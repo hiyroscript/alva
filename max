@@ -1,1497 +1,1469 @@
-You are building a complete browser-based 2D sprite fighting game called:
+You are working directly in the existing GitHub repository:
+
+hiyroscript/maxy
+
+Your task is to perform a complete product rebrand from Maxy / MAXY to Alva / ALVA, modernize the interface color system, and completely redesign the Home Screen into a clean, minimalist, professional application-style experience.
+
+This is an existing working browser fighting game. Do not rebuild the project from scratch, replace its architecture, or create a second app.
+
+First inspect the repository and understand the existing implementation before making changes.
+
+PRIMARY OBJECTIVES
+
+Complete all three of these goals:
+
+1. Completely rename the product from Maxy to Alva everywhere.
+2. Replace the existing black/orange brand identity with a new white-dominant monochrome system using white, black, and gray.
+3. Completely redesign the Home Screen so it feels clean, minimalist, refined, and professional—closer to a premium modern app than a traditional loud fighting-game title screen.
+
+The resulting product should unmistakably feel like a new identity called Alva, not a recolored version of Maxy.
+
+⸻
+
+EXISTING PROJECT — UNDERSTAND BEFORE EDITING
+
+The existing game is a dependency-free browser-based 2D sprite fighting game using:
+
+* HTML
+* CSS
+* vanilla JavaScript ES modules
+* HTML5 Canvas 2D
+* no framework
+* no build step
+* relative asset/module URLs for GitHub Pages compatibility
+
+The existing application already has:
+
+* splash screen
+* Home Screen
+* mode selection
+* character selection
+* map selection
+* battle screen
+* pause UI
+* help and credits
+* loading/error overlays
+* keyboard navigation
+* mouse input
+* touch controls
+* gamepad input
+* responsive landscape layouts
+* reduced-motion support
+* sprite normalization
+* fixed-step fighting simulation
+* camera system
+* HUD
+* procedural stages
+
+Do not break any of those systems.
+
+Important existing files include:
+
+* index.html
+* styles.css
+* README.md
+* max
+* js/config.js
+* js/core/app.js
+* js/core/screen-manager.js
+* js/core/menu-navigator.js
+* js/screens/splash-screen.js
+* js/screens/home-screen.js
+* js/screens/mode-select-screen.js
+* js/screens/character-select-screen.js
+* js/screens/map-select-screen.js
+* js/screens/help-credits-screen.js
+* js/screens/battle-screen.js
+* js/ui/logo.js
+* js/ui/components.js
+* js/ui/help-content.js
+* js/ui/overlays.js
+* js/game/*
+* js/data/*
+* js/stages/*
 
-MAXY
+The current Home Screen is specifically implemented in:
 
-Work directly from the existing Maxy GitHub repository. Do not create a separate unrelated project. Inspect the repository before changing anything and preserve/use the existing #0001 sprite assets.
+* js/screens/home-screen.js
+* the Home section of styles.css
+* js/ui/logo.js
 
-==================================================
-1. OVERALL GOAL
-==================================================
+Currently it contains:
 
-Create a polished, professional, fully 2D sprite-based fighting game that runs in a web browser and is suitable for GitHub Pages hosting.
+* black full-screen background
+* grid decoration
+* large orange diagonal slash
+* animated horizontal streaks
+* large fighter silhouette
+* orange rim treatment
+* custom skewed MAXY geometric SVG wordmark
+* numbered 01 PLAY / 02 HELP AND CREDITS menu buttons
+* orange primary action
+* keyboard hint footer
+* developer/build information
 
-The game must work well on:
+Do not preserve that composition simply with different colors.
 
-- Desktop/laptop computers in landscape layouts
-- Phones in landscape orientation
-- Tablets in landscape orientation
+Redesign it substantially.
 
-This is a pure 2D game.
+⸻
 
-DO NOT use:
-- Three.js
-- Babylon.js
-- WebGL 3D engines
-- 3D models
-- 3D environments
-- 3D assets
-- 3D libraries
-- fake 3D character models
+PART 1 — COMPLETE MAXY → ALVA REBRAND
 
-Use standard HTML, CSS, JavaScript, and the HTML5 Canvas 2D API.
+The old product name must disappear from the active project.
 
-Prefer a dependency-free implementation.
+Use these naming conventions:
 
-The repository MUST contain a working index.html because the game will be deployed with GitHub Pages.
+* MAXY → ALVA
+* Maxy → Alva
+* maxy → alva where it represents the product/repository/deployment slug
 
-All asset references must use relative URLs such as:
-./assets/...
-./0001_idle1.png
+Perform a case-insensitive audit of all tracked text files.
 
-Do NOT use root-relative paths such as:
-"/assets/..."
+Do not limit the rebrand to visible text.
 
-GitHub project pages may run under /maxy/, so root-relative URLs may break deployment.
+Check:
 
-The visual identity of Maxy should feel modern, stylish, clean, responsive, and professional rather than like a basic HTML demo.
+* page title
+* HTML metadata
+* descriptions
+* accessibility labels
+* SVG titles and aria labels
+* JavaScript constants
+* comments
+* console messages
+* credits
+* help text
+* documentation
+* README
+* deployment instructions
+* developer documentation/specification files
+* splash/home/menu copy
+* error messages
+* loading UI
+* any internal product-name strings
+* GitHub Pages example URLs
+* repository-related references
+* CSS comments/headings
+* favicon branding
 
-==================================================
-2. CURRENT REPOSITORY ASSETS
-==================================================
+Known places that currently contain Maxy branding include at minimum:
 
-The repository currently contains these #0001 sprite frames:
+index.html
 
-Idle:
-- 0001_idle1.png
-- 0001_idle2.png
-- 0001_idle3.png
-- 0001_idle4.png
+Currently contains:
 
-Run:
-- 0001_run1.png
-- 0001_run2.png
-- 0001_run3.png
-- 0001_run4.png
-- 0001_run5.png
-- 0001_run6.png
+* <title>MAXY</title>
+* MAXY description metadata
+* orange MAXY-style favicon
+* rotation message referring to Maxy
+* boot error copy containing MAXY
+* noscript copy containing MAXY
 
-Current source dimensions:
+Change all of these to Alva.
 
-Idle:
-- 0001_idle1.png = 560 × 832
-- 0001_idle2.png = 592 × 832
-- 0001_idle3.png = 576 × 800
-- 0001_idle4.png = 560 × 816
+js/config.js
 
-Run:
-- 0001_run1.png = 148 × 188
-- 0001_run2.png = 160 × 184
-- 0001_run3.png = 152 × 184
-- 0001_run4.png = 128 × 184
-- 0001_run5.png = 152 × 188
-- 0001_run6.png = 156 × 184
+Change:
 
-IMPORTANT:
-The raw dimensions of the idle and run frames are drastically different.
+title: 'MAXY'
 
-Do not simply draw every PNG at the same raw scale.
+to:
 
-Create a sprite normalization system.
-
-When the images load:
-1. Inspect the alpha channel once.
-2. Determine the non-transparent visual bounding box of each frame.
-3. Cache that information.
-4. Draw frames using their visible bounds.
-5. Anchor all character frames at bottom-center.
-6. Normalize each animation to a consistent in-game character height.
-7. Make collision/hurt boxes independent from the PNG dimensions.
-
-The character should not visibly grow, shrink, jump vertically, or slide when changing between idle and run.
+title: 'ALVA'
 
-Canvas image smoothing should be disabled for character sprites:
-ctx.imageSmoothingEnabled = false
-
-Use pixel-art-friendly rendering.
-
-Do not redraw, replace, AI-generate, or modify #0001's sprite artwork unless absolutely required for technical reasons.
-
-==================================================
-3. GAME BRANDING
-==================================================
-
-Game name:
-MAXY
+Update the file comments from Maxy to Alva as well.
 
-Developer credit:
-hiyroscript
+Where practical, use CONFIG.title rather than duplicating the product name in new runtime code.
 
-Core color palette:
-- Black
-- White
-- Gray
-- Orange
+js/core/app.js
 
-Suggested palette:
-- Near black: #080808
-- Dark gray: #151515
-- Medium gray: #333333
-- Light gray: #BDBDBD
-- White: #FFFFFF
-- Main orange: approximately #FF7A00
-- Bright orange highlight: approximately #FF9A2E
+The current asset errors use console prefixes such as:
 
-Exact values may be refined, but the whole interface must remain recognizably black/white/gray/orange.
-
-Orange should be used primarily for:
-- Selected elements
-- Main CTAs
-- Focus states
-- Progress indicators
-- Important accents
-- Active controls
+[Maxy]
 
-Avoid excessive gradients and avoid making everything orange.
+Change those to:
 
-The UI should have:
-- Strong typography
-- Clean spacing
-- Consistent rounded corners
-- Clear hierarchy
-- Subtle motion
-- Smooth screen transitions
-- Responsive sizing
-- Excellent contrast
-- Professional button hover/press/focus states
+[Alva]
 
-Do not make the interface look like a generic Bootstrap website.
+Audit any similar diagnostic strings elsewhere.
 
-==================================================
-4. APPLICATION ARCHITECTURE
-==================================================
+js/ui/logo.js
 
-Implement the game as a state/screen driven application.
+This is currently a bespoke geometric MAXY SVG made from four custom polygon-based letters.
 
-Recommended primary states:
+It must be replaced with a new ALVA identity.
 
-SPLASH
-HOME
-MODE_SELECT
-CHARACTER_SELECT
-MAP_SELECT
-BATTLE
-PAUSE
-HELP_CREDITS
+Do not simply rename the SVG accessibility title while leaving the MAXY shapes.
 
-Use one central Game/App controller rather than random global functions.
+Create an actual ALVA wordmark.
 
-Recommended logical systems:
+js/screens/help-credits-screen.js
 
-- App / ScreenManager
-- AssetLoader
-- InputManager
-- TouchInputManager
-- SpriteAnimator
-- Character
-- FighterController
-- Physics
-- Camera
-- Stage / Map
-- Renderer
-- HUD
-- UIManager
-- Settings/config
-- Character database
-- Map database
+The current header uses MAXY as a kicker.
 
-Keep game simulation logic separate from menu DOM logic.
+Replace it with ALVA or use CONFIG.title.
 
-Menus may use normal HTML/CSS because that gives better responsive layout and accessibility.
+js/ui/help-content.js
 
-Actual battle rendering should use Canvas 2D.
+The credits currently contain:
 
-Do not render the entire game UI directly into one giant canvas if HTML/CSS is better suited for menus.
+* a MAXY card
+* text saying work is original to Maxy
 
-==================================================
-5. SPLASH SCREEN
-==================================================
+Rewrite all of this for Alva while preserving the existing third-party sprite attribution and rights notices.
 
-When Maxy launches, begin with a completely black screen.
+Do not remove or weaken existing attribution for the #0001 sprite source.
 
-Do not immediately display the menu.
+js/screens/mode-select-screen.js
 
-Near the bottom center of the screen display:
+The explanatory copy currently says Quick Battle is the first mode in Maxy.
 
-a game by hiyroscript
+Rewrite it to Alva.
 
-The wording and capitalization should be exactly:
+README.md
 
-a game by hiyroscript
+Rewrite all product-level Maxy references to Alva.
 
-Style:
-- Small/medium text
-- White or soft gray
-- Clean font
-- Generous letter spacing
-- Positioned toward the bottom of the viewport
-- Sophisticated and understated
+Update:
 
-Animation:
-- Start from black
-- Fade the text in
-- Hold briefly
-- Fade it out
-- Transition cleanly to Home
+* heading
+* project description
+* architecture wording
+* credits
+* branding descriptions
+* deployment examples
+* GitHub Pages examples
 
-Total splash duration should be roughly 2.5–3.5 seconds.
+If the repository is eventually renamed to alva, documentation should use the /alva/ GitHub Pages path.
 
-Do not make the player wait an excessive amount of time.
+Keep asset paths relative so the project continues to work regardless of GitHub Pages subdirectory.
 
-Respect prefers-reduced-motion by minimizing fades if the browser requests reduced motion.
+max
 
-==================================================
-6. HOME SCREEN
-==================================================
+This file contains the original Maxy project specification and includes extensive old branding and the old black/white/gray/orange visual requirements.
 
-After the splash, show the Maxy Home Screen.
+Do not leave this as an obsolete Maxy specification.
 
-The Home Screen must feel like the front menu of a real fighting game.
+Either:
 
-Prominently display:
+* rename it to a clearer Alva-oriented specification file such as ALVA_SPEC.md
 
-MAXY
+or, if there is a reason to retain its existing filename:
 
-Use a custom text treatment made with typography/CSS rather than requiring an external copyrighted logo.
+* rewrite its contents for Alva
 
-For this version the Home Screen contains only two primary menu buttons:
+Preferred solution: give the file a meaningful descriptive name rather than keeping the ambiguous max filename.
 
-PLAY
+Its branding requirements must match the new white/black/gray identity.
 
-HELP AND CREDITS
+Repository-level name
 
-Do not fill the page with fake unavailable menu entries.
+If the environment/API has permission to rename the GitHub repository itself, rename:
 
-Layout should remain simple and premium.
+maxy
 
-Possible composition:
-- MAXY title on left/center
-- Menu beneath it
-- Abstract 2D animated background
-- Subtle orange line accents or particles
-- Background may include silhouettes, geometric shapes, scan-line-like effects, or subtle animated panels
+to:
 
-Keep visual movement subtle enough that it doesn't interfere with navigation.
+alva
 
-PLAY must be the primary orange-highlighted option.
+If repository renaming is outside the coding environment’s capabilities, make all code and documentation ready for that repository rename without breaking the existing deployment.
 
-HELP AND CREDITS should be secondary.
+Do not introduce hard-coded /alva/ root paths into runtime assets. Continue using relative paths.
 
-Keyboard, mouse, touch, and game-style directional navigation should all be supported where practical.
+⸻
 
-==================================================
-7. GAME MODE SELECTION
-==================================================
+PART 2 — NEW ALVA BRAND IDENTITY
 
-Selecting PLAY opens a Game Mode Selection screen.
+The new identity is deliberately restrained.
 
-Header:
+Core palette
 
-SELECT MODE
+The Alva application UI must use only a monochrome family:
 
-For now there is only one playable mode:
+* White — dominant
+* Black
+* Gray tones
 
-QUICK BATTLE
+Recommended semantic palette:
 
-Make the screen visually designed for future expansion.
+--bg: #ffffff;
+--surface: #ffffff;
+--surface-subtle: #f7f7f7;
+--surface-muted: #f1f1f1;
+--text: #111111;
+--text-strong: #000000;
+--text-secondary: #666666;
+--text-muted: #8a8a8a;
+--border: #e2e2e2;
+--border-strong: #c8c8c8;
+--black: #000000;
+--white: #ffffff;
 
-Do NOT make the one mode look lonely in a tiny centered button.
+Exact neutral values can be refined for contrast and visual quality.
 
-Use a larger mode card layout with room for additional modes later.
+Remove the orange brand system
 
-QUICK BATTLE card can include:
-- Mode name
-- Short description
-- Stylized 2D background
-- Orange active accent
-- Clear selectable/hover state
+The current interface defines and heavily uses:
 
-Example description:
+* --orange
+* --orange-hi
+* --orange-soft
+* #ff7a00
+* #ff9a2e
+* rgba(255, 122, 0, ...)
 
-Choose a fighter and stage, then enter battle.
+These must no longer be part of the Alva interface design system.
 
-Do not add fake online matchmaking.
+Perform an audit of styles.css and JavaScript-generated color values.
 
-Include a clear Back button.
+Replace orange UI states with appropriate monochrome treatments.
 
-==================================================
-8. CHARACTER SELECT / LARGE ROSTER
-==================================================
+Examples:
 
-Selecting Quick Battle opens Character Select.
+Primary action:
 
-This screen is important and must look substantial even though only one fighter exists.
+* black background
+* white text
 
-The only current fighter is:
+Secondary action:
 
-#0001
+* white or light-gray background
+* black text
+* gray border
 
-Repository asset prefix:
-0001
+Selected state:
 
-Displayed in-game name:
-#0001
+* black border
+* subtle light-gray background
+* check icon or filled black indicator
 
-Do NOT display "0001" without the # in the actual roster UI.
+Focus state:
 
-Make the roster deliberately LARGE.
+* high-contrast black focus ring
+* optionally a secondary white offset ring when necessary on dark surfaces
+
+Progress bars:
+
+* black foreground
+* pale gray track
+
+Active tabs:
+
+* black text
+* black underline or border
+
+Muted states:
+
+* neutral gray
+
+Do not substitute orange with another accent color.
+
+There should be no blue, purple, green, red, gold, or replacement brand accent.
+
+The identity is intentionally monochrome.
+
+Important gameplay exception
+
+The monochrome rule applies to:
+
+* application chrome
+* branding
+* menus
+* buttons
+* cards
+* overlays
+* decorative backgrounds
+* focus/selection states
+* Home Screen presentation
+
+Do not automatically recolor the original character sprite artwork or the actual stage artwork just to force gameplay into monochrome.
+
+Character sprites and stage art are game content, not brand chrome.
+
+Preserve gameplay art unless a color is clearly being generated specifically as a UI/brand accent.
+
+For example, orange fighter rim effects used by menus should be removed/reworked, but the original source colors inside a sprite should not be destructively edited.
+
+⸻
+
+PART 3 — LIGHT / WHITE-DOMINANT APPLICATION THEME
+
+The existing UI is predominantly near-black.
+
+Alva should reverse that hierarchy.
+
+White must become the dominant application color.
+
+This does not mean every object needs to be pure white.
+
+Instead:
+
+* page/menu backgrounds should generally be white
+* surfaces may use #f7f7f7 or similar soft gray
+* primary text should be black
+* secondary text should be medium gray
+* borders should be subtle light gray
+* primary CTA should be black
+* major panels should have excellent whitespace
+* dark elements should be deliberate and limited
+
+Avoid making the redesign look sterile or unfinished.
+
+The difference between surfaces should come from:
+
+* spacing
+* thin borders
+* subtle gray backgrounds
+* restrained shadows
+* typography hierarchy
+
+—not from bright accent colors.
+
+Color scheme metadata
+
+Review index.html.
+
+The project currently declares a dark browser theme.
+
+Update appropriately for the white-first interface:
+
+* theme-color should align with the new white/light UI
+* browser color-scheme should no longer globally force dark mode
+* mobile browser/status bar configuration should look intentional with a white-dominant interface
+
+The battle screen may still explicitly use dark UI elements where appropriate for readability.
+
+⸻
+
+PART 4 — NEW ALVA WORDMARK
+
+Completely replace the current MAXY-specific polygon wordmark.
+
+The new wordmark must read:
+
+ALVA
+
+It should feel:
+
+* minimal
+* precise
+* modern
+* confident
+* app-like
+* timeless
+* highly legible
+
+Avoid:
+
+* orange accents
+* racing stripes
+* extreme skew
+* flames
+* esports styling
+* graffiti aesthetics
+* gaming clichés
+* exaggerated sci-fi styling
+* large drop shadows
+* faux metallic effects
+
+Preferred direction:
+
+A restrained bold or semibold uppercase wordmark with carefully controlled spacing.
+
+The wordmark can still live in js/ui/logo.js, but simplify the implementation if that creates a cleaner result.
+
+It is acceptable to use a custom inline SVG.
+
+Do not require external font downloads.
+
+Use either:
+
+* clean geometric SVG letterforms
+
+or:
+
+* an SVG/text treatment based on the existing system font stack
+
+The logo must work in:
+
+* the Home Screen
+* loading overlay
+* any small brand context
+* accessibility tree
+
+Make sure:
+
+* SVG <title> says ALVA
+* aria-label says ALVA
+* all visible letters genuinely form ALVA
+* there is no leftover X/Y geometry from MAXY
+
+Create a simple favicon as well.
+
+Preferred favicon direction:
+
+* white background
+* black minimal A or ALVA monogram
+* no orange
+* clear at small sizes
+
+⸻
+
+PART 5 — COMPLETELY REDESIGN THE HOME SCREEN
+
+This is the most important visual change.
+
+Do not lightly modify the existing Home Screen.
+
+Treat it as a new interface.
+
+The current fighting-game splash-menu composition should disappear.
+
+Remove the current:
+
+* orange diagonal slash
+* orange rim glow
+* moving streaks
+* decorative grid-heavy composition
+* giant full-bleed fighter silhouette
+* skewed MAXY display logo
+* numbered 01 / 02 arcade-menu styling
+* orange-filled menu button
+* loud fighting-game visual language
+
+The new Home Screen should feel like opening a polished modern application.
+
+Think:
+
+* premium desktop/mobile app
+* generous white space
+* excellent alignment
+* calm hierarchy
+* restrained animation
+* strong typography
+* clear actions
+* functional rather than decorative
+
+Do not copy Apple, Notion, Linear, Arc, or any other application directly.
+
+Use the general design principles of modern professional software without cloning a specific product.
+
+⸻
+
+HOME SCREEN — REQUIRED STRUCTURE
+
+Create a centered responsive application shell.
+
+Suggested structure:
+
+┌─────────────────────────────────────────────────────────────┐
+│ ALVA                                          BUILD 0.1.0   │
+│─────────────────────────────────────────────────────────────│
+│                                                             │
+│              2D SPRITE FIGHTING GAME                        │
+│                                                             │
+│              ALVA                                           │
+│              Clean supporting copy                          │
+│                                                             │
+│              [ Play ]                                       │
+│              [ Help & Credits ]                             │
+│                                                             │
+│                                  subtle fighter preview      │
+│                                                             │
+│─────────────────────────────────────────────────────────────│
+│ by hiyroscript                           keyboard hints      │
+└─────────────────────────────────────────────────────────────┘
+
+This diagram is conceptual, not a pixel-perfect requirement.
+
+The implementation should be polished rather than mechanically matching ASCII art.
+
+Overall background
+
+Use:
+
+#ffffff
+
+or the final chosen equivalent white token.
+
+No large gradients.
+
+No orange or colored ambient lighting.
+
+If subtle visual separation is useful, use:
+
+* #f7f7f7
+* very soft gray border
+* extremely subtle neutral shadow
+
+Keep the canvas calm.
+
+⸻
+
+HOME HEADER
+
+Create a simple top header inside the application shell.
+
+Left:
+
+* small/medium ALVA wordmark
+
+Right:
+
+* build/version label, e.g. BUILD 0.1.0
+
+Optional:
+
+* subtle text/icon shortcut to Help, only if it improves usability without duplicating the main actions excessively
+
+Use a thin light-gray divider beneath the header if useful.
+
+Do not make this resemble a game HUD.
+
+⸻
+
+HOME MAIN CONTENT
+
+The central content should have a clear hierarchy.
+
+Suggested left/main section:
+
+Small eyebrow:
+
+2D SPRITE FIGHTING GAME
+
+Then the main ALVA wordmark/title.
+
+Under it, use only a small amount of supporting copy.
+
+Possible direction:
+
+Fast, responsive browser fighting.
+
+or another similarly short factual line.
+
+Do not add marketing paragraphs.
+
+The Home Screen should remain minimal.
+
+⸻
+
+HOME ACTIONS
+
+Retain the two existing functional destinations:
+
+1. Play
+2. Help & Credits
+
+Do not change navigation behavior.
+
+PLAY must still go to the existing mode-select flow.
+
+HELP & CREDITS must still go to the existing help screen.
+
+Restyle them as professional application controls.
+
+Play button
+
+Primary action:
+
+* black background
+* white text
+* medium rounded corner
+* simple arrow icon if desired
+* no orange
+* no giant transform animation
+* no arcade index number
+
+Hover:
+
+* slightly lighter black/dark gray
+
+Focus:
+
+* clearly visible monochrome focus ring
+
+Pressed:
+
+* subtle scale or darkening feedback
+
+Help & Credits
+
+Secondary action:
+
+* white or very light gray
+* black text
+* thin gray border
+
+Hover:
+
+* light gray background
+
+Focus:
+
+* strong black outline/ring
+
+Buttons should have generous touch targets.
+
+Keep all existing keyboard/gamepad navigation mechanisms working.
+
+⸻
+
+OPTIONAL FIGHTER PREVIEW
+
+The game currently loads #0001 and renders an animated silhouette on the Home Screen.
+
+You may keep the existing technical ability to preview the fighter, but completely change its presentation.
+
+Preferred direction:
+
+Place a restrained preview on the right side of the Home content in a contained light-gray panel/card.
 
 For example:
-- 40–60 visible roster slots overall
-- Grid can be scrollable if necessary
-- Many future slots
-- Responsive number of columns
 
-Only #0001 is selectable.
+* #f6f6f6 background
+* thin gray border
+* rounded corners
+* black or charcoal silhouette
+* very subtle gray shadow
+* idle animation only
+* no glow
+* no orange rim
+* no fullscreen character
+* no overlapping the main navigation
 
-All other slots should appear as tasteful locked/empty roster positions.
+The fighter should be supporting visual content, not the dominant element.
 
-Do not invent fake character names.
+Use existing loaded/normalized sprite data.
 
-Placeholder slots can use:
-- ?
-- Silhouette
-- Lock symbol
-- Dark geometric portrait
-- EMPTY / LOCKED if necessary
+Do not duplicate sprite-loading logic.
 
-Keep them visually restrained so #0001 clearly stands out.
+Do not edit the original #0001 PNGs.
 
-Desktop layout:
-- Large roster grid on one side
-- Large character preview/detail panel on the other side
+If the fighter preview makes the Home Screen less clean at compact dimensions, hide or reduce it responsively.
 
-Mobile landscape:
-- Roster should remain large but compact enough to avoid microscopic buttons
-- Character preview panel can reduce in width
-- Keep both areas usable without vertical page scrolling
+⸻
 
-The #0001 preview should display an animated idle loop using the four existing idle frames.
+HOME FOOTER
 
-Character detail panel should include at minimum:
+Keep the useful information already present:
 
-#0001
+* by hiyroscript
+* build version
+* keyboard navigation hints where applicable
 
-AVAILABLE
-
-Animations:
-IDLE
-RUN
-
-Optional tasteful decorative stat areas may exist, but do not invent meaningless numerical power ratings.
-
-Selected #0001 roster card:
-- Orange border/accent
-- Strong focus state
-- Animated preview
-- Confirm button
-
-Allow #0001 to be confirmed with:
-- Mouse
-- Touch
-- Enter
-- Controller-style confirm keyboard mapping if implemented
-
-Include Back.
-
-==================================================
-9. MAP SELECT
-==================================================
-
-After confirming #0001, open the stage selection screen.
-
-Header:
-
-SELECT MAP
-
-There are exactly two maps in this version:
-
-DESERT
-CITY
-
-Both must look dramatically different.
-
-Provide large visual preview cards and a larger selected-map preview.
-
-Do not simply recolor the same layout.
-
---------------------------------------------------
-DESERT
---------------------------------------------------
-
-The Desert should feel wide, bright, warm, open, and atmospheric.
-
-Visual ideas:
-- Huge distant dunes
-- Large sandstone rock formations
-- Mesas
-- Desert cliffs
-- Orange sunset or bright desert sun
-- Long shadows
-- Sparse dry plants
-- Sand drifting near the floor
-- Atmospheric haze
-- Multiple 2D parallax layers
-
-The actual playable terrain should be mostly open/flat so this stage contrasts with the City stage.
-
-The map itself should be significantly wider than one screen.
-
---------------------------------------------------
-CITY
---------------------------------------------------
-
-The City should have a completely different silhouette and gameplay feel.
-
-Possible setting:
-- Rooftops
-- Elevated city platforms
-- Dense skyline
-- Building silhouettes
-- Rooftop antennas
-- Ventilation units
-- Signs
-- Windows
-- Orange neon/accent lighting
-- Dark gray/black structures
-- Overpasses or construction structures
-
-Use platforms on the City map.
-
-Platforms should meaningfully change traversal without becoming frustrating.
-
-City can be at dusk/night to contrast with the bright Desert.
-
-Use several independent 2D parallax layers to create depth.
-
-Do not use actual 3D geometry.
-
-The maps must still be 100% 2D.
-
-==================================================
-10. STAGE SIZE AND CAMERA
-==================================================
-
-Maps should feel large.
-
-Do NOT design stages where the whole map fits onto one phone screen.
-
-A good target is approximately 2.5–4 viewport widths of horizontal playable space depending on the stage.
-
-The camera should:
-- Follow the active fighters
-- Smoothly interpolate instead of snapping
-- Stay inside stage boundaries
-- Avoid showing outside the map
-- Support wide desktop screens and narrow landscape phone screens
-- Keep fighters readable
-
-If two fighters exist in the battle, frame both when practical.
-
-Characters must not dominate the screen.
-
-At a typical 16:9 resolution, aim for a displayed fighter height around roughly 14–18% of the viewport, adjusted as necessary after seeing the actual sprites.
-
-They should be easy to read but leave plenty of stage visible.
-
-==================================================
-11. CURRENT CHARACTER ANIMATIONS
-==================================================
-
-#0001 currently has ONLY:
-
-IDLE
-RUN
-
-Do not invent additional sprite frames.
-
-Do not generate fake attack sprites.
-
-Recommended animation speed:
-- Idle: approximately 6–8 FPS
-- Run: approximately 10–12 FPS
-
-Tune visually rather than blindly following numbers.
-
-Idle should loop continuously while stationary.
-
-Run should loop while moving horizontally.
-
-When changing direction:
-- Flip the rendered sprite horizontally
-- Do not create separate duplicated image files
-
-Character facing should generally point toward the opponent when applicable.
-
-If jumping is implemented before a dedicated jump animation exists:
-- Use a suitable idle frame/idle animation in the air
-- Do not stretch or rotate the sprite to fake a jump animation
-
-==================================================
-12. QUICK BATTLE IN THIS EARLY VERSION
-==================================================
-
-Build the game architecture as a genuine fighting-game foundation, but respect the fact that #0001 currently does not have attack, hit, hurt, block, or special animations.
-
-Do not pretend that finished combat animations exist.
-
-The first version should have fully functional:
-- Character spawning
-- Idle animation
-- Running
-- Facing
-- Stage collision
-- Gravity
-- Jumping
-- Platform collision
-- Camera movement
-- Player input
-- Mobile touch input
-- Pause menu
-- HUD framework
-- Character state machine
-- Combat input placeholders
-
-A second #0001 can be spawned as the opposing fighter so the battle scene has the correct two-fighter structure.
-
-It can initially use extremely simple non-attacking movement AI or remain a training-style opponent.
-
-Keep Player 1 and opponent logic separate so a future AI/combat system can be added cleanly.
-
-Create a combat architecture containing concepts such as:
-- health
-- damage
-- hitboxes
-- hurtboxes
-- attack definitions
-- block state
-- knockback
-- stun
-- attack cooldowns
-
-However, do not fabricate real attacks until the corresponding sprite assets/attack definitions are added.
-
-Health may remain at 100% in the current build.
-
-The purpose is to make extending #0001 straightforward when more sprites are added later.
-
-==================================================
-13. PHYSICS
-==================================================
-
-Use stable 2D game physics implemented for this project.
-
-You do not need an external physics engine.
-
-Implement:
-- Horizontal acceleration
-- Horizontal deceleration
-- Maximum movement speed
-- Gravity
-- Vertical velocity
-- Jump impulse
-- Ground collision
-- Platform collision
-- Stage bounds
-- Falling/landing detection
-
-Separate:
-- visual sprite dimensions
-from
-- collision dimensions
-
-A fighter's collision capsule/rectangle should not be determined from the transparent PNG dimensions.
-
-Use bottom-center as the main fighter origin.
-
-Do not allow characters to:
-- sink through the floor
-- float above platforms
-- jitter while standing
-- escape stage boundaries
-
-For City platforms, support dropping through selected one-way platforms using the Down command if appropriate.
-
-==================================================
-14. GAME LOOP
-==================================================
-
-Use requestAnimationFrame.
-
-For gameplay simulation, use a stable timestep or capped delta-time system so movement does not vary wildly between 30 Hz, 60 Hz, and 120 Hz displays.
-
-Separate:
-
-update()
-render()
-
-Avoid tying movement distance directly to frame count.
-
-Pause simulation when:
-- pause menu is active
-- page visibility changes if appropriate
-- device is forced into the portrait orientation warning
-
-==================================================
-15. BATTLE HUD
-==================================================
-
-Create a professional fighting-game HUD using the Maxy visual palette.
-
-Top-left:
-Player 1 / #0001
-Health bar
-
-Top-right:
-Opponent / #0001
-Health bar
-
-Top-center:
-Round/timer area
-
-Use:
-- black translucent panels
-- white labels
-- gray secondary information
-- orange accents
-
-The HUD should stay clear of mobile safe areas and the pause button.
-
-Do not make the HUD excessively tall.
-
-==================================================
-16. MOBILE LANDSCAPE CONTROLS
-==================================================
-
-Use the uploaded reference screenshot as the positional inspiration for the mobile controls.
-
-Do NOT reuse copyrighted control graphics from the screenshot.
-
-Create original control icons using simple SVG/CSS shapes.
-
-The important aspect to reproduce is the overall placement, grouping, circular-button language, and ergonomics.
-
-All mobile buttons should be:
-- Circular
-- Large enough for thumbs
-- Semi-transparent enough not to hide gameplay
-- Still clearly visible
-- White iconography
-- Black/dark outlines
-- Gray/orange styling consistent with Maxy's palette
-- Responsive to press/release states
-
-Use subtle scaling/glow while pressed.
-
---------------------------------------------------
-LEFT-SIDE MOVEMENT CLUSTER
---------------------------------------------------
-
-At the bottom-left, create three large circular controls arranged horizontally similar to the reference:
-
-[ LEFT ] [ DOWN ] [ RIGHT ]
-
-They should sit close to the lower-left safe area without touching the screen edges.
-
-LEFT:
-Move left.
-
-RIGHT:
-Move right.
-
-DOWN:
-Reserved for crouch/down/platform-drop behavior.
-
-The three circles should be evenly spaced.
-
-Do not use a generic virtual joystick.
-
-The screenshot specifically uses separate circular directional buttons, so follow that structure.
-
---------------------------------------------------
-RIGHT-SIDE ACTION CLUSTER
---------------------------------------------------
-
-Create the action buttons on the lower-right using approximately the same staggered arrangement as the provided reference.
-
-Conceptual layout:
-
-                         [ PRIMARY ]
-
-                 [ SPECIAL ] [ BLOCK ]
-
-          [ ACTION 1 ] [ ACTION 2 ] [ JUMP ]
-
-The exact responsive spacing may change by screen size, but preserve this overall visual hierarchy.
-
-PRIMARY should be the upper-right button and visually important.
-
-SPECIAL should be offset left beneath it.
-
-BLOCK should sit to the right of SPECIAL.
-
-The lowest row contains:
-- Action 1
-- Action 2
-- Jump
-
-JUMP should be the lowest/rightmost button.
-
-Because attack animations do not exist yet:
-- PRIMARY
-- SPECIAL
-- ACTION 1
-- ACTION 2
-
-should have their input architecture implemented but should not fabricate attacks.
-
-They may visually appear available while their actual action handler safely remains unimplemented, or can have a subtle disabled/unavailable indication.
-
-Do not constantly display annoying "not available" alerts when they are pressed.
-
-BLOCK may set a logical block state even if it currently uses the idle visual.
-
-JUMP is fully functional.
-
---------------------------------------------------
-PAUSE
---------------------------------------------------
-
-Place a separate circular pause button near the upper-right corner just like the reference layout.
-
-It should:
-- Respect safe-area insets
-- Not overlap the HUD
-- Open the pause menu
-- Use an original pause icon
-
-==================================================
-17. MULTI-TOUCH REQUIREMENTS
-==================================================
-
-Touch controls MUST support true simultaneous inputs.
-
-The player must be able to:
-- Hold Right + press Jump
-- Hold Left + press another action
-- Hold movement while interacting with action buttons
-
-Do not build touch input around only a single active touch.
-
-Use Pointer Events or properly tracked touch identifiers.
-
-Keep an internal pressed-state Set/Map.
-
-Support:
-pointerdown
-pointerup
-pointercancel
-lostpointercapture
-
-Prevent the browser from interpreting gameplay touches as:
-- page scrolling
-- pull-to-refresh
-- browser zoom gestures
-- text selection
-
-Use touch-action: none where appropriate.
-
-Do not disable accessibility unnecessarily outside the game viewport.
-
-==================================================
-18. DESKTOP CONTROLS
-==================================================
-
-Implement comfortable desktop keyboard controls.
-
-Suggested Player 1 controls:
-
-A / Left Arrow:
-Move left
-
-D / Right Arrow:
-Move right
-
-S / Down Arrow:
-Down / platform drop
-
-W or Space:
-Jump
-
-J:
-Primary
-
-K:
-Special
-
-L:
-Block
-
-U:
-Action 1
-
-I:
-Action 2
-
-Escape or P:
-Pause
-
-Allow simultaneous key presses.
-
-Do not rely on repeated keydown events.
-
-Maintain a pressed-key state.
-
-The Help screen must display the final actual key bindings.
-
-==================================================
-19. RESPONSIVE MOBILE LAYOUT
-==================================================
-
-The game is intended for LANDSCAPE mobile use.
+But visually simplify it.
 
 Use:
 
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+* small gray text
+* thin divider
+* low visual priority
 
-Handle notches and rounded displays using:
-env(safe-area-inset-left)
-env(safe-area-inset-right)
-env(safe-area-inset-top)
-env(safe-area-inset-bottom)
+Keyboard hints should remain hidden on touch-first devices as the existing application already does.
 
-Use dvh/dvw or appropriate modern viewport units where useful.
+⸻
 
-If a mobile device is in portrait orientation:
-- Pause the game
-- Display a clean black overlay
-- Show a simple rotate-device icon
-- Display text such as:
+HOME SCREEN RESPONSIVENESS
 
-ROTATE YOUR DEVICE
-Maxy is designed for landscape play.
+The game supports:
 
-When landscape returns, restore the game correctly.
+* desktop/laptop
+* phone landscape
+* tablet landscape
+* unusual browser sizes
 
-Do not let the game's HTML page vertically scroll during play.
+The Home Screen must adapt cleanly.
 
-==================================================
-20. DESKTOP/MOBILE CONTROL VISIBILITY
-==================================================
+Wide desktop
 
-Touch controls should not clutter desktop gameplay.
+Allow a two-column main area:
 
-Show mobile controls when the environment is touch-oriented, using a sensible combination of:
-- pointer: coarse
-- hover capability
-- viewport size
-- actual touch interaction
+* branding/actions on left
+* subtle fighter preview on right
 
-Do not blindly classify all narrow windows as phones.
+Use a centered maximum width rather than spreading content across an ultrawide display.
 
-Desktop retains keyboard controls.
+Suggested content maximum width:
 
-==================================================
-21. PAUSE MENU
-==================================================
+approximately 1100px–1200px
 
-Pause should freeze gameplay and display a polished overlay.
+Tablet / compact landscape
 
-Options:
+Reduce spacing and type scale.
 
-RESUME
-RESTART BATTLE
-HELP
-RETURN TO HOME
+The fighter preview may become smaller.
 
-Use confirmation for RETURN TO HOME if it would discard the active battle.
+Buttons must remain comfortably tappable.
 
-Pause must work with:
-- Escape/P
-- Mobile pause button
+Very short phone landscape
 
-==================================================
-22. HELP AND CREDITS
-==================================================
+Prioritize:
 
-The Home Screen's HELP AND CREDITS button opens a combined screen.
+1. ALVA identity
+2. Play
+3. Help & Credits
 
-Use clear sections/tabs or vertically arranged cards.
+Hide nonessential decorative content first.
 
-HELP should explain:
-- Desktop controls
-- Mobile control layout
-- Character movement
-- Map/platform behavior
-- Pause
+The interface must not overflow vertically.
 
-CREDITS should include:
+Do not force the user to scroll the Home Screen.
 
-MAXY
-Created by hiyroscript
+Respect safe-area insets.
 
-#0001 Sprite Source
+Portrait
 
-Naruto Uzumaki
-Jump Ultimate Stars
-Nintendo DS / DSi
-The Spriters Resource
+Do not break the existing portrait-block/rotation system.
 
-Source sheet:
-Uploaded by Dazz
-Contributor: FRET
+Change its copy from Maxy to Alva.
 
-Make it clear this is source attribution for the original sprite material.
+⸻
 
-Do not claim that hiyroscript created the original Naruto artwork or owns the underlying Naruto/Jump Ultimate Stars intellectual property.
+PART 6 — REMOVE GAMEY HOME EFFECTS FROM JAVASCRIPT
 
-A reasonable additional line is:
+js/screens/home-screen.js currently creates:
 
-Original characters, games, and related properties belong to their respective rights holders.
+* .home-bg
+* .home-grid
+* .home-slash
+* .home-streaks
+* multiple animated streak spans
+* large .home-fighter
+* orange fighter rim generated through tintFrame(... '#ff7a00' ...)
+* numbered menu markup
 
-Do not hide the asset attribution in tiny unreadable text.
+Refactor this substantially.
 
-Keep credits accessible from the Home Screen at all times.
+Do not leave unused Home DOM elements or unused CSS after the redesign.
 
-==================================================
-23. MENU NAVIGATION
-==================================================
+Remove old visual elements instead of hiding them indefinitely.
 
-Every non-battle screen except Home should have a consistent Back action.
+Simplify the screen class.
 
-Flow:
+If the fighter preview remains:
+
+* keep only the animation/update logic actually required
+* use neutral monochrome tinting
+* keep imageSmoothingEnabled = false
+* retain resize correctness
+* respect device pixel ratio
+* retain normalized sprite usage
+
+If the new Home Screen no longer requires animation, remove unnecessary rendering/update complexity cleanly.
+
+Do not leave dead code.
+
+⸻
+
+PART 7 — MODERNIZE THE GLOBAL UI DESIGN SYSTEM
+
+Although the Home Screen receives the largest redesign, the rest of the application must no longer look like an unrelated orange-on-black product.
+
+Restyle shared application chrome so Alva feels coherent across screens.
+
+This includes:
+
+* mode select
+* fighter select
+* map select
+* help/credits
+* loading overlay
+* confirmation dialog
+* pause menu
+* buttons
+* tabs
+* cards
+* headers
+* setup step indicators
+* hint bars
+* badges
+* selection/focus states
+
+Do not necessarily redesign every screen from zero.
+
+Instead, preserve the existing layouts and usability while translating them into the new Alva visual system.
+
+Examples:
+
+Screen backgrounds
+
+Old:
+
+* near black
+* orange radial glow
+* grid texture
+
+New:
+
+* white
+* subtle gray surfaces
+* minimal texture or preferably none
+
+Panels
+
+Use:
+
+* white backgrounds
+* thin #e2e2e2 borders
+* optional light shadow
+* restrained radii
+
+Screen headings
+
+Remove or significantly reduce the current aggressive skewed treatment.
+
+Use clean application typography.
+
+Kicker labels
+
+Change orange labels to neutral gray/black.
+
+Setup steps
+
+Completed:
+
+* medium gray
+
+Current:
+
+* black
+* black underline/border
+
+Future:
+
+* light gray
+
+Selected cards
+
+Use:
+
+* black border
+* subtle gray background
+* black checkmark
+
+Not orange.
+
+Primary controls
+
+Black fill / white text.
+
+Information labels
+
+Gray.
+
+Tabs
+
+Active:
+
+* black text
+* black underline
+
+Inactive:
+
+* gray text
+
+⸻
+
+PART 8 — LOADING / OVERLAYS
+
+The loading overlay currently uses a dark theme and the MAXY SVG.
+
+Update it to Alva.
+
+Suggested loading experience:
+
+* white or near-white background
+* small ALVA wordmark
+* black loading label
+* light gray progress track
+* black progress fill
+
+Error state:
+
+* readable black text
+* primary Retry button in black
+* secondary Back button in white/light gray
+
+Confirmation dialogs:
+
+* white panel
+* subtle gray border/shadow
+* black typography
+* black primary confirmation button
+* neutral secondary cancel button
+
+Retain all existing accessibility behavior.
+
+⸻
+
+PART 9 — SPLASH SCREEN
+
+The existing splash is intentionally understated:
+
+a game by hiyroscript
+
+Keep that concept.
+
+It may remain dark if desired because it functions as a cinematic transition rather than application chrome.
+
+However:
+
+* do not show MAXY anywhere
+* transition elegantly from the black splash into the new bright Alva Home Screen
+* make the transition feel intentional rather than a sudden broken flash
+* retain reduced-motion behavior
+* retain skip support
+
+Do not add a noisy logo animation.
+
+⸻
+
+PART 10 — HELP / CREDITS
+
+Preserve all factual attribution.
+
+The existing credits correctly identify the #0001 sprite source.
+
+Keep the third-party attribution and rights statements.
+
+Only change the Maxy-specific ownership/branding wording.
+
+For example, the existing statement describing code/UI/stage art as original to Maxy should now refer to Alva.
+
+Do not imply ownership of:
+
+* Naruto
+* Jump Ultimate Stars
+* Nintendo IP
+* The Spriters Resource material
+
+Do not remove existing attribution merely for visual simplification.
+
+⸻
+
+PART 11 — BATTLE SCREEN
+
+Do not rewrite the fighting engine.
+
+Preserve:
+
+* physics
+* state machine
+* combat logic
+* camera
+* input
+* touch controls
+* timer
+* pause functionality
+* HUD behavior
+* sprite rendering
+* stage collision
+* stage artwork
+
+Only update the UI chrome to fit Alva where necessary.
+
+Examples:
+
+* HUD accent colors
+* pause controls
+* overlay panels
+* selection states
+* result UI
+* touch button active-state accents
+
+Replace orange UI accents with monochrome equivalents.
+
+Do not turn the entire stage or character sprites grayscale.
+
+⸻
+
+PART 12 — ACCESSIBILITY AND INTERACTION
+
+Do not regress accessibility during the redesign.
+
+Maintain or improve:
+
+* semantic buttons
+* keyboard navigation
+* focus indicators
+* aria-label
+* aria-labelledby
+* tab semantics
+* dialog semantics
+* keyboard/gamepad interaction
+* touch targets
+* visible focus
+* reduced motion
+* safe-area support
+* contrast
+
+Do not rely solely on color to communicate:
+
+* focus
+* selected state
+* availability
+* errors
+* current setup step
+
+Use borders, icons, labels, shape, and weight as appropriate.
+
+⸻
+
+PART 13 — TYPOGRAPHY
+
+Continue using system fonts.
+
+Do not add an external font dependency.
+
+Recommended stack can remain similar to:
+
+system-ui,
+-apple-system,
+"Segoe UI",
+Roboto,
+"Helvetica Neue",
+Arial,
+sans-serif
+
+Use typography to create hierarchy instead of visual effects.
+
+Preferred characteristics:
+
+* strong but not oversized headings
+* normal/non-skewed body text
+* restrained tracking
+* readable small labels
+* semibold/bold rather than extreme 900 everywhere
+* sentence/title case where it feels more app-like
+
+You may keep uppercase ALVA branding.
+
+Avoid making every control uppercase if title case produces a more polished application feel.
+
+⸻
+
+PART 14 — MOTION
+
+Alva should use subtle motion.
+
+Good:
+
+* 120–220ms hover/focus transitions
+* gentle screen transitions
+* slight button press feedback
+* restrained fighter idle animation
+* subtle opacity/translate entrance
+
+Avoid:
+
+* moving light streaks
+* dramatic diagonal wipes
+* glowing accents
+* constant ambient animations
+* large hover translations
+* excessive scale effects
+
+Respect prefers-reduced-motion.
+
+⸻
+
+PART 15 — CSS CLEANUP
+
+Do not just append a giant override section at the end of styles.css.
+
+Refactor the existing stylesheet.
+
+Remove obsolete Maxy-era Home styles and old orange token usage.
+
+Consolidate the design tokens.
+
+Use meaningful semantic variables.
+
+A preferred approach is something like:
+
+:root {
+  --bg: #fff;
+  --surface: #fff;
+  --surface-subtle: #f7f7f7;
+  --surface-muted: #f1f1f1;
+  --text: #111;
+  --text-strong: #000;
+  --text-secondary: #666;
+  --text-muted: #8a8a8a;
+  --border: #e2e2e2;
+  --border-strong: #c8c8c8;
+  --black: #000;
+  --white: #fff;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+  --focus-ring: 0 0 0 2px #fff, 0 0 0 4px #000;
+}
+
+The exact naming can differ if a better architecture fits the current stylesheet.
+
+The important requirement is a coherent semantic system without the old orange identity.
+
+⸻
+
+PART 16 — HTML METADATA AND FAVICON
+
+Update index.html thoroughly.
+
+Expected branding direction:
+
+<title>ALVA</title>
+
+Description should describe Alva rather than Maxy.
+
+Update:
+
+* theme color
+* color scheme
+* favicon
+* rotate overlay copy
+* boot error
+* noscript copy
+
+Example copy:
+
+Alva — a 2D sprite fighting game by hiyroscript.
+
+Keep wording concise.
+
+The favicon should be a new monochrome Alva mark.
+
+⸻
+
+PART 17 — DO NOT BREAK EXISTING GAME FLOW
+
+After changes, this flow must still work:
 
 Splash
 → Home
-
-Home
 → Play
-→ Mode Select
-
-Mode Select
-→ Quick Battle
-→ Character Select
-
-Character Select
-→ #0001
-→ Map Select
-
-Map Select
-→ Desert or City
+→ Select Mode
+→ Select Fighter
+→ Select Stage
 → Battle
+→ Pause / Resume / Restart / Help / Home
 
-Home
-→ Help and Credits
+Help & Credits must also remain directly accessible from Home.
 
-All transitions should feel intentional.
+Preserve selection state and screen-manager behavior.
 
-Avoid full-page browser reloads while navigating menus.
+Do not replace the existing application controller with a new router.
 
-==================================================
-24. UI INTERACTION QUALITY
-==================================================
+Do not introduce a framework.
 
-Every button needs:
+Do not add npm/build dependencies unless absolutely unavoidable. There should be no reason to do so for this task.
 
-Default state
-Hover state
-Focused state
-Pressed state
-Disabled state if relevant
+⸻
 
-Keyboard focus must remain visible.
+PART 18 — TECHNICAL CONSTRAINTS
 
-Touch interactions should feel immediate.
+Maintain:
 
-Avoid 300ms-feeling delays.
-
-Buttons should have clear readable labels.
-
-Do not use excessive glassmorphism.
-
-Do not make everything float in giant cards.
-
-Avoid tiny text.
-
-Use responsive clamp() sizing where useful.
-
-==================================================
-25. MAP ART IMPLEMENTATION
-==================================================
-
-If no dedicated background artwork exists in the repository, create original 2D environments programmatically using:
-
-- Canvas 2D shapes
-- CSS
-- SVG
-- Gradients
-- Procedurally placed decorative elements
-
-Do not download random artwork from the internet.
-
-Do not introduce uncredited copyrighted backgrounds.
-
-Create layered backgrounds that can later be replaced with image assets without rewriting stage physics.
-
-Recommended layer concept:
-
-Layer 0:
-Far sky
-
-Layer 1:
-Very distant environment
-
-Layer 2:
-Mid-distance silhouettes
-
-Layer 3:
-Near background
-
-Layer 4:
-Playable terrain
-
-Layer 5:
-Foreground atmosphere/particles
-
-Move background layers at different horizontal ratios to create 2D parallax.
-
-This is still 2D and should remain visually flat/sprite-based.
-
-==================================================
-26. PARTICLES AND ATMOSPHERE
-==================================================
-
-Use light 2D effects to make maps feel alive.
-
-Desert:
-- Sparse dust particles
-- Gentle drifting sand
-- Very subtle heat haze simulation if performant
-
-City:
-- Occasional glowing windows
-- Moving distant light
-- Subtle rooftop particles
-- Tiny drifting atmospheric particles
-
-Keep effects inexpensive.
-
-Particles must not overwhelm sprite readability.
-
-Respect reduced-motion settings where reasonable.
-
-==================================================
-27. PERFORMANCE
-==================================================
-
-Target smooth 60 FPS on reasonably modern phones.
-
-Performance requirements:
-
-- Preload required assets before entering battle
-- Avoid unnecessary DOM changes every frame
-- Cache normalized sprite bounds
-- Do not scan sprite alpha data every render frame
-- Cache/pre-render expensive static map layers
-- Cap devicePixelRatio if necessary, e.g. around 2
-- Resize canvas only when the viewport actually changes
-- Avoid excessive allocations in the update loop
-- Do not create hundreds of particles unnecessarily
-
-If using offscreen canvases for map layers, recreate them only when required.
-
-==================================================
-28. CANVAS SCALING
-==================================================
-
-Keep gameplay coordinates in logical world units.
-
-Do not make physics depend directly on physical device pixels.
-
-Canvas should:
-- Fill the available game viewport
-- Account for devicePixelRatio
-- Preserve crisp rendering
-- Scale cleanly between phones and desktop
-
-Separate:
-CSS canvas dimensions
-from
-backing-buffer dimensions
-
-==================================================
-29. LOADING
-==================================================
-
-Do not let users enter the battle before required sprite assets are loaded.
-
-Create a simple Maxy loading overlay when necessary.
-
-Use the same black/white/gray/orange identity.
-
-If an image fails:
-- Log a clear developer error
-- Avoid crashing the entire application
-- Display an appropriate fallback message
-
-==================================================
-30. CHARACTER CONFIGURATION
-==================================================
-
-Do not hard-code #0001 behavior throughout dozens of functions.
-
-Create a character definition object/data file resembling:
-
-id: "0001"
-displayName: "#0001"
-available: true
-
-animations:
-idle:
-  frames: [...]
-  fps: ...
-  loop: true
-
-run:
-  frames: [...]
-  fps: ...
-  loop: true
-
-Include configurable fields for future:
-- movement speed
-- acceleration
-- jump force
-- gravity modifier
-- collider width
-- collider height
-- visual scale
-- sprite anchor
-- health
-- future attacks
-
-Adding #0002 in the future should primarily involve:
-1. Adding assets
-2. Adding a character definition
-3. Adding a roster entry
-
-It should NOT require rewriting the entire game.
-
-==================================================
-31. MAP CONFIGURATION
-==================================================
-
-Likewise, define maps with data.
-
-For example:
-
-id
-name
-worldWidth
-worldHeight
-groundLevel
-spawnPoints
-platforms
-cameraBounds
-theme/background renderer
-
-Desert and City should use the same stage interface but different stage data/renderers.
-
-This makes future maps easy to add.
-
-==================================================
-32. MOBILE CONTROL RESPONSIVENESS
-==================================================
-
-Use proportional/clamped sizing rather than fixed giant pixel measurements.
-
-For example, control diameter can use CSS clamp() so controls remain usable on:
-- small phones
-- large phones
-- tablets
-
-Keep controls away from screen edges using safe areas.
-
-The reference screenshot uses large thumb-sized circles. Preserve that feel.
-
-On extremely wide phone ratios, do not allow controls to drift absurdly far from natural thumb reach.
-
-==================================================
-33. VISUAL FEEDBACK
-==================================================
-
-When a mobile control is pressed:
-- Slightly scale it down
-- Increase border/brightness
-- Show an orange/white feedback state
-- Restore smoothly on release
-
-Directional controls should visibly indicate they are being held.
-
-Desktop buttons should have equivalent keyboard focus feedback in menus.
-
-==================================================
-34. AUDIO
-==================================================
-
-No copyrighted music or sounds should be downloaded or inserted.
-
-The game should work perfectly with no audio assets.
-
-If a lightweight AudioManager is prepared for future use, that is fine.
-
-Do not autoplay audio before user interaction.
-
-==================================================
-35. ACCESSIBILITY
-==================================================
-
-Maintain strong text contrast.
-
-Provide:
-- semantic buttons
-- aria-labels where icons are used
-- visible keyboard focus
-- sensible tab ordering
-- reduced-motion handling
-
-Mobile graphical control buttons should have meaningful labels such as:
-"Move left"
-"Move right"
-"Jump"
-"Pause"
-
-Do not rely solely on color to communicate selection.
-
-==================================================
-36. PROJECT STRUCTURE
-==================================================
-
-Create a maintainable structure rather than putting thousands of lines into index.html.
-
-A reasonable structure is:
-
-index.html
-styles.css
-
-js/
-  main.js
-  config.js
-
-  core/
-    app.js
-    screen-manager.js
-    asset-loader.js
-    input-manager.js
-
-  screens/
-    splash-screen.js
-    home-screen.js
-    mode-select-screen.js
-    character-select-screen.js
-    map-select-screen.js
-    help-credits-screen.js
-
-  game/
-    battle.js
-    character.js
-    sprite-animator.js
-    physics.js
-    camera.js
-    hud.js
-    touch-controls.js
-
-  data/
-    characters.js
-    maps.js
-
-Existing sprites may remain at the repository root if moving them is unnecessary, as long as paths are clean and documented.
-
-Alternatively, they can be moved carefully into:
-
-assets/characters/0001/
-
-but do not accidentally delete or break them.
-
-If reorganizing the sprite files, verify every reference afterward.
-
-==================================================
-37. GITHUB PAGES COMPATIBILITY
-==================================================
-
-The final project must work as a static GitHub Pages site.
-
-Do not require:
-- Node server
-- PHP
-- database
-- backend API
-- private server
-- runtime build process
-- environment secrets
-
-index.html must be the entry point.
-
-Use relative paths throughout.
-
-Do not require npm install merely to play the deployed game.
-
-==================================================
-38. README
-==================================================
-
-Add/update README.md with:
-
-# Maxy
-
-Short description.
-
-How to run locally.
-
-GitHub Pages deployment notes.
-
-Controls.
-
-Current characters:
-#0001
-
-Current maps:
-Desert
-City
-
-Current animation support:
-Idle
-Run
-
-Credits/source attribution.
-
-Keep the README professional and concise.
-
-==================================================
-39. REQUIRED QUALITY CHECKS
-==================================================
-
-Before considering the implementation finished, test:
-
-Desktop:
-- 1920×1080
-- 1366×768
-- Wide desktop viewport
-
-Mobile landscape simulations:
-- 16:9
-- 19.5:9
-- 20:9
-
-Verify:
-- Splash transitions correctly
-- Home works
-- Help/Credits works
-- Play works
-- Quick Battle works
-- Large roster renders correctly
-- #0001 can be selected
-- Animated character preview works
-- Desert can be selected
-- City can be selected
-- Battle starts
-- Idle works
-- Run works
-- Character frame dimensions remain visually consistent
-- Left/right movement works
-- Character facing works
-- Jump works
-- Gravity works
-- Platforms work
-- Camera follows correctly
-- Map boundaries work
-- Pause works
-- Resume works
-- Restart works
-- Return Home works
-- Mobile controls don't overlap each other
-- Multi-touch works
-- User can hold movement and jump simultaneously
-- Portrait orientation warning works
-- Safe areas are respected
-- Desktop does not show unnecessary touch controls
-- No horizontal/vertical browser scrolling during gameplay
-- No broken asset URLs on GitHub Pages
-- No console errors during normal use
-
-==================================================
-40. IMPORTANT DESIGN RESTRICTIONS
-==================================================
+* working index.html
+* ES modules
+* relative URLs
+* GitHub Pages compatibility
+* Canvas 2D battle renderer
+* current sprite normalization
+* pixel-art rendering
+* current assets
+* existing game mechanics
+* keyboard controls
+* gamepad controls
+* touch controls
+* responsive layouts
 
 Do not:
-- Convert this into a 3D game
-- Use 3D libraries
-- Add unrelated frameworks
-- Add random copyrighted assets from the internet
-- Add fake characters
-- Add fake attack animations
-- Rename #0001 to Naruto inside normal gameplay
-- Make the maps tiny
-- Make the player character enormous
-- Make the player character microscopic
-- Make the roster tiny because only one fighter exists
-- Use a virtual joystick instead of the requested circular directional buttons
-- Ignore the uploaded mobile-control reference
-- Create a desktop-only layout
-- Create a portrait-first mobile layout
-- Remove existing sprite assets
-- Stretch sprites non-uniformly
-- Smooth/blurry upscale pixel artwork
-- Hard-code everything specifically for one screen resolution
 
-==================================================
-41. FINAL EXPERIENCE TARGET
-==================================================
+* convert to React/Vue/Svelte
+* add Tailwind
+* add Bootstrap
+* add WebGL
+* add Three.js
+* replace the game engine
+* recreate sprite assets
+* alter source character artwork
+* remove credits
+* add unnecessary dependencies
 
-When Maxy is opened for the first time, the experience should be:
+⸻
 
-1. Black screen.
-2. "a game by hiyroscript" subtly appears near the bottom.
-3. Smooth transition into a polished MAXY Home Screen.
-4. Player chooses PLAY.
-5. Player sees a professional Game Mode screen.
-6. Player chooses QUICK BATTLE.
-7. Player sees a very large fighting-game roster despite there currently being only #0001.
-8. Selecting #0001 shows a large animated character preview.
-9. Player confirms #0001.
-10. Player sees beautiful, visually distinct DESERT and CITY stage choices.
-11. Player selects a map.
-12. Battle loads.
-13. #0001 is rendered at a balanced size inside a large 2D stage.
-14. Desktop users control the fighter with keyboard controls.
-15. Mobile landscape users get large circular controls positioned like the supplied reference: movement on the lower-left, staggered actions on the lower-right, pause at the upper-right.
-16. Everything uses Maxy's black/white/gray/orange design language.
-17. The game feels intentionally built as the foundation for a much larger sprite fighting game.
+PART 19 — REPOSITORY CLEANUP
 
-==================================================
-42. COMPLETION STANDARD
-==================================================
+After implementation, search the entire working tree for old branding.
 
-Do not stop after creating mockups or empty menu screens.
+There should be no active Maxy references left.
 
-Actually implement the complete navigable flow and functioning battle movement described above.
+Audit at minimum for:
 
-Do not leave critical TODOs for:
-- responsiveness
-- touch input
-- sprite normalization
-- map collision
-- camera
-- navigation
-- GitHub Pages compatibility
+MAXY
+Maxy
+maxy
+#ff7a00
+#FF7A00
+#ff9a2e
+255, 122, 0
+--orange
 
-Combat attacks themselves may remain intentionally unimplemented because matching sprite frames do not yet exist.
+Handle results intelligently.
 
-At completion, provide a concise summary covering:
-- files created/changed
-- architecture
-- controls
-- responsive behavior
-- sprite normalization solution
-- map implementations
-- what is intentionally waiting on future #0001 animation assets
+For example, old strings should not survive in:
 
-The finished result should look like the first polished playable foundation of Maxy, not an HTML prototype.
+* comments
+* runtime text
+* metadata
+* documentation
+* CSS variables
+* JS-generated color values
+* logo code
+* spec documents
+
+If a maxy string exists solely because the Git remote/repository has not yet been renamed and cannot be renamed programmatically, document that specific limitation rather than silently leaving unrelated old branding.
+
+Remove unused CSS selectors associated with:
+
+* .home-grid
+* .home-slash
+* .home-streaks
+* old orange Home treatments
+
+if they are no longer used.
+
+Remove obsolete JS imports/functions if the redesigned Home no longer needs them.
+
+⸻
+
+PART 20 — QUALITY BAR
+
+The result should look intentionally designed.
+
+Do not stop after:
+
+* changing MAXY text to ALVA
+* changing orange to gray
+* changing background from black to white
+
+That is not sufficient.
+
+The Home Screen must have a genuinely new layout and visual hierarchy.
+
+The redesign should demonstrate:
+
+* professional spacing
+* consistent alignment
+* strong component hierarchy
+* restrained visual effects
+* clean responsive behavior
+* polished hover/focus/pressed states
+* strong monochrome identity
+* thoughtful use of the existing fighter artwork
+* no visual remnants of the old Maxy theme
+
+The user should immediately perceive Alva as a cleaner and more mature product.
+
+⸻
+
+PART 21 — ACCEPTANCE CHECKLIST
+
+Before considering the work complete, verify all of the following.
+
+Branding
+
+* Product is called ALVA in browser title.
+* Product metadata says Alva.
+* Home shows ALVA.
+* ALVA logo actually depicts ALVA.
+* Loading UI uses ALVA.
+* Help/Credits says ALVA.
+* Console prefixes use Alva.
+* README says Alva.
+* Original specification/documentation has been updated.
+* Rotate message says Alva.
+* Error/no-JS messages say ALVA/Alva.
+* Old MAXY/Maxy branding is removed.
+
+Color
+
+* White is the dominant application UI color.
+* Black is the main high-contrast action/text color.
+* Gray is used for hierarchy, surfaces and borders.
+* Orange brand variables are removed.
+* Orange menu accents are removed.
+* No replacement accent color has been introduced.
+* Gameplay sprites/stage art have not been destructively recolored.
+
+Home Screen
+
+* Existing diagonal orange slash is gone.
+* Animated streaks are gone.
+* Heavy grid treatment is gone.
+* Old MAXY logo is gone.
+* Numbered arcade menu presentation is gone.
+* Home is white-dominant.
+* Home resembles a polished modern app.
+* Play remains the obvious primary action.
+* Help & Credits remains accessible.
+* Developer/build information is retained subtly.
+* Fighter preview, if retained, is contained and monochrome.
+* Desktop layout is polished.
+* Tablet landscape is polished.
+* Phone landscape fits without overflow.
+* Keyboard navigation still works.
+* Touch controls/navigation still work.
+* Reduced motion still works.
+
+Game
+
+* Splash works.
+* Play navigation works.
+* Mode selection works.
+* Character selection works.
+* Map selection works.
+* Battle launches.
+* Pause works.
+* Help/Credits works.
+* Return-to-home works.
+* Character sprites still render correctly.
+* Stage rendering still works.
+* No console errors were introduced.
+
+⸻
+
+PART 22 — FINAL VERIFICATION
+
+Run the project from a local HTTP server, not from file://.
+
+Test at multiple viewport sizes, including:
+
+* desktop 1920×1080
+* laptop 1366×768
+* tablet landscape approximately 1024×768
+* phone landscape approximately 844×390
+* a very short landscape viewport
+
+Verify:
+
+* no clipped Home content
+* no accidental scrollbars
+* no hidden primary controls
+* correct focus order
+* sufficient contrast
+* correct safe-area handling
+* no broken canvas resizing
+* no missing assets
+* no broken relative URLs
+
+Inspect the browser console.
+
+Fix all errors introduced by the redesign.
+
+Finally perform a repository-wide search for stale Maxy and orange-brand references.
+
+Do not declare the task finished until the rebrand is complete, the new Home Screen is visibly distinct from the old one, and the complete game flow still functions.
