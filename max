@@ -1,0 +1,1497 @@
+You are building a complete browser-based 2D sprite fighting game called:
+
+MAXY
+
+Work directly from the existing Maxy GitHub repository. Do not create a separate unrelated project. Inspect the repository before changing anything and preserve/use the existing #0001 sprite assets.
+
+==================================================
+1. OVERALL GOAL
+==================================================
+
+Create a polished, professional, fully 2D sprite-based fighting game that runs in a web browser and is suitable for GitHub Pages hosting.
+
+The game must work well on:
+
+- Desktop/laptop computers in landscape layouts
+- Phones in landscape orientation
+- Tablets in landscape orientation
+
+This is a pure 2D game.
+
+DO NOT use:
+- Three.js
+- Babylon.js
+- WebGL 3D engines
+- 3D models
+- 3D environments
+- 3D assets
+- 3D libraries
+- fake 3D character models
+
+Use standard HTML, CSS, JavaScript, and the HTML5 Canvas 2D API.
+
+Prefer a dependency-free implementation.
+
+The repository MUST contain a working index.html because the game will be deployed with GitHub Pages.
+
+All asset references must use relative URLs such as:
+./assets/...
+./0001_idle1.png
+
+Do NOT use root-relative paths such as:
+"/assets/..."
+
+GitHub project pages may run under /maxy/, so root-relative URLs may break deployment.
+
+The visual identity of Maxy should feel modern, stylish, clean, responsive, and professional rather than like a basic HTML demo.
+
+==================================================
+2. CURRENT REPOSITORY ASSETS
+==================================================
+
+The repository currently contains these #0001 sprite frames:
+
+Idle:
+- 0001_idle1.png
+- 0001_idle2.png
+- 0001_idle3.png
+- 0001_idle4.png
+
+Run:
+- 0001_run1.png
+- 0001_run2.png
+- 0001_run3.png
+- 0001_run4.png
+- 0001_run5.png
+- 0001_run6.png
+
+Current source dimensions:
+
+Idle:
+- 0001_idle1.png = 560 × 832
+- 0001_idle2.png = 592 × 832
+- 0001_idle3.png = 576 × 800
+- 0001_idle4.png = 560 × 816
+
+Run:
+- 0001_run1.png = 148 × 188
+- 0001_run2.png = 160 × 184
+- 0001_run3.png = 152 × 184
+- 0001_run4.png = 128 × 184
+- 0001_run5.png = 152 × 188
+- 0001_run6.png = 156 × 184
+
+IMPORTANT:
+The raw dimensions of the idle and run frames are drastically different.
+
+Do not simply draw every PNG at the same raw scale.
+
+Create a sprite normalization system.
+
+When the images load:
+1. Inspect the alpha channel once.
+2. Determine the non-transparent visual bounding box of each frame.
+3. Cache that information.
+4. Draw frames using their visible bounds.
+5. Anchor all character frames at bottom-center.
+6. Normalize each animation to a consistent in-game character height.
+7. Make collision/hurt boxes independent from the PNG dimensions.
+
+The character should not visibly grow, shrink, jump vertically, or slide when changing between idle and run.
+
+Canvas image smoothing should be disabled for character sprites:
+ctx.imageSmoothingEnabled = false
+
+Use pixel-art-friendly rendering.
+
+Do not redraw, replace, AI-generate, or modify #0001's sprite artwork unless absolutely required for technical reasons.
+
+==================================================
+3. GAME BRANDING
+==================================================
+
+Game name:
+MAXY
+
+Developer credit:
+hiyroscript
+
+Core color palette:
+- Black
+- White
+- Gray
+- Orange
+
+Suggested palette:
+- Near black: #080808
+- Dark gray: #151515
+- Medium gray: #333333
+- Light gray: #BDBDBD
+- White: #FFFFFF
+- Main orange: approximately #FF7A00
+- Bright orange highlight: approximately #FF9A2E
+
+Exact values may be refined, but the whole interface must remain recognizably black/white/gray/orange.
+
+Orange should be used primarily for:
+- Selected elements
+- Main CTAs
+- Focus states
+- Progress indicators
+- Important accents
+- Active controls
+
+Avoid excessive gradients and avoid making everything orange.
+
+The UI should have:
+- Strong typography
+- Clean spacing
+- Consistent rounded corners
+- Clear hierarchy
+- Subtle motion
+- Smooth screen transitions
+- Responsive sizing
+- Excellent contrast
+- Professional button hover/press/focus states
+
+Do not make the interface look like a generic Bootstrap website.
+
+==================================================
+4. APPLICATION ARCHITECTURE
+==================================================
+
+Implement the game as a state/screen driven application.
+
+Recommended primary states:
+
+SPLASH
+HOME
+MODE_SELECT
+CHARACTER_SELECT
+MAP_SELECT
+BATTLE
+PAUSE
+HELP_CREDITS
+
+Use one central Game/App controller rather than random global functions.
+
+Recommended logical systems:
+
+- App / ScreenManager
+- AssetLoader
+- InputManager
+- TouchInputManager
+- SpriteAnimator
+- Character
+- FighterController
+- Physics
+- Camera
+- Stage / Map
+- Renderer
+- HUD
+- UIManager
+- Settings/config
+- Character database
+- Map database
+
+Keep game simulation logic separate from menu DOM logic.
+
+Menus may use normal HTML/CSS because that gives better responsive layout and accessibility.
+
+Actual battle rendering should use Canvas 2D.
+
+Do not render the entire game UI directly into one giant canvas if HTML/CSS is better suited for menus.
+
+==================================================
+5. SPLASH SCREEN
+==================================================
+
+When Maxy launches, begin with a completely black screen.
+
+Do not immediately display the menu.
+
+Near the bottom center of the screen display:
+
+a game by hiyroscript
+
+The wording and capitalization should be exactly:
+
+a game by hiyroscript
+
+Style:
+- Small/medium text
+- White or soft gray
+- Clean font
+- Generous letter spacing
+- Positioned toward the bottom of the viewport
+- Sophisticated and understated
+
+Animation:
+- Start from black
+- Fade the text in
+- Hold briefly
+- Fade it out
+- Transition cleanly to Home
+
+Total splash duration should be roughly 2.5–3.5 seconds.
+
+Do not make the player wait an excessive amount of time.
+
+Respect prefers-reduced-motion by minimizing fades if the browser requests reduced motion.
+
+==================================================
+6. HOME SCREEN
+==================================================
+
+After the splash, show the Maxy Home Screen.
+
+The Home Screen must feel like the front menu of a real fighting game.
+
+Prominently display:
+
+MAXY
+
+Use a custom text treatment made with typography/CSS rather than requiring an external copyrighted logo.
+
+For this version the Home Screen contains only two primary menu buttons:
+
+PLAY
+
+HELP AND CREDITS
+
+Do not fill the page with fake unavailable menu entries.
+
+Layout should remain simple and premium.
+
+Possible composition:
+- MAXY title on left/center
+- Menu beneath it
+- Abstract 2D animated background
+- Subtle orange line accents or particles
+- Background may include silhouettes, geometric shapes, scan-line-like effects, or subtle animated panels
+
+Keep visual movement subtle enough that it doesn't interfere with navigation.
+
+PLAY must be the primary orange-highlighted option.
+
+HELP AND CREDITS should be secondary.
+
+Keyboard, mouse, touch, and game-style directional navigation should all be supported where practical.
+
+==================================================
+7. GAME MODE SELECTION
+==================================================
+
+Selecting PLAY opens a Game Mode Selection screen.
+
+Header:
+
+SELECT MODE
+
+For now there is only one playable mode:
+
+QUICK BATTLE
+
+Make the screen visually designed for future expansion.
+
+Do NOT make the one mode look lonely in a tiny centered button.
+
+Use a larger mode card layout with room for additional modes later.
+
+QUICK BATTLE card can include:
+- Mode name
+- Short description
+- Stylized 2D background
+- Orange active accent
+- Clear selectable/hover state
+
+Example description:
+
+Choose a fighter and stage, then enter battle.
+
+Do not add fake online matchmaking.
+
+Include a clear Back button.
+
+==================================================
+8. CHARACTER SELECT / LARGE ROSTER
+==================================================
+
+Selecting Quick Battle opens Character Select.
+
+This screen is important and must look substantial even though only one fighter exists.
+
+The only current fighter is:
+
+#0001
+
+Repository asset prefix:
+0001
+
+Displayed in-game name:
+#0001
+
+Do NOT display "0001" without the # in the actual roster UI.
+
+Make the roster deliberately LARGE.
+
+For example:
+- 40–60 visible roster slots overall
+- Grid can be scrollable if necessary
+- Many future slots
+- Responsive number of columns
+
+Only #0001 is selectable.
+
+All other slots should appear as tasteful locked/empty roster positions.
+
+Do not invent fake character names.
+
+Placeholder slots can use:
+- ?
+- Silhouette
+- Lock symbol
+- Dark geometric portrait
+- EMPTY / LOCKED if necessary
+
+Keep them visually restrained so #0001 clearly stands out.
+
+Desktop layout:
+- Large roster grid on one side
+- Large character preview/detail panel on the other side
+
+Mobile landscape:
+- Roster should remain large but compact enough to avoid microscopic buttons
+- Character preview panel can reduce in width
+- Keep both areas usable without vertical page scrolling
+
+The #0001 preview should display an animated idle loop using the four existing idle frames.
+
+Character detail panel should include at minimum:
+
+#0001
+
+AVAILABLE
+
+Animations:
+IDLE
+RUN
+
+Optional tasteful decorative stat areas may exist, but do not invent meaningless numerical power ratings.
+
+Selected #0001 roster card:
+- Orange border/accent
+- Strong focus state
+- Animated preview
+- Confirm button
+
+Allow #0001 to be confirmed with:
+- Mouse
+- Touch
+- Enter
+- Controller-style confirm keyboard mapping if implemented
+
+Include Back.
+
+==================================================
+9. MAP SELECT
+==================================================
+
+After confirming #0001, open the stage selection screen.
+
+Header:
+
+SELECT MAP
+
+There are exactly two maps in this version:
+
+DESERT
+CITY
+
+Both must look dramatically different.
+
+Provide large visual preview cards and a larger selected-map preview.
+
+Do not simply recolor the same layout.
+
+--------------------------------------------------
+DESERT
+--------------------------------------------------
+
+The Desert should feel wide, bright, warm, open, and atmospheric.
+
+Visual ideas:
+- Huge distant dunes
+- Large sandstone rock formations
+- Mesas
+- Desert cliffs
+- Orange sunset or bright desert sun
+- Long shadows
+- Sparse dry plants
+- Sand drifting near the floor
+- Atmospheric haze
+- Multiple 2D parallax layers
+
+The actual playable terrain should be mostly open/flat so this stage contrasts with the City stage.
+
+The map itself should be significantly wider than one screen.
+
+--------------------------------------------------
+CITY
+--------------------------------------------------
+
+The City should have a completely different silhouette and gameplay feel.
+
+Possible setting:
+- Rooftops
+- Elevated city platforms
+- Dense skyline
+- Building silhouettes
+- Rooftop antennas
+- Ventilation units
+- Signs
+- Windows
+- Orange neon/accent lighting
+- Dark gray/black structures
+- Overpasses or construction structures
+
+Use platforms on the City map.
+
+Platforms should meaningfully change traversal without becoming frustrating.
+
+City can be at dusk/night to contrast with the bright Desert.
+
+Use several independent 2D parallax layers to create depth.
+
+Do not use actual 3D geometry.
+
+The maps must still be 100% 2D.
+
+==================================================
+10. STAGE SIZE AND CAMERA
+==================================================
+
+Maps should feel large.
+
+Do NOT design stages where the whole map fits onto one phone screen.
+
+A good target is approximately 2.5–4 viewport widths of horizontal playable space depending on the stage.
+
+The camera should:
+- Follow the active fighters
+- Smoothly interpolate instead of snapping
+- Stay inside stage boundaries
+- Avoid showing outside the map
+- Support wide desktop screens and narrow landscape phone screens
+- Keep fighters readable
+
+If two fighters exist in the battle, frame both when practical.
+
+Characters must not dominate the screen.
+
+At a typical 16:9 resolution, aim for a displayed fighter height around roughly 14–18% of the viewport, adjusted as necessary after seeing the actual sprites.
+
+They should be easy to read but leave plenty of stage visible.
+
+==================================================
+11. CURRENT CHARACTER ANIMATIONS
+==================================================
+
+#0001 currently has ONLY:
+
+IDLE
+RUN
+
+Do not invent additional sprite frames.
+
+Do not generate fake attack sprites.
+
+Recommended animation speed:
+- Idle: approximately 6–8 FPS
+- Run: approximately 10–12 FPS
+
+Tune visually rather than blindly following numbers.
+
+Idle should loop continuously while stationary.
+
+Run should loop while moving horizontally.
+
+When changing direction:
+- Flip the rendered sprite horizontally
+- Do not create separate duplicated image files
+
+Character facing should generally point toward the opponent when applicable.
+
+If jumping is implemented before a dedicated jump animation exists:
+- Use a suitable idle frame/idle animation in the air
+- Do not stretch or rotate the sprite to fake a jump animation
+
+==================================================
+12. QUICK BATTLE IN THIS EARLY VERSION
+==================================================
+
+Build the game architecture as a genuine fighting-game foundation, but respect the fact that #0001 currently does not have attack, hit, hurt, block, or special animations.
+
+Do not pretend that finished combat animations exist.
+
+The first version should have fully functional:
+- Character spawning
+- Idle animation
+- Running
+- Facing
+- Stage collision
+- Gravity
+- Jumping
+- Platform collision
+- Camera movement
+- Player input
+- Mobile touch input
+- Pause menu
+- HUD framework
+- Character state machine
+- Combat input placeholders
+
+A second #0001 can be spawned as the opposing fighter so the battle scene has the correct two-fighter structure.
+
+It can initially use extremely simple non-attacking movement AI or remain a training-style opponent.
+
+Keep Player 1 and opponent logic separate so a future AI/combat system can be added cleanly.
+
+Create a combat architecture containing concepts such as:
+- health
+- damage
+- hitboxes
+- hurtboxes
+- attack definitions
+- block state
+- knockback
+- stun
+- attack cooldowns
+
+However, do not fabricate real attacks until the corresponding sprite assets/attack definitions are added.
+
+Health may remain at 100% in the current build.
+
+The purpose is to make extending #0001 straightforward when more sprites are added later.
+
+==================================================
+13. PHYSICS
+==================================================
+
+Use stable 2D game physics implemented for this project.
+
+You do not need an external physics engine.
+
+Implement:
+- Horizontal acceleration
+- Horizontal deceleration
+- Maximum movement speed
+- Gravity
+- Vertical velocity
+- Jump impulse
+- Ground collision
+- Platform collision
+- Stage bounds
+- Falling/landing detection
+
+Separate:
+- visual sprite dimensions
+from
+- collision dimensions
+
+A fighter's collision capsule/rectangle should not be determined from the transparent PNG dimensions.
+
+Use bottom-center as the main fighter origin.
+
+Do not allow characters to:
+- sink through the floor
+- float above platforms
+- jitter while standing
+- escape stage boundaries
+
+For City platforms, support dropping through selected one-way platforms using the Down command if appropriate.
+
+==================================================
+14. GAME LOOP
+==================================================
+
+Use requestAnimationFrame.
+
+For gameplay simulation, use a stable timestep or capped delta-time system so movement does not vary wildly between 30 Hz, 60 Hz, and 120 Hz displays.
+
+Separate:
+
+update()
+render()
+
+Avoid tying movement distance directly to frame count.
+
+Pause simulation when:
+- pause menu is active
+- page visibility changes if appropriate
+- device is forced into the portrait orientation warning
+
+==================================================
+15. BATTLE HUD
+==================================================
+
+Create a professional fighting-game HUD using the Maxy visual palette.
+
+Top-left:
+Player 1 / #0001
+Health bar
+
+Top-right:
+Opponent / #0001
+Health bar
+
+Top-center:
+Round/timer area
+
+Use:
+- black translucent panels
+- white labels
+- gray secondary information
+- orange accents
+
+The HUD should stay clear of mobile safe areas and the pause button.
+
+Do not make the HUD excessively tall.
+
+==================================================
+16. MOBILE LANDSCAPE CONTROLS
+==================================================
+
+Use the uploaded reference screenshot as the positional inspiration for the mobile controls.
+
+Do NOT reuse copyrighted control graphics from the screenshot.
+
+Create original control icons using simple SVG/CSS shapes.
+
+The important aspect to reproduce is the overall placement, grouping, circular-button language, and ergonomics.
+
+All mobile buttons should be:
+- Circular
+- Large enough for thumbs
+- Semi-transparent enough not to hide gameplay
+- Still clearly visible
+- White iconography
+- Black/dark outlines
+- Gray/orange styling consistent with Maxy's palette
+- Responsive to press/release states
+
+Use subtle scaling/glow while pressed.
+
+--------------------------------------------------
+LEFT-SIDE MOVEMENT CLUSTER
+--------------------------------------------------
+
+At the bottom-left, create three large circular controls arranged horizontally similar to the reference:
+
+[ LEFT ] [ DOWN ] [ RIGHT ]
+
+They should sit close to the lower-left safe area without touching the screen edges.
+
+LEFT:
+Move left.
+
+RIGHT:
+Move right.
+
+DOWN:
+Reserved for crouch/down/platform-drop behavior.
+
+The three circles should be evenly spaced.
+
+Do not use a generic virtual joystick.
+
+The screenshot specifically uses separate circular directional buttons, so follow that structure.
+
+--------------------------------------------------
+RIGHT-SIDE ACTION CLUSTER
+--------------------------------------------------
+
+Create the action buttons on the lower-right using approximately the same staggered arrangement as the provided reference.
+
+Conceptual layout:
+
+                         [ PRIMARY ]
+
+                 [ SPECIAL ] [ BLOCK ]
+
+          [ ACTION 1 ] [ ACTION 2 ] [ JUMP ]
+
+The exact responsive spacing may change by screen size, but preserve this overall visual hierarchy.
+
+PRIMARY should be the upper-right button and visually important.
+
+SPECIAL should be offset left beneath it.
+
+BLOCK should sit to the right of SPECIAL.
+
+The lowest row contains:
+- Action 1
+- Action 2
+- Jump
+
+JUMP should be the lowest/rightmost button.
+
+Because attack animations do not exist yet:
+- PRIMARY
+- SPECIAL
+- ACTION 1
+- ACTION 2
+
+should have their input architecture implemented but should not fabricate attacks.
+
+They may visually appear available while their actual action handler safely remains unimplemented, or can have a subtle disabled/unavailable indication.
+
+Do not constantly display annoying "not available" alerts when they are pressed.
+
+BLOCK may set a logical block state even if it currently uses the idle visual.
+
+JUMP is fully functional.
+
+--------------------------------------------------
+PAUSE
+--------------------------------------------------
+
+Place a separate circular pause button near the upper-right corner just like the reference layout.
+
+It should:
+- Respect safe-area insets
+- Not overlap the HUD
+- Open the pause menu
+- Use an original pause icon
+
+==================================================
+17. MULTI-TOUCH REQUIREMENTS
+==================================================
+
+Touch controls MUST support true simultaneous inputs.
+
+The player must be able to:
+- Hold Right + press Jump
+- Hold Left + press another action
+- Hold movement while interacting with action buttons
+
+Do not build touch input around only a single active touch.
+
+Use Pointer Events or properly tracked touch identifiers.
+
+Keep an internal pressed-state Set/Map.
+
+Support:
+pointerdown
+pointerup
+pointercancel
+lostpointercapture
+
+Prevent the browser from interpreting gameplay touches as:
+- page scrolling
+- pull-to-refresh
+- browser zoom gestures
+- text selection
+
+Use touch-action: none where appropriate.
+
+Do not disable accessibility unnecessarily outside the game viewport.
+
+==================================================
+18. DESKTOP CONTROLS
+==================================================
+
+Implement comfortable desktop keyboard controls.
+
+Suggested Player 1 controls:
+
+A / Left Arrow:
+Move left
+
+D / Right Arrow:
+Move right
+
+S / Down Arrow:
+Down / platform drop
+
+W or Space:
+Jump
+
+J:
+Primary
+
+K:
+Special
+
+L:
+Block
+
+U:
+Action 1
+
+I:
+Action 2
+
+Escape or P:
+Pause
+
+Allow simultaneous key presses.
+
+Do not rely on repeated keydown events.
+
+Maintain a pressed-key state.
+
+The Help screen must display the final actual key bindings.
+
+==================================================
+19. RESPONSIVE MOBILE LAYOUT
+==================================================
+
+The game is intended for LANDSCAPE mobile use.
+
+Use:
+
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+
+Handle notches and rounded displays using:
+env(safe-area-inset-left)
+env(safe-area-inset-right)
+env(safe-area-inset-top)
+env(safe-area-inset-bottom)
+
+Use dvh/dvw or appropriate modern viewport units where useful.
+
+If a mobile device is in portrait orientation:
+- Pause the game
+- Display a clean black overlay
+- Show a simple rotate-device icon
+- Display text such as:
+
+ROTATE YOUR DEVICE
+Maxy is designed for landscape play.
+
+When landscape returns, restore the game correctly.
+
+Do not let the game's HTML page vertically scroll during play.
+
+==================================================
+20. DESKTOP/MOBILE CONTROL VISIBILITY
+==================================================
+
+Touch controls should not clutter desktop gameplay.
+
+Show mobile controls when the environment is touch-oriented, using a sensible combination of:
+- pointer: coarse
+- hover capability
+- viewport size
+- actual touch interaction
+
+Do not blindly classify all narrow windows as phones.
+
+Desktop retains keyboard controls.
+
+==================================================
+21. PAUSE MENU
+==================================================
+
+Pause should freeze gameplay and display a polished overlay.
+
+Options:
+
+RESUME
+RESTART BATTLE
+HELP
+RETURN TO HOME
+
+Use confirmation for RETURN TO HOME if it would discard the active battle.
+
+Pause must work with:
+- Escape/P
+- Mobile pause button
+
+==================================================
+22. HELP AND CREDITS
+==================================================
+
+The Home Screen's HELP AND CREDITS button opens a combined screen.
+
+Use clear sections/tabs or vertically arranged cards.
+
+HELP should explain:
+- Desktop controls
+- Mobile control layout
+- Character movement
+- Map/platform behavior
+- Pause
+
+CREDITS should include:
+
+MAXY
+Created by hiyroscript
+
+#0001 Sprite Source
+
+Naruto Uzumaki
+Jump Ultimate Stars
+Nintendo DS / DSi
+The Spriters Resource
+
+Source sheet:
+Uploaded by Dazz
+Contributor: FRET
+
+Make it clear this is source attribution for the original sprite material.
+
+Do not claim that hiyroscript created the original Naruto artwork or owns the underlying Naruto/Jump Ultimate Stars intellectual property.
+
+A reasonable additional line is:
+
+Original characters, games, and related properties belong to their respective rights holders.
+
+Do not hide the asset attribution in tiny unreadable text.
+
+Keep credits accessible from the Home Screen at all times.
+
+==================================================
+23. MENU NAVIGATION
+==================================================
+
+Every non-battle screen except Home should have a consistent Back action.
+
+Flow:
+
+Splash
+→ Home
+
+Home
+→ Play
+→ Mode Select
+
+Mode Select
+→ Quick Battle
+→ Character Select
+
+Character Select
+→ #0001
+→ Map Select
+
+Map Select
+→ Desert or City
+→ Battle
+
+Home
+→ Help and Credits
+
+All transitions should feel intentional.
+
+Avoid full-page browser reloads while navigating menus.
+
+==================================================
+24. UI INTERACTION QUALITY
+==================================================
+
+Every button needs:
+
+Default state
+Hover state
+Focused state
+Pressed state
+Disabled state if relevant
+
+Keyboard focus must remain visible.
+
+Touch interactions should feel immediate.
+
+Avoid 300ms-feeling delays.
+
+Buttons should have clear readable labels.
+
+Do not use excessive glassmorphism.
+
+Do not make everything float in giant cards.
+
+Avoid tiny text.
+
+Use responsive clamp() sizing where useful.
+
+==================================================
+25. MAP ART IMPLEMENTATION
+==================================================
+
+If no dedicated background artwork exists in the repository, create original 2D environments programmatically using:
+
+- Canvas 2D shapes
+- CSS
+- SVG
+- Gradients
+- Procedurally placed decorative elements
+
+Do not download random artwork from the internet.
+
+Do not introduce uncredited copyrighted backgrounds.
+
+Create layered backgrounds that can later be replaced with image assets without rewriting stage physics.
+
+Recommended layer concept:
+
+Layer 0:
+Far sky
+
+Layer 1:
+Very distant environment
+
+Layer 2:
+Mid-distance silhouettes
+
+Layer 3:
+Near background
+
+Layer 4:
+Playable terrain
+
+Layer 5:
+Foreground atmosphere/particles
+
+Move background layers at different horizontal ratios to create 2D parallax.
+
+This is still 2D and should remain visually flat/sprite-based.
+
+==================================================
+26. PARTICLES AND ATMOSPHERE
+==================================================
+
+Use light 2D effects to make maps feel alive.
+
+Desert:
+- Sparse dust particles
+- Gentle drifting sand
+- Very subtle heat haze simulation if performant
+
+City:
+- Occasional glowing windows
+- Moving distant light
+- Subtle rooftop particles
+- Tiny drifting atmospheric particles
+
+Keep effects inexpensive.
+
+Particles must not overwhelm sprite readability.
+
+Respect reduced-motion settings where reasonable.
+
+==================================================
+27. PERFORMANCE
+==================================================
+
+Target smooth 60 FPS on reasonably modern phones.
+
+Performance requirements:
+
+- Preload required assets before entering battle
+- Avoid unnecessary DOM changes every frame
+- Cache normalized sprite bounds
+- Do not scan sprite alpha data every render frame
+- Cache/pre-render expensive static map layers
+- Cap devicePixelRatio if necessary, e.g. around 2
+- Resize canvas only when the viewport actually changes
+- Avoid excessive allocations in the update loop
+- Do not create hundreds of particles unnecessarily
+
+If using offscreen canvases for map layers, recreate them only when required.
+
+==================================================
+28. CANVAS SCALING
+==================================================
+
+Keep gameplay coordinates in logical world units.
+
+Do not make physics depend directly on physical device pixels.
+
+Canvas should:
+- Fill the available game viewport
+- Account for devicePixelRatio
+- Preserve crisp rendering
+- Scale cleanly between phones and desktop
+
+Separate:
+CSS canvas dimensions
+from
+backing-buffer dimensions
+
+==================================================
+29. LOADING
+==================================================
+
+Do not let users enter the battle before required sprite assets are loaded.
+
+Create a simple Maxy loading overlay when necessary.
+
+Use the same black/white/gray/orange identity.
+
+If an image fails:
+- Log a clear developer error
+- Avoid crashing the entire application
+- Display an appropriate fallback message
+
+==================================================
+30. CHARACTER CONFIGURATION
+==================================================
+
+Do not hard-code #0001 behavior throughout dozens of functions.
+
+Create a character definition object/data file resembling:
+
+id: "0001"
+displayName: "#0001"
+available: true
+
+animations:
+idle:
+  frames: [...]
+  fps: ...
+  loop: true
+
+run:
+  frames: [...]
+  fps: ...
+  loop: true
+
+Include configurable fields for future:
+- movement speed
+- acceleration
+- jump force
+- gravity modifier
+- collider width
+- collider height
+- visual scale
+- sprite anchor
+- health
+- future attacks
+
+Adding #0002 in the future should primarily involve:
+1. Adding assets
+2. Adding a character definition
+3. Adding a roster entry
+
+It should NOT require rewriting the entire game.
+
+==================================================
+31. MAP CONFIGURATION
+==================================================
+
+Likewise, define maps with data.
+
+For example:
+
+id
+name
+worldWidth
+worldHeight
+groundLevel
+spawnPoints
+platforms
+cameraBounds
+theme/background renderer
+
+Desert and City should use the same stage interface but different stage data/renderers.
+
+This makes future maps easy to add.
+
+==================================================
+32. MOBILE CONTROL RESPONSIVENESS
+==================================================
+
+Use proportional/clamped sizing rather than fixed giant pixel measurements.
+
+For example, control diameter can use CSS clamp() so controls remain usable on:
+- small phones
+- large phones
+- tablets
+
+Keep controls away from screen edges using safe areas.
+
+The reference screenshot uses large thumb-sized circles. Preserve that feel.
+
+On extremely wide phone ratios, do not allow controls to drift absurdly far from natural thumb reach.
+
+==================================================
+33. VISUAL FEEDBACK
+==================================================
+
+When a mobile control is pressed:
+- Slightly scale it down
+- Increase border/brightness
+- Show an orange/white feedback state
+- Restore smoothly on release
+
+Directional controls should visibly indicate they are being held.
+
+Desktop buttons should have equivalent keyboard focus feedback in menus.
+
+==================================================
+34. AUDIO
+==================================================
+
+No copyrighted music or sounds should be downloaded or inserted.
+
+The game should work perfectly with no audio assets.
+
+If a lightweight AudioManager is prepared for future use, that is fine.
+
+Do not autoplay audio before user interaction.
+
+==================================================
+35. ACCESSIBILITY
+==================================================
+
+Maintain strong text contrast.
+
+Provide:
+- semantic buttons
+- aria-labels where icons are used
+- visible keyboard focus
+- sensible tab ordering
+- reduced-motion handling
+
+Mobile graphical control buttons should have meaningful labels such as:
+"Move left"
+"Move right"
+"Jump"
+"Pause"
+
+Do not rely solely on color to communicate selection.
+
+==================================================
+36. PROJECT STRUCTURE
+==================================================
+
+Create a maintainable structure rather than putting thousands of lines into index.html.
+
+A reasonable structure is:
+
+index.html
+styles.css
+
+js/
+  main.js
+  config.js
+
+  core/
+    app.js
+    screen-manager.js
+    asset-loader.js
+    input-manager.js
+
+  screens/
+    splash-screen.js
+    home-screen.js
+    mode-select-screen.js
+    character-select-screen.js
+    map-select-screen.js
+    help-credits-screen.js
+
+  game/
+    battle.js
+    character.js
+    sprite-animator.js
+    physics.js
+    camera.js
+    hud.js
+    touch-controls.js
+
+  data/
+    characters.js
+    maps.js
+
+Existing sprites may remain at the repository root if moving them is unnecessary, as long as paths are clean and documented.
+
+Alternatively, they can be moved carefully into:
+
+assets/characters/0001/
+
+but do not accidentally delete or break them.
+
+If reorganizing the sprite files, verify every reference afterward.
+
+==================================================
+37. GITHUB PAGES COMPATIBILITY
+==================================================
+
+The final project must work as a static GitHub Pages site.
+
+Do not require:
+- Node server
+- PHP
+- database
+- backend API
+- private server
+- runtime build process
+- environment secrets
+
+index.html must be the entry point.
+
+Use relative paths throughout.
+
+Do not require npm install merely to play the deployed game.
+
+==================================================
+38. README
+==================================================
+
+Add/update README.md with:
+
+# Maxy
+
+Short description.
+
+How to run locally.
+
+GitHub Pages deployment notes.
+
+Controls.
+
+Current characters:
+#0001
+
+Current maps:
+Desert
+City
+
+Current animation support:
+Idle
+Run
+
+Credits/source attribution.
+
+Keep the README professional and concise.
+
+==================================================
+39. REQUIRED QUALITY CHECKS
+==================================================
+
+Before considering the implementation finished, test:
+
+Desktop:
+- 1920×1080
+- 1366×768
+- Wide desktop viewport
+
+Mobile landscape simulations:
+- 16:9
+- 19.5:9
+- 20:9
+
+Verify:
+- Splash transitions correctly
+- Home works
+- Help/Credits works
+- Play works
+- Quick Battle works
+- Large roster renders correctly
+- #0001 can be selected
+- Animated character preview works
+- Desert can be selected
+- City can be selected
+- Battle starts
+- Idle works
+- Run works
+- Character frame dimensions remain visually consistent
+- Left/right movement works
+- Character facing works
+- Jump works
+- Gravity works
+- Platforms work
+- Camera follows correctly
+- Map boundaries work
+- Pause works
+- Resume works
+- Restart works
+- Return Home works
+- Mobile controls don't overlap each other
+- Multi-touch works
+- User can hold movement and jump simultaneously
+- Portrait orientation warning works
+- Safe areas are respected
+- Desktop does not show unnecessary touch controls
+- No horizontal/vertical browser scrolling during gameplay
+- No broken asset URLs on GitHub Pages
+- No console errors during normal use
+
+==================================================
+40. IMPORTANT DESIGN RESTRICTIONS
+==================================================
+
+Do not:
+- Convert this into a 3D game
+- Use 3D libraries
+- Add unrelated frameworks
+- Add random copyrighted assets from the internet
+- Add fake characters
+- Add fake attack animations
+- Rename #0001 to Naruto inside normal gameplay
+- Make the maps tiny
+- Make the player character enormous
+- Make the player character microscopic
+- Make the roster tiny because only one fighter exists
+- Use a virtual joystick instead of the requested circular directional buttons
+- Ignore the uploaded mobile-control reference
+- Create a desktop-only layout
+- Create a portrait-first mobile layout
+- Remove existing sprite assets
+- Stretch sprites non-uniformly
+- Smooth/blurry upscale pixel artwork
+- Hard-code everything specifically for one screen resolution
+
+==================================================
+41. FINAL EXPERIENCE TARGET
+==================================================
+
+When Maxy is opened for the first time, the experience should be:
+
+1. Black screen.
+2. "a game by hiyroscript" subtly appears near the bottom.
+3. Smooth transition into a polished MAXY Home Screen.
+4. Player chooses PLAY.
+5. Player sees a professional Game Mode screen.
+6. Player chooses QUICK BATTLE.
+7. Player sees a very large fighting-game roster despite there currently being only #0001.
+8. Selecting #0001 shows a large animated character preview.
+9. Player confirms #0001.
+10. Player sees beautiful, visually distinct DESERT and CITY stage choices.
+11. Player selects a map.
+12. Battle loads.
+13. #0001 is rendered at a balanced size inside a large 2D stage.
+14. Desktop users control the fighter with keyboard controls.
+15. Mobile landscape users get large circular controls positioned like the supplied reference: movement on the lower-left, staggered actions on the lower-right, pause at the upper-right.
+16. Everything uses Maxy's black/white/gray/orange design language.
+17. The game feels intentionally built as the foundation for a much larger sprite fighting game.
+
+==================================================
+42. COMPLETION STANDARD
+==================================================
+
+Do not stop after creating mockups or empty menu screens.
+
+Actually implement the complete navigable flow and functioning battle movement described above.
+
+Do not leave critical TODOs for:
+- responsiveness
+- touch input
+- sprite normalization
+- map collision
+- camera
+- navigation
+- GitHub Pages compatibility
+
+Combat attacks themselves may remain intentionally unimplemented because matching sprite frames do not yet exist.
+
+At completion, provide a concise summary covering:
+- files created/changed
+- architecture
+- controls
+- responsive behavior
+- sprite normalization solution
+- map implementations
+- what is intentionally waiting on future #0001 animation assets
+
+The finished result should look like the first polished playable foundation of Maxy, not an HTML prototype.
