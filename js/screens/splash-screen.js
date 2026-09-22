@@ -1,5 +1,5 @@
 // SPLASH: black screen, "a game by hiyroscript" fades in near the bottom,
-// holds, fades out, then Home. Any key / tap skips.
+// holds, fades out, then Home dissolves in over the black. Any key / tap skips.
 
 import { Screen } from '../core/screen-manager.js';
 import { CONFIG } from '../config.js';
@@ -9,6 +9,8 @@ export class SplashScreen extends Screen {
   constructor(app) {
     super(app, 'splash');
     this.navigable = false;
+    // Stay underneath while the white Home fades in (see .screen--home.is-entering).
+    this.leaveMs = 760;
     this.text = el('p', { class: 'splash-credit', text: 'a game by hiyroscript' });
     this.el.replaceChildren(this.text);
     this.timers = [];

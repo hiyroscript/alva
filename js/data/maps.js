@@ -12,7 +12,7 @@
 export const MAPS = [
   {
     id: 'desert',
-    name: 'DESERT',
+    name: 'Desert',
     tagline: 'Sandstone basin at golden hour',
     description:
       'A wide, sun-baked basin ringed by mesas. Open footing and long sightlines make it a stage about spacing and movement.',
@@ -40,7 +40,7 @@ export const MAPS = [
   },
   {
     id: 'city',
-    name: 'CITY',
+    name: 'City',
     tagline: 'Rooftop district after dark',
     description:
       'A dense rooftop block at night. Vents, girders and catwalks stack into vertical routes above the main roof.',

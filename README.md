@@ -1,4 +1,4 @@
-# Maxy
+# Alva
 
 A 2D sprite fighting game for the browser by **hiyroscript**. Pure HTML, CSS and
 JavaScript with Canvas 2D: no frameworks, no build step, no 3D. It runs on desktop
@@ -7,6 +7,9 @@ and on phones and tablets in landscape.
 This is the first playable foundation: full menu flow, a 48-slot roster, two
 large stages, movement and platform physics, a camera, a HUD, touch controls,
 and a combat system that is wired up and ready for attack sprites.
+
+The full product specification, including the Alva brand system, is in
+[`ALVA_SPEC.md`](./ALVA_SPEC.md).
 
 ## Run locally
 
@@ -24,11 +27,18 @@ Any static server works (`npx serve`, `npx http-server`, …). You don't need `n
 
 1. Push the repository to GitHub.
 2. Go to **Settings → Pages**, choose **Deploy from a branch**, select your branch and `/ (root)`.
-3. Open `https://<user>.github.io/maxy/`.
+3. Open `https://<user>.github.io/alva/`.
 
 `index.html` is the entry point. Every asset and module path is relative
-(`./assets/...`, `./js/...`), so the game works under the `/maxy/` sub-path.
-`.nojekyll` stops Jekyll from processing the site.
+(`./assets/...`, `./js/...`), so the game works under any sub-path, including
+`/alva/`. `.nojekyll` stops Jekyll from processing the site.
+
+### Repository name
+
+The product is Alva, but the GitHub repository itself is still named `maxy`, so
+until it is renamed the site is served from `/maxy/`. Rename it under
+**Settings → General → Repository name** (GitHub redirects the old URL). Nothing
+in the code depends on the repository name, so no file changes are needed.
 
 ## Controls
 
@@ -59,11 +69,33 @@ Touch controls show on touch-first devices (coarse pointer, or a touch actually 
 - **Animations:** Idle, Run
 - **Mode:** Quick Battle: 1 round, 99 seconds, against a non-attacking training CPU
 
+## Design
+
+Alva's interface is white-dominant and strictly monochrome: white surfaces,
+black type and primary actions, gray for secondary text, borders and quiet
+surfaces. There is no accent colour. Selection and focus are shown with black
+borders, check marks, filled indicators and a black focus ring rather than hue.
+
+- **Tokens** live at the top of `styles.css` (`--bg`, `--surface*`, `--text*`,
+  `--border*`, `--ink`, radii, shadows, `--focus-ring`).
+- **Wordmark:** `js/ui/logo.js` draws ALVA from geometric SVG letterforms and
+  inherits `currentColor`, so it needs no font download. `assets/favicon.svg`
+  is the matching "A" monogram.
+- **Home** is an application-style screen: header with wordmark and build,
+  Play (black) and Help & Credits (outlined), and a contained charcoal preview
+  of the current fighter's idle loop.
+- **Battle** keeps dark translucent chrome over the stage so the HUD stays
+  readable, using the same monochrome rules.
+- Character sprites and stage artwork are game content and keep their original
+  colours; only interface chrome follows the monochrome palette.
+
 ## How it's built
 
 ```
 index.html            entry point
-styles.css            all UI styling (black / white / gray / orange)
+styles.css            all UI styling (Alva monochrome design tokens + screens)
+ALVA_SPEC.md          product specification
+assets/favicon.svg    Alva monogram
 assets/characters/0001/   #0001 sprite frames (unchanged originals)
 js/
   main.js, config.js  boot + global config (bindings, render, timing)
@@ -74,7 +106,7 @@ js/
                       combat, sprite normalizer/animator, HUD, touch controls
   stages/             Desert and City layered renderers (procedural Canvas 2D)
   data/               characters.js, maps.js
-  ui/                 logo, icons, overlays, shared help content, stage preview
+  ui/                 wordmark, icons, overlays, shared help content, stage preview
 ```
 
 - **Sprite normalization.** The idle frames are pixel art at roughly 16× scale and the run frames at 4×. When a frame loads, the game reads its alpha channel once and finds the visible bounds. It then detects the pixel grid from every colour transition and resamples the frame to 1 pixel per art pixel. Every frame is drawn at the same world scale, anchored bottom-centre at the upper-body centroid, so the fighter keeps the same size and position when switching between idle and run. When the size stays close to the target, each art pixel maps to a whole number of device pixels.
@@ -95,7 +127,7 @@ Add an entry to `MAPS` in `js/data/maps.js` (size, ground, bounds, spawns, platf
 
 ## Credits
 
-**MAXY**, created by hiyroscript.
+**Alva**, created by hiyroscript.
 
 **#0001 sprite source.** This credits the original sprite material:
 
@@ -106,5 +138,5 @@ hiyroscript did not create the original Naruto artwork and does not own the
 Naruto or Jump Ultimate Stars intellectual property. Original characters, games,
 and related properties belong to their respective rights holders.
 
-The code, UI, logo and Desert / City stage art are original to Maxy. The game
-ships with no audio.
+The code, UI, Alva wordmark and Desert / City stage art are original to Alva.
+The game ships with no audio.

@@ -1,6 +1,7 @@
 // HELP AND CREDITS: two tabs sharing one scrollable panel.
 
 import { Screen } from '../core/screen-manager.js';
+import { CONFIG } from '../config.js';
 import { el } from '../core/utils.js';
 import { screenHeader, hintBar } from '../ui/components.js';
 import { buildHelp, buildCredits } from '../ui/help-content.js';
@@ -9,8 +10,8 @@ export class HelpCreditsScreen extends Screen {
   constructor(app) {
     super(app, 'help');
     this.tabs = [
-      { id: 'help', label: 'HELP', build: buildHelp },
-      { id: 'credits', label: 'CREDITS', build: buildCredits },
+      { id: 'help', label: 'Help', build: buildHelp },
+      { id: 'credits', label: 'Credits', build: buildCredits },
     ].map((t) => {
       const btn = el('button', {
         class: 'tab', type: 'button', role: 'tab', id: `tab-${t.id}`,
@@ -28,7 +29,7 @@ export class HelpCreditsScreen extends Screen {
     this.tabs[0].btn.setAttribute('data-nav-default', '');
 
     this.el.replaceChildren(
-      screenHeader({ title: 'HELP AND CREDITS', kicker: 'MAXY', onBack: () => this.onBack() }),
+      screenHeader({ title: 'Help & Credits', kicker: CONFIG.title, onBack: () => this.onBack() }),
       el('div', { class: 'screen-body help-layout' }, [
         el('div', { class: 'tabs', role: 'tablist', 'aria-label': 'Help and credits' }, this.tabs.map((t) => t.btn)),
         el('div', { class: 'tab-panels' }, this.tabs.map((t) => t.panel)),

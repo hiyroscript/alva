@@ -21,7 +21,7 @@ function controlsTable() {
     el('tr', {}, [
       el('th', { scope: 'row' }, [
         ACTION_LABELS[action],
-        PENDING.has(action) ? el('span', { class: 'tag', text: 'RESERVED' }) : null,
+        PENDING.has(action) ? el('span', { class: 'tag', text: 'Reserved' }) : null,
       ]),
       el('td', {}, [keys(CONFIG.bindings[action])]),
     ]),
@@ -58,15 +58,15 @@ function mobileDiagram() {
 
 export function buildHelp() {
   return el('div', { class: 'info-grid' }, [
-    card('DESKTOP CONTROLS', [
+    card('Desktop controls', [
       controlsTable(),
       el('p', { class: 'info-note', text: 'Keys can be held together — run and jump at the same time. Gamepads with a standard layout also work (D-pad / stick to move, A to jump, Start to pause).' }),
     ], 'info-card--wide'),
-    card('MOBILE CONTROLS', [
+    card('Mobile controls', [
       mobileDiagram(),
       el('p', { class: 'info-note', text: 'Play in landscape. Hold a direction and press Jump with your other thumb; you can slide between the movement buttons without lifting.' }),
     ]),
-    card('MOVEMENT', [
+    card('Movement', [
       el('ul', { class: 'info-list' }, [
         el('li', { text: 'Left / Right accelerate into a run. Release to slow to a stop.' }),
         el('li', { text: 'Jump from the ground; you can steer while airborne.' }),
@@ -74,22 +74,22 @@ export function buildHelp() {
         el('li', { text: 'Hold Down on solid ground to crouch in place.' }),
       ]),
     ]),
-    card('STAGES & PLATFORMS', [
+    card('Stages & platforms', [
       el('ul', { class: 'info-list' }, [
-        el('li', { text: 'DESERT is wide and open, with two rock outcrops you can hop onto.' }),
-        el('li', { text: 'CITY stacks one-way platforms over the rooftop. Jump up through them from below.' }),
+        el('li', { text: 'Desert is wide and open, with two rock outcrops you can hop onto.' }),
+        el('li', { text: 'City stacks one-way platforms over the rooftop. Jump up through them from below.' }),
         el('li', { text: 'Press Down while standing on a platform to drop through it. The water-tower deck is solid footing.' }),
         el('li', { text: 'The camera follows the action; stage edges are walled off.' }),
       ]),
     ]),
-    card('PAUSE', [
+    card('Pause', [
       el('ul', { class: 'info-list' }, [
         el('li', { text: 'Press Esc or P, or tap the pause button in the top-right corner.' }),
         el('li', { text: 'Resume, restart the battle, read this help, or return to Home.' }),
         el('li', { text: 'The game pauses automatically when you switch tabs or rotate to portrait.' }),
       ]),
     ]),
-    card('THIS BUILD', [
+    card('This build', [
       el('p', { class: 'info-text', text: '#0001 currently has idle and run animations. Primary, Special, Action 1 and Action 2 are wired into the input and combat systems but stay inactive until matching attack sprites are added. Block sets a guard state that uses the idle pose.' }),
     ]),
   ]);
@@ -97,11 +97,11 @@ export function buildHelp() {
 
 export function buildCredits() {
   return el('div', { class: 'info-grid info-grid--credits' }, [
-    card('MAXY', [
+    card(CONFIG.title, [
       el('p', { class: 'credit-lead', text: `Created by ${CONFIG.developer}` }),
-      el('p', { class: 'info-text', text: 'Game design, code, user interface and the Desert and City stage art are original work for Maxy.' }),
+      el('p', { class: 'info-text', text: `Game design, code, user interface, the ${CONFIG.name} wordmark and the Desert and City stage art are original work for ${CONFIG.name}.` }),
     ]),
-    card('#0001 SPRITE SOURCE', [
+    card('#0001 sprite source', [
       el('p', { class: 'info-text', text: 'Source attribution for the original sprite material used for #0001:' }),
       el('dl', { class: 'detail-list credit-list' }, [
         el('dt', { text: 'Character' }), el('dd', { text: 'Naruto Uzumaki' }),
@@ -113,7 +113,7 @@ export function buildCredits() {
       ]),
       el('p', { class: 'info-text', text: `${CONFIG.developer} did not create the original Naruto artwork and does not own the Naruto or Jump Ultimate Stars intellectual property.` }),
     ], 'info-card--wide'),
-    card('RIGHTS', [
+    card('Rights', [
       el('p', { class: 'info-text', text: 'Original characters, games, and related properties belong to their respective rights holders.' }),
     ]),
   ]);

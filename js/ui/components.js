@@ -3,7 +3,7 @@
 import { el } from '../core/utils.js';
 import { ICONS } from './icons.js';
 
-const STEPS = ['MODE', 'FIGHTER', 'STAGE'];
+const STEPS = ['Mode', 'Fighter', 'Stage'];
 
 export function screenHeader({ title, kicker, step = null, onBack }) {
   const back = el('button', {
@@ -11,7 +11,7 @@ export function screenHeader({ title, kicker, step = null, onBack }) {
     type: 'button',
     'data-nav': true,
     'aria-label': 'Back',
-    html: `${ICONS.back}<span>BACK</span>`,
+    html: `${ICONS.back}<span>Back</span>`,
   });
   back.addEventListener('click', onBack);
 
@@ -22,7 +22,11 @@ export function screenHeader({ title, kicker, step = null, onBack }) {
         el('li', {
           class: i < step ? 'is-done' : i === step ? 'is-current' : '',
           'aria-current': i === step ? 'step' : null,
-        }, [el('span', { class: 'step-num', text: String(i + 1).padStart(2, '0') }), el('span', { class: 'step-name', text: name })]),
+        }, [
+          // Completed steps show a check, so progress doesn't rely on tone alone.
+          el('span', i < step ? { class: 'step-num', html: ICONS.check } : { class: 'step-num', text: String(i + 1) }),
+          el('span', { class: 'step-name', text: name }),
+        ]),
       ),
     );
   }

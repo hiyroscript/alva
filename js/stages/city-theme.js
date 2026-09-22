@@ -1,5 +1,6 @@
 // CITY — dense rooftop district at night. Vertical routes over platforms,
-// dark structures with orange accent lighting.
+// dark structures with warm neon accent lighting. These are scene colours of
+// the stage artwork, not part of the monochrome Alva interface palette.
 
 import { StageTheme, ParticleField } from './stage-theme.js';
 import { mulberry32, range } from '../core/utils.js';

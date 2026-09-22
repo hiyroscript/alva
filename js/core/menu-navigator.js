@@ -102,7 +102,7 @@ export class MenuNavigator {
     if (this.command(cmd, e)) {
       e.preventDefault();
       // Lets later key listeners (e.g. battle pause toggle) skip this event.
-      e.maxyHandled = true;
+      e.menuHandled = true;
     }
   }
 

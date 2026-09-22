@@ -132,7 +132,7 @@ export function normalizeFrame(img, url, { forcedPixelSize = null, anchor = 'tor
   } catch (err) {
     // Canvas tainted (e.g. opened via file://). Fall back to raw drawing.
     if (!warnedTaint) {
-      console.warn('[Maxy] Could not read sprite pixels; serve the game over http(s) for sprite normalization.', err);
+      console.warn('[Alva] Could not read sprite pixels; serve the game over http(s) for sprite normalization.', err);
       warnedTaint = true;
     }
     return {
