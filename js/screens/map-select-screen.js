@@ -30,11 +30,11 @@ export class MapSelectScreen extends Screen {
       }, [
         el('span', { class: 'map-thumb-wrap' }, [thumb]),
         el('span', { class: 'map-card-body' }, [
-          el('span', { class: 'map-card-index', text: `STAGE ${String(i + 1).padStart(2, '0')}` }),
+          el('span', { class: 'map-card-index', text: `Stage ${String(i + 1).padStart(2, '0')}` }),
           el('span', { class: 'map-card-name', text: map.name }),
           el('span', { class: 'map-card-tag', text: map.tagline }),
         ]),
-        el('span', { class: 'map-card-selected', html: `${ICONS.check}<span>SELECTED</span>` }),
+        el('span', { class: 'map-card-selected', html: `${ICONS.check}<span>Selected</span>` }),
       ]);
       card._map = map;
       card._preview = new StagePreview(thumb, { animated: false, pan: false, reducedMotion: true });
@@ -45,12 +45,12 @@ export class MapSelectScreen extends Screen {
 
     this.startBtn = el('button', {
       class: 'btn btn--primary btn--start', type: 'button', 'data-nav': true,
-      html: `<span>START BATTLE</span>${ICONS.right}`,
+      html: `<span>Start Battle</span>${ICONS.arrow}`,
     });
     this.startBtn.addEventListener('click', () => this.start());
 
     this.el.replaceChildren(
-      screenHeader({ title: 'SELECT MAP', kicker: 'QUICK BATTLE', step: 2, onBack: () => this.onBack() }),
+      screenHeader({ title: 'Select Map', kicker: 'Quick Battle', step: 2, onBack: () => this.onBack() }),
       el('div', { class: 'screen-body map-layout' }, [
         el('section', { class: 'map-hero', 'aria-labelledby': 'map-hero-name' }, [
           this.heroCanvas,
@@ -58,8 +58,8 @@ export class MapSelectScreen extends Screen {
         ]),
         el('div', { class: 'map-side' }, [
           el('div', { class: 'panel-head' }, [
-            el('span', { class: 'panel-title', text: 'STAGES' }),
-            el('span', { class: 'panel-meta', text: `${MAPS.length} AVAILABLE` }),
+            el('span', { class: 'panel-title', text: 'Stages' }),
+            el('span', { class: 'panel-meta', text: `${MAPS.length} available` }),
           ]),
           el('div', { class: 'map-cards', role: 'radiogroup', 'aria-label': 'Stages' }, this.cards),
           this.startBtn,
@@ -100,21 +100,21 @@ export class MapSelectScreen extends Screen {
       c.classList.toggle('is-selected', on);
       c.setAttribute('aria-checked', on ? 'true' : 'false');
     }
-    this.startBtn.querySelector('span').textContent = `START BATTLE · ${map.name}`;
+    this.startBtn.querySelector('span').textContent = `Start Battle · ${map.name}`;
   }
 
   showHero(map) {
     if (this.heroMap === map) return;
     this.heroMap = map;
     const i = MAPS.indexOf(map);
-    this.heroIndex.textContent = `STAGE ${String(i + 1).padStart(2, '0')}`;
+    this.heroIndex.textContent = `Stage ${String(i + 1).padStart(2, '0')}`;
     this.heroName.textContent = map.name;
     this.heroTagline.textContent = map.tagline;
     this.heroDesc.textContent = map.description;
     const width = `${(map.worldWidth / REF_VIEW_W).toFixed(1)} screens wide`;
+    // Each term/value pair is grouped so a pair never wraps apart.
     this.heroTraits.replaceChildren(
-      el('dt', { text: 'Size' }), el('dd', { text: width }),
-      ...map.traits.flatMap(([k, v]) => [el('dt', { text: k }), el('dd', { text: v })]),
+      ...[['Size', width], ...map.traits].map(([k, v]) => el('div', { class: 'map-trait' }, [el('dt', { text: k }), el('dd', { text: v })])),
     );
     this.el.dataset.map = map.id;
     requestAnimationFrame(() => this.hero.setMap(map, this.sprites));

@@ -1,4 +1,4 @@
-// Original inline SVG icons (simple geometric shapes, white strokes).
+// Original inline SVG icons (simple geometric shapes, stroked in currentColor).
 
 const svg = (body, { fill = false, vb = 24 } = {}) =>
   `<svg viewBox="0 0 ${vb} ${vb}" aria-hidden="true" focusable="false" class="icon${fill ? ' icon--fill' : ''}">${body}</svg>`;
@@ -6,6 +6,7 @@ const svg = (body, { fill = false, vb = 24 } = {}) =>
 export const ICONS = {
   left: svg('<path d="M15 4.5 7.5 12 15 19.5"/>'),
   right: svg('<path d="M9 4.5 16.5 12 9 19.5"/>'),
+  arrow: svg('<path d="M4.5 12h15"/><path d="M13.5 6l6 6-6 6"/>'),
   down: svg('<path d="M4.5 9 12 16.5 19.5 9"/>'),
   up: svg('<path d="M4.5 15 12 7.5 19.5 15"/>'),
   jump: svg('<path d="M12 17.5V5.5"/><path d="M6.5 11 12 5.5l5.5 5.5"/><path d="M5 20.5h14"/>'),

@@ -89,8 +89,8 @@ export class App {
     const def = getCharacter(id);
     const promise = this.assets.loadAll(characterFramePaths(def), onProgress).then(({ failed }) => {
       const set = SpriteSet.build(def, (url) => this.assets.get(url));
-      if (failed.length) console.error(`[Maxy] ${def.displayName}: ${failed.length} frame(s) failed to load`, failed);
-      if (!set.usable) console.error(`[Maxy] ${def.displayName} has no usable frames.`);
+      if (failed.length) console.error(`[Alva] ${def.displayName}: ${failed.length} frame(s) failed to load`, failed);
+      if (!set.usable) console.error(`[Alva] ${def.displayName} has no usable frames.`);
       this.spriteSets.set(id, set);
       this.spritePromises.delete(id);
       return set;

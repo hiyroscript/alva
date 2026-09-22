@@ -11,6 +11,9 @@ import { drawFrame } from './sprite-normalizer.js';
 import { createTheme } from '../stages/index.js';
 import { mulberry32 } from '../core/utils.js';
 
+// Ground ring + name tag tones: the player is white, the CPU a mid gray.
+const MARKER = { p1: '#ffffff', p2: '#a3a3a3' };
+
 export class Battle {
   constructor({ canvas, map, p1Def, p2Def, p1Sprites, p2Sprites, input, reducedMotion = false, onPhase }) {
     this.canvas = canvas;
@@ -209,7 +212,7 @@ export class Battle {
     // Player ring marker on the ground.
     ctx.save();
     ctx.globalAlpha = 0.85 * fade;
-    ctx.strokeStyle = f.slot === 'p1' ? '#ff7a00' : '#bdbdbd';
+    ctx.strokeStyle = MARKER[f.slot];
     ctx.lineWidth = Math.max(1.5, view.scale * 1.2);
     ctx.beginPath();
     ctx.ellipse(sx, sy, rx * 1.1, ry * 1.35, 0, 0, Math.PI * 2);
@@ -233,8 +236,7 @@ export class Battle {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'bottom';
     for (const f of this.fighters) {
-      const isP1 = f.slot === 'p1';
-      const color = isP1 ? '#ff7a00' : '#bdbdbd';
+      const color = MARKER[f.slot];
       const [x, footY] = this.toScreen(f.renderX, f.renderY);
       const top = footY - (f.def.visual.height + 16) * s;
       const onScreen = x > -10 && x < view.pxW + 10;
@@ -283,7 +285,7 @@ export class Battle {
       ctx.strokeStyle = color;
       ctx.strokeRect(Math.round(sx) + 0.5, Math.round(sy) + 0.5, Math.round(w * s), Math.round(h * s));
     };
-    for (const p of this.stage.platforms) rect(p.x, p.y, p.w, 2, p.dropThrough ? '#ff9a2e' : '#ff3b3b');
+    for (const p of this.stage.platforms) rect(p.x, p.y, p.w, 2, p.dropThrough ? '#ffffff' : '#ff3b3b');
     for (const so of this.stage.solids) rect(so.x, so.y, so.w, so.h, '#ff3b3b');
     const box = {};
     for (const f of this.fighters) {

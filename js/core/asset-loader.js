@@ -27,7 +27,7 @@ export class AssetLoader {
         resolve(img);
       };
       img.onerror = () => {
-        console.error(`[Maxy] Failed to load image asset: ${url}`);
+        console.error(`[Alva] Failed to load image asset: ${url}`);
         this.failed.add(url);
         this.pending.delete(url);
         resolve(null);

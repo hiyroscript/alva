@@ -11,6 +11,6 @@ const THEMES = {
 
 export function createTheme(map, opts) {
   const Theme = THEMES[map.theme];
-  if (!Theme) throw new Error(`[Maxy] Unknown stage theme "${map.theme}"`);
+  if (!Theme) throw new Error(`[Alva] Unknown stage theme "${map.theme}"`);
   return new Theme(map, opts);
 }

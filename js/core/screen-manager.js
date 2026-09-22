@@ -9,6 +9,8 @@ export class Screen {
     this.el = document.querySelector(`[data-screen="${id}"]`);
     // Whether arrow keys / Enter / Esc drive menu navigation on this screen.
     this.navigable = true;
+    // How long the screen stays mounted under the next one when leaving.
+    this.leaveMs = null;
   }
 
   // Lifecycle hooks (override as needed)
@@ -51,7 +53,7 @@ export class ScreenManager {
   // back stack; `reset` clears the stack (e.g. returning Home).
   go(id, params = {}, { replace = false, reset = false } = {}) {
     const next = this.screens.get(id);
-    if (!next) throw new Error(`[Maxy] Unknown screen "${id}"`);
+    if (!next) throw new Error(`[Alva] Unknown screen "${id}"`);
     const prev = this.current;
     if (reset) this.stack = [];
     else if (prev && !replace && prev !== next) this.stack.push(prev.id);
@@ -80,7 +82,7 @@ export class ScreenManager {
         el._hideTimer = setTimeout(() => {
           el.classList.remove('is-leaving');
           if (this.current !== prev) el.hidden = true;
-        }, this.transitionMs);
+        }, prev.leaveMs ?? this.transitionMs);
       }
     }
     this.current = next;

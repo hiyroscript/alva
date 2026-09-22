@@ -141,7 +141,7 @@ export class Fighter {
     if (atk.groundOnly && !this.body.grounded) return false;
     // Never fake an attack pose: require real frames for the attack.
     if (!atk.animation || !this.sprites.has(atk.animation)) {
-      console.warn(`[Maxy] Attack "${attackId}" has no animation frames; ignoring.`);
+      console.warn(`[Alva] Attack "${attackId}" has no animation frames; ignoring.`);
       return false;
     }
     combat.attack = { def: atk, time: 0, hasHit: false };

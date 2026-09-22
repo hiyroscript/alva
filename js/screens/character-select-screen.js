@@ -9,7 +9,7 @@ import { screenHeader, hintBar, MENU_HINTS } from '../ui/components.js';
 import { CHARACTERS, getCharacter } from '../data/characters.js';
 import { fitCanvas, drawFrameAt } from '../ui/sprite-art.js';
 
-const ANIM_LABELS = { idle: 'IDLE', run: 'RUN' };
+const ANIM_LABELS = { idle: 'Idle', run: 'Run' };
 
 export class CharacterSelectScreen extends Screen {
   constructor(app) {
@@ -75,19 +75,19 @@ export class CharacterSelectScreen extends Screen {
       el('div', { class: 'preview-stage' }, [el('div', { class: 'preview-floor' }), this.previewCanvas]),
       el('div', { class: 'preview-info' }, [
         el('div', { class: 'preview-head' }, [this.status, this.name, this.sub]),
-        el('div', { class: 'preview-anims' }, [el('span', { class: 'label', text: 'ANIMATIONS' }), this.chips]),
+        el('div', { class: 'preview-anims' }, [el('span', { class: 'label', text: 'Animations' }), this.chips]),
         this.facts,
         this.confirmBtn,
       ]),
     ]);
 
     this.el.replaceChildren(
-      screenHeader({ title: 'SELECT FIGHTER', kicker: 'QUICK BATTLE', step: 1, onBack: () => this.onBack() }),
+      screenHeader({ title: 'Select Fighter', kicker: 'Quick Battle', step: 1, onBack: () => this.onBack() }),
       el('div', { class: 'screen-body char-layout' }, [
         el('section', { class: 'roster-panel', 'aria-label': 'Roster' }, [
           el('div', { class: 'panel-head' }, [
-            el('span', { class: 'panel-title', text: 'ROSTER' }),
-            el('span', { class: 'panel-meta', html: `<b>${available}</b> / ${total} AVAILABLE` }),
+            el('span', { class: 'panel-title', text: 'Roster' }),
+            el('span', { class: 'panel-meta', html: `<b>${available}</b> / ${total} available` }),
           ]),
           el('div', { class: 'roster-scroll' }, [this.grid]),
         ]),
@@ -160,9 +160,9 @@ export class CharacterSelectScreen extends Screen {
     const num = String(slot._index + 1).padStart(2, '0');
     if (!def || !def.available) {
       this.el.classList.add('is-locked-preview');
-      this.status.textContent = 'LOCKED';
+      this.status.textContent = 'Locked';
       this.status.className = 'status-badge is-locked';
-      this.name.textContent = `SLOT ${num}`;
+      this.name.textContent = `Slot ${num}`;
       this.sub.textContent = 'No fighter assigned to this slot yet.';
       this.chips.replaceChildren(el('span', { class: 'chip is-muted', text: '—' }));
       this.facts.replaceChildren();
@@ -172,7 +172,7 @@ export class CharacterSelectScreen extends Screen {
       return;
     }
     this.el.classList.remove('is-locked-preview');
-    this.status.textContent = 'AVAILABLE';
+    this.status.textContent = 'Available';
     this.status.className = 'status-badge is-available';
     this.name.textContent = def.displayName;
     this.sub.textContent = `Roster slot ${num}`;
@@ -185,7 +185,7 @@ export class CharacterSelectScreen extends Screen {
         const chip = el('button', {
           class: `chip${key === this.previewAnim ? ' is-active' : ''}`, type: 'button', 'data-nav': true,
           'aria-pressed': key === this.previewAnim ? 'true' : 'false',
-          text: ANIM_LABELS[key] || key.toUpperCase(),
+          text: ANIM_LABELS[key] || key,
         });
         chip.addEventListener('click', () => {
           this.previewAnim = key;
@@ -201,10 +201,10 @@ export class CharacterSelectScreen extends Screen {
     );
     this.facts.replaceChildren(
       ...anims.flatMap((key) => [
-        el('dt', { text: `${ANIM_LABELS[key] || key.toUpperCase()} FRAMES` }),
+        el('dt', { text: `${ANIM_LABELS[key] || key} frames` }),
         el('dd', { text: String(def.animations[key].frames.length) }),
       ]),
-      el('dt', { text: 'ATTACK SET' }),
+      el('dt', { text: 'Attack set' }),
       el('dd', { text: 'Awaiting sprites' }),
     );
     this.previewIndex = 0;
@@ -216,7 +216,7 @@ export class CharacterSelectScreen extends Screen {
   updateConfirm() {
     const def = getCharacter(this.selectedId);
     this.confirmBtn.disabled = !def;
-    this.confirmBtn.textContent = def ? `CONFIRM ${def.displayName}` : 'SELECT A FIGHTER';
+    this.confirmBtn.textContent = def ? `Confirm ${def.displayName}` : 'Select a fighter';
   }
 
   confirm() {

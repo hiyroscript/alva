@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <title>ALVA</title>
+  <rect x="0.75" y="0.75" width="62.5" height="62.5" rx="14" fill="#ffffff" stroke="#dcdcdc" stroke-width="1.5"/>
+  <path transform="translate(14.8 12) scale(0.4)" fill="#000000" fill-rule="evenodd" d="M0 100L34.5 0L51.5 0L86 100L69 100L61.41 78L24.59 78L17 100ZM43 24.64L56.24 63L29.77 63Z"/>
+</svg>

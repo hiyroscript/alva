@@ -1,4 +1,4 @@
-// Audio foundation. Maxy ships with no audio assets and works silently.
+// Audio foundation. Alva ships with no audio assets and works silently.
 // Sounds can be registered later (e.g. audio.register('confirm', './assets/audio/confirm.ogg')).
 // Nothing plays before a user gesture unlocks the AudioContext.
 
@@ -37,7 +37,7 @@ export class AudioManager {
       const data = await res.arrayBuffer();
       this.buffers.set(name, await this.ctx.decodeAudioData(data));
     } catch (err) {
-      console.error(`[Maxy] Failed to load audio "${name}" (${url})`, err);
+      console.error(`[Alva] Failed to load audio "${name}" (${url})`, err);
     }
   }
 

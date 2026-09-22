@@ -34,7 +34,7 @@ const ATTACK_DEFAULTS = {
 };
 
 export function createAttackDefinition(spec) {
-  if (!spec?.id) throw new Error('[Maxy] Attack definitions need an id');
+  if (!spec?.id) throw new Error('[Alva] Attack definitions need an id');
   const def = { ...ATTACK_DEFAULTS, ...spec };
   def.total = def.startup + def.active + def.recovery;
   return Object.freeze(def);

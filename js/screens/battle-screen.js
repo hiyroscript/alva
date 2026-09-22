@@ -67,10 +67,10 @@ export class BattleScreen extends Screen {
 
   buildPause() {
     this.pauseKicker = el('span', { class: 'kicker' });
-    const resume = menuButton('RESUME', { primary: true });
-    const restart = menuButton('RESTART BATTLE');
-    const help = menuButton('HELP');
-    const home = menuButton('RETURN TO HOME');
+    const resume = menuButton('Resume', { primary: true });
+    const restart = menuButton('Restart Battle');
+    const help = menuButton('Help');
+    const home = menuButton('Return to Home');
     resume.addEventListener('click', () => this.resume());
     restart.addEventListener('click', () => this.restart());
     help.addEventListener('click', () => this.openHelp());
@@ -78,15 +78,15 @@ export class BattleScreen extends Screen {
 
     this.pauseMenuView = el('div', { class: 'pause-view' }, [
       this.pauseKicker,
-      el('h2', { class: 'pause-title', id: 'pause-title', text: 'PAUSED' }),
+      el('h2', { class: 'pause-title', id: 'pause-title', text: 'Paused' }),
       el('div', { class: 'pause-menu' }, [resume, restart, help, home]),
     ]);
 
-    const helpBack = el('button', { class: 'btn-back', type: 'button', 'data-nav': true, 'data-nav-default': true, 'aria-label': 'Back to pause menu', html: `${ICONS.back}<span>BACK</span>` });
+    const helpBack = el('button', { class: 'btn-back', type: 'button', 'data-nav': true, 'data-nav-default': true, 'aria-label': 'Back to pause menu', html: `${ICONS.back}<span>Back</span>` });
     helpBack.addEventListener('click', () => this.closeHelp());
     this.helpScroll = el('div', { class: 'pause-help-scroll', tabindex: '0' }, [buildHelp()]);
     this.pauseHelpView = el('div', { class: 'pause-view pause-view--help', hidden: true }, [
-      el('div', { class: 'pause-help-head' }, [helpBack, el('h2', { class: 'pause-title', text: 'HELP' })]),
+      el('div', { class: 'pause-help-head' }, [helpBack, el('h2', { class: 'pause-title', text: 'Help' })]),
       this.helpScroll,
     ]);
 
@@ -107,12 +107,12 @@ export class BattleScreen extends Screen {
   }
 
   buildResult() {
-    this.resultKicker = el('span', { class: 'kicker', text: 'TIME OVER' });
+    this.resultKicker = el('span', { class: 'kicker', text: 'Time over' });
     this.resultTitle = el('h2', { class: 'result-title', id: 'result-title' });
     this.resultSub = el('p', { class: 'result-sub' });
-    const rematch = menuButton('REMATCH', { primary: true });
-    const stage = menuButton('CHANGE STAGE');
-    const home = menuButton('RETURN TO HOME');
+    const rematch = menuButton('Rematch', { primary: true });
+    const stage = menuButton('Change Stage');
+    const home = menuButton('Return to Home');
     rematch.addEventListener('click', () => this.rematch());
     stage.addEventListener('click', () => this.leave(() => this.app.screens.back()));
     home.addEventListener('click', () => this.leave(() => this.app.screens.go('home', {}, { reset: true })));
@@ -141,7 +141,7 @@ export class BattleScreen extends Screen {
     this.token = {};
     const token = this.token;
 
-    app.loading.show(`LOADING ${def.displayName}`);
+    app.loading.show(`Loading ${def.displayName}`);
     const sprites = await app.loadCharacter(def.id, (done, total) => app.loading.setProgress(done, total));
     if (token !== this.token) return; // left the screen while loading
 
@@ -170,7 +170,7 @@ export class BattleScreen extends Screen {
       onPhase: (phase, battle) => this.onPhase(phase, battle),
     });
     this.hud.bind(this.battle.p1, this.battle.p2);
-    this.pauseKicker.textContent = `QUICK BATTLE · ${map.name}`;
+    this.pauseKicker.textContent = `Quick Battle · ${map.name}`;
     this.needsResize = true;
     this.paused = false;
     this.hidePause();
@@ -225,7 +225,7 @@ export class BattleScreen extends Screen {
   }
 
   onKey(e) {
-    if (e.maxyHandled || !this.battle || this.app.dialog.resolve) return;
+    if (e.menuHandled || !this.battle || this.app.dialog.resolve) return;
     if (e.code === CONFIG.debug.overlayKey && !e.repeat) {
       this.battle.debug = !this.battle.debug;
       if (!this.isRunning) this.battle.render();
@@ -339,10 +339,10 @@ export class BattleScreen extends Screen {
 
   async confirmHome() {
     const ok = await this.app.dialog.open({
-      title: 'RETURN TO HOME?',
+      title: 'Return to Home?',
       message: 'The current battle will end and its progress will be discarded.',
-      confirmLabel: 'RETURN HOME',
-      cancelLabel: 'KEEP PLAYING',
+      confirmLabel: 'Return Home',
+      cancelLabel: 'Keep Playing',
     });
     if (ok) this.leave(() => this.app.screens.go('home', {}, { reset: true }));
   }
@@ -357,7 +357,7 @@ export class BattleScreen extends Screen {
 
   showResult() {
     const { outcome } = this.battle.result;
-    this.resultTitle.textContent = outcome === 'draw' ? 'DRAW' : outcome === 'p1' ? 'PLAYER 1 WINS' : 'CPU WINS';
+    this.resultTitle.textContent = outcome === 'draw' ? 'Draw' : outcome === 'p1' ? 'Player 1 Wins' : 'CPU Wins';
     this.resultSub.textContent = outcome === 'draw'
       ? 'Time ran out with both fighters standing.'
       : 'Time ran out. Remaining health decides the round.';

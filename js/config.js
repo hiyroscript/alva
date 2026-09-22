@@ -1,9 +1,10 @@
-// Global, data-only configuration for Maxy.
+// Global, data-only configuration for Alva.
 // Gameplay coordinates are logical world units; nothing here is in device pixels
 // except where explicitly noted.
 
 export const CONFIG = Object.freeze({
-  title: 'MAXY',
+  title: 'ALVA',     // wordmark / document title
+  name: 'Alva',      // product name in running text
   version: '0.1.0',
   developer: 'hiyroscript',
 
