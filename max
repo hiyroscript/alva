@@ -1,0 +1,545 @@
+You are working on the Alva game repository:
+
+hiyroscript/alva
+
+Use this repository as the implementation target.
+
+Use the Seren repository as the visual reference:
+
+hiyroscript/seren
+
+The goal is to redesign Alva’s color system across the UI so it has the same general visual discipline and atmosphere as Seren—black/charcoal dominant, gray surfaces, off-white typography, restrained borders, and one strong accent color—but replace Seren’s red accent with green.
+
+There is one extremely important scope rule:
+
+Only the Alva Home Screen may receive a structural/layout redesign.
+
+Every other screen must retain its current layout, DOM structure, spacing system, controls, functionality, navigation, information hierarchy, and gameplay behavior. Other screens should only inherit the new dark/green visual palette through shared styling and narrowly targeted color changes.
+
+Do not redesign Mode Select, Character Select, Map Select, Help/Credits, Battle, pause/results UI, overlays, or any other screen.
+
+Reference direction
+
+Seren establishes its visual identity using a very small palette:
+
+--void: #050506;
+--ground: #0A0B0C;
+--asphalt: #141518;
+--ink: #F4F5F6;
+--ink-2: #A7ACB3;
+--ink-3: #71767E;
+--ink-4: #4C5158;
+--line: rgba(255,255,255,.09);
+--line-2: rgba(255,255,255,.16);
+--line-3: rgba(255,255,255,.28);
+--wash: rgba(255,255,255,.04);
+--wash-2: rgba(255,255,255,.07);
+
+Seren then uses red as its sole interface accent.
+
+For Alva, use the same philosophy but make green the accent.
+
+A suitable Alva accent family is:
+
+--accent: #2FBF63;
+--accent-hi: #7CF7A6;
+--accent-lo: #1F8F4A;
+--accent-wash: rgba(47,191,99,.14);
+
+Do not introduce blue, purple, orange, yellow, cyan, or additional decorative hues.
+
+The finished UI should visually read as:
+
+near-black → charcoal → gray → off-white → green accent
+
+Green should be deliberate and relatively scarce. The game should remain primarily black/gray/white rather than becoming a “green UI.”
+
+Global Alva color conversion
+
+Alva currently defines a white-dominant monochrome system at the top of styles.css. Convert that system into a dark Seren-like system.
+
+Target approximately:
+
+--bg: #050506;
+--surface: #0A0B0C;
+--surface-subtle: #141518;
+--surface-muted: #1C1F24;
+--surface-sunken: #08090A;
+--text: #F4F5F6;
+--text-strong: #FFFFFF;
+--text-secondary: #A7ACB3;
+--text-muted: #71767E;
+--text-faint: #4C5158;
+--border: rgba(255,255,255,.09);
+--border-strong: rgba(255,255,255,.16);
+--border-hover: rgba(255,255,255,.28);
+--black: #050506;
+--white: #FFFFFF;
+--accent: #2FBF63;
+--accent-hi: #7CF7A6;
+--accent-lo: #1F8F4A;
+--accent-wash: rgba(47,191,99,.14);
+
+Do not blindly invert existing variables if doing so creates incorrect semantics. Alva currently uses variables such as --ink, --black, and --white for both text and filled controls. Refactor individual rules where necessary so that dark surfaces remain dark, text remains light, and green is used for intentional emphasis.
+
+Primary interactive emphasis should generally become green, similar to how Seren uses red.
+
+Examples include primary actions, active/focused selection accents, small progress/indicator accents, and selected-state borders where appropriate.
+
+Secondary controls should generally remain transparent or charcoal with thin gray borders and off-white/gray text.
+
+Hover states should lighten surfaces slightly rather than introducing new colors.
+
+Pressed green actions can use --accent-lo.
+
+Green hover/highlight treatment can use --accent-hi sparingly.
+
+Subtle selected backgrounds may use --accent-wash.
+
+Do not make every border green.
+
+Do not make every heading green.
+
+Do not tint entire cards green.
+
+Do not use neon glow everywhere.
+
+The green needs to work like Seren’s red: a controlled visual signal.
+
+Preserve game artwork
+
+This is critical.
+
+Do not recolor, tint, regenerate, replace, filter, or otherwise modify:
+
+character sprites,
+stage artwork,
+map artwork,
+gameplay Canvas rendering,
+environment colors,
+sprite assets,
+animation frames.
+
+The dark/green conversion applies to interface chrome, not game content.
+
+Battle stages and characters must retain their original colors.
+
+The existing dark battle HUD can be adjusted where necessary so its UI accents fit the new palette, but do not touch the rendered stage or fighter artwork.
+
+Non-Home screens
+
+Do not redesign these screens.
+
+Their layouts and structures are already established.
+
+That includes:
+
+Mode Select,
+Character Select,
+Map Select,
+Help & Credits,
+Battle,
+Pause,
+Results,
+dialogs,
+loading overlays,
+rotate-device UI.
+
+Allow them to inherit the new dark palette through the shared CSS tokens.
+
+Where an existing rule explicitly assumes a white background or black foreground and therefore looks wrong after the token change, update the color declaration only.
+
+Do not modify grid definitions, dimensions, padding, component arrangement, responsive layout, button placement, or JS behavior on these screens.
+
+Treat this as a theme conversion, not a UI redesign.
+
+Home Screen — full redesign allowed
+
+The Home Screen is the exception.
+
+Rework the Alva Home Screen so its composition feels strongly related to Seren’s Home Screen while still clearly being Alva.
+
+The existing Alva Home currently consists of a header, text/action column, and a contained character preview card.
+
+Replace the existing character-preview concept.
+
+The new Home composition should have a large editorial wordmark/text area on the left and an abstract moving road occupying the right side of the screen.
+
+The road replaces the current character placeholder/preview panel.
+
+Do not place a fighter sprite on the Home Screen.
+
+Home visual hierarchy
+
+The background should be full-screen near-black/charcoal.
+
+Make the existing ALVA geometric SVG wordmark the dominant visual element.
+
+Do not replace Alva’s existing logo with a generic font.
+
+Continue using logoSVG() from:
+
+js/ui/logo.js
+
+The wordmark should become dramatically larger than it is currently—closer to Seren’s oversized “SEREN” Home title.
+
+Think editorial title scale rather than application-logo scale.
+
+Keep it off-white/white.
+
+Above the title, retain a small mono uppercase kicker such as the existing:
+
+2D sprite fighting game
+
+This should be muted gray.
+
+Below or close to the title, keep a short supporting line if it contributes to balance, but do not clutter the composition.
+
+The left side should contain the existing functional actions:
+
+Play
+
+Help & Credits
+
+Play is the primary action and should use the green accent.
+
+Help & Credits should be a restrained ghost/secondary action.
+
+Do not change what either button does.
+
+Play must continue to navigate to mode.
+
+Help & Credits must continue to navigate to help.
+
+Road composition
+
+Use Seren’s #ribbon treatment as visual inspiration, not as something to copy literally.
+
+Create an Alva-specific road element using HTML/CSS rather than adding a raster image.
+
+The road should occupy approximately the right 40–48% of the Home composition on larger screens.
+
+It should extend beyond the viewport vertically so it feels like a continuous piece of environment rather than a card.
+
+Give it an angled/banked presentation, roughly in the neighborhood of 18–24 degrees.
+
+Use charcoal asphalt tones such as:
+
+linear-gradient(
+  90deg,
+  #111214,
+  #242629 50%,
+  #151618
+)
+
+Add subtle pale-gray lane markings.
+
+The lane markings may move continuously to imply forward motion, similar to Seren’s Home road.
+
+Keep the animation subtle.
+
+Do not create a visually noisy racing effect.
+
+The road should feel architectural and graphic.
+
+Use soft dark fades at the top and bottom so the road dissolves naturally into the background.
+
+Do not use Seren’s red/white kerbs.
+
+This is Alva, not a racing-game clone.
+
+Green slash separator
+
+The key visual signature of this Home redesign should be a smooth diagonal green slash/line separating the large text area from the road.
+
+The slash should follow or closely echo the left edge/angle of the road.
+
+Use --accent for the primary line.
+
+It should be crisp and anti-aliased through normal CSS transforms—not pixelated.
+
+Aim for roughly 2–4 CSS pixels of visible thickness depending on resolution.
+
+It can have an extremely restrained soft bloom such as:
+
+box-shadow: 0 0 18px rgba(47,191,99,.20);
+
+but do not turn it into a neon beam.
+
+The green slash should be visually recognizable without overpowering the wordmark.
+
+It should create the impression that the Home Screen is split into two zones:
+
+ALVA / navigation / typography on the left
+
+and
+
+moving road / motion / game world on the right.
+
+The separator should remain clean through responsive resizing.
+
+Home actions
+
+Keep the current two actions and their existing navigation.
+
+Restyle them to fit the Seren-inspired language.
+
+The Play button should be a green primary button with white text.
+
+Keep its arrow/icon.
+
+Use a relatively squared shape rather than a large soft pill. A small radius around 2–6px is appropriate.
+
+Give the primary button restrained depth rather than a large shadow.
+
+The secondary Help & Credits action should be transparent or lightly washed, with gray/off-white text.
+
+Do not put both actions inside separate large floating cards.
+
+The Home should feel open and typographic rather than card-heavy.
+
+Header
+
+The existing Home header currently contains a small Alva mark and build number.
+
+You may simplify its presentation as part of the Home redesign.
+
+Keep the build/version information available.
+
+A quiet mono build label in the upper-right is appropriate.
+
+If the small duplicate Alva logo makes the composition feel redundant next to the huge central wordmark, it can be reduced substantially, but retain enough branding/navigation structure that the screen feels deliberate.
+
+Do not add fake settings, profile, shop, online, account, or other features that Alva does not currently have.
+
+Footer
+
+Preserve:
+
+by hiyroscript
+
+and the existing navigation hints.
+
+Restyle them for the dark palette.
+
+Use a subtle top hairline and gray typography similar to Seren’s restrained footer treatment.
+
+Do not change keyboard behavior.
+
+Home Screen JavaScript cleanup
+
+The existing js/screens/home-screen.js creates:
+
+home-preview,
+home-preview-canvas,
+home-preview-caption,
+the selected fighter name,
+an idle sprite animation,
+a charcoal tint,
+and Canvas drawing logic.
+
+Because the road is replacing that character preview, remove the Home-only fighter-preview implementation cleanly.
+
+That means the Home Screen should no longer need imports that exist only for that preview, including things such as:
+
+getCharacter
+
+tintFrame
+
+fitCanvas
+
+drawFrameAt
+
+and the Home-only SILHOUETTE constant.
+
+Remove Home-only frame state and Home-only enter(), update(), or draw() logic if it becomes unnecessary.
+
+Do not remove or alter those shared utilities themselves because they are used elsewhere.
+
+Do not modify character-loading behavior anywhere outside Home.
+
+Build the new road DOM directly inside HomeScreen with semantic/decorative elements, or use Home-specific pseudo-elements where that creates a cleaner implementation.
+
+Mark purely decorative road elements with aria-hidden="true".
+
+Preserve aria-labelledby and sensible accessible naming for the Home navigation.
+
+Home responsive behavior
+
+Alva is designed for desktop and landscape mobile/tablet play, so the new Home needs to remain strong at short viewport heights.
+
+Do not simply hide the entire road at smaller widths the way the old fighter preview is currently hidden.
+
+Instead, adapt it.
+
+On smaller/narrower layouts, allow the road to move farther off the right edge and behave more like a decorative background strip.
+
+Keep the large ALVA title readable and prevent it from colliding with Play/Help controls.
+
+At very short landscape heights, reduce vertical gaps, kicker spacing, title scale, and button height before removing meaningful content.
+
+The green separator should remain visible whenever practical.
+
+Do not introduce scrolling on the main Home screen.
+
+Respect safe-area insets.
+
+Motion
+
+The Home entrance animation can retain Alva’s existing fade/rise character, but adapt it to the new elements.
+
+The road lane motion can run continuously at low intensity.
+
+A slow translation such as Seren’s approximately 1.4-second repeating lane cycle is a reasonable reference.
+
+The green slash itself should remain mostly stable. If it animates on entrance, use a short smooth reveal rather than perpetual pulsing.
+
+Respect:
+
+@media (prefers-reduced-motion: reduce)
+
+When reduced motion is requested, lane scrolling and decorative entrance motion should stop or effectively become instantaneous.
+
+Do not interfere with the existing ScreenManager transitions.
+
+Browser chrome
+
+Alva’s index.html currently declares a light browser theme.
+
+Update the browser-level appearance to match the new dark interface.
+
+Change the theme color from white to the dark ground/void color, for example:
+
+<meta name="theme-color" content="#050506">
+
+Update color-scheme appropriately for a dark UI.
+
+Avoid a white flash during boot or transitions.
+
+The splash is already black, so the transition from Splash to the redesigned dark Home should feel seamless.
+
+Focus and accessibility
+
+Do not use green alone to indicate selection or keyboard focus.
+
+Maintain a strong visible focus treatment.
+
+Because the background is now dark, update the existing focus-ring recipe so it remains visible against both charcoal surfaces and green controls.
+
+White/off-white outer focus treatment plus a dark separation line is appropriate.
+
+Maintain usable text contrast.
+
+Muted text should still be clearly readable.
+
+Buttons must remain identifiable without depending solely on color.
+
+Do not remove ARIA labels or semantic button elements.
+
+Things that must not change
+
+Do not modify gameplay mechanics.
+
+Do not modify fighter physics.
+
+Do not modify combat.
+
+Do not modify maps.
+
+Do not change roster data.
+
+Do not change game controls.
+
+Do not change navigation destinations.
+
+Do not introduce a framework.
+
+Do not add a build step.
+
+Do not add unnecessary dependencies.
+
+Do not replace the existing Alva SVG logo.
+
+Do not redraw or recolor character artwork.
+
+Do not redraw or recolor stage artwork.
+
+Do not copy Seren assets into Alva.
+
+Do not structurally redesign screens other than Home.
+
+Do not turn green into the dominant background color.
+
+Documentation
+
+Alva’s README and ALVA_SPEC.md currently explicitly describe the interface as white-dominant, strictly monochrome, and without an accent color.
+
+After implementing the design, update only the relevant design documentation so it accurately describes the new system:
+
+dark black/gray dominant interface,
+off-white/gray typography,
+green accent,
+original-color game artwork,
+Seren-inspired visual discipline,
+Home road composition.
+
+Do not rewrite unrelated product documentation.
+
+Implementation quality
+
+Keep the implementation concise and consistent with the existing codebase.
+
+Prefer changing shared semantic color variables over duplicating literal colors across dozens of selectors.
+
+Where current variable semantics conflict with the new theme, introduce appropriately named semantic variables instead of forcing an old variable to mean two contradictory things.
+
+Keep Home-specific styling under the existing Home section of styles.css.
+
+Keep non-Home changes limited to theme/color corrections.
+
+Avoid !important unless genuinely required by an existing specificity conflict.
+
+Avoid visual effects that do not exist elsewhere in the design system.
+
+No excessive gradients, glassmorphism, glow, rounded cards, or animated decoration.
+
+The result should feel like Alva redesigned by the same visual system that produced Seren, not like Seren copied directly into Alva.
+
+Acceptance criteria
+
+* Alva opens into a near-black/charcoal interface rather than a white interface.
+* The UI across menus uses white/off-white text, gray hierarchy, subtle translucent light borders, and dark surfaces.
+* Green is the only major interface accent hue.
+* Character sprites and stage artwork retain their original colors.
+* No gameplay or navigation behavior changes.
+* Mode Select, Character Select, Map Select, Help, Battle and other screens retain their existing layouts.
+* Only Home receives new structure/layout.
+* Home has a dramatically larger ALVA wordmark on the left.
+* Home’s old fighter preview card is removed.
+* A dark angled road occupies the right side instead.
+* The road has subtle moving lane markings.
+* A smooth green diagonal slash separates the typography/navigation zone from the road.
+* Play is green and remains the primary action.
+* Help & Credits remains secondary.
+* Build/version information remains available.
+* by hiyroscript and navigation hints remain available.
+* Home remains usable on desktop and landscape mobile/tablet dimensions.
+* Reduced-motion users do not receive continuous decorative road animation.
+* Focus states remain obvious without relying only on green.
+* index.html uses a dark browser theme color.
+* There are no white flashes between Splash and Home.
+* There are no console errors.
+* The project remains plain HTML/CSS/JavaScript with no new build process.
+* README/spec design language is updated to match the implemented theme.
+
+Before finishing, run through the entire existing flow:
+
+Splash → Home → Select Mode → Select Fighter → Select Map → Battle
+
+Also verify:
+
+Home → Help & Credits → Home
+
+and returning Home from gameplay.
+
+The final result should feel restrained, premium, fast, dark, and cohesive: Seren’s black/gray/off-white visual language translated into Alva, with green replacing red and a new road-driven Home composition built specifically for Alva.
