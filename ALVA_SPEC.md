@@ -38,13 +38,17 @@ behave, and how it must look. The README covers running and deploying it.
   each of jump (624 × 816 px), fall (544 × 832 px) and land (≈528–544 ×
   560–688 px), one hurt frame (608 × 752 px), one mid-air hurt frame
   (424 × 272 px), four Basic Attack 1 frames `0001_1ba1`–`0001_1ba4`
-  (≈264–376 × 392–432 px) and five mid-air Basic Attack 1 frames
-  `0001_midair1ba1`–`0001_midair1ba5` (≈248–424 × 344–448 px).
-- File names: `ba` means basic attack and `1ba` is Basic Attack 1; the number
-  at the very end is always the frame number (`0001_1ba3.png` is Basic Attack
-  1, frame 3).
+  (≈264–376 × 392–432 px), five mid-air Basic Attack 1 frames
+  `0001_midair1ba1`–`0001_midair1ba5` (≈248–424 × 344–448 px), seven Basic
+  Attack 2 frames `0001_2ba1`–`0001_2ba7` (≈224–336 × 384–424 px) and three
+  mid-air Basic Attack 2 frames `0001_midair2ba1`–`0001_midair2ba3`
+  (≈216–352 × 424–536 px).
+- File names: `ba` means basic attack; the digit before it says which one
+  (`1ba` is Basic Attack 1, `2ba` Basic Attack 2). The number at the very end
+  is always the frame number (`0001_1ba3.png` is Basic Attack 1, frame 3;
+  `0001_midair2ba1.png` is Mid-air Basic Attack 2, frame 1).
 - The idle, jump, fall, land and hurt frames (≈16× pixel art), the mid-air
-  hurt and Basic Attack 1 frames (≈8×) and the run frames (≈4×) are at very
+  hurt and Basic Attack 1 and 2 frames (≈8×) and the run frames (≈4×) are at very
   different raw scales. A normalization
   system must, once per frame: read the alpha channel, find the visible bounds,
   detect the pixel-art grid, resample to one pixel per art pixel, and anchor
@@ -327,8 +331,9 @@ no header, build label, eyebrow or keyboard hint bar.
 
 ### 7.2 Fighters, physics and combat
 
-- `#0001` has Idle, Run, Jump, Fall, Land, Hurt, Mid-air Hurt, Basic Attack 1
-  and Mid-air Basic Attack 1. No invented frames. Rising uses Jump and
+- `#0001` has Idle, Run, Jump, Fall, Land, Hurt, Mid-air Hurt, Basic Attack 1,
+  Mid-air Basic Attack 1, Basic Attack 2 and Mid-air Basic Attack 2. No
+  invented frames. Rising uses Jump and
   descending (including platform drops) uses Fall; each plays once at 10 fps
   and holds its last frame. Land plays once at 12 fps on touchdown, for
   exactly the clip's length, then returns to idle or run. Land is a visual
@@ -353,15 +358,32 @@ no header, build label, eyebrow or keyboard hint bar.
   mirror with facing. Movement and facing lock while an attack plays; gravity
   still applies, and a mid-air BA1 that lands finishes its own clip. Ground
   BA1 is ground-only.
+- Basic Attack 2 (BA2) is #0001's secondary basic attack, on the `action2`
+  input, selected the same way (`action2: { ground, air }`). On the ground it
+  is a spinning high kick (`ba2`, 7 real frames); in the air a kunai slash
+  (`midairBa2`, 3 real frames). Both play once at 12 fps, and the phases are
+  the frames that visibly strike: ground BA2 is frames 1–3 startup (step in,
+  lead jab, spin), frames 4–5 active (the kick, drawn with motion trails),
+  frames 6–7 recovery; mid-air BA2 is frames 1–2 startup (kunai drawn back,
+  then overhead) and frame 3 active (the slash arc), with no recovery frame,
+  so the attack ends with its clip. BA2 is slower and heavier than BA1: each
+  hits once for 8 damage, 0.24 s hitstun, 0.15 s blockstun, 0.07 s hitstop,
+  220 horizontal knockback and no launch, with a 0.15 s cooldown on the
+  ground and 0.18 s in the air. Hitboxes cover the kick arc and the slash arc
+  in front of the fighter and mirror with facing. The same movement/facing
+  lock applies, gravity keeps working, and a mid-air BA2 that lands finishes
+  its own clip instead of switching to ground BA2 or Land. Ground BA2 is
+  ground-only; pressing BA2 and Jump on the same step attacks on the ground.
 - Physics: acceleration, deceleration, max speed, gravity, jump impulse,
   ground/platform/solid collision, stage bounds, landing detection; collision
   boxes independent of PNG size; bottom-centre origin; no sinking, floating,
   jitter or escaping the stage.
 - Combat architecture (health, damage, hitboxes, hurtboxes, attack definitions,
-  block, knockback, stun, hitstop, cooldowns) is data-driven. Basic Attack 1
-  is implemented through it with real artwork; Primary, Special and Action 2
+  block, knockback, stun, hitstop, cooldowns) is data-driven. Basic Attacks 1
+  and 2 are implemented through it with real artwork; Primary and Special
   stay reserved (mapped to no attack) until real sprites exist, and no attack
-  is ever fabricated. An attack whose frames fail to load is refused. Block
+  or frame is ever fabricated. An attack whose frames fail to load is refused
+  (no substitute pose, no invisible hitbox). Block
   sets a guard state using the idle pose.
 - Quick Battle: one round, 99 seconds, against a non-attacking training CPU
   that uses the same fighter definition.
@@ -403,15 +425,17 @@ no header, build label, eyebrow or keyboard hint bar.
 
 - Keyboard (simultaneous keys, held-state tracking, no reliance on key
   repeat): A/D or ←/→ move, S/↓ down, W/Space/↑ jump, J primary, K special,
-  L block, U Basic Attack 1 (BA1), I action 2, Esc/P pause. `` ` `` toggles a
-  debug overlay (colliders, hurtboxes, and attack hitboxes while active).
+  L block, U Basic Attack 1 (BA1), I Basic Attack 2 (BA2), Esc/P pause.
+  `` ` `` toggles a debug overlay (colliders, hurtboxes, and attack hitboxes
+  while active).
 - Gamepad (standard layout) for movement, jump (A), Basic Attack 1 (B /
-  Circle), reserved actions, block and Start to pause/menus.
+  Circle), Basic Attack 2 (LB), reserved actions (X / Y), block (RB / RT) and
+  Start to pause/menus.
 - Touch (landscape, Pointer Events, true multi-touch): lower-left Left / Down /
   Right with thumb sliding; lower-right staggered cluster —
-  Primary (top) · Special, Block · BA1, Action 2, Jump (bottom-right). The
-  BA1 button (Basic Attack 1, internally `action1`) is solid like Block and
-  Jump.
+  Primary (top) · Special, Block · BA1, BA2, Jump (bottom-right). The BA1
+  button (Basic Attack 1, internally `action1`) and the BA2 button (Basic
+  Attack 2, internally `action2`) are solid like Block and Jump.
   Tapping the timer or the pause section beneath it (top centre, 7.3) pauses.
   Original circular icons, translucent dark fill, white outlines; pressed
   buttons scale down and brighten to white — no hue.

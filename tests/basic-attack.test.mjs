@@ -1,42 +1,32 @@
 // Run with node --test tests/basic-attack.test.mjs (no dependencies).
 // #0001 Basic Attack 1 (BA1) on action1: ground/air selection, clip playback,
 // phase timing, hit resolution and the reserved combat inputs. Uses the real
-// Fighter, CombatSystem and physics (see fighter-harness.mjs).
+// Fighter, CombatSystem and physics (see fighter-harness.mjs). Basic Attack 2
+// (BA2, action2) has its own file, basic-attack-2.test.mjs.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { COMBAT_ACTIONS } from '../js/game/character.js';
-import { CombatSystem, worldBox } from '../js/game/combat.js';
+import { worldBox } from '../js/game/combat.js';
 import { TrainingAIController } from '../js/game/fighter-controller.js';
 import { CONFIG } from '../js/config.js';
-import { def, DT, SIM_CTX, fakeSprites, makeFighter, frameName, stepUntil } from './fighter-harness.mjs';
+import {
+  def, DT, SIM_CTX, fakeSprites, makeFighter, frameName, stepUntil,
+  steps, frameNo, recordAttack, sequence, duel,
+} from './fighter-harness.mjs';
 
 const BA1 = { action1: true, action1Pressed: true };
-const steps = (seconds) => Math.round(seconds / DT);
-const frameNo = (name) => Number(name.match(/(\d+)\.png$/)[1]);
+const BA2 = { action2: true, action2Pressed: true };
 
-// Records every step of an attack until the fighter leaves the attack state.
-function recordAttack(step, held) {
-  const log = [];
-  let f = step(held);
-  while (f.state === 'attack') {
-    log.push({ id: f.combat.attack.def.id, phase: f.combat.phase, frame: frameName(f), anim: f.animator.anim.key, grounded: f.grounded });
-    f = step();
-  }
-  return log;
-}
-
-// Consecutive duplicates removed: the order frames were shown in.
-const sequence = (log) => log.map((s) => s.frame).filter((n, i, a) => n !== a[i - 1]);
-
-test('action1 is Basic Attack 1: ground ba1, air midairBa1; the rest stay reserved', () => {
+test('action1 is Basic Attack 1: ground ba1, air midairBa1; action2 is BA2; Primary and Special stay reserved', () => {
   assert.deepEqual(def.actions, {
     primary: null,
     special: null,
     action1: { ground: 'ba1', air: 'midairBa1' },
-    action2: null,
+    action2: { ground: 'ba2', air: 'midairBa2' },
   });
   assert.deepEqual(COMBAT_ACTIONS, ['primary', 'special', 'action1', 'action2']);
   assert.deepEqual(CONFIG.bindings.action1, ['KeyU']);
+  assert.deepEqual(CONFIG.bindings.action2, ['KeyI']);
   assert.deepEqual(CONFIG.bindings.primary, ['KeyJ']);
 });
 
@@ -189,9 +179,11 @@ test('BA1 on the same step as a jump punches on the ground; the jump is dropped'
 test('the ground/air choice follows grounded state; a mapping without `air` is inactive in the air', () => {
   const { fighter, step } = makeFighter();
   assert.equal(fighter.attackFor('action1'), 'ba1');
+  assert.equal(fighter.attackFor('action2'), 'ba2');
   step({ jump: true, jumpPressed: true });
   assert.equal(fighter.attackFor('action1'), 'midairBa1');
-  for (const action of ['primary', 'special', 'action2']) assert.equal(fighter.attackFor(action), null);
+  assert.equal(fighter.attackFor('action2'), 'midairBa2');
+  for (const action of ['primary', 'special']) assert.equal(fighter.attackFor(action), null);
 
   const character = { ...def, actions: { ...def.actions, action1: { ground: 'ba1' } } };
   const groundOnly = makeFighter({ character });
@@ -213,9 +205,9 @@ test('a plain string mapping still means one attack', () => {
   assert.equal(air.fighter.combat.attack, null);
 });
 
-test('Primary, Special and Action 2 stay inactive for #0001', () => {
+test('Primary and Special stay inactive for #0001; BA1 and BA2 work', () => {
   const { fighter, step } = makeFighter();
-  for (const action of ['primary', 'special', 'action2']) {
+  for (const action of ['primary', 'special']) {
     assert.equal(fighter.tryAction(action), false);
     step({ [action]: true, [`${action}Pressed`]: true });
     assert.equal(fighter.combat.attack, null, action);
@@ -223,9 +215,20 @@ test('Primary, Special and Action 2 stay inactive for #0001', () => {
     assert.equal(fighter.combat.lastIntent, action);
   }
   step({ jump: true, jumpPressed: true });
-  for (const action of ['primary', 'special', 'action2']) {
+  for (const action of ['primary', 'special']) {
     step({ [action]: true, [`${action}Pressed`]: true });
     assert.equal(fighter.combat.attack, null, `${action} in the air`);
+  }
+
+  // The two basic attacks, on the ground and in the air.
+  for (const [held, ground, air] of [[BA1, 'ba1', 'midairBa1'], [BA2, 'ba2', 'midairBa2']]) {
+    const g = makeFighter();
+    g.step(held);
+    assert.equal(g.fighter.combat.attack?.def.id, ground);
+    const a = makeFighter();
+    a.step({ jump: true, jumpPressed: true });
+    a.step(held);
+    assert.equal(a.fighter.combat.attack?.def.id, air);
   }
 });
 
@@ -259,28 +262,6 @@ test('BA1 locks movement and facing while it plays', () => {
   step({ left: true });
   assert.equal(fighter.facing, -1);
 });
-
-// Two fighters and the real CombatSystem, stepped like Battle.step().
-function duel({ gap = 44, attackerFacing = 1, targetSprites } = {}) {
-  const x = 500;
-  const a = makeFighter({ x, facing: attackerFacing });
-  const b = makeFighter({ x: x + gap * attackerFacing, facing: -attackerFacing, sprites: targetSprites });
-  a.fighter.opponent = b.fighter;
-  b.fighter.opponent = a.fighter;
-  const system = new CombatSystem();
-  const events = [];
-  const tick = (held = {}) => {
-    a.step(held);
-    b.step();
-    events.push(...system.update([a.fighter, b.fighter]));
-  };
-  // Ticks until `pred` holds; fails instead of hanging.
-  const until = (pred, limit = 600) => {
-    for (let i = 0; i < limit && !pred(); i++) tick();
-    assert.ok(pred(), 'condition never reached');
-  };
-  return { attacker: a.fighter, target: b.fighter, tick, until, events };
-}
 
 test('ground BA1 hits an opponent in front during the active phase only', () => {
   const { attacker, target, tick, events } = duel();

@@ -2,8 +2,9 @@
 //
 // Attacks are pure data on the character definition; Fighter turns each entry
 // into a frozen definition with createAttackDefinition(). #0001's Basic
-// Attack 1 (ground `ba1`, mid-air `midairBa1`, both on action1) is the first
-// real attack; see js/data/characters.js. The general shape:
+// Attack 1 (ground `ba1`, mid-air `midairBa1`, both on action1) and Basic
+// Attack 2 (`ba2` / `midairBa2` on action2) are the real attacks so far; see
+// js/data/characters.js. The general shape:
 //
 //   attacks: {
 //     jab: {

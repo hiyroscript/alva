@@ -4,9 +4,10 @@
 //   lower-left : [LEFT] [DOWN] [RIGHT]  — thumb can slide between them
 //   lower-right:              [PRIMARY]
 //                     [SPECIAL] [BLOCK]
-//               [BA1] [ACTION 2] [JUMP]
+//                    [BA1] [BA2] [JUMP]
 //
-// BA1 (Basic Attack 1) is the `action1` input.
+// BA1 (Basic Attack 1) is the `action1` input, BA2 (Basic Attack 2) the
+// `action2` input.
 //
 // Every pointer is tracked by pointerId, so Right + Jump (or any combination)
 // works simultaneously. State is pushed into InputManager.setTouch().
@@ -26,7 +27,7 @@ const ACTION_BUTTONS = [
   { action: 'special', label: 'Special', icon: ICONS.special, pos: 'special', pending: true },
   { action: 'block', label: 'Block', icon: ICONS.block, pos: 'block' },
   { action: 'action1', label: 'Basic Attack 1', text: 'BA1', pos: 'a1' },
-  { action: 'action2', label: 'Action 2', text: 'A2', pos: 'a2', pending: true },
+  { action: 'action2', label: 'Basic Attack 2', text: 'BA2', pos: 'a2' },
   { action: 'jump', label: 'Jump', icon: ICONS.jump, pos: 'jump' },
 ];
 
