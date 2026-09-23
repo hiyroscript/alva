@@ -28,10 +28,12 @@ export const CONFIG = Object.freeze({
   },
 
   splash: {
-    fadeIn: 850,
-    hold: 1250,
-    fadeOut: 700,
-    reducedMotionHold: 1400,
+    fadeIn: 900,
+    hold: 1600,
+    fadeOut: 800,
+    betweenImages: 220,
+    finalBlackHold: 200,
+    reducedMotionHold: 1000,
   },
 
   battle: {

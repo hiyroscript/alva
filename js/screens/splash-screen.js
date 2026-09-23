@@ -1,66 +1,124 @@
-// SPLASH: black screen, "a game by hiyroscript" fades in near the bottom,
-// holds, fades out, then Home dissolves in over the black. Any key / tap skips.
-
+// Both decoded images are required before this non-skippable intro starts.
 import { Screen } from '../core/screen-manager.js';
 import { CONFIG } from '../config.js';
 import { el } from '../core/utils.js';
+
+const ARTWORK = [
+  { url: './hs.jpg', name: 'hs', alt: 'hiyroscript' },
+  { url: './alvafav.PNG', name: 'alva', alt: 'Alva' },
+];
 
 export class SplashScreen extends Screen {
   constructor(app) {
     super(app, 'splash');
     this.navigable = false;
-    // Stay underneath while the white Home fades in (see .screen--home.is-entering).
-    this.leaveMs = 760;
-    this.text = el('p', { class: 'splash-credit', text: 'a game by hiyroscript' });
-    this.el.replaceChildren(this.text);
-    this.timers = [];
-    this.done = false;
-    this.skip = this.skip.bind(this);
+    this.leaveMs = 760; // Keep black underneath Home's existing dissolve.
+    this.stage = el('div', { class: 'splash-stage' });
+    this.el.replaceChildren(this.stage);
+    this.run = null;
   }
 
   enter() {
-    this.done = false;
-    const cfg = CONFIG.splash;
-    const reduced = this.app.device.reducedMotion;
-    this.text.classList.remove('is-in', 'is-out');
-    this.text.style.setProperty('--fade-in', `${reduced ? 0 : cfg.fadeIn}ms`);
-    this.text.style.setProperty('--fade-out', `${reduced ? 0 : cfg.fadeOut}ms`);
+    this.clear();
+    const run = { cancelled: false, done: false, animations: [], cancelDelay: null };
+    this.run = run;
+    this.el.dataset.phase = 'loading';
+    void this.play(run);
+  }
 
-    const at = (ms, fn) => this.timers.push(setTimeout(fn, ms));
-    if (reduced) {
-      this.text.classList.add('is-in');
-      at(cfg.reducedMotionHold, () => this.finish());
-    } else {
-      at(250, () => this.text.classList.add('is-in'));
-      at(250 + cfg.fadeIn + cfg.hold, () => this.text.classList.add('is-out'));
-      at(250 + cfg.fadeIn + cfg.hold + cfg.fadeOut + 150, () => this.finish());
+  active(run) {
+    return this.run === run && !run.cancelled && !run.done;
+  }
+
+  async play(run) {
+    const cfg = CONFIG.splash;
+    try {
+      const images = await Promise.all(ARTWORK.map(({ url }) => this.app.assets.loadImage(url)));
+      if (!this.active(run)) return;
+      if (images.some((img) => !img)) throw new Error('One or more splash images failed to load.');
+      // AssetLoader tolerates decode failures for game sprites. The intro's
+      // stricter gate requires successful decoding before either image mounts.
+      await Promise.all(images.map((img) => img.decode ? img.decode() : Promise.resolve()));
+      if (!this.active(run)) return;
+      const reduced = this.app.device.reducedMotion;
+      for (const [index, img] of images.entries()) {
+        const art = ARTWORK[index];
+        img.className = `splash-image splash-image--${art.name}`;
+        img.alt = art.alt;
+        img.draggable = false;
+        this.stage.replaceChildren(img); // Reuse the loaded element: no src swap/request.
+        this.el.dataset.phase = `${art.name}-show`;
+        if (reduced) {
+          img.style.opacity = '1';
+          if (!await this.delay(run, cfg.reducedMotionHold)) return;
+          img.style.opacity = '';
+        } else {
+          const duration = cfg.fadeIn + cfg.hold + cfg.fadeOut;
+          img.style.willChange = 'transform, opacity';
+          // Separate tracks keep the zoom continuous across all opacity phases.
+          run.animations = [
+            img.animate([
+              { opacity: 0, offset: 0, easing: 'ease-in-out' },
+              { opacity: 1, offset: cfg.fadeIn / duration },
+              { opacity: 1, offset: (cfg.fadeIn + cfg.hold) / duration, easing: 'ease-in-out' },
+              { opacity: 0, offset: 1 },
+            ], { duration, fill: 'forwards' }),
+            img.animate([
+              { transform: 'scale(0.88)' },
+              { transform: 'scale(1.16)' },
+            ], { duration, easing: 'linear', fill: 'forwards' }),
+          ];
+          await Promise.all(run.animations.map((animation) => animation.finished));
+          if (!this.active(run)) return;
+          for (const animation of run.animations) animation.cancel();
+          run.animations = [];
+          img.style.willChange = '';
+        }
+        this.stage.replaceChildren();
+        this.el.dataset.phase = index === 0 ? 'gap' : 'finish';
+        if (!await this.delay(run, index === 0 ? cfg.betweenImages : cfg.finalBlackHold)) return;
+      }
+      this.finish(run);
+    } catch (error) {
+      if (!this.active(run)) return; // Cancellation rejects animation.finished.
+      console.error('[Alva] Splash unavailable; skipping the entire intro.', error);
+      this.finish(run); // No partial artwork or broken image on failure.
     }
-    // Let players skip after a beat (avoid skipping on the launching tap).
-    at(400, () => {
-      window.addEventListener('keydown', this.skip);
-      window.addEventListener('pointerdown', this.skip);
+  }
+
+  delay(run, ms) {
+    return new Promise((resolve) => {
+      const timer = setTimeout(() => {
+        run.cancelDelay = null;
+        resolve(this.active(run));
+      }, ms);
+      run.cancelDelay = () => {
+        clearTimeout(timer);
+        resolve(false);
+      };
     });
   }
 
-  skip() {
-    if (this.done) return;
-    this.text.classList.add('is-out');
+  finish(run) {
+    if (!this.active(run)) return;
+    run.done = true;
     this.clear();
-    this.timers.push(setTimeout(() => this.finish(), this.app.device.reducedMotion ? 0 : 260));
+    this.app.screens.go('home', {}, { reset: true });
   }
 
   clear() {
-    for (const t of this.timers) clearTimeout(t);
-    this.timers = [];
-    window.removeEventListener('keydown', this.skip);
-    window.removeEventListener('pointerdown', this.skip);
-  }
-
-  finish() {
-    if (this.done) return;
-    this.done = true;
-    this.clear();
-    this.app.screens.go('home', {}, { reset: true });
+    const run = this.run;
+    if (run) {
+      run.cancelled = true;
+      run.cancelDelay?.();
+      for (const animation of run.animations) animation.cancel();
+    }
+    for (const img of this.stage.children) {
+      img.style.opacity = '';
+      img.style.willChange = '';
+    }
+    this.stage.replaceChildren();
+    this.run = null;
   }
 
   exit() {
