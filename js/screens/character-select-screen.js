@@ -5,18 +5,15 @@ import { Screen } from '../core/screen-manager.js';
 import { CONFIG } from '../config.js';
 import { el } from '../core/utils.js';
 import { ICONS } from '../ui/icons.js';
-import { screenHeader, hintBar, MENU_HINTS } from '../ui/components.js';
+import { screenHeader } from '../ui/components.js';
 import { CHARACTERS, getCharacter } from '../data/characters.js';
 import { fitCanvas, drawFrameAt } from '../ui/sprite-art.js';
-
-const ANIM_LABELS = { idle: 'Idle', run: 'Run' };
 
 export class CharacterSelectScreen extends Screen {
   constructor(app) {
     super(app, 'character');
     this.slots = [];
     this.focusedSlot = null;
-    this.previewAnim = 'idle';
     this.previewIndex = 0;
     this.previewTime = 0;
     this.previewSprites = null;
@@ -59,24 +56,18 @@ export class CharacterSelectScreen extends Screen {
       slot.addEventListener('focus', () => this.preview(slot));
       slot.addEventListener('click', (e) => this.activate(slot, e));
     }
-    const available = CHARACTERS.filter((c) => c.available).length;
 
     // ---- Preview panel ----------------------------------------------------
     this.previewCanvas = el('canvas', { class: 'preview-canvas', 'aria-hidden': 'true' });
     this.status = el('span', { class: 'status-badge' });
     this.name = el('h2', { class: 'preview-name', id: 'preview-name' });
-    this.sub = el('p', { class: 'preview-sub' });
-    this.chips = el('div', { class: 'anim-chips', role: 'group', 'aria-label': 'Preview animation' });
-    this.facts = el('dl', { class: 'detail-list detail-list--compact' });
     this.confirmBtn = el('button', { class: 'btn btn--primary btn--confirm', type: 'button', 'data-nav': true });
     this.confirmBtn.addEventListener('click', () => this.confirm());
 
     const previewPanel = el('aside', { class: 'char-preview', 'aria-labelledby': 'preview-name', 'aria-live': 'polite' }, [
-      el('div', { class: 'preview-stage' }, [el('div', { class: 'preview-floor' }), this.previewCanvas]),
+      el('div', { class: 'preview-stage' }, [this.previewCanvas]),
       el('div', { class: 'preview-info' }, [
-        el('div', { class: 'preview-head' }, [this.status, this.name, this.sub]),
-        el('div', { class: 'preview-anims' }, [el('span', { class: 'label', text: 'Animations' }), this.chips]),
-        this.facts,
+        el('div', { class: 'preview-head' }, [this.status, this.name]),
         this.confirmBtn,
       ]),
     ]);
@@ -87,13 +78,11 @@ export class CharacterSelectScreen extends Screen {
         el('section', { class: 'roster-panel', 'aria-label': 'Roster' }, [
           el('div', { class: 'panel-head' }, [
             el('span', { class: 'panel-title', text: 'Roster' }),
-            el('span', { class: 'panel-meta', html: `<b>${available}</b> / ${total} available` }),
           ]),
           el('div', { class: 'roster-scroll' }, [this.grid]),
         ]),
         previewPanel,
       ]),
-      hintBar(MENU_HINTS),
     );
   }
 
@@ -163,9 +152,6 @@ export class CharacterSelectScreen extends Screen {
       this.status.textContent = 'Locked';
       this.status.className = 'status-badge is-locked';
       this.name.textContent = `Slot ${num}`;
-      this.sub.textContent = 'No fighter assigned to this slot yet.';
-      this.chips.replaceChildren(el('span', { class: 'chip is-muted', text: '—' }));
-      this.facts.replaceChildren();
       this.previewSprites = null;
       this.clearPreview();
       this.updateConfirm();
@@ -175,38 +161,8 @@ export class CharacterSelectScreen extends Screen {
     this.status.textContent = 'Available';
     this.status.className = 'status-badge is-available';
     this.name.textContent = def.displayName;
-    this.sub.textContent = `Roster slot ${num}`;
     const set = this.app.getSprites(def.id);
     this.previewSprites = set?.usable ? set : null;
-    const anims = Object.keys(def.animations);
-    if (!anims.includes(this.previewAnim)) this.previewAnim = anims[0];
-    this.chips.replaceChildren(
-      ...anims.map((key) => {
-        const chip = el('button', {
-          class: `chip${key === this.previewAnim ? ' is-active' : ''}`, type: 'button', 'data-nav': true,
-          'aria-pressed': key === this.previewAnim ? 'true' : 'false',
-          text: ANIM_LABELS[key] || key,
-        });
-        chip.addEventListener('click', () => {
-          this.previewAnim = key;
-          this.previewIndex = 0;
-          for (const c of this.chips.children) {
-            const on = c === chip;
-            c.classList.toggle('is-active', on);
-            c.setAttribute('aria-pressed', on ? 'true' : 'false');
-          }
-        });
-        return chip;
-      }),
-    );
-    this.facts.replaceChildren(
-      ...anims.flatMap((key) => [
-        el('dt', { text: `${ANIM_LABELS[key] || key} frames` }),
-        el('dd', { text: String(def.animations[key].frames.length) }),
-      ]),
-      el('dt', { text: 'Attack set' }),
-      el('dd', { text: 'Awaiting sprites' }),
-    );
     this.previewIndex = 0;
     this.previewTime = 0;
     this.updateConfirm();
@@ -234,7 +190,7 @@ export class CharacterSelectScreen extends Screen {
   update(dt) {
     const set = this.previewSprites;
     if (!set) return;
-    const anim = set.animations[this.previewAnim] || set.animations.idle;
+    const anim = set.animations.idle;
     this.previewTime += dt;
     const step = 1 / anim.fps;
     while (this.previewTime >= step) {
@@ -246,7 +202,7 @@ export class CharacterSelectScreen extends Screen {
     const ctx = this.previewCanvas.getContext('2d');
     ctx.clearRect(0, 0, w, h);
     ctx.imageSmoothingEnabled = false;
-    // Integer scale from the reference height keeps idle/run consistent.
+    // Integer scale from the reference height keeps normalized frames consistent.
     const n = Math.max(1, Math.floor((h * 0.84) / set.refArtHeight));
     drawFrameAt(ctx, frame, w / 2, Math.round(h * 0.94), n, false);
   }
