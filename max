@@ -1,531 +1,394 @@
-Work directly in the current hiyroscript/alva repository on the existing architecture. First inspect the relevant files and understand the existing DOM, CSS, battle state flow, accessibility behavior, keyboard/gamepad navigation, responsive rules, and mobile/touch behavior before editing anything.
-
-This is a pure HTML/CSS/JavaScript Canvas 2D game with no framework or build step. Do not introduce React, dependencies, a bundler, or a new UI framework. Preserve the existing Alva design system, gameplay, Canvas rendering, physics, camera, combat architecture, stage art, character sprites, controls, menu navigation, accessibility, reduced-motion handling, and responsive landscape behavior unless a change below explicitly requires otherwise.
-
-The main files involved are expected to include:
-
-* js/game/hud.js
-* js/screens/battle-screen.js
-* js/ui/overlays.js
-* styles.css
-* ALVA_SPEC.md
-* tests where appropriate
-
-The existing design tokens in styles.css should be reused rather than hardcoding a completely unrelated visual system. Alva uses near-black/charcoal UI, white/off-white typography, subtle translucent borders, and green as its interface accent.
+Work in the GitHub repository hiyroscript/alva.
 
 Goal
 
-Refine the in-battle HUD and dialogs so they use a coherent semi-transparent glass treatment, simplify the information displayed, merge the timer and pause controls into one compact central unit, and remove UI that is not currently useful.
+Make the requested Alva menu, selection, HUD, pause, and Return Home UI elements use the exact same small rounded-corner treatment as the Play button on the Home Screen.
 
-Do not redesign unrelated menus or screens.
+The Home Screen Play button is the visual source of truth.
 
-1. Create a consistent battle glass treatment
+In styles.css, .home-action currently uses:
 
-Introduce or consolidate reusable CSS variables/classes for a lightweight semi-transparent dark glass appearance suitable for overlays on top of animated stage artwork.
+border-radius: 3px;
 
-The glass should feel consistent with Alva’s existing Home glass treatment, but it must remain highly readable over bright and dark portions of the stages.
+Use 3px as the canonical outer corner radius for every element listed below.
 
-The treatment should generally include:
+This is a visual-consistency pass only. Do not redesign the screens, change their layouts, alter navigation/game logic, or change the Alva color system beyond the secondary-dialog-button background treatment described below.
 
-* semi-transparent near-black/charcoal background rather than an opaque var(--surface)
-* subtle translucent white edge/border
-* restrained highlight or gradient to give it a glass-like surface
-* readable white/off-white text
-* appropriate shadow where needed
-* optional subtle backdrop-filter / blur only if it performs well
-* a graceful fallback if backdrop filtering is unavailable
+Important implementation rule
 
-Do not make the glass excessively bright, frosted, milky, or glossy. It should still look like Alva.
+Do not globally redefine --radius-sm, --radius-md, or --radius-lg to 3px. Those tokens are also used by unrelated UI that is not part of this request.
 
-Be careful with mobile performance: this is a 60 FPS Canvas fighting game. Prefer a restrained effect over an expensive large-area blur.
+Either:
 
-2. Make the pause dialog glass
+* introduce a narrowly scoped 3px radius token and apply it only to the requested components, or
+* use 3px directly on the targeted selectors.
 
-The current pause menu is built in BattleScreen.buildPause() and displayed inside .pause-panel.
+Keep the existing Home Play button visually unchanged.
 
-Change the pause dialog panel from its current opaque surface to the new semi-transparent glass treatment.
+⸻
 
-The battle should remain visible behind it through both:
+1. Select Mode
 
-* the existing dimmed overlay
-* the translucent pause panel itself
+File relationships:
 
-Retain strong text contrast and focus visibility.
+* js/screens/mode-select-screen.js
+* js/ui/components.js
+* styles.css
 
-Keep:
+Give the following the same 3px corner radius as Home → Play:
 
-* Paused title
+* Back button on Select Mode
+    * .btn-back as used by .screen--mode
+* Quick Battle card
+    * .mode-card
+* Mode details panel
+    * .mode-info
+* Green Select control inside the Quick Battle card
+    * .mode-cta
+
+Do not alter the Quick Battle card’s current spacing, hover behavior, focus handling, typography, or navigation behavior.
+
+⸻
+
+2. Select Fighter
+
+Files:
+
+* js/screens/character-select-screen.js
+* js/ui/components.js
+* styles.css
+
+Apply the same 3px corners to:
+
+* Back button on Select Fighter
+* Roster card/container
+    * .roster-panel
+* Every character/roster slot, including available and locked slots
+    * .slot
+* Character preview card
+    * .char-preview
+* Confirm fighter button
+    * .btn--confirm
+
+All 48 roster slots should therefore share the same small corner language.
+
+Do not modify:
+
+* circular selected check badges
+* availability pills/status badges
+* locked-state behavior
+* fighter artwork
+* roster navigation
+* fighter selection logic
+
+Only the requested rectangular card/control corners should change.
+
+⸻
+
+3. Select Stage
+
+Files:
+
+* js/screens/map-select-screen.js
+* js/ui/components.js
+* styles.css
+
+Apply the Home Play button’s 3px radius to:
+
+* Back button on Select Stage
+* Large live stage preview
+    * .map-hero
+* Both stage selection holders/cards
+    * every .map-card, currently Desert and City
+* Confirm and start battle button
+    * .btn--start
+
+Do not change the Selected badge inside a stage card. It can remain pill-shaped.
+
+Do not alter the stage artwork, stage preview rendering, camera pan, selection logic, or card dimensions.
+
+⸻
+
+4. Battle HUD
+
+Files:
+
+* js/game/hud.js
+* styles.css
+
+Apply the same 3px outer corners to the fighter HUD chrome.
+
+Fighter health holder cards
+
+Change both P1 and CPU holder cards:
+
+* .hud-side
+
+to a 3px radius.
+
+Health bars
+
+The health bars:
+
+* .hud-bar
+
+already use border-radius: 3px.
+
+Keep that value and make sure both health holders and their health bars now visually share the same radius language.
+
+Do not change health colors, delayed-damage layers, health logic, animation, sizes, or labels.
+
+Timer/counter + pause control
+
+The top-center timer and pause control is built from:
+
+* .hud-center
+* .hud-time
+* .hud-pause
+
+Make the combined control visually use the same 3px outer radius as Home → Play.
+
+Preserve the existing structure:
+
+* timer/counter on top
+* pause section directly underneath
+* no gap between them
+* existing seam/hairline between the two sections
+* only the outside corners rounded
+* internal meeting corners remain square
+
+Because the parent has a border, it is fine for the child button’s inner corner radius to be slightly smaller, e.g. calc(3px - 1px), as long as the final visible outer shape is the same 3px corner treatment as the Play button.
+
+Do not split the timer and pause controls into separate cards.
+
+⸻
+
+5. Pause dialog
+
+Files:
+
+* js/screens/battle-screen.js
+* styles.css
+
+The pause overlay currently uses:
+
+* .pause-overlay
+* .pause-panel
+* .pause-btn-item
+
+Give the pause dialog panel a 3px radius.
+
+Give every button inside the pause dialog the same 3px radius.
+
+This includes:
+
 * Resume
 * Restart Battle
-* Help, but disabled as described below
+* Help
+* Return to Home
+* the Back button in the dormant Help view if/when that view is displayed
+
+Pause button background treatment
+
+Resume is the green primary action and must remain green.
+
+For the working secondary actions in the pause menu:
+
+* Restart Battle
 * Return to Home
 
-Do not alter pause/resume mechanics.
+change their normal/resting background to transparent, visually following the transparent treatment already used by the disabled Help button.
 
-3. Remove the stage name from the pause dialog
+However, unlike disabled Help:
 
-Currently BattleScreen.enter() sets:
+* their text must remain white/off-white and fully readable
+* they must remain enabled
+* they must still respond to pointer, keyboard, and gamepad input
+* focus rings must remain
+* hover/pressed feedback may remain
+* do not reduce their opacity
+* do not make them look disabled
 
-this.pauseKicker.textContent = \Quick Battle · ${map.name}`;`
+The actual Help button is currently intentionally disabled. Do not enable Help. It can remain transparent with its existing muted disabled text so the disabled state is still distinguishable.
 
-Remove the stage/map name from this dialog.
+Scope these pause-specific secondary button changes to the pause overlay rather than unintentionally restyling unrelated result-screen controls.
 
-The pause dialog must no longer display Desert, City, or any future stage name through this kicker.
+Do not modify pause behavior, restart behavior, Return Home behavior, focus management, or keyboard/gamepad navigation.
 
-Use simply:
+⸻
 
-Quick Battle
+6. Return Home confirmation dialog
 
-or otherwise remove only the stage-specific portion while preserving the surrounding hierarchy.
+Files:
 
-Do NOT remove the actual Desert/City names from the Select Stage cards. Those names are still important for stage selection and accessibility.
+* js/ui/overlays.js
+* styles.css
 
-4. Disable the pause-menu Help button for now
+The Return Home confirmation uses:
 
-The Home screen’s Help & Credits button is already disabled in the current repository. Keep that behavior unchanged.
+* .dialog-overlay
+* .dialog-panel
+* .dialog-actions
+* .btn
+* .btn--primary
 
-Also disable the Help button inside the battle pause menu.
+Apply the same 3px radius to:
 
-It should:
-
-* remain visible
-* look clearly unavailable/muted
-* have no hover/pressed behavior
-* not respond to mouse/touch
-* be skipped by keyboard/gamepad menu navigation
-* use the native disabled state where possible
-* not open the pause Help view
-
-Do not delete the Help screen, buildHelp(), pause-help implementation, credits data, or other underlying Help infrastructure. This is temporary UI disabling only, so it should be easy to restore later.
-
-Make sure disabling Help does not break focus restoration or navigation indexing. There is currently code in closeHelp() that relies on positional querySelectorAll('[data-nav]')[2]; clean up any brittle indexing if necessary so a disabled Help item cannot cause focus/navigation bugs.
-
-5. Make both fighter stat holders glass
-
-The two .hud-side containers at the top left and top right currently use the battle --scrim treatment.
-
-Make both fighter stat holders use the same visual glass language as the pause dialog, adjusted appropriately for the smaller HUD context.
-
-Keep the panels lightweight and readable over the stage.
-
-Both sides should use the same surface treatment. Do not make one side visually more opaque than the other.
-
-Keep the fighter slot/name hierarchy unless explicitly removed below.
-
-6. Make BOTH health bars green
-
-Currently:
-
-* Player 1 health is white
-* CPU health is gray
-
-Change both health bars to Alva’s green accent.
-
-Use the existing Alva green design token, preferably var(--accent) or another existing appropriate green token rather than inventing a disconnected green.
-
-Both P1 and CPU should use the same green health color.
-
-Preserve:
-
-* health percentage behavior
-* left/right fill direction
-* health meter accessibility attributes
-* delayed/ghost health behavior
-* low-health animation unless it conflicts visually
-
-The delayed health/ghost layer should also harmonize with the green bar. It can be a lower-opacity green rather than remaining bright white.
-
-Do not use red health bars.
-
-7. Remove the text below the health bars
-
-In js/game/hud.js, the fighter panels currently show:
-
-* PLAYER 1
-* TRAINING OPPONENT
-
-under their health bars through .hud-sub.
-
-Remove these labels entirely.
-
-Do not merely hide them at one breakpoint.
-
-Prefer removing the unnecessary DOM/content from the HUD implementation so the stat boxes become cleaner and slightly more compact.
-
-Keep the actual fighter name and P1/CPU identification above the health bar.
-
-Remove obsolete .hud-sub styling and responsive rules if they are no longer needed.
-
-8. Redesign the timer holder as glass
-
-The .hud-center timer container should use the same semi-transparent battle glass styling as the fighter stat holders.
-
-Keep:
-
-* round label
-* numeric timer
-* tabular numerals
-* readable hierarchy
-
-The center unit should remain visually compact.
-
-9. Change urgent timer behavior
-
-The current CSS does this during the final ten seconds:
-
-.hud-timer.is-urgent { background: var(--white); color: var(--black); }
-
-Remove that inversion completely.
-
-When the timer enters its urgent/final-seconds state:
-
-* DO NOT turn the timer background white
-* DO NOT invert to black digits
-* DO NOT flash the entire holder
-* DO NOT change the glass panel background
-* only make the timer digits pure white
-
-The timer holder must remain the same glass surface.
-
-If the ordinary timer digits need a slightly softer neutral/off-white value so the urgent shift to pure white is actually perceptible, use the existing Alva text hierarchy. Keep the change subtle. Do not introduce red, orange, or another warning hue.
-
-10. Merge the timer holder and pause control
-
-This is the main HUD layout change.
-
-The current pause button is an independent circular control positioned at the top-right of the screen with .pause-toggle.
-
-Remove that detached top-right presentation.
-
-Instead, put the pause control directly underneath the center timer holder.
-
-The visual structure should be approximately:
-
-[ ROUND 1 ]
-[    99   ]
-───────────
-[ pause icon ]
-
-But treat the timer area and pause area as two parts of one unified glass control.
-
-Requirements:
-
-* timer/round holder on top
-* pause holder directly underneath
-* absolutely zero layout gap between them
-* same width
-* same horizontal alignment
-* shared visual language
-* top portion gets top corner rounding
-* bottom portion gets bottom corner rounding
-* no rounded seam between the two sections
-* use a subtle shared border/separator at the seam
-* do not leave a visible empty strip between them
-* the total unit should feel like one merged control, not two unrelated boxes
-
-The pause holder should be a semi-transparent rectangular glass box, not the current standalone circular button.
-
-Keep the pause icon centered.
-
-Use comfortable pointer/touch target sizing.
-
-11. BOTH the timer area and pause area must pause the game
-
-Clicking/tapping either half of the merged center control must trigger the exact same existing BattleScreen.pause() behavior.
-
-That means:
-
-* clicking the timer holder pauses
-* clicking the pause-icon holder pauses
-
-Do not duplicate pause state logic. Both should route to the same pause method.
-
-Make both areas proper accessible interactive controls rather than relying on a click listener attached to a meaningless div.
-
-Prefer semantic <button> elements or another implementation with equivalent keyboard and accessibility behavior.
-
-The timer section should have a useful accessible label such as a pause action combined with the current time, e.g. conceptually:
-
-Pause game — 87 seconds remaining
-
-Update the time portion if necessary without causing excessive DOM work.
-
-The pause-icon section should retain an accessible Pause label.
-
-Do not interfere with:
-
-* Esc/P pause
-* gamepad Start pause
-* visibility-change auto-pause
-* portrait-device pause behavior
-
-12. Refactor the HUD center cleanly
-
-The cleanest implementation will probably require a small structural refactor rather than trying to absolutely position the old .pause-toggle beneath .hud-center.
-
-Refactor the HUD center into a contiguous center stack/control.
-
-Possible structure:
-
-* .hud-center-stack
-    * .hud-time-control
-        * .hud-round
-        * .hud-timer
-    * .hud-pause-control
-        * pause icon
-
-The exact names may differ, but the implementation should be logically equivalent.
-
-Avoid circular module dependencies. battle-screen.js already owns the pause action and has access to ICONS.pause; structure the integration cleanly so HUD presentation does not start owning battle-state logic.
-
-The old detached pause control should be removed from BattleScreen.el.replaceChildren(...) once it has been integrated into the HUD.
-
-Because the old .pause-toggle was positioned at the top right, also revisit the .hud padding. It currently reserves extra horizontal space using var(--pause-size) on both sides. Once the pause control is centered, remove unnecessary reserved space and use safe-area-aware HUD padding appropriate to the new layout.
-
-Make sure P1/CPU stat panels still have enough width at landscape phone sizes.
-
-13. Keep the whole merged center HUD clickable despite existing pointer-event rules
-
-The current .hud uses:
-
-pointer-events: none
-
-because most HUD content is informational.
-
-Preserve the benefit of that where appropriate, but explicitly restore pointer interaction on the new timer/pause controls.
-
-For example, the HUD root can remain non-interactive while the merged center control uses pointer-events: auto.
-
-Do not accidentally block gameplay interaction beneath the left/right stat panels.
-
-14. Remove the Draw result dialog
-
-Currently, Battle.result can return:
-
-{ outcome: 'draw' }
-
-and BattleScreen.showResult() opens the result overlay with the title Draw.
-
-Remove the Draw dialog behavior.
-
-When the battle ends with equal health:
-
-* do not show the resultOverlay
-* do not display a Draw title
-* do not display the current "Time ran out with both fighters standing." draw copy
-
-However, do not leave the game permanently stuck in phase === 'result' with no UI.
-
-Handle the draw path deliberately.
-
-After the existing TIME / time-over presentation has completed, automatically begin a fresh battle/round using the existing restart/rematch mechanics rather than opening a Draw modal.
-
-Reuse existing restart logic rather than duplicating fighter reset code.
-
-Do not alter non-draw result behavior unless necessary for the refactor. Future P1/CPU wins may continue to use the result menu.
-
-Do not remove draw detection from the lower-level battle model if it remains useful. The requested change is primarily that a draw should no longer surface a blocking result dialog.
-
-Ensure input, HUD, touch controls, timer, camera, and banner state are restored correctly after the automatic draw restart.
-
-15. Make Return to Home confirmation glass
-
-ConfirmDialog in js/ui/overlays.js creates the confirmation used when selecting Return to Home from a paused battle.
-
-Make .dialog-panel use the same semi-transparent glass treatment as the pause panel.
-
-Preserve:
-
-* modal semantics
-* role="alertdialog"
-* title/message relationships
-* focus trapping/scope behavior
+* the Return Home dialog panel itself
 * Keep Playing
 * Return Home
-* green primary action
-* keyboard/gamepad navigation
 
-The battle/stage should remain dimly visible through the confirmation dialog.
+Button backgrounds
 
-Do not reduce text contrast.
+The green Return Home confirmation button remains a green primary button.
 
-16. Preserve navigation behavior
+The Keep Playing button should:
 
-After all of these changes, verify:
+* have a transparent resting background
+* keep white/off-white text
+* remain fully enabled
+* keep its border
+* keep normal hover, focus, and pressed feedback
+* retain its current default-focus behavior
 
-* Resume remains the default pause-menu selection.
-* Disabled Help is skipped.
-* Restart Battle remains reachable.
-* Return to Home remains reachable.
-* Back/Esc behavior still resumes as expected.
-* P can still resume from pause where currently supported.
-* Gamepad navigation still works.
-* Clicking the timer while playing opens pause.
-* Clicking the pause-icon holder while playing opens pause.
-* Neither HUD control causes double pause calls.
-* Rapid clicking does not create multiple navigation scopes.
-* Return Home confirmation still correctly returns focus when cancelled.
-* Touch controls correctly disable while paused and restore after resume.
+Do not make Keep Playing gray or disabled-looking.
 
-17. Responsive requirements
+The desired visual relationship is:
 
-Test the HUD at:
+* primary action = green
+* secondary active action = transparent + white text
+* genuinely disabled action = transparent + muted gray text
 
-* normal desktop landscape
-* large desktop
-* short desktop landscape
-* landscape phone-like widths/heights
-* device safe areas/notches
-* very short landscape heights already handled by existing CSS media queries
+⸻
 
-The merged timer/pause stack must not:
+7. Avoid unrelated changes
 
-* overlap either fighter stat holder
-* overlap safe areas
-* cover a significant amount of play space
-* wrap unexpectedly
-* create horizontal overflow
+Do not change the shape of unrelated UI merely because it uses one of the existing radius tokens.
 
-Keep the timer legible.
+In particular, leave intentional circles/pills alone, including things such as:
 
-The two fighter boxes should remain symmetrical.
+* roster selected check circle
+* availability/status badge
+* stage Selected badge
+* setup-step number circles
+* P1/CPU tags unless specifically necessary
+* touch-control circles
+* circular icons
+* Home credits/glass treatment
+* splash presentation
 
-18. Accessibility
+Also do not restyle the battle result dialog unless a shared CSS rule makes it absolutely necessary. The requested dialog changes are specifically for the Pause dialog and Return Home confirmation.
 
-Maintain the project’s existing accessibility standards.
+Prefer selector scoping over broad global changes.
 
-Specifically:
+⸻
 
-* interactive timer/pause holders must be keyboard operable
-* they need meaningful accessible names
-* native disabled state for Help should be exposed correctly
-* health bars remain role="meter" with valid current values
-* dialog semantics remain intact
-* focus rings remain clearly visible
-* do not rely on green alone to identify P1 vs CPU; P1/CPU tags and fighter names remain
-* minimum touch targets should remain comfortable
-* disabled Help must not receive keyboard/gamepad focus
+8. Preserve behavior and accessibility
 
-Do not add unnecessary announcements every second from the timer.
+This should ideally be a CSS-focused change.
 
-19. CSS cleanup
+Do not break or alter:
 
-After implementing the new design, remove or refactor obsolete styles rather than leaving dead rules.
+* Home → Mode → Fighter → Stage → Battle flow
+* mouse/touch interaction
+* keyboard navigation
+* gamepad navigation
+* focus rings
+* default focus targets
+* aria-* attributes
+* disabled Help behavior
+* modal behavior
+* Return Home confirmation behavior
+* stage/fighter selection
+* battle HUD functionality
+* timer/pause click targets
+* responsive layouts
+* reduced-motion behavior
 
-Likely candidates include:
+Maintain existing minimum touch-target sizes.
 
-* old circular .pause-toggle positioning and dimensions
-* extra HUD padding reserved for the old top-right pause button
-* .hud-sub
-* old P1 white / CPU gray health fill overrides
-* timer inversion styling
-* obsolete responsive rules tied to .hud-sub
+⸻
 
-Do not remove unrelated styles.
+9. Visual acceptance criteria
 
-Prefer a small shared set of glass variables/rules instead of repeating slightly different RGBA values everywhere.
+After the change, manually inspect the complete flow:
 
-20. Update the specification
+Home
 
-Update ALVA_SPEC.md wherever the existing specification now contradicts the implementation.
+* Use Play as the visual radius reference.
 
-In particular, it currently describes battle chrome approximately as:
+Select Mode
 
-* P1 white health
-* CPU gray health
-* timer inverting to a white block/black digits
-* separate round/timer treatment
-* active pause Help/result behavior
+* Back
+* Quick Battle card
+* Mode details
+* Select
 
-Revise those parts to accurately document the new intended design:
+All visibly match Play’s 3px corners.
 
-* green health for both fighters
-* translucent glass fighter panels
-* merged timer + pause glass control
-* both timer and pause sections pause the game
-* urgent timer changes digits to white without background inversion
-* no PLAYER 1 / TRAINING OPPONENT subtitle rows
-* pause menu Help temporarily disabled
-* pause and Return Home panels use glass treatment
-* stage name is not shown in the pause dialog
-* draw does not produce a blocking result dialog
+Select Fighter
 
-Keep the rest of the product specification intact.
+* Back
+* roster container
+* all roster character cards
+* character preview
+* Confirm fighter
 
-21. Testing
+All use the same 3px corner language.
 
-Do not stop after making it look correct.
+Select Stage
 
-Add focused automated tests where practical using the repository’s current dependency-free node:test style.
+* Back
+* main stage preview
+* Desert card
+* City card
+* Confirm and start battle
 
-At minimum, test behavioral logic that does not require a real browser layout engine, especially:
+All use 3px corners.
 
-1. pause Help is disabled / not treated as an active navigation option
-2. draw result does not open the result dialog and triggers the intended restart behavior
-3. non-draw result behavior is preserved
-4. timer and pause controls both invoke the same pause path if the DOM test harness makes that practical
+Battle
 
-Do not add npm dependencies just for tests.
+* P1 HUD holder
+* CPU HUD holder
+* both health bars
+* combined timer/pause box
 
-Run all existing tests plus new tests.
+All visually use the same small-radius treatment.
 
-Also manually reason through or browser-test the CSS/layout because Node unit tests cannot validate paint/layout.
+Pause
 
-22. Do not change unrelated game systems
+* panel and every button use 3px corners
+* Resume stays green
+* Restart Battle and Return to Home are transparent with white text
+* Help remains disabled and visually distinguishable
 
-Do NOT change:
+Return Home confirmation
 
-* Canvas stage rendering
-* stage artwork
-* fighter sprites
-* physics
-* collision
-* camera
-* combat values
-* round length
-* character data
-* stage selection behavior
-* map thumbnails
-* character selection
-* splash screen
-* Home layout
-* Home glass credits strip
-* desktop/touch gameplay bindings
-* player markers
-* debug overlay
+* panel and both buttons use 3px corners
+* Return Home stays green
+* Keep Playing is transparent with white text
 
-Home Help & Credits is already disabled; leave it disabled.
+There should be no accidental large 8px/12px/18px rounding left on any of these requested rectangular surfaces.
 
-Do not remove the underlying Help/Credits implementation.
+⸻
 
-Final acceptance checklist
+10. Validation
 
-The work is complete only when all of the following are true:
+Run the existing tests after the change:
 
-* Pause dialog is semi-transparent dark glass.
-* Return Home confirmation dialog is semi-transparent dark glass.
-* Pause dialog no longer shows the selected stage name.
-* Pause-menu Help is visible but disabled and skipped by navigation.
-* Home Help & Credits remains disabled.
-* P1 and CPU stat holders are semi-transparent glass.
-* Both health bars are the same Alva green.
-* PLAYER 1 text below P1 health is gone.
-* TRAINING OPPONENT text below CPU health is gone.
-* Timer holder is semi-transparent glass.
-* Final-ten-seconds state never produces a white timer background.
-* Urgent state changes only the timer digits to pure white.
-* Old standalone circular top-right pause button is gone.
-* A rectangular/semi-transparent pause holder sits immediately underneath the timer with zero gap.
-* Timer and pause holders form one contiguous visual control.
-* Clicking/tapping the timer holder pauses.
-* Clicking/tapping the pause holder pauses.
-* Esc/P and gamepad pause still work.
-* Draws no longer open a Draw dialog.
-* A draw cannot leave the game frozen with no available UI.
-* Non-draw result handling remains functional.
-* HUD remains responsive on landscape mobile and desktop.
-* Accessibility and focus behavior remain intact.
-* ALVA_SPEC.md reflects the new behavior.
-* Existing and newly added tests pass.
+node --test tests/battle-screen.test.mjs
+node --test tests/splash-screen.test.mjs
 
-Before finishing, inspect the diff for unnecessary changes and keep the implementation narrowly scoped to this request.
+The battle test explicitly covers pause-menu/HUD/end-of-battle behavior, so it must continue to pass.
+
+Then serve the game locally over HTTP and visually test the complete flow in a real browser because the existing tests do not validate CSS paint/layout:
+
+python3 -m http.server 8000
+
+Open the game, proceed from Home through Quick Battle, enter battle, open Pause, and open the Return Home confirmation.
+
+Test at both desktop size and landscape mobile/tablet dimensions.
+
+Definition of done
+
+The task is complete when every specifically requested rectangular UI surface uses the Home Play button’s exact small 3px corner language, the specified active secondary dialog buttons have transparent resting backgrounds with white text, green primary buttons remain green, genuine disabled states remain distinguishable, and all existing game/navigation behavior continues to work.
