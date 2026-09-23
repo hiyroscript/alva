@@ -1,1421 +1,1743 @@
-Implement Character #0001’s new Charge state, its four uploaded charge animation frames, the new Charge control, and a full blue Energy bar in the Alva battle HUD.
+Implement Character #0001’s Charge release pose and new ground + mid-air Dodge defense animations in the current Alva repository.
 
-Work from the current main branch. Before editing, inspect the existing BA1/BA2 implementation, Fighter state machine, SpriteAnimator, InputManager, touch controls, HUD, Help UI, tests, README, and ALVA_SPEC.md.
+Work from the latest main branch.
 
-Do not redesign unrelated systems.
+The current game already includes:
 
-1. New charge artwork
+* Idle / Run / Jump / Fall / Land
+* Hurt / Mid-Air Hurt
+* BA1 + Mid-Air BA1
+* BA2 + Mid-Air BA2
+* Charge
+* Energy meter
+* generic combat/blocking infrastructure
+* touch, keyboard and gamepad controls
+* dependency-free Node tests
 
-The repository root currently contains four new Character #0001 sprites:
+Do not rebuild systems that already exist.
 
-* 0001_charge1.png
-* 0001_charge2.png
-* 0001_chargea.png
-* 0001_chargeb.png
+The goal of this task is:
 
-Move all four files into the canonical Character #0001 sprite directory:
+1. When the player voluntarily releases Charge, #0001 briefly uses 0001_charge1.png as the Charge exit/release pose.
+2. Add #0001’s new three-frame grounded Dodge.
+3. Add #0001’s new three-frame mid-air Dodge.
+4. Replace the generic gameplay action/input name Block with Defense.
+5. #0001’s Defense mechanism is Dodge, not Block.
+6. Replace #0001’s touch shield icon with the visible text D.
+7. Preserve the architecture so future characters can use either Dodge or Block behind the same generic Defense input.
+
+1. Existing Charge implementation
+
+Do not replace the Charge system that is already merged.
+
+The current Charge architecture is:
+
+logical state: charge
+chargeStart:
+charge1 → charge2
+chargeLoop:
+chargea ↔ chargeb
+
+The current sequence while continuously held is:
+
+charge1
+→ charge2
+→ chargea
+→ chargeb
+→ chargea
+→ chargeb
+→ ...
+
+Charge is:
+
+* grounded only
+* held-state driven
+* not a toggle
+* movement-locking
+* non-attacking
+* non-invulnerable
+* interrupted by higher-priority states
+* restarted from charge1 on every new charge
+
+Keep all of that.
+
+2. New Charge release behavior
+
+Currently, releasing Charge immediately exits the Charge state and returns to the normal state such as Idle or Run.
+
+Change this.
+
+When the player was actually charging and then voluntarily releases the Charge input, #0001 must show:
+
+0001_charge1.png
+
+as a short Charge release/end pose.
+
+This reuses the existing real 0001_charge1.png asset.
+
+Do not create or duplicate another PNG.
+
+3. Add a dedicated Charge release clip/state
+
+Represent the voluntary release cleanly instead of hacking the animator index.
+
+Add an animation key conceptually similar to:
+
+chargeRelease: {
+  frames: [`${BASE_0001}charge1.png`],
+  fps: CHARGE_FPS,
+  loop: false,
+  heightRatio: 1,
+}
+
+This is intentionally the same artwork as the first Charge startup frame.
+
+Use a short logical state such as:
+
+chargeRelease
+
+The state should last exactly one frame-time at CHARGE_FPS.
+
+The current Charge rate is 10 FPS, so this naturally means roughly:
+
+0.1 seconds
+
+Do not introduce a random hard-coded timeout disconnected from the animation rate.
+
+Prefer:
+
+this.chargeReleaseDuration = sprites.duration('chargeRelease');
+
+or equivalent.
+
+4. “Voluntary release” is important
+
+Only play chargeRelease when the player stops holding the Charge control normally.
+
+Example:
+
+player is actively charging
+→ Charge key/button becomes released
+→ chargeRelease
+→ normal Idle/Run/etc.
+
+Do not force the release pose when Charge is interrupted by another gameplay state.
+
+These transitions should remain immediate:
+
+Charge → Hitstun
+Charge → BA1
+Charge → BA2
+Charge → Jump
+Charge → Defense/Dodge
+Charge → airborne state
+
+For example, if #0001 is charging and gets hit:
+
+chargea → Hurt
+
+not:
+
+chargea → charge1 → Hurt
+
+Likewise:
+
+Charge + BA1 → BA1 immediately
+Charge + Defense → Dodge immediately
+Charge + Jump → Jump immediately
+
+The release pose represents the character letting go of Charge, not every possible way the Charge state can end.
+
+5. Detect the release transition explicitly
+
+Track whether #0001 was actually charging on the previous simulation step.
+
+Do not infer voluntary release merely from:
+
+input.charge === false
+
+because Charge can be inactive for many other reasons.
+
+Conceptually distinguish:
+
+wasCharging = true
+input.charge = false
+no higher-priority interruption started
+
+from:
+
+wasCharging = true
+input.charge = true
+attack begins
+
+and:
+
+wasCharging = true
+input.charge = true
+hitstun begins
+
+Only the first case starts chargeRelease.
+
+A simple boolean or short release timer is fine as long as the state transition is explicit and deterministic.
+
+6. Charge release priority
+
+A sensible state priority after this task is:
+
+hitstun
+attack
+defense/dodge
+jump / fall
+land
+active charge
+chargeRelease
+run
+idle
+
+chargeRelease is a low-priority visual recovery state.
+
+It must never delay:
+
+* Hitstun
+* an attack
+* a Dodge
+* a Jump
+* airborne state
+* Land
+
+If the player begins a new Charge while chargeRelease is still displayed, the new Charge should immediately win and restart from:
+
+0001_charge1.png
+
+7. Charge release should not create gameplay effects
+
+The Charge release pose is visual.
+
+Do not add:
+
+* damage
+* hitbox
+* invulnerability
+* armour
+* Energy gain
+* Energy drain
+* knockback
+* special movement
+
+Normal movement may resume according to the existing movement system while the brief release pose is displayed.
+
+Do not add an artificial movement freeze just because the release pose exists.
+
+8. New Dodge sprites
+
+The repository root currently contains:
+
+Ground Dodge
+
+0001_dodge1.png
+0001_dodge2.png
+0001_dodge3.png
+
+Mid-Air Dodge
+
+0001_midairdodge1.png
+0001_midairdodge2.png
+0001_midairdodge3.png
+
+These were uploaded in the two most recent sprite commits.
+
+Move all six into:
 
 ./assets/characters/0001/
 
 Final paths:
 
-./assets/characters/0001/0001_charge1.png
-./assets/characters/0001/0001_charge2.png
-./assets/characters/0001/0001_chargea.png
-./assets/characters/0001/0001_chargeb.png
+./assets/characters/0001/0001_dodge1.png
+./assets/characters/0001/0001_dodge2.png
+./assets/characters/0001/0001_dodge3.png
+./assets/characters/0001/0001_midairdodge1.png
+./assets/characters/0001/0001_midairdodge2.png
+./assets/characters/0001/0001_midairdodge3.png
 
-Do not leave duplicate copies at the repository root.
+Remove the root copies.
 
-Preserve the PNG bytes unchanged.
+Preserve their bytes exactly.
 
-Do not redraw, recolour, replace, rotate, AI-generate, or otherwise fabricate any #0001 artwork.
+Do not redraw, recolour, AI-generate, manually scale, rotate or replace any frame.
 
-Continue using relative URLs because the game must work from a GitHub Pages subpath such as /alva/.
+0001_dodge3.png currently happens to share the same repository blob contents as an existing charge frame. Treat its filename and role as intentional. Do not delete or rename it simply because the bytes happen to match another sprite.
 
-2. Exact Charge animation sequence
+9. Register the Dodge animations
 
-Charge is not a normal four-frame looping animation.
+In Character #0001’s animation data, add:
 
-The required sequence is:
-
-0001_charge1
-→ 0001_charge2
-→ 0001_chargea
-→ 0001_chargeb
-→ 0001_chargea
-→ 0001_chargeb
-→ 0001_chargea
-→ 0001_chargeb
-→ ...
-
-In other words:
-
-1. charge1 plays once.
-2. charge2 plays once.
-3. Then enter a sustained loop:
-    * chargea
-    * chargeb
-    * chargea
-    * chargeb
-    * forever while Charge remains held.
-
-Do not loop back to charge1 or charge2 while the same charge hold continues.
-
-When the player releases Charge and later starts charging again, the sequence must restart from charge1.
-
-3. Implement the animation as an intro plus loop
-
-The existing SpriteAnimator only supports normal clips that either loop their entire frame list or stop on their last frame.
-
-Do not complicate the general animator with a special hard-coded #0001 frame sequence if that can be avoided.
-
-Represent Charge as two animation clips while keeping one logical fighter state:
-
-logical state: charge
-chargeStart:
-  charge1
-  charge2
-  non-looping
-chargeLoop:
-  chargea
-  chargeb
-  looping
-
-In js/data/characters.js, add something equivalent to:
-
-chargeStart: {
-  frames: [
-    `${BASE_0001}charge1.png`,
-    `${BASE_0001}charge2.png`,
-  ],
-  fps: CHARGE_FPS,
-  loop: false,
-  ...
-},
-chargeLoop: {
-  frames: [
-    `${BASE_0001}chargea.png`,
-    `${BASE_0001}chargeb.png`,
-  ],
-  fps: CHARGE_FPS,
-  loop: true,
-  ...
-},
-
-Do not use the numeric frames() helper for chargea / chargeb, since those filenames intentionally use letters.
-
-Introduce a clearly named constant such as:
-
-const CHARGE_FPS = 10;
-
-or another sensible rate after visually checking the four frames in-game.
-
-Start around 10–12 FPS.
-
-The important requirement is the ordering and transition behavior, not an arbitrary exact FPS.
-
-Use the existing sprite-normalization system. Determine an appropriate heightRatio from the actual art so #0001 remains visually consistent with Idle, BA1, BA2, Hurt, etc.
-
-Do not resize sprites manually based on their raw PNG dimensions.
-
-4. Keep one logical charge state
-
-Add a logical Fighter state named:
-
-charge
-
-Do not expose chargeStart and chargeLoop as two different gameplay states. They are two animation phases of one Charge state.
-
-Cache or otherwise determine the duration of chargeStart, similar to how the fighter currently determines the Land animation duration.
+dodge
+midairDodge
 
 Conceptually:
 
-this.chargeStartDuration = sprites.duration('chargeStart');
+const DODGE_FPS = 12;
+dodge: {
+  frames: frames(BASE_0001, 'dodge', 3),
+  fps: DODGE_FPS,
+  loop: false,
+  ...
+},
+midairDodge: {
+  frames: frames(BASE_0001, 'midairdodge', 3),
+  fps: DODGE_FPS,
+  loop: false,
+  ...
+},
 
-When the Fighter’s logical state is charge:
+Both have exactly three real frames.
 
-* while stateTime is within the two-frame intro, render chargeStart
-* after the intro finishes, render chargeLoop
+Start with 12 FPS unless browser inspection of the actual sprites clearly indicates another rate.
 
-For example, animationFor('charge') may select:
+Both must play once.
 
-chargeStart while stateTime < chargeStartDuration
-chargeLoop afterward
+Do not loop the entire Dodge continuously while the button is held.
 
-Make sure both intro frames are actually visible before transitioning.
+Use the normal sprite-normalization system and determine suitable heightRatio values by inspecting the actual sprites in-game.
 
-Once chargeLoop begins, it must keep alternating A/B for as long as Charge remains held.
+10. Rename the generic gameplay input from Block to Defense
 
-5. Charge is a held action, never a toggle
+The current generic control is named:
 
-The Charge control must be held.
+block
 
-This requirement applies to touch, keyboard, and any gameplay gamepad mapping.
+Replace the generic input/action concept with:
+
+defense
+
+This matters because different characters can use different defense mechanics.
+
+The shared player-facing action is:
+
+Defense
+
+A character may implement Defense as:
+
+Block
+
+or:
+
+Dodge
+
+For #0001:
+
+Defense type = Dodge
+
+Do not call the shared action itself dodge.
+
+Do not leave the generic action named block.
+
+11. Rename gameplay input fields
+
+Update the gameplay input architecture.
+
+Change:
+
+block
+blockPressed
+
+to:
+
+defense
+defensePressed
+
+everywhere the values represent the player’s generic defense command.
+
+That includes at minimum:
+
+* CONFIG.bindings
+* ACTIONS
+* InputManager frame
+* InputManager sampling
+* gamepad mapping
+* NEUTRAL_INPUT
+* controller blank inputs
+* touch controls
+* Fighter input handling
+* tests
+
+Avoid transitional aliases such as permanently supporting both:
+
+block
+defense
+
+for the same player action.
+
+The canonical gameplay action after this change is defense.
+
+12. Keep the physical Defense controls
+
+Do not change the physical bindings.
+
+The control that used to activate Block now activates Defense.
+
+Keyboard
+
+Keep:
+
+L
+
+but rename its action:
+
+defense: ['KeyL']
+
+Gamepad
+
+Keep:
+
+RB
+RT
+
+but map both to:
+
+defense
+
+Touch
+
+Keep the existing Defense button in the same lower-right physical position.
+
+Do not rearrange the action cluster.
+
+13. Rename player-facing Block text to Defense
+
+Change user-facing references from:
+
+Block
+
+to:
+
+Defense
+
+where the text describes the generic control.
+
+For example:
+
+ACTION_LABELS.defense = 'Defense'
+
+The controls table should show:
+
+Defense | L
+
+not:
+
+Block | L
+
+Gamepad documentation should describe:
+
+RB / RT = Defense
+
+14. Replace the shield touch icon with “D”
+
+The existing touch control uses:
+
+ICONS.block
+
+which renders a shield.
+
+For #0001, remove that shield from the visible Defense button.
+
+Display exactly:
+
+D
+
+The D means Dodge because #0001’s Defense mechanic is Dodge.
+
+The generic accessible/action name remains:
+
+Defense
+
+So the touch specification should be equivalent to:
+
+{
+  action: 'defense',
+  label: 'Defense',
+  text: 'D',
+  pos: 'defense'
+}
+
+Use visible text:
+
+D
+
+not a shield SVG.
+
+Do not display:
+
+Block
+Dodge
+DEF
+
+on the button itself.
+
+The button visibly says exactly D.
+
+15. Rename its CSS/layout identifiers
+
+Because the generic action is being completely renamed, update generic control selectors such as:
+
+tc-block
+
+to:
+
+tc-defense
+
+and the corresponding mobile Help diagram selector from something like:
+
+md-block
+
+to:
+
+md-defense
+
+Keep the physical button coordinates unchanged.
+
+Do not move Defense around the control layout.
+
+16. Remove obsolete shield use
+
+If ICONS.block becomes completely unused after this task, remove that icon definition.
+
+If another actual existing UI still uses it for something unrelated, leave it.
+
+Do not leave dead shield rendering just for the Defense button.
+
+17. Add character-level Defense configuration
+
+Do not hard-code:
+
+Defense always means Dodge
+
+into the global input system.
+
+The whole reason for renaming the generic action is that future characters may defend differently.
+
+Add character-level data describing the defense mechanism.
+
+For example:
+
+defense: {
+  type: 'dodge',
+  ground: {
+    animation: 'dodge',
+    ...
+  },
+  air: {
+    animation: 'midairDodge',
+    ...
+  },
+}
+
+For a future blocking character, the architecture should be able to support something conceptually like:
+
+defense: {
+  type: 'block',
+  ...
+}
+
+without renaming the global button/input again.
+
+You do not need to add a new character in this task.
+
+18. #0001 no longer blocks
+
+For #0001 specifically:
+
+* pressing Defense does not set a permanent guard
+* holding Defense does not produce chip-damage blocking
+* #0001 should not enter the current block visual state
+* #0001 should not use the idle sprite as a fake guard
+* #0001 should not reduce incoming damage via blockDamageScale
+
+Instead, #0001 performs a discrete Dodge.
+
+The existing block implementation may remain available internally for a future character whose:
+
+defense.type === 'block'
+
+Do not delete useful block-specific combat architecture solely because #0001 no longer uses it.
+
+19. Keep block-specific terminology where it is actually block-specific
+
+Do not blindly rename combat concepts such as:
+
+blockstun
+blockDamageScale
+blocking
+
+to awkward names such as:
+
+defensestun
+defenseDamageScale
+
+if those fields specifically describe the mechanics of an actual Block defense.
+
+The important split is:
+
+player input = Defense
+character mechanism = Dodge or Block
+
+For a block-type character, internal fields like blocking, blockstun, and blockDamageScale can remain meaningful.
+
+For #0001, they simply must not become active when Defense is used.
+
+20. Dodge is a press action, not a held guard
+
+Unlike the old Block mechanic, #0001’s Dodge is a discrete action.
+
+Trigger Dodge from:
+
+defensePressed
+
+not from continuously checking:
+
+input.defense
 
 Correct behavior:
 
-press and hold Charge
-→ enter Charge state
-continue holding
-→ stay in Charge state
-→ charge1, charge2, then A/B loop
-release Charge
-→ immediately leave Charge state
-press and hold again later
-→ restart from charge1
+press Defense
+→ perform one Dodge
+continue holding Defense
+→ do not loop another Dodge
+release
+→ nothing special
+press again
+→ perform another Dodge
 
-Do not implement:
+Do not make the three-frame animation repeat continuously while L/RB/RT/touch D remains held.
 
-* tap-to-toggle charging
-* a latched Charge state
-* press once to start / press again to stop
-* charge buffering after release
-* a minimum hold timer before entering the state
+A new Dodge requires a new press edge.
 
-The continuous held value must determine whether the fighter is charging.
+21. Ground vs mid-air Dodge selection
 
-Use input.charge, not a one-time chargePressed edge, as the source of the sustained state.
+When Defense is newly pressed:
 
-6. Completely replace the gameplay Down action with Charge
-
-The current gameplay action named down must be replaced with:
-
-charge
-
-This is a complete gameplay-control rename/replacement.
-
-Currently the gameplay Down action controls:
-
-* crouching
-* dropping through one-way platforms
-* the middle lower-left touch button
-
-Those gameplay behaviors must no longer be attached to this control.
-
-Change the gameplay action from:
-
-down
-
-to:
-
-charge
-
-in the relevant input configuration and fixed-step input snapshot.
-
-For example, the gameplay ACTIONS list should conceptually become:
-
-[
-  'left',
-  'right',
-  'charge',
-  'jump',
-  'primary',
-  'special',
-  'block',
-  'action1',
-  'action2',
-  'pause',
-]
-
-The gameplay frame should contain:
-
-charge: false
-
-instead of:
-
-down: false
-
-The Fighter should read:
-
-input.charge
-
-to determine charging.
-
-Do not secretly keep input.down as an alias to Charge.
-
-There should be one clear gameplay action named charge.
-
-7. Preserve menu Down navigation
-
-The gameplay action is being replaced, but menu navigation still needs Down.
-
-Do not rename or break:
-
-CONFIG.menuBindings.down
-
-Arrow Down / S should still navigate downward through menus exactly as before.
-
-Keep the distinction clear:
-
-Gameplay:
-S / ↓ = Charge
-Menus:
-S / ↓ = navigate Down
-
-This is already structurally possible because menu bindings are separate from gameplay actions.
-
-8. Keyboard Charge binding
-
-Reuse the physical keys currently assigned to gameplay Down:
-
-S
-Down Arrow
-
-They now mean:
-
-Charge
-
-So the gameplay config should conceptually become:
-
-charge: ['KeyS', 'ArrowDown']
-
-instead of:
-
-down: ['KeyS', 'ArrowDown']
-
-Do not add KeyC merely because the touch button visibly says C.
-
-C is the requested touch-button text.
-
-The existing physical gameplay S / Down Arrow location should become Charge.
-
-Because Charge is held-state driven:
-
-* holding S charges
-* holding ↓ charges
-* releasing the key exits Charge
-
-Keyboard auto-repeat must remain irrelevant; use existing held-state tracking.
-
-9. Touch control: replace the Down arrow with “C”
-
-The lower-left touch cluster currently contains:
-
-LEFT | DOWN | RIGHT
-
-Replace it with:
-
-LEFT | C | RIGHT
-
-The middle button must be the Charge control.
-
-Change the corresponding DPAD entry from something like:
-
-{
-  action: 'down',
-  label: 'Down, drop through platform',
-  icon: ICONS.down
-}
-
-to something equivalent to:
-
-{
-  action: 'charge',
-  label: 'Charge',
-  text: 'C'
-}
-
-Required properties:
-
-* visible button text: exactly C
-* accessible label: Charge
-* internal gameplay action: charge
-* location: exactly where the old Down button is now
-* remain part of the same lower-left cluster
-* preserve true held-pointer behavior
-
-The button must visually show its held/pressed state for the full duration of the pointer hold.
-
-Do not move Charge into the lower-right attack cluster.
-
-Do not add another button.
-
-This is a replacement of the existing middle button.
-
-Rename relevant classes where appropriate:
-
-tc-down → tc-charge
-
-and update comments accordingly.
-
-The touch cluster comment should describe:
-
-[LEFT] [C] [RIGHT]
-
-not [LEFT] [DOWN] [RIGHT].
-
-The group ARIA label can become something like:
-
-Movement and Charge
-
-rather than incorrectly calling all three buttons movement directions.
-
-10. Preserve touch sliding and multi-touch
-
-The current lower-left cluster supports sliding a thumb between its buttons.
-
-Keep that behavior.
-
-For example:
-
-* slide Left → Charge: Left releases and Charge becomes held
-* slide Charge → Right: Charge releases and Right becomes held
-
-Do not create stuck Charge input when a pointer slides away, is cancelled, or loses pointer capture.
-
-releaseAll() must release Charge correctly.
-
-Also preserve multi-touch, e.g.:
-
-* one finger holds Charge
-* another finger presses BA1, BA2, Block, or Jump
-
-Gameplay state priority determines the result, but the input system itself must correctly track both touches.
-
-11. Gamepad behavior
-
-The current gameplay down action is fed by gamepad downward input.
-
-Replace those gameplay mappings with charge.
-
-At minimum, the existing gameplay D-pad Down mapping should now produce:
-
-charge
-
-If the existing left-stick downward axis currently feeds gameplay Down, preserve the same physical behavior by making it feed Charge instead.
-
-Do not alter menu navigation: D-pad/left-stick Down must still navigate down in menus through the existing menu-input path.
-
-Document the gamepad Charge control accurately in Help/README.
-
-12. Remove crouch behavior from this control
-
-The current Fighter has:
-
-this.crouching
-
-and uses held Down on the ground to enter the crouch visual state.
-
-That gameplay behavior is being replaced by Charge.
-
-Remove the active gameplay path where holding S/↓/the middle touch button makes #0001 crouch.
-
-Do not allow holding Charge to also make this.crouching = true.
-
-Prefer replacing the current crouch-tracking field with something clear such as:
-
-this.charging = false;
-
-if that keeps the Fighter implementation straightforward.
-
-There should be no ambiguity where one input simultaneously means crouch and Charge.
-
-Do not create a new crouch binding elsewhere in this task.
-
-13. Remove platform drop-through from this control
-
-The old Down press currently calls the one-way-platform dropThrough() behavior.
-
-That must no longer happen when Charge is pressed.
-
-Holding or pressing Charge while standing on a one-way platform must not cause #0001 to fall through it.
-
-You do not need to delete the generic dropThrough() physics helper if it may be useful for future controls or fighters.
-
-However:
-
-* Fighter should no longer invoke it from the Charge control
-* docs must no longer tell players S/↓/the middle touch button drops through platforms
-* existing tests that expect gameplay Down to drop through must be updated
-
-Do not invent a replacement drop-through control in this task.
-
-One-way platforms can continue to function as one-way collision surfaces; the player simply no longer has the current Down-to-drop-through command.
-
-14. Charge state conditions
-
-Charge should be a grounded state for #0001.
-
-Enter Charge only when all of the following are true:
-
-* Charge is currently held
-* #0001 is grounded
-* normal action conditions allow it
-* #0001 is not in hitstun
-* #0001 is not currently attacking
-* #0001 is not blocking
-
-A sensible implementation is conceptually:
-
-this.charging =
-  canAct &&
-  body.grounded &&
-  input.charge &&
-  !combat.blocking;
-
-Do not render the grounded Charge animation in mid-air.
-
-If Charge is held while #0001 is airborne:
-
-* continue Jump/Fall normally
-* do not show charge sprites in the air
-
-If the player continues holding Charge through landing, allow the normal Land animation/state priority to finish according to the existing state machine, then enter Charge while the key is still held.
-
-Do not create fake mid-air charge artwork.
-
-15. Charge movement behavior
-
-While #0001 is actively charging:
-
-* horizontal movement should be locked
-* normal gravity/collision should still work
-* the collider/hurtboxes must not change
-* #0001 remains hittable
-* Charge does not grant armour
-* Charge does not grant invulnerability
-* Charge does not push opponents
-* Charge creates no attack hitbox
-
-Include Charge in the horizontal movement lock.
-
-For example, the movement lock should account for:
-
-blocking
-charging
-hitstun
-attack movement lock
-
-Do not implement Charge as an attack.
-
-Do not put Charge into COMBAT_ACTIONS.
-
-16. State priority
-
-Preserve the established state-machine priorities.
-
-Charge must never override higher-priority combat or airborne states.
-
-A suitable ordering is:
-
-hitstun
-attack
-jump / fall
-land
-block
-charge
-run
-idle
-
-This means:
-
-* being hit immediately replaces Charge with Hurt/Hitstun
-* starting BA1/BA2 interrupts Charge
-* jumping interrupts Charge
-* being airborne prevents Charge
-* Block has priority if Block and Charge are both held
-* Charge overrides normal Run/Idle presentation while actually active
-
-Do not weaken BA1 or BA2 behavior.
-
-17. Charge and attacks
-
-BA1 and BA2 must remain fully functional.
-
-If the player is charging and presses an attack:
-
-* existing combat intent processing should be allowed to start the valid attack
-* Charge ends because the fighter is now attacking
-* attack animation/state has priority
-
-Do not require the player to manually release Charge before attacking.
-
-Do not allow Charge to cancel hitstun.
-
-Do not introduce attack-cancelling mechanics beyond what follows naturally from the existing state priority.
-
-18. Charge and Jump
-
-Jump should be able to interrupt Charge through the existing jump system.
-
-If Charge is held and Jump begins:
-
-* leave Charge
-* use Jump normally
-* do not show Charge frames while airborne
-
-If Charge remains held until the fighter returns to the ground, Charge can become active again once higher-priority landing behavior is finished.
-
-Do not alter jump velocity, gravity, coyote time, or jump buffering as part of this feature.
-
-19. Charge animation restart rules
-
-When Charge begins:
-
-* start at 0001_charge1.png
-
-When the intro completes:
-
-* 0001_charge2.png must have been shown
-* switch to 0001_chargea.png
-* then alternate A/B
-
-When Charge is interrupted or released:
-
-* leave the Charge logical state
-* do not keep the previous loop index as the next starting point
-
-On the next new Charge:
-
-* start again at 0001_charge1.png
-* not chargea
-* not chargeb
-* not charge2
-
-Test this explicitly.
-
-20. Missing Charge artwork
-
-Add appropriate graceful fallback behavior.
-
-If Charge art unexpectedly fails to load:
-
-* do not crash
-* do not stretch or synthesize frames
-* do not invent artwork
-* fall back to an existing safe still pose such as Idle
-
-Since Charge is not an attack, it does not need the attack system’s strict invisible-hitbox refusal logic.
-
-But the fighter must remain valid and responsive.
-
-The uploaded four frames should normally preload automatically through characterFramePaths() once the two Charge animation definitions are registered.
-
-21. Add an actual Energy stat
-
-The blue bar must be backed by real fighter state rather than a permanently hard-coded CSS rectangle.
-
-Extend #0001’s stats with an energy capacity.
-
-Use a simple initial value such as:
-
-stats: {
-  health: 100,
-  energy: 100,
-  blockDamageScale: 0.15,
-}
-
-Extend the per-fighter state currently represented by CombatState with:
-
-this.maxEnergy = stats.energy ?? 100;
-this.energy = this.maxEnergy;
-
-or an equivalently clean data-driven implementation.
-
-Because CombatState is recreated in Fighter.reset(), restarting/rematching should naturally restore Energy to full.
-
-Clamp future Energy values to the valid range when setter/update logic is added.
-
-22. Energy starts full
-
-For this task:
-
-maxEnergy = 100
-energy = 100
-
-The HUD must therefore initially show a completely full blue bar.
-
-The user has not specified any spending, gain, drain, or regeneration formula yet.
-
-Do not invent one.
-
-In particular, do not arbitrarily:
-
-* consume Energy for BA1
-* consume Energy for BA2
-* drain Energy while blocking
-* drain Energy while charging
-* increase Energy over time
-* increase Energy from dealing damage
-* increase Energy from taking damage
-
-Charge is being added as a gameplay state now, and Energy is being added as a real resource now, but this task should not invent an unspecified relationship between the two.
-
-Keep the architecture ready for future Energy rules.
-
-23. Add a blue Energy bar under each green health bar
-
-The current HUD side panel is approximately:
-
-fighter tag/name
-green health bar
-
-Change each P1/CPU fighter panel to:
-
-fighter tag/name
-green health bar
-blue energy bar
-
-The Energy bar must be directly beneath the green health bar.
-
-Add it for both:
-
-* Player 1
-* CPU
-
-Both use the same Character #0001 definition and both should expose their Energy resource consistently.
-
-Do not place Energy in the center timer/pause HUD.
-
-Do not put Energy above Health.
-
-24. Energy meter structure
-
-Give the Energy bar its own clear DOM/classes instead of pretending it is Health.
-
-For example:
-
-hud-energy
-hud-energy-fill
-
-or similarly explicit names.
-
-The meter should expose accessibility semantics:
-
-role="meter"
-aria-label="Energy"
-aria-valuemin="0"
-aria-valuemax="100"
-aria-valuenow="100"
-
-If maxEnergy becomes character-dependent, use that real maximum rather than permanently assuming 100 in HUD update logic.
-
-The fill transform should be driven from:
-
-fighter.combat.energy / fighter.combat.maxEnergy
-
-or wherever the final data model stores the real resource.
-
-Add a setEnergy() equivalent to the existing setHealth() pattern so the DOM only changes when displayed values change.
-
-25. Energy bar styling
-
-The Energy bar must be blue.
-
-Health remains Alva green.
-
-Introduce an explicit Energy HUD token/colour rather than globally turning other accent elements blue.
-
-For example, a dedicated token could be:
-
---energy: #3b82f6;
-
-The exact shade may be adjusted slightly to fit the existing dark HUD, but it must read unmistakably as blue.
-
-This is an intentional gameplay-resource colour exception to the existing green interface accent rule.
-
-Do not recolour:
-
-* buttons
-* selection
-* focus
-* health
-* ALVA accent elements
-
-to blue.
-
-The Energy meter should visually belong to the existing fighter HUD panel:
-
-* same width as Health
-* directly below it
-* clean small spacing
-* same rounded/contained visual language
-* readable over stage art
-
-A slightly shorter height than Health is acceptable if it keeps the HUD compact, but it must remain clearly visible.
-
-Do not add a delayed-damage/ghost effect to Energy unless actual Energy loss semantics are later introduced.
-
-For now one solid blue fill is enough.
-
-26. Preserve Health behavior
-
-Do not break the existing green health meter.
-
-Health must retain:
-
-* real health ratio
-* green fill
-* delayed ghost layer
-* low-health behavior
-* P1 left-origin fill
-* CPU right-origin fill
-
-The new Energy bar should follow the same left/right orientation conventions:
-
-* P1 Energy drains/fills from the left origin
-* CPU Energy mirrors from the right origin
-
-even though both are currently full.
-
-27. HUD binding and reset
-
-HUD.bind() should reset its cached Energy display values just as it resets Health caches.
-
-HUD.update(battle) should update:
-
-P1 Health
-P1 Energy
-CPU Health
-CPU Energy
-Timer
-Round
-
-When a battle restarts/rematches:
-
-* Health resets as before
-* Energy resets to full
-* HUD immediately shows full blue Energy meters
-
-Do not alter the winner calculation: the round result is still determined by remaining Health, not Energy.
-
-28. Update the HUD tests
-
-The existing battle HUD test currently expects each side panel to have exactly two children:
-
-name row
-health bar
-
-Update it for the new intended structure:
-
-name row
-health bar
-energy bar
-
-Do not weaken the test by removing structure assertions entirely.
-
-Add assertions that:
-
-* each side has an Energy meter
-* Energy meter has role="meter"
-* Energy has aria-label="Energy"
-* initial aria-valuenow is 100
-* its fill is full
-* changing fighter Energy changes only the Energy fill/value
-* Health still reflects Health
-* P1/CPU orientations remain correct
-
-The fake battle fighters in tests should provide Energy state.
-
-29. Rename the Help control
-
-In js/config.js:
-
-Change the gameplay label from:
-
-Down / drop through
-
-to:
-
-Charge
-
-under the new charge action.
-
-The Help controls table should list:
-
-Charge | S / ↓
-
-instead of Down/drop-through.
-
-Do not change menuBindings.down.
-
-30. Update the mobile Help diagram
-
-The current mobile diagram displays a Down-arrow button between Left and Right.
-
-Replace it with the Charge button.
-
-Diagram:
-
-Left | C | Right
+Grounded
 
 Use:
 
-* visible text: C
-* title/accessibility description: Charge
+dodge
 
-Rename .md-down to an appropriate .md-charge selector while keeping the same physical location:
+with:
 
-left: 21.5%
-top: 78%
+0001_dodge1
+→ 0001_dodge2
+→ 0001_dodge3
 
-Update the overall diagram ARIA description from:
+Airborne
 
-movement buttons Left, Down, Right
+Use:
 
-to something like:
+midairDodge
 
-Left, Charge and Right controls at the lower left
+with:
 
-Update the legend from:
+0001_midairdodge1
+→ 0001_midairdodge2
+→ 0001_midairdodge3
 
-Left · Down · Right
+Choose grounded vs airborne once when Defense is pressed.
+
+Do not switch clips halfway through the same Dodge simply because the fighter lands.
+
+22. Mid-air Dodge should finish its selected clip
+
+Follow the precedent already established by mid-air BA1 and BA2.
+
+If #0001 starts:
+
+midairDodge
+
+and lands before the three frames finish:
+
+* keep the Dodge action active
+* keep midairDodge
+* finish the remaining frames
+* do not switch to ground dodge
+* do not switch to land halfway through
+
+Once the Dodge completes, resume the appropriate grounded state.
+
+23. Gravity continues during mid-air Dodge
+
+Mid-air Dodge must not freeze #0001 in the air.
+
+During midairDodge:
+
+* gravity continues
+* vertical velocity continues
+* existing horizontal velocity can continue
+* collision continues
+
+Do not add:
+
+* hovering
+* extra jump force
+* upward lift
+* downward spike
+* teleportation
+
+unless explicitly specified by a later design task.
+
+24. Do not invent a Dodge dash
+
+The new art represents Dodge, but no special displacement distance was specified.
+
+Do not arbitrarily make #0001:
+
+* dash forward
+* dash backward
+* teleport
+* roll a fixed world distance
+
+because of the animation.
+
+Keep collision/body motion based on existing physics.
+
+On the ground, lock new directional acceleration during the Dodge and allow existing velocity to decelerate naturally, matching the attack/Charge movement discipline.
+
+In the air, preserve current momentum and gravity.
+
+25. Dodge requires a real defensive effect
+
+Since Dodge replaces #0001’s Block as the character’s Defense mechanic, it must actually avoid attacks during an intentional evasion window.
+
+Add a generic concept of temporary target invulnerability/evasion to the combat path.
+
+Do not simulate a Dodge by merely playing sprites while still taking every hit normally.
+
+26. Align Dodge invulnerability with animation frames
+
+Both Dodge clips have three frames.
+
+Use whole animation-frame timing.
+
+A conservative initial timing at 12 FPS is:
+
+frame 1 = startup / vulnerable
+frame 2 = dodge / invulnerable
+frame 3 = recovery / vulnerable
+
+Equivalent:
+
+startup: 1 / DODGE_FPS
+invulnerable: 1 / DODGE_FPS
+recovery: 1 / DODGE_FPS
+
+for both ground and mid-air Dodge.
+
+Before finalizing, inspect the actual artwork in the browser.
+
+If the visibly evasive body position clearly spans a different set of frames, align the invulnerability window to that artwork.
+
+Do not simply make all three frames invulnerable without inspecting them.
+
+Do not use arbitrary millisecond constants disconnected from animation frames.
+
+27. Generic invulnerability implementation
+
+Implement the defensive invulnerability in a way CombatSystem can understand without hard-coding sprite filenames.
+
+For example, expose something equivalent to:
+
+target is currently invulnerable
+
+from Fighter/CombatState.
+
+Then before resolving a hit against a target:
+
+if target is invulnerable
+→ do not apply the hit
+
+Do not:
+
+* subtract health
+* apply hitstun
+* apply blockstun
+* apply knockback
+* apply hitstop
+* mark the attack as having hit that fighter
+
+An attack whose active hitbox overlaps the Dodge’s invulnerability window should pass through.
+
+If the same attack remains active after invulnerability ends, normal collision rules may allow it to connect then.
+
+28. Dodge is not Block
+
+A successful Dodge must not create a:
+
+block
+
+combat event.
+
+It should simply avoid the hit.
+
+Do not apply:
+
+* chip damage
+* blockstun
+* reduced knockback
+
+because no block occurred.
+
+You do not need to invent a special “perfect dodge” reward, sound, Energy gain or counterattack.
+
+29. Dodge action runtime
+
+Use a dedicated short Defense/Dodge runtime state rather than pretending Dodge is an attack.
+
+A clean model would store something equivalent to:
+
+this.defenseAction = {
+  type: 'dodge',
+  animation: 'dodge', // or midairDodge
+  time: 0,
+  ...
+}
+
+The exact structure is flexible.
+
+Important requirements:
+
+* selected animation is locked when Dodge begins
+* duration comes from the clip/frame timing
+* state ends automatically after one pass
+* invulnerability phase comes from elapsed Dodge time
+* holding Defense does not restart it
+
+30. Dodge is not a combat attack
+
+Do not add Dodge to:
+
+COMBAT_ACTIONS
+
+Do not create an attack definition with:
+
+damage: 0
+
+just to abuse the attack system.
+
+Dodge should not have:
+
+* attack hitbox
+* hasHit
+* damage
+* attack cooldown map entry
+* attack event
+
+It is a Defense action/state.
+
+31. State priority
+
+Update the Fighter state machine to support generic Defense cleanly.
+
+For #0001, an appropriate priority is:
+
+hitstun
+attack
+active defense/dodge
+jump / fall
+land
+active charge
+chargeRelease
+run
+idle
+
+The exact internal structure can vary, but preserve these behaviors:
+
+* Hitstun always wins.
+* BA1/BA2 already started before Defense should continue normally.
+* A Dodge that successfully starts gets its own animation for its one-pass duration.
+* An aerial Dodge stays visible even while airborne.
+* Land does not replace a mid-air Dodge midway through its clip.
+* Charge is below active Dodge.
+* voluntary Charge release is below active Dodge.
+
+32. Defense should interrupt Charge
+
+If #0001 is actively charging and the player presses Defense:
+
+Charge → Dodge
+
+immediately.
+
+Do not play:
+
+chargeRelease
+
+first.
+
+This is not a voluntary Charge release animation; it is a higher-priority action interruption.
+
+If the Charge key remains held through the complete Dodge:
+
+* finish Dodge
+* if #0001 is grounded and still eligible
+* start a fresh Charge from charge1
+
+Do not resume directly at chargea/chargeb.
+
+33. Charge release plus Defense on same step
+
+Explicitly handle the case:
+
+player releases Charge
+and presses Defense
+on the same simulation step
+
+Defense wins.
+
+Result:
+
+Dodge
+
+not:
+
+chargeRelease
+
+After the Dodge ends, normal state selection resumes.
+
+34. Attacks and Defense interaction
+
+Preserve the existing combat-intent ordering carefully.
+
+Do not accidentally allow the same press step to start both:
+
+BA1 + Dodge
+
+or:
+
+BA2 + Dodge
+
+Choose a deterministic priority consistent with the existing attack-first architecture.
+
+Prefer keeping attacks at the current higher priority:
+
+attack successfully starts
+→ Dodge does not also start that step
+
+Do not change BA1/BA2 behavior as part of this feature.
+
+35. Dodge and Jump interaction
+
+Defense in the air is valid, so defensePressed while already airborne triggers midairDodge.
+
+For simultaneous ground inputs, preserve deterministic behavior.
+
+A reasonable rule is:
+
+Defense successfully starts on ground
+→ Dodge owns that step and Jump does not also launch
+
+or retain the existing higher-priority intent ordering if tests establish another rule.
+
+Whichever rule is used:
+
+* make it explicit
+* test it
+* do not accidentally start both states
+
+36. Facing during Dodge
+
+Lock facing for the duration of one Dodge.
+
+Do not allow holding the opposite direction to mirror the sprite halfway through a three-frame Dodge.
+
+When the Dodge ends, normal facing rules resume.
+
+This should match attack animation consistency.
+
+37. Missing Dodge artwork
+
+A Defense action that grants invulnerability must not silently work without visible Dodge art.
+
+If the appropriate Dodge clip is unavailable:
+
+do not start the Dodge
+do not grant invulnerability
+
+Log or handle it consistently with the existing “never fake combat artwork” philosophy.
+
+Do not use an Idle sprite while secretly granting invulnerability.
+
+This is more like an attack than a harmless movement fallback because it changes combat outcomes.
+
+38. Remove #0001’s old Block fallback/state usage
+
+Character #0001 currently has:
+
+block: { animation: 'idle' }
+
+as an animation fallback.
+
+Since #0001 no longer blocks, remove that obsolete #0001 block presentation.
+
+Do not show Idle as a guard pose when L is held.
+
+Its Defense action now has real Dodge artwork.
+
+39. #0001 should no longer use blockDamageScale
+
+Character #0001 currently defines:
+
+blockDamageScale: 0.15
+
+Because #0001 no longer has a Block defense, remove or stop using that #0001-specific stat.
+
+Keep a default/block-specific mechanism available for future characters that actually use:
+
+defense.type = block
+
+Do not let #0001 receive chip damage from Defense.
+
+40. Keep attack blockstun data for future blockers
+
+BA1/BA2 currently include values such as:
+
+blockstun
+
+Those values can remain.
+
+They describe what would happen if an actual blocking character defended against the attack.
+
+#0001’s Dodge does not use those values.
+
+This preserves future character support without confusing the generic input with a specific defense mechanic.
+
+41. Rename Help controls
+
+In Help, change:
+
+Block
 
 to:
 
-Left · Charge · Right
+Defense
 
-31. Update Help gameplay descriptions
+The desktop controls table should show approximately:
 
-Remove stale Help text that says:
+Defense | L
 
-* Hold Down to crouch
-* Press Down to drop through platforms
+not Block.
 
-Replace it with Charge behavior.
+The player-facing action name is always Defense.
 
-Explain that:
+42. Update the mobile Help diagram
 
-* hold Charge while grounded to enter #0001’s charging stance
-* Charge plays its two-frame startup once, then loops its sustained pose while held
-* release Charge to stop charging
+Replace the shield marker with:
 
-Do not claim Charge currently restores Energy unless that behavior has actually been specified and implemented in a later task.
+D
 
-The Help section may state that the blue Energy meter currently begins full and is reserved for the Energy system.
+at the same physical location.
 
-32. Update README controls
+Its title/description should say:
 
-Change README gameplay controls from:
+Defense
 
-Down / drop through platform | S or ↓ | Lower-left ▼
+The diagram should describe #0001’s Defense as Dodge in explanatory text.
+
+For example:
+
+D = Defense; #0001 uses Dodge as its Defense.
+
+Do not label the generic control “Block”.
+
+43. Update touch layout comments
+
+The lower-right control documentation currently includes:
+
+[SPECIAL] [BLOCK]
+
+Update it to:
+
+[SPECIAL] [DEFENSE]
+
+or describe the visible control as:
+
+[SPECIAL] [D]
+
+with a comment that D is #0001’s Dodge-type Defense.
+
+Keep the button’s location unchanged.
+
+44. README controls
+
+Update the control table from:
+
+Block | L | ...
 
 to:
 
-Charge | S or ↓ | Lower-left C
+Defense | L | ... D
 
-Update Touch documentation from:
+Explain:
 
-Left / Down / Right
+* Defense is the game’s generic defensive input.
+* Different characters may implement Defense differently.
+* #0001 uses Dodge.
+* #0001 has a grounded Dodge and a mid-air Dodge.
+* touch displays D because #0001’s Defense is Dodge.
+* gamepad RB/RT trigger Defense.
 
-to:
+Do not describe #0001 as blocking anymore.
 
-Left / Charge / Right
+45. README Charge wording
 
-Explain that Charge must be held.
+Update Charge documentation to include the release behavior.
 
-Remove crouch/drop-through instructions tied to this control.
+It should explain:
 
-Do not change menu navigation instructions—S/↓ still navigate down in menus.
+Hold Charge:
+charge1 → charge2 → chargea ↔ chargeb
+Voluntarily release Charge:
+show charge1 briefly, then return to normal state
 
-33. Update gamepad documentation
+Clarify that interruptions such as:
 
-Document the actual new gameplay mapping after implementation.
+* Dodge
+* Jump
+* BA1
+* BA2
+* getting hit
 
-If the current D-pad Down and downward left-stick direction are retained as the physical sources for the renamed action, describe them as Charge during battle.
+do not wait for the release pose.
 
-Keep normal menu D-pad/stick navigation intact.
+46. ALVA_SPEC.md Defense architecture
 
-Do not modify unrelated gamepad bindings:
+Update the product specification to distinguish:
+
+Defense = shared player action
+Block = one possible defense mechanism
+Dodge = another possible defense mechanism
+
+Character #0001 uses:
+
+Defense type: Dodge
+
+Document both real clips:
+
+Ground Dodge:
+dodge1 → dodge2 → dodge3
+Mid-Air Dodge:
+midairdodge1 → midairdodge2 → midairdodge3
+
+Document:
+
+* one press = one Dodge
+* holding does not auto-repeat
+* ground/air selected at activation
+* mid-air Dodge continues through landing
+* gravity continues
+* no invented dash displacement
+* facing locks
+* invulnerability is aligned to visible Dodge frame(s)
+* no chip damage
+* no blockstun
+* missing Dodge art means no invisible Dodge
+
+47. ALVA_SPEC.md Charge update
+
+Change the current wording that says:
+
+Releasing it exits the state on that step
+
+to the new behavior:
+
+Voluntarily releasing Charge enters a brief chargeRelease visual state using charge1 for one Charge frame-time, then resumes the normal state.
+
+Also state:
+
+Higher-priority interruptions do not play chargeRelease first.
+
+Update the priority documentation accordingly.
+
+48. Combat-system documentation
+
+Where documentation currently describes the architecture as containing:
+
+block
+
+as though that were the universal player action, update it to say:
+
+Defense
+
+with Block/Dodge as implementations.
+
+Specific low-level attack concepts such as blockstun can still be called blockstun because that is exactly what they mean.
+
+49. Update stale source comments
+
+Search the repo for generic comments/text that say:
+
+* Block button
+* block input
+* Block wins over Charge
+* shield button
+* block is #0001’s defense
+* block sets a guard state using idle
+
+Update them.
+
+Examples should become:
+
+Defense input
+#0001 Dodge
+Defense interrupts Charge
+
+where appropriate.
+
+Do not mechanically rename legitimate block-specific combat implementation comments.
+
+50. Tests: Dodge assets
+
+Add a dedicated test file such as:
+
+tests/defense.test.mjs
+
+or:
+
+tests/dodge.test.mjs
+
+Assert all six sprites are registered under the canonical directory:
+
+0001_dodge1.png
+0001_dodge2.png
+0001_dodge3.png
+0001_midairdodge1.png
+0001_midairdodge2.png
+0001_midairdodge3.png
+
+Assert root copies are gone.
+
+Assert characterFramePaths() includes them.
+
+51. Tests: ground Dodge playback
+
+From grounded Idle, press Defense once.
+
+Assert:
+
+* Defense type is Dodge
+* logical defense state begins
+* animation is dodge
+* first frame is 0001_dodge1.png
+* sequence is exactly:
+
+dodge1
+dodge2
+dodge3
+
+* it does not loop
+* duration is exactly one clip pass
+* normal state resumes afterward
+
+52. Tests: holding does not repeat Dodge
+
+Press Defense and keep it held for much longer than the three-frame clip.
+
+Assert:
+
+* only one Dodge occurs
+* after the clip, normal state resumes
+* another Dodge does not automatically start
+
+Release and press again.
+
+Assert the next Dodge starts normally from:
+
+dodge1
+
+53. Tests: mid-air Dodge
+
+Jump.
+
+While rising, press Defense.
+
+Assert:
+
+* midairDodge begins
+* sequence is exactly:
+
+midairdodge1
+midairdodge2
+midairdodge3
+
+* gravity continues
+
+Repeat while descending.
+
+Assert it works during Fall as well.
+
+54. Tests: landing during mid-air Dodge
+
+Start a mid-air Dodge late in a fall.
+
+Land while the three-frame clip is active.
+
+Assert:
+
+* Defense action remains active
+* animation remains midairDodge
+* no switch to ground Dodge
+* no switch to Land midway
+* all three mid-air frames finish
+* afterward Fighter returns to an appropriate grounded state
+
+55. Tests: invulnerability window
+
+Test Dodge against a real BA1/BA2 hitbox using CombatSystem.
+
+Arrange the attack so contact overlaps the intended invulnerable frame.
+
+Assert:
+
+* target loses no Health
+* target gets no stun
+* target gets no knockback
+* target gets no hitstop from that avoided collision
+* no block event is generated
+* attack is not falsely consumed as a successful hit
+
+Also test contact during startup/recovery.
+
+Assert normal hits still work outside the invulnerability window.
+
+56. Tests: no chip damage
+
+Old #0001 Block behavior must be gone.
+
+Hold or press Defense during an incoming attack where the Dodge invulnerability does not cover the hit.
+
+Assert:
+
+* there is no reduced/chip-damage block
+* either the Dodge avoids it during invulnerability or #0001 takes a normal hit outside it
+
+Do not produce the old 15% blocking damage behavior.
+
+57. Tests: generic Defense input rename
+
+Assert:
+
+ACTIONS includes defense
+ACTIONS does not include block
+
+Assert:
+
+CONFIG.bindings.defense === ['KeyL']
+
+and that there is no gameplay:
+
+CONFIG.bindings.block
+
+Input snapshots should expose:
+
+defense
+defensePressed
+
+not:
+
+block
+blockPressed
+
+58. Tests: gamepad
+
+Assert:
+
+RB → defense
+RT → defense
+
+Do not alter:
 
 * A / Cross = Jump
 * B / Circle = BA1
 * LB = BA2
-* X / Square = reserved Primary
-* Y / Triangle = reserved Special
-* RB / RT = Block
-* Start = pause/menu behavior
+* D-pad/left-stick Down = Charge
+* X / Square = Primary
+* Y / Triangle = Special
 
-34. Update ALVA_SPEC.md
+59. Tests: touch Defense button
 
-Update the product spec so it matches the implementation.
+Assert the old Block button slot now:
 
-Add Character #0001 Charge to the animation/state list.
+* is registered as defense
+* visibly reads exactly D
+* has accessible label Defense
+* uses .tc-defense
+* does not contain the shield SVG
+* dispatches defense: true on pointer down
+* dispatches defense: false on pointer up
 
-Document the exact Charge animation:
+The same button position must be preserved.
 
-charge1 → charge2 → chargea ↔ chargeb
+60. Tests: Charge voluntary release frame
 
-Clarify:
+Extend tests/charge.test.mjs.
 
-* charge1/2 are intro frames
-* chargea/chargeb are the sustained loop
-* holding Charge maintains the state
-* releasing Charge exits
-* starting Charge again restarts from charge1
-* Charge is grounded
-* Charge locks normal horizontal movement
-* attacks, jump, Block and Hitstun retain the appropriate state priority
-* Charge itself has no hitbox
-* no armour/invulnerability is added
+Charge into the A/B loop.
 
-Update the battle input section:
+Release Charge without pressing any other action.
 
-S / ↓ = Charge
+Assert the visible transition includes:
 
-Update touch:
+... chargea/chargeb
+→ 0001_charge1.png
+→ normal state
 
-Left · C · Right
+Assert charge1 is displayed for exactly one Charge frame-time.
 
-Remove current Down-to-crouch/drop-through descriptions.
+61. Tests: release from any Charge phase
 
-35. Update the HUD specification
-
-Update ALVA_SPEC.md Battle chrome/HUD section.
-
-It currently specifies each fighter panel as tag/name plus green Health.
-
-Change it to specify:
-
-fighter tag/name
-green Health bar
-blue Energy bar
-
-Clarify:
-
-* Health remains green
-* Energy is blue
-* Energy is directly beneath Health
-* both P1 and CPU display Energy
-* Energy initializes full
-* Energy is a gameplay-resource colour exception to the otherwise green-focused UI
-* no Energy spending/gain mechanics are invented in this task
-
-36. Update current-content documentation
-
-README and Help should list Charge among #0001’s implemented animations/states.
-
-For example:
-
-Idle
-Run
-Jump
-Fall
-Land
-Hurt
-Mid-Air Hurt
-BA1
-Mid-Air BA1
-BA2
-Mid-Air BA2
-Charge
-
-Do not describe chargeStart and chargeLoop as separate player actions. They form one Charge state.
-
-37. Tests: charge assets
-
-Extend the test suite to verify all four sprites.
-
-Assert that the character definition references:
-
-assets/characters/0001/0001_charge1.png
-assets/characters/0001/0001_charge2.png
-assets/characters/0001/0001_chargea.png
-assets/characters/0001/0001_chargeb.png
-
-Assert they are no longer present at repository root.
-
-Assert characterFramePaths() includes all four.
-
-38. Tests: exact animation progression
-
-Add dedicated Charge tests.
-
-While continuously holding Charge from Idle, collect visible frame changes.
-
-The beginning must be exactly:
-
-0001_charge1.png
-0001_charge2.png
-0001_chargea.png
-0001_chargeb.png
-0001_chargea.png
-0001_chargeb.png
-
-Continue long enough to prove the loop does not return to:
+Voluntarily release during each possible Charge portion:
 
 * charge1
 * charge2
+* chargea
+* chargeb
 
-after the intro.
-
-Test multiple A/B loop cycles.
-
-39. Tests: release
-
-Hold Charge until the A/B loop is running.
-
-Release it.
-
-Assert:
-
-* Fighter leaves charge
-* Charge animation stops
-* normal Idle/Run state resumes appropriately
-* it does not remain latched
-
-40. Tests: new charge restarts from frame 1
-
-After releasing:
-
-1. wait until Fighter is no longer in Charge
-2. hold Charge again
-
-Assert the first frame is:
+After release, assert the release state uses:
 
 0001_charge1.png
 
-not A/B and not charge2.
+for its configured release duration.
 
-41. Tests: input must be held
+Then normal state resumes.
 
-Explicitly prove Charge is held-state based.
+62. Tests: interruptions do not show Charge release
 
-A short press followed by release must not leave Fighter charging afterward.
-
-No toggle behavior may exist.
-
-Do not base sustained Charge on chargePressed.
-
-42. Tests: Charge is grounded
-
-While airborne, hold Charge.
-
-Assert:
-
-* Fighter remains Jump/Fall
-* Charge art is not shown
-
-Land while continuing to hold it.
-
-After higher-priority Land behavior finishes, assert Fighter enters Charge automatically because the key is still held.
-
-43. Tests: movement lock
-
-Start moving horizontally, then hold Charge while grounded.
-
-Assert Charge eventually stops/locks horizontal movement according to the normal deceleration rules and the fighter does not keep running through the Charge animation.
-
-Holding Left/Right simultaneously with Charge must not turn Charge into a moving animation.
-
-On release, held horizontal input may resume normal movement.
-
-44. Tests: interruption priority
-
-Test at least:
+Explicitly test:
 
 Hitstun
 
-While charging, apply hitstun.
+Charge → hit
 
-Assert:
+Assert immediate Hurt.
 
-charge → hitstun/hurt
-
-immediately according to existing freeze/stun behavior.
+No chargeRelease.
 
 BA1
 
-While charging, press BA1.
+Charge → BA1
 
-Assert BA1 starts and its normal animation/state wins.
+Assert immediate BA1 frame.
+
+No release pose first.
 
 BA2
 
-Same for BA2.
+Same.
 
 Jump
 
-While charging, jump.
+Immediate Jump.
 
-Assert Charge ends and Jump becomes active.
+Defense
 
-Block
+Immediate Dodge.
 
-If Charge and Block are both held while eligible, preserve the chosen state priority with Block above Charge.
+No chargeRelease before any of these transitions.
 
-Do not alter existing BA1/BA2/hitstun tests.
-
-45. Tests: Charge has no combat effect
+63. Tests: release + Defense same step
 
 While charging:
 
-* combat.attack must remain null
-* no attack hitbox exists
-* opponent health does not change
-* no hitstop occurs
-* no cooldown is created
+Charge becomes false
+DefensePressed becomes true
 
-Charge is a Fighter state, not an attack definition.
-
-46. Tests: platform behavior changed intentionally
-
-Replace the old test:
-
-dropping through a platform uses fall, then lands
-
-as a gameplay-Down expectation.
-
-The new control should prove:
-
-* holding/pressing Charge while standing on the one-way ledge does not call the drop-through behavior
-* fighter remains standing on that platform while charging
-* Charge animation is shown
-
-Do not remove one-way-platform physics from the engine unless necessary.
-
-47. Tests: gameplay input rename
+on the same fixed step.
 
 Assert:
 
-* gameplay ACTIONS contains charge
-* gameplay ACTIONS no longer contains down
-* CONFIG.bindings.charge is ['KeyS', 'ArrowDown']
-* CONFIG.bindings.down is no longer the gameplay binding
-* CONFIG.menuBindings.down remains intact
+Dodge
 
-InputManager’s gameplay sample should expose:
+starts immediately.
 
-charge
+Do not show a Charge release state first.
 
-not down.
+64. Tests: Charge resumes correctly after Dodge
 
-48. Tests: touch Charge button
+Keep the Charge key held.
+
+Start a Dodge.
+
+Assert Dodge interrupts Charge.
+
+After Dodge ends, if #0001 is grounded and Charge is still held:
+
+* re-enter Charge
+* first frame is 0001_charge1.png
+
+Do not resume chargea or chargeb.
+
+65. Update old Charge tests
+
+Current Charge tests explicitly contain expectations such as:
+
+Block outranks Charge when both are held
+
+Replace these with the new Defense/Dodge behavior.
+
+Do not simply delete priority coverage.
+
+Test the real new rule:
+
+Defense press interrupts Charge with Dodge
+
+Also update Energy regression tests currently referring to “charging and blocking” so they refer to the current Dodge/Defense behavior.
+
+Energy should remain unchanged unless a future task specifies otherwise.
+
+66. Help/UI tests
 
 Update tests/controls-ui.test.mjs.
 
-Assert the middle lower-left button:
-
-* is registered as charge
-* has visible text exactly C
-* has accessible label exactly Charge
-* uses its Charge CSS class
-* does not use the old Down-arrow icon
-* dispatches ['charge', true] on pointer down
-* dispatches ['charge', false] on release
-* remains held for the pointer duration
-
-Also test sliding:
-
-left → charge → right
-
-releases/activates each corresponding action correctly.
-
-49. Tests: Help UI
-
 Assert:
 
-* ACTION_LABELS.charge === 'Charge'
-* Help controls display Charge
-* gameplay Help no longer contains Down / drop through
-* mobile diagram contains visible C
-* mobile diagram labels it Charge
-* mobile diagram no longer shows the Down arrow in that slot
-* legend says Left · Charge · Right
-* Charge instructions say it must be held
+ACTION_LABELS.defense === 'Defense'
 
-Menu navigation documentation can still use the word Down where it genuinely means menu direction.
+Assert Help contains:
 
-50. Tests: Energy data
+Defense
 
-Assert a newly created Fighter has:
+and does not list a generic control called:
 
-maxEnergy = 100
-energy = 100
+Block
 
-If Energy is manually reduced during a test and the fighter/battle is reset, assert it returns to full.
+for #0001.
 
-Do not tie this assertion to Health.
+Assert mobile diagram shows:
 
-51. Tests: Energy HUD
+D
 
-Extend the HUD tests.
+at the Defense slot.
 
-For each fighter side panel assert:
+Assert its title/accessible context identifies it as Defense.
 
-* name/tag row exists
-* Health meter exists
-* Energy meter exists beneath Health
-* Energy meter has role="meter"
-* Energy meter has aria-label="Energy"
-* initial value is 100
-* initial fill is full
+Explanatory copy should make clear:
 
-Reduce one fighter’s Energy to e.g. 40 and call hud.update().
+#0001's Defense is Dodge
 
-Assert:
+67. Preserve Energy behavior
 
-* Energy meter reports 40
-* Energy fill is scaleX(0.4)
-* that fighter’s Health value is unchanged
-* the other fighter’s Energy remains 100
+Do not alter the Energy feature as part of this task.
 
-Also verify CPU’s bar uses the mirrored fill origin like its Health bar.
+Energy still:
 
-52. Full regression suite
+starts full
+does not drain
+does not regenerate
+is not spent
+
+Do not charge Energy for Dodge.
+
+Do not reward a successful Dodge with Energy.
+
+Do not connect Defense to Energy yet.
+
+68. Preserve the training CPU
+
+The current training CPU remains deliberately non-attacking.
+
+Do not teach it:
+
+* BA1
+* BA2
+* Charge
+* Dodge
+
+unless required solely to prevent errors after the input rename.
+
+Its blank/input structures should use the new generic defense field instead of block, but it should continue leaving Defense inactive.
+
+Its AI-only platform-drop behavior remains unchanged.
+
+69. Full regression suite
 
 Run:
 
 node --test
 
-All existing tests must pass after updating intentionally obsolete Down/crouch/drop-through assertions.
+All tests must pass.
 
-Do not weaken unrelated tests.
+Do not regress:
 
-Specifically ensure no regressions to:
-
+* Charge startup/loop
+* Charge held input
+* Charge platform behavior
+* Energy HUD
 * BA1
 * Mid-Air BA1
 * BA2
 * Mid-Air BA2
 * Hurt
 * Mid-Air Hurt
-* Land
 * Jump/Fall
-* hitboxes
-* blocking
-* touch multi-touch
-* pause/result screen
-* health HUD
+* Land
 * sprite normalization
+* touch multi-touch
+* menu Down navigation
+* pause/results
+* CPU platform following
 
-53. Manual browser verification
+Only intentionally obsolete Block assumptions should change.
 
-After automated tests pass, run the game in a real browser.
+70. Manual browser verification
+
+After tests pass, verify in an actual battle.
+
+Charge voluntary release
+
+Hold C / S / ↓ until A/B is looping.
+
+Release it normally.
 
 Verify:
 
-Charge animation
+chargea/chargeb
+→ charge1
+→ Idle
 
-Hold S or ↓ on the ground.
+or Run if movement resumes.
 
-Observe:
+The charge1 release pose should be brief, not stuck.
 
-charge1
-charge2
-chargea
-chargeb
-chargea
-chargeb
-...
-
-Keep holding for several seconds to confirm only A/B loop.
-
-Release.
-
-Confirm #0001 leaves Charge immediately.
-
-Hold again.
-
-Confirm it restarts at charge1.
-
-Touch
-
-On a touch layout confirm the lower-left cluster reads:
-
-←   C   →
-
-The middle button must not show a Down arrow.
-
-Hold C and verify the full Charge sequence.
-
-Release C and verify Charge stops.
-
-Slide between Left, C and Right and check no input sticks.
-
-Combat interruption
+Charge interruptions
 
 While charging:
 
-* BA1 should interrupt correctly
-* BA2 should interrupt correctly
-* Jump should interrupt correctly
-* getting hit should show Hurt rather than Charge
+* press BA1
+* press BA2
+* Jump
+* press Defense
+* get hit
 
-Platform
+Verify none of those wait for the Charge release pose.
 
-Stand on a City one-way platform.
+Ground Defense
 
-Hold Charge.
+Press L / RB / RT / touch D while grounded.
 
-Confirm #0001 charges in place rather than dropping through.
+Verify:
 
-HUD
+dodge1
+→ dodge2
+→ dodge3
 
-For both P1 and CPU confirm:
+once.
 
-green Health bar
-blue Energy bar
+Holding the input should not continuously loop Dodge.
 
-Energy is directly beneath Health and begins completely full.
+Mid-air Defense
 
-Check different viewport sizes so the extra bar does not collide with:
+Press Defense during ascent and descent.
 
-* fighter names
-* center timer/pause
-* safe areas
-* touch controls
+Verify:
 
-54. Keep the scope focused
+midairdodge1
+→ midairdodge2
+→ midairdodge3
 
-Do not add unspecified Energy mechanics.
+Gravity must continue.
 
-Do not:
+Landing
 
-* make Charge restore Energy yet
-* drain Energy during Charge
-* spend Energy on attacks
-* create special attacks
-* add particle effects
-* add glowing auras
-* add sound effects
-* add armour
-* add invulnerability
-* add damage to Charge
-* create a mid-air Charge animation
-* invent new sprite frames
-* redesign the HUD
-* redesign stages
-* redesign menus
-* change BA1/BA2 damage
-* change CPU behavior
+Start a Dodge shortly before landing.
 
-The training CPU must remain non-attacking.
+Verify the mid-air clip finishes rather than switching animation halfway through.
 
-If the CPU’s AI input never holds Charge, it does not need to start charging on its own.
+Combat
+
+Enable the debug overlay.
+
+Test incoming attacks.
+
+Verify:
+
+* attacks can hit during vulnerable startup/recovery
+* attacks pass through during the intended Dodge invulnerability frame(s)
+* no chip damage appears
+* no block event appears
+* no shield/guard behavior remains for #0001
+
+Touch
+
+Verify the lower-right button formerly showing a shield now visibly shows exactly:
+
+D
+
+and still occupies the same button slot.
+
+UI
+
+Verify Help and controls say:
+
+Defense
+
+not Block.
+
+71. Scope restrictions
+
+Do not add:
+
+* dodge particles
+* dodge sound effects
+* perfect-dodge bonuses
+* slow motion
+* counterattacks
+* Energy rewards
+* Energy costs
+* arbitrary dash displacement
+* armour
+* attack changes
+* new Charge artwork
+* new characters
+
+Do not redesign:
+
+* HUD
+* stages
+* camera
+* menus
+* roster
+* battle result flow
+
+Do not modify BA1/BA2 balance.
 
 Acceptance criteria
 
-The implementation is complete only when all of the following are true:
+The task is complete when:
 
-1. The four new charge sprites live under assets/characters/0001/, not the repo root.
-2. Charge is one logical Fighter state.
-3. A new Charge begins with charge1.
-4. It proceeds to charge2.
-5. It then enters the chargea ↔ chargeb loop.
-6. charge1 and charge2 never repeat during one uninterrupted hold.
-7. Releasing Charge exits the state.
-8. Starting a new Charge restarts at charge1.
-9. Charge requires continuous held input and is not a toggle.
-10. The gameplay down action has been replaced by charge.
-11. S and ↓ now mean Charge during gameplay.
-12. Menu S/↓ Down navigation still works normally.
-13. The lower-left touch cluster is Left · C · Right.
-14. The middle touch button visibly reads exactly C.
-15. Its accessible label is Charge.
-16. Holding Charge no longer crouches.
-17. Holding/pressing Charge no longer drops through platforms.
-18. Charge is grounded only.
-19. Charge locks normal horizontal movement.
-20. Hitstun, attacks, airborne states, Land and Block retain proper priority.
-21. Charge has no attack hitbox or damage.
-22. Every fighter has real energy/maxEnergy state.
-23. Energy starts full at 100/100.
-24. Both P1 and CPU have a full blue Energy meter directly below Health.
-25. Health remains green and otherwise behaves unchanged.
-26. Energy does not gain/drain/spend in this task because no such rule was specified.
-27. Help, README and ALVA_SPEC.md accurately describe Charge and Energy.
-28. Existing BA1 and BA2 behavior is unchanged.
+1. All six Dodge sprites live only under assets/characters/0001/.
+2. Ground Defense plays dodge1 → dodge2 → dodge3 once.
+3. Mid-air Defense plays midairdodge1 → midairdodge2 → midairdodge3 once.
+4. The shared input/action is named defense, not block.
+5. Keyboard L triggers Defense.
+6. Gamepad RB and RT trigger Defense.
+7. #0001’s Defense implementation is Dodge.
+8. Future character data can still implement Defense as Block.
+9. The touch Defense button remains in the old Block position.
+10. The touch button visibly reads exactly D.
+11. The shield graphic is gone from #0001’s Defense control.
+12. The accessible/player-facing generic label is Defense.
+13. One Defense press causes one Dodge.
+14. Holding Defense does not auto-loop Dodge.
+15. Ground vs mid-air Dodge is selected when Defense starts.
+16. A mid-air Dodge continues through landing until its clip ends.
+17. Gravity continues during mid-air Dodge.
+18. Dodge does not invent a dash/teleport.
+19. The visible evasive frame(s) provide real invulnerability.
+20. Dodge causes no chip damage or blockstun.
+21. #0001 no longer uses the old Block guard behavior.
+22. Missing Dodge art never grants invisible invulnerability.
+23. Voluntarily releasing Charge shows 0001_charge1.png for one Charge frame-time.
+24. Charge interruptions by hit, attack, Jump or Dodge do not play that release pose first.
+25. A new Charge still begins at charge1.
+26. Charge’s existing charge1 → charge2 → chargea ↔ chargeb hold sequence remains unchanged.
+27. Energy remains unchanged by Dodge.
+28. README, Help and ALVA_SPEC.md describe Defense/Dodge and Charge release correctly.
 29. The training CPU remains non-attacking.
-30. The entire node --test suite passes.
-31. Manual browser testing confirms the exact intro-then-A/B-loop animation and held-input behavior.
+30. node --test passes completely.
