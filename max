@@ -1,23 +1,23 @@
-Work in the GitHub repository:
+Work in the hiyroscript/alva repository on the current main branch state.
 
-hiyroscript/alva
+First inspect the existing implementation before editing. This is a pure HTML/CSS/JavaScript Canvas 2D fighting game with no framework or build step. Preserve the existing architecture and visual system; make the smallest clean changes necessary.
 
-Use the current main branch as the source of truth.
+Goals
 
-Goal
+Implement two related updates:
 
-Make two focused changes to Alva:
+1. Fix specific secondary buttons in the paused battle / Return Home confirmation so their backgrounds never change during interaction, while preserving the existing white focus outline.
+2. Integrate the newly uploaded jumping-related sprite frames for character #0001, including ascent, fall, and landing animation.
 
-1. In the battle pause/Return Home flow, stop the specified secondary buttons from changing their background color on hover, focus, press, mouse/touch interaction, or keyboard/gamepad selection. They must remain transparent while still keeping the existing white focus outline and normal enabled behavior.
-2. Add and wire the newly supplied jumping sprite frames for character #0001 so the real jump art is used during battle instead of the idle-pose fallback.
-
-Do not redesign unrelated UI, change battle physics, change navigation behavior, or introduce invented sprite art.
+Do not redesign unrelated UI, change physics, change combat behavior, redraw/recolour sprite artwork, or make broad styling changes.
 
 ⸻
 
-1. Understand the current button behavior before changing it
+1. Pause / Return Home button interaction styling
 
-Relevant files:
+Existing structure
+
+Relevant files include:
 
 * js/screens/battle-screen.js
 * js/ui/overlays.js
@@ -26,683 +26,422 @@ Relevant files:
 
 The pause menu is built in BattleScreen.buildPause().
 
-It currently contains:
+Its current items are:
 
-* Resume — primary green action
-* Restart Battle — enabled secondary action
+* Resume — primary
+* Restart Battle — secondary
 * Help — disabled
-* Return to Home — enabled secondary action
+* Return to Home — secondary
 
-The Return Home confirmation is opened from BattleScreen.confirmHome() and is implemented by ConfirmDialog in:
+Return to Home opens the shared ConfirmDialog with:
 
-js/ui/overlays.js
+* Return Home — primary confirmation
+* Keep Playing — secondary cancel action
 
-Its actions are:
+The current CSS gives .pause-btn-item and .btn generic hover/active background changes. Later CSS makes secondary pause/dialog buttons transparent only while they are not hovered or active.
 
-* Keep Playing — secondary/default-focus action
-* Return Home — primary green confirmation action
+The existing focus treatment is already correct:
 
-The current secondary buttons already have transparent resting backgrounds because of the scoped rules near the bottom of styles.css, but they still receive fills while hovered or pressed.
+* .pause-btn-item:focus { box-shadow: var(--focus-ring); }
+* .btn:focus { box-shadow: var(--focus-ring); }
 
-Current generic pause rules include behavior equivalent to:
+That white/off-white focus ring must remain.
 
-.pause-btn-item:hover {
-  background: var(--surface-subtle);
-}
-.pause-btn-item:active {
-  background: var(--surface-muted);
-}
+Required behavior
 
-The normal .btn rules similarly apply:
+Change only these three actions:
 
-.btn:hover {
-  background: var(--surface-subtle);
-}
-.btn:active {
-  background: var(--surface-muted);
-}
+* Restart Battle in the paused battle menu
+* Return to Home in the paused battle menu
+* Keep Playing in the Return to Home? confirmation dialog
 
-There is also a later battle/dialog-specific rule that intentionally preserves hover/pressed feedback for enabled secondary actions.
+For those controls:
 
-This follow-up task supersedes that previous behavior for the specific buttons named below.
+* Normal background: transparent.
+* Hover background: still transparent.
+* Keyboard/gamepad focus background: still transparent.
+* Mouse/touch active/pressed background: still transparent.
+* The existing white focus outline/ring must continue to appear on focus.
+* Do not remove accessibility focus indication.
+* Do not replace the focus ring with a green fill.
+* Text should remain readable using the existing secondary-button text colour.
+* Existing press transform may remain; this request is specifically about preventing the background colour/fill from changing.
+* Existing border behavior may remain unless it interferes with the white focus ring.
 
-The existing focus ring is:
+Do not remove hover/pressed colour feedback globally from all buttons.
 
---focus-ring: 0 0 0 2px var(--black), 0 0 0 4px var(--white);
+In particular, preserve current behavior for:
 
-That white focus treatment must remain intact.
+* Resume
+* Return Home confirmation
+* Rematch
+* Change Stage
+* other .btn controls elsewhere in the application
 
-⸻
+Implementation approach
 
-2. Pause menu: keep Restart Battle and Return to Home transparent in every interactive state
+Use a narrowly scoped semantic class such as is-outline-only or equivalent rather than broad selectors that affect every secondary button.
 
-Target only these two pause-menu buttons:
-
-* Restart Battle
-* Return to Home
-
-Their background must remain transparent in all of these states:
-
-* resting
-* hover
-* keyboard focus
-* gamepad focus/navigation
-* pointer/touch press
-* :active
-
-Do not remove their enabled appearance.
-
-They must continue to have:
-
-* white/off-white enabled text
-* existing border
-* existing white --focus-ring
-* pointer interaction
-* touch interaction
-* keyboard interaction
-* gamepad navigation
-* existing callbacks
-* existing active/press transform if desired
-
-The request is specifically to eliminate the changing background fill. A small existing press transform may remain because it is not a color change.
-
-Do not remove or hide the white focus outline in order to accomplish this.
-
-Scope the behavior semantically
-
-Do not solve this using:
-
-* nth-child
-* button text selectors
-* DOM position assumptions
-* a global override of every .pause-btn-item
-* a global override of every .btn
-
-Give the intended controls an explicit opt-in class/state, for example something conceptually like:
-
-no-fill-feedback
-
-The exact class name is up to you, but it should clearly express the behavior.
-
-A clean approach would be to extend the local menuButton() helper in battle-screen.js with an option and assign that option only to:
+Extend menuButton() in js/screens/battle-screen.js with an option for this behavior, and apply it specifically to:
 
 * Restart Battle
 * Return to Home
 
-Resume must not get this treatment.
+Do not apply it to Resume or disabled Help.
 
-Help must retain its actual disabled styling.
+For the Keep Playing button, remember that ConfirmDialog is a shared UI component. Do not permanently restyle every cancel button in every possible confirmation dialog.
 
-CSS behavior
+Add an optional ConfirmDialog.open() setting such as cancelOutlineOnly / outlineOnlyCancel and enable it only from BattleScreen.confirmHome().
 
-Place the narrowly scoped override after the existing generic hover/active rules so specificity/order is unambiguous.
+Make sure that optional state is reset on every open() call so a later dialog cannot accidentally inherit the class. Prefer explicit classList.add() / classList.remove() if that keeps the existing lightweight test DOM simple.
 
-The equivalent visual behavior should be:
+Add scoped CSS overrides after the generic button states so the selected outline-only controls keep:
 
-.pause-overlay .pause-btn-item.<opt-in-class>:enabled,
-.pause-overlay .pause-btn-item.<opt-in-class>:enabled:hover,
-.pause-overlay .pause-btn-item.<opt-in-class>:enabled:focus,
-.pause-overlay .pause-btn-item.<opt-in-class>:enabled:active {
-  background: transparent;
-}
+background: transparent
 
-Do not blindly copy that exact selector if a cleaner implementation fits the codebase better.
+through normal, hover, focus, and active interaction.
 
-Important: do not override the existing box-shadow: var(--focus-ring) applied on focus.
+Do not remove or override:
 
-Border hover changes can remain unless they conflict visually with the existing white focus ring. The important requirement is that the actual button fill stays transparent.
+box-shadow: var(--focus-ring)
+
+on focus.
 
 ⸻
 
-3. Return Home confirmation: Keep Playing must behave the same way
+2. Integrate the new #0001 jumping sprite frames
 
-Target:
+New files already in the repository
 
-Keep Playing
+The latest upload added these six files at the repository root:
 
-in the Return Home confirmation opened from:
+* 0001_jump1.png
+* 0001_jump2.png
+* 0001_fall1.png
+* 0001_fall2.png
+* 0001_land1.png
+* 0001_land2.png
 
-BattleScreen.confirmHome()
+These are the actual new character frames. Do not redraw, regenerate, recolour, resize destructively, or replace them.
 
-Keep Playing must stay transparent in:
+Relocate them into the existing character asset directory, preserving their exact filenames and bytes:
 
-* resting state
-* hover
-* focus
-* active/pressed state
-* mouse input
-* touch input
-* keyboard navigation
-* gamepad navigation
+assets/characters/0001/0001_jump1.png
+assets/characters/0001/0001_jump2.png
+assets/characters/0001/0001_fall1.png
+assets/characters/0001/0001_fall2.png
+assets/characters/0001/0001_land1.png
+assets/characters/0001/0001_land2.png
 
-It must keep:
+Do not leave duplicate copies at the repository root after the move.
 
-* white/off-white enabled text
-* its existing border
-* the white --focus-ring
-* default focus when the dialog opens
-* normal click behavior
-* Escape/back cancellation behavior
-* focus restoration back to Return to Home after cancellation
-
-The green confirmation action:
-
-Return Home
-
-must stay unchanged as the primary green action.
-
-Avoid globally changing every confirmation dialog
-
-Prefer an explicit opt-in mechanism rather than changing all .dialog-actions .btn:not(.btn--primary) controls everywhere.
-
-For example, ConfirmDialog.open() may accept a narrowly scoped option that applies the no-fill class to the cancel action for this invocation, or another equally robust mechanism may be used.
-
-Then BattleScreen.confirmHome() should opt Keep Playing into the behavior.
-
-Do not key styling off the literal text "Keep Playing".
-
-⸻
-
-4. Preserve the white focus outline exactly
-
-This is important.
-
-The desired interaction is:
-
-* transparent secondary button background
-* visible white focus outline/ring
-
-Do not change the global --focus-ring token.
-
-Do not replace focus with a background fill.
-
-Do not use outline: none or box-shadow: none on these controls.
-
-Keyboard and gamepad users must be able to see which secondary action is selected even though its background remains transparent.
-
-The existing focus ring is the correct visual indicator.
-
-⸻
-
-5. Do not change these button states
-
-Pause menu:
-
-Resume
-
-* remains green
-* existing hover/pressed green behavior may remain
-* existing focus ring remains
-
-Help
-
-* remains disabled
-* remains muted
-* remains skipped by navigation
-* do not enable it
-
-Return Home confirmation:
-
-Return Home
-
-* remains green
-* remains the destructive/confirm action
-* preserve existing behavior
-
-Battle result-screen buttons:
-
-* do not apply this change to Rematch, Change Stage, or Return to Home in the result screen
-
-Other application buttons:
-
-* leave them alone
-
-This is intentionally a narrow battle pause/confirmation change.
-
-⸻
-
-6. Add the supplied #0001 jumping sprite files
+Existing animation architecture
 
 Relevant files:
 
-* assets/characters/0001/
 * js/data/characters.js
-* js/core/app.js
 * js/game/character.js
 * js/game/sprite-animator.js
 * js/game/sprite-normalizer.js
+* js/core/app.js
+* js/game/physics.js
 
-Character #0001 currently contains:
+Character assets are data-driven through CHARACTERS.
 
-* 4 idle frames
-* 6 run frames
-* no jump frames
+characterFramePaths() automatically loads every frame registered in def.animations.
 
-The current animationFallbacks therefore map jump and fall to the idle artwork.
+SpriteSet.build() already normalizes every registered animation and handles the wildly different raw pixel scales used by #0001.
 
-The newly supplied jump PNGs are the source of truth.
+Do not bypass that normalizer or add special-case rendering for these PNGs.
 
-Add the supplied files to:
+SpriteSet.resolve() already uses a dedicated animation when one exists and falls back through animationFallbacks otherwise.
 
-assets/characters/0001/
+The fighter state machine currently already chooses:
 
-Preserve the artwork exactly.
+* jump while airborne with vy < 0
+* fall while airborne with vy >= 0
 
-Do not:
+but #0001 currently has no dedicated jump/fall animations, so both fall back to idle.
 
-* redraw it
-* rotate it
-* stretch it
-* recolor it
-* upscale/downscale the source PNGs manually
-* generate substitute jump art
-* derive fake jump poses from idle/run frames
+Physics also already exposes:
 
-The existing sprite-normalization system is designed to reconcile different raw pixel-art scales automatically.
+body.landed
 
-If the supplied files already follow names such as:
-
-0001_jump1.png
-0001_jump2.png
-0001_jump3.png
-etc.
-
-keep that convention.
-
-If they need to be renamed for consistency, use sequential:
-
-0001_jump1.png through 0001_jumpN.png
-
-where N is the actual number of supplied jump frames.
-
-Never invent a frame count. Inspect the supplied files and use the real count.
-
-If the actual jump images are not available in the coding environment or task attachments, do not fabricate replacements. Complete the UI portion and explicitly report that the binary sprite files are missing.
-
-⸻
-
-7. Register the jump animation in js/data/characters.js
-
-#0001 currently defines only idle and run under animations.
-
-Add a real jump animation using the newly added files.
-
-Use the existing frames(BASE_0001, name, count) helper when the filenames follow the normal sequential convention.
-
-The configuration should conceptually look like:
-
-jump: {
-  frames: frames(BASE_0001, 'jump', N),
-  fps: 10,
-  loop: false,
-  heightRatio: 1,
-},
-
-where N is the real supplied frame count.
-
-10 fps is a sensible starting playback speed for the non-looping jump sequence. If visual inspection of the supplied sequence clearly requires a slightly different rate, make the smallest reasonable adjustment and document it.
-
-The jump animation must not loop continuously in mid-air.
-
-The existing SpriteAnimator already leaves a non-looping animation on its final frame after playback reaches the end.
-
-Do not add special-case #0001 animation code to the engine.
-
-⸻
-
-8. Remove the obsolete jump-to-idle fallback
-
-SpriteSet.resolve() already prioritizes a real animation before consulting animationFallbacks.
-
-Once real jump art exists, the old definition:
-
-jump: { animation: 'idle', frame: 0 }
-
-is obsolete and misleading.
-
-Remove that jump fallback.
-
-Do not change the state-machine logic in Character.updateState().
-
-It already correctly chooses:
-
-* jump while airborne and moving upward
-* fall while airborne and moving downward
-
-No physics/state-machine rewrite is required.
-
-⸻
-
-9. Make falling continue to use the new airborne artwork
-
-There are no dedicated falling sprites in the current repository.
-
-Do not invent any.
-
-When the character passes the apex, the state changes from jump to fall.
-
-Instead of reverting to idle during descent, update the fall fallback so it resolves to the new jump animation and holds an appropriate airborne frame.
-
-Unless inspection of the actual supplied frames clearly suggests another frame, use the final jump frame for falling.
-
-For example, conceptually:
-
-fall: {
-  animation: 'jump',
-  frame: N - 1,
-},
-
-The frame index is zero-based.
-
-This gives the desired behavior:
-
-* jump begins → jump sequence plays once
-* if the sequence completes before the apex → final jump frame is held
-* descent begins → final jump frame continues to be held
-* landing → state returns normally to idle/run
-
-Do not create a fake looping fall animation.
-
-If the supplied sprite package actually contains separately identifiable fall/descent frames, use the real supplied art appropriately instead of forcing this fallback, but do not invent a separate fall animation without actual frames.
-
-⸻
-
-10. Do not change jump physics
-
-Do not alter:
-
-* jumpVelocity
-* gravity
-* gravityScale
-* maxFallSpeed
-* coyote time
-* jump buffering
-* collision
-* landing detection
-* platform drop-through
-* collider dimensions
-* hurtboxes
-* pushboxes
-* camera behavior
-
-This task is visual animation integration only.
-
-The existing jump mechanics already work.
-
-⸻
-
-11. Let the existing asset pipeline handle the new frames
-
-Do not hard-code additional image loading in app.js.
-
-characterFramePaths(def) already walks every animation declared in the character definition, so adding jump to animations should automatically cause those PNGs to be preloaded.
-
-SpriteSet.build() already normalizes all declared animations.
-
-SpriteAnimator.play() already supports the jump state.
+for the step where an airborne fighter touches the floor/platform.
 
 Use those existing systems.
 
-Avoid unnecessary architecture changes.
+Character animation definitions
+
+In js/data/characters.js, add dedicated #0001 animations for:
+
+jump
+
+Frames:
+
+0001_jump1.png
+0001_jump2.png
+
+Behavior:
+
+* non-looping
+* approximately 10 fps
+* play frame 1 then frame 2
+* once the sequence finishes during a long ascent, hold the last frame rather than cycling repeatedly
+
+fall
+
+Frames:
+
+0001_fall1.png
+0001_fall2.png
+
+Behavior:
+
+* non-looping
+* approximately 10 fps
+* play frame 1 then frame 2
+* hold the last frame for the remainder of the descent rather than looping
+
+land
+
+Frames:
+
+0001_land1.png
+0001_land2.png
+
+Behavior:
+
+* non-looping
+* approximately 12 fps
+* play once immediately after touchdown
+* after it completes, return to the appropriate ordinary grounded state
+
+Use the normal existing frames(BASE_0001, ...) helper rather than hardcoding six unrelated path strings.
+
+Give the new animations sensible heightRatio values consistent with the current normalization system. Prefer letting pixel-grid detection establish the actual scale; do not introduce manual visual-size hacks unless genuinely necessary.
+
+Keep resilient fallbacks to an idle frame for jump/fall/land if the dedicated animation cannot be loaded. Update the existing fallback comment because it currently implies jump/fall have no dedicated artwork.
+
+Landing state
+
+There is currently no visual land state in Fighter.updateState().
+
+Add one without changing physics.
+
+Desired state priority should remain conceptually:
+
+1. hitstun
+2. attack
+3. airborne jump/fall
+4. brief landing animation
+5. block
+6. crouch
+7. run
+8. idle
+
+Important implications:
+
+* An immediate new jump must interrupt landing animation because the fighter is airborne again.
+* Attack/hitstun states must retain priority.
+* Landing animation must not modify velocity, acceleration, jump timing, collision, coyote time, input buffering, hitboxes, hurtboxes, or movement.
+* This is a visual state only.
+
+When body.landed becomes true and the land animation exists, enter land.
+
+Do not show land for only one 60 Hz simulation step. Keep the state active long enough for the non-looping landing clip to play once.
+
+Derive the landing duration from the actual animation metadata, e.g. the clip’s frame count and FPS, rather than hardcoding assumptions about exactly two frames into general fighter logic.
+
+Conceptually:
+
+landing duration = land animation frame count / land animation fps
+
+Continue the land state while grounded until that duration has elapsed, unless a higher-priority state or a new jump interrupts it.
+
+The existing SpriteAnimator already stops a non-looping clip on its final frame, so do not rewrite its basic animation engine unless a real bug requires it.
+
+Expected in-game sequence
+
+A normal jump by #0001 should visually behave like:
+
+grounded
+→ jump1
+→ jump2
+→ fall1 around/after the apex
+→ fall2
+→ land1 on touchdown
+→ land2
+→ idle or run
+
+Horizontal air movement must continue to work exactly as it does now.
+
+Dropping through platforms should use the appropriate falling animation because the fighter is airborne with downward velocity.
+
+Both the player and training CPU should use the same animations automatically through the shared character definition.
 
 ⸻
 
-12. Validate sprite normalization carefully
+3. Documentation
 
-#0001’s existing idle and run source art use dramatically different raw scales, and sprite-normalizer.js intentionally handles that.
+Update documentation that is now factually stale.
 
-The new jump animation must not make the character visibly:
-
-* grow
-* shrink
-* shift sideways
-* float above the floor because of anchoring
-* snap horizontally when transitioning from run/idle into jump
-* change art style because of smoothing
-
-Preserve:
-
-imageSmoothingEnabled = false
-
-through the existing renderer.
-
-Use the current torso/bottom anchoring system.
-
-Do not manually compensate by modifying physics or the fighter collider.
-
-If normalization cannot detect the source art grid, the animation’s heightRatio can be adjusted only as a data-level normalization fallback after visually inspecting the actual images.
-
-Do not change the normalizer globally just for these frames unless there is a genuine bug affecting all sprite data.
-
-⸻
-
-13. Update documentation that is now factually obsolete
-
-The current documentation explicitly says #0001 only has Idle and Run and uses idle art while jumping.
-
-That will no longer be true.
-
-Update the relevant wording in:
+At minimum inspect and update:
 
 README.md
 
-The current feature list says:
+It currently says:
 
 Animations: Idle, Run
 
-Update it to include Jump.
+Update this to include the new airborne/landing animation support.
 
-Also update sprite-normalization wording if it specifically describes transitions only between idle and run.
-
-Update:
+Also update any nearby description that says jumping uses only the idle pose.
 
 ALVA_SPEC.md
 
-The sprite section currently says there are four idle and six run frames.
+The specification currently states that:
 
-Add the actual number of new jump frames.
+* assets/characters/0001/ contains only four idle and six run frames.
+* #0001 has only Idle and Run.
+* jumping uses the idle pose.
 
-The battle section currently says, in substance:
+Update those statements to reflect the six newly added jump/fall/land frames and the new behavior.
 
-#0001 has only Idle and Run. No invented frames; jumping uses the idle pose...
+Do not rewrite unrelated product-spec sections.
 
-Replace that with the new factual behavior:
-
-* #0001 has real jump frames
-* the real jump animation is used on ascent
-* the final airborne frame is held through descent when there is no dedicated fall art
-* no invented frames are used
-
-Keep the existing sprite attribution intact.
-
-Do not claim a frame count or behavior that does not match the actual files.
+Preserve the existing rule that #0001 artwork must never be redrawn, recoloured, replaced, or AI-generated.
 
 ⸻
 
-14. Tests
+4. Tests
 
-Run the existing tests:
+Keep the existing tests passing and add focused regression coverage.
 
-node --test tests/battle-screen.test.mjs
-node --test tests/splash-screen.test.mjs
+Run:
 
-They must continue to pass.
+node --test tests/*.test.mjs
 
-Extend tests/battle-screen.test.mjs where practical to verify the semantic targeting of the UI change.
+or the appropriate individual Node test files if glob behavior differs in the environment.
 
-At minimum, test that:
+Button regression coverage
 
-* Restart Battle receives the no-fill opt-in state/class
-* pause Return to Home receives it
-* Resume does not
-* Help remains disabled
-* Keep Playing receives the corresponding no-fill opt-in state/class when the Return Home confirmation is opened
-* confirmation Return Home remains primary
-* cancelling still restores focus to the pause-menu Return to Home button
-* navigation scopes are unchanged
+Extend tests/battle-screen.test.mjs as appropriate to verify the structural scoping:
 
-Do not try to unit-test actual CSS painting using the fake DOM.
+* Restart Battle receives the outline-only/no-fill interaction class.
+* Return to Home receives it.
+* Resume does not.
+* disabled Help does not need it.
+* opening Return to Home? with confirmHome() applies the outline-only/no-fill class to Keep Playing.
+* the Return Home confirmation button remains primary.
+* closing/cancelling preserves the existing focus-restoration behavior.
+* opening a confirmation without the optional setting does not inherit stale outline-only state.
 
-Add a small character-data test if useful, for example:
+The Node DOM test cannot validate actual CSS paint, so also manually verify the interaction states in a real browser.
 
-tests/character-data.test.mjs
+Animation regression coverage
 
-It should validate data-level facts such as:
+Add focused tests for the #0001 state/animation behavior without coupling them to PNG rendering internals.
 
-* #0001 has a jump animation
-* the jump frame list contains exactly the supplied assets in order
-* the jump animation is non-looping
-* jump no longer falls back to idle
-* fall resolves to/points at the real jump art as intended
+Verify at least:
 
-Do not introduce npm dependencies just for these tests.
+* #0001 registers jump, fall, and land animations.
+* the correct frame paths are present.
+* jump/fall/land are non-looping.
+* airborne negative vy selects jump.
+* airborne positive vy selects fall.
+* touchdown selects land.
+* land persists long enough for its clip to complete rather than lasting one simulation tick.
+* after landing duration finishes, the fighter returns to idle/run as appropriate.
+* jumping again immediately interrupts land.
+* no physics constants or colliders changed.
+
+Use lightweight fake sprite animation metadata where practical rather than requiring browser Canvas APIs in Node tests.
 
 ⸻
 
-15. Manual browser validation
+5. Browser verification
 
-Serve the game over HTTP because sprite normalization reads image pixels:
+Serve the game over HTTP as required by the repository, for example:
 
 python3 -m http.server 8000
 
-Open the game and test the complete Quick Battle flow.
+Smoke-test Quick Battle.
 
-Pause-menu interaction
+Verify both desktop mouse/keyboard and keyboard/gamepad-style navigation behavior where possible.
 
-Enter battle and pause.
+Pause UI
 
-Verify Restart Battle and Return to Home individually with:
+Pause a battle and check:
 
-* mouse hover
-* mouse down
-* touch if available
-* Tab/keyboard focus
-* arrow/WASD menu navigation
-* gamepad navigation if available
+Restart Battle
 
-Their backgrounds must remain transparent at all times.
+* transparent normally
+* transparent on hover
+* transparent while pressed
+* transparent when focused
+* existing white focus ring remains visible
 
-When focused, the existing white focus ring must still be clearly visible.
+Return to Home
 
-Their text must remain enabled white/off-white.
+* same behavior
 
-Their actions must still work.
+Open Return to Home?.
 
-Verify Resume remains green.
+Keep Playing
 
-Verify disabled Help is still visually muted and skipped by navigation.
+* same transparent behavior in normal/hover/pressed/focused states
+* white focus ring remains
 
-Return Home confirmation
+Return Home
 
-Select Return to Home.
+* remains the primary filled action with its existing green states
 
-Verify Keep Playing:
+Resume
 
-* starts focused as before
-* remains transparent
-* remains transparent on hover
-* remains transparent while pressed
-* shows the existing white focus ring
-* still closes the confirmation
-* returns focus to Return to Home in the pause menu
+* remains the existing primary filled pause action
 
-Verify the confirmation Return Home button remains green.
+#0001 animation
 
-Jump sprites
+Check:
 
-Resume/start a battle with #0001.
-
-Jump using one or more existing controls:
-
-* W
-* Space
-* ArrowUp
-* touch Jump
-* gamepad A where available
-
-Verify:
-
-* jump input/height/timing are unchanged
-* the new real jump sequence begins immediately when leaving the ground
-* the sequence plays in the intended frame order
-* it does not loop
-* the airborne pose does not revert to idle at the apex
-* descent uses the intended final airborne frame unless real descent frames were supplied
-* landing cleanly returns to idle/run
-* facing-left sprite flipping still works
-* jumping while moving horizontally works
-* the sprite does not change apparent scale compared with idle/run
-* no new asset-load errors appear in the console
-
-Test both Desert and City so platform jumping/landing still works.
-
-Also test at a desktop viewport and a landscape mobile/tablet-sized viewport.
+* jump starts with the new jump frames
+* apex/descent switches naturally to fall frames
+* landing plays both landing frames once
+* no visible character scale pop between idle/run/jump/fall/land
+* bottom-centre/torso anchoring remains stable
+* sprite artwork retains original colours
+* no image smoothing is introduced
+* movement and collision feel unchanged
+* platform jumps and platform drops work
+* repeated jumps correctly restart the jump sequence
+* landing animation does not prevent a rapid subsequent jump
 
 ⸻
 
-16. Avoid unrelated changes
+6. Constraints
 
-Do not modify unrelated:
+Do not:
 
-* Home UI
-* Select Mode UI
-* Select Fighter UI
-* Select Stage UI
-* result-screen button styling
-* primary green button colors
-* global color tokens
-* global radius tokens
-* battle timing
-* AI behavior
-* combat behavior
-* stage rendering
-* camera behavior
-* touch-control geometry
-* attack placeholders
-* audio
-* splash screen
+* modify stage rendering
+* modify combat balance
+* modify movement constants
+* modify collider/hurtbox sizes
+* invent attack animations
+* alter the source PNG artwork
+* add dependencies or a build system
+* replace the existing sprite normalization architecture
+* globally disable button hover feedback
+* remove keyboard/gamepad focus visibility
+* change unrelated dialog buttons
+* make unrelated visual redesigns
 
-Do not broadly remove hover feedback from Alva.
+Keep the implementation data-driven and consistent with the existing Alva architecture.
 
-Only the specifically requested secondary battle-dialog buttons should stop changing their background fill.
+At completion, provide:
 
-The existing root file max contains the previous UI-corner task and explicitly allowed hover/pressed fills on these secondary controls. This follow-up request supersedes only that portion of the old brief. Do not use that older allowance as a reason to preserve the background-color changes.
-
-⸻
-
-Definition of done
-
-The task is complete when:
-
-Pause dialog
-
-* Restart Battle remains transparent at rest, hover, focus, and press
-* Return to Home remains transparent at rest, hover, focus, and press
-* both still display the existing white focus ring
-* both remain completely functional
-* Resume remains green
-* Help remains disabled
-
-Return Home confirmation
-
-* Keep Playing remains transparent at rest, hover, focus, and press
-* Keep Playing still has the existing white focus ring
-* Keep Playing remains the default focused cancel action
-* Return Home remains green
-
-#0001
-
-* the supplied jump PNGs exist under assets/characters/0001/
-* the files are loaded by the normal character asset pipeline
-* characters.js declares a real non-looping jump animation
-* jump no longer uses the idle fallback
-* descent uses real airborne art instead of idle when no dedicated fall frames exist
-* jump physics are unchanged
-* transitions between idle/run/jump/fall do not visibly resize or mis-anchor the fighter
-
-Documentation/tests
-
-* README and ALVA_SPEC no longer say that #0001 only has Idle/Run or jumps using idle
-* all existing tests pass
-* any added targeted tests pass
-* real-browser validation shows no navigation, accessibility, sprite-loading, or visual regressions
+1. A concise summary of the changes.
+2. The files changed/moved.
+3. Tests run and their results.
+4. Any browser/manual verification performed.
+5. Any assumptions made about animation timing.
