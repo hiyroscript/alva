@@ -22,6 +22,7 @@ function menuButton(label, opts = {}) {
   return el('button', {
     class: `pause-btn-item${opts.primary ? ' is-primary' : ''}`, type: 'button', 'data-nav': true,
     'data-nav-default': opts.primary || null,
+    disabled: opts.disabled || null,
     text: label,
   });
 }
@@ -33,9 +34,7 @@ export class BattleScreen extends Screen {
 
     this.canvas = el('canvas', { class: 'battle-canvas', 'aria-label': 'Battle', role: 'img' });
     this.hudRoot = el('div', { class: 'hud' });
-    this.hud = new HUD(this.hudRoot);
-    this.pauseBtn = el('button', { class: 'pause-toggle', type: 'button', 'aria-label': 'Pause', html: ICONS.pause, tabindex: '-1' });
-    this.pauseBtn.addEventListener('click', () => this.pause());
+    this.hud = new HUD(this.hudRoot, { onPause: () => this.pause() });
     this.touchRoot = el('div', { class: 'touch-controls' });
     this.touch = new TouchControls(this.touchRoot, app.input);
 
@@ -48,7 +47,7 @@ export class BattleScreen extends Screen {
     this.buildResult();
 
     this.el.replaceChildren(
-      this.canvas, this.hudRoot, this.pauseBtn, this.touchRoot, this.banner,
+      this.canvas, this.hudRoot, this.touchRoot, this.banner,
       this.pauseOverlay, this.resultOverlay,
     );
 
@@ -66,20 +65,21 @@ export class BattleScreen extends Screen {
   // ---- DOM builders ---------------------------------------------------------
 
   buildPause() {
-    this.pauseKicker = el('span', { class: 'kicker' });
     const resume = menuButton('Resume', { primary: true });
     const restart = menuButton('Restart Battle');
-    const help = menuButton('Help');
+    // Help is disabled for now. Disabled buttons ignore clicks and the menu
+    // navigator skips them; drop `disabled` to bring the Help view back.
+    this.helpBtn = menuButton('Help', { disabled: true });
     const home = menuButton('Return to Home');
     resume.addEventListener('click', () => this.resume());
     restart.addEventListener('click', () => this.restart());
-    help.addEventListener('click', () => this.openHelp());
+    this.helpBtn.addEventListener('click', () => this.openHelp());
     home.addEventListener('click', () => this.confirmHome());
 
     this.pauseMenuView = el('div', { class: 'pause-view' }, [
-      this.pauseKicker,
+      el('span', { class: 'kicker', text: 'Quick Battle' }),
       el('h2', { class: 'pause-title', id: 'pause-title', text: 'Paused' }),
-      el('div', { class: 'pause-menu' }, [resume, restart, help, home]),
+      el('div', { class: 'pause-menu' }, [resume, restart, this.helpBtn, home]),
     ]);
 
     const helpBack = el('button', { class: 'btn-back', type: 'button', 'data-nav': true, 'data-nav-default': true, 'aria-label': 'Back to pause menu', html: `${ICONS.back}<span>Back</span>` });
@@ -92,7 +92,7 @@ export class BattleScreen extends Screen {
 
     this.pauseOverlay = el('div', {
       class: 'overlay pause-overlay', hidden: true, role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'pause-title',
-    }, [el('div', { class: 'pause-panel' }, [this.pauseMenuView, this.pauseHelpView])]);
+    }, [el('div', { class: 'pause-panel glass glass--panel' }, [this.pauseMenuView, this.pauseHelpView])]);
 
     this.pauseScope = {
       el: this.pauseOverlay,
@@ -118,7 +118,7 @@ export class BattleScreen extends Screen {
     home.addEventListener('click', () => this.leave(() => this.app.screens.go('home', {}, { reset: true })));
     this.resultOverlay = el('div', {
       class: 'overlay result-overlay', hidden: true, role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'result-title',
-    }, [el('div', { class: 'pause-panel result-panel' }, [
+    }, [el('div', { class: 'pause-panel result-panel glass glass--panel' }, [
       this.resultKicker, this.resultTitle, this.resultSub,
       el('div', { class: 'pause-menu' }, [rematch, stage, home]),
     ])]);
@@ -167,10 +167,8 @@ export class BattleScreen extends Screen {
       p2Sprites: sprites,
       input: app.input,
       reducedMotion: app.device.reducedMotion,
-      onPhase: (phase, battle) => this.onPhase(phase, battle),
     });
     this.hud.bind(this.battle.p1, this.battle.p2);
-    this.pauseKicker.textContent = `Quick Battle · ${map.name}`;
     this.needsResize = true;
     this.paused = false;
     this.hidePause();
@@ -216,6 +214,12 @@ export class BattleScreen extends Screen {
     if (!this.isRunning || this.app.device.blockedPortrait) return;
     battle.frame(dt);
     this.hud.update(battle);
+    // Handled after the frame rather than from inside the simulation step, so
+    // a draw can restart the battle safely.
+    if (battle.phase === 'result') {
+      this.finishBattle();
+      return;
+    }
     this.updateBanner();
   }
 
@@ -251,11 +255,7 @@ export class BattleScreen extends Screen {
     return false;
   }
 
-  // ---- Phases & banner ----------------------------------------------------------
-
-  onPhase(phase) {
-    if (phase === 'result') this.showResult();
-  }
+  // ---- Banner -------------------------------------------------------------------
 
   updateBanner() {
     const b = this.battle;
@@ -324,7 +324,9 @@ export class BattleScreen extends Screen {
     this.pauseOverlay.classList.remove('is-help');
     this.pauseHelpView.hidden = true;
     this.pauseMenuView.hidden = false;
-    if (!silent) this.pauseMenuView.querySelectorAll('[data-nav]')[2]?.focus({ preventScroll: true });
+    if (silent) return;
+    const target = this.helpBtn.disabled ? this.pauseMenuView.querySelector('[data-nav-default]') : this.helpBtn;
+    target.focus({ preventScroll: true });
   }
 
   restart() {
@@ -355,12 +357,17 @@ export class BattleScreen extends Screen {
 
   // ---- Result -----------------------------------------------------------------
 
+  // A draw opens no result dialog: once TIME has played out, a fresh battle
+  // starts through the usual restart path. A winner gets the result menu.
+  finishBattle() {
+    if (this.battle.result.outcome === 'draw') this.restart();
+    else this.showResult();
+  }
+
   showResult() {
     const { outcome } = this.battle.result;
-    this.resultTitle.textContent = outcome === 'draw' ? 'Draw' : outcome === 'p1' ? 'Player 1 Wins' : 'CPU Wins';
-    this.resultSub.textContent = outcome === 'draw'
-      ? 'Time ran out with both fighters standing.'
-      : 'Time ran out. Remaining health decides the round.';
+    this.resultTitle.textContent = outcome === 'p1' ? 'Player 1 Wins' : 'CPU Wins';
+    this.resultSub.textContent = 'Time ran out. Remaining health decides the round.';
     this.setBanner(null);
     this.app.input.setGameplayActive(false);
     this.touch.setEnabled(false);

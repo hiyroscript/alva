@@ -89,7 +89,7 @@ export class ConfirmDialog {
     root.setAttribute('aria-labelledby', 'dialog-title');
     root.setAttribute('aria-describedby', 'dialog-message');
     root.replaceChildren(
-      el('div', { class: 'dialog-panel' }, [
+      el('div', { class: 'dialog-panel glass glass--panel' }, [
         this.title,
         this.message,
         el('div', { class: 'dialog-actions' }, [this.cancelBtn, this.okBtn]),

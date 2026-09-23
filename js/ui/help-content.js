@@ -36,7 +36,7 @@ function controlsTable() {
 function mobileDiagram() {
   const dot = (cls, icon, label) =>
     el('span', { class: `md-btn ${cls}`, title: label }, [el('span', { class: 'md-icon', html: icon })]);
-  return el('div', { class: 'mobile-diagram', role: 'img', 'aria-label': 'Landscape phone layout: movement buttons Left, Down, Right at the lower left; Primary, Special, Block, Action 1, Action 2 and Jump staggered at the lower right; Pause at the upper right.' }, [
+  return el('div', { class: 'mobile-diagram', role: 'img', 'aria-label': 'Landscape phone layout: movement buttons Left, Down, Right at the lower left; Primary, Special, Block, Action 1, Action 2 and Jump staggered at the lower right; the timer and Pause at the top centre.' }, [
     el('div', { class: 'md-screen' }, [
       dot('md-pause', ICONS.pause, 'Pause'),
       dot('md-left', ICONS.left, 'Left'),
@@ -52,7 +52,7 @@ function mobileDiagram() {
     el('dl', { class: 'detail-list md-legend' }, [
       el('dt', { text: 'Lower left' }), el('dd', { text: 'Left · Down · Right' }),
       el('dt', { text: 'Lower right' }), el('dd', { text: 'Primary, Special · Block, Action 1 · Action 2 · Jump' }),
-      el('dt', { text: 'Top right' }), el('dd', { text: 'Pause' }),
+      el('dt', { text: 'Top centre' }), el('dd', { text: 'Timer · Pause' }),
     ]),
   ]);
 }
@@ -85,7 +85,7 @@ export function buildHelp() {
     ]),
     card('Pause', [
       el('ul', { class: 'info-list' }, [
-        el('li', { text: 'Press Esc or P, or tap the pause button in the top-right corner.' }),
+        el('li', { text: 'Press Esc or P, or tap the timer or the pause button under it at the top centre.' }),
         el('li', { text: 'Resume, restart the battle, read this help, or return to Home.' }),
         el('li', { text: 'The game pauses automatically when you switch tabs or rotate to portrait.' }),
       ]),
