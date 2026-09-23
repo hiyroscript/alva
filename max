@@ -1,914 +1,1421 @@
-Implement Character #0001’s Basic Attack 2 (BA2) and Mid-Air Basic Attack 2 in the Alva repository.
+Implement Character #0001’s new Charge state, its four uploaded charge animation frames, the new Charge control, and a full blue Energy bar in the Alva battle HUD.
 
-Before editing anything, inspect the current main branch and understand the existing BA1 implementation. BA1 is already complete and merged; BA2 should extend the exact same architecture rather than creating a parallel combat/input system.
+Work from the current main branch. Before editing, inspect the existing BA1/BA2 implementation, Fighter state machine, SpriteAnimator, InputManager, touch controls, HUD, Help UI, tests, README, and ALVA_SPEC.md.
 
-Terminology and naming
+Do not redesign unrelated systems.
 
-For these sprites:
+1. New charge artwork
 
-* ba means basic attack
-* 2ba means Basic Attack 2 / BA2
-* The 2 before ba identifies which basic attack it is.
-* The number at the very end of the filename is the animation frame number.
+The repository root currently contains four new Character #0001 sprites:
 
-Examples:
+* 0001_charge1.png
+* 0001_charge2.png
+* 0001_chargea.png
+* 0001_chargeb.png
 
-* 0001_2ba1.png = Character #0001, Basic Attack 2, frame 1
-* 0001_2ba7.png = Character #0001, Basic Attack 2, frame 7
-* 0001_midair2ba1.png = Character #0001, Mid-Air Basic Attack 2, frame 1
-
-BA2 is the secondary basic attack and belongs to the existing internal action2 input.
-
-Do not rename the internal controller action from action2. Only change its player-facing label from Action 2 / A2 to Basic Attack 2 / BA2.
-
-Existing artwork
-
-The current repo root contains these newly uploaded sprites:
-
-Ground BA2
-
-* 0001_2ba1.png
-* 0001_2ba2.png
-* 0001_2ba3.png
-* 0001_2ba4.png
-* 0001_2ba5.png
-* 0001_2ba6.png
-* 0001_2ba7.png
-
-This is a 7-frame ground animation.
-
-Mid-Air BA2
-
-* 0001_midair2ba1.png
-* 0001_midair2ba2.png
-* 0001_midair2ba3.png
-
-This is a 3-frame mid-air animation.
-
-There were previously incorrectly named 0001_2ab*.png files in the repository history. They were deleted. Do not restore them and do not use 2ab anywhere. The correct naming is 2ba.
-
-Do not redraw, recolour, reinterpret, replace, upscale manually, or AI-generate any #0001 sprite artwork. Use the uploaded PNGs exactly as the source animation frames.
-
-1. Move the new sprites into the canonical fighter asset directory
-
-Move the ten new PNGs from the repository root into:
+Move all four files into the canonical Character #0001 sprite directory:
 
 ./assets/characters/0001/
 
-The final paths must therefore be:
+Final paths:
 
-./assets/characters/0001/0001_2ba1.png
-through
-./assets/characters/0001/0001_2ba7.png
-
-and:
-
-./assets/characters/0001/0001_midair2ba1.png
-through
-./assets/characters/0001/0001_midair2ba3.png
+./assets/characters/0001/0001_charge1.png
+./assets/characters/0001/0001_charge2.png
+./assets/characters/0001/0001_chargea.png
+./assets/characters/0001/0001_chargeb.png
 
 Do not leave duplicate copies at the repository root.
 
 Preserve the PNG bytes unchanged.
 
-All runtime asset URLs must remain relative because Alva can be served from the /alva/ GitHub Pages subpath.
+Do not redraw, recolour, replace, rotate, AI-generate, or otherwise fabricate any #0001 artwork.
 
-2. Register BA2 animations in Character #0001 data
+Continue using relative URLs because the game must work from a GitHub Pages subpath such as /alva/.
 
-Extend js/data/characters.js using the existing BA1 conventions.
+2. Exact Charge animation sequence
 
-BA1 currently establishes the correct pattern:
+Charge is not a normal four-frame looping animation.
 
-* ba1
-* midairBa1
-* a shared FPS constant
-* non-looping clips
-* action1: { ground: 'ba1', air: 'midairBa1' }
-* corresponding attack definitions
+The required sequence is:
 
-Add equivalent logical animation keys for BA2:
+0001_charge1
+→ 0001_charge2
+→ 0001_chargea
+→ 0001_chargeb
+→ 0001_chargea
+→ 0001_chargeb
+→ 0001_chargea
+→ 0001_chargeb
+→ ...
 
-* ba2
-* midairBa2
+In other words:
+
+1. charge1 plays once.
+2. charge2 plays once.
+3. Then enter a sustained loop:
+    * chargea
+    * chargeb
+    * chargea
+    * chargeb
+    * forever while Charge remains held.
+
+Do not loop back to charge1 or charge2 while the same charge hold continues.
+
+When the player releases Charge and later starts charging again, the sequence must restart from charge1.
+
+3. Implement the animation as an intro plus loop
+
+The existing SpriteAnimator only supports normal clips that either loop their entire frame list or stop on their last frame.
+
+Do not complicate the general animator with a special hard-coded #0001 frame sequence if that can be avoided.
+
+Represent Charge as two animation clips while keeping one logical fighter state:
+
+logical state: charge
+chargeStart:
+  charge1
+  charge2
+  non-looping
+chargeLoop:
+  chargea
+  chargeb
+  looping
+
+In js/data/characters.js, add something equivalent to:
+
+chargeStart: {
+  frames: [
+    `${BASE_0001}charge1.png`,
+    `${BASE_0001}charge2.png`,
+  ],
+  fps: CHARGE_FPS,
+  loop: false,
+  ...
+},
+chargeLoop: {
+  frames: [
+    `${BASE_0001}chargea.png`,
+    `${BASE_0001}chargeb.png`,
+  ],
+  fps: CHARGE_FPS,
+  loop: true,
+  ...
+},
+
+Do not use the numeric frames() helper for chargea / chargeb, since those filenames intentionally use letters.
+
+Introduce a clearly named constant such as:
+
+const CHARGE_FPS = 10;
+
+or another sensible rate after visually checking the four frames in-game.
+
+Start around 10–12 FPS.
+
+The important requirement is the ordering and transition behavior, not an arbitrary exact FPS.
+
+Use the existing sprite-normalization system. Determine an appropriate heightRatio from the actual art so #0001 remains visually consistent with Idle, BA1, BA2, Hurt, etc.
+
+Do not resize sprites manually based on their raw PNG dimensions.
+
+4. Keep one logical charge state
+
+Add a logical Fighter state named:
+
+charge
+
+Do not expose chargeStart and chargeLoop as two different gameplay states. They are two animation phases of one Charge state.
+
+Cache or otherwise determine the duration of chargeStart, similar to how the fighter currently determines the Land animation duration.
+
+Conceptually:
+
+this.chargeStartDuration = sprites.duration('chargeStart');
+
+When the Fighter’s logical state is charge:
+
+* while stateTime is within the two-frame intro, render chargeStart
+* after the intro finishes, render chargeLoop
+
+For example, animationFor('charge') may select:
+
+chargeStart while stateTime < chargeStartDuration
+chargeLoop afterward
+
+Make sure both intro frames are actually visible before transitioning.
+
+Once chargeLoop begins, it must keep alternating A/B for as long as Charge remains held.
+
+5. Charge is a held action, never a toggle
+
+The Charge control must be held.
+
+This requirement applies to touch, keyboard, and any gameplay gamepad mapping.
+
+Correct behavior:
+
+press and hold Charge
+→ enter Charge state
+continue holding
+→ stay in Charge state
+→ charge1, charge2, then A/B loop
+release Charge
+→ immediately leave Charge state
+press and hold again later
+→ restart from charge1
+
+Do not implement:
+
+* tap-to-toggle charging
+* a latched Charge state
+* press once to start / press again to stop
+* charge buffering after release
+* a minimum hold timer before entering the state
+
+The continuous held value must determine whether the fighter is charging.
+
+Use input.charge, not a one-time chargePressed edge, as the source of the sustained state.
+
+6. Completely replace the gameplay Down action with Charge
+
+The current gameplay action named down must be replaced with:
+
+charge
+
+This is a complete gameplay-control rename/replacement.
+
+Currently the gameplay Down action controls:
+
+* crouching
+* dropping through one-way platforms
+* the middle lower-left touch button
+
+Those gameplay behaviors must no longer be attached to this control.
+
+Change the gameplay action from:
+
+down
+
+to:
+
+charge
+
+in the relevant input configuration and fixed-step input snapshot.
+
+For example, the gameplay ACTIONS list should conceptually become:
+
+[
+  'left',
+  'right',
+  'charge',
+  'jump',
+  'primary',
+  'special',
+  'block',
+  'action1',
+  'action2',
+  'pause',
+]
+
+The gameplay frame should contain:
+
+charge: false
+
+instead of:
+
+down: false
+
+The Fighter should read:
+
+input.charge
+
+to determine charging.
+
+Do not secretly keep input.down as an alias to Charge.
+
+There should be one clear gameplay action named charge.
+
+7. Preserve menu Down navigation
+
+The gameplay action is being replaced, but menu navigation still needs Down.
+
+Do not rename or break:
+
+CONFIG.menuBindings.down
+
+Arrow Down / S should still navigate downward through menus exactly as before.
+
+Keep the distinction clear:
+
+Gameplay:
+S / ↓ = Charge
+Menus:
+S / ↓ = navigate Down
+
+This is already structurally possible because menu bindings are separate from gameplay actions.
+
+8. Keyboard Charge binding
+
+Reuse the physical keys currently assigned to gameplay Down:
+
+S
+Down Arrow
+
+They now mean:
+
+Charge
+
+So the gameplay config should conceptually become:
+
+charge: ['KeyS', 'ArrowDown']
+
+instead of:
+
+down: ['KeyS', 'ArrowDown']
+
+Do not add KeyC merely because the touch button visibly says C.
+
+C is the requested touch-button text.
+
+The existing physical gameplay S / Down Arrow location should become Charge.
+
+Because Charge is held-state driven:
+
+* holding S charges
+* holding ↓ charges
+* releasing the key exits Charge
+
+Keyboard auto-repeat must remain irrelevant; use existing held-state tracking.
+
+9. Touch control: replace the Down arrow with “C”
+
+The lower-left touch cluster currently contains:
+
+LEFT | DOWN | RIGHT
+
+Replace it with:
+
+LEFT | C | RIGHT
+
+The middle button must be the Charge control.
+
+Change the corresponding DPAD entry from something like:
+
+{
+  action: 'down',
+  label: 'Down, drop through platform',
+  icon: ICONS.down
+}
+
+to something equivalent to:
+
+{
+  action: 'charge',
+  label: 'Charge',
+  text: 'C'
+}
+
+Required properties:
+
+* visible button text: exactly C
+* accessible label: Charge
+* internal gameplay action: charge
+* location: exactly where the old Down button is now
+* remain part of the same lower-left cluster
+* preserve true held-pointer behavior
+
+The button must visually show its held/pressed state for the full duration of the pointer hold.
+
+Do not move Charge into the lower-right attack cluster.
+
+Do not add another button.
+
+This is a replacement of the existing middle button.
+
+Rename relevant classes where appropriate:
+
+tc-down → tc-charge
+
+and update comments accordingly.
+
+The touch cluster comment should describe:
+
+[LEFT] [C] [RIGHT]
+
+not [LEFT] [DOWN] [RIGHT].
+
+The group ARIA label can become something like:
+
+Movement and Charge
+
+rather than incorrectly calling all three buttons movement directions.
+
+10. Preserve touch sliding and multi-touch
+
+The current lower-left cluster supports sliding a thumb between its buttons.
+
+Keep that behavior.
+
+For example:
+
+* slide Left → Charge: Left releases and Charge becomes held
+* slide Charge → Right: Charge releases and Right becomes held
+
+Do not create stuck Charge input when a pointer slides away, is cancelled, or loses pointer capture.
+
+releaseAll() must release Charge correctly.
+
+Also preserve multi-touch, e.g.:
+
+* one finger holds Charge
+* another finger presses BA1, BA2, Block, or Jump
+
+Gameplay state priority determines the result, but the input system itself must correctly track both touches.
+
+11. Gamepad behavior
+
+The current gameplay down action is fed by gamepad downward input.
+
+Replace those gameplay mappings with charge.
+
+At minimum, the existing gameplay D-pad Down mapping should now produce:
+
+charge
+
+If the existing left-stick downward axis currently feeds gameplay Down, preserve the same physical behavior by making it feed Charge instead.
+
+Do not alter menu navigation: D-pad/left-stick Down must still navigate down in menus through the existing menu-input path.
+
+Document the gamepad Charge control accurately in Help/README.
+
+12. Remove crouch behavior from this control
+
+The current Fighter has:
+
+this.crouching
+
+and uses held Down on the ground to enter the crouch visual state.
+
+That gameplay behavior is being replaced by Charge.
+
+Remove the active gameplay path where holding S/↓/the middle touch button makes #0001 crouch.
+
+Do not allow holding Charge to also make this.crouching = true.
+
+Prefer replacing the current crouch-tracking field with something clear such as:
+
+this.charging = false;
+
+if that keeps the Fighter implementation straightforward.
+
+There should be no ambiguity where one input simultaneously means crouch and Charge.
+
+Do not create a new crouch binding elsewhere in this task.
+
+13. Remove platform drop-through from this control
+
+The old Down press currently calls the one-way-platform dropThrough() behavior.
+
+That must no longer happen when Charge is pressed.
+
+Holding or pressing Charge while standing on a one-way platform must not cause #0001 to fall through it.
+
+You do not need to delete the generic dropThrough() physics helper if it may be useful for future controls or fighters.
+
+However:
+
+* Fighter should no longer invoke it from the Charge control
+* docs must no longer tell players S/↓/the middle touch button drops through platforms
+* existing tests that expect gameplay Down to drop through must be updated
+
+Do not invent a replacement drop-through control in this task.
+
+One-way platforms can continue to function as one-way collision surfaces; the player simply no longer has the current Down-to-drop-through command.
+
+14. Charge state conditions
+
+Charge should be a grounded state for #0001.
+
+Enter Charge only when all of the following are true:
+
+* Charge is currently held
+* #0001 is grounded
+* normal action conditions allow it
+* #0001 is not in hitstun
+* #0001 is not currently attacking
+* #0001 is not blocking
+
+A sensible implementation is conceptually:
+
+this.charging =
+  canAct &&
+  body.grounded &&
+  input.charge &&
+  !combat.blocking;
+
+Do not render the grounded Charge animation in mid-air.
+
+If Charge is held while #0001 is airborne:
+
+* continue Jump/Fall normally
+* do not show charge sprites in the air
+
+If the player continues holding Charge through landing, allow the normal Land animation/state priority to finish according to the existing state machine, then enter Charge while the key is still held.
+
+Do not create fake mid-air charge artwork.
+
+15. Charge movement behavior
+
+While #0001 is actively charging:
+
+* horizontal movement should be locked
+* normal gravity/collision should still work
+* the collider/hurtboxes must not change
+* #0001 remains hittable
+* Charge does not grant armour
+* Charge does not grant invulnerability
+* Charge does not push opponents
+* Charge creates no attack hitbox
+
+Include Charge in the horizontal movement lock.
+
+For example, the movement lock should account for:
+
+blocking
+charging
+hitstun
+attack movement lock
+
+Do not implement Charge as an attack.
+
+Do not put Charge into COMBAT_ACTIONS.
+
+16. State priority
+
+Preserve the established state-machine priorities.
+
+Charge must never override higher-priority combat or airborne states.
+
+A suitable ordering is:
+
+hitstun
+attack
+jump / fall
+land
+block
+charge
+run
+idle
+
+This means:
+
+* being hit immediately replaces Charge with Hurt/Hitstun
+* starting BA1/BA2 interrupts Charge
+* jumping interrupts Charge
+* being airborne prevents Charge
+* Block has priority if Block and Charge are both held
+* Charge overrides normal Run/Idle presentation while actually active
+
+Do not weaken BA1 or BA2 behavior.
+
+17. Charge and attacks
+
+BA1 and BA2 must remain fully functional.
+
+If the player is charging and presses an attack:
+
+* existing combat intent processing should be allowed to start the valid attack
+* Charge ends because the fighter is now attacking
+* attack animation/state has priority
+
+Do not require the player to manually release Charge before attacking.
+
+Do not allow Charge to cancel hitstun.
+
+Do not introduce attack-cancelling mechanics beyond what follows naturally from the existing state priority.
+
+18. Charge and Jump
+
+Jump should be able to interrupt Charge through the existing jump system.
+
+If Charge is held and Jump begins:
+
+* leave Charge
+* use Jump normally
+* do not show Charge frames while airborne
+
+If Charge remains held until the fighter returns to the ground, Charge can become active again once higher-priority landing behavior is finished.
+
+Do not alter jump velocity, gravity, coyote time, or jump buffering as part of this feature.
+
+19. Charge animation restart rules
+
+When Charge begins:
+
+* start at 0001_charge1.png
+
+When the intro completes:
+
+* 0001_charge2.png must have been shown
+* switch to 0001_chargea.png
+* then alternate A/B
+
+When Charge is interrupted or released:
+
+* leave the Charge logical state
+* do not keep the previous loop index as the next starting point
+
+On the next new Charge:
+
+* start again at 0001_charge1.png
+* not chargea
+* not chargeb
+* not charge2
+
+Test this explicitly.
+
+20. Missing Charge artwork
+
+Add appropriate graceful fallback behavior.
+
+If Charge art unexpectedly fails to load:
+
+* do not crash
+* do not stretch or synthesize frames
+* do not invent artwork
+* fall back to an existing safe still pose such as Idle
+
+Since Charge is not an attack, it does not need the attack system’s strict invisible-hitbox refusal logic.
+
+But the fighter must remain valid and responsive.
+
+The uploaded four frames should normally preload automatically through characterFramePaths() once the two Charge animation definitions are registered.
+
+21. Add an actual Energy stat
+
+The blue bar must be backed by real fighter state rather than a permanently hard-coded CSS rectangle.
+
+Extend #0001’s stats with an energy capacity.
+
+Use a simple initial value such as:
+
+stats: {
+  health: 100,
+  energy: 100,
+  blockDamageScale: 0.15,
+}
+
+Extend the per-fighter state currently represented by CombatState with:
+
+this.maxEnergy = stats.energy ?? 100;
+this.energy = this.maxEnergy;
+
+or an equivalently clean data-driven implementation.
+
+Because CombatState is recreated in Fighter.reset(), restarting/rematching should naturally restore Energy to full.
+
+Clamp future Energy values to the valid range when setter/update logic is added.
+
+22. Energy starts full
+
+For this task:
+
+maxEnergy = 100
+energy = 100
+
+The HUD must therefore initially show a completely full blue bar.
+
+The user has not specified any spending, gain, drain, or regeneration formula yet.
+
+Do not invent one.
+
+In particular, do not arbitrarily:
+
+* consume Energy for BA1
+* consume Energy for BA2
+* drain Energy while blocking
+* drain Energy while charging
+* increase Energy over time
+* increase Energy from dealing damage
+* increase Energy from taking damage
+
+Charge is being added as a gameplay state now, and Energy is being added as a real resource now, but this task should not invent an unspecified relationship between the two.
+
+Keep the architecture ready for future Energy rules.
+
+23. Add a blue Energy bar under each green health bar
+
+The current HUD side panel is approximately:
+
+fighter tag/name
+green health bar
+
+Change each P1/CPU fighter panel to:
+
+fighter tag/name
+green health bar
+blue energy bar
+
+The Energy bar must be directly beneath the green health bar.
+
+Add it for both:
+
+* Player 1
+* CPU
+
+Both use the same Character #0001 definition and both should expose their Energy resource consistently.
+
+Do not place Energy in the center timer/pause HUD.
+
+Do not put Energy above Health.
+
+24. Energy meter structure
+
+Give the Energy bar its own clear DOM/classes instead of pretending it is Health.
+
+For example:
+
+hud-energy
+hud-energy-fill
+
+or similarly explicit names.
+
+The meter should expose accessibility semantics:
+
+role="meter"
+aria-label="Energy"
+aria-valuemin="0"
+aria-valuemax="100"
+aria-valuenow="100"
+
+If maxEnergy becomes character-dependent, use that real maximum rather than permanently assuming 100 in HUD update logic.
+
+The fill transform should be driven from:
+
+fighter.combat.energy / fighter.combat.maxEnergy
+
+or wherever the final data model stores the real resource.
+
+Add a setEnergy() equivalent to the existing setHealth() pattern so the DOM only changes when displayed values change.
+
+25. Energy bar styling
+
+The Energy bar must be blue.
+
+Health remains Alva green.
+
+Introduce an explicit Energy HUD token/colour rather than globally turning other accent elements blue.
+
+For example, a dedicated token could be:
+
+--energy: #3b82f6;
+
+The exact shade may be adjusted slightly to fit the existing dark HUD, but it must read unmistakably as blue.
+
+This is an intentional gameplay-resource colour exception to the existing green interface accent rule.
+
+Do not recolour:
+
+* buttons
+* selection
+* focus
+* health
+* ALVA accent elements
+
+to blue.
+
+The Energy meter should visually belong to the existing fighter HUD panel:
+
+* same width as Health
+* directly below it
+* clean small spacing
+* same rounded/contained visual language
+* readable over stage art
+
+A slightly shorter height than Health is acceptable if it keeps the HUD compact, but it must remain clearly visible.
+
+Do not add a delayed-damage/ghost effect to Energy unless actual Energy loss semantics are later introduced.
+
+For now one solid blue fill is enough.
+
+26. Preserve Health behavior
+
+Do not break the existing green health meter.
+
+Health must retain:
+
+* real health ratio
+* green fill
+* delayed ghost layer
+* low-health behavior
+* P1 left-origin fill
+* CPU right-origin fill
+
+The new Energy bar should follow the same left/right orientation conventions:
+
+* P1 Energy drains/fills from the left origin
+* CPU Energy mirrors from the right origin
+
+even though both are currently full.
+
+27. HUD binding and reset
+
+HUD.bind() should reset its cached Energy display values just as it resets Health caches.
+
+HUD.update(battle) should update:
+
+P1 Health
+P1 Energy
+CPU Health
+CPU Energy
+Timer
+Round
+
+When a battle restarts/rematches:
+
+* Health resets as before
+* Energy resets to full
+* HUD immediately shows full blue Energy meters
+
+Do not alter the winner calculation: the round result is still determined by remaining Health, not Energy.
+
+28. Update the HUD tests
+
+The existing battle HUD test currently expects each side panel to have exactly two children:
+
+name row
+health bar
+
+Update it for the new intended structure:
+
+name row
+health bar
+energy bar
+
+Do not weaken the test by removing structure assertions entirely.
+
+Add assertions that:
+
+* each side has an Energy meter
+* Energy meter has role="meter"
+* Energy has aria-label="Energy"
+* initial aria-valuenow is 100
+* its fill is full
+* changing fighter Energy changes only the Energy fill/value
+* Health still reflects Health
+* P1/CPU orientations remain correct
+
+The fake battle fighters in tests should provide Energy state.
+
+29. Rename the Help control
+
+In js/config.js:
+
+Change the gameplay label from:
+
+Down / drop through
+
+to:
+
+Charge
+
+under the new charge action.
+
+The Help controls table should list:
+
+Charge | S / ↓
+
+instead of Down/drop-through.
+
+Do not change menuBindings.down.
+
+30. Update the mobile Help diagram
+
+The current mobile diagram displays a Down-arrow button between Left and Right.
+
+Replace it with the Charge button.
+
+Diagram:
+
+Left | C | Right
 
 Use:
 
-* frames(BASE_0001, '2ba', 7) for ba2
-* frames(BASE_0001, 'midair2ba', 3) for midairBa2
+* visible text: C
+* title/accessibility description: Charge
 
-Both animations must be:
+Rename .md-down to an appropriate .md-charge selector while keeping the same physical location:
 
-* non-looping
-* played once
-* allowed to hold their final frame naturally if necessary
-* normalized through the existing sprite-normalization pipeline
-* anchored consistently with #0001’s existing animations
+left: 21.5%
+top: 78%
 
-Do not hard-code any special rendering logic specifically for the PNG dimensions.
+Update the overall diagram ARIA description from:
 
-The existing sprite normalizer should continue to determine visible bounds, pixel-art grid, world scaling, and torso/bottom-centre anchoring.
+movement buttons Left, Down, Right
 
-Start with 12 FPS, consistent with BA1, unless direct inspection of the actual BA2 frames makes another whole-frame playback rate clearly necessary. If a different FPS is selected, document why and keep all attack phase durations derived from that FPS so animation and combat cannot drift apart.
+to something like:
 
-Prefer introducing a BA2_FPS constant alongside BA1_FPS.
+Left, Charge and Right controls at the lower left
 
-3. Map the existing Action 2 input to BA2
+Update the legend from:
 
-Character #0001 currently has approximately this action mapping:
+Left · Down · Right
 
-actions: {
-  primary: null,
-  special: null,
-  action1: { ground: 'ba1', air: 'midairBa1' },
-  action2: null,
-}
+to:
 
-Change only action2 so it becomes the second basic attack:
+Left · Charge · Right
 
-action2: {
-  ground: 'ba2',
-  air: 'midairBa2',
-}
+31. Update Help gameplay descriptions
 
-Do not change BA1.
+Remove stale Help text that says:
 
-Do not move BA2 onto primary, special, or action1.
+* Hold Down to crouch
+* Press Down to drop through platforms
 
-After this change:
+Replace it with Charge behavior.
 
-* action1 = Basic Attack 1 / BA1
-* action2 = Basic Attack 2 / BA2
-* primary remains reserved
-* special remains reserved
+Explain that:
 
-The existing Fighter.attackFor() implementation already supports { ground, air } mappings. Reuse it.
+* hold Charge while grounded to enter #0001’s charging stance
+* Charge plays its two-frame startup once, then loops its sustained pose while held
+* release Charge to stop charging
 
-Do not add another grounded/airborne dispatch system.
+Do not claim Charge currently restores Energy unless that behavior has actually been specified and implemented in a later task.
 
-4. Preserve the existing BA1 input bindings
+The Help section may state that the blue Energy meter currently begins full and is reserved for the Energy system.
 
-The current controls are already wired correctly.
+32. Update README controls
 
-BA2 must use the physical controls that currently activate action2:
+Change README gameplay controls from:
 
-Keyboard
+Down / drop through platform | S or ↓ | Lower-left ▼
 
-I
+to:
 
-Do not move BA2 to J, K, U, or another key.
+Charge | S or ↓ | Lower-left C
 
-Current important mappings remain:
+Update Touch documentation from:
 
-* U → BA1 / action1
-* I → BA2 / action2
+Left / Down / Right
 
-Gamepad
+to:
 
-The existing standard-gamepad mapping assigns:
+Left / Charge / Right
 
-* B / Circle → action1 / BA1
-* LB → action2
+Explain that Charge must be held.
 
-Therefore LB becomes BA2.
+Remove crouch/drop-through instructions tied to this control.
 
-Do not remap gamepad buttons unless there is an actual bug in the existing mapping.
+Do not change menu navigation instructions—S/↓ still navigate down in menus.
 
-Touch
+33. Update gamepad documentation
 
-Keep the existing action2 touch-button position and CSS slot.
+Document the actual new gameplay mapping after implementation.
 
-The internal action remains:
+If the current D-pad Down and downward left-stick direction are retained as the physical sources for the renamed action, describe them as Charge during battle.
 
-action2
+Keep normal menu D-pad/stick navigation intact.
 
-The existing CSS/layout class can remain .tc-a2.
+Do not modify unrelated gamepad bindings:
 
-Only its visible label/status changes.
+* A / Cross = Jump
+* B / Circle = BA1
+* LB = BA2
+* X / Square = reserved Primary
+* Y / Triangle = reserved Special
+* RB / RT = Block
+* Start = pause/menu behavior
 
-5. Change “A2” to “BA2”
+34. Update ALVA_SPEC.md
 
-Change the user-facing touch button from:
+Update the product spec so it matches the implementation.
 
-A2
+Add Character #0001 Charge to the animation/state list.
 
-to exactly:
+Document the exact Charge animation:
+
+charge1 → charge2 → chargea ↔ chargeb
+
+Clarify:
+
+* charge1/2 are intro frames
+* chargea/chargeb are the sustained loop
+* holding Charge maintains the state
+* releasing Charge exits
+* starting Charge again restarts from charge1
+* Charge is grounded
+* Charge locks normal horizontal movement
+* attacks, jump, Block and Hitstun retain the appropriate state priority
+* Charge itself has no hitbox
+* no armour/invulnerability is added
+
+Update the battle input section:
+
+S / ↓ = Charge
+
+Update touch:
+
+Left · C · Right
+
+Remove current Down-to-crouch/drop-through descriptions.
+
+35. Update the HUD specification
+
+Update ALVA_SPEC.md Battle chrome/HUD section.
+
+It currently specifies each fighter panel as tag/name plus green Health.
+
+Change it to specify:
+
+fighter tag/name
+green Health bar
+blue Energy bar
+
+Clarify:
+
+* Health remains green
+* Energy is blue
+* Energy is directly beneath Health
+* both P1 and CPU display Energy
+* Energy initializes full
+* Energy is a gameplay-resource colour exception to the otherwise green-focused UI
+* no Energy spending/gain mechanics are invented in this task
+
+36. Update current-content documentation
+
+README and Help should list Charge among #0001’s implemented animations/states.
+
+For example:
+
+Idle
+Run
+Jump
+Fall
+Land
+Hurt
+Mid-Air Hurt
+BA1
+Mid-Air BA1
+BA2
+Mid-Air BA2
+Charge
+
+Do not describe chargeStart and chargeLoop as separate player actions. They form one Charge state.
+
+37. Tests: charge assets
+
+Extend the test suite to verify all four sprites.
+
+Assert that the character definition references:
+
+assets/characters/0001/0001_charge1.png
+assets/characters/0001/0001_charge2.png
+assets/characters/0001/0001_chargea.png
+assets/characters/0001/0001_chargeb.png
+
+Assert they are no longer present at repository root.
+
+Assert characterFramePaths() includes all four.
+
+38. Tests: exact animation progression
+
+Add dedicated Charge tests.
+
+While continuously holding Charge from Idle, collect visible frame changes.
+
+The beginning must be exactly:
+
+0001_charge1.png
+0001_charge2.png
+0001_chargea.png
+0001_chargeb.png
+0001_chargea.png
+0001_chargeb.png
+
+Continue long enough to prove the loop does not return to:
+
+* charge1
+* charge2
+
+after the intro.
+
+Test multiple A/B loop cycles.
+
+39. Tests: release
+
+Hold Charge until the A/B loop is running.
+
+Release it.
+
+Assert:
+
+* Fighter leaves charge
+* Charge animation stops
+* normal Idle/Run state resumes appropriately
+* it does not remain latched
+
+40. Tests: new charge restarts from frame 1
+
+After releasing:
+
+1. wait until Fighter is no longer in Charge
+2. hold Charge again
+
+Assert the first frame is:
+
+0001_charge1.png
+
+not A/B and not charge2.
+
+41. Tests: input must be held
+
+Explicitly prove Charge is held-state based.
+
+A short press followed by release must not leave Fighter charging afterward.
+
+No toggle behavior may exist.
+
+Do not base sustained Charge on chargePressed.
+
+42. Tests: Charge is grounded
+
+While airborne, hold Charge.
+
+Assert:
+
+* Fighter remains Jump/Fall
+* Charge art is not shown
+
+Land while continuing to hold it.
+
+After higher-priority Land behavior finishes, assert Fighter enters Charge automatically because the key is still held.
+
+43. Tests: movement lock
+
+Start moving horizontally, then hold Charge while grounded.
+
+Assert Charge eventually stops/locks horizontal movement according to the normal deceleration rules and the fighter does not keep running through the Charge animation.
+
+Holding Left/Right simultaneously with Charge must not turn Charge into a moving animation.
+
+On release, held horizontal input may resume normal movement.
+
+44. Tests: interruption priority
+
+Test at least:
+
+Hitstun
+
+While charging, apply hitstun.
+
+Assert:
+
+charge → hitstun/hurt
+
+immediately according to existing freeze/stun behavior.
+
+BA1
+
+While charging, press BA1.
+
+Assert BA1 starts and its normal animation/state wins.
 
 BA2
 
-Also change its accessible label from:
+Same for BA2.
 
-Action 2
+Jump
 
-to:
+While charging, jump.
 
-Basic Attack 2
+Assert Charge ends and Jump becomes active.
 
-In js/game/touch-controls.js, the equivalent button should become conceptually:
+Block
 
-{
-  action: 'action2',
-  label: 'Basic Attack 2',
-  text: 'BA2',
-  pos: 'a2'
-}
+If Charge and Block are both held while eligible, preserve the chosen state priority with Block above Charge.
 
-Remove its pending: true state now that real attack artwork exists.
+Do not alter existing BA1/BA2/hitstun tests.
 
-The BA2 button must therefore no longer use the dashed/dimmed reserved appearance.
+45. Tests: Charge has no combat effect
 
-Do not rename .tc-a2 just to match the visible text.
+While charging:
 
-Do not change the button’s location.
+* combat.attack must remain null
+* no attack hitbox exists
+* opponent health does not change
+* no hitstop occurs
+* no cooldown is created
 
-6. Update global action labels
+Charge is a Fighter state, not an attack definition.
 
-In js/config.js, change:
+46. Tests: platform behavior changed intentionally
 
-action2: 'Action 2'
+Replace the old test:
 
-to:
+dropping through a platform uses fall, then lands
 
-action2: 'Basic Attack 2'
+as a gameplay-Down expectation.
 
-Keep the keyboard binding:
+The new control should prove:
 
-action2: ['KeyI']
+* holding/pressing Charge while standing on the one-way ledge does not call the drop-through behavior
+* fighter remains standing on that platform while charging
+* Charge animation is shown
 
-unchanged.
+Do not remove one-way-platform physics from the engine unless necessary.
 
-BA1 should remain:
-
-Basic Attack 1
-
-7. Update the Help UI
-
-js/ui/help-content.js currently considers Primary, Special, and Action 2 reserved.
-
-Once BA2 is implemented:
-
-* remove action2 from PENDING
-* leave primary and special reserved
-
-The pending set should therefore effectively contain only:
-
-* primary
-* special
-
-Update the mobile diagram:
-
-* A2 → BA2
-* title/accessible label → Basic Attack 2
-* descriptive text should say BA1 and BA2 rather than Action 1 / Action 2
-
-Update the mobile diagram’s overall ARIA description accordingly.
-
-Update the legend so it refers to:
-
-* BA1
-* BA2
-
-rather than:
-
-* BA1
-* Action 2
-
-Update explanatory text so the dashed buttons are now only Primary and Special.
-
-8. Update stale help/build descriptions
-
-The Help screen currently describes BA1 as implemented while Action 2 remains reserved.
-
-Update this description to state that #0001 now has:
-
-* Idle
-* Run
-* Jump
-* Fall
-* Land
-* Hurt
-* Mid-Air Hurt
-* Basic Attack 1
-* Mid-Air Basic Attack 1
-* Basic Attack 2
-* Mid-Air Basic Attack 2
-
-Mention that:
-
-* BA1 uses action1
-* BA2 uses action2
-* Primary and Special remain reserved
-* the training CPU remains non-attacking
-
-Do not claim that Primary or Special have attacks.
-
-9. Implement BA2 attack definitions using the existing combat system
-
-Add two new attack definitions:
-
-* ba2
-* midairBa2
-
-Do this entirely through the current createAttackDefinition / character-data combat architecture.
-
-Do not create a BA2-specific combat engine.
-
-Do not create manual collision checks outside CombatSystem.
-
-Do not bypass the existing attack state.
-
-The existing system already handles:
-
-* startup
-* active frames
-* recovery
-* damage
-* hitboxes
-* hurtboxes
-* knockback
-* hitstun
-* blockstun
-* hitstop
-* cooldowns
-* one-hit-per-attack behavior
-* attack movement locking
-* active-hitbox debug rendering
-* horizontal mirroring
-* grounded/airborne attack selection
-
-Reuse all of it.
-
-10. Align BA2 gameplay timing with the actual animation frames
-
-Combat phases must be based on whole animation frames at BA2_FPS, like BA1.
-
-Before finalizing the numbers, inspect all ten sprites visually and determine which frame or frames represent the actual strike/contact portion.
-
-Do not make the hitbox active during the entire animation.
-
-Ground BA2
-
-There are 7 frames:
-
-2ba1 through 2ba7.
-
-Determine visually:
-
-* wind-up/startup frames
-* actual contact/strike frame or frames
-* recovery frames
-
-A sensible starting point, if the artwork supports it, is:
-
-* frames 1–3: startup
-* frames 4–5: active
-* frames 6–7: recovery
-
-At 12 FPS this would be:
-
-startup: 3 / BA2_FPS,
-active: 2 / BA2_FPS,
-recovery: 2 / BA2_FPS,
-
-However, do not blindly use this split if the sprite artwork clearly shows contact on another frame.
-
-The active phase should correspond to what is visibly striking.
-
-The total attack duration should equal exactly one pass of the 7-frame animation.
-
-Mid-Air BA2
-
-There are 3 frames:
-
-midair2ba1
-midair2ba2
-midair2ba3
-
-A sensible initial split, if frame 2 is the visible contact frame, is:
-
-* frame 1: startup
-* frame 2: active
-* frame 3: recovery
-
-At 12 FPS:
-
-startup: 1 / BA2_FPS,
-active: 1 / BA2_FPS,
-recovery: 1 / BA2_FPS,
-
-Again, inspect the actual sprites before locking the active phase.
-
-The total duration must equal one pass of the three-frame clip.
-
-Maintain the existing phase-boundary handling that avoids 60 Hz floating-point drift.
-
-11. Make BA2 meaningfully distinct without breaking the game’s balance
-
-BA1 currently uses conservative combat values around:
-
-* 6 damage
-* 180 horizontal knockback
-* 0 vertical launch
-* 0.22 s hitstun
-* 0.14 s blockstun
-* 0.06 s hitstop
-* 0.1 s cooldown
-
-BA2 is the secondary basic attack, so it should not simply be a second ID pointing at BA1.
-
-Use the new artwork to determine its reach and feel.
-
-A reasonable initial BA2 tuning target is slightly slower/heavier than BA1, for example:
-
-Ground BA2 starting values
-
-* damage: approximately 8
-* horizontal knockback: approximately 220
-* vertical knockback: 0 unless the artwork very clearly depicts a launcher
-* hitstun: approximately 0.24
-* blockstun: approximately 0.15
-* hitstop: approximately 0.07
-* cooldown: approximately 0.15–0.18
-* lockMovement: true
-* groundOnly: true
-
-Mid-Air BA2 starting values
-
-Use comparable values, adjusted only if necessary for the visible aerial move.
-
-Do not arbitrarily create:
-
-* launches
-* spikes
-* teleports
-* dashes
-* projectile behavior
-* multi-hits
-* armour
-* invulnerability
-* wall bounces
-* camera shakes
-* new physics mechanics
-
-unless the current design/art specifically requires them.
-
-A basic attack should remain a straightforward use of the existing combat system.
-
-12. Fit hitboxes to the visible strike
-
-Inspect the actual contact frame(s) and make each hitbox correspond to the limb/weapon/body region that visibly attacks.
-
-Do not just copy BA1’s hitbox if BA2 has a different pose or range.
-
-The hitbox should:
-
-* appear in front of the fighter when facing right
-* automatically mirror through the existing combat system when facing left
-* stay reasonably close to the visible attacking limb
-* not cover the entire character
-* not extend unrealistically far away
-* not be active during startup/recovery
-
-Use the existing Backquote debug overlay to validate it in battle.
-
-The debug attack hitbox should appear only during BA2’s active phase.
-
-13. Ground vs mid-air behavior
-
-When action2 is pressed:
-
-Grounded
-
-Start ba2.
-
-Airborne
-
-Start midairBa2.
-
-This should use the already-implemented attackFor('action2') grounded/air selection.
-
-BA2 must work during both:
-
-* jump ascent
-* jump descent/fall
-
-For the aerial move, gravity must keep working.
-
-Do not freeze #0001 in the air.
-
-Do not add extra lift unless the move is specifically designed to have it.
-
-If #0001 lands while midairBa2 is still playing, preserve the BA1 precedent:
-
-allow the mid-air BA2 attack to finish its own clip instead of swapping to the ground BA2 animation or the landing animation midway through the move.
-
-Once it ends, normal grounded state selection can resume.
-
-14. Same-frame input behavior
-
-Preserve the combat-intent ordering already established for BA1.
-
-If BA2 and Jump are pressed on the exact same simulation step while #0001 is grounded, the grounded attack should begin and the jump should not incorrectly turn the attack into its aerial version.
-
-Do not change this behavior for BA1.
-
-15. Attack animation safety
-
-Keep the existing rule that attacks with missing/unloaded animation frames are refused rather than faked.
-
-If ba2 or midairBa2 fails to load:
-
-* do not substitute idle as an attack
-* do not fabricate an attack pose
-* do not run an invisible damaging hitbox
-
-Fighter.tryAction() should simply refuse that attack using the same mechanism already used for BA1.
-
-16. Preserve attack priority/state behavior
-
-Do not disturb the current Fighter state priority.
-
-In particular:
-
-* hitstun must still override attacks
-* an attack must override normal jump/fall/land/run/idle rendering while active
-* normal physics continue
-* landing while an aerial attack is active must not replace its animation
-* hitstop behavior must stay intact
-* movement/facing lock semantics should stay consistent with BA1
-
-Do not change hurt/hitstun animations as part of this feature.
-
-17. Preserve the non-attacking training CPU
-
-Quick Battle’s CPU is intentionally a non-attacking training opponent.
-
-Adding BA2 to Character #0001 must not cause the training AI to begin using BA1 or BA2.
-
-Do not change TrainingAIController behavior unless necessary only to keep its existing non-attacking behavior intact.
-
-18. Update README
-
-Update README.md to reflect BA2.
-
-The controls section should show something equivalent to:
-
-* Basic Attack 1 (BA1) — U — touch BA1
-* Basic Attack 2 (BA2) — I — touch BA2
-
-Primary and Special remain marked reserved.
-
-Remove the reserved marker from Action 2 because it is no longer reserved.
-
-Change user-facing references from Action 2 to Basic Attack 2 (BA2).
-
-Update gamepad documentation:
-
-* B / Circle → BA1
-* LB → BA2
-* X / Y remain reserved
-* RB / RT → Block
-
-Update the animations section to include:
-
-* Basic Attack 2 — 7 frames
-* Mid-Air Basic Attack 2 — 3 frames
-
-Update the attacks section to say BA1 and BA2 are implemented on the ground and in the air.
-
-Do not state that Primary or Special are implemented.
-
-19. Update ALVA_SPEC.md
-
-Update the specification so its battle/combat/input sections match the actual game.
-
-Document:
-
-* BA2 as #0001’s secondary basic attack
-* ground BA2 has 7 real frames
-* mid-air BA2 has 3 real frames
-* action2 selects ground/air versions
-* keyboard I
-* gamepad LB
-* touch button BA2
-* BA2 is no longer reserved
-* Primary and Special remain reserved
-* landing during mid-air BA2 does not cancel its attack clip
-* attack phases correspond to the visible frames
-* no fabricated attacks or frames
-
-Do not delete the BA1 specification.
-
-20. Update stale source comments
-
-Search for comments that currently say things like:
-
-* Action 2 is reserved
-* only BA1 is implemented
-* Primary, Special and Action 2 are waiting for artwork
-* the game has only one real attack
-
-Update those comments so they accurately describe the build.
-
-Do not rewrite unrelated documentation.
-
-21. Tests
-
-Extend the dependency-free Node test suite.
-
-Prefer extending/generalizing the existing:
-
-* tests/basic-attack.test.mjs
-* tests/controls-ui.test.mjs
-* tests/fighter-animation.test.mjs
-
-or split BA2 into a clearly named attack test file if that produces cleaner tests.
-
-Do not remove BA1 coverage.
-
-Add BA2 coverage for at least all of the following.
-
-Asset registration
+47. Tests: gameplay input rename
 
 Assert:
 
-* all 7 0001_2ba*.png files are referenced from assets/characters/0001/
-* all 3 0001_midair2ba*.png files are referenced from assets/characters/0001/
-* the root copies no longer exist
-* no 2ab spelling is used
-* characterFramePaths() includes the new frames
+* gameplay ACTIONS contains charge
+* gameplay ACTIONS no longer contains down
+* CONFIG.bindings.charge is ['KeyS', 'ArrowDown']
+* CONFIG.bindings.down is no longer the gameplay binding
+* CONFIG.menuBindings.down remains intact
 
-Character action mapping
+InputManager’s gameplay sample should expose:
 
-Assert:
+charge
 
-action1: {
-  ground: 'ba1',
-  air: 'midairBa1',
-}
+not down.
 
-remains intact.
+48. Tests: touch Charge button
 
-Assert:
+Update tests/controls-ui.test.mjs.
 
-action2: {
-  ground: 'ba2',
-  air: 'midairBa2',
-}
+Assert the middle lower-left button:
 
-is active.
+* is registered as charge
+* has visible text exactly C
+* has accessible label exactly Charge
+* uses its Charge CSS class
+* does not use the old Down-arrow icon
+* dispatches ['charge', true] on pointer down
+* dispatches ['charge', false] on release
+* remains held for the pointer duration
 
-Assert Primary and Special remain null.
+Also test sliding:
 
-Input
+left → charge → right
 
-Assert:
+releases/activates each corresponding action correctly.
 
-* CONFIG.bindings.action1 remains ['KeyU']
-* CONFIG.bindings.action2 remains ['KeyI']
-* COMBAT_ACTIONS still includes action1 and action2
-
-Do not rename internal actions to BA1/BA2.
-
-Ground BA2 playback
-
-From idle on the ground, press action2.
+49. Tests: Help UI
 
 Assert:
 
-* attack id is ba2
-* animation is ba2
-* animation starts at 0001_2ba1.png
-* the visible frame sequence reaches all seven frames in order
-* it does not loop
-* it runs for exactly one animation pass
-* it exits cleanly afterward
-* cooldown behaves correctly
+* ACTION_LABELS.charge === 'Charge'
+* Help controls display Charge
+* gameplay Help no longer contains Down / drop through
+* mobile diagram contains visible C
+* mobile diagram labels it Charge
+* mobile diagram no longer shows the Down arrow in that slot
+* legend says Left · Charge · Right
+* Charge instructions say it must be held
 
-Mid-air BA2 playback
+Menu navigation documentation can still use the word Down where it genuinely means menu direction.
 
-Jump and press action2.
+50. Tests: Energy data
 
-Assert:
+Assert a newly created Fighter has:
 
-* attack id is midairBa2
-* animation is midairBa2
-* all three frames appear in order
-* it works while rising
-* it works while descending
-* gravity continues during the attack
-* it does not loop
+maxEnergy = 100
+energy = 100
 
-Landing during mid-air BA2
+If Energy is manually reduced during a test and the fighter/battle is reset, assert it returns to full.
 
-Start BA2 late in a fall so #0001 lands before the attack finishes.
+Do not tie this assertion to Health.
 
-Assert:
+51. Tests: Energy HUD
 
-* the attack remains midairBa2
-* the animation remains midairBa2
-* it does not switch to ba2
-* it does not switch to land
-* the remaining aerial frames finish normally
-* the fighter returns to an appropriate grounded state afterward
+Extend the HUD tests.
 
-Active-frame timing
+For each fighter side panel assert:
 
-Assert the attack hitbox is active only on the selected visual contact frame(s).
+* name/tag row exists
+* Health meter exists
+* Energy meter exists beneath Health
+* Energy meter has role="meter"
+* Energy meter has aria-label="Energy"
+* initial value is 100
+* initial fill is full
 
-For example, if ground BA2 uses frames 4–5 as contact, tests should ensure the active phase corresponds to those frames and not startup/recovery.
-
-For mid-air BA2, test the actual contact frame determined from the sprites.
-
-Damage/hit resolution
-
-Using the real CombatSystem:
-
-* ground BA2 can hit an opponent in front
-* aerial BA2 can hit an opponent in an appropriate airborne setup
-* one attack cannot repeatedly damage the same target every active simulation step
-* hitstun, hitstop, damage and knockback use the configured BA2 values
-* hitboxes mirror with facing
-
-Movement/facing
-
-Assert BA2 uses the same attack movement/facing lock conventions as BA1.
-
-Missing sprite safety
-
-Construct a sprite set where BA2 animation data is unavailable.
-
-Press action2.
+Reduce one fighter’s Energy to e.g. 40 and call hud.update().
 
 Assert:
 
-* attack does not begin
-* there is no invisible hitbox
-* the fighter stays in a valid normal state
-* the existing warning/refusal behavior occurs
+* Energy meter reports 40
+* Energy fill is scaleX(0.4)
+* that fighter’s Health value is unchanged
+* the other fighter’s Energy remains 100
 
-Reserved attacks
+Also verify CPU’s bar uses the mirrored fill origin like its Health bar.
 
-Update the old test that currently says:
+52. Full regression suite
 
-Primary, Special and Action 2 stay inactive
-
-because Action 2 is now BA2.
-
-It should instead verify:
-
-* Primary remains inactive
-* Special remains inactive
-* BA1 works
-* BA2 works
-
-Touch controls
-
-Assert the action2 touch button:
-
-* displays exactly BA2
-* has .tc-a2
-* has data-action="action2"
-* has accessible label Basic Attack 2
-* is no longer is-pending
-
-Assert only Primary and Special remain pending.
-
-Touch dispatch
-
-Pressing the visible BA2 button must dispatch:
-
-action2
-
-not a newly invented ba2 input action.
-
-Test multi-touch with movement as is already done for BA1.
-
-Help UI
-
-Assert:
-
-* ACTION_LABELS.action2 === 'Basic Attack 2'
-* the controls table displays Basic Attack 2
-* it is not marked Reserved
-* the mobile diagram displays BA2
-* it does not display A2
-* Help text identifies BA2 as available
-* Help still identifies Primary and Special as reserved
-
-22. Regression requirements
-
-Run the complete test suite with:
+Run:
 
 node --test
 
-All existing BA1, hurt, movement, battle-screen, animation, UI and combat tests must continue passing.
+All existing tests must pass after updating intentionally obsolete Down/crouch/drop-through assertions.
 
-Do not weaken existing BA1 assertions just to make BA2 pass.
+Do not weaken unrelated tests.
 
-In particular verify BA1 still:
+Specifically ensure no regressions to:
 
-* uses U / B-Circle / action1
-* has its 4-frame ground animation
-* has its 5-frame aerial animation
-* uses its existing combat values
-* finishes an aerial attack after landing
-* refuses to attack if its frames are unavailable
+* BA1
+* Mid-Air BA1
+* BA2
+* Mid-Air BA2
+* Hurt
+* Mid-Air Hurt
+* Land
+* Jump/Fall
+* hitboxes
+* blocking
+* touch multi-touch
+* pause/result screen
+* health HUD
+* sprite normalization
 
-23. Manual browser verification
+53. Manual browser verification
 
-After automated tests pass, manually run the game and verify #0001 in an actual Quick Battle.
+After automated tests pass, run the game in a real browser.
 
-Check all of these:
+Verify:
 
-Ground
+Charge animation
 
-* U triggers BA1
-* I triggers BA2
-* BA1 still looks correct
-* BA2 plays all seven frames at a natural size
-* no sprite popping, sinking or horizontal sliding
-* BA2 hitbox appears at the visible strike when debug overlay is enabled
-* facing-left attacks mirror correctly
+Hold S or ↓ on the ground.
 
-Air
+Observe:
 
-* U triggers Mid-Air BA1
-* I triggers Mid-Air BA2
-* Mid-Air BA2 works while rising and falling
-* gravity continues normally
-* landing before it ends does not replace its clip
+charge1
+charge2
+chargea
+chargeb
+chargea
+chargeb
+...
+
+Keep holding for several seconds to confirm only A/B loop.
+
+Release.
+
+Confirm #0001 leaves Charge immediately.
+
+Hold again.
+
+Confirm it restarts at charge1.
 
 Touch
 
-* visible BA1 button says BA1
-* visible BA2 button says BA2
-* BA2 is no longer dashed/dimmed
-* Primary and Special remain dashed
-* BA1 and BA2 can be used while another finger holds movement
+On a touch layout confirm the lower-left cluster reads:
 
-Gamepad
+←   C   →
 
-* B / Circle triggers BA1
-* LB triggers BA2
-* block and jump mappings remain unchanged
+The middle button must not show a Down arrow.
 
-Combat
+Hold C and verify the full Charge sequence.
 
-* BA2 can connect in front of #0001
-* hitbox matches the visible strike
-* attacks do not hit behind #0001
-* one attack does not multi-hit accidentally
-* active hitbox only exists during the intended contact frames
-* missing attack artwork never produces invisible damage
+Release C and verify Charge stops.
 
-24. Do not change unrelated game systems
+Slide between Left, C and Right and check no input sticks.
 
-Keep this feature focused.
+Combat interruption
 
-Do not redesign:
+While charging:
 
-* menus
-* stages
-* camera
-* HUD
-* physics
-* roster
-* splash screen
-* branding
-* pause/result screens
+* BA1 should interrupt correctly
+* BA2 should interrupt correctly
+* Jump should interrupt correctly
+* getting hit should show Hurt rather than Charge
 
-Do not add extra fighters or attacks.
+Platform
 
-Do not make the CPU attack.
+Stand on a City one-way platform.
 
-Do not remap BA1.
+Hold Charge.
 
-Do not rename action1 or action2.
+Confirm #0001 charges in place rather than dropping through.
 
-Do not replace existing sprite-normalization behavior.
+HUD
 
-Do not remove the existing relative asset-path strategy.
+For both P1 and CPU confirm:
+
+green Health bar
+blue Energy bar
+
+Energy is directly beneath Health and begins completely full.
+
+Check different viewport sizes so the extra bar does not collide with:
+
+* fighter names
+* center timer/pause
+* safe areas
+* touch controls
+
+54. Keep the scope focused
+
+Do not add unspecified Energy mechanics.
+
+Do not:
+
+* make Charge restore Energy yet
+* drain Energy during Charge
+* spend Energy on attacks
+* create special attacks
+* add particle effects
+* add glowing auras
+* add sound effects
+* add armour
+* add invulnerability
+* add damage to Charge
+* create a mid-air Charge animation
+* invent new sprite frames
+* redesign the HUD
+* redesign stages
+* redesign menus
+* change BA1/BA2 damage
+* change CPU behavior
+
+The training CPU must remain non-attacking.
+
+If the CPU’s AI input never holds Charge, it does not need to start charging on its own.
 
 Acceptance criteria
 
-The task is complete when:
+The implementation is complete only when all of the following are true:
 
-1. All ten new BA2 PNGs live only under assets/characters/0001/.
-2. Ground BA2 uses all seven 0001_2ba1–0001_2ba7 frames.
-3. Mid-Air BA2 uses all three 0001_midair2ba1–0001_midair2ba3 frames.
-4. action2 selects ba2 on the ground and midairBa2 in the air.
-5. Keyboard I triggers BA2.
-6. Gamepad LB triggers BA2.
-7. The touch button visibly reads exactly BA2.
-8. Its accessible/user-facing name is Basic Attack 2.
-9. BA2 is no longer shown as reserved.
-10. Primary and Special remain reserved.
-11. BA1 is unchanged and still works.
-12. Ground and aerial BA2 phases line up with the visible attack frames.
-13. BA2 uses the existing data-driven combat/hitbox system.
-14. Aerial BA2 continues through landing just like aerial BA1.
-15. Missing BA2 artwork never creates an invisible/fake attack.
-16. Documentation and Help accurately describe BA1 and BA2.
-17. The training CPU remains non-attacking.
-18. node --test passes completely.
-19. Manual browser verification confirms correct sprite scale, anchoring, animation order, hitbox placement and inputs.
+1. The four new charge sprites live under assets/characters/0001/, not the repo root.
+2. Charge is one logical Fighter state.
+3. A new Charge begins with charge1.
+4. It proceeds to charge2.
+5. It then enters the chargea ↔ chargeb loop.
+6. charge1 and charge2 never repeat during one uninterrupted hold.
+7. Releasing Charge exits the state.
+8. Starting a new Charge restarts at charge1.
+9. Charge requires continuous held input and is not a toggle.
+10. The gameplay down action has been replaced by charge.
+11. S and ↓ now mean Charge during gameplay.
+12. Menu S/↓ Down navigation still works normally.
+13. The lower-left touch cluster is Left · C · Right.
+14. The middle touch button visibly reads exactly C.
+15. Its accessible label is Charge.
+16. Holding Charge no longer crouches.
+17. Holding/pressing Charge no longer drops through platforms.
+18. Charge is grounded only.
+19. Charge locks normal horizontal movement.
+20. Hitstun, attacks, airborne states, Land and Block retain proper priority.
+21. Charge has no attack hitbox or damage.
+22. Every fighter has real energy/maxEnergy state.
+23. Energy starts full at 100/100.
+24. Both P1 and CPU have a full blue Energy meter directly below Health.
+25. Health remains green and otherwise behaves unchanged.
+26. Energy does not gain/drain/spend in this task because no such rule was specified.
+27. Help, README and ALVA_SPEC.md accurately describe Charge and Energy.
+28. Existing BA1 and BA2 behavior is unchanged.
+29. The training CPU remains non-attacking.
+30. The entire node --test suite passes.
+31. Manual browser testing confirms the exact intro-then-A/B-loop animation and held-input behavior.
