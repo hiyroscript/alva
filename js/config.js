@@ -93,7 +93,7 @@ export const ACTION_LABELS = Object.freeze({
   special: 'Special',
   block: 'Block',
   action1: 'Basic Attack 1',
-  action2: 'Action 2',
+  action2: 'Basic Attack 2',
   pause: 'Pause',
 });
 

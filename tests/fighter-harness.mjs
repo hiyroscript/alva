@@ -2,8 +2,10 @@
 // file itself). Runs the real Fighter, physics and SpriteSet resolve logic.
 // Sprite sets carry clip metadata only (no decoded PNGs), so scale, anchoring
 // and paint still need real-browser verification.
+import assert from 'node:assert/strict';
 import { getCharacter } from '../js/data/characters.js';
 import { Fighter } from '../js/game/character.js';
+import { CombatSystem } from '../js/game/combat.js';
 import { StageCollision } from '../js/game/physics.js';
 import { SpriteSet } from '../js/game/sprite-normalizer.js';
 import { CONFIG } from '../js/config.js';
@@ -57,4 +59,45 @@ export const frameName = (f) => f.animator.frame?.url.split('/').pop();
 export function stepUntil(step, pred, held, limit = 600) {
   for (let i = 1; i <= limit; i++) if (pred(step(held))) return i;
   throw new Error('condition never reached');
+}
+
+// ---- Attack helpers (Basic Attack 1 and 2 tests) --------------------------
+
+export const steps = (seconds) => Math.round(seconds / DT);
+export const frameNo = (name) => Number(name.match(/(\d+)\.png$/)[1]);
+
+// Records every step of an attack until the fighter leaves the attack state.
+export function recordAttack(step, held) {
+  const log = [];
+  let f = step(held);
+  while (f.state === 'attack') {
+    log.push({ id: f.combat.attack.def.id, phase: f.combat.phase, frame: frameName(f), anim: f.animator.anim.key, grounded: f.grounded });
+    f = step();
+  }
+  return log;
+}
+
+// Consecutive duplicates removed: the order frames were shown in.
+export const sequence = (log) => log.map((s) => s.frame).filter((n, i, a) => n !== a[i - 1]);
+
+// Two fighters and the real CombatSystem, stepped like Battle.step().
+export function duel({ gap = 44, attackerFacing = 1, attackerSprites, targetSprites } = {}) {
+  const x = 500;
+  const a = makeFighter({ x, facing: attackerFacing, sprites: attackerSprites });
+  const b = makeFighter({ x: x + gap * attackerFacing, facing: -attackerFacing, sprites: targetSprites });
+  a.fighter.opponent = b.fighter;
+  b.fighter.opponent = a.fighter;
+  const system = new CombatSystem();
+  const events = [];
+  const tick = (held = {}, targetHeld = {}) => {
+    a.step(held);
+    b.step(targetHeld);
+    events.push(...system.update([a.fighter, b.fighter]));
+  };
+  // Ticks until `pred` holds; fails instead of hanging.
+  const until = (pred, limit = 600) => {
+    for (let i = 0; i < limit && !pred(); i++) tick();
+    assert.ok(pred(), 'condition never reached');
+  };
+  return { attacker: a.fighter, target: b.fighter, tick, until, events };
 }

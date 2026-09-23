@@ -18,6 +18,8 @@ const BASE_0001 = './assets/characters/0001/0001_';
 // Playback rate of #0001's Basic Attack 1 clips. The BA1 attack phases below
 // are whole frames at this rate, so tuning it keeps combat in sync with the art.
 const BA1_FPS = 12;
+// Same for Basic Attack 2: its phases are whole frames at this rate.
+const BA2_FPS = 12;
 
 export const CHARACTERS = [
   {
@@ -97,6 +99,19 @@ export const CHARACTERS = [
         loop: false,
         heightRatio: 1.08,
       },
+      // Basic Attack 2 (BA2), ground and mid-air. Played once, like BA1.
+      ba2: {
+        frames: frames(BASE_0001, '2ba', 7),
+        fps: BA2_FPS,
+        loop: false,
+        heightRatio: 1.02,
+      },
+      midairBa2: {
+        frames: frames(BASE_0001, 'midair2ba', 3),
+        fps: BA2_FPS,
+        loop: false,
+        heightRatio: 1.29,
+      },
     },
 
     // States without dedicated art yet, plus a still idle frame for the
@@ -163,7 +178,7 @@ export const CHARACTERS = [
       primary: null,
       special: null,
       action1: { ground: 'ba1', air: 'midairBa1' }, // Basic Attack 1 (BA1)
-      action2: null,
+      action2: { ground: 'ba2', air: 'midairBa2' }, // Basic Attack 2 (BA2)
     },
 
     // Attack definitions, keyed by id. See js/game/combat.js for the schema
@@ -200,6 +215,44 @@ export const CHARACTERS = [
         blockstun: 0.14,
         hitstop: 0.06,
         cooldown: 0.1,
+      },
+      // Frames 1-3 wind-up (step in, lead jab, spin), frames 4-5 the kick
+      // (low sweep rising into a high kick, both drawn with motion trails),
+      // frames 6-7 recovery (kick apex, settle). One hit per attack, so the
+      // lead jab is part of the wind-up. The hitbox spans the kick's arc in
+      // front of the fighter, knee height to overhead. Slower and heavier than
+      // BA1.
+      ba2: {
+        animation: 'ba2',
+        startup: 3 / BA2_FPS,
+        active: 2 / BA2_FPS,
+        recovery: 2 / BA2_FPS,
+        damage: 8,
+        hitbox: { x: 10, y: -88, w: 24, h: 78 },
+        knockback: { x: 220, y: 0 },
+        hitstun: 0.24,
+        blockstun: 0.15,
+        hitstop: 0.07,
+        cooldown: 0.15,
+        groundOnly: true,
+      },
+      // Frames 1-2 wind-up (kunai drawn back, then overhead), frame 3 the
+      // downward kunai slash. The clip has no recovery frame, so the attack
+      // ends with it; the longer cooldown stops it being repeated faster than
+      // ground BA2. The hitbox covers the slash arc in front of the fighter.
+      // Chosen only by action2's `air` branch.
+      midairBa2: {
+        animation: 'midairBa2',
+        startup: 2 / BA2_FPS,
+        active: 1 / BA2_FPS,
+        recovery: 0,
+        damage: 8,
+        hitbox: { x: 14, y: -100, w: 22, h: 80 },
+        knockback: { x: 220, y: 0 },
+        hitstun: 0.24,
+        blockstun: 0.15,
+        hitstop: 0.07,
+        cooldown: 0.18,
       },
     },
   },

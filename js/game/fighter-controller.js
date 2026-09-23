@@ -26,7 +26,8 @@ export class PlayerController {
 
 // Non-attacking training opponent: keeps a readable distance, follows the
 // player across platforms and occasionally repositions. It never presses
-// combat buttons (Basic Attack 1 included), so the player can practise on it.
+// combat buttons (Basic Attacks 1 and 2 included), so the player can practise
+// on it.
 export class TrainingAIController {
   constructor({ rng = Math.random } = {}) {
     this.kind = 'cpu';

@@ -3,7 +3,7 @@
 // real Fighter, physics and SpriteSet resolve logic (see fighter-harness.mjs).
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, readdirSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { CHARACTERS, characterFramePaths } from '../js/data/characters.js';
 import { CONFIG } from '../js/config.js';
@@ -70,6 +70,43 @@ test('#0001 registers hurt, mid-air hurt and both Basic Attack 1 clips', () => {
   // Hurt art that fails to load holds a still idle frame.
   assert.deepEqual(def.animationFallbacks.hurt, { animation: 'idle', frame: 0 });
   assert.deepEqual(def.animationFallbacks.midairHurt, { animation: 'idle', frame: 0 });
+});
+
+test('#0001 registers both Basic Attack 2 clips from the canonical asset folder', () => {
+  const expected = {
+    ba2: Array.from({ length: 7 }, (_, i) => `${BASE}2ba${i + 1}.png`),
+    midairBa2: Array.from({ length: 3 }, (_, i) => `${BASE}midair2ba${i + 1}.png`),
+  };
+  const paths = characterFramePaths(def);
+  for (const [key, frames] of Object.entries(expected)) {
+    const anim = def.animations[key];
+    assert.ok(anim, `${key} is registered`);
+    // Exact, ordered frame lists: the trailing number is the frame number.
+    assert.deepEqual(anim.frames, frames, key);
+    assert.equal(anim.loop, false, `${key} plays once`);
+    assert.equal(anim.fps, 12, `${key} plays at BA2's 12 fps`);
+    for (const url of frames) {
+      assert.ok(paths.includes(url), `${url} is preloaded`);
+      assert.ok(url.startsWith('./assets/characters/0001/'), `${url} is relative and canonical`);
+      assert.ok(existsSync(ROOT + url.slice(2)), `${url} exists`);
+      assert.ok(!existsSync(ROOT + url.split('/').pop()), `no root copy of ${url}`);
+    }
+    // Attacks never fall back to other art.
+    assert.equal(def.animationFallbacks[key], undefined);
+  }
+  const dir = readdirSync(ROOT + 'assets/characters/0001/');
+  assert.deepEqual(dir.filter((n) => /^0001_2ba\d\.png$/.test(n)).sort(), expected.ba2.map((u) => u.split('/').pop()));
+  assert.deepEqual(dir.filter((n) => /^0001_midair2ba\d\.png$/.test(n)).sort(), expected.midairBa2.map((u) => u.split('/').pop()));
+});
+
+test('the misspelled 2ab frame names are gone for good', () => {
+  for (const url of characterFramePaths(def)) assert.doesNotMatch(url, /2ab/i, url);
+  for (const dir of ['', 'assets/characters/0001/']) {
+    for (const name of readdirSync(ROOT + dir)) assert.doesNotMatch(name, /2ab/i, `${dir}${name}`);
+  }
+  const sources = (dir) => readdirSync(ROOT + dir, { withFileTypes: true }).flatMap((e) =>
+    e.isDirectory() ? sources(`${dir}${e.name}/`) : e.name.endsWith('.js') ? [`${dir}${e.name}`] : []);
+  for (const file of sources('js/')) assert.doesNotMatch(readFileSync(ROOT + file, 'utf8'), /\b\d{4}_(midair)?2ab/i, file);
 });
 
 test('the third ground BA1 frame is exactly 0001_1ba3.png, with no U+FFFC anywhere', () => {
