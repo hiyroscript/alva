@@ -1,330 +1,503 @@
-Update the Alva game’s Home screen and credits presentation. Work within the existing architecture and visual language. This is a plain HTML/CSS/vanilla-JavaScript browser fighting game with no framework and no build step. Do not modify combat, physics, fighter sprite rendering, stage rendering, input systems, or unrelated menu screens.
+Work directly in the hiyroscript/alva repository and implement the following changes. First inspect the existing code and preserve the current architecture, visual language, responsive behavior, accessibility behavior, and game functionality unless a change is explicitly required below.
 
-Files/context to inspect first
+Goals
 
-The main relevant files are:
+Make three focused changes:
 
-* js/screens/home-screen.js — constructs the Home screen.
-* styles.css — Home layout begins around the .screen--home / .home-* rules.
-* js/ui/help-content.js — current Help and Credits content.
-* js/screens/help-credits-screen.js — existing Help & Credits screen.
-* js/core/app.js — screen registration.
-* ALVA_SPEC.md and README.md — update documentation where needed so it does not contradict the finished UI.
+1. Remove every textual mention of Nintendo, DS, and DSi from the project.
+2. Make the animated Home credits roll user-interactive: players must be able to manually scroll through the credits, and after roughly 2 seconds without interaction the existing automatic upward scrolling must resume from the user’s current position.
+3. Use the existing root-level alvafav.PNG file as the site’s favicon.
 
-Preserve Alva’s existing near-black/charcoal/off-white/green design system and its existing geometric SVG wordmark.
+Do not redesign Alva or alter unrelated gameplay.
 
-1. Reposition the large ALVA wordmark
+⸻
 
-On the Home screen, move the large ALVA wordmark farther to the left.
+Existing architecture and relevant files
 
-The visible left edge of the first “A” glyph should line up with the exact horizontal starting position of the supporting text below it.
+Alva is plain HTML/CSS/vanilla JavaScript using ES modules.
 
-The supporting text currently starts with “Fast…”, so the intended visual instruction is: put ALVA where the word “Fast” currently starts.
+Relevant files currently include:
 
-Do this as a Home-specific layout adjustment. Do not modify the global logo.js wordmark geometry in a way that changes the logo everywhere else.
+* index.html
+    * Current favicon is:
+        <link rel="icon" type="image/svg+xml" href="./assets/favicon.svg">
+* alvafav.PNG
+    * Already exists at the repository root.
+* js/screens/home-screen.js
+    * Builds the Home credits roll.
+    * Imports the shared CREDITS list.
+    * Uses two copies of the credits sequence to create a seamless loop.
+    * ROLL_SPEED is currently 22 CSS px/sec.
+    * HomeScreen.update(dt) advances rollOffset using the application’s existing frame loop and applies a translate3d(...).
+* js/core/app.js
+    * Owns the global requestAnimationFrame loop.
+    * Calls this.screens.current?.update(dt).
+    * Keep the Home credits animation within this architecture. Do not create another permanent animation loop or interval.
+* styles.css
+    * .home-credits clips the credits to the angled glass area.
+    * .home-credits-col currently has overflow: hidden.
+    * The credits become manually scrollable only under prefers-reduced-motion.
+    * .home-scene has pointer-events: none; reduced-motion CSS currently selectively restores pointer interaction to .home-credits-col.
+* js/ui/help-content.js
+    * Contains the canonical shared CREDITS data used by both the Home roll and Credits tab.
+* js/screens/help-credits-screen.js
+    * Builds the separate Help/Credits tab screen.
+* js/core/menu-navigator.js
+    * Owns Home keyboard/gamepad directional navigation, so any keyboard interaction added to the Home credits must not break Play/menu navigation.
+* ALVA_SPEC.md, README.md, and max
+    * Contain documentation/planning references that also need cleanup.
 
-If the SVG element is technically aligned but its visible glyph still appears inset, compensate in the Home-only CSS with positioning/translation so the visible first stroke of the A aligns with the text.
+Preserve the current dark glass-strip Home composition, green edge, typography, clipping, responsiveness, endless roll, and duplicated accessibility-hidden sequence.
 
-2. Change the Home tagline
+⸻
 
-Replace:
+1. Remove Nintendo / DS / DSi everywhere
 
-Fast, responsive fighting in your browser.
+Remove all textual occurrences of these terms from the repository:
 
-with exactly:
+* Nintendo
+* standalone DS
+* DSi
 
-Fan project. Big heart.
+This applies to:
 
-Keep the same general typography hierarchy and muted supporting-text treatment unless spacing needs adjustment for the redesigned layout.
+* visible in-game text
+* shared credits data
+* documentation
+* specifications
+* comments or planning text where applicable
+* stale/dead textual references
 
-3. Remove the “2D sprite fighting game” Home text
+Do not perform a blind substring replacement for DS, because normal words can contain those letters. Treat DS as a standalone word/token.
 
-Completely remove the visible Home eyebrow:
+Known places that currently require changes include at least:
 
-2D sprite fighting game
+js/ui/help-content.js
 
-Do not merely hide it with opacity. Remove the element from the Home DOM and remove/rework any spacing that existed specifically for .home-eyebrow.
+Current #0001 sprite source data contains:
 
-This request concerns the visible Home UI; do not break useful technical metadata solely because similar descriptive wording exists elsewhere.
-
-4. Remove the small top-left ALVA mark
-
-Remove the small decorative ALVA logo currently shown in the Home header at the top left.
-
-The large central ALVA wordmark remains.
-
-Remove unused markup/CSS/imports associated specifically with the small Home header logo where appropriate.
-
-5. Remove the top-right Build label
-
-Remove the Home-screen text such as:
-
-Build 0.1.0
-
-There should be no build/version label in the upper-right corner of Home.
-
-After removing both the small ALVA mark and Build label, do not leave an empty header taking up unnecessary vertical space. Reclaim that space for the main Home composition.
-
-Do not remove CONFIG.version globally if it is useful elsewhere.
-
-6. Disable Help & Credits from Home for now
-
-Keep the visible Help & Credits button on the Home menu, but disable it for now.
-
-Requirements:
-
-* Use a genuinely disabled button state.
-* It must not navigate to the Help & Credits screen.
-* It must not receive keyboard/gamepad menu focus.
-* It must not react to click/touch.
-* Give it a restrained disabled appearance consistent with Alva’s existing charcoal/gray hierarchy.
-* Keep its text readable.
-* Play remains the default focused Home action.
-
-Do not delete the underlying Help/credits infrastructure because Help is still used from the battle pause menu and may be re-enabled later.
-
-7. Completely remove the decorative road
-
-Delete the Home road visual.
-
-Remove:
-
-* the angled road surface,
-* lane markings,
-* lane animation,
-* road-specific masking,
-* road scrolling keyframes,
-* road-specific responsive positioning,
-* any other CSS or DOM that only exists to render the road.
-
-There should be no visual trace of a roadway.
-
-8. Replace the road area with an infinite vertical credits section
-
-Use the area that was previously occupied by the road as a dedicated credits panel on the right side of Home.
-
-Visual design
-
-The new credits region should:
-
-* occupy approximately the same right-side visual zone that the road used,
-* have a gray/charcoal background that is clearly distinct from the near-black menu background,
-* contain upright, readable credit text,
-* use Alva’s existing typography,
-* remain restrained and clean rather than looking like an arcade marquee.
-
-Place a crisp green separator line along the left boundary of the credits region, visually separating the left-side Home menu from the right-side credits panel.
-
-The separator should use the existing Alva green accent. A roughly 3px divider is appropriate and should visually replace the role the old road’s green slash played.
-
-Do not introduce new accent colors.
-
-9. Infinite credits scrolling behavior
-
-The credits inside the right panel should automatically move vertically upward at a slow, readable, constant speed.
-
-Behavior:
-
-1. Credits enter/move upward through the visible panel.
-2. The entire credit sequence continues until all text has completely passed out of view.
-3. Once the complete sequence has passed, restart it from the beginning.
-4. Continue indefinitely.
-
-A seamless duplicated-track loop is acceptable and preferable if it avoids a visible hitch, but a clean reset after the final text has fully passed is also acceptable.
-
-Do not create timers that accumulate or duplicate themselves every time Home is entered.
-
-Accessibility
-
-For prefers-reduced-motion: reduce:
-
-* disable the automatic movement,
-* present the credits in a readable static state instead.
-
-If duplicated DOM is used to create the infinite animation, expose only one copy to assistive technology and mark animation-only duplicates aria-hidden="true".
-
-10. Credit copy and attribution
-
-The new Home credits panel should provide meaningful attribution rather than filler.
-
-Use concise credit groups along these lines:
-
-ALVA
-Created by hiyroscript
-
-Original work
-Game design, code, interface, ALVA wordmark, and Desert / City stage artwork by hiyroscript.
-
-#0001 sprite source
-Original sprite material from Jump Ultimate Stars
-Nintendo DS / DSi
-The Spriters Resource
-Source sheet uploaded by Dazz
-Contributor: FRET
-
-Rights
-hiyroscript did not create or claim ownership of the original third-party character/game artwork. Original characters, games, and related properties belong to their respective rights holders.
-
-Project
-Unofficial fan project. No affiliation or endorsement is implied.
-
-Keep the wording compact enough for a scrolling credits treatment.
-
-Prefer making the credit copy a single source of truth in or near js/ui/help-content.js so the Home credits panel and existing Credits screen do not drift into contradictory attribution.
-
-11. Remove Naruto/Uzumaki references
-
-Remove user-facing mentions of:
-
-Naruto Uzumaki
-
-Also remove standalone user-facing occurrences of Naruto or Uzumaki so the character is not explicitly named anywhere in the game UI.
-
-In particular, the current buildCredits() implementation contains:
-
-* the Character field naming Naruto Uzumaki,
-* a sentence referring to “original Naruto artwork”.
-
-Replace those references with the generic but accurate attribution described above.
-
-Do not remove the legitimate source credits for:
-
-* Jump Ultimate Stars
+* Original sprite material from Jump Ultimate Stars
 * Nintendo DS / DSi
 * The Spriters Resource
-* Dazz
-* FRET
-* appropriate third-party rights-holder language.
+* Source sheet uploaded by Dazz
+* Contributor: FRET
 
-Do not alter, redraw, rename, recolor, replace, or otherwise modify the actual #0001 sprite assets.
+Remove the platform line completely.
 
-Also update README.md / ALVA_SPEC.md where necessary so the repository documentation reflects the new credit wording and no longer instructs the UI to explicitly display Naruto/Uzumaki.
+The resulting attribution should retain the remaining source information, for example:
 
-12. Remove the Home control hints
+* Original sprite material from Jump Ultimate Stars
+* The Spriters Resource
+* Source sheet uploaded by Dazz
+* Contributor: FRET
 
-Remove the keyboard/navigation hints currently displayed at the bottom-right of Home, such as:
+Do not remove Jump Ultimate Stars, The Spriters Resource, Dazz, or FRET merely because the platform wording is being removed.
 
-↑ ↓ Navigate
-Enter Select
+Rights copy
 
-This should be a Home-only change.
+The specification currently includes language referring to Nintendo IP.
 
-Remove the hintBar(...) call from home-screen.js and its import if it becomes unused there.
+Rewrite it generically so the intended rights disclaimer remains intact without naming Nintendo.
 
-Do not globally remove hint bars from the other setup/menu screens.
+For example, retain the principle that Alva does not claim ownership of the original third-party character/game artwork and that original characters, games, artwork, and related properties belong to their respective rights holders.
 
-Keep the existing by hiyroscript footer text unless its positioning needs to move slightly to fit the redesigned composition.
+Do not replace the removed company/platform references with another company/platform reference.
 
-13. Revised Home composition
+README.md
 
-The final Home screen should read visually as:
+The Credits section currently identifies Jump Ultimate Stars with a parenthetical platform/company reference. Remove that parenthetical while retaining the relevant source attribution.
 
-Left/menu side
+ALVA_SPEC.md
 
-Large ALVA wordmark
-Fan project. Big heart.
+Update its Help & Credits specification so it matches the actual revised CREDITS data.
 
-Play
-Help & Credits — visibly disabled
+Remove the later Nintendo IP reference as well.
 
-by hiyroscript near the bottom
+Root max file
 
-Divider
+This file currently also contains multiple Nintendo / DS / DSi references. Remove or rewrite all of them consistently.
 
-Thin Alva-green line separating the two regions.
+Verification
 
-Right side
+Before finishing, run a repository-wide case-insensitive textual search equivalent to:
 
-Gray/charcoal credits panel with the continuously upward-looping credits.
+rg -n -i '\bNintendo\b|\bDS\b|\bDSi\b' .
 
-There should be:
+Exclude binary-image contents if necessary, but there must be no remaining textual source/document/UI matches.
 
-* no small ALVA logo in the top left,
-* no Build/version text in the top right,
-* no “2D sprite fighting game” eyebrow,
-* no road,
-* no road lanes,
-* no road animation,
-* no Home navigation/control hint bar.
+Also verify that Home credits and the Credits tab still get their data from the single shared CREDITS definition rather than introducing duplicate credit copy.
 
-14. Responsive behavior
+⸻
 
-Preserve the current requirement that Home fits the viewport without page scrolling and respects safe-area insets.
+2. Make the Home credits manually scrollable
 
-Test at minimum:
+The Home credits currently auto-scroll continuously inside the angled glass strip using HomeScreen.update(dt).
 
-* normal desktop landscape,
-* wide desktop,
-* narrow desktop,
-* short landscape heights,
-* touch/mobile landscape,
-* very short landscape layouts.
+Change this behavior so it supports both automatic and manual scrolling.
 
-The Home menu must remain legible and usable even when the viewport height is constrained.
+Required behavior
 
-The credits panel should not overlap the menu or make the Play button inaccessible.
+Automatic behavior
 
-If the viewport becomes too narrow for a comfortable side-by-side presentation, intelligently reduce the credits-panel footprint while preserving the green separator and keeping the main ALVA/menu content dominant. Do not bring the road back.
+On entering Home, preserve the current slow continuous upward credits movement.
 
-15. Preserve existing behavior
+Keep approximately the existing speed (ROLL_SPEED = 22) unless implementation details require a negligible adjustment.
 
-Do not change:
+The sequence must continue to loop seamlessly forever.
 
-* Splash behavior.
-* Select Mode.
-* Select Fighter.
-* Select Map.
-* Battle.
-* Physics.
-* Combat architecture.
-* Character normalization.
-* Stage renderers.
-* Touch controls.
-* Gamepad support.
-* Pause menu Help.
-* Loading/error overlays.
-* Existing sprite artwork.
+There must be no visible jump when wrapping between the first and duplicate credits sequence.
 
-The Home Play button must still navigate to Select Mode exactly as before.
+Manual interaction
 
-The disabled Help & Credits Home button is the only Home navigation feature intentionally made unavailable.
+Players must be able to manually move through the Home credits.
 
-16. Cleanup
+Support the practical input methods available to the browser:
 
-After implementing:
+* mouse wheel
+* trackpad scrolling
+* touch dragging/swiping
+* pointer dragging where appropriate
+* keyboard scrolling when the credits region itself is intentionally focused, if this can be integrated without breaking the existing Home menu navigation
 
-* Remove unused road CSS.
-* Remove unused road DOM.
-* Remove unused Home imports.
-* Remove obsolete Home header CSS if nothing else uses it.
-* Remove obsolete .home-eyebrow, .home-build, .home-road* rules.
-* Adjust Home entrance-animation selectors so removed elements do not leave incorrect nth-child() timing assumptions.
-* Ensure there are no console errors.
-* Do not introduce dependencies or a build system.
+The interaction should feel like scrolling the credits, not like dragging an unrelated decorative element.
 
-Acceptance criteria
+Do not make the entire Home screen scroll. Only the credits region inside the glass strip is interactive.
 
-The change is complete only when all of the following are true:
+The Play button and existing Home navigation must remain fully functional.
 
-* The large ALVA wordmark is visibly farther left and its first visible stroke aligns with the start of Fan project. Big heart.
-* The tagline is exactly Fan project. Big heart.
-* 2D sprite fighting game is gone from the visible Home UI.
-* The small top-left ALVA mark is gone.
-* The top-right Build label is gone.
-* Help & Credits remains visible but is disabled and cannot be selected or activated.
-* The road and all lane graphics are completely gone.
-* A gray/charcoal credits region occupies the former right-side visual area.
-* A green line cleanly separates the menu and credits regions.
-* Credits automatically scroll upward and restart indefinitely.
-* Reduced-motion users receive a non-animated readable version.
-* Home bottom-right keyboard/control hints are gone.
-* by hiyroscript remains.
-* No user-facing runtime text contains Naruto or Uzumaki.
-* Jump Ultimate Stars / Nintendo / The Spriters Resource / Dazz / FRET attribution remains appropriately represented.
-* #0001 sprite assets are untouched.
-* Play still works.
-* Pause-menu Help still works.
-* Desktop and landscape mobile layouts remain usable.
-* There are no JavaScript errors or layout overflow regressions.
+Pause while interacting
 
-Implement this as a focused Home/credits redesign rather than a broader restyling of the game.
+As soon as the player begins interacting with the credits:
+
+* stop automatic progression immediately
+* allow the user’s movement to control the current credits position
+* reset the inactivity timer every time the user continues scrolling/dragging
+
+Use a clear constant such as:
+
+CREDITS_RESUME_DELAY = 2000
+
+or an equivalent 2-second value.
+
+Automatic resume
+
+After approximately 2 seconds with no further credits interaction, automatic upward scrolling must resume.
+
+It must resume:
+
+* from the exact current user-selected position
+* at the normal automatic speed
+* without snapping back to the old position
+* without restarting the credits from the beginning
+* without an animation jump
+* without briefly moving in the wrong direction
+
+If the player interacts again, pause automatic movement again and restart the inactivity countdown.
+
+Seamless looping during manual movement
+
+Manual scrolling can potentially move the logical offset across a sequence boundary.
+
+Normalize/wrap the credits position so users can continue moving through the repeated sequence naturally.
+
+Do not let manual interaction permanently reach a dead end simply because the content uses two copies for the automatic loop.
+
+The duplicate sequence that exists only to make the visual loop seamless must remain hidden from assistive technology.
+
+⸻
+
+Implementation approach
+
+Choose the cleanest implementation for the existing codebase rather than bolting on a second scrolling system.
+
+A good solution may either:
+
+1. keep rollOffset as the authoritative logical credits position and adjust it directly for wheel/touch/pointer input, or
+2. convert the credits viewport to a native scrolling element and make its scrollTop the authoritative position.
+
+Whichever approach you choose, there must be exactly one authoritative position. Do not let a CSS transform and native scrollTop independently accumulate competing offsets.
+
+The current app already has the correct animation architecture:
+
+App.loop() → current screen update(dt)
+
+Use that loop for automatic credits movement.
+
+Prefer tracking something such as:
+
+* current logical offset
+* whether the user is actively interacting
+* timestamp of the most recent manual credits interaction
+
+Then update(dt) can advance automatically only when:
+
+* Home is active
+* reduced motion is not enabled
+* the interaction inactivity window has elapsed
+
+Avoid repeating setInterval loops.
+
+If a timeout is used solely to transition interaction state, make sure it cannot stack on repeated Home visits or repeated scrolling.
+
+Event listeners created by HomeScreen must not multiply when leaving/re-entering Home.
+
+⸻
+
+Touch/pointer behavior
+
+The credits strip must work naturally on phones/tablets in landscape.
+
+Ensure the relevant portion of the credits layer can receive pointer input despite the current .home-scene { pointer-events: none; } rule.
+
+Only enable pointer interaction on the credits viewport/column, not the decorative glass generally.
+
+Touch interaction must not trigger the Home Play button or interfere with another region of the screen.
+
+If manually implementing dragging:
+
+* capture the active pointer appropriately
+* track vertical deltas
+* release cleanly on pointerup / pointercancel
+* do not leave the credits permanently in an “interacting” state after cancellation
+* use vertical movement in the natural scrolling direction
+
+If native scrolling is used, configure touch-action, overscroll behavior, and overflow so it behaves correctly inside the clipped strip without allowing document scrolling.
+
+⸻
+
+Mouse wheel / trackpad behavior
+
+Wheel/trackpad input over the credits region should:
+
+* manually move the credits by the wheel delta
+* pause automatic scrolling
+* update the inactivity timestamp
+* remain constrained to the credits experience rather than accidentally scrolling the page
+
+Remember that the document itself intentionally does not scroll.
+
+⸻
+
+Keyboard behavior
+
+If the credits region is made keyboard-focusable, make it semantically sensible and visibly focusable without damaging the Home design.
+
+Arrow/Page scrolling while that region is focused may control the credits.
+
+However:
+
+* do not add the credits to the ordinary data-nav Play/Help menu navigation unless doing so is clearly intentional
+* do not break the existing spatial menu navigator
+* Play should remain the default Home focus
+* normal Home arrow navigation should continue to work when the menu is focused
+
+A simple focusable scroll region with an accessible label is preferable to turning the credits into another Home action.
+
+⸻
+
+3. Preserve reduced-motion behavior
+
+The existing product intentionally treats prefers-reduced-motion: reduce differently.
+
+Preserve that accessibility contract:
+
+* automatic credits motion stays disabled when reduced motion is enabled
+* show one readable copy rather than endlessly animating duplicates
+* manual scrolling remains available
+* do not automatically resume after 2 seconds for reduced-motion users
+
+The new general-purpose manual credits interaction should ideally make the existing reduced-motion special-case simpler rather than producing two unrelated implementations.
+
+If the user’s reduced-motion preference changes while Home is active, update cleanly.
+
+⸻
+
+4. Keep the responsive glass-strip behavior
+
+Do not redesign the Home screen.
+
+Preserve:
+
+* the angled 21-degree glass panel
+* green slash on the glass edge
+* fade/mask at top and bottom
+* upright credits text
+* clipping to the glass
+* current Home title/actions/footer
+* responsive narrow-screen behavior
+* short-height typography adjustments
+* portrait behavior where the credits are visually hidden because too little of the glass is visible
+
+When the credits are visually hidden in portrait via the existing responsive rule, do not leave an invisible interactive surface intercepting taps from the rest of the Home UI.
+
+⸻
+
+5. Update favicon to alvafav.PNG
+
+The repository already contains:
+
+/alvafav.PNG
+
+Use this exact file and exact case as the browser favicon.
+
+In index.html, replace the current SVG favicon declaration:
+
+<link rel="icon" type="image/svg+xml" href="./assets/favicon.svg">
+
+with a PNG favicon declaration using the root-relative-to-document path:
+
+<link rel="icon" type="image/png" href="./alvafav.PNG">
+
+Keep the path relative because Alva is designed to work from a GitHub Pages project subpath.
+
+Do not rename alvafav.PNG.
+
+Do not introduce an absolute /alvafav.PNG path.
+
+The old assets/favicon.svg may remain in the repository if something else legitimately uses it, but it must no longer be the active HTML favicon.
+
+Search for other code/docs that describe assets/favicon.svg as the live favicon and update those statements to match reality.
+
+Known documentation needing updates includes:
+
+* README.md
+* ALVA_SPEC.md
+
+Where the specification currently describes the old favicon’s exact visual appearance, do not make assumptions about the new PNG. Inspect alvafav.PNG if possible and either document it accurately or simply state that alvafav.PNG is the favicon source.
+
+⸻
+
+6. Do not change unrelated behavior
+
+Do not alter:
+
+* fighter artwork
+* sprite normalization
+* combat
+* movement
+* physics
+* stages
+* camera behavior
+* map selection
+* character selection
+* battle controls
+* HUD
+* splash timing
+* Help & Credits availability state on Home
+* the separate Help/Credits screen’s general layout
+* overall Alva palette/layout
+
+Do not add frameworks, npm dependencies, or a build step.
+
+Continue using plain HTML, CSS, and JavaScript ES modules.
+
+Do not introduce third-party assets.
+
+⸻
+
+7. Documentation consistency
+
+After implementation, bring documentation in line with the actual product.
+
+Update at least:
+
+* README.md
+* ALVA_SPEC.md
+
+They should accurately state:
+
+* Home credits automatically roll upward.
+* Players can manually scroll the Home credits.
+* Manual interaction temporarily pauses auto-scroll.
+* Auto-scroll resumes after about 2 seconds of inactivity.
+* Reduced-motion mode remains manual-only.
+* alvafav.PNG is the site’s favicon.
+* Credits/source attribution no longer contains Nintendo / DS / DSi wording.
+
+If max is retained as a repo planning/spec artifact, update its outdated wording too so the global removal requirement is satisfied.
+
+⸻
+
+8. Testing / acceptance criteria
+
+Treat all of the following as required.
+
+Attribution cleanup
+
+* Nintendo appears nowhere in textual repository content.
+* standalone DS appears nowhere as the removed platform reference.
+* DSi appears nowhere.
+* In-game Home credits do not display those terms.
+* The Credits tab does not display those terms.
+* Remaining Jump Ultimate Stars / Spriters Resource / Dazz / FRET attribution remains intact where it currently belongs.
+* Rights wording remains clear and generic.
+
+Credits auto-scroll
+
+* Home opens with the credits automatically moving upward.
+* Speed remains close to the existing 22 px/sec.
+* The roll loops without a visible seam.
+* Leaving and returning to Home does not make the credits run faster or stack animation timers/listeners.
+
+Manual credits interaction
+
+* Wheel works.
+* Trackpad works.
+* Touch scrolling/dragging works.
+* Manual input immediately stops automatic advancement.
+* Continued input keeps automatic motion paused.
+* Roughly 2 seconds after the final interaction, automatic movement resumes.
+* Resume occurs from the current manual position with no snap.
+* Interacting again pauses it again.
+* Manual navigation remains usable around the loop boundary.
+
+Home UI regression checks
+
+* Play remains clickable/tappable.
+* Play remains the default keyboard focus.
+* Existing Home keyboard/gamepad menu navigation still works.
+* Help & Credits remains disabled on Home as it is currently designed.
+* The credits interaction does not cause the page/body to scroll.
+* The glass clipping/fades still render properly.
+* Narrow-screen and short-height Home layouts remain intact.
+* Portrait-hidden credits do not intercept invisible pointer input.
+
+Reduced motion
+
+With prefers-reduced-motion: reduce:
+
+* Home credits do not automatically move.
+* only the appropriate readable credits copy is shown
+* users can manually scroll it
+* inactivity does not restart automatic motion
+
+Favicon
+
+* Browser requests ./alvafav.PNG.
+* The tab displays the PNG favicon.
+* GitHub Pages/subdirectory deployment still works because the URL is relative.
+* No active favicon markup still points to ./assets/favicon.svg.
+
+Console/runtime
+
+* No new console errors.
+* No uncaught pointer/wheel/scroll errors.
+* No errors after repeatedly navigating Home → other screens → Home.
+* Existing battle/game functionality still runs.
+
+⸻
+
+9. Final verification
+
+Before considering the task complete:
+
+1. Review the final diff for unrelated changes.
+2. Search the full repository for the prohibited terms using word boundaries.
+3. Search for favicon.svg and verify any remaining occurrence is not claiming it is the active site favicon.
+4. Search for alvafav.PNG and confirm index.html references it exactly.
+5. Manually test Home credits with mouse/trackpad, touch emulation, keyboard where implemented, and reduced-motion emulation.
+6. Verify the 2-second inactivity resume multiple times.
+7. Verify the loop boundary both during automatic scrolling and after manually moving near/across it.
+8. Verify re-entering Home does not duplicate event handlers or alter scrolling speed.
+
+Make the smallest coherent set of changes that fully satisfies these requirements, and keep the implementation consistent with the existing Alva code style and architecture.
