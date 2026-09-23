@@ -747,9 +747,6 @@ html:not(.is-pointer-input) .mode-card:focus { box-shadow: var(--focus-ring), va
   z-index: 1;
 }
 .slot-lock { position: absolute; top: 5px; right: 5px; display: grid; font-size: clamp(9px, 1.5vh, 12px); color: var(--text-faint); }
-.slot.is-locked:hover { border-color: var(--border-strong); }
-.slot.is-denied { animation: deny 0.32s ease; }
-@keyframes deny { 25% { transform: translateX(-3px); } 50% { transform: translateX(3px); } 75% { transform: translateX(-2px); } }
 
 .slot.is-available { background: var(--surface-muted); border-color: var(--border-strong); }
 .slot.is-available .slot-num { color: var(--text-secondary); }
@@ -783,11 +780,8 @@ html:not(.is-pointer-input) .mode-card:focus { box-shadow: var(--focus-ring), va
   font-size: clamp(9px, 1.5vh, 12px);
 }
 .slot-check .icon { stroke-width: 3.4; }
-.slot.is-selected { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
 .slot.is-selected .slot-check { display: grid; }
-.slot.is-selected:focus { box-shadow: inset 0 0 0 1px var(--accent), var(--focus-ring); }
 .slot.is-available:hover { border-color: var(--border-hover); }
-.slot.is-selected:hover { border-color: var(--accent); }
 
 .char-preview {
   display: grid;
@@ -846,38 +840,6 @@ html:not(.is-pointer-input) .mode-card:focus { box-shadow: var(--focus-ring), va
   background: var(--surface-muted);
 }
 .map-hero-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
-.map-hero-info {
-  position: absolute;
-  left: clamp(8px, 1.4vw, 16px);
-  top: clamp(8px, 1.6vh, 16px);
-  max-width: min(520px, calc(100% - 2 * clamp(8px, 1.4vw, 16px)));
-  display: grid;
-  gap: 4px;
-  justify-items: start;
-  padding: clamp(10px, 2vh, 18px) clamp(12px, 1.6vw, 20px);
-  border-radius: var(--radius-md);
-  background: var(--surface-overlay);
-  box-shadow: var(--shadow-md);
-}
-.map-hero-name {
-  font-weight: 700;
-  font-size: clamp(22px, 5.6vh, 44px);
-  line-height: 1.05;
-  letter-spacing: -0.02em;
-  color: var(--text-strong);
-}
-.map-hero-tagline { color: var(--text); font-weight: 600; font-size: clamp(13px, 2vh, 16px); }
-.map-hero-desc { color: var(--text-secondary); font-size: clamp(12px, 1.9vh, 14px); max-width: 58ch; line-height: 1.45; }
-.map-traits { display: flex; flex-wrap: wrap; gap: 4px 16px; margin-top: 4px; }
-.map-trait { display: flex; align-items: baseline; gap: 6px; white-space: nowrap; }
-.map-traits dt {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-}
-.map-traits dd { font-size: 12px; font-weight: 600; }
 
 .map-side { display: flex; flex-direction: column; min-height: 0; }
 .map-cards { flex: 1; min-height: 0; display: grid; grid-template-rows: 1fr 1fr; gap: clamp(8px, 1.6vh, 14px); margin-bottom: clamp(8px, 1.6vh, 14px); }
@@ -896,24 +858,18 @@ html:not(.is-pointer-input) .mode-card:focus { box-shadow: var(--focus-ring), va
 .map-card:hover { border-color: var(--border-hover); }
 .map-card:focus { box-shadow: var(--focus-ring); }
 .map-card:active { transform: scale(0.99); }
-.map-card.is-selected { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
-.map-card.is-selected:focus { box-shadow: inset 0 0 0 1px var(--accent), var(--focus-ring); }
 .map-thumb-wrap { position: relative; min-height: 0; display: block; }
 .map-thumb { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 .map-card-body {
   display: grid;
-  grid-template-columns: auto 1fr;
-  grid-template-areas: "name index" "tag tag";
-  align-items: baseline;
-  gap: 1px 10px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1px;
   padding: clamp(6px, 1.3vh, 12px) 12px clamp(7px, 1.4vh, 12px);
   border-top: 1px solid var(--border);
   background: var(--surface);
 }
-.map-card-index { grid-area: index; justify-self: end; font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-muted); }
-.map-card.is-selected .map-card-index { color: var(--text-strong); }
-.map-card-name { grid-area: name; font-weight: 700; font-size: clamp(15px, 2.8vh, 22px); letter-spacing: -0.01em; color: var(--text-strong); }
-.map-card-tag { grid-area: tag; color: var(--text-secondary); font-size: clamp(11px, 1.7vh, 13px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.map-card-name { font-weight: 700; font-size: clamp(15px, 2.8vh, 22px); letter-spacing: -0.01em; color: var(--text-strong); }
+.map-card-tag { color: var(--text-secondary); font-size: clamp(11px, 1.7vh, 13px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .map-card-selected {
   position: absolute;
   top: 8px;
@@ -931,7 +887,9 @@ html:not(.is-pointer-input) .mode-card:focus { box-shadow: var(--focus-ring), va
 }
 .map-card-selected .icon { stroke-width: 3.2; }
 .map-card.is-selected .map-card-selected { display: inline-flex; }
-.btn--start { width: 100%; flex: none; }
+.btn--start { width: 100%; flex: none; padding-block: 6px; text-align: center; }
+/* The fixed label wraps on compact landscape columns; balance the two lines. */
+.btn--start span { text-wrap: balance; }
 
 /* ---------------------------------------------------------------------
    Help & credits
@@ -1426,8 +1384,6 @@ html.is-portrait-blocked .rotate-overlay { display: grid; }
   .step-name { display: none; }
   .hint-bar { display: none; }
   .preview-info { gap: 7px; }
-  .map-hero-desc { display: none; }
-  .map-traits { display: none; }
   .hud-sub { display: none; }
   .info-card--wide { grid-column: auto; }
   .tab { padding: 6px 14px 7px; }
