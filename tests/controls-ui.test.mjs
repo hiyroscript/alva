@@ -1,6 +1,7 @@
 // Run with node --test tests/controls-ui.test.mjs (no dependencies).
-// Touch controls and Help content for Basic Attacks 1 and 2 (BA1, BA2) on a
-// minimal fake DOM; layout and paint still need real-browser verification.
+// Touch controls and Help content for Basic Attacks 1 and 2 (BA1, BA2) and
+// Charge on a minimal fake DOM; layout and paint still need real-browser
+// verification.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -16,6 +17,7 @@ class Element extends Node {
   listeners = new Map();
   dataset = {};
   html = '';
+  rect = { left: 0, top: 0, width: 40, height: 40 };
   constructor(tag) {
     super();
     this.tagName = tag.toUpperCase();
@@ -44,6 +46,7 @@ class Element extends Node {
   }
   dispatch(type, event) { for (const fn of this.listeners.get(type) || []) fn(event); }
   setPointerCapture() {}
+  getBoundingClientRect() { return this.rect; }
   querySelectorAll(selector) {
     const match = (n) => (selector.startsWith('.') ? n.classNames.has(selector.slice(1)) : n.tagName === selector.toUpperCase());
     const out = [];
@@ -67,6 +70,7 @@ globalThis.document = {
 const { TouchControls } = await import('../js/game/touch-controls.js');
 const { buildHelp } = await import('../js/ui/help-content.js');
 const { ACTION_LABELS, CONFIG } = await import('../js/config.js');
+const { ICONS } = await import('../js/ui/icons.js');
 
 function touchControls() {
   const calls = [];
@@ -110,7 +114,7 @@ test('only Primary and Special touch buttons are still reserved', () => {
   const pending = [...tc.buttons].filter(([, b]) => b.classList.contains('is-pending')).map(([action]) => action);
   assert.deepEqual(pending.sort(), ['primary', 'special']);
   const texts = tc.root.querySelectorAll('.tc-text').map((t) => t.textContent);
-  assert.deepEqual(texts, ['BA1', 'BA2']);
+  assert.deepEqual(texts, ['C', 'BA1', 'BA2']);
 });
 
 test('pressing BA1 still dispatches the internal action1 input', () => {
@@ -233,4 +237,166 @@ test('the build notes say BA1 and BA2 are available and Primary and Special are 
   assert.match(text, /training CPU never attacks/);
   assert.doesNotMatch(text, /Action [12]/);
   assert.doesNotMatch(text, /idle and run animations\./);
+});
+
+// ---- Charge ---------------------------------------------------------------
+
+// Lays the lower-left cluster out left to right, 50 px apart.
+function layoutDpad(tc) {
+  ['left', 'charge', 'right'].forEach((action, i) => {
+    tc.buttons.get(action).rect = { left: i * 50, top: 0, width: 40, height: 40 };
+  });
+  return (action) => ({ clientX: ['left', 'charge', 'right'].indexOf(action) * 50 + 20, clientY: 20 });
+}
+
+test('the middle lower-left touch button is Charge: text C, labelled Charge, no Down arrow', () => {
+  const { tc } = touchControls();
+  const [left, middle, right] = tc.dpad.children;
+  assert.equal(left, tc.buttons.get('left'));
+  assert.equal(middle, tc.buttons.get('charge'));
+  assert.equal(right, tc.buttons.get('right'));
+  assert.equal(tc.dpad.children.length, 3, 'a replacement, not an extra button');
+  assert.equal(tc.buttons.has('down'), false);
+
+  assert.equal(middle.textContent, 'C');
+  assert.equal(middle.querySelector('.tc-text').textContent, 'C');
+  assert.equal(middle.getAttribute('aria-label'), 'Charge');
+  assert.equal(middle.getAttribute('data-action'), 'charge');
+  assert.ok(middle.classList.contains('tc-charge'));
+  assert.equal(middle.classList.contains('tc-down'), false);
+  assert.equal(middle.classList.contains('is-pending'), false);
+  assert.notEqual(middle.innerHTML, ICONS.down);
+  assert.doesNotMatch(middle.innerHTML, /<svg/);
+  // Still part of the lower-left cluster, not the attack cluster.
+  assert.ok(tc.dpad.classList.contains('tc-dpad'));
+  assert.equal(tc.dpad.getAttribute('aria-label'), 'Movement and Charge');
+  assert.equal(tc.actions.children.includes(middle), false);
+});
+
+test('holding C dispatches charge for the whole pointer hold', () => {
+  const { tc, calls } = touchControls();
+  const at = layoutDpad(tc);
+  const b = tc.buttons.get('charge');
+  tc.dpad.dispatch('pointerdown', { pointerId: 4, ...at('charge'), preventDefault() {} });
+  assert.deepEqual(calls, [['charge', true]]);
+  assert.ok(b.classList.contains('is-pressed'));
+  // Small thumb movement inside C keeps it held, with no repeat dispatches.
+  for (const dx of [-6, 3, 8, 0]) {
+    tc.dpad.dispatch('pointermove', { pointerId: 4, clientX: at('charge').clientX + dx, clientY: 22 });
+    assert.ok(b.classList.contains('is-pressed'));
+  }
+  assert.deepEqual(calls, [['charge', true]]);
+  tc.dpad.dispatch('pointerup', { pointerId: 4 });
+  assert.deepEqual(calls, [['charge', true], ['charge', false]]);
+  assert.equal(b.classList.contains('is-pressed'), false);
+});
+
+test('sliding Left → C → Right hands the hold from action to action', () => {
+  const { tc, calls } = touchControls();
+  const at = layoutDpad(tc);
+  tc.dpad.dispatch('pointerdown', { pointerId: 1, ...at('left'), preventDefault() {} });
+  tc.dpad.dispatch('pointermove', { pointerId: 1, ...at('charge') });
+  assert.deepEqual(calls, [['left', true], ['left', false], ['charge', true]]);
+  assert.ok(tc.buttons.get('charge').classList.contains('is-pressed'));
+  assert.equal(tc.buttons.get('left').classList.contains('is-pressed'), false);
+  tc.dpad.dispatch('pointermove', { pointerId: 1, ...at('right') });
+  assert.deepEqual(calls.slice(3), [['charge', false], ['right', true]]);
+  assert.equal(tc.buttons.get('charge').classList.contains('is-pressed'), false);
+  tc.dpad.dispatch('pointermove', { pointerId: 1, ...at('charge') });
+  tc.dpad.dispatch('pointerup', { pointerId: 1 });
+  assert.deepEqual(calls.slice(5), [['right', false], ['charge', true], ['charge', false]]);
+  assert.equal(tc.counts.get('charge'), 0);
+});
+
+test('a cancelled or lost Charge pointer, or releaseAll(), never leaves Charge stuck', () => {
+  for (const end of ['pointercancel', 'lostpointercapture']) {
+    const { tc, calls } = touchControls();
+    const at = layoutDpad(tc);
+    tc.dpad.dispatch('pointerdown', { pointerId: 2, ...at('charge'), preventDefault() {} });
+    tc.dpad.dispatch(end, { pointerId: 2 });
+    assert.deepEqual(calls, [['charge', true], ['charge', false]], end);
+    assert.equal(tc.buttons.get('charge').classList.contains('is-pressed'), false);
+  }
+  const { tc, calls } = touchControls();
+  const at = layoutDpad(tc);
+  tc.dpad.dispatch('pointerdown', { pointerId: 3, ...at('charge'), preventDefault() {} });
+  tc.releaseAll();
+  assert.deepEqual(calls, [['charge', true], ['charge', false]]);
+  assert.equal(tc.buttons.get('charge').classList.contains('is-pressed'), false);
+  // Disabling (pause, result screen) releases it too.
+  tc.dpad.dispatch('pointerdown', { pointerId: 5, ...at('charge'), preventDefault() {} });
+  tc.setEnabled(false);
+  assert.deepEqual(calls.at(-1), ['charge', false]);
+});
+
+test('Charge works alongside BA1, BA2, Block and Jump (multi-touch)', () => {
+  for (const other of ['action1', 'action2', 'block', 'jump']) {
+    const { tc, calls } = touchControls();
+    const at = layoutDpad(tc);
+    tc.dpad.dispatch('pointerdown', { pointerId: 1, ...at('charge'), preventDefault() {} });
+    tc.buttons.get(other).dispatch('pointerdown', { pointerId: 2, preventDefault() {} });
+    assert.deepEqual(calls, [['charge', true], [other, true]], other);
+    tc.buttons.get(other).dispatch('pointerup', { pointerId: 2 });
+    assert.deepEqual(calls.at(-1), [other, false]);
+    assert.ok(tc.buttons.get('charge').classList.contains('is-pressed'), `Charge still held after ${other}`);
+    assert.equal(tc.counts.get('charge'), 1);
+    tc.dpad.dispatch('pointerup', { pointerId: 1 });
+    assert.deepEqual(calls.at(-1), ['charge', false]);
+  }
+});
+
+test('help lists Charge on S / ↓ in place of Down / drop through', () => {
+  assert.equal(ACTION_LABELS.charge, 'Charge');
+  assert.equal(ACTION_LABELS.down, undefined);
+  assert.deepEqual(CONFIG.bindings.charge, ['KeyS', 'ArrowDown']);
+  const help = buildHelp();
+  const rows = help.querySelectorAll('tr').slice(1).map((tr) => ({
+    label: tr.querySelector('th').children[0].textContent,
+    reserved: !!tr.querySelector('th').querySelector('.tag'),
+    keys: tr.querySelector('td').querySelectorAll('kbd').map((k) => k.textContent),
+  }));
+  assert.deepEqual(rows.map((r) => r.label).slice(0, 4), ['Move left', 'Move right', 'Charge', 'Jump']);
+  const charge = rows.find((r) => r.label === 'Charge');
+  assert.deepEqual(charge.keys, ['S', '↓']);
+  assert.equal(charge.reserved, false);
+  const text = help.textContent;
+  assert.doesNotMatch(text, /drop through/i);
+  assert.doesNotMatch(text, /crouch/i);
+  assert.doesNotMatch(text, /Down \/ drop/);
+  assert.doesNotMatch(text, /(Hold|Press) Down/);
+});
+
+test('the mobile diagram shows C for Charge between Left and Right', () => {
+  const help = buildHelp();
+  assert.equal(help.querySelector('.md-down'), null);
+  const dot = help.querySelector('.md-charge');
+  assert.ok(dot, 'Charge dot');
+  assert.equal(dot.getAttribute('title'), 'Charge');
+  const icon = dot.querySelector('.md-icon').innerHTML;
+  assert.equal(icon, '<b>C</b>');
+  assert.notEqual(icon, ICONS.down);
+  const screen = help.querySelector('.md-screen').children;
+  const order = screen.map((d) => d.getAttribute('title'));
+  assert.deepEqual(order.slice(1, 4), ['Left', 'Charge', 'Right']);
+  const diagram = help.querySelector('.mobile-diagram');
+  assert.match(diagram.getAttribute('aria-label'), /Left, Charge and Right controls at the lower left/);
+  assert.doesNotMatch(diagram.getAttribute('aria-label'), /Down/);
+  const legend = help.querySelector('.md-legend').textContent;
+  assert.match(legend, /Left · Charge · Right/);
+  assert.doesNotMatch(legend, /Down/);
+});
+
+test('help explains that Charge is held, loops while held, and that Energy starts full', () => {
+  const help = buildHelp();
+  const items = help.querySelectorAll('li').map((li) => li.textContent).join(' ');
+  assert.match(items, /Hold Charge \(S \/ ↓, or C on touch\) while grounded/);
+  assert.match(items, /Charge must be held: release it to stop charging/);
+  assert.match(items, /two-frame startup once, then loops its sustained pose/);
+  assert.match(items, /blue Energy meter .* begins full/);
+  assert.doesNotMatch(items, /restores Energy\b(?! yet)/);
+  const notes = help.querySelectorAll('.info-note').map((p) => p.textContent).join(' ');
+  assert.match(notes, /down to Charge/);
+  assert.match(notes, /C is Charge: hold it to charge/);
+  const build = help.querySelectorAll('.info-text').map((p) => p.textContent).join(' ');
+  assert.match(build, /held Charge stance/);
 });

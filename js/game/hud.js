@@ -2,9 +2,10 @@
 // The merged timer + pause control reports presses through `onPause`; the
 // battle screen owns what pausing means.
 
-import { el } from '../core/utils.js';
+import { clamp, el } from '../core/utils.js';
 import { ICONS } from '../ui/icons.js';
 
+// Tag + name, the green health bar, and the blue energy bar directly beneath.
 function sidePanel(side) {
   const fill = el('div', { class: 'hud-bar-fill' });
   const ghost = el('div', { class: 'hud-bar-ghost' });
@@ -13,15 +14,26 @@ function sidePanel(side) {
   const bar = el('div', {
     class: 'hud-bar',
     role: 'meter',
+    'aria-label': 'Health',
     'aria-valuemin': '0',
     'aria-valuemax': '100',
     'aria-valuenow': '100',
   }, [ghost, fill]);
+  const energyFill = el('div', { class: 'hud-energy-fill' });
+  const energy = el('div', {
+    class: 'hud-energy',
+    role: 'meter',
+    'aria-label': 'Energy',
+    'aria-valuemin': '0',
+    'aria-valuemax': '100',
+    'aria-valuenow': '100',
+  }, [energyFill]);
   const root = el('div', { class: `hud-side hud-${side} glass` }, [
     el('div', { class: 'hud-tag' }, [tag, name]),
     bar,
+    energy,
   ]);
-  return { root, fill, ghost, name, tag, bar, value: -1 };
+  return { root, fill, ghost, name, tag, bar, value: -1, energy, energyFill, energyValue: -1, energyMax: -1 };
 }
 
 function timeLabel(t) {
@@ -54,8 +66,11 @@ export class HUD {
     this.left.name.textContent = p1.def.displayName;
     this.right.tag.textContent = 'CPU';
     this.right.name.textContent = p2.def.displayName;
-    this.left.value = -1;
-    this.right.value = -1;
+    for (const panel of [this.left, this.right]) {
+      panel.value = -1;
+      panel.energyValue = -1;
+      panel.energyMax = -1;
+    }
     this.shownTime = null;
     this.shownRound = null;
   }
@@ -70,10 +85,24 @@ export class HUD {
     panel.root.classList.toggle('is-low', ratio <= 0.25);
   }
 
+  // Energy reports real values against the fighter's own maximum.
+  setEnergy(panel, energy, max) {
+    const ratio = max > 0 ? clamp(energy / max, 0, 1) : 0;
+    const pct = Math.round(ratio * 1000) / 10;
+    if (pct === panel.energyValue && max === panel.energyMax) return;
+    panel.energyValue = pct;
+    panel.energyMax = max;
+    panel.energyFill.style.transform = `scaleX(${ratio})`;
+    panel.energy.setAttribute('aria-valuemax', String(max));
+    panel.energy.setAttribute('aria-valuenow', String(Math.round(ratio * max)));
+  }
+
   update(battle) {
     const { p1, p2 } = battle;
     this.setHealth(this.left, p1.combat.health / p1.combat.maxHealth);
+    this.setEnergy(this.left, p1.combat.energy, p1.combat.maxEnergy);
     this.setHealth(this.right, p2.combat.health / p2.combat.maxHealth);
+    this.setEnergy(this.right, p2.combat.energy, p2.combat.maxEnergy);
     const t = Number.isFinite(battle.timeLeft) ? Math.ceil(battle.timeLeft) : '∞';
     if (t !== this.shownTime) {
       this.shownTime = t;

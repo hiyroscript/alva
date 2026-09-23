@@ -56,6 +56,10 @@ export class CombatState {
   constructor(stats) {
     this.maxHealth = stats.health;
     this.health = stats.health;
+    // Energy resource shown under the health bar. Starts full; no rule spends
+    // or restores it yet, so a reset (new CombatState) refills it.
+    this.maxEnergy = stats.energy ?? 100;
+    this.energy = this.maxEnergy;
     this.blockDamageScale = stats.blockDamageScale ?? 0.2;
     this.blocking = false;
     this.stun = 0;          // hitstun / blockstun remaining

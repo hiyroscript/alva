@@ -140,7 +140,10 @@ function setup() {
 
 // A stand-in for Battle that uses the real draw/winner rule.
 function fakeBattle({ p1 = 100, p2 = 100 } = {}) {
-  const fighter = (health) => ({ def: { displayName: '#0001' }, combat: { health, maxHealth: 100 } });
+  const fighter = (health) => ({
+    def: { displayName: '#0001' },
+    combat: { health, maxHealth: 100, energy: 100, maxEnergy: 100 },
+  });
   const battle = {
     p1: fighter(p1), p2: fighter(p2), phase: 'fight', phaseTime: 1, timeLeft: 0.2, round: 1, restarts: 0,
     resize: () => false,
@@ -149,6 +152,7 @@ function fakeBattle({ p1 = 100, p2 = 100 } = {}) {
     restart() {
       this.restarts++;
       this.p1.combat.health = this.p2.combat.health = 100;
+      this.p1.combat.energy = this.p2.combat.energy = 100;
       this.timeLeft = 99;
       this.phase = 'intro';
       this.phaseTime = 0;
@@ -194,6 +198,23 @@ test('pause Help is visible but disabled, and navigation skips it', () => {
   help.click();
   assert.equal(screen.helpOpen, false);
   assert.equal(screen.pauseHelpView.hidden, true);
+});
+
+test('S and ↓ still move down through menus; gameplay Charge leaves menu Down alone', () => {
+  const { app, screen } = setup();
+  startBattle(screen);
+  screen.pause();
+  const items = pauseItems(screen);
+  items.forEach((b, i) => { b.rect = { left: 0, top: i * 50, width: 300, height: 44 }; });
+  const [resume, restart, , home] = items;
+  assert.equal(document.activeElement, resume);
+  const key = (code) => app.nav.onKey({ code, repeat: false, preventDefault() {} });
+  key('KeyS');
+  assert.equal(document.activeElement, restart);
+  key('ArrowDown');
+  assert.equal(document.activeElement, home, 'skips the disabled Help');
+  key('KeyW');
+  assert.equal(document.activeElement, restart);
 });
 
 test('leaving the Help view focuses a live pause item, not a positional index', () => {
@@ -260,7 +281,11 @@ test('HUD: glass panels without subtitle rows, labelled timer, digits-only urgen
   const { hud } = screen;
   for (const side of [hud.left, hud.right]) {
     assert.equal(side.root.classList.contains('glass'), true);
-    assert.equal(side.root.children.length, 2, 'name row and health bar only');
+    const [tagRow, health, energy, ...rest] = side.root.children;
+    assert.equal(tagRow.classList.contains('hud-tag'), true, 'name row first');
+    assert.equal(health, side.bar, 'health bar second');
+    assert.equal(energy, side.energy, 'energy bar third, directly beneath health');
+    assert.deepEqual(rest, [], 'name row, health bar and energy bar only');
     assert.equal(side.root.querySelector('.hud-sub'), null);
   }
   assert.equal(hud.timeButton.parentNode.classList.contains('glass'), true);
@@ -279,6 +304,115 @@ test('HUD: glass panels without subtitle rows, labelled timer, digits-only urgen
   assert.equal(hud.timeButton.getAttribute('aria-label'), 'Pause game, 1 second remaining');
   assert.equal(hud.timer.classList.contains('is-urgent'), true);
   assert.equal(hud.timeButton.classList.contains('is-urgent'), false, 'the holder itself never changes');
+});
+
+// Transform scale of a meter fill; an unset transform is a full bar.
+const scale = (fill) => fill.style.transform ?? 'scaleX(1)';
+
+test('HUD: each fighter panel has a green health meter and a full blue energy meter beneath it', () => {
+  const { screen } = setup();
+  const battle = startBattle(screen);
+  const { hud } = screen;
+  hud.update(battle);
+  for (const side of [hud.left, hud.right]) {
+    assert.equal(side.root.children[0].querySelector('.hud-name').textContent, '#0001');
+    assert.equal(side.bar.classList.contains('hud-bar'), true);
+    assert.equal(side.bar.getAttribute('role'), 'meter');
+    assert.equal(side.bar.getAttribute('aria-label'), 'Health');
+    assert.equal(side.bar.getAttribute('aria-valuenow'), '100');
+    assert.equal(side.fill.classList.contains('hud-bar-fill'), true);
+    assert.equal(side.ghost.classList.contains('hud-bar-ghost'), true);
+
+    const { energy, energyFill } = side;
+    assert.equal(energy.classList.contains('hud-energy'), true);
+    assert.equal(energy.classList.contains('hud-bar'), false, 'energy is not styled as health');
+    assert.equal(energy.getAttribute('role'), 'meter');
+    assert.equal(energy.getAttribute('aria-label'), 'Energy');
+    assert.equal(energy.getAttribute('aria-valuemin'), '0');
+    assert.equal(energy.getAttribute('aria-valuemax'), '100');
+    assert.equal(energy.getAttribute('aria-valuenow'), '100');
+    assert.deepEqual(energy.children, [energyFill]);
+    assert.equal(energyFill.classList.contains('hud-energy-fill'), true);
+    assert.equal(scale(energyFill), 'scaleX(1)', 'starts full');
+  }
+  // P1 fills from the left, the CPU mirrors from the right (see styles.css).
+  assert.equal(hud.left.root.classList.contains('hud-p1'), true);
+  assert.equal(hud.right.root.classList.contains('hud-p2'), true);
+});
+
+test('HUD: changing a fighter\'s energy moves only that energy meter', () => {
+  const { screen } = setup();
+  const battle = startBattle(screen, { p1: 70 });
+  const { hud } = screen;
+  hud.update(battle);
+  const before = {
+    health: [hud.left.bar.getAttribute('aria-valuenow'), hud.right.bar.getAttribute('aria-valuenow')],
+    fills: [scale(hud.left.fill), scale(hud.right.fill)],
+  };
+  assert.deepEqual(before.health, ['70', '100']);
+
+  battle.p2.combat.energy = 40;
+  hud.update(battle);
+  assert.equal(hud.right.energy.getAttribute('aria-valuenow'), '40');
+  assert.equal(hud.right.energyFill.style.transform, 'scaleX(0.4)');
+  assert.equal(hud.left.energy.getAttribute('aria-valuenow'), '100', 'the other fighter keeps full energy');
+  assert.equal(scale(hud.left.energyFill), 'scaleX(1)');
+  // Health still reflects health only.
+  assert.deepEqual([hud.left.bar.getAttribute('aria-valuenow'), hud.right.bar.getAttribute('aria-valuenow')], before.health);
+  assert.deepEqual([scale(hud.left.fill), scale(hud.right.fill)], before.fills);
+  assert.equal(hud.right.root.classList.contains('is-low'), false);
+
+  battle.p1.combat.energy = 25;
+  hud.update(battle);
+  assert.equal(hud.left.energy.getAttribute('aria-valuenow'), '25');
+  assert.equal(hud.left.energyFill.style.transform, 'scaleX(0.25)');
+  assert.equal(hud.left.bar.getAttribute('aria-valuenow'), '70');
+
+  // The meter reports against the fighter's real maximum.
+  battle.p2.combat.maxEnergy = 80;
+  battle.p2.combat.energy = 20;
+  hud.update(battle);
+  assert.equal(hud.right.energy.getAttribute('aria-valuemax'), '80');
+  assert.equal(hud.right.energy.getAttribute('aria-valuenow'), '20');
+  assert.equal(hud.right.energyFill.style.transform, 'scaleX(0.25)');
+});
+
+test('HUD: energy only touches the DOM when its shown value changes, and bind() resets it', () => {
+  const { screen } = setup();
+  const battle = startBattle(screen);
+  const { hud } = screen;
+  hud.update(battle);
+  const writes = [];
+  const fill = hud.left.energyFill;
+  fill.style = new Proxy({}, { set(t, k, v) { writes.push(v); t[k] = v; return true; } });
+  hud.update(battle);
+  hud.update(battle);
+  assert.deepEqual(writes, [], 'unchanged energy writes nothing');
+  battle.p1.combat.energy = 60;
+  hud.update(battle);
+  assert.deepEqual(writes, ['scaleX(0.6)']);
+  hud.bind(battle.p1, battle.p2);
+  hud.update(battle);
+  assert.deepEqual(writes, ['scaleX(0.6)', 'scaleX(0.6)'], 'bind() clears the cached value');
+});
+
+test('HUD: a rematch shows full energy again; the winner is still decided by health', () => {
+  const { screen } = setup();
+  const battle = startBattle(screen, { p2: 40 });
+  battle.p1.combat.energy = 10;
+  battle.p2.combat.energy = 90;
+  screen.hud.update(battle);
+  // Less energy, more health: P1 still wins.
+  battle.frame = () => { battle.phase = 'result'; battle.timeLeft = 0; };
+  screen.update(1 / 60);
+  assert.equal(battle.result.outcome, 'p1');
+  assert.equal(screen.resultTitle.textContent, 'Player 1 Wins');
+
+  byText(screen.resultOverlay.querySelectorAll('[data-nav]'), 'Rematch').click();
+  for (const side of [screen.hud.left, screen.hud.right]) {
+    assert.equal(side.energy.getAttribute('aria-valuenow'), '100');
+    assert.equal(side.energyFill.style.transform, 'scaleX(1)');
+  }
 });
 
 test('a draw opens no result dialog and starts a fresh battle', () => {

@@ -18,7 +18,7 @@ function card(title, children, cls = '') {
 }
 
 function controlsTable() {
-  const order = ['left', 'right', 'down', 'jump', 'primary', 'special', 'block', 'action1', 'action2', 'pause'];
+  const order = ['left', 'right', 'charge', 'jump', 'primary', 'special', 'block', 'action1', 'action2', 'pause'];
   const rows = order.map((action) =>
     el('tr', {}, [
       el('th', { scope: 'row' }, [
@@ -37,11 +37,11 @@ function controlsTable() {
 function mobileDiagram() {
   const dot = (cls, icon, label) =>
     el('span', { class: `md-btn ${cls}`, title: label }, [el('span', { class: 'md-icon', html: icon })]);
-  return el('div', { class: 'mobile-diagram', role: 'img', 'aria-label': 'Landscape phone layout: movement buttons Left, Down, Right at the lower left; Primary, Special, Block, Basic Attack 1 (BA1), Basic Attack 2 (BA2) and Jump staggered at the lower right; the timer and Pause at the top centre.' }, [
+  return el('div', { class: 'mobile-diagram', role: 'img', 'aria-label': 'Landscape phone layout: Left, Charge and Right controls at the lower left; Primary, Special, Block, Basic Attack 1 (BA1), Basic Attack 2 (BA2) and Jump staggered at the lower right; the timer and Pause at the top centre.' }, [
     el('div', { class: 'md-screen' }, [
       dot('md-pause', ICONS.pause, 'Pause'),
       dot('md-left', ICONS.left, 'Left'),
-      dot('md-down', ICONS.down, 'Down'),
+      dot('md-charge', '<b>C</b>', 'Charge'),
       dot('md-right', ICONS.right, 'Right'),
       dot('md-primary', ICONS.primary, 'Primary'),
       dot('md-special', ICONS.special, 'Special'),
@@ -51,7 +51,7 @@ function mobileDiagram() {
       dot('md-jump', ICONS.jump, 'Jump'),
     ]),
     el('dl', { class: 'detail-list md-legend' }, [
-      el('dt', { text: 'Lower left' }), el('dd', { text: 'Left · Down · Right' }),
+      el('dt', { text: 'Lower left' }), el('dd', { text: 'Left · Charge · Right' }),
       el('dt', { text: 'Lower right' }), el('dd', { text: 'Primary, Special · Block, BA1 · BA2 · Jump' }),
       el('dt', { text: 'Top centre' }), el('dd', { text: 'Timer · Pause' }),
     ]),
@@ -62,25 +62,31 @@ export function buildHelp() {
   return el('div', { class: 'info-grid' }, [
     card('Desktop controls', [
       controlsTable(),
-      el('p', { class: 'info-note', text: 'Keys can be held together — run and jump at the same time. Gamepads with a standard layout also work (D-pad / stick to move, A to jump, B for Basic Attack 1, LB for Basic Attack 2, Start to pause).' }),
+      el('p', { class: 'info-note', text: 'Keys can be held together — run and jump at the same time. Gamepads with a standard layout also work (D-pad / left stick left and right to move, down to Charge, A to jump, B for Basic Attack 1, LB for Basic Attack 2, Start to pause). In menus, S / ↓ and D-pad / stick down still move down.' }),
     ], 'info-card--wide'),
     card('Mobile controls', [
       mobileDiagram(),
-      el('p', { class: 'info-note', text: 'Play in landscape. Hold a direction and press Jump with your other thumb; you can slide between the movement buttons without lifting. BA1 and BA2 are Basic Attacks 1 and 2; the dashed Primary and Special buttons are reserved.' }),
+      el('p', { class: 'info-note', text: 'Play in landscape. Hold a direction and press Jump with your other thumb; you can slide between Left, C and Right without lifting. C is Charge: hold it to charge. BA1 and BA2 are Basic Attacks 1 and 2; the dashed Primary and Special buttons are reserved.' }),
     ]),
     card('Movement', [
       el('ul', { class: 'info-list' }, [
         el('li', { text: 'Left / Right accelerate into a run. Release to slow to a stop.' }),
         el('li', { text: 'Jump from the ground; you can steer while airborne.' }),
         el('li', { text: 'Standing still, your fighter turns to face the opponent.' }),
-        el('li', { text: 'Hold Down on solid ground to crouch in place.' }),
+      ]),
+    ]),
+    card('Charge & Energy', [
+      el('ul', { class: 'info-list' }, [
+        el('li', { text: 'Hold Charge (S / ↓, or C on touch) while grounded to enter #0001’s charging stance. Charge must be held: release it to stop charging.' }),
+        el('li', { text: 'Charge plays its two-frame startup once, then loops its sustained pose for as long as you hold it. Each new Charge starts again from the startup.' }),
+        el('li', { text: 'You stay in place while charging. Jump, BA1, BA2 and Block take over from Charge, and a hit interrupts it.' }),
+        el('li', { text: 'The blue Energy meter under each health bar begins full. It is reserved for the Energy system: nothing spends or restores Energy yet.' }),
       ]),
     ]),
     card('Stages & platforms', [
       el('ul', { class: 'info-list' }, [
         el('li', { text: 'Desert is wide and open, with two rock outcrops you can hop onto.' }),
-        el('li', { text: 'City stacks one-way platforms over the rooftop. Jump up through them from below.' }),
-        el('li', { text: 'Press Down while standing on a platform to drop through it. The water-tower deck is solid footing.' }),
+        el('li', { text: 'City stacks one-way platforms over the rooftop. Jump up through them from below, and walk off an edge to come back down.' }),
         el('li', { text: 'The camera follows the action; stage edges are walled off.' }),
       ]),
     ]),
@@ -92,7 +98,7 @@ export function buildHelp() {
       ]),
     ]),
     card('This build', [
-      el('p', { class: 'info-text', text: '#0001 has idle, run, jump, fall and land animations, ground and mid-air hurt poses, Basic Attack 1 (BA1) and Basic Attack 2 (BA2), each on the ground and in the air. BA1 (action1) is a punch on the ground and a kick in the air; BA2 (action2) is a spinning high kick on the ground and a kunai slash in the air. Primary and Special are wired into the input and combat systems but stay reserved until matching attack sprites are added. Block sets a guard state that uses the idle pose. The training CPU never attacks.' }),
+      el('p', { class: 'info-text', text: '#0001 has idle, run, jump, fall and land animations, ground and mid-air hurt poses, a held Charge stance, and Basic Attack 1 (BA1) and Basic Attack 2 (BA2), each on the ground and in the air. BA1 (action1) is a punch on the ground and a kick in the air; BA2 (action2) is a spinning high kick on the ground and a kunai slash in the air. Primary and Special are wired into the input and combat systems but stay reserved until matching attack sprites are added. Block sets a guard state that uses the idle pose. Energy starts full for both fighters. The training CPU never attacks.' }),
     ]),
   ]);
 }
