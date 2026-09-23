@@ -255,6 +255,12 @@ export class SpriteSet {
     return !!this.animations[key];
   }
 
+  // Seconds one pass of a dedicated animation takes (0 without its own art).
+  duration(key) {
+    const anim = this.animations[key];
+    return anim ? anim.frames.length / anim.fps : 0;
+  }
+
   // Resolve a logical state (e.g. 'jump') to a playable animation + optional
   // held frame using the character's fallback table.
   resolve(stateKey) {

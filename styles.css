@@ -1413,6 +1413,19 @@ html.is-touch .touch-controls { display: block; }
 .dialog-overlay .dialog-actions .btn:not(.btn--primary):enabled:not(:hover):not(:active) {
   background: transparent;
 }
+/* Outline-only actions (pause Restart Battle / Return to Home, and Keep
+   Playing in Return to Home?): no fill in any state. The focus ring and press
+   scale come from the base rules and are left alone. */
+.pause-overlay .pause-btn-item.is-outline-only,
+.pause-overlay .pause-btn-item.is-outline-only:hover,
+.pause-overlay .pause-btn-item.is-outline-only:focus,
+.pause-overlay .pause-btn-item.is-outline-only:active,
+.dialog-overlay .dialog-actions .btn.is-outline-only,
+.dialog-overlay .dialog-actions .btn.is-outline-only:hover,
+.dialog-overlay .dialog-actions .btn.is-outline-only:focus,
+.dialog-overlay .dialog-actions .btn.is-outline-only:active {
+  background: transparent;
+}
 
 .rotate-overlay {
   position: fixed;

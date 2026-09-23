@@ -100,12 +100,15 @@ export class ConfirmDialog {
     this.okBtn.addEventListener('click', () => this.close(true));
   }
 
-  open({ title, message, confirmLabel = 'Confirm', cancelLabel = 'Cancel' }) {
+  // cancelOutlineOnly keeps the cancel button's background transparent through
+  // hover/press. Set per call, so no later dialog inherits it.
+  open({ title, message, confirmLabel = 'Confirm', cancelLabel = 'Cancel', cancelOutlineOnly = false }) {
     if (this.resolve) this.close(false);
     this.title.textContent = title;
     this.message.textContent = message;
     this.okBtn.textContent = confirmLabel;
     this.cancelBtn.textContent = cancelLabel;
+    this.cancelBtn.classList.toggle('is-outline-only', cancelOutlineOnly);
     this.returnFocus = document.activeElement;
     this.root.hidden = false;
     this.scope = { el: this.root, onBack: () => this.close(false) };

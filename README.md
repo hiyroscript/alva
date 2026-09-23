@@ -66,7 +66,7 @@ Touch controls show on touch-first devices (coarse pointer, or a touch actually 
 
 - **Characters:** #0001
 - **Maps:** Desert (wide, open, 3.8 screens) and City (rooftops with 7 one-way platforms, 3.1 screens)
-- **Animations:** Idle, Run
+- **Animations:** Idle, Run, Jump, Fall, Land (jump/fall play while airborne; land plays once on touchdown)
 - **Mode:** Quick Battle: 1 round, 99 seconds, against a non-attacking training CPU
 
 ## Design
@@ -118,7 +118,7 @@ js/
   ui/                 wordmark, icons, overlays, shared help content, stage preview
 ```
 
-- **Sprite normalization.** The idle frames are pixel art at roughly 16× scale and the run frames at 4×. When a frame loads, the game reads its alpha channel once and finds the visible bounds. It then detects the pixel grid from every colour transition and resamples the frame to 1 pixel per art pixel. Every frame is drawn at the same world scale, anchored bottom-centre at the upper-body centroid, so the fighter keeps the same size and position when switching between idle and run. When the size stays close to the target, each art pixel maps to a whole number of device pixels.
+- **Sprite normalization.** The idle, jump, fall and land frames are pixel art at roughly 16× scale and the run frames at 4×. When a frame loads, the game reads its alpha channel once and finds the visible bounds. It then detects the pixel grid from every colour transition and resamples the frame to 1 pixel per art pixel. Every frame is drawn at the same world scale, anchored bottom-centre at the upper-body centroid, so the fighter keeps the same size and position when switching between animations. When the size stays close to the target, each art pixel maps to a whole number of device pixels.
 - **Simulation.** Fixed 60 Hz steps with interpolated rendering, so movement is the same at 30, 60 and 120 Hz. Colliders, hurtboxes and pushboxes are set in data and don't depend on PNG size.
 - **Stages.** Six parallax layers (sky, far, mid, near, terrain, atmosphere) are generated once from a seeded RNG into cached `Path2D` geometry. Collision comes only from `js/data/maps.js`, so any layer can later be swapped for image art.
 
