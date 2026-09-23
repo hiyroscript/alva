@@ -1,394 +1,708 @@
-Work in the GitHub repository hiyroscript/alva.
+Work in the GitHub repository:
+
+hiyroscript/alva
+
+Use the current main branch as the source of truth.
 
 Goal
 
-Make the requested Alva menu, selection, HUD, pause, and Return Home UI elements use the exact same small rounded-corner treatment as the Play button on the Home Screen.
+Make two focused changes to Alva:
 
-The Home Screen Play button is the visual source of truth.
+1. In the battle pause/Return Home flow, stop the specified secondary buttons from changing their background color on hover, focus, press, mouse/touch interaction, or keyboard/gamepad selection. They must remain transparent while still keeping the existing white focus outline and normal enabled behavior.
+2. Add and wire the newly supplied jumping sprite frames for character #0001 so the real jump art is used during battle instead of the idle-pose fallback.
 
-In styles.css, .home-action currently uses:
-
-border-radius: 3px;
-
-Use 3px as the canonical outer corner radius for every element listed below.
-
-This is a visual-consistency pass only. Do not redesign the screens, change their layouts, alter navigation/game logic, or change the Alva color system beyond the secondary-dialog-button background treatment described below.
-
-Important implementation rule
-
-Do not globally redefine --radius-sm, --radius-md, or --radius-lg to 3px. Those tokens are also used by unrelated UI that is not part of this request.
-
-Either:
-
-* introduce a narrowly scoped 3px radius token and apply it only to the requested components, or
-* use 3px directly on the targeted selectors.
-
-Keep the existing Home Play button visually unchanged.
+Do not redesign unrelated UI, change battle physics, change navigation behavior, or introduce invented sprite art.
 
 ⸻
 
-1. Select Mode
+1. Understand the current button behavior before changing it
 
-File relationships:
-
-* js/screens/mode-select-screen.js
-* js/ui/components.js
-* styles.css
-
-Give the following the same 3px corner radius as Home → Play:
-
-* Back button on Select Mode
-    * .btn-back as used by .screen--mode
-* Quick Battle card
-    * .mode-card
-* Mode details panel
-    * .mode-info
-* Green Select control inside the Quick Battle card
-    * .mode-cta
-
-Do not alter the Quick Battle card’s current spacing, hover behavior, focus handling, typography, or navigation behavior.
-
-⸻
-
-2. Select Fighter
-
-Files:
-
-* js/screens/character-select-screen.js
-* js/ui/components.js
-* styles.css
-
-Apply the same 3px corners to:
-
-* Back button on Select Fighter
-* Roster card/container
-    * .roster-panel
-* Every character/roster slot, including available and locked slots
-    * .slot
-* Character preview card
-    * .char-preview
-* Confirm fighter button
-    * .btn--confirm
-
-All 48 roster slots should therefore share the same small corner language.
-
-Do not modify:
-
-* circular selected check badges
-* availability pills/status badges
-* locked-state behavior
-* fighter artwork
-* roster navigation
-* fighter selection logic
-
-Only the requested rectangular card/control corners should change.
-
-⸻
-
-3. Select Stage
-
-Files:
-
-* js/screens/map-select-screen.js
-* js/ui/components.js
-* styles.css
-
-Apply the Home Play button’s 3px radius to:
-
-* Back button on Select Stage
-* Large live stage preview
-    * .map-hero
-* Both stage selection holders/cards
-    * every .map-card, currently Desert and City
-* Confirm and start battle button
-    * .btn--start
-
-Do not change the Selected badge inside a stage card. It can remain pill-shaped.
-
-Do not alter the stage artwork, stage preview rendering, camera pan, selection logic, or card dimensions.
-
-⸻
-
-4. Battle HUD
-
-Files:
-
-* js/game/hud.js
-* styles.css
-
-Apply the same 3px outer corners to the fighter HUD chrome.
-
-Fighter health holder cards
-
-Change both P1 and CPU holder cards:
-
-* .hud-side
-
-to a 3px radius.
-
-Health bars
-
-The health bars:
-
-* .hud-bar
-
-already use border-radius: 3px.
-
-Keep that value and make sure both health holders and their health bars now visually share the same radius language.
-
-Do not change health colors, delayed-damage layers, health logic, animation, sizes, or labels.
-
-Timer/counter + pause control
-
-The top-center timer and pause control is built from:
-
-* .hud-center
-* .hud-time
-* .hud-pause
-
-Make the combined control visually use the same 3px outer radius as Home → Play.
-
-Preserve the existing structure:
-
-* timer/counter on top
-* pause section directly underneath
-* no gap between them
-* existing seam/hairline between the two sections
-* only the outside corners rounded
-* internal meeting corners remain square
-
-Because the parent has a border, it is fine for the child button’s inner corner radius to be slightly smaller, e.g. calc(3px - 1px), as long as the final visible outer shape is the same 3px corner treatment as the Play button.
-
-Do not split the timer and pause controls into separate cards.
-
-⸻
-
-5. Pause dialog
-
-Files:
+Relevant files:
 
 * js/screens/battle-screen.js
-* styles.css
-
-The pause overlay currently uses:
-
-* .pause-overlay
-* .pause-panel
-* .pause-btn-item
-
-Give the pause dialog panel a 3px radius.
-
-Give every button inside the pause dialog the same 3px radius.
-
-This includes:
-
-* Resume
-* Restart Battle
-* Help
-* Return to Home
-* the Back button in the dormant Help view if/when that view is displayed
-
-Pause button background treatment
-
-Resume is the green primary action and must remain green.
-
-For the working secondary actions in the pause menu:
-
-* Restart Battle
-* Return to Home
-
-change their normal/resting background to transparent, visually following the transparent treatment already used by the disabled Help button.
-
-However, unlike disabled Help:
-
-* their text must remain white/off-white and fully readable
-* they must remain enabled
-* they must still respond to pointer, keyboard, and gamepad input
-* focus rings must remain
-* hover/pressed feedback may remain
-* do not reduce their opacity
-* do not make them look disabled
-
-The actual Help button is currently intentionally disabled. Do not enable Help. It can remain transparent with its existing muted disabled text so the disabled state is still distinguishable.
-
-Scope these pause-specific secondary button changes to the pause overlay rather than unintentionally restyling unrelated result-screen controls.
-
-Do not modify pause behavior, restart behavior, Return Home behavior, focus management, or keyboard/gamepad navigation.
-
-⸻
-
-6. Return Home confirmation dialog
-
-Files:
-
 * js/ui/overlays.js
 * styles.css
+* tests/battle-screen.test.mjs
 
-The Return Home confirmation uses:
+The pause menu is built in BattleScreen.buildPause().
 
-* .dialog-overlay
-* .dialog-panel
-* .dialog-actions
-* .btn
-* .btn--primary
+It currently contains:
 
-Apply the same 3px radius to:
+* Resume — primary green action
+* Restart Battle — enabled secondary action
+* Help — disabled
+* Return to Home — enabled secondary action
 
-* the Return Home dialog panel itself
-* Keep Playing
-* Return Home
+The Return Home confirmation is opened from BattleScreen.confirmHome() and is implemented by ConfirmDialog in:
 
-Button backgrounds
+js/ui/overlays.js
 
-The green Return Home confirmation button remains a green primary button.
+Its actions are:
 
-The Keep Playing button should:
+* Keep Playing — secondary/default-focus action
+* Return Home — primary green confirmation action
 
-* have a transparent resting background
-* keep white/off-white text
-* remain fully enabled
-* keep its border
-* keep normal hover, focus, and pressed feedback
-* retain its current default-focus behavior
+The current secondary buttons already have transparent resting backgrounds because of the scoped rules near the bottom of styles.css, but they still receive fills while hovered or pressed.
 
-Do not make Keep Playing gray or disabled-looking.
+Current generic pause rules include behavior equivalent to:
 
-The desired visual relationship is:
+.pause-btn-item:hover {
+  background: var(--surface-subtle);
+}
+.pause-btn-item:active {
+  background: var(--surface-muted);
+}
 
-* primary action = green
-* secondary active action = transparent + white text
-* genuinely disabled action = transparent + muted gray text
+The normal .btn rules similarly apply:
 
-⸻
+.btn:hover {
+  background: var(--surface-subtle);
+}
+.btn:active {
+  background: var(--surface-muted);
+}
 
-7. Avoid unrelated changes
+There is also a later battle/dialog-specific rule that intentionally preserves hover/pressed feedback for enabled secondary actions.
 
-Do not change the shape of unrelated UI merely because it uses one of the existing radius tokens.
+This follow-up task supersedes that previous behavior for the specific buttons named below.
 
-In particular, leave intentional circles/pills alone, including things such as:
+The existing focus ring is:
 
-* roster selected check circle
-* availability/status badge
-* stage Selected badge
-* setup-step number circles
-* P1/CPU tags unless specifically necessary
-* touch-control circles
-* circular icons
-* Home credits/glass treatment
-* splash presentation
+--focus-ring: 0 0 0 2px var(--black), 0 0 0 4px var(--white);
 
-Also do not restyle the battle result dialog unless a shared CSS rule makes it absolutely necessary. The requested dialog changes are specifically for the Pause dialog and Return Home confirmation.
-
-Prefer selector scoping over broad global changes.
+That white focus treatment must remain intact.
 
 ⸻
 
-8. Preserve behavior and accessibility
+2. Pause menu: keep Restart Battle and Return to Home transparent in every interactive state
 
-This should ideally be a CSS-focused change.
+Target only these two pause-menu buttons:
 
-Do not break or alter:
+* Restart Battle
+* Return to Home
 
-* Home → Mode → Fighter → Stage → Battle flow
-* mouse/touch interaction
+Their background must remain transparent in all of these states:
+
+* resting
+* hover
+* keyboard focus
+* gamepad focus/navigation
+* pointer/touch press
+* :active
+
+Do not remove their enabled appearance.
+
+They must continue to have:
+
+* white/off-white enabled text
+* existing border
+* existing white --focus-ring
+* pointer interaction
+* touch interaction
+* keyboard interaction
+* gamepad navigation
+* existing callbacks
+* existing active/press transform if desired
+
+The request is specifically to eliminate the changing background fill. A small existing press transform may remain because it is not a color change.
+
+Do not remove or hide the white focus outline in order to accomplish this.
+
+Scope the behavior semantically
+
+Do not solve this using:
+
+* nth-child
+* button text selectors
+* DOM position assumptions
+* a global override of every .pause-btn-item
+* a global override of every .btn
+
+Give the intended controls an explicit opt-in class/state, for example something conceptually like:
+
+no-fill-feedback
+
+The exact class name is up to you, but it should clearly express the behavior.
+
+A clean approach would be to extend the local menuButton() helper in battle-screen.js with an option and assign that option only to:
+
+* Restart Battle
+* Return to Home
+
+Resume must not get this treatment.
+
+Help must retain its actual disabled styling.
+
+CSS behavior
+
+Place the narrowly scoped override after the existing generic hover/active rules so specificity/order is unambiguous.
+
+The equivalent visual behavior should be:
+
+.pause-overlay .pause-btn-item.<opt-in-class>:enabled,
+.pause-overlay .pause-btn-item.<opt-in-class>:enabled:hover,
+.pause-overlay .pause-btn-item.<opt-in-class>:enabled:focus,
+.pause-overlay .pause-btn-item.<opt-in-class>:enabled:active {
+  background: transparent;
+}
+
+Do not blindly copy that exact selector if a cleaner implementation fits the codebase better.
+
+Important: do not override the existing box-shadow: var(--focus-ring) applied on focus.
+
+Border hover changes can remain unless they conflict visually with the existing white focus ring. The important requirement is that the actual button fill stays transparent.
+
+⸻
+
+3. Return Home confirmation: Keep Playing must behave the same way
+
+Target:
+
+Keep Playing
+
+in the Return Home confirmation opened from:
+
+BattleScreen.confirmHome()
+
+Keep Playing must stay transparent in:
+
+* resting state
+* hover
+* focus
+* active/pressed state
+* mouse input
+* touch input
 * keyboard navigation
 * gamepad navigation
-* focus rings
-* default focus targets
-* aria-* attributes
-* disabled Help behavior
-* modal behavior
-* Return Home confirmation behavior
-* stage/fighter selection
-* battle HUD functionality
-* timer/pause click targets
-* responsive layouts
-* reduced-motion behavior
 
-Maintain existing minimum touch-target sizes.
+It must keep:
 
-⸻
+* white/off-white enabled text
+* its existing border
+* the white --focus-ring
+* default focus when the dialog opens
+* normal click behavior
+* Escape/back cancellation behavior
+* focus restoration back to Return to Home after cancellation
 
-9. Visual acceptance criteria
+The green confirmation action:
 
-After the change, manually inspect the complete flow:
+Return Home
 
-Home
+must stay unchanged as the primary green action.
 
-* Use Play as the visual radius reference.
+Avoid globally changing every confirmation dialog
 
-Select Mode
+Prefer an explicit opt-in mechanism rather than changing all .dialog-actions .btn:not(.btn--primary) controls everywhere.
 
-* Back
-* Quick Battle card
-* Mode details
-* Select
+For example, ConfirmDialog.open() may accept a narrowly scoped option that applies the no-fill class to the cancel action for this invocation, or another equally robust mechanism may be used.
 
-All visibly match Play’s 3px corners.
+Then BattleScreen.confirmHome() should opt Keep Playing into the behavior.
 
-Select Fighter
-
-* Back
-* roster container
-* all roster character cards
-* character preview
-* Confirm fighter
-
-All use the same 3px corner language.
-
-Select Stage
-
-* Back
-* main stage preview
-* Desert card
-* City card
-* Confirm and start battle
-
-All use 3px corners.
-
-Battle
-
-* P1 HUD holder
-* CPU HUD holder
-* both health bars
-* combined timer/pause box
-
-All visually use the same small-radius treatment.
-
-Pause
-
-* panel and every button use 3px corners
-* Resume stays green
-* Restart Battle and Return to Home are transparent with white text
-* Help remains disabled and visually distinguishable
-
-Return Home confirmation
-
-* panel and both buttons use 3px corners
-* Return Home stays green
-* Keep Playing is transparent with white text
-
-There should be no accidental large 8px/12px/18px rounding left on any of these requested rectangular surfaces.
+Do not key styling off the literal text "Keep Playing".
 
 ⸻
 
-10. Validation
+4. Preserve the white focus outline exactly
 
-Run the existing tests after the change:
+This is important.
+
+The desired interaction is:
+
+* transparent secondary button background
+* visible white focus outline/ring
+
+Do not change the global --focus-ring token.
+
+Do not replace focus with a background fill.
+
+Do not use outline: none or box-shadow: none on these controls.
+
+Keyboard and gamepad users must be able to see which secondary action is selected even though its background remains transparent.
+
+The existing focus ring is the correct visual indicator.
+
+⸻
+
+5. Do not change these button states
+
+Pause menu:
+
+Resume
+
+* remains green
+* existing hover/pressed green behavior may remain
+* existing focus ring remains
+
+Help
+
+* remains disabled
+* remains muted
+* remains skipped by navigation
+* do not enable it
+
+Return Home confirmation:
+
+Return Home
+
+* remains green
+* remains the destructive/confirm action
+* preserve existing behavior
+
+Battle result-screen buttons:
+
+* do not apply this change to Rematch, Change Stage, or Return to Home in the result screen
+
+Other application buttons:
+
+* leave them alone
+
+This is intentionally a narrow battle pause/confirmation change.
+
+⸻
+
+6. Add the supplied #0001 jumping sprite files
+
+Relevant files:
+
+* assets/characters/0001/
+* js/data/characters.js
+* js/core/app.js
+* js/game/character.js
+* js/game/sprite-animator.js
+* js/game/sprite-normalizer.js
+
+Character #0001 currently contains:
+
+* 4 idle frames
+* 6 run frames
+* no jump frames
+
+The current animationFallbacks therefore map jump and fall to the idle artwork.
+
+The newly supplied jump PNGs are the source of truth.
+
+Add the supplied files to:
+
+assets/characters/0001/
+
+Preserve the artwork exactly.
+
+Do not:
+
+* redraw it
+* rotate it
+* stretch it
+* recolor it
+* upscale/downscale the source PNGs manually
+* generate substitute jump art
+* derive fake jump poses from idle/run frames
+
+The existing sprite-normalization system is designed to reconcile different raw pixel-art scales automatically.
+
+If the supplied files already follow names such as:
+
+0001_jump1.png
+0001_jump2.png
+0001_jump3.png
+etc.
+
+keep that convention.
+
+If they need to be renamed for consistency, use sequential:
+
+0001_jump1.png through 0001_jumpN.png
+
+where N is the actual number of supplied jump frames.
+
+Never invent a frame count. Inspect the supplied files and use the real count.
+
+If the actual jump images are not available in the coding environment or task attachments, do not fabricate replacements. Complete the UI portion and explicitly report that the binary sprite files are missing.
+
+⸻
+
+7. Register the jump animation in js/data/characters.js
+
+#0001 currently defines only idle and run under animations.
+
+Add a real jump animation using the newly added files.
+
+Use the existing frames(BASE_0001, name, count) helper when the filenames follow the normal sequential convention.
+
+The configuration should conceptually look like:
+
+jump: {
+  frames: frames(BASE_0001, 'jump', N),
+  fps: 10,
+  loop: false,
+  heightRatio: 1,
+},
+
+where N is the real supplied frame count.
+
+10 fps is a sensible starting playback speed for the non-looping jump sequence. If visual inspection of the supplied sequence clearly requires a slightly different rate, make the smallest reasonable adjustment and document it.
+
+The jump animation must not loop continuously in mid-air.
+
+The existing SpriteAnimator already leaves a non-looping animation on its final frame after playback reaches the end.
+
+Do not add special-case #0001 animation code to the engine.
+
+⸻
+
+8. Remove the obsolete jump-to-idle fallback
+
+SpriteSet.resolve() already prioritizes a real animation before consulting animationFallbacks.
+
+Once real jump art exists, the old definition:
+
+jump: { animation: 'idle', frame: 0 }
+
+is obsolete and misleading.
+
+Remove that jump fallback.
+
+Do not change the state-machine logic in Character.updateState().
+
+It already correctly chooses:
+
+* jump while airborne and moving upward
+* fall while airborne and moving downward
+
+No physics/state-machine rewrite is required.
+
+⸻
+
+9. Make falling continue to use the new airborne artwork
+
+There are no dedicated falling sprites in the current repository.
+
+Do not invent any.
+
+When the character passes the apex, the state changes from jump to fall.
+
+Instead of reverting to idle during descent, update the fall fallback so it resolves to the new jump animation and holds an appropriate airborne frame.
+
+Unless inspection of the actual supplied frames clearly suggests another frame, use the final jump frame for falling.
+
+For example, conceptually:
+
+fall: {
+  animation: 'jump',
+  frame: N - 1,
+},
+
+The frame index is zero-based.
+
+This gives the desired behavior:
+
+* jump begins → jump sequence plays once
+* if the sequence completes before the apex → final jump frame is held
+* descent begins → final jump frame continues to be held
+* landing → state returns normally to idle/run
+
+Do not create a fake looping fall animation.
+
+If the supplied sprite package actually contains separately identifiable fall/descent frames, use the real supplied art appropriately instead of forcing this fallback, but do not invent a separate fall animation without actual frames.
+
+⸻
+
+10. Do not change jump physics
+
+Do not alter:
+
+* jumpVelocity
+* gravity
+* gravityScale
+* maxFallSpeed
+* coyote time
+* jump buffering
+* collision
+* landing detection
+* platform drop-through
+* collider dimensions
+* hurtboxes
+* pushboxes
+* camera behavior
+
+This task is visual animation integration only.
+
+The existing jump mechanics already work.
+
+⸻
+
+11. Let the existing asset pipeline handle the new frames
+
+Do not hard-code additional image loading in app.js.
+
+characterFramePaths(def) already walks every animation declared in the character definition, so adding jump to animations should automatically cause those PNGs to be preloaded.
+
+SpriteSet.build() already normalizes all declared animations.
+
+SpriteAnimator.play() already supports the jump state.
+
+Use those existing systems.
+
+Avoid unnecessary architecture changes.
+
+⸻
+
+12. Validate sprite normalization carefully
+
+#0001’s existing idle and run source art use dramatically different raw scales, and sprite-normalizer.js intentionally handles that.
+
+The new jump animation must not make the character visibly:
+
+* grow
+* shrink
+* shift sideways
+* float above the floor because of anchoring
+* snap horizontally when transitioning from run/idle into jump
+* change art style because of smoothing
+
+Preserve:
+
+imageSmoothingEnabled = false
+
+through the existing renderer.
+
+Use the current torso/bottom anchoring system.
+
+Do not manually compensate by modifying physics or the fighter collider.
+
+If normalization cannot detect the source art grid, the animation’s heightRatio can be adjusted only as a data-level normalization fallback after visually inspecting the actual images.
+
+Do not change the normalizer globally just for these frames unless there is a genuine bug affecting all sprite data.
+
+⸻
+
+13. Update documentation that is now factually obsolete
+
+The current documentation explicitly says #0001 only has Idle and Run and uses idle art while jumping.
+
+That will no longer be true.
+
+Update the relevant wording in:
+
+README.md
+
+The current feature list says:
+
+Animations: Idle, Run
+
+Update it to include Jump.
+
+Also update sprite-normalization wording if it specifically describes transitions only between idle and run.
+
+Update:
+
+ALVA_SPEC.md
+
+The sprite section currently says there are four idle and six run frames.
+
+Add the actual number of new jump frames.
+
+The battle section currently says, in substance:
+
+#0001 has only Idle and Run. No invented frames; jumping uses the idle pose...
+
+Replace that with the new factual behavior:
+
+* #0001 has real jump frames
+* the real jump animation is used on ascent
+* the final airborne frame is held through descent when there is no dedicated fall art
+* no invented frames are used
+
+Keep the existing sprite attribution intact.
+
+Do not claim a frame count or behavior that does not match the actual files.
+
+⸻
+
+14. Tests
+
+Run the existing tests:
 
 node --test tests/battle-screen.test.mjs
 node --test tests/splash-screen.test.mjs
 
-The battle test explicitly covers pause-menu/HUD/end-of-battle behavior, so it must continue to pass.
+They must continue to pass.
 
-Then serve the game locally over HTTP and visually test the complete flow in a real browser because the existing tests do not validate CSS paint/layout:
+Extend tests/battle-screen.test.mjs where practical to verify the semantic targeting of the UI change.
+
+At minimum, test that:
+
+* Restart Battle receives the no-fill opt-in state/class
+* pause Return to Home receives it
+* Resume does not
+* Help remains disabled
+* Keep Playing receives the corresponding no-fill opt-in state/class when the Return Home confirmation is opened
+* confirmation Return Home remains primary
+* cancelling still restores focus to the pause-menu Return to Home button
+* navigation scopes are unchanged
+
+Do not try to unit-test actual CSS painting using the fake DOM.
+
+Add a small character-data test if useful, for example:
+
+tests/character-data.test.mjs
+
+It should validate data-level facts such as:
+
+* #0001 has a jump animation
+* the jump frame list contains exactly the supplied assets in order
+* the jump animation is non-looping
+* jump no longer falls back to idle
+* fall resolves to/points at the real jump art as intended
+
+Do not introduce npm dependencies just for these tests.
+
+⸻
+
+15. Manual browser validation
+
+Serve the game over HTTP because sprite normalization reads image pixels:
 
 python3 -m http.server 8000
 
-Open the game, proceed from Home through Quick Battle, enter battle, open Pause, and open the Return Home confirmation.
+Open the game and test the complete Quick Battle flow.
 
-Test at both desktop size and landscape mobile/tablet dimensions.
+Pause-menu interaction
+
+Enter battle and pause.
+
+Verify Restart Battle and Return to Home individually with:
+
+* mouse hover
+* mouse down
+* touch if available
+* Tab/keyboard focus
+* arrow/WASD menu navigation
+* gamepad navigation if available
+
+Their backgrounds must remain transparent at all times.
+
+When focused, the existing white focus ring must still be clearly visible.
+
+Their text must remain enabled white/off-white.
+
+Their actions must still work.
+
+Verify Resume remains green.
+
+Verify disabled Help is still visually muted and skipped by navigation.
+
+Return Home confirmation
+
+Select Return to Home.
+
+Verify Keep Playing:
+
+* starts focused as before
+* remains transparent
+* remains transparent on hover
+* remains transparent while pressed
+* shows the existing white focus ring
+* still closes the confirmation
+* returns focus to Return to Home in the pause menu
+
+Verify the confirmation Return Home button remains green.
+
+Jump sprites
+
+Resume/start a battle with #0001.
+
+Jump using one or more existing controls:
+
+* W
+* Space
+* ArrowUp
+* touch Jump
+* gamepad A where available
+
+Verify:
+
+* jump input/height/timing are unchanged
+* the new real jump sequence begins immediately when leaving the ground
+* the sequence plays in the intended frame order
+* it does not loop
+* the airborne pose does not revert to idle at the apex
+* descent uses the intended final airborne frame unless real descent frames were supplied
+* landing cleanly returns to idle/run
+* facing-left sprite flipping still works
+* jumping while moving horizontally works
+* the sprite does not change apparent scale compared with idle/run
+* no new asset-load errors appear in the console
+
+Test both Desert and City so platform jumping/landing still works.
+
+Also test at a desktop viewport and a landscape mobile/tablet-sized viewport.
+
+⸻
+
+16. Avoid unrelated changes
+
+Do not modify unrelated:
+
+* Home UI
+* Select Mode UI
+* Select Fighter UI
+* Select Stage UI
+* result-screen button styling
+* primary green button colors
+* global color tokens
+* global radius tokens
+* battle timing
+* AI behavior
+* combat behavior
+* stage rendering
+* camera behavior
+* touch-control geometry
+* attack placeholders
+* audio
+* splash screen
+
+Do not broadly remove hover feedback from Alva.
+
+Only the specifically requested secondary battle-dialog buttons should stop changing their background fill.
+
+The existing root file max contains the previous UI-corner task and explicitly allowed hover/pressed fills on these secondary controls. This follow-up request supersedes only that portion of the old brief. Do not use that older allowance as a reason to preserve the background-color changes.
+
+⸻
 
 Definition of done
 
-The task is complete when every specifically requested rectangular UI surface uses the Home Play button’s exact small 3px corner language, the specified active secondary dialog buttons have transparent resting backgrounds with white text, green primary buttons remain green, genuine disabled states remain distinguishable, and all existing game/navigation behavior continues to work.
+The task is complete when:
+
+Pause dialog
+
+* Restart Battle remains transparent at rest, hover, focus, and press
+* Return to Home remains transparent at rest, hover, focus, and press
+* both still display the existing white focus ring
+* both remain completely functional
+* Resume remains green
+* Help remains disabled
+
+Return Home confirmation
+
+* Keep Playing remains transparent at rest, hover, focus, and press
+* Keep Playing still has the existing white focus ring
+* Keep Playing remains the default focused cancel action
+* Return Home remains green
+
+#0001
+
+* the supplied jump PNGs exist under assets/characters/0001/
+* the files are loaded by the normal character asset pipeline
+* characters.js declares a real non-looping jump animation
+* jump no longer uses the idle fallback
+* descent uses real airborne art instead of idle when no dedicated fall frames exist
+* jump physics are unchanged
+* transitions between idle/run/jump/fall do not visibly resize or mis-anchor the fighter
+
+Documentation/tests
+
+* README and ALVA_SPEC no longer say that #0001 only has Idle/Run or jumps using idle
+* all existing tests pass
+* any added targeted tests pass
+* real-browser validation shows no navigation, accessibility, sprite-loading, or visual regressions
