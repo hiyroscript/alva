@@ -394,62 +394,45 @@ html.is-touch .hint-bar { display: none; }
 
 .screen--home {
   --gutter: clamp(24px, 6vw, 112px);
-  isolation: isolate;
+  --gutter-r: clamp(20px, 4vw, 72px);
+  --credits-w: clamp(240px, 36vw, 640px);
+  --credits-pad: clamp(20px, 3vw, 48px);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--credits-w);
+  grid-template-rows: minmax(0, 1fr) auto;
 }
 .screen--home.is-entering { animation: fade-in 0.7s ease both; }
 .screen--home.is-entering .home-intro > * { animation: rise-in 0.6s var(--ease) both; }
 .screen--home.is-entering .home-intro > :nth-child(2) { animation-delay: 40ms; }
 .screen--home.is-entering .home-intro > :nth-child(3) { animation-delay: 80ms; }
-.screen--home.is-entering .home-intro > :nth-child(4) { animation-delay: 120ms; }
 
-.home-header, .home-footer {
-  position: relative;
-  z-index: 1;
-  flex: none;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding-left: max(var(--safe-l), var(--gutter));
-  padding-right: max(var(--safe-r), var(--gutter));
-}
-.home-header {
-  min-height: calc(clamp(40px, 9vh, 80px) + var(--safe-t));
-  padding-top: var(--safe-t);
-}
-.logo--mark { width: auto; height: clamp(12px, 2vh, 16px); color: var(--text-secondary); }
-.home-build {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--text-secondary);
-}
 .home-main {
-  position: relative;
-  z-index: 1;
-  flex: 1;
+  grid-column: 1;
+  grid-row: 1;
+  min-width: 0;
   min-height: 0;
   display: flex;
   align-items: center;
-  padding: 16px max(var(--safe-r), var(--gutter)) 24px max(var(--safe-l), var(--gutter));
+  padding: max(var(--safe-t), 24px) var(--gutter-r) 24px max(var(--safe-l), var(--gutter));
 }
-.home-intro { display: flex; flex-direction: column; align-items: flex-start; width: 54%; min-width: 0; }
-.home-eyebrow {
-  margin-bottom: clamp(14px, 3vh, 28px);
-  font-family: var(--font-mono);
-  font-size: clamp(10px, 1.6vh, 12px);
-  font-weight: 500;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--text-muted);
+.home-intro {
+  --lede-size: clamp(13px, 2.1vh, 17px);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 100%;
+  min-width: 0;
 }
 .home-title { width: 100%; line-height: 0; }
-.logo--display { width: 100%; height: auto; max-height: 24vh; object-position: left; }
+/* Width drives height, so the SVG box keeps the wordmark's own aspect ratio
+   and the A starts on the box edge instead of being centred in a wider box.
+   The shift matches the side bearing of the tagline's first letter, so the
+   A's first stroke lines up with the tagline's visible start. */
+.logo--display { width: min(100%, 72vh); height: auto; transform: translateX(calc(var(--lede-size) * 0.085)); }
 .home-lede {
   margin-top: clamp(14px, 3vh, 28px);
   max-width: 34ch;
-  font-size: clamp(13px, 2.1vh, 17px);
+  font-size: var(--lede-size);
   line-height: 1.45;
   color: var(--text-secondary);
 }
@@ -483,85 +466,115 @@ html.is-touch .hint-bar { display: none; }
 .home-action--primary { background: var(--action); border-color: var(--action); color: var(--white); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12); }
 .home-action--primary:hover { background: var(--action-hover); border-color: var(--action-hover); color: var(--white); }
 .home-action--primary:active { background: var(--action-pressed); border-color: var(--action-pressed); }
+/* Unavailable for now: quieter outline, readable muted label, no hover or
+   press response. Kept after the interactive states so it overrides them. */
+.home-action:disabled { background: transparent; border-color: var(--border); color: var(--text-muted); cursor: not-allowed; transform: none; }
+.home-action:disabled .icon { color: var(--text-faint); transform: none; }
 
-/* Fade in viewport space; the road and its slash share one transform so
-   their edges stay aligned at every size. Nothing here renders game art. */
-.home-road-scene {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  overflow: hidden;
-  mask-image: linear-gradient(transparent, #000 20%, #000 80%, transparent);
-}
-.home-road {
-  position: absolute;
-  left: 64%;
-  top: -45%;
-  width: 44%;
-  height: 190%;
-  transform: rotate(21deg);
-  background: linear-gradient(90deg, #111214, #242629 50%, #151618);
-  border-right: 1px solid var(--border-strong);
-}
-.home-road::before {
-  content: "";
-  position: absolute;
-  inset: 0 auto 0 0;
-  width: 3px;
-  background: var(--accent);
-  box-shadow: 0 0 18px rgba(47, 191, 99, 0.2);
-}
-.home-road-lane {
-  position: absolute;
-  top: -80px;
-  bottom: -80px;
-  left: 33.33%;
-  width: 2px;
-  background: repeating-linear-gradient(to bottom, rgba(244, 245, 246, 0.25) 0 32px, transparent 32px 80px);
-  animation: home-road-scroll 1.8s linear infinite;
-}
-.home-road-lane + .home-road-lane { left: 66.66%; }
-@keyframes home-road-scroll { to { transform: translateY(80px); } }
 .home-footer {
+  grid-column: 1;
+  grid-row: 2;
+  display: flex;
+  align-items: center;
   min-height: calc(clamp(34px, 8vh, 64px) + var(--safe-b));
-  padding-bottom: var(--safe-b);
+  padding: 0 var(--gutter-r) var(--safe-b) max(var(--safe-l), var(--gutter));
   border-top: 1px solid var(--border);
-  background: var(--bg);
   font-family: var(--font-mono);
   font-size: 11px;
   color: var(--text-muted);
 }
-/* Preserve desktop hints even at short landscape heights. */
-html:not(.is-touch) .home-footer .hint-bar { display: flex; }
+
+/* Credits roll: a charcoal panel behind a crisp green separator. The track
+   holds the sequence twice and HomeScreen.update() moves it up by one pass
+   before wrapping, so the loop has no seam. */
+.home-credits {
+  grid-column: 2;
+  grid-row: 1 / -1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  border-left: 3px solid var(--accent);
+  background: var(--surface-muted);
+}
+.home-credits-viewport {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  padding: 0 max(var(--safe-r), var(--credits-pad)) 0 var(--credits-pad);
+  mask-image: linear-gradient(transparent, #000 14%, #000 86%, transparent);
+}
+.home-credits-track { will-change: transform; }
+/* Top + bottom padding is the pause between one pass and the next. */
+.home-credits-seq { padding: 16vh 0 20vh; }
+.home-credit { max-width: 38ch; }
+.home-credit + .home-credit { margin-top: clamp(28px, 6vh, 56px); }
+.home-credit-title {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.home-credit-lead { margin-top: 8px; font-size: clamp(17px, 2.6vh, 22px); font-weight: 700; line-height: 1.25; color: var(--text-strong); }
+.home-credit-text { margin-top: 8px; font-size: clamp(13px, 1.9vh, 15px); line-height: 1.55; color: var(--text-secondary); }
+.home-credit-facts { margin-top: 12px; }
+.home-credit-facts dt {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.home-credit-facts dt:not(:first-child) { margin-top: 10px; }
+.home-credit-facts dd { margin: 2px 0 0; font-size: clamp(13px, 1.9vh, 15px); font-weight: 600; color: var(--text); }
 
 @media (max-width: 900px) {
-  .screen--home { --gutter: clamp(20px, 5vw, 44px); }
-  .home-intro { width: 62%; }
-  .home-road { left: 75%; width: 48%; }
+  .screen--home { --gutter: clamp(20px, 5vw, 44px); --credits-w: clamp(200px, 32vw, 300px); }
 }
-@media (max-aspect-ratio: 1/1) {
-  .home-intro { width: 86%; }
-  .home-road { left: 108%; width: 60%; opacity: 0.65; }
+/* Narrow windows: a slimmer credits column keeps the wordmark and menu
+   dominant while the separator stays in place. */
+@media (max-width: 640px), (max-aspect-ratio: 1/1) {
+  .screen--home { --gutter-r: 20px; --credits-w: clamp(150px, 28vw, 240px); --credits-pad: 16px; }
+  .home-credit-lead { font-size: 16px; }
+  .home-credit-text, .home-credit-facts dd { font-size: 13px; }
 }
 @media (max-height: 500px) {
-  .home-header { min-height: calc(34px + var(--safe-t)); }
-  .home-main { padding-top: 8px; padding-bottom: 12px; }
-  .home-eyebrow { margin-bottom: 10px; font-size: 10px; }
-  .logo--display { width: auto; max-width: 100%; height: 23vh; }
-  .home-lede { margin-top: 10px; font-size: 13px; }
+  .home-main { padding-top: max(var(--safe-t), 12px); padding-bottom: 12px; }
+  .home-intro { --lede-size: 13px; }
+  .logo--display { width: min(100%, 69vh); }
+  .home-lede { margin-top: 10px; }
   .home-actions { margin-top: 16px; gap: 6px; }
   .home-action { height: 40px; }
   .home-footer { min-height: calc(32px + var(--safe-b)); }
+  .home-credit + .home-credit { margin-top: 22px; }
+  .home-credit-title { font-size: 10px; }
+  .home-credit-lead { margin-top: 4px; font-size: 16px; }
+  .home-credit-text { margin-top: 4px; font-size: 12px; line-height: 1.5; }
+  .home-credit-facts { margin-top: 8px; }
+  .home-credit-facts dt:not(:first-child) { margin-top: 6px; }
+  .home-credit-facts dd { font-size: 12px; }
 }
 @media (max-height: 360px) {
-  .home-eyebrow { margin-bottom: 7px; }
-  .logo--display { height: 21vh; }
+  .logo--display { width: min(100%, 63vh); }
   .home-lede { margin-top: 8px; }
   .home-actions { margin-top: 10px; gap: 5px; }
   .home-action { height: 36px; }
 }
+/* Still credits: one readable copy that can be scrolled by hand. */
 @media (prefers-reduced-motion: reduce) {
-  .home-road-lane, .screen--home.is-entering .home-intro > * { animation: none; }
+  .screen--home.is-entering .home-intro > * { animation: none; }
+  .home-credits-viewport {
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    touch-action: pan-y;
+    mask-image: none;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-strong) transparent;
+  }
+  .home-credits-track { will-change: auto; }
+  .home-credits-seq { padding: max(var(--safe-t), clamp(20px, 5vh, 48px)) 0 max(var(--safe-b), clamp(20px, 5vh, 48px)); }
+  .home-credits-seq[aria-hidden] { display: none; }
 }
 
 /* ---------------------------------------------------------------------

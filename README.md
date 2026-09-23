@@ -84,11 +84,12 @@ ring with dark separation keep states identifiable beyond colour.
 - **Wordmark:** `js/ui/logo.js` draws ALVA from geometric SVG letterforms and
   inherits `currentColor`, so it needs no font download. `assets/favicon.svg`
   is the matching "A" monogram.
-- **Home** pairs an oversized off-white ALVA wordmark and Play / Help & Credits
-  actions with an angled charcoal CSS road. A crisp green slash separates the
-  two zones; subtle lane motion stops for reduced-motion users. Build, creator
-  credit and navigation hints remain available, including at short landscape
-  heights. The road shifts outward on narrow screens instead of disappearing.
+- **Home** pairs an oversized off-white ALVA wordmark, the line "Fan project.
+  Big heart." and a Play action with a charcoal credits panel on the right. A
+  crisp green line separates the two zones. The credits roll upward in an
+  endless loop and stand still for reduced-motion users. Help & Credits stays
+  visible but is disabled for now. On narrow screens the credits panel slims
+  down so the menu stays dominant.
 - **Other screens** retain their established layouts, controls and navigation;
   only interface colours change. Battle keeps readable dark translucent chrome.
 - Character sprites and stage artwork keep their original colours. No artwork,
@@ -132,16 +133,21 @@ Add an entry to `MAPS` in `js/data/maps.js` (size, ground, bounds, spawns, platf
 
 ## Credits
 
-**Alva**, created by hiyroscript.
+**ALVA**, created by hiyroscript.
 
-**#0001 sprite source.** This credits the original sprite material:
+**Original work.** Game design, code, interface, ALVA wordmark, and Desert / City
+stage artwork by hiyroscript.
 
-- Naruto Uzumaki, *Jump Ultimate Stars* (Nintendo DS / DSi)
+**#0001 sprite source.** Original sprite material from:
+
+- *Jump Ultimate Stars* (Nintendo DS / DSi)
 - The Spriters Resource. Source sheet uploaded by Dazz, contributor FRET.
 
-hiyroscript did not create the original Naruto artwork and does not own the
-Naruto or Jump Ultimate Stars intellectual property. Original characters, games,
-and related properties belong to their respective rights holders.
+**Rights.** hiyroscript did not create or claim ownership of the original
+third-party character/game artwork. Original characters, games, and related
+properties belong to their respective rights holders.
 
-The code, UI, Alva wordmark and Desert / City stage art are original to Alva.
-The game ships with no audio.
+**Project.** Unofficial fan project. No affiliation or endorsement is implied.
+
+The in-game credits (Home credits roll and Credits tab) render from one list in
+`js/ui/help-content.js`. The game ships with no audio.

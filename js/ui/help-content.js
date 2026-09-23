@@ -1,5 +1,6 @@
-// Help + credits content, shared by the Help & Credits screen and the pause
-// menu. Key bindings are rendered straight from CONFIG.bindings.
+// Help + credits content, shared by the Help & Credits screen, the pause
+// menu and the Home credits roll. Key bindings are rendered straight from
+// CONFIG.bindings.
 
 import { CONFIG, ACTION_LABELS, keyLabel } from '../config.js';
 import { el } from '../core/utils.js';
@@ -95,26 +96,40 @@ export function buildHelp() {
   ]);
 }
 
+// Credits live here once so the Home credits roll and the Credits tab can't
+// drift apart. Each group has a title plus any of: a lead line, running text
+// and [label, value] facts.
+export const CREDITS = [
+  { title: CONFIG.title, lead: `Created by ${CONFIG.developer}` },
+  {
+    title: 'Original work',
+    text: `Game design, code, interface, ${CONFIG.title} wordmark, and Desert / City stage artwork by ${CONFIG.developer}.`,
+  },
+  {
+    title: '#0001 sprite source',
+    facts: [
+      ['Game', 'Jump Ultimate Stars'],
+      ['Platform', 'Nintendo DS / DSi'],
+      ['Source', 'The Spriters Resource'],
+      ['Source sheet', 'Uploaded by Dazz'],
+      ['Contributor', 'FRET'],
+    ],
+  },
+  {
+    title: 'Rights',
+    text: `${CONFIG.developer} did not create or claim ownership of the original third-party character/game artwork. Original characters, games, and related properties belong to their respective rights holders.`,
+  },
+  { title: 'Project', text: 'Unofficial fan project. No affiliation or endorsement is implied.' },
+];
+
 export function buildCredits() {
-  return el('div', { class: 'info-grid info-grid--credits' }, [
-    card(CONFIG.title, [
-      el('p', { class: 'credit-lead', text: `Created by ${CONFIG.developer}` }),
-      el('p', { class: 'info-text', text: `Game design, code, user interface, the ${CONFIG.name} wordmark and the Desert and City stage art are original work for ${CONFIG.name}.` }),
+  return el('div', { class: 'info-grid info-grid--credits' }, CREDITS.map((group) =>
+    card(group.title, [
+      group.lead ? el('p', { class: 'credit-lead', text: group.lead }) : null,
+      group.text ? el('p', { class: 'info-text', text: group.text }) : null,
+      group.facts ? el('dl', { class: 'detail-list credit-list' }, group.facts.flatMap(([dt, dd]) => [
+        el('dt', { text: dt }), el('dd', { text: dd }),
+      ])) : null,
     ]),
-    card('#0001 sprite source', [
-      el('p', { class: 'info-text', text: 'Source attribution for the original sprite material used for #0001:' }),
-      el('dl', { class: 'detail-list credit-list' }, [
-        el('dt', { text: 'Character' }), el('dd', { text: 'Naruto Uzumaki' }),
-        el('dt', { text: 'Game' }), el('dd', { text: 'Jump Ultimate Stars' }),
-        el('dt', { text: 'Platform' }), el('dd', { text: 'Nintendo DS / DSi' }),
-        el('dt', { text: 'Source' }), el('dd', { text: 'The Spriters Resource' }),
-        el('dt', { text: 'Source sheet' }), el('dd', { text: 'Uploaded by Dazz' }),
-        el('dt', { text: 'Contributor' }), el('dd', { text: 'FRET' }),
-      ]),
-      el('p', { class: 'info-text', text: `${CONFIG.developer} did not create the original Naruto artwork and does not own the Naruto or Jump Ultimate Stars intellectual property.` }),
-    ], 'info-card--wide'),
-    card('Rights', [
-      el('p', { class: 'info-text', text: 'Original characters, games, and related properties belong to their respective rights holders.' }),
-    ]),
-  ]);
+  ));
 }
