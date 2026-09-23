@@ -1,410 +1,405 @@
-Implement a new startup splash sequence for the Alva browser game in the hiyroscript/alva repository.
+Work in the Alva repository and update the Select Mode screen only. Before changing anything, inspect the existing implementation and preserve the established Alva visual language, accessibility behavior, responsive layout, keyboard/gamepad navigation, screen transitions, and overall game flow.
 
-Before editing anything, inspect the existing implementation, especially:
+The current Select Mode implementation is primarily in:
 
-* index.html
+* js/screens/mode-select-screen.js
 * styles.css
-* js/config.js
-* js/core/app.js
-* js/core/asset-loader.js
-* js/core/screen-manager.js
-* js/screens/splash-screen.js
-* js/screens/home-screen.js
-* ALVA_SPEC.md
+* js/core/menu-navigator.js
+* shared menu/header utilities in js/ui/components.js
 
-This project is plain HTML, CSS, and vanilla JavaScript ES modules. Do not add frameworks, npm packages, build tooling, or dependencies.
+The current flow must remain:
+
+Home → Select Mode → Select Fighter → Select Map → Battle
+
+Do not redesign unrelated screens.
 
 Goal
 
-Replace the current text-only "a game by hiyroscript" startup splash with a polished two-image splash animation.
+Simplify Select Mode into a much cleaner two-card composition and clearly separate these interaction states:
 
-The required startup flow is:
+hover = preview
 
-Blank black screen while both splash images preload and decode → hs.jpg animation → short black transition → alvafav.PNG animation → Home screen
+click / confirm = select the mode and continue
 
-Both image files already exist at the repository root:
+The Quick Battle card must no longer look or behave as if simply hovering it has already selected the mode.
 
-* ./hs.jpg
-* ./alvafav.PNG
+⸻
 
-Important: the existing file is named exactly alvafav.PNG. Do not reference altafav.PNG, rename the asset, duplicate it, or introduce a new image file.
+1. Remove the Select Mode control hint bar
 
-Critical preload requirement
+Completely remove the bottom keyboard/control hint bar from the Select Mode screen only.
 
-The splash animation MUST NOT begin until BOTH ./hs.jpg and ./alvafav.PNG are fully loaded and decoded.
+The current screen calls:
 
-Immediately when the game opens:
+hintBar(MENU_HINTS)
 
-* Show only a completely black screen.
-* Do not show hs.jpg.
-* Do not show alvafav.PNG.
-* Do not show the Home screen underneath.
-* Do not briefly show the old splash text.
-* Do not show broken-image placeholders.
-* Do not display a loading spinner, loading percentage, ALVA wordmark, or other loading UI.
-* Avoid flashes of white or other backgrounds.
-* The user should simply see black while the two images load invisibly in the background.
+Remove that from Select Mode.
 
-Use Alva’s existing AssetLoader rather than introducing an unrelated image-loading implementation. AssetLoader.loadImage() already waits for the image load event and attempts img.decode(), so integrate the two splash assets into that existing architecture.
+Also clean up the now-unused imports from mode-select-screen.js.
 
-The splash may be entered immediately as it is now, but its visible sequence must wait for something equivalent to:
+Do not delete the shared hintBar, MENU_HINTS, or .hint-bar implementation because other screens may still depend on them.
 
-Promise.all([app.assets.loadImage('./hs.jpg'), app.assets.loadImage('./alvafav.PNG')])
+The Select Mode screen should end after its main content rather than showing:
 
-Do not begin any animation when only one image has finished.
+* arrow-key Navigate hints
+* Enter Select hint
+* Esc Back hint
 
-If an asset fails to load, do not run a partial sequence with only one image. Handle the error cleanly, log a useful error, and avoid hanging with a broken image visible.
+The Back button in the screen header must remain.
 
-The existing fighter preload that starts from App.start() may continue simultaneously in the background. The splash does NOT need to wait for fighter sprites; its loading gate concerns these two splash images only.
+⸻
 
-Splash image 1: hs.jpg
+2. Remove the large Quick Battle image/art section
 
-Once BOTH splash assets are ready, begin the first animation.
+The current Quick Battle card is split into:
 
-Render hs.jpg:
+1. the large fighter-art/canvas section
+2. the lower information/action section
 
-* exactly centered horizontally and vertically
-* above a pure black #000 background
-* maintaining its natural aspect ratio
-* never stretched or distorted
-* never cropped unintentionally
-* responsive on desktop, tablets, and phones
-* constrained so it fits comfortably within the viewport
+Remove the large upper art area completely.
 
-The image should begin invisible and slightly smaller than its normal presentation size.
+That means removing the Select Mode-specific:
 
-Then animate it with BOTH opacity and scale.
+* .mode-card-art
+* .mode-art-canvas
+* canvas creation
+* neutral fighter silhouette rendering
+* PLAYER_TONE
+* CPU_TONE
+* sprite tinting
+* Select Mode enter() sprite-loading work if it is no longer needed
+* Select Mode update() canvas-resize work
+* Select Mode draw() rendering code
+* unused tintFrame, fitCanvas, and drawFrameAt imports
 
-The visual feeling should be cinematic and restrained:
+Do not leave an empty image container or blank region where the artwork used to be.
 
-1. Fade smoothly from opacity 0 to 1.
-2. At the same time, begin slowly scaling upward.
-3. Continue scaling very gradually while the image is fully visible.
-4. After holding visibly for a short period, fade it smoothly back to opacity 0.
-5. Continue the slow scale increase during the fade-out, so it feels as though the image is slowly moving forward toward the viewer and passing through the screen.
+The Quick Battle card should literally consist of the existing bottom section only.
 
-Do NOT make it bounce, snap, overshoot, rotate, slide, blur heavily, or use flashy effects.
+Keep the useful Quick Battle content in that lower section, including the current basic identity/action information such as:
 
-Use smooth easing.
+* Mode 01
+* Quick Battle
+* the short Quick Battle description
+* Select action / arrow
 
-A good target animation is approximately:
+Do not replace the removed artwork with another image, illustration, gradient hero, icon, or placeholder.
 
-* fade in: 800–1000ms
-* visible/slow-zoom hold: 1400–1800ms
-* fade out: 700–900ms
-* initial scale: approximately 0.86–0.90
-* scale around fully visible state: approximately 1.00
-* final scale at the end of fade-out: approximately 1.12–1.18
+⸻
 
-The scaling should be continuous rather than restarting between phases.
+3. Make Quick Battle a compact card
 
-The exact values may be adjusted slightly if required to make the existing images look better, but preserve the effect: fade in + slow forward zoom + hold + fade out while continuing forward.
+After removing the image, do not allow .mode-card to remain stretched vertically as though the art still existed.
 
-Transition between the images
+Remove the old two-row layout based around:
 
-After hs.jpg has completely faded out:
+grid-template-rows: minmax(0, 1fr) auto
 
-* leave the screen fully black for a very short beat, approximately 150–300ms
-* make absolutely certain the first image is visually gone
-* then begin the second image
+The remaining card body should define the actual card.
 
-Do not crossfade the two images directly over one another. There should be a clean moment of black separating them.
+The Quick Battle card should be a compact horizontal/content card rather than a giant empty panel.
 
-Splash image 2: alvafav.PNG
+Preserve the existing Alva design language:
 
-Then perform the same sequence with:
+* near-black/charcoal surface
+* subtle hairline border
+* restrained radius
+* strong Quick Battle title
+* subdued metadata/description
+* green action treatment
+* no unnecessary decoration
 
-./alvafav.PNG
+⸻
 
-It must:
+4. Align Quick Battle with Mode Details
 
-* appear centered on the screen
-* preserve its natural aspect ratio
-* start at opacity 0
-* fade in smoothly
-* slowly grow toward the viewer
-* remain visible for a short period while continuing its subtle zoom
-* fade back to black
-* continue becoming slightly larger during the fade-out
+Quick Battle and Mode Details should read as two sibling cards in one composition.
 
-Use the same animation character and approximately the same timing as hs.jpg.
+Place the compact Quick Battle card at the same vertical level as the Mode Details card.
 
-Do not stretch the favicon-style image to match the dimensions of hs.jpg. They can use the same animation logic while retaining an appropriate visual size for each image.
+Their top edges should align.
 
-The image container/layout should therefore be responsive, while each actual <img> preserves its own proportions.
+Their panel shells should also have matching/equal visual height so one does not appear like a large hero while the other looks like a small secondary panel.
 
-Transition to Home
+Do not stretch either card to consume all remaining viewport height.
 
-Only after alvafav.PNG has completely finished fading out should the game navigate to the existing Home screen.
+The composition should feel deliberate and compact, with open negative space below it if necessary.
 
-Preserve the existing architecture:
+Maintain responsive behavior. On layouts where the screen stacks vertically, keep the relationship clean and avoid oversized empty panels.
 
-SplashScreen -> this.app.screens.go('home', {}, { reset: true })
+⸻
 
-The final transition should feel seamless:
+5. Strip Mode Details down to only its heading and separator
 
-1. alvafav.PNG reaches opacity 0.
-2. Splash is pure black again.
-3. Brief black beat if needed, around 150–250ms.
-4. Navigate to Home.
-5. Let the existing Home entrance animation/fade handle the reveal.
+The Mode Details card currently contains:
 
-The existing Home screen currently fades in using .screen--home.is-entering; preserve that behavior rather than duplicating Home animation logic inside SplashScreen.
+* Mode details
+* Format
+* Rounds
+* Timer
+* Opponent
+* How Quick Battle works
+* numbered flow steps
+* explanatory note
+* 01 / 01 modes
 
-Also preserve the technique whereby the splash can stay mounted underneath Home during the Home dissolve if useful. The current SplashScreen.leaveMs and .screen--splash.is-leaving behavior already exist for this purpose.
+Remove all of that content except:
 
-There must never be a frame where another menu screen appears between the splash and Home.
+Mode details
 
-Splash DOM structure
+and the small thin horizontal separator/hairline directly beneath that heading.
 
-Refactor SplashScreen away from its current text-only <p class="splash-credit">.
+The final Mode Details card should therefore visually contain only:
 
-A reasonable structure is one centered splash stage containing the two images, for example conceptually:
+MODE DETAILS
 
-screen--splash
-→ splash-stage
-→ image for hs.jpg
-→ image for alvafav.PNG
+followed by a subtle thin line.
 
-Only one image may be visible at a time.
+There should be no:
 
-It is also acceptable to reuse one <img> element and swap its loaded source between the already-decoded image assets if that produces cleaner state management. Whichever approach is used:
+* Format
+* 1 vs CPU
+* Rounds
+* Timer
+* Opponent
+* Training CPU
+* Choose a fighter
+* Pick from the roster
+* Choose a stage
+* Desert or City
+* Battle
+* One round against the CPU
+* explanatory paragraph
+* mode count
+* numbered flow circles
 
-* there must be no additional network request that delays the sequence
-* the already-loaded images should be used
-* no innerHTML string containing untrusted data
-* no duplicate timers/listeners after lifecycle changes
+Remove the elements from the DOM rather than merely hiding them with CSS.
 
-JavaScript implementation requirements
+Since the existing thin line is currently tied to surrounding detail-list styling, create or preserve a deliberate separator directly underneath the Mode Details heading after the detail list is removed.
 
-Keep the state machine deterministic and easy to read.
+Use the existing Alva border token/hairline styling rather than introducing a new color.
 
-Update js/screens/splash-screen.js rather than placing startup animation logic in main.js.
+The empty space beneath the separator is intentional. Do not invent replacement copy.
 
-The splash should have clearly defined phases such as:
+⸻
 
-loading
-→ hs-in
-→ hs-hold
-→ hs-out
-→ gap
-→ alva-in
-→ alva-hold
-→ alva-out
-→ finish
+6. Hover must mean preview, not selection
 
-You do not have to literally use those strings, but the code should have equally clear sequencing.
+This interaction change is important.
 
-Avoid a fragile pile of unrelated setTimeout() calls.
+Currently Alva’s global MenuNavigator contains mouse behavior that finds [data-nav] elements on pointerover and calls .focus() on them. The Quick Battle card then receives its :focus styling, which visually makes hovering feel like the card was already selected.
 
-A small async sequence with a reusable delay/helper or CSS animationend/transitionend synchronization is preferable, as long as:
+Change this behavior for the Select Mode / Quick Battle card so the states are clearly different.
 
-* it cleans up correctly
-* it cannot call finish() twice
-* leaving the splash prevents stale asynchronous work from navigating later
-* restarting/re-entering does not create duplicate sequences
-* listeners are removed
-* timers are cleared
-* rejected/failed asset loads are handled
+Pointer hover
 
-If using timers, centralize them and continue using lifecycle cleanup comparable to the existing clear() implementation.
+Hovering Quick Battle should behave strictly as a preview state.
 
-Do not introduce a second requestAnimationFrame game loop. Alva already owns one in App.
+A mouse hover may provide a restrained Alva-style visual response such as:
 
-Input behavior
+* slightly stronger neutral border
+* subtle surface change
+* subtle shadow
+* subtle Select-button response
 
-The loading gate is absolute.
+But hovering must NOT:
 
-Keyboard, pointer, touch, or gamepad input while the two images are still loading must NOT:
+* select Quick Battle
+* commit app.selection.mode
+* navigate away from Select Mode
+* show a persistent selected state
+* make the card look confirmed
+* apply the same green selection/focus treatment used for an actual keyboard focus state
+* cause a click-like state transition
 
-* begin the sequence early
-* reveal one of the images
-* jump to Home before the required images are ready
+When the pointer leaves, the preview treatment should disappear.
 
-The current splash contains key/pointer skip behavior designed for the old text intro. Remove or adapt that behavior so it cannot interfere with this new branded startup sequence.
+Click
 
-For this implementation, the two-image sequence should normally play completely once loading has finished rather than being accidentally dismissed by the same pointer/tap that launched or focused the game.
+A real pointer click on the Quick Battle card is the choose/select action.
 
-Do not allow repeated user input to produce duplicate navigation to Home.
+Only then should it:
 
-CSS requirements
+1. set app.selection.mode = 'quick-battle'
+2. move the player to the Select Fighter screen using the existing screen-manager flow
 
-Modify the Splash section of styles.css.
+The existing next step is:
 
-Keep:
+app.screens.go('character')
 
-html:not([data-screen]), html[data-screen="splash"] { background: #000; }
+Preserve that.
 
-or equivalent behavior so the browser is black from the earliest possible frame.
+There should be no extra confirmation click.
 
-The splash section itself must remain pure black.
+One click = select Quick Battle and continue.
 
-Center the splash stage with CSS rather than calculating screen coordinates in JavaScript.
+⸻
 
-Images should use properties conceptually equivalent to:
+7. Do not globally break mouse navigation
 
-* absolute positioning or a centered grid/flex stage
-* object-fit: contain
-* max-width
-* max-height
-* opacity initially 0
-* transform-origin: center center
-* GPU-friendly transform: scale(...)
-* will-change: transform, opacity only while appropriate
+Be careful with js/core/menu-navigator.js.
 
-Do not animate layout properties such as width, height, top, or left every frame. Animate transform and opacity.
+Other Alva screens intentionally use the global behavior where mouse hover can move menu focus.
 
-Avoid oversized shadows, glowing borders, text, frames, glass effects, or green UI decoration around the splash artwork. This startup should remain minimal: image on black.
+Do not globally remove that behavior just to fix Quick Battle.
 
-Ensure safe areas and unusual aspect ratios do not clip the image.
+Make the change scoped.
 
-Reduced-motion accessibility
+A clean approach would be to introduce an explicit opt-out attribute/class for elements whose mouse hover is preview-only, for example something conceptually similar to:
 
-Preserve Alva’s existing prefers-reduced-motion support.
+data-nav-no-hover-focus
 
-When reduced motion is enabled:
+Then have the global pointer-over logic ignore only those elements.
 
-* do not perform the continuous zoom animation
-* avoid long fades
-* show hs.jpg centered for a short readable hold
-* return to black
-* show alvafav.PNG centered for a short readable hold
-* return to black
-* continue to Home
+The exact name is up to you, but the architecture should make the intent obvious.
 
-The preload gate still applies exactly the same way.
+The Quick Battle card can still remain a [data-nav] item for keyboard/gamepad navigation.
 
-Do not use the global reduced-motion CSS rule in a way that accidentally breaks the sequence’s JavaScript timing. Make the reduced-motion timing explicit in SplashScreen if necessary.
+Mouse hover simply should not hijack DOM focus for this specific preview-only card.
 
-Other startup overlays
+⸻
 
-During the splash/loading phase, the intended visual result is black followed only by the two splash images.
+8. Preserve keyboard and gamepad accessibility
 
-Do not allow normal app chrome or loading UI to appear over the sequence.
+Do not solve the pointer-hover problem by making Quick Battle inaccessible to non-pointer users.
 
-If Alva’s device/rotate overlay would otherwise appear over the splash on a portrait touch device, suppress that overlay specifically while html[data-screen="splash"] is active and allow its normal behavior again once Home/game navigation begins.
+Quick Battle must remain keyboard/gamepad navigable.
 
-Do not permanently change the device-orientation behavior elsewhere in the game.
+Keyboard/gamepad focus should still have a real, visible focus treatment in accordance with Alva’s accessibility rules.
 
-Configuration
+Prefer a distinction such as:
 
-Use CONFIG.splash in js/config.js for the sequence timing rather than scattering magic timing numbers throughout the splash implementation.
+* :hover = neutral preview treatment
+* :focus-visible = accessibility focus ring
+* click / Enter / gamepad confirm = activation and navigation
 
-Refactor the current old-text values as needed.
+Do not use a green hover state that is visually indistinguishable from selected/confirmed state.
 
-For example, keep configurable values for concepts such as:
+Enter/gamepad confirm on the focused Quick Battle card should continue to activate it immediately through the existing menu navigation system.
 
-* fade-in duration
-* hold duration
-* fade-out duration
-* between-image gap
-* final black hold
-* reduced-motion hold
+The Back button must also continue working with keyboard, mouse, touch, and gamepad.
 
-Scale values may be CSS custom properties or configuration values, whichever fits the existing project style better.
+⸻
 
-Keep the configuration understandable.
+9. Clean up obsolete Mode Details data
 
-Do not change unrelated game behavior
+Because all Mode Details body content is being removed, clean up the data/model code that exists exclusively for that removed content.
 
-Do not redesign or rewrite:
+For example, if no longer needed on this screen, remove:
+
+* mode.details
+* the timer formatting used only by those details
+* CONFIG import if it becomes unused
+* flow-list construction
+* panel note construction
+* mode-count construction
+
+Do not leave dead variables or unused imports.
+
+Keep the MODES structure as simple as necessary for the current Quick Battle card and future extension.
+
+⸻
+
+10. CSS cleanup
+
+Review the Select Mode CSS section around the existing .mode-layout, .mode-rail, .mode-card, .mode-card-art, .mode-card-body, .mode-info, .flow-list, and mode detail styles.
+
+Remove obsolete Select Mode-specific rules where they no longer have a consumer.
+
+In particular, do not leave CSS whose only purpose was:
+
+* sizing the removed image
+* positioning the removed canvas
+* rendering deleted flow-list content
+* rendering deleted mode-count content
+
+Be careful with shared selectors such as .detail-list, .panel-title, or other classes used by Character Select or other screens. Do not delete shared rules merely because Select Mode no longer uses them.
+
+Keep responsive rules clean as well. Remove or revise Select Mode-specific compact-height rules that refer to elements which no longer exist.
+
+⸻
+
+11. Do not alter these things
+
+Do not change:
 
 * Home
-* Mode Select
-* Character Select
-* Map Select
+* Select Fighter
+* Select Map
 * Battle
-* credits roll
-* fighter asset loading
-* sprite normalization
-* input systems
-* stage art
-* game physics
-* combat
-* favicon behavior
+* Splash
+* Help & Credits
+* character sprites
+* stage artwork
+* the setup-step header
+* the Select Mode Back button
+* the overall screen transition system
+* Quick Battle’s actual battle rules
+* selection state outside what is required for this interaction cleanup
+* shared controls unless necessary for the scoped hover-focus opt-out
 
-alvafav.PNG must remain usable as the browser favicon through the existing relative reference in index.html.
+Do not add frameworks, dependencies, build tooling, or external assets.
 
-Do not alter the actual contents of hs.jpg or alvafav.PNG.
+This remains vanilla HTML/CSS/JavaScript.
 
-Do not convert, resize, recompress, redraw, or AI-generate either image.
+⸻
 
-All asset URLs must remain relative because Alva is deployed on GitHub Pages under a repository subpath.
+12. Expected final visual structure
 
-Use:
+Conceptually the Select Mode body should become:
 
-./hs.jpg
+Select Mode
+Mode · Fighter · Stage
+┌─────────────────────────────────────┐  ┌─────────────────────┐
+│ MODE 01                             │  │ MODE DETAILS        │
+│ Quick Battle              [Select →]│  │ ─────────────────── │
+│ Choose a fighter and stage...       │  │                     │
+└─────────────────────────────────────┘  └─────────────────────┘
 
-and:
+The exact spacing should follow the existing Alva system rather than literally copying this ASCII drawing.
 
-./alvafav.PNG
+Important visual qualities:
 
-Never use /hs.jpg or /alvafav.PNG.
+* no giant Quick Battle artwork
+* no giant empty Quick Battle area
+* compact sibling cards
+* aligned panel tops
+* matching panel height
+* Mode Details contains only its heading and hairline
+* no bottom control-hint footer
+* plenty of controlled negative space
+* still unmistakably Alva
 
-Documentation
+⸻
 
-Update the Splash section of ALVA_SPEC.md because its current specification still describes the old "a game by hiyroscript" text animation.
-
-The revised specification should document:
-
-* blank black preload state
-* both images being fully loaded/decoded before animation starts
-* hs.jpg appearing first
-* fade + slow forward zoom
-* fade to black
-* alvafav.PNG appearing second with the same treatment
-* fade back to black
-* transition to Home
-* reduced-motion behavior
-
-Remove contradictory requirements saying the splash contains only "a game by hiyroscript" or that no logo/image animation is permitted.
-
-Do not change unrelated sections of the product specification.
-
-Verification
-
-After implementation, run the project through a local HTTP server because Alva uses ES modules and cannot be properly tested through file://.
+13. Interaction acceptance criteria
 
 Verify all of the following:
 
-1. On a cold load, the first visible frame is black.
-2. If network loading is artificially slowed, the screen stays black until BOTH splash assets are ready.
-3. Neither image appears partially loaded.
-4. hs.jpg is first.
-5. hs.jpg is centered and maintains its aspect ratio.
-6. It fades in and slowly scales larger.
-7. It continues scaling subtly while visible.
-8. It fades completely to black.
-9. There is a short clean black separation.
-10. alvafav.PNG then performs the same sequence.
-11. The two images never overlap visibly.
-12. Home does not initialize visually before the second image is finished.
-13. Home fades in cleanly after the final black frame.
-14. No white flash occurs before, during, or after the splash.
-15. Refreshing repeatedly does not produce duplicate timers or navigation.
-16. Input during the preload does not bypass the asset gate.
-17. Asset paths work from a GitHub Pages-style subdirectory.
-18. The splash remains responsive at desktop, phone-landscape, tablet, ultrawide, and short-landscape dimensions.
-19. Reduced-motion mode removes the continuous zoom while retaining the two-step image sequence.
-20. No unrelated menu/game behavior changes.
-21. No new console errors are introduced.
+1. Enter Select Mode from Home.
+2. No control-hint bar appears at the bottom.
+3. Quick Battle no longer contains the fighter image/canvas.
+4. There is no blank region where the image used to be.
+5. Quick Battle consists only of the former lower information/action portion.
+6. Quick Battle and Mode Details align cleanly at the same vertical level.
+7. Their card shells are visually the same height.
+8. Mode Details shows only Mode details and a thin separator underneath.
+9. None of the old Mode Details body text remains in the DOM.
+10. Moving the mouse over Quick Battle produces only a temporary preview/hover treatment.
+11. Mouse hover does not set app.selection.mode.
+12. Mouse hover does not navigate.
+13. Mouse hover does not visually imitate a confirmed selection.
+14. Moving the mouse away removes the preview treatment.
+15. A single click on Quick Battle selects it and opens Select Fighter.
+16. Keyboard users can still focus Quick Battle.
+17. Keyboard focus remains visibly accessible.
+18. Enter activates Quick Battle and opens Select Fighter.
+19. Gamepad confirm continues to work.
+20. Back continues to return to Home.
+21. Other menus retain their existing mouse-hover/focus behavior.
+22. There are no console errors.
+23. There are no unused Select Mode canvas/sprite imports or dead rendering methods.
+24. The screen remains usable at Alva’s supported responsive sizes and short landscape heights.
+25. Reduced-motion behavior remains correct.
 
-Final result
-
-Opening Alva should feel like this:
-
-Black.
-
-Nothing appears while hs.jpg and alvafav.PNG quietly load and decode in the background.
-
-Once both are completely ready, hs.jpg gently emerges in the exact center of the screen. It slowly grows toward the viewer while becoming fully visible, remains present briefly, then keeps drifting forward as it disappears back into black.
-
-A brief moment of black follows.
-
-Then alvafav.PNG emerges from the center with the same slow forward motion, remains visible briefly, continues enlarging subtly, and fades completely away.
-
-The screen returns to black for a short beat.
-
-Then the existing Alva Home screen fades in normally.
-
-Keep the effect smooth, minimal, polished, and integrated with the architecture that is already in the repository.
+When complete, review the diff specifically for unnecessary changes and keep the implementation focused on this Select Mode redesign.
