@@ -153,7 +153,7 @@ Battle (time over) → Result → Rematch / Change Stage / Return to Home
 
 Every menu screen except Home has a consistent Back action. Keyboard, mouse,
 touch and gamepad all navigate menus with one shared highlight (mouse hover
-moves focus).
+moves focus, except on preview-only items such as the Select Mode card).
 
 ### 6.1 Splash
 
@@ -218,10 +218,15 @@ no header, build label, eyebrow or keyboard hint bar.
 ### 6.3 Select Mode
 
 - Header "Select Mode" with setup steps (Mode · Fighter · Stage).
-- One large Quick Battle card (art area with two neutral fighter silhouettes,
-  name, description "Choose a fighter and stage, then enter battle.", green
-  Select action) in a rail built for future modes, plus a details panel
-  (format, rounds, timer, opponent, how it works).
+- Two compact sibling cards, top-aligned and equal in height, with open space
+  below. No artwork and no keyboard hint bar.
+- Quick Battle card (Mode 01, name, description "Choose a fighter and stage,
+  then enter battle.", green Select action) in a rail built for future modes.
+- Mode details panel: only its heading and a hairline beneath it.
+- Mouse hover only previews the card (lighter surface and border) and does not
+  move focus. A click, Enter or gamepad confirm selects Quick Battle and opens
+  Select Fighter. Keyboard/gamepad focus shows the standard focus ring, which
+  stays hidden while the last menu input was a pointer press.
 - No fake modes or online matchmaking.
 
 ### 6.4 Select Fighter
