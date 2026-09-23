@@ -218,8 +218,8 @@ no header, build label, eyebrow or keyboard hint bar.
 ### 6.3 Select Mode
 
 - Header "Select Mode" with setup steps (Mode · Fighter · Stage).
-- Two compact sibling cards, top-aligned and equal in height, with open space
-  below. No artwork and no keyboard hint bar.
+- A compact Quick Battle card and a full-height Mode details panel, top-aligned.
+  No artwork and no keyboard hint bar.
 - Quick Battle card (Mode 01, name, description "Choose a fighter and stage,
   then enter battle.", green Select action) in a rail built for future modes.
 - Mode details panel: only its heading and a hairline beneath it.
