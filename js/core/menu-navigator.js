@@ -52,17 +52,32 @@ export class MenuNavigator {
     this.app = app;
     this.codeMap = buildCodeMap();
     this.scopes = []; // overlay scopes: { el, onBack, onStart }
-    app.input.onKey((e) => this.onKey(e));
-    app.input.onPadMenu((cmd) => this.command(cmd, null));
+    app.input.onKey((e) => {
+      this.setPointerInput(false);
+      this.onKey(e);
+    });
+    app.input.onPadMenu((cmd) => {
+      this.setPointerInput(false);
+      this.command(cmd, null);
+    });
 
-    // Mouse hover selects, so keyboard and mouse share one highlight.
+    // Mouse hover selects, so keyboard and mouse share one highlight. Items
+    // marked data-nav-no-hover-focus treat hover as a preview and keep focus.
     document.addEventListener('pointerover', (e) => {
       if (e.pointerType !== 'mouse') return;
       const item = e.target.closest?.('[data-nav]');
+      if (item?.hasAttribute('data-nav-no-hover-focus')) return;
       if (item && this.inScope(item) && visible(item) && document.activeElement !== item) {
         item.focus({ preventScroll: true });
       }
     });
+    document.addEventListener('pointerdown', () => this.setPointerInput(true), { capture: true, passive: true });
+  }
+
+  // html.is-pointer-input marks that the last menu input was a mouse or touch
+  // press, so preview-only items can keep their focus ring for keys and pads.
+  setPointerInput(on) {
+    document.documentElement.classList.toggle('is-pointer-input', on);
   }
 
   pushScope(scope) {

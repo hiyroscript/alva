@@ -642,40 +642,29 @@ html[data-screen="splash"] .overlay { display: none; }
    Mode select
    --------------------------------------------------------------------- */
 
+/* A compact Quick Battle card at the top; Mode details keeps its full height. */
 .mode-layout { grid-template-columns: minmax(0, 1.75fr) minmax(220px, 1fr); }
-.mode-rail { display: flex; min-height: 0; }
+.mode-rail { display: flex; align-self: start; }
+/* Hover is a neutral preview. The focus ring is for keyboard/gamepad focus,
+   so it stays off while the last menu input was a pointer. */
 .mode-card {
   flex: 1;
-  min-height: 0;
-  display: grid;
-  grid-template-rows: minmax(0, 1fr) auto;
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--border);
-  background: var(--surface);
-  box-shadow: var(--shadow-sm);
-  overflow: hidden;
-  text-align: left;
-  transition: border-color var(--dur-fast) ease, box-shadow var(--dur) ease, transform var(--dur) var(--ease);
-}
-.mode-card:hover { border-color: var(--border-hover); box-shadow: var(--shadow-md); }
-.mode-card:focus { border-color: var(--accent); box-shadow: var(--focus-ring), var(--shadow-md); }
-.mode-card:active { transform: scale(0.997); }
-.mode-card-art {
-  position: relative;
-  min-height: 0;
-  overflow: hidden;
-  background: var(--surface-subtle);
-}
-.mode-art-canvas { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; }
-.mode-card-body {
   display: grid;
   grid-template-columns: 1fr auto;
   grid-template-areas: "index cta" "name cta" "desc cta";
   gap: 4px 18px;
   align-items: center;
   padding: clamp(12px, 2.6vh, 24px) clamp(16px, 2vw, 28px);
-  border-top: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  text-align: left;
+  transition: background-color var(--dur-fast) ease, border-color var(--dur-fast) ease, box-shadow var(--dur) ease, transform var(--dur) var(--ease);
 }
+.mode-card:hover { background: var(--surface-subtle); border-color: var(--border-hover); box-shadow: var(--shadow-md); }
+html:not(.is-pointer-input) .mode-card:focus { box-shadow: var(--focus-ring), var(--shadow-md); }
+.mode-card:active { transform: scale(0.997); }
 .mode-index { grid-area: index; font-family: var(--font-mono); font-size: 11px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-muted); }
 .mode-name {
   grid-area: name;
@@ -700,35 +689,9 @@ html[data-screen="splash"] .overlay { display: none; }
 }
 .mode-card:hover .mode-cta { background: var(--action-hover); }
 
-.mode-info {
-  display: flex;
-  flex-direction: column;
-  gap: clamp(10px, 2vh, 18px);
-  padding: clamp(14px, 2.6vh, 24px) clamp(14px, 1.8vw, 24px);
-  min-height: 0;
-  overflow: auto;
-}
-.mode-info .detail-list { padding: 12px 0; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
-.flow-list { list-style: none; margin: 0; padding: 0; display: grid; gap: clamp(6px, 1.4vh, 12px); }
-.flow-list li { display: flex; gap: 12px; align-items: flex-start; }
-.flow-num {
-  flex: none;
-  display: grid;
-  place-items: center;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  border: 1px solid var(--border-strong);
-  font-family: var(--font-mono);
-  font-size: 10px;
-  font-weight: 600;
-  color: var(--text);
-}
-.flow-text { display: grid; gap: 1px; padding-top: 1px; }
-.flow-text b { font-size: 14px; font-weight: 600; }
-.flow-text span { color: var(--text-secondary); font-size: 13px; }
-.mode-count { margin-top: auto; font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-muted); }
-.mode-count-num { color: var(--text-strong); font-weight: 700; font-size: 18px; }
+/* Same vertical padding as the card so both mono labels share a top line. */
+.mode-info { padding: clamp(12px, 2.6vh, 24px) clamp(14px, 1.8vw, 24px); }
+.mode-info .panel-title { padding-bottom: clamp(8px, 1.6vh, 12px); border-bottom: 1px solid var(--border); }
 
 /* ---------------------------------------------------------------------
    Character select
@@ -1491,8 +1454,6 @@ html.is-portrait-blocked .rotate-overlay { display: grid; }
   .steps li { padding: 5px 8px 6px; }
   .step-name { display: none; }
   .hint-bar { display: none; }
-  .mode-info .panel-note { display: none; }
-  .flow-text span { display: none; }
   .preview-sub { display: none; }
   .detail-list--compact { display: none; }
   .preview-info { gap: 7px; }
@@ -1518,7 +1479,8 @@ html.is-portrait-blocked .rotate-overlay { display: grid; }
 
 /* Tall / narrow desktop windows: stack panels instead of squeezing them. */
 @media (max-aspect-ratio: 1/1) and (min-height: 600px) {
-  .mode-layout, .char-layout, .map-layout { grid-template-columns: 1fr; grid-template-rows: minmax(0, 1.4fr) minmax(0, 1fr); }
+  .char-layout, .map-layout { grid-template-columns: 1fr; grid-template-rows: minmax(0, 1.4fr) minmax(0, 1fr); }
+  .mode-layout { grid-template-columns: 1fr; grid-template-rows: auto minmax(0, 1fr); }
 }
 
 @media (min-width: 1700px) and (min-height: 900px) {
