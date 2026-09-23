@@ -157,14 +157,23 @@ moves focus).
 
 ### 6.1 Splash
 
-- Black screen; "a game by hiyroscript" (exact wording) fades in near the
-  bottom centre in soft gray with generous letter spacing, holds, fades out.
-- Total ≈ 2.5–3.5 s; any key or tap skips.
-- Home then dissolves in over the black (the splash stays mounted underneath
-  until the fade completes) for a seamless dark transition. The page and browser
-  theme stay dark before boot, during the splash and throughout navigation.
-- Reduced motion: no fades, short hold.
-- No wordmark or logo animation on the splash.
+- Start on blank, pure black, with no text, loading UI, Home or rotate overlay.
+  Both `./hs.jpg` and `./alvafav.PNG` must load through AssetLoader and fully
+  decode before either image appears. Fighter preloading continues independently.
+- Show `hs.jpg` first, centred with its natural proportions and responsive sizing.
+  Fade in for 900 ms, hold for 1600 ms, and fade out for 800 ms. A continuous,
+  restrained forward zoom from 0.88 to 1.16 spans all three phases.
+- After 220 ms of clean black, show `alvafav.PNG` with the same treatment at
+  its own appropriate size. The images never overlap visibly.
+- After the second fade-out and 200 ms of black, navigate to Home. Its existing
+  entrance dissolve reveals it over the still-mounted black splash.
+- Input does not skip loading or the sequence. Leaving or re-entering cancels
+  pending animation and delays. A load/decode failure logs an error and skips
+  the entire intro to Home without showing partial or broken artwork.
+- Reduced motion retains the same preload gate and image order, with no zoom
+  or fades: each image holds for 1000 ms, separated by the same black beats.
+- The page is black before boot; the rotate overlay resumes normally after splash.
+  Asset paths remain relative and the existing favicon reference is unchanged.
 
 ### 6.2 Home
 

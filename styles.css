@@ -368,25 +368,37 @@ html.is-touch .hint-bar { display: none; }
 
 .screen--splash {
   background: #000;
-  justify-content: flex-end;
-  align-items: center;
-  padding-bottom: max(calc(var(--safe-b) + 7vh), 9vh);
+  padding: 0;
+  display: grid;
+  place-items: center;
 }
-.screen--splash.is-entering { animation-name: fade-in; animation-duration: 0.4s; }
-/* Hold the black under Home while it dissolves in. */
-.screen--splash.is-leaving { animation: none; }
-.splash-credit {
-  margin: 0;
-  padding-left: 0.34em; /* balance trailing letter-spacing */
-  font-size: clamp(13px, 2.1vh, 17px);
-  font-weight: 400;
-  letter-spacing: 0.34em;
-  color: #d4d4d4;
+/* No screen-level fade; keep pure black underneath Home's dissolve. */
+.screen--splash.is-entering, .screen--splash.is-leaving { animation: none; }
+.splash-stage {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template: minmax(0, 1fr) / minmax(0, 1fr);
+  place-items: center;
+  /* Symmetric safe-area padding keeps the artwork at the viewport centre. */
+  padding: max(24px, var(--safe-t), var(--safe-b)) max(24px, var(--safe-l), var(--safe-r));
+}
+.splash-image {
+  grid-area: 1 / 1;
+  width: auto;
+  height: auto;
+  max-width: min(70%, 640px);
+  max-height: 65%;
+  object-fit: contain;
   opacity: 0;
-  transition: opacity var(--fade-in, 800ms) ease;
+  transform: scale(1);
+  transform-origin: center center;
 }
-.splash-credit.is-in { opacity: 1; }
-.splash-credit.is-out { opacity: 0; transition-duration: var(--fade-out, 700ms); }
+.splash-image--alva { max-width: min(52%, 300px); max-height: 52%; }
+/* Device and application overlays resume normally after the intro. */
+html:not([data-screen]) .rotate-overlay,
+html[data-screen="splash"] .rotate-overlay,
+html[data-screen="splash"] .overlay { display: none; }
 
 /* ---------------------------------------------------------------------
    Home
