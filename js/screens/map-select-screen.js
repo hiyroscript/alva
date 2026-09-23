@@ -37,7 +37,7 @@ export class MapSelectScreen extends Screen {
 
     this.startBtn = el('button', {
       class: 'btn btn--primary btn--start', type: 'button', 'data-nav': true,
-      html: `<span>Confirm stage and Start Battle</span>${ICONS.arrow}`,
+      html: `<span>Confirm and start battle</span>${ICONS.arrow}`,
     });
     this.startBtn.addEventListener('click', () => this.start());
 
