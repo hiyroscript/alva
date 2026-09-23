@@ -394,37 +394,17 @@ html.is-touch .hint-bar { display: none; }
 
 .screen--home {
   --gutter: clamp(24px, 6vw, 112px);
+  /* Glass strip before its 21deg turn, as fractions of the screen width. */
+  --glass-l: 0.64;
+  --glass-w: 0.44;
+  --credits-pad: clamp(18px, 2.6vw, 40px);
   isolation: isolate;
 }
 .screen--home.is-entering { animation: fade-in 0.7s ease both; }
 .screen--home.is-entering .home-intro > * { animation: rise-in 0.6s var(--ease) both; }
 .screen--home.is-entering .home-intro > :nth-child(2) { animation-delay: 40ms; }
 .screen--home.is-entering .home-intro > :nth-child(3) { animation-delay: 80ms; }
-.screen--home.is-entering .home-intro > :nth-child(4) { animation-delay: 120ms; }
 
-.home-header, .home-footer {
-  position: relative;
-  z-index: 1;
-  flex: none;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding-left: max(var(--safe-l), var(--gutter));
-  padding-right: max(var(--safe-r), var(--gutter));
-}
-.home-header {
-  min-height: calc(clamp(40px, 9vh, 80px) + var(--safe-t));
-  padding-top: var(--safe-t);
-}
-.logo--mark { width: auto; height: clamp(12px, 2vh, 16px); color: var(--text-secondary); }
-.home-build {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--text-secondary);
-}
 .home-main {
   position: relative;
   z-index: 1;
@@ -432,24 +412,30 @@ html.is-touch .hint-bar { display: none; }
   min-height: 0;
   display: flex;
   align-items: center;
-  padding: 16px max(var(--safe-r), var(--gutter)) 24px max(var(--safe-l), var(--gutter));
+  padding: max(var(--safe-t), 24px) max(var(--safe-r), var(--gutter)) 24px max(var(--safe-l), var(--gutter));
+  /* Only the intro takes the pointer, so the credits column behind the empty
+     right side stays scrollable when it is still (reduced motion). */
+  pointer-events: none;
 }
-.home-intro { display: flex; flex-direction: column; align-items: flex-start; width: 54%; min-width: 0; }
-.home-eyebrow {
-  margin-bottom: clamp(14px, 3vh, 28px);
-  font-family: var(--font-mono);
-  font-size: clamp(10px, 1.6vh, 12px);
-  font-weight: 500;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--text-muted);
+.home-intro {
+  --lede-size: clamp(13px, 2.1vh, 17px);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 54%;
+  min-width: 0;
+  pointer-events: auto;
 }
 .home-title { width: 100%; line-height: 0; }
-.logo--display { width: 100%; height: auto; max-height: 24vh; object-position: left; }
+/* Width drives height, so the SVG box keeps the wordmark's own aspect ratio
+   and the A starts on the box edge instead of being centred in a wider box.
+   The shift matches the side bearing of the tagline's first letter, so the
+   A's first stroke lines up with the tagline's visible start. */
+.logo--display { width: min(100%, 72vh); height: auto; transform: translateX(calc(var(--lede-size) * 0.085)); }
 .home-lede {
   margin-top: clamp(14px, 3vh, 28px);
   max-width: 34ch;
-  font-size: clamp(13px, 2.1vh, 17px);
+  font-size: var(--lede-size);
   line-height: 1.45;
   color: var(--text-secondary);
 }
@@ -483,27 +469,35 @@ html.is-touch .hint-bar { display: none; }
 .home-action--primary { background: var(--action); border-color: var(--action); color: var(--white); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12); }
 .home-action--primary:hover { background: var(--action-hover); border-color: var(--action-hover); color: var(--white); }
 .home-action--primary:active { background: var(--action-pressed); border-color: var(--action-pressed); }
+/* Unavailable for now: quieter outline, readable muted label, no hover or
+   press response. Kept after the interactive states so it overrides them. */
+.home-action:disabled { background: transparent; border-color: var(--border); color: var(--text-muted); cursor: not-allowed; transform: none; }
+.home-action:disabled .icon { color: var(--text-faint); transform: none; }
 
-/* Fade in viewport space; the road and its slash share one transform so
-   their edges stay aligned at every size. Nothing here renders game art. */
-.home-road-scene {
+/* Two walls: the menu's near-black behind, and a semi-transparent glass strip
+   in front of it with the green line on its edge. The strip and its credits
+   share one fade in viewport space. Nothing here renders game art. */
+.home-scene {
   position: absolute;
   inset: 0;
   pointer-events: none;
   overflow: hidden;
   mask-image: linear-gradient(transparent, #000 20%, #000 80%, transparent);
 }
-.home-road {
+.home-glass {
   position: absolute;
-  left: 64%;
+  left: calc(var(--glass-l) * 100%);
   top: -45%;
-  width: 44%;
+  width: calc(var(--glass-w) * 100%);
   height: 190%;
   transform: rotate(21deg);
-  background: linear-gradient(90deg, #111214, #242629 50%, #151618);
+  background:
+    linear-gradient(90deg, transparent 3px, rgba(255, 255, 255, 0.16) 3px 4px, transparent 4px),
+    linear-gradient(90deg, transparent 54%, rgba(255, 255, 255, 0.035) 62%, transparent 70%),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.035) 30%, rgba(255, 255, 255, 0.04) 75%, rgba(255, 255, 255, 0.065));
   border-right: 1px solid var(--border-strong);
 }
-.home-road::before {
+.home-glass::before {
   content: "";
   position: absolute;
   inset: 0 auto 0 0;
@@ -511,57 +505,105 @@ html.is-touch .hint-bar { display: none; }
   background: var(--accent);
   box-shadow: 0 0 18px rgba(47, 191, 99, 0.2);
 }
-.home-road-lane {
+
+/* Upright credits clipped to the glass. The strip's edges cross mid-height
+   at these fractions of the width and slant by tan(21deg) * 50vh either way.
+   The track holds the credits twice and HomeScreen.update() moves it up by
+   one pass before wrapping, so the loop has no seam. */
+.home-credits {
+  --glass-x: calc(var(--glass-l) - 0.0356 * var(--glass-w));
+  --glass-xr: calc(var(--glass-l) + 1.0356 * var(--glass-w));
   position: absolute;
-  top: -80px;
-  bottom: -80px;
-  left: 33.33%;
-  width: 2px;
-  background: repeating-linear-gradient(to bottom, rgba(244, 245, 246, 0.25) 0 32px, transparent 32px 80px);
-  animation: home-road-scroll 1.8s linear infinite;
+  inset: 0;
+  clip-path: polygon(
+    calc(var(--glass-x) * 100% + 19.19vh) 0, calc(var(--glass-xr) * 100% + 19.19vh) 0,
+    calc(var(--glass-xr) * 100% - 19.19vh) 100%, calc(var(--glass-x) * 100% - 19.19vh) 100%);
+  clip-path: polygon(
+    calc(var(--glass-x) * 100% + 19.19dvh) 0, calc(var(--glass-xr) * 100% + 19.19dvh) 0,
+    calc(var(--glass-xr) * 100% - 19.19dvh) 100%, calc(var(--glass-x) * 100% - 19.19dvh) 100%);
 }
-.home-road-lane + .home-road-lane { left: 66.66%; }
-@keyframes home-road-scroll { to { transform: translateY(80px); } }
+/* The column starts where the glass edge is a quarter of the way down, so
+   rising text only meets the edge inside the top fade. */
+.home-credits-col {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(var(--glass-x) * 100% + 9.6vh + var(--credits-pad));
+  left: calc(var(--glass-x) * 100% + 9.6dvh + var(--credits-pad));
+  right: max(var(--safe-r), var(--credits-pad));
+  overflow: hidden;
+  text-align: center;
+}
+.home-credits-track { will-change: transform; }
+/* Top + bottom padding is the pause between one pass and the next. */
+.home-credits-seq { padding: 24vh 0 8vh; }
+.home-credit { max-width: 36ch; margin: 0 auto; }
+.home-credit + .home-credit { margin-top: clamp(26px, 5.5vh, 52px); }
+.home-credit-title { font-size: clamp(12px, 1.8vh, 14px); font-weight: 600; color: var(--text); }
+.home-credit-lead { margin-top: 4px; font-size: clamp(16px, 2.4vh, 20px); font-weight: 700; line-height: 1.3; color: var(--text-strong); }
+.home-credit-line { margin-top: 4px; font-size: clamp(13px, 1.9vh, 15px); line-height: 1.5; color: var(--text-secondary); }
+
 .home-footer {
+  position: relative;
+  z-index: 1;
+  flex: none;
+  display: flex;
+  align-items: center;
   min-height: calc(clamp(34px, 8vh, 64px) + var(--safe-b));
-  padding-bottom: var(--safe-b);
+  padding: 0 max(var(--safe-r), var(--gutter)) var(--safe-b) max(var(--safe-l), var(--gutter));
   border-top: 1px solid var(--border);
   background: var(--bg);
   font-family: var(--font-mono);
   font-size: 11px;
   color: var(--text-muted);
 }
-/* Preserve desktop hints even at short landscape heights. */
-html:not(.is-touch) .home-footer .hint-bar { display: flex; }
 
 @media (max-width: 900px) {
-  .screen--home { --gutter: clamp(20px, 5vw, 44px); }
+  .screen--home { --gutter: clamp(20px, 5vw, 44px); --glass-l: 0.75; --glass-w: 0.48; --credits-pad: 16px; }
   .home-intro { width: 62%; }
-  .home-road { left: 75%; width: 48%; }
+  .home-credit-lead { font-size: 15px; }
+  .home-credit-title, .home-credit-line { font-size: 12px; }
 }
 @media (max-aspect-ratio: 1/1) {
+  .screen--home { --glass-l: 1.08; --glass-w: 0.6; }
   .home-intro { width: 86%; }
-  .home-road { left: 108%; width: 60%; opacity: 0.65; }
+  .home-glass { opacity: 0.65; }
+  /* Too little glass is on screen here for readable text, so the credits
+     stay available to assistive technology only. */
+  .home-credits { clip-path: inset(50%); }
 }
 @media (max-height: 500px) {
-  .home-header { min-height: calc(34px + var(--safe-t)); }
-  .home-main { padding-top: 8px; padding-bottom: 12px; }
-  .home-eyebrow { margin-bottom: 10px; font-size: 10px; }
-  .logo--display { width: auto; max-width: 100%; height: 23vh; }
-  .home-lede { margin-top: 10px; font-size: 13px; }
+  .home-main { padding-top: max(var(--safe-t), 12px); padding-bottom: 12px; }
+  .home-intro { --lede-size: 13px; }
+  .logo--display { width: min(100%, 69vh); }
+  .home-lede { margin-top: 10px; }
   .home-actions { margin-top: 16px; gap: 6px; }
   .home-action { height: 40px; }
   .home-footer { min-height: calc(32px + var(--safe-b)); }
+  .home-credit + .home-credit { margin-top: 20px; }
+  .home-credit-lead { font-size: 14px; }
+  .home-credit-title, .home-credit-line { margin-top: 2px; font-size: 11px; line-height: 1.45; }
+  .home-credit-title { margin-top: 0; }
 }
 @media (max-height: 360px) {
-  .home-eyebrow { margin-bottom: 7px; }
-  .logo--display { height: 21vh; }
+  .logo--display { width: min(100%, 63vh); }
   .home-lede { margin-top: 8px; }
   .home-actions { margin-top: 10px; gap: 5px; }
   .home-action { height: 36px; }
 }
+/* Still credits: one readable copy, clear of the fades, scrollable by hand. */
 @media (prefers-reduced-motion: reduce) {
-  .home-road-lane, .screen--home.is-entering .home-intro > * { animation: none; }
+  .screen--home.is-entering .home-intro > * { animation: none; }
+  .home-credits-col {
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    touch-action: pan-y;
+    pointer-events: auto;
+    scrollbar-width: none;
+  }
+  .home-credits-track { will-change: auto; }
+  .home-credits-seq { padding-bottom: 24vh; }
+  .home-credits-seq[aria-hidden] { display: none; }
 }
 
 /* ---------------------------------------------------------------------
@@ -986,8 +1028,6 @@ html:not(.is-touch) .home-footer .hint-bar { display: flex; }
 .info-text, .info-note { color: var(--text-secondary); font-size: 14px; line-height: 1.55; }
 .info-text + .info-text, .info-note { margin-top: 10px; }
 .credit-lead { font-size: clamp(17px, 2.8vh, 22px); font-weight: 700; color: var(--text-strong); margin-bottom: 8px; }
-.credit-list { margin: 12px 0; padding: 12px 0; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
-.credit-list dd { font-size: 15px; }
 
 .controls-table { width: 100%; border-collapse: collapse; font-size: 14px; }
 .controls-table th, .controls-table td { padding: 7px 0; border-bottom: 1px solid var(--border); text-align: left; font-weight: 500; }

@@ -100,15 +100,16 @@ and progress; it does not fill every card, border or heading.
 - **Setup steps:** done = gray with a check; current = filled green number and
   underline; future = gray.
 - **Panels:** charcoal, translucent light hairlines, established radii and
-  restrained neutral shadows. No new textures or glass effects.
+  restrained neutral shadows. No new textures or glass effects; the Home
+  credits strip (6.2) is the one glass surface.
 
 ### 5.3 Wordmark and favicon
 
 - The wordmark reads **ALVA**, drawn from original geometric SVG letterforms
   (`js/ui/logo.js`): bold, uppercase, evenly and optically spaced, no skew, no
   shadows, no effects. It inherits `currentColor`.
-- It is used in the Home header (small), the Home title (large) and the loading
-  overlay. The SVG exposes `role="img"`, `aria-label="ALVA"` and a `<title>`;
+- It is used as the large Home title and in the loading overlay. The SVG
+  exposes `role="img"`, `aria-label="ALVA"` and a `<title>`;
   repeated decorative copies are `aria-hidden`.
 - Favicon: white rounded square, thin gray outline, black "A" monogram.
 
@@ -125,10 +126,10 @@ and progress; it does not fill every card, border or heading.
 
 - 120–220 ms hover/focus transitions, gentle screen transitions (short fade
   and ≤ 12 px slide), subtle press feedback, restrained idle animation.
-- No streaks, wipes or large hover translations. Home alone has subtle
-  continuous lane motion and a restrained bloom around its stable green slash.
-- `prefers-reduced-motion: reduce` removes transitions and animation, and the
-  Home road lanes remain still.
+- No streaks, wipes or large hover translations. Home alone has continuous
+  motion: a slow, constant upward credits roll beside its stable green slash.
+- `prefers-reduced-motion: reduce` removes transitions and animation; the Home
+  credits stand still as a single readable copy.
 
 ### 5.6 Game content exception
 
@@ -142,7 +143,7 @@ fit the palette.
 
 ```
 Splash → Home → Select Mode → Select Fighter → Select Map → Battle
-Home → Help & Credits
+Home → Help & Credits (the Home entry is disabled for now)
 Battle → Pause → Resume / Restart / Help / Return to Home (confirmed)
 Battle (time over) → Result → Rematch / Change Stage / Return to Home
 ```
@@ -164,24 +165,40 @@ moves focus).
 
 ### 6.2 Home
 
-An open editorial composition with a full-screen near-black background:
+An open editorial composition on a full-screen near-black background, with
+the menu on the left and an angled glass credits strip on the right. There is
+no header, build label, eyebrow or keyboard hint bar.
 
-- **Header:** quiet small ALVA mark and mono "Build x.y.z" label.
-- **Intro:** muted uppercase "2D sprite fighting game", dramatically enlarged
-  original ALVA SVG wordmark, then one short supporting line.
+- **Intro:** the dramatically enlarged original ALVA SVG wordmark, then the
+  supporting line "Fan project. Big heart." The wordmark's first visible stroke
+  lines up with the start of that line.
 - **Actions:** exactly two — **Play** (green, white text, arrow) opens Select
-  Mode; **Help & Credits** (restrained secondary, chevron) opens Help & Credits.
-  Play is focused by default. Home buttons have a small 3 px radius.
-- **Road:** decorative HTML/CSS, `aria-hidden`, roughly the right 44% on wide
-  screens, angled 21 degrees and extended beyond the viewport. Charcoal asphalt,
-  subtle pale lane markings on a 1.8 s cycle, and dark top/bottom fades. A stable
-  3 px green slash follows the road's left edge. No fighter preview or Canvas.
-- **Footer:** "by hiyroscript" and existing keyboard hints (hidden on touch-first
-  devices), gray typography and a subtle top hairline.
-- **Responsive:** safe-area-aware, no Home scrolling. On narrow layouts the road
-  moves farther off-screen but remains a background strip. Short landscape
-  heights reduce title size, gaps and action height while retaining meaningful
-  content. Reduced motion stops decorative lane and entrance animations.
+  Mode and is focused by default; **Help & Credits** (chevron) stays visible but
+  is a genuinely disabled button for now: muted gray label and outline, no
+  hover or press response, skipped by keyboard/gamepad focus. The Help &
+  Credits screen and the pause-menu Help remain in place. Home buttons have a
+  small 3 px radius.
+- **Footer:** "by hiyroscript" in gray monospace, full width under a subtle
+  top hairline.
+- **Credits strip:** two walls. The back wall is the same near-black as the
+  menu; in front of it, a semi-transparent glass strip roughly covers the right
+  44% on wide screens, angled 21 degrees and extended beyond the viewport, with
+  a faint sheen and edge highlights. A stable 3 px green slash with a
+  restrained bloom runs along its left edge, and the strip fades out at the
+  top and bottom. No fighter preview or Canvas.
+- **Credits roll:** plain upright text (group titles and lines from the shared
+  credits data, see 6.6; no cards or boxes), centred in a column inside the
+  glass and clipped to it. It rolls upward at a slow constant speed and loops
+  seamlessly without end. The roll is driven by the app's frame loop, so
+  re-entering Home never stacks timers. The animation-only duplicate is
+  `aria-hidden`.
+- **Responsive:** safe-area-aware, no Home scrolling. On narrow layouts the
+  strip moves farther right and the credits column narrows; when the window is
+  taller than it is wide the strip is mostly off-screen and the credits remain
+  for assistive technology only. Short landscape heights reduce title size,
+  gaps, action height and credit type. Reduced motion stops the roll and
+  entrance animations and shows one still copy of the credits that can be
+  scrolled by hand.
 - All other screens retain their layout, structure, spacing and behaviour.
 
 ### 6.3 Select Mode
@@ -216,17 +233,24 @@ An open editorial composition with a full-screen near-black background:
   ↑/↓ scroll.
 - Help: desktop controls rendered from the live key bindings, mobile control
   diagram, movement, stages and platforms, pause, notes on this build.
-- Credits (must remain visible and readable):
-  - **Alva** — created by hiyroscript; game design, code, interface, the Alva
-    wordmark and the Desert and City stage art are original work for Alva.
-  - **#0001 sprite source** — Naruto Uzumaki; *Jump Ultimate Stars*; Nintendo
-    DS / DSi; The Spriters Resource; source sheet uploaded by Dazz; contributor
-    FRET. hiyroscript did not create the original Naruto artwork and does not
-    own the Naruto or Jump Ultimate Stars intellectual property.
-  - **Rights** — original characters, games and related properties belong to
-    their respective rights holders.
-- Never imply ownership of Naruto, Jump Ultimate Stars, Nintendo IP or The
-  Spriters Resource material.
+- The Home entry to this screen is disabled for now; the screen stays in place
+  so it can return.
+- Credits (must remain visible and readable). One list in
+  `js/ui/help-content.js` feeds both this tab and the Home credits roll:
+  - **ALVA** — created by hiyroscript.
+  - **Original work** — game design, code, interface, ALVA wordmark, and
+    Desert / City stage artwork by hiyroscript.
+  - **#0001 sprite source** — original sprite material from *Jump Ultimate
+    Stars*; Nintendo DS / DSi; The Spriters Resource; source sheet uploaded by
+    Dazz; contributor FRET.
+  - **Rights** — hiyroscript did not create or claim ownership of the original
+    third-party character/game artwork. Original characters, games, and related
+    properties belong to their respective rights holders.
+  - **Project** — unofficial fan project. No affiliation or endorsement is
+    implied.
+- The UI does not name the character behind #0001. Never imply ownership of
+  the original character, Jump Ultimate Stars, Nintendo IP or The Spriters
+  Resource material.
 
 ### 6.7 Loading and dialogs
 
