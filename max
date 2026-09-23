@@ -1,545 +1,330 @@
-You are working on the Alva game repository:
+Update the Alva game’s Home screen and credits presentation. Work within the existing architecture and visual language. This is a plain HTML/CSS/vanilla-JavaScript browser fighting game with no framework and no build step. Do not modify combat, physics, fighter sprite rendering, stage rendering, input systems, or unrelated menu screens.
 
-hiyroscript/alva
+Files/context to inspect first
 
-Use this repository as the implementation target.
+The main relevant files are:
 
-Use the Seren repository as the visual reference:
+* js/screens/home-screen.js — constructs the Home screen.
+* styles.css — Home layout begins around the .screen--home / .home-* rules.
+* js/ui/help-content.js — current Help and Credits content.
+* js/screens/help-credits-screen.js — existing Help & Credits screen.
+* js/core/app.js — screen registration.
+* ALVA_SPEC.md and README.md — update documentation where needed so it does not contradict the finished UI.
 
-hiyroscript/seren
+Preserve Alva’s existing near-black/charcoal/off-white/green design system and its existing geometric SVG wordmark.
 
-The goal is to redesign Alva’s color system across the UI so it has the same general visual discipline and atmosphere as Seren—black/charcoal dominant, gray surfaces, off-white typography, restrained borders, and one strong accent color—but replace Seren’s red accent with green.
+1. Reposition the large ALVA wordmark
 
-There is one extremely important scope rule:
+On the Home screen, move the large ALVA wordmark farther to the left.
 
-Only the Alva Home Screen may receive a structural/layout redesign.
+The visible left edge of the first “A” glyph should line up with the exact horizontal starting position of the supporting text below it.
 
-Every other screen must retain its current layout, DOM structure, spacing system, controls, functionality, navigation, information hierarchy, and gameplay behavior. Other screens should only inherit the new dark/green visual palette through shared styling and narrowly targeted color changes.
+The supporting text currently starts with “Fast…”, so the intended visual instruction is: put ALVA where the word “Fast” currently starts.
 
-Do not redesign Mode Select, Character Select, Map Select, Help/Credits, Battle, pause/results UI, overlays, or any other screen.
+Do this as a Home-specific layout adjustment. Do not modify the global logo.js wordmark geometry in a way that changes the logo everywhere else.
 
-Reference direction
+If the SVG element is technically aligned but its visible glyph still appears inset, compensate in the Home-only CSS with positioning/translation so the visible first stroke of the A aligns with the text.
 
-Seren establishes its visual identity using a very small palette:
+2. Change the Home tagline
 
---void: #050506;
---ground: #0A0B0C;
---asphalt: #141518;
---ink: #F4F5F6;
---ink-2: #A7ACB3;
---ink-3: #71767E;
---ink-4: #4C5158;
---line: rgba(255,255,255,.09);
---line-2: rgba(255,255,255,.16);
---line-3: rgba(255,255,255,.28);
---wash: rgba(255,255,255,.04);
---wash-2: rgba(255,255,255,.07);
+Replace:
 
-Seren then uses red as its sole interface accent.
+Fast, responsive fighting in your browser.
 
-For Alva, use the same philosophy but make green the accent.
+with exactly:
 
-A suitable Alva accent family is:
+Fan project. Big heart.
 
---accent: #2FBF63;
---accent-hi: #7CF7A6;
---accent-lo: #1F8F4A;
---accent-wash: rgba(47,191,99,.14);
+Keep the same general typography hierarchy and muted supporting-text treatment unless spacing needs adjustment for the redesigned layout.
 
-Do not introduce blue, purple, orange, yellow, cyan, or additional decorative hues.
+3. Remove the “2D sprite fighting game” Home text
 
-The finished UI should visually read as:
-
-near-black → charcoal → gray → off-white → green accent
-
-Green should be deliberate and relatively scarce. The game should remain primarily black/gray/white rather than becoming a “green UI.”
-
-Global Alva color conversion
-
-Alva currently defines a white-dominant monochrome system at the top of styles.css. Convert that system into a dark Seren-like system.
-
-Target approximately:
-
---bg: #050506;
---surface: #0A0B0C;
---surface-subtle: #141518;
---surface-muted: #1C1F24;
---surface-sunken: #08090A;
---text: #F4F5F6;
---text-strong: #FFFFFF;
---text-secondary: #A7ACB3;
---text-muted: #71767E;
---text-faint: #4C5158;
---border: rgba(255,255,255,.09);
---border-strong: rgba(255,255,255,.16);
---border-hover: rgba(255,255,255,.28);
---black: #050506;
---white: #FFFFFF;
---accent: #2FBF63;
---accent-hi: #7CF7A6;
---accent-lo: #1F8F4A;
---accent-wash: rgba(47,191,99,.14);
-
-Do not blindly invert existing variables if doing so creates incorrect semantics. Alva currently uses variables such as --ink, --black, and --white for both text and filled controls. Refactor individual rules where necessary so that dark surfaces remain dark, text remains light, and green is used for intentional emphasis.
-
-Primary interactive emphasis should generally become green, similar to how Seren uses red.
-
-Examples include primary actions, active/focused selection accents, small progress/indicator accents, and selected-state borders where appropriate.
-
-Secondary controls should generally remain transparent or charcoal with thin gray borders and off-white/gray text.
-
-Hover states should lighten surfaces slightly rather than introducing new colors.
-
-Pressed green actions can use --accent-lo.
-
-Green hover/highlight treatment can use --accent-hi sparingly.
-
-Subtle selected backgrounds may use --accent-wash.
-
-Do not make every border green.
-
-Do not make every heading green.
-
-Do not tint entire cards green.
-
-Do not use neon glow everywhere.
-
-The green needs to work like Seren’s red: a controlled visual signal.
-
-Preserve game artwork
-
-This is critical.
-
-Do not recolor, tint, regenerate, replace, filter, or otherwise modify:
-
-character sprites,
-stage artwork,
-map artwork,
-gameplay Canvas rendering,
-environment colors,
-sprite assets,
-animation frames.
-
-The dark/green conversion applies to interface chrome, not game content.
-
-Battle stages and characters must retain their original colors.
-
-The existing dark battle HUD can be adjusted where necessary so its UI accents fit the new palette, but do not touch the rendered stage or fighter artwork.
-
-Non-Home screens
-
-Do not redesign these screens.
-
-Their layouts and structures are already established.
-
-That includes:
-
-Mode Select,
-Character Select,
-Map Select,
-Help & Credits,
-Battle,
-Pause,
-Results,
-dialogs,
-loading overlays,
-rotate-device UI.
-
-Allow them to inherit the new dark palette through the shared CSS tokens.
-
-Where an existing rule explicitly assumes a white background or black foreground and therefore looks wrong after the token change, update the color declaration only.
-
-Do not modify grid definitions, dimensions, padding, component arrangement, responsive layout, button placement, or JS behavior on these screens.
-
-Treat this as a theme conversion, not a UI redesign.
-
-Home Screen — full redesign allowed
-
-The Home Screen is the exception.
-
-Rework the Alva Home Screen so its composition feels strongly related to Seren’s Home Screen while still clearly being Alva.
-
-The existing Alva Home currently consists of a header, text/action column, and a contained character preview card.
-
-Replace the existing character-preview concept.
-
-The new Home composition should have a large editorial wordmark/text area on the left and an abstract moving road occupying the right side of the screen.
-
-The road replaces the current character placeholder/preview panel.
-
-Do not place a fighter sprite on the Home Screen.
-
-Home visual hierarchy
-
-The background should be full-screen near-black/charcoal.
-
-Make the existing ALVA geometric SVG wordmark the dominant visual element.
-
-Do not replace Alva’s existing logo with a generic font.
-
-Continue using logoSVG() from:
-
-js/ui/logo.js
-
-The wordmark should become dramatically larger than it is currently—closer to Seren’s oversized “SEREN” Home title.
-
-Think editorial title scale rather than application-logo scale.
-
-Keep it off-white/white.
-
-Above the title, retain a small mono uppercase kicker such as the existing:
+Completely remove the visible Home eyebrow:
 
 2D sprite fighting game
 
-This should be muted gray.
+Do not merely hide it with opacity. Remove the element from the Home DOM and remove/rework any spacing that existed specifically for .home-eyebrow.
 
-Below or close to the title, keep a short supporting line if it contributes to balance, but do not clutter the composition.
+This request concerns the visible Home UI; do not break useful technical metadata solely because similar descriptive wording exists elsewhere.
 
-The left side should contain the existing functional actions:
+4. Remove the small top-left ALVA mark
+
+Remove the small decorative ALVA logo currently shown in the Home header at the top left.
+
+The large central ALVA wordmark remains.
+
+Remove unused markup/CSS/imports associated specifically with the small Home header logo where appropriate.
+
+5. Remove the top-right Build label
+
+Remove the Home-screen text such as:
+
+Build 0.1.0
+
+There should be no build/version label in the upper-right corner of Home.
+
+After removing both the small ALVA mark and Build label, do not leave an empty header taking up unnecessary vertical space. Reclaim that space for the main Home composition.
+
+Do not remove CONFIG.version globally if it is useful elsewhere.
+
+6. Disable Help & Credits from Home for now
+
+Keep the visible Help & Credits button on the Home menu, but disable it for now.
+
+Requirements:
+
+* Use a genuinely disabled button state.
+* It must not navigate to the Help & Credits screen.
+* It must not receive keyboard/gamepad menu focus.
+* It must not react to click/touch.
+* Give it a restrained disabled appearance consistent with Alva’s existing charcoal/gray hierarchy.
+* Keep its text readable.
+* Play remains the default focused Home action.
+
+Do not delete the underlying Help/credits infrastructure because Help is still used from the battle pause menu and may be re-enabled later.
+
+7. Completely remove the decorative road
+
+Delete the Home road visual.
+
+Remove:
+
+* the angled road surface,
+* lane markings,
+* lane animation,
+* road-specific masking,
+* road scrolling keyframes,
+* road-specific responsive positioning,
+* any other CSS or DOM that only exists to render the road.
+
+There should be no visual trace of a roadway.
+
+8. Replace the road area with an infinite vertical credits section
+
+Use the area that was previously occupied by the road as a dedicated credits panel on the right side of Home.
+
+Visual design
+
+The new credits region should:
+
+* occupy approximately the same right-side visual zone that the road used,
+* have a gray/charcoal background that is clearly distinct from the near-black menu background,
+* contain upright, readable credit text,
+* use Alva’s existing typography,
+* remain restrained and clean rather than looking like an arcade marquee.
+
+Place a crisp green separator line along the left boundary of the credits region, visually separating the left-side Home menu from the right-side credits panel.
+
+The separator should use the existing Alva green accent. A roughly 3px divider is appropriate and should visually replace the role the old road’s green slash played.
+
+Do not introduce new accent colors.
+
+9. Infinite credits scrolling behavior
+
+The credits inside the right panel should automatically move vertically upward at a slow, readable, constant speed.
+
+Behavior:
+
+1. Credits enter/move upward through the visible panel.
+2. The entire credit sequence continues until all text has completely passed out of view.
+3. Once the complete sequence has passed, restart it from the beginning.
+4. Continue indefinitely.
+
+A seamless duplicated-track loop is acceptable and preferable if it avoids a visible hitch, but a clean reset after the final text has fully passed is also acceptable.
+
+Do not create timers that accumulate or duplicate themselves every time Home is entered.
+
+Accessibility
+
+For prefers-reduced-motion: reduce:
+
+* disable the automatic movement,
+* present the credits in a readable static state instead.
+
+If duplicated DOM is used to create the infinite animation, expose only one copy to assistive technology and mark animation-only duplicates aria-hidden="true".
+
+10. Credit copy and attribution
+
+The new Home credits panel should provide meaningful attribution rather than filler.
+
+Use concise credit groups along these lines:
+
+ALVA
+Created by hiyroscript
+
+Original work
+Game design, code, interface, ALVA wordmark, and Desert / City stage artwork by hiyroscript.
+
+#0001 sprite source
+Original sprite material from Jump Ultimate Stars
+Nintendo DS / DSi
+The Spriters Resource
+Source sheet uploaded by Dazz
+Contributor: FRET
+
+Rights
+hiyroscript did not create or claim ownership of the original third-party character/game artwork. Original characters, games, and related properties belong to their respective rights holders.
+
+Project
+Unofficial fan project. No affiliation or endorsement is implied.
+
+Keep the wording compact enough for a scrolling credits treatment.
+
+Prefer making the credit copy a single source of truth in or near js/ui/help-content.js so the Home credits panel and existing Credits screen do not drift into contradictory attribution.
+
+11. Remove Naruto/Uzumaki references
+
+Remove user-facing mentions of:
+
+Naruto Uzumaki
+
+Also remove standalone user-facing occurrences of Naruto or Uzumaki so the character is not explicitly named anywhere in the game UI.
+
+In particular, the current buildCredits() implementation contains:
+
+* the Character field naming Naruto Uzumaki,
+* a sentence referring to “original Naruto artwork”.
+
+Replace those references with the generic but accurate attribution described above.
+
+Do not remove the legitimate source credits for:
+
+* Jump Ultimate Stars
+* Nintendo DS / DSi
+* The Spriters Resource
+* Dazz
+* FRET
+* appropriate third-party rights-holder language.
+
+Do not alter, redraw, rename, recolor, replace, or otherwise modify the actual #0001 sprite assets.
+
+Also update README.md / ALVA_SPEC.md where necessary so the repository documentation reflects the new credit wording and no longer instructs the UI to explicitly display Naruto/Uzumaki.
+
+12. Remove the Home control hints
+
+Remove the keyboard/navigation hints currently displayed at the bottom-right of Home, such as:
+
+↑ ↓ Navigate
+Enter Select
+
+This should be a Home-only change.
+
+Remove the hintBar(...) call from home-screen.js and its import if it becomes unused there.
+
+Do not globally remove hint bars from the other setup/menu screens.
+
+Keep the existing by hiyroscript footer text unless its positioning needs to move slightly to fit the redesigned composition.
+
+13. Revised Home composition
+
+The final Home screen should read visually as:
+
+Left/menu side
+
+Large ALVA wordmark
+Fan project. Big heart.
 
 Play
+Help & Credits — visibly disabled
 
-Help & Credits
+by hiyroscript near the bottom
 
-Play is the primary action and should use the green accent.
+Divider
 
-Help & Credits should be a restrained ghost/secondary action.
+Thin Alva-green line separating the two regions.
 
-Do not change what either button does.
+Right side
 
-Play must continue to navigate to mode.
+Gray/charcoal credits panel with the continuously upward-looping credits.
 
-Help & Credits must continue to navigate to help.
+There should be:
 
-Road composition
+* no small ALVA logo in the top left,
+* no Build/version text in the top right,
+* no “2D sprite fighting game” eyebrow,
+* no road,
+* no road lanes,
+* no road animation,
+* no Home navigation/control hint bar.
 
-Use Seren’s #ribbon treatment as visual inspiration, not as something to copy literally.
+14. Responsive behavior
 
-Create an Alva-specific road element using HTML/CSS rather than adding a raster image.
+Preserve the current requirement that Home fits the viewport without page scrolling and respects safe-area insets.
 
-The road should occupy approximately the right 40–48% of the Home composition on larger screens.
+Test at minimum:
 
-It should extend beyond the viewport vertically so it feels like a continuous piece of environment rather than a card.
+* normal desktop landscape,
+* wide desktop,
+* narrow desktop,
+* short landscape heights,
+* touch/mobile landscape,
+* very short landscape layouts.
 
-Give it an angled/banked presentation, roughly in the neighborhood of 18–24 degrees.
+The Home menu must remain legible and usable even when the viewport height is constrained.
 
-Use charcoal asphalt tones such as:
+The credits panel should not overlap the menu or make the Play button inaccessible.
 
-linear-gradient(
-  90deg,
-  #111214,
-  #242629 50%,
-  #151618
-)
+If the viewport becomes too narrow for a comfortable side-by-side presentation, intelligently reduce the credits-panel footprint while preserving the green separator and keeping the main ALVA/menu content dominant. Do not bring the road back.
 
-Add subtle pale-gray lane markings.
+15. Preserve existing behavior
 
-The lane markings may move continuously to imply forward motion, similar to Seren’s Home road.
+Do not change:
 
-Keep the animation subtle.
+* Splash behavior.
+* Select Mode.
+* Select Fighter.
+* Select Map.
+* Battle.
+* Physics.
+* Combat architecture.
+* Character normalization.
+* Stage renderers.
+* Touch controls.
+* Gamepad support.
+* Pause menu Help.
+* Loading/error overlays.
+* Existing sprite artwork.
 
-Do not create a visually noisy racing effect.
+The Home Play button must still navigate to Select Mode exactly as before.
 
-The road should feel architectural and graphic.
+The disabled Help & Credits Home button is the only Home navigation feature intentionally made unavailable.
 
-Use soft dark fades at the top and bottom so the road dissolves naturally into the background.
+16. Cleanup
 
-Do not use Seren’s red/white kerbs.
+After implementing:
 
-This is Alva, not a racing-game clone.
-
-Green slash separator
-
-The key visual signature of this Home redesign should be a smooth diagonal green slash/line separating the large text area from the road.
-
-The slash should follow or closely echo the left edge/angle of the road.
-
-Use --accent for the primary line.
-
-It should be crisp and anti-aliased through normal CSS transforms—not pixelated.
-
-Aim for roughly 2–4 CSS pixels of visible thickness depending on resolution.
-
-It can have an extremely restrained soft bloom such as:
-
-box-shadow: 0 0 18px rgba(47,191,99,.20);
-
-but do not turn it into a neon beam.
-
-The green slash should be visually recognizable without overpowering the wordmark.
-
-It should create the impression that the Home Screen is split into two zones:
-
-ALVA / navigation / typography on the left
-
-and
-
-moving road / motion / game world on the right.
-
-The separator should remain clean through responsive resizing.
-
-Home actions
-
-Keep the current two actions and their existing navigation.
-
-Restyle them to fit the Seren-inspired language.
-
-The Play button should be a green primary button with white text.
-
-Keep its arrow/icon.
-
-Use a relatively squared shape rather than a large soft pill. A small radius around 2–6px is appropriate.
-
-Give the primary button restrained depth rather than a large shadow.
-
-The secondary Help & Credits action should be transparent or lightly washed, with gray/off-white text.
-
-Do not put both actions inside separate large floating cards.
-
-The Home should feel open and typographic rather than card-heavy.
-
-Header
-
-The existing Home header currently contains a small Alva mark and build number.
-
-You may simplify its presentation as part of the Home redesign.
-
-Keep the build/version information available.
-
-A quiet mono build label in the upper-right is appropriate.
-
-If the small duplicate Alva logo makes the composition feel redundant next to the huge central wordmark, it can be reduced substantially, but retain enough branding/navigation structure that the screen feels deliberate.
-
-Do not add fake settings, profile, shop, online, account, or other features that Alva does not currently have.
-
-Footer
-
-Preserve:
-
-by hiyroscript
-
-and the existing navigation hints.
-
-Restyle them for the dark palette.
-
-Use a subtle top hairline and gray typography similar to Seren’s restrained footer treatment.
-
-Do not change keyboard behavior.
-
-Home Screen JavaScript cleanup
-
-The existing js/screens/home-screen.js creates:
-
-home-preview,
-home-preview-canvas,
-home-preview-caption,
-the selected fighter name,
-an idle sprite animation,
-a charcoal tint,
-and Canvas drawing logic.
-
-Because the road is replacing that character preview, remove the Home-only fighter-preview implementation cleanly.
-
-That means the Home Screen should no longer need imports that exist only for that preview, including things such as:
-
-getCharacter
-
-tintFrame
-
-fitCanvas
-
-drawFrameAt
-
-and the Home-only SILHOUETTE constant.
-
-Remove Home-only frame state and Home-only enter(), update(), or draw() logic if it becomes unnecessary.
-
-Do not remove or alter those shared utilities themselves because they are used elsewhere.
-
-Do not modify character-loading behavior anywhere outside Home.
-
-Build the new road DOM directly inside HomeScreen with semantic/decorative elements, or use Home-specific pseudo-elements where that creates a cleaner implementation.
-
-Mark purely decorative road elements with aria-hidden="true".
-
-Preserve aria-labelledby and sensible accessible naming for the Home navigation.
-
-Home responsive behavior
-
-Alva is designed for desktop and landscape mobile/tablet play, so the new Home needs to remain strong at short viewport heights.
-
-Do not simply hide the entire road at smaller widths the way the old fighter preview is currently hidden.
-
-Instead, adapt it.
-
-On smaller/narrower layouts, allow the road to move farther off the right edge and behave more like a decorative background strip.
-
-Keep the large ALVA title readable and prevent it from colliding with Play/Help controls.
-
-At very short landscape heights, reduce vertical gaps, kicker spacing, title scale, and button height before removing meaningful content.
-
-The green separator should remain visible whenever practical.
-
-Do not introduce scrolling on the main Home screen.
-
-Respect safe-area insets.
-
-Motion
-
-The Home entrance animation can retain Alva’s existing fade/rise character, but adapt it to the new elements.
-
-The road lane motion can run continuously at low intensity.
-
-A slow translation such as Seren’s approximately 1.4-second repeating lane cycle is a reasonable reference.
-
-The green slash itself should remain mostly stable. If it animates on entrance, use a short smooth reveal rather than perpetual pulsing.
-
-Respect:
-
-@media (prefers-reduced-motion: reduce)
-
-When reduced motion is requested, lane scrolling and decorative entrance motion should stop or effectively become instantaneous.
-
-Do not interfere with the existing ScreenManager transitions.
-
-Browser chrome
-
-Alva’s index.html currently declares a light browser theme.
-
-Update the browser-level appearance to match the new dark interface.
-
-Change the theme color from white to the dark ground/void color, for example:
-
-<meta name="theme-color" content="#050506">
-
-Update color-scheme appropriately for a dark UI.
-
-Avoid a white flash during boot or transitions.
-
-The splash is already black, so the transition from Splash to the redesigned dark Home should feel seamless.
-
-Focus and accessibility
-
-Do not use green alone to indicate selection or keyboard focus.
-
-Maintain a strong visible focus treatment.
-
-Because the background is now dark, update the existing focus-ring recipe so it remains visible against both charcoal surfaces and green controls.
-
-White/off-white outer focus treatment plus a dark separation line is appropriate.
-
-Maintain usable text contrast.
-
-Muted text should still be clearly readable.
-
-Buttons must remain identifiable without depending solely on color.
-
-Do not remove ARIA labels or semantic button elements.
-
-Things that must not change
-
-Do not modify gameplay mechanics.
-
-Do not modify fighter physics.
-
-Do not modify combat.
-
-Do not modify maps.
-
-Do not change roster data.
-
-Do not change game controls.
-
-Do not change navigation destinations.
-
-Do not introduce a framework.
-
-Do not add a build step.
-
-Do not add unnecessary dependencies.
-
-Do not replace the existing Alva SVG logo.
-
-Do not redraw or recolor character artwork.
-
-Do not redraw or recolor stage artwork.
-
-Do not copy Seren assets into Alva.
-
-Do not structurally redesign screens other than Home.
-
-Do not turn green into the dominant background color.
-
-Documentation
-
-Alva’s README and ALVA_SPEC.md currently explicitly describe the interface as white-dominant, strictly monochrome, and without an accent color.
-
-After implementing the design, update only the relevant design documentation so it accurately describes the new system:
-
-dark black/gray dominant interface,
-off-white/gray typography,
-green accent,
-original-color game artwork,
-Seren-inspired visual discipline,
-Home road composition.
-
-Do not rewrite unrelated product documentation.
-
-Implementation quality
-
-Keep the implementation concise and consistent with the existing codebase.
-
-Prefer changing shared semantic color variables over duplicating literal colors across dozens of selectors.
-
-Where current variable semantics conflict with the new theme, introduce appropriately named semantic variables instead of forcing an old variable to mean two contradictory things.
-
-Keep Home-specific styling under the existing Home section of styles.css.
-
-Keep non-Home changes limited to theme/color corrections.
-
-Avoid !important unless genuinely required by an existing specificity conflict.
-
-Avoid visual effects that do not exist elsewhere in the design system.
-
-No excessive gradients, glassmorphism, glow, rounded cards, or animated decoration.
-
-The result should feel like Alva redesigned by the same visual system that produced Seren, not like Seren copied directly into Alva.
+* Remove unused road CSS.
+* Remove unused road DOM.
+* Remove unused Home imports.
+* Remove obsolete Home header CSS if nothing else uses it.
+* Remove obsolete .home-eyebrow, .home-build, .home-road* rules.
+* Adjust Home entrance-animation selectors so removed elements do not leave incorrect nth-child() timing assumptions.
+* Ensure there are no console errors.
+* Do not introduce dependencies or a build system.
 
 Acceptance criteria
 
-* Alva opens into a near-black/charcoal interface rather than a white interface.
-* The UI across menus uses white/off-white text, gray hierarchy, subtle translucent light borders, and dark surfaces.
-* Green is the only major interface accent hue.
-* Character sprites and stage artwork retain their original colors.
-* No gameplay or navigation behavior changes.
-* Mode Select, Character Select, Map Select, Help, Battle and other screens retain their existing layouts.
-* Only Home receives new structure/layout.
-* Home has a dramatically larger ALVA wordmark on the left.
-* Home’s old fighter preview card is removed.
-* A dark angled road occupies the right side instead.
-* The road has subtle moving lane markings.
-* A smooth green diagonal slash separates the typography/navigation zone from the road.
-* Play is green and remains the primary action.
-* Help & Credits remains secondary.
-* Build/version information remains available.
-* by hiyroscript and navigation hints remain available.
-* Home remains usable on desktop and landscape mobile/tablet dimensions.
-* Reduced-motion users do not receive continuous decorative road animation.
-* Focus states remain obvious without relying only on green.
-* index.html uses a dark browser theme color.
-* There are no white flashes between Splash and Home.
-* There are no console errors.
-* The project remains plain HTML/CSS/JavaScript with no new build process.
-* README/spec design language is updated to match the implemented theme.
+The change is complete only when all of the following are true:
 
-Before finishing, run through the entire existing flow:
+* The large ALVA wordmark is visibly farther left and its first visible stroke aligns with the start of Fan project. Big heart.
+* The tagline is exactly Fan project. Big heart.
+* 2D sprite fighting game is gone from the visible Home UI.
+* The small top-left ALVA mark is gone.
+* The top-right Build label is gone.
+* Help & Credits remains visible but is disabled and cannot be selected or activated.
+* The road and all lane graphics are completely gone.
+* A gray/charcoal credits region occupies the former right-side visual area.
+* A green line cleanly separates the menu and credits regions.
+* Credits automatically scroll upward and restart indefinitely.
+* Reduced-motion users receive a non-animated readable version.
+* Home bottom-right keyboard/control hints are gone.
+* by hiyroscript remains.
+* No user-facing runtime text contains Naruto or Uzumaki.
+* Jump Ultimate Stars / Nintendo / The Spriters Resource / Dazz / FRET attribution remains appropriately represented.
+* #0001 sprite assets are untouched.
+* Play still works.
+* Pause-menu Help still works.
+* Desktop and landscape mobile layouts remain usable.
+* There are no JavaScript errors or layout overflow regressions.
 
-Splash → Home → Select Mode → Select Fighter → Select Map → Battle
-
-Also verify:
-
-Home → Help & Credits → Home
-
-and returning Home from gameplay.
-
-The final result should feel restrained, premium, fast, dark, and cohesive: Seren’s black/gray/off-white visual language translated into Alva, with green replacing red and a new road-driven Home composition built specifically for Alva.
+Implement this as a focused Home/credits redesign rather than a broader restyling of the game.
