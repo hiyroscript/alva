@@ -15,18 +15,18 @@ class Element {
   children = [];
   dataset = {};
   style = {};
+  animations = [];
   replaceChildren(...children) { this.children = children; }
+  animate(keyframes) {
+    const done = deferred();
+    const animation = { keyframes, finished: done.promise, finish: done.resolve, cancel: () => done.reject(new Error('cancelled')) };
+    this.animations.push(animation);
+    return animation;
+  }
 }
 function image(decode = () => Promise.resolve()) {
   const img = new Element();
   img.decode = decode;
-  img.animations = [];
-  img.animate = () => {
-    const done = deferred();
-    const animation = { finished: done.promise, finish: done.resolve, cancel: () => done.reject(new Error('cancelled')) };
-    img.animations.push(animation);
-    return animation;
-  };
   return img;
 }
 function setup(loadImage, reduced = false) {
@@ -59,11 +59,20 @@ test('both loads and both decodes gate the ordered sequence and single Home navi
   decode.resolve(); await flush();
   assert.deepEqual(splash.stage.children, [hs]);
   assert.equal(calls.length, 0);
+  const credit = splash.credit;
+  assert.equal(credit.textContent, 'a game by hiyroscript');
+  assert.equal(credit.animations.length, 1);
+  assert.deepEqual(credit.animations[0].keyframes, hs.animations[0].keyframes);
+  assert.deepEqual(hs.animations[1].keyframes.map(k => k.transform),
+    [`scale(${CONFIG.splash.zoomFrom})`, `scale(${CONFIG.splash.zoomTo})`]);
   hs.animations.forEach(a => a.finish()); await flush();
+  assert.deepEqual(splash.stage.children, [hs]); // Still waiting on the credit fade.
+  credit.animations.forEach(a => a.finish()); await flush();
   assert.equal(splash.stage.children.length, 0);
   assert.equal(delays[0].ms, CONFIG.splash.betweenImages);
   delays.shift().finish(); await flush();
   assert.deepEqual(splash.stage.children, [alva]);
+  assert.equal(credit.animations.length, 1); // The credit only accompanies hs.jpg.
   alva.animations.forEach(a => a.finish()); await flush();
   assert.equal(splash.stage.children.length, 0);
   assert.equal(calls.length, 0);
@@ -95,12 +104,16 @@ test('reduced motion uses holds without animation; real pending timer is cleared
   const delays = fakeDelays(splash);
   splash.enter(); await flush();
   assert.equal(hs.style.opacity, '1');
+  assert.equal(splash.credit.style.opacity, '1');
   assert.equal(hs.animations.length, 0);
+  assert.equal(splash.credit.animations.length, 0);
   assert.equal(delays[0].ms, CONFIG.splash.reducedMotionHold);
   delays.shift().finish(); await flush();
   assert.equal(splash.stage.children.length, 0);
+  assert.equal(splash.credit.style.opacity, '');
   delays.shift().finish(); await flush();
   assert.deepEqual(splash.stage.children, [alva]);
+  assert.equal(splash.credit.style.opacity, '');
   assert.equal(alva.animations.length, 0);
   splash.exit(); await flush();
   assert.equal(calls.length, 0);

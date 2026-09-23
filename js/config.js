@@ -31,6 +31,8 @@ export const CONFIG = Object.freeze({
     fadeIn: 900,
     hold: 1600,
     fadeOut: 800,
+    zoomFrom: 0.96,        // gentle forward zoom across the whole image phase
+    zoomTo: 1.04,
     betweenImages: 220,
     finalBlackHold: 200,
     reducedMotionHold: 1000,
