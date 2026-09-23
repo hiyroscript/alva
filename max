@@ -1,405 +1,376 @@
-Work in the Alva repository and update the Select Mode screen only. Before changing anything, inspect the existing implementation and preserve the established Alva visual language, accessibility behavior, responsive layout, keyboard/gamepad navigation, screen transitions, and overall game flow.
+You are working in the GitHub repository hiyroscript/alva on the main branch.
 
-The current Select Mode implementation is primarily in:
-
-* js/screens/mode-select-screen.js
-* styles.css
-* js/core/menu-navigator.js
-* shared menu/header utilities in js/ui/components.js
-
-The current flow must remain:
-
-Home → Select Mode → Select Fighter → Select Map → Battle
-
-Do not redesign unrelated screens.
+Make a focused visual cleanup to the Select Fighter screen only. Do not redesign the screen and do not alter the game’s underlying fighter data, sprite assets, loading system, selection flow, combat systems, or other screens.
 
 Goal
 
-Simplify Select Mode into a much cleaner two-card composition and clearly separate these interaction states:
+Simplify the Select Fighter screen by removing the extra developer-style metadata, animation controls, floor marker, roster count, and bottom control hints. The result should feel cleaner and more presentation-focused while preserving the existing roster, fighter preview, selection behavior, availability state, and Confirm action.
 
-hover = preview
+The relevant implementation is primarily in:
 
-click / confirm = select the mode and continue
+* js/screens/character-select-screen.js
+* styles.css
+* ALVA_SPEC.md
 
-The Quick Battle card must no longer look or behave as if simply hovering it has already selected the mode.
+The shared hint component lives in:
 
-⸻
+* js/ui/components.js
 
-1. Remove the Select Mode control hint bar
+Do not remove or break the shared hint component globally. Other screens may still use it.
 
-Completely remove the bottom keyboard/control hint bar from the Select Mode screen only.
+Required removals
 
-The current screen calls:
+On the Select Fighter screen, completely remove the following visible UI:
+
+1. The control hints in the bottom-right/bottom footer:
+    * arrow keys + Navigate
+    * Enter + Select
+    * Esc + Back
+2. The roster availability count:
+    * 1 / 48 available
+    * or any equivalent availability-count metadata beside the Roster heading.
+3. The thin horizontal floor/ground line underneath the fighter in the preview.
+4. The preview subtext:
+    * Roster slot 01
+5. The animation section label:
+    * Animations
+6. The animation controls/chips:
+    * Idle
+    * Run
+7. The frame metadata:
+    * Idle frames
+    * 4
+    * Run frames
+    * 6
+8. The attack metadata:
+    * Attack set
+    * Awaiting sprites
+
+Do not leave empty containers, blank rows, unnecessary gaps, invisible focus targets, or spacing where these elements used to be.
+
+js/screens/character-select-screen.js
+
+The current file constructs all of these elements directly.
+
+Bottom control hints
+
+The file currently imports:
+
+screenHeader, hintBar, MENU_HINTS
+
+from ../ui/components.js.
+
+The screen then adds:
 
 hintBar(MENU_HINTS)
 
-Remove that from Select Mode.
+as the final child in this.el.replaceChildren(...).
 
-Also clean up the now-unused imports from mode-select-screen.js.
+Remove the hint bar from CharacterSelectScreen only.
 
-Do not delete the shared hintBar, MENU_HINTS, or .hint-bar implementation because other screens may still depend on them.
+Afterward, clean up the unused hintBar and MENU_HINTS imports from this file.
 
-The Select Mode screen should end after its main content rather than showing:
+Do not modify the shared hintBar() implementation in js/ui/components.js, because other screens may still rely on it.
 
-* arrow-key Navigate hints
-* Enter Select hint
-* Esc Back hint
+Roster availability count
 
-The Back button in the screen header must remain.
+The file calculates:
 
-⸻
+const available = CHARACTERS.filter((c) => c.available).length;
 
-2. Remove the large Quick Battle image/art section
+and renders a .panel-meta containing the available/total count.
 
-The current Quick Battle card is split into:
+Remove the .panel-meta availability element from the roster header.
 
-1. the large fighter-art/canvas section
-2. the lower information/action section
+Keep the Roster title.
 
-Remove the large upper art area completely.
+If the available variable becomes unused, remove it.
 
-That means removing the Select Mode-specific:
+Do not change CONFIG.roster.totalSlots, the 48-slot roster, available/locked logic, or character definitions.
 
-* .mode-card-art
-* .mode-art-canvas
-* canvas creation
-* neutral fighter silhouette rendering
-* PLAYER_TONE
-* CPU_TONE
-* sprite tinting
-* Select Mode enter() sprite-loading work if it is no longer needed
-* Select Mode update() canvas-resize work
-* Select Mode draw() rendering code
-* unused tintFrame, fitCanvas, and drawFrameAt imports
+Preview floor line
 
-Do not leave an empty image container or blank region where the artwork used to be.
+The preview currently renders:
 
-The Quick Battle card should literally consist of the existing bottom section only.
+<div class="preview-floor">
 
-Keep the useful Quick Battle content in that lower section, including the current basic identity/action information such as:
+inside .preview-stage.
 
-* Mode 01
-* Quick Battle
-* the short Quick Battle description
-* Select action / arrow
+Delete this element completely.
 
-Do not replace the removed artwork with another image, illustration, gradient hero, icon, or placeholder.
+The fighter canvas should remain unchanged and continue to occupy the preview stage normally.
 
-⸻
+Roster slot text
 
-3. Make Quick Battle a compact card
+For available fighter #0001, the preview currently assigns:
 
-After removing the image, do not allow .mode-card to remain stretched vertically as though the art still existed.
+Roster slot 01
 
-Remove the old two-row layout based around:
+to the .preview-sub element.
 
-grid-template-rows: minmax(0, 1fr) auto
+Remove this visible roster-slot metadata.
 
-The remaining card body should define the actual card.
+Do not replace it with another slot number, ID description, subtitle, or filler text.
 
-The Quick Battle card should be a compact horizontal/content card rather than a giant empty panel.
+If .preview-sub is no longer required for the available fighter state, avoid leaving an empty <p> that reserves space.
 
-Preserve the existing Alva design language:
+The locked-slot explanatory message may be retained if useful, but it must only exist/render for an actual locked-slot preview. Do not preserve an empty subtitle underneath #0001.
 
-* near-black/charcoal surface
-* subtle hairline border
-* restrained radius
-* strong Quick Battle title
-* subdued metadata/description
-* green action treatment
-* no unnecessary decoration
+Animation UI
 
-⸻
+The file currently creates:
 
-4. Align Quick Battle with Mode Details
+* this.chips
+* .preview-anims
+* the Animations label
+* clickable Idle and Run chips
+* ANIM_LABELS
 
-Quick Battle and Mode Details should read as two sibling cards in one composition.
+Remove the animation-control UI completely.
 
-Place the compact Quick Battle card at the same vertical level as the Mode Details card.
+There should be no visible Animations, Idle, or Run text in the Select Fighter preview.
 
-Their top edges should align.
+Do not delete the actual idle/run animation definitions from js/data/characters.js.
 
-Their panel shells should also have matching/equal visual height so one does not appear like a large hero while the other looks like a small secondary panel.
+Do not delete the sprite frames.
 
-Do not stretch either card to consume all remaining viewport height.
+Do not modify the normalization or sprite-loading system.
 
-The composition should feel deliberate and compact, with open negative space below it if necessary.
+The preview should continue displaying an animated fighter. With the manual animation selector gone, keeping the existing idle animation as the default preview is appropriate.
 
-Maintain responsive behavior. On layouts where the screen stacks vertically, keep the relationship clean and avoid oversized empty panels.
+Simplify the code accordingly. If ANIM_LABELS, animation-chip event handlers, or animation-selection code becomes unused, remove the dead code.
 
-⸻
+Do not fabricate replacement controls.
 
-5. Strip Mode Details down to only its heading and separator
+Frame facts and attack set
 
-The Mode Details card currently contains:
+The file currently creates:
 
-* Mode details
-* Format
-* Rounds
-* Timer
-* Opponent
-* How Quick Battle works
-* numbered flow steps
-* explanatory note
-* 01 / 01 modes
+this.facts = el('dl', { class: 'detail-list detail-list--compact' })
 
-Remove all of that content except:
+and fills it with:
 
-Mode details
+* Idle frames → 4
+* Run frames → 6
+* Attack set → Awaiting sprites
 
-and the small thin horizontal separator/hairline directly beneath that heading.
+Remove this entire metadata/facts block from the Select Fighter preview.
 
-The final Mode Details card should therefore visually contain only:
+Do not merely hide the labels while leaving the values.
 
-MODE DETAILS
+Do not leave 4, 6, or Awaiting sprites visible by themselves.
 
-followed by a subtle thin line.
+Remove any now-unused DOM construction and update logic associated with this facts list.
 
-There should be no:
+What must remain
 
-* Format
-* 1 vs CPU
-* Rounds
-* Timer
-* Opponent
-* Training CPU
-* Choose a fighter
-* Pick from the roster
-* Choose a stage
-* Desert or City
-* Battle
-* One round against the CPU
-* explanatory paragraph
-* mode count
-* numbered flow circles
+The Select Fighter screen must still retain its important gameplay UI and behavior:
 
-Remove the elements from the DOM rather than merely hiding them with CSS.
+* Select Fighter screen title
+* Quick Battle setup header/step indicator
+* normal Back button in the header
+* Roster heading
+* all 48 roster slots
+* selectable #0001
+* locked placeholders for unavailable roster slots
+* slot numbering within the roster cards unless separately requested otherwise
+* fighter portrait
+* large fighter preview canvas
+* animated fighter preview
+* Available status badge for #0001
+* Locked status behavior for locked slots
+* #0001 fighter name
+* Confirm #0001 primary button
+* keyboard navigation
+* gamepad navigation
+* pointer/touch interaction
+* first-click select / second-click confirm behavior
+* immediate keyboard/gamepad confirmation behavior
+* loading of character sprites
+* selection state passed into Select Map
 
-Since the existing thin line is currently tied to surrounding detail-list styling, create or preserve a deliberate separator directly underneath the Mode Details heading after the detail list is removed.
+Do not change the roster cards themselves just because they contain slot numbers. The requested Roster slot 01 removal refers to the metadata beneath the fighter name in the preview, not necessarily the existing numbers shown on roster tiles.
 
-Use the existing Alva border token/hairline styling rather than introducing a new color.
+Preview behavior
 
-The empty space beneath the separator is intentional. Do not invent replacement copy.
+With the Idle/Run buttons gone, simplify the preview animation implementation without changing the rendering system.
 
-⸻
+The preview should continue to animate smoothly using the existing normalized sprite data, preferably using the fighter’s idle animation.
 
-6. Hover must mean preview, not selection
+Preserve:
 
-This interaction change is important.
+* fitCanvas(...)
+* drawFrameAt(...)
+* imageSmoothingEnabled = false
+* bottom-center positioning
+* consistent normalized scale
+* existing sprite loading behavior
 
-Currently Alva’s global MenuNavigator contains mouse behavior that finds [data-nav] elements on pointerover and calls .focus() on them. The Quick Battle card then receives its :focus styling, which visually makes hovering feel like the card was already selected.
+Do not hardcode a new sprite or replace the existing artwork.
 
-Change this behavior for the Select Mode / Quick Battle card so the states are clearly different.
+Do not remove the run animation from the character database merely because it is no longer selectable from this menu. Run is still required by gameplay.
 
-Pointer hover
+CSS cleanup in styles.css
 
-Hovering Quick Battle should behave strictly as a preview state.
+Clean up the CSS associated specifically with the elements removed from Character Select.
 
-A mouse hover may provide a restrained Alva-style visual response such as:
+The relevant existing rules include approximately:
 
-* slightly stronger neutral border
-* subtle surface change
-* subtle shadow
-* subtle Select-button response
+* .preview-floor
+* .is-locked-preview .preview-floor
+* .preview-sub
+* .preview-anims
+* .anim-chips
+* .detail-list--compact
+* Character Select usages of .chip
+* responsive rules referencing .preview-sub
+* responsive rules referencing .detail-list--compact
+* responsive rules referencing .preview-anims .label
 
-But hovering must NOT:
+Delete obsolete Character Select-only rules where they are no longer referenced.
 
-* select Quick Battle
-* commit app.selection.mode
-* navigate away from Select Mode
-* show a persistent selected state
-* make the card look confirmed
-* apply the same green selection/focus treatment used for an actual keyboard focus state
-* cause a click-like state transition
+However, do not blindly delete generic/shared selectors such as:
 
-When the pointer leaves, the preview treatment should disappear.
+* .panel-meta
+* .detail-list
+* .label
+* .chip
+* .hint-bar
 
-Click
+unless you verify that they are unused everywhere else in the project.
 
-A real pointer click on the Quick Battle card is the choose/select action.
+The goal is to clean up dead Character Select styling without causing regressions on another screen.
 
-Only then should it:
+Preview spacing
 
-1. set app.selection.mode = 'quick-battle'
-2. move the player to the Select Fighter screen using the existing screen-manager flow
+The current .preview-info uses a grid with a relatively large gap because it accommodates several blocks:
 
-The existing next step is:
+* heading/status
+* animations
+* facts
+* Confirm button
 
-app.screens.go('character')
+After those sections are removed, adjust the layout naturally so that the remaining preview information does not have awkward blank vertical space.
 
-Preserve that.
+The remaining information area should essentially contain:
 
-There should be no extra confirmation click.
+* availability/status
+* fighter name
+* optional locked-state explanation only when relevant
+* Confirm button
+
+Keep the existing dark Alva visual language, borders, typography, panel geometry, and responsive behavior.
 
-One click = select Quick Battle and continue.
+Do not perform a broader redesign.
 
-⸻
+Do not globally remove menu hints
 
-7. Do not globally break mouse navigation
-
-Be careful with js/core/menu-navigator.js.
-
-Other Alva screens intentionally use the global behavior where mouse hover can move menu focus.
-
-Do not globally remove that behavior just to fix Quick Battle.
-
-Make the change scoped.
-
-A clean approach would be to introduce an explicit opt-out attribute/class for elements whose mouse hover is preview-only, for example something conceptually similar to:
-
-data-nav-no-hover-focus
-
-Then have the global pointer-over logic ignore only those elements.
-
-The exact name is up to you, but the architecture should make the intent obvious.
-
-The Quick Battle card can still remain a [data-nav] item for keyboard/gamepad navigation.
-
-Mouse hover simply should not hijack DOM focus for this specific preview-only card.
-
-⸻
-
-8. Preserve keyboard and gamepad accessibility
-
-Do not solve the pointer-hover problem by making Quick Battle inaccessible to non-pointer users.
-
-Quick Battle must remain keyboard/gamepad navigable.
-
-Keyboard/gamepad focus should still have a real, visible focus treatment in accordance with Alva’s accessibility rules.
-
-Prefer a distinction such as:
-
-* :hover = neutral preview treatment
-* :focus-visible = accessibility focus ring
-* click / Enter / gamepad confirm = activation and navigation
-
-Do not use a green hover state that is visually indistinguishable from selected/confirmed state.
-
-Enter/gamepad confirm on the focused Quick Battle card should continue to activate it immediately through the existing menu navigation system.
-
-The Back button must also continue working with keyboard, mouse, touch, and gamepad.
-
-⸻
-
-9. Clean up obsolete Mode Details data
-
-Because all Mode Details body content is being removed, clean up the data/model code that exists exclusively for that removed content.
-
-For example, if no longer needed on this screen, remove:
-
-* mode.details
-* the timer formatting used only by those details
-* CONFIG import if it becomes unused
-* flow-list construction
-* panel note construction
-* mode-count construction
-
-Do not leave dead variables or unused imports.
-
-Keep the MODES structure as simple as necessary for the current Quick Battle card and future extension.
-
-⸻
-
-10. CSS cleanup
-
-Review the Select Mode CSS section around the existing .mode-layout, .mode-rail, .mode-card, .mode-card-art, .mode-card-body, .mode-info, .flow-list, and mode detail styles.
-
-Remove obsolete Select Mode-specific rules where they no longer have a consumer.
-
-In particular, do not leave CSS whose only purpose was:
-
-* sizing the removed image
-* positioning the removed canvas
-* rendering deleted flow-list content
-* rendering deleted mode-count content
-
-Be careful with shared selectors such as .detail-list, .panel-title, or other classes used by Character Select or other screens. Do not delete shared rules merely because Select Mode no longer uses them.
-
-Keep responsive rules clean as well. Remove or revise Select Mode-specific compact-height rules that refer to elements which no longer exist.
-
-⸻
-
-11. Do not alter these things
-
-Do not change:
-
-* Home
-* Select Fighter
-* Select Map
-* Battle
-* Splash
-* Help & Credits
-* character sprites
-* stage artwork
-* the setup-step header
-* the Select Mode Back button
-* the overall screen transition system
-* Quick Battle’s actual battle rules
-* selection state outside what is required for this interaction cleanup
-* shared controls unless necessary for the scoped hover-focus opt-out
-
-Do not add frameworks, dependencies, build tooling, or external assets.
-
-This remains vanilla HTML/CSS/JavaScript.
-
-⸻
-
-12. Expected final visual structure
-
-Conceptually the Select Mode body should become:
-
-Select Mode
-Mode · Fighter · Stage
-┌─────────────────────────────────────┐  ┌─────────────────────┐
-│ MODE 01                             │  │ MODE DETAILS        │
-│ Quick Battle              [Select →]│  │ ─────────────────── │
-│ Choose a fighter and stage...       │  │                     │
-└─────────────────────────────────────┘  └─────────────────────┘
-
-The exact spacing should follow the existing Alva system rather than literally copying this ASCII drawing.
-
-Important visual qualities:
-
-* no giant Quick Battle artwork
-* no giant empty Quick Battle area
-* compact sibling cards
-* aligned panel tops
-* matching panel height
-* Mode Details contains only its heading and hairline
-* no bottom control-hint footer
-* plenty of controlled negative space
-* still unmistakably Alva
-
-⸻
-
-13. Interaction acceptance criteria
-
-Verify all of the following:
-
-1. Enter Select Mode from Home.
-2. No control-hint bar appears at the bottom.
-3. Quick Battle no longer contains the fighter image/canvas.
-4. There is no blank region where the image used to be.
-5. Quick Battle consists only of the former lower information/action portion.
-6. Quick Battle and Mode Details align cleanly at the same vertical level.
-7. Their card shells are visually the same height.
-8. Mode Details shows only Mode details and a thin separator underneath.
-9. None of the old Mode Details body text remains in the DOM.
-10. Moving the mouse over Quick Battle produces only a temporary preview/hover treatment.
-11. Mouse hover does not set app.selection.mode.
-12. Mouse hover does not navigate.
-13. Mouse hover does not visually imitate a confirmed selection.
-14. Moving the mouse away removes the preview treatment.
-15. A single click on Quick Battle selects it and opens Select Fighter.
-16. Keyboard users can still focus Quick Battle.
-17. Keyboard focus remains visibly accessible.
-18. Enter activates Quick Battle and opens Select Fighter.
-19. Gamepad confirm continues to work.
-20. Back continues to return to Home.
-21. Other menus retain their existing mouse-hover/focus behavior.
-22. There are no console errors.
-23. There are no unused Select Mode canvas/sprite imports or dead rendering methods.
-24. The screen remains usable at Alva’s supported responsive sizes and short landscape heights.
-25. Reduced-motion behavior remains correct.
-
-When complete, review the diff specifically for unnecessary changes and keep the implementation focused on this Select Mode redesign.
+Although the Select Fighter control hint footer must disappear, hintBar() in js/ui/components.js is a shared UI component.
+
+Do not remove keyboard hints from unrelated screens.
+
+Only stop rendering the hint bar on Character Select.
+
+Update ALVA_SPEC.md
+
+The current Select Fighter specification says the preview contains:
+
+* animated idle/run preview
+* availability badge
+* animation chips
+* frame facts
+* Confirm button
+
+Update section 6.4 Select Fighter so the specification matches the new UI.
+
+It should describe the preview as a clean animated fighter preview with the availability state/name and Confirm action, without:
+
+* animation chips
+* frame-count facts
+* attack-set metadata
+* roster-slot metadata
+* a preview floor line
+* bottom keyboard/control hints
+* roster availability-count metadata
+
+Do not alter unrelated design or gameplay requirements in the spec.
+
+Non-goals
+
+Do not:
+
+* change the fighter artwork
+* modify #0001’s idle or run frame files
+* change the 4 idle / 6 run frame data
+* remove the run animation from gameplay
+* alter physics
+* alter combat
+* alter the map-select screen
+* alter the battle screen
+* change the Home screen
+* change the Select Mode screen
+* change the 48-slot roster structure
+* invent fighter names
+* add new UI in place of the removed metadata
+* replace removed information with icons/tooltips
+* hide elements with hacks when they can cleanly be removed from the DOM
+* globally disable keyboard/gamepad navigation
+* globally remove the shared menu hint component
+
+Acceptance criteria
+
+After the change, navigate:
+
+Home → Play → Quick Battle → Select Fighter
+
+and verify all of the following.
+
+The Select Fighter screen must not contain:
+
+* 1 / 48 available
+* Roster slot 01
+* Animations
+* an Idle animation chip
+* a Run animation chip
+* Idle frames
+* 4 as an idle-frame fact
+* Run frames
+* 6 as a run-frame fact
+* Attack set
+* Awaiting sprites
+* the thin floor line underneath the preview fighter
+* the bottom Navigate / Select / Back control hint footer
+
+The screen must still contain and correctly operate:
+
+* Select Fighter heading
+* Back button
+* setup steps
+* Roster heading
+* 48 roster slots
+* #0001 selectable roster card
+* locked roster slots
+* fighter preview
+* animated idle sprite
+* Available badge
+* #0001 name
+* Confirm #0001
+* correct focus behavior
+* keyboard/gamepad interaction
+* pointer/touch interaction
+* confirmation into Select Map
+
+Also verify:
+
+* no unexplained empty space remains where removed metadata used to be
+* no blank focusable elements remain
+* Tab/menu navigation does not land on deleted animation controls
+* no console errors are introduced
+* no undefined references remain after deleting DOM fields
+* short-height responsive layouts still work
+* tall/narrow layouts still work
+* Select Fighter fits the viewport as before
+* other screens retain their own control hints and behavior
+* the game still loads through relative paths suitable for GitHub Pages
+
+Keep the patch minimal, intentional, and restricted to this Select Fighter UI cleanup.
