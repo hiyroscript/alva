@@ -295,6 +295,12 @@ export class Battle {
         worldBox(f, hb, box);
         rect(box.x, box.y, box.w, box.h, '#4aa8ff');
       }
+      // Attack hitbox, only while it can connect.
+      const atk = f.combat.attack;
+      if (atk && f.combat.phase === 'active') {
+        worldBox(f, atk.def.hitbox, box);
+        rect(box.x, box.y, box.w, box.h, '#ffb020');
+      }
     }
     ctx.fillStyle = '#fff';
     ctx.font = '12px ui-monospace, Menlo, Consolas, monospace';
@@ -302,7 +308,7 @@ export class Battle {
     ctx.textBaseline = 'top';
     const p = this.p1;
     const lines = [
-      `state ${p.state}  grounded ${p.body.grounded}  ground ${p.body.ground?.id ?? '-'}`,
+      `state ${p.state}${p.combat.attack ? ` ${p.combat.attack.def.id} ${p.combat.phase}` : ''}  grounded ${p.body.grounded}  ground ${p.body.ground?.id ?? '-'}`,
       `pos ${p.body.x.toFixed(1)}, ${p.body.y.toFixed(1)}  vel ${p.body.vx.toFixed(0)}, ${p.body.vy.toFixed(0)}`,
       `view ${view.w.toFixed(0)}x${view.h.toFixed(0)}  px/art ${this.pxPerArt.toFixed(2)}  cpu ${this.p2.state}`,
     ];

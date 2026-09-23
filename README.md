@@ -6,7 +6,8 @@ and on phones and tablets in landscape.
 
 This is the first playable foundation: full menu flow, a 48-slot roster, two
 large stages, movement and platform physics, a camera, a HUD, touch controls,
-and a combat system that is wired up and ready for attack sprites.
+and a data-driven combat system with #0001's first real attack, Basic Attack 1
+(BA1).
 
 The full product specification, including the Alva brand system, is in
 [`ALVA_SPEC.md`](./ALVA_SPEC.md).
@@ -50,15 +51,21 @@ in the code depends on the repository name, so no file changes are needed.
 | Primary* | `J` | Lower-right, top |
 | Special* | `K` | Lower-right, middle row |
 | Block | `L` | Lower-right, middle row |
-| Action 1* / Action 2* | `U` / `I` | Lower-right, bottom row |
+| Basic Attack 1 (BA1) | `U` | Lower-right, bottom row (**BA1**) |
+| Action 2* | `I` | Lower-right, bottom row |
 | Pause | `Esc` or `P` | Timer or pause button, top centre |
 
-\* Wired into input and combat, but inactive until #0001 has attack animations.
+\* Reserved: wired into input and combat, but inactive until #0001 has matching
+attack animations. Their touch buttons have dashed outlines.
 
+- **Basic Attack 1 (BA1):** a punch on the ground, a kick in the air. The same
+  button picks the move from whether #0001 is grounded when you press it; a
+  mid-air BA1 that lands keeps playing to the end. Internally this is the
+  `action1` input.
 - **Menus:** arrow keys or WASD to move, `Enter` to select, `Esc` to go back. Mouse and touch work too.
 - **Touch:** several fingers work at once (hold Right and press Jump). You can slide your thumb between the movement buttons.
-- **Gamepad (standard layout):** D-pad or left stick to move, A to jump, X / Y / B / LB for the reserved actions, RB or RT to block, Start to pause.
-- **Debug:** `` ` `` toggles the collider and hurtbox overlay in battle.
+- **Gamepad (standard layout):** D-pad or left stick to move, A to jump, B / Circle for Basic Attack 1, X / Y / LB for the reserved actions, RB or RT to block, Start to pause.
+- **Debug:** `` ` `` toggles the collider, hurtbox and attack-hitbox overlay in battle (a hitbox shows only while it can connect).
 
 Touch controls show on touch-first devices (coarse pointer, or a touch actually detected). A narrow desktop window doesn't count as a phone. On a phone held in portrait, the game pauses and asks you to rotate.
 
@@ -66,7 +73,8 @@ Touch controls show on touch-first devices (coarse pointer, or a touch actually 
 
 - **Characters:** #0001
 - **Maps:** Desert (wide, open, 3.8 screens) and City (rooftops with 7 one-way platforms, 3.1 screens)
-- **Animations:** Idle, Run, Jump, Fall, Land (jump/fall play while airborne; land plays once on touchdown)
+- **Animations:** Idle, Run, Jump, Fall, Land (jump/fall play while airborne; land plays once on touchdown), Hurt and Mid-air Hurt (shown during hitstun on the ground / in the air), Basic Attack 1 (4 frames) and Mid-air Basic Attack 1 (5 frames), each played once at 12 fps
+- **Attacks:** Basic Attack 1 on the ground and in the air. Primary, Special and Action 2 are reserved.
 - **Mode:** Quick Battle: 1 round, 99 seconds, against a non-attacking training CPU
 
 ## Design
@@ -118,7 +126,7 @@ js/
   ui/                 wordmark, icons, overlays, shared help content, stage preview
 ```
 
-- **Sprite normalization.** The idle, jump, fall and land frames are pixel art at roughly 16× scale and the run frames at 4×. When a frame loads, the game reads its alpha channel once and finds the visible bounds. It then detects the pixel grid from every colour transition and resamples the frame to 1 pixel per art pixel. Every frame is drawn at the same world scale, anchored bottom-centre at the upper-body centroid, so the fighter keeps the same size and position when switching between animations. When the size stays close to the target, each art pixel maps to a whole number of device pixels.
+- **Sprite normalization.** The idle, jump, fall, land and hurt frames are pixel art at roughly 16× scale, the mid-air hurt and Basic Attack 1 frames at 8×, and the run frames at 4×. When a frame loads, the game reads its alpha channel once and finds the visible bounds. It then detects the pixel grid from every colour transition and resamples the frame to 1 pixel per art pixel. Every frame is drawn at the same world scale, anchored bottom-centre at the upper-body centroid, so the fighter keeps the same size and position when switching between animations. When the size stays close to the target, each art pixel maps to a whole number of device pixels.
 - **Simulation.** Fixed 60 Hz steps with interpolated rendering, so movement is the same at 30, 60 and 120 Hz. Colliders, hurtboxes and pushboxes are set in data and don't depend on PNG size.
 - **Stages.** Six parallax layers (sky, far, mid, near, terrain, atmosphere) are generated once from a seeded RNG into cached `Path2D` geometry. Collision comes only from `js/data/maps.js`, so any layer can later be swapped for image art.
 
@@ -128,7 +136,7 @@ js/
 2. Add a definition to `CHARACTERS` in `js/data/characters.js` (animations, movement, collider, hurtboxes, stats).
 3. Give it a free `rosterSlot`.
 
-To add attacks, create animations with real frames, define them in `attacks` (see the schema in `js/game/combat.js`), and map them in `actions`. An attack without frames is refused rather than faked.
+To add attacks, create animations with real frames, define them in `attacks` (see the schema in `js/game/combat.js`), and map them in `actions`: a string for one attack, or `{ ground, air }` to pick by whether the fighter is grounded (as #0001's `action1: { ground: 'ba1', air: 'midairBa1' }` does). Time `startup` / `active` / `recovery` to whole frames of the clip so the hitbox is live only while the strike is on screen. An attack without frames is refused rather than faked.
 
 ### Adding a map
 

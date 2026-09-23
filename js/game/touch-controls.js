@@ -4,7 +4,9 @@
 //   lower-left : [LEFT] [DOWN] [RIGHT]  — thumb can slide between them
 //   lower-right:              [PRIMARY]
 //                     [SPECIAL] [BLOCK]
-//          [ACTION 1] [ACTION 2] [JUMP]
+//               [BA1] [ACTION 2] [JUMP]
+//
+// BA1 (Basic Attack 1) is the `action1` input.
 //
 // Every pointer is tracked by pointerId, so Right + Jump (or any combination)
 // works simultaneously. State is pushed into InputManager.setTouch().
@@ -18,12 +20,12 @@ const DPAD = [
   { action: 'right', label: 'Move right', icon: ICONS.right },
 ];
 
-// `pending` marks actions whose handler waits on future attack animations.
+// `pending` marks reserved actions that wait on future attack animations.
 const ACTION_BUTTONS = [
   { action: 'primary', label: 'Primary', icon: ICONS.primary, pos: 'primary', pending: true },
   { action: 'special', label: 'Special', icon: ICONS.special, pos: 'special', pending: true },
   { action: 'block', label: 'Block', icon: ICONS.block, pos: 'block' },
-  { action: 'action1', label: 'Action 1', text: 'A1', pos: 'a1', pending: true },
+  { action: 'action1', label: 'Basic Attack 1', text: 'BA1', pos: 'a1' },
   { action: 'action2', label: 'Action 2', text: 'A2', pos: 'a2', pending: true },
   { action: 'jump', label: 'Jump', icon: ICONS.jump, pos: 'jump' },
 ];

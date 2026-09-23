@@ -1,18 +1,23 @@
 // Combat architecture.
 //
-// This build ships with NO attacks because #0001 has no attack/hit/block
-// animation frames yet. Everything needed to add them is here so a future
-// attack only needs data:
+// Attacks are pure data on the character definition; Fighter turns each entry
+// into a frozen definition with createAttackDefinition(). #0001's Basic
+// Attack 1 (ground `ba1`, mid-air `midairBa1`, both on action1) is the first
+// real attack; see js/data/characters.js. The general shape:
 //
 //   attacks: {
-//     jab: createAttackDefinition({
-//       id: 'jab', animation: 'jab', startup: 0.07, active: 0.05, recovery: 0.16,
+//     jab: {
+//       animation: 'jab', startup: 0.07, active: 0.05, recovery: 0.16,
 //       damage: 6, hitbox: { x: 18, y: -62, w: 34, h: 18 },
 //       knockback: { x: 180, y: 0 }, hitstun: 0.22, blockstun: 0.14, cooldown: 0.1,
-//     }),
+//     },
+//     airJab: { animation: 'airJab', ... },
 //   },
-//   actions: { primary: 'jab', ... }
+//   // One attack per action, or { ground, air } chosen by grounded state.
+//   actions: { primary: 'jab', action1: { ground: 'jab', air: 'airJab' }, ... }
 //
+// An attack needs real frames for its `animation`; without them it is refused
+// rather than faked. Its hitbox only exists during the active phase.
 // Hitboxes are defined facing right relative to the fighter's origin
 // (bottom-centre) and mirrored automatically.
 
@@ -32,6 +37,11 @@ const ATTACK_DEFAULTS = {
   groundOnly: false,
   lockMovement: true,
 };
+
+// Attack time is a sum of fixed steps, so compare phase boundaries with a
+// little slack: a phase that is a whole number of steps long (e.g. 1 / 12 s at
+// 60 Hz) then lasts exactly that many steps instead of drifting by one.
+const PHASE_EPSILON = 1e-6;
 
 export function createAttackDefinition(spec) {
   if (!spec?.id) throw new Error('[Alva] Attack definitions need an id');
@@ -61,8 +71,8 @@ export class CombatState {
   get phase() {
     const a = this.attack;
     if (!a) return null;
-    if (a.time < a.def.startup) return 'startup';
-    if (a.time < a.def.startup + a.def.active) return 'active';
+    if (a.time < a.def.startup - PHASE_EPSILON) return 'startup';
+    if (a.time < a.def.startup + a.def.active - PHASE_EPSILON) return 'active';
     return 'recovery';
   }
 
@@ -82,7 +92,7 @@ export class CombatState {
     if (this.stun > 0) this.stun = Math.max(0, this.stun - dt);
     if (this.attack) {
       this.attack.time += dt;
-      if (this.attack.time >= this.attack.def.total) {
+      if (this.attack.time >= this.attack.def.total - PHASE_EPSILON) {
         this.cooldowns.set(this.attack.def.id, this.attack.def.cooldown);
         this.attack = null;
       }

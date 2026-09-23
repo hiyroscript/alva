@@ -74,14 +74,21 @@ export class Fighter {
     const input = this.inputLocked ? NEUTRAL_INPUT : raw;
 
     combat.update(dt);
-    if (combat.hitstop > 0) return; // impact freeze
+    if (combat.hitstop > 0) {
+      // Impact freeze: nothing moves or advances, but a fresh hit still
+      // switches to the hurt pose so the freeze holds the reaction.
+      this.updateState(0);
+      return;
+    }
 
-    const canAct = combat.canAct();
-
-    // ---- Combat intents (placeholders until attack frames exist) ---------
+    // ---- Combat intents --------------------------------------------------
+    // Actions mapped to null are wired but reserved (see tryAction).
     for (const action of COMBAT_ACTIONS) {
       if (input[`${action}Pressed`]) this.tryAction(action);
     }
+    // After the intents, so an attack started this step also rules out a
+    // jump, block, crouch or platform drop on the same step.
+    const canAct = combat.canAct();
     combat.blocking = canAct && body.grounded && input.block;
 
     // ---- Down: drop through one-way platforms / crouch ---------------------
@@ -136,8 +143,8 @@ export class Fighter {
   tryAction(action) {
     const combat = this.combat;
     combat.lastIntent = action;
-    const attackId = this.def.actions?.[action];
-    if (!attackId) return false; // wired, intentionally no attack yet
+    const attackId = this.attackFor(action);
+    if (!attackId) return false; // reserved: wired, but no attack mapped
     const atk = this.attacks[attackId];
     if (!atk || !combat.canAct() || combat.cooldowns.has(attackId)) return false;
     if (atk.groundOnly && !this.body.grounded) return false;
@@ -148,6 +155,15 @@ export class Fighter {
     }
     combat.attack = { def: atk, time: 0, hasHit: false };
     return true;
+  }
+
+  // Attack id for a controller action. The character's `actions` entry is a
+  // string (one attack), { ground, air } (chosen by whether the fighter is
+  // grounded as the button is pressed) or null (reserved).
+  attackFor(action) {
+    const mapping = this.def.actions?.[action];
+    if (!mapping || typeof mapping === 'string') return mapping || null;
+    return (this.body.grounded ? mapping.ground : mapping.air) || null;
   }
 
   updateFacing(dir) {
@@ -183,8 +199,7 @@ export class Fighter {
       this.stateTime += dt;
     }
 
-    const animKey = next === 'attack' ? combat.attack.def.animation : next;
-    this.animator.play(animKey);
+    this.animator.play(this.animationFor(next));
     if (next === 'run') {
       const anim = this.animator.anim;
       const ratio = Math.abs(body.vx) / this.def.movement.maxSpeed;
@@ -193,6 +208,15 @@ export class Fighter {
       this.animator.setSpeed(1);
     }
     this.animator.update(dt);
+  }
+
+  // Animation key for a visual state. An attack plays its own clip for its
+  // whole length, even if the fighter lands or leaves the ground meanwhile.
+  // Hitstun shows `hurt` on the ground and `midairHurt` in the air.
+  animationFor(state) {
+    if (state === 'attack') return this.combat.attack.def.animation;
+    if (state === 'hitstun') return this.body.grounded ? 'hurt' : 'midairHurt';
+    return state;
   }
 
   // Touchdown starts the land state; it then lasts one pass of the land clip

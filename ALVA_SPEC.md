@@ -34,11 +34,18 @@ behave, and how it must look. The README covers running and deploying it.
 ## 3. Assets
 
 - `#0001` frames live in `assets/characters/0001/`: four idle frames
-  (≈560–592 × 800–832 px), six run frames (≈128–160 × 184–188 px), and two
+  (≈560–592 × 800–832 px), six run frames (≈128–160 × 184–188 px), two
   each of jump (624 × 816 px), fall (544 × 832 px) and land (≈528–544 ×
-  560–688 px).
-- The idle, jump, fall and land frames (≈16× pixel art) and the run frames
-  (≈4×) are at very different raw scales. A normalization
+  560–688 px), one hurt frame (608 × 752 px), one mid-air hurt frame
+  (424 × 272 px), four Basic Attack 1 frames `0001_1ba1`–`0001_1ba4`
+  (≈264–376 × 392–432 px) and five mid-air Basic Attack 1 frames
+  `0001_midair1ba1`–`0001_midair1ba5` (≈248–424 × 344–448 px).
+- File names: `ba` means basic attack and `1ba` is Basic Attack 1; the number
+  at the very end is always the frame number (`0001_1ba3.png` is Basic Attack
+  1, frame 3).
+- The idle, jump, fall, land and hurt frames (≈16× pixel art), the mid-air
+  hurt and Basic Attack 1 frames (≈8×) and the run frames (≈4×) are at very
+  different raw scales. A normalization
   system must, once per frame: read the alpha channel, find the visible bounds,
   detect the pixel-art grid, resample to one pixel per art pixel, and anchor
   bottom-centre so the fighter never grows, shrinks, jumps or slides when
@@ -320,21 +327,42 @@ no header, build label, eyebrow or keyboard hint bar.
 
 ### 7.2 Fighters, physics and combat
 
-- `#0001` has Idle, Run, Jump, Fall and Land. No invented frames. Rising uses
-  Jump and descending (including platform drops) uses Fall; each plays once at
-  10 fps and holds its last frame. Land plays once at 12 fps on touchdown, for
+- `#0001` has Idle, Run, Jump, Fall, Land, Hurt, Mid-air Hurt, Basic Attack 1
+  and Mid-air Basic Attack 1. No invented frames. Rising uses Jump and
+  descending (including platform drops) uses Fall; each plays once at 10 fps
+  and holds its last frame. Land plays once at 12 fps on touchdown, for
   exactly the clip's length, then returns to idle or run. Land is a visual
   state only: it never changes movement or collision, and a new jump, attack
   or hitstun cuts it short. If those frames fail to load, the fighter holds an
   idle frame without stretching or rotating. Facing flips the sprite and turns
   toward the opponent when standing.
+- Hitstun shows Hurt while grounded and Mid-air Hurt while airborne, switching
+  to Hurt if the fighter lands still stunned; the pose also holds through the
+  impact freeze. Hitstun outranks attack, land, run, jump, fall, block, crouch
+  and idle, and normal states resume when it ends. It is a visual state only:
+  no physics or collider changes. Missing hurt art holds an idle frame.
+- Basic Attack 1 (BA1) is #0001's first attack, on the `action1` input. On the
+  ground it is a punch (`ba1`, 4 frames); in the air a kick (`midairBa1`,
+  5 frames); the character data maps `action1: { ground, air }` and the
+  fighter picks by grounded state when the button is pressed. Both play once
+  at 12 fps. Phases are whole frames: ground BA1 is frame 1 startup, frame 2
+  active, frames 3–4 recovery; mid-air BA1 is frames 1–2 startup, frame 3
+  active, frames 4–5 recovery. Each hits once for 6 damage, 0.22 s hitstun,
+  0.14 s blockstun, 0.06 s hitstop, 180 horizontal knockback and no launch,
+  with a 0.1 s cooldown. Hitboxes match the strike in the contact frame and
+  mirror with facing. Movement and facing lock while an attack plays; gravity
+  still applies, and a mid-air BA1 that lands finishes its own clip. Ground
+  BA1 is ground-only.
 - Physics: acceleration, deceleration, max speed, gravity, jump impulse,
   ground/platform/solid collision, stage bounds, landing detection; collision
   boxes independent of PNG size; bottom-centre origin; no sinking, floating,
   jitter or escaping the stage.
 - Combat architecture (health, damage, hitboxes, hurtboxes, attack definitions,
-  block, knockback, stun, cooldowns) exists but no attack is fabricated until
-  real sprites exist. Block sets a guard state using the idle pose.
+  block, knockback, stun, hitstop, cooldowns) is data-driven. Basic Attack 1
+  is implemented through it with real artwork; Primary, Special and Action 2
+  stay reserved (mapped to no attack) until real sprites exist, and no attack
+  is ever fabricated. An attack whose frames fail to load is refused. Block
+  sets a guard state using the idle pose.
 - Quick Battle: one round, 99 seconds, against a non-attacking training CPU
   that uses the same fighter definition.
 
@@ -375,12 +403,15 @@ no header, build label, eyebrow or keyboard hint bar.
 
 - Keyboard (simultaneous keys, held-state tracking, no reliance on key
   repeat): A/D or ←/→ move, S/↓ down, W/Space/↑ jump, J primary, K special,
-  L block, U action 1, I action 2, Esc/P pause. `` ` `` toggles a debug overlay.
-- Gamepad (standard layout) for movement, jump, reserved actions, block and
-  Start to pause/menus.
+  L block, U Basic Attack 1 (BA1), I action 2, Esc/P pause. `` ` `` toggles a
+  debug overlay (colliders, hurtboxes, and attack hitboxes while active).
+- Gamepad (standard layout) for movement, jump (A), Basic Attack 1 (B /
+  Circle), reserved actions, block and Start to pause/menus.
 - Touch (landscape, Pointer Events, true multi-touch): lower-left Left / Down /
   Right with thumb sliding; lower-right staggered cluster —
-  Primary (top) · Special, Block · Action 1, Action 2, Jump (bottom-right).
+  Primary (top) · Special, Block · BA1, Action 2, Jump (bottom-right). The
+  BA1 button (Basic Attack 1, internally `action1`) is solid like Block and
+  Jump.
   Tapping the timer or the pause section beneath it (top centre, 7.3) pauses.
   Original circular icons, translucent dark fill, white outlines; pressed
   buttons scale down and brighten to white — no hue.
