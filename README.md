@@ -85,11 +85,11 @@ ring with dark separation keep states identifiable beyond colour.
   inherits `currentColor`, so it needs no font download. `assets/favicon.svg`
   is the matching "A" monogram.
 - **Home** pairs an oversized off-white ALVA wordmark, the line "Fan project.
-  Big heart." and a Play action with a charcoal credits panel on the right. A
-  crisp green line separates the two zones. The credits roll upward in an
-  endless loop and stand still for reduced-motion users. Help & Credits stays
-  visible but is disabled for now. On narrow screens the credits panel slims
-  down so the menu stays dominant.
+  Big heart." and a Play action with an angled strip of semi-transparent glass
+  over the black background. A crisp green slash separates the two zones.
+  Plain-text credits roll upward inside the glass in an endless loop and stand
+  still for reduced-motion users. Help & Credits stays visible but is disabled
+  for now. The strip shifts outward on narrow screens.
 - **Other screens** retain their established layouts, controls and navigation;
   only interface colours change. Battle keeps readable dark translucent chrome.
 - Character sprites and stage artwork keep their original colours. No artwork,

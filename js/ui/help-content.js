@@ -97,39 +97,38 @@ export function buildHelp() {
 }
 
 // Credits live here once so the Home credits roll and the Credits tab can't
-// drift apart. Each group has a title plus any of: a lead line, running text
-// and [label, value] facts.
+// drift apart. Each group is a title, an optional lead line and plain lines.
 export const CREDITS = [
   { title: CONFIG.title, lead: `Created by ${CONFIG.developer}` },
   {
     title: 'Original work',
-    text: `Game design, code, interface, ${CONFIG.title} wordmark, and Desert / City stage artwork by ${CONFIG.developer}.`,
+    lines: [`Game design, code, interface, ${CONFIG.title} wordmark, and Desert / City stage artwork by ${CONFIG.developer}.`],
   },
   {
     title: '#0001 sprite source',
-    facts: [
-      ['Game', 'Jump Ultimate Stars'],
-      ['Platform', 'Nintendo DS / DSi'],
-      ['Source', 'The Spriters Resource'],
-      ['Source sheet', 'Uploaded by Dazz'],
-      ['Contributor', 'FRET'],
+    lines: [
+      'Original sprite material from Jump Ultimate Stars',
+      'Nintendo DS / DSi',
+      'The Spriters Resource',
+      'Source sheet uploaded by Dazz',
+      'Contributor: FRET',
     ],
   },
   {
     title: 'Rights',
-    text: `${CONFIG.developer} did not create or claim ownership of the original third-party character/game artwork. Original characters, games, and related properties belong to their respective rights holders.`,
+    lines: [
+      `${CONFIG.developer} did not create or claim ownership of the original third-party character/game artwork.`,
+      'Original characters, games, and related properties belong to their respective rights holders.',
+    ],
   },
-  { title: 'Project', text: 'Unofficial fan project. No affiliation or endorsement is implied.' },
+  { title: 'Project', lines: ['Unofficial fan project.', 'No affiliation or endorsement is implied.'] },
 ];
 
 export function buildCredits() {
   return el('div', { class: 'info-grid info-grid--credits' }, CREDITS.map((group) =>
     card(group.title, [
       group.lead ? el('p', { class: 'credit-lead', text: group.lead }) : null,
-      group.text ? el('p', { class: 'info-text', text: group.text }) : null,
-      group.facts ? el('dl', { class: 'detail-list credit-list' }, group.facts.flatMap(([dt, dd]) => [
-        el('dt', { text: dt }), el('dd', { text: dd }),
-      ])) : null,
+      group.lines ? el('p', { class: 'info-text' }, group.lines.flatMap((line, i) => (i ? [el('br'), line] : [line]))) : null,
     ]),
   ));
 }

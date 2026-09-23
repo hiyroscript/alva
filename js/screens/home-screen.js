@@ -1,4 +1,5 @@
-// HOME: editorial wordmark and navigation beside a looping credits roll.
+// HOME: editorial wordmark and navigation beside a glass strip carrying a
+// looping credits roll.
 
 import { Screen } from '../core/screen-manager.js';
 import { CONFIG } from '../config.js';
@@ -16,10 +17,7 @@ function creditsSequence({ copy = false } = {}) {
     el('section', { class: 'home-credit' }, [
       el('h2', { class: 'home-credit-title', text: group.title }),
       group.lead ? el('p', { class: 'home-credit-lead', text: group.lead }) : null,
-      group.text ? el('p', { class: 'home-credit-text', text: group.text }) : null,
-      group.facts ? el('dl', { class: 'home-credit-facts' }, group.facts.flatMap(([dt, dd]) => [
-        el('dt', { text: dt }), el('dd', { text: dd }),
-      ])) : null,
+      ...(group.lines || []).map((line) => el('p', { class: 'home-credit-line', text: line })),
     ]),
   ));
 }
@@ -45,6 +43,12 @@ export class HomeScreen extends Screen {
     this.rollOffset = 0;
 
     this.el.replaceChildren(
+      el('div', { class: 'home-scene' }, [
+        el('div', { class: 'home-glass', 'aria-hidden': 'true' }),
+        el('aside', { class: 'home-credits', 'aria-label': 'Credits' }, [
+          el('div', { class: 'home-credits-col' }, [this.rollTrack]),
+        ]),
+      ]),
       el('div', { class: 'home-main' }, [
         el('div', { class: 'home-intro' }, [
           el('h1', { class: 'home-title', id: 'home-title', html: logoSVG({ className: 'logo logo--display' }) }),
@@ -54,9 +58,6 @@ export class HomeScreen extends Screen {
       ]),
       el('footer', { class: 'home-footer' }, [
         el('span', { text: `by ${CONFIG.developer}` }),
-      ]),
-      el('aside', { class: 'home-credits', 'aria-label': 'Credits' }, [
-        el('div', { class: 'home-credits-viewport' }, [this.rollTrack]),
       ]),
     );
     this.el.setAttribute('aria-labelledby', 'home-title');

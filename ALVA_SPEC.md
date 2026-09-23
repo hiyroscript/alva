@@ -100,7 +100,8 @@ and progress; it does not fill every card, border or heading.
 - **Setup steps:** done = gray with a check; current = filled green number and
   underline; future = gray.
 - **Panels:** charcoal, translucent light hairlines, established radii and
-  restrained neutral shadows. No new textures or glass effects.
+  restrained neutral shadows. No new textures or glass effects; the Home
+  credits strip (6.2) is the one glass surface.
 
 ### 5.3 Wordmark and favicon
 
@@ -126,7 +127,7 @@ and progress; it does not fill every card, border or heading.
 - 120–220 ms hover/focus transitions, gentle screen transitions (short fade
   and ≤ 12 px slide), subtle press feedback, restrained idle animation.
 - No streaks, wipes or large hover translations. Home alone has continuous
-  motion: a slow, constant upward credits roll beside a stable green separator.
+  motion: a slow, constant upward credits roll beside its stable green slash.
 - `prefers-reduced-motion: reduce` removes transitions and animation; the Home
   credits stand still as a single readable copy.
 
@@ -164,9 +165,9 @@ moves focus).
 
 ### 6.2 Home
 
-An open editorial composition: a near-black menu side on the left and a
-charcoal credits panel on the right. There is no header, build label, eyebrow
-or keyboard hint bar.
+An open editorial composition on a full-screen near-black background, with
+the menu on the left and an angled glass credits strip on the right. There is
+no header, build label, eyebrow or keyboard hint bar.
 
 - **Intro:** the dramatically enlarged original ALVA SVG wordmark, then the
   supporting line "Fan project. Big heart." The wordmark's first visible stroke
@@ -177,19 +178,27 @@ or keyboard hint bar.
   hover or press response, skipped by keyboard/gamepad focus. The Help &
   Credits screen and the pause-menu Help remain in place. Home buttons have a
   small 3 px radius.
-- **Footer:** "by hiyroscript" in gray monospace under a subtle top hairline,
-  on the menu side.
-- **Credits panel:** roughly the right 36% on wide screens, full height, with
-  a charcoal background and a crisp 3 px green separator along its left edge.
-  Upright credits (from the shared credits data, see 6.6) roll upward at a
-  slow constant speed and loop seamlessly without end; the top and bottom edges
-  fade softly. The roll is driven by the app's frame loop, so re-entering Home
-  never stacks timers. The animation-only duplicate is `aria-hidden`.
-- **Responsive:** safe-area-aware, no Home scrolling. Narrow windows keep the
-  panel and separator but slim the panel so the wordmark and menu stay
-  dominant. Short landscape heights reduce title size, gaps, action height and
-  credit type. Reduced motion stops the roll and entrance animations and shows
-  one still copy of the credits that can be scrolled by hand.
+- **Footer:** "by hiyroscript" in gray monospace, full width under a subtle
+  top hairline.
+- **Credits strip:** two walls. The back wall is the same near-black as the
+  menu; in front of it, a semi-transparent glass strip roughly covers the right
+  44% on wide screens, angled 21 degrees and extended beyond the viewport, with
+  a faint sheen and edge highlights. A stable 3 px green slash with a
+  restrained bloom runs along its left edge, and the strip fades out at the
+  top and bottom. No fighter preview or Canvas.
+- **Credits roll:** plain upright text (group titles and lines from the shared
+  credits data, see 6.6; no cards or boxes), centred in a column inside the
+  glass and clipped to it. It rolls upward at a slow constant speed and loops
+  seamlessly without end. The roll is driven by the app's frame loop, so
+  re-entering Home never stacks timers. The animation-only duplicate is
+  `aria-hidden`.
+- **Responsive:** safe-area-aware, no Home scrolling. On narrow layouts the
+  strip moves farther right and the credits column narrows; when the window is
+  taller than it is wide the strip is mostly off-screen and the credits remain
+  for assistive technology only. Short landscape heights reduce title size,
+  gaps, action height and credit type. Reduced motion stops the roll and
+  entrance animations and shows one still copy of the credits that can be
+  scrolled by hand.
 - All other screens retain their layout, structure, spacing and behaviour.
 
 ### 6.3 Select Mode

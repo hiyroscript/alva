@@ -394,12 +394,11 @@ html.is-touch .hint-bar { display: none; }
 
 .screen--home {
   --gutter: clamp(24px, 6vw, 112px);
-  --gutter-r: clamp(20px, 4vw, 72px);
-  --credits-w: clamp(240px, 36vw, 640px);
-  --credits-pad: clamp(20px, 3vw, 48px);
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) var(--credits-w);
-  grid-template-rows: minmax(0, 1fr) auto;
+  /* Glass strip before its 21deg turn, as fractions of the screen width. */
+  --glass-l: 0.64;
+  --glass-w: 0.44;
+  --credits-pad: clamp(18px, 2.6vw, 40px);
+  isolation: isolate;
 }
 .screen--home.is-entering { animation: fade-in 0.7s ease both; }
 .screen--home.is-entering .home-intro > * { animation: rise-in 0.6s var(--ease) both; }
@@ -407,21 +406,25 @@ html.is-touch .hint-bar { display: none; }
 .screen--home.is-entering .home-intro > :nth-child(3) { animation-delay: 80ms; }
 
 .home-main {
-  grid-column: 1;
-  grid-row: 1;
-  min-width: 0;
+  position: relative;
+  z-index: 1;
+  flex: 1;
   min-height: 0;
   display: flex;
   align-items: center;
-  padding: max(var(--safe-t), 24px) var(--gutter-r) 24px max(var(--safe-l), var(--gutter));
+  padding: max(var(--safe-t), 24px) max(var(--safe-r), var(--gutter)) 24px max(var(--safe-l), var(--gutter));
+  /* Only the intro takes the pointer, so the credits column behind the empty
+     right side stays scrollable when it is still (reduced motion). */
+  pointer-events: none;
 }
 .home-intro {
   --lede-size: clamp(13px, 2.1vh, 17px);
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  width: 100%;
+  width: 54%;
   min-width: 0;
+  pointer-events: auto;
 }
 .home-title { width: 100%; line-height: 0; }
 /* Width drives height, so the SVG box keeps the wordmark's own aspect ratio
@@ -471,73 +474,103 @@ html.is-touch .hint-bar { display: none; }
 .home-action:disabled { background: transparent; border-color: var(--border); color: var(--text-muted); cursor: not-allowed; transform: none; }
 .home-action:disabled .icon { color: var(--text-faint); transform: none; }
 
-.home-footer {
-  grid-column: 1;
-  grid-row: 2;
-  display: flex;
-  align-items: center;
-  min-height: calc(clamp(34px, 8vh, 64px) + var(--safe-b));
-  padding: 0 var(--gutter-r) var(--safe-b) max(var(--safe-l), var(--gutter));
-  border-top: 1px solid var(--border);
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: var(--text-muted);
+/* Two walls: the menu's near-black behind, and a semi-transparent glass strip
+   in front of it with the green line on its edge. The strip and its credits
+   share one fade in viewport space. Nothing here renders game art. */
+.home-scene {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  mask-image: linear-gradient(transparent, #000 20%, #000 80%, transparent);
+}
+.home-glass {
+  position: absolute;
+  left: calc(var(--glass-l) * 100%);
+  top: -45%;
+  width: calc(var(--glass-w) * 100%);
+  height: 190%;
+  transform: rotate(21deg);
+  background:
+    linear-gradient(90deg, transparent 3px, rgba(255, 255, 255, 0.16) 3px 4px, transparent 4px),
+    linear-gradient(90deg, transparent 54%, rgba(255, 255, 255, 0.035) 62%, transparent 70%),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.035) 30%, rgba(255, 255, 255, 0.04) 75%, rgba(255, 255, 255, 0.065));
+  border-right: 1px solid var(--border-strong);
+}
+.home-glass::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+  background: var(--accent);
+  box-shadow: 0 0 18px rgba(47, 191, 99, 0.2);
 }
 
-/* Credits roll: a charcoal panel behind a crisp green separator. The track
-   holds the sequence twice and HomeScreen.update() moves it up by one pass
-   before wrapping, so the loop has no seam. */
+/* Upright credits clipped to the glass. The strip's edges cross mid-height
+   at these fractions of the width and slant by tan(21deg) * 50vh either way.
+   The track holds the credits twice and HomeScreen.update() moves it up by
+   one pass before wrapping, so the loop has no seam. */
 .home-credits {
-  grid-column: 2;
-  grid-row: 1 / -1;
-  min-width: 0;
-  min-height: 0;
-  display: flex;
-  border-left: 3px solid var(--accent);
-  background: var(--surface-muted);
+  --glass-x: calc(var(--glass-l) - 0.0356 * var(--glass-w));
+  --glass-xr: calc(var(--glass-l) + 1.0356 * var(--glass-w));
+  position: absolute;
+  inset: 0;
+  clip-path: polygon(
+    calc(var(--glass-x) * 100% + 19.19vh) 0, calc(var(--glass-xr) * 100% + 19.19vh) 0,
+    calc(var(--glass-xr) * 100% - 19.19vh) 100%, calc(var(--glass-x) * 100% - 19.19vh) 100%);
+  clip-path: polygon(
+    calc(var(--glass-x) * 100% + 19.19dvh) 0, calc(var(--glass-xr) * 100% + 19.19dvh) 0,
+    calc(var(--glass-xr) * 100% - 19.19dvh) 100%, calc(var(--glass-x) * 100% - 19.19dvh) 100%);
 }
-.home-credits-viewport {
-  flex: 1;
-  min-width: 0;
+/* The column starts where the glass edge is a quarter of the way down, so
+   rising text only meets the edge inside the top fade. */
+.home-credits-col {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(var(--glass-x) * 100% + 9.6vh + var(--credits-pad));
+  left: calc(var(--glass-x) * 100% + 9.6dvh + var(--credits-pad));
+  right: max(var(--safe-r), var(--credits-pad));
   overflow: hidden;
-  padding: 0 max(var(--safe-r), var(--credits-pad)) 0 var(--credits-pad);
-  mask-image: linear-gradient(transparent, #000 14%, #000 86%, transparent);
+  text-align: center;
 }
 .home-credits-track { will-change: transform; }
 /* Top + bottom padding is the pause between one pass and the next. */
-.home-credits-seq { padding: 16vh 0 20vh; }
-.home-credit { max-width: 38ch; }
-.home-credit + .home-credit { margin-top: clamp(28px, 6vh, 56px); }
-.home-credit-title {
+.home-credits-seq { padding: 24vh 0 8vh; }
+.home-credit { max-width: 36ch; margin: 0 auto; }
+.home-credit + .home-credit { margin-top: clamp(26px, 5.5vh, 52px); }
+.home-credit-title { font-size: clamp(12px, 1.8vh, 14px); font-weight: 600; color: var(--text); }
+.home-credit-lead { margin-top: 4px; font-size: clamp(16px, 2.4vh, 20px); font-weight: 700; line-height: 1.3; color: var(--text-strong); }
+.home-credit-line { margin-top: 4px; font-size: clamp(13px, 1.9vh, 15px); line-height: 1.5; color: var(--text-secondary); }
+
+.home-footer {
+  position: relative;
+  z-index: 1;
+  flex: none;
+  display: flex;
+  align-items: center;
+  min-height: calc(clamp(34px, 8vh, 64px) + var(--safe-b));
+  padding: 0 max(var(--safe-r), var(--gutter)) var(--safe-b) max(var(--safe-l), var(--gutter));
+  border-top: 1px solid var(--border);
+  background: var(--bg);
   font-family: var(--font-mono);
   font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
   color: var(--text-muted);
 }
-.home-credit-lead { margin-top: 8px; font-size: clamp(17px, 2.6vh, 22px); font-weight: 700; line-height: 1.25; color: var(--text-strong); }
-.home-credit-text { margin-top: 8px; font-size: clamp(13px, 1.9vh, 15px); line-height: 1.55; color: var(--text-secondary); }
-.home-credit-facts { margin-top: 12px; }
-.home-credit-facts dt {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-}
-.home-credit-facts dt:not(:first-child) { margin-top: 10px; }
-.home-credit-facts dd { margin: 2px 0 0; font-size: clamp(13px, 1.9vh, 15px); font-weight: 600; color: var(--text); }
 
 @media (max-width: 900px) {
-  .screen--home { --gutter: clamp(20px, 5vw, 44px); --credits-w: clamp(200px, 32vw, 300px); }
+  .screen--home { --gutter: clamp(20px, 5vw, 44px); --glass-l: 0.75; --glass-w: 0.48; --credits-pad: 16px; }
+  .home-intro { width: 62%; }
+  .home-credit-lead { font-size: 15px; }
+  .home-credit-title, .home-credit-line { font-size: 12px; }
 }
-/* Narrow windows: a slimmer credits column keeps the wordmark and menu
-   dominant while the separator stays in place. */
-@media (max-width: 640px), (max-aspect-ratio: 1/1) {
-  .screen--home { --gutter-r: 20px; --credits-w: clamp(150px, 28vw, 240px); --credits-pad: 16px; }
-  .home-credit-lead { font-size: 16px; }
-  .home-credit-text, .home-credit-facts dd { font-size: 13px; }
+@media (max-aspect-ratio: 1/1) {
+  .screen--home { --glass-l: 1.08; --glass-w: 0.6; }
+  .home-intro { width: 86%; }
+  .home-glass { opacity: 0.65; }
+  /* Too little glass is on screen here for readable text, so the credits
+     stay available to assistive technology only. */
+  .home-credits { clip-path: inset(50%); }
 }
 @media (max-height: 500px) {
   .home-main { padding-top: max(var(--safe-t), 12px); padding-bottom: 12px; }
@@ -547,13 +580,10 @@ html.is-touch .hint-bar { display: none; }
   .home-actions { margin-top: 16px; gap: 6px; }
   .home-action { height: 40px; }
   .home-footer { min-height: calc(32px + var(--safe-b)); }
-  .home-credit + .home-credit { margin-top: 22px; }
-  .home-credit-title { font-size: 10px; }
-  .home-credit-lead { margin-top: 4px; font-size: 16px; }
-  .home-credit-text { margin-top: 4px; font-size: 12px; line-height: 1.5; }
-  .home-credit-facts { margin-top: 8px; }
-  .home-credit-facts dt:not(:first-child) { margin-top: 6px; }
-  .home-credit-facts dd { font-size: 12px; }
+  .home-credit + .home-credit { margin-top: 20px; }
+  .home-credit-lead { font-size: 14px; }
+  .home-credit-title, .home-credit-line { margin-top: 2px; font-size: 11px; line-height: 1.45; }
+  .home-credit-title { margin-top: 0; }
 }
 @media (max-height: 360px) {
   .logo--display { width: min(100%, 63vh); }
@@ -561,19 +591,18 @@ html.is-touch .hint-bar { display: none; }
   .home-actions { margin-top: 10px; gap: 5px; }
   .home-action { height: 36px; }
 }
-/* Still credits: one readable copy that can be scrolled by hand. */
+/* Still credits: one readable copy, clear of the fades, scrollable by hand. */
 @media (prefers-reduced-motion: reduce) {
   .screen--home.is-entering .home-intro > * { animation: none; }
-  .home-credits-viewport {
+  .home-credits-col {
     overflow-y: auto;
     overscroll-behavior: contain;
     touch-action: pan-y;
-    mask-image: none;
-    scrollbar-width: thin;
-    scrollbar-color: var(--border-strong) transparent;
+    pointer-events: auto;
+    scrollbar-width: none;
   }
   .home-credits-track { will-change: auto; }
-  .home-credits-seq { padding: max(var(--safe-t), clamp(20px, 5vh, 48px)) 0 max(var(--safe-b), clamp(20px, 5vh, 48px)); }
+  .home-credits-seq { padding-bottom: 24vh; }
   .home-credits-seq[aria-hidden] { display: none; }
 }
 
@@ -999,8 +1028,6 @@ html.is-touch .hint-bar { display: none; }
 .info-text, .info-note { color: var(--text-secondary); font-size: 14px; line-height: 1.55; }
 .info-text + .info-text, .info-note { margin-top: 10px; }
 .credit-lead { font-size: clamp(17px, 2.8vh, 22px); font-weight: 700; color: var(--text-strong); margin-bottom: 8px; }
-.credit-list { margin: 12px 0; padding: 12px 0; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
-.credit-list dd { font-size: 15px; }
 
 .controls-table { width: 100%; border-collapse: collapse; font-size: 14px; }
 .controls-table th, .controls-table td { padding: 7px 0; border-bottom: 1px solid var(--border); text-align: left; font-weight: 500; }
