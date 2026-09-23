@@ -71,29 +71,34 @@ Touch controls show on touch-first devices (coarse pointer, or a touch actually 
 
 ## Design
 
-Alva's interface is white-dominant and strictly monochrome: white surfaces,
-black type and primary actions, gray for secondary text, borders and quiet
-surfaces. There is no accent colour. Selection and focus are shown with black
-borders, check marks, filled indicators and a black focus ring rather than hue.
+Alva's interface follows Seren's restrained visual discipline: near-black and
+charcoal surfaces, off-white typography, gray hierarchy and thin translucent
+borders. Green is the sole interface accent, used sparingly for primary actions,
+selection and progress. Check marks, filled indicators and an off-white focus
+ring with dark separation keep states identifiable beyond colour.
 
 - **Tokens** live at the top of `styles.css` (`--bg`, `--surface*`, `--text*`,
-  `--border*`, `--ink`, radii, shadows, `--focus-ring`).
+  `--border*`, `--accent*`, `--action*`, radii, shadows, `--focus-ring`). Deeper
+  green action fills preserve contrast for white labels; muted text is lifted
+  for legibility on charcoal.
 - **Wordmark:** `js/ui/logo.js` draws ALVA from geometric SVG letterforms and
   inherits `currentColor`, so it needs no font download. `assets/favicon.svg`
   is the matching "A" monogram.
-- **Home** is an application-style screen: header with wordmark and build,
-  Play (black) and Help & Credits (outlined), and a contained charcoal preview
-  of the current fighter's idle loop.
-- **Battle** keeps dark translucent chrome over the stage so the HUD stays
-  readable, using the same monochrome rules.
-- Character sprites and stage artwork are game content and keep their original
-  colours; only interface chrome follows the monochrome palette.
+- **Home** pairs an oversized off-white ALVA wordmark and Play / Help & Credits
+  actions with an angled charcoal CSS road. A crisp green slash separates the
+  two zones; subtle lane motion stops for reduced-motion users. Build, creator
+  credit and navigation hints remain available, including at short landscape
+  heights. The road shifts outward on narrow screens instead of disappearing.
+- **Other screens** retain their established layouts, controls and navigation;
+  only interface colours change. Battle keeps readable dark translucent chrome.
+- Character sprites and stage artwork keep their original colours. No artwork,
+  Canvas rendering, physics or combat is changed by the interface theme.
 
 ## How it's built
 
 ```
 index.html            entry point
-styles.css            all UI styling (Alva monochrome design tokens + screens)
+styles.css            all UI styling (Alva dark/green design tokens + screens)
 ALVA_SPEC.md          product specification
 assets/favicon.svg    Alva monogram
 assets/characters/0001/   #0001 sprite frames (unchanged originals)
