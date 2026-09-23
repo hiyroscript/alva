@@ -1375,6 +1375,45 @@ html.is-touch .touch-controls { display: block; }
 .dialog-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 8px; flex-wrap: wrap; }
 .dialog-actions .btn { flex: 1 1 180px; padding: 0 16px; }
 
+/* Match Home Play on the requested surfaces only. Keep shared radius
+   tokens, intentional pills, and result-dialog styling unchanged. */
+.screen--mode .btn-back,
+.screen--character .btn-back,
+.screen--map .btn-back,
+.mode-card,
+.mode-info,
+.mode-cta,
+.roster-panel,
+.slot,
+.char-preview,
+.btn--confirm,
+.map-hero,
+.map-card,
+.btn--start,
+.hud-side,
+.hud-center,
+.pause-overlay .pause-panel,
+.pause-overlay .pause-btn-item,
+.pause-overlay .btn-back,
+.dialog-overlay .dialog-panel,
+.dialog-overlay .dialog-actions .btn {
+  border-radius: 3px;
+}
+
+/* Square meeting corners inside the single bordered timer/pause holder. */
+.hud-time { border-radius: 2px 2px 0 0; }
+.hud-pause { border-radius: 0 0 2px 2px; }
+
+/* Preserve hover/pressed feedback and distinguish enabled secondary actions. */
+.pause-overlay .pause-btn-item:not(.is-primary):enabled,
+.dialog-overlay .dialog-actions .btn:not(.btn--primary):enabled {
+  color: var(--text);
+}
+.pause-overlay .pause-btn-item:not(.is-primary):enabled:not(:hover):not(:active),
+.dialog-overlay .dialog-actions .btn:not(.btn--primary):enabled:not(:hover):not(:active) {
+  background: transparent;
+}
+
 .rotate-overlay {
   position: fixed;
   inset: 0;
