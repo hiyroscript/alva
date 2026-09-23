@@ -234,10 +234,11 @@ no header, build label, eyebrow or keyboard hint bar.
 - Deliberately large roster: 48 slots in a responsive, scrollable grid.
 - Only `#0001` (always shown with the `#`) is selectable; other slots are quiet
   locked placeholders (silhouette + lock). No invented names or power ratings.
-- Preview panel: animated idle/run preview in original colours, availability
-  badge, animation chips (Idle / Run), frame facts, "Confirm #0001" primary
-  button. Keyboard/gamepad activation confirms immediately; pointer selects
-  first and confirms on a second press.
+- Preview panel: clean animated idle fighter preview in original colours,
+  availability badge, fighter name, and "Confirm #0001" primary button.
+  No animation controls, frame facts, attack-set or roster-slot metadata,
+  preview floor line, roster availability count, or bottom control hints.
+  Keyboard/gamepad activation confirms immediately; pointer selects first and confirms on a second press.
 
 ### 6.5 Select Map
 

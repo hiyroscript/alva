@@ -796,20 +796,11 @@ html:not(.is-pointer-input) .mode-card:focus { box-shadow: var(--focus-ring), va
   overflow: hidden;
 }
 .preview-stage { position: relative; min-height: 0; background: var(--surface-subtle); }
-.preview-floor {
-  position: absolute;
-  left: 16%;
-  right: 16%;
-  bottom: 6%;
-  height: 1px;
-  background: var(--border-strong);
-}
 .preview-canvas { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; }
-.is-locked-preview .preview-floor { background: var(--border); }
 
 .preview-info {
   display: grid;
-  gap: clamp(8px, 1.6vh, 14px);
+  gap: clamp(8px, 1.2vh, 12px);
   padding: clamp(10px, 2vh, 18px) clamp(12px, 1.6vw, 20px) clamp(12px, 2.2vh, 20px);
   border-top: 1px solid var(--border);
 }
@@ -838,27 +829,7 @@ html:not(.is-pointer-input) .mode-card:focus { box-shadow: var(--focus-ring), va
   letter-spacing: -0.02em;
   color: var(--text-strong);
 }
-.preview-sub { color: var(--text-secondary); font-size: 13px; }
-.preview-anims { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .label { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-muted); }
-.anim-chips { display: flex; gap: 6px; }
-.chip {
-  display: inline-flex;
-  align-items: center;
-  padding: 5px 12px;
-  border-radius: var(--radius-pill);
-  border: 1px solid var(--border-strong);
-  background: var(--surface);
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-secondary);
-  transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease, box-shadow 120ms ease;
-}
-.chip:hover { border-color: var(--border-hover); color: var(--text); }
-.chip:focus { box-shadow: var(--focus-ring); }
-.chip.is-active { background: var(--accent-wash); border-color: var(--accent); color: var(--text); }
-.chip.is-muted { color: var(--text-faint); }
-.detail-list--compact { gap: 6px 14px; font-size: 13px; }
 .btn--confirm { width: 100%; }
 
 /* ---------------------------------------------------------------------
@@ -1454,8 +1425,6 @@ html.is-portrait-blocked .rotate-overlay { display: grid; }
   .steps li { padding: 5px 8px 6px; }
   .step-name { display: none; }
   .hint-bar { display: none; }
-  .preview-sub { display: none; }
-  .detail-list--compact { display: none; }
   .preview-info { gap: 7px; }
   .map-hero-desc { display: none; }
   .map-traits { display: none; }
@@ -1466,7 +1435,6 @@ html.is-portrait-blocked .rotate-overlay { display: grid; }
 
 @media (max-height: 420px) {
   .screen-heading .kicker { display: none; }
-  .preview-anims .label { display: none; }
   .mode-desc { display: none; }
   .map-card-tag { display: none; }
   .hud-side { padding: 4px 8px 5px; }
