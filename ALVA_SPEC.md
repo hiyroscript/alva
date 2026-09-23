@@ -66,41 +66,41 @@ behave, and how it must look. The README covers running and deploying it.
 
 ### 5.1 Palette
 
-Alva's interface is **white-dominant and strictly monochrome**: white, black
-and grays. There is **no accent hue** — no orange, blue, purple, green, red or
-gold in the interface. Emphasis comes from contrast, weight, borders, shape and
-spacing.
+Alva's interface is **near-black/charcoal dominant**, with off-white typography,
+gray hierarchy and **green as the sole interface accent**. It follows Seren's
+visual discipline without copying its assets. Green signals actions, selection
+and progress; it does not fill every card, border or heading.
 
 | Token | Value | Use |
 | --- | --- | --- |
-| `--bg`, `--surface` | `#ffffff` | Page and panel backgrounds |
-| `--surface-subtle` | `#f7f7f7` | Quiet surfaces, preview stages |
-| `--surface-muted` | `#efefef` | Pressed states, tracks |
-| `--text` / `--text-strong` | `#111111` / `#000000` | Body text / headings |
-| `--text-secondary` | `#5c5c5c` | Supporting copy |
-| `--text-muted` | `#737373` | Labels, meta (≥ 4.5:1 on white) |
-| `--text-faint` | `#a6a6a6` | Decorative / unavailable only |
-| `--border` / `--border-strong` | `#e4e4e4` / `#cccccc` | Dividers / control outlines |
-| `--ink` | `#111111` | Primary action fill |
-| `--focus-ring` | `0 0 0 2px #fff, 0 0 0 4px #000` | Keyboard/gamepad focus |
-
-Exact neutrals may be refined for contrast, but the system stays monochrome.
+| `--bg` / `--surface` | `#050506` / `#0a0b0c` | Page / panels |
+| `--surface-subtle` | `#141518` | Quiet surfaces, preview backgrounds |
+| `--surface-muted` / `--surface-sunken` | `#1c1f24` / `#08090a` | Pressed states, tracks / recesses |
+| `--text` / `--text-strong` | `#f4f5f6` / `#ffffff` | Body text / headings |
+| `--text-secondary` / `--text-muted` | `#a7acb3` / `#8c929a` | Supporting copy / readable metadata |
+| `--text-faint` | `#4c5158` | Decorative / unavailable only |
+| `--border` / `--border-strong` / `--border-hover` | White at 9% / 16% / 28% | Hairlines / outlines / hover |
+| `--accent` / `--accent-hi` / `--accent-lo` | `#2fbf63` / `#7cf7a6` / `#1f8f4a` | Green accent family |
+| `--accent-wash` | `rgba(47,191,99,.14)` | Subtle selected fill |
+| `--action` / `--action-hover` / `--action-pressed` | `#197a3d` / `#1b8141` / `#146332` | Green fills with ≥ 4.5:1 white label contrast |
+| `--surface-overlay` | `rgba(10,11,12,.94)` | Readable map detail chrome |
+| `--focus-ring` | Dark 2 px separation, off-white 4 px outer ring | Keyboard/gamepad focus |
 
 ### 5.2 Component rules
 
-- **Primary action:** black fill, white text, medium radius; hover slightly
-  lighter; pressed darker with a slight scale.
-- **Secondary action:** white fill, black text, gray border; hover light gray.
-- **Selected:** black border (2 px), light-gray surface where useful, and a
-  black check mark or filled indicator.
-- **Focus:** the black focus ring (white offset on light surfaces). Never
-  colour alone.
-- **Progress:** black fill on a pale-gray track.
-- **Tabs:** active tab black text with a black underline; inactive gray.
-- **Setup steps:** done = gray with a check; current = black, filled number,
-  black underline; future = light gray.
-- **Panels:** white, thin `#e4e4e4` border, restrained radius (8/12/18 px),
-  at most a soft neutral shadow. No textures, grids or glows.
+- **Primary action:** deep green fill, white text; hover slightly lighter,
+  pressed darker. Existing geometry is retained outside Home.
+- **Secondary action:** transparent or charcoal, off-white/gray text, thin
+  gray border; hover slightly lightens the surface.
+- **Selected:** green border plus a check mark, filled indicator or underline.
+  Small bright-green indicators use dark text for contrast.
+- **Focus:** off-white ring with dark separation; never green alone.
+- **Progress:** green fill on a charcoal track.
+- **Tabs:** active off-white text with green underline; inactive gray.
+- **Setup steps:** done = gray with a check; current = filled green number and
+  underline; future = gray.
+- **Panels:** charcoal, translucent light hairlines, established radii and
+  restrained neutral shadows. No new textures or glass effects.
 
 ### 5.3 Wordmark and favicon
 
@@ -125,14 +125,14 @@ Exact neutrals may be refined for contrast, but the system stays monochrome.
 
 - 120–220 ms hover/focus transitions, gentle screen transitions (short fade
   and ≤ 12 px slide), subtle press feedback, restrained idle animation.
-- No streaks, wipes, glows, constant ambient animation or large hover
-  translations.
+- No streaks, wipes or large hover translations. Home alone has subtle
+  continuous lane motion and a restrained bloom around its stable green slash.
 - `prefers-reduced-motion: reduce` removes transitions and animation, and the
-  Home fighter preview holds a still frame.
+  Home road lanes remain still.
 
 ### 5.6 Game content exception
 
-The monochrome rule covers interface chrome: menus, buttons, cards, overlays,
+The dark/green palette covers interface chrome: menus, buttons, cards, overlays,
 focus/selection states, HUD accents and decoration. **Character sprites and
 stage artwork are game content** and keep their own colours (e.g. the City's
 warm neon lighting and the Desert's sunset). Do not grayscale gameplay art to
@@ -157,39 +157,38 @@ moves focus).
   bottom centre in soft gray with generous letter spacing, holds, fades out.
 - Total ≈ 2.5–3.5 s; any key or tap skips.
 - Home then dissolves in over the black (the splash stays mounted underneath
-  until the fade completes) so the change to the white interface is deliberate,
-  never a flash. The page background is black before boot and during the splash.
+  until the fade completes) for a seamless dark transition. The page and browser
+  theme stay dark before boot, during the splash and throughout navigation.
 - Reduced motion: no fades, short hold.
 - No wordmark or logo animation on the splash.
 
 ### 6.2 Home
 
-An application-style shell, centred with a maximum content width of ≈ 1160 px:
+An open editorial composition with a full-screen near-black background:
 
-- **Header:** small ALVA wordmark (left), "Build x.y.z" pill (right), thin
-  divider below.
-- **Intro column:** eyebrow "2D sprite fighting game", the large ALVA wordmark
-  as the page heading, one short line of supporting copy, then the actions.
-- **Actions:** exactly two — **Play** (primary, black, arrow icon) opens Select
-  Mode; **Help & Credits** (secondary, outlined, chevron) opens Help & Credits.
-  Play is focused by default. No numbering, no arcade styling.
-- **Fighter preview:** a contained light-gray card on the right showing the
-  current fighter's idle loop as a charcoal silhouette with a soft ground
-  shadow and a small caption (name · Idle). Uses the already-loaded,
-  normalized sprite set; tinted once; pixelated; DPR-aware; supporting, never
-  dominant. It stays invisible if the frames are unavailable.
-- **Footer:** "by hiyroscript" and keyboard hints (hidden on touch-first
-  devices), small gray text above a thin divider.
-- Responsive: two columns on wide screens; tighter spacing and a smaller
-  preview on tablets; on short phone landscape the eyebrow, then the supporting
-  copy and caption, drop out so the wordmark, Play and Help & Credits always fit
-  without scrolling; stacked layout on tall desktop windows.
+- **Header:** quiet small ALVA mark and mono "Build x.y.z" label.
+- **Intro:** muted uppercase "2D sprite fighting game", dramatically enlarged
+  original ALVA SVG wordmark, then one short supporting line.
+- **Actions:** exactly two — **Play** (green, white text, arrow) opens Select
+  Mode; **Help & Credits** (restrained secondary, chevron) opens Help & Credits.
+  Play is focused by default. Home buttons have a small 3 px radius.
+- **Road:** decorative HTML/CSS, `aria-hidden`, roughly the right 44% on wide
+  screens, angled 21 degrees and extended beyond the viewport. Charcoal asphalt,
+  subtle pale lane markings on a 1.8 s cycle, and dark top/bottom fades. A stable
+  3 px green slash follows the road's left edge. No fighter preview or Canvas.
+- **Footer:** "by hiyroscript" and existing keyboard hints (hidden on touch-first
+  devices), gray typography and a subtle top hairline.
+- **Responsive:** safe-area-aware, no Home scrolling. On narrow layouts the road
+  moves farther off-screen but remains a background strip. Short landscape
+  heights reduce title size, gaps and action height while retaining meaningful
+  content. Reduced motion stops decorative lane and entrance animations.
+- All other screens retain their layout, structure, spacing and behaviour.
 
 ### 6.3 Select Mode
 
 - Header "Select Mode" with setup steps (Mode · Fighter · Stage).
 - One large Quick Battle card (art area with two neutral fighter silhouettes,
-  name, description "Choose a fighter and stage, then enter battle.", black
+  name, description "Choose a fighter and stage, then enter battle.", green
   Select action) in a rail built for future modes, plus a details panel
   (format, rounds, timer, opponent, how it works).
 - No fake modes or online matchmaking.
@@ -208,7 +207,7 @@ An application-style shell, centred with a maximum content width of ≈ 1160 px:
 
 - Two stages, **Desert** and **City**, with a large live preview (idle fighters
   at the spawns, gentle camera pan) and selectable cards with thumbnails.
-- Stage details sit in a white information card over the preview.
+- Stage details sit in a dark information card over the preview.
 - "Start Battle · <Stage>" primary action.
 
 ### 6.6 Help & Credits
@@ -231,15 +230,15 @@ An application-style shell, centred with a maximum content width of ≈ 1160 px:
 
 ### 6.7 Loading and dialogs
 
-- Loading overlay: white background, small ALVA wordmark, black label
-  ("Loading #0001"), pale-gray track with black progress fill; shown after a
+- Loading overlay: near-black background, small ALVA wordmark, off-white label
+  ("Loading #0001"), charcoal track with green progress fill; shown after a
   short delay so instant loads don't flash.
-- Error state: readable message, black **Retry** and outlined **Back**.
+- Error state: readable message, green **Retry** and outlined **Back**.
   Battle never starts before its sprites are ready.
-- Confirmation dialog (`alertdialog`, modal): white panel, subtle border and
-  shadow, black title, gray message, outlined cancel and black confirm.
+- Confirmation dialog (`alertdialog`, modal): dark panel, subtle border and
+  shadow, off-white title, gray message, outlined cancel and green confirm.
   Returning Home from a battle is always confirmed.
-- Portrait on touch devices: a white "Rotate your device — Alva is designed for
+- Portrait on touch devices: a dark "Rotate your device — Alva is designed for
   landscape play." overlay; the battle pauses and resumes correctly on return
   to landscape.
 
@@ -275,15 +274,15 @@ An application-style shell, centred with a maximum content width of ≈ 1160 px:
 ### 7.3 Battle chrome
 
 - The battle keeps deliberate dark chrome over the stage for legibility, using
-  the same monochrome rules: translucent black HUD panels, white labels, gray
+  the same neutral hierarchy: translucent black HUD panels, white labels, gray
   secondary text.
 - HUD: P1 (filled white tag, white health bar) top-left; CPU (outlined tag,
   gray health bar) top-right; round label and timer top-centre. The timer
   inverts (white block, black digits) for the last ten seconds.
 - Player markers above fighters and ground rings: P1 white, CPU gray.
 - Round banners ("ROUND 1", "FIGHT", "TIME") in white on a dark band.
-- Pause and result menus are white Alva panels over a dimmed battle with a
-  black primary action (Resume / Rematch).
+- Pause and result menus are dark Alva panels over a dimmed battle with a
+  green primary action (Resume / Rematch).
 
 ### 7.4 Input
 
