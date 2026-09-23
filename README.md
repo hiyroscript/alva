@@ -82,13 +82,16 @@ ring with dark separation keep states identifiable beyond colour.
   green action fills preserve contrast for white labels; muted text is lifted
   for legibility on charcoal.
 - **Wordmark:** `js/ui/logo.js` draws ALVA from geometric SVG letterforms and
-  inherits `currentColor`, so it needs no font download. `assets/favicon.svg`
-  is the matching "A" monogram.
+  inherits `currentColor`, so it needs no font download. `alvafav.PNG`
+  is the site favicon.
 - **Home** pairs an oversized off-white ALVA wordmark, the line "Fan project.
   Big heart." and a Play action with an angled strip of semi-transparent glass
   over the black background. A crisp green slash separates the two zones.
   Plain-text credits roll upward inside the glass in an endless loop and stand
-  still for reduced-motion users. Help & Credits stays visible but is disabled
+  still for reduced-motion users. Wheel/trackpad, pointer or touch dragging,
+  and focused arrow/Page keys scroll the credits manually. Automatic movement
+  resumes from that position after about 2 seconds of inactivity; reduced-motion
+  mode remains manual-only. Help & Credits stays visible but is disabled
   for now. The strip shifts outward on narrow screens.
 - **Other screens** retain their established layouts, controls and navigation;
   only interface colours change. Battle keeps readable dark translucent chrome.
@@ -101,7 +104,7 @@ ring with dark separation keep states identifiable beyond colour.
 index.html            entry point
 styles.css            all UI styling (Alva dark/green design tokens + screens)
 ALVA_SPEC.md          product specification
-assets/favicon.svg    Alva monogram
+alvafav.PNG           site favicon
 assets/characters/0001/   #0001 sprite frames (unchanged originals)
 js/
   main.js, config.js  boot + global config (bindings, render, timing)
@@ -140,7 +143,7 @@ stage artwork by hiyroscript.
 
 **#0001 sprite source.** Original sprite material from:
 
-- *Jump Ultimate Stars* (Nintendo DS / DSi)
+- *Jump Ultimate Stars*
 - The Spriters Resource. Source sheet uploaded by Dazz, contributor FRET.
 
 **Rights.** hiyroscript did not create or claim ownership of the original

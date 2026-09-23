@@ -44,7 +44,7 @@ behave, and how it must look. The README covers running and deploying it.
   allows, whole device pixels per art pixel.
 - **Never redraw, recolour, replace or AI-generate the #0001 artwork.** Do not
   download third-party art. Stage art is original and procedural.
-- `assets/favicon.svg` holds the Alva "A" monogram.
+- `alvafav.PNG` is the site favicon source.
 
 ## 4. Architecture
 
@@ -111,7 +111,7 @@ and progress; it does not fill every card, border or heading.
 - It is used as the large Home title and in the loading overlay. The SVG
   exposes `role="img"`, `aria-label="ALVA"` and a `<title>`;
   repeated decorative copies are `aria-hidden`.
-- Favicon: white rounded square, thin gray outline, black "A" monogram.
+- Favicon: `alvafav.PNG`, referenced with a relative URL for project subpaths.
 
 ### 5.4 Typography
 
@@ -129,7 +129,10 @@ and progress; it does not fill every card, border or heading.
 - No streaks, wipes or large hover translations. Home alone has continuous
   motion: a slow, constant upward credits roll beside its stable green slash.
 - `prefers-reduced-motion: reduce` removes transitions and animation; the Home
-  credits stand still as a single readable copy.
+  credits remain manual-only as a single readable copy.
+- Home credits accept wheel/trackpad, touch/pointer dragging, and arrow/Page
+  keys when focused. Interaction pauses the roll; after about 2 seconds of
+  inactivity it resumes from the current position at 22 CSS px/sec.
 
 ### 5.6 Game content exception
 
@@ -241,7 +244,7 @@ no header, build label, eyebrow or keyboard hint bar.
   - **Original work** — game design, code, interface, ALVA wordmark, and
     Desert / City stage artwork by hiyroscript.
   - **#0001 sprite source** — original sprite material from *Jump Ultimate
-    Stars*; Nintendo DS / DSi; The Spriters Resource; source sheet uploaded by
+    Stars*; The Spriters Resource; source sheet uploaded by
     Dazz; contributor FRET.
   - **Rights** — hiyroscript did not create or claim ownership of the original
     third-party character/game artwork. Original characters, games, and related
@@ -249,8 +252,8 @@ no header, build label, eyebrow or keyboard hint bar.
   - **Project** — unofficial fan project. No affiliation or endorsement is
     implied.
 - The UI does not name the character behind #0001. Never imply ownership of
-  the original character, Jump Ultimate Stars, Nintendo IP or The Spriters
-  Resource material.
+  original third-party characters, games, artwork, or related properties;
+  these belong to their respective rights holders.
 
 ### 6.7 Loading and dialogs
 

@@ -8,6 +8,7 @@ import { logoSVG } from '../ui/logo.js';
 import { ICONS } from '../ui/icons.js';
 import { CREDITS } from '../ui/help-content.js';
 
+const CREDITS_RESUME_DELAY = 2000;
 const ROLL_SPEED = 22; // credits roll, CSS px per second
 
 // One pass of the credits. The roll shows it twice; the copy is hidden from
@@ -41,12 +42,55 @@ export class HomeScreen extends Screen {
 
     this.rollTrack = el('div', { class: 'home-credits-track' }, [creditsSequence(), creditsSequence({ copy: true })]);
     this.rollOffset = 0;
+    this.lastInteraction = -Infinity;
+    this.activePointer = null;
+    this.portraitQuery = window.matchMedia('(max-aspect-ratio: 1/1)');
+    this.creditsViewport = el('div', {
+      class: 'home-credits-col', tabindex: 0, role: 'region',
+      'aria-label': 'Credits. Scroll or use arrow and Page keys to read.',
+    }, [this.rollTrack]);
+    // Registered once: Home visits reuse this screen and the app frame loop.
+    this.creditsViewport.addEventListener('wheel', (event) => {
+      event.preventDefault();
+      const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? this.creditsViewport.clientHeight : 1;
+      this.scrollCredits(event.deltaY * unit);
+    }, { passive: false });
+    this.creditsViewport.addEventListener('pointerdown', (event) => {
+      if (event.button !== 0 || this.activePointer !== null) return;
+      event.preventDefault();
+      this.creditsViewport.focus({ preventScroll: true });
+      this.activePointer = event.pointerId;
+      this.pointerY = event.clientY;
+      this.lastInteraction = performance.now();
+      this.creditsViewport.setPointerCapture(event.pointerId);
+    });
+    this.creditsViewport.addEventListener('pointermove', (event) => {
+      if (event.pointerId !== this.activePointer) return;
+      this.scrollCredits(this.pointerY - event.clientY);
+      this.pointerY = event.clientY;
+    });
+    for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) {
+      this.creditsViewport.addEventListener(type, (event) => {
+        if (event.pointerId === this.activePointer) this.endDrag();
+      });
+    }
+    this.creditsViewport.addEventListener('keydown', (event) => {
+      if (event.altKey || event.ctrlKey || event.metaKey) return;
+      const page = this.creditsViewport.clientHeight * 0.8;
+      const delta = { ArrowUp: -40, ArrowDown: 40, PageUp: -page, PageDown: page,
+        Space: event.shiftKey ? -page : page }[event.code];
+      if (delta === undefined) return;
+      event.preventDefault();
+      // Handle only intentional credits focus before the window menu listener.
+      event.stopPropagation();
+      this.scrollCredits(delta);
+    });
 
     this.el.replaceChildren(
       el('div', { class: 'home-scene' }, [
         el('div', { class: 'home-glass', 'aria-hidden': 'true' }),
         el('aside', { class: 'home-credits', 'aria-label': 'Credits' }, [
-          el('div', { class: 'home-credits-col' }, [this.rollTrack]),
+          this.creditsViewport,
         ]),
       ]),
       el('div', { class: 'home-main' }, [
@@ -63,20 +107,48 @@ export class HomeScreen extends Screen {
     this.el.setAttribute('aria-labelledby', 'home-title');
   }
 
-  // Runs on the app's frame loop, so re-entering Home never stacks timers.
-  // The copy follows the first pass, so wrapping the offset at one pass
-  // height restarts the credits without a visible seam.
-  update(dt) {
-    if (this.app.device.reducedMotion) {
-      if (this.rollOffset) {
-        this.rollOffset = 0;
-        this.rollTrack.style.transform = '';
-      }
-      return;
-    }
+  endDrag() {
+    const pointer = this.activePointer;
+    this.activePointer = null;
+    if (pointer === null) return;
+    this.lastInteraction = performance.now();
+    if (this.creditsViewport.hasPointerCapture(pointer)) this.creditsViewport.releasePointerCapture(pointer);
+  }
+
+  enter() {
+    this.lastInteraction = -Infinity;
+  }
+
+  exit() {
+    this.endDrag();
+  }
+
+  scrollCredits(delta) {
+    this.lastInteraction = performance.now();
+    this.rollOffset += delta;
+    this.renderCredits();
+  }
+
+  renderCredits() {
     const period = this.rollTrack.firstChild.getBoundingClientRect().height;
     if (!period) return;
-    this.rollOffset = (this.rollOffset + ROLL_SPEED * dt) % period;
+    // A single logical position drives both manual and automatic movement.
+    // Reduced motion uses the same inputs, bounded to one readable copy.
+    this.rollOffset = this.app.device.reducedMotion
+      ? Math.max(0, Math.min(this.rollOffset, Math.max(0, period - this.creditsViewport.clientHeight)))
+      : ((this.rollOffset % period) + period) % period;
     this.rollTrack.style.transform = `translate3d(0, ${-this.rollOffset}px, 0)`;
+  }
+
+  update(dt) {
+    const portrait = this.portraitQuery.matches;
+    this.creditsViewport.tabIndex = portrait ? -1 : 0;
+    if (portrait && document.activeElement === this.creditsViewport) this.focusDefault();
+    if (this.activePointer !== null && (!document.hasFocus() || portrait)) this.endDrag();
+    if (!this.app.device.reducedMotion && this.activePointer === null &&
+        performance.now() - this.lastInteraction >= CREDITS_RESUME_DELAY) {
+      this.rollOffset += ROLL_SPEED * dt;
+    }
+    this.renderCredits();
   }
 }

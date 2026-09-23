@@ -108,7 +108,6 @@ export const CREDITS = [
     title: '#0001 sprite source',
     lines: [
       'Original sprite material from Jump Ultimate Stars',
-      'Nintendo DS / DSi',
       'The Spriters Resource',
       'Source sheet uploaded by Dazz',
       'Contributor: FRET',
