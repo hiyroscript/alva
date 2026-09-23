@@ -1,529 +1,914 @@
-Work in the hiyroscript/alva repository. Inspect the current implementation before changing anything, then implement the new #0001 animation assets and wire Basic Attack 1 into the existing combat architecture.
+Implement Character #0001’s Basic Attack 2 (BA2) and Mid-Air Basic Attack 2 in the Alva repository.
 
-The goal is to add four things for character #0001:
+Before editing anything, inspect the current main branch and understand the existing BA1 implementation. BA1 is already complete and merged; BA2 should extend the exact same architecture rather than creating a parallel combat/input system.
 
-1. Ground hurt
-2. Mid-air hurt
-3. Basic Attack 1 / BA1 on the ground
-4. Mid-air Basic Attack 1 / BA1
+Terminology and naming
 
-Also change the visible A1 button text to BA1.
-
-Important naming clarification
-
-In these sprite filenames:
+For these sprites:
 
 * ba means basic attack
-* 1ba means Basic Attack 1
-* therefore the existing internal action1 input is the input for BA1
-* the number at the very end of a filename is the animation frame number
+* 2ba means Basic Attack 2 / BA2
+* The 2 before ba identifies which basic attack it is.
+* The number at the very end of the filename is the animation frame number.
 
 Examples:
 
-* 0001_1ba1.png = Basic Attack 1, frame 1
-* 0001_1ba4.png = Basic Attack 1, frame 4
-* 0001_midair1ba3.png = mid-air Basic Attack 1, frame 3
+* 0001_2ba1.png = Character #0001, Basic Attack 2, frame 1
+* 0001_2ba7.png = Character #0001, Basic Attack 2, frame 7
+* 0001_midair2ba1.png = Character #0001, Mid-Air Basic Attack 2, frame 1
 
-Do not interpret 1ba1 as attack 1BA1 or create a new unrelated action.
+BA2 is the secondary basic attack and belongs to the existing internal action2 input.
 
-Keep the existing internal input name action1; do not rename the whole input system. Only change its user-facing meaning/label to Basic Attack 1 / BA1 where appropriate.
+Do not rename the internal controller action from action2. Only change its player-facing label from Action 2 / A2 to Basic Attack 2 / BA2.
 
-Existing repo architecture to preserve
+Existing artwork
 
-The game is already structured correctly for this:
+The current repo root contains these newly uploaded sprites:
 
-* js/data/characters.js owns character animations, action mappings, attack definitions, movement, hurtboxes, etc.
-* js/game/character.js owns the Fighter state machine and tryAction().
-* js/game/combat.js already provides startup/active/recovery, damage, hitboxes, knockback, hitstun, blockstun, hitstop and cooldowns.
-* js/game/sprite-normalizer.js normalizes different sprite scales and anchors them bottom-centre.
-* js/game/sprite-animator.js handles non-looping clips and fallback animations.
-* js/core/app.js preloads every path returned by characterFramePaths().
-* action1 is already wired through keyboard, touch and gamepad.
-* U is the keyboard binding for action1.
-* standard gamepad B / Circle is already mapped to action1.
-* the training CPU must remain non-attacking.
-* Primary, Special and Action 2 must remain reserved/inactive unless they already have real artwork. Do not make up attacks for them.
+Ground BA2
 
-Follow the same approach used by PR #15 when jump/fall/land were added: real artwork only, canonical character asset folder, data-driven definitions, graceful missing-frame behavior, tests, and no physics/collider changes merely to accommodate artwork.
+* 0001_2ba1.png
+* 0001_2ba2.png
+* 0001_2ba3.png
+* 0001_2ba4.png
+* 0001_2ba5.png
+* 0001_2ba6.png
+* 0001_2ba7.png
 
-New assets currently at the repository root
+This is a 7-frame ground animation.
 
-The following new files currently exist at the repo root:
+Mid-Air BA2
 
-Hurt
+* 0001_midair2ba1.png
+* 0001_midair2ba2.png
+* 0001_midair2ba3.png
 
-* 0001_hurt.png
-* 0001_midairhurt.png
+This is a 3-frame mid-air animation.
 
-Ground BA1
+There were previously incorrectly named 0001_2ab*.png files in the repository history. They were deleted. Do not restore them and do not use 2ab anywhere. The correct naming is 2ba.
 
-* 0001_1ba1.png
-* 0001_1ba2.png
-* the third frame currently has a malformed filename
-* 0001_1ba4.png
+Do not redraw, recolour, reinterpret, replace, upscale manually, or AI-generate any #0001 sprite artwork. Use the uploaded PNGs exactly as the source animation frames.
 
-The malformed third frame is currently named:
+1. Move the new sprites into the canonical fighter asset directory
 
-0001_1￼ba3.png
+Move the ten new PNGs from the repository root into:
 
-There is an invisible/odd U+FFFC OBJECT REPLACEMENT CHARACTER between the 1 and ba.
+./assets/characters/0001/
 
-It must become exactly:
+The final paths must therefore be:
 
-0001_1ba3.png
+./assets/characters/0001/0001_2ba1.png
+through
+./assets/characters/0001/0001_2ba7.png
 
-Do not preserve the malformed Unicode character anywhere.
+and:
 
-Mid-air BA1
+./assets/characters/0001/0001_midair2ba1.png
+through
+./assets/characters/0001/0001_midair2ba3.png
 
-* 0001_midair1ba1.png
-* 0001_midair1ba2.png
-* 0001_midair1ba3.png
-* 0001_midair1ba4.png
-* 0001_midair1ba5.png
+Do not leave duplicate copies at the repository root.
 
-There were older generic ba and 2ba uploads in git history that were subsequently deleted. Do not restore those. The assets currently intended for this task are the 1ba and midair1ba sets above.
+Preserve the PNG bytes unchanged.
 
-1. Move all new artwork into the canonical character directory
+All runtime asset URLs must remain relative because Alva can be served from the /alva/ GitHub Pages subpath.
 
-Following the jump/fall/land precedent, move the new PNGs from the repository root into:
+2. Register BA2 animations in Character #0001 data
 
-assets/characters/0001/
+Extend js/data/characters.js using the existing BA1 conventions.
 
-The final canonical paths must be:
+BA1 currently establishes the correct pattern:
 
-* assets/characters/0001/0001_hurt.png
-* assets/characters/0001/0001_midairhurt.png
-* assets/characters/0001/0001_1ba1.png
-* assets/characters/0001/0001_1ba2.png
-* assets/characters/0001/0001_1ba3.png
-* assets/characters/0001/0001_1ba4.png
-* assets/characters/0001/0001_midair1ba1.png
-* assets/characters/0001/0001_midair1ba2.png
-* assets/characters/0001/0001_midair1ba3.png
-* assets/characters/0001/0001_midair1ba4.png
-* assets/characters/0001/0001_midair1ba5.png
-
-There should be no duplicate copies of these new character frames left at the repository root.
-
-Do not edit, redraw, recolour, rescale or regenerate the PNG artwork.
-
-2. Register the new #0001 animation clips
-
-Update js/data/characters.js.
-
-Add dedicated animation entries for approximately these logical animation keys:
-
-* hurt
-* midairHurt
 * ba1
 * midairBa1
+* a shared FPS constant
+* non-looping clips
+* action1: { ground: 'ba1', air: 'midairBa1' }
+* corresponding attack definitions
 
-Use the existing BASE_0001 / frames() conventions where suitable.
+Add equivalent logical animation keys for BA2:
 
-Expected frame sets:
+* ba2
+* midairBa2
 
-hurt
+Use:
 
-One frame:
+* frames(BASE_0001, '2ba', 7) for ba2
+* frames(BASE_0001, 'midair2ba', 3) for midairBa2
 
-0001_hurt.png
+Both animations must be:
 
-Non-looping/still.
+* non-looping
+* played once
+* allowed to hold their final frame naturally if necessary
+* normalized through the existing sprite-normalization pipeline
+* anchored consistently with #0001’s existing animations
 
-midairHurt
+Do not hard-code any special rendering logic specifically for the PNG dimensions.
 
-One frame:
+The existing sprite normalizer should continue to determine visible bounds, pixel-art grid, world scaling, and torso/bottom-centre anchoring.
 
-0001_midairhurt.png
+Start with 12 FPS, consistent with BA1, unless direct inspection of the actual BA2 frames makes another whole-frame playback rate clearly necessary. If a different FPS is selected, document why and keep all attack phase durations derived from that FPS so animation and combat cannot drift apart.
 
-Non-looping/still.
+Prefer introducing a BA2_FPS constant alongside BA1_FPS.
 
-ba1
+3. Map the existing Action 2 input to BA2
 
-Four frames, in exact order:
+Character #0001 currently has approximately this action mapping:
 
-1. 0001_1ba1.png
-2. 0001_1ba2.png
-3. 0001_1ba3.png
-4. 0001_1ba4.png
+actions: {
+  primary: null,
+  special: null,
+  action1: { ground: 'ba1', air: 'midairBa1' },
+  action2: null,
+}
 
-It must play once, not loop.
+Change only action2 so it becomes the second basic attack:
 
-midairBa1
+action2: {
+  ground: 'ba2',
+  air: 'midairBa2',
+}
 
-Five frames, in exact order:
+Do not change BA1.
 
-1. 0001_midair1ba1.png
-2. 0001_midair1ba2.png
-3. 0001_midair1ba3.png
-4. 0001_midair1ba4.png
-5. 0001_midair1ba5.png
+Do not move BA2 onto primary, special, or action1.
 
-It must play once, not loop.
+After this change:
 
-A starting playback rate of 12 fps is appropriate for both BA1 clips. Keep it data-driven so it can be tuned later.
+* action1 = Basic Attack 1 / BA1
+* action2 = Basic Attack 2 / BA2
+* primary remains reserved
+* special remains reserved
 
-The single-frame hurt clips can also use a normal positive fps value even though playback rate does not materially affect a one-frame clip.
+The existing Fighter.attackFor() implementation already supports { ground, air } mappings. Reuse it.
 
-Let the existing sprite normalization system handle differing raw PNG dimensions. Do not bypass normalization or introduce special hard-coded rendering sizes for these clips.
+Do not add another grounded/airborne dispatch system.
 
-Add sensible idle-frame fallbacks for hurt and midairHurt, matching the repo’s current graceful-degradation philosophy.
+4. Preserve the existing BA1 input bindings
 
-If a hurt asset cannot load, holding a still idle frame is acceptable.
+The current controls are already wired correctly.
 
-3. Ground hurt versus mid-air hurt
+BA2 must use the physical controls that currently activate action2:
 
-The Fighter’s logical combat state should remain hitstun; do not unnecessarily rename the entire combat concept.
+Keyboard
 
-Instead, choose the rendered animation based on whether the fighter is grounded while in hitstun:
+I
 
-* hitstun + grounded → hurt
-* hitstun + airborne → midairHurt
+Do not move BA2 to J, K, U, or another key.
 
-hitstun must continue having higher visual priority than attack, land, run, jump, fall, block, crouch and idle, consistent with the current state ordering.
+Current important mappings remain:
 
-If an airborne fighter lands while hitstun is still active, switching from the mid-air hurt art to the grounded hurt art is acceptable and desirable.
+* U → BA1 / action1
+* I → BA2 / action2
 
-When hitstun expires, normal state selection should resume naturally:
+Gamepad
 
-* idle/run when grounded
-* jump/fall when airborne
-* etc.
+The existing standard-gamepad mapping assigns:
 
-Do not change movement physics, collider sizes, pushbox sizes, normal hurtboxes, gravity, jump velocity, stage collision or camera behavior just to display the hurt frames.
+* B / Circle → action1 / BA1
+* LB → action2
 
-4. Make action1 actually perform BA1
+Therefore LB becomes BA2.
 
-action1 currently exists but maps to null.
+Do not remap gamepad buttons unless there is an actual bug in the existing mapping.
 
-It should now trigger Basic Attack 1.
+Touch
 
-The same action1 input must select a different attack depending on grounded state:
+Keep the existing action2 touch-button position and CSS slot.
 
-* grounded action1 → ground BA1
-* airborne action1 → mid-air BA1
+The internal action remains:
 
-A clean data-driven representation would be something like:
+action2
 
-action1: { ground: 'ba1', air: 'midairBa1' }
+The existing CSS/layout class can remain .tc-a2.
 
-while leaving:
+Only its visible label/status changes.
 
-* primary: null
-* special: null
-* action2: null
+5. Change “A2” to “BA2”
 
-Update Fighter.tryAction() so action mappings remain backwards-compatible:
+Change the user-facing touch button from:
 
-* a string mapping still means one normal attack ID
-* an object with ground / air chooses the proper attack from this.body.grounded
-* null continues to mean intentionally inactive
+A2
 
-Do not hard-code #0001 into the Fighter class.
+to exactly:
 
-The generic Fighter code should simply understand ground/air action mappings, with #0001’s data deciding which attack IDs are used.
+BA2
 
-5. Define the two BA1 attacks through the existing combat system
+Also change its accessible label from:
 
-Add separate attack definitions for:
-
-* ground ba1
-* midairBa1
-
-Each definition should point at its matching animation.
-
-Do not build a second attack system.
-
-Use the existing createAttackDefinition() architecture and existing world-space hitbox mirroring.
-
-Animation-aligned timing
-
-Keep combat timing synchronized with the visible clips instead of letting the attack end halfway through its sprite animation.
-
-For a starting implementation at 12 fps:
-
-Ground BA1 — 4 frames
-
-Use roughly:
-
-* frame 1 = startup
-* frame 2 = active/contact
-* frames 3–4 = recovery
-
-That corresponds to approximately:
-
-* startup: 1 / 12
-* active: 1 / 12
-* recovery: 2 / 12
-
-Mid-air BA1 — 5 frames
-
-Use roughly:
-
-* frames 1–2 = startup
-* frame 3 = active/contact
-* frames 4–5 = recovery
-
-That corresponds to approximately:
-
-* startup: 2 / 12
-* active: 1 / 12
-* recovery: 2 / 12
-
-The active hitbox should not be active during the entire animation.
-
-Initial combat values
-
-Use conservative values suitable for a first basic attack rather than turning BA1 into an oversized or high-damage move.
-
-The sample attack documented in js/game/combat.js is an appropriate baseline:
-
-* damage around 6
-* hitstun around 0.22
-* blockstun around 0.14
-* hitstop around 0.06
-* cooldown around 0.1
-* horizontal knockback around 180
-* no arbitrary vertical launch unless the artwork/gameplay clearly calls for it
-
-Start from the sample forward hitbox in combat.js and adjust its rectangle only as necessary so the hitbox reasonably matches the actual strike shown by the BA1 contact frame.
-
-Use the debug overlay to verify the hitbox is in front of the character and not absurdly oversized.
-
-Ground BA1 can use groundOnly: true.
-
-The mid-air definition is selected only by the airborne branch of the action mapping. Avoid introducing unnecessary new schema unless required.
-
-Movement can remain locked during the attack using the current lockMovement behavior. Do not add dashes, teleports, recoil, extra jumps, stalls or other mechanics that were not requested.
-
-If the fighter lands while a mid-air BA1 is already in progress, allow the attack it started to finish rather than switching halfway into the ground BA1 clip.
-
-If the selected attack animation has no successfully loaded frames, retain the current behavior of refusing the attack rather than faking an attack pose.
-
-6. Preserve the current input bindings
-
-Do not change which physical controls activate action1.
-
-BA1 should therefore work through all of the existing action1 routes:
-
-* Keyboard: U
-* Touch: the current A1-position button
-* Standard gamepad: B / Circle via the existing action1 mapping
-
-Do not move BA1 onto Primary/J.
-
-Primary remains reserved.
-
-7. Change the visible A1 button to BA1
-
-In js/game/touch-controls.js:
-
-Change the action1 button’s visible text from:
-
-A1
+Action 2
 
 to:
 
-BA1
+Basic Attack 2
 
-Also change its accessible label from generic Action 1 to:
+In js/game/touch-controls.js, the equivalent button should become conceptually:
+
+{
+  action: 'action2',
+  label: 'Basic Attack 2',
+  text: 'BA2',
+  pos: 'a2'
+}
+
+Remove its pending: true state now that real attack artwork exists.
+
+The BA2 button must therefore no longer use the dashed/dimmed reserved appearance.
+
+Do not rename .tc-a2 just to match the visible text.
+
+Do not change the button’s location.
+
+6. Update global action labels
+
+In js/config.js, change:
+
+action2: 'Action 2'
+
+to:
+
+action2: 'Basic Attack 2'
+
+Keep the keyboard binding:
+
+action2: ['KeyI']
+
+unchanged.
+
+BA1 should remain:
 
 Basic Attack 1
 
-Keep the internal action value as action1.
+7. Update the Help UI
 
-Keep the existing .tc-a1 positioning class unless there is a strong technical reason to rename it; this task does not require CSS layout churn.
+js/ui/help-content.js currently considers Primary, Special, and Action 2 reserved.
 
-Because BA1 is now implemented, remove pending: true from the action1 touch button.
+Once BA2 is implemented:
 
-That means BA1 should no longer receive the dashed/low-opacity .is-pending treatment.
+* remove action2 from PENDING
+* leave primary and special reserved
 
-Do not remove the generic .is-pending CSS because Primary, Special and Action 2 still need it.
+The pending set should therefore effectively contain only:
 
-8. Update help/control UI to match
+* primary
+* special
 
-Update js/config.js user-facing action labels so action1 is described as:
+Update the mobile diagram:
 
-Basic Attack 1
+* A2 → BA2
+* title/accessible label → Basic Attack 2
+* descriptive text should say BA1 and BA2 rather than Action 1 / Action 2
 
-Internal identifier remains action1.
+Update the mobile diagram’s overall ARIA description accordingly.
 
-In js/ui/help-content.js:
+Update the legend so it refers to:
 
-* remove action1 from the PENDING set
-* leave Primary, Special and Action 2 reserved
-* change the mobile diagram’s A1 text to BA1
-* use Basic Attack 1 as its accessible label/title
-* update relevant explanatory copy so it no longer says Action 1 is inactive
-* fix the stale “This build” copy, which currently understates #0001’s existing jump/fall/land animations as well
+* BA1
+* BA2
 
-The help UI should clearly communicate that BA1 is available while the other still-unimplemented combat inputs remain reserved.
+rather than:
 
-9. Update documentation/spec comments that are now stale
+* BA1
+* Action 2
 
-Update at least:
+Update explanatory text so the dashed buttons are now only Primary and Special.
 
-* README.md
-* ALVA_SPEC.md
-* stale comments in js/data/characters.js
-* stale introductory comments in js/game/combat.js
-* stale Training AI comments in js/game/fighter-controller.js
-* any other comment claiming that the build has no attacks or that #0001 lacks attack sprites
+8. Update stale help/build descriptions
 
-README controls should no longer mark Basic Attack 1 as inactive/reserved.
+The Help screen currently describes BA1 as implemented while Action 2 remains reserved.
 
-Do not claim Primary, Special or Action 2 are implemented.
+Update this description to state that #0001 now has:
 
-Update the current #0001 animation list to include the new hurt and BA1 states.
+* Idle
+* Run
+* Jump
+* Fall
+* Land
+* Hurt
+* Mid-Air Hurt
+* Basic Attack 1
+* Mid-Air Basic Attack 1
+* Basic Attack 2
+* Mid-Air Basic Attack 2
 
-Update the asset documentation to acknowledge the new frame sets in assets/characters/0001/.
+Mention that:
 
-Update the combat specification so it reflects that real BA1 artwork now exists and BA1 is implemented through the combat system.
+* BA1 uses action1
+* BA2 uses action2
+* Primary and Special remain reserved
+* the training CPU remains non-attacking
 
-Keep the training CPU non-attacking unless specifically requested otherwise.
+Do not claim that Primary or Special have attacks.
 
-10. Tests
+9. Implement BA2 attack definitions using the existing combat system
 
-Extend the existing dependency-free Node test suite.
+Add two new attack definitions:
 
-Use tests/fighter-animation.test.mjs where appropriate and add another focused test file if that keeps things clearer.
+* ba2
+* midairBa2
 
-At minimum test the following.
+Do this entirely through the current createAttackDefinition / character-data combat architecture.
+
+Do not create a BA2-specific combat engine.
+
+Do not create manual collision checks outside CombatSystem.
+
+Do not bypass the existing attack state.
+
+The existing system already handles:
+
+* startup
+* active frames
+* recovery
+* damage
+* hitboxes
+* hurtboxes
+* knockback
+* hitstun
+* blockstun
+* hitstop
+* cooldowns
+* one-hit-per-attack behavior
+* attack movement locking
+* active-hitbox debug rendering
+* horizontal mirroring
+* grounded/airborne attack selection
+
+Reuse all of it.
+
+10. Align BA2 gameplay timing with the actual animation frames
+
+Combat phases must be based on whole animation frames at BA2_FPS, like BA1.
+
+Before finalizing the numbers, inspect all ten sprites visually and determine which frame or frames represent the actual strike/contact portion.
+
+Do not make the hitbox active during the entire animation.
+
+Ground BA2
+
+There are 7 frames:
+
+2ba1 through 2ba7.
+
+Determine visually:
+
+* wind-up/startup frames
+* actual contact/strike frame or frames
+* recovery frames
+
+A sensible starting point, if the artwork supports it, is:
+
+* frames 1–3: startup
+* frames 4–5: active
+* frames 6–7: recovery
+
+At 12 FPS this would be:
+
+startup: 3 / BA2_FPS,
+active: 2 / BA2_FPS,
+recovery: 2 / BA2_FPS,
+
+However, do not blindly use this split if the sprite artwork clearly shows contact on another frame.
+
+The active phase should correspond to what is visibly striking.
+
+The total attack duration should equal exactly one pass of the 7-frame animation.
+
+Mid-Air BA2
+
+There are 3 frames:
+
+midair2ba1
+midair2ba2
+midair2ba3
+
+A sensible initial split, if frame 2 is the visible contact frame, is:
+
+* frame 1: startup
+* frame 2: active
+* frame 3: recovery
+
+At 12 FPS:
+
+startup: 1 / BA2_FPS,
+active: 1 / BA2_FPS,
+recovery: 1 / BA2_FPS,
+
+Again, inspect the actual sprites before locking the active phase.
+
+The total duration must equal one pass of the three-frame clip.
+
+Maintain the existing phase-boundary handling that avoids 60 Hz floating-point drift.
+
+11. Make BA2 meaningfully distinct without breaking the game’s balance
+
+BA1 currently uses conservative combat values around:
+
+* 6 damage
+* 180 horizontal knockback
+* 0 vertical launch
+* 0.22 s hitstun
+* 0.14 s blockstun
+* 0.06 s hitstop
+* 0.1 s cooldown
+
+BA2 is the secondary basic attack, so it should not simply be a second ID pointing at BA1.
+
+Use the new artwork to determine its reach and feel.
+
+A reasonable initial BA2 tuning target is slightly slower/heavier than BA1, for example:
+
+Ground BA2 starting values
+
+* damage: approximately 8
+* horizontal knockback: approximately 220
+* vertical knockback: 0 unless the artwork very clearly depicts a launcher
+* hitstun: approximately 0.24
+* blockstun: approximately 0.15
+* hitstop: approximately 0.07
+* cooldown: approximately 0.15–0.18
+* lockMovement: true
+* groundOnly: true
+
+Mid-Air BA2 starting values
+
+Use comparable values, adjusted only if necessary for the visible aerial move.
+
+Do not arbitrarily create:
+
+* launches
+* spikes
+* teleports
+* dashes
+* projectile behavior
+* multi-hits
+* armour
+* invulnerability
+* wall bounces
+* camera shakes
+* new physics mechanics
+
+unless the current design/art specifically requires them.
+
+A basic attack should remain a straightforward use of the existing combat system.
+
+12. Fit hitboxes to the visible strike
+
+Inspect the actual contact frame(s) and make each hitbox correspond to the limb/weapon/body region that visibly attacks.
+
+Do not just copy BA1’s hitbox if BA2 has a different pose or range.
+
+The hitbox should:
+
+* appear in front of the fighter when facing right
+* automatically mirror through the existing combat system when facing left
+* stay reasonably close to the visible attacking limb
+* not cover the entire character
+* not extend unrealistically far away
+* not be active during startup/recovery
+
+Use the existing Backquote debug overlay to validate it in battle.
+
+The debug attack hitbox should appear only during BA2’s active phase.
+
+13. Ground vs mid-air behavior
+
+When action2 is pressed:
+
+Grounded
+
+Start ba2.
+
+Airborne
+
+Start midairBa2.
+
+This should use the already-implemented attackFor('action2') grounded/air selection.
+
+BA2 must work during both:
+
+* jump ascent
+* jump descent/fall
+
+For the aerial move, gravity must keep working.
+
+Do not freeze #0001 in the air.
+
+Do not add extra lift unless the move is specifically designed to have it.
+
+If #0001 lands while midairBa2 is still playing, preserve the BA1 precedent:
+
+allow the mid-air BA2 attack to finish its own clip instead of swapping to the ground BA2 animation or the landing animation midway through the move.
+
+Once it ends, normal grounded state selection can resume.
+
+14. Same-frame input behavior
+
+Preserve the combat-intent ordering already established for BA1.
+
+If BA2 and Jump are pressed on the exact same simulation step while #0001 is grounded, the grounded attack should begin and the jump should not incorrectly turn the attack into its aerial version.
+
+Do not change this behavior for BA1.
+
+15. Attack animation safety
+
+Keep the existing rule that attacks with missing/unloaded animation frames are refused rather than faked.
+
+If ba2 or midairBa2 fails to load:
+
+* do not substitute idle as an attack
+* do not fabricate an attack pose
+* do not run an invisible damaging hitbox
+
+Fighter.tryAction() should simply refuse that attack using the same mechanism already used for BA1.
+
+16. Preserve attack priority/state behavior
+
+Do not disturb the current Fighter state priority.
+
+In particular:
+
+* hitstun must still override attacks
+* an attack must override normal jump/fall/land/run/idle rendering while active
+* normal physics continue
+* landing while an aerial attack is active must not replace its animation
+* hitstop behavior must stay intact
+* movement/facing lock semantics should stay consistent with BA1
+
+Do not change hurt/hitstun animations as part of this feature.
+
+17. Preserve the non-attacking training CPU
+
+Quick Battle’s CPU is intentionally a non-attacking training opponent.
+
+Adding BA2 to Character #0001 must not cause the training AI to begin using BA1 or BA2.
+
+Do not change TrainingAIController behavior unless necessary only to keep its existing non-attacking behavior intact.
+
+18. Update README
+
+Update README.md to reflect BA2.
+
+The controls section should show something equivalent to:
+
+* Basic Attack 1 (BA1) — U — touch BA1
+* Basic Attack 2 (BA2) — I — touch BA2
+
+Primary and Special remain marked reserved.
+
+Remove the reserved marker from Action 2 because it is no longer reserved.
+
+Change user-facing references from Action 2 to Basic Attack 2 (BA2).
+
+Update gamepad documentation:
+
+* B / Circle → BA1
+* LB → BA2
+* X / Y remain reserved
+* RB / RT → Block
+
+Update the animations section to include:
+
+* Basic Attack 2 — 7 frames
+* Mid-Air Basic Attack 2 — 3 frames
+
+Update the attacks section to say BA1 and BA2 are implemented on the ground and in the air.
+
+Do not state that Primary or Special are implemented.
+
+19. Update ALVA_SPEC.md
+
+Update the specification so its battle/combat/input sections match the actual game.
+
+Document:
+
+* BA2 as #0001’s secondary basic attack
+* ground BA2 has 7 real frames
+* mid-air BA2 has 3 real frames
+* action2 selects ground/air versions
+* keyboard I
+* gamepad LB
+* touch button BA2
+* BA2 is no longer reserved
+* Primary and Special remain reserved
+* landing during mid-air BA2 does not cancel its attack clip
+* attack phases correspond to the visible frames
+* no fabricated attacks or frames
+
+Do not delete the BA1 specification.
+
+20. Update stale source comments
+
+Search for comments that currently say things like:
+
+* Action 2 is reserved
+* only BA1 is implemented
+* Primary, Special and Action 2 are waiting for artwork
+* the game has only one real attack
+
+Update those comments so they accurately describe the build.
+
+Do not rewrite unrelated documentation.
+
+21. Tests
+
+Extend the dependency-free Node test suite.
+
+Prefer extending/generalizing the existing:
+
+* tests/basic-attack.test.mjs
+* tests/controls-ui.test.mjs
+* tests/fighter-animation.test.mjs
+
+or split BA2 into a clearly named attack test file if that produces cleaner tests.
+
+Do not remove BA1 coverage.
+
+Add BA2 coverage for at least all of the following.
 
 Asset registration
 
-Verify all new expected paths are returned by characterFramePaths(def).
+Assert:
 
-Verify the files exist under:
+* all 7 0001_2ba*.png files are referenced from assets/characters/0001/
+* all 3 0001_midair2ba*.png files are referenced from assets/characters/0001/
+* the root copies no longer exist
+* no 2ab spelling is used
+* characterFramePaths() includes the new frames
 
-assets/characters/0001/
+Character action mapping
 
-Verify equivalent root copies do not remain.
+Assert:
 
-Explicitly ensure the canonical frame 3 is named:
+action1: {
+  ground: 'ba1',
+  air: 'midairBa1',
+}
 
-0001_1ba3.png
+remains intact.
 
-with no U+FFFC character.
+Assert:
 
-Animation definitions
+action2: {
+  ground: 'ba2',
+  air: 'midairBa2',
+}
 
-Verify:
+is active.
 
-* hurt is registered
-* mid-air hurt is registered
-* ground BA1 has exactly 4 ordered frames
-* mid-air BA1 has exactly 5 ordered frames
-* BA1 clips are non-looping
-* their fps values are positive/the expected value
+Assert Primary and Special remain null.
 
-Ground BA1
+Input
 
-From a grounded fighter, pressing action1Pressed should:
+Assert:
 
-* start the ground BA1 attack definition
-* put the fighter in attack state
-* select the ground BA1 animation
-* begin on 0001_1ba1.png
-* progress through the clip once
-* never loop back to frame 1
-* exit cleanly after attack recovery
+* CONFIG.bindings.action1 remains ['KeyU']
+* CONFIG.bindings.action2 remains ['KeyI']
+* COMBAT_ACTIONS still includes action1 and action2
 
-Mid-air BA1
+Do not rename internal actions to BA1/BA2.
 
-Jump or otherwise put the fighter airborne, then press action1Pressed.
+Ground BA2 playback
 
-Verify:
+From idle on the ground, press action2.
 
-* the mid-air attack definition is selected
-* 0001_midair1ba1.png is the first frame
-* the five-frame clip plays once
-* it can trigger during ascent and descent
-* it is not replaced by the ground BA1 merely because the fighter lands during the attack
+Assert:
 
-Reserved actions
+* attack id is ba2
+* animation is ba2
+* animation starts at 0001_2ba1.png
+* the visible frame sequence reaches all seven frames in order
+* it does not loop
+* it runs for exactly one animation pass
+* it exits cleanly afterward
+* cooldown behaves correctly
 
-Verify Primary, Special and Action 2 remain inactive for #0001.
+Mid-air BA2 playback
 
-Hurt
+Jump and press action2.
 
-Verify:
+Assert:
 
-* grounded hitstun uses 0001_hurt.png
-* airborne hitstun uses 0001_midairhurt.png
-* hurt takes visual priority over land
-* after stun expires, the correct normal state resumes
-* missing hurt artwork falls back safely instead of crashing
+* attack id is midairBa2
+* animation is midairBa2
+* all three frames appear in order
+* it works while rising
+* it works while descending
+* gravity continues during the attack
+* it does not loop
 
-UI
+Landing during mid-air BA2
 
-Verify the touch action1 button:
+Start BA2 late in a fall so #0001 lands before the attack finishes.
 
-* visibly reads BA1
-* has an accessible label of Basic Attack 1
-* does not have the pending class
-* still dispatches internal action action1
+Assert:
 
-Verify the help/mobile diagram uses BA1, not A1, and action1 is no longer tagged Reserved.
+* the attack remains midairBa2
+* the animation remains midairBa2
+* it does not switch to ba2
+* it does not switch to land
+* the remaining aerial frames finish normally
+* the fighter returns to an appropriate grounded state afterward
 
-11. Regression requirements
+Active-frame timing
 
-Do not regress the functionality already covered by the existing tests.
+Assert the attack hitbox is active only on the selected visual contact frame(s).
 
-In particular preserve:
+For example, if ground BA2 uses frames 4–5 as contact, tests should ensure the active phase corresponds to those frames and not startup/recovery.
 
-* idle/run/jump/fall/land playback
-* land duration/interruption behavior
-* buffered jumps
-* platform dropping
-* movement physics
-* colliders/hurtboxes
-* sprite normalization
-* bottom-centre rendering
-* facing/mirroring
-* pause/result behavior
-* multi-touch input
-* stage rendering
-* character select
-* relative asset paths for GitHub Pages
+For mid-air BA2, test the actual contact frame determined from the sprites.
 
-Do not add absolute /assets/... URLs. Continue using relative ./assets/... paths.
+Damage/hit resolution
 
-Do not add dependencies just for this feature.
+Using the real CombatSystem:
 
-12. Manual browser verification
+* ground BA2 can hit an opponent in front
+* aerial BA2 can hit an opponent in an appropriate airborne setup
+* one attack cannot repeatedly damage the same target every active simulation step
+* hitstun, hitstop, damage and knockback use the configured BA2 values
+* hitboxes mirror with facing
 
-After automated tests pass, serve the game over HTTP(S), because sprite normalization requires canvas pixel access.
+Movement/facing
 
-Manually check at least:
+Assert BA2 uses the same attack movement/facing lock conventions as BA1.
 
-1. Grounded #0001 + U plays the four-frame ground BA1.
-2. Airborne #0001 + U plays the five-frame mid-air BA1.
-3. The touch button says BA1, has its normal solid available appearance, and triggers the same move.
-4. Gamepad B/Circle triggers BA1.
-5. When #0001 is hit while grounded, the ground hurt pose is shown.
-6. When #0001 is hit while airborne, the mid-air hurt pose is shown.
-7. No new sprite visibly changes #0001’s intended scale or makes the character jump/sink because of raw PNG dimensions.
-8. Facing left mirrors all new sprites correctly.
-9. BA1’s hitbox appears only during its intended contact phase.
-10. There are no failed requests caused by the malformed old 1￼ba3 filename.
-11. There are no console errors or broken root-relative GitHub Pages paths.
-12. Primary, Special and Action 2 remain reserved.
-13. The CPU remains non-attacking.
+Missing sprite safety
 
-Run the full test suite when complete, not just newly added tests.
+Construct a sprite set where BA2 animation data is unavailable.
 
-Final implementation constraints
+Press action2.
 
-* Reuse the current systems rather than replacing them.
-* Keep #0001-specific data in js/data/characters.js.
-* Keep generic ground/air attack selection reusable for future characters.
-* No AI-generated/recreated sprite artwork.
-* No unrelated redesign.
-* No arbitrary changes to movement or collision.
-* No restoration of the deleted generic ba or 2ba sprite sets.
-* Do not rename internal action1; user-facing naming becomes Basic Attack 1 / BA1.
-* The final touch button text must be exactly BA1.
-* The malformed third ground frame must end up exactly as 0001_1ba3.png.
-* Make the implementation production-ready, tested, and consistent with the existing code style.
+Assert:
+
+* attack does not begin
+* there is no invisible hitbox
+* the fighter stays in a valid normal state
+* the existing warning/refusal behavior occurs
+
+Reserved attacks
+
+Update the old test that currently says:
+
+Primary, Special and Action 2 stay inactive
+
+because Action 2 is now BA2.
+
+It should instead verify:
+
+* Primary remains inactive
+* Special remains inactive
+* BA1 works
+* BA2 works
+
+Touch controls
+
+Assert the action2 touch button:
+
+* displays exactly BA2
+* has .tc-a2
+* has data-action="action2"
+* has accessible label Basic Attack 2
+* is no longer is-pending
+
+Assert only Primary and Special remain pending.
+
+Touch dispatch
+
+Pressing the visible BA2 button must dispatch:
+
+action2
+
+not a newly invented ba2 input action.
+
+Test multi-touch with movement as is already done for BA1.
+
+Help UI
+
+Assert:
+
+* ACTION_LABELS.action2 === 'Basic Attack 2'
+* the controls table displays Basic Attack 2
+* it is not marked Reserved
+* the mobile diagram displays BA2
+* it does not display A2
+* Help text identifies BA2 as available
+* Help still identifies Primary and Special as reserved
+
+22. Regression requirements
+
+Run the complete test suite with:
+
+node --test
+
+All existing BA1, hurt, movement, battle-screen, animation, UI and combat tests must continue passing.
+
+Do not weaken existing BA1 assertions just to make BA2 pass.
+
+In particular verify BA1 still:
+
+* uses U / B-Circle / action1
+* has its 4-frame ground animation
+* has its 5-frame aerial animation
+* uses its existing combat values
+* finishes an aerial attack after landing
+* refuses to attack if its frames are unavailable
+
+23. Manual browser verification
+
+After automated tests pass, manually run the game and verify #0001 in an actual Quick Battle.
+
+Check all of these:
+
+Ground
+
+* U triggers BA1
+* I triggers BA2
+* BA1 still looks correct
+* BA2 plays all seven frames at a natural size
+* no sprite popping, sinking or horizontal sliding
+* BA2 hitbox appears at the visible strike when debug overlay is enabled
+* facing-left attacks mirror correctly
+
+Air
+
+* U triggers Mid-Air BA1
+* I triggers Mid-Air BA2
+* Mid-Air BA2 works while rising and falling
+* gravity continues normally
+* landing before it ends does not replace its clip
+
+Touch
+
+* visible BA1 button says BA1
+* visible BA2 button says BA2
+* BA2 is no longer dashed/dimmed
+* Primary and Special remain dashed
+* BA1 and BA2 can be used while another finger holds movement
+
+Gamepad
+
+* B / Circle triggers BA1
+* LB triggers BA2
+* block and jump mappings remain unchanged
+
+Combat
+
+* BA2 can connect in front of #0001
+* hitbox matches the visible strike
+* attacks do not hit behind #0001
+* one attack does not multi-hit accidentally
+* active hitbox only exists during the intended contact frames
+* missing attack artwork never produces invisible damage
+
+24. Do not change unrelated game systems
+
+Keep this feature focused.
+
+Do not redesign:
+
+* menus
+* stages
+* camera
+* HUD
+* physics
+* roster
+* splash screen
+* branding
+* pause/result screens
+
+Do not add extra fighters or attacks.
+
+Do not make the CPU attack.
+
+Do not remap BA1.
+
+Do not rename action1 or action2.
+
+Do not replace existing sprite-normalization behavior.
+
+Do not remove the existing relative asset-path strategy.
+
+Acceptance criteria
+
+The task is complete when:
+
+1. All ten new BA2 PNGs live only under assets/characters/0001/.
+2. Ground BA2 uses all seven 0001_2ba1–0001_2ba7 frames.
+3. Mid-Air BA2 uses all three 0001_midair2ba1–0001_midair2ba3 frames.
+4. action2 selects ba2 on the ground and midairBa2 in the air.
+5. Keyboard I triggers BA2.
+6. Gamepad LB triggers BA2.
+7. The touch button visibly reads exactly BA2.
+8. Its accessible/user-facing name is Basic Attack 2.
+9. BA2 is no longer shown as reserved.
+10. Primary and Special remain reserved.
+11. BA1 is unchanged and still works.
+12. Ground and aerial BA2 phases line up with the visible attack frames.
+13. BA2 uses the existing data-driven combat/hitbox system.
+14. Aerial BA2 continues through landing just like aerial BA1.
+15. Missing BA2 artwork never creates an invisible/fake attack.
+16. Documentation and Help accurately describe BA1 and BA2.
+17. The training CPU remains non-attacking.
+18. node --test passes completely.
+19. Manual browser verification confirms correct sprite scale, anchoring, animation order, hitbox placement and inputs.
