@@ -51,7 +51,7 @@ in the code depends on the repository name, so no file changes are needed.
 | Special* | `K` | Lower-right, middle row |
 | Block | `L` | Lower-right, middle row |
 | Action 1* / Action 2* | `U` / `I` | Lower-right, bottom row |
-| Pause | `Esc` or `P` | Round button, top-right |
+| Pause | `Esc` or `P` | Timer or pause button, top centre |
 
 \* Wired into input and combat, but inactive until #0001 has attack animations.
 

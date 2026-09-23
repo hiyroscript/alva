@@ -100,8 +100,9 @@ and progress; it does not fill every card, border or heading.
 - **Setup steps:** done = gray with a check; current = filled green number and
   underline; future = gray.
 - **Panels:** charcoal, translucent light hairlines, established radii and
-  restrained neutral shadows. No new textures or glass effects; the Home
-  credits strip (6.2) is the one glass surface.
+  restrained neutral shadows. No new textures. Glass appears in two places
+  only: the Home credits strip (6.2) and the battle glass (7.3) used by the
+  battle HUD, the pause/result panels and the Return Home confirmation.
 
 ### 5.3 Wordmark and favicon
 
@@ -148,8 +149,9 @@ fit the palette.
 ```
 Splash → Home → Select Mode → Select Fighter → Select Stage → Battle
 Home → Help & Credits (the Home entry is disabled for now)
-Battle → Pause → Resume / Restart / Help / Return to Home (confirmed)
-Battle (time over) → Result → Rematch / Change Stage / Return to Home
+Battle → Pause → Resume / Restart / Return to Home (confirmed); Help is shown but disabled for now
+Battle (time over, one fighter ahead) → Result → Rematch / Change Stage / Return to Home
+Battle (time over, draw) → a fresh battle starts, no dialog
 ```
 
 Every menu screen except Home has a consistent Back action. Keyboard, mouse,
@@ -190,9 +192,9 @@ no header, build label, eyebrow or keyboard hint bar.
 - **Actions:** exactly two — **Play** (green, white text, arrow) opens Select
   Mode and is focused by default; **Help & Credits** (chevron) stays visible but
   is a genuinely disabled button for now: muted gray label and outline, no
-  hover or press response, skipped by keyboard/gamepad focus. The Help &
-  Credits screen and the pause-menu Help remain in place. Home buttons have a
-  small 3 px radius.
+  hover or press response, skipped by keyboard/gamepad focus. The pause-menu
+  Help is disabled the same way (7.3); the Help & Credits screen and the pause
+  Help view remain in place. Home buttons have a small 3 px radius.
 - **Footer:** "by hiyroscript" in gray monospace, full width under a subtle
   top hairline.
 - **Credits strip:** two walls. The back wall is the same near-black as the
@@ -290,9 +292,11 @@ no header, build label, eyebrow or keyboard hint bar.
   short delay so instant loads don't flash.
 - Error state: readable message, green **Retry** and outlined **Back**.
   Battle never starts before its sprites are ready.
-- Confirmation dialog (`alertdialog`, modal): dark panel, subtle border and
-  shadow, off-white title, gray message, outlined cancel and green confirm.
-  Returning Home from a battle is always confirmed.
+- Confirmation dialog (`alertdialog`, modal): battle glass panel (7.3) with the
+  dimmed battle visible behind it, off-white title, gray message, outlined
+  cancel (**Keep Playing**, focused) and green confirm (**Return Home**).
+  Returning Home from a battle is always confirmed; cancelling returns focus
+  to the pause menu.
 - Portrait on touch devices: a dark "Rotate your device — Alva is designed for
   landscape play." overlay; the battle pauses and resumes correctly on return
   to landscape.
@@ -329,15 +333,35 @@ no header, build label, eyebrow or keyboard hint bar.
 ### 7.3 Battle chrome
 
 - The battle keeps deliberate dark chrome over the stage for legibility, using
-  the same neutral hierarchy: translucent black HUD panels, white labels, gray
-  secondary text.
-- HUD: P1 (filled white tag, white health bar) top-left; CPU (outlined tag,
-  gray health bar) top-right; round label and timer top-centre. The timer
-  inverts (white block, black digits) for the last ten seconds.
+  the same neutral hierarchy: white labels, gray secondary text.
+- **Battle glass** (`.glass` in `styles.css`): semi-transparent charcoal with a
+  faint top sheen, a light translucent hairline and a soft shadow; darker than
+  the Home strip so type stays readable over bright and dark stage art. HUD
+  pieces float over a canvas that repaints every frame, so they skip backdrop
+  blur. Pause, result and confirmation panels sit over a paused battle and add
+  a light blur where supported, with a denser fill as the fallback. The stage
+  stays dimly visible behind every panel.
+- HUD fighter panels: P1 (filled white tag) top-left and CPU (outlined tag)
+  top-right, identical glass, each with the tag, fighter name and health bar.
+  There are no subtitle rows under the bars. Both health bars use the Alva
+  green (`--accent`) with a lower-opacity green delayed-damage layer; tags and
+  names, not colour, tell the fighters apart.
+- Timer + pause: one glass control at top centre. The round label and timer
+  sit on top; a rectangular pause section sits directly beneath with no gap,
+  the same width and a hairline seam, so only the outer corners are rounded.
+  Both halves are buttons that pause the game; the timer half is labelled
+  "Pause game, N seconds remaining". For the last ten seconds only the digits
+  change, from a slightly softened off-white to pure white; the glass never
+  changes colour, inverts or flashes.
 - Player markers above fighters and ground rings: P1 white, CPU gray.
 - Round banners ("ROUND 1", "FIGHT", "TIME") in white on a dark band.
-- Pause and result menus are dark Alva panels over a dimmed battle with a
-  green primary action (Resume / Rematch).
+- Pause menu: glass panel over a dimmed battle with "Quick Battle" (no stage
+  name), "Paused", green **Resume** (default), **Restart Battle**, **Help** and
+  **Return to Home**. Help is shown but disabled for now: muted, no hover or
+  press response, skipped by keyboard/gamepad focus.
+- Time over: if one fighter has more health, a glass result menu offers green
+  **Rematch**, **Change Stage** and **Return to Home**. A draw opens no dialog;
+  once the TIME banner has played, a fresh battle starts.
 
 ### 7.4 Input
 
@@ -348,9 +372,10 @@ no header, build label, eyebrow or keyboard hint bar.
   Start to pause/menus.
 - Touch (landscape, Pointer Events, true multi-touch): lower-left Left / Down /
   Right with thumb sliding; lower-right staggered cluster —
-  Primary (top) · Special, Block · Action 1, Action 2, Jump (bottom-right);
-  round Pause top-right. Original circular icons, translucent dark fill, white
-  outlines; pressed buttons scale down and brighten to white — no hue.
+  Primary (top) · Special, Block · Action 1, Action 2, Jump (bottom-right).
+  Tapping the timer or the pause section beneath it (top centre, 7.3) pauses.
+  Original circular icons, translucent dark fill, white outlines; pressed
+  buttons scale down and brighten to white — no hue.
   Reserved actions use dashed outlines and never show nagging alerts.
 - Touch controls appear only on touch-first devices (coarse pointer or an
   observed touch), never merely because a desktop window is narrow.
