@@ -1,44 +1,219 @@
-Alva Home credits and favicon task
+Work in the hiyroscript/alva repository on the current main branch.
 
-Scope: preserve the existing architecture, dark glass-strip composition,
-responsive layouts, accessibility, shared credits data, and gameplay.
+Task
 
-Requirements
+Fix the visual bug where a white/light rectangular outline appears around the credits text area when the player interacts with or scrolls the credits.
 
-1. Remove obsolete company/platform wording throughout textual source and
-   documentation. Retain Jump Ultimate Stars, The Spriters Resource, Dazz, and
-   FRET attribution. Keep the rights disclaimer generic: original third-party
-   characters, games, artwork, and related properties belong to their rights
-   holders; Alva does not claim ownership.
-2. Keep the endless Home credits roll at 22 CSS px/sec in HomeScreen.update(dt),
-   using the app's existing frame loop. Preserve the accessibility-hidden copy.
-3. Support wheel/trackpad, touch/pointer dragging, and focused keyboard scrolling
-   in the credits column only. Pause immediately on interaction and resume from
-   the current position after about 2 seconds of inactivity. Wrap movement in
-   both directions without a seam. Use one authoritative logical offset.
-4. Capture and release pointers cleanly, including cancellation and screen exit.
-   Install listeners once; do not add intervals or permanent animation loops.
-5. Keep Play as the default focus and preserve keyboard/gamepad menu navigation.
-   Keep Help & Credits disabled on Home. Give the credits a labeled focusable
-   region; portrait-hidden credits must not intercept taps or keyboard focus.
-6. Reduced-motion mode shows one manually scrollable copy, never auto-resumes,
-   and responds to preference changes while Home is active.
-7. Use the existing root alvafav.PNG as the favicon, with exact case and the
-   relative href ./alvafav.PNG and image/png MIME type. Retain project-subpath
-   compatibility. Update README.md and ALVA_SPEC.md to describe actual behavior.
-8. Preserve the 21-degree glass, green edge, fades, upright text, clipping,
-   narrow/short-height layouts, and portrait behavior. Do not alter sprites,
-   combat, physics, stages, camera, selection screens, HUD, or splash timing.
-   Keep plain HTML/CSS/ES modules; add no dependencies, assets, or build step.
+The fix should be surgical. Remove the unwanted outline without changing the credits design, scrolling behavior, controls, automatic credits roll, accessibility semantics, or the rest of ALVA’s UI.
 
-Acceptance checks
+Relevant architecture and current behavior
 
-- Search all textual repository content for obsolete attribution wording.
-- Confirm Home and the Credits tab use the canonical CREDITS definition.
-- Confirm the active favicon points to alvafav.PNG with a relative URL.
-- Exercise wheel/trackpad, pointer/touch, focused keyboard, repeated inactivity
-  resume, forward/backward loop boundaries, and repeated Home visits.
-- Verify reduced-motion behavior and live preference changes.
-- Verify Play, menu navigation, portrait hit testing, responsive clipping,
-  document scroll containment, and the existing game flow; check runtime errors.
-- Review the final diff for unrelated changes.
+ALVA is a vanilla HTML/CSS/JavaScript game with no UI framework. The page itself does not scroll; individual game screens and panels manage their own scrolling/interactions.
+
+The primary affected credits implementation is the animated credits column on the Home screen.
+
+Relevant files:
+
+js/screens/home-screen.js
+
+The Home screen creates a focusable credits viewport:
+
+this.creditsViewport = el('div', {
+  class: 'home-credits-col', tabindex: 0, role: 'region',
+  'aria-label': 'Credits. Scroll or use arrow and Page keys to read.',
+}, [this.rollTrack]);
+
+The credits support several manual interaction methods:
+
+* wheel/trackpad scrolling
+* pointer/touch dragging
+* Arrow Up / Arrow Down
+* Page Up / Page Down
+* Space / Shift+Space
+
+The pointer-down handler explicitly focuses the credits viewport:
+
+this.creditsViewport.focus({ preventScroll: true });
+
+Do not remove this keyboard accessibility or the existing manual scrolling behavior merely to hide the visual bug.
+
+The credits are not natively scrolling vertically on Home. Their position is driven through rollOffset and:
+
+this.rollTrack.style.transform = `translate3d(0, ${-this.rollOffset}px, 0)`;
+
+Automatic movement resumes after player inactivity, and reduced-motion mode uses the same input system while remaining manual-only. Preserve all of this.
+
+Primary root cause to investigate
+
+In styles.css, the Home credits viewport currently contains this focus styling:
+
+.home-credits-col:focus-visible {
+  outline: 2px solid var(--text);
+  outline-offset: -6px;
+}
+
+--text is a very light/off-white color, so when the credits viewport becomes :focus-visible, the player sees a large light rectangular box surrounding the credits area.
+
+This appears to be the main source of the reported white outline.
+
+Confirm the behavior in the running game before changing it, but treat this selector as the primary suspect.
+
+Secondary place to inspect
+
+The standalone Help & Credits screen is implemented in:
+
+js/screens/help-credits-screen.js
+
+Its Help and Credits tab panels are also focusable:
+
+tabindex: '0'
+
+and styles.css currently includes:
+
+.tab-panel:focus {
+  outline: none;
+}
+.tab-panel:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--border-strong);
+  border-radius: var(--radius-md);
+}
+
+This produces another light rectangular focus treatment around a scrollable text panel.
+
+Check whether the same reported visual artifact occurs when scrolling the Credits tab. If it does, fix that instance as part of the same change.
+
+Do not indiscriminately remove focus styles from every component in ALVA. Buttons, tabs, menu entries, character selection, map selection, and other genuinely interactive controls should retain their existing focus treatment.
+
+Required result
+
+When a player scrolls, drags, or otherwise interacts with the Home credits, there must no longer be a white/light rectangular outline surrounding the credits text/viewport.
+
+The credits should continue to look like plain text floating inside the angled glass strip. Do not introduce a new card, box, border, panel, background, or rectangular frame around them.
+
+Keep the existing:
+
+* angled glass treatment
+* clipping and masks
+* stable green slash
+* typography
+* credit spacing
+* seamless looping roll
+* manual scroll position
+* automatic resume behavior
+* reduced-motion behavior
+* touch dragging
+* wheel/trackpad support
+* keyboard scrolling
+* ARIA role and label
+* responsive positioning
+
+Do not change the actual credits content in js/ui/help-content.js.
+
+Accessibility constraint
+
+Do not solve this by globally disabling focus outlines.
+
+In particular, do not add rules such as:
+
+*:focus {
+  outline: none;
+}
+
+and do not alter the shared focus styles used by buttons or navigation controls.
+
+The credits region must remain keyboard-focusable because it accepts Arrow/Page/Space scrolling commands.
+
+The goal is specifically to eliminate the large white rectangular visual frame around the credits.
+
+If a focus indication still needs to be present for keyboard accessibility, use an ALVA-appropriate treatment that does not surround the credit text with a white rectangle. Prefer something extremely restrained and non-disruptive, such as an accent-based cue that integrates with the existing Home glass/green-slash design.
+
+Do not add a visible treatment during ordinary mouse, touch, trackpad, or drag interaction.
+
+If the existing :focus-visible behavior can be adjusted cleanly with CSS alone, prefer that over introducing new JavaScript modality tracking.
+
+Implementation preference
+
+Start with the smallest possible fix.
+
+For the Home credits, inspect .home-credits-col:focus-visible first. If that rule alone accounts for the artifact, make the change there rather than altering the credits scrolling implementation.
+
+Only modify js/screens/home-screen.js if CSS cannot correctly distinguish the desired interaction behavior.
+
+For the Help & Credits .tab-panel, only change its focus treatment if you can reproduce the same unwanted light box there. Do not change tab button focus styles such as .tab:focus; those are navigation controls and are intentionally visible.
+
+Keep selectors scoped to the affected scrolling regions.
+
+Do not change
+
+Do not modify unrelated gameplay or UI systems.
+
+Specifically avoid changes to:
+
+js/game/*
+
+character movement or combat
+
+stage rendering
+
+Home credits scroll speed (ROLL_SPEED)
+
+credits resume delay (CREDITS_RESUME_DELAY)
+
+credit text/data in js/ui/help-content.js
+
+Home layout geometry
+
+glass-strip angle
+
+clip paths or masks
+
+green accent slash
+
+screen transitions
+
+global menu navigation
+
+global focus-ring variables unless absolutely necessary
+
+Validation
+
+Test the final implementation with all supported credits interactions.
+
+On the Home screen:
+
+1. Hover over the credits and use a mouse wheel.
+2. Use a trackpad to scroll.
+3. Click/press and drag the credits vertically.
+4. Release after dragging and confirm automatic rolling resumes after the existing delay.
+5. Focus the credits using the keyboard and use Arrow Up/Down.
+6. Test Page Up and Page Down.
+7. Test Space and Shift+Space.
+8. Confirm none of those actions creates the unwanted white/light rectangular frame.
+9. Confirm the browser/page itself does not begin scrolling.
+10. Confirm Play and normal menu navigation still receive their existing focus appearance.
+
+Also test prefers-reduced-motion: reduce. The credits should remain manual-only as before and should not regain the unwanted outline.
+
+If the Help & Credits screen can be reached during development, open the Credits tab and scroll it with the mouse/touch and keyboard. If its .tab-panel:focus-visible treatment creates the same unwanted rectangular frame, remove or redesign that treatment without affecting the tab buttons themselves.
+
+Check both a normal desktop viewport and a short landscape/mobile-sized viewport so the fix does not interfere with clipping or responsive credits positioning.
+
+Acceptance criteria
+
+The change is complete when:
+
+* No white/light rectangular outline appears around the Home credits while scrolling or dragging.
+* No unwanted white/light rectangular outline appears around Credits text in the Help & Credits screen, if that screen reproduces the issue.
+* The credits remain keyboard accessible.
+* Arrow/Page/Space scrolling continues working.
+* Wheel/trackpad scrolling continues working.
+* Pointer/touch dragging continues working.
+* Automatic Home credits movement still pauses and resumes exactly as before.
+* Reduced-motion behavior remains unchanged.
+* There is no page-level scrolling.
+* There are no changes to credits content, typography, glass geometry, clipping, or the green slash.
+* Existing focus indication on real buttons/menu controls remains unchanged.
+* No global outline: none workaround is introduced.
+* The implementation is narrowly scoped and contains no unrelated refactoring.
+
+After making the change, summarize exactly which selectors/files were modified and explain briefly why the old focus treatment caused the visible white outline.
