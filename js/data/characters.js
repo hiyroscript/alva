@@ -20,6 +20,8 @@ const BASE_0001 = './assets/characters/0001/0001_';
 const BA1_FPS = 12;
 // Same for Basic Attack 2: its phases are whole frames at this rate.
 const BA2_FPS = 12;
+// Playback rate of both Charge clips (startup and sustained loop).
+const CHARGE_FPS = 10;
 
 export const CHARACTERS = [
   {
@@ -112,21 +114,38 @@ export const CHARACTERS = [
         loop: false,
         heightRatio: 1.29,
       },
+      // Charge: one logical fighter state drawn as two clips. The startup
+      // (charge1, charge2) plays once when Charge begins; the sustained loop
+      // (chargea, chargeb) then alternates for as long as Charge is held.
+      // The loop frames are lettered, not numbered, so they are listed by hand.
+      chargeStart: {
+        frames: [`${BASE_0001}charge1.png`, `${BASE_0001}charge2.png`],
+        fps: CHARGE_FPS,
+        loop: false,
+        heightRatio: 1,
+      },
+      chargeLoop: {
+        frames: [`${BASE_0001}chargea.png`, `${BASE_0001}chargeb.png`],
+        fps: CHARGE_FPS,
+        loop: true,
+        heightRatio: 1,
+      },
     },
 
     // States without dedicated art yet, plus a still idle frame for the
-    // airborne, landing and hurt states if their frames fail to load. `frame`
-    // holds a single frame instead of looping, so the fighter never stretches or
-    // rotates to fake a pose. Attacks never fall back: an attack whose frames
-    // are missing is refused (see Fighter.tryAction).
+    // airborne, landing, hurt and charge clips if their frames fail to load.
+    // `frame` holds a single frame instead of looping, so the fighter never
+    // stretches or rotates to fake a pose. Attacks never fall back: an attack
+    // whose frames are missing is refused (see Fighter.tryAction).
     animationFallbacks: {
       jump: { animation: 'idle', frame: 0 },
       fall: { animation: 'idle', frame: 0 },
       land: { animation: 'idle', frame: 0 },
-      crouch: { animation: 'idle' },
       block: { animation: 'idle' },
       hurt: { animation: 'idle', frame: 0 },
       midairHurt: { animation: 'idle', frame: 0 },
+      chargeStart: { animation: 'idle', frame: 0 },
+      chargeLoop: { animation: 'idle', frame: 0 },
     },
 
     visual: {
@@ -155,6 +174,7 @@ export const CHARACTERS = [
       maxFallSpeed: 1500,
       coyoteTime: 0.08,
       jumpBuffer: 0.12,
+      // Used only by the training CPU's platform drop; see Fighter.update.
       dropThroughTime: 0.28,
     },
 
@@ -168,6 +188,9 @@ export const CHARACTERS = [
 
     stats: {
       health: 100,
+      // Energy capacity. Fighters start full; nothing spends or restores
+      // Energy yet.
+      energy: 100,
       blockDamageScale: 0.15,
     },
 

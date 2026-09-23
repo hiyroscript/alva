@@ -3,7 +3,8 @@
 // surface the feet rest on.
 //
 // platforms: one-way surfaces (pass through from below, land from above).
-//            `dropThrough` controls whether Down drops through them.
+//            `dropThrough` controls whether the training CPU can drop
+//            through them (the player has no drop control).
 //            `h` is visual slab thickness only; `kind` picks the art.
 // solids:    full AABB blocks (collide on every side).
 // bounds:    horizontal playable limits for fighter colliders.

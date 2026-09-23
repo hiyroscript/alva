@@ -9,11 +9,17 @@ import { approach, clamp, sign } from '../core/utils.js';
 
 export const COMBAT_ACTIONS = ['primary', 'special', 'action1', 'action2'];
 
+// stateTime is a sum of fixed steps, which drifts just below whole-step
+// boundaries (12 steps of 1/60 s sum to 0.19999...), so timed clip phases
+// compare with a little slack and last exactly their whole number of steps.
+const TIME_EPSILON = 1e-6;
+
 const NEUTRAL_INPUT = Object.freeze({
-  left: false, right: false, down: false, jump: false, block: false,
+  left: false, right: false, charge: false, jump: false, block: false,
   primary: false, special: false, action1: false, action2: false,
-  jumpPressed: false, downPressed: false, blockPressed: false,
+  jumpPressed: false, chargePressed: false, blockPressed: false,
   primaryPressed: false, specialPressed: false, action1Pressed: false, action2Pressed: false,
+  dropPressed: false,
 });
 
 export class Fighter {
@@ -26,6 +32,8 @@ export class Fighter {
     this.animator = new SpriteAnimator(sprites);
     // One pass of the touchdown clip; 0 skips the land state entirely.
     this.landDuration = sprites.duration('land');
+    // One pass of the Charge startup clip; the loop clip follows it.
+    this.chargeStartDuration = sprites.duration('chargeStart');
     this.attacks = Object.fromEntries(
       Object.entries(def.attacks || {}).map(([id, spec]) => [id, createAttackDefinition({ id, ...spec })]),
     );
@@ -51,7 +59,7 @@ export class Fighter {
     this.state = 'idle';
     this.stateTime = 0;
     this.moveDir = 0;
-    this.crouching = false;
+    this.charging = false;
     this.coyote = 0;
     this.jumpBuffer = 0;
     this.lastGroundY = this.body.y;
@@ -87,20 +95,26 @@ export class Fighter {
       if (input[`${action}Pressed`]) this.tryAction(action);
     }
     // After the intents, so an attack started this step also rules out a
-    // jump, block, crouch or platform drop on the same step.
+    // jump, block, charge or platform drop on the same step.
     const canAct = combat.canAct();
     combat.blocking = canAct && body.grounded && input.block;
 
-    // ---- Down: drop through one-way platforms / crouch ---------------------
-    if (input.downPressed && canAct && body.grounded && !combat.blocking) {
+    // ---- Charge: grounded, and only while held ---------------------------
+    // The held value alone decides it: no toggle, latch or buffer, so the
+    // step that sees Charge released ends it. Block wins if both are held.
+    this.charging = canAct && body.grounded && !!input.charge && !combat.blocking;
+
+    // ---- Platform drop (training CPU only) -------------------------------
+    // No player key, button or touch control produces `dropPressed`; the
+    // training CPU uses it to follow the player down through one-way platforms.
+    if (input.dropPressed && canAct && body.grounded && !combat.blocking) {
       dropThrough(body, mv.dropThroughTime);
     }
-    this.crouching = canAct && body.grounded && input.down && !combat.blocking;
 
     // ---- Horizontal movement ---------------------------------------------
     let dir = (input.right ? 1 : 0) - (input.left ? 1 : 0);
     const locked =
-      combat.blocking || this.crouching || combat.stun > 0 ||
+      combat.blocking || this.charging || combat.stun > 0 ||
       (combat.attack && combat.attack.def.lockMovement);
     if (locked) dir = 0;
     this.moveDir = dir;
@@ -128,7 +142,7 @@ export class Fighter {
       body.ground = null;
       this.coyote = 0;
       this.jumpBuffer = 0;
-      this.crouching = false;
+      this.charging = false;
       combat.blocking = false;
     }
 
@@ -188,7 +202,7 @@ export class Fighter {
     else if (!body.grounded) next = body.vy < 0 ? 'jump' : 'fall';
     else if (this.isLanding(dt)) next = 'land';
     else if (combat.blocking) next = 'block';
-    else if (this.crouching) next = 'crouch';
+    else if (this.charging) next = 'charge';
     else if ((this.moveDir !== 0 && Math.abs(body.vx) > 20) || Math.abs(body.vx) > 140) next = 'run';
     else next = 'idle';
 
@@ -213,9 +227,14 @@ export class Fighter {
   // Animation key for a visual state. An attack plays its own clip for its
   // whole length, even if the fighter lands or leaves the ground meanwhile.
   // Hitstun shows `hurt` on the ground and `midairHurt` in the air.
+  // Charge plays `chargeStart` once, then `chargeLoop` for the rest of the
+  // hold; a new Charge resets stateTime, so it starts from the first frame.
   animationFor(state) {
     if (state === 'attack') return this.combat.attack.def.animation;
     if (state === 'hitstun') return this.body.grounded ? 'hurt' : 'midairHurt';
+    if (state === 'charge') {
+      return this.stateTime < this.chargeStartDuration - TIME_EPSILON ? 'chargeStart' : 'chargeLoop';
+    }
     return state;
   }
 

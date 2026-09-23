@@ -40,6 +40,9 @@
 
   /* Battle chrome (dark, over stage art) */
   --scrim-text-muted: #ababab;
+  /* Energy meter: a gameplay-resource colour, the one deliberate blue in the
+     interface. Buttons, selection, focus and health stay green/neutral. */
+  --energy: #3b82f6;
   /* Battle glass: translucent charcoal with a faint top sheen and a light
      hairline. Darker than the Home strip so white type stays readable over
      bright and dark stage art. */
@@ -1016,7 +1019,7 @@ html:not(.is-pointer-input) .mode-card:focus { box-shadow: var(--focus-ring), va
 .md-legend dd { font-weight: 500; color: var(--text-secondary); }
 .md-pause { width: 6.5%; left: 50%; top: 12%; }
 .md-left { left: 9%; top: 78%; }
-.md-down { left: 21.5%; top: 78%; }
+.md-charge { left: 21.5%; top: 78%; }
 .md-right { left: 34%; top: 78%; }
 .md-jump { left: 91%; top: 80%; }
 .md-a2 { left: 78.5%; top: 80%; }
@@ -1110,6 +1113,17 @@ html:not(.is-pointer-input) .mode-card:focus { box-shadow: var(--focus-ring), va
 .hud-bar-ghost { opacity: 0.38; transition: transform 0.6s ease 0.25s; }
 .hud-side.is-low .hud-bar-fill { animation: low-hp 0.8s ease-in-out infinite alternate; }
 @keyframes low-hp { to { opacity: 0.5; } }
+/* Energy sits directly under health: same width and track, a little
+   shorter, one solid blue fill mirrored for the CPU like its health. */
+.hud-energy {
+  position: relative;
+  height: clamp(5px, 1.1vh, 8px);
+  border-radius: 3px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.14);
+}
+.hud-energy-fill { position: absolute; inset: 0; transform-origin: left center; background: var(--energy); }
+.hud-p2 .hud-energy-fill { transform-origin: right center; }
 
 /* Timer on top, pause directly beneath: one glass control split by a
    hairline, both halves the same width. Either half pauses. This is the

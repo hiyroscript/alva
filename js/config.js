@@ -49,11 +49,12 @@ export const CONFIG = Object.freeze({
   },
 
   // Player 1 keyboard bindings (KeyboardEvent.code). The Help screen renders
-  // these directly, so this table is the single source of truth.
+  // these directly, so this table is the single source of truth. S / ↓ are
+  // Charge in battle; menus read their own Down from menuBindings below.
   bindings: {
     left: ['KeyA', 'ArrowLeft'],
     right: ['KeyD', 'ArrowRight'],
-    down: ['KeyS', 'ArrowDown'],
+    charge: ['KeyS', 'ArrowDown'],
     jump: ['KeyW', 'Space', 'ArrowUp'],
     primary: ['KeyJ'],
     special: ['KeyK'],
@@ -79,7 +80,7 @@ export const CONFIG = Object.freeze({
 });
 
 export const ACTIONS = Object.freeze([
-  'left', 'right', 'down', 'jump',
+  'left', 'right', 'charge', 'jump',
   'primary', 'special', 'block', 'action1', 'action2',
   'pause',
 ]);
@@ -87,7 +88,7 @@ export const ACTIONS = Object.freeze([
 export const ACTION_LABELS = Object.freeze({
   left: 'Move left',
   right: 'Move right',
-  down: 'Down / drop through',
+  charge: 'Charge',
   jump: 'Jump',
   primary: 'Primary',
   special: 'Special',

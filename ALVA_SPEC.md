@@ -40,16 +40,19 @@ behave, and how it must look. The README covers running and deploying it.
   (424 × 272 px), four Basic Attack 1 frames `0001_1ba1`–`0001_1ba4`
   (≈264–376 × 392–432 px), five mid-air Basic Attack 1 frames
   `0001_midair1ba1`–`0001_midair1ba5` (≈248–424 × 344–448 px), seven Basic
-  Attack 2 frames `0001_2ba1`–`0001_2ba7` (≈224–336 × 384–424 px) and three
+  Attack 2 frames `0001_2ba1`–`0001_2ba7` (≈224–336 × 384–424 px), three
   mid-air Basic Attack 2 frames `0001_midair2ba1`–`0001_midair2ba3`
-  (≈216–352 × 424–536 px).
+  (≈216–352 × 424–536 px) and four Charge frames `0001_charge1`,
+  `0001_charge2`, `0001_chargea` and `0001_chargeb` (≈272–288 × 416 px).
 - File names: `ba` means basic attack; the digit before it says which one
   (`1ba` is Basic Attack 1, `2ba` Basic Attack 2). The number at the very end
   is always the frame number (`0001_1ba3.png` is Basic Attack 1, frame 3;
-  `0001_midair2ba1.png` is Mid-air Basic Attack 2, frame 1).
+  `0001_midair2ba1.png` is Mid-air Basic Attack 2, frame 1). Charge is the
+  exception: `charge1` / `charge2` are its startup frames and the lettered
+  `chargea` / `chargeb` its sustained loop.
 - The idle, jump, fall, land and hurt frames (≈16× pixel art), the mid-air
-  hurt and Basic Attack 1 and 2 frames (≈8×) and the run frames (≈4×) are at very
-  different raw scales. A normalization
+  hurt, Basic Attack 1 and 2 and Charge frames (≈8×) and the run frames (≈4×)
+  are at very different raw scales. A normalization
   system must, once per frame: read the alpha channel, find the visible bounds,
   detect the pixel-art grid, resample to one pixel per art pixel, and anchor
   bottom-centre so the fighter never grows, shrinks, jumps or slides when
@@ -83,7 +86,9 @@ behave, and how it must look. The README covers running and deploying it.
 Alva's interface is **near-black/charcoal dominant**, with off-white typography,
 gray hierarchy and **green as the sole interface accent**. It follows Seren's
 visual discipline without copying its assets. Green signals actions, selection
-and progress; it does not fill every card, border or heading.
+and progress; it does not fill every card, border or heading. The single
+exception is the blue battle-HUD Energy meter (`--energy`, 7.3), a
+gameplay-resource colour; nothing else in the interface turns blue.
 
 | Token | Value | Use |
 | --- | --- | --- |
@@ -98,6 +103,7 @@ and progress; it does not fill every card, border or heading.
 | `--accent-wash` | `rgba(47,191,99,.14)` | Subtle selected fill |
 | `--action` / `--action-hover` / `--action-pressed` | `#197a3d` / `#1b8141` / `#146332` | Green fills with ≥ 4.5:1 white label contrast |
 | `--surface-overlay` | `rgba(10,11,12,.94)` | Readable map detail chrome |
+| `--energy` | `#3b82f6` | Battle HUD Energy meter fill only (gameplay-resource exception) |
 | `--focus-ring` | Dark 2 px separation, off-white 4 px outer ring | Keyboard/gamepad focus |
 
 ### 5.2 Component rules
@@ -279,7 +285,8 @@ no header, build label, eyebrow or keyboard hint bar.
 - Two tabs (Help, Credits) sharing one scrollable panel; ←/→ switch tabs,
   ↑/↓ scroll.
 - Help: desktop controls rendered from the live key bindings, mobile control
-  diagram, movement, stages and platforms, pause, notes on this build.
+  diagram, movement, Charge & Energy, stages and platforms, pause, notes on
+  this build.
 - The Home entry to this screen is disabled for now; the screen stays in place
   so it can return.
 - Credits (must remain visible and readable). One list in
@@ -324,7 +331,9 @@ no header, build label, eyebrow or keyboard hint bar.
 - **Desert:** wide, bright, open; mesas, rock formations, sunset haze, drifting
   sand; two rock outcrops to hop onto.
 - **City:** rooftops at night; dense skyline, vents, girders, warm neon;
-  seven one-way platforms (Down drops through) and a solid water-tower deck.
+  seven one-way platforms that fighters jump up through from below. The
+  player has no drop-through control and walks off an edge to come down; the
+  training CPU can drop through all of them except the water-tower deck.
 - Collision comes only from map data, never from art.
 - The camera frames both fighters, interpolates smoothly and never shows
   outside the map. Fighters occupy ≈ 14–18 % of viewport height.
@@ -332,9 +341,9 @@ no header, build label, eyebrow or keyboard hint bar.
 ### 7.2 Fighters, physics and combat
 
 - `#0001` has Idle, Run, Jump, Fall, Land, Hurt, Mid-air Hurt, Basic Attack 1,
-  Mid-air Basic Attack 1, Basic Attack 2 and Mid-air Basic Attack 2. No
-  invented frames. Rising uses Jump and
-  descending (including platform drops) uses Fall; each plays once at 10 fps
+  Mid-air Basic Attack 1, Basic Attack 2, Mid-air Basic Attack 2 and Charge.
+  No invented frames. Rising uses Jump and
+  descending (walking off a ledge included) uses Fall; each plays once at 10 fps
   and holds its last frame. Land plays once at 12 fps on touchdown, for
   exactly the clip's length, then returns to idle or run. Land is a visual
   state only: it never changes movement or collision, and a new jump, attack
@@ -343,7 +352,7 @@ no header, build label, eyebrow or keyboard hint bar.
   toward the opponent when standing.
 - Hitstun shows Hurt while grounded and Mid-air Hurt while airborne, switching
   to Hurt if the fighter lands still stunned; the pose also holds through the
-  impact freeze. Hitstun outranks attack, land, run, jump, fall, block, crouch
+  impact freeze. Hitstun outranks attack, land, run, jump, fall, block, charge
   and idle, and normal states resume when it ends. It is a visual state only:
   no physics or collider changes. Missing hurt art holds an idle frame.
 - Basic Attack 1 (BA1) is #0001's first attack, on the `action1` input. On the
@@ -374,6 +383,31 @@ no header, build label, eyebrow or keyboard hint bar.
   lock applies, gravity keeps working, and a mid-air BA2 that lands finishes
   its own clip instead of switching to ground BA2 or Land. Ground BA2 is
   ground-only; pressing BA2 and Jump on the same step attacks on the ground.
+- Charge is one logical fighter state (`charge`) drawn by two clips: the
+  startup `chargeStart` (`charge1`, `charge2`, played once) and the sustained
+  loop `chargeLoop` (`chargea`, `chargeb`, looping), both at 10 fps. Holding
+  Charge plays `charge1 → charge2 → chargea ↔ chargeb`: the startup lasts
+  exactly one pass of its clip, then A and B alternate for as long as Charge
+  is held, never returning to `charge1` / `charge2` during that hold.
+  Charge is driven by the held input alone. It is never a toggle, latch or
+  buffered press, and has no minimum hold. Releasing it exits the state on
+  that step, and every new Charge restarts from `charge1`. Charge is grounded
+  only: held in the air, the fighter keeps Jump / Fall (no charge art is
+  shown); held through touchdown, Land plays out first and Charge follows.
+  While charging, horizontal movement is locked (a run decelerates normally
+  to a stop) while gravity and collision still apply. Collider and hurtboxes
+  are unchanged. Charge has no hitbox, no damage, no armour and no
+  invulnerability, and it is not an attack or a combat action. State
+  priority is hitstun > attack > jump / fall > land > block > charge > run >
+  idle: a hit shows Hurt at once, BA1 / BA2 start straight out of a held
+  Charge, Jump interrupts it, and Block wins when both are held. Charge on a
+  one-way platform charges in place and never drops through. If the charge
+  frames fail to load, the fighter holds a still idle frame.
+- Every fighter has an Energy resource (`energy` / `maxEnergy` on its combat
+  state, capacity from the character's `stats.energy`, 100 for #0001). It
+  starts full and refills on restart / rematch. No rule spends, drains or
+  restores Energy yet, Charge included, and the winner is still decided by
+  remaining health.
 - Physics: acceleration, deceleration, max speed, gravity, jump impulse,
   ground/platform/solid collision, stage bounds, landing detection; collision
   boxes independent of PNG size; bottom-centre origin; no sinking, floating,
@@ -386,7 +420,8 @@ no header, build label, eyebrow or keyboard hint bar.
   (no substitute pose, no invisible hitbox). Block
   sets a guard state using the idle pose.
 - Quick Battle: one round, 99 seconds, against a non-attacking training CPU
-  that uses the same fighter definition.
+  that uses the same fighter definition. It never charges; it drops through
+  one-way platforms with an internal intent that no player control produces.
 
 ### 7.3 Battle chrome
 
@@ -400,10 +435,18 @@ no header, build label, eyebrow or keyboard hint bar.
   a light blur where supported, with a denser fill as the fallback. The stage
   stays dimly visible behind every panel.
 - HUD fighter panels: P1 (filled white tag) top-left and CPU (outlined tag)
-  top-right, identical glass, each with the tag, fighter name and health bar.
-  There are no subtitle rows under the bars. Both health bars use the Alva
-  green (`--accent`) with a lower-opacity green delayed-damage layer; tags and
-  names, not colour, tell the fighters apart.
+  top-right, identical glass, each with, in order, the tag and fighter name,
+  a green health bar, and a blue Energy bar directly beneath it. There are no
+  subtitle rows. Both health bars use the Alva green (`--accent`) with a
+  lower-opacity green delayed-damage layer; tags and names, not colour, tell
+  the fighters apart.
+- Energy bars (`role="meter"`, `aria-label="Energy"`, reporting the fighter's
+  real energy against its maximum) are the same width as health and slightly
+  shorter, with the same track, and one solid `--energy` blue fill with no
+  delayed-damage layer. Both P1 and CPU show one, both start full, and the CPU's
+  fills from the right like its health bar. Blue here is a deliberate
+  gameplay-resource exception to the green-only interface accent (5.1); no
+  Energy gain or spending is implemented yet.
 - Timer + pause: one glass control at top centre. The round label and timer
   sit on top; a rectangular pause section sits directly beneath with no gap,
   the same width and a hairline seam, so only the outer corners are rounded.
@@ -424,15 +467,19 @@ no header, build label, eyebrow or keyboard hint bar.
 ### 7.4 Input
 
 - Keyboard (simultaneous keys, held-state tracking, no reliance on key
-  repeat): A/D or ←/→ move, S/↓ down, W/Space/↑ jump, J primary, K special,
+  repeat): A/D or ←/→ move, S/↓ Charge (held), W/Space/↑ jump, J primary, K special,
   L block, U Basic Attack 1 (BA1), I Basic Attack 2 (BA2), Esc/P pause.
   `` ` `` toggles a debug overlay (colliders, hurtboxes, and attack hitboxes
-  while active).
-- Gamepad (standard layout) for movement, jump (A), Basic Attack 1 (B /
-  Circle), Basic Attack 2 (LB), reserved actions (X / Y), block (RB / RT) and
-  Start to pause/menus.
-- Touch (landscape, Pointer Events, true multi-touch): lower-left Left / Down /
-  Right with thumb sliding; lower-right staggered cluster —
+  while active). In menus S/↓ still navigate down: menu bindings are separate
+  from the gameplay `charge` action.
+- Gamepad (standard layout) for movement (D-pad / left stick left and
+  right), Charge in battle (D-pad down / left stick down, held; menus still
+  read them as Down), jump (A), Basic Attack 1 (B / Circle), Basic Attack 2
+  (LB), reserved actions (X / Y), block (RB / RT) and Start to pause/menus.
+- Touch (landscape, Pointer Events, true multi-touch): lower-left
+  Left · C · Right with thumb sliding, where the middle button reads **C**, is
+  labelled "Charge" and stays pressed for as long as the pointer holds it;
+  lower-right staggered cluster —
   Primary (top) · Special, Block · BA1, BA2, Jump (bottom-right). The BA1
   button (Basic Attack 1, internally `action1`) and the BA2 button (Basic
   Attack 2, internally `action2`) are solid like Block and Jump.

@@ -16,7 +16,7 @@ const PAD_BUTTONS = {
   5: 'block',    // RB
   7: 'block',    // RT
   12: 'jump',    // D-pad up
-  13: 'down',
+  13: 'charge',  // D-pad down (menus still read it as Down; see _padMenu)
   14: 'left',
   15: 'right',
 };
@@ -47,9 +47,9 @@ export class InputManager {
 
     // Reused per-step snapshot to avoid allocations in the sim loop.
     this.frame = {
-      left: false, right: false, down: false, jump: false, block: false,
+      left: false, right: false, charge: false, jump: false, block: false,
       primary: false, special: false, action1: false, action2: false,
-      jumpPressed: false, downPressed: false, primaryPressed: false,
+      jumpPressed: false, chargePressed: false, primaryPressed: false,
       specialPressed: false, action1Pressed: false, action2Pressed: false,
       blockPressed: false,
     };
@@ -156,7 +156,7 @@ export class InputManager {
     const f = this.frame;
     f.left = this.isHeld('left');
     f.right = this.isHeld('right');
-    f.down = this.isHeld('down');
+    f.charge = this.isHeld('charge');
     f.jump = this.isHeld('jump');
     f.block = this.isHeld('block');
     f.primary = this.isHeld('primary');
@@ -164,7 +164,7 @@ export class InputManager {
     f.action1 = this.isHeld('action1');
     f.action2 = this.isHeld('action2');
     f.jumpPressed = this.consume('jump');
-    f.downPressed = this.consume('down');
+    f.chargePressed = this.consume('charge');
     f.blockPressed = this.consume('block');
     f.primaryPressed = this.consume('primary');
     f.specialPressed = this.consume('special');
@@ -188,7 +188,7 @@ export class InputManager {
     const ay = pad.axes[1] || 0;
     if (ax < -PAD_DEADZONE) next.add('left');
     if (ax > PAD_DEADZONE) next.add('right');
-    if (ay > PAD_DEADZONE) next.add('down');
+    if (ay > PAD_DEADZONE) next.add('charge');
 
     let changed = false;
     for (const a of next) if (!this.pad.has(a)) changed = true;
