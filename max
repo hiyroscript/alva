@@ -1,447 +1,529 @@
-Work in the hiyroscript/alva repository on the current main branch state.
+Work in the hiyroscript/alva repository. Inspect the current implementation before changing anything, then implement the new #0001 animation assets and wire Basic Attack 1 into the existing combat architecture.
 
-First inspect the existing implementation before editing. This is a pure HTML/CSS/JavaScript Canvas 2D fighting game with no framework or build step. Preserve the existing architecture and visual system; make the smallest clean changes necessary.
+The goal is to add four things for character #0001:
 
-Goals
+1. Ground hurt
+2. Mid-air hurt
+3. Basic Attack 1 / BA1 on the ground
+4. Mid-air Basic Attack 1 / BA1
 
-Implement two related updates:
+Also change the visible A1 button text to BA1.
 
-1. Fix specific secondary buttons in the paused battle / Return Home confirmation so their backgrounds never change during interaction, while preserving the existing white focus outline.
-2. Integrate the newly uploaded jumping-related sprite frames for character #0001, including ascent, fall, and landing animation.
+Important naming clarification
 
-Do not redesign unrelated UI, change physics, change combat behavior, redraw/recolour sprite artwork, or make broad styling changes.
+In these sprite filenames:
 
-⸻
+* ba means basic attack
+* 1ba means Basic Attack 1
+* therefore the existing internal action1 input is the input for BA1
+* the number at the very end of a filename is the animation frame number
 
-1. Pause / Return Home button interaction styling
+Examples:
 
-Existing structure
+* 0001_1ba1.png = Basic Attack 1, frame 1
+* 0001_1ba4.png = Basic Attack 1, frame 4
+* 0001_midair1ba3.png = mid-air Basic Attack 1, frame 3
 
-Relevant files include:
+Do not interpret 1ba1 as attack 1BA1 or create a new unrelated action.
 
-* js/screens/battle-screen.js
-* js/ui/overlays.js
-* styles.css
-* tests/battle-screen.test.mjs
+Keep the existing internal input name action1; do not rename the whole input system. Only change its user-facing meaning/label to Basic Attack 1 / BA1 where appropriate.
 
-The pause menu is built in BattleScreen.buildPause().
+Existing repo architecture to preserve
 
-Its current items are:
+The game is already structured correctly for this:
 
-* Resume — primary
-* Restart Battle — secondary
-* Help — disabled
-* Return to Home — secondary
+* js/data/characters.js owns character animations, action mappings, attack definitions, movement, hurtboxes, etc.
+* js/game/character.js owns the Fighter state machine and tryAction().
+* js/game/combat.js already provides startup/active/recovery, damage, hitboxes, knockback, hitstun, blockstun, hitstop and cooldowns.
+* js/game/sprite-normalizer.js normalizes different sprite scales and anchors them bottom-centre.
+* js/game/sprite-animator.js handles non-looping clips and fallback animations.
+* js/core/app.js preloads every path returned by characterFramePaths().
+* action1 is already wired through keyboard, touch and gamepad.
+* U is the keyboard binding for action1.
+* standard gamepad B / Circle is already mapped to action1.
+* the training CPU must remain non-attacking.
+* Primary, Special and Action 2 must remain reserved/inactive unless they already have real artwork. Do not make up attacks for them.
 
-Return to Home opens the shared ConfirmDialog with:
+Follow the same approach used by PR #15 when jump/fall/land were added: real artwork only, canonical character asset folder, data-driven definitions, graceful missing-frame behavior, tests, and no physics/collider changes merely to accommodate artwork.
 
-* Return Home — primary confirmation
-* Keep Playing — secondary cancel action
+New assets currently at the repository root
 
-The current CSS gives .pause-btn-item and .btn generic hover/active background changes. Later CSS makes secondary pause/dialog buttons transparent only while they are not hovered or active.
+The following new files currently exist at the repo root:
 
-The existing focus treatment is already correct:
+Hurt
 
-* .pause-btn-item:focus { box-shadow: var(--focus-ring); }
-* .btn:focus { box-shadow: var(--focus-ring); }
+* 0001_hurt.png
+* 0001_midairhurt.png
 
-That white/off-white focus ring must remain.
+Ground BA1
 
-Required behavior
+* 0001_1ba1.png
+* 0001_1ba2.png
+* the third frame currently has a malformed filename
+* 0001_1ba4.png
 
-Change only these three actions:
+The malformed third frame is currently named:
 
-* Restart Battle in the paused battle menu
-* Return to Home in the paused battle menu
-* Keep Playing in the Return to Home? confirmation dialog
+0001_1￼ba3.png
 
-For those controls:
+There is an invisible/odd U+FFFC OBJECT REPLACEMENT CHARACTER between the 1 and ba.
 
-* Normal background: transparent.
-* Hover background: still transparent.
-* Keyboard/gamepad focus background: still transparent.
-* Mouse/touch active/pressed background: still transparent.
-* The existing white focus outline/ring must continue to appear on focus.
-* Do not remove accessibility focus indication.
-* Do not replace the focus ring with a green fill.
-* Text should remain readable using the existing secondary-button text colour.
-* Existing press transform may remain; this request is specifically about preventing the background colour/fill from changing.
-* Existing border behavior may remain unless it interferes with the white focus ring.
+It must become exactly:
 
-Do not remove hover/pressed colour feedback globally from all buttons.
+0001_1ba3.png
 
-In particular, preserve current behavior for:
+Do not preserve the malformed Unicode character anywhere.
 
-* Resume
-* Return Home confirmation
-* Rematch
-* Change Stage
-* other .btn controls elsewhere in the application
+Mid-air BA1
 
-Implementation approach
+* 0001_midair1ba1.png
+* 0001_midair1ba2.png
+* 0001_midair1ba3.png
+* 0001_midair1ba4.png
+* 0001_midair1ba5.png
 
-Use a narrowly scoped semantic class such as is-outline-only or equivalent rather than broad selectors that affect every secondary button.
+There were older generic ba and 2ba uploads in git history that were subsequently deleted. Do not restore those. The assets currently intended for this task are the 1ba and midair1ba sets above.
 
-Extend menuButton() in js/screens/battle-screen.js with an option for this behavior, and apply it specifically to:
+1. Move all new artwork into the canonical character directory
 
-* Restart Battle
-* Return to Home
+Following the jump/fall/land precedent, move the new PNGs from the repository root into:
 
-Do not apply it to Resume or disabled Help.
+assets/characters/0001/
 
-For the Keep Playing button, remember that ConfirmDialog is a shared UI component. Do not permanently restyle every cancel button in every possible confirmation dialog.
+The final canonical paths must be:
 
-Add an optional ConfirmDialog.open() setting such as cancelOutlineOnly / outlineOnlyCancel and enable it only from BattleScreen.confirmHome().
+* assets/characters/0001/0001_hurt.png
+* assets/characters/0001/0001_midairhurt.png
+* assets/characters/0001/0001_1ba1.png
+* assets/characters/0001/0001_1ba2.png
+* assets/characters/0001/0001_1ba3.png
+* assets/characters/0001/0001_1ba4.png
+* assets/characters/0001/0001_midair1ba1.png
+* assets/characters/0001/0001_midair1ba2.png
+* assets/characters/0001/0001_midair1ba3.png
+* assets/characters/0001/0001_midair1ba4.png
+* assets/characters/0001/0001_midair1ba5.png
 
-Make sure that optional state is reset on every open() call so a later dialog cannot accidentally inherit the class. Prefer explicit classList.add() / classList.remove() if that keeps the existing lightweight test DOM simple.
+There should be no duplicate copies of these new character frames left at the repository root.
 
-Add scoped CSS overrides after the generic button states so the selected outline-only controls keep:
+Do not edit, redraw, recolour, rescale or regenerate the PNG artwork.
 
-background: transparent
+2. Register the new #0001 animation clips
 
-through normal, hover, focus, and active interaction.
+Update js/data/characters.js.
 
-Do not remove or override:
+Add dedicated animation entries for approximately these logical animation keys:
 
-box-shadow: var(--focus-ring)
+* hurt
+* midairHurt
+* ba1
+* midairBa1
 
-on focus.
+Use the existing BASE_0001 / frames() conventions where suitable.
 
-⸻
+Expected frame sets:
 
-2. Integrate the new #0001 jumping sprite frames
+hurt
 
-New files already in the repository
+One frame:
 
-The latest upload added these six files at the repository root:
+0001_hurt.png
 
-* 0001_jump1.png
-* 0001_jump2.png
-* 0001_fall1.png
-* 0001_fall2.png
-* 0001_land1.png
-* 0001_land2.png
+Non-looping/still.
 
-These are the actual new character frames. Do not redraw, regenerate, recolour, resize destructively, or replace them.
+midairHurt
 
-Relocate them into the existing character asset directory, preserving their exact filenames and bytes:
+One frame:
 
-assets/characters/0001/0001_jump1.png
-assets/characters/0001/0001_jump2.png
-assets/characters/0001/0001_fall1.png
-assets/characters/0001/0001_fall2.png
-assets/characters/0001/0001_land1.png
-assets/characters/0001/0001_land2.png
+0001_midairhurt.png
 
-Do not leave duplicate copies at the repository root after the move.
+Non-looping/still.
 
-Existing animation architecture
+ba1
 
-Relevant files:
+Four frames, in exact order:
 
-* js/data/characters.js
-* js/game/character.js
-* js/game/sprite-animator.js
-* js/game/sprite-normalizer.js
-* js/core/app.js
-* js/game/physics.js
+1. 0001_1ba1.png
+2. 0001_1ba2.png
+3. 0001_1ba3.png
+4. 0001_1ba4.png
 
-Character assets are data-driven through CHARACTERS.
+It must play once, not loop.
 
-characterFramePaths() automatically loads every frame registered in def.animations.
+midairBa1
 
-SpriteSet.build() already normalizes every registered animation and handles the wildly different raw pixel scales used by #0001.
+Five frames, in exact order:
 
-Do not bypass that normalizer or add special-case rendering for these PNGs.
+1. 0001_midair1ba1.png
+2. 0001_midair1ba2.png
+3. 0001_midair1ba3.png
+4. 0001_midair1ba4.png
+5. 0001_midair1ba5.png
 
-SpriteSet.resolve() already uses a dedicated animation when one exists and falls back through animationFallbacks otherwise.
+It must play once, not loop.
 
-The fighter state machine currently already chooses:
+A starting playback rate of 12 fps is appropriate for both BA1 clips. Keep it data-driven so it can be tuned later.
 
-* jump while airborne with vy < 0
-* fall while airborne with vy >= 0
+The single-frame hurt clips can also use a normal positive fps value even though playback rate does not materially affect a one-frame clip.
 
-but #0001 currently has no dedicated jump/fall animations, so both fall back to idle.
+Let the existing sprite normalization system handle differing raw PNG dimensions. Do not bypass normalization or introduce special hard-coded rendering sizes for these clips.
 
-Physics also already exposes:
+Add sensible idle-frame fallbacks for hurt and midairHurt, matching the repo’s current graceful-degradation philosophy.
 
-body.landed
+If a hurt asset cannot load, holding a still idle frame is acceptable.
 
-for the step where an airborne fighter touches the floor/platform.
+3. Ground hurt versus mid-air hurt
 
-Use those existing systems.
+The Fighter’s logical combat state should remain hitstun; do not unnecessarily rename the entire combat concept.
 
-Character animation definitions
+Instead, choose the rendered animation based on whether the fighter is grounded while in hitstun:
 
-In js/data/characters.js, add dedicated #0001 animations for:
+* hitstun + grounded → hurt
+* hitstun + airborne → midairHurt
 
-jump
+hitstun must continue having higher visual priority than attack, land, run, jump, fall, block, crouch and idle, consistent with the current state ordering.
 
-Frames:
+If an airborne fighter lands while hitstun is still active, switching from the mid-air hurt art to the grounded hurt art is acceptable and desirable.
 
-0001_jump1.png
-0001_jump2.png
+When hitstun expires, normal state selection should resume naturally:
 
-Behavior:
+* idle/run when grounded
+* jump/fall when airborne
+* etc.
 
-* non-looping
-* approximately 10 fps
-* play frame 1 then frame 2
-* once the sequence finishes during a long ascent, hold the last frame rather than cycling repeatedly
+Do not change movement physics, collider sizes, pushbox sizes, normal hurtboxes, gravity, jump velocity, stage collision or camera behavior just to display the hurt frames.
 
-fall
+4. Make action1 actually perform BA1
 
-Frames:
+action1 currently exists but maps to null.
 
-0001_fall1.png
-0001_fall2.png
+It should now trigger Basic Attack 1.
 
-Behavior:
+The same action1 input must select a different attack depending on grounded state:
 
-* non-looping
-* approximately 10 fps
-* play frame 1 then frame 2
-* hold the last frame for the remainder of the descent rather than looping
+* grounded action1 → ground BA1
+* airborne action1 → mid-air BA1
 
-land
+A clean data-driven representation would be something like:
 
-Frames:
+action1: { ground: 'ba1', air: 'midairBa1' }
 
-0001_land1.png
-0001_land2.png
+while leaving:
 
-Behavior:
+* primary: null
+* special: null
+* action2: null
 
-* non-looping
-* approximately 12 fps
-* play once immediately after touchdown
-* after it completes, return to the appropriate ordinary grounded state
+Update Fighter.tryAction() so action mappings remain backwards-compatible:
 
-Use the normal existing frames(BASE_0001, ...) helper rather than hardcoding six unrelated path strings.
+* a string mapping still means one normal attack ID
+* an object with ground / air chooses the proper attack from this.body.grounded
+* null continues to mean intentionally inactive
 
-Give the new animations sensible heightRatio values consistent with the current normalization system. Prefer letting pixel-grid detection establish the actual scale; do not introduce manual visual-size hacks unless genuinely necessary.
+Do not hard-code #0001 into the Fighter class.
 
-Keep resilient fallbacks to an idle frame for jump/fall/land if the dedicated animation cannot be loaded. Update the existing fallback comment because it currently implies jump/fall have no dedicated artwork.
+The generic Fighter code should simply understand ground/air action mappings, with #0001’s data deciding which attack IDs are used.
 
-Landing state
+5. Define the two BA1 attacks through the existing combat system
 
-There is currently no visual land state in Fighter.updateState().
+Add separate attack definitions for:
 
-Add one without changing physics.
+* ground ba1
+* midairBa1
 
-Desired state priority should remain conceptually:
+Each definition should point at its matching animation.
 
-1. hitstun
-2. attack
-3. airborne jump/fall
-4. brief landing animation
-5. block
-6. crouch
-7. run
-8. idle
+Do not build a second attack system.
 
-Important implications:
+Use the existing createAttackDefinition() architecture and existing world-space hitbox mirroring.
 
-* An immediate new jump must interrupt landing animation because the fighter is airborne again.
-* Attack/hitstun states must retain priority.
-* Landing animation must not modify velocity, acceleration, jump timing, collision, coyote time, input buffering, hitboxes, hurtboxes, or movement.
-* This is a visual state only.
+Animation-aligned timing
 
-When body.landed becomes true and the land animation exists, enter land.
+Keep combat timing synchronized with the visible clips instead of letting the attack end halfway through its sprite animation.
 
-Do not show land for only one 60 Hz simulation step. Keep the state active long enough for the non-looping landing clip to play once.
+For a starting implementation at 12 fps:
 
-Derive the landing duration from the actual animation metadata, e.g. the clip’s frame count and FPS, rather than hardcoding assumptions about exactly two frames into general fighter logic.
+Ground BA1 — 4 frames
 
-Conceptually:
+Use roughly:
 
-landing duration = land animation frame count / land animation fps
+* frame 1 = startup
+* frame 2 = active/contact
+* frames 3–4 = recovery
 
-Continue the land state while grounded until that duration has elapsed, unless a higher-priority state or a new jump interrupts it.
+That corresponds to approximately:
 
-The existing SpriteAnimator already stops a non-looping clip on its final frame, so do not rewrite its basic animation engine unless a real bug requires it.
+* startup: 1 / 12
+* active: 1 / 12
+* recovery: 2 / 12
 
-Expected in-game sequence
+Mid-air BA1 — 5 frames
 
-A normal jump by #0001 should visually behave like:
+Use roughly:
 
-grounded
-→ jump1
-→ jump2
-→ fall1 around/after the apex
-→ fall2
-→ land1 on touchdown
-→ land2
-→ idle or run
+* frames 1–2 = startup
+* frame 3 = active/contact
+* frames 4–5 = recovery
 
-Horizontal air movement must continue to work exactly as it does now.
+That corresponds to approximately:
 
-Dropping through platforms should use the appropriate falling animation because the fighter is airborne with downward velocity.
+* startup: 2 / 12
+* active: 1 / 12
+* recovery: 2 / 12
 
-Both the player and training CPU should use the same animations automatically through the shared character definition.
+The active hitbox should not be active during the entire animation.
 
-⸻
+Initial combat values
 
-3. Documentation
+Use conservative values suitable for a first basic attack rather than turning BA1 into an oversized or high-damage move.
 
-Update documentation that is now factually stale.
+The sample attack documented in js/game/combat.js is an appropriate baseline:
 
-At minimum inspect and update:
+* damage around 6
+* hitstun around 0.22
+* blockstun around 0.14
+* hitstop around 0.06
+* cooldown around 0.1
+* horizontal knockback around 180
+* no arbitrary vertical launch unless the artwork/gameplay clearly calls for it
 
-README.md
+Start from the sample forward hitbox in combat.js and adjust its rectangle only as necessary so the hitbox reasonably matches the actual strike shown by the BA1 contact frame.
 
-It currently says:
+Use the debug overlay to verify the hitbox is in front of the character and not absurdly oversized.
 
-Animations: Idle, Run
+Ground BA1 can use groundOnly: true.
 
-Update this to include the new airborne/landing animation support.
+The mid-air definition is selected only by the airborne branch of the action mapping. Avoid introducing unnecessary new schema unless required.
 
-Also update any nearby description that says jumping uses only the idle pose.
+Movement can remain locked during the attack using the current lockMovement behavior. Do not add dashes, teleports, recoil, extra jumps, stalls or other mechanics that were not requested.
 
-ALVA_SPEC.md
+If the fighter lands while a mid-air BA1 is already in progress, allow the attack it started to finish rather than switching halfway into the ground BA1 clip.
 
-The specification currently states that:
+If the selected attack animation has no successfully loaded frames, retain the current behavior of refusing the attack rather than faking an attack pose.
 
-* assets/characters/0001/ contains only four idle and six run frames.
-* #0001 has only Idle and Run.
-* jumping uses the idle pose.
+6. Preserve the current input bindings
 
-Update those statements to reflect the six newly added jump/fall/land frames and the new behavior.
+Do not change which physical controls activate action1.
 
-Do not rewrite unrelated product-spec sections.
+BA1 should therefore work through all of the existing action1 routes:
 
-Preserve the existing rule that #0001 artwork must never be redrawn, recoloured, replaced, or AI-generated.
+* Keyboard: U
+* Touch: the current A1-position button
+* Standard gamepad: B / Circle via the existing action1 mapping
 
-⸻
+Do not move BA1 onto Primary/J.
 
-4. Tests
+Primary remains reserved.
 
-Keep the existing tests passing and add focused regression coverage.
+7. Change the visible A1 button to BA1
 
-Run:
+In js/game/touch-controls.js:
 
-node --test tests/*.test.mjs
+Change the action1 button’s visible text from:
 
-or the appropriate individual Node test files if glob behavior differs in the environment.
+A1
 
-Button regression coverage
+to:
 
-Extend tests/battle-screen.test.mjs as appropriate to verify the structural scoping:
+BA1
 
-* Restart Battle receives the outline-only/no-fill interaction class.
-* Return to Home receives it.
-* Resume does not.
-* disabled Help does not need it.
-* opening Return to Home? with confirmHome() applies the outline-only/no-fill class to Keep Playing.
-* the Return Home confirmation button remains primary.
-* closing/cancelling preserves the existing focus-restoration behavior.
-* opening a confirmation without the optional setting does not inherit stale outline-only state.
+Also change its accessible label from generic Action 1 to:
 
-The Node DOM test cannot validate actual CSS paint, so also manually verify the interaction states in a real browser.
+Basic Attack 1
 
-Animation regression coverage
+Keep the internal action value as action1.
 
-Add focused tests for the #0001 state/animation behavior without coupling them to PNG rendering internals.
+Keep the existing .tc-a1 positioning class unless there is a strong technical reason to rename it; this task does not require CSS layout churn.
 
-Verify at least:
+Because BA1 is now implemented, remove pending: true from the action1 touch button.
 
-* #0001 registers jump, fall, and land animations.
-* the correct frame paths are present.
-* jump/fall/land are non-looping.
-* airborne negative vy selects jump.
-* airborne positive vy selects fall.
-* touchdown selects land.
-* land persists long enough for its clip to complete rather than lasting one simulation tick.
-* after landing duration finishes, the fighter returns to idle/run as appropriate.
-* jumping again immediately interrupts land.
-* no physics constants or colliders changed.
+That means BA1 should no longer receive the dashed/low-opacity .is-pending treatment.
 
-Use lightweight fake sprite animation metadata where practical rather than requiring browser Canvas APIs in Node tests.
+Do not remove the generic .is-pending CSS because Primary, Special and Action 2 still need it.
 
-⸻
+8. Update help/control UI to match
 
-5. Browser verification
+Update js/config.js user-facing action labels so action1 is described as:
 
-Serve the game over HTTP as required by the repository, for example:
+Basic Attack 1
 
-python3 -m http.server 8000
+Internal identifier remains action1.
 
-Smoke-test Quick Battle.
+In js/ui/help-content.js:
 
-Verify both desktop mouse/keyboard and keyboard/gamepad-style navigation behavior where possible.
+* remove action1 from the PENDING set
+* leave Primary, Special and Action 2 reserved
+* change the mobile diagram’s A1 text to BA1
+* use Basic Attack 1 as its accessible label/title
+* update relevant explanatory copy so it no longer says Action 1 is inactive
+* fix the stale “This build” copy, which currently understates #0001’s existing jump/fall/land animations as well
 
-Pause UI
+The help UI should clearly communicate that BA1 is available while the other still-unimplemented combat inputs remain reserved.
 
-Pause a battle and check:
+9. Update documentation/spec comments that are now stale
 
-Restart Battle
+Update at least:
 
-* transparent normally
-* transparent on hover
-* transparent while pressed
-* transparent when focused
-* existing white focus ring remains visible
+* README.md
+* ALVA_SPEC.md
+* stale comments in js/data/characters.js
+* stale introductory comments in js/game/combat.js
+* stale Training AI comments in js/game/fighter-controller.js
+* any other comment claiming that the build has no attacks or that #0001 lacks attack sprites
 
-Return to Home
+README controls should no longer mark Basic Attack 1 as inactive/reserved.
 
-* same behavior
+Do not claim Primary, Special or Action 2 are implemented.
 
-Open Return to Home?.
+Update the current #0001 animation list to include the new hurt and BA1 states.
 
-Keep Playing
+Update the asset documentation to acknowledge the new frame sets in assets/characters/0001/.
 
-* same transparent behavior in normal/hover/pressed/focused states
-* white focus ring remains
+Update the combat specification so it reflects that real BA1 artwork now exists and BA1 is implemented through the combat system.
 
-Return Home
+Keep the training CPU non-attacking unless specifically requested otherwise.
 
-* remains the primary filled action with its existing green states
+10. Tests
 
-Resume
+Extend the existing dependency-free Node test suite.
 
-* remains the existing primary filled pause action
+Use tests/fighter-animation.test.mjs where appropriate and add another focused test file if that keeps things clearer.
 
-#0001 animation
+At minimum test the following.
 
-Check:
+Asset registration
 
-* jump starts with the new jump frames
-* apex/descent switches naturally to fall frames
-* landing plays both landing frames once
-* no visible character scale pop between idle/run/jump/fall/land
-* bottom-centre/torso anchoring remains stable
-* sprite artwork retains original colours
-* no image smoothing is introduced
-* movement and collision feel unchanged
-* platform jumps and platform drops work
-* repeated jumps correctly restart the jump sequence
-* landing animation does not prevent a rapid subsequent jump
+Verify all new expected paths are returned by characterFramePaths(def).
 
-⸻
+Verify the files exist under:
 
-6. Constraints
+assets/characters/0001/
 
-Do not:
+Verify equivalent root copies do not remain.
 
-* modify stage rendering
-* modify combat balance
-* modify movement constants
-* modify collider/hurtbox sizes
-* invent attack animations
-* alter the source PNG artwork
-* add dependencies or a build system
-* replace the existing sprite normalization architecture
-* globally disable button hover feedback
-* remove keyboard/gamepad focus visibility
-* change unrelated dialog buttons
-* make unrelated visual redesigns
+Explicitly ensure the canonical frame 3 is named:
 
-Keep the implementation data-driven and consistent with the existing Alva architecture.
+0001_1ba3.png
 
-At completion, provide:
+with no U+FFFC character.
 
-1. A concise summary of the changes.
-2. The files changed/moved.
-3. Tests run and their results.
-4. Any browser/manual verification performed.
-5. Any assumptions made about animation timing.
+Animation definitions
+
+Verify:
+
+* hurt is registered
+* mid-air hurt is registered
+* ground BA1 has exactly 4 ordered frames
+* mid-air BA1 has exactly 5 ordered frames
+* BA1 clips are non-looping
+* their fps values are positive/the expected value
+
+Ground BA1
+
+From a grounded fighter, pressing action1Pressed should:
+
+* start the ground BA1 attack definition
+* put the fighter in attack state
+* select the ground BA1 animation
+* begin on 0001_1ba1.png
+* progress through the clip once
+* never loop back to frame 1
+* exit cleanly after attack recovery
+
+Mid-air BA1
+
+Jump or otherwise put the fighter airborne, then press action1Pressed.
+
+Verify:
+
+* the mid-air attack definition is selected
+* 0001_midair1ba1.png is the first frame
+* the five-frame clip plays once
+* it can trigger during ascent and descent
+* it is not replaced by the ground BA1 merely because the fighter lands during the attack
+
+Reserved actions
+
+Verify Primary, Special and Action 2 remain inactive for #0001.
+
+Hurt
+
+Verify:
+
+* grounded hitstun uses 0001_hurt.png
+* airborne hitstun uses 0001_midairhurt.png
+* hurt takes visual priority over land
+* after stun expires, the correct normal state resumes
+* missing hurt artwork falls back safely instead of crashing
+
+UI
+
+Verify the touch action1 button:
+
+* visibly reads BA1
+* has an accessible label of Basic Attack 1
+* does not have the pending class
+* still dispatches internal action action1
+
+Verify the help/mobile diagram uses BA1, not A1, and action1 is no longer tagged Reserved.
+
+11. Regression requirements
+
+Do not regress the functionality already covered by the existing tests.
+
+In particular preserve:
+
+* idle/run/jump/fall/land playback
+* land duration/interruption behavior
+* buffered jumps
+* platform dropping
+* movement physics
+* colliders/hurtboxes
+* sprite normalization
+* bottom-centre rendering
+* facing/mirroring
+* pause/result behavior
+* multi-touch input
+* stage rendering
+* character select
+* relative asset paths for GitHub Pages
+
+Do not add absolute /assets/... URLs. Continue using relative ./assets/... paths.
+
+Do not add dependencies just for this feature.
+
+12. Manual browser verification
+
+After automated tests pass, serve the game over HTTP(S), because sprite normalization requires canvas pixel access.
+
+Manually check at least:
+
+1. Grounded #0001 + U plays the four-frame ground BA1.
+2. Airborne #0001 + U plays the five-frame mid-air BA1.
+3. The touch button says BA1, has its normal solid available appearance, and triggers the same move.
+4. Gamepad B/Circle triggers BA1.
+5. When #0001 is hit while grounded, the ground hurt pose is shown.
+6. When #0001 is hit while airborne, the mid-air hurt pose is shown.
+7. No new sprite visibly changes #0001’s intended scale or makes the character jump/sink because of raw PNG dimensions.
+8. Facing left mirrors all new sprites correctly.
+9. BA1’s hitbox appears only during its intended contact phase.
+10. There are no failed requests caused by the malformed old 1￼ba3 filename.
+11. There are no console errors or broken root-relative GitHub Pages paths.
+12. Primary, Special and Action 2 remain reserved.
+13. The CPU remains non-attacking.
+
+Run the full test suite when complete, not just newly added tests.
+
+Final implementation constraints
+
+* Reuse the current systems rather than replacing them.
+* Keep #0001-specific data in js/data/characters.js.
+* Keep generic ground/air attack selection reusable for future characters.
+* No AI-generated/recreated sprite artwork.
+* No unrelated redesign.
+* No arbitrary changes to movement or collision.
+* No restoration of the deleted generic ba or 2ba sprite sets.
+* Do not rename internal action1; user-facing naming becomes Basic Attack 1 / BA1.
+* The final touch button text must be exactly BA1.
+* The malformed third ground frame must end up exactly as 0001_1ba3.png.
+* Make the implementation production-ready, tested, and consistent with the existing code style.
