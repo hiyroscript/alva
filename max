@@ -1,294 +1,129 @@
-Work in the hiyroscript/alva repository on the current implementation of the Quick Battle character-selection and stage-selection flow.
+Work in the hiyroscript/alva repository.
 
-First inspect the existing code and preserve the current architecture, responsive behavior, keyboard/gamepad support, touch support, accessibility, stage rendering, and transition into battle. Do not redesign unrelated screens or change combat/gameplay behavior.
+Task
 
-The main files involved are:
-
-* js/screens/character-select-screen.js
-* js/screens/map-select-screen.js
-* js/core/menu-navigator.js if necessary
-* js/ui/stage-preview.js if necessary
-* styles.css
-
-The existing implementation already contains most of the required state and selection logic. Make the following targeted UI/UX changes.
-
-1. Character Select — confirmation text
-
-On the Select Fighter screen, the primary confirmation button currently becomes character-specific, for example:
-
-Confirm #0001
-
-Change the enabled confirmation text to exactly:
-
-Confirm fighter
-
-Do not include the fighter ID or display name.
-
-When no valid fighter is selected, the existing disabled/unselected behavior can remain appropriate.
-
-The relevant logic currently lives in CharacterSelectScreen.updateConfirm().
-
-2. Character Select — empty slots must not receive hover/focus navigation
-
-The roster currently has 48 slots, with unavailable/empty slots represented by .slot.is-locked.
-
-At the moment those locked slots are still given data-nav, and the shared menu navigator intentionally considers aria-disabled elements focusable. As a result, moving the mouse over an empty slot can move the menu focus/highlight onto it.
-
-Change this behavior so empty/unavailable character slots are non-interactive placeholders.
-
-Requirements:
-
-* Mouse hover must NOT transfer focus/highlight to an empty slot.
-* Keyboard/gamepad spatial navigation must skip empty slots.
-* Normal Tab navigation must not land on empty slots.
-* Empty slots must not show a hover border or focus ring.
-* Only actually available fighters should be navigation/selection candidates.
-* Preserve the visual empty/locked placeholder grid so the 48-slot roster layout remains intact.
-* Do not break future roster expansion: as soon as a character definition is marked available, its slot should behave like a normal selectable fighter without special hard-coded handling for #0001.
-
-A clean implementation is preferred over special-casing the pointer handler. For example, unavailable slots should not receive the same data-nav/focusable interactive markup as available fighters. If keeping them as buttons, ensure they cannot enter focus/navigation; alternatively render unavailable slots as non-interactive elements while preserving the existing .slot.is-locked styling.
-
-Do not globally remove support for disabled navigable elements from menu-navigator.js unless required, because other screens may depend on that behavior.
-
-3. Character Select — remove green selected-card outline
-
-The selected fighter currently receives a green accent outline through CSS such as:
-
-.slot.is-selected
-
-Remove the green border/inset outline from the selected roster fighter card.
-
-Important:
-
-* Keep the selected state and selection logic.
-* The existing selected/check indicator can remain.
-* Keep a normal accessible focus indication for keyboard/gamepad focus.
-* The focus indicator should use the existing neutral/off-white focus treatment rather than combining it with a green selected outline.
-* Hover may continue to use the normal neutral hover border.
-
-In practice, remove the accent border-color / accent inset box-shadow behavior from .slot.is-selected, .slot.is-selected:focus, and any selected-hover rule that forces the accent border.
-
-4. Stage Select — rename screen
-
-On the current Select Map screen, change the header title from:
-
-Select Map
-
-to exactly:
-
-Select Stage
-
-This should remain Quick Battle step 2; do not alter the flow or shared step indicator.
-
-5. Stage Select — hero should contain only the stage preview
-
-The large left-side stage preview currently contains:
-
-* the live stage canvas,
-* a large overlaid text/information card,
-* two copies of the selected fighter rendered at the stage spawn positions.
-
-Simplify this area so it shows ONLY the stage artwork/live stage preview.
-
-Remove the entire large text/information overlay from the hero. This includes the current:
-
-* Stage 01 / stage index in the hero,
-* large stage name,
-* tagline,
-* description,
-* size information,
-* terrain/obstacle/platform/light traits,
-* overlay/card background that contains those elements.
-
-The large preview canvas itself must remain and should continue switching/rendering correctly as the user focuses/selects different stages.
-
-After removing the text card, clean up unused DOM references and CSS such as the .map-hero-info, .map-hero-name, .map-hero-tagline, .map-hero-desc, .map-traits, and .map-trait rules if they are no longer used anywhere.
-
-Keep appropriate accessibility semantics for the preview even though the visible text overlay is gone. For example, the preview container may have a concise stage-specific accessible label.
-
-6. Stage Select — remove both fighter sprites from the large preview
-
-The two fighters visible in the large map preview come from StagePreview.drawFighters() when character sprites are supplied to the preview.
-
-For the Stage Select screen, do not render either fighter. The hero should be a clean stage/environment preview only.
-
-Prefer keeping StagePreview’s general ability to render fighters intact if it could be useful elsewhere. Instead, make MapSelectScreen use the preview without supplying fighter sprites.
-
-Currently MapSelectScreen.enter() loads the selected character and assigns its sprite set to the hero, and showHero() passes those sprites into setMap().
-
-Remove that stage-select-specific character loading/rendering path and call the hero preview with no sprites, e.g. conceptually:
-
-this.hero.setMap(map, null)
-
-The map thumbnails already render without fighters; preserve that behavior.
-
-Do not alter actual battle fighter spawning.
-
-7. Stage cards — remove “Stage 01” and “Stage 02”
-
-The two stage cards currently display index labels:
-
-Stage 01
-Stage 02
-
-Remove those index labels completely from the stage cards.
-
-Keep:
-
-* stage thumbnail,
-* stage name such as Desert / City,
-* stage tagline,
-* selected-state indicator.
-
-After removing .map-card-index, adjust the card-body CSS so there is no empty column or spacing where the index used to be. The stage name/tagline should lay out naturally.
-
-Remove now-unused .map-card-index CSS.
-
-This must work automatically for future stages; do not hard-code Desert or City.
-
-8. Stage Select — remove control hints
-
-Remove the keyboard/control hint footer from the Select Stage screen.
-
-This is currently created with:
-
-hintBar(MENU_HINTS)
-
-Remove it from MapSelectScreen and clean up the unused hintBar / MENU_HINTS imports there.
-
-Do NOT globally delete the shared hint-bar component or remove hints from unrelated screens.
-
-9. Stage cards — remove green selected-card outline
-
-The selected stage card currently gets a green accent border/inset outline through:
-
-.map-card.is-selected
-
-Remove that green outline.
-
-Requirements:
-
-* Keep stage selection state functional.
-* Keep the existing selected badge/check if desired.
-* Keep a normal accessible keyboard/gamepad focus ring.
-* Do not combine the focus ring with a green selected outline.
-* Normal neutral hover treatment can remain.
-* Selecting a stage must still update app.selection.mapId.
-
-Update .map-card.is-selected and .map-card.is-selected:focus accordingly.
-
-10. Stage confirmation button text
-
-The stage confirmation/start button currently starts as:
-
-Start Battle
-
-and after selection becomes something like:
-
-Start Battle · Desert
-
-Change the button text to exactly:
+Change the Select Stage primary action text from:
 
 Confirm stage and Start Battle
 
-Keep the existing arrow icon if desired.
+to exactly:
 
-This wording must remain the same regardless of which stage is selected. Do not append the stage name.
+Confirm and start battle
 
-Make sure select() no longer overwrites the button text with Start Battle · ${map.name}.
+The final visible button text must match that wording and capitalization exactly.
 
-Clicking/confirming this button must continue to launch the battle with the selected:
+Product context
 
-* mapId
-* characterId
+Alva is a browser-based 2D fighting game built with plain HTML, CSS, and vanilla JavaScript ES modules.
 
-Do not change the battle transition itself.
+The main menu/game flow is:
 
-Expected final Stage Select structure
+Splash → Home → Select Mode → Select Fighter → Select Stage → Battle
 
-Visually, the screen should now be substantially cleaner:
+The requested text appears on the Select Stage screen as the primary action used to enter Battle after choosing a stage.
 
-* Header: Select Stage
-* Large left area: stage/environment preview ONLY
-* No fighter sprites in that preview
-* No large text/info overlay on top of the preview
-* Right side:
-    * Stages heading / availability information may remain
-    * stage cards with preview, name, and tagline
-    * no Stage 01 / Stage 02
-    * no green selected-card outline
-    * selection indicator may remain
-    * button labeled Confirm stage and Start Battle
-* No keyboard/control-hint footer at the bottom
+The Select Stage implementation is in:
 
-Expected final Character Select behavior
+js/screens/map-select-screen.js
 
-* Header remains Select Fighter.
-* Available fighter cards remain selectable.
-* Empty roster slots remain visible but cannot receive hover focus or keyboard/gamepad focus.
-* Selected fighter card has no green accent outline.
-* Selection indicator can remain.
-* Confirmation button reads exactly Confirm fighter.
-* Confirmation still transitions to Stage Select.
+The relevant button is currently created as this.startBtn with:
 
-Preserve existing functionality
+html: `<span>Confirm stage and Start Battle</span>${ICONS.arrow}`,
+
+Its click handler calls the existing start() method, which transitions to the Battle screen using the selected map and character.
+
+Required implementation
+
+In js/screens/map-select-screen.js, change only the button copy so it becomes:
+
+html: `<span>Confirm and start battle</span>${ICONS.arrow}`,
+
+Preserve the existing:
+
+* btn btn--primary btn--start classes
+* type="button"
+* data-nav
+* arrow icon
+* click listener
+* start() behavior
+* selected stage behavior
+* keyboard/gamepad menu navigation
+* mouse/touch interaction
+* focus behavior
+* accessibility semantics
+* layout and styling
+
+Do not rename the button variable, restructure the component, or modify the transition into Battle.
+
+Keep the product specification synchronized
+
+ALVA_SPEC.md is explicitly documented as the single product specification for Alva, and its Select Stage section currently specifies:
+
+"Confirm stage and Start Battle" primary action
+
+Update that specification to use the new exact copy:
+
+"Confirm and start battle" primary action
+
+There is also a general typography rule in ALVA_SPEC.md stating that headings and buttons use title case. The requested label is intentionally sentence case. Do not change the requested text to satisfy that general rule.
+
+If necessary to keep the specification internally consistent, make only the smallest documentation adjustment needed to identify this Select Stage action as a deliberate sentence-case exception. Do not broadly redesign or rewrite Alva’s typography rules.
+
+Scope constraints
+
+This is a copy-only UI change.
 
 Do not change:
 
-* the 48-slot roster concept,
-* fighter portrait rendering,
-* fighter animated character preview,
-* map rendering/artwork,
-* stage thumbnail rendering,
-* Desert/City stage definitions,
-* stage selection state,
-* character selection state,
-* keyboard/gamepad selection for valid controls,
-* Back navigation,
-* responsive layouts,
-* reduced-motion handling,
-* touch support,
-* actual battle spawning,
-* physics/combat/gameplay.
+* stage selection logic
+* Desert or City data
+* stage previews or Canvas rendering
+* Battle loading or navigation
+* fighter selection
+* menu navigation
+* button dimensions or CSS
+* colors, typography styling, or icons
+* combat, physics, camera, HUD, or game controls
+* any unrelated text
 
-Avoid unrelated refactors.
+Do not introduce dependencies, frameworks, or new abstractions for this change.
 
-Cleanup
+Repository-wide verification
 
-After implementing the visual changes:
+Search the repository for the exact old phrase:
 
-* Remove imports, properties, methods, or CSS selectors that become genuinely unused.
-* Do not leave dead hero-information state behind just hidden with CSS when it can cleanly be removed from MapSelectScreen.
-* Keep StagePreview reusable rather than stripping fighter support from it globally merely to satisfy this screen.
-* Do not hard-code behavior around character ID 0001 except where the existing data naturally references it.
+Confirm stage and Start Battle
 
-Verification / acceptance criteria
+After the change, there should be no remaining user-facing or authoritative-spec occurrences of that old wording unless an occurrence is intentionally historical and should remain unchanged.
 
-Verify all of the following before finishing:
+Do not blindly replace unrelated text.
 
-1. Enter Quick Battle and open Select Fighter.
-2. Hover over an empty roster slot: focus/highlight does not move onto it.
-3. Use arrow keys/WASD/gamepad navigation: empty slots are skipped.
-4. Tab navigation does not land on empty roster slots.
-5. Select the available fighter.
-6. Its card does not receive a green selected outline.
-7. The confirmation button says exactly Confirm fighter.
-8. Confirming opens the next screen.
-9. The next screen heading says exactly Select Stage.
-10. The large stage preview contains only the stage environment.
-11. There is no hero text/info card over the large preview.
-12. There are no fighter sprites in the large stage preview.
-13. Focusing Desert and City still updates the large stage preview.
-14. Stage cards do not display Stage 01, Stage 02, or equivalent generated stage-number labels.
-15. Selected stage cards have no green outline.
-16. The stage selected/check indicator still works.
-17. The control-hint footer is absent from Select Stage.
-18. The primary button says exactly Confirm stage and Start Battle.
-19. Switching stages does not alter that button label.
-20. Confirming the stage starts the battle using the chosen stage and fighter.
-21. Back navigation still works.
-22. No JavaScript errors appear in the console.
-23. Existing tests continue to pass.
-24. Check both a normal desktop landscape viewport and the project’s supported responsive/touch layouts for overflow or broken spacing.
+Validation
 
-Make the smallest coherent set of code/CSS changes needed to achieve this.
+Verify that:
+
+1. The Select Stage primary button visibly reads exactly:
+    Confirm and start battle
+2. The capitalization is exact:
+    * Confirm begins with a capital C.
+    * and start battle remains lowercase.
+3. The arrow icon still appears in the button.
+4. Clicking the button still starts Battle with the currently selected stage and fighter.
+5. Existing keyboard, gamepad, mouse, and touch behavior is unchanged.
+6. Stage selection still works normally for both Desert and City.
+7. ALVA_SPEC.md reflects the new label.
+8. No unrelated visual or functional changes are introduced.
+9. Existing tests, if applicable, still pass.
+
+Deliverable
+
+Make the smallest clean diff necessary for this request.
+
+When finished, report:
+
+* the files changed
+* the exact copy change made
+* whether any specification wording needed adjustment for the intentional sentence-case exception
+* what validation/tests were performed
+
+Do not make any unrelated improvements or refactors.
