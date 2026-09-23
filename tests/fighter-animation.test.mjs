@@ -1,66 +1,15 @@
 // Run with node --test tests/fighter-animation.test.mjs (no dependencies).
-// #0001 airborne/landing states on the real Fighter, physics and SpriteSet
-// resolve logic. Sprite sets carry clip metadata only (no decoded PNGs), so
-// scale, anchoring and paint still need real-browser verification.
+// #0001 animation registration plus airborne, landing and hurt states on the
+// real Fighter, physics and SpriteSet resolve logic (see fighter-harness.mjs).
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync } from 'node:fs';
+import { existsSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { CHARACTERS, getCharacter, characterFramePaths } from '../js/data/characters.js';
-import { Fighter } from '../js/game/character.js';
-import { StageCollision } from '../js/game/physics.js';
-import { SpriteSet } from '../js/game/sprite-normalizer.js';
+import { CHARACTERS, characterFramePaths } from '../js/data/characters.js';
 import { CONFIG } from '../js/config.js';
+import { def, DT, BASE, fakeSprites, makeFighter, frameName, stepUntil } from './fighter-harness.mjs';
 
-const def = getCharacter('0001');
-const DT = CONFIG.sim.step;
-const BASE = './assets/characters/0001/0001_';
-
-// SpriteSet with the definition's clip metadata in place of decoded frames.
-function fakeSprites(keys = Object.keys(def.animations)) {
-  const set = new SpriteSet(def);
-  for (const key of keys) {
-    const anim = def.animations[key];
-    set.animations[key] = {
-      key, fps: anim.fps, loop: anim.loop !== false,
-      frames: anim.frames.map((url) => ({ url })),
-    };
-  }
-  set.usable = true;
-  return set;
-}
-
-const STAGE = new StageCollision({
-  groundLevel: 800,
-  bounds: { left: 0, right: 2000 },
-  platforms: [{ id: 'ledge', x: 900, y: 600, w: 200, h: 16 }],
-  solids: [],
-});
-
-function makeFighter({ sprites = fakeSprites(), x = 500, y } = {}) {
-  const input = {};
-  const controller = { getInput: () => ({ ...input }) };
-  const fighter = new Fighter({
-    def, sprites, stage: STAGE, slot: 0, label: 'P1', controller,
-    spawn: { x, y, facing: 1 },
-  });
-  const ctx = { stage: STAGE, gravity: CONFIG.sim.gravity };
-  const step = (held = {}) => {
-    for (const k of Object.keys(input)) delete input[k];
-    Object.assign(input, held);
-    fighter.update(DT, ctx);
-    return fighter;
-  };
-  return { fighter, step };
-}
-
-const frameName = (f) => f.animator.frame?.url.split('/').pop();
-
-// Steps until `pred` holds, returning the number of steps taken.
-function stepUntil(step, pred, held, limit = 600) {
-  for (let i = 1; i <= limit; i++) if (pred(step(held))) return i;
-  throw new Error('condition never reached');
-}
+const ROOT = fileURLToPath(new URL('../', import.meta.url));
 
 test('#0001 registers dedicated non-looping jump, fall and land clips', () => {
   const expected = {
@@ -86,6 +35,54 @@ test('#0001 registers dedicated non-looping jump, fall and land clips', () => {
   assert.equal(def.animations.fall.fps, 10);
   assert.equal(def.animations.land.fps, 12);
   assert.equal(CHARACTERS.filter((c) => c.id === '0001').length, 1);
+});
+
+const NEW_CLIPS = {
+  hurt: [`${BASE}hurt.png`],
+  midairHurt: [`${BASE}midairhurt.png`],
+  ba1: [`${BASE}1ba1.png`, `${BASE}1ba2.png`, `${BASE}1ba3.png`, `${BASE}1ba4.png`],
+  midairBa1: [
+    `${BASE}midair1ba1.png`, `${BASE}midair1ba2.png`, `${BASE}midair1ba3.png`,
+    `${BASE}midair1ba4.png`, `${BASE}midair1ba5.png`,
+  ],
+};
+
+test('#0001 registers hurt, mid-air hurt and both Basic Attack 1 clips', () => {
+  const paths = characterFramePaths(def);
+  for (const [key, frames] of Object.entries(NEW_CLIPS)) {
+    const anim = def.animations[key];
+    assert.ok(anim, `${key} is registered`);
+    // Exact, ordered frame lists: the trailing number is the frame number.
+    assert.deepEqual(anim.frames, frames, key);
+    assert.equal(anim.loop, false, `${key} plays once`);
+    assert.ok(anim.fps > 0, `${key} has a positive fps`);
+    for (const url of frames) {
+      assert.ok(paths.includes(url), `${url} is preloaded`);
+      assert.ok(url.startsWith('./assets/characters/0001/'), `${url} is relative and canonical`);
+      assert.ok(existsSync(ROOT + url.slice(2)), `${url} exists`);
+      assert.ok(!existsSync(ROOT + url.split('/').pop()), `no root copy of ${url}`);
+    }
+  }
+  assert.equal(def.animations.ba1.frames.length, 4);
+  assert.equal(def.animations.midairBa1.frames.length, 5);
+  assert.equal(def.animations.ba1.fps, 12);
+  assert.equal(def.animations.midairBa1.fps, 12);
+  // Hurt art that fails to load holds a still idle frame.
+  assert.deepEqual(def.animationFallbacks.hurt, { animation: 'idle', frame: 0 });
+  assert.deepEqual(def.animationFallbacks.midairHurt, { animation: 'idle', frame: 0 });
+});
+
+test('the third ground BA1 frame is exactly 0001_1ba3.png, with no U+FFFC anywhere', () => {
+  const OBJ = '\uFFFC';
+  assert.equal(def.animations.ba1.frames[2], './assets/characters/0001/0001_1ba3.png');
+  assert.equal(def.animations.ba1.frames[2].split('/').pop(), '0001_1ba3.png');
+  for (const url of characterFramePaths(def)) assert.ok(!url.includes(OBJ), `${url} is clean`);
+  for (const dir of ['', 'assets/characters/0001/']) {
+    for (const name of readdirSync(ROOT + dir)) assert.ok(!name.includes(OBJ), `${dir}${name} is clean`);
+  }
+  assert.ok(readdirSync(ROOT + 'assets/characters/0001/').includes('0001_1ba3.png'));
+  // No character frames are left at the repository root.
+  assert.deepEqual(readdirSync(ROOT).filter((n) => /^0001_.*\.png$/i.test(n)), []);
 });
 
 test('movement, collider and hurtbox data are unchanged', () => {
@@ -211,6 +208,102 @@ test('hitstun keeps priority over land', () => {
   stepUntil(step, (f) => f.grounded);
   assert.equal(fighter.body.landed, true);
   assert.equal(fighter.state, 'hitstun');
+  assert.equal(frameName(fighter), '0001_hurt.png');
+});
+
+test('grounded hitstun shows 0001_hurt.png, then idle resumes', () => {
+  const { fighter, step } = makeFighter();
+  fighter.combat.stun = 0.22;
+  step();
+  assert.equal(fighter.state, 'hitstun');
+  assert.equal(frameName(fighter), '0001_hurt.png');
+  const n = stepUntil(step, (f) => f.state !== 'hitstun');
+  assert.equal(n + 1, Math.ceil(0.22 / DT)); // the stun, not a single tick
+  assert.equal(fighter.state, 'idle');
+  assert.equal(frameName(fighter), '0001_idle1.png');
+});
+
+test('hitstun takes priority over run, and run resumes when it ends', () => {
+  const { fighter, step } = makeFighter();
+  const right = { right: true };
+  stepUntil(step, (f) => f.state === 'run', right);
+  fighter.combat.stun = 0.2;
+  step(right);
+  assert.equal(fighter.state, 'hitstun');
+  assert.equal(frameName(fighter), '0001_hurt.png');
+  stepUntil(step, (f) => f.state !== 'hitstun', right);
+  stepUntil(step, (f) => f.state === 'run', right, 30);
+});
+
+test('airborne hitstun shows 0001_midairhurt.png, switching to 0001_hurt.png on landing', () => {
+  const { fighter, step } = makeFighter();
+  step({ jump: true, jumpPressed: true });
+  stepUntil(step, (f) => f.body.vy > 0 && f.body.y > 700);
+  fighter.combat.stun = 1;
+  step();
+  assert.equal(fighter.grounded, false);
+  assert.equal(fighter.state, 'hitstun');
+  assert.equal(frameName(fighter), '0001_midairhurt.png');
+  while (!fighter.grounded) {
+    assert.equal(frameName(fighter), '0001_midairhurt.png');
+    step();
+  }
+  // Still stunned on the ground: the grounded hurt pose, never land.
+  assert.equal(fighter.state, 'hitstun');
+  assert.equal(frameName(fighter), '0001_hurt.png');
+  stepUntil(step, (f) => f.state !== 'hitstun');
+  assert.equal(fighter.state, 'idle');
+});
+
+test('hitstun ending mid-air resumes jump or fall', () => {
+  const { fighter, step } = makeFighter();
+  step({ jump: true, jumpPressed: true });
+  step();
+  fighter.combat.stun = 0.1;
+  step();
+  assert.equal(frameName(fighter), '0001_midairhurt.png');
+  stepUntil(step, (f) => f.state !== 'hitstun');
+  assert.equal(fighter.grounded, false);
+  assert.ok(['jump', 'fall'].includes(fighter.state));
+  assert.equal(frameName(fighter), `0001_${fighter.state}1.png`);
+});
+
+test('the hurt poses are visual only: hitstun movement matches a fighter without hurt art', () => {
+  const withHurt = makeFighter();
+  const without = makeFighter({ sprites: fakeSprites(['idle', 'run', 'jump', 'fall', 'land']) });
+  for (let i = 0; i < 160; i++) {
+    const held = i === 0 ? { jump: true, jumpPressed: true, right: true } : { right: true };
+    if (i === 20 || i === 90) for (const r of [withHurt, without]) r.fighter.combat.stun = 0.3;
+    const a = withHurt.step(held);
+    const b = without.step(held);
+    for (const k of ['x', 'y', 'vx', 'vy', 'grounded', 'landed']) {
+      assert.equal(a.body[k], b.body[k], `step ${i}: body.${k}`);
+    }
+    assert.equal(a.state, b.state);
+  }
+});
+
+test('missing hurt art holds a still idle frame instead of crashing', () => {
+  const { fighter, step } = makeFighter({ sprites: fakeSprites(['idle', 'run', 'jump', 'fall', 'land']) });
+  fighter.combat.stun = 0.3;
+  step();
+  assert.equal(fighter.state, 'hitstun');
+  assert.equal(fighter.animator.hold, 0);
+  assert.equal(frameName(fighter), '0001_idle1.png');
+  step({ jump: true, jumpPressed: true }); // stunned: no jump
+  assert.equal(fighter.grounded, true);
+  stepUntil(step, (f) => f.state !== 'hitstun');
+  assert.equal(fighter.state, 'idle');
+  assert.equal(fighter.animator.hold, null);
+
+  // Airborne, too.
+  const air = makeFighter({ sprites: fakeSprites(['idle', 'run', 'jump', 'fall', 'land']) });
+  air.step({ jump: true, jumpPressed: true });
+  air.fighter.combat.stun = 0.3;
+  air.step();
+  assert.equal(air.fighter.state, 'hitstun');
+  assert.equal(frameName(air.fighter), '0001_idle1.png');
+  assert.equal(air.fighter.animator.hold, 0);
 });
 
 test('dropping through a platform uses fall, then lands', () => {

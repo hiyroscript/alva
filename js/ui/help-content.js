@@ -6,7 +6,8 @@ import { CONFIG, ACTION_LABELS, keyLabel } from '../config.js';
 import { el } from '../core/utils.js';
 import { ICONS } from './icons.js';
 
-const PENDING = new Set(['primary', 'special', 'action1', 'action2']);
+// Wired into input and combat but reserved until they have attack artwork.
+const PENDING = new Set(['primary', 'special', 'action2']);
 
 function keys(codes) {
   return el('span', { class: 'keys' }, codes.map((c) => el('kbd', { text: keyLabel(c) })));
@@ -36,7 +37,7 @@ function controlsTable() {
 function mobileDiagram() {
   const dot = (cls, icon, label) =>
     el('span', { class: `md-btn ${cls}`, title: label }, [el('span', { class: 'md-icon', html: icon })]);
-  return el('div', { class: 'mobile-diagram', role: 'img', 'aria-label': 'Landscape phone layout: movement buttons Left, Down, Right at the lower left; Primary, Special, Block, Action 1, Action 2 and Jump staggered at the lower right; the timer and Pause at the top centre.' }, [
+  return el('div', { class: 'mobile-diagram', role: 'img', 'aria-label': 'Landscape phone layout: movement buttons Left, Down, Right at the lower left; Primary, Special, Block, Basic Attack 1 (BA1), Action 2 and Jump staggered at the lower right; the timer and Pause at the top centre.' }, [
     el('div', { class: 'md-screen' }, [
       dot('md-pause', ICONS.pause, 'Pause'),
       dot('md-left', ICONS.left, 'Left'),
@@ -45,13 +46,13 @@ function mobileDiagram() {
       dot('md-primary', ICONS.primary, 'Primary'),
       dot('md-special', ICONS.special, 'Special'),
       dot('md-block', ICONS.block, 'Block'),
-      dot('md-a1', '<b>A1</b>', 'Action 1'),
+      dot('md-a1', '<b>BA1</b>', 'Basic Attack 1'),
       dot('md-a2', '<b>A2</b>', 'Action 2'),
       dot('md-jump', ICONS.jump, 'Jump'),
     ]),
     el('dl', { class: 'detail-list md-legend' }, [
       el('dt', { text: 'Lower left' }), el('dd', { text: 'Left · Down · Right' }),
-      el('dt', { text: 'Lower right' }), el('dd', { text: 'Primary, Special · Block, Action 1 · Action 2 · Jump' }),
+      el('dt', { text: 'Lower right' }), el('dd', { text: 'Primary, Special · Block, BA1 · Action 2 · Jump' }),
       el('dt', { text: 'Top centre' }), el('dd', { text: 'Timer · Pause' }),
     ]),
   ]);
@@ -61,11 +62,11 @@ export function buildHelp() {
   return el('div', { class: 'info-grid' }, [
     card('Desktop controls', [
       controlsTable(),
-      el('p', { class: 'info-note', text: 'Keys can be held together — run and jump at the same time. Gamepads with a standard layout also work (D-pad / stick to move, A to jump, Start to pause).' }),
+      el('p', { class: 'info-note', text: 'Keys can be held together — run and jump at the same time. Gamepads with a standard layout also work (D-pad / stick to move, A to jump, B for Basic Attack 1, Start to pause).' }),
     ], 'info-card--wide'),
     card('Mobile controls', [
       mobileDiagram(),
-      el('p', { class: 'info-note', text: 'Play in landscape. Hold a direction and press Jump with your other thumb; you can slide between the movement buttons without lifting.' }),
+      el('p', { class: 'info-note', text: 'Play in landscape. Hold a direction and press Jump with your other thumb; you can slide between the movement buttons without lifting. BA1 is Basic Attack 1; the dashed Primary, Special and Action 2 buttons are reserved.' }),
     ]),
     card('Movement', [
       el('ul', { class: 'info-list' }, [
@@ -91,7 +92,7 @@ export function buildHelp() {
       ]),
     ]),
     card('This build', [
-      el('p', { class: 'info-text', text: '#0001 currently has idle and run animations. Primary, Special, Action 1 and Action 2 are wired into the input and combat systems but stay inactive until matching attack sprites are added. Block sets a guard state that uses the idle pose.' }),
+      el('p', { class: 'info-text', text: '#0001 has idle, run, jump, fall and land animations, ground and mid-air hurt poses, and Basic Attack 1 (BA1): a punch on the ground and a kick in the air. Primary, Special and Action 2 are wired into the input and combat systems but stay reserved until matching attack sprites are added. Block sets a guard state that uses the idle pose. The training CPU never attacks.' }),
     ]),
   ]);
 }

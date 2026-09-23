@@ -73,7 +73,7 @@ export const CONFIG = Object.freeze({
   },
 
   debug: {
-    // Toggle collider / hurtbox overlay in battle with this key.
+    // Toggle collider / hurtbox / active-hitbox overlay in battle with this key.
     overlayKey: 'Backquote',
   },
 });
@@ -92,7 +92,7 @@ export const ACTION_LABELS = Object.freeze({
   primary: 'Primary',
   special: 'Special',
   block: 'Block',
-  action1: 'Action 1',
+  action1: 'Basic Attack 1',
   action2: 'Action 2',
   pause: 'Pause',
 });
