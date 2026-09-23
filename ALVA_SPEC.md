@@ -160,9 +160,11 @@ moves focus).
 - Start on blank, pure black, with no text, loading UI, Home or rotate overlay.
   Both `./hs.jpg` and `./alvafav.PNG` must load through AssetLoader and fully
   decode before either image appears. Fighter preloading continues independently.
-- Show `hs.jpg` first, centred with its natural proportions and responsive sizing.
-  Fade in for 900 ms, hold for 1600 ms, and fade out for 800 ms. A continuous,
-  restrained forward zoom from 0.88 to 1.16 spans all three phases.
+- Show `hs.jpg` first, centred with its natural proportions, responsive sizing
+  and rounded corners. Fade in for 900 ms, hold for 1600 ms, and fade out for
+  800 ms. A continuous, gentle forward zoom from 0.96 to 1.04 spans all three phases.
+- "a game by hiyroscript" (exact wording) sits near the bottom centre in soft gray
+  with generous letter spacing. It fades in and out with `hs.jpg` and does not zoom.
 - After 220 ms of clean black, show `alvafav.PNG` with the same treatment at
   its own appropriate size. The images never overlap visibly.
 - After the second fade-out and 200 ms of black, navigate to Home. Its existing
