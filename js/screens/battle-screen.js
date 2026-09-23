@@ -18,9 +18,12 @@ const BANNERS = {
   time: { sub: 'TIME OVER', main: 'TIME' },
 };
 
+// opts.outlineOnly: background stays transparent through hover/press; the
+// focus ring is unchanged.
 function menuButton(label, opts = {}) {
   return el('button', {
-    class: `pause-btn-item${opts.primary ? ' is-primary' : ''}`, type: 'button', 'data-nav': true,
+    class: `pause-btn-item${opts.primary ? ' is-primary' : ''}${opts.outlineOnly ? ' is-outline-only' : ''}`,
+    type: 'button', 'data-nav': true,
     'data-nav-default': opts.primary || null,
     disabled: opts.disabled || null,
     text: label,
@@ -66,11 +69,11 @@ export class BattleScreen extends Screen {
 
   buildPause() {
     const resume = menuButton('Resume', { primary: true });
-    const restart = menuButton('Restart Battle');
+    const restart = menuButton('Restart Battle', { outlineOnly: true });
     // Help is disabled for now. Disabled buttons ignore clicks and the menu
     // navigator skips them; drop `disabled` to bring the Help view back.
     this.helpBtn = menuButton('Help', { disabled: true });
-    const home = menuButton('Return to Home');
+    const home = menuButton('Return to Home', { outlineOnly: true });
     resume.addEventListener('click', () => this.resume());
     restart.addEventListener('click', () => this.restart());
     this.helpBtn.addEventListener('click', () => this.openHelp());
@@ -345,6 +348,7 @@ export class BattleScreen extends Screen {
       message: 'The current battle will end and its progress will be discarded.',
       confirmLabel: 'Return Home',
       cancelLabel: 'Keep Playing',
+      cancelOutlineOnly: true,
     });
     if (ok) this.leave(() => this.app.screens.go('home', {}, { reset: true }));
   }

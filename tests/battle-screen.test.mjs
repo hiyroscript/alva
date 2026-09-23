@@ -355,3 +355,48 @@ test('cancelling Return to Home keeps the pause menu and its focus', async () =>
   assert.deepEqual(app.nav.scopes, [screen.pauseScope]);
   assert.equal(screen.paused, true);
 });
+
+const outlineOnly = (b) => b.classList.contains('is-outline-only');
+
+test('only Restart Battle and Return to Home drop their fill in the pause menu', () => {
+  const { screen } = setup();
+  const [resume, restart, help, home] = pauseItems(screen);
+  assert.equal(outlineOnly(restart), true);
+  assert.equal(outlineOnly(home), true);
+  assert.equal(outlineOnly(resume), false);
+  assert.equal(resume.classList.contains('is-primary'), true);
+  assert.equal(outlineOnly(help), false);
+  for (const b of screen.resultOverlay.querySelectorAll('[data-nav]')) {
+    assert.equal(outlineOnly(b), false, `${b.textContent} keeps its fill states`);
+  }
+});
+
+test('Keep Playing is outline-only for Return to Home? alone', async () => {
+  const { app, screen } = setup();
+  startBattle(screen);
+  screen.pause();
+  const { cancelBtn, okBtn } = app.dialog;
+  assert.equal(outlineOnly(cancelBtn), false);
+
+  const home = byText(pauseItems(screen), 'Return to Home');
+  home.focus();
+  home.click();
+  assert.equal(cancelBtn.textContent, 'Keep Playing');
+  assert.equal(outlineOnly(cancelBtn), true);
+  assert.equal(document.activeElement, cancelBtn);
+  assert.equal(okBtn.textContent, 'Return Home');
+  assert.equal(okBtn.classList.contains('btn--primary'), true);
+  assert.equal(outlineOnly(okBtn), false);
+
+  cancelBtn.click();
+  await Promise.resolve();
+  assert.equal(document.activeElement, home, 'focus returns to Return to Home');
+  assert.equal(screen.paused, true);
+
+  // A dialog opened without the option must not inherit the class.
+  const pending = app.dialog.open({ title: 'Other', message: 'Another confirmation' });
+  assert.equal(cancelBtn.textContent, 'Cancel');
+  assert.equal(outlineOnly(cancelBtn), false);
+  cancelBtn.click();
+  assert.equal(await pending, false);
+});

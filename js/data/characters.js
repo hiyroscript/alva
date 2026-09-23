@@ -41,13 +41,38 @@ export const CHARACTERS = [
         // Playback rate follows horizontal speed, clamped to this minimum.
         minSpeedScale: 0.7,
       },
+      // Airborne clips play once and hold their last frame for the rest of
+      // the ascent / descent.
+      jump: {
+        frames: frames(BASE_0001, 'jump', 2),
+        fps: 10,
+        loop: false,
+        heightRatio: 0.98,
+      },
+      fall: {
+        frames: frames(BASE_0001, 'fall', 2),
+        fps: 10,
+        loop: false,
+        heightRatio: 1,
+      },
+      // Plays once on touchdown; the fighter holds the land state for exactly
+      // one pass of this clip (frames / fps).
+      land: {
+        frames: frames(BASE_0001, 'land', 2),
+        fps: 12,
+        loop: false,
+        heightRatio: 0.83,
+      },
     },
 
-    // States without dedicated art yet. `frame` holds a single frame instead of
-    // looping, so the fighter never stretches or rotates to fake a pose.
+    // States without dedicated art yet, plus a still idle frame for the
+    // airborne and landing states if their frames fail to load. `frame` holds a
+    // single frame instead of looping, so the fighter never stretches or rotates
+    // to fake a pose.
     animationFallbacks: {
       jump: { animation: 'idle', frame: 0 },
       fall: { animation: 'idle', frame: 0 },
+      land: { animation: 'idle', frame: 0 },
       crouch: { animation: 'idle' },
       block: { animation: 'idle' },
       hitstun: { animation: 'idle', frame: 0 },

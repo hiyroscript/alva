@@ -34,8 +34,11 @@ behave, and how it must look. The README covers running and deploying it.
 ## 3. Assets
 
 - `#0001` frames live in `assets/characters/0001/`: four idle frames
-  (≈560–592 × 800–832 px) and six run frames (≈128–160 × 184–188 px).
-- The idle and run frames are at very different raw scales. A normalization
+  (≈560–592 × 800–832 px), six run frames (≈128–160 × 184–188 px), and two
+  each of jump (624 × 816 px), fall (544 × 832 px) and land (≈528–544 ×
+  560–688 px).
+- The idle, jump, fall and land frames (≈16× pixel art) and the run frames
+  (≈4×) are at very different raw scales. A normalization
   system must, once per frame: read the alpha channel, find the visible bounds,
   detect the pixel-art grid, resample to one pixel per art pixel, and anchor
   bottom-centre so the fighter never grows, shrinks, jumps or slides when
@@ -317,9 +320,14 @@ no header, build label, eyebrow or keyboard hint bar.
 
 ### 7.2 Fighters, physics and combat
 
-- `#0001` has only Idle and Run. No invented frames; jumping uses the idle pose
-  without stretching or rotating; facing flips the sprite and turns toward the
-  opponent when standing.
+- `#0001` has Idle, Run, Jump, Fall and Land. No invented frames. Rising uses
+  Jump and descending (including platform drops) uses Fall; each plays once at
+  10 fps and holds its last frame. Land plays once at 12 fps on touchdown, for
+  exactly the clip's length, then returns to idle or run. Land is a visual
+  state only: it never changes movement or collision, and a new jump, attack
+  or hitstun cuts it short. If those frames fail to load, the fighter holds an
+  idle frame without stretching or rotating. Facing flips the sprite and turns
+  toward the opponent when standing.
 - Physics: acceleration, deceleration, max speed, gravity, jump impulse,
   ground/platform/solid collision, stage bounds, landing detection; collision
   boxes independent of PNG size; bottom-centre origin; no sinking, floating,

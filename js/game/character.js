@@ -24,6 +24,8 @@ export class Fighter {
     this.label = label;
     this.controller = controller;
     this.animator = new SpriteAnimator(sprites);
+    // One pass of the touchdown clip; 0 skips the land state entirely.
+    this.landDuration = sprites.duration('land');
     this.attacks = Object.fromEntries(
       Object.entries(def.attacks || {}).map(([id, spec]) => [id, createAttackDefinition({ id, ...spec })]),
     );
@@ -161,12 +163,14 @@ export class Fighter {
     }
   }
 
+  // Visual state only: nothing here feeds back into movement or collision.
   updateState(dt) {
     const { body, combat } = this;
     let next;
     if (combat.stun > 0) next = 'hitstun';
     else if (combat.attack) next = 'attack';
     else if (!body.grounded) next = body.vy < 0 ? 'jump' : 'fall';
+    else if (this.isLanding(dt)) next = 'land';
     else if (combat.blocking) next = 'block';
     else if (this.crouching) next = 'crouch';
     else if ((this.moveDir !== 0 && Math.abs(body.vx) > 20) || Math.abs(body.vx) > 140) next = 'run';
@@ -189,6 +193,14 @@ export class Fighter {
       this.animator.setSpeed(1);
     }
     this.animator.update(dt);
+  }
+
+  // Touchdown starts the land state; it then lasts one pass of the land clip
+  // while grounded. Anything with higher priority (a new jump included) ends it.
+  isLanding(dt) {
+    if (!this.landDuration) return false;
+    if (this.body.landed) return true;
+    return this.state === 'land' && this.stateTime + dt < this.landDuration;
   }
 
   // Interpolated position for rendering between fixed steps.
