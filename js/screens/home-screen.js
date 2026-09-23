@@ -58,6 +58,9 @@ export class HomeScreen extends Screen {
     this.creditsViewport.addEventListener('pointerdown', (event) => {
       if (event.button !== 0 || this.activePointer !== null) return;
       event.preventDefault();
+      // Scripted focus matches :focus-visible, so mark it to keep the keyboard
+      // cue hidden until a key is pressed here or focus leaves.
+      this.creditsViewport.classList.add('is-pointer-focus');
       this.creditsViewport.focus({ preventScroll: true });
       this.activePointer = event.pointerId;
       this.pointerY = event.clientY;
@@ -74,7 +77,12 @@ export class HomeScreen extends Screen {
         if (event.pointerId === this.activePointer) this.endDrag();
       });
     }
+    this.creditsViewport.addEventListener('blur', () => {
+      // Switching windows blurs without moving focus; keep the mark then.
+      if (document.activeElement !== this.creditsViewport) this.creditsViewport.classList.remove('is-pointer-focus');
+    });
     this.creditsViewport.addEventListener('keydown', (event) => {
+      this.creditsViewport.classList.remove('is-pointer-focus');
       if (event.altKey || event.ctrlKey || event.metaKey) return;
       const page = this.creditsViewport.clientHeight * 0.8;
       const delta = { ArrowUp: -40, ArrowDown: 40, PageUp: -page, PageDown: page,

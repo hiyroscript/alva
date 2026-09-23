@@ -538,7 +538,12 @@ html.is-touch .hint-bar { display: none; }
   overscroll-behavior: contain;
   user-select: none;
 }
-.home-credits-col:focus-visible { outline: 2px solid var(--text); outline-offset: -6px; }
+/* Keyboard focus turns the credit headings green instead of boxing the text;
+   the transparent outline only shows in forced-colors mode. Presses and drags
+   focus by script, which still matches :focus-visible, hence .is-pointer-focus. */
+.home-credits-col:focus { outline: none; }
+.home-credits-col:focus-visible:not(.is-pointer-focus) { outline: 2px solid transparent; outline-offset: -6px; }
+.home-credits-col:focus-visible:not(.is-pointer-focus) .home-credit-title { color: var(--accent); }
 .home-credits-track { will-change: transform; }
 /* Top + bottom padding is the pause between one pass and the next. */
 .home-credits-seq { padding: 24vh 0 8vh; }
@@ -998,7 +1003,9 @@ html.is-touch .hint-bar { display: none; }
   -webkit-user-select: text;
 }
 .tab-panel:focus { outline: none; }
-.tab-panel:focus-visible { box-shadow: inset 0 0 0 2px var(--border-strong); border-radius: var(--radius-md); }
+/* Same cue as the Home credits: green headings rather than a frame. */
+.tab-panel:focus-visible { outline: 2px solid transparent; outline-offset: -2px; }
+.tab-panel:focus-visible .info-title { color: var(--accent); }
 
 .info-grid {
   display: grid;
