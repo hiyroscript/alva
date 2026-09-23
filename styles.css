@@ -533,7 +533,12 @@ html.is-touch .hint-bar { display: none; }
   right: max(var(--safe-r), var(--credits-pad));
   overflow: hidden;
   text-align: center;
+  pointer-events: auto;
+  touch-action: none;
+  overscroll-behavior: contain;
+  user-select: none;
 }
+.home-credits-col:focus-visible { outline: 2px solid var(--text); outline-offset: -6px; }
 .home-credits-track { will-change: transform; }
 /* Top + bottom padding is the pause between one pass and the next. */
 .home-credits-seq { padding: 24vh 0 8vh; }
@@ -571,6 +576,7 @@ html.is-touch .hint-bar { display: none; }
   /* Too little glass is on screen here for readable text, so the credits
      stay available to assistive technology only. */
   .home-credits { clip-path: inset(50%); }
+  .home-credits-col { pointer-events: none; }
 }
 @media (max-height: 500px) {
   .home-main { padding-top: max(var(--safe-t), 12px); padding-bottom: 12px; }
@@ -594,13 +600,6 @@ html.is-touch .hint-bar { display: none; }
 /* Still credits: one readable copy, clear of the fades, scrollable by hand. */
 @media (prefers-reduced-motion: reduce) {
   .screen--home.is-entering .home-intro > * { animation: none; }
-  .home-credits-col {
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    touch-action: pan-y;
-    pointer-events: auto;
-    scrollbar-width: none;
-  }
   .home-credits-track { will-change: auto; }
   .home-credits-seq { padding-bottom: 24vh; }
   .home-credits-seq[aria-hidden] { display: none; }
