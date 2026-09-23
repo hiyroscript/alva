@@ -145,7 +145,7 @@ fit the palette.
 ## 6. Screens and flow
 
 ```
-Splash → Home → Select Mode → Select Fighter → Select Map → Battle
+Splash → Home → Select Mode → Select Fighter → Select Stage → Battle
 Home → Help & Credits (the Home entry is disabled for now)
 Battle → Pause → Resume / Restart / Help / Return to Home (confirmed)
 Battle (time over) → Result → Rematch / Change Stage / Return to Home
@@ -234,18 +234,28 @@ no header, build label, eyebrow or keyboard hint bar.
 - Deliberately large roster: 48 slots in a responsive, scrollable grid.
 - Only `#0001` (always shown with the `#`) is selectable; other slots are quiet
   locked placeholders (silhouette + lock). No invented names or power ratings.
+- Locked slots are non-interactive: hover, Tab and keyboard/gamepad navigation
+  skip them, and they show no hover border or focus ring. Any fighter marked
+  available becomes a normal selectable slot.
+- The selected fighter keeps its check badge but no green outline; focus uses
+  the standard neutral focus ring.
 - Preview panel: clean animated idle fighter preview in original colours,
-  availability badge, fighter name, and "Confirm #0001" primary button.
+  availability badge, fighter name, and "Confirm fighter" primary button.
   No animation controls, frame facts, attack-set or roster-slot metadata,
   preview floor line, roster availability count, or bottom control hints.
   Keyboard/gamepad activation confirms immediately; pointer selects first and confirms on a second press.
 
-### 6.5 Select Map
+### 6.5 Select Stage
 
-- Two stages, **Desert** and **City**, with a large live preview (idle fighters
-  at the spawns, gentle camera pan) and selectable cards with thumbnails.
-- Stage details sit in a dark information card over the preview.
-- "Start Battle · <Stage>" primary action.
+- Two stages, **Desert** and **City**, with a large live preview (stage
+  artwork only, gentle camera pan) and selectable cards with thumbnails.
+- The preview has no fighters and no text overlay; it carries an accessible
+  stage label instead.
+- Cards show thumbnail, stage name and tagline, with no stage-number label.
+  The selected card keeps its Selected badge but no green outline; focus uses
+  the standard neutral focus ring.
+- "Confirm stage and Start Battle" primary action (same label for every
+  stage). No bottom control hints.
 
 ### 6.6 Help & Credits
 

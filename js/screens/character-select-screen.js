@@ -1,5 +1,6 @@
 // SELECT FIGHTER: large roster grid (48 slots) + animated preview panel.
-// Only #0001 is selectable; other slots are restrained locked placeholders.
+// Available fighters are selectable; other slots are non-interactive locked
+// placeholders that stay out of hover, Tab and spatial navigation.
 
 import { Screen } from '../core/screen-manager.js';
 import { CONFIG } from '../config.js';
@@ -39,11 +40,11 @@ export class CharacterSelectScreen extends Screen {
           el('span', { class: 'slot-check', html: ICONS.check }),
         ]);
         slot._portrait = portrait;
+        slot.addEventListener('focus', () => this.preview(slot));
+        slot.addEventListener('click', (e) => this.activate(slot, e));
       } else {
-        slot = el('button', {
-          class: 'slot is-locked', type: 'button', 'data-nav': true, 'aria-disabled': 'true',
-          'aria-label': `Slot ${num}, locked`,
-        }, [
+        // Plain element without data-nav: never focused, hovered into or tabbed to.
+        slot = el('div', { class: 'slot is-locked', role: 'img', 'aria-label': `Slot ${num}, locked` }, [
           el('span', { class: 'slot-num', text: num }),
           el('span', { class: 'slot-art', html: ICONS.silhouette }),
           el('span', { class: 'slot-lock', html: ICONS.lock }),
@@ -53,8 +54,6 @@ export class CharacterSelectScreen extends Screen {
       slot._def = def;
       this.slots.push(slot);
       this.grid.append(el('div', { class: 'slot-cell', role: 'listitem' }, [slot]));
-      slot.addEventListener('focus', () => this.preview(slot));
-      slot.addEventListener('click', (e) => this.activate(slot, e));
     }
 
     // ---- Preview panel ----------------------------------------------------
@@ -129,12 +128,6 @@ export class CharacterSelectScreen extends Screen {
   }
 
   activate(slot, e) {
-    if (!slot._def?.available) {
-      slot.classList.remove('is-denied');
-      void slot.offsetWidth;
-      slot.classList.add('is-denied');
-      return;
-    }
     // Keyboard/gamepad activation confirms immediately; pointer selects first
     // and confirms on a second press.
     const wasSelected = this.selectedId === slot._def.id;
@@ -172,7 +165,7 @@ export class CharacterSelectScreen extends Screen {
   updateConfirm() {
     const def = getCharacter(this.selectedId);
     this.confirmBtn.disabled = !def;
-    this.confirmBtn.textContent = def ? `Confirm ${def.displayName}` : 'Select a fighter';
+    this.confirmBtn.textContent = def ? 'Confirm fighter' : 'Select a fighter';
   }
 
   confirm() {
