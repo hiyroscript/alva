@@ -121,6 +121,7 @@ and progress; it does not fill every card, border or heading.
   900-weight display text in the interface.
 - Headings and buttons in title case ("Select Fighter", "Start Battle");
   small metadata labels in tracked monospace capitals.
+- The Select Stage action "Confirm and start battle" is intentionally sentence case.
 
 ### 5.5 Motion
 
@@ -254,7 +255,7 @@ no header, build label, eyebrow or keyboard hint bar.
 - Cards show thumbnail, stage name and tagline, with no stage-number label.
   The selected card keeps its Selected badge but no green outline; focus uses
   the standard neutral focus ring.
-- "Confirm stage and Start Battle" primary action (same label for every
+- "Confirm and start battle" primary action (same label for every
   stage). No bottom control hints.
 
 ### 6.6 Help & Credits
