@@ -1,219 +1,410 @@
-Work in the hiyroscript/alva repository on the current main branch.
+Implement a new startup splash sequence for the Alva browser game in the hiyroscript/alva repository.
 
-Task
+Before editing anything, inspect the existing implementation, especially:
 
-Fix the visual bug where a white/light rectangular outline appears around the credits text area when the player interacts with or scrolls the credits.
+* index.html
+* styles.css
+* js/config.js
+* js/core/app.js
+* js/core/asset-loader.js
+* js/core/screen-manager.js
+* js/screens/splash-screen.js
+* js/screens/home-screen.js
+* ALVA_SPEC.md
 
-The fix should be surgical. Remove the unwanted outline without changing the credits design, scrolling behavior, controls, automatic credits roll, accessibility semantics, or the rest of ALVA’s UI.
+This project is plain HTML, CSS, and vanilla JavaScript ES modules. Do not add frameworks, npm packages, build tooling, or dependencies.
 
-Relevant architecture and current behavior
+Goal
 
-ALVA is a vanilla HTML/CSS/JavaScript game with no UI framework. The page itself does not scroll; individual game screens and panels manage their own scrolling/interactions.
+Replace the current text-only "a game by hiyroscript" startup splash with a polished two-image splash animation.
 
-The primary affected credits implementation is the animated credits column on the Home screen.
+The required startup flow is:
 
-Relevant files:
+Blank black screen while both splash images preload and decode → hs.jpg animation → short black transition → alvafav.PNG animation → Home screen
 
-js/screens/home-screen.js
+Both image files already exist at the repository root:
 
-The Home screen creates a focusable credits viewport:
+* ./hs.jpg
+* ./alvafav.PNG
 
-this.creditsViewport = el('div', {
-  class: 'home-credits-col', tabindex: 0, role: 'region',
-  'aria-label': 'Credits. Scroll or use arrow and Page keys to read.',
-}, [this.rollTrack]);
+Important: the existing file is named exactly alvafav.PNG. Do not reference altafav.PNG, rename the asset, duplicate it, or introduce a new image file.
 
-The credits support several manual interaction methods:
+Critical preload requirement
 
-* wheel/trackpad scrolling
-* pointer/touch dragging
-* Arrow Up / Arrow Down
-* Page Up / Page Down
-* Space / Shift+Space
+The splash animation MUST NOT begin until BOTH ./hs.jpg and ./alvafav.PNG are fully loaded and decoded.
 
-The pointer-down handler explicitly focuses the credits viewport:
+Immediately when the game opens:
 
-this.creditsViewport.focus({ preventScroll: true });
+* Show only a completely black screen.
+* Do not show hs.jpg.
+* Do not show alvafav.PNG.
+* Do not show the Home screen underneath.
+* Do not briefly show the old splash text.
+* Do not show broken-image placeholders.
+* Do not display a loading spinner, loading percentage, ALVA wordmark, or other loading UI.
+* Avoid flashes of white or other backgrounds.
+* The user should simply see black while the two images load invisibly in the background.
 
-Do not remove this keyboard accessibility or the existing manual scrolling behavior merely to hide the visual bug.
+Use Alva’s existing AssetLoader rather than introducing an unrelated image-loading implementation. AssetLoader.loadImage() already waits for the image load event and attempts img.decode(), so integrate the two splash assets into that existing architecture.
 
-The credits are not natively scrolling vertically on Home. Their position is driven through rollOffset and:
+The splash may be entered immediately as it is now, but its visible sequence must wait for something equivalent to:
 
-this.rollTrack.style.transform = `translate3d(0, ${-this.rollOffset}px, 0)`;
+Promise.all([app.assets.loadImage('./hs.jpg'), app.assets.loadImage('./alvafav.PNG')])
 
-Automatic movement resumes after player inactivity, and reduced-motion mode uses the same input system while remaining manual-only. Preserve all of this.
+Do not begin any animation when only one image has finished.
 
-Primary root cause to investigate
+If an asset fails to load, do not run a partial sequence with only one image. Handle the error cleanly, log a useful error, and avoid hanging with a broken image visible.
 
-In styles.css, the Home credits viewport currently contains this focus styling:
+The existing fighter preload that starts from App.start() may continue simultaneously in the background. The splash does NOT need to wait for fighter sprites; its loading gate concerns these two splash images only.
 
-.home-credits-col:focus-visible {
-  outline: 2px solid var(--text);
-  outline-offset: -6px;
-}
+Splash image 1: hs.jpg
 
---text is a very light/off-white color, so when the credits viewport becomes :focus-visible, the player sees a large light rectangular box surrounding the credits area.
+Once BOTH splash assets are ready, begin the first animation.
 
-This appears to be the main source of the reported white outline.
+Render hs.jpg:
 
-Confirm the behavior in the running game before changing it, but treat this selector as the primary suspect.
+* exactly centered horizontally and vertically
+* above a pure black #000 background
+* maintaining its natural aspect ratio
+* never stretched or distorted
+* never cropped unintentionally
+* responsive on desktop, tablets, and phones
+* constrained so it fits comfortably within the viewport
 
-Secondary place to inspect
+The image should begin invisible and slightly smaller than its normal presentation size.
 
-The standalone Help & Credits screen is implemented in:
+Then animate it with BOTH opacity and scale.
 
-js/screens/help-credits-screen.js
+The visual feeling should be cinematic and restrained:
 
-Its Help and Credits tab panels are also focusable:
+1. Fade smoothly from opacity 0 to 1.
+2. At the same time, begin slowly scaling upward.
+3. Continue scaling very gradually while the image is fully visible.
+4. After holding visibly for a short period, fade it smoothly back to opacity 0.
+5. Continue the slow scale increase during the fade-out, so it feels as though the image is slowly moving forward toward the viewer and passing through the screen.
 
-tabindex: '0'
+Do NOT make it bounce, snap, overshoot, rotate, slide, blur heavily, or use flashy effects.
 
-and styles.css currently includes:
+Use smooth easing.
 
-.tab-panel:focus {
-  outline: none;
-}
-.tab-panel:focus-visible {
-  box-shadow: inset 0 0 0 2px var(--border-strong);
-  border-radius: var(--radius-md);
-}
+A good target animation is approximately:
 
-This produces another light rectangular focus treatment around a scrollable text panel.
+* fade in: 800–1000ms
+* visible/slow-zoom hold: 1400–1800ms
+* fade out: 700–900ms
+* initial scale: approximately 0.86–0.90
+* scale around fully visible state: approximately 1.00
+* final scale at the end of fade-out: approximately 1.12–1.18
 
-Check whether the same reported visual artifact occurs when scrolling the Credits tab. If it does, fix that instance as part of the same change.
+The scaling should be continuous rather than restarting between phases.
 
-Do not indiscriminately remove focus styles from every component in ALVA. Buttons, tabs, menu entries, character selection, map selection, and other genuinely interactive controls should retain their existing focus treatment.
+The exact values may be adjusted slightly if required to make the existing images look better, but preserve the effect: fade in + slow forward zoom + hold + fade out while continuing forward.
 
-Required result
+Transition between the images
 
-When a player scrolls, drags, or otherwise interacts with the Home credits, there must no longer be a white/light rectangular outline surrounding the credits text/viewport.
+After hs.jpg has completely faded out:
 
-The credits should continue to look like plain text floating inside the angled glass strip. Do not introduce a new card, box, border, panel, background, or rectangular frame around them.
+* leave the screen fully black for a very short beat, approximately 150–300ms
+* make absolutely certain the first image is visually gone
+* then begin the second image
 
-Keep the existing:
+Do not crossfade the two images directly over one another. There should be a clean moment of black separating them.
 
-* angled glass treatment
-* clipping and masks
-* stable green slash
-* typography
-* credit spacing
-* seamless looping roll
-* manual scroll position
-* automatic resume behavior
+Splash image 2: alvafav.PNG
+
+Then perform the same sequence with:
+
+./alvafav.PNG
+
+It must:
+
+* appear centered on the screen
+* preserve its natural aspect ratio
+* start at opacity 0
+* fade in smoothly
+* slowly grow toward the viewer
+* remain visible for a short period while continuing its subtle zoom
+* fade back to black
+* continue becoming slightly larger during the fade-out
+
+Use the same animation character and approximately the same timing as hs.jpg.
+
+Do not stretch the favicon-style image to match the dimensions of hs.jpg. They can use the same animation logic while retaining an appropriate visual size for each image.
+
+The image container/layout should therefore be responsive, while each actual <img> preserves its own proportions.
+
+Transition to Home
+
+Only after alvafav.PNG has completely finished fading out should the game navigate to the existing Home screen.
+
+Preserve the existing architecture:
+
+SplashScreen -> this.app.screens.go('home', {}, { reset: true })
+
+The final transition should feel seamless:
+
+1. alvafav.PNG reaches opacity 0.
+2. Splash is pure black again.
+3. Brief black beat if needed, around 150–250ms.
+4. Navigate to Home.
+5. Let the existing Home entrance animation/fade handle the reveal.
+
+The existing Home screen currently fades in using .screen--home.is-entering; preserve that behavior rather than duplicating Home animation logic inside SplashScreen.
+
+Also preserve the technique whereby the splash can stay mounted underneath Home during the Home dissolve if useful. The current SplashScreen.leaveMs and .screen--splash.is-leaving behavior already exist for this purpose.
+
+There must never be a frame where another menu screen appears between the splash and Home.
+
+Splash DOM structure
+
+Refactor SplashScreen away from its current text-only <p class="splash-credit">.
+
+A reasonable structure is one centered splash stage containing the two images, for example conceptually:
+
+screen--splash
+→ splash-stage
+→ image for hs.jpg
+→ image for alvafav.PNG
+
+Only one image may be visible at a time.
+
+It is also acceptable to reuse one <img> element and swap its loaded source between the already-decoded image assets if that produces cleaner state management. Whichever approach is used:
+
+* there must be no additional network request that delays the sequence
+* the already-loaded images should be used
+* no innerHTML string containing untrusted data
+* no duplicate timers/listeners after lifecycle changes
+
+JavaScript implementation requirements
+
+Keep the state machine deterministic and easy to read.
+
+Update js/screens/splash-screen.js rather than placing startup animation logic in main.js.
+
+The splash should have clearly defined phases such as:
+
+loading
+→ hs-in
+→ hs-hold
+→ hs-out
+→ gap
+→ alva-in
+→ alva-hold
+→ alva-out
+→ finish
+
+You do not have to literally use those strings, but the code should have equally clear sequencing.
+
+Avoid a fragile pile of unrelated setTimeout() calls.
+
+A small async sequence with a reusable delay/helper or CSS animationend/transitionend synchronization is preferable, as long as:
+
+* it cleans up correctly
+* it cannot call finish() twice
+* leaving the splash prevents stale asynchronous work from navigating later
+* restarting/re-entering does not create duplicate sequences
+* listeners are removed
+* timers are cleared
+* rejected/failed asset loads are handled
+
+If using timers, centralize them and continue using lifecycle cleanup comparable to the existing clear() implementation.
+
+Do not introduce a second requestAnimationFrame game loop. Alva already owns one in App.
+
+Input behavior
+
+The loading gate is absolute.
+
+Keyboard, pointer, touch, or gamepad input while the two images are still loading must NOT:
+
+* begin the sequence early
+* reveal one of the images
+* jump to Home before the required images are ready
+
+The current splash contains key/pointer skip behavior designed for the old text intro. Remove or adapt that behavior so it cannot interfere with this new branded startup sequence.
+
+For this implementation, the two-image sequence should normally play completely once loading has finished rather than being accidentally dismissed by the same pointer/tap that launched or focused the game.
+
+Do not allow repeated user input to produce duplicate navigation to Home.
+
+CSS requirements
+
+Modify the Splash section of styles.css.
+
+Keep:
+
+html:not([data-screen]), html[data-screen="splash"] { background: #000; }
+
+or equivalent behavior so the browser is black from the earliest possible frame.
+
+The splash section itself must remain pure black.
+
+Center the splash stage with CSS rather than calculating screen coordinates in JavaScript.
+
+Images should use properties conceptually equivalent to:
+
+* absolute positioning or a centered grid/flex stage
+* object-fit: contain
+* max-width
+* max-height
+* opacity initially 0
+* transform-origin: center center
+* GPU-friendly transform: scale(...)
+* will-change: transform, opacity only while appropriate
+
+Do not animate layout properties such as width, height, top, or left every frame. Animate transform and opacity.
+
+Avoid oversized shadows, glowing borders, text, frames, glass effects, or green UI decoration around the splash artwork. This startup should remain minimal: image on black.
+
+Ensure safe areas and unusual aspect ratios do not clip the image.
+
+Reduced-motion accessibility
+
+Preserve Alva’s existing prefers-reduced-motion support.
+
+When reduced motion is enabled:
+
+* do not perform the continuous zoom animation
+* avoid long fades
+* show hs.jpg centered for a short readable hold
+* return to black
+* show alvafav.PNG centered for a short readable hold
+* return to black
+* continue to Home
+
+The preload gate still applies exactly the same way.
+
+Do not use the global reduced-motion CSS rule in a way that accidentally breaks the sequence’s JavaScript timing. Make the reduced-motion timing explicit in SplashScreen if necessary.
+
+Other startup overlays
+
+During the splash/loading phase, the intended visual result is black followed only by the two splash images.
+
+Do not allow normal app chrome or loading UI to appear over the sequence.
+
+If Alva’s device/rotate overlay would otherwise appear over the splash on a portrait touch device, suppress that overlay specifically while html[data-screen="splash"] is active and allow its normal behavior again once Home/game navigation begins.
+
+Do not permanently change the device-orientation behavior elsewhere in the game.
+
+Configuration
+
+Use CONFIG.splash in js/config.js for the sequence timing rather than scattering magic timing numbers throughout the splash implementation.
+
+Refactor the current old-text values as needed.
+
+For example, keep configurable values for concepts such as:
+
+* fade-in duration
+* hold duration
+* fade-out duration
+* between-image gap
+* final black hold
+* reduced-motion hold
+
+Scale values may be CSS custom properties or configuration values, whichever fits the existing project style better.
+
+Keep the configuration understandable.
+
+Do not change unrelated game behavior
+
+Do not redesign or rewrite:
+
+* Home
+* Mode Select
+* Character Select
+* Map Select
+* Battle
+* credits roll
+* fighter asset loading
+* sprite normalization
+* input systems
+* stage art
+* game physics
+* combat
+* favicon behavior
+
+alvafav.PNG must remain usable as the browser favicon through the existing relative reference in index.html.
+
+Do not alter the actual contents of hs.jpg or alvafav.PNG.
+
+Do not convert, resize, recompress, redraw, or AI-generate either image.
+
+All asset URLs must remain relative because Alva is deployed on GitHub Pages under a repository subpath.
+
+Use:
+
+./hs.jpg
+
+and:
+
+./alvafav.PNG
+
+Never use /hs.jpg or /alvafav.PNG.
+
+Documentation
+
+Update the Splash section of ALVA_SPEC.md because its current specification still describes the old "a game by hiyroscript" text animation.
+
+The revised specification should document:
+
+* blank black preload state
+* both images being fully loaded/decoded before animation starts
+* hs.jpg appearing first
+* fade + slow forward zoom
+* fade to black
+* alvafav.PNG appearing second with the same treatment
+* fade back to black
+* transition to Home
 * reduced-motion behavior
-* touch dragging
-* wheel/trackpad support
-* keyboard scrolling
-* ARIA role and label
-* responsive positioning
 
-Do not change the actual credits content in js/ui/help-content.js.
+Remove contradictory requirements saying the splash contains only "a game by hiyroscript" or that no logo/image animation is permitted.
 
-Accessibility constraint
+Do not change unrelated sections of the product specification.
 
-Do not solve this by globally disabling focus outlines.
+Verification
 
-In particular, do not add rules such as:
+After implementation, run the project through a local HTTP server because Alva uses ES modules and cannot be properly tested through file://.
 
-*:focus {
-  outline: none;
-}
+Verify all of the following:
 
-and do not alter the shared focus styles used by buttons or navigation controls.
+1. On a cold load, the first visible frame is black.
+2. If network loading is artificially slowed, the screen stays black until BOTH splash assets are ready.
+3. Neither image appears partially loaded.
+4. hs.jpg is first.
+5. hs.jpg is centered and maintains its aspect ratio.
+6. It fades in and slowly scales larger.
+7. It continues scaling subtly while visible.
+8. It fades completely to black.
+9. There is a short clean black separation.
+10. alvafav.PNG then performs the same sequence.
+11. The two images never overlap visibly.
+12. Home does not initialize visually before the second image is finished.
+13. Home fades in cleanly after the final black frame.
+14. No white flash occurs before, during, or after the splash.
+15. Refreshing repeatedly does not produce duplicate timers or navigation.
+16. Input during the preload does not bypass the asset gate.
+17. Asset paths work from a GitHub Pages-style subdirectory.
+18. The splash remains responsive at desktop, phone-landscape, tablet, ultrawide, and short-landscape dimensions.
+19. Reduced-motion mode removes the continuous zoom while retaining the two-step image sequence.
+20. No unrelated menu/game behavior changes.
+21. No new console errors are introduced.
 
-The credits region must remain keyboard-focusable because it accepts Arrow/Page/Space scrolling commands.
+Final result
 
-The goal is specifically to eliminate the large white rectangular visual frame around the credits.
+Opening Alva should feel like this:
 
-If a focus indication still needs to be present for keyboard accessibility, use an ALVA-appropriate treatment that does not surround the credit text with a white rectangle. Prefer something extremely restrained and non-disruptive, such as an accent-based cue that integrates with the existing Home glass/green-slash design.
+Black.
 
-Do not add a visible treatment during ordinary mouse, touch, trackpad, or drag interaction.
+Nothing appears while hs.jpg and alvafav.PNG quietly load and decode in the background.
 
-If the existing :focus-visible behavior can be adjusted cleanly with CSS alone, prefer that over introducing new JavaScript modality tracking.
+Once both are completely ready, hs.jpg gently emerges in the exact center of the screen. It slowly grows toward the viewer while becoming fully visible, remains present briefly, then keeps drifting forward as it disappears back into black.
 
-Implementation preference
+A brief moment of black follows.
 
-Start with the smallest possible fix.
+Then alvafav.PNG emerges from the center with the same slow forward motion, remains visible briefly, continues enlarging subtly, and fades completely away.
 
-For the Home credits, inspect .home-credits-col:focus-visible first. If that rule alone accounts for the artifact, make the change there rather than altering the credits scrolling implementation.
+The screen returns to black for a short beat.
 
-Only modify js/screens/home-screen.js if CSS cannot correctly distinguish the desired interaction behavior.
+Then the existing Alva Home screen fades in normally.
 
-For the Help & Credits .tab-panel, only change its focus treatment if you can reproduce the same unwanted light box there. Do not change tab button focus styles such as .tab:focus; those are navigation controls and are intentionally visible.
-
-Keep selectors scoped to the affected scrolling regions.
-
-Do not change
-
-Do not modify unrelated gameplay or UI systems.
-
-Specifically avoid changes to:
-
-js/game/*
-
-character movement or combat
-
-stage rendering
-
-Home credits scroll speed (ROLL_SPEED)
-
-credits resume delay (CREDITS_RESUME_DELAY)
-
-credit text/data in js/ui/help-content.js
-
-Home layout geometry
-
-glass-strip angle
-
-clip paths or masks
-
-green accent slash
-
-screen transitions
-
-global menu navigation
-
-global focus-ring variables unless absolutely necessary
-
-Validation
-
-Test the final implementation with all supported credits interactions.
-
-On the Home screen:
-
-1. Hover over the credits and use a mouse wheel.
-2. Use a trackpad to scroll.
-3. Click/press and drag the credits vertically.
-4. Release after dragging and confirm automatic rolling resumes after the existing delay.
-5. Focus the credits using the keyboard and use Arrow Up/Down.
-6. Test Page Up and Page Down.
-7. Test Space and Shift+Space.
-8. Confirm none of those actions creates the unwanted white/light rectangular frame.
-9. Confirm the browser/page itself does not begin scrolling.
-10. Confirm Play and normal menu navigation still receive their existing focus appearance.
-
-Also test prefers-reduced-motion: reduce. The credits should remain manual-only as before and should not regain the unwanted outline.
-
-If the Help & Credits screen can be reached during development, open the Credits tab and scroll it with the mouse/touch and keyboard. If its .tab-panel:focus-visible treatment creates the same unwanted rectangular frame, remove or redesign that treatment without affecting the tab buttons themselves.
-
-Check both a normal desktop viewport and a short landscape/mobile-sized viewport so the fix does not interfere with clipping or responsive credits positioning.
-
-Acceptance criteria
-
-The change is complete when:
-
-* No white/light rectangular outline appears around the Home credits while scrolling or dragging.
-* No unwanted white/light rectangular outline appears around Credits text in the Help & Credits screen, if that screen reproduces the issue.
-* The credits remain keyboard accessible.
-* Arrow/Page/Space scrolling continues working.
-* Wheel/trackpad scrolling continues working.
-* Pointer/touch dragging continues working.
-* Automatic Home credits movement still pauses and resumes exactly as before.
-* Reduced-motion behavior remains unchanged.
-* There is no page-level scrolling.
-* There are no changes to credits content, typography, glass geometry, clipping, or the green slash.
-* Existing focus indication on real buttons/menu controls remains unchanged.
-* No global outline: none workaround is introduced.
-* The implementation is narrowly scoped and contains no unrelated refactoring.
-
-After making the change, summarize exactly which selectors/files were modified and explain briefly why the old focus treatment caused the visible white outline.
+Keep the effect smooth, minimal, polished, and integrated with the architecture that is already in the repository.
