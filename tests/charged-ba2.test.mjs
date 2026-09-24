@@ -353,13 +353,13 @@ test('the Sphere Rush data: 1050 dash, 4 + 16 = 20 damage, 2.0 s delay, no Energ
   assert.equal(box.x, -box.w / 2);
   assert.equal(box.y, -box.h / 2);
   assert.deepEqual(TECH.targetOffset, { x: 0, y: -48 });
-  // Normal BA2 keeps its own data (its launch is its own Vertical Knockback
-  // Power, not the explosion's knockback).
+  // Normal BA2 keeps its own data (its launch is its own High vertical
+  // Knockback, not the explosion's knockback).
   assert.deepEqual(
     { ...def.attacks.ba2 },
     {
       animation: 'ba2', startup: 3 / 12, active: 2 / 12, recovery: 2 / 12, damage: 8,
-      hitbox: { x: 10, y: -88, w: 24, h: 78 }, powers: { verticalKnockback: 2 },
+      hitbox: { x: 10, y: -88, w: 24, h: 78 }, knockback: { axis: 'vertical', level: 'high' },
       hitstun: 0.24, blockstun: 0.15, hitstop: 0.07, cooldown: 0.15, groundOnly: true,
     },
   );
@@ -1146,7 +1146,7 @@ test('Charged BA1 is still the 25 Energy Clone Attack and keeps #0001 charging; 
   assert.equal(d.attacker.combat.energy, 75);
 });
 
-test('normal BA2 is unchanged outside Charge: 2ba1-2ba7 for 8 on the ground, midair2ba1-3 in the air, no sphere', () => {
+test('normal BA2 is unchanged outside Charge: 2ba1-2ba7 for 8 on the ground, midair1ba1-5 in the air, no sphere', () => {
   const ground = duel();
   ground.tick(BA2);
   const frames = [];
@@ -1168,7 +1168,7 @@ test('normal BA2 is unchanged outside Charge: 2ba1-2ba7 for 8 on the ground, mid
     airFrames.push(frameName(air.attacker));
     air.tick();
   }
-  assert.deepEqual(order(airFrames), ['0001_midair2ba1.png', '0001_midair2ba2.png', '0001_midair2ba3.png']);
+  assert.deepEqual(order(airFrames), Array.from({ length: 5 }, (_, i) => `0001_midair1ba${i + 1}.png`));
   assert.equal(air.attacker.technique, null);
 });
 

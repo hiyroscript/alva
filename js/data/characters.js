@@ -2,9 +2,11 @@
 //
 // Adding a fighter (e.g. #0002) should only require:
 //   1. dropping frames into ./assets/characters/<id>/
-//   2. adding a definition to CHARACTERS below, including its fighter Power
-//      tiers (`powers`) and each attack's knockback Power tiers (the attack's
-//      own `powers`); see js/data/powers.js
+//   2. adding a definition to CHARACTERS below, including its Power tiers
+//      (`powers`, see js/data/powers.js) and each attack's Knockback: an axis
+//      and a Low / Mid / High level, e.g. `knockback: { axis: 'horizontal',
+//      level: 'low' }`, or `{ axis: 'vertical', level: 'mid', sign: -1 }` to
+//      drive the opponent downward (see js/data/knockback.js)
 //   3. giving it a rosterSlot
 //
 // Every field the engine reads lives here; nothing about #0001 is hard-coded
@@ -113,6 +115,8 @@ export const CHARACTERS = [
       },
       // Basic Attack 1 (BA1), ground and mid-air. Each plays once; the attack
       // definitions below time startup / active / recovery to these frames.
+      // Mid-air BA1 is the three-frame kunai slash drawn as midair2ba1-3 (the
+      // file names predate the move's place on BA1).
       ba1: {
         frames: frames(BASE_0001, '1ba', 4),
         fps: BA1_FPS,
@@ -120,12 +124,13 @@ export const CHARACTERS = [
         heightRatio: 1.04,
       },
       midairBa1: {
-        frames: frames(BASE_0001, 'midair1ba', 5),
+        frames: frames(BASE_0001, 'midair2ba', 3),
         fps: BA1_FPS,
         loop: false,
-        heightRatio: 1.08,
+        heightRatio: 1.29,
       },
       // Basic Attack 2 (BA2), ground and mid-air. Played once, like BA1.
+      // Mid-air BA2 is the five-frame airborne kick drawn as midair1ba1-5.
       ba2: {
         frames: frames(BASE_0001, '2ba', 7),
         fps: BA2_FPS,
@@ -133,10 +138,10 @@ export const CHARACTERS = [
         heightRatio: 1.02,
       },
       midairBa2: {
-        frames: frames(BASE_0001, 'midair2ba', 3),
+        frames: frames(BASE_0001, 'midair1ba', 5),
         fps: BA2_FPS,
         loop: false,
-        heightRatio: 1.29,
+        heightRatio: 1.08,
       },
       // Charge: one logical fighter state drawn as two clips. The startup
       // (charge1, charge2) plays once when Charge begins; the sustained loop
@@ -322,11 +327,11 @@ export const CHARACTERS = [
       portrait: { animation: 'idle', frame: 0, centerY: 0.24, size: 0.5 },
     },
 
-    // Fighter Powers, each owned at one tier. The tier tables in
-    // js/data/powers.js turn these into gameplay values: Jump Power 2 is the
-    // normal jump and Speed Power 2 the normal top speed, the only sources of
-    // this fighter's jump strength and movement speed. (Attack Powers belong
-    // to each attack below, not here.)
+    // Powers, each owned at one tier. The tier tables in js/data/powers.js
+    // turn these into gameplay values: Jump Power 2 is the normal jump and
+    // Speed Power 2 the normal top speed, the only sources of this fighter's
+    // jump strength and movement speed. (Knockback is not a Power: it belongs
+    // to each attack below.)
     powers: {
       jump: 2,
       speed: 2,
@@ -494,11 +499,11 @@ export const CHARACTERS = [
     // (createAttackDefinition). Phases are whole frames of the attack's clip,
     // so the hitbox is live only while the strike is on screen. Hitboxes face
     // right from the fighter's origin (bottom-centre) and mirror with facing.
-    // Knockback comes from each attack's own Powers (js/data/powers.js): ground
-    // BA1 pushes sideways (Horizontal Knockback Power 2); mid-air BA1 pushes
-    // sideways the same and drives the target downward (Vertical Knockback
-    // Power -2); ground BA2 launches upward (Vertical Knockback Power 2) and
-    // mid-air BA2 launches upward more lightly (Vertical Knockback Power 1).
+    // Each attack's `knockback` is an axis and a Low / Mid / High level
+    // (js/data/knockback.js): ground BA1 pushes sideways (Low horizontal),
+    // mid-air BA1 drives the target downward (Mid vertical, reversed), ground
+    // BA2 launches it upward hard (High vertical) and mid-air BA2 launches it
+    // upward lightly (Low vertical).
     attacks: {
       // Frame 1 wind-up, frame 2 punch, frames 3-4 recovery.
       ba1: {
@@ -508,28 +513,30 @@ export const CHARACTERS = [
         recovery: 2 / BA1_FPS,
         damage: 6,
         hitbox: { x: 12, y: -64, w: 28, h: 16 },
-        powers: { horizontalKnockback: 2 },
+        knockback: { axis: 'horizontal', level: 'low' },
         hitstun: 0.22,
         blockstun: 0.14,
         hitstop: 0.06,
         cooldown: 0.1,
         groundOnly: true,
       },
-      // Frames 1-2 wind-up, frame 3 kick (the forward-low arc), frames 4-5
-      // recovery. Chosen only by action1's `air` branch. Pushes sideways like
-      // ground BA1 and, unlike it, drives the target downward.
+      // Frames 1-2 wind-up (kunai drawn back, then overhead), frame 3 the
+      // downward kunai slash. The clip has no recovery frame, so the attack
+      // ends with it; the longer cooldown makes up for the missing recovery.
+      // The hitbox covers the slash arc in front of the fighter, and it
+      // drives the target downward. Chosen only by action1's `air` branch.
       midairBa1: {
         animation: 'midairBa1',
         startup: 2 / BA1_FPS,
         active: 1 / BA1_FPS,
-        recovery: 2 / BA1_FPS,
-        damage: 6,
-        hitbox: { x: 8, y: -44, w: 40, h: 40 },
-        powers: { horizontalKnockback: 2, verticalKnockback: -2 },
-        hitstun: 0.22,
-        blockstun: 0.14,
-        hitstop: 0.06,
-        cooldown: 0.1,
+        recovery: 0,
+        damage: 8,
+        hitbox: { x: 14, y: -100, w: 22, h: 80 },
+        knockback: { axis: 'vertical', level: 'mid', sign: -1 },
+        hitstun: 0.24,
+        blockstun: 0.15,
+        hitstop: 0.07,
+        cooldown: 0.18,
       },
       // Frames 1-3 wind-up (step in, lead jab, spin), frames 4-5 the kick
       // (low sweep rising into a high kick, both drawn with motion trails),
@@ -544,31 +551,28 @@ export const CHARACTERS = [
         recovery: 2 / BA2_FPS,
         damage: 8,
         hitbox: { x: 10, y: -88, w: 24, h: 78 },
-        powers: { verticalKnockback: 2 },
+        knockback: { axis: 'vertical', level: 'high' },
         hitstun: 0.24,
         blockstun: 0.15,
         hitstop: 0.07,
         cooldown: 0.15,
         groundOnly: true,
       },
-      // Frames 1-2 wind-up (kunai drawn back, then overhead), frame 3 the
-      // downward kunai slash. The clip has no recovery frame, so the attack
-      // ends with it; the longer cooldown stops it being repeated faster than
-      // ground BA2. The hitbox covers the slash arc in front of the fighter,
-      // and it launches upward like ground BA2, only more lightly. Chosen only
-      // by action2's `air` branch.
+      // Frames 1-2 wind-up, frame 3 kick (the forward-low arc), frames 4-5
+      // recovery. Launches the target upward, lightly. Chosen only by
+      // action2's `air` branch.
       midairBa2: {
         animation: 'midairBa2',
         startup: 2 / BA2_FPS,
         active: 1 / BA2_FPS,
-        recovery: 0,
-        damage: 8,
-        hitbox: { x: 14, y: -100, w: 22, h: 80 },
-        powers: { verticalKnockback: 1 },
-        hitstun: 0.24,
-        blockstun: 0.15,
-        hitstop: 0.07,
-        cooldown: 0.18,
+        recovery: 2 / BA2_FPS,
+        damage: 6,
+        hitbox: { x: 8, y: -44, w: 40, h: 40 },
+        knockback: { axis: 'vertical', level: 'low' },
+        hitstun: 0.22,
+        blockstun: 0.14,
+        hitstop: 0.06,
+        cooldown: 0.1,
       },
       // Frame 1 wind-up, frame 2 release, frame 3 follow-through. No melee
       // hitbox: the damage is the shuriken's, released once, as the attack

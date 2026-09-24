@@ -16,7 +16,7 @@ import { characterFramePaths } from '../js/data/characters.js';
 import { getMap } from '../js/data/maps.js';
 import { Fighter } from '../js/game/character.js';
 import { CombatState } from '../js/game/combat.js';
-import { getHorizontalKnockback } from '../js/data/powers.js';
+import { KNOCKBACK_LEVELS } from '../js/data/knockback.js';
 import { Clone } from '../js/game/clone.js';
 import { SpriteSet } from '../js/game/sprite-normalizer.js';
 import { TrainingAIController } from '../js/game/fighter-controller.js';
@@ -167,19 +167,19 @@ test('the Clone Attack is data: a 25 Energy Charged BA1 summon reusing ba1 and t
   assert.equal(SUMMON.effectOffset.x, 0);
   assert.ok(SUMMON.effectOffset.y < 0, 'the cloud centres on the body, above the feet');
   assert.equal(def.stats.energy / SUMMON.energyCost, 4, 'a full meter pays for four');
-  // BA1 itself is unchanged: its knockback is its Horizontal Knockback
-  // Power 2, and the summon has no knockback tuning of its own.
+  // BA1 itself: its knockback is its Low horizontal Knockback, and the
+  // summon has no knockback tuning of its own.
   assert.deepEqual(
     { ...ATTACK },
     {
       animation: 'ba1', startup: 1 / 12, active: 1 / 12, recovery: 2 / 12, damage: 6,
-      hitbox: { x: 12, y: -64, w: 28, h: 16 }, powers: { horizontalKnockback: 2 },
+      hitbox: { x: 12, y: -64, w: 28, h: 16 }, knockback: { axis: 'horizontal', level: 'low' },
       hitstun: 0.22, blockstun: 0.14, hitstop: 0.06, cooldown: 0.1, groundOnly: true,
     },
   );
   for (const key of ['knockback', 'powers']) assert.equal(key in SUMMON, false, `no summon ${key}`);
-  assert.doesNotMatch(readFileSync(ROOT + 'js/game/clone.js', 'utf8'), /powers\.js|Knockback/,
-    'the clone performs the owner\'s resolved attack; it never reads Power tiers');
+  assert.doesNotMatch(readFileSync(ROOT + 'js/game/clone.js', 'utf8'), /knockback\.js|resolveKnockback|KNOCKBACK_LEVELS|powers\.js/,
+    'the clone performs the owner\'s resolved attack; it never resolves Knockback itself');
   assert.deepEqual(def.actions.action1, { ground: 'ba1', air: 'midairBa1' });
   // No new control: the summon has no action, key or attack of its own.
   assert.equal(def.actions.clone, undefined);
@@ -615,11 +615,11 @@ test('stage edges clamp where the clone appears, without moving it afterwards', 
 test('the clone BA1 hits once with BA1\'s damage, stun and knockback from the clone, credited to the owner', () => {
   const d = duel();
   const clone = summon(d);
-  // The owner's own resolved BA1: Horizontal Knockback Power 2 is already
-  // its numeric knockback, so the clone resolves no Power itself.
+  // The owner's own resolved BA1: its Low horizontal Knockback is already
+  // numeric, so the clone resolves nothing itself.
   assert.equal(clone.attackDef, d.attacker.attacks.ba1);
-  assert.deepEqual(clone.attackDef.knockback, { x: getHorizontalKnockback(ATTACK), y: 0 });
-  assert.deepEqual(clone.attackDef.knockback, { x: 180, y: 0 });
+  assert.deepEqual(clone.attackDef.knockback, { x: KNOCKBACK_LEVELS.low.horizontal, y: 0 });
+  assert.deepEqual(clone.attackDef.knockback, { x: 140, y: 0 });
   d.until(() => d.events.length > 0);
   assert.equal(d.events.length, 1);
   const [e] = d.events;
@@ -635,7 +635,7 @@ test('the clone BA1 hits once with BA1\'s damage, stun and knockback from the cl
   // Knockback along the clone's facing (left, away from the clone), even
   // though the owner faces right.
   assert.equal(d.attacker.facing, 1);
-  assert.equal(d.target.body.vx, -180);
+  assert.equal(d.target.body.vx, -140);
   assert.equal(clone.hasHit, true);
   assert.equal(clone.attackPhase, 'active');
   assert.equal(clone.hitbox(), null, 'used up');
@@ -752,7 +752,7 @@ test('Block (future fighters): a guard facing away does not block the clone; tur
   assert.equal(e.attacker, front.attacker);
   assert.equal(e.damage, ATTACK.damage * front.target.combat.blockDamageScale, 'chip damage');
   assert.equal(front.target.combat.stun, ATTACK.blockstun);
-  assert.equal(front.target.body.vx, 0.5 * 180 * clone.facing, 'half knockback, from the clone');
+  assert.equal(front.target.body.vx, 0.5 * 140 * clone.facing, 'half knockback, from the clone');
   assert.equal(clone.hitstop, ATTACK.hitstop, 'a blocked punch still pauses the clone');
   assert.equal(front.attacker.combat.hitstop, 0);
 });
