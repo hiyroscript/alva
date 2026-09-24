@@ -55,9 +55,9 @@ export const HORIZONTAL_KNOCKBACK_POWER_TIERS = Object.freeze([
 // an attack's unblocked hit gives its target. It becomes the attack's positive
 // `knockback.y`, which CombatSystem.applyHit applies as `vy = -knockback.y`.
 export const VERTICAL_KNOCKBACK_POWER_TIERS = Object.freeze([
-  Object.freeze({ tier: 1, name: 'Vertical Knockback Power 1', description: 'Light upward launch.', knockbackY: 220 }),
-  Object.freeze({ tier: 2, name: 'Vertical Knockback Power 2', description: 'Normal upward launch.', knockbackY: 300 }),
-  Object.freeze({ tier: 3, name: 'Vertical Knockback Power 3', description: 'Strong upward launch.', knockbackY: 380 }),
+  Object.freeze({ tier: 1, name: 'Vertical Knockback Power 1', description: 'Light upward launch.', knockbackY: 480 }),
+  Object.freeze({ tier: 2, name: 'Vertical Knockback Power 2', description: 'Normal upward launch.', knockbackY: 640 }),
+  Object.freeze({ tier: 3, name: 'Vertical Knockback Power 3', description: 'Strong upward launch.', knockbackY: 800 }),
 ]);
 
 // ---- Registry ------------------------------------------------------------------

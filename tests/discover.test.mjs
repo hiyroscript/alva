@@ -410,7 +410,7 @@ test('the Power page shows no tuning numbers and nothing interactive', () => {
   home.el.querySelectorAll('.home-action')[2].click();
   const page = discover.sections[0].panel;
   const numbers = new Set(POWERS.flatMap((p) => p.tiers.flatMap((t) => Object.values(t).filter((v) => typeof v === 'number' && v > 3))));
-  assert.deepEqual([...numbers].sort((a, b) => a - b), [140, 180, 220, 270, 300, 330, 360, 380, 650, 920, 1000]);
+  assert.deepEqual([...numbers].sort((a, b) => a - b), [140, 180, 220, 270, 330, 360, 480, 640, 650, 800, 920, 1000]);
   for (const n of numbers) assert.ok(!everything(page).includes(String(n)), `no raw ${n}`);
   assert.deepEqual(page.querySelectorAll('button').concat(page.querySelectorAll('[data-nav]')), []);
 });
