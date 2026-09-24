@@ -27,7 +27,7 @@ const JUMP = { jump: true, jumpPressed: true };
 const CONTACT = { ba2: [4, 5], midairBa2: [3] };
 
 // Vertical Knockback Power 2: BA2's upward launch speed.
-const LAUNCH = 300;
+const LAUNCH = 640;
 
 // Zero either way: a vertical-only hit sets vx to 0 * facing, which is -0
 // when the hit travels left (still === 0).
@@ -105,7 +105,7 @@ test('BA2 attack definitions match their clips and are a heavier, slower basic a
     assert.ok(Math.abs(atk.active - CONTACT[id].length / clip.fps) < 1e-9, `${id} active`);
     assert.ok(atk.active < atk.total / 2, `${id} is not active for its whole clip`);
     assert.equal(atk.damage, 8);
-    // Vertical Knockback Power 2, resolved: an upward launch of 300 and no
+    // Vertical Knockback Power 2, resolved: an upward launch of 640 and no
     // sideways push.
     assert.deepEqual(def.attacks[id].powers, { verticalKnockback: 2 });
     assert.deepEqual(atk.knockback, { x: 0, y: LAUNCH });
@@ -408,7 +408,7 @@ test('a normal BA2 hit launches a grounded target straight up through the shared
     assert.equal(target.grounded, true);
     tick(BA2);
     while (!events.length) tick();
-    // At impact, before any gravity: vx 0, vy -300, off the ground.
+    // At impact, before any gravity: vx 0, vy -640, off the ground.
     assert.ok(isZero(target.body.vx), `facing ${facing}: no sideways push`);
     assert.equal(target.body.vy, -LAUNCH);
     assert.equal(target.grounded, false);
@@ -459,12 +459,20 @@ test('a ground BA2 hit shows the target in its hurt poses while it is launched',
   assert.ok(target.body.y < frozenAt.y, 'launched upward');
   assert.equal(target.body.x, frozenAt.x, 'not knocked sideways');
   assert.equal(frameName(target), '0001_midairhurt.png');
-  while (target.state === 'hitstun') tick();
-  assert.equal(target.grounded, true);
+  // Mid-air hurt for the whole hitstun. The launch outlasts it, so the
+  // target is still in the air when it ends and finishes the fall normally.
+  while (target.state === 'hitstun') {
+    assert.equal(frameName(target), '0001_midairhurt.png');
+    tick();
+  }
+  assert.equal(target.grounded, false, 'still airborne after hitstun');
+  assert.ok(['jump', 'fall'].includes(target.state));
+  until(() => target.grounded);
+  assert.equal(target.body.y, frozenAt.y, 'lands where it stood');
   assert.equal(target.body.x, frozenAt.x);
 });
 
-test('mid-air BA2 launches the same way: vx 0, vy -300 on a grounded target', () => {
+test('mid-air BA2 launches the same way: vx 0, vy -640 on a grounded target', () => {
   const { attacker, target, tick, until, events } = duel();
   tick(JUMP);
   until(() => attacker.body.vy > 0 && attacker.body.y > 650);
