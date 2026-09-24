@@ -3,6 +3,7 @@
 // voluntary-release pose, held (never toggled) input, grounded-only entry,
 // movement lock, state priority (interruptions skip the release pose), no
 // combat effect, the gameplay Down -> Charge rename, and the Energy stat.
+// Charged BA1 (the Clone Attack) is covered in detail by clone.test.mjs.
 // Uses the real Fighter, CombatSystem, physics and InputManager (see
 // fighter-harness.mjs).
 import test from 'node:test';
@@ -425,38 +426,75 @@ test('a real hit on a charging fighter shows Hurt through the impact freeze, wit
   assert.ok(!states.includes('chargeRelease'), states.join());
 });
 
-for (const [name, press, id, first] of [['BA1', BA1, 'ba1', '0001_1ba1.png'], ['BA2', BA2, 'ba2', '0001_2ba1.png']]) {
-  test(`${name} interrupts Charge without releasing it, then Charge restarts from charge1`, () => {
-    const { fighter, step } = makeFighter();
-    chargeIntoLoop(step);
-    step({ ...CHARGE, ...press });
-    assert.equal(fighter.state, 'attack');
-    assert.equal(fighter.combat.attack.def.id, id);
-    assert.equal(fighter.charging, false);
-    assert.equal(frameName(fighter), first);
-    const frames = [];
-    while (fighter.state === 'attack') {
-      frames.push(frameName(fighter));
-      step(CHARGE);
-    }
-    const clip = def.animations[id].frames.map((u) => u.split('/').pop());
-    assert.deepEqual(frames.filter((n, i, a) => n !== a[i - 1]), clip, `the whole ${name} clip plays`);
-    assert.ok(frames.every((n) => !isChargeFrame(n)));
-    assert.equal(fighter.state, 'charge');
-    assert.equal(frameName(fighter), '0001_charge1.png');
-  });
+test('BA2 interrupts Charge without releasing it, then Charge restarts from charge1', () => {
+  const { attacker: fighter, tick, clones } = duel();
+  const step = (held) => {
+    tick(held);
+    return fighter;
+  };
+  chargeIntoLoop(step);
+  step({ ...CHARGE, ...BA2 });
+  assert.equal(fighter.state, 'attack');
+  assert.equal(fighter.combat.attack.def.id, 'ba2');
+  assert.equal(fighter.charging, false);
+  assert.equal(frameName(fighter), '0001_2ba1.png');
+  const frames = [];
+  while (fighter.state === 'attack') {
+    frames.push(frameName(fighter));
+    step(CHARGE);
+  }
+  const clip = def.animations.ba2.frames.map((u) => u.split('/').pop());
+  assert.deepEqual(frames.filter((n, i, a) => n !== a[i - 1]), clip, 'the whole BA2 clip plays');
+  assert.ok(frames.every((n) => !isChargeFrame(n)));
+  assert.equal(fighter.state, 'charge');
+  assert.equal(frameName(fighter), '0001_charge1.png');
+  assert.equal(clones.length, 0, 'BA2 has no charged action');
+  assert.equal(fighter.combat.energy, 100);
+});
 
+test('BA1 while already charging, Charge still held, summons a clone: the owner stays in Charge', () => {
+  const { attacker: fighter, tick, clones } = duel();
+  const step = (held) => {
+    tick(held);
+    return fighter;
+  };
+  chargeIntoLoop(step);
+  const loopFrame = frameName(fighter);
+  step({ ...CHARGE, ...BA1 });
+  assert.equal(clones.length, 1, 'the Charged BA1 Clone Attack');
+  assert.equal(fighter.combat.energy, 75);
+  // The owner neither attacks nor releases: the Charge loop just carries on.
+  assert.equal(fighter.state, 'charge');
+  assert.equal(fighter.charging, true);
+  assert.equal(fighter.combat.attack, null);
+  assert.equal(fighter.animator.anim.key, 'chargeLoop');
+  assert.match(frameName(fighter), /^0001_charge[ab]\.png$/);
+  assert.match(loopFrame, /^0001_charge[ab]\.png$/);
+  const states = new Set();
+  for (let i = 0; i < steps(1); i++) states.add(step(CHARGE).state);
+  assert.deepEqual([...states], ['charge'], 'no BA1 and no release pose');
+});
+
+for (const [name, press, id, first] of [['BA1', BA1, 'ba1', '0001_1ba1.png'], ['BA2', BA2, 'ba2', '0001_2ba1.png']]) {
   test(`letting go of Charge on the step ${name} is pressed starts ${name} at once, with no release pose`, () => {
-    const { fighter, step } = makeFighter();
+    const { attacker: fighter, tick, clones } = duel();
+    const step = (held = {}) => {
+      tick(held);
+      return fighter;
+    };
     chargeIntoLoop(step);
     step(press);
     assert.equal(fighter.state, 'attack');
+    assert.equal(fighter.combat.attack.def.id, id);
     assert.equal(frameName(fighter), first);
     const states = [];
     while (fighter.state === 'attack') states.push(step().state);
     // The attack ended Charge, so its end goes straight to idle.
     assert.ok(!states.includes('chargeRelease'), states.join());
     assert.equal(fighter.state, 'idle');
+    // Not a Charged BA1: no clone and nothing spent.
+    assert.equal(clones.length, 0);
+    assert.equal(fighter.combat.energy, 100);
   });
 }
 
@@ -762,7 +800,7 @@ test('every fighter starts with full Energy, and a reset refills it', () => {
   assert.equal(plain.fighter.combat.energy, 100);
 });
 
-test('nothing spends or restores Energy yet: charging, releasing, dodging, attacking and hits leave it full', () => {
+test('only the Clone Attack spends Energy: charging, releasing, dodging, attacking and hits leave it full', () => {
   const full = (...fighters) => {
     for (const f of fighters) {
       assert.equal(f.combat.energy, 100);

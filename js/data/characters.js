@@ -31,6 +31,10 @@ const THROW_FPS = 12;
 // Playback rate of the shuriken's in-flight spin. Art only: it never changes
 // how fast the projectile travels.
 const SHURIKEN_FPS = 18;
+// Playback rate of the clone-summon cloud. The same rate plays it forwards
+// as the clone appears and backwards as it vanishes, so both take one pass
+// of the clip (10 frames = 0.5 s at 20 fps).
+const CLONE_CLOUD_FPS = 20;
 
 export const CHARACTERS = [
   {
@@ -196,6 +200,22 @@ export const CHARACTERS = [
       },
     },
 
+    // Effect art: not a fighter pose and not a projectile. Normalized like
+    // projectile art (own size, centre anchor, the fighter's art-pixel
+    // scale, never fitted to the fighter's height) and drawn by whatever
+    // uses it. `sourceFacing: 0` marks direction-neutral art: never mirrored.
+    effectAnimations: {
+      // The smoke cloud a summoned clone appears from and vanishes into:
+      // played 1 -> 10 once as it appears, then the same frames 10 -> 1 as it
+      // vanishes (reversed at runtime, never duplicated on disk).
+      cloneCloud: {
+        frames: frames(BASE_0001, 'cloneav', 10),
+        fps: CLONE_CLOUD_FPS,
+        loop: false,
+        sourceFacing: 0,
+      },
+    },
+
     // Projectile behaviour, keyed by id. See js/game/projectile.js for the
     // schema (createProjectileDefinition). The hitbox is centred on the
     // projectile and mirrors with its direction; the combat fields resolve
@@ -269,8 +289,9 @@ export const CHARACTERS = [
 
     stats: {
       health: 100,
-      // Energy capacity. Fighters start full; nothing spends or restores
-      // Energy yet.
+      // Energy capacity. Fighters start full. #0001's Charged BA1 Clone
+      // Attack costs 25 (summons.ba1Clone); no Energy regeneration or gain
+      // exists yet.
       energy: 100,
     },
 
@@ -307,6 +328,36 @@ export const CHARACTERS = [
       special: null,
       action1: { ground: 'ba1', air: 'midairBa1' }, // Basic Attack 1 (BA1)
       action2: { ground: 'ba2', air: 'midairBa2' }, // Basic Attack 2 (BA2)
+    },
+
+    // Charged actions: a combat button pressed while the fighter is already
+    // Charging (since an earlier step) and still holding Charge summons
+    // instead of attacking. If the summon cannot happen (too little Energy,
+    // missing art), the press falls through to the button's normal attack.
+    chargedActions: {
+      action1: 'ba1Clone', // Charged BA1: Clone Attack
+    },
+
+    // Summons, keyed by id. See js/game/clone.js for the schema
+    // (createSummonDefinition). A clone is a temporary attack entity, not a
+    // fighter: it appears behind the opponent through the `cloud` effect,
+    // performs the owner's `attack` once with that attack's own art and
+    // combat data, then vanishes through the same cloud played in reverse.
+    summons: {
+      ba1Clone: {
+        attack: 'ba1',
+        cloud: 'cloneCloud',
+        // Spent once, when the summon is accepted.
+        energyCost: 25,
+        // World units behind the opponent (on its back side) at the summon;
+        // BA1's punch reaches forward from there into the opponent.
+        behindDistance: 48,
+        // Cloud centre from the clone's origin (bottom-centre), facing right:
+        // half the fighter's visual height, so the smoke wraps the body.
+        effectOffset: { x: 0, y: -44 },
+        // Keeps the clone this far inside the stage's horizontal bounds.
+        stageMargin: 17,
+      },
     },
 
     // Attack definitions, keyed by id. See js/game/combat.js for the schema
@@ -404,10 +455,12 @@ export function getCharacter(id) {
   return CHARACTERS.find((c) => c.id === id) || null;
 }
 
-// Every frame a character needs before battle: fighter poses and projectiles.
+// Every frame a character needs before battle: fighter poses, projectiles
+// and effects.
 export function characterFramePaths(def) {
   const out = [];
   for (const anim of Object.values(def.animations)) out.push(...anim.frames);
   for (const anim of Object.values(def.projectileAnimations || {})) out.push(...anim.frames);
+  for (const anim of Object.values(def.effectAnimations || {})) out.push(...anim.frames);
   return out;
 }

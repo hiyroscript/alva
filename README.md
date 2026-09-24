@@ -8,8 +8,8 @@ This is the first playable foundation: full menu flow, a 48-slot roster, two
 large stages, movement and platform physics, a camera, a HUD, touch controls,
 and a data-driven combat system with #0001's two real attacks, Basic Attack 1
 (BA1) and Basic Attack 2 (BA2), a ground and mid-air Dodge on the shared
-Defense input, a held Charge stance and a blue Energy meter under each health
-bar.
+Defense input, a held Charge stance, a Charged BA1 Clone Attack and a blue
+Energy meter under each health bar.
 
 The full product specification, including the Alva brand system, is in
 [`ALVA_SPEC.md`](./ALVA_SPEC.md).
@@ -101,16 +101,34 @@ attack animations. Its touch button has a dashed outline.
   `charge1` briefly as a release pose (one Charge frame, 0.1 s), then returns
   to its normal state; the next Charge starts from the beginning again.
   #0001 stays in place while charging. Charge has no hitbox, armour or
-  invulnerability. A Dodge, Jump, BA1, BA2, Throw or getting hit take over
-  from it at once, without waiting for the release pose. It works on one-way platforms
-  without dropping through them. There is no drop-through control: walk off
-  an edge to come down.
-- **Energy:** the blue bar under each health bar. It begins full, and nothing
-  spends or restores it yet.
+  invulnerability, and it does not generate Energy. A Dodge, Jump, BA2,
+  Throw or getting hit take over from it at once, without waiting for the
+  release pose; so does BA1 if you let go of Charge as you press it. BA1
+  pressed while Charge is still held is the Clone Attack (below). It works
+  on one-way platforms without dropping through them. There is no
+  drop-through control: walk off an edge to come down.
+- **Clone Attack (Charged BA1):** while already holding Charge, press BA1. If
+  #0001 has at least 25 Energy, 25 Energy is spent and a clone appears behind
+  the opponent in a smoke cloud (`cloneav1 → … → cloneav10`, 20 fps),
+  performs #0001's normal BA1, then vanishes through the cloud animation in
+  reverse (`cloneav10 → … → cloneav1`). #0001 remains in Charge while the
+  button stays held. With less than 25 Energy, BA1 behaves normally instead.
+  The clone appears on the opponent's back side, facing it, at the spot where
+  the opponent stood when you pressed BA1; it never follows, so an opponent
+  who moves away makes it miss. Its punch is BA1's (6 damage, same hitbox,
+  hitstun and knockback, pushing the opponent away from the clone), hits
+  once, and passes through a Dodge's evasive frames like any attack. The
+  impact freezes the opponent and the clone, never #0001. The clone cannot be
+  hit, blocks nobody and is not followed by the camera. Once summoned it
+  finishes appearing, attacking and vanishing whatever #0001 does next.
+  Pressing Charge and BA1 on the same step from standing is an ordinary BA1.
+- **Energy:** the blue bar under each health bar. It begins full. The Clone
+  Attack spends 25 of it (a full bar pays for four); nothing else spends it,
+  nothing restores it yet, and it refills on restart or rematch.
 - **Menus:** arrow keys or WASD to move, `Enter` to select, `Esc` to go back. Mouse and touch work too.
 - **Touch:** several fingers work at once (hold Right and press Jump, or hold C and press BA1). You can slide your thumb between Left / Charge / Right. **T** is Throw.
 - **Gamepad (standard layout):** D-pad or left stick left / right to move and down to Charge in battle (they still navigate menus), A to jump, X / Square to Throw, B / Circle for Basic Attack 1, LB for Basic Attack 2, Y / Triangle for the reserved Special, RB or RT for Defense, Start to pause.
-- **Debug:** `` ` `` toggles the collider, hurtbox and attack-hitbox overlay in battle (a hitbox shows only while it can connect; hurtboxes turn gray while a Dodge makes the fighter invulnerable; a flying shuriken's hitbox is outlined in magenta and labelled).
+- **Debug:** `` ` `` toggles the collider, hurtbox and attack-hitbox overlay in battle (a hitbox shows only while it can connect; hurtboxes turn gray while a Dodge makes the fighter invulnerable; a flying shuriken's hitbox is outlined in magenta and labelled; a clone's BA1 hitbox shows in the attack colour, labelled `clone ba1`, only on its active frame).
 
 Touch controls show on touch-first devices (coarse pointer, or a touch actually detected). A narrow desktop window doesn't count as a phone. On a phone held in portrait, the game pauses and asks you to rotate.
 
@@ -118,10 +136,10 @@ Touch controls show on touch-first devices (coarse pointer, or a touch actually 
 
 - **Characters:** #0001
 - **Maps:** Desert (wide, open, 3.8 screens) and City (rooftops with 7 one-way platforms, 3.1 screens)
-- **Animations:** Idle, Run, Jump, Fall, Land (jump/fall play while airborne; land plays once on touchdown), Hurt and Mid-air Hurt (shown during hitstun on the ground / in the air), Basic Attack 1 (4 frames), Mid-air Basic Attack 1 (5 frames), Basic Attack 2 (7 frames) and Mid-air Basic Attack 2 (3 frames), each played once at 12 fps, Dodge and Mid-air Dodge (3 frames each, played once at 12 fps), Charge (charge1 → charge2 once, then chargea ↔ chargeb while held, at 10 fps, with charge1 shown briefly on release), Throw (3 fighter frames, played once at 12 fps) and Shuriken (3 looping projectile frames at 18 fps, normalized and drawn separately from the fighter poses)
-- **Attacks:** Basic Attack 1 and Basic Attack 2, each on the ground and in the air, and a ground Throw that releases one shuriken. Special is reserved.
+- **Animations:** Idle, Run, Jump, Fall, Land (jump/fall play while airborne; land plays once on touchdown), Hurt and Mid-air Hurt (shown during hitstun on the ground / in the air), Basic Attack 1 (4 frames), Mid-air Basic Attack 1 (5 frames), Basic Attack 2 (7 frames) and Mid-air Basic Attack 2 (3 frames), each played once at 12 fps, Dodge and Mid-air Dodge (3 frames each, played once at 12 fps), Charge (charge1 → charge2 once, then chargea ↔ chargeb while held, at 10 fps, with charge1 shown briefly on release), Throw (3 fighter frames, played once at 12 fps), Shuriken (3 looping projectile frames at 18 fps, normalized and drawn separately from the fighter poses) and the clone appear / vanish cloud (`0001_cloneav1`–`0001_cloneav10`, an effect at 20 fps: forwards as a clone appears, the same frames in reverse as it vanishes)
+- **Attacks:** Basic Attack 1 and Basic Attack 2, each on the ground and in the air, a ground Throw that releases one shuriken, and the Charged BA1 Clone Attack (25 Energy). Special is reserved.
 - **Defense:** #0001 dodges, on the ground and in the air.
-- **HUD:** each fighter panel shows a green health bar with a blue Energy bar directly beneath it. Both start full.
+- **HUD:** each fighter panel shows a green health bar with a blue Energy bar directly beneath it. Both start full; the Energy bar drops by a quarter with each clone summoned.
 - **Mode:** Quick Battle: 1 round, 99 seconds, against a non-attacking training CPU
 
 ## Design
@@ -170,13 +188,14 @@ js/
                       asset loader, input (keyboard/touch/gamepad), device, audio stub
   screens/            splash, home, mode, character, map, help, battle
   game/               battle loop, fighter state machine, physics, camera,
-                      combat, sprite normalizer/animator, HUD, touch controls
+                      combat, projectiles, summoned clones, sprite
+                      normalizer/animator, HUD, touch controls
   stages/             Desert and City layered renderers (procedural Canvas 2D)
   data/               characters.js, maps.js
   ui/                 wordmark, icons, overlays, shared help content, stage preview
 ```
 
-- **Sprite normalization.** The idle, jump, fall, land and hurt frames are pixel art at roughly 16× scale, the mid-air hurt, Basic Attack 1 and 2, Charge and Dodge frames at 8×, and the run frames at 4×. When a frame loads, the game reads its alpha channel once and finds the visible bounds. It then detects the pixel grid from every colour transition and resamples the frame to 1 pixel per art pixel. Every frame is drawn at the same world scale, anchored bottom-centre at the upper-body centroid, so the fighter keeps the same size and position when switching between animations. When the size stays close to the target, each art pixel maps to a whole number of device pixels.
+- **Sprite normalization.** The idle, jump, fall, land and hurt frames are pixel art at roughly 16× scale, the mid-air hurt, Basic Attack 1 and 2, Charge and Dodge frames at 8×, and the run frames at 4×. When a frame loads, the game reads its alpha channel once and finds the visible bounds. It then detects the pixel grid from every colour transition and resamples the frame to 1 pixel per art pixel. Every frame is drawn at the same world scale, anchored bottom-centre at the upper-body centroid, so the fighter keeps the same size and position when switching between animations. When the size stays close to the target, each art pixel maps to a whole number of device pixels. Projectile and effect art (the shuriken at 8×, the clone cloud at 2×) goes through the same grid detection but keeps its own art size, centre-anchored at the fighter's art-pixel scale, and is never fitted to the fighter's height.
 - **Simulation.** Fixed 60 Hz steps with interpolated rendering, so movement is the same at 30, 60 and 120 Hz. Colliders, hurtboxes and pushboxes are set in data and don't depend on PNG size.
 - **Stages.** Six parallax layers (sky, far, mid, near, terrain, atmosphere) are generated once from a seeded RNG into cached `Path2D` geometry. Collision comes only from `js/data/maps.js`, so any layer can later be swapped for image art.
 
@@ -187,6 +206,8 @@ js/
 3. Give it a free `rosterSlot`.
 
 To add attacks, create animations with real frames, define them in `attacks` (see the schema in `js/game/combat.js`), and map them in `actions`: a string for one attack, or `{ ground, air }` to pick by whether the fighter is grounded (as #0001's `action1: { ground: 'ba1', air: 'midairBa1' }` and `action2: { ground: 'ba2', air: 'midairBa2' }` do). Time `startup` / `active` / `recovery` to whole frames of the clip so the hitbox is live only while the strike is on screen. An attack without frames is refused rather than faked.
+
+To give a fighter a charged action, map a combat button in `chargedActions` to an entry in `summons` (see the schema in `js/game/clone.js`), as #0001's `action1: 'ba1Clone'` does. Pressed while already charging, with Charge still held, it pays the summon's `energyCost` and spawns a clone that performs one of the fighter's own `attacks` through an `effectAnimations` cloud. Without the Energy or the art, the press falls through to the normal attack.
 
 To choose how a fighter defends, give it a `defense` entry. `{ type: 'dodge', ground, air }` (like #0001) plays one Dodge clip per press, with `startup` / `invulnerable` / `recovery` timed to whole frames of that clip; `{ type: 'block' }` is a held guard that takes chip damage (`stats.blockDamageScale`) and each attack's `blockstun`. Either way the player presses the same Defense button. A Dodge without frames is refused, so it never grants invisible invulnerability.
 

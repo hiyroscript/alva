@@ -397,11 +397,28 @@ test('help explains that Charge is held, loops while held, and that Energy start
   assert.match(items, /two-frame startup once, then loops its sustained pose/);
   assert.match(items, /blue Energy meter .* begins full/);
   assert.doesNotMatch(items, /restores Energy\b(?! yet)/);
+  assert.doesNotMatch(items, /Charge (generates|builds|fills|restores)/i, 'Charge never gives Energy');
   const notes = help.querySelectorAll('.info-note').map((p) => p.textContent).join(' ');
   assert.match(notes, /down to Charge/);
   assert.match(notes, /C is Charge: hold it to charge/);
   const build = help.querySelectorAll('.info-text').map((p) => p.textContent).join(' ');
   assert.match(build, /held Charge stance/);
+});
+
+test('help explains the Charged BA1 Clone Attack in the Charge & Energy card, with no new control row', () => {
+  const help = buildHelp();
+  const card = help.querySelectorAll('.info-card').find((c) => /Charge & Energy/.test(c.textContent));
+  const items = card.querySelectorAll('li').map((li) => li.textContent).join(' ');
+  assert.match(items, /Hold Charge first, then press BA1 to spend 25 Energy and summon a clone behind the opponent/);
+  assert.match(items, /The clone appears .*, performs BA1 and disappears/);
+  assert.match(items, /keeps charging for as long as you hold Charge/);
+  assert.match(items, /less than 25 Energy, BA1 works normally/);
+  assert.match(items, /Letting go of Charge as you press BA1 gives a normal BA1/);
+  assert.match(items, /Only the Clone Attack spends it, and nothing restores Energy yet/);
+  assert.doesNotMatch(items, /nothing spends/i);
+  // The combo uses the existing Charge and BA1 controls.
+  const rows = help.querySelectorAll('tr').map((tr) => tr.textContent);
+  assert.ok(!rows.some((r) => /clone/i.test(r)), 'no control row for it');
 });
 
 // ---- Defense (#0001's Dodge) ---------------------------------------------
@@ -505,7 +522,7 @@ test('help explains Defense, #0001\'s Dodge and the Charge release', () => {
   assert.match(items, /Holding Defense does not repeat it/);
   assert.match(items, /never takes chip damage/);
   assert.match(items, /Let go and #0001 shows its first Charge pose for a moment/);
-  assert.match(items, /Jump, BA1, BA2, Throw and Defense \(Dodge\) take over from Charge at once/);
+  assert.match(items, /Jump, BA2, Throw and Defense \(Dodge\) take over from Charge at once/);
   const build = help.querySelectorAll('.info-text').map((p) => p.textContent).join(' ');
   assert.match(build, /Defense is a ground and mid-air Dodge for #0001/);
   assert.doesNotMatch(build, /guard state/);

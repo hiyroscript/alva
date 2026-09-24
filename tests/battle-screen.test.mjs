@@ -7,6 +7,7 @@ import { BattleScreen } from '../js/screens/battle-screen.js';
 import { MenuNavigator } from '../js/core/menu-navigator.js';
 import { ConfirmDialog } from '../js/ui/overlays.js';
 import { Battle } from '../js/game/battle.js';
+import { duel } from './fighter-harness.mjs';
 
 class Node {
   parentNode = null;
@@ -412,6 +413,39 @@ test('HUD: a rematch shows full energy again; the winner is still decided by hea
   for (const side of [screen.hud.left, screen.hud.right]) {
     assert.equal(side.energy.getAttribute('aria-valuenow'), '100');
     assert.equal(side.energyFill.style.transform, 'scaleX(1)');
+  }
+});
+
+test('HUD: a Charged BA1 clone summon shows its 25 Energy cost at once; health is untouched', () => {
+  const { screen } = setup();
+  // Real fighters: P1 charges, then presses BA1 with Charge still held.
+  const d = duel();
+  const battle = { p1: d.attacker, p2: d.target, timeLeft: 99, round: 1 };
+  const { hud } = screen;
+  hud.bind(battle.p1, battle.p2);
+  hud.update(battle);
+  assert.equal(hud.left.energy.getAttribute('aria-valuenow'), '100');
+  d.tick({ charge: true });
+  d.tick({ charge: true, action1: true, action1Pressed: true });
+  assert.equal(d.clones.length, 1);
+  hud.update(battle);
+  assert.equal(hud.left.energy.getAttribute('aria-valuenow'), '75');
+  assert.equal(hud.left.energy.getAttribute('aria-valuemax'), '100');
+  assert.equal(hud.left.energy.getAttribute('aria-label'), 'Energy');
+  assert.equal(hud.left.energy.getAttribute('role'), 'meter');
+  assert.equal(hud.left.energyFill.style.transform, 'scaleX(0.75)');
+  // Spending Energy is not damage, and the CPU's meters do not move.
+  assert.equal(hud.left.bar.getAttribute('aria-valuenow'), '100');
+  assert.equal(hud.right.bar.getAttribute('aria-valuenow'), '100');
+  assert.equal(hud.right.energy.getAttribute('aria-valuenow'), '100');
+  assert.equal(scale(hud.right.energyFill), 'scaleX(1)');
+  // Each further summon lowers it by a quarter, down to empty.
+  for (const [now, fill] of [['50', 'scaleX(0.5)'], ['25', 'scaleX(0.25)'], ['0', 'scaleX(0)']]) {
+    d.tick({ charge: true });
+    d.tick({ charge: true, action1: true, action1Pressed: true });
+    hud.update(battle);
+    assert.equal(hud.left.energy.getAttribute('aria-valuenow'), now);
+    assert.equal(hud.left.energyFill.style.transform, fill);
   }
 });
 

@@ -47,6 +47,11 @@
 //   defense: { type: 'block' }
 //
 // A Dodge is not an attack: no hitbox, damage, cooldown or combat event.
+//
+// A summon (see js/game/clone.js) is a detached attacker: a temporary clone
+// that performs one of its owner's attacks from its own position and facing.
+// Its hits resolve through the same applyHit and credit the owner, but, like
+// a projectile's, they never freeze the owner.
 
 const ATTACK_DEFAULTS = {
   animation: null,
@@ -70,6 +75,14 @@ const ATTACK_DEFAULTS = {
 // little slack: a phase that is a whole number of steps long (e.g. 1 / 12 s at
 // 60 Hz) then lasts exactly that many steps instead of drifting by one.
 const PHASE_EPSILON = 1e-6;
+
+// 'startup' | 'active' | 'recovery' for an attack `time` seconds in. Shared
+// by fighters (CombatState.phase) and clones.
+export function attackPhase(def, time) {
+  if (time < def.startup - PHASE_EPSILON) return 'startup';
+  if (time < def.startup + def.active - PHASE_EPSILON) return 'active';
+  return 'recovery';
+}
 
 export function createAttackDefinition(spec) {
   if (!spec?.id) throw new Error('[Alva] Attack definitions need an id');
@@ -103,8 +116,10 @@ export class CombatState {
   constructor(stats) {
     this.maxHealth = stats.health;
     this.health = stats.health;
-    // Energy resource shown under the health bar. Starts full; no rule spends
-    // or restores it yet, so a reset (new CombatState) refills it.
+    // Energy resource shown under the health bar. Starts full, and a reset
+    // (new CombatState) refills it. Only spendEnergy() lowers it: #0001's
+    // Charged BA1 Clone Attack costs 25. No Energy regeneration or gain
+    // exists yet.
     this.maxEnergy = stats.energy ?? 100;
     this.energy = this.maxEnergy;
     // Block-type Defense only: the held guard and its chip-damage scale.
@@ -125,10 +140,7 @@ export class CombatState {
 
   get phase() {
     const a = this.attack;
-    if (!a) return null;
-    if (a.time < a.def.startup - PHASE_EPSILON) return 'startup';
-    if (a.time < a.def.startup + a.def.active - PHASE_EPSILON) return 'active';
-    return 'recovery';
+    return a ? attackPhase(a.def, a.time) : null;
   }
 
   // 'startup' | 'invulnerable' | 'recovery' while a Dodge plays, else null.
@@ -147,6 +159,19 @@ export class CombatState {
 
   canAct() {
     return !this.attack && !this.defenseAction && this.stun <= 0 && this.health > 0;
+  }
+
+  // Whether `amount` Energy is available to spend.
+  canSpendEnergy(amount) {
+    return amount >= 0 && this.energy >= amount;
+  }
+
+  // Spends `amount` Energy, once, if there is enough: true when paid. With
+  // too little it changes nothing and returns false; it never goes below 0.
+  spendEnergy(amount) {
+    if (!this.canSpendEnergy(amount)) return false;
+    this.energy = Math.max(0, this.energy - amount);
+    return true;
   }
 
   update(dt) {
@@ -197,16 +222,17 @@ const scratchHit = {};
 const scratchHurt = {};
 
 // Resolves hits each simulation step: fighters' melee hitboxes, then live
-// projectiles (see js/game/projectile.js).
+// projectiles (see js/game/projectile.js), then summoned clones (see
+// js/game/clone.js).
 export class CombatSystem {
   constructor() {
-    // { type: 'hit' | 'block', attacker, target, damage, projectile }
-    // `attacker` is the projectile's owner for a projectile hit; `projectile`
-    // is null for melee.
+    // { type: 'hit' | 'block', attacker, target, damage, projectile, summon }
+    // `attacker` is the owner for a projectile or clone hit; `projectile` and
+    // `summon` are null for the fighter's own melee.
     this.events = [];
   }
 
-  update(fighters, projectiles = []) {
+  update(fighters, projectiles = [], clones = []) {
     this.events.length = 0;
     for (const attacker of fighters) {
       const atk = attacker.combat.attack;
@@ -241,16 +267,37 @@ export class CombatSystem {
         break;
       }
     }
+    for (const c of clones) {
+      // Only during the attack's active phase, and only once per attack.
+      const hit = c.hitbox(scratchHit);
+      if (!hit) continue;
+      for (const target of fighters) {
+        if (target === c.owner || target.combat.health <= 0) continue;
+        // Dodged: passes through unspent, exactly like the fighter's own.
+        if (target.combat.invulnerable) continue;
+        const struck = target.def.hurtboxes.some((hb) => intersects(hit, worldBox(target, hb, scratchHurt)));
+        if (!struck) continue;
+        c.hasHit = true;
+        // The clone's own facing, never the owner's: knockback travels from
+        // the clone, and a Block guard must face the clone to hold.
+        this.applyHit(c.owner, target, c.attackDef, { facing: c.facing, summon: c });
+        c.hitstop = c.attackDef.hitstop;
+        break;
+      }
+    }
     return this.events;
   }
 
-  // Shared by melee and projectiles. `facing` is the direction the hit
-  // travels: the attacker's facing for melee, the projectile's own direction
-  // (fixed when thrown) for a projectile. `blocked` needs a Block-type guard
-  // facing into it; a Dodge never blocks, so a hit outside its invulnerable
-  // frames is a full hit. A projectile hit freezes only its target: the
-  // thrower is elsewhere, doing something else.
-  applyHit(attacker, target, def, { facing = attacker.facing, projectile = null } = {}) {
+  // Shared by melee, projectiles and clones. `facing` is the direction the
+  // hit travels: the attacker's facing for melee, the projectile's own
+  // direction (fixed when thrown) or the clone's facing (fixed when
+  // summoned). `blocked` needs a Block-type guard facing into it; a Dodge
+  // never blocks, so a hit outside its invulnerable frames is a full hit.
+  // A detached hit (a projectile's or a clone's) freezes only its target:
+  // the owner is elsewhere, doing something else.
+  applyHit(attacker, target, def, {
+    facing = attacker.facing, projectile = null, summon = null, detached = !!(projectile || summon),
+  } = {}) {
     const tc = target.combat;
     const blocked = tc.blocking && target.facing === -facing;
     // Hitstun always wins: a hit cancels a Dodge in its startup or recovery.
@@ -259,13 +306,13 @@ export class CombatSystem {
     tc.health = Math.max(0, tc.health - damage);
     tc.stun = blocked ? def.blockstun : def.hitstun;
     tc.hitstop = def.hitstop;
-    if (!projectile) attacker.combat.hitstop = def.hitstop;
+    if (!detached) attacker.combat.hitstop = def.hitstop;
     const kx = (blocked ? 0.5 : 1) * def.knockback.x * facing;
     target.body.vx = kx;
     if (!blocked && def.knockback.y) {
       target.body.vy = -def.knockback.y;
       target.body.grounded = false;
     }
-    this.events.push({ type: blocked ? 'block' : 'hit', attacker, target, damage, projectile });
+    this.events.push({ type: blocked ? 'block' : 'hit', attacker, target, damage, projectile, summon });
   }
 }

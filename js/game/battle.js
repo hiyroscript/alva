@@ -7,6 +7,7 @@ import { Fighter } from './character.js';
 import { PlayerController, TrainingAIController } from './fighter-controller.js';
 import { CombatSystem, worldBox } from './combat.js';
 import { spawnProjectiles, removeDeadProjectiles } from './projectile.js';
+import { spawnClones, updateClones, removeDeadClones } from './clone.js';
 import { Camera } from './camera.js';
 import { drawFrame, drawCenteredFrame } from './sprite-normalizer.js';
 import { createTheme } from '../stages/index.js';
@@ -48,6 +49,9 @@ export class Battle {
     this.fighters = [this.p1, this.p2];
     // Live projectiles (js/game/projectile.js), in spawn order.
     this.projectiles = [];
+    // Live summoned clones (js/game/clone.js), in spawn order. Never
+    // fighters: no pushbox, camera, HUD, marker or result role.
+    this.clones = [];
 
     this.restart();
   }
@@ -55,6 +59,7 @@ export class Battle {
   restart() {
     for (const f of this.fighters) f.reset(this.stage);
     this.projectiles.length = 0;
+    this.clones.length = 0;
     this.acc = 0;
     this.roundSeconds = CONFIG.battle.roundSeconds;
     this.timeLeft = this.roundSeconds > 0 ? this.roundSeconds : Infinity;
@@ -136,15 +141,20 @@ export class Battle {
     }
 
     // Fighters first; then the projectiles they released this step spawn
-    // (once each), every projectile moves, melee and projectile hits
-    // resolve, and spent projectiles are dropped.
+    // (once each) and every projectile moves. Live clones advance, then the
+    // clones summoned this step spawn (once each, on their cloud's first
+    // frame). Melee, projectile and clone hits resolve, and spent
+    // projectiles and finished clones are dropped.
     for (const f of this.fighters) f.update(dt, this.simCtx);
     separate(this.p1.body, this.p2.body, this.p1.def.pushbox.width / 2, this.p2.def.pushbox.width / 2, this.stage);
     for (const f of this.fighters) resolveSolidOverlap(f.body, this.stage);
     spawnProjectiles(this.fighters, this.projectiles);
     for (const p of this.projectiles) p.update(dt, this.stage);
-    this.combat.update(this.fighters, this.projectiles);
+    updateClones(this.clones, dt);
+    spawnClones(this.fighters, this.clones, this.stage);
+    this.combat.update(this.fighters, this.projectiles, this.clones);
     removeDeadProjectiles(this.projectiles);
+    removeDeadClones(this.clones);
   }
 
   get result() {
@@ -178,6 +188,9 @@ export class Battle {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     for (const f of this.fighters) this.drawShadow(f);
     ctx.imageSmoothingEnabled = false;
+    // Clones and their clouds behind both fighters: a clone stands behind
+    // its target, so the real fighter stays in front where they overlap.
+    for (const c of this.clones) this.drawClone(c);
     // CPU first so Player 1 is always drawn on top.
     this.drawFighter(this.p2);
     this.drawFighter(this.p1);
@@ -239,6 +252,22 @@ export class Battle {
     const [sx, sy] = this.toScreen(f.renderX, f.renderY);
     // Mirroring follows the playing clip's own source orientation.
     drawFrame(this.ctx, frame, sx, sy, this.pxPerArt, f.spriteFlip);
+  }
+
+  // The clone's body (the owner's real art, mirrored by the same per-clip
+  // rule), then its cloud over it, centred at the cloud offset at the
+  // fighters' art scale and never mirrored. No shadow, ring or marker.
+  drawClone(c) {
+    const body = c.frame;
+    if (body) {
+      const [sx, sy] = this.toScreen(c.x, c.y);
+      drawFrame(this.ctx, body, sx, sy, this.pxPerArt, c.spriteFlip);
+    }
+    const cloud = c.cloudFrame;
+    if (cloud) {
+      const [sx, sy] = this.toScreen(...c.cloudCenter());
+      drawCenteredFrame(this.ctx, cloud, sx, sy, this.pxPerArt, false);
+    }
   }
 
   // Centred on the projectile's position, at the fighters' art scale.
@@ -327,6 +356,15 @@ export class Battle {
     ctx.font = '11px ui-monospace, Menlo, Consolas, monospace';
     ctx.textAlign = 'left';
     ctx.textBaseline = 'bottom';
+    // Clone attack hitboxes, in the attack colour and labelled, during the
+    // active phase like a fighter's. A clone has no hurtboxes to draw.
+    for (const c of this.clones) {
+      if (!c.activeBox(box)) continue;
+      rect(box.x, box.y, box.w, box.h, '#ffb020');
+      const [lx, ly] = this.toScreen(box.x, box.y);
+      ctx.fillStyle = '#ffb020';
+      ctx.fillText(`clone ${c.attackDef.id}`, Math.round(lx), Math.round(ly) - 2);
+    }
     for (const p of this.projectiles) {
       p.hitbox(box);
       box.x += p.renderX - p.x;
@@ -347,7 +385,7 @@ export class Battle {
     const lines = [
       `state ${p.state}${action}  grounded ${p.body.grounded}  ground ${p.body.ground?.id ?? '-'}`,
       `pos ${p.body.x.toFixed(1)}, ${p.body.y.toFixed(1)}  vel ${p.body.vx.toFixed(0)}, ${p.body.vy.toFixed(0)}`,
-      `view ${view.w.toFixed(0)}x${view.h.toFixed(0)}  px/art ${this.pxPerArt.toFixed(2)}  cpu ${this.p2.state}`,
+      `view ${view.w.toFixed(0)}x${view.h.toFixed(0)}  px/art ${this.pxPerArt.toFixed(2)}  cpu ${this.p2.state}  clones ${this.clones.length}`,
     ];
     const y0 = view.pxH - 12 - lines.length * 16;
     lines.forEach((l, i) => {
@@ -362,6 +400,7 @@ export class Battle {
   destroy() {
     this.fighters = [];
     this.projectiles = [];
+    this.clones = [];
   }
 }
 

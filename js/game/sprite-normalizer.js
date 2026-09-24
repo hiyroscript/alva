@@ -13,9 +13,10 @@
 // The result is cached; nothing touches pixel data per render frame.
 // Every normalized frame is drawn bottom-centre anchored at a shared
 // world-units-per-art-pixel scale, so idle and run match exactly.
-// Projectile art (a character's `projectileAnimations`) goes through the same
-// analysis but keeps its own size and a centre anchor: it shares the fighter's
-// art-pixel scale, never the fighter's height.
+// Projectile and effect art (a character's `projectileAnimations` and
+// `effectAnimations`) goes through the same analysis but keeps its own size
+// and a centre anchor: it shares the fighter's art-pixel scale, never the
+// fighter's height.
 
 const ALPHA_MIN = 16;
 
@@ -182,6 +183,7 @@ export class SpriteSet {
     this.def = def;
     this.animations = {};
     this.projectiles = {}; // projectile animations, keyed like projectileAnimations
+    this.effects = {}; // effect animations (e.g. the clone cloud), keyed like effectAnimations
     this.worldPerArt = 1;
     this.refArtHeight = 1;
     this.missing = [];
@@ -224,27 +226,32 @@ export class SpriteSet {
       };
     }
 
-    // Projectiles: same grid detection, centre anchor, no height fitting.
-    for (const [key, anim] of Object.entries(def.projectileAnimations || {})) {
-      const frames = [];
-      for (const url of anim.frames) {
-        const img = getImage(url);
-        if (!img) {
-          set.missing.push(url);
-          continue;
+    // Projectiles and effects: same grid detection, centre anchor, no
+    // height fitting.
+    const buildCentred = (anims, into) => {
+      for (const [key, anim] of Object.entries(anims || {})) {
+        const frames = [];
+        for (const url of anim.frames) {
+          const img = getImage(url);
+          if (!img) {
+            set.missing.push(url);
+            continue;
+          }
+          frames.push(normalizeFrame(img, url, { forcedPixelSize: forced, anchor: 'center' }));
         }
-        frames.push(normalizeFrame(img, url, { forcedPixelSize: forced, anchor: 'center' }));
+        if (!frames.length) continue;
+        into[key] = {
+          key,
+          frames,
+          fps: anim.fps,
+          loop: anim.loop !== false,
+          // 0: direction-neutral art, never mirrored (see Projectile.flip).
+          sourceFacing: anim.sourceFacing ?? 0,
+        };
       }
-      if (!frames.length) continue;
-      set.projectiles[key] = {
-        key,
-        frames,
-        fps: anim.fps,
-        loop: anim.loop !== false,
-        // 0: direction-neutral art, never mirrored (see Projectile.flip).
-        sourceFacing: anim.sourceFacing ?? 0,
-      };
-    }
+    };
+    buildCentred(def.projectileAnimations, set.projectiles);
+    buildCentred(def.effectAnimations, set.effects);
 
     const names = Object.keys(set.animations);
     if (!names.length) return set;
@@ -274,9 +281,9 @@ export class SpriteSet {
       anim.maxArtH = Math.max(...anim.frames.map((f) => f.artH));
     }
 
-    // One projectile art pixel is one fighter art pixel. A frame whose grid
-    // could not be detected borrows the reference clip's pixel size.
-    for (const anim of Object.values(set.projectiles)) {
+    // One projectile or effect art pixel is one fighter art pixel. A frame
+    // whose grid could not be detected borrows the reference clip's pixel size.
+    for (const anim of [...Object.values(set.projectiles), ...Object.values(set.effects)]) {
       for (const f of anim.frames) {
         f.unit = f.unit || ref.frames[0].unit;
         f.artW = f.w / f.unit;
@@ -298,6 +305,11 @@ export class SpriteSet {
   // Normalized projectile animation, or null without its own art.
   projectile(key) {
     return this.projectiles[key] || null;
+  }
+
+  // Normalized effect animation, or null without its own art.
+  effect(key) {
+    return this.effects[key] || null;
   }
 
   // Seconds one pass of a dedicated animation takes (0 without its own art).
@@ -352,8 +364,8 @@ export function drawFrame(ctx, frame, x, y, pxPerArt, flip) {
   ctx.restore();
 }
 
-// Draws a normalized projectile frame centred on device pixel position
-// (x, y), at the same `pxPerArt` as the fighters.
+// Draws a normalized projectile or effect frame centred on device pixel
+// position (x, y), at the same `pxPerArt` as the fighters.
 export function drawCenteredFrame(ctx, frame, x, y, pxPerArt, flip) {
   const w = frame.artW * pxPerArt;
   const h = frame.artH * pxPerArt;

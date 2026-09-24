@@ -6,6 +6,7 @@ import { SpriteAnimator } from './sprite-animator.js';
 import { createBody, stepBody, dropThrough } from './physics.js';
 import { CombatState, createAttackDefinition, createDefenseDefinition } from './combat.js';
 import { createProjectileDefinition } from './projectile.js';
+import { createSummonDefinition, summonProblem } from './clone.js';
 import { approach, clamp, sign } from '../core/utils.js';
 
 export const COMBAT_ACTIONS = ['primary', 'special', 'action1', 'action2'];
@@ -43,6 +44,9 @@ export class Fighter {
     this.projectileDefs = Object.fromEntries(
       Object.entries(def.projectiles || {}).map(([id, spec]) => [id, createProjectileDefinition({ id, ...spec })]),
     );
+    this.summonDefs = Object.fromEntries(
+      Object.entries(def.summons || {}).map(([id, spec]) => [id, createSummonDefinition({ id, ...spec })]),
+    );
     // What the shared Defense input does for this character (null: nothing).
     this.defense = createDefenseDefinition(def.defense);
     this.opponent = null;
@@ -77,6 +81,9 @@ export class Fighter {
     // Projectiles released this step, waiting for the battle to spawn them
     // (see spawnProjectiles in js/game/projectile.js).
     this.releases = [];
+    // Summons paid for this step, waiting for the battle to spawn them (see
+    // spawnClones in js/game/clone.js): { id, target }.
+    this.summons = [];
     this.renderX = this.body.x;
     this.renderY = this.body.y;
     this.animator.play('idle', { restart: true });
@@ -111,9 +118,17 @@ export class Fighter {
     }
 
     // ---- Combat intents --------------------------------------------------
-    // Actions mapped to null are wired but reserved (see tryAction).
+    // Actions mapped to null are wired but reserved (see tryAction). A press
+    // while already Charging (since an earlier step) with Charge still held
+    // is a charged action first (see trySummon): a summon that happens
+    // consumes the press, otherwise the normal attack gets it. Letting go of
+    // Charge on the press step, or pressing it with a fresh Charge, is a
+    // normal attack.
+    const charged = wasCharging && !!input.charge;
     for (const action of COMBAT_ACTIONS) {
-      if (input[`${action}Pressed`]) this.tryAction(action);
+      if (!input[`${action}Pressed`]) continue;
+      if (charged && this.trySummon(action)) continue;
+      this.tryAction(action);
     }
     // ---- Defense ---------------------------------------------------------
     // A Dodge starts only on a new press, after the attacks so an attack
@@ -204,6 +219,27 @@ export class Fighter {
       return false;
     }
     this.combat.defenseAction = { type: 'dodge', def: move, time: 0 };
+    return true;
+  }
+
+  // The charged action for `action` (e.g. #0001's Charged BA1 Clone
+  // Attack): pays its Energy, once, and queues one summon at the opponent for
+  // the battle to spawn. The fighter itself performs nothing and keeps
+  // charging. False, with nothing spent, if the action has no summon, the
+  // fighter cannot act, there is no opponent, the art is missing (logged) or
+  // there is too little Energy.
+  trySummon(action) {
+    const id = this.def.chargedActions?.[action];
+    const summon = id && this.summonDefs[id];
+    if (!summon || !this.opponent || !this.combat.canAct()) return false;
+    const problem = summonProblem(this, summon);
+    if (problem) {
+      console.warn(`[Alva] Summon "${id}" is unavailable: ${problem}; ignoring.`);
+      return false;
+    }
+    if (!this.combat.spendEnergy(summon.energyCost)) return false;
+    this.combat.lastIntent = action;
+    this.summons.push({ id, target: this.opponent });
     return true;
   }
 
