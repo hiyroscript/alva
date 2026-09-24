@@ -1,9 +1,10 @@
 // Run with node --test tests/controls-ui.test.mjs (no dependencies).
-// Touch controls and Help content for Basic Attacks 1 and 2 (BA1, BA2) and
-// Charge on a minimal fake DOM; layout and paint still need real-browser
-// verification.
+// Touch controls and Help content for Basic Attacks 1 and 2 (BA1, BA2),
+// Charge and Defense (#0001's Dodge) on a minimal fake DOM; layout and paint
+// still need real-browser verification.
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 
 class Node {
   parentNode = null;
@@ -93,7 +94,7 @@ test('the action1 touch button reads BA1 and is labelled Basic Attack 1', () => 
   for (const reserved of ['primary', 'special']) {
     assert.ok(tc.buttons.get(reserved).classList.contains('is-pending'), `${reserved} stays reserved`);
   }
-  assert.equal(tc.buttons.get('block').classList.contains('is-pending'), false);
+  assert.equal(tc.buttons.get('defense').classList.contains('is-pending'), false);
   assert.equal(tc.buttons.get('jump').classList.contains('is-pending'), false);
 });
 
@@ -114,7 +115,7 @@ test('only Primary and Special touch buttons are still reserved', () => {
   const pending = [...tc.buttons].filter(([, b]) => b.classList.contains('is-pending')).map(([action]) => action);
   assert.deepEqual(pending.sort(), ['primary', 'special']);
   const texts = tc.root.querySelectorAll('.tc-text').map((t) => t.textContent);
-  assert.deepEqual(texts, ['C', 'BA1', 'BA2']);
+  assert.deepEqual(texts, ['C', 'D', 'BA1', 'BA2']);
 });
 
 test('pressing BA1 still dispatches the internal action1 input', () => {
@@ -174,7 +175,8 @@ test('help labels action1 Basic Attack 1 and no longer marks it Reserved', () =>
   assert.equal(rows['Basic Attack 1'], false);
   assert.equal(rows.Primary, true);
   assert.equal(rows.Special, true);
-  assert.equal(rows.Block, false);
+  assert.equal(rows.Defense, false);
+  assert.equal(rows.Block, undefined);
   assert.equal(rows['Action 1'], undefined);
 });
 
@@ -329,8 +331,8 @@ test('a cancelled or lost Charge pointer, or releaseAll(), never leaves Charge s
   assert.deepEqual(calls.at(-1), ['charge', false]);
 });
 
-test('Charge works alongside BA1, BA2, Block and Jump (multi-touch)', () => {
-  for (const other of ['action1', 'action2', 'block', 'jump']) {
+test('Charge works alongside BA1, BA2, Defense and Jump (multi-touch)', () => {
+  for (const other of ['action1', 'action2', 'defense', 'jump']) {
     const { tc, calls } = touchControls();
     const at = layoutDpad(tc);
     tc.dpad.dispatch('pointerdown', { pointerId: 1, ...at('charge'), preventDefault() {} });
@@ -399,4 +401,111 @@ test('help explains that Charge is held, loops while held, and that Energy start
   assert.match(notes, /C is Charge: hold it to charge/);
   const build = help.querySelectorAll('.info-text').map((p) => p.textContent).join(' ');
   assert.match(build, /held Charge stance/);
+});
+
+// ---- Defense (#0001's Dodge) ---------------------------------------------
+
+const CSS = readFileSync(new URL('../styles.css', import.meta.url), 'utf8');
+
+test('the old Block touch slot is now Defense: reads exactly D, labelled Defense, no shield', () => {
+  const { tc } = touchControls();
+  assert.equal(tc.buttons.has('block'), false);
+  const b = tc.buttons.get('defense');
+  assert.equal(b.textContent, 'D');
+  assert.equal(b.querySelector('.tc-text').textContent, 'D');
+  assert.equal(b.getAttribute('aria-label'), 'Defense');
+  assert.equal(b.getAttribute('data-action'), 'defense');
+  assert.ok(b.classList.contains('tc-defense'));
+  assert.equal(b.classList.contains('tc-block'), false);
+  assert.equal(b.classList.contains('is-pending'), false);
+  assert.doesNotMatch(b.innerHTML, /<svg/);
+  assert.equal(b.querySelector('svg'), null);
+  for (const word of ['Block', 'Dodge', 'DEF']) assert.doesNotMatch(b.textContent, new RegExp(word));
+  // The shield icon is gone entirely; nothing else used it.
+  assert.equal(ICONS.block, undefined);
+  // Same place in the cluster: third of the staggered action buttons.
+  assert.deepEqual(tc.actions.children.map((c) => c.getAttribute('data-action')),
+    ['primary', 'special', 'defense', 'action1', 'action2', 'jump']);
+});
+
+test('the Defense touch button keeps the old Block coordinates', () => {
+  assert.match(CSS, /\.tc-defense \{ right: calc\(var\(--tc-pitch\) \* 0\.5\); bottom: calc\(var\(--tc-pitch\) \* 0\.87\); \}/);
+  assert.match(CSS, /\.md-defense \{ left: 85%; top: 54%; \}/);
+  assert.doesNotMatch(CSS, /\.tc-block\b/);
+  assert.doesNotMatch(CSS, /\.md-block\b/);
+});
+
+test('holding D dispatches defense on pointer down and releases it on pointer up', () => {
+  const { tc, calls } = touchControls();
+  const b = tc.buttons.get('defense');
+  b.dispatch('pointerdown', { pointerId: 6, preventDefault() {} });
+  assert.deepEqual(calls, [['defense', true]]);
+  assert.ok(b.classList.contains('is-pressed'));
+  b.dispatch('pointerup', { pointerId: 6 });
+  assert.deepEqual(calls, [['defense', true], ['defense', false]]);
+  assert.equal(b.classList.contains('is-pressed'), false);
+  assert.ok(calls.every(([action]) => action === 'defense'), 'no block or dodge input');
+  // Alongside a held direction, too.
+  tc.assign(1, 'right');
+  b.dispatch('pointerdown', { pointerId: 2, preventDefault() {} });
+  assert.deepEqual(calls.slice(2), [['right', true], ['defense', true]]);
+  tc.releaseAll();
+  assert.deepEqual(calls.slice(4).sort(), [['defense', false], ['right', false]]);
+});
+
+test('help lists Defense on L, never a generic Block control', () => {
+  assert.equal(ACTION_LABELS.defense, 'Defense');
+  assert.equal(ACTION_LABELS.block, undefined);
+  assert.deepEqual(CONFIG.bindings.defense, ['KeyL']);
+  assert.equal(CONFIG.bindings.block, undefined);
+  const help = buildHelp();
+  const rows = help.querySelectorAll('tr').slice(1).map((tr) => ({
+    label: tr.querySelector('th').children[0].textContent,
+    reserved: !!tr.querySelector('th').querySelector('.tag'),
+    keys: tr.querySelector('td').querySelectorAll('kbd').map((k) => k.textContent),
+  }));
+  const defense = rows.find((r) => r.label === 'Defense');
+  assert.ok(defense, 'Defense row');
+  assert.deepEqual(defense.keys, ['L']);
+  assert.equal(defense.reserved, false);
+  assert.equal(rows.find((r) => r.label === 'Block'), undefined);
+  assert.deepEqual(rows.map((r) => r.label).slice(4, 8), ['Primary', 'Special', 'Defense', 'Basic Attack 1']);
+  assert.doesNotMatch(help.textContent, /\bblock\b/i, 'no Block anywhere in Help');
+});
+
+test('the mobile diagram shows D for Defense in the old Block spot and says #0001 dodges', () => {
+  const help = buildHelp();
+  assert.equal(help.querySelector('.md-block'), null);
+  const dot = help.querySelector('.md-defense');
+  assert.ok(dot, 'Defense dot');
+  assert.equal(dot.getAttribute('title'), 'Defense');
+  assert.equal(dot.querySelector('.md-icon').innerHTML, '<b>D</b>');
+  assert.doesNotMatch(dot.querySelector('.md-icon').innerHTML, /<svg/);
+  const order = help.querySelector('.md-screen').children.map((d) => d.getAttribute('title'));
+  assert.deepEqual(order.slice(4, 8), ['Primary', 'Special', 'Defense', 'Basic Attack 1']);
+  const label = help.querySelector('.mobile-diagram').getAttribute('aria-label');
+  assert.match(label, /Primary, Special, Defense \(D\), Basic Attack 1/);
+  assert.match(label, /#0001 uses Dodge as its Defense/);
+  assert.doesNotMatch(label, /Block/);
+  const legend = help.querySelector('.md-legend').textContent;
+  assert.match(legend, /Special · D, BA1/);
+  assert.match(legend, /#0001 uses Dodge as its Defense/);
+});
+
+test('help explains Defense, #0001\'s Dodge and the Charge release', () => {
+  const help = buildHelp();
+  const notes = help.querySelectorAll('.info-note').map((p) => p.textContent).join(' ');
+  assert.match(notes, /RB \/ RT for Defense/);
+  assert.match(notes, /D is Defense, which #0001 uses to Dodge/);
+  const items = help.querySelectorAll('li').map((li) => li.textContent).join(' ');
+  assert.match(items, /Defense \(L, RB \/ RT, or D on touch\) is the shared defensive button/);
+  assert.match(items, /#0001 dodges/);
+  assert.match(items, /One press, one Dodge/);
+  assert.match(items, /Holding Defense does not repeat it/);
+  assert.match(items, /never takes chip damage/);
+  assert.match(items, /Let go and #0001 shows its first Charge pose for a moment/);
+  assert.match(items, /Jump, BA1, BA2 and Defense \(Dodge\) take over from Charge at once/);
+  const build = help.querySelectorAll('.info-text').map((p) => p.textContent).join(' ');
+  assert.match(build, /Defense is a ground and mid-air Dodge for #0001/);
+  assert.doesNotMatch(build, /guard state/);
 });

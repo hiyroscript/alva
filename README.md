@@ -7,8 +7,9 @@ and on phones and tablets in landscape.
 This is the first playable foundation: full menu flow, a 48-slot roster, two
 large stages, movement and platform physics, a camera, a HUD, touch controls,
 and a data-driven combat system with #0001's two real attacks, Basic Attack 1
-(BA1) and Basic Attack 2 (BA2), plus a held Charge stance and a blue Energy
-meter under each health bar.
+(BA1) and Basic Attack 2 (BA2), a ground and mid-air Dodge on the shared
+Defense input, a held Charge stance and a blue Energy meter under each health
+bar.
 
 The full product specification, including the Alva brand system, is in
 [`ALVA_SPEC.md`](./ALVA_SPEC.md).
@@ -51,7 +52,7 @@ in the code depends on the repository name, so no file changes are needed.
 | Jump | `W`, `Space` or `↑` | Lower-right, bottom corner |
 | Primary* | `J` | Lower-right, top |
 | Special* | `K` | Lower-right, middle row |
-| Block | `L` | Lower-right, middle row |
+| Defense | `L` | Lower-right, middle row (**D**) |
 | Basic Attack 1 (BA1) | `U` | Lower-right, bottom row (**BA1**) |
 | Basic Attack 2 (BA2) | `I` | Lower-right, bottom row (**BA2**) |
 | Pause | `Esc` or `P` | Timer or pause button, top centre |
@@ -67,21 +68,36 @@ attack animations. Their touch buttons have dashed outlines.
   ground, a kunai slash in the air. It picks the move the same way, and a
   mid-air BA2 that lands also plays to the end. Internally this is the
   `action2` input.
+- **Defense:** the game's generic defensive input: `L`, RB / RT on a
+  gamepad, **D** on touch. Different characters may implement Defense
+  differently (a Dodge, or in future a Block); the button stays the same.
+  #0001 uses **Dodge**. One press plays one Dodge: a grounded sidestep
+  (`dodge1 → dodge2 → dodge3`) on the ground, or a mid-air Dodge
+  (`midairdodge1 → midairdodge2 → midairdodge3`) in the air, chosen when you
+  press it. Holding Defense does not repeat it; press again for another.
+  Attacks pass straight through #0001 during the evasive frames (the side-on
+  `dodge2`, and the afterimage frames `midairdodge1`–`2`) and hit normally
+  before and after them. There is no chip damage, blockstun or guard pose.
+  The Dodge adds no dash or teleport: gravity keeps working in the air, and a
+  mid-air Dodge that lands plays to the end. The touch button reads **D**
+  because #0001's Defense is a Dodge.
 - **Charge:** hold `S` / `↓` (**C** on touch, D-pad down or left stick down
-  on a gamepad) while #0001 is on the ground. It plays a two-frame startup
-  once, then loops its sustained pose for as long as you hold it. Charge must
-  be held; it never toggles. Release it to stop, and the next Charge starts
-  from the beginning again. #0001 stays in place while charging. Charge has
-  no hitbox, armour or invulnerability, and Jump, BA1, BA2, Block and getting
-  hit all take over from it. It works on one-way platforms without dropping
-  through them. There is no drop-through control: walk off an edge to come
-  down.
+  on a gamepad) while #0001 is on the ground. Held, it plays
+  `charge1 → charge2` once, then loops `chargea ↔ chargeb` for as long as you
+  hold it. Charge must be held; it never toggles. Let go and #0001 shows
+  `charge1` briefly as a release pose (one Charge frame, 0.1 s), then returns
+  to its normal state; the next Charge starts from the beginning again.
+  #0001 stays in place while charging. Charge has no hitbox, armour or
+  invulnerability. A Dodge, Jump, BA1, BA2 or getting hit take over from it at
+  once, without waiting for the release pose. It works on one-way platforms
+  without dropping through them. There is no drop-through control: walk off
+  an edge to come down.
 - **Energy:** the blue bar under each health bar. It begins full, and nothing
   spends or restores it yet.
 - **Menus:** arrow keys or WASD to move, `Enter` to select, `Esc` to go back. Mouse and touch work too.
 - **Touch:** several fingers work at once (hold Right and press Jump, or hold C and press BA1). You can slide your thumb between Left / Charge / Right.
-- **Gamepad (standard layout):** D-pad or left stick left / right to move and down to Charge in battle (they still navigate menus), A to jump, B / Circle for Basic Attack 1, LB for Basic Attack 2, X / Y for the reserved actions, RB or RT to block, Start to pause.
-- **Debug:** `` ` `` toggles the collider, hurtbox and attack-hitbox overlay in battle (a hitbox shows only while it can connect).
+- **Gamepad (standard layout):** D-pad or left stick left / right to move and down to Charge in battle (they still navigate menus), A to jump, B / Circle for Basic Attack 1, LB for Basic Attack 2, X / Y for the reserved actions, RB or RT for Defense, Start to pause.
+- **Debug:** `` ` `` toggles the collider, hurtbox and attack-hitbox overlay in battle (a hitbox shows only while it can connect; hurtboxes turn gray while a Dodge makes the fighter invulnerable).
 
 Touch controls show on touch-first devices (coarse pointer, or a touch actually detected). A narrow desktop window doesn't count as a phone. On a phone held in portrait, the game pauses and asks you to rotate.
 
@@ -89,8 +105,9 @@ Touch controls show on touch-first devices (coarse pointer, or a touch actually 
 
 - **Characters:** #0001
 - **Maps:** Desert (wide, open, 3.8 screens) and City (rooftops with 7 one-way platforms, 3.1 screens)
-- **Animations:** Idle, Run, Jump, Fall, Land (jump/fall play while airborne; land plays once on touchdown), Hurt and Mid-air Hurt (shown during hitstun on the ground / in the air), Basic Attack 1 (4 frames), Mid-air Basic Attack 1 (5 frames), Basic Attack 2 (7 frames) and Mid-air Basic Attack 2 (3 frames), each played once at 12 fps, and Charge (charge1 → charge2 once, then chargea ↔ chargeb while held, at 10 fps)
+- **Animations:** Idle, Run, Jump, Fall, Land (jump/fall play while airborne; land plays once on touchdown), Hurt and Mid-air Hurt (shown during hitstun on the ground / in the air), Basic Attack 1 (4 frames), Mid-air Basic Attack 1 (5 frames), Basic Attack 2 (7 frames) and Mid-air Basic Attack 2 (3 frames), each played once at 12 fps, Dodge and Mid-air Dodge (3 frames each, played once at 12 fps), and Charge (charge1 → charge2 once, then chargea ↔ chargeb while held, at 10 fps, with charge1 shown briefly on release)
 - **Attacks:** Basic Attack 1 and Basic Attack 2, each on the ground and in the air. Primary and Special are reserved.
+- **Defense:** #0001 dodges, on the ground and in the air.
 - **HUD:** each fighter panel shows a green health bar with a blue Energy bar directly beneath it. Both start full.
 - **Mode:** Quick Battle: 1 round, 99 seconds, against a non-attacking training CPU
 
@@ -146,7 +163,7 @@ js/
   ui/                 wordmark, icons, overlays, shared help content, stage preview
 ```
 
-- **Sprite normalization.** The idle, jump, fall, land and hurt frames are pixel art at roughly 16× scale, the mid-air hurt, Basic Attack 1 and 2 and Charge frames at 8×, and the run frames at 4×. When a frame loads, the game reads its alpha channel once and finds the visible bounds. It then detects the pixel grid from every colour transition and resamples the frame to 1 pixel per art pixel. Every frame is drawn at the same world scale, anchored bottom-centre at the upper-body centroid, so the fighter keeps the same size and position when switching between animations. When the size stays close to the target, each art pixel maps to a whole number of device pixels.
+- **Sprite normalization.** The idle, jump, fall, land and hurt frames are pixel art at roughly 16× scale, the mid-air hurt, Basic Attack 1 and 2, Charge and Dodge frames at 8×, and the run frames at 4×. When a frame loads, the game reads its alpha channel once and finds the visible bounds. It then detects the pixel grid from every colour transition and resamples the frame to 1 pixel per art pixel. Every frame is drawn at the same world scale, anchored bottom-centre at the upper-body centroid, so the fighter keeps the same size and position when switching between animations. When the size stays close to the target, each art pixel maps to a whole number of device pixels.
 - **Simulation.** Fixed 60 Hz steps with interpolated rendering, so movement is the same at 30, 60 and 120 Hz. Colliders, hurtboxes and pushboxes are set in data and don't depend on PNG size.
 - **Stages.** Six parallax layers (sky, far, mid, near, terrain, atmosphere) are generated once from a seeded RNG into cached `Path2D` geometry. Collision comes only from `js/data/maps.js`, so any layer can later be swapped for image art.
 
@@ -157,6 +174,8 @@ js/
 3. Give it a free `rosterSlot`.
 
 To add attacks, create animations with real frames, define them in `attacks` (see the schema in `js/game/combat.js`), and map them in `actions`: a string for one attack, or `{ ground, air }` to pick by whether the fighter is grounded (as #0001's `action1: { ground: 'ba1', air: 'midairBa1' }` and `action2: { ground: 'ba2', air: 'midairBa2' }` do). Time `startup` / `active` / `recovery` to whole frames of the clip so the hitbox is live only while the strike is on screen. An attack without frames is refused rather than faked.
+
+To choose how a fighter defends, give it a `defense` entry. `{ type: 'dodge', ground, air }` (like #0001) plays one Dodge clip per press, with `startup` / `invulnerable` / `recovery` timed to whole frames of that clip; `{ type: 'block' }` is a held guard that takes chip damage (`stats.blockDamageScale`) and each attack's `blockstun`. Either way the player presses the same Defense button. A Dodge without frames is refused, so it never grants invisible invulnerability.
 
 ### Adding a map
 

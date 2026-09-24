@@ -20,8 +20,11 @@ const BASE_0001 = './assets/characters/0001/0001_';
 const BA1_FPS = 12;
 // Same for Basic Attack 2: its phases are whole frames at this rate.
 const BA2_FPS = 12;
-// Playback rate of both Charge clips (startup and sustained loop).
+// Playback rate of the Charge clips (startup, sustained loop and release).
 const CHARGE_FPS = 10;
+// Playback rate of both Dodge clips. The Dodge phases below are whole frames
+// at this rate, so the invulnerable window stays on the evasive art.
+const DODGE_FPS = 12;
 
 export const CHARACTERS = [
   {
@@ -130,18 +133,42 @@ export const CHARACTERS = [
         loop: true,
         heightRatio: 1,
       },
+      // Letting go of Charge shows charge1 again for one Charge frame-time
+      // before the normal state resumes. Same artwork as the startup's first
+      // frame, on purpose.
+      chargeRelease: {
+        frames: [`${BASE_0001}charge1.png`],
+        fps: CHARGE_FPS,
+        loop: false,
+        heightRatio: 1,
+      },
+      // Dodge, #0001's Defense: `dodge` on the ground, `midairDodge` in the
+      // air. Each plays once per Defense press; the `defense` entry below
+      // times the invulnerable frames to this art. dodge3 happens to be the
+      // same image as charge1; it is still the Dodge's own recovery frame.
+      dodge: {
+        frames: frames(BASE_0001, 'dodge', 3),
+        fps: DODGE_FPS,
+        loop: false,
+        heightRatio: 1,
+      },
+      midairDodge: {
+        frames: frames(BASE_0001, 'midairdodge', 3),
+        fps: DODGE_FPS,
+        loop: false,
+        heightRatio: 0.96,
+      },
     },
 
-    // States without dedicated art yet, plus a still idle frame for the
-    // airborne, landing, hurt and charge clips if their frames fail to load.
-    // `frame` holds a single frame instead of looping, so the fighter never
-    // stretches or rotates to fake a pose. Attacks never fall back: an attack
-    // whose frames are missing is refused (see Fighter.tryAction).
+    // A still idle frame for the airborne, landing, hurt and charge clips if
+    // their frames fail to load. `frame` holds a single frame instead of
+    // looping, so the fighter never stretches or rotates to fake a pose.
+    // Attacks and Dodges never fall back: one whose frames are missing is
+    // refused (see Fighter.tryAction and Fighter.tryDefense).
     animationFallbacks: {
       jump: { animation: 'idle', frame: 0 },
       fall: { animation: 'idle', frame: 0 },
       land: { animation: 'idle', frame: 0 },
-      block: { animation: 'idle' },
       hurt: { animation: 'idle', frame: 0 },
       midairHurt: { animation: 'idle', frame: 0 },
       chargeStart: { animation: 'idle', frame: 0 },
@@ -191,7 +218,31 @@ export const CHARACTERS = [
       // Energy capacity. Fighters start full; nothing spends or restores
       // Energy yet.
       energy: 100,
-      blockDamageScale: 0.15,
+    },
+
+    // What the shared Defense input (L, RB / RT, touch D) does for this
+    // fighter. #0001 dodges: each new press plays one Dodge, `ground` or `air`
+    // by whether it is grounded at the press. Phases are whole frames of the
+    // clip (see createDefenseDefinition in js/game/combat.js); attacks pass
+    // through only during `invulnerable`. On the ground that is dodge2, the
+    // side-on lean away (dodge1 braces, dodge3 settles back). In the air it is
+    // midairdodge1-2, the frames drawn breaking up into afterimages
+    // (midairdodge3 is solid again). A future blocking fighter would use
+    // { type: 'block' } instead, with stats.blockDamageScale for chip damage.
+    defense: {
+      type: 'dodge',
+      ground: {
+        animation: 'dodge',
+        startup: 1 / DODGE_FPS,
+        invulnerable: 1 / DODGE_FPS,
+        recovery: 1 / DODGE_FPS,
+      },
+      air: {
+        animation: 'midairDodge',
+        startup: 0,
+        invulnerable: 2 / DODGE_FPS,
+        recovery: 1 / DODGE_FPS,
+      },
     },
 
     // Controller actions -> attack ids. A string is one attack; { ground, air }

@@ -13,8 +13,8 @@ const PAD_BUTTONS = {
   3: 'special',  // Y / Triangle
   1: 'action1',  // B / Circle
   4: 'action2',  // LB
-  5: 'block',    // RB
-  7: 'block',    // RT
+  5: 'defense',  // RB
+  7: 'defense',  // RT
   12: 'jump',    // D-pad up
   13: 'charge',  // D-pad down (menus still read it as Down; see _padMenu)
   14: 'left',
@@ -47,11 +47,11 @@ export class InputManager {
 
     // Reused per-step snapshot to avoid allocations in the sim loop.
     this.frame = {
-      left: false, right: false, charge: false, jump: false, block: false,
+      left: false, right: false, charge: false, jump: false, defense: false,
       primary: false, special: false, action1: false, action2: false,
       jumpPressed: false, chargePressed: false, primaryPressed: false,
       specialPressed: false, action1Pressed: false, action2Pressed: false,
-      blockPressed: false,
+      defensePressed: false,
     };
 
     this._onKeyDown = this._onKeyDown.bind(this);
@@ -158,14 +158,14 @@ export class InputManager {
     f.right = this.isHeld('right');
     f.charge = this.isHeld('charge');
     f.jump = this.isHeld('jump');
-    f.block = this.isHeld('block');
+    f.defense = this.isHeld('defense');
     f.primary = this.isHeld('primary');
     f.special = this.isHeld('special');
     f.action1 = this.isHeld('action1');
     f.action2 = this.isHeld('action2');
     f.jumpPressed = this.consume('jump');
     f.chargePressed = this.consume('charge');
-    f.blockPressed = this.consume('block');
+    f.defensePressed = this.consume('defense');
     f.primaryPressed = this.consume('primary');
     f.specialPressed = this.consume('special');
     f.action1Pressed = this.consume('action1');

@@ -70,8 +70,8 @@ test('keyboard I and gamepad LB press action2; U and B / Circle still press acti
   button(1, true); // B / Circle
   assert.deepEqual(pressed(), ['action1']);
   button(1, false);
-  // Block and jump mappings are unchanged.
-  for (const [i, action] of [[0, 'jump'], [5, 'block'], [7, 'block']]) {
+  // Defense and jump mappings are unchanged.
+  for (const [i, action] of [[0, 'jump'], [5, 'defense'], [7, 'defense']]) {
     button(i, true);
     assert.equal(input.sample()[action], true, `button ${i}`);
     button(i, false);
@@ -372,13 +372,18 @@ test('a ground BA2 hit shows the target in its hurt pose, then knocks it away', 
   assert.equal(target.grounded, true);
 });
 
-test('a blocked BA2 does chip damage and blockstun', () => {
-  const { attacker, target, tick, events } = duel();
-  tick(BA2, { block: true });
-  while (attacker.combat.attack) tick({}, { block: true });
+test('a Block-type fighter guarding BA2 takes chip damage and blockstun; #0001 itself does not block', () => {
+  // #0001's Defense is a Dodge, so the block path is kept for future
+  // characters whose Defense is { type: 'block' }.
+  const blocker = { ...def, defense: { type: 'block' }, stats: { ...def.stats, blockDamageScale: 0.15 } };
+  const { attacker, target, tick, events } = duel({ targetCharacter: blocker });
+  tick(BA2, { defense: true });
+  assert.equal(target.combat.blocking, true);
+  while (attacker.combat.attack) tick({}, { defense: true });
   assert.equal(events.length, 1);
   assert.equal(events[0].type, 'block');
-  assert.ok(Math.abs(target.combat.health - (100 - 8 * def.stats.blockDamageScale)) < 1e-9);
+  assert.ok(Math.abs(target.combat.health - (100 - 8 * 0.15)) < 1e-9);
+  assert.equal(def.stats.blockDamageScale, undefined, '#0001 has no chip-damage stat');
 });
 
 test('mid-air BA2 hits a grounded opponent in front while still airborne', () => {

@@ -3,12 +3,13 @@
 // Layout (matches the reference ergonomics):
 //   lower-left : [LEFT] [C] [RIGHT]  — thumb can slide between them
 //   lower-right:              [PRIMARY]
-//                     [SPECIAL] [BLOCK]
+//                       [SPECIAL] [D]
 //                    [BA1] [BA2] [JUMP]
 //
 // C is Charge (the `charge` input, held for as long as the pointer stays on
-// it). BA1 (Basic Attack 1) is the `action1` input, BA2 (Basic Attack 2) the
-// `action2` input.
+// it). D is Defense (the `defense` input), labelled Defense; it reads D
+// because #0001's Defense is a Dodge. BA1 (Basic Attack 1) is the `action1`
+// input, BA2 (Basic Attack 2) the `action2` input.
 //
 // Every pointer is tracked by pointerId, so Right + Jump (or any combination)
 // works simultaneously. State is pushed into InputManager.setTouch().
@@ -27,7 +28,7 @@ const DPAD = [
 const ACTION_BUTTONS = [
   { action: 'primary', label: 'Primary', icon: ICONS.primary, pos: 'primary', pending: true },
   { action: 'special', label: 'Special', icon: ICONS.special, pos: 'special', pending: true },
-  { action: 'block', label: 'Block', icon: ICONS.block, pos: 'block' },
+  { action: 'defense', label: 'Defense', text: 'D', pos: 'defense' },
   { action: 'action1', label: 'Basic Attack 1', text: 'BA1', pos: 'a1' },
   { action: 'action2', label: 'Basic Attack 2', text: 'BA2', pos: 'a2' },
   { action: 'jump', label: 'Jump', icon: ICONS.jump, pos: 'jump' },

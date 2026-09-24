@@ -6,9 +6,9 @@ import { range } from '../core/utils.js';
 
 function blankInput() {
   return {
-    left: false, right: false, charge: false, jump: false, block: false,
+    left: false, right: false, charge: false, jump: false, defense: false,
     primary: false, special: false, action1: false, action2: false,
-    jumpPressed: false, chargePressed: false, blockPressed: false,
+    jumpPressed: false, chargePressed: false, defensePressed: false,
     primaryPressed: false, specialPressed: false, action1Pressed: false, action2Pressed: false,
     dropPressed: false,
   };
@@ -27,8 +27,8 @@ export class PlayerController {
 
 // Non-attacking training opponent: keeps a readable distance, follows the
 // player across platforms and occasionally repositions. It never presses
-// combat buttons (Basic Attacks 1 and 2 included) or Charge, so the player can
-// practise on it. It drops through one-way platforms with `dropPressed`, an
+// combat buttons (Basic Attacks 1 and 2 included), Charge or Defense, so the
+// player can practise on it. It drops through one-way platforms with `dropPressed`, an
 // intent no player control produces.
 export class TrainingAIController {
   constructor({ rng = Math.random } = {}) {

@@ -4,7 +4,7 @@
 
 import { SpriteAnimator } from './sprite-animator.js';
 import { createBody, stepBody, dropThrough } from './physics.js';
-import { CombatState, createAttackDefinition } from './combat.js';
+import { CombatState, createAttackDefinition, createDefenseDefinition } from './combat.js';
 import { approach, clamp, sign } from '../core/utils.js';
 
 export const COMBAT_ACTIONS = ['primary', 'special', 'action1', 'action2'];
@@ -15,9 +15,9 @@ export const COMBAT_ACTIONS = ['primary', 'special', 'action1', 'action2'];
 const TIME_EPSILON = 1e-6;
 
 const NEUTRAL_INPUT = Object.freeze({
-  left: false, right: false, charge: false, jump: false, block: false,
+  left: false, right: false, charge: false, jump: false, defense: false,
   primary: false, special: false, action1: false, action2: false,
-  jumpPressed: false, chargePressed: false, blockPressed: false,
+  jumpPressed: false, chargePressed: false, defensePressed: false,
   primaryPressed: false, specialPressed: false, action1Pressed: false, action2Pressed: false,
   dropPressed: false,
 });
@@ -34,9 +34,13 @@ export class Fighter {
     this.landDuration = sprites.duration('land');
     // One pass of the Charge startup clip; the loop clip follows it.
     this.chargeStartDuration = sprites.duration('chargeStart');
+    // One Charge frame-time of the release pose; 0 skips it entirely.
+    this.chargeReleaseDuration = sprites.duration('chargeRelease');
     this.attacks = Object.fromEntries(
       Object.entries(def.attacks || {}).map(([id, spec]) => [id, createAttackDefinition({ id, ...spec })]),
     );
+    // What the shared Defense input does for this character (null: nothing).
+    this.defense = createDefenseDefinition(def.defense);
     this.opponent = null;
     this.spawn = spawn;
     this.reset(stage);
@@ -60,6 +64,7 @@ export class Fighter {
     this.stateTime = 0;
     this.moveDir = 0;
     this.charging = false;
+    this.chargeReleased = false;
     this.coyote = 0;
     this.jumpBuffer = 0;
     this.lastGroundY = this.body.y;
@@ -80,6 +85,8 @@ export class Fighter {
 
     const raw = this.controller ? this.controller.getInput(this, dt, ctx) : NEUTRAL_INPUT;
     const input = this.inputLocked ? NEUTRAL_INPUT : raw;
+    const wasCharging = this.charging;
+    this.chargeReleased = false;
 
     combat.update(dt);
     if (combat.hitstop > 0) {
@@ -94,14 +101,20 @@ export class Fighter {
     for (const action of COMBAT_ACTIONS) {
       if (input[`${action}Pressed`]) this.tryAction(action);
     }
-    // After the intents, so an attack started this step also rules out a
-    // jump, block, charge or platform drop on the same step.
+    // ---- Defense ---------------------------------------------------------
+    // A Dodge starts only on a new press, after the attacks so an attack
+    // started this step keeps it (and a Dodge keeps a jump) from starting too.
+    if (input.defensePressed) this.tryDefense();
+    // After the intents, so an attack or Dodge started this step also rules
+    // out a jump, Block guard, charge or platform drop on the same step.
     const canAct = combat.canAct();
-    combat.blocking = canAct && body.grounded && input.block;
+    // Block-type Defense is a held guard; a Dodge fighter never blocks.
+    combat.blocking = this.defense?.type === 'block' && canAct && body.grounded && !!input.defense;
 
     // ---- Charge: grounded, and only while held ---------------------------
     // The held value alone decides it: no toggle, latch or buffer, so the
-    // step that sees Charge released ends it. Block wins if both are held.
+    // step that sees Charge released ends it. Defense interrupts it: a Dodge
+    // through canAct, a held Block guard here.
     this.charging = canAct && body.grounded && !!input.charge && !combat.blocking;
 
     // ---- Platform drop (training CPU only) -------------------------------
@@ -112,9 +125,12 @@ export class Fighter {
     }
 
     // ---- Horizontal movement ---------------------------------------------
+    // A Dodge locks it too: no new acceleration, and the current velocity
+    // slows under the normal deceleration (in the air, the gentle air drag),
+    // so the art never moves the body (no dash, lift or teleport).
     let dir = (input.right ? 1 : 0) - (input.left ? 1 : 0);
     const locked =
-      combat.blocking || this.charging || combat.stun > 0 ||
+      combat.blocking || this.charging || combat.stun > 0 || combat.defenseAction ||
       (combat.attack && combat.attack.def.lockMovement);
     if (locked) dir = 0;
     this.moveDir = dir;
@@ -146,12 +162,35 @@ export class Fighter {
       combat.blocking = false;
     }
 
+    // ---- Voluntary Charge release ----------------------------------------
+    // Charging last step, Charge let go this step, and nothing else took over
+    // (a hit, attack, Dodge, guard or jump all rule it out through canAct,
+    // blocking or grounded). Only then does the brief release pose play.
+    this.chargeReleased =
+      wasCharging && !input.charge && canAct && body.grounded && !combat.blocking;
+
     // ---- Integrate -------------------------------------------------------
     stepBody(body, dt, ctx.stage, ctx.gravity);
     if (body.grounded) this.lastGroundY = body.y;
 
     this.updateFacing(dir);
     this.updateState(dt);
+  }
+
+  // Starts one Dodge, if this fighter's Defense is a Dodge and it is free to
+  // act. Ground or air is chosen here, once, and kept for the whole clip.
+  tryDefense() {
+    const spec = this.defense;
+    if (spec?.type !== 'dodge' || !this.combat.canAct()) return false;
+    const move = this.body.grounded ? spec.ground : spec.air;
+    if (!move) return false;
+    // Never grant invisible invulnerability: require real Dodge frames.
+    if (!move.animation || !this.sprites.has(move.animation)) {
+      console.warn(`[Alva] Dodge "${move.animation}" has no animation frames; ignoring.`);
+      return false;
+    }
+    this.combat.defenseAction = { type: 'dodge', def: move, time: 0 };
+    return true;
   }
 
   tryAction(action) {
@@ -181,8 +220,8 @@ export class Fighter {
   }
 
   updateFacing(dir) {
-    const { body } = this;
-    if (this.combat.attack || this.combat.stun > 0) return;
+    const { body, combat } = this;
+    if (combat.attack || combat.defenseAction || combat.stun > 0) return;
     if (dir !== 0 && (Math.abs(body.vx) > 20 || !body.grounded)) {
       this.facing = dir;
       return;
@@ -199,10 +238,12 @@ export class Fighter {
     let next;
     if (combat.stun > 0) next = 'hitstun';
     else if (combat.attack) next = 'attack';
+    else if (combat.defenseAction) next = 'defense';
     else if (!body.grounded) next = body.vy < 0 ? 'jump' : 'fall';
     else if (this.isLanding(dt)) next = 'land';
     else if (combat.blocking) next = 'block';
     else if (this.charging) next = 'charge';
+    else if (this.isReleasingCharge(dt)) next = 'chargeRelease';
     else if ((this.moveDir !== 0 && Math.abs(body.vx) > 20) || Math.abs(body.vx) > 140) next = 'run';
     else next = 'idle';
 
@@ -224,13 +265,14 @@ export class Fighter {
     this.animator.update(dt);
   }
 
-  // Animation key for a visual state. An attack plays its own clip for its
-  // whole length, even if the fighter lands or leaves the ground meanwhile.
-  // Hitstun shows `hurt` on the ground and `midairHurt` in the air.
+  // Animation key for a visual state. An attack or Dodge plays its own clip
+  // for its whole length, even if the fighter lands or leaves the ground
+  // meanwhile. Hitstun shows `hurt` on the ground and `midairHurt` in the air.
   // Charge plays `chargeStart` once, then `chargeLoop` for the rest of the
   // hold; a new Charge resets stateTime, so it starts from the first frame.
   animationFor(state) {
     if (state === 'attack') return this.combat.attack.def.animation;
+    if (state === 'defense') return this.combat.defenseAction.def.animation;
     if (state === 'hitstun') return this.body.grounded ? 'hurt' : 'midairHurt';
     if (state === 'charge') {
       return this.stateTime < this.chargeStartDuration - TIME_EPSILON ? 'chargeStart' : 'chargeLoop';
@@ -244,6 +286,15 @@ export class Fighter {
     if (!this.landDuration) return false;
     if (this.body.landed) return true;
     return this.state === 'land' && this.stateTime + dt < this.landDuration;
+  }
+
+  // A voluntary Charge release starts the chargeRelease state; it then lasts
+  // one Charge frame-time while nothing of higher priority takes over. A new
+  // Charge outranks it and starts again from charge1.
+  isReleasingCharge(dt) {
+    if (!this.chargeReleaseDuration) return false;
+    if (this.chargeReleased) return true;
+    return this.state === 'chargeRelease' && this.stateTime + dt < this.chargeReleaseDuration - TIME_EPSILON;
   }
 
   // Interpolated position for rendering between fixed steps.

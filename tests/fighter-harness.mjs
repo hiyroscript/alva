@@ -81,10 +81,13 @@ export function recordAttack(step, held) {
 export const sequence = (log) => log.map((s) => s.frame).filter((n, i, a) => n !== a[i - 1]);
 
 // Two fighters and the real CombatSystem, stepped like Battle.step().
-export function duel({ gap = 44, attackerFacing = 1, attackerSprites, targetSprites } = {}) {
+// `targetCharacter` swaps in another definition (e.g. a Block-type fighter).
+export function duel({ gap = 44, attackerFacing = 1, attackerSprites, targetSprites, targetCharacter } = {}) {
   const x = 500;
   const a = makeFighter({ x, facing: attackerFacing, sprites: attackerSprites });
-  const b = makeFighter({ x: x + gap * attackerFacing, facing: -attackerFacing, sprites: targetSprites });
+  const b = makeFighter({
+    x: x + gap * attackerFacing, facing: -attackerFacing, sprites: targetSprites, character: targetCharacter,
+  });
   a.fighter.opponent = b.fighter;
   b.fighter.opponent = a.fighter;
   const system = new CombatSystem();
