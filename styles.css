@@ -1030,6 +1030,172 @@ html:not(.is-pointer-input) .mode-card:focus { box-shadow: var(--focus-ring), va
 .md-throw { left: 88%; top: 27%; width: 12.5%; border: 2px solid var(--accent); }
 
 /* ---------------------------------------------------------------------
+   Discover — the in-game reference: an index rail beside one page
+   --------------------------------------------------------------------- */
+
+.discover-layout {
+  grid-template-columns: clamp(124px, 16vw, 200px) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  gap: clamp(14px, 2.6vw, 32px);
+}
+.discover-rail {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  padding-right: clamp(10px, 1.6vw, 20px);
+  border-right: 1px solid var(--border);
+}
+/* The open section wears a bar on its leading edge, a faint wash and full,
+   bolder type, so it reads without the green too. */
+.discover-tab {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 10px 12px;
+  border-left: 2px solid transparent;
+  border-radius: 0 3px 3px 0;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-align: left;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  transition: color 120ms ease, border-color 120ms ease, background-color 120ms ease, box-shadow 120ms ease;
+}
+.discover-tab:hover { color: var(--text); background: var(--surface-subtle); }
+.discover-tab.is-active { color: var(--text-strong); font-weight: 700; border-left-color: var(--accent); background: var(--accent-wash); }
+/* Hover is a preview and a press selects, so the ring is for keyboard and
+   gamepad focus only. */
+html:not(.is-pointer-input) .discover-tab:focus { box-shadow: var(--focus-ring-inset); }
+
+.discover-panels { min-height: 0; display: grid; }
+.discover-panel {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 4px 12px 16px 4px;
+  border-radius: 3px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+  touch-action: pan-y;
+  user-select: text;
+  -webkit-user-select: text;
+}
+.discover-panel:focus { outline: none; }
+/* Framed rather than recoloured: an empty page shows its focus too. */
+html:not(.is-pointer-input) .discover-panel:focus { box-shadow: var(--focus-ring-inset); }
+
+.discover-page { display: grid; gap: clamp(10px, 2vh, 16px); max-width: 1040px; }
+.discover-page-title,
+.discover-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+.discover-label { margin: 0; font-size: 10px; color: var(--text-muted); }
+
+/* One reference entry per Power, under a hairline: what it does and who
+   owns which tier beside its tiers, in two columns wherever both fit. */
+.discover-entry {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 190px), 1fr));
+  gap: clamp(14px, 2.6vw, 32px);
+  align-items: start;
+  padding-top: clamp(12px, 2.4vh, 20px);
+  border-top: 1px solid var(--border);
+}
+.discover-entry-about { display: grid; gap: 10px; min-width: 0; }
+.discover-entry-title {
+  font-weight: 700;
+  font-size: clamp(17px, 3.2vh, 22px);
+  line-height: 1.15;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--text-strong);
+}
+.discover-entry-text { max-width: 46ch; color: var(--text-secondary); font-size: 14px; line-height: 1.55; }
+.discover-owners { display: grid; gap: 8px; margin-top: 4px; padding-top: 12px; border-top: 1px solid var(--border); }
+
+.discover-tiers { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; min-width: 0; }
+.discover-tier {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 14px;
+  min-height: 58px;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background: var(--surface);
+}
+.discover-tier.is-used { border-color: var(--border-strong); background: var(--surface-subtle); }
+.discover-meter { display: inline-flex; align-items: flex-end; gap: 3px; height: 20px; }
+.discover-meter i { width: 5px; border-radius: 1px; background: var(--border-strong); }
+.discover-meter i.is-on { background: var(--text-secondary); }
+.discover-tier.is-used .discover-meter i.is-on { background: var(--accent); }
+.discover-tier-copy { display: grid; justify-items: start; gap: 3px; min-width: 0; }
+.discover-tier-name {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-strong);
+}
+.discover-tier-desc { color: var(--text-secondary); font-size: 14px; line-height: 1.4; }
+.discover-tier-users {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 5px;
+  padding: 3px 9px 3px 7px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-pill);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text);
+}
+.discover-tier-check { display: inline-grid; color: var(--accent-hi); }
+.discover-tier-check .icon { font-size: 12px; stroke-width: 3; }
+
+/* Compact landscape: a slimmer rail and tighter tiers so the page fits
+   without much scrolling. The rail stays down the side here, where height
+   is scarcer than width. */
+@media (max-height: 560px) {
+  .discover-layout { grid-template-columns: clamp(108px, 16vw, 200px) minmax(0, 1fr); }
+  .discover-tab { min-height: 38px; padding: 8px 10px; font-size: 11px; letter-spacing: 0.12em; }
+  .discover-tier { min-height: 50px; padding: 8px 12px; }
+  .discover-entry-text, .discover-tier-desc { font-size: 13px; }
+}
+/* Narrow windows (never short landscape ones): the rail runs across the
+   top, its bar under the open section. Keep in step with NARROW_QUERY in
+   js/screens/discover-screen.js. */
+@media (max-width: 600px) and (min-height: 441px), (max-aspect-ratio: 1/1) and (min-height: 600px) {
+  .discover-layout { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); gap: clamp(10px, 2vh, 16px); }
+  .discover-rail { flex-direction: row; gap: 2px; padding-right: 0; border-right: 0; border-bottom: 1px solid var(--border); }
+  .discover-tab {
+    flex: 1;
+    justify-content: center;
+    min-height: 40px;
+    margin-bottom: -1px;
+    padding: 8px 6px;
+    border-left: 0;
+    border-bottom: 2px solid transparent;
+    border-radius: 3px 3px 0 0;
+    text-align: center;
+  }
+  .discover-tab.is-active { border-bottom-color: var(--accent); }
+}
+
+/* ---------------------------------------------------------------------
    Battle — dark chrome over the original-colour stage art
    --------------------------------------------------------------------- */
 
@@ -1511,6 +1677,7 @@ html.is-touch .touch-controls { display: block; }
 .screen--mode .btn-back,
 .screen--character .btn-back,
 .screen--map .btn-back,
+.screen--discover .btn-back,
 .mode-card,
 .mode-info,
 .mode-cta,

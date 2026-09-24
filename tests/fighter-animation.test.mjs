@@ -7,6 +7,7 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { CHARACTERS, characterFramePaths } from '../js/data/characters.js';
 import { CONFIG } from '../js/config.js';
+import { getJumpVelocity } from '../js/data/powers.js';
 import { def, DT, BASE, fakeSprites, makeFighter, frameName, stepUntil } from './fighter-harness.mjs';
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
@@ -123,11 +124,16 @@ test('the third ground BA1 frame is exactly 0001_1ba3.png, with no U+FFFC anywhe
 });
 
 test('movement, collider and hurtbox data are unchanged', () => {
+  // The jump's strength moved to the Power system (js/data/powers.js):
+  // movement keeps every other stat, and no raw jumpVelocity can drift from
+  // the tier that now decides it.
   assert.deepEqual(def.movement, {
     maxSpeed: 330, acceleration: 2600, deceleration: 3200, turnBoost: 1.6,
-    airAcceleration: 1500, airDeceleration: 420, jumpVelocity: 920, gravityScale: 1,
+    airAcceleration: 1500, airDeceleration: 420, gravityScale: 1,
     maxFallSpeed: 1500, coyoteTime: 0.08, jumpBuffer: 0.12, dropThroughTime: 0.28,
   });
+  assert.deepEqual(def.powers, { jump: 2 });
+  assert.equal(getJumpVelocity(def), 920, 'Jump Power 2 is the original jump');
   assert.deepEqual(def.collider, { width: 34, height: 80 });
   assert.deepEqual(def.pushbox, { width: 36 });
   assert.deepEqual(def.hurtboxes, [

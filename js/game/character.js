@@ -8,6 +8,7 @@ import { CombatState, createAttackDefinition, createDefenseDefinition } from './
 import { createProjectileDefinition } from './projectile.js';
 import { createSummonDefinition, summonProblem } from './clone.js';
 import { ChargedTechnique, createTechniqueDefinition, techniqueProblem } from './charged-technique.js';
+import { getJumpVelocity } from '../data/powers.js';
 import { approach, clamp, sign } from '../core/utils.js';
 
 export const COMBAT_ACTIONS = ['primary', 'special', 'action1', 'action2'];
@@ -53,6 +54,9 @@ export class Fighter {
     );
     // What the shared Defense input does for this character (null: nothing).
     this.defense = createDefenseDefinition(def.defense);
+    // Upward speed of the normal jump, from the character's Jump Power tier
+    // (js/data/powers.js). Nothing else (knockback, Dodges, techniques) uses it.
+    this.jumpVelocity = getJumpVelocity(def);
     this.opponent = null;
     this.spawn = spawn;
     this.reset(stage);
@@ -220,7 +224,7 @@ export class Fighter {
     else this.coyote = Math.max(0, this.coyote - dt);
 
     if (this.jumpBuffer > 0 && this.coyote > 0 && canAct) {
-      body.vy = -mv.jumpVelocity;
+      body.vy = -this.jumpVelocity;
       body.grounded = false;
       body.ground = null;
       this.coyote = 0;

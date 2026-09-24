@@ -5,8 +5,9 @@ JavaScript with Canvas 2D: no frameworks, no build step, no 3D. It runs on deskt
 and on phones and tablets in landscape.
 
 This is the first playable foundation: full menu flow, a 48-slot roster, two
-large stages, a Practice Ground training room, movement and platform physics,
-a camera, a HUD, touch controls,
+large stages, a Practice Ground training room, a Discover reference screen,
+movement and platform physics, a tiered Power system (starting with Jump
+Power), a camera, a HUD, touch controls,
 and a data-driven combat system with #0001's two real attacks, Basic Attack 1
 (BA1) and Basic Attack 2 (BA2), a ground and mid-air Dodge on the shared
 Defense input, a held Charge stance, a Charged BA1 Clone Attack, a Charged
@@ -168,6 +169,7 @@ Touch controls show on touch-first devices (coarse pointer, or a touch actually 
 - **Animations:** Idle, Run, Jump, Fall, Land (jump/fall play while airborne; land plays once on touchdown), Hurt and Mid-air Hurt (shown during hitstun on the ground / in the air), Basic Attack 1 (4 frames), Mid-air Basic Attack 1 (5 frames), Basic Attack 2 (7 frames) and Mid-air Basic Attack 2 (3 frames), each played once at 12 fps, Dodge and Mid-air Dodge (3 frames each, played once at 12 fps), Charge (charge1 → charge2 once, then chargea ↔ chargeb while held, at 10 fps, with charge1 shown briefly on release), Throw (3 fighter frames, played once at 12 fps), Shuriken (3 looping projectile frames at 18 fps, normalized and drawn separately from the fighter poses), the clone appear / vanish cloud (`0001_cloneav1`–`0001_cloneav10`, an effect at 20 fps: forwards as a clone appears, the same frames in reverse as it vanishes), the Sphere Rush poses (`0001_rasen1`–`0001_rasen12` as three one-shot fighter clips at 12 fps: formation 1–3, dash 4–6, hit follow-through 7–12) and its blue sphere (`0001_prasen1`–`0001_prasen11` as three one-shot effects at 12 fps: formation 1–6, on the opponent 7–9, explosion 10–11)
 - **Attacks:** Basic Attack 1 and Basic Attack 2, each on the ground and in the air, a ground Throw that releases one shuriken, the Charged BA1 Clone Attack (25 Energy) and the Charged BA2 Sphere Rush (ground only, two hits, no Energy cost). Special is reserved.
 - **Defense:** #0001 dodges, on the ground and in the air.
+- **Powers:** Jump Power in three tiers — 1 (very low jump), 2 (normal jump) and 3 (slightly higher jump). #0001 has Jump Power 2, its original jump.
 - **HUD:** each fighter panel shows a green health bar with a blue Energy bar directly beneath it. Both start full; the Energy bar drops by a quarter with each clone summoned.
 - **Modes:** Quick Battle: 1 round, 99 seconds, against a non-attacking training CPU. Practice Ground: training on its own stage, alone or with an optional stand-still CPU dummy, with no timer or rounds (below).
 
@@ -197,8 +199,14 @@ neutral.
   and focused arrow/Page keys scroll the credits manually. Automatic movement
   resumes from that position after about 2 seconds of inactivity; reduced-motion
   mode remains manual-only. **Practice Ground**, the secondary action under
-  Play, opens the training room directly. The strip shifts outward on narrow
-  screens.
+  Play, opens the training room directly, and **Discover** beneath it opens
+  the in-game reference. The strip shifts outward on narrow screens.
+- **Discover** takes its composition from Seren's Cars & more reference: an
+  index rail (**POWER**, **CONDITIONS**) beside one scrollable page of
+  structured entries, in Alva's charcoal, off-white and green. The open
+  section wears a green bar, a faint wash and bolder type; the rail runs
+  across the top on narrow windows but stays at the side in short
+  landscape.
 - **Practice Ground** is a pale, cool-gray simulation room: original Canvas
   artwork with a gridded back wall, a perspective floor and side walls at the
   bounds. Its HUD keeps Player 1's panel and a three-dots More button, top
@@ -222,14 +230,15 @@ js/
   main.js, config.js  boot + global config (bindings, render, timing)
   core/               app controller, screen manager, menu navigation,
                       asset loader, input (keyboard/touch/gamepad), device, audio stub
-  screens/            splash, home, mode, character, map, help, battle, practice
+  screens/            splash, home, mode, character, map, help, battle,
+                      practice, discover
   game/               arena (shared loop + rendering), Quick Battle, Practice
                       session, fighter state machine, physics, camera,
                       combat, projectiles, summoned clones, charged
                       techniques, sprite normalizer/animator, HUDs,
                       touch controls
   stages/             Desert, City and Practice renderers (procedural Canvas 2D)
-  data/               characters.js, maps.js, practice-map.js
+  data/               characters.js, maps.js, practice-map.js, powers.js
   ui/                 wordmark, icons, overlays, shared help content, stage
                       preview, fighter roster
 ```
@@ -285,10 +294,30 @@ until you choose Return.
   Revoke infinite energy until you turn it off. It survives Change Fighter.
 - Every new visit starts with no CPU and infinite energy off.
 
+### Powers
+
+Powers are gameplay abilities a fighter owns at a fixed tier. `js/data/powers.js` holds each Power's tier table (tier number, name, description and gameplay value) and is their single source of truth: a fighter's definition only names its tier, and the Discover screen reads the same table.
+
+- **Jump Power** sets the initial upward speed of a fighter's normal jump, in world units per second at the global gravity of 2500:
+
+  | Tier | Discover says | Jump speed |
+  | --- | --- | --- |
+  | Jump Power 1 | Very low jump. | 650 |
+  | Jump Power 2 | Normal jump. | 920 |
+  | Jump Power 3 | Slightly higher jump. | 1000 |
+
+- #0001 declares `powers: { jump: 2 }`. Jump Power 2 is exactly the 920 its jump always had, so it feels identical. Movement no longer has a raw `jumpVelocity`: the tier is the only source of jump strength.
+- `Fighter` resolves the tier once (`getJumpVelocity`) and uses it in the one shared jump, so Player 1, the Quick Battle CPU and Practice Ground all get it. Buffering, coyote time, action gating, animations, gravity, falling, knockback, launches, Dodges and charged techniques never depend on it. A definition with no valid tier is logged and gets Jump Power 2.
+- To add another Power, add its tier table and an entry to `POWERS`; Discover lists it with no screen changes. The tiers are not upgradeable or selectable in game.
+
+### Discover
+
+**Home → Discover** opens the reference. **POWER** (open by default) explains Jump Power and its three tiers, marking Jump Power 2 as used by #0001; no physics numbers are shown. **CONDITIONS** is intentionally empty until Alva has Conditions. Arrow keys, the D-pad or the stick move between Back, the sections and the page (↑ / ↓ scroll a long page); Back, `Esc` or gamepad B returns Home.
+
 ### Adding a fighter (#0002)
 
 1. Put the frames in `assets/characters/0002/`.
-2. Add a definition to `CHARACTERS` in `js/data/characters.js` (animations, movement, collider, hurtboxes, stats).
+2. Add a definition to `CHARACTERS` in `js/data/characters.js` (animations, movement, Power tiers such as `powers: { jump: 2 }`, collider, hurtboxes, stats).
 3. Give it a free `rosterSlot`.
 
 To add attacks, create animations with real frames, define them in `attacks` (see the schema in `js/game/combat.js`), and map them in `actions`: a string for one attack, or `{ ground, air }` to pick by whether the fighter is grounded (as #0001's `action1: { ground: 'ba1', air: 'midairBa1' }` and `action2: { ground: 'ba2', air: 'midairBa2' }` do). Time `startup` / `active` / `recovery` to whole frames of the clip so the hitbox is live only while the strike is on screen. An attack without frames is refused rather than faked.

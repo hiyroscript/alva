@@ -21,6 +21,7 @@ import { MapSelectScreen } from '../screens/map-select-screen.js';
 import { HelpCreditsScreen } from '../screens/help-credits-screen.js';
 import { BattleScreen } from '../screens/battle-screen.js';
 import { PracticeGroundScreen } from '../screens/practice-screen.js';
+import { DiscoverScreen } from '../screens/discover-screen.js';
 
 export class App {
   constructor() {
@@ -59,6 +60,7 @@ export class App {
     s.register(new HelpCreditsScreen(this));
     s.register(new BattleScreen(this));
     s.register(new PracticeGroundScreen(this));
+    s.register(new DiscoverScreen(this));
 
     // Preload every available fighter while the splash plays.
     for (const def of CHARACTERS) if (def.available) this.loadCharacter(def.id);

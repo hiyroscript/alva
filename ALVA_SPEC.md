@@ -141,9 +141,10 @@ behave, and how it must look. The README covers running and deploying it.
   Practice Ground (`PracticeSession`) runs Player 1, and an optional
   training-dummy CPU, with none of them.
 - Data-driven content: `js/data/characters.js`, `js/data/maps.js` (the Quick
-  Battle stages) and `js/data/practice-map.js` (the training stage). Adding a
-  fighter means adding frames, a definition and a roster slot — never editing
-  engine code.
+  Battle stages), `js/data/practice-map.js` (the training stage) and
+  `js/data/powers.js` (the Power tier tables, 7.2). Adding a fighter means
+  adding frames, a definition (including its Power tiers) and a roster slot —
+  never editing engine code.
 - Simulation uses fixed 60 Hz steps with interpolated rendering and a clamped
   frame delta, so behaviour is identical at 30, 60 and 120 Hz.
 
@@ -237,6 +238,7 @@ fit the palette.
 ```
 Splash → Home → Select Mode → Select Fighter → Select Stage → Battle
 Home → Practice Ground (starts at once with #0001)
+Home → Discover (Power / Conditions reference; Back returns Home)
 Practice Ground → More → Change Fighter (roster dialog) / Enable CPU or Change CPU (CPU roster dialog → Disable CPU) / Allow or Revoke infinite energy / Return (Home)
 Battle → Pause → Resume / Restart / Return to Home (confirmed); Help is shown but disabled for now
 Battle (time over, one fighter ahead) → Result → Rematch / Change Stage / Return to Home
@@ -278,13 +280,15 @@ no header, build label, eyebrow or keyboard hint bar.
 - **Intro:** the dramatically enlarged original ALVA SVG wordmark, then the
   supporting line "Fan project. Big heart." The wordmark's first visible stroke
   lines up with the start of that line.
-- **Actions:** exactly two — **Play** (green, white text, arrow) opens Select
+- **Actions:** exactly three — **Play** (green, white text, arrow) opens Select
   Mode and is focused by default; **Practice Ground** (outlined, chevron)
   beneath it opens Practice Ground (6.8) straight away, with no mode, fighter
   or stage select. It replaced the former, disabled Help & Credits entry; the
   Help & Credits screen and the pause Help view remain in place (the
-  pause-menu Help is still disabled, 7.3). Home buttons have a small 3 px
-  radius.
+  pause-menu Help is still disabled, 7.3). **Discover** (outlined, chevron,
+  like Practice Ground) directly beneath it opens the Discover reference
+  (6.9). All three are in keyboard / gamepad menu navigation, in that order.
+  Home buttons have a small 3 px radius.
 - **Footer:** "by hiyroscript" in gray monospace, full width under a subtle
   top hairline.
 - **Credits strip:** two walls. The back wall is the same near-black as the
@@ -474,6 +478,47 @@ A solo training room, entered straight from Home.
   its damage numbers), closes the dialog and leaves practice paused in the
   menu with focus on Enable CPU. A failed load keeps the current CPU (or
   none) and the dialog.
+
+### 6.9 Discover
+
+An in-game reference, entered from Home's Discover action. Its composition
+follows Seren's Cars & more reference screen (an index rail beside a
+scrollable page of structured entries) in Alva's own visual language:
+charcoal surfaces, off-white type, thin borders and the green accent.
+
+- **Header:** the standard menu header — Back (Alva's back icon, labelled
+  "Back") and the title **Discover**. Back, Esc / Backspace and gamepad B
+  return Home.
+- **Rail:** exactly two sections, **POWER** then **CONDITIONS**, as a
+  `tablist` of real buttons (`tab`, `aria-selected`, `aria-controls`, roving
+  tabindex; each page a focusable `tabpanel`). Every visit opens on Power.
+  The open section wears a green bar on its leading edge, a faint green wash
+  and bolder, full-strength type, so it never relies on colour alone.
+  Keyboard or gamepad focus on a section opens it; a click or tap selects
+  it; mouse hover is only a preview. Down the left on wide and short
+  landscape windows; across the top of the page (bar underneath) on narrow
+  windows (≤ 600 px wide unless shorter than 441 px) and tall ones.
+- **Page:** fills the rest and scrolls on its own; the document never
+  scrolls. The open page is a stop in menu navigation so a gamepad can
+  scroll it: ↑ / ↓ scroll it while it can scroll that way, then move on,
+  and leaving it toward the rail lands on the open section's tab. The hidden
+  page is `hidden`, so nothing in it can take focus. Focus shows as an inset
+  frame, so an empty page shows it too.
+- **Power:** one entry per Power type, built from `POWERS` in
+  `js/data/powers.js` (names, descriptions, tier numbers) and the roster's
+  own `powers` data, so it cannot drift from gameplay. Today that is
+  **Jump Power**: "Controls how high a fighter’s normal jump goes. Higher
+  tiers jump higher." Beside it (stacked when there is no room for two
+  columns), its tiers — **Jump Power 1** "Very low jump.", **Jump Power 2**
+  "Normal jump.", **Jump Power 3** "Slightly higher jump." — each with a
+  decorative rising-bar meter. A Fighters list and a check-marked "Used by
+  #0001" on the Jump Power 2 row say which tier each fighter owns. No
+  velocities or other physics constants are shown.
+- **Conditions:** intentionally empty — no cards, placeholder or "coming
+  soon" copy — until a Conditions system exists. The section is fully
+  selectable and accessible.
+- A new Power type appears here once it is added to `POWERS`, with no
+  change to the screen.
 
 ## 7. Battle
 
@@ -873,10 +918,24 @@ A solo training room, entered straight from Home.
   Energy regeneration or gain: Charge, hits, Dodges and time generate none,
   and BA1, BA2, Throw, Defense and the Charged BA2 Sphere Rush cost none. The winner is still decided by
   remaining health.
-- Physics: acceleration, deceleration, max speed, gravity, jump impulse,
-  ground/platform/solid collision, stage bounds, landing detection; collision
-  boxes independent of PNG size; bottom-centre origin; no sinking, floating,
-  jitter or escaping the stage.
+- Physics: acceleration, deceleration, max speed, gravity, jump impulse
+  (from the fighter's Jump Power, below), ground/platform/solid collision,
+  stage bounds, landing detection; collision boxes independent of PNG size;
+  bottom-centre origin; no sinking, floating, jitter or escaping the stage.
+- **Powers** (`js/data/powers.js`): gameplay abilities each fighter owns at
+  one tier, declared in its definition (`powers: { jump: 2 }`) and turned
+  into gameplay values only by the tier tables there, which the Discover
+  reference (6.9) also reads. **Jump Power** sets the initial upward speed
+  of the normal, voluntary jump: Jump Power 1 = 650 (a very low jump),
+  Jump Power 2 = 920 (the normal jump) and Jump Power 3 = 1000 (slightly
+  higher), in world units per second at the global gravity of 2500. #0001
+  has **Jump Power 2**, exactly its original 920, so its jump is unchanged.
+  The tier is the only source of jump strength (movement has no raw
+  `jumpVelocity`). The shared Fighter applies it for Player 1, the CPU and
+  Practice Ground alike; buffering, coyote time, action gating, animation,
+  gravity, fall speed, knockback, launches, Dodges and charged techniques
+  never depend on it. A definition without a valid tier is logged and gets
+  the default Jump Power 2.
 - Combat architecture (health, damage, hitboxes, hurtboxes, attack definitions,
   Defense with Block / Dodge implementations, invulnerability, knockback,
   stun and blockstun, hitstop, cooldowns, Energy, binds, charged actions,
