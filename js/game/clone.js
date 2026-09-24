@@ -1,10 +1,11 @@
 // Summoned clones: temporary attack entities, not fighters.
 //
-// A charged action (see `chargedActions` in js/data/characters.js) makes the
-// Fighter pay the summon's Energy and queue one summon request. The Battle
-// then turns each request into a live Clone, owns it, updates it every fixed
-// step, resolves its hit through CombatSystem and removes it once it is done.
-// Behaviour is data on the character (`summons`):
+// A summon-type charged action (`{ type: 'summon', id }` in `chargedActions`,
+// js/data/characters.js) makes the Fighter pay the summon's Energy and queue
+// one summon request. The Battle then turns each request into a live Clone,
+// owns it, updates it every fixed step, resolves its hit through
+// CombatSystem and removes it once it is done. Behaviour is data on the
+// character (`summons`):
 //
 //   summons: {
 //     ba1Clone: {

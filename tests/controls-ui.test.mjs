@@ -522,7 +522,7 @@ test('help explains Defense, #0001\'s Dodge and the Charge release', () => {
   assert.match(items, /Holding Defense does not repeat it/);
   assert.match(items, /never takes chip damage/);
   assert.match(items, /Let go and #0001 shows its first Charge pose for a moment/);
-  assert.match(items, /Jump, BA2, Throw and Defense \(Dodge\) take over from Charge at once/);
+  assert.match(items, /Jump, Throw and Defense \(Dodge\) take over from Charge at once/);
   const build = help.querySelectorAll('.info-text').map((p) => p.textContent).join(' ');
   assert.match(build, /Defense is a ground and mid-air Dodge for #0001/);
   assert.doesNotMatch(build, /guard state/);

@@ -35,6 +35,13 @@ const SHURIKEN_FPS = 18;
 // as the clone appears and backwards as it vanishes, so both take one pass
 // of the clip (10 frames = 0.5 s at 20 fps).
 const CLONE_CLOUD_FPS = 20;
+// Playback rate of #0001's Charged BA2 (Sphere Rush) poses. The dash lasts
+// exactly one pass of rasenDash at this rate, so tuning it keeps the rush's
+// contact window on the dash art.
+const RASEN_FPS = 12;
+// Playback rate of the Sphere Rush's blue sphere. The rush waits for one full
+// pass of rasenSphereBuild (6 frames = 0.5 s) before it dashes.
+const PRASEN_FPS = 12;
 
 export const CHARACTERS = [
   {
@@ -182,6 +189,31 @@ export const CHARACTERS = [
         loop: false,
         heightRatio: 0.9,
       },
+      // Charged BA2, the Sphere Rush: one set of twelve poses (rasen1-12)
+      // split into three clips, each played once by its own technique phase
+      // (see chargedTechniques.rasenRush). rasenForm: the rear palm opens
+      // for the sphere to form in. rasenDash: the rush, sphere carried
+      // behind, swung forward on rasen6. rasenConfirm: the palm driven into
+      // the opponent, then the recovery; only a hit ever shows it. Faces
+      // right like the rest of #0001.
+      rasenForm: {
+        frames: frames(BASE_0001, 'rasen', 3),
+        fps: RASEN_FPS,
+        loop: false,
+        heightRatio: 0.94,
+      },
+      rasenDash: {
+        frames: [4, 5, 6].map((n) => `${BASE_0001}rasen${n}.png`),
+        fps: RASEN_FPS,
+        loop: false,
+        heightRatio: 0.88,
+      },
+      rasenConfirm: {
+        frames: [7, 8, 9, 10, 11, 12].map((n) => `${BASE_0001}rasen${n}.png`),
+        fps: RASEN_FPS,
+        loop: false,
+        heightRatio: 1,
+      },
     },
 
     // Projectile art, kept apart from the fighter poses above: it is
@@ -211,6 +243,29 @@ export const CHARACTERS = [
       cloneCloud: {
         frames: frames(BASE_0001, 'cloneav', 10),
         fps: CLONE_CLOUD_FPS,
+        loop: false,
+        sourceFacing: 0,
+      },
+      // The Sphere Rush's blue sphere (prasen1-11), split into three one-shot
+      // clips: rasenSphereBuild forms it in the hand (prasen1-6),
+      // rasenSphereImpact intensifies it on the opponent after a hit
+      // (prasen7-9, then held on prasen9) and rasenSphereExplosion is the
+      // delayed blast (prasen10-11). A round effect: never mirrored.
+      rasenSphereBuild: {
+        frames: frames(BASE_0001, 'prasen', 6),
+        fps: PRASEN_FPS,
+        loop: false,
+        sourceFacing: 0,
+      },
+      rasenSphereImpact: {
+        frames: [7, 8, 9].map((n) => `${BASE_0001}prasen${n}.png`),
+        fps: PRASEN_FPS,
+        loop: false,
+        sourceFacing: 0,
+      },
+      rasenSphereExplosion: {
+        frames: [10, 11].map((n) => `${BASE_0001}prasen${n}.png`),
+        fps: PRASEN_FPS,
         loop: false,
         sourceFacing: 0,
       },
@@ -330,12 +385,16 @@ export const CHARACTERS = [
       action2: { ground: 'ba2', air: 'midairBa2' }, // Basic Attack 2 (BA2)
     },
 
-    // Charged actions: a combat button pressed while the fighter is already
-    // Charging (since an earlier step) and still holding Charge summons
-    // instead of attacking. If the summon cannot happen (too little Energy,
-    // missing art), the press falls through to the button's normal attack.
+    // Charged actions: what a combat button does when pressed while the
+    // fighter is already Charging (since an earlier step) and still holding
+    // Charge, instead of its normal attack. Each is typed: a `summon` (see
+    // `summons`) sends out a detached entity while the fighter keeps
+    // charging; a `technique` (see `chargedTechniques`) is performed by the
+    // fighter itself. If it cannot happen (too little Energy, missing art),
+    // the press falls through to the button's normal attack.
     chargedActions: {
-      action1: 'ba1Clone', // Charged BA1: Clone Attack
+      action1: { type: 'summon', id: 'ba1Clone' }, // Charged BA1: Clone Attack
+      action2: { type: 'technique', id: 'rasenRush' }, // Charged BA2: Sphere Rush
     },
 
     // Summons, keyed by id. See js/game/clone.js for the schema
@@ -357,6 +416,64 @@ export const CHARACTERS = [
         effectOffset: { x: 0, y: -44 },
         // Keeps the clone this far inside the stage's horizontal bounds.
         stageMargin: 17,
+      },
+    },
+
+    // Charged techniques, keyed by id. See js/game/charged-technique.js for
+    // the schema (createTechniqueDefinition) and the phases. Not an attack, a
+    // projectile or a summon: #0001 performs it himself.
+    chargedTechniques: {
+      // Charged BA2, the Sphere Rush. The sphere forms in #0001's rear palm
+      // (rasenForm + rasenSphereBuild, 0.5 s), then he rushes forward for one
+      // pass of rasenDash (0.25 s, about 262 world units) carrying it behind
+      // him and swinging it forward on rasen6. It must connect during that
+      // rush: a miss ends the technique. A hit (4) binds the opponent, the
+      // sphere moves onto it and rasenConfirm plays; 2 s after the hit it
+      // explodes for the big second hit (16, 20 in all), releasing and
+      // launching the opponent. The whole technique needs ground under #0001.
+      rasenRush: {
+        formAnimation: 'rasenForm',
+        dashAnimation: 'rasenDash',
+        confirmAnimation: 'rasenConfirm',
+        sphereBuild: 'rasenSphereBuild',
+        sphereImpact: 'rasenSphereImpact',
+        sphereExplosion: 'rasenSphereExplosion',
+        // No Energy cost for now; the field is here so one can be set.
+        energyCost: 0,
+        // World units per second, in the facing snapshotted at the start.
+        dashSpeed: 1050,
+        // Sphere centre from #0001's origin (bottom-centre), facing right,
+        // one per frame: the rear palm in rasen1-5 (the fist in rasen1, the
+        // open palm in rasen2-3, trailing behind in rasen4-5), then the hand
+        // at the end of the forward swing in rasen6.
+        handOffsets: {
+          rasenForm: [{ x: -15, y: -47 }, { x: -25, y: -42 }, { x: -25, y: -42 }],
+          rasenDash: [{ x: -32, y: -51 }, { x: -34, y: -51 }, { x: 32, y: -47 }],
+        },
+        // Around the sphere centre: the visible orb of the complete sphere.
+        sphereHitbox: { x: -24, y: -24, w: 48, h: 48 },
+        // Sphere centre from the opponent's origin once it hits (x along
+        // the rush): over the caught opponent's body.
+        targetOffset: { x: 0, y: -48 },
+        // Seconds from the hit to the explosion.
+        explosionDelay: 2.0,
+        // Hit 1, the sphere's contact: the setup, no launch. The bind that
+        // follows (not this hitstun) is what holds the opponent.
+        firstHit: {
+          damage: 4,
+          knockback: { x: 0, y: 0 },
+          hitstun: 0.2,
+          blockstun: 0.15,
+          hitstop: 0.06,
+        },
+        // Hit 2, the explosion: the big one.
+        explosionHit: {
+          damage: 16,
+          knockback: { x: 420, y: 220 },
+          hitstun: 0.55,
+          blockstun: 0.3,
+          hitstop: 0.12,
+        },
       },
     },
 

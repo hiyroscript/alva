@@ -81,8 +81,11 @@ export function buildHelp() {
       el('ul', { class: 'info-list' }, [
         el('li', { text: 'Hold Charge (S / ↓, or C on touch) while grounded to enter #0001’s charging stance. Charge must be held: release it to stop charging.' }),
         el('li', { text: 'Charge plays its two-frame startup once, then loops its sustained pose for as long as you hold it. Each new Charge starts again from the startup.' }),
-        el('li', { text: 'You stay in place while charging. Let go and #0001 shows its first Charge pose for a moment before returning to normal. Jump, BA2, Throw and Defense (Dodge) take over from Charge at once, and a hit interrupts it. Letting go of Charge as you press BA1 gives a normal BA1.' }),
+        el('li', { text: 'You stay in place while charging. Let go and #0001 shows its first Charge pose for a moment before returning to normal. Jump, Throw and Defense (Dodge) take over from Charge at once, and a hit interrupts it. Letting go of Charge as you press BA1 gives a normal BA1, and the same goes for BA2.' }),
+        el('li', { text: 'While already charging: Charge + BA1 = Clone Attack (25 Energy); Charge + BA2 = Sphere Rush (no Energy cost). Pressing Charge and the button together from a standstill gives the normal attack.' }),
         el('li', { text: 'Hold Charge first, then press BA1 to spend 25 Energy and summon a clone behind the opponent (the Clone Attack). The clone appears in a cloud of smoke, performs BA1 and disappears, while #0001 keeps charging for as long as you hold Charge. With less than 25 Energy, BA1 works normally.' }),
+        el('li', { text: 'Hold Charge first, then press BA2 for the Sphere Rush: #0001 forms a blue sphere in his hand, and only once it is complete does he dash forward with it. The rush must connect: a miss ends the technique at once. A hit (the first of two) traps the opponent in the sphere, and about two seconds later it explodes for a much bigger second hit that launches them. You can let go of Charge once it starts.' }),
+        el('li', { text: 'The Sphere Rush needs ground under #0001 from start to finish: losing it (running off an edge mid-rush, for instance) cancels the technique, frees the opponent and #0001 falls. A hit on #0001 cancels it too.' }),
         el('li', { text: 'The blue Energy meter under each health bar begins full. Only the Clone Attack spends it, and nothing restores Energy yet: it refills when a new battle starts.' }),
       ]),
     ]),
@@ -115,7 +118,7 @@ export function buildHelp() {
       ]),
     ]),
     card('This build', [
-      el('p', { class: 'info-text', text: '#0001 has idle, run, jump, fall and land animations, ground and mid-air hurt poses, a held Charge stance, Basic Attack 1 (BA1) and Basic Attack 2 (BA2), each on the ground and in the air, and a ground Throw. BA1 (action1) is a punch on the ground and a kick in the air; BA2 (action2) is a spinning high kick on the ground and a kunai slash in the air. Throw (the primary action) throws an animated shuriken. Only Special is still reserved: it is wired into the input and combat systems but waits for matching attack sprites. Defense is a ground and mid-air Dodge for #0001. Energy starts full for both fighters; #0001’s Charged BA1 Clone Attack is the one move that spends it. The training CPU never attacks.' }),
+      el('p', { class: 'info-text', text: '#0001 has idle, run, jump, fall and land animations, ground and mid-air hurt poses, a held Charge stance, Basic Attack 1 (BA1) and Basic Attack 2 (BA2), each on the ground and in the air, and a ground Throw. BA1 (action1) is a punch on the ground and a kick in the air; BA2 (action2) is a spinning high kick on the ground and a kunai slash in the air. Throw (the primary action) throws an animated shuriken. Only Special is still reserved: it is wired into the input and combat systems but waits for matching attack sprites. Defense is a ground and mid-air Dodge for #0001. Holding Charge turns BA1 into the Clone Attack and BA2 into the Sphere Rush. Energy starts full for both fighters; #0001’s Charged BA1 Clone Attack is the one move that spends it. The training CPU never attacks.' }),
     ]),
   ]);
 }

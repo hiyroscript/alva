@@ -8,7 +8,7 @@ import { Fighter } from '../js/game/character.js';
 import { CombatSystem } from '../js/game/combat.js';
 import { spawnProjectiles, removeDeadProjectiles } from '../js/game/projectile.js';
 import { spawnClones, updateClones, removeDeadClones } from '../js/game/clone.js';
-import { StageCollision } from '../js/game/physics.js';
+import { StageCollision, separate, resolveSolidOverlap } from '../js/game/physics.js';
 import { SpriteSet } from '../js/game/sprite-normalizer.js';
 import { CONFIG } from '../js/config.js';
 
@@ -60,17 +60,19 @@ export const STAGE = new StageCollision({
 
 export const SIM_CTX = { stage: STAGE, gravity: CONFIG.sim.gravity };
 
-export function makeFighter({ sprites = fakeSprites(), x = 500, y, facing = 1, character = def } = {}) {
+// `stage` swaps in another StageCollision (ledges, walls).
+export function makeFighter({ sprites = fakeSprites(), x = 500, y, facing = 1, character = def, stage = STAGE } = {}) {
   const input = {};
   const controller = { getInput: () => ({ ...input }) };
   const fighter = new Fighter({
-    def: character, sprites, stage: STAGE, slot: 0, label: 'P1', controller,
+    def: character, sprites, stage, slot: 0, label: 'P1', controller,
     spawn: { x, y, facing },
   });
+  const ctx = stage === STAGE ? SIM_CTX : { stage, gravity: CONFIG.sim.gravity };
   const step = (held = {}) => {
     for (const k of Object.keys(input)) delete input[k];
     Object.assign(input, held);
-    fighter.update(DT, SIM_CTX);
+    fighter.update(DT, ctx);
     return fighter;
   };
   return { fighter, step };
@@ -106,14 +108,16 @@ export const sequence = (log) => log.map((s) => s.frame).filter((n, i, a) => n !
 // Two fighters, their projectiles and clones and the real CombatSystem,
 // stepped in Battle.update()'s order. `targetCharacter` swaps in another
 // definition (e.g. a Block-type fighter); `targetFacing` overrides the
-// target's starting facing (by default it faces the attacker).
+// target's starting facing (by default it faces the attacker). `stage`
+// and `x` (the attacker's spawn) place them; `pushboxes` also keeps the two
+// bodies apart and out of solids, as Battle.update() does.
 export function duel({
   gap = 44, attackerFacing = 1, attackerSprites, targetSprites, targetCharacter, targetFacing = -attackerFacing,
+  stage = STAGE, x = 500, pushboxes = false,
 } = {}) {
-  const x = 500;
-  const a = makeFighter({ x, facing: attackerFacing, sprites: attackerSprites });
+  const a = makeFighter({ x, facing: attackerFacing, sprites: attackerSprites, stage });
   const b = makeFighter({
-    x: x + gap * attackerFacing, facing: targetFacing, sprites: targetSprites, character: targetCharacter,
+    x: x + gap * attackerFacing, facing: targetFacing, sprites: targetSprites, character: targetCharacter, stage,
   });
   a.fighter.opponent = b.fighter;
   b.fighter.opponent = a.fighter;
@@ -125,8 +129,12 @@ export function duel({
   const tick = (held = {}, targetHeld = {}) => {
     a.step(held);
     b.step(targetHeld);
+    if (pushboxes) {
+      separate(a.fighter.body, b.fighter.body, a.fighter.def.pushbox.width / 2, b.fighter.def.pushbox.width / 2, stage);
+      for (const f of fighters) resolveSolidOverlap(f.body, stage);
+    }
     spawnProjectiles(fighters, projectiles);
-    for (const p of projectiles) p.update(DT, STAGE);
+    for (const p of projectiles) p.update(DT, stage);
     updateClones(clones, DT);
     spawnClones(fighters, clones, STAGE);
     events.push(...system.update(fighters, projectiles, clones));

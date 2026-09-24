@@ -47,9 +47,19 @@ behave, and how it must look. The README covers running and deploying it.
   three Dodge frames `0001_dodge1`–`0001_dodge3` (≈256–288 × 384–416 px),
   three mid-air Dodge frames `0001_midairdodge1`–`0001_midairdodge3`
   (≈288–320 × 376–400 px) and three Throw frames `0001_throw1`–`0001_throw3`
-  (≈280–312 × 360–376 px). `0001_dodge3` happens to be the same image as
-  `0001_charge1`; it is kept under its own name as the Dodge's recovery
-  frame.
+  (≈280–312 × 360–376 px), and twelve Charged BA2 (Sphere Rush) poses
+  `0001_rasen1`–`0001_rasen12` (≈64–110 × 80–104 px, ≈2× pixel art).
+  `0001_dodge3` happens to be the same image as `0001_charge1`; it is kept
+  under its own name as the Dodge's recovery frame.
+- The twelve Sphere Rush poses are fighter poses, registered as three
+  logical one-shot clips in `animations` rather than one blind animation:
+  `rasenForm` (`rasen1`–`rasen3`, preparation: the rear palm opens for the
+  sphere), `rasenDash` (`rasen4`–`rasen6`, the rush: the sphere carried
+  behind, swung forward on `rasen6`) and `rasenConfirm` (`rasen7`–`rasen12`,
+  the palm driven into the opponent, then the recovery). They use the normal
+  fighter normalization (bottom-centre anchor, fighter height, per-clip
+  source facing, pixel-grid detection) and inherit the character's
+  `sourceFacing: 1`.
 - The same folder holds #0001's projectile art: three shuriken frames
   `0001_shuriken1`–`0001_shuriken3` (48–64 px square). They are the in-flight
   spin of one shuriken, not fighter poses and not three shurikens. They are
@@ -70,6 +80,19 @@ behave, and how it must look. The README covers running and deploying it.
   The cloud is direction-neutral (`sourceFacing: 0`) and never mirrored. An
   early upload named `0001_ cloneav8.png` (with a space) was replaced by
   `0001_cloneav8.png`; only the latter exists.
+- The same folder holds the Sphere Rush's blue sphere, eleven effect frames
+  `0001_prasen1`–`0001_prasen11` (≈36–116 × 34–118 px, ≈2× pixel art),
+  registered as three one-shot `effectAnimations` at 12 fps:
+  `rasenSphereBuild` (`prasen1`–`prasen6`, energy gathering into the
+  complete orb, 0.5 s), `rasenSphereImpact` (`prasen7`–`prasen9`, the orb
+  intensifying on the opponent, 0.25 s) and `rasenSphereExplosion`
+  (`prasen10`–`prasen11`, the blast, ≈0.167 s). Normalized like the clone
+  cloud (own art size, centre anchor, the fighter's world-per-art-pixel
+  scale, never fitted to the fighter's height): the complete `prasen6` orb
+  is 38 × 41 art pixels, ≈64 × 69 world units. Direction-neutral
+  (`sourceFacing: 0`): the round orb is never mirrored, only its position
+  offset follows facing. It is not a projectile. None of the 23 files is
+  duplicated, and none remains at the repository root.
 - Source orientation: #0001's art faces right (`sourceFacing: 1` on the
   character), except `midairdodge1`–`3`, which are drawn facing left. An
   animation may override the character's orientation with its own
@@ -89,7 +112,8 @@ behave, and how it must look. The README covers running and deploying it.
   same file, for the Charge release pose.
 - The idle, jump, fall, land and hurt frames (≈16× pixel art), the mid-air
   hurt, Basic Attack 1 and 2, Charge, Dodge, Throw and shuriken frames (≈8×),
-  the run frames (≈4×) and the clone cloud frames (≈2×)
+  the run frames (≈4×) and the clone cloud, Sphere Rush pose and sphere
+  frames (≈2×)
   are at very different raw scales. A normalization
   system must, once per frame: read the alpha channel, find the visible bounds,
   detect the pixel-art grid, resample to one pixel per art pixel, and anchor
@@ -110,7 +134,8 @@ behave, and how it must look. The README covers running and deploying it.
 - Systems: asset loader, input (keyboard, touch, gamepad), menu navigator,
   device detection, audio stub, sprite normalizer/animator, fighter state
   machine, controllers (player / training AI), physics, camera, combat,
-  projectiles, summoned clones, HUD, touch controls, stage themes.
+  projectiles, summoned clones, charged techniques, HUD, touch controls,
+  stage themes.
 - Data-driven content: `js/data/characters.js` and `js/data/maps.js`. Adding a
   fighter means adding frames, a definition and a roster slot — never editing
   engine code.
@@ -323,10 +348,12 @@ no header, build label, eyebrow or keyboard hint bar.
 - Two tabs (Help, Credits) sharing one scrollable panel; ←/→ switch tabs,
   ↑/↓ scroll.
 - Help: desktop controls rendered from the live key bindings, mobile control
-  diagram, movement, Charge & Energy (including the Charged BA1 Clone
-  Attack, with no extra control row: it uses the existing Charge and BA1
-  controls), Throw, Defense, stages and platforms, pause, notes on this
-  build.
+  diagram, movement, Charge & Energy (including Charge + BA1 = Clone Attack,
+  25 Energy, and Charge + BA2 = Sphere Rush: already Charging, forms before
+  dashing, needs a hit to continue, two hits with the second delayed, ground
+  needed throughout; no extra control row: both use the existing Charge,
+  BA1 and BA2 controls), Throw, Defense, stages and platforms, pause, notes
+  on this build.
 - The Home entry to this screen is disabled for now; the screen stays in place
   so it can return.
 - Credits (must remain visible and readable). One list in
@@ -382,7 +409,8 @@ no header, build label, eyebrow or keyboard hint bar.
 
 - `#0001` has Idle, Run, Jump, Fall, Land, Hurt, Mid-air Hurt, Basic Attack 1,
   Mid-air Basic Attack 1, Basic Attack 2, Mid-air Basic Attack 2, Charge,
-  Dodge, Mid-air Dodge and Throw, plus the Shuriken projectile animation.
+  Dodge, Mid-air Dodge, Throw and the Sphere Rush (three clips), plus the
+  Shuriken projectile animation and the clone-cloud and sphere effects.
   No invented frames. Rising uses Jump and
   descending (walking off a ledge included) uses Fall; each plays once at 10 fps
   and holds its last frame. Land plays once at 12 fps on touchdown, for
@@ -394,9 +422,9 @@ no header, build label, eyebrow or keyboard hint bar.
   opponent when standing.
 - Hitstun shows Hurt while grounded and Mid-air Hurt while airborne, switching
   to Hurt if the fighter lands still stunned; the pose also holds through the
-  impact freeze. Hitstun outranks every other state (attack, Defense, jump,
-  fall, land, charge, charge release, run and idle), and normal states resume
-  when it ends. It is a visual state only:
+  impact freeze. Hitstun outranks every other state (charged technique,
+  bound, attack, Defense, jump, fall, land, charge, charge release, run and
+  idle), and normal states resume when it ends. It is a visual state only:
   no physics or collider changes. Missing hurt art holds an idle frame.
 - Basic Attack 1 (BA1) is #0001's first attack, on the `action1` input. On the
   ground it is a punch (`ba1`, 4 frames); in the air a kick (`midairBa1`,
@@ -486,14 +514,17 @@ no header, build label, eyebrow or keyboard hint bar.
   normal state (idle, or run if a direction is held). It is a release only
   when the fighter was charging on the previous step, Charge is no longer
   held, and nothing of higher priority started on that step; higher-priority
-  interruptions (a hit, BA1, BA2, Throw, a Dodge, a jump, leaving the ground)
-  do not play `chargeRelease` first, and letting go of Charge on the same
-  step as one of them goes straight to it. BA1 interrupts Charge only when
+  interruptions (a hit, BA1, BA2, Throw, a Dodge, a jump, leaving the ground,
+  the Sphere Rush) do not play `chargeRelease` first, and letting go of
+  Charge on the same step as one of them goes straight to it. BA1 interrupts Charge only when
   Charge is let go on the BA1 press step (an ordinary BA1, with no release
   pose and no clone) or when the Clone Attack cannot be paid for: BA1 while
   Charge is still held and sufficient Energy is available summons a clone
   instead of making the owner perform BA1, and the owner stays in Charge
-  (see the Charged BA1 Clone Attack below). The release pose is visual only: no
+  (see the Charged BA1 Clone Attack below). Likewise BA2 pressed while Charge
+  is still held starts the Charged BA2 Sphere Rush instead of BA2 (below),
+  and BA2 interrupts Charge as an ordinary BA2 only when Charge is let go on
+  the press step or the Sphere Rush cannot start. The release pose is visual only: no
   damage, hitbox, invulnerability, armour, Energy change, knockback or
   special movement, and movement resumes normally while it shows. Every new
   Charge, including one started during the release pose, restarts from
@@ -504,12 +535,12 @@ no header, build label, eyebrow or keyboard hint bar.
   to a stop) while gravity and collision still apply. Collider and hurtboxes
   are unchanged. Charge has no hitbox, no damage, no armour and no
   invulnerability, and it is not an attack or a combat action. State
-  priority is hitstun > attack > Defense (Dodge) > jump / fall > land >
-  charge > charge release > run > idle (a Block-type guard would sit between
-  land and charge): a hit shows Hurt at once, BA2 / Throw start straight
-  out of a held Charge (so does BA1 when the Clone Attack cannot be paid
-  for), Jump interrupts it, and a Defense press interrupts it with a
-  Dodge. If Charge is still held when that Dodge ends, a fresh Charge starts
+  priority is hitstun > charged technique > bound > attack > Defense (Dodge)
+  > jump / fall > land > charge > charge release > run > idle (a Block-type
+  guard would sit between land and charge): a hit shows Hurt at once, Throw
+  starts straight out of a held Charge (so do BA1 when the Clone Attack
+  cannot be paid for and BA2 when the Sphere Rush cannot start), Jump
+  interrupts it, and a Defense press interrupts it with a Dodge. If Charge is still held when that Dodge ends, a fresh Charge starts
   from `charge1`, never from `chargea` / `chargeb`. Charge on a one-way
   platform charges in place and never drops through. If the charge frames
   fail to load, the fighter holds a still idle frame; without the release
@@ -550,6 +581,21 @@ no header, build label, eyebrow or keyboard hint bar.
   nothing. If a Dodge clip's frames are missing, that Dodge is refused
   (logged) rather than granting invisible invulnerability. The debug overlay
   grays a fighter's hurtboxes while it is invulnerable.
+- Charged actions are a generic dispatch, not a summon shortcut. The
+  character's `chargedActions` maps a combat button to a typed descriptor:
+  `{ type: 'summon', id }` (an entry in `summons`: a detached temporary
+  entity; the fighter keeps charging) or `{ type: 'technique', id }` (an entry
+  in `chargedTechniques`: a sequence the fighter performs itself). #0001 has
+  `action1: { type: 'summon', id: 'ba1Clone' }` (the Clone Attack) and
+  `action2: { type: 'technique', id: 'rasenRush' }` (the Sphere Rush); its
+  normal `actions` are unchanged. The activation rule is shared: the fighter
+  must already be Charging (it entered the Charge state on an earlier
+  simulation step) and Charge must still be held on the step the button is
+  newly pressed. `Fighter.tryChargedAction` dispatches on the type
+  (`trySummon` / `tryTechnique`); one that happens consumes the press, and
+  one that cannot (missing art, invalid data, too little Energy) lets the
+  same press fall through to the button's normal attack. The Clone Attack
+  never depends on technique code, nor the technique on the summon system.
 - Charged BA1 Clone Attack (#0001). Trigger: the fighter must already be
   Charging (it entered the Charge state on an earlier simulation step), and
   Charge must still be held on the step BA1 (`action1`: U, B / Circle, touch
@@ -621,13 +667,123 @@ no header, build label, eyebrow or keyboard hint bar.
   finished clones. Restart / rematch and leaving the battle clear every clone.
   The debug overlay draws a clone's BA1 hitbox in the attack colour, labelled
   `clone ba1`, only on its active frame; a clone has no hurtboxes to draw.
+- Charged BA2 Sphere Rush (#0001, `chargedTechniques.rasenRush`, runtime in
+  `js/game/charged-technique.js`). Not a summon, a projectile, ordinary BA2
+  or a big melee hitbox: #0001 himself changes animation, holds the sphere,
+  dashes and makes contact, driven by a dedicated technique runtime with
+  explicit phases (`form`, `dash`, `confirm`, `wait`, `explode`, `done`),
+  never inferred from animation frames. It sets no `combat.attack`. Trigger:
+  the shared charged-action rule with BA2 (`action2`: I, LB, touch **BA2**);
+  no new control. Charge and BA2 pressed together from idle, or BA2 pressed
+  on the step Charge is let go, is ordinary BA2 (8 damage, `2ba1`–`2ba7`,
+  unchanged; mid-air BA2 `midair2ba1`–`3` likewise) with no release pose.
+  Grounded only (Charge is too). Once started it owns the fighter and Charge
+  no longer needs to be held; it ends only by a miss, a wall, ground loss, a
+  hit on #0001, a blocked contact, a knockout, completion or a reset. Sprite
+  partitioning:
+
+  | Frames | Clip | Role |
+  | --- | --- | --- |
+  | `rasen1`–`3` | `rasenForm` | preparation |
+  | `rasen4`–`6` | `rasenDash` | dash / contact search |
+  | `rasen7`–`12` | `rasenConfirm` | hit-confirm continuation |
+  | `prasen1`–`6` | `rasenSphereBuild` | sphere formation |
+  | `prasen7`–`9` | `rasenSphereImpact` | confirmed sphere |
+  | `prasen10`–`11` | `rasenSphereExplosion` | explosion |
+
+  Deterministic sequence, in 60 Hz fixed steps (all clips at 12 fps; the
+  technique's clock follows the sprite animator, so a clip's first frame
+  shows 4 steps, later frames 5):
+  1. FORM (activation step + 29 more, 0.5 s): on the BA2 press #0001 leaves
+     Charge with no `chargeRelease`, horizontal speed 0, controls and facing
+     locked (the facing is snapshotted here). `rasen1 → rasen2 → rasen3`
+     play once, `rasen3` held, while `prasen1 → … → prasen6` form in his
+     rear palm; poses and sphere frames change on the same steps. It lasts
+     the longer of the two clips, so the rush never starts before `prasen6`
+     has completed its frame time. No movement, no hitbox.
+  2. DASH (15 steps, 0.25 s): `rasen4 → rasen5 → rasen6` once, at a fixed
+     1050 world units / s in the snapshotted facing, through normal
+     fixed-step physics (≈262 units at most; stage bounds, solids and ground
+     respected; player left / right ignored). The complete `prasen6` stays
+     in the hand, never rebuilt. This is the only contact search: each step
+     the sphere's hitbox (48 × 48 units, centred on the sphere) is tested
+     against the opponent's hurtboxes, from the sphere's actual world
+     position. Hand offsets (sphere centre from #0001's origin, facing
+     right, x mirrored with facing, one per pose shown): `rasen1` (−15, −47)
+     the fist, `rasen2` / `rasen3` (−25, −42) the open palm, `rasen4`
+     (−32, −51) and `rasen5` (−34, −51) trailing behind him, `rasen6`
+     (32, −47) swung in front. So contact is made on the forward swing
+     (`rasen6`), after the rush has closed in; pushboxes keep #0001 from
+     running through the opponent meanwhile. No contact by the end of
+     `rasen6`, or a solid wall or stage edge reached first (no pass-through),
+     is a miss: no hit, bind, `rasen7`–`12` or `prasen7`–`11`; the sphere
+     is removed, the rush stops dead (no slide) and #0001 is back in Idle /
+     normal control on the next step.
+  3. CONFIRM (from the contact step): the rush stops at once (`vx` 0, no
+     sliding through). Hit 1 of 2, applied exactly once through
+     `CombatSystem.applyHit`: 4 damage (100 → 96), no knockback or launch,
+     0.2 s hitstun, 0.15 s blockstun, 0.06 s hitstop on the target only.
+     The target is then bound (below) with its horizontal speed zeroed, the
+     sphere moves from the hand onto it (centre at the target's origin +
+     (0, −48), over its body, following it every step) and plays
+     `prasen7 → prasen8 → prasen9` once, then holds `prasen9`, while #0001
+     plays `rasen7 → … → rasen12` exactly once from the same step.
+  4. WAIT: #0001 holds `rasen12`, committed (no movement, attack, summon,
+     Dodge, Throw, jump or Charge), and the bound target holds with the
+     sphere on it.
+  5. EXPLODE: exactly 2.0 s (`explosionDelay`, 120 steps) after the
+     contact step, counted from the hit, never from formation: the sphere
+     plays `prasen10 → prasen11` once, and on the step `prasen10` first
+     shows the target is released from the bind and then takes hit 2: 16
+     damage (96 → 80; 20 in all), knockback 420 along the rush and a 220
+     launch, 0.55 s hitstun, 0.12 s hitstop (twice the first hit's), 0.3 s
+     blockstun. Releasing first keeps the bind from cancelling the launch.
+  6. DONE: after `prasen11` the sphere is removed and the technique cleared;
+     #0001 returns to Idle / normal control. Exactly two damage events for a
+     full sequence. A Charge still held does not restart by itself: it has to
+     be let go and held again.
+  The bind is a combat status separate from hitstun (`CombatState.bind` /
+  `unbind`, keyed by the technique as a token so it only ever releases its
+  own hold). While bound a fighter can't act (`canAct()` is false): no walk,
+  run, jump, Charge, Throw, BA1, BA2, Defense or turning; its horizontal
+  speed is held at 0, gravity and vertical collision still apply (an
+  airborne catch falls and lands, the sphere following it), and it shows
+  Hurt / Mid-air Hurt. It lasts until the explosion, or until the technique
+  is cancelled. Ground dependency: from the first `rasen1` frame to the end,
+  #0001 must be supported by real ground, checked every step
+  (`body.grounded`, not remembered from the start). Losing it in formation,
+  mid-dash (running off a ledge; no hover over the gap, no snap back) or
+  after the hit cancels the technique on that step: sphere removed, any bind
+  released at once (hit 1's damage stays, hit 2 never happens) and #0001
+  enters Fall, straight down. A hit on #0001 in any phase cancels it the same
+  way and shows the normal Hurt (no armour, no invulnerability). A Dodge's
+  invulnerable frames let the rushing sphere pass without a hit, damage,
+  bind or use of the sphere; the search continues and may still connect
+  after them, otherwise it is a miss. A Block-type guard (future fighters)
+  facing the rush blocks the contact with the normal chip damage and
+  blockstun; then there is no bind or explosion and the technique ends. A
+  first hit that knocks the target out ends it at once (no bind, no
+  explosion), as does the target being knocked out or losing its bind
+  meanwhile. Before starting, the technique requires all three fighter clips
+  and all three sphere effects (and valid data); anything missing logs a
+  warning and the same press becomes an ordinary BA2: never a sphere around
+  the wrong pose, an invisible sphere, bind or delayed hit. Energy cost 0
+  (`energyCost` is data-ready; nothing is drained, refunded or gained). The
+  sphere is drawn over both fighters (terrain, shadows, clones, CPU, P1,
+  sphere, projectiles, foreground), centred at the fighters' art-pixel
+  scale with image smoothing off, never mirrored. Restart / rematch
+  (`Fighter.reset`) and leaving the battle end any technique, its sphere,
+  bind and pending explosion, and drop its owner and target references. The
+  debug overlay draws the rushing sphere's hitbox as a dashed cyan box
+  labelled `charged ba2 dash`, then a dashed cyan cross on the attached
+  sphere's centre, and labels a bound fighter `bound`.
 - Every fighter has an Energy resource (`energy` / `maxEnergy` on its combat
   state, capacity from the character's `stats.energy`, 100 for #0001). It
   starts full and refills on restart / rematch. It changes only through the
   combat state's `canSpendEnergy` / `spendEnergy` helpers, and #0001's
   Charged BA1 Clone Attack (25) is the only thing that spends it. There is no
   Energy regeneration or gain: Charge, hits, Dodges and time generate none,
-  and BA1, BA2, Throw and Defense cost none. The winner is still decided by
+  and BA1, BA2, Throw, Defense and the Charged BA2 Sphere Rush cost none. The winner is still decided by
   remaining health.
 - Physics: acceleration, deceleration, max speed, gravity, jump impulse,
   ground/platform/solid collision, stage bounds, landing detection; collision
@@ -635,17 +791,20 @@ no header, build label, eyebrow or keyboard hint bar.
   jitter or escaping the stage.
 - Combat architecture (health, damage, hitboxes, hurtboxes, attack definitions,
   Defense with Block / Dodge implementations, invulnerability, knockback,
-  stun and blockstun, hitstop, cooldowns, Energy, charged actions and
-  summons) is data-driven. Basic Attacks 1 and 2, Throw (with its shuriken
-  projectile) and the Charged BA1 Clone Attack (a summoned clone performing
-  BA1) are implemented through it with real artwork; Special stays reserved
+  stun and blockstun, hitstop, cooldowns, Energy, binds, charged actions,
+  summons and charged techniques) is data-driven. Basic Attacks 1 and 2,
+  Throw (with its shuriken projectile), the Charged BA1 Clone Attack (a
+  summoned clone performing BA1) and the Charged BA2 Sphere Rush (a charged
+  technique) are implemented through it with real artwork; Special stays reserved
   (mapped to no attack) until real sprites exist, and no attack, projectile,
   clone or frame is ever fabricated. An attack whose frames fail to load is
   refused (no substitute pose, no invisible hitbox), and so is a Dodge, and so
-  is a clone summon whose cloud or attack art is missing (nothing is spent).
+  is a clone summon whose cloud or attack art is missing (nothing is spent),
+  and so is a charged technique with any of its clips missing.
 - Quick Battle: one round, 99 seconds, against a non-attacking training CPU
   that uses the same fighter definition. It never attacks, throws, charges,
-  summons clones or uses Defense;
+  summons clones, uses the Sphere Rush or uses Defense (while bound, its
+  input is simply ignored);
   it drops through one-way platforms with an internal intent that no player
   control produces.
 
@@ -673,8 +832,8 @@ no header, build label, eyebrow or keyboard hint bar.
   fills from the right like its health bar. Blue here is a deliberate
   gameplay-resource exception to the green-only interface accent (5.1). The
   meter changes the moment Energy is spent (each Clone Attack drops it by a
-  quarter: 100 % → 75 % → 50 % → 25 % → 0 %); no Energy gain is implemented
-  yet.
+  quarter: 100 % → 75 % → 50 % → 25 % → 0 %; the Sphere Rush never moves
+  it); no Energy gain is implemented yet.
 - Timer + pause: one glass control at top centre. The round label and timer
   sit on top; a rectangular pause section sits directly beneath with no gap,
   the same width and a hairline seam, so only the outer corners are rounded.
@@ -699,9 +858,11 @@ no header, build label, eyebrow or keyboard hint bar.
   internal `primary` action), K Special (reserved), L Defense, U Basic
   Attack 1 (BA1), I Basic Attack 2 (BA2), Esc/P pause. `` ` `` toggles a
   debug overlay (colliders, hurtboxes, attack hitboxes while active, each
-  flying projectile's hitbox in magenta with its name, and each clone's BA1
-  hitbox, labelled `clone ba1`, on its active frame). BA1 pressed while
-  Charge is still held is the Charged BA1 Clone Attack (7.2): no extra key. In menus S/↓ still navigate down: menu bindings are separate
+  flying projectile's hitbox in magenta with its name, each clone's BA1
+  hitbox, labelled `clone ba1`, on its active frame, and the Sphere Rush's
+  dashed cyan sphere box / centre with a `bound` label on a caught fighter).
+  BA1 pressed while Charge is still held is the Charged BA1 Clone Attack
+  and BA2 the Charged BA2 Sphere Rush (7.2): no extra key. In menus S/↓ still navigate down: menu bindings are separate
   from the gameplay `charge` action.
 - Gamepad (standard layout) for movement (D-pad / left stick left and
   right), Charge in battle (D-pad down / left stick down, held; menus still

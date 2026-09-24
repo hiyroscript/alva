@@ -52,6 +52,13 @@
 // that performs one of its owner's attacks from its own position and facing.
 // Its hits resolve through the same applyHit and credit the owner, but, like
 // a projectile's, they never freeze the owner.
+//
+// A charged technique (see js/game/charged-technique.js) is performed by the
+// fighter itself but is not an attack either: its sphere's contact and its
+// delayed explosion are its two hits, resolved here through applyHit with
+// their own data. They freeze only the target. A confirmed contact binds the
+// target (CombatState.bind): a hold on it, separate from hitstun, that only
+// the technique which placed it releases.
 
 const ATTACK_DEFAULTS = {
   animation: null,
@@ -132,6 +139,9 @@ export class CombatState {
     this.defenseAction = null; // { type: 'dodge', def, time } while a Dodge plays
     this.cooldowns = new Map();
     this.lastIntent = null; // last combat button pressed (for future buffering/UI)
+    // Whatever holds this fighter in place (a charged technique that caught
+    // it), each by its own token so a source only ever releases its own hold.
+    this.binds = new Set();
   }
 
   get attacking() {
@@ -157,8 +167,27 @@ export class CombatState {
     return this.defensePhase === 'invulnerable';
   }
 
+  // Bound: caught and held by a charged technique (see bind). Unlike
+  // hitstun it has no timer: it lasts until its source releases it.
+  get immobilized() {
+    return this.binds.size > 0;
+  }
+
+  bind(source) {
+    this.binds.add(source);
+  }
+
+  // Releases only `source`'s hold; any other stays.
+  unbind(source) {
+    this.binds.delete(source);
+  }
+
+  isBoundBy(source) {
+    return this.binds.has(source);
+  }
+
   canAct() {
-    return !this.attack && !this.defenseAction && this.stun <= 0 && this.health > 0;
+    return !this.attack && !this.defenseAction && this.stun <= 0 && this.health > 0 && !this.immobilized;
   }
 
   // Whether `amount` Energy is available to spend.
@@ -223,12 +252,13 @@ const scratchHurt = {};
 
 // Resolves hits each simulation step: fighters' melee hitboxes, then live
 // projectiles (see js/game/projectile.js), then summoned clones (see
-// js/game/clone.js).
+// js/game/clone.js), then charged techniques (see
+// js/game/charged-technique.js).
 export class CombatSystem {
   constructor() {
-    // { type: 'hit' | 'block', attacker, target, damage, projectile, summon }
-    // `attacker` is the owner for a projectile or clone hit; `projectile` and
-    // `summon` are null for the fighter's own melee.
+    // { type: 'hit' | 'block', attacker, target, damage, projectile, summon, technique }
+    // `attacker` is the owner for a projectile or clone hit; `projectile`,
+    // `summon` and `technique` are null for the fighter's own melee.
     this.events = [];
   }
 
@@ -285,18 +315,47 @@ export class CombatSystem {
         break;
       }
     }
+    for (const owner of fighters) {
+      const t = owner.technique;
+      if (!t) continue;
+      // The delayed explosion, on the step its first frame shows: the target
+      // is released first, then takes the big hit and its launch.
+      if (t.explosionDue) {
+        const target = t.takeExplosion();
+        if (target) this.applyHit(owner, target, t.def.explosionHit, { facing: t.facing, technique: t });
+        continue;
+      }
+      // The rushing sphere: only while dashing, and only until it connects.
+      const hit = t.sphereHitbox(scratchHit);
+      if (!hit) continue;
+      for (const target of fighters) {
+        if (target === owner || target.combat.health <= 0) continue;
+        // Dodged: the rush carries on, unspent, and can still connect after
+        // the invulnerable frames.
+        if (target.combat.invulnerable) continue;
+        const struck = target.def.hurtboxes.some((hb) => intersects(hit, worldBox(target, hb, scratchHurt)));
+        if (!struck) continue;
+        // Hit 1 of 2, exactly once; the sphere stops searching after it.
+        const event = this.applyHit(owner, target, t.def.firstHit, { facing: t.facing, technique: t });
+        const ended = t.contact(target, event.type === 'block');
+        if (ended) owner.endTechnique(ended);
+        break;
+      }
+    }
     return this.events;
   }
 
-  // Shared by melee, projectiles and clones. `facing` is the direction the
-  // hit travels: the attacker's facing for melee, the projectile's own
-  // direction (fixed when thrown) or the clone's facing (fixed when
-  // summoned). `blocked` needs a Block-type guard facing into it; a Dodge
-  // never blocks, so a hit outside its invulnerable frames is a full hit.
-  // A detached hit (a projectile's or a clone's) freezes only its target:
-  // the owner is elsewhere, doing something else.
+  // Shared by melee, projectiles, clones and charged techniques. `facing` is
+  // the direction the hit travels: the attacker's facing for melee, the
+  // projectile's own direction (fixed when thrown), the clone's facing
+  // (fixed when summoned) or the technique's (fixed when it started).
+  // `blocked` needs a Block-type guard facing into it; a Dodge never blocks,
+  // so a hit outside its invulnerable frames is a full hit. A detached hit
+  // (a projectile's, a clone's or a technique's) freezes only its target.
+  // Returns the event it recorded.
   applyHit(attacker, target, def, {
-    facing = attacker.facing, projectile = null, summon = null, detached = !!(projectile || summon),
+    facing = attacker.facing, projectile = null, summon = null, technique = null,
+    detached = !!(projectile || summon || technique),
   } = {}) {
     const tc = target.combat;
     const blocked = tc.blocking && target.facing === -facing;
@@ -307,12 +366,17 @@ export class CombatSystem {
     tc.stun = blocked ? def.blockstun : def.hitstun;
     tc.hitstop = def.hitstop;
     if (!detached) attacker.combat.hitstop = def.hitstop;
+    // ...and a charged technique: no armour. It ends at once, releasing
+    // whatever it held, before the knockback below moves the fighter.
+    target.endTechnique?.('hit');
     const kx = (blocked ? 0.5 : 1) * def.knockback.x * facing;
     target.body.vx = kx;
     if (!blocked && def.knockback.y) {
       target.body.vy = -def.knockback.y;
       target.body.grounded = false;
     }
-    this.events.push({ type: blocked ? 'block' : 'hit', attacker, target, damage, projectile, summon });
+    const event = { type: blocked ? 'block' : 'hit', attacker, target, damage, projectile, summon, technique };
+    this.events.push(event);
+    return event;
   }
 }

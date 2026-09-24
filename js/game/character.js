@@ -7,6 +7,7 @@ import { createBody, stepBody, dropThrough } from './physics.js';
 import { CombatState, createAttackDefinition, createDefenseDefinition } from './combat.js';
 import { createProjectileDefinition } from './projectile.js';
 import { createSummonDefinition, summonProblem } from './clone.js';
+import { ChargedTechnique, createTechniqueDefinition, techniqueProblem } from './charged-technique.js';
 import { approach, clamp, sign } from '../core/utils.js';
 
 export const COMBAT_ACTIONS = ['primary', 'special', 'action1', 'action2'];
@@ -47,6 +48,9 @@ export class Fighter {
     this.summonDefs = Object.fromEntries(
       Object.entries(def.summons || {}).map(([id, spec]) => [id, createSummonDefinition({ id, ...spec })]),
     );
+    this.techniqueDefs = Object.fromEntries(
+      Object.entries(def.chargedTechniques || {}).map(([id, spec]) => [id, createTechniqueDefinition({ id, ...spec })]),
+    );
     // What the shared Defense input does for this character (null: nothing).
     this.defense = createDefenseDefinition(def.defense);
     this.opponent = null;
@@ -55,6 +59,9 @@ export class Fighter {
   }
 
   reset(stage) {
+    // A charged technique in progress ends first, releasing any opponent it
+    // holds: nothing of it survives a rematch.
+    if (this.technique) this.endTechnique('reset');
     const { def, spawn } = this;
     const half = def.collider.width / 2;
     const ground = stage.surfaceBelow(spawn.x - half, spawn.x + half, spawn.y ?? stage.groundY);
@@ -73,6 +80,11 @@ export class Fighter {
     this.moveDir = 0;
     this.charging = false;
     this.chargeReleased = false;
+    // Whether Charge was held on the latest step, and whether it was held as
+    // a charged technique ended: such a Charge does not charge again until
+    // it is let go (see update).
+    this.chargeHeld = false;
+    this.chargeHeldOver = false;
     this.coyote = 0;
     this.jumpBuffer = 0;
     this.lastGroundY = this.body.y;
@@ -84,6 +96,9 @@ export class Fighter {
     // Summons paid for this step, waiting for the battle to spawn them (see
     // spawnClones in js/game/clone.js): { id, target }.
     this.summons = [];
+    // The charged technique this fighter is performing (see
+    // js/game/charged-technique.js), or null.
+    this.technique = null;
     this.renderX = this.body.x;
     this.renderY = this.body.y;
     this.animator.play('idle', { restart: true });
@@ -101,8 +116,13 @@ export class Fighter {
     const input = this.inputLocked ? NEUTRAL_INPUT : raw;
     const wasCharging = this.charging;
     this.chargeReleased = false;
+    this.chargeHeld = !!input.charge;
+    if (!this.chargeHeld) this.chargeHeldOver = false;
 
     combat.update(dt);
+    // Hitstun always wins over a charged technique (CombatSystem.applyHit
+    // normally ends it on the hit itself).
+    if (this.technique && combat.stun > 0) this.endTechnique('hit');
     // ---- Projectile release ----------------------------------------------
     // The attack crossed its release point this step: queue one projectile,
     // aimed where the fighter faces now. Its direction never changes after.
@@ -120,31 +140,43 @@ export class Fighter {
     // ---- Combat intents --------------------------------------------------
     // Actions mapped to null are wired but reserved (see tryAction). A press
     // while already Charging (since an earlier step) with Charge still held
-    // is a charged action first (see trySummon): a summon that happens
+    // is a charged action first (see tryChargedAction): one that starts
     // consumes the press, otherwise the normal attack gets it. Letting go of
     // Charge on the press step, or pressing it with a fresh Charge, is a
     // normal attack.
     const charged = wasCharging && !!input.charge;
     for (const action of COMBAT_ACTIONS) {
       if (!input[`${action}Pressed`]) continue;
-      if (charged && this.trySummon(action)) continue;
+      if (charged && this.tryChargedAction(action)) continue;
       this.tryAction(action);
     }
     // ---- Defense ---------------------------------------------------------
     // A Dodge starts only on a new press, after the attacks so an attack
     // started this step keeps it (and a Dodge keeps a jump) from starting too.
     if (input.defensePressed) this.tryDefense();
-    // After the intents, so an attack or Dodge started this step also rules
-    // out a jump, Block guard, charge or platform drop on the same step.
-    const canAct = combat.canAct();
+
+    // ---- Charged technique -------------------------------------------------
+    // While one runs it owns the fighter: its phases advance on their own
+    // clock (a clean miss or a finished explosion ends it here), whether or
+    // not Charge is still held.
+    if (this.technique) {
+      const ended = this.technique.update(dt);
+      if (ended) this.endTechnique(ended);
+    }
+
+    // After the intents, so an attack, Dodge or charged technique started
+    // this step also rules out a jump, Block guard, charge or platform drop
+    // on the same step.
+    const canAct = this.canAct();
     // Block-type Defense is a held guard; a Dodge fighter never blocks.
     combat.blocking = this.defense?.type === 'block' && canAct && body.grounded && !!input.defense;
 
     // ---- Charge: grounded, and only while held ---------------------------
-    // The held value alone decides it: no toggle, latch or buffer, so the
-    // step that sees Charge released ends it. Defense interrupts it: a Dodge
-    // through canAct, a held Block guard here.
-    this.charging = canAct && body.grounded && !!input.charge && !combat.blocking;
+    // The held value alone decides it: no toggle or buffer, so the step that
+    // sees Charge released ends it. Defense interrupts it: a Dodge through
+    // canAct, a held Block guard here. After a charged technique, a Charge
+    // held since before it must be let go and held again.
+    this.charging = canAct && body.grounded && !!input.charge && !combat.blocking && !this.chargeHeldOver;
 
     // ---- Platform drop (training CPU only) -------------------------------
     // No player key, button or touch control produces `dropPressed`; the
@@ -156,17 +188,23 @@ export class Fighter {
     // ---- Horizontal movement ---------------------------------------------
     // A Dodge locks it too: no new acceleration, and the current velocity
     // slows under the normal deceleration (in the air, the gentle air drag),
-    // so the art never moves the body (no dash, lift or teleport).
+    // so the art never moves the body (no dash, lift or teleport). A charged
+    // technique sets the speed itself (still, or its fixed rush), and a bound
+    // fighter is held in place; gravity still applies to both.
     let dir = (input.right ? 1 : 0) - (input.left ? 1 : 0);
     const locked =
       combat.blocking || this.charging || combat.stun > 0 || combat.defenseAction ||
-      (combat.attack && combat.attack.def.lockMovement);
+      (combat.attack && combat.attack.def.lockMovement) || combat.immobilized || !!this.technique;
     if (locked) dir = 0;
     this.moveDir = dir;
 
     const accel = body.grounded ? mv.acceleration : mv.airAcceleration;
     const decel = body.grounded ? mv.deceleration : mv.airDeceleration;
-    if (combat.stun > 0) {
+    if (this.technique) {
+      body.vx = this.technique.velocityX;
+    } else if (combat.immobilized) {
+      body.vx = 0;
+    } else if (combat.stun > 0) {
       body.vx = approach(body.vx, 0, decel * 0.5 * dt);
     } else if (dir !== 0) {
       const turning = body.vx !== 0 && sign(body.vx) !== dir;
@@ -202,15 +240,31 @@ export class Fighter {
     stepBody(body, dt, ctx.stage, ctx.gravity);
     if (body.grounded) this.lastGroundY = body.y;
 
+    // ---- Charged technique: ground and walls ------------------------------
+    // It needs real ground under the fighter from its first frame to its
+    // last: ground lost (a ledge, a vanished platform) ends it at once and
+    // the fighter falls from where it is. A wall ends the rush as a miss.
+    const technique = this.technique;
+    if (technique) {
+      if (!body.grounded) this.endTechnique('ground');
+      else if (technique.phase === 'dash' && body.wall === technique.facing) this.endTechnique('wall');
+    }
+
     this.updateFacing(dir);
     this.updateState(dt);
+  }
+
+  // Free to start something new: the combat state allows it (no attack,
+  // Dodge, stun, bind or knockout) and no charged technique owns the fighter.
+  canAct() {
+    return this.combat.canAct() && !this.technique;
   }
 
   // Starts one Dodge, if this fighter's Defense is a Dodge and it is free to
   // act. Ground or air is chosen here, once, and kept for the whole clip.
   tryDefense() {
     const spec = this.defense;
-    if (spec?.type !== 'dodge' || !this.combat.canAct()) return false;
+    if (spec?.type !== 'dodge' || !this.canAct()) return false;
     const move = this.body.grounded ? spec.ground : spec.air;
     if (!move) return false;
     // Never grant invisible invulnerability: require real Dodge frames.
@@ -222,16 +276,28 @@ export class Fighter {
     return true;
   }
 
-  // The charged action for `action` (e.g. #0001's Charged BA1 Clone
-  // Attack): pays its Energy, once, and queues one summon at the opponent for
-  // the battle to spawn. The fighter itself performs nothing and keeps
-  // charging. False, with nothing spent, if the action has no summon, the
-  // fighter cannot act, there is no opponent, the art is missing (logged) or
-  // there is too little Energy.
-  trySummon(action) {
-    const id = this.def.chargedActions?.[action];
-    const summon = id && this.summonDefs[id];
-    if (!summon || !this.opponent || !this.combat.canAct()) return false;
+  // The charged action for `action`, dispatched on its type: a `summon`
+  // (#0001's Charged BA1 Clone Attack, see trySummon) or a `technique`
+  // (#0001's Charged BA2 Sphere Rush, see tryTechnique). True when it
+  // happened and consumed the press; false leaves the press to the normal
+  // attack.
+  tryChargedAction(action) {
+    const charged = this.def.chargedActions?.[action];
+    if (!charged) return false;
+    if (charged.type === 'summon') return this.trySummon(action, charged.id);
+    if (charged.type === 'technique') return this.tryTechnique(action, charged.id);
+    console.warn(`[Alva] Charged ${action} has an unknown type "${charged.type}"; ignoring.`);
+    return false;
+  }
+
+  // Summon `id` from `action`: pays its Energy, once, and queues one summon
+  // at the opponent for the battle to spawn. The fighter itself performs
+  // nothing and keeps charging. False, with nothing spent, if there is no
+  // such summon, the fighter cannot act, there is no opponent, the art is
+  // missing (logged) or there is too little Energy.
+  trySummon(action, id) {
+    const summon = this.summonDefs[id];
+    if (!summon || !this.opponent || !this.canAct()) return false;
     const problem = summonProblem(this, summon);
     if (problem) {
       console.warn(`[Alva] Summon "${id}" is unavailable: ${problem}; ignoring.`);
@@ -243,13 +309,49 @@ export class Fighter {
     return true;
   }
 
+  // Start technique `id` from `action`: the fighter leaves Charge (no
+  // release pose) and the technique owns it from this step (see
+  // js/game/charged-technique.js). Grounded only. False, with nothing spent,
+  // if there is no such technique, the fighter cannot act or is airborne,
+  // its art or data is missing (logged) or there is too little Energy.
+  tryTechnique(action, id) {
+    const def = this.techniqueDefs[id];
+    if (!def || !this.canAct() || !this.body.grounded) return false;
+    const problem = techniqueProblem(this, def);
+    if (problem) {
+      console.warn(`[Alva] Charged technique "${id}" is unavailable: ${problem}; ignoring.`);
+      return false;
+    }
+    if (!this.combat.spendEnergy(def.energyCost)) return false;
+    this.combat.lastIntent = action;
+    this.charging = false;
+    this.body.vx = 0;
+    this.technique = new ChargedTechnique({ owner: this, def, action });
+    return true;
+  }
+
+  // Ends the charged technique in progress, if any, for `reason`: 'miss',
+  // 'wall', 'blocked', 'ko', 'done', 'ground', 'hit', 'released', 'reset'
+  // or 'destroy'. The sphere is removed and any opponent it holds released;
+  // damage already dealt stays. The rush never carries on as a slide, and a
+  // Charge still held from before it does not resume by itself.
+  endTechnique(reason) {
+    const t = this.technique;
+    if (!t) return;
+    t.end(reason);
+    this.technique = null;
+    this.chargeHeldOver = this.chargeHeld;
+    this.body.vx = 0;
+    this.updateState(0);
+  }
+
   tryAction(action) {
     const combat = this.combat;
     combat.lastIntent = action;
     const attackId = this.attackFor(action);
     if (!attackId) return false; // reserved: wired, but no attack mapped
     const atk = this.attacks[attackId];
-    if (!atk || !combat.canAct() || combat.cooldowns.has(attackId)) return false;
+    if (!atk || !this.canAct() || combat.cooldowns.has(attackId)) return false;
     if (atk.groundOnly && !this.body.grounded) return false;
     // Never fake an attack pose: require real frames for the attack.
     if (!atk.animation || !this.sprites.has(atk.animation)) {
@@ -279,7 +381,7 @@ export class Fighter {
 
   updateFacing(dir) {
     const { body, combat } = this;
-    if (combat.attack || combat.defenseAction || combat.stun > 0) return;
+    if (combat.attack || combat.defenseAction || combat.stun > 0 || combat.immobilized || this.technique) return;
     if (dir !== 0 && (Math.abs(body.vx) > 20 || !body.grounded)) {
       this.facing = dir;
       return;
@@ -295,6 +397,8 @@ export class Fighter {
     const { body, combat } = this;
     let next;
     if (combat.stun > 0) next = 'hitstun';
+    else if (this.technique) next = 'technique';
+    else if (combat.immobilized) next = 'bound';
     else if (combat.attack) next = 'attack';
     else if (combat.defenseAction) next = 'defense';
     else if (!body.grounded) next = body.vy < 0 ? 'jump' : 'fall';
@@ -325,13 +429,16 @@ export class Fighter {
 
   // Animation key for a visual state. An attack or Dodge plays its own clip
   // for its whole length, even if the fighter lands or leaves the ground
-  // meanwhile. Hitstun shows `hurt` on the ground and `midairHurt` in the air.
-  // Charge plays `chargeStart` once, then `chargeLoop` for the rest of the
-  // hold; a new Charge resets stateTime, so it starts from the first frame.
+  // meanwhile. Hitstun, and being bound by a charged technique, show `hurt`
+  // on the ground and `midairHurt` in the air. A charged technique plays the
+  // clip of its current phase. Charge plays `chargeStart` once, then
+  // `chargeLoop` for the rest of the hold; a new Charge resets stateTime, so
+  // it starts from the first frame.
   animationFor(state) {
     if (state === 'attack') return this.combat.attack.def.animation;
     if (state === 'defense') return this.combat.defenseAction.def.animation;
-    if (state === 'hitstun') return this.body.grounded ? 'hurt' : 'midairHurt';
+    if (state === 'technique') return this.technique.animation;
+    if (state === 'hitstun' || state === 'bound') return this.body.grounded ? 'hurt' : 'midairHurt';
     if (state === 'charge') {
       return this.stateTime < this.chargeStartDuration - TIME_EPSILON ? 'chargeStart' : 'chargeLoop';
     }
