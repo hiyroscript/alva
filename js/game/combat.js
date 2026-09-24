@@ -10,12 +10,22 @@
 //     jab: {
 //       animation: 'jab', startup: 0.07, active: 0.05, recovery: 0.16,
 //       damage: 6, hitbox: { x: 18, y: -62, w: 34, h: 18 },
-//       knockback: { x: 180, y: 0 }, hitstun: 0.22, blockstun: 0.14, cooldown: 0.1,
+//       powers: { horizontalKnockback: 2 }, hitstun: 0.22, blockstun: 0.14, cooldown: 0.1,
 //     },
+//     launcher: { ..., powers: { verticalKnockback: 2 } },
 //     airJab: { animation: 'airJab', ... },
 //   },
 //   // One attack per action, or { ground, air } chosen by grounded state.
 //   actions: { primary: 'jab', action1: { ground: 'jab', air: 'airJab' }, ... }
+//
+// An attack's knockback comes from its attack Powers (js/data/powers.js):
+// `horizontalKnockback` pushes the target away along the attack's facing and
+// `verticalKnockback` launches it upward, each at the declared tier, and an
+// axis the attack leaves out is 0. createAttackDefinition resolves them
+// once, into the definition's numeric `knockback: { x, y }`, which is all
+// applyHit (and a clone performing the attack) ever reads. Bespoke hits that
+// are not fighter attacks (a projectile's, a charged technique's) still carry
+// their own raw `knockback: { x, y }`.
 //
 // An attack needs real frames for its `animation`; without them it is refused
 // rather than faked. Its hitbox only exists during the active phase.
@@ -60,6 +70,8 @@
 // target (CombatState.bind): a hold on it, separate from hitstun, that only
 // the technique which placed it releases.
 
+import { getAttackKnockback } from '../data/powers.js';
+
 const ATTACK_DEFAULTS = {
   animation: null,
   startup: 0.08,
@@ -91,9 +103,19 @@ export function attackPhase(def, time) {
   return 'recovery';
 }
 
+// Frozen attack definition from a character's attack entry (plus its `id`).
+// Declared attack Powers become its numeric `knockback` here, once, so hits
+// never look tiers up. Without `powers` the entry's raw `knockback` (if any)
+// is kept as it is.
 export function createAttackDefinition(spec) {
   if (!spec?.id) throw new Error('[Alva] Attack definitions need an id');
   const def = { ...ATTACK_DEFAULTS, ...spec };
+  if (spec.powers) {
+    if (spec.knockback) {
+      console.warn(`[Alva] Attack "${spec.id}" declares both knockback Powers and a raw knockback; using the Powers.`);
+    }
+    def.knockback = getAttackKnockback(spec);
+  }
   def.total = def.startup + def.active + def.recovery;
   return Object.freeze(def);
 }

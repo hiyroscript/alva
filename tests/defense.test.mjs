@@ -333,8 +333,8 @@ test('a ground Dodge adds no displacement: velocity decays exactly as with no in
   const { fighter, step } = makeFighter();
   const plain = makeFighter();
   const right = { right: true };
-  stepUntil(step, (f) => f.body.vx >= def.movement.maxSpeed, right);
-  stepUntil(plain.step, (f) => f.body.vx >= def.movement.maxSpeed, right);
+  stepUntil(step, (f) => f.body.vx >= f.maxSpeed, right);
+  stepUntil(plain.step, (f) => f.body.vx >= f.maxSpeed, right);
   assert.equal(fighter.body.x, plain.fighter.body.x);
   // Holding right through the Dodge changes nothing: the lock matches letting go.
   const log = recordDodge(step, { ...DEFENSE, ...right }, right);
@@ -409,7 +409,7 @@ test('a mid-air Dodge keeps its horizontal momentum under the normal air drag', 
   const { fighter, step } = makeFighter();
   const plain = makeFighter();
   for (const r of [step, plain.step]) {
-    stepUntil(r, (f) => f.body.vx >= def.movement.maxSpeed, right);
+    stepUntil(r, (f) => f.body.vx >= f.maxSpeed, right);
     r({ ...JUMP, ...right });
     r(right);
   }
@@ -421,7 +421,7 @@ test('a mid-air Dodge keeps its horizontal momentum under the normal air drag', 
     assert.equal(s.x, plain.fighter.body.x, `step ${i}: x`);
     plain.step();
   }
-  assert.ok(log.at(-1).vx > def.movement.maxSpeed / 2, 'momentum carries on');
+  assert.ok(log.at(-1).vx > fighter.maxSpeed / 2, 'momentum carries on');
   assert.equal(fighter.grounded, false);
 });
 

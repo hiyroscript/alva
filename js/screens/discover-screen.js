@@ -1,8 +1,10 @@
 // DISCOVER: the in-game reference. An index rail of sections (Power,
 // Conditions) beside one scrollable page; on narrow windows the rail runs
-// across the top instead. Pages are built from the same data the game plays
-// by (js/data/powers.js, js/data/characters.js), so the reference cannot
-// drift from gameplay.
+// across the top instead. The Power page is built from the Power registry
+// the game plays by (POWERS in js/data/powers.js: names, descriptions and
+// tier numbers, never the tuning values), so the reference cannot drift from
+// gameplay. It explains mechanics only: it never says which fighter or
+// attack uses which Power or tier, so it stays the same as the roster grows.
 //
 // The rail is a tablist with automatic activation: keyboard or gamepad focus
 // on a section shows it, a click or tap selects it, and mouse hover is only a
@@ -13,24 +15,14 @@ import { Screen } from '../core/screen-manager.js';
 import { findNeighbor } from '../core/menu-navigator.js';
 import { CONFIG } from '../config.js';
 import { el } from '../core/utils.js';
-import { ICONS } from '../ui/icons.js';
 import { screenHeader } from '../ui/components.js';
-import { POWERS, getFighterPowerTier } from '../data/powers.js';
-import { CHARACTERS } from '../data/characters.js';
+import { POWERS } from '../data/powers.js';
 
 // Where the rail turns horizontal: narrow windows, but never short landscape
 // ones. Keep in step with the matching rule in styles.css (Discover, narrow).
 const NARROW_QUERY = '(max-width: 600px) and (min-height: 441px), (max-aspect-ratio: 1/1) and (min-height: 600px)';
 
 const DIRECTIONS = ['up', 'down', 'left', 'right'];
-
-// Roster fighters, in roster order, with the tier each owns of `power`.
-function fighterTiers(power) {
-  return CHARACTERS
-    .filter((def) => def.available)
-    .sort((a, b) => a.rosterSlot - b.rosterSlot)
-    .map((def) => ({ def, tier: getFighterPowerTier(def, power.id) }));
-}
 
 // Tier i of n as n rising bars, the first i filled. Decorative: the tier's
 // name carries its number.
@@ -43,38 +35,23 @@ function tierMeter(tier, count) {
   );
 }
 
-// One Power: what it does and which fighter owns which tier beside its tiers,
-// each marked with the fighters that use it.
+// One Power: what it does, beside its tiers. Names and descriptions only.
 function powerEntry(power) {
   const titleId = `discover-power-${power.id}`;
-  const owners = fighterTiers(power);
   const count = power.tiers.length;
   return el('article', { class: 'discover-entry', 'aria-labelledby': titleId }, [
     el('div', { class: 'discover-entry-about' }, [
       el('h3', { class: 'discover-entry-title', id: titleId, text: power.name }),
       el('p', { class: 'discover-entry-text', text: power.summary }),
-      owners.length ? el('div', { class: 'discover-owners' }, [
-        el('h4', { class: 'discover-label', text: 'Fighters' }),
-        el('dl', { class: 'detail-list' }, owners.flatMap(({ def, tier }) => [
-          el('dt', { text: def.displayName }),
-          el('dd', { text: tier.name }),
-        ])),
-      ]) : null,
     ]),
-    el('ol', { class: 'discover-tiers', 'aria-label': `${power.name} tiers` }, power.tiers.map((tier) => {
-      const users = owners.filter((o) => o.tier === tier).map((o) => o.def.displayName);
-      return el('li', { class: `discover-tier${users.length ? ' is-used' : ''}`, dataset: { tier: String(tier.tier) } }, [
+    el('ol', { class: 'discover-tiers', 'aria-label': `${power.name} tiers` }, power.tiers.map((tier) =>
+      el('li', { class: 'discover-tier', dataset: { tier: String(tier.tier) } }, [
         tierMeter(tier.tier, count),
         el('div', { class: 'discover-tier-copy' }, [
           el('span', { class: 'discover-tier-name', text: tier.name }),
           el('span', { class: 'discover-tier-desc', text: tier.description }),
-          users.length ? el('span', { class: 'discover-tier-users' }, [
-            el('span', { class: 'discover-tier-check', html: ICONS.check }),
-            `Used by ${users.join(', ')}`,
-          ]) : null,
         ]),
-      ]);
-    })),
+      ]))),
   ]);
 }
 

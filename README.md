@@ -68,9 +68,10 @@ attack animations. Its touch button has a dashed outline.
   mid-air BA1 that lands keeps playing to the end. Internally this is the
   `action1` input.
 - **Basic Attack 2 (BA2):** a slower, heavier spinning high kick on the
-  ground, a kunai slash in the air. It picks the move the same way, and a
-  mid-air BA2 that lands also plays to the end. Internally this is the
-  `action2` input.
+  ground, a kunai slash in the air. Where BA1 pushes the opponent away, a
+  BA2 hit launches it upward (a blocked BA2 does not). It picks the move the
+  same way, and a mid-air BA2 that lands also plays to the end. Internally
+  this is the `action2` input.
 - **Throw:** #0001's projectile attack, on `J`, X / Square on a gamepad and
   **T** on touch. One press plays one three-frame Throw
   (`throw1 → throw2 → throw3`, once, at 12 fps) and releases exactly one
@@ -150,7 +151,7 @@ attack animations. Its touch button has a dashed outline.
   cancels it (no armour), freeing the opponent. Afterwards, Charge must be
   let go and held again to charge. Pressing Charge and BA2 on the same step
   from standing, or letting go of Charge as you press BA2, is an ordinary
-  BA2, which is unchanged.
+  BA2.
 - **Energy:** the blue bar under each health bar. It begins full. The Clone
   Attack spends 25 of it (a full bar pays for four); nothing else spends it
   (the Sphere Rush is free), nothing restores it yet, and it refills on
@@ -169,7 +170,7 @@ Touch controls show on touch-first devices (coarse pointer, or a touch actually 
 - **Animations:** Idle, Run, Jump, Fall, Land (jump/fall play while airborne; land plays once on touchdown), Hurt and Mid-air Hurt (shown during hitstun on the ground / in the air), Basic Attack 1 (4 frames), Mid-air Basic Attack 1 (5 frames), Basic Attack 2 (7 frames) and Mid-air Basic Attack 2 (3 frames), each played once at 12 fps, Dodge and Mid-air Dodge (3 frames each, played once at 12 fps), Charge (charge1 → charge2 once, then chargea ↔ chargeb while held, at 10 fps, with charge1 shown briefly on release), Throw (3 fighter frames, played once at 12 fps), Shuriken (3 looping projectile frames at 18 fps, normalized and drawn separately from the fighter poses), the clone appear / vanish cloud (`0001_cloneav1`–`0001_cloneav10`, an effect at 20 fps: forwards as a clone appears, the same frames in reverse as it vanishes), the Sphere Rush poses (`0001_rasen1`–`0001_rasen12` as three one-shot fighter clips at 12 fps: formation 1–3, dash 4–6, hit follow-through 7–12) and its blue sphere (`0001_prasen1`–`0001_prasen11` as three one-shot effects at 12 fps: formation 1–6, on the opponent 7–9, explosion 10–11)
 - **Attacks:** Basic Attack 1 and Basic Attack 2, each on the ground and in the air, a ground Throw that releases one shuriken, the Charged BA1 Clone Attack (25 Energy) and the Charged BA2 Sphere Rush (ground only, two hits, no Energy cost). Special is reserved.
 - **Defense:** #0001 dodges, on the ground and in the air.
-- **Powers:** Jump Power in three tiers — 1 (very low jump), 2 (normal jump) and 3 (slightly higher jump). #0001 has Jump Power 2, its original jump.
+- **Powers:** Jump Power, Speed Power, Horizontal Knockback Power and Vertical Knockback Power, each in three tiers. #0001 has Jump Power 2 and Speed Power 2 (its original jump and speed); its BA1 has Horizontal Knockback Power 2 and its BA2 Vertical Knockback Power 2.
 - **HUD:** each fighter panel shows a green health bar with a blue Energy bar directly beneath it. Both start full; the Energy bar drops by a quarter with each clone summoned.
 - **Modes:** Quick Battle: 1 round, 99 seconds, against a non-attacking training CPU. Practice Ground: training on its own stage, alone or with an optional stand-still CPU dummy, with no timer or rounds (below).
 
@@ -296,31 +297,37 @@ until you choose Return.
 
 ### Powers
 
-Powers are gameplay abilities a fighter owns at a fixed tier. `js/data/powers.js` holds each Power's tier table (tier number, name, description and gameplay value) and is their single source of truth: a fighter's definition only names its tier, and the Discover screen reads the same table.
+Powers are gameplay abilities owned at one of three tiers. `js/data/powers.js` holds each Power's frozen tier table (tier number, name, description and gameplay value) in the one `POWERS` registry, their single source of truth: a definition only names a tier, gameplay reads the value and the Discover screen reads the names and descriptions. Each Power has a scope:
 
-- **Jump Power** sets the initial upward speed of a fighter's normal jump, in world units per second at the global gravity of 2500:
+- **Fighter Powers** belong to a fighter, which declares one tier of each: `powers: { jump: 2, speed: 2 }`. `Fighter` resolves them once (`getJumpVelocity`, `getMaxSpeed`).
+- **Attack Powers** belong to individual attacks, so a fighter's attacks can differ. An attack declares the axes it uses in its own `powers`, e.g. `powers: { horizontalKnockback: 2 }`; an axis it leaves out is 0, and it may declare both. `createAttackDefinition` turns them into the attack's numeric `knockback: { x, y }` once, so combat, clones and the debug overlay keep reading plain numbers.
 
-  | Tier | Discover says | Jump speed |
-  | --- | --- | --- |
-  | Jump Power 1 | Very low jump. | 650 |
-  | Jump Power 2 | Normal jump. | 920 |
-  | Jump Power 3 | Slightly higher jump. | 1000 |
+Values are in world units per second, at the global gravity of 2500:
 
-- #0001 declares `powers: { jump: 2 }`. Jump Power 2 is exactly the 920 its jump always had, so it feels identical. Movement no longer has a raw `jumpVelocity`: the tier is the only source of jump strength.
-- `Fighter` resolves the tier once (`getJumpVelocity`) and uses it in the one shared jump, so Player 1, the Quick Battle CPU and Practice Ground all get it. Buffering, coyote time, action gating, animations, gravity, falling, knockback, launches, Dodges and charged techniques never depend on it. A definition with no valid tier is logged and gets Jump Power 2.
-- To add another Power, add its tier table and an entry to `POWERS`; Discover lists it with no screen changes. The tiers are not upgradeable or selectable in game.
+| Power | Scope | Tier 1 | Tier 2 | Tier 3 | Controls |
+| --- | --- | --- | --- | --- | --- |
+| Jump Power | fighter | 650 | 920 | 1000 | the initial upward speed of the normal jump |
+| Speed Power | fighter | 270 | 330 | 360 | the top speed of normal left / right movement, on the ground and in the air |
+| Horizontal Knockback Power | attack | 140 | 180 | 220 | how hard a hit pushes the opponent away (`knockback.x`) |
+| Vertical Knockback Power | attack | 140 | 220 | 300 | how hard an unblocked hit launches the opponent upward (`knockback.y`) |
+
+- #0001 declares `powers: { jump: 2, speed: 2 }`: exactly the 920 jump and 330 top speed it always had, so it moves and jumps identically. Movement has no raw `jumpVelocity` or `maxSpeed`: the tiers are the only sources.
+- #0001's BA1 (ground and mid-air) declares Horizontal Knockback Power 2, so it still pushes the opponent 180 sideways. Its BA2 (ground and mid-air) declares Vertical Knockback Power 2, so it now launches the opponent upward at 220 instead of pushing it 220 sideways. The Clone Attack performs BA1's resolved definition, so it inherits BA1's knockback with no tuning of its own.
+- Speed Power only sets the normal top speed. Acceleration, deceleration, the turn boost, air control, gravity, falling, the jump, knockback, projectiles (the shuriken's 700), Dodges and charged techniques (the Sphere Rush's 1050 dash) never depend on it. Bespoke hits such as the shuriken and the Sphere Rush keep their own raw `knockback`.
+- A declared tier the table lacks (or a fighter with no tier of a fighter Power) is logged and gets tier 2. An attack declaring something that is not an attack Power is logged and ignored.
+- To add another Power, add its tier table and an entry (with its `scope`) to `POWERS`; Discover lists it with no screen changes. The tiers are not upgradeable or selectable in game.
 
 ### Discover
 
-**Home → Discover** opens the reference. **POWER** (open by default) explains Jump Power and its three tiers, marking Jump Power 2 as used by #0001; no physics numbers are shown. **CONDITIONS** is intentionally empty until Alva has Conditions. Arrow keys, the D-pad or the stick move between Back, the sections and the page (↑ / ↓ scroll a long page); Back, `Esc` or gamepad B returns Home.
+**Home → Discover** opens the reference, a character-neutral explanation of Alva's mechanics. **POWER** (open by default) explains Jump Power, Speed Power, Horizontal Knockback Power and Vertical Knockback Power, each with its three tiers. It never says which fighter or attack uses a Power or tier, and shows no tuning numbers. **CONDITIONS** is intentionally empty until Alva has Conditions. Arrow keys, the D-pad or the stick move between Back, the sections and the page (↑ / ↓ scroll a long page); Back, `Esc` or gamepad B returns Home.
 
 ### Adding a fighter (#0002)
 
 1. Put the frames in `assets/characters/0002/`.
-2. Add a definition to `CHARACTERS` in `js/data/characters.js` (animations, movement, Power tiers such as `powers: { jump: 2 }`, collider, hurtboxes, stats).
+2. Add a definition to `CHARACTERS` in `js/data/characters.js` (animations, movement, fighter Power tiers such as `powers: { jump: 2, speed: 2 }`, collider, hurtboxes, stats).
 3. Give it a free `rosterSlot`.
 
-To add attacks, create animations with real frames, define them in `attacks` (see the schema in `js/game/combat.js`), and map them in `actions`: a string for one attack, or `{ ground, air }` to pick by whether the fighter is grounded (as #0001's `action1: { ground: 'ba1', air: 'midairBa1' }` and `action2: { ground: 'ba2', air: 'midairBa2' }` do). Time `startup` / `active` / `recovery` to whole frames of the clip so the hitbox is live only while the strike is on screen. An attack without frames is refused rather than faked.
+To add attacks, create animations with real frames, define them in `attacks` (see the schema in `js/game/combat.js`; knockback comes from each attack's `powers`, such as `{ horizontalKnockback: 2 }`), and map them in `actions`: a string for one attack, or `{ ground, air }` to pick by whether the fighter is grounded (as #0001's `action1: { ground: 'ba1', air: 'midairBa1' }` and `action2: { ground: 'ba2', air: 'midairBa2' }` do). Time `startup` / `active` / `recovery` to whole frames of the clip so the hitbox is live only while the strike is on screen. An attack without frames is refused rather than faked.
 
 To give a fighter a charged action, map a combat button in `chargedActions` to a typed descriptor. Pressed while already charging, with Charge still held, the button does that instead of its normal attack; `Fighter.tryChargedAction` dispatches on the type:
 
