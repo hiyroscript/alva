@@ -57,6 +57,19 @@ behave, and how it must look. The README covers running and deploying it.
   preloaded with the character, and normalized and drawn separately: same
   grid detection, a centre anchor instead of bottom-centre, and the
   fighter's world-per-art-pixel scale, never fitted to the fighter's height.
+- The same folder holds #0001's effect art: the clone appear / vanish cloud,
+  ten frames `0001_cloneav1`–`0001_cloneav10` (≈38–210 × 36–132 px, ≈2×
+  pixel art), a smoke puff that grows, fills out and then breaks into
+  scattered wisps. Appearance plays them in forward order (`cloneav1 → … →
+  cloneav10`); disappearance plays the same ten files in reverse order
+  (`cloneav10 → … → cloneav1`), reversed at runtime, never duplicated or
+  reversed on disk. They are registered apart from the fighter and projectile
+  animations (`effectAnimations.cloneCloud`), preloaded with the character,
+  and normalized like projectile art (own art size, centre anchor, the
+  fighter's world-per-art-pixel scale, never fitted to the fighter's height).
+  The cloud is direction-neutral (`sourceFacing: 0`) and never mirrored. An
+  early upload named `0001_ cloneav8.png` (with a space) was replaced by
+  `0001_cloneav8.png`; only the latter exists.
 - Source orientation: #0001's art faces right (`sourceFacing: 1` on the
   character), except `midairdodge1`–`3`, which are drawn facing left. An
   animation may override the character's orientation with its own
@@ -75,8 +88,8 @@ behave, and how it must look. The README covers running and deploying it.
   `chargea` / `chargeb` its sustained loop; `charge1` is also reused, as the
   same file, for the Charge release pose.
 - The idle, jump, fall, land and hurt frames (≈16× pixel art), the mid-air
-  hurt, Basic Attack 1 and 2, Charge, Dodge, Throw and shuriken frames (≈8×)
-  and the run frames (≈4×)
+  hurt, Basic Attack 1 and 2, Charge, Dodge, Throw and shuriken frames (≈8×),
+  the run frames (≈4×) and the clone cloud frames (≈2×)
   are at very different raw scales. A normalization
   system must, once per frame: read the alpha channel, find the visible bounds,
   detect the pixel-art grid, resample to one pixel per art pixel, and anchor
@@ -97,7 +110,7 @@ behave, and how it must look. The README covers running and deploying it.
 - Systems: asset loader, input (keyboard, touch, gamepad), menu navigator,
   device detection, audio stub, sprite normalizer/animator, fighter state
   machine, controllers (player / training AI), physics, camera, combat,
-  projectiles, HUD, touch controls, stage themes.
+  projectiles, summoned clones, HUD, touch controls, stage themes.
 - Data-driven content: `js/data/characters.js` and `js/data/maps.js`. Adding a
   fighter means adding frames, a definition and a roster slot — never editing
   engine code.
@@ -310,8 +323,10 @@ no header, build label, eyebrow or keyboard hint bar.
 - Two tabs (Help, Credits) sharing one scrollable panel; ←/→ switch tabs,
   ↑/↓ scroll.
 - Help: desktop controls rendered from the live key bindings, mobile control
-  diagram, movement, Charge & Energy, Throw, Defense, stages and platforms,
-  pause, notes on this build.
+  diagram, movement, Charge & Energy (including the Charged BA1 Clone
+  Attack, with no extra control row: it uses the existing Charge and BA1
+  controls), Throw, Defense, stages and platforms, pause, notes on this
+  build.
 - The Home entry to this screen is disabled for now; the screen stays in place
   so it can return.
 - Credits (must remain visible and readable). One list in
@@ -471,9 +486,14 @@ no header, build label, eyebrow or keyboard hint bar.
   normal state (idle, or run if a direction is held). It is a release only
   when the fighter was charging on the previous step, Charge is no longer
   held, and nothing of higher priority started on that step; higher-priority
-  interruptions (a hit, BA1, BA2, a Dodge, a jump, leaving the ground) do not
-  play `chargeRelease` first, and letting go of Charge on the same step as
-  one of them goes straight to it. The release pose is visual only: no
+  interruptions (a hit, BA1, BA2, Throw, a Dodge, a jump, leaving the ground)
+  do not play `chargeRelease` first, and letting go of Charge on the same
+  step as one of them goes straight to it. BA1 interrupts Charge only when
+  Charge is let go on the BA1 press step (an ordinary BA1, with no release
+  pose and no clone) or when the Clone Attack cannot be paid for: BA1 while
+  Charge is still held and sufficient Energy is available summons a clone
+  instead of making the owner perform BA1, and the owner stays in Charge
+  (see the Charged BA1 Clone Attack below). The release pose is visual only: no
   damage, hitbox, invulnerability, armour, Energy change, knockback or
   special movement, and movement resumes normally while it shows. Every new
   Charge, including one started during the release pose, restarts from
@@ -486,8 +506,9 @@ no header, build label, eyebrow or keyboard hint bar.
   invulnerability, and it is not an attack or a combat action. State
   priority is hitstun > attack > Defense (Dodge) > jump / fall > land >
   charge > charge release > run > idle (a Block-type guard would sit between
-  land and charge): a hit shows Hurt at once, BA1 / BA2 / Throw start straight
-  out of a held Charge, Jump interrupts it, and a Defense press interrupts it with a
+  land and charge): a hit shows Hurt at once, BA2 / Throw start straight
+  out of a held Charge (so does BA1 when the Clone Attack cannot be paid
+  for), Jump interrupts it, and a Defense press interrupts it with a
   Dodge. If Charge is still held when that Dodge ends, a fresh Charge starts
   from `charge1`, never from `chargea` / `chargeb`. Charge on a one-way
   platform charges in place and never drops through. If the charge frames
@@ -529,25 +550,102 @@ no header, build label, eyebrow or keyboard hint bar.
   nothing. If a Dodge clip's frames are missing, that Dodge is refused
   (logged) rather than granting invisible invulnerability. The debug overlay
   grays a fighter's hurtboxes while it is invulnerable.
+- Charged BA1 Clone Attack (#0001). Trigger: the fighter must already be
+  Charging (it entered the Charge state on an earlier simulation step), and
+  Charge must still be held on the step BA1 (`action1`: U, B / Circle, touch
+  **BA1**) is pressed. There is no new button or key. Charge and BA1 pressed
+  together from idle on the same first step is an ordinary BA1 (normal action
+  priority), and so is BA1 pressed on the step Charge is let go (no release
+  pose, no clone, no cost). It is data on the character: `chargedActions`
+  maps `action1` to the `ba1Clone` summon, which names the attack (`ba1`),
+  the cloud effect (`cloneCloud`), `energyCost` 25, `behindDistance` 48 world
+  units, the cloud's `effectOffset` (centred 44 units above the clone's feet,
+  half the fighter's height) and a `stageMargin`. A successful summon spends
+  exactly 25 Energy once, when it is accepted (100 → 75 → 50 → 25 → 0; a full
+  meter pays for four; never below 0), and nothing is spent per cloud frame,
+  on the attack, on a hit or miss, or on vanishing. With less than 25 Energy
+  no clone is summoned and nothing is spent: the press falls through to the
+  ordinary grounded BA1. Before paying, the summon checks that the cloud and
+  BA1 have real frames, BA1 is defined and there is an opponent; missing art
+  logs a warning, spends nothing, summons nothing and falls back to BA1
+  (itself refused if BA1's frames are missing). One press summons exactly one
+  clone; holding BA1 does not repeat it. There is no hidden one-clone limit:
+  each further paid press while still charging summons another, each on its
+  own independent lifecycle.
+  The owner does not perform BA1: no `0001_1ba*` art, no attack, no BA1
+  cooldown, no `chargeRelease`. While Charge stays held it remains in Charge,
+  playing its normal `charge1 → charge2 → chargea ↔ chargeb` art (there is no
+  summon pose). Once summoned, the clone is independent: the owner may release
+  Charge (the normal release pose), jump, throw, use BA2, dodge, be hit or
+  even be knocked out, and the clone still finishes appearing, attacking and
+  vanishing, with no refund. It never retargets or summons again.
+  The clone is not a Fighter (`js/game/clone.js`): it has no health, Energy,
+  controller, pushbox, hurtboxes, defence, jump or coyote logic, physics or
+  gravity, and it is not in `battle.fighters`. It is untargetable, takes no
+  part in fighter separation or solid collision (the opponent can move
+  through it), is ignored by the camera (framing still uses P1 and the CPU)
+  and has no marker, name, ring, shadow, health or Energy bar. Its position
+  and facing are snapshotted once, on the summon step: on the opponent's back
+  side (`x = target.x − target.facing × 48`, clamped inside the stage's
+  horizontal bounds), at the opponent's foot height (a target on a platform
+  or airborne included), facing the way the opponent faced. It never moves,
+  turns, chases or teleports after that, so an opponent who moves away before
+  the punch makes it whiff. Lifecycle, all on fixed steps: APPEAR plays
+  `cloneav1 → … → cloneav10` once at 20 fps (0.5 s), with no hitbox; the
+  clone's first BA1 frame shows beneath the last cloud frame as the smoke
+  clears. ATTACK plays one ordinary grounded BA1 from frame 1 with the owner's
+  real sprites (`0001_1ba1 → 1ba2 → 1ba3 → 1ba4` at 12 fps, the same
+  per-clip `sourceFacing` mirroring, no tint, transparency, outline or
+  silhouette) and BA1's own definition (`attacks.ba1`: frame 1 startup, frame
+  2 active, frames 3–4 recovery, 6 damage, 0.22 s hitstun, 0.14 s blockstun,
+  0.06 s hitstop, 180 horizontal knockback), so its hitbox exists only on the
+  active frame and hits at most once. VANISH removes the body and plays the
+  same cloud backwards, `cloneav10 → … → cloneav1`, at the same 20 fps
+  (0.5 s), with no hitbox; the clone is then removed. The clone's hitbox is
+  resolved from the clone's own position and facing, never the owner's. A hit
+  credits the owner as the attacker (the combat event also names the clone as
+  its `summon`) and pushes the target along the clone's facing, away from the
+  clone. It is a detached hit: the target gets BA1's hitstop and the clone
+  pauses its own attack clock for the same 0.06 s, but the owner is never
+  frozen (like a projectile's thrower). During a Dodge's invulnerable frames
+  it passes through unspent (no damage, stun, knockback or hitstop) and can
+  still connect if the active frame outlasts them. A Block-type guard (future
+  fighters) blocks it only when facing the clone (the clone's facing drives
+  the check), so a guard still facing away from a clone at its back is hit.
+  Clones are drawn behind both fighters (terrain, shadows, clones, CPU, P1,
+  projectiles, foreground), with the cloud centred at the effect offset at
+  the fighters' art-pixel scale. The Battle owns live clones: each fixed step
+  it updates the fighters, spawns projectiles and moves them, advances live
+  clones, spawns the clones summoned that step (each on cloud frame 1),
+  resolves melee, projectile and clone hits, then drops spent projectiles and
+  finished clones. Restart / rematch and leaving the battle clear every clone.
+  The debug overlay draws a clone's BA1 hitbox in the attack colour, labelled
+  `clone ba1`, only on its active frame; a clone has no hurtboxes to draw.
 - Every fighter has an Energy resource (`energy` / `maxEnergy` on its combat
   state, capacity from the character's `stats.energy`, 100 for #0001). It
-  starts full and refills on restart / rematch. No rule spends, drains or
-  restores Energy yet, Charge and Dodge included, and the winner is still
-  decided by remaining health.
+  starts full and refills on restart / rematch. It changes only through the
+  combat state's `canSpendEnergy` / `spendEnergy` helpers, and #0001's
+  Charged BA1 Clone Attack (25) is the only thing that spends it. There is no
+  Energy regeneration or gain: Charge, hits, Dodges and time generate none,
+  and BA1, BA2, Throw and Defense cost none. The winner is still decided by
+  remaining health.
 - Physics: acceleration, deceleration, max speed, gravity, jump impulse,
   ground/platform/solid collision, stage bounds, landing detection; collision
   boxes independent of PNG size; bottom-centre origin; no sinking, floating,
   jitter or escaping the stage.
 - Combat architecture (health, damage, hitboxes, hurtboxes, attack definitions,
   Defense with Block / Dodge implementations, invulnerability, knockback,
-  stun and blockstun, hitstop, cooldowns) is data-driven. Basic Attacks 1
-  and 2 and Throw (with its shuriken projectile) are implemented through it
-  with real artwork; Special stays reserved (mapped to no attack) until real
-  sprites exist, and no attack, projectile or frame is ever fabricated. An attack whose frames fail to load is refused
-  (no substitute pose, no invisible hitbox), and so is a Dodge.
+  stun and blockstun, hitstop, cooldowns, Energy, charged actions and
+  summons) is data-driven. Basic Attacks 1 and 2, Throw (with its shuriken
+  projectile) and the Charged BA1 Clone Attack (a summoned clone performing
+  BA1) are implemented through it with real artwork; Special stays reserved
+  (mapped to no attack) until real sprites exist, and no attack, projectile,
+  clone or frame is ever fabricated. An attack whose frames fail to load is
+  refused (no substitute pose, no invisible hitbox), and so is a Dodge, and so
+  is a clone summon whose cloud or attack art is missing (nothing is spent).
 - Quick Battle: one round, 99 seconds, against a non-attacking training CPU
-  that uses the same fighter definition. It never attacks, throws, charges or
-  uses Defense;
+  that uses the same fighter definition. It never attacks, throws, charges,
+  summons clones or uses Defense;
   it drops through one-way platforms with an internal intent that no player
   control produces.
 
@@ -573,8 +671,10 @@ no header, build label, eyebrow or keyboard hint bar.
   shorter, with the same track, and one solid `--energy` blue fill with no
   delayed-damage layer. Both P1 and CPU show one, both start full, and the CPU's
   fills from the right like its health bar. Blue here is a deliberate
-  gameplay-resource exception to the green-only interface accent (5.1); no
-  Energy gain or spending is implemented yet.
+  gameplay-resource exception to the green-only interface accent (5.1). The
+  meter changes the moment Energy is spent (each Clone Attack drops it by a
+  quarter: 100 % → 75 % → 50 % → 25 % → 0 %); no Energy gain is implemented
+  yet.
 - Timer + pause: one glass control at top centre. The round label and timer
   sit on top; a rectangular pause section sits directly beneath with no gap,
   the same width and a hairline seam, so only the outer corners are rounded.
@@ -598,8 +698,10 @@ no header, build label, eyebrow or keyboard hint bar.
   repeat): A/D or ←/→ move, S/↓ Charge (held), W/Space/↑ jump, J Throw (the
   internal `primary` action), K Special (reserved), L Defense, U Basic
   Attack 1 (BA1), I Basic Attack 2 (BA2), Esc/P pause. `` ` `` toggles a
-  debug overlay (colliders, hurtboxes, attack hitboxes while active, and each
-  flying projectile's hitbox in magenta with its name). In menus S/↓ still navigate down: menu bindings are separate
+  debug overlay (colliders, hurtboxes, attack hitboxes while active, each
+  flying projectile's hitbox in magenta with its name, and each clone's BA1
+  hitbox, labelled `clone ba1`, on its active frame). BA1 pressed while
+  Charge is still held is the Charged BA1 Clone Attack (7.2): no extra key. In menus S/↓ still navigate down: menu bindings are separate
   from the gameplay `charge` action.
 - Gamepad (standard layout) for movement (D-pad / left stick left and
   right), Charge in battle (D-pad down / left stick down, held; menus still

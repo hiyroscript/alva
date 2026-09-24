@@ -81,8 +81,9 @@ export function buildHelp() {
       el('ul', { class: 'info-list' }, [
         el('li', { text: 'Hold Charge (S / ↓, or C on touch) while grounded to enter #0001’s charging stance. Charge must be held: release it to stop charging.' }),
         el('li', { text: 'Charge plays its two-frame startup once, then loops its sustained pose for as long as you hold it. Each new Charge starts again from the startup.' }),
-        el('li', { text: 'You stay in place while charging. Let go and #0001 shows its first Charge pose for a moment before returning to normal. Jump, BA1, BA2, Throw and Defense (Dodge) take over from Charge at once, and a hit interrupts it.' }),
-        el('li', { text: 'The blue Energy meter under each health bar begins full. It is reserved for the Energy system: nothing spends or restores Energy yet.' }),
+        el('li', { text: 'You stay in place while charging. Let go and #0001 shows its first Charge pose for a moment before returning to normal. Jump, BA2, Throw and Defense (Dodge) take over from Charge at once, and a hit interrupts it. Letting go of Charge as you press BA1 gives a normal BA1.' }),
+        el('li', { text: 'Hold Charge first, then press BA1 to spend 25 Energy and summon a clone behind the opponent (the Clone Attack). The clone appears in a cloud of smoke, performs BA1 and disappears, while #0001 keeps charging for as long as you hold Charge. With less than 25 Energy, BA1 works normally.' }),
+        el('li', { text: 'The blue Energy meter under each health bar begins full. Only the Clone Attack spends it, and nothing restores Energy yet: it refills when a new battle starts.' }),
       ]),
     ]),
     card('Throw', [
@@ -114,7 +115,7 @@ export function buildHelp() {
       ]),
     ]),
     card('This build', [
-      el('p', { class: 'info-text', text: '#0001 has idle, run, jump, fall and land animations, ground and mid-air hurt poses, a held Charge stance, Basic Attack 1 (BA1) and Basic Attack 2 (BA2), each on the ground and in the air, and a ground Throw. BA1 (action1) is a punch on the ground and a kick in the air; BA2 (action2) is a spinning high kick on the ground and a kunai slash in the air. Throw (the primary action) throws an animated shuriken. Only Special is still reserved: it is wired into the input and combat systems but waits for matching attack sprites. Defense is a ground and mid-air Dodge for #0001. Energy starts full for both fighters. The training CPU never attacks.' }),
+      el('p', { class: 'info-text', text: '#0001 has idle, run, jump, fall and land animations, ground and mid-air hurt poses, a held Charge stance, Basic Attack 1 (BA1) and Basic Attack 2 (BA2), each on the ground and in the air, and a ground Throw. BA1 (action1) is a punch on the ground and a kick in the air; BA2 (action2) is a spinning high kick on the ground and a kunai slash in the air. Throw (the primary action) throws an animated shuriken. Only Special is still reserved: it is wired into the input and combat systems but waits for matching attack sprites. Defense is a ground and mid-air Dodge for #0001. Energy starts full for both fighters; #0001’s Charged BA1 Clone Attack is the one move that spends it. The training CPU never attacks.' }),
     ]),
   ]);
 }

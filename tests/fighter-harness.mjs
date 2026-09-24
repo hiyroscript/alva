@@ -7,6 +7,7 @@ import { getCharacter } from '../js/data/characters.js';
 import { Fighter } from '../js/game/character.js';
 import { CombatSystem } from '../js/game/combat.js';
 import { spawnProjectiles, removeDeadProjectiles } from '../js/game/projectile.js';
+import { spawnClones, updateClones, removeDeadClones } from '../js/game/clone.js';
 import { StageCollision } from '../js/game/physics.js';
 import { SpriteSet } from '../js/game/sprite-normalizer.js';
 import { CONFIG } from '../js/config.js';
@@ -16,8 +17,13 @@ export const DT = CONFIG.sim.step;
 export const BASE = './assets/characters/0001/0001_';
 
 // SpriteSet with the definition's clip metadata in place of decoded frames.
-// `projectileKeys` picks which projectile animations have art.
-export function fakeSprites(keys = Object.keys(def.animations), projectileKeys = Object.keys(def.projectileAnimations)) {
+// `projectileKeys` and `effectKeys` pick which projectile and effect
+// animations have art.
+export function fakeSprites(
+  keys = Object.keys(def.animations),
+  projectileKeys = Object.keys(def.projectileAnimations),
+  effectKeys = Object.keys(def.effectAnimations),
+) {
   const set = new SpriteSet(def);
   for (const key of keys) {
     const anim = def.animations[key];
@@ -30,6 +36,13 @@ export function fakeSprites(keys = Object.keys(def.animations), projectileKeys =
   for (const key of projectileKeys) {
     const anim = def.projectileAnimations[key];
     set.projectiles[key] = {
+      key, fps: anim.fps, loop: anim.loop !== false, sourceFacing: anim.sourceFacing ?? 0,
+      frames: anim.frames.map((url) => ({ url })),
+    };
+  }
+  for (const key of effectKeys) {
+    const anim = def.effectAnimations[key];
+    set.effects[key] = {
       key, fps: anim.fps, loop: anim.loop !== false, sourceFacing: anim.sourceFacing ?? 0,
       frames: anim.frames.map((url) => ({ url })),
     };
@@ -90,33 +103,40 @@ export function recordAttack(step, held) {
 // Consecutive duplicates removed: the order frames were shown in.
 export const sequence = (log) => log.map((s) => s.frame).filter((n, i, a) => n !== a[i - 1]);
 
-// Two fighters, their projectiles and the real CombatSystem, stepped in
-// Battle.update()'s order. `targetCharacter` swaps in another definition
-// (e.g. a Block-type fighter).
-export function duel({ gap = 44, attackerFacing = 1, attackerSprites, targetSprites, targetCharacter } = {}) {
+// Two fighters, their projectiles and clones and the real CombatSystem,
+// stepped in Battle.update()'s order. `targetCharacter` swaps in another
+// definition (e.g. a Block-type fighter); `targetFacing` overrides the
+// target's starting facing (by default it faces the attacker).
+export function duel({
+  gap = 44, attackerFacing = 1, attackerSprites, targetSprites, targetCharacter, targetFacing = -attackerFacing,
+} = {}) {
   const x = 500;
   const a = makeFighter({ x, facing: attackerFacing, sprites: attackerSprites });
   const b = makeFighter({
-    x: x + gap * attackerFacing, facing: -attackerFacing, sprites: targetSprites, character: targetCharacter,
+    x: x + gap * attackerFacing, facing: targetFacing, sprites: targetSprites, character: targetCharacter,
   });
   a.fighter.opponent = b.fighter;
   b.fighter.opponent = a.fighter;
   const system = new CombatSystem();
   const events = [];
   const projectiles = [];
+  const clones = [];
   const fighters = [a.fighter, b.fighter];
   const tick = (held = {}, targetHeld = {}) => {
     a.step(held);
     b.step(targetHeld);
     spawnProjectiles(fighters, projectiles);
     for (const p of projectiles) p.update(DT, STAGE);
-    events.push(...system.update(fighters, projectiles));
+    updateClones(clones, DT);
+    spawnClones(fighters, clones, STAGE);
+    events.push(...system.update(fighters, projectiles, clones));
     removeDeadProjectiles(projectiles);
+    removeDeadClones(clones);
   };
   // Ticks until `pred` holds; fails instead of hanging.
   const until = (pred, limit = 600) => {
     for (let i = 0; i < limit && !pred(); i++) tick();
     assert.ok(pred(), 'condition never reached');
   };
-  return { attacker: a.fighter, target: b.fighter, tick, until, events, projectiles };
+  return { attacker: a.fighter, target: b.fighter, tick, until, events, projectiles, clones };
 }
