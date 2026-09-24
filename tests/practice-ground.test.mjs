@@ -302,24 +302,32 @@ function practiceSession({ cpu = true } = {}) {
 
 // ---- Home ---------------------------------------------------------------------
 
-test('Home: Practice Ground replaces Help & Credits, enabled, under Play, and opens Practice Ground directly', () => {
+test('Home: Play, Practice Ground, then Discover; Practice Ground and Discover open directly', () => {
   const { app } = fakeApp();
   const home = new HomeScreen(app);
   const actions = home.el.querySelectorAll('.home-action');
-  assert.equal(actions.length, 2);
-  const [play, practice] = actions;
+  assert.equal(actions.length, 3);
+  const [play, practice, discover] = actions;
   assert.ok(play.html.includes('<span>Play</span>'));
   assert.ok(practice.html.includes('<span>Practice Ground</span>'));
-  assert.ok(practice.html.includes(ICONS.right), 'keeps the Home chevron');
+  assert.ok(discover.html.includes('<span>Discover</span>'));
+  // Discover matches Practice Ground: the same outlined action and chevron.
+  for (const action of [practice, discover]) {
+    assert.ok(action.html.includes(ICONS.right), 'keeps the Home chevron');
+    assert.equal(action.className, 'home-action');
+    assert.equal(action.disabled, false);
+    assert.equal(action.hasAttribute('data-nav'), true);
+  }
   assert.ok(!home.el.querySelectorAll('.home-action').some((b) => b.html.includes('Help')));
-  assert.equal(practice.disabled, false);
-  assert.equal(practice.hasAttribute('data-nav'), true);
-  assert.deepEqual(app.nav.candidates(home.el), [play, practice], 'keyboard / gamepad reach it');
+  assert.deepEqual(app.nav.candidates(home.el), [play, practice, discover], 'keyboard / gamepad reach them, in order');
+  assert.equal(home.el.querySelector('.home-actions').children.at(-1), discover, 'Discover sits directly under Practice Ground');
 
   practice.click();
   assert.deepEqual(app.screens.calls, [['practice']], 'no mode, fighter or stage select first');
+  discover.click();
+  assert.deepEqual(app.screens.calls[1], ['discover'], 'Discover opens the Discover screen');
   play.click();
-  assert.deepEqual(app.screens.calls[1], ['mode'], 'Play still opens Select Mode');
+  assert.deepEqual(app.screens.calls[2], ['mode'], 'Play still opens Select Mode');
 });
 
 // ---- Entering -----------------------------------------------------------------

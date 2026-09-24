@@ -36,8 +36,14 @@ export class HomeScreen extends Screen {
       class: 'home-action', type: 'button', 'data-nav': true,
       html: `<span>Practice Ground</span>${ICONS.right}`,
     });
+    // The in-game reference (Power, Conditions), opened directly.
+    const discover = el('button', {
+      class: 'home-action', type: 'button', 'data-nav': true,
+      html: `<span>Discover</span>${ICONS.right}`,
+    });
     play.addEventListener('click', () => app.screens.go('mode'));
     practice.addEventListener('click', () => app.screens.go('practice'));
+    discover.addEventListener('click', () => app.screens.go('discover'));
 
     this.rollTrack = el('div', { class: 'home-credits-track' }, [creditsSequence(), creditsSequence({ copy: true })]);
     this.rollOffset = 0;
@@ -104,7 +110,7 @@ export class HomeScreen extends Screen {
         el('div', { class: 'home-intro' }, [
           el('h1', { class: 'home-title', id: 'home-title', html: logoSVG({ className: 'logo logo--display' }) }),
           el('p', { class: 'home-lede', text: 'Fan project. Big heart.' }),
-          el('nav', { class: 'home-actions', 'aria-label': 'Main menu' }, [play, practice]),
+          el('nav', { class: 'home-actions', 'aria-label': 'Main menu' }, [play, practice, discover]),
         ]),
       ]),
       el('footer', { class: 'home-footer' }, [

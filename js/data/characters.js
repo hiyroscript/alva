@@ -2,7 +2,8 @@
 //
 // Adding a fighter (e.g. #0002) should only require:
 //   1. dropping frames into ./assets/characters/<id>/
-//   2. adding a definition to CHARACTERS below
+//   2. adding a definition to CHARACTERS below, including its Power tiers
+//      (`powers`, see js/data/powers.js)
 //   3. giving it a rosterSlot
 //
 // Every field the engine reads lives here; nothing about #0001 is hard-coded
@@ -318,6 +319,13 @@ export const CHARACTERS = [
       portrait: { animation: 'idle', frame: 0, centerY: 0.24, size: 0.5 },
     },
 
+    // Gameplay Powers, each owned at one tier. The tier tables in
+    // js/data/powers.js turn these into gameplay values: Jump Power 2 is the
+    // normal jump, and the only source of this fighter's jump strength.
+    powers: {
+      jump: 2,
+    },
+
     movement: {
       maxSpeed: 330,
       acceleration: 2600,
@@ -325,7 +333,6 @@ export const CHARACTERS = [
       turnBoost: 1.6,
       airAcceleration: 1500,
       airDeceleration: 420,
-      jumpVelocity: 920,
       gravityScale: 1,
       maxFallSpeed: 1500,
       coyoteTime: 0.08,
