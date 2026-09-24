@@ -118,7 +118,7 @@ export function buildHelp() {
       ]),
     ]),
     card('This build', [
-      el('p', { class: 'info-text', text: '#0001 has idle, run, jump, fall and land animations, ground and mid-air hurt poses, a held Charge stance, Basic Attack 1 (BA1) and Basic Attack 2 (BA2), each on the ground and in the air, and a ground Throw. BA1 (action1) is a punch on the ground and a downward kunai slash in the air; BA2 (action2) is a spinning high kick on the ground and a kick in the air. Throw (the primary action) throws an animated shuriken. Only Special is still reserved: it is wired into the input and combat systems but waits for matching attack sprites. Defense is a ground and mid-air Dodge for #0001. Holding Charge turns BA1 into the Clone Attack and BA2 into the Sphere Rush. Energy starts full for both fighters; #0001’s Charged BA1 Clone Attack is the one move that spends it. The training CPU never attacks.' }),
+      el('p', { class: 'info-text', text: '#0001 has idle, run, jump, fall and land animations, ground and mid-air hurt poses, a held Charge stance, Basic Attack 1 (BA1) and Basic Attack 2 (BA2), each on the ground and in the air, and a ground Throw. BA1 (action1) is a punch on the ground and a kunai slash in the air; BA2 (action2) is a spinning high kick on the ground and a kick in the air. Throw (the primary action) throws an animated shuriken. Only Special is still reserved: it is wired into the input and combat systems but waits for matching attack sprites. Defense is a ground and mid-air Dodge for #0001. Holding Charge turns BA1 into the Clone Attack and BA2 into the Sphere Rush. Energy starts full for both fighters; #0001’s Charged BA1 Clone Attack is the one move that spends it. The training CPU never attacks.' }),
     ]),
   ]);
 }
