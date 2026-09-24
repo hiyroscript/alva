@@ -1,2039 +1,733 @@
-Work from the latest main branch of hiyroscript/alva.
+Implement “Practice Ground” in Alva
 
-Implement #0001’s new Charged BA2 technique using the newly uploaded rasen fighter frames and prasen blue-sphere effect frames.
+Work in the hiyroscript/alva repository on the current main branch.
 
-The intended move is:
+Implement a new Practice Ground experience that replaces the currently disabled Help & Credits home-menu entry.
 
-Already Charging
-→ press BA2
-→ #0001 enters a preparation pose
-→ a blue sphere forms in his hand
-→ once fully formed, #0001 dashes forward with it
-→ if the sphere misses, the technique ends and #0001 returns to normal
-→ if the sphere hits the opponent, the hit confirms
-→ the opponent is immobilized
-→ #0001 continues the contact/recovery animation
-→ after about 2 seconds the sphere explodes
-→ the explosion deals a much larger second hit
-→ the opponent is released/launched
+Do not redesign Alva’s overall architecture or visual identity. Build this feature using the existing vanilla JavaScript, Canvas 2D, screen manager, fighter systems, stage renderer, menu navigation, touch controls, glass UI, and character data.
 
-The technique is strictly ground-dependent.
+The result must feel like a first-class Alva mode, not a prototype bolted onto the game.
 
-If #0001 loses the ground beneath him while the sequence is active:
+Repository context you must preserve
 
-cancel the technique
-→ remove the sphere
-→ release any temporary immobilization
-→ #0001 enters Fall
+Before making changes, inspect and understand these existing files:
 
-Do not allow the move to hover across gaps.
+* index.html
+* styles.css
+* js/core/app.js
+* js/core/screen-manager.js
+* js/core/menu-navigator.js
+* js/screens/home-screen.js
+* js/screens/character-select-screen.js
+* js/screens/battle-screen.js
+* js/game/battle.js
+* js/game/hud.js
+* js/game/camera.js
+* js/game/fighter-controller.js
+* js/game/character.js
+* js/game/combat.js
+* js/game/projectile.js
+* js/game/clone.js
+* js/game/charged-technique.js
+* js/game/touch-controls.js
+* js/data/characters.js
+* js/data/maps.js
+* js/stages/index.js
+* js/stages/stage-theme.js
+* the existing test files under tests/
 
-Preserve the existing:
+Important facts about the current implementation:
 
-* Charge
-* Charged BA1 Clone Attack
-* Energy system
-* normal BA1
-* normal ground/mid-air BA2
-* Throw + shuriken
-* Defense/Dodge
-* clone system
-* projectile system
-* fixed-step physics
-* HUD
-* training CPU
+* HomeScreen currently contains a disabled Help & Credits button.
+* That button currently points to the help screen.
+* The standard fighter-select screen has a 48-slot roster, with available fighters as buttons and locked slots as non-interactive placeholders.
+* Fighter #0001 is character ID "0001", is available, and occupies roster slot 0.
+* Quick Battle’s Battle class currently always creates both P1 and a second fighter controlled by TrainingAIController.
+* The normal HUD always creates P1, CPU, round/timer, and pause UI.
+* Camera.follow(primary, secondary, dt) and Camera.snap(primary, secondary) already support a missing/null secondary fighter.
+* MAPS directly drives the normal Quick Battle stage selector, so the Practice Ground map must not simply be added to MAPS.
+* The repo already has reusable semi-transparent glass styling through .glass, .glass--panel, overlays, pause menus, etc.
+* Keep Quick Battle behavior completely intact.
 
-Do not replace working systems.
+⸻
 
-1. Current Charged-action architecture
+1. Replace “Help & Credits” with “Practice Ground”
 
-The current game already supports:
+On the Home screen, replace the currently disabled:
 
-chargedActions: {
-  action1: 'ba1Clone'
-}
+Help & Credits
 
-but the implementation currently assumes a charged action is specifically a summon and routes it through trySummon().
+button with:
 
-That assumption is no longer sufficient.
+Practice Ground
 
-After this task there are two different kinds of charged actions:
+Requirements:
 
-Charged BA1
-→ summon-type charged action
-→ Clone Attack
-Charged BA2
-→ self-performed sequence/rush charged action
-→ new sphere technique
+* Enable the button.
+* Keep it as the secondary Home action under Play.
+* Keep the existing Home visual language and arrow treatment.
+* Clicking it must immediately enter Practice Ground.
+* Do not send the player through Select Mode, Select Fighter, or Select Stage first.
+* Play must continue to work exactly as it does now.
 
-Generalize the dispatcher cleanly.
+Use a dedicated screen ID such as:
 
-Do not disguise the Charged BA2 technique as:
+practice
 
-* a summon
-* a projectile
-* ordinary BA2
-* a giant melee hitbox
+Add the corresponding screen container to index.html and register a new PracticeGroundScreen from App.
 
-2. Generalize chargedActions
+The old standalone Help & Credits screen no longer needs to be accessible from Home. It can remain in the repository if other help/credits data is still useful, but do not accidentally remove help-content.js or the Home credits data because other parts of the app still use that content.
 
-Prefer changing the character data to typed charged-action descriptors.
+⸻
 
-Conceptually:
+2. Practice Ground starts immediately with fighter #0001
 
-chargedActions: {
-  action1: {
-    type: 'summon',
-    id: 'ba1Clone',
-  },
-  action2: {
-    type: 'technique',
-    id: 'rasenRush',
-  },
-}
+Every fresh entry into Practice Ground from the Home screen must start with:
 
-Then Fighter can do something conceptually like:
+#0001
 
-if (charged) {
-  if (this.tryChargedAction(action, ctx)) continue;
-}
-this.tryAction(action);
+Character ID:
 
-tryChargedAction() should dispatch based on type.
+"0001"
 
-Keep Charged BA1 behavior unchanged.
+Do not use the fighter previously selected in Quick Battle as the initial Practice Ground fighter.
 
-Do not make Clone Attack depend on the new rush-specific code.
+Practice mode should have its own fighter selection state, separate from:
 
-3. Same Charged-action activation rule
+app.selection.characterId
 
-Use the rule already established by Charged BA1.
+Changing fighter inside Practice Ground should therefore not silently change the user’s Quick Battle fighter selection.
 
-The player must have been actually Charging on an earlier simulation step, and Charge must still be held when BA2 is newly pressed.
+When entering Practice Ground:
 
-Correct:
+1. Load #0001 using the existing app.loadCharacter() asset pipeline.
+2. Show the existing loading overlay if necessary.
+3. Create the practice session.
+4. Spawn #0001 at the practice stage’s default spawn.
+5. Give the player control immediately.
 
-enter Charge
-→ keep Charge held
-→ press BA2
-→ Charged BA2 technique
+There should be no character-select screen before entering.
 
-Not correct:
+⸻
 
-standing
-→ press Charge + BA2 simultaneously
-→ charged technique
+3. No CPU or second fighter
 
-Fresh simultaneous Charge + BA2 from Idle should continue to give ordinary BA2 according to existing action priority.
+Practice Ground currently has no CPU at all.
 
-4. Releasing Charge while pressing BA2
+This is important: do not solve this by creating an invisible CPU, hidden fighter, stationary dummy, or off-screen TrainingAIController.
 
-If #0001 was charging but Charge is released on the exact BA2 press step:
+There must genuinely be only one fighter in the practice simulation.
 
-Charge held last step
-Charge = false now
-BA2Pressed = true
+Do not instantiate TrainingAIController.
 
-use the existing normal BA2.
+Practice Ground should contain:
 
-Do not activate Charged BA2.
+* one Fighter
+* a PlayerController
+* the normal stage collision system
+* normal movement and physics
+* normal attacks
+* normal projectiles
+* normal clones
+* normal charge mechanics
+* normal defense mechanics
+* normal sprite animation
+* normal camera
+* normal touch controls
 
-Do not play chargeRelease before BA2.
+The fighter should have no opponent unless a future feature adds one.
 
-5. Once Charged BA2 starts, Charge no longer needs to stay held
+Audit moves that normally reference an opponent or target. In a no-opponent practice session they must fail gracefully or simply miss; they must never throw an exception.
 
-Charge is the activation prerequisite.
+Do not render:
 
-Once the technique has successfully begun:
+* a CPU character
+* CPU shadow
+* CPU ground marker
+* CPU HUD
+* CPU health
+* CPU energy
+* CPU labels
+* CPU debug information
 
-formation
-→ dash
-→ confirmed sequence
-→ delayed explosion
+⸻
 
-owns the fighter.
+4. Create a dedicated Practice Ground simulation
 
-The player may release the Charge control afterward without cancelling it.
+Do not force the Quick Battle lifecycle onto Practice Ground.
 
-The technique only ends through its defined:
+Quick Battle currently has concepts such as:
 
-* miss
-* ground-loss cancellation
-* hitstun/interruption
-* successful completion
-* battle reset
+* Round 1
+* intro phase
+* FIGHT banner
+* 99-second timer
+* TIME
+* results
+* winner/draw logic
+* CPU
 
-6. New uploaded fighter frames
+Practice Ground needs none of these.
 
-The repository root currently contains:
+Create a dedicated practice-session implementation, for example:
 
-0001_rasen1.png
-0001_rasen2.png
-0001_rasen3.png
-0001_rasen4.png
-0001_rasen5.png
-0001_rasen6.png
-0001_rasen7.png
-0001_rasen8.png
-0001_rasen9.png
-0001_rasen10.png
-0001_rasen11.png
-0001_rasen12.png
+js/game/practice.js
 
-Move all twelve into:
+or another clean equivalent.
 
-./assets/characters/0001/
+Reuse existing lower-level systems wherever possible:
 
-Final canonical paths:
+* StageCollision
+* Fighter
+* PlayerController
+* CombatSystem
+* projectile helpers
+* clone helpers
+* Camera
+* stage themes
+* sprite rendering
+* existing fighter mechanics
 
-./assets/characters/0001/0001_rasen1.png
-...
-./assets/characters/0001/0001_rasen12.png
+Avoid copying the entire Battle class if a small shared extraction can prevent major duplication.
 
-Remove all twelve root copies.
+At the same time, do not perform an unnecessarily risky rewrite of Quick Battle. The existing Quick Battle code and tests should remain stable.
 
-Preserve their bytes exactly.
+A good architecture is:
 
-Do not redraw, recolour, flip, resize, regenerate or replace them.
+* Quick Battle continues using Battle
+* Practice Ground uses PracticeSession
+* both reuse the same Fighter/physics/combat/rendering primitives
 
-7. New blue-sphere frames
+The Practice session should:
 
-The repository root also contains:
+* immediately unlock player input
+* have no countdown
+* have no timer
+* have no result state
+* run indefinitely until the player leaves
+* call camera.follow(player, null, dt)
+* call camera.snap(player, null) when necessary
+* keep projectiles and clones functioning
+* render only the practice fighter and relevant effects
 
-0001_prasen1.png
-0001_prasen2.png
-0001_prasen3.png
-0001_prasen4.png
-0001_prasen5.png
-0001_prasen6.png
-0001_prasen7.png
-0001_prasen8.png
-0001_prasen9.png
-0001_prasen10.png
-0001_prasen11.png
+⸻
 
-Move all eleven into:
+5. Create the default Practice Ground stage
 
-./assets/characters/0001/
+Practice Ground needs its own dedicated training stage.
 
-Remove the root copies.
+Do not put it into the normal MAPS array because MapSelectScreen automatically turns MAPS into the Quick Battle stage list.
 
-Preserve the files exactly.
+Create something like:
 
-8. Interpret the fighter artwork as three phases
+js/data/practice-map.js
 
-Register the twelve fighter frames as separate logical clips rather than one blindly playing animation.
+with an exported map definition such as:
 
-Use:
+PRACTICE_MAP
 
-rasenForm
-rasenDash
-rasenConfirm
+Then create a new practice stage theme such as:
 
-Formation
+js/stages/practice-theme.js
 
-rasen1
-rasen2
-rasen3
+and register its theme key inside:
 
-Dash/search
+js/stages/index.js
 
-rasen4
-rasen5
-rasen6
+Visual direction
 
-Successful-contact continuation/recovery
+The stage should evoke the visual language of the classic Super Smash Bros. training stage, but it must be original Alva artwork implemented with Canvas rather than copied Nintendo assets.
 
-rasen7
-rasen8
-rasen9
-rasen10
-rasen11
-rasen12
+Do not use Nintendo logos, textures, screenshots, ripped assets, or an exact traced layout.
 
-This cleanly implements the requested rule:
+The intended visual language is:
 
-continue the animation sequence only if the sphere collides.
+* clean training-room environment
+* large geometric grid
+* neutral white / pale-gray / cool-gray surfaces
+* clearly visible darker grid lines
+* occasional stronger major grid lines
+* extremely minimal scenery
+* no city/desert environmental clutter
+* deliberately artificial “simulation room” feeling
+* broad flat training floor
+* crisp, readable geometry
+* enough empty space for running, jumping, charging and testing attacks
 
-A miss never plays rasen7–12.
+Think of it as Alva’s own minimalist combat laboratory.
 
-9. Initial fighter playback rate
+The grid should have visual depth without becoming distracting.
 
-Use:
+A possible treatment:
 
-const RASEN_FPS = 12;
+* pale gray background
+* fine square grid across the backdrop
+* stronger line every several cells
+* subtle horizontal/vertical reference axes
+* slightly darker playable floor
+* simple edge treatment showing where the stage ends
+* restrained shadows
+* no particles or environmental hazards
 
-as the starting playback rate.
+The stage must remain visually compatible with Alva’s pixel-art fighter.
 
-All timing should derive from frame timing rather than arbitrary milliseconds where possible.
+Keep it performant: generate/calculate static geometry once where possible rather than rebuilding expensive paths every frame.
 
-Inspect the real result in-browser before finalizing.
+There should be:
 
-10. Normal fighter normalization
+* no hazards
+* no moving stage pieces
+* no damaging environment
+* no CPU-specific navigation requirements
 
-The rasen frames are #0001 fighter poses.
+Use a generous world size so the player can move around and experiment comfortably.
 
-Register them under normal:
+⸻
 
-animations
+6. Practice Ground HUD
 
-so they use the existing:
+Do not use the normal Quick Battle HUD unchanged.
 
-* bottom-centre anchor
-* fighter height normalization
-* source-facing support
-* pixel-art grid detection
+Practice Ground should show only information relevant to the current player.
 
-Do not normalize them as effects.
+Keep the P1 fighter panel with:
 
-11. Source orientation
+* P1
+* fighter name
+* health
+* energy
 
-The uploaded rasen fighter frames visibly follow #0001’s normal right-facing art direction.
+Remove the entire CPU/right-side panel.
 
-They should inherit:
+Remove:
 
-sourceFacing: 1
+* ROUND
+* round number
+* timer
+* timer button
+* timer box
 
-from the character.
+There must be no timer box at all.
 
-Do not add an unnecessary orientation override unless real browser testing proves one frame set differs.
+Replace Pause with a More button
 
-12. Interpret the sphere artwork as three effect clips
+Instead of the normal pause symbol, Practice Ground gets a standalone More button represented by a three-dots icon.
 
-Use #0001’s existing effectAnimations architecture, already created for the clone cloud.
+Add an icon to js/ui/icons.js, for example ICONS.more.
 
-Create:
+Use three simple dots matching the existing icon system.
 
-rasenSphereBuild
-rasenSphereImpact
-rasenSphereExplosion
+The button should:
 
-Sphere formation
+* visually use the existing glass UI
+* be compact
+* be clearly separate from any timer because the timer no longer exists
+* have aria-label="Practice menu" or equivalent
+* work with mouse/touch
+* work with keyboard
+* work with gamepad/menu navigation
 
-prasen1
-prasen2
-prasen3
-prasen4
-prasen5
-prasen6
+A compact top-right placement is appropriate for Practice Ground, respecting safe-area insets.
 
-Hit-confirm intensification
+Do not show the normal pause icon in this mode.
 
-prasen7
-prasen8
-prasen9
+⸻
 
-Explosion
+7. Three-dots menu
 
-prasen10
-prasen11
+Clicking the three-dots More button should freeze/pause Practice Ground and show a semi-transparent menu over the stage.
 
-Do not create duplicate PNGs.
+The stage must remain visible behind it.
 
-13. Sphere effect rate
+Use Alva’s existing glass styling as the basis, but make this menu lighter and more translucent than a full opaque screen.
 
-Start with:
+The visible menu must contain exactly these two primary actions:
 
-const PRASEN_FPS = 12;
+1. Change Fighter
+2. Return
 
-That gives:
+Do not add visible buttons for:
 
-formation: 6 frames = 0.5 s
-impact:    3 frames = 0.25 s
-explosion: 2 frames ≈ 0.167 s
+* Resume
+* Restart
+* Help
+* Settings
+* Change Stage
 
-This matches the visual progression well.
+The menu should not navigate to another full-screen screen.
 
-Tune only if real playback clearly requires it.
+While the menu is open:
 
-14. Sphere is an effect, not a projectile
+* freeze the practice simulation
+* disable gameplay input
+* disable touch combat controls
+* keep the canvas visible underneath
+* push an overlay scope into MenuNavigator
+* place focus on Change Fighter
 
-The blue sphere stays attached to either:
+The player must be able to dismiss the menu and continue practicing by:
 
-#0001's hand
+* pressing the More button again, and/or
+* pressing Escape / Back / gamepad back
 
-or, after successful contact:
+Clicking the dimmed background may also close the menu if that fits the existing interaction style, but do not make background clicking interfere with the fighter dialog.
 
-the opponent
+Return
 
-It does not independently fly across the stage.
+The button label should be exactly:
 
-Therefore do not put it under:
+Return
 
-projectiles
+Clicking Return exits Practice Ground and returns to the Home screen.
 
-or instantiate Projectile.
+Use the existing screen manager.
 
-Use:
+Clean up:
 
-effectAnimations
+* input listeners
+* touch state
+* navigation scopes
+* practice simulation
+* resize observers/listeners
+* temporary projectiles/clones
+* any active technique references
 
-and a technique runtime.
+Do not leave the practice simulation running underneath Home.
 
-15. Effect normalization
+⸻
 
-The existing SpriteSet effect system already:
+8. “Change Fighter” opens a large roster dialog
 
-* centre-anchors effects
-* keeps their own art size
-* shares #0001’s world-per-art-pixel scale
-* avoids fighter-height scaling
+Clicking Change Fighter must not navigate to the existing Select Fighter screen.
 
-Use it.
+Instead, open a very large modal/dialog over Practice Ground.
 
-Do not scale the sphere to #0001’s body height.
+The frozen practice stage should still be visible behind it.
 
-16. Sphere orientation
+This dialog must be semi-transparent.
 
-The sphere itself is direction-neutral.
+Visually it should feel like the Select Fighter experience has been turned into a huge glass modal rather than another screen.
 
-Use:
+Recommended approximate sizing:
 
-sourceFacing: 0
+* width around 90vw
+* max width appropriate for large desktops
+* height around 85–90dvh
+* responsive on smaller landscape screens
+* safe-area aware
 
-for its effect clips.
+Do not make the dialog fully opaque.
 
-Do not horizontally mirror a round energy effect merely because #0001 faces left.
+Use a stronger glass panel than the small More menu while still preserving visible stage context behind it.
 
-Its position offset should mirror with #0001’s facing, not the artwork.
+⸻
 
-17. Preload all new art
+9. Reuse the full fighter roster experience
 
-Extend the existing character preload path naturally through:
+The Change Fighter dialog should reuse the same fighter roster rules and presentation as CharacterSelectScreen.
 
-animations
-+
-projectileAnimations
-+
-effectAnimations
+It must show the full configured roster:
 
-All 23 new files must be loaded before battle.
+CONFIG.roster.totalSlots
 
-Do not load them when BA2 is pressed.
+which is currently 48.
 
-18. Add a data-driven Charged BA2 definition
+Match the existing character selector behavior:
 
-Store the move in character data.
+* available fighters show their real portraits
+* locked fighters remain visible
+* locked fighters remain non-interactive
+* locked fighters do not enter keyboard/gamepad navigation
+* available fighters can be highlighted
+* selected fighter is visibly selected
+* preview uses the fighter’s idle animation
+* portraits use the existing sprite-loading/normalization pipeline
+* roster remains keyboard/gamepad navigable
+* roster remains mouse/touch usable
 
-For example:
+Prefer extracting reusable roster UI/logic from CharacterSelectScreen rather than maintaining two completely independent 48-slot implementations.
 
-chargedTechniques: {
-  rasenRush: {
-    formAnimation: 'rasenForm',
-    dashAnimation: 'rasenDash',
-    confirmAnimation: 'rasenConfirm',
-    sphereBuild: 'rasenSphereBuild',
-    sphereImpact: 'rasenSphereImpact',
-    sphereExplosion: 'rasenSphereExplosion',
-    dashSpeed: ...,
-    dashHitbox: ...,
-    explosionDelay: 2.0,
-    firstHit: { ... },
-    explosionHit: { ... },
-  },
-}
+For example, a reusable fighter roster/selector component can be consumed by:
 
-Exact naming may differ.
+* normal CharacterSelectScreen
+* Practice Ground’s Change Fighter dialog
 
-Keep timing/combat values out of hard-coded Battle branches.
+Do not introduce duplicate global element IDs if both UIs exist in the DOM. Any IDs used for preview labels/dialog accessibility should be configurable or unique.
 
-19. Do not use the summon system
+The normal Quick Battle Select Fighter screen must look and behave the same after the refactor.
 
-Clone is specifically:
+⸻
 
-a detached temporary entity
+10. Fighter selection behavior inside Practice Ground
 
-Charged BA2 instead drives the real fighter.
+When the Change Fighter dialog opens:
 
-Do not create a clone-like fake #0001 for this move.
+* the current practice fighter should start selected
+* its preview should be shown
+* focus should land on the current fighter or a sensible first available fighter
 
-The owner himself:
+Selecting another fighter should work similarly to the normal roster.
 
-* changes animation
-* holds the sphere
-* dashes
-* performs collision
+On confirmation:
 
-20. Add a dedicated technique runtime
+1. Load the selected character with app.loadCharacter().
+2. Handle loading failure using the existing loading/error conventions.
+3. Replace the active practice fighter.
+4. Reset that fighter at the Practice Ground spawn.
+5. Reset that fighter’s health/combat/energy state.
+6. Clear projectiles, clones, charged-technique state, or effects belonging to the previous fighter.
+7. Rebind the Practice HUD to the new fighter.
+8. Snap/recenter the camera if necessary.
+9. Close the fighter dialog.
+10. Close the More menu.
+11. Restore gameplay input and touch controls.
+12. Resume Practice Ground.
 
-This move is more complex than a normal AttackDefinition.
+Do not navigate away from Practice Ground.
 
-Create a focused runtime such as:
+Do not send the user through Select Stage.
 
-js/game/charged-technique.js
+Do not mutate Quick Battle’s currently selected fighter as a side effect.
 
-or:
+If the player cancels/back-outs of the fighter dialog:
 
-js/game/rasen-rush.js
+* close only the fighter dialog
+* return focus to the Practice Ground More menu
+* leave the current fighter unchanged
 
-A generic name is preferable if the abstraction stays small and reusable.
+⸻
 
-Conceptually the runtime contains:
+11. Practice dialog accessibility and navigation
 
-{
-  def,
-  phase,
-  time,
-  target,
-  hitConfirmed,
-  sphereOwner, // fighter | target
-  spherePhase,
-  firstHitDone,
-  explosionDone,
-}
+Use real dialog semantics.
 
-21. Technique phases
+The large fighter dialog should have:
 
-Use explicit phases:
+* role="dialog"
+* aria-modal="true"
+* an accessible title such as Change Fighter
+* proper focus containment through the existing MenuNavigator overlay scope
+* a predictable default focus target
 
-form
-dash
-confirm
-wait
-explode
-done
+Keyboard/gamepad requirements:
 
-Never infer phase from random animation-frame indices scattered through Fighter.
+* directional navigation moves through roster entries
+* Confirm selects/confirms using existing conventions
+* Back/Escape closes the roster dialog
+* Back from the underlying More menu resumes Practice Ground
 
-22. FORM phase
+Do not allow menu focus to escape into buttons underneath an active modal.
 
-Immediately after successful Charged BA2 activation:
+Pointer hover behavior should remain consistent with the existing roster.
 
-* leave Charge
-* do not show chargeRelease
-* lock normal controls
-* lock facing
-* set horizontal velocity to 0
-* begin rasenForm
-* begin rasenSphereBuild
+⸻
 
-The effect appears at #0001’s sphere-hand position.
+12. Touch/mobile behavior
 
-23. Formation visual sequence
+Alva supports phones/tablets in landscape, so Practice Ground must too.
 
-The sphere must visibly progress:
+Reuse the existing TouchControls.
 
-prasen1
-→ prasen2
-→ prasen3
-→ prasen4
-→ prasen5
-→ prasen6
+When actively practicing:
 
-Only after the complete prasen6 orb is reached may the forward dash begin.
+* touch controls are enabled
 
-Do not start moving on prasen1.
+When the More menu or fighter dialog is open:
 
-24. Sync the three preparation poses to the six sphere frames
+* touch gameplay controls are disabled
 
-rasenForm contains only three fighter frames while the sphere has six formation frames.
+When the overlay closes:
 
-Let the fighter poses progress naturally:
+* touch gameplay controls reactivate
 
-rasen1
-→ rasen2
-→ rasen3
+Respect the existing portrait-blocking behavior and safe-area variables.
 
-and hold rasen3 if necessary until prasen6 has completed its formation timing.
+The More button and dialogs must remain usable on a small landscape phone without overflowing offscreen.
 
-Do not artificially loop rasen1–3.
+The 48-slot roster should scroll within the dialog if necessary rather than causing the entire page to scroll.
 
-25. Attach the sphere to the hand
+⸻
 
-Add data for the sphere’s centre relative to #0001’s bottom-centre origin.
+13. Styling
 
-For example:
+Add focused Practice Ground styles to styles.css.
 
-handOffset: {
-  x: ...,
-  y: ...,
-}
+Reuse existing variables and visual language instead of creating an unrelated design system.
 
-Mirror only the x component with facing.
+Reuse where appropriate:
 
-Inspect the supplied fighter artwork and position the sphere so it visibly sits in the extended hand.
+* .glass
+* .glass--panel
+* existing borders
+* radii
+* focus rings
+* spacing conventions
+* roster styles
+* buttons
 
-Do not spawn it:
+Create dedicated class names such as:
 
-* at the fighter’s feet
-* at the body centre
-* floating far in front
+* .screen--practice
+* .practice-hud
+* .practice-more
+* .practice-menu-overlay
+* .practice-menu-panel
+* .practice-roster-overlay
+* .practice-roster-dialog
 
-26. Per-phase offsets are allowed
+These are suggestions; choose names consistent with the repo.
 
-Because #0001’s pose changes during formation/dash, one fixed offset may not perfectly follow the hand.
+The stage itself should occupy the full practice screen just like the battle canvas.
 
-If needed, allow data such as:
+The More menu should feel light, floating and semi-transparent.
 
-handOffsets: {
-  form: [...],
-  dash: [...],
-}
+The fighter dialog should feel large and substantial, but still translucent enough to see the paused training stage behind it.
 
-or per-fighter-frame offsets.
+Avoid excessive blur on continuously animating surfaces. The existing code deliberately avoids expensive backdrop blur over the live battle canvas; preserve that performance awareness.
 
-Keep these as visual/interaction data, not hard-coded Canvas conditionals.
+⸻
 
-27. DASH phase
+14. Do not break Quick Battle
 
-After the sphere is complete:
+This is a hard requirement.
 
-rasen4
-→ rasen5
-→ rasen6
+After implementation, the existing path:
 
-and #0001 rapidly moves forward.
+Home → Play → Select Mode → Select Fighter → Select Stage → Battle
 
-Use a fixed technique dash speed.
+must work exactly as before.
 
-A good starting value is:
+Quick Battle must still have:
 
-dashSpeed: 1050
+* CPU
+* timer
+* round intro
+* pause UI
+* results
+* stage selection
+* both existing stages
+* existing touch controls
+* existing combat behavior
 
-world units per second.
+Do not accidentally put Practice Ground into Select Stage.
 
-At 12 FPS, the three-frame dash lasts roughly:
+Do not alter Quick Battle’s default character selection as a consequence of using Practice Ground.
 
-0.25 seconds
+Do not replace TrainingAIController globally. It is still required for Quick Battle.
 
-for approximately:
+⸻
 
-262 world units
+15. Tests
 
-of maximum travel.
+Add automated coverage for the new feature and run the complete existing test suite.
 
-Tune this in-browser so it feels like a committed forward rush rather than a teleport.
+At minimum verify:
 
-28. Sphere remains complete during the dash
+* the Home button says Practice Ground
+* it is enabled
+* activating it opens the practice screen
+* fresh Practice Ground entry defaults to character ID "0001"
+* Practice Ground creates exactly one fighter
+* no TrainingAIController is instantiated in Practice Ground
+* no CPU HUD exists
+* no practice timer exists
+* no round display exists
+* the More button uses a three-dot icon
+* More opens the semi-transparent Practice menu
+* the menu exposes Change Fighter and Return
+* the menu does not expose Resume/Restart/Help/Change Stage
+* Change Fighter opens a modal rather than navigating to character
+* the modal contains the configured roster
+* locked roster entries remain non-interactive
+* selecting a fighter replaces the practice fighter in-place
+* fighter change does not navigate away from Practice Ground
+* fighter change does not alter Quick Battle character state
+* Return routes back Home
+* Practice Ground’s map is not part of MAPS
+* Quick Battle continues creating its CPU and timer
+* existing battle tests continue passing
 
-During the dash:
+Also manually verify the feature in a browser served over HTTP, since this repo uses ES modules and Canvas sprite loading.
 
-prasen6
+⸻
 
-should remain visible on the hand.
+16. Acceptance criteria
 
-Do not restart prasen1–6.
+The feature is complete when this exact flow works:
 
-The complete sphere is what collides with the opponent.
+Home → Practice Ground
 
-29. Dash collision comes from the sphere
+The training stage appears immediately with #0001 and no CPU.
 
-The first hitbox should represent the visible sphere.
+The player can freely:
 
-Do not use #0001’s whole pushbox/body as the attack.
-
-Add something equivalent to a centred:
-
-sphereHitbox: {
-  x: -18,
-  y: -18,
-  w: 36,
-  h: 36,
-}
-
-around the sphere centre as an initial value.
-
-Tune it with the debug overlay so the visible orb and collision volume agree.
-
-30. Dash movement must use real physics support
-
-Do not teleport:
-
-body.x += hugeDistance;
-
-once.
-
-Advance through fixed simulation steps.
-
-Respect:
-
-* stage horizontal bounds
-* solid walls
-* ground support
-* fixed-step determinism
-
-The move must be able to encounter a stage edge during its dash.
-
-31. Ground dependency begins immediately
-
-From the first rasen1 preparation frame until the technique has fully resolved:
-
-#0001 must remain supported by ground
-
-Check actual body.grounded.
-
-Do not merely remember that he was grounded at activation.
-
-32. Ground loss during formation
-
-If the platform disappears from under #0001, or he otherwise becomes unsupported during:
-
-rasen1–3
-
-then:
-
-cancel technique
-remove sphere
-clear technique lock
-enter Fall
-
-No first hit.
-
-No explosion.
-
-33. Ground loss during dash
-
-If the rush carries #0001 off a platform/ledge:
-
-the dash stops immediately
-the sphere disappears
-the technique cancels
-#0001 falls
-
-Do not let the animation hover beyond the ledge.
-
-Do not snap him back onto the stage.
-
-34. Ground loss after successful first hit
-
-The user explicitly requested that losing ground during the sequence cancels it.
-
-Therefore even after first contact, if #0001 loses ground before the delayed explosion has happened:
-
-* cancel the remaining technique
-* remove the attached sphere
-* clear the special immobilization from the opponent
-* preserve any damage already dealt by hit 1
-* skip hit 2
-* #0001 enters Fall
-
-This gives the ground requirement real meaning for the full sequence.
-
-35. Being hit also interrupts the technique
-
-Normal Hitstun remains higher priority than Charged BA2.
-
-If #0001 is struck before the technique finishes:
-
-* cancel the technique
-* remove the sphere
-* release the opponent from technique-specific immobilization
-* keep any already-applied damage
-* enter normal Hurt/Hitstun
-
-Do not give the move armour or invulnerability.
-
-36. Miss rule
-
-The dash gets one contact-search window:
-
-rasen4
-rasen5
-rasen6
-
-If the complete sphere never successfully collides during those frames:
-
-no hit
-no prasen7–11
-no rasen7–12
-
-Immediately end the special technique.
-
-If still grounded:
-
-return to Idle / normal movement
-
-as requested.
-
-Do not play a long recovery sequence after a clean miss.
-
-37. Stop dash immediately on confirmed contact
-
-When the sphere successfully hits:
-
-body.vx = 0
-
-and snapshot the contact.
-
-Do not continue sliding through the opponent.
-
-Transition immediately into:
-
-confirm
-
-38. First hit
-
-The sphere contact is hit 1 of 2.
-
-Use conservative initial values:
-
-firstHit: {
-  damage: 4,
-  knockback: { x: 0, y: 0 },
-  hitstop: 0.06,
-}
-
-This first hit is primarily the setup/bind.
-
-Do not launch the opponent away before the delayed explosion.
-
-39. First hit must occur exactly once
-
-Once the sphere contacts:
-
-firstHitDone = true
-
-No repeated damage every simulation step.
-
-The confirmed sphere is no longer checking dash collision afterward.
-
-40. Immobilize the opponent
-
-A successful unblocked first hit applies a temporary special status.
-
-Call it something like:
-
-immobilized
-bound
-techniqueLock
-
-Do not fake this solely by repeatedly resetting input.
-
-The status belongs in combat/runtime state.
-
-41. What “can’t move” means
-
-From first hit until:
-
-* the explosion resolves, or
-* the technique is cancelled
-
-the opponent may not:
-
-* walk/run
+* move
+* run
 * jump
-* Charge
-* Throw
-* BA1
-* BA2
-* use Defense
-* turn through normal locomotion
+* charge
+* dodge
+* use attacks
+* use projectiles
+* use clone/charged techniques without crashes
 
-Set horizontal velocity to 0 on the first hit.
+There is:
 
-They are effectively caught by the technique.
+* no countdown
+* no Round 1
+* no fight banner
+* no timer
+* no CPU
+* no result screen
 
-42. Gravity still exists
+At the top of the Practice Ground UI, the player sees their own status and a compact three-dots More button.
 
-Do not make immobilization magically suspend the opponent in mid-air.
+Pressing the More button pauses practice and displays a semi-transparent menu containing:
 
-If an opponent happens to be airborne when hit:
+Change Fighter
 
-* player/AI control remains locked
-* gravity continues
-* normal vertical collision continues
+Return
 
-The sphere effect follows them.
+Selecting Change Fighter opens a huge semi-transparent fighter-selection dialog over the paused training stage.
 
-This prevents floating characters.
+The dialog uses the full Alva roster and the same visual/interaction logic as Select Fighter.
 
-43. Separate immobilization from ordinary hitstun
+Selecting a fighter swaps the player’s fighter directly inside Practice Ground and resumes practice.
 
-Do not simply set:
+Selecting Return goes back Home.
 
-stun = 2.5
+Quick Battle remains completely unchanged.
 
-and call it done.
+⸻
 
-The delayed explosion needs a status that can be explicitly released by:
+Implementation quality expectations
 
-* successful explosion
-* owner losing ground
-* owner being interrupted
-* reset/destroy
+Keep the implementation idiomatic to this repository:
 
-Use a token/source reference so the technique removes only its own immobilization.
+* vanilla ES modules
+* no framework
+* no build step
+* no external UI library
+* no new runtime dependency
+* Canvas 2D for the stage
+* existing asset loader for fighters
+* existing screen manager
+* existing menu navigation
+* existing input system
+* existing accessibility conventions
 
-44. CONFIRM animation
+Prefer small reusable abstractions over duplicated UI or simulation code.
 
-On successful hit, play:
+Do not implement a hidden CPU as a shortcut.
 
-rasen7
-→ rasen8
-→ rasen9
-→ rasen10
-→ rasen11
-→ rasen12
+Do not copy copyrighted game assets for the training-stage appearance.
 
-exactly once.
+When finished, review all touched files for stale comments such as references to Help & Credits being disabled, timer/pause assumptions, or two-fighter assumptions that are no longer universally true.
 
-This is the continuation that a miss never sees.
+Finally, provide a concise summary of:
 
-45. Sphere impact progression
-
-When contact happens, move the sphere effect from the owner’s hand to the opponent.
-
-Play:
-
-prasen7
-→ prasen8
-→ prasen9
-
-These later frames visibly intensify the sphere.
-
-46. Attach sphere to opponent after contact
-
-After the first hit, the effect’s world position should be calculated from the target.
-
-Use a data-driven offset such as:
-
-targetOffset: {
-  x: 0,
-  y: -48,
-}
-
-and tune visually so the sphere sits around the collision/torso area.
-
-The sphere should move with the caught target if physics changes its position.
-
-47. Hold prasen9 during the delay
-
-After:
-
-prasen7 → prasen8 → prasen9
-
-hold the final impact frame:
-
-prasen9
-
-on the target.
-
-Do not loop 7→9 repeatedly.
-
-48. #0001 remains committed
-
-After rasen12 is reached, hold the final rasen12 pose while waiting for the delayed explosion.
-
-Do not let #0001:
-
-* run away
-* attack again
-* summon a clone
-* Dodge
-* Throw
-* start another Charge
-
-during the two-second trap.
-
-This prevents the immobilization window from becoming a free two-second combo opportunity.
-
-49. Delayed second hit timing
-
-The explosion occurs:
-
-2.0 seconds
-
-after the first hit confirms.
-
-Store:
-
-explosionDelay: 2.0
-
-in technique data.
-
-The delay is counted from the first successful hit, not from the beginning of formation.
-
-50. Explosion animation
-
-When the delay expires:
-
-prasen10
-→ prasen11
-
-plays once.
-
-Apply the large second hit at the beginning of:
-
-prasen10
-
-so the damage event aligns with the first visible explosion frame.
-
-51. Second hit
-
-The explosion is the major hit.
-
-Use initial tuning:
-
-explosionHit: {
-  damage: 16,
-  knockback: {
-    x: 420,
-    y: 220,
-  },
-  hitstun: 0.55,
-  hitstop: 0.12,
-}
-
-Combined damage:
-
-4 + 16 = 20
-
-The second hit should clearly feel much stronger than the setup contact.
-
-Keep these numbers data-driven for later balance changes.
-
-52. Release immobilization before explosion knockback
-
-When explosion hit 2 resolves:
-
-1. remove the technique immobilization
-2. apply the big explosion damage
-3. apply launch/knockback
-4. apply normal explosion hitstun
-
-Otherwise the binding state may incorrectly cancel the intended knockback.
-
-53. Finish after explosion
-
-Once prasen11 completes:
-
-remove sphere effect
-clear technique
-
-If #0001 is still grounded:
-
-return to Idle / normal control
-
-Do not restart Charge automatically just because the Charge key happens still to be held.
-
-Require the player to establish a fresh normal Charge state through the existing state machine.
-
-54. Dodge interaction
-
-Existing Dodge invulnerability must apply to the rushing sphere.
-
-If the sphere overlaps an opponent during their invulnerable Dodge frame:
-
-no hit
-no first damage
-no immobilization
-no hit confirm
-
-Continue the dash/search window.
-
-If no later valid contact happens by the end of rasen6:
-
-miss
-→ Idle
-
-Do not consume the hit on invulnerability.
-
-55. Future Block behavior
-
-For a future Block-type character:
-
-If the initial sphere contact is successfully blocked:
-
-* resolve normal block/chip behavior for hit 1
-* do not apply the special immobilization
-* do not start the delayed explosion
-* end the Charged BA2 sequence after the blocked contact
-
-A valid guard should prevent the full trapping sequence.
-
-This keeps generic Defense meaningful.
-
-56. Do not use normal BA2 combat data
-
-Charged BA2 is not:
-
-ba2 with more damage
-
-It has its own combat definition.
-
-Normal BA2 remains:
-
-8 damage
-existing high-kick art
-existing timings
-
-Do not modify it.
-
-57. No ordinary combat.attack during the technique
-
-Do not pretend this is a regular startup/active/recovery AttackDefinition.
-
-The move has:
-
-formation
-conditional dash
-conditional hit confirm
-target attachment
-2-second delayed event
-second hit
-ground cancellation
-
-Use a dedicated charged-technique runtime.
-
-58. Fighter action lock
-
-While a charged technique is active, the fighter is not free to start:
-
-* normal attack
-* summon
-* Dodge
-* Jump
-* Charge
-* movement
-
-Update Fighter’s free-to-act checks accordingly.
-
-A helper such as:
-
-canAct()
-
-or:
-
-isFreeToAct()
-
-should account for:
-
-combat
-+
-active charged technique
-
-without breaking the existing CombatState API.
-
-59. State priority
-
-Use approximately:
-
-hitstun
-active charged technique
-normal attack
-Defense
-airborne
-Land
-Block
-Charge
-chargeRelease
-Run
-Idle
-
-Hitstun must always interrupt.
-
-Ground loss inside the technique explicitly transitions to Fall.
-
-60. Technique animation selection
-
-When the fighter logical state is something like:
-
-technique
-
-select the correct clip from the runtime phase:
-
-form    → rasenForm
-dash    → rasenDash
-confirm → rasenConfirm
-wait    → hold last rasenConfirm frame
-explode → hold last rasenConfirm frame
-
-Do not overload animationFor('attack').
-
-61. Technique facing
-
-Snapshot/lock #0001’s facing when Charged BA2 starts.
-
-Do not auto-turn toward the opponent midway through:
-
-* formation
-* dash
-* confirm
-* wait
-* explosion
-
-The dash travels in that snapshotted facing direction.
-
-62. Wall collision
-
-A solid wall should stop forward movement.
-
-If the dash hits a wall before the opponent:
-
-treat it as a miss
-remove sphere
-end technique
-return to normal grounded state
-
-Do not pass through solid geometry.
-
-63. Stage bounds
-
-Do not move #0001 outside the stage’s horizontal bounds.
-
-Stage-edge ground loss must still behave normally:
-
-unsupported
-→ technique cancelled
-→ Fall
-
-64. Missing fighter art safety
-
-Charged BA2 must be refused if any required fighter clip is unavailable:
-
-rasenForm
-rasenDash
-rasenConfirm
-
-Do not create a blue sphere around Idle art.
-
-On missing technique art:
-
-no technique
-fallback to normal BA2
-warning
-
-65. Missing sphere art safety
-
-Likewise require:
-
-rasenSphereBuild
-rasenSphereImpact
-rasenSphereExplosion
-
-before accepting the charged technique.
-
-Never create:
-
-* an invisible collision sphere
-* invisible immobilization
-* invisible delayed damage
-
-If required effect art is missing:
-
-normal BA2 fallback
-
-66. Energy behavior
-
-This request does not specify an Energy cost.
-
-Do not invent one.
-
-Charged BA1 remains the only current Energy spender:
-
-Clone Attack = 25 Energy
-
-Charged BA2:
-
-Energy cost = 0
-
-for this implementation.
-
-Do not drain, refund or regenerate Energy because of this move.
-
-Keep its resource cost data-ready so an energyCost could be added later without architectural changes.
-
-67. Existing Charged BA1 must remain unchanged
-
-After generalizing the dispatcher:
-
-Charge → BA1
-
-must still:
-
-* require prior Charge
-* cost 25 Energy
-* summon one clone
-* keep the owner Charging
-* fall back to normal BA1 if unavailable
-
-Do not regress clone.test.mjs.
-
-68. Charged BA2 consumes the BA2 press
-
-When Charged BA2 successfully starts:
-
-do not also start ordinary ba2
-
-The action press belongs entirely to the technique.
-
-69. Charged BA2 unavailable fallback
-
-If the charged technique cannot begin because of:
-
-* missing art
-* invalid runtime definition
-* some other setup failure
-
-then let the same BA2 press fall through to normal:
-
-tryAction('action2')
-
-Do not leave BA2 dead.
-
-70. Opponent KO on first hit
-
-If hit 1 reduces the opponent to zero Health:
-
-* do not hold a defeated opponent for two seconds
-* clear immobilization
-* cancel the remaining delayed explosion
-* finish/end the technique cleanly
-
-Do not attack an already defeated fighter again.
-
-71. Reset safety
-
-Fighter.reset() / Battle.restart() must clear:
-
-* active Charged BA2 runtime
-* sphere effect
-* any immobilization caused by it
-* delayed-explosion timers
-
-No special state may survive a rematch.
-
-72. Battle destroy safety
-
-Leaving Battle must clear all technique references.
-
-Do not retain target/owner references after destroy().
-
-73. Rendering
-
-Render the attached sphere through the existing centred effect renderer.
-
-During formation/dash:
-
-sphere centre = owner position + hand offset
-
-After hit:
-
-sphere centre = target position + target offset
-
-Render it over the fighter sprites so the glowing orb is not hidden behind the character body.
-
-Keep:
-
-imageSmoothingEnabled = false
-
-for the pixel art.
-
-74. Debug overlay
-
-Extend Backquote debug mode to show:
-
-* rushing sphere hitbox during dash
-* attached-sphere centre after hit
-* optional label charged ba2
-* opponent immobilization status
-
-Use a visually distinct debug outline from:
-
-* melee attacks
-* projectiles
-* clone BA1
-
-Do not show these in normal gameplay.
-
-75. Add a focused test file
-
-Create:
-
-tests/charged-ba2.test.mjs
-
-Use:
-
-* real Fighter
-* real CombatState
-* real CombatSystem
-* fixed-step physics
-* real SpriteSet metadata
-* existing fighter harness patterns
-
-76. Asset tests
-
-Assert all 23 new files exist under:
-
-assets/characters/0001/
-
-Assert the repository-root copies are gone.
-
-Assert characterFramePaths() preloads all 23.
-
-77. Clip registration tests
-
-Assert:
-
-rasenForm = rasen1–3
-rasenDash = rasen4–6
-rasenConfirm = rasen7–12
-
-and:
-
-rasenSphereBuild = prasen1–6
-rasenSphereImpact = prasen7–9
-rasenSphereExplosion = prasen10–11
-
-None loop.
-
-78. Charged-action data tests
-
-Assert #0001 has:
-
-Charged action1 → Clone summon
-Charged action2 → sphere-rush technique
-
-Do not remove normal:
-
-actions.action2 = {
-  ground: 'ba2',
-  air: 'midairBa2'
-}
-
-79. Trigger test
-
-From grounded Idle:
-
-step Charge
-→ state Charge
-next step Charge + BA2Pressed
-
-Assert:
-
-* technique starts
-* owner leaves Charge
-* owner does not enter normal attack
-* first fighter frame is rasen1
-* first effect frame is prasen1
-* Energy stays unchanged
-
-80. Fresh simultaneous input test
-
-From Idle:
-
-ChargePressed + BA2Pressed
-
-on the same first step.
-
-Assert:
-
-ordinary BA2
-
-not Charged BA2.
-
-81. Charge-release + BA2 test
-
-Already Charge, then on one step:
-
-Charge false
-BA2Pressed true
-
-Assert:
-
-ordinary BA2
-
-with:
-
-* no charged technique
-* no chargeRelease
-* no Energy change
-
-82. Formation sequence test
-
-Record the effect frames.
-
-Assert the build order is exactly:
-
-prasen1
-prasen2
-prasen3
-prasen4
-prasen5
-prasen6
-
-and dash cannot begin before the completed sphere.
-
-83. Fighter preparation test
-
-Assert fighter preparation uses:
-
-rasen1
-rasen2
-rasen3
-
-in order.
-
-No dash movement during the formation phase.
-
-84. Dash test
-
-After the sphere completes:
-
-* state phase becomes dash
-* body starts moving only in locked facing direction
-* fighter animation uses rasen4–6
-* sphere remains prasen6
-* normal player left/right input cannot alter dash speed or direction
-
-85. Miss test
-
-Place the opponent outside dash range.
-
-Assert:
-
-formation
-→ dash
-→ no contact
-→ technique ends
-
-and:
-
-* no damage
-* no immobilization
-* no rasen7–12
-* no prasen7–11
-* sphere removed
-* owner returns Idle if grounded
-
-86. First-hit test
-
-Place the opponent in dash range.
-
-Assert exactly one contact occurs.
-
-After contact:
-
-target health: 100 → 96
-
-using the initial 4-damage tuning.
-
-Assert:
-
-* dash stops
-* target velocity x becomes 0
-* target receives technique immobilization
-* fighter moves into confirm sequence
-* sphere switches to target attachment
-
-87. Confirm fighter sequence test
-
-After hit 1, assert the fighter shows exactly:
-
-rasen7
-rasen8
-rasen9
-rasen10
-rasen11
-rasen12
-
-in order.
-
-88. Impact sphere test
-
-After hit 1, assert:
-
-prasen7
-→ prasen8
-→ prasen9
-
-then:
-
-prasen9 remains held
-
-until the delayed explosion.
-
-89. Immobilization test
-
-During the delay, repeatedly feed the target:
-
-* Left
-* Right
-* Jump
-* Charge
-* BA1
-* BA2
-* Throw
-* Defense
-
-Assert none start movement/actions.
-
-The target remains locked until resolution/cancellation.
-
-90. Two-second delay test
-
-Measure from the exact first-hit simulation step.
-
-The explosion must not happen early.
-
-At approximately:
-
-2.0 seconds
-
-the effect enters its explosion phase.
-
-Use fixed-step deterministic timing.
-
-91. Explosion test
-
-At explosion:
-
-prasen10
-→ prasen11
-
-Assert hit 2 applies once.
-
-Using initial values:
-
-96 → 80 Health
-
-for 16 additional damage.
-
-Assert:
-
-* immobilization is removed
-* big knockback occurs
-* vertical launch occurs
-* explosion hitstun is applied
-* explosion hitstop is longer than first-hit hitstop
-
-92. Total hit count test
-
-Successful full sequence:
-
-exactly two damage events
-
-not:
-
-* one
-* three
-* one per sphere frame
-
-Event 1 = contact.
-
-Event 2 = explosion.
-
-93. Ground-loss formation test
-
-Begin Charged BA2 near a condition where support disappears during formation.
-
-Assert:
-
-technique cancelled
-sphere gone
-state Fall
-
-No damage.
-
-94. Ground-loss dash test
-
-Dash off a ledge.
-
-Assert immediately:
-
-phase ends
-sphere disappears
-body becomes airborne
-state Fall
-
-No hovering.
-
-95. Ground-loss after hit test
-
-Hit the opponent, then make #0001 lose ground before the two-second explosion.
-
-Assert:
-
-* first damage remains
-* second damage never occurs
-* sphere disappears
-* target immobilization clears immediately
-* #0001 enters Fall
-
-96. Owner-interruption test
-
-Hit #0001 during:
-
-* formation
-* dash
-* confirmed wait
-
-Each should:
-
-cancel technique
-remove effect
-release target if necessary
-show normal Hurt
-
-No armour.
-
-97. Dodge test
-
-Time the target’s Dodge to overlap the rushing sphere.
-
-Assert:
-
-* no first hit
-* no target lock
-* sphere is not consumed
-* dash continues
-
-If dash subsequently ends without valid contact:
-
-miss
-
-98. Block test
-
-Use a Block-type test character.
-
-Guard the initial contact.
-
-Assert:
-
-* normal Block event/chip rules
-* no special immobilization
-* no delayed explosion
-* technique ends
-
-99. Gravity test for captured airborne target
-
-If the test target is airborne when successfully hit:
-
-* control remains locked
-* gravity continues
-* sphere follows its body
-* target does not hover
-
-100. Facing test
-
-Start #0001 facing right.
-
-Technique must dash right.
-
-Start facing left.
-
-Technique must dash left.
-
-Attempt to cross the opponent behind #0001 during formation.
-
-Facing must remain locked.
-
-101. Wall test
-
-Place a solid wall between #0001 and opponent.
-
-Dash into it.
-
-Assert:
-
-no pass-through
-no opponent hit
-technique ends as miss
-
-102. Missing-art tests
-
-Test each required category missing:
-
-fighter preparation
-fighter dash
-fighter confirm
-sphere build
-sphere impact
-sphere explosion
-
-A missing required clip must:
-
-* prevent Charged BA2 activation
-* spawn no invisible effect
-* apply no damage/status
-* spend no Energy
-* fall back to normal BA2
-* warn clearly
-
-103. Energy regression
-
-Assert throughout successful Charged BA2:
-
-energy before === energy after
-
-Charged BA1 remains the only Energy spender.
-
-The HUD must not move because of Charged BA2.
-
-104. Clone regression
-
-Charged BA1 must still:
-
-cost 25
-summon clone
-keep owner charging
-
-Generalizing chargedActions must not alter its behavior.
-
-Run all existing clone tests unchanged except data-shape expectations that necessarily change because chargedActions is now typed.
-
-105. Normal BA2 regression
-
-Outside Charge:
-
-Ground BA2 remains:
-
-2ba1–2ba7
-8 damage
-
-Mid-Air BA2 remains:
-
-midair2ba1–3
-
-No new sphere effect.
-
-106. Throw regression
-
-Throw + shuriken remains unchanged.
-
-107. Defense regression
-
-Ground/Mid-Air Dodge and invulnerability remain unchanged.
-
-108. Charge regression
-
-Normal Charge still uses:
-
-charge1
-→ charge2
-→ chargea ↔ chargeb
-
-and voluntary release still uses:
-
-charge1
-
-briefly.
-
-Charged BA2 starts directly from Charge without showing chargeRelease.
-
-109. Training CPU
-
-The training CPU remains non-attacking.
-
-Do not teach it Charged BA2.
-
-No AI changes beyond ensuring its neutral input structures continue working.
-
-110. README
-
-Document:
-
-Charged BA2
-
-under Charge/combat controls.
-
-Describe it clearly:
-
-Hold Charge first, then press BA2. #0001 forms a blue sphere, dashes forward once it is complete, and must connect during the rush. A miss ends the technique immediately. A hit traps the opponent, continues the animation, and causes the sphere to explode about two seconds later for a much larger second hit. The entire technique requires ground beneath #0001; losing ground cancels it and makes him fall.
-
-Also say:
-
-Charged BA2 currently has no Energy cost.
-
-Do not imply normal BA2 changed.
-
-111. Help screen
-
-Update Charge & Energy or add an appropriate combat note explaining:
-
-Charge + BA1 = Clone Attack, 25 Energy
-Charge + BA2 = Sphere Rush
-
-Clarify Charged BA2:
-
-* must already be Charging
-* forms before dashing
-* requires a hit to continue
-* has two hits
-* second hit is delayed
-* requires ground for the full sequence
-
-Do not add a new input row because it uses existing Charge + BA2 controls.
-
-112. ALVA_SPEC.md
-
-Document the complete deterministic sequence.
-
-Include exact sprite partitioning:
-
-rasen1–3   preparation
-rasen4–6   dash/contact search
-rasen7–12  hit-confirm continuation
-prasen1–6   sphere formation
-prasen7–9   confirmed sphere
-prasen10–11 explosion
-
-Document:
-
-first hit = 4
-delay = 2.0 s
-second hit = 16
-total = 20
-
-and the final tuned:
-
-* dash speed
-* sphere hitbox
-* offsets
-* knockback
-* hitstun
-* hitstop
-
-after browser verification.
-
-113. Update charged-action architecture docs
-
-Current README/spec architecture says:
-
-chargedActions maps buttons to summons
-
-That is no longer true.
-
-Update it to describe:
-
-chargedActions = generic charged-action dispatch
-
-with at least:
-
-type: summon
-type: technique
-
-The Clone Attack remains the summon example.
-
-Charged BA2 becomes the technique example.
-
-114. Debug/manual verification
-
-In a browser, test:
-
-Formation
-
-Hold Charge, press BA2.
-
-Verify #0001 stays still while:
-
-rasen1–3
-
-play and:
-
-prasen1–6
-
-forms naturally in the hand.
-
-Dash
-
-Verify #0001 starts moving only when the sphere is visually complete.
-
-The sphere remains attached to the hand.
-
-Miss
-
-Stand too far away.
-
-Verify the move ends after the dash with no remaining sphere.
-
-Hit
-
-Stand in range.
-
-Verify the sphere physically contacts the CPU, #0001 stops, the CPU becomes unable to move, and the later fighter frames play.
-
-Delay
-
-Count roughly two seconds.
-
-The sphere should remain visible on the opponent rather than disappear.
-
-Explosion
-
-Verify prasen10–11 creates a visibly larger effect, the second hit deals substantially more damage, and the opponent is launched/released.
-
-Ledge
-
-Perform it near a platform edge.
-
-If the dash leaves ground:
-
-sphere gone
-technique cancelled
-#0001 falls
-
-There must be no invisible platform beneath him.
-
-115. Scope restrictions
-
-Do not add:
-
-* new controls
-* homing
-* teleportation
-* automatic turning
-* armour
-* invulnerability
-* passive Energy cost
-* Energy gain
-* screen-filling explosion graphics
-* camera cutscenes
-* cinematic zoom
-* new sound effects
-* new particle art
-* new sphere sprites
-* mid-air Charged BA2
-* AI Charged BA2
-
-Use only the supplied rasen and prasen artwork.
-
-Acceptance criteria
-
-The feature is complete when:
-
-1. All 12 rasen files live under assets/characters/0001/.
-2. All 11 prasen files live under assets/characters/0001/.
-3. No root copies remain.
-4. All 23 files preload with #0001.
-5. rasen1–3 are the preparation phase.
-6. prasen1–6 visibly form the sphere.
-7. #0001 does not dash before the sphere completes.
-8. rasen4–6 drive the forward dash/contact search.
-9. The complete sphere remains attached to the hand during dash.
-10. Collision is based on the sphere’s actual world position.
-11. A miss does not play rasen7–12.
-12. A grounded miss returns #0001 to normal state.
-13. A successful contact deals exactly one first hit.
-14. First-hit damage is initially 4.
-15. First hit has no launch.
-16. The opponent becomes unable to move or act after hit 1.
-17. rasen7–12 only play after successful hit confirmation.
-18. prasen7–9 play after successful contact.
-19. prasen9 remains attached during the delay.
-20. Explosion happens 2.0 seconds after hit 1.
-21. prasen10–11 are the explosion.
-22. Explosion deals exactly one second hit.
-23. Second-hit damage is initially 16.
-24. Total successful damage is initially 20.
-25. The explosion releases the opponent from immobilization before knockback.
-26. The explosion launches with substantially stronger knockback.
-27. Dodge invulnerability can make the rush miss.
-28. A Block prevents the special immobilization/explosion sequence.
-29. #0001’s facing remains locked throughout the technique.
-30. The technique is ground-only.
-31. Losing ground during formation cancels into Fall.
-32. Losing ground during dash cancels into Fall.
-33. Losing ground after first hit but before explosion cancels the remaining sequence and releases the target.
-34. Hitstun can interrupt/cancel #0001 normally.
-35. No armour or invulnerability is added.
-36. Charged BA2 does not consume Energy in this task.
-37. Charged BA1 still costs 25 Energy and works exactly as before.
-38. Normal BA2 remains unchanged.
-39. Fresh simultaneous Charge+BA2 from Idle produces normal BA2.
-40. Releasing Charge on the BA2 press step produces normal BA2.
-41. Missing Charged BA2 art safely falls back to normal BA2.
-42. No invisible damage/effect can occur.
-43. Restart/rematch clears every technique/bind/effect state.
-44. README, Help, source comments and ALVA_SPEC.md describe the new Charged BA2 accurately.
-45. node --test passes in full.
+1. files changed/added
+2. architecture used for the solo practice session
+3. how the practice stage was implemented
+4. how fighter changing works
+5. tests added/run
+6. any remaining limitations
