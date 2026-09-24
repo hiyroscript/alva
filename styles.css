@@ -509,8 +509,9 @@ html[data-screen="splash"] .overlay { display: none; }
 .home-action--primary { background: var(--action); border-color: var(--action); color: var(--white); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12); }
 .home-action--primary:hover { background: var(--action-hover); border-color: var(--action-hover); color: var(--white); }
 .home-action--primary:active { background: var(--action-pressed); border-color: var(--action-pressed); }
-/* Unavailable for now: quieter outline, readable muted label, no hover or
-   press response. Kept after the interactive states so it overrides them. */
+/* A disabled Home action (none today): quieter outline, readable muted label,
+   no hover or press response. Kept after the interactive states so it
+   overrides them. */
 .home-action:disabled { background: transparent; border-color: var(--border); color: var(--text-muted); cursor: not-allowed; transform: none; }
 .home-action:disabled .icon { color: var(--text-faint); transform: none; }
 
@@ -1351,6 +1352,109 @@ html.is-touch .touch-controls { display: block; }
 .result-sub { color: var(--text-secondary); font-size: 14px; }
 
 /* ---------------------------------------------------------------------
+   Practice Ground — the training stage fills the screen like the battle
+   canvas. The HUD keeps only Player 1's panel and a three-dots More button;
+   the Practice menu floats under it and the Change Fighter dialog is the
+   fighter roster as one large glass panel. Both sit over a paused, still
+   stage, so it stays in view behind them.
+   --------------------------------------------------------------------- */
+
+.screen--practice {
+  background: #000;
+  color: var(--white);
+  color-scheme: dark;
+  touch-action: none;
+}
+.screen--practice.is-entering { animation-name: fade-in; animation-duration: 0.4s; }
+
+/* Player 1's panel on the left, no wider than a Quick Battle side panel;
+   the More button top-right. */
+.practice-hud { grid-template-columns: minmax(0, 1fr) auto; }
+.practice-hud .hud-side { max-width: min(470px, 44vw); }
+.practice-more {
+  --more: clamp(38px, 6.6vh, 48px);
+  justify-self: end;
+  display: grid;
+  place-items: center;
+  width: var(--more);
+  height: var(--more);
+  color: var(--text);
+  font-size: clamp(18px, 3.2vh, 24px);
+  pointer-events: auto;
+  transition: background-color var(--dur-fast) ease, border-color var(--dur-fast) ease, box-shadow var(--dur-fast) ease;
+}
+@media (hover: hover) {
+  .practice-more:hover { background: var(--glass-sheen), rgba(34, 36, 40, 0.72); border-color: var(--border-hover); }
+}
+.practice-more:active { background: var(--glass-sheen), rgba(52, 54, 58, 0.78); }
+.practice-more:focus { box-shadow: var(--glass-shadow), var(--focus-ring-inset); }
+/* Open: the button reads as pressed while its menu shows. */
+.practice-more[aria-expanded="true"] { background: var(--glass-sheen), rgba(46, 48, 52, 0.8); border-color: rgba(255, 255, 255, 0.42); }
+
+/* The frozen stage stays visible: a light dim, the HUD above it so the More
+   button can close the menu, and the touch controls faded out. */
+.screen--practice.is-menu-open .practice-hud { z-index: 7; }
+.screen--practice.is-menu-open .touch-controls { opacity: 0.25; }
+.screen--practice.is-roster-open .practice-hud,
+.screen--practice.is-roster-open .practice-menu-panel { visibility: hidden; }
+
+.practice-menu-overlay {
+  z-index: 6;
+  place-items: start end;
+  padding-top: calc(max(var(--safe-t), clamp(8px, 1.6vh, 14px)) + clamp(38px, 6.6vh, 48px) + 8px);
+  background: rgba(0, 0, 0, 0.16);
+  animation: dim-in 0.18s ease both;
+}
+.practice-menu-overlay > .practice-menu-panel { animation: fade-in 0.18s ease both; }
+/* Lighter than the pause panel (smaller, a softer blur, a lighter dim), yet
+   dense enough that white labels stay readable over the pale stage. */
+.practice-menu-panel.glass--panel {
+  width: min(300px, 100%);
+  gap: clamp(6px, 1.4vh, 10px);
+  padding: clamp(12px, 2.4vh, 18px);
+  background: var(--glass-sheen), rgba(10, 11, 13, 0.72);
+}
+@supports ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+  .practice-menu-panel.glass--panel {
+    background: var(--glass-sheen), rgba(10, 11, 13, 0.62);
+    -webkit-backdrop-filter: blur(8px) saturate(1.1);
+    backdrop-filter: blur(8px) saturate(1.1);
+  }
+}
+.practice-menu-title { display: block; color: var(--scrim-text-muted); }
+.practice-menu-panel .pause-menu { margin-top: 0; }
+
+/* Change Fighter: Select Fighter as one large glass dialog. It hosts a live
+   idle preview, so it skips backdrop blur and relies on its fill; its inner
+   panels are translucent too, so the stage stays visible behind them. */
+.practice-roster-overlay {
+  z-index: 8;
+  background: rgba(0, 0, 0, 0.28);
+  animation: dim-in 0.18s ease both;
+}
+.practice-roster-overlay > .practice-roster-dialog { animation: fade-in 0.18s ease both; }
+.practice-roster-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(8px, 2vh, 20px);
+  width: min(90vw, 1400px, 100%);
+  height: min(88vh, 940px);
+  height: min(88dvh, 940px);
+  max-height: 100%;
+  padding: clamp(10px, 2.6vh, 24px) clamp(12px, 2vw, 28px) clamp(12px, 2.6vh, 24px);
+  color: var(--text);
+  color-scheme: dark;
+  background: var(--glass-sheen), rgba(10, 11, 13, 0.62);
+  box-shadow: var(--glass-shadow), var(--shadow-lg);
+  overflow: hidden;
+}
+.practice-roster-dialog .roster-panel,
+.practice-roster-dialog .char-preview { background: rgba(10, 11, 13, 0.46); border-color: var(--glass-edge); }
+.practice-roster-dialog .preview-stage { background: rgba(255, 255, 255, 0.05); }
+.practice-roster-dialog .slot.is-locked { background: rgba(26, 28, 32, 0.62); }
+.practice-roster-dialog .slot.is-locked .slot-art .icon { fill: rgba(5, 5, 6, 0.55); }
+
+/* ---------------------------------------------------------------------
    Global overlays: loading, confirm dialog, rotate
    --------------------------------------------------------------------- */
 
@@ -1409,6 +1513,11 @@ html.is-touch .touch-controls { display: block; }
 .pause-overlay .pause-panel,
 .pause-overlay .pause-btn-item,
 .pause-overlay .btn-back,
+.practice-more,
+.practice-menu-overlay .pause-panel,
+.practice-menu-overlay .pause-btn-item,
+.practice-roster-dialog,
+.practice-roster-dialog .btn-back,
 .dialog-overlay .dialog-panel,
 .dialog-overlay .dialog-actions .btn {
   border-radius: 3px;
@@ -1420,20 +1529,26 @@ html.is-touch .touch-controls { display: block; }
 
 /* Preserve hover/pressed feedback and distinguish enabled secondary actions. */
 .pause-overlay .pause-btn-item:not(.is-primary):enabled,
+.practice-menu-overlay .pause-btn-item:not(.is-primary):enabled,
 .dialog-overlay .dialog-actions .btn:not(.btn--primary):enabled {
   color: var(--text);
 }
 .pause-overlay .pause-btn-item:not(.is-primary):enabled:not(:hover):not(:active),
+.practice-menu-overlay .pause-btn-item:not(.is-primary):enabled:not(:hover):not(:active),
 .dialog-overlay .dialog-actions .btn:not(.btn--primary):enabled:not(:hover):not(:active) {
   background: transparent;
 }
-/* Outline-only actions (pause Restart Battle / Return to Home, and Keep
-   Playing in Return to Home?): no fill in any state. The focus ring and press
-   scale come from the base rules and are left alone. */
+/* Outline-only actions (pause Restart Battle / Return to Home, Practice
+   Return, and Keep Playing in Return to Home?): no fill in any state. The
+   focus ring and press scale come from the base rules and are left alone. */
 .pause-overlay .pause-btn-item.is-outline-only,
 .pause-overlay .pause-btn-item.is-outline-only:hover,
 .pause-overlay .pause-btn-item.is-outline-only:focus,
 .pause-overlay .pause-btn-item.is-outline-only:active,
+.practice-menu-overlay .pause-btn-item.is-outline-only,
+.practice-menu-overlay .pause-btn-item.is-outline-only:hover,
+.practice-menu-overlay .pause-btn-item.is-outline-only:focus,
+.practice-menu-overlay .pause-btn-item.is-outline-only:active,
 .dialog-overlay .dialog-actions .btn.is-outline-only,
 .dialog-overlay .dialog-actions .btn.is-outline-only:hover,
 .dialog-overlay .dialog-actions .btn.is-outline-only:focus,

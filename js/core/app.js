@@ -20,6 +20,7 @@ import { CharacterSelectScreen } from '../screens/character-select-screen.js';
 import { MapSelectScreen } from '../screens/map-select-screen.js';
 import { HelpCreditsScreen } from '../screens/help-credits-screen.js';
 import { BattleScreen } from '../screens/battle-screen.js';
+import { PracticeGroundScreen } from '../screens/practice-screen.js';
 
 export class App {
   constructor() {
@@ -33,6 +34,7 @@ export class App {
     this.loading = new LoadingOverlay(document.getElementById('loading-overlay'));
     this.dialog = new ConfirmDialog(document.getElementById('confirm-dialog'), this);
 
+    // Quick Battle's choices. Practice Ground keeps its own fighter.
     this.selection = {
       mode: 'quick-battle',
       characterId: CHARACTERS.find((c) => c.available)?.id ?? null,
@@ -53,8 +55,10 @@ export class App {
     s.register(new ModeSelectScreen(this));
     s.register(new CharacterSelectScreen(this));
     s.register(new MapSelectScreen(this));
+    // No longer linked from Home (Practice Ground took its entry); kept in place.
     s.register(new HelpCreditsScreen(this));
     s.register(new BattleScreen(this));
+    s.register(new PracticeGroundScreen(this));
 
     // Preload every available fighter while the splash plays.
     for (const def of CHARACTERS) if (def.available) this.loadCharacter(def.id);

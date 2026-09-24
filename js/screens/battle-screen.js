@@ -5,6 +5,7 @@ import { Screen } from '../core/screen-manager.js';
 import { CONFIG } from '../config.js';
 import { el } from '../core/utils.js';
 import { ICONS } from '../ui/icons.js';
+import { menuButton } from '../ui/components.js';
 import { buildHelp } from '../ui/help-content.js';
 import { getCharacter } from '../data/characters.js';
 import { getMap } from '../data/maps.js';
@@ -17,18 +18,6 @@ const BANNERS = {
   fight: { sub: '', main: 'FIGHT' },
   time: { sub: 'TIME OVER', main: 'TIME' },
 };
-
-// opts.outlineOnly: background stays transparent through hover/press; the
-// focus ring is unchanged.
-function menuButton(label, opts = {}) {
-  return el('button', {
-    class: `pause-btn-item${opts.primary ? ' is-primary' : ''}${opts.outlineOnly ? ' is-outline-only' : ''}`,
-    type: 'button', 'data-nav': true,
-    'data-nav-default': opts.primary || null,
-    disabled: opts.disabled || null,
-    text: label,
-  });
-}
 
 export class BattleScreen extends Screen {
   constructor(app) {

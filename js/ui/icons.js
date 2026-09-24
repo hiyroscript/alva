@@ -12,6 +12,8 @@ export const ICONS = {
   jump: svg('<path d="M12 17.5V5.5"/><path d="M6.5 11 12 5.5l5.5 5.5"/><path d="M5 20.5h14"/>'),
   special: svg('<path d="M12 2.5l2.3 7.2 7.2 2.3-7.2 2.3-2.3 7.2-2.3-7.2-7.2-2.3 7.2-2.3z"/>', { fill: true }),
   pause: svg('<path d="M9 5.5v13M15 5.5v13"/>'),
+  // Three dots: Practice Ground's More button.
+  more: svg('<circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/>', { fill: true }),
   back: svg('<path d="M14.5 5 7.5 12l7 7"/>'),
   lock: svg('<rect x="5.5" y="10.5" width="13" height="10" rx="2"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/>'),
   check: svg('<path d="M5 12.5 10 17.5 19 7"/>'),
