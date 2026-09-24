@@ -15,6 +15,10 @@ import { mulberry32 } from '../core/utils.js';
 
 // Ground ring + name tag tones: the player is white, the CPU a mid gray.
 const MARKER = { p1: '#ffffff', p2: '#a3a3a3' };
+// Debug overlay: charged techniques get their own dashed colour, apart from
+// melee / clone (orange) and projectile (magenta) boxes.
+const TECHNIQUE_DEBUG = '#29f0ff';
+const DEBUG_BUTTON = { primary: 'throw', special: 'special', action1: 'ba1', action2: 'ba2' };
 
 export class Battle {
   constructor({ canvas, map, p1Def, p2Def, p1Sprites, p2Sprites, input, reducedMotion = false, onPhase }) {
@@ -52,11 +56,16 @@ export class Battle {
     // Live summoned clones (js/game/clone.js), in spawn order. Never
     // fighters: no pushbox, camera, HUD, marker or result role.
     this.clones = [];
+    // A charged technique (js/game/charged-technique.js) lives on the
+    // fighter performing it (`fighter.technique`), not here: that fighter
+    // updates, moves and ends it, and a reset ends it.
 
     this.restart();
   }
 
   restart() {
+    // Resetting a fighter ends its charged technique and releases whatever
+    // it held; the fresh combat state carries no bind, timer or sphere.
     for (const f of this.fighters) f.reset(this.stage);
     this.projectiles.length = 0;
     this.clones.length = 0;
@@ -140,10 +149,11 @@ export class Battle {
         break;
     }
 
-    // Fighters first; then the projectiles they released this step spawn
-    // (once each) and every projectile moves. Live clones advance, then the
-    // clones summoned this step spawn (once each, on their cloud's first
-    // frame). Melee, projectile and clone hits resolve, and spent
+    // Fighters first (a charged technique advances and moves with its
+    // fighter); then the projectiles they released this step spawn (once
+    // each) and every projectile moves. Live clones advance, then the clones
+    // summoned this step spawn (once each, on their cloud's first frame).
+    // Melee, projectile, clone and charged-technique hits resolve, and spent
     // projectiles and finished clones are dropped.
     for (const f of this.fighters) f.update(dt, this.simCtx);
     separate(this.p1.body, this.p2.body, this.p1.def.pushbox.width / 2, this.p2.def.pushbox.width / 2, this.stage);
@@ -194,6 +204,9 @@ export class Battle {
     // CPU first so Player 1 is always drawn on top.
     this.drawFighter(this.p2);
     this.drawFighter(this.p1);
+    // A charged technique's sphere over both fighters, so the glowing orb is
+    // never hidden behind a body, whether in a hand or on a caught opponent.
+    for (const f of this.fighters) if (f.technique) this.drawTechnique(f.technique);
     // Projectiles over the fighters, so a shuriken stays visible in front.
     for (const p of this.projectiles) this.drawProjectile(p);
     ctx.imageSmoothingEnabled = true;
@@ -268,6 +281,18 @@ export class Battle {
       const [sx, sy] = this.toScreen(...c.cloudCenter());
       drawCenteredFrame(this.ctx, cloud, sx, sy, this.pxPerArt, false);
     }
+  }
+
+  // The technique's sphere frame, centred on the hand or the caught
+  // opponent (interpolated like the fighters), at the fighters' art scale
+  // and never mirrored: a round effect only moves its offset with facing.
+  drawTechnique(t) {
+    const sphere = t.sphere;
+    const center = sphere && t.sphereCenter(true);
+    if (!center) return;
+    const [sx, sy] = this.toScreen(...center);
+    const source = sphere.anim.sourceFacing;
+    drawCenteredFrame(this.ctx, sphere.anim.frames[sphere.index], sx, sy, this.pxPerArt, !!source && t.facing !== source);
   }
 
   // Centred on the projectile's position, at the fighters' art scale.
@@ -374,18 +399,53 @@ export class Battle {
       ctx.fillStyle = '#ff4dff';
       ctx.fillText(p.def.id, Math.round(lx), Math.round(ly) - 2);
     }
+    // Charged techniques, dashed cyan: the rushing sphere's hitbox while it
+    // can connect, then a cross on the sphere's centre once it is attached
+    // to the caught opponent, drawn where the sphere is drawn. A bound
+    // fighter is labelled over its hurtboxes.
+    ctx.setLineDash([4, 3]);
+    ctx.fillStyle = TECHNIQUE_DEBUG;
+    for (const f of this.fighters) {
+      const t = f.technique;
+      if (!t) continue;
+      const label = `charged ${DEBUG_BUTTON[t.action] ?? t.action} ${t.phase}`;
+      if (t.sphereHitbox(box, true)) {
+        rect(box.x, box.y, box.w, box.h, TECHNIQUE_DEBUG);
+        const [lx, ly] = this.toScreen(box.x, box.y);
+        ctx.fillText(label, Math.round(lx), Math.round(ly) - 2);
+      } else if (t.sphereOwner === 'target') {
+        const [cx, cy] = this.toScreen(...t.sphereCenter(true));
+        ctx.strokeStyle = TECHNIQUE_DEBUG;
+        ctx.beginPath();
+        ctx.moveTo(Math.round(cx) - 6, Math.round(cy) + 0.5);
+        ctx.lineTo(Math.round(cx) + 7, Math.round(cy) + 0.5);
+        ctx.moveTo(Math.round(cx) + 0.5, Math.round(cy) - 6);
+        ctx.lineTo(Math.round(cx) + 0.5, Math.round(cy) + 7);
+        ctx.stroke();
+        ctx.fillText(label, Math.round(cx) + 8, Math.round(cy) - 8);
+      }
+    }
+    for (const f of this.fighters) {
+      if (!f.combat.immobilized) continue;
+      const [lx, ly] = this.toScreen(f.renderX - f.body.halfW, f.renderY - f.body.height);
+      ctx.fillText('bound', Math.round(lx), Math.round(ly) - 14);
+    }
+    ctx.setLineDash([]);
     ctx.fillStyle = '#fff';
     ctx.font = '12px ui-monospace, Menlo, Consolas, monospace';
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
     const p = this.p1;
-    const action = p.combat.attack
-      ? ` ${p.combat.attack.def.id} ${p.combat.phase}`
-      : p.combat.defenseAction ? ` ${p.combat.defenseAction.def.animation} ${p.combat.defensePhase}` : '';
+    const action = p.technique
+      ? ` ${p.technique.def.id} ${p.technique.phase}`
+      : p.combat.attack
+        ? ` ${p.combat.attack.def.id} ${p.combat.phase}`
+        : p.combat.defenseAction ? ` ${p.combat.defenseAction.def.animation} ${p.combat.defensePhase}` : '';
+    const cpu = `${this.p2.state}${this.p2.combat.immobilized ? ' (bound)' : ''}`;
     const lines = [
       `state ${p.state}${action}  grounded ${p.body.grounded}  ground ${p.body.ground?.id ?? '-'}`,
       `pos ${p.body.x.toFixed(1)}, ${p.body.y.toFixed(1)}  vel ${p.body.vx.toFixed(0)}, ${p.body.vy.toFixed(0)}`,
-      `view ${view.w.toFixed(0)}x${view.h.toFixed(0)}  px/art ${this.pxPerArt.toFixed(2)}  cpu ${this.p2.state}  clones ${this.clones.length}`,
+      `view ${view.w.toFixed(0)}x${view.h.toFixed(0)}  px/art ${this.pxPerArt.toFixed(2)}  cpu ${cpu}  clones ${this.clones.length}`,
     ];
     const y0 = view.pxH - 12 - lines.length * 16;
     lines.forEach((l, i) => {
@@ -398,6 +458,8 @@ export class Battle {
   }
 
   destroy() {
+    // No technique may keep its owner, target or bind past the battle.
+    for (const f of this.fighters) f.endTechnique('destroy');
     this.fighters = [];
     this.projectiles = [];
     this.clones = [];

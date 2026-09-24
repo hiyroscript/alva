@@ -426,8 +426,37 @@ test('a real hit on a charging fighter shows Hurt through the impact freeze, wit
   assert.ok(!states.includes('chargeRelease'), states.join());
 });
 
-test('BA2 interrupts Charge without releasing it, then Charge restarts from charge1', () => {
+test('BA2 while already charging, Charge still held, starts the Charged BA2 Sphere Rush with no release pose', () => {
   const { attacker: fighter, tick, clones } = duel();
+  const step = (held) => {
+    tick(held);
+    return fighter;
+  };
+  chargeIntoLoop(step);
+  step({ ...CHARGE, ...BA2 });
+  assert.equal(fighter.state, 'technique');
+  assert.equal(fighter.technique.def.id, 'rasenRush');
+  assert.equal(fighter.combat.attack, null, 'not the normal BA2');
+  assert.equal(fighter.charging, false);
+  assert.equal(frameName(fighter), '0001_rasen1.png', 'straight into the technique, no charge1 release pose');
+  const states = [];
+  while (fighter.technique) states.push(step(CHARGE).state);
+  assert.ok(!states.includes('chargeRelease') && !states.includes('charge'), states.join());
+  // Charge held right through it does not restart Charge by itself: it has
+  // to be let go and held again.
+  for (let i = 0; i < 10; i++) assert.notEqual(step(CHARGE).state, 'charge');
+  step();
+  assert.equal(step(CHARGE).state, 'charge');
+  assert.equal(frameName(fighter), '0001_charge1.png');
+  assert.equal(clones.length, 0, 'the Sphere Rush is no summon');
+  assert.equal(fighter.combat.energy, 100);
+});
+
+test('without its art, Charged BA2 falls back to BA2, which interrupts Charge; Charge then restarts from charge1', (t) => {
+  t.mock.method(console, 'warn', () => {});
+  const { attacker: fighter, tick, clones } = duel({
+    attackerSprites: fakeSprites(Object.keys(def.animations).filter((k) => k !== 'rasenDash')),
+  });
   const step = (held) => {
     tick(held);
     return fighter;
@@ -436,6 +465,7 @@ test('BA2 interrupts Charge without releasing it, then Charge restarts from char
   step({ ...CHARGE, ...BA2 });
   assert.equal(fighter.state, 'attack');
   assert.equal(fighter.combat.attack.def.id, 'ba2');
+  assert.equal(fighter.technique, null);
   assert.equal(fighter.charging, false);
   assert.equal(frameName(fighter), '0001_2ba1.png');
   const frames = [];
@@ -448,7 +478,7 @@ test('BA2 interrupts Charge without releasing it, then Charge restarts from char
   assert.ok(frames.every((n) => !isChargeFrame(n)));
   assert.equal(fighter.state, 'charge');
   assert.equal(frameName(fighter), '0001_charge1.png');
-  assert.equal(clones.length, 0, 'BA2 has no charged action');
+  assert.equal(clones.length, 0);
   assert.equal(fighter.combat.energy, 100);
 });
 

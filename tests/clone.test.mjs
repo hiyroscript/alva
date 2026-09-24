@@ -149,12 +149,16 @@ test('the cloud is a one-shot, direction-neutral effect animation (1 -> 10 at 20
   }
   for (const anim of Object.values(def.projectileAnimations)) assert.ok(anim.frames.every((u) => !/clone/.test(u)));
   assert.equal(def.animationFallbacks.cloneCloud, undefined);
-  // Only ten frames: the vanish is the same list reversed at runtime.
-  assert.equal(Object.keys(def.effectAnimations).length, 1);
+  // Only ten frames: the vanish is the same list reversed at runtime, and no
+  // other effect uses them.
+  const withCloud = Object.keys(def.effectAnimations).filter((k) => def.effectAnimations[k].frames.some((u) => /cloneav/.test(u)));
+  assert.deepEqual(withCloud, ['cloneCloud']);
 });
 
 test('the Clone Attack is data: a 25 Energy Charged BA1 summon reusing ba1 and the cloud', () => {
-  assert.deepEqual(def.chargedActions, { action1: 'ba1Clone' }, 'only BA1 has a charged action');
+  // Charged actions are typed: Charged BA1 is this summon (Charged BA2, the
+  // Sphere Rush, is a technique; see charged-ba2.test.mjs).
+  assert.deepEqual(def.chargedActions.action1, { type: 'summon', id: 'ba1Clone' });
   assert.equal(SUMMON.energyCost, 25);
   assert.equal(SUMMON.attack, 'ba1');
   assert.equal(SUMMON.cloud, 'cloneCloud');
@@ -232,6 +236,7 @@ test('SpriteSet normalizes the cloud as an effect at its own art size, on the fi
       ...def,
       animations: { idle: { frames: [`${BASE}idle1.png`], fps: 7, loop: true } },
       projectileAnimations: {},
+      effectAnimations: { cloneCloud: def.effectAnimations.cloneCloud },
       visual: { ...def.visual, height },
     };
     return SpriteSet.build(character, (url) => images.get(url));
@@ -472,9 +477,9 @@ test('ordinary ground and mid-air BA1 are unchanged: no clone and no Energy cost
   }
 });
 
-test('Charged BA2, Throw and Defense keep their behaviour: no clone and no Energy cost', () => {
+test('Charged BA2 (its own Sphere Rush technique), Throw and Defense summon no clone and cost no Energy', () => {
   for (const [press, check] of [
-    [BA2, (d) => assert.equal(d.attacker.combat.attack?.def.id, 'ba2')],
+    [BA2, (d) => assert.equal(d.attacker.technique?.def.id, 'rasenRush')],
     [THROW, (d) => assert.equal(d.attacker.combat.attack?.def.id, 'throw')],
     [DEFENSE, (d) => assert.equal(d.attacker.combat.defenseAction?.type, 'dodge')],
   ]) {
@@ -483,7 +488,7 @@ test('Charged BA2, Throw and Defense keep their behaviour: no clone and no Energ
     d.tick({ ...CHARGE, ...press });
     check(d);
     assert.equal(d.attacker.charging, false, 'it interrupts Charge as before');
-    d.until(() => !d.attacker.combat.attack && !d.attacker.combat.defenseAction);
+    d.until(() => !d.attacker.combat.attack && !d.attacker.combat.defenseAction && !d.attacker.technique);
     for (let i = 0; i < 30; i++) d.tick(CHARGE);
     assert.equal(d.clones.length, 0);
     assert.equal(d.attacker.combat.energy, 100);
