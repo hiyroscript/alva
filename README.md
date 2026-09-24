@@ -57,7 +57,7 @@ in the code depends on the repository name, so no file changes are needed.
 | Basic Attack 1 (BA1) | `U` | Lower-right, bottom row (**BA1**) |
 | Basic Attack 2 (BA2) | `I` | Lower-right, bottom row (**BA2**) |
 | Pause | `Esc` or `P` | Timer or pause button, top centre |
-| Practice menu (Practice Ground) | `Esc` or `P` | Three-dots button, top right |
+| Practice menu (Practice Ground) | `Esc` or `P` | Three-dots button, top centre |
 
 \* Reserved: wired into input and combat, but inactive until #0001 has matching
 attack animations. Its touch button has a dashed outline.
@@ -169,7 +169,7 @@ Touch controls show on touch-first devices (coarse pointer, or a touch actually 
 - **Attacks:** Basic Attack 1 and Basic Attack 2, each on the ground and in the air, a ground Throw that releases one shuriken, the Charged BA1 Clone Attack (25 Energy) and the Charged BA2 Sphere Rush (ground only, two hits, no Energy cost). Special is reserved.
 - **Defense:** #0001 dodges, on the ground and in the air.
 - **HUD:** each fighter panel shows a green health bar with a blue Energy bar directly beneath it. Both start full; the Energy bar drops by a quarter with each clone summoned.
-- **Modes:** Quick Battle: 1 round, 99 seconds, against a non-attacking training CPU. Practice Ground: solo training on its own stage, with no CPU, timer or rounds (below).
+- **Modes:** Quick Battle: 1 round, 99 seconds, against a non-attacking training CPU. Practice Ground: training on its own stage, alone or with an optional stand-still CPU dummy, with no timer or rounds (below).
 
 ## Design
 
@@ -201,9 +201,10 @@ neutral.
   screens.
 - **Practice Ground** is a pale, cool-gray simulation room: original Canvas
   artwork with a gridded back wall, a perspective floor and side walls at the
-  bounds. Its HUD keeps Player 1's panel and a three-dots More button; the
-  Practice menu and the Change Fighter dialog are translucent glass over the
-  paused stage.
+  bounds. Its HUD keeps Player 1's panel and a three-dots More button, top
+  centre; the Practice menu and the Change Fighter and CPU dialogs are
+  translucent glass over the paused stage. Damage dealt to the practice CPU
+  floats over its head in red.
 - **Other screens** retain their established layouts, controls and navigation;
   only interface colours change. Battle keeps readable dark translucent chrome.
 - Character sprites and stage artwork keep their original colours. No artwork,
@@ -239,30 +240,50 @@ js/
 
 ### Practice Ground
 
-**Home → Practice Ground** starts at once with #0001 on the training stage:
-no fighter or stage select, countdown, timer, CPU or result. It runs until
-you choose Return.
+**Home → Practice Ground** starts at once with #0001 alone on the training
+stage: no fighter or stage select, countdown, timer, CPU or result. It runs
+until you choose Return.
 
-- **One fighter.** `PracticeSession` (`js/game/practice.js`) and Quick
-  Battle's `Battle` both extend `Arena` (`js/game/arena.js`), which owns the
-  fixed-step world, the camera and all Canvas drawing. The practice session
-  holds a single fighter under your control and nothing else, so no CPU is
-  drawn, labelled or shown in the HUD. Moves aimed at an opponent fall back or
+- **Your fighter, and an optional CPU.** `PracticeSession`
+  (`js/game/practice.js`) and Quick Battle's `Battle` both extend `Arena`
+  (`js/game/arena.js`), which owns the fixed-step world, the camera and all
+  Canvas drawing. The practice session holds your fighter and, only once you
+  enable one, a practice CPU. Alone, moves aimed at an opponent fall back or
   miss: Charged BA1 has nobody to appear behind, so it is an ordinary BA1 (no
   Energy spent); the Sphere Rush dashes, finds no one and ends.
 - **Stage.** `PRACTICE_MAP` (`js/data/practice-map.js`) is deliberately not
   in `MAPS`, which feeds Select Stage. `js/stages/practice-theme.js` draws the
   room as one square grid in one-point perspective (back wall, floor, side
   walls at the bounds, a ruler along the front edge).
-- **More menu.** The three-dots button (or `Esc` / `P` / Start) freezes
-  practice under a light glass menu with **Change Fighter** and **Return**.
-  Press More, `Esc` or `P` again (or tap the dim) to carry on.
+- **More menu.** The three-dots button, top centre where Quick Battle's
+  timer sits (or `Esc` / `P` / Start), freezes practice under a light glass
+  menu with **Change Fighter**, **Enable CPU** (**Change CPU** once there is
+  one), **Allow infinite energy** (**Revoke infinite energy** while it is on)
+  and **Return**. Press More, `Esc` or `P` again (or tap the dim) to carry
+  on.
 - **Change Fighter** opens the full roster as a large glass dialog over the
   paused stage. It is the same roster component as Select Fighter
   (`js/ui/fighter-roster.js`). Confirming swaps the fighter in place at the
   spawn with full health and Energy and resumes; `Esc` / Back returns to the
   menu. Practice keeps its own fighter: Quick Battle's selection never
   changes, and every new visit starts with #0001 again.
+- **Practice CPU.** Enable CPU opens a second copy of the roster dialog
+  (Select CPU). Confirming loads that fighter and puts it 320 units to your
+  right, facing you, labelled CPU, and resumes; the camera frames you both.
+  It is a training dummy with no controller: it never moves, jumps, attacks,
+  charges or defends, but it takes real hits, hitstun, knockback and binds,
+  so clones, shurikens, BA1 / BA2 and the Sphere Rush all land on it. Each hit
+  floats its damage (`-6`, `-2.5`) in red over its head for under a second,
+  straight from the combat system's resolved hit. Knocked out, it gets back
+  up with full health once its hit reaction ends. Change CPU swaps it for
+  another fighter; **Disable CPU**, beside Back in that dialog, removes it
+  and returns you to the paused menu. Changing your own fighter keeps the
+  CPU. It gets no HUD panel.
+- **Infinite energy.** Allow infinite energy keeps your fighter's Energy full
+  (the CPU's is unaffected): every Energy cost can be paid while moves keep
+  their normal rules and cooldowns. The menu stays open and the button reads
+  Revoke infinite energy until you turn it off. It survives Change Fighter.
+- Every new visit starts with no CPU and infinite energy off.
 
 ### Adding a fighter (#0002)
 

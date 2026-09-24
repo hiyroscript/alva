@@ -1,13 +1,13 @@
 // Fighter roster: the large roster grid (CONFIG.roster.totalSlots slots) and
 // its animated preview panel, shared by the Select Fighter screen and
-// Practice Ground's Change Fighter dialog. Available fighters are selectable
-// buttons; other slots are non-interactive locked placeholders that stay out
-// of hover, Tab and spatial navigation.
+// Practice Ground's Change Fighter and CPU dialogs. Available fighters are
+// selectable buttons; other slots are non-interactive locked placeholders
+// that stay out of hover, Tab and spatial navigation.
 //
 // The host places `rosterPanel` and `previewPanel`, calls show() when they
 // appear, drives update(dt) while they are visible and decides what
 // confirming a fighter means (`onConfirm(def)`). Preview element ids come
-// from `previewId`, so two rosters can share the page.
+// from `previewId`, so several rosters can share the page.
 
 import { CONFIG } from '../config.js';
 import { el } from '../core/utils.js';

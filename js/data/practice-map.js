@@ -2,9 +2,11 @@
 // js/data/maps.js), but deliberately kept out of MAPS: the Select Stage
 // screen offers every MAPS entry as a Quick Battle stage.
 //
-// One broad, flat floor with no platforms, solids or hazards, and a single
-// spawn on the room's centre axis. The bounds sit on grid lines of the
-// practice theme (js/stages/practice-theme.js), whose side walls mark them.
+// One broad, flat floor with no platforms, solids or hazards. Player 1 spawns
+// on the room's centre axis; the optional practice CPU spawns 320 units to
+// its right (as far apart as Quick Battle's two starting fighters), facing
+// it. The bounds and both spawns sit on grid lines of the practice theme
+// (js/stages/practice-theme.js), whose side walls mark the bounds.
 
 export const PRACTICE_MAP = {
   id: 'practice',
@@ -17,6 +19,7 @@ export const PRACTICE_MAP = {
   cameraBounds: { left: 0, right: 4000, top: 0, bottom: 1100 },
   spawnPoints: [
     { x: 2000, facing: 1 },
+    { x: 2320, facing: -1 },
   ],
   platforms: [],
   solids: [],
