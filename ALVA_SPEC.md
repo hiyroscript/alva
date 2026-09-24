@@ -604,8 +604,8 @@ read the character database, so it stays the same as fighters are added.
   hits once for 8 damage, 0.24 s hitstun, 0.15 s blockstun and 0.07 s
   hitstop, with a 0.15 s cooldown on the ground and 0.18 s in the air. Both
   declare Vertical Knockback Power 2 (`powers: { verticalKnockback: 2 }`):
-  an unblocked hit launches the opponent upward at 220 (at impact vx 0, vy
-  −220, airborne, then normal gravity brings it down) instead of the 220
+  an unblocked hit launches the opponent upward at 300 (at impact vx 0, vy
+  −300, airborne, then normal gravity brings it down) instead of the 220
   sideways push BA2 used to have, and it has no horizontal knockback. The
   launch comes from the shared knockback path, not special BA2 code. A
   blocked BA2 still takes chip damage, blockstun and hitstop, but is never
@@ -980,7 +980,7 @@ read the character database, so it stays the same as fighters are added.
   | Jump Power | 650 | 920 | 1000 | initial upward speed of the normal jump |
   | Speed Power | 270 | 330 | 360 | top speed of normal movement |
   | Horizontal Knockback Power | 140 | 180 | 220 | the attack's `knockback.x` |
-  | Vertical Knockback Power | 140 | 220 | 300 | the attack's `knockback.y` (launch; `vy = −y`) |
+  | Vertical Knockback Power | 220 | 300 | 380 | the attack's `knockback.y` (launch; `vy = −y`) |
 
   #0001 has **Jump Power 2** and **Speed Power 2**, exactly its original 920
   jump and 330 top speed, so its jump and movement are unchanged; BA1 has

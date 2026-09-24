@@ -1068,7 +1068,7 @@ test('Player 1\'s BA2 launches the CPU straight up (Vertical Knockback Power 2),
   // At impact: launched upward, not pushed sideways.
   assert.ok(cpu.body.vx === 0, 'no sideways push');
   assert.equal(cpu.body.vy, -player.attacks.ba2.knockback.y);
-  assert.equal(cpu.body.vy, -220);
+  assert.equal(cpu.body.vy, -300);
   assert.equal(cpu.grounded, false);
   let top = groundY;
   for (let i = 0; i < 120 && !cpu.grounded; i++) {

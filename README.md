@@ -309,10 +309,10 @@ Values are in world units per second, at the global gravity of 2500:
 | Jump Power | fighter | 650 | 920 | 1000 | the initial upward speed of the normal jump |
 | Speed Power | fighter | 270 | 330 | 360 | the top speed of normal left / right movement, on the ground and in the air |
 | Horizontal Knockback Power | attack | 140 | 180 | 220 | how hard a hit pushes the opponent away (`knockback.x`) |
-| Vertical Knockback Power | attack | 140 | 220 | 300 | how hard an unblocked hit launches the opponent upward (`knockback.y`) |
+| Vertical Knockback Power | attack | 220 | 300 | 380 | how hard an unblocked hit launches the opponent upward (`knockback.y`) |
 
 - #0001 declares `powers: { jump: 2, speed: 2 }`: exactly the 920 jump and 330 top speed it always had, so it moves and jumps identically. Movement has no raw `jumpVelocity` or `maxSpeed`: the tiers are the only sources.
-- #0001's BA1 (ground and mid-air) declares Horizontal Knockback Power 2, so it still pushes the opponent 180 sideways. Its BA2 (ground and mid-air) declares Vertical Knockback Power 2, so it now launches the opponent upward at 220 instead of pushing it 220 sideways. The Clone Attack performs BA1's resolved definition, so it inherits BA1's knockback with no tuning of its own.
+- #0001's BA1 (ground and mid-air) declares Horizontal Knockback Power 2, so it still pushes the opponent 180 sideways. Its BA2 (ground and mid-air) declares Vertical Knockback Power 2, so it now launches the opponent upward at 300 instead of pushing it 220 sideways. The Clone Attack performs BA1's resolved definition, so it inherits BA1's knockback with no tuning of its own.
 - Speed Power only sets the normal top speed. Acceleration, deceleration, the turn boost, air control, gravity, falling, the jump, knockback, projectiles (the shuriken's 700), Dodges and charged techniques (the Sphere Rush's 1050 dash) never depend on it. Bespoke hits such as the shuriken and the Sphere Rush keep their own raw `knockback`.
 - A declared tier the table lacks (or a fighter with no tier of a fighter Power) is logged and gets tier 2. An attack declaring something that is not an attack Power is logged and ignored.
 - To add another Power, add its tier table and an entry (with its `scope`) to `POWERS`; Discover lists it with no screen changes. The tiers are not upgradeable or selectable in game.
