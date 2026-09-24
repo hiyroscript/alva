@@ -1,914 +1,1815 @@
-Implement Character #0001’s Basic Attack 2 (BA2) and Mid-Air Basic Attack 2 in the Alva repository.
+Work from the latest main branch of hiyroscript/alva.
 
-Before editing anything, inspect the current main branch and understand the existing BA1 implementation. BA1 is already complete and merged; BA2 should extend the exact same architecture rather than creating a parallel combat/input system.
+Implement three related changes:
 
-Terminology and naming
+1. Fix #0001’s Mid-Air Dodge artwork facing the opposite direction from the fighter.
+2. Add #0001’s new Throw animation on the existing internal primary action.
+3. Add #0001’s animated shuriken projectile, including real projectile movement, collision, damage and rendering.
 
-For these sprites:
+Preserve the existing Charge, Defense/Dodge, BA1, BA2, Energy, physics, HUD, and training-CPU behavior.
 
-* ba means basic attack
-* 2ba means Basic Attack 2 / BA2
-* The 2 before ba identifies which basic attack it is.
-* The number at the very end of the filename is the animation frame number.
+Do not redesign unrelated systems.
 
-Examples:
+1. Current relevant architecture
 
-* 0001_2ba1.png = Character #0001, Basic Attack 2, frame 1
-* 0001_2ba7.png = Character #0001, Basic Attack 2, frame 7
-* 0001_midair2ba1.png = Character #0001, Mid-Air Basic Attack 2, frame 1
+The current game already has:
 
-BA2 is the secondary basic attack and belongs to the existing internal action2 input.
+* generic primary, special, action1, action2 combat inputs
+* primary on keyboard J
+* primary on gamepad X / Square
+* a reserved Primary touch button in the upper-right action cluster
+* BA1 on action1
+* BA2 on action2
+* Defense on defense
+* #0001 ground Dodge and Mid-Air Dodge
+* a generic attack definition/combat system
+* no projectile subsystem
+* fighter rendering through Battle.drawFighter()
+* one global character sourceFacing
 
-Do not rename the internal controller action from action2. Only change its player-facing label from Action 2 / A2 to Basic Attack 2 / BA2.
+Character #0001 currently defines:
 
-Existing artwork
+sourceFacing: 1
 
-The current repo root contains these newly uploaded sprites:
+meaning its normal source art is assumed to face right.
 
-Ground BA2
+Battle.drawFighter() currently determines mirroring approximately as:
 
-* 0001_2ba1.png
-* 0001_2ba2.png
-* 0001_2ba3.png
-* 0001_2ba4.png
-* 0001_2ba5.png
-* 0001_2ba6.png
-* 0001_2ba7.png
+const flip = f.facing !== (f.def.sourceFacing || 1);
 
-This is a 7-frame ground animation.
+That global assumption is the cause of the Mid-Air Dodge facing bug.
 
-Mid-Air BA2
+2. Fix Mid-Air Dodge source orientation
 
-* 0001_midair2ba1.png
-* 0001_midair2ba2.png
-* 0001_midair2ba3.png
+The Mid-Air Dodge artwork is drawn facing the opposite direction from #0001’s normal source art.
 
-This is a 3-frame mid-air animation.
+Do not fix this by:
 
-There were previously incorrectly named 0001_2ab*.png files in the repository history. They were deleted. Do not restore them and do not use 2ab anywhere. The correct naming is 2ba.
+* changing fighter.facing
+* negating movement
+* swapping left/right controls
+* globally setting sourceFacing: -1
+* horizontally modifying the PNG files
+* special-casing midairDodge by name inside Battle.drawFighter()
 
-Do not redraw, recolour, reinterpret, replace, upscale manually, or AI-generate any #0001 sprite artwork. Use the uploaded PNGs exactly as the source animation frames.
+The fighter’s logical facing is already correct.
 
-1. Move the new sprites into the canonical fighter asset directory
+This is an art-source orientation problem.
 
-Move the ten new PNGs from the repository root into:
+3. Add per-animation sourceFacing
+
+Allow an animation to override the character’s default source orientation.
+
+Extend animation metadata so an animation may contain:
+
+sourceFacing: -1
+
+If omitted, continue inheriting:
+
+character.sourceFacing
+
+For #0001:
+
+midairDodge: {
+  frames: frames(BASE_0001, 'midairdodge', 3),
+  fps: DODGE_FPS,
+  loop: false,
+  heightRatio: 0.96,
+  sourceFacing: -1,
+}
+
+Keep #0001’s character-level value:
+
+sourceFacing: 1
+
+All other existing animations should therefore continue behaving exactly as they do now.
+
+4. Preserve the metadata through SpriteSet
+
+SpriteSet.build() currently keeps fields such as:
+
+fps
+loop
+heightRatio
+minSpeedScale
+
+Add the animation’s optional source orientation:
+
+sourceFacing: anim.sourceFacing ?? def.sourceFacing ?? 1
+
+or equivalent.
+
+The normalized animation stored in:
+
+set.animations[key]
+
+must know the orientation of its own original artwork.
+
+Do not put orientation on every individual frame unless necessary; it is animation-level metadata.
+
+5. Use current animation orientation when rendering
+
+Change Battle.drawFighter() from the global-only rule to the currently playing animation.
+
+Conceptually:
+
+const sourceFacing =
+  f.animator.anim?.sourceFacing ??
+  f.def.sourceFacing ??
+  1;
+const flip = f.facing !== sourceFacing;
+
+Then call drawFrame() normally.
+
+Required result:
+
+Normal right-facing source animation
+
+fighter faces right → no flip
+fighter faces left  → flip
+
+Mid-Air Dodge, whose source art faces left
+
+fighter faces right → flip
+fighter faces left  → no flip
+
+Do not change the fighter’s actual facing property to achieve this.
+
+6. Do not alter Dodge gameplay
+
+This fix is visual only.
+
+Do not change:
+
+* Dodge duration
+* Dodge invulnerability
+* ground Dodge
+* Defense input
+* facing lock during Defense
+* gravity
+* momentum
+* collision
+* landing-through-midair-Dodge behavior
+
+The current Mid-Air Dodge invulnerability frames remain as implemented.
+
+The fighter’s world-space hurtboxes must still use its logical facing, not the source-art orientation.
+
+sourceFacing controls sprite rendering only.
+
+7. New uploaded Throw artwork
+
+The latest repository upload contains:
+
+0001_throw1.png
+0001_throw2.png
+0001_throw3.png
+
+These are #0001’s Throw animation frames.
+
+Move them from the repository root to:
 
 ./assets/characters/0001/
 
-The final paths must therefore be:
+Final paths:
 
-./assets/characters/0001/0001_2ba1.png
-through
-./assets/characters/0001/0001_2ba7.png
+./assets/characters/0001/0001_throw1.png
+./assets/characters/0001/0001_throw2.png
+./assets/characters/0001/0001_throw3.png
 
-and:
-
-./assets/characters/0001/0001_midair2ba1.png
-through
-./assets/characters/0001/0001_midair2ba3.png
-
-Do not leave duplicate copies at the repository root.
+Remove the root copies.
 
 Preserve the PNG bytes unchanged.
 
-All runtime asset URLs must remain relative because Alva can be served from the /alva/ GitHub Pages subpath.
+Do not redraw, rotate, recolour, replace or AI-generate the artwork.
 
-2. Register BA2 animations in Character #0001 data
+8. New uploaded shuriken artwork
 
-Extend js/data/characters.js using the existing BA1 conventions.
+The same upload contains:
 
-BA1 currently establishes the correct pattern:
+0001_shuriken1.png
+0001_shuriken2.png
+0001_shuriken3.png
 
-* ba1
-* midairBa1
-* a shared FPS constant
-* non-looping clips
-* action1: { ground: 'ba1', air: 'midairBa1' }
-* corresponding attack definitions
+Move these into:
 
-Add equivalent logical animation keys for BA2:
+./assets/characters/0001/
 
-* ba2
-* midairBa2
+Final paths:
 
-Use:
+./assets/characters/0001/0001_shuriken1.png
+./assets/characters/0001/0001_shuriken2.png
+./assets/characters/0001/0001_shuriken3.png
 
-* frames(BASE_0001, '2ba', 7) for ba2
-* frames(BASE_0001, 'midair2ba', 3) for midairBa2
+Remove the root copies.
 
-Both animations must be:
+These three frames are the animation of the projectile itself, not fighter poses.
 
-* non-looping
-* played once
-* allowed to hold their final frame naturally if necessary
-* normalized through the existing sprite-normalization pipeline
-* anchored consistently with #0001’s existing animations
+Do not treat them as three separate shurikens.
 
-Do not hard-code any special rendering logic specifically for the PNG dimensions.
+9. Throw is the existing Primary action
 
-The existing sprite normalizer should continue to determine visible bounds, pixel-art grid, world scaling, and torso/bottom-centre anchoring.
+Use the existing internal action:
 
-Start with 12 FPS, consistent with BA1, unless direct inspection of the actual BA2 frames makes another whole-frame playback rate clearly necessary. If a different FPS is selected, document why and keep all attack phase durations derived from that FPS so animation and combat cannot drift apart.
+primary
 
-Prefer introducing a BA2_FPS constant alongside BA1_FPS.
+for Throw.
 
-3. Map the existing Action 2 input to BA2
+Do not add another gameplay button.
 
-Character #0001 currently has approximately this action mapping:
+The mapping becomes conceptually:
 
 actions: {
-  primary: null,
+  primary: 'throw',
   special: null,
   action1: { ground: 'ba1', air: 'midairBa1' },
-  action2: null,
+  action2: { ground: 'ba2', air: 'midairBa2' },
 }
 
-Change only action2 so it becomes the second basic attack:
+The internal action may remain named primary.
 
-action2: {
-  ground: 'ba2',
-  air: 'midairBa2',
-}
+The player-facing name is now:
 
-Do not change BA1.
+Throw
 
-Do not move BA2 onto primary, special, or action1.
+This avoids unnecessarily breaking the existing generic combat-action architecture while fulfilling the requested Primary → Throw control rename.
 
-After this change:
+10. Existing physical controls remain unchanged
 
-* action1 = Basic Attack 1 / BA1
-* action2 = Basic Attack 2 / BA2
-* primary remains reserved
-* special remains reserved
-
-The existing Fighter.attackFor() implementation already supports { ground, air } mappings. Reuse it.
-
-Do not add another grounded/airborne dispatch system.
-
-4. Preserve the existing BA1 input bindings
-
-The current controls are already wired correctly.
-
-BA2 must use the physical controls that currently activate action2:
+Throw uses the physical controls that currently belong to Primary.
 
 Keyboard
 
-I
+Keep:
 
-Do not move BA2 to J, K, U, or another key.
-
-Current important mappings remain:
-
-* U → BA1 / action1
-* I → BA2 / action2
+J
 
 Gamepad
 
-The existing standard-gamepad mapping assigns:
+Keep:
 
-* B / Circle → action1 / BA1
-* LB → action2
-
-Therefore LB becomes BA2.
-
-Do not remap gamepad buttons unless there is an actual bug in the existing mapping.
+X / Square
 
 Touch
 
-Keep the existing action2 touch-button position and CSS slot.
+Keep the current Primary button’s physical position.
 
-The internal action remains:
+Do not move the button.
 
-action2
+11. Rename player-facing Primary to Throw
 
-The existing CSS/layout class can remain .tc-a2.
+Change:
 
-Only its visible label/status changes.
-
-5. Change “A2” to “BA2”
-
-Change the user-facing touch button from:
-
-A2
-
-to exactly:
-
-BA2
-
-Also change its accessible label from:
-
-Action 2
+ACTION_LABELS.primary = 'Primary'
 
 to:
 
-Basic Attack 2
+ACTION_LABELS.primary = 'Throw'
 
-In js/game/touch-controls.js, the equivalent button should become conceptually:
+Help should therefore display:
 
-{
-  action: 'action2',
-  label: 'Basic Attack 2',
-  text: 'BA2',
-  pos: 'a2'
-}
-
-Remove its pending: true state now that real attack artwork exists.
-
-The BA2 button must therefore no longer use the dashed/dimmed reserved appearance.
-
-Do not rename .tc-a2 just to match the visible text.
-
-Do not change the button’s location.
-
-6. Update global action labels
-
-In js/config.js, change:
-
-action2: 'Action 2'
-
-to:
-
-action2: 'Basic Attack 2'
-
-Keep the keyboard binding:
-
-action2: ['KeyI']
-
-unchanged.
-
-BA1 should remain:
-
-Basic Attack 1
-
-7. Update the Help UI
-
-js/ui/help-content.js currently considers Primary, Special, and Action 2 reserved.
-
-Once BA2 is implemented:
-
-* remove action2 from PENDING
-* leave primary and special reserved
-
-The pending set should therefore effectively contain only:
-
-* primary
-* special
-
-Update the mobile diagram:
-
-* A2 → BA2
-* title/accessible label → Basic Attack 2
-* descriptive text should say BA1 and BA2 rather than Action 1 / Action 2
-
-Update the mobile diagram’s overall ARIA description accordingly.
-
-Update the legend so it refers to:
-
-* BA1
-* BA2
+Throw | J
 
 rather than:
 
-* BA1
-* Action 2
+Primary | J
 
-Update explanatory text so the dashed buttons are now only Primary and Special.
+Do not refer to the playable action as Primary in user-facing controls after this change.
 
-8. Update stale help/build descriptions
+Internal code may still use primary.
 
-The Help screen currently describes BA1 as implemented while Action 2 remains reserved.
+12. Change the touch Primary icon to “T”
 
-Update this description to state that #0001 now has:
+The current Primary touch control uses ICONS.primary.
 
-* Idle
-* Run
-* Jump
-* Fall
-* Land
-* Hurt
-* Mid-Air Hurt
-* Basic Attack 1
-* Mid-Air Basic Attack 1
-* Basic Attack 2
-* Mid-Air Basic Attack 2
+Replace its visible icon with the letter:
 
-Mention that:
+T
 
-* BA1 uses action1
-* BA2 uses action2
-* Primary and Special remain reserved
-* the training CPU remains non-attacking
+exactly.
 
-Do not claim that Primary or Special have attacks.
+The touch definition should become equivalent to:
 
-9. Implement BA2 attack definitions using the existing combat system
+{
+  action: 'primary',
+  label: 'Throw',
+  text: 'T',
+  pos: 'throw',
+}
 
-Add two new attack definitions:
+Important:
 
-* ba2
-* midairBa2
+* visible text = exactly T
+* accessible label = Throw
+* data-action remains primary
+* no reserved/pending state
+* same physical button location as the old Primary button
 
-Do this entirely through the current createAttackDefinition / character-data combat architecture.
+Do not show:
 
-Do not create a BA2-specific combat engine.
+Primary
+THROW
+SH
 
-Do not create manual collision checks outside CombatSystem.
+inside the button.
 
-Do not bypass the existing attack state.
+Only:
 
-The existing system already handles:
+T
 
-* startup
-* active frames
-* recovery
-* damage
-* hitboxes
-* hurtboxes
-* knockback
-* hitstun
-* blockstun
-* hitstop
-* cooldowns
-* one-hit-per-attack behavior
-* attack movement locking
-* active-hitbox debug rendering
-* horizontal mirroring
-* grounded/airborne attack selection
+13. Rename visual Primary selectors to Throw
 
-Reuse all of it.
+Where selectors describe this visible button rather than the internal action, rename them.
 
-10. Align BA2 gameplay timing with the actual animation frames
+For example:
 
-Combat phases must be based on whole animation frames at BA2_FPS, like BA1.
+tc-primary → tc-throw
+md-primary → md-throw
 
-Before finalizing the numbers, inspect all ten sprites visually and determine which frame or frames represent the actual strike/contact portion.
+Keep the exact same coordinates and size.
 
-Do not make the hitbox active during the entire animation.
+The existing Primary button is the larger upper-right action button. Throw must stay there.
 
-Ground BA2
+If ICONS.primary becomes completely unused after this change, remove it.
 
-There are 7 frames:
+14. Primary is no longer pending
 
-2ba1 through 2ba7.
+The current pending set contains:
 
-Determine visually:
+new Set(['primary', 'special'])
 
-* wind-up/startup frames
-* actual contact/strike frame or frames
-* recovery frames
+Change it so only Special remains reserved:
 
-A sensible starting point, if the artwork supports it, is:
+new Set(['special'])
 
-* frames 1–3: startup
-* frames 4–5: active
-* frames 6–7: recovery
+Throw must use the normal solid enabled button styling.
 
-At 12 FPS this would be:
+Special stays unchanged and reserved.
 
-startup: 3 / BA2_FPS,
-active: 2 / BA2_FPS,
-recovery: 2 / BA2_FPS,
+15. Register the fighter Throw animation
 
-However, do not blindly use this split if the sprite artwork clearly shows contact on another frame.
+Add a real fighter animation:
 
-The active phase should correspond to what is visibly striking.
+const THROW_FPS = 12;
 
-The total attack duration should equal exactly one pass of the 7-frame animation.
+and:
 
-Mid-Air BA2
+throw: {
+  frames: frames(BASE_0001, 'throw', 3),
+  fps: THROW_FPS,
+  loop: false,
+  heightRatio: ...,
+}
 
-There are 3 frames:
+Inspect the real sprites in-browser and choose the normalization ratio that keeps #0001 stable relative to Idle, BA1, BA2 and Dodge.
 
-midair2ba1
-midair2ba2
-midair2ba3
+Do not manually scale based on PNG dimensions.
 
-A sensible initial split, if frame 2 is the visible contact frame, is:
+Use the existing normalization pipeline.
 
-* frame 1: startup
-* frame 2: active
-* frame 3: recovery
+16. Check Throw source orientation
+
+While testing the uploaded Throw sprites, determine which way the source artwork actually faces.
+
+If it follows #0001’s normal artwork, inherit:
+
+sourceFacing: 1
+
+If it is drawn in the opposite orientation, use the new per-animation override.
+
+Do not assume blindly.
+
+This is precisely why this task adds per-animation source-facing metadata.
+
+17. Throw is grounded because there is no Mid-Air Throw art
+
+Only three normal Throw frames were uploaded.
+
+There are no:
+
+0001_midairthrow*.png
+
+frames.
+
+Therefore #0001’s Throw is currently ground-only.
+
+Pressing Throw while airborne should not:
+
+* show ground Throw artwork in the air
+* throw an invisible shuriken
+* fall back to Idle while spawning a projectile
+
+Until real Mid-Air Throw artwork exists, airborne Primary should do nothing.
+
+18. Throw animation timing
+
+The Throw clip has three frames.
+
+Use whole-frame combat timing.
+
+Start with:
+
+frame 1 = startup
+frame 2 = projectile release
+frame 3 = recovery
 
 At 12 FPS:
 
-startup: 1 / BA2_FPS,
-active: 1 / BA2_FPS,
-recovery: 1 / BA2_FPS,
+startup: 1 / THROW_FPS,
+active: 1 / THROW_FPS,
+recovery: 1 / THROW_FPS,
 
-Again, inspect the actual sprites before locking the active phase.
+However, visually inspect the actual three Throw frames.
 
-The total duration must equal one pass of the three-frame clip.
+The shuriken must spawn on the frame where #0001 visibly releases it.
 
-Maintain the existing phase-boundary handling that avoids 60 Hz floating-point drift.
+If the real release is clearly on frame 3 rather than frame 2, align spawning to that real artwork.
 
-11. Make BA2 meaningfully distinct without breaking the game’s balance
+Do not spawn it arbitrarily on button press before the throwing motion appears.
 
-BA1 currently uses conservative combat values around:
+19. Throw should play once
 
-* 6 damage
-* 180 horizontal knockback
-* 0 vertical launch
-* 0.22 s hitstun
-* 0.14 s blockstun
-* 0.06 s hitstop
-* 0.1 s cooldown
+One Primary press:
 
-BA2 is the secondary basic attack, so it should not simply be a second ID pointing at BA1.
+throw1
+→ throw2
+→ throw3
+→ normal state
 
-Use the new artwork to determine its reach and feel.
+Do not loop Throw while J is held.
 
-A reasonable initial BA2 tuning target is slightly slower/heavier than BA1, for example:
+The existing press-edge combat action behavior already supports this.
 
-Ground BA2 starting values
+20. Lock movement and facing during Throw
 
-* damage: approximately 8
-* horizontal knockback: approximately 220
-* vertical knockback: 0 unless the artwork very clearly depicts a launcher
-* hitstun: approximately 0.24
-* blockstun: approximately 0.15
-* hitstop: approximately 0.07
-* cooldown: approximately 0.15–0.18
-* lockMovement: true
-* groundOnly: true
+Treat Throw consistently with #0001’s other attacks.
 
-Mid-Air BA2 starting values
+During the Throw animation:
 
-Use comparable values, adjusted only if necessary for the visible aerial move.
+* lock new horizontal movement
+* lock facing
+* let existing physics behave normally
+* do not rotate toward an opponent midway through the Throw
 
-Do not arbitrarily create:
+The shuriken direction must be determined from #0001’s facing when the projectile is spawned.
 
-* launches
-* spikes
-* teleports
-* dashes
-* projectile behavior
-* multi-hits
-* armour
-* invulnerability
-* wall bounces
-* camera shakes
-* new physics mechanics
+If #0001 turns afterward, the already-thrown projectile does not reverse.
 
-unless the current design/art specifically requires them.
+21. Do not fake the shuriken with a huge fighter hitbox
 
-A basic attack should remain a straightforward use of the existing combat system.
+Alva currently only has fighter-attached melee hitboxes.
 
-12. Fit hitboxes to the visible strike
+Do not implement Throw as something like:
 
-Inspect the actual contact frame(s) and make each hitbox correspond to the limb/weapon/body region that visibly attacks.
+hitbox: {
+  x: 10,
+  y: -60,
+  w: 500,
+  h: 10,
+}
 
-Do not just copy BA1’s hitbox if BA2 has a different pose or range.
+That would not be a projectile.
 
-The hitbox should:
+The shuriken must exist as a separate battle entity after leaving #0001.
 
-* appear in front of the fighter when facing right
-* automatically mirror through the existing combat system when facing left
-* stay reasonably close to the visible attacking limb
-* not cover the entire character
-* not extend unrealistically far away
-* not be active during startup/recovery
+It must:
 
-Use the existing Backquote debug overlay to validate it in battle.
+* have its own position
+* have its own velocity
+* have its own animation
+* continue existing after the release frame
+* collide independently
+* disappear independently
 
-The debug attack hitbox should appear only during BA2’s active phase.
+22. Add a small projectile subsystem
 
-13. Ground vs mid-air behavior
+Add a focused projectile implementation under js/game/.
 
-When action2 is pressed:
+For example:
 
-Grounded
+js/game/projectile.js
 
-Start ba2.
+The exact class/module organization is flexible.
 
-Airborne
+A projectile should track at minimum:
 
-Start midairBa2.
+owner
+x
+y
+previous x/y if interpolation is used
+direction
+speed
+animation
+animation time/frame
+hitbox
+damage/combat data
+lifetime
+active/alive state
 
-This should use the already-implemented attackFor('action2') grounded/air selection.
+Do not implement an over-engineered general physics engine.
 
-BA2 must work during both:
+Build only the clean data-driven foundation needed for animated fighting-game projectiles.
 
-* jump ascent
-* jump descent/fall
+23. Add projectile data to the character definition
 
-For the aerial move, gravity must keep working.
+Store shuriken behavior in Character #0001 data rather than hard-coding numbers in Battle.
 
-Do not freeze #0001 in the air.
+For example:
 
-Do not add extra lift unless the move is specifically designed to have it.
+projectileAnimations: {
+  shuriken: {
+    frames: frames(BASE_0001, 'shuriken', 3),
+    fps: SHURIKEN_FPS,
+    loop: true,
+  },
+},
+projectiles: {
+  shuriken: {
+    animation: 'shuriken',
+    speed: ...,
+    lifetime: ...,
+    hitbox: ...,
+    damage: ...,
+    knockback: ...,
+    hitstun: ...,
+    blockstun: ...,
+    hitstop: ...,
+  },
+},
 
-If #0001 lands while midairBa2 is still playing, preserve the BA1 precedent:
+Names may vary, but keep projectile art/behavior data-driven.
 
-allow the mid-air BA2 attack to finish its own clip instead of swapping to the ground BA2 animation or the landing animation midway through the move.
+24. Do not register shuriken frames as fighter animations
 
-Once it ends, normal grounded state selection can resume.
+This is important.
 
-14. Same-frame input behavior
+Do not simply put:
 
-Preserve the combat-intent ordering already established for BA1.
+shuriken: {
+  frames: ...
+}
 
-If BA2 and Jump are pressed on the exact same simulation step while #0001 is grounded, the grounded attack should begin and the jump should not incorrectly turn the attack into its aerial version.
+inside the normal fighter animations object and treat it like a fighter pose.
 
-Do not change this behavior for BA1.
+The current SpriteSet normalizes fighter animations relative to the fighter’s reference height.
 
-15. Attack animation safety
+The shuriken is a tiny independent object and must not be normalized to fighter height.
 
-Keep the existing rule that attacks with missing/unloaded animation frames are refused rather than faked.
+Keep:
 
-If ba2 or midairBa2 fails to load:
+fighter animations
 
-* do not substitute idle as an attack
-* do not fabricate an attack pose
-* do not run an invisible damaging hitbox
+and:
 
-Fighter.tryAction() should simply refuse that attack using the same mechanism already used for BA1.
+projectile animations
 
-16. Preserve attack priority/state behavior
+logically separate.
 
-Do not disturb the current Fighter state priority.
+25. Preload shuriken frames with the character
 
-In particular:
+The existing application preloads:
 
-* hitstun must still override attacks
-* an attack must override normal jump/fall/land/run/idle rendering while active
-* normal physics continue
-* landing while an aerial attack is active must not replace its animation
-* hitstop behavior must stay intact
-* movement/facing lock semantics should stay consistent with BA1
+characterFramePaths(def)
 
-Do not change hurt/hitstun animations as part of this feature.
+Extend that path collector so it includes:
 
-17. Preserve the non-attacking training CPU
+* normal fighter animation frames
+* projectile animation frames
 
-Quick Battle’s CPU is intentionally a non-attacking training opponent.
+That means loading #0001 still preloads everything needed for #0001 before battle begins.
 
-Adding BA2 to Character #0001 must not cause the training AI to begin using BA1 or BA2.
+Do not create a network load the first time the player presses Throw.
 
-Do not change TrainingAIController behavior unless necessary only to keep its existing non-attacking behavior intact.
+26. Normalize projectile pixel art separately
 
-18. Update README
+Reuse as much of normalizeFrame() as practical, but projectiles need different anchoring/scaling semantics.
 
-Update README.md to reflect BA2.
+Normalize the shuriken frames:
 
-The controls section should show something equivalent to:
+* detect their pixel-art grid
+* preserve their actual art size
+* use a center anchor
+* use the same character/world art scale
+* do not scale them up to fighter height
 
-* Basic Attack 1 (BA1) — U — touch BA1
-* Basic Attack 2 (BA2) — I — touch BA2
+A good architecture is for SpriteSet to expose a separate collection such as:
 
-Primary and Special remain marked reserved.
+set.projectiles.shuriken
 
-Remove the reserved marker from Action 2 because it is no longer reserved.
+whose frames have:
 
-Change user-facing references from Action 2 to Basic Attack 2 (BA2).
+artW
+artH
+center anchor
+fps
+loop
 
-Update gamepad documentation:
+The fighter worldPerArt can be reused after normalization so one projectile art pixel uses the same world scale as the character artwork.
 
-* B / Circle → BA1
-* LB → BA2
-* X / Y remain reserved
-* RB / RT → Block
+27. Projectile rendering must be centered
 
-Update the animations section to include:
+drawFrame() currently anchors fighter sprites at their feet/bottom-center.
 
-* Basic Attack 2 — 7 frames
-* Mid-Air Basic Attack 2 — 3 frames
+That is not suitable for an airborne shuriken.
 
-Update the attacks section to say BA1 and BA2 are implemented on the ground and in the air.
+Add or reuse a drawing helper that renders a normalized frame centered on:
 
-Do not state that Primary or Special are implemented.
+projectile.x
+projectile.y
 
-19. Update ALVA_SPEC.md
+For example:
 
-Update the specification so its battle/combat/input sections match the actual game.
+drawCenteredFrame(...)
+
+or make the renderer accept explicit anchor metadata.
+
+Do not treat the projectile’s location as its feet.
+
+Keep:
+
+ctx.imageSmoothingEnabled = false
+
+while rendering it.
+
+28. Shuriken animation
+
+The three frames:
+
+shuriken1
+shuriken2
+shuriken3
+
+form the shuriken’s in-flight animation.
+
+They should loop while the projectile exists:
+
+1 → 2 → 3 → 1 → 2 → 3 → ...
+
+Use a dedicated constant such as:
+
+const SHURIKEN_FPS = 18;
+
+as a starting point.
+
+A range around 15–18 FPS is appropriate for a visible spinning projectile, but inspect the artwork and browser playback before finalizing.
+
+The important requirement is:
+
+* all three real frames animate
+* they loop during flight
+* they do not determine projectile movement speed
+
+29. Projectile travel direction
+
+At spawn time:
+
+direction = fighter.facing;
+
+Then:
+
+projectile.vx = projectile.speed * direction;
+
+A projectile thrown while facing right travels right.
+
+A projectile thrown while facing left travels left.
+
+Do not use the owner’s later facing every frame.
+
+The direction is fixed when thrown.
+
+30. Shuriken visual mirroring
+
+Inspect the shuriken frames.
+
+If the three spinning sprites are visually direction-neutral, they do not need horizontal mirroring.
+
+If they contain an asymmetric directional trail or orientation, support projectile-level sourceFacing similarly to fighter animations.
+
+Movement direction itself must always be correct regardless of whether the artwork is mirrored.
+
+31. Spawn the shuriken from the throwing hand
+
+Define a projectile spawn offset relative to #0001’s bottom-center origin.
+
+For example, character data can store:
+
+spawnOffset: {
+  x: ...,
+  y: ...,
+}
+
+The x component mirrors with facing.
+
+Determine the final numbers by displaying the Throw animation and placing the shuriken at the visible throwing/release hand.
+
+Do not simply spawn at:
+
+fighter centre
+
+or:
+
+fighter feet
+
+if that visibly disconnects it from the Throw artwork.
+
+32. Spawn exactly once
+
+The projectile release frame lasts multiple fixed 60 Hz simulation steps.
+
+Do not spawn one shuriken every simulation step during that frame.
+
+The current attack runtime should track something equivalent to:
+
+projectileSpawned: false
+
+or a generic one-shot attack event.
+
+When elapsed attack time crosses the configured release point:
+
+spawn once
+mark spawned
+
+One Throw press must produce exactly one shuriken.
+
+33. Extend attack definitions cleanly
+
+The Throw can remain an attack in the existing attack-state architecture.
+
+Give the attack a projectile event rather than a melee hitbox.
+
+Conceptually:
+
+throw: {
+  animation: 'throw',
+  startup: 1 / THROW_FPS,
+  active: 1 / THROW_FPS,
+  recovery: 1 / THROW_FPS,
+  hitbox: null,
+  projectile: {
+    id: 'shuriken',
+    spawnAt: 1 / THROW_FPS,
+    offset: { x: ..., y: ... },
+  },
+  cooldown: ...,
+  groundOnly: true,
+  lockMovement: true,
+}
+
+The exact schema may differ.
+
+Do not process a null hitbox as a melee strike.
+
+34. Melee CombatSystem must tolerate projectile attacks
+
+CombatSystem.update() currently assumes active fighter attacks have a melee hitbox.
+
+Extend it safely so a projectile-only move does not generate:
+
+* invalid rectangles
+* NaN coordinates
+* an invisible melee hit
+* exceptions
+
+Conceptually:
+
+if (!atk.def.hitbox) continue;
+
+for the melee hitbox path.
+
+The Throw animation itself should deal no contact damage unless explicit real melee artwork later supports that.
+
+35. Suggested initial shuriken combat tuning
+
+Use conservative projectile values so Throw is useful but does not replace BA1/BA2.
+
+A reasonable starting point is approximately:
+
+damage: 4,
+speed: 700,
+lifetime: 1.5,
+knockback: { x: 140, y: 0 },
+hitstun: 0.16,
+blockstun: 0.10,
+hitstop: 0.04,
+
+and a small hitbox fit closely around the visible shuriken.
+
+Treat these as starting values.
+
+The required behavior matters more than these exact numbers.
+
+Do not make the shuriken:
+
+* launch vertically
+* explode
+* multihit
+* home toward the enemy
+* bounce
+* pierce through a successful hit
+* stun for longer than BA1/BA2
+* deal more damage than BA2 without explicit design direction
+
+36. Throw cooldown
+
+Give Throw a modest cooldown to prevent extremely dense projectile spam.
+
+Start around:
+
+0.2–0.3 seconds
+
+after the Throw attack finishes.
+
+Use the existing combat cooldown system where practical.
+
+Do not add an Energy cost; none was requested.
+
+37. Projectile collision with fighters
+
+Each projectile should test its hitbox against opponent hurtboxes.
+
+Skip:
+
+projectile.owner
+
+so the thrower cannot hit themself.
+
+On a successful hit:
+
+* apply damage once
+* apply normal hitstun
+* apply configured knockback
+* apply hitstop
+* destroy the shuriken
+
+Do not repeatedly damage the same fighter over multiple simulation ticks.
+
+38. Reuse CombatSystem hit resolution
+
+Avoid creating a second unrelated damage implementation.
+
+Refactor/reuse the current CombatSystem.applyHit() logic so both:
+
+* melee attacks
+* projectiles
+
+use consistent:
+
+* health reduction
+* hitstun
+* blockstun
+* hitstop
+* knockback
+* combat events
+
+A projectile hit should still identify #0001 as the attacker/owner.
+
+39. Preserve projectile direction in hit resolution
+
+Do not use the owner’s current facing when resolving projectile knockback or future Block checks.
+
+The shuriken’s direction was fixed when spawned.
+
+Allow hit resolution to accept the attack direction separately.
+
+Conceptually:
+
+applyHit(attacker, target, def, {
+  facing: projectile.direction,
+});
+
+Melee can continue defaulting to:
+
+attacker.facing
+
+This prevents a shuriken thrown right from suddenly knocking left because #0001 turned around before it connected.
+
+40. Dodge must work against shurikens
+
+The current Dodge architecture exposes:
+
+target.combat.invulnerable
+
+A shuriken must respect that.
+
+If its hitbox overlaps #0001 during Dodge invulnerability:
+
+* no damage
+* no hitstun
+* no hitstop
+* no knockback
+* no block event
+
+The shuriken should continue travelling rather than being counted as a successful hit.
+
+If it is still overlapping after invulnerability ends, normal collision may then connect.
+
+This mirrors the current melee Dodge rule.
+
+41. Future Block defense must work too
+
+The generic Defense architecture deliberately supports future:
+
+defense.type = 'block'
+
+Projectiles should reuse normal Block resolution.
+
+If a future Block-type fighter is guarding toward an incoming shuriken:
+
+* block/chip rules work
+* blockstun works
+* reduced knockback works
+* projectile disappears after the successful blocked impact
+
+Do not special-case #0001’s Dodge in a way that breaks future Block characters.
+
+42. Projectile lifetime and cleanup
+
+A shuriken must eventually disappear even if it misses.
+
+Despawn it when:
+
+* it hits a fighter
+* its lifetime expires
+* it travels outside the stage bounds with a small margin
+* it hits genuinely solid stage geometry if projectile/solid collision is implemented
+
+Do not let missed projectiles remain forever.
+
+One-way platforms do not need to stop shurikens unless the existing stage collision design makes that clearly desirable.
+
+Do not invent ricochets.
+
+43. Battle owns active projectiles
+
+Battle is the natural owner of live projectile entities.
+
+Add something equivalent to:
+
+this.projectiles = [];
+
+Reset it in:
+
+restart()
+
+and clear it in:
+
+destroy()
+
+The fixed-step loop should:
+
+1. update fighters
+2. create projectile events exactly once
+3. update projectile positions/animations
+4. resolve projectile hits
+5. remove dead projectiles
+
+Keep ordering deterministic.
+
+44. Render projectiles in battle
+
+Draw live shurikens with the battle Canvas.
+
+Use normalized, pixelated frames.
+
+A sensible layer is:
+
+stage terrain
+shadows
+fighters
+projectiles
+foreground
+HUD remains DOM
+
+or another nearby layer that keeps the shuriken clearly visible.
+
+Do not render projectiles through DOM elements.
+
+45. Projectile interpolation
+
+Alva interpolates fighter positions between fixed steps.
+
+Projectile motion should also look smooth at display rates above/below 60 Hz.
+
+Prefer storing:
+
+prevX
+prevY
+x
+y
+renderX
+renderY
+
+and interpolating with the same alpha.
+
+Do not make projectiles visibly jitter while fighters interpolate smoothly.
+
+46. Debug overlay
+
+Extend the Backquote debug overlay.
+
+While a shuriken exists, draw:
+
+* its collision hitbox
+* optionally a small label such as shuriken
+
+This makes projectile collision tuning testable.
+
+Use a visually distinct debug outline from fighter hurtboxes and melee hitboxes.
+
+Do not render debug graphics in normal gameplay.
+
+47. Missing Throw artwork safety
+
+Existing attacks refuse to start if their required fighter animation is missing.
+
+Keep that principle.
+
+If:
+
+throw
+
+fighter frames are unavailable:
+
+* refuse Throw
+* spawn nothing
+
+Do not fake Throw using Idle.
+
+48. Missing shuriken artwork safety
+
+Do not allow an invisible damaging projectile.
+
+Before starting Throw—or at latest before spawning—verify that the actual shuriken projectile animation exists.
+
+Preferred behavior:
+
+missing shuriken art
+→ Throw is refused
+→ no projectile
+→ warning
+
+Do not:
+
+play Throw normally
+→ create invisible damage box
+
+49. Preserve Throw animation if projectile has already spawned
+
+Once the projectile is created, it is independent.
+
+If #0001 is hit after releasing the shuriken:
+
+Throw → Hurt
+
+the already-existing shuriken continues travelling.
+
+Do not delete it merely because its owner entered Hitstun.
+
+Likewise, the projectile continues if #0001:
+
+* turns around
+* jumps
+* dodges
+* begins charging
+
+after the shuriken has left their hand.
+
+50. Ground Throw and Charge interaction
+
+Primary/Throw is already processed through the combat-action loop before Charge state selection.
+
+Preserve that behavior.
+
+If #0001 is charging and Throw is pressed:
+
+Charge → Throw
+
+immediately.
+
+Do not play the voluntary Charge release pose first.
+
+If Charge remains held after Throw ends, normal existing rules may restart Charge from:
+
+charge1
+
+51. Throw and Defense interaction
+
+Preserve the existing deterministic priority:
+
+* combat actions are processed first
+* Defense/Dodge is processed afterward
+
+If Throw and Defense are pressed on the same simulation step and Throw successfully begins:
+
+Throw wins
+
+Do not start both Throw and Dodge.
+
+Do not change BA1/BA2’s existing same-step priority behavior.
+
+52. Rename Help “Primary” to “Throw”
+
+Help currently shows Primary as reserved.
+
+Change it to:
+
+Throw
+
+and make it active.
+
+Desktop controls:
+
+Throw | J
+
+Gamepad notes:
+
+X / Square = Throw
+
+Remove Primary from reserved-action copy.
+
+After this task only:
+
+Special
+
+is reserved.
+
+53. Mobile Help diagram
+
+Replace the current Primary icon in the upper-right action slot with:
+
+T
+
+Title:
+
+Throw
+
+Update the diagram ARIA label accordingly.
+
+The lower-right layout should now describe something equivalent to:
+
+Throw (T)
+Special
+Defense (D)
+BA1
+BA2
+Jump
+
+Do not change their positions.
+
+54. Touch Help legend
+
+Update the visible legend so it uses:
+
+T
+
+for Throw.
+
+For example:
+
+T = Throw; #0001 throws a shuriken.
+D = Defense; #0001 uses Dodge.
+
+Do not leave stale references saying Primary is reserved.
+
+55. Update current-build Help copy
+
+The Help “This build” section should now say that #0001 has:
+
+* BA1
+* BA2
+* Throw
+* Charge
+* Dodge
+
+Describe Throw as:
+
+Throw (the primary action) throws an animated shuriken.
+
+Special remains wired but reserved.
+
+The training CPU remains non-attacking.
+
+56. README controls
+
+Change:
+
+Primary* | J
+
+to:
+
+Throw | J
+
+Touch:
+
+T
+
+Gamepad:
+
+X / Square = Throw
+
+Remove Primary from the reserved footnote.
+
+Only Special remains reserved.
+
+57. README gameplay description
 
 Document:
 
-* BA2 as #0001’s secondary basic attack
-* ground BA2 has 7 real frames
-* mid-air BA2 has 3 real frames
-* action2 selects ground/air versions
-* keyboard I
-* gamepad LB
-* touch button BA2
-* BA2 is no longer reserved
-* Primary and Special remain reserved
-* landing during mid-air BA2 does not cancel its attack clip
-* attack phases correspond to the visible frames
-* no fabricated attacks or frames
+Throw
 
-Do not delete the BA1 specification.
+as #0001’s projectile attack.
 
-20. Update stale source comments
+Explain:
 
-Search for comments that currently say things like:
+* one press performs one three-frame Throw
+* one shuriken is released
+* shuriken uses its three-frame looping animation while flying
+* projectile direction follows #0001’s facing at release
+* Throw is currently ground-only because no Mid-Air Throw sprites exist
+* Throw is the internal primary action
 
-* Action 2 is reserved
-* only BA1 is implemented
-* Primary, Special and Action 2 are waiting for artwork
-* the game has only one real attack
+Do not claim a Mid-Air Throw exists.
 
-Update those comments so they accurately describe the build.
+58. README animation list
 
-Do not rewrite unrelated documentation.
+Add:
 
-21. Tests
+Throw — 3 fighter frames
+Shuriken — 3 looping projectile frames
 
-Extend the dependency-free Node test suite.
+Also keep existing:
 
-Prefer extending/generalizing the existing:
+* Dodge
+* Mid-Air Dodge
+* Charge
+* BA1
+* BA2
 
-* tests/basic-attack.test.mjs
-* tests/controls-ui.test.mjs
-* tests/fighter-animation.test.mjs
+59. ALVA_SPEC sprite inventory
 
-or split BA2 into a clearly named attack test file if that produces cleaner tests.
+Update the Character #0001 sprite inventory to include:
 
-Do not remove BA1 coverage.
+0001_throw1–3
+0001_shuriken1–3
 
-Add BA2 coverage for at least all of the following.
+Clarify that shuriken frames are projectile art and are normalized/rendered separately from fighter poses.
 
-Asset registration
+Document the Mid-Air Dodge exception:
 
-Assert:
+midairDodge source artwork faces left while #0001's default source artwork faces right
 
-* all 7 0001_2ba*.png files are referenced from assets/characters/0001/
-* all 3 0001_midair2ba*.png files are referenced from assets/characters/0001/
-* the root copies no longer exist
-* no 2ab spelling is used
-* characterFramePaths() includes the new frames
+and explain animation-level source-facing overrides.
 
-Character action mapping
+60. ALVA_SPEC combat section
 
-Assert:
+Document Throw as #0001’s projectile attack on internal primary.
 
-action1: {
-  ground: 'ba1',
-  air: 'midairBa1',
-}
+Specify:
 
-remains intact.
+ground-only
+3-frame one-pass Throw
+one shuriken spawn at the visible release frame
+animated independent projectile
+fixed direction at spawn
+one hit maximum
 
-Assert:
+Include the final tuned damage, speed, hitstun, knockback, lifetime and cooldown values after implementation.
 
-action2: {
-  ground: 'ba2',
-  air: 'midairBa2',
-}
+61. ALVA_SPEC input section
 
-is active.
+Update:
 
-Assert Primary and Special remain null.
+J = Throw
+X / Square = Throw
+touch T = Throw
 
-Input
+Keep:
 
-Assert:
+Special = K / Y / Triangle, reserved
 
-* CONFIG.bindings.action1 remains ['KeyU']
-* CONFIG.bindings.action2 remains ['KeyI']
-* COMBAT_ACTIONS still includes action1 and action2
+Do not rename menu Confirm or any unrelated J behavior unless it currently depends on gameplay bindings.
 
-Do not rename internal actions to BA1/BA2.
+62. Update stale comments and docs
 
-Ground BA2 playback
+Search for phrases such as:
 
-From idle on the ground, press action2.
+Primary and Special are reserved
+Primary button
+reserved Primary
 
-Assert:
+After this feature they are stale.
 
-* attack id is ba2
-* animation is ba2
-* animation starts at 0001_2ba1.png
-* the visible frame sequence reaches all seven frames in order
-* it does not loop
-* it runs for exactly one animation pass
-* it exits cleanly afterward
-* cooldown behaves correctly
+The correct state is:
 
-Mid-air BA2 playback
+Throw is active
+Special is reserved
 
-Jump and press action2.
+Do not rename the internal primary code identifier in comments where it clearly refers to the generic internal action slot.
+
+63. Tests: Mid-Air Dodge facing metadata
+
+Extend tests/defense.test.mjs.
 
 Assert:
 
-* attack id is midairBa2
-* animation is midairBa2
-* all three frames appear in order
-* it works while rising
-* it works while descending
-* gravity continues during the attack
-* it does not loop
+def.sourceFacing === 1
 
-Landing during mid-air BA2
+and:
 
-Start BA2 late in a fall so #0001 lands before the attack finishes.
+def.animations.midairDodge.sourceFacing === -1
 
-Assert:
+Ground Dodge should inherit the normal right-facing source orientation.
 
-* the attack remains midairBa2
-* the animation remains midairBa2
-* it does not switch to ba2
-* it does not switch to land
-* the remaining aerial frames finish normally
-* the fighter returns to an appropriate grounded state afterward
+64. Tests: SpriteSet orientation metadata
 
-Active-frame timing
+Build a real/fake SpriteSet and assert the resolved animation metadata carries:
 
-Assert the attack hitbox is active only on the selected visual contact frame(s).
+idle.sourceFacing = +1
+dodge.sourceFacing = +1
+midairDodge.sourceFacing = -1
 
-For example, if ground BA2 uses frames 4–5 as contact, tests should ensure the active phase corresponds to those frames and not startup/recovery.
+Animations without overrides must inherit the character default.
 
-For mid-air BA2, test the actual contact frame determined from the sprites.
+65. Tests: render-facing calculation
 
-Damage/hit resolution
+Test both fighter orientations.
 
-Using the real CombatSystem:
+For midairDodge:
 
-* ground BA2 can hit an opponent in front
-* aerial BA2 can hit an opponent in an appropriate airborne setup
-* one attack cannot repeatedly damage the same target every active simulation step
-* hitstun, hitstop, damage and knockback use the configured BA2 values
-* hitboxes mirror with facing
+Fighter logically facing right
 
-Movement/facing
+facing = +1
+sourceFacing = -1
+flip = true
 
-Assert BA2 uses the same attack movement/facing lock conventions as BA1.
+Fighter logically facing left
 
-Missing sprite safety
+facing = -1
+sourceFacing = -1
+flip = false
 
-Construct a sprite set where BA2 animation data is unavailable.
+For Idle:
 
-Press action2.
+facing = +1 → flip false
+facing = -1 → flip true
 
-Assert:
+Do not merely assert fighter.facing; the existing bug already has correct logical facing.
 
-* attack does not begin
-* there is no invisible hitbox
-* the fighter stays in a valid normal state
-* the existing warning/refusal behavior occurs
+Test the actual source-facing/render-flip decision.
 
-Reserved attacks
+66. Tests: no Dodge regression
 
-Update the old test that currently says:
+Keep existing assertions that:
 
-Primary, Special and Action 2 stay inactive
+* facing remains locked for the Dodge
+* Mid-Air Dodge has three frames
+* Dodge invulnerability remains correct
+* Mid-Air Dodge finishes through landing
+* gravity continues
 
-because Action 2 is now BA2.
+The facing-art fix must not change gameplay.
 
-It should instead verify:
+67. Tests: uploaded Throw/Shuriken assets
 
-* Primary remains inactive
-* Special remains inactive
-* BA1 works
-* BA2 works
+Assert all six canonical files exist:
 
-Touch controls
+assets/characters/0001/0001_throw1.png
+assets/characters/0001/0001_throw2.png
+assets/characters/0001/0001_throw3.png
+assets/characters/0001/0001_shuriken1.png
+assets/characters/0001/0001_shuriken2.png
+assets/characters/0001/0001_shuriken3.png
 
-Assert the action2 touch button:
+Assert none remain at the repository root.
 
-* displays exactly BA2
-* has .tc-a2
-* has data-action="action2"
-* has accessible label Basic Attack 2
-* is no longer is-pending
+Assert character asset preloading includes all six.
 
-Assert only Primary and Special remain pending.
-
-Touch dispatch
-
-Pressing the visible BA2 button must dispatch:
-
-action2
-
-not a newly invented ba2 input action.
-
-Test multi-touch with movement as is already done for BA1.
-
-Help UI
+68. Tests: Throw registration
 
 Assert:
 
-* ACTION_LABELS.action2 === 'Basic Attack 2'
-* the controls table displays Basic Attack 2
-* it is not marked Reserved
-* the mobile diagram displays BA2
-* it does not display A2
-* Help text identifies BA2 as available
-* Help still identifies Primary and Special as reserved
+primary → throw
+special → null
 
-22. Regression requirements
+BA1/BA2 mappings stay unchanged.
 
-Run the complete test suite with:
+Assert Throw:
+
+* uses the real Throw clip
+* is ground-only
+* is one pass
+* has exactly three frames
+* does not have a fighter-attached damaging hitbox
+
+69. Update old reserved-action tests
+
+Current BA1 tests expect:
+
+Primary and Special stay inactive
+
+Replace these expectations.
+
+New intended state:
+
+Throw/primary works
+Special remains inactive/reserved
+BA1 works
+BA2 works
+
+Do not weaken the tests by simply deleting Primary coverage.
+
+70. Tests: Throw playback
+
+From grounded Idle press:
+
+primaryPressed: true
+
+Assert the displayed sequence is exactly:
+
+0001_throw1.png
+0001_throw2.png
+0001_throw3.png
+
+one pass.
+
+Assert the state exits normally afterward.
+
+71. Tests: one projectile per press
+
+One Throw press must spawn:
+
+exactly one
+
+shuriken.
+
+Hold J.
+
+Assert it still produces only one projectile until J is released and newly pressed again.
+
+Do not spawn one projectile per active-frame simulation tick.
+
+72. Tests: spawn frame
+
+Record Throw frame and active projectiles each fixed step.
+
+Assert the shuriken is created on exactly the configured visual release frame.
+
+It must not appear:
+
+* before the release pose
+* after the Throw has already ended
+
+73. Tests: projectile travel
+
+Spawn while #0001 faces right.
+
+Assert:
+
+x increases every fixed step
+
+Spawn while #0001 faces left.
+
+Assert:
+
+x decreases every fixed step
+
+Then turn the owner after spawn.
+
+Assert the projectile continues in its original direction.
+
+74. Tests: projectile animation
+
+Keep a shuriken alive for multiple animation cycles.
+
+Its visible frames must progress:
+
+shuriken1
+shuriken2
+shuriken3
+shuriken1
+shuriken2
+shuriken3
+
+according to SHURIKEN_FPS.
+
+Do not let it freeze on frame 1.
+
+75. Tests: projectile hit
+
+Use real combat collision.
+
+Fire a shuriken into an opponent.
+
+Assert:
+
+* one hit event
+* configured damage once
+* configured hitstun
+* configured knockback
+* configured hitstop
+* projectile removed after hit
+
+Continue stepping.
+
+Opponent must not take repeated damage from that same projectile.
+
+76. Tests: projectile knockback direction snapshot
+
+Throw right.
+
+Turn #0001 left before impact.
+
+When the projectile connects, assert the target is still knocked:
+
+right
+
+Throw left and test the inverse.
+
+This verifies projectile hit resolution uses projectile direction, not the owner’s later facing.
+
+77. Tests: projectile and Dodge
+
+Arrange for a shuriken to overlap the opponent during Dodge invulnerability.
+
+Assert:
+
+* no damage
+* no stun
+* no hitstop
+* no projectile hit event
+* projectile is not falsely consumed
+
+If it remains active/overlapping once invulnerability finishes, normal collision may then occur.
+
+78. Tests: missing art
+
+Missing Throw animation
+
+Assert Primary is refused and no projectile appears.
+
+Missing shuriken animation
+
+Assert Throw cannot create an invisible damaging projectile.
+
+Preferred behavior is to refuse the Throw entirely.
+
+Warn clearly and remain stable.
+
+79. Tests: airborne Primary
+
+Jump and press Throw.
+
+Because there is no Mid-Air Throw artwork:
+
+* no Throw animation
+* no shuriken
+* fighter stays in Jump/Fall
+
+Do not silently use the ground animation.
+
+80. Tests: input/UI
+
+Assert:
+
+CONFIG.bindings.primary === ['KeyJ']
+
+and gamepad button 2 still drives internal:
+
+primary
+
+but player-facing label is:
+
+Throw
+
+81. Tests: touch T
+
+Assert the former Primary touch button:
+
+* remains in the same location
+* has data-action="primary"
+* is labelled Throw
+* visibly reads exactly T
+* has .tc-throw
+* does not use .tc-primary
+* is not pending
+* dispatches internal primary
+
+82. Tests: only Special pending
+
+Update UI tests to assert the only remaining pending action is:
+
+special
+
+Throw must not have a dashed outline.
+
+The touch text set should now include:
+
+C
+T
+D
+BA1
+BA2
+
+83. Tests: Help
+
+Assert Help:
+
+* contains Throw
+* lists J for Throw
+* mobile diagram shows T
+* T is titled Throw
+* mentions X / Square for Throw
+* does not say Primary is reserved
+* says only Special is reserved
+
+84. Preserve Energy
+
+Throw has no Energy cost in this task.
+
+Do not:
+
+* reduce Energy for Throw
+* regenerate Energy on hit
+* reward Energy for projectile damage
+
+The Energy bar remains as currently implemented.
+
+85. Preserve training CPU behavior
+
+The training CPU remains non-attacking.
+
+It should never:
+
+* press Primary/Throw
+* spawn a shuriken
+* BA1
+* BA2
+
+No AI projectile behavior is part of this task.
+
+86. Full test suite
+
+Run:
 
 node --test
 
-All existing BA1, hurt, movement, battle-screen, animation, UI and combat tests must continue passing.
+All tests must pass.
 
-Do not weaken existing BA1 assertions just to make BA2 pass.
+Preserve regressions for:
 
-In particular verify BA1 still:
+* Charge
+* Charge release
+* ground Dodge
+* Mid-Air Dodge
+* Dodge invulnerability
+* BA1
+* Mid-Air BA1
+* BA2
+* Mid-Air BA2
+* Hurt
+* Mid-Air Hurt
+* Energy
+* touch multi-touch
+* menu controls
+* CPU behavior
+* fixed-step physics
 
-* uses U / B-Circle / action1
-* has its 4-frame ground animation
-* has its 5-frame aerial animation
-* uses its existing combat values
-* finishes an aerial attack after landing
-* refuses to attack if its frames are unavailable
+87. Manual browser verification: Mid-Air Dodge
 
-23. Manual browser verification
+Test #0001 facing right.
 
-After automated tests pass, manually run the game and verify #0001 in an actual Quick Battle.
+Jump and press Defense.
 
-Check all of these:
+Verify every Mid-Air Dodge frame visually faces right.
 
-Ground
+Then face left.
 
-* U triggers BA1
-* I triggers BA2
-* BA1 still looks correct
-* BA2 plays all seven frames at a natural size
-* no sprite popping, sinking or horizontal sliding
-* BA2 hitbox appears at the visible strike when debug overlay is enabled
-* facing-left attacks mirror correctly
+Jump and press Defense.
 
-Air
+Verify every Mid-Air Dodge frame visually faces left.
 
-* U triggers Mid-Air BA1
-* I triggers Mid-Air BA2
-* Mid-Air BA2 works while rising and falling
-* gravity continues normally
-* landing before it ends does not replace its clip
+Check that:
 
-Touch
+* #0001’s logical movement direction did not change
+* ground Dodge still faces correctly
+* BA1/BA2 still face correctly
+* Idle/Run still face correctly
 
-* visible BA1 button says BA1
-* visible BA2 button says BA2
-* BA2 is no longer dashed/dimmed
-* Primary and Special remain dashed
-* BA1 and BA2 can be used while another finger holds movement
+88. Manual browser verification: Throw
+
+Facing right, press J.
+
+Verify:
+
+throw1
+→ throw2
+→ throw3
+
+and exactly one shuriken appears from the throwing hand and flies right.
+
+Face left and repeat.
+
+Verify the Throw art and projectile both face/travel consistently left.
+
+89. Manual browser verification: projectile
+
+Watch the projectile carefully.
+
+Verify:
+
+* shuriken frames visibly animate
+* projectile movement is smooth
+* projectile remains crisp/pixelated
+* it does not grow to fighter size
+* it does not jitter
+* it does not originate at the fighter’s feet
+* it disappears correctly after hit/miss
+* debug hitbox fits the visible shuriken
+
+90. Manual browser verification: controls
+
+Verify:
+
+Keyboard
+
+J = Throw
 
 Gamepad
 
-* B / Circle triggers BA1
-* LB triggers BA2
-* block and jump mappings remain unchanged
+X / Square = Throw
 
-Combat
+Touch
 
-* BA2 can connect in front of #0001
-* hitbox matches the visible strike
-* attacks do not hit behind #0001
-* one attack does not multi-hit accidentally
-* active hitbox only exists during the intended contact frames
-* missing attack artwork never produces invisible damage
+The old Primary button now visibly reads:
 
-24. Do not change unrelated game systems
+T
 
-Keep this feature focused.
+and pressing it throws one shuriken.
 
-Do not redesign:
+Special remains reserved.
 
-* menus
-* stages
-* camera
-* HUD
-* physics
-* roster
-* splash screen
-* branding
-* pause/result screens
+Scope restrictions
 
-Do not add extra fighters or attacks.
+Do not add:
 
-Do not make the CPU attack.
+* multiple shurikens per press
+* charged shurikens
+* homing
+* explosions
+* ricochets
+* projectile clashes
+* projectile parries
+* Energy costs
+* ammo counters
+* Mid-Air Throw without real artwork
+* new particle effects
+* new sound effects
+* screen shake
+* artificial projectile trails
+* AI Throw behavior
 
-Do not remap BA1.
+Do not modify the supplied PNG artwork.
 
-Do not rename action1 or action2.
-
-Do not replace existing sprite-normalization behavior.
-
-Do not remove the existing relative asset-path strategy.
+Do not rebalance BA1, BA2, Charge or Dodge.
 
 Acceptance criteria
 
-The task is complete when:
+The task is complete only when:
 
-1. All ten new BA2 PNGs live only under assets/characters/0001/.
-2. Ground BA2 uses all seven 0001_2ba1–0001_2ba7 frames.
-3. Mid-Air BA2 uses all three 0001_midair2ba1–0001_midair2ba3 frames.
-4. action2 selects ba2 on the ground and midairBa2 in the air.
-5. Keyboard I triggers BA2.
-6. Gamepad LB triggers BA2.
-7. The touch button visibly reads exactly BA2.
-8. Its accessible/user-facing name is Basic Attack 2.
-9. BA2 is no longer shown as reserved.
-10. Primary and Special remain reserved.
-11. BA1 is unchanged and still works.
-12. Ground and aerial BA2 phases line up with the visible attack frames.
-13. BA2 uses the existing data-driven combat/hitbox system.
-14. Aerial BA2 continues through landing just like aerial BA1.
-15. Missing BA2 artwork never creates an invisible/fake attack.
-16. Documentation and Help accurately describe BA1 and BA2.
-17. The training CPU remains non-attacking.
-18. node --test passes completely.
-19. Manual browser verification confirms correct sprite scale, anchoring, animation order, hitbox placement and inputs.
+1. Mid-Air Dodge displays in the same direction #0001 is logically facing.
+2. Mid-Air Dodge uses an animation-level source-facing override rather than corrupting fighter facing.
+3. Other #0001 animations retain their current orientation.
+4. Throw1–3 live under assets/characters/0001/.
+5. Shuriken1–3 live under assets/characters/0001/.
+6. The six root copies are removed.
+7. Internal primary maps to #0001’s Throw.
+8. Player-facing Primary is renamed to Throw.
+9. J triggers Throw.
+10. X / Square triggers Throw.
+11. The touch Throw button stays in the old Primary position.
+12. That button visibly reads exactly T.
+13. Throw is no longer pending.
+14. Only Special remains reserved.
+15. Ground Throw plays exactly Throw1 → Throw2 → Throw3 once.
+16. Airborne Throw is refused because no Mid-Air Throw artwork exists.
+17. Exactly one shuriken spawns per Throw.
+18. The shuriken spawns on the visually correct release frame.
+19. The shuriken starts at the visible throwing hand.
+20. Its travel direction is snapshotted from #0001’s facing at release.
+21. Turning later does not reverse an existing projectile.
+22. Shuriken1–3 loop while the projectile travels.
+23. Shuriken art uses projectile-scale normalization, not fighter-height normalization.
+24. Projectile movement is independently simulated.
+25. Projectile collision causes one configured hit and then destroys the projectile.
+26. Knockback uses projectile direction, not the owner’s later facing.
+27. Dodge invulnerability works against shurikens.
+28. Future Block-type Defense can use normal projectile block/chip resolution.
+29. Missing projectile art never creates invisible damage.
+30. Missed projectiles are eventually cleaned up.
+31. Debug mode can visualize the shuriken hitbox.
+32. Charge/Charge-release behavior remains unchanged.
+33. Defense/Dodge behavior remains unchanged except for the Mid-Air Dodge visual-facing fix.
+34. Energy remains unchanged.
+35. Training CPU remains non-attacking.
+36. README, Help, control diagrams and ALVA_SPEC.md describe Throw accurately.
+37. The complete node --test suite passes.
