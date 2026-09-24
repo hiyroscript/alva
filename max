@@ -1,477 +1,482 @@
-Work in the hiyroscript/alva repository and implement the following Practice Ground improvements. Inspect and follow the existing architecture and visual language before changing anything. Do not redesign unrelated systems and do not change Quick Battle behavior.
+You are modifying the hiyroscript/alva repository. Before changing anything, inspect the existing implementation carefully and preserve the architecture, visual language, accessibility, navigation conventions, and existing gameplay behavior.
 
-Existing architecture you should preserve
+Also inspect hiyroscript/seren, specifically its Cars & more reference screen. Use the composition and information architecture of that screen as inspiration, but do NOT copy Seren’s visual identity. The new screen must look and feel native to Alva.
 
-Practice Ground is implemented primarily through:
+Goal
 
-js/screens/practice-screen.js
-js/game/practice.js
-js/game/hud.js
-js/ui/fighter-roster.js
-js/game/arena.js
-js/game/character.js
-js/game/combat.js
-js/data/practice-map.js
+Add a new reusable Power system to Alva, beginning with Jump Power, and add a new Discover reference screen accessible from Home.
+
+There are three Jump Power tiers:
+
+1. Jump Power 1 — very low jump.
+2. Jump Power 2 — normal jump. This must be exactly the jump #0001 already has today.
+3. Jump Power 3 — slightly higher than Jump Power 2.
+
+#0001 must use Jump Power 2.
+
+The work must create an actual extensible gameplay/data system. Do not merely rename jumpVelocity in the UI.
+
+Current Alva behavior that must be preserved
+
+The repository currently defines global gravity in js/config.js as:
+
+CONFIG.sim.gravity = 2500
+
+#0001 currently has this movement value in js/data/characters.js:
+
+jumpVelocity: 920
+
+Jumping is applied centrally in js/game/character.js through the equivalent of:
+
+body.vy = -mv.jumpVelocity
+
+The existing buffered jump, coyote time, grounded checks, animation selection, combat/action gating, CPU behavior, gravity, collision, falling, landing, platforms, and input behavior must remain intact.
+
+Jump Power 2 must resolve to exactly 920 world units/second, so #0001 feels identical after this feature ships.
+
+Do not alter global gravity to implement the tiers.
+
+Jump Power data model
+
+Create a single source of truth for Power definitions rather than scattering numerical jump velocities throughout fighter definitions.
+
+Prefer a dedicated data module such as:
+
+js/data/powers.js
+
+Create a Jump Power tier table with three entries.
+
+Use these initial tuning values:
+
+* Jump Power 1 → 650
+* Jump Power 2 → 920
+* Jump Power 3 → 1000
+
+At Alva’s existing gravity, this makes Power 1 dramatically lower than the current jump, Power 2 exactly the existing jump, and Power 3 noticeably but only slightly higher.
+
+The names, descriptions, tier numbers, and gameplay values should come from this central definition wherever practical.
+
+A good conceptual structure is:
+
+JUMP_POWER_TIERS
+
+with entries containing the tier, display name, description, and jump velocity.
+
+Also expose a small resolver/helper rather than having Fighter know the table structure directly.
+
+For example, conceptually:
+
+getJumpPowerTier(characterDefinition)
+
+and/or
+
+getJumpVelocityForCharacter(characterDefinition)
+
+Choose names that fit the existing codebase.
+
+Character schema
+
+Give fighters an explicit Power configuration.
+
+For #0001, add something conceptually equivalent to:
+
+powers: { jump: 2 }
+
+Do not represent #0001 as a special case in the physics code.
+
+The point is that future fighters can simply declare:
+
+powers: { jump: 1 }
+
+or:
+
+powers: { jump: 3 }
+
+and automatically receive the corresponding gameplay jump.
+
+The fighter definition is responsible for saying which power tier it owns. The Power system is responsible for translating that tier into the actual gameplay value.
+
+Avoid maintaining two independent canonical values such as both powers.jump: 2 and an unrelated movement.jumpVelocity: 920. That can drift later. After the migration, the tier system should be the source of truth for voluntary jump velocity.
+
+If a defensive fallback is necessary for malformed character data, make it explicit and safe, but valid fighters should always use the Power system.
+
+Gameplay integration
+
+Update the shared fighter jump implementation so that when a valid jump begins it receives its vertical velocity from the fighter’s Jump Power tier.
+
+Everything around the jump must continue to work exactly as it does now:
+
+buffering,
+coyote time,
+canAct(),
+ground checks,
+charge interruption,
+blocking interruption,
+jump/fall/land animation states,
+platform interaction,
+ceiling collision,
+CPU jumps,
+Practice Ground,
+Quick Battle,
+touch controls,
+keyboard controls,
+and controllers.
+
+Do not create separate Player and CPU implementations.
+
+The shared Fighter behavior should make the tier work everywhere automatically.
+
+Only the initial voluntary jump strength should change between the tiers.
+
+Knockback, launches caused by attacks, falling, gravity, hitstun, charged techniques, dodges, and other vertical motion must not use Jump Power unless they are genuinely performing the standard jump action.
+
+#0001 requirement
+
+Set #0001 to:
+
+Jump Power 2
+
+This must preserve its current jump exactly.
+
+A fresh #0001 jump should therefore still begin at:
+
+body.vy === -920
+
+before gravity is integrated.
+
+There should be no gameplay regression for #0001 from introducing this system.
+
+Home — add Discover
+
+Alva’s current Home navigation is built in:
+
+js/screens/home-screen.js
+
+It currently contains:
+
+Play
+Practice Ground
+
+Add a third Home action immediately under Practice Ground:
+
+Discover
+
+So the ordering becomes:
+
+Play
+Practice Ground
+Discover
+
+Use the same home-action component/style and the same right-chevron treatment as Practice Ground. It must participate in existing keyboard/gamepad menu navigation through data-nav.
+
+Clicking Discover opens the new Discover screen directly.
+
+Do NOT put Discover inside the Practice Ground pause/More menu. It is a Home destination directly below Practice Ground.
+
+New Discover screen
+
+Create a proper screen using Alva’s existing Screen / ScreenManager architecture, for example:
+
+js/screens/discover-screen.js
+
+Register it in js/core/app.js.
+
+Add its corresponding <section> to index.html, following Alva’s existing screen structure, for example with:
+
+data-screen="discover"
+
+and an appropriate accessible label.
+
+The screen must support normal ScreenManager enter/exit behavior and return cleanly to Home.
+
+Discover visual direction
+
+Use Seren’s Cars & more screen as structural inspiration.
+
+Relevant Seren ideas include:
+
+a top header with a Back control and page title,
+a compact reference/index rail,
+the active section visually indicated on that rail,
+a scrollable reference content area,
+structured informational cards,
+two-column content where space permits,
+one-column content on smaller layouts,
+and a horizontal tab rail on narrow screens.
+
+However, this is an Alva screen.
+
+Do not use Seren’s red accents or SEREN typography/look.
+
+Use Alva’s existing visual tokens from styles.css:
+
+near-black / charcoal surfaces,
+off-white text,
+Alva’s restrained green --accent,
+--accent-hi,
+--accent-wash,
+existing borders,
+existing focus treatment,
+existing radius system,
+existing spacing,
+existing screen header/back-button patterns.
+
+The result should look like Discover was always part of Alva.
+
+Avoid introducing an unrelated design system.
+
+Discover header
+
+The screen title should be:
+
+Discover
+
+Provide a Back button using Alva’s existing icon/button language.
+
+Back returns to Home.
+
+It must work with pointer, keyboard, gamepad/menu navigation, and the existing Back/Escape behavior where appropriate.
+
+Discover sections
+
+The Discover screen currently has exactly two sections:
+
+POWER
+
+CONDITIONS
+
+POWER comes first and is selected by default.
+
+Structurally this should feel inspired by Seren’s Cars & more left-hand index rail:
+
+POWER
+CONDITIONS
+
+On narrow/mobile layouts, convert this into a horizontal rail similar to Seren’s responsive reference screen.
+
+Use Alva green for the active indicator rather than Seren red.
+
+The tabs/section controls must be real accessible buttons.
+
+Use sensible role="tablist", role="tab", aria-selected, and focus behavior if implementing it as a tab interface.
+
+Arrow-key navigation between POWER and CONDITIONS is desirable and should follow the existing menu/navigation architecture without fighting it.
+
+POWER content
+
+POWER is a reference page explaining gameplay Powers.
+
+For this first version it only contains Jump Power.
+
+Create a reference entry headed:
+
+JUMP POWER
+
+Explain clearly and briefly that Jump Power controls how high a fighter’s normal jump goes and that higher tiers jump higher.
+
+Then show the three tiers in a clean Alva-style reference treatment:
+
+JUMP POWER 1
+Very low jump.
+
+JUMP POWER 2
+Normal jump.
+
+JUMP POWER 3
+Slightly higher jump.
+
+Clearly indicate that #0001 uses Jump Power 2.
+
+This information should be driven from the same Jump Power tier data used by gameplay as much as reasonably possible. Do not create a completely separate hard-coded UI definition of what the three tiers mean if the gameplay table already contains their names/descriptions.
+
+Do not expose raw 650, 920, or 1000 velocity numbers to the player in the Discover UI unless Alva already establishes a reason to show low-level tuning numbers. The screen should communicate the game concept, not developer physics constants.
+
+The Discover content should remain easy to extend later with additional Power types.
+
+For example, a future developer should be able to add another Power category without redesigning the whole screen.
+
+CONDITIONS content
+
+The second section is:
+
+CONDITIONS
+
+For now, Conditions intentionally has no content.
+
+Do not add fake Conditions.
+
+Do not write “Coming soon.”
+
+Do not add placeholder cards.
+
+Do not invent descriptions.
+
+When CONDITIONS is selected, the content region can simply be empty while the section/tab remains fully functional and accessible.
+
+This is intentional scaffolding for a future Conditions system.
+
+Styling
+
+Add Discover-specific styling to styles.css while reusing existing Alva primitives and CSS variables.
+
+Do not blindly paste Seren CSS.
+
+Create Alva-specific class names, such as a discover-* namespace or whatever matches the current conventions.
+
+Desktop/wide layout should approximately follow this composition:
+
+Back + Discover header across the top.
+
+Below it, a narrow left reference rail containing POWER and CONDITIONS.
+
+To its right, a scrollable content region.
+
+The POWER reference content should have restrained dividers/cards similar in informational density to Seren’s Cars & more cards, but styled with Alva’s existing dark surfaces and green active state.
+
+At narrower widths, place POWER and CONDITIONS in a horizontal rail above the content.
+
+Respect safe-area insets.
+
+Keep the screen usable at short landscape heights because Alva is designed around landscape play.
+
+Ensure long content can scroll without making the entire app/document scroll unexpectedly.
+
+Accessibility
+
+Preserve Alva’s accessibility conventions.
+
+Discover and every interactive control must be keyboard reachable.
+
+Focus must always be visible.
+
+Hidden section content must not remain focusable.
+
+The currently selected POWER/CONDITIONS control must expose its state semantically.
+
+The Back control needs a meaningful accessible name.
+
+Do not rely on green colour alone to communicate the active section; use structure/border/state as well.
+
+Respect reduced-motion behavior. This screen does not need elaborate animations.
+
+Tests
+
+Update and add tests rather than weakening existing tests.
+
+tests/practice-ground.test.mjs currently verifies that Home has exactly two Home actions and navigation candidates [Play, Practice Ground]. Update this expectation for:
+
+Play
+Practice Ground
+Discover
+
+Also test that clicking Discover navigates to the Discover screen, while Practice Ground still opens Practice Ground directly.
+
+Add focused tests for the Power system.
+
+At minimum verify:
+
+Jump Power 1 resolves to 650.
+
+Jump Power 2 resolves to 920.
+
+Jump Power 3 resolves to 1000.
+
+The values are strictly ordered:
+
+Power 1 < Power 2 < Power 3.
+
+#0001 declares Jump Power 2.
+
+A normal #0001 jump still starts at exactly -920 vertical velocity.
+
+A fighter configured with tier 1 receives the tier-1 jump.
+
+A fighter configured with tier 3 receives the tier-3 jump.
+
+Tier changes do not change gravity, max fall speed, coyote time, jump buffering, or unrelated movement stats.
+
+The same Fighter implementation handles player-controlled and CPU-controlled fighters.
+
+Add a Discover screen test covering at least:
+
+screen registration/construction,
+Home → Discover,
+Back → Home,
+POWER selected by default,
+POWER shows Jump Power information,
+#0001 is identified with Jump Power 2,
+CONDITIONS is selectable,
+CONDITIONS contains no invented placeholder content,
+and keyboard/menu navigation can reach the controls.
+
+Do not make tests dependent on pixel-perfect visual layout.
+
+Documentation
+
+Update the appropriate Alva documentation (README.md, ALVA_SPEC.md, or both where appropriate) so the architecture describes:
+
+the new Power system,
+the three initial Jump Power tiers,
+#0001 using Jump Power 2,
+the fact that Jump Power 2 preserves the original 920 jump,
+and the Discover reference screen.
+
+Avoid leaving documentation saying fighter jump strength is only a raw movement.jumpVelocity if that is no longer true.
+
+Files likely involved
+
+Expect to inspect and potentially modify:
+
+index.html
+
 styles.css
+
+js/core/app.js
+
+js/screens/home-screen.js
+
+js/screens/discover-screen.js — new
+
+js/data/powers.js — new or equivalent
+
+js/data/characters.js
+
+js/game/character.js
+
 tests/practice-ground.test.mjs
 
-Important existing behavior:
+new focused Power/Discover tests
 
-Practice Ground currently starts with one P1 fighter and no opponent. PracticeGroundScreen owns its More menu and Change Fighter roster. PracticeSession extends Arena. Arena.fighters[0] is the primary fighter and Arena.fighters[1], when present, automatically becomes the camera’s secondary fighter. The shared CombatSystem already supports melee, projectile, clone, and charged-technique hits against any fighter in fighters.
+README.md
 
-The shared FighterRoster is already used by Practice Ground’s Change Fighter dialog. Reuse it for CPU selection instead of making another roster implementation.
+ALVA_SPEC.md
 
-CombatSystem.events already exposes resolved hit data in this shape:
+Do not assume this list is exhaustive. Follow actual dependencies in the repository.
 
-{ type, attacker, target, damage, projectile, summon, technique }
+Non-goals
 
-Use those resolved events as the source of truth for CPU damage indicators. Do not independently recalculate attack damage.
+Do not add selectable Power upgrades.
 
-Energy is stored on fighter.combat.energy / maxEnergy and is spent through the existing combat flow. Infinite energy must be a Practice Ground-only rule; do not globally alter Quick Battle’s energy behavior.
+Do not let the player change #0001’s Jump Power from Discover.
 
-1. Move the Practice Ground More button
+Do not add progression/unlocking.
 
-The Practice Ground three-dot More button currently lives at the upper-right of the HUD.
+Do not add Conditions gameplay yet.
 
-Move it horizontally to the same center position occupied by Quick Battle’s timer/pause control (.hud-center), but put the More button slightly lower vertically.
+Do not change attack power, damage, speed, gravity, defense, Energy, or other fighter stats.
 
-The target layout is:
+Do not rebalance #0001’s existing normal jump.
 
-P1 HUD stays on the upper-left.
+Do not redesign Home.
 
-The More button is centered horizontally at the top of the screen, aligned with where Quick Battle places its timer.
+Do not replace Practice Ground.
 
-Move it downward by a small responsive amount, roughly 8–14 px depending on viewport size. It should clearly look slightly lower than the Quick Battle timer position without being dramatically displaced.
+Do not copy Seren’s red palette.
 
-Do not add a CPU HUD panel on the right just because a practice CPU exists.
+Do not create a second independent jump implementation for Practice Ground or CPUs.
 
-Update the Practice menu overlay positioning too. Since the More button is no longer in the upper-right corner, its translucent Practice menu should open underneath the centered More button rather than remaining anchored to the right edge.
+Definition of done
 
-Preserve the existing glass styling, hover/active/focus states, aria-expanded, and input behavior.
+The implementation is complete when Home displays Discover directly below Practice Ground, Discover opens a polished Alva-native reference screen inspired structurally by Seren’s Cars & more screen, POWER and CONDITIONS are available with POWER selected by default, POWER accurately explains the three Jump Power tiers, CONDITIONS is intentionally empty, the gameplay uses a centralized three-tier Jump Power system, #0001 is assigned Jump Power 2, and #0001’s actual current jump remains exactly unchanged.
 
-2. Expand the Practice Ground More menu
-
-The current Practice menu contains:
-
-Change Fighter
-Return
-
-Change it to this exact order:
-
-Change Fighter
-Enable CPU
-Allow infinite energy
-Return
-
-The CPU and energy labels are stateful as described below.
-
-Use the existing menuButton() styling and navigation conventions.
-
-Do not add Restart, Help, Settings, Change Stage, or any Quick Battle options.
-
-3. Enable CPU / Change CPU
-
-When no Practice CPU exists, the second button must say:
-
-Enable CPU
-
-Clicking it opens a CPU fighter-selection roster.
-
-After a CPU has been selected and spawned, that same menu button changes to:
-
-Change CPU
-
-Clicking Change CPU opens the same CPU-selection roster and allows the player to replace the current CPU with another fighter.
-
-The CPU selection must not navigate away from Practice Ground.
-
-4. CPU fighter-selection roster
-
-Build a second Practice roster using the existing FighterRoster component.
-
-It must use the same large semi-transparent glass presentation as the existing Change Fighter roster, including the stage remaining visible behind it.
-
-Do not duplicate the roster implementation itself. Instantiate another FighterRoster with its own host and its own unique preview element ID so there are no duplicate DOM IDs.
-
-Suggested heading:
-
-Kicker: Practice Ground
-Title: Select CPU when no CPU exists, or Change CPU when one already exists.
-
-The standard Back button must return to the Practice menu without changing anything.
-
-When a CPU already exists, place a second button directly next to the Back button in the CPU roster header:
-
-Disable CPU
-
-This button should only be present/enabled when a CPU currently exists.
-
-Pressing Disable CPU must:
-
-remove the CPU from the active Practice session,
-remove all player/CPU opponent references,
-remove any stale interaction state tied to that CPU,
-close the CPU roster,
-return to the Practice menu,
-change the menu’s Change CPU label back to Enable CPU,
-and leave Practice Ground paused until the player resumes.
-
-Focus should return to Enable CPU after disabling.
-
-When enabling CPU for the first time, there should be no meaningless Disable CPU action.
-
-5. Spawning the Practice CPU
-
-Extend PracticeSession so it can optionally contain:
-
-this.player
-this.cpu
-
-The session still begins with:
-
-this.cpu = null
-
-When a fighter is selected from the CPU roster, load its sprites through the existing app.loadCharacter() flow exactly as Change Fighter already does.
-
-Spawn a new Fighter using:
-
-the selected fighter definition,
-the selected fighter sprites,
-slot p2,
-label CPU.
-
-Add a second Practice Ground spawn location for the CPU. Keep the existing P1 spawn unchanged and place the CPU approximately the same distance away that the Quick Battle maps separate their two initial fighters, with the CPU facing toward P1. A second PRACTICE_MAP.spawnPoints entry around 300–340 world units to the right of P1 is appropriate.
-
-Once CPU exists:
-
-player.opponent must reference CPU.
-cpu.opponent must reference player.
-session.fighters must be [player, cpu].
-
-This is important because the existing Arena/Combat code then automatically gives the player a valid target for clone attacks, projectiles, Sphere Rush, melee attacks, pushboxes, camera framing, etc.
-
-The existing Arena camera should therefore frame P1 and the CPU naturally through its existing primary / secondary behavior. Do not create a separate Practice-only camera implementation.
-
-6. The Practice CPU must be completely non-combatant
-
-The Practice Ground CPU is a training dummy.
-
-It must never voluntarily:
-
-walk,
-run,
-jump,
-drop through platforms,
-attack,
-throw,
-use BA1,
-use BA2,
-use Special,
-charge,
-use Defense,
-block,
-dodge,
-or otherwise generate gameplay inputs.
-
-Do NOT directly reuse the current Quick Battle TrainingAIController for this feature. That controller is non-attacking but still follows/repositions around the player.
-
-For Practice Ground, use a truly neutral controller. Since Fighter already falls back to neutral input when there is no controller, using no controller for the Practice CPU is acceptable and preferable if it integrates cleanly.
-
-The CPU should still remain a normal Fighter for simulation purposes. That means it should still:
-
-have hurtboxes,
-take actual combat damage,
-enter hitstun,
-play hurt animations,
-receive knockback,
-fall and land normally,
-collide with the stage,
-collide through fighter pushboxes,
-be targetable by charged techniques/clones/projectiles,
-and automatically face its opponent where existing Fighter behavior does so.
-
-“The CPU does not fight” means it never produces intentional gameplay actions. Do not make it intangible or immune to normal hit reactions.
-
-Do not change Quick Battle’s existing TrainingAIController.
-
-7. Changing the player’s fighter while CPU exists
-
-The existing PracticeSession.setFighter() currently rebuilds fighters as only [player].
-
-Update that behavior so changing the Practice player’s fighter does NOT accidentally remove an enabled CPU.
-
-If CPU exists when P1 changes fighter:
-
-replace only P1,
-preserve the existing CPU,
-rewire newPlayer.opponent = cpu,
-rewire cpu.opponent = newPlayer,
-set fighters = [newPlayer, cpu],
-and preserve the CPU’s selected fighter.
-
-Existing projectiles/clones/charged-technique cleanup associated with swapping P1 should still be handled safely.
-
-If infinite energy is enabled, the newly selected P1 fighter must immediately inherit the infinite-energy Practice rule.
-
-8. CPU damage-taken indicator
-
-Whenever the Practice CPU receives actual resolved damage, show the amount above the CPU’s head.
-
-The text must:
-
-be red,
-start with a minus sign,
-show the actual damage received.
-
-Examples:
-
--6
--15
--2.5
-
-Do not display a plus sign or plain unsigned number.
-
-Use PracticeSession’s this.combat.events after Arena resolves combat. Find events where:
-
-event.target === this.cpu
-
-and:
-
-event.damage > 0
-
-Create a Practice-only floating damage indicator from the actual event.damage.
-
-Do not calculate damage from the attack definition yourself because CombatSystem.applyHit() is already the authoritative location that resolves the final amount.
-
-The indicator must visually follow the CPU rather than being placed at a hard-coded screen coordinate.
-
-Anchor it above the CPU’s current head using the same fighter/world-to-screen information already used by Arena’s fighter markers. It should remain readable as the camera moves.
-
-Give the indicator a short training-game-style lifetime: approximately 0.6–1.0 seconds is appropriate. It can drift upward slightly and fade out.
-
-If multiple hits occur rapidly, do not lose damage events. Either maintain a small collection of simultaneous floating numbers or otherwise ensure each actual hit can be represented.
-
-Format integer damage without an unnecessary decimal. For fractional damage, use a concise value rather than long floating-point noise.
-
-Keep this rendering Practice-specific unless a very small generic Arena hook is clearly cleaner. Do not add damage numbers to Quick Battle.
-
-9. Infinite energy Practice option
-
-Under the CPU menu button add:
-
-Allow infinite energy
-
-Clicking it enables infinite energy for the Practice player’s fighter only.
-
-When enabled, immediately change the button text to:
-
-Revoke infinite energy
-
-Clicking Revoke infinite energy disables the rule and changes the text back to:
-
-Allow infinite energy
-
-This toggle should not close the Practice menu. Keep the menu open and preserve focus on the same button so the text change is immediately visible.
-
-While infinite energy is enabled:
-
-P1’s energy must always be treated as full.
-Any charged action should be able to pay its normal energy cost whenever its other gameplay requirements are satisfied.
-The HUD energy meter should remain full.
-Energy-consuming actions must still execute their normal logic and cooldowns; only the resource limitation is removed.
-
-Keep this rule entirely inside Practice Ground. Do not modify CombatState.spendEnergy() globally in a way that affects Quick Battle.
-
-A clean Practice-specific implementation is to ensure the Practice player’s energy is set to maxEnergy before the fixed simulation step so cost checks always succeed, run the normal Arena update, then restore it to maxEnergy after the step so the HUD never shows a depleted value.
-
-When infinite energy is first enabled, refill P1 immediately.
-
-When it is revoked, stop refilling it. There is no need to artificially deduct energy retroactively.
-
-If P1 changes fighter while infinite energy is enabled, keep the option enabled and make the replacement fighter full immediately.
-
-The CPU is not affected by this setting.
-
-A fresh entry into Practice Ground should start with infinite energy disabled.
-
-10. CPU replacement and cleanup
-
-Implement explicit PracticeSession methods along the lines of:
-
-setCPU(def, sprites)
-removeCPU()
-
-The exact names may differ, but keep this responsibility in the session rather than manually editing all fighter state from the screen.
-
-When replacing an existing CPU:
-
-clean up the old CPU safely,
-create the replacement at the CPU spawn,
-keep the current P1 untouched,
-rewire opponent references,
-clear stale effects that directly reference the removed CPU where necessary,
-reset interpolation/accumulator state if required,
-and refit/snap the camera if the canvas already has a view.
-
-When disabling CPU:
-
-end any active player technique that is currently attached to/holding the CPU,
-make sure no clone, projectile, bind, technique, or opponent reference retains a broken CPU reference,
-set cpu = null,
-set player.opponent = null,
-set fighters = [player].
-
-After removal the existing solo Practice behavior must work exactly as it does today: attacks with no target safely miss/fall back, clone summons requiring an opponent do not spend energy, and the camera returns to following only P1.
-
-11. Screen/menu state and loading
-
-Give CPU selection its own state, for example:
-
-cpuRosterOpen
-cpuSwapping
-
-Do not overload rosterOpen in a way that causes the Change Fighter roster and CPU roster to interfere with one another.
-
-While either roster is open:
-
-Practice remains frozen,
-gameplay input remains disabled,
-touch controls remain disabled,
-the Practice menu underneath is inert,
-the HUD underneath is inert,
-navigation/focus stays inside the active roster.
-
-Continue using the existing token/check pattern around asynchronous character loads so leaving Practice Ground while CPU art is loading cannot mutate a destroyed session.
-
-If CPU sprite loading fails:
-
-keep the current CPU unchanged,
-keep the CPU roster open,
-show the existing loading error treatment,
-and allow returning to the selected roster slot.
-
-If the CPU did not previously exist, a failed load should leave CPU disabled.
-
-12. Fresh-session behavior
-
-Practice Ground should remain independent from Quick Battle selection state.
-
-Every fresh visit from Home should still begin with the normal Practice default fighter.
-
-Also reset these Practice-only options on a fresh visit:
-
-CPU disabled.
-Infinite energy disabled.
-
-Do not persist the selected Practice CPU into Quick Battle.
-
-Do not modify app.selection when changing either the Practice player or Practice CPU.
-
-13. Accessibility and navigation
-
-Preserve the existing menu navigator conventions.
-
-The new Practice menu controls must participate in keyboard/gamepad spatial navigation.
-
-The CPU roster must have its own navigation scope.
-
-Back/Escape/gamepad Back from the CPU roster returns to the Practice menu.
-
-The CPU roster Back button must have an appropriate accessible label.
-
-Disable CPU must be a real button and keyboard/gamepad accessible.
-
-Keep unique IDs for both roster preview panels and aria-labelledby relationships.
-
-Do not break the existing More button’s:
-
-aria-label="Practice menu"
-aria-haspopup="dialog"
-aria-expanded
-
-14. Styling
-
-Reuse Alva’s existing glass UI rather than introducing a new visual design.
-
-The CPU roster should inherit/reuse the existing .practice-roster-dialog, roster panels, slot styling and translucent treatment wherever possible.
-
-Only add new CSS selectors where necessary for:
-
-centered/lowered More positioning,
-centered Practice menu positioning,
-CPU roster header actions,
-Disable CPU placement,
-damage number rendering if DOM-based,
-or any other strictly necessary state.
-
-If damage text is canvas-rendered, use a strong readable red and ensure it remains legible against the light Practice stage, using a subtle dark shadow/stroke if needed.
-
-Do not change Quick Battle’s timer, pause control, HUD placement, roster visuals, or stage selection.
-
-15. Tests
-
-Extend tests/practice-ground.test.mjs rather than creating a completely separate test architecture.
-
-Update old assertions that deliberately expect:
-
-exactly two Practice menu buttons,
-no CPU ever,
-or exactly one Practice spawn point.
-
-Add coverage for the new behavior.
-
-At minimum verify all of the following:
-
-* Practice More button/HUD structure supports center placement while P1 remains the only fighter HUD panel.
-* Practice menu button order is exactly Change Fighter, Enable CPU, Allow infinite energy, Return.
-* Enabling CPU opens a second shared FighterRoster.
-* CPU roster has unique DOM IDs and does not conflict with the player roster.
-* Selecting a CPU loads and creates the selected fighter as p2 / CPU.
-* session.fighters becomes [player, cpu].
-* P1 and CPU opponent references point to one another.
-* The session’s secondary becomes the CPU.
-* CPU creates no voluntary input/actions even after many simulation steps.
-* P1 attacks can hit the CPU through the real CombatSystem.
-* A CPU hit produces a Practice damage-indicator record with the actual resolved damage and negative display text.
-* Projectile, clone and charged-technique damage can also generate CPU damage indicators.
-* Change CPU replaces the current CPU without replacing P1.
-* Disable CPU removes it, clears opponent references and returns to solo Practice behavior.
-* Changing P1 while CPU exists preserves CPU.
-* Infinite energy toggle changes both button label and behavior.
-* With infinite energy enabled, repeated energy-cost actions can continue and P1 energy remains at max.
-* Infinite energy does not affect CPU.
-* Changing P1 preserves the enabled infinite-energy rule.
-* Fresh Practice entry resets CPU and infinite energy.
-* Quick Battle still creates its original CPU AI, timer, rounds, HUD and normal finite-energy behavior.
-* Existing Change Fighter behavior still works.
-* Existing Practice input/menu/cleanup tests still pass.
-
-Run at least:
-
-node --test tests/practice-ground.test.mjs
-
-Also run the existing battle/combat/charge-related tests affected by the shared fighter/combat systems, and ideally the complete tests/*.test.mjs suite.
-
-16. Scope discipline
-
-Do not implement a combat AI for the Practice CPU.
-
-Do not add CPU attacks.
-
-Do not add a second CPU HUD panel.
-
-Do not add a Practice timer or rounds.
-
-Do not alter Quick Battle behavior.
-
-Do not duplicate the fighter roster.
-
-Do not globally make energy infinite.
-
-Do not hard-code damage amounts.
-
-Do not recreate combat resolution just for Practice mode.
-
-Use the existing Arena, Fighter, FighterRoster, CombatSystem, camera, loading, menu navigation and styling systems as much as possible.
-
-Implement the feature completely, update comments that currently describe Practice Ground as permanently having “no CPU,” and leave the code/test suite in a consistent state.
+Run the full existing Node test suite plus all new tests and fix regressions rather than changing expected behavior to hide them. Also manually verify Home, Discover, POWER/CONDITIONS switching, Back behavior, #0001 jumping in Practice Ground, #0001 jumping in Quick Battle, keyboard navigation, gamepad/menu navigation, and narrow landscape responsive layout.
