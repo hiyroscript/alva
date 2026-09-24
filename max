@@ -1,191 +1,826 @@
-Work in the hiyroscript/alva repository on the current main branch.
+Work in the current main branch of hiyroscript/alva.
 
-Implement the following combat balance changes cleanly within Alva’s existing data-driven Power architecture. Do not replace the Power system with hard-coded per-move velocities, and do not change unrelated attack timing, animation, hitboxes, damage, hitstun, cooldowns, movement, projectile speed, or charged-technique behavior.
+Refactor Alva’s combat architecture to completely remove Horizontal Knockback Power and Vertical Knockback Power and replace them with a new, much simpler standalone system called Knockback, with exactly three strength levels:
 
-Repository context
+* Low
+* Mid
+* High
 
-Alva currently stores fighter and attack definitions in js/data/characters.js.
+This must no longer be part of the Power system.
 
-The shared Power system is in js/data/powers.js. Attack Powers currently include horizontalKnockback and verticalKnockback, each with tiers 1–3.
+Jump Power and Speed Power remain Powers and should continue working exactly as they do now.
 
-Current Vertical Knockback Power magnitudes are:
+The goal is to make ordinary attack knockback data easy to read:
 
-* Tier 1 = 480
-* Tier 2 = 640
-* Tier 3 = 800
+knockback: { axis: 'horizontal', level: 'low' }
 
-createAttackDefinition() in js/game/combat.js resolves an attack’s Power declarations into a numeric knockback: { x, y }.
+or:
 
-CombatSystem.applyHit() currently applies vertical knockback with:
+knockback: { axis: 'vertical', level: 'high' }
 
-target.body.vy = -def.knockback.y;
+and for reversed vertical knockback:
 
-Therefore positive resolved knockback.y launches upward, while a negative resolved knockback.y naturally produces positive vy and sends the opponent downward.
+knockback: { axis: 'vertical', level: 'mid', sign: -1 }
 
-The current production roster contains #0001. Its stats are already health: 100 and energy: 100, but this requirement should be enforced for every fighter definition, not treated as a #0001-specific assumption.
+sign: -1 on vertical knockback means the force is reversed and therefore drives the opponent downward.
 
-Required changes
+Do not retain the old horizontalKnockback, verticalKnockback, positive/negative Power tiers, attack-Power scopes, or attack powers declarations as a compatibility layer. This is a real migration and cleanup.
 
-Fighter health and Energy
+1. Remove Knockback from the Power system
 
-Every fighter in CHARACTERS must have exactly:
+js/data/powers.js currently contains:
 
-stats: {
-  health: 100,
-  energy: 100,
-}
+* Jump Power
+* Speed Power
+* Horizontal Knockback Power
+* Vertical Knockback Power
+* HORIZONTAL_KNOCKBACK_POWER_TIERS
+* VERTICAL_KNOCKBACK_POWER_TIERS
+* attack-Power resolution
+* signed Vertical Knockback Power logic
+* ATTACK_POWERS
+* getAttackPowerTier
+* getHorizontalKnockback
+* getVerticalKnockback
+* getAttackKnockback
 
-#0001 already has these values, so preserve them.
+Remove the knockback-related parts completely.
 
-Keep CombatState data-driven: fighters should still initialize maxHealth, health, maxEnergy, and energy from their character stats. Do not hard-code #0001 inside the combat engine.
+After this change, powers.js should only be responsible for actual fighter Powers such as Jump Power and Speed Power.
 
-Add a regression test that iterates every fighter in CHARACTERS and verifies that all fighters have exactly 100 maximum health and 100 maximum Energy and start full when instantiated.
+There should be no:
 
-Do not change Clone Attack Energy cost, infinite-Energy Practice behavior, Energy spending, or any other Energy mechanics.
+powers: { horizontalKnockback: ... }
 
-Support downward Vertical Knockback Powers
+or:
 
-Extend the attack Power resolver so verticalKnockback supports a signed tier declaration.
+powers: { verticalKnockback: ... }
 
-The magnitude must still come from the existing three Vertical Knockback Power tiers. Do not add new -1/-2/-3 tier rows and do not duplicate the tuning values.
+on attacks anywhere in the game.
 
-The intended semantics are:
+There should also be no concept of an “attack Power” remaining solely for knockback.
 
-verticalKnockback: 1   // +480 resolved y: upward
-verticalKnockback: 2   // +640 resolved y: upward
-verticalKnockback: 3   // +800 resolved y: upward
-verticalKnockback: -1  // -480 resolved y: downward
-verticalKnockback: -2  // -640 resolved y: downward
-verticalKnockback: -3  // -800 resolved y: downward
+If scope: 'attack', ATTACK_POWERS, signed Power handling, or related generic code becomes unused after this migration, remove it instead of leaving dead abstractions behind.
 
-A negative declaration means “use this Vertical Knockback Power tier’s magnitude, but reverse its vertical direction.”
+Do not disturb Jump Power or Speed Power behavior, values, Discover presentation, movement behavior, or fighter definitions.
 
-Keep the tier table itself positive. getPowerTier('verticalKnockback', 2) should still return the normal tier-2 entry, and the existing tuning values 480/640/800 should remain unchanged.
+2. Add the new standalone Knockback system
 
-Implement signed handling in the attack-Power resolution layer. For a numeric verticalKnockback declaration, use its absolute value to select the tier and its sign to determine the resolved knockback.y.
+Create a small authoritative knockback module, preferably:
 
-Do not change Horizontal Knockback Power semantics. Horizontal knockback already uses the attack/facing direction in CombatSystem.applyHit(), so negative horizontal tiers are not part of this task.
+js/data/knockback.js
 
-Preserve existing malformed-data behavior. Values outside valid tier magnitudes should still warn/fall back according to the project’s existing conventions rather than silently creating arbitrary knockback. Do not accidentally make strings such as "2" valid just because a numeric absolute-value operation could coerce them.
+The new system has exactly three named levels:
 
-Update comments/documentation in js/data/powers.js and js/game/combat.js so they no longer claim Vertical Knockback can only launch upward. Clearly document that positive Vertical Knockback is upward and negative Vertical Knockback is downward.
+low
+mid
+high
 
-CombatSystem.applyHit() already has the correct arithmetic for a negative resolved knockback.y; avoid special-casing #0001 there. Only change that method if necessary for clarity or correctness.
+Preserve the current gameplay magnitudes that were previously represented by tiers 1, 2, and 3.
 
-#0001 mid-air BA1
+Use these values:
 
-In js/data/characters.js, change #0001’s midairBa1 Power declaration so it retains its existing Horizontal Knockback Power 2 and also gains downward Vertical Knockback Power 2:
+Low:
+  horizontal = 140
+  vertical = 480
+Mid:
+  horizontal = 180
+  vertical = 640
+High:
+  horizontal = 220
+  vertical = 800
 
-powers: {
-  horizontalKnockback: 2,
-  verticalKnockback: -2,
-}
+These are world-units-per-second magnitudes.
 
-Its resolved knockback must therefore be:
+The level data should be the single source of truth. Do not scatter 140, 180, 220, 480, 640, and 800 throughout individual fighter attacks.
 
-{ x: 180, y: -640 }
+A suitable conceptual structure is:
 
-On an unblocked hit, because combat performs vy = -knockback.y, the victim must receive:
+export const KNOCKBACK_LEVELS = Object.freeze({
+  low: Object.freeze({
+    name: 'Low',
+    horizontal: 140,
+    vertical: 480,
+  }),
+  mid: Object.freeze({
+    name: 'Mid',
+    horizontal: 180,
+    vertical: 640,
+  }),
+  high: Object.freeze({
+    name: 'High',
+    horizontal: 220,
+    vertical: 800,
+  }),
+});
 
-vx = 180 * facing
-vy = 640
+The exact implementation may differ if there is a cleaner fit with the codebase, but Low / Mid / High must be the public data model.
 
-The positive body vy means the opponent is driven downward.
+Provide a resolver that turns an ordinary attack’s Knockback descriptor into the numeric vector used by combat.
 
-This is specifically a mid-air BA1 change. Ground ba1 must stay Horizontal Knockback Power 2 only:
+For example:
 
-{ x: 180, y: 0 }
+{ axis: 'horizontal', level: 'low' }
 
-Do not change BA1 damage, animation timing, hitbox, hitstun, blockstun, hitstop, cooldown, or any other BA1 behavior.
+resolves to:
 
-Update stale comments in characters.js, README documentation, and ALVA_SPEC.md that currently say both ground and mid-air BA1 have only horizontal knockback/no launch.
+{ x: 140, y: 0 }
+{ axis: 'vertical', level: 'high' }
 
-#0001 mid-air BA2
+resolves to:
 
-Change only #0001’s midairBa2 from:
+{ x: 0, y: 800 }
+
+and:
+
+{ axis: 'vertical', level: 'mid', sign: -1 }
+
+resolves to:
+
+{ x: 0, y: -640 }
+
+For normal vertical knockback, sign should be omitted or treated as +1.
+
+Only vertical Knockback needs the negative/reversed form for this task.
+
+Horizontal Knockback should continue traveling according to the attack’s facing. Do not require sign for ordinary horizontal hits.
+
+Validate descriptors. Invalid axes, levels, signs, or malformed values should not silently produce arbitrary force. Follow Alva’s existing pattern of logging a useful warning and choosing a safe behavior.
+
+Do not accept old numeric tiers as valid Knockback levels.
+
+For example, this must no longer be valid ordinary attack data:
 
 powers: { verticalKnockback: 2 }
 
-to:
+Neither should this become valid:
 
-powers: { verticalKnockback: 1 }
+knockback: { axis: 'vertical', level: 2 }
 
-Its resolved knockback must become:
+The level is explicitly one of the strings:
 
-{ x: 0, y: 480 }
+low
+mid
+high
 
-An unblocked hit therefore gives the victim:
+3. Integrate it with createAttackDefinition
 
-vy = -480
+js/game/combat.js currently imports getAttackKnockback from powers.js and converts attack Powers into numeric { x, y } knockback.
 
-which remains an upward launch, but weaker than before.
+Remove that Power dependency.
 
-Ground ba2 must remain Vertical Knockback Power 2 and continue resolving to:
+Instead, import the new Knockback resolver.
+
+Ordinary fighter attacks should declare their semantic Knockback descriptor in character data, while the frozen runtime attack definition should still contain the numeric:
+
+knockback: { x, y }
+
+that CombatSystem.applyHit() already knows how to process.
+
+In other words:
+
+character attack data
+    ↓
+Low / Mid / High Knockback resolver
+    ↓
+numeric { x, y }
+    ↓
+CombatSystem.applyHit()
+
+CombatSystem.applyHit() should remain generic.
+
+Its existing vertical behavior is already suitable:
+
+target.body.vy = -def.knockback.y;
+
+Therefore:
 
 { x: 0, y: 640 }
 
-Do not change BA2 damage, animation timing, hitboxes, hitstun, blockstun, hitstop, cooldowns, or other behavior.
+gives:
 
-Update README/spec language that currently says ground and mid-air BA2 both use Vertical Knockback Power 2.
+vy = -640
 
-Shuriken knockback
+which launches upward.
 
-#0001’s shuriken currently has bespoke raw knockback:
+And:
 
-knockback: { x: 140, y: 0 }
+{ x: 0, y: -640 }
 
-Change it to no knockback at all:
+gives:
+
+vy = 640
+
+which drives downward.
+
+Do not hard-code BA1, BA2, #0001, Low, Mid, or High inside applyHit().
+
+Blocked-hit behavior should continue using the existing combat rules.
+
+Bespoke hits that are not ordinary fighter attacks, such as Sphere Rush’s separately defined contact/explosion hits, may continue to use their explicit numeric { x, y } values. They are not the old Knockback Power system and do not need to be forced into Low/Mid/High as part of this task.
+
+The shuriken should remain:
 
 knockback: { x: 0, y: 0 }
 
-Do not convert the shuriken into an attack Power unless there is a compelling architectural reason. Projectiles and charged-technique hits currently use bespoke raw knockback, and preserving that distinction is preferable.
+with no knockback.
 
-A shuriken hit must still:
+4. #0001 ground BA1 — Low horizontal Knockback
 
-deal its existing 4 damage,
-apply its existing hitstun,
-apply its existing hitstop/blockstun behavior,
-disappear after connecting,
-credit the correct owner,
-travel at its existing 700 units/second,
-and retain all current projectile animation, lifetime, collision, Dodge interaction, and Throw behavior.
+Change #0001’s ground ba1 from the old:
 
-It simply must not alter the target’s horizontal or vertical velocity through knockback.
+powers: { horizontalKnockback: 2 }
 
-Update any tests and documentation that currently expect the shuriken to apply 140 horizontal knockback.
+to the new semantic Knockback declaration:
 
-Tests
+knockback: {
+  axis: 'horizontal',
+  level: 'low',
+}
 
-Update existing tests rather than weakening or deleting them.
+Its resolved runtime knockback must be:
 
-Pay particular attention to:
+{ x: 140, y: 0 }
 
-tests/powers.test.mjs, which currently asserts that Vertical Knockback Power only resolves positive launch values and currently expects #0001’s mid-air BA1 to resolve { x: 180, y: 0 }, mid-air BA2 to resolve { x: 0, y: 640 }, and the shuriken to retain { x: 140, y: 0 }.
+An unblocked hit while facing right therefore gives the opponent:
 
-tests/basic-attack.test.mjs, which currently expects both BA1 variants to declare only Horizontal Knockback Power 2.
+vx = 140
 
-tests/basic-attack-2.test.mjs, which should verify that ground BA2 remains tier 2 while mid-air BA2 is tier 1.
+Facing left must naturally reverse that horizontal velocity through the existing facing logic.
 
-tests/throw.test.mjs, which should explicitly verify zero shuriken knockback.
+Do not change ground BA1’s animation, timing, damage, hitbox, hitstun, blockstun, hitstop, cooldown, or Clone Attack behavior.
 
-Add direct regression coverage for downward vertical knockback, not just data-shape assertions.
+The Charged BA1 clone performs ground BA1 and must automatically inherit the new Low horizontal Knockback through the same resolved attack definition.
 
-Acceptance criteria
+5. #0001 ground BA2 — High vertical Knockback
 
-1. Every character definition has stats.health === 100 and stats.energy === 100, and newly constructed fighters begin at 100/100.
-2. Vertical Knockback Power still has exactly three magnitude tiers, 480/640/800.
-3. verticalKnockback: -2 is a valid attack declaration that resolves to knockback.y === -640, without a malformed-tier warning.
-4. A real unblocked hit using Vertical Knockback Power -2 gives the target positive vertical body velocity, sending it downward.
-5. Positive vertical tiers retain their current upward-launch behavior.
-6. #0001 ground BA1 remains { x: 180, y: 0 }.
-7. #0001 mid-air BA1 resolves to { x: 180, y: -640 }.
-8. #0001 ground BA2 remains { x: 0, y: 640 }.
-9. #0001 mid-air BA2 resolves to { x: 0, y: 480 }.
-10. #0001 shuriken resolves to { x: 0, y: 0 } and causes no horizontal or vertical knockback while retaining damage and hitstun.
-11. Existing malformed-Power warnings/fallback behavior continues to work.
-12. Existing unrelated combat, Clone Attack, Sphere Rush, Practice, Throw, Dodge, movement, HUD, and animation tests remain passing.
-13. README and ALVA_SPEC.md accurately describe the new mid-air BA1 downward knockback, weaker mid-air BA2, signed Vertical Knockback semantics, and zero-knockback shuriken.
+Change ground ba2 from the old Vertical Knockback Power 2 to:
 
-After making the changes, run the relevant targeted test files first, then run the complete test suite with Node’s test runner. Fix regressions caused by these changes rather than altering tests to conceal incorrect behavior.
+knockback: {
+  axis: 'vertical',
+  level: 'high',
+}
 
-Keep the implementation minimal, data-driven, and consistent with the existing Alva architecture.
+It must resolve to:
+
+{ x: 0, y: 800 }
+
+An unblocked hit must therefore produce:
+
+vy = -800
+
+which is a strong upward launch.
+
+Do not add horizontal knockback.
+
+Do not change the ground BA2 art, startup, active frames, recovery, damage, hitbox, hitstun, blockstun, hitstop, cooldown, or ground-only restriction.
+
+6. Swap #0001’s two mid-air Basic Attacks
+
+The current game has:
+
+midairBa1
+
+* current animation source: midair1ba1 through midair1ba5
+* five-frame airborne kick
+* current BA1-style attack timing/hitbox/combat package
+
+midairBa2
+
+* current animation source: midair2ba1 through midair2ba3
+* three-frame kunai/downward-slash move
+* current BA2-style attack timing/hitbox/combat package
+
+Swap these two airborne moves completely.
+
+After the refactor:
+
+New midairBa1
+
+midairBa1 must be the move that is currently midairBa2.
+
+That means the 3-frame midair2ba kunai/slash artwork becomes the airborne Basic Attack 1 move.
+
+Its animation key should still cleanly correspond to the final move identity midairBa1; update the animation definitions so the final data is not misleading.
+
+For example, after the swap, animations.midairBa1 should point at the current:
+
+0001_midair2ba1.png
+0001_midair2ba2.png
+0001_midair2ba3.png
+
+and use the current midairBa2 visual sizing.
+
+Move the current midairBa2 art-aware attack package with it:
+
+* startup/recovery timing appropriate to the 3-frame clip
+* its active slash frame
+* its current slash hitbox
+* damage
+* hitstun
+* blockstun
+* hitstop
+* cooldown
+* other attack-specific behavior
+
+Do not leave the old five-frame kick timing or hitbox attached to the three-frame kunai animation.
+
+Then replace its knockback with the new required value described below.
+
+New midairBa2
+
+midairBa2 must be the move that is currently midairBa1.
+
+That means the 5-frame midair1ba airborne kick artwork becomes the airborne Basic Attack 2 move.
+
+After the swap, animations.midairBa2 should point at the current:
+
+0001_midair1ba1.png
+0001_midair1ba2.png
+0001_midair1ba3.png
+0001_midair1ba4.png
+0001_midair1ba5.png
+
+and use the current midairBa1 visual sizing.
+
+Move the current midairBa1 art-aware attack package with it:
+
+* startup/recovery timing appropriate to the 5-frame clip
+* its contact frame
+* its kick hitbox
+* damage
+* hitstun
+* blockstun
+* hitstop
+* cooldown
+* other attack-specific behavior
+
+Again, the move, artwork, timing, hitbox, and combat characteristics must stay internally consistent after the swap.
+
+Only its knockback is replaced by the requested new Knockback value below.
+
+7. Final airborne action mapping
+
+Keep the semantic controller mapping clean:
+
+actions: {
+  primary: 'throw',
+  special: null,
+  action1: { ground: 'ba1', air: 'midairBa1' },
+  action2: { ground: 'ba2', air: 'midairBa2' },
+}
+
+Do not solve the swap by permanently mapping:
+
+action1.air = 'midairBa2'
+action2.air = 'midairBa1'
+
+That would leave the internal move names backwards forever.
+
+Instead, swap the underlying airborne move definitions/art so that after the migration:
+
+* BA1 input in the air starts the newly swapped midairBa1
+* BA2 input in the air starts the newly swapped midairBa2
+
+The final internal names must match what the player is doing.
+
+8. New midairBa1 — Mid negative vertical Knockback
+
+After the airborne move swap, the final midairBa1 must use:
+
+knockback: {
+  axis: 'vertical',
+  level: 'mid',
+  sign: -1,
+}
+
+It must resolve to:
+
+{ x: 0, y: -640 }
+
+On an unblocked hit:
+
+target.body.vy = 640
+
+so the opponent is driven downward.
+
+This attack must have no horizontal knockback.
+
+This intentionally removes the current mid-air BA1’s combined horizontal + downward knockback behavior.
+
+Final expected vector:
+
+midairBa1.knockback === { x: 0, y: -640 }
+
+9. New midairBa2 — Low vertical Knockback
+
+After the airborne move swap, the final midairBa2 must use:
+
+knockback: {
+  axis: 'vertical',
+  level: 'low',
+}
+
+It must resolve to:
+
+{ x: 0, y: 480 }
+
+On an unblocked hit:
+
+target.body.vy = -480
+
+so the target is launched upward lightly.
+
+It must have no horizontal knockback.
+
+Final expected vector:
+
+midairBa2.knockback === { x: 0, y: 480 }
+
+10. Final #0001 Basic Attack Knockback matrix
+
+The final ordinary Basic Attacks must resolve exactly as follows:
+
+ba1
+Low Horizontal
+{x: 140, y: 0}
+ba2
+High Vertical
+{x: 0, y: 800}
+midairBa1
+Mid Negative Vertical
+{x: 0, y: -640}
+midairBa2
+Low Vertical
+{x: 0, y: 480}
+
+These four cases should have direct regression tests.
+
+11. Preserve Throw and shuriken behavior
+
+The current shuriken already has:
+
+knockback: { x: 0, y: 0 }
+
+Keep it that way.
+
+Do not give Throw or the shuriken a Low/Mid/High Knockback level just for consistency. A zero-knockback projectile is a valid bespoke hit.
+
+It must continue to:
+
+* deal 4 damage
+* apply its existing stun/hitstop/block behavior
+* travel at 700 units/second
+* use the same animation
+* spawn on the same Throw frame
+* disappear after a successful hit
+* have zero horizontal knockback
+* have zero vertical knockback
+
+12. Discover UI
+
+The current Discover Power page is generated directly from POWERS, and therefore currently displays:
+
+* Jump Power
+* Speed Power
+* Horizontal Knockback Power
+* Vertical Knockback Power
+
+After the migration, Horizontal Knockback Power and Vertical Knockback Power must disappear entirely from Discover.
+
+The Power page should now describe only actual Powers:
+
+* Jump Power
+* Speed Power
+
+Add Knockback as its own mechanic in Discover rather than pretending it is still a Power.
+
+A clean final section order is:
+
+Power
+Knockback
+Conditions
+
+The Knockback page should be generated from the same Knockback level registry gameplay uses.
+
+It should explain, without exposing tuning numbers:
+
+Knockback
+
+Controls how strongly an attack moves an opponent when it connects.
+
+Low
+Light knockback.
+
+Mid
+Medium knockback.
+
+High
+Strong knockback.
+
+Also explain direction in ordinary language:
+
+* horizontal Knockback pushes away from the direction of the hit
+* positive vertical Knockback launches upward
+* reversed/negative vertical Knockback drives downward
+
+Do not mention #0001 or specific attacks on the generic Discover mechanics page.
+
+Do not display world-unit numbers there, matching the current Discover philosophy.
+
+Reuse the existing Discover visual language where appropriate rather than creating unrelated UI styling.
+
+13. Update tests/powers.test.mjs
+
+Remove every test whose purpose is the deleted Knockback Power system.
+
+The Power tests should no longer import or reference:
+
+ATTACK_POWERS
+HORIZONTAL_KNOCKBACK_POWER_TIERS
+VERTICAL_KNOCKBACK_POWER_TIERS
+getAttackPowerTier
+getHorizontalKnockback
+getVerticalKnockback
+getAttackKnockback
+horizontalKnockback
+verticalKnockback
+signed attack Powers
+
+POWERS should now describe only the remaining fighter Powers.
+
+Continue testing Jump Power and Speed Power thoroughly.
+
+Do not leave tests asserting that four Powers exist.
+
+14. Add dedicated Knockback tests
+
+Create a focused test file such as:
+
+tests/knockback.test.mjs
+
+Test the new standalone system directly.
+
+At minimum verify:
+
+Low horizontal = 140
+Mid horizontal = 180
+High horizontal = 220
+Low vertical = 480
+Mid vertical = 640
+High vertical = 800
+
+Verify resolution:
+
+{ axis: 'horizontal', level: 'low' }
+=> { x: 140, y: 0 }
+{ axis: 'vertical', level: 'high' }
+=> { x: 0, y: 800 }
+{ axis: 'vertical', level: 'mid', sign: -1 }
+=> { x: 0, y: -640 }
+
+Verify actual combat physics through CombatSystem.applyHit():
+
+Low horizontal while facing right:
+
+vx === 140
+
+Low horizontal while facing left:
+
+vx === -140
+
+High vertical:
+
+vy === -800
+
+Mid negative vertical:
+
+vy === 640
+
+Verify malformed level names do not silently resolve as legitimate values.
+
+Verify numeric old tiers are rejected as Knockback level names.
+
+Verify Knockback resolution is independent of Jump Power and Speed Power.
+
+15. Update BA1 tests for the airborne swap
+
+tests/basic-attack.test.mjs currently assumes midairBa1 is the five-frame midair1ba kick.
+
+After this work, that is no longer true.
+
+Update the tests so midairBa1 is the current three-frame midair2ba kunai/slash move.
+
+Tests should validate the final move, not preserve outdated historical assumptions.
+
+They should verify:
+
+ground ba1:
+  unchanged animation/package
+  Low horizontal Knockback
+  resolved {x: 140, y: 0}
+midairBa1:
+  uses the former midairBa2 / midair2ba art
+  correct 3-frame animation
+  correct slash contact frame
+  correct swapped timing/hitbox/combat package
+  Mid negative vertical Knockback
+  resolved {x: 0, y: -640}
+
+Airborne action1 must start midairBa1.
+
+Landing during it should continue following the existing rule that an already-started airborne attack finishes its chosen attack clip rather than changing into a ground move halfway through.
+
+16. Update BA2 tests for the airborne swap
+
+tests/basic-attack-2.test.mjs currently assumes midairBa2 is the three-frame midair2ba kunai slash.
+
+After this work, midairBa2 is the former five-frame airborne kick.
+
+Update the tests accordingly.
+
+Verify:
+
+ground ba2:
+  existing ground animation/package
+  High vertical Knockback
+  resolved {x: 0, y: 800}
+midairBa2:
+  uses the former midairBa1 / midair1ba art
+  correct 5-frame animation
+  correct kick contact frame
+  correct swapped timing/hitbox/combat package
+  Low vertical Knockback
+  resolved {x: 0, y: 480}
+
+Airborne action2 must start midairBa2.
+
+17. Update integration tests
+
+Review tests that depend on the old move identity or old numeric launch values, including at least:
+
+tests/practice-ground.test.mjs
+tests/basic-attack.test.mjs
+tests/basic-attack-2.test.mjs
+tests/discover.test.mjs
+tests/powers.test.mjs
+tests/clone.test.mjs
+
+and any other tests found by repository-wide search.
+
+Ground BA1 tests expecting 180 horizontal knockback must become 140.
+
+Ground BA2 tests expecting 640 vertical knockback must become 800.
+
+Any test expecting midair BA1 to use midair1ba art must account for the swap.
+
+Any test expecting midair BA2 to use midair2ba art must account for the swap.
+
+The clone uses ground BA1, so tests involving Clone Attack knockback must expect Low horizontal Knockback / 140.
+
+Do not weaken unrelated assertions simply to make the suite pass.
+
+18. Repository-wide cleanup
+
+Search the entire repository for these concepts and remove stale references:
+
+Horizontal Knockback Power
+Vertical Knockback Power
+horizontalKnockback
+verticalKnockback
+ATTACK_POWERS
+HORIZONTAL_KNOCKBACK_POWER_TIERS
+VERTICAL_KNOCKBACK_POWER_TIERS
+getAttackPowerTier
+getHorizontalKnockback
+getVerticalKnockback
+getAttackKnockback
+attack Power
+signed Vertical Knockback Power
+Knockback Power 1
+Knockback Power 2
+Knockback Power 3
+
+After the migration, those terms should not survive in production code, tests, comments, README, or the design specification except where explicitly discussing historical migration—which is not necessary here.
+
+Update comments at the top of js/data/characters.js. They currently instruct future fighters to give attacks Knockback Power tiers; that guidance must instead describe Low/Mid/High Knockback.
+
+Update the comments in js/game/combat.js describing attack Powers.
+
+19. README and ALVA_SPEC.md
+
+Rewrite the relevant documentation so it reflects the final architecture.
+
+The Power documentation should explain only Jump Power and Speed Power.
+
+Add a separate Knockback section describing:
+
+Low
+Mid
+High
+
+Explain that axis and strength are separate.
+
+Explain that reversed vertical Knockback drives downward.
+
+Document the values where the technical README/spec currently documents tuning:
+
+           Low   Mid   High
+Horizontal 140   180   220
+Vertical   480   640   800
+
+Document #0001’s final moves:
+
+BA1: Low horizontal
+BA2: High vertical
+Mid-air BA1: Mid negative vertical
+Mid-air BA2: Low vertical
+
+Also document the airborne move swap accurately:
+
+* Mid-air BA1 is now the three-frame kunai/slash move that previously belonged to Mid-air BA2.
+* Mid-air BA2 is now the five-frame airborne kick that previously belonged to Mid-air BA1.
+
+Update animation/frame documentation wherever the old associations appear.
+
+Update the Adding a Fighter / Adding an Attack documentation to demonstrate the new syntax instead of powers: { horizontalKnockback: 2 }.
+
+For example:
+
+knockback: {
+  axis: 'horizontal',
+  level: 'low',
+}
+
+and:
+
+knockback: {
+  axis: 'vertical',
+  level: 'mid',
+  sign: -1,
+}
+
+20. Do not change unrelated systems
+
+Do not alter:
+
+* health or Energy
+* Jump Power tuning
+* Speed Power tuning
+* gravity
+* general physics
+* controls
+* Charge behavior
+* Dodge behavior
+* Throw timing
+* shuriken speed/damage
+* Clone Attack Energy cost
+* Sphere Rush timing or bespoke hit values
+* stage behavior
+* HUD
+* input mappings
+* gamepad mappings
+* touch controls
+* animation assets themselves
+* Special being reserved
+
+The task is the Knockback-system replacement, the requested four Basic Attack Knockback values, and the airborne BA1/BA2 move swap.
+
+21. Final acceptance criteria
+
+The work is complete only when all of the following are true:
+
+1. Horizontal Knockback Power no longer exists.
+2. Vertical Knockback Power no longer exists.
+3. powers.js contains no attack Knockback system.
+4. No ordinary attack declares horizontalKnockback or verticalKnockback.
+5. No old attack Knockback tier resolver remains.
+6. A standalone Low/Mid/High Knockback registry/resolver exists.
+7. Low/Mid/High preserve the former tier-1/2/3 magnitudes:
+    horizontal 140/180/220 and vertical 480/640/800.
+8. Ground BA1 declares Low horizontal Knockback and resolves to { x: 140, y: 0 }.
+9. Ground BA2 declares High vertical Knockback and resolves to { x: 0, y: 800 }.
+10. Final Mid-air BA1 declares Mid reversed vertical Knockback and resolves to { x: 0, y: -640 }.
+11. Final Mid-air BA2 declares Low vertical Knockback and resolves to { x: 0, y: 480 }.
+12. An actual Mid-air BA1 hit gives the opponent positive vy and drives it downward.
+13. An actual BA2 hit gives the opponent vy === -800.
+14. Ground BA1 still reverses horizontal velocity correctly with fighter facing.
+15. Mid-air BA1 and Mid-air BA2 have completely exchanged their previous airborne move identities.
+16. The final midairBa1 uses the former midair2ba 3-frame kunai/slash artwork and corresponding move package.
+17. The final midairBa2 uses the former midair1ba 5-frame kick artwork and corresponding move package.
+18. action1.air still semantically starts midairBa1.
+19. action2.air still semantically starts midairBa2.
+20. The shuriken remains zero knockback.
+21. Clone Attack inherits ground BA1’s new Low horizontal Knockback.
+22. Jump Power and Speed Power remain unchanged.
+23. Discover’s Power page contains only the remaining Powers.
+24. Discover exposes Knockback Low/Mid/High as its own mechanic rather than as Powers.
+25. There are no stale old Knockback Power names in production code, tests, README, or ALVA_SPEC.md.
+26. Relevant targeted tests pass.
+27. The complete Node test suite passes.
+
+Run the focused Knockback, Power, BA1, BA2, Discover, Clone, Throw, and Practice tests first. Then run the complete test suite.
+
+Fix regressions caused by this migration rather than deleting assertions or adding compatibility hacks for the removed Knockback Power architecture.
+
+Keep the result clean, data-driven, and easy for future fighters to configure.
