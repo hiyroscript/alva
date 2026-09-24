@@ -1,9 +1,9 @@
 // Run with node --test tests/basic-attack.test.mjs (no dependencies).
 // #0001 Basic Attack 1 (BA1) on action1: ground/air selection, clip playback,
 // phase timing, hit resolution (ground BA1's Low horizontal push; mid-air
-// BA1, the three-frame kunai slash, driving the target downward with Mid
-// reversed vertical Knockback) and the other combat inputs (Throw on
-// primary, Special still reserved). Uses the real Fighter, CombatSystem and
+// BA1, the three-frame kunai slash, launching the target upward with Mid
+// vertical Knockback) and the other combat inputs (Throw on primary,
+// Special still reserved). Uses the real Fighter, CombatSystem and
 // physics (see fighter-harness.mjs). Basic Attack 2 (BA2, action2) has its
 // own file, basic-attack-2.test.mjs.
 import test from 'node:test';
@@ -24,15 +24,15 @@ const BA2 = { action2: true, action2Pressed: true };
 const JUMP = { jump: true, jumpPressed: true };
 
 // Each BA1's declared Knockback and its resolved numbers: ground BA1 pushes
-// 140 sideways (Low horizontal); mid-air BA1 drives the target downward at
-// 640 (Mid vertical, reversed) and pushes it nowhere.
+// 140 sideways (Low horizontal); mid-air BA1 launches the target upward at
+// 640 (Mid vertical) and pushes it nowhere.
 const BA1_KNOCKBACK = {
   ba1: { axis: 'horizontal', level: 'low' },
-  midairBa1: { axis: 'vertical', level: 'mid', sign: -1 },
+  midairBa1: { axis: 'vertical', level: 'mid' },
 };
 const BA1_RESOLVED = {
   ba1: { x: 140, y: 0 },
-  midairBa1: { x: 0, y: -640 },
+  midairBa1: { x: 0, y: 640 },
 };
 
 // Each BA1's whole data entry. Ground BA1 is the four-frame punch; mid-air
@@ -111,12 +111,12 @@ test('BA1 attack definitions match their clips: the ground punch and the mid-air
   assert.ok(a.cooldown > g.cooldown);
 });
 
-test('BA1 knockback comes only from its Knockback level, not a raw value: Low horizontal, Mid reversed vertical in mid-air', () => {
+test('BA1 knockback comes only from its Knockback level, not a raw value: Low horizontal, Mid vertical in mid-air', () => {
   assert.equal(KNOCKBACK_LEVELS.low.horizontal, 140);
   assert.equal(KNOCKBACK_LEVELS.mid.vertical, 640);
   const { fighter } = makeFighter();
   assert.deepEqual(fighter.attacks.ba1.knockback, { x: KNOCKBACK_LEVELS.low.horizontal, y: 0 });
-  assert.deepEqual(fighter.attacks.midairBa1.knockback, { x: 0, y: -KNOCKBACK_LEVELS.mid.vertical });
+  assert.deepEqual(fighter.attacks.midairBa1.knockback, { x: 0, y: KNOCKBACK_LEVELS.mid.vertical });
   for (const id of ['ba1', 'midairBa1']) {
     const source = def.attacks[id];
     assert.deepEqual(source.knockback, BA1_KNOCKBACK[id], `${id} declares a Knockback descriptor`);
@@ -128,7 +128,7 @@ test('BA1 knockback comes only from its Knockback level, not a raw value: Low ho
       const atk = createAttackDefinition({ id, ...source, knockback: { ...source.knockback, level } });
       const expected = id === 'ba1'
         ? { x: KNOCKBACK_LEVELS[level].horizontal, y: 0 }
-        : { x: 0, y: -KNOCKBACK_LEVELS[level].vertical };
+        : { x: 0, y: KNOCKBACK_LEVELS[level].vertical };
       assert.deepEqual(atk.knockback, expected, `${id} at ${level}`);
     }
     // Everything else about BA1 is its entry's own.
@@ -486,9 +486,9 @@ test('mid-air BA1 hits a grounded opponent below and in front while still airbor
   assert.equal(target.combat.health, 92);
 });
 
-test('a mid-air BA1 hit drives the target downward with no sideways push: vx 0, vy +640', () => {
+test('a mid-air BA1 hit launches a grounded target straight up with no sideways push: vx 0, vy -640', () => {
   for (const facing of [1, -1]) {
-    const { attacker, target, tick, events } = midairBa1Duel({ attackerFacing: facing });
+    const { attacker, target, tick, until, events } = midairBa1Duel({ attackerFacing: facing });
     const floor = target.body.y;
     const startX = target.body.x;
     while (!events.length) tick();
@@ -497,20 +497,41 @@ test('a mid-air BA1 hit drives the target downward with no sideways push: vx 0, 
     assert.equal(attacker.facing, facing);
     // At impact, before the target's next step: CombatSystem.applyHit set it.
     assert.ok(isZero(target.body.vx), 'no horizontal knockback');
-    assert.equal(target.body.vy, 640, 'positive body vy: downward, not a launch');
-    // Knocked into the floor it stands on: it never rises, and settles back
-    // on the ground.
-    while (target.combat.stun > 0 || target.combat.hitstop > 0) {
-      tick();
-      assert.ok(target.body.y >= floor, 'never lifted off the ground');
-      assert.equal(target.body.y, floor, 'never pushed through the floor');
-    }
-    assert.equal(target.grounded, true);
-    assert.equal(target.body.x, startX, 'never pushed sideways');
+    assert.equal(target.body.vy, -640, 'negative body vy: launched upward');
+    assert.equal(target.grounded, false);
+    // It rises, then gravity brings it back down where it stood.
+    let top = floor;
+    until(() => {
+      top = Math.min(top, target.body.y);
+      assert.equal(target.body.x, startX, 'straight up and down');
+      return target.grounded;
+    });
+    assert.ok(floor - top > 5, `rose ${(floor - top).toFixed(1)} units`);
+    assert.equal(target.body.y, floor, 'lands where it stood');
   }
 });
 
-test('a blocked mid-air BA1 is neither driven downward nor pushed', () => {
+test('a mid-air BA1 hit launches less high than a ground BA2 hit', () => {
+  // Highest point a grounded target reaches after the hit.
+  const peak = (air) => {
+    const d = air ? midairBa1Duel() : duel();
+    if (!air) d.tick(BA2);
+    while (!d.events.length) d.tick();
+    const floor = d.target.body.y;
+    let top = floor;
+    d.until(() => {
+      top = Math.min(top, d.target.body.y);
+      return d.target.grounded;
+    });
+    return floor - top;
+  };
+  const slash = peak(true);
+  const ground = peak(false);
+  assert.ok(slash > 0, 'mid-air BA1 lifts the target');
+  assert.ok(slash < ground, `a lower launch than ground BA2 (${slash.toFixed(1)} < ${ground.toFixed(1)})`);
+});
+
+test('a blocked mid-air BA1 is neither launched nor pushed', () => {
   const blocker = { ...def, defense: { type: 'block' } };
   const d = duel({ targetCharacter: blocker });
   d.tick(JUMP, { defense: true });
@@ -520,59 +541,9 @@ test('a blocked mid-air BA1 is neither driven downward nor pushed', () => {
   while (!d.events.length && d.attacker.combat.attack) d.tick({}, { defense: true });
   assert.equal(d.events.length, 1);
   assert.equal(d.events[0].type, 'block');
-  assert.equal(d.target.body.vy, 0, 'no downward knockback on a block');
+  assert.equal(d.target.body.vy, 0, 'no vertical knockback on a block');
   assert.ok(isZero(d.target.body.vx), 'no horizontal knockback to halve');
   assert.equal(d.target.grounded, true);
-});
-
-test('a mid-air BA1 hit on a rising target reverses it: driven downward instead of carrying on up', () => {
-  // #0001 jumps and presses BA1 on the way down; the target jumps `delay`
-  // ticks after that press, so the slash meets it on its way up. Each run
-  // logs the target from its jump until it lands.
-  const run = (delay, kick) => {
-    const d = duel();
-    d.tick(JUMP);
-    d.until(() => d.attacker.body.vy > 0 && d.attacker.body.y > 650);
-    const log = [];
-    for (let i = 0; i < 600 && !(log.length && d.target.grounded); i++) {
-      const hits = d.events.length;
-      const before = { y: d.target.body.y, vy: d.target.body.vy };
-      d.tick(i === 0 && kick ? BA1 : {}, i === delay ? { jump: true, jumpPressed: true } : {});
-      if (i >= delay) {
-        log.push({ before, y: d.target.body.y, vx: d.target.body.vx, vy: d.target.body.vy, hit: d.events.length > hits, grounded: d.target.grounded });
-      }
-    }
-    return { d, log };
-  };
-  // The first jump delay whose slash lands while the target is still rising.
-  let delay = 0;
-  let kicked = null;
-  for (; delay < 12; delay++) {
-    kicked = run(delay, true);
-    const hit = kicked.log.find((s) => s.hit);
-    if (hit && hit.before.vy < 0) break;
-  }
-  assert.ok(delay < 12, 'the slash meets a rising target');
-  const plain = run(delay, false);
-  assert.equal(plain.d.events.length, 0);
-  assert.equal(kicked.d.events.length, 1);
-  assert.equal(kicked.d.events[0].type, 'hit');
-  const at = kicked.log.findIndex((s) => s.hit);
-  const impact = kicked.log[at];
-  assert.equal(impact.grounded, false, 'hit in the air');
-  assert.ok(impact.before.vy < 0, 'rising until the slash');
-  assert.equal(impact.vy, 640, 'positive body vy: driven downward');
-  assert.ok(isZero(impact.vx), 'and never pushed sideways');
-  // Without the slash the target carries on up; with it, from the hit to
-  // touchdown it only ever moves down (or holds, frozen by the impact's
-  // hitstop).
-  assert.ok(plain.log[at + 1].y < plain.log[at].y, 'unhit, it keeps rising');
-  for (let i = at + 1; i < kicked.log.length; i++) {
-    assert.ok(kicked.log[i].y >= kicked.log[i - 1].y, `tick ${i}: never lifted`);
-  }
-  assert.ok(Math.min(...kicked.log.slice(at).map((s) => s.y)) >= impact.y, 'never above where it was hit');
-  assert.equal(kicked.d.target.grounded, true, 'lands');
-  assert.ok(kicked.log.length < plain.log.length, 'lands sooner than the unhit jump');
 });
 
 test('the training CPU never presses a combat button', () => {

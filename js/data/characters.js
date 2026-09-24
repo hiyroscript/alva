@@ -501,9 +501,9 @@ export const CHARACTERS = [
     // right from the fighter's origin (bottom-centre) and mirror with facing.
     // Each attack's `knockback` is an axis and a Low / Mid / High level
     // (js/data/knockback.js): ground BA1 pushes sideways (Low horizontal),
-    // mid-air BA1 drives the target downward (Mid vertical, reversed), ground
-    // BA2 launches it upward hard (High vertical) and mid-air BA2 launches it
-    // upward less high (Mid vertical).
+    // mid-air BA1 launches the target upward (Mid vertical), ground BA2
+    // launches it upward hard (High vertical) and mid-air BA2 drives it
+    // downward hard (High vertical, reversed).
     attacks: {
       // Frame 1 wind-up, frame 2 punch, frames 3-4 recovery.
       ba1: {
@@ -524,7 +524,7 @@ export const CHARACTERS = [
       // downward kunai slash. The clip has no recovery frame, so the attack
       // ends with it; the longer cooldown makes up for the missing recovery.
       // The hitbox covers the slash arc in front of the fighter, and it
-      // drives the target downward. Chosen only by action1's `air` branch.
+      // launches the target upward. Chosen only by action1's `air` branch.
       midairBa1: {
         animation: 'midairBa1',
         startup: 2 / BA1_FPS,
@@ -532,7 +532,7 @@ export const CHARACTERS = [
         recovery: 0,
         damage: 8,
         hitbox: { x: 14, y: -100, w: 22, h: 80 },
-        knockback: { axis: 'vertical', level: 'mid', sign: -1 },
+        knockback: { axis: 'vertical', level: 'mid' },
         hitstun: 0.24,
         blockstun: 0.15,
         hitstop: 0.07,
@@ -559,8 +559,8 @@ export const CHARACTERS = [
         groundOnly: true,
       },
       // Frames 1-2 wind-up, frame 3 kick (the forward-low arc), frames 4-5
-      // recovery. Launches the target upward, less high than ground BA2.
-      // Chosen only by action2's `air` branch.
+      // recovery. Drives the target hard downward. Chosen only by action2's
+      // `air` branch.
       midairBa2: {
         animation: 'midairBa2',
         startup: 2 / BA2_FPS,
@@ -568,7 +568,7 @@ export const CHARACTERS = [
         recovery: 2 / BA2_FPS,
         damage: 6,
         hitbox: { x: 8, y: -44, w: 40, h: 40 },
-        knockback: { axis: 'vertical', level: 'mid' },
+        knockback: { axis: 'vertical', level: 'high', sign: -1 },
         hitstun: 0.22,
         blockstun: 0.14,
         hitstop: 0.06,

@@ -596,7 +596,7 @@ read the character database, so it stays the same as fighters are added.
   idle), and normal states resume when it ends. It is a visual state only:
   no physics or collider changes. Missing hurt art holds an idle frame.
 - Basic Attack 1 (BA1) is #0001's first attack, on the `action1` input. On the
-  ground it is a punch (`ba1`, 4 frames); in the air a downward kunai slash
+  ground it is a punch (`ba1`, 4 frames); in the air a kunai slash
   (`midairBa1`, 3 frames: `midair2ba1`–`midair2ba3`); the character data
   maps `action1: { ground, air }` and the fighter picks by grounded state
   when the button is pressed. Both play once at 12 fps, and the phases are
@@ -610,12 +610,11 @@ read the character database, so it stays the same as fighters are added.
   opponent 140 away (at impact vx 140 × facing) with no vertical knockback.
   Mid-air BA1 hits once for 8 damage, 0.24 s hitstun, 0.15 s blockstun,
   0.07 s hitstop and a 0.18 s cooldown (longer, making up for the missing
-  recovery), and declares Mid vertical Knockback, reversed (`knockback: {
-  axis: 'vertical', level: 'mid', sign: -1 }`, resolved `{ x: 0, y: −640 }`):
-  an unblocked hit drives the opponent downward with no sideways push (at
-  impact vx 0, vy +640). A grounded opponent is knocked straight back onto
-  the ground it stands on; an airborne one is sent down toward it. A blocked
-  mid-air BA1 is neither pushed nor driven downward. Hitboxes match the
+  recovery), and declares Mid vertical Knockback (`knockback: { axis:
+  'vertical', level: 'mid' }`, resolved `{ x: 0, y: 640 }`): an unblocked
+  hit launches the opponent upward with no sideways push (at impact vx 0,
+  vy −640), less high than ground BA2's launch. A blocked mid-air BA1 is
+  neither pushed nor launched. Hitboxes match the
   strike in the contact frame (the punch; the slash arc in front of the
   fighter) and mirror with facing. Movement and facing lock while an attack
   plays; gravity still applies, and a mid-air BA1 that lands finishes its
@@ -637,13 +636,15 @@ read the character database, so it stays the same as fighters are added.
   airborne, rising well above a fighter's height before normal gravity
   brings it down). Mid-air BA2 hits once for 6 damage, 0.22 s hitstun,
   0.14 s blockstun and 0.06 s hitstop, with a 0.1 s cooldown, and declares
-  Mid vertical Knockback (`knockback: { axis: 'vertical', level: 'mid' }`,
-  resolved `{ x: 0, y: 640 }`): still an upward launch (at impact vx 0,
-  vy −640), but a lower one than ground BA2's. Neither has horizontal
-  knockback. The launch comes from the shared knockback path, not special
-  BA2 code. A blocked BA2 still takes chip damage, blockstun and hitstop,
-  but is never launched (vertical knockback applies only to unblocked hits)
-  and is not pushed. Hitboxes cover the ground kick's arc and the airborne
+  High vertical Knockback, reversed (`knockback: { axis: 'vertical', level:
+  'high', sign: -1 }`, resolved `{ x: 0, y: −800 }`): an unblocked hit
+  drives the opponent downward just as hard (at impact vx 0, vy +800). A
+  grounded opponent is knocked straight back onto the ground it stands on;
+  an airborne one is sent down toward it. Neither has horizontal knockback.
+  Both come from the shared knockback path, not special BA2 code. A blocked
+  BA2 still takes chip damage, blockstun and hitstop, but is never launched
+  or driven down (vertical knockback applies only to unblocked hits) and is
+  not pushed. Hitboxes cover the ground kick's arc and the airborne
   kick's forward-low arc in front of the fighter and mirror with facing.
   The same movement/facing lock applies, gravity keeps working, and a
   mid-air BA2 that lands finishes its own clip instead of switching to
@@ -1061,8 +1062,8 @@ read the character database, so it stays the same as fighters are added.
   | --- | --- | --- |
   | Ground BA1 | Low horizontal | `{ x: 140, y: 0 }` |
   | Ground BA2 | High vertical | `{ x: 0, y: 800 }` |
-  | Mid-air BA1 | Mid vertical, reversed | `{ x: 0, y: −640 }` |
-  | Mid-air BA2 | Mid vertical | `{ x: 0, y: 640 }` |
+  | Mid-air BA1 | Mid vertical | `{ x: 0, y: 640 }` |
+  | Mid-air BA2 | High vertical, reversed | `{ x: 0, y: −800 }` |
 
   Those attacks have no raw numeric `knockback`: the levels are the only
   sources. Knockback never depends on either fighter's Jump or Speed Power.

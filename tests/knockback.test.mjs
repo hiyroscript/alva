@@ -320,18 +320,18 @@ test('Knockback is not a Power, and ignores Jump Power and Speed Power on either
 
 // ---- #0001 ----------------------------------------------------------------------------
 
-test('#0001\'s Basic Attacks: ba1 Low horizontal, ba2 High vertical, midairBa1 Mid reversed vertical, midairBa2 Mid vertical', () => {
+test('#0001\'s Basic Attacks: ba1 Low horizontal, ba2 High vertical, midairBa1 Mid vertical, midairBa2 High reversed vertical', () => {
   assert.deepEqual(def.attacks.ba1.knockback, { axis: 'horizontal', level: 'low' });
   assert.deepEqual(def.attacks.ba2.knockback, { axis: 'vertical', level: 'high' });
-  assert.deepEqual(def.attacks.midairBa1.knockback, { axis: 'vertical', level: 'mid', sign: -1 });
-  assert.deepEqual(def.attacks.midairBa2.knockback, { axis: 'vertical', level: 'mid' });
+  assert.deepEqual(def.attacks.midairBa1.knockback, { axis: 'vertical', level: 'mid' });
+  assert.deepEqual(def.attacks.midairBa2.knockback, { axis: 'vertical', level: 'high', sign: -1 });
 
   const { value: fighter, warnings: logged } = warnings(() => makeFighter().fighter);
   assert.deepEqual(logged, [], '#0001\'s data is valid');
   assert.deepEqual(fighter.attacks.ba1.knockback, { x: 140, y: 0 });
   assert.deepEqual(fighter.attacks.ba2.knockback, { x: 0, y: 800 });
-  assert.deepEqual(fighter.attacks.midairBa1.knockback, { x: 0, y: -640 });
-  assert.deepEqual(fighter.attacks.midairBa2.knockback, { x: 0, y: 640 });
+  assert.deepEqual(fighter.attacks.midairBa1.knockback, { x: 0, y: 640 });
+  assert.deepEqual(fighter.attacks.midairBa2.knockback, { x: 0, y: -800 });
   for (const [id, attack] of Object.entries(def.attacks)) assert.equal('powers' in attack, false, `${id} declares no Powers`);
 });
 
