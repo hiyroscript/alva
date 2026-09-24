@@ -1,2019 +1,2039 @@
 Work from the latest main branch of hiyroscript/alva.
 
-Implement a new attack mechanic for Character #0001:
+Implement #0001’s new Charged BA2 technique using the newly uploaded rasen fighter frames and prasen blue-sphere effect frames.
 
-While #0001 is already Charging, pressing Basic Attack 1 summons a temporary clone behind the opponent. The clone appears through the new clone-cloud animation, uses #0001’s existing character sprites to perform Basic Attack 1 from behind the opponent, then disappears through the same cloud animation played in reverse. Successfully summoning a clone costs Energy.
+The intended move is:
+
+Already Charging
+→ press BA2
+→ #0001 enters a preparation pose
+→ a blue sphere forms in his hand
+→ once fully formed, #0001 dashes forward with it
+→ if the sphere misses, the technique ends and #0001 returns to normal
+→ if the sphere hits the opponent, the hit confirms
+→ the opponent is immobilized
+→ #0001 continues the contact/recovery animation
+→ after about 2 seconds the sphere explodes
+→ the explosion deals a much larger second hit
+→ the opponent is released/launched
+
+The technique is strictly ground-dependent.
+
+If #0001 loses the ground beneath him while the sequence is active:
+
+cancel the technique
+→ remove the sphere
+→ release any temporary immobilization
+→ #0001 enters Fall
+
+Do not allow the move to hover across gaps.
 
 Preserve the existing:
 
-* Charge startup / loop / voluntary release
-* ordinary ground and mid-air BA1
-* BA2
-* Throw + shuriken projectiles
-* Defense / Dodge
-* Energy HUD
-* movement and physics
-* controls
-* training CPU behavior
-* result logic
+* Charge
+* Charged BA1 Clone Attack
+* Energy system
+* normal BA1
+* normal ground/mid-air BA2
+* Throw + shuriken
+* Defense/Dodge
+* clone system
+* projectile system
+* fixed-step physics
+* HUD
+* training CPU
 
-Do not replace or rewrite systems that already work.
+Do not replace working systems.
 
-1. Current relevant game state
+1. Current Charged-action architecture
 
-The current game already has:
+The current game already supports:
 
-Charge
-BA1 / Mid-Air BA1
-BA2 / Mid-Air BA2
-Throw + shuriken projectile
-Defense / Dodge
-Energy
-
-#0001 currently has:
-
-maxEnergy = 100
-energy = 100
-
-Energy starts full and resets to full on restart/rematch.
-
-At the moment, nothing spends Energy.
-
-This task makes the clone attack the first mechanic that spends it.
-
-2. Trigger: Charged BA1
-
-The clone attack uses the existing controls.
-
-Do not add a new button or key.
-
-The input combination is:
-
-already Charging
-+
-Basic Attack 1 pressed
-
-BA1 remains:
-
-Keyboard: U
-Gamepad: B / Circle
-Touch: BA1
-internal action: action1
-
-Charge remains:
-
-Keyboard: S / ↓
-Gamepad: D-pad down / left-stick down
-Touch: C
-
-3. The player must already be Charging
-
-This is an intentional sequence:
-
-Charge
-then
-BA1
-
-Do not activate the clone from an idle simultaneous press such as:
-
-ChargePressed + BA1Pressed
-
-on the same first simulation step.
-
-The fighter must have actually entered the Charge state on a previous step.
-
-Conceptually:
-
-wasCharging === true
-input.charge === true
-input.action1Pressed === true
-
-is eligible for Clone Attack.
-
-This preserves the meaning of:
-
-when charging, then use BA1
-
-4. Releasing Charge while pressing BA1 is not Clone Attack
-
-If #0001 was charging but the player releases Charge on the same step BA1 is pressed:
-
-input.charge === false
-action1Pressed === true
-
-keep the existing behavior:
-
-normal BA1 begins immediately
-
-Do not summon the clone.
-
-Do not play chargeRelease before that normal BA1.
-
-This preserves the current Charge-interruption rule.
-
-5. Ordinary BA1 must remain unchanged
-
-Outside of the valid Charged BA1 condition:
-
-U / B / BA1
-
-continues to perform the existing BA1.
-
-Ground:
-
-0001_1ba1
-→ 0001_1ba2
-→ 0001_1ba3
-→ 0001_1ba4
-
-Air:
-
-0001_midair1ba1
-→ ...
-→ 0001_midair1ba5
-
-Do not alter:
-
-* BA1 damage
-* BA1 hitbox
-* BA1 startup
-* BA1 recovery
-* Mid-Air BA1
-* BA1 cooldown
-* BA1 input
-
-The clone attack is an additional Charged BA1 behavior, not a replacement for BA1.
-
-6. Energy cost
-
-Add a data-driven Energy cost for this move.
-
-Use:
-
-Clone Attack cost = 25 Energy
-
-as the initial value.
-
-For #0001:
-
-max Energy = 100
-
-so a full meter supports four successful clone summons if no other Energy mechanics exist.
-
-Store this in character/move data rather than scattering:
-
-25
-
-through Fighter/Battle code.
-
-For example:
-
-cloneAttack: {
-  energyCost: 25,
-  ...
+chargedActions: {
+  action1: 'ba1Clone'
 }
 
-7. Spend Energy exactly once
+but the implementation currently assumes a charged action is specifically a summon and routes it through trySummon().
 
-On a successful Charged BA1 clone activation:
+That assumption is no longer sufficient.
 
-100 → 75
-75 → 50
-50 → 25
-25 → 0
+After this task there are two different kinds of charged actions:
 
-Deduct Energy exactly once when the summon command is successfully accepted.
+Charged BA1
+→ summon-type charged action
+→ Clone Attack
+Charged BA2
+→ self-performed sequence/rush charged action
+→ new sphere technique
 
-Do not deduct Energy:
+Generalize the dispatcher cleanly.
 
-* once per cloud frame
-* once when the clone attacks
-* again when it disappears
-* when the clone hits
-* when the clone misses
+Do not disguise the Charged BA2 technique as:
 
-One clone summon = one Energy payment.
+* a summon
+* a projectile
+* ordinary BA2
+* a giant melee hitbox
 
-8. Add Energy helpers
+2. Generalize chargedActions
 
-Instead of arbitrary mutation throughout gameplay, give CombatState small reusable Energy helpers.
-
-For example:
-
-canSpendEnergy(amount)
-spendEnergy(amount)
-
-spendEnergy() should:
-
-* return false when insufficient
-* never make Energy negative
-* return true and deduct exactly once when sufficient
+Prefer changing the character data to typed charged-action descriptors.
 
 Conceptually:
 
-spendEnergy(25)
-
-from 25 must produce exactly:
-
-0
-
-not a negative value.
-
-9. Insufficient Energy fallback
-
-If #0001 is Charging and BA1 is pressed but has less than the required Energy:
-
-energy < 25
-
-do not summon a clone.
-
-Do not consume Energy.
-
-Instead, preserve BA1 usability and fall back to the existing normal grounded BA1.
-
-Example:
-
-Energy = 10
-Charging + BA1
-→ normal BA1
-→ Energy remains 10
-
-Do not make BA1 become a dead button merely because the resource is low.
-
-10. Existing Energy behavior otherwise remains unchanged
-
-Do not introduce:
-
-* passive Energy regeneration
-* Charge generating Energy
-* hits generating Energy
-* Dodge generating Energy
-* Throw consuming Energy
-* BA1 consuming Energy
-* BA2 consuming Energy
-
-For this task, the only Energy expenditure is:
-
-successful Charged BA1 Clone Attack
-
-Restart/rematch still restores Energy to full.
-
-Winner logic remains Health-only.
-
-11. New clone-cloud assets
-
-The repository root currently contains the corrected complete set:
-
-0001_cloneav1.png
-0001_cloneav2.png
-0001_cloneav3.png
-0001_cloneav4.png
-0001_cloneav5.png
-0001_cloneav6.png
-0001_cloneav7.png
-0001_cloneav8.png
-0001_cloneav9.png
-0001_cloneav10.png
-
-Move all ten files into:
-
-./assets/characters/0001/
-
-Final paths:
-
-./assets/characters/0001/0001_cloneav1.png
-./assets/characters/0001/0001_cloneav2.png
-./assets/characters/0001/0001_cloneav3.png
-./assets/characters/0001/0001_cloneav4.png
-./assets/characters/0001/0001_cloneav5.png
-./assets/characters/0001/0001_cloneav6.png
-./assets/characters/0001/0001_cloneav7.png
-./assets/characters/0001/0001_cloneav8.png
-./assets/characters/0001/0001_cloneav9.png
-./assets/characters/0001/0001_cloneav10.png
-
-Remove the root copies.
-
-Preserve the bytes exactly.
-
-Do not redraw, recolour, resize, rotate, replace or AI-generate them.
-
-12. Do not reintroduce the typo asset
-
-An earlier upload temporarily used:
-
-0001_ cloneav8.png
-
-with an accidental space.
-
-That incorrect file was already deleted and replaced by:
-
-0001_cloneav8.png
-
-Do not recreate the typo filename.
-
-Only use:
-
-0001_cloneav8.png
-
-13. Exact cloud appearance order
-
-The clone’s appearance cloud must play:
-
-cloneav1
-→ cloneav2
-→ cloneav3
-→ cloneav4
-→ cloneav5
-→ cloneav6
-→ cloneav7
-→ cloneav8
-→ cloneav9
-→ cloneav10
-
-exactly once.
-
-Do not loop the appearance sequence.
-
-14. Exact cloud disappearance order
-
-When the clone vanishes, reuse those same ten real frames in reverse:
-
-cloneav10
-→ cloneav9
-→ cloneav8
-→ cloneav7
-→ cloneav6
-→ cloneav5
-→ cloneav4
-→ cloneav3
-→ cloneav2
-→ cloneav1
-
-Do not create:
-
-clonevanish1...
-
-assets.
-
-Do not duplicate/reverse the PNG files on disk.
-
-Reverse the frame list/runtime playback in code.
-
-15. Cloud animation rate
-
-Add a dedicated constant such as:
-
-const CLONE_CLOUD_FPS = 20;
-
-Use it for both:
-
-appear
-vanish
-
-so appearance and disappearance have symmetrical timing.
-
-At 20 FPS:
-
-10 frames = 0.5 seconds
-
-per cloud pass.
-
-Inspect the actual animation in the browser before finalizing. If the provided sprites clearly need a slightly different playback rate, tune the one shared constant, not individual frames.
-
-The required properties are:
-
-* appearance order is 1→10
-* disappearance order is 10→1
-* same frame timing in both directions
-
-16. Cloud art is an effect, not a fighter pose
-
-Do not put clone-cloud frames into the normal:
-
-animations
-
-collection and normalize them to fighter height.
-
-The clouds are effect artwork.
-
-The current SpriteSet already separates:
-
-fighter animations
-projectile animations
-
-Extend that idea with something like:
-
-effectAnimations
-
-For example:
-
-effectAnimations: {
-  cloneCloud: {
-    frames: frames(BASE_0001, 'cloneav', 10),
-    fps: CLONE_CLOUD_FPS,
-    loop: false,
-    sourceFacing: 0,
+chargedActions: {
+  action1: {
+    type: 'summon',
+    id: 'ba1Clone',
+  },
+  action2: {
+    type: 'technique',
+    id: 'rasenRush',
   },
 }
 
-sourceFacing: 0 means the cloud is direction-neutral and should not flip merely because the clone faces left.
+Then Fighter can do something conceptually like:
 
-17. Normalize effects at actual art scale
-
-Process clone-cloud artwork similarly to projectile art:
-
-* detect its pixel grid
-* preserve its native art size
-* use #0001’s existing world-per-art-pixel scale
-* do not fit it to fighter height
-
-Expose something conceptually like:
-
-sprites.effect('cloneCloud')
-
-Do not let the cloud become a full fighter-sized image merely because it belongs to #0001.
-
-18. Preload cloud frames with #0001
-
-Extend:
-
-characterFramePaths(def)
-
-so it includes:
-
-fighter animations
-projectile animations
-effect animations
-
-All ten clone-cloud files must be loaded before battle.
-
-Do not load the cloud files only after BA1 is pressed.
-
-19. The clone is not another Fighter
-
-Do not instantiate a normal Fighter for the clone.
-
-A normal Fighter brings unwanted systems:
-
-* Health
-* Energy
-* player controls
-* CPU controller
-* pushbox
-* camera tracking
-* stage collision
-* HUD
-* result participation
-* facing AI
-* jump/coyote logic
-
-The clone is a temporary summon/attack entity.
-
-Add a dedicated implementation such as:
-
-js/game/clone.js
-
-or a more general:
-
-js/game/summon.js
-
-if written cleanly.
-
-20. Suggested clone entity state
-
-A clone entity should own only what it actually needs.
-
-Conceptually:
-
-{
-  owner,
-  target,
-  x,
-  y,
-  facing,
-  phase,       // appear | attack | vanish
-  time,
-  animator,    // uses owner's actual #0001 SpriteSet for BA1
-  cloudAnim,
-  attackDef,
-  hasHit,
-  hitstop,
-  alive,
+if (charged) {
+  if (this.tryChargedAction(action, ctx)) continue;
 }
+this.tryAction(action);
 
-Do not give it:
+tryChargedAction() should dispatch based on type.
 
-health
-energy
-controller
-pushbox
-jump buffer
-coyote time
+Keep Charged BA1 behavior unchanged.
 
-21. Use the same #0001 character sprites
+Do not make Clone Attack depend on the new rush-specific code.
 
-The clone is visually another #0001.
+3. Same Charged-action activation rule
 
-Do not create special clone-body sprites.
+Use the rule already established by Charged BA1.
 
-Reuse the owner’s existing normalized #0001 fighter animation.
+The player must have been actually Charging on an earlier simulation step, and Charge must still be held when BA2 is newly pressed.
 
-For this move, the clone attacks with the existing:
+Correct:
 
-ba1
+enter Charge
+→ keep Charge held
+→ press BA2
+→ Charged BA2 technique
 
-clip:
+Not correct:
 
-0001_1ba1
-→ 0001_1ba2
-→ 0001_1ba3
-→ 0001_1ba4
+standing
+→ press Charge + BA2 simultaneously
+→ charged technique
 
-Use the same source-facing metadata and rendering rules already used for #0001.
+Fresh simultaneous Charge + BA2 from Idle should continue to give ordinary BA2 according to existing action priority.
 
-Do not tint the clone.
+4. Releasing Charge while pressing BA2
 
-Do not make it translucent.
+If #0001 was charging but Charge is released on the exact BA2 press step:
 
-Do not generate a fake silhouette.
+Charge held last step
+Charge = false now
+BA2Pressed = true
 
-The visible clone body should use the same real #0001 sprite artwork.
+use the existing normal BA2.
 
-22. Clone lifecycle
+Do not activate Charged BA2.
 
-A successful summon has exactly three phases:
+Do not play chargeRelease before BA2.
 
-APPEAR
-→ ATTACK
-→ VANISH
-→ REMOVE
+5. Once Charged BA2 starts, Charge no longer needs to stay held
 
-No idle AI phase is needed.
+Charge is the activation prerequisite.
 
-23. APPEAR phase
+Once the technique has successfully begun:
 
-At the chosen position behind the opponent:
+formation
+→ dash
+→ confirmed sequence
+→ delayed explosion
 
-cloneav1
-→ ...
-→ cloneav10
+owns the fighter.
 
-plays once.
+The player may release the Charge control afterward without cancelling it.
 
-During APPEAR:
+The technique only ends through its defined:
 
-* no clone attack hitbox
-* no damage
-* no pushbox
-* clone cannot be hit
-* clone does not move
-* clone does not track the target
+* miss
+* ground-loss cancellation
+* hitstun/interruption
+* successful completion
+* battle reset
 
-The effect is purely the summoning animation.
+6. New uploaded fighter frames
 
-24. Transition from cloud to clone
+The repository root currently contains:
 
-When cloneav10 completes:
+0001_rasen1.png
+0001_rasen2.png
+0001_rasen3.png
+0001_rasen4.png
+0001_rasen5.png
+0001_rasen6.png
+0001_rasen7.png
+0001_rasen8.png
+0001_rasen9.png
+0001_rasen10.png
+0001_rasen11.png
+0001_rasen12.png
 
-* the cloud appearance phase ends
-* the #0001 clone becomes fully visible
-* the clone begins BA1 from frame 1 immediately
+Move all twelve into:
 
-A visually smooth implementation may draw the clone beneath the final cloud frame on the last appearance instant if that looks correct.
+./assets/characters/0001/
 
-Do not invent extra transition sprites.
+Final canonical paths:
 
-25. ATTACK phase
+./assets/characters/0001/0001_rasen1.png
+...
+./assets/characters/0001/0001_rasen12.png
 
-The clone performs exactly one ordinary grounded BA1 using #0001’s existing BA1 animation and combat values.
+Remove all twelve root copies.
 
-Reuse the current BA1 definition:
+Preserve their bytes exactly.
 
-startup: frame 1
-active: frame 2
-recovery: frames 3–4
-damage: 6
-hitstun: 0.22
-blockstun: 0.14
-hitstop: 0.06
-horizontal knockback: 180
+Do not redraw, recolour, flip, resize, regenerate or replace them.
 
-Do not make a separate stronger clone BA1 unless a later design change requests it.
+7. New blue-sphere frames
 
-26. Reuse BA1 hitbox data
+The repository root also contains:
 
-Do not manually copy a second hard-coded hitbox if avoidable.
+0001_prasen1.png
+0001_prasen2.png
+0001_prasen3.png
+0001_prasen4.png
+0001_prasen5.png
+0001_prasen6.png
+0001_prasen7.png
+0001_prasen8.png
+0001_prasen9.png
+0001_prasen10.png
+0001_prasen11.png
 
-The clone should use the existing:
+Move all eleven into:
 
-attacks.ba1
+./assets/characters/0001/
 
-definition as its attack data.
+Remove the root copies.
 
-That keeps:
+Preserve the files exactly.
 
-* artwork timing
-* active frame
-* damage
-* knockback
-* blockstun
-* hitstun
+8. Interpret the fighter artwork as three phases
 
-in sync with ordinary BA1.
-
-27. Clone attack is detached from its owner
-
-The clone’s hit belongs to #0001 for damage/event attribution, but it occurs at the clone’s own position and facing.
-
-Do not resolve its hitbox from:
-
-owner.body.x
-owner.body.y
-owner.facing
+Register the twelve fighter frames as separate logical clips rather than one blindly playing animation.
 
 Use:
 
-clone.x
-clone.y
-clone.facing
+rasenForm
+rasenDash
+rasenConfirm
 
-The owner can be somewhere completely different by the time the punch connects.
+Formation
 
-28. Clone hit must not freeze the real #0001
+rasen1
+rasen2
+rasen3
 
-Existing ordinary melee hitstop freezes the attacking Fighter.
+Dash/search
 
-A clone is a detached attacker.
+rasen4
+rasen5
+rasen6
 
-When its BA1 connects:
+Successful-contact continuation/recovery
 
-* target receives normal BA1 hitstop
-* clone itself may visually pause for BA1’s hitstop
-* real #0001 must continue normally
+rasen7
+rasen8
+rasen9
+rasen10
+rasen11
+rasen12
 
-Do not apply:
+This cleanly implements the requested rule:
 
-owner.combat.hitstop
+continue the animation sequence only if the sphere collides.
 
-because the clone hit something somewhere else.
+A miss never plays rasen7–12.
 
-Generalize CombatSystem.applyHit() if needed with an option such as:
+9. Initial fighter playback rate
 
-detached: true
+Use:
+
+const RASEN_FPS = 12;
+
+as the starting playback rate.
+
+All timing should derive from frame timing rather than arbitrary milliseconds where possible.
+
+Inspect the real result in-browser before finalizing.
+
+10. Normal fighter normalization
+
+The rasen frames are #0001 fighter poses.
+
+Register them under normal:
+
+animations
+
+so they use the existing:
+
+* bottom-centre anchor
+* fighter height normalization
+* source-facing support
+* pixel-art grid detection
+
+Do not normalize them as effects.
+
+11. Source orientation
+
+The uploaded rasen fighter frames visibly follow #0001’s normal right-facing art direction.
+
+They should inherit:
+
+sourceFacing: 1
+
+from the character.
+
+Do not add an unnecessary orientation override unless real browser testing proves one frame set differs.
+
+12. Interpret the sphere artwork as three effect clips
+
+Use #0001’s existing effectAnimations architecture, already created for the clone cloud.
+
+Create:
+
+rasenSphereBuild
+rasenSphereImpact
+rasenSphereExplosion
+
+Sphere formation
+
+prasen1
+prasen2
+prasen3
+prasen4
+prasen5
+prasen6
+
+Hit-confirm intensification
+
+prasen7
+prasen8
+prasen9
+
+Explosion
+
+prasen10
+prasen11
+
+Do not create duplicate PNGs.
+
+13. Sphere effect rate
+
+Start with:
+
+const PRASEN_FPS = 12;
+
+That gives:
+
+formation: 6 frames = 0.5 s
+impact:    3 frames = 0.25 s
+explosion: 2 frames ≈ 0.167 s
+
+This matches the visual progression well.
+
+Tune only if real playback clearly requires it.
+
+14. Sphere is an effect, not a projectile
+
+The blue sphere stays attached to either:
+
+#0001's hand
+
+or, after successful contact:
+
+the opponent
+
+It does not independently fly across the stage.
+
+Therefore do not put it under:
+
+projectiles
+
+or instantiate Projectile.
+
+Use:
+
+effectAnimations
+
+and a technique runtime.
+
+15. Effect normalization
+
+The existing SpriteSet effect system already:
+
+* centre-anchors effects
+* keeps their own art size
+* shares #0001’s world-per-art-pixel scale
+* avoids fighter-height scaling
+
+Use it.
+
+Do not scale the sphere to #0001’s body height.
+
+16. Sphere orientation
+
+The sphere itself is direction-neutral.
+
+Use:
+
+sourceFacing: 0
+
+for its effect clips.
+
+Do not horizontally mirror a round energy effect merely because #0001 faces left.
+
+Its position offset should mirror with #0001’s facing, not the artwork.
+
+17. Preload all new art
+
+Extend the existing character preload path naturally through:
+
+animations
++
+projectileAnimations
++
+effectAnimations
+
+All 23 new files must be loaded before battle.
+
+Do not load them when BA2 is pressed.
+
+18. Add a data-driven Charged BA2 definition
+
+Store the move in character data.
+
+For example:
+
+chargedTechniques: {
+  rasenRush: {
+    formAnimation: 'rasenForm',
+    dashAnimation: 'rasenDash',
+    confirmAnimation: 'rasenConfirm',
+    sphereBuild: 'rasenSphereBuild',
+    sphereImpact: 'rasenSphereImpact',
+    sphereExplosion: 'rasenSphereExplosion',
+    dashSpeed: ...,
+    dashHitbox: ...,
+    explosionDelay: 2.0,
+    firstHit: { ... },
+    explosionHit: { ... },
+  },
+}
+
+Exact naming may differ.
+
+Keep timing/combat values out of hard-coded Battle branches.
+
+19. Do not use the summon system
+
+Clone is specifically:
+
+a detached temporary entity
+
+Charged BA2 instead drives the real fighter.
+
+Do not create a clone-like fake #0001 for this move.
+
+The owner himself:
+
+* changes animation
+* holds the sphere
+* dashes
+* performs collision
+
+20. Add a dedicated technique runtime
+
+This move is more complex than a normal AttackDefinition.
+
+Create a focused runtime such as:
+
+js/game/charged-technique.js
 
 or:
 
-freezeAttacker: false
+js/game/rasen-rush.js
 
-Projectiles already establish the same principle: remote attacks should not freeze their owner.
+A generic name is preferable if the abstraction stays small and reusable.
 
-29. Give the clone local hitstop
+Conceptually the runtime contains:
 
-For visual impact, if the clone’s BA1 hits or is blocked, pause the clone’s own attack clock for BA1’s normal:
+{
+  def,
+  phase,
+  time,
+  target,
+  hitConfirmed,
+  sphereOwner, // fighter | target
+  spherePhase,
+  firstHitDone,
+  explosionDone,
+}
 
-0.06 s
+21. Technique phases
 
-while the owner remains unaffected.
+Use explicit phases:
 
-This keeps the clone punch visually consistent with normal BA1 without incorrectly freezing #0001.
+form
+dash
+confirm
+wait
+explode
+done
 
-30. One clone attack can hit once
+Never infer phase from random animation-frame indices scattered through Fighter.
 
-The clone BA1 should use the same one-hit rule as ordinary attacks.
+22. FORM phase
 
-Track:
+Immediately after successful Charged BA2 activation:
 
-hasHit
+* leave Charge
+* do not show chargeRelease
+* lock normal controls
+* lock facing
+* set horizontal velocity to 0
+* begin rasenForm
+* begin rasenSphereBuild
 
-or equivalent.
+The effect appears at #0001’s sphere-hand position.
 
-Once the clone BA1 successfully hits or is blocked:
+23. Formation visual sequence
 
-no second hit from that same clone punch
+The sphere must visibly progress:
 
-Recovery still finishes normally.
+prasen1
+→ prasen2
+→ prasen3
+→ prasen4
+→ prasen5
+→ prasen6
 
-31. VANISH phase
+Only after the complete prasen6 orb is reached may the forward dash begin.
 
-As soon as the BA1 clip finishes:
+Do not start moving on prasen1.
 
-* remove the clone body sprite
-* start the cloud effect at cloneav10
-* play backward through cloneav1
+24. Sync the three preparation poses to the six sphere frames
 
-Exact order:
+rasenForm contains only three fighter frames while the sphere has six formation frames.
 
-10
-9
-8
-7
-6
-5
-4
-3
-2
-1
+Let the fighter poses progress naturally:
 
-After cloneav1 finishes:
+rasen1
+→ rasen2
+→ rasen3
 
-clone entity is removed
+and hold rasen3 if necessary until prasen6 has completed its formation timing.
 
-32. No attack during vanish
+Do not artificially loop rasen1–3.
 
-During VANISH:
+25. Attach the sphere to the hand
 
-* no hitbox
+Add data for the sphere’s centre relative to #0001’s bottom-centre origin.
+
+For example:
+
+handOffset: {
+  x: ...,
+  y: ...,
+}
+
+Mirror only the x component with facing.
+
+Inspect the supplied fighter artwork and position the sphere so it visibly sits in the extended hand.
+
+Do not spawn it:
+
+* at the fighter’s feet
+* at the body centre
+* floating far in front
+
+26. Per-phase offsets are allowed
+
+Because #0001’s pose changes during formation/dash, one fixed offset may not perfectly follow the hand.
+
+If needed, allow data such as:
+
+handOffsets: {
+  form: [...],
+  dash: [...],
+}
+
+or per-fighter-frame offsets.
+
+Keep these as visual/interaction data, not hard-coded Canvas conditionals.
+
+27. DASH phase
+
+After the sphere is complete:
+
+rasen4
+→ rasen5
+→ rasen6
+
+and #0001 rapidly moves forward.
+
+Use a fixed technique dash speed.
+
+A good starting value is:
+
+dashSpeed: 1050
+
+world units per second.
+
+At 12 FPS, the three-frame dash lasts roughly:
+
+0.25 seconds
+
+for approximately:
+
+262 world units
+
+of maximum travel.
+
+Tune this in-browser so it feels like a committed forward rush rather than a teleport.
+
+28. Sphere remains complete during the dash
+
+During the dash:
+
+prasen6
+
+should remain visible on the hand.
+
+Do not restart prasen1–6.
+
+The complete sphere is what collides with the opponent.
+
+29. Dash collision comes from the sphere
+
+The first hitbox should represent the visible sphere.
+
+Do not use #0001’s whole pushbox/body as the attack.
+
+Add something equivalent to a centred:
+
+sphereHitbox: {
+  x: -18,
+  y: -18,
+  w: 36,
+  h: 36,
+}
+
+around the sphere centre as an initial value.
+
+Tune it with the debug overlay so the visible orb and collision volume agree.
+
+30. Dash movement must use real physics support
+
+Do not teleport:
+
+body.x += hugeDistance;
+
+once.
+
+Advance through fixed simulation steps.
+
+Respect:
+
+* stage horizontal bounds
+* solid walls
+* ground support
+* fixed-step determinism
+
+The move must be able to encounter a stage edge during its dash.
+
+31. Ground dependency begins immediately
+
+From the first rasen1 preparation frame until the technique has fully resolved:
+
+#0001 must remain supported by ground
+
+Check actual body.grounded.
+
+Do not merely remember that he was grounded at activation.
+
+32. Ground loss during formation
+
+If the platform disappears from under #0001, or he otherwise becomes unsupported during:
+
+rasen1–3
+
+then:
+
+cancel technique
+remove sphere
+clear technique lock
+enter Fall
+
+No first hit.
+
+No explosion.
+
+33. Ground loss during dash
+
+If the rush carries #0001 off a platform/ledge:
+
+the dash stops immediately
+the sphere disappears
+the technique cancels
+#0001 falls
+
+Do not let the animation hover beyond the ledge.
+
+Do not snap him back onto the stage.
+
+34. Ground loss after successful first hit
+
+The user explicitly requested that losing ground during the sequence cancels it.
+
+Therefore even after first contact, if #0001 loses ground before the delayed explosion has happened:
+
+* cancel the remaining technique
+* remove the attached sphere
+* clear the special immobilization from the opponent
+* preserve any damage already dealt by hit 1
+* skip hit 2
+* #0001 enters Fall
+
+This gives the ground requirement real meaning for the full sequence.
+
+35. Being hit also interrupts the technique
+
+Normal Hitstun remains higher priority than Charged BA2.
+
+If #0001 is struck before the technique finishes:
+
+* cancel the technique
+* remove the sphere
+* release the opponent from technique-specific immobilization
+* keep any already-applied damage
+* enter normal Hurt/Hitstun
+
+Do not give the move armour or invulnerability.
+
+36. Miss rule
+
+The dash gets one contact-search window:
+
+rasen4
+rasen5
+rasen6
+
+If the complete sphere never successfully collides during those frames:
+
+no hit
+no prasen7–11
+no rasen7–12
+
+Immediately end the special technique.
+
+If still grounded:
+
+return to Idle / normal movement
+
+as requested.
+
+Do not play a long recovery sequence after a clean miss.
+
+37. Stop dash immediately on confirmed contact
+
+When the sphere successfully hits:
+
+body.vx = 0
+
+and snapshot the contact.
+
+Do not continue sliding through the opponent.
+
+Transition immediately into:
+
+confirm
+
+38. First hit
+
+The sphere contact is hit 1 of 2.
+
+Use conservative initial values:
+
+firstHit: {
+  damage: 4,
+  knockback: { x: 0, y: 0 },
+  hitstop: 0.06,
+}
+
+This first hit is primarily the setup/bind.
+
+Do not launch the opponent away before the delayed explosion.
+
+39. First hit must occur exactly once
+
+Once the sphere contacts:
+
+firstHitDone = true
+
+No repeated damage every simulation step.
+
+The confirmed sphere is no longer checking dash collision afterward.
+
+40. Immobilize the opponent
+
+A successful unblocked first hit applies a temporary special status.
+
+Call it something like:
+
+immobilized
+bound
+techniqueLock
+
+Do not fake this solely by repeatedly resetting input.
+
+The status belongs in combat/runtime state.
+
+41. What “can’t move” means
+
+From first hit until:
+
+* the explosion resolves, or
+* the technique is cancelled
+
+the opponent may not:
+
+* walk/run
+* jump
+* Charge
+* Throw
+* BA1
+* BA2
+* use Defense
+* turn through normal locomotion
+
+Set horizontal velocity to 0 on the first hit.
+
+They are effectively caught by the technique.
+
+42. Gravity still exists
+
+Do not make immobilization magically suspend the opponent in mid-air.
+
+If an opponent happens to be airborne when hit:
+
+* player/AI control remains locked
+* gravity continues
+* normal vertical collision continues
+
+The sphere effect follows them.
+
+This prevents floating characters.
+
+43. Separate immobilization from ordinary hitstun
+
+Do not simply set:
+
+stun = 2.5
+
+and call it done.
+
+The delayed explosion needs a status that can be explicitly released by:
+
+* successful explosion
+* owner losing ground
+* owner being interrupted
+* reset/destroy
+
+Use a token/source reference so the technique removes only its own immobilization.
+
+44. CONFIRM animation
+
+On successful hit, play:
+
+rasen7
+→ rasen8
+→ rasen9
+→ rasen10
+→ rasen11
+→ rasen12
+
+exactly once.
+
+This is the continuation that a miss never sees.
+
+45. Sphere impact progression
+
+When contact happens, move the sphere effect from the owner’s hand to the opponent.
+
+Play:
+
+prasen7
+→ prasen8
+→ prasen9
+
+These later frames visibly intensify the sphere.
+
+46. Attach sphere to opponent after contact
+
+After the first hit, the effect’s world position should be calculated from the target.
+
+Use a data-driven offset such as:
+
+targetOffset: {
+  x: 0,
+  y: -48,
+}
+
+and tune visually so the sphere sits around the collision/torso area.
+
+The sphere should move with the caught target if physics changes its position.
+
+47. Hold prasen9 during the delay
+
+After:
+
+prasen7 → prasen8 → prasen9
+
+hold the final impact frame:
+
+prasen9
+
+on the target.
+
+Do not loop 7→9 repeatedly.
+
+48. #0001 remains committed
+
+After rasen12 is reached, hold the final rasen12 pose while waiting for the delayed explosion.
+
+Do not let #0001:
+
+* run away
+* attack again
+* summon a clone
+* Dodge
+* Throw
+* start another Charge
+
+during the two-second trap.
+
+This prevents the immobilization window from becoming a free two-second combo opportunity.
+
+49. Delayed second hit timing
+
+The explosion occurs:
+
+2.0 seconds
+
+after the first hit confirms.
+
+Store:
+
+explosionDelay: 2.0
+
+in technique data.
+
+The delay is counted from the first successful hit, not from the beginning of formation.
+
+50. Explosion animation
+
+When the delay expires:
+
+prasen10
+→ prasen11
+
+plays once.
+
+Apply the large second hit at the beginning of:
+
+prasen10
+
+so the damage event aligns with the first visible explosion frame.
+
+51. Second hit
+
+The explosion is the major hit.
+
+Use initial tuning:
+
+explosionHit: {
+  damage: 16,
+  knockback: {
+    x: 420,
+    y: 220,
+  },
+  hitstun: 0.55,
+  hitstop: 0.12,
+}
+
+Combined damage:
+
+4 + 16 = 20
+
+The second hit should clearly feel much stronger than the setup contact.
+
+Keep these numbers data-driven for later balance changes.
+
+52. Release immobilization before explosion knockback
+
+When explosion hit 2 resolves:
+
+1. remove the technique immobilization
+2. apply the big explosion damage
+3. apply launch/knockback
+4. apply normal explosion hitstun
+
+Otherwise the binding state may incorrectly cancel the intended knockback.
+
+53. Finish after explosion
+
+Once prasen11 completes:
+
+remove sphere effect
+clear technique
+
+If #0001 is still grounded:
+
+return to Idle / normal control
+
+Do not restart Charge automatically just because the Charge key happens still to be held.
+
+Require the player to establish a fresh normal Charge state through the existing state machine.
+
+54. Dodge interaction
+
+Existing Dodge invulnerability must apply to the rushing sphere.
+
+If the sphere overlaps an opponent during their invulnerable Dodge frame:
+
+no hit
+no first damage
+no immobilization
+no hit confirm
+
+Continue the dash/search window.
+
+If no later valid contact happens by the end of rasen6:
+
+miss
+→ Idle
+
+Do not consume the hit on invulnerability.
+
+55. Future Block behavior
+
+For a future Block-type character:
+
+If the initial sphere contact is successfully blocked:
+
+* resolve normal block/chip behavior for hit 1
+* do not apply the special immobilization
+* do not start the delayed explosion
+* end the Charged BA2 sequence after the blocked contact
+
+A valid guard should prevent the full trapping sequence.
+
+This keeps generic Defense meaningful.
+
+56. Do not use normal BA2 combat data
+
+Charged BA2 is not:
+
+ba2 with more damage
+
+It has its own combat definition.
+
+Normal BA2 remains:
+
+8 damage
+existing high-kick art
+existing timings
+
+Do not modify it.
+
+57. No ordinary combat.attack during the technique
+
+Do not pretend this is a regular startup/active/recovery AttackDefinition.
+
+The move has:
+
+formation
+conditional dash
+conditional hit confirm
+target attachment
+2-second delayed event
+second hit
+ground cancellation
+
+Use a dedicated charged-technique runtime.
+
+58. Fighter action lock
+
+While a charged technique is active, the fighter is not free to start:
+
+* normal attack
+* summon
+* Dodge
+* Jump
+* Charge
+* movement
+
+Update Fighter’s free-to-act checks accordingly.
+
+A helper such as:
+
+canAct()
+
+or:
+
+isFreeToAct()
+
+should account for:
+
+combat
++
+active charged technique
+
+without breaking the existing CombatState API.
+
+59. State priority
+
+Use approximately:
+
+hitstun
+active charged technique
+normal attack
+Defense
+airborne
+Land
+Block
+Charge
+chargeRelease
+Run
+Idle
+
+Hitstun must always interrupt.
+
+Ground loss inside the technique explicitly transitions to Fall.
+
+60. Technique animation selection
+
+When the fighter logical state is something like:
+
+technique
+
+select the correct clip from the runtime phase:
+
+form    → rasenForm
+dash    → rasenDash
+confirm → rasenConfirm
+wait    → hold last rasenConfirm frame
+explode → hold last rasenConfirm frame
+
+Do not overload animationFor('attack').
+
+61. Technique facing
+
+Snapshot/lock #0001’s facing when Charged BA2 starts.
+
+Do not auto-turn toward the opponent midway through:
+
+* formation
+* dash
+* confirm
+* wait
+* explosion
+
+The dash travels in that snapshotted facing direction.
+
+62. Wall collision
+
+A solid wall should stop forward movement.
+
+If the dash hits a wall before the opponent:
+
+treat it as a miss
+remove sphere
+end technique
+return to normal grounded state
+
+Do not pass through solid geometry.
+
+63. Stage bounds
+
+Do not move #0001 outside the stage’s horizontal bounds.
+
+Stage-edge ground loss must still behave normally:
+
+unsupported
+→ technique cancelled
+→ Fall
+
+64. Missing fighter art safety
+
+Charged BA2 must be refused if any required fighter clip is unavailable:
+
+rasenForm
+rasenDash
+rasenConfirm
+
+Do not create a blue sphere around Idle art.
+
+On missing technique art:
+
+no technique
+fallback to normal BA2
+warning
+
+65. Missing sphere art safety
+
+Likewise require:
+
+rasenSphereBuild
+rasenSphereImpact
+rasenSphereExplosion
+
+before accepting the charged technique.
+
+Never create:
+
+* an invisible collision sphere
+* invisible immobilization
+* invisible delayed damage
+
+If required effect art is missing:
+
+normal BA2 fallback
+
+66. Energy behavior
+
+This request does not specify an Energy cost.
+
+Do not invent one.
+
+Charged BA1 remains the only current Energy spender:
+
+Clone Attack = 25 Energy
+
+Charged BA2:
+
+Energy cost = 0
+
+for this implementation.
+
+Do not drain, refund or regenerate Energy because of this move.
+
+Keep its resource cost data-ready so an energyCost could be added later without architectural changes.
+
+67. Existing Charged BA1 must remain unchanged
+
+After generalizing the dispatcher:
+
+Charge → BA1
+
+must still:
+
+* require prior Charge
+* cost 25 Energy
+* summon one clone
+* keep the owner Charging
+* fall back to normal BA1 if unavailable
+
+Do not regress clone.test.mjs.
+
+68. Charged BA2 consumes the BA2 press
+
+When Charged BA2 successfully starts:
+
+do not also start ordinary ba2
+
+The action press belongs entirely to the technique.
+
+69. Charged BA2 unavailable fallback
+
+If the charged technique cannot begin because of:
+
+* missing art
+* invalid runtime definition
+* some other setup failure
+
+then let the same BA2 press fall through to normal:
+
+tryAction('action2')
+
+Do not leave BA2 dead.
+
+70. Opponent KO on first hit
+
+If hit 1 reduces the opponent to zero Health:
+
+* do not hold a defeated opponent for two seconds
+* clear immobilization
+* cancel the remaining delayed explosion
+* finish/end the technique cleanly
+
+Do not attack an already defeated fighter again.
+
+71. Reset safety
+
+Fighter.reset() / Battle.restart() must clear:
+
+* active Charged BA2 runtime
+* sphere effect
+* any immobilization caused by it
+* delayed-explosion timers
+
+No special state may survive a rematch.
+
+72. Battle destroy safety
+
+Leaving Battle must clear all technique references.
+
+Do not retain target/owner references after destroy().
+
+73. Rendering
+
+Render the attached sphere through the existing centred effect renderer.
+
+During formation/dash:
+
+sphere centre = owner position + hand offset
+
+After hit:
+
+sphere centre = target position + target offset
+
+Render it over the fighter sprites so the glowing orb is not hidden behind the character body.
+
+Keep:
+
+imageSmoothingEnabled = false
+
+for the pixel art.
+
+74. Debug overlay
+
+Extend Backquote debug mode to show:
+
+* rushing sphere hitbox during dash
+* attached-sphere centre after hit
+* optional label charged ba2
+* opponent immobilization status
+
+Use a visually distinct debug outline from:
+
+* melee attacks
+* projectiles
+* clone BA1
+
+Do not show these in normal gameplay.
+
+75. Add a focused test file
+
+Create:
+
+tests/charged-ba2.test.mjs
+
+Use:
+
+* real Fighter
+* real CombatState
+* real CombatSystem
+* fixed-step physics
+* real SpriteSet metadata
+* existing fighter harness patterns
+
+76. Asset tests
+
+Assert all 23 new files exist under:
+
+assets/characters/0001/
+
+Assert the repository-root copies are gone.
+
+Assert characterFramePaths() preloads all 23.
+
+77. Clip registration tests
+
+Assert:
+
+rasenForm = rasen1–3
+rasenDash = rasen4–6
+rasenConfirm = rasen7–12
+
+and:
+
+rasenSphereBuild = prasen1–6
+rasenSphereImpact = prasen7–9
+rasenSphereExplosion = prasen10–11
+
+None loop.
+
+78. Charged-action data tests
+
+Assert #0001 has:
+
+Charged action1 → Clone summon
+Charged action2 → sphere-rush technique
+
+Do not remove normal:
+
+actions.action2 = {
+  ground: 'ba2',
+  air: 'midairBa2'
+}
+
+79. Trigger test
+
+From grounded Idle:
+
+step Charge
+→ state Charge
+next step Charge + BA2Pressed
+
+Assert:
+
+* technique starts
+* owner leaves Charge
+* owner does not enter normal attack
+* first fighter frame is rasen1
+* first effect frame is prasen1
+* Energy stays unchanged
+
+80. Fresh simultaneous input test
+
+From Idle:
+
+ChargePressed + BA2Pressed
+
+on the same first step.
+
+Assert:
+
+ordinary BA2
+
+not Charged BA2.
+
+81. Charge-release + BA2 test
+
+Already Charge, then on one step:
+
+Charge false
+BA2Pressed true
+
+Assert:
+
+ordinary BA2
+
+with:
+
+* no charged technique
+* no chargeRelease
+* no Energy change
+
+82. Formation sequence test
+
+Record the effect frames.
+
+Assert the build order is exactly:
+
+prasen1
+prasen2
+prasen3
+prasen4
+prasen5
+prasen6
+
+and dash cannot begin before the completed sphere.
+
+83. Fighter preparation test
+
+Assert fighter preparation uses:
+
+rasen1
+rasen2
+rasen3
+
+in order.
+
+No dash movement during the formation phase.
+
+84. Dash test
+
+After the sphere completes:
+
+* state phase becomes dash
+* body starts moving only in locked facing direction
+* fighter animation uses rasen4–6
+* sphere remains prasen6
+* normal player left/right input cannot alter dash speed or direction
+
+85. Miss test
+
+Place the opponent outside dash range.
+
+Assert:
+
+formation
+→ dash
+→ no contact
+→ technique ends
+
+and:
+
 * no damage
-* no collision
-* no clone body
-* no targeting
+* no immobilization
+* no rasen7–12
+* no prasen7–11
+* sphere removed
+* owner returns Idle if grounded
 
-It is visual cleanup only.
+86. First-hit test
 
-33. Spawn behind the opponent
+Place the opponent in dash range.
 
-The clone must appear on the opponent’s back side.
+Assert exactly one contact occurs.
 
-Use the opponent’s facing at activation.
+After contact:
 
-Conceptually:
+target health: 100 → 96
 
-const behind = -target.facing;
-clone.x = target.body.x + behind * CLONE_BEHIND_DISTANCE;
-clone.facing = target.facing;
+using the initial 4-damage tuning.
 
-Why:
+Assert:
 
-If the opponent faces left:
+* dash stops
+* target velocity x becomes 0
+* target receives technique immobilization
+* fighter moves into confirm sequence
+* sphere switches to target attachment
 
-their back is to the right
-clone appears right of them
-clone faces left toward them
+87. Confirm fighter sequence test
 
-If the opponent faces right:
+After hit 1, assert the fighter shows exactly:
 
-their back is to the left
-clone appears left of them
-clone faces right toward them
+rasen7
+rasen8
+rasen9
+rasen10
+rasen11
+rasen12
 
-This is more precise than merely using the owner’s side.
+in order.
 
-34. Suggested behind distance
+88. Impact sphere test
 
-Use a data-driven initial value around:
+After hit 1, assert:
 
-48 world units
+prasen7
+→ prasen8
+→ prasen9
 
-because #0001’s current body width and BA1 hitbox allow the clone to stand visually behind the target while still letting the active BA1 punch overlap naturally.
+then:
 
-Store it in clone move data:
+prasen9 remains held
 
-behindDistance: 48
+until the delayed explosion.
 
-Inspect it with the debug overlay and adjust slightly only if necessary to make the BA1 hitbox visually match the punch.
+89. Immobilization test
 
-Do not compensate by enlarging the BA1 hitbox.
+During the delay, repeatedly feed the target:
 
-35. Snapshot the spawn position
+* Left
+* Right
+* Jump
+* Charge
+* BA1
+* BA2
+* Throw
+* Defense
 
-Determine the clone’s:
+Assert none start movement/actions.
 
-x
-y
-facing
+The target remains locked until resolution/cancellation.
 
-once when the summon begins.
+90. Two-second delay test
 
-Do not continuously teleport the cloud behind the opponent.
+Measure from the exact first-hit simulation step.
 
-If the opponent moves during the cloud animation:
+The explosion must not happen early.
 
-the clone stays where it was summoned
+At approximately:
 
-and its BA1 can miss.
+2.0 seconds
 
-This preserves counterplay and avoids a homing teleport.
+the effect enters its explosion phase.
 
-36. Vertical placement
+Use fixed-step deterministic timing.
 
-Snapshot the opponent’s current foot/origin Y:
+91. Explosion test
 
-clone.y = target.body.y;
+At explosion:
 
-The clone is a magical temporary attack entity rather than a physics-controlled Fighter.
+prasen10
+→ prasen11
 
-Do not run gravity or platform collision on it.
+Assert hit 2 applies once.
 
-This guarantees the clone genuinely appears behind the target even when the target is on a platform or temporarily airborne.
+Using initial values:
 
-Do not add an unrequested Mid-Air Clone attack.
+96 → 80 Health
 
-The clone still uses the real grounded BA1 artwork.
+for 16 additional damage.
 
-37. Clamp horizontal spawn to the stage
+Assert:
 
-Do not spawn the visual completely outside the stage.
+* immobilization is removed
+* big knockback occurs
+* vertical launch occurs
+* explosion hitstun is applied
+* explosion hitstop is longer than first-hit hitstop
 
-Clamp the behind position to the map’s playable horizontal bounds with a small art margin.
+92. Total hit count test
 
-Do not add physics or push it around solids.
+Successful full sequence:
 
-The clone is an ephemeral summon.
+exactly two damage events
 
-38. Clone does not chase
+not:
 
-Once spawned:
+* one
+* three
+* one per sphere frame
 
-clone.x = fixed
-clone.y = fixed
-clone.facing = fixed
+Event 1 = contact.
 
-for its whole life.
+Event 2 = explosion.
 
-Do not:
+93. Ground-loss formation test
 
-* chase the enemy
-* turn around after them
-* slide toward them
-* teleport again
-* copy owner movement
+Begin Charged BA2 near a condition where support disappears during formation.
 
-If the opponent escapes before the active BA1 frame:
+Assert:
 
-the clone whiffs
+technique cancelled
+sphere gone
+state Fall
 
-and then vanishes normally.
+No damage.
 
-39. The real #0001 remains Charging
+94. Ground-loss dash test
 
-A successful Charged BA1 clone command should not make the real #0001 perform BA1.
+Dash off a ledge.
 
-The clone is the attack.
+Assert immediately:
 
-If Charge remains held:
+phase ends
+sphere disappears
+body becomes airborne
+state Fall
 
-real #0001 stays in Charge
+No hovering.
 
-while the cloud/clone acts remotely.
+95. Ground-loss after hit test
 
-Do not play:
+Hit the opponent, then make #0001 lose ground before the two-second explosion.
 
-0001_1ba*
+Assert:
 
-on the owner.
+* first damage remains
+* second damage never occurs
+* sphere disappears
+* target immobilization clears immediately
+* #0001 enters Fall
 
-This is important because there is no dedicated summon animation for the real fighter.
+96. Owner-interruption test
 
-40. Do not fake a summoning pose
+Hit #0001 during:
 
-No new owner summon artwork was provided.
+* formation
+* dash
+* confirmed wait
 
-Therefore the owner continues using the existing Charge animation:
+Each should:
+
+cancel technique
+remove effect
+release target if necessary
+show normal Hurt
+
+No armour.
+
+97. Dodge test
+
+Time the target’s Dodge to overlap the rushing sphere.
+
+Assert:
+
+* no first hit
+* no target lock
+* sphere is not consumed
+* dash continues
+
+If dash subsequently ends without valid contact:
+
+miss
+
+98. Block test
+
+Use a Block-type test character.
+
+Guard the initial contact.
+
+Assert:
+
+* normal Block event/chip rules
+* no special immobilization
+* no delayed explosion
+* technique ends
+
+99. Gravity test for captured airborne target
+
+If the test target is airborne when successfully hit:
+
+* control remains locked
+* gravity continues
+* sphere follows its body
+* target does not hover
+
+100. Facing test
+
+Start #0001 facing right.
+
+Technique must dash right.
+
+Start facing left.
+
+Technique must dash left.
+
+Attempt to cross the opponent behind #0001 during formation.
+
+Facing must remain locked.
+
+101. Wall test
+
+Place a solid wall between #0001 and opponent.
+
+Dash into it.
+
+Assert:
+
+no pass-through
+no opponent hit
+technique ends as miss
+
+102. Missing-art tests
+
+Test each required category missing:
+
+fighter preparation
+fighter dash
+fighter confirm
+sphere build
+sphere impact
+sphere explosion
+
+A missing required clip must:
+
+* prevent Charged BA2 activation
+* spawn no invisible effect
+* apply no damage/status
+* spend no Energy
+* fall back to normal BA2
+* warn clearly
+
+103. Energy regression
+
+Assert throughout successful Charged BA2:
+
+energy before === energy after
+
+Charged BA1 remains the only Energy spender.
+
+The HUD must not move because of Charged BA2.
+
+104. Clone regression
+
+Charged BA1 must still:
+
+cost 25
+summon clone
+keep owner charging
+
+Generalizing chargedActions must not alter its behavior.
+
+Run all existing clone tests unchanged except data-shape expectations that necessarily change because chargedActions is now typed.
+
+105. Normal BA2 regression
+
+Outside Charge:
+
+Ground BA2 remains:
+
+2ba1–2ba7
+8 damage
+
+Mid-Air BA2 remains:
+
+midair2ba1–3
+
+No new sphere effect.
+
+106. Throw regression
+
+Throw + shuriken remains unchanged.
+
+107. Defense regression
+
+Ground/Mid-Air Dodge and invulnerability remain unchanged.
+
+108. Charge regression
+
+Normal Charge still uses:
 
 charge1
 → charge2
 → chargea ↔ chargeb
 
-while the clone attack happens.
+and voluntary release still uses:
 
-Do not use:
+charge1
 
-* Throw
-* BA1
-* Idle
-* a stretched cloud frame
+briefly.
 
-as a fake summon pose on the owner.
+Charged BA2 starts directly from Charge without showing chargeRelease.
 
-41. Successful clone summon does not trigger chargeRelease
+109. Training CPU
 
-Because the player is still holding Charge:
+The training CPU remains non-attacking.
 
-Charged BA1 Clone Attack
+Do not teach it Charged BA2.
 
-does not count as voluntarily releasing Charge.
+No AI changes beyond ensuring its neutral input structures continue working.
 
-No:
+110. README
 
-chargeRelease
+Document:
 
-pose should occur.
+Charged BA2
 
-42. Owner can be interrupted after summoning
+under Charge/combat controls.
 
-Once the Energy has been spent and the clone entity has successfully been created, it is independent.
+Describe it clearly:
 
-If the real #0001 is then:
+Hold Charge first, then press BA2. #0001 forms a blue sphere, dashes forward once it is complete, and must connect during the rush. A miss ends the technique immediately. A hit traps the opponent, continues the animation, and causes the sphere to explode about two seconds later for a much larger second hit. The entire technique requires ground beneath #0001; losing ground cancels it and makes him fall.
 
-* hit
-* Dodges
-* Jumps
-* Throws
-* uses BA2
-* releases Charge
+Also say:
 
-the existing clone continues its:
+Charged BA2 currently has no Energy cost.
 
-appear → BA1 → vanish
+Do not imply normal BA2 changed.
 
-sequence.
+111. Help screen
 
-Do not delete it because the owner changed state.
+Update Charge & Energy or add an appropriate combat note explaining:
 
-43. Owner KO after summon
+Charge + BA1 = Clone Attack, 25 Energy
+Charge + BA2 = Sphere Rush
 
-If the owner is hit to 0 Health after successfully summoning the clone, do not abruptly leave an orphaned cloud/entity.
+Clarify Charged BA2:
 
-Let an already-created clone finish its current lifecycle unless the entire battle is being reset/destroyed.
+* must already be Charging
+* forms before dashing
+* requires a hit to continue
+* has two hits
+* second hit is delayed
+* requires ground for the full sequence
 
-It must not create another clone or retarget.
+Do not add a new input row because it uses existing Charge + BA2 controls.
 
-44. Clone is not targetable
+112. ALVA_SPEC.md
 
-The temporary clone has:
+Document the complete deterministic sequence.
 
-no hurtboxes
-no health
-no defense
-no pushbox
+Include exact sprite partitioning:
 
-Enemy attacks do not destroy it.
+rasen1–3   preparation
+rasen4–6   dash/contact search
+rasen7–12  hit-confirm continuation
+prasen1–6   sphere formation
+prasen7–9   confirmed sphere
+prasen10–11 explosion
 
-Do not include it in:
+Document:
 
-battle.fighters
+first hit = 4
+delay = 2.0 s
+second hit = 16
+total = 20
 
-Only the real P1 and CPU remain fighters.
+and the final tuned:
 
-45. Clone does not affect fighter separation
+* dash speed
+* sphere hitbox
+* offsets
+* knockback
+* hitstun
+* hitstop
 
-Do not pass the clone to:
+after browser verification.
 
-separate()
-resolveSolidOverlap()
+113. Update charged-action architecture docs
 
-or any player pushbox system.
+Current README/spec architecture says:
 
-The opponent can move through its location.
+chargedActions maps buttons to summons
 
-It is a combat summon/effect, not another physical fighter.
+That is no longer true.
 
-46. Clone does not affect the camera
+Update it to describe:
 
-Camera framing continues using only:
+chargedActions = generic charged-action dispatch
 
-P1
-CPU
+with at least:
 
-Do not zoom out because the clone appears elsewhere.
+type: summon
+type: technique
 
-47. Clone has no HUD marker
+The Clone Attack remains the summon example.
 
-Do not give the clone:
+Charged BA2 becomes the technique example.
 
-* P1 marker
-* CPU marker
-* name
-* Health bar
-* Energy bar
-* ground ring
+114. Debug/manual verification
 
-Only render:
+In a browser, test:
 
-cloud
-clone sprite
-clone attack
+Formation
 
-48. Exact visual clone art
+Hold Charge, press BA2.
 
-When the clone body is active, render it through the same normalized #0001 SpriteSet.
+Verify #0001 stays still while:
 
-The BA1 sprite must obey the same animation-specific sourceFacing rules that the real fighter uses.
+rasen1–3
 
-Clone facing is determined at summon time and then locked.
+play and:
 
-49. Cloud placement
+prasen1–6
 
-Render the cloud around the clone’s spawn location.
+forms naturally in the hand.
 
-Because the cloud is effect artwork rather than a fighter sprite, give it a configurable visual offset such as:
+Dash
 
-effectOffset: { x: 0, y: ... }
+Verify #0001 starts moving only when the sphere is visually complete.
 
-Inspect the real files in-browser and center the cloud around the clone’s appearance area.
+The sphere remains attached to the hand.
 
-Do not use PNG dimensions as world coordinates.
+Miss
 
-Use the existing art-pixel scale.
+Stand too far away.
 
-50. Render the clone behind the opponent
+Verify the move ends after the dash with no remaining sphere.
 
-Render clone entities/effects before the normal fighters so the real opponent remains visually in front if their sprites overlap.
+Hit
 
-A useful battle layer order is:
+Stand in range.
 
-terrain
-shadows
-clone summons
-P2
-P1
-projectiles
-foreground
+Verify the sphere physically contacts the CPU, #0001 stops, the CPU becomes unable to move, and the later fighter frames play.
 
-or an equivalent order preserving the intended depth.
+Delay
 
-This complements the physical placement behind the enemy.
+Count roughly two seconds.
 
-51. No tint or opacity gimmick
+The sphere should remain visible on the opponent rather than disappear.
 
-The instruction is that it is a clone using the same #0001 sprites.
+Explosion
 
-Therefore do not automatically apply:
+Verify prasen10–11 creates a visibly larger effect, the second hit deals substantially more damage, and the opponent is launched/released.
 
-* blue tint
-* gray tint
-* transparency
-* outline
-* ghost effect
+Ledge
 
-The cloud communicates that it is a clone summon.
+Perform it near a platform edge.
 
-52. Clone attack and Dodge
+If the dash leaves ground:
 
-The target’s current Dodge invulnerability must work against the clone BA1.
+sphere gone
+technique cancelled
+#0001 falls
 
-If the clone BA1 active hitbox overlaps while:
+There must be no invisible platform beneath him.
 
-target.combat.invulnerable === true
-
-then:
-
-* no damage
-* no stun
-* no knockback
-* no hitstop
-* clone attack is not consumed
-
-If BA1 remains active after invulnerability ends and still overlaps, normal collision may connect.
-
-Match the current melee/projectile Dodge semantics.
-
-53. Clone attack and future Block
-
-Preserve the generic Defense architecture.
-
-If a future character uses:
-
-defense.type = 'block'
-
-the clone BA1 should use normal block-facing logic.
-
-Because the clone appears behind the opponent, an opponent who is still facing away from the clone should generally not block it.
-
-Pass:
-
-clone.facing
-
-into hit resolution.
-
-Do not use the owner’s facing.
-
-54. Knockback direction
-
-Clone BA1 knockback comes from the clone toward the target.
-
-Use:
-
-clone.facing
-
-as the attack direction.
-
-Do not calculate knockback from the real #0001’s later facing.
-
-55. Owner attribution
-
-Combat events should still identify the real #0001 as the owning attacker for game logic.
-
-If useful, add a source field:
-
-source: clone
-
-or:
-
-summon: clone
-
-for debugging.
-
-But the player owns the attack.
-
-Do not turn the clone into another scoring/player entity.
-
-56. Clone attack should not trigger owner’s BA1 cooldown
-
-The owner did not personally perform ordinary BA1.
-
-Do not set #0001’s normal:
-
-ba1 cooldown
-
-because the clone punched.
-
-The resource cost and summon lifecycle are the limiter.
-
-Ordinary BA1 remains independently usable according to existing combat state.
-
-57. One command = one clone
-
-Each valid:
-
-already Charging + BA1 press + enough Energy
-
-creates exactly one clone entity.
-
-Holding BA1 must not create repeated clones.
-
-The existing pressed-edge input architecture should be preserved.
-
-Another clone requires another actual BA1 press.
-
-58. Multiple paid clones
-
-Do not invent a hidden one-clone-only limit.
-
-If the player remains Charging, has enough Energy, and presses BA1 again while an earlier clone still exists:
-
-another successful press may summon another clone
-
-and spends another 25 Energy.
-
-Energy itself limits the number of simultaneous summons to at most four from a full meter.
-
-Keep each clone’s lifecycle independent.
-
-59. Process Charged BA1 before ordinary combat actions
-
-The current Fighter loop handles all COMBAT_ACTIONS generically.
-
-Intercept the Charged BA1 combination before normal action1 dispatch.
-
-Conceptually:
-
-let action1Consumed = false;
-if (
-  input.action1Pressed &&
-  wasCharging &&
-  input.charge
-) {
-  action1Consumed = this.tryCloneAttack(ctx);
-}
-for (const action of COMBAT_ACTIONS) {
-  if (action === 'action1' && action1Consumed) continue;
-  if (input[`${action}Pressed`]) this.tryAction(action);
-}
-
-The exact code may differ.
-
-The key rule is:
-
-successful clone summon consumes that BA1 press
-
-so ordinary BA1 does not also start.
-
-60. If clone activation fails, ordinary BA1 gets the press
-
-tryCloneAttack() should return false when the clone attack cannot be used.
-
-Examples:
-
-insufficient Energy
-missing clone-cloud art
-missing BA1 art
-not already Charging
-
-Then the same action1Pressed should fall through to normal:
-
-tryAction('action1')
-
-where appropriate.
-
-Do not silently swallow BA1.
-
-61. Validate artwork before spending Energy
-
-Never charge the player Energy for an invisible/broken summon.
-
-Before spending 25 Energy verify:
-
-* cloud effect has real frames
-* BA1 animation has real frames
-* BA1 attack definition exists
-* opponent exists
-* CombatState can perform the summon
-
-Only then deduct Energy and queue/create the clone.
-
-62. Missing cloud art behavior
-
-If the clone-cloud files fail to load:
-
-Charged BA1
-→ no clone summon
-→ no Energy spent
-→ normal BA1 fallback
-
-Log a clear warning.
-
-Do not create an invisible clone attack.
-
-63. Missing BA1 art behavior
-
-If BA1 artwork is unavailable:
-
-no clone attack
-no Energy spent
-
-Follow the existing no-fake-attacks philosophy.
-
-Do not display cloud animation and then create an invisible punch.
-
-64. Add summon queue/lifecycle cleanly
-
-The current fighter already has a release queue for projectiles.
-
-Use a similar explicit mechanism for summons rather than having Battle inspect buttons.
-
-For example:
-
-this.summons = [];
-
-Successful Charged BA1 could queue:
-
-{
-  id: 'ba1Clone',
-  target: this.opponent,
-}
-
-Battle then converts queued summon requests into live clone entities.
-
-Clear consumed requests once per fixed step.
-
-65. Battle owns live clones
-
-Add:
-
-this.clones = [];
-
-or a general:
-
-this.summons = [];
-
-to Battle.
-
-Battle should:
-
-* spawn queued clones
-* update their clocks
-* resolve clone attack hitboxes
-* render them
-* remove finished clones
-
-66. Clear clones on restart
-
-Battle.restart() must clear all live clone entities.
-
-A rematch must not retain:
-
-* clone bodies
-* cloud effects
-* attack hitboxes
-* summon timers
-
-Energy already resets to 100 through Fighter.reset().
-
-67. Clear clones on destroy
-
-Battle.destroy() must clear clone/summon arrays.
-
-No stale references to fighters/targets should remain after leaving battle.
-
-68. Fixed-step update order
-
-Use deterministic fixed-step ordering.
-
-A suitable order is:
-
-fighters update
-projectile/summon requests are consumed
-clones spawn
-projectiles update
-clones update
-fighter melee hits resolve
-projectile hits resolve
-clone hits resolve
-dead projectiles/clones are removed
-
-Exact organization can differ, but there must be no render-frame-dependent combat logic.
-
-69. Do not make cloud frames combat-active
-
-The clone’s BA1 hitbox exists only during BA1’s existing active phase.
-
-Cloud appearance:
-
-no hitbox
-
-Cloud disappearance:
-
-no hitbox
-
-70. Debug overlay
-
-Extend debug mode to visualize the clone BA1 active hitbox.
-
-Use the same attack-hitbox color or a clearly related distinct color.
-
-Optionally label it:
-
-clone ba1
-
-Do not draw fake clone hurtboxes because the clone is not targetable.
-
-71. Energy HUD
-
-No HUD redesign is needed.
-
-The existing blue meter already reads:
-
-fighter.combat.energy
-
-When the clone spends 25 Energy, the bar should immediately change:
-
-100% → 75%
-75% → 50%
-50% → 25%
-25% → 0%
-
-Keep CPU mirroring and all accessibility attributes.
-
-72. Update Energy comments
-
-Current source comments say:
-
-nothing spends or restores Energy yet
-
-Those become false.
-
-Change them to explain:
-
-Energy starts full.
-#0001's Charged BA1 Clone Attack costs 25.
-No Energy regeneration or gain exists yet.
-
-73. Update Charge documentation
-
-The current spec says BA1 interrupts Charge.
-
-That is no longer universally true.
-
-Update it:
-
-BA1 while Charge is still held and sufficient Energy is available summons a clone instead of making the owner perform BA1.
-
-Also clarify:
-
-releasing Charge + BA1
-→ ordinary BA1
-
-and:
-
-BA2 / Throw / Dodge / Jump / hit
-
-retain their current interruption behavior.
-
-74. Update README
-
-Add a section explaining Charged BA1.
-
-Suggested behavior description:
-
-Clone Attack — While already holding Charge, press BA1. If #0001 has at least 25 Energy, 25 Energy is spent and a clone appears behind the opponent in a smoke cloud, performs #0001's normal BA1, then vanishes through the cloud animation in reverse. #0001 remains in Charge while the button stays held. With less than 25 Energy, BA1 behaves normally instead.
-
-Do not imply Charge generates Energy.
-
-75. Update Help
-
-Add the combo to the existing Charge & Energy information.
-
-Explain:
-
-Hold Charge first, then press BA1 to spend 25 Energy and summon a clone behind the opponent.
-
-Mention:
-
-The clone performs BA1 and disappears.
-
-Do not add another control-row entry because the move uses existing Charge + BA1 controls.
-
-76. Update ALVA_SPEC.md
-
-Document the complete move:
-
-Charged BA1 Clone Attack
-
-Include:
-
-* requirement to already be Charging
-* Charge must still be held on the BA1 press
-* 25 Energy cost
-* insufficient-Energy normal-BA1 fallback
-* owner remains Charging
-* exact cloud sequence
-* reverse vanish sequence
-* position behind opponent
-* fixed spawn position
-* same #0001 BA1 sprites
-* normal BA1 combat values
-* clone is untargetable
-* clone is not a Fighter
-* no camera/pushbox/HUD participation
-* detached hitstop behavior
-* Dodge/Block interaction
-* no Energy regeneration
-
-77. Update sprite inventory
-
-Add the ten cloud frames to the #0001 content inventory:
-
-Clone appear/vanish cloud:
-0001_cloneav1–0001_cloneav10
-
-State explicitly:
-
-appearance = forward order
-disappearance = reverse order
-
-78. Update existing Charge tests
-
-Current tests explicitly assert:
-
-BA1 interrupts Charge and the owner performs BA1
-
-That expectation must change.
-
-Split BA1 and BA2 coverage.
-
-Keep:
-
-Charge + BA2
-→ BA2
-
-New BA1 expectation:
-
-already charging + Charge still held + BA1 + enough Energy
-→ clone summon
-→ owner stays Charge
-
-79. Preserve release+BA1 test
-
-The existing test:
-
-letting go of Charge on the step BA1 is pressed
-
-should remain conceptually valid.
-
-New expected result:
-
-ordinary BA1
-no clone
-no chargeRelease
-no Energy cost
-
-This is an important distinction.
-
-80. Test simultaneous fresh Charge + BA1
-
-From Idle:
-
-Charge + BA1 pressed on the same first step
-
-must not summon a clone.
-
-Because #0001 was not already Charging, normal action priority applies.
-
-Assert:
-
-ordinary BA1 begins
-Energy remains 100
-no clone exists
-
-81. Add tests/clone.test.mjs
-
-Create focused tests for the feature.
-
-Use the real:
-
-* Fighter
-* CombatState
-* CombatSystem
-* SpriteSet metadata
-* BA1 definition
-* fixed-step timing
-
-Extend the harness to support clone/summon entities where useful.
-
-82. Asset tests
-
-Assert all ten canonical cloud paths exist under:
-
-assets/characters/0001/
-
-Assert none remain at repo root.
-
-Assert:
-
-0001_ cloneav8.png
-
-does not exist.
-
-Assert character preloading contains all ten correct paths.
-
-83. Cloud registration test
-
-Assert:
-
-cloneCloud.frames
-
-are exactly:
-
-1,2,3,4,5,6,7,8,9,10
-
-in the definition.
-
-Assert:
-
-loop === false
-
-84. Appearance order test
-
-Spawn a clone and record visible cloud frames.
-
-Assert the unique visible sequence is exactly:
-
-0001_cloneav1.png
-0001_cloneav2.png
-0001_cloneav3.png
-0001_cloneav4.png
-0001_cloneav5.png
-0001_cloneav6.png
-0001_cloneav7.png
-0001_cloneav8.png
-0001_cloneav9.png
-0001_cloneav10.png
-
-85. Vanish order test
-
-After clone BA1 finishes, record the disappearance cloud.
-
-Assert:
-
-0001_cloneav10.png
-0001_cloneav9.png
-0001_cloneav8.png
-0001_cloneav7.png
-0001_cloneav6.png
-0001_cloneav5.png
-0001_cloneav4.png
-0001_cloneav3.png
-0001_cloneav2.png
-0001_cloneav1.png
-
-Then the clone entity must be removed.
-
-86. Clone BA1 animation test
-
-Between the two cloud phases, assert the clone’s body animation is exactly:
-
-0001_1ba1.png
-0001_1ba2.png
-0001_1ba3.png
-0001_1ba4.png
-
-using the existing BA1 FPS/timing.
-
-Do not duplicate BA1 frames into another asset list.
-
-87. Trigger test
-
-From Idle:
-
-1. enter Charge
-2. allow at least one simulation step of real Charge
-3. keep Charge held
-4. press BA1
-
-Assert:
-
-clone created
-owner stays charge
-owner does not enter attack
-Energy = 75
-
-88. Energy sequence test
-
-Repeated successful summons should produce:
-
-100
-75
-50
-25
-0
-
-Assert Energy never goes negative.
-
-89. Insufficient Energy test
-
-Set:
-
-Energy = 24
-
-Enter Charge and press BA1.
-
-Assert:
-
-no clone
-normal BA1 begins
-Energy stays 24
-
-90. Exact-cost test
-
-Set:
-
-Energy = 25
-
-Trigger Charged BA1.
-
-Assert:
-
-clone spawns
-Energy = 0
-
-91. Missing-cloud safety test
-
-Remove/omit the clone cloud effect from fake SpriteSet data.
-
-Trigger Charged BA1 with 100 Energy.
-
-Assert:
-
-no clone
-no Energy spent
-normal BA1 fallback
-warning emitted
-
-92. Normal BA1 regression
-
-Without Charging:
-
-BA1
-
-must behave exactly as before.
-
-Assert:
-
-* ground BA1 unchanged
-* Mid-Air BA1 unchanged
-* no Energy cost
-* no clone
-
-93. BA2 regression
-
-While Charging:
-
-BA2
-
-still interrupts Charge and starts BA2 normally.
-
-No Energy cost.
-
-No clone.
-
-94. Throw regression
-
-While Charging:
-
-Throw
-
-retains the existing Throw behavior.
-
-It must not summon a clone.
-
-It must not cost Energy.
-
-95. Defense regression
-
-Defense/Dodge remains unchanged.
-
-Charged BA1 clone logic must not affect:
-
-Defense
-Dodge invulnerability
-mid-air Dodge
-
-96. Owner stays Charge test
-
-Trigger a clone while continuing to hold Charge for the entire clone lifecycle.
-
-Assert the owner remains in:
-
-charge
-
-and continues its normal Charge animation independently.
-
-The owner’s animator must never switch to:
-
-ba1
-
-because of the clone attack.
-
-97. Owner release after summon
-
-Spawn a clone, then release Charge.
-
-Assert:
-
-* owner gets existing voluntary chargeRelease
-* clone continues appearing/attacking/vanishing independently
-
-98. Owner hit after summon
-
-Spawn a clone, then hit the real #0001.
-
-Assert:
-
-* owner enters Hurt/Hitstun normally
-* clone remains alive
-* clone continues its lifecycle
-* no Energy refund
-
-99. Behind-position test
-
-Test a target facing left.
-
-Assert the clone spawns:
-
-to target's right
-
-and faces left.
-
-Test a target facing right.
-
-Assert the clone spawns:
-
-to target's left
-
-and faces right.
-
-100. Position snapshot test
-
-Spawn the cloud.
-
-Move the target during APPEAR.
-
-Assert clone/cloud position does not follow.
-
-The attack may miss because the opponent escaped.
-
-101. Clone damage test
-
-Keep the target in range.
-
-Assert the clone’s active BA1 frame:
-
-* hits exactly once
-* deals 6 damage
-* applies BA1 hitstun
-* applies BA1 knockback
-* then completes recovery
-* then vanishes
-
-102. Clone whiff test
-
-Move the opponent away during the appearance animation.
-
-Assert:
-
-clone BA1 misses
-no damage
-clone still completes recovery
-cloud reverses
-clone is removed
-
-103. Dodge interaction test
-
-Time Defense so the target is invulnerable on the clone BA1 active frame.
-
-Assert:
-
-no damage
-no stun
-no knockback
-no hitstop
-
-and do not falsely mark the attack consumed merely because it overlapped during invulnerability.
-
-104. Behind Block test
-
-Use a test character with:
-
-defense.type = 'block'
-
-If it is facing away from the clone because the clone appeared behind it, its guard should not block the rear BA1.
-
-If it turns and actually faces the clone before impact, normal Block logic may apply.
-
-This verifies clone direction rather than owner direction drives block resolution.
-
-105. Detached hitstop test
-
-When the clone BA1 connects:
-
-target freezes
-clone briefly freezes
-owner does not
-
-Assert the real #0001’s Charge animation/state clock is not frozen by the remote clone hit.
-
-106. Multiple clone test
-
-With 100 Energy, trigger several distinct charged BA1 presses quickly enough that earlier clones remain alive.
-
-Assert:
-
-* each successful press spends 25
-* each creates exactly one independent clone
-* their cloud/attack/vanish clocks do not overwrite each other
-* at Energy 0 no fifth clone can be created
-
-107. HUD regression
-
-After one successful summon, update the real HUD.
-
-Assert P1 Energy meter reports:
-
-75
-
-and the fill is:
-
-scaleX(0.75)
-
-Health remains unchanged merely from spending Energy.
-
-108. Reset/rematch test
-
-Spend Energy and create one or more clones.
-
-Restart/rematch.
-
-Assert:
-
-Energy = 100
-live clones = 0
-
-109. CPU behavior
-
-The training CPU remains deliberately non-attacking.
-
-It must not:
-
-* Charge
-* trigger Charged BA1
-* summon clones
-* Throw
-* BA1
-* BA2
-
-No clone AI is part of this task.
-
-110. Manual browser verification
-
-In a real Quick Battle:
-
-Trigger
-
-Hold Charge until #0001 visibly enters the Charge stance.
-
-While still holding Charge, press BA1.
-
-Verify:
-
-Energy 100 → 75
-
-and the real #0001 remains charging.
-
-Appearance
-
-Behind the CPU, verify the cloud plays:
-
-1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 → 10
-
-Attack
-
-Verify an identical #0001 clone appears and plays normal ground BA1 toward the CPU.
-
-Vanish
-
-After BA1 finishes, verify:
-
-10 → 9 → 8 → 7 → 6 → 5 → 4 → 3 → 2 → 1
-
-and the clone disappears completely.
-
-Movement
-
-Move the CPU during the cloud animation.
-
-Verify the cloud does not chase it.
-
-The clone should be able to miss.
-
-Direction
-
-Test CPU facing both directions.
-
-Verify the clone always appears on the CPU’s back side and faces toward it.
-
-Debug
-
-Enable the debug overlay and verify the active clone BA1 hitbox matches the existing normal BA1 punch.
-
-There should be no hitbox during the appearance or disappearance clouds.
-
-111. Scope restrictions
+115. Scope restrictions
 
 Do not add:
 
-* clone Health
-* clone Energy
-* clone AI
-* clone movement
-* clone jumping
-* clone projectiles
-* clone Throw
-* clone BA2
-* clone Dodge
-* clone hit reactions
-* clone pushboxes
-* clone camera tracking
-* clone HUD
-* clone labels
-* passive Energy regeneration
-* Charge-generated Energy
-* clone tinting
-* extra clone sprites
-* extra cloud sprites
-* clone sound effects
-* particles beyond the supplied cloud artwork
+* new controls
+* homing
+* teleportation
+* automatic turning
+* armour
+* invulnerability
+* passive Energy cost
+* Energy gain
+* screen-filling explosion graphics
+* camera cutscenes
+* cinematic zoom
+* new sound effects
+* new particle art
+* new sphere sprites
+* mid-air Charged BA2
+* AI Charged BA2
 
-Do not rebalance normal BA1, BA2, Throw, Dodge or Charge.
+Use only the supplied rasen and prasen artwork.
 
 Acceptance criteria
 
 The feature is complete when:
 
-1. 0001_cloneav1–10.png exist only under assets/characters/0001/.
-2. The incorrect old 0001_ cloneav8.png path does not exist.
-3. Clone cloud appearance plays exactly 1→10.
-4. Clone cloud disappearance plays exactly 10→1.
-5. Clone effect frames preload with #0001.
-6. Clone clouds are normalized as effects, not fighter-height animations.
-7. Clone Attack requires #0001 to already be Charging.
-8. Charge must still be held when BA1 is pressed.
-9. Fresh simultaneous Charge+BA1 from Idle does not summon.
-10. Successful Charged BA1 costs exactly 25 Energy.
-11. Energy never goes below 0.
-12. 25 Energy is enough for exactly one summon.
-13. Less than 25 Energy produces no clone and falls back to normal BA1.
-14. Missing required clone artwork spends no Energy.
-15. Normal BA1 remains unchanged outside the Charged combo.
-16. The real #0001 does not perform BA1 during a successful clone summon.
-17. The real #0001 remains Charging while Charge remains held.
-18. The clone appears on the opponent’s back side.
-19. Its position/facing are snapshotted and do not track afterward.
-20. The clone uses #0001’s actual existing BA1 sprite frames.
-21. The clone uses the existing BA1 combat definition.
-22. Clone BA1 can hit only once.
-23. Clone damage/knockback comes from the clone’s position/facing.
-24. The clone is not targetable and has no Health/pushbox.
-25. Clone attacks respect Dodge invulnerability.
-26. Future Block defense uses correct rear/front attack direction.
-27. A clone hit does not apply hitstop to the real owner.
-28. The clone finishes even if the owner releases Charge or gets hit afterward.
-29. The clone always vanishes after its attack, hit or miss.
-30. Multiple paid summons can coexist independently while Energy allows.
-31. Restart/rematch removes all clones and refills Energy.
-32. The Energy HUD immediately reflects the cost.
-33. No other current action consumes or regenerates Energy.
-34. Training CPU remains non-attacking.
-35. README, Help, comments, and ALVA_SPEC.md describe the new move and Energy behavior accurately.
-36. node --test passes completely.
+1. All 12 rasen files live under assets/characters/0001/.
+2. All 11 prasen files live under assets/characters/0001/.
+3. No root copies remain.
+4. All 23 files preload with #0001.
+5. rasen1–3 are the preparation phase.
+6. prasen1–6 visibly form the sphere.
+7. #0001 does not dash before the sphere completes.
+8. rasen4–6 drive the forward dash/contact search.
+9. The complete sphere remains attached to the hand during dash.
+10. Collision is based on the sphere’s actual world position.
+11. A miss does not play rasen7–12.
+12. A grounded miss returns #0001 to normal state.
+13. A successful contact deals exactly one first hit.
+14. First-hit damage is initially 4.
+15. First hit has no launch.
+16. The opponent becomes unable to move or act after hit 1.
+17. rasen7–12 only play after successful hit confirmation.
+18. prasen7–9 play after successful contact.
+19. prasen9 remains attached during the delay.
+20. Explosion happens 2.0 seconds after hit 1.
+21. prasen10–11 are the explosion.
+22. Explosion deals exactly one second hit.
+23. Second-hit damage is initially 16.
+24. Total successful damage is initially 20.
+25. The explosion releases the opponent from immobilization before knockback.
+26. The explosion launches with substantially stronger knockback.
+27. Dodge invulnerability can make the rush miss.
+28. A Block prevents the special immobilization/explosion sequence.
+29. #0001’s facing remains locked throughout the technique.
+30. The technique is ground-only.
+31. Losing ground during formation cancels into Fall.
+32. Losing ground during dash cancels into Fall.
+33. Losing ground after first hit but before explosion cancels the remaining sequence and releases the target.
+34. Hitstun can interrupt/cancel #0001 normally.
+35. No armour or invulnerability is added.
+36. Charged BA2 does not consume Energy in this task.
+37. Charged BA1 still costs 25 Energy and works exactly as before.
+38. Normal BA2 remains unchanged.
+39. Fresh simultaneous Charge+BA2 from Idle produces normal BA2.
+40. Releasing Charge on the BA2 press step produces normal BA2.
+41. Missing Charged BA2 art safely falls back to normal BA2.
+42. No invisible damage/effect can occur.
+43. Restart/rematch clears every technique/bind/effect state.
+44. README, Help, source comments and ALVA_SPEC.md describe the new Charged BA2 accurately.
+45. node --test passes in full.
