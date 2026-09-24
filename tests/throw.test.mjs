@@ -2,10 +2,11 @@
 // #0001's Throw on the primary action and its shuriken projectile: artwork,
 // registration, one-pass playback, one release per press on the release
 // frame, independent flight, spin animation, hits through the real
-// CombatSystem (knockback direction, Dodge, Block), cleanup, missing-art
+// CombatSystem (no knockback either way, Dodge, Block), cleanup, missing-art
 // safety, the ground-only rule, Charge / Defense priority, input and the
-// training CPU. Uses the real Fighter, CombatSystem, projectiles, physics and
-// InputManager (see fighter-harness.mjs).
+// training CPU. The shuriken has no knockback: a hit deals damage and stun
+// but never pushes or launches. Uses the real Fighter, CombatSystem,
+// projectiles, physics and InputManager (see fighter-harness.mjs).
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
@@ -13,6 +14,7 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { characterFramePaths } from '../js/data/characters.js';
 import { COMBAT_ACTIONS } from '../js/game/character.js';
+import { CombatSystem } from '../js/game/combat.js';
 import { Projectile, spawnProjectiles, removeDeadProjectiles, createProjectileDefinition } from '../js/game/projectile.js';
 import { StageCollision } from '../js/game/physics.js';
 import { SpriteSet } from '../js/game/sprite-normalizer.js';
@@ -168,7 +170,11 @@ test('the Throw attack: its own clip, ground-only, one pass, no melee hitbox, on
   assert.ok(proj.damage > 0 && proj.damage < def.attacks.ba2.damage);
   assert.ok(proj.hitstun < def.attacks.ba1.hitstun && proj.hitstun < def.attacks.ba2.hitstun);
   assert.ok(proj.hitstop <= def.attacks.ba1.hitstop);
-  assert.equal(proj.knockback.y, 0, 'no launch');
+  assert.deepEqual(SHURIKEN.knockback, { x: 0, y: 0 }, 'no knockback: no push, no launch');
+  assert.deepEqual(proj.knockback, { x: 0, y: 0 });
+  assert.equal('powers' in SHURIKEN, false, 'a bespoke hit, not an attack Power');
+  assert.equal(proj.damage, 4);
+  assert.equal(proj.speed, 700);
   assert.ok(proj.speed > 0 && proj.lifetime > 0);
   assert.ok(proj.hitbox.w <= 16 && proj.hitbox.h <= 16, 'a small box around the shuriken');
   assert.equal(proj.hitbox.x, -proj.hitbox.w / 2);
@@ -347,8 +353,10 @@ test('the Throw locks movement and facing; the release keeps #0001\'s logical fa
 
 // ---- Hits -----------------------------------------------------------------------
 
-test('a shuriken hits once for its damage, stun, hitstop and knockback, then disappears', () => {
+test('a shuriken hits once for its damage, stun and hitstop, with no knockback, then disappears', () => {
   const d = duel({ gap: 200 });
+  const startX = d.target.body.x;
+  const floor = d.target.body.y;
   d.tick(THROW);
   d.until(() => d.events.length > 0);
   const [ev] = d.events;
@@ -360,8 +368,10 @@ test('a shuriken hits once for its damage, stun, hitstop and knockback, then dis
   assert.equal(d.target.combat.health, 100 - SHURIKEN.damage);
   assert.ok(Math.abs(d.target.combat.stun - SHURIKEN.hitstun) < 1e-9);
   assert.equal(d.target.combat.hitstop, SHURIKEN.hitstop);
-  assert.equal(d.target.body.vx, SHURIKEN.knockback.x, 'knocked away from the thrower');
+  assert.equal(d.target.combat.health, 96);
+  assert.equal(d.target.body.vx, 0, 'not pushed');
   assert.equal(d.target.body.vy, 0, 'no launch');
+  assert.equal(d.target.grounded, true);
   assert.equal(d.attacker.combat.hitstop, 0, 'the thrower is not frozen by a distant hit');
   assert.equal(d.projectiles.length, 0, 'destroyed on impact');
   assert.equal(ev.projectile.alive, false);
@@ -372,10 +382,12 @@ test('a shuriken hits once for its damage, stun, hitstop and knockback, then dis
   for (let i = 0; i < 90; i++) d.tick();
   assert.equal(d.events.length, 1);
   assert.equal(d.target.combat.health, 100 - SHURIKEN.damage);
-  assert.ok(d.target.body.x > d.attacker.body.x + 200, 'pushed back');
+  assert.equal(d.target.body.x, startX, 'not pushed back: stays where it was hit');
+  assert.equal(d.target.body.y, floor);
+  assert.equal(d.target.grounded, true);
 });
 
-test('knockback follows the shuriken\'s direction, not the thrower\'s later facing', () => {
+test('a shuriken pushes the target neither way, whichever way it flies and wherever the thrower then faces', () => {
   for (const facing of [1, -1]) {
     const d = duel({ gap: 320, attackerFacing: facing });
     d.attacker.opponent = null;
@@ -387,10 +399,37 @@ test('knockback follows the shuriken\'s direction, not the thrower\'s later faci
     d.tick(back);
     assert.equal(d.attacker.facing, -facing);
     assert.equal(d.events.length, 0, 'still in flight');
+    const startX = d.target.body.x;
     d.until(() => d.events.length > 0);
     assert.equal(d.attacker.facing, -facing, 'facing away at impact');
-    assert.equal(Math.sign(d.target.body.vx), facing, `knocked ${facing > 0 ? 'right' : 'left'}`);
-    assert.equal(d.target.body.vx, SHURIKEN.knockback.x * facing);
+    assert.equal(d.events[0].type, 'hit');
+    assert.equal(d.events[0].attacker, d.attacker, 'the thrower is credited');
+    // 0 along the shuriken's direction: -0 when it flies left, still 0.
+    assert.equal(Math.abs(d.target.body.vx), 0, `not knocked ${facing > 0 ? 'right' : 'left'}`);
+    assert.equal(d.target.body.vy, 0, 'no launch');
+    while (d.target.combat.stun > 0 || d.target.combat.hitstop > 0) d.tick();
+    assert.equal(d.target.body.x, startX, 'not displaced');
+    assert.equal(d.target.grounded, true);
+  }
+});
+
+test('a shuriken hit leaves an airborne target\'s vertical velocity alone', () => {
+  const { fighter } = makeFighter();
+  const shuriken = fighter.projectileDefs.shuriken;
+  for (const vy of [-300, 0, 450]) {
+    const d = duel({ gap: 200 });
+    Object.assign(d.target.body, { y: 600, vy, grounded: false, ground: null });
+    const p = { owner: d.attacker, def: shuriken, direction: 1 };
+    const system = new CombatSystem();
+    const event = system.applyHit(d.attacker, d.target, shuriken, { facing: 1, projectile: p });
+    assert.equal(event.type, 'hit');
+    assert.equal(event.damage, 4);
+    assert.equal(d.target.combat.health, 96);
+    assert.ok(Math.abs(d.target.combat.stun - SHURIKEN.hitstun) < 1e-9, 'hitstun');
+    assert.equal(d.target.combat.hitstop, SHURIKEN.hitstop);
+    assert.equal(d.target.body.vy, vy, 'no vertical knockback: the fall or rise carries on');
+    assert.equal(d.target.body.vx, 0, 'no horizontal knockback');
+    assert.equal(d.target.body.grounded, false);
   }
 });
 
@@ -464,7 +503,7 @@ test('a shuriken still overlapping when the invulnerable frames end connects the
   assert.equal(d.target.combat.defenseAction, null, 'the hit cancels the Dodge recovery');
 });
 
-test('a Block-type fighter guarding toward a shuriken blocks it with chip damage, blockstun and half knockback', () => {
+test('a Block-type fighter guarding toward a shuriken blocks it with chip damage and blockstun, and no knockback', () => {
   const blocker = { ...def, defense: { type: 'block' }, stats: { ...def.stats, blockDamageScale: 0.25 } };
   for (const facing of [1, -1]) {
     const d = duel({ gap: 200, attackerFacing: facing, targetCharacter: blocker });
@@ -475,7 +514,7 @@ test('a Block-type fighter guarding toward a shuriken blocks it with chip damage
     assert.equal(d.events[0].type, 'block');
     assert.ok(Math.abs(d.events[0].damage - SHURIKEN.damage * 0.25) < 1e-9, 'chip damage');
     assert.ok(Math.abs(d.target.combat.stun - SHURIKEN.blockstun) < 1e-9, 'blockstun');
-    assert.equal(d.target.body.vx, 0.5 * SHURIKEN.knockback.x * facing, 'reduced knockback, same direction');
+    assert.equal(Math.abs(d.target.body.vx), 0, 'no knockback to halve');
     assert.equal(d.projectiles.length, 0, 'gone after the blocked impact');
   }
   // Guarding the other way does not block it.

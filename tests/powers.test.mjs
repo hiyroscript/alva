@@ -6,8 +6,10 @@
 // player and CPU fighters alike, while gravity, falling, coyote time, the jump
 // buffer, acceleration, knockback, projectiles, techniques and every other
 // movement stat stay independent of them. Attack definitions turn their
-// knockback Powers into numeric knockback once, when they are created. Runs
-// the real Fighter, physics and combat (see fighter-harness.mjs).
+// knockback Powers into numeric knockback once, when they are created;
+// Vertical Knockback is signed (a positive tier launches upward, a negative
+// one drives the target downward at the same tier's magnitude). Runs the
+// real Fighter, physics and combat (see fighter-harness.mjs).
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -140,8 +142,10 @@ test('POWERS is the one registry of Power types: four Powers in two scopes, froz
     'Controls how high a normal jump goes. Higher tiers jump higher.',
     'Controls maximum movement speed. Higher tiers move faster.',
     'Controls how strongly an attack pushes a hit opponent sideways. Higher tiers push farther.',
-    'Controls how strongly an attack launches a hit opponent upward. Higher tiers launch higher.',
+    'Controls how strongly an attack launches a hit opponent upward or drives it downward. Higher tiers hit harder.',
   ]);
+  // Only Vertical Knockback takes a signed tier.
+  assert.deepEqual(POWERS.filter((p) => p.signed).map((p) => p.id), ['verticalKnockback']);
 });
 
 test('fighter resolvers read fighter Powers only; attack resolvers attack Powers only', () => {
@@ -626,15 +630,39 @@ test('Horizontal Knockback Power has exactly three tiers: 140, 180 and 220', () 
 
 test('Vertical Knockback Power has exactly three tiers: 480, 640 and 800', () => {
   assert.deepEqual(VERTICAL_KNOCKBACK_POWER_TIERS.map((t) => [t.tier, t.name, t.description, t.knockbackY]), [
-    [1, 'Vertical Knockback Power 1', 'Light upward launch.', 480],
-    [2, 'Vertical Knockback Power 2', 'Normal upward launch.', 640],
-    [3, 'Vertical Knockback Power 3', 'Strong upward launch.', 800],
+    [1, 'Vertical Knockback Power 1', 'Light vertical knockback.', 480],
+    [2, 'Vertical Knockback Power 2', 'Normal vertical knockback.', 640],
+    [3, 'Vertical Knockback Power 3', 'Strong vertical knockback.', 800],
   ]);
   for (const [tier, y] of [[1, 480], [2, 640], [3, 800]]) {
     assert.equal(getPowerTier('verticalKnockback', tier).knockbackY, y);
-    assert.equal(getVerticalKnockback({ id: 'a', powers: { verticalKnockback: tier } }), y);
+    assert.equal(getVerticalKnockback({ id: 'a', powers: { verticalKnockback: tier } }), y, `tier ${tier} launches upward`);
   }
   assert.equal(getPowerTier('verticalKnockback', 0), null);
+});
+
+test('a negative Vertical Knockback tier is that tier\'s magnitude reversed: downward, with no tiers of its own', () => {
+  // The table stays three positive magnitudes; there are no -1 / -2 / -3 rows.
+  assert.deepEqual(VERTICAL_KNOCKBACK_POWER_TIERS.map((t) => t.tier), [1, 2, 3]);
+  assert.ok(VERTICAL_KNOCKBACK_POWER_TIERS.every((t) => t.knockbackY > 0));
+  for (const tier of [-1, -2, -3]) assert.equal(getPowerTier('verticalKnockback', tier), null, `no tier ${tier} row`);
+  assert.equal(getPowerTier('verticalKnockback', 2), VERTICAL_KNOCKBACK_POWER_TIERS[1]);
+  for (const [tier, y] of [[1, 480], [2, 640], [3, 800]]) {
+    const up = { id: 'up', powers: { verticalKnockback: tier } };
+    const down = { id: 'down', powers: { verticalKnockback: -tier } };
+    const { value, warnings: logged } = warnings(() => [
+      getAttackPowerTier(down, 'verticalKnockback'), getVerticalKnockback(down), createAttackDefinition(down).knockback,
+    ]);
+    assert.deepEqual(logged, [], `tier ${-tier} is valid data, not a malformed tier`);
+    const [entry, knockbackY, knockback] = value;
+    // Same tier entry as the positive declaration, opposite direction.
+    assert.equal(entry, getPowerTier('verticalKnockback', tier));
+    assert.equal(entry, getAttackPowerTier(up, 'verticalKnockback'));
+    assert.equal(knockbackY, -y, `tier ${-tier} resolves to ${-y}`);
+    assert.equal(getVerticalKnockback(up), y);
+    assert.deepEqual(knockback, { x: 0, y: -y });
+    assert.deepEqual(getAttackKnockback(down), { x: 0, y: -y });
+  }
 });
 
 test('both knockback Powers are strictly increasing: 1 < 2 < 3', () => {
@@ -652,6 +680,8 @@ test('attack knockback resolves each axis on its own: horizontal only, vertical 
     [{ verticalKnockback: 2 }, { x: 0, y: 640 }, 'vertical only'],
     [{ horizontalKnockback: 3, verticalKnockback: 1 }, { x: 220, y: 480 }, 'both'],
     [{ horizontalKnockback: 1, verticalKnockback: 3 }, { x: 140, y: 800 }, 'both, the other way'],
+    [{ verticalKnockback: -1 }, { x: 0, y: -480 }, 'vertical only, downward'],
+    [{ horizontalKnockback: 2, verticalKnockback: -2 }, { x: 180, y: -640 }, 'both, downward'],
     [{}, { x: 0, y: 0 }, 'neither'],
   ]) {
     assert.deepEqual(getAttackKnockback(spec(powers)), knockback, label);
@@ -685,19 +715,100 @@ test('attack Powers resolve once, when the attack definition is created, and hit
   assert.equal(target.fighter.grounded, false);
 });
 
+// An unblocked hit from an attack with `powers` on `target`, through the real
+// CombatSystem.applyHit; the attacker faces `facing`.
+function hitWith(powers, { facing = 1, airborne = false, blocker = false } = {}) {
+  const atk = createAttackDefinition({
+    id: 'probe', animation: 'ba1', startup: 0, active: DT, recovery: 0, damage: 5, hitstun: 0.3, hitstop: 0, powers,
+  });
+  const attacker = makeFighter({ x: 500, facing });
+  const target = makeFighter({
+    x: 500 + 50 * facing, facing: -facing,
+    character: blocker ? { ...def, defense: { type: 'block' } } : def,
+  });
+  if (airborne) {
+    target.fighter.body.y = 500;
+    target.fighter.body.vy = 0;
+    target.fighter.body.grounded = false;
+    target.fighter.body.ground = null;
+  }
+  if (blocker) target.fighter.combat.blocking = true;
+  const event = new CombatSystem().applyHit(attacker.fighter, target.fighter, atk);
+  return { atk, event, target };
+}
+
+test('an unblocked Vertical Knockback Power -2 hit drives the target downward: vy +640', () => {
+  for (const facing of [1, -1]) {
+    // A grounded target: knocked down into the floor, it stays on the ground.
+    const grounded = hitWith({ verticalKnockback: -2 }, { facing });
+    const body = grounded.target.fighter.body;
+    assert.equal(grounded.event.type, 'hit');
+    assert.equal(grounded.atk.knockback.y, -640);
+    assert.equal(body.vy, 640, 'positive body vy: downward');
+    assert.ok(body.vy > 0);
+    assert.equal(Math.abs(body.vx), 0, 'no horizontal Power, no push');
+    const floor = body.y;
+    grounded.target.step();
+    assert.equal(body.y, floor, 'never goes up, and never below the floor');
+    assert.equal(body.grounded, true, 'back on the ground at once');
+
+    // An airborne target falls faster and lands sooner than one that is not hit.
+    const hit = hitWith({ verticalKnockback: -2 }, { facing, airborne: true });
+    const plain = makeFighter({ x: 500 + 50 * facing, facing: -facing });
+    Object.assign(plain.fighter.body, { y: 500, vy: 0, grounded: false, ground: null });
+    assert.equal(hit.target.fighter.body.vy, 640);
+    const startY = hit.target.fighter.body.y;
+    hit.target.step();
+    plain.step();
+    assert.ok(hit.target.fighter.body.y > startY, 'moves down on the very next step');
+    assert.ok(hit.target.fighter.body.y > plain.fighter.body.y, 'faster than falling on its own');
+    const landHit = stepUntil(hit.target.step, (f) => f.grounded);
+    const landPlain = stepUntil(plain.step, (f) => f.grounded);
+    assert.ok(landHit < landPlain, 'lands sooner');
+  }
+});
+
+test('Vertical Knockback Power -2 with Horizontal Knockback Power 2: pushed away and down; blocked, neither vertical', () => {
+  for (const facing of [1, -1]) {
+    const { target } = hitWith({ horizontalKnockback: 2, verticalKnockback: -2 }, { facing, airborne: true });
+    assert.equal(target.fighter.body.vx, 180 * facing, 'away from the attacker');
+    assert.equal(target.fighter.body.vy, 640, 'downward');
+    // Vertical knockback, either way, needs an unblocked hit.
+    const blocked = hitWith({ horizontalKnockback: 2, verticalKnockback: -2 }, { facing, blocker: true });
+    assert.equal(blocked.event.type, 'block');
+    assert.equal(blocked.target.fighter.body.vx, 90 * facing, 'half the push');
+    assert.equal(blocked.target.fighter.body.vy, 0, 'no downward knockback on a block');
+    assert.equal(blocked.target.fighter.grounded, true);
+  }
+});
+
+test('positive Vertical Knockback tiers still launch upward: vy -480, -640, -800', () => {
+  for (const [tier, y] of [[1, 480], [2, 640], [3, 800]]) {
+    const { target } = hitWith({ verticalKnockback: tier });
+    assert.equal(target.fighter.body.vy, -y, `tier ${tier}`);
+    assert.equal(target.fighter.grounded, false, 'off the ground');
+    const floor = STAGE.groundY;
+    target.step();
+    assert.ok(target.fighter.body.y < floor, 'rising');
+  }
+});
+
 test('#0001\'s attacks resolve their knockback Powers; bespoke hits keep their own knockback', () => {
   const { fighter } = makeFighter();
   assert.deepEqual(fighter.attacks.ba1.knockback, { x: 180, y: 0 });
-  assert.deepEqual(fighter.attacks.midairBa1.knockback, { x: 180, y: 0 });
+  assert.deepEqual(fighter.attacks.midairBa1.knockback, { x: 180, y: -640 }, 'pushed away and driven downward');
   assert.deepEqual(fighter.attacks.ba2.knockback, { x: 0, y: 640 });
-  assert.deepEqual(fighter.attacks.midairBa2.knockback, { x: 0, y: 640 });
+  assert.deepEqual(fighter.attacks.midairBa2.knockback, { x: 0, y: 480 }, 'a lighter launch than ground BA2');
+  assert.deepEqual(def.attacks.midairBa1.powers, { horizontalKnockback: 2, verticalKnockback: -2 });
+  assert.deepEqual(def.attacks.midairBa2.powers, { verticalKnockback: 1 });
   assert.deepEqual(fighter.attacks.throw.knockback, { x: 0, y: 0 }, 'Throw has no melee hit');
   for (const id of ['ba1', 'midairBa1', 'ba2', 'midairBa2']) {
     assert.equal('knockback' in def.attacks[id], false, `${id}: its Powers are the only source`);
   }
-  // Not migrated: the shuriken and the Sphere Rush hits are bespoke.
-  assert.deepEqual(def.projectiles.shuriken.knockback, { x: 140, y: 0 });
-  assert.deepEqual(fighter.projectileDefs.shuriken.knockback, { x: 140, y: 0 });
+  // Not migrated: the shuriken and the Sphere Rush hits are bespoke. The
+  // shuriken has no knockback at all.
+  assert.deepEqual(def.projectiles.shuriken.knockback, { x: 0, y: 0 });
+  assert.deepEqual(fighter.projectileDefs.shuriken.knockback, { x: 0, y: 0 });
   assert.deepEqual(def.chargedTechniques.rasenRush.firstHit.knockback, { x: 0, y: 0 });
   assert.deepEqual(def.chargedTechniques.rasenRush.explosionHit.knockback, { x: 420, y: 220 });
   for (const hit of [def.projectiles.shuriken, def.chargedTechniques.rasenRush.firstHit, def.chargedTechniques.rasenRush.explosionHit]) {
@@ -709,6 +820,15 @@ test('malformed attack Power data: a bad tier is logged and gets the normal tier
   for (const [powers, knockback, pattern, label] of [
     [{ horizontalKnockback: 7 }, { x: 180, y: 0 }, /Horizontal Knockback Power/, 'an unknown horizontal tier'],
     [{ verticalKnockback: '2' }, { x: 0, y: 640 }, /Vertical Knockback Power/, 'a vertical tier that is not a number'],
+    // A signed tier must be a real number whose magnitude is a tier; anything
+    // else is malformed as before: logged, the default tier, upward.
+    [{ verticalKnockback: '-2' }, { x: 0, y: 640 }, /Vertical Knockback Power/, 'a negative vertical tier that is a string'],
+    [{ verticalKnockback: -7 }, { x: 0, y: 640 }, /Vertical Knockback Power/, 'a negative vertical tier out of range'],
+    [{ verticalKnockback: 0 }, { x: 0, y: 640 }, /Vertical Knockback Power/, 'vertical tier 0'],
+    [{ verticalKnockback: -1.5 }, { x: 0, y: 640 }, /Vertical Knockback Power/, 'a fractional negative vertical tier'],
+    [{ verticalKnockback: -Infinity }, { x: 0, y: 640 }, /Vertical Knockback Power/, 'an infinite negative vertical tier'],
+    // Horizontal Knockback is never signed: direction is the hit's facing.
+    [{ horizontalKnockback: -2 }, { x: 180, y: 0 }, /Horizontal Knockback Power/, 'a negative horizontal tier'],
     [{ jump: 2 }, { x: 0, y: 0 }, /"jump", which is not an attack Power/, 'a fighter Power on an attack'],
     [{ knockbak: 2 }, { x: 0, y: 0 }, /"knockbak", which is not an attack Power/, 'a misspelt Power'],
   ]) {
@@ -725,4 +845,5 @@ test('malformed attack Power data: a bad tier is logged and gets the normal tier
   // Valid data, and an omitted axis, never warn.
   assert.deepEqual(warnings(() => makeFighter()).warnings, []);
   assert.deepEqual(warnings(() => createAttackDefinition({ id: 'probe', powers: { horizontalKnockback: 2 } })).warnings, []);
+  assert.deepEqual(warnings(() => createAttackDefinition({ id: 'probe', powers: { horizontalKnockback: 2, verticalKnockback: -2 } })).warnings, []);
 });

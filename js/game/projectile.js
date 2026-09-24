@@ -12,7 +12,7 @@
 //     shuriken: {
 //       animation: 'shuriken', speed: 700, lifetime: 1.5,
 //       hitbox: { x: -5, y: -5, w: 10, h: 10 },
-//       damage: 4, knockback: { x: 140, y: 0 }, hitstun: 0.16, blockstun: 0.1, hitstop: 0.04,
+//       damage: 4, knockback: { x: 0, y: 0 }, hitstun: 0.16, blockstun: 0.1, hitstop: 0.04,
 //     },
 //   },
 //

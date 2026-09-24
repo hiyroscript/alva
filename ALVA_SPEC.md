@@ -527,8 +527,9 @@ read the character database, so it stays the same as fighters are added.
     horizontal knockback.", "Normal horizontal knockback.", "Strong
     horizontal knockback."
   - **Vertical Knockback Power**: "Controls how strongly an attack launches a
-    hit opponent upward. Higher tiers launch higher." — tiers 1–3 "Light
-    upward launch.", "Normal upward launch.", "Strong upward launch."
+    hit opponent upward or drives it downward. Higher tiers hit harder." —
+    tiers 1–3 "Light vertical knockback.", "Normal vertical knockback.",
+    "Strong vertical knockback."
 
   No tuning values (velocities, speeds, knockback) or other physics
   constants are shown, and there is no fighter list, "Used by" label or
@@ -586,9 +587,16 @@ read the character database, so it stays the same as fighters are added.
   at 12 fps. Phases are whole frames: ground BA1 is frame 1 startup, frame 2
   active, frames 3–4 recovery; mid-air BA1 is frames 1–2 startup, frame 3
   active, frames 4–5 recovery. Each hits once for 6 damage, 0.22 s hitstun,
-  0.14 s blockstun, 0.06 s hitstop and a 0.1 s cooldown. Both declare
-  Horizontal Knockback Power 2 (`powers: { horizontalKnockback: 2 }`), so
-  they keep their 180 horizontal knockback, with no launch. Hitboxes match
+  0.14 s blockstun, 0.06 s hitstop and a 0.1 s cooldown. Ground BA1
+  declares Horizontal Knockback Power 2 (`powers: { horizontalKnockback: 2
+  }`, resolved `{ x: 180, y: 0 }`): 180 horizontal knockback and no vertical
+  knockback. Mid-air BA1 declares the same Horizontal Knockback Power 2 plus
+  downward Vertical Knockback Power −2 (`powers: { horizontalKnockback: 2,
+  verticalKnockback: -2 }`, resolved `{ x: 180, y: −640 }`): an unblocked
+  hit pushes the opponent 180 away and drives it downward (at impact vx
+  180 × facing, vy +640). A grounded opponent is knocked straight back onto
+  the ground it stands on; an airborne one is sent down toward it. A blocked
+  mid-air BA1 gets the usual half push and no vertical knockback. Hitboxes match
   the strike in the contact frame and mirror with facing. Movement and facing
   lock while an attack plays; gravity still applies, and a mid-air BA1 that
   lands finishes its own clip. Ground BA1 is ground-only.
@@ -602,12 +610,15 @@ read the character database, so it stays the same as fighters are added.
   then overhead) and frame 3 active (the slash arc), with no recovery frame,
   so the attack ends with its clip. BA2 is slower and heavier than BA1: each
   hits once for 8 damage, 0.24 s hitstun, 0.15 s blockstun and 0.07 s
-  hitstop, with a 0.15 s cooldown on the ground and 0.18 s in the air. Both
-  declare Vertical Knockback Power 2 (`powers: { verticalKnockback: 2 }`):
-  an unblocked hit launches the opponent upward at 640 (at impact vx 0, vy
-  −640, airborne, rising about a fighter's height before normal gravity
-  brings it down) instead of the 220
-  sideways push BA2 used to have, and it has no horizontal knockback. The
+  hitstop, with a 0.15 s cooldown on the ground and 0.18 s in the air.
+  Ground BA2 declares Vertical Knockback Power 2 (`powers: {
+  verticalKnockback: 2 }`, resolved `{ x: 0, y: 640 }`): an unblocked hit
+  launches the opponent upward at 640 (at impact vx 0, vy −640, airborne,
+  rising about a fighter's height before normal gravity brings it down).
+  Mid-air BA2 declares the lighter Vertical Knockback Power 1 (`powers: {
+  verticalKnockback: 1 }`, resolved `{ x: 0, y: 480 }`): still an upward
+  launch (at impact vx 0, vy −480), but a lower one than ground BA2's.
+  Neither has horizontal knockback. The
   launch comes from the shared knockback path, not special BA2 code. A
   blocked BA2 still takes chip damage, blockstun and hitstop, but is never
   launched (vertical knockback applies only to unblocked hits) and is not
@@ -646,16 +657,16 @@ read the character database, so it stays the same as fighters are added.
   700 units/s, looping `shuriken1 → shuriken2 → shuriken3` at 18 fps (art
   only; speed never depends on it). Its hitbox is 10 × 10 units, centred.
   It hits at most once: 4 damage, 0.16 s hitstun, 0.10 s blockstun, 0.04 s
-  hitstop on the target only (the thrower does not freeze), 140 horizontal
-  knockback along the shuriken's own direction and no launch, then it
-  disappears. Hits resolve through the same `CombatSystem.applyHit` as melee,
+  hitstop on the target only (the thrower does not freeze) and no knockback
+  at all (`knockback: { x: 0, y: 0 }`: it neither pushes nor launches), then
+  it disappears. Hits resolve through the same `CombatSystem.applyHit` as melee,
   with the shuriken's direction in place of the attacker's facing, and credit
   #0001 as the attacker. It never hits its thrower. During a Dodge's
   invulnerable frames it passes through unspent (no damage, stun, hitstop,
   knockback or event) and can still connect if it overlaps once they end; a
   future Block-type fighter guarding toward it blocks it with the normal chip
-  damage, blockstun and half knockback, and it disappears. A missed shuriken
-  disappears after 1.5 s, once it has flown past a stage edge, or when it
+  damage and blockstun (no knockback to halve), and it disappears. A missed
+  shuriken disappears after 1.5 s, once it has flown past a stage edge, or when it
   meets a solid block; one-way platforms do not stop it. No multi-hit,
   homing, bouncing, piercing, explosion or clash. The Battle owns live
   projectiles: each fixed step it updates the fighters, spawns released
@@ -942,9 +953,11 @@ read the character database, so it stays the same as fighters are added.
   debug overlay draws the rushing sphere's hitbox as a dashed cyan box
   labelled `charged ba2 dash`, then a dashed cyan cross on the attached
   sphere's centre, and labels a bound fighter `bound`.
-- Every fighter has an Energy resource (`energy` / `maxEnergy` on its combat
-  state, capacity from the character's `stats.energy`, 100 for #0001). It
-  starts full and refills on restart / rematch. It changes only through the
+- Every fighter has 100 health and an Energy resource of 100: each
+  definition in `CHARACTERS` declares `stats: { health: 100, energy: 100 }`,
+  and its combat state reads `maxHealth` / `health` and `maxEnergy` /
+  `energy` from those stats (nothing in the engine names a fighter). Both
+  start full and refill on restart / rematch. It changes only through the
   combat state's `canSpendEnergy` / `spendEnergy` helpers, and #0001's
   Charged BA1 Clone Attack (25) is the only thing that spends it. There is no
   Energy regeneration or gain: Charge, hits, Dodges and time generate none,
@@ -972,7 +985,17 @@ read the character database, so it stays the same as fighters are added.
     once into the definition's numeric `knockback: { x, y }`, which is all
     `CombatSystem.applyHit` and clones ever read. Bespoke hits that are not
     fighter attacks (the shuriken, the Sphere Rush contact and explosion)
-    keep their own raw `knockback`.
+    keep their own raw `knockback`; the shuriken's is `{ x: 0, y: 0 }`.
+  - **Vertical Knockback is signed.** The declared tier's magnitude picks the
+    tier and its sign the direction: `verticalKnockback: 1 / 2 / 3` resolve
+    to `knockback.y` +480 / +640 / +800 (an upward launch), `-1 / -2 / -3` to
+    −480 / −640 / −800 (driven downward). `applyHit` sets `vy = −knockback.y`
+    on an unblocked hit, so a negative tier gives the target a positive
+    (downward) `vy`. The tier table stays three positive magnitudes (no
+    negative rows; `getPowerTier('verticalKnockback', 2)` is the normal tier
+    2 entry), and the `signed` flag on the registry entry is what allows the
+    negative form. Horizontal Knockback is never signed: a hit already
+    pushes along its facing.
 
   Tier values (world units per second, at the global gravity of 2500):
 
@@ -981,11 +1004,15 @@ read the character database, so it stays the same as fighters are added.
   | Jump Power | 650 | 920 | 1000 | initial upward speed of the normal jump |
   | Speed Power | 270 | 330 | 360 | top speed of normal movement |
   | Horizontal Knockback Power | 140 | 180 | 220 | the attack's `knockback.x` |
-  | Vertical Knockback Power | 480 | 640 | 800 | the attack's `knockback.y` (launch; `vy = −y`) |
+  | Vertical Knockback Power | 480 | 640 | 800 | the attack's `knockback.y`, signed (positive tier: launch upward; negative tier: downward; `vy = −y`) |
 
   #0001 has **Jump Power 2** and **Speed Power 2**, exactly its original 920
-  jump and 330 top speed, so its jump and movement are unchanged; BA1 has
-  Horizontal Knockback Power 2 and BA2 Vertical Knockback Power 2 (above).
+  jump and 330 top speed, so its jump and movement are unchanged. Ground BA1
+  has Horizontal Knockback Power 2 (`{ x: 180, y: 0 }`), mid-air BA1
+  Horizontal Knockback Power 2 and Vertical Knockback Power −2 (`{ x: 180,
+  y: −640 }`, downward), ground BA2 Vertical Knockback Power 2 (`{ x: 0, y:
+  640 }`) and mid-air BA2 Vertical Knockback Power 1 (`{ x: 0, y: 480 }`)
+  (above).
   The tiers are the only sources: movement has no raw `jumpVelocity` or
   `maxSpeed`, and those attacks no raw `knockback`. Speed Power feeds the
   same normal left / right target speed on the ground and in the air (and
@@ -995,9 +1022,11 @@ read the character database, so it stays the same as fighters are added.
   charged techniques (the Sphere Rush's 1050 dash) never depend on it, just
   as none of them depend on Jump Power. The shared Fighter applies both for
   Player 1, the CPU and Practice Ground alike. A declared tier the table
-  lacks (or a fighter missing a fighter Power) is logged and gets tier 2; an
-  attack entry naming something that is not an attack Power is logged and
-  ignored.
+  lacks (or a fighter missing a fighter Power) is logged and gets tier 2; for
+  Vertical Knockback that means anything but a number from −3 to −1 or 1 to
+  3 (0, −7, a fraction, the string `'-2'`), which gets tier 2 upward as
+  before, and for Horizontal Knockback any negative tier. An attack entry
+  naming something that is not an attack Power is logged and ignored.
 - Combat architecture (health, damage, hitboxes, hurtboxes, attack definitions,
   Defense with Block / Dodge implementations, invulnerability, knockback,
   stun and blockstun, hitstop, cooldowns, Energy, binds, charged actions,

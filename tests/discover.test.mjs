@@ -367,7 +367,7 @@ test('the Power page lists every registry Power, in order, each with its three t
     'Controls how high a normal jump goes. Higher tiers jump higher.',
     'Controls maximum movement speed. Higher tiers move faster.',
     'Controls how strongly an attack pushes a hit opponent sideways. Higher tiers push farther.',
-    'Controls how strongly an attack launches a hit opponent upward. Higher tiers launch higher.',
+    'Controls how strongly an attack launches a hit opponent upward or drives it downward. Higher tiers hit harder.',
   ]);
 
   entries.forEach((entry, i) => {
