@@ -291,9 +291,10 @@ export class Battle {
     for (const f of this.fighters) {
       const b = f.body;
       rect(b.x - b.halfW, b.y - b.height, b.halfW * 2, b.height, '#3cff7a');
+      // Hurtboxes turn gray while a Dodge makes the fighter invulnerable.
       for (const hb of f.def.hurtboxes) {
         worldBox(f, hb, box);
-        rect(box.x, box.y, box.w, box.h, '#4aa8ff');
+        rect(box.x, box.y, box.w, box.h, f.combat.invulnerable ? '#8a8a8a' : '#4aa8ff');
       }
       // Attack hitbox, only while it can connect.
       const atk = f.combat.attack;
@@ -307,8 +308,11 @@ export class Battle {
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
     const p = this.p1;
+    const action = p.combat.attack
+      ? ` ${p.combat.attack.def.id} ${p.combat.phase}`
+      : p.combat.defenseAction ? ` ${p.combat.defenseAction.def.animation} ${p.combat.defensePhase}` : '';
     const lines = [
-      `state ${p.state}${p.combat.attack ? ` ${p.combat.attack.def.id} ${p.combat.phase}` : ''}  grounded ${p.body.grounded}  ground ${p.body.ground?.id ?? '-'}`,
+      `state ${p.state}${action}  grounded ${p.body.grounded}  ground ${p.body.ground?.id ?? '-'}`,
       `pos ${p.body.x.toFixed(1)}, ${p.body.y.toFixed(1)}  vel ${p.body.vx.toFixed(0)}, ${p.body.vy.toFixed(0)}`,
       `view ${view.w.toFixed(0)}x${view.h.toFixed(0)}  px/art ${this.pxPerArt.toFixed(2)}  cpu ${this.p2.state}`,
     ];

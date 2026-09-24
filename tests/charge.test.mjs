@@ -1,7 +1,8 @@
 // Run with node --test tests/charge.test.mjs (no dependencies).
-// #0001 Charge: artwork registration, the startup-then-loop frame order, held
-// (never toggled) input, grounded-only entry, movement lock, state priority,
-// no combat effect, the gameplay Down -> Charge rename, and the Energy stat.
+// #0001 Charge: artwork registration, the startup-then-loop frame order, the
+// voluntary-release pose, held (never toggled) input, grounded-only entry,
+// movement lock, state priority (interruptions skip the release pose), no
+// combat effect, the gameplay Down -> Charge rename, and the Energy stat.
 // Uses the real Fighter, CombatSystem, physics and InputManager (see
 // fighter-harness.mjs).
 import test from 'node:test';
@@ -21,6 +22,7 @@ const CHARGE = { charge: true };
 const BA1 = { action1: true, action1Pressed: true };
 const BA2 = { action2: true, action2Pressed: true };
 const JUMP = { jump: true, jumpPressed: true };
+const DEFENSE = { defense: true, defensePressed: true };
 const CHARGE_FRAMES = ['0001_charge1.png', '0001_charge2.png', '0001_chargea.png', '0001_chargeb.png'];
 const isChargeFrame = (name) => CHARGE_FRAMES.includes(name);
 
@@ -56,6 +58,9 @@ function runs(log) {
 function chargeIntoLoop(step, extra = {}) {
   stepUntil(step, (f) => f.animator.anim.key === 'chargeLoop', { ...CHARGE, ...extra });
 }
+
+// Steps one Charge frame-time lasts: how long the release pose shows.
+const RELEASE_STEPS = Math.round(1 / def.animations.chargeRelease.fps / DT);
 
 // ---- Artwork ------------------------------------------------------------------
 
@@ -93,6 +98,20 @@ test('Charge is two clips: a non-looping startup and a looping sustain, with idl
   // No crouch left over from the old Down action.
   assert.equal(def.animationFallbacks.crouch, undefined);
   assert.equal(def.animations.charge, undefined, 'one logical state, drawn by two clips');
+});
+
+test('the release pose is its own one-frame clip reusing charge1, lasting one Charge frame-time', () => {
+  const { chargeRelease, chargeStart } = def.animations;
+  assert.deepEqual(chargeRelease.frames, [`${BASE}charge1.png`], 'the real charge1, not a copy');
+  assert.equal(chargeRelease.frames[0], chargeStart.frames[0]);
+  assert.equal(chargeRelease.fps, chargeStart.fps);
+  assert.equal(chargeRelease.loop, false);
+  assert.equal(chargeRelease.heightRatio, 1);
+  const { fighter } = makeFighter();
+  assert.equal(fighter.chargeReleaseDuration, 1 / chargeStart.fps);
+  assert.equal(RELEASE_STEPS, 6, 'one 10 fps frame at 60 Hz');
+  // No duplicated PNG: exactly the four charge files exist.
+  assert.deepEqual(readdirSync(ROOT + 'assets/characters/0001/').filter((n) => /charge/.test(n)).sort(), CHARGE_FRAMES);
 });
 
 test('Charge is a fighter state, never an attack or a combat action', () => {
@@ -137,26 +156,61 @@ test('holding Charge plays charge1, charge2 once, then loops chargea / chargeb',
   for (const r of loop.slice(1, -1)) assert.ok(Math.abs(r.steps - frameSteps) <= 1, `loop frame lasts ${r.steps} steps`);
 });
 
-test('releasing Charge leaves the state at once; nothing is latched', () => {
+test('voluntarily releasing Charge shows charge1 for one Charge frame-time, then idle', () => {
   const { fighter, step } = makeFighter();
   chargeIntoLoop(step);
   assert.equal(fighter.state, 'charge');
   assert.equal(fighter.charging, true);
+  const held = frameName(fighter);
+  assert.match(held, /^0001_charge[ab]\.png$/);
 
-  step();
-  assert.equal(fighter.state, 'idle');
+  const log = record(step, {}, steps(1));
+  const shown = runs([{ frame: held }, ...log]);
+  assert.deepEqual(shown.slice(0, 3).map((r) => r.frame), [held, '0001_charge1.png', '0001_idle1.png']);
+  assert.equal(shown[1].steps, RELEASE_STEPS, 'exactly one Charge frame-time');
+  assert.ok(log.slice(0, RELEASE_STEPS).every((s) => s.state === 'chargeRelease' && s.anim === 'chargeRelease'));
+  // Charging ended on the release step: the pose is visual only.
   assert.equal(fighter.charging, false);
-  assert.equal(frameName(fighter), '0001_idle1.png');
-  for (const s of record(step, {}, steps(1))) {
+  for (const s of log.slice(RELEASE_STEPS)) {
     assert.equal(s.state, 'idle');
     assert.ok(!isChargeFrame(s.frame), s.frame);
   }
+});
 
-  // Releasing with a direction held runs.
-  const run = makeFighter();
-  chargeIntoLoop(run.step, { right: true });
-  stepUntil(run.step, (f) => f.state === 'run', { right: true }, 20);
-  assert.ok(!isChargeFrame(frameName(run.fighter)));
+test('the release pose never freezes movement: a held direction moves at once, then runs', () => {
+  const { fighter, step } = makeFighter();
+  chargeIntoLoop(step);
+  const x = fighter.body.x;
+  const plain = makeFighter();
+  const right = { right: true };
+  const states = [];
+  for (let i = 0; i < 20; i++) {
+    step(right);
+    plain.step(right);
+    states.push(fighter.state);
+    // The same acceleration as a fighter starting from idle.
+    assert.equal(fighter.body.vx, plain.fighter.body.vx, `step ${i}: vx`);
+  }
+  assert.deepEqual(states.slice(0, RELEASE_STEPS), Array(RELEASE_STEPS).fill('chargeRelease'));
+  assert.ok(fighter.body.x > x, 'moved during the release pose');
+  assert.equal(fighter.state, 'run');
+  assert.ok(!isChargeFrame(frameName(fighter)));
+});
+
+test('releasing during any Charge frame plays the same charge1 release pose', () => {
+  for (const releaseOn of CHARGE_FRAMES) {
+    const { fighter, step } = makeFighter();
+    stepUntil(step, (f) => frameName(f) === releaseOn, CHARGE);
+    assert.equal(fighter.state, 'charge');
+    const log = record(step, {}, RELEASE_STEPS + 2);
+    for (const s of log.slice(0, RELEASE_STEPS)) {
+      assert.equal(s.state, 'chargeRelease', `after ${releaseOn}`);
+      assert.equal(s.anim, 'chargeRelease');
+      assert.equal(s.frame, '0001_charge1.png');
+    }
+    assert.equal(log[RELEASE_STEPS].state, 'idle', `normal state resumes after ${releaseOn}`);
+    assert.equal(log[RELEASE_STEPS].frame, '0001_idle1.png');
+  }
 });
 
 test('every new Charge restarts from charge1, wherever the last one was released', () => {
@@ -164,6 +218,8 @@ test('every new Charge restarts from charge1, wherever the last one was released
   for (const releaseOn of CHARGE_FRAMES) {
     stepUntil(step, (f) => frameName(f) === releaseOn, CHARGE);
     stepUntil(step, (f) => f.state !== 'charge');
+    // Holding Charge again during the release pose wins at once.
+    assert.equal(fighter.state, 'chargeRelease');
     step(CHARGE);
     assert.equal(fighter.state, 'charge');
     assert.equal(frameName(fighter), '0001_charge1.png', `after releasing on ${releaseOn}`);
@@ -176,6 +232,13 @@ test('every new Charge restarts from charge1, wherever the last one was released
   step();
   step(CHARGE);
   assert.equal(frameName(fighter), '0001_charge1.png');
+  assert.equal(fighter.animator.anim.key, 'chargeStart');
+  // Once the release pose has ended, too.
+  step();
+  stepUntil(step, (f) => f.state === 'idle');
+  step(CHARGE);
+  assert.equal(fighter.state, 'charge');
+  assert.equal(frameName(fighter), '0001_charge1.png');
 });
 
 // ---- Held input -------------------------------------------------------------------
@@ -186,7 +249,8 @@ test('Charge follows the held value: a tap does not latch, and the press edge al
   assert.equal(tap.fighter.state, 'charge');
   for (let i = 0; i < steps(1); i++) {
     tap.step();
-    assert.equal(tap.fighter.state, 'idle');
+    // Only the brief release pose, then idle: never a latched Charge.
+    assert.equal(tap.fighter.state, i < RELEASE_STEPS ? 'chargeRelease' : 'idle');
     assert.equal(tap.fighter.charging, false);
   }
 
@@ -195,7 +259,8 @@ test('Charge follows the held value: a tap does not latch, and the press edge al
   tap.step(CHARGE);
   assert.equal(tap.fighter.state, 'charge');
   tap.step();
-  assert.equal(tap.fighter.state, 'idle');
+  assert.equal(tap.fighter.state, 'chargeRelease');
+  assert.equal(tap.fighter.charging, false);
 
   const edgeOnly = makeFighter();
   for (let i = 0; i < steps(1); i++) {
@@ -317,6 +382,17 @@ test('hitstun replaces Charge at once; Charge resumes from charge1 once the stun
   assert.ok(n > 5, 'Charge never cancels hitstun');
   assert.equal(fighter.state, 'charge');
   assert.equal(frameName(fighter), '0001_charge1.png');
+
+  // Letting go during the stun: the stun ends straight into idle, with no
+  // release pose, because the hit (not the player) ended that Charge.
+  const hurt = makeFighter();
+  chargeIntoLoop(hurt.step);
+  hurt.fighter.combat.stun = 0.2;
+  hurt.step(CHARGE);
+  const after = [];
+  for (let i = 0; i < steps(0.5); i++) after.push(hurt.step().state);
+  assert.ok(!after.includes('chargeRelease'), after.join());
+  assert.equal(after.at(-1), 'idle');
 });
 
 test('a real hit on a charging fighter shows Hurt through the impact freeze, with full damage', () => {
@@ -332,11 +408,21 @@ test('a real hit on a charging fighter shows Hurt through the impact freeze, wit
   assert.equal(events[0].type, 'hit', 'Charge grants no guard');
   assert.equal(events[0].damage, 6, 'or armour');
   assert.equal(target.combat.health, 94);
+  assert.match(frameName(target), /^0001_charge[ab]\.png$/, 'still the loop at impact');
   tick({}, CHARGE);
   assert.ok(target.combat.hitstop > 0 || target.combat.stun > 0);
   assert.equal(target.state, 'hitstun');
-  assert.equal(frameName(target), '0001_hurt.png');
+  assert.equal(frameName(target), '0001_hurt.png', 'chargea / chargeb -> Hurt, never charge1 first');
   assert.equal(attacker.combat.attack?.def.id, 'ba1');
+  // Released through the stun: no release pose once it ends.
+  const states = [];
+  while (target.combat.stun > 0 || target.combat.hitstop > 0) {
+    tick();
+    states.push(target.state);
+  }
+  tick();
+  states.push(target.state);
+  assert.ok(!states.includes('chargeRelease'), states.join());
 });
 
 for (const [name, press, id, first] of [['BA1', BA1, 'ba1', '0001_1ba1.png'], ['BA2', BA2, 'ba2', '0001_2ba1.png']]) {
@@ -359,6 +445,19 @@ for (const [name, press, id, first] of [['BA1', BA1, 'ba1', '0001_1ba1.png'], ['
     assert.equal(fighter.state, 'charge');
     assert.equal(frameName(fighter), '0001_charge1.png');
   });
+
+  test(`letting go of Charge on the step ${name} is pressed starts ${name} at once, with no release pose`, () => {
+    const { fighter, step } = makeFighter();
+    chargeIntoLoop(step);
+    step(press);
+    assert.equal(fighter.state, 'attack');
+    assert.equal(frameName(fighter), first);
+    const states = [];
+    while (fighter.state === 'attack') states.push(step().state);
+    // The attack ended Charge, so its end goes straight to idle.
+    assert.ok(!states.includes('chargeRelease'), states.join());
+    assert.equal(fighter.state, 'idle');
+  });
 }
 
 test('Jump interrupts Charge through the normal jump', () => {
@@ -371,18 +470,75 @@ test('Jump interrupts Charge through the normal jump', () => {
   assert.equal(frameName(fighter), '0001_jump1.png');
   stepUntil(step, (f) => f.body.vy > 0, CHARGE);
   assert.equal(fighter.state, 'fall');
+
+  // Letting go of Charge on the jump step: straight into Jump, no release pose.
+  const other = makeFighter();
+  chargeIntoLoop(other.step);
+  other.step(JUMP);
+  assert.equal(other.fighter.state, 'jump');
+  assert.equal(frameName(other.fighter), '0001_jump1.png');
+  const states = [];
+  while (!other.fighter.grounded || other.fighter.state === 'land') states.push(other.step().state);
+  assert.ok(!states.includes('chargeRelease'), states.join());
 });
 
-test('Block outranks Charge when both are held; Charge follows when Block is released', () => {
+test('a Defense press interrupts Charge with an immediate Dodge; a held Charge restarts from charge1 after it', () => {
   const { fighter, step } = makeFighter();
-  step({ ...CHARGE, block: true });
+  chargeIntoLoop(step);
+  step({ ...CHARGE, ...DEFENSE });
+  assert.equal(fighter.state, 'defense');
+  assert.equal(fighter.combat.defenseAction.type, 'dodge');
+  assert.equal(fighter.animator.anim.key, 'dodge');
+  assert.equal(frameName(fighter), '0001_dodge1.png', 'no release pose first');
+  assert.equal(fighter.charging, false);
+  assert.equal(fighter.combat.blocking, false, 'Defense is a Dodge, never a guard');
+  const frames = [];
+  while (fighter.state === 'defense') {
+    frames.push(frameName(fighter));
+    step({ ...CHARGE, defense: true });
+  }
+  assert.deepEqual(frames.filter((n, i, a) => n !== a[i - 1]), ['0001_dodge1.png', '0001_dodge2.png', '0001_dodge3.png']);
+  assert.equal(frames.length, steps(3 / 12), 'the whole Dodge, once');
+  // Still holding Charge (and Defense): a fresh Charge from charge1, not the loop.
+  assert.equal(fighter.state, 'charge');
+  assert.equal(frameName(fighter), '0001_charge1.png');
+  assert.equal(fighter.animator.anim.key, 'chargeStart');
+
+  // Pressing Defense with Charge from idle dodges; Charge waits for the Dodge.
+  const both = makeFighter();
+  both.step({ ...CHARGE, ...DEFENSE });
+  assert.equal(both.fighter.state, 'defense');
+  stepUntil(both.step, (f) => f.state !== 'defense', CHARGE);
+  assert.equal(both.fighter.state, 'charge');
+  assert.equal(frameName(both.fighter), '0001_charge1.png');
+});
+
+test('letting go of Charge on the step Defense is pressed dodges at once; no release pose', () => {
+  for (const releaseOn of CHARGE_FRAMES) {
+    const { fighter, step } = makeFighter();
+    stepUntil(step, (f) => frameName(f) === releaseOn, CHARGE);
+    step(DEFENSE); // charge: false and defensePressed: true on the same step
+    assert.equal(fighter.state, 'defense', `after ${releaseOn}`);
+    assert.equal(frameName(fighter), '0001_dodge1.png');
+    const states = [fighter.state];
+    for (let i = 0; i < steps(0.5); i++) states.push(step().state);
+    assert.ok(!states.includes('chargeRelease'), states.join());
+    assert.ok(!states.includes('charge'));
+    assert.equal(fighter.state, 'idle', 'normal state selection after the Dodge');
+  }
+});
+
+test('a Block-type fighter\'s held guard still outranks Charge (future blockers)', () => {
+  const blocker = { ...def, defense: { type: 'block' } };
+  const { fighter, step } = makeFighter({ character: blocker });
+  step({ ...CHARGE, defense: true });
   assert.equal(fighter.state, 'block');
   assert.equal(fighter.combat.blocking, true);
   assert.equal(fighter.charging, false);
 
   chargeIntoLoop(step);
-  step({ ...CHARGE, block: true });
-  assert.equal(fighter.state, 'block');
+  step({ ...CHARGE, defense: true });
+  assert.equal(fighter.state, 'block', 'the guard, not the release pose');
   step(CHARGE);
   assert.equal(fighter.state, 'charge');
   assert.equal(frameName(fighter), '0001_charge1.png');
@@ -536,7 +692,7 @@ test('InputManager samples a held charge from S, ↓, D-pad down and the left st
   assert.equal(input.sample().charge, false);
 
   // Other pad mappings are unchanged.
-  for (const [i, action] of [[0, 'jump'], [1, 'action1'], [4, 'action2'], [5, 'block'], [7, 'block'], [2, 'primary'], [3, 'special']]) {
+  for (const [i, action] of [[0, 'jump'], [1, 'action1'], [4, 'action2'], [5, 'defense'], [7, 'defense'], [2, 'primary'], [3, 'special']]) {
     pad.buttons[i] = { pressed: true, value: 1 };
     input.pollGamepads(4000);
     const f = input.sample();
@@ -562,8 +718,10 @@ test('the training CPU never charges or attacks, and still drops through platfor
     assert.equal(out.charge, false);
     assert.equal(out.chargePressed, false);
     assert.equal('down' in out, false);
+    assert.equal('block' in out, false);
     bot.step(out);
     assert.notEqual(bot.fighter.state, 'charge');
+    assert.notEqual(bot.fighter.state, 'chargeRelease');
     assert.equal(bot.fighter.combat.attack, null);
   }
 
@@ -604,22 +762,29 @@ test('every fighter starts with full Energy, and a reset refills it', () => {
   assert.equal(plain.fighter.combat.energy, 100);
 });
 
-test('nothing spends or restores Energy yet: charging, blocking, attacking and hits leave it full', () => {
+test('nothing spends or restores Energy yet: charging, releasing, dodging, attacking and hits leave it full', () => {
   const full = (...fighters) => {
     for (const f of fighters) {
       assert.equal(f.combat.energy, 100);
       assert.equal(f.combat.maxEnergy, 100);
     }
   };
-  // Charging and blocking for a while, then a blocked BA1.
-  const guard = duel();
-  const BLOCK = { block: true };
-  for (let i = 0; i < steps(2); i++) guard.tick(CHARGE, BLOCK);
-  full(guard.attacker, guard.target);
-  guard.tick(BA1, BLOCK);
-  for (let i = 0; i < 60 && !guard.events.length; i++) guard.tick({}, BLOCK);
-  assert.equal(guard.events[0]?.type, 'block');
-  full(guard.attacker, guard.target);
+  // Charging and releasing for a while, then repeated ground and mid-air
+  // Dodges, then a BA1 the target dodges clean through.
+  const dodge = duel();
+  for (let i = 0; i < steps(2); i++) dodge.tick(i % 40 < 30 ? CHARGE : {}, i % 40 < 30 ? CHARGE : {});
+  full(dodge.attacker, dodge.target);
+  for (let i = 0; i < steps(2); i++) {
+    const press = i % 20 === 0 ? DEFENSE : i === 60 ? JUMP : {};
+    dodge.tick(press, press);
+  }
+  full(dodge.attacker, dodge.target);
+  while (!dodge.target.grounded || dodge.target.combat.defenseAction) dodge.tick();
+  assert.equal(dodge.target.body.x - dodge.attacker.body.x, 44, 'still in BA1 range');
+  dodge.tick(BA1, DEFENSE);
+  while (dodge.attacker.combat.attack) dodge.tick();
+  assert.deepEqual(dodge.events, [], 'the BA1 passed through the Dodge');
+  full(dodge.attacker, dodge.target);
 
   // Clean BA1 and BA2 hits: dealing and taking damage change nothing.
   for (const press of [BA1, BA2]) {

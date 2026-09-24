@@ -42,16 +42,22 @@ behave, and how it must look. The README covers running and deploying it.
   `0001_midair1ba1`–`0001_midair1ba5` (≈248–424 × 344–448 px), seven Basic
   Attack 2 frames `0001_2ba1`–`0001_2ba7` (≈224–336 × 384–424 px), three
   mid-air Basic Attack 2 frames `0001_midair2ba1`–`0001_midair2ba3`
-  (≈216–352 × 424–536 px) and four Charge frames `0001_charge1`,
-  `0001_charge2`, `0001_chargea` and `0001_chargeb` (≈272–288 × 416 px).
+  (≈216–352 × 424–536 px), four Charge frames `0001_charge1`,
+  `0001_charge2`, `0001_chargea` and `0001_chargeb` (≈272–288 × 416 px),
+  three Dodge frames `0001_dodge1`–`0001_dodge3` (≈256–288 × 384–416 px)
+  and three mid-air Dodge frames `0001_midairdodge1`–`0001_midairdodge3`
+  (≈288–320 × 376–400 px). `0001_dodge3` happens to be the same image as
+  `0001_charge1`; it is kept under its own name as the Dodge's recovery
+  frame.
 - File names: `ba` means basic attack; the digit before it says which one
   (`1ba` is Basic Attack 1, `2ba` Basic Attack 2). The number at the very end
   is always the frame number (`0001_1ba3.png` is Basic Attack 1, frame 3;
   `0001_midair2ba1.png` is Mid-air Basic Attack 2, frame 1). Charge is the
   exception: `charge1` / `charge2` are its startup frames and the lettered
-  `chargea` / `chargeb` its sustained loop.
+  `chargea` / `chargeb` its sustained loop; `charge1` is also reused, as the
+  same file, for the Charge release pose.
 - The idle, jump, fall, land and hurt frames (≈16× pixel art), the mid-air
-  hurt, Basic Attack 1 and 2 and Charge frames (≈8×) and the run frames (≈4×)
+  hurt, Basic Attack 1 and 2, Charge and Dodge frames (≈8×) and the run frames (≈4×)
   are at very different raw scales. A normalization
   system must, once per frame: read the alpha channel, find the visible bounds,
   detect the pixel-art grid, resample to one pixel per art pixel, and anchor
@@ -285,8 +291,8 @@ no header, build label, eyebrow or keyboard hint bar.
 - Two tabs (Help, Credits) sharing one scrollable panel; ←/→ switch tabs,
   ↑/↓ scroll.
 - Help: desktop controls rendered from the live key bindings, mobile control
-  diagram, movement, Charge & Energy, stages and platforms, pause, notes on
-  this build.
+  diagram, movement, Charge & Energy, Defense, stages and platforms, pause,
+  notes on this build.
 - The Home entry to this screen is disabled for now; the screen stays in place
   so it can return.
 - Credits (must remain visible and readable). One list in
@@ -341,7 +347,8 @@ no header, build label, eyebrow or keyboard hint bar.
 ### 7.2 Fighters, physics and combat
 
 - `#0001` has Idle, Run, Jump, Fall, Land, Hurt, Mid-air Hurt, Basic Attack 1,
-  Mid-air Basic Attack 1, Basic Attack 2, Mid-air Basic Attack 2 and Charge.
+  Mid-air Basic Attack 1, Basic Attack 2, Mid-air Basic Attack 2, Charge,
+  Dodge and Mid-air Dodge.
   No invented frames. Rising uses Jump and
   descending (walking off a ledge included) uses Fall; each plays once at 10 fps
   and holds its last frame. Land plays once at 12 fps on touchdown, for
@@ -352,8 +359,9 @@ no header, build label, eyebrow or keyboard hint bar.
   toward the opponent when standing.
 - Hitstun shows Hurt while grounded and Mid-air Hurt while airborne, switching
   to Hurt if the fighter lands still stunned; the pose also holds through the
-  impact freeze. Hitstun outranks attack, land, run, jump, fall, block, charge
-  and idle, and normal states resume when it ends. It is a visual state only:
+  impact freeze. Hitstun outranks every other state (attack, Defense, jump,
+  fall, land, charge, charge release, run and idle), and normal states resume
+  when it ends. It is a visual state only:
   no physics or collider changes. Missing hurt art holds an idle frame.
 - Basic Attack 1 (BA1) is #0001's first attack, on the `action1` input. On the
   ground it is a punch (`ba1`, 4 frames); in the air a kick (`midairBa1`,
@@ -390,38 +398,90 @@ no header, build label, eyebrow or keyboard hint bar.
   exactly one pass of its clip, then A and B alternate for as long as Charge
   is held, never returning to `charge1` / `charge2` during that hold.
   Charge is driven by the held input alone. It is never a toggle, latch or
-  buffered press, and has no minimum hold. Releasing it exits the state on
-  that step, and every new Charge restarts from `charge1`. Charge is grounded
+  buffered press, and has no minimum hold. Voluntarily releasing Charge
+  enters a brief `chargeRelease` visual state using `charge1` for one Charge
+  frame-time (its own one-frame clip at 10 fps, 0.1 s), then resumes the
+  normal state (idle, or run if a direction is held). It is a release only
+  when the fighter was charging on the previous step, Charge is no longer
+  held, and nothing of higher priority started on that step; higher-priority
+  interruptions (a hit, BA1, BA2, a Dodge, a jump, leaving the ground) do not
+  play `chargeRelease` first, and letting go of Charge on the same step as
+  one of them goes straight to it. The release pose is visual only: no
+  damage, hitbox, invulnerability, armour, Energy change, knockback or
+  special movement, and movement resumes normally while it shows. Every new
+  Charge, including one started during the release pose, restarts from
+  `charge1`. Charge is grounded
   only: held in the air, the fighter keeps Jump / Fall (no charge art is
   shown); held through touchdown, Land plays out first and Charge follows.
   While charging, horizontal movement is locked (a run decelerates normally
   to a stop) while gravity and collision still apply. Collider and hurtboxes
   are unchanged. Charge has no hitbox, no damage, no armour and no
   invulnerability, and it is not an attack or a combat action. State
-  priority is hitstun > attack > jump / fall > land > block > charge > run >
-  idle: a hit shows Hurt at once, BA1 / BA2 start straight out of a held
-  Charge, Jump interrupts it, and Block wins when both are held. Charge on a
-  one-way platform charges in place and never drops through. If the charge
-  frames fail to load, the fighter holds a still idle frame.
+  priority is hitstun > attack > Defense (Dodge) > jump / fall > land >
+  charge > charge release > run > idle (a Block-type guard would sit between
+  land and charge): a hit shows Hurt at once, BA1 / BA2 start straight out of
+  a held Charge, Jump interrupts it, and a Defense press interrupts it with a
+  Dodge. If Charge is still held when that Dodge ends, a fresh Charge starts
+  from `charge1`, never from `chargea` / `chargeb`. Charge on a one-way
+  platform charges in place and never drops through. If the charge frames
+  fail to load, the fighter holds a still idle frame; without the release
+  clip the release pose is skipped.
+- Defense is the shared player action (keyboard L, gamepad RB / RT, touch
+  **D**). How a fighter defends is character data (`defense` in
+  `js/data/characters.js`), not part of the input system: Block is one
+  possible defense mechanism (a held guard with chip damage from
+  `stats.blockDamageScale` and each attack's `blockstun`), Dodge is another.
+  Character #0001 uses Defense type: Dodge. It never blocks: no guard state,
+  idle-as-guard pose, chip damage or `blockDamageScale`. The Block mechanism
+  stays in the engine for future characters with `defense: { type: 'block' }`.
+- #0001's Dodge has two real clips, both played once at 12 fps:
+  Ground Dodge `dodge1 → dodge2 → dodge3` (`dodge`) and Mid-Air Dodge
+  `midairdodge1 → midairdodge2 → midairdodge3` (`midairDodge`). One press =
+  one Dodge; holding Defense does not auto-repeat it, and a new Dodge needs a
+  new press. Ground or air is selected at activation, and a mid-air Dodge
+  continues through landing to the end of its own clip (no switch to the
+  ground Dodge or to Land). A Dodge lasts one pass of its clip and is not an
+  attack: no hitbox, damage, cooldown, `hasHit` or combat event. While it
+  plays, gravity continues, horizontal input is locked like an attack (the
+  current velocity slows under the normal ground deceleration or air drag),
+  and there is no invented dash, lift, spike or teleport. Facing locks for
+  the whole Dodge. Invulnerability is aligned to the visible Dodge frames:
+  on the ground frame 1 is startup (bracing), frame 2 invulnerable (the
+  side-on lean away) and frame 3 recovery (settling back); in the air
+  frames 1–2 are invulnerable (drawn breaking up into afterimages) and frame 3
+  recovery (solid again). Like attack phases, the window may trail the art by
+  one simulation step. An attack whose active hitbox overlaps the
+  invulnerable frames passes through: no health loss, hitstun, blockstun,
+  knockback or hitstop, and the attack is not used up, so it can still
+  connect if it is active after the window ends. A hit during startup or
+  recovery is a full, normal hit that cancels the Dodge. A Dodge causes no
+  chip damage, no blockstun and no block event, and gives no Energy, sound,
+  particles or counter. Priority: an attack pressed on the same step wins and
+  no Dodge starts; a Dodge that starts on the ground owns its step, so a Jump
+  pressed with it does not launch; Defense during an attack or hitstun does
+  nothing. If a Dodge clip's frames are missing, that Dodge is refused
+  (logged) rather than granting invisible invulnerability. The debug overlay
+  grays a fighter's hurtboxes while it is invulnerable.
 - Every fighter has an Energy resource (`energy` / `maxEnergy` on its combat
   state, capacity from the character's `stats.energy`, 100 for #0001). It
   starts full and refills on restart / rematch. No rule spends, drains or
-  restores Energy yet, Charge included, and the winner is still decided by
-  remaining health.
+  restores Energy yet, Charge and Dodge included, and the winner is still
+  decided by remaining health.
 - Physics: acceleration, deceleration, max speed, gravity, jump impulse,
   ground/platform/solid collision, stage bounds, landing detection; collision
   boxes independent of PNG size; bottom-centre origin; no sinking, floating,
   jitter or escaping the stage.
 - Combat architecture (health, damage, hitboxes, hurtboxes, attack definitions,
-  block, knockback, stun, hitstop, cooldowns) is data-driven. Basic Attacks 1
+  Defense with Block / Dodge implementations, invulnerability, knockback,
+  stun and blockstun, hitstop, cooldowns) is data-driven. Basic Attacks 1
   and 2 are implemented through it with real artwork; Primary and Special
   stay reserved (mapped to no attack) until real sprites exist, and no attack
   or frame is ever fabricated. An attack whose frames fail to load is refused
-  (no substitute pose, no invisible hitbox). Block
-  sets a guard state using the idle pose.
+  (no substitute pose, no invisible hitbox), and so is a Dodge.
 - Quick Battle: one round, 99 seconds, against a non-attacking training CPU
-  that uses the same fighter definition. It never charges; it drops through
-  one-way platforms with an internal intent that no player control produces.
+  that uses the same fighter definition. It never charges or uses Defense;
+  it drops through one-way platforms with an internal intent that no player
+  control produces.
 
 ### 7.3 Battle chrome
 
@@ -468,21 +528,23 @@ no header, build label, eyebrow or keyboard hint bar.
 
 - Keyboard (simultaneous keys, held-state tracking, no reliance on key
   repeat): A/D or ←/→ move, S/↓ Charge (held), W/Space/↑ jump, J primary, K special,
-  L block, U Basic Attack 1 (BA1), I Basic Attack 2 (BA2), Esc/P pause.
+  L Defense, U Basic Attack 1 (BA1), I Basic Attack 2 (BA2), Esc/P pause.
   `` ` `` toggles a debug overlay (colliders, hurtboxes, and attack hitboxes
   while active). In menus S/↓ still navigate down: menu bindings are separate
   from the gameplay `charge` action.
 - Gamepad (standard layout) for movement (D-pad / left stick left and
   right), Charge in battle (D-pad down / left stick down, held; menus still
   read them as Down), jump (A), Basic Attack 1 (B / Circle), Basic Attack 2
-  (LB), reserved actions (X / Y), block (RB / RT) and Start to pause/menus.
+  (LB), reserved actions (X / Y), Defense (RB / RT) and Start to pause/menus.
 - Touch (landscape, Pointer Events, true multi-touch): lower-left
   Left · C · Right with thumb sliding, where the middle button reads **C**, is
   labelled "Charge" and stays pressed for as long as the pointer holds it;
   lower-right staggered cluster —
-  Primary (top) · Special, Block · BA1, BA2, Jump (bottom-right). The BA1
-  button (Basic Attack 1, internally `action1`) and the BA2 button (Basic
-  Attack 2, internally `action2`) are solid like Block and Jump.
+  Primary (top) · Special, Defense · BA1, BA2, Jump (bottom-right). The
+  Defense button sits in the old Block slot; it reads exactly **D** (no
+  shield icon) because #0001's Defense is a Dodge, and is labelled "Defense".
+  The BA1 button (Basic Attack 1, internally `action1`) and the BA2 button
+  (Basic Attack 2, internally `action2`) are solid like Defense and Jump.
   Tapping the timer or the pause section beneath it (top centre, 7.3) pauses.
   Original circular icons, translucent dark fill, white outlines; pressed
   buttons scale down and brighten to white — no hue.

@@ -1024,7 +1024,7 @@ html:not(.is-pointer-input) .mode-card:focus { box-shadow: var(--focus-ring), va
 .md-jump { left: 91%; top: 80%; }
 .md-a2 { left: 78.5%; top: 80%; }
 .md-a1 { left: 66%; top: 80%; }
-.md-block { left: 85%; top: 54%; }
+.md-defense { left: 85%; top: 54%; }
 .md-special { left: 72.5%; top: 54%; }
 .md-primary { left: 88%; top: 27%; width: 12.5%; border: 2px solid var(--accent); }
 
@@ -1230,7 +1230,7 @@ html.is-touch .touch-controls { display: block; }
 .tc-jump { right: 0; bottom: 0; }
 .tc-a2 { right: var(--tc-pitch); bottom: 0; }
 .tc-a1 { right: calc(var(--tc-pitch) * 2); bottom: 0; }
-.tc-block { right: calc(var(--tc-pitch) * 0.5); bottom: calc(var(--tc-pitch) * 0.87); }
+.tc-defense { right: calc(var(--tc-pitch) * 0.5); bottom: calc(var(--tc-pitch) * 0.87); }
 .tc-special { right: calc(var(--tc-pitch) * 1.5); bottom: calc(var(--tc-pitch) * 0.87); }
 .tc-primary {
   right: calc(var(--tc-pitch) * 0.02);

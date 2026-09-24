@@ -21,6 +21,21 @@
 // rather than faked. Its hitbox only exists during the active phase.
 // Hitboxes are defined facing right relative to the fighter's origin
 // (bottom-centre) and mirrored automatically.
+//
+// Defense is the shared player input; each character's `defense` entry says
+// how it defends (see createDefenseDefinition):
+//
+//   // Dodge: one press, one clip; attacks pass through while invulnerable.
+//   defense: {
+//     type: 'dodge',
+//     ground: { animation: 'dodge', startup: 1 / 12, invulnerable: 1 / 12, recovery: 1 / 12 },
+//     air: { animation: 'midairDodge', ... },
+//   }
+//   // Block: a held guard that takes chip damage (stats.blockDamageScale)
+//   // and each attack's blockstun instead of a full hit.
+//   defense: { type: 'block' }
+//
+// A Dodge is not an attack: no hitbox, damage, cooldown or combat event.
 
 const ATTACK_DEFAULTS = {
   animation: null,
@@ -51,6 +66,26 @@ export function createAttackDefinition(spec) {
   return Object.freeze(def);
 }
 
+const DODGE_DEFAULTS = { animation: null, startup: 0, invulnerable: 0, recovery: 0 };
+
+function createDodgeMove(spec) {
+  if (!spec) return null;
+  const move = { ...DODGE_DEFAULTS, ...spec };
+  move.total = move.startup + move.invulnerable + move.recovery;
+  return Object.freeze(move);
+}
+
+// Frozen form of a character's `defense` entry, or null for a fighter that has
+// no Defense (the input then does nothing).
+export function createDefenseDefinition(spec) {
+  if (!spec) return null;
+  if (spec.type === 'dodge') {
+    return Object.freeze({ type: 'dodge', ground: createDodgeMove(spec.ground), air: createDodgeMove(spec.air) });
+  }
+  if (spec.type === 'block') return Object.freeze({ ...spec });
+  throw new Error(`[Alva] Unknown defense type "${spec.type}"`);
+}
+
 // Per-fighter combat state.
 export class CombatState {
   constructor(stats) {
@@ -60,11 +95,13 @@ export class CombatState {
     // or restores it yet, so a reset (new CombatState) refills it.
     this.maxEnergy = stats.energy ?? 100;
     this.energy = this.maxEnergy;
+    // Block-type Defense only: the held guard and its chip-damage scale.
     this.blockDamageScale = stats.blockDamageScale ?? 0.2;
     this.blocking = false;
     this.stun = 0;          // hitstun / blockstun remaining
     this.hitstop = 0;       // freeze frames on impact
     this.attack = null;     // { def, time, hasHit }
+    this.defenseAction = null; // { type: 'dodge', def, time } while a Dodge plays
     this.cooldowns = new Map();
     this.lastIntent = null; // last combat button pressed (for future buffering/UI)
   }
@@ -81,8 +118,22 @@ export class CombatState {
     return 'recovery';
   }
 
+  // 'startup' | 'invulnerable' | 'recovery' while a Dodge plays, else null.
+  get defensePhase() {
+    const d = this.defenseAction;
+    if (!d) return null;
+    if (d.time < d.def.startup - PHASE_EPSILON) return 'startup';
+    if (d.time < d.def.startup + d.def.invulnerable - PHASE_EPSILON) return 'invulnerable';
+    return 'recovery';
+  }
+
+  // Attacks pass through an invulnerable fighter (see CombatSystem.update).
+  get invulnerable() {
+    return this.defensePhase === 'invulnerable';
+  }
+
   canAct() {
-    return !this.attack && this.stun <= 0 && this.health > 0;
+    return !this.attack && !this.defenseAction && this.stun <= 0 && this.health > 0;
   }
 
   update(dt) {
@@ -101,6 +152,11 @@ export class CombatState {
         this.cooldowns.set(this.attack.def.id, this.attack.def.cooldown);
         this.attack = null;
       }
+    }
+    // A Dodge ends by itself after one pass of its clip.
+    if (this.defenseAction) {
+      this.defenseAction.time += dt;
+      if (this.defenseAction.time >= this.defenseAction.def.total - PHASE_EPSILON) this.defenseAction = null;
     }
   }
 }
@@ -134,6 +190,9 @@ export class CombatSystem {
       const hit = worldBox(attacker, atk.def.hitbox, scratchHit);
       for (const target of fighters) {
         if (target === attacker || target.combat.health <= 0) continue;
+        // Dodged: the attack passes through without being used up, so it can
+        // still connect if it is active after the invulnerable frames end.
+        if (target.combat.invulnerable) continue;
         const struck = target.def.hurtboxes.some((hb) => intersects(hit, worldBox(target, hb, scratchHurt)));
         if (!struck) continue;
         atk.hasHit = true;
@@ -144,9 +203,13 @@ export class CombatSystem {
     return this.events;
   }
 
+  // `blocked` needs a Block-type guard facing the attacker; a Dodge never
+  // blocks, so a hit outside its invulnerable frames is a full hit.
   applyHit(attacker, target, def) {
     const tc = target.combat;
     const blocked = tc.blocking && target.facing === -attacker.facing;
+    // Hitstun always wins: a hit cancels a Dodge in its startup or recovery.
+    tc.defenseAction = null;
     const damage = blocked ? def.chipDamage || def.damage * tc.blockDamageScale : def.damage;
     tc.health = Math.max(0, tc.health - damage);
     tc.stun = blocked ? def.blockstun : def.hitstun;

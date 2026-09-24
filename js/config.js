@@ -51,6 +51,8 @@ export const CONFIG = Object.freeze({
   // Player 1 keyboard bindings (KeyboardEvent.code). The Help screen renders
   // these directly, so this table is the single source of truth. S / ↓ are
   // Charge in battle; menus read their own Down from menuBindings below.
+  // `defense` is the shared Defense input; each character decides what it
+  // does (#0001 dodges).
   bindings: {
     left: ['KeyA', 'ArrowLeft'],
     right: ['KeyD', 'ArrowRight'],
@@ -58,7 +60,7 @@ export const CONFIG = Object.freeze({
     jump: ['KeyW', 'Space', 'ArrowUp'],
     primary: ['KeyJ'],
     special: ['KeyK'],
-    block: ['KeyL'],
+    defense: ['KeyL'],
     action1: ['KeyU'],
     action2: ['KeyI'],
     pause: ['Escape', 'KeyP'],
@@ -81,7 +83,7 @@ export const CONFIG = Object.freeze({
 
 export const ACTIONS = Object.freeze([
   'left', 'right', 'charge', 'jump',
-  'primary', 'special', 'block', 'action1', 'action2',
+  'primary', 'special', 'defense', 'action1', 'action2',
   'pause',
 ]);
 
@@ -92,7 +94,7 @@ export const ACTION_LABELS = Object.freeze({
   jump: 'Jump',
   primary: 'Primary',
   special: 'Special',
-  block: 'Block',
+  defense: 'Defense',
   action1: 'Basic Attack 1',
   action2: 'Basic Attack 2',
   pause: 'Pause',
