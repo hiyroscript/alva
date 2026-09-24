@@ -1,7 +1,7 @@
 // Run with node --test tests/basic-attack-2.test.mjs (no dependencies).
 // #0001 Basic Attack 2 (BA2) on action2: inputs, ground/air selection, clip
 // playback, phase timing against the art, hit resolution (ground BA2's High
-// vertical Knockback launch, mid-air BA2's lighter Low vertical launch from
+// vertical Knockback launch, mid-air BA2's lower Mid vertical launch from
 // the five-frame airborne kick, and a blocked BA2 that does not launch) and
 // missing-art safety. Uses the real Fighter, CombatSystem, physics and
 // InputManager (see fighter-harness.mjs). Basic Attack 1 lives in
@@ -29,12 +29,12 @@ const CONTACT = { ba2: [4, 5], midairBa2: [3] };
 
 // High vertical Knockback: ground BA2's upward launch speed.
 const LAUNCH = 800;
-// Low vertical Knockback: mid-air BA2's lighter upward launch speed.
-const AIR_LAUNCH = 480;
+// Mid vertical Knockback: mid-air BA2's lower upward launch speed.
+const AIR_LAUNCH = 640;
 // Each BA2's declared Knockback and launch speed.
 const KNOCKBACK = {
   ba2: { axis: 'vertical', level: 'high' },
-  midairBa2: { axis: 'vertical', level: 'low' },
+  midairBa2: { axis: 'vertical', level: 'mid' },
 };
 const LAUNCHES = { ba2: LAUNCH, midairBa2: AIR_LAUNCH };
 
@@ -131,8 +131,8 @@ test('BA2 attack definitions match their clips: the ground spinning kick and the
     assert.ok(Math.abs(atk.active - CONTACT[id].length / clip.fps) < 1e-9, `${id} active`);
     assert.ok(atk.active < atk.total / 2, `${id} is not active for its whole clip`);
     assert.equal(atk.lockMovement, true);
-    // High vertical on the ground (an 800 launch), Low in mid-air (a lighter
-    // 480 launch), and no sideways push.
+    // High vertical on the ground (an 800 launch), Mid in mid-air (a lower
+    // 640 launch), and no sideways push.
     assert.deepEqual(atk.knockback, { x: 0, y: LAUNCHES[id] });
     // Not BA1 under another name: a launch where BA1 pushes (on the ground)
     // or drives downward (in mid-air), with its own art and hitbox.
@@ -175,7 +175,7 @@ test('BA2 attack definitions match their clips: the ground spinning kick and the
 
 test('BA2 knockback comes only from its Knockback level, not a raw value: High vertical on the ground, Low in mid-air', () => {
   assert.equal(KNOCKBACK_LEVELS.high.vertical, LAUNCH);
-  assert.equal(KNOCKBACK_LEVELS.low.vertical, AIR_LAUNCH);
+  assert.equal(KNOCKBACK_LEVELS.mid.vertical, AIR_LAUNCH);
   for (const id of ['ba2', 'midairBa2']) {
     const source = def.attacks[id];
     assert.deepEqual(source.knockback, KNOCKBACK[id], `${id} declares vertical Knockback only: no sideways push`);
@@ -515,7 +515,7 @@ test('a ground BA2 hit shows the target in its hurt poses while it is launched',
   assert.equal(target.body.x, frozenAt.x);
 });
 
-test('mid-air BA2 launches upward more lightly: vx 0, vy -480 on a grounded target', () => {
+test('mid-air BA2 launches upward less high: vx 0, vy -640 on a grounded target', () => {
   // Highest point a grounded target reaches after a BA2 hit, ground or air.
   const peak = (air) => {
     const { attacker, target, tick, until, events } = duel();
