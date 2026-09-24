@@ -1353,13 +1353,18 @@ html.is-touch .touch-controls { display: block; }
 
 /* ---------------------------------------------------------------------
    Practice Ground — the training stage fills the screen like the battle
-   canvas. The HUD keeps only Player 1's panel and a three-dots More button;
-   the Practice menu floats under it and the Change Fighter dialog is the
-   fighter roster as one large glass panel. Both sit over a paused, still
-   stage, so it stays in view behind them.
+   canvas. The HUD keeps only Player 1's panel and a three-dots More button
+   (even with a practice CPU on the stage); the Practice menu floats under
+   it, and the Change Fighter and CPU dialogs are the fighter roster as one
+   large glass panel. All sit over a paused, still stage, so it stays in
+   view behind them.
    --------------------------------------------------------------------- */
 
 .screen--practice {
+  /* The More button's size, and how much lower than Quick Battle's timer it
+     sits; the Practice menu opens just under it. */
+  --more: clamp(38px, 6.6vh, 48px);
+  --more-drop: clamp(8px, 1.6vh, 14px);
   background: #000;
   color: var(--white);
   color-scheme: dark;
@@ -1368,12 +1373,12 @@ html.is-touch .touch-controls { display: block; }
 .screen--practice.is-entering { animation-name: fade-in; animation-duration: 0.4s; }
 
 /* Player 1's panel on the left, no wider than a Quick Battle side panel;
-   the More button top-right. */
-.practice-hud { grid-template-columns: minmax(0, 1fr) auto; }
+   the More button in the HUD's centre column, where Quick Battle's timer
+   sits, a little lower. The right column stays empty: no CPU panel. */
 .practice-hud .hud-side { max-width: min(470px, 44vw); }
 .practice-more {
-  --more: clamp(38px, 6.6vh, 48px);
-  justify-self: end;
+  justify-self: center;
+  margin-top: var(--more-drop);
   display: grid;
   place-items: center;
   width: var(--more);
@@ -1396,12 +1401,15 @@ html.is-touch .touch-controls { display: block; }
 .screen--practice.is-menu-open .practice-hud { z-index: 7; }
 .screen--practice.is-menu-open .touch-controls { opacity: 0.25; }
 .screen--practice.is-roster-open .practice-hud,
-.screen--practice.is-roster-open .practice-menu-panel { visibility: hidden; }
+.screen--practice.is-roster-open .practice-menu-panel,
+.screen--practice.is-cpu-roster-open .practice-hud,
+.screen--practice.is-cpu-roster-open .practice-menu-panel { visibility: hidden; }
 
+/* Centred just under the More button. */
 .practice-menu-overlay {
   z-index: 6;
-  place-items: start end;
-  padding-top: calc(max(var(--safe-t), clamp(8px, 1.6vh, 14px)) + clamp(38px, 6.6vh, 48px) + 8px);
+  place-items: start center;
+  padding-top: calc(max(var(--safe-t), clamp(8px, 1.6vh, 14px)) + var(--more-drop) + var(--more) + 8px);
   background: rgba(0, 0, 0, 0.16);
   animation: dim-in 0.18s ease both;
 }
@@ -1424,9 +1432,10 @@ html.is-touch .touch-controls { display: block; }
 .practice-menu-title { display: block; color: var(--scrim-text-muted); }
 .practice-menu-panel .pause-menu { margin-top: 0; }
 
-/* Change Fighter: Select Fighter as one large glass dialog. It hosts a live
-   idle preview, so it skips backdrop blur and relies on its fill; its inner
-   panels are translucent too, so the stage stays visible behind them. */
+/* Change Fighter and the CPU dialog: Select Fighter as one large glass
+   dialog. It hosts a live idle preview, so it skips backdrop blur and relies
+   on its fill; its inner panels are translucent too, so the stage stays
+   visible behind them. */
 .practice-roster-overlay {
   z-index: 8;
   background: rgba(0, 0, 0, 0.28);
@@ -1453,6 +1462,10 @@ html.is-touch .touch-controls { display: block; }
 .practice-roster-dialog .preview-stage { background: rgba(255, 255, 255, 0.05); }
 .practice-roster-dialog .slot.is-locked { background: rgba(26, 28, 32, 0.62); }
 .practice-roster-dialog .slot.is-locked .slot-art .icon { fill: rgba(5, 5, 6, 0.55); }
+/* Back, and in the CPU dialog Disable CPU right beside it. */
+.practice-roster-actions { display: flex; align-items: center; gap: 8px; flex: none; }
+.practice-cpu-disable { padding: 0 14px; }
+.practice-cpu-disable[hidden] { display: none; }
 
 /* ---------------------------------------------------------------------
    Global overlays: loading, confirm dialog, rotate

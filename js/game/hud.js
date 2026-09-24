@@ -126,9 +126,10 @@ export class HUD {
 }
 
 // Practice Ground HUD: Player 1's panel (tag, name, health and Energy) and a
-// compact three-dots More button, nothing else: no opponent panel, round,
-// timer or pause control. Presses on More are reported through `onMore`; the
-// Practice Ground screen owns the menu it opens.
+// compact three-dots More button, top centre where Quick Battle's timer sits,
+// nothing else: no panel for the practice CPU, round, timer or pause control.
+// Presses on More are reported through `onMore`; the Practice Ground screen
+// owns the menu it opens.
 export class PracticeHUD {
   constructor(root, { onMore } = {}) {
     this.root = root;

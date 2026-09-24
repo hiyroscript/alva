@@ -138,7 +138,8 @@ behave, and how it must look. The README covers running and deploying it.
   stage themes, fighter roster.
 - One arena (`js/game/arena.js`) owns the fixed-step world and its Canvas
   rendering. Quick Battle (`Battle`) adds the CPU, phases and round timer;
-  Practice Ground (`PracticeSession`) runs one fighter with none of them.
+  Practice Ground (`PracticeSession`) runs Player 1, and an optional
+  training-dummy CPU, with none of them.
 - Data-driven content: `js/data/characters.js`, `js/data/maps.js` (the Quick
   Battle stages) and `js/data/practice-map.js` (the training stage). Adding a
   fighter means adding frames, a definition and a roster slot — never editing
@@ -236,7 +237,7 @@ fit the palette.
 ```
 Splash → Home → Select Mode → Select Fighter → Select Stage → Battle
 Home → Practice Ground (starts at once with #0001)
-Practice Ground → More → Change Fighter (roster dialog) / Return (Home)
+Practice Ground → More → Change Fighter (roster dialog) / Enable CPU or Change CPU (CPU roster dialog → Disable CPU) / Allow or Revoke infinite energy / Return (Home)
 Battle → Pause → Resume / Restart / Return to Home (confirmed); Help is shown but disabled for now
 Battle (time over, one fighter ahead) → Result → Rematch / Change Stage / Return to Home
 Battle (time over, draw) → a fresh battle starts, no dialog
@@ -403,15 +404,28 @@ A solo training room, entered straight from Home.
 - **Start:** every fresh entry loads #0001 (character `0001`) through the usual
   loading overlay and gives control at once: no fighter select, countdown,
   round banner, timer, CPU or result. It runs until the player returns Home.
-  Practice keeps its own fighter choice; it never reads or changes Quick
-  Battle's selected fighter.
-- **One fighter:** the simulation holds exactly one fighter under Player 1's
-  control, with normal movement, physics, attacks, projectiles, clones,
-  Charge, Defense, animation, camera (following that fighter alone) and touch
-  controls. There is no CPU, hidden fighter or dummy. Moves aimed at an
-  opponent fall back or miss: Charged BA1 has nobody to appear behind, so it
-  is an ordinary BA1 and costs no Energy; the Sphere Rush dashes, finds no one
-  and ends as a miss.
+  Practice keeps its own fighter and CPU choices; it never reads or changes
+  Quick Battle's selection. Every fresh entry also starts with no CPU and
+  infinite energy off.
+- **Player 1:** one fighter under Player 1's control, with normal movement,
+  physics, attacks, projectiles, clones, Charge, Defense, animation, camera
+  and touch controls. Until a CPU is enabled there is no other fighter,
+  hidden or not, and the camera follows Player 1 alone. Moves aimed at an
+  opponent then fall back or miss: Charged BA1 has nobody to appear behind,
+  so it is an ordinary BA1 and costs no Energy; the Sphere Rush dashes, finds
+  no one and ends as a miss.
+- **Practice CPU (optional):** a training dummy, slot `p2`, labelled CPU, at
+  the stage's second spawn (320 units right of Player 1's, facing it). It has
+  no controller, so it never walks, jumps, drops, attacks, throws, charges,
+  blocks or dodges; it is otherwise a normal fighter (hurtboxes, real damage,
+  hitstun, hurt animations, knockback, gravity, stage and pushbox
+  collisions, binds, facing its opponent). With it, Player 1 and the CPU are
+  each other's opponent, so clones, projectiles, the Sphere Rush and melee
+  target it and the camera frames both. Each hit it takes shows its resolved
+  damage (the CombatSystem's hit event) in red over its head, `-6` or `-2.5`,
+  rising and fading over 0.8 s; simultaneous hits stack. Knocked out, it is
+  restored to full health once its hit reaction ends. No HUD panel,
+  timer or rounds come with it.
 - **Training stage:** its own map (`js/data/practice-map.js`), kept out of the
   Quick Battle stage list. Original Canvas artwork of a minimalist combat
   laboratory: a pale, cool-gray room built from one square grid, with a gridded
@@ -420,14 +434,24 @@ A solo training room, entered straight from Home.
   along the floor's front edge. No scenery, particles, hazards or moving parts.
   Only the camera moves the room; its static geometry is computed once.
 - **HUD:** only the P1 panel (tag, name, health, Energy) top-left and a compact
-  glass **More** button (three dots, `aria-label="Practice menu"`) top-right.
-  No CPU panel, round label, timer or pause control.
+  glass **More** button (three dots, `aria-label="Practice menu"`,
+  `aria-haspopup="dialog"`, `aria-expanded`) centred at the top where Quick
+  Battle's timer sits, a responsive 8–14 px lower. No CPU panel (even with a
+  practice CPU), round label, timer or pause control.
 - **Practice menu:** More, Esc / P or gamepad Start freezes practice
   (simulation, gameplay input and touch controls stop) and floats a light,
-  translucent glass menu under the More button over a lightly dimmed, still
-  stage. It holds exactly **Change Fighter** (green, focused) and **Return**
-  (outlined). More again, Esc / Back, P, Start or a press on the dim resumes.
-  **Return** goes Home and tears everything down.
+  translucent glass menu centred under the More button over a lightly
+  dimmed, still stage. It holds exactly **Change Fighter** (green, focused),
+  **Enable CPU** (**Change CPU** while there is one), **Allow infinite
+  energy** (**Revoke infinite energy** while on) and **Return** (outlined).
+  More again, Esc / Back, P, Start or a press on the dim resumes. **Return**
+  goes Home and tears everything down.
+- **Infinite energy:** a Practice-only rule for Player 1: its Energy is full
+  before and after every simulation step, so every cost can be paid while the
+  moves keep their normal rules and cooldowns, and the HUD bar stays full.
+  Allowing it refills at once; revoking it just stops the refills. The
+  toggle keeps the menu open and focus on the button. It survives Change
+  Fighter; the CPU never has it.
 - **Change Fighter:** opens the fighter roster (the same component, rules and
   look as Select Fighter, 6.4) as one large translucent glass dialog
   (`role="dialog"`, `aria-modal`, titled "Change Fighter"; about 90 vw ×
@@ -438,7 +462,18 @@ A solo training room, entered straight from Home.
   fighter's projectiles, clones and technique, rebinds the HUD, closes both
   overlays and resumes. Back / Esc closes only the dialog and returns focus to
   Change Fighter, leaving the fighter unchanged. A failed load keeps the
-  current fighter and the dialog.
+  current fighter and the dialog. A practice CPU stays through the swap, now
+  facing the new fighter, and infinite energy stays on.
+- **CPU dialog:** Enable CPU / Change CPU opens a second instance of the same
+  roster dialog (its own ids and navigation scope), titled Select CPU or
+  Change CPU. Confirming loads the fighter, puts it on the CPU spawn
+  (replacing any current CPU, never Player 1), closes both overlays and
+  resumes. Back / Esc returns to the menu unchanged. While a CPU exists,
+  **Disable CPU** sits right beside Back: it removes the CPU with everything
+  aimed at it (a technique holding it, clones summoned at it, opponent links,
+  its damage numbers), closes the dialog and leaves practice paused in the
+  menu with focus on Enable CPU. A failed load keeps the current CPU (or
+  none) and the dialog.
 
 ## 7. Battle
 
@@ -453,7 +488,8 @@ A solo training room, entered straight from Home.
   player has no drop-through control and walks off an edge to come down; the
   training CPU can drop through all of them except the water-tower deck.
 - Collision comes only from map data, never from art.
-- The camera frames both fighters (Practice Ground's single fighter alone),
+- The camera frames both fighters (Practice Ground's fighter alone until a
+  practice CPU is enabled),
   interpolates smoothly and never shows outside the map. Fighters occupy
   ≈ 14–18 % of viewport height.
 
@@ -940,9 +976,9 @@ A solo training room, entered straight from Home.
   nagging alerts; Throw is solid.
 - Touch controls appear only on touch-first devices (coarse pointer or an
   observed touch), never merely because a desktop window is narrow.
-- Gameplay pauses when the pause menu (Practice Ground: the Practice menu or
-  the Change Fighter dialog) is open, the tab is hidden, or the device is
-  blocked in portrait.
+- Gameplay pauses when the pause menu (Practice Ground: the Practice menu,
+  the Change Fighter dialog or the CPU dialog) is open, the tab is hidden, or
+  the device is blocked in portrait.
 
 ## 8. Accessibility
 

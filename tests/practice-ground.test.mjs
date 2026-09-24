@@ -1,8 +1,10 @@
 // Run with node --test tests/practice-ground.test.mjs (no dependencies).
-// Practice Ground: the Home entry, the solo PracticeSession, its HUD, the
-// Practice menu and the Change Fighter dialog, on a minimal fake DOM and a
-// no-op Canvas; plus checks that Quick Battle keeps its CPU, timer and
-// stages. Layout and paint still need real-browser verification.
+// Practice Ground: the Home entry, the PracticeSession (solo, then with its
+// optional training-dummy CPU, damage numbers and infinite energy), its HUD,
+// the Practice menu and the Change Fighter and CPU dialogs, on a minimal fake
+// DOM and a no-op Canvas; plus checks that Quick Battle keeps its CPU, timer,
+// finite Energy and stages. Layout and paint still need real-browser
+// verification.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -172,7 +174,9 @@ const { MAPS, getMap } = await import('../js/data/maps.js');
 const { PRACTICE_MAP } = await import('../js/data/practice-map.js');
 const { createTheme } = await import('../js/stages/index.js');
 const { PracticeTheme } = await import('../js/stages/practice-theme.js');
-const { PracticeSession } = await import('../js/game/practice.js');
+const { PracticeSession, formatDamage } = await import('../js/game/practice.js');
+const { Fighter } = await import('../js/game/character.js');
+const { FighterRoster } = await import('../js/ui/fighter-roster.js');
 const { Battle } = await import('../js/game/battle.js');
 const { HUD } = await import('../js/game/hud.js');
 const { PlayerController, TrainingAIController } = await import('../js/game/fighter-controller.js');
@@ -258,6 +262,43 @@ async function enterPractice() {
 
 const labels = (root) => root.querySelectorAll('[data-nav]').map((b) => b.textContent);
 const slotFor = (screen, id) => screen.roster.slots.find((s) => s._def?.id === id);
+const cpuSlotFor = (screen, id) => screen.cpuRoster.slots.find((s) => s._def?.id === id);
+const PRACTICE_MENU = ['Change Fighter', 'Enable CPU', 'Allow infinite energy', 'Return'];
+
+// Through the Practice menu and the CPU dialog, like the player: puts `id`
+// on the stage as the practice CPU and resumes.
+async function enableCpu(screen, id = '9999') {
+  screen.openMenu();
+  screen.cpuBtn.click();
+  cpuSlotFor(screen, id).click(0);
+  await flush();
+  return screen.session.cpu;
+}
+
+// A practice session on a fake canvas, with a CPU (#9999) by default. `run`
+// feeds one input snapshot per step; `events` collects every hit the
+// CombatSystem resolved and `numbers` every damage number that appeared.
+function practiceSession({ cpu = true } = {}) {
+  const input = fakeInput();
+  const session = new PracticeSession({ canvas: new Element('canvas'), map: PRACTICE_MAP, def: DEF_0001, sprites: fakeSprites(), input });
+  if (cpu) session.setCPU(DEF_9999, fakeSprites());
+  const events = [];
+  const numbers = [];
+  const run = (held = {}, steps = 1) => {
+    for (let i = 0; i < steps; i++) {
+      input.script.push({ ...held });
+      session.update(DT);
+      events.push(...session.combat.events);
+      numbers.push(...session.damageNumbers.filter((d) => d.age === 0));
+    }
+  };
+  // Steps with no input until `pred` holds; fails instead of hanging.
+  const until = (pred, limit = 600) => {
+    for (let i = 0; i < limit && !pred(); i++) run();
+    assert.ok(pred(), 'condition never reached');
+  };
+  return { session, input, run, until, events, numbers };
+}
 
 // ---- Home ---------------------------------------------------------------------
 
@@ -320,9 +361,11 @@ test('a failed load uses the loading error, and Back returns Home', async () => 
 
 // ---- The solo simulation ------------------------------------------------------
 
-test('Practice Ground runs exactly one player-controlled fighter: no CPU, opponent or AI', async () => {
+test('Practice Ground starts with exactly one player-controlled fighter: no CPU, opponent or AI', async () => {
   const { screen } = await enterPractice();
   const { session } = screen;
+  assert.equal(session.cpu, null);
+  assert.equal(session.infiniteEnergy, false);
   assert.equal(session.fighters.length, 1);
   assert.equal(session.fighters[0], session.player);
   assert.ok(session.player.controller instanceof PlayerController);
@@ -483,9 +526,34 @@ test('the More button is a compact three-dots glass button labelled Practice men
   assert.ok(ICONS.more.includes('aria-hidden="true"'));
 });
 
+test('layout: More sits in the HUD\'s centre column, a little below Quick Battle\'s timer, and the menu opens under it', () => {
+  // Layout itself needs a real browser; this pins down the rules behind it.
+  const css = readFileSync(new URL('../styles.css', import.meta.url), 'utf8');
+  const rule = (selector) => {
+    const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return css.match(new RegExp(`(?:^|\\n)${escaped}\\s*\\{([^}]*)\\}`))?.[1] ?? null;
+  };
+  // The practice HUD keeps the battle HUD's three columns (P1 | centre |
+  // empty right), so its centre column is where .hud-center sits in Quick
+  // Battle.
+  assert.match(rule('.hud'), /grid-template-columns:\s*minmax\(0, 1fr\) auto minmax\(0, 1fr\)/);
+  assert.equal(rule('.practice-hud'), null, 'no column override');
+  const more = rule('.practice-more');
+  assert.match(more, /justify-self:\s*center/);
+  assert.match(more, /margin-top:\s*var\(--more-drop\)/);
+  const drop = rule('.screen--practice').match(/--more-drop:\s*clamp\((\d+)px,\s*[\d.]+vh,\s*(\d+)px\)/);
+  assert.ok(drop, 'a responsive drop');
+  assert.deepEqual([Number(drop[1]), Number(drop[2])], [8, 14]);
+  const menu = rule('.practice-menu-overlay');
+  assert.match(menu, /place-items:\s*start center/);
+  assert.match(menu, /var\(--more-drop\)\s*\+\s*var\(--more\)/, 'just under the lowered button');
+  // Quick Battle's centre control is untouched.
+  assert.match(rule('.hud-center'), /width:\s*clamp\(64px, 8\.4vw, 92px\)/);
+});
+
 // ---- Practice menu ------------------------------------------------------------
 
-test('More freezes practice under a translucent menu with exactly Change Fighter and Return', async () => {
+test('More freezes practice under a translucent menu: Change Fighter, Enable CPU, Allow infinite energy, Return', async () => {
   const { app, screen } = await enterPractice();
   let frames = 0;
   screen.session.frame = () => { frames++; };
@@ -497,9 +565,17 @@ test('More freezes practice under a translucent menu with exactly Change Fighter
   assert.equal(menuOverlay.getAttribute('role'), 'dialog');
   assert.equal(menuOverlay.getAttribute('aria-modal'), 'true');
   assert.ok(menuOverlay.children[0].classList.contains('glass'));
-  assert.deepEqual(labels(menuOverlay), ['Change Fighter', 'Return']);
+  assert.deepEqual(labels(menuOverlay), PRACTICE_MENU);
+  assert.deepEqual(app.nav.candidates(menuOverlay), [screen.changeBtn, screen.cpuBtn, screen.energyBtn, screen.returnBtn]);
   for (const hidden of ['Resume', 'Restart', 'Restart Battle', 'Help', 'Settings', 'Change Stage']) {
     assert.ok(!labels(menuOverlay).includes(hidden), `no ${hidden}`);
+  }
+  // The shared menu-button look: Change Fighter green, CPU and Energy plain,
+  // Return outlined.
+  for (const b of [screen.cpuBtn, screen.energyBtn]) {
+    assert.equal(b.tagName, 'BUTTON');
+    assert.ok(b.classList.contains('pause-btn-item'));
+    assert.ok(!b.classList.contains('is-primary') && !b.classList.contains('is-outline-only'));
   }
   assert.equal(document.activeElement, screen.changeBtn);
   assert.deepEqual(app.nav.scopes, [screen.menuScope]);
@@ -743,6 +819,791 @@ test('a failed fighter load keeps the current fighter and the dialog', async () 
   assert.equal(document.activeElement, slotFor(screen, '9999'), 'back to choosing');
 });
 
+// ---- Practice CPU ---------------------------------------------------------------
+
+test('Enable CPU opens a second shared roster in its own glass dialog, titled Select CPU, with no Disable CPU', async () => {
+  const { app, screen } = await enterPractice();
+  screen.openMenu();
+  assert.equal(screen.cpuBtn.textContent, 'Enable CPU');
+  screen.cpuBtn.click();
+
+  const overlay = screen.cpuRosterOverlay;
+  assert.deepEqual(app.screens.calls, [], 'never leaves Practice Ground');
+  assert.equal(screen.cpuRosterOpen, true);
+  assert.equal(screen.rosterOpen, false, 'Change Fighter\'s dialog stays shut');
+  assert.equal(screen.rosterOverlay.hidden, true);
+  assert.equal(overlay.hidden, false);
+  assert.equal(overlay.getAttribute('role'), 'dialog');
+  assert.equal(overlay.getAttribute('aria-modal'), 'true');
+  const titleId = overlay.getAttribute('aria-labelledby');
+  assert.equal(titleId, 'practice-cpu-roster-title');
+  const title = overlay.querySelectorAll('h2').find((h) => h.id === titleId);
+  assert.equal(title.textContent, 'Select CPU');
+  assert.equal(overlay.querySelector('.kicker').textContent, 'Practice Ground');
+
+  // Another instance of the same roster, in the same large glass dialog.
+  assert.ok(screen.cpuRoster instanceof FighterRoster);
+  assert.notEqual(screen.cpuRoster, screen.roster);
+  assert.ok(overlay.classList.contains('practice-roster-overlay'));
+  for (const cls of ['practice-roster-dialog', 'glass']) assert.ok(screen.cpuRosterDialog.classList.contains(cls));
+  assert.ok(overlay.contains(screen.cpuRoster.rosterPanel) && overlay.contains(screen.cpuRoster.previewPanel));
+  assert.equal(screen.cpuRoster.slots.length, CONFIG.roster.totalSlots);
+  assert.equal(screen.cpuRoster.selectedId, '0001');
+
+  // No CPU yet, so nothing to disable.
+  assert.equal(screen.disableCpuBtn.hidden, true);
+  assert.equal(screen.disableCpuBtn.disabled, true);
+  assert.ok(!app.nav.candidates(overlay).includes(screen.disableCpuBtn));
+
+  // Frozen, input and touch off, the menu and HUD inert beneath, focus in
+  // the dialog's own scope, starting on the player's fighter.
+  assert.equal(screen.isRunning, false);
+  assert.equal(app.input.gameplayActive, false);
+  assert.equal(screen.touch.enabled, false);
+  assert.equal(screen.menuOpen, true);
+  assert.equal(screen.menuOverlay.inert, true);
+  assert.equal(screen.hudRoot.inert, true);
+  assert.ok(screen.el.classList.contains('is-cpu-roster-open'));
+  assert.deepEqual(app.nav.scopes, [screen.menuScope, screen.cpuRosterScope]);
+  const candidates = app.nav.candidates(overlay);
+  assert.ok(candidates.includes(screen.cpuRosterBack));
+  assert.ok(!candidates.some((c) => screen.menuOverlay.contains(c) || screen.rosterOverlay.contains(c)));
+  const current = cpuSlotFor(screen, '0001');
+  assert.equal(document.activeElement, current);
+  assert.equal(screen.cpuRoster.selectedId, '0001');
+  screen.cpuBtn.focus();
+  assert.equal(document.activeElement, current, 'nothing underneath takes focus');
+  screen.hud.moreButton.click();
+  app.input.key('KeyP');
+  screen.openRoster();
+  assert.equal(screen.cpuRosterOpen, true, 'More, P and Change Fighter do nothing meanwhile');
+  assert.equal(screen.rosterOpen, false);
+  assert.equal(screen.menuOpen, true);
+
+  // Only this dialog's preview animates; the stage stays still.
+  let previews = 0;
+  let otherPreviews = 0;
+  let frames = 0;
+  screen.cpuRoster.update = () => { previews++; };
+  screen.roster.update = () => { otherPreviews++; };
+  screen.session.frame = () => { frames++; };
+  screen.update(DT);
+  assert.deepEqual([previews, otherPreviews, frames], [1, 0, 0]);
+});
+
+test('both Practice rosters keep unique ids and their own aria-labelledby links', async () => {
+  const { screen } = await enterPractice();
+  const ids = [];
+  const collect = (n) => { if (n instanceof Element) { if (n.id) ids.push(n.id); n.children.forEach(collect); } };
+  collect(screen.el);
+  assert.equal(new Set(ids).size, ids.length, `duplicate ids: ${ids}`);
+  assert.equal(screen.roster.name.id, 'practice-preview-name');
+  assert.equal(screen.cpuRoster.name.id, 'practice-cpu-preview-name');
+  assert.equal(screen.roster.previewPanel.getAttribute('aria-labelledby'), 'practice-preview-name');
+  assert.equal(screen.cpuRoster.previewPanel.getAttribute('aria-labelledby'), 'practice-cpu-preview-name');
+  assert.equal(screen.rosterOverlay.getAttribute('aria-labelledby'), 'practice-roster-title');
+  assert.equal(screen.cpuRosterOverlay.getAttribute('aria-labelledby'), 'practice-cpu-roster-title');
+  assert.equal(screen.cpuRosterTitle.id, 'practice-cpu-roster-title');
+  assert.ok(!screen.rosterOverlay.contains(screen.cpuRoster.grid) && !screen.cpuRosterOverlay.contains(screen.roster.grid));
+  // The More button keeps its contract.
+  const more = screen.hud.moreButton;
+  assert.equal(more.getAttribute('aria-label'), 'Practice menu');
+  assert.equal(more.getAttribute('aria-haspopup'), 'dialog');
+  assert.equal(more.getAttribute('aria-expanded'), 'false');
+});
+
+test('selecting a CPU loads it and puts it on the stage as a p2 / CPU training dummy facing Player 1', async () => {
+  const { app, screen, loads } = await enterPractice();
+  const { session } = screen;
+  const player = session.player;
+  const cpu = await enableCpu(screen, '9999');
+
+  assert.equal(loads.at(-1), '9999', 'loaded through app.loadCharacter');
+  assert.equal(app.loading.labels.at(-1), 'Loading #9999');
+  assert.deepEqual(app.screens.calls, []);
+  assert.equal(screen.session, session, 'the same practice session');
+  assert.ok(cpu instanceof Fighter);
+  assert.equal(cpu.def.id, '9999');
+  assert.equal(cpu.sprites, app.getSprites('9999'));
+  assert.equal(cpu.slot, 'p2');
+  assert.equal(cpu.label, 'CPU');
+  assert.equal(cpu.controller, null, 'no controller at all: neutral input');
+  assert.equal(session.player, player, 'Player 1 untouched');
+  assert.deepEqual(session.fighters, [player, cpu]);
+  assert.equal(player.opponent, cpu);
+  assert.equal(cpu.opponent, player);
+  assert.equal(session.primary, player);
+  assert.equal(session.secondary, cpu);
+  assert.equal(cpu.body.x, PRACTICE_MAP.spawnPoints[1].x);
+  assert.equal(cpu.body.y, PRACTICE_MAP.groundLevel);
+  assert.equal(cpu.facing, -1, 'facing Player 1');
+  assert.equal(cpu.combat.health, cpu.combat.maxHealth);
+
+  // The dialog and menu close and practice resumes; the menu now offers
+  // Change CPU.
+  assert.equal(screen.cpuRosterOpen, false);
+  assert.equal(screen.cpuRosterOverlay.hidden, true);
+  assert.equal(screen.menuOpen, false);
+  assert.deepEqual(app.nav.scopes, []);
+  assert.equal(screen.isRunning, true);
+  assert.equal(app.input.gameplayActive, true);
+  assert.equal(screen.touch.enabled, true);
+  assert.equal(screen.cpuBtn.textContent, 'Change CPU');
+  assert.equal(app.selection.characterId, '0001', 'Quick Battle\'s selection is untouched');
+
+  // Still only Player 1's HUD panel: no CPU panel on the right.
+  assert.deepEqual(screen.hudRoot.children, [screen.hud.panel.root, screen.hud.moreButton]);
+  assert.equal(screen.hudRoot.querySelectorAll('.hud-side').length, 1);
+  assert.deepEqual(screen.hudRoot.querySelectorAll('.hud-p2'), []);
+  assert.equal(screen.hud.panel.name.textContent, '#0001');
+
+  // The Arena's own camera frames both: the CPU is the secondary fighter.
+  const calls = [];
+  const { follow, snap } = session.camera;
+  session.camera.follow = (...args) => { calls.push(['follow', ...args]); return follow.apply(session.camera, args); };
+  session.camera.snap = (...args) => { calls.push(['snap', ...args]); return snap.apply(session.camera, args); };
+  screen.update(DT);
+  assert.deepEqual(calls.map(([kind, p, s]) => [kind, p, s]), [['snap', player, cpu], ['follow', player, cpu]]);
+  // Rendering both fighters, markers and the debug overlay runs cleanly.
+  session.debug = true;
+  session.frame(DT);
+});
+
+test('the practice CPU never acts on its own: no movement, jump, attack, charge, Defense or AI, however long it stands', async () => {
+  const { app, screen } = await enterPractice();
+  const cpu = await enableCpu(screen, '0001');
+  const { session } = screen;
+  const aiBefore = aiInputs;
+  const spawnX = cpu.body.x;
+  const states = new Set();
+  for (let i = 0; i < 60 * 30; i++) {
+    screen.update(DT);
+    states.add(cpu.state);
+    const c = cpu.combat;
+    if (cpu.body.x !== spawnX || cpu.body.y !== PRACTICE_MAP.groundLevel || !cpu.body.grounded || cpu.moveDir !== 0 ||
+        c.attack || c.defenseAction || c.blocking || cpu.charging || cpu.technique || cpu.releases.length || cpu.summons.length) {
+      assert.fail(`the CPU acted on step ${i}: ${cpu.state}`);
+    }
+  }
+  assert.deepEqual([...states], ['idle']);
+  assert.equal(cpu.combat.lastIntent, null, 'no combat button was ever pressed');
+  assert.equal(cpu.combat.energy, cpu.combat.maxEnergy);
+  assert.equal(cpu.combat.cooldowns.size, 0);
+  assert.deepEqual(session.projectiles, []);
+  assert.deepEqual(session.clones, []);
+  assert.equal(aiInputs, aiBefore, 'no training AI ever runs');
+
+  // Player 1's input moves Player 1 only.
+  const x = session.player.body.x;
+  for (let i = 0; i < 30; i++) {
+    app.input.script.push({ left: true });
+    session.update(DT);
+  }
+  assert.ok(session.player.body.x < x);
+  assert.equal(cpu.body.x, spawnX);
+  assert.equal(cpu.facing, -1, 'still turned toward Player 1');
+});
+
+test('Player 1\'s attacks hit the CPU through the real CombatSystem, and it reacts like any fighter', () => {
+  const { session, run, until, events, numbers } = practiceSession();
+  const { player, cpu } = session;
+  // Walk up to the CPU: pushboxes stop Player 1 at its side.
+  for (let i = 0; i < 300 && cpu.body.x - player.body.x > 60; i++) run({ right: true });
+  run({}, 30);
+  const gap = cpu.body.x - player.body.x;
+  assert.ok(gap >= (player.def.pushbox.width + cpu.def.pushbox.width) / 2 - 1 && gap < 60, `side by side (${gap})`);
+  assert.equal(player.facing, 1);
+  assert.equal(cpu.facing, -1);
+
+  const health = cpu.combat.health;
+  run({ action1: true, action1Pressed: true });
+  until(() => events.length > 0, 30);
+  const [hit] = events;
+  assert.equal(hit.type, 'hit');
+  assert.equal(hit.attacker, player);
+  assert.equal(hit.target, cpu);
+  assert.equal(hit.damage, player.attacks.ba1.damage);
+  assert.deepEqual([hit.projectile, hit.summon, hit.technique], [null, null, null]);
+  assert.equal(cpu.combat.health, health - hit.damage, 'real damage');
+  assert.ok(cpu.combat.stun > 0, 'hitstun');
+  run(); // the reaction shows from the CPU's next update
+  assert.equal(cpu.state, 'hitstun');
+  assert.equal(cpu.animator.anim.key, 'hurt');
+  // Its number, straight from the resolved event.
+  assert.deepEqual(numbers.map((d) => [d.target, d.damage, d.text]), [[cpu, hit.damage, `-${hit.damage}`]]);
+  assert.equal(numbers[0].text, '-6');
+  // Knocked back, then idle again, never hitting back.
+  const x = cpu.body.x;
+  run({}, 40);
+  assert.ok(cpu.body.x > x, 'knockback');
+  assert.equal(cpu.state, 'idle');
+  assert.equal(player.combat.health, player.combat.maxHealth);
+  assert.equal(events.length, 1);
+});
+
+test('shuriken, clone and Sphere Rush hits on the CPU each float their own resolved damage', () => {
+  // Throw: the shuriken flies from Player 1's spawn into the CPU.
+  {
+    const { session, run, until, events, numbers } = practiceSession();
+    run({ primary: true, primaryPressed: true });
+    until(() => events.length > 0, 120);
+    const [hit] = events;
+    assert.ok(hit.projectile, 'a projectile hit');
+    assert.equal(hit.target, session.cpu);
+    assert.equal(hit.damage, hit.projectile.def.damage);
+    assert.deepEqual(numbers.map((d) => [d.damage, d.text]), [[hit.damage, `-${hit.damage}`]]);
+  }
+  // Charged BA1: the clone appears behind the CPU (paid for as usual) and
+  // strikes it.
+  {
+    const { session, run, until, events, numbers } = practiceSession();
+    const { player, cpu } = session;
+    run({ charge: true }, 10);
+    run({ charge: true, action1: true, action1Pressed: true });
+    assert.equal(session.clones.length, 1);
+    assert.equal(session.clones[0].target, cpu);
+    assert.equal(player.combat.energy, player.combat.maxEnergy - 25, 'finite Energy: the clone is paid for');
+    until(() => events.length > 0, 180);
+    const [hit] = events;
+    assert.equal(hit.summon, session.clones[0] ?? hit.summon);
+    assert.ok(hit.summon);
+    assert.equal(hit.attacker, player);
+    assert.equal(hit.target, cpu);
+    assert.deepEqual(numbers.map((d) => d.text), [`-${hit.damage}`]);
+  }
+  // Charged BA2: the Sphere Rush catches the CPU, then explodes on it.
+  {
+    const { session, run, until, events, numbers } = practiceSession();
+    const { player, cpu } = session;
+    run({ charge: true }, 10);
+    run({ charge: true, action2: true, action2Pressed: true });
+    const rush = player.technique;
+    assert.ok(rush);
+    until(() => rush.hitConfirmed, 120);
+    assert.equal(rush.target, cpu);
+    assert.ok(cpu.combat.immobilized, 'bound');
+    until(() => events.length >= 2, 400);
+    assert.ok(events.every((e) => e.technique === rush && e.target === cpu));
+    const damages = events.map((e) => e.damage);
+    assert.deepEqual(damages, [rush.def.firstHit.damage, rush.def.explosionHit.damage]);
+    assert.deepEqual(numbers.map((d) => d.text), damages.map((d) => `-${d}`));
+  }
+});
+
+test('damage numbers: negative red text over the CPU\'s head that follows it, stacks, and fades within a second', () => {
+  assert.equal(formatDamage(6), '-6');
+  assert.equal(formatDamage(15), '-15');
+  assert.equal(formatDamage(2.5), '-2.5');
+  assert.equal(formatDamage(4 * 0.2), '-0.8', 'no float noise');
+  assert.equal(formatDamage(1 / 3), '-0.33');
+
+  const { session, run, until, events } = practiceSession();
+  const { player, cpu } = session;
+  // Only hits on the CPU with damage count; several in one step all show,
+  // stacked.
+  session.combat.events.push(
+    { type: 'hit', attacker: player, target: cpu, damage: 6 },
+    { type: 'hit', attacker: player, target: player, damage: 9 },
+    { type: 'block', attacker: player, target: cpu, damage: 0 },
+    { type: 'hit', attacker: player, target: cpu, damage: 2.5 },
+  );
+  session.updateDamageNumbers(0);
+  assert.deepEqual(session.damageNumbers.map((d) => [d.text, d.stack]), [['-6', 0], ['-2.5', 1]]);
+  // Once a number has had a moment to rise, its row is free again.
+  session.combat.events.length = 0;
+  session.updateDamageNumbers(0.1);
+  session.combat.events.push({ type: 'hit', attacker: player, target: cpu, damage: 4 });
+  session.updateDamageNumbers(0);
+  assert.deepEqual(session.damageNumbers.map((d) => [d.text, d.stack]), [['-6', 0], ['-2.5', 1], ['-4', 2]]);
+  session.combat.events.length = 0;
+  session.updateDamageNumbers(0.15);
+  session.combat.events.push({ type: 'hit', attacker: player, target: cpu, damage: 8 });
+  session.updateDamageNumbers(0);
+  assert.deepEqual(session.damageNumbers.map((d) => [d.text, d.stack]), [['-6', 0], ['-2.5', 1], ['-4', 2], ['-8', 0]]);
+  session.combat.events.length = 0;
+  session.damageNumbers.length = 0;
+
+  // A real hit, drawn on a sized 1280 x 720 canvas at a real art scale (the
+  // fake art is 1 px tall), with both fighters in view.
+  session.canvas.rect = { left: 0, top: 0, width: 1280, height: 720 };
+  player.sprites.refArtHeight = 60;
+  player.sprites.worldPerArt = player.def.visual.height / 60;
+  session.resize();
+  assert.ok(session.view.w > 600 && session.view.w < 1600, `a real view (${session.view.w} units wide)`);
+  const drawn = [];
+  session.ctx.fillText = (text, x, y) => drawn.push({ text, x, y, fill: session.ctx.fillStyle, alpha: session.ctx.globalAlpha });
+  run({ primary: true, primaryPressed: true });
+  until(() => events.length > 0, 120);
+  const draw = () => {
+    drawn.length = 0;
+    session.render();
+    return drawn.find((d) => d.text === '-4');
+  };
+  const first = draw();
+  assert.ok(first, 'drawn');
+  assert.match(first.fill, /^#ff/i, 'red');
+  assert.equal(first.alpha, 1);
+  const [x, tagTop] = session.markerAnchor(cpu);
+  assert.equal(first.x, Math.round(x), 'centred over the CPU');
+  assert.ok(first.y < tagTop, 'above its head and name tag');
+  const tag = drawn.find((d) => d.text === 'CPU');
+  assert.ok(tag && first.y < tag.y, 'above the CPU label');
+  // It follows the CPU as it moves.
+  cpu.renderX += 50;
+  const moved = draw();
+  assert.equal(moved.x, Math.round(session.markerAnchor(cpu)[0]));
+  assert.ok(moved.x > first.x);
+  cpu.renderX -= 50;
+  // It rises, fades and is gone within about a second.
+  let steps = 0;
+  while (session.damageNumbers.length && steps < 120) { run(); steps++; }
+  assert.ok(steps >= 0.6 * 60 && steps <= 1.0 * 60, `lasts ${steps} steps`);
+  session.damageNumbers.push({ target: cpu, damage: 4, text: '-4', age: 0.7, stack: 0 });
+  const late = draw();
+  assert.ok(late.y < first.y, 'drifted up');
+  assert.ok(late.alpha < 1, 'fading');
+});
+
+test('a knocked-out CPU gets back up with full health once its hit reaction is over', () => {
+  const { session, run, until, events, numbers } = practiceSession();
+  const { cpu } = session;
+  cpu.combat.health = 2;
+  run({ primary: true, primaryPressed: true });
+  until(() => events.length > 0, 120);
+  assert.equal(cpu.combat.health, 0);
+  assert.equal(numbers.at(-1).text, '-4', 'the number is the resolved damage, not what was left');
+  until(() => cpu.combat.health > 0, 120);
+  assert.equal(cpu.combat.health, cpu.combat.maxHealth);
+  assert.equal(cpu.combat.stun, 0);
+  // ...and can be hit again.
+  run({}, 30);
+  run({ primary: true, primaryPressed: true });
+  until(() => events.length > 1, 120);
+  assert.equal(events[1].target, cpu);
+});
+
+test('Change CPU replaces the CPU in place and leaves Player 1 alone', async () => {
+  const { app, screen, loads } = await enterPractice();
+  const { session } = screen;
+  const old = await enableCpu(screen, '9999');
+  const player = session.player;
+  player.combat.health = 50;
+  old.combat.health = 40;
+  session.damageNumbers.push({ target: old, damage: 6, text: '-6', age: 0, stack: 0 });
+
+  screen.openMenu();
+  assert.equal(screen.cpuBtn.textContent, 'Change CPU');
+  screen.cpuBtn.click();
+  assert.equal(screen.cpuRosterTitle.textContent, 'Change CPU');
+  assert.equal(screen.cpuRoster.selectedId, '9999', 'the current CPU starts selected');
+  assert.equal(document.activeElement, cpuSlotFor(screen, '9999'));
+
+  // Disable CPU: a real button right beside Back, reachable by keys and pads.
+  const disable = screen.disableCpuBtn;
+  assert.equal(disable.tagName, 'BUTTON');
+  assert.equal(disable.getAttribute('type'), 'button');
+  assert.equal(disable.textContent, 'Disable CPU');
+  assert.equal(disable.hidden, false);
+  assert.equal(disable.disabled, false);
+  assert.ok(disable.hasAttribute('data-nav'));
+  assert.deepEqual(disable.parentNode.children, [screen.cpuRosterBack, disable]);
+  assert.ok(app.nav.candidates(screen.cpuRosterOverlay).includes(disable));
+  screen.cpuRosterBack.rect = { left: 0, top: 0, width: 90, height: 40 };
+  disable.rect = { left: 100, top: 0, width: 120, height: 40 };
+  screen.cpuRosterBack.focus();
+  app.nav.command('right');
+  assert.equal(document.activeElement, disable);
+
+  cpuSlotFor(screen, '0001').click(0);
+  await flush();
+  const cpu = session.cpu;
+  assert.equal(loads.at(-1), '0001');
+  assert.notEqual(cpu, old);
+  assert.equal(cpu.def.id, '0001');
+  assert.equal(cpu.label, 'CPU');
+  assert.equal(cpu.body.x, PRACTICE_MAP.spawnPoints[1].x);
+  assert.equal(cpu.combat.health, cpu.combat.maxHealth);
+  assert.equal(session.player, player, 'Player 1 untouched');
+  assert.equal(player.combat.health, 50);
+  assert.deepEqual(session.fighters, [player, cpu]);
+  assert.equal(player.opponent, cpu);
+  assert.equal(cpu.opponent, player);
+  assert.equal(old.opponent, null);
+  assert.equal(session.secondary, cpu);
+  assert.deepEqual(session.damageNumbers, [], 'the old CPU\'s numbers go with it');
+  assert.equal(screen.menuOpen, false);
+  assert.equal(screen.cpuBtn.textContent, 'Change CPU');
+});
+
+test('Disable CPU removes the CPU and every reference to it, then waits, frozen, in the menu', async () => {
+  const { app, screen } = await enterPractice();
+  const { session } = screen;
+  const input = app.input;
+  const cpu = await enableCpu(screen, '9999');
+  const player = session.player;
+  // Catch the CPU in a Sphere Rush (bound, the sphere on it, a number over
+  // it), with a clone summoned at it and a shuriken of Player 1's in flight.
+  for (let i = 0; i < 10; i++) { input.script.push({ charge: true }); session.update(DT); }
+  input.script.push({ charge: true, action2: true, action2Pressed: true });
+  session.update(DT);
+  const rush = player.technique;
+  for (let i = 0; i < 120 && !rush.hitConfirmed; i++) session.update(DT);
+  assert.equal(rush.target, cpu);
+  assert.ok(cpu.combat.isBoundBy(rush));
+  assert.equal(session.damageNumbers.length, 1);
+  const stray = { alive: true, owner: player, target: cpu };
+  const shuriken = { alive: true, owner: player };
+  session.clones.push(stray);
+  session.projectiles.push(shuriken);
+
+  screen.openMenu();
+  screen.cpuBtn.click();
+  let frames = 0;
+  session.frame = () => { frames++; };
+  let renders = 0;
+  const render = session.render.bind(session);
+  session.render = () => { renders++; render(); };
+  screen.disableCpuBtn.click();
+
+  assert.equal(session.cpu, null);
+  assert.deepEqual(session.fighters, [player]);
+  assert.equal(session.secondary, null);
+  assert.equal(player.opponent, null);
+  assert.equal(cpu.opponent, null);
+  assert.equal(player.technique, null, 'the technique holding the CPU ends');
+  assert.equal(rush.endReason, 'released');
+  assert.equal(rush.target, null);
+  assert.equal(cpu.combat.immobilized, false);
+  assert.ok(!session.clones.includes(stray), 'the clone aimed at it goes');
+  assert.ok(session.projectiles.includes(shuriken), 'Player 1\'s shuriken flies on');
+  assert.deepEqual(session.damageNumbers, []);
+  const refs = [
+    ...session.fighters.flatMap((f) => [f, f.opponent, f.technique?.target]),
+    ...session.fighters.flatMap((f) => f.summons.map((s) => s.target)),
+    ...session.clones.flatMap((c) => [c.owner, c.target]),
+    ...session.projectiles.map((p) => p.owner),
+  ];
+  assert.ok(!refs.includes(cpu), 'nothing refers to the CPU');
+  session.clones.length = 0; // the stand-ins above have no art to draw
+  session.projectiles.length = 0;
+
+  // Back in the menu, still frozen, on Enable CPU; the still stage redrawn.
+  assert.equal(screen.cpuRosterOpen, false);
+  assert.equal(screen.cpuRosterOverlay.hidden, true);
+  assert.equal(screen.menuOpen, true);
+  assert.equal(screen.menuOverlay.inert, false);
+  assert.equal(screen.hudRoot.inert, false);
+  assert.deepEqual(app.nav.scopes, [screen.menuScope]);
+  assert.equal(screen.cpuBtn.textContent, 'Enable CPU');
+  assert.equal(document.activeElement, screen.cpuBtn);
+  assert.equal(screen.isRunning, false);
+  assert.equal(input.gameplayActive, false);
+  assert.equal(renders, 1);
+  screen.update(DT);
+  assert.equal(frames, 0, 'paused until the player resumes');
+
+  // Opening the dialog again: Select CPU, and no Disable CPU.
+  screen.cpuBtn.click();
+  assert.equal(screen.cpuRosterTitle.textContent, 'Select CPU');
+  assert.equal(screen.disableCpuBtn.hidden, true);
+  screen.disableCpuBtn.click();
+  assert.equal(screen.cpuRosterOpen, true, 'a hidden, disabled button does nothing');
+  screen.cpuRosterBack.click();
+
+  // Solo practice again: a Charged BA1 is an ordinary BA1, for free, and the
+  // camera follows Player 1 alone.
+  session.frame = Object.getPrototypeOf(session).frame.bind(session);
+  screen.resume();
+  assert.equal(screen.isRunning, true);
+  for (let i = 0; i < 90 && (player.state !== 'idle' || player.technique); i++) session.update(DT);
+  for (let i = 0; i < 10; i++) { input.script.push({ charge: true }); session.update(DT); }
+  input.script.push({ charge: true, action1: true, action1Pressed: true });
+  session.update(DT);
+  assert.equal(player.combat.attack?.def.id, 'ba1');
+  assert.deepEqual(session.clones, []);
+  assert.equal(player.combat.energy, player.combat.maxEnergy);
+  const calls = [];
+  const { follow } = session.camera;
+  session.camera.follow = (...args) => { calls.push(args); return follow.apply(session.camera, args); };
+  screen.update(DT);
+  assert.deepEqual(calls.map(([p, s]) => [p, s]), [[player, null]]);
+});
+
+test('Back, Esc and gamepad Back leave the CPU dialog for the menu without changing anything', async () => {
+  const { app, screen } = await enterPractice();
+  const { session } = screen;
+  assert.equal(screen.cpuRosterBack.getAttribute('aria-label'), 'Back to practice menu');
+  screen.openMenu();
+  screen.cpuBtn.click();
+  cpuSlotFor(screen, '9999').click(); // pointer: selects, does not confirm
+  assert.equal(screen.cpuRoster.selectedId, '9999');
+  app.input.key('Escape');
+  assert.equal(screen.cpuRosterOpen, false);
+  assert.equal(screen.cpuRosterOverlay.hidden, true);
+  assert.equal(screen.menuOpen, true, 'the menu stays');
+  assert.equal(document.activeElement, screen.cpuBtn);
+  assert.deepEqual(app.nav.scopes, [screen.menuScope]);
+  assert.equal(session.cpu, null, 'no CPU');
+
+  screen.cpuBtn.click();
+  screen.cpuRosterBack.click();
+  assert.equal(screen.cpuRosterOpen, false);
+  screen.cpuBtn.click();
+  app.nav.command('back');
+  assert.equal(screen.cpuRosterOpen, false);
+  assert.equal(document.activeElement, screen.cpuBtn);
+
+  // With a CPU: backing out keeps it.
+  const cpu = await enableCpu(screen, '9999');
+  screen.openMenu();
+  screen.cpuBtn.click();
+  cpuSlotFor(screen, '0001').click();
+  app.nav.command('back');
+  assert.equal(session.cpu, cpu);
+  assert.deepEqual(session.fighters, [session.player, cpu]);
+  app.nav.command('back');
+  assert.equal(screen.menuOpen, false, 'Back from the menu resumes practice');
+});
+
+test('the new menu items take part in keyboard / gamepad navigation', async () => {
+  const { app, screen } = await enterPractice();
+  screen.openMenu();
+  const items = [screen.changeBtn, screen.cpuBtn, screen.energyBtn, screen.returnBtn];
+  items.forEach((b, i) => { b.rect = { left: 0, top: i * 50, width: 280, height: 44 }; });
+  const visited = [document.activeElement];
+  for (let i = 0; i < 3; i++) {
+    app.nav.command('down');
+    visited.push(document.activeElement);
+  }
+  assert.deepEqual(visited, items);
+  app.nav.command('up');
+  app.nav.command('up');
+  assert.equal(document.activeElement, screen.cpuBtn);
+  app.nav.command('confirm');
+  assert.equal(screen.cpuRosterOpen, true, 'confirm opens the CPU dialog');
+});
+
+test('a failed CPU load keeps the current CPU (or none) and the CPU dialog', async () => {
+  const { app, screen } = await enterPractice();
+  const { session } = screen;
+  const load = app.loadCharacter;
+  screen.openMenu();
+  screen.cpuBtn.click();
+  app.loadCharacter = () => Promise.resolve({ usable: false });
+  cpuSlotFor(screen, '9999').click(0);
+  await flush();
+  assert.match(app.loading.error.message, /#9999's sprite frames could not be loaded/);
+  assert.equal(session.cpu, null, 'still no CPU');
+  assert.deepEqual(session.fighters, [session.player]);
+  assert.equal(screen.cpuRosterOpen, true);
+  assert.equal(screen.cpuSwapping, false);
+  assert.equal(screen.isRunning, false);
+  app.loading.error.opts.onBack();
+  assert.equal(document.activeElement, cpuSlotFor(screen, '9999'), 'back to choosing');
+  assert.equal(screen.cpuBtn.textContent, 'Enable CPU');
+
+  // With a CPU, a failed replacement keeps it.
+  app.loadCharacter = load;
+  cpuSlotFor(screen, '9999').click(0);
+  await flush();
+  const cpu = session.cpu;
+  assert.ok(cpu);
+  screen.openMenu();
+  screen.cpuBtn.click();
+  app.loadCharacter = () => Promise.resolve({ usable: false });
+  cpuSlotFor(screen, '0001').click(0);
+  await flush();
+  assert.equal(session.cpu, cpu);
+  assert.deepEqual(session.fighters, [session.player, cpu]);
+  assert.equal(screen.cpuRosterOpen, true);
+  assert.equal(screen.disableCpuBtn.hidden, false);
+});
+
+test('leaving while CPU art is still loading never touches the old session', async () => {
+  const { app, screen } = await enterPractice();
+  const session = screen.session;
+  screen.openMenu();
+  screen.cpuBtn.click();
+  let resolve;
+  app.loadCharacter = () => new Promise((r) => { resolve = r; });
+  cpuSlotFor(screen, '9999').click(0);
+  assert.equal(screen.cpuSwapping, true);
+  assert.equal(screen.isRunning, false);
+  screen.exit();
+  assert.equal(screen.cpuSwapping, false);
+  assert.equal(screen.cpuRosterOpen, false);
+  assert.equal(screen.cpuRosterOverlay.hidden, true);
+  assert.deepEqual(app.nav.scopes, []);
+  resolve(fakeSprites());
+  await flush();
+  assert.equal(screen.session, null);
+  assert.equal(session.cpu, null);
+  assert.deepEqual(session.fighters, []);
+});
+
+test('changing Player 1\'s fighter keeps the CPU, rewired to the new fighter', async () => {
+  const { app, screen } = await enterPractice();
+  const { session } = screen;
+  const input = app.input;
+  const cpu = await enableCpu(screen, '9999');
+  const old = session.player;
+  // The old fighter's Sphere Rush holds the CPU.
+  for (let i = 0; i < 10; i++) { input.script.push({ charge: true }); session.update(DT); }
+  input.script.push({ charge: true, action2: true, action2Pressed: true });
+  session.update(DT);
+  const rush = old.technique;
+  for (let i = 0; i < 120 && !rush.hitConfirmed; i++) session.update(DT);
+  assert.ok(cpu.combat.isBoundBy(rush));
+
+  screen.openMenu();
+  screen.openRoster();
+  slotFor(screen, '9999').click(0);
+  await flush();
+  const p = session.player;
+  assert.notEqual(p, old);
+  assert.equal(p.def.id, '9999');
+  assert.equal(session.cpu, cpu, 'the same CPU');
+  assert.equal(cpu.def.id, '9999');
+  assert.deepEqual(session.fighters, [p, cpu]);
+  assert.equal(p.opponent, cpu);
+  assert.equal(cpu.opponent, p);
+  assert.equal(old.opponent, null);
+  assert.equal(session.secondary, cpu);
+  assert.equal(rush.endReason, 'destroy');
+  assert.equal(cpu.combat.immobilized, false, 'released');
+  assert.deepEqual(session.projectiles, []);
+  assert.deepEqual(session.clones, []);
+  assert.equal(screen.cpuBtn.textContent, 'Change CPU');
+  assert.equal(screen.hud.panel.name.textContent, '#9999');
+  assert.equal(app.selection.characterId, '0001');
+});
+
+// ---- Infinite energy ------------------------------------------------------------
+
+test('Allow infinite energy toggles in place: the label flips, the menu stays open and focus stays put', async () => {
+  const { app, screen } = await enterPractice();
+  const { session } = screen;
+  const max = session.player.combat.maxEnergy;
+  session.player.combat.energy = 25;
+  screen.hud.update(session);
+  screen.openMenu();
+  const btn = screen.energyBtn;
+  assert.equal(btn.textContent, 'Allow infinite energy');
+  btn.focus();
+  btn.click(0);
+  assert.equal(session.infiniteEnergy, true);
+  assert.equal(btn.textContent, 'Revoke infinite energy');
+  assert.equal(screen.menuOpen, true, 'the menu stays open');
+  assert.equal(document.activeElement, btn);
+  assert.deepEqual(app.nav.scopes, [screen.menuScope]);
+  assert.equal(session.player.combat.energy, max, 'refilled at once');
+  assert.equal(screen.hud.panel.energy.getAttribute('aria-valuenow'), String(max));
+
+  // Confirm through the menu navigator revokes it again: no refund taken.
+  app.nav.command('confirm');
+  assert.equal(session.infiniteEnergy, false);
+  assert.equal(btn.textContent, 'Allow infinite energy');
+  assert.equal(document.activeElement, btn);
+  assert.equal(session.player.combat.energy, max);
+  // Revoked: a cost is paid for good again.
+  assert.equal(session.player.combat.spendEnergy(25), true);
+  session.update(DT);
+  assert.equal(session.player.combat.energy, max - 25);
+});
+
+test('with infinite energy, Energy costs are always payable and Player 1 stays full; the CPU is unaffected', () => {
+  // Finite: four 25-Energy clones empty the bar and the fifth press is a BA1.
+  {
+    const { session, run } = practiceSession();
+    run({ charge: true }, 10);
+    for (let i = 0; i < 6; i++) {
+      run({ charge: true, action1: true, action1Pressed: true });
+      run({ charge: true });
+    }
+    assert.equal(session.clones.length, 4);
+    assert.equal(session.player.combat.energy, 0);
+  }
+  // Infinite: every press summons, each paid through the normal cost check,
+  // and the bar never drops.
+  const { session, run } = practiceSession();
+  const { player, cpu } = session;
+  const max = player.combat.maxEnergy;
+  cpu.combat.energy = 10;
+  session.setInfiniteEnergy(true);
+  const paid = [];
+  const spend = player.combat.spendEnergy.bind(player.combat);
+  player.combat.spendEnergy = (amount) => { const ok = spend(amount); paid.push([amount, ok]); return ok; };
+  run({ charge: true }, 10);
+  for (let i = 0; i < 6; i++) {
+    // Whatever lowered it between steps, a step starts full.
+    if (i === 5) player.combat.energy = 0;
+    run({ charge: true, action1: true, action1Pressed: true });
+    assert.equal(player.combat.energy, max);
+    run({ charge: true });
+  }
+  assert.equal(session.clones.length, 6);
+  assert.deepEqual(paid, Array(6).fill([25, true]));
+  assert.equal(cpu.combat.energy, 10, 'the CPU never gets it');
+  // The moves keep their own rules: with no one to appear behind, the press
+  // is still an ordinary BA1.
+  session.removeCPU();
+  run({}, 120);
+  run({ charge: true }, 10);
+  run({ charge: true, action1: true, action1Pressed: true });
+  assert.equal(player.combat.attack?.def.id, 'ba1');
+  assert.equal(paid.length, 6);
+  // Revoked: the next cost comes off the bar.
+  session.setInfiniteEnergy(false);
+  assert.equal(player.combat.spendEnergy(25), true);
+  run();
+  assert.equal(player.combat.energy, max - 25);
+});
+
+test('changing fighter keeps infinite energy on, and the new fighter starts full', async () => {
+  const { screen } = await enterPractice();
+  screen.openMenu();
+  screen.energyBtn.click();
+  screen.openRoster();
+  slotFor(screen, '9999').click(0);
+  await flush();
+  const { session } = screen;
+  assert.equal(session.infiniteEnergy, true);
+  assert.equal(session.player.def.id, '9999');
+  assert.equal(session.player.combat.energy, session.player.combat.maxEnergy);
+  session.player.combat.energy = 0;
+  session.update(DT);
+  assert.equal(session.player.combat.energy, session.player.combat.maxEnergy, 'the rule applies to the new fighter');
+  screen.openMenu();
+  assert.equal(screen.energyBtn.textContent, 'Revoke infinite energy');
+});
+
+// ---- Fresh visits ---------------------------------------------------------------
+
+test('a fresh visit starts with no CPU and finite Energy, whatever the last visit left', async () => {
+  const { app, screen } = await enterPractice();
+  screen.openMenu();
+  screen.energyBtn.click();
+  screen.closeRoster();
+  await enableCpu(screen, '9999');
+  assert.ok(screen.session.cpu);
+  assert.equal(screen.session.infiniteEnergy, true);
+
+  screen.exit();
+  await screen.enter();
+  const { session } = screen;
+  assert.equal(session.cpu, null);
+  assert.equal(session.infiniteEnergy, false);
+  assert.deepEqual(session.fighters, [session.player]);
+  assert.equal(session.player.def.id, '0001');
+  assert.equal(session.secondary, null);
+  screen.openMenu();
+  assert.deepEqual(labels(screen.menuOverlay), PRACTICE_MENU);
+  screen.cpuBtn.click();
+  assert.equal(screen.cpuRosterTitle.textContent, 'Select CPU');
+  assert.equal(screen.disableCpuBtn.hidden, true);
+  assert.equal(app.selection.characterId, '0001', 'nothing of Practice reaches Quick Battle');
+});
+
 // ---- Leaving ------------------------------------------------------------------
 
 test('Return goes Home, and leaving cleans up the session, input, scopes and listeners', async () => {
@@ -762,6 +1623,7 @@ test('Return goes Home, and leaving cleans up the session, input, scopes and lis
   assert.deepEqual(app.nav.scopes, []);
   assert.equal(screen.menuOpen, false);
   assert.equal(screen.rosterOpen, false);
+  assert.equal(screen.cpuRosterOpen, false);
   assert.equal(app.input.gameplayActive, false);
   assert.equal(screen.touch.enabled, false);
   assert.equal(app.input.listeners.size, 1, 'practice key listener removed');
@@ -790,11 +1652,21 @@ test('the training stage is its own map, outside MAPS and so outside Select Stag
   assert.equal(PRACTICE_MAP.theme, 'practice');
   assert.deepEqual(PRACTICE_MAP.platforms, []);
   assert.deepEqual(PRACTICE_MAP.solids, []);
-  assert.equal(PRACTICE_MAP.spawnPoints.length, 1);
+  // Player 1's spawn, then the CPU's: as far apart as Quick Battle's two
+  // starting fighters, each facing the other.
+  assert.equal(PRACTICE_MAP.spawnPoints.length, 2);
   const { left, right } = PRACTICE_MAP.bounds;
   assert.ok(right - left >= 3000, 'a generous floor');
-  const spawn = PRACTICE_MAP.spawnPoints[0].x;
-  assert.ok(spawn > left && spawn < right);
+  const [p1, cpu] = PRACTICE_MAP.spawnPoints;
+  assert.deepEqual(p1, { x: 2000, facing: 1 }, 'Player 1\'s spawn is unchanged');
+  for (const { x } of [p1, cpu]) assert.ok(x > left && x < right);
+  const gap = cpu.x - p1.x;
+  assert.ok(gap >= 300 && gap <= 340, `CPU ${gap} units to the right`);
+  for (const map of MAPS) {
+    const [a, b] = map.spawnPoints;
+    assert.ok(Math.abs(Math.abs(b.x - a.x) - gap) <= 40, `about ${map.name}'s spawn gap`);
+  }
+  assert.equal(cpu.facing, -1, 'the CPU faces Player 1');
 });
 
 test('the practice theme is registered and draws without building paths each frame', () => {
@@ -816,7 +1688,7 @@ test('the practice theme is registered and draws without building paths each fra
 
 // ---- Quick Battle is unchanged --------------------------------------------------
 
-test('Quick Battle still creates its CPU, round intro and 99-second timer', () => {
+test('Quick Battle still creates its AI CPU, round intro, 99-second timer, two-panel HUD and finite Energy', () => {
   const input = fakeInput();
   const battle = new Battle({
     canvas: new Element('canvas'), map: getMap('desert'),
@@ -835,6 +1707,14 @@ test('Quick Battle still creates its CPU, round intro and 99-second timer', () =
   for (let i = 0; i < Math.ceil(CONFIG.battle.introSeconds * 60) + 60; i++) battle.update(DT);
   assert.equal(battle.phase, 'fight');
   assert.ok(battle.timeLeft < CONFIG.battle.roundSeconds);
+  // None of Practice Ground's rules: no infinite energy or damage numbers.
+  assert.ok(!(battle instanceof PracticeSession));
+  for (const key of ['cpu', 'infiniteEnergy', 'damageNumbers']) assert.equal(key in battle, false, `no ${key}`);
+  const max = battle.p1.combat.maxEnergy;
+  assert.equal(battle.p1.combat.spendEnergy(25), true);
+  for (let i = 0; i < 30; i++) battle.update(DT);
+  assert.equal(battle.p1.combat.energy, max - 25, 'spent Energy stays spent');
+  assert.equal(battle.p2.combat.energy, battle.p2.combat.maxEnergy);
 
   const root = new Element('div');
   const hud = new HUD(root);
@@ -862,12 +1742,13 @@ test('Select Fighter still builds the full roster from the shared component and 
   assert.equal(app.selection.characterId, '9999');
   assert.deepEqual(app.screens.calls, [['map']]);
 
-  // Both rosters can share the page: no id is used twice.
+  // All three rosters can share the page: no id is used twice.
   const practice = new PracticeGroundScreen(app);
   const ids = [];
   const collect = (n) => { if (n instanceof Element) { if (n.id) ids.push(n.id); n.children.forEach(collect); } };
   collect(select.el);
   collect(practice.el);
   assert.equal(new Set(ids).size, ids.length, `duplicate ids: ${ids}`);
+  for (const id of ['preview-name', 'practice-preview-name', 'practice-cpu-preview-name']) assert.ok(ids.includes(id), id);
   assert.equal(getCharacter('9999').displayName, '#9999');
 });

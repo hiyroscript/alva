@@ -1,12 +1,16 @@
-// PRACTICE GROUND screen: a solo training room. It starts at once with
-// #0001 on the training stage, with no CPU, intro, timer or result, and runs
-// until the player returns Home. The three-dots More button (or Esc / P /
-// Start) freezes it under a light Practice menu: Change Fighter opens the
+// PRACTICE GROUND screen: a training room. It starts at once with #0001
+// alone on the training stage, with no intro, timer or result, and runs until
+// the player returns Home. The three-dots More button (top centre, or Esc / P
+// / Start) freezes it under a light Practice menu: Change Fighter opens the
 // full roster in a large glass dialog over the paused stage and swaps the
-// fighter in place; Return goes Home.
+// fighter in place; Enable CPU (Change CPU once there is one) opens a second
+// roster dialog that puts a training-dummy CPU on the stage or replaces it,
+// and whose Disable CPU takes it away again; Allow / Revoke infinite energy
+// toggles the player's infinite Energy; Return goes Home.
 //
-// Practice keeps its own fighter choice: it never reads or writes Quick
-// Battle's app.selection.
+// Practice keeps its own fighter and CPU choices, and every fresh visit
+// starts over (default fighter, no CPU, finite Energy): it never reads or
+// writes Quick Battle's app.selection.
 
 import { Screen } from '../core/screen-manager.js';
 import { CONFIG } from '../config.js';
@@ -36,14 +40,21 @@ export class PracticeGroundScreen extends Screen {
 
     this.buildMenu();
     this.buildRoster();
+    this.buildCpuRoster();
 
-    this.el.replaceChildren(this.canvas, this.hudRoot, this.touchRoot, this.menuOverlay, this.rosterOverlay);
+    this.el.replaceChildren(
+      this.canvas, this.hudRoot, this.touchRoot, this.menuOverlay, this.rosterOverlay, this.cpuRosterOverlay,
+    );
 
     this.session = null;
     this.characterId = PRACTICE_DEFAULT_FIGHTER;
     this.menuOpen = false;
+    // Change Fighter's dialog and the CPU dialog each have their own open and
+    // loading state; at most one of them is open at a time.
     this.rosterOpen = false;
     this.swapping = false;
+    this.cpuRosterOpen = false;
+    this.cpuSwapping = false;
     this.needsResize = true;
     // Observed only while Practice Ground is showing (see enter / exit).
     this.resizeObserver = new ResizeObserver(() => { this.needsResize = true; });
@@ -55,12 +66,18 @@ export class PracticeGroundScreen extends Screen {
 
   // ---- DOM builders ---------------------------------------------------------
 
-  // The light Practice menu: exactly Change Fighter and Return. Esc / Back,
-  // Start, the More button or a press on the dim around it close it again.
+  // The light Practice menu: exactly Change Fighter, Enable CPU (Change CPU
+  // while there is one), Allow infinite energy (Revoke infinite energy while
+  // it is on) and Return. Esc / Back, Start, the More button or a press on
+  // the dim around it close it again.
   buildMenu() {
     this.changeBtn = menuButton('Change Fighter', { primary: true });
+    this.cpuBtn = menuButton('Enable CPU');
+    this.energyBtn = menuButton('Allow infinite energy');
     this.returnBtn = menuButton('Return', { outlineOnly: true });
     this.changeBtn.addEventListener('click', () => this.openRoster());
+    this.cpuBtn.addEventListener('click', () => this.openCpuRoster());
+    this.energyBtn.addEventListener('click', () => this.toggleInfiniteEnergy());
     this.returnBtn.addEventListener('click', () => this.leave());
 
     this.menuOverlay = el('div', {
@@ -68,7 +85,7 @@ export class PracticeGroundScreen extends Screen {
       role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'practice-menu-title',
     }, [el('div', { class: 'pause-panel practice-menu-panel glass glass--panel' }, [
       el('h2', { class: 'kicker practice-menu-title', id: 'practice-menu-title', text: 'Practice Ground' }),
-      el('div', { class: 'pause-menu' }, [this.changeBtn, this.returnBtn]),
+      el('div', { class: 'pause-menu' }, [this.changeBtn, this.cpuBtn, this.energyBtn, this.returnBtn]),
     ])]);
     this.menuOverlay.addEventListener('click', (e) => {
       if (e.target === this.menuOverlay) this.resume();
@@ -81,41 +98,79 @@ export class PracticeGroundScreen extends Screen {
     };
   }
 
-  // Change Fighter: the shared fighter roster in a large glass dialog. Back
-  // (the header button, Esc / Back) returns to the Practice menu.
-  buildRoster() {
+  // A roster dialog: its own instance of the shared fighter roster as one
+  // large glass panel over the paused stage, under a header with Back (plus
+  // any `actions` right beside it) and a Practice Ground heading. Ids come
+  // from `titleId` and `previewId`, so both dialogs share the page.
+  buildRosterDialog({ titleId, title, previewId, onConfirm, onBack, actions = [] }) {
     const back = el('button', {
       class: 'btn-back', type: 'button', 'data-nav': true,
       'aria-label': 'Back to practice menu', html: `${ICONS.back}<span>Back</span>`,
     });
-    back.addEventListener('click', () => this.closeRoster());
+    back.addEventListener('click', onBack);
 
-    this.rosterDialog = el('div', { class: 'practice-roster-dialog glass' });
-    this.roster = new FighterRoster(this.app, {
-      host: this.rosterDialog,
-      previewId: 'practice-preview-name',
-      onConfirm: (def) => this.changeFighter(def),
-    });
-    this.rosterDialog.replaceChildren(
+    const dialog = el('div', { class: 'practice-roster-dialog glass' });
+    const roster = new FighterRoster(this.app, { host: dialog, previewId, onConfirm });
+    const heading = el('h2', { class: 'screen-title', id: titleId, text: title });
+    dialog.replaceChildren(
       el('header', { class: 'screen-header practice-roster-head' }, [
-        back,
+        el('div', { class: 'practice-roster-actions' }, [back, ...actions]),
         el('div', { class: 'screen-heading' }, [
           el('span', { class: 'kicker', text: 'Practice Ground' }),
-          el('h2', { class: 'screen-title', id: 'practice-roster-title', text: 'Change Fighter' }),
+          heading,
         ]),
       ]),
-      el('div', { class: 'screen-body char-layout practice-roster-body' }, [this.roster.rosterPanel, this.roster.previewPanel]),
+      el('div', { class: 'screen-body char-layout practice-roster-body' }, [roster.rosterPanel, roster.previewPanel]),
     );
 
-    this.rosterOverlay = el('div', {
+    const overlay = el('div', {
       class: 'overlay practice-roster-overlay', hidden: true,
-      role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'practice-roster-title',
-    }, [this.rosterDialog]);
+      role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': titleId,
+    }, [dialog]);
+    return { overlay, dialog, roster, back, heading, scope: { el: overlay, onBack } };
+  }
 
-    this.rosterScope = {
-      el: this.rosterOverlay,
+  // Change Fighter: the shared fighter roster in a large glass dialog. Back
+  // (the header button, Esc / Back) returns to the Practice menu.
+  buildRoster() {
+    const dialog = this.buildRosterDialog({
+      titleId: 'practice-roster-title',
+      title: 'Change Fighter',
+      previewId: 'practice-preview-name',
+      onConfirm: (def) => this.changeFighter(def),
       onBack: () => this.closeRoster(),
-    };
+    });
+    this.rosterOverlay = dialog.overlay;
+    this.rosterDialog = dialog.dialog;
+    this.roster = dialog.roster;
+    this.rosterScope = dialog.scope;
+  }
+
+  // The CPU dialog: a second instance of the same roster and dialog, titled
+  // Select CPU (Change CPU while there is one). Back (the header button,
+  // Esc / Back) returns to the Practice menu; Disable CPU, beside Back and
+  // only while there is a CPU, removes it.
+  buildCpuRoster() {
+    this.disableCpuBtn = el('button', {
+      class: 'btn-back practice-cpu-disable', type: 'button', 'data-nav': true,
+      text: 'Disable CPU', hidden: true, disabled: true,
+    });
+    this.disableCpuBtn.addEventListener('click', () => this.disableCpu());
+    const dialog = this.buildRosterDialog({
+      titleId: 'practice-cpu-roster-title',
+      title: 'Select CPU',
+      previewId: 'practice-cpu-preview-name',
+      onConfirm: (def) => this.selectCpu(def),
+      onBack: () => this.closeCpuRoster(),
+      actions: [this.disableCpuBtn],
+    });
+    this.cpuRosterOverlay = dialog.overlay;
+    this.cpuRosterOverlay.classList.add('practice-cpu-roster-overlay');
+    this.cpuRosterDialog = dialog.dialog;
+    this.cpuRoster = dialog.roster;
+    this.cpuRosterBack = dialog.back;
+    this.cpuRosterTitle = dialog.heading;
+    this.cpuRosterScope = dialog.scope;
   }
 
   // ---- Lifecycle --------------------------------------------------------------
@@ -123,7 +178,8 @@ export class PracticeGroundScreen extends Screen {
   async enter() {
     const app = this.app;
     // A fresh visit always starts from the default fighter, whatever Quick
-    // Battle or an earlier visit used.
+    // Battle or an earlier visit used (and, with a fresh session, with no CPU
+    // and finite Energy).
     this.characterId = PRACTICE_DEFAULT_FIGHTER;
     const def = getCharacter(this.characterId);
     this.token = {};
@@ -156,6 +212,7 @@ export class PracticeGroundScreen extends Screen {
     });
     this.hud.bind(this.session.player);
     this.hud.update(this.session);
+    this.syncMenu();
     this.needsResize = true;
     this.resizeObserver.observe(this.el);
     this.unsubKey = app.input.onKey((e) => this.onKey(e));
@@ -168,11 +225,13 @@ export class PracticeGroundScreen extends Screen {
   exit() {
     this.token = null;
     this.swapping = false;
+    this.cpuSwapping = false;
     this.unsubKey?.();
     this.unsubKey = null;
     document.removeEventListener('visibilitychange', this.onVisibility);
     this.resizeObserver.disconnect();
     this.closeRoster({ silent: true });
+    this.closeCpuRoster({ silent: true });
     this.hideMenu();
     this.app.input.setGameplayActive(false);
     this.touch.setEnabled(false);
@@ -181,9 +240,19 @@ export class PracticeGroundScreen extends Screen {
     this.session = null;
   }
 
-  // Running: a session exists and neither the menu nor a fighter swap holds it.
+  // Running: a session exists and neither the menu nor a fighter load holds it.
   get isRunning() {
-    return !!this.session && !this.menuOpen && !this.swapping;
+    return !!this.session && !this.menuOpen && !this.loadingFighter;
+  }
+
+  // Either roster dialog (Change Fighter or CPU) is open over the menu.
+  get dialogOpen() {
+    return this.rosterOpen || this.cpuRosterOpen;
+  }
+
+  // Either dialog is loading the fighter it was given.
+  get loadingFighter() {
+    return this.swapping || this.cpuSwapping;
   }
 
   update(dt) {
@@ -194,6 +263,7 @@ export class PracticeGroundScreen extends Screen {
       if (session.resize() && !this.isRunning) session.render();
     }
     if (this.rosterOpen) this.roster.update(dt);
+    if (this.cpuRosterOpen) this.cpuRoster.update(dt);
     if (!this.isRunning || this.app.device.blockedPortrait) return;
     session.frame(dt);
     this.hud.update(session);
@@ -215,7 +285,7 @@ export class PracticeGroundScreen extends Screen {
     if (this.isRunning) {
       e.preventDefault();
       this.openMenu();
-    } else if (this.menuOpen && !this.rosterOpen && e.code === 'KeyP') {
+    } else if (this.menuOpen && !this.dialogOpen && e.code === 'KeyP') {
       e.preventDefault();
       this.resume();
     }
@@ -244,7 +314,7 @@ export class PracticeGroundScreen extends Screen {
 
   // The More button: opens the menu while practising, closes it again.
   toggleMenu() {
-    if (this.rosterOpen || this.swapping) return;
+    if (this.dialogOpen || this.loadingFighter) return;
     if (this.menuOpen) this.resume();
     else this.openMenu();
   }
@@ -263,9 +333,9 @@ export class PracticeGroundScreen extends Screen {
     this.changeBtn.focus({ preventScroll: true });
   }
 
-  // Back to practising, from the menu (never past the fighter dialog).
+  // Back to practising, from the menu (never past a roster dialog).
   resume() {
-    if (!this.menuOpen || this.rosterOpen || this.swapping) return;
+    if (!this.menuOpen || this.dialogOpen || this.loadingFighter) return;
     if (this.app.device.blockedPortrait) return; // stay frozen until landscape
     this.hideMenu();
     // Keys pressed in the menu (J confirms, K goes back) are not attacks.
@@ -285,12 +355,31 @@ export class PracticeGroundScreen extends Screen {
     this.app.screens.go('home', {}, { reset: true });
   }
 
+  // The menu's stateful labels, from the session: Enable CPU / Change CPU and
+  // Allow / Revoke infinite energy.
+  syncMenu() {
+    const session = this.session;
+    this.cpuBtn.textContent = session?.cpu ? 'Change CPU' : 'Enable CPU';
+    this.energyBtn.textContent = session?.infiniteEnergy ? 'Revoke infinite energy' : 'Allow infinite energy';
+  }
+
+  // Allow / Revoke infinite energy: toggles the rule for the player's
+  // fighter. The menu stays open with focus on the same button, so its new
+  // label shows at once; the HUD's Energy bar refills at once when allowed.
+  toggleInfiniteEnergy() {
+    if (!this.session || !this.menuOpen || this.dialogOpen || this.loadingFighter) return;
+    this.session.setInfiniteEnergy(!this.session.infiniteEnergy);
+    this.syncMenu();
+    this.hud.update(this.session);
+    this.energyBtn.focus({ preventScroll: true });
+  }
+
   // ---- Change Fighter ---------------------------------------------------------
 
   // Opens the roster over the frozen stage with the current fighter
   // selected and focused. The menu stays open, inert, beneath it.
   openRoster() {
-    if (!this.menuOpen || this.rosterOpen) return;
+    if (!this.menuOpen || this.dialogOpen) return;
     this.rosterOpen = true;
     this.el.classList.add('is-roster-open');
     this.menuOverlay.inert = true;
@@ -315,8 +404,9 @@ export class PracticeGroundScreen extends Screen {
   }
 
   // Swaps the practice fighter in place: loads `def`, puts a fresh fighter
-  // on the spawn, rebinds the HUD, then closes the dialog and the menu and
-  // resumes. A failed load keeps the current fighter and the dialog open.
+  // on the spawn (a CPU stays, now facing it; infinite energy stays on),
+  // rebinds the HUD, then closes the dialog and the menu and resumes. A
+  // failed load keeps the current fighter and the dialog open.
   async changeFighter(def) {
     if (this.swapping || !this.session) return;
     const app = this.app;
@@ -346,5 +436,84 @@ export class PracticeGroundScreen extends Screen {
     this.hud.update(this.session);
     this.closeRoster({ silent: true });
     this.resume();
+  }
+
+  // ---- Practice CPU -----------------------------------------------------------
+
+  // Enable CPU / Change CPU: opens the CPU dialog over the frozen stage, the
+  // current CPU (else the player's fighter) selected and focused, titled
+  // Select CPU or Change CPU. Disable CPU shows only while there is a CPU.
+  // The menu stays open, inert, beneath it.
+  openCpuRoster() {
+    if (!this.menuOpen || this.dialogOpen || !this.session) return;
+    const cpu = this.session.cpu;
+    this.cpuRosterOpen = true;
+    this.cpuRosterTitle.textContent = cpu ? 'Change CPU' : 'Select CPU';
+    this.disableCpuBtn.hidden = !cpu;
+    this.disableCpuBtn.disabled = !cpu;
+    this.el.classList.add('is-cpu-roster-open');
+    this.menuOverlay.inert = true;
+    this.hudRoot.inert = true;
+    this.cpuRosterOverlay.hidden = false;
+    this.cpuRoster.show(cpu?.def.id ?? this.characterId);
+    this.app.nav.pushScope(this.cpuRosterScope);
+    this.cpuRoster.focusSelected();
+  }
+
+  // Closes only the CPU dialog, back to the menu with focus on the CPU
+  // button. `silent` leaves focus alone.
+  closeCpuRoster({ silent = false } = {}) {
+    if (!this.cpuRosterOpen) return;
+    this.cpuRosterOpen = false;
+    this.cpuRosterOverlay.hidden = true;
+    this.el.classList.remove('is-cpu-roster-open');
+    this.menuOverlay.inert = false;
+    this.hudRoot.inert = false;
+    this.app.nav.popScope(this.cpuRosterScope);
+    if (!silent) this.cpuBtn.focus({ preventScroll: true });
+  }
+
+  // Puts `def` on the stage as the practice CPU (replacing any current one):
+  // loads it like Change Fighter does, adds it at the CPU spawn, then closes
+  // the dialog and the menu and resumes. The player's fighter is untouched.
+  // A failed load keeps the current CPU (or none) and the dialog open.
+  async selectCpu(def) {
+    if (this.cpuSwapping || !this.session) return;
+    const app = this.app;
+    const token = this.token;
+    this.cpuSwapping = true;
+    app.loading.show(`Loading ${def.displayName}`);
+    const sprites = await app.loadCharacter(def.id, (done, total) => app.loading.setProgress(done, total));
+    if (token !== this.token || !this.session) return; // left Practice Ground meanwhile
+    this.cpuSwapping = false;
+
+    if (!sprites?.usable) {
+      app.loading.showError(`${def.displayName}'s sprite frames could not be loaded. Check your connection and that the files in assets/characters/${def.id}/ exist.`, {
+        nav: app.nav,
+        onRetry: () => {
+          app.resetCharacter(def.id);
+          this.selectCpu(def);
+        },
+        onBack: () => this.cpuRoster.focusSelected(),
+      });
+      return;
+    }
+    app.loading.hide();
+
+    this.session.setCPU(def, sprites);
+    this.syncMenu();
+    this.closeCpuRoster({ silent: true });
+    this.resume();
+  }
+
+  // Disable CPU: removes the CPU and everything aimed at it, closes the
+  // dialog and leaves practice frozen under the menu, focus on Enable CPU.
+  // The still stage is redrawn without it.
+  disableCpu() {
+    if (!this.cpuRosterOpen || this.cpuSwapping || !this.session?.cpu) return;
+    this.session.removeCPU();
+    this.syncMenu();
+    this.closeCpuRoster();
+    this.session.render();
   }
 }

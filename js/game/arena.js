@@ -1,8 +1,8 @@
 // Arena: the fixed-timestep simulation and Canvas 2D rendering shared by every
 // mode that puts fighters on a stage. Quick Battle (js/game/battle.js) adds an
 // opponent, phases and a round timer; Practice Ground (js/game/practice.js)
-// runs a single fighter with none of them. DOM concerns (HUD, menus,
-// overlays) live in each mode's screen.
+// runs Player 1 with an optional training-dummy CPU and none of them. DOM
+// concerns (HUD, menus, overlays) live in each mode's screen.
 
 import { CONFIG } from '../config.js';
 import { StageCollision, separate, resolveSolidOverlap } from './physics.js';
@@ -262,17 +262,29 @@ export class Arena {
     drawCenteredFrame(this.ctx, p.frame, sx, sy, this.pxPerArt, p.flip);
   }
 
+  // Name-tag font size, in device pixels.
+  get markerFont() {
+    return Math.max(10, Math.round(9.5 * this.view.scale));
+  }
+
+  // Where `f`'s name tag hangs, in device pixels: its centre x, the y just
+  // over the head where the tag's box ends and its arrow points down, and
+  // the y of the feet. Practice Ground floats its damage numbers from here.
+  markerAnchor(f) {
+    const [x, footY] = this.toScreen(f.renderX, f.renderY);
+    return [x, footY - (f.def.visual.height + 16) * this.view.scale, footY];
+  }
+
   drawMarkers() {
     const { ctx, view } = this;
     const s = view.scale;
-    const font = Math.max(10, Math.round(9.5 * s));
+    const font = this.markerFont;
     ctx.font = `700 ${font}px ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'bottom';
     for (const f of this.fighters) {
       const color = MARKER[f.slot];
-      const [x, footY] = this.toScreen(f.renderX, f.renderY);
-      const top = footY - (f.def.visual.height + 16) * s;
+      const [x, top, footY] = this.markerAnchor(f);
       const onScreen = x > -10 && x < view.pxW + 10;
       if (onScreen) {
         ctx.fillStyle = 'rgba(8,8,8,0.55)';
@@ -402,8 +414,8 @@ export class Arena {
       : p.combat.attack
         ? ` ${p.combat.attack.def.id} ${p.combat.phase}`
         : p.combat.defenseAction ? ` ${p.combat.defenseAction.def.animation} ${p.combat.defensePhase}` : '';
-    // The other fighter's state under its own label (the CPU's in Quick
-    // Battle); nothing when Player 1 is alone.
+    // The other fighter's state under its own label (the CPU's, in Quick
+    // Battle or practice); nothing when Player 1 is alone.
     const other = this.secondary;
     const rival = other ? `  ${other.label.toLowerCase()} ${other.state}${other.combat.immobilized ? ' (bound)' : ''}` : '';
     const lines = [
