@@ -1,1815 +1,2019 @@
 Work from the latest main branch of hiyroscript/alva.
 
-Implement three related changes:
+Implement a new attack mechanic for Character #0001:
 
-1. Fix #0001’s Mid-Air Dodge artwork facing the opposite direction from the fighter.
-2. Add #0001’s new Throw animation on the existing internal primary action.
-3. Add #0001’s animated shuriken projectile, including real projectile movement, collision, damage and rendering.
+While #0001 is already Charging, pressing Basic Attack 1 summons a temporary clone behind the opponent. The clone appears through the new clone-cloud animation, uses #0001’s existing character sprites to perform Basic Attack 1 from behind the opponent, then disappears through the same cloud animation played in reverse. Successfully summoning a clone costs Energy.
 
-Preserve the existing Charge, Defense/Dodge, BA1, BA2, Energy, physics, HUD, and training-CPU behavior.
+Preserve the existing:
 
-Do not redesign unrelated systems.
+* Charge startup / loop / voluntary release
+* ordinary ground and mid-air BA1
+* BA2
+* Throw + shuriken projectiles
+* Defense / Dodge
+* Energy HUD
+* movement and physics
+* controls
+* training CPU behavior
+* result logic
 
-1. Current relevant architecture
+Do not replace or rewrite systems that already work.
+
+1. Current relevant game state
 
 The current game already has:
 
-* generic primary, special, action1, action2 combat inputs
-* primary on keyboard J
-* primary on gamepad X / Square
-* a reserved Primary touch button in the upper-right action cluster
-* BA1 on action1
-* BA2 on action2
-* Defense on defense
-* #0001 ground Dodge and Mid-Air Dodge
-* a generic attack definition/combat system
-* no projectile subsystem
-* fighter rendering through Battle.drawFighter()
-* one global character sourceFacing
+Charge
+BA1 / Mid-Air BA1
+BA2 / Mid-Air BA2
+Throw + shuriken projectile
+Defense / Dodge
+Energy
 
-Character #0001 currently defines:
+#0001 currently has:
 
-sourceFacing: 1
+maxEnergy = 100
+energy = 100
 
-meaning its normal source art is assumed to face right.
+Energy starts full and resets to full on restart/rematch.
 
-Battle.drawFighter() currently determines mirroring approximately as:
+At the moment, nothing spends Energy.
 
-const flip = f.facing !== (f.def.sourceFacing || 1);
+This task makes the clone attack the first mechanic that spends it.
 
-That global assumption is the cause of the Mid-Air Dodge facing bug.
+2. Trigger: Charged BA1
 
-2. Fix Mid-Air Dodge source orientation
+The clone attack uses the existing controls.
 
-The Mid-Air Dodge artwork is drawn facing the opposite direction from #0001’s normal source art.
+Do not add a new button or key.
 
-Do not fix this by:
+The input combination is:
 
-* changing fighter.facing
-* negating movement
-* swapping left/right controls
-* globally setting sourceFacing: -1
-* horizontally modifying the PNG files
-* special-casing midairDodge by name inside Battle.drawFighter()
+already Charging
++
+Basic Attack 1 pressed
 
-The fighter’s logical facing is already correct.
+BA1 remains:
 
-This is an art-source orientation problem.
+Keyboard: U
+Gamepad: B / Circle
+Touch: BA1
+internal action: action1
 
-3. Add per-animation sourceFacing
+Charge remains:
 
-Allow an animation to override the character’s default source orientation.
+Keyboard: S / ↓
+Gamepad: D-pad down / left-stick down
+Touch: C
 
-Extend animation metadata so an animation may contain:
+3. The player must already be Charging
 
-sourceFacing: -1
+This is an intentional sequence:
 
-If omitted, continue inheriting:
+Charge
+then
+BA1
 
-character.sourceFacing
+Do not activate the clone from an idle simultaneous press such as:
+
+ChargePressed + BA1Pressed
+
+on the same first simulation step.
+
+The fighter must have actually entered the Charge state on a previous step.
+
+Conceptually:
+
+wasCharging === true
+input.charge === true
+input.action1Pressed === true
+
+is eligible for Clone Attack.
+
+This preserves the meaning of:
+
+when charging, then use BA1
+
+4. Releasing Charge while pressing BA1 is not Clone Attack
+
+If #0001 was charging but the player releases Charge on the same step BA1 is pressed:
+
+input.charge === false
+action1Pressed === true
+
+keep the existing behavior:
+
+normal BA1 begins immediately
+
+Do not summon the clone.
+
+Do not play chargeRelease before that normal BA1.
+
+This preserves the current Charge-interruption rule.
+
+5. Ordinary BA1 must remain unchanged
+
+Outside of the valid Charged BA1 condition:
+
+U / B / BA1
+
+continues to perform the existing BA1.
+
+Ground:
+
+0001_1ba1
+→ 0001_1ba2
+→ 0001_1ba3
+→ 0001_1ba4
+
+Air:
+
+0001_midair1ba1
+→ ...
+→ 0001_midair1ba5
+
+Do not alter:
+
+* BA1 damage
+* BA1 hitbox
+* BA1 startup
+* BA1 recovery
+* Mid-Air BA1
+* BA1 cooldown
+* BA1 input
+
+The clone attack is an additional Charged BA1 behavior, not a replacement for BA1.
+
+6. Energy cost
+
+Add a data-driven Energy cost for this move.
+
+Use:
+
+Clone Attack cost = 25 Energy
+
+as the initial value.
 
 For #0001:
 
-midairDodge: {
-  frames: frames(BASE_0001, 'midairdodge', 3),
-  fps: DODGE_FPS,
-  loop: false,
-  heightRatio: 0.96,
-  sourceFacing: -1,
+max Energy = 100
+
+so a full meter supports four successful clone summons if no other Energy mechanics exist.
+
+Store this in character/move data rather than scattering:
+
+25
+
+through Fighter/Battle code.
+
+For example:
+
+cloneAttack: {
+  energyCost: 25,
+  ...
 }
 
-Keep #0001’s character-level value:
+7. Spend Energy exactly once
 
-sourceFacing: 1
+On a successful Charged BA1 clone activation:
 
-All other existing animations should therefore continue behaving exactly as they do now.
+100 → 75
+75 → 50
+50 → 25
+25 → 0
 
-4. Preserve the metadata through SpriteSet
+Deduct Energy exactly once when the summon command is successfully accepted.
 
-SpriteSet.build() currently keeps fields such as:
+Do not deduct Energy:
 
-fps
-loop
-heightRatio
-minSpeedScale
+* once per cloud frame
+* once when the clone attacks
+* again when it disappears
+* when the clone hits
+* when the clone misses
 
-Add the animation’s optional source orientation:
+One clone summon = one Energy payment.
 
-sourceFacing: anim.sourceFacing ?? def.sourceFacing ?? 1
+8. Add Energy helpers
 
-or equivalent.
+Instead of arbitrary mutation throughout gameplay, give CombatState small reusable Energy helpers.
 
-The normalized animation stored in:
+For example:
 
-set.animations[key]
+canSpendEnergy(amount)
+spendEnergy(amount)
 
-must know the orientation of its own original artwork.
+spendEnergy() should:
 
-Do not put orientation on every individual frame unless necessary; it is animation-level metadata.
-
-5. Use current animation orientation when rendering
-
-Change Battle.drawFighter() from the global-only rule to the currently playing animation.
+* return false when insufficient
+* never make Energy negative
+* return true and deduct exactly once when sufficient
 
 Conceptually:
 
-const sourceFacing =
-  f.animator.anim?.sourceFacing ??
-  f.def.sourceFacing ??
-  1;
-const flip = f.facing !== sourceFacing;
+spendEnergy(25)
 
-Then call drawFrame() normally.
+from 25 must produce exactly:
 
-Required result:
+0
 
-Normal right-facing source animation
+not a negative value.
 
-fighter faces right → no flip
-fighter faces left  → flip
+9. Insufficient Energy fallback
 
-Mid-Air Dodge, whose source art faces left
+If #0001 is Charging and BA1 is pressed but has less than the required Energy:
 
-fighter faces right → flip
-fighter faces left  → no flip
+energy < 25
 
-Do not change the fighter’s actual facing property to achieve this.
+do not summon a clone.
 
-6. Do not alter Dodge gameplay
+Do not consume Energy.
 
-This fix is visual only.
+Instead, preserve BA1 usability and fall back to the existing normal grounded BA1.
 
-Do not change:
+Example:
 
-* Dodge duration
-* Dodge invulnerability
-* ground Dodge
-* Defense input
-* facing lock during Defense
-* gravity
-* momentum
-* collision
-* landing-through-midair-Dodge behavior
+Energy = 10
+Charging + BA1
+→ normal BA1
+→ Energy remains 10
 
-The current Mid-Air Dodge invulnerability frames remain as implemented.
+Do not make BA1 become a dead button merely because the resource is low.
 
-The fighter’s world-space hurtboxes must still use its logical facing, not the source-art orientation.
+10. Existing Energy behavior otherwise remains unchanged
 
-sourceFacing controls sprite rendering only.
+Do not introduce:
 
-7. New uploaded Throw artwork
+* passive Energy regeneration
+* Charge generating Energy
+* hits generating Energy
+* Dodge generating Energy
+* Throw consuming Energy
+* BA1 consuming Energy
+* BA2 consuming Energy
 
-The latest repository upload contains:
+For this task, the only Energy expenditure is:
 
-0001_throw1.png
-0001_throw2.png
-0001_throw3.png
+successful Charged BA1 Clone Attack
 
-These are #0001’s Throw animation frames.
+Restart/rematch still restores Energy to full.
 
-Move them from the repository root to:
+Winner logic remains Health-only.
 
-./assets/characters/0001/
+11. New clone-cloud assets
 
-Final paths:
+The repository root currently contains the corrected complete set:
 
-./assets/characters/0001/0001_throw1.png
-./assets/characters/0001/0001_throw2.png
-./assets/characters/0001/0001_throw3.png
+0001_cloneav1.png
+0001_cloneav2.png
+0001_cloneav3.png
+0001_cloneav4.png
+0001_cloneav5.png
+0001_cloneav6.png
+0001_cloneav7.png
+0001_cloneav8.png
+0001_cloneav9.png
+0001_cloneav10.png
 
-Remove the root copies.
-
-Preserve the PNG bytes unchanged.
-
-Do not redraw, rotate, recolour, replace or AI-generate the artwork.
-
-8. New uploaded shuriken artwork
-
-The same upload contains:
-
-0001_shuriken1.png
-0001_shuriken2.png
-0001_shuriken3.png
-
-Move these into:
+Move all ten files into:
 
 ./assets/characters/0001/
 
 Final paths:
 
-./assets/characters/0001/0001_shuriken1.png
-./assets/characters/0001/0001_shuriken2.png
-./assets/characters/0001/0001_shuriken3.png
+./assets/characters/0001/0001_cloneav1.png
+./assets/characters/0001/0001_cloneav2.png
+./assets/characters/0001/0001_cloneav3.png
+./assets/characters/0001/0001_cloneav4.png
+./assets/characters/0001/0001_cloneav5.png
+./assets/characters/0001/0001_cloneav6.png
+./assets/characters/0001/0001_cloneav7.png
+./assets/characters/0001/0001_cloneav8.png
+./assets/characters/0001/0001_cloneav9.png
+./assets/characters/0001/0001_cloneav10.png
 
 Remove the root copies.
 
-These three frames are the animation of the projectile itself, not fighter poses.
+Preserve the bytes exactly.
 
-Do not treat them as three separate shurikens.
+Do not redraw, recolour, resize, rotate, replace or AI-generate them.
 
-9. Throw is the existing Primary action
+12. Do not reintroduce the typo asset
 
-Use the existing internal action:
+An earlier upload temporarily used:
 
-primary
+0001_ cloneav8.png
 
-for Throw.
+with an accidental space.
 
-Do not add another gameplay button.
+That incorrect file was already deleted and replaced by:
 
-The mapping becomes conceptually:
+0001_cloneav8.png
 
-actions: {
-  primary: 'throw',
-  special: null,
-  action1: { ground: 'ba1', air: 'midairBa1' },
-  action2: { ground: 'ba2', air: 'midairBa2' },
-}
+Do not recreate the typo filename.
 
-The internal action may remain named primary.
+Only use:
 
-The player-facing name is now:
+0001_cloneav8.png
 
-Throw
+13. Exact cloud appearance order
 
-This avoids unnecessarily breaking the existing generic combat-action architecture while fulfilling the requested Primary → Throw control rename.
+The clone’s appearance cloud must play:
 
-10. Existing physical controls remain unchanged
+cloneav1
+→ cloneav2
+→ cloneav3
+→ cloneav4
+→ cloneav5
+→ cloneav6
+→ cloneav7
+→ cloneav8
+→ cloneav9
+→ cloneav10
 
-Throw uses the physical controls that currently belong to Primary.
+exactly once.
 
-Keyboard
+Do not loop the appearance sequence.
 
-Keep:
+14. Exact cloud disappearance order
 
-J
+When the clone vanishes, reuse those same ten real frames in reverse:
 
-Gamepad
+cloneav10
+→ cloneav9
+→ cloneav8
+→ cloneav7
+→ cloneav6
+→ cloneav5
+→ cloneav4
+→ cloneav3
+→ cloneav2
+→ cloneav1
 
-Keep:
+Do not create:
 
-X / Square
+clonevanish1...
 
-Touch
+assets.
 
-Keep the current Primary button’s physical position.
+Do not duplicate/reverse the PNG files on disk.
 
-Do not move the button.
+Reverse the frame list/runtime playback in code.
 
-11. Rename player-facing Primary to Throw
+15. Cloud animation rate
 
-Change:
+Add a dedicated constant such as:
 
-ACTION_LABELS.primary = 'Primary'
+const CLONE_CLOUD_FPS = 20;
 
-to:
+Use it for both:
 
-ACTION_LABELS.primary = 'Throw'
+appear
+vanish
 
-Help should therefore display:
+so appearance and disappearance have symmetrical timing.
 
-Throw | J
+At 20 FPS:
 
-rather than:
+10 frames = 0.5 seconds
 
-Primary | J
+per cloud pass.
 
-Do not refer to the playable action as Primary in user-facing controls after this change.
+Inspect the actual animation in the browser before finalizing. If the provided sprites clearly need a slightly different playback rate, tune the one shared constant, not individual frames.
 
-Internal code may still use primary.
+The required properties are:
 
-12. Change the touch Primary icon to “T”
+* appearance order is 1→10
+* disappearance order is 10→1
+* same frame timing in both directions
 
-The current Primary touch control uses ICONS.primary.
+16. Cloud art is an effect, not a fighter pose
 
-Replace its visible icon with the letter:
+Do not put clone-cloud frames into the normal:
 
-T
+animations
 
-exactly.
+collection and normalize them to fighter height.
 
-The touch definition should become equivalent to:
+The clouds are effect artwork.
 
-{
-  action: 'primary',
-  label: 'Throw',
-  text: 'T',
-  pos: 'throw',
-}
-
-Important:
-
-* visible text = exactly T
-* accessible label = Throw
-* data-action remains primary
-* no reserved/pending state
-* same physical button location as the old Primary button
-
-Do not show:
-
-Primary
-THROW
-SH
-
-inside the button.
-
-Only:
-
-T
-
-13. Rename visual Primary selectors to Throw
-
-Where selectors describe this visible button rather than the internal action, rename them.
-
-For example:
-
-tc-primary → tc-throw
-md-primary → md-throw
-
-Keep the exact same coordinates and size.
-
-The existing Primary button is the larger upper-right action button. Throw must stay there.
-
-If ICONS.primary becomes completely unused after this change, remove it.
-
-14. Primary is no longer pending
-
-The current pending set contains:
-
-new Set(['primary', 'special'])
-
-Change it so only Special remains reserved:
-
-new Set(['special'])
-
-Throw must use the normal solid enabled button styling.
-
-Special stays unchanged and reserved.
-
-15. Register the fighter Throw animation
-
-Add a real fighter animation:
-
-const THROW_FPS = 12;
-
-and:
-
-throw: {
-  frames: frames(BASE_0001, 'throw', 3),
-  fps: THROW_FPS,
-  loop: false,
-  heightRatio: ...,
-}
-
-Inspect the real sprites in-browser and choose the normalization ratio that keeps #0001 stable relative to Idle, BA1, BA2 and Dodge.
-
-Do not manually scale based on PNG dimensions.
-
-Use the existing normalization pipeline.
-
-16. Check Throw source orientation
-
-While testing the uploaded Throw sprites, determine which way the source artwork actually faces.
-
-If it follows #0001’s normal artwork, inherit:
-
-sourceFacing: 1
-
-If it is drawn in the opposite orientation, use the new per-animation override.
-
-Do not assume blindly.
-
-This is precisely why this task adds per-animation source-facing metadata.
-
-17. Throw is grounded because there is no Mid-Air Throw art
-
-Only three normal Throw frames were uploaded.
-
-There are no:
-
-0001_midairthrow*.png
-
-frames.
-
-Therefore #0001’s Throw is currently ground-only.
-
-Pressing Throw while airborne should not:
-
-* show ground Throw artwork in the air
-* throw an invisible shuriken
-* fall back to Idle while spawning a projectile
-
-Until real Mid-Air Throw artwork exists, airborne Primary should do nothing.
-
-18. Throw animation timing
-
-The Throw clip has three frames.
-
-Use whole-frame combat timing.
-
-Start with:
-
-frame 1 = startup
-frame 2 = projectile release
-frame 3 = recovery
-
-At 12 FPS:
-
-startup: 1 / THROW_FPS,
-active: 1 / THROW_FPS,
-recovery: 1 / THROW_FPS,
-
-However, visually inspect the actual three Throw frames.
-
-The shuriken must spawn on the frame where #0001 visibly releases it.
-
-If the real release is clearly on frame 3 rather than frame 2, align spawning to that real artwork.
-
-Do not spawn it arbitrarily on button press before the throwing motion appears.
-
-19. Throw should play once
-
-One Primary press:
-
-throw1
-→ throw2
-→ throw3
-→ normal state
-
-Do not loop Throw while J is held.
-
-The existing press-edge combat action behavior already supports this.
-
-20. Lock movement and facing during Throw
-
-Treat Throw consistently with #0001’s other attacks.
-
-During the Throw animation:
-
-* lock new horizontal movement
-* lock facing
-* let existing physics behave normally
-* do not rotate toward an opponent midway through the Throw
-
-The shuriken direction must be determined from #0001’s facing when the projectile is spawned.
-
-If #0001 turns afterward, the already-thrown projectile does not reverse.
-
-21. Do not fake the shuriken with a huge fighter hitbox
-
-Alva currently only has fighter-attached melee hitboxes.
-
-Do not implement Throw as something like:
-
-hitbox: {
-  x: 10,
-  y: -60,
-  w: 500,
-  h: 10,
-}
-
-That would not be a projectile.
-
-The shuriken must exist as a separate battle entity after leaving #0001.
-
-It must:
-
-* have its own position
-* have its own velocity
-* have its own animation
-* continue existing after the release frame
-* collide independently
-* disappear independently
-
-22. Add a small projectile subsystem
-
-Add a focused projectile implementation under js/game/.
-
-For example:
-
-js/game/projectile.js
-
-The exact class/module organization is flexible.
-
-A projectile should track at minimum:
-
-owner
-x
-y
-previous x/y if interpolation is used
-direction
-speed
-animation
-animation time/frame
-hitbox
-damage/combat data
-lifetime
-active/alive state
-
-Do not implement an over-engineered general physics engine.
-
-Build only the clean data-driven foundation needed for animated fighting-game projectiles.
-
-23. Add projectile data to the character definition
-
-Store shuriken behavior in Character #0001 data rather than hard-coding numbers in Battle.
-
-For example:
-
-projectileAnimations: {
-  shuriken: {
-    frames: frames(BASE_0001, 'shuriken', 3),
-    fps: SHURIKEN_FPS,
-    loop: true,
-  },
-},
-projectiles: {
-  shuriken: {
-    animation: 'shuriken',
-    speed: ...,
-    lifetime: ...,
-    hitbox: ...,
-    damage: ...,
-    knockback: ...,
-    hitstun: ...,
-    blockstun: ...,
-    hitstop: ...,
-  },
-},
-
-Names may vary, but keep projectile art/behavior data-driven.
-
-24. Do not register shuriken frames as fighter animations
-
-This is important.
-
-Do not simply put:
-
-shuriken: {
-  frames: ...
-}
-
-inside the normal fighter animations object and treat it like a fighter pose.
-
-The current SpriteSet normalizes fighter animations relative to the fighter’s reference height.
-
-The shuriken is a tiny independent object and must not be normalized to fighter height.
-
-Keep:
+The current SpriteSet already separates:
 
 fighter animations
-
-and:
-
 projectile animations
 
-logically separate.
+Extend that idea with something like:
 
-25. Preload shuriken frames with the character
+effectAnimations
 
-The existing application preloads:
+For example:
+
+effectAnimations: {
+  cloneCloud: {
+    frames: frames(BASE_0001, 'cloneav', 10),
+    fps: CLONE_CLOUD_FPS,
+    loop: false,
+    sourceFacing: 0,
+  },
+}
+
+sourceFacing: 0 means the cloud is direction-neutral and should not flip merely because the clone faces left.
+
+17. Normalize effects at actual art scale
+
+Process clone-cloud artwork similarly to projectile art:
+
+* detect its pixel grid
+* preserve its native art size
+* use #0001’s existing world-per-art-pixel scale
+* do not fit it to fighter height
+
+Expose something conceptually like:
+
+sprites.effect('cloneCloud')
+
+Do not let the cloud become a full fighter-sized image merely because it belongs to #0001.
+
+18. Preload cloud frames with #0001
+
+Extend:
 
 characterFramePaths(def)
 
-Extend that path collector so it includes:
+so it includes:
 
-* normal fighter animation frames
-* projectile animation frames
+fighter animations
+projectile animations
+effect animations
 
-That means loading #0001 still preloads everything needed for #0001 before battle begins.
+All ten clone-cloud files must be loaded before battle.
 
-Do not create a network load the first time the player presses Throw.
+Do not load the cloud files only after BA1 is pressed.
 
-26. Normalize projectile pixel art separately
+19. The clone is not another Fighter
 
-Reuse as much of normalizeFrame() as practical, but projectiles need different anchoring/scaling semantics.
+Do not instantiate a normal Fighter for the clone.
 
-Normalize the shuriken frames:
+A normal Fighter brings unwanted systems:
 
-* detect their pixel-art grid
-* preserve their actual art size
-* use a center anchor
-* use the same character/world art scale
-* do not scale them up to fighter height
+* Health
+* Energy
+* player controls
+* CPU controller
+* pushbox
+* camera tracking
+* stage collision
+* HUD
+* result participation
+* facing AI
+* jump/coyote logic
 
-A good architecture is for SpriteSet to expose a separate collection such as:
+The clone is a temporary summon/attack entity.
 
-set.projectiles.shuriken
+Add a dedicated implementation such as:
 
-whose frames have:
+js/game/clone.js
 
-artW
-artH
-center anchor
-fps
-loop
+or a more general:
 
-The fighter worldPerArt can be reused after normalization so one projectile art pixel uses the same world scale as the character artwork.
+js/game/summon.js
 
-27. Projectile rendering must be centered
+if written cleanly.
 
-drawFrame() currently anchors fighter sprites at their feet/bottom-center.
+20. Suggested clone entity state
 
-That is not suitable for an airborne shuriken.
+A clone entity should own only what it actually needs.
 
-Add or reuse a drawing helper that renders a normalized frame centered on:
+Conceptually:
 
-projectile.x
-projectile.y
-
-For example:
-
-drawCenteredFrame(...)
-
-or make the renderer accept explicit anchor metadata.
-
-Do not treat the projectile’s location as its feet.
-
-Keep:
-
-ctx.imageSmoothingEnabled = false
-
-while rendering it.
-
-28. Shuriken animation
-
-The three frames:
-
-shuriken1
-shuriken2
-shuriken3
-
-form the shuriken’s in-flight animation.
-
-They should loop while the projectile exists:
-
-1 → 2 → 3 → 1 → 2 → 3 → ...
-
-Use a dedicated constant such as:
-
-const SHURIKEN_FPS = 18;
-
-as a starting point.
-
-A range around 15–18 FPS is appropriate for a visible spinning projectile, but inspect the artwork and browser playback before finalizing.
-
-The important requirement is:
-
-* all three real frames animate
-* they loop during flight
-* they do not determine projectile movement speed
-
-29. Projectile travel direction
-
-At spawn time:
-
-direction = fighter.facing;
-
-Then:
-
-projectile.vx = projectile.speed * direction;
-
-A projectile thrown while facing right travels right.
-
-A projectile thrown while facing left travels left.
-
-Do not use the owner’s later facing every frame.
-
-The direction is fixed when thrown.
-
-30. Shuriken visual mirroring
-
-Inspect the shuriken frames.
-
-If the three spinning sprites are visually direction-neutral, they do not need horizontal mirroring.
-
-If they contain an asymmetric directional trail or orientation, support projectile-level sourceFacing similarly to fighter animations.
-
-Movement direction itself must always be correct regardless of whether the artwork is mirrored.
-
-31. Spawn the shuriken from the throwing hand
-
-Define a projectile spawn offset relative to #0001’s bottom-center origin.
-
-For example, character data can store:
-
-spawnOffset: {
-  x: ...,
-  y: ...,
+{
+  owner,
+  target,
+  x,
+  y,
+  facing,
+  phase,       // appear | attack | vanish
+  time,
+  animator,    // uses owner's actual #0001 SpriteSet for BA1
+  cloudAnim,
+  attackDef,
+  hasHit,
+  hitstop,
+  alive,
 }
 
-The x component mirrors with facing.
+Do not give it:
 
-Determine the final numbers by displaying the Throw animation and placing the shuriken at the visible throwing/release hand.
+health
+energy
+controller
+pushbox
+jump buffer
+coyote time
 
-Do not simply spawn at:
+21. Use the same #0001 character sprites
 
-fighter centre
+The clone is visually another #0001.
+
+Do not create special clone-body sprites.
+
+Reuse the owner’s existing normalized #0001 fighter animation.
+
+For this move, the clone attacks with the existing:
+
+ba1
+
+clip:
+
+0001_1ba1
+→ 0001_1ba2
+→ 0001_1ba3
+→ 0001_1ba4
+
+Use the same source-facing metadata and rendering rules already used for #0001.
+
+Do not tint the clone.
+
+Do not make it translucent.
+
+Do not generate a fake silhouette.
+
+The visible clone body should use the same real #0001 sprite artwork.
+
+22. Clone lifecycle
+
+A successful summon has exactly three phases:
+
+APPEAR
+→ ATTACK
+→ VANISH
+→ REMOVE
+
+No idle AI phase is needed.
+
+23. APPEAR phase
+
+At the chosen position behind the opponent:
+
+cloneav1
+→ ...
+→ cloneav10
+
+plays once.
+
+During APPEAR:
+
+* no clone attack hitbox
+* no damage
+* no pushbox
+* clone cannot be hit
+* clone does not move
+* clone does not track the target
+
+The effect is purely the summoning animation.
+
+24. Transition from cloud to clone
+
+When cloneav10 completes:
+
+* the cloud appearance phase ends
+* the #0001 clone becomes fully visible
+* the clone begins BA1 from frame 1 immediately
+
+A visually smooth implementation may draw the clone beneath the final cloud frame on the last appearance instant if that looks correct.
+
+Do not invent extra transition sprites.
+
+25. ATTACK phase
+
+The clone performs exactly one ordinary grounded BA1 using #0001’s existing BA1 animation and combat values.
+
+Reuse the current BA1 definition:
+
+startup: frame 1
+active: frame 2
+recovery: frames 3–4
+damage: 6
+hitstun: 0.22
+blockstun: 0.14
+hitstop: 0.06
+horizontal knockback: 180
+
+Do not make a separate stronger clone BA1 unless a later design change requests it.
+
+26. Reuse BA1 hitbox data
+
+Do not manually copy a second hard-coded hitbox if avoidable.
+
+The clone should use the existing:
+
+attacks.ba1
+
+definition as its attack data.
+
+That keeps:
+
+* artwork timing
+* active frame
+* damage
+* knockback
+* blockstun
+* hitstun
+
+in sync with ordinary BA1.
+
+27. Clone attack is detached from its owner
+
+The clone’s hit belongs to #0001 for damage/event attribution, but it occurs at the clone’s own position and facing.
+
+Do not resolve its hitbox from:
+
+owner.body.x
+owner.body.y
+owner.facing
+
+Use:
+
+clone.x
+clone.y
+clone.facing
+
+The owner can be somewhere completely different by the time the punch connects.
+
+28. Clone hit must not freeze the real #0001
+
+Existing ordinary melee hitstop freezes the attacking Fighter.
+
+A clone is a detached attacker.
+
+When its BA1 connects:
+
+* target receives normal BA1 hitstop
+* clone itself may visually pause for BA1’s hitstop
+* real #0001 must continue normally
+
+Do not apply:
+
+owner.combat.hitstop
+
+because the clone hit something somewhere else.
+
+Generalize CombatSystem.applyHit() if needed with an option such as:
+
+detached: true
 
 or:
 
-fighter feet
+freezeAttacker: false
 
-if that visibly disconnects it from the Throw artwork.
+Projectiles already establish the same principle: remote attacks should not freeze their owner.
 
-32. Spawn exactly once
+29. Give the clone local hitstop
 
-The projectile release frame lasts multiple fixed 60 Hz simulation steps.
+For visual impact, if the clone’s BA1 hits or is blocked, pause the clone’s own attack clock for BA1’s normal:
 
-Do not spawn one shuriken every simulation step during that frame.
+0.06 s
 
-The current attack runtime should track something equivalent to:
+while the owner remains unaffected.
 
-projectileSpawned: false
+This keeps the clone punch visually consistent with normal BA1 without incorrectly freezing #0001.
 
-or a generic one-shot attack event.
+30. One clone attack can hit once
 
-When elapsed attack time crosses the configured release point:
+The clone BA1 should use the same one-hit rule as ordinary attacks.
 
-spawn once
-mark spawned
+Track:
 
-One Throw press must produce exactly one shuriken.
+hasHit
 
-33. Extend attack definitions cleanly
+or equivalent.
 
-The Throw can remain an attack in the existing attack-state architecture.
+Once the clone BA1 successfully hits or is blocked:
 
-Give the attack a projectile event rather than a melee hitbox.
+no second hit from that same clone punch
 
-Conceptually:
+Recovery still finishes normally.
 
-throw: {
-  animation: 'throw',
-  startup: 1 / THROW_FPS,
-  active: 1 / THROW_FPS,
-  recovery: 1 / THROW_FPS,
-  hitbox: null,
-  projectile: {
-    id: 'shuriken',
-    spawnAt: 1 / THROW_FPS,
-    offset: { x: ..., y: ... },
-  },
-  cooldown: ...,
-  groundOnly: true,
-  lockMovement: true,
-}
+31. VANISH phase
 
-The exact schema may differ.
+As soon as the BA1 clip finishes:
 
-Do not process a null hitbox as a melee strike.
+* remove the clone body sprite
+* start the cloud effect at cloneav10
+* play backward through cloneav1
 
-34. Melee CombatSystem must tolerate projectile attacks
+Exact order:
 
-CombatSystem.update() currently assumes active fighter attacks have a melee hitbox.
+10
+9
+8
+7
+6
+5
+4
+3
+2
+1
 
-Extend it safely so a projectile-only move does not generate:
+After cloneav1 finishes:
 
-* invalid rectangles
-* NaN coordinates
-* an invisible melee hit
-* exceptions
+clone entity is removed
 
-Conceptually:
+32. No attack during vanish
 
-if (!atk.def.hitbox) continue;
+During VANISH:
 
-for the melee hitbox path.
-
-The Throw animation itself should deal no contact damage unless explicit real melee artwork later supports that.
-
-35. Suggested initial shuriken combat tuning
-
-Use conservative projectile values so Throw is useful but does not replace BA1/BA2.
-
-A reasonable starting point is approximately:
-
-damage: 4,
-speed: 700,
-lifetime: 1.5,
-knockback: { x: 140, y: 0 },
-hitstun: 0.16,
-blockstun: 0.10,
-hitstop: 0.04,
-
-and a small hitbox fit closely around the visible shuriken.
-
-Treat these as starting values.
-
-The required behavior matters more than these exact numbers.
-
-Do not make the shuriken:
-
-* launch vertically
-* explode
-* multihit
-* home toward the enemy
-* bounce
-* pierce through a successful hit
-* stun for longer than BA1/BA2
-* deal more damage than BA2 without explicit design direction
-
-36. Throw cooldown
-
-Give Throw a modest cooldown to prevent extremely dense projectile spam.
-
-Start around:
-
-0.2–0.3 seconds
-
-after the Throw attack finishes.
-
-Use the existing combat cooldown system where practical.
-
-Do not add an Energy cost; none was requested.
-
-37. Projectile collision with fighters
-
-Each projectile should test its hitbox against opponent hurtboxes.
-
-Skip:
-
-projectile.owner
-
-so the thrower cannot hit themself.
-
-On a successful hit:
-
-* apply damage once
-* apply normal hitstun
-* apply configured knockback
-* apply hitstop
-* destroy the shuriken
-
-Do not repeatedly damage the same fighter over multiple simulation ticks.
-
-38. Reuse CombatSystem hit resolution
-
-Avoid creating a second unrelated damage implementation.
-
-Refactor/reuse the current CombatSystem.applyHit() logic so both:
-
-* melee attacks
-* projectiles
-
-use consistent:
-
-* health reduction
-* hitstun
-* blockstun
-* hitstop
-* knockback
-* combat events
-
-A projectile hit should still identify #0001 as the attacker/owner.
-
-39. Preserve projectile direction in hit resolution
-
-Do not use the owner’s current facing when resolving projectile knockback or future Block checks.
-
-The shuriken’s direction was fixed when spawned.
-
-Allow hit resolution to accept the attack direction separately.
-
-Conceptually:
-
-applyHit(attacker, target, def, {
-  facing: projectile.direction,
-});
-
-Melee can continue defaulting to:
-
-attacker.facing
-
-This prevents a shuriken thrown right from suddenly knocking left because #0001 turned around before it connected.
-
-40. Dodge must work against shurikens
-
-The current Dodge architecture exposes:
-
-target.combat.invulnerable
-
-A shuriken must respect that.
-
-If its hitbox overlaps #0001 during Dodge invulnerability:
-
+* no hitbox
 * no damage
-* no hitstun
-* no hitstop
-* no knockback
-* no block event
+* no collision
+* no clone body
+* no targeting
 
-The shuriken should continue travelling rather than being counted as a successful hit.
+It is visual cleanup only.
 
-If it is still overlapping after invulnerability ends, normal collision may then connect.
+33. Spawn behind the opponent
 
-This mirrors the current melee Dodge rule.
+The clone must appear on the opponent’s back side.
 
-41. Future Block defense must work too
+Use the opponent’s facing at activation.
 
-The generic Defense architecture deliberately supports future:
+Conceptually:
 
-defense.type = 'block'
+const behind = -target.facing;
+clone.x = target.body.x + behind * CLONE_BEHIND_DISTANCE;
+clone.facing = target.facing;
 
-Projectiles should reuse normal Block resolution.
+Why:
 
-If a future Block-type fighter is guarding toward an incoming shuriken:
+If the opponent faces left:
 
-* block/chip rules work
-* blockstun works
-* reduced knockback works
-* projectile disappears after the successful blocked impact
+their back is to the right
+clone appears right of them
+clone faces left toward them
 
-Do not special-case #0001’s Dodge in a way that breaks future Block characters.
+If the opponent faces right:
 
-42. Projectile lifetime and cleanup
+their back is to the left
+clone appears left of them
+clone faces right toward them
 
-A shuriken must eventually disappear even if it misses.
+This is more precise than merely using the owner’s side.
 
-Despawn it when:
+34. Suggested behind distance
 
-* it hits a fighter
-* its lifetime expires
-* it travels outside the stage bounds with a small margin
-* it hits genuinely solid stage geometry if projectile/solid collision is implemented
+Use a data-driven initial value around:
 
-Do not let missed projectiles remain forever.
+48 world units
 
-One-way platforms do not need to stop shurikens unless the existing stage collision design makes that clearly desirable.
+because #0001’s current body width and BA1 hitbox allow the clone to stand visually behind the target while still letting the active BA1 punch overlap naturally.
 
-Do not invent ricochets.
+Store it in clone move data:
 
-43. Battle owns active projectiles
+behindDistance: 48
 
-Battle is the natural owner of live projectile entities.
+Inspect it with the debug overlay and adjust slightly only if necessary to make the BA1 hitbox visually match the punch.
 
-Add something equivalent to:
+Do not compensate by enlarging the BA1 hitbox.
 
-this.projectiles = [];
+35. Snapshot the spawn position
 
-Reset it in:
+Determine the clone’s:
 
-restart()
-
-and clear it in:
-
-destroy()
-
-The fixed-step loop should:
-
-1. update fighters
-2. create projectile events exactly once
-3. update projectile positions/animations
-4. resolve projectile hits
-5. remove dead projectiles
-
-Keep ordering deterministic.
-
-44. Render projectiles in battle
-
-Draw live shurikens with the battle Canvas.
-
-Use normalized, pixelated frames.
-
-A sensible layer is:
-
-stage terrain
-shadows
-fighters
-projectiles
-foreground
-HUD remains DOM
-
-or another nearby layer that keeps the shuriken clearly visible.
-
-Do not render projectiles through DOM elements.
-
-45. Projectile interpolation
-
-Alva interpolates fighter positions between fixed steps.
-
-Projectile motion should also look smooth at display rates above/below 60 Hz.
-
-Prefer storing:
-
-prevX
-prevY
 x
 y
-renderX
-renderY
+facing
 
-and interpolating with the same alpha.
+once when the summon begins.
 
-Do not make projectiles visibly jitter while fighters interpolate smoothly.
+Do not continuously teleport the cloud behind the opponent.
 
-46. Debug overlay
+If the opponent moves during the cloud animation:
 
-Extend the Backquote debug overlay.
+the clone stays where it was summoned
 
-While a shuriken exists, draw:
+and its BA1 can miss.
 
-* its collision hitbox
-* optionally a small label such as shuriken
+This preserves counterplay and avoids a homing teleport.
 
-This makes projectile collision tuning testable.
+36. Vertical placement
 
-Use a visually distinct debug outline from fighter hurtboxes and melee hitboxes.
+Snapshot the opponent’s current foot/origin Y:
 
-Do not render debug graphics in normal gameplay.
+clone.y = target.body.y;
 
-47. Missing Throw artwork safety
+The clone is a magical temporary attack entity rather than a physics-controlled Fighter.
 
-Existing attacks refuse to start if their required fighter animation is missing.
+Do not run gravity or platform collision on it.
 
-Keep that principle.
+This guarantees the clone genuinely appears behind the target even when the target is on a platform or temporarily airborne.
 
-If:
+Do not add an unrequested Mid-Air Clone attack.
 
-throw
+The clone still uses the real grounded BA1 artwork.
 
-fighter frames are unavailable:
+37. Clamp horizontal spawn to the stage
 
-* refuse Throw
-* spawn nothing
+Do not spawn the visual completely outside the stage.
 
-Do not fake Throw using Idle.
+Clamp the behind position to the map’s playable horizontal bounds with a small art margin.
 
-48. Missing shuriken artwork safety
+Do not add physics or push it around solids.
 
-Do not allow an invisible damaging projectile.
+The clone is an ephemeral summon.
 
-Before starting Throw—or at latest before spawning—verify that the actual shuriken projectile animation exists.
+38. Clone does not chase
 
-Preferred behavior:
+Once spawned:
 
-missing shuriken art
-→ Throw is refused
-→ no projectile
-→ warning
+clone.x = fixed
+clone.y = fixed
+clone.facing = fixed
+
+for its whole life.
 
 Do not:
 
-play Throw normally
-→ create invisible damage box
+* chase the enemy
+* turn around after them
+* slide toward them
+* teleport again
+* copy owner movement
 
-49. Preserve Throw animation if projectile has already spawned
+If the opponent escapes before the active BA1 frame:
 
-Once the projectile is created, it is independent.
+the clone whiffs
 
-If #0001 is hit after releasing the shuriken:
+and then vanishes normally.
 
-Throw → Hurt
+39. The real #0001 remains Charging
 
-the already-existing shuriken continues travelling.
+A successful Charged BA1 clone command should not make the real #0001 perform BA1.
 
-Do not delete it merely because its owner entered Hitstun.
+The clone is the attack.
 
-Likewise, the projectile continues if #0001:
+If Charge remains held:
 
-* turns around
-* jumps
-* dodges
-* begins charging
+real #0001 stays in Charge
 
-after the shuriken has left their hand.
+while the cloud/clone acts remotely.
 
-50. Ground Throw and Charge interaction
+Do not play:
 
-Primary/Throw is already processed through the combat-action loop before Charge state selection.
+0001_1ba*
 
-Preserve that behavior.
+on the owner.
 
-If #0001 is charging and Throw is pressed:
+This is important because there is no dedicated summon animation for the real fighter.
 
-Charge → Throw
+40. Do not fake a summoning pose
 
-immediately.
+No new owner summon artwork was provided.
 
-Do not play the voluntary Charge release pose first.
-
-If Charge remains held after Throw ends, normal existing rules may restart Charge from:
+Therefore the owner continues using the existing Charge animation:
 
 charge1
+→ charge2
+→ chargea ↔ chargeb
 
-51. Throw and Defense interaction
+while the clone attack happens.
 
-Preserve the existing deterministic priority:
+Do not use:
 
-* combat actions are processed first
-* Defense/Dodge is processed afterward
-
-If Throw and Defense are pressed on the same simulation step and Throw successfully begins:
-
-Throw wins
-
-Do not start both Throw and Dodge.
-
-Do not change BA1/BA2’s existing same-step priority behavior.
-
-52. Rename Help “Primary” to “Throw”
-
-Help currently shows Primary as reserved.
-
-Change it to:
-
-Throw
-
-and make it active.
-
-Desktop controls:
-
-Throw | J
-
-Gamepad notes:
-
-X / Square = Throw
-
-Remove Primary from reserved-action copy.
-
-After this task only:
-
-Special
-
-is reserved.
-
-53. Mobile Help diagram
-
-Replace the current Primary icon in the upper-right action slot with:
-
-T
-
-Title:
-
-Throw
-
-Update the diagram ARIA label accordingly.
-
-The lower-right layout should now describe something equivalent to:
-
-Throw (T)
-Special
-Defense (D)
-BA1
-BA2
-Jump
-
-Do not change their positions.
-
-54. Touch Help legend
-
-Update the visible legend so it uses:
-
-T
-
-for Throw.
-
-For example:
-
-T = Throw; #0001 throws a shuriken.
-D = Defense; #0001 uses Dodge.
-
-Do not leave stale references saying Primary is reserved.
-
-55. Update current-build Help copy
-
-The Help “This build” section should now say that #0001 has:
-
-* BA1
-* BA2
 * Throw
-* Charge
-* Dodge
-
-Describe Throw as:
-
-Throw (the primary action) throws an animated shuriken.
-
-Special remains wired but reserved.
-
-The training CPU remains non-attacking.
-
-56. README controls
-
-Change:
-
-Primary* | J
-
-to:
-
-Throw | J
-
-Touch:
-
-T
-
-Gamepad:
-
-X / Square = Throw
-
-Remove Primary from the reserved footnote.
-
-Only Special remains reserved.
-
-57. README gameplay description
-
-Document:
-
-Throw
-
-as #0001’s projectile attack.
-
-Explain:
-
-* one press performs one three-frame Throw
-* one shuriken is released
-* shuriken uses its three-frame looping animation while flying
-* projectile direction follows #0001’s facing at release
-* Throw is currently ground-only because no Mid-Air Throw sprites exist
-* Throw is the internal primary action
-
-Do not claim a Mid-Air Throw exists.
-
-58. README animation list
-
-Add:
-
-Throw — 3 fighter frames
-Shuriken — 3 looping projectile frames
-
-Also keep existing:
-
-* Dodge
-* Mid-Air Dodge
-* Charge
 * BA1
-* BA2
+* Idle
+* a stretched cloud frame
 
-59. ALVA_SPEC sprite inventory
+as a fake summon pose on the owner.
 
-Update the Character #0001 sprite inventory to include:
+41. Successful clone summon does not trigger chargeRelease
 
-0001_throw1–3
-0001_shuriken1–3
+Because the player is still holding Charge:
 
-Clarify that shuriken frames are projectile art and are normalized/rendered separately from fighter poses.
+Charged BA1 Clone Attack
 
-Document the Mid-Air Dodge exception:
+does not count as voluntarily releasing Charge.
 
-midairDodge source artwork faces left while #0001's default source artwork faces right
+No:
 
-and explain animation-level source-facing overrides.
+chargeRelease
 
-60. ALVA_SPEC combat section
+pose should occur.
 
-Document Throw as #0001’s projectile attack on internal primary.
+42. Owner can be interrupted after summoning
 
-Specify:
+Once the Energy has been spent and the clone entity has successfully been created, it is independent.
 
-ground-only
-3-frame one-pass Throw
-one shuriken spawn at the visible release frame
-animated independent projectile
-fixed direction at spawn
-one hit maximum
+If the real #0001 is then:
 
-Include the final tuned damage, speed, hitstun, knockback, lifetime and cooldown values after implementation.
+* hit
+* Dodges
+* Jumps
+* Throws
+* uses BA2
+* releases Charge
 
-61. ALVA_SPEC input section
+the existing clone continues its:
 
-Update:
+appear → BA1 → vanish
 
-J = Throw
-X / Square = Throw
-touch T = Throw
+sequence.
 
-Keep:
+Do not delete it because the owner changed state.
 
-Special = K / Y / Triangle, reserved
+43. Owner KO after summon
 
-Do not rename menu Confirm or any unrelated J behavior unless it currently depends on gameplay bindings.
+If the owner is hit to 0 Health after successfully summoning the clone, do not abruptly leave an orphaned cloud/entity.
 
-62. Update stale comments and docs
+Let an already-created clone finish its current lifecycle unless the entire battle is being reset/destroyed.
 
-Search for phrases such as:
+It must not create another clone or retarget.
 
-Primary and Special are reserved
-Primary button
-reserved Primary
+44. Clone is not targetable
 
-After this feature they are stale.
+The temporary clone has:
 
-The correct state is:
+no hurtboxes
+no health
+no defense
+no pushbox
 
-Throw is active
-Special is reserved
+Enemy attacks do not destroy it.
 
-Do not rename the internal primary code identifier in comments where it clearly refers to the generic internal action slot.
+Do not include it in:
 
-63. Tests: Mid-Air Dodge facing metadata
+battle.fighters
 
-Extend tests/defense.test.mjs.
+Only the real P1 and CPU remain fighters.
 
-Assert:
+45. Clone does not affect fighter separation
 
-def.sourceFacing === 1
+Do not pass the clone to:
 
-and:
+separate()
+resolveSolidOverlap()
 
-def.animations.midairDodge.sourceFacing === -1
+or any player pushbox system.
 
-Ground Dodge should inherit the normal right-facing source orientation.
+The opponent can move through its location.
 
-64. Tests: SpriteSet orientation metadata
+It is a combat summon/effect, not another physical fighter.
 
-Build a real/fake SpriteSet and assert the resolved animation metadata carries:
+46. Clone does not affect the camera
 
-idle.sourceFacing = +1
-dodge.sourceFacing = +1
-midairDodge.sourceFacing = -1
+Camera framing continues using only:
 
-Animations without overrides must inherit the character default.
+P1
+CPU
 
-65. Tests: render-facing calculation
+Do not zoom out because the clone appears elsewhere.
 
-Test both fighter orientations.
+47. Clone has no HUD marker
 
-For midairDodge:
+Do not give the clone:
 
-Fighter logically facing right
+* P1 marker
+* CPU marker
+* name
+* Health bar
+* Energy bar
+* ground ring
 
-facing = +1
-sourceFacing = -1
-flip = true
+Only render:
 
-Fighter logically facing left
+cloud
+clone sprite
+clone attack
 
-facing = -1
-sourceFacing = -1
-flip = false
+48. Exact visual clone art
 
-For Idle:
+When the clone body is active, render it through the same normalized #0001 SpriteSet.
 
-facing = +1 → flip false
-facing = -1 → flip true
+The BA1 sprite must obey the same animation-specific sourceFacing rules that the real fighter uses.
 
-Do not merely assert fighter.facing; the existing bug already has correct logical facing.
+Clone facing is determined at summon time and then locked.
 
-Test the actual source-facing/render-flip decision.
+49. Cloud placement
 
-66. Tests: no Dodge regression
+Render the cloud around the clone’s spawn location.
 
-Keep existing assertions that:
+Because the cloud is effect artwork rather than a fighter sprite, give it a configurable visual offset such as:
 
-* facing remains locked for the Dodge
-* Mid-Air Dodge has three frames
-* Dodge invulnerability remains correct
-* Mid-Air Dodge finishes through landing
-* gravity continues
+effectOffset: { x: 0, y: ... }
 
-The facing-art fix must not change gameplay.
+Inspect the real files in-browser and center the cloud around the clone’s appearance area.
 
-67. Tests: uploaded Throw/Shuriken assets
+Do not use PNG dimensions as world coordinates.
 
-Assert all six canonical files exist:
+Use the existing art-pixel scale.
 
-assets/characters/0001/0001_throw1.png
-assets/characters/0001/0001_throw2.png
-assets/characters/0001/0001_throw3.png
-assets/characters/0001/0001_shuriken1.png
-assets/characters/0001/0001_shuriken2.png
-assets/characters/0001/0001_shuriken3.png
+50. Render the clone behind the opponent
 
-Assert none remain at the repository root.
+Render clone entities/effects before the normal fighters so the real opponent remains visually in front if their sprites overlap.
 
-Assert character asset preloading includes all six.
+A useful battle layer order is:
 
-68. Tests: Throw registration
+terrain
+shadows
+clone summons
+P2
+P1
+projectiles
+foreground
 
-Assert:
+or an equivalent order preserving the intended depth.
 
-primary → throw
-special → null
+This complements the physical placement behind the enemy.
 
-BA1/BA2 mappings stay unchanged.
+51. No tint or opacity gimmick
 
-Assert Throw:
+The instruction is that it is a clone using the same #0001 sprites.
 
-* uses the real Throw clip
-* is ground-only
-* is one pass
-* has exactly three frames
-* does not have a fighter-attached damaging hitbox
+Therefore do not automatically apply:
 
-69. Update old reserved-action tests
+* blue tint
+* gray tint
+* transparency
+* outline
+* ghost effect
 
-Current BA1 tests expect:
+The cloud communicates that it is a clone summon.
 
-Primary and Special stay inactive
+52. Clone attack and Dodge
 
-Replace these expectations.
+The target’s current Dodge invulnerability must work against the clone BA1.
 
-New intended state:
+If the clone BA1 active hitbox overlaps while:
 
-Throw/primary works
-Special remains inactive/reserved
-BA1 works
-BA2 works
+target.combat.invulnerable === true
 
-Do not weaken the tests by simply deleting Primary coverage.
-
-70. Tests: Throw playback
-
-From grounded Idle press:
-
-primaryPressed: true
-
-Assert the displayed sequence is exactly:
-
-0001_throw1.png
-0001_throw2.png
-0001_throw3.png
-
-one pass.
-
-Assert the state exits normally afterward.
-
-71. Tests: one projectile per press
-
-One Throw press must spawn:
-
-exactly one
-
-shuriken.
-
-Hold J.
-
-Assert it still produces only one projectile until J is released and newly pressed again.
-
-Do not spawn one projectile per active-frame simulation tick.
-
-72. Tests: spawn frame
-
-Record Throw frame and active projectiles each fixed step.
-
-Assert the shuriken is created on exactly the configured visual release frame.
-
-It must not appear:
-
-* before the release pose
-* after the Throw has already ended
-
-73. Tests: projectile travel
-
-Spawn while #0001 faces right.
-
-Assert:
-
-x increases every fixed step
-
-Spawn while #0001 faces left.
-
-Assert:
-
-x decreases every fixed step
-
-Then turn the owner after spawn.
-
-Assert the projectile continues in its original direction.
-
-74. Tests: projectile animation
-
-Keep a shuriken alive for multiple animation cycles.
-
-Its visible frames must progress:
-
-shuriken1
-shuriken2
-shuriken3
-shuriken1
-shuriken2
-shuriken3
-
-according to SHURIKEN_FPS.
-
-Do not let it freeze on frame 1.
-
-75. Tests: projectile hit
-
-Use real combat collision.
-
-Fire a shuriken into an opponent.
-
-Assert:
-
-* one hit event
-* configured damage once
-* configured hitstun
-* configured knockback
-* configured hitstop
-* projectile removed after hit
-
-Continue stepping.
-
-Opponent must not take repeated damage from that same projectile.
-
-76. Tests: projectile knockback direction snapshot
-
-Throw right.
-
-Turn #0001 left before impact.
-
-When the projectile connects, assert the target is still knocked:
-
-right
-
-Throw left and test the inverse.
-
-This verifies projectile hit resolution uses projectile direction, not the owner’s later facing.
-
-77. Tests: projectile and Dodge
-
-Arrange for a shuriken to overlap the opponent during Dodge invulnerability.
-
-Assert:
+then:
 
 * no damage
 * no stun
+* no knockback
 * no hitstop
-* no projectile hit event
-* projectile is not falsely consumed
+* clone attack is not consumed
 
-If it remains active/overlapping once invulnerability finishes, normal collision may then occur.
+If BA1 remains active after invulnerability ends and still overlaps, normal collision may connect.
 
-78. Tests: missing art
+Match the current melee/projectile Dodge semantics.
 
-Missing Throw animation
+53. Clone attack and future Block
 
-Assert Primary is refused and no projectile appears.
+Preserve the generic Defense architecture.
 
-Missing shuriken animation
+If a future character uses:
 
-Assert Throw cannot create an invisible damaging projectile.
+defense.type = 'block'
 
-Preferred behavior is to refuse the Throw entirely.
+the clone BA1 should use normal block-facing logic.
 
-Warn clearly and remain stable.
+Because the clone appears behind the opponent, an opponent who is still facing away from the clone should generally not block it.
 
-79. Tests: airborne Primary
+Pass:
 
-Jump and press Throw.
+clone.facing
 
-Because there is no Mid-Air Throw artwork:
+into hit resolution.
 
-* no Throw animation
-* no shuriken
-* fighter stays in Jump/Fall
+Do not use the owner’s facing.
 
-Do not silently use the ground animation.
+54. Knockback direction
 
-80. Tests: input/UI
+Clone BA1 knockback comes from the clone toward the target.
+
+Use:
+
+clone.facing
+
+as the attack direction.
+
+Do not calculate knockback from the real #0001’s later facing.
+
+55. Owner attribution
+
+Combat events should still identify the real #0001 as the owning attacker for game logic.
+
+If useful, add a source field:
+
+source: clone
+
+or:
+
+summon: clone
+
+for debugging.
+
+But the player owns the attack.
+
+Do not turn the clone into another scoring/player entity.
+
+56. Clone attack should not trigger owner’s BA1 cooldown
+
+The owner did not personally perform ordinary BA1.
+
+Do not set #0001’s normal:
+
+ba1 cooldown
+
+because the clone punched.
+
+The resource cost and summon lifecycle are the limiter.
+
+Ordinary BA1 remains independently usable according to existing combat state.
+
+57. One command = one clone
+
+Each valid:
+
+already Charging + BA1 press + enough Energy
+
+creates exactly one clone entity.
+
+Holding BA1 must not create repeated clones.
+
+The existing pressed-edge input architecture should be preserved.
+
+Another clone requires another actual BA1 press.
+
+58. Multiple paid clones
+
+Do not invent a hidden one-clone-only limit.
+
+If the player remains Charging, has enough Energy, and presses BA1 again while an earlier clone still exists:
+
+another successful press may summon another clone
+
+and spends another 25 Energy.
+
+Energy itself limits the number of simultaneous summons to at most four from a full meter.
+
+Keep each clone’s lifecycle independent.
+
+59. Process Charged BA1 before ordinary combat actions
+
+The current Fighter loop handles all COMBAT_ACTIONS generically.
+
+Intercept the Charged BA1 combination before normal action1 dispatch.
+
+Conceptually:
+
+let action1Consumed = false;
+if (
+  input.action1Pressed &&
+  wasCharging &&
+  input.charge
+) {
+  action1Consumed = this.tryCloneAttack(ctx);
+}
+for (const action of COMBAT_ACTIONS) {
+  if (action === 'action1' && action1Consumed) continue;
+  if (input[`${action}Pressed`]) this.tryAction(action);
+}
+
+The exact code may differ.
+
+The key rule is:
+
+successful clone summon consumes that BA1 press
+
+so ordinary BA1 does not also start.
+
+60. If clone activation fails, ordinary BA1 gets the press
+
+tryCloneAttack() should return false when the clone attack cannot be used.
+
+Examples:
+
+insufficient Energy
+missing clone-cloud art
+missing BA1 art
+not already Charging
+
+Then the same action1Pressed should fall through to normal:
+
+tryAction('action1')
+
+where appropriate.
+
+Do not silently swallow BA1.
+
+61. Validate artwork before spending Energy
+
+Never charge the player Energy for an invisible/broken summon.
+
+Before spending 25 Energy verify:
+
+* cloud effect has real frames
+* BA1 animation has real frames
+* BA1 attack definition exists
+* opponent exists
+* CombatState can perform the summon
+
+Only then deduct Energy and queue/create the clone.
+
+62. Missing cloud art behavior
+
+If the clone-cloud files fail to load:
+
+Charged BA1
+→ no clone summon
+→ no Energy spent
+→ normal BA1 fallback
+
+Log a clear warning.
+
+Do not create an invisible clone attack.
+
+63. Missing BA1 art behavior
+
+If BA1 artwork is unavailable:
+
+no clone attack
+no Energy spent
+
+Follow the existing no-fake-attacks philosophy.
+
+Do not display cloud animation and then create an invisible punch.
+
+64. Add summon queue/lifecycle cleanly
+
+The current fighter already has a release queue for projectiles.
+
+Use a similar explicit mechanism for summons rather than having Battle inspect buttons.
+
+For example:
+
+this.summons = [];
+
+Successful Charged BA1 could queue:
+
+{
+  id: 'ba1Clone',
+  target: this.opponent,
+}
+
+Battle then converts queued summon requests into live clone entities.
+
+Clear consumed requests once per fixed step.
+
+65. Battle owns live clones
+
+Add:
+
+this.clones = [];
+
+or a general:
+
+this.summons = [];
+
+to Battle.
+
+Battle should:
+
+* spawn queued clones
+* update their clocks
+* resolve clone attack hitboxes
+* render them
+* remove finished clones
+
+66. Clear clones on restart
+
+Battle.restart() must clear all live clone entities.
+
+A rematch must not retain:
+
+* clone bodies
+* cloud effects
+* attack hitboxes
+* summon timers
+
+Energy already resets to 100 through Fighter.reset().
+
+67. Clear clones on destroy
+
+Battle.destroy() must clear clone/summon arrays.
+
+No stale references to fighters/targets should remain after leaving battle.
+
+68. Fixed-step update order
+
+Use deterministic fixed-step ordering.
+
+A suitable order is:
+
+fighters update
+projectile/summon requests are consumed
+clones spawn
+projectiles update
+clones update
+fighter melee hits resolve
+projectile hits resolve
+clone hits resolve
+dead projectiles/clones are removed
+
+Exact organization can differ, but there must be no render-frame-dependent combat logic.
+
+69. Do not make cloud frames combat-active
+
+The clone’s BA1 hitbox exists only during BA1’s existing active phase.
+
+Cloud appearance:
+
+no hitbox
+
+Cloud disappearance:
+
+no hitbox
+
+70. Debug overlay
+
+Extend debug mode to visualize the clone BA1 active hitbox.
+
+Use the same attack-hitbox color or a clearly related distinct color.
+
+Optionally label it:
+
+clone ba1
+
+Do not draw fake clone hurtboxes because the clone is not targetable.
+
+71. Energy HUD
+
+No HUD redesign is needed.
+
+The existing blue meter already reads:
+
+fighter.combat.energy
+
+When the clone spends 25 Energy, the bar should immediately change:
+
+100% → 75%
+75% → 50%
+50% → 25%
+25% → 0%
+
+Keep CPU mirroring and all accessibility attributes.
+
+72. Update Energy comments
+
+Current source comments say:
+
+nothing spends or restores Energy yet
+
+Those become false.
+
+Change them to explain:
+
+Energy starts full.
+#0001's Charged BA1 Clone Attack costs 25.
+No Energy regeneration or gain exists yet.
+
+73. Update Charge documentation
+
+The current spec says BA1 interrupts Charge.
+
+That is no longer universally true.
+
+Update it:
+
+BA1 while Charge is still held and sufficient Energy is available summons a clone instead of making the owner perform BA1.
+
+Also clarify:
+
+releasing Charge + BA1
+→ ordinary BA1
+
+and:
+
+BA2 / Throw / Dodge / Jump / hit
+
+retain their current interruption behavior.
+
+74. Update README
+
+Add a section explaining Charged BA1.
+
+Suggested behavior description:
+
+Clone Attack — While already holding Charge, press BA1. If #0001 has at least 25 Energy, 25 Energy is spent and a clone appears behind the opponent in a smoke cloud, performs #0001's normal BA1, then vanishes through the cloud animation in reverse. #0001 remains in Charge while the button stays held. With less than 25 Energy, BA1 behaves normally instead.
+
+Do not imply Charge generates Energy.
+
+75. Update Help
+
+Add the combo to the existing Charge & Energy information.
+
+Explain:
+
+Hold Charge first, then press BA1 to spend 25 Energy and summon a clone behind the opponent.
+
+Mention:
+
+The clone performs BA1 and disappears.
+
+Do not add another control-row entry because the move uses existing Charge + BA1 controls.
+
+76. Update ALVA_SPEC.md
+
+Document the complete move:
+
+Charged BA1 Clone Attack
+
+Include:
+
+* requirement to already be Charging
+* Charge must still be held on the BA1 press
+* 25 Energy cost
+* insufficient-Energy normal-BA1 fallback
+* owner remains Charging
+* exact cloud sequence
+* reverse vanish sequence
+* position behind opponent
+* fixed spawn position
+* same #0001 BA1 sprites
+* normal BA1 combat values
+* clone is untargetable
+* clone is not a Fighter
+* no camera/pushbox/HUD participation
+* detached hitstop behavior
+* Dodge/Block interaction
+* no Energy regeneration
+
+77. Update sprite inventory
+
+Add the ten cloud frames to the #0001 content inventory:
+
+Clone appear/vanish cloud:
+0001_cloneav1–0001_cloneav10
+
+State explicitly:
+
+appearance = forward order
+disappearance = reverse order
+
+78. Update existing Charge tests
+
+Current tests explicitly assert:
+
+BA1 interrupts Charge and the owner performs BA1
+
+That expectation must change.
+
+Split BA1 and BA2 coverage.
+
+Keep:
+
+Charge + BA2
+→ BA2
+
+New BA1 expectation:
+
+already charging + Charge still held + BA1 + enough Energy
+→ clone summon
+→ owner stays Charge
+
+79. Preserve release+BA1 test
+
+The existing test:
+
+letting go of Charge on the step BA1 is pressed
+
+should remain conceptually valid.
+
+New expected result:
+
+ordinary BA1
+no clone
+no chargeRelease
+no Energy cost
+
+This is an important distinction.
+
+80. Test simultaneous fresh Charge + BA1
+
+From Idle:
+
+Charge + BA1 pressed on the same first step
+
+must not summon a clone.
+
+Because #0001 was not already Charging, normal action priority applies.
 
 Assert:
 
-CONFIG.bindings.primary === ['KeyJ']
+ordinary BA1 begins
+Energy remains 100
+no clone exists
 
-and gamepad button 2 still drives internal:
+81. Add tests/clone.test.mjs
 
-primary
+Create focused tests for the feature.
 
-but player-facing label is:
+Use the real:
+
+* Fighter
+* CombatState
+* CombatSystem
+* SpriteSet metadata
+* BA1 definition
+* fixed-step timing
+
+Extend the harness to support clone/summon entities where useful.
+
+82. Asset tests
+
+Assert all ten canonical cloud paths exist under:
+
+assets/characters/0001/
+
+Assert none remain at repo root.
+
+Assert:
+
+0001_ cloneav8.png
+
+does not exist.
+
+Assert character preloading contains all ten correct paths.
+
+83. Cloud registration test
+
+Assert:
+
+cloneCloud.frames
+
+are exactly:
+
+1,2,3,4,5,6,7,8,9,10
+
+in the definition.
+
+Assert:
+
+loop === false
+
+84. Appearance order test
+
+Spawn a clone and record visible cloud frames.
+
+Assert the unique visible sequence is exactly:
+
+0001_cloneav1.png
+0001_cloneav2.png
+0001_cloneav3.png
+0001_cloneav4.png
+0001_cloneav5.png
+0001_cloneav6.png
+0001_cloneav7.png
+0001_cloneav8.png
+0001_cloneav9.png
+0001_cloneav10.png
+
+85. Vanish order test
+
+After clone BA1 finishes, record the disappearance cloud.
+
+Assert:
+
+0001_cloneav10.png
+0001_cloneav9.png
+0001_cloneav8.png
+0001_cloneav7.png
+0001_cloneav6.png
+0001_cloneav5.png
+0001_cloneav4.png
+0001_cloneav3.png
+0001_cloneav2.png
+0001_cloneav1.png
+
+Then the clone entity must be removed.
+
+86. Clone BA1 animation test
+
+Between the two cloud phases, assert the clone’s body animation is exactly:
+
+0001_1ba1.png
+0001_1ba2.png
+0001_1ba3.png
+0001_1ba4.png
+
+using the existing BA1 FPS/timing.
+
+Do not duplicate BA1 frames into another asset list.
+
+87. Trigger test
+
+From Idle:
+
+1. enter Charge
+2. allow at least one simulation step of real Charge
+3. keep Charge held
+4. press BA1
+
+Assert:
+
+clone created
+owner stays charge
+owner does not enter attack
+Energy = 75
+
+88. Energy sequence test
+
+Repeated successful summons should produce:
+
+100
+75
+50
+25
+0
+
+Assert Energy never goes negative.
+
+89. Insufficient Energy test
+
+Set:
+
+Energy = 24
+
+Enter Charge and press BA1.
+
+Assert:
+
+no clone
+normal BA1 begins
+Energy stays 24
+
+90. Exact-cost test
+
+Set:
+
+Energy = 25
+
+Trigger Charged BA1.
+
+Assert:
+
+clone spawns
+Energy = 0
+
+91. Missing-cloud safety test
+
+Remove/omit the clone cloud effect from fake SpriteSet data.
+
+Trigger Charged BA1 with 100 Energy.
+
+Assert:
+
+no clone
+no Energy spent
+normal BA1 fallback
+warning emitted
+
+92. Normal BA1 regression
+
+Without Charging:
+
+BA1
+
+must behave exactly as before.
+
+Assert:
+
+* ground BA1 unchanged
+* Mid-Air BA1 unchanged
+* no Energy cost
+* no clone
+
+93. BA2 regression
+
+While Charging:
+
+BA2
+
+still interrupts Charge and starts BA2 normally.
+
+No Energy cost.
+
+No clone.
+
+94. Throw regression
+
+While Charging:
 
 Throw
 
-81. Tests: touch T
+retains the existing Throw behavior.
 
-Assert the former Primary touch button:
+It must not summon a clone.
 
-* remains in the same location
-* has data-action="primary"
-* is labelled Throw
-* visibly reads exactly T
-* has .tc-throw
-* does not use .tc-primary
-* is not pending
-* dispatches internal primary
+It must not cost Energy.
 
-82. Tests: only Special pending
+95. Defense regression
 
-Update UI tests to assert the only remaining pending action is:
+Defense/Dodge remains unchanged.
 
-special
+Charged BA1 clone logic must not affect:
 
-Throw must not have a dashed outline.
+Defense
+Dodge invulnerability
+mid-air Dodge
 
-The touch text set should now include:
+96. Owner stays Charge test
 
-C
-T
-D
-BA1
-BA2
+Trigger a clone while continuing to hold Charge for the entire clone lifecycle.
 
-83. Tests: Help
+Assert the owner remains in:
 
-Assert Help:
+charge
 
-* contains Throw
-* lists J for Throw
-* mobile diagram shows T
-* T is titled Throw
-* mentions X / Square for Throw
-* does not say Primary is reserved
-* says only Special is reserved
+and continues its normal Charge animation independently.
 
-84. Preserve Energy
+The owner’s animator must never switch to:
 
-Throw has no Energy cost in this task.
+ba1
 
-Do not:
+because of the clone attack.
 
-* reduce Energy for Throw
-* regenerate Energy on hit
-* reward Energy for projectile damage
+97. Owner release after summon
 
-The Energy bar remains as currently implemented.
+Spawn a clone, then release Charge.
 
-85. Preserve training CPU behavior
+Assert:
 
-The training CPU remains non-attacking.
+* owner gets existing voluntary chargeRelease
+* clone continues appearing/attacking/vanishing independently
 
-It should never:
+98. Owner hit after summon
 
-* press Primary/Throw
-* spawn a shuriken
-* BA1
-* BA2
+Spawn a clone, then hit the real #0001.
 
-No AI projectile behavior is part of this task.
+Assert:
 
-86. Full test suite
+* owner enters Hurt/Hitstun normally
+* clone remains alive
+* clone continues its lifecycle
+* no Energy refund
 
-Run:
+99. Behind-position test
 
-node --test
+Test a target facing left.
 
-All tests must pass.
+Assert the clone spawns:
 
-Preserve regressions for:
+to target's right
+
+and faces left.
+
+Test a target facing right.
+
+Assert the clone spawns:
+
+to target's left
+
+and faces right.
+
+100. Position snapshot test
+
+Spawn the cloud.
+
+Move the target during APPEAR.
+
+Assert clone/cloud position does not follow.
+
+The attack may miss because the opponent escaped.
+
+101. Clone damage test
+
+Keep the target in range.
+
+Assert the clone’s active BA1 frame:
+
+* hits exactly once
+* deals 6 damage
+* applies BA1 hitstun
+* applies BA1 knockback
+* then completes recovery
+* then vanishes
+
+102. Clone whiff test
+
+Move the opponent away during the appearance animation.
+
+Assert:
+
+clone BA1 misses
+no damage
+clone still completes recovery
+cloud reverses
+clone is removed
+
+103. Dodge interaction test
+
+Time Defense so the target is invulnerable on the clone BA1 active frame.
+
+Assert:
+
+no damage
+no stun
+no knockback
+no hitstop
+
+and do not falsely mark the attack consumed merely because it overlapped during invulnerability.
+
+104. Behind Block test
+
+Use a test character with:
+
+defense.type = 'block'
+
+If it is facing away from the clone because the clone appeared behind it, its guard should not block the rear BA1.
+
+If it turns and actually faces the clone before impact, normal Block logic may apply.
+
+This verifies clone direction rather than owner direction drives block resolution.
+
+105. Detached hitstop test
+
+When the clone BA1 connects:
+
+target freezes
+clone briefly freezes
+owner does not
+
+Assert the real #0001’s Charge animation/state clock is not frozen by the remote clone hit.
+
+106. Multiple clone test
+
+With 100 Energy, trigger several distinct charged BA1 presses quickly enough that earlier clones remain alive.
+
+Assert:
+
+* each successful press spends 25
+* each creates exactly one independent clone
+* their cloud/attack/vanish clocks do not overwrite each other
+* at Energy 0 no fifth clone can be created
+
+107. HUD regression
+
+After one successful summon, update the real HUD.
+
+Assert P1 Energy meter reports:
+
+75
+
+and the fill is:
+
+scaleX(0.75)
+
+Health remains unchanged merely from spending Energy.
+
+108. Reset/rematch test
+
+Spend Energy and create one or more clones.
+
+Restart/rematch.
+
+Assert:
+
+Energy = 100
+live clones = 0
+
+109. CPU behavior
+
+The training CPU remains deliberately non-attacking.
+
+It must not:
 
 * Charge
-* Charge release
-* ground Dodge
-* Mid-Air Dodge
-* Dodge invulnerability
+* trigger Charged BA1
+* summon clones
+* Throw
 * BA1
-* Mid-Air BA1
 * BA2
-* Mid-Air BA2
-* Hurt
-* Mid-Air Hurt
-* Energy
-* touch multi-touch
-* menu controls
-* CPU behavior
-* fixed-step physics
 
-87. Manual browser verification: Mid-Air Dodge
+No clone AI is part of this task.
 
-Test #0001 facing right.
+110. Manual browser verification
 
-Jump and press Defense.
+In a real Quick Battle:
 
-Verify every Mid-Air Dodge frame visually faces right.
+Trigger
 
-Then face left.
+Hold Charge until #0001 visibly enters the Charge stance.
 
-Jump and press Defense.
-
-Verify every Mid-Air Dodge frame visually faces left.
-
-Check that:
-
-* #0001’s logical movement direction did not change
-* ground Dodge still faces correctly
-* BA1/BA2 still face correctly
-* Idle/Run still face correctly
-
-88. Manual browser verification: Throw
-
-Facing right, press J.
+While still holding Charge, press BA1.
 
 Verify:
 
-throw1
-→ throw2
-→ throw3
+Energy 100 → 75
 
-and exactly one shuriken appears from the throwing hand and flies right.
+and the real #0001 remains charging.
 
-Face left and repeat.
+Appearance
 
-Verify the Throw art and projectile both face/travel consistently left.
+Behind the CPU, verify the cloud plays:
 
-89. Manual browser verification: projectile
+1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 → 10
 
-Watch the projectile carefully.
+Attack
 
-Verify:
+Verify an identical #0001 clone appears and plays normal ground BA1 toward the CPU.
 
-* shuriken frames visibly animate
-* projectile movement is smooth
-* projectile remains crisp/pixelated
-* it does not grow to fighter size
-* it does not jitter
-* it does not originate at the fighter’s feet
-* it disappears correctly after hit/miss
-* debug hitbox fits the visible shuriken
+Vanish
 
-90. Manual browser verification: controls
+After BA1 finishes, verify:
 
-Verify:
+10 → 9 → 8 → 7 → 6 → 5 → 4 → 3 → 2 → 1
 
-Keyboard
+and the clone disappears completely.
 
-J = Throw
+Movement
 
-Gamepad
+Move the CPU during the cloud animation.
 
-X / Square = Throw
+Verify the cloud does not chase it.
 
-Touch
+The clone should be able to miss.
 
-The old Primary button now visibly reads:
+Direction
 
-T
+Test CPU facing both directions.
 
-and pressing it throws one shuriken.
+Verify the clone always appears on the CPU’s back side and faces toward it.
 
-Special remains reserved.
+Debug
 
-Scope restrictions
+Enable the debug overlay and verify the active clone BA1 hitbox matches the existing normal BA1 punch.
+
+There should be no hitbox during the appearance or disappearance clouds.
+
+111. Scope restrictions
 
 Do not add:
 
-* multiple shurikens per press
-* charged shurikens
-* homing
-* explosions
-* ricochets
-* projectile clashes
-* projectile parries
-* Energy costs
-* ammo counters
-* Mid-Air Throw without real artwork
-* new particle effects
-* new sound effects
-* screen shake
-* artificial projectile trails
-* AI Throw behavior
+* clone Health
+* clone Energy
+* clone AI
+* clone movement
+* clone jumping
+* clone projectiles
+* clone Throw
+* clone BA2
+* clone Dodge
+* clone hit reactions
+* clone pushboxes
+* clone camera tracking
+* clone HUD
+* clone labels
+* passive Energy regeneration
+* Charge-generated Energy
+* clone tinting
+* extra clone sprites
+* extra cloud sprites
+* clone sound effects
+* particles beyond the supplied cloud artwork
 
-Do not modify the supplied PNG artwork.
-
-Do not rebalance BA1, BA2, Charge or Dodge.
+Do not rebalance normal BA1, BA2, Throw, Dodge or Charge.
 
 Acceptance criteria
 
-The task is complete only when:
+The feature is complete when:
 
-1. Mid-Air Dodge displays in the same direction #0001 is logically facing.
-2. Mid-Air Dodge uses an animation-level source-facing override rather than corrupting fighter facing.
-3. Other #0001 animations retain their current orientation.
-4. Throw1–3 live under assets/characters/0001/.
-5. Shuriken1–3 live under assets/characters/0001/.
-6. The six root copies are removed.
-7. Internal primary maps to #0001’s Throw.
-8. Player-facing Primary is renamed to Throw.
-9. J triggers Throw.
-10. X / Square triggers Throw.
-11. The touch Throw button stays in the old Primary position.
-12. That button visibly reads exactly T.
-13. Throw is no longer pending.
-14. Only Special remains reserved.
-15. Ground Throw plays exactly Throw1 → Throw2 → Throw3 once.
-16. Airborne Throw is refused because no Mid-Air Throw artwork exists.
-17. Exactly one shuriken spawns per Throw.
-18. The shuriken spawns on the visually correct release frame.
-19. The shuriken starts at the visible throwing hand.
-20. Its travel direction is snapshotted from #0001’s facing at release.
-21. Turning later does not reverse an existing projectile.
-22. Shuriken1–3 loop while the projectile travels.
-23. Shuriken art uses projectile-scale normalization, not fighter-height normalization.
-24. Projectile movement is independently simulated.
-25. Projectile collision causes one configured hit and then destroys the projectile.
-26. Knockback uses projectile direction, not the owner’s later facing.
-27. Dodge invulnerability works against shurikens.
-28. Future Block-type Defense can use normal projectile block/chip resolution.
-29. Missing projectile art never creates invisible damage.
-30. Missed projectiles are eventually cleaned up.
-31. Debug mode can visualize the shuriken hitbox.
-32. Charge/Charge-release behavior remains unchanged.
-33. Defense/Dodge behavior remains unchanged except for the Mid-Air Dodge visual-facing fix.
-34. Energy remains unchanged.
-35. Training CPU remains non-attacking.
-36. README, Help, control diagrams and ALVA_SPEC.md describe Throw accurately.
-37. The complete node --test suite passes.
+1. 0001_cloneav1–10.png exist only under assets/characters/0001/.
+2. The incorrect old 0001_ cloneav8.png path does not exist.
+3. Clone cloud appearance plays exactly 1→10.
+4. Clone cloud disappearance plays exactly 10→1.
+5. Clone effect frames preload with #0001.
+6. Clone clouds are normalized as effects, not fighter-height animations.
+7. Clone Attack requires #0001 to already be Charging.
+8. Charge must still be held when BA1 is pressed.
+9. Fresh simultaneous Charge+BA1 from Idle does not summon.
+10. Successful Charged BA1 costs exactly 25 Energy.
+11. Energy never goes below 0.
+12. 25 Energy is enough for exactly one summon.
+13. Less than 25 Energy produces no clone and falls back to normal BA1.
+14. Missing required clone artwork spends no Energy.
+15. Normal BA1 remains unchanged outside the Charged combo.
+16. The real #0001 does not perform BA1 during a successful clone summon.
+17. The real #0001 remains Charging while Charge remains held.
+18. The clone appears on the opponent’s back side.
+19. Its position/facing are snapshotted and do not track afterward.
+20. The clone uses #0001’s actual existing BA1 sprite frames.
+21. The clone uses the existing BA1 combat definition.
+22. Clone BA1 can hit only once.
+23. Clone damage/knockback comes from the clone’s position/facing.
+24. The clone is not targetable and has no Health/pushbox.
+25. Clone attacks respect Dodge invulnerability.
+26. Future Block defense uses correct rear/front attack direction.
+27. A clone hit does not apply hitstop to the real owner.
+28. The clone finishes even if the owner releases Charge or gets hit afterward.
+29. The clone always vanishes after its attack, hit or miss.
+30. Multiple paid summons can coexist independently while Energy allows.
+31. Restart/rematch removes all clones and refills Energy.
+32. The Energy HUD immediately reflects the cost.
+33. No other current action consumes or regenerates Energy.
+34. Training CPU remains non-attacking.
+35. README, Help, comments, and ALVA_SPEC.md describe the new move and Energy behavior accurately.
+36. node --test passes completely.
