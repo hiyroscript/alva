@@ -2,8 +2,9 @@
 //
 // Adding a fighter (e.g. #0002) should only require:
 //   1. dropping frames into ./assets/characters/<id>/
-//   2. adding a definition to CHARACTERS below, including its Power tiers
-//      (`powers`, see js/data/powers.js)
+//   2. adding a definition to CHARACTERS below, including its fighter Power
+//      tiers (`powers`) and each attack's knockback Power tiers (the attack's
+//      own `powers`); see js/data/powers.js
 //   3. giving it a rosterSlot
 //
 // Every field the engine reads lives here; nothing about #0001 is hard-coded
@@ -319,15 +320,18 @@ export const CHARACTERS = [
       portrait: { animation: 'idle', frame: 0, centerY: 0.24, size: 0.5 },
     },
 
-    // Gameplay Powers, each owned at one tier. The tier tables in
+    // Fighter Powers, each owned at one tier. The tier tables in
     // js/data/powers.js turn these into gameplay values: Jump Power 2 is the
-    // normal jump, and the only source of this fighter's jump strength.
+    // normal jump and Speed Power 2 the normal top speed, the only sources of
+    // this fighter's jump strength and movement speed. (Attack Powers belong
+    // to each attack below, not here.)
     powers: {
       jump: 2,
+      speed: 2,
     },
 
+    // Every other movement stat. The top speed is Speed Power's.
     movement: {
-      maxSpeed: 330,
       acceleration: 2600,
       deceleration: 3200,
       turnBoost: 1.6,
@@ -488,6 +492,9 @@ export const CHARACTERS = [
     // (createAttackDefinition). Phases are whole frames of the attack's clip,
     // so the hitbox is live only while the strike is on screen. Hitboxes face
     // right from the fighter's origin (bottom-centre) and mirror with facing.
+    // Knockback comes from each attack's own Powers (js/data/powers.js): BA1
+    // pushes sideways (Horizontal Knockback Power 2), BA2 launches upward
+    // (Vertical Knockback Power 2).
     attacks: {
       // Frame 1 wind-up, frame 2 punch, frames 3-4 recovery.
       ba1: {
@@ -497,7 +504,7 @@ export const CHARACTERS = [
         recovery: 2 / BA1_FPS,
         damage: 6,
         hitbox: { x: 12, y: -64, w: 28, h: 16 },
-        knockback: { x: 180, y: 0 },
+        powers: { horizontalKnockback: 2 },
         hitstun: 0.22,
         blockstun: 0.14,
         hitstop: 0.06,
@@ -513,7 +520,7 @@ export const CHARACTERS = [
         recovery: 2 / BA1_FPS,
         damage: 6,
         hitbox: { x: 8, y: -44, w: 40, h: 40 },
-        knockback: { x: 180, y: 0 },
+        powers: { horizontalKnockback: 2 },
         hitstun: 0.22,
         blockstun: 0.14,
         hitstop: 0.06,
@@ -524,7 +531,7 @@ export const CHARACTERS = [
       // frames 6-7 recovery (kick apex, settle). One hit per attack, so the
       // lead jab is part of the wind-up. The hitbox spans the kick's arc in
       // front of the fighter, knee height to overhead. Slower and heavier than
-      // BA1.
+      // BA1, and it launches the opponent upward instead of pushing it away.
       ba2: {
         animation: 'ba2',
         startup: 3 / BA2_FPS,
@@ -532,7 +539,7 @@ export const CHARACTERS = [
         recovery: 2 / BA2_FPS,
         damage: 8,
         hitbox: { x: 10, y: -88, w: 24, h: 78 },
-        knockback: { x: 220, y: 0 },
+        powers: { verticalKnockback: 2 },
         hitstun: 0.24,
         blockstun: 0.15,
         hitstop: 0.07,
@@ -542,8 +549,9 @@ export const CHARACTERS = [
       // Frames 1-2 wind-up (kunai drawn back, then overhead), frame 3 the
       // downward kunai slash. The clip has no recovery frame, so the attack
       // ends with it; the longer cooldown stops it being repeated faster than
-      // ground BA2. The hitbox covers the slash arc in front of the fighter.
-      // Chosen only by action2's `air` branch.
+      // ground BA2. The hitbox covers the slash arc in front of the fighter,
+      // and it launches upward like ground BA2. Chosen only by action2's `air`
+      // branch.
       midairBa2: {
         animation: 'midairBa2',
         startup: 2 / BA2_FPS,
@@ -551,7 +559,7 @@ export const CHARACTERS = [
         recovery: 0,
         damage: 8,
         hitbox: { x: 14, y: -100, w: 22, h: 80 },
-        knockback: { x: 220, y: 0 },
+        powers: { verticalKnockback: 2 },
         hitstun: 0.24,
         blockstun: 0.15,
         hitstop: 0.07,

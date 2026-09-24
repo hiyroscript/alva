@@ -8,7 +8,7 @@ import { CombatState, createAttackDefinition, createDefenseDefinition } from './
 import { createProjectileDefinition } from './projectile.js';
 import { createSummonDefinition, summonProblem } from './clone.js';
 import { ChargedTechnique, createTechniqueDefinition, techniqueProblem } from './charged-technique.js';
-import { getJumpVelocity } from '../data/powers.js';
+import { getJumpVelocity, getMaxSpeed } from '../data/powers.js';
 import { approach, clamp, sign } from '../core/utils.js';
 
 export const COMBAT_ACTIONS = ['primary', 'special', 'action1', 'action2'];
@@ -54,9 +54,14 @@ export class Fighter {
     );
     // What the shared Defense input does for this character (null: nothing).
     this.defense = createDefenseDefinition(def.defense);
-    // Upward speed of the normal jump, from the character's Jump Power tier
-    // (js/data/powers.js). Nothing else (knockback, Dodges, techniques) uses it.
+    // The character's fighter Powers (js/data/powers.js), resolved once.
+    // Upward speed of the normal jump, from its Jump Power tier. Nothing else
+    // (knockback, Dodges, techniques) uses it.
     this.jumpVelocity = getJumpVelocity(def);
+    // Top speed of normal left / right movement, on the ground and in the
+    // air, from its Speed Power tier. Nothing else (acceleration, knockback,
+    // projectiles, Dodges, techniques) uses it.
+    this.maxSpeed = getMaxSpeed(def);
     this.opponent = null;
     this.spawn = spawn;
     this.reset(stage);
@@ -212,7 +217,7 @@ export class Fighter {
       body.vx = approach(body.vx, 0, decel * 0.5 * dt);
     } else if (dir !== 0) {
       const turning = body.vx !== 0 && sign(body.vx) !== dir;
-      body.vx = approach(body.vx, dir * mv.maxSpeed, accel * (turning ? mv.turnBoost : 1) * dt);
+      body.vx = approach(body.vx, dir * this.maxSpeed, accel * (turning ? mv.turnBoost : 1) * dt);
     } else {
       body.vx = approach(body.vx, 0, decel * dt);
     }
@@ -422,8 +427,9 @@ export class Fighter {
 
     this.animator.play(this.animationFor(next));
     if (next === 'run') {
+      // The clip's own rate at the fighter's own top speed, whatever its tier.
       const anim = this.animator.anim;
-      const ratio = Math.abs(body.vx) / this.def.movement.maxSpeed;
+      const ratio = Math.abs(body.vx) / this.maxSpeed;
       this.animator.setSpeed(clamp(ratio, anim?.minSpeedScale ?? 1, 1));
     } else {
       this.animator.setSpeed(1);

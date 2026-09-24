@@ -353,12 +353,13 @@ test('the Sphere Rush data: 1050 dash, 4 + 16 = 20 damage, 2.0 s delay, no Energ
   assert.equal(box.x, -box.w / 2);
   assert.equal(box.y, -box.h / 2);
   assert.deepEqual(TECH.targetOffset, { x: 0, y: -48 });
-  // Normal BA2 keeps its own data.
+  // Normal BA2 keeps its own data (its launch is its own Vertical Knockback
+  // Power, not the explosion's knockback).
   assert.deepEqual(
     { ...def.attacks.ba2 },
     {
       animation: 'ba2', startup: 3 / 12, active: 2 / 12, recovery: 2 / 12, damage: 8,
-      hitbox: { x: 10, y: -88, w: 24, h: 78 }, knockback: { x: 220, y: 0 },
+      hitbox: { x: 10, y: -88, w: 24, h: 78 }, powers: { verticalKnockback: 2 },
       hitstun: 0.24, blockstun: 0.15, hitstop: 0.07, cooldown: 0.15, groundOnly: true,
     },
   );

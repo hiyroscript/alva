@@ -1,10 +1,11 @@
 // Run with node --test tests/discover.test.mjs (no dependencies).
 // Discover: its registration, Home → Discover → Back through the real
 // ScreenManager, the Power / Conditions tabs, the Power page built from the
-// Jump Power tier data (with #0001 on Jump Power 2), the intentionally empty
-// Conditions page, and keyboard / gamepad menu navigation through the real
-// MenuNavigator, on a minimal fake DOM. Layout and paint still need
-// real-browser verification.
+// Power registry alone (Jump, Speed, Horizontal and Vertical Knockback Power,
+// with no tuning numbers and no character information of any kind), the
+// intentionally empty Conditions page, and keyboard / gamepad menu navigation
+// through the real MenuNavigator, on a minimal fake DOM. Layout and paint
+// still need real-browser verification.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -198,6 +199,21 @@ function layOutHome(home) {
 }
 
 const text = (el) => el.textContent.replace(/\s+/g, ' ').trim();
+// Everything a subtree could say: its text, every attribute and dataset
+// value (hidden accessible names included) and any raw markup.
+function everything(el) {
+  const out = [];
+  const walk = (n) => {
+    if (!(n instanceof Element)) {
+      out.push(n.textContent);
+      return;
+    }
+    out.push(...n.attrs.values(), ...Object.values(n.dataset), n.html);
+    n.children.forEach(walk);
+  };
+  walk(el);
+  return out.join(' ');
+}
 const selected = (discover) => discover.sections.filter((s) => s.tab.getAttribute('aria-selected') === 'true').map((s) => s.id);
 
 // ---- Registration ---------------------------------------------------------------
@@ -337,76 +353,111 @@ test('Conditions is selectable by click and by focus; the hidden page takes no f
 
 // ---- Power ------------------------------------------------------------------------
 
-test('the Power page explains Jump Power and lists its three tiers from the tier table', () => {
+test('the Power page lists every registry Power, in order, each with its three tiers', () => {
   const { home, discover } = boot();
   home.el.querySelectorAll('.home-action')[2].click();
   const page = discover.sections[0].panel;
   assert.equal(text(page.querySelector('.discover-page-title')), 'Power');
   const entries = page.querySelectorAll('.discover-entry');
   assert.equal(entries.length, POWERS.length, 'one entry per Power');
-  const [jump] = entries;
-  const title = jump.querySelector('.discover-entry-title');
-  assert.equal(title.tagName, 'H3');
-  assert.equal(text(title), 'Jump Power', 'shown uppercase as JUMP POWER by CSS');
-  assert.equal(jump.getAttribute('aria-labelledby'), title.id);
-  assert.equal(text(jump.querySelector('.discover-entry-text')),
-    'Controls how high a fighter’s normal jump goes. Higher tiers jump higher.');
+  assert.deepEqual(entries.map((e) => text(e.querySelector('.discover-entry-title'))), [
+    'Jump Power', 'Speed Power', 'Horizontal Knockback Power', 'Vertical Knockback Power',
+  ], 'shown uppercase by CSS');
+  assert.deepEqual(entries.map((e) => text(e.querySelector('.discover-entry-text'))), [
+    'Controls how high a normal jump goes. Higher tiers jump higher.',
+    'Controls maximum movement speed. Higher tiers move faster.',
+    'Controls how strongly an attack pushes a hit opponent sideways. Higher tiers push farther.',
+    'Controls how strongly an attack launches a hit opponent upward. Higher tiers launch higher.',
+  ]);
 
-  const list = jump.querySelector('.discover-tiers');
-  assert.equal(list.tagName, 'OL');
-  assert.equal(list.getAttribute('aria-label'), 'Jump Power tiers');
-  const rows = list.querySelectorAll('.discover-tier');
-  assert.deepEqual(rows.map((r) => [text(r.querySelector('.discover-tier-name')), text(r.querySelector('.discover-tier-desc'))]), [
+  entries.forEach((entry, i) => {
+    const power = POWERS[i];
+    const title = entry.querySelector('.discover-entry-title');
+    assert.equal(title.tagName, 'H3');
+    assert.equal(entry.getAttribute('aria-labelledby'), title.id);
+    assert.equal(text(title), power.name);
+    assert.equal(text(entry.querySelector('.discover-entry-text')), power.summary);
+
+    const list = entry.querySelector('.discover-tiers');
+    assert.equal(list.tagName, 'OL');
+    assert.equal(list.getAttribute('aria-label'), `${power.name} tiers`);
+    const rows = list.querySelectorAll('.discover-tier');
+    assert.equal(rows.length, 3, `${power.name}: exactly three tiers`);
+    assert.deepEqual(rows.map((r) => [r.dataset.tier, text(r.querySelector('.discover-tier-name')), text(r.querySelector('.discover-tier-desc'))]),
+      power.tiers.map((t) => [String(t.tier), t.name, t.description]), `${power.name}: straight from its tier table`);
+    // Every row the same: nothing singled out.
+    assert.ok(rows.every((r) => r.className === 'discover-tier'), `${power.name}: no row is marked`);
+    // The meter is decoration: n rising bars, the first `tier` filled.
+    rows.forEach((row, j) => {
+      const meter = row.querySelector('.discover-meter');
+      assert.equal(meter.getAttribute('aria-hidden'), 'true');
+      assert.equal(meter.children.length, 3);
+      assert.equal(meter.children.filter((b) => b.classList.contains('is-on')).length, j + 1);
+    });
+  });
+
+  // The Jump Power rows, spelled out.
+  assert.deepEqual(entries[0].querySelectorAll('.discover-tier').map((r) => [text(r.querySelector('.discover-tier-name')), text(r.querySelector('.discover-tier-desc'))]), [
     ['Jump Power 1', 'Very low jump.'],
     ['Jump Power 2', 'Normal jump.'],
     ['Jump Power 3', 'Slightly higher jump.'],
   ]);
-  assert.deepEqual(rows.map((r) => [r.dataset.tier, text(r.querySelector('.discover-tier-name'))]),
-    JUMP_POWER_TIERS.map((t) => [String(t.tier), t.name]), 'straight from JUMP_POWER_TIERS');
-  // The meter is decoration: n rising bars, the first `tier` filled.
-  rows.forEach((row, i) => {
-    const meter = row.querySelector('.discover-meter');
-    assert.equal(meter.getAttribute('aria-hidden'), 'true');
-    assert.equal(meter.children.length, 3);
-    assert.equal(meter.children.filter((b) => b.classList.contains('is-on')).length, i + 1);
-  });
-
-  // A reference for players: no physics constants, and nothing interactive
-  // inside the page itself.
-  for (const n of ['650', '920', '1000']) assert.ok(!text(page).includes(n), `no raw ${n}`);
-  assert.deepEqual(page.querySelectorAll('button').concat(page.querySelectorAll('[data-nav]')), []);
+  assert.deepEqual(entries[0].querySelectorAll('.discover-tier').map((r) => r.dataset.tier), JUMP_POWER_TIERS.map((t) => String(t.tier)));
 });
 
-test('#0001 is identified with Jump Power 2, and only there', () => {
+test('the Power page shows no tuning numbers and nothing interactive', () => {
   const { home, discover } = boot();
   home.el.querySelectorAll('.home-action')[2].click();
   const page = discover.sections[0].panel;
-  const rows = page.querySelectorAll('.discover-tier');
-  assert.deepEqual(rows.map((r) => r.classList.contains('is-used')), [false, true, false]);
-  assert.deepEqual(rows.map((r) => r.querySelector('.discover-tier-users') && text(r.querySelector('.discover-tier-users'))), [
-    null, 'Used by #0001', null,
-  ]);
-  // Not by colour alone: the row says so in words, beside a check mark.
-  assert.ok(rows[1].querySelector('.discover-tier-check').html.includes('<svg'));
-
-  const owners = page.querySelector('.discover-owners');
-  assert.equal(text(owners.querySelector('.discover-label')), 'Fighters');
-  const list = owners.querySelector('dl');
-  assert.deepEqual(list.children.map((c) => [c.tagName, text(c)]), [['DT', '#0001'], ['DD', 'Jump Power 2']]);
+  const numbers = new Set(POWERS.flatMap((p) => p.tiers.flatMap((t) => Object.values(t).filter((v) => typeof v === 'number' && v > 3))));
+  assert.deepEqual([...numbers].sort((a, b) => a - b), [140, 180, 220, 270, 300, 330, 360, 650, 920, 1000]);
+  for (const n of numbers) assert.ok(!everything(page).includes(String(n)), `no raw ${n}`);
+  assert.deepEqual(page.querySelectorAll('button').concat(page.querySelectorAll('[data-nav]')), []);
 });
 
-test('the Power page follows the data: a fighter declaring another tier shows up under it', () => {
-  const extra = { ...CHARACTERS[0], id: '9998', displayName: '#9998', rosterSlot: 7, available: true, powers: { jump: 3 } };
-  CHARACTERS.push(extra);
-  try {
+test('Discover names no fighter: no roster, ownership or character data anywhere', () => {
+  const { home, discover } = boot();
+  home.el.querySelectorAll('.home-action')[2].click();
+  const names = CHARACTERS.filter((c) => c.available).map((c) => c.displayName);
+  assert.ok(names.includes('#0001'));
+  for (const section of discover.sections) {
+    section.tab.click();
+    // Visible text, attributes (hidden accessible names included) and markup.
+    const all = everything(discover.el);
+    for (const name of names) assert.ok(!all.includes(name), `${section.id}: no ${name}`);
+    assert.doesNotMatch(all, /#\d{4}/, `${section.id}: no character id`);
+    assert.doesNotMatch(all, /\bFighters?\b|Used by|\broster\b/i, `${section.id}: no ownership labels`);
+  }
+  const page = discover.sections[0].panel;
+  for (const gone of ['.discover-owners', '.discover-tier-users', '.discover-tier-check', '.is-used', 'dl']) {
+    assert.deepEqual(page.querySelectorAll(gone), [], `no ${gone}`);
+  }
+
+  // Structurally: the screen builds its Power content from the Power
+  // registry alone, never from the roster.
+  const source = readFileSync(new URL('../js/screens/discover-screen.js', import.meta.url), 'utf8');
+  assert.doesNotMatch(source, /characters\.js|\bCHARACTERS\b|getCharacter\b/);
+  assert.doesNotMatch(source, /getFighterPowerTier|fighterTiers|displayName|\.powers\b/);
+  assert.doesNotMatch(source, /'Fighters'|Used by|is-used/);
+  assert.match(source, /import \{ POWERS \} from '\.\.\/data\/powers\.js';/);
+  // And the ownership styles are gone with it.
+  const css = readFileSync(new URL('../styles.css', import.meta.url), 'utf8');
+  assert.doesNotMatch(css, /\.discover-(owners|tier-users|tier-check|label)\b|\.discover-tier\.is-used/);
+});
+
+test('the Power page stays the same as the roster grows', () => {
+  const render = () => {
     const { home, discover } = boot();
     home.el.querySelectorAll('.home-action')[2].click();
-    const page = discover.sections[0].panel;
-    const rows = page.querySelectorAll('.discover-tier');
-    assert.deepEqual(rows.map((r) => r.querySelector('.discover-tier-users') && text(r.querySelector('.discover-tier-users'))), [
-      null, 'Used by #0001', 'Used by #9998',
-    ]);
-    assert.deepEqual(page.querySelector('dl').children.map(text), ['#0001', 'Jump Power 2', '#9998', 'Jump Power 3']);
+    return everything(discover.sections[0].panel);
+  };
+  const before = render();
+  const extra = { ...CHARACTERS[0], id: '9998', displayName: '#9998', rosterSlot: 7, available: true, powers: { jump: 3, speed: 1 } };
+  CHARACTERS.push(extra);
+  try {
+    const after = render();
+    assert.equal(after, before, 'another fighter, on other tiers, changes nothing');
+    assert.ok(!after.includes('#9998'));
   } finally {
     CHARACTERS.splice(CHARACTERS.indexOf(extra), 1);
   }

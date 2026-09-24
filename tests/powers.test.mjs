@@ -1,29 +1,51 @@
 // Run with node --test tests/powers.test.mjs (no dependencies).
-// The Power system (js/data/powers.js): the Jump Power tier table, its
-// resolvers, #0001's Jump Power 2, and the shared Fighter jump taking its
-// strength from the tier for player and CPU fighters alike, while gravity,
-// falling, coyote time, the jump buffer, knockback and every other movement
-// stat stay independent of it. Runs the real Fighter, physics and combat
-// (see fighter-harness.mjs).
+// The Power system (js/data/powers.js): the registry of fighter Powers (Jump,
+// Speed) and attack Powers (Horizontal and Vertical Knockback), their frozen
+// tier tables and resolvers, and #0001's Jump Power 2 and Speed Power 2. The
+// shared Fighter takes its jump strength and top speed from those tiers for
+// player and CPU fighters alike, while gravity, falling, coyote time, the jump
+// buffer, acceleration, knockback, projectiles, techniques and every other
+// movement stat stay independent of them. Attack definitions turn their
+// knockback Powers into numeric knockback once, when they are created. Runs
+// the real Fighter, physics and combat (see fighter-harness.mjs).
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  POWERS, JUMP_POWER_TIERS, getPower, getPowerTier, getFighterPowerTier, getJumpPowerTier, getJumpVelocity,
+  POWERS, FIGHTER_POWERS, ATTACK_POWERS,
+  JUMP_POWER_TIERS, SPEED_POWER_TIERS, HORIZONTAL_KNOCKBACK_POWER_TIERS, VERTICAL_KNOCKBACK_POWER_TIERS,
+  getPower, getPowerTier, getFighterPowerTier, getJumpPowerTier, getJumpVelocity, getSpeedPowerTier, getMaxSpeed,
+  getAttackPowerTier, getHorizontalKnockback, getVerticalKnockback, getAttackKnockback,
 } from '../js/data/powers.js';
 import { CHARACTERS } from '../js/data/characters.js';
 import { Fighter } from '../js/game/character.js';
 import { CombatSystem, createAttackDefinition } from '../js/game/combat.js';
+import { spawnProjectiles } from '../js/game/projectile.js';
 import { PlayerController, TrainingAIController } from '../js/game/fighter-controller.js';
 import { CONFIG } from '../js/config.js';
 import { def, DT, STAGE, SIM_CTX, fakeSprites, makeFighter, stepUntil } from './fighter-harness.mjs';
 
 const JUMP = { jump: true, jumpPressed: true };
+const RIGHT = { right: true };
 // One step with gravity switched off: the velocity the jump itself set,
 // before any gravity is integrated.
 const NO_GRAVITY = { stage: STAGE, gravity: 0 };
 
-// #0001 with another Jump Power tier and nothing else changed.
+// #0001 with another Jump Power or Speed Power tier and nothing else changed.
 const withJump = (tier) => ({ ...def, powers: { ...def.powers, jump: tier } });
+const withSpeed = (tier) => ({ ...def, powers: { ...def.powers, speed: tier } });
+
+const SPEEDS = [[1, 270], [2, 330], [3, 360]];
+
+// Holds `held` until horizontal speed stops changing; returns the settled vx.
+function settledSpeed(step, fighter, held = RIGHT) {
+  let vx = NaN;
+  for (let i = 0; i < 600; i++) {
+    step(held);
+    if (fighter.body.vx === vx) return vx;
+    vx = fighter.body.vx;
+  }
+  throw new Error('speed never settled');
+}
 
 // Silences and collects console.warn while `fn` runs.
 function warnings(fn) {
@@ -61,7 +83,7 @@ function apexOf(character) {
   return { height: ground - top, airSteps: steps };
 }
 
-// ---- The tier table ------------------------------------------------------------
+// ---- Jump Power ------------------------------------------------------------------
 
 test('Jump Power has exactly three tiers: 650, 920 and 1000', () => {
   assert.deepEqual(JUMP_POWER_TIERS.map((t) => [t.tier, t.name, t.description, t.jumpVelocity]), [
@@ -85,36 +107,71 @@ test('Jump Power tiers are strictly ordered: 1 < 2 < 3', () => {
   }
 });
 
-test('POWERS is the one registry of Power types: Jump Power, frozen, with a valid default tier', () => {
-  assert.deepEqual(POWERS.map((p) => p.id), ['jump']);
-  const jump = getPower('jump');
-  assert.equal(jump.name, 'Jump Power');
-  assert.equal(jump.tiers, JUMP_POWER_TIERS);
-  assert.match(jump.summary, /how high a fighter’s normal jump goes/);
-  assert.match(jump.summary, /Higher tiers jump higher/);
-  assert.equal(getPowerTier('jump', jump.defaultTier), JUMP_POWER_TIERS[1], 'the default is the normal jump');
+// ---- Registry ------------------------------------------------------------------
+
+test('POWERS is the one registry of Power types: four Powers in two scopes, frozen, each with tiers 1, 2 and 3', () => {
+  assert.deepEqual(POWERS.map((p) => p.id), ['jump', 'speed', 'horizontalKnockback', 'verticalKnockback']);
+  assert.deepEqual(POWERS.map((p) => p.name), ['Jump Power', 'Speed Power', 'Horizontal Knockback Power', 'Vertical Knockback Power']);
+  assert.deepEqual(POWERS.map((p) => [p.id, p.scope]), [
+    ['jump', 'fighter'], ['speed', 'fighter'], ['horizontalKnockback', 'attack'], ['verticalKnockback', 'attack'],
+  ]);
+  assert.deepEqual(FIGHTER_POWERS.map((p) => p.id), ['jump', 'speed']);
+  assert.deepEqual(ATTACK_POWERS.map((p) => p.id), ['horizontalKnockback', 'verticalKnockback']);
+  assert.deepEqual(POWERS.map((p) => p.tiers), [
+    JUMP_POWER_TIERS, SPEED_POWER_TIERS, HORIZONTAL_KNOCKBACK_POWER_TIERS, VERTICAL_KNOCKBACK_POWER_TIERS,
+  ]);
   for (const power of POWERS) {
     assert.ok(power.id && power.name && power.summary);
-    assert.deepEqual(power.tiers.map((t) => t.tier), power.tiers.map((_, i) => i + 1), `${power.id} tiers count up from 1`);
-    assert.ok(Object.isFrozen(power) && Object.isFrozen(power.tiers) && power.tiers.every(Object.isFrozen));
+    assert.equal(getPower(power.id), power);
+    assert.deepEqual(power.tiers.map((t) => t.tier), [1, 2, 3], `${power.id} has exactly tiers 1, 2 and 3`);
+    assert.deepEqual(power.tiers.map((t) => t.name), [1, 2, 3].map((n) => `${power.name} ${n}`));
+    assert.ok(power.tiers.every((t) => typeof t.description === 'string' && t.description.endsWith('.')));
+    assert.equal(power.defaultTier, 2, `${power.id} falls back to its normal tier`);
+    assert.ok(Object.isFrozen(power) && Object.isFrozen(power.tiers) && power.tiers.every(Object.isFrozen), `${power.id} is frozen`);
+    // Player-facing copy is mechanics only: no fighter is ever named.
+    for (const text of [power.name, power.summary, ...power.tiers.flatMap((t) => [t.name, t.description])]) {
+      assert.doesNotMatch(text, /#\d{4}/, text);
+      for (const character of CHARACTERS) assert.ok(!text.includes(character.displayName), text);
+    }
   }
-  assert.ok(Object.isFrozen(POWERS));
+  assert.ok(Object.isFrozen(POWERS) && Object.isFrozen(FIGHTER_POWERS) && Object.isFrozen(ATTACK_POWERS));
   assert.equal(getPower('nope'), null);
+  assert.deepEqual(POWERS.map((p) => p.summary), [
+    'Controls how high a normal jump goes. Higher tiers jump higher.',
+    'Controls maximum movement speed. Higher tiers move faster.',
+    'Controls how strongly an attack pushes a hit opponent sideways. Higher tiers push farther.',
+    'Controls how strongly an attack launches a hit opponent upward. Higher tiers launch higher.',
+  ]);
+});
+
+test('fighter resolvers read fighter Powers only; attack resolvers attack Powers only', () => {
+  const attack = { id: 'probe', powers: { horizontalKnockback: 2, verticalKnockback: 2 } };
+  const fighter = { ...def, powers: { ...def.powers, horizontalKnockback: 3 } };
+  for (const power of ATTACK_POWERS) assert.equal(getFighterPowerTier(fighter, power.id), null, power.id);
+  for (const power of FIGHTER_POWERS) assert.equal(getAttackPowerTier({ ...attack, powers: { [power.id]: 2 } }, power.id), null, power.id);
+  assert.equal(getAttackPowerTier(attack, 'unknown'), null);
+  assert.equal(getFighterPowerTier(def, 'speed'), getSpeedPowerTier(def));
 });
 
 // ---- #0001 ------------------------------------------------------------------------
 
-test('#0001 declares Jump Power 2, which resolves to its original 920', () => {
-  assert.deepEqual(def.powers, { jump: 2 });
+test('#0001 declares Jump Power 2 and Speed Power 2, which resolve to its original 920 and 330', () => {
+  assert.deepEqual(def.powers, { jump: 2, speed: 2 });
   assert.equal(getJumpPowerTier(def), getPowerTier('jump', 2));
   assert.equal(getFighterPowerTier(def, 'jump').name, 'Jump Power 2');
   assert.equal(getJumpVelocity(def), 920);
   assert.equal('jumpVelocity' in def.movement, false, 'the tier is the only source of the jump strength');
-  // Every roster fighter owns a valid tier of every Power.
+  assert.equal(getSpeedPowerTier(def), getPowerTier('speed', 2));
+  assert.equal(getFighterPowerTier(def, 'speed').name, 'Speed Power 2');
+  assert.equal(getMaxSpeed(def), 330);
+  assert.equal('maxSpeed' in def.movement, false, 'the tier is the only source of the top speed');
+  // Every roster fighter owns a valid tier of every fighter Power, and no
+  // attack Power: those belong to its attacks.
   for (const character of CHARACTERS) {
-    for (const power of POWERS) {
+    for (const power of FIGHTER_POWERS) {
       assert.ok(power.tiers.some((t) => t.tier === character.powers?.[power.id]), `${character.displayName} ${power.name}`);
     }
+    for (const power of ATTACK_POWERS) assert.equal(power.id in character.powers, false, `${character.displayName} ${power.id}`);
   }
 });
 
@@ -136,7 +193,7 @@ test('a normal #0001 jump still starts at exactly -920, then falls under the unc
 
 // ---- Other tiers --------------------------------------------------------------
 
-test('fighters configured with tier 1 or tier 3 receive that tier\'s jump', () => {
+test('fighters configured with Jump Power 1 or 3 receive that tier\'s jump', () => {
   for (const [tier, velocity] of [[1, 650], [2, 920], [3, 1000]]) {
     const { fighter } = makeFighter({ character: withJump(tier) });
     assert.equal(fighter.jumpVelocity, velocity);
@@ -154,7 +211,7 @@ test('Jump Power 1 is dramatically lower than the normal jump; Jump Power 3 only
   assert.ok(low.airSteps < normal.airSteps && normal.airSteps < high.airSteps);
 });
 
-test('the tier changes nothing but the jump\'s initial speed: gravity, fall speed and movement stats are shared', () => {
+test('Jump Power changes nothing but the jump\'s initial speed: gravity, fall speed and movement stats are shared', () => {
   const fighters = [1, 2, 3].map((tier) => makeFighter({ character: withJump(tier) }));
   for (const { fighter } of fighters) {
     assert.equal(fighter.def.movement, def.movement, 'the same movement data');
@@ -186,46 +243,52 @@ test('the tier changes nothing but the jump\'s initial speed: gravity, fall spee
   assert.equal(CONFIG.sim.gravity, 2500, 'global gravity is untouched');
 });
 
-test('coyote time and the jump buffer work the same for every tier', () => {
+// Coyote time and the jump buffer for `character`, whose normal jump starts
+// at `velocity`: a jump just inside coyote time works and one just past it
+// does not; a press buffered just before touchdown jumps on landing and one
+// pressed too early has expired.
+function checkCoyoteAndBuffer(character, velocity, label) {
   const coyoteSteps = Math.floor(def.movement.coyoteTime / DT);
   const bufferSteps = Math.floor(def.movement.jumpBuffer / DT);
+
+  // Walk off the ledge, then jump while coyote time remains.
+  const ledge = makeFighter({ character, x: 1000, y: 600 });
+  assert.equal(ledge.fighter.body.ground.id, 'ledge');
+  stepUntil(ledge.step, (f) => !f.grounded, RIGHT);
+  for (let i = 0; i < coyoteSteps - 1; i++) ledge.step(RIGHT);
+  ledge.fighter.controller = { getInput: () => JUMP };
+  ledge.fighter.update(DT, NO_GRAVITY);
+  assert.equal(ledge.fighter.body.vy, -velocity, `${label}: a coyote-time jump`);
+
+  // Past coyote time, the same press does not jump.
+  const late = makeFighter({ character, x: 1000, y: 600 });
+  stepUntil(late.step, (f) => !f.grounded, RIGHT);
+  for (let i = 0; i < coyoteSteps + 2; i++) late.step(RIGHT);
+  const vy = late.fighter.body.vy;
+  late.fighter.controller = { getInput: () => JUMP };
+  late.fighter.update(DT, NO_GRAVITY);
+  assert.equal(late.fighter.body.vy, vy, `${label}: no jump after coyote time`);
+
+  // Pressed a few steps before touchdown, the buffered press jumps on the
+  // step after landing; pressed too early, it has expired by then.
+  const ref = makeFighter({ character });
+  ref.step(JUMP);
+  const airborne = stepUntil(ref.step, (f) => f.grounded);
+  for (const [early, jumps] of [[bufferSteps - 2, true], [bufferSteps + 3, false]]) {
+    const run = makeFighter({ character });
+    run.step(JUMP);
+    for (let i = 1; i < airborne - early; i++) run.step();
+    run.step(JUMP);
+    stepUntil(run.step, (f) => f.grounded);
+    run.step();
+    assert.equal(!run.fighter.grounded, jumps, `${label}: pressed ${early} steps before landing`);
+    if (jumps) assert.equal(run.fighter.body.vy, -velocity + CONFIG.sim.gravity * def.movement.gravityScale * DT);
+  }
+}
+
+test('coyote time and the jump buffer work the same for every Jump Power tier', () => {
   for (const tier of [1, 2, 3]) {
-    const velocity = getPowerTier('jump', tier).jumpVelocity;
-    const character = withJump(tier);
-
-    // Walk off the ledge, then jump while coyote time remains.
-    const ledge = makeFighter({ character, x: 1000, y: 600 });
-    assert.equal(ledge.fighter.body.ground.id, 'ledge');
-    stepUntil(ledge.step, (f) => !f.grounded, { right: true });
-    for (let i = 0; i < coyoteSteps - 1; i++) ledge.step({ right: true });
-    ledge.fighter.controller = { getInput: () => JUMP };
-    ledge.fighter.update(DT, NO_GRAVITY);
-    assert.equal(ledge.fighter.body.vy, -velocity, `tier ${tier}: a coyote-time jump`);
-
-    // Past coyote time, the same press does not jump.
-    const late = makeFighter({ character, x: 1000, y: 600 });
-    stepUntil(late.step, (f) => !f.grounded, { right: true });
-    for (let i = 0; i < coyoteSteps + 2; i++) late.step({ right: true });
-    const vy = late.fighter.body.vy;
-    late.fighter.controller = { getInput: () => JUMP };
-    late.fighter.update(DT, NO_GRAVITY);
-    assert.equal(late.fighter.body.vy, vy, `tier ${tier}: no jump after coyote time`);
-
-    // Pressed a few steps before touchdown, the buffered press jumps on the
-    // step after landing; pressed too early, it has expired by then.
-    const ref = makeFighter({ character });
-    ref.step(JUMP);
-    const airborne = stepUntil(ref.step, (f) => f.grounded);
-    for (const [early, jumps] of [[bufferSteps - 2, true], [bufferSteps + 3, false]]) {
-      const run = makeFighter({ character });
-      run.step(JUMP);
-      for (let i = 1; i < airborne - early; i++) run.step();
-      run.step(JUMP);
-      stepUntil(run.step, (f) => f.grounded);
-      run.step();
-      assert.equal(!run.fighter.grounded, jumps, `tier ${tier}: pressed ${early} steps before landing`);
-      if (jumps) assert.equal(run.fighter.body.vy, -velocity + CONFIG.sim.gravity * def.movement.gravityScale * DT);
-    }
+    checkCoyoteAndBuffer(withJump(tier), getPowerTier('jump', tier).jumpVelocity, `Jump Power ${tier}`);
   }
 });
 
@@ -314,4 +377,352 @@ test('only the jump reads Jump Power: a fighter at rest or running has the same 
     }
   }
   assert.ok(SIM_CTX.gravity === CONFIG.sim.gravity);
+});
+
+test('Speed Power and Jump Power are independent of each other', () => {
+  for (const tier of [1, 3]) {
+    const jumper = makeFighter({ character: withJump(tier) }).fighter;
+    assert.equal(jumper.maxSpeed, 330, `Jump Power ${tier} keeps Speed Power 2`);
+    const runner = makeFighter({ character: withSpeed(tier) }).fighter;
+    assert.equal(runner.jumpVelocity, 920, `Speed Power ${tier} keeps Jump Power 2`);
+    assert.deepEqual(apexOf(withSpeed(tier)), apexOf(def), `Speed Power ${tier}: the same jump height and airtime`);
+  }
+});
+
+// ---- Speed Power --------------------------------------------------------------
+
+test('Speed Power has exactly three tiers: 270, 330 and 360', () => {
+  assert.deepEqual(SPEED_POWER_TIERS.map((t) => [t.tier, t.name, t.description, t.maxSpeed]), [
+    [1, 'Speed Power 1', 'Slow.', 270],
+    [2, 'Speed Power 2', 'Normal speed.', 330],
+    [3, 'Speed Power 3', 'Slightly faster.', 360],
+  ]);
+  for (const [tier, speed] of SPEEDS) assert.equal(getPowerTier('speed', tier).maxSpeed, speed);
+  assert.equal(getPowerTier('speed', 0), null);
+  assert.equal(getPowerTier('speed', 4), null);
+});
+
+test('Speed Power tiers are strictly ordered: tier 1 clearly slower, tier 3 only moderately faster', () => {
+  const [slow, normal, fast] = [1, 2, 3].map((tier) => getPowerTier('speed', tier).maxSpeed);
+  assert.ok(slow < normal && normal < fast);
+  assert.ok(slow <= normal * 0.85, 'tier 1 is clearly slower');
+  assert.ok(fast > normal && fast <= normal * 1.15, 'tier 3 is not a dramatic boost');
+});
+
+test('a held run caps at exactly the tier\'s top speed, on the ground and in the air', () => {
+  for (const [tier, speed] of SPEEDS) {
+    const character = withSpeed(tier);
+    const right = makeFighter({ character });
+    assert.equal(right.fighter.maxSpeed, speed);
+    assert.equal(settledSpeed(right.step, right.fighter), speed, `Speed Power ${tier} right`);
+    assert.equal(right.fighter.state, 'run');
+    const left = makeFighter({ character });
+    assert.equal(settledSpeed(left.step, left.fighter, { left: true }), -speed, `Speed Power ${tier} left`);
+
+    // The same target in the air: from a standing jump, air control builds
+    // up to the tier's speed and no further.
+    const air = makeFighter({ character });
+    air.step(JUMP);
+    let top = 0;
+    while (!air.fighter.grounded) {
+      air.step(RIGHT);
+      top = Math.max(top, air.fighter.body.vx);
+    }
+    assert.equal(top, speed, `Speed Power ${tier} in the air`);
+  }
+  // #0001 itself: exactly its original 330.
+  const { fighter, step } = makeFighter();
+  assert.equal(settledSpeed(step, fighter), 330);
+});
+
+test('Speed Power changes only the top speed: acceleration, deceleration, air control and the turn boost are shared', () => {
+  const mv = def.movement;
+  const close = (a, b) => Math.abs(a - b) < 1e-9;
+  // Each step's change in vx while it is still short of its target.
+  const deltas = (step, fighter, held, n) => {
+    const out = [];
+    for (let i = 0; i < n; i++) {
+      const vx = fighter.body.vx;
+      step(held);
+      out.push(fighter.body.vx - vx);
+    }
+    return out;
+  };
+  for (const [tier, speed] of SPEEDS) {
+    const character = withSpeed(tier);
+    const label = `Speed Power ${tier}`;
+    const { fighter, step } = makeFighter({ character });
+    assert.equal(fighter.def.movement, mv, 'the same movement data');
+
+    // Ground acceleration from rest, the same per step until the cap.
+    const accel = Math.floor(speed / (mv.acceleration * DT));
+    assert.ok(deltas(step, fighter, RIGHT, accel).every((d) => close(d, mv.acceleration * DT)), `${label}: acceleration`);
+    settledSpeed(step, fighter);
+    // The turn boost on the first step against the run.
+    const [turn] = deltas(step, fighter, { left: true }, 1);
+    assert.ok(close(turn, -mv.acceleration * mv.turnBoost * DT), `${label}: turn boost`);
+    // Ground deceleration from the tier's top speed.
+    settledSpeed(step, fighter);
+    const decel = Math.floor(speed / (mv.deceleration * DT));
+    assert.ok(deltas(step, fighter, {}, decel).every((d) => close(d, -mv.deceleration * DT)), `${label}: deceleration`);
+
+    // Air acceleration from a standing jump, then the gentle air drag.
+    const air = makeFighter({ character });
+    air.step(JUMP);
+    const airAccel = Math.floor(speed / (mv.airAcceleration * DT));
+    assert.ok(deltas(air.step, air.fighter, RIGHT, airAccel).every((d) => close(d, mv.airAcceleration * DT)), `${label}: air acceleration`);
+    assert.ok(deltas(air.step, air.fighter, {}, 5).every((d) => close(d, -mv.airDeceleration * DT)), `${label}: air deceleration`);
+  }
+});
+
+test('Speed Power changes nothing vertical: jump, gravity, fall speed, coyote time and the jump buffer', () => {
+  const reference = makeFighter();
+  reference.step(JUMP);
+  const path = [];
+  while (!reference.fighter.grounded) path.push([reference.fighter.body.y, reference.fighter.body.vy, reference.step().state]);
+  for (const tier of [1, 3]) {
+    const character = withSpeed(tier);
+    const { fighter, step } = makeFighter({ character });
+    assert.equal(fighter.jumpVelocity, 920);
+    assert.equal(fighter.body.gravityScale, def.movement.gravityScale);
+    assert.equal(fighter.body.maxFall, def.movement.maxFallSpeed);
+    step(JUMP);
+    const own = [];
+    while (!fighter.grounded) own.push([fighter.body.y, fighter.body.vy, step().state]);
+    assert.deepEqual(own, path, `Speed Power ${tier}: the same jump, rise and fall`);
+    checkCoyoteAndBuffer(character, 920, `Speed Power ${tier}`);
+  }
+  assert.equal(CONFIG.sim.gravity, 2500, 'global gravity is untouched');
+});
+
+// A ground Dodge from standing: how many steps it lasts, how far it moved.
+function dodgeFrom(character) {
+  const { fighter, step } = makeFighter({ character });
+  const x = fighter.body.x;
+  step({ defense: true, defensePressed: true });
+  assert.equal(fighter.state, 'defense');
+  const steps = stepUntil(step, (f) => !f.combat.defenseAction);
+  return { steps, moved: fighter.body.x - x };
+}
+
+test('Speed Power leaves every other velocity alone: knockback received, the shuriken, the Sphere Rush and Dodges', () => {
+  // Knockback and launches received: tier 1 and tier 3 targets fly alike.
+  const launch = createAttackDefinition({
+    id: 'launch', animation: 'ba1', startup: 0, active: DT, recovery: 0,
+    damage: 5, knockback: { x: 260, y: 480 }, hitstun: 0.4, hitstop: 0,
+  });
+  const flights = [1, 3].map((tier) => {
+    const attacker = makeFighter({ x: 400 });
+    const target = makeFighter({ character: withSpeed(tier), x: 460, facing: -1 });
+    new CombatSystem().applyHit(attacker.fighter, target.fighter, launch);
+    assert.deepEqual([target.fighter.body.vx, target.fighter.body.vy], [260, -480]);
+    const path = [];
+    while (target.fighter.combat.stun > 0 || !target.fighter.grounded) {
+      target.step();
+      path.push([target.fighter.body.x, target.fighter.body.y]);
+      assert.ok(path.length < 600);
+    }
+    return path;
+  });
+  assert.deepEqual(flights[0], flights[1]);
+
+  for (const [tier] of SPEEDS) {
+    const character = withSpeed(tier);
+    const label = `Speed Power ${tier}`;
+
+    // The shuriken flies at its own 700.
+    const thrower = makeFighter({ character });
+    const projectiles = [];
+    for (let i = 0; i < 30 && !projectiles.length; i++) {
+      thrower.step(i === 0 ? { primary: true, primaryPressed: true } : {});
+      spawnProjectiles([thrower.fighter], projectiles);
+    }
+    assert.equal(projectiles.length, 1);
+    assert.equal(projectiles[0].vx, def.projectiles.shuriken.speed, label);
+    assert.equal(def.projectiles.shuriken.speed, 700);
+
+    // The Sphere Rush dashes at its own 1050.
+    const rusher = makeFighter({ character });
+    rusher.step({ charge: true });
+    rusher.step({ charge: true, action2: true, action2Pressed: true });
+    const technique = rusher.fighter.technique;
+    assert.ok(technique, `${label}: the Sphere Rush started`);
+    stepUntil(rusher.step, () => technique.phase === 'dash');
+    assert.equal(rusher.fighter.body.vx, def.chargedTechniques.rasenRush.dashSpeed, label);
+    assert.equal(def.chargedTechniques.rasenRush.dashSpeed, 1050);
+
+    // A Dodge from standing still adds no movement and lasts as long.
+    const dodge = dodgeFrom(character);
+    assert.deepEqual(dodge, dodgeFrom(def), `${label}: the same Dodge, with no movement`);
+    assert.equal(dodge.moved, 0);
+
+    // At its own top speed the run clip plays at its own rate.
+    const runner = makeFighter({ character });
+    settledSpeed(runner.step, runner.fighter);
+    assert.equal(runner.fighter.animator.anim.key, 'run');
+    assert.equal(runner.fighter.animator.speed, 1, `${label}: the run clip's own rate at top speed`);
+    assert.equal(runner.fighter.animator.anim.fps, def.animations.run.fps);
+  }
+});
+
+test('the same Fighter speed serves player- and CPU-controlled fighters, with the tier each declares', () => {
+  for (const [tier, speed] of SPEEDS) {
+    const character = withSpeed(tier);
+    const player = fighterWith(character, new PlayerController({ sample: () => ({ ...RIGHT }) }), 300);
+    const ai = new TrainingAIController({ rng: () => 0.5 });
+    ai.thinkTimer = Infinity; // no decisions of its own: just keep walking right
+    ai.moveIntent = 1;
+    const cpu = fighterWith(character, ai, 600);
+    // Far away, so neither turns back toward the other.
+    const decoy = makeFighter({ x: 1900 }).fighter;
+    player.opponent = decoy;
+    cpu.opponent = decoy;
+    for (const fighter of [player, cpu]) {
+      assert.ok(fighter instanceof Fighter);
+      assert.equal(fighter.update, Fighter.prototype.update, 'no separate player or CPU movement');
+      assert.equal(fighter.maxSpeed, speed);
+      let top = 0;
+      for (let i = 0; i < 60; i++) {
+        fighter.update(DT, SIM_CTX);
+        top = Math.max(top, fighter.body.vx);
+      }
+      assert.equal(top, speed, `${fighter.controller.kind} at Speed Power ${tier}`);
+      assert.equal(fighter.body.vx, speed);
+    }
+  }
+});
+
+test('a fighter with no valid Speed Power falls back, logged, to the normal speed', () => {
+  for (const [character, label] of [
+    [{ ...def, powers: { jump: 2 } }, 'no speed tier'],
+    [{ ...def, powers: { jump: 2, speed: 0 } }, 'an unknown tier'],
+    [{ ...def, powers: { jump: 2, speed: '3' } }, 'a tier that is not a number'],
+  ]) {
+    const { value, warnings: logged } = warnings(() => getSpeedPowerTier(character));
+    assert.equal(value, getPowerTier('speed', 2), label);
+    assert.equal(logged.length, 1, `${label} is logged`);
+    assert.match(logged[0], /Speed Power/);
+    const built = warnings(() => makeFighter({ character }).fighter);
+    assert.equal(built.value.maxSpeed, 330, `${label}: still a playable speed`);
+    assert.equal(built.value.jumpVelocity, 920, `${label}: the jump is unaffected`);
+  }
+  assert.deepEqual(warnings(() => getMaxSpeed(def)).warnings, []);
+});
+
+// ---- Attack Powers ------------------------------------------------------------
+
+test('Horizontal Knockback Power has exactly three tiers: 140, 180 and 220', () => {
+  assert.deepEqual(HORIZONTAL_KNOCKBACK_POWER_TIERS.map((t) => [t.tier, t.name, t.description, t.knockbackX]), [
+    [1, 'Horizontal Knockback Power 1', 'Light horizontal knockback.', 140],
+    [2, 'Horizontal Knockback Power 2', 'Normal horizontal knockback.', 180],
+    [3, 'Horizontal Knockback Power 3', 'Strong horizontal knockback.', 220],
+  ]);
+  for (const [tier, x] of [[1, 140], [2, 180], [3, 220]]) {
+    assert.equal(getPowerTier('horizontalKnockback', tier).knockbackX, x);
+    assert.equal(getHorizontalKnockback({ id: 'a', powers: { horizontalKnockback: tier } }), x);
+  }
+  assert.equal(getPowerTier('horizontalKnockback', 4), null);
+});
+
+test('Vertical Knockback Power has exactly three tiers: 140, 220 and 300', () => {
+  assert.deepEqual(VERTICAL_KNOCKBACK_POWER_TIERS.map((t) => [t.tier, t.name, t.description, t.knockbackY]), [
+    [1, 'Vertical Knockback Power 1', 'Light upward launch.', 140],
+    [2, 'Vertical Knockback Power 2', 'Normal upward launch.', 220],
+    [3, 'Vertical Knockback Power 3', 'Strong upward launch.', 300],
+  ]);
+  for (const [tier, y] of [[1, 140], [2, 220], [3, 300]]) {
+    assert.equal(getPowerTier('verticalKnockback', tier).knockbackY, y);
+    assert.equal(getVerticalKnockback({ id: 'a', powers: { verticalKnockback: tier } }), y);
+  }
+  assert.equal(getPowerTier('verticalKnockback', 0), null);
+});
+
+test('both knockback Powers are strictly increasing: 1 < 2 < 3', () => {
+  for (const [table, key] of [[HORIZONTAL_KNOCKBACK_POWER_TIERS, 'knockbackX'], [VERTICAL_KNOCKBACK_POWER_TIERS, 'knockbackY']]) {
+    const values = table.map((t) => t[key]);
+    assert.ok(values.every((v) => v > 0));
+    for (let i = 1; i < values.length; i++) assert.ok(values[i] > values[i - 1], `${key} tier ${i + 1}`);
+  }
+});
+
+test('attack knockback resolves each axis on its own: horizontal only, vertical only, both or neither', () => {
+  const spec = (powers) => ({ id: 'probe', animation: 'ba1', powers });
+  for (const [powers, knockback, label] of [
+    [{ horizontalKnockback: 2 }, { x: 180, y: 0 }, 'horizontal only'],
+    [{ verticalKnockback: 2 }, { x: 0, y: 220 }, 'vertical only'],
+    [{ horizontalKnockback: 3, verticalKnockback: 1 }, { x: 220, y: 140 }, 'both'],
+    [{ horizontalKnockback: 1, verticalKnockback: 3 }, { x: 140, y: 300 }, 'both, the other way'],
+    [{}, { x: 0, y: 0 }, 'neither'],
+  ]) {
+    assert.deepEqual(getAttackKnockback(spec(powers)), knockback, label);
+    const atk = createAttackDefinition(spec(powers));
+    assert.deepEqual(atk.knockback, knockback, `${label}, as an attack definition`);
+    assert.ok(Object.isFrozen(atk) && Object.isFrozen(atk.knockback));
+  }
+  // An omitted axis is 0, not a default tier.
+  assert.equal(getAttackPowerTier(spec({ verticalKnockback: 2 }), 'horizontalKnockback'), null);
+  assert.equal(getHorizontalKnockback(spec({ verticalKnockback: 2 })), 0);
+  assert.equal(getVerticalKnockback(spec({ horizontalKnockback: 2 })), 0);
+  // No Powers at all: an explicit, bespoke knockback is kept as it is, and
+  // without one the attack has none.
+  assert.deepEqual(createAttackDefinition({ id: 'bespoke', knockback: { x: 420, y: 220 } }).knockback, { x: 420, y: 220 });
+  assert.deepEqual(createAttackDefinition({ id: 'plain' }).knockback, { x: 0, y: 0 });
+});
+
+test('attack Powers resolve once, when the attack definition is created, and hits use that number', () => {
+  const powers = { horizontalKnockback: 1, verticalKnockback: 1 };
+  const atk = createAttackDefinition({
+    id: 'probe', animation: 'ba1', startup: 0, active: DT, recovery: 0, damage: 1, hitstop: 0, powers,
+  });
+  // Later edits to the source data never reach the frozen definition.
+  powers.horizontalKnockback = 3;
+  assert.deepEqual(atk.knockback, { x: 140, y: 140 });
+  const attacker = makeFighter({ x: 400 });
+  const target = makeFighter({ x: 460, facing: -1 });
+  new CombatSystem().applyHit(attacker.fighter, target.fighter, atk);
+  assert.equal(target.fighter.body.vx, 140);
+  assert.equal(target.fighter.body.vy, -140, 'a positive vertical Power launches upward');
+  assert.equal(target.fighter.grounded, false);
+});
+
+test('#0001\'s attacks resolve their knockback Powers; bespoke hits keep their own knockback', () => {
+  const { fighter } = makeFighter();
+  assert.deepEqual(fighter.attacks.ba1.knockback, { x: 180, y: 0 });
+  assert.deepEqual(fighter.attacks.midairBa1.knockback, { x: 180, y: 0 });
+  assert.deepEqual(fighter.attacks.ba2.knockback, { x: 0, y: 220 });
+  assert.deepEqual(fighter.attacks.midairBa2.knockback, { x: 0, y: 220 });
+  assert.deepEqual(fighter.attacks.throw.knockback, { x: 0, y: 0 }, 'Throw has no melee hit');
+  for (const id of ['ba1', 'midairBa1', 'ba2', 'midairBa2']) {
+    assert.equal('knockback' in def.attacks[id], false, `${id}: its Powers are the only source`);
+  }
+  // Not migrated: the shuriken and the Sphere Rush hits are bespoke.
+  assert.deepEqual(def.projectiles.shuriken.knockback, { x: 140, y: 0 });
+  assert.deepEqual(fighter.projectileDefs.shuriken.knockback, { x: 140, y: 0 });
+  assert.deepEqual(def.chargedTechniques.rasenRush.firstHit.knockback, { x: 0, y: 0 });
+  assert.deepEqual(def.chargedTechniques.rasenRush.explosionHit.knockback, { x: 420, y: 220 });
+  for (const hit of [def.projectiles.shuriken, def.chargedTechniques.rasenRush.firstHit, def.chargedTechniques.rasenRush.explosionHit]) {
+    assert.equal('powers' in hit, false);
+  }
+});
+
+test('malformed attack Power data: a bad tier is logged and gets the normal tier; a non-attack Power is logged and ignored', () => {
+  for (const [powers, knockback, pattern, label] of [
+    [{ horizontalKnockback: 7 }, { x: 180, y: 0 }, /Horizontal Knockback Power/, 'an unknown horizontal tier'],
+    [{ verticalKnockback: '2' }, { x: 0, y: 220 }, /Vertical Knockback Power/, 'a vertical tier that is not a number'],
+    [{ jump: 2 }, { x: 0, y: 0 }, /"jump", which is not an attack Power/, 'a fighter Power on an attack'],
+    [{ knockbak: 2 }, { x: 0, y: 0 }, /"knockbak", which is not an attack Power/, 'a misspelt Power'],
+  ]) {
+    const { value, warnings: logged } = warnings(() => createAttackDefinition({ id: 'probe', powers }));
+    assert.deepEqual(value.knockback, knockback, label);
+    assert.equal(logged.length, 1, `${label} is logged`);
+    assert.match(logged[0], /Attack "probe"/);
+    assert.match(logged[0], pattern);
+  }
+  // Powers and a raw knockback on one attack: two sources; the Powers win.
+  const both = warnings(() => createAttackDefinition({ id: 'probe', powers: { verticalKnockback: 2 }, knockback: { x: 50, y: 0 } }));
+  assert.deepEqual(both.value.knockback, { x: 0, y: 220 });
+  assert.match(both.warnings.join('\n'), /both knockback Powers and a raw knockback/);
+  // Valid data, and an omitted axis, never warn.
+  assert.deepEqual(warnings(() => makeFighter()).warnings, []);
+  assert.deepEqual(warnings(() => createAttackDefinition({ id: 'probe', powers: { horizontalKnockback: 2 } })).warnings, []);
 });

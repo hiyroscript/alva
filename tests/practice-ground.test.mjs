@@ -1049,6 +1049,41 @@ test('Player 1\'s attacks hit the CPU through the real CombatSystem, and it reac
   assert.equal(events.length, 1);
 });
 
+test('Player 1\'s BA2 launches the CPU straight up (Vertical Knockback Power 2), then gravity brings it down', () => {
+  const { session, run, until, events, numbers } = practiceSession();
+  const { player, cpu } = session;
+  for (let i = 0; i < 300 && cpu.body.x - player.body.x > 60; i++) run({ right: true });
+  run({}, 30);
+  const groundY = cpu.body.y;
+  const startX = cpu.body.x;
+  assert.equal(cpu.grounded, true);
+
+  run({ action2: true, action2Pressed: true });
+  until(() => events.length > 0, 30);
+  const [hit] = events;
+  assert.equal(hit.type, 'hit');
+  assert.equal(hit.target, cpu);
+  assert.equal(hit.damage, player.attacks.ba2.damage);
+  assert.equal(numbers[0].text, '-8');
+  // At impact: launched upward, not pushed sideways.
+  assert.ok(cpu.body.vx === 0, 'no sideways push');
+  assert.equal(cpu.body.vy, -player.attacks.ba2.knockback.y);
+  assert.equal(cpu.body.vy, -220);
+  assert.equal(cpu.grounded, false);
+  let top = groundY;
+  for (let i = 0; i < 120 && !cpu.grounded; i++) {
+    run();
+    top = Math.min(top, cpu.body.y);
+  }
+  assert.ok(top < groundY, 'it left the ground');
+  assert.equal(cpu.grounded, true, 'and came back down');
+  assert.equal(cpu.body.y, groundY);
+  assert.equal(cpu.body.x, startX, 'straight up and down');
+  run({}, 40);
+  assert.equal(cpu.state, 'idle');
+  assert.equal(events.length, 1);
+});
+
 test('shuriken, clone and Sphere Rush hits on the CPU each float their own resolved damage', () => {
   // Throw: the shuriken flies from Player 1's spawn into the CPU.
   {

@@ -143,8 +143,9 @@ behave, and how it must look. The README covers running and deploying it.
 - Data-driven content: `js/data/characters.js`, `js/data/maps.js` (the Quick
   Battle stages), `js/data/practice-map.js` (the training stage) and
   `js/data/powers.js` (the Power tier tables, 7.2). Adding a fighter means
-  adding frames, a definition (including its Power tiers) and a roster slot —
-  never editing engine code.
+  adding frames, a definition (including its fighter Power tiers and its
+  attacks' knockback Power tiers) and a roster slot — never editing engine
+  code.
 - Simulation uses fixed 60 Hz steps with interpolated rendering and a clamped
   frame delta, so behaviour is identical at 30, 60 and 120 Hz.
 
@@ -485,6 +486,11 @@ An in-game reference, entered from Home's Discover action. Its composition
 follows Seren's Cars & more reference screen (an index rail beside a
 scrollable page of structured entries) in Alva's own visual language:
 charcoal surfaces, off-white type, thin borders and the green accent.
+Discover is a character-neutral mechanics reference, not a roster or stat
+sheet: it explains how each mechanic works and never says which fighter (or
+which of a fighter's attacks) uses which Power or tier. No character name or
+ID appears anywhere on it, visibly or in accessible text, and it does not
+read the character database, so it stays the same as fighters are added.
 
 - **Header:** the standard menu header — Back (Alva's back icon, labelled
   "Back") and the title **Discover**. Back, Esc / Backspace and gamepad B
@@ -504,16 +510,30 @@ charcoal surfaces, off-white type, thin borders and the green accent.
   and leaving it toward the rail lands on the open section's tab. The hidden
   page is `hidden`, so nothing in it can take focus. Focus shows as an inset
   frame, so an empty page shows it too.
-- **Power:** one entry per Power type, built from `POWERS` in
-  `js/data/powers.js` (names, descriptions, tier numbers) and the roster's
-  own `powers` data, so it cannot drift from gameplay. Today that is
-  **Jump Power**: "Controls how high a fighter’s normal jump goes. Higher
-  tiers jump higher." Beside it (stacked when there is no room for two
-  columns), its tiers — **Jump Power 1** "Very low jump.", **Jump Power 2**
-  "Normal jump.", **Jump Power 3** "Slightly higher jump." — each with a
-  decorative rising-bar meter. A Fighters list and a check-marked "Used by
-  #0001" on the Jump Power 2 row say which tier each fighter owns. No
-  velocities or other physics constants are shown.
+- **Power:** one entry per Power type, in registry order, built only from
+  `POWERS` in `js/data/powers.js` (names, descriptions, tier numbers), so it
+  cannot drift from gameplay. Each entry is the Power's name and summary
+  beside (stacked when there is no room for two columns) its three tiers,
+  each with its name, description and a decorative rising-bar meter; every
+  tier row looks the same, none is singled out. Today there are four:
+  - **Jump Power**: "Controls how high a normal jump goes. Higher tiers jump
+    higher." — Jump Power 1 "Very low jump.", Jump Power 2 "Normal jump.",
+    Jump Power 3 "Slightly higher jump."
+  - **Speed Power**: "Controls maximum movement speed. Higher tiers move
+    faster." — Speed Power 1 "Slow.", Speed Power 2 "Normal speed.", Speed
+    Power 3 "Slightly faster."
+  - **Horizontal Knockback Power**: "Controls how strongly an attack pushes a
+    hit opponent sideways. Higher tiers push farther." — tiers 1–3 "Light
+    horizontal knockback.", "Normal horizontal knockback.", "Strong
+    horizontal knockback."
+  - **Vertical Knockback Power**: "Controls how strongly an attack launches a
+    hit opponent upward. Higher tiers launch higher." — tiers 1–3 "Light
+    upward launch.", "Normal upward launch.", "Strong upward launch."
+
+  No tuning values (velocities, speeds, knockback) or other physics
+  constants are shown, and there is no fighter list, "Used by" label or
+  ownership highlighting. On short landscape windows the entries and tiers
+  tighten so the four entries scroll by in a few steps.
 - **Conditions:** intentionally empty — no cards, placeholder or "coming
   soon" copy — until a Conditions system exists. The section is fully
   selectable and accessible.
@@ -566,11 +586,12 @@ charcoal surfaces, off-white type, thin borders and the green accent.
   at 12 fps. Phases are whole frames: ground BA1 is frame 1 startup, frame 2
   active, frames 3–4 recovery; mid-air BA1 is frames 1–2 startup, frame 3
   active, frames 4–5 recovery. Each hits once for 6 damage, 0.22 s hitstun,
-  0.14 s blockstun, 0.06 s hitstop, 180 horizontal knockback and no launch,
-  with a 0.1 s cooldown. Hitboxes match the strike in the contact frame and
-  mirror with facing. Movement and facing lock while an attack plays; gravity
-  still applies, and a mid-air BA1 that lands finishes its own clip. Ground
-  BA1 is ground-only.
+  0.14 s blockstun, 0.06 s hitstop and a 0.1 s cooldown. Both declare
+  Horizontal Knockback Power 2 (`powers: { horizontalKnockback: 2 }`), so
+  they keep their 180 horizontal knockback, with no launch. Hitboxes match
+  the strike in the contact frame and mirror with facing. Movement and facing
+  lock while an attack plays; gravity still applies, and a mid-air BA1 that
+  lands finishes its own clip. Ground BA1 is ground-only.
 - Basic Attack 2 (BA2) is #0001's secondary basic attack, on the `action2`
   input, selected the same way (`action2: { ground, air }`). On the ground it
   is a spinning high kick (`ba2`, 7 real frames); in the air a kunai slash
@@ -580,13 +601,20 @@ charcoal surfaces, off-white type, thin borders and the green accent.
   frames 6–7 recovery; mid-air BA2 is frames 1–2 startup (kunai drawn back,
   then overhead) and frame 3 active (the slash arc), with no recovery frame,
   so the attack ends with its clip. BA2 is slower and heavier than BA1: each
-  hits once for 8 damage, 0.24 s hitstun, 0.15 s blockstun, 0.07 s hitstop,
-  220 horizontal knockback and no launch, with a 0.15 s cooldown on the
-  ground and 0.18 s in the air. Hitboxes cover the kick arc and the slash arc
-  in front of the fighter and mirror with facing. The same movement/facing
-  lock applies, gravity keeps working, and a mid-air BA2 that lands finishes
-  its own clip instead of switching to ground BA2 or Land. Ground BA2 is
-  ground-only; pressing BA2 and Jump on the same step attacks on the ground.
+  hits once for 8 damage, 0.24 s hitstun, 0.15 s blockstun and 0.07 s
+  hitstop, with a 0.15 s cooldown on the ground and 0.18 s in the air. Both
+  declare Vertical Knockback Power 2 (`powers: { verticalKnockback: 2 }`):
+  an unblocked hit launches the opponent upward at 220 (at impact vx 0, vy
+  −220, airborne, then normal gravity brings it down) instead of the 220
+  sideways push BA2 used to have, and it has no horizontal knockback. The
+  launch comes from the shared knockback path, not special BA2 code. A
+  blocked BA2 still takes chip damage, blockstun and hitstop, but is never
+  launched (vertical knockback applies only to unblocked hits) and is not
+  pushed. Hitboxes cover the kick arc and the slash arc in front of the
+  fighter and mirror with facing. The same movement/facing lock applies,
+  gravity keeps working, and a mid-air BA2 that lands finishes its own clip
+  instead of switching to ground BA2 or Land. Ground BA2 is ground-only;
+  pressing BA2 and Jump on the same step attacks on the ground.
 - Throw is #0001's projectile attack, on the internal `primary` action
   (player-facing name Throw; keyboard J, gamepad X / Square, touch **T**).
   The character data maps `primary: 'throw'`. It is ground-only: there is no
@@ -775,10 +803,13 @@ charcoal surfaces, off-white type, thin borders and the green accent.
   clears. ATTACK plays one ordinary grounded BA1 from frame 1 with the owner's
   real sprites (`0001_1ba1 → 1ba2 → 1ba3 → 1ba4` at 12 fps, the same
   per-clip `sourceFacing` mirroring, no tint, transparency, outline or
-  silhouette) and BA1's own definition (`attacks.ba1`: frame 1 startup, frame
-  2 active, frames 3–4 recovery, 6 damage, 0.22 s hitstun, 0.14 s blockstun,
-  0.06 s hitstop, 180 horizontal knockback), so its hitbox exists only on the
-  active frame and hits at most once. VANISH removes the body and plays the
+  silhouette) and BA1's own resolved attack definition (`attacks.ba1`: frame 1
+  startup, frame 2 active, frames 3–4 recovery, 6 damage, 0.22 s hitstun,
+  0.14 s blockstun, 0.06 s hitstop), so its hitbox exists only on the active
+  frame and hits at most once. It performs the owner's normalized BA1, so it
+  inherits BA1's Horizontal Knockback Power 2 (180 horizontal knockback)
+  automatically; the summon has no knockback tuning of its own and never
+  resolves Powers itself. VANISH removes the body and plays the
   same cloud backwards, `cloneav10 → … → cloneav1`, at the same 20 fps
   (0.5 s), with no hitbox; the clone is then removed. The clone's hitbox is
   resolved from the clone's own position and facing, never the owner's. A hit
@@ -918,24 +949,54 @@ charcoal surfaces, off-white type, thin borders and the green accent.
   Energy regeneration or gain: Charge, hits, Dodges and time generate none,
   and BA1, BA2, Throw, Defense and the Charged BA2 Sphere Rush cost none. The winner is still decided by
   remaining health.
-- Physics: acceleration, deceleration, max speed, gravity, jump impulse
-  (from the fighter's Jump Power, below), ground/platform/solid collision,
+- Physics: acceleration, deceleration, max speed (from the fighter's Speed
+  Power, below), gravity, jump impulse (from its Jump Power, below),
+  ground/platform/solid collision,
   stage bounds, landing detection; collision boxes independent of PNG size;
   bottom-centre origin; no sinking, floating, jitter or escaping the stage.
-- **Powers** (`js/data/powers.js`): gameplay abilities each fighter owns at
-  one tier, declared in its definition (`powers: { jump: 2 }`) and turned
-  into gameplay values only by the tier tables there, which the Discover
-  reference (6.9) also reads. **Jump Power** sets the initial upward speed
-  of the normal, voluntary jump: Jump Power 1 = 650 (a very low jump),
-  Jump Power 2 = 920 (the normal jump) and Jump Power 3 = 1000 (slightly
-  higher), in world units per second at the global gravity of 2500. #0001
-  has **Jump Power 2**, exactly its original 920, so its jump is unchanged.
-  The tier is the only source of jump strength (movement has no raw
-  `jumpVelocity`). The shared Fighter applies it for Player 1, the CPU and
-  Practice Ground alike; buffering, coyote time, action gating, animation,
-  gravity, fall speed, knockback, launches, Dodges and charged techniques
-  never depend on it. A definition without a valid tier is logged and gets
-  the default Jump Power 2.
+- **Powers** (`js/data/powers.js`): gameplay abilities owned at one of three
+  tiers. Each Power is a frozen tier table in the one `POWERS` registry, the
+  single source of its names, descriptions, tier numbers and tuning values:
+  gameplay reads the values, the Discover reference (6.9) the names and
+  descriptions. Every registry entry has a `scope`:
+  - **Fighter Powers** (`scope: 'fighter'`) — Jump and Speed — belong to a
+    fighter, whose definition declares one tier of each
+    (`powers: { jump: 2, speed: 2 }`). `Fighter` resolves them once, at
+    construction (`getJumpVelocity`, `getMaxSpeed`).
+  - **Attack Powers** (`scope: 'attack'`) — Horizontal Knockback and
+    Vertical Knockback — belong to individual attacks, so one fighter's
+    attacks can differ. An attack entry declares the axes it uses
+    (`powers: { horizontalKnockback: 2 }`, `{ verticalKnockback: 2 }`, both
+    or neither); an omitted axis is 0. `createAttackDefinition` resolves them
+    once into the definition's numeric `knockback: { x, y }`, which is all
+    `CombatSystem.applyHit` and clones ever read. Bespoke hits that are not
+    fighter attacks (the shuriken, the Sphere Rush contact and explosion)
+    keep their own raw `knockback`.
+
+  Tier values (world units per second, at the global gravity of 2500):
+
+  | Power | Tier 1 | Tier 2 | Tier 3 | Becomes |
+  | --- | --- | --- | --- | --- |
+  | Jump Power | 650 | 920 | 1000 | initial upward speed of the normal jump |
+  | Speed Power | 270 | 330 | 360 | top speed of normal movement |
+  | Horizontal Knockback Power | 140 | 180 | 220 | the attack's `knockback.x` |
+  | Vertical Knockback Power | 140 | 220 | 300 | the attack's `knockback.y` (launch; `vy = −y`) |
+
+  #0001 has **Jump Power 2** and **Speed Power 2**, exactly its original 920
+  jump and 330 top speed, so its jump and movement are unchanged; BA1 has
+  Horizontal Knockback Power 2 and BA2 Vertical Knockback Power 2 (above).
+  The tiers are the only sources: movement has no raw `jumpVelocity` or
+  `maxSpeed`, and those attacks no raw `knockback`. Speed Power feeds the
+  same normal left / right target speed on the ground and in the air (and
+  the run clip's playback rate, relative to the fighter's own top speed);
+  acceleration, deceleration, the turn boost, air control, gravity, fall
+  speed, coyote time, the jump buffer, knockback, projectiles, Dodges and
+  charged techniques (the Sphere Rush's 1050 dash) never depend on it, just
+  as none of them depend on Jump Power. The shared Fighter applies both for
+  Player 1, the CPU and Practice Ground alike. A declared tier the table
+  lacks (or a fighter missing a fighter Power) is logged and gets tier 2; an
+  attack entry naming something that is not an attack Power is logged and
+  ignored.
 - Combat architecture (health, damage, hitboxes, hurtboxes, attack definitions,
   Defense with Block / Dodge implementations, invulnerability, knockback,
   stun and blockstun, hitstop, cooldowns, Energy, binds, charged actions,

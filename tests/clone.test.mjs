@@ -16,6 +16,7 @@ import { characterFramePaths } from '../js/data/characters.js';
 import { getMap } from '../js/data/maps.js';
 import { Fighter } from '../js/game/character.js';
 import { CombatState } from '../js/game/combat.js';
+import { getHorizontalKnockback } from '../js/data/powers.js';
 import { Clone } from '../js/game/clone.js';
 import { SpriteSet } from '../js/game/sprite-normalizer.js';
 import { TrainingAIController } from '../js/game/fighter-controller.js';
@@ -166,15 +167,19 @@ test('the Clone Attack is data: a 25 Energy Charged BA1 summon reusing ba1 and t
   assert.equal(SUMMON.effectOffset.x, 0);
   assert.ok(SUMMON.effectOffset.y < 0, 'the cloud centres on the body, above the feet');
   assert.equal(def.stats.energy / SUMMON.energyCost, 4, 'a full meter pays for four');
-  // BA1 itself is unchanged.
+  // BA1 itself is unchanged: its knockback is its Horizontal Knockback
+  // Power 2, and the summon has no knockback tuning of its own.
   assert.deepEqual(
     { ...ATTACK },
     {
       animation: 'ba1', startup: 1 / 12, active: 1 / 12, recovery: 2 / 12, damage: 6,
-      hitbox: { x: 12, y: -64, w: 28, h: 16 }, knockback: { x: 180, y: 0 },
+      hitbox: { x: 12, y: -64, w: 28, h: 16 }, powers: { horizontalKnockback: 2 },
       hitstun: 0.22, blockstun: 0.14, hitstop: 0.06, cooldown: 0.1, groundOnly: true,
     },
   );
+  for (const key of ['knockback', 'powers']) assert.equal(key in SUMMON, false, `no summon ${key}`);
+  assert.doesNotMatch(readFileSync(ROOT + 'js/game/clone.js', 'utf8'), /powers\.js|Knockback/,
+    'the clone performs the owner\'s resolved attack; it never reads Power tiers');
   assert.deepEqual(def.actions.action1, { ground: 'ba1', air: 'midairBa1' });
   // No new control: the summon has no action, key or attack of its own.
   assert.equal(def.actions.clone, undefined);
@@ -610,6 +615,11 @@ test('stage edges clamp where the clone appears, without moving it afterwards', 
 test('the clone BA1 hits once with BA1\'s damage, stun and knockback from the clone, credited to the owner', () => {
   const d = duel();
   const clone = summon(d);
+  // The owner's own resolved BA1: Horizontal Knockback Power 2 is already
+  // its numeric knockback, so the clone resolves no Power itself.
+  assert.equal(clone.attackDef, d.attacker.attacks.ba1);
+  assert.deepEqual(clone.attackDef.knockback, { x: getHorizontalKnockback(ATTACK), y: 0 });
+  assert.deepEqual(clone.attackDef.knockback, { x: 180, y: 0 });
   d.until(() => d.events.length > 0);
   assert.equal(d.events.length, 1);
   const [e] = d.events;

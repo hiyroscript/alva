@@ -7,7 +7,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { COMBAT_ACTIONS } from '../js/game/character.js';
-import { worldBox } from '../js/game/combat.js';
+import { worldBox, createAttackDefinition } from '../js/game/combat.js';
+import { getPowerTier } from '../js/data/powers.js';
 import { TrainingAIController } from '../js/game/fighter-controller.js';
 import { CONFIG } from '../js/config.js';
 import {
@@ -43,6 +44,9 @@ test('BA1 attack definitions match their clips and stay conservative', () => {
     assert.ok(Math.abs(atk.total - clip.frames.length / clip.fps) < 1e-9, `${id} lasts one pass of its clip`);
     assert.ok(atk.active < atk.total / 3, `${id} is not active for its whole clip`);
     assert.equal(atk.damage, 6);
+    // Horizontal Knockback Power 2, resolved: the same 180 sideways push
+    // and no launch as before.
+    assert.deepEqual(def.attacks[id].powers, { horizontalKnockback: 2 });
     assert.deepEqual(atk.knockback, { x: 180, y: 0 });
     assert.equal(atk.hitstun, 0.22);
     assert.equal(atk.blockstun, 0.14);
@@ -60,6 +64,28 @@ test('BA1 attack definitions match their clips and stay conservative', () => {
   const a = fighter.attacks.midairBa1;
   assert.deepEqual([a.startup, a.active, a.recovery], [2 / 12, 1 / 12, 2 / 12]);
   assert.equal(a.groundOnly, false);
+});
+
+test('BA1 knockback comes only from its Horizontal Knockback Power 2, not a raw value', () => {
+  const tier = getPowerTier('horizontalKnockback', 2);
+  assert.equal(tier.knockbackX, 180);
+  for (const id of ['ba1', 'midairBa1']) {
+    const source = def.attacks[id];
+    assert.equal('knockback' in source, false, `${id} has no raw knockback in #0001's data`);
+    assert.deepEqual(source.powers, { horizontalKnockback: 2 }, `${id} declares no vertical launch`);
+    // The resolved number follows the declared tier and nothing else: the
+    // same entry at tiers 1 and 3 gets those tiers' pushes.
+    for (const n of [1, 2, 3]) {
+      const atk = createAttackDefinition({ id, ...source, powers: { horizontalKnockback: n } });
+      assert.deepEqual(atk.knockback, { x: getPowerTier('horizontalKnockback', n).knockbackX, y: 0 }, `${id} at tier ${n}`);
+    }
+    // Everything else about BA1 is untouched by the Power.
+    const { fighter } = makeFighter();
+    const atk = fighter.attacks[id];
+    for (const [key, value] of Object.entries(source)) {
+      if (key !== 'powers') assert.deepEqual(atk[key], value, `${id}.${key}`);
+    }
+  }
 });
 
 test('grounded action1 plays the four-frame ground BA1 once, then returns to idle', () => {
@@ -286,6 +312,19 @@ test('ground BA1 hits an opponent in front during the active phase only', () => 
   assert.equal(events[0].damage, 6);
   assert.equal(target.combat.health, 94);
   assert.equal(hitPhase, 'active');
+});
+
+test('a BA1 hit pushes the target sideways by exactly 180, away from the attacker, with no launch', () => {
+  for (const facing of [1, -1]) {
+    const { attacker, target, tick, events } = duel({ attackerFacing: facing });
+    tick(BA1);
+    while (!events.length) tick();
+    // At impact, before the target's next step: CombatSystem.applyHit set it.
+    assert.equal(target.body.vx, 180 * facing);
+    assert.equal(target.body.vy, 0);
+    assert.equal(target.grounded, true, 'BA1 never launches');
+    assert.equal(attacker.facing, facing);
+  }
 });
 
 test('a hit shows the target in its hurt pose through the impact freeze', () => {

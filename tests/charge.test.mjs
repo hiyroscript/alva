@@ -321,7 +321,7 @@ test('Charge holds its ground at a ledge edge, and falling never shows charge ar
 test('Charge locks horizontal movement: a run decelerates to a stop and stays put', () => {
   const { fighter, step } = makeFighter();
   const right = { right: true };
-  stepUntil(step, (f) => f.body.vx >= def.movement.maxSpeed, right);
+  stepUntil(step, (f) => f.body.vx >= f.maxSpeed, right);
 
   let vx = fighter.body.vx;
   step({ ...CHARGE, ...right });
