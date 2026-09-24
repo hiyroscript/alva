@@ -1,482 +1,1375 @@
-You are modifying the hiyroscript/alva repository. Before changing anything, inspect the existing implementation carefully and preserve the architecture, visual language, accessibility, navigation conventions, and existing gameplay behavior.
+You are modifying the current hiyroscript/alva repository.
 
-Also inspect hiyroscript/seren, specifically its Cars & more reference screen. Use the composition and information architecture of that screen as inspiration, but do NOT copy Seren’s visual identity. The new screen must look and feel native to Alva.
+Before making changes, inspect the current implementation carefully. This repository already has:
 
-Goal
+* js/data/powers.js
+* Jump Power 1 / 2 / 3
+* #0001 assigned Jump Power 2
+* a data-driven Discover screen
+* POWER and CONDITIONS Discover sections
+* tests for Powers and Discover
 
-Add a new reusable Power system to Alva, beginning with Jump Power, and add a new Discover reference screen accessible from Home.
+Do not rebuild those systems. Extend and clean up the existing Power architecture.
 
-There are three Jump Power tiers:
+The goal of this change is to:
 
-1. Jump Power 1 — very low jump.
-2. Jump Power 2 — normal jump. This must be exactly the jump #0001 already has today.
-3. Jump Power 3 — slightly higher than Jump Power 2.
+1. Add Speed Power 1 / 2 / 3.
+2. Set #0001 to Speed Power 2, preserving its current movement speed exactly.
+3. Extend the Power system to attacks with:
+    * Horizontal Knockback Power 1 / 2 / 3
+    * Vertical Knockback Power 1 / 2 / 3
+4. Make #0001’s Basic Attack 1 use Horizontal Knockback Power 2.
+5. Make #0001’s Basic Attack 2 use Vertical Knockback Power 2, so it launches the opponent upward instead of pushing them sideways.
+6. Remove all character-specific information from Discover. Discover must explain the Power system only. It must never say which character uses which Power or tier.
 
-#0001 must use Jump Power 2.
+The implementation should remain data-driven, extensible, and consistent with Alva’s current architecture.
 
-The work must create an actual extensible gameplay/data system. Do not merely rename jumpVelocity in the UI.
+1. Preserve the existing Jump Power system
 
-Current Alva behavior that must be preserved
+The existing Jump Power implementation is correct and should remain functionally unchanged.
 
-The repository currently defines global gravity in js/config.js as:
-
-CONFIG.sim.gravity = 2500
-
-#0001 currently has this movement value in js/data/characters.js:
-
-jumpVelocity: 920
-
-Jumping is applied centrally in js/game/character.js through the equivalent of:
-
-body.vy = -mv.jumpVelocity
-
-The existing buffered jump, coyote time, grounded checks, animation selection, combat/action gating, CPU behavior, gravity, collision, falling, landing, platforms, and input behavior must remain intact.
-
-Jump Power 2 must resolve to exactly 920 world units/second, so #0001 feels identical after this feature ships.
-
-Do not alter global gravity to implement the tiers.
-
-Jump Power data model
-
-Create a single source of truth for Power definitions rather than scattering numerical jump velocities throughout fighter definitions.
-
-Prefer a dedicated data module such as:
-
-js/data/powers.js
-
-Create a Jump Power tier table with three entries.
-
-Use these initial tuning values:
+Current tiers are:
 
 * Jump Power 1 → 650
 * Jump Power 2 → 920
 * Jump Power 3 → 1000
 
-At Alva’s existing gravity, this makes Power 1 dramatically lower than the current jump, Power 2 exactly the existing jump, and Power 3 noticeably but only slightly higher.
-
-The names, descriptions, tier numbers, and gameplay values should come from this central definition wherever practical.
-
-A good conceptual structure is:
-
-JUMP_POWER_TIERS
-
-with entries containing the tier, display name, description, and jump velocity.
-
-Also expose a small resolver/helper rather than having Fighter know the table structure directly.
-
-For example, conceptually:
-
-getJumpPowerTier(characterDefinition)
-
-and/or
-
-getJumpVelocityForCharacter(characterDefinition)
-
-Choose names that fit the existing codebase.
-
-Character schema
-
-Give fighters an explicit Power configuration.
-
-For #0001, add something conceptually equivalent to:
+#0001 currently declares:
 
 powers: { jump: 2 }
 
-Do not represent #0001 as a special case in the physics code.
+Its normal jump resolves through js/data/powers.js, and Fighter stores the resolved jump velocity instead of reading a raw movement.jumpVelocity.
 
-The point is that future fighters can simply declare:
+Keep this behavior.
 
-powers: { jump: 1 }
+Do not change Jump Power tuning.
+
+Do not change Alva’s global gravity.
+
+Do not reintroduce movement.jumpVelocity.
+
+The existing jump tests must continue passing.
+
+2. Add Speed Power
+
+Add a new Power type to js/data/powers.js:
+
+Speed Power
+
+Speed Power controls the fighter’s normal horizontal movement speed.
+
+There are exactly three tiers:
+
+* Speed Power 1 — Slow.
+* Speed Power 2 — Normal speed.
+* Speed Power 3 — Slightly faster.
+
+Use these gameplay values:
+
+* Speed Power 1 → 270
+* Speed Power 2 → 330
+* Speed Power 3 → 360
+
+These are world units per second.
+
+The important compatibility rule is:
+
+Speed Power 2 must resolve to exactly 330, because 330 is #0001’s current movement.maxSpeed.
+
+#0001 should therefore feel exactly the same horizontally after this change.
+
+Speed Power 3 should be only moderately faster than Speed Power 2, not a dramatic speed boost.
+
+Speed Power 1 should be clearly slower.
+
+Speed Power data
+
+Add a frozen tier table following the same style as JUMP_POWER_TIERS.
+
+Conceptually:
+
+SPEED_POWER_TIERS
+
+Each tier should have:
+
+* tier
+* name
+* description
+* the resolved gameplay speed
+
+For example, use a sensible value field such as:
+
+maxSpeed
+
+or another clearly named field consistent with the existing Power module.
+
+Add Speed Power to the central POWERS registry.
+
+Its player-facing summary should be character-neutral, for example:
+
+“Controls maximum movement speed. Higher tiers move faster.”
+
+Do not mention #0001 in this text.
+
+3. #0001 uses Speed Power 2
+
+Update #0001’s fighter-level Power declaration from:
+
+powers: { jump: 2 }
+
+to conceptually:
+
+powers: {
+  jump: 2,
+  speed: 2,
+}
+
+Speed Power 2 is the only canonical source of #0001’s normal max movement speed.
+
+Remove the raw:
+
+movement.maxSpeed: 330
+
+from #0001’s movement data once all runtime references have been migrated.
+
+Do not keep both:
+
+powers.speed: 2
+
+and:
+
+movement.maxSpeed: 330
+
+as independent canonical values.
+
+That creates drift.
+
+Follow the same principle already used for Jump Power.
+
+4. Resolve Speed Power in Fighter
+
+Add an appropriate helper to js/data/powers.js, such as:
+
+getSpeedPowerTier(def)
+
+and:
+
+getMaxSpeed(def)
+
+Choose names that match the current style.
+
+When Fighter is constructed, resolve the fighter’s Speed Power once, similarly to the current:
+
+this.jumpVelocity = getJumpVelocity(def)
+
+A reasonable structure would be:
+
+this.maxSpeed = getMaxSpeed(def)
 
 or:
 
-powers: { jump: 3 }
+this.moveSpeed = getMoveSpeed(def)
 
-and automatically receive the corresponding gameplay jump.
+Then update normal horizontal movement to use the resolved Power value rather than:
 
-The fighter definition is responsible for saying which power tier it owns. The Power system is responsible for translating that tier into the actual gameplay value.
+mv.maxSpeed
 
-Avoid maintaining two independent canonical values such as both powers.jump: 2 and an unrelated movement.jumpVelocity: 920. That can drift later. After the migration, the tier system should be the source of truth for voluntary jump velocity.
+The current movement code targets:
 
-If a defensive fallback is necessary for malformed character data, make it explicit and safe, but valid fighters should always use the Power system.
+dir * mv.maxSpeed
 
-Gameplay integration
+Replace only the maximum-speed source.
 
-Update the shared fighter jump implementation so that when a valid jump begins it receives its vertical velocity from the fighter’s Jump Power tier.
+Preserve all other movement behavior:
 
-Everything around the jump must continue to work exactly as it does now:
+* acceleration
+* deceleration
+* turn boost
+* air acceleration
+* air deceleration
+* gravity
+* max fall speed
+* jump buffering
+* coyote time
+* platform drops
+* collisions
+* pushboxes
+* attack movement locks
+* charging locks
+* stun behavior
 
-buffering,
-coyote time,
-canAct(),
-ground checks,
-charge interruption,
-blocking interruption,
-jump/fall/land animation states,
-platform interaction,
-ceiling collision,
-CPU jumps,
-Practice Ground,
-Quick Battle,
-touch controls,
-keyboard controls,
-and controllers.
+Speed Power should alter maximum normal directional movement speed only.
 
-Do not create separate Player and CPU implementations.
+Because the existing movement code uses the same maximum horizontal target while grounded and airborne, preserve that behavior. Speed Power should feed the same target that movement.maxSpeed currently feeds.
 
-The shared Fighter behavior should make the tier work everywhere automatically.
+Do not invent separate ground and air Speed Powers.
 
-Only the initial voluntary jump strength should change between the tiers.
+5. Things Speed Power must NOT control
 
-Knockback, launches caused by attacks, falling, gravity, hitstun, charged techniques, dodges, and other vertical motion must not use Jump Power unless they are genuinely performing the standard jump action.
+Speed Power must not affect unrelated velocity systems.
 
-#0001 requirement
+Specifically, it must not alter:
 
-Set #0001 to:
+* Jump Power
+* attack knockback
+* hit launches
+* projectile speed
+* shuriken speed
+* charged-technique dash speed
+* Sphere Rush’s dashSpeed
+* knockback received
+* Dodge behavior
+* animation FPS
+* acceleration
+* deceleration
 
-Jump Power 2
+The Sphere Rush currently has its own dashSpeed: 1050. Leave it alone.
 
-This must preserve its current jump exactly.
+The shuriken currently has its own speed: 700. Leave it alone.
 
-A fresh #0001 jump should therefore still begin at:
+Speed Power means normal fighter movement speed, not every velocity in the game.
 
-body.vy === -920
+6. Extend the Power model to support attack Powers
 
-before gravity is integrated.
+The existing Power architecture currently assumes Powers are fighter-owned.
 
-There should be no gameplay regression for #0001 from introducing this system.
+That assumption needs to evolve.
 
-Home — add Discover
+There are now two conceptual scopes of Power:
 
-Alva’s current Home navigation is built in:
+Fighter Powers
 
-js/screens/home-screen.js
+* Jump Power
+* Speed Power
 
-It currently contains:
+Attack Powers
 
-Play
-Practice Ground
+* Horizontal Knockback Power
+* Vertical Knockback Power
 
-Add a third Home action immediately under Practice Ground:
+Do not put attack knockback tiers on the fighter itself.
 
-Discover
+A fighter can have different attacks with different knockback Powers.
 
-So the ordering becomes:
+Instead, individual attack definitions should declare their attack Power tiers.
 
-Play
-Practice Ground
-Discover
+A clean schema would be something conceptually like:
 
-Use the same home-action component/style and the same right-chevron treatment as Practice Ground. It must participate in existing keyboard/gamepad menu navigation through data-nav.
+attacks: {
+  ba1: {
+    ...
+    powers: {
+      horizontalKnockback: 2
+    }
+  }
+}
 
-Clicking Discover opens the new Discover screen directly.
+and:
 
-Do NOT put Discover inside the Practice Ground pause/More menu. It is a Home destination directly below Practice Ground.
+attacks: {
+  ba2: {
+    ...
+    powers: {
+      verticalKnockback: 2
+    }
+  }
+}
 
-New Discover screen
+The exact property names may differ if another structure fits the repository better, but keep the model explicit and data-driven.
 
-Create a proper screen using Alva’s existing Screen / ScreenManager architecture, for example:
+Do not hard-code:
 
-js/screens/discover-screen.js
+if attack.id === 'ba1'
 
-Register it in js/core/app.js.
+or:
 
-Add its corresponding <section> to index.html, following Alva’s existing screen structure, for example with:
+if character.id === '0001'
 
-data-screen="discover"
+inside combat.
 
-and an appropriate accessible label.
+7. Power registry scopes
 
-The screen must support normal ScreenManager enter/exit behavior and return cleanly to Home.
+Because not every Power belongs directly to a fighter anymore, update the Power registry so it can distinguish Power types.
 
-Discover visual direction
+A clean approach is to add metadata such as:
 
-Use Seren’s Cars & more screen as structural inspiration.
+scope: 'fighter'
 
-Relevant Seren ideas include:
+for:
 
-a top header with a Back control and page title,
-a compact reference/index rail,
-the active section visually indicated on that rail,
-a scrollable reference content area,
-structured informational cards,
-two-column content where space permits,
-one-column content on smaller layouts,
-and a horizontal tab rail on narrow screens.
+* Jump Power
+* Speed Power
 
-However, this is an Alva screen.
+and:
 
-Do not use Seren’s red accents or SEREN typography/look.
+scope: 'attack'
 
-Use Alva’s existing visual tokens from styles.css:
+for:
 
-near-black / charcoal surfaces,
-off-white text,
-Alva’s restrained green --accent,
---accent-hi,
---accent-wash,
-existing borders,
-existing focus treatment,
-existing radius system,
-existing spacing,
-existing screen header/back-button patterns.
+* Horizontal Knockback Power
+* Vertical Knockback Power
 
-The result should look like Discover was always part of Alva.
+This prevents code such as “every fighter must declare every entry in POWERS” from incorrectly requiring attack Powers on the fighter-level powers object.
 
-Avoid introducing an unrelated design system.
+Keep the generic:
 
-Discover header
+getPower(id)
 
-The screen title should be:
+and:
 
-Discover
+getPowerTier(powerId, tier)
 
-Provide a Back button using Alva’s existing icon/button language.
+style of API.
 
-Back returns to Home.
+Fighter-specific resolvers should operate only on fighter Powers.
 
-It must work with pointer, keyboard, gamepad/menu navigation, and the existing Back/Escape behavior where appropriate.
+Attack-specific resolvers should operate on attack Power declarations.
 
-Discover sections
+8. Horizontal Knockback Power
 
-The Discover screen currently has exactly two sections:
+Add:
 
-POWER
+Horizontal Knockback Power
 
-CONDITIONS
+There are exactly three tiers.
 
-POWER comes first and is selected by default.
+Use these values:
 
-Structurally this should feel inspired by Seren’s Cars & more left-hand index rail:
+* Horizontal Knockback Power 1 → 140
+* Horizontal Knockback Power 2 → 180
+* Horizontal Knockback Power 3 → 220
 
-POWER
-CONDITIONS
+The resolved value represents the magnitude placed into the attack definition’s horizontal knockback.
 
-On narrow/mobile layouts, convert this into a horizontal rail similar to Seren’s responsive reference screen.
+Tier descriptions can be concise:
 
-Use Alva green for the active indicator rather than Seren red.
+Horizontal Knockback Power 1
+Light horizontal knockback.
 
-The tabs/section controls must be real accessible buttons.
+Horizontal Knockback Power 2
+Normal horizontal knockback.
 
-Use sensible role="tablist", role="tab", aria-selected, and focus behavior if implementing it as a tab interface.
+Horizontal Knockback Power 3
+Strong horizontal knockback.
 
-Arrow-key navigation between POWER and CONDITIONS is desirable and should follow the existing menu/navigation architecture without fighting it.
+The summary should explain the mechanic generically, for example:
 
-POWER content
+“Controls how strongly an attack pushes a hit opponent sideways. Higher tiers push farther.”
 
-POWER is a reference page explaining gameplay Powers.
+Do not mention a character.
 
-For this first version it only contains Jump Power.
+9. Vertical Knockback Power
 
-Create a reference entry headed:
+Add:
 
-JUMP POWER
+Vertical Knockback Power
 
-Explain clearly and briefly that Jump Power controls how high a fighter’s normal jump goes and that higher tiers jump higher.
+There are exactly three tiers.
 
-Then show the three tiers in a clean Alva-style reference treatment:
+Use these values:
 
-JUMP POWER 1
-Very low jump.
+* Vertical Knockback Power 1 → 140
+* Vertical Knockback Power 2 → 220
+* Vertical Knockback Power 3 → 300
 
-JUMP POWER 2
-Normal jump.
+The resolved value represents the positive launch magnitude stored in the attack’s knockback.y.
 
-JUMP POWER 3
-Slightly higher jump.
+Alva’s existing CombatSystem.applyHit() already does:
 
-Clearly indicate that #0001 uses Jump Power 2.
+target.body.vy = -def.knockback.y
 
-This information should be driven from the same Jump Power tier data used by gameplay as much as reasonably possible. Do not create a completely separate hard-coded UI definition of what the three tiers mean if the gameplay table already contains their names/descriptions.
+for an unblocked vertical hit.
 
-Do not expose raw 650, 920, or 1000 velocity numbers to the player in the Discover UI unless Alva already establishes a reason to show low-level tuning numbers. The screen should communicate the game concept, not developer physics constants.
+That means a positive Vertical Knockback Power value correctly launches the victim upward.
 
-The Discover content should remain easy to extend later with additional Power types.
+Do not reverse that convention.
 
-For example, a future developer should be able to add another Power category without redesigning the whole screen.
+Tier descriptions can be:
 
-CONDITIONS content
+Vertical Knockback Power 1
+Light upward launch.
 
-The second section is:
+Vertical Knockback Power 2
+Normal upward launch.
 
-CONDITIONS
+Vertical Knockback Power 3
+Strong upward launch.
 
-For now, Conditions intentionally has no content.
+Its summary should be generic, for example:
 
-Do not add fake Conditions.
+“Controls how strongly an attack launches a hit opponent upward. Higher tiers launch higher.”
 
-Do not write “Coming soon.”
+Again, do not mention a character.
 
-Do not add placeholder cards.
+10. Attack Power resolver
 
-Do not invent descriptions.
+Add reusable attack-Power resolution.
 
-When CONDITIONS is selected, the content region can simply be empty while the section/tab remains fully functional and accessible.
+The character attack data should declare Power tiers.
 
-This is intentional scaffolding for a future Conditions system.
+The runtime attack definition should still expose the final numeric:
 
-Styling
+knockback: { x, y }
 
-Add Discover-specific styling to styles.css while reusing existing Alva primitives and CSS variables.
+because CombatSystem.applyHit(), clones, hit resolution, debug tooling, and tests already operate on normalized attack definitions.
 
-Do not blindly paste Seren CSS.
+In other words:
 
-Create Alva-specific class names, such as a discover-* namespace or whatever matches the current conventions.
+character data
+→ declares attack Power tier(s)
 
-Desktop/wide layout should approximately follow this composition:
+Power resolver / attack-definition normalization
+→ turns the tiers into { x, y }
 
-Back + Discover header across the top.
+CombatSystem
+→ continues consuming the resolved numeric { x, y }
 
-Below it, a narrow left reference rail containing POWER and CONDITIONS.
+Do not force the combat resolver to understand Power tier tables every time a hit lands.
 
-To its right, a scrollable content region.
+Resolve attack Power during attack-definition creation.
 
-The POWER reference content should have restrained dividers/cards similar in informational density to Seren’s Cars & more cards, but styled with Alva’s existing dark surfaces and green active state.
+This keeps combat simple and ensures cloned attacks automatically inherit exactly the same resolved knockback.
 
-At narrower widths, place POWER and CONDITIONS in a horizontal rail above the content.
+11. Allow horizontal, vertical, or combined attack Powers
 
-Respect safe-area insets.
+Design attack Power resolution so the engine can support:
 
-Keep the screen usable at short landscape heights because Alva is designed around landscape play.
+* horizontal only
+* vertical only
+* both horizontal and vertical
+* neither
 
-Ensure long content can scroll without making the entire app/document scroll unexpectedly.
+even though #0001 currently only needs:
 
-Accessibility
+BA1 → horizontal only
 
-Preserve Alva’s accessibility conventions.
+BA2 → vertical only
 
-Discover and every interactive control must be keyboard reachable.
+An omitted attack Power should mean zero on that axis.
 
-Focus must always be visible.
+For example:
 
-Hidden section content must not remain focusable.
+powers: { horizontalKnockback: 2 }
 
-The currently selected POWER/CONDITIONS control must expose its state semantically.
+should resolve to:
 
-The Back control needs a meaningful accessible name.
+knockback: { x: 180, y: 0 }
 
-Do not rely on green colour alone to communicate the active section; use structure/border/state as well.
+while:
 
-Respect reduced-motion behavior. This screen does not need elaborate animations.
+powers: { verticalKnockback: 2 }
 
-Tests
+should resolve to:
 
-Update and add tests rather than weakening existing tests.
+knockback: { x: 0, y: 220 }
 
-tests/practice-ground.test.mjs currently verifies that Home has exactly two Home actions and navigation candidates [Play, Practice Ground]. Update this expectation for:
+and a future attack could declare both.
 
-Play
-Practice Ground
-Discover
+Do not automatically give every attack tier 2 on every axis.
 
-Also test that clicking Discover navigates to the Discover screen, while Practice Ground still opens Practice Ground directly.
+Missing and invalid data are different:
 
-Add focused tests for the Power system.
+* omitted axis → intentionally zero
+* declared invalid tier → log a useful warning and use a safe fallback
 
-At minimum verify:
+12. #0001 Basic Attack 1
 
-Jump Power 1 resolves to 650.
+#0001’s Basic Attack 1 currently has:
 
-Jump Power 2 resolves to 920.
+knockback: { x: 180, y: 0 }
 
-Jump Power 3 resolves to 1000.
+Both:
 
-The values are strictly ordered:
+* ba1
+* midairBa1
 
-Power 1 < Power 2 < Power 3.
+currently use that same knockback.
 
-#0001 declares Jump Power 2.
+Migrate both BA1 variants to:
 
-A normal #0001 jump still starts at exactly -920 vertical velocity.
+Horizontal Knockback Power 2
 
-A fighter configured with tier 1 receives the tier-1 jump.
+Remove the raw numeric knockback declaration from their character-data entries.
 
-A fighter configured with tier 3 receives the tier-3 jump.
+Conceptually they should declare:
 
-Tier changes do not change gravity, max fall speed, coyote time, jump buffering, or unrelated movement stats.
+powers: { horizontalKnockback: 2 }
 
-The same Fighter implementation handles player-controlled and CPU-controlled fighters.
+The normalized runtime attack definition must still become:
 
-Add a Discover screen test covering at least:
+knockback: { x: 180, y: 0 }
 
-screen registration/construction,
-Home → Discover,
-Back → Home,
-POWER selected by default,
-POWER shows Jump Power information,
-#0001 is identified with Jump Power 2,
-CONDITIONS is selectable,
-CONDITIONS contains no invented placeholder content,
-and keyboard/menu navigation can reach the controls.
+Therefore BA1’s actual behavior should remain unchanged.
 
-Do not make tests dependent on pixel-perfect visual layout.
+Damage, hitstun, blockstun, hitstop, hitbox, animation timing, cooldown, ground/air selection, and movement lock must remain unchanged.
 
-Documentation
+The charged BA1 clone uses BA1’s real attack definition. Because the clone consumes the normalized BA1 attack definition, it must automatically continue to produce the same 180 horizontal knockback.
 
-Update the appropriate Alva documentation (README.md, ALVA_SPEC.md, or both where appropriate) so the architecture describes:
+Do not create separate clone knockback tuning.
 
-the new Power system,
-the three initial Jump Power tiers,
-#0001 using Jump Power 2,
-the fact that Jump Power 2 preserves the original 920 jump,
-and the Discover reference screen.
+13. #0001 Basic Attack 2
 
-Avoid leaving documentation saying fighter jump strength is only a raw movement.jumpVelocity if that is no longer true.
+#0001’s Basic Attack 2 currently has:
 
-Files likely involved
+knockback: { x: 220, y: 0 }
 
-Expect to inspect and potentially modify:
+for both:
 
-index.html
+* ba2
+* midairBa2
 
-styles.css
+Change both variants to:
 
-js/core/app.js
+Vertical Knockback Power 2
 
-js/screens/home-screen.js
+Conceptually:
 
-js/screens/discover-screen.js — new
+powers: { verticalKnockback: 2 }
 
-js/data/powers.js — new or equivalent
+The normalized runtime attack definition should become:
+
+knockback: { x: 0, y: 220 }
+
+This is an intentional gameplay change.
+
+BA2 should no longer shove the opponent sideways on a normal hit.
+
+Instead, a normal BA2 hit should launch the opponent upward.
+
+Through the existing CombatSystem convention this should result in:
+
+target.body.vx === 0
+
+and:
+
+target.body.vy === -220
+
+at impact, before subsequent gravity integration.
+
+The target must become airborne:
+
+target.body.grounded === false
+
+Do not add special BA2 launch code.
+
+The normal shared knockback path must produce this behavior from the resolved Vertical Knockback Power.
+
+Apply this to both the ground and mid-air BA2 versions.
+
+14. Blocking behavior
+
+Preserve the existing blocking rules.
+
+CombatSystem.applyHit() currently:
+
+* halves horizontal knockback on a blocked hit
+* does not apply vertical launch on a blocked hit
+
+Keep this behavior.
+
+Therefore a blocked vertical-only BA2 should:
+
+* take normal chip damage according to existing rules
+* take blockstun
+* take hitstop
+* not be launched
+* have no new horizontal push unless the attack actually declares horizontal knockback
+
+Do not change Block semantics as part of this feature.
+
+15. Do not automatically migrate bespoke non-basic hits
+
+This feature is specifically introducing attack Power tiers for the normal attack definitions.
+
+Do not unintentionally rebalance bespoke systems such as:
+
+* projectiles
+* Sphere Rush contact
+* Sphere Rush explosion
+* summons other than their inherited BA1 attack
+* future special entities
+
+For example, the Sphere Rush explosion currently has explicit:
+
+knockback: { x: 420, y: 220 }
+
+Leave that bespoke technique hit alone unless the architecture can support it without changing its behavior.
+
+Likewise the shuriken currently has its own explicit projectile knockback.
+
+Do not convert every combat object merely to make the code look uniform.
+
+The critical requirement is that normal fighter attacks can now define knockback through attack Powers, and #0001’s BA1 / BA2 use them.
+
+16. Discover must become completely character-neutral
+
+This is an important change.
+
+The current Discover implementation imports:
+
+CHARACTERS
+
+and:
+
+getFighterPowerTier
+
+It builds:
+
+* a Fighters ownership list
+* “Used by #0001”
+* is-used tier states
+* check-mark ownership labels
+
+Remove all of this.
+
+Discover must not mention any character anywhere.
+
+That means the Power page must contain:
+
+* no character names
+* no character IDs
+* no #0001
+* no “Fighters” list
+* no “Used by …”
+* no ownership checkmarks
+* no tier highlighting based on roster ownership
+* no hidden accessible character ownership text
+* no screen logic that imports the character database simply to show ownership
+
+Remove the CHARACTERS import from discover-screen.js.
+
+Remove getFighterPowerTier from Discover.
+
+Remove helper logic such as fighterTiers().
+
+Remove any unused Discover CSS that existed only for:
+
+* .discover-owners
+* .discover-tier-users
+* .discover-tier-check
+* character ownership state
+* .is-used if it serves no remaining visual purpose
+
+Discover is a mechanics reference, not a roster/stat sheet.
+
+17. Discover POWER page after this change
+
+The POWER page should continue being built automatically from the central POWERS registry.
+
+It should now show four Power entries, in this order:
+
+1. Jump Power
+2. Speed Power
+3. Horizontal Knockback Power
+4. Vertical Knockback Power
+
+Each entry should show:
+
+* Power name
+* generic description
+* tier 1
+* tier 2
+* tier 3
+* existing rising-bar tier visualization
+
+Nothing else is necessary.
+
+No characters should appear.
+
+Recommended generic copy:
+
+Jump Power
+Controls how high a normal jump goes. Higher tiers jump higher.
+
+Speed Power
+Controls maximum movement speed. Higher tiers move faster.
+
+Horizontal Knockback Power
+Controls how strongly an attack pushes a hit opponent sideways. Higher tiers push farther.
+
+Vertical Knockback Power
+Controls how strongly an attack launches a hit opponent upward. Higher tiers launch higher.
+
+Keep the raw gameplay numbers hidden from the player.
+
+Discover should not print:
+
+* 270
+* 330
+* 360
+* 140
+* 180
+* 220
+* 300
+* 650
+* 920
+* 1000
+
+Those are tuning constants, not player-facing reference copy.
+
+18. CONDITIONS remains unchanged
+
+The CONDITIONS section should remain exactly what it is now:
+
+selectable and accessible but intentionally empty.
+
+Do not add Conditions content.
+
+Do not add “Coming soon.”
+
+Do not invent placeholders.
+
+19. Power module architecture
+
+Refactor js/data/powers.js cleanly rather than bolting unrelated helpers onto it.
+
+A good end-state should provide:
+
+Generic:
+
+* POWERS
+* getPower(id)
+* getPowerTier(powerId, tier)
+
+Fighter Power helpers:
+
+* Jump Power resolver
+* Speed Power resolver
+
+Attack Power helpers:
+
+* Horizontal Knockback resolver
+* Vertical Knockback resolver
+* combined attack knockback resolver if useful
+
+Avoid duplicating table-search logic.
+
+The four tier tables should be frozen just like the existing Jump table.
+
+The registry should remain the single source of truth for:
+
+* names
+* descriptions
+* tier numbers
+* tuning values
+
+Discover should consume the same names/descriptions.
+
+Gameplay should consume the same tuning values.
+
+20. Source-of-truth requirements
+
+After this feature:
+
+Normal jump strength must come only from:
+
+powers.jump
+
+Normal max movement speed must come only from:
+
+powers.speed
+
+BA1 horizontal knockback must come only from:
+
+attacks.ba1.powers.horizontalKnockback
+and the equivalent mid-air BA1 entry.
+
+BA2 vertical knockback must come only from:
+
+attacks.ba2.powers.verticalKnockback
+and the equivalent mid-air BA2 entry.
+
+Do not leave duplicate raw values in the same character attack/movement definitions.
+
+The normalized runtime attack is allowed to contain numeric knockback because that is computed output, not a second source of truth.
+
+21. Tests — Power registry
+
+Expand tests/powers.test.mjs.
+
+It currently assumes:
+
+POWERS.map(...) === ['jump']
+
+That is no longer correct.
+
+Update it to verify the complete registry contains:
+
+* jump
+* speed
+* horizontalKnockback
+* verticalKnockback
+
+Verify each Power has exactly tiers 1 / 2 / 3.
+
+Verify all tier tables and registry entries remain frozen.
+
+Verify their scope/category metadata is correct if scope metadata is introduced.
+
+22. Tests — Speed Power
+
+Add focused Speed Power coverage.
+
+At minimum test:
+
+Speed Power tiers resolve to:
+
+* 1 → 270
+* 2 → 330
+* 3 → 360
+
+They are strictly ordered:
+
+1 < 2 < 3
+
+#0001 declares:
+
+speed: 2
+
+Speed Power 2 resolves to exactly 330.
+
+There is no raw maxSpeed left as an independent canonical value in #0001’s movement data.
+
+A long enough held-right movement sequence reaches the correct maximum speed for each tier.
+
+A tier-1 fighter caps at 270.
+
+A tier-2 fighter caps at 330.
+
+A tier-3 fighter caps at 360.
+
+Changing Speed Power does not change:
+
+* acceleration
+* deceleration
+* air acceleration
+* air deceleration
+* turn boost
+* Jump Power
+* gravity
+* fall speed
+* coyote time
+* jump buffer
+
+Verify both player-controlled and training-CPU-controlled fighters use the same Fighter speed resolution rather than separate systems.
+
+23. Tests — Jump Power regression
+
+Existing Jump Power tests must continue to prove:
+
+* tier 1 = 650
+* tier 2 = 920
+* tier 3 = 1000
+* #0001 = Jump Power 2
+* #0001 still begins a normal jump at -920 before gravity
+* changing Speed Power does not alter jump height
+* changing Jump Power does not alter Speed Power
+
+Update older test wording that says Jump Power is the only Power type.
+
+24. Tests — attack Power tables
+
+Add tests for:
+
+Horizontal Knockback Power:
+
+* 1 → 140
+* 2 → 180
+* 3 → 220
+
+Vertical Knockback Power:
+
+* 1 → 140
+* 2 → 220
+* 3 → 300
+
+Verify both are strictly increasing.
+
+Verify generic Power lookup resolves them correctly.
+
+Verify an attack with:
+
+horizontalKnockback: 2
+
+normalizes to:
+
+{ x: 180, y: 0 }
+
+Verify an attack with:
+
+verticalKnockback: 2
+
+normalizes to:
+
+{ x: 0, y: 220 }
+
+Verify an attack that declares both axes can resolve both without special-case code.
+
+Verify an attack declaring neither resolves to zero knockback unless it is intentionally using an existing explicit bespoke knockback path.
+
+25. Tests — BA1
+
+Update tests/basic-attack.test.mjs.
+
+Both:
+
+* ba1
+* midairBa1
+
+must declare Horizontal Knockback Power 2 in source character data.
+
+Their normalized attack definitions must still contain:
+
+knockback: { x: 180, y: 0 }
+
+A successful BA1 hit must still produce the same horizontal push as before.
+
+All other BA1 tuning remains unchanged.
+
+The test should prove the numeric knockback comes from the Power tier rather than a raw knockback entry in #0001’s BA1 data.
+
+26. Tests — BA1 clone
+
+Update tests/clone.test.mjs where it currently expects BA1’s raw source definition to contain:
+
+knockback: { x: 180, y: 0 }
+
+The character-source expectation should reflect the new attack Power schema.
+
+Runtime clone behavior must remain identical:
+
+* clone BA1 uses the resolved BA1 attack
+* target receives 180 horizontal knockback
+* direction comes from the clone’s facing
+* owner is still credited
+* blocking still halves horizontal knockback
+* Dodge still passes the hit through unspent
+
+Do not duplicate Power resolution inside Clone.
+
+27. Tests — BA2 launch
+
+Update tests/basic-attack-2.test.mjs.
+
+Both:
+
+* ba2
+* midairBa2
+
+must declare Vertical Knockback Power 2.
+
+Their normalized knockback must be:
+
+{ x: 0, y: 220 }
+
+Replace old assertions that BA2 has:
+
+{ x: 220, y: 0 }
+
+Update tests that currently say BA2 is “heavier” because:
+
+atk.knockback.x > ba1.knockback.x
+
+That comparison is no longer meaningful because the attacks now knock back on different axes.
+
+BA2 can still be heavier through:
+
+* higher damage
+* longer hitstun
+* its slower timing
+* its upward launch behavior
+
+Do not force a horizontal comparison between two different attack types.
+
+Add explicit impact assertions:
+
+A normal BA2 hit on a grounded target should result in:
+
+target.body.vx === 0
+
+target.body.vy === -220
+
+target.body.grounded === false
+
+Then normal global gravity should pull the target back down.
+
+The launch must come through ordinary CombatSystem.applyHit() behavior.
+
+No BA2-specific combat branch is allowed.
+
+28. Tests — blocked BA2
+
+Add or update the existing Block BA2 test.
+
+A blocked Vertical Knockback Power 2 BA2 must:
+
+* deal chip damage as before
+* apply blockstun
+* apply hitstop
+* not launch the blocker
+* not force grounded = false
+* not invent horizontal displacement
+
+This verifies the current rule that vertical launch is only applied to unblocked hits remains intact.
+
+29. Tests — Discover contains no characters
+
+Substantially update tests/discover.test.mjs.
+
+Remove current tests that expect:
+
+* “Fighters”
+* “Used by #0001”
+* a checkmark on Jump Power 2
+* roster ownership state
+* adding another fighter dynamically to change the Discover page
+
+Instead test that:
+
+Discover POWER contains one entry for every POWERS registry entry.
+
+The rendered Power entries are:
+
+* Jump Power
+* Speed Power
+* Horizontal Knockback Power
+* Vertical Knockback Power
+
+Each displays exactly three tiers.
+
+The existing tier meter remains present.
+
+No raw tuning numbers appear.
+
+Most importantly:
+
+No character-specific information appears anywhere in Discover.
+
+The test should verify that the rendered Discover text contains no available character displayName.
+
+Also inspect discover-screen.js structurally and assert that the screen does not depend on the roster database merely to build Power content.
+
+It should no longer import:
+
+CHARACTERS
+
+or:
+
+getFighterPowerTier
+
+and should contain no ownership labels such as:
+
+Fighters
+
+or:
+
+Used by
+
+The user-facing Discover screen must remain generic even as more characters are added later.
+
+30. Discover styling
+
+Keep the current Discover composition and Alva styling.
+
+Do not redesign the screen.
+
+Retain:
+
+* Discover header
+* Back control
+* vertical index rail on wide layouts
+* horizontal rail on narrow layouts
+* POWER
+* CONDITIONS
+* scrollable content panel
+* rising tier meters
+* Alva green active state
+* keyboard/gamepad navigation
+* focus treatment
+* safe-area behavior
+* responsive short-landscape behavior
+
+Only remove character-ownership UI and make space for the additional Power entries.
+
+Make sure four Power entries still scroll comfortably on short landscape screens.
+
+31. Documentation
+
+Update both implementation documentation and player-facing project documentation where necessary.
+
+ALVA_SPEC.md currently explicitly says Discover shows a Fighters list and “Used by #0001”.
+
+Remove that.
+
+Document Discover as a character-neutral mechanics reference.
+
+Its POWER section should list:
+
+* Jump Power
+* Speed Power
+* Horizontal Knockback Power
+* Vertical Knockback Power
+
+Document the new tier values in technical sections, but not as player-facing Discover copy.
+
+Update the Powers architecture section to explain the two scopes:
+
+fighter Powers:
+
+* Jump
+* Speed
+
+attack Powers:
+
+* Horizontal Knockback
+* Vertical Knockback
+
+Update movement documentation so it no longer says normal maximum movement speed is sourced directly from movement.maxSpeed.
+
+Update BA1 documentation:
+
+BA1 uses Horizontal Knockback Power 2 and therefore retains 180 horizontal knockback.
+
+Update BA2 documentation:
+
+BA2 uses Vertical Knockback Power 2 and therefore now launches upward at 220 instead of applying 220 horizontal knockback.
+
+Update Clone documentation to explain that it inherits BA1’s resolved attack definition and therefore inherits BA1’s Horizontal Knockback Power automatically.
+
+Do not change Sphere Rush documentation unless necessary.
+
+32. Comments and architecture documentation in code
+
+Update stale source comments.
+
+Examples:
+
+js/data/powers.js currently describes Powers as something “a fighter owns at a fixed tier.”
+
+That is no longer universally true because attack definitions now own attack-Power tiers.
+
+Rewrite comments to accurately describe both fighter and attack Powers.
+
+js/screens/discover-screen.js currently says pages read js/data/powers.js, js/data/characters.js.
+
+After removing character ownership, Discover should only need the generic Power data.
+
+Update that comment.
+
+Update combat examples that show raw BA1-style knockback declarations if normal attacks now declare knockback Powers instead.
+
+Do not leave misleading architecture examples.
+
+33. Compatibility requirements
+
+This feature must not break:
+
+Practice Ground.
+
+Quick Battle.
+
+Player input.
+
+Training CPU input.
+
+Fighter selection.
+
+Damage.
+
+Hitstun.
+
+Blockstun.
+
+Hitstop.
+
+Defense / Dodge.
+
+Clone Attack.
+
+Sphere Rush.
+
+Throw.
+
+Shuriken.
+
+Jump Power.
+
+Infinite Energy.
+
+Touch controls.
+
+Keyboard controls.
+
+Gamepad controls.
+
+Animation playback.
+
+Collision.
+
+Camera behavior.
+
+34. Likely files involved
+
+Inspect and modify as necessary:
+
+js/data/powers.js
 
 js/data/characters.js
 
 js/game/character.js
 
-tests/practice-ground.test.mjs
+js/game/combat.js
 
-new focused Power/Discover tests
+js/screens/discover-screen.js
+
+styles.css
+
+tests/powers.test.mjs
+
+tests/discover.test.mjs
+
+tests/basic-attack.test.mjs
+
+tests/basic-attack-2.test.mjs
+
+tests/clone.test.mjs
+
+tests/fighter-harness.mjs if fixtures require updating
 
 README.md
 
 ALVA_SPEC.md
 
-Do not assume this list is exhaustive. Follow actual dependencies in the repository.
+Do not assume this is exhaustive. Search the repository for references to:
 
-Non-goals
+maxSpeed
 
-Do not add selectable Power upgrades.
+knockback
 
-Do not let the player change #0001’s Jump Power from Discover.
+180
 
-Do not add progression/unlocking.
+220
 
-Do not add Conditions gameplay yet.
+Jump Power
 
-Do not change attack power, damage, speed, gravity, defense, Energy, or other fighter stats.
+POWERS
 
-Do not rebalance #0001’s existing normal jump.
+Used by
 
-Do not redesign Home.
+Fighters
 
-Do not replace Practice Ground.
+getFighterPowerTier
 
-Do not copy Seren’s red palette.
+and update stale assumptions where they refer to the systems being changed.
 
-Do not create a second independent jump implementation for Practice Ground or CPUs.
+35. Non-goals
 
-Definition of done
+Do not add player-selectable Power upgrades.
 
-The implementation is complete when Home displays Discover directly below Practice Ground, Discover opens a polished Alva-native reference screen inspired structurally by Seren’s Cars & more screen, POWER and CONDITIONS are available with POWER selected by default, POWER accurately explains the three Jump Power tiers, CONDITIONS is intentionally empty, the gameplay uses a centralized three-tier Jump Power system, #0001 is assigned Jump Power 2, and #0001’s actual current jump remains exactly unchanged.
+Do not add progression.
 
-Run the full existing Node test suite plus all new tests and fix regressions rather than changing expected behavior to hide them. Also manually verify Home, Discover, POWER/CONDITIONS switching, Back behavior, #0001 jumping in Practice Ground, #0001 jumping in Quick Battle, keyboard navigation, gamepad/menu navigation, and narrow landscape responsive layout.
+Do not let Discover change Powers.
+
+Do not show which character owns a Power.
+
+Do not show which character uses a specific tier.
+
+Do not expose raw tuning values in Discover.
+
+Do not change Jump Power tuning.
+
+Do not change global gravity.
+
+Do not make Speed Power affect techniques or projectiles.
+
+Do not make BA1 stronger or weaker.
+
+Do not give BA2 horizontal knockback in addition to its new vertical launch.
+
+Do not change BA2 damage simply because its launch direction changed.
+
+Do not change Conditions.
+
+Do not redesign Discover.
+
+36. Definition of done
+
+The change is complete when:
+
+#0001 declares both:
+
+* Jump Power 2
+* Speed Power 2
+
+Speed Power tiers are:
+
+* 1 = 270
+* 2 = 330
+* 3 = 360
+
+#0001 moves at exactly its existing 330 max speed because it uses Speed Power 2.
+
+Normal movement no longer uses an independently stored raw movement.maxSpeed.
+
+Horizontal Knockback Power tiers are:
+
+* 1 = 140
+* 2 = 180
+* 3 = 220
+
+Vertical Knockback Power tiers are:
+
+* 1 = 140
+* 2 = 220
+* 3 = 300
+
+#0001 BA1 and mid-air BA1 declare Horizontal Knockback Power 2 and still resolve to:
+
+{ x: 180, y: 0 }
+
+#0001 BA2 and mid-air BA2 declare Vertical Knockback Power 2 and now resolve to:
+
+{ x: 0, y: 220 }
+
+A normal BA2 hit launches the target upward through the shared CombatSystem.
+
+A blocked BA2 does not launch.
+
+The BA1 clone automatically inherits BA1’s resolved Horizontal Knockback Power without separate tuning.
+
+Discover shows:
+
+* Jump Power
+* Speed Power
+* Horizontal Knockback Power
+* Vertical Knockback Power
+
+Discover contains zero character-specific information.
+
+There is no:
+
+* “#0001”
+* Fighters ownership list
+* “Used by”
+* roster lookup
+* character ownership highlighting
+
+CONDITIONS remains intentionally empty.
+
+All existing tests plus the expanded Power, Discover, BA1, BA2, and Clone tests pass.
+
+Finally, manually verify in a browser:
+
+* #0001’s normal movement feels unchanged
+* #0001’s normal jump feels unchanged
+* BA1 still pushes sideways exactly as before
+* BA2 visibly launches the opponent upward instead of sideways
+* BA2 launch works in Practice Ground and Quick Battle
+* the BA1 clone still knocks away from the clone correctly
+* blocked BA2 does not launch
+* Discover contains no character names anywhere
+* all four Power entries fit and scroll correctly
+* keyboard navigation works
+* gamepad navigation works
+* narrow landscape layout remains usable
+* no console warnings or errors appear during normal valid gameplay
