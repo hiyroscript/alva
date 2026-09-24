@@ -1,1743 +1,914 @@
-Implement Character #0001’s Charge release pose and new ground + mid-air Dodge defense animations in the current Alva repository.
+Implement Character #0001’s Basic Attack 2 (BA2) and Mid-Air Basic Attack 2 in the Alva repository.
 
-Work from the latest main branch.
+Before editing anything, inspect the current main branch and understand the existing BA1 implementation. BA1 is already complete and merged; BA2 should extend the exact same architecture rather than creating a parallel combat/input system.
 
-The current game already includes:
+Terminology and naming
 
-* Idle / Run / Jump / Fall / Land
-* Hurt / Mid-Air Hurt
-* BA1 + Mid-Air BA1
-* BA2 + Mid-Air BA2
-* Charge
-* Energy meter
-* generic combat/blocking infrastructure
-* touch, keyboard and gamepad controls
-* dependency-free Node tests
+For these sprites:
 
-Do not rebuild systems that already exist.
+* ba means basic attack
+* 2ba means Basic Attack 2 / BA2
+* The 2 before ba identifies which basic attack it is.
+* The number at the very end of the filename is the animation frame number.
 
-The goal of this task is:
+Examples:
 
-1. When the player voluntarily releases Charge, #0001 briefly uses 0001_charge1.png as the Charge exit/release pose.
-2. Add #0001’s new three-frame grounded Dodge.
-3. Add #0001’s new three-frame mid-air Dodge.
-4. Replace the generic gameplay action/input name Block with Defense.
-5. #0001’s Defense mechanism is Dodge, not Block.
-6. Replace #0001’s touch shield icon with the visible text D.
-7. Preserve the architecture so future characters can use either Dodge or Block behind the same generic Defense input.
+* 0001_2ba1.png = Character #0001, Basic Attack 2, frame 1
+* 0001_2ba7.png = Character #0001, Basic Attack 2, frame 7
+* 0001_midair2ba1.png = Character #0001, Mid-Air Basic Attack 2, frame 1
 
-1. Existing Charge implementation
+BA2 is the secondary basic attack and belongs to the existing internal action2 input.
 
-Do not replace the Charge system that is already merged.
+Do not rename the internal controller action from action2. Only change its player-facing label from Action 2 / A2 to Basic Attack 2 / BA2.
 
-The current Charge architecture is:
+Existing artwork
 
-logical state: charge
-chargeStart:
-charge1 → charge2
-chargeLoop:
-chargea ↔ chargeb
+The current repo root contains these newly uploaded sprites:
 
-The current sequence while continuously held is:
+Ground BA2
 
-charge1
-→ charge2
-→ chargea
-→ chargeb
-→ chargea
-→ chargeb
-→ ...
+* 0001_2ba1.png
+* 0001_2ba2.png
+* 0001_2ba3.png
+* 0001_2ba4.png
+* 0001_2ba5.png
+* 0001_2ba6.png
+* 0001_2ba7.png
 
-Charge is:
+This is a 7-frame ground animation.
 
-* grounded only
-* held-state driven
-* not a toggle
-* movement-locking
-* non-attacking
-* non-invulnerable
-* interrupted by higher-priority states
-* restarted from charge1 on every new charge
+Mid-Air BA2
 
-Keep all of that.
+* 0001_midair2ba1.png
+* 0001_midair2ba2.png
+* 0001_midair2ba3.png
 
-2. New Charge release behavior
+This is a 3-frame mid-air animation.
 
-Currently, releasing Charge immediately exits the Charge state and returns to the normal state such as Idle or Run.
+There were previously incorrectly named 0001_2ab*.png files in the repository history. They were deleted. Do not restore them and do not use 2ab anywhere. The correct naming is 2ba.
 
-Change this.
+Do not redraw, recolour, reinterpret, replace, upscale manually, or AI-generate any #0001 sprite artwork. Use the uploaded PNGs exactly as the source animation frames.
 
-When the player was actually charging and then voluntarily releases the Charge input, #0001 must show:
+1. Move the new sprites into the canonical fighter asset directory
 
-0001_charge1.png
-
-as a short Charge release/end pose.
-
-This reuses the existing real 0001_charge1.png asset.
-
-Do not create or duplicate another PNG.
-
-3. Add a dedicated Charge release clip/state
-
-Represent the voluntary release cleanly instead of hacking the animator index.
-
-Add an animation key conceptually similar to:
-
-chargeRelease: {
-  frames: [`${BASE_0001}charge1.png`],
-  fps: CHARGE_FPS,
-  loop: false,
-  heightRatio: 1,
-}
-
-This is intentionally the same artwork as the first Charge startup frame.
-
-Use a short logical state such as:
-
-chargeRelease
-
-The state should last exactly one frame-time at CHARGE_FPS.
-
-The current Charge rate is 10 FPS, so this naturally means roughly:
-
-0.1 seconds
-
-Do not introduce a random hard-coded timeout disconnected from the animation rate.
-
-Prefer:
-
-this.chargeReleaseDuration = sprites.duration('chargeRelease');
-
-or equivalent.
-
-4. “Voluntary release” is important
-
-Only play chargeRelease when the player stops holding the Charge control normally.
-
-Example:
-
-player is actively charging
-→ Charge key/button becomes released
-→ chargeRelease
-→ normal Idle/Run/etc.
-
-Do not force the release pose when Charge is interrupted by another gameplay state.
-
-These transitions should remain immediate:
-
-Charge → Hitstun
-Charge → BA1
-Charge → BA2
-Charge → Jump
-Charge → Defense/Dodge
-Charge → airborne state
-
-For example, if #0001 is charging and gets hit:
-
-chargea → Hurt
-
-not:
-
-chargea → charge1 → Hurt
-
-Likewise:
-
-Charge + BA1 → BA1 immediately
-Charge + Defense → Dodge immediately
-Charge + Jump → Jump immediately
-
-The release pose represents the character letting go of Charge, not every possible way the Charge state can end.
-
-5. Detect the release transition explicitly
-
-Track whether #0001 was actually charging on the previous simulation step.
-
-Do not infer voluntary release merely from:
-
-input.charge === false
-
-because Charge can be inactive for many other reasons.
-
-Conceptually distinguish:
-
-wasCharging = true
-input.charge = false
-no higher-priority interruption started
-
-from:
-
-wasCharging = true
-input.charge = true
-attack begins
-
-and:
-
-wasCharging = true
-input.charge = true
-hitstun begins
-
-Only the first case starts chargeRelease.
-
-A simple boolean or short release timer is fine as long as the state transition is explicit and deterministic.
-
-6. Charge release priority
-
-A sensible state priority after this task is:
-
-hitstun
-attack
-defense/dodge
-jump / fall
-land
-active charge
-chargeRelease
-run
-idle
-
-chargeRelease is a low-priority visual recovery state.
-
-It must never delay:
-
-* Hitstun
-* an attack
-* a Dodge
-* a Jump
-* airborne state
-* Land
-
-If the player begins a new Charge while chargeRelease is still displayed, the new Charge should immediately win and restart from:
-
-0001_charge1.png
-
-7. Charge release should not create gameplay effects
-
-The Charge release pose is visual.
-
-Do not add:
-
-* damage
-* hitbox
-* invulnerability
-* armour
-* Energy gain
-* Energy drain
-* knockback
-* special movement
-
-Normal movement may resume according to the existing movement system while the brief release pose is displayed.
-
-Do not add an artificial movement freeze just because the release pose exists.
-
-8. New Dodge sprites
-
-The repository root currently contains:
-
-Ground Dodge
-
-0001_dodge1.png
-0001_dodge2.png
-0001_dodge3.png
-
-Mid-Air Dodge
-
-0001_midairdodge1.png
-0001_midairdodge2.png
-0001_midairdodge3.png
-
-These were uploaded in the two most recent sprite commits.
-
-Move all six into:
+Move the ten new PNGs from the repository root into:
 
 ./assets/characters/0001/
 
-Final paths:
+The final paths must therefore be:
 
-./assets/characters/0001/0001_dodge1.png
-./assets/characters/0001/0001_dodge2.png
-./assets/characters/0001/0001_dodge3.png
-./assets/characters/0001/0001_midairdodge1.png
-./assets/characters/0001/0001_midairdodge2.png
-./assets/characters/0001/0001_midairdodge3.png
+./assets/characters/0001/0001_2ba1.png
+through
+./assets/characters/0001/0001_2ba7.png
 
-Remove the root copies.
+and:
 
-Preserve their bytes exactly.
+./assets/characters/0001/0001_midair2ba1.png
+through
+./assets/characters/0001/0001_midair2ba3.png
 
-Do not redraw, recolour, AI-generate, manually scale, rotate or replace any frame.
+Do not leave duplicate copies at the repository root.
 
-0001_dodge3.png currently happens to share the same repository blob contents as an existing charge frame. Treat its filename and role as intentional. Do not delete or rename it simply because the bytes happen to match another sprite.
+Preserve the PNG bytes unchanged.
 
-9. Register the Dodge animations
+All runtime asset URLs must remain relative because Alva can be served from the /alva/ GitHub Pages subpath.
 
-In Character #0001’s animation data, add:
+2. Register BA2 animations in Character #0001 data
 
-dodge
-midairDodge
+Extend js/data/characters.js using the existing BA1 conventions.
 
-Conceptually:
+BA1 currently establishes the correct pattern:
 
-const DODGE_FPS = 12;
-dodge: {
-  frames: frames(BASE_0001, 'dodge', 3),
-  fps: DODGE_FPS,
-  loop: false,
-  ...
-},
-midairDodge: {
-  frames: frames(BASE_0001, 'midairdodge', 3),
-  fps: DODGE_FPS,
-  loop: false,
-  ...
-},
+* ba1
+* midairBa1
+* a shared FPS constant
+* non-looping clips
+* action1: { ground: 'ba1', air: 'midairBa1' }
+* corresponding attack definitions
 
-Both have exactly three real frames.
+Add equivalent logical animation keys for BA2:
 
-Start with 12 FPS unless browser inspection of the actual sprites clearly indicates another rate.
+* ba2
+* midairBa2
 
-Both must play once.
+Use:
 
-Do not loop the entire Dodge continuously while the button is held.
+* frames(BASE_0001, '2ba', 7) for ba2
+* frames(BASE_0001, 'midair2ba', 3) for midairBa2
 
-Use the normal sprite-normalization system and determine suitable heightRatio values by inspecting the actual sprites in-game.
+Both animations must be:
 
-10. Rename the generic gameplay input from Block to Defense
+* non-looping
+* played once
+* allowed to hold their final frame naturally if necessary
+* normalized through the existing sprite-normalization pipeline
+* anchored consistently with #0001’s existing animations
 
-The current generic control is named:
+Do not hard-code any special rendering logic specifically for the PNG dimensions.
 
-block
+The existing sprite normalizer should continue to determine visible bounds, pixel-art grid, world scaling, and torso/bottom-centre anchoring.
 
-Replace the generic input/action concept with:
+Start with 12 FPS, consistent with BA1, unless direct inspection of the actual BA2 frames makes another whole-frame playback rate clearly necessary. If a different FPS is selected, document why and keep all attack phase durations derived from that FPS so animation and combat cannot drift apart.
 
-defense
+Prefer introducing a BA2_FPS constant alongside BA1_FPS.
 
-This matters because different characters can use different defense mechanics.
+3. Map the existing Action 2 input to BA2
 
-The shared player-facing action is:
+Character #0001 currently has approximately this action mapping:
 
-Defense
+actions: {
+  primary: null,
+  special: null,
+  action1: { ground: 'ba1', air: 'midairBa1' },
+  action2: null,
+}
 
-A character may implement Defense as:
+Change only action2 so it becomes the second basic attack:
 
-Block
+action2: {
+  ground: 'ba2',
+  air: 'midairBa2',
+}
 
-or:
+Do not change BA1.
 
-Dodge
+Do not move BA2 onto primary, special, or action1.
 
-For #0001:
+After this change:
 
-Defense type = Dodge
+* action1 = Basic Attack 1 / BA1
+* action2 = Basic Attack 2 / BA2
+* primary remains reserved
+* special remains reserved
 
-Do not call the shared action itself dodge.
+The existing Fighter.attackFor() implementation already supports { ground, air } mappings. Reuse it.
 
-Do not leave the generic action named block.
+Do not add another grounded/airborne dispatch system.
 
-11. Rename gameplay input fields
+4. Preserve the existing BA1 input bindings
 
-Update the gameplay input architecture.
+The current controls are already wired correctly.
 
-Change:
-
-block
-blockPressed
-
-to:
-
-defense
-defensePressed
-
-everywhere the values represent the player’s generic defense command.
-
-That includes at minimum:
-
-* CONFIG.bindings
-* ACTIONS
-* InputManager frame
-* InputManager sampling
-* gamepad mapping
-* NEUTRAL_INPUT
-* controller blank inputs
-* touch controls
-* Fighter input handling
-* tests
-
-Avoid transitional aliases such as permanently supporting both:
-
-block
-defense
-
-for the same player action.
-
-The canonical gameplay action after this change is defense.
-
-12. Keep the physical Defense controls
-
-Do not change the physical bindings.
-
-The control that used to activate Block now activates Defense.
+BA2 must use the physical controls that currently activate action2:
 
 Keyboard
 
-Keep:
+I
 
-L
+Do not move BA2 to J, K, U, or another key.
 
-but rename its action:
+Current important mappings remain:
 
-defense: ['KeyL']
+* U → BA1 / action1
+* I → BA2 / action2
 
 Gamepad
 
-Keep:
+The existing standard-gamepad mapping assigns:
 
-RB
-RT
+* B / Circle → action1 / BA1
+* LB → action2
 
-but map both to:
+Therefore LB becomes BA2.
 
-defense
+Do not remap gamepad buttons unless there is an actual bug in the existing mapping.
 
 Touch
 
-Keep the existing Defense button in the same lower-right physical position.
+Keep the existing action2 touch-button position and CSS slot.
 
-Do not rearrange the action cluster.
+The internal action remains:
 
-13. Rename player-facing Block text to Defense
+action2
 
-Change user-facing references from:
+The existing CSS/layout class can remain .tc-a2.
 
-Block
+Only its visible label/status changes.
 
-to:
+5. Change “A2” to “BA2”
 
-Defense
+Change the user-facing touch button from:
 
-where the text describes the generic control.
+A2
 
-For example:
-
-ACTION_LABELS.defense = 'Defense'
-
-The controls table should show:
-
-Defense | L
-
-not:
-
-Block | L
-
-Gamepad documentation should describe:
-
-RB / RT = Defense
-
-14. Replace the shield touch icon with “D”
-
-The existing touch control uses:
-
-ICONS.block
-
-which renders a shield.
-
-For #0001, remove that shield from the visible Defense button.
-
-Display exactly:
-
-D
-
-The D means Dodge because #0001’s Defense mechanic is Dodge.
-
-The generic accessible/action name remains:
-
-Defense
-
-So the touch specification should be equivalent to:
-
-{
-  action: 'defense',
-  label: 'Defense',
-  text: 'D',
-  pos: 'defense'
-}
-
-Use visible text:
-
-D
-
-not a shield SVG.
-
-Do not display:
-
-Block
-Dodge
-DEF
-
-on the button itself.
-
-The button visibly says exactly D.
-
-15. Rename its CSS/layout identifiers
-
-Because the generic action is being completely renamed, update generic control selectors such as:
-
-tc-block
-
-to:
-
-tc-defense
-
-and the corresponding mobile Help diagram selector from something like:
-
-md-block
-
-to:
-
-md-defense
-
-Keep the physical button coordinates unchanged.
-
-Do not move Defense around the control layout.
-
-16. Remove obsolete shield use
-
-If ICONS.block becomes completely unused after this task, remove that icon definition.
-
-If another actual existing UI still uses it for something unrelated, leave it.
-
-Do not leave dead shield rendering just for the Defense button.
-
-17. Add character-level Defense configuration
-
-Do not hard-code:
-
-Defense always means Dodge
-
-into the global input system.
-
-The whole reason for renaming the generic action is that future characters may defend differently.
-
-Add character-level data describing the defense mechanism.
-
-For example:
-
-defense: {
-  type: 'dodge',
-  ground: {
-    animation: 'dodge',
-    ...
-  },
-  air: {
-    animation: 'midairDodge',
-    ...
-  },
-}
-
-For a future blocking character, the architecture should be able to support something conceptually like:
-
-defense: {
-  type: 'block',
-  ...
-}
-
-without renaming the global button/input again.
-
-You do not need to add a new character in this task.
-
-18. #0001 no longer blocks
-
-For #0001 specifically:
-
-* pressing Defense does not set a permanent guard
-* holding Defense does not produce chip-damage blocking
-* #0001 should not enter the current block visual state
-* #0001 should not use the idle sprite as a fake guard
-* #0001 should not reduce incoming damage via blockDamageScale
-
-Instead, #0001 performs a discrete Dodge.
-
-The existing block implementation may remain available internally for a future character whose:
-
-defense.type === 'block'
-
-Do not delete useful block-specific combat architecture solely because #0001 no longer uses it.
-
-19. Keep block-specific terminology where it is actually block-specific
-
-Do not blindly rename combat concepts such as:
-
-blockstun
-blockDamageScale
-blocking
-
-to awkward names such as:
-
-defensestun
-defenseDamageScale
-
-if those fields specifically describe the mechanics of an actual Block defense.
-
-The important split is:
-
-player input = Defense
-character mechanism = Dodge or Block
-
-For a block-type character, internal fields like blocking, blockstun, and blockDamageScale can remain meaningful.
-
-For #0001, they simply must not become active when Defense is used.
-
-20. Dodge is a press action, not a held guard
-
-Unlike the old Block mechanic, #0001’s Dodge is a discrete action.
-
-Trigger Dodge from:
-
-defensePressed
-
-not from continuously checking:
-
-input.defense
-
-Correct behavior:
-
-press Defense
-→ perform one Dodge
-continue holding Defense
-→ do not loop another Dodge
-release
-→ nothing special
-press again
-→ perform another Dodge
-
-Do not make the three-frame animation repeat continuously while L/RB/RT/touch D remains held.
-
-A new Dodge requires a new press edge.
-
-21. Ground vs mid-air Dodge selection
-
-When Defense is newly pressed:
-
-Grounded
-
-Use:
-
-dodge
-
-with:
-
-0001_dodge1
-→ 0001_dodge2
-→ 0001_dodge3
-
-Airborne
-
-Use:
-
-midairDodge
-
-with:
-
-0001_midairdodge1
-→ 0001_midairdodge2
-→ 0001_midairdodge3
-
-Choose grounded vs airborne once when Defense is pressed.
-
-Do not switch clips halfway through the same Dodge simply because the fighter lands.
-
-22. Mid-air Dodge should finish its selected clip
-
-Follow the precedent already established by mid-air BA1 and BA2.
-
-If #0001 starts:
-
-midairDodge
-
-and lands before the three frames finish:
-
-* keep the Dodge action active
-* keep midairDodge
-* finish the remaining frames
-* do not switch to ground dodge
-* do not switch to land halfway through
-
-Once the Dodge completes, resume the appropriate grounded state.
-
-23. Gravity continues during mid-air Dodge
-
-Mid-air Dodge must not freeze #0001 in the air.
-
-During midairDodge:
-
-* gravity continues
-* vertical velocity continues
-* existing horizontal velocity can continue
-* collision continues
-
-Do not add:
-
-* hovering
-* extra jump force
-* upward lift
-* downward spike
-* teleportation
-
-unless explicitly specified by a later design task.
-
-24. Do not invent a Dodge dash
-
-The new art represents Dodge, but no special displacement distance was specified.
-
-Do not arbitrarily make #0001:
-
-* dash forward
-* dash backward
-* teleport
-* roll a fixed world distance
-
-because of the animation.
-
-Keep collision/body motion based on existing physics.
-
-On the ground, lock new directional acceleration during the Dodge and allow existing velocity to decelerate naturally, matching the attack/Charge movement discipline.
-
-In the air, preserve current momentum and gravity.
-
-25. Dodge requires a real defensive effect
-
-Since Dodge replaces #0001’s Block as the character’s Defense mechanic, it must actually avoid attacks during an intentional evasion window.
-
-Add a generic concept of temporary target invulnerability/evasion to the combat path.
-
-Do not simulate a Dodge by merely playing sprites while still taking every hit normally.
-
-26. Align Dodge invulnerability with animation frames
-
-Both Dodge clips have three frames.
-
-Use whole animation-frame timing.
-
-A conservative initial timing at 12 FPS is:
-
-frame 1 = startup / vulnerable
-frame 2 = dodge / invulnerable
-frame 3 = recovery / vulnerable
-
-Equivalent:
-
-startup: 1 / DODGE_FPS
-invulnerable: 1 / DODGE_FPS
-recovery: 1 / DODGE_FPS
-
-for both ground and mid-air Dodge.
-
-Before finalizing, inspect the actual artwork in the browser.
-
-If the visibly evasive body position clearly spans a different set of frames, align the invulnerability window to that artwork.
-
-Do not simply make all three frames invulnerable without inspecting them.
-
-Do not use arbitrary millisecond constants disconnected from animation frames.
-
-27. Generic invulnerability implementation
-
-Implement the defensive invulnerability in a way CombatSystem can understand without hard-coding sprite filenames.
-
-For example, expose something equivalent to:
-
-target is currently invulnerable
-
-from Fighter/CombatState.
-
-Then before resolving a hit against a target:
-
-if target is invulnerable
-→ do not apply the hit
-
-Do not:
-
-* subtract health
-* apply hitstun
-* apply blockstun
-* apply knockback
-* apply hitstop
-* mark the attack as having hit that fighter
-
-An attack whose active hitbox overlaps the Dodge’s invulnerability window should pass through.
-
-If the same attack remains active after invulnerability ends, normal collision rules may allow it to connect then.
-
-28. Dodge is not Block
-
-A successful Dodge must not create a:
-
-block
-
-combat event.
-
-It should simply avoid the hit.
-
-Do not apply:
-
-* chip damage
-* blockstun
-* reduced knockback
-
-because no block occurred.
-
-You do not need to invent a special “perfect dodge” reward, sound, Energy gain or counterattack.
-
-29. Dodge action runtime
-
-Use a dedicated short Defense/Dodge runtime state rather than pretending Dodge is an attack.
-
-A clean model would store something equivalent to:
-
-this.defenseAction = {
-  type: 'dodge',
-  animation: 'dodge', // or midairDodge
-  time: 0,
-  ...
-}
-
-The exact structure is flexible.
-
-Important requirements:
-
-* selected animation is locked when Dodge begins
-* duration comes from the clip/frame timing
-* state ends automatically after one pass
-* invulnerability phase comes from elapsed Dodge time
-* holding Defense does not restart it
-
-30. Dodge is not a combat attack
-
-Do not add Dodge to:
-
-COMBAT_ACTIONS
-
-Do not create an attack definition with:
-
-damage: 0
-
-just to abuse the attack system.
-
-Dodge should not have:
-
-* attack hitbox
-* hasHit
-* damage
-* attack cooldown map entry
-* attack event
-
-It is a Defense action/state.
-
-31. State priority
-
-Update the Fighter state machine to support generic Defense cleanly.
-
-For #0001, an appropriate priority is:
-
-hitstun
-attack
-active defense/dodge
-jump / fall
-land
-active charge
-chargeRelease
-run
-idle
-
-The exact internal structure can vary, but preserve these behaviors:
-
-* Hitstun always wins.
-* BA1/BA2 already started before Defense should continue normally.
-* A Dodge that successfully starts gets its own animation for its one-pass duration.
-* An aerial Dodge stays visible even while airborne.
-* Land does not replace a mid-air Dodge midway through its clip.
-* Charge is below active Dodge.
-* voluntary Charge release is below active Dodge.
-
-32. Defense should interrupt Charge
-
-If #0001 is actively charging and the player presses Defense:
-
-Charge → Dodge
-
-immediately.
-
-Do not play:
-
-chargeRelease
-
-first.
-
-This is not a voluntary Charge release animation; it is a higher-priority action interruption.
-
-If the Charge key remains held through the complete Dodge:
-
-* finish Dodge
-* if #0001 is grounded and still eligible
-* start a fresh Charge from charge1
-
-Do not resume directly at chargea/chargeb.
-
-33. Charge release plus Defense on same step
-
-Explicitly handle the case:
-
-player releases Charge
-and presses Defense
-on the same simulation step
-
-Defense wins.
-
-Result:
-
-Dodge
-
-not:
-
-chargeRelease
-
-After the Dodge ends, normal state selection resumes.
-
-34. Attacks and Defense interaction
-
-Preserve the existing combat-intent ordering carefully.
-
-Do not accidentally allow the same press step to start both:
-
-BA1 + Dodge
-
-or:
-
-BA2 + Dodge
-
-Choose a deterministic priority consistent with the existing attack-first architecture.
-
-Prefer keeping attacks at the current higher priority:
-
-attack successfully starts
-→ Dodge does not also start that step
-
-Do not change BA1/BA2 behavior as part of this feature.
-
-35. Dodge and Jump interaction
-
-Defense in the air is valid, so defensePressed while already airborne triggers midairDodge.
-
-For simultaneous ground inputs, preserve deterministic behavior.
-
-A reasonable rule is:
-
-Defense successfully starts on ground
-→ Dodge owns that step and Jump does not also launch
-
-or retain the existing higher-priority intent ordering if tests establish another rule.
-
-Whichever rule is used:
-
-* make it explicit
-* test it
-* do not accidentally start both states
-
-36. Facing during Dodge
-
-Lock facing for the duration of one Dodge.
-
-Do not allow holding the opposite direction to mirror the sprite halfway through a three-frame Dodge.
-
-When the Dodge ends, normal facing rules resume.
-
-This should match attack animation consistency.
-
-37. Missing Dodge artwork
-
-A Defense action that grants invulnerability must not silently work without visible Dodge art.
-
-If the appropriate Dodge clip is unavailable:
-
-do not start the Dodge
-do not grant invulnerability
-
-Log or handle it consistently with the existing “never fake combat artwork” philosophy.
-
-Do not use an Idle sprite while secretly granting invulnerability.
-
-This is more like an attack than a harmless movement fallback because it changes combat outcomes.
-
-38. Remove #0001’s old Block fallback/state usage
-
-Character #0001 currently has:
-
-block: { animation: 'idle' }
-
-as an animation fallback.
-
-Since #0001 no longer blocks, remove that obsolete #0001 block presentation.
-
-Do not show Idle as a guard pose when L is held.
-
-Its Defense action now has real Dodge artwork.
-
-39. #0001 should no longer use blockDamageScale
-
-Character #0001 currently defines:
-
-blockDamageScale: 0.15
-
-Because #0001 no longer has a Block defense, remove or stop using that #0001-specific stat.
-
-Keep a default/block-specific mechanism available for future characters that actually use:
-
-defense.type = block
-
-Do not let #0001 receive chip damage from Defense.
-
-40. Keep attack blockstun data for future blockers
-
-BA1/BA2 currently include values such as:
-
-blockstun
-
-Those values can remain.
-
-They describe what would happen if an actual blocking character defended against the attack.
-
-#0001’s Dodge does not use those values.
-
-This preserves future character support without confusing the generic input with a specific defense mechanic.
-
-41. Rename Help controls
-
-In Help, change:
-
-Block
-
-to:
-
-Defense
-
-The desktop controls table should show approximately:
-
-Defense | L
-
-not Block.
-
-The player-facing action name is always Defense.
-
-42. Update the mobile Help diagram
-
-Replace the shield marker with:
-
-D
-
-at the same physical location.
-
-Its title/description should say:
-
-Defense
-
-The diagram should describe #0001’s Defense as Dodge in explanatory text.
-
-For example:
-
-D = Defense; #0001 uses Dodge as its Defense.
-
-Do not label the generic control “Block”.
-
-43. Update touch layout comments
-
-The lower-right control documentation currently includes:
-
-[SPECIAL] [BLOCK]
-
-Update it to:
-
-[SPECIAL] [DEFENSE]
-
-or describe the visible control as:
-
-[SPECIAL] [D]
-
-with a comment that D is #0001’s Dodge-type Defense.
-
-Keep the button’s location unchanged.
-
-44. README controls
-
-Update the control table from:
-
-Block | L | ...
-
-to:
-
-Defense | L | ... D
-
-Explain:
-
-* Defense is the game’s generic defensive input.
-* Different characters may implement Defense differently.
-* #0001 uses Dodge.
-* #0001 has a grounded Dodge and a mid-air Dodge.
-* touch displays D because #0001’s Defense is Dodge.
-* gamepad RB/RT trigger Defense.
-
-Do not describe #0001 as blocking anymore.
-
-45. README Charge wording
-
-Update Charge documentation to include the release behavior.
-
-It should explain:
-
-Hold Charge:
-charge1 → charge2 → chargea ↔ chargeb
-Voluntarily release Charge:
-show charge1 briefly, then return to normal state
-
-Clarify that interruptions such as:
-
-* Dodge
-* Jump
-* BA1
-* BA2
-* getting hit
-
-do not wait for the release pose.
-
-46. ALVA_SPEC.md Defense architecture
-
-Update the product specification to distinguish:
-
-Defense = shared player action
-Block = one possible defense mechanism
-Dodge = another possible defense mechanism
-
-Character #0001 uses:
-
-Defense type: Dodge
-
-Document both real clips:
-
-Ground Dodge:
-dodge1 → dodge2 → dodge3
-Mid-Air Dodge:
-midairdodge1 → midairdodge2 → midairdodge3
-
-Document:
-
-* one press = one Dodge
-* holding does not auto-repeat
-* ground/air selected at activation
-* mid-air Dodge continues through landing
-* gravity continues
-* no invented dash displacement
-* facing locks
-* invulnerability is aligned to visible Dodge frame(s)
-* no chip damage
-* no blockstun
-* missing Dodge art means no invisible Dodge
-
-47. ALVA_SPEC.md Charge update
-
-Change the current wording that says:
-
-Releasing it exits the state on that step
-
-to the new behavior:
-
-Voluntarily releasing Charge enters a brief chargeRelease visual state using charge1 for one Charge frame-time, then resumes the normal state.
-
-Also state:
-
-Higher-priority interruptions do not play chargeRelease first.
-
-Update the priority documentation accordingly.
-
-48. Combat-system documentation
-
-Where documentation currently describes the architecture as containing:
-
-block
-
-as though that were the universal player action, update it to say:
-
-Defense
-
-with Block/Dodge as implementations.
-
-Specific low-level attack concepts such as blockstun can still be called blockstun because that is exactly what they mean.
-
-49. Update stale source comments
-
-Search the repo for generic comments/text that say:
-
-* Block button
-* block input
-* Block wins over Charge
-* shield button
-* block is #0001’s defense
-* block sets a guard state using idle
-
-Update them.
-
-Examples should become:
-
-Defense input
-#0001 Dodge
-Defense interrupts Charge
-
-where appropriate.
-
-Do not mechanically rename legitimate block-specific combat implementation comments.
-
-50. Tests: Dodge assets
-
-Add a dedicated test file such as:
-
-tests/defense.test.mjs
-
-or:
-
-tests/dodge.test.mjs
-
-Assert all six sprites are registered under the canonical directory:
-
-0001_dodge1.png
-0001_dodge2.png
-0001_dodge3.png
-0001_midairdodge1.png
-0001_midairdodge2.png
-0001_midairdodge3.png
-
-Assert root copies are gone.
-
-Assert characterFramePaths() includes them.
-
-51. Tests: ground Dodge playback
-
-From grounded Idle, press Defense once.
-
-Assert:
-
-* Defense type is Dodge
-* logical defense state begins
-* animation is dodge
-* first frame is 0001_dodge1.png
-* sequence is exactly:
-
-dodge1
-dodge2
-dodge3
-
-* it does not loop
-* duration is exactly one clip pass
-* normal state resumes afterward
-
-52. Tests: holding does not repeat Dodge
-
-Press Defense and keep it held for much longer than the three-frame clip.
-
-Assert:
-
-* only one Dodge occurs
-* after the clip, normal state resumes
-* another Dodge does not automatically start
-
-Release and press again.
-
-Assert the next Dodge starts normally from:
-
-dodge1
-
-53. Tests: mid-air Dodge
-
-Jump.
-
-While rising, press Defense.
-
-Assert:
-
-* midairDodge begins
-* sequence is exactly:
-
-midairdodge1
-midairdodge2
-midairdodge3
-
-* gravity continues
-
-Repeat while descending.
-
-Assert it works during Fall as well.
-
-54. Tests: landing during mid-air Dodge
-
-Start a mid-air Dodge late in a fall.
-
-Land while the three-frame clip is active.
-
-Assert:
-
-* Defense action remains active
-* animation remains midairDodge
-* no switch to ground Dodge
-* no switch to Land midway
-* all three mid-air frames finish
-* afterward Fighter returns to an appropriate grounded state
-
-55. Tests: invulnerability window
-
-Test Dodge against a real BA1/BA2 hitbox using CombatSystem.
-
-Arrange the attack so contact overlaps the intended invulnerable frame.
-
-Assert:
-
-* target loses no Health
-* target gets no stun
-* target gets no knockback
-* target gets no hitstop from that avoided collision
-* no block event is generated
-* attack is not falsely consumed as a successful hit
-
-Also test contact during startup/recovery.
-
-Assert normal hits still work outside the invulnerability window.
-
-56. Tests: no chip damage
-
-Old #0001 Block behavior must be gone.
-
-Hold or press Defense during an incoming attack where the Dodge invulnerability does not cover the hit.
-
-Assert:
-
-* there is no reduced/chip-damage block
-* either the Dodge avoids it during invulnerability or #0001 takes a normal hit outside it
-
-Do not produce the old 15% blocking damage behavior.
-
-57. Tests: generic Defense input rename
-
-Assert:
-
-ACTIONS includes defense
-ACTIONS does not include block
-
-Assert:
-
-CONFIG.bindings.defense === ['KeyL']
-
-and that there is no gameplay:
-
-CONFIG.bindings.block
-
-Input snapshots should expose:
-
-defense
-defensePressed
-
-not:
-
-block
-blockPressed
-
-58. Tests: gamepad
-
-Assert:
-
-RB → defense
-RT → defense
-
-Do not alter:
-
-* A / Cross = Jump
-* B / Circle = BA1
-* LB = BA2
-* D-pad/left-stick Down = Charge
-* X / Square = Primary
-* Y / Triangle = Special
-
-59. Tests: touch Defense button
-
-Assert the old Block button slot now:
-
-* is registered as defense
-* visibly reads exactly D
-* has accessible label Defense
-* uses .tc-defense
-* does not contain the shield SVG
-* dispatches defense: true on pointer down
-* dispatches defense: false on pointer up
-
-The same button position must be preserved.
-
-60. Tests: Charge voluntary release frame
-
-Extend tests/charge.test.mjs.
-
-Charge into the A/B loop.
-
-Release Charge without pressing any other action.
-
-Assert the visible transition includes:
-
-... chargea/chargeb
-→ 0001_charge1.png
-→ normal state
-
-Assert charge1 is displayed for exactly one Charge frame-time.
-
-61. Tests: release from any Charge phase
-
-Voluntarily release during each possible Charge portion:
-
-* charge1
-* charge2
-* chargea
-* chargeb
-
-After release, assert the release state uses:
-
-0001_charge1.png
-
-for its configured release duration.
-
-Then normal state resumes.
-
-62. Tests: interruptions do not show Charge release
-
-Explicitly test:
-
-Hitstun
-
-Charge → hit
-
-Assert immediate Hurt.
-
-No chargeRelease.
-
-BA1
-
-Charge → BA1
-
-Assert immediate BA1 frame.
-
-No release pose first.
+to exactly:
 
 BA2
 
-Same.
+Also change its accessible label from:
 
-Jump
+Action 2
 
-Immediate Jump.
+to:
 
-Defense
+Basic Attack 2
 
-Immediate Dodge.
+In js/game/touch-controls.js, the equivalent button should become conceptually:
 
-No chargeRelease before any of these transitions.
+{
+  action: 'action2',
+  label: 'Basic Attack 2',
+  text: 'BA2',
+  pos: 'a2'
+}
 
-63. Tests: release + Defense same step
+Remove its pending: true state now that real attack artwork exists.
 
-While charging:
+The BA2 button must therefore no longer use the dashed/dimmed reserved appearance.
 
-Charge becomes false
-DefensePressed becomes true
+Do not rename .tc-a2 just to match the visible text.
 
-on the same fixed step.
+Do not change the button’s location.
 
-Assert:
+6. Update global action labels
 
-Dodge
+In js/config.js, change:
 
-starts immediately.
+action2: 'Action 2'
 
-Do not show a Charge release state first.
+to:
 
-64. Tests: Charge resumes correctly after Dodge
+action2: 'Basic Attack 2'
 
-Keep the Charge key held.
+Keep the keyboard binding:
 
-Start a Dodge.
+action2: ['KeyI']
 
-Assert Dodge interrupts Charge.
+unchanged.
 
-After Dodge ends, if #0001 is grounded and Charge is still held:
+BA1 should remain:
 
-* re-enter Charge
-* first frame is 0001_charge1.png
+Basic Attack 1
 
-Do not resume chargea or chargeb.
+7. Update the Help UI
 
-65. Update old Charge tests
+js/ui/help-content.js currently considers Primary, Special, and Action 2 reserved.
 
-Current Charge tests explicitly contain expectations such as:
+Once BA2 is implemented:
 
-Block outranks Charge when both are held
+* remove action2 from PENDING
+* leave primary and special reserved
 
-Replace these with the new Defense/Dodge behavior.
+The pending set should therefore effectively contain only:
 
-Do not simply delete priority coverage.
+* primary
+* special
 
-Test the real new rule:
+Update the mobile diagram:
 
-Defense press interrupts Charge with Dodge
+* A2 → BA2
+* title/accessible label → Basic Attack 2
+* descriptive text should say BA1 and BA2 rather than Action 1 / Action 2
 
-Also update Energy regression tests currently referring to “charging and blocking” so they refer to the current Dodge/Defense behavior.
+Update the mobile diagram’s overall ARIA description accordingly.
 
-Energy should remain unchanged unless a future task specifies otherwise.
-
-66. Help/UI tests
-
-Update tests/controls-ui.test.mjs.
-
-Assert:
-
-ACTION_LABELS.defense === 'Defense'
-
-Assert Help contains:
-
-Defense
-
-and does not list a generic control called:
-
-Block
-
-for #0001.
-
-Assert mobile diagram shows:
-
-D
-
-at the Defense slot.
-
-Assert its title/accessible context identifies it as Defense.
-
-Explanatory copy should make clear:
-
-#0001's Defense is Dodge
-
-67. Preserve Energy behavior
-
-Do not alter the Energy feature as part of this task.
-
-Energy still:
-
-starts full
-does not drain
-does not regenerate
-is not spent
-
-Do not charge Energy for Dodge.
-
-Do not reward a successful Dodge with Energy.
-
-Do not connect Defense to Energy yet.
-
-68. Preserve the training CPU
-
-The current training CPU remains deliberately non-attacking.
-
-Do not teach it:
+Update the legend so it refers to:
 
 * BA1
 * BA2
-* Charge
-* Dodge
 
-unless required solely to prevent errors after the input rename.
+rather than:
 
-Its blank/input structures should use the new generic defense field instead of block, but it should continue leaving Defense inactive.
+* BA1
+* Action 2
 
-Its AI-only platform-drop behavior remains unchanged.
+Update explanatory text so the dashed buttons are now only Primary and Special.
 
-69. Full regression suite
+8. Update stale help/build descriptions
 
-Run:
+The Help screen currently describes BA1 as implemented while Action 2 remains reserved.
+
+Update this description to state that #0001 now has:
+
+* Idle
+* Run
+* Jump
+* Fall
+* Land
+* Hurt
+* Mid-Air Hurt
+* Basic Attack 1
+* Mid-Air Basic Attack 1
+* Basic Attack 2
+* Mid-Air Basic Attack 2
+
+Mention that:
+
+* BA1 uses action1
+* BA2 uses action2
+* Primary and Special remain reserved
+* the training CPU remains non-attacking
+
+Do not claim that Primary or Special have attacks.
+
+9. Implement BA2 attack definitions using the existing combat system
+
+Add two new attack definitions:
+
+* ba2
+* midairBa2
+
+Do this entirely through the current createAttackDefinition / character-data combat architecture.
+
+Do not create a BA2-specific combat engine.
+
+Do not create manual collision checks outside CombatSystem.
+
+Do not bypass the existing attack state.
+
+The existing system already handles:
+
+* startup
+* active frames
+* recovery
+* damage
+* hitboxes
+* hurtboxes
+* knockback
+* hitstun
+* blockstun
+* hitstop
+* cooldowns
+* one-hit-per-attack behavior
+* attack movement locking
+* active-hitbox debug rendering
+* horizontal mirroring
+* grounded/airborne attack selection
+
+Reuse all of it.
+
+10. Align BA2 gameplay timing with the actual animation frames
+
+Combat phases must be based on whole animation frames at BA2_FPS, like BA1.
+
+Before finalizing the numbers, inspect all ten sprites visually and determine which frame or frames represent the actual strike/contact portion.
+
+Do not make the hitbox active during the entire animation.
+
+Ground BA2
+
+There are 7 frames:
+
+2ba1 through 2ba7.
+
+Determine visually:
+
+* wind-up/startup frames
+* actual contact/strike frame or frames
+* recovery frames
+
+A sensible starting point, if the artwork supports it, is:
+
+* frames 1–3: startup
+* frames 4–5: active
+* frames 6–7: recovery
+
+At 12 FPS this would be:
+
+startup: 3 / BA2_FPS,
+active: 2 / BA2_FPS,
+recovery: 2 / BA2_FPS,
+
+However, do not blindly use this split if the sprite artwork clearly shows contact on another frame.
+
+The active phase should correspond to what is visibly striking.
+
+The total attack duration should equal exactly one pass of the 7-frame animation.
+
+Mid-Air BA2
+
+There are 3 frames:
+
+midair2ba1
+midair2ba2
+midair2ba3
+
+A sensible initial split, if frame 2 is the visible contact frame, is:
+
+* frame 1: startup
+* frame 2: active
+* frame 3: recovery
+
+At 12 FPS:
+
+startup: 1 / BA2_FPS,
+active: 1 / BA2_FPS,
+recovery: 1 / BA2_FPS,
+
+Again, inspect the actual sprites before locking the active phase.
+
+The total duration must equal one pass of the three-frame clip.
+
+Maintain the existing phase-boundary handling that avoids 60 Hz floating-point drift.
+
+11. Make BA2 meaningfully distinct without breaking the game’s balance
+
+BA1 currently uses conservative combat values around:
+
+* 6 damage
+* 180 horizontal knockback
+* 0 vertical launch
+* 0.22 s hitstun
+* 0.14 s blockstun
+* 0.06 s hitstop
+* 0.1 s cooldown
+
+BA2 is the secondary basic attack, so it should not simply be a second ID pointing at BA1.
+
+Use the new artwork to determine its reach and feel.
+
+A reasonable initial BA2 tuning target is slightly slower/heavier than BA1, for example:
+
+Ground BA2 starting values
+
+* damage: approximately 8
+* horizontal knockback: approximately 220
+* vertical knockback: 0 unless the artwork very clearly depicts a launcher
+* hitstun: approximately 0.24
+* blockstun: approximately 0.15
+* hitstop: approximately 0.07
+* cooldown: approximately 0.15–0.18
+* lockMovement: true
+* groundOnly: true
+
+Mid-Air BA2 starting values
+
+Use comparable values, adjusted only if necessary for the visible aerial move.
+
+Do not arbitrarily create:
+
+* launches
+* spikes
+* teleports
+* dashes
+* projectile behavior
+* multi-hits
+* armour
+* invulnerability
+* wall bounces
+* camera shakes
+* new physics mechanics
+
+unless the current design/art specifically requires them.
+
+A basic attack should remain a straightforward use of the existing combat system.
+
+12. Fit hitboxes to the visible strike
+
+Inspect the actual contact frame(s) and make each hitbox correspond to the limb/weapon/body region that visibly attacks.
+
+Do not just copy BA1’s hitbox if BA2 has a different pose or range.
+
+The hitbox should:
+
+* appear in front of the fighter when facing right
+* automatically mirror through the existing combat system when facing left
+* stay reasonably close to the visible attacking limb
+* not cover the entire character
+* not extend unrealistically far away
+* not be active during startup/recovery
+
+Use the existing Backquote debug overlay to validate it in battle.
+
+The debug attack hitbox should appear only during BA2’s active phase.
+
+13. Ground vs mid-air behavior
+
+When action2 is pressed:
+
+Grounded
+
+Start ba2.
+
+Airborne
+
+Start midairBa2.
+
+This should use the already-implemented attackFor('action2') grounded/air selection.
+
+BA2 must work during both:
+
+* jump ascent
+* jump descent/fall
+
+For the aerial move, gravity must keep working.
+
+Do not freeze #0001 in the air.
+
+Do not add extra lift unless the move is specifically designed to have it.
+
+If #0001 lands while midairBa2 is still playing, preserve the BA1 precedent:
+
+allow the mid-air BA2 attack to finish its own clip instead of swapping to the ground BA2 animation or the landing animation midway through the move.
+
+Once it ends, normal grounded state selection can resume.
+
+14. Same-frame input behavior
+
+Preserve the combat-intent ordering already established for BA1.
+
+If BA2 and Jump are pressed on the exact same simulation step while #0001 is grounded, the grounded attack should begin and the jump should not incorrectly turn the attack into its aerial version.
+
+Do not change this behavior for BA1.
+
+15. Attack animation safety
+
+Keep the existing rule that attacks with missing/unloaded animation frames are refused rather than faked.
+
+If ba2 or midairBa2 fails to load:
+
+* do not substitute idle as an attack
+* do not fabricate an attack pose
+* do not run an invisible damaging hitbox
+
+Fighter.tryAction() should simply refuse that attack using the same mechanism already used for BA1.
+
+16. Preserve attack priority/state behavior
+
+Do not disturb the current Fighter state priority.
+
+In particular:
+
+* hitstun must still override attacks
+* an attack must override normal jump/fall/land/run/idle rendering while active
+* normal physics continue
+* landing while an aerial attack is active must not replace its animation
+* hitstop behavior must stay intact
+* movement/facing lock semantics should stay consistent with BA1
+
+Do not change hurt/hitstun animations as part of this feature.
+
+17. Preserve the non-attacking training CPU
+
+Quick Battle’s CPU is intentionally a non-attacking training opponent.
+
+Adding BA2 to Character #0001 must not cause the training AI to begin using BA1 or BA2.
+
+Do not change TrainingAIController behavior unless necessary only to keep its existing non-attacking behavior intact.
+
+18. Update README
+
+Update README.md to reflect BA2.
+
+The controls section should show something equivalent to:
+
+* Basic Attack 1 (BA1) — U — touch BA1
+* Basic Attack 2 (BA2) — I — touch BA2
+
+Primary and Special remain marked reserved.
+
+Remove the reserved marker from Action 2 because it is no longer reserved.
+
+Change user-facing references from Action 2 to Basic Attack 2 (BA2).
+
+Update gamepad documentation:
+
+* B / Circle → BA1
+* LB → BA2
+* X / Y remain reserved
+* RB / RT → Block
+
+Update the animations section to include:
+
+* Basic Attack 2 — 7 frames
+* Mid-Air Basic Attack 2 — 3 frames
+
+Update the attacks section to say BA1 and BA2 are implemented on the ground and in the air.
+
+Do not state that Primary or Special are implemented.
+
+19. Update ALVA_SPEC.md
+
+Update the specification so its battle/combat/input sections match the actual game.
+
+Document:
+
+* BA2 as #0001’s secondary basic attack
+* ground BA2 has 7 real frames
+* mid-air BA2 has 3 real frames
+* action2 selects ground/air versions
+* keyboard I
+* gamepad LB
+* touch button BA2
+* BA2 is no longer reserved
+* Primary and Special remain reserved
+* landing during mid-air BA2 does not cancel its attack clip
+* attack phases correspond to the visible frames
+* no fabricated attacks or frames
+
+Do not delete the BA1 specification.
+
+20. Update stale source comments
+
+Search for comments that currently say things like:
+
+* Action 2 is reserved
+* only BA1 is implemented
+* Primary, Special and Action 2 are waiting for artwork
+* the game has only one real attack
+
+Update those comments so they accurately describe the build.
+
+Do not rewrite unrelated documentation.
+
+21. Tests
+
+Extend the dependency-free Node test suite.
+
+Prefer extending/generalizing the existing:
+
+* tests/basic-attack.test.mjs
+* tests/controls-ui.test.mjs
+* tests/fighter-animation.test.mjs
+
+or split BA2 into a clearly named attack test file if that produces cleaner tests.
+
+Do not remove BA1 coverage.
+
+Add BA2 coverage for at least all of the following.
+
+Asset registration
+
+Assert:
+
+* all 7 0001_2ba*.png files are referenced from assets/characters/0001/
+* all 3 0001_midair2ba*.png files are referenced from assets/characters/0001/
+* the root copies no longer exist
+* no 2ab spelling is used
+* characterFramePaths() includes the new frames
+
+Character action mapping
+
+Assert:
+
+action1: {
+  ground: 'ba1',
+  air: 'midairBa1',
+}
+
+remains intact.
+
+Assert:
+
+action2: {
+  ground: 'ba2',
+  air: 'midairBa2',
+}
+
+is active.
+
+Assert Primary and Special remain null.
+
+Input
+
+Assert:
+
+* CONFIG.bindings.action1 remains ['KeyU']
+* CONFIG.bindings.action2 remains ['KeyI']
+* COMBAT_ACTIONS still includes action1 and action2
+
+Do not rename internal actions to BA1/BA2.
+
+Ground BA2 playback
+
+From idle on the ground, press action2.
+
+Assert:
+
+* attack id is ba2
+* animation is ba2
+* animation starts at 0001_2ba1.png
+* the visible frame sequence reaches all seven frames in order
+* it does not loop
+* it runs for exactly one animation pass
+* it exits cleanly afterward
+* cooldown behaves correctly
+
+Mid-air BA2 playback
+
+Jump and press action2.
+
+Assert:
+
+* attack id is midairBa2
+* animation is midairBa2
+* all three frames appear in order
+* it works while rising
+* it works while descending
+* gravity continues during the attack
+* it does not loop
+
+Landing during mid-air BA2
+
+Start BA2 late in a fall so #0001 lands before the attack finishes.
+
+Assert:
+
+* the attack remains midairBa2
+* the animation remains midairBa2
+* it does not switch to ba2
+* it does not switch to land
+* the remaining aerial frames finish normally
+* the fighter returns to an appropriate grounded state afterward
+
+Active-frame timing
+
+Assert the attack hitbox is active only on the selected visual contact frame(s).
+
+For example, if ground BA2 uses frames 4–5 as contact, tests should ensure the active phase corresponds to those frames and not startup/recovery.
+
+For mid-air BA2, test the actual contact frame determined from the sprites.
+
+Damage/hit resolution
+
+Using the real CombatSystem:
+
+* ground BA2 can hit an opponent in front
+* aerial BA2 can hit an opponent in an appropriate airborne setup
+* one attack cannot repeatedly damage the same target every active simulation step
+* hitstun, hitstop, damage and knockback use the configured BA2 values
+* hitboxes mirror with facing
+
+Movement/facing
+
+Assert BA2 uses the same attack movement/facing lock conventions as BA1.
+
+Missing sprite safety
+
+Construct a sprite set where BA2 animation data is unavailable.
+
+Press action2.
+
+Assert:
+
+* attack does not begin
+* there is no invisible hitbox
+* the fighter stays in a valid normal state
+* the existing warning/refusal behavior occurs
+
+Reserved attacks
+
+Update the old test that currently says:
+
+Primary, Special and Action 2 stay inactive
+
+because Action 2 is now BA2.
+
+It should instead verify:
+
+* Primary remains inactive
+* Special remains inactive
+* BA1 works
+* BA2 works
+
+Touch controls
+
+Assert the action2 touch button:
+
+* displays exactly BA2
+* has .tc-a2
+* has data-action="action2"
+* has accessible label Basic Attack 2
+* is no longer is-pending
+
+Assert only Primary and Special remain pending.
+
+Touch dispatch
+
+Pressing the visible BA2 button must dispatch:
+
+action2
+
+not a newly invented ba2 input action.
+
+Test multi-touch with movement as is already done for BA1.
+
+Help UI
+
+Assert:
+
+* ACTION_LABELS.action2 === 'Basic Attack 2'
+* the controls table displays Basic Attack 2
+* it is not marked Reserved
+* the mobile diagram displays BA2
+* it does not display A2
+* Help text identifies BA2 as available
+* Help still identifies Primary and Special as reserved
+
+22. Regression requirements
+
+Run the complete test suite with:
 
 node --test
 
-All tests must pass.
+All existing BA1, hurt, movement, battle-screen, animation, UI and combat tests must continue passing.
 
-Do not regress:
+Do not weaken existing BA1 assertions just to make BA2 pass.
 
-* Charge startup/loop
-* Charge held input
-* Charge platform behavior
-* Energy HUD
-* BA1
-* Mid-Air BA1
-* BA2
-* Mid-Air BA2
-* Hurt
-* Mid-Air Hurt
-* Jump/Fall
-* Land
-* sprite normalization
-* touch multi-touch
-* menu Down navigation
-* pause/results
-* CPU platform following
+In particular verify BA1 still:
 
-Only intentionally obsolete Block assumptions should change.
+* uses U / B-Circle / action1
+* has its 4-frame ground animation
+* has its 5-frame aerial animation
+* uses its existing combat values
+* finishes an aerial attack after landing
+* refuses to attack if its frames are unavailable
 
-70. Manual browser verification
+23. Manual browser verification
 
-After tests pass, verify in an actual battle.
+After automated tests pass, manually run the game and verify #0001 in an actual Quick Battle.
 
-Charge voluntary release
+Check all of these:
 
-Hold C / S / ↓ until A/B is looping.
+Ground
 
-Release it normally.
+* U triggers BA1
+* I triggers BA2
+* BA1 still looks correct
+* BA2 plays all seven frames at a natural size
+* no sprite popping, sinking or horizontal sliding
+* BA2 hitbox appears at the visible strike when debug overlay is enabled
+* facing-left attacks mirror correctly
 
-Verify:
+Air
 
-chargea/chargeb
-→ charge1
-→ Idle
-
-or Run if movement resumes.
-
-The charge1 release pose should be brief, not stuck.
-
-Charge interruptions
-
-While charging:
-
-* press BA1
-* press BA2
-* Jump
-* press Defense
-* get hit
-
-Verify none of those wait for the Charge release pose.
-
-Ground Defense
-
-Press L / RB / RT / touch D while grounded.
-
-Verify:
-
-dodge1
-→ dodge2
-→ dodge3
-
-once.
-
-Holding the input should not continuously loop Dodge.
-
-Mid-air Defense
-
-Press Defense during ascent and descent.
-
-Verify:
-
-midairdodge1
-→ midairdodge2
-→ midairdodge3
-
-Gravity must continue.
-
-Landing
-
-Start a Dodge shortly before landing.
-
-Verify the mid-air clip finishes rather than switching animation halfway through.
-
-Combat
-
-Enable the debug overlay.
-
-Test incoming attacks.
-
-Verify:
-
-* attacks can hit during vulnerable startup/recovery
-* attacks pass through during the intended Dodge invulnerability frame(s)
-* no chip damage appears
-* no block event appears
-* no shield/guard behavior remains for #0001
+* U triggers Mid-Air BA1
+* I triggers Mid-Air BA2
+* Mid-Air BA2 works while rising and falling
+* gravity continues normally
+* landing before it ends does not replace its clip
 
 Touch
 
-Verify the lower-right button formerly showing a shield now visibly shows exactly:
+* visible BA1 button says BA1
+* visible BA2 button says BA2
+* BA2 is no longer dashed/dimmed
+* Primary and Special remain dashed
+* BA1 and BA2 can be used while another finger holds movement
 
-D
+Gamepad
 
-and still occupies the same button slot.
+* B / Circle triggers BA1
+* LB triggers BA2
+* block and jump mappings remain unchanged
 
-UI
+Combat
 
-Verify Help and controls say:
+* BA2 can connect in front of #0001
+* hitbox matches the visible strike
+* attacks do not hit behind #0001
+* one attack does not multi-hit accidentally
+* active hitbox only exists during the intended contact frames
+* missing attack artwork never produces invisible damage
 
-Defense
+24. Do not change unrelated game systems
 
-not Block.
-
-71. Scope restrictions
-
-Do not add:
-
-* dodge particles
-* dodge sound effects
-* perfect-dodge bonuses
-* slow motion
-* counterattacks
-* Energy rewards
-* Energy costs
-* arbitrary dash displacement
-* armour
-* attack changes
-* new Charge artwork
-* new characters
+Keep this feature focused.
 
 Do not redesign:
 
-* HUD
+* menus
 * stages
 * camera
-* menus
+* HUD
+* physics
 * roster
-* battle result flow
+* splash screen
+* branding
+* pause/result screens
 
-Do not modify BA1/BA2 balance.
+Do not add extra fighters or attacks.
+
+Do not make the CPU attack.
+
+Do not remap BA1.
+
+Do not rename action1 or action2.
+
+Do not replace existing sprite-normalization behavior.
+
+Do not remove the existing relative asset-path strategy.
 
 Acceptance criteria
 
 The task is complete when:
 
-1. All six Dodge sprites live only under assets/characters/0001/.
-2. Ground Defense plays dodge1 → dodge2 → dodge3 once.
-3. Mid-air Defense plays midairdodge1 → midairdodge2 → midairdodge3 once.
-4. The shared input/action is named defense, not block.
-5. Keyboard L triggers Defense.
-6. Gamepad RB and RT trigger Defense.
-7. #0001’s Defense implementation is Dodge.
-8. Future character data can still implement Defense as Block.
-9. The touch Defense button remains in the old Block position.
-10. The touch button visibly reads exactly D.
-11. The shield graphic is gone from #0001’s Defense control.
-12. The accessible/player-facing generic label is Defense.
-13. One Defense press causes one Dodge.
-14. Holding Defense does not auto-loop Dodge.
-15. Ground vs mid-air Dodge is selected when Defense starts.
-16. A mid-air Dodge continues through landing until its clip ends.
-17. Gravity continues during mid-air Dodge.
-18. Dodge does not invent a dash/teleport.
-19. The visible evasive frame(s) provide real invulnerability.
-20. Dodge causes no chip damage or blockstun.
-21. #0001 no longer uses the old Block guard behavior.
-22. Missing Dodge art never grants invisible invulnerability.
-23. Voluntarily releasing Charge shows 0001_charge1.png for one Charge frame-time.
-24. Charge interruptions by hit, attack, Jump or Dodge do not play that release pose first.
-25. A new Charge still begins at charge1.
-26. Charge’s existing charge1 → charge2 → chargea ↔ chargeb hold sequence remains unchanged.
-27. Energy remains unchanged by Dodge.
-28. README, Help and ALVA_SPEC.md describe Defense/Dodge and Charge release correctly.
-29. The training CPU remains non-attacking.
-30. node --test passes completely.
+1. All ten new BA2 PNGs live only under assets/characters/0001/.
+2. Ground BA2 uses all seven 0001_2ba1–0001_2ba7 frames.
+3. Mid-Air BA2 uses all three 0001_midair2ba1–0001_midair2ba3 frames.
+4. action2 selects ba2 on the ground and midairBa2 in the air.
+5. Keyboard I triggers BA2.
+6. Gamepad LB triggers BA2.
+7. The touch button visibly reads exactly BA2.
+8. Its accessible/user-facing name is Basic Attack 2.
+9. BA2 is no longer shown as reserved.
+10. Primary and Special remain reserved.
+11. BA1 is unchanged and still works.
+12. Ground and aerial BA2 phases line up with the visible attack frames.
+13. BA2 uses the existing data-driven combat/hitbox system.
+14. Aerial BA2 continues through landing just like aerial BA1.
+15. Missing BA2 artwork never creates an invisible/fake attack.
+16. Documentation and Help accurately describe BA1 and BA2.
+17. The training CPU remains non-attacking.
+18. node --test passes completely.
+19. Manual browser verification confirms correct sprite scale, anchoring, animation order, hitbox placement and inputs.
