@@ -1,733 +1,477 @@
-Implement “Practice Ground” in Alva
+Work in the hiyroscript/alva repository and implement the following Practice Ground improvements. Inspect and follow the existing architecture and visual language before changing anything. Do not redesign unrelated systems and do not change Quick Battle behavior.
 
-Work in the hiyroscript/alva repository on the current main branch.
+Existing architecture you should preserve
 
-Implement a new Practice Ground experience that replaces the currently disabled Help & Credits home-menu entry.
+Practice Ground is implemented primarily through:
 
-Do not redesign Alva’s overall architecture or visual identity. Build this feature using the existing vanilla JavaScript, Canvas 2D, screen manager, fighter systems, stage renderer, menu navigation, touch controls, glass UI, and character data.
-
-The result must feel like a first-class Alva mode, not a prototype bolted onto the game.
-
-Repository context you must preserve
-
-Before making changes, inspect and understand these existing files:
-
-* index.html
-* styles.css
-* js/core/app.js
-* js/core/screen-manager.js
-* js/core/menu-navigator.js
-* js/screens/home-screen.js
-* js/screens/character-select-screen.js
-* js/screens/battle-screen.js
-* js/game/battle.js
-* js/game/hud.js
-* js/game/camera.js
-* js/game/fighter-controller.js
-* js/game/character.js
-* js/game/combat.js
-* js/game/projectile.js
-* js/game/clone.js
-* js/game/charged-technique.js
-* js/game/touch-controls.js
-* js/data/characters.js
-* js/data/maps.js
-* js/stages/index.js
-* js/stages/stage-theme.js
-* the existing test files under tests/
-
-Important facts about the current implementation:
-
-* HomeScreen currently contains a disabled Help & Credits button.
-* That button currently points to the help screen.
-* The standard fighter-select screen has a 48-slot roster, with available fighters as buttons and locked slots as non-interactive placeholders.
-* Fighter #0001 is character ID "0001", is available, and occupies roster slot 0.
-* Quick Battle’s Battle class currently always creates both P1 and a second fighter controlled by TrainingAIController.
-* The normal HUD always creates P1, CPU, round/timer, and pause UI.
-* Camera.follow(primary, secondary, dt) and Camera.snap(primary, secondary) already support a missing/null secondary fighter.
-* MAPS directly drives the normal Quick Battle stage selector, so the Practice Ground map must not simply be added to MAPS.
-* The repo already has reusable semi-transparent glass styling through .glass, .glass--panel, overlays, pause menus, etc.
-* Keep Quick Battle behavior completely intact.
-
-⸻
-
-1. Replace “Help & Credits” with “Practice Ground”
-
-On the Home screen, replace the currently disabled:
-
-Help & Credits
-
-button with:
-
-Practice Ground
-
-Requirements:
-
-* Enable the button.
-* Keep it as the secondary Home action under Play.
-* Keep the existing Home visual language and arrow treatment.
-* Clicking it must immediately enter Practice Ground.
-* Do not send the player through Select Mode, Select Fighter, or Select Stage first.
-* Play must continue to work exactly as it does now.
-
-Use a dedicated screen ID such as:
-
-practice
-
-Add the corresponding screen container to index.html and register a new PracticeGroundScreen from App.
-
-The old standalone Help & Credits screen no longer needs to be accessible from Home. It can remain in the repository if other help/credits data is still useful, but do not accidentally remove help-content.js or the Home credits data because other parts of the app still use that content.
-
-⸻
-
-2. Practice Ground starts immediately with fighter #0001
-
-Every fresh entry into Practice Ground from the Home screen must start with:
-
-#0001
-
-Character ID:
-
-"0001"
-
-Do not use the fighter previously selected in Quick Battle as the initial Practice Ground fighter.
-
-Practice mode should have its own fighter selection state, separate from:
-
-app.selection.characterId
-
-Changing fighter inside Practice Ground should therefore not silently change the user’s Quick Battle fighter selection.
-
-When entering Practice Ground:
-
-1. Load #0001 using the existing app.loadCharacter() asset pipeline.
-2. Show the existing loading overlay if necessary.
-3. Create the practice session.
-4. Spawn #0001 at the practice stage’s default spawn.
-5. Give the player control immediately.
-
-There should be no character-select screen before entering.
-
-⸻
-
-3. No CPU or second fighter
-
-Practice Ground currently has no CPU at all.
-
-This is important: do not solve this by creating an invisible CPU, hidden fighter, stationary dummy, or off-screen TrainingAIController.
-
-There must genuinely be only one fighter in the practice simulation.
-
-Do not instantiate TrainingAIController.
-
-Practice Ground should contain:
-
-* one Fighter
-* a PlayerController
-* the normal stage collision system
-* normal movement and physics
-* normal attacks
-* normal projectiles
-* normal clones
-* normal charge mechanics
-* normal defense mechanics
-* normal sprite animation
-* normal camera
-* normal touch controls
-
-The fighter should have no opponent unless a future feature adds one.
-
-Audit moves that normally reference an opponent or target. In a no-opponent practice session they must fail gracefully or simply miss; they must never throw an exception.
-
-Do not render:
-
-* a CPU character
-* CPU shadow
-* CPU ground marker
-* CPU HUD
-* CPU health
-* CPU energy
-* CPU labels
-* CPU debug information
-
-⸻
-
-4. Create a dedicated Practice Ground simulation
-
-Do not force the Quick Battle lifecycle onto Practice Ground.
-
-Quick Battle currently has concepts such as:
-
-* Round 1
-* intro phase
-* FIGHT banner
-* 99-second timer
-* TIME
-* results
-* winner/draw logic
-* CPU
-
-Practice Ground needs none of these.
-
-Create a dedicated practice-session implementation, for example:
-
+js/screens/practice-screen.js
 js/game/practice.js
-
-or another clean equivalent.
-
-Reuse existing lower-level systems wherever possible:
-
-* StageCollision
-* Fighter
-* PlayerController
-* CombatSystem
-* projectile helpers
-* clone helpers
-* Camera
-* stage themes
-* sprite rendering
-* existing fighter mechanics
-
-Avoid copying the entire Battle class if a small shared extraction can prevent major duplication.
-
-At the same time, do not perform an unnecessarily risky rewrite of Quick Battle. The existing Quick Battle code and tests should remain stable.
-
-A good architecture is:
-
-* Quick Battle continues using Battle
-* Practice Ground uses PracticeSession
-* both reuse the same Fighter/physics/combat/rendering primitives
-
-The Practice session should:
-
-* immediately unlock player input
-* have no countdown
-* have no timer
-* have no result state
-* run indefinitely until the player leaves
-* call camera.follow(player, null, dt)
-* call camera.snap(player, null) when necessary
-* keep projectiles and clones functioning
-* render only the practice fighter and relevant effects
-
-⸻
-
-5. Create the default Practice Ground stage
-
-Practice Ground needs its own dedicated training stage.
-
-Do not put it into the normal MAPS array because MapSelectScreen automatically turns MAPS into the Quick Battle stage list.
-
-Create something like:
-
+js/game/hud.js
+js/ui/fighter-roster.js
+js/game/arena.js
+js/game/character.js
+js/game/combat.js
 js/data/practice-map.js
+styles.css
+tests/practice-ground.test.mjs
 
-with an exported map definition such as:
+Important existing behavior:
 
-PRACTICE_MAP
+Practice Ground currently starts with one P1 fighter and no opponent. PracticeGroundScreen owns its More menu and Change Fighter roster. PracticeSession extends Arena. Arena.fighters[0] is the primary fighter and Arena.fighters[1], when present, automatically becomes the camera’s secondary fighter. The shared CombatSystem already supports melee, projectile, clone, and charged-technique hits against any fighter in fighters.
 
-Then create a new practice stage theme such as:
+The shared FighterRoster is already used by Practice Ground’s Change Fighter dialog. Reuse it for CPU selection instead of making another roster implementation.
 
-js/stages/practice-theme.js
+CombatSystem.events already exposes resolved hit data in this shape:
 
-and register its theme key inside:
+{ type, attacker, target, damage, projectile, summon, technique }
 
-js/stages/index.js
+Use those resolved events as the source of truth for CPU damage indicators. Do not independently recalculate attack damage.
 
-Visual direction
+Energy is stored on fighter.combat.energy / maxEnergy and is spent through the existing combat flow. Infinite energy must be a Practice Ground-only rule; do not globally alter Quick Battle’s energy behavior.
 
-The stage should evoke the visual language of the classic Super Smash Bros. training stage, but it must be original Alva artwork implemented with Canvas rather than copied Nintendo assets.
+1. Move the Practice Ground More button
 
-Do not use Nintendo logos, textures, screenshots, ripped assets, or an exact traced layout.
+The Practice Ground three-dot More button currently lives at the upper-right of the HUD.
 
-The intended visual language is:
+Move it horizontally to the same center position occupied by Quick Battle’s timer/pause control (.hud-center), but put the More button slightly lower vertically.
 
-* clean training-room environment
-* large geometric grid
-* neutral white / pale-gray / cool-gray surfaces
-* clearly visible darker grid lines
-* occasional stronger major grid lines
-* extremely minimal scenery
-* no city/desert environmental clutter
-* deliberately artificial “simulation room” feeling
-* broad flat training floor
-* crisp, readable geometry
-* enough empty space for running, jumping, charging and testing attacks
+The target layout is:
 
-Think of it as Alva’s own minimalist combat laboratory.
+P1 HUD stays on the upper-left.
 
-The grid should have visual depth without becoming distracting.
+The More button is centered horizontally at the top of the screen, aligned with where Quick Battle places its timer.
 
-A possible treatment:
+Move it downward by a small responsive amount, roughly 8–14 px depending on viewport size. It should clearly look slightly lower than the Quick Battle timer position without being dramatically displaced.
 
-* pale gray background
-* fine square grid across the backdrop
-* stronger line every several cells
-* subtle horizontal/vertical reference axes
-* slightly darker playable floor
-* simple edge treatment showing where the stage ends
-* restrained shadows
-* no particles or environmental hazards
+Do not add a CPU HUD panel on the right just because a practice CPU exists.
 
-The stage must remain visually compatible with Alva’s pixel-art fighter.
+Update the Practice menu overlay positioning too. Since the More button is no longer in the upper-right corner, its translucent Practice menu should open underneath the centered More button rather than remaining anchored to the right edge.
 
-Keep it performant: generate/calculate static geometry once where possible rather than rebuilding expensive paths every frame.
+Preserve the existing glass styling, hover/active/focus states, aria-expanded, and input behavior.
 
-There should be:
+2. Expand the Practice Ground More menu
 
-* no hazards
-* no moving stage pieces
-* no damaging environment
-* no CPU-specific navigation requirements
+The current Practice menu contains:
 
-Use a generous world size so the player can move around and experiment comfortably.
-
-⸻
-
-6. Practice Ground HUD
-
-Do not use the normal Quick Battle HUD unchanged.
-
-Practice Ground should show only information relevant to the current player.
-
-Keep the P1 fighter panel with:
-
-* P1
-* fighter name
-* health
-* energy
-
-Remove the entire CPU/right-side panel.
-
-Remove:
-
-* ROUND
-* round number
-* timer
-* timer button
-* timer box
-
-There must be no timer box at all.
-
-Replace Pause with a More button
-
-Instead of the normal pause symbol, Practice Ground gets a standalone More button represented by a three-dots icon.
-
-Add an icon to js/ui/icons.js, for example ICONS.more.
-
-Use three simple dots matching the existing icon system.
-
-The button should:
-
-* visually use the existing glass UI
-* be compact
-* be clearly separate from any timer because the timer no longer exists
-* have aria-label="Practice menu" or equivalent
-* work with mouse/touch
-* work with keyboard
-* work with gamepad/menu navigation
-
-A compact top-right placement is appropriate for Practice Ground, respecting safe-area insets.
-
-Do not show the normal pause icon in this mode.
-
-⸻
-
-7. Three-dots menu
-
-Clicking the three-dots More button should freeze/pause Practice Ground and show a semi-transparent menu over the stage.
-
-The stage must remain visible behind it.
-
-Use Alva’s existing glass styling as the basis, but make this menu lighter and more translucent than a full opaque screen.
-
-The visible menu must contain exactly these two primary actions:
-
-1. Change Fighter
-2. Return
-
-Do not add visible buttons for:
-
-* Resume
-* Restart
-* Help
-* Settings
-* Change Stage
-
-The menu should not navigate to another full-screen screen.
-
-While the menu is open:
-
-* freeze the practice simulation
-* disable gameplay input
-* disable touch combat controls
-* keep the canvas visible underneath
-* push an overlay scope into MenuNavigator
-* place focus on Change Fighter
-
-The player must be able to dismiss the menu and continue practicing by:
-
-* pressing the More button again, and/or
-* pressing Escape / Back / gamepad back
-
-Clicking the dimmed background may also close the menu if that fits the existing interaction style, but do not make background clicking interfere with the fighter dialog.
-
+Change Fighter
 Return
 
-The button label should be exactly:
+Change it to this exact order:
 
+Change Fighter
+Enable CPU
+Allow infinite energy
 Return
 
-Clicking Return exits Practice Ground and returns to the Home screen.
+The CPU and energy labels are stateful as described below.
 
-Use the existing screen manager.
+Use the existing menuButton() styling and navigation conventions.
 
-Clean up:
+Do not add Restart, Help, Settings, Change Stage, or any Quick Battle options.
 
-* input listeners
-* touch state
-* navigation scopes
-* practice simulation
-* resize observers/listeners
-* temporary projectiles/clones
-* any active technique references
+3. Enable CPU / Change CPU
 
-Do not leave the practice simulation running underneath Home.
+When no Practice CPU exists, the second button must say:
 
-⸻
+Enable CPU
 
-8. “Change Fighter” opens a large roster dialog
+Clicking it opens a CPU fighter-selection roster.
 
-Clicking Change Fighter must not navigate to the existing Select Fighter screen.
+After a CPU has been selected and spawned, that same menu button changes to:
 
-Instead, open a very large modal/dialog over Practice Ground.
+Change CPU
 
-The frozen practice stage should still be visible behind it.
+Clicking Change CPU opens the same CPU-selection roster and allows the player to replace the current CPU with another fighter.
 
-This dialog must be semi-transparent.
+The CPU selection must not navigate away from Practice Ground.
 
-Visually it should feel like the Select Fighter experience has been turned into a huge glass modal rather than another screen.
+4. CPU fighter-selection roster
 
-Recommended approximate sizing:
+Build a second Practice roster using the existing FighterRoster component.
 
-* width around 90vw
-* max width appropriate for large desktops
-* height around 85–90dvh
-* responsive on smaller landscape screens
-* safe-area aware
+It must use the same large semi-transparent glass presentation as the existing Change Fighter roster, including the stage remaining visible behind it.
 
-Do not make the dialog fully opaque.
+Do not duplicate the roster implementation itself. Instantiate another FighterRoster with its own host and its own unique preview element ID so there are no duplicate DOM IDs.
 
-Use a stronger glass panel than the small More menu while still preserving visible stage context behind it.
+Suggested heading:
 
-⸻
+Kicker: Practice Ground
+Title: Select CPU when no CPU exists, or Change CPU when one already exists.
 
-9. Reuse the full fighter roster experience
+The standard Back button must return to the Practice menu without changing anything.
 
-The Change Fighter dialog should reuse the same fighter roster rules and presentation as CharacterSelectScreen.
+When a CPU already exists, place a second button directly next to the Back button in the CPU roster header:
 
-It must show the full configured roster:
+Disable CPU
 
-CONFIG.roster.totalSlots
+This button should only be present/enabled when a CPU currently exists.
 
-which is currently 48.
+Pressing Disable CPU must:
 
-Match the existing character selector behavior:
+remove the CPU from the active Practice session,
+remove all player/CPU opponent references,
+remove any stale interaction state tied to that CPU,
+close the CPU roster,
+return to the Practice menu,
+change the menu’s Change CPU label back to Enable CPU,
+and leave Practice Ground paused until the player resumes.
 
-* available fighters show their real portraits
-* locked fighters remain visible
-* locked fighters remain non-interactive
-* locked fighters do not enter keyboard/gamepad navigation
-* available fighters can be highlighted
-* selected fighter is visibly selected
-* preview uses the fighter’s idle animation
-* portraits use the existing sprite-loading/normalization pipeline
-* roster remains keyboard/gamepad navigable
-* roster remains mouse/touch usable
+Focus should return to Enable CPU after disabling.
 
-Prefer extracting reusable roster UI/logic from CharacterSelectScreen rather than maintaining two completely independent 48-slot implementations.
+When enabling CPU for the first time, there should be no meaningless Disable CPU action.
 
-For example, a reusable fighter roster/selector component can be consumed by:
+5. Spawning the Practice CPU
 
-* normal CharacterSelectScreen
-* Practice Ground’s Change Fighter dialog
+Extend PracticeSession so it can optionally contain:
 
-Do not introduce duplicate global element IDs if both UIs exist in the DOM. Any IDs used for preview labels/dialog accessibility should be configurable or unique.
+this.player
+this.cpu
 
-The normal Quick Battle Select Fighter screen must look and behave the same after the refactor.
+The session still begins with:
 
-⸻
+this.cpu = null
 
-10. Fighter selection behavior inside Practice Ground
+When a fighter is selected from the CPU roster, load its sprites through the existing app.loadCharacter() flow exactly as Change Fighter already does.
 
-When the Change Fighter dialog opens:
+Spawn a new Fighter using:
 
-* the current practice fighter should start selected
-* its preview should be shown
-* focus should land on the current fighter or a sensible first available fighter
+the selected fighter definition,
+the selected fighter sprites,
+slot p2,
+label CPU.
 
-Selecting another fighter should work similarly to the normal roster.
+Add a second Practice Ground spawn location for the CPU. Keep the existing P1 spawn unchanged and place the CPU approximately the same distance away that the Quick Battle maps separate their two initial fighters, with the CPU facing toward P1. A second PRACTICE_MAP.spawnPoints entry around 300–340 world units to the right of P1 is appropriate.
 
-On confirmation:
+Once CPU exists:
 
-1. Load the selected character with app.loadCharacter().
-2. Handle loading failure using the existing loading/error conventions.
-3. Replace the active practice fighter.
-4. Reset that fighter at the Practice Ground spawn.
-5. Reset that fighter’s health/combat/energy state.
-6. Clear projectiles, clones, charged-technique state, or effects belonging to the previous fighter.
-7. Rebind the Practice HUD to the new fighter.
-8. Snap/recenter the camera if necessary.
-9. Close the fighter dialog.
-10. Close the More menu.
-11. Restore gameplay input and touch controls.
-12. Resume Practice Ground.
+player.opponent must reference CPU.
+cpu.opponent must reference player.
+session.fighters must be [player, cpu].
 
-Do not navigate away from Practice Ground.
+This is important because the existing Arena/Combat code then automatically gives the player a valid target for clone attacks, projectiles, Sphere Rush, melee attacks, pushboxes, camera framing, etc.
 
-Do not send the user through Select Stage.
+The existing Arena camera should therefore frame P1 and the CPU naturally through its existing primary / secondary behavior. Do not create a separate Practice-only camera implementation.
 
-Do not mutate Quick Battle’s currently selected fighter as a side effect.
+6. The Practice CPU must be completely non-combatant
 
-If the player cancels/back-outs of the fighter dialog:
+The Practice Ground CPU is a training dummy.
 
-* close only the fighter dialog
-* return focus to the Practice Ground More menu
-* leave the current fighter unchanged
+It must never voluntarily:
 
-⸻
+walk,
+run,
+jump,
+drop through platforms,
+attack,
+throw,
+use BA1,
+use BA2,
+use Special,
+charge,
+use Defense,
+block,
+dodge,
+or otherwise generate gameplay inputs.
 
-11. Practice dialog accessibility and navigation
+Do NOT directly reuse the current Quick Battle TrainingAIController for this feature. That controller is non-attacking but still follows/repositions around the player.
 
-Use real dialog semantics.
+For Practice Ground, use a truly neutral controller. Since Fighter already falls back to neutral input when there is no controller, using no controller for the Practice CPU is acceptable and preferable if it integrates cleanly.
 
-The large fighter dialog should have:
+The CPU should still remain a normal Fighter for simulation purposes. That means it should still:
 
-* role="dialog"
-* aria-modal="true"
-* an accessible title such as Change Fighter
-* proper focus containment through the existing MenuNavigator overlay scope
-* a predictable default focus target
+have hurtboxes,
+take actual combat damage,
+enter hitstun,
+play hurt animations,
+receive knockback,
+fall and land normally,
+collide with the stage,
+collide through fighter pushboxes,
+be targetable by charged techniques/clones/projectiles,
+and automatically face its opponent where existing Fighter behavior does so.
 
-Keyboard/gamepad requirements:
+“The CPU does not fight” means it never produces intentional gameplay actions. Do not make it intangible or immune to normal hit reactions.
 
-* directional navigation moves through roster entries
-* Confirm selects/confirms using existing conventions
-* Back/Escape closes the roster dialog
-* Back from the underlying More menu resumes Practice Ground
+Do not change Quick Battle’s existing TrainingAIController.
 
-Do not allow menu focus to escape into buttons underneath an active modal.
+7. Changing the player’s fighter while CPU exists
 
-Pointer hover behavior should remain consistent with the existing roster.
+The existing PracticeSession.setFighter() currently rebuilds fighters as only [player].
 
-⸻
+Update that behavior so changing the Practice player’s fighter does NOT accidentally remove an enabled CPU.
 
-12. Touch/mobile behavior
+If CPU exists when P1 changes fighter:
 
-Alva supports phones/tablets in landscape, so Practice Ground must too.
+replace only P1,
+preserve the existing CPU,
+rewire newPlayer.opponent = cpu,
+rewire cpu.opponent = newPlayer,
+set fighters = [newPlayer, cpu],
+and preserve the CPU’s selected fighter.
 
-Reuse the existing TouchControls.
+Existing projectiles/clones/charged-technique cleanup associated with swapping P1 should still be handled safely.
 
-When actively practicing:
+If infinite energy is enabled, the newly selected P1 fighter must immediately inherit the infinite-energy Practice rule.
 
-* touch controls are enabled
+8. CPU damage-taken indicator
 
-When the More menu or fighter dialog is open:
+Whenever the Practice CPU receives actual resolved damage, show the amount above the CPU’s head.
 
-* touch gameplay controls are disabled
+The text must:
 
-When the overlay closes:
+be red,
+start with a minus sign,
+show the actual damage received.
 
-* touch gameplay controls reactivate
+Examples:
 
-Respect the existing portrait-blocking behavior and safe-area variables.
+-6
+-15
+-2.5
 
-The More button and dialogs must remain usable on a small landscape phone without overflowing offscreen.
+Do not display a plus sign or plain unsigned number.
 
-The 48-slot roster should scroll within the dialog if necessary rather than causing the entire page to scroll.
+Use PracticeSession’s this.combat.events after Arena resolves combat. Find events where:
 
-⸻
+event.target === this.cpu
 
-13. Styling
+and:
 
-Add focused Practice Ground styles to styles.css.
+event.damage > 0
 
-Reuse existing variables and visual language instead of creating an unrelated design system.
+Create a Practice-only floating damage indicator from the actual event.damage.
 
-Reuse where appropriate:
+Do not calculate damage from the attack definition yourself because CombatSystem.applyHit() is already the authoritative location that resolves the final amount.
 
-* .glass
-* .glass--panel
-* existing borders
-* radii
-* focus rings
-* spacing conventions
-* roster styles
-* buttons
+The indicator must visually follow the CPU rather than being placed at a hard-coded screen coordinate.
 
-Create dedicated class names such as:
+Anchor it above the CPU’s current head using the same fighter/world-to-screen information already used by Arena’s fighter markers. It should remain readable as the camera moves.
 
-* .screen--practice
-* .practice-hud
-* .practice-more
-* .practice-menu-overlay
-* .practice-menu-panel
-* .practice-roster-overlay
-* .practice-roster-dialog
+Give the indicator a short training-game-style lifetime: approximately 0.6–1.0 seconds is appropriate. It can drift upward slightly and fade out.
 
-These are suggestions; choose names consistent with the repo.
+If multiple hits occur rapidly, do not lose damage events. Either maintain a small collection of simultaneous floating numbers or otherwise ensure each actual hit can be represented.
 
-The stage itself should occupy the full practice screen just like the battle canvas.
+Format integer damage without an unnecessary decimal. For fractional damage, use a concise value rather than long floating-point noise.
 
-The More menu should feel light, floating and semi-transparent.
+Keep this rendering Practice-specific unless a very small generic Arena hook is clearly cleaner. Do not add damage numbers to Quick Battle.
 
-The fighter dialog should feel large and substantial, but still translucent enough to see the paused training stage behind it.
+9. Infinite energy Practice option
 
-Avoid excessive blur on continuously animating surfaces. The existing code deliberately avoids expensive backdrop blur over the live battle canvas; preserve that performance awareness.
+Under the CPU menu button add:
 
-⸻
+Allow infinite energy
 
-14. Do not break Quick Battle
+Clicking it enables infinite energy for the Practice player’s fighter only.
 
-This is a hard requirement.
+When enabled, immediately change the button text to:
 
-After implementation, the existing path:
+Revoke infinite energy
 
-Home → Play → Select Mode → Select Fighter → Select Stage → Battle
+Clicking Revoke infinite energy disables the rule and changes the text back to:
 
-must work exactly as before.
+Allow infinite energy
 
-Quick Battle must still have:
+This toggle should not close the Practice menu. Keep the menu open and preserve focus on the same button so the text change is immediately visible.
 
-* CPU
-* timer
-* round intro
-* pause UI
-* results
-* stage selection
-* both existing stages
-* existing touch controls
-* existing combat behavior
+While infinite energy is enabled:
 
-Do not accidentally put Practice Ground into Select Stage.
+P1’s energy must always be treated as full.
+Any charged action should be able to pay its normal energy cost whenever its other gameplay requirements are satisfied.
+The HUD energy meter should remain full.
+Energy-consuming actions must still execute their normal logic and cooldowns; only the resource limitation is removed.
 
-Do not alter Quick Battle’s default character selection as a consequence of using Practice Ground.
+Keep this rule entirely inside Practice Ground. Do not modify CombatState.spendEnergy() globally in a way that affects Quick Battle.
 
-Do not replace TrainingAIController globally. It is still required for Quick Battle.
+A clean Practice-specific implementation is to ensure the Practice player’s energy is set to maxEnergy before the fixed simulation step so cost checks always succeed, run the normal Arena update, then restore it to maxEnergy after the step so the HUD never shows a depleted value.
 
-⸻
+When infinite energy is first enabled, refill P1 immediately.
+
+When it is revoked, stop refilling it. There is no need to artificially deduct energy retroactively.
+
+If P1 changes fighter while infinite energy is enabled, keep the option enabled and make the replacement fighter full immediately.
+
+The CPU is not affected by this setting.
+
+A fresh entry into Practice Ground should start with infinite energy disabled.
+
+10. CPU replacement and cleanup
+
+Implement explicit PracticeSession methods along the lines of:
+
+setCPU(def, sprites)
+removeCPU()
+
+The exact names may differ, but keep this responsibility in the session rather than manually editing all fighter state from the screen.
+
+When replacing an existing CPU:
+
+clean up the old CPU safely,
+create the replacement at the CPU spawn,
+keep the current P1 untouched,
+rewire opponent references,
+clear stale effects that directly reference the removed CPU where necessary,
+reset interpolation/accumulator state if required,
+and refit/snap the camera if the canvas already has a view.
+
+When disabling CPU:
+
+end any active player technique that is currently attached to/holding the CPU,
+make sure no clone, projectile, bind, technique, or opponent reference retains a broken CPU reference,
+set cpu = null,
+set player.opponent = null,
+set fighters = [player].
+
+After removal the existing solo Practice behavior must work exactly as it does today: attacks with no target safely miss/fall back, clone summons requiring an opponent do not spend energy, and the camera returns to following only P1.
+
+11. Screen/menu state and loading
+
+Give CPU selection its own state, for example:
+
+cpuRosterOpen
+cpuSwapping
+
+Do not overload rosterOpen in a way that causes the Change Fighter roster and CPU roster to interfere with one another.
+
+While either roster is open:
+
+Practice remains frozen,
+gameplay input remains disabled,
+touch controls remain disabled,
+the Practice menu underneath is inert,
+the HUD underneath is inert,
+navigation/focus stays inside the active roster.
+
+Continue using the existing token/check pattern around asynchronous character loads so leaving Practice Ground while CPU art is loading cannot mutate a destroyed session.
+
+If CPU sprite loading fails:
+
+keep the current CPU unchanged,
+keep the CPU roster open,
+show the existing loading error treatment,
+and allow returning to the selected roster slot.
+
+If the CPU did not previously exist, a failed load should leave CPU disabled.
+
+12. Fresh-session behavior
+
+Practice Ground should remain independent from Quick Battle selection state.
+
+Every fresh visit from Home should still begin with the normal Practice default fighter.
+
+Also reset these Practice-only options on a fresh visit:
+
+CPU disabled.
+Infinite energy disabled.
+
+Do not persist the selected Practice CPU into Quick Battle.
+
+Do not modify app.selection when changing either the Practice player or Practice CPU.
+
+13. Accessibility and navigation
+
+Preserve the existing menu navigator conventions.
+
+The new Practice menu controls must participate in keyboard/gamepad spatial navigation.
+
+The CPU roster must have its own navigation scope.
+
+Back/Escape/gamepad Back from the CPU roster returns to the Practice menu.
+
+The CPU roster Back button must have an appropriate accessible label.
+
+Disable CPU must be a real button and keyboard/gamepad accessible.
+
+Keep unique IDs for both roster preview panels and aria-labelledby relationships.
+
+Do not break the existing More button’s:
+
+aria-label="Practice menu"
+aria-haspopup="dialog"
+aria-expanded
+
+14. Styling
+
+Reuse Alva’s existing glass UI rather than introducing a new visual design.
+
+The CPU roster should inherit/reuse the existing .practice-roster-dialog, roster panels, slot styling and translucent treatment wherever possible.
+
+Only add new CSS selectors where necessary for:
+
+centered/lowered More positioning,
+centered Practice menu positioning,
+CPU roster header actions,
+Disable CPU placement,
+damage number rendering if DOM-based,
+or any other strictly necessary state.
+
+If damage text is canvas-rendered, use a strong readable red and ensure it remains legible against the light Practice stage, using a subtle dark shadow/stroke if needed.
+
+Do not change Quick Battle’s timer, pause control, HUD placement, roster visuals, or stage selection.
 
 15. Tests
 
-Add automated coverage for the new feature and run the complete existing test suite.
+Extend tests/practice-ground.test.mjs rather than creating a completely separate test architecture.
 
-At minimum verify:
+Update old assertions that deliberately expect:
 
-* the Home button says Practice Ground
-* it is enabled
-* activating it opens the practice screen
-* fresh Practice Ground entry defaults to character ID "0001"
-* Practice Ground creates exactly one fighter
-* no TrainingAIController is instantiated in Practice Ground
-* no CPU HUD exists
-* no practice timer exists
-* no round display exists
-* the More button uses a three-dot icon
-* More opens the semi-transparent Practice menu
-* the menu exposes Change Fighter and Return
-* the menu does not expose Resume/Restart/Help/Change Stage
-* Change Fighter opens a modal rather than navigating to character
-* the modal contains the configured roster
-* locked roster entries remain non-interactive
-* selecting a fighter replaces the practice fighter in-place
-* fighter change does not navigate away from Practice Ground
-* fighter change does not alter Quick Battle character state
-* Return routes back Home
-* Practice Ground’s map is not part of MAPS
-* Quick Battle continues creating its CPU and timer
-* existing battle tests continue passing
+exactly two Practice menu buttons,
+no CPU ever,
+or exactly one Practice spawn point.
 
-Also manually verify the feature in a browser served over HTTP, since this repo uses ES modules and Canvas sprite loading.
+Add coverage for the new behavior.
 
-⸻
+At minimum verify all of the following:
 
-16. Acceptance criteria
+* Practice More button/HUD structure supports center placement while P1 remains the only fighter HUD panel.
+* Practice menu button order is exactly Change Fighter, Enable CPU, Allow infinite energy, Return.
+* Enabling CPU opens a second shared FighterRoster.
+* CPU roster has unique DOM IDs and does not conflict with the player roster.
+* Selecting a CPU loads and creates the selected fighter as p2 / CPU.
+* session.fighters becomes [player, cpu].
+* P1 and CPU opponent references point to one another.
+* The session’s secondary becomes the CPU.
+* CPU creates no voluntary input/actions even after many simulation steps.
+* P1 attacks can hit the CPU through the real CombatSystem.
+* A CPU hit produces a Practice damage-indicator record with the actual resolved damage and negative display text.
+* Projectile, clone and charged-technique damage can also generate CPU damage indicators.
+* Change CPU replaces the current CPU without replacing P1.
+* Disable CPU removes it, clears opponent references and returns to solo Practice behavior.
+* Changing P1 while CPU exists preserves CPU.
+* Infinite energy toggle changes both button label and behavior.
+* With infinite energy enabled, repeated energy-cost actions can continue and P1 energy remains at max.
+* Infinite energy does not affect CPU.
+* Changing P1 preserves the enabled infinite-energy rule.
+* Fresh Practice entry resets CPU and infinite energy.
+* Quick Battle still creates its original CPU AI, timer, rounds, HUD and normal finite-energy behavior.
+* Existing Change Fighter behavior still works.
+* Existing Practice input/menu/cleanup tests still pass.
 
-The feature is complete when this exact flow works:
+Run at least:
 
-Home → Practice Ground
+node --test tests/practice-ground.test.mjs
 
-The training stage appears immediately with #0001 and no CPU.
+Also run the existing battle/combat/charge-related tests affected by the shared fighter/combat systems, and ideally the complete tests/*.test.mjs suite.
 
-The player can freely:
+16. Scope discipline
 
-* move
-* run
-* jump
-* charge
-* dodge
-* use attacks
-* use projectiles
-* use clone/charged techniques without crashes
+Do not implement a combat AI for the Practice CPU.
 
-There is:
+Do not add CPU attacks.
 
-* no countdown
-* no Round 1
-* no fight banner
-* no timer
-* no CPU
-* no result screen
+Do not add a second CPU HUD panel.
 
-At the top of the Practice Ground UI, the player sees their own status and a compact three-dots More button.
+Do not add a Practice timer or rounds.
 
-Pressing the More button pauses practice and displays a semi-transparent menu containing:
+Do not alter Quick Battle behavior.
 
-Change Fighter
+Do not duplicate the fighter roster.
 
-Return
+Do not globally make energy infinite.
 
-Selecting Change Fighter opens a huge semi-transparent fighter-selection dialog over the paused training stage.
+Do not hard-code damage amounts.
 
-The dialog uses the full Alva roster and the same visual/interaction logic as Select Fighter.
+Do not recreate combat resolution just for Practice mode.
 
-Selecting a fighter swaps the player’s fighter directly inside Practice Ground and resumes practice.
+Use the existing Arena, Fighter, FighterRoster, CombatSystem, camera, loading, menu navigation and styling systems as much as possible.
 
-Selecting Return goes back Home.
-
-Quick Battle remains completely unchanged.
-
-⸻
-
-Implementation quality expectations
-
-Keep the implementation idiomatic to this repository:
-
-* vanilla ES modules
-* no framework
-* no build step
-* no external UI library
-* no new runtime dependency
-* Canvas 2D for the stage
-* existing asset loader for fighters
-* existing screen manager
-* existing menu navigation
-* existing input system
-* existing accessibility conventions
-
-Prefer small reusable abstractions over duplicated UI or simulation code.
-
-Do not implement a hidden CPU as a shortcut.
-
-Do not copy copyrighted game assets for the training-stage appearance.
-
-When finished, review all touched files for stale comments such as references to Help & Credits being disabled, timer/pause assumptions, or two-fighter assumptions that are no longer universally true.
-
-Finally, provide a concise summary of:
-
-1. files changed/added
-2. architecture used for the solo practice session
-3. how the practice stage was implemented
-4. how fighter changing works
-5. tests added/run
-6. any remaining limitations
+Implement the feature completely, update comments that currently describe Practice Ground as permanently having “no CPU,” and leave the code/test suite in a consistent state.
