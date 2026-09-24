@@ -50,7 +50,7 @@ in the code depends on the repository name, so no file changes are needed.
 | Move left / right | `A` `D` or `←` `→` | Lower-left ◀ ▶ |
 | Charge | `S` or `↓` | Lower-left **C** |
 | Jump | `W`, `Space` or `↑` | Lower-right, bottom corner |
-| Primary* | `J` | Lower-right, top |
+| Throw | `J` | Lower-right, top (**T**) |
 | Special* | `K` | Lower-right, middle row |
 | Defense | `L` | Lower-right, middle row (**D**) |
 | Basic Attack 1 (BA1) | `U` | Lower-right, bottom row (**BA1**) |
@@ -58,7 +58,7 @@ in the code depends on the repository name, so no file changes are needed.
 | Pause | `Esc` or `P` | Timer or pause button, top centre |
 
 \* Reserved: wired into input and combat, but inactive until #0001 has matching
-attack animations. Their touch buttons have dashed outlines.
+attack animations. Its touch button has a dashed outline.
 
 - **Basic Attack 1 (BA1):** a punch on the ground, a kick in the air. The same
   button picks the move from whether #0001 is grounded when you press it; a
@@ -68,6 +68,19 @@ attack animations. Their touch buttons have dashed outlines.
   ground, a kunai slash in the air. It picks the move the same way, and a
   mid-air BA2 that lands also plays to the end. Internally this is the
   `action2` input.
+- **Throw:** #0001's projectile attack, on `J`, X / Square on a gamepad and
+  **T** on touch. One press plays one three-frame Throw
+  (`throw1 → throw2 → throw3`, once, at 12 fps) and releases exactly one
+  shuriken as the arm whips forward on `throw2`; holding the button does not
+  throw again. The shuriken leaves the throwing hand and flies straight the
+  way #0001 was facing at the release, spinning through its own three-frame
+  loop (`shuriken1 → shuriken2 → shuriken3`, 18 fps). Turning, jumping or
+  getting hit afterwards does not change its course. It hits once (4 damage,
+  a short hitstun and a small push away from the throw) and disappears; it
+  also vanishes after 1.5 s, at a stage edge or against a solid rock or wall.
+  A Dodge lets it pass through. Throw is ground-only for now because there
+  are no mid-air Throw sprites: pressing it in the air does nothing. It has a
+  0.25 s cooldown and no Energy cost. Internally it is the `primary` input.
 - **Defense:** the game's generic defensive input: `L`, RB / RT on a
   gamepad, **D** on touch. Different characters may implement Defense
   differently (a Dodge, or in future a Block); the button stays the same.
@@ -88,16 +101,16 @@ attack animations. Their touch buttons have dashed outlines.
   `charge1` briefly as a release pose (one Charge frame, 0.1 s), then returns
   to its normal state; the next Charge starts from the beginning again.
   #0001 stays in place while charging. Charge has no hitbox, armour or
-  invulnerability. A Dodge, Jump, BA1, BA2 or getting hit take over from it at
-  once, without waiting for the release pose. It works on one-way platforms
+  invulnerability. A Dodge, Jump, BA1, BA2, Throw or getting hit take over
+  from it at once, without waiting for the release pose. It works on one-way platforms
   without dropping through them. There is no drop-through control: walk off
   an edge to come down.
 - **Energy:** the blue bar under each health bar. It begins full, and nothing
   spends or restores it yet.
 - **Menus:** arrow keys or WASD to move, `Enter` to select, `Esc` to go back. Mouse and touch work too.
-- **Touch:** several fingers work at once (hold Right and press Jump, or hold C and press BA1). You can slide your thumb between Left / Charge / Right.
-- **Gamepad (standard layout):** D-pad or left stick left / right to move and down to Charge in battle (they still navigate menus), A to jump, B / Circle for Basic Attack 1, LB for Basic Attack 2, X / Y for the reserved actions, RB or RT for Defense, Start to pause.
-- **Debug:** `` ` `` toggles the collider, hurtbox and attack-hitbox overlay in battle (a hitbox shows only while it can connect; hurtboxes turn gray while a Dodge makes the fighter invulnerable).
+- **Touch:** several fingers work at once (hold Right and press Jump, or hold C and press BA1). You can slide your thumb between Left / Charge / Right. **T** is Throw.
+- **Gamepad (standard layout):** D-pad or left stick left / right to move and down to Charge in battle (they still navigate menus), A to jump, X / Square to Throw, B / Circle for Basic Attack 1, LB for Basic Attack 2, Y / Triangle for the reserved Special, RB or RT for Defense, Start to pause.
+- **Debug:** `` ` `` toggles the collider, hurtbox and attack-hitbox overlay in battle (a hitbox shows only while it can connect; hurtboxes turn gray while a Dodge makes the fighter invulnerable; a flying shuriken's hitbox is outlined in magenta and labelled).
 
 Touch controls show on touch-first devices (coarse pointer, or a touch actually detected). A narrow desktop window doesn't count as a phone. On a phone held in portrait, the game pauses and asks you to rotate.
 
@@ -105,8 +118,8 @@ Touch controls show on touch-first devices (coarse pointer, or a touch actually 
 
 - **Characters:** #0001
 - **Maps:** Desert (wide, open, 3.8 screens) and City (rooftops with 7 one-way platforms, 3.1 screens)
-- **Animations:** Idle, Run, Jump, Fall, Land (jump/fall play while airborne; land plays once on touchdown), Hurt and Mid-air Hurt (shown during hitstun on the ground / in the air), Basic Attack 1 (4 frames), Mid-air Basic Attack 1 (5 frames), Basic Attack 2 (7 frames) and Mid-air Basic Attack 2 (3 frames), each played once at 12 fps, Dodge and Mid-air Dodge (3 frames each, played once at 12 fps), and Charge (charge1 → charge2 once, then chargea ↔ chargeb while held, at 10 fps, with charge1 shown briefly on release)
-- **Attacks:** Basic Attack 1 and Basic Attack 2, each on the ground and in the air. Primary and Special are reserved.
+- **Animations:** Idle, Run, Jump, Fall, Land (jump/fall play while airborne; land plays once on touchdown), Hurt and Mid-air Hurt (shown during hitstun on the ground / in the air), Basic Attack 1 (4 frames), Mid-air Basic Attack 1 (5 frames), Basic Attack 2 (7 frames) and Mid-air Basic Attack 2 (3 frames), each played once at 12 fps, Dodge and Mid-air Dodge (3 frames each, played once at 12 fps), Charge (charge1 → charge2 once, then chargea ↔ chargeb while held, at 10 fps, with charge1 shown briefly on release), Throw (3 fighter frames, played once at 12 fps) and Shuriken (3 looping projectile frames at 18 fps, normalized and drawn separately from the fighter poses)
+- **Attacks:** Basic Attack 1 and Basic Attack 2, each on the ground and in the air, and a ground Throw that releases one shuriken. Special is reserved.
 - **Defense:** #0001 dodges, on the ground and in the air.
 - **HUD:** each fighter panel shows a green health bar with a blue Energy bar directly beneath it. Both start full.
 - **Mode:** Quick Battle: 1 round, 99 seconds, against a non-attacking training CPU

@@ -13,7 +13,8 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { characterFramePaths } from '../js/data/characters.js';
 import { COMBAT_ACTIONS } from '../js/game/character.js';
-import { createDefenseDefinition } from '../js/game/combat.js';
+import { createDefenseDefinition, worldBox as worldBoxOf } from '../js/game/combat.js';
+import { SpriteSet } from '../js/game/sprite-normalizer.js';
 import { ACTIONS, ACTION_LABELS, CONFIG } from '../js/config.js';
 import {
   def, DT, BASE, SIM_CTX, fakeSprites, makeFighter, frameName, stepUntil, steps, duel,
@@ -94,6 +95,82 @@ test('dodge and midairDodge are three-frame, play-once clips at 12 fps with no f
   // #0001's old Block presentation is gone.
   assert.equal(def.animationFallbacks.block, undefined);
   assert.equal(def.animations.block, undefined);
+});
+
+// ---- Source orientation (Mid-Air Dodge art faces left) -------------------------
+
+test('#0001 art faces right, except the mid-air Dodge clip, which overrides it', () => {
+  assert.equal(def.sourceFacing, 1, 'the character default stays right-facing');
+  assert.equal(def.animations.midairDodge.sourceFacing, -1);
+  // Every other clip, ground Dodge included, inherits the default.
+  for (const [key, anim] of Object.entries(def.animations)) {
+    if (key !== 'midairDodge') assert.equal(anim.sourceFacing, undefined, key);
+  }
+});
+
+test('SpriteSet.build keeps each clip\'s own source orientation', (t) => {
+  // Stand-in images: no canvas in Node, so frames take the raw-size fallback.
+  // Orientation is animation metadata and does not depend on the pixels.
+  t.mock.method(console, 'warn', () => {});
+  const set = SpriteSet.build(def, () => ({ naturalWidth: 64, naturalHeight: 128 }));
+  assert.equal(set.usable, true);
+  assert.equal(set.animations.idle.sourceFacing, 1);
+  assert.equal(set.animations.dodge.sourceFacing, 1);
+  assert.equal(set.animations.midairDodge.sourceFacing, -1);
+  for (const [key, anim] of Object.entries(set.animations)) {
+    assert.equal(anim.sourceFacing, key === 'midairDodge' ? -1 : 1, key);
+    for (const frame of anim.frames) assert.equal(frame.sourceFacing, undefined, `${key}: per clip, not per frame`);
+  }
+  // A character whose art faces left by default passes that on too.
+  const leftArt = SpriteSet.build({ ...def, sourceFacing: -1 }, () => ({ naturalWidth: 64, naturalHeight: 128 }));
+  assert.equal(leftArt.animations.idle.sourceFacing, -1);
+  assert.equal(leftArt.animations.midairDodge.sourceFacing, -1);
+});
+
+test('the render flip follows the playing clip: mid-air Dodge mirrors opposite to Idle', () => {
+  for (const facing of [1, -1]) {
+    const { fighter, step } = makeFighter({ facing });
+    assert.equal(fighter.animator.anim.key, 'idle');
+    assert.equal(fighter.spriteFlip, facing === -1, `idle, facing ${facing}`);
+    step(JUMP);
+    step(DEFENSE);
+    assert.equal(fighter.animator.anim.key, 'midairDodge');
+    assert.equal(fighter.facing, facing, 'logical facing is untouched');
+    // Left-facing art: mirrored for a right-facing fighter, drawn as is for a left one.
+    assert.equal(fighter.spriteFlip, facing === 1, `midairDodge, facing ${facing}`);
+    while (fighter.state === 'defense') {
+      assert.equal(fighter.spriteFlip, facing === 1);
+      assert.equal(fighter.facing, facing);
+      step();
+    }
+    // Back on a right-facing clip, the usual rule again.
+    assert.equal(fighter.spriteFlip, facing === -1);
+    // The ground Dodge is right-facing art like the rest.
+    stepUntil(step, (f) => f.grounded && f.state === 'idle');
+    step(DEFENSE);
+    assert.equal(fighter.animator.anim.key, 'dodge');
+    assert.equal(fighter.spriteFlip, facing === -1, `dodge, facing ${facing}`);
+  }
+});
+
+test('the orientation override is visual only: boxes and motion follow the fighter\'s facing', () => {
+  for (const facing of [1, -1]) {
+    const { fighter, step } = makeFighter({ facing });
+    const plain = makeFighter({ facing });
+    const held = facing === 1 ? { right: true } : { left: true };
+    for (const r of [step, plain.step]) {
+      r(held);
+      r({ ...JUMP, ...held });
+      r(held);
+    }
+    step({ ...DEFENSE, ...held });
+    plain.step(held);
+    assert.equal(fighter.animator.anim.key, 'midairDodge');
+    assert.ok(fighter.body.vx * facing > 0, 'still moving the way it faces');
+    // Hurtboxes use the logical facing, whatever way the art is drawn.
+    const box = worldBoxOf(fighter, def.hurtboxes[1]);
+    assert.equal(box.x, facing > 0 ? fighter.body.x + def.hurtboxes[1].x : fighter.body.x - def.hurtboxes[1].x - def.hurtboxes[1].w);
+  }
 });
 
 // ---- Character data -----------------------------------------------------------

@@ -9,7 +9,7 @@ const PAD_DEADZONE = 0.45;
 // Standard Gamepad mapping -> gameplay actions.
 const PAD_BUTTONS = {
   0: 'jump',     // A / Cross
-  2: 'primary',  // X / Square
+  2: 'primary',  // X / Square (Throw)
   3: 'special',  // Y / Triangle
   1: 'action1',  // B / Circle
   4: 'action2',  // LB

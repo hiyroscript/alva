@@ -1,6 +1,7 @@
 // Run with node --test tests/basic-attack.test.mjs (no dependencies).
 // #0001 Basic Attack 1 (BA1) on action1: ground/air selection, clip playback,
-// phase timing, hit resolution and the reserved combat inputs. Uses the real
+// phase timing, hit resolution and the other combat inputs (Throw on primary,
+// Special still reserved). Uses the real
 // Fighter, CombatSystem and physics (see fighter-harness.mjs). Basic Attack 2
 // (BA2, action2) has its own file, basic-attack-2.test.mjs.
 import test from 'node:test';
@@ -17,9 +18,9 @@ import {
 const BA1 = { action1: true, action1Pressed: true };
 const BA2 = { action2: true, action2Pressed: true };
 
-test('action1 is Basic Attack 1: ground ba1, air midairBa1; action2 is BA2; Primary and Special stay reserved', () => {
+test('action1 is Basic Attack 1: ground ba1, air midairBa1; action2 is BA2; primary is Throw; Special stays reserved', () => {
   assert.deepEqual(def.actions, {
-    primary: null,
+    primary: 'throw',
     special: null,
     action1: { ground: 'ba1', air: 'midairBa1' },
     action2: { ground: 'ba2', air: 'midairBa2' },
@@ -183,7 +184,11 @@ test('the ground/air choice follows grounded state; a mapping without `air` is i
   step({ jump: true, jumpPressed: true });
   assert.equal(fighter.attackFor('action1'), 'midairBa1');
   assert.equal(fighter.attackFor('action2'), 'midairBa2');
-  for (const action of ['primary', 'special']) assert.equal(fighter.attackFor(action), null);
+  assert.equal(fighter.attackFor('special'), null);
+  // Throw is a plain string mapping: the same id in the air, refused there
+  // because it is ground-only (see throw.test.mjs).
+  assert.equal(fighter.attackFor('primary'), 'throw');
+  assert.equal(fighter.tryAction('primary'), false);
 
   const character = { ...def, actions: { ...def.actions, action1: { ground: 'ba1' } } };
   const groundOnly = makeFighter({ character });
@@ -205,20 +210,22 @@ test('a plain string mapping still means one attack', () => {
   assert.equal(air.fighter.combat.attack, null);
 });
 
-test('Primary and Special stay inactive for #0001; BA1 and BA2 work', () => {
+test('Special stays inactive for #0001; Throw (primary), BA1 and BA2 work', () => {
   const { fighter, step } = makeFighter();
-  for (const action of ['primary', 'special']) {
-    assert.equal(fighter.tryAction(action), false);
-    step({ [action]: true, [`${action}Pressed`]: true });
-    assert.equal(fighter.combat.attack, null, action);
-    assert.equal(fighter.state, 'idle', action);
-    assert.equal(fighter.combat.lastIntent, action);
-  }
+  assert.equal(fighter.tryAction('special'), false);
+  step({ special: true, specialPressed: true });
+  assert.equal(fighter.combat.attack, null);
+  assert.equal(fighter.state, 'idle');
+  assert.equal(fighter.combat.lastIntent, 'special');
   step({ jump: true, jumpPressed: true });
-  for (const action of ['primary', 'special']) {
-    step({ [action]: true, [`${action}Pressed`]: true });
-    assert.equal(fighter.combat.attack, null, `${action} in the air`);
-  }
+  step({ special: true, specialPressed: true });
+  assert.equal(fighter.combat.attack, null, 'special in the air');
+
+  // Throw, the primary action, on the ground (it has no mid-air version).
+  const thrower = makeFighter();
+  thrower.step({ primary: true, primaryPressed: true });
+  assert.equal(thrower.fighter.combat.attack?.def.id, 'throw');
+  assert.equal(thrower.fighter.combat.lastIntent, 'primary');
 
   // The two basic attacks, on the ground and in the air.
   for (const [held, ground, air] of [[BA1, 'ba1', 'midairBa1'], [BA2, 'ba2', 'midairBa2']]) {

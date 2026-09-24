@@ -2,9 +2,9 @@
 //
 // Attacks are pure data on the character definition; Fighter turns each entry
 // into a frozen definition with createAttackDefinition(). #0001's Basic
-// Attack 1 (ground `ba1`, mid-air `midairBa1`, both on action1) and Basic
-// Attack 2 (`ba2` / `midairBa2` on action2) are the real attacks so far; see
-// js/data/characters.js. The general shape:
+// Attack 1 (ground `ba1`, mid-air `midairBa1`, both on action1), Basic
+// Attack 2 (`ba2` / `midairBa2` on action2) and Throw (`throw` on primary)
+// are the real attacks so far; see js/data/characters.js. The general shape:
 //
 //   attacks: {
 //     jab: {
@@ -21,6 +21,17 @@
 // rather than faked. Its hitbox only exists during the active phase.
 // Hitboxes are defined facing right relative to the fighter's origin
 // (bottom-centre) and mirrored automatically.
+//
+// A projectile attack has `hitbox: null` (no melee strike) and a `projectile`
+// event instead: once its time crosses `spawnAt` it releases that projectile,
+// exactly once, from `offset` (facing right from the origin, mirrored).
+// See js/game/projectile.js.
+//
+//   throw: {
+//     animation: 'throw', startup: 1 / 12, active: 1 / 12, recovery: 1 / 12,
+//     hitbox: null, projectile: { id: 'shuriken', spawnAt: 1 / 12, offset: { x: 16, y: -38 } },
+//     cooldown: 0.25, groundOnly: true,
+//   },
 //
 // Defense is the shared player input; each character's `defense` entry says
 // how it defends (see createDefenseDefinition):
@@ -52,6 +63,7 @@ const ATTACK_DEFAULTS = {
   cooldown: 0,
   groundOnly: false,
   lockMovement: true,
+  projectile: null, // { id, spawnAt, offset } for a projectile attack
 };
 
 // Attack time is a sum of fixed steps, so compare phase boundaries with a
@@ -100,7 +112,8 @@ export class CombatState {
     this.blocking = false;
     this.stun = 0;          // hitstun / blockstun remaining
     this.hitstop = 0;       // freeze frames on impact
-    this.attack = null;     // { def, time, hasHit }
+    this.attack = null;     // { def, time, hasHit, projectileSpawned }
+    this.release = null;    // the attack's projectile, released this step (see Fighter.update)
     this.defenseAction = null; // { type: 'dodge', def, time } while a Dodge plays
     this.cooldowns = new Map();
     this.lastIntent = null; // last combat button pressed (for future buffering/UI)
@@ -148,6 +161,13 @@ export class CombatState {
     if (this.stun > 0) this.stun = Math.max(0, this.stun - dt);
     if (this.attack) {
       this.attack.time += dt;
+      // One-shot release: the step the attack's time crosses `spawnAt`. A
+      // throw interrupted by a hit before that point throws nothing.
+      const proj = this.attack.def.projectile;
+      if (proj && !this.attack.projectileSpawned && this.attack.time >= proj.spawnAt - PHASE_EPSILON) {
+        this.attack.projectileSpawned = true;
+        if (this.stun <= 0) this.release = proj;
+      }
       if (this.attack.time >= this.attack.def.total - PHASE_EPSILON) {
         this.cooldowns.set(this.attack.def.id, this.attack.def.cooldown);
         this.attack = null;
@@ -176,17 +196,22 @@ const intersects = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b
 const scratchHit = {};
 const scratchHurt = {};
 
-// Resolves hits between fighters each simulation step.
+// Resolves hits each simulation step: fighters' melee hitboxes, then live
+// projectiles (see js/game/projectile.js).
 export class CombatSystem {
   constructor() {
-    this.events = []; // { type: 'hit' | 'block', attacker, target, damage }
+    // { type: 'hit' | 'block', attacker, target, damage, projectile }
+    // `attacker` is the projectile's owner for a projectile hit; `projectile`
+    // is null for melee.
+    this.events = [];
   }
 
-  update(fighters) {
+  update(fighters, projectiles = []) {
     this.events.length = 0;
     for (const attacker of fighters) {
       const atk = attacker.combat.attack;
-      if (!atk || atk.hasHit || attacker.combat.phase !== 'active') continue;
+      // A projectile attack has no melee hitbox: its damage is the projectile's.
+      if (!atk || !atk.def.hitbox || atk.hasHit || attacker.combat.phase !== 'active') continue;
       const hit = worldBox(attacker, atk.def.hitbox, scratchHit);
       for (const target of fighters) {
         if (target === attacker || target.combat.health <= 0) continue;
@@ -200,27 +225,47 @@ export class CombatSystem {
         break;
       }
     }
+    for (const p of projectiles) {
+      if (!p.alive) continue;
+      const hit = p.hitbox(scratchHit);
+      for (const target of fighters) {
+        if (target === p.owner || target.combat.health <= 0) continue;
+        // Dodged: the projectile flies on, unspent, and can still connect if
+        // it overlaps once the invulnerable frames end.
+        if (target.combat.invulnerable) continue;
+        const struck = target.def.hurtboxes.some((hb) => intersects(hit, worldBox(target, hb, scratchHurt)));
+        if (!struck) continue;
+        // One hit, then it is gone (a blocked projectile included).
+        p.alive = false;
+        this.applyHit(p.owner, target, p.def, { facing: p.direction, projectile: p });
+        break;
+      }
+    }
     return this.events;
   }
 
-  // `blocked` needs a Block-type guard facing the attacker; a Dodge never
-  // blocks, so a hit outside its invulnerable frames is a full hit.
-  applyHit(attacker, target, def) {
+  // Shared by melee and projectiles. `facing` is the direction the hit
+  // travels: the attacker's facing for melee, the projectile's own direction
+  // (fixed when thrown) for a projectile. `blocked` needs a Block-type guard
+  // facing into it; a Dodge never blocks, so a hit outside its invulnerable
+  // frames is a full hit. A projectile hit freezes only its target: the
+  // thrower is elsewhere, doing something else.
+  applyHit(attacker, target, def, { facing = attacker.facing, projectile = null } = {}) {
     const tc = target.combat;
-    const blocked = tc.blocking && target.facing === -attacker.facing;
+    const blocked = tc.blocking && target.facing === -facing;
     // Hitstun always wins: a hit cancels a Dodge in its startup or recovery.
     tc.defenseAction = null;
     const damage = blocked ? def.chipDamage || def.damage * tc.blockDamageScale : def.damage;
     tc.health = Math.max(0, tc.health - damage);
     tc.stun = blocked ? def.blockstun : def.hitstun;
     tc.hitstop = def.hitstop;
-    attacker.combat.hitstop = def.hitstop;
-    const kx = (blocked ? 0.5 : 1) * def.knockback.x * attacker.facing;
+    if (!projectile) attacker.combat.hitstop = def.hitstop;
+    const kx = (blocked ? 0.5 : 1) * def.knockback.x * facing;
     target.body.vx = kx;
     if (!blocked && def.knockback.y) {
       target.body.vy = -def.knockback.y;
       target.body.grounded = false;
     }
-    this.events.push({ type: blocked ? 'block' : 'hit', attacker, target, damage });
+    this.events.push({ type: blocked ? 'block' : 'hit', attacker, target, damage, projectile });
   }
 }

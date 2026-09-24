@@ -25,6 +25,12 @@ const CHARGE_FPS = 10;
 // Playback rate of both Dodge clips. The Dodge phases below are whole frames
 // at this rate, so the invulnerable window stays on the evasive art.
 const DODGE_FPS = 12;
+// Playback rate of the Throw clip. The Throw phases and the shuriken's release
+// point below are whole frames at this rate.
+const THROW_FPS = 12;
+// Playback rate of the shuriken's in-flight spin. Art only: it never changes
+// how fast the projectile travels.
+const SHURIKEN_FPS = 18;
 
 export const CHARACTERS = [
   {
@@ -33,7 +39,9 @@ export const CHARACTERS = [
     available: true,
     rosterSlot: 0,
 
-    // The source art faces right.
+    // The source art faces right. A clip drawn the other way overrides this
+    // with its own `sourceFacing` (see midairDodge); it only decides whether
+    // the sprite is mirrored, never the fighter's facing or its boxes.
     sourceFacing: 1,
 
     animations: {
@@ -152,11 +160,57 @@ export const CHARACTERS = [
         loop: false,
         heightRatio: 1,
       },
+      // The mid-air Dodge art is drawn facing left, unlike the rest of #0001.
       midairDodge: {
         frames: frames(BASE_0001, 'midairdodge', 3),
         fps: DODGE_FPS,
         loop: false,
         heightRatio: 0.96,
+        sourceFacing: -1,
+      },
+      // Throw, on the primary action: throw1 raises the shuriken by the face,
+      // throw2 whips the arm across and lets go (the release frame), throw3
+      // follows through. Faces right like the rest of #0001. Ground only:
+      // there is no mid-air Throw art.
+      throw: {
+        frames: frames(BASE_0001, 'throw', 3),
+        fps: THROW_FPS,
+        loop: false,
+        heightRatio: 0.9,
+      },
+    },
+
+    // Projectile art, kept apart from the fighter poses above: it is
+    // normalized at its own size around a centre anchor, never scaled to the
+    // fighter's height (see SpriteSet.build). Frames loop while it flies.
+    // `sourceFacing` is the way the art travels; it is mirrored when thrown
+    // the other way. Left out, the art is treated as direction-neutral.
+    projectileAnimations: {
+      // Three rotations of one shuriken, spinning clockwise: rolling
+      // forward when thrown right, so it is mirrored when thrown left.
+      shuriken: {
+        frames: frames(BASE_0001, 'shuriken', 3),
+        fps: SHURIKEN_FPS,
+        loop: true,
+        sourceFacing: 1,
+      },
+    },
+
+    // Projectile behaviour, keyed by id. See js/game/projectile.js for the
+    // schema (createProjectileDefinition). The hitbox is centred on the
+    // projectile and mirrors with its direction; the combat fields resolve
+    // exactly like an attack's (CombatSystem.applyHit). One hit at most.
+    projectiles: {
+      shuriken: {
+        animation: 'shuriken',
+        speed: 700,
+        lifetime: 1.5,
+        hitbox: { x: -5, y: -5, w: 10, h: 10 },
+        damage: 4,
+        knockback: { x: 140, y: 0 },
+        hitstun: 0.16,
+        blockstun: 0.1,
+        hitstop: 0.04,
       },
     },
 
@@ -249,7 +303,7 @@ export const CHARACTERS = [
     // picks by whether the fighter is grounded when the button is pressed.
     // Null means the input is wired but reserved: no artwork, no attack.
     actions: {
-      primary: null,
+      primary: 'throw', // Throw (the player-facing name of primary)
       special: null,
       action1: { ground: 'ba1', air: 'midairBa1' }, // Basic Attack 1 (BA1)
       action2: { ground: 'ba2', air: 'midairBa2' }, // Basic Attack 2 (BA2)
@@ -328,6 +382,20 @@ export const CHARACTERS = [
         hitstop: 0.07,
         cooldown: 0.18,
       },
+      // Frame 1 wind-up, frame 2 release, frame 3 follow-through. No melee
+      // hitbox: the damage is the shuriken's, released once, as the attack
+      // reaches frame 2, from the throwing hand (`offset` is from the
+      // fighter's origin, facing right, and mirrors with facing).
+      throw: {
+        animation: 'throw',
+        startup: 1 / THROW_FPS,
+        active: 1 / THROW_FPS,
+        recovery: 1 / THROW_FPS,
+        hitbox: null,
+        projectile: { id: 'shuriken', spawnAt: 1 / THROW_FPS, offset: { x: 16, y: -38 } },
+        cooldown: 0.25,
+        groundOnly: true,
+      },
     },
   },
 ];
@@ -336,8 +404,10 @@ export function getCharacter(id) {
   return CHARACTERS.find((c) => c.id === id) || null;
 }
 
+// Every frame a character needs before battle: fighter poses and projectiles.
 export function characterFramePaths(def) {
   const out = [];
   for (const anim of Object.values(def.animations)) out.push(...anim.frames);
+  for (const anim of Object.values(def.projectileAnimations || {})) out.push(...anim.frames);
   return out;
 }

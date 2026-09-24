@@ -6,8 +6,9 @@ import { StageCollision, separate, resolveSolidOverlap } from './physics.js';
 import { Fighter } from './character.js';
 import { PlayerController, TrainingAIController } from './fighter-controller.js';
 import { CombatSystem, worldBox } from './combat.js';
+import { spawnProjectiles, removeDeadProjectiles } from './projectile.js';
 import { Camera } from './camera.js';
-import { drawFrame } from './sprite-normalizer.js';
+import { drawFrame, drawCenteredFrame } from './sprite-normalizer.js';
 import { createTheme } from '../stages/index.js';
 import { mulberry32 } from '../core/utils.js';
 
@@ -45,12 +46,15 @@ export class Battle {
     this.p1.opponent = this.p2;
     this.p2.opponent = this.p1;
     this.fighters = [this.p1, this.p2];
+    // Live projectiles (js/game/projectile.js), in spawn order.
+    this.projectiles = [];
 
     this.restart();
   }
 
   restart() {
     for (const f of this.fighters) f.reset(this.stage);
+    this.projectiles.length = 0;
     this.acc = 0;
     this.roundSeconds = CONFIG.battle.roundSeconds;
     this.timeLeft = this.roundSeconds > 0 ? this.roundSeconds : Infinity;
@@ -105,6 +109,7 @@ export class Battle {
     if (steps >= CONFIG.sim.maxStepsPerFrame) this.acc = 0;
     const alpha = this.acc / this.step;
     for (const f of this.fighters) f.interpolate(alpha);
+    for (const p of this.projectiles) p.interpolate(alpha);
     this.camera.follow(this.p1, this.p2, dt);
     this.syncView();
     this.theme.update(dt, this.view);
@@ -130,10 +135,16 @@ export class Battle {
         break;
     }
 
+    // Fighters first; then the projectiles they released this step spawn
+    // (once each), every projectile moves, melee and projectile hits
+    // resolve, and spent projectiles are dropped.
     for (const f of this.fighters) f.update(dt, this.simCtx);
     separate(this.p1.body, this.p2.body, this.p1.def.pushbox.width / 2, this.p2.def.pushbox.width / 2, this.stage);
     for (const f of this.fighters) resolveSolidOverlap(f.body, this.stage);
-    this.combat.update(this.fighters);
+    spawnProjectiles(this.fighters, this.projectiles);
+    for (const p of this.projectiles) p.update(dt, this.stage);
+    this.combat.update(this.fighters, this.projectiles);
+    removeDeadProjectiles(this.projectiles);
   }
 
   get result() {
@@ -170,6 +181,8 @@ export class Battle {
     // CPU first so Player 1 is always drawn on top.
     this.drawFighter(this.p2);
     this.drawFighter(this.p1);
+    // Projectiles over the fighters, so a shuriken stays visible in front.
+    for (const p of this.projectiles) this.drawProjectile(p);
     ctx.imageSmoothingEnabled = true;
 
     theme.drawForeground(ctx, view);
@@ -224,8 +237,14 @@ export class Battle {
     const frame = f.animator.frame;
     if (!frame) return;
     const [sx, sy] = this.toScreen(f.renderX, f.renderY);
-    const flip = f.facing !== (f.def.sourceFacing || 1);
-    drawFrame(this.ctx, frame, sx, sy, this.pxPerArt, flip);
+    // Mirroring follows the playing clip's own source orientation.
+    drawFrame(this.ctx, frame, sx, sy, this.pxPerArt, f.spriteFlip);
+  }
+
+  // Centred on the projectile's position, at the fighters' art scale.
+  drawProjectile(p) {
+    const [sx, sy] = this.toScreen(p.renderX, p.renderY);
+    drawCenteredFrame(this.ctx, p.frame, sx, sy, this.pxPerArt, p.flip);
   }
 
   drawMarkers() {
@@ -298,10 +317,24 @@ export class Battle {
       }
       // Attack hitbox, only while it can connect.
       const atk = f.combat.attack;
-      if (atk && f.combat.phase === 'active') {
+      if (atk?.def.hitbox && f.combat.phase === 'active') {
         worldBox(f, atk.def.hitbox, box);
         rect(box.x, box.y, box.w, box.h, '#ffb020');
       }
+    }
+    // Projectile hitboxes, magenta and labelled, drawn where the sprite is
+    // drawn (interpolated) so the fit around the art can be judged.
+    ctx.font = '11px ui-monospace, Menlo, Consolas, monospace';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'bottom';
+    for (const p of this.projectiles) {
+      p.hitbox(box);
+      box.x += p.renderX - p.x;
+      box.y += p.renderY - p.y;
+      rect(box.x, box.y, box.w, box.h, '#ff4dff');
+      const [lx, ly] = this.toScreen(box.x, box.y);
+      ctx.fillStyle = '#ff4dff';
+      ctx.fillText(p.def.id, Math.round(lx), Math.round(ly) - 2);
     }
     ctx.fillStyle = '#fff';
     ctx.font = '12px ui-monospace, Menlo, Consolas, monospace';
@@ -328,6 +361,7 @@ export class Battle {
 
   destroy() {
     this.fighters = [];
+    this.projectiles = [];
   }
 }
 

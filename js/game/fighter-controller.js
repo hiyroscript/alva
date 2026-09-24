@@ -27,9 +27,10 @@ export class PlayerController {
 
 // Non-attacking training opponent: keeps a readable distance, follows the
 // player across platforms and occasionally repositions. It never presses
-// combat buttons (Basic Attacks 1 and 2 included), Charge or Defense, so the
-// player can practise on it. It drops through one-way platforms with `dropPressed`, an
-// intent no player control produces.
+// combat buttons (Throw and Basic Attacks 1 and 2 included, so it never
+// throws a shuriken), Charge or Defense, so the player can practise on it.
+// It drops through one-way platforms with `dropPressed`, an intent no player
+// control produces.
 export class TrainingAIController {
   constructor({ rng = Math.random } = {}) {
     this.kind = 'cpu';

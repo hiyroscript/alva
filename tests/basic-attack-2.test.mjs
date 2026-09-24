@@ -25,7 +25,7 @@ const CONTACT = { ba2: [4, 5], midairBa2: [3] };
 test('action2 is Basic Attack 2: ground ba2, air midairBa2; the internal actions keep their names', () => {
   assert.deepEqual(def.actions.action2, { ground: 'ba2', air: 'midairBa2' });
   assert.deepEqual(def.actions.action1, { ground: 'ba1', air: 'midairBa1' });
-  assert.equal(def.actions.primary, null);
+  assert.equal(def.actions.primary, 'throw');
   assert.equal(def.actions.special, null);
   assert.deepEqual(CONFIG.bindings.action1, ['KeyU']);
   assert.deepEqual(CONFIG.bindings.action2, ['KeyI']);
