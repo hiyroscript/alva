@@ -1,7 +1,7 @@
 // Run with node --test tests/controls-ui.test.mjs (no dependencies).
 // Touch controls and Help content for Basic Attacks 1 and 2 (BA1, BA2),
-// Charge and Defense (#0001's Dodge) on a minimal fake DOM; layout and paint
-// still need real-browser verification.
+// Charge, Throw (the primary action) and Defense (#0001's Dodge) on a
+// minimal fake DOM; layout and paint still need real-browser verification.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -91,9 +91,8 @@ test('the action1 touch button reads BA1 and is labelled Basic Attack 1', () => 
   // Same slot as before, but no longer dashed/dimmed as reserved.
   assert.ok(b.classList.contains('tc-a1'));
   assert.equal(b.classList.contains('is-pending'), false);
-  for (const reserved of ['primary', 'special']) {
-    assert.ok(tc.buttons.get(reserved).classList.contains('is-pending'), `${reserved} stays reserved`);
-  }
+  assert.ok(tc.buttons.get('special').classList.contains('is-pending'), 'special stays reserved');
+  assert.equal(tc.buttons.get('primary').classList.contains('is-pending'), false, 'Throw is live');
   assert.equal(tc.buttons.get('defense').classList.contains('is-pending'), false);
   assert.equal(tc.buttons.get('jump').classList.contains('is-pending'), false);
 });
@@ -110,12 +109,12 @@ test('the action2 touch button reads BA2 and is labelled Basic Attack 2', () => 
   assert.equal(b.classList.contains('is-pending'), false);
 });
 
-test('only Primary and Special touch buttons are still reserved', () => {
+test('only the Special touch button is still reserved', () => {
   const { tc } = touchControls();
   const pending = [...tc.buttons].filter(([, b]) => b.classList.contains('is-pending')).map(([action]) => action);
-  assert.deepEqual(pending.sort(), ['primary', 'special']);
+  assert.deepEqual(pending, ['special']);
   const texts = tc.root.querySelectorAll('.tc-text').map((t) => t.textContent);
-  assert.deepEqual(texts, ['C', 'D', 'BA1', 'BA2']);
+  assert.deepEqual(texts, ['C', 'T', 'D', 'BA1', 'BA2']);
 });
 
 test('pressing BA1 still dispatches the internal action1 input', () => {
@@ -173,7 +172,8 @@ test('help labels action1 Basic Attack 1 and no longer marks it Reserved', () =>
     return [th.children[0].textContent, !!th.querySelector('.tag')];
   }));
   assert.equal(rows['Basic Attack 1'], false);
-  assert.equal(rows.Primary, true);
+  assert.equal(rows.Throw, false);
+  assert.equal(rows.Primary, undefined);
   assert.equal(rows.Special, true);
   assert.equal(rows.Defense, false);
   assert.equal(rows.Block, undefined);
@@ -194,7 +194,7 @@ test('help labels action2 Basic Attack 2 and no longer marks it Reserved', () =>
   assert.equal(ba2.keys, 'I');
   assert.equal(rows.find((r) => r.label === 'Basic Attack 1').keys, 'U');
   assert.equal(rows.find((r) => r.label === 'Action 2'), undefined);
-  assert.deepEqual(rows.filter((r) => r.reserved).map((r) => r.label), ['Primary', 'Special']);
+  assert.deepEqual(rows.filter((r) => r.reserved).map((r) => r.label), ['Special']);
 });
 
 test('the mobile diagram shows BA1, not A1', () => {
@@ -222,12 +222,12 @@ test('the mobile diagram shows BA2, not A2', () => {
   assert.match(legend, /BA1 · BA2/);
   assert.doesNotMatch(legend, /Action 2/);
   const notes = help.querySelectorAll('.info-note').map((p) => p.textContent).join(' ');
-  assert.match(notes, /dashed Primary and Special buttons are reserved/);
+  assert.match(notes, /only the dashed Special button is reserved/);
   assert.match(notes, /LB for Basic Attack 2/);
   assert.doesNotMatch(notes, /Action 2/);
 });
 
-test('the build notes say BA1 and BA2 are available and Primary and Special are reserved', () => {
+test('the build notes say BA1, BA2 and Throw are available and only Special is reserved', () => {
   const text = buildHelp().querySelectorAll('.info-text').map((p) => p.textContent).join(' ');
   assert.match(text, /Basic Attack 1/);
   assert.match(text, /Basic Attack 2/);
@@ -235,7 +235,8 @@ test('the build notes say BA1 and BA2 are available and Primary and Special are 
   assert.match(text, /BA1 \(action1\)/);
   assert.match(text, /BA2 \(action2\)/);
   assert.match(text, /jump, fall and land/);
-  assert.match(text, /Primary and Special .* reserved/);
+  assert.match(text, /Only Special is still reserved/);
+  assert.doesNotMatch(text, /Primary/);
   assert.match(text, /training CPU never attacks/);
   assert.doesNotMatch(text, /Action [12]/);
   assert.doesNotMatch(text, /idle and run animations\./);
@@ -469,7 +470,7 @@ test('help lists Defense on L, never a generic Block control', () => {
   assert.deepEqual(defense.keys, ['L']);
   assert.equal(defense.reserved, false);
   assert.equal(rows.find((r) => r.label === 'Block'), undefined);
-  assert.deepEqual(rows.map((r) => r.label).slice(4, 8), ['Primary', 'Special', 'Defense', 'Basic Attack 1']);
+  assert.deepEqual(rows.map((r) => r.label).slice(4, 8), ['Throw', 'Special', 'Defense', 'Basic Attack 1']);
   assert.doesNotMatch(help.textContent, /\bblock\b/i, 'no Block anywhere in Help');
 });
 
@@ -482,9 +483,9 @@ test('the mobile diagram shows D for Defense in the old Block spot and says #000
   assert.equal(dot.querySelector('.md-icon').innerHTML, '<b>D</b>');
   assert.doesNotMatch(dot.querySelector('.md-icon').innerHTML, /<svg/);
   const order = help.querySelector('.md-screen').children.map((d) => d.getAttribute('title'));
-  assert.deepEqual(order.slice(4, 8), ['Primary', 'Special', 'Defense', 'Basic Attack 1']);
+  assert.deepEqual(order.slice(4, 8), ['Throw', 'Special', 'Defense', 'Basic Attack 1']);
   const label = help.querySelector('.mobile-diagram').getAttribute('aria-label');
-  assert.match(label, /Primary, Special, Defense \(D\), Basic Attack 1/);
+  assert.match(label, /Throw \(T\), Special, Defense \(D\), Basic Attack 1/);
   assert.match(label, /#0001 uses Dodge as its Defense/);
   assert.doesNotMatch(label, /Block/);
   const legend = help.querySelector('.md-legend').textContent;
@@ -504,8 +505,103 @@ test('help explains Defense, #0001\'s Dodge and the Charge release', () => {
   assert.match(items, /Holding Defense does not repeat it/);
   assert.match(items, /never takes chip damage/);
   assert.match(items, /Let go and #0001 shows its first Charge pose for a moment/);
-  assert.match(items, /Jump, BA1, BA2 and Defense \(Dodge\) take over from Charge at once/);
+  assert.match(items, /Jump, BA1, BA2, Throw and Defense \(Dodge\) take over from Charge at once/);
   const build = help.querySelectorAll('.info-text').map((p) => p.textContent).join(' ');
   assert.match(build, /Defense is a ground and mid-air Dodge for #0001/);
   assert.doesNotMatch(build, /guard state/);
+});
+
+// ---- Throw (the primary action) -------------------------------------------
+
+test('the old Primary touch slot is Throw: reads exactly T, labelled Throw, solid, dispatches primary', () => {
+  const { tc, calls } = touchControls();
+  const b = tc.buttons.get('primary');
+  assert.equal(b.textContent, 'T');
+  assert.equal(b.querySelector('.tc-text').textContent, 'T');
+  assert.equal(b.querySelector('svg'), null);
+  assert.doesNotMatch(b.innerHTML, /<svg/);
+  assert.equal(b.getAttribute('aria-label'), 'Throw');
+  assert.equal(b.getAttribute('data-action'), 'primary');
+  assert.ok(b.classList.contains('tc-throw'));
+  assert.equal(b.classList.contains('tc-primary'), false);
+  assert.equal(b.classList.contains('is-pending'), false, 'no dashed outline');
+  for (const word of ['Primary', 'THROW', 'SH']) assert.doesNotMatch(b.textContent, new RegExp(word));
+  // Still first in the cluster: the large upper-right button.
+  assert.equal(tc.actions.children[0], b);
+  b.dispatch('pointerdown', { pointerId: 3, preventDefault() {} });
+  assert.deepEqual(calls, [['primary', true]]);
+  assert.ok(b.classList.contains('is-pressed'));
+  b.dispatch('pointerup', { pointerId: 3 });
+  assert.deepEqual(calls, [['primary', true], ['primary', false]]);
+  // Alongside a held direction, too.
+  tc.assign(1, 'right');
+  b.dispatch('pointerdown', { pointerId: 2, preventDefault() {} });
+  assert.deepEqual(calls.slice(2), [['right', true], ['primary', true]]);
+  tc.releaseAll();
+  // The star icon is gone: nothing uses it any more.
+  assert.equal(ICONS.primary, undefined);
+  assert.ok(ICONS.special, 'Special keeps its icon');
+});
+
+test('the Throw touch button keeps the old Primary coordinates and size', () => {
+  assert.match(CSS, /\.tc-throw \{\n  right: calc\(var\(--tc-pitch\) \* 0\.02\);\n  bottom: calc\(var\(--tc-pitch\) \* 1\.74\);\n  width: calc\(var\(--tc\) \* 1\.12\);\n  height: calc\(var\(--tc\) \* 1\.12\);/);
+  assert.match(CSS, /\.md-throw \{ left: 88%; top: 27%; width: 12\.5%;/);
+  assert.doesNotMatch(CSS, /\.tc-primary\b/);
+  assert.doesNotMatch(CSS, /\.md-primary\b/);
+});
+
+test('help lists Throw on J, active, and only Special as reserved', () => {
+  assert.equal(ACTION_LABELS.primary, 'Throw');
+  assert.deepEqual(CONFIG.bindings.primary, ['KeyJ']);
+  const help = buildHelp();
+  const rows = help.querySelectorAll('tr').slice(1).map((tr) => ({
+    label: tr.querySelector('th').children[0].textContent,
+    reserved: !!tr.querySelector('th').querySelector('.tag'),
+    keys: tr.querySelector('td').querySelectorAll('kbd').map((k) => k.textContent),
+  }));
+  const row = rows.find((r) => r.label === 'Throw');
+  assert.ok(row, 'Throw row');
+  assert.deepEqual(row.keys, ['J']);
+  assert.equal(row.reserved, false);
+  assert.equal(rows.find((r) => r.label === 'Primary'), undefined);
+  assert.deepEqual(rows.filter((r) => r.reserved).map((r) => r.label), ['Special']);
+  const text = help.textContent;
+  assert.doesNotMatch(text, /Primary/, 'no player-facing Primary left');
+  assert.match(text, /X \/ Square for Throw/);
+  assert.match(text, /only the dashed Special button is reserved/);
+});
+
+test('the mobile diagram shows T for Throw in the upper-right slot', () => {
+  const help = buildHelp();
+  assert.equal(help.querySelector('.md-primary'), null);
+  const dot = help.querySelector('.md-throw');
+  assert.ok(dot, 'Throw dot');
+  assert.equal(dot.getAttribute('title'), 'Throw');
+  assert.equal(dot.querySelector('.md-icon').innerHTML, '<b>T</b>');
+  const order = help.querySelector('.md-screen').children.map((d) => d.getAttribute('title'));
+  assert.deepEqual(order.slice(4), ['Throw', 'Special', 'Defense', 'Basic Attack 1', 'Basic Attack 2', 'Jump']);
+  const label = help.querySelector('.mobile-diagram').getAttribute('aria-label');
+  assert.match(label, /Throw \(T\)/);
+  assert.doesNotMatch(label, /Primary/);
+  const legend = help.querySelector('.md-legend').textContent;
+  assert.match(legend, /T, Special · D, BA1 · BA2 · Jump/);
+  assert.match(legend, /Throw; #0001 throws a shuriken\./);
+  assert.match(legend, /Defense; #0001 uses Dodge as its Defense\./);
+});
+
+test('help explains Throw and lists it in this build', () => {
+  const help = buildHelp();
+  const items = help.querySelectorAll('li').map((li) => li.textContent).join(' ');
+  assert.match(items, /Throw \(J, X \/ Square, or T on touch\) makes #0001 throw one shuriken per press/);
+  assert.match(items, /flies straight the way #0001 was facing/);
+  assert.match(items, /ground only/);
+  const build = help.querySelectorAll('.info-text').map((p) => p.textContent).join(' ');
+  assert.match(build, /Throw \(the primary action\) throws an animated shuriken/);
+  assert.match(build, /BA1/);
+  assert.match(build, /BA2/);
+  assert.match(build, /Charge/);
+  assert.match(build, /Dodge/);
+  assert.match(build, /Only Special is still reserved/);
+  assert.match(build, /training CPU never attacks/);
+  assert.doesNotMatch(build, /mid-air Throw/i);
 });

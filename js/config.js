@@ -92,7 +92,7 @@ export const ACTION_LABELS = Object.freeze({
   right: 'Move right',
   charge: 'Charge',
   jump: 'Jump',
-  primary: 'Primary',
+  primary: 'Throw', // the internal action keeps its generic name
   special: 'Special',
   defense: 'Defense',
   action1: 'Basic Attack 1',

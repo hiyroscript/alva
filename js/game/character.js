@@ -5,6 +5,7 @@
 import { SpriteAnimator } from './sprite-animator.js';
 import { createBody, stepBody, dropThrough } from './physics.js';
 import { CombatState, createAttackDefinition, createDefenseDefinition } from './combat.js';
+import { createProjectileDefinition } from './projectile.js';
 import { approach, clamp, sign } from '../core/utils.js';
 
 export const COMBAT_ACTIONS = ['primary', 'special', 'action1', 'action2'];
@@ -39,6 +40,9 @@ export class Fighter {
     this.attacks = Object.fromEntries(
       Object.entries(def.attacks || {}).map(([id, spec]) => [id, createAttackDefinition({ id, ...spec })]),
     );
+    this.projectileDefs = Object.fromEntries(
+      Object.entries(def.projectiles || {}).map(([id, spec]) => [id, createProjectileDefinition({ id, ...spec })]),
+    );
     // What the shared Defense input does for this character (null: nothing).
     this.defense = createDefenseDefinition(def.defense);
     this.opponent = null;
@@ -70,6 +74,9 @@ export class Fighter {
     this.lastGroundY = this.body.y;
     this.inputLocked = false;
     this.combat = new CombatState(def.stats);
+    // Projectiles released this step, waiting for the battle to spawn them
+    // (see spawnProjectiles in js/game/projectile.js).
+    this.releases = [];
     this.renderX = this.body.x;
     this.renderY = this.body.y;
     this.animator.play('idle', { restart: true });
@@ -89,6 +96,13 @@ export class Fighter {
     this.chargeReleased = false;
 
     combat.update(dt);
+    // ---- Projectile release ----------------------------------------------
+    // The attack crossed its release point this step: queue one projectile,
+    // aimed where the fighter faces now. Its direction never changes after.
+    if (combat.release) {
+      this.releases.push({ id: combat.release.id, offset: combat.release.offset, direction: this.facing });
+      combat.release = null;
+    }
     if (combat.hitstop > 0) {
       // Impact freeze: nothing moves or advances, but a fresh hit still
       // switches to the hurt pose so the freeze holds the reaction.
@@ -206,7 +220,15 @@ export class Fighter {
       console.warn(`[Alva] Attack "${attackId}" has no animation frames; ignoring.`);
       return false;
     }
-    combat.attack = { def: atk, time: 0, hasHit: false };
+    // Nor an invisible projectile: a throw needs its projectile's art too.
+    if (atk.projectile) {
+      const proj = this.projectileDefs[atk.projectile.id];
+      if (!proj?.animation || !this.sprites.projectile(proj.animation)) {
+        console.warn(`[Alva] Attack "${attackId}" throws "${atk.projectile.id}", which has no animation frames; ignoring.`);
+        return false;
+      }
+    }
+    combat.attack = { def: atk, time: 0, hasHit: false, projectileSpawned: false };
     return true;
   }
 
@@ -295,6 +317,16 @@ export class Fighter {
     if (!this.chargeReleaseDuration) return false;
     if (this.chargeReleased) return true;
     return this.state === 'chargeRelease' && this.stateTime + dt < this.chargeReleaseDuration - TIME_EPSILON;
+  }
+
+  // Whether the current frame is drawn mirrored. Each clip knows which way its
+  // own artwork faces (`sourceFacing`, per animation, else the character's),
+  // so art drawn facing left (e.g. #0001's mid-air Dodge) is mirrored when the
+  // fighter faces right. Rendering only: `facing`, movement and every
+  // hurtbox / hitbox are unaffected.
+  get spriteFlip() {
+    const sourceFacing = this.animator.anim?.sourceFacing ?? this.def.sourceFacing ?? 1;
+    return this.facing !== sourceFacing;
   }
 
   // Interpolated position for rendering between fixed steps.

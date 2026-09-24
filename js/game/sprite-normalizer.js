@@ -13,6 +13,9 @@
 // The result is cached; nothing touches pixel data per render frame.
 // Every normalized frame is drawn bottom-centre anchored at a shared
 // world-units-per-art-pixel scale, so idle and run match exactly.
+// Projectile art (a character's `projectileAnimations`) goes through the same
+// analysis but keeps its own size and a centre anchor: it shares the fighter's
+// art-pixel scale, never the fighter's height.
 
 const ALPHA_MIN = 16;
 
@@ -178,6 +181,7 @@ export class SpriteSet {
   constructor(def) {
     this.def = def;
     this.animations = {};
+    this.projectiles = {}; // projectile animations, keyed like projectileAnimations
     this.worldPerArt = 1;
     this.refArtHeight = 1;
     this.missing = [];
@@ -214,7 +218,31 @@ export class SpriteSet {
         loop: anim.loop !== false,
         heightRatio: anim.heightRatio ?? 1,
         minSpeedScale: anim.minSpeedScale ?? 1,
+        // The way this clip's own artwork faces (see Fighter.spriteFlip).
+        sourceFacing: anim.sourceFacing ?? def.sourceFacing ?? 1,
         resolved: frames.every((f) => f.unit),
+      };
+    }
+
+    // Projectiles: same grid detection, centre anchor, no height fitting.
+    for (const [key, anim] of Object.entries(def.projectileAnimations || {})) {
+      const frames = [];
+      for (const url of anim.frames) {
+        const img = getImage(url);
+        if (!img) {
+          set.missing.push(url);
+          continue;
+        }
+        frames.push(normalizeFrame(img, url, { forcedPixelSize: forced, anchor: 'center' }));
+      }
+      if (!frames.length) continue;
+      set.projectiles[key] = {
+        key,
+        frames,
+        fps: anim.fps,
+        loop: anim.loop !== false,
+        // 0: direction-neutral art, never mirrored (see Projectile.flip).
+        sourceFacing: anim.sourceFacing ?? 0,
       };
     }
 
@@ -246,6 +274,18 @@ export class SpriteSet {
       anim.maxArtH = Math.max(...anim.frames.map((f) => f.artH));
     }
 
+    // One projectile art pixel is one fighter art pixel. A frame whose grid
+    // could not be detected borrows the reference clip's pixel size.
+    for (const anim of Object.values(set.projectiles)) {
+      for (const f of anim.frames) {
+        f.unit = f.unit || ref.frames[0].unit;
+        f.artW = f.w / f.unit;
+        f.artH = f.h / f.unit;
+        f.anchorArtX = f.anchorX / f.unit;
+        f.anchorArtY = f.artH / 2;
+      }
+    }
+
     set.worldPerArt = def.visual.height / set.refArtHeight;
     set.usable = true;
     return set;
@@ -253,6 +293,11 @@ export class SpriteSet {
 
   has(key) {
     return !!this.animations[key];
+  }
+
+  // Normalized projectile animation, or null without its own art.
+  projectile(key) {
+    return this.projectiles[key] || null;
   }
 
   // Seconds one pass of a dedicated animation takes (0 without its own art).
@@ -304,5 +349,21 @@ export function drawFrame(ctx, frame, x, y, pxPerArt, flip) {
   ctx.translate(Math.round(x), Math.round(y));
   if (flip) ctx.scale(-1, 1);
   ctx.drawImage(frame.canvas, -ax, -Math.round(h), Math.round(w), Math.round(h));
+  ctx.restore();
+}
+
+// Draws a normalized projectile frame centred on device pixel position
+// (x, y), at the same `pxPerArt` as the fighters.
+export function drawCenteredFrame(ctx, frame, x, y, pxPerArt, flip) {
+  const w = frame.artW * pxPerArt;
+  const h = frame.artH * pxPerArt;
+  ctx.save();
+  ctx.translate(Math.round(x), Math.round(y));
+  if (flip) ctx.scale(-1, 1);
+  ctx.drawImage(
+    frame.canvas,
+    -Math.round(frame.anchorArtX * pxPerArt), -Math.round(frame.anchorArtY * pxPerArt),
+    Math.round(w), Math.round(h),
+  );
   ctx.restore();
 }

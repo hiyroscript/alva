@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 import { getCharacter } from '../js/data/characters.js';
 import { Fighter } from '../js/game/character.js';
 import { CombatSystem } from '../js/game/combat.js';
+import { spawnProjectiles, removeDeadProjectiles } from '../js/game/projectile.js';
 import { StageCollision } from '../js/game/physics.js';
 import { SpriteSet } from '../js/game/sprite-normalizer.js';
 import { CONFIG } from '../js/config.js';
@@ -15,12 +16,21 @@ export const DT = CONFIG.sim.step;
 export const BASE = './assets/characters/0001/0001_';
 
 // SpriteSet with the definition's clip metadata in place of decoded frames.
-export function fakeSprites(keys = Object.keys(def.animations)) {
+// `projectileKeys` picks which projectile animations have art.
+export function fakeSprites(keys = Object.keys(def.animations), projectileKeys = Object.keys(def.projectileAnimations)) {
   const set = new SpriteSet(def);
   for (const key of keys) {
     const anim = def.animations[key];
     set.animations[key] = {
       key, fps: anim.fps, loop: anim.loop !== false,
+      sourceFacing: anim.sourceFacing ?? def.sourceFacing ?? 1,
+      frames: anim.frames.map((url) => ({ url })),
+    };
+  }
+  for (const key of projectileKeys) {
+    const anim = def.projectileAnimations[key];
+    set.projectiles[key] = {
+      key, fps: anim.fps, loop: anim.loop !== false, sourceFacing: anim.sourceFacing ?? 0,
       frames: anim.frames.map((url) => ({ url })),
     };
   }
@@ -80,8 +90,9 @@ export function recordAttack(step, held) {
 // Consecutive duplicates removed: the order frames were shown in.
 export const sequence = (log) => log.map((s) => s.frame).filter((n, i, a) => n !== a[i - 1]);
 
-// Two fighters and the real CombatSystem, stepped like Battle.step().
-// `targetCharacter` swaps in another definition (e.g. a Block-type fighter).
+// Two fighters, their projectiles and the real CombatSystem, stepped in
+// Battle.update()'s order. `targetCharacter` swaps in another definition
+// (e.g. a Block-type fighter).
 export function duel({ gap = 44, attackerFacing = 1, attackerSprites, targetSprites, targetCharacter } = {}) {
   const x = 500;
   const a = makeFighter({ x, facing: attackerFacing, sprites: attackerSprites });
@@ -92,15 +103,20 @@ export function duel({ gap = 44, attackerFacing = 1, attackerSprites, targetSpri
   b.fighter.opponent = a.fighter;
   const system = new CombatSystem();
   const events = [];
+  const projectiles = [];
+  const fighters = [a.fighter, b.fighter];
   const tick = (held = {}, targetHeld = {}) => {
     a.step(held);
     b.step(targetHeld);
-    events.push(...system.update([a.fighter, b.fighter]));
+    spawnProjectiles(fighters, projectiles);
+    for (const p of projectiles) p.update(DT, STAGE);
+    events.push(...system.update(fighters, projectiles));
+    removeDeadProjectiles(projectiles);
   };
   // Ticks until `pred` holds; fails instead of hanging.
   const until = (pred, limit = 600) => {
     for (let i = 0; i < limit && !pred(); i++) tick();
     assert.ok(pred(), 'condition never reached');
   };
-  return { attacker: a.fighter, target: b.fighter, tick, until, events };
+  return { attacker: a.fighter, target: b.fighter, tick, until, events, projectiles };
 }

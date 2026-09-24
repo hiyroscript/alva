@@ -44,11 +44,29 @@ behave, and how it must look. The README covers running and deploying it.
   mid-air Basic Attack 2 frames `0001_midair2ba1`–`0001_midair2ba3`
   (≈216–352 × 424–536 px), four Charge frames `0001_charge1`,
   `0001_charge2`, `0001_chargea` and `0001_chargeb` (≈272–288 × 416 px),
-  three Dodge frames `0001_dodge1`–`0001_dodge3` (≈256–288 × 384–416 px)
-  and three mid-air Dodge frames `0001_midairdodge1`–`0001_midairdodge3`
-  (≈288–320 × 376–400 px). `0001_dodge3` happens to be the same image as
+  three Dodge frames `0001_dodge1`–`0001_dodge3` (≈256–288 × 384–416 px),
+  three mid-air Dodge frames `0001_midairdodge1`–`0001_midairdodge3`
+  (≈288–320 × 376–400 px) and three Throw frames `0001_throw1`–`0001_throw3`
+  (≈280–312 × 360–376 px). `0001_dodge3` happens to be the same image as
   `0001_charge1`; it is kept under its own name as the Dodge's recovery
   frame.
+- The same folder holds #0001's projectile art: three shuriken frames
+  `0001_shuriken1`–`0001_shuriken3` (48–64 px square). They are the in-flight
+  spin of one shuriken, not fighter poses and not three shurikens. They are
+  registered apart from the fighter animations (`projectileAnimations`),
+  preloaded with the character, and normalized and drawn separately: same
+  grid detection, a centre anchor instead of bottom-centre, and the
+  fighter's world-per-art-pixel scale, never fitted to the fighter's height.
+- Source orientation: #0001's art faces right (`sourceFacing: 1` on the
+  character), except `midairdodge1`–`3`, which are drawn facing left. An
+  animation may override the character's orientation with its own
+  `sourceFacing` (`midairDodge` has `-1`); the normalized clip keeps it, and
+  the renderer mirrors a frame only when the fighter's facing differs from
+  its clip's `sourceFacing`. It is rendering metadata only: the fighter's
+  facing, movement, hurtboxes and hitboxes never change with it. The Throw
+  frames face right like the rest. The shuriken art is a four-point star
+  spinning clockwise; it is mirrored when thrown left so it always rolls
+  forward.
 - File names: `ba` means basic attack; the digit before it says which one
   (`1ba` is Basic Attack 1, `2ba` Basic Attack 2). The number at the very end
   is always the frame number (`0001_1ba3.png` is Basic Attack 1, frame 3;
@@ -57,7 +75,8 @@ behave, and how it must look. The README covers running and deploying it.
   `chargea` / `chargeb` its sustained loop; `charge1` is also reused, as the
   same file, for the Charge release pose.
 - The idle, jump, fall, land and hurt frames (≈16× pixel art), the mid-air
-  hurt, Basic Attack 1 and 2, Charge and Dodge frames (≈8×) and the run frames (≈4×)
+  hurt, Basic Attack 1 and 2, Charge, Dodge, Throw and shuriken frames (≈8×)
+  and the run frames (≈4×)
   are at very different raw scales. A normalization
   system must, once per frame: read the alpha channel, find the visible bounds,
   detect the pixel-art grid, resample to one pixel per art pixel, and anchor
@@ -77,8 +96,8 @@ behave, and how it must look. The README covers running and deploying it.
   reloads); inactive screens are `hidden` and `inert`.
 - Systems: asset loader, input (keyboard, touch, gamepad), menu navigator,
   device detection, audio stub, sprite normalizer/animator, fighter state
-  machine, controllers (player / training AI), physics, camera, combat, HUD,
-  touch controls, stage themes.
+  machine, controllers (player / training AI), physics, camera, combat,
+  projectiles, HUD, touch controls, stage themes.
 - Data-driven content: `js/data/characters.js` and `js/data/maps.js`. Adding a
   fighter means adding frames, a definition and a roster slot — never editing
   engine code.
@@ -291,8 +310,8 @@ no header, build label, eyebrow or keyboard hint bar.
 - Two tabs (Help, Credits) sharing one scrollable panel; ←/→ switch tabs,
   ↑/↓ scroll.
 - Help: desktop controls rendered from the live key bindings, mobile control
-  diagram, movement, Charge & Energy, Defense, stages and platforms, pause,
-  notes on this build.
+  diagram, movement, Charge & Energy, Throw, Defense, stages and platforms,
+  pause, notes on this build.
 - The Home entry to this screen is disabled for now; the screen stays in place
   so it can return.
 - Credits (must remain visible and readable). One list in
@@ -348,15 +367,16 @@ no header, build label, eyebrow or keyboard hint bar.
 
 - `#0001` has Idle, Run, Jump, Fall, Land, Hurt, Mid-air Hurt, Basic Attack 1,
   Mid-air Basic Attack 1, Basic Attack 2, Mid-air Basic Attack 2, Charge,
-  Dodge and Mid-air Dodge.
+  Dodge, Mid-air Dodge and Throw, plus the Shuriken projectile animation.
   No invented frames. Rising uses Jump and
   descending (walking off a ledge included) uses Fall; each plays once at 10 fps
   and holds its last frame. Land plays once at 12 fps on touchdown, for
   exactly the clip's length, then returns to idle or run. Land is a visual
   state only: it never changes movement or collision, and a new jump, attack
   or hitstun cuts it short. If those frames fail to load, the fighter holds an
-  idle frame without stretching or rotating. Facing flips the sprite and turns
-  toward the opponent when standing.
+  idle frame without stretching or rotating. Facing flips the sprite (per
+  clip, against that clip's source orientation; see 3) and turns toward the
+  opponent when standing.
 - Hitstun shows Hurt while grounded and Mid-air Hurt while airborne, switching
   to Hurt if the fighter lands still stunned; the pose also holds through the
   impact freeze. Hitstun outranks every other state (attack, Defense, jump,
@@ -391,6 +411,53 @@ no header, build label, eyebrow or keyboard hint bar.
   lock applies, gravity keeps working, and a mid-air BA2 that lands finishes
   its own clip instead of switching to ground BA2 or Land. Ground BA2 is
   ground-only; pressing BA2 and Jump on the same step attacks on the ground.
+- Throw is #0001's projectile attack, on the internal `primary` action
+  (player-facing name Throw; keyboard J, gamepad X / Square, touch **T**).
+  The character data maps `primary: 'throw'`. It is ground-only: there is no
+  mid-air Throw art, so pressing it in the air does nothing (no pose, no
+  shuriken, Jump / Fall continue). One press plays the 3-frame `throw` clip
+  once at 12 fps (`throw1` raises the shuriken by the face, `throw2` whips the
+  arm across and lets go, `throw3` follows through) and releases exactly one
+  shuriken; holding the button neither loops the clip nor throws again. Its
+  phases are whole frames: frame 1 startup, frame 2 active (the release),
+  frame 3 recovery. The attack has no melee hitbox (`hitbox: null`); instead
+  a one-shot projectile event releases the shuriken once, on the step the
+  attack's time reaches `throw2` (`spawnAt` 1/12 s; like other phases it may
+  trail the art by one simulation step, never before the release pose and
+  never after the Throw ends), at the throwing hand (16 units in front of
+  the origin, 38 up, mirrored with facing). A Throw hit before its release
+  throws nothing. Movement and facing lock like other attacks, gravity keeps
+  working, and there is a 0.25 s cooldown after it. No Energy cost. Like
+  BA1 / BA2, Throw pressed on the same step as Defense wins and no Dodge
+  starts, and it cuts straight out of Charge without the release pose. If
+  the Throw frames or the shuriken frames are missing, Throw is refused
+  (logged): never a faked pose or an invisible projectile.
+- The shuriken is an independent battle entity (`js/game/projectile.js`), not
+  a fighter hitbox: it has its own position (interpolated between fixed
+  steps like the fighters), velocity, animation clock, hitbox, combat data
+  and lifetime, all from character data (`projectiles.shuriken`). Its
+  direction is #0001's facing at the release and never changes afterwards,
+  even if #0001 turns, jumps, dodges, charges or is hit. It flies straight at
+  700 units/s, looping `shuriken1 → shuriken2 → shuriken3` at 18 fps (art
+  only; speed never depends on it). Its hitbox is 10 × 10 units, centred.
+  It hits at most once: 4 damage, 0.16 s hitstun, 0.10 s blockstun, 0.04 s
+  hitstop on the target only (the thrower does not freeze), 140 horizontal
+  knockback along the shuriken's own direction and no launch, then it
+  disappears. Hits resolve through the same `CombatSystem.applyHit` as melee,
+  with the shuriken's direction in place of the attacker's facing, and credit
+  #0001 as the attacker. It never hits its thrower. During a Dodge's
+  invulnerable frames it passes through unspent (no damage, stun, hitstop,
+  knockback or event) and can still connect if it overlaps once they end; a
+  future Block-type fighter guarding toward it blocks it with the normal chip
+  damage, blockstun and half knockback, and it disappears. A missed shuriken
+  disappears after 1.5 s, once it has flown past a stage edge, or when it
+  meets a solid block; one-way platforms do not stop it. No multi-hit,
+  homing, bouncing, piercing, explosion or clash. The Battle owns live
+  projectiles: each fixed step it updates the fighters, spawns released
+  projectiles (once each), moves them, resolves melee and projectile hits,
+  then removes spent ones. They are drawn on the battle canvas over the
+  fighters, centred on their position with image smoothing off, and cleared
+  on restart.
 - Charge is one logical fighter state (`charge`) drawn by two clips: the
   startup `chargeStart` (`charge1`, `charge2`, played once) and the sustained
   loop `chargeLoop` (`chargea`, `chargeb`, looping), both at 10 fps. Holding
@@ -419,8 +486,8 @@ no header, build label, eyebrow or keyboard hint bar.
   invulnerability, and it is not an attack or a combat action. State
   priority is hitstun > attack > Defense (Dodge) > jump / fall > land >
   charge > charge release > run > idle (a Block-type guard would sit between
-  land and charge): a hit shows Hurt at once, BA1 / BA2 start straight out of
-  a held Charge, Jump interrupts it, and a Defense press interrupts it with a
+  land and charge): a hit shows Hurt at once, BA1 / BA2 / Throw start straight
+  out of a held Charge, Jump interrupts it, and a Defense press interrupts it with a
   Dodge. If Charge is still held when that Dodge ends, a fresh Charge starts
   from `charge1`, never from `chargea` / `chargeb`. Charge on a one-way
   platform charges in place and never drops through. If the charge frames
@@ -474,12 +541,13 @@ no header, build label, eyebrow or keyboard hint bar.
 - Combat architecture (health, damage, hitboxes, hurtboxes, attack definitions,
   Defense with Block / Dodge implementations, invulnerability, knockback,
   stun and blockstun, hitstop, cooldowns) is data-driven. Basic Attacks 1
-  and 2 are implemented through it with real artwork; Primary and Special
-  stay reserved (mapped to no attack) until real sprites exist, and no attack
-  or frame is ever fabricated. An attack whose frames fail to load is refused
+  and 2 and Throw (with its shuriken projectile) are implemented through it
+  with real artwork; Special stays reserved (mapped to no attack) until real
+  sprites exist, and no attack, projectile or frame is ever fabricated. An attack whose frames fail to load is refused
   (no substitute pose, no invisible hitbox), and so is a Dodge.
 - Quick Battle: one round, 99 seconds, against a non-attacking training CPU
-  that uses the same fighter definition. It never charges or uses Defense;
+  that uses the same fighter definition. It never attacks, throws, charges or
+  uses Defense;
   it drops through one-way platforms with an internal intent that no player
   control produces.
 
@@ -527,20 +595,24 @@ no header, build label, eyebrow or keyboard hint bar.
 ### 7.4 Input
 
 - Keyboard (simultaneous keys, held-state tracking, no reliance on key
-  repeat): A/D or ←/→ move, S/↓ Charge (held), W/Space/↑ jump, J primary, K special,
-  L Defense, U Basic Attack 1 (BA1), I Basic Attack 2 (BA2), Esc/P pause.
-  `` ` `` toggles a debug overlay (colliders, hurtboxes, and attack hitboxes
-  while active). In menus S/↓ still navigate down: menu bindings are separate
+  repeat): A/D or ←/→ move, S/↓ Charge (held), W/Space/↑ jump, J Throw (the
+  internal `primary` action), K Special (reserved), L Defense, U Basic
+  Attack 1 (BA1), I Basic Attack 2 (BA2), Esc/P pause. `` ` `` toggles a
+  debug overlay (colliders, hurtboxes, attack hitboxes while active, and each
+  flying projectile's hitbox in magenta with its name). In menus S/↓ still navigate down: menu bindings are separate
   from the gameplay `charge` action.
 - Gamepad (standard layout) for movement (D-pad / left stick left and
   right), Charge in battle (D-pad down / left stick down, held; menus still
-  read them as Down), jump (A), Basic Attack 1 (B / Circle), Basic Attack 2
-  (LB), reserved actions (X / Y), Defense (RB / RT) and Start to pause/menus.
+  read them as Down), jump (A), Throw (X / Square), Basic Attack 1
+  (B / Circle), Basic Attack 2 (LB), Special (Y / Triangle, reserved),
+  Defense (RB / RT) and Start to pause/menus.
 - Touch (landscape, Pointer Events, true multi-touch): lower-left
   Left · C · Right with thumb sliding, where the middle button reads **C**, is
   labelled "Charge" and stays pressed for as long as the pointer holds it;
   lower-right staggered cluster —
-  Primary (top) · Special, Defense · BA1, BA2, Jump (bottom-right). The
+  Throw (top, the larger button, reading exactly **T** and labelled
+  "Throw"; it sends the internal `primary` action) · Special, Defense · BA1,
+  BA2, Jump (bottom-right). The
   Defense button sits in the old Block slot; it reads exactly **D** (no
   shield icon) because #0001's Defense is a Dodge, and is labelled "Defense".
   The BA1 button (Basic Attack 1, internally `action1`) and the BA2 button
@@ -548,7 +620,8 @@ no header, build label, eyebrow or keyboard hint bar.
   Tapping the timer or the pause section beneath it (top centre, 7.3) pauses.
   Original circular icons, translucent dark fill, white outlines; pressed
   buttons scale down and brighten to white — no hue.
-  Reserved actions use dashed outlines and never show nagging alerts.
+  Reserved actions (only Special now) use dashed outlines and never show
+  nagging alerts; Throw is solid.
 - Touch controls appear only on touch-first devices (coarse pointer or an
   observed touch), never merely because a desktop window is narrow.
 - Gameplay pauses when the pause menu is open, the tab is hidden, or the device
