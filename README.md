@@ -74,7 +74,7 @@ attack animations. Its touch button has a dashed outline.
 - **Basic Attack 2 (BA2):** a slower, heavier spinning high kick on the
   ground, an airborne kick in the air. Where ground BA1 pushes the opponent
   away, a BA2 hit launches it upward: hard from the ground kick (High
-  vertical Knockback), lightly from the mid-air kick (Low vertical
+  vertical Knockback), less high from the mid-air kick (Mid vertical
   Knockback). A blocked BA2 does not launch. It picks the move the same way,
   and a mid-air BA2 that lands also plays to the end. Internally this is the
   `action2` input.
@@ -179,7 +179,7 @@ Touch controls show on touch-first devices (coarse pointer, or a touch actually 
 - **Attacks:** Basic Attack 1 and Basic Attack 2, each on the ground and in the air, a ground Throw that releases one shuriken, the Charged BA1 Clone Attack (25 Energy) and the Charged BA2 Sphere Rush (ground only, two hits, no Energy cost). Special is reserved.
 - **Defense:** #0001 dodges, on the ground and in the air.
 - **Powers:** Jump Power and Speed Power, each in three tiers. #0001 has Jump Power 2 and Speed Power 2 (its original jump and speed).
-- **Knockback:** each attack's own, Low, Mid or High, pushing sideways or launching upward (or, reversed, driving downward). #0001's BA1 is Low horizontal, its BA2 High vertical, its mid-air BA1 Mid vertical reversed (downward) and its mid-air BA2 Low vertical.
+- **Knockback:** each attack's own, Low, Mid or High, pushing sideways or launching upward (or, reversed, driving downward). #0001's BA1 is Low horizontal, its BA2 High vertical, its mid-air BA1 Mid vertical reversed (downward) and its mid-air BA2 Mid vertical.
 - **HUD:** each fighter panel shows a green health bar with a blue Energy bar directly beneath it. Both start full; the Energy bar drops by a quarter with each clone summoned.
 - **Modes:** Quick Battle: 1 round, 99 seconds, against a non-attacking training CPU. Practice Ground: training on its own stage, alone or with an optional stand-still CPU dummy, with no timer or rounds (below).
 
@@ -351,9 +351,9 @@ knockback: { axis: 'vertical', level: 'mid', sign: -1 } // reversed: drives down
 | BA1 (ground punch) | Low horizontal | `{ x: 140, y: 0 }` |
 | BA2 (ground spinning kick) | High vertical | `{ x: 0, y: 800 }` |
 | Mid-air BA1 (kunai slash) | Mid vertical, reversed | `{ x: 0, y: -640 }` |
-| Mid-air BA2 (airborne kick) | Low vertical | `{ x: 0, y: 480 }` |
+| Mid-air BA2 (airborne kick) | Mid vertical | `{ x: 0, y: 640 }` |
 
-An unblocked BA1 hit sets the opponent's `vx` to 140 away from #0001; BA2 sets `vy = -800`, a strong launch; mid-air BA1 sets `vy = +640`, driving it downward with no sideways push; mid-air BA2 sets `vy = -480`, a light launch. The Clone Attack performs ground BA1's resolved definition, so it inherits Low horizontal Knockback with no tuning of its own.
+An unblocked BA1 hit sets the opponent's `vx` to 140 away from #0001; BA2 sets `vy = -800`, a strong launch; mid-air BA1 sets `vy = +640`, driving it downward with no sideways push; mid-air BA2 sets `vy = -640`, a lower launch than BA2's. The Clone Attack performs ground BA1's resolved definition, so it inherits Low horizontal Knockback with no tuning of its own.
 
 The two mid-air Basic Attacks swapped moves: **mid-air BA1** is the three-frame kunai slash (`0001_midair2ba1`–`3`), which used to be mid-air BA2, and **mid-air BA2** is the five-frame airborne kick (`0001_midair1ba1`–`5`), which used to be mid-air BA1. Each move kept its own art, timing, hitbox, damage and stun; only its knockback changed. The frame file names are the originals.
 

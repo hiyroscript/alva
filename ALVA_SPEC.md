@@ -637,9 +637,9 @@ read the character database, so it stays the same as fighters are added.
   airborne, rising well above a fighter's height before normal gravity
   brings it down). Mid-air BA2 hits once for 6 damage, 0.22 s hitstun,
   0.14 s blockstun and 0.06 s hitstop, with a 0.1 s cooldown, and declares
-  Low vertical Knockback (`knockback: { axis: 'vertical', level: 'low' }`,
-  resolved `{ x: 0, y: 480 }`): still an upward launch (at impact vx 0,
-  vy −480), but a much lower one than ground BA2's. Neither has horizontal
+  Mid vertical Knockback (`knockback: { axis: 'vertical', level: 'mid' }`,
+  resolved `{ x: 0, y: 640 }`): still an upward launch (at impact vx 0,
+  vy −640), but a lower one than ground BA2's. Neither has horizontal
   knockback. The launch comes from the shared knockback path, not special
   BA2 code. A blocked BA2 still takes chip damage, blockstun and hitstop,
   but is never launched (vertical knockback applies only to unblocked hits)
@@ -1062,7 +1062,7 @@ read the character database, so it stays the same as fighters are added.
   | Ground BA1 | Low horizontal | `{ x: 140, y: 0 }` |
   | Ground BA2 | High vertical | `{ x: 0, y: 800 }` |
   | Mid-air BA1 | Mid vertical, reversed | `{ x: 0, y: −640 }` |
-  | Mid-air BA2 | Low vertical | `{ x: 0, y: 480 }` |
+  | Mid-air BA2 | Mid vertical | `{ x: 0, y: 640 }` |
 
   Those attacks have no raw numeric `knockback`: the levels are the only
   sources. Knockback never depends on either fighter's Jump or Speed Power.

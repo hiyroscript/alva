@@ -503,7 +503,7 @@ export const CHARACTERS = [
     // (js/data/knockback.js): ground BA1 pushes sideways (Low horizontal),
     // mid-air BA1 drives the target downward (Mid vertical, reversed), ground
     // BA2 launches it upward hard (High vertical) and mid-air BA2 launches it
-    // upward lightly (Low vertical).
+    // upward less high (Mid vertical).
     attacks: {
       // Frame 1 wind-up, frame 2 punch, frames 3-4 recovery.
       ba1: {
@@ -559,8 +559,8 @@ export const CHARACTERS = [
         groundOnly: true,
       },
       // Frames 1-2 wind-up, frame 3 kick (the forward-low arc), frames 4-5
-      // recovery. Launches the target upward, lightly. Chosen only by
-      // action2's `air` branch.
+      // recovery. Launches the target upward, less high than ground BA2.
+      // Chosen only by action2's `air` branch.
       midairBa2: {
         animation: 'midairBa2',
         startup: 2 / BA2_FPS,
@@ -568,7 +568,7 @@ export const CHARACTERS = [
         recovery: 2 / BA2_FPS,
         damage: 6,
         hitbox: { x: 8, y: -44, w: 40, h: 40 },
-        knockback: { axis: 'vertical', level: 'low' },
+        knockback: { axis: 'vertical', level: 'mid' },
         hitstun: 0.22,
         blockstun: 0.14,
         hitstop: 0.06,
