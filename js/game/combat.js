@@ -13,19 +13,22 @@
 //       powers: { horizontalKnockback: 2 }, hitstun: 0.22, blockstun: 0.14, cooldown: 0.1,
 //     },
 //     launcher: { ..., powers: { verticalKnockback: 2 } },
-//     airJab: { animation: 'airJab', ... },
+//     airJab: { animation: 'airJab', ..., powers: { horizontalKnockback: 2, verticalKnockback: -2 } },
 //   },
 //   // One attack per action, or { ground, air } chosen by grounded state.
 //   actions: { primary: 'jab', action1: { ground: 'jab', air: 'airJab' }, ... }
 //
 // An attack's knockback comes from its attack Powers (js/data/powers.js):
 // `horizontalKnockback` pushes the target away along the attack's facing and
-// `verticalKnockback` launches it upward, each at the declared tier, and an
-// axis the attack leaves out is 0. createAttackDefinition resolves them
-// once, into the definition's numeric `knockback: { x, y }`, which is all
-// applyHit (and a clone performing the attack) ever reads. Bespoke hits that
-// are not fighter attacks (a projectile's, a charged technique's) still carry
-// their own raw `knockback: { x, y }`.
+// `verticalKnockback` moves it vertically, each at the declared tier, and an
+// axis the attack leaves out is 0. Vertical Knockback is signed: a positive
+// tier launches upward (positive `knockback.y`), a negative tier drives the
+// target downward with the same tier's magnitude (negative `knockback.y`).
+// createAttackDefinition resolves them once, into the definition's numeric
+// `knockback: { x, y }`, which is all applyHit (and a clone performing the
+// attack) ever reads. Bespoke hits that are not fighter attacks (a
+// projectile's, a charged technique's) still carry their own raw
+// `knockback: { x, y }`.
 //
 // An attack needs real frames for its `animation`; without them it is refused
 // rather than faked. Its hitbox only exists during the active phase.
@@ -393,6 +396,9 @@ export class CombatSystem {
     target.endTechnique?.('hit');
     const kx = (blocked ? 0.5 : 1) * def.knockback.x * facing;
     target.body.vx = kx;
+    // Vertical knockback, unblocked hits only: world y grows downward, so a
+    // positive knockback.y launches upward and a negative one drives the
+    // target down.
     if (!blocked && def.knockback.y) {
       target.body.vy = -def.knockback.y;
       target.body.grounded = false;

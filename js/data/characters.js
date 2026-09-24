@@ -284,7 +284,9 @@ export const CHARACTERS = [
         lifetime: 1.5,
         hitbox: { x: -5, y: -5, w: 10, h: 10 },
         damage: 4,
-        knockback: { x: 140, y: 0 },
+        // No knockback: a hit deals its damage and stun without pushing or
+        // launching the target.
+        knockback: { x: 0, y: 0 },
         hitstun: 0.16,
         blockstun: 0.1,
         hitstop: 0.04,
@@ -492,9 +494,11 @@ export const CHARACTERS = [
     // (createAttackDefinition). Phases are whole frames of the attack's clip,
     // so the hitbox is live only while the strike is on screen. Hitboxes face
     // right from the fighter's origin (bottom-centre) and mirror with facing.
-    // Knockback comes from each attack's own Powers (js/data/powers.js): BA1
-    // pushes sideways (Horizontal Knockback Power 2), BA2 launches upward
-    // (Vertical Knockback Power 2).
+    // Knockback comes from each attack's own Powers (js/data/powers.js): ground
+    // BA1 pushes sideways (Horizontal Knockback Power 2); mid-air BA1 pushes
+    // sideways the same and drives the target downward (Vertical Knockback
+    // Power -2); ground BA2 launches upward (Vertical Knockback Power 2) and
+    // mid-air BA2 launches upward more lightly (Vertical Knockback Power 1).
     attacks: {
       // Frame 1 wind-up, frame 2 punch, frames 3-4 recovery.
       ba1: {
@@ -512,7 +516,8 @@ export const CHARACTERS = [
         groundOnly: true,
       },
       // Frames 1-2 wind-up, frame 3 kick (the forward-low arc), frames 4-5
-      // recovery. Chosen only by action1's `air` branch.
+      // recovery. Chosen only by action1's `air` branch. Pushes sideways like
+      // ground BA1 and, unlike it, drives the target downward.
       midairBa1: {
         animation: 'midairBa1',
         startup: 2 / BA1_FPS,
@@ -520,7 +525,7 @@ export const CHARACTERS = [
         recovery: 2 / BA1_FPS,
         damage: 6,
         hitbox: { x: 8, y: -44, w: 40, h: 40 },
-        powers: { horizontalKnockback: 2 },
+        powers: { horizontalKnockback: 2, verticalKnockback: -2 },
         hitstun: 0.22,
         blockstun: 0.14,
         hitstop: 0.06,
@@ -550,8 +555,8 @@ export const CHARACTERS = [
       // downward kunai slash. The clip has no recovery frame, so the attack
       // ends with it; the longer cooldown stops it being repeated faster than
       // ground BA2. The hitbox covers the slash arc in front of the fighter,
-      // and it launches upward like ground BA2. Chosen only by action2's `air`
-      // branch.
+      // and it launches upward like ground BA2, only more lightly. Chosen only
+      // by action2's `air` branch.
       midairBa2: {
         animation: 'midairBa2',
         startup: 2 / BA2_FPS,
@@ -559,7 +564,7 @@ export const CHARACTERS = [
         recovery: 0,
         damage: 8,
         hitbox: { x: 14, y: -100, w: 22, h: 80 },
-        powers: { verticalKnockback: 2 },
+        powers: { verticalKnockback: 1 },
         hitstun: 0.24,
         blockstun: 0.15,
         hitstop: 0.07,

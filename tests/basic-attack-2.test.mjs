@@ -1,7 +1,8 @@
 // Run with node --test tests/basic-attack-2.test.mjs (no dependencies).
 // #0001 Basic Attack 2 (BA2) on action2: inputs, ground/air selection, clip
-// playback, phase timing against the art, hit resolution (its Vertical
-// Knockback Power 2 launch, and a blocked BA2 that does not launch) and
+// playback, phase timing against the art, hit resolution (ground BA2's
+// Vertical Knockback Power 2 launch, mid-air BA2's lighter Vertical Knockback
+// Power 1 launch, and a blocked BA2 that does not launch) and
 // missing-art safety. Uses the real Fighter, CombatSystem, physics and
 // InputManager (see fighter-harness.mjs). Basic Attack 1 lives in
 // basic-attack.test.mjs.
@@ -26,8 +27,13 @@ const JUMP = { jump: true, jumpPressed: true };
 // BA2's kunai slash (midair2ba3, the frame with the slash arc).
 const CONTACT = { ba2: [4, 5], midairBa2: [3] };
 
-// Vertical Knockback Power 2: BA2's upward launch speed.
+// Vertical Knockback Power 2: ground BA2's upward launch speed.
 const LAUNCH = 640;
+// Vertical Knockback Power 1: mid-air BA2's lighter upward launch speed.
+const AIR_LAUNCH = 480;
+// Each BA2's declared Vertical Knockback Power tier and launch speed.
+const TIER = { ba2: 2, midairBa2: 1 };
+const LAUNCHES = { ba2: LAUNCH, midairBa2: AIR_LAUNCH };
 
 // Zero either way: a vertical-only hit sets vx to 0 * facing, which is -0
 // when the hit travels left (still === 0).
@@ -105,10 +111,10 @@ test('BA2 attack definitions match their clips and are a heavier, slower basic a
     assert.ok(Math.abs(atk.active - CONTACT[id].length / clip.fps) < 1e-9, `${id} active`);
     assert.ok(atk.active < atk.total / 2, `${id} is not active for its whole clip`);
     assert.equal(atk.damage, 8);
-    // Vertical Knockback Power 2, resolved: an upward launch of 640 and no
-    // sideways push.
-    assert.deepEqual(def.attacks[id].powers, { verticalKnockback: 2 });
-    assert.deepEqual(atk.knockback, { x: 0, y: LAUNCH });
+    // Vertical Knockback Power 2 on the ground (a 640 launch), Power 1 in
+    // mid-air (a lighter 480 launch), and no sideways push.
+    assert.deepEqual(def.attacks[id].powers, { verticalKnockback: TIER[id] });
+    assert.deepEqual(atk.knockback, { x: 0, y: LAUNCHES[id] });
     assert.equal(atk.hitstun, 0.24);
     assert.equal(atk.blockstun, 0.15);
     assert.equal(atk.hitstop, 0.07);
@@ -118,7 +124,7 @@ test('BA2 attack definitions match their clips and are a heavier, slower basic a
     // different axes, so the two are not compared by size.
     const ba1 = fighter.attacks[id === 'ba2' ? 'ba1' : 'midairBa1'];
     assert.ok(atk.damage > ba1.damage && atk.hitstun > ba1.hitstun);
-    assert.ok(atk.knockback.y > 0 && ba1.knockback.y === 0, 'BA2 launches; BA1 does not');
+    assert.ok(atk.knockback.y > 0 && ba1.knockback.y <= 0, 'BA2 launches upward; BA1 does not');
     assert.ok(atk.knockback.x === 0 && ba1.knockback.x > 0, 'BA1 pushes sideways; BA2 does not');
     assert.notEqual(atk.animation, ba1.animation);
     assert.notDeepEqual(atk.hitbox, ba1.hitbox);
@@ -139,14 +145,17 @@ test('BA2 attack definitions match their clips and are a heavier, slower basic a
   assert.deepEqual([a.startup, a.active, a.recovery], [2 / 12, 1 / 12, 0]);
   assert.equal(a.groundOnly, false);
   assert.equal(a.cooldown, 0.18);
+  assert.ok(a.knockback.y < g.knockback.y, 'mid-air BA2 launches less than ground BA2');
 });
 
-test('BA2 knockback comes only from its Vertical Knockback Power 2, not a raw value', () => {
+test('BA2 knockback comes only from its Vertical Knockback Power, not a raw value: tier 2 on the ground, tier 1 in mid-air', () => {
   assert.equal(getPowerTier('verticalKnockback', 2).knockbackY, LAUNCH);
+  assert.equal(getPowerTier('verticalKnockback', 1).knockbackY, AIR_LAUNCH);
   for (const id of ['ba2', 'midairBa2']) {
     const source = def.attacks[id];
     assert.equal('knockback' in source, false, `${id} has no raw knockback in #0001's data`);
-    assert.deepEqual(source.powers, { verticalKnockback: 2 }, `${id} declares no sideways push`);
+    assert.deepEqual(source.powers, { verticalKnockback: TIER[id] }, `${id} declares no sideways push`);
+    assert.equal(getPowerTier('verticalKnockback', TIER[id]).knockbackY, LAUNCHES[id]);
     for (const n of [1, 2, 3]) {
       const atk = createAttackDefinition({ id, ...source, powers: { verticalKnockback: n } });
       assert.deepEqual(atk.knockback, { x: 0, y: getPowerTier('verticalKnockback', n).knockbackY }, `${id} at tier ${n}`);
@@ -472,17 +481,34 @@ test('a ground BA2 hit shows the target in its hurt poses while it is launched',
   assert.equal(target.body.x, frozenAt.x);
 });
 
-test('mid-air BA2 launches the same way: vx 0, vy -640 on a grounded target', () => {
-  const { attacker, target, tick, until, events } = duel();
-  tick(JUMP);
-  until(() => attacker.body.vy > 0 && attacker.body.y > 650);
-  tick(BA2);
-  assert.equal(attacker.combat.attack.def.id, 'midairBa2');
-  while (!events.length) tick();
-  assert.equal(target.combat.health, 92);
-  assert.ok(isZero(target.body.vx));
-  assert.equal(target.body.vy, -LAUNCH);
-  assert.equal(target.grounded, false);
+test('mid-air BA2 launches upward more lightly: vx 0, vy -480 on a grounded target', () => {
+  // Highest point a grounded target reaches after a BA2 hit, ground or air.
+  const peak = (air) => {
+    const { attacker, target, tick, until, events } = duel();
+    if (air) {
+      tick(JUMP);
+      until(() => attacker.body.vy > 0 && attacker.body.y > 650);
+    }
+    tick(BA2);
+    assert.equal(attacker.combat.attack.def.id, air ? 'midairBa2' : 'ba2');
+    while (!events.length) tick();
+    assert.equal(target.combat.health, 92);
+    assert.ok(isZero(target.body.vx));
+    assert.equal(target.body.vy, air ? -AIR_LAUNCH : -LAUNCH, 'launched upward');
+    assert.ok(target.body.vy < 0, 'still upward');
+    assert.equal(target.grounded, false);
+    const floor = target.body.y;
+    let top = floor;
+    until(() => {
+      top = Math.min(top, target.body.y);
+      return target.grounded;
+    });
+    return floor - top;
+  };
+  const ground = peak(false);
+  const air = peak(true);
+  assert.ok(air > 0, 'mid-air BA2 still lifts the target');
+  assert.ok(air < ground, `a lower launch than ground BA2 (${air.toFixed(1)} < ${ground.toFixed(1)})`);
 });
 
 test('a Block-type fighter guarding BA2 takes chip damage, blockstun and hitstop but is not launched; #0001 itself does not block', () => {
