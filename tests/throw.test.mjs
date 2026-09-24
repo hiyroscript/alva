@@ -172,7 +172,8 @@ test('the Throw attack: its own clip, ground-only, one pass, no melee hitbox, on
   assert.ok(proj.hitstop <= def.attacks.ba1.hitstop);
   assert.deepEqual(SHURIKEN.knockback, { x: 0, y: 0 }, 'no knockback: no push, no launch');
   assert.deepEqual(proj.knockback, { x: 0, y: 0 });
-  assert.equal('powers' in SHURIKEN, false, 'a bespoke hit, not an attack Power');
+  assert.equal('powers' in SHURIKEN, false, 'a bespoke hit, with no Powers');
+  assert.equal('axis' in SHURIKEN.knockback, false, 'numeric knockback, not a Knockback level');
   assert.equal(proj.damage, 4);
   assert.equal(proj.speed, 700);
   assert.ok(proj.speed > 0 && proj.lifetime > 0);

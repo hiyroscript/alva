@@ -1097,9 +1097,10 @@ html:not(.is-pointer-input) .discover-panel:focus { box-shadow: var(--focus-ring
   color: var(--text-secondary);
 }
 
-/* One reference entry per Power, under a hairline: what it does beside its
-   tiers, in two columns wherever both fit. Mechanics only: no fighter is
-   ever named or singled out here. */
+/* One reference entry per Power (or Knockback topic), under a hairline:
+   what it does beside its tiers, levels or directions, in two columns
+   wherever both fit. Mechanics only: no fighter is ever named or singled out
+   here. */
 .discover-entry {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 190px), 1fr));
@@ -1135,6 +1136,12 @@ html:not(.is-pointer-input) .discover-panel:focus { box-shadow: var(--focus-ring
 .discover-meter { display: inline-flex; align-items: flex-end; gap: 3px; height: 20px; }
 .discover-meter i { width: 5px; border-radius: 1px; background: var(--border-strong); }
 .discover-meter i.is-on { background: var(--text-secondary); }
+/* A Knockback direction's arrow, in the meter's place: pointing along the
+   hit, turned up for a launch and down when reversed. */
+.discover-direction { display: inline-flex; width: 20px; height: 20px; color: var(--text-secondary); }
+.discover-direction svg { width: 100%; height: 100%; }
+.discover-tier[data-direction="vertical"] .discover-direction svg { transform: rotate(-90deg); }
+.discover-tier[data-direction="reversed"] .discover-direction svg { transform: rotate(90deg); }
 .discover-tier-copy { display: grid; justify-items: start; gap: 3px; min-width: 0; }
 .discover-tier-name {
   font-family: var(--font-mono);
@@ -1148,8 +1155,8 @@ html:not(.is-pointer-input) .discover-panel:focus { box-shadow: var(--focus-ring
 }
 .discover-tier-desc { color: var(--text-secondary); font-size: 14px; line-height: 1.4; }
 
-/* Compact landscape: a slimmer rail and tighter entries and tiers, so the
-   four Power entries scroll by in few steps. The rail stays down the side
+/* Compact landscape: a slimmer rail and tighter entries and tiers, so a
+   page's entries scroll by in few steps. The rail stays down the side
    here, where height is scarcer than width. */
 @media (max-height: 560px) {
   .discover-layout { grid-template-columns: clamp(108px, 16vw, 200px) minmax(0, 1fr); }
@@ -1175,6 +1182,8 @@ html:not(.is-pointer-input) .discover-panel:focus { box-shadow: var(--focus-ring
     border-left: 0;
     border-bottom: 2px solid transparent;
     border-radius: 3px 3px 0 0;
+    /* Tighter tracking, so three sections share even a narrow window. */
+    letter-spacing: 0.1em;
     text-align: center;
   }
   .discover-tab.is-active { border-bottom-color: var(--accent); }

@@ -6,9 +6,10 @@ and on phones and tablets in landscape.
 
 This is the first playable foundation: full menu flow, a 48-slot roster, two
 large stages, a Practice Ground training room, a Discover reference screen,
-movement and platform physics, a tiered Power system (starting with Jump
+movement and platform physics, a tiered Power system (Jump Power and Speed
 Power), a camera, a HUD, touch controls,
-and a data-driven combat system with #0001's two real attacks, Basic Attack 1
+and a data-driven combat system with Low / Mid / High Knockback and
+#0001's two real attacks, Basic Attack 1
 (BA1) and Basic Attack 2 (BA2), a ground and mid-air Dodge on the shared
 Defense input, a held Charge stance, a Charged BA1 Clone Attack, a Charged
 BA2 Sphere Rush and a blue Energy meter under each health bar.
@@ -63,17 +64,20 @@ in the code depends on the repository name, so no file changes are needed.
 \* Reserved: wired into input and combat, but inactive until #0001 has matching
 attack animations. Its touch button has a dashed outline.
 
-- **Basic Attack 1 (BA1):** a punch on the ground, a kick in the air. The same
-  button picks the move from whether #0001 is grounded when you press it; a
-  mid-air BA1 that lands keeps playing to the end. Both push the opponent
-  away; the mid-air kick also drives it downward (a blocked one does not).
-  Internally this is the `action1` input.
+- **Basic Attack 1 (BA1):** a punch on the ground, a downward kunai slash in
+  the air. The same button picks the move from whether #0001 is grounded
+  when you press it; a mid-air BA1 that lands keeps playing to the end. The
+  punch pushes the opponent away (Low horizontal Knockback); the mid-air
+  slash drives it downward instead, with no sideways push (Mid vertical
+  Knockback, reversed). A blocked slash does not drive it down. Internally
+  this is the `action1` input.
 - **Basic Attack 2 (BA2):** a slower, heavier spinning high kick on the
-  ground, a kunai slash in the air. Where ground BA1 pushes the opponent
-  away, a BA2 hit launches it upward, less high from the mid-air slash than
-  from the ground kick (a blocked BA2 does not launch). It picks the move the
-  same way, and a mid-air BA2 that lands also plays to the end. Internally
-  this is the `action2` input.
+  ground, an airborne kick in the air. Where ground BA1 pushes the opponent
+  away, a BA2 hit launches it upward: hard from the ground kick (High
+  vertical Knockback), lightly from the mid-air kick (Low vertical
+  Knockback). A blocked BA2 does not launch. It picks the move the same way,
+  and a mid-air BA2 that lands also plays to the end. Internally this is the
+  `action2` input.
 - **Throw:** #0001's projectile attack, on `J`, X / Square on a gamepad and
   **T** on touch. One press plays one three-frame Throw
   (`throw1 → throw2 → throw3`, once, at 12 fps) and releases exactly one
@@ -171,10 +175,11 @@ Touch controls show on touch-first devices (coarse pointer, or a touch actually 
 
 - **Characters:** #0001
 - **Maps:** Desert (wide, open, 3.8 screens) and City (rooftops with 7 one-way platforms, 3.1 screens) for Quick Battle; the Practice Ground training room (one broad flat floor, about 3.5 screens) for practice
-- **Animations:** Idle, Run, Jump, Fall, Land (jump/fall play while airborne; land plays once on touchdown), Hurt and Mid-air Hurt (shown during hitstun on the ground / in the air), Basic Attack 1 (4 frames), Mid-air Basic Attack 1 (5 frames), Basic Attack 2 (7 frames) and Mid-air Basic Attack 2 (3 frames), each played once at 12 fps, Dodge and Mid-air Dodge (3 frames each, played once at 12 fps), Charge (charge1 → charge2 once, then chargea ↔ chargeb while held, at 10 fps, with charge1 shown briefly on release), Throw (3 fighter frames, played once at 12 fps), Shuriken (3 looping projectile frames at 18 fps, normalized and drawn separately from the fighter poses), the clone appear / vanish cloud (`0001_cloneav1`–`0001_cloneav10`, an effect at 20 fps: forwards as a clone appears, the same frames in reverse as it vanishes), the Sphere Rush poses (`0001_rasen1`–`0001_rasen12` as three one-shot fighter clips at 12 fps: formation 1–3, dash 4–6, hit follow-through 7–12) and its blue sphere (`0001_prasen1`–`0001_prasen11` as three one-shot effects at 12 fps: formation 1–6, on the opponent 7–9, explosion 10–11)
+- **Animations:** Idle, Run, Jump, Fall, Land (jump/fall play while airborne; land plays once on touchdown), Hurt and Mid-air Hurt (shown during hitstun on the ground / in the air), Basic Attack 1 (4 frames), Mid-air Basic Attack 1 (the kunai slash, 3 frames: `0001_midair2ba1`–`3`), Basic Attack 2 (7 frames) and Mid-air Basic Attack 2 (the airborne kick, 5 frames: `0001_midair1ba1`–`5`), each played once at 12 fps, Dodge and Mid-air Dodge (3 frames each, played once at 12 fps), Charge (charge1 → charge2 once, then chargea ↔ chargeb while held, at 10 fps, with charge1 shown briefly on release), Throw (3 fighter frames, played once at 12 fps), Shuriken (3 looping projectile frames at 18 fps, normalized and drawn separately from the fighter poses), the clone appear / vanish cloud (`0001_cloneav1`–`0001_cloneav10`, an effect at 20 fps: forwards as a clone appears, the same frames in reverse as it vanishes), the Sphere Rush poses (`0001_rasen1`–`0001_rasen12` as three one-shot fighter clips at 12 fps: formation 1–3, dash 4–6, hit follow-through 7–12) and its blue sphere (`0001_prasen1`–`0001_prasen11` as three one-shot effects at 12 fps: formation 1–6, on the opponent 7–9, explosion 10–11)
 - **Attacks:** Basic Attack 1 and Basic Attack 2, each on the ground and in the air, a ground Throw that releases one shuriken, the Charged BA1 Clone Attack (25 Energy) and the Charged BA2 Sphere Rush (ground only, two hits, no Energy cost). Special is reserved.
 - **Defense:** #0001 dodges, on the ground and in the air.
-- **Powers:** Jump Power, Speed Power, Horizontal Knockback Power and Vertical Knockback Power, each in three tiers. #0001 has Jump Power 2 and Speed Power 2 (its original jump and speed); its BA1 has Horizontal Knockback Power 2 (plus Vertical Knockback Power −2, downward, in mid-air), its ground BA2 Vertical Knockback Power 2 and its mid-air BA2 Vertical Knockback Power 1. Vertical Knockback is signed: positive tiers launch upward, negative tiers drive the opponent downward.
+- **Powers:** Jump Power and Speed Power, each in three tiers. #0001 has Jump Power 2 and Speed Power 2 (its original jump and speed).
+- **Knockback:** each attack's own, Low, Mid or High, pushing sideways or launching upward (or, reversed, driving downward). #0001's BA1 is Low horizontal, its BA2 High vertical, its mid-air BA1 Mid vertical reversed (downward) and its mid-air BA2 Low vertical.
 - **HUD:** each fighter panel shows a green health bar with a blue Energy bar directly beneath it. Both start full; the Energy bar drops by a quarter with each clone summoned.
 - **Modes:** Quick Battle: 1 round, 99 seconds, against a non-attacking training CPU. Practice Ground: training on its own stage, alone or with an optional stand-still CPU dummy, with no timer or rounds (below).
 
@@ -207,7 +212,7 @@ neutral.
   Play, opens the training room directly, and **Discover** beneath it opens
   the in-game reference. The strip shifts outward on narrow screens.
 - **Discover** takes its composition from Seren's Cars & more reference: an
-  index rail (**POWER**, **CONDITIONS**) beside one scrollable page of
+  index rail (**POWER**, **KNOCKBACK**, **CONDITIONS**) beside one scrollable page of
   structured entries, in Alva's charcoal, off-white and green. The open
   section wears a green bar, a faint wash and bolder type; the rail runs
   across the top on narrow windows but stays at the side in short
@@ -243,7 +248,8 @@ js/
                       techniques, sprite normalizer/animator, HUDs,
                       touch controls
   stages/             Desert, City and Practice renderers (procedural Canvas 2D)
-  data/               characters.js, maps.js, practice-map.js, powers.js
+  data/               characters.js, maps.js, practice-map.js, powers.js,
+                      knockback.js
   ui/                 wordmark, icons, overlays, shared help content, stage
                       preview, fighter roster
 ```
@@ -301,38 +307,91 @@ until you choose Return.
 
 ### Powers
 
-Powers are gameplay abilities owned at one of three tiers. `js/data/powers.js` holds each Power's frozen tier table (tier number, name, description and gameplay value) in the one `POWERS` registry, their single source of truth: a definition only names a tier, gameplay reads the value and the Discover screen reads the names and descriptions. Each Power has a scope:
-
-- **Fighter Powers** belong to a fighter, which declares one tier of each: `powers: { jump: 2, speed: 2 }`. `Fighter` resolves them once (`getJumpVelocity`, `getMaxSpeed`).
-- **Attack Powers** belong to individual attacks, so a fighter's attacks can differ. An attack declares the axes it uses in its own `powers`, e.g. `powers: { horizontalKnockback: 2 }`; an axis it leaves out is 0, and it may declare both. `createAttackDefinition` turns them into the attack's numeric `knockback: { x, y }` once, so combat, clones and the debug overlay keep reading plain numbers.
-- **Vertical Knockback is signed.** A positive tier launches upward; a negative tier uses the same tier's magnitude but drives the opponent downward. `verticalKnockback: 2` resolves to `knockback.y` 640 (an unblocked hit sets `vy = -640`, up) and `verticalKnockback: -2` to −640 (`vy = +640`, down). The tier table itself stays three positive magnitudes: there are no −1 / −2 / −3 tiers. Horizontal Knockback is not signed, because a hit already pushes along its own facing.
+Powers are fighter abilities owned at one of three tiers: Jump Power and Speed Power. `js/data/powers.js` holds each Power's frozen tier table (tier number, name, description and gameplay value) in the one `POWERS` registry, their single source of truth: a fighter declares one tier of each (`powers: { jump: 2, speed: 2 }`), `Fighter` resolves them once (`getJumpVelocity`, `getMaxSpeed`) and the Discover screen reads the names and descriptions.
 
 Values are in world units per second, at the global gravity of 2500:
 
-| Power | Scope | Tier 1 | Tier 2 | Tier 3 | Controls |
-| --- | --- | --- | --- | --- | --- |
-| Jump Power | fighter | 650 | 920 | 1000 | the initial upward speed of the normal jump |
-| Speed Power | fighter | 270 | 330 | 360 | the top speed of normal left / right movement, on the ground and in the air |
-| Horizontal Knockback Power | attack | 140 | 180 | 220 | how hard a hit pushes the opponent away (`knockback.x`) |
-| Vertical Knockback Power | attack | 480 | 640 | 800 | how hard an unblocked hit launches the opponent upward (positive tier) or drives it downward (negative tier) (`knockback.y`, signed) |
+| Power | Tier 1 | Tier 2 | Tier 3 | Controls |
+| --- | --- | --- | --- | --- |
+| Jump Power | 650 | 920 | 1000 | the initial upward speed of the normal jump |
+| Speed Power | 270 | 330 | 360 | the top speed of normal left / right movement, on the ground and in the air |
 
 - #0001 declares `powers: { jump: 2, speed: 2 }`: exactly the 920 jump and 330 top speed it always had, so it moves and jumps identically. Movement has no raw `jumpVelocity` or `maxSpeed`: the tiers are the only sources.
-- #0001's ground BA1 declares Horizontal Knockback Power 2, so it pushes the opponent 180 sideways with no vertical knockback (`{ x: 180, y: 0 }`). Its mid-air BA1 declares Horizontal Knockback Power 2 and Vertical Knockback Power −2 (`{ x: 180, y: -640 }`): it pushes the opponent 180 away and drives it downward at 640. Its ground BA2 declares Vertical Knockback Power 2, launching the opponent upward at 640 (about a fighter's height; `{ x: 0, y: 640 }`), and its mid-air BA2 Vertical Knockback Power 1, a lighter 480 launch (`{ x: 0, y: 480 }`). The Clone Attack performs ground BA1's resolved definition, so it inherits that knockback with no tuning of its own.
-- Speed Power only sets the normal top speed. Acceleration, deceleration, the turn boost, air control, gravity, falling, the jump, knockback, projectiles (the shuriken's 700), Dodges and charged techniques (the Sphere Rush's 1050 dash) never depend on it. Bespoke hits such as the shuriken and the Sphere Rush keep their own raw `knockback`; the shuriken's is `{ x: 0, y: 0 }`, no knockback at all.
-- A declared tier the table lacks (or a fighter with no tier of a fighter Power) is logged and gets tier 2. That includes a Vertical Knockback tier that is not −3 to −1 or 1 to 3 (such as −7, 0 or the string `'-2'`), which gets tier 2 upward as before, and any negative Horizontal Knockback tier. An attack declaring something that is not an attack Power is logged and ignored.
-- To add another Power, add its tier table and an entry (with its `scope`) to `POWERS`; Discover lists it with no screen changes. The tiers are not upgradeable or selectable in game.
+- Speed Power only sets the normal top speed. Acceleration, deceleration, the turn boost, air control, gravity, falling, the jump, knockback, projectiles (the shuriken's 700), Dodges and charged techniques (the Sphere Rush's 1050 dash) never depend on it, and neither Power changes the knockback a fighter deals or takes.
+- A declared tier the table lacks (or a fighter with no tier of a Power) is logged and gets tier 2.
+- To add another Power, add its tier table and an entry to `POWERS`; Discover lists it with no screen changes. The tiers are not upgradeable or selectable in game.
+
+### Knockback
+
+Knockback is how strongly an ordinary attack moves an opponent when it connects. It is not a Power: each attack declares its own, in `js/data/characters.js`, as an **axis** and a **strength level**, which are independent of each other:
+
+```js
+knockback: { axis: 'horizontal', level: 'low' }         // pushes away along the hit
+knockback: { axis: 'vertical', level: 'high' }          // launches upward
+knockback: { axis: 'vertical', level: 'mid', sign: -1 } // reversed: drives downward
+```
+
+- The three levels are **Low**, **Mid** and **High**, in `KNOCKBACK_LEVELS` (`js/data/knockback.js`), the single source of truth for their names, descriptions and values:
+
+  | | Low | Mid | High |
+  | --- | --- | --- | --- |
+  | Horizontal | 140 | 180 | 220 |
+  | Vertical | 480 | 640 | 800 |
+
+  World units per second. A level is named only by those strings: tier numbers (`level: 2`) and display names (`'Low'`) are not levels.
+- **Horizontal** Knockback pushes the opponent away along the hit's facing, so it takes no sign. **Vertical** Knockback launches the opponent upward; `sign: -1` reverses it, driving the opponent downward at the same level's strength. Only vertical Knockback can be reversed, and a sign is only ever 1 (the default) or −1.
+- `createAttackDefinition` (`js/game/combat.js`) resolves the descriptor once, through `resolveKnockback`, into the attack's numeric `knockback: { x, y }`: `{ axis: 'horizontal', level: 'low' }` is `{ x: 140, y: 0 }`, `{ axis: 'vertical', level: 'high' }` is `{ x: 0, y: 800 }` and `{ axis: 'vertical', level: 'mid', sign: -1 }` is `{ x: 0, y: -640 }`. `CombatSystem.applyHit` stays generic: it sets `vx = x × facing` (halved when blocked) and, on an unblocked hit only, `vy = −y`, so a positive `y` launches upward and a negative one drives downward. Clones and the debug overlay read the same numbers.
+- An attack that declares no `knockback` has none. A malformed descriptor (an unknown axis or level, a bad sign, a reversed horizontal, an unknown field or anything that is not a descriptor) is logged and also gets no knockback, so bad data never pushes anyone with a force nobody chose.
+- Bespoke hits that are not ordinary attacks keep their own numeric `knockback: { x, y }`: the shuriken's is `{ x: 0, y: 0 }`, no knockback at all, and the Sphere Rush's contact and explosion hits have their own.
+
+#0001's Basic Attacks:
+
+| Attack | Knockback | Resolved |
+| --- | --- | --- |
+| BA1 (ground punch) | Low horizontal | `{ x: 140, y: 0 }` |
+| BA2 (ground spinning kick) | High vertical | `{ x: 0, y: 800 }` |
+| Mid-air BA1 (kunai slash) | Mid vertical, reversed | `{ x: 0, y: -640 }` |
+| Mid-air BA2 (airborne kick) | Low vertical | `{ x: 0, y: 480 }` |
+
+An unblocked BA1 hit sets the opponent's `vx` to 140 away from #0001; BA2 sets `vy = -800`, a strong launch; mid-air BA1 sets `vy = +640`, driving it downward with no sideways push; mid-air BA2 sets `vy = -480`, a light launch. The Clone Attack performs ground BA1's resolved definition, so it inherits Low horizontal Knockback with no tuning of its own.
+
+The two mid-air Basic Attacks swapped moves: **mid-air BA1** is the three-frame kunai slash (`0001_midair2ba1`–`3`), which used to be mid-air BA2, and **mid-air BA2** is the five-frame airborne kick (`0001_midair1ba1`–`5`), which used to be mid-air BA1. Each move kept its own art, timing, hitbox, damage and stun; only its knockback changed. The frame file names are the originals.
 
 ### Discover
 
-**Home → Discover** opens the reference, a character-neutral explanation of Alva's mechanics. **POWER** (open by default) explains Jump Power, Speed Power, Horizontal Knockback Power and Vertical Knockback Power, each with its three tiers. It never says which fighter or attack uses a Power or tier, and shows no tuning numbers. **CONDITIONS** is intentionally empty until Alva has Conditions. Arrow keys, the D-pad or the stick move between Back, the sections and the page (↑ / ↓ scroll a long page); Back, `Esc` or gamepad B returns Home.
+**Home → Discover** opens the reference, a character-neutral explanation of Alva's mechanics. **POWER** (open by default) explains Jump Power and Speed Power, each with its three tiers. **KNOCKBACK** explains Knockback, its Low, Mid and High levels and its directions (horizontal pushes the opponent away from the direction of the hit, vertical launches it upward, reversed vertical drives it downward), straight from the Knockback levels gameplay uses. Neither page says which fighter or attack uses a Power, tier or level, and neither shows tuning numbers. **CONDITIONS** is intentionally empty until Alva has Conditions. Arrow keys, the D-pad or the stick move between Back, the sections and the page (↑ / ↓ scroll a long page); Back, `Esc` or gamepad B returns Home.
 
 ### Adding a fighter (#0002)
 
 1. Put the frames in `assets/characters/0002/`.
-2. Add a definition to `CHARACTERS` in `js/data/characters.js` (animations, movement, fighter Power tiers such as `powers: { jump: 2, speed: 2 }`, collider, hurtboxes, stats).
+2. Add a definition to `CHARACTERS` in `js/data/characters.js` (animations, movement, Power tiers such as `powers: { jump: 2, speed: 2 }`, collider, hurtboxes, stats).
 3. Give it a free `rosterSlot`.
 
-To add attacks, create animations with real frames, define them in `attacks` (see the schema in `js/game/combat.js`; knockback comes from each attack's `powers`, such as `{ horizontalKnockback: 2 }`, or `{ horizontalKnockback: 2, verticalKnockback: -2 }` for a hit that also drives the opponent downward), and map them in `actions`: a string for one attack, or `{ ground, air }` to pick by whether the fighter is grounded (as #0001's `action1: { ground: 'ba1', air: 'midairBa1' }` and `action2: { ground: 'ba2', air: 'midairBa2' }` do). Time `startup` / `active` / `recovery` to whole frames of the clip so the hitbox is live only while the strike is on screen. An attack without frames is refused rather than faked.
+To add attacks, create animations with real frames, define them in `attacks` (see the schema in `js/game/combat.js`), give each its Knockback, and map them in `actions`: a string for one attack, or `{ ground, air }` to pick by whether the fighter is grounded (as #0001's `action1: { ground: 'ba1', air: 'midairBa1' }` and `action2: { ground: 'ba2', air: 'midairBa2' }` do). Time `startup` / `active` / `recovery` to whole frames of the clip so the hitbox is live only while the strike is on screen. An attack without frames is refused rather than faked. Knockback is an axis and a level (see [Knockback](#knockback)):
+
+```js
+attacks: {
+  jab: {
+    animation: 'jab', startup: 1 / 12, active: 1 / 12, recovery: 2 / 12, damage: 6,
+    hitbox: { x: 12, y: -64, w: 28, h: 16 },
+    knockback: {
+      axis: 'horizontal',
+      level: 'low',
+    },
+    hitstun: 0.22, blockstun: 0.14, hitstop: 0.06,
+  },
+  airSpike: {
+    animation: 'airSpike', startup: 2 / 12, active: 1 / 12, recovery: 0, damage: 8,
+    hitbox: { x: 14, y: -100, w: 22, h: 80 },
+    knockback: {
+      axis: 'vertical',
+      level: 'mid',
+      sign: -1, // drives the opponent downward
+    },
+    hitstun: 0.24, blockstun: 0.15, hitstop: 0.07,
+  },
+},
+```
 
 To give a fighter a charged action, map a combat button in `chargedActions` to a typed descriptor. Pressed while already charging, with Charge still held, the button does that instead of its normal attack; `Fighter.tryChargedAction` dispatches on the type:
 

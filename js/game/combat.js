@@ -10,24 +10,24 @@
 //     jab: {
 //       animation: 'jab', startup: 0.07, active: 0.05, recovery: 0.16,
 //       damage: 6, hitbox: { x: 18, y: -62, w: 34, h: 18 },
-//       powers: { horizontalKnockback: 2 }, hitstun: 0.22, blockstun: 0.14, cooldown: 0.1,
+//       knockback: { axis: 'horizontal', level: 'low' }, hitstun: 0.22, blockstun: 0.14, cooldown: 0.1,
 //     },
-//     launcher: { ..., powers: { verticalKnockback: 2 } },
-//     airJab: { animation: 'airJab', ..., powers: { horizontalKnockback: 2, verticalKnockback: -2 } },
+//     launcher: { ..., knockback: { axis: 'vertical', level: 'high' } },
+//     airSpike: { animation: 'airSpike', ..., knockback: { axis: 'vertical', level: 'mid', sign: -1 } },
 //   },
 //   // One attack per action, or { ground, air } chosen by grounded state.
-//   actions: { primary: 'jab', action1: { ground: 'jab', air: 'airJab' }, ... }
+//   actions: { primary: 'jab', action1: { ground: 'jab', air: 'airSpike' }, ... }
 //
-// An attack's knockback comes from its attack Powers (js/data/powers.js):
-// `horizontalKnockback` pushes the target away along the attack's facing and
-// `verticalKnockback` moves it vertically, each at the declared tier, and an
-// axis the attack leaves out is 0. Vertical Knockback is signed: a positive
-// tier launches upward (positive `knockback.y`), a negative tier drives the
-// target downward with the same tier's magnitude (negative `knockback.y`).
-// createAttackDefinition resolves them once, into the definition's numeric
-// `knockback: { x, y }`, which is all applyHit (and a clone performing the
-// attack) ever reads. Bespoke hits that are not fighter attacks (a
-// projectile's, a charged technique's) still carry their own raw
+// An attack's `knockback` is a Knockback descriptor (js/data/knockback.js):
+// an `axis` and a strength `level` ('low', 'mid' or 'high'), independent of
+// each other. Horizontal Knockback pushes the target away along the hit's
+// facing; vertical Knockback launches it upward (positive `knockback.y`), or,
+// with `sign: -1`, drives it downward at the same level's strength (negative
+// `knockback.y`). An attack that declares none has no knockback.
+// createAttackDefinition resolves the descriptor once, into the definition's
+// numeric `knockback: { x, y }`, which is all applyHit (and a clone
+// performing the attack) ever reads. Bespoke hits that are not fighter
+// attacks (a projectile's, a charged technique's) carry their own numeric
 // `knockback: { x, y }`.
 //
 // An attack needs real frames for its `animation`; without them it is refused
@@ -73,7 +73,7 @@
 // target (CombatState.bind): a hold on it, separate from hitstun, that only
 // the technique which placed it releases.
 
-import { getAttackKnockback } from '../data/powers.js';
+import { resolveKnockback } from '../data/knockback.js';
 
 const ATTACK_DEFAULTS = {
   animation: null,
@@ -83,7 +83,6 @@ const ATTACK_DEFAULTS = {
   damage: 0,
   chipDamage: 0,
   hitbox: { x: 0, y: -60, w: 30, h: 20 },
-  knockback: { x: 0, y: 0 },
   hitstun: 0.2,
   blockstun: 0.12,
   hitstop: 0.06,
@@ -107,18 +106,12 @@ export function attackPhase(def, time) {
 }
 
 // Frozen attack definition from a character's attack entry (plus its `id`).
-// Declared attack Powers become its numeric `knockback` here, once, so hits
-// never look tiers up. Without `powers` the entry's raw `knockback` (if any)
-// is kept as it is.
+// Its Knockback descriptor becomes its numeric `knockback` here, once, so
+// hits never look levels up.
 export function createAttackDefinition(spec) {
   if (!spec?.id) throw new Error('[Alva] Attack definitions need an id');
   const def = { ...ATTACK_DEFAULTS, ...spec };
-  if (spec.powers) {
-    if (spec.knockback) {
-      console.warn(`[Alva] Attack "${spec.id}" declares both knockback Powers and a raw knockback; using the Powers.`);
-    }
-    def.knockback = getAttackKnockback(spec);
-  }
+  def.knockback = resolveKnockback(spec.knockback, `Attack "${spec.id}"`);
   def.total = def.startup + def.active + def.recovery;
   return Object.freeze(def);
 }

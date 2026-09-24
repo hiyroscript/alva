@@ -1,11 +1,12 @@
 // Run with node --test tests/discover.test.mjs (no dependencies).
 // Discover: its registration, Home → Discover → Back through the real
-// ScreenManager, the Power / Conditions tabs, the Power page built from the
-// Power registry alone (Jump, Speed, Horizontal and Vertical Knockback Power,
-// with no tuning numbers and no character information of any kind), the
-// intentionally empty Conditions page, and keyboard / gamepad menu navigation
-// through the real MenuNavigator, on a minimal fake DOM. Layout and paint
-// still need real-browser verification.
+// ScreenManager, the Power / Knockback / Conditions tabs, the Power page built
+// from the Power registry alone (Jump Power and Speed Power), the Knockback
+// page built from the Knockback levels alone (Low, Mid, High and the
+// directions Knockback takes), both with no tuning numbers and no character
+// information of any kind, the intentionally empty Conditions page, and
+// keyboard / gamepad menu navigation through the real MenuNavigator, on a
+// minimal fake DOM. Layout and paint still need real-browser verification.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -139,6 +140,7 @@ const { MenuNavigator } = await import('../js/core/menu-navigator.js');
 const { HomeScreen } = await import('../js/screens/home-screen.js');
 const { DiscoverScreen } = await import('../js/screens/discover-screen.js');
 const { POWERS, JUMP_POWER_TIERS } = await import('../js/data/powers.js');
+const { KNOCKBACK_LEVELS, KNOCKBACK_DIRECTIONS, KNOCKBACK_SUMMARY, KNOCKBACK_DIRECTION_SUMMARY } = await import('../js/data/knockback.js');
 const { CHARACTERS } = await import('../js/data/characters.js');
 
 // Keyboard input: key() runs a keydown through every listener, as the app does.
@@ -178,19 +180,15 @@ const place = (el, left, top, width, height) => { el.rect = { left, top, width, 
 
 // A wide landscape layout: Back over a rail down the left, the page beside it.
 function layOutWide(discover) {
-  const [power, conditions] = discover.sections;
   place(discover.el.querySelector('.btn-back'), 40, 20, 90, 44);
-  place(power.tab, 40, 110, 180, 44);
-  place(conditions.tab, 40, 158, 180, 44);
+  discover.sections.forEach((s, i) => place(s.tab, 40, 110 + i * 48, 180, 44));
   for (const s of discover.sections) place(s.panel, 270, 110, 960, 590);
 }
 
 // The narrow layout: the rail runs across the top, the page below it.
 function layOutNarrow(discover) {
-  const [power, conditions] = discover.sections;
   place(discover.el.querySelector('.btn-back'), 16, 20, 90, 44);
-  place(power.tab, 16, 110, 230, 40);
-  place(conditions.tab, 250, 110, 230, 40);
+  discover.sections.forEach((s, i) => place(s.tab, 16 + i * 156, 110, 152, 40));
   for (const s of discover.sections) place(s.panel, 16, 170, 468, 600);
 }
 
@@ -215,6 +213,8 @@ function everything(el) {
   return out.join(' ');
 }
 const selected = (discover) => discover.sections.filter((s) => s.tab.getAttribute('aria-selected') === 'true').map((s) => s.id);
+// Discover's sections by id.
+const sectionsOf = (discover) => Object.fromEntries(discover.sections.map((s) => [s.id, s]));
 
 // ---- Registration ---------------------------------------------------------------
 
@@ -280,27 +280,34 @@ test('Esc, Backspace and gamepad Back leave Discover for Home', () => {
 
 test('every visit opens on Power, whatever the last one left open', () => {
   const { app, home, discover } = boot();
-  home.el.querySelectorAll('.home-action')[2].click();
-  discover.sections[1].tab.click();
-  assert.deepEqual(selected(discover), ['conditions']);
-  app.screens.back();
-  home.el.querySelectorAll('.home-action')[2].click();
-  assert.deepEqual(selected(discover), ['power']);
-  assert.equal(discover.sections[0].panel.hidden, false);
-  assert.equal(discover.sections[1].panel.hidden, true);
+  const { power, knockback, conditions } = sectionsOf(discover);
+  for (const last of [knockback, conditions]) {
+    home.el.querySelectorAll('.home-action')[2].click();
+    last.tab.click();
+    assert.deepEqual(selected(discover), [last.id]);
+    app.screens.back();
+    home.el.querySelectorAll('.home-action')[2].click();
+    assert.deepEqual(selected(discover), ['power']);
+    assert.equal(power.panel.hidden, false);
+    assert.equal(knockback.panel.hidden, true);
+    assert.equal(conditions.panel.hidden, true);
+    app.screens.back();
+  }
 });
 
 // ---- Tabs -----------------------------------------------------------------------
 
-test('Power and Conditions are real, labelled tabs; Power is selected by default', () => {
+test('Power, Knockback and Conditions are real, labelled tabs; Power is selected by default', () => {
   const { app, home, discover } = boot();
   home.el.querySelectorAll('.home-action')[2].click();
   const rail = discover.el.querySelector('.discover-rail');
   assert.equal(rail.getAttribute('role'), 'tablist');
   assert.equal(rail.getAttribute('aria-label'), 'Discover sections');
   assert.equal(rail.getAttribute('aria-orientation'), 'vertical');
-  assert.deepEqual(rail.children, discover.sections.map((s) => s.tab), 'Power first, then Conditions');
-  assert.deepEqual(discover.sections.map((s) => [s.id, s.tab.textContent]), [['power', 'Power'], ['conditions', 'Conditions']]);
+  assert.deepEqual(rail.children, discover.sections.map((s) => s.tab), 'Power, then Knockback, then Conditions');
+  assert.deepEqual(discover.sections.map((s) => [s.id, s.tab.textContent]), [
+    ['power', 'Power'], ['knockback', 'Knockback'], ['conditions', 'Conditions'],
+  ]);
 
   for (const { id, tab, panel } of discover.sections) {
     assert.equal(tab.tagName, 'BUTTON');
@@ -314,22 +321,31 @@ test('Power and Conditions are real, labelled tabs; Power is selected by default
     assert.equal(panel.getAttribute('tabindex'), '0');
     assert.equal(panel.id, `discover-panel-${id}`);
   }
-  const [power, conditions] = discover.sections;
+  const { power, knockback, conditions } = sectionsOf(discover);
   assert.equal(power.tab.getAttribute('aria-selected'), 'true');
   assert.equal(power.tab.classList.contains('is-active'), true);
   assert.equal(power.tab.getAttribute('tabindex'), '0');
   assert.equal(power.panel.hidden, false);
-  assert.equal(conditions.tab.getAttribute('aria-selected'), 'false');
-  assert.equal(conditions.tab.classList.contains('is-active'), false);
-  assert.equal(conditions.tab.getAttribute('tabindex'), '-1', 'roving tabindex');
-  assert.equal(conditions.panel.hidden, true);
+  for (const other of [knockback, conditions]) {
+    assert.equal(other.tab.getAttribute('aria-selected'), 'false');
+    assert.equal(other.tab.classList.contains('is-active'), false);
+    assert.equal(other.tab.getAttribute('tabindex'), '-1', 'roving tabindex');
+    assert.equal(other.panel.hidden, true);
+  }
   assert.deepEqual(app.nav.candidates(discover.el).filter((c) => c.getAttribute('role') === 'tabpanel'), [power.panel]);
 });
 
-test('Conditions is selectable by click and by focus; the hidden page takes no focus', () => {
+test('Knockback and Conditions are selectable by click and by focus; a hidden page takes no focus', () => {
   const { app, home, discover } = boot();
   home.el.querySelectorAll('.home-action')[2].click();
-  const [power, conditions] = discover.sections;
+  const { power, knockback, conditions } = sectionsOf(discover);
+
+  knockback.tab.click();
+  assert.deepEqual(selected(discover), ['knockback']);
+  assert.equal(knockback.tab.getAttribute('tabindex'), '0');
+  assert.equal(knockback.panel.hidden, false);
+  assert.equal(power.panel.hidden, true);
+  assert.equal(conditions.panel.hidden, true);
 
   conditions.tab.click();
   assert.deepEqual(selected(discover), ['conditions']);
@@ -345,15 +361,20 @@ test('Conditions is selectable by click and by focus; the hidden page takes no f
   assert.equal(document.activeElement, before, 'the hidden Power page cannot take focus');
 
   // Keyboard / gamepad focus selects (automatic activation).
+  knockback.tab.focus();
+  assert.deepEqual(selected(discover), ['knockback']);
+  assert.equal(knockback.panel.hidden, false);
+  assert.equal(conditions.panel.hidden, true);
   power.tab.focus();
   assert.deepEqual(selected(discover), ['power']);
   assert.equal(power.panel.hidden, false);
+  assert.equal(knockback.panel.hidden, true);
   assert.equal(conditions.panel.hidden, true);
 });
 
 // ---- Power ------------------------------------------------------------------------
 
-test('the Power page lists every registry Power, in order, each with its three tiers', () => {
+test('the Power page lists every registry Power, in order, each with its three tiers: Jump Power and Speed Power only', () => {
   const { home, discover } = boot();
   home.el.querySelectorAll('.home-action')[2].click();
   const page = discover.sections[0].panel;
@@ -361,14 +382,13 @@ test('the Power page lists every registry Power, in order, each with its three t
   const entries = page.querySelectorAll('.discover-entry');
   assert.equal(entries.length, POWERS.length, 'one entry per Power');
   assert.deepEqual(entries.map((e) => text(e.querySelector('.discover-entry-title'))), [
-    'Jump Power', 'Speed Power', 'Horizontal Knockback Power', 'Vertical Knockback Power',
+    'Jump Power', 'Speed Power',
   ], 'shown uppercase by CSS');
   assert.deepEqual(entries.map((e) => text(e.querySelector('.discover-entry-text'))), [
     'Controls how high a normal jump goes. Higher tiers jump higher.',
     'Controls maximum movement speed. Higher tiers move faster.',
-    'Controls how strongly an attack pushes a hit opponent sideways. Higher tiers push farther.',
-    'Controls how strongly an attack launches a hit opponent upward or drives it downward. Higher tiers hit harder.',
   ]);
+  assert.doesNotMatch(everything(page), /knockback/i, 'Knockback is not a Power');
 
   entries.forEach((entry, i) => {
     const power = POWERS[i];
@@ -410,8 +430,81 @@ test('the Power page shows no tuning numbers and nothing interactive', () => {
   home.el.querySelectorAll('.home-action')[2].click();
   const page = discover.sections[0].panel;
   const numbers = new Set(POWERS.flatMap((p) => p.tiers.flatMap((t) => Object.values(t).filter((v) => typeof v === 'number' && v > 3))));
-  assert.deepEqual([...numbers].sort((a, b) => a - b), [140, 180, 220, 270, 330, 360, 480, 640, 650, 800, 920, 1000]);
+  assert.deepEqual([...numbers].sort((a, b) => a - b), [270, 330, 360, 650, 920, 1000]);
   for (const n of numbers) assert.ok(!everything(page).includes(String(n)), `no raw ${n}`);
+  assert.deepEqual(page.querySelectorAll('button').concat(page.querySelectorAll('[data-nav]')), []);
+});
+
+// ---- Knockback --------------------------------------------------------------------
+
+test('the Knockback page lists Low, Mid and High from the Knockback levels, then the directions it takes', () => {
+  const { home, discover } = boot();
+  home.el.querySelectorAll('.home-action')[2].click();
+  const { knockback } = sectionsOf(discover);
+  knockback.tab.click();
+  const page = knockback.panel;
+  assert.equal(text(page.querySelector('.discover-page-title')), 'Knockback');
+  const entries = page.querySelectorAll('.discover-entry');
+  assert.equal(entries.length, 2);
+  assert.deepEqual(entries.map((e) => text(e.querySelector('.discover-entry-title'))), ['Knockback', 'Direction']);
+  assert.deepEqual(entries.map((e) => text(e.querySelector('.discover-entry-text'))), [
+    'Controls how strongly an attack moves an opponent when it connects.',
+    KNOCKBACK_DIRECTION_SUMMARY,
+  ]);
+  assert.equal(text(entries[0].querySelector('.discover-entry-text')), KNOCKBACK_SUMMARY);
+  for (const entry of entries) {
+    const title = entry.querySelector('.discover-entry-title');
+    assert.equal(title.tagName, 'H3');
+    assert.equal(entry.getAttribute('aria-labelledby'), title.id);
+  }
+
+  // Strength: the three levels, weakest first, straight from the registry.
+  const levels = entries[0].querySelector('.discover-tiers');
+  assert.equal(levels.tagName, 'OL');
+  assert.equal(levels.getAttribute('aria-label'), 'Knockback levels');
+  const rows = levels.querySelectorAll('.discover-tier');
+  assert.deepEqual(rows.map((r) => [r.dataset.level, text(r.querySelector('.discover-tier-name')), text(r.querySelector('.discover-tier-desc'))]), [
+    ['low', 'Low', 'Light knockback.'],
+    ['mid', 'Mid', 'Medium knockback.'],
+    ['high', 'High', 'Strong knockback.'],
+  ]);
+  assert.deepEqual(rows.map((r) => [r.dataset.level, text(r.querySelector('.discover-tier-name')), text(r.querySelector('.discover-tier-desc'))]),
+    Object.values(KNOCKBACK_LEVELS).map((l) => [l.id, l.name, l.description]));
+  // The same rising meter as the Power tiers: decoration only.
+  rows.forEach((row, j) => {
+    const meter = row.querySelector('.discover-meter');
+    assert.equal(meter.getAttribute('aria-hidden'), 'true');
+    assert.equal(meter.children.length, 3);
+    assert.equal(meter.children.filter((b) => b.classList.contains('is-on')).length, j + 1);
+  });
+  assert.ok(rows.every((r) => r.className === 'discover-tier'), 'no level is marked');
+
+  // Direction: sideways, upward and reversed downward.
+  const directions = entries[1].querySelector('.discover-tiers');
+  assert.equal(directions.tagName, 'UL');
+  assert.equal(directions.getAttribute('aria-label'), 'Knockback directions');
+  const dirRows = directions.querySelectorAll('.discover-tier');
+  assert.deepEqual(dirRows.map((r) => [r.dataset.direction, text(r.querySelector('.discover-tier-name')), text(r.querySelector('.discover-tier-desc'))]), [
+    ['horizontal', 'Horizontal', 'Pushes the opponent away from the direction of the hit.'],
+    ['vertical', 'Vertical', 'Launches the opponent upward.'],
+    ['reversed', 'Reversed vertical', 'Drives the opponent downward.'],
+  ]);
+  assert.deepEqual(dirRows.map((r) => r.dataset.direction), KNOCKBACK_DIRECTIONS.map((d) => d.id));
+  for (const row of dirRows) assert.equal(row.querySelector('.discover-direction').getAttribute('aria-hidden'), 'true');
+  // Not a Power: no Power wording or tiers here.
+  assert.doesNotMatch(text(page), /\bPower\b|\btiers?\b/i);
+});
+
+test('the Knockback page shows no tuning numbers, no attacks and nothing interactive', () => {
+  const { home, discover } = boot();
+  home.el.querySelectorAll('.home-action')[2].click();
+  const { knockback } = sectionsOf(discover);
+  knockback.tab.click();
+  const page = knockback.panel;
+  const numbers = Object.values(KNOCKBACK_LEVELS).flatMap((l) => [l.horizontal, l.vertical]);
+  assert.deepEqual(numbers.sort((a, b) => a - b), [140, 180, 220, 480, 640, 800]);
+  for (const n of numbers) assert.ok(!everything(page).includes(String(n)), `no raw ${n}`);
+  assert.doesNotMatch(everything(page), /\bBA\d|Basic Attack|mid-?air|Throw|shuriken|Sphere|clone/i, 'no attack is named');
   assert.deepEqual(page.querySelectorAll('button').concat(page.querySelectorAll('[data-nav]')), []);
 });
 
@@ -434,29 +527,35 @@ test('Discover names no fighter: no roster, ownership or character data anywhere
   }
 
   // Structurally: the screen builds its Power content from the Power
-  // registry alone, never from the roster.
+  // registry and its Knockback content from the Knockback levels alone,
+  // never from the roster or any attack.
   const source = readFileSync(new URL('../js/screens/discover-screen.js', import.meta.url), 'utf8');
   assert.doesNotMatch(source, /characters\.js|\bCHARACTERS\b|getCharacter\b/);
-  assert.doesNotMatch(source, /getFighterPowerTier|fighterTiers|displayName|\.powers\b/);
+  assert.doesNotMatch(source, /getFighterPowerTier|fighterTiers|displayName|\.powers\b|\.attacks\b|resolveKnockback/);
   assert.doesNotMatch(source, /'Fighters'|Used by|is-used/);
   assert.match(source, /import \{ POWERS \} from '\.\.\/data\/powers\.js';/);
+  assert.match(source, /\bKNOCKBACK_LEVELS\b[^;]*\} from '\.\.\/data\/knockback\.js';/);
   // And the ownership styles are gone with it.
   const css = readFileSync(new URL('../styles.css', import.meta.url), 'utf8');
   assert.doesNotMatch(css, /\.discover-(owners|tier-users|tier-check|label)\b|\.discover-tier\.is-used/);
 });
 
-test('the Power page stays the same as the roster grows', () => {
+test('the Power and Knockback pages stay the same as the roster grows', () => {
   const render = () => {
     const { home, discover } = boot();
     home.el.querySelectorAll('.home-action')[2].click();
-    return everything(discover.sections[0].panel);
+    const { power, knockback } = sectionsOf(discover);
+    return everything(power.panel) + everything(knockback.panel);
   };
   const before = render();
-  const extra = { ...CHARACTERS[0], id: '9998', displayName: '#9998', rosterSlot: 7, available: true, powers: { jump: 3, speed: 1 } };
+  const extra = {
+    ...CHARACTERS[0], id: '9998', displayName: '#9998', rosterSlot: 7, available: true, powers: { jump: 3, speed: 1 },
+    attacks: { ...CHARACTERS[0].attacks, ba1: { ...CHARACTERS[0].attacks.ba1, knockback: { axis: 'horizontal', level: 'high' } } },
+  };
   CHARACTERS.push(extra);
   try {
     const after = render();
-    assert.equal(after, before, 'another fighter, on other tiers, changes nothing');
+    assert.equal(after, before, 'another fighter, on other tiers and levels, changes nothing');
     assert.ok(!after.includes('#9998'));
   } finally {
     CHARACTERS.splice(CHARACTERS.indexOf(extra), 1);
@@ -468,7 +567,7 @@ test('the Power page stays the same as the roster grows', () => {
 test('Conditions is intentionally empty: no cards, placeholder or invented copy', () => {
   const { home, discover } = boot();
   home.el.querySelectorAll('.home-action')[2].click();
-  const conditions = discover.sections[1];
+  const { conditions } = sectionsOf(discover);
   conditions.tab.click();
   assert.equal(conditions.panel.hidden, false);
   assert.deepEqual(conditions.panel.children, []);
@@ -485,7 +584,7 @@ test('keyboard and gamepad reach Discover from Home and every control on it (wid
   const { app, home, discover, plays } = boot();
   layOutHome(home);
   layOutWide(discover);
-  const [power, conditions] = discover.sections;
+  const { power, knockback, conditions } = sectionsOf(discover);
   const back = discover.el.querySelector('.btn-back');
 
   // Home: Play → Practice Ground → Discover, then confirm (J / A).
@@ -497,14 +596,28 @@ test('keyboard and gamepad reach Discover from Home and every control on it (wid
   assert.equal(document.activeElement, power.tab);
 
   app.input.key('ArrowDown');
+  assert.equal(document.activeElement, knockback.tab);
+  assert.deepEqual(selected(discover), ['knockback']);
+  app.input.key('ArrowDown');
   assert.equal(document.activeElement, conditions.tab);
   assert.deepEqual(selected(discover), ['conditions']);
+  app.input.key('ArrowUp');
+  assert.equal(document.activeElement, knockback.tab);
+  assert.deepEqual(selected(discover), ['knockback']);
+
+  // Into the Knockback page and back: leaving toward the rail lands on the
+  // open tab, never on another one, so the page never switches underneath.
+  app.nav.command('right', null);
+  assert.equal(document.activeElement, knockback.panel);
+  app.nav.command('left', null);
+  assert.equal(document.activeElement, knockback.tab);
+  assert.deepEqual(selected(discover), ['knockback']);
   app.input.key('ArrowUp');
   assert.equal(document.activeElement, power.tab);
   assert.deepEqual(selected(discover), ['power']);
 
   // Into the page and back: leaving toward the rail lands on the open tab,
-  // never on Conditions, so the page never switches underneath.
+  // never on Knockback, so the page never switches underneath.
   app.nav.command('right', null);
   assert.equal(document.activeElement, power.panel);
   app.nav.command('left', null);
@@ -555,10 +668,14 @@ test('narrow layout: the rail runs across the top and arrows follow it', () => {
     layOutNarrow(discover);
     home.el.querySelectorAll('.home-action')[2].click();
     assert.equal(discover.el.querySelector('.discover-rail').getAttribute('aria-orientation'), 'horizontal');
-    const [power, conditions] = discover.sections;
+    const { power, knockback, conditions } = sectionsOf(discover);
+    app.input.key('ArrowRight');
+    assert.equal(document.activeElement, knockback.tab);
+    assert.deepEqual(selected(discover), ['knockback']);
     app.input.key('ArrowRight');
     assert.equal(document.activeElement, conditions.tab);
     assert.deepEqual(selected(discover), ['conditions']);
+    app.input.key('ArrowLeft');
     app.input.key('ArrowLeft');
     assert.equal(document.activeElement, power.tab);
     app.input.key('ArrowDown');

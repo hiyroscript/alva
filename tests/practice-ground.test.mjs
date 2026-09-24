@@ -1049,7 +1049,7 @@ test('Player 1\'s attacks hit the CPU through the real CombatSystem, and it reac
   assert.equal(events.length, 1);
 });
 
-test('Player 1\'s BA2 launches the CPU straight up (Vertical Knockback Power 2), then gravity brings it down', () => {
+test('Player 1\'s BA2 launches the CPU straight up (High vertical Knockback), then gravity brings it down', () => {
   const { session, run, until, events, numbers } = practiceSession();
   const { player, cpu } = session;
   for (let i = 0; i < 300 && cpu.body.x - player.body.x > 60; i++) run({ right: true });
@@ -1068,7 +1068,7 @@ test('Player 1\'s BA2 launches the CPU straight up (Vertical Knockback Power 2),
   // At impact: launched upward, not pushed sideways.
   assert.ok(cpu.body.vx === 0, 'no sideways push');
   assert.equal(cpu.body.vy, -player.attacks.ba2.knockback.y);
-  assert.equal(cpu.body.vy, -640);
+  assert.equal(cpu.body.vy, -800);
   assert.equal(cpu.grounded, false);
   let top = groundY;
   for (let i = 0; i < 120 && !cpu.grounded; i++) {

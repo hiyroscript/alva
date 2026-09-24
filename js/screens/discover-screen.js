@@ -1,10 +1,12 @@
 // DISCOVER: the in-game reference. An index rail of sections (Power,
-// Conditions) beside one scrollable page; on narrow windows the rail runs
-// across the top instead. The Power page is built from the Power registry
-// the game plays by (POWERS in js/data/powers.js: names, descriptions and
-// tier numbers, never the tuning values), so the reference cannot drift from
-// gameplay. It explains mechanics only: it never says which fighter or
-// attack uses which Power or tier, so it stays the same as the roster grows.
+// Knockback, Conditions) beside one scrollable page; on narrow windows the
+// rail runs across the top instead. Each page is built from the registry the
+// game plays by, never the tuning values, so the reference cannot drift from
+// gameplay: Power from POWERS in js/data/powers.js (names, descriptions and
+// tier numbers), Knockback from KNOCKBACK_LEVELS in js/data/knockback.js
+// (level names and descriptions, and what each direction does). It explains
+// mechanics only: it never says which fighter or attack uses which Power,
+// tier or level, so it stays the same as the roster grows.
 //
 // The rail is a tablist with automatic activation: keyboard or gamepad focus
 // on a section shows it, a click or tap selects it, and mouse hover is only a
@@ -17,6 +19,9 @@ import { CONFIG } from '../config.js';
 import { el } from '../core/utils.js';
 import { screenHeader } from '../ui/components.js';
 import { POWERS } from '../data/powers.js';
+import {
+  KNOCKBACK_LEVELS, KNOCKBACK_SUMMARY, KNOCKBACK_DIRECTIONS, KNOCKBACK_DIRECTION_SUMMARY,
+} from '../data/knockback.js';
 
 // Where the rail turns horizontal: narrow windows, but never short landscape
 // ones. Keep in step with the matching rule in styles.css (Discover, narrow).
@@ -24,8 +29,8 @@ const NARROW_QUERY = '(max-width: 600px) and (min-height: 441px), (max-aspect-ra
 
 const DIRECTIONS = ['up', 'down', 'left', 'right'];
 
-// Tier i of n as n rising bars, the first i filled. Decorative: the tier's
-// name carries its number.
+// Tier (or level) i of n as n rising bars, the first i filled. Decorative:
+// the name beside it says which it is.
 function tierMeter(tier, count) {
   return el('span', { class: 'discover-meter', 'aria-hidden': 'true' },
     Array.from({ length: count }, (_, i) => el('i', {
@@ -35,24 +40,39 @@ function tierMeter(tier, count) {
   );
 }
 
-// One Power: what it does, beside its tiers. Names and descriptions only.
-function powerEntry(power) {
-  const titleId = `discover-power-${power.id}`;
-  const count = power.tiers.length;
+// An arrow pointing right, turned by CSS to show a Knockback direction.
+// Decorative: the direction's name says which it is.
+const ARROW = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 8h11M9 4l4 4-4 4"/></svg>';
+
+// One reference entry: a title and what it explains, beside its rows.
+function entry(id, title, text, list) {
+  const titleId = `discover-${id}`;
   return el('article', { class: 'discover-entry', 'aria-labelledby': titleId }, [
     el('div', { class: 'discover-entry-about' }, [
-      el('h3', { class: 'discover-entry-title', id: titleId, text: power.name }),
-      el('p', { class: 'discover-entry-text', text: power.summary }),
+      el('h3', { class: 'discover-entry-title', id: titleId, text: title }),
+      el('p', { class: 'discover-entry-text', text }),
     ]),
-    el('ol', { class: 'discover-tiers', 'aria-label': `${power.name} tiers` }, power.tiers.map((tier) =>
-      el('li', { class: 'discover-tier', dataset: { tier: String(tier.tier) } }, [
-        tierMeter(tier.tier, count),
-        el('div', { class: 'discover-tier-copy' }, [
-          el('span', { class: 'discover-tier-name', text: tier.name }),
-          el('span', { class: 'discover-tier-desc', text: tier.description }),
-        ]),
-      ]))),
+    list,
   ]);
+}
+
+// One row: a decorative marker beside a name and its description.
+function row(dataset, marker, name, description) {
+  return el('li', { class: 'discover-tier', dataset }, [
+    marker,
+    el('div', { class: 'discover-tier-copy' }, [
+      el('span', { class: 'discover-tier-name', text: name }),
+      el('span', { class: 'discover-tier-desc', text: description }),
+    ]),
+  ]);
+}
+
+// One Power: what it does, beside its tiers. Names and descriptions only.
+function powerEntry(power) {
+  const count = power.tiers.length;
+  return entry(`power-${power.id}`, power.name, power.summary,
+    el('ol', { class: 'discover-tiers', 'aria-label': `${power.name} tiers` }, power.tiers.map((tier) =>
+      row({ tier: String(tier.tier) }, tierMeter(tier.tier, count), tier.name, tier.description))));
 }
 
 function buildPowerPage() {
@@ -62,10 +82,28 @@ function buildPowerPage() {
   ]);
 }
 
+// Knockback: its strength levels, weakest first, then the directions it can
+// take. Names and descriptions only.
+function buildKnockbackPage() {
+  const levels = Object.values(KNOCKBACK_LEVELS);
+  return el('div', { class: 'discover-page' }, [
+    el('h2', { class: 'discover-page-title', text: 'Knockback' }),
+    entry('knockback-strength', 'Knockback', KNOCKBACK_SUMMARY,
+      el('ol', { class: 'discover-tiers', 'aria-label': 'Knockback levels' }, levels.map((level, i) =>
+        row({ level: level.id }, tierMeter(i + 1, levels.length), level.name, level.description)))),
+    entry('knockback-direction', 'Direction', KNOCKBACK_DIRECTION_SUMMARY,
+      el('ul', { class: 'discover-tiers', 'aria-label': 'Knockback directions' }, KNOCKBACK_DIRECTIONS.map((direction) =>
+        row({ direction: direction.id },
+          el('span', { class: 'discover-direction', 'aria-hidden': 'true', html: ARROW }),
+          direction.name, direction.description)))),
+  ]);
+}
+
 // Conditions has no content yet, on purpose: the section is scaffolding for
 // a future Conditions system, so its page stays empty rather than faked.
 const SECTIONS = [
   { id: 'power', label: 'Power', build: buildPowerPage },
+  { id: 'knockback', label: 'Knockback', build: buildKnockbackPage },
   { id: 'conditions', label: 'Conditions', build: () => null },
 ];
 

@@ -54,7 +54,7 @@ export class Fighter {
     );
     // What the shared Defense input does for this character (null: nothing).
     this.defense = createDefenseDefinition(def.defense);
-    // The character's fighter Powers (js/data/powers.js), resolved once.
+    // The character's Powers (js/data/powers.js), resolved once.
     // Upward speed of the normal jump, from its Jump Power tier. Nothing else
     // (knockback, Dodges, techniques) uses it.
     this.jumpVelocity = getJumpVelocity(def);
