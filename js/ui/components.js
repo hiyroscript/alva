@@ -53,6 +53,20 @@ export function hintBar(items) {
   );
 }
 
+// A full-width action in a glass menu panel (pause, result, Practice menu).
+// opts.primary: green fill, and the panel's default focus. opts.outlineOnly:
+// background stays transparent through hover/press; the focus ring is
+// unchanged.
+export function menuButton(label, opts = {}) {
+  return el('button', {
+    class: `pause-btn-item${opts.primary ? ' is-primary' : ''}${opts.outlineOnly ? ' is-outline-only' : ''}`,
+    type: 'button', 'data-nav': true,
+    'data-nav-default': opts.primary || null,
+    disabled: opts.disabled || null,
+    text: label,
+  });
+}
+
 export const MENU_HINTS = [
   [['↑', '↓', '←', '→'], 'Navigate'],
   [['Enter'], 'Select'],

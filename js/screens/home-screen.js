@@ -31,14 +31,13 @@ export class HomeScreen extends Screen {
       class: 'home-action home-action--primary', type: 'button', 'data-nav': true, 'data-nav-default': true,
       html: `<span>Play</span>${ICONS.arrow}`,
     });
-    // Help & Credits is disabled for now. Disabled buttons ignore clicks and
-    // the menu navigator skips them; drop `disabled` to bring the entry back.
-    const help = el('button', {
-      class: 'home-action', type: 'button', 'data-nav': true, disabled: true,
-      html: `<span>Help &amp; Credits</span>${ICONS.right}`,
+    // Straight into the training room: no mode, fighter or stage select.
+    const practice = el('button', {
+      class: 'home-action', type: 'button', 'data-nav': true,
+      html: `<span>Practice Ground</span>${ICONS.right}`,
     });
     play.addEventListener('click', () => app.screens.go('mode'));
-    help.addEventListener('click', () => app.screens.go('help'));
+    practice.addEventListener('click', () => app.screens.go('practice'));
 
     this.rollTrack = el('div', { class: 'home-credits-track' }, [creditsSequence(), creditsSequence({ copy: true })]);
     this.rollOffset = 0;
@@ -105,7 +104,7 @@ export class HomeScreen extends Screen {
         el('div', { class: 'home-intro' }, [
           el('h1', { class: 'home-title', id: 'home-title', html: logoSVG({ className: 'logo logo--display' }) }),
           el('p', { class: 'home-lede', text: 'Fan project. Big heart.' }),
-          el('nav', { class: 'home-actions', 'aria-label': 'Main menu' }, [play, help]),
+          el('nav', { class: 'home-actions', 'aria-label': 'Main menu' }, [play, practice]),
         ]),
       ]),
       el('footer', { class: 'home-footer' }, [

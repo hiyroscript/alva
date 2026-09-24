@@ -5,7 +5,8 @@ JavaScript with Canvas 2D: no frameworks, no build step, no 3D. It runs on deskt
 and on phones and tablets in landscape.
 
 This is the first playable foundation: full menu flow, a 48-slot roster, two
-large stages, movement and platform physics, a camera, a HUD, touch controls,
+large stages, a Practice Ground training room, movement and platform physics,
+a camera, a HUD, touch controls,
 and a data-driven combat system with #0001's two real attacks, Basic Attack 1
 (BA1) and Basic Attack 2 (BA2), a ground and mid-air Dodge on the shared
 Defense input, a held Charge stance, a Charged BA1 Clone Attack, a Charged
@@ -56,6 +57,7 @@ in the code depends on the repository name, so no file changes are needed.
 | Basic Attack 1 (BA1) | `U` | Lower-right, bottom row (**BA1**) |
 | Basic Attack 2 (BA2) | `I` | Lower-right, bottom row (**BA2**) |
 | Pause | `Esc` or `P` | Timer or pause button, top centre |
+| Practice menu (Practice Ground) | `Esc` or `P` | Three-dots button, top right |
 
 \* Reserved: wired into input and combat, but inactive until #0001 has matching
 attack animations. Its touch button has a dashed outline.
@@ -162,12 +164,12 @@ Touch controls show on touch-first devices (coarse pointer, or a touch actually 
 ## Current content
 
 - **Characters:** #0001
-- **Maps:** Desert (wide, open, 3.8 screens) and City (rooftops with 7 one-way platforms, 3.1 screens)
+- **Maps:** Desert (wide, open, 3.8 screens) and City (rooftops with 7 one-way platforms, 3.1 screens) for Quick Battle; the Practice Ground training room (one broad flat floor, about 3.5 screens) for practice
 - **Animations:** Idle, Run, Jump, Fall, Land (jump/fall play while airborne; land plays once on touchdown), Hurt and Mid-air Hurt (shown during hitstun on the ground / in the air), Basic Attack 1 (4 frames), Mid-air Basic Attack 1 (5 frames), Basic Attack 2 (7 frames) and Mid-air Basic Attack 2 (3 frames), each played once at 12 fps, Dodge and Mid-air Dodge (3 frames each, played once at 12 fps), Charge (charge1 → charge2 once, then chargea ↔ chargeb while held, at 10 fps, with charge1 shown briefly on release), Throw (3 fighter frames, played once at 12 fps), Shuriken (3 looping projectile frames at 18 fps, normalized and drawn separately from the fighter poses), the clone appear / vanish cloud (`0001_cloneav1`–`0001_cloneav10`, an effect at 20 fps: forwards as a clone appears, the same frames in reverse as it vanishes), the Sphere Rush poses (`0001_rasen1`–`0001_rasen12` as three one-shot fighter clips at 12 fps: formation 1–3, dash 4–6, hit follow-through 7–12) and its blue sphere (`0001_prasen1`–`0001_prasen11` as three one-shot effects at 12 fps: formation 1–6, on the opponent 7–9, explosion 10–11)
 - **Attacks:** Basic Attack 1 and Basic Attack 2, each on the ground and in the air, a ground Throw that releases one shuriken, the Charged BA1 Clone Attack (25 Energy) and the Charged BA2 Sphere Rush (ground only, two hits, no Energy cost). Special is reserved.
 - **Defense:** #0001 dodges, on the ground and in the air.
 - **HUD:** each fighter panel shows a green health bar with a blue Energy bar directly beneath it. Both start full; the Energy bar drops by a quarter with each clone summoned.
-- **Mode:** Quick Battle: 1 round, 99 seconds, against a non-attacking training CPU
+- **Modes:** Quick Battle: 1 round, 99 seconds, against a non-attacking training CPU. Practice Ground: solo training on its own stage, with no CPU, timer or rounds (below).
 
 ## Design
 
@@ -194,8 +196,14 @@ neutral.
   still for reduced-motion users. Wheel/trackpad, pointer or touch dragging,
   and focused arrow/Page keys scroll the credits manually. Automatic movement
   resumes from that position after about 2 seconds of inactivity; reduced-motion
-  mode remains manual-only. Help & Credits stays visible but is disabled
-  for now. The strip shifts outward on narrow screens.
+  mode remains manual-only. **Practice Ground**, the secondary action under
+  Play, opens the training room directly. The strip shifts outward on narrow
+  screens.
+- **Practice Ground** is a pale, cool-gray simulation room: original Canvas
+  artwork with a gridded back wall, a perspective floor and side walls at the
+  bounds. Its HUD keeps Player 1's panel and a three-dots More button; the
+  Practice menu and the Change Fighter dialog are translucent glass over the
+  paused stage.
 - **Other screens** retain their established layouts, controls and navigation;
   only interface colours change. Battle keeps readable dark translucent chrome.
 - Character sprites and stage artwork keep their original colours. No artwork,
@@ -213,19 +221,48 @@ js/
   main.js, config.js  boot + global config (bindings, render, timing)
   core/               app controller, screen manager, menu navigation,
                       asset loader, input (keyboard/touch/gamepad), device, audio stub
-  screens/            splash, home, mode, character, map, help, battle
-  game/               battle loop, fighter state machine, physics, camera,
+  screens/            splash, home, mode, character, map, help, battle, practice
+  game/               arena (shared loop + rendering), Quick Battle, Practice
+                      session, fighter state machine, physics, camera,
                       combat, projectiles, summoned clones, charged
-                      techniques, sprite normalizer/animator, HUD,
+                      techniques, sprite normalizer/animator, HUDs,
                       touch controls
-  stages/             Desert and City layered renderers (procedural Canvas 2D)
-  data/               characters.js, maps.js
-  ui/                 wordmark, icons, overlays, shared help content, stage preview
+  stages/             Desert, City and Practice renderers (procedural Canvas 2D)
+  data/               characters.js, maps.js, practice-map.js
+  ui/                 wordmark, icons, overlays, shared help content, stage
+                      preview, fighter roster
 ```
 
 - **Sprite normalization.** The idle, jump, fall, land and hurt frames are pixel art at roughly 16× scale, the mid-air hurt, Basic Attack 1 and 2, Charge and Dodge frames at 8×, and the run frames at 4×. When a frame loads, the game reads its alpha channel once and finds the visible bounds. It then detects the pixel grid from every colour transition and resamples the frame to 1 pixel per art pixel. Every frame is drawn at the same world scale, anchored bottom-centre at the upper-body centroid, so the fighter keeps the same size and position when switching between animations. When the size stays close to the target, each art pixel maps to a whole number of device pixels. The Sphere Rush poses are fighter poses at 2×, normalized like the rest. Projectile and effect art (the shuriken at 8×, the clone cloud and the Sphere Rush sphere at 2×) goes through the same grid detection but keeps its own art size, centre-anchored at the fighter's art-pixel scale, and is never fitted to the fighter's height.
 - **Simulation.** Fixed 60 Hz steps with interpolated rendering, so movement is the same at 30, 60 and 120 Hz. Colliders, hurtboxes and pushboxes are set in data and don't depend on PNG size.
 - **Stages.** Six parallax layers (sky, far, mid, near, terrain, atmosphere) are generated once from a seeded RNG into cached `Path2D` geometry. Collision comes only from `js/data/maps.js`, so any layer can later be swapped for image art.
+
+### Practice Ground
+
+**Home → Practice Ground** starts at once with #0001 on the training stage:
+no fighter or stage select, countdown, timer, CPU or result. It runs until
+you choose Return.
+
+- **One fighter.** `PracticeSession` (`js/game/practice.js`) and Quick
+  Battle's `Battle` both extend `Arena` (`js/game/arena.js`), which owns the
+  fixed-step world, the camera and all Canvas drawing. The practice session
+  holds a single fighter under your control and nothing else, so no CPU is
+  drawn, labelled or shown in the HUD. Moves aimed at an opponent fall back or
+  miss: Charged BA1 has nobody to appear behind, so it is an ordinary BA1 (no
+  Energy spent); the Sphere Rush dashes, finds no one and ends.
+- **Stage.** `PRACTICE_MAP` (`js/data/practice-map.js`) is deliberately not
+  in `MAPS`, which feeds Select Stage. `js/stages/practice-theme.js` draws the
+  room as one square grid in one-point perspective (back wall, floor, side
+  walls at the bounds, a ruler along the front edge).
+- **More menu.** The three-dots button (or `Esc` / `P` / Start) freezes
+  practice under a light glass menu with **Change Fighter** and **Return**.
+  Press More, `Esc` or `P` again (or tap the dim) to carry on.
+- **Change Fighter** opens the full roster as a large glass dialog over the
+  paused stage. It is the same roster component as Select Fighter
+  (`js/ui/fighter-roster.js`). Confirming swaps the fighter in place at the
+  spawn with full health and Energy and resumes; `Esc` / Back returns to the
+  menu. Practice keeps its own fighter: Quick Battle's selection never
+  changes, and every new visit starts with #0001 again.
 
 ### Adding a fighter (#0002)
 
@@ -246,7 +283,7 @@ To choose how a fighter defends, give it a `defense` entry. `{ type: 'dodge', gr
 
 ### Adding a map
 
-Add an entry to `MAPS` in `js/data/maps.js` (size, ground, bounds, spawns, platforms, solids), then register a theme renderer in `js/stages/index.js`.
+Add an entry to `MAPS` in `js/data/maps.js` (size, ground, bounds, spawns, platforms, solids), then register a theme renderer in `js/stages/index.js`. Every `MAPS` entry becomes a Quick Battle stage on Select Stage; the Practice Ground stage lives apart in `js/data/practice-map.js`.
 
 ## Credits
 

@@ -2,7 +2,7 @@
 // into a menu canvas. Optionally shows idle fighters at the spawn points.
 
 import { createTheme } from '../stages/index.js';
-import { computeWorldScale } from '../game/battle.js';
+import { computeWorldScale } from '../game/arena.js';
 import { drawFrame } from '../game/sprite-normalizer.js';
 import { fitCanvas } from './sprite-art.js';
 

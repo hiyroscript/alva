@@ -1,5 +1,6 @@
 // 2D follow camera working in world units. Frames both fighters when they fit,
-// otherwise keeps Player 1 comfortably in view; always clamped to the stage.
+// otherwise keeps Player 1 comfortably in view (with no second fighter, as in
+// Practice Ground, it follows Player 1 alone); always clamped to the stage.
 
 import { clamp, damp } from '../core/utils.js';
 

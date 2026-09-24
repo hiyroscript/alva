@@ -135,8 +135,12 @@ behave, and how it must look. The README covers running and deploying it.
   device detection, audio stub, sprite normalizer/animator, fighter state
   machine, controllers (player / training AI), physics, camera, combat,
   projectiles, summoned clones, charged techniques, HUD, touch controls,
-  stage themes.
-- Data-driven content: `js/data/characters.js` and `js/data/maps.js`. Adding a
+  stage themes, fighter roster.
+- One arena (`js/game/arena.js`) owns the fixed-step world and its Canvas
+  rendering. Quick Battle (`Battle`) adds the CPU, phases and round timer;
+  Practice Ground (`PracticeSession`) runs one fighter with none of them.
+- Data-driven content: `js/data/characters.js`, `js/data/maps.js` (the Quick
+  Battle stages) and `js/data/practice-map.js` (the training stage). Adding a
   fighter means adding frames, a definition and a roster slot — never editing
   engine code.
 - Simulation uses fixed 60 Hz steps with interpolated rendering and a clamped
@@ -231,7 +235,8 @@ fit the palette.
 
 ```
 Splash → Home → Select Mode → Select Fighter → Select Stage → Battle
-Home → Help & Credits (the Home entry is disabled for now)
+Home → Practice Ground (starts at once with #0001)
+Practice Ground → More → Change Fighter (roster dialog) / Return (Home)
 Battle → Pause → Resume / Restart / Return to Home (confirmed); Help is shown but disabled for now
 Battle (time over, one fighter ahead) → Result → Rematch / Change Stage / Return to Home
 Battle (time over, draw) → a fresh battle starts, no dialog
@@ -273,11 +278,12 @@ no header, build label, eyebrow or keyboard hint bar.
   supporting line "Fan project. Big heart." The wordmark's first visible stroke
   lines up with the start of that line.
 - **Actions:** exactly two — **Play** (green, white text, arrow) opens Select
-  Mode and is focused by default; **Help & Credits** (chevron) stays visible but
-  is a genuinely disabled button for now: muted gray label and outline, no
-  hover or press response, skipped by keyboard/gamepad focus. The pause-menu
-  Help is disabled the same way (7.3); the Help & Credits screen and the pause
-  Help view remain in place. Home buttons have a small 3 px radius.
+  Mode and is focused by default; **Practice Ground** (outlined, chevron)
+  beneath it opens Practice Ground (6.8) straight away, with no mode, fighter
+  or stage select. It replaced the former, disabled Help & Credits entry; the
+  Help & Credits screen and the pause Help view remain in place (the
+  pause-menu Help is still disabled, 7.3). Home buttons have a small 3 px
+  radius.
 - **Footer:** "by hiyroscript" in gray monospace, full width under a subtle
   top hairline.
 - **Credits strip:** two walls. The back wall is the same near-black as the
@@ -354,8 +360,9 @@ no header, build label, eyebrow or keyboard hint bar.
   needed throughout; no extra control row: both use the existing Charge,
   BA1 and BA2 controls), Throw, Defense, stages and platforms, pause, notes
   on this build.
-- The Home entry to this screen is disabled for now; the screen stays in place
-  so it can return.
+- Home no longer links to this screen (its entry became Practice Ground); the
+  screen stays in place, and its shared content still feeds the Home credits
+  roll and the pause Help view.
 - Credits (must remain visible and readable). One list in
   `js/ui/help-content.js` feeds both this tab and the Home credits roll:
   - **ALVA** — created by hiyroscript.
@@ -389,6 +396,50 @@ no header, build label, eyebrow or keyboard hint bar.
   landscape play." overlay; the battle pauses and resumes correctly on return
   to landscape.
 
+### 6.8 Practice Ground
+
+A solo training room, entered straight from Home.
+
+- **Start:** every fresh entry loads #0001 (character `0001`) through the usual
+  loading overlay and gives control at once: no fighter select, countdown,
+  round banner, timer, CPU or result. It runs until the player returns Home.
+  Practice keeps its own fighter choice; it never reads or changes Quick
+  Battle's selected fighter.
+- **One fighter:** the simulation holds exactly one fighter under Player 1's
+  control, with normal movement, physics, attacks, projectiles, clones,
+  Charge, Defense, animation, camera (following that fighter alone) and touch
+  controls. There is no CPU, hidden fighter or dummy. Moves aimed at an
+  opponent fall back or miss: Charged BA1 has nobody to appear behind, so it
+  is an ordinary BA1 and costs no Energy; the Sphere Rush dashes, finds no one
+  and ends as a miss.
+- **Training stage:** its own map (`js/data/practice-map.js`), kept out of the
+  Quick Battle stage list. Original Canvas artwork of a minimalist combat
+  laboratory: a pale, cool-gray room built from one square grid, with a gridded
+  back wall, a broad flat floor in one-point perspective, stronger lines every
+  five cells, a darker centre axis, side walls at the stage bounds and a ruler
+  along the floor's front edge. No scenery, particles, hazards or moving parts.
+  Only the camera moves the room; its static geometry is computed once.
+- **HUD:** only the P1 panel (tag, name, health, Energy) top-left and a compact
+  glass **More** button (three dots, `aria-label="Practice menu"`) top-right.
+  No CPU panel, round label, timer or pause control.
+- **Practice menu:** More, Esc / P or gamepad Start freezes practice
+  (simulation, gameplay input and touch controls stop) and floats a light,
+  translucent glass menu under the More button over a lightly dimmed, still
+  stage. It holds exactly **Change Fighter** (green, focused) and **Return**
+  (outlined). More again, Esc / Back, P, Start or a press on the dim resumes.
+  **Return** goes Home and tears everything down.
+- **Change Fighter:** opens the fighter roster (the same component, rules and
+  look as Select Fighter, 6.4) as one large translucent glass dialog
+  (`role="dialog"`, `aria-modal`, titled "Change Fighter"; about 90 vw ×
+  88 dvh, safe-area aware, the roster scrolling inside it) over the paused
+  stage. The current fighter starts selected, previewed and focused; the
+  menu beneath is inert. Confirming loads the fighter, replaces the practice
+  fighter in place at the spawn with full health and Energy, clears the old
+  fighter's projectiles, clones and technique, rebinds the HUD, closes both
+  overlays and resumes. Back / Esc closes only the dialog and returns focus to
+  Change Fighter, leaving the fighter unchanged. A failed load keeps the
+  current fighter and the dialog.
+
 ## 7. Battle
 
 ### 7.1 Stages and camera
@@ -402,8 +453,9 @@ no header, build label, eyebrow or keyboard hint bar.
   player has no drop-through control and walks off an edge to come down; the
   training CPU can drop through all of them except the water-tower deck.
 - Collision comes only from map data, never from art.
-- The camera frames both fighters, interpolates smoothly and never shows
-  outside the map. Fighters occupy ≈ 14–18 % of viewport height.
+- The camera frames both fighters (Practice Ground's single fighter alone),
+  interpolates smoothly and never shows outside the map. Fighters occupy
+  ≈ 14–18 % of viewport height.
 
 ### 7.2 Fighters, physics and combat
 
@@ -856,7 +908,8 @@ no header, build label, eyebrow or keyboard hint bar.
 - Keyboard (simultaneous keys, held-state tracking, no reliance on key
   repeat): A/D or ←/→ move, S/↓ Charge (held), W/Space/↑ jump, J Throw (the
   internal `primary` action), K Special (reserved), L Defense, U Basic
-  Attack 1 (BA1), I Basic Attack 2 (BA2), Esc/P pause. `` ` `` toggles a
+  Attack 1 (BA1), I Basic Attack 2 (BA2), Esc/P pause (the Practice menu in
+  Practice Ground). `` ` `` toggles a
   debug overlay (colliders, hurtboxes, attack hitboxes while active, each
   flying projectile's hitbox in magenta with its name, each clone's BA1
   hitbox, labelled `clone ba1`, on its active frame, and the Sphere Rush's
@@ -887,8 +940,9 @@ no header, build label, eyebrow or keyboard hint bar.
   nagging alerts; Throw is solid.
 - Touch controls appear only on touch-first devices (coarse pointer or an
   observed touch), never merely because a desktop window is narrow.
-- Gameplay pauses when the pause menu is open, the tab is hidden, or the device
-  is blocked in portrait.
+- Gameplay pauses when the pause menu (Practice Ground: the Practice menu or
+  the Change Fighter dialog) is open, the tab is hidden, or the device is
+  blocked in portrait.
 
 ## 8. Accessibility
 
