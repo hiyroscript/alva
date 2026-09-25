@@ -36,10 +36,12 @@
 //
 // and is then removed. Its position, facing and attack are chosen once, at
 // the summon, and it never moves, turns, falls or retargets after that. It
-// has no Knockback of its own, controller, pushbox, hurtboxes, physics,
+// has no Launch Point of its own, controller, pushbox, hurtboxes, physics,
 // camera or HUD presence: it cannot be hit and nothing collides with it. Its
 // hitbox exists only during the attack's active phase and connects at most
-// once, with the attack's own damage and launch; the hit credits the owner
+// once, with the attack's own damage, Base Launch and Directional Launch,
+// resolved by the same CombatSystem.applyHit as the owner's (a horizontal
+// launch travels along the clone's facing); the hit credits the owner
 // but freezes only the target and the clone itself, never the owner.
 
 import { SpriteAnimator } from './sprite-animator.js';

@@ -5,8 +5,8 @@
 // sequence (rasen7-8, rasen8 held, rasen9 for the blast, rasen10-12 after
 // it), the rasen12 whiff release, the target's hurt pose on the contact
 // step, the sphere spinning and growing on the target, its hits (a contact
-// that only binds, 1 Knockback every 0.5 s while bound, then the 15-damage
-// sideways blast), the bind on the opponent, its 5-second cooldown, ground
+// that only binds, 1 Launch Point every 0.5 s while bound with no launch,
+// then the 15-damage blast at Base Launch 3 sideways), the bind on the opponent, its 5-second cooldown, ground
 // dependency, interruption, Dodge, Block, walls, facing, reset / destroy and
 // rendering. Uses
 // the real Fighter, CombatState, CombatSystem, ChargedTechnique, physics,
@@ -19,7 +19,6 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { characterFramePaths } from '../js/data/characters.js';
 import { getMap } from '../js/data/maps.js';
-import { KNOCKBACK_LEVELS, accumulatedKnockbackBonus } from '../js/data/knockback.js';
 import { CombatSystem } from '../js/game/combat.js';
 import { ChargedTechnique } from '../js/game/charged-technique.js';
 import { StageCollision } from '../js/game/physics.js';
@@ -397,19 +396,19 @@ test('the Sphere Rush data: 1050 dash, a contact that only binds, +1 every 0.5 s
   assert.equal(TECH.cooldown, 5);
   assert.equal('energyCost' in TECH, false, 'no cost of any kind');
   assert.equal(TECH.firstHit.damage, 0, 'no large contact hit');
-  assert.deepEqual(TECH.firstHit.baseKnockback, { x: 0, y: 0 }, 'the setup never launches');
+  assert.deepEqual([TECH.firstHit.baseLaunch, TECH.firstHit.directionalLaunch], [0, null], 'the setup never launches');
   assert.equal(TECH.tickInterval, 0.5);
-  assert.deepEqual(TECH.tickHit, { damage: 1, baseKnockback: { x: 0, y: 0 }, hitstun: 0, blockstun: 0, hitstop: 0 });
+  assert.deepEqual(TECH.tickHit, { damage: 1, baseLaunch: 0, directionalLaunch: null, hitstun: 0, blockstun: 0, hitstop: 0 });
+  // The blast: the technique's only launching hit, Base Launch 3 sideways,
+  // through the same shared launch as every other hit: no bespoke vector.
   assert.equal(TECH.explosionHit.damage, 15);
-  // The blast: a strong, mostly horizontal default launch, far past BA1's
-  // push, whose accumulated-Knockback bonus is declared horizontal, at the
-  // finisher's knockback growth: twice the standard.
-  const { x, y } = TECH.explosionHit.baseKnockback;
-  assert.ok(x > 3 * KNOCKBACK_LEVELS.high.horizontal && x > 4 * KNOCKBACK_LEVELS.low.horizontal);
-  assert.ok(x >= 3 * y && y >= 0, 'primarily horizontal');
-  assert.equal(TECH.explosionHit.accumulatedKnockbackAxis, 'horizontal');
-  assert.equal(TECH.explosionHit.knockbackGrowth, 2);
-  assert.ok(TECH.explosionHit.knockbackGrowth > def.attacks.ba2.knockbackGrowth, 'grows faster than any Basic Attack');
+  assert.equal(TECH.explosionHit.baseLaunch, 3);
+  assert.equal(TECH.explosionHit.directionalLaunch, 'horizontal');
+  for (const key of ['baseKnockback', 'knockbackGrowth', 'accumulatedKnockbackAxis']) {
+    assert.equal(key in TECH.explosionHit, false, `no ${key}`);
+  }
+  const hits = [TECH.firstHit, TECH.tickHit, TECH.explosionHit];
+  assert.deepEqual(hits.filter((h) => h.baseLaunch > 0), [TECH.explosionHit], 'the only launching hit');
   assert.equal(TECH.explosionHit.hitstun, 0.55);
   assert.ok(TECH.explosionHit.hitstop > TECH.firstHit.hitstop);
   // A hand offset for every frame the sphere is held through, and a box
@@ -420,13 +419,13 @@ test('the Sphere Rush data: 1050 dash, a contact that only binds, +1 every 0.5 s
   assert.equal(box.x, -box.w / 2);
   assert.equal(box.y, -box.h / 2);
   assert.deepEqual(TECH.targetOffset, { x: 0, y: -48 });
-  // Normal BA2 keeps its own data (its launch is its own High vertical
-  // Knockback, not the explosion's knockback).
+  // Normal BA2 keeps its own data (its own Base Launch 2 upward, not the
+  // explosion's launch).
   assert.deepEqual(
     { ...def.attacks.ba2 },
     {
       animation: 'ba2', startup: 3 / 12, active: 2 / 12, recovery: 2 / 12, damage: 10,
-      hitbox: { x: 10, y: -88, w: 24, h: 78 }, knockback: { axis: 'vertical', level: 'high' }, knockbackGrowth: 1,
+      hitbox: { x: 10, y: -88, w: 24, h: 78 }, baseLaunch: 2, directionalLaunch: 'vertical',
       hitstun: 0.24, blockstun: 0.15, hitstop: 0.07, cooldown: 0.15, groundOnly: true,
     },
   );
@@ -627,7 +626,7 @@ test('a clean miss: the rush stops, #0001 lets go on rasen12 alone for one frame
     assert.ok(!log.some((s) => PRASEN.slice(6).includes(s.sphere)), 'no impact or explosion frames');
     assert.ok(!log.some((s) => RASEN.slice(6, 11).includes(s.frame)), 'no contact, blast or recovery poses');
     assert.deepEqual(d.events, [], 'no contact, tick or explosion');
-    assert.equal(d.target.combat.knockback, 0);
+    assert.equal(d.target.combat.launchPoint, 0);
     assert.equal(d.target.combat.immobilized, false);
     assert.equal(t.explosionDone, false);
     assert.deepEqual(d.clones, []);
@@ -662,7 +661,7 @@ test('a hit: exactly one contact that adds nothing, the rush stops, and the targ
   assert.equal(event.technique, t);
   assert.equal(event.summon, null);
   assert.equal(event.projectile, null);
-  assert.equal(d.target.combat.knockback, 0);
+  assert.equal(d.target.combat.launchPoint, 0);
   // Contact on the swing, the complete sphere meeting the target.
   assert.equal(t.firstHitDone, true);
   assert.equal(t.hitConfirmed, true);
@@ -701,7 +700,7 @@ test('on the very step the sphere first hits, the target already shows Hurt, bou
   }
   // The contact step itself, nothing ticked since: the target on screen is
   // already the caught one.
-  assert.equal(d.target.combat.knockback, 0);
+  assert.equal(d.target.combat.launchPoint, 0);
   assert.equal(d.events.length, 1);
   assert.equal(t.phase, 'confirm');
   assert.equal(d.target.combat.isBoundBy(t), true);
@@ -838,7 +837,7 @@ test('the attached sphere frame is a pure function of the time since the hit (de
   assert.deepEqual(run(), first, 'the same every time');
 });
 
-test('the explosion comes exactly 2.0 s after the hit step on rasen9: prasen10 -> prasen11, +15, target released then launched sideways; only then rasen10-12', () => {
+test('the explosion comes exactly 2.0 s after the hit step on rasen9: prasen10 -> prasen11, +15, target released then launched sideways at 3 x 18; only then rasen10-12', () => {
   const d = hitDuel();
   const t = hitConfirm(d);
   // Never early: still bound, and only the ticks so far, on every step
@@ -846,10 +845,10 @@ test('the explosion comes exactly 2.0 s after the hit step on rasen9: prasen10 -
   for (let i = 1; i < DELAY_STEPS; i++) {
     d.tick();
     assert.notEqual(t.phase, 'explode', `step ${i}`);
-    assert.equal(d.target.combat.knockback, Math.floor(i / TICK_STEPS), `step ${i}`);
+    assert.equal(d.target.combat.launchPoint, Math.floor(i / TICK_STEPS), `step ${i}`);
     assert.equal(d.target.combat.immobilized, true);
   }
-  assert.equal(d.target.combat.knockback, 3);
+  assert.equal(d.target.combat.launchPoint, 3);
   d.tick();
   assert.equal(t.phase, 'explode', 'exactly 2.0 s of fixed steps after the hit step');
   assert.equal(name(t.sphereFrame), '0001_prasen10.png', 'the blast lands on the first explosion frame');
@@ -859,22 +858,19 @@ test('the explosion comes exactly 2.0 s after the hit step on rasen9: prasen10 -
   assert.equal(blast.damage, 15);
   assert.equal(blast.move, 'rasenRush.explosionHit');
   assert.equal(blast.technique, t);
-  assert.equal(d.target.combat.knockback, 18, '3 ticks, then 15');
-  // Released before the knockback, so the launch is intact: sideways and
-  // hard, away from #0001. Its own default launch plus the horizontal bonus
-  // for the 18 Knockback the target now has at the blast's growth (2); the
-  // slight lift is its own, unchanged, and nothing multiplies the whole
-  // vector.
+  assert.equal(d.target.combat.launchPoint, 18, '3 ticks, then 15');
+  // Released before the launch, so it is intact: 3 + 15 = 18 first, then
+  // exactly 3 x 18 = 54, sideways away from #0001, with no lift and nothing
+  // added.
   assert.equal(d.target.combat.immobilized, false);
-  const { x, y } = TECH.explosionHit.baseKnockback;
   assert.equal('launchMultiplier' in blast, false);
-  assert.deepEqual(blast.baseLaunch, { x: 720, y: 180 });
-  assert.deepEqual(blast.bonusLaunch, { x: 72, y: 0 });
-  assert.deepEqual(blast.finalLaunch, { x: 792, y: 180 });
-  assert.equal(d.target.body.vx, x + accumulatedKnockbackBonus(18, 'horizontal', 2));
-  assert.equal(d.target.body.vy, -y);
-  assert.ok(d.target.body.vx > 3 * Math.abs(d.target.body.vy), 'mostly horizontal');
-  assert.equal(d.target.grounded, false);
+  assert.equal('bonusLaunch' in blast, false);
+  assert.deepEqual([blast.launchPointBefore, blast.launchPointAfter], [3, 18]);
+  assert.deepEqual([blast.baseLaunch, blast.directionalLaunch, blast.launchStrength], [3, 'horizontal', 54]);
+  assert.deepEqual(blast.finalLaunch, { x: 54, y: 0 });
+  assert.equal(d.target.body.vx, 54);
+  assert.equal(d.target.body.vy, 0, 'horizontal only');
+  assert.equal(d.target.grounded, true, 'a horizontal launch invents no lift');
   assert.equal(d.target.combat.stun, 0.55);
   assert.equal(d.target.combat.hitstop, 0.12);
   assert.ok(d.target.combat.hitstop > TECH.firstHit.hitstop);
@@ -906,12 +902,12 @@ test('the explosion comes exactly 2.0 s after the hit step on rasen9: prasen10 -
   assert.equal(t.sphereFrame, null);
   assert.equal(d.attacker.state, 'idle');
   assert.equal(log.at(-1).canAct, true, 'free again once rasen12 is over');
-  // The target flies off after its freeze, then lands.
+  // The target slides away after its freeze.
   d.until(() => d.target.grounded);
-  assert.ok(d.target.body.x > launchX + 20, 'launched away');
+  assert.ok(d.target.body.x > launchX, 'launched away');
   for (let i = 0; i < steps(1); i++) d.tick();
   assert.equal(d.events.length, 5, 'no tick or blast after the technique');
-  assert.equal(d.target.combat.knockback, 18, '1 + 1 + 1 + 15 = 18 in all');
+  assert.equal(d.target.combat.launchPoint, 18, '1 + 1 + 1 + 15 = 18 in all');
 });
 
 test('a full Sphere Rush: nothing on contact, +1 at 0.5, 1.0 and 1.5 s, then +15 on the blast, 18 in all', () => {
@@ -924,8 +920,8 @@ test('a full Sphere Rush: nothing on contact, +1 at 0.5, 1.0 and 1.5 s, then +15
     'rasenRush.firstHit', 'rasenRush.tickHit', 'rasenRush.tickHit', 'rasenRush.tickHit', 'rasenRush.explosionHit',
   ]);
   assert.ok(d.events.every((e) => e.technique && e.attacker === d.attacker && e.target === d.target));
-  assert.equal(d.target.combat.knockback, 18);
-  assert.equal(d.attacker.combat.knockback, 0, 'the attacker takes nothing');
+  assert.equal(d.target.combat.launchPoint, 18);
+  assert.equal(d.attacker.combat.launchPoint, 0, 'the attacker takes nothing');
 });
 
 // ---- Ticks while bound ----------------------------------------------------------------
@@ -964,7 +960,7 @@ test('ticks begin only once the rush has caught someone: a whiff, and the rush b
   miss.until(() => !miss.attacker.technique);
   assert.equal(t.endReason, 'miss');
   assert.deepEqual(miss.events, []);
-  assert.equal(miss.target.combat.knockback, 0);
+  assert.equal(miss.target.combat.launchPoint, 0);
   const hit = hitDuel();
   const u = start(hit);
   while (!u.hitConfirmed) {
@@ -973,7 +969,7 @@ test('ticks begin only once the rush has caught someone: a whiff, and the rush b
   }
 });
 
-test('a tick adds 1 Knockback and nothing else: no launch, no stun or freeze, the hold never stutters', () => {
+test('a tick adds 1 Launch Point and nothing else: no launch, no stun or freeze, the hold never stutters', () => {
   const d = hitDuel();
   const t = hitConfirm(d);
   // Well past the contact's own hitstun and freeze.
@@ -983,7 +979,9 @@ test('a tick adds 1 Knockback and nothing else: no launch, no stun or freeze, th
   d.tick();
   const tick = d.events.at(-1);
   assert.equal(tick.move, 'rasenRush.tickHit');
-  assert.deepEqual([tick.damage, tick.knockbackBefore, tick.knockbackAfter], [1, 0, 1]);
+  assert.deepEqual([tick.damage, tick.launchPointBefore, tick.launchPointAfter], [1, 0, 1]);
+  assert.deepEqual([tick.baseLaunch, tick.directionalLaunch, tick.launchStrength], [0, null, 0]);
+  assert.deepEqual(tick.finalLaunch, { x: 0, y: 0 });
   assert.equal(d.target.body.vx, 0);
   assert.equal(d.target.body.vy, 0);
   assert.deepEqual([d.target.body.x, d.target.body.y], [x, y]);
@@ -994,40 +992,45 @@ test('a tick adds 1 Knockback and nothing else: no launch, no stun or freeze, th
   assert.equal(d.target.combat.isBoundBy(t), true, 'still held');
   assert.equal(frameName(d.target), pose, 'the same caught pose');
   assert.equal(t.phase, 'wait');
-  // Even at a huge Knockback, a tick never launches.
-  const big = hitDuel();
-  big.target.combat.knockback = 900;
-  hitConfirm(big);
-  for (let i = 0; i < TICK_STEPS; i++) big.tick();
-  assert.equal(big.target.combat.knockback, 901);
-  assert.deepEqual([big.target.body.vx, big.target.body.vy], [0, 0]);
+  // Even at a huge Launch Point, a tick never launches: 0 x 120 and 0 x 901
+  // are both 0.
+  for (const [from, to] of [[119, 120], [900, 901]]) {
+    const big = hitDuel();
+    big.target.combat.launchPoint = from;
+    hitConfirm(big);
+    for (let i = 0; i < TICK_STEPS; i++) big.tick();
+    assert.equal(big.target.combat.launchPoint, to);
+    assert.equal(big.events.at(-1).launchStrength, 0);
+    assert.deepEqual([big.target.body.vx, big.target.body.vy], [0, 0]);
+  }
 });
 
-test('the blast is a strong sideways launch, harder than BA1 and growing with the target\'s Knockback', () => {
-  const blastAt = (knockback, facing = 1) => {
+test('the blast adds its 15 first, then launches at exactly 3 x the new Launch Point, sideways: 105 + 15 = 120, 360', () => {
+  // `from` before the contact; the three ticks add 3 before the blast.
+  const blastAt = (from, facing = 1) => {
     const d = hitDuel({ attackerFacing: facing, x: facing > 0 ? 500 : 1500 });
-    d.target.combat.knockback = knockback;
+    d.target.combat.launchPoint = from;
     const t = hitConfirm(d);
     while (t.phase !== 'explode') d.tick();
-    return { vx: d.target.body.vx, vy: d.target.body.vy, k: d.target.combat.knockback };
+    const blast = d.events.at(-1);
+    assert.equal(blast.move, 'rasenRush.explosionHit');
+    return { blast, vx: d.target.body.vx, vy: d.target.body.vy, k: d.target.combat.launchPoint };
   };
   for (const facing of [1, -1]) {
     const fresh = blastAt(0, facing);
     assert.equal(fresh.k, 18);
-    assert.equal(Math.sign(fresh.vx), facing, 'away from #0001');
-    assert.ok(Math.abs(fresh.vx) > 3 * Math.abs(fresh.vy), 'mostly horizontal');
-    // Far harder than BA1 would push the same target.
-    const ba1Growth = def.attacks.ba1.knockbackGrowth;
-    assert.ok(Math.abs(fresh.vx) > 4 * (KNOCKBACK_LEVELS.low.horizontal + accumulatedKnockbackBonus(fresh.k, 'horizontal', ba1Growth)));
-    const worn = blastAt(100, facing);
-    assert.equal(worn.k, 118);
-    // 100 more Knockback adds exactly 100 points' horizontal bonus at the
-    // blast's own growth, twice what a standard-growth hit gains: added,
-    // never a ratio of its default launch.
-    assert.equal(worn.vx - fresh.vx, facing * accumulatedKnockbackBonus(100, 'horizontal', 2), 'plus the accumulated-Knockback bonus');
-    assert.equal(worn.vx - fresh.vx, facing * 2 * accumulatedKnockbackBonus(100, 'horizontal'));
-    assert.equal(worn.vy, fresh.vy, 'the slight lift is the blast\'s own, whatever the Knockback');
-    assert.ok(Math.abs(worn.vx) > Math.abs(fresh.vx));
+    assert.equal(fresh.vx, 54 * facing, '3 x 18, away from #0001');
+    assert.equal(fresh.vy, 0, 'no lift');
+    const worn = blastAt(102, facing);
+    assert.equal(worn.blast.launchPointBefore, 105, '102 + three ticks');
+    assert.equal(worn.k, 120, '105 + 15');
+    assert.equal(worn.blast.launchStrength, 360, '3 x 120, not 3 x 105');
+    assert.deepEqual(worn.blast.finalLaunch, { x: 360 * facing, y: 0 });
+    assert.equal(worn.vx, 360 * facing);
+    assert.equal(worn.vy, 0);
+    // Not the old bespoke { x: 720, y: 180 } vector, or anything added to it.
+    assert.notEqual(Math.abs(worn.vx), 720);
+    assert.notEqual(Math.abs(fresh.vx), 720);
   }
 });
 
@@ -1035,11 +1038,11 @@ test('an interruption stops the ticks: a hit on #0001 after the first tick leave
   const d = hitDuel();
   const t = hitConfirm(d);
   for (let i = 0; i < TICK_STEPS + 5; i++) d.tick();
-  assert.equal(d.target.combat.knockback, 1);
+  assert.equal(d.target.combat.launchPoint, 1);
   new CombatSystem().applyHit(d.target, d.attacker, d.target.attacks.ba1);
   assert.equal(t.endReason, 'hit');
   for (let i = 0; i < DELAY_STEPS + 30; i++) d.tick();
-  assert.equal(d.target.combat.knockback, 1, 'no tick after the interruption, no blast');
+  assert.equal(d.target.combat.launchPoint, 1, 'no tick after the interruption, no blast');
   assert.equal(d.events.filter((e) => e.technique).length, 2, 'the contact and the one tick');
 });
 
@@ -1047,18 +1050,18 @@ test('a lost bind stops the ticks: nothing more once the target is no longer hel
   const d = hitDuel();
   const t = hitConfirm(d);
   for (let i = 0; i < 2 * TICK_STEPS + 5; i++) d.tick();
-  assert.equal(d.target.combat.knockback, 2);
+  assert.equal(d.target.combat.launchPoint, 2);
   d.target.combat.unbind(t);
   for (let i = 0; i < DELAY_STEPS; i++) d.tick();
   assert.equal(t.endReason, 'released');
-  assert.equal(d.target.combat.knockback, 2);
+  assert.equal(d.target.combat.launchPoint, 2);
   // Nor is a tick due on the step of the release dealt.
   const e = hitDuel();
   const u = hitConfirm(e);
   for (let i = 0; i < TICK_STEPS - 1; i++) e.tick();
   e.target.combat.unbind(u);
   e.tick();
-  assert.equal(e.target.combat.knockback, 0);
+  assert.equal(e.target.combat.launchPoint, 0);
   assert.equal(u.takeTick(), null);
 });
 
@@ -1066,20 +1069,20 @@ test('the Void stops the ticks: a caught target lost to it takes nothing more', 
   const { battle, script } = await realBattle();
   const t = battleHit(battle, script);
   for (let i = 0; i < TICK_STEPS + 5; i++) battle.update(DT);
-  assert.equal(battle.p2.combat.knockback, 1);
+  assert.equal(battle.p2.combat.launchPoint, 1);
   Object.assign(battle.p2.body, { x: battle.stage.void.right + 50, grounded: false, ground: null });
   battle.update(DT);
   assert.equal(battle.p2.lostToVoid, true);
   assert.equal(t.endReason, 'released');
-  // Out of play for its respawn wait, keeping the Knockback it fell with:
+  // Out of play for its respawn wait, keeping the Launch Point it fell with:
   // no tick or explosion reaches it.
   while (battle.p2.lostToVoid) {
-    assert.equal(battle.p2.combat.knockback, 1);
+    assert.equal(battle.p2.combat.launchPoint, 1);
     battle.update(DT);
   }
   // Back from the Void: a fresh 0, and still nothing from the ended rush.
   for (let i = 0; i < DELAY_STEPS; i++) battle.update(DT);
-  assert.equal(battle.p2.combat.knockback, 0);
+  assert.equal(battle.p2.combat.launchPoint, 0);
 });
 
 // ---- Cooldown ---------------------------------------------------------------------------
@@ -1256,18 +1259,18 @@ test('once it is over, a Charge still held does not charge again until it is let
   assert.equal(f.attacker.state, 'charge');
 });
 
-test('no amount of Knockback ends the hold: a target at 999 is caught, ticked and blown up like any other', () => {
+test('no Launch Point ends the hold: a target at 999 is caught, ticked and blown up like any other', () => {
   const d = hitDuel();
-  d.target.combat.knockback = 999;
+  d.target.combat.launchPoint = 999;
   const t = start(d);
   d.until(() => !d.attacker.technique);
   assert.equal(t.endReason, 'done');
   assert.deepEqual(d.events.map((e) => [e.type, e.damage]), FULL_RUSH);
-  assert.equal(d.target.combat.knockback, 999 + 18);
+  assert.equal(d.target.combat.launchPoint, 999 + 18);
   assert.equal(d.target.combat.immobilized, false);
   // Only its own hold ending (its bind lost, the technique over) releases it.
   const code = readFileSync(ROOT + 'js/game/charged-technique.js', 'utf8').replace(/^\s*\/\/.*$/gm, '');
-  assert.doesNotMatch(code, /health|knockback\s*[<>]/i, 'no Health, and no Knockback threshold');
+  assert.doesNotMatch(code, /health|knockback|launchPoint\s*[<>]/i, 'no Health, and no Launch Point threshold');
 });
 
 // ---- Ground ------------------------------------------------------------------------
@@ -1293,7 +1296,7 @@ test('ground lost during formation cancels it: no sphere, no hit, and #0001 fall
   d.until(() => d.attacker.grounded);
   assert.equal(d.attacker.body.y, 800, 'down to the floor, no invisible platform');
   assert.deepEqual(d.events, []);
-  assert.equal(d.target.combat.knockback, 0);
+  assert.equal(d.target.combat.launchPoint, 0);
   assert.ok(d.attacker.combat.chargedCooldowns.active('rasenRush'), 'the cooldown is spent all the same');
 });
 
@@ -1359,9 +1362,9 @@ test('ground lost after the hit cancels the rest: the tick dealt stays, the targ
   standOn(d.attacker, stage, 'slab');
   assert.equal(d.target.body.ground.id, '__floor');
   const t = hitConfirm(d);
-  assert.equal(d.target.combat.knockback, 0);
+  assert.equal(d.target.combat.launchPoint, 0);
   for (let i = 0; i < 40; i++) d.tick();
-  assert.equal(d.target.combat.knockback, 1, 'one tick so far');
+  assert.equal(d.target.combat.launchPoint, 1, 'one tick so far');
   assert.equal(t.phase, 'wait');
   stage.platforms.length = 0;
   d.tick();
@@ -1372,7 +1375,7 @@ test('ground lost after the hit cancels the rest: the tick dealt stays, the targ
   assert.equal(d.attacker.state, 'fall');
   for (let i = 0; i < DELAY_STEPS + 30; i++) d.tick();
   assert.equal(d.events.length, 2, 'the contact and one tick: the rest never comes');
-  assert.equal(d.target.combat.knockback, 1, 'what was dealt is kept');
+  assert.equal(d.target.combat.launchPoint, 1, 'what was dealt is kept');
 });
 
 // ---- Interruption ------------------------------------------------------------------
@@ -1395,15 +1398,15 @@ test('a hit on #0001 cancels the technique in formation, dash, wait, a miss\'s r
     assert.equal(t.endReason, 'hit');
     assert.equal(t.sphereFrame, null);
     assert.equal(d.target.combat.immobilized, false);
-    assert.equal(d.attacker.combat.knockback, 5, 'full damage: no armour');
-    assert.ok(Math.abs(d.attacker.body.vx) > 0, 'full knockback');
+    assert.equal(d.attacker.combat.launchPoint, 5, 'full damage: no armour');
+    assert.ok(Math.abs(d.attacker.body.vx) > 0, 'the full launch');
     d.tick();
     assert.equal(d.attacker.state, 'hitstun');
     assert.equal(frameName(d.attacker), '0001_hurt.png');
     const hits = d.events.length;
     for (let i = 0; i < DELAY_STEPS + 20; i++) d.tick();
     assert.equal(d.events.length, hits, `${when}: nothing more from the cancelled technique`);
-    assert.equal(d.target.combat.knockback, { release: 18 }[when] ?? 0, 'Knockback already added stays');
+    assert.equal(d.target.combat.launchPoint, { release: 18 }[when] ?? 0, 'Launch Point already added stays');
   }
   // A punch that really lands during formation does the same.
   const d = duel({ gap: 44 });
@@ -1442,7 +1445,7 @@ test('Dodge invulnerability makes the rush pass unspent: no hit or bind, and a m
   runUntil(d, () => !d.attacker.technique, () => ({}), (i) => (i + 2 === C - 5 ? DEFENSE : {}));
   assert.equal(t.endReason, 'miss');
   assert.deepEqual(d.events, []);
-  assert.equal(d.target.combat.knockback, 0);
+  assert.equal(d.target.combat.launchPoint, 0);
   assert.equal(d.target.combat.immobilized, false);
   assert.equal(t.firstHitDone, false, 'the sphere was never used up');
 });
@@ -1473,7 +1476,7 @@ test('Block (future fighters): a guarded contact is a normal block; no bind, tic
   assert.equal(d.events[0].type, 'block');
   assert.equal(d.events[0].technique, t);
   assert.equal(d.events[0].damage, 0, 'the contact deals nothing, blocked or not');
-  assert.equal(d.target.combat.knockback, 0);
+  assert.equal(d.target.combat.launchPoint, 0);
   assert.equal(d.target.combat.immobilized, false);
   assert.equal(d.attacker.state, 'idle');
   for (let i = 0; i < DELAY_STEPS + 20; i++) d.tick({}, { defense: true });
@@ -1559,7 +1562,7 @@ test('a solid wall stops the rush: no pass-through, no hit behind it, and #0001 
   assert.ok(release.every((s) => s.sphere === null && !s.searching));
   assert.equal(log.at(-2).frame, WHIFF_POSE);
   assert.deepEqual(d.events, []);
-  assert.equal(d.target.combat.knockback, 0);
+  assert.equal(d.target.combat.launchPoint, 0);
   assert.ok(d.attacker.combat.chargedCooldowns.active('rasenRush'), 'a wall still spends the cooldown');
   assert.equal(d.attacker.state, 'idle');
   assert.equal(t.sphereFrame, null);
@@ -1736,7 +1739,7 @@ test('Battle: restart and rematch clear the technique, its sphere, the bind and 
   const { battle, script } = await realBattle();
   const t = battleHit(battle, script);
   for (let i = 0; i < TICK_STEPS; i++) battle.update(DT);
-  assert.equal(battle.p2.combat.knockback, 1);
+  assert.equal(battle.p2.combat.launchPoint, 1);
   assert.equal(battle.p2.combat.immobilized, true);
   battle.restart();
   assert.equal(battle.p1.technique, null);
@@ -1745,11 +1748,11 @@ test('Battle: restart and rematch clear the technique, its sphere, the bind and 
   assert.equal(t.target, null);
   assert.equal(t.owner, null);
   assert.equal(battle.p2.combat.immobilized, false);
-  assert.equal(battle.p2.combat.knockback, 0, 'a rematch starts from 0');
+  assert.equal(battle.p2.combat.launchPoint, 0, 'a rematch starts from 0');
   assert.equal(battle.p1.combat.chargedCooldowns.size, 0, 'and with every cooldown ready');
   assert.equal(battle.p1.state, 'idle');
   for (let i = 0; i < DELAY_STEPS + 30; i++) battle.update(DT);
-  assert.equal(battle.p2.combat.knockback, 0, 'no tick or explosion survives a rematch');
+  assert.equal(battle.p2.combat.launchPoint, 0, 'no tick or explosion survives a rematch');
   assert.equal(battle.p1.technique, null);
 
   // Resetting the owner alone frees the opponent at once...
@@ -1958,6 +1961,6 @@ test('Battle draws a miss in either direction: the rush, then rasen12 with no sp
     assert.equal(released.length, WHIFF_STEPS);
     assert.ok(released.every((f) => f.length === 1), 'no sphere drawn with the release');
     assert.ok(!frames.flat().some((id) => PRASEN.slice(6).includes(id)), 'no impact or explosion drawn');
-    assert.equal(battle.p2.combat.knockback, 0);
+    assert.equal(battle.p2.combat.launchPoint, 0);
   }
 });

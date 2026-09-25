@@ -18,7 +18,6 @@ import { characterFramePaths } from '../js/data/characters.js';
 import { getMap } from '../js/data/maps.js';
 import { Fighter } from '../js/game/character.js';
 import { CombatState, CooldownTimers } from '../js/game/combat.js';
-import { KNOCKBACK_LEVELS, accumulatedKnockbackBonus } from '../js/data/knockback.js';
 import { Clone } from '../js/game/clone.js';
 import { StageCollision, createBody, stepBody } from '../js/game/physics.js';
 import { SpriteSet } from '../js/game/sprite-normalizer.js';
@@ -170,19 +169,19 @@ test('the Clone Attack is data: a Charged BA1 summon on a 5-second cooldown, reu
   assert.equal(SUMMON.behindDistance, 48);
   assert.equal(SUMMON.effectOffset.x, 0);
   assert.ok(SUMMON.effectOffset.y < 0, 'the cloud centres on the body, above the feet');
-  // BA1 itself: its knockback is its Low horizontal Knockback, and the
-  // summon has no knockback tuning of its own.
+  // BA1 itself: Base Launch 1, horizontal, and the summon has no launch data
+  // of its own.
   assert.deepEqual(
     { ...ATTACK },
     {
       animation: 'ba1', startup: 1 / 12, active: 1 / 12, recovery: 2 / 12, damage: 5,
-      hitbox: { x: 12, y: -64, w: 28, h: 16 }, knockback: { axis: 'horizontal', level: 'low' }, knockbackGrowth: 0.5,
+      hitbox: { x: 12, y: -64, w: 28, h: 16 }, baseLaunch: 1, directionalLaunch: 'horizontal',
       hitstun: 0.22, blockstun: 0.14, hitstop: 0.06, cooldown: 0.1, groundOnly: true,
     },
   );
-  for (const key of ['knockback', 'powers']) assert.equal(key in SUMMON, false, `no summon ${key}`);
-  assert.doesNotMatch(readFileSync(ROOT + 'js/game/clone.js', 'utf8'), /knockback\.js|resolveKnockback|KNOCKBACK_LEVELS|powers\.js/,
-    'the clone performs the owner\'s resolved attack; it never resolves Knockback itself');
+  for (const key of ['baseLaunch', 'directionalLaunch', 'launchPoint', 'powers']) assert.equal(key in SUMMON, false, `no summon ${key}`);
+  assert.doesNotMatch(readFileSync(ROOT + 'js/game/clone.js', 'utf8'), /knockback|launch\.js|resolveHitLaunch|resolveLaunchStrength|resolveDirectionalLaunch|powers\.js/i,
+    'the clone performs the owner\'s resolved attack; it never resolves a launch itself');
   assert.deepEqual(def.actions.action1, { ground: 'ba1', air: 'midairBa1' });
   // No new control: the summon has no action, key or attack of its own.
   assert.equal(def.actions.clone, undefined);
@@ -597,9 +596,9 @@ test('the clone never follows: the target can walk straight through its spot, an
   const log = follow(d, clone, () => CHARGE, (i) => (i < CLOUD_STEPS ? { right: true } : {}));
   assert.ok(d.target.body.x > spot.x + 60, 'no pushbox stopped it');
   for (const s of log) assert.deepEqual({ x: s.x, y: s.y, facing: s.facing }, spot);
-  // Whiff: no Knockback added, and the full BA1 still plays and recovers.
+  // Whiff: no Launch Point added, and the full BA1 still plays and recovers.
   assert.deepEqual(d.events, []);
-  assert.equal(d.target.combat.knockback, 0);
+  assert.equal(d.target.combat.launchPoint, 0);
   const attack = log.filter((s) => s.phase === 'attack');
   assert.equal(attack.length, BA1_STEPS, 'startup, active and recovery, no freeze');
   // BA1's own 12 fps: every frame for 1/12 s, the hitbox on frame 2.
@@ -693,7 +692,7 @@ test('the no-ground fallback is data: the summon reuses midairBa2 over the targe
     { ...MB2 },
     {
       animation: 'midairBa2', startup: 2 / 12, active: 1 / 12, recovery: 2 / 12, damage: 10,
-      hitbox: { x: 8, y: -44, w: 40, h: 40 }, knockback: { axis: 'vertical', level: 'high', sign: -1 }, knockbackGrowth: 1,
+      hitbox: { x: 8, y: -44, w: 40, h: 40 }, baseLaunch: 2, directionalLaunch: 'reverseVertical',
       hitstun: 0.22, blockstun: 0.14, hitstop: 0.06, cooldown: 0.1,
     },
   );
@@ -706,7 +705,7 @@ test('the no-ground fallback is data: the summon reuses midairBa2 over the targe
   assert.ok(Object.isFrozen(f.summonDefs.ba1Clone.noGround));
 });
 
-test('supported ground is unchanged: behind the target either way it faces, BA1, 5 damage and Low horizontal Knockback', () => {
+test('supported ground is unchanged: behind the target either way it faces, BA1, 5 damage, Base Launch 1 horizontal', () => {
   for (const attackerFacing of [1, -1]) {
     const d = duel({ attackerFacing });
     const facing = d.target.facing;
@@ -723,15 +722,19 @@ test('supported ground is unchanged: behind the target either way it faces, BA1,
     assert.deepEqual(order(log.filter((s) => s.phase === 'vanish').map((s) => s.cloud)), [...CLOUD].reverse());
     assert.equal(d.events.length, 1);
     assert.equal(d.events[0].damage, 5, 'the clone\'s BA1 adds 5');
-    assert.equal(d.target.combat.knockback, 5);
+    assert.equal(d.target.combat.launchPoint, 5);
     assert.ok(d.attacker.combat.chargedCooldowns.active('ba1Clone'));
   }
-  // Knockback read at the hit: along the clone's facing, no launch.
+  // BA1's own authored launch, inherited through the shared applyHit: 115 +
+  // 5 = 120, then 1 x 120 along the clone's facing, no upward launch.
   const d = duel();
+  d.target.combat.launchPoint = 115;
   const clone = summon(d);
   d.until(() => d.events.length > 0);
-  // BA1's own default launch and knockback growth (0.5), inherited.
-  assert.equal(d.target.body.vx, (KNOCKBACK_LEVELS.low.horizontal + accumulatedKnockbackBonus(5, 'horizontal', 0.5)) * clone.facing);
+  const [e] = d.events;
+  assert.deepEqual([e.damage, e.baseLaunch, e.directionalLaunch], [5, 1, 'horizontal']);
+  assert.deepEqual([e.launchPointBefore, e.launchPointAfter, e.launchStrength], [115, 120, 120]);
+  assert.equal(d.target.body.vx, 120 * clone.facing);
   assert.equal(d.target.body.vy, 0);
 });
 
@@ -878,8 +881,8 @@ test('the overhead kick lands on a stationary target through the real hitbox and
     const d = roofDuel(targetX, facing);
     const clone = summon(d);
     assert.equal(clone.attackDef, d.attacker.attacks.midairBa2);
-    // Its own resolved High reversed vertical Knockback: no sideways push.
-    assert.deepEqual(clone.attackDef.baseKnockback, { x: 0, y: -KNOCKBACK_LEVELS.high.vertical });
+    // Mid-air BA2's own Base Launch 2, reverse vertical: no sideways push.
+    assert.deepEqual([clone.attackDef.baseLaunch, clone.attackDef.directionalLaunch], [2, 'reverseVertical']);
     let n = 0;
     while (!d.events.length) {
       d.tick(CHARGE);
@@ -897,7 +900,7 @@ test('the overhead kick lands on a stationary target through the real hitbox and
     assert.equal(e.projectile, null);
     assert.equal(e.technique, null);
     assert.equal(e.damage, 10, 'the overhead Mid-air BA2 adds 10');
-    assert.equal(d.target.combat.knockback, 10);
+    assert.equal(d.target.combat.launchPoint, 10);
     assert.equal(d.target.combat.stun, MB2.hitstun);
     assert.equal(d.target.combat.hitstop, MB2.hitstop);
     assert.equal(clone.hitstop, MB2.hitstop, 'the clone freezes on impact');
@@ -907,15 +910,16 @@ test('the overhead kick lands on a stationary target through the real hitbox and
   }
 });
 
-test('the overhead kick drives the target downward with midairBa2\'s High reversed vertical Knockback', () => {
+test('the overhead kick drives the target downward with mid-air BA2\'s Base Launch 2 reverse vertical: 110 + 10 = 120, vy +240', () => {
   for (const [targetX, facing] of EDGES) {
     const d = roofDuel(targetX, facing);
+    d.target.combat.launchPoint = 110;
     summon(d);
     d.until(() => d.events.length > 0);
     assert.ok(d.target.body.vx === 0, 'no sideways push');
     assert.ok(d.target.body.vy > 0, 'downward: world y grows down');
-    assert.equal(d.target.body.vy, KNOCKBACK_LEVELS.high.vertical + accumulatedKnockbackBonus(10, 'vertical'), 'plus the bonus for the 10 it adds, still downward');
-    assert.equal(KNOCKBACK_LEVELS.high.vertical, 800);
+    assert.equal(d.events[0].launchStrength, 240);
+    assert.equal(d.target.body.vy, 240, '2 x 120, downward');
     assert.equal(d.target.body.grounded, false);
   }
 });
@@ -930,7 +934,7 @@ test('the overhead kick hits once, however many steps its active box overlaps th
   }
   assert.equal(overlapSteps, steps(MB2.active) + Math.ceil(MB2.hitstop / DT), 'live across several steps (and the freeze)');
   assert.equal(d.events.length, 1, 'one hit event');
-  assert.equal(d.target.combat.knockback, 10, 'one damage application');
+  assert.equal(d.target.combat.launchPoint, 10, 'one damage application');
   assert.equal(clone.hasHit, true);
   assert.equal(clone.hitbox(), null, 'used up');
 });
@@ -948,7 +952,7 @@ test('a Dodge\'s invulnerable frames let the overhead kick pass through unspent;
   }
   assert.equal(activeSteps, steps(MB2.active));
   assert.deepEqual(covered.events, []);
-  assert.equal(covered.target.combat.knockback, 0);
+  assert.equal(covered.target.combat.launchPoint, 0);
   assert.equal(covered.target.combat.stun, 0);
   assert.equal(covered.target.body.vy, 0, 'no spike');
   assert.equal(covered.target.grounded, true);
@@ -968,7 +972,7 @@ test('a Dodge\'s invulnerable frames let the overhead kick pass through unspent;
   assert.equal(hitAt, invulnerable.at(-1) + 1, 'it connects on the first step after the window');
   assert.equal(late.events.length, 1);
   assert.equal(late.events[0].summon, c2);
-  assert.equal(late.target.combat.knockback, 10);
+  assert.equal(late.target.combat.launchPoint, 10);
 });
 
 test('Block (future fighters): the overhead kick goes through applyHit like any hit; a block suppresses its spike', () => {
@@ -976,15 +980,17 @@ test('Block (future fighters): the overhead kick goes through applyHit like any 
   const GUARD = { defense: true };
   // The guard faces the owner, the way the clone faces: not into it.
   const open = roofDuel(1180, -1, { targetCharacter: blocker });
+  open.target.combat.launchPoint = 110;
   const c1 = summon(open, GUARD);
   assert.equal(c1.attackDef.id, 'midairBa2');
   while (!open.events.length) open.tick(CHARGE, GUARD);
   assert.equal(open.target.combat.blocking, true, 'the guard was up');
   assert.equal(open.events[0].type, 'hit');
   assert.equal(open.events[0].damage, 10);
-  assert.equal(open.target.body.vy, KNOCKBACK_LEVELS.high.vertical + accumulatedKnockbackBonus(10, 'vertical'));
+  assert.equal(open.target.body.vy, 240, 'the full spike: 2 x 120');
 
-  // Turned to face the clone: a normal block, with no vertical knockback.
+  // Turned to face the clone: a normal block. Its chip damage still adds
+  // to Launch Point, but the block cancels the reverse vertical launch.
   const front = roofDuel(1180, -1, { targetCharacter: blocker });
   const c2 = summon(front, GUARD);
   front.target.opponent = null;
@@ -998,6 +1004,7 @@ test('Block (future fighters): the overhead kick goes through applyHit like any 
   assert.equal(front.target.combat.stun, MB2.blockstun);
   assert.ok(front.target.body.vx === 0);
   assert.equal(front.target.body.vy, 0, 'no spike on a block');
+  assert.equal(front.target.combat.launchPoint, e.damage, 'the chip damage still counts');
   assert.equal(front.target.body.grounded, true);
   assert.equal(c2.hitstop, MB2.hitstop);
   assert.equal(front.attacker.combat.hitstop, 0);
@@ -1014,7 +1021,7 @@ test('the overhead clone never follows: position, facing and attack stay put, an
   for (const s of log) assert.deepEqual({ x: s.x, y: s.y, facing: s.facing }, { x: spot.x, y: spot.y, facing: spot.facing });
   assert.equal(clone.attackDef, spot.attackDef, 'the attack choice never changes');
   assert.deepEqual(d.events, []);
-  assert.equal(d.target.combat.knockback, 0);
+  assert.equal(d.target.combat.launchPoint, 0);
   const attack = log.filter((s) => s.phase === 'attack');
   assert.equal(attack.length, MB2_STEPS, 'all five frames, no freeze');
   assert.deepEqual(runs(attack.map((s) => s.body)), MB2_FRAMES.map((f) => [f, steps(1 / 12)]));
@@ -1160,14 +1167,14 @@ test('on the real City map: behind on a catwalk\'s middle, overhead at its edge'
 
 // ---- Hits ---------------------------------------------------------------------------
 
-test('the clone BA1 hits once with BA1\'s damage, stun and knockback from the clone, credited to the owner', () => {
+test('the clone BA1 hits once with BA1\'s damage, stun and launch from the clone, credited to the owner', () => {
   const d = duel();
+  d.target.combat.launchPoint = 115;
   const clone = summon(d);
-  // The owner's own resolved BA1: its Low horizontal Knockback is already
-  // numeric, so the clone resolves nothing itself.
+  // The owner's own BA1 definition, so the clone resolves nothing itself:
+  // Base Launch 1, horizontal.
   assert.equal(clone.attackDef, d.attacker.attacks.ba1);
-  assert.deepEqual(clone.attackDef.baseKnockback, { x: KNOCKBACK_LEVELS.low.horizontal, y: 0 });
-  assert.deepEqual(clone.attackDef.baseKnockback, { x: 140, y: 0 });
+  assert.deepEqual([clone.attackDef.baseLaunch, clone.attackDef.directionalLaunch], [1, 'horizontal']);
   d.until(() => d.events.length > 0);
   assert.equal(d.events.length, 1);
   const [e] = d.events;
@@ -1177,13 +1184,14 @@ test('the clone BA1 hits once with BA1\'s damage, stun and knockback from the cl
   assert.equal(e.summon, clone);
   assert.equal(e.projectile, null);
   assert.equal(e.damage, 5, 'the clone\'s BA1 adds 5');
-  assert.equal(d.target.combat.knockback, 5);
+  assert.equal(d.target.combat.launchPoint, 120, '115 + 5');
+  assert.equal(e.launchStrength, 120, '1 x 120');
   assert.equal(d.target.combat.stun, ATTACK.hitstun);
   assert.equal(d.target.combat.hitstop, ATTACK.hitstop);
-  // Knockback along the clone's facing (left, away from the clone), even
+  // Launched along the clone's facing (left, away from the clone), even
   // though the owner faces right.
   assert.equal(d.attacker.facing, 1);
-  assert.equal(d.target.body.vx, -(140 + accumulatedKnockbackBonus(5, 'horizontal', 0.5)));
+  assert.equal(d.target.body.vx, -120);
   assert.equal(clone.hasHit, true);
   assert.equal(clone.attackPhase, 'active');
   assert.equal(clone.hitbox(), null, 'used up');
@@ -1196,7 +1204,7 @@ test('the clone BA1 hits once with BA1\'s damage, stun and knockback from the cl
   assert.ok(log.some((s) => s.phase === 'attack' && s.body === '0001_1ba4.png'), 'recovery plays out');
   assert.deepEqual(order(log.filter((s) => s.phase === 'vanish').map((s) => s.cloud)), [...CLOUD].reverse());
   assert.equal(d.clones.length, 0);
-  assert.equal(d.target.combat.knockback, 5);
+  assert.equal(d.target.combat.launchPoint, 120);
 });
 
 test('a clone hit freezes the target and the clone, never the owner, whose Charge keeps animating', () => {
@@ -1248,9 +1256,9 @@ test('a Dodge\'s invulnerable frames let the clone BA1 pass through unspent; aft
   }
   assert.equal(activeSteps, steps(ATTACK.active));
   assert.deepEqual(covered.events, []);
-  assert.equal(covered.target.combat.knockback, 0);
+  assert.equal(covered.target.combat.launchPoint, 0);
   assert.equal(covered.target.combat.stun, 0);
-  assert.equal(covered.target.body.vx, 0, 'no knockback');
+  assert.equal(covered.target.body.vx, 0, 'no launch');
   assert.equal(clone.hasHit, false, 'not used up by the Dodge');
   assert.equal(clone.hitstop, 0, 'no freeze');
 
@@ -1270,7 +1278,7 @@ test('a Dodge\'s invulnerable frames let the clone BA1 pass through unspent; aft
   assert.equal(late.events.length, 1);
   assert.equal(late.events[0].type, 'hit');
   assert.equal(late.events[0].summon, c2);
-  assert.equal(late.target.combat.knockback, 5);
+  assert.equal(late.target.combat.launchPoint, 5);
 });
 
 test('Block (future fighters): a guard facing away does not block the clone; turned toward it, it does', () => {
@@ -1291,6 +1299,9 @@ test('Block (future fighters): a guard facing away does not block the clone; tur
 
   // Turned to face the clone before the punch: a normal block.
   const front = duel({ targetCharacter: blocker });
+  // 119 + the chip damage (5 x 0.2 = 1) is 120: a raw 1 x 120, halved by
+  // the Block afterward.
+  front.target.combat.launchPoint = 119;
   const clone = summon(front, GUARD);
   front.target.opponent = null;
   front.target.facing = -clone.facing;
@@ -1300,7 +1311,9 @@ test('Block (future fighters): a guard facing away does not block the clone; tur
   assert.equal(e.attacker, front.attacker);
   assert.equal(e.damage, ATTACK.damage * front.target.combat.blockDamageScale, 'chip damage');
   assert.equal(front.target.combat.stun, ATTACK.blockstun);
-  assert.equal(front.target.body.vx, 0.5 * (140 + accumulatedKnockbackBonus(front.target.combat.knockback, 'horizontal', 0.5)) * clone.facing, 'half knockback, from the clone');
+  assert.equal(front.target.combat.launchPoint, 120);
+  assert.equal(e.launchStrength, 120, 'the raw strength, before Block');
+  assert.equal(front.target.body.vx, 60 * clone.facing, 'half of it, from the clone');
   assert.equal(clone.hitstop, ATTACK.hitstop, 'a blocked punch still pauses the clone');
   assert.equal(front.attacker.combat.hitstop, 0);
 });
@@ -1367,7 +1380,7 @@ test('an owner hit after summoning goes into hitstun; the clone carries on, and 
   d.until(() => d.events.some((e) => e.target === d.attacker));
   d.tick(CHARGE);
   assert.equal(d.attacker.state, 'hitstun');
-  assert.equal(d.attacker.combat.knockback, 5);
+  assert.equal(d.attacker.combat.launchPoint, 5);
   assert.equal(clone.alive, true);
   assert.equal(d.clones.length, 1);
   const log = follow(d, clone);
@@ -1377,13 +1390,13 @@ test('an owner hit after summoning goes into hitstun; the clone carries on, and 
   assert.equal(d.clones.length, 0);
 });
 
-test('an owner launched after summoning, at high Knockback, leaves its clone to finish; nothing new is summoned', () => {
+test('an owner launched after summoning, at a high Launch Point, leaves its clone to finish; nothing new is summoned', () => {
   const d = duel();
-  d.attacker.combat.knockback = 250;
+  d.attacker.combat.launchPoint = 250;
   const clone = summon(d);
   d.tick(CHARGE, BA2);
   d.until(() => d.events.some((e) => e.target === d.attacker));
-  assert.ok(d.attacker.combat.knockback > 250);
+  assert.ok(d.attacker.combat.launchPoint > 250);
   const log = follow(d, clone, () => CHARGED_BA1);
   assert.deepEqual(order(log.map((s) => s.body)), BA1_FRAMES);
   assert.deepEqual(order(log.filter((s) => s.phase === 'vanish').map((s) => s.cloud)), [...CLOUD].reverse());
@@ -1427,11 +1440,11 @@ test('clones from successive Charged BA1s never overlap: each waits out the 5 s 
   assert.ok(d.events.filter((e) => e.summon).every((e) => e.attacker === d.attacker));
 });
 
-test('a clone is not a fighter: no Knockback, controller, pushbox or hurtboxes', () => {
+test('a clone is not a fighter: no Launch Point, controller, pushbox or hurtboxes', () => {
   const d = duel();
   const clone = summon(d);
   assert.equal(clone instanceof Fighter, false);
-  for (const key of ['knockback', 'combat', 'controller', 'body', 'pushbox', 'hurtboxes', 'jumpBuffer', 'coyote', 'label', 'slot']) {
+  for (const key of ['launchPoint', 'combat', 'controller', 'body', 'pushbox', 'hurtboxes', 'jumpBuffer', 'coyote', 'label', 'slot']) {
     assert.equal(key in clone, false, `no ${key}`);
   }
   // Only fighters are ever hit: the target punching through the clone's

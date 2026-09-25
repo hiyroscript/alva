@@ -12,15 +12,14 @@
 //     shuriken: {
 //       animation: 'shuriken', speed: 700, lifetime: 1.5,
 //       hitbox: { x: -5, y: -5, w: 10, h: 10 },
-//       damage: 1, baseKnockback: { x: 0, y: 0 }, hitstun: 0.16, blockstun: 0.1, hitstop: 0.04,
+//       damage: 1, baseLaunch: 0, directionalLaunch: null, hitstun: 0.16, blockstun: 0.1, hitstop: 0.04,
 //     },
 //   },
 //
-// `baseKnockback` is the projectile's own default launch (see
-// js/data/knockback.js); an optional `accumulatedKnockbackAxis` names the
-// axis the target's accumulated Knockback adds launch along (by default its
-// dominant one), and an optional `knockbackGrowth` how strongly (by default
-// the standard rate). A projectile with no default launch never launches.
+// `baseLaunch` and `directionalLaunch` are the projectile's own Base Launch
+// and Directional Launch (see js/data/launch.js), validated here exactly
+// like an attack's. A horizontal launch travels along the projectile's own
+// direction. A projectile with Base Launch 0 or no direction never launches.
 //
 // A projectile flies straight in the direction it was released, hits at most
 // once and then disappears. It also disappears when its lifetime runs out,
@@ -29,7 +28,7 @@
 // floor's body included; one-way platforms never stop it. Its hitbox is
 // centred on its position and mirrors with its direction.
 
-import { resolveKnockbackGrowth, resolveLaunchAxis } from '../data/knockback.js';
+import { resolveHitLaunch } from '../data/launch.js';
 
 const PROJECTILE_DEFAULTS = {
   animation: null,
@@ -38,7 +37,8 @@ const PROJECTILE_DEFAULTS = {
   hitbox: { x: -4, y: -4, w: 8, h: 8 },
   damage: 0,
   chipDamage: 0,
-  baseKnockback: { x: 0, y: 0 },
+  baseLaunch: 0,
+  directionalLaunch: null,
   hitstun: 0.2,
   blockstun: 0.12,
   hitstop: 0.06,
@@ -50,9 +50,7 @@ const TIME_EPSILON = 1e-6;
 
 export function createProjectileDefinition(spec) {
   if (!spec?.id) throw new Error('[Alva] Projectile definitions need an id');
-  const def = { ...PROJECTILE_DEFAULTS, ...spec };
-  def.accumulatedKnockbackAxis = resolveLaunchAxis(def.baseKnockback, spec.accumulatedKnockbackAxis, `Projectile "${spec.id}"`);
-  def.knockbackGrowth = resolveKnockbackGrowth(spec.knockbackGrowth, `Projectile "${spec.id}"`);
+  const def = { ...PROJECTILE_DEFAULTS, ...spec, ...resolveHitLaunch(spec, `Projectile "${spec.id}"`) };
   return Object.freeze(def);
 }
 

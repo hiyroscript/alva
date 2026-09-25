@@ -12,8 +12,8 @@
 //
 // the character's own portrait crop (visual.portrait), turned to face the
 // centre whichever way its art was drawn, one thin divider, then its slot
-// tag and name over its accumulated Knockback (a plain number: no bar,
-// maximum or % sign). Under it, in Quick Battle only, one dot per point the
+// tag and name over its Launch Point (a plain number: no bar, maximum or
+// % sign; named for screen readers). Under it, in Quick Battle only, one dot per point the
 // match is played to (CONFIG.battle.pointsToWin), filled for each point the
 // fighter has scored. The CPU's card mirrors the player's. Stamina and the
 // CAB cooldowns are drawn over the fighter itself (js/game/fighter-status.js);
@@ -27,8 +27,8 @@ import { paintPortrait, portraitSourceFacing } from '../ui/sprite-art.js';
 // Spoken names of the slot tags, for the score dots' labels.
 const SLOT_NAMES = { P1: 'Player 1', CPU: 'CPU' };
 
-// The Knockback on show: whole numbers, with no % sign.
-export function formatKnockback(value) {
+// The Launch Point on show: whole numbers, with no % sign.
+export function formatLaunchPoint(value) {
   return String(Math.round(value));
 }
 
@@ -50,22 +50,22 @@ function sidePanel(side, { inward, points = 0 }) {
   const divider = el('span', { class: 'hud-divider', 'aria-hidden': 'true' });
   const tag = el('span', { class: 'hud-slot' });
   const name = el('span', { class: 'hud-name' });
-  const knockbackValue = el('span', { class: 'hud-knockback-value', text: '0' });
-  const knockback = el('div', { class: 'hud-knockback', role: 'group', 'aria-label': 'Knockback' }, [knockbackValue]);
+  const launchPointValue = el('span', { class: 'hud-launch-point-value', text: '0' });
+  const launchPoint = el('div', { class: 'hud-launch-point', role: 'group', 'aria-label': 'Launch Point' }, [launchPointValue]);
   const stamina = el('span', { class: 'hud-sr' });
-  const info = el('div', { class: 'hud-info' }, [el('div', { class: 'hud-tag' }, [tag, name]), knockback]);
+  const info = el('div', { class: 'hud-info' }, [el('div', { class: 'hud-tag' }, [tag, name]), launchPoint]);
   const root = el('div', { class: `hud-side hud-${side} glass` }, [portrait, divider, info, stamina]);
   const dots = Array.from({ length: points }, () => el('span', { class: 'hud-dot', 'aria-hidden': 'true' }));
   const score = points ? el('div', { class: 'hud-score', role: 'img' }, dots) : null;
   const wrap = el('div', { class: `hud-fighter hud-fighter--${side}` }, [root, score]);
   return {
-    wrap, root, portrait, divider, tag, name, info, knockback, knockbackValue, stamina, score, dots, inward,
-    shownKnockback: null, shownStamina: null, shownScore: null, sprites: null,
+    wrap, root, portrait, divider, tag, name, info, launchPoint, launchPointValue, stamina, score, dots, inward,
+    shownLaunchPoint: null, shownStamina: null, shownScore: null, sprites: null,
   };
 }
 
 // Shows `fighter` in `panel` under `tag`: its portrait (facing the centre),
-// name and Knockback, and forgets the cached values so the next update
+// name and Launch Point, and forgets the cached values so the next update
 // redraws everything.
 function bindPanel(panel, tag, fighter) {
   panel.tag.textContent = tag;
@@ -77,17 +77,17 @@ function bindPanel(panel, tag, fighter) {
   // Mirrored only when the art faces away from the centre.
   panel.portrait.classList.toggle('is-mirrored', portraitSourceFacing(fighter.def) !== panel.inward);
   panel.portrait.dataset.facing = panel.inward > 0 ? 'right' : 'left';
-  panel.shownKnockback = null;
+  panel.shownLaunchPoint = null;
   panel.shownStamina = null;
   panel.shownScore = null;
 }
 
 function updatePanel(panel, fighter) {
   const { combat } = fighter;
-  const text = formatKnockback(combat.knockback);
-  if (text !== panel.shownKnockback) {
-    panel.shownKnockback = text;
-    panel.knockbackValue.textContent = text;
+  const text = formatLaunchPoint(combat.launchPoint);
+  if (text !== panel.shownLaunchPoint) {
+    panel.shownLaunchPoint = text;
+    panel.launchPointValue.textContent = text;
   }
   const stamina = describeStamina(combat);
   if (stamina !== panel.shownStamina) {
@@ -138,7 +138,7 @@ export class HUD {
   }
 
   // The match's points fill the dots the moment they are scored (a fighter
-  // out of play keeps its card and its Knockback until it respawns).
+  // out of play keeps its card and its Launch Point until it respawns).
   update(battle) {
     const { p1, p2 } = battle;
     updatePanel(this.left, p1);

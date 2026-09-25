@@ -11,11 +11,11 @@
 // moves, jumps, attacks, charges or defends of its own accord (Fighter falls
 // back to neutral input), and keeps its spawn's facing: like every fighter
 // it never turns toward its opponent by itself. It is otherwise a normal
-// fighter: it takes real hits, hitstun, knockback and binds, collides, and
-// the camera frames it as the secondary fighter. Its Knockback builds up
-// like anyone's (and launches it further as it does), shown on its own HUD
-// card, and every hit it takes also floats the Knockback it added over its
-// head (damageNumbers, "+5").
+// fighter: it takes real hits, hitstun, launches and binds, collides, and
+// the camera frames it as the secondary fighter. Its Launch Point builds up
+// like anyone's (and launching hits send it further as it does), shown on
+// its own HUD card, and every hit it takes also floats the Launch Point it
+// added over its head (damageNumbers, "+5").
 //
 // With no CPU, moves aimed at an opponent fall back or miss on their own: a
 // Charged BA1 clone has nobody to appear behind, so the press is an ordinary
@@ -25,7 +25,7 @@
 //
 // The Void never ends practice and scores nothing: a fighter that falls into
 // it is out of play for CONFIG.battle.respawnSeconds, then back at its own
-// spawn (onVoid, Arena.updateRespawns), fresh: 0 Knockback, full stamina and
+// spawn (onVoid, Arena.updateRespawns), fresh: 0 Launch Point, full stamina and
 // every cooldown ready. Player 1 and the CPU each wait on their own.
 
 import { Arena } from './arena.js';
@@ -44,7 +44,7 @@ const DAMAGE_FADE = 0.45;
 const DAMAGE_STACK = 0.2;
 const DAMAGE_COLOR = '#ff3434';
 
-// "+5", "+15", "+2.5": the Knockback a hit added, with no float noise.
+// "+5", "+15", "+2.5": the Launch Point a hit added, with no float noise.
 export function formatDamage(damage) {
   return `+${Number(damage.toFixed(2))}`;
 }
@@ -62,7 +62,7 @@ export class PracticeSession extends Arena {
   }
 
   // Puts `def` on the training floor as the practice fighter, replacing the
-  // current one: a fresh Fighter at the stage's spawn with 0 Knockback and
+  // current one: a fresh Fighter at the stage's spawn with 0 Launch Point and
   // no cooldowns, driven by Player 1 at once. Nothing of the previous fighter
   // stays: its charged technique ends and its projectiles and clones go. A
   // CPU stays as it is.
@@ -137,7 +137,7 @@ export class PracticeSession extends Arena {
   // play): nothing may keep hold of or aim at it (a technique holding it
   // ends; clones and projectiles aimed at it or its own go, and so do its
   // damage numbers). After its respawn wait it is back at its own spawn,
-  // still, in a fresh training state: 0 Knockback, full stamina and its
+  // still, in a fresh training state: 0 Launch Point, full stamina and its
   // charged cooldowns ready (Fighter.respawn). No point is scored and
   // practice simply carries on.
   onVoid(f) {
@@ -157,7 +157,7 @@ export class PracticeSession extends Arena {
   }
 
   // Ages the numbers already up, then adds one per hit the CPU took this
-  // step, from the Knockback the CombatSystem's resolved hit added.
+  // step, from the Launch Point the CombatSystem's resolved hit added.
   updateDamageNumbers(dt) {
     const list = this.damageNumbers;
     let n = 0;

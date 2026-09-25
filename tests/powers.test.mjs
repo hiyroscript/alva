@@ -3,9 +3,9 @@
 // their frozen tier tables and resolvers, and #0001's Jump Power 2 and Speed
 // Power 2. The shared Fighter takes its jump strength and top speed from
 // those tiers for player and CPU fighters alike, while gravity, falling,
-// coyote time, the jump buffer, acceleration, knockback, projectiles,
+// coyote time, the jump buffer, acceleration, launches, projectiles,
 // techniques and every other movement stat stay independent of them.
-// (Knockback is its own system, not a Power: see knockback.test.mjs.) Runs
+// (Launch is its own system, not a Power: see launch.test.mjs.) Runs
 // the real Fighter, physics and combat (see fighter-harness.mjs).
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -35,13 +35,14 @@ const withSpeed = (tier) => ({ ...def, powers: { ...def.powers, speed: tier } })
 
 const SPEEDS = [[1, 270], [2, 330], [3, 360]];
 
-// A bespoke hit (like the Sphere Rush's explosion) that pushes and launches,
-// for checking what a target's Powers do, or don't do, to its flight.
-// No damage, so it launches a fresh target (0 Knockback) at exactly its
-// default launch, with no accumulated-Knockback bonus: whatever the target's Powers, the launch is the hit's own.
-const LAUNCH = Object.freeze({
-  damage: 0, chipDamage: 0, baseKnockback: Object.freeze({ x: 260, y: 480 }), hitstun: 0.4, blockstun: 0.12, hitstop: 0,
-});
+// Bespoke hits (like the Sphere Rush's explosion) that launch upward and
+// push sideways, for checking what a target's Powers do, or don't do, to its
+// flight. On a fresh target (0 Launch Point) the damage is the whole new
+// Launch Point: 3 x 160 = 480 upward, 2 x 130 = 260 sideways, whatever the
+// target's Powers.
+const HIT = { chipDamage: 0, hitstun: 0.4, blockstun: 0.12, hitstop: 0 };
+const LAUNCH_UP = Object.freeze({ ...HIT, damage: 160, baseLaunch: 3, directionalLaunch: 'vertical' });
+const LAUNCH_SIDEWAYS = Object.freeze({ ...HIT, damage: 130, baseLaunch: 2, directionalLaunch: 'horizontal' });
 
 // Holds `held` until horizontal speed stops changing; returns the settled vx.
 function settledSpeed(step, fighter, held = RIGHT) {
@@ -144,10 +145,10 @@ test('POWERS is the one registry of Power types: Jump Power and Speed Power, fro
   ]);
 });
 
-test('the Power module holds fighter abilities only: no knockback, and no attack ever declares a Power', () => {
-  assert.ok(!POWERS.some((p) => /knockback/i.test(`${p.id} ${p.name} ${p.summary}`)), 'Knockback is not a Power');
+test('the Power module holds fighter abilities only: no launch, and no attack ever declares a Power', () => {
+  assert.ok(!POWERS.some((p) => /launch|knockback/i.test(`${p.id} ${p.name} ${p.summary}`)), 'Launch is not a Power');
   const source = readFileSync(new URL('../js/data/powers.js', import.meta.url), 'utf8');
-  assert.doesNotMatch(source.replace(/^\s*\/\/.*$/gm, ''), /knockback/i, 'no knockback code');
+  assert.doesNotMatch(source.replace(/^\s*\/\/.*$/gm, ''), /launch|knockback/i, 'no launch code');
   assert.deepEqual(Object.keys(powersModule).sort(), [
     'JUMP_POWER_TIERS', 'POWERS', 'SPEED_POWER_TIERS', 'getFighterPowerTier', 'getJumpPowerTier', 'getJumpVelocity',
     'getMaxSpeed', 'getPower', 'getPowerTier', 'getSpeedPowerTier',
@@ -300,12 +301,12 @@ test('coyote time and the jump buffer work the same for every Jump Power tier', 
   }
 });
 
-test('knockback and launches ignore Jump Power: tier 1 and tier 3 targets fly identically', () => {
+test('launches ignore Jump Power: tier 1 and tier 3 targets fly identically', () => {
   const flights = [1, 3].map((tier) => {
     const attacker = makeFighter({ x: 400 });
     const target = makeFighter({ character: withJump(tier), x: 460, facing: -1 });
-    new CombatSystem().applyHit(attacker.fighter, target.fighter, LAUNCH);
-    assert.equal(target.fighter.body.vy, -480, 'the launch is the hit\'s own');
+    new CombatSystem().applyHit(attacker.fighter, target.fighter, LAUNCH_UP);
+    assert.equal(target.fighter.body.vy, -480, 'Base Launch x Launch Point, nothing else');
     const path = [];
     while (target.fighter.combat.stun > 0 || !target.fighter.grounded) {
       target.step();
@@ -509,12 +510,17 @@ function dodgeFrom(character) {
   return { steps, moved: fighter.body.x - x };
 }
 
-test('Speed Power leaves every other velocity alone: knockback received, the shuriken, the Sphere Rush and Dodges', () => {
-  // Knockback and launches received: tier 1 and tier 3 targets fly alike.
+test('Speed Power leaves every other velocity alone: launches received, the shuriken, the Sphere Rush and Dodges', () => {
+  // Launches received: tier 1 and tier 3 targets fly alike, pushed sideways
+  // and launched upward.
   const flights = [1, 3].map((tier) => {
     const attacker = makeFighter({ x: 400 });
     const target = makeFighter({ character: withSpeed(tier), x: 460, facing: -1 });
-    new CombatSystem().applyHit(attacker.fighter, target.fighter, LAUNCH);
+    const system = new CombatSystem();
+    // Upward first: a horizontal launch then keeps that vertical speed.
+    system.applyHit(attacker.fighter, target.fighter, LAUNCH_UP);
+    target.fighter.combat.launchPoint = 0;
+    system.applyHit(attacker.fighter, target.fighter, LAUNCH_SIDEWAYS);
     assert.deepEqual([target.fighter.body.vx, target.fighter.body.vy], [260, -480]);
     const path = [];
     while (target.fighter.combat.stun > 0 || !target.fighter.grounded) {

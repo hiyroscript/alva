@@ -9,7 +9,7 @@
 //
 // Adding a Power type means adding its tier table and an entry to POWERS;
 // Discover lists every entry without further changes. (How hard an attack
-// moves its target is Knockback, not a Power: see js/data/knockback.js.)
+// moves its target is Launch, not a Power: see js/data/launch.js.)
 
 // ---- Tier tables ------------------------------------------------------------
 
@@ -27,7 +27,7 @@ export const JUMP_POWER_TIERS = Object.freeze([
 // Speed Power: the top speed (world units / s) of a fighter's normal left /
 // right movement, on the ground and in the air alike. Tier 2 is the normal
 // speed and tier 3 only a little faster. Acceleration, deceleration, the turn
-// boost and air control are movement stats; knockback, projectiles, Dodges
+// boost and air control are movement stats; launches, projectiles, Dodges
 // and charged techniques have speeds of their own.
 export const SPEED_POWER_TIERS = Object.freeze([
   Object.freeze({ tier: 1, name: 'Speed Power 1', description: 'Slow.', maxSpeed: 270 }),

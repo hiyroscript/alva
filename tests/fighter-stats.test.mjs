@@ -1,7 +1,7 @@
 // Run with node --test tests/fighter-stats.test.mjs (no dependencies).
-// Every fighter's base combat state: accumulated Knockback starts at 0 with
-// no cooldowns, has no maximum, a reset (a new match) puts it back at 0,
-// and no amount of it ever stops a fighter acting. There is no Health or
+// Every fighter's base combat state: Launch Point starts at 0 with no
+// cooldowns, has no maximum, a reset (a new match) puts it back at 0, and
+// no amount of it ever stops a fighter acting. There is no Health or
 // Energy anywhere in a fighter's data or combat state.
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -30,38 +30,38 @@ test('no fighter declares Health or Energy, and no combat state carries either',
   }
 });
 
-test('every new fighter starts at 0 Knockback with every cooldown ready, and a reset returns it there', () => {
+test('every new fighter starts at 0 Launch Point with every cooldown ready, and a reset returns it there', () => {
   for (const character of CHARACTERS) {
     for (const facing of [1, -1]) {
       const fighter = build(character, facing);
-      assert.equal(fighter.combat.knockback, 0, `${character.displayName} starts at 0`);
+      assert.equal(fighter.combat.launchPoint, 0, `${character.displayName} starts at 0`);
       assert.equal(fighter.combat.cooldowns.size, 0);
       assert.equal(fighter.combat.chargedCooldowns.size, 0);
-      fighter.combat.knockback = 87;
+      fighter.combat.launchPoint = 87;
       fighter.combat.chargedCooldowns.start('ba1Clone', 5);
       fighter.reset(STAGE);
-      assert.equal(fighter.combat.knockback, 0, `${character.displayName} after a reset`);
+      assert.equal(fighter.combat.launchPoint, 0, `${character.displayName} after a reset`);
       assert.equal(fighter.combat.chargedCooldowns.size, 0);
     }
   }
-  assert.equal(new CombatState().knockback, 0);
+  assert.equal(new CombatState().launchPoint, 0);
 });
 
-test('Knockback has no maximum: hits keep adding to it far past 100', () => {
+test('Launch Point has no maximum: hits keep adding to it far past 100', () => {
   const { attacker, target } = duel();
   const system = new CombatSystem();
-  const hit = { id: 'probe', damage: 40, baseKnockback: { x: 0, y: 0 }, hitstun: 0, blockstun: 0, hitstop: 0 };
+  const hit = { id: 'probe', damage: 40, baseLaunch: 0, directionalLaunch: null, hitstun: 0, blockstun: 0, hitstop: 0 };
   for (let i = 0; i < 20; i++) system.applyHit(attacker, target, hit);
-  assert.equal(target.combat.knockback, 800);
-  target.combat.knockback = 1e6;
+  assert.equal(target.combat.launchPoint, 800);
+  target.combat.launchPoint = 1e6;
   system.applyHit(attacker, target, hit);
-  assert.equal(target.combat.knockback, 1e6 + 40);
+  assert.equal(target.combat.launchPoint, 1e6 + 40);
 });
 
-test('high Knockback alone never stops a fighter acting: it runs, jumps, attacks, dodges and charges at 100, 200 and 500', () => {
+test('a high Launch Point alone never stops a fighter acting: it runs, jumps, attacks, dodges and charges at 100, 200 and 500', () => {
   for (const value of [100, 200, 500]) {
     const { fighter, step } = makeFighter();
-    fighter.combat.knockback = value;
+    fighter.combat.launchPoint = value;
     assert.equal(fighter.canAct(), true, `can act at ${value}`);
     assert.equal(fighter.combat.canAct(), true);
     step({ right: true });
@@ -78,6 +78,6 @@ test('high Knockback alone never stops a fighter acting: it runs, jumps, attacks
     for (let i = 0; i < 10; i++) step();
     step({ jump: true, jumpPressed: true });
     assert.equal(fighter.grounded, false, `jumps at ${value}`);
-    assert.equal(fighter.combat.knockback, value, 'acting never changes Knockback');
+    assert.equal(fighter.combat.launchPoint, value, 'acting never changes Launch Point');
   }
 });

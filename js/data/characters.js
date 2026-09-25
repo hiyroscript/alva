@@ -3,11 +3,11 @@
 // Adding a fighter (e.g. #0002) should only require:
 //   1. dropping frames into ./assets/characters/<id>/
 //   2. adding a definition to CHARACTERS below, including its Power tiers
-//      (`powers`, see js/data/powers.js) and each attack's default
-//      Knockback: an axis and a Low / Mid / High level, e.g.
-//      `knockback: { axis: 'horizontal', level: 'low' }`, or
-//      `{ axis: 'vertical', level: 'mid', sign: -1 }` to drive the opponent
-//      downward (see js/data/knockback.js)
+//      (`powers`, see js/data/powers.js) and each hit's `damage`, Base
+//      Launch (`baseLaunch`: 0, 1, 2 or 3) and Directional Launch
+//      (`directionalLaunch`: null, 'horizontal', 'vertical' or
+//      'reverseVertical'), e.g. `damage: 10, baseLaunch: 2,
+//      directionalLaunch: 'vertical'` (see js/data/launch.js)
 //   3. giving it a rosterSlot
 //
 // Every field the engine reads lives here; nothing about #0001 is hard-coded
@@ -329,12 +329,12 @@ export const CHARACTERS = [
         speed: 700,
         lifetime: 1.5,
         hitbox: { x: -5, y: -5, w: 10, h: 10 },
-        // Adds 1 to the target's Knockback.
+        // Adds 1 to the target's Launch Point. Base Launch 0 and no
+        // direction: never a launching hit. It adds its damage and stun
+        // without pushing or launching the target, at any Launch Point.
         damage: 1,
-        // No default knockback: not a launching hit. It adds its damage and
-        // stun without pushing or launching the target, however much
-        // accumulated Knockback it has.
-        baseKnockback: { x: 0, y: 0 },
+        baseLaunch: 0,
+        directionalLaunch: null,
         hitstun: 0.16,
         blockstun: 0.1,
         hitstop: 0.04,
@@ -373,8 +373,8 @@ export const CHARACTERS = [
     // Powers, each owned at one tier. The tier tables in js/data/powers.js
     // turn these into gameplay values: Jump Power 2 is the normal jump and
     // Speed Power 2 the normal top speed, the only sources of this fighter's
-    // jump strength and movement speed. (Knockback is not a Power: it belongs
-    // to each attack below.)
+    // jump strength and movement speed. (Launch is not a Power: Base Launch
+    // and Directional Launch belong to each hit below.)
     powers: {
       jump: 2,
       speed: 2,
@@ -531,10 +531,11 @@ export const CHARACTERS = [
       // binds the opponent (no damage of its own) and the sphere moves onto
       // it, spinning there (prasen7-9 looped) while rasenConfirm plays
       // rasen7 -> rasen8 and holds rasen8 as the sphere grows. While it is
-      // held, every 0.5 s adds 1 Knockback (0.5, 1 and 1.5 s after the hit).
-      // 2 s after the hit it explodes (prasen10-11) while #0001 is on
-      // rasenExplosion (rasen9): 15 more Knockback and a strong sideways
-      // launch that releases the opponent (18 in all); once the blast is
+      // held, every 0.5 s adds 1 Launch Point, with no launch (0.5, 1 and
+      // 1.5 s after the hit). 2 s after the hit it explodes (prasen10-11)
+      // while #0001 is on rasenExplosion (rasen9): 15 more Launch Point, then
+      // Base Launch 3 sideways, which releases the opponent (18 damage in
+      // all); once the blast is
       // over he recovers through rasenRelease (rasen10-12). The whole
       // technique needs ground under #0001.
       rasenRush: {
@@ -576,34 +577,31 @@ export const CHARACTERS = [
         // that follows (not this hitstun) is what holds the opponent.
         firstHit: {
           damage: 0,
-          baseKnockback: { x: 0, y: 0 },
+          baseLaunch: 0,
+          directionalLaunch: null,
           hitstun: 0.2,
           blockstun: 0.15,
           hitstop: 0.06,
         },
         // While the opponent is held, before the explosion: one tickHit
-        // every tickInterval seconds since the contact. Knockback only: no
+        // every tickInterval seconds since the contact. Launch Point only: no
         // launch, stun or freeze, so the hold never stutters.
         tickInterval: 0.5,
         tickHit: {
           damage: 1,
-          baseKnockback: { x: 0, y: 0 },
+          baseLaunch: 0,
+          directionalLaunch: null,
           hitstun: 0,
           blockstun: 0,
           hitstop: 0,
         },
-        // The explosion: the big one. Its default knockback is a strong,
-        // mostly horizontal blast away from #0001 (with a slight lift so it
-        // carries through the air instead of scraping along the ground).
-        // The target's accumulated Knockback adds its extra launch
-        // horizontally only, so the lift stays the same slight one. #0001's
-        // finisher: twice the standard knockback growth, so it rings an
-        // opponent out well before anything else does.
+        // The explosion: the big one, and the technique's only launching
+        // hit. Its 15 damage is added first, then the target's new Launch
+        // Point is tripled and sent sideways along the technique's facing.
         explosionHit: {
           damage: 15,
-          baseKnockback: { x: 720, y: 180 },
-          accumulatedKnockbackAxis: 'horizontal',
-          knockbackGrowth: 2,
+          baseLaunch: 3,
+          directionalLaunch: 'horizontal',
           hitstun: 0.55,
           blockstun: 0.3,
           hitstop: 0.12,
@@ -615,17 +613,13 @@ export const CHARACTERS = [
     // (createAttackDefinition). Phases are whole frames of the attack's clip,
     // so the hitbox is live only while the strike is on screen. Hitboxes face
     // right from the fighter's origin (bottom-centre) and mirror with facing.
-    // Each attack's `knockback` is an axis and a Low / Mid / High level
-    // (js/data/knockback.js): ground BA1 pushes sideways (Low horizontal),
-    // mid-air BA1 launches the target upward (Mid vertical), ground BA2
-    // launches it upward hard (High vertical) and mid-air BA2 drives it
-    // downward hard (High vertical, reversed). That is each move's default
-    // launch; the target's accumulated Knockback adds its own separate extra
-    // launch along the same axis, at the move's `knockbackGrowth`: ground
-    // BA1 is a jab (0.5: it stays a poke however high Knockback gets),
-    // mid-air BA1 a light launcher (0.75), and either BA2 the standard (1).
-    // `damage` is how much accumulated Knockback a hit adds: 5 for either
-    // BA1, 10 for either BA2.
+    // Each attack's `damage` is added to the target's Launch Point first;
+    // its Base Launch then multiplies that new Launch Point and its
+    // Directional Launch sends the result: ground BA1 pushes sideways (1,
+    // horizontal), ground BA2 and mid-air BA1 launch upward (2, vertical)
+    // and mid-air BA2 drives the target downward (2, reverse vertical).
+    // Damage and Base Launch are authored separately: neither is derived
+    // from the other.
     attacks: {
       // Frame 1 wind-up, frame 2 punch, frames 3-4 recovery.
       ba1: {
@@ -634,9 +628,9 @@ export const CHARACTERS = [
         active: 1 / BA1_FPS,
         recovery: 2 / BA1_FPS,
         damage: 5,
+        baseLaunch: 1,
+        directionalLaunch: 'horizontal',
         hitbox: { x: 12, y: -64, w: 28, h: 16 },
-        knockback: { axis: 'horizontal', level: 'low' },
-        knockbackGrowth: 0.5,
         hitstun: 0.22,
         blockstun: 0.14,
         hitstop: 0.06,
@@ -654,9 +648,9 @@ export const CHARACTERS = [
         active: 1 / BA1_FPS,
         recovery: 0,
         damage: 5,
+        baseLaunch: 2,
+        directionalLaunch: 'vertical',
         hitbox: { x: 14, y: -100, w: 22, h: 80 },
-        knockback: { axis: 'vertical', level: 'mid' },
-        knockbackGrowth: 0.75,
         hitstun: 0.24,
         blockstun: 0.15,
         hitstop: 0.07,
@@ -674,9 +668,9 @@ export const CHARACTERS = [
         active: 2 / BA2_FPS,
         recovery: 2 / BA2_FPS,
         damage: 10,
+        baseLaunch: 2,
+        directionalLaunch: 'vertical',
         hitbox: { x: 10, y: -88, w: 24, h: 78 },
-        knockback: { axis: 'vertical', level: 'high' },
-        knockbackGrowth: 1,
         hitstun: 0.24,
         blockstun: 0.15,
         hitstop: 0.07,
@@ -692,9 +686,9 @@ export const CHARACTERS = [
         active: 1 / BA2_FPS,
         recovery: 2 / BA2_FPS,
         damage: 10,
+        baseLaunch: 2,
+        directionalLaunch: 'reverseVertical',
         hitbox: { x: 8, y: -44, w: 40, h: 40 },
-        knockback: { axis: 'vertical', level: 'high', sign: -1 },
-        knockbackGrowth: 1,
         hitstun: 0.22,
         blockstun: 0.14,
         hitstop: 0.06,

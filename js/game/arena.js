@@ -198,7 +198,7 @@ export class Arena {
   }
 
   // One step of every respawn wait. A fighter whose wait is over is back at
-  // its own spawn (Fighter.respawn: 0 Knockback, full stamina, every
+  // its own spawn (Fighter.respawn: 0 Launch Point, full stamina, every
   // cooldown ready, nothing transient) and in play at once. Buffered presses
   // made while Player 1 was out are dropped, so it comes back neutral.
   updateRespawns(dt) {

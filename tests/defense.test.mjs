@@ -568,11 +568,11 @@ test('a BA1 whose active frame meets dodge2 passes clean through', () => {
   assert.ok(active.every((s) => s.targetPhase === 'invulnerable'), 'overlaps the evasive frame');
   assert.deepEqual(events, [], 'no hit and no block event');
   assert.ok(log.every((s) => !s.hasHit), 'the attack is not used up');
-  assert.equal(target.combat.knockback, 0, 'no Knockback added');
+  assert.equal(target.combat.launchPoint, 0, 'no Launch Point added');
   assert.equal(target.combat.stun, 0);
   assert.equal(target.combat.hitstop, 0);
   assert.equal(attacker.combat.hitstop, 0, 'no impact freeze either side');
-  assert.equal(target.body.vx, 0, 'no knockback');
+  assert.equal(target.body.vx, 0, 'no launch');
   assert.equal(target.combat.blocking, false);
 });
 
@@ -586,7 +586,7 @@ test('a mid-air BA1 passes through the afterimage frames of a mid-air Dodge', ()
   assert.ok(active.length > 0);
   assert.ok(active.every((s) => s.targetPhase === 'invulnerable'));
   assert.deepEqual(events, []);
-  assert.equal(target.combat.knockback, 0);
+  assert.equal(target.combat.launchPoint, 0);
 });
 
 test('an attack still active after the evasive frame connects then, as a normal hit', () => {
@@ -600,12 +600,13 @@ test('an attack still active after the evasive frame connects then, as a normal 
   assert.equal(events.length, 1);
   assert.equal(events[0].type, 'hit');
   assert.equal(events[0].damage, 10);
-  assert.equal(target.combat.knockback, 10);
+  assert.equal(target.combat.launchPoint, 10);
 });
 
 for (const [when, at] of [['startup', FRAME], ['recovery', -FRAME]]) {
   test(`a hit during the Dodge's ${when} lands in full and cancels the Dodge`, () => {
-    const d = exchange({ attack: BA1, at, untilHit: true });
+    // From 115, BA1's 5 makes 120 and a push of 1 x 120.
+    const d = exchange({ attack: BA1, at, untilHit: true, setup: (duel) => { duel.target.combat.launchPoint = 115; } });
     const hit = d.log.find((s) => s.hit);
     assert.equal(hit.targetPhase, null, 'the hit cleared the Dodge');
     // How far into the Dodge the hit landed: before or after dodge2.
@@ -617,16 +618,17 @@ for (const [when, at] of [['startup', FRAME], ['recovery', -FRAME]]) {
     assert.equal(d.events.length, 1);
     assert.equal(d.events[0].type, 'hit', 'never a block');
     assert.equal(d.events[0].damage, 5, 'full damage, no chip scaling');
-    assert.equal(d.target.combat.knockback, 5);
+    assert.equal(d.target.combat.launchPoint, 120);
+    assert.equal(d.events[0].launchStrength, 120, 'the full launch: 1 x 120');
     assert.equal(d.target.combat.defenseAction, null, 'hitstun takes over');
     d.tick();
     assert.equal(d.target.state, 'hitstun');
     assert.equal(frameName(d.target), '0001_hurt.png');
-    // Hitstun, not blockstun; full knockback once the freeze ends.
+    // Hitstun, not blockstun; the full launch once the freeze ends.
     assert.ok(Math.abs(d.target.combat.stun - def.attacks.ba1.hitstun) < 1e-9);
     while (d.target.combat.hitstop > 0) d.tick();
     d.tick();
-    assert.ok(d.target.body.vx > 0, 'knocked back');
+    assert.ok(d.target.body.vx > 0, 'launched away');
     // The cancelled Dodge never comes back after the stun.
     const states = [];
     while (d.target.combat.stun > 0) {
@@ -648,7 +650,7 @@ test('holding Defense is no guard: #0001 takes full hits with no chip damage', (
   until(() => events.length > 0);
   assert.equal(events[0].type, 'hit');
   assert.equal(events[0].damage, def.attacks.ba1.damage);
-  assert.equal(target.combat.knockback, 5, 'not the old 15% chip damage');
+  assert.equal(target.combat.launchPoint, 5, 'not the old 15% chip damage');
   assert.equal(target.combat.blocking, false);
   assert.ok(Math.abs(target.combat.stun - def.attacks.ba1.hitstun) < 1e-9, 'hitstun, not blockstun');
   while (attacker.combat.attack) tick({}, HOLD);
@@ -663,12 +665,12 @@ test('holding Defense is no guard: #0001 takes full hits with no chip damage', (
   assert.equal(fighter.state, 'run');
 });
 
-test('a Dodge changes no Knockback and starts no cooldown', () => {
+test('a Dodge changes no Launch Point and starts no cooldown', () => {
   const { attacker, target, events, log } = exchange({ attack: BA1, at: 0 });
   assert.ok(log.length > 0);
   assert.deepEqual(events, []);
   for (const f of [attacker, target]) {
-    assert.equal(f.combat.knockback, 0);
+    assert.equal(f.combat.launchPoint, 0);
     assert.equal(f.combat.chargedCooldowns.size, 0);
   }
 });
@@ -688,7 +690,7 @@ test('missing Dodge art refuses the Dodge: no invisible invulnerability', () => 
     assert.equal(target.combat.invulnerable, false);
     until(() => events.length > 0);
     assert.equal(events[0].type, 'hit', 'the attack lands normally');
-    assert.equal(target.combat.knockback, 5);
+    assert.equal(target.combat.launchPoint, 5);
     while (attacker.combat.attack) tick();
 
     // Only the mid-air clip missing: ground Dodges still work, air ones are refused.
@@ -719,7 +721,7 @@ test('Defense stays generic: a Block-type character guards, one without Defense 
   for (let i = 0; i < 60 && !events.length; i++) tick({}, HOLD);
   assert.equal(events[0].type, 'block');
   assert.ok(Math.abs(events[0].damage - 5 * 0.15) < 1e-9, 'chip damage');
-  assert.ok(Math.abs(target.combat.knockback - 5 * 0.15) < 1e-9, 'added to Knockback, like any damage');
+  assert.ok(Math.abs(target.combat.launchPoint - 5 * 0.15) < 1e-9, 'added to Launch Point, like any damage');
   assert.ok(Math.abs(target.combat.stun - def.attacks.ba1.blockstun) < 1e-9, 'blockstun');
   while (attacker.combat.attack) tick({}, HOLD);
 

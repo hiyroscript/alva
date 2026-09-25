@@ -59,10 +59,10 @@ export class Fighter {
     this.defense = createDefenseDefinition(def.defense);
     // The character's Powers (js/data/powers.js), resolved once.
     // Upward speed of the normal jump, from its Jump Power tier. Nothing else
-    // (knockback, Dodges, techniques) uses it.
+    // (launches, Dodges, techniques) uses it.
     this.jumpVelocity = getJumpVelocity(def);
     // Top speed of normal left / right movement, on the ground and in the
-    // air, from its Speed Power tier. Nothing else (acceleration, knockback,
+    // air, from its Speed Power tier. Nothing else (acceleration, launches,
     // projectiles, Dodges, techniques) uses it.
     this.maxSpeed = getMaxSpeed(def);
     // Seconds of charged-action cooldown recovered per second while in
@@ -122,7 +122,7 @@ export class Fighter {
     // trackDashTaps): { direction, age }, or null.
     this.dash = null;
     this.dashTap = null;
-    // A fresh combat state: 0 Knockback, full stamina and every cooldown
+    // A fresh combat state: 0 Launch Point, full stamina and every cooldown
     // ready.
     this.combat = new CombatState(def.stats, this.staminaDef);
     // Projectiles released this step, waiting for the battle to spawn them
@@ -140,7 +140,7 @@ export class Fighter {
   }
 
   // Back at its own spawn after the Void's wait (see Arena.updateRespawns):
-  // a clean, neutral state, exactly a reset. Knockback is back to 0,
+  // a clean, neutral state, exactly a reset. Launch Point is back to 0,
   // stamina full and not exhausted, and every cooldown (charged ones
   // included) ready; everything transient goes with the old body: velocity,
   // attack, Dodge, Dash, stun, freeze, binds, its charged technique and any
@@ -356,8 +356,8 @@ export class Fighter {
 
   // Free to start something new: the combat state allows it (no attack,
   // Dodge, stun or bind), no charged technique owns the fighter and it is
-  // not dashing. However much Knockback it has taken, or stamina it has
-  // left, never matters.
+  // not dashing. Its Launch Point, however high, and the stamina it has
+  // left never matter.
   canAct() {
     return this.combat.canAct() && !this.technique && !this.dash;
   }
@@ -415,7 +415,7 @@ export class Fighter {
 
   // Starts one Dash toward `direction` (1 right, -1 left): a short grounded
   // burst at movement.dashSpeed for one pass of the dash clip. Movement
-  // only: no hitbox, damage, knockback or invulnerability. Only while free
+  // only: no hitbox, damage, launch or invulnerability. Only while free
   // to act (no attack, Dodge, stun, bind, charged technique or Dash already
   // running), grounded, not in or holding Charge, and with the stamina for
   // it, paying dashCost. The fighter faces the Dash at once. False, with
@@ -510,7 +510,7 @@ export class Fighter {
   // Ends the charged technique in progress, if any, for `reason`: 'miss' or
   // 'wall' (once its release pose has shown), 'blocked', 'done', 'ground',
   // 'hit', 'released', 'void', 'reset' or 'destroy'. The sphere is removed
-  // and any opponent it holds released; Knockback already added stays, and
+  // and any opponent it holds released; Launch Point already added stays, and
   // no further tick or explosion follows. The rush never carries on as a
   // slide, and a Charge still held from before it does not resume by itself.
   endTechnique(reason) {

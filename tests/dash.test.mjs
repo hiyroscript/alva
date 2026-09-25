@@ -255,7 +255,7 @@ test('a Dash plays the real dash clip once, dash1 then dash2, then the fighter r
   assert.ok(frames.every((n) => !/run/.test(n)));
 });
 
-test('a Dash is movement only: no hitbox, damage, knockback or invulnerability, even straight through the opponent', () => {
+test('a Dash is movement only: no hitbox, damage, launch or invulnerability, even straight through the opponent', () => {
   const d = duel({ gap: 120, pushboxes: true });
   d.tick(RIGHT);
   d.tick({});
@@ -268,7 +268,7 @@ test('a Dash is movement only: no hitbox, damage, knockback or invulnerability, 
     d.tick({ right: true });
   }
   assert.deepEqual(d.events, [], 'no hit of any kind');
-  assert.equal(d.target.combat.knockback, 0);
+  assert.equal(d.target.combat.launchPoint, 0);
   assert.equal(d.target.combat.stun, 0);
   // And it can be hit while dashing: the hit ends it.
   const hit = duel({ gap: 40, attackerFacing: -1, x: 540, pushboxes: true });

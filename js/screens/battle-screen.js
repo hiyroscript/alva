@@ -21,11 +21,11 @@ const BANNERS = {
 };
 
 // Result dialog kicker and line for each way a match ends (Battle.result):
-// the winning point from a fall, or on time by points, then by Knockback.
+// the winning point from a fall, or on time by points, then by Launch Point.
 const RESULT_TEXT = {
   void: { kicker: 'K.O.', sub: (loser) => `${loser} fell into the Void for the final point.` },
   points: { kicker: 'Time over', sub: () => 'Time ran out. More points wins the match.' },
-  time: { kicker: 'Time over', sub: () => 'Time ran out with the points level. Lower Knockback wins.' },
+  time: { kicker: 'Time over', sub: () => 'Time ran out with the points level. Lower Launch Point wins.' },
 };
 
 export class BattleScreen extends Screen {

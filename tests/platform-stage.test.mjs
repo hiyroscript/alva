@@ -367,22 +367,22 @@ test('Quick Battle: the CPU in the Void scores Player 1 a point; a technique hol
   assert.equal(battle.secondary, null, 'the camera frames Player 1 alone');
 });
 
-test('Quick Battle: after time runs out, a fall scores nothing and nobody respawns; points, then Knockback, decide', () => {
+test('Quick Battle: after time runs out, a fall scores nothing and nobody respawns; points, then Launch Point, decide', () => {
   const { battle } = realBattle('city');
   battle.setPhase('timeup');
-  battle.p1.combat.knockback = 30;
+  battle.p1.combat.launchPoint = 30;
   Object.assign(battle.p2.body, { y: battle.stage.void.bottom + 100, grounded: false, ground: null });
   battle.update(DT);
   assert.equal(battle.p2.lostToVoid, true);
   assert.equal(battle.phase, 'timeup', 'no KO beat once time is up');
   assert.deepEqual(battle.score, { p1: 0, p2: 0 }, 'no point after time');
   assert.equal(battle.p2.respawnTimer, null, 'and no respawn');
-  // Level on points: the lower Knockback wins, the fall itself decides nothing.
+  // Level on points: the lower Launch Point wins, the fall itself decides nothing.
   assert.deepEqual(battle.result, { outcome: 'p2', reason: 'time' });
   Object.assign(battle.p1.body, { y: battle.stage.void.bottom + 100, grounded: false, ground: null });
   for (let i = 0; i < 60 * 3; i++) battle.update(DT);
   assert.deepEqual(battle.inPlay, [], 'both stay out');
-  battle.p1.combat.knockback = 0;
+  battle.p1.combat.launchPoint = 0;
   assert.deepEqual(battle.result, { outcome: 'draw', reason: 'time' });
 });
 
