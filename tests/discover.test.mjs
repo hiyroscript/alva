@@ -2,8 +2,9 @@
 // Discover: its registration, Home → Discover → Back through the real
 // ScreenManager, the Power / Knockback / Conditions tabs, the Power page built
 // from the Power registry alone (Jump Power and Speed Power), the Knockback
-// page built from the Knockback levels alone (Low, Mid, High and the
-// directions Knockback takes), both with no tuning numbers and no character
+// page built from the Knockback levels and reference copy alone (how it
+// works, then Strength: Low, Mid, High; Direction; and Growth: None, Low,
+// Standard, High), both with no tuning numbers and no character
 // information of any kind, the intentionally empty Conditions page, and
 // keyboard / gamepad menu navigation through the real MenuNavigator, on a
 // minimal fake DOM. Layout and paint still need real-browser verification.
@@ -140,7 +141,10 @@ const { MenuNavigator } = await import('../js/core/menu-navigator.js');
 const { HomeScreen } = await import('../js/screens/home-screen.js');
 const { DiscoverScreen } = await import('../js/screens/discover-screen.js');
 const { POWERS, JUMP_POWER_TIERS } = await import('../js/data/powers.js');
-const { KNOCKBACK_LEVELS, KNOCKBACK_DIRECTIONS, KNOCKBACK_SUMMARY, KNOCKBACK_DIRECTION_SUMMARY } = await import('../js/data/knockback.js');
+const {
+  KNOCKBACK_LEVELS, KNOCKBACK_DIRECTIONS, KNOCKBACK_SUMMARY, KNOCKBACK_STRENGTH_SUMMARY, KNOCKBACK_DIRECTION_SUMMARY,
+  KNOCKBACK_GROWTH_SUMMARY, KNOCKBACK_GROWTH_BANDS,
+} = await import('../js/data/knockback.js');
 const { CHARACTERS } = await import('../js/data/characters.js');
 
 // Keyboard input: key() runs a keydown through every listener, as the app does.
@@ -437,7 +441,7 @@ test('the Power page shows no tuning numbers and nothing interactive', () => {
 
 // ---- Knockback --------------------------------------------------------------------
 
-test('the Knockback page lists Low, Mid and High from the Knockback levels, then the directions it takes', () => {
+test('the Knockback page explains how it works, then Strength, Direction and Growth, from the Knockback registry', () => {
   const { home, discover } = boot();
   home.el.querySelectorAll('.home-action')[2].click();
   const { knockback } = sectionsOf(discover);
@@ -445,28 +449,41 @@ test('the Knockback page lists Low, Mid and High from the Knockback levels, then
   const page = knockback.panel;
   assert.equal(text(page.querySelector('.discover-page-title')), 'Knockback');
   const entries = page.querySelectorAll('.discover-entry');
-  assert.equal(entries.length, 2);
-  assert.deepEqual(entries.map((e) => text(e.querySelector('.discover-entry-title'))), ['Knockback', 'Direction']);
+  assert.equal(entries.length, 4);
+  assert.deepEqual(entries.map((e) => text(e.querySelector('.discover-entry-title'))), ['How it works', 'Strength', 'Direction', 'Growth']);
   assert.deepEqual(entries.map((e) => text(e.querySelector('.discover-entry-text'))), [
-    'Controls how strongly an attack moves an opponent when it connects.',
-    KNOCKBACK_DIRECTION_SUMMARY,
+    KNOCKBACK_SUMMARY, KNOCKBACK_STRENGTH_SUMMARY, KNOCKBACK_DIRECTION_SUMMARY, KNOCKBACK_GROWTH_SUMMARY,
   ]);
-  assert.equal(text(entries[0].querySelector('.discover-entry-text')), KNOCKBACK_SUMMARY);
   for (const entry of entries) {
     const title = entry.querySelector('.discover-entry-title');
     assert.equal(title.tagName, 'H3');
     assert.equal(entry.getAttribute('aria-labelledby'), title.id);
   }
 
+  // How it works: the number, what adds to it, and the three parts of a
+  // launch, in words alone.
+  assert.equal(
+    KNOCKBACK_SUMMARY,
+    'Knockback is the number under each name. It starts at 0 and every hit you take adds its damage. '
+      + 'An attack launches with its own strength, in its own direction, and the opponent\'s Knockback adds extra '
+      + 'launch on top, as much as the attack\'s growth allows. The higher your Knockback, the further you fly.',
+  );
+  assert.deepEqual(entries[0].querySelectorAll('.discover-tiers'), [], 'text only');
+
   // Strength: the three levels, weakest first, straight from the registry.
-  const levels = entries[0].querySelector('.discover-tiers');
+  assert.equal(
+    KNOCKBACK_STRENGTH_SUMMARY,
+    'How hard an attack launches on its own, even against an opponent with no Knockback. '
+      + 'It never changes, and an attack with no strength never launches.',
+  );
+  const levels = entries[1].querySelector('.discover-tiers');
   assert.equal(levels.tagName, 'OL');
-  assert.equal(levels.getAttribute('aria-label'), 'Knockback levels');
+  assert.equal(levels.getAttribute('aria-label'), 'Knockback strength levels');
   const rows = levels.querySelectorAll('.discover-tier');
   assert.deepEqual(rows.map((r) => [r.dataset.level, text(r.querySelector('.discover-tier-name')), text(r.querySelector('.discover-tier-desc'))]), [
-    ['low', 'Low', 'Light knockback.'],
-    ['mid', 'Mid', 'Medium knockback.'],
-    ['high', 'High', 'Strong knockback.'],
+    ['low', 'Low', 'A light launch.'],
+    ['mid', 'Mid', 'A medium launch.'],
+    ['high', 'High', 'A strong launch.'],
   ]);
   assert.deepEqual(rows.map((r) => [r.dataset.level, text(r.querySelector('.discover-tier-name')), text(r.querySelector('.discover-tier-desc'))]),
     Object.values(KNOCKBACK_LEVELS).map((l) => [l.id, l.name, l.description]));
@@ -480,7 +497,12 @@ test('the Knockback page lists Low, Mid and High from the Knockback levels, then
   assert.ok(rows.every((r) => r.className === 'discover-tier'), 'no level is marked');
 
   // Direction: sideways, upward and reversed downward.
-  const directions = entries[1].querySelector('.discover-tiers');
+  assert.equal(
+    KNOCKBACK_DIRECTION_SUMMARY,
+    'Which way an attack launches. Direction is separate from strength, '
+      + 'and the extra launch from Knockback always goes the same way.',
+  );
+  const directions = entries[2].querySelector('.discover-tiers');
   assert.equal(directions.tagName, 'UL');
   assert.equal(directions.getAttribute('aria-label'), 'Knockback directions');
   const dirRows = directions.querySelectorAll('.discover-tier');
@@ -491,8 +513,35 @@ test('the Knockback page lists Low, Mid and High from the Knockback levels, then
   ]);
   assert.deepEqual(dirRows.map((r) => r.dataset.direction), KNOCKBACK_DIRECTIONS.map((d) => d.id));
   for (const row of dirRows) assert.equal(row.querySelector('.discover-direction').getAttribute('aria-hidden'), 'true');
-  // Not a Power: no Power wording or tiers here.
+
+  // Growth: slowest first, from an empty meter to a full one.
+  assert.equal(
+    KNOCKBACK_GROWTH_SUMMARY,
+    'How much the opponent\'s Knockback adds to an attack\'s launch. Every attack has its own growth: '
+      + 'as Knockback climbs, fast-growing attacks pull further ahead of slow-growing ones.',
+  );
+  const growth = entries[3].querySelector('.discover-tiers');
+  assert.equal(growth.tagName, 'OL');
+  assert.equal(growth.getAttribute('aria-label'), 'Knockback growth');
+  const growthRows = growth.querySelectorAll('.discover-tier');
+  assert.deepEqual(growthRows.map((r) => [r.dataset.growth, text(r.querySelector('.discover-tier-name')), text(r.querySelector('.discover-tier-desc'))]), [
+    ['none', 'None', 'The same launch at any Knockback.'],
+    ['low', 'Low', 'Grows slowly: a light hit stays light.'],
+    ['standard', 'Standard', 'Grows at the usual rate.'],
+    ['high', 'High', 'Grows fast: a finishing blow at high Knockback.'],
+  ]);
+  assert.deepEqual(growthRows.map((r) => r.dataset.growth), KNOCKBACK_GROWTH_BANDS.map((b) => b.id));
+  growthRows.forEach((row, j) => {
+    const meter = row.querySelector('.discover-meter');
+    assert.equal(meter.getAttribute('aria-hidden'), 'true');
+    assert.equal(meter.children.length, 3);
+    assert.equal(meter.children.filter((b) => b.classList.contains('is-on')).length, j, `${row.dataset.growth}: ${j} bars`);
+  });
+
+  // Not a Power, and never the old multiplier: no Power wording, tiers or
+  // scaling words here.
   assert.doesNotMatch(text(page), /\bPower\b|\btiers?\b/i);
+  assert.doesNotMatch(text(page), /multipl|scales?\b|percent|%/i);
 });
 
 test('the Knockback page shows no tuning numbers, no attacks and nothing interactive', () => {

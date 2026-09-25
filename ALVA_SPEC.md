@@ -563,19 +563,36 @@ read the character database, so it stays the same as fighters are added.
 
   Knockback is not a Power and is not listed here.
 - **Knockback:** built only from `KNOCKBACK_LEVELS` and the reference copy
-  in `js/data/knockback.js` (level names and descriptions, never values), in
-  the same entry and row language as Power. Two entries:
-  - **Knockback**: "Controls how strongly an attack moves an opponent when it
-    connects." — Low "Light knockback.", Mid "Medium knockback.", High
-    "Strong knockback.", each with the same decorative rising-bar meter
-    (one, two, three bars).
-  - **Direction**: "Direction is separate from strength: any level can push
-    an opponent sideways, launch it upward or drive it downward." —
-    Horizontal "Pushes the opponent away from the direction of the hit.",
-    Vertical "Launches the opponent upward.", Reversed vertical "Drives the
-    opponent downward.", each with a decorative arrow (along, up, down).
+  in `js/data/knockback.js` (names and descriptions, never values), in the
+  same entry and row language as Power. Four entries:
+  - **How it works** (text only): "Knockback is the number under each name.
+    It starts at 0 and every hit you take adds its damage. An attack
+    launches with its own strength, in its own direction, and the
+    opponent's Knockback adds extra launch on top, as much as the attack's
+    growth allows. The higher your Knockback, the further you fly."
+  - **Strength**: "How hard an attack launches on its own, even against an
+    opponent with no Knockback. It never changes, and an attack with no
+    strength never launches." — Low "A light launch.", Mid "A medium
+    launch.", High "A strong launch.", each with the same decorative
+    rising-bar meter (one, two, three bars).
+  - **Direction**: "Which way an attack launches. Direction is separate from
+    strength, and the extra launch from Knockback always goes the same
+    way." — Horizontal "Pushes the opponent away from the direction of the
+    hit.", Vertical "Launches the opponent upward.", Reversed vertical
+    "Drives the opponent downward.", each with a decorative arrow (along,
+    up, down).
+  - **Growth**: "How much the opponent's Knockback adds to an attack's
+    launch. Every attack has its own growth: as Knockback climbs,
+    fast-growing attacks pull further ahead of slow-growing ones." — None
+    "The same launch at any Knockback.", Low "Grows slowly: a light hit
+    stays light.", Standard "Grows at the usual rate.", High "Grows fast: a
+    finishing blow at high Knockback.", with the same meter from empty to
+    three bars (`KNOCKBACK_GROWTH_BANDS`: words for where an attack's
+    `knockbackGrowth` sits, 0, below the standard 1, 1 or above it, never
+    its value).
 
-  It names no fighter or attack.
+  It names no fighter or attack, and never describes Knockback as a
+  multiplier.
 - No tuning values (velocities, speeds, knockback) or other physics
   constants are shown on either page, and there is no fighter list, "Used
   by" label or ownership highlighting. On short landscape windows the

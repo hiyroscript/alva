@@ -3,8 +3,9 @@
 // rail runs across the top instead. Each page is built from the registry the
 // game plays by, never the tuning values, so the reference cannot drift from
 // gameplay: Power from POWERS in js/data/powers.js (names, descriptions and
-// tier numbers), Knockback from KNOCKBACK_LEVELS in js/data/knockback.js
-// (level names and descriptions, and what each direction does). It explains
+// tier numbers), Knockback from KNOCKBACK_LEVELS and the reference copy in
+// js/data/knockback.js (how Knockback works, and the names and descriptions
+// of its strength levels, directions and growth). It explains
 // mechanics only: it never says which fighter or attack uses which Power,
 // tier or level, so it stays the same as the roster grows.
 //
@@ -20,7 +21,8 @@ import { el } from '../core/utils.js';
 import { screenHeader } from '../ui/components.js';
 import { POWERS } from '../data/powers.js';
 import {
-  KNOCKBACK_LEVELS, KNOCKBACK_SUMMARY, KNOCKBACK_DIRECTIONS, KNOCKBACK_DIRECTION_SUMMARY,
+  KNOCKBACK_LEVELS, KNOCKBACK_SUMMARY, KNOCKBACK_STRENGTH_SUMMARY, KNOCKBACK_DIRECTIONS, KNOCKBACK_DIRECTION_SUMMARY,
+  KNOCKBACK_GROWTH_SUMMARY, KNOCKBACK_GROWTH_BANDS,
 } from '../data/knockback.js';
 
 // Where the rail turns horizontal: narrow windows, but never short landscape
@@ -29,8 +31,8 @@ const NARROW_QUERY = '(max-width: 600px) and (min-height: 441px), (max-aspect-ra
 
 const DIRECTIONS = ['up', 'down', 'left', 'right'];
 
-// Tier (or level) i of n as n rising bars, the first i filled. Decorative:
-// the name beside it says which it is.
+// Tier (or level) i of n as n rising bars, the first i filled (none for 0).
+// Decorative: the name beside it says which it is.
 function tierMeter(tier, count) {
   return el('span', { class: 'discover-meter', 'aria-hidden': 'true' },
     Array.from({ length: count }, (_, i) => el('i', {
@@ -44,8 +46,9 @@ function tierMeter(tier, count) {
 // Decorative: the direction's name says which it is.
 const ARROW = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 8h11M9 4l4 4-4 4"/></svg>';
 
-// One reference entry: a title and what it explains, beside its rows.
-function entry(id, title, text, list) {
+// One reference entry: a title and what it explains, beside its rows (an
+// entry with no `list` is its text alone).
+function entry(id, title, text, list = null) {
   const titleId = `discover-${id}`;
   return el('article', { class: 'discover-entry', 'aria-labelledby': titleId }, [
     el('div', { class: 'discover-entry-about' }, [
@@ -82,20 +85,27 @@ function buildPowerPage() {
   ]);
 }
 
-// Knockback: its strength levels, weakest first, then the directions it can
-// take. Names and descriptions only.
+// Knockback: how it works, then the three things every attack's launch is
+// made of: its strength (the levels, weakest first), its direction and its
+// growth (slowest first). Names and descriptions only.
 function buildKnockbackPage() {
   const levels = Object.values(KNOCKBACK_LEVELS);
+  const bands = KNOCKBACK_GROWTH_BANDS;
   return el('div', { class: 'discover-page' }, [
     el('h2', { class: 'discover-page-title', text: 'Knockback' }),
-    entry('knockback-strength', 'Knockback', KNOCKBACK_SUMMARY,
-      el('ol', { class: 'discover-tiers', 'aria-label': 'Knockback levels' }, levels.map((level, i) =>
+    entry('knockback-about', 'How it works', KNOCKBACK_SUMMARY),
+    entry('knockback-strength', 'Strength', KNOCKBACK_STRENGTH_SUMMARY,
+      el('ol', { class: 'discover-tiers', 'aria-label': 'Knockback strength levels' }, levels.map((level, i) =>
         row({ level: level.id }, tierMeter(i + 1, levels.length), level.name, level.description)))),
     entry('knockback-direction', 'Direction', KNOCKBACK_DIRECTION_SUMMARY,
       el('ul', { class: 'discover-tiers', 'aria-label': 'Knockback directions' }, KNOCKBACK_DIRECTIONS.map((direction) =>
         row({ direction: direction.id },
           el('span', { class: 'discover-direction', 'aria-hidden': 'true', html: ARROW }),
           direction.name, direction.description)))),
+    // None is an empty meter; each band after it one more bar.
+    entry('knockback-growth', 'Growth', KNOCKBACK_GROWTH_SUMMARY,
+      el('ol', { class: 'discover-tiers', 'aria-label': 'Knockback growth' }, bands.map((band, i) =>
+        row({ growth: band.id }, tierMeter(i, bands.length - 1), band.name, band.description)))),
   ]);
 }
 

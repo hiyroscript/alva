@@ -39,7 +39,7 @@
 // resolveKnockback, once, into the numeric `baseKnockback: { x, y }` that
 // CombatSystem.applyHit reads, and the descriptor's axis into its
 // `accumulatedKnockbackAxis`; the Discover screen reads the same names and
-// descriptions (never the values). Bespoke hits that are not fighter attacks
+// descriptions (never the values), with the reference copy below. Bespoke hits that are not fighter attacks
 // (a projectile's, a charged technique's) declare a numeric `baseKnockback`
 // directly, and may name their `accumulatedKnockbackAxis` (see
 // resolveLaunchAxis). Any hit may declare its `knockbackGrowth`
@@ -67,9 +67,9 @@
 // multiplier or the launch at high Knockback. Listed in reference order,
 // weakest first.
 export const KNOCKBACK_LEVELS = Object.freeze({
-  low: Object.freeze({ id: 'low', name: 'Low', description: 'Light knockback.', horizontal: 140, vertical: 480 }),
-  mid: Object.freeze({ id: 'mid', name: 'Mid', description: 'Medium knockback.', horizontal: 180, vertical: 640 }),
-  high: Object.freeze({ id: 'high', name: 'High', description: 'Strong knockback.', horizontal: 220, vertical: 800 }),
+  low: Object.freeze({ id: 'low', name: 'Low', description: 'A light launch.', horizontal: 140, vertical: 480 }),
+  mid: Object.freeze({ id: 'mid', name: 'Mid', description: 'A medium launch.', horizontal: 180, vertical: 640 }),
+  high: Object.freeze({ id: 'high', name: 'High', description: 'A strong launch.', horizontal: 220, vertical: 800 }),
 });
 
 export const KNOCKBACK_AXES = Object.freeze(['horizontal', 'vertical']);
@@ -164,9 +164,18 @@ export function resolveLaunch(base, accumulated, {
 
 // ---- Reference copy --------------------------------------------------------------
 
-// What Discover says about Knockback beside its levels. Mechanics only: no
-// fighter, attack or tuning value is ever named.
-export const KNOCKBACK_SUMMARY = 'Controls how strongly an attack moves an opponent when it connects.';
+// What Discover says about Knockback: how it works, then the three things
+// every attack's launch is made of, its strength (KNOCKBACK_LEVELS), its
+// direction and its growth. Mechanics only: no fighter, attack or tuning
+// value is ever named.
+export const KNOCKBACK_SUMMARY =
+  'Knockback is the number under each name. It starts at 0 and every hit you take adds its damage. ' +
+  'An attack launches with its own strength, in its own direction, and the opponent\'s Knockback adds extra ' +
+  'launch on top, as much as the attack\'s growth allows. The higher your Knockback, the further you fly.';
+
+export const KNOCKBACK_STRENGTH_SUMMARY =
+  'How hard an attack launches on its own, even against an opponent with no Knockback. ' +
+  'It never changes, and an attack with no strength never launches.';
 
 export const KNOCKBACK_DIRECTIONS = Object.freeze([
   Object.freeze({ id: 'horizontal', name: 'Horizontal', description: 'Pushes the opponent away from the direction of the hit.' }),
@@ -175,7 +184,23 @@ export const KNOCKBACK_DIRECTIONS = Object.freeze([
 ]);
 
 export const KNOCKBACK_DIRECTION_SUMMARY =
-  'Direction is separate from strength: any level can push an opponent sideways, launch it upward or drive it downward.';
+  'Which way an attack launches. Direction is separate from strength, ' +
+  'and the extra launch from Knockback always goes the same way.';
+
+export const KNOCKBACK_GROWTH_SUMMARY =
+  'How much the opponent\'s Knockback adds to an attack\'s launch. Every attack has its own growth: ' +
+  'as Knockback climbs, fast-growing attacks pull further ahead of slow-growing ones.';
+
+// The growth scale, slowest first, in words: none (0), below the standard
+// rate, the standard rate (DEFAULT_KNOCKBACK_GROWTH) and above it. An
+// attack's knockbackGrowth is any number of 0 or more; these name where it
+// sits, never a value.
+export const KNOCKBACK_GROWTH_BANDS = Object.freeze([
+  Object.freeze({ id: 'none', name: 'None', description: 'The same launch at any Knockback.' }),
+  Object.freeze({ id: 'low', name: 'Low', description: 'Grows slowly: a light hit stays light.' }),
+  Object.freeze({ id: 'standard', name: 'Standard', description: 'Grows at the usual rate.' }),
+  Object.freeze({ id: 'high', name: 'High', description: 'Grows fast: a finishing blow at high Knockback.' }),
+]);
 
 // ---- Resolution ------------------------------------------------------------------
 

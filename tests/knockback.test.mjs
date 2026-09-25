@@ -16,6 +16,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
   KNOCKBACK_LEVELS, KNOCKBACK_AXES, KNOCKBACK_DIRECTIONS, KNOCKBACK_SUMMARY, KNOCKBACK_DIRECTION_SUMMARY,
+  KNOCKBACK_STRENGTH_SUMMARY, KNOCKBACK_GROWTH_SUMMARY, KNOCKBACK_GROWTH_BANDS,
   ACCUMULATED_KNOCKBACK_SCALING, DEFAULT_KNOCKBACK_GROWTH, getKnockbackLevel, resolveKnockback,
   resolveKnockbackGrowth, accumulatedKnockbackBonus, dominantLaunchAxis, resolveLaunchAxis, resolveLaunch,
 } from '../js/data/knockback.js';
@@ -90,9 +91,9 @@ const MID_REVERSED = { axis: 'vertical', level: 'mid', sign: -1 };
 test('Knockback has exactly three levels, Low, Mid and High: horizontal 140 / 180 / 220, vertical 480 / 640 / 800', () => {
   assert.deepEqual(Object.keys(KNOCKBACK_LEVELS), ['low', 'mid', 'high']);
   assert.deepEqual(Object.values(KNOCKBACK_LEVELS).map((l) => [l.id, l.name, l.description, l.horizontal, l.vertical]), [
-    ['low', 'Low', 'Light knockback.', 140, 480],
-    ['mid', 'Mid', 'Medium knockback.', 180, 640],
-    ['high', 'High', 'Strong knockback.', 220, 800],
+    ['low', 'Low', 'A light launch.', 140, 480],
+    ['mid', 'Mid', 'A medium launch.', 180, 640],
+    ['high', 'High', 'A strong launch.', 220, 800],
   ]);
   assert.equal(KNOCKBACK_LEVELS.low.horizontal, 140);
   assert.equal(KNOCKBACK_LEVELS.mid.horizontal, 180);
@@ -120,13 +121,18 @@ test('levels are named by exactly \'low\', \'mid\' and \'high\': never old tier 
   }
 });
 
-test('the reference copy names no fighter, attack or tuning value', () => {
+test('the reference copy explains strength, direction and growth, and names no fighter, attack or tuning value', () => {
   const copy = [
-    KNOCKBACK_SUMMARY, KNOCKBACK_DIRECTION_SUMMARY,
+    KNOCKBACK_SUMMARY, KNOCKBACK_STRENGTH_SUMMARY, KNOCKBACK_DIRECTION_SUMMARY, KNOCKBACK_GROWTH_SUMMARY,
     ...Object.values(KNOCKBACK_LEVELS).flatMap((l) => [l.name, l.description]),
     ...KNOCKBACK_DIRECTIONS.flatMap((d) => [d.name, d.description]),
+    ...KNOCKBACK_GROWTH_BANDS.flatMap((b) => [b.name, b.description]),
   ];
-  assert.equal(KNOCKBACK_SUMMARY, 'Controls how strongly an attack moves an opponent when it connects.');
+  assert.match(KNOCKBACK_SUMMARY, /strength.*direction.*growth/s, 'how it works names all three parts');
+  assert.deepEqual(KNOCKBACK_GROWTH_BANDS.map((b) => b.id), ['none', 'low', 'standard', 'high'], 'slowest first');
+  assert.ok(Object.isFrozen(KNOCKBACK_GROWTH_BANDS) && KNOCKBACK_GROWTH_BANDS.every(Object.isFrozen));
+  // The old multiplier is not described anywhere.
+  for (const text of copy) assert.doesNotMatch(text, /multipl|scales?\b|percent|%|\bfighters?\b/i, text);
   assert.deepEqual(KNOCKBACK_DIRECTIONS.map((d) => [d.id, d.name, d.description]), [
     ['horizontal', 'Horizontal', 'Pushes the opponent away from the direction of the hit.'],
     ['vertical', 'Vertical', 'Launches the opponent upward.'],
