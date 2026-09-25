@@ -139,9 +139,10 @@ attack animations. Its touch button has a dashed outline.
   Pressing Charge and BA1 on the same step from standing is an ordinary BA1.
 - **Sphere Rush (Charged BA2):** Hold Charge first, then press BA2. #0001
   forms a blue sphere, dashes forward once it is complete, and must connect
-  during the rush. A miss ends the technique immediately. A hit traps the
-  opponent, continues the animation, and causes the sphere to explode about
-  two seconds later for a much larger second hit. The entire technique
+  during the rush. A miss stops him dead and he lets the sphere go on a
+  brief release pose before he is free again. A hit traps the opponent in
+  the spinning sphere, which explodes about two seconds later for a much
+  larger second hit. The entire technique
   requires ground beneath #0001; losing ground cancels it and makes him
   fall. Charged BA2 currently has no Energy cost.
   In detail: #0001 leaves Charge (no release pose) and stands still while
@@ -149,16 +150,20 @@ attack animations. Its touch button has a dashed outline.
   with `prasen1 → prasen6`, 0.5 s). Only then does he rush forward at a
   fixed speed for one pass of `rasen4 → rasen6` (0.25 s, about 262 world
   units), carrying the finished sphere behind him and swinging it forward on
-  `rasen6`; the sphere itself is what has to touch the opponent. A hit (4
-  damage, no launch) stops the rush at once and traps the opponent: it can't
-  move, jump, attack, Charge, Throw or Defend, but gravity still applies. The
-  sphere moves onto it and intensifies (`prasen7 → prasen9`, then held) while
-  #0001 plays `rasen7 → rasen12` and holds the last pose. Exactly 2 s after
-  the hit it explodes (`prasen10 → prasen11`): the opponent is released, then
-  takes 16 (20 in all) and is launched. A Dodge's evasive frames let the rush
-  pass through without using it up; a Block-type guard blocks the contact
-  normally and ends the technique with no trap or explosion; a wall ends the
-  rush as a miss. Once it starts you can let go of Charge; a hit on #0001
+  `rasen6`; the sphere itself is what has to touch the opponent. No contact
+  by the end of the rush (or a wall first) is a miss: #0001 stops where he
+  is, the sphere vanishes without exploding, and he shows the release pose
+  `rasen12` for one frame (1/12 s) before he is free. A hit (4 damage, no
+  launch) stops the rush at once and traps the opponent, shown hurt on that
+  very frame: it can't move, jump, attack, Charge, Throw or Defend, but
+  gravity still applies. The sphere moves onto it and keeps spinning there
+  (`prasen7 → prasen8 → prasen9`, looped) while #0001 plays
+  `rasen7 → rasen11` and holds `rasen11`. Exactly 2 s after the hit it
+  explodes (`prasen10 → prasen11`, once) as #0001 lets go on `rasen12`: the
+  opponent is released, then takes 16 (20 in all) and is launched. A Dodge's
+  evasive frames let the rush pass through without using it up; a Block-type
+  guard blocks the contact normally and ends the technique with no trap or
+  explosion. Once it starts you can let go of Charge; a hit on #0001
   cancels it (no armour), freeing the opponent. Afterwards, Charge must be
   let go and held again to charge. Pressing Charge and BA2 on the same step
   from standing, or letting go of Charge as you press BA2, is an ordinary
@@ -179,7 +184,7 @@ Touch controls show on touch-first devices (coarse pointer, or a touch actually 
 
 - **Characters:** #0001
 - **Maps:** Desert (wide, open, 3.8 screens) and City (rooftops with 7 one-way platforms, 3.1 screens) for Quick Battle; the Practice Ground training room (one broad flat floor, about 3.5 screens) for practice
-- **Animations:** Idle, Run, Jump, Fall, Land (jump/fall play while airborne; land plays once on touchdown), Hurt and Mid-air Hurt (shown during hitstun on the ground / in the air), Basic Attack 1 (4 frames), Mid-air Basic Attack 1 (the kunai slash, 3 frames: `0001_midair2ba1`–`3`), Basic Attack 2 (7 frames) and Mid-air Basic Attack 2 (the airborne kick, 5 frames: `0001_midair1ba1`–`5`), each played once at 12 fps, Dodge and Mid-air Dodge (3 frames each, played once at 12 fps), Charge (charge1 → charge2 once, then chargea ↔ chargeb while held, at 10 fps, with charge1 shown briefly on release), Throw (3 fighter frames, played once at 12 fps), Shuriken (3 looping projectile frames at 18 fps, normalized and drawn separately from the fighter poses), the clone appear / vanish cloud (`0001_cloneav1`–`0001_cloneav10`, an effect at 20 fps: forwards as a clone appears, the same frames in reverse as it vanishes), the Sphere Rush poses (`0001_rasen1`–`0001_rasen12` as three one-shot fighter clips at 12 fps: formation 1–3, dash 4–6, hit follow-through 7–12) and its blue sphere (`0001_prasen1`–`0001_prasen11` as three one-shot effects at 12 fps: formation 1–6, on the opponent 7–9, explosion 10–11)
+- **Animations:** Idle, Run, Jump, Fall, Land (jump/fall play while airborne; land plays once on touchdown), Hurt and Mid-air Hurt (shown during hitstun on the ground / in the air), Basic Attack 1 (4 frames), Mid-air Basic Attack 1 (the kunai slash, 3 frames: `0001_midair2ba1`–`3`), Basic Attack 2 (7 frames) and Mid-air Basic Attack 2 (the airborne kick, 5 frames: `0001_midair1ba1`–`5`), each played once at 12 fps, Dodge and Mid-air Dodge (3 frames each, played once at 12 fps), Charge (charge1 → charge2 once, then chargea ↔ chargeb while held, at 10 fps, with charge1 shown briefly on release), Throw (3 fighter frames, played once at 12 fps), Shuriken (3 looping projectile frames at 18 fps, normalized and drawn separately from the fighter poses), the clone appear / vanish cloud (`0001_cloneav1`–`0001_cloneav10`, an effect at 20 fps: forwards as a clone appears, the same frames in reverse as it vanishes), the Sphere Rush poses (`0001_rasen1`–`0001_rasen12` as four one-shot fighter clips at 12 fps: formation 1–3, dash 4–6, contact 7–11, and the release / recovery pose 12 alone) and its blue sphere (`0001_prasen1`–`0001_prasen11` as three effects at 12 fps: formation 1–6 once, spinning on the opponent 7–9 looped, explosion 10–11 once)
 - **Attacks:** Basic Attack 1 and Basic Attack 2, each on the ground and in the air, a ground Throw that releases one shuriken, the Charged BA1 Clone Attack (25 Energy) and the Charged BA2 Sphere Rush (ground only, two hits, no Energy cost). Special is reserved.
 - **Defense:** #0001 dodges, on the ground and in the air.
 - **Powers:** Jump Power and Speed Power, each in three tiers. #0001 has Jump Power 2 and Speed Power 2 (its original jump and speed).
@@ -274,7 +279,7 @@ until you choose Return.
   Canvas drawing. The practice session holds your fighter and, only once you
   enable one, a practice CPU. Alone, moves aimed at an opponent fall back or
   miss: Charged BA1 has nobody to appear behind, so it is an ordinary BA1 (no
-  Energy spent); the Sphere Rush dashes, finds no one and ends.
+  Energy spent); the Sphere Rush dashes, finds no one, releases and ends.
 - **Stage.** `PRACTICE_MAP` (`js/data/practice-map.js`) is deliberately not
   in `MAPS`, which feeds Select Stage. `js/stages/practice-theme.js` draws the
   room as one square grid in one-point perspective (back wall, floor, side
@@ -400,7 +405,7 @@ attacks: {
 To give a fighter a charged action, map a combat button in `chargedActions` to a typed descriptor. Pressed while already charging, with Charge still held, the button does that instead of its normal attack; `Fighter.tryChargedAction` dispatches on the type:
 
 - `{ type: 'summon', id }` names an entry in `summons` (see the schema in `js/game/clone.js`), as #0001's `action1: { type: 'summon', id: 'ba1Clone' }` (the Clone Attack) does. It pays the summon's `energyCost` and spawns a detached clone that performs one of the fighter's own `attacks` through an `effectAnimations` cloud, while the fighter keeps charging. An optional `noGround: { attack, offset }` names another of its attacks, and where to appear relative to the opponent, for when there is no ground behind the opponent at its foot height.
-- `{ type: 'technique', id }` names an entry in `chargedTechniques` (see the schema and phases in `js/game/charged-technique.js`), as #0001's `action2: { type: 'technique', id: 'rasenRush' }` (the Sphere Rush) does. The fighter itself performs it: fighter clips from `animations` for its form / dash / confirm phases, an effect from `effectAnimations` for each stage of the sphere, a dash speed, hand offsets per frame, a sphere hitbox, a delay and the data for its two hits. It may set an `energyCost` (#0001's is 0).
+- `{ type: 'technique', id }` names an entry in `chargedTechniques` (see the schema and phases in `js/game/charged-technique.js`), as #0001's `action2: { type: 'technique', id: 'rasenRush' }` (the Sphere Rush) does. The fighter itself performs it: fighter clips from `animations` for its form / dash / confirm phases and its release pose, an effect from `effectAnimations` for each stage of the sphere, a dash speed, hand offsets per frame, a sphere hitbox, a delay and the data for its two hits. It may set an `energyCost` (#0001's is 0).
 
 Without the Energy, the art or valid data, the press falls through to the normal attack.
 
