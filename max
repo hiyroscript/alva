@@ -1,682 +1,409 @@
-Work in the current `hiyroscript/alva` repository on `main` and fix #0001’s Charged BA2 / Sphere Rush again.
+You are modifying the existing Alva game repository (hiyroscript/alva).
 
-IMPORTANT: inspect the CURRENT implementation first. The previous fix has already been merged. Do not revert it wholesale.
+This is the first platform-fighter conversion pass. Alva will eventually move toward the stage/combat presentation of games such as Brawlhalla, MultiVersus, and Super Smash Bros., but DO NOT redesign the whole combat system yet.
 
-Current main already correctly has:
-- a dedicated ChargedTechnique architecture;
-- immediate Hurt / Mid-air Hurt on the exact contact tick;
-- prasen7-9 rotating on the enemy;
-- a whiff release instead of snapping instantly to Idle;
-- correct first-hit + delayed-explosion combat structure;
-- bind ownership and release-before-knockback;
-- fixed facing, grounding rules, wall behavior, interruption handling, etc.
+For this pass, make ONLY the stage, camera/FOV, 3D presentation, finite-stage, and Void changes described below.
 
-Keep all of those good parts.
+Do not add stocks, percentages, new attacks, new movement mechanics, new characters, new menus, new HUD systems, or unrelated visual redesigns.
 
-The remaining problem is that the fighter frames and the pre-explosion sphere behavior are still interpreted incorrectly.
+Existing architecture you must work with
 
-I inspected the actual `0001_rasen*.png` and `0001_prasen*.png` artwork. The intended successful-hit animation is:
+Inspect the existing implementation before changing anything.
 
-FORM
-rasen1 -> rasen2 -> rasen3
+Important files/systems include:
 
-RUSH
-rasen4 -> rasen5 -> rasen6
+* js/data/maps.js
+    * Desert and City Quick Battle maps.
+    * Desert is currently 3600 x 1000.
+    * City is currently 3000 x 1100.
+    * Both define bounds, cameraBounds, spawns, platforms/solids and a theme.
+* js/data/practice-map.js
+    * Practice Ground is separate from MAPS.
+    * Currently 4000 x 1100.
+    * It has its own bounds, cameraBounds, and spawn points.
+* js/game/physics.js
+    * StageCollision currently copies map.bounds.left/right.
+    * stepBody() clamps fighters against stage.left/right.
+    * separate() also clamps fighter pushboxes against those limits.
+    * The current FLOOR / groundY implementation behaves as an effectively infinite horizontal floor. This MUST change or removing the side walls will only allow fighters to stand on invisible ground outside the stage.
+* js/game/camera.js
+    * Fixed-size world camera which follows/framing the two fighters and clamps against cameraBounds.
+* js/game/arena.js
+    * computeWorldScale() controls how zoomed-in gameplay appears.
+    * The target fighter height currently comes from CONFIG.render.fighterScreenRatio.
+* js/config.js
+    * Current fighterScreenRatio is 0.16.
+* js/stages/practice-theme.js
+    * This is the visual reference for the new stage perspective.
+    * It already creates a convincing pseudo-3D room using one-point perspective, FAR/NEAR depth factors, a projected floor, back wall, side walls and front face.
+* js/stages/desert-theme.js
+    * Currently uses layered 2D parallax.
+    * Explicitly builds Boundary cliffs at the map bounds.
+* js/stages/city-theme.js
+    * Currently uses layered 2D parallax.
+    * Explicitly builds Boundary buildings through buildBounds().
+* js/game/projectile.js, js/game/clone.js, charged techniques and related tests also contain assumptions about horizontal stage bounds. Audit them when the old walls are removed.
 
-CONTACT / HOLD
-rasen7 -> rasen8
-then HOLD rasen8 while the sphere stays attached, rotates, and grows larger and larger.
+Required changes
 
-EXPLOSION
-rasen9
-The actual blast happens while #0001 is on rasen9.
+1. Convert all three stages from enclosed arenas into finite platform-fighter stages.
 
-POST-EXPLOSION RELEASE / RECOVERY
-rasen10 -> rasen11 -> rasen12
+Desert, City, and Practice Ground must no longer have solid left/right arena walls.
 
-That is the critical correction.
+Remove fighter collision clamping against the old map.bounds.left/right.
 
-Do NOT keep rasen10/11 in the pre-explosion confirm sequence.
-Do NOT hold rasen11 waiting for the explosion.
-Do NOT use rasen12 during the explosion.
-rasen9 is the explosion pose.
-rasen10 is where the post-explosion release/recovery starts.
+A fighter must be able to:
 
---------------------------------------------------
-1. CORRECT THE FIGHTER ANIMATION SPLIT
---------------------------------------------------
+* run off either edge of the main stage;
+* jump off the stage;
+* fall below the stage;
+* be knocked horizontally beyond the stage;
+* attempt to recover before reaching the Void.
 
-Current `js/data/characters.js` has approximately:
+Do NOT replace the current walls with invisible walls.
 
-rasenForm      = rasen1-3
-rasenDash      = rasen4-6
-rasenConfirm   = rasen7-11
-rasenRelease   = rasen12
+The existing main floor is effectively infinite because groundY always provides a landing surface. Refactor this so the primary floor has a finite horizontal extent.
 
-That is still wrong for a successful hit.
+Use a clean data-driven representation such as a finite main floor/platform range rather than scattering hard-coded checks through physics.
 
-Change the logical clips to represent the actual artwork:
+For example, a map may expose a main stage/floor structure describing:
 
-rasenForm:
-  rasen1, rasen2, rasen3
+* left edge;
+* right edge;
+* top Y;
+* visual thickness/depth.
 
-rasenDash:
-  rasen4, rasen5, rasen6
+The exact schema is your choice, but physics and visuals should share the same source of truth.
 
-rasenConfirm:
-  rasen7, rasen8
+StageCollision.surfaceBelow() and stepBody() must only treat the main floor as valid support when the fighter horizontally overlaps the finite stage surface.
 
-rasenExplosion:
-  rasen9 only
+Preserve existing one-way platforms and solid obstacle behavior.
 
-rasenRelease:
-  rasen10, rasen11, rasen12
-
-A clean rush miss still needs the special behavior established previously:
-the final visible miss/release pose should be rasen12.
-
-Therefore it is fine to add a dedicated logical clip such as:
-
-rasenWhiffRelease:
-  rasen12 only
-
-This reuses the same existing PNG. Do NOT duplicate, regenerate, rename, redraw, or modify the PNG file itself.
-
-It is okay for `rasen12.png` to be referenced by two logical animation clips:
-- the last frame of successful post-explosion `rasenRelease`;
-- the one-frame `rasenWhiffRelease` for a failed rush.
+Update pushbox separation so fighters are no longer forced back inside former arena walls.
 
-The old test that assumes every rasen source path can occur in exactly one logical clip must be updated accordingly. What matters is that there is still exactly one physical PNG file on disk.
+2. Make the physical stages substantially smaller.
 
-All fighter clips remain right-facing source art and one-shot at RASEN_FPS.
+The current stages are extremely wide for a platform fighter.
 
---------------------------------------------------
-2. CORRECT THE SUCCESSFUL-HIT STATE MACHINE
---------------------------------------------------
-
-The current successful path is roughly:
-
-form
--> dash
--> confirm rasen7-11
--> wait holding rasen11
--> explode while showing rasen12
--> done
-
-Replace that successful path with:
-
-form
--> dash
--> confirm
--> wait
--> explode
--> release
--> done
-
-Meaning:
-
-FORM
-- unchanged.
-
-DASH
-- unchanged.
-- rasen4-6.
-- fixed rush velocity.
-- sphere carried in the hand.
-- this remains the ONLY contact-search phase.
-
-CONFIRM
-- contact applies first hit exactly once.
-- rush stops immediately.
-- target becomes bound.
-- target immediately displays Hurt/Mid-air Hurt on the same collision tick.
-- sphere moves onto the enemy.
-- #0001 plays rasen7 -> rasen8.
-- sphere begins its attached rotation.
-
-WAIT
-- #0001 HOLDS rasen8.
-- absolutely do not advance him to rasen9 yet.
-- rasen9 belongs to the explosion itself.
-- while rasen8 is held, the sphere continues rotating and gradually becomes larger and larger.
-- the target remains bound/Hurt.
-- #0001 remains locked and stationary.
-- this lasts until the existing `explosionDelay`.
-
-EXPLODE
-- when the delayed explosion begins, immediately switch #0001 to rasen9.
-- rasen9 is the fighter’s explosion pose.
-- sphere stops using its normal attached-state visuals and switches to the authored explosion effect.
-- explosion hit still happens on the first explosion frame.
-- release the target from the bind BEFORE applying explosion knockback, as the code already does.
-- hold rasen9 for the duration of the visible sphere explosion if necessary; do not start rasen10 until the explosion effect itself has finished.
+Shrink the actual fighting surfaces and reposition their contents around the middle of the map.
 
-RELEASE
-- only AFTER the visible explosion completes:
-  rasen10 -> rasen11 -> rasen12
-- no sphere remains during this phase.
-- no more damage.
-- no contact search.
-- no bind.
-- no additional explosion.
-- fighter remains committed/locked during this short recovery.
-- after rasen12 finishes, technique ends and normal control returns.
+Target the general scale of a compact 1v1 platform-fighter stage rather than a long side-scrolling arena.
 
-This means the successful sequence on screen should read unmistakably as:
+A reasonable starting target is approximately:
 
-rasen7
-rasen8
-rasen8 held...
-rasen8 held...
-rasen8 held...
-EXPLOSION -> rasen9
-then
-rasen10
-rasen11
-rasen12
-then neutral.
+* Desert main fighting surface: ~1400–1600 world units wide.
+* City main fighting surface: ~1400–1600 world units wide.
+* Practice main fighting surface: ~1300–1500 world units wide.
 
-Do not let rasen10 or rasen11 appear before the blast.
+These are tuning targets, not a reason to distort existing gameplay objects. Adjust them slightly if necessary so platforms, fighters and art remain coherent.
 
---------------------------------------------------
-3. KEEP THE CLEAN-MISS BEHAVIOR SEPARATE
---------------------------------------------------
+Reposition spawn points around the new center.
 
-Do not accidentally make a whiff play the whole rasen10-12 successful recovery if that changes the intended failed-rush look.
+For City, compress/reposition the current seven one-way platforms into the smaller layout while preserving the stage’s vertical character.
 
-The earlier requirement still applies:
+For Desert, keep its relatively open identity.
 
-If #0001 rushes and hits nobody:
-- rush ends;
-- velocity becomes 0;
-- contact search ends;
-- no enemy is damaged;
-- no enemy is bound;
-- no prasen7-11 attached/blast sequence occurs;
-- the sphere disappears without exploding;
-- #0001 displays the LAST rasen frame, rasen12, as the whiff release;
-- hold it for the intended one-frame duration;
-- then return to neutral.
+For Practice, keep the simple training-stage identity.
 
-A wall-stopped rush should use the same whiff-release semantics.
+Do not remove City platforms or Desert’s existing rock obstacles unless necessary to make the finite-stage geometry work.
 
-So a clean implementation can use separate data/runtime fields such as:
+3. Remove all three stages’ side-wall artwork.
 
-confirmAnimation
-explosionAnimation
-releaseAnimation
-whiffReleaseAnimation
+This means both gameplay walls and visual walls.
 
-Do not hard-code #0001 filenames directly inside the generic runtime. Keep ChargedTechnique data-driven.
+Desert:
 
---------------------------------------------------
-4. THE SPHERE MUST STILL ROTATE ON THE TARGET
---------------------------------------------------
+Remove the existing boundary cliffs generated by buildCliffs() as stage-edge walls. The desert should no longer look like a basin trapped between two enormous cliffs.
 
-Preserve the previous correction that made the attached blue sphere rotate.
+City:
 
-The attached sphere should keep cycling:
+Remove the left/right Boundary buildings created by buildBounds(). Buildings can remain in the background scenery, but nothing should visually read as a giant wall preventing the fighter from leaving the stage.
 
-prasen7 -> prasen8 -> prasen9 -> prasen7 -> ...
+Practice Ground:
 
-until the explosion starts.
+Remove the left/right side-wall and bulkhead treatment produced by drawSideWall() and drawBulkhead().
 
-Do not freeze on one frame.
+Keep the Practice Ground’s back-wall grid/perspective aesthetic. The instruction is to remove the enclosing SIDE walls, not flatten the training room into a blank background.
 
-Do not put prasen10 or prasen11 into this rotation loop.
+4. Zoom the gameplay camera out for a platform-fighter feel.
 
-prasen10 and prasen11 are the bright explosion frames.
+The current fighter target is roughly 16% of viewport height, which feels too close for the direction of the game.
 
-Keep the attached sphere direction-neutral and centre-anchored.
+Adjust the world scale so fighters generally occupy approximately 10–12% of viewport height during normal gameplay.
 
-Keep its centre following the target through the existing `targetOffset`, including an airborne caught enemy.
+Use this as a tuning target rather than blindly applying a single number if it produces bad results on different aspect ratios.
 
---------------------------------------------------
-5. ADD REAL SPHERE GROWTH BEFORE THE EXPLOSION
---------------------------------------------------
+The player should see:
 
-Rotation alone is not sufficient.
+* the entire core fighting platform most of the time;
+* substantial air space above it;
+* meaningful space past the left/right ledges;
+* enough space underneath to visually understand falling/recovery;
+* both fighters comfortably when they separate.
 
-While #0001 is stopped/holding rasen8, the sphere is supposed to become progressively bigger and bigger before exploding.
+Do NOT zoom so far out that fighters become unreadable.
 
-Implement explicit visual scale growth for the sphere while it is attached to the enemy.
+Keep responsive behavior working on desktop and smaller displays.
 
-Important: do NOT assume cycling prasen7-9 provides the growth.
+Do not implement a huge new cinematic camera system in this pass. Improve the existing Camera/scale system enough to establish the wider platform-fighter FOV.
 
-The actual source PNG canvas sizes are approximately:
+Camera bounds should no longer be synonymous with the old solid arena walls.
 
-prasen7: 116 x 118 source pixels
-prasen8: 106 x 110
-prasen9: 100 x 106
+5. Make Desert and City feel 3D like Practice Ground.
 
-So their native dimensions actually trend smaller rather than monotonically larger.
+Stay within the existing Canvas 2D rendering architecture. Do NOT introduce Three.js, WebGL, a new engine, or external 3D assets.
 
-Therefore growth must be represented explicitly in the technique/rendering logic.
+The goal is pseudo-3D perspective like practice-theme.js.
 
-A clean implementation would expose a data-driven attached-sphere growth configuration on the technique definition, for example conceptually:
+Extract/reuse perspective concepts from Practice Ground where useful instead of duplicating large amounts of projection math.
 
-sphereGrowth: {
-  startScale: ...,
-  endScale: ...,
-}
+The playable terrain should visibly have depth.
 
-or equivalent.
+For Desert:
 
-Do not bury #0001-specific magic constants directly in Arena.drawTechnique.
+Turn the playable desert surface into a perspective sandstone/sand platform rather than a flat 2D strip.
 
-The technique runtime should expose something like a visual `sphereScale` derived deterministically from its state/time, and the renderer should render the centered sphere with that scale multiplier.
+It should have:
 
-Requirements for growth:
+* a readable top surface;
+* visible front thickness/face;
+* perspective depth;
+* shading that makes the stage feel volumetric;
+* existing desert sky, sun, mesas, dunes, dust and thematic colors preserved where appropriate.
 
-- sphere stays centred on the caught opponent;
-- its centre must NOT drift as it becomes larger;
-- it continues rotating through prasen7-9 while scaling;
-- scaling affects visuals only;
-- it must not create repeated hits;
-- it must not enlarge/re-enable the rush hitbox after contact;
-- it must not alter the target hurtbox or collision;
-- growth must be deterministic under the fixed 60 Hz update;
-- it should visibly increase continuously/progressively, not randomly pulse;
-- scale should never shrink during this pre-explosion growth period.
+The stage can visually resemble a raised sandstone formation or compact desert plateau with open air beyond its ledges.
 
-Begin the growth once #0001 has reached the rasen8 hold portion of the contact sequence.
+The old boundary cliffs must not return as disguised walls.
 
-The visual should communicate:
-sphere caught enemy -> energy keeps building -> sphere becomes increasingly large -> blast.
+Rock obstacles should also get enough top/front/side shading to match the new depth treatment.
 
-Use a configurable start/end scale rather than sprinkling renderer constants around the code.
+For City:
 
-Tune the final scale visually against the actual game so the growth is obvious but does not become absurdly oversized.
+Turn the playable rooftop into an actual dimensional rooftop slab.
 
-Add tests for the scale progression:
-- scale at beginning of attached hold;
-- scale partway through delay;
-- scale immediately before explosion;
-- assert start < middle < end;
-- assert repeated calls at the same fixed-step time return identical values.
+Give it:
 
---------------------------------------------------
-6. EXPLOSION VISUAL TIMING
---------------------------------------------------
+* a perspective top plane;
+* visible front facade/thickness;
+* appropriate side/front shading;
+* volumetric treatment of catwalks, girders, scaffolds, rooftop structures and the bulkhead.
 
-The current sphere explosion art is:
+Keep the existing nighttime skyline, moon, neon, trains, searchlights and city identity.
 
-prasen10
-prasen11
+The core playable geometry should now visually belong in the same pseudo-3D world as Practice Ground instead of looking like flat layered shapes.
 
-Keep those as the explosion animation.
+Practice Ground is the perspective reference, but Desert and City must retain their own art direction. Do not simply put Practice Ground’s grid onto them.
 
-They are visibly much lighter/brighter than the attached sphere and represent the blast.
+6. Add the new kill boundary: Void.
 
-At exactly the configured explosion time:
+Introduce a data-driven stage property for a kill/blast boundary called Void.
 
-1. #0001 switches from held rasen8 to rasen9.
-2. attached sphere growth/rotation stops.
-3. first sphere blast frame prasen10 appears.
-4. target is released from the bind.
-5. explosion hit is applied.
-6. target receives the existing launch/knockback.
-7. prasen11 follows once.
-8. after the explosion animation finishes, the sphere disappears.
-9. only then does #0001 begin rasen10 -> rasen11 -> rasen12 recovery.
+The Void must sit significantly beyond the playable stage so fighters have real off-stage space.
 
-Do NOT start rasen10 on the same instant that prasen10 first appears.
+Do not place the kill boundary directly beside the ledge.
 
-The explosion visual belongs with rasen9.
+A fighter should be able to:
 
-Because rasenExplosion may only contain one fighter frame while the sphere blast contains two frames, it is acceptable and preferable to hold rasen9 for the full sphere-explosion duration.
+* leave the platform;
+* travel some distance away from it;
+* potentially recover;
+* only die once they cross the distant Void boundary.
 
-Then transition to release.
+The Void should surround the meaningful play space rather than only replacing the old left/right walls. It should account for falling below the stage and being launched far horizontally. A sufficiently distant upper kill boundary should also exist so extremely high launch positions cannot continue forever.
 
---------------------------------------------------
-7. DAMAGE / COMBAT VALUES SHOULD NOT CHANGE
---------------------------------------------------
+Use explicit per-stage voidBounds or an equivalent clean data structure.
 
-Unless another authoritative repo source explicitly contradicts them, preserve the existing combat values:
+Keep the Void boundary independent from:
 
-first contact:
-- 4 damage;
-- no launch;
-- existing hitstun/blockstun/hitstop.
+* the finite platform edge;
+* normal camera bounds;
+* former wall bounds.
 
-delayed explosion:
-- 16 damage;
-- existing 420 horizontal / 220 upward launch;
-- existing stun/hitstop/blockstun.
+7. Void visuals.
 
-Total unblocked successful move:
-20 damage.
+The Void must have a visible visual identity.
 
-Keep exactly one contact damage event and exactly one explosion damage event.
+It is a deep/pure black region with a wavy animated inner edge.
 
-Do not make the growing sphere deal repeated damage.
+It should feel ominous and organic rather than like a straight black rectangle.
 
-Do not turn the growth phase into a multihit.
+Requirements:
 
---------------------------------------------------
-8. IMMEDIATE HURT FRAME MUST REMAIN FIXED
---------------------------------------------------
+* call the system/region Void;
+* use black as its dominant visual;
+* render a gently wavering boundary;
+* the wavy motion should be visual only;
+* gameplay death detection must use a stable mathematical boundary, NOT the animated wave position;
+* respect reduced-motion mode by freezing or greatly reducing wave animation;
+* keep the Void far enough away that it does not visually crowd the stage during normal neutral play.
 
-The previous fix correctly forces the caught opponent into Hurt/Mid-air Hurt on the exact collision tick.
+The Void should appear as fighters approach the blast-zone area rather than making every stage look boxed in by four black walls at all times.
 
-Do NOT regress this.
+It may be implemented as black regions outside the configured safe rectangle with sine/noise-style wavering inner edges.
 
-On the exact tick health changes 100 -> 96:
-- target is already bound;
-- target is already in Hurt or Mid-air Hurt;
-- sphere is already centred on the target;
-- attacker is already on the first contact pose;
-- rush velocity is already stopped.
+Do not use external textures for this.
 
-The successful first contact should begin at rasen7.
+8. Void gameplay behavior.
 
---------------------------------------------------
-9. UPDATE THE GENERIC TECHNIQUE RUNTIME CLEANLY
---------------------------------------------------
+Crossing the configured Void boundary is an immediate kill.
 
-Relevant file:
+Do not add a stock system yet.
 
-`js/game/charged-technique.js`
+For Quick Battle, implement the minimum clean behavior necessary so entering the Void clearly counts as that fighter being defeated rather than allowing them to continue moving outside the world.
 
-Do not special-case frame names like `"rasen8"` or `"rasen9"` inside the runtime.
+A Void death should immediately resolve the appropriate fighter as defeated. Do not make the player wait until the 99-second timer expires.
 
-Extend the definition schema so the phases remain data-driven.
+Reuse the existing battle/result architecture where sensible rather than building a full new match rules system.
 
-Conceptually the definition now needs enough fighter animation roles to distinguish:
+For Practice Ground, Void contact must not permanently end the training session. Reset the affected fighter cleanly back to its appropriate spawn so Practice remains usable.
 
-- formAnimation
-- dashAnimation
-- confirmAnimation
-- explosionAnimation
-- releaseAnimation
-- whiffReleaseAnimation
+When resetting from Void:
 
-along with the existing sphere animation roles.
+* clear invalid velocity;
+* clear transient attack/technique state that cannot survive a respawn;
+* do not leave clones, projectiles, binds, or references pointing at an invalid/dead fighter.
 
-Update `TECHNIQUE_DEFAULTS`, validation in `techniqueProblem`, constructor-resolved animation metadata/durations, and `animation` selection accordingly.
+Do not introduce stocks, respawn invulnerability, percentages or platform-fighter damage scaling yet.
 
-A clean explicit phase model would be:
+9. Audit old wall-bound assumptions.
 
-form
-dash
-whiffRelease          // miss/wall only
-confirm
-wait
-explode
-release               // successful post-explosion recovery
-done
+Removing stage.left/right as walls can affect systems other than walking.
 
-Exact names can differ, but do not conflate these behaviors again.
+Audit at minimum:
 
-Important duration rules:
+* fighter movement;
+* fighter pushbox separation;
+* clone placement;
+* projectile cleanup;
+* charged techniques that check ground or stage margins;
+* camera clamping;
+* stage previews;
+* Practice Ground tests;
+* any test that expects a fighter to stop at map.bounds.left/right.
 
-confirm:
-plays rasen7-8 once.
+Projectiles should eventually be culled using sensible world/Void limits rather than the old solid-wall boundary.
 
-wait:
-holds rasen8.
+Clone placement should not behave as though invisible side walls still exist.
 
-explode:
-plays/holds rasen9 for the visible prasen10-11 blast duration.
+Do not break techniques that depend on checking whether ground exists under the fighter. Finite stage edges should correctly count as losing ground.
 
-release:
-plays rasen10-12 once.
+Camera and stage relationship
 
-whiffRelease:
-shows rasen12 for the intended short whiff recovery.
+Keep these concepts separate:
 
-`velocityX` remains nonzero ONLY during dash.
+Main platform
+The physical surface fighters stand on.
 
---------------------------------------------------
-10. RENDERER CHANGES
---------------------------------------------------
+Off-stage space
+Open recoverable air beyond the ledges.
 
-Relevant code:
+Camera framing area
+Where the camera is allowed to travel/frame combat.
 
-`js/game/arena.js`
-`Arena.drawTechnique()`
+Void
+The distant kill/blast boundary.
 
-The renderer currently:
-- asks the technique for its sphere frame;
-- asks for sphere centre;
-- draws the effect centred using the fighter art scale.
+These four concepts must not be represented by one shared bounds rectangle anymore.
 
-Keep that architecture.
+The existing architecture currently mixes several of these ideas. Clean that up enough for this pass.
 
-Add the sphere growth multiplier cleanly.
+Stage previews
 
-For example, conceptually:
+Make sure stage-select previews still render correctly after changing the dimensions/perspective.
 
-const scale = this.pxPerArt * t.sphereScale;
+js/ui/stage-preview.js already derives much of its framing from map dimensions and computeWorldScale(). Update it only where needed.
 
-and pass the resulting art scale to the centered effect renderer.
+A preview should show the compact stage itself, not mostly empty off-stage/Void space.
 
-Do not alter global fighter scale.
-Do not resize the opponent.
-Do not mutate normalized sprite frames.
-Do not create new canvases each frame.
-Do not rotate the entire canvas artificially; frame cycling already provides the authored sphere rotation.
+Preserve existing functionality
 
-The sphere must remain precisely centre-anchored as its scale increases.
+Do not intentionally change:
 
-During successful release rasen10-12 there should be no sphere to draw.
+* character moves;
+* attack frame data;
+* hitboxes/hurtboxes;
+* damage values;
+* health system;
+* Energy;
+* knockback configuration;
+* movement speed;
+* jump values;
+* defense;
+* charged attacks;
+* controls;
+* menu flow;
+* character selection;
+* Practice options;
+* existing accessibility/reduced-motion behavior except where necessary for the new Void wave.
 
---------------------------------------------------
-11. UPDATE TESTS THAT CURRENTLY ENCODE THE WRONG SEQUENCE
---------------------------------------------------
+Keep all existing game modes operational.
 
-The current `tests/charged-ba2.test.mjs` explicitly encodes the previous interpretation and MUST be updated.
+Tests
 
-Current wrong expectations include things like:
+Update tests that were specifically asserting the old wall behavior.
 
-- rasenConfirm = rasen7-11
-- rasen11 held until the explosion
-- rasen12 shown during the explosion
-- successful blast and release happening in the same phase
+Add focused tests covering the new architecture, particularly:
 
-Replace those expectations.
+* fighter can cross the former left/right stage bounds;
+* fighter is not clamped by an invisible wall;
+* finite main floor stops supporting a fighter once they leave its horizontal footprint;
+* fighter can fall off either ledge;
+* surfaceBelow() correctly reports no main-floor support outside the finite floor;
+* fighter pushbox separation does not clamp against removed side walls;
+* Void is farther away than the platform ledges;
+* crossing Void triggers a kill;
+* Practice Void contact resets the fighter instead of ending Practice;
+* projectile/clone behavior does not depend on old wall bounds;
+* existing platform/solid collision tests continue passing;
+* reduced motion leaves the Void visual static or minimally animated.
 
-Add/modify tests to prove the corrected behavior.
+Run the complete existing test suite after implementation and fix regressions caused by these changes.
 
-A. Animation registration
+Visual acceptance criteria
 
-Assert:
+When the work is finished:
 
-rasenForm      = 1-3
-rasenDash      = 4-6
-rasenConfirm   = 7-8
-rasenExplosion = 9
-rasenRelease   = 10-12
+Desert should look like a compact dimensional desert fighting platform surrounded by open space, with no enclosing cliff walls.
 
-and whichever logical one-frame clip is used for whiff:
-rasenWhiffRelease = 12
+City should look like a compact dimensional rooftop/platform-fighter stage surrounded by open space, with no giant boundary buildings acting as walls.
 
-Do not require every source PNG to be referenced by exactly one logical clip, because rasen12 can legitimately be reused by the whiff clip.
+Practice Ground should retain its clean one-point-perspective training-room identity but have open left/right stage edges rather than side walls.
 
-Still verify no duplicate physical PNG files exist.
+All three stages should visibly read as smaller arenas.
 
-B. Contact / pre-explosion fighter frames
+The camera should be noticeably farther out than before.
 
-After contact:
-- rasen7 appears;
-- then rasen8;
-- rasen8 remains held for the rest of the delay;
-- rasen9 does NOT appear early;
-- rasen10/11/12 do NOT appear early.
+Players should be able to leave the stage and fall into open space.
 
-C. Sphere rotation
+The black, wavy Void should exist far outside the main platform and act as the actual kill boundary.
 
-Before explosion:
-prasen7 -> 8 -> 9 -> 7 -> ...
-continues correctly.
+The game should feel like it has taken its first structural step from a traditional enclosed fighting arena toward a platform fighter.
 
-D. Sphere growth
+Strict scope limit
 
-Sample attached-sphere scale at multiple points during the rasen8 hold:
-- early;
-- midpoint;
-- immediately pre-explosion.
+Do NOT use this task as an opportunity to perform the rest of the platform-fighter conversion.
 
-Assert monotonically increasing scale.
+Specifically do not add:
 
-Also ensure its world/render centre stays the target centre despite the changing size.
+* stocks/lives UI;
+* percentage damage;
+* directional influence;
+* air dodges beyond what already exists;
+* wall jumps;
+* ledge grabs;
+* new recovery moves;
+* new characters;
+* new attacks;
+* new stages;
+* new game modes;
+* item systems;
+* camera shake overhaul;
+* major HUD redesign;
+* menu redesign;
+* unrelated refactoring.
 
-E. Exact explosion transition
+Implement only what is necessary for:
 
-At the explosion tick:
-- phase becomes explode;
-- fighter frame is rasen9;
-- sphere is prasen10;
-- second damage event happens;
-- target is released before knockback;
-- target health becomes 80;
-- launch remains intact.
+smaller stages + open ledges + removed walls + wider FOV + Desert/City pseudo-3D + distant wavy Void kill boundary.
 
-On subsequent explosion visual frame:
-- fighter still shows/holds rasen9;
-- sphere advances to prasen11.
-
-F. Post-explosion release
-
-Only after prasen10-11 finish:
-- sphere becomes null;
-- phase enters release;
-- rasen10 -> rasen11 -> rasen12 play once;
-- no new damage events;
-- controls remain locked until rasen12 completes;
-- then technique clears and normal control returns.
-
-G. Clean miss
-
-Preserve:
-- rasen12 is the whiff release pose;
-- no prasen7-11;
-- no damage;
-- no bind;
-- no successful-hit rasen7-11 sequence;
-- then neutral.
-
-H. Rendering test
-
-Current Battle render test says the sphere spins while #0001 holds rasen11 and then expects rasen12 beside prasen10.
-
-That test is obsolete.
-
-Replace it so it verifies:
-- target Hurt + rasen7 + prasen7 on contact;
-- rasen8 held while the sphere rotates and gets progressively larger;
-- rasen9 + prasen10 on explosion;
-- rasen9 + prasen11 for the rest of the visible blast;
-- then no sphere while rasen10, rasen11, rasen12 play.
-
-If the fake canvas records destination width/height or transforms, explicitly assert that the rendered attached-sphere dimensions increase over the hold while its center translation stays unchanged.
-
---------------------------------------------------
-12. UPDATE DOCUMENTATION
---------------------------------------------------
-
-Update all stale descriptions in:
-
-- `js/data/characters.js`
-- `js/game/charged-technique.js`
-- `tests/charged-ba2.test.mjs`
-- `ALVA_SPEC.md`
-- README/help text if they currently describe the old frame roles
-
-Remove statements such as:
-
-- rasen7-11 are all confirm frames;
-- rasen11 is held until explosion;
-- rasen12 is used as the explosion release pose.
-
-Document instead:
-
-rasen1-3   formation
-rasen4-6   rush
-rasen7-8   successful contact / stop
-rasen8     held while attached sphere builds in size
-rasen9     explosion pose
-rasen10-12 post-explosion release/recovery
-rasen12    also used alone as the clean-whiff release pose
-
-prasen1-6  formation
-prasen7-9  rotating attached sphere, visually scaled larger over the hold
-prasen10-11 explosion
-
---------------------------------------------------
-13. DO NOT REGRESS THE REST OF THE GAME
---------------------------------------------------
-
-Preserve all existing behavior for:
-
-- ordinary ground BA2;
-- mid-air BA2;
-- Charged BA1 Clone Attack;
-- Throw;
-- Dodge;
-- Charge activation requirements;
-- Energy;
-- facing snapshot;
-- left-facing mirroring;
-- hand offsets;
-- grounded-only startup;
-- ground-loss cancellation;
-- wall stopping;
-- attacker being hit during the technique;
-- Block interaction;
-- Dodge interaction;
-- knockout handling;
-- reset/rematch cleanup;
-- destroy cleanup;
-- target bind ownership;
-- airborne caught target falling/landing normally;
-- immediate target Hurt pose;
-- exactly two successful damage events;
-- no extra hitboxes;
-- fixed-step determinism.
-
-Do not turn Sphere Rush into a normal attack/projectile/summon.
-Do not rewrite unrelated systems.
-
---------------------------------------------------
-14. VALIDATION
---------------------------------------------------
-
-Run:
-
-node --test tests/charged-ba2.test.mjs
-
-Then:
-
-node --test tests/*.test.mjs
-
-Also manually inspect the move in the browser.
-
-Successful hit must visibly read:
-
-sphere forms
--> rush
--> contact on rasen7
--> settle on rasen8
--> #0001 remains frozen on rasen8
--> sphere continues rotating on the Hurt enemy
--> sphere steadily gets larger and larger
--> blast begins
--> #0001 is on rasen9 while prasen10-11 explode
--> sphere disappears
--> #0001 releases/recoveries through rasen10
--> rasen11
--> rasen12
--> neutral
-
-Clean miss must visibly read:
-
-sphere forms
--> rush
--> catches nobody
--> rush stops
--> no explosion
--> final rasen12 release pose
--> neutral
-
-This is an animation-semantics fix, not a combat redesign. The finished move should make the role of each supplied sprite obvious from the gameplay instead of forcing the late rasen frames into the wrong phases.
+Keep the implementation clean, data-driven, maintainable, and consistent with the existing Alva codebase.
