@@ -1,12 +1,13 @@
-// DISCOVER: the in-game reference. An index rail of sections (Power,
-// Knockback, Conditions) beside one scrollable page; on narrow windows the
-// rail runs across the top instead. Each page is built from the registry the
-// game plays by, never the tuning values, so the reference cannot drift from
+// DISCOVER: the in-game reference. An index rail of sections (Power, Launch,
+// Conditions) beside one scrollable page; on narrow windows the rail runs
+// across the top instead. Each page is built from the registry the game
+// plays by, never the tuning values, so the reference cannot drift from
 // gameplay: Power from POWERS in js/data/powers.js (names, descriptions and
-// tier numbers), Knockback from KNOCKBACK_LEVELS in js/data/knockback.js
-// (level names and descriptions, and what each direction does). It explains
-// mechanics only: it never says which fighter or attack uses which Power,
-// tier or level, so it stays the same as the roster grows.
+// tier numbers), Launch from js/data/launch.js (Launch Point, the Base Launch
+// values and the formula they follow, and every Directional Launch). It
+// explains mechanics only: it never says which fighter or attack uses which
+// Power, tier, Base Launch or direction, so it stays the same as the roster
+// grows.
 //
 // The rail is a tablist with automatic activation: keyboard or gamepad focus
 // on a section shows it, a click or tap selects it, and mouse hover is only a
@@ -20,8 +21,9 @@ import { el } from '../core/utils.js';
 import { screenHeader } from '../ui/components.js';
 import { POWERS } from '../data/powers.js';
 import {
-  KNOCKBACK_LEVELS, KNOCKBACK_SUMMARY, KNOCKBACK_DIRECTIONS, KNOCKBACK_DIRECTION_SUMMARY,
-} from '../data/knockback.js';
+  BASE_LAUNCH_VALUES, BASE_LAUNCH_DESCRIPTIONS, BASE_LAUNCH_SUMMARY, LAUNCH_FORMULA, LAUNCH_POINT_SUMMARY,
+  DIRECTIONAL_LAUNCHES, DIRECTIONAL_LAUNCH_SUMMARY,
+} from '../data/launch.js';
 
 // Where the rail turns horizontal: narrow windows, but never short landscape
 // ones. Keep in step with the matching rule in styles.css (Discover, narrow).
@@ -29,8 +31,8 @@ const NARROW_QUERY = '(max-width: 600px) and (min-height: 441px), (max-aspect-ra
 
 const DIRECTIONS = ['up', 'down', 'left', 'right'];
 
-// Tier (or level) i of n as n rising bars, the first i filled. Decorative:
-// the name beside it says which it is.
+// Tier i of n as n rising bars, the first i filled. Decorative: the name
+// beside it says which it is.
 function tierMeter(tier, count) {
   return el('span', { class: 'discover-meter', 'aria-hidden': 'true' },
     Array.from({ length: count }, (_, i) => el('i', {
@@ -40,17 +42,20 @@ function tierMeter(tier, count) {
   );
 }
 
-// An arrow pointing right, turned by CSS to show a Knockback direction.
-// Decorative: the direction's name says which it is.
+// An arrow pointing right, turned by CSS to show a Directional Launch, and
+// a dash for none. Decorative: the direction's name says which it is.
 const ARROW = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 8h11M9 4l4 4-4 4"/></svg>';
+const DASH = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 8h8"/></svg>';
 
-// One reference entry: a title and what it explains, beside its rows.
-function entry(id, title, text, list) {
+// One reference entry: a title and what it explains (and any `extra` under
+// it, such as a formula), beside its rows, if it has any.
+function entry(id, title, text, list = null, extra = null) {
   const titleId = `discover-${id}`;
   return el('article', { class: 'discover-entry', 'aria-labelledby': titleId }, [
     el('div', { class: 'discover-entry-about' }, [
       el('h3', { class: 'discover-entry-title', id: titleId, text: title }),
       el('p', { class: 'discover-entry-text', text }),
+      extra,
     ]),
     list,
   ]);
@@ -82,19 +87,23 @@ function buildPowerPage() {
   ]);
 }
 
-// Knockback: its strength levels, weakest first, then the directions it can
-// take. Names and descriptions only.
-function buildKnockbackPage() {
-  const levels = Object.values(KNOCKBACK_LEVELS);
+// Launch: Launch Point, then every Base Launch value (each marked with the
+// number itself, not a meter: they are literal multipliers) and the formula
+// they follow, then every Directional Launch. Generic mechanics only.
+function buildLaunchPage() {
   return el('div', { class: 'discover-page' }, [
-    el('h2', { class: 'discover-page-title', text: 'Knockback' }),
-    entry('knockback-strength', 'Knockback', KNOCKBACK_SUMMARY,
-      el('ol', { class: 'discover-tiers', 'aria-label': 'Knockback levels' }, levels.map((level, i) =>
-        row({ level: level.id }, tierMeter(i + 1, levels.length), level.name, level.description)))),
-    entry('knockback-direction', 'Direction', KNOCKBACK_DIRECTION_SUMMARY,
-      el('ul', { class: 'discover-tiers', 'aria-label': 'Knockback directions' }, KNOCKBACK_DIRECTIONS.map((direction) =>
-        row({ direction: direction.id },
-          el('span', { class: 'discover-direction', 'aria-hidden': 'true', html: ARROW }),
+    el('h2', { class: 'discover-page-title', text: 'Launch' }),
+    entry('launch-point', 'Launch Point', LAUNCH_POINT_SUMMARY),
+    entry('base-launch', 'Base Launch', BASE_LAUNCH_SUMMARY,
+      el('ol', { class: 'discover-tiers', 'aria-label': 'Base Launch values' }, BASE_LAUNCH_VALUES.map((value) =>
+        row({ value: String(value) },
+          el('span', { class: 'discover-value', 'aria-hidden': 'true', text: String(value) }),
+          `Base Launch ${value}`, BASE_LAUNCH_DESCRIPTIONS[value]))),
+      el('p', { class: 'discover-formula', text: LAUNCH_FORMULA })),
+    entry('directional-launch', 'Directional Launch', DIRECTIONAL_LAUNCH_SUMMARY,
+      el('ul', { class: 'discover-tiers', 'aria-label': 'Directional Launch directions' }, DIRECTIONAL_LAUNCHES.map((direction) =>
+        row({ direction: direction.id ?? 'none' },
+          el('span', { class: 'discover-direction', 'aria-hidden': 'true', html: direction.id ? ARROW : DASH }),
           direction.name, direction.description)))),
   ]);
 }
@@ -103,7 +112,7 @@ function buildKnockbackPage() {
 // a future Conditions system, so its page stays empty rather than faked.
 const SECTIONS = [
   { id: 'power', label: 'Power', build: buildPowerPage },
-  { id: 'knockback', label: 'Knockback', build: buildKnockbackPage },
+  { id: 'launch', label: 'Launch', build: buildLaunchPage },
   { id: 'conditions', label: 'Conditions', build: () => null },
 ];
 

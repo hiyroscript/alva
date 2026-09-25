@@ -9,8 +9,8 @@
 // that fell is out of play for CONFIG.battle.respawnSeconds (2), then back
 // at its spawn, fresh, while the fight (and the timer) carries on. The
 // point that reaches 3 ends the match instead: no respawn, the KO beat,
-// then the result. If time runs out first, more points wins, then less
-// accumulated Knockback; equal on both is a draw.
+// then the result. If time runs out first, more points wins, then lower
+// Launch Point; equal on both is a draw.
 
 import { CONFIG } from '../config.js';
 import { Arena } from './arena.js';
@@ -46,7 +46,7 @@ export class Battle extends Arena {
   restart() {
     // Resetting a fighter ends its charged technique and releases whatever
     // it held, and cancels any respawn wait; the fresh combat state carries
-    // no bind, timer or sphere, 0 Knockback, full stamina and no cooldowns.
+    // no bind, timer or sphere, 0 Launch Point, full stamina and no cooldowns.
     // Both back to 0 points.
     for (const f of this.fighters) f.reset(this.stage);
     this.score.p1 = 0;
@@ -106,8 +106,8 @@ export class Battle extends Arena {
   // still waits to respawn) that fall scores nothing, so a double K.O.
   // never moves both toward the win. The point that reaches pointsToWin
   // ends the match: the KO beat, then the result, and the loser stays out.
-  // Otherwise the fighter respawns after its wait, keeping its Knockback
-  // until then. Once time is up or the match is won, a fall changes
+  // Otherwise the fighter respawns after its wait, keeping its Launch Point
+  // until then (the respawn resets it to 0). Once time is up or the match is won, a fall changes
   // nothing more: no point and no respawn.
   onVoid(f) {
     this.detachFromPlay(f, 'void');
@@ -124,23 +124,23 @@ export class Battle extends Arena {
   }
 
   // Respawn waits run only while the fight is on: once time is up or the
-  // match is won, whoever is out stays out, with the Knockback it fell with.
+  // match is won, whoever is out stays out, with the Launch Point it fell with.
   updateRespawns(dt) {
     if (this.phase === 'fight') super.updateRespawns(dt);
   }
 
   // The winner: whoever reached pointsToWin ('void': it took the last point
   // from a fall), else, on time, whoever has more points ('points'), else
-  // whoever has less accumulated Knockback ('time'; a fighter still out
-  // counts with the Knockback it fell with). Equal on both is a draw.
+  // whoever has the lower Launch Point ('time'; a fighter still out counts
+  // with the Launch Point it fell with). Equal on both is a draw.
   get result() {
     const { p1, p2 } = this.score;
     if (p1 !== p2) {
       const outcome = p1 > p2 ? 'p1' : 'p2';
       return { outcome, reason: Math.max(p1, p2) >= this.pointsToWin ? 'void' : 'points' };
     }
-    const a = this.p1.combat.knockback;
-    const b = this.p2.combat.knockback;
+    const a = this.p1.combat.launchPoint;
+    const b = this.p2.combat.launchPoint;
     if (Math.abs(a - b) < 1e-6) return { outcome: 'draw', reason: 'time' };
     return { outcome: a < b ? 'p1' : 'p2', reason: 'time' };
   }

@@ -409,7 +409,7 @@ test('a real hit on a charging fighter shows Hurt through the impact freeze, wit
   assert.equal(events.length, 1);
   assert.equal(events[0].type, 'hit', 'Charge grants no guard');
   assert.equal(events[0].damage, 5, 'or armour');
-  assert.equal(target.combat.knockback, 5);
+  assert.equal(target.combat.launchPoint, 5);
   assert.match(frameName(target), /^0001_charge[ab]\.png$/, 'still the loop at impact');
   tick({}, CHARGE);
   assert.ok(target.combat.hitstop > 0 || target.combat.stun > 0);
@@ -630,7 +630,7 @@ test('charging next to an opponent creates no attack, hitbox, damage, hitstop or
     assert.equal(attacker.combat.cooldowns.size, 0);
   }
   assert.deepEqual(events, []);
-  assert.equal(target.combat.knockback, 0);
+  assert.equal(target.combat.launchPoint, 0);
   assert.equal(target.body.x, x, 'Charge pushes nobody');
 });
 
@@ -980,7 +980,7 @@ test('charging, releasing, dodging, attacking and hits start no charged cooldown
     tick(press);
     until(() => events.length > 0);
     until(() => !attacker.combat.attack && target.combat.stun <= 0);
-    assert.ok(target.combat.knockback > 0);
+    assert.ok(target.combat.launchPoint > 0);
     none(attacker, target);
   }
 });

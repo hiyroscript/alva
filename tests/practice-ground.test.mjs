@@ -1,7 +1,7 @@
 // Run with node --test tests/practice-ground.test.mjs (no dependencies).
 // Practice Ground: the Home entry, the PracticeSession (with its default
 // training-dummy CPU, or solo once that is disabled, its "+N" damage
-// numbers and its 2-second Void respawns back to 0 Knockback), its HUD (a
+// numbers and its 2-second Void respawns back to 0 Launch Point), its HUD (a
 // card for Player 1 and one for the CPU), the Practice menu and the Change
 // Fighter and CPU dialogs, on a minimal fake DOM and a no-op Canvas; plus
 // checks that Quick Battle keeps its CPU, timer and stages. Layout and paint
@@ -10,7 +10,6 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fakeSprites, def as DEF_0001, DT } from './fighter-harness.mjs';
-import { accumulatedKnockbackBonus } from '../js/data/knockback.js';
 
 // ---- Fake DOM + Canvas -------------------------------------------------------
 
@@ -401,14 +400,14 @@ test('Practice Ground starts with Player 1 and the default CPU: two fighters, pa
   for (const key of ['infiniteEnergy', 'setInfiniteEnergy', 'refillEnergy', 'reviveCPU']) {
     assert.equal(key in session, false, `no ${key}`);
   }
-  assert.equal(player.combat.knockback, 0);
+  assert.equal(player.combat.launchPoint, 0);
   assert.equal(session.fighters.length, 2);
   assert.deepEqual(session.fighters, [player, cpu]);
   assert.ok(player.controller instanceof PlayerController);
   assert.equal(cpu.def.id, PRACTICE_DEFAULT_FIGHTER);
   assert.equal(cpu.controller, null, 'the training dummy: no controller');
   assert.deepEqual([cpu.slot, cpu.label], ['p2', 'CPU']);
-  assert.equal(cpu.combat.knockback, 0);
+  assert.equal(cpu.combat.launchPoint, 0);
   assert.deepEqual([cpu.body.x, cpu.facing], [PRACTICE_MAP.spawnPoints[1].x, -1]);
   assert.ok(session.fighters.every((f) => !(f.controller instanceof TrainingAIController)));
   assert.equal(player.opponent, cpu);
@@ -513,7 +512,7 @@ test('moves that aim at an opponent fall back or miss with nobody there, without
   run({ defense: true, defensePressed: true });
   assert.equal(p.state, 'defense');
   idle();
-  assert.equal(p.combat.knockback, 0, 'nothing ever hits the lone fighter');
+  assert.equal(p.combat.launchPoint, 0, 'nothing ever hits the lone fighter');
 
   // Rendering with a sized view draws only this fighter (the fake canvas
   // records nothing, but every path must run without throwing).
@@ -562,7 +561,7 @@ test('the Void never ends practice: a fighter in it is out for 2 s, then back at
   const [p1Spawn, cpuSpawn] = PRACTICE_MAP.spawnPoints;
   // Player 1, a shuriken of its in flight, is carried just past the Void's
   // fixed line: its next step takes it out of play, its own shuriken gone.
-  player.combat.knockback = 70;
+  player.combat.launchPoint = 70;
   player.combat.chargedCooldowns.start('rasenRush', 5);
   player.combat.chargedCooldowns.start('ba1Clone', 2);
   run({ primary: true, primaryPressed: true });
@@ -573,7 +572,7 @@ test('the Void never ends practice: a fighter in it is out for 2 s, then back at
   assert.deepEqual(session.inPlay, [cpu], 'out of play: not updated, hit or drawn');
   assert.deepEqual(session.cameraTargets, [cpu, null], 'the camera follows the CPU meanwhile');
   assert.deepEqual(session.projectiles, [], 'its shuriken went with it');
-  assert.equal(player.combat.knockback, 70, 'its Knockback stays until it is back');
+  assert.equal(player.combat.launchPoint, 70, 'its Launch Point stays until it is back');
   for (const key of ['score', 'points']) assert.equal(key in session, false, `no ${key}: practice scores nothing`);
   // Two seconds later: back, still, in a fresh training state.
   run({}, RESPAWN_STEPS - 1);
@@ -586,7 +585,7 @@ test('the Void never ends practice: a fighter in it is out for 2 s, then back at
     [p1Spawn.x, top, 0, 0, true],
   );
   assert.equal(player.combat.attack, null, 'no attack survives it');
-  assert.equal(player.combat.knockback, 0, 'a fresh 0');
+  assert.equal(player.combat.launchPoint, 0, 'a fresh 0');
   assert.equal(player.combat.chargedCooldowns.size, 0, 'charged cooldowns cleared: ready again');
   assert.equal(player.combat.stamina, player.combat.maxStamina, 'full stamina');
   assert.equal(player.combat.stun, 0);
@@ -605,7 +604,7 @@ test('the Void never ends practice: a fighter in it is out for 2 s, then back at
   run({}, 30); // the first tick: +1 over it
   assert.ok(cpu.combat.immobilized);
   assert.ok(session.damageNumbers.some((d) => d.target === cpu && d.text === '+1'));
-  cpu.combat.knockback += 60;
+  cpu.combat.launchPoint += 60;
   Object.assign(cpu.body, { y: v.bottom + cpu.body.height, grounded: false, ground: null });
   run();
   assert.equal(cpu.lostToVoid, true);
@@ -618,13 +617,13 @@ test('the Void never ends practice: a fighter in it is out for 2 s, then back at
   run({}, RESPAWN_STEPS);
   assert.equal(cpu.lostToVoid, false);
   assert.deepEqual([cpu.body.x, cpu.body.y, cpu.body.grounded, cpu.facing], [cpuSpawn.x, top, true, cpuSpawn.facing]);
-  assert.equal(cpu.combat.knockback, 0, 'the CPU back to 0 Knockback too');
+  assert.equal(cpu.combat.launchPoint, 0, 'the CPU back to 0 Launch Point too');
   assert.deepEqual(session.fighters, [player, cpu]);
   run({}, 30);
   assert.equal(cpu.body.x, cpuSpawn.x, 'standing still again');
   // No tick from the ended rush ever reaches it.
   run({}, 120);
-  assert.equal(cpu.combat.knockback, 0);
+  assert.equal(cpu.combat.launchPoint, 0);
   // Practice simply carries on: Player 1 can fight the CPU again.
   assert.equal(session.cpu, cpu);
   assert.equal(player.canAct(), true);
@@ -667,7 +666,7 @@ test('HUD: Player 1\'s card, the More button and the CPU\'s card; no score dots,
   // Practice has no points: no score dots on either card.
   assert.deepEqual(hudRoot.querySelectorAll('.hud-score'), []);
   assert.deepEqual(hudRoot.querySelectorAll('.hud-dot'), []);
-  // The same cards as Quick Battle's: portrait | name over Knockback. No
+  // The same cards as Quick Battle's: portrait | name over Launch Point. No
   // cooldown rings (they are under the fighters now), Health or Energy.
   for (const [card, tag, side] of [[panel, 'P1', 'hud-p1'], [cpuPanel, 'CPU', 'hud-p2']]) {
     assert.equal(card.wrap.hidden, false);
@@ -677,8 +676,8 @@ test('HUD: Player 1\'s card, the More button and the CPU\'s card; no score dots,
     assert.equal(card.root.children[2], card.info);
     assert.equal(card.tag.textContent, tag);
     assert.equal(card.name.textContent, '#0001');
-    assert.equal(card.knockback.getAttribute('aria-label'), 'Knockback');
-    assert.equal(card.knockbackValue.textContent, '0');
+    assert.equal(card.launchPoint.getAttribute('aria-label'), 'Launch Point');
+    assert.equal(card.launchPointValue.textContent, '0');
     assert.equal(card.root.classList.contains('has-portrait'), false, 'the fake art has no portrait (and no crash)');
   }
   assert.equal(panel.portrait.dataset.facing, 'right', 'Player 1\'s portrait faces the centre');
@@ -690,14 +689,14 @@ test('HUD: Player 1\'s card, the More button and the CPU\'s card; no score dots,
   assert.ok(!hudRoot.querySelectorAll('[aria-label]').some((n) => /health|energy/i.test(n.getAttribute('aria-label'))));
   assert.doesNotMatch(hudRoot.textContent, /energy/i);
 
-  // Each card follows its own fighter's Knockback: the CPU's number moves
+  // Each card follows its own fighter's Launch Point: the CPU's number moves
   // when it takes damage, alongside the floating "+N".
   const { player, cpu } = screen.session;
-  player.combat.knockback = 40;
-  cpu.combat.knockback = 17;
+  player.combat.launchPoint = 40;
+  cpu.combat.launchPoint = 17;
   hud.update(screen.session);
-  assert.equal(panel.knockbackValue.textContent, '40');
-  assert.equal(cpuPanel.knockbackValue.textContent, '17');
+  assert.equal(panel.launchPointValue.textContent, '40');
+  assert.equal(cpuPanel.launchPointValue.textContent, '17');
 });
 
 test('HUD: the CPU card follows real hits, rebinds when the CPU changes and goes when it is disabled', async () => {
@@ -714,14 +713,14 @@ test('HUD: the CPU card follows real hits, rebinds when the CPU changes and goes
   for (let i = 0; i < 30; i++) step();
   step({ action1: true, action1Pressed: true });
   for (let i = 0; i < 30; i++) step();
-  assert.equal(session.cpu.combat.knockback, 5);
-  assert.equal(cpuPanel.knockbackValue.textContent, '5');
+  assert.equal(session.cpu.combat.launchPoint, 5);
+  assert.equal(cpuPanel.launchPointValue.textContent, '5');
   assert.ok(session.damageNumbers.some((d) => d.text === '+5'), 'the floating number too');
 
   // Change CPU: the card is the new fighter's.
   const cpu = await enableCpu(screen, '9999');
   assert.equal(cpuPanel.name.textContent, '#9999');
-  assert.equal(cpuPanel.knockbackValue.textContent, '0');
+  assert.equal(cpuPanel.launchPointValue.textContent, '0');
   assert.equal(hud.cpu, cpu);
   assert.equal(cpuPanel.wrap.hidden, false);
 
@@ -992,7 +991,7 @@ test('confirming a fighter swaps it in place and resumes practice', async () => 
   assert.ok(rush);
   session.projectiles.push({ alive: true });
   session.clones.push({ alive: true });
-  old.combat.knockback = 30;
+  old.combat.launchPoint = 30;
   assert.ok(old.combat.chargedCooldowns.active('rasenRush'));
 
   screen.openMenu();
@@ -1010,7 +1009,7 @@ test('confirming a fighter swaps it in place and resumes practice', async () => 
   assert.ok(p.controller instanceof PlayerController);
   assert.equal(p.body.x, PRACTICE_MAP.spawnPoints[0].x);
   assert.equal(p.body.y, PRACTICE_MAP.mainStage.top);
-  assert.equal(p.combat.knockback, 0, 'a fresh 0');
+  assert.equal(p.combat.launchPoint, 0, 'a fresh 0');
   assert.equal(p.combat.chargedCooldowns.size, 0, 'no charged cooldowns');
   assert.equal(p.technique, null);
   assert.equal(rush.phase, 'done', 'the old technique ended');
@@ -1018,7 +1017,7 @@ test('confirming a fighter swaps it in place and resumes practice', async () => 
   assert.deepEqual(session.projectiles, []);
   assert.deepEqual(session.clones, []);
   assert.equal(screen.hud.panel.name.textContent, '#9999');
-  assert.equal(screen.hud.panel.knockbackValue.textContent, '0');
+  assert.equal(screen.hud.panel.launchPointValue.textContent, '0');
   assert.equal(screen.hud.cpuPanel.name.textContent, '#0001', 'the CPU card is unchanged');
 
   assert.equal(screen.rosterOpen, false);
@@ -1173,7 +1172,7 @@ test('selecting a CPU loads it and puts it on the stage as a p2 / CPU training d
   assert.equal(cpu.body.x, PRACTICE_MAP.spawnPoints[1].x);
   assert.equal(cpu.body.y, PRACTICE_MAP.mainStage.top);
   assert.equal(cpu.facing, -1, 'facing Player 1');
-  assert.equal(cpu.combat.knockback, 0, 'a fresh CPU starts at 0');
+  assert.equal(cpu.combat.launchPoint, 0, 'a fresh CPU starts at 0');
 
   // The dialog and menu close and practice resumes; the menu now offers
   // Change CPU.
@@ -1251,7 +1250,9 @@ test('Player 1\'s attacks hit the CPU through the real CombatSystem, and it reac
   assert.equal(player.facing, 1);
   assert.equal(cpu.facing, -1);
 
-  assert.equal(cpu.combat.knockback, 0);
+  assert.equal(cpu.combat.launchPoint, 0);
+  // From 115, BA1's 5 makes 120: a push of 1 x 120.
+  cpu.combat.launchPoint = 115;
   run({ action1: true, action1Pressed: true });
   until(() => events.length > 0, 30);
   const [hit] = events;
@@ -1260,7 +1261,8 @@ test('Player 1\'s attacks hit the CPU through the real CombatSystem, and it reac
   assert.equal(hit.target, cpu);
   assert.equal(hit.damage, player.attacks.ba1.damage);
   assert.deepEqual([hit.projectile, hit.summon, hit.technique], [null, null, null]);
-  assert.equal(cpu.combat.knockback, hit.damage, 'its Knockback builds up');
+  assert.equal(cpu.combat.launchPoint, 115 + hit.damage, 'its Launch Point builds up');
+  assert.equal(hit.launchStrength, 120);
   assert.ok(cpu.combat.stun > 0, 'hitstun');
   run(); // the reaction shows from the CPU's next update
   assert.equal(cpu.state, 'hitstun');
@@ -1268,16 +1270,16 @@ test('Player 1\'s attacks hit the CPU through the real CombatSystem, and it reac
   // Its number, straight from the resolved event.
   assert.deepEqual(numbers.map((d) => [d.target, d.damage, d.text]), [[cpu, hit.damage, `+${hit.damage}`]]);
   assert.equal(numbers[0].text, '+5');
-  // Knocked back, then idle again, never hitting back.
+  // Launched away, then idle again, never hitting back.
   const x = cpu.body.x;
   run({}, 40);
-  assert.ok(cpu.body.x > x, 'knockback');
+  assert.ok(cpu.body.x > x, 'launched away');
   assert.equal(cpu.state, 'idle');
-  assert.equal(player.combat.knockback, 0);
+  assert.equal(player.combat.launchPoint, 0);
   assert.equal(events.length, 1);
 });
 
-test('Player 1\'s BA2 launches the CPU straight up (High vertical Knockback), then gravity brings it down', () => {
+test('Player 1\'s BA2 launches the CPU straight up (Base Launch 2, vertical), then gravity brings it down', () => {
   const { session, run, until, events, numbers } = practiceSession();
   const { player, cpu } = session;
   for (let i = 0; i < 300 && cpu.body.x - player.body.x > 60; i++) run({ right: true });
@@ -1285,6 +1287,7 @@ test('Player 1\'s BA2 launches the CPU straight up (High vertical Knockback), th
   const groundY = cpu.body.y;
   const startX = cpu.body.x;
   assert.equal(cpu.grounded, true);
+  cpu.combat.launchPoint = 110;
 
   run({ action2: true, action2Pressed: true });
   until(() => events.length > 0, 30);
@@ -1293,12 +1296,11 @@ test('Player 1\'s BA2 launches the CPU straight up (High vertical Knockback), th
   assert.equal(hit.target, cpu);
   assert.equal(hit.damage, player.attacks.ba2.damage);
   assert.equal(numbers[0].text, '+10');
-  // At impact: launched upward, not pushed sideways, at BA2's default launch
-  // plus the vertical bonus for the 10 Knockback it added (its Knockback
-  // affects its launch though Practice shows no panel for it).
+  // At impact: launched upward, not pushed sideways, at BA2's Base Launch 2
+  // x the CPU's new Launch Point: 110 + 10 = 120, so 240.
   assert.ok(cpu.body.vx === 0, 'no sideways push');
-  assert.equal(cpu.combat.knockback, 10);
-  assert.equal(cpu.body.vy, -(player.attacks.ba2.baseKnockback.y + accumulatedKnockbackBonus(10, 'vertical')));
+  assert.equal(cpu.combat.launchPoint, 120);
+  assert.equal(cpu.body.vy, -240);
   assert.equal(cpu.grounded, false);
   let top = groundY;
   for (let i = 0; i < 120 && !cpu.grounded; i++) {
@@ -1440,22 +1442,22 @@ test('damage numbers: positive "+N" red text over the CPU\'s head that follows i
   assert.ok(late.alpha < 1, 'fading');
 });
 
-test('the CPU is never knocked out: at any Knockback it keeps taking hits, with nothing to revive', () => {
+test('the CPU is never knocked out: at any Launch Point it keeps taking hits, with nothing to revive', () => {
   const { session, run, until, events, numbers } = practiceSession();
   const { cpu } = session;
-  cpu.combat.knockback = 500;
+  cpu.combat.launchPoint = 500;
   run({ primary: true, primaryPressed: true });
   until(() => events.length > 0, 120);
-  assert.equal(cpu.combat.knockback, 501);
+  assert.equal(cpu.combat.launchPoint, 501);
   assert.equal(numbers.at(-1).text, '+1', 'the number is what the hit added');
   until(() => cpu.combat.stun <= 0 && cpu.combat.hitstop <= 0, 120);
-  assert.equal(cpu.canAct(), true, '500 Knockback never stops it');
+  assert.equal(cpu.canAct(), true, '500 Launch Point never stops it');
   // ...and can be hit again.
   run({}, 30);
   run({ primary: true, primaryPressed: true });
   until(() => events.length > 1, 120);
   assert.equal(events[1].target, cpu);
-  assert.equal(cpu.combat.knockback, 502);
+  assert.equal(cpu.combat.launchPoint, 502);
 });
 
 test('Change CPU replaces the CPU in place and leaves Player 1 alone', async () => {
@@ -1463,8 +1465,8 @@ test('Change CPU replaces the CPU in place and leaves Player 1 alone', async () 
   const { session } = screen;
   const old = await enableCpu(screen, '9999');
   const player = session.player;
-  player.combat.knockback = 50;
-  old.combat.knockback = 40;
+  player.combat.launchPoint = 50;
+  old.combat.launchPoint = 40;
   session.damageNumbers.push({ target: old, damage: 5, text: '+5', age: 0, stack: 0 });
 
   screen.openMenu();
@@ -1498,9 +1500,9 @@ test('Change CPU replaces the CPU in place and leaves Player 1 alone', async () 
   assert.equal(cpu.def.id, '0001');
   assert.equal(cpu.label, 'CPU');
   assert.equal(cpu.body.x, PRACTICE_MAP.spawnPoints[1].x);
-  assert.equal(cpu.combat.knockback, 0, 'the new CPU starts at 0');
+  assert.equal(cpu.combat.launchPoint, 0, 'the new CPU starts at 0');
   assert.equal(session.player, player, 'Player 1 untouched');
-  assert.equal(player.combat.knockback, 50);
+  assert.equal(player.combat.launchPoint, 50);
   assert.deepEqual(session.fighters, [player, cpu]);
   assert.equal(player.opponent, cpu);
   assert.equal(cpu.opponent, player);
@@ -1759,7 +1761,7 @@ test('changing Player 1\'s fighter keeps the CPU, rewired to the new fighter', a
 
 // ---- Charged cooldowns and the Void ------------------------------------------
 
-test('a Practice Void respawn is a fresh training state: 0 Knockback, full stamina and both charged abilities ready again', () => {
+test('a Practice Void respawn is a fresh training state: 0 Launch Point, full stamina and both charged abilities ready again', () => {
   const { session, run, until } = practiceSession();
   const { player } = session;
   // Use both charged abilities for real.
@@ -1770,16 +1772,16 @@ test('a Practice Void respawn is a fresh training state: 0 Knockback, full stami
   const cd = player.combat.chargedCooldowns;
   assert.ok(cd.active('ba1Clone') && cd.active('rasenRush'));
   until(() => !player.technique, 400);
-  player.combat.knockback = 88;
+  player.combat.launchPoint = 88;
   player.combat.spendStamina(100);
   assert.equal(player.combat.staminaExhausted, true);
   Object.assign(player.body, { x: PRACTICE_MAP.voidBounds.right + 20, grounded: false, ground: null });
   run();
   assert.equal(player.lostToVoid, true);
-  assert.equal(player.combat.knockback, 88, 'kept through the wait');
+  assert.equal(player.combat.launchPoint, 88, 'kept through the wait');
   run({}, RESPAWN_STEPS);
   assert.equal(player.lostToVoid, false);
-  assert.equal(player.combat.knockback, 0);
+  assert.equal(player.combat.launchPoint, 0);
   assert.equal(player.combat.stamina, player.combat.maxStamina, 'stamina full');
   assert.equal(player.combat.staminaExhausted, false, 'and no longer exhausted');
   assert.equal(cd === player.combat.chargedCooldowns ? cd.size : player.combat.chargedCooldowns.size, 0);
@@ -1793,10 +1795,10 @@ test('a Practice Void respawn is a fresh training state: 0 Knockback, full stami
 
 // ---- Fresh visits ---------------------------------------------------------------
 
-test('a fresh visit starts with the default CPU again and a fresh 0-Knockback fighter, whatever the last visit left', async () => {
+test('a fresh visit starts with the default CPU again and a fresh fighter at 0 Launch Point, whatever the last visit left', async () => {
   const { app, screen, loads } = await enterPractice();
   await enableCpu(screen, '9999');
-  screen.session.player.combat.knockback = 42;
+  screen.session.player.combat.launchPoint = 42;
   screen.session.player.combat.chargedCooldowns.start('ba1Clone', 5);
   // The last visit ends with the CPU disabled: that is never remembered.
   screen.openMenu();
@@ -1811,7 +1813,7 @@ test('a fresh visit starts with the default CPU again and a fresh 0-Knockback fi
   assert.deepEqual(loads.slice(before), ['0001'], 'one load for both');
   assert.ok(session.cpu, 'the CPU is back');
   assert.equal(session.cpu.def.id, '0001');
-  assert.equal(session.player.combat.knockback, 0);
+  assert.equal(session.player.combat.launchPoint, 0);
   assert.equal(session.player.combat.chargedCooldowns.size, 0);
   assert.deepEqual(session.fighters, [session.player, session.cpu]);
   assert.equal(session.player.def.id, '0001');
@@ -1940,7 +1942,7 @@ test('Quick Battle still creates its AI CPU, round intro, 99-second timer and tw
   // Quick Battle's own, after a point; see match-score.test.mjs).
   assert.ok(!(battle instanceof PracticeSession));
   for (const key of ['cpu', 'damageNumbers']) assert.equal(key in battle, false, `no ${key}`);
-  assert.deepEqual([battle.p1.combat.knockback, battle.p2.combat.knockback], [0, 0]);
+  assert.deepEqual([battle.p1.combat.launchPoint, battle.p2.combat.launchPoint], [0, 0]);
 
   const root = new Element('div');
   const hud = new HUD(root);

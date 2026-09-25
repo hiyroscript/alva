@@ -51,7 +51,7 @@
 //                 passed since the hit.
 //                 Through confirm and wait, every whole tickInterval since
 //                 the hit (while the target is still bound) is one tickHit
-//                 on it: Knockback only, no launch. A tick that would fall on
+//                 on it: Launch Point only, no launch. A tick that would fall on
 //                 the explosion's step is not dealt: the explosion is the
 //                 last hit, never a tick as well.
 //   explode       the fighter shows explosionAnimation while sphereExplosion
@@ -77,18 +77,19 @@
 // always agree.
 //
 // Each hit (firstHit, tickHit, explosionHit) is resolved by applyHit like an
-// attack's, with its own numeric default launch, `baseKnockback: { x, y }`,
-// and optionally the `accumulatedKnockbackAxis` the target's accumulated
-// Knockback adds launch along and the `knockbackGrowth` it adds it at (see
-// js/data/knockback.js). A hit with no default launch (a contact that only
-// binds, a tick) never launches.
+// attack's, with its own `damage`, `baseLaunch` and `directionalLaunch` (see
+// js/data/launch.js), validated here exactly like an attack's. A horizontal
+// launch travels along the technique's facing, snapshotted at its start. A
+// hit with Base Launch 0 or no direction (a contact that only binds, a
+// tick) never launches.
 
-import { resolveKnockbackGrowth, resolveLaunchAxis } from '../data/knockback.js';
+import { resolveHitLaunch } from '../data/launch.js';
 
 const HIT_DEFAULTS = {
   damage: 0,
   chipDamage: 0,
-  baseKnockback: { x: 0, y: 0 },
+  baseLaunch: 0,
+  directionalLaunch: null,
   hitstun: 0.2,
   blockstun: 0.12,
   hitstop: 0.06,
@@ -135,9 +136,7 @@ const ORIGIN = Object.freeze({ x: 0, y: 0 });
 
 function createHit(id, spec) {
   if (!spec) return null;
-  const hit = { ...HIT_DEFAULTS, ...spec, id };
-  hit.accumulatedKnockbackAxis = resolveLaunchAxis(hit.baseKnockback, spec.accumulatedKnockbackAxis, `Hit "${id}"`);
-  hit.knockbackGrowth = resolveKnockbackGrowth(spec.knockbackGrowth, `Hit "${id}"`);
+  const hit = { ...HIT_DEFAULTS, ...spec, id, ...resolveHitLaunch(spec, `Hit "${id}"`) };
   return Object.freeze(hit);
 }
 
@@ -441,7 +440,7 @@ export class ChargedTechnique {
   }
 
   // Takes the explosion due this step: the target is released first (so
-  // the blast's knockback is never held back by the bind) and returned for
+  // the blast's launch is never held back by the bind) and returned for
   // the CombatSystem to hit, or null if it is out already.
   takeExplosion() {
     if (!this.explosionDue) return null;

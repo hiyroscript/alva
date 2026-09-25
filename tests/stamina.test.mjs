@@ -189,7 +189,7 @@ test('Block keeps its chip damage: stamina changes nothing about the hit itself'
   for (let i = 0; i < 60 && !events.length; i++) tick({}, { defense: true });
   assert.equal(events[0].type, 'block');
   near(events[0].damage, 5 * 0.2, 'chip damage as before');
-  near(target.combat.knockback, 1);
+  near(target.combat.launchPoint, 1);
   assert.ok(attacker.combat.stamina === 100, 'attacking costs nothing');
 });
 

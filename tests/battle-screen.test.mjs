@@ -1,5 +1,5 @@
 // Run with node --test tests/battle-screen.test.mjs (no dependencies).
-// Pause menu, the HUD (fighter cards with portrait, name and Knockback, the
+// Pause menu, the HUD (fighter cards with portrait, name and Launch Point, the
 // score dots under them; timer and pause controls) and end-of-battle flow
 // on a minimal fake DOM; layout/paint still needs real-browser verification.
 import test from 'node:test';
@@ -10,7 +10,7 @@ import { ConfirmDialog } from '../js/ui/overlays.js';
 import { readFileSync } from 'node:fs';
 import { Battle } from '../js/game/battle.js';
 import { CombatState } from '../js/game/combat.js';
-import { formatKnockback, describeStamina } from '../js/game/hud.js';
+import { formatLaunchPoint, describeStamina } from '../js/game/hud.js';
 import { CONFIG } from '../js/config.js';
 import { duel, def as DEF_0001 } from './fighter-harness.mjs';
 
@@ -148,11 +148,11 @@ function setup() {
 }
 
 // A stand-in for Battle that uses the real draw/winner rule. `p1` / `p2`
-// are the fighters' accumulated Knockback, `score` their points.
+// are the fighters' Launch Point, `score` their points.
 function fakeBattle({ p1 = 0, p2 = 0, score = { p1: 0, p2: 0 } } = {}) {
-  const fighter = (knockback) => {
+  const fighter = (launchPoint) => {
     const combat = new CombatState();
-    combat.knockback = knockback;
+    combat.launchPoint = launchPoint;
     return { def: { displayName: '#0001', chargedActions: DEF_0001.chargedActions }, combat };
   };
   const battle = {
@@ -164,7 +164,7 @@ function fakeBattle({ p1 = 0, p2 = 0, score = { p1: 0, p2: 0 } } = {}) {
     restart() {
       this.restarts++;
       for (const f of [this.p1, this.p2]) {
-        f.combat.knockback = 0;
+        f.combat.launchPoint = 0;
         f.combat.chargedCooldowns.clear();
       }
       this.score.p1 = 0;
@@ -291,7 +291,7 @@ test('timer and pause halves both run the one pause path, once', () => {
   assert.deepEqual(app.nav.scopes, [screen.pauseScope]);
 });
 
-test('HUD: one glass card per fighter, portrait | divider | name over Knockback, three score dots beneath; labelled timer, digits-only urgency', () => {
+test('HUD: one glass card per fighter, portrait | divider | name over Launch Point, three score dots beneath; labelled timer, digits-only urgency', () => {
   const { screen } = setup();
   const battle = startBattle(screen, { p2: 40 });
   const { hud } = screen;
@@ -309,10 +309,10 @@ test('HUD: one glass card per fighter, portrait | divider | name over Knockback,
     assert.equal(side.portrait.getAttribute('aria-hidden'), 'true');
     assert.ok(side.divider.classList.contains('hud-divider'), 'one thin divider');
     assert.equal(side.root.querySelectorAll('.hud-divider').length, 1);
-    const [tagRow, knockback] = side.info.children;
+    const [tagRow, launchPoint] = side.info.children;
     assert.ok(tagRow.classList.contains('hud-tag'), 'name on top');
     assert.equal(tagRow.querySelector('.hud-name').textContent, '#0001', 'the character\'s displayName');
-    assert.equal(knockback, side.knockback, 'Knockback under the name');
+    assert.equal(launchPoint, side.launchPoint, 'Launch Point under the name');
     assert.equal(side.root.querySelector('.hud-sub'), null);
     // No CAB cooldowns in the card any more: they are drawn under the
     // fighter itself (see fighter-status.test.mjs).
@@ -334,8 +334,8 @@ test('HUD: one glass card per fighter, portrait | divider | name over Knockback,
   assert.deepEqual([hud.left.tag.textContent, hud.right.tag.textContent], ['P1', 'CPU']);
   assert.equal(hud.left.root.classList.contains('hud-p1'), true);
   assert.equal(hud.right.root.classList.contains('hud-p2'), true, 'the CPU card mirrors (see styles.css)');
-  assert.equal(hud.left.knockbackValue.textContent, '0');
-  assert.equal(hud.right.knockbackValue.textContent, '40');
+  assert.equal(hud.left.launchPointValue.textContent, '0');
+  assert.equal(hud.right.launchPointValue.textContent, '40');
   assert.equal(hud.timeButton.parentNode.classList.contains('glass'), true);
   assert.equal(hud.pauseButton.parentNode, hud.timeButton.parentNode);
 
@@ -434,23 +434,23 @@ test('HUD: no Health or Energy anywhere: no meter, bar, fill, label or maximum',
     // Stamina is not Energy: described (to screen readers only) by name.
     assert.equal(side.stamina.textContent, 'Stamina 100 of 100');
     assert.doesNotMatch(side.stamina.textContent, /energy/i);
-    // Knockback: labelled, a plain number with no maximum and no % sign.
-    assert.equal(side.knockback.getAttribute('aria-label'), 'Knockback');
-    assert.equal(side.knockback.getAttribute('aria-valuemax'), null);
-    assert.equal(side.knockbackValue.textContent, '0', 'starts at 0');
+    // Launch Point: labelled, a plain number with no maximum and no % sign.
+    assert.equal(side.launchPoint.getAttribute('aria-label'), 'Launch Point');
+    assert.equal(side.launchPoint.getAttribute('aria-valuemax'), null);
+    assert.equal(side.launchPointValue.textContent, '0', 'starts at 0');
     assert.doesNotMatch(side.root.textContent, /%|HP|\/100/);
   }
   const css = readFileSync(new URL('../styles.css', import.meta.url), 'utf8');
   assert.doesNotMatch(css, /hud-bar|hud-energy|low-hp|--energy/, 'no Health / Energy styles left');
 });
 
-test('HUD: the Knockback number follows the fighter, touches the DOM only when it changes, and bind() resets it', () => {
+test('HUD: the Launch Point number follows the fighter, touches the DOM only when it changes, and bind() resets it', () => {
   const { screen } = setup();
   const battle = startBattle(screen);
   const { hud } = screen;
   hud.update(battle);
   const writes = [];
-  const value = hud.left.knockbackValue;
+  const value = hud.left.launchPointValue;
   const set = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(value), 'textContent').set;
   Object.defineProperty(value, 'textContent', {
     set(v) { writes.push(v); set.call(this, v); },
@@ -458,20 +458,20 @@ test('HUD: the Knockback number follows the fighter, touches the DOM only when i
   });
   hud.update(battle);
   hud.update(battle);
-  assert.deepEqual(writes, [], 'unchanged Knockback writes nothing');
+  assert.deepEqual(writes, [], 'unchanged Launch Point writes nothing');
   for (const [k, shown] of [[5, '5'], [27, '27'], [84, '84'], [143, '143'], [1234.4, '1234']]) {
-    battle.p1.combat.knockback = k;
+    battle.p1.combat.launchPoint = k;
     hud.update(battle);
     assert.equal(value.textContent, shown);
   }
-  assert.equal(hud.right.knockbackValue.textContent, '0', 'the other card is its own');
+  assert.equal(hud.right.launchPointValue.textContent, '0', 'the other card is its own');
   assert.deepEqual(writes, ['5', '27', '84', '143', '1234']);
   hud.bind(battle.p1, battle.p2);
   hud.update(battle);
   assert.deepEqual(writes.at(-1), '1234', 'bind() clears the cached value');
   assert.equal(writes.length, 6);
-  assert.equal(formatKnockback(0), '0');
-  assert.equal(formatKnockback(99.6), '100');
+  assert.equal(formatLaunchPoint(0), '0');
+  assert.equal(formatLaunchPoint(99.6), '100');
 });
 
 test('HUD: the card describes stamina to screen readers in steps of 5, exhausted included, never as Energy', () => {
@@ -519,7 +519,7 @@ test('HUD: the portrait is the character\'s own crop from its sprites, with noth
   assert.match(source, /paintPortrait/, 'the shared portrait painter, as the roster uses');
 });
 
-test('HUD: a real hit raises the Knockback shown on the target\'s card only', () => {
+test('HUD: a real hit raises the Launch Point shown on the target\'s card only', () => {
   const { screen } = setup();
   const d = duel();
   const battle = { p1: d.attacker, p2: d.target, timeLeft: 99, round: 1, score: { p1: 0, p2: 0 } };
@@ -529,35 +529,35 @@ test('HUD: a real hit raises the Knockback shown on the target\'s card only', ()
   d.tick({ action1: true, action1Pressed: true });
   d.until(() => d.events.length > 0);
   hud.update(battle);
-  assert.equal(hud.right.knockbackValue.textContent, '5');
-  assert.equal(hud.left.knockbackValue.textContent, '0');
+  assert.equal(hud.right.launchPointValue.textContent, '5');
+  assert.equal(hud.left.launchPointValue.textContent, '0');
 });
 
-test('HUD: a rematch shows 0 Knockback and empty dots again; on time and level on points the lower Knockback wins', () => {
+test('HUD: a rematch shows 0 Launch Point and empty dots again; on time and level on points the lower Launch Point wins', () => {
   const { screen } = setup();
   const battle = startBattle(screen, { p1: 12, p2: 40, score: { p1: 1, p2: 1 } });
   screen.hud.update(battle);
   battle.frame = () => { battle.phase = 'result'; battle.timeLeft = 0; };
   screen.update(1 / 60);
-  assert.deepEqual(battle.result, { outcome: 'p1', reason: 'time' }, 'less Knockback is better');
+  assert.deepEqual(battle.result, { outcome: 'p1', reason: 'time' }, 'lower Launch Point is better');
   assert.equal(screen.resultTitle.textContent, 'Player 1 Wins');
 
   byText(screen.resultOverlay.querySelectorAll('[data-nav]'), 'Rematch').click();
   for (const side of [screen.hud.left, screen.hud.right]) {
-    assert.equal(side.knockbackValue.textContent, '0');
+    assert.equal(side.launchPointValue.textContent, '0');
     assert.ok(side.dots.every((d) => !d.classList.contains('is-filled')));
   }
 });
 
-test('Quick Battle result: points first (3 wins at once, or more on time), then lower Knockback, then a draw', () => {
+test('Quick Battle result: points first (3 wins at once, or more on time), then lower Launch Point, then a draw', () => {
   const result = (p1, p2, score) => fakeBattle({ p1, p2, score }).result;
-  // Level on points at time: Knockback decides.
+  // Level on points at time: Launch Point decides.
   assert.deepEqual(result(42, 81, { p1: 0, p2: 0 }), { outcome: 'p1', reason: 'time' });
   assert.deepEqual(result(81, 42, { p1: 1, p2: 1 }), { outcome: 'p2', reason: 'time' });
   assert.deepEqual(result(0, 5, { p1: 2, p2: 2 }), { outcome: 'p1', reason: 'time' });
   assert.deepEqual(result(37, 37, { p1: 1, p2: 1 }), { outcome: 'draw', reason: 'time' });
   assert.deepEqual(result(0, 0, { p1: 0, p2: 0 }), { outcome: 'draw', reason: 'time' });
-  // More points wins on time, whatever the Knockback says.
+  // More points wins on time, whatever the Launch Point says.
   assert.deepEqual(result(300, 0, { p1: 1, p2: 0 }), { outcome: 'p1', reason: 'points' });
   assert.deepEqual(result(0, 300, { p1: 0, p2: 2 }), { outcome: 'p2', reason: 'points' });
   // Three points: the match is won, by K.O.
@@ -603,7 +603,7 @@ test('a winner still gets the result menu', () => {
     assert.equal(battle.restarts, 0);
     assert.equal(screen.resultOverlay.hidden, false);
     assert.equal(screen.resultTitle.textContent, title);
-    assert.equal(screen.resultSub.textContent, 'Time ran out with the points level. Lower Knockback wins.');
+    assert.equal(screen.resultSub.textContent, 'Time ran out with the points level. Lower Launch Point wins.');
     assert.deepEqual(app.nav.scopes, [screen.resultScope]);
     assert.equal(document.activeElement.textContent, 'Rematch');
     assert.equal(app.input.gameplayActive, false);
@@ -629,11 +629,11 @@ test('the third point plays the K.O. banner with the dots filled, then the resul
     const battle = startBattle(screen);
     const won = lost === 'p1' ? 'p2' : 'p1';
     // The Battle scored the winner's third point and took the loser out:
-    // its Knockback (lower here) does not matter.
+    // its Launch Point (lower here) does not matter.
     battle.score[won] = 3;
     battle.score[lost] = 2;
     battle[lost].lostToVoid = true;
-    battle[won].combat.knockback = 120;
+    battle[won].combat.launchPoint = 120;
     battle.phase = 'ko';
     battle.phaseTime = 0.2;
     screen.update(1 / 60);

@@ -87,9 +87,9 @@ test('a fall takes the fighter out of play at once; it is back exactly 2 s later
   const { battle, run, script, input } = match();
   const { p1, p2 } = battle;
   const [spawn] = battle.map.spawnPoints;
-  // Make a mess to clear: Knockback, empty stamina, both charged cooldowns,
+  // Make a mess to clear: Launch Point, empty stamina, both charged cooldowns,
   // a stun and a speed.
-  p1.combat.knockback = 64;
+  p1.combat.launchPoint = 64;
   p1.combat.drainStamina(100);
   p1.combat.chargedCooldowns.start('ba1Clone', 5);
   p1.combat.chargedCooldowns.start('rasenRush', 5);
@@ -101,12 +101,12 @@ test('a fall takes the fighter out of play at once; it is back exactly 2 s later
   assert.equal(battle.secondary, p2);
   assert.deepEqual(battle.cameraTargets, [p2, null], 'the camera follows the CPU meanwhile');
   const frozen = { x: p1.body.x, y: p1.body.y };
-  // Not a step early; its Knockback stays until it is back.
+  // Not a step early; its Launch Point stays until it is back.
   script.held = { right: true, jump: true, jumpPressed: true };
   for (let i = 1; i < RESPAWN_STEPS; i++) {
     run();
     assert.equal(p1.lostToVoid, true, `still out after ${i} steps`);
-    assert.equal(p1.combat.knockback, 64);
+    assert.equal(p1.combat.launchPoint, 64);
     assert.deepEqual({ x: p1.body.x, y: p1.body.y }, frozen, 'frozen');
   }
   const flushes = input.flushes;
@@ -117,7 +117,7 @@ test('a fall takes the fighter out of play at once; it is back exactly 2 s later
   assert.ok(input.flushes > flushes, 'presses buffered while it was out are dropped');
   assert.deepEqual([p1.body.x, p1.body.vx, p1.body.vy, p1.body.grounded], [spawn.x, 0, 0, true]);
   assert.equal(p1.body.y, battle.map.mainStage.top, 'on the stage, never inside a solid');
-  assert.equal(p1.combat.knockback, 0);
+  assert.equal(p1.combat.launchPoint, 0);
   assert.deepEqual([p1.combat.stamina, p1.combat.staminaExhausted], [100, false], 'stamina full, not exhausted');
   assert.equal(p1.combat.chargedCooldowns.size, 0, 'CAB1 and CAB2 ready');
   assert.deepEqual([p1.combat.stun, p1.combat.hitstop, p1.combat.attack, p1.technique, p1.dash], [0, 0, null, null, null]);
@@ -201,11 +201,11 @@ test('a fall while the opponent still waits to respawn scores nothing either', (
   assert.equal(p1.lostToVoid, false);
 });
 
-test('the timer keeps running through a respawn wait; time up during one keeps the points and the Knockback it fell with', () => {
+test('the timer keeps running through a respawn wait; time up during one keeps the points and the Launch Point it fell with', () => {
   const { battle, run } = match();
   const { p1, p2 } = battle;
-  p1.combat.knockback = 80;
-  p2.combat.knockback = 10;
+  p1.combat.launchPoint = 80;
+  p2.combat.launchPoint = 10;
   battle.timeLeft = 0.5;
   intoVoid(battle, p1);
   run();
@@ -216,14 +216,14 @@ test('the timer keeps running through a respawn wait; time up during one keeps t
   run(30);
   assert.equal(battle.phase, 'timeup');
   // No more respawns once time is up: whoever is out stays out, keeping the
-  // Knockback it fell with, and no point comes from the timer.
+  // Launch Point it fell with, and no point comes from the timer.
   run(RESPAWN_STEPS * 2);
   assert.equal(p1.lostToVoid, true);
-  assert.equal(p1.combat.knockback, 80);
+  assert.equal(p1.combat.launchPoint, 80);
   assert.deepEqual(battle.score, { p1: 0, p2: 1 });
   assert.equal(battle.phase, 'result');
   assert.deepEqual(battle.result, { outcome: 'p2', reason: 'points' });
-  // Level on points, the Knockback it fell with still counts.
+  // Level on points, the Launch Point it fell with still counts.
   battle.score.p2 = 0;
   assert.deepEqual(battle.result, { outcome: 'p2', reason: 'time' });
 });

@@ -160,10 +160,11 @@ behave, and how it must look. The README covers running and deploying it.
   training-dummy CPU, with none of them.
 - Data-driven content: `js/data/characters.js`, `js/data/maps.js` (the Quick
   Battle stages), `js/data/practice-map.js` (the training stage) and
-  `js/data/powers.js` (the Power tier tables, 7.2) and `js/data/knockback.js`
-  (the Knockback levels, 7.2). Adding a fighter means adding frames, a
-  definition (including its Power tiers and each attack's Knockback axis and
-  level) and a roster slot — never editing engine code.
+  `js/data/powers.js` (the Power tier tables, 7.2) and `js/data/launch.js`
+  (the Base Launch values and Directional Launches, 7.2). Adding a fighter
+  means adding frames, a definition (including its Power tiers and each
+  hit's damage, Base Launch and Directional Launch) and a roster slot —
+  never editing engine code.
 - Simulation uses fixed 60 Hz steps with interpolated rendering and a clamped
   frame delta, so behaviour is identical at 30, 60 and 120 Hz.
 
@@ -256,13 +257,13 @@ fit the palette.
 ```
 Splash → Home → Select Mode → Select Fighter → Select Stage → Battle
 Home → Practice Ground (starts at once with #0001 and a #0001 practice CPU)
-Home → Discover (Power / Knockback / Conditions reference; Back returns Home)
+Home → Discover (Power / Launch / Conditions reference; Back returns Home)
 Practice Ground → More → Change Fighter (roster dialog) / Change CPU, or Enable CPU once disabled (CPU roster dialog → Disable CPU) / Return (Home)
 Battle → Pause → Resume / Restart / Return to Home (confirmed); Help is shown but disabled for now
 Battle (a fighter falls into the Void) → the opponent scores a point → that fighter respawns 2 s later; the fight goes on
 Battle (a fighter scores its 3rd point) → K.O. → Result → Rematch / Change Stage / Return to Home
-Battle (time over, one fighter ahead on points, or level with less Knockback) → Result → Rematch / Change Stage / Return to Home
-Battle (time over, level on points and Knockback: a draw) → a fresh battle starts, no dialog
+Battle (time over, one fighter ahead on points, or level with the lower Launch Point) → Result → Rematch / Change Stage / Return to Home
+Battle (time over, level on points and Launch Point: a draw) → a fresh battle starts, no dialog
 ```
 
 Every menu screen except Home has a consistent Back action. Keyboard, mouse,
@@ -381,7 +382,7 @@ no header, build label, eyebrow or keyboard hint bar.
 - Help: desktop controls rendered from the live key bindings, mobile control
   diagram, movement, Charge & cooldowns (including Charge + BA1 = Clone
   Attack and Charge + BA2 = Sphere Rush: already Charging, forms before
-  dashing, needs a hit to continue, +1 Knockback every half second while it
+  dashing, needs a hit to continue, +1 Launch Point every half second while it
   holds the opponent and 15 on the delayed blast, ground needed throughout;
   each on its own 5-second cooldown that Charge recovers twice as fast; no
   extra control row: both use the existing Charge, BA1 and BA2 controls),
@@ -431,7 +432,7 @@ A training room, entered straight from Home.
   round banner, timer, points or result. It runs until the player returns
   Home. Practice keeps its own fighter and CPU choices; it never reads or
   changes Quick Battle's selection. Every fresh entry starts with a fresh
-  fighter at 0 Knockback and the practice CPU already enabled: the same
+  fighter at 0 Launch Point and the practice CPU already enabled: the same
   default fighter (#0001), sharing its one loaded sprite set (one load for
   both), paired with Player 1, framed by the camera and shown on its own HUD
   card. A CPU disabled (or changed) on an earlier visit is never
@@ -448,17 +449,17 @@ A training room, entered straight from Home.
   the stage's second spawn (320 units right of Player 1's, facing it). It has
   no controller, so it never walks, jumps, drops, attacks, throws, charges,
   blocks or dodges; it is otherwise a normal fighter (hurtboxes, real damage
-  adding to its own accumulated Knockback, so hits launch it further as it
-  builds up, hitstun, hurt animations, knockback, gravity, stage and pushbox
+  adding to its own Launch Point, so launching hits send it further as it
+  builds up, hitstun, hurt animations, launches, gravity, stage and pushbox
   collisions, binds; it keeps its spawn's facing, never turning toward its
   opponent). With it, Player 1 and the CPU are
   each other's opponent, so clones, projectiles, the Sphere Rush and melee
   target it and the camera frames both. Each hit it takes shows the
-  Knockback it added (the CombatSystem's resolved hit event) in red over its
+  Launch Point it added (the CombatSystem's resolved hit event) in red over its
   head as a positive `+5`, `+1` or `+15`, rising and fading over 0.8 s;
   simultaneous hits stack, and a hit that adds nothing (the Sphere Rush's
   contact) shows none. It is never knocked out. Its own HUD card follows its
-  Knockback; no timer, rounds or points come with it.
+  Launch Point; no timer, rounds or points come with it.
 - **Training stage:** its own map (`js/data/practice-map.js`), kept out of the
   Quick Battle stage list. Original Canvas artwork of a minimalist combat
   laboratory: a pale, cool-gray room built from one square grid, with a gridded
@@ -470,15 +471,15 @@ A training room, entered straight from Home.
   room; its static geometry is computed once. A fighter that falls into the
   Void is out of play at once (7.1) and, 2 s later
   (`CONFIG.battle.respawnSeconds`), back at its own spawn, still, in a fresh
-  training state: its Knockback back to 0, full stamina and not exhausted,
+  training state: its Launch Point back to 0, full stamina and not exhausted,
   its charged cooldowns cleared (both abilities ready) and its velocity,
   stun, freeze, attack and Dash reset; whatever held or aimed at it (a
   Sphere Rush bind and its ticks, clones, projectiles, damage numbers) goes.
   Player 1 and the CPU each wait out their own 2 s. No point is scored, and
   practice carries on.
 - **HUD:** the P1 card and the CPU card (the same cards as Quick Battle's,
-  7.3: portrait facing the centre, divider, tag and name over the Knockback
-  number), both against a compact glass **More** button (three dots,
+  7.3: portrait facing the centre, divider, tag and name over the Launch
+  Point number), both against a compact glass **More** button (three dots,
   `aria-label="Practice menu"`, `aria-haspopup="dialog"`, `aria-expanded`)
   centred at the top where Quick Battle's timer sits, a responsive 8–14 px
   lower. No score dots (practice has no points), round label, timer or pause
@@ -498,7 +499,7 @@ A training room, entered straight from Home.
   88 dvh, safe-area aware, the roster scrolling inside it) over the paused
   stage. The current fighter starts selected, previewed and focused; the
   menu beneath is inert. Confirming loads the fighter, replaces the practice
-  fighter in place at the spawn with 0 Knockback and no cooldowns, clears the old
+  fighter in place at the spawn with 0 Launch Point and no cooldowns, clears the old
   fighter's projectiles, clones and technique, rebinds the HUD, closes both
   overlays and resumes. Back / Esc closes only the dialog and returns focus to
   Change Fighter, leaving the fighter unchanged. A failed load keeps the
@@ -523,7 +524,8 @@ scrollable page of structured entries) in Alva's own visual language:
 charcoal surfaces, off-white type, thin borders and the green accent.
 Discover is a character-neutral mechanics reference, not a roster or stat
 sheet: it explains how each mechanic works and never says which fighter (or
-which of a fighter's attacks) uses which Power, tier or Knockback level. No
+which of a fighter's attacks) uses which Power, tier, Base Launch or
+Directional Launch. No
 character name or
 ID appears anywhere on it, visibly or in accessible text, and it does not
 read the character database, so it stays the same as fighters are added.
@@ -531,7 +533,7 @@ read the character database, so it stays the same as fighters are added.
 - **Header:** the standard menu header — Back (Alva's back icon, labelled
   "Back") and the title **Discover**. Back, Esc / Backspace and gamepad B
   return Home.
-- **Rail:** exactly three sections, **POWER**, **KNOCKBACK** then
+- **Rail:** exactly three sections, **POWER**, **LAUNCH** then
   **CONDITIONS**, as a
   `tablist` of real buttons (`tab`, `aria-selected`, `aria-controls`, roving
   tabindex; each page a focusable `tabpanel`). Every visit opens on Power.
@@ -561,22 +563,33 @@ read the character database, so it stays the same as fighters are added.
     faster." — Speed Power 1 "Slow.", Speed Power 2 "Normal speed.", Speed
     Power 3 "Slightly faster."
 
-  Knockback is not a Power and is not listed here.
-- **Knockback:** built only from `KNOCKBACK_LEVELS` and the reference copy
-  in `js/data/knockback.js` (level names and descriptions, never values), in
-  the same entry and row language as Power. Two entries:
-  - **Knockback**: "Controls how strongly an attack moves an opponent when it
-    connects." — Low "Light knockback.", Mid "Medium knockback.", High
-    "Strong knockback.", each with the same decorative rising-bar meter
-    (one, two, three bars).
-  - **Direction**: "Direction is separate from strength: any level can push
-    an opponent sideways, launch it upward or drive it downward." —
-    Horizontal "Pushes the opponent away from the direction of the hit.",
-    Vertical "Launches the opponent upward.", Reversed vertical "Drives the
-    opponent downward.", each with a decorative arrow (along, up, down).
+  Launch is not a Power and is not listed here.
+- **Launch:** built only from the registry and reference copy in
+  `js/data/launch.js` (`BASE_LAUNCH_VALUES`, `DIRECTIONAL_LAUNCHES` and their
+  summaries), in the same entry and row language as Power. Three entries:
+  - **Launch Point**: accumulated damage: it starts at 0, all damage taken is
+    added to it, the higher it is the harder a hit with a Base Launch above 0
+    launches, and it resets to 0 after an elimination, on respawn. Explained,
+    with no rows.
+  - **Base Launch**: every hit has a Base Launch of 0, 1, 2 or 3; the hit's
+    damage is added to the Launch Point first, then the new Launch Point is
+    multiplied by it. Rows: Base Launch 0 "No launch. The Launch Point is
+    multiplied by zero.", 1 "Normal launch. Uses the Launch Point once.", 2
+    "Double launch. Uses twice the Launch Point.", 3 "Triple launch. Uses
+    three times the Launch Point.", each marked with its own number (not a
+    meter: these are literal multipliers, not tiers), and the formula
+    "Launch strength = Base Launch × Launch Point" set apart beneath the
+    entry's text.
+  - **Directional Launch**: it decides where the launch strength sends the
+    target, never how strong it is. Rows: None "The hit deals damage but
+    causes no directional launch." (a dash marker), Horizontal "Launches in
+    the direction the hit is traveling.", Vertical "Launches upward.",
+    Reverse vertical "Launches downward.", each with a decorative arrow
+    (along, up, down).
 
-  It names no fighter or attack.
-- No tuning values (velocities, speeds, knockback) or other physics
+  It names no fighter or attack, and never shows the removed Low / Mid /
+  High levels or growth.
+- No tuning values (velocities, speeds) or other physics
   constants are shown on either page, and there is no fighter list, "Used
   by" label or ownership highlighting. On short landscape windows the
   entries and rows tighten so a page's entries scroll by in a few steps.
@@ -638,10 +651,10 @@ read the character database, so it stays the same as fighters are added.
   event. After `CONFIG.battle.respawnSeconds` (2 s, counted on the
   simulation clock, never a timer) it is back at its own spawn (the usual
   reset onto the surface under it, never inside a solid) in a clean neutral
-  state: 0 Knockback, full stamina and not exhausted, CAB1 / CAB2 ready, no
-  velocity, stun, freeze, attack, technique or Dash; it is active at once,
-  with no respawn invulnerability or platform. Its Knockback stays as it
-  fell until then. In Quick Battle each fall also scores (7.2). Art: one
+  state: 0 Launch Point, full stamina and not exhausted, CAB1 / CAB2 ready,
+  no velocity, stun, freeze, attack, technique or Dash; it is active at
+  once, with no respawn invulnerability or platform. Its Launch Point stays
+  as it fell until then. In Quick Battle each fall also scores (7.2). Art: one
   solid black layer beyond the boundary with a single gently wavering inner
   edge (±12 units around the line), drawn over everything in one path and
   one fill, only on the sides the view comes near, so neutral play is never
@@ -693,16 +706,16 @@ read the character database, so it stays the same as fighters are added.
   overhead) and frame 3 active (the slash arc), with no recovery frame, so
   the attack ends with its clip. Ground BA1 hits once for 5 damage, 0.22 s
   hitstun, 0.14 s blockstun, 0.06 s hitstop and a 0.1 s cooldown, and
-  declares Low horizontal Knockback (`knockback: { axis: 'horizontal',
-  level: 'low' }`, resolved `{ x: 140, y: 0 }`): an unblocked hit pushes the
-  opponent away at 140 (at impact vx 140 × facing, before the
-  accumulated-Knockback bonus in 7.2 is added) with no vertical knockback.
-  Mid-air BA1 hits once for 5 damage, 0.24 s hitstun, 0.15 s blockstun,
-  0.07 s hitstop and a 0.18 s cooldown (longer, making up for the missing
-  recovery), and declares Mid vertical Knockback (`knockback: { axis:
-  'vertical', level: 'mid' }`, resolved `{ x: 0, y: 640 }`): an unblocked
-  hit launches the opponent upward with no sideways push (at impact vx 0,
-  vy −640), less high than ground BA2's launch. A blocked mid-air BA1 is
+  declares `baseLaunch: 1, directionalLaunch: 'horizontal'`: an unblocked
+  hit adds its 5 to the opponent's Launch Point, then pushes it away at 1 ×
+  that new Launch Point (from 115: 120, at impact vx 120 × facing) with no
+  vertical launch. Mid-air BA1 hits once for 5 damage, 0.24 s hitstun,
+  0.15 s blockstun, 0.07 s hitstop and a 0.18 s cooldown (longer, making up
+  for the missing recovery), and declares `baseLaunch: 2,
+  directionalLaunch: 'vertical'`: an unblocked hit launches the opponent
+  upward at 2 × its new Launch Point with no sideways push (from 115: at
+  impact vx 0, vy −240), less high than ground BA2's launch from the same
+  Launch Point, as BA2 adds more damage first. A blocked mid-air BA1 is
   neither pushed nor launched. Hitboxes match the
   strike in the contact frame (the punch; the slash arc in front of the
   fighter) and mirror with facing. Movement and facing lock while an attack
@@ -719,21 +732,19 @@ read the character database, so it stays the same as fighters are added.
   startup, frame 3 active (the kick's forward-low arc) and frames 4–5
   recovery. Ground BA2 is slower and heavier than ground BA1: it hits once
   for 10 damage, 0.24 s hitstun, 0.15 s blockstun and 0.07 s hitstop, with a
-  0.15 s cooldown, and declares High vertical Knockback (`knockback: { axis:
-  'vertical', level: 'high' }`, resolved `{ x: 0, y: 800 }`): an unblocked
-  hit launches the opponent upward at 800 (at impact vx 0, vy −800,
-  airborne, rising well above a fighter's height before normal gravity
-  brings it down). Mid-air BA2 hits once for 10 damage, 0.22 s hitstun,
-  0.14 s blockstun and 0.06 s hitstop, with a 0.1 s cooldown, and declares
-  High vertical Knockback, reversed (`knockback: { axis: 'vertical', level:
-  'high', sign: -1 }`, resolved `{ x: 0, y: −800 }`): an unblocked hit
-  drives the opponent downward just as hard (at impact vx 0, vy +800). A
-  grounded opponent is knocked straight back onto the ground it stands on;
-  an airborne one is sent down toward it. Neither has horizontal knockback.
-  Both come from the shared knockback path, not special BA2 code. A blocked
-  BA2 still takes chip damage (added to Knockback), blockstun and hitstop, but is never launched
-  or driven down (vertical knockback applies only to unblocked hits) and is
-  not pushed. Hitboxes cover the ground kick's arc and the airborne
+  0.15 s cooldown, and declares `baseLaunch: 2, directionalLaunch:
+  'vertical'`: an unblocked hit adds its 10, then launches the opponent
+  upward at 2 × its new Launch Point (from 110: 120, at impact vx 0,
+  vy −240, airborne, before normal gravity brings it down). Mid-air BA2 hits
+  once for 10 damage, 0.22 s hitstun, 0.14 s blockstun and 0.06 s hitstop,
+  with a 0.1 s cooldown, and declares `baseLaunch: 2, directionalLaunch:
+  'reverseVertical'`: an unblocked hit drives the opponent downward just as
+  hard (from 110: at impact vx 0, vy +240). A grounded opponent is knocked
+  straight back onto the ground it stands on; an airborne one is sent down
+  toward it. Neither has a horizontal launch. Both come from the shared
+  launch path, not special BA2 code. A blocked BA2 still takes chip damage
+  (added to Launch Point), blockstun and hitstop, but is never launched or
+  driven down (Block cancels every vertical launch) and is not pushed. Hitboxes cover the ground kick's arc and the airborne
   kick's forward-low arc in front of the fighter and mirror with facing.
   The same movement/facing lock applies, gravity keeps working, and a
   mid-air BA2 that lands finishes its own clip instead of switching to
@@ -743,7 +754,7 @@ read the character database, so it stays the same as fighters are added.
   three-frame kunai slash that used to be mid-air BA2, and mid-air BA2 the
   five-frame airborne kick that used to be mid-air BA1. Each move took its
   whole package with it (art, timing, hitbox, damage, stun, hitstop and
-  cooldown); only its knockback changed, to the values above. The frame
+  cooldown); only its launch changed, to the values above. The frame
   files keep their original names.
 - Throw is #0001's projectile attack, on the internal `primary` action
   (player-facing name Throw; keyboard J, gamepad X / Square, touch **T**).
@@ -774,18 +785,18 @@ read the character database, so it stays the same as fighters are added.
   even if #0001 turns, jumps, dodges, charges or is hit. It flies straight at
   700 units/s, looping `shuriken1 → shuriken2 → shuriken3` at 18 fps (art
   only; speed never depends on it). Its hitbox is 10 × 10 units, centred.
-  It hits at most once: 1 damage (+1 Knockback), 0.16 s hitstun, 0.10 s
+  It hits at most once: 1 damage (+1 Launch Point), 0.16 s hitstun, 0.10 s
   blockstun, 0.04 s hitstop on the target only (the thrower does not freeze)
-  and no default knockback at all (`baseKnockback: { x: 0, y: 0 }`: not a
-  launching hit, so it neither pushes nor launches and gets no
-  accumulated-Knockback bonus, however much Knockback the target has), then
+  and `baseLaunch: 0, directionalLaunch: null`: 0 × any Launch Point is no
+  launch, so it neither pushes nor launches, however high the target's
+  Launch Point (from 500 the target is at 501 and still not launched), then
   it disappears. Hits resolve through the same `CombatSystem.applyHit` as melee,
   with the shuriken's direction in place of the attacker's facing, and credit
   #0001 as the attacker. It never hits its thrower. During a Dodge's
   invulnerable frames it passes through unspent (no damage, stun, hitstop,
-  knockback or event) and can still connect if it overlaps once they end; a
+  launch or event) and can still connect if it overlaps once they end; a
   future Block-type fighter guarding toward it blocks it with the normal chip
-  damage and blockstun (no knockback to halve), and it disappears. A missed
+  damage and blockstun (no launch to halve), and it disappears. A missed
   shuriken disappears after 1.5 s, once it has flown into the Void, or when it
   meets a solid block (the main stage's own cliff face included); one-way
   platforms and the open air past a ledge do not stop it. No multi-hit,
@@ -819,7 +830,7 @@ read the character database, so it stays the same as fighters are added.
   is still held starts the Charged BA2 Sphere Rush instead of BA2 (below),
   and BA2 interrupts Charge as an ordinary BA2 only when Charge is let go on
   the press step or the Sphere Rush cannot start. The release pose is visual only: no
-  damage, hitbox, invulnerability, armour, cooldown change, knockback or
+  damage, hitbox, invulnerability, armour, cooldown change, launch or
   special movement, and movement resumes normally while it shows. Every new
   Charge, including one started during the release pose, restarts from
   `charge1`. Charge is grounded
@@ -866,8 +877,8 @@ read the character database, so it stays the same as fighters are added.
   frames 1–2 are invulnerable (drawn breaking up into afterimages) and frame 3
   recovery (solid again). Like attack phases, the window may trail the art by
   one simulation step. An attack whose active hitbox overlaps the
-  invulnerable frames passes through: no Knockback added, hitstun, blockstun,
-  knockback or hitstop, and the attack is not used up, so it can still
+  invulnerable frames passes through: no Launch Point added, hitstun, blockstun,
+  launch or hitstop, and the attack is not used up, so it can still
   connect if it is active after the window ends. A hit during startup or
   recovery is a full, normal hit that cancels the Dodge. A Dodge causes no
   chip damage, no blockstun and no block event, and gives no cooldown, sound,
@@ -918,7 +929,7 @@ read the character database, so it stays the same as fighters are added.
   that speed. It obeys collision: a solid stops it (the Dash ends against
   it), and leaving the ground ends it (the fighter falls on with its speed).
   Hitstun or a bind end it at once. While it runs the fighter cannot attack,
-  Dodge, jump, charge or Dash again. It has no hitbox, damage, knockback or
+  Dodge, jump, charge or Dash again. It has no hitbox, damage, launch or
   invulnerability. The training CPU never dashes (its input never has press
   edges), though any caller may use `tryDash`.
 - Charged actions are a generic dispatch, not a summon shortcut. The
@@ -985,7 +996,7 @@ read the character database, so it stays the same as fighters are added.
   Charge (the normal release pose), jump, throw, use BA2, dodge or be hit and
   launched, and the clone still finishes appearing, attacking and
   vanishing, with no cooldown refund. It never retargets or summons again.
-  The clone is not a Fighter (`js/game/clone.js`): it has no Knockback,
+  The clone is not a Fighter (`js/game/clone.js`): it has no Launch Point,
   controller, pushbox, hurtboxes, defence, jump or coyote logic, physics or
   gravity, and it is not in `battle.fighters`. It is untargetable, takes no
   part in fighter separation or solid collision (the opponent can move
@@ -1019,16 +1030,17 @@ read the character database, so it stays the same as fighters are added.
   startup, frame 2 active, frames 3–4 recovery, 5 damage, 0.22 s hitstun,
   0.14 s blockstun, 0.06 s hitstop), so its hitbox exists only on the active
   frame and hits at most once. It performs the owner's normalized BA1, so it
-  inherits BA1's Low horizontal Knockback (140 horizontal knockback, away
-  from the clone) automatically; the summon has no knockback tuning of its
-  own and never resolves Knockback itself. The overhead clone instead plays
+  inherits BA1's Base Launch 1 and horizontal Directional Launch (along the
+  clone's facing, away from the clone) automatically through the shared
+  `CombatSystem.applyHit`; the summon has no launch data of its own and
+  never computes a launch itself. The overhead clone instead plays
   Mid-air BA2 from frame 1 (`0001_midair1ba1 → … → midair1ba5` at 12 fps)
   with its own resolved definition (`attacks.midairBa2`: frames 1–2
   startup, frame 3 active, frames 4–5 recovery, 10 damage, 0.22 s hitstun,
   0.14 s blockstun, 0.06 s hitstop), whose hitbox, from the overhead spot,
-  lands on a stationary opponent's hurtboxes, and whose High reversed
-  vertical Knockback drives the opponent downward (`vy = +800`, no sideways
-  push; none on a block, like any vertical Knockback). VANISH removes the
+  lands on a stationary opponent's hurtboxes, and whose Base Launch 2
+  reverse vertical launch drives the opponent downward (from 110: `vy =
+  +240`, no sideways push; none on a block, like any vertical launch). VANISH removes the
   body and plays
   the same cloud backwards, `cloneav10 → … → cloneav1`, at the same 20 fps
   (0.5 s), with no hitbox; the clone is then removed. The clone's hitbox is
@@ -1038,7 +1050,7 @@ read the character database, so it stays the same as fighters are added.
   clone. It is a detached hit: the target gets the attack's hitstop and the
   clone pauses its own attack clock for the same 0.06 s, but the owner is never
   frozen (like a projectile's thrower). During a Dodge's invulnerable frames
-  it passes through unspent (no damage, stun, knockback or hitstop) and can
+  it passes through unspent (no damage, stun, launch or hitstop) and can
   still connect if the active frame outlasts them. A Block-type guard (future
   fighters) blocks it only when facing the clone (the clone's facing drives
   the check), so a guard still facing away from a clone at its back is hit.
@@ -1123,8 +1135,8 @@ read the character database, so it stays the same as fighters are added.
      Idle. The technique then ends as a `miss` (or `wall`).
   4. CONFIRM (from the contact step): the rush stops at once (`vx` 0, no
      sliding through). The contact, applied exactly once through
-     `CombatSystem.applyHit`: no damage (no large initial hit), no knockback
-     or launch, 0.2 s hitstun, 0.15 s blockstun, 0.06 s hitstop on the
+     `CombatSystem.applyHit`: no damage (no large initial hit), Base Launch 0
+     and no Directional Launch (no launch), 0.2 s hitstun, 0.15 s blockstun, 0.06 s hitstop on the
      target only.
      The target is then bound (below) with its horizontal speed zeroed and,
      on that same contact step (hits resolve after both fighters have picked
@@ -1151,8 +1163,8 @@ read the character database, so it stays the same as fighters are added.
      TICKS: through CONFIRM and WAIT, while the target is still bound by the
      technique, every whole `tickInterval` (0.5 s) since the contact step
      is one `tickHit` on it through `CombatSystem.applyHit`: 1 damage (+1
-     Knockback), no knockback, stun or hitstop, so the hold never
-     stutters. They fall 0.5, 1.0 and 1.5 s after the contact (steps 30, 60
+     Launch Point), Base Launch 0 and no Directional Launch (no launch), no
+     stun or hitstop, so the hold never stutters. They fall 0.5, 1.0 and 1.5 s after the contact (steps 30, 60
      and 90), counted on the fixed-step clock, never from animation frames;
      none before the contact, none after the technique ends or the bind is
      lost, and none on the explosion's step (the explosion is never also a
@@ -1163,13 +1175,12 @@ read the character database, so it stays the same as fighters are added.
      and growing and plays `prasen10 → prasen11` once at the grown size. On
      the step `prasen10` first shows the target is released from the bind
      and then takes the explosion, exactly once: 15 damage (18 in all with
-     the three ticks), a strong, mostly horizontal launch along the rush
-     (default `baseKnockback: { x: 720, y: 180 }`: over three times High
-     horizontal, with a slight lift so it carries through the air), plus
-     the target's accumulated-Knockback bonus added horizontally only
-     (`accumulatedKnockbackAxis: 'horizontal'`, so the lift stays 180) at
-     twice the standard knockback growth (`knockbackGrowth: 2`: #0001's
-     finisher), 0.55 s hitstun, 0.12 s hitstop
+     the three ticks) with `baseLaunch: 3, directionalLaunch: 'horizontal'`:
+     the 15 is added first, then the target's new Launch Point is tripled
+     and sent sideways along the rush, through the same shared launch as
+     every other hit (from 105 before the blast: 120, launched at 360; a
+     fresh target, 18 after the ticks and the blast, at 54). It is the
+     technique's only launching hit. 0.55 s hitstun, 0.12 s hitstop
      (twice the contact's), 0.3 s blockstun. Releasing first keeps the bind
      from cancelling the launch. `rasen9` is held for the whole blast (it lasts
      the longer of the blast and the explosion pose).
@@ -1204,7 +1215,7 @@ read the character database, so it stays the same as fighters are added.
   facing the rush blocks the contact with its blockstun (the contact deals
   no damage, so no chip damage either); then there is no bind, tick or
   explosion and the technique ends. The target losing its bind meanwhile
-  (a reset, or the Void taking it) ends it too. No amount of Knockback ends
+  (a reset, or the Void taking it) ends it too. No Launch Point ends
   the hold: there is no knockout. Before starting, the technique requires all six fighter clips
   and all three sphere effects (and valid data); anything missing logs a
   warning and the same press becomes an ordinary BA2: never a sphere around
@@ -1218,63 +1229,55 @@ read the character database, so it stays the same as fighters are added.
   debug overlay draws the rushing sphere's hitbox as a dashed cyan box
   labelled `charged ba2 dash`, then a dashed cyan cross on the attached
   sphere's centre, and labels a bound fighter `bound`.
-- Every fighter's central combat number
-  is its accumulated **Knockback** (`CombatState.knockback`): it starts at 0
-  (a new fighter, a Quick Battle restart / rematch, a new Practice fighter
-  and every respawn after the Void all start from 0), has no maximum and is shown
-  as a bare number (no % sign). A hit's `damage` is how much it adds:
-  #0001's BA1 5, mid-air BA1 5, BA2 10, mid-air BA2 10, shuriken 1, the
-  clone's BA1 5 or overhead mid-air BA2 10, the Sphere Rush 0 on contact, 1
-  per tick and 15 on the explosion (a blocked hit adds its chip damage).
-  Accumulated Knockback is a separate value from any attack's default
-  (base) Knockback and knockback growth, and none is derived from another.
-  The model is a platform fighter's, like Smash's: a move's own base
-  launch, plus more the higher the target's number, at the move's own
-  growth:
+- Every fighter's central combat number is its **Launch Point**
+  (`CombatState.launchPoint`): it starts at 0 (a new fighter, a Quick
+  Battle restart / rematch, a new Practice fighter and every respawn after
+  the Void all start from 0), grows by exactly the damage received, never
+  goes below 0, has no maximum and is shown as a bare number (no % sign). A
+  hit's `damage` is how much it adds: #0001's BA1 5, mid-air BA1 5, BA2 10,
+  mid-air BA2 10, shuriken 1, the clone's BA1 5 or overhead mid-air BA2 10,
+  the Sphere Rush 0 on contact, 1 per tick and 15 on the explosion (a
+  blocked hit adds its chip damage).
+  Every fighter has a Launch Point that starts at 0 and increases by damage
+  received. Every hit declares a Base Launch of 0, 1, 2 or 3 and a
+  Directional Launch. After a hit's damage is added, its launch strength is:
+  Base Launch × the target's new Launch Point. Base Launch 0 therefore never
+  launches, while 1 uses normal Launch Point strength, 2 doubles it, and 3
+  triples it.
 
   | Concept | Belongs to | Meaning |
   | --- | --- | --- |
-  | Damage | the hit | how much it adds to the target's accumulated Knockback |
-  | Default (base) Knockback | the hit | how hard, and which way, the move naturally launches |
-  | Knockback growth | the hit | how strongly the target's accumulated Knockback adds to this move's launch |
-  | Accumulated Knockback | the fighter | the total it has taken, a plain number |
-  | Accumulated launch bonus | from the fighter, at the hit's growth | extra launch for being at higher Knockback |
-  | Final launch | the hit's result | default launch + accumulated bonus |
+  | Damage | the hit | how much it adds to the target's Launch Point |
+  | Launch Point | the fighter | the damage it has taken this life, a plain number |
+  | Base Launch | the hit | 0, 1, 2 or 3: how many times the new Launch Point the launch strength is |
+  | Directional Launch | the hit | `null`, `'horizontal'`, `'vertical'` or `'reverseVertical'`: where that strength goes |
+  | Launch strength | the hit's result | Base Launch × Launch Point (after this hit's damage) |
 
-  The shared `CombatSystem.applyHit` adds the damage first, then launches
-  with the move's default launch plus a separate bonus for the new total
-  (`resolveLaunch`, `js/data/knockback.js`): `accumulatedKnockbackBonus` is
-  2 per point horizontally and 4 per point vertically at the standard
-  growth (`ACCUMULATED_KNOCKBACK_SCALING`, uncapped), times the move's
-  `knockbackGrowth`, and never derived from its default launch, so the hit
-  that raises the number already launches harder. Knockback growth is each
-  move's own, declared (`knockbackGrowth`, any number of 0 or more; none is
-  the standard 1, and anything else is logged and grows at 1): a jab's is
-  low, so it stays a poke however high Knockback gets; a finisher's is
-  high, so it becomes a kill move; 0 never grows. It is never derived from
-  the move's damage or default launch. #0001's: ground BA1 0.5 (a jab),
-  mid-air BA1 0.75 (a light launcher), ground and mid-air BA2 1, the Sphere
-  Rush explosion 2 (its finisher); the clone inherits the growth of the
-  attack it performs. The bonus follows the move's own axis (an
-  attack's descriptor axis; a bespoke hit's `accumulatedKnockbackAxis`, or
-  its dominant axis) in the sign its default launch already has there:
-  horizontal stays horizontal, upward stays upward, a downward spike gets
-  faster downward. The other axis of a mixed bespoke launch keeps its
-  default unchanged. At 100 Knockback and the standard growth, a Low push
-  (140) is 340 and a High push (220) is 420, both +200 (never 280 or 440);
-  two moves at the same growth always gain the same bonus. At the same 100,
-  #0001's BA1 (growth 0.5) is 240 and the Sphere Rush explosion (growth 2)
-  is 1120 sideways with its 180 lift (never 1440). A hit with no
-  default launch (the shuriken, the Sphere Rush contact and ticks) is not
-  a launching hit: it gets no bonus and never launches. A block halves the
-  sideways final launch and cancels the vertical one. Its event carries
-  `damage`, `knockbackBefore`, `knockbackAfter`, `baseLaunch`, `bonusLaunch`
-  and `finalLaunch` (in the move's frame: x away from the attacker, y
-  upward). Knockback never disables a fighter (`canAct()` never
-  reads it) and never takes one out: only the Void does. On time-up in
-  Quick Battle, level on points, the fighter with less Knockback wins
-  (a fighter still waiting to respawn counts the Knockback it fell with);
-  equal is a draw.
+  Damage, Base Launch and Directional Launch are authored separately on
+  every hit, and none is derived from another. The shared
+  `CombatSystem.applyHit` adds the damage first, then computes the strength
+  (`resolveLaunchStrength`) and turns it into a velocity
+  (`resolveDirectionalLaunch`, `js/data/launch.js`): horizontal along the
+  hit's travel (`vx = strength × facing`), vertical upward (`vy =
+  −strength`, as world y grows downward), reverse vertical downward (`vy =
+  +strength`), `null` nothing at all. That multiplication is the whole
+  strength: no base velocity is added, nothing grows per point, and
+  horizontal and vertical launches use the same number. At 120 Launch
+  Point, Base Launch 0, 1, 2 and 3 give 0, 120, 240 and 360; at 37, 0, 37,
+  74 and 111. Block modifies the resolved launch afterward: a blocked hit
+  keeps half of a horizontal launch (`BLOCKED_HORIZONTAL_LAUNCH_SCALE`, a
+  Block rule, not part of Base Launch) and none of a vertical or reverse
+  vertical one. A hit that launches replaces the target's sideways speed (a
+  vertical one sends it straight up or down) and, when it has one, its
+  vertical speed; a hit that does not launch (Base Launch 0, no direction,
+  or nothing left after Block) leaves the target's velocity alone. Its
+  event carries `damage`, `launchPointBefore`, `launchPointAfter`,
+  `baseLaunch` (the integer), `directionalLaunch`, `launchStrength` and
+  `finalLaunch` (the world-space `{ x, y }` velocity given). Launch Point
+  never disables a fighter (`canAct()` never reads it) and never takes one
+  out: only the Void does. On time-up in Quick Battle, level on points, the
+  fighter with the lower Launch Point wins (a fighter still waiting to
+  respawn counts the Launch Point it fell with); equal is a draw.
 - Physics: acceleration, deceleration, max speed (from the fighter's Speed
   Power, below), gravity, jump impulse (from its Jump Power, below),
   ground/platform/solid collision on a finite main floor (no side walls:
@@ -1303,66 +1306,47 @@ read the character database, so it stays the same as fighters are added.
   Speed Power feeds the same normal left / right target speed on the ground
   and in the air (and the run clip's playback rate, relative to the
   fighter's own top speed); acceleration, deceleration, the turn boost, air
-  control, gravity, fall speed, coyote time, the jump buffer, knockback,
+  control, gravity, fall speed, coyote time, the jump buffer, launches,
   projectiles, Dodges and charged techniques (the Sphere Rush's 1050 dash)
   never depend on it, just as none of them depend on Jump Power. The shared
   Fighter applies both for Player 1, the CPU and Practice Ground alike. A
   declared tier the table lacks (or a fighter missing a Power) is logged and
   gets tier 2.
-- **Knockback** (`js/data/knockback.js`): how strongly an ordinary attack
-  moves an opponent when it connects. Each attack's own default (base)
-  Knockback, separate from the target's accumulated Knockback (above),
-  which only ever adds its own bonus on top. It is not a Power: each attack
-  declares its own as an axis and a strength level, which are independent:
-  `knockback: { axis: 'horizontal', level: 'low' }`, `{ axis: 'vertical',
-  level: 'high' }`, or `{ axis: 'vertical', level: 'mid', sign: -1 }` for
-  reversed vertical Knockback. There are exactly three levels, **Low**,
-  **Mid** and **High** (`KNOCKBACK_LEVELS`, the single source of their
-  names, descriptions and values), named only by the strings `'low'`,
-  `'mid'` and `'high'`:
+- **Launch** (`js/data/launch.js`): how a hit sends its target flying. It is
+  not a Power: every hit (an attack's, a projectile's, a charged
+  technique's) declares its own `baseLaunch` and `directionalLaunch` beside
+  its `damage`, independently of each other:
+  `damage: 5, baseLaunch: 1, directionalLaunch: 'horizontal'`,
+  `damage: 10, baseLaunch: 2, directionalLaunch: 'vertical'`, or
+  `damage: 10, baseLaunch: 2, directionalLaunch: 'reverseVertical'` to drive
+  the target downward. `BASE_LAUNCH_VALUES` (`[0, 1, 2, 3]`) holds the only
+  legal Base Launch values: literal multipliers, not tiers, levels or
+  velocities. `DIRECTIONAL_LAUNCHES` holds the only legal directions:
+  `null` (None), `'horizontal'`, `'vertical'` and `'reverseVertical'`
+  (Reverse vertical). `resolveHitLaunch` validates both fields once, when a
+  hit's definition is built (`createAttackDefinition`,
+  `createProjectileDefinition`, `createTechniqueDefinition`): a hit that
+  declares neither has Base Launch 0 and no direction; any other Base
+  Launch (0.5, 4, 10, −1 ...) is logged and becomes 0, an unknown direction
+  is logged and becomes `null`, and a nonzero Base Launch with no direction
+  is logged and never launches, so bad data never launches anyone with a
+  strength nobody chose. Neither field is inferred from damage, the hitbox
+  or the other field. #0001's hits:
 
-  | | Low | Mid | High |
+  | Hit | Damage | Base Launch | Directional Launch |
   | --- | --- | --- | --- |
-  | Horizontal | 140 | 180 | 220 |
-  | Vertical | 480 | 640 | 800 |
+  | Ground BA1 | 5 | 1 | horizontal |
+  | Ground BA2 | 10 | 2 | vertical |
+  | Mid-air BA1 | 5 | 2 | vertical |
+  | Mid-air BA2 | 10 | 2 | reverse vertical |
+  | Shuriken | 1 | 0 | none |
+  | Sphere Rush contact | 0 | 0 | none |
+  | Sphere Rush tick (every 0.5 s while held) | 1 | 0 | none |
+  | Sphere Rush explosion | 15 | 3 | horizontal |
 
-  World units per second: default attack launch only, never accumulated
-  Knockback, a multiplier or the launch at high Knockback. Horizontal
-  Knockback pushes the target away along
-  the hit's facing and takes no sign. Vertical Knockback launches the target
-  upward; `sign: -1` reverses it, driving the target downward at the same
-  level's strength (only vertical Knockback can be reversed). An attack with
-  no `knockback` has none. `createAttackDefinition` resolves the descriptor
-  once, through `resolveKnockback`, into the definition's numeric default
-  launch, `baseKnockback: { x, y }` (Low horizontal `{ x: 140, y: 0 }`, High
-  vertical `{ x: 0, y: 800 }`, Mid vertical reversed `{ x: 0, y: −640 }`),
-  its axis, `accumulatedKnockbackAxis`, and the attack's own
-  `knockbackGrowth`, which is all `CombatSystem.applyHit` and clones ever
-  read. `applyHit` stays generic:
-  from the final launch (default + accumulated bonus, 7.2) it sets
-  `vx = x × facing` (halved when blocked) and, on an unblocked hit only,
-  `vy = −y`, so a positive `y` launches upward and a negative one drives
-  the target down. A malformed descriptor (an unknown axis or level
-  such as a tier number or `'Low'`, a sign other than 1 or −1, a reversed
-  horizontal, an unknown field, or anything that is not a descriptor) is
-  logged and gets no knockback, never an arbitrary force. Bespoke hits that
-  are not fighter attacks (the shuriken, the Sphere Rush contact, ticks and
-  explosion) declare their own numeric `baseKnockback` and, optionally,
-  their `accumulatedKnockbackAxis` and `knockbackGrowth`; the shuriken's is
-  `{ x: 0, y: 0 }`. #0001's Basic Attacks (above):
-
-  | Attack | Knockback | Resolved default launch | Knockback growth |
-  | --- | --- | --- | --- |
-  | Ground BA1 | Low horizontal | `{ x: 140, y: 0 }` | 0.5 |
-  | Ground BA2 | High vertical | `{ x: 0, y: 800 }` | 1 |
-  | Mid-air BA1 | Mid vertical | `{ x: 0, y: 640 }` | 0.75 |
-  | Mid-air BA2 | High vertical, reversed | `{ x: 0, y: −800 }` | 1 |
-
-  Those attacks have no raw numeric default launch: the levels are the
-  only sources. Their growth sits beside the descriptor
-  (`knockbackGrowth: 0.5`). Knockback never depends on either fighter's Jump or Speed Power.
-- Combat architecture (accumulated Knockback, damage, hitboxes, hurtboxes, attack definitions,
-  Defense with Block / Dodge implementations, invulnerability, knockback,
+  Launch never depends on either fighter's Jump or Speed Power.
+- Combat architecture (Launch Point, Base Launch, Directional Launch, damage, hitboxes, hurtboxes, attack definitions,
+  Defense with Block / Dodge implementations, invulnerability, launches,
   stun and blockstun, hitstop, cooldowns, charged-action cooldowns, binds, charged actions,
   summons and charged techniques) is data-driven. Basic Attacks 1 and 2,
   Throw (with its shuriken projectile), the Charged BA1 Clone Attack (a
@@ -1394,8 +1378,8 @@ read the character database, so it stays the same as fighters are added.
   reaches 3 ends the match: no respawn for the loser, the `ko` phase (the
   K.O. beat) and then the result. Once time is up or the match is won, a
   fall scores nothing and nobody respawns. The result: 3 points wins
-  (`reason: 'void'`); on time, more points wins (`'points'`), then less
-  Knockback (`'time'`), else a draw. Restart and rematch reset both scores
+  (`reason: 'void'`); on time, more points wins (`'points'`), then the lower
+  Launch Point (`'time'`), else a draw. Restart and rematch reset both scores
   to 0 and cancel any respawn wait.
 
 ### 7.3 Battle chrome
@@ -1418,8 +1402,8 @@ read the character database, so it stays the same as fighters are added.
   than the menu panels, so the stage shows through, dark enough to read on
   every stage): the character's portrait (its own `visual.portrait` crop,
   painted by the same helper as the roster, pixelated), one thin vertical
-  divider, then the tag and name (`displayName`) with the accumulated
-  Knockback beneath it as a large bare number (`0`, `27`, `143`; no bar,
+  divider, then the tag and name (`displayName`) with the Launch Point
+  beneath it as a large bare number (`0`, `27`, `143`; no bar,
   maximum, `/100` or `%`). The CPU's card mirrors P1's (portrait on the
   outer right edge). Both portraits face the timer, whatever the fighters'
   facing in play: P1's faces right, the CPU's left, each mirrored
@@ -1455,8 +1439,8 @@ read the character database, so it stays the same as fighters are added.
   cooldown ends. No green. With the bar hidden nothing is kept above the
   tag (`Arena.statusTop`). A fighter off screen keeps only its edge
   pointer; one out of play shows none of it.
-- Accessibility: the Knockback number sits in a group labelled "Knockback"
-  (no maximum); each card carries a screen-reader-only stamina description
+- Accessibility: the Launch Point number sits in a group labelled "Launch
+  Point" (no maximum); each card carries a screen-reader-only stamina description
   in steps of 5 ("Stamina 75 of 100", "Stamina exhausted, refilling: 40 of
   100"; never "Energy"), and each score row is an image labelled "Player 1:
   1 of 3 points". The HUD writes to the DOM only when a shown value
@@ -1478,9 +1462,8 @@ read the character database, so it stays the same as fighters are added.
   **Return to Home**. Help is shown but disabled for now: muted, no hover or
   press response, skipped by keyboard/gamepad focus.
 - Time over: the fighter with more points wins ("Time ran out. More points
-  wins the match."); level on points, the one with less accumulated
-  Knockback wins ("Time ran out with the points level. Lower Knockback
-  wins."). A glass result menu offers green **Rematch**, **Change Stage**
+  wins the match."); level on points, the one with the lower Launch Point
+  wins ("Time ran out with the points level. Lower Launch Point wins."). A glass result menu offers green **Rematch**, **Change Stage**
   and **Return to Home**. Level on both is a draw: no dialog; once the TIME
   banner has played, a fresh battle starts.
 - Match K.O.: once the K.O. banner has played, the same result menu opens
