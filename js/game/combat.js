@@ -20,15 +20,18 @@
 //
 // An attack's `knockback` is a Knockback descriptor (js/data/knockback.js):
 // an `axis` and a strength `level` ('low', 'mid' or 'high'), independent of
-// each other. Horizontal Knockback pushes the target away along the hit's
-// facing; vertical Knockback launches it upward (positive `knockback.y`), or,
-// with `sign: -1`, drives it downward at the same level's strength (negative
-// `knockback.y`). An attack that declares none has no knockback.
-// createAttackDefinition resolves the descriptor once, into the definition's
-// numeric `knockback: { x, y }`, which is all applyHit (and a clone
-// performing the attack) ever reads. Bespoke hits that are not fighter
-// attacks (a projectile's, a charged technique's) carry their own numeric
-// `knockback: { x, y }`.
+// each other. It is the attack's default Knockback: its own natural launch,
+// never the target's accumulated Knockback. Horizontal Knockback pushes the
+// target away along the hit's facing; vertical Knockback launches it upward
+// (positive `baseKnockback.y`), or, with `sign: -1`, drives it downward at
+// the same level's strength (negative `baseKnockback.y`). An attack that
+// declares none has no knockback. createAttackDefinition resolves the
+// descriptor once, into the definition's numeric `baseKnockback: { x, y }`
+// and its `accumulatedKnockbackAxis` (the descriptor's axis), which is all
+// applyHit (and a clone performing the attack) ever reads. Bespoke hits that
+// are not fighter attacks (a projectile's, a charged technique's) declare
+// their own numeric `baseKnockback: { x, y }` and, optionally, their
+// `accumulatedKnockbackAxis`.
 //
 // An attack needs real frames for its `animation`; without them it is refused
 // rather than faked. Its hitbox only exists during the active phase.
@@ -60,9 +63,11 @@
 //   defense: { type: 'block' }
 //
 // A hit's `damage` (a blocked hit's chip damage) is how much it adds to the
-// target's accumulated Knockback (CombatState.knockback); the hit's base
-// launch is then scaled by that new total (see knockbackMultiplier in
-// js/data/knockback.js). No amount of Knockback defeats a fighter: only the
+// target's accumulated Knockback (CombatState.knockback). A launching hit
+// then launches with its own default launch plus a separate bonus from that
+// new total (see resolveLaunch in js/data/knockback.js): the bonus follows
+// the move's direction but never its strength, and damage never sets the
+// move's default launch. No amount of Knockback defeats a fighter: only the
 // Void takes one out of play.
 //
 // A Dodge is not an attack: no hitbox, damage, cooldown or combat event.
@@ -92,7 +97,7 @@
 // exhausts the fighter: no Dash, Dodge or Block until it is full again.
 // Nothing else (movement, jumps, attacks, charged actions) ever touches it.
 
-import { resolveKnockback, knockbackMultiplier } from '../data/knockback.js';
+import { resolveKnockback, resolveLaunch } from '../data/knockback.js';
 
 const ATTACK_DEFAULTS = {
   animation: null,
@@ -125,12 +130,16 @@ export function attackPhase(def, time) {
 }
 
 // Frozen attack definition from a character's attack entry (plus its `id`).
-// Its Knockback descriptor becomes its numeric `knockback` here, once, so
-// hits never look levels up.
+// Its Knockback descriptor becomes its numeric default launch,
+// `baseKnockback`, here, once, so hits never look levels up; the
+// descriptor's axis is the one the target's accumulated Knockback adds
+// launch along (none for an attack with no default launch).
 export function createAttackDefinition(spec) {
   if (!spec?.id) throw new Error('[Alva] Attack definitions need an id');
-  const def = { ...ATTACK_DEFAULTS, ...spec };
-  def.knockback = resolveKnockback(spec.knockback, `Attack "${spec.id}"`);
+  const { knockback, ...rest } = spec;
+  const def = { ...ATTACK_DEFAULTS, ...rest };
+  def.baseKnockback = resolveKnockback(knockback, `Attack "${spec.id}"`);
+  def.accumulatedKnockbackAxis = def.baseKnockback.x || def.baseKnockback.y ? knockback.axis : null;
   def.total = def.startup + def.active + def.recovery;
   return Object.freeze(def);
 }
@@ -235,7 +244,8 @@ export class CombatState {
   constructor(stats = {}, stamina = resolveStamina()) {
     // Accumulated Knockback: starts at 0 and only ever grows, by each hit's
     // damage (see CombatSystem.applyHit). No maximum, and it never stops the
-    // fighter acting; the higher it is, the further hits launch the fighter.
+    // fighter acting; the higher it is, the more extra launch every
+    // launching hit adds on top of that move's own default launch.
     this.knockback = 0;
     // Stamina for Dash, Dodge and Block (see resolveStamina): full at the
     // start, never below 0 or above maxStamina. Emptying it exhausts the
@@ -425,11 +435,16 @@ const scratchHurt = {};
 export class CombatSystem {
   constructor() {
     // { type: 'hit' | 'block', attacker, target, move, damage, knockbackBefore,
-    //   knockbackAfter, launchMultiplier, projectile, summon, technique }
+    //   knockbackAfter, baseLaunch, bonusLaunch, finalLaunch, projectile,
+    //   summon, technique }
     // `damage` is what the hit added to the target's Knockback, `move` the id
-    // of the attack or hit that dealt it. `attacker` is the owner for a
-    // projectile or clone hit; `projectile`, `summon` and `technique` are
-    // null for the fighter's own melee.
+    // of the attack or hit that dealt it. The launches are in the move's own
+    // frame (x away from the attacker, y upward): `baseLaunch` the move's
+    // default, `bonusLaunch` what the target's accumulated Knockback added
+    // and `finalLaunch` what the target was given (base + bonus; on a block,
+    // half of that sideways and nothing vertical). `attacker` is the owner
+    // for a projectile or clone hit; `projectile`, `summon` and `technique`
+    // are null for the fighter's own melee.
     this.events = [];
   }
 
@@ -530,9 +545,12 @@ export class CombatSystem {
   // (a projectile's, a clone's or a technique's) freezes only its target.
   //
   // The damage (chip damage when blocked) is added to the target's
-  // accumulated Knockback first; the move's base launch is then scaled by
-  // the multiplier for that new total, so the hit that raises it already
-  // launches harder. Returns the event it recorded.
+  // accumulated Knockback first. The launch is then the move's default launch
+  // plus the accumulated-Knockback bonus for that new total, two separate
+  // parts added, never one scaled by the other (see resolveLaunch), so the
+  // hit that raises the number already launches harder. A block then halves
+  // the sideways launch and cancels the vertical one. Returns the event it
+  // recorded.
   applyHit(attacker, target, def, {
     facing = attacker.facing, projectile = null, summon = null, technique = null,
     detached = !!(projectile || summon || technique),
@@ -544,7 +562,10 @@ export class CombatSystem {
     const damage = blocked ? def.chipDamage || def.damage * tc.blockDamageScale : def.damage;
     const knockbackBefore = tc.knockback;
     tc.knockback = knockbackBefore + damage;
-    const launchMultiplier = knockbackMultiplier(tc.knockback);
+    // A hit with no default launch (a shuriken, a technique's ticks) has no
+    // launch axis, so the bonus leaves it at zero however high Knockback is.
+    const launch = resolveLaunch(def.baseKnockback, tc.knockback, def.accumulatedKnockbackAxis);
+    const finalLaunch = blocked ? { x: 0.5 * launch.final.x, y: 0 } : launch.final;
     // A hit with no stun or freeze of its own (a charged technique's tick)
     // leaves any already running as it is.
     const stun = blocked ? def.blockstun : def.hitstun;
@@ -554,19 +575,18 @@ export class CombatSystem {
     // ...and a charged technique: no armour. It ends at once, releasing
     // whatever it held, before the knockback below moves the fighter.
     target.endTechnique?.('hit');
-    // Zero base launch stays zero whatever the multiplier.
-    const kx = (blocked ? 0.5 : 1) * def.knockback.x * launchMultiplier * facing;
-    target.body.vx = kx;
+    target.body.vx = finalLaunch.x * facing;
     // Vertical knockback, unblocked hits only: world y grows downward, so a
-    // positive knockback.y launches upward and a negative one drives the
+    // positive launch y launches upward and a negative one drives the
     // target down.
-    if (!blocked && def.knockback.y) {
-      target.body.vy = -def.knockback.y * launchMultiplier;
+    if (finalLaunch.y) {
+      target.body.vy = -finalLaunch.y;
       target.body.grounded = false;
     }
     const event = {
       type: blocked ? 'block' : 'hit', attacker, target, move: def.id ?? null,
-      damage, knockbackBefore, knockbackAfter: tc.knockback, launchMultiplier,
+      damage, knockbackBefore, knockbackAfter: tc.knockback,
+      baseLaunch: launch.base, bonusLaunch: launch.bonus, finalLaunch,
       projectile, summon, technique,
     };
     this.events.push(event);

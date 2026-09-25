@@ -3,10 +3,11 @@
 // Adding a fighter (e.g. #0002) should only require:
 //   1. dropping frames into ./assets/characters/<id>/
 //   2. adding a definition to CHARACTERS below, including its Power tiers
-//      (`powers`, see js/data/powers.js) and each attack's Knockback: an axis
-//      and a Low / Mid / High level, e.g. `knockback: { axis: 'horizontal',
-//      level: 'low' }`, or `{ axis: 'vertical', level: 'mid', sign: -1 }` to
-//      drive the opponent downward (see js/data/knockback.js)
+//      (`powers`, see js/data/powers.js) and each attack's default
+//      Knockback: an axis and a Low / Mid / High level, e.g.
+//      `knockback: { axis: 'horizontal', level: 'low' }`, or
+//      `{ axis: 'vertical', level: 'mid', sign: -1 }` to drive the opponent
+//      downward (see js/data/knockback.js)
 //   3. giving it a rosterSlot
 //
 // Every field the engine reads lives here; nothing about #0001 is hard-coded
@@ -330,9 +331,10 @@ export const CHARACTERS = [
         hitbox: { x: -5, y: -5, w: 10, h: 10 },
         // Adds 1 to the target's Knockback.
         damage: 1,
-        // No knockback: a hit adds its damage and stun without pushing or
-        // launching the target, however much Knockback it has.
-        knockback: { x: 0, y: 0 },
+        // No default knockback: not a launching hit. It adds its damage and
+        // stun without pushing or launching the target, however much
+        // accumulated Knockback it has.
+        baseKnockback: { x: 0, y: 0 },
         hitstun: 0.16,
         blockstun: 0.1,
         hitstop: 0.04,
@@ -574,7 +576,7 @@ export const CHARACTERS = [
         // that follows (not this hitstun) is what holds the opponent.
         firstHit: {
           damage: 0,
-          knockback: { x: 0, y: 0 },
+          baseKnockback: { x: 0, y: 0 },
           hitstun: 0.2,
           blockstun: 0.15,
           hitstop: 0.06,
@@ -585,18 +587,20 @@ export const CHARACTERS = [
         tickInterval: 0.5,
         tickHit: {
           damage: 1,
-          knockback: { x: 0, y: 0 },
+          baseKnockback: { x: 0, y: 0 },
           hitstun: 0,
           blockstun: 0,
           hitstop: 0,
         },
-        // The explosion: the big one. A strong, mostly horizontal blast
-        // away from #0001 (with a slight lift so it carries through the air
-        // instead of scraping along the ground), scaled like every hit by
-        // the target's Knockback.
+        // The explosion: the big one. Its default knockback is a strong,
+        // mostly horizontal blast away from #0001 (with a slight lift so it
+        // carries through the air instead of scraping along the ground).
+        // The target's accumulated Knockback adds its extra launch
+        // horizontally only, so the lift stays the same slight one.
         explosionHit: {
           damage: 15,
-          knockback: { x: 720, y: 180 },
+          baseKnockback: { x: 720, y: 180 },
+          accumulatedKnockbackAxis: 'horizontal',
           hitstun: 0.55,
           blockstun: 0.3,
           hitstop: 0.12,
@@ -612,9 +616,10 @@ export const CHARACTERS = [
     // (js/data/knockback.js): ground BA1 pushes sideways (Low horizontal),
     // mid-air BA1 launches the target upward (Mid vertical), ground BA2
     // launches it upward hard (High vertical) and mid-air BA2 drives it
-    // downward hard (High vertical, reversed). That is each move's base
-    // launch; the target's accumulated Knockback scales it. `damage` is how
-    // much Knockback a hit adds: 5 for either BA1, 10 for either BA2.
+    // downward hard (High vertical, reversed). That is each move's default
+    // launch; the target's accumulated Knockback adds its own separate extra
+    // launch along the same axis. `damage` is how much accumulated Knockback
+    // a hit adds: 5 for either BA1, 10 for either BA2.
     attacks: {
       // Frame 1 wind-up, frame 2 punch, frames 3-4 recovery.
       ba1: {

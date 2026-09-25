@@ -10,6 +10,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fakeSprites, def as DEF_0001, DT } from './fighter-harness.mjs';
+import { accumulatedKnockbackBonus } from '../js/data/knockback.js';
 
 // ---- Fake DOM + Canvas -------------------------------------------------------
 
@@ -1292,12 +1293,12 @@ test('Player 1\'s BA2 launches the CPU straight up (High vertical Knockback), th
   assert.equal(hit.target, cpu);
   assert.equal(hit.damage, player.attacks.ba2.damage);
   assert.equal(numbers[0].text, '+10');
-  // At impact: launched upward, not pushed sideways, scaled by the 10 it
-  // added (its Knockback affects its launch though Practice shows no panel
-  // for it).
+  // At impact: launched upward, not pushed sideways, at BA2's default launch
+  // plus the vertical bonus for the 10 Knockback it added (its Knockback
+  // affects its launch though Practice shows no panel for it).
   assert.ok(cpu.body.vx === 0, 'no sideways push');
   assert.equal(cpu.combat.knockback, 10);
-  assert.equal(cpu.body.vy, -player.attacks.ba2.knockback.y * 1.1);
+  assert.equal(cpu.body.vy, -(player.attacks.ba2.baseKnockback.y + accumulatedKnockbackBonus(10, 'vertical')));
   assert.equal(cpu.grounded, false);
   let top = groundY;
   for (let i = 0; i < 120 && !cpu.grounded; i++) {
