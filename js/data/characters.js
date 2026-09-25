@@ -417,14 +417,17 @@ export const CHARACTERS = [
 
     // Summons, keyed by id. See js/game/clone.js for the schema
     // (createSummonDefinition). A clone is a temporary attack entity, not a
-    // fighter: it appears behind the opponent through the `cloud` effect,
-    // performs the owner's `attack` once with that attack's own art and
-    // combat data, then vanishes through the same cloud played in reverse.
+    // fighter: it appears through the `cloud` effect, performs one of the
+    // owner's attacks once with that attack's own art and combat data, then
+    // vanishes through the same cloud played in reverse. Normally it appears
+    // behind the opponent and performs `attack`; with nothing to stand on
+    // there at the opponent's foot height, the optional `noGround` fallback
+    // places it and picks its attack instead.
     summons: {
       ba1Clone: {
         attack: 'ba1',
         cloud: 'cloneCloud',
-        // Spent once, when the summon is accepted.
+        // Spent once, when the summon is accepted, whichever way it appears.
         energyCost: 25,
         // World units behind the opponent (on its back side) at the summon;
         // BA1's punch reaches forward from there into the opponent.
@@ -434,6 +437,16 @@ export const CHARACTERS = [
         effectOffset: { x: 0, y: -44 },
         // Keeps the clone this far inside the stage's horizontal bounds.
         stageMargin: 17,
+        // No ground behind the opponent at its foot height (past a platform's
+        // edge, or the opponent is airborne): the clone appears over it
+        // instead and performs the mid-air BA2 kick, driving it downward.
+        // `offset` is the clone's origin from the opponent's (facing right,
+        // mirrored): feet at its upper body, where midairBa2's own hitbox
+        // lands on its hurtboxes.
+        noGround: {
+          attack: 'midairBa2',
+          offset: { x: 0, y: -36 },
+        },
       },
     },
 

@@ -136,7 +136,7 @@ export function duel({
     spawnProjectiles(fighters, projectiles);
     for (const p of projectiles) p.update(DT, stage);
     updateClones(clones, DT);
-    spawnClones(fighters, clones, STAGE);
+    spawnClones(fighters, clones, stage);
     events.push(...system.update(fighters, projectiles, clones));
     removeDeadProjectiles(projectiles);
     removeDeadClones(clones);

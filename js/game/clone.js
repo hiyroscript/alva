@@ -11,24 +11,33 @@
 //     ba1Clone: {
 //       attack: 'ba1', cloud: 'cloneCloud', energyCost: 25,
 //       behindDistance: 48, effectOffset: { x: 0, y: -44 }, stageMargin: 17,
+//       noGround: { attack: 'midairBa2', offset: { x: 0, y: -36 } },
 //     },
 //   },
+//
+// A clone normally appears on the target's back side, at its foot height,
+// and performs `attack`. The optional `noGround` fallback covers a spot with
+// nothing to stand on at that height (past a platform's edge, or behind an
+// airborne target): the clone then appears at `offset` from the target's
+// origin instead (facing right, mirrored with the clone's facing) and
+// performs the fallback's `attack`. Without `noGround` it always appears
+// behind. Either way it faces the way the target faced at the summon.
 //
 // A clone lives through exactly three phases:
 //
 //   appear  the `cloud` effect plays forwards once (frame 1 -> last); the
 //           clone's first attack frame shows beneath the last cloud frame
 //           as the smoke clears
-//   attack  the owner's `attack` plays once with its own art and combat data
+//   attack  the chosen attack plays once with its own art and combat data
 //   vanish  the body is gone; the same cloud plays backwards once
 //           (last -> frame 1)
 //
-// and is then removed. It appears on the target's back side, facing the way
-// the target faced at the summon, and never moves, turns or retargets after
-// that. It has no health, Energy, controller, pushbox, hurtboxes, physics,
-// camera or HUD presence: it cannot be hit and nothing collides with it. Its
-// hitbox exists only during the attack's active phase and connects at most
-// once; the hit credits the owner but freezes only the target and the clone
+// and is then removed. Its position, facing and attack are chosen once, at
+// the summon, and it never moves, turns, falls or retargets after that. It
+// has no health, Energy, controller, pushbox, hurtboxes, physics, camera or
+// HUD presence: it cannot be hit and nothing collides with it. Its hitbox
+// exists only during the attack's active phase and connects at most once;
+// the hit credits the owner but freezes only the target and the clone
 // itself, never the owner.
 
 import { SpriteAnimator } from './sprite-animator.js';
@@ -41,6 +50,12 @@ const SUMMON_DEFAULTS = {
   behindDistance: 48, // world units behind the target
   effectOffset: { x: 0, y: 0 }, // cloud centre from the clone origin, facing right
   stageMargin: 0,     // kept this far inside the stage's horizontal bounds
+  noGround: null,     // { attack, offset } where there is no ground behind
+};
+
+const NO_GROUND_DEFAULTS = {
+  attack: null,           // owner attack id the clone performs instead
+  offset: { x: 0, y: 0 }, // clone origin from the target's origin, facing right
 };
 
 // Clocks are sums of fixed steps; compare against boundaries with a little
@@ -49,23 +64,34 @@ const TIME_EPSILON = 1e-6;
 
 export function createSummonDefinition(spec) {
   if (!spec?.id) throw new Error('[Alva] Summon definitions need an id');
-  return Object.freeze({ ...SUMMON_DEFAULTS, ...spec });
+  const def = { ...SUMMON_DEFAULTS, ...spec };
+  if (def.noGround) def.noGround = Object.freeze({ ...NO_GROUND_DEFAULTS, ...def.noGround });
+  return Object.freeze(def);
+}
+
+// Why a clone of `owner` cannot perform attack `id`, or null when it can.
+function attackProblem(owner, id, label) {
+  const atk = owner.attacks[id];
+  if (!atk) return `its ${label} "${id}" is not defined`;
+  if (!atk.hitbox) return `its ${label} "${id}" has no hitbox`;
+  if (!atk.animation || !owner.sprites.has(atk.animation)) return `its ${label} "${id}" has no animation frames`;
+  return null;
 }
 
 // Why `owner` cannot summon `def` right now, or null when it can. Checked
 // before any Energy is spent: never pay for an invisible clone or punch.
+// The no-ground attack is checked too, wherever the target stands, so
+// whether a summon works never depends on where the clone would appear.
 export function summonProblem(owner, def) {
   const cloud = owner.sprites.effect(def.cloud);
   if (!cloud?.frames.length) return `its cloud effect "${def.cloud}" has no animation frames`;
-  const atk = owner.attacks[def.attack];
-  if (!atk) return `its attack "${def.attack}" is not defined`;
-  if (!atk.hitbox) return `its attack "${def.attack}" has no hitbox`;
-  if (!atk.animation || !owner.sprites.has(atk.animation)) return `its attack "${def.attack}" has no animation frames`;
-  return null;
+  return attackProblem(owner, def.attack, 'attack') ??
+    (def.noGround ? attackProblem(owner, def.noGround.attack, 'no-ground attack') : null);
 }
 
 export class Clone {
-  // Everything is fixed here: position, facing and target never change.
+  // Everything is fixed here: position, facing, attack and target never
+  // change.
   constructor({ owner, target, def, attackDef, cloud, x, y, facing }) {
     this.owner = owner;
     this.target = target;
@@ -88,7 +114,7 @@ export class Clone {
   }
 
   // Builds the clone an owner summoned, or null if it no longer can (never
-  // an invisible one). Position and facing are snapshotted here, once.
+  // an invisible one). Position, facing and attack are snapshotted here, once.
   static summon(owner, { id, target }, stage) {
     const def = owner.summonDefs?.[id];
     const problem = !def ? `"${id}" is not defined` : !target ? 'there is no target' : summonProblem(owner, def);
@@ -96,16 +122,27 @@ export class Clone {
       console.warn(`[Alva] Summon "${id}" not spawned: ${problem}.`);
       return null;
     }
-    // Behind the target: on its back side, facing the way it faces.
+    const clampX = (x) => (stage ? Math.min(Math.max(x, stage.left + def.stageMargin), stage.right - def.stageMargin) : x);
+    // Behind the target: on its back side, at its foot height, facing the
+    // way it faces.
     const facing = target.facing;
-    const x = target.body.x - facing * def.behindDistance;
+    let x = clampX(target.body.x - facing * def.behindDistance);
+    let y = target.body.y;
+    let attack = def.attack;
+    // Nothing to stand on there at that height, judged at the spot the clone
+    // would really take and with the owner's own collider: the no-ground
+    // placement and attack instead, if the summon has them.
+    const half = owner.def.collider.width / 2;
+    if (def.noGround && stage && !stage.supportsAt(x - half, x + half, y)) {
+      x = clampX(target.body.x + def.noGround.offset.x * facing);
+      y = target.body.y + def.noGround.offset.y;
+      attack = def.noGround.attack;
+    }
     return new Clone({
       owner, target, def,
-      attackDef: owner.attacks[def.attack],
+      attackDef: owner.attacks[attack],
       cloud: owner.sprites.effect(def.cloud),
-      x: stage ? Math.min(Math.max(x, stage.left + def.stageMargin), stage.right - def.stageMargin) : x,
-      y: target.body.y,
-      facing,
+      x, y, facing,
     });
   }
 

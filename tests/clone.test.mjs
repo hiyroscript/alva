@@ -2,8 +2,10 @@
 // #0001's Charged BA1 Clone Attack: the clone-cloud artwork and its effect
 // registration, the Charge-then-BA1 trigger, the Energy cost and its
 // fallbacks, the clone's appear -> BA1 -> vanish lifecycle, its placement
-// behind the opponent, detached hits (Dodge, Block, hitstop, attribution),
-// independence from its owner, and battle restart / rendering. Uses the real
+// behind the opponent, the overhead Mid-air BA2 it performs instead where
+// there is no ground behind (platform edges, airborne opponents), detached
+// hits (Dodge, Block, hitstop, attribution), independence from its owner,
+// and battle restart / rendering. Uses the real
 // Fighter, CombatState, CombatSystem, Clone, SpriteSet and Battle (see
 // fighter-harness.mjs); sprite sets carry clip metadata only, so scale,
 // anchoring and paint still need real-browser verification.
@@ -18,6 +20,7 @@ import { Fighter } from '../js/game/character.js';
 import { CombatState } from '../js/game/combat.js';
 import { KNOCKBACK_LEVELS } from '../js/data/knockback.js';
 import { Clone } from '../js/game/clone.js';
+import { StageCollision, createBody, stepBody } from '../js/game/physics.js';
 import { SpriteSet } from '../js/game/sprite-normalizer.js';
 import { TrainingAIController } from '../js/game/fighter-controller.js';
 import {
@@ -568,11 +571,16 @@ test('the clone is summoned behind the target, on its back side, facing it; the 
   assert.equal(c.x, away.target.body.x - 48);
   assert.equal(c.facing, 1);
 
-  // On a platform: the clone stands at the target's feet height, no physics.
+  // On a platform (the harness ledge, x 900 - 1100), with the platform
+  // still under the spot behind: the clone stands at the target's feet
+  // height, no physics.
   const high = duel();
+  high.target.body.x = 1000;
   high.target.body.y = 600;
   const h = Clone.summon(high.attacker, { id: 'ba1Clone', target: high.target }, STAGE);
+  assert.equal(h.x, 1048);
   assert.equal(h.y, 600);
+  assert.equal(h.attackDef.id, 'ba1');
   assert.equal('body' in h, false);
 });
 
@@ -608,6 +616,536 @@ test('stage edges clamp where the clone appears, without moving it afterwards', 
   assert.equal(r.facing, -1);
   for (let i = 0; i < 60; i++) r.update(DT);
   assert.equal(r.x, STAGE.right - SUMMON.stageMargin);
+});
+
+// ---- No ground behind: the overhead Mid-air BA2 -------------------------------------
+
+// A one-way roof 200 above the floor (x 800 - 1200) with a lower step off its
+// right edge (x 1200 - 1400, 100 above the floor): past either roof edge
+// there is only something lower to stand on.
+const ROOF_Y = 600;
+const ROOF = new StageCollision({
+  groundLevel: 800,
+  bounds: { left: 0, right: 2000 },
+  platforms: [
+    { id: 'roof', x: 800, y: ROOF_Y, w: 400, h: 16 },
+    { id: 'step', x: 1200, y: 700, w: 200, h: 16 },
+  ],
+  solids: [],
+});
+const MB2 = def.attacks.midairBa2;
+const MB2_FRAMES = ['0001_midair1ba1.png', '0001_midair1ba2.png', '0001_midair1ba3.png', '0001_midair1ba4.png', '0001_midair1ba5.png'];
+const MB2_STEPS = steps(MB2.startup + MB2.active + MB2.recovery);
+const MB2_TO_ACTIVE = CLOUD_STEPS + steps(MB2.startup);
+const HALF = def.collider.width / 2;
+
+// Stands `f` at `x` on whatever surface is at `y` (the real spawn
+// placement), facing `facing`.
+function place(f, stage, x, y, facing) {
+  f.spawn = { x, y, facing };
+  f.reset(stage);
+}
+
+// A duel on ROOF: the target stands on the roof at `targetX`, facing
+// `facing`, with the owner on the roof just in front of it (so its back is to
+// the other side and it keeps facing the owner).
+function roofDuel(targetX, facing, opts = {}) {
+  const d = duel({ stage: ROOF, ...opts });
+  place(d.target, ROOF, targetX, ROOF_Y, facing);
+  place(d.attacker, ROOF, targetX + facing * 44, ROOF_Y, -facing);
+  return d;
+}
+
+// Target spots on the roof whose back is past the roof's edge: its right
+// edge facing left, its left edge facing right.
+const EDGES = [[1180, -1], [820, 1]];
+
+test('StageCollision.supportsAt: a surface at that very height under the span, never a lower one', () => {
+  assert.equal(ROOF.supportsAt(990, 1024, ROOF_Y), true, 'on the roof');
+  assert.equal(ROOF.supportsAt(1300, 1334, 700), true, 'on the step');
+  assert.equal(ROOF.supportsAt(400, 434, 800), true, 'on the floor');
+  assert.equal(ROOF.supportsAt(1300, 1334, ROOF_Y), false, 'the step is lower than the roof');
+  assert.equal(ROOF.surfaceBelow(1300, 1334, ROOF_Y).ref.id, 'step', 'even though surfaceBelow finds it');
+  assert.equal(ROOF.supportsAt(400, 434, ROOF_Y), false, 'the floor is lower still');
+  assert.equal(ROOF.supportsAt(990, 1024, 500), false, 'in the air over the roof');
+  // Any horizontal overlap counts, as it does for a landing body.
+  assert.equal(ROOF.supportsAt(1199, 1233, ROOF_Y), true);
+  assert.equal(ROOF.supportsAt(1200, 1234, ROOF_Y), false);
+  // Solids' tops too, within the physics tolerance of the height.
+  const block = new StageCollision({ groundLevel: 800, bounds: { left: 0, right: 2000 }, platforms: [], solids: [{ id: 'b', x: 100, y: 700, w: 50, h: 100 }] });
+  assert.equal(block.supportsAt(110, 144, 700), true);
+  assert.equal(block.supportsAt(110, 144, 700.4), true);
+  assert.equal(block.supportsAt(110, 144, 702), false);
+});
+
+test('the no-ground fallback is data: the summon reuses midairBa2 over the target; nothing about midairBa2 changes', () => {
+  assert.deepEqual(SUMMON.noGround, { attack: 'midairBa2', offset: { x: 0, y: -36 } });
+  assert.equal(SUMMON.attack, 'ba1', 'BA1 stays the normal clone attack');
+  assert.equal(SUMMON.energyCost, 25, 'one cost, whichever way it appears');
+  assert.deepEqual(
+    { ...MB2 },
+    {
+      animation: 'midairBa2', startup: 2 / 12, active: 1 / 12, recovery: 2 / 12, damage: 6,
+      hitbox: { x: 8, y: -44, w: 40, h: 40 }, knockback: { axis: 'vertical', level: 'high', sign: -1 },
+      hitstun: 0.22, blockstun: 0.14, hitstop: 0.06, cooldown: 0.1,
+    },
+  );
+  assert.equal(def.attacks.ba1Clone, undefined);
+  // The clone engine never names a fighter, a summon or an attack.
+  const src = readFileSync(ROOT + 'js/game/clone.js', 'utf8').replace(/^\s*\/\/.*$/gm, '');
+  assert.doesNotMatch(src, /0001|ba1Clone|midairBa2|'ba1'/);
+  const f = makeFighter().fighter;
+  assert.deepEqual(f.summonDefs.ba1Clone.noGround, SUMMON.noGround);
+  assert.ok(Object.isFrozen(f.summonDefs.ba1Clone.noGround));
+});
+
+test('supported ground is unchanged: behind the target either way it faces, BA1, 6 damage and Low horizontal Knockback', () => {
+  for (const attackerFacing of [1, -1]) {
+    const d = duel({ attackerFacing });
+    const facing = d.target.facing;
+    assert.equal(facing, -attackerFacing);
+    const clone = summon(d);
+    assert.equal(clone.attackDef, d.attacker.attacks.ba1);
+    assert.equal(clone.animator.anim.key, 'ba1');
+    assert.equal(clone.x, d.target.body.x - facing * 48);
+    assert.equal(clone.y, d.target.body.y);
+    assert.equal(clone.facing, facing);
+    const log = follow(d, clone);
+    assert.deepEqual(order(log.filter((s) => s.phase === 'appear').map((s) => s.cloud)), CLOUD);
+    assert.deepEqual(order(log.map((s) => s.body)), BA1_FRAMES);
+    assert.deepEqual(order(log.filter((s) => s.phase === 'vanish').map((s) => s.cloud)), [...CLOUD].reverse());
+    assert.equal(d.events.length, 1);
+    assert.equal(d.events[0].damage, 6);
+    assert.equal(d.target.combat.health, 94);
+    assert.equal(d.attacker.combat.energy, 75);
+  }
+  // Knockback read at the hit: along the clone's facing, no launch.
+  const d = duel();
+  const clone = summon(d);
+  d.until(() => d.events.length > 0);
+  assert.equal(d.target.body.vx, KNOCKBACK_LEVELS.low.horizontal * clone.facing);
+  assert.equal(d.target.body.vy, 0);
+});
+
+test('on a platform with support behind the target, the clone still stands behind it and uses BA1', () => {
+  for (const [targetX, facing] of [[1000, -1], [1000, 1], [1150, -1], [850, 1]]) {
+    const d = roofDuel(targetX, facing);
+    const clone = summon(d);
+    assert.equal(d.target.body.y, ROOF_Y);
+    assert.equal(d.target.facing, facing);
+    assert.equal(clone.attackDef.id, 'ba1', `${targetX} facing ${facing}`);
+    assert.equal(clone.x, targetX - facing * 48);
+    assert.equal(clone.y, ROOF_Y);
+    assert.equal(clone.facing, facing);
+  }
+});
+
+test('support follows the physics: the clone stands behind exactly where a body there would stand on the roof', () => {
+  const owner = makeFighter({ stage: ROOF }).fighter;
+  const modes = new Set();
+  for (let targetX = 1140; targetX <= 1183; targetX++) {
+    const target = makeFighter({ x: targetX, y: ROOF_Y, facing: -1, stage: ROOF }).fighter;
+    assert.equal(target.body.y, ROOF_Y);
+    const clone = Clone.summon(owner, { id: 'ba1Clone', target }, ROOF);
+    // A body of the owner's collider, resting at the behind spot: does one
+    // step of the real physics keep it on the roof?
+    const behind = targetX + 48;
+    const probe = createBody({ x: behind, y: ROOF_Y, width: def.collider.width, height: def.collider.height });
+    stepBody(probe, DT, ROOF, SIM_CTX.gravity);
+    const stands = probe.grounded && probe.y === ROOF_Y;
+    assert.equal(clone.attackDef.id, stands ? 'ba1' : 'midairBa2', `target at ${targetX}`);
+    modes.add(clone.attackDef.id);
+  }
+  assert.deepEqual([...modes], ['ba1', 'midairBa2'], 'both sides of the edge were covered');
+  // The last supported spot overlaps the roof by a single unit.
+  const at = (x) => Clone.summon(owner, { id: 'ba1Clone', target: makeFighter({ x, y: ROOF_Y, facing: -1, stage: ROOF }).fighter }, ROOF);
+  assert.equal(at(1168).attackDef.id, 'ba1');
+  assert.equal(at(1168).x - HALF, 1199);
+  assert.equal(at(1169).attackDef.id, 'midairBa2');
+});
+
+test('at a platform edge with nothing behind at its height, the clone appears over the target and uses midairBa2', () => {
+  for (const [targetX, facing] of EDGES) {
+    const d = roofDuel(targetX, facing);
+    const clone = summon(d);
+    // The target itself stands on the roof; only the spot behind it is bare.
+    assert.equal(d.target.grounded, true);
+    assert.equal(d.target.body.y, ROOF_Y);
+    assert.equal(d.target.body.ground.id, 'roof');
+    assert.equal(ROOF.supportsAt(targetX - facing * 48 - HALF, targetX - facing * 48 + HALF, ROOF_Y), false);
+    assert.equal(clone.attackDef, d.attacker.attacks.midairBa2, `${targetX} facing ${facing}`);
+    assert.equal(clone.attackDef.id, 'midairBa2');
+    assert.equal(clone.animator.anim.key, 'midairBa2');
+    assert.equal(clone.x, d.target.body.x);
+    assert.equal(clone.y, d.target.body.y - 36);
+    assert.equal(clone.facing, d.target.facing);
+    assert.equal(clone.facing, facing);
+    assert.equal(clone.phase, 'appear');
+    assert.equal(name(clone.cloudFrame), CLOUD[0]);
+    assert.equal(d.attacker.combat.energy, 75, 'the same single 25 Energy');
+    assert.equal(d.attacker.state, 'charge');
+    for (const key of ['body', 'pushbox', 'hurtboxes']) assert.equal(key in clone, false, `no ${key}`);
+  }
+});
+
+test('a lower surface under the spot behind does not count: only support at the target\'s own foot height does', () => {
+  // Right roof edge: the step (100 lower) is under the spot behind.
+  const step = roofDuel(1180, -1);
+  assert.equal(ROOF.surfaceBelow(1228 - HALF, 1228 + HALF, ROOF_Y).ref.id, 'step');
+  assert.equal(summon(step).attackDef.id, 'midairBa2');
+  // Left roof edge: only the floor (200 lower) is under it.
+  const floor = roofDuel(820, 1);
+  assert.equal(ROOF.surfaceBelow(772 - HALF, 772 + HALF, ROOF_Y).ref.id, '__floor');
+  assert.equal(summon(floor).attackDef.id, 'midairBa2');
+  // The harness ledge (x 900 - 1100, y 600) over the floor (y 800), the
+  // same way.
+  const onLedge = makeFighter({ x: 1090, y: 600, facing: -1 }).fighter;
+  assert.equal(onLedge.body.y, 600);
+  assert.equal(STAGE.surfaceBelow(1138 - HALF, 1138 + HALF, 600).y, 800);
+  const past = Clone.summon(makeFighter().fighter, { id: 'ba1Clone', target: onLedge }, STAGE);
+  assert.equal(past.attackDef.id, 'midairBa2');
+  assert.equal(past.x, 1090);
+  assert.equal(past.y, 564);
+});
+
+test('an airborne target gets the overhead midairBa2, snapshotted where it was at the summon', () => {
+  for (const attackerFacing of [1, -1]) {
+    const d = duel({ attackerFacing });
+    d.tick(CHARGE, JUMP);
+    for (let i = 0; i < 8; i++) d.tick(CHARGE, { jump: true });
+    assert.equal(d.attacker.state, 'charge');
+    assert.equal(d.target.grounded, false);
+    d.tick(CHARGED_BA1, { jump: true });
+    assert.equal(d.clones.length, 1);
+    const [clone] = d.clones;
+    assert.ok(d.target.body.y < 800 - 36, 'well off the floor');
+    assert.equal(clone.attackDef.id, 'midairBa2');
+    assert.equal(clone.x, d.target.body.x);
+    assert.equal(clone.y, d.target.body.y - 36);
+    assert.equal(clone.facing, d.target.facing);
+    assert.equal(d.attacker.combat.energy, 75);
+    const spot = { x: clone.x, y: clone.y, facing: clone.facing };
+    const log = follow(d, clone);
+    for (const s of log) assert.deepEqual({ x: s.x, y: s.y, facing: s.facing }, spot, 'no gravity, no landing');
+    assert.deepEqual(order(log.map((s) => s.body)), MB2_FRAMES);
+  }
+});
+
+test('the overhead clone appears, kicks with the real five midairBa2 frames on their own timing, then vanishes', () => {
+  for (const [targetX, facing] of EDGES) {
+    const d = roofDuel(targetX, facing);
+    const clone = summon(d);
+    const log = follow(d, clone);
+    assert.equal(d.clones.length, 0);
+    assert.equal(clone.alive, false);
+    const appear = log.filter((s) => s.phase === 'appear');
+    const attack = log.filter((s) => s.phase === 'attack');
+    const vanish = log.filter((s) => s.phase === 'vanish');
+    assert.deepEqual(log.map((s) => s.phase), [...appear, ...attack, ...vanish].map((s) => s.phase));
+    // The same cloud, both ways, at the same timing.
+    assert.deepEqual(runs(appear.map((s) => s.cloud)), CLOUD.map((f) => [f, steps(1 / 20)]));
+    assert.deepEqual(runs(vanish.map((s) => s.cloud)), [...CLOUD].reverse().map((f) => [f, steps(1 / 20)]));
+    // Mid-air BA2 frame 1 (not BA1's) shows under the last cloud frame.
+    assert.deepEqual(appear.filter((s) => s.body).map((s) => [s.cloud, s.body]), Array(steps(1 / 20)).fill([CLOUD[9], MB2_FRAMES[0]]));
+    assert.deepEqual(order(log.map((s) => s.body)), MB2_FRAMES);
+    assert.ok(log.every((s) => !BA1_FRAMES.includes(s.body)), 'no ground BA1 frame');
+    assert.ok(vanish.every((s) => s.body === null));
+    // The hitbox only on frame 3, for midairBa2's own active time, and
+    // never in a cloud.
+    assert.ok(appear.every((s) => !s.active) && vanish.every((s) => !s.active));
+    const active = attack.filter((s) => s.active);
+    assert.equal(active.length, steps(MB2.active) + Math.ceil(MB2.hitstop / DT), 'its active time, held through the freeze');
+    assert.ok(active.every((s) => s.body === '0001_midair1ba3.png'));
+    // The stationary target was hit: its five frames plus the clone's freeze.
+    assert.equal(d.events.length, 1);
+    assert.equal(attack.length, MB2_STEPS + Math.ceil(MB2.hitstop / DT));
+    // Stationary the whole time, never falling.
+    for (const s of log) assert.deepEqual([s.x, s.y, s.facing], [targetX, ROOF_Y - 36, facing]);
+    assert.ok(log.every((s) => s.owner === 'charge' && s.energy === 75));
+  }
+});
+
+test('the overhead kick lands on a stationary target through the real hitbox and hurtboxes, credited to the owner', () => {
+  for (const [targetX, facing] of EDGES) {
+    const d = roofDuel(targetX, facing);
+    const clone = summon(d);
+    assert.equal(clone.attackDef, d.attacker.attacks.midairBa2);
+    // Its own resolved High reversed vertical Knockback: no sideways push.
+    assert.deepEqual(clone.attackDef.knockback, { x: 0, y: -KNOCKBACK_LEVELS.high.vertical });
+    let n = 0;
+    while (!d.events.length) {
+      d.tick(CHARGE);
+      assert.ok(++n <= MB2_TO_ACTIVE, 'it connects on its first active step');
+    }
+    assert.equal(n, MB2_TO_ACTIVE);
+    assert.equal(clone.attackPhase, 'active');
+    assert.equal(name(clone.frame), '0001_midair1ba3.png');
+    assert.equal(d.events.length, 1);
+    const [e] = d.events;
+    assert.equal(e.type, 'hit');
+    assert.equal(e.attacker, d.attacker);
+    assert.equal(e.target, d.target);
+    assert.equal(e.summon, clone);
+    assert.equal(e.projectile, null);
+    assert.equal(e.technique, null);
+    assert.equal(e.damage, 6);
+    assert.equal(d.target.combat.health, 94);
+    assert.equal(d.target.combat.stun, MB2.hitstun);
+    assert.equal(d.target.combat.hitstop, MB2.hitstop);
+    assert.equal(clone.hitstop, MB2.hitstop, 'the clone freezes on impact');
+    assert.equal(d.attacker.combat.hitstop, 0, 'the owner never does');
+    assert.equal(d.attacker.state, 'charge');
+    assert.equal(d.attacker.combat.cooldowns.has('midairBa2'), false);
+  }
+});
+
+test('the overhead kick drives the target downward with midairBa2\'s High reversed vertical Knockback', () => {
+  for (const [targetX, facing] of EDGES) {
+    const d = roofDuel(targetX, facing);
+    summon(d);
+    d.until(() => d.events.length > 0);
+    assert.ok(d.target.body.vx === 0, 'no sideways push');
+    assert.ok(d.target.body.vy > 0, 'downward: world y grows down');
+    assert.equal(d.target.body.vy, KNOCKBACK_LEVELS.high.vertical);
+    assert.equal(d.target.body.vy, 800);
+    assert.equal(d.target.body.grounded, false);
+  }
+});
+
+test('the overhead kick hits once, however many steps its active box overlaps the target', () => {
+  const d = roofDuel(1180, -1);
+  const clone = summon(d);
+  let overlapSteps = 0;
+  while (d.clones.includes(clone)) {
+    d.tick(CHARGE);
+    if (clone.activeBox()) overlapSteps++;
+  }
+  assert.equal(overlapSteps, steps(MB2.active) + Math.ceil(MB2.hitstop / DT), 'live across several steps (and the freeze)');
+  assert.equal(d.events.length, 1, 'one hit event');
+  assert.equal(d.target.combat.health, 94, 'one damage application');
+  assert.equal(clone.hasHit, true);
+  assert.equal(clone.hitbox(), null, 'used up');
+});
+
+test('a Dodge\'s invulnerable frames let the overhead kick pass through unspent; after them it can still connect', () => {
+  const dodgeStartup = steps(def.defense.ground.startup);
+  const covered = roofDuel(1180, -1);
+  const clone = summon(covered);
+  let activeSteps = 0;
+  for (let i = 1; covered.clones.includes(clone); i++) {
+    covered.tick(CHARGE, i === MB2_TO_ACTIVE - dodgeStartup ? DEFENSE : {});
+    if (!clone.activeBox()) continue;
+    activeSteps++;
+    assert.equal(covered.target.combat.invulnerable, true, `invulnerable while the kick is live (step ${i})`);
+  }
+  assert.equal(activeSteps, steps(MB2.active));
+  assert.deepEqual(covered.events, []);
+  assert.equal(covered.target.combat.health, 100);
+  assert.equal(covered.target.combat.stun, 0);
+  assert.equal(covered.target.body.vy, 0, 'no spike');
+  assert.equal(covered.target.grounded, true);
+  assert.equal(clone.hasHit, false, 'not used up by the Dodge');
+  assert.equal(clone.hitstop, 0);
+
+  const late = roofDuel(1180, -1);
+  const c2 = summon(late);
+  const invulnerable = [];
+  let hitAt = null;
+  for (let i = 1; late.clones.includes(c2); i++) {
+    late.tick(CHARGE, i === MB2_TO_ACTIVE - dodgeStartup - 2 ? DEFENSE : {});
+    if (late.target.combat.invulnerable) invulnerable.push(i);
+    if (hitAt === null && late.events.length) hitAt = i;
+  }
+  assert.ok(invulnerable.includes(MB2_TO_ACTIVE), 'the window covered the start of the kick');
+  assert.equal(hitAt, invulnerable.at(-1) + 1, 'it connects on the first step after the window');
+  assert.equal(late.events.length, 1);
+  assert.equal(late.events[0].summon, c2);
+  assert.equal(late.target.combat.health, 94);
+});
+
+test('Block (future fighters): the overhead kick goes through applyHit like any hit; a block suppresses its spike', () => {
+  const blocker = { ...def, defense: { type: 'block' } };
+  const GUARD = { defense: true };
+  // The guard faces the owner, the way the clone faces: not into it.
+  const open = roofDuel(1180, -1, { targetCharacter: blocker });
+  const c1 = summon(open, GUARD);
+  assert.equal(c1.attackDef.id, 'midairBa2');
+  while (!open.events.length) open.tick(CHARGE, GUARD);
+  assert.equal(open.target.combat.blocking, true, 'the guard was up');
+  assert.equal(open.events[0].type, 'hit');
+  assert.equal(open.events[0].damage, 6);
+  assert.equal(open.target.body.vy, KNOCKBACK_LEVELS.high.vertical);
+
+  // Turned to face the clone: a normal block, with no vertical knockback.
+  const front = roofDuel(1180, -1, { targetCharacter: blocker });
+  const c2 = summon(front, GUARD);
+  front.target.opponent = null;
+  front.target.facing = -c2.facing;
+  while (!front.events.length) front.tick(CHARGE, GUARD);
+  const [e] = front.events;
+  assert.equal(e.type, 'block');
+  assert.equal(e.attacker, front.attacker);
+  assert.equal(e.summon, c2);
+  assert.equal(e.damage, MB2.damage * front.target.combat.blockDamageScale, 'chip damage');
+  assert.equal(front.target.combat.stun, MB2.blockstun);
+  assert.ok(front.target.body.vx === 0);
+  assert.equal(front.target.body.vy, 0, 'no spike on a block');
+  assert.equal(front.target.body.grounded, true);
+  assert.equal(c2.hitstop, MB2.hitstop);
+  assert.equal(front.attacker.combat.hitstop, 0);
+});
+
+test('the overhead clone never follows: position, facing and attack stay put, and the kick whiffs', () => {
+  const d = roofDuel(1180, -1);
+  const clone = summon(d);
+  const spot = { x: clone.x, y: clone.y, facing: clone.facing, attackDef: clone.attackDef };
+  // The target walks off along the roof, away from the spot, and stands.
+  const log = follow(d, clone, () => CHARGE, (i) => (i < CLOUD_STEPS ? { left: true } : {}));
+  assert.ok(d.target.body.x < spot.x - 80, 'it walked away');
+  assert.equal(d.target.body.y, ROOF_Y, 'still on the roof');
+  for (const s of log) assert.deepEqual({ x: s.x, y: s.y, facing: s.facing }, { x: spot.x, y: spot.y, facing: spot.facing });
+  assert.equal(clone.attackDef, spot.attackDef, 'the attack choice never changes');
+  assert.deepEqual(d.events, []);
+  assert.equal(d.target.combat.health, 100);
+  const attack = log.filter((s) => s.phase === 'attack');
+  assert.equal(attack.length, MB2_STEPS, 'all five frames, no freeze');
+  assert.deepEqual(runs(attack.map((s) => s.body)), MB2_FRAMES.map((f) => [f, steps(1 / 12)]));
+  assert.deepEqual(attack.filter((s) => s.active).map((s) => s.body), Array(steps(MB2.active)).fill('0001_midair1ba3.png'));
+  assert.deepEqual(order(log.filter((s) => s.phase === 'vanish').map((s) => s.cloud)), [...CLOUD].reverse());
+  assert.equal(d.clones.length, 0);
+
+  // Nor does a spot chosen behind a grounded target become overhead later.
+  const g = roofDuel(1000, -1);
+  const behind = summon(g);
+  const gLog = follow(g, behind, () => CHARGE, () => ({ right: true }));
+  assert.ok(g.target.body.y > ROOF_Y, 'the target ran off the roof edge');
+  assert.equal(behind.attackDef.id, 'ba1');
+  assert.ok(gLog.every((s) => s.x === 1048 && s.y === ROOF_Y));
+  assert.deepEqual(order(gLog.map((s) => s.body)), BA1_FRAMES);
+});
+
+test('missing no-ground attack art or data: no clone anywhere, no Energy spent, a warning, and an ordinary BA1', () => {
+  const noArt = fakeSprites(Object.keys(def.animations).filter((k) => k !== 'midairBa2'));
+  // At a roof edge (where it would be needed) and on the floor (where it
+  // would not): the same refusal, so Energy never depends on the spot.
+  for (const d of [roofDuel(1180, -1, { attackerSprites: noArt }), duel({ attackerSprites: noArt })]) {
+    const warnings = captureWarnings(() => {
+      d.tick(CHARGE);
+      d.tick(CHARGED_BA1);
+    });
+    assert.equal(d.clones.length, 0, 'no invisible clone');
+    assert.equal(d.attacker.summons.length, 0);
+    assert.equal(d.attacker.combat.energy, 100, 'nothing spent');
+    assert.equal(d.attacker.combat.attack?.def.id, 'ba1', 'the press falls through to BA1');
+    assert.equal(warnings.length, 1);
+    assert.match(warnings[0], /ba1Clone.*no-ground attack "midairBa2" has no animation frames/);
+  }
+
+  // Data missing: no such attack, or no hitbox.
+  const { midairBa2, ...rest } = def.attacks;
+  for (const [character, problem] of [
+    [{ ...def, attacks: rest }, /no-ground attack "midairBa2" is not defined/],
+    [{ ...def, attacks: { ...def.attacks, midairBa2: { ...midairBa2, hitbox: null } } }, /no-ground attack "midairBa2" has no hitbox/],
+  ]) {
+    const a = makeFighter({ character, stage: ROOF, x: 1136, y: ROOF_Y, facing: 1 });
+    const b = makeFighter({ stage: ROOF, x: 1180, y: ROOF_Y, facing: -1 });
+    a.fighter.opponent = b.fighter;
+    const warnings = captureWarnings(() => {
+      a.step(CHARGE);
+      a.step(CHARGED_BA1);
+    });
+    assert.equal(a.fighter.summons.length, 0);
+    assert.equal(a.fighter.combat.energy, 100);
+    assert.equal(a.fighter.combat.attack?.def.id, 'ba1');
+    assert.match(warnings.join('\n'), problem);
+    // Nor does a request that got through anyway spawn a broken clone.
+    let clone;
+    const spawnWarnings = captureWarnings(() => {
+      clone = Clone.summon(a.fighter, { id: 'ba1Clone', target: b.fighter }, ROOF);
+    });
+    assert.equal(clone, null);
+    assert.match(spawnWarnings.join('\n'), problem);
+  }
+});
+
+test('a summon without a no-ground fallback keeps the old placement: behind at foot height, even past an edge', () => {
+  const plain = { ...def.summons.ba1Clone };
+  delete plain.noGround;
+  const character = { ...def, summons: { ba1Clone: plain } };
+  // No midairBa2 art needed either.
+  const sprites = fakeSprites(Object.keys(def.animations).filter((k) => k !== 'midairBa2'));
+  const owner = makeFighter({ character, sprites, stage: ROOF }).fighter;
+  assert.equal(owner.summonDefs.ba1Clone.noGround, null);
+  for (const [targetX, facing] of EDGES) {
+    const target = makeFighter({ x: targetX, y: ROOF_Y, facing, stage: ROOF }).fighter;
+    const clone = Clone.summon(owner, { id: 'ba1Clone', target }, ROOF);
+    assert.equal(clone.attackDef.id, 'ba1');
+    assert.equal(clone.x, targetX - facing * 48);
+    assert.equal(clone.y, ROOF_Y);
+  }
+});
+
+test('stage edges: support is judged at the clamped spot behind, and the overhead spot stays inside the margins', () => {
+  // A platform flush with the left bound: the unclamped spot behind (x -18)
+  // is off it, the clamped one (x 17) is on it, so the clone stands behind.
+  const wall = new StageCollision({
+    groundLevel: 800, bounds: { left: 0, right: 2000 },
+    platforms: [{ id: 'sill', x: 0, y: ROOF_Y, w: 100, h: 16 }, { id: 'far', x: 1900, y: ROOF_Y, w: 100, h: 16 }], solids: [],
+  });
+  const owner = makeFighter({ stage: wall }).fighter;
+  const left = makeFighter({ x: 30, y: ROOF_Y, facing: 1, stage: wall }).fighter;
+  const l = Clone.summon(owner, { id: 'ba1Clone', target: left }, wall);
+  assert.equal(l.x, SUMMON.stageMargin);
+  assert.equal(l.y, ROOF_Y);
+  assert.equal(l.attackDef.id, 'ba1');
+  const right = makeFighter({ x: 1975, y: ROOF_Y, facing: -1, stage: wall }).fighter;
+  const r = Clone.summon(owner, { id: 'ba1Clone', target: right }, wall);
+  assert.equal(r.x, 2000 - SUMMON.stageMargin);
+  assert.equal(r.attackDef.id, 'ba1');
+
+  // Airborne targets at both bounds: overhead, inside the margins.
+  for (const [x, facing] of [[17, 1], [17, -1], [1983, 1], [1983, -1]]) {
+    const target = makeFighter({ x, facing, stage: wall }).fighter;
+    target.body.y = 500;
+    const c = Clone.summon(owner, { id: 'ba1Clone', target }, wall);
+    assert.equal(c.attackDef.id, 'midairBa2');
+    assert.equal(c.x, x);
+    assert.ok(c.x >= wall.left + SUMMON.stageMargin && c.x <= wall.right - SUMMON.stageMargin);
+  }
+
+  // A sideways offset mirrors with facing and is clamped like the spot behind.
+  const shifted = { ...def, summons: { ba1Clone: { ...def.summons.ba1Clone, noGround: { attack: 'midairBa2', offset: { x: 40, y: -36 } } } } };
+  const o = makeFighter({ character: shifted, stage: wall }).fighter;
+  const at = (x, facing) => {
+    const target = makeFighter({ x, facing, stage: wall }).fighter;
+    target.body.y = 500;
+    return Clone.summon(o, { id: 'ba1Clone', target }, wall);
+  };
+  assert.equal(at(1000, 1).x, 1040);
+  assert.equal(at(1000, -1).x, 960);
+  assert.equal(at(1000, 1).y, 464);
+  assert.equal(at(1975, 1).x, 2000 - SUMMON.stageMargin, 'not 2015');
+  assert.equal(at(25, -1).x, SUMMON.stageMargin, 'not -15');
+  const moved = at(1975, 1);
+  for (let i = 0; i < 60; i++) moved.update(DT);
+  assert.equal(moved.x, 2000 - SUMMON.stageMargin);
+});
+
+test('on the real City map: behind on a catwalk\'s middle, overhead at its edge', () => {
+  const stage = new StageCollision(getMap('city'));
+  const overpass = stage.platforms.find((p) => p.id === 'overpass'); // x 960 - 1340
+  const owner = makeFighter({ stage }).fighter;
+  const on = (x, facing) => {
+    const target = makeFighter({ x, y: overpass.y, facing, stage }).fighter;
+    assert.equal(target.body.y, overpass.y);
+    return [target, Clone.summon(owner, { id: 'ba1Clone', target }, stage)];
+  };
+  const [, mid] = on(1150, 1);
+  assert.deepEqual([mid.attackDef.id, mid.x, mid.y], ['ba1', 1102, overpass.y]);
+  const [t, edge] = on(985, 1);
+  assert.deepEqual([edge.attackDef.id, edge.x, edge.y, edge.facing], ['midairBa2', t.body.x, overpass.y - 36, 1]);
+  // The main roof far below is no support at the catwalk's height.
+  assert.equal(stage.surfaceBelow(937 - HALF, 937 + HALF, overpass.y).y, stage.groundY);
 });
 
 // ---- Hits ---------------------------------------------------------------------------

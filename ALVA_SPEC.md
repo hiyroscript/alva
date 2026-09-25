@@ -808,15 +808,22 @@ read the character database, so it stays the same as fighters are added.
   maps `action1` to the `ba1Clone` summon, which names the attack (`ba1`),
   the cloud effect (`cloneCloud`), `energyCost` 25, `behindDistance` 48 world
   units, the cloud's `effectOffset` (centred 44 units above the clone's feet,
-  half the fighter's height) and a `stageMargin`. A successful summon spends
+  half the fighter's height), a `stageMargin` and a `noGround` fallback (the
+  attack `midairBa2` at `offset` `{ x: 0, y: -36 }` from the opponent's
+  origin) for when there is no ground behind the opponent (below). A
+  successful summon spends
   exactly 25 Energy once, when it is accepted (100 → 75 → 50 → 25 → 0; a full
   meter pays for four; never below 0), and nothing is spent per cloud frame,
-  on the attack, on a hit or miss, or on vanishing. With less than 25 Energy
+  on the attack, on a hit or miss, or on vanishing; the overhead fallback is
+  the same paid summon, never a second charge. With less than 25 Energy
   no clone is summoned and nothing is spent: the press falls through to the
-  ordinary grounded BA1. Before paying, the summon checks that the cloud and
-  BA1 have real frames, BA1 is defined and there is an opponent; missing art
-  logs a warning, spends nothing, summons nothing and falls back to BA1
-  (itself refused if BA1's frames are missing). One press summons exactly one
+  ordinary grounded BA1. Before paying, the summon checks that the cloud has
+  real frames, that both of its attacks (BA1 and the no-ground Mid-air BA2)
+  are defined with a hitbox and real frames, and that there is an opponent,
+  wherever the opponent stands, so whether it works never depends on where
+  the clone would appear; missing art or data logs a warning, spends
+  nothing, summons nothing and falls back to BA1 (itself refused if BA1's
+  frames are missing). One press summons exactly one
   clone; holding BA1 does not repeat it. There is no hidden one-clone limit:
   each further paid press while still charging summons another, each on its
   own independent lifecycle.
@@ -833,15 +840,28 @@ read the character database, so it stays the same as fighters are added.
   part in fighter separation or solid collision (the opponent can move
   through it), is ignored by the camera (framing still uses P1 and the CPU)
   and has no marker, name, ring, shadow, health or Energy bar. Its position
-  and facing are snapshotted once, on the summon step: on the opponent's back
-  side (`x = target.x − target.facing × 48`, clamped inside the stage's
-  horizontal bounds), at the opponent's foot height (a target on a platform
-  or airborne included), facing the way the opponent faced. It never moves,
-  turns, chases or teleports after that, so an opponent who moves away before
-  the punch makes it whiff. Lifecycle, all on fixed steps: APPEAR plays
+  facing and attack are snapshotted once, on the summon step, facing the way
+  the opponent faced. Normally it stands on the opponent's back side
+  (`x = target.x − target.facing × 48`, clamped inside the stage's
+  horizontal bounds), at the opponent's foot height, and performs BA1. That
+  spot counts as ground only if something the clone's collider (#0001's, 34
+  wide) would stand on lies at the opponent's current foot height (within
+  the physics' 0.5-unit tolerance, with the same horizontal overlap a
+  landing body needs), judged at the clamped spot where the clone would
+  really appear. A lower platform or the floor further down does not count,
+  and neither does the opponent itself being grounded. With no such ground
+  (an opponent at a platform's edge with its back to the drop, or an
+  airborne opponent), the clone appears over the opponent instead, at
+  `x = target.x`, `y = target.y − 36` (feet level with its upper body; a
+  sideways `offset.x` would mirror with facing and is clamped the same way),
+  and performs #0001's existing Mid-air BA2 kick. Either way it never moves,
+  turns, chases, falls, lands or teleports after that, and never re-checks
+  the ground or switches attack, so an opponent who moves away before the
+  strike makes it whiff. Lifecycle, all on fixed steps: APPEAR plays
   `cloneav1 → … → cloneav10` once at 20 fps (0.5 s), with no hitbox; the
-  clone's first BA1 frame shows beneath the last cloud frame as the smoke
-  clears. ATTACK plays one ordinary grounded BA1 from frame 1 with the owner's
+  clone's first attack frame (`1ba1`, or `midair1ba1` overhead) shows
+  beneath the last cloud frame as the smoke clears. ATTACK plays one
+  ordinary grounded BA1 from frame 1 with the owner's
   real sprites (`0001_1ba1 → 1ba2 → 1ba3 → 1ba4` at 12 fps, the same
   per-clip `sourceFacing` mirroring, no tint, transparency, outline or
   silhouette) and BA1's own resolved attack definition (`attacks.ba1`: frame 1
@@ -850,14 +870,22 @@ read the character database, so it stays the same as fighters are added.
   frame and hits at most once. It performs the owner's normalized BA1, so it
   inherits BA1's Low horizontal Knockback (140 horizontal knockback, away
   from the clone) automatically; the summon has no knockback tuning of its
-  own and never resolves Knockback itself. VANISH removes the body and plays
+  own and never resolves Knockback itself. The overhead clone instead plays
+  Mid-air BA2 from frame 1 (`0001_midair1ba1 → … → midair1ba5` at 12 fps)
+  with its own resolved definition (`attacks.midairBa2`: frames 1–2
+  startup, frame 3 active, frames 4–5 recovery, 6 damage, 0.22 s hitstun,
+  0.14 s blockstun, 0.06 s hitstop), whose hitbox, from the overhead spot,
+  lands on a stationary opponent's hurtboxes, and whose High reversed
+  vertical Knockback drives the opponent downward (`vy = +800`, no sideways
+  push; none on a block, like any vertical Knockback). VANISH removes the
+  body and plays
   the same cloud backwards, `cloneav10 → … → cloneav1`, at the same 20 fps
   (0.5 s), with no hitbox; the clone is then removed. The clone's hitbox is
   resolved from the clone's own position and facing, never the owner's. A hit
   credits the owner as the attacker (the combat event also names the clone as
   its `summon`) and pushes the target along the clone's facing, away from the
-  clone. It is a detached hit: the target gets BA1's hitstop and the clone
-  pauses its own attack clock for the same 0.06 s, but the owner is never
+  clone. It is a detached hit: the target gets the attack's hitstop and the
+  clone pauses its own attack clock for the same 0.06 s, but the owner is never
   frozen (like a projectile's thrower). During a Dodge's invulnerable frames
   it passes through unspent (no damage, stun, knockback or hitstop) and can
   still connect if the active frame outlasts them. A Block-type guard (future
@@ -870,8 +898,9 @@ read the character database, so it stays the same as fighters are added.
   clones, spawns the clones summoned that step (each on cloud frame 1),
   resolves melee, projectile and clone hits, then drops spent projectiles and
   finished clones. Restart / rematch and leaving the battle clear every clone.
-  The debug overlay draws a clone's BA1 hitbox in the attack colour, labelled
-  `clone ba1`, only on its active frame; a clone has no hurtboxes to draw.
+  The debug overlay draws a clone's hitbox in the attack colour, labelled
+  with its attack (`clone ba1`, or `clone midairBa2` overhead), only on its
+  active frame; a clone has no hurtboxes to draw.
 - Charged BA2 Sphere Rush (#0001, `chargedTechniques.rasenRush`, runtime in
   `js/game/charged-technique.js`). Not a summon, a projectile, ordinary BA2
   or a big melee hitbox: #0001 himself changes animation, holds the sphere,
@@ -1072,7 +1101,8 @@ read the character database, so it stays the same as fighters are added.
   stun and blockstun, hitstop, cooldowns, Energy, binds, charged actions,
   summons and charged techniques) is data-driven. Basic Attacks 1 and 2,
   Throw (with its shuriken projectile), the Charged BA1 Clone Attack (a
-  summoned clone performing BA1) and the Charged BA2 Sphere Rush (a charged
+  summoned clone performing BA1, or Mid-air BA2 over an opponent with no
+  ground behind it) and the Charged BA2 Sphere Rush (a charged
   technique) are implemented through it with real artwork; Special stays reserved
   (mapped to no attack) until real sprites exist, and no attack, projectile,
   clone or frame is ever fabricated. An attack whose frames fail to load is
@@ -1137,8 +1167,9 @@ read the character database, so it stays the same as fighters are added.
   Attack 1 (BA1), I Basic Attack 2 (BA2), Esc/P pause (the Practice menu in
   Practice Ground). `` ` `` toggles a
   debug overlay (colliders, hurtboxes, attack hitboxes while active, each
-  flying projectile's hitbox in magenta with its name, each clone's BA1
-  hitbox, labelled `clone ba1`, on its active frame, and the Sphere Rush's
+  flying projectile's hitbox in magenta with its name, each clone's attack
+  hitbox, labelled `clone ba1` or `clone midairBa2`, on its active frame,
+  and the Sphere Rush's
   dashed cyan sphere box / centre with a `bound` label on a caught fighter).
   BA1 pressed while Charge is still held is the Charged BA1 Clone Attack
   and BA2 the Charged BA2 Sphere Rush (7.2): no extra key. In menus S/↓ still navigate down: menu bindings are separate
