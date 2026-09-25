@@ -1,1246 +1,757 @@
-You are modifying the current Alva repository:
+Objective
 
-hiyroscript/alva
+Completely replace Alva’s current Knockback / launch architecture with a new, much simpler system built around exactly three concepts:
 
-This is a complete replacement of the current Knockback/launch architecture.
+1. Launch Point — a number stored on each fighter.
+2. Base Launch — a per-hit integer multiplier restricted to 0, 1, 2, or 3.
+3. Directional Launch — a per-hit direction describing how the resulting launch is applied.
 
-Do not patch the current system.
+This is a full system replacement.
 
-Do not preserve the current:
+Do not preserve the current Knockback model internally under renamed fields. Remove the old mechanics, formulas, registries, terminology, helper functions, growth values, Low/Mid/High levels, accumulated bonus calculations, and compatibility paths.
 
-* Low / Mid / High Knockback tiers;
-* numeric base knockback vectors;
-* accumulated-Knockback bonus system;
-* knockback growth;
-* additive launch formula;
-* old resolveLaunch() behavior;
-* baseKnockback;
-* accumulatedKnockbackAxis;
-* knockbackGrowth;
-* Knockback-specific scaling helpers.
+The new launch formula is intentionally simple:
 
-Replace the entire gameplay launch model with the new system described below.
+launch strength = Base Launch × target's Launch Point
 
-The new system has only two main concepts:
-
-1. Launch point — a number owned by the fighter.
-2. Base launch — an integer 0, 1, 2, or 3 owned by each hit/attack.
-
-The final launch magnitude is:
-
-Launch point × Base launch
-
-This must become the single source of truth for how hard a fighter is launched after a hit.
-
-⸻
-
-1. Core terminology
-
-From this point forward:
-
-Do not call the fighter’s accumulated number:
-
-Knockback
-
-Call it:
-
-Launch point
-
-Player-facing capitalization:
-
-Launch point
-
-Internal recommended property:
-
-launchPoint
-
-Examples:
-
-* 0
-* 5
-* 25
-* 120
-* 245
-
-Every fighter starts at:
-
-0 Launch point
-
-⸻
-
-2. What Launch point means
-
-Launch point is the fighter’s accumulated damage-like number.
-
-Every damaging hit adds its damage amount directly to the target’s Launch point.
+The target’s Launch Point must include the damage from the hit that just connected before calculating that hit’s launch.
 
 Example:
 
-fighter begins:
+target Launch Point before hit = 115
+attack damage = 5
+target Launch Point after damage = 120
+Base Launch = 2
+launch strength = 2 × 120 = 240
 
-0
-
-BA1 hits for 5:
-
-5
-
-BA2 hits for 10:
-
-15
-
-shuriken hits for 1:
-
-16
-
-another BA1:
-
-21
-
-There is no percentage sign.
-
-There is no Health.
-
-Launch point is not reduced by attacks.
-
-It accumulates until the fighter is eliminated and respawns.
+There must be no hidden constant launch strength, no per-axis scaling coefficient, no knockback growth, no additive base velocity, and no conversion from the existing Low/Mid/High system.
 
 ⸻
 
-3. Launch point reset
-
-Launch point starts at:
-
-0
-
-on:
-
-* fresh match;
-* fighter respawn;
-* Practice fighter reset;
-* Practice CPU respawn;
-* character swap.
-
-It does not reset simply because:
-
-* an attack ends;
-* the fighter touches ground;
-* time passes;
-* stamina refills.
-
-⸻
-
-4. Damage and Launch point
-
-Damage now has one direct meaning:
-
-Damage = how many Launch points this hit adds.
-
-Examples:
-
-damage: 5
-
-means:
-
-target.launchPoint += 5
-
-damage: 10
-
-means:
-
-target.launchPoint += 10
-
-Keep the existing damage field if convenient.
-
-But comments/docs should explain that damage adds to Launch point.
-
-⸻
-
-5. Base launch
-
-Every attack/hit also has:
-
-baseLaunch
-
-Base launch must be exactly one of:
-
-* 0
-* 1
-* 2
-* 3
-
-No decimals.
-
-No values above 3.
-
-No Low/Mid/High names.
-
-No vector strength values like:
-
-* 140;
-* 220;
-* 720;
-* 800.	
-
-Those belong to the old system and should be removed from launch-strength calculation.
-
-⸻
-
-6. Meaning of each Base launch value
-
-Base launch 0
-
-No launch.
-
-Formula:
-
-Launch point × 0 = 0
-
-Examples:
-
-Launch point 5:
-5 × 0 = 0
-
-Launch point 120:
-120 × 0 = 0
-
-Launch point 500:
-500 × 0 = 0
-
-The target can still:
-
-* take damage;
-* gain Launch point;
-* receive hitstun/hitstop;
-
-but receives no launch velocity from the hit.
-
-⸻
-
-Base launch 1
-
-Normal launch.
-
-Formula:
-
-Launch point × 1
-
-Example:
-
-Launch point 120:
-
-120 × 1 = 120
-
-Launch strength:
-
-120
-
-⸻
-
-Base launch 2
-
-Double launch.
-
-Formula:
-
-Launch point × 2
-
-Example:
-
-Launch point 120:
-
-120 × 2 = 240
-
-⸻
-
-Base launch 3
-
-Triple launch.
-
-Formula:
-
-Launch point × 3
-
-Example:
-
-Launch point 120:
-
-120 × 3 = 360
-
-This is the strongest allowed Base launch tier.
-
-⸻
-
-7. Important formula
-
-The launch formula is simply:
-
-launchStrength = target.launchPoint * hit.baseLaunch
-
-Use the target’s Launch point after this hit’s damage has been added.
-
-Example:
-
-Target before hit:
-
-115
-
-BA1:
-
-* damage 5;
-* Base launch 1.
-
-First add damage:
-
-115 + 5 = 120
-
-Then calculate launch:
-
-120 × 1 = 120
-
-Final launch strength:
-
-120
-
-⸻
-
-8. BA2 example
-
-Target before hit:
-
-110
-
-BA2:
-
-* damage 10;
-* Base launch 2.
-
-After damage:
-
-120
-
-Launch:
-
-120 × 2 = 240
-
-Final launch strength:
-
-240
-
-⸻
-
-9. Charged BA2 explosion example
-
-Target before explosion:
-
-105
-
-Explosion:
-
-* damage 15;
-* Base launch 3.
-
-After damage:
-
-120
-
-Launch:
-
-120 × 3 = 360
-
-Final launch strength:
-
-360
-
-⸻
-
-10. Zero-launch example
-
-Target:
-
-119
-
-Shuriken:
-
-* damage 1;
-* Base launch 0.
-
-After hit:
-
-120
-
-Launch:
-
-120 × 0 = 0
-
-Target now has:
-
-120 Launch point
-
-but is not physically launched by the shuriken.
-
-This is intentional.
-
-⸻
-
-11. Remove the current Knockback architecture completely
-
-The current repository contains an earlier launch system involving:
-
-* js/data/knockback.js;
-* KNOCKBACK_LEVELS;
-* Low/Mid/High;
-* resolveKnockback();
-* baseKnockback;
-* accumulatedKnockbackAxis;
-* knockbackGrowth;
-* accumulated bonus;
-* horizontal/vertical per-point tuning;
-* resolveLaunch();
-* related README/spec descriptions.
-
-These systems should no longer determine attack launch strength.
-
-Delete/refactor them rather than keeping them dormant alongside the new design.
-
-There should not be two launch systems.
-
-⸻
-
-12. Replace CombatState.knockback
-
-Current fighter state uses:
+1. Remove the current Knockback architecture completely
+
+The current repository still contains an older system centered around:
+
+* CombatState.knockback
+* js/data/knockback.js
+* KNOCKBACK_LEVELS
+* Low / Mid / High Knockback
+* resolveKnockback
+* baseKnockback
+* knockbackGrowth
+* DEFAULT_KNOCKBACK_GROWTH
+* ACCUMULATED_KNOCKBACK_SCALING
+* accumulatedKnockbackBonus
+* accumulatedKnockbackAxis
+* dominantLaunchAxis
+* resolveLaunchAxis
+* the current additive resolveLaunch(...)
+* event fields such as knockbackBefore, knockbackAfter, baseLaunch, and bonusLaunch
+* documentation describing accumulated Knockback
+* Discover’s current Knockback levels and Knockback directions reference
+
+Delete or replace all of this.
+
+Do not leave deprecated aliases such as:
 
 combat.knockback
-
-Replace it with:
-
-combat.launchPoint
-
-Recommended:
-
-this.launchPoint = 0
-
-Do not keep combat.knockback as a hidden compatibility mirror unless absolutely required during one migration step.
-
-Final code should use one canonical property:
-
-launchPoint
-
-⸻
-
-13. HUD rename
-
-The top fighter card currently displays the accumulated Knockback number.
-
-Rename the player-facing label/ARIA meaning to:
-
-Launch point
-
-The visual can remain just the number beneath the character name.
-
-Example:
-
-#0001
-85
-
-But accessibility should say:
-
-Launch point 85
-
-Do not show:
-
-* Knockback;
-* %;
-* Health.
-
-⸻
-
-14. Practice damage numbers
-
-Practice floating hit numbers can remain:
-
-+5
-+10
-+1
-+15
-
-because they represent how much Launch point was added.
-
-Update comments from:
-
-“Knockback added”
-
-to:
-
-“Launch point added”
-
-⸻
-
-15. Exact #0001 damage values
-
-Preserve exactly:
-
-BA1
-
-damage:
-5
-
-Midair BA1
-
-damage:
-5
-
-BA2
-
-damage:
-10
-
-Midair BA2
-
-damage:
-10
-
-Shuriken
-
-damage:
-1
-
-Charged BA2 tick
-
-damage:
-1
-
-every:
-
-0.5 seconds
-
-Charged BA2 explosion
-
-damage:
-15
-
-Do not change these numbers.
-
-⸻
-
-16. Exact #0001 Base launch values
-
-Implement exactly:
-
-Move	Damage	Base launch
-BA1	5	1
-Midair BA1	5	2
-BA2	10	2
-Midair BA2	10	2
-Shuriken	1	0
-Charged BA2 tick	1	0
-Charged BA2 explosion	15	3
-
-Charged BA2’s initial Sphere Rush contact should remain:
-
-* damage 0;
-* Base launch 0;
-
-unless current technique flow requires another explicit setup value.
-
-It should bind/connect without prematurely launching.
-
-⸻
-
-17. Charged BA1 clone
-
-Charged BA1 uses the existing clone that performs normal attack definitions.
-
-Therefore:
-
-Ground clone BA1
-
-inherits:
-
-* damage 5;
-* Base launch 1.
-
-No-ground fallback midair BA2
-
-inherits:
-
-* damage 10;
-* Base launch 2.
-
-Do not duplicate separate clone launch values.
-
-The clone should reuse the actual attack definition.
-
-⸻
-
-18. Launch direction remains separate
-
-Base launch controls:
-
-how strong
-
-the launch is.
-
-It does not describe direction.
-
-Keep launch direction as a separate attack property.
-
-The current game already needs distinct directions:
-
-* horizontal;
-* upward;
-* downward;
-* primarily horizontal Sphere Rush explosion.
-
-Preserve that identity.
-
-Recommended new attack schema:
-
-baseLaunch: 1
-
-plus something like:
-
-launchDirection: 'horizontal'
-
-or:
-
-launch: {
-  base: 1,
-  direction: 'horizontal'
-}
-
-Either is acceptable.
-
-Do not encode direction using huge numeric vectors.
-
-⸻
-
-19. Direction types
-
-The minimum direction set should support:
-
-* horizontal;
-* upward;
-* downward.
-
-For example:
-
-launchDirection: 'horizontal'
-
-launchDirection: 'up'
-
-launchDirection: 'down'
-
-Sphere Rush explosion should be:
-
-horizontal
-
-because it is intended as a strong horizontal finisher.
-
-⸻
-
-20. #0001 launch directions
-
-Preserve the current move identities:
-
-BA1
-
-Base launch:
-1
-
-Direction:
-horizontal
-
-Push away from attacker’s facing.
-
-Midair BA1
-
-Base launch:
-2
-
-Direction:
-up
-
-BA2
-
-Base launch:
-2
-
-Direction:
-up
-
-Midair BA2
-
-Base launch:
-2
-
-Direction:
-down
-
-Shuriken
-
-Base launch:
-0
-
-Direction can be:
-
-* none;
-* horizontal;
-
-but Base launch 0 means final launch is always zero.
-
-Prefer:
-
-launchDirection: null
-
-for zero-launch hits.
-
-Charged BA2 tick
-
-Base launch:
-0
-
-Direction:
-none.
-
-Charged BA2 explosion
-
-Base launch:
-3
-
-Direction:
-horizontal
-
-⸻
-
-21. Final velocity conversion
-
-launchStrength = Launch point × Base launch
-
-produces one logical launch strength value.
-
-Convert this into body velocity according to launch direction.
-
-For horizontal:
-
-body.vx = launchStrength * facing
-
-For upward:
-
-body.vy = -launchStrength
-
-For downward:
-
-body.vy = launchStrength
-
-However, inspect current physics scale before finalizing direct world-units usage.
-
-The important gameplay invariant is:
-
-* Launch point 120 × Base launch 1 = logical launch 120;
-* ×2 = logical launch 240;
-* ×3 = logical launch 360.
-
-If a global physics conversion constant is needed because raw 120 world units/sec is too weak relative to gravity, centralize one universal conversion factor.
-
-For example:
-
-velocity = logicalLaunch × LAUNCH_VELOCITY_SCALE
-
-But:
-
-do not use different multipliers per attack.
-
-The Base launch tier is already the attack-strength multiplier.
-
-Any conversion between logical launch units and world velocity must be global and uniform.
-
-⸻
-
-22. Recommended global velocity scale
-
-Because Alva currently uses relatively large physics values such as gravity around thousands of world units per second squared, raw values like:
-
-5
-20
-120
-
-may be too small as direct velocities.
-
-Therefore create one global conversion factor if needed.
-
-Example starting point:
-
-LAUNCH_VELOCITY_SCALE = 4
-
-Then:
-
-Launch point 120 × Base 1:
-
-logical:
-120
-
-world velocity:
-480
-
-Base 2:
-
-logical:
-240
-
-world velocity:
-960
-
-Base 3:
-
-logical:
-360
-
-world velocity:
-1440
-
-This preserves the exact 1×/2×/3× relationship.
-
-Tune the single global scale based on gameplay.
-
-Do not tune attack-specific launch speeds outside Base launch.
-
-⸻
-
-23. Critical mathematical invariant
-
-For any target Launch point L:
-
-Base 0:
-0 × L = 0
-
-Base 1:
-1 × L = L
-
-Base 2:
-2 × L = 2L
-
-Base 3:
-3 × L = 3L
-
-This relationship must remain exact before the optional universal physics conversion factor.
-
-No additive constant.
-
-No attack-specific growth.
-
-No Low/Mid/High speed lookup.
-
-No exponential formula.
-
-No percentage multiplier.
-
-⸻
-
-24. Launch at zero Launch point
-
-Important consequence:
-
-If a fighter’s Launch point is:
-
-0
-
-and receives a hit with:
-
-damage > 0
-
-the hit’s damage is added first.
-
-So a damaging hit normally still launches.
-
-Example:
-
-fighter at 0.
-
-BA1:
-damage 5.
-
-After damage:
-5
-
-Launch:
-5 × 1 = 5
-
-not zero.
-
-BA2:
-damage 10.
-
-After damage:
-10
-
-Launch:
-10 × 2 = 20
-
-This is why damage must be added before launch calculation.
-
-⸻
-
-25. Zero-damage launching hits
-
-If a future hit has:
-
-* damage 0;
-* Base launch > 0;
-
-against a fighter with existing Launch point, it can still launch them.
-
-Example:
-
-target Launch point 100.
-
-Move:
-
-* damage 0;
-* Base launch 2.
-
-Launch:
-100 × 2 = 200
-
-This is valid.
-
-Therefore do not make launch conditional on damage > 0.
-
-Launch depends on:
-
-* current Launch point after damage;
-* Base launch.
-
-⸻
-
-26. Base launch 0 always wins
-
-If:
-
-baseLaunch === 0
-
-final launch strength must always be:
-
-0
-
-regardless of:
-
-* Launch point;
-* damage;
-* direction;
-* attack type.
-
-This should be an explicit fast path.
-
-Example:
-
-if (baseLaunch === 0) finalLaunch = 0
-
-This prevents shuriken/tick regressions.
-
-⸻
-
-27. Validate Base launch values
-
-Create a resolver/validator.
-
-Allowed values:
-
-0
-1
-2
-3
-
-Reject:
-
-* -1
-* 4
-* 1.5
-* '2'
-* null unless deliberately treated as 0;
-* arbitrary values.
-
-Recommended default:
-
-0
-
-for hits that declare no Base launch.
-
-Malformed definitions should warn and safely become 0.
-
-⸻
-
-28. Remove Low/Mid/High
-
-Delete the current gameplay concept:
-
+attack.knockback
+baseKnockback
+knockbackGrowth
+accumulatedKnockbackAxis
 KNOCKBACK_LEVELS
 
-Do not preserve:
+Do not have the new engine calculate the new result by passing through the old machinery.
 
-* Low;
-* Mid;
-* High;
-* horizontal 140/180/220;
-* vertical 480/640/800.
+The runtime vocabulary should become Launch Point, Base Launch, Directional Launch, and Launch.
 
-Base launch 0–3 replaces attack-strength tiers.
-
-If Discover/UI currently exposes Low/Mid/High Knockback, remove or replace that content.
-
-Do not leave stale documentation teaching a system that no longer exists.
-
-⸻
-
-29. Remove knockback growth
-
-Delete:
-
-knockbackGrowth
-
-entirely.
-
-No attack should have:
-
-* 0.4 growth;
-* 1 growth;
-* 2 growth;
-* any custom per-point growth.
-
-Base launch is the complete attack launch-strength multiplier.
-
-Sphere Rush explosion is stronger because:
-
-baseLaunch: 3
-
-not because of custom growth.
-
-⸻
-
-30. Remove numeric baseKnockback
-
-Delete numeric vectors such as:
-
-baseKnockback: { x: 720, y: 180 }
-
-from gameplay definitions.
-
-Attack launch magnitude must no longer come from numeric velocity vectors.
-
-Instead:
-
-baseLaunch: 3
-
-launchDirection: 'horizontal'
-
-For ordinary attacks:
-
-baseLaunch: 1/2
-
-plus their direction.
-
-⸻
-
-31. Remove accumulated launch bonus
-
-Delete helpers/concepts like:
-
-* accumulated Knockback bonus;
-* per-point horizontal bonus;
-* per-point vertical bonus;
-* default + bonus;
-* base + accumulated formula.
-
-The new formula is multiplicative in a much simpler sense:
-
-Base launch tier × Launch point
-
-Do not carry forward the previous additive model.
-
-⸻
-
-32. Remove old Knockback module or repurpose it
-
-js/data/knockback.js currently exists entirely around the old architecture.
-
-Preferred:
-
-rename it to something like:
+Where practical, rename files as well. For example, js/data/knockback.js should no longer remain the source of truth for a system that no longer exists. A clean replacement such as:
 
 js/data/launch.js
 
-and rewrite it around the new model.
+is preferable.
 
-Possible exports:
+Update all imports accordingly.
 
-BASE_LAUNCH_VALUES
+Search the entire repository for stale references to:
 
-resolveBaseLaunch()
+knockback
+Knockback
+KNOCKBACK
+baseKnockback
+knockbackGrowth
+accumulatedKnockback
+Low
+Mid
+High
 
-resolveLaunchDirection()
+and remove old combat-system references wherever they refer to this obsolete mechanic.
 
-launchStrength()
-
-launchVelocity()
-
-Example:
-
-export const BASE_LAUNCH_VALUES = [0, 1, 2, 3];
-
-export function launchStrength(launchPoint, baseLaunch) {
-  return Math.max(0, launchPoint) * baseLaunch;
-}
-
-Avoid retaining obsolete Knockback names merely for convenience.
+Do not blindly remove unrelated ordinary English uses if a comment genuinely has another meaning, but the old gameplay concept must be gone.
 
 ⸻
 
-33. Recommended launch module
+2. Launch Point
+
+Every fighter owns one numerical combat value named:
+
+launchPoint
+
+It replaces accumulated Knockback.
+
+A fighter starts each fresh life / spawn at:
+
+Launch Point = 0
+
+Taking damage increases Launch Point by exactly the damage actually received.
+
+Examples:
+
+0 + 5 damage = 5 Launch Point
+5 + 10 damage = 15 Launch Point
+115 + 5 damage = 120 Launch Point
+
+There is no percentage conversion and no multiplier formula other than the attack’s Base Launch.
+
+Launch Point:
+
+* starts at 0;
+* never becomes negative;
+* has no normal maximum;
+* does not defeat a fighter by itself;
+* resets when that fighter is eliminated and respawns, consistent with the game’s stock/point respawn flow;
+* is the number shown in the fighter HUD where the old Knockback number is currently displayed.
+
+Rename the combat state:
+
+this.knockback
+
+to something explicit such as:
+
+this.launchPoint
+
+Every battle, Practice, HUD, reset, respawn, timeout/tiebreak, test, and debug path that currently reads accumulated Knockback must use Launch Point instead.
+
+If the current timed-battle tiebreak uses lower accumulated Knockback after points are compared, preserve that game rule using lower Launch Point instead.
+
+⸻
+
+3. Damage ordering is mandatory
+
+When an attack connects, process its damage before calculating launch.
+
+For a normal unblocked hit:
+
+launchPointBefore = target.launchPoint
+damage = hit.damage
+target.launchPoint += damage
+launchPointAfter = target.launchPoint
+launchStrength = baseLaunch × launchPointAfter
+
+The current hit therefore contributes to its own launch.
+
+Example:
+
+Launch Point before BA1 = 115
+BA1 damage = 5
+Launch Point after BA1 = 120
+BA1 Base Launch = 1
+final launch strength = 1 × 120 = 120
+
+Do not calculate against 115.
+
+⸻
+
+4. Damage values for #0001
+
+Preserve these exact damage values:
+
+Move / hit	Damage added to Launch Point
+Ground BA1	5
+Ground BA2	10
+Mid-air BA1	5
+Mid-air BA2	10
+Shuriken	1
+Charged BA2 tick	1
+Charged BA2 explosion	15
+
+For Charged BA2, preserve the existing tick cadence:
+
+1 damage every 0.5 seconds
+
+while the target is held.
+
+Do not alter existing attack animation timing, startup, active frames, recovery, hitboxes, cooldowns, hitstop, technique timing, sphere behavior, or visuals unless a change is strictly necessary to connect the new launch fields.
+
+Damage and Base Launch remain independent data.
+
+For example, a 10-damage move does not automatically receive Base Launch 2. Its Base Launch is explicitly authored.
+
+⸻
+
+5. Base Launch
+
+Every damaging hit must have a field named:
+
+baseLaunch
+
+baseLaunch is not a velocity.
+
+It is a multiplier.
+
+The only legal Base Launch numbers are:
+
+0
+1
+2
+3
+
+Their exact meaning is:
+
+Base Launch 0:
+launchStrength = 0 × Launch Point
+therefore the hit causes no launch
+Base Launch 1:
+launchStrength = 1 × Launch Point
+normal Launch Point strength
+Base Launch 2:
+launchStrength = 2 × Launch Point
+double Launch Point strength
+Base Launch 3:
+launchStrength = 3 × Launch Point
+triple Launch Point strength
+
+Example at 120 Launch Point:
+
+Base Launch 0 → 0
+Base Launch 1 → 120
+Base Launch 2 → 240
+Base Launch 3 → 360
+
+This exact multiplication is the complete strength calculation.
+
+Do not add a secondary number afterward.
+
+Wrong:
+
+final = launchPoint * baseLaunch + 140;
+
+Wrong:
+
+final = baseVelocity + launchPoint * growth;
+
+Wrong:
+
+final = levelVelocity * launchPoint;
+
+Wrong:
+
+final = launchPoint * baseLaunch * horizontalScaling;
+
+Correct:
+
+const launchStrength = target.launchPoint * hit.baseLaunch;
+
+The only remaining work is applying that resulting strength in the hit’s Directional Launch.
+
+⸻
+
+6. Validate Base Launch data
+
+Centralize Base Launch validation.
+
+A hit must only be allowed to declare:
+
+0
+1
+2
+3
+
+Do not silently permit arbitrary values such as:
+
+0.5
+4
+10
+-1
+
+A malformed combat definition should produce a clear development-time error or warning and resolve safely according to the project’s existing data-validation conventions.
+
+Prefer an exported registry/constant for the legal values, for example:
+
+export const BASE_LAUNCH_VALUES = Object.freeze([0, 1, 2, 3]);
+
+but do not introduce unnecessary tier objects or numerical tuning tables.
+
+These four numbers are the actual values.
+
+⸻
+
+7. Directional Launch
+
+Every hit also owns a string/null property named:
+
+directionalLaunch
+
+The supported concepts are:
+
+null
+horizontal
+vertical
+reverse vertical
+
+Use clean programmatic IDs. Recommended:
+
+null
+'horizontal'
+'vertical'
+'reverseVertical'
+
+The display copy can say Reverse vertical.
+
+Do not encode direction using an arbitrary {x, y} base velocity anymore.
+
+Do not encode reverse vertical as a negative Base Launch.
+
+Base Launch is always the scalar 0–3.
+
+Direction is a separate field.
+
+⸻
+
+8. Direction semantics
+
+null
+
+directionalLaunch: null
+
+means no launch direction.
+
+A hit with a null direction must not alter the target’s launch velocity.
+
+It can still:
+
+* deal damage;
+* increase Launch Point;
+* cause whatever existing stun/hitstop behavior its hit definition specifies;
+* participate in the rest of the technique.
+
+A null direction is particularly appropriate for non-launching damage such as Charged BA2 ticks.
+
+Even if malformed data combines a nonzero Base Launch with a null direction, null direction must result in no physical launch.
+
+horizontal
+
+Apply:
+
+launch strength = Base Launch × Launch Point
+
+horizontally, traveling in the hit’s existing facing/travel direction.
+
+For fighter melee this uses the attacking fighter’s hit facing.
+
+For a projectile it uses the projectile’s travel direction.
+
+For a clone it uses the clone’s facing.
+
+For a charged technique it uses the technique’s captured facing.
+
+A horizontal hit should not invent vertical launch.
 
 Conceptually:
 
-js/data/launch.js
+vx = launchStrength * facing;
 
-should own:
+Do not multiply launchStrength by another horizontal tuning number.
 
-* valid Base launch tiers;
-* direction validation;
-* logical launch calculation;
-* optional global world-velocity scale.
+vertical
 
-Example responsibilities:
+Launch upward with exactly the computed launch strength.
 
-resolveBaseLaunch(value)
+The game world currently uses positive Y downward, so implementation will normally resemble:
 
-resolveLaunchDirection(value)
+vy = -launchStrength;
+grounded = false;
 
-calculateLaunchStrength(launchPoint, baseLaunch)
+Do not apply horizontal launch unless another existing non-launch movement mechanic specifically requires it.
 
-launchVector(strength, direction, facing)
+reverseVertical
 
-Keep it simple.
+This is the exact opposite of normal vertical launch.
 
-⸻
+The target is launched downward with the computed strength.
 
-34. Attack definition schema
+Conceptually:
 
-Update createAttackDefinition().
+vy = launchStrength;
+grounded = false;
 
-Old shape:
-
-knockback: { axis, level }
-
-knockbackGrowth
-
-etc.
-
-New shape:
-
-baseLaunch
-
-launchDirection
-
-Example:
-
-ba1: {
-  damage: 5,
-  baseLaunch: 1,
-  launchDirection: 'horizontal'
-}
-
-BA2:
-
-baseLaunch: 2
-
-launchDirection: 'up'
+This is a direction, not a negative Base Launch.
 
 ⸻
 
-35. Hit definition schema
+9. Zero Base Launch must truly cancel launch
 
-Projectiles and charged-technique hits should use exactly the same fields.
+This is particularly important.
 
-Example shuriken:
+If:
+
+Launch Point = 120
+Base Launch = 0
+
+then:
+
+0 × 120 = 0
+
+and the hit causes no launch.
+
+This must remain true at every Launch Point:
+
+0 × 5 = 0
+0 × 120 = 0
+0 × 500 = 0
+0 × 10,000 = 0
+
+There must be no residual old base velocity.
+
+There must be no accumulated bonus.
+
+There must be no minimum launch.
+
+There must be no hidden projectile push.
+
+There must be no legacy knockback path restoring motion.
+
+This property is essential for shurikens and Charged BA2’s non-explosion damage.
+
+⸻
+
+10. #0001’s exact Base Launch assignments
+
+Configure #0001 exactly as follows.
+
+Ground BA1
+
+damage: 5,
+baseLaunch: 1,
+directionalLaunch: 'horizontal'
+
+At target Launch Point 120 after damage:
+
+1 × 120 = 120 horizontal launch
+
+Ground BA2
+
+damage: 10,
+baseLaunch: 2,
+directionalLaunch: 'vertical'
+
+At target Launch Point 120 after damage:
+
+2 × 120 = 240 upward launch
+
+Mid-air BA1
+
+damage: 5,
+baseLaunch: 2,
+directionalLaunch: 'vertical'
+
+At target Launch Point 120 after damage:
+
+2 × 120 = 240 upward launch
+
+Mid-air BA2
+
+damage: 10,
+baseLaunch: 2,
+directionalLaunch: 'reverseVertical'
+
+At target Launch Point 120 after damage:
+
+2 × 120 = 240 downward launch
+
+This move must remain the downward-launching/spiking aerial move.
+
+Do not interpret “opposite direction” as horizontally behind the attacker. For this attack, reverse vertical means the opposite of normal vertical: downward.
+
+Shuriken
 
 damage: 1,
 baseLaunch: 0,
-launchDirection: null
+directionalLaunch: null
 
-Tick:
+The shuriken adds exactly 1 Launch Point and causes no launch at any Launch Point.
+
+Charged BA2 tick
+
+Every 0.5 seconds:
 
 damage: 1,
 baseLaunch: 0,
-launchDirection: null
+directionalLaunch: null
 
-Explosion:
+Each tick adds exactly 1 Launch Point.
+
+It causes no physical launch.
+
+The target should remain governed by the existing Charged BA2 hold/bind logic until the technique releases/explodes as it does today.
+
+Charged BA2 explosion
 
 damage: 15,
 baseLaunch: 3,
-launchDirection: 'horizontal'
+directionalLaunch: 'horizontal'
 
-Avoid separate bespoke schemas.
+The explosion first adds 15 Launch Point, then uses the resulting total.
+
+Example:
+
+Launch Point before explosion = 105
+explosion damage = 15
+Launch Point after explosion = 120
+3 × 120 = 360 horizontal launch
+
+Remove the current special numeric explosion launch such as {x: 720, y: 180} and its old knockback growth configuration. The explosion now follows the same shared system as every other launching hit.
 
 ⸻
 
-36. CombatState rename
+11. #0001 data should visibly express the new system
 
-Replace comments/state:
+The character data should be easy to read.
 
-Accumulated Knockback
+The ordinary attacks should look conceptually like:
 
-with:
+ba1: {
+  ...
+  damage: 5,
+  baseLaunch: 1,
+  directionalLaunch: 'horizontal',
+  ...
+},
+ba2: {
+  ...
+  damage: 10,
+  baseLaunch: 2,
+  directionalLaunch: 'vertical',
+  ...
+},
+midairBa1: {
+  ...
+  damage: 5,
+  baseLaunch: 2,
+  directionalLaunch: 'vertical',
+  ...
+},
+midairBa2: {
+  ...
+  damage: 10,
+  baseLaunch: 2,
+  directionalLaunch: 'reverseVertical',
+  ...
+},
 
-Launch point
+The shuriken should clearly declare:
+
+damage: 1,
+baseLaunch: 0,
+directionalLaunch: null,
+
+Charged BA2 should use the same field vocabulary for:
+
+* first/contact hit if it deals damage;
+* tick hit;
+* explosion hit.
+
+Do not retain numeric {x, y} baseKnockback fields beside these new fields.
+
+⸻
+
+12. Charged BA2 contact before its ticks
+
+Inspect the current Sphere Rush definition carefully.
+
+The user-required values specifically define:
+
+* tick damage: 1 every 0.5 s;
+* tick Base Launch: 0;
+* tick Directional Launch: null;
+* explosion damage: 15;
+* explosion Base Launch: 3;
+* explosion Directional Launch: horizontal.
+
+If the existing initial Sphere Rush contact currently deals damage separately from the recurring tick, do not invent a new damage value for it.
+
+Preserve its currently intended damage semantics unless existing data shows it is simply part of the first tick.
+
+What is mandatory is that any pre-explosion Sphere Rush damage that should not launch must use:
+
+baseLaunch: 0
+directionalLaunch: null
+
+and that the explosion is the only horizontal Base Launch 3 hit in that technique.
+
+Do not accidentally cause an initial rush-contact launch before the hold.
+
+⸻
+
+13. Shared hit resolver
+
+The new system must be generic.
+
+CombatSystem.applyHit() must not contain checks such as:
+
+if (def.id === 'ba1')
+if (fighter.id === '0001')
+if (technique.id === 'rasenRush')
+
+The shared resolution path should work from hit data.
+
+A clean conceptual sequence is:
+
+const launchPointBefore = target.combat.launchPoint;
+const damage = ...; // full or blocked/chip damage according to existing defense rules
+target.combat.launchPoint =
+  Math.max(0, launchPointBefore + damage);
+const launchPointAfter = target.combat.launchPoint;
+const launchStrength =
+  def.baseLaunch * launchPointAfter;
+const launch = resolveDirectionalLaunch(
+  launchStrength,
+  def.directionalLaunch,
+  facing
+);
+
+Then apply the resulting velocity according to the existing hit/block rules.
+
+Melee, projectiles, summoned clones, and charged-technique hits should all travel through the same underlying launch calculation.
+
+⸻
+
+14. Blocking
+
+Preserve the game’s existing Block mechanics unless they conflict with the new model.
+
+The current resolver treats a blocked hit differently:
+
+* damage becomes chip damage;
+* horizontal movement is reduced;
+* vertical launch is cancelled.
+
+Keep the intended defensive behavior.
+
+However, even a blocked hit’s Launch Point increase must use the actual chip damage that was received.
+
+Recommended sequence:
+
+1. determine whether blocked
+2. determine full damage vs chip damage
+3. add that actual damage to Launch Point
+4. calculate raw launch strength from new Launch Point
+5. apply Block's existing launch suppression/reduction
+
+Do not resurrect old Knockback growth or additive launch math for blocking.
+
+A blocked vertical or reverse-vertical attack should continue producing no vertical launch if that is the current Block rule.
+
+A blocked horizontal attack may continue using the existing half-strength behavior:
+
+blocked horizontal strength = raw launch strength × 0.5
+
+That 0.5 is a Block modifier, not part of Base Launch calculation.
+
+Keep that distinction clear in code and documentation.
+
+⸻
+
+15. Create a small launch data module
+
+Replace the old js/data/knockback.js architecture with a much smaller launch-oriented module, preferably:
+
+js/data/launch.js
+
+Its responsibilities should be limited to things such as:
+
+* legal Base Launch values;
+* legal Directional Launch values;
+* validation;
+* resolving a strength + direction into velocity components;
+* Discover’s generic system descriptions if keeping reference text colocated with gameplay enums is useful.
+
+For example:
+
+export const BASE_LAUNCH_VALUES = Object.freeze([0, 1, 2, 3]);
+export const DIRECTIONAL_LAUNCHES = Object.freeze([
+  ...
+]);
+export function resolveBaseLaunch(value, owner) { ... }
+export function resolveDirectionalLaunch(direction, strength) { ... }
+
+Do not rebuild another complicated growth/scaling subsystem in this file.
+
+There should be no:
+
+per-point rate
+horizontalPerPoint
+verticalPerPoint
+growth
+level
+Low
+Mid
+High
+bonus
+default velocity table
+
+The system does not need any of those concepts.
+
+⸻
+
+16. Attack-definition creation
+
+Update createAttackDefinition().
+
+Currently it converts a Knockback descriptor into a numeric vector and growth metadata.
+
+Remove that behavior.
+
+It should instead validate and freeze the declared:
+
+baseLaunch
+directionalLaunch
+
+fields.
+
+Conceptually:
+
+def.baseLaunch = resolveBaseLaunch(spec.baseLaunch, `Attack "${spec.id}"`);
+def.directionalLaunch =
+  resolveDirectionalLaunchValue(
+    spec.directionalLaunch,
+    `Attack "${spec.id}"`
+  );
+
+Do not derive one from the other.
+
+Do not infer Base Launch from damage.
+
+Do not infer Directional Launch from hitbox orientation.
+
+Do not preserve knockbackGrowth.
+
+⸻
+
+17. Combat events
+
+Rewrite combat event terminology as well.
+
+Remove event fields based on the obsolete architecture:
+
+knockbackBefore
+knockbackAfter
+baseLaunch // if currently this means vector velocity
+bonusLaunch
+
+Use event information that accurately describes the new system.
 
 Recommended:
-
-this.launchPoint = 0
-
-No maximum.
-
-No percentage.
-
-It grows by hit damage.
-
-It does not itself eliminate the fighter.
-
-Void remains the elimination mechanism.
-
-⸻
-
-37. applyHit() new flow
-
-Rewrite CombatSystem.applyHit() around this exact sequence:
-
-1. determine whether target blocked;
-2. determine actual damage/chip damage;
-3. record launchPointBefore;
-4. add damage to target Launch point;
-5. record launchPointAfter;
-6. read hit baseLaunch;
-7. calculate:
-    launchStrength = launchPointAfter * baseLaunch;
-8. resolve direction;
-9. convert logical launch strength to final velocity;
-10. apply velocity;
-11. apply hitstun/hitstop;
-12. emit event.
-
-Do not call any old Knockback growth/base-vector functions.
-
-⸻
-
-38. Hit event structure
-
-Replace old event fields such as:
-
-* knockbackBefore
-* knockbackAfter
-* baseLaunch vector;
-* bonusLaunch;
-* finalLaunch vector based on old architecture.
-
-Recommended event:
 
 {
   type,
@@ -1251,1402 +762,958 @@ Recommended event:
   launchPointBefore,
   launchPointAfter,
   baseLaunch,
+  directionalLaunch,
   launchStrength,
-  launchDirection,
+  finalLaunch,
   projectile,
   summon,
   technique
 }
 
-Optionally include applied velocity for debugging.
+Where:
+
+baseLaunch
+
+is the integer 0–3, not a {x, y} vector.
+
+launchStrength
+
+is:
+
+baseLaunch × launchPointAfter
+finalLaunch
+
+can remain an {x, y} resolved velocity object if useful for debugging/tests.
+
+There must be no bonusLaunch because the concept no longer exists.
 
 ⸻
 
-39. Block behavior
+18. HUD terminology
 
-Do not let the rework accidentally destroy Block.
+The battle and Practice HUD currently show the fighter’s accumulated Knockback value.
 
-Current block behavior uses chip damage and reduced launch.
+Replace this with Launch Point.
 
-Preserve the high-level concept:
+Use the existing compact fighter cards and layout.
 
-* blocked hit adds chip damage rather than full damage;
-* block can reduce/cancel launch according to current design.
+Do not redesign the whole HUD.
 
-But calculate Launch point first using chip damage.
+The displayed number must read the new:
 
-Then:
+fighter.combat.launchPoint
 
-launchStrength = newLaunchPoint × baseLaunch
+value.
 
-Then apply block reduction.
+If the card currently labels it Knockback, change that label to:
 
-If current block behavior halves horizontal launch and removes vertical launch, preserve that unless another requirement says otherwise.
+Launch Point
 
-Do not create separate Base launch values for blocked attacks.
+or the shortest existing-card-compatible representation if space is constrained, while still clearly calling the mechanic Launch Point.
 
-⸻
-
-40. Dodge behavior
-
-Dodge remains simple:
-
-if attack does not connect:
-
-* no damage;
-* no Launch point increase;
-* no launch.
-
-No special changes.
+Do not continue exposing the word Knockback for this mechanic.
 
 ⸻
 
-41. #0001 BA1 data
+19. Respawn/reset behavior
 
-Change BA1 to:
+When a fighter is eliminated by the Void and later respawns:
 
-* damage 5;
-* Base launch 1;
-* horizontal launch.
+Launch Point → 0
 
-Remove:
+This must happen at the correct life reset point.
 
-* Low Knockback descriptor;
-* knockback growth;
-* numeric base vector.
+The fighter must not carry Launch Point across eliminations.
 
-Example:
+Practice resets/respawns must also restore Launch Point to 0.
 
-damage: 5
-baseLaunch: 1
-launchDirection: 'horizontal'
+Round/rematch/restart initialization must start every fighter at 0.
 
 ⸻
 
-42. #0001 midair BA1
+20. Discover: rename Knockback to Launch
 
-Change to:
+The Discover screen currently has:
 
-* damage 5;
-* Base launch 2;
-* upward launch.
-
-Example:
-
-damage: 5
-baseLaunch: 2
-launchDirection: 'up'
-
-⸻
-
-43. #0001 BA2
-
-Change to:
-
-* damage 10;
-* Base launch 2;
-* upward launch.
-
-Example:
-
-damage: 10
-baseLaunch: 2
-launchDirection: 'up'
-
-⸻
-
-44. #0001 midair BA2
-
-Change to:
-
-* damage 10;
-* Base launch 2;
-* downward launch.
-
-Example:
-
-damage: 10
-baseLaunch: 2
-launchDirection: 'down'
-
-⸻
-
-45. #0001 shuriken
-
-Change to:
-
-* damage 1;
-* Base launch 0;
-* no launch direction needed.
-
-A shuriken must increase Launch point but never move the target.
-
-Even at:
-
-Launch point 500
-
-shuriken hit:
-
-after damage:
-501
-
-launch:
-
-501 × 0 = 0
-
-No physical push.
-
-⸻
-
-46. Charged BA2 initial contact
-
-Current contact is a setup/bind.
-
-Keep:
-
-* damage 0;
-* Base launch 0.
-
-Therefore:
-
-no launch.
-
-It binds the target for the technique.
-
-⸻
-
-47. Charged BA2 ticks
-
-Every 0.5 seconds before explosion:
-
-* damage 1;
-* Base launch 0.
-
-Example target begins technique at Launch point 50.
-
-Tick 1:
-51
-launch 0.
-
-Tick 2:
-52
-launch 0.
-
-Tick 3:
-53
-launch 0.
-
-No movement from the ticks.
-
-⸻
-
-48. Charged BA2 explosion
-
-Explosion:
-
-* damage 15;
-* Base launch 3;
-* horizontal direction.
-
-If target before explosion is:
-
-53
-
-after damage:
-
-68
-
-launch:
-
-68 × 3 = 204
-
-Then apply global physics conversion factor if used.
-
-Do not use:
-
-* 720;
-* 180;
-* growth 2;
-* accumulated horizontal bonus.
-
-Those are obsolete.
-
-⸻
-
-49. Charged BA2 total sequence example
-
-Suppose target begins confirmed Sphere Rush at:
-
-100 Launch point
-
-Ticks at:
-
-0.5 sec:
-101
-
-1.0 sec:
-102
-
-1.5 sec:
-103
-
-Explosion:
-+15
-
-new Launch point:
-
-118
-
-Explosion Base launch:
-
-3
-
-Logical launch:
-
-118 × 3 = 354
-
-This is the intended calculation.
-
-⸻
-
-50. Clone behavior
-
-Clone hits use the same attack definitions.
-
-Ground clone BA1:
-
-if target becomes 80 after damage:
-
-Base launch 1
-
-launch:
-80
-
-Midair fallback BA2:
-
-if target becomes 80:
-
-Base launch 2
-
-launch:
-160
-
-No clone-specific launch formula.
-
-⸻
-
-51. Direction and facing
-
-Horizontal launch should travel away in the hit’s facing direction.
-
-Use the attacker/projectile/clone/technique facing that already exists in the hit resolution path.
-
-Example:
-
-Base launch 2.
-
-Launch point 100.
-
-Strength:
-
-200
-
-Attack facing right:
-
-positive horizontal velocity.
-
-Facing left:
-
-negative horizontal velocity.
-
-⸻
-
-52. Vertical launch
-
-Up:
-
-negative body Y velocity.
-
-Down:
-
-positive body Y velocity.
-
-Keep the game’s existing coordinate convention.
-
-Do not change gravity.
-
-⸻
-
-53. Grounded upward hit
-
-A hit with upward direction and Base launch >0 should:
-
-* set upward velocity;
-* mark body ungrounded if appropriate.
-
-Preserve current launch behavior.
-
-⸻
-
-54. Downward hit
-
-A downward hit:
-
-* pushes airborne target downward;
-* against grounded target it may immediately collide with the floor.
-
-Preserve current collision physics.
-
-Do not add floor bounce.
-
-⸻
-
-55. Launch point is not velocity
-
-Do not directly store Launch point in:
-
-body.vx
-
-or:
-
-body.vy
-
-without the centralized launch conversion.
-
-Launch point is gameplay state.
-
-Velocity is physics state.
-
-Use:
-
-logical launch strength
-
-then convert to world velocity.
-
-This keeps balancing possible without changing displayed Launch point values.
-
-⸻
-
-56. One global launch scale only
-
-If physics needs amplification, use one global constant.
-
-Example:
-
-LAUNCH_WORLD_SCALE = 4
-
-Then:
-
-logical 120 becomes velocity 480.
-
-logical 240 becomes 960.
-
-logical 360 becomes 1440.
-
-This constant applies to every move equally.
-
-Do not create:
-
-* BA1 launch speed;
-* BA2 launch speed;
-* Sphere Rush custom numeric speed.
-
-Those differences come exclusively from Base launch.
-
-⸻
-
-57. No minimum launch floor unless necessary
-
-Do not add arbitrary logic like:
-
-Math.max(100, launchStrength)
-
-because that destroys the exact formula at low Launch point.
-
-At low Launch point, launch should genuinely be weak.
-
-Example:
-
-first BA1:
-
-after damage = 5
-
-Base 1:
-
-logical launch = 5.
-
-If that feels too weak in physics, adjust the universal world scale.
-
-Do not add an attack-specific minimum.
-
-⸻
-
-58. No extra Base launch offset
-
-Do not calculate:
-
-(baseLaunch + 1) × launchPoint
-
-Base launch 0 must equal no launch.
-
-Exact formula:
-
-baseLaunch × launchPoint
-
-⸻
-
-59. No additive old launch
-
-Do not do:
-
-oldBaseVelocity + launchPoint × baseLaunch
-
-That would retain the old system.
-
-There is no old base velocity anymore.
-
-The Base launch integer itself is the move’s strength.
-
-⸻
-
-60. No Knockback growth
-
-Do not do:
-
-launchPoint × baseLaunch × growth
-
-There is no growth stat.
-
-Exact formula stays:
-
-launchPoint × baseLaunch
-
-⸻
-
-61. No Low/Mid/High conversion
-
-Do not map:
-
-Base launch 1 → Low 140.
-
-Base launch 2 → Mid 180.
-
-Base launch 3 → High 220.
-
-That would be preserving the previous architecture under new names.
-
-Base launch is literally the multiplier number:
-
-0, 1, 2, or 3.
-
-⸻
-
-62. No attack-specific velocity vectors
-
-Do not preserve:
-
-{ x: 140, y: 0 }
-
-{ x: 0, y: 800 }
-
-{ x: 720, y: 180 }
-
-as attack launch strengths.
-
-Only direction should remain.
-
-Magnitude comes from:
-
-Launch point × Base launch.
-
-⸻
-
-63. Practice HUD
-
-Rename accumulated display from:
-
+Power
 Knockback
+Conditions
 
-to:
+Change it to:
 
-Launch point
+Power
+Launch
+Conditions
 
-for both:
+This means:
 
-* P1;
-* CPU.
+* section ID should preferably become launch;
+* tab label becomes Launch;
+* panel/page heading becomes Launch;
+* ARIA labels and test selectors should use Launch terminology;
+* comments and imports should no longer describe Discover as Power / Knockback / Conditions.
 
-Practice CPU continues to accumulate Launch point normally.
+Completely remove the current Discover Knockback presentation.
 
-⸻
+Do not show:
 
-64. Quick Battle HUD
-
-Both top cards display:
-
-Launch point numeric value.
-
-Examples:
-
-P1:
-#0001
-63
-
-CPU:
-#0001
-121
-
-No %.
-
-No Knockback ARIA label.
-
-Use:
-
-Launch point
-
-⸻
-
-65. Time-up logic
-
-Current Quick Battle may use accumulated Knockback as a tiebreaker.
-
-Rename/update this to Launch point.
-
-When score is tied at time-up:
-
-fighter with lower Launch point wins.
-
-If Launch point also equal:
-draw.
-
-Do not refer to Knockback in result reason/comments.
-
-⸻
-
-66. Respawn
-
-On the 2-second respawn:
-
-reset:
-
-launchPoint = 0
-
-along with existing:
-
-* stamina;
-* exhaustion;
-* charged cooldowns;
-* transient combat state.
-
-Score persists.
-
-⸻
-
-67. Practice respawn
-
-Practice Void respawn after 2 seconds:
-
-Launch point returns to:
-
-0
-
-No Practice scoring.
-
-⸻
-
-68. Remove old Discover Knockback content
-
-Search UI/data for:
-
-* Knockback Power;
-* Knockback levels;
-* Low/Mid/High;
-* Knockback direction summaries.
-
-If Discover currently documents the old launch system, replace it.
-
-New informational concept:
-
-Launch point
-
-“Damage received increases Launch point. Higher Launch point makes attacks launch the fighter harder.”
-
-Base launch
-
-“Each attack has Base launch 0–3. Final launch strength equals Launch point multiplied by Base launch.”
-
-Do not expose internal physics velocity scale.
-
-⸻
-
-69. Base launch descriptions
-
-If Discover needs readable descriptions:
-
-0 — None
-
-“No launch.”
-
-1 — Normal
-
-“Launches at 1× Launch point.”
-
-2 — Strong
-
-“Launches at 2× Launch point.”
-
-3 — Very Strong
-
-“Launches at 3× Launch point.”
-
-Names are optional.
-
-The numeric values are authoritative.
-
-⸻
-
-70. Update README
-
-Remove all stale language about:
-
-* accumulated Knockback;
-* base Knockback;
-* Knockback growth;
-* Low/Mid/High;
-* per-point horizontal/vertical bonus;
-* resolveKnockback;
-* resolveLaunch;
-* additive base + bonus.
-
-Replace with the new simple model.
-
-Recommended explanation:
-
-“Each fighter has a Launch point starting at 0. Damage adds directly to Launch point. Each hit has a Base launch value from 0 to 3. After damage is applied, launch strength is calculated as Launch point × Base launch. Base launch 0 means no launch; 1 uses the Launch point directly; 2 doubles it; 3 triples it. Direction is stored separately from strength.”
-
-⸻
-
-71. Update ALVA_SPEC
-
-Do the same full replacement.
-
-Do not leave historical descriptions of the previous system in the active specification.
-
-⸻
-
-72. Search all comments
-
-Search repository-wide for:
-
-* Knockback;
-* knockback;
-* baseKnockback;
-* knockbackGrowth;
-* accumulatedKnockback;
 * Low;
 * Mid;
 * High;
-* resolveLaunch;
-* resolveKnockback.
-
-Decide case by case.
-
-Keep the word only where it genuinely refers to something unrelated or historical.
-
-Gameplay launch comments should move to Launch point/Base launch terminology.
-
-⸻
-
-73. Tests: Launch point state
-
-Add tests:
-
-fresh fighter:
-
-launchPoint === 0
-
-Damage:
-
-* +5 => 5;
-* +10 => 15;
-* +1 => 16.
-
-No maximum.
-
-High values remain valid.
-
-⸻
-
-74. Tests: Base launch validation
-
-Verify:
-
-valid:
-
-* 0;
-* 1;
-* 2;
-* 3.	
-
-Invalid:
-
-* -1;
-* 4;
-* 2.5;
-* string values;
-* NaN;
-* Infinity.
-
-Invalid values should safely resolve to 0 and warn.
-
-⸻
-
-75. Tests: Base 0
-
-For Launch points:
-
-* 1;
-* 10;
-* 120;
-* 500;
-* 10,000.
-
-Base launch 0 always yields:
-
-0.
-
-⸻
-
-76. Tests: Base 1
-
-For Launch point:
-
-120
-
-Base 1:
-
-120.
-
-For:
-40
-
-Base 1:
-
-40.
-
-⸻
-
-77. Tests: Base 2
-
-Launch point:
-
-120
-
-Base 2:
-
-240.
-
-Launch point:
-40
-
-Base 2:
-
-80.
-
-⸻
-
-78. Tests: Base 3
-
-Launch point:
-
-120
-
-Base 3:
-
-360.
-
-Launch point:
-40
-
-Base 3:
-
-120.
-
-⸻
-
-79. Tests: exact formula
-
-Core helper test:
-
-for many Launch point values L:
-
-calculateLaunchStrength(L, 0) === 0
-
-calculateLaunchStrength(L, 1) === L
-
-calculateLaunchStrength(L, 2) === L * 2
-
-calculateLaunchStrength(L, 3) === L * 3
-
-This should be one of the most important tests in the project.
-
-⸻
-
-80. Tests: damage happens first
-
-Target:
-
-115
-
-Hit:
-
-* damage 5;
-* Base 1.
-
-Expected:
-
-Launch point:
-120
-
-launch strength:
-120.
-
-Not:
-115.
-
-⸻
-
-81. Tests: BA1
-
-Fresh target:
-
-BA1.
-
-Damage:
-5.
-
-New Launch point:
-5.
-
-Base:
-1.
-
-Logical launch:
-5.
-
-Second BA1:
-
-new Launch point:
-10.
-
-logical launch:
-10.
-
-The exact world velocity may be:
-
-logical × global scale.
-
-⸻
-
-82. Tests: BA2
-
-Fresh target:
-
-BA2.
-
-Damage:
-10.
-
-Launch point:
-10.
-
-Base:
-2.
-
-Logical launch:
-20.
-
-Later at 110 before hit:
-
-damage:
-+10
-
-new:
-120.
-
-Base:
-2.
-
-logical:
-240.
-
-⸻
-
-83. Tests: midair BA1
-
-Damage:
-5.
-
-Base:
-2.
-
-Direction:
-up.
-
-At Launch point after damage 50:
-
-logical launch:
-100 upward.
-
-⸻
-
-84. Tests: midair BA2
-
-Damage:
-10.
-
-Base:
-2.
-
-Direction:
-down.
-
-At new Launch point 120:
-
-logical launch:
-240 downward.
-
-⸻
-
-85. Tests: shuriken
-
-Fresh target:
-
-shuriken:
-
-* damage 1;
-* Launch point becomes 1;
-* Base 0;
-* zero launch.
-
-At target 119:
-
-shuriken:
-
-* new Launch point 120;
-* zero launch.
-
-At 999:
-
-* becomes 1000;
-* zero launch.
-
-⸻
-
-86. Tests: charged BA2 ticks
-
-Start target:
-
-Each tick:
-
-101;
-102;
-103;
-
-Each tick:
-
-Base 0.
-
-No launch velocity.
-
-⸻
-
-87. Tests: charged BA2 explosion
-
-After ticks, suppose:
-
-Explosion:
-+15.
-
-New:
-
-Base 3.
-
-Logical launch:
-
-354.
-
-Horizontal direction.
-
-Verify exact result before global velocity scaling.
-
-⸻
-
-88. Tests: clone BA1
-
-Clone ground attack:
-
-damage 5.
-
-Base 1.
-
-Uses same formula as real BA1.
-
-No clone-specific launch strength.
-
-⸻
-
-89. Tests: clone fallback
-
-Clone fallback midair BA2:
-
-damage 10.
-
-Base 2.
-
-Direction down.
-
-Uses same attack data as regular midair BA2.
-
-⸻
-
-90. Tests: direction does not alter strength
-
-For same:
-
-Launch point = 100.
-
-Base = 2.
-
-All directions must have logical magnitude:
-
-200.
-
-Horizontal:
-200 sideways.
-
-Up:
-200 upward.
-
-Down:
-200 downward.
-
-Direction changes vector orientation, not strength.
-
-⸻
-
-91. Tests: global scale
-
-If using:
-
-LAUNCH_WORLD_SCALE
-
-test:
-
-appliedSpeed = logicalLaunch × scale
-
-The same scale must apply to every direction and every attack.
-
-No attack-specific exceptions.
-
-⸻
-
-92. Tests: HUD rename
-
-Verify:
-
-* no Knockback label;
-* Launch point displayed;
-* number updates after damage;
-* resets on respawn;
-* no percentage.
-
-⸻
-
-93. Tests: time-up
-
-Score tied.
-
-P1 Launch point:
-50.
-
-P2:
-80.
-
-P1 wins time tiebreak.
-
-If both:
-50.
-
-draw.
-
-⸻
-
-94. Tests to remove
-
-Delete/update tests asserting:
-
-* Low/Mid/High values;
-* 140/180/220 horizontal;
-* 480/640/800 vertical;
-* baseKnockback;
-* accumulated bonus;
-* knockback growth;
-* Sphere Rush numeric 720 launch;
-* additive launch;
-* resolveKnockback;
-* old resolveLaunch;
-* Knockback HUD terminology.
-
-Do not keep obsolete tests disabled.
-
-Rewrite them around Launch point.
-
-⸻
-
-95. File architecture suggestion
-
-Recommended changes:
-
-New
-
-js/data/launch.js
-
-Rewrite
-
-js/game/combat.js
-
-Update
-
-js/data/characters.js
-js/game/hud.js
-js/game/practice.js
-js/game/battle.js
-js/game/fighter-status.js
-README.md
-ALVA_SPEC.md
-
-Remove
-
-js/data/knockback.js
-
-if nothing else requires it after migration.
-
-Update all imports.
-
-⸻
-
-96. Preserve current hit reaction systems
-
-Do not remove:
-
-* hitstun;
-* hitstop;
-* hurt animation;
-* blockstun;
-* Dodge;
-* bind;
-* gravity.
-
-Only replace how launch strength is calculated.
-
-⸻
-
-97. Preserve current non-launch systems
-
-Do not alter:
-
-* stages;
-* Void;
-* 3-point scoring;
-* 2-second respawn;
-* stamina;
-* Dash;
-* CAB cooldowns;
-* Practice CPU;
-* HUD layout;
-* portrait orientation;
-* manual fighter facing;
-* camera;
-* attack timing;
-* animation;
-* hitboxes.
-
-This is specifically a Launch-system rework.
-
-⸻
-
-98. Naming rule
-
-After this migration, use:
-
-Launch point
-for the fighter’s accumulated number.
-
-Use:
-
-Base launch
-for the attack’s 0–3 multiplier.
-
-Use:
-
-Launch strength
-for the computed:
-
-Launch point × Base launch
-
-Use:
-
-Launch direction
-for horizontal/up/down.
-
-Avoid calling any of these:
-
-* Knockback;
+* the old Knockback levels;
+* old numeric launch-speed values;
 * Knockback growth;
-* base Knockback;
-* accumulated Knockback.
+* accumulated Knockback bonuses;
+* the old formulas.
+
+Rewrite the section around the new generic system.
 
 ⸻
 
-99. Mental model
+21. Discover must explain the new system without mentioning any fighter or attack
 
-This should be the complete system:
+This is mandatory.
 
-Fighter
+The Launch page must explain the system generically.
 
-owns:
-Launch point
+It must not mention:
 
-starts:
-0
+#0001
+BA1
+BA2
+shuriken
+charged BA2
+Sphere Rush
+any named fighter
+any named attack
 
-Hit
+A good structure is three entries:
 
-owns:
-damage
-Base launch
-Launch direction
+Launch Point
 
-On hit
-
-Launch point += damage
-
-then:
-
-Launch strength = Launch point × Base launch
-
-then:
-
-apply Launch strength in Launch direction.
-
-That is all.
-
-⸻
-
-100. #0001 final reference table
-
-Hit	Damage	Base launch	Direction
-BA1	5	1	Horizontal
-Midair BA1	5	2	Up
-BA2	10	2	Up
-Midair BA2	10	2	Down
-Shuriken	1	0	None
-Charged BA2 contact	0	0	None
-Charged BA2 tick	1	0	None
-Charged BA2 explosion	15	3	Horizontal
-
-Charged BA1 clone inherits BA1 or midair BA2 depending on its existing fallback behavior.
-
-⸻
-
-101. Final acceptance criteria
-
-This rework is complete when:
-
-Launch point
+Explain that:
 
 * every fighter starts at 0;
-* damage adds directly to Launch point;
-* HUD displays Launch point;
-* no percentage;
-* respawn resets to 0.
+* damage received adds to Launch Point;
+* higher Launch Point produces stronger launch when hit by an attack with Base Launch greater than zero;
+* Launch Point resets after elimination/respawn.
 
-Base launch
+Suggested copy:
 
-* only values 0,1,2,3 exist;
-* each hit has one;
-* no Low/Mid/High strength system remains;
-* no numeric attack launch vectors remain.
+Launch Point is a fighter’s accumulated damage value. Taking damage increases it. When a launching hit connects, the current Launch Point is used to determine how strongly the fighter is launched.
 
-Formula
+Avoid fighter-specific examples.
 
-* final logical launch = current Launch point after damage × Base launch;
-* Base 0 always gives 0;
-* Base 1 gives 1×;
-* Base 2 gives 2×;
-* Base 3 gives 3×.
+Base Launch
 
-Directions
+Show the four actual values:
 
-* BA1 horizontal;
-* midair BA1 up;
-* BA2 up;
-* midair BA2 down;
-* shuriken none;
-* CAB2 ticks none;
-* CAB2 explosion horizontal.
+0
+1
+2
+3
 
-#0001 damage
+Explain them clearly:
 
-* BA1 5;
-* midair BA1 5;
-* BA2 10;
-* midair BA2 10;
-* shuriken 1;
-* CAB2 ticks 1 every 0.5 sec;
-* CAB2 explosion 15.
+0 — No launch. The Launch Point is multiplied by zero.
+1 — Normal launch. Uses the Launch Point once.
+2 — Double launch. Uses twice the Launch Point.
+3 — Triple launch. Uses three times the Launch Point.
 
-Old system removed
+The page may show the formula generically:
 
-* no KNOCKBACK_LEVELS;
-* no Low/Mid/High gameplay tiers;
-* no baseKnockback;
-* no knockbackGrowth;
-* no accumulated bonus;
-* no additive launch model;
-* no old numeric launch vectors;
-* no stale Knockback HUD terminology.
+Launch strength = Base Launch × Launch Point
 
-Quality
+This is not hidden tuning information; it is the actual public mechanic and should be documented.
 
-* tests explicitly verify the formula;
-* shuriken/ticks never launch;
-* explosion uses Base launch 3;
-* clone reuses real move data;
-* global physics conversion, if required, is uniform;
-* full test suite passes.
+Do not call these Low/Mid/High tiers.
+
+They are literal Base Launch numbers.
+
+Directional Launch
+
+Explain:
+
+None
+Horizontal
+Vertical
+Reverse vertical
+
+Suggested meanings:
+
+None — The hit deals damage but causes no directional launch.
+Horizontal — Launches in the direction the hit is traveling.
+Vertical — Launches upward.
+Reverse vertical — Launches downward.
+
+Again, no named attacks or fighters.
 
 ⸻
 
-102. Strict scope
+22. Discover data should come from the new system
 
-Completely replace the current launch/Knockback system with:
+The current Discover page imports:
 
-Launch point + Base launch.
+KNOCKBACK_LEVELS
+KNOCKBACK_SUMMARY
+KNOCKBACK_DIRECTIONS
+KNOCKBACK_DIRECTION_SUMMARY
 
-Do not partially reuse the previous launch model.
+Delete that dependency.
 
-Do not create a hybrid.
+If the new Launch page is data-driven, read from the new launch registry/constants instead.
 
-The final authoritative formula is:
+For example:
 
-Launch point after damage × Base launch = Launch strength
+BASE_LAUNCH_VALUES
+DIRECTIONAL_LAUNCHES
+LAUNCH_POINT_SUMMARY
+BASE_LAUNCH_SUMMARY
+DIRECTIONAL_LAUNCH_SUMMARY
 
-with:
+Keep Discover as a mechanics reference, not a hardcoded #0001 move list.
 
-Base launch ∈ {0, 1, 2, 3}
+⸻
 
-and Launch direction handled separately.
+23. Discover styling
 
-Everything else in the game should remain unchanged.
+Reuse the existing Discover visual language where appropriate.
+
+The old tier meter may no longer make conceptual sense because Base Launch 0–3 are literal numeric multipliers rather than Low/Mid/High qualitative tiers.
+
+Adjust the presentation so the numbers themselves are clear.
+
+For example, each Base Launch row can display a small numeric marker:
+
+0
+1
+2
+3
+
+instead of progressively filled Low/Mid/High bars.
+
+Directional Launch can continue using arrow-style icons:
+
+* horizontal → right arrow;
+* vertical → up arrow;
+* reverse vertical → down arrow;
+* none → neutral/dash/zero marker.
+
+Keep accessibility intact:
+
+* visible text must explain every icon;
+* decorative arrows should remain aria-hidden;
+* lists should have useful ARIA labels.
+
+Do not redesign the whole Discover screen.
+
+⸻
+
+24. Documentation
+
+Update all project documentation to make the new system authoritative.
+
+At minimum inspect and update:
+
+README.md
+ALVA_SPEC.md
+js/game/combat.js comments
+js/data/characters.js comments
+Discover comments
+projectile comments
+charged-technique comments
+clone comments where relevant
+tests/comments
+
+Remove explanations of:
+
+Low / Mid / High Knockback
+default Knockback vectors
+accumulated Knockback
+Knockback growth
+per-point launch scaling
+base + bonus
+horizontal/vertical accumulated bonus rates
+
+Replace them with:
+
+Launch Point
+Base Launch 0–3
+Directional Launch
+Base Launch × Launch Point
+
+Documentation must clearly establish that the hit’s damage is added first.
+
+A concise canonical description should be:
+
+Every fighter has a Launch Point that starts at 0 and increases by damage received.
+Every hit declares a Base Launch of 0, 1, 2, or 3 and a Directional Launch.
+After a hit's damage is added, its launch strength is:
+Base Launch × the target's new Launch Point.
+Base Launch 0 therefore never launches, while 1 uses normal Launch Point strength, 2 doubles it, and 3 triples it.
+
+⸻
+
+25. Remove obsolete tests rather than adapting their old assumptions
+
+The current tests strongly enforce the outgoing architecture, including tests for:
+
+* Low/Mid/High launch levels;
+* numeric baseKnockback;
+* accumulated Knockback bonuses;
+* knockbackGrowth;
+* axis-dependent per-point scaling;
+* additive launch;
+* old Discover Knockback content.
+
+These expectations must be deleted or rewritten.
+
+Do not leave tests that force the implementation to preserve both systems.
+
+⸻
+
+26. Core new Launch-system tests
+
+Create comprehensive tests for the new mechanics.
+
+Launch Point initialization
+
+Assert:
+
+new fighter Launch Point = 0
+
+Damage accumulation
+
+Starting at 0:
+
++5 → 5
++10 → 15
++1 → 16
+
+Verify it is actual received damage/chip damage that gets added.
+
+Damage-before-launch ordering
+
+Start target at:
+
+115 Launch Point
+
+Apply:
+
+damage 5
+Base Launch 1
+
+Assert:
+
+Launch Point after = 120
+launch strength = 120
+
+not 115.
+
+⸻
+
+27. Exact multiplication tests
+
+At target Launch Point 120, directly verify:
+
+Base Launch 0 → 0
+Base Launch 1 → 120
+Base Launch 2 → 240
+Base Launch 3 → 360
+
+Do this using the shared runtime resolver, not a duplicate test-only formula.
+
+Also test another value, for example 37:
+
+0 × 37 = 0
+1 × 37 = 37
+2 × 37 = 74
+3 × 37 = 111
+
+This prevents accidental constants from being introduced.
+
+⸻
+
+28. No hidden launch constants test
+
+Explicitly ensure the formula contains no old velocity contribution.
+
+For Base Launch 1 and Launch Point 120, final raw launch strength must be exactly:
+
+120
+
+not:
+
+260
+600
+620
+800
+120 + some default
+
+For Base Launch 2:
+
+240
+
+exactly.
+
+For Base Launch 3:
+
+360
+
+exactly.
+
+⸻
+
+29. Zero Base Launch regression tests
+
+At several Launch Point values:
+
+0
+1
+50
+120
+500
+1000
+
+a hit with:
+
+baseLaunch: 0
+
+must have zero launch strength.
+
+Test both:
+
+directionalLaunch: null
+
+and, defensively, a non-null direction with Base Launch 0.
+
+No velocity should be introduced by the launch system.
+
+⸻
+
+30. Direction tests
+
+For a positive launch strength such as 120:
+
+Horizontal facing right
+
+vx = +120
+no launch-system vertical velocity
+
+Horizontal facing left
+
+vx = -120
+
+Vertical
+
+vy = -120
+
+because world Y increases downward.
+
+Reverse vertical
+
+vy = +120
+
+Null
+
+No launch velocity is applied.
+
+These direction tests should exercise the shared runtime helper/path.
+
+⸻
+
+31. #0001 move-data tests
+
+Assert the exact authored data:
+
+ground BA1
+damage 5
+Base Launch 1
+Directional Launch horizontal
+ground BA2
+damage 10
+Base Launch 2
+Directional Launch vertical
+mid-air BA1
+damage 5
+Base Launch 2
+Directional Launch vertical
+mid-air BA2
+damage 10
+Base Launch 2
+Directional Launch reverse vertical
+shuriken
+damage 1
+Base Launch 0
+Directional Launch null
+charged BA2 tick
+damage 1
+Base Launch 0
+Directional Launch null
+charged BA2 explosion
+damage 15
+Base Launch 3
+Directional Launch horizontal
+
+Preserve all unrelated timing/hitbox/art expectations in their existing move-specific test suites.
+
+⸻
+
+32. #0001 behavioral examples
+
+Add behavior-level regression tests.
+
+Starting from 115 Launch Point:
+
+BA1
+
++5 damage
+new Launch Point = 120
+1 × 120 = 120
+horizontal launch = 120
+
+BA2
+
+Starting from 110:
+
++10 = 120
+2 × 120 = 240
+upward launch = 240
+
+Mid-air BA1
+
+Starting from 115:
+
++5 = 120
+2 × 120 = 240
+upward launch = 240
+
+Mid-air BA2
+
+Starting from 110:
+
++10 = 120
+2 × 120 = 240
+downward launch = 240
+
+Shuriken
+
+Starting from 119:
+
++1 = 120
+0 × 120 = 0
+no launch
+
+Charged BA2 tick
+
+Starting from 119:
+
++1 = 120
+0 × 120 = 0
+no launch
+
+Charged BA2 explosion
+
+Starting from 105:
+
++15 = 120
+3 × 120 = 360
+horizontal launch = 360
+
+⸻
+
+33. Charged BA2 timing test
+
+Preserve and explicitly verify:
+
+tick interval = 0.5 seconds
+tick damage = 1
+
+Each tick must increase Launch Point by exactly one and apply zero launch.
+
+The delayed explosion must:
+
+1. add 15;
+2. calculate the new Launch Point;
+3. multiply it by 3;
+4. launch horizontally.
+
+The explosion must not use the old bespoke {x:720,y:180} vector.
+
+⸻
+
+34. Projectile integration test
+
+Verify the actual shuriken path:
+
+* projectile hits;
+* projectile disappears as currently designed;
+* target receives 1 Launch Point;
+* target receives normal existing shuriken hitstun/hitstop;
+* launch strength is 0;
+* no horizontal or vertical launch is introduced.
+
+Test this at high Launch Point too.
+
+A target at 500 that gets hit by the shuriken becomes:
+
+501 Launch Point
+
+but is still not launched.
+
+⸻
+
+35. Clone integration
+
+Charged BA1’s clone uses ordinary #0001 attacks through the shared combat path.
+
+Make sure clones automatically use the attacks’ new:
+
+baseLaunch
+directionalLaunch
+
+fields.
+
+Do not create clone-specific Launch calculations.
+
+If the clone performs BA1, its hit uses BA1’s:
+
+damage 5
+Base Launch 1
+horizontal
+
+If another clone path performs another ordinary attack, it should inherit that attack’s authored launch data normally.
+
+⸻
+
+36. Block integration tests
+
+Test at least:
+
+Horizontal blocked hit
+
+* chip damage adds to Launch Point;
+* raw strength is calculated from the new Launch Point;
+* existing horizontal Block reduction is applied afterward.
+
+Vertical blocked hit
+
+* chip damage still adds to Launch Point;
+* no vertical launch is applied.
+
+Reverse-vertical blocked hit
+
+* chip damage still adds to Launch Point;
+* no downward launch is applied.
+
+This proves defense modifies the result rather than reverting to old Knockback logic.
+
+⸻
+
+37. Respawn tests
+
+Verify that a fighter with a nonzero Launch Point who falls into the Void:
+
+* is eliminated normally;
+* awards the opponent’s point normally;
+* enters the existing respawn flow;
+* returns after the existing respawn delay;
+* respawns with:
+
+Launch Point = 0
+
+Do the equivalent Practice reset/respawn assertion.
+
+⸻
+
+38. Discover tests
+
+Rewrite tests/discover.test.mjs.
+
+It should now assert that the sections are:
+
+Power
+Launch
+Conditions
+
+The Launch page should contain generic information for:
+
+Launch Point
+Base Launch
+Directional Launch
+
+Verify the page contains Base Launch values:
+
+0
+1
+2
+3
+
+Verify it describes:
+
+None
+Horizontal
+Vertical
+Reverse vertical
+
+Verify it communicates the formula:
+
+Base Launch × Launch Point
+
+or equivalent text.
+
+Verify it does not contain:
+
+Low
+Mid
+High
+Knockback growth
+accumulated Knockback
+
+And preserve the important existing rule that Discover does not mention any fighter or attack.
+
+Explicitly check that the Launch page does not contain terms such as:
+
+#0001
+BA1
+BA2
+shuriken
+Sphere Rush
+
+⸻
+
+39. Repository-wide obsolete-system regression
+
+Add a targeted source-regression test or equivalent checks to ensure the old architecture cannot quietly return.
+
+Relevant gameplay/data files should no longer contain identifiers such as:
+
+KNOCKBACK_LEVELS
+ACCUMULATED_KNOCKBACK_SCALING
+DEFAULT_KNOCKBACK_GROWTH
+knockbackGrowth
+accumulatedKnockbackAxis
+accumulatedKnockbackBonus
+baseKnockback
+resolveKnockback
+resolveLaunchAxis
+
+Do not make a brittle repository-wide assertion against every English occurrence of the word knockback if unrelated historical text would make that unsafe, but the obsolete engine API must be gone.
+
+⸻
+
+40. Naming consistency
+
+Use these exact gameplay concepts consistently:
+
+Launch Point
+Base Launch
+Directional Launch
+Launch
+
+Recommended JS names:
+
+launchPoint
+baseLaunch
+directionalLaunch
+launchStrength
+finalLaunch
+
+Do not mix in:
+
+damage percentage
+knockback points
+knockback level
+launch level
+power level
+growth
+bonus knockback
+default knockback
+
+unless discussing migration/removal in a test comment.
+
+⸻
+
+41. Do not confuse Base Launch with movement velocity
+
+This architectural distinction is important.
+
+baseLaunch is one of:
+
+0
+1
+2
+3
+
+It is not:
+
+140 px/s
+800 px/s
+{ x: 720, y: 180 }
+
+The resulting velocity magnitude comes from:
+
+baseLaunch × launchPoint
+
+So with Launch Point 120:
+
+baseLaunch 1 = velocity strength 120
+baseLaunch 2 = velocity strength 240
+baseLaunch 3 = velocity strength 360
+
+The direction then determines the velocity axis/sign.
+
+⸻
+
+42. Do not normalize horizontal and vertical strength differently
+
+The old system uses very different horizontal and vertical launch constants.
+
+Remove that concept.
+
+If launch strength is:
+
+240
+
+then:
+
+horizontal → |vx| = 240
+vertical → |vy| = 240
+reverse vertical → |vy| = 240
+
+There is no hidden vertical ×4 or horizontal ×2 scaling.
+
+Directional Launch changes direction only.
+
+It does not change magnitude.
+
+⸻
+
+43. Preserve unrelated gameplay
+
+This pass is specifically a complete rework of the launch/damage-accumulation system.
+
+Do not redesign unrelated systems.
+
+Preserve:
+
+* three-point match win condition;
+* Void elimination;
+* two-second respawns;
+* stage layouts;
+* camera;
+* CPU behavior except where it reads the renamed Launch Point;
+* fighter controls;
+* Dash;
+* stamina;
+* exhaustion;
+* Dodge;
+* Block except its integration with the new Launch calculation;
+* Charge;
+* charged-action cooldowns;
+* cooldown indicators;
+* stamina bar visibility;
+* player-facing behavior;
+* hitboxes;
+* hurtboxes;
+* animation timings;
+* movement;
+* #0001 artwork;
+* shuriken movement/lifetime;
+* clone visuals/behavior;
+* Charged BA2 animation/effect sequencing;
+* Sphere Rush binding/hold behavior;
+* UI styling outside terminology and Discover content.
+
+Do not add:
+
+* DI;
+* weight;
+* launch resistance;
+* rage;
+* launch decay;
+* gravity scaling based on Launch Point;
+* caps;
+* minimum launch;
+* random variation;
+* attack-specific hidden velocity constants;
+* air-dash changes;
+* new attacks.
+
+⸻
+
+44. Expected implementation shape
+
+The finished architecture should be understandable at a glance.
+
+A normal hit should conceptually reduce to:
+
+const damage = resolveDamage(...);
+const launchPointBefore = target.combat.launchPoint;
+target.combat.launchPoint += damage;
+const launchPointAfter = target.combat.launchPoint;
+const launchStrength =
+  def.baseLaunch * launchPointAfter;
+const finalLaunch =
+  directionalLaunchVector(
+    def.directionalLaunch,
+    launchStrength,
+    facing
+  );
+applyVelocity(target, finalLaunch);
+
+with Block modifying the resolved physical launch afterward.
+
+That is the core system.
+
+Do not make it more complicated than necessary.
+
+⸻
+
+45. Acceptance criteria
+
+The work is complete only when all of the following are true:
+
+1. Fighters use Launch Point, not accumulated Knockback.
+2. Every fresh fighter/life starts at 0.
+3. Damage adds directly to Launch Point.
+4. The current hit’s damage is added before its launch is calculated.
+5. Base Launch supports only 0, 1, 2, 3.
+6. Final raw launch strength is exactly:
+
+Base Launch × Launch Point
+
+7. There are no per-axis strength multipliers.
+8. There is no old base velocity added to the result.
+9. Base Launch 0 always causes zero launch.
+10. Directional Launch is separate from Base Launch.
+11. horizontal launches along hit facing.
+12. vertical launches upward.
+13. reverseVertical launches downward.
+14. null causes no launch.
+15. #0001 ground BA1 = damage 5, Base Launch 1, horizontal.
+16. #0001 ground BA2 = damage 10, Base Launch 2, vertical.
+17. #0001 mid-air BA1 = damage 5, Base Launch 2, vertical.
+18. #0001 mid-air BA2 = damage 10, Base Launch 2, reverse vertical.
+19. #0001 shuriken = damage 1, Base Launch 0, null direction.
+20. Charged BA2 ticks = damage 1 every 0.5 s, Base Launch 0, null direction.
+21. Charged BA2 explosion = damage 15, Base Launch 3, horizontal.
+22. The old Low/Mid/High Knockback system is removed.
+23. knockbackGrowth is removed.
+24. baseKnockback vector data is removed.
+25. accumulated-knockback bonus/scaling code is removed.
+26. old CombatState.knockback is replaced with launchPoint.
+27. HUD displays Launch Point.
+28. respawning resets Launch Point to zero.
+29. Discover’s Knockback tab becomes Launch.
+30. Discover explains Launch Point, Base Launch, and Directional Launch.
+31. Discover contains no named fighters or attacks.
+32. README/spec/comments describe only the new model.
+33. Tests enforce the exact multiplication formula and #0001 data.
+34. Existing unrelated gameplay remains working.
+
+Run the complete test suite after the migration and fix every test based on the new intended architecture rather than weakening assertions to accommodate old behavior.
+
+The central rule must remain unmistakable throughout the codebase:
+
+Damage increases the fighter’s Launch Point. A hit’s Base Launch is 0, 1, 2, or 3. After damage is added, launch strength is exactly Base Launch multiplied by the target’s Launch Point, and Directional Launch decides where that strength sends the fighter.
