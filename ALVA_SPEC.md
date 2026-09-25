@@ -450,7 +450,8 @@ A training room, entered straight from Home.
   blocks or dodges; it is otherwise a normal fighter (hurtboxes, real damage
   adding to its own accumulated Knockback, so hits launch it further as it
   builds up, hitstun, hurt animations, knockback, gravity, stage and pushbox
-  collisions, binds, facing its opponent). With it, Player 1 and the CPU are
+  collisions, binds; it keeps its spawn's facing, never turning toward its
+  opponent). With it, Player 1 and the CPU are
   each other's opponent, so clones, projectiles, the Sphere Rush and melee
   target it and the camera frames both. Each hit it takes shows the
   Knockback it added (the CombatSystem's resolved hit event) in red over its
@@ -501,8 +502,8 @@ A training room, entered straight from Home.
   fighter's projectiles, clones and technique, rebinds the HUD, closes both
   overlays and resumes. Back / Esc closes only the dialog and returns focus to
   Change Fighter, leaving the fighter unchanged. A failed load keeps the
-  current fighter and the dialog. A practice CPU stays through the swap, now
-  facing the new fighter.
+  current fighter and the dialog. A practice CPU stays through the swap as
+  it is.
 - **CPU dialog:** Change CPU / Enable CPU opens a second instance of the same
   roster dialog (its own ids and navigation scope), titled Change CPU or
   Select CPU. Confirming loads the fighter, puts it on the CPU spawn
@@ -668,8 +669,14 @@ read the character database, so it stays the same as fighters are added.
   state only: it never changes movement or collision, and a new jump, attack
   or hitstun cuts it short. If those frames fail to load, the fighter holds an
   idle frame without stretching or rotating. Facing flips the sprite (per
-  clip, against that clip's source orientation; see 3) and turns toward the
-  opponent when standing.
+  clip, against that clip's source orientation; see 3). It is manual: only
+  the fighter's own movement (running past a small speed on the ground,
+  steering in the air) and a Dash turn it, a spawn or respawn takes the
+  spawn's `facing`, and otherwise it keeps its last facing. It never turns
+  toward the opponent by itself (the player, the training CPU and the
+  practice dummy alike), so attacks, Throws and the Sphere Rush go the way
+  the fighter already faces. The HUD portraits facing the timer (7.3) are a
+  separate, fixed rule.
 - Hitstun shows Hurt while grounded and Mid-air Hurt while airborne, switching
   to Hurt if the fighter lands still stunned; the pose also holds through the
   impact freeze. Hitstun outranks every other state (charged technique,
@@ -1377,20 +1384,27 @@ read the character database, so it stays the same as fighters are added.
   restart or a rematch. Practice Ground shows none.
 - Fighter status (Canvas, `js/game/fighter-status.js`, drawn by the Arena
   over everything, the Void included, for each fighter in play whose body
-  is on screen, at its interpolated position): a thin **stamina bar** just
-  above the name tag (about the fighter's width, at least 44 CSS px; a black
-  outline, a dark track and a purple fill, `stamina / maxStamina` wide,
-  shrinking from the right; gray instead while exhausted, proportional to
-  what has refilled, purple again at full), and under the feet one row of
-  **CAB1** and **CAB2** rings (Charged BA1, Charged BA2: one per charged
-  action in the character's `chargedActions`), each a white ring with a
-  black outline that fills clockwise from the top as the ability recovers
-  (`progress = 1 − remaining / duration`, read straight from the cooldown
-  state, so Charge visibly speeds it), the seconds left inside it (`4.3`,
-  one decimal, rounded up so it never reads `0.0`) while cooling, and its
-  white `CAB1` / `CAB2` label beneath, all text outlined in black: complete
-  and empty of numbers when ready. No green. A fighter off screen keeps
-  only its edge pointer; one out of play shows none of it.
+  is on screen, at its interpolated position). Both parts are temporary:
+  a thin **stamina bar** just above the name tag, only while stamina is
+  below full (`stamina < maxStamina`; hidden at full, so a fresh or
+  respawned fighter shows none; about the fighter's width, at least 44 CSS
+  px; a black outline, a dark track and a purple fill, `stamina /
+  maxStamina` wide, shrinking from the right; gray instead from the moment
+  it empties and through the whole refill, proportional to what has come
+  back, and gone, never purple, once full), and under the feet a row of
+  **CAB1** / **CAB2** rings (Charged BA1, Charged BA2), one only for each
+  charged action actually cooling down (`chargedCooldowns.active`), in the
+  character's `chargedActions` order: a lone ring centred under the
+  fighter, two side by side, no slot kept for a ready one and nothing at
+  all while both are ready. Each is a white ring with a black outline that
+  fills clockwise from the top as the ability recovers (`progress = 1 −
+  remaining / duration`, read straight from the cooldown state, so Charge
+  visibly speeds it), the seconds left inside it (`4.3`, one decimal,
+  rounded up so it never reads `0.0`), and its white `CAB1` / `CAB2` label
+  beneath, all text outlined in black; it disappears on the step the
+  cooldown ends. No green. With the bar hidden nothing is kept above the
+  tag (`Arena.statusTop`). A fighter off screen keeps only its edge
+  pointer; one out of play shows none of it.
 - Accessibility: the Knockback number sits in a group labelled "Knockback"
   (no maximum); each card carries a screen-reader-only stamina description
   in steps of 5 ("Stamina 75 of 100", "Stamina exhausted, refilling: 40 of

@@ -557,17 +557,17 @@ export class Fighter {
     return (this.body.grounded ? mapping.ground : mapping.air) || null;
   }
 
+  // Facing follows only the fighter's own movement: the way it is running
+  // (once past a small speed on the ground, so a turn does not flicker) or
+  // steering in the air. A Dash sets it as it starts (tryDash); a spawn or
+  // respawn takes the spawn's. Otherwise it keeps its last facing: it never
+  // turns toward its opponent by itself, standing still included, so an
+  // opponent crossing behind it stays behind it. Locked while an attack,
+  // Dodge, stun, bind, charged technique or Dash plays.
   updateFacing(dir) {
     const { body, combat } = this;
     if (combat.attack || combat.defenseAction || combat.stun > 0 || combat.immobilized || this.technique || this.dash) return;
-    if (dir !== 0 && (Math.abs(body.vx) > 20 || !body.grounded)) {
-      this.facing = dir;
-      return;
-    }
-    if (body.grounded && this.opponent && !this.opponent.lostToVoid && dir === 0) {
-      const dx = this.opponent.body.x - body.x;
-      if (Math.abs(dx) > 14) this.facing = sign(dx);
-    }
+    if (dir !== 0 && (Math.abs(body.vx) > 20 || !body.grounded)) this.facing = dir;
   }
 
   // Visual state only: nothing here feeds back into movement or collision.

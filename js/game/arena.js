@@ -13,7 +13,7 @@ import { spawnProjectiles, removeDeadProjectiles } from './projectile.js';
 import { spawnClones, updateClones, removeDeadClones } from './clone.js';
 import { Camera } from './camera.js';
 import { drawFrame, drawCenteredFrame } from './sprite-normalizer.js';
-import { drawStaminaBar, drawCabIndicators, statusOnScreen } from './fighter-status.js';
+import { drawStaminaBar, drawCabIndicators, staminaBarState, statusOnScreen } from './fighter-status.js';
 import { createTheme } from '../stages/index.js';
 
 // Ground ring + name tag tones: the player is white, the CPU a mid gray.
@@ -273,8 +273,8 @@ export class Arena {
     // The status of each fighter in play over everything, the Void
     // included, so it stays readable near its edge: name tags (or the
     // off-screen pointers), then each on-screen fighter's stamina bar over
-    // its tag and its CAB1 / CAB2 cooldowns under its feet. A fighter out
-    // of play shows none of it.
+    // its tag while below full and its CAB1 / CAB2 cooldowns under its feet
+    // while cooling down. A fighter out of play shows none of it.
     this.drawMarkers(fighters);
     this.drawStatus(fighters);
     if (this.debug) this.drawDebug();
@@ -385,10 +385,10 @@ export class Arena {
     return this.markerAnchor(f)[1] - this.markerFont * 1.25;
   }
 
-  // `f`'s stamina bar, in device pixels: { x, y, w, h } (y its top), just
-  // over its name tag. Compact: about the fighter's width at this zoom
-  // (roughly 45-60 px on a desktop screen), never narrower than 44 CSS px
-  // or thinner than 4.
+  // Where `f`'s stamina bar goes when it shows, in device pixels: { x, y,
+  // w, h } (y its top), just over its name tag. Compact: about the
+  // fighter's width at this zoom (roughly 45-60 px on a desktop screen),
+  // never narrower than 44 CSS px or thinner than 4.
   staminaBarRect(f) {
     const { scale: s, dpr } = this.view;
     const [x] = this.markerAnchor(f);
@@ -398,14 +398,17 @@ export class Arena {
     return { x: Math.round(x - w / 2), y: Math.round(this.markerTop(f) - gap - h), w, h };
   }
 
-  // The highest point of what is drawn over `f` (the top of its stamina
-  // bar's outline). Practice Ground floats its damage numbers from here.
+  // The highest point of what is drawn over `f`: the top of its stamina
+  // bar's outline while the bar shows, else the top of its name tag, so no
+  // room is kept for a hidden bar. Practice Ground floats its damage numbers
+  // from here.
   statusTop(f) {
-    return this.staminaBarRect(f).y - 1;
+    return staminaBarState(f).visible ? this.staminaBarRect(f).y - 1 : this.markerTop(f);
   }
 
   // Stamina bars and CAB cooldowns, for the fighters whose body is on
-  // screen: an off-screen fighter only gets its edge pointer.
+  // screen: an off-screen fighter only gets its edge pointer. Each draws
+  // only while it has something to show (see js/game/fighter-status.js).
   drawStatus(fighters = this.inPlay) {
     const { ctx, view } = this;
     for (const f of fighters) {

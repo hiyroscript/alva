@@ -726,7 +726,6 @@ test('BA2 misses an opponent out of reach or behind the attacker', () => {
     for (const air of [false, true]) {
       const { attacker, target, tick, until, events } = duel({ gap });
       attacker.facing = 1;
-      attacker.opponent = null; // keep facing right even with the target behind
       if (air) {
         tick(JUMP, JUMP);
         until(() => attacker.body.vy > -600);

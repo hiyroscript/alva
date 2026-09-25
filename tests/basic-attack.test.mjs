@@ -446,7 +446,6 @@ test('BA1 misses an opponent out of reach or behind the attacker', () => {
   for (const gap of [70, -44]) {
     const { attacker, target, tick, events } = duel({ gap });
     attacker.facing = 1;
-    attacker.opponent = null; // keep facing right even with the target behind
     tick(BA1);
     while (attacker.combat.attack) tick();
     assert.equal(events.length, 0, `gap ${gap}`);

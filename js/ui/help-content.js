@@ -75,8 +75,8 @@ export function buildHelp() {
         el('li', { text: 'Left / Right accelerate into a run. Release to slow to a stop.' }),
         el('li', { text: 'Jump from the ground; you can steer while airborne.' }),
         el('li', { text: 'Press the same direction twice quickly (Right, Right or Left, Left) on the ground to Dash: a short, fast burst that way. It only moves you: it never hits, and a ledge or a wall ends it.' }),
-        el('li', { text: 'The purple bar above your fighter is stamina. Dash and Dodge each cost a quarter of it, and it refills by itself, faster while you hold Charge. Empty it and it turns gray: no Dash or Dodge until it is completely full again. Running, jumping and attacking never cost stamina.' }),
-        el('li', { text: 'Standing still, your fighter turns to face the opponent.' }),
+        el('li', { text: 'The purple bar above your fighter is stamina; it shows only while it is not full. Dash and Dodge each cost a quarter of it, and it refills by itself, faster while you hold Charge. Empty it and it turns gray: no Dash or Dodge until it is completely full again. Running, jumping and attacking never cost stamina.' }),
+        el('li', { text: 'Your fighter faces the way it last moved or dashed, and keeps that facing when it stops: it never turns toward the opponent by itself.' }),
       ]),
     ]),
     card('Charge & cooldowns', [
@@ -88,7 +88,7 @@ export function buildHelp() {
         el('li', { text: 'Hold Charge first, then press BA1 to summon a clone behind the opponent (the Clone Attack). The clone appears in a cloud of smoke, performs BA1 and disappears, while #0001 keeps charging for as long as you hold Charge. With no ground behind the opponent (a platform edge, or in the air), it appears above the opponent and performs Mid-air BA2 instead.' }),
         el('li', { text: 'Hold Charge first, then press BA2 for the Sphere Rush: #0001 forms a blue sphere in his hand, and only once it is complete does he dash forward with it. The rush must connect: a miss stops him and he lets the sphere go, with no explosion. A hit traps the opponent in the spinning sphere, adding 1 Knockback every half second while it grows bigger and bigger until, about two seconds later, it explodes for 15 more and a strong sideways launch. You can let go of Charge once it starts.' }),
         el('li', { text: 'The Sphere Rush needs ground under #0001 from start to finish: losing it (running off an edge mid-rush, for instance) cancels the technique, frees the opponent and #0001 falls. A hit on #0001 cancels it too.' }),
-        el('li', { text: 'Each charged move has its own 5-second cooldown, shown as a white ring under your fighter: CAB1 for Charged BA1, CAB2 for Charged BA2. It starts the moment the move is used, hit or miss. While it is cooling down, the charged press does nothing. Charging makes both cooldowns recover twice as fast, and refills your stamina faster too.' }),
+        el('li', { text: 'Each charged move has its own 5-second cooldown, shown while it counts down as a white ring under your fighter: CAB1 for Charged BA1, CAB2 for Charged BA2. It starts the moment the move is used, hit or miss. While it is cooling down, the charged press does nothing. Charging makes both cooldowns recover twice as fast, and refills your stamina faster too.' }),
       ]),
     ]),
     card('Throw', [

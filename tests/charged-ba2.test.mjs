@@ -1509,8 +1509,8 @@ test('facing is snapshotted: right rushes right, left rushes left, and an oppone
   left.until(() => left.attacker.technique?.phase === 'dash');
   assert.ok(left.attacker.body.vx < 0);
 
-  // Standing still, #0001 would turn to face an opponent behind him; during
-  // the technique he never does, and the rush goes the original way.
+  // An opponent crossing behind never turns #0001, during the technique or
+  // after it, and the rush goes the original way.
   const d = duel({ gap: 200 });
   const t = start(d);
   d.target.body.x = 300;
@@ -1521,7 +1521,7 @@ test('facing is snapshotted: right rushes right, left rushes left, and an oppone
   assert.ok(d.attacker.body.x > 700, 'rushed right, away from the opponent');
   assert.equal(t.endReason, 'miss');
   d.tick();
-  assert.equal(d.attacker.facing, -1, 'free again, it turns as usual');
+  assert.equal(d.attacker.facing, 1, 'free again, it still faces the way it rushed');
 });
 
 test('a solid wall stops the rush: no pass-through, no hit behind it, and #0001 releases against it like a miss', () => {
