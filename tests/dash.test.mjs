@@ -67,14 +67,20 @@ test('the two dash frames live in #0001\'s folder, are registered as a one-shot 
   assert.match(source, /const DASH_FPS = 10;/);
 });
 
-test('movement data: dashSpeed about 1.8x the top speed, a 0.22 s double-tap window; the top speed itself untouched', () => {
+test('movement data: dashSpeed 900 (about 2.7x the top speed) for about 180 units, a 0.22 s double-tap window; the top speed itself untouched', () => {
   assert.equal(def.movement.dashTapWindow, 0.22);
-  assert.equal(def.movement.dashSpeed, 600);
+  assert.equal(def.movement.dashSpeed, 900);
   const ratio = def.movement.dashSpeed / getMaxSpeed(def);
-  assert.ok(ratio >= 1.6 && ratio <= 1.9, `${ratio}`);
+  assert.ok(ratio >= 2.6 && ratio <= 2.8, `${ratio}`);
   const { fighter } = makeFighter();
   assert.equal(fighter.maxSpeed, getMaxSpeed(def));
   near(fighter.dashDuration, 0.2, 'one pass of the clip');
+  // The clip's length never changed: the extra reach is all speed.
+  assert.equal(DASH_STEPS, 12);
+  const reach = def.movement.dashSpeed * fighter.dashDuration;
+  assert.ok(reach >= 170 && reach <= 180, `about 180 units, half as far again as the old 120: ${reach}`);
+  assert.notEqual(def.movement.dashSpeed, def.chargedTechniques.rasenRush.dashSpeed, 'the Sphere Rush has its own');
+  assert.equal(def.chargedTechniques.rasenRush.dashSpeed, 1050);
 });
 
 // ---- Input ---------------------------------------------------------------------------
@@ -416,7 +422,8 @@ test('a Dash spends 15 exactly once as it starts, and bursts at dashSpeed for on
     n++;
   }
   assert.equal(n, DASH_STEPS + 1, 'over after one pass of the clip');
-  near(x1 - x0, def.movement.dashSpeed * DT * DASH_STEPS, 'straight along the ground: 120 units in all');
+  near(x1 - x0, def.movement.dashSpeed * DT * DASH_STEPS, 'straight along the ground');
+  near(x1 - x0, 180, 'about 180 units in all');
   assert.ok(fighter.body.vx < def.movement.dashSpeed, 'then the normal movement slows it');
   assert.equal(fighter.grounded, true);
   // No top speed was changed on the way.

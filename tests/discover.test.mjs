@@ -1,11 +1,11 @@
 // Run with node --test tests/discover.test.mjs (no dependencies).
 // Discover: its registration, Home → Discover → Back through the real
-// ScreenManager, the Power / Launch / Conditions tabs, the Power page built
+// ScreenManager, the Power / Launch / Passives tabs, the Power page built
 // from the Power registry alone (Jump Power and Speed Power), the Launch page
 // built from the launch registry alone (Launch Point, the Base Launch values
 // 0-3 and their formula, and every Directional Launch), both with no tuning
 // numbers and no fighter, attack or character information of any kind, the
-// intentionally empty Conditions page, and
+// intentionally empty Passives page, and
 // keyboard / gamepad menu navigation through the real MenuNavigator, on a
 // minimal fake DOM. Layout and paint still need real-browser verification.
 import test from 'node:test';
@@ -284,8 +284,8 @@ test('Esc, Backspace and gamepad Back leave Discover for Home', () => {
 
 test('every visit opens on Power, whatever the last one left open', () => {
   const { app, home, discover } = boot();
-  const { power, launch, conditions } = sectionsOf(discover);
-  for (const last of [launch, conditions]) {
+  const { power, launch, passives } = sectionsOf(discover);
+  for (const last of [launch, passives]) {
     home.el.querySelectorAll('.home-action')[2].click();
     last.tab.click();
     assert.deepEqual(selected(discover), [last.id]);
@@ -294,23 +294,23 @@ test('every visit opens on Power, whatever the last one left open', () => {
     assert.deepEqual(selected(discover), ['power']);
     assert.equal(power.panel.hidden, false);
     assert.equal(launch.panel.hidden, true);
-    assert.equal(conditions.panel.hidden, true);
+    assert.equal(passives.panel.hidden, true);
     app.screens.back();
   }
 });
 
 // ---- Tabs -----------------------------------------------------------------------
 
-test('Power, Launch and Conditions are real, labelled tabs; Power is selected by default', () => {
+test('Power, Launch and Passives are real, labelled tabs; Power is selected by default', () => {
   const { app, home, discover } = boot();
   home.el.querySelectorAll('.home-action')[2].click();
   const rail = discover.el.querySelector('.discover-rail');
   assert.equal(rail.getAttribute('role'), 'tablist');
   assert.equal(rail.getAttribute('aria-label'), 'Discover sections');
   assert.equal(rail.getAttribute('aria-orientation'), 'vertical');
-  assert.deepEqual(rail.children, discover.sections.map((s) => s.tab), 'Power, then Launch, then Conditions');
+  assert.deepEqual(rail.children, discover.sections.map((s) => s.tab), 'Power, then Launch, then Passives');
   assert.deepEqual(discover.sections.map((s) => [s.id, s.tab.textContent]), [
-    ['power', 'Power'], ['launch', 'Launch'], ['conditions', 'Conditions'],
+    ['power', 'Power'], ['launch', 'Launch'], ['passives', 'Passives'],
   ]);
 
   for (const { id, tab, panel } of discover.sections) {
@@ -324,13 +324,22 @@ test('Power, Launch and Conditions are real, labelled tabs; Power is selected by
     assert.equal(panel.getAttribute('aria-labelledby'), tab.id);
     assert.equal(panel.getAttribute('tabindex'), '0');
     assert.equal(panel.id, `discover-panel-${id}`);
+    assert.equal(tab.id, `discover-tab-${id}`);
   }
-  const { power, launch, conditions } = sectionsOf(discover);
+  // The third section was Conditions: renamed through and through, no id
+  // or label of it left.
+  assert.doesNotMatch(text(discover.el), /condition/i);
+  for (const { id, tab, panel } of discover.sections) {
+    for (const s of [id, tab.id, panel.id, tab.getAttribute('aria-controls'), tab.textContent]) {
+      assert.doesNotMatch(s, /condition/i, s);
+    }
+  }
+  const { power, launch, passives } = sectionsOf(discover);
   assert.equal(power.tab.getAttribute('aria-selected'), 'true');
   assert.equal(power.tab.classList.contains('is-active'), true);
   assert.equal(power.tab.getAttribute('tabindex'), '0');
   assert.equal(power.panel.hidden, false);
-  for (const other of [launch, conditions]) {
+  for (const other of [launch, passives]) {
     assert.equal(other.tab.getAttribute('aria-selected'), 'false');
     assert.equal(other.tab.classList.contains('is-active'), false);
     assert.equal(other.tab.getAttribute('tabindex'), '-1', 'roving tabindex');
@@ -339,27 +348,27 @@ test('Power, Launch and Conditions are real, labelled tabs; Power is selected by
   assert.deepEqual(app.nav.candidates(discover.el).filter((c) => c.getAttribute('role') === 'tabpanel'), [power.panel]);
 });
 
-test('Launch and Conditions are selectable by click and by focus; a hidden page takes no focus', () => {
+test('Launch and Passives are selectable by click and by focus; a hidden page takes no focus', () => {
   const { app, home, discover } = boot();
   home.el.querySelectorAll('.home-action')[2].click();
-  const { power, launch, conditions } = sectionsOf(discover);
+  const { power, launch, passives } = sectionsOf(discover);
 
   launch.tab.click();
   assert.deepEqual(selected(discover), ['launch']);
   assert.equal(launch.tab.getAttribute('tabindex'), '0');
   assert.equal(launch.panel.hidden, false);
   assert.equal(power.panel.hidden, true);
-  assert.equal(conditions.panel.hidden, true);
+  assert.equal(passives.panel.hidden, true);
 
-  conditions.tab.click();
-  assert.deepEqual(selected(discover), ['conditions']);
-  assert.equal(conditions.tab.getAttribute('tabindex'), '0');
+  passives.tab.click();
+  assert.deepEqual(selected(discover), ['passives']);
+  assert.equal(passives.tab.getAttribute('tabindex'), '0');
   assert.equal(power.tab.getAttribute('tabindex'), '-1');
-  assert.equal(conditions.panel.hidden, false);
+  assert.equal(passives.panel.hidden, false);
   assert.equal(power.panel.hidden, true);
   const candidates = app.nav.candidates(discover.el);
   assert.ok(!candidates.includes(power.panel), 'the hidden Power page is out of navigation');
-  assert.ok(candidates.includes(conditions.panel));
+  assert.ok(candidates.includes(passives.panel));
   const before = document.activeElement;
   power.panel.focus();
   assert.equal(document.activeElement, before, 'the hidden Power page cannot take focus');
@@ -368,12 +377,12 @@ test('Launch and Conditions are selectable by click and by focus; a hidden page 
   launch.tab.focus();
   assert.deepEqual(selected(discover), ['launch']);
   assert.equal(launch.panel.hidden, false);
-  assert.equal(conditions.panel.hidden, true);
+  assert.equal(passives.panel.hidden, true);
   power.tab.focus();
   assert.deepEqual(selected(discover), ['power']);
   assert.equal(power.panel.hidden, false);
   assert.equal(launch.panel.hidden, true);
-  assert.equal(conditions.panel.hidden, true);
+  assert.equal(passives.panel.hidden, true);
 });
 
 // ---- Power ------------------------------------------------------------------------
@@ -591,17 +600,17 @@ test('the Power and Launch pages stay the same as the roster grows', () => {
   }
 });
 
-// ---- Conditions ---------------------------------------------------------------
+// ---- Passives -----------------------------------------------------------------
 
-test('Conditions is intentionally empty: no cards, placeholder or invented copy', () => {
+test('Passives is intentionally empty: no cards, placeholder or invented copy', () => {
   const { home, discover } = boot();
   home.el.querySelectorAll('.home-action')[2].click();
-  const { conditions } = sectionsOf(discover);
-  conditions.tab.click();
-  assert.equal(conditions.panel.hidden, false);
-  assert.deepEqual(conditions.panel.children, []);
-  assert.equal(conditions.panel.textContent, '');
-  assert.equal(conditions.panel.innerHTML, '');
+  const { passives } = sectionsOf(discover);
+  passives.tab.click();
+  assert.equal(passives.panel.hidden, false);
+  assert.deepEqual(passives.panel.children, []);
+  assert.equal(passives.panel.textContent, '');
+  assert.equal(passives.panel.innerHTML, '');
   const source = readFileSync(new URL('../js/screens/discover-screen.js', import.meta.url), 'utf8');
   assert.doesNotMatch(source, /coming soon/i);
   assert.doesNotMatch(text(discover.el), /coming soon|placeholder|tbd/i);
@@ -613,7 +622,7 @@ test('keyboard and gamepad reach Discover from Home and every control on it (wid
   const { app, home, discover, plays } = boot();
   layOutHome(home);
   layOutWide(discover);
-  const { power, launch, conditions } = sectionsOf(discover);
+  const { power, launch, passives } = sectionsOf(discover);
   const back = discover.el.querySelector('.btn-back');
 
   // Home: Play → Practice Ground → Discover, then confirm (J / A).
@@ -628,8 +637,8 @@ test('keyboard and gamepad reach Discover from Home and every control on it (wid
   assert.equal(document.activeElement, launch.tab);
   assert.deepEqual(selected(discover), ['launch']);
   app.input.key('ArrowDown');
-  assert.equal(document.activeElement, conditions.tab);
-  assert.deepEqual(selected(discover), ['conditions']);
+  assert.equal(document.activeElement, passives.tab);
+  assert.deepEqual(selected(discover), ['passives']);
   app.input.key('ArrowUp');
   assert.equal(document.activeElement, launch.tab);
   assert.deepEqual(selected(discover), ['launch']);
@@ -697,13 +706,13 @@ test('narrow layout: the rail runs across the top and arrows follow it', () => {
     layOutNarrow(discover);
     home.el.querySelectorAll('.home-action')[2].click();
     assert.equal(discover.el.querySelector('.discover-rail').getAttribute('aria-orientation'), 'horizontal');
-    const { power, launch, conditions } = sectionsOf(discover);
+    const { power, launch, passives } = sectionsOf(discover);
     app.input.key('ArrowRight');
     assert.equal(document.activeElement, launch.tab);
     assert.deepEqual(selected(discover), ['launch']);
     app.input.key('ArrowRight');
-    assert.equal(document.activeElement, conditions.tab);
-    assert.deepEqual(selected(discover), ['conditions']);
+    assert.equal(document.activeElement, passives.tab);
+    assert.deepEqual(selected(discover), ['passives']);
     app.input.key('ArrowLeft');
     app.input.key('ArrowLeft');
     assert.equal(document.activeElement, power.tab);

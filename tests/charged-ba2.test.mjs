@@ -388,8 +388,9 @@ test('the Sphere Rush data: 1050 dash, a contact that only binds, +1 every 0.5 s
   assert.equal(TECH.explosionAnimation, 'rasenExplosion');
   assert.equal(TECH.releaseAnimation, 'rasenRelease');
   assert.equal(TECH.whiffReleaseAnimation, 'rasenWhiffRelease');
-  // The sphere on the target grows: visibly, never absurdly, never shrinking.
-  assert.deepEqual(TECH.sphereGrowth, { startScale: 1, endScale: 1.4 });
+  // The sphere on the target grows dramatically, from its own size to three
+  // times it by the blast, never shrinking.
+  assert.deepEqual(TECH.sphereGrowth, { startScale: 1, endScale: 3 });
   assert.equal(TECH.sphereBuild, 'rasenSphereBuild');
   assert.equal(TECH.sphereImpact, 'rasenSphereImpact');
   assert.equal(TECH.sphereExplosion, 'rasenSphereExplosion');
@@ -802,13 +803,18 @@ test('the sphere on the target grows steadily through the rasen8 hold, from star
   const early = hold[0].scale;
   const mid = hold[Math.floor(hold.length / 2)].scale;
   const late = hold.at(-1).scale;
+  // Steady: the same increment every step, never a shrink, a jump or a pulse.
+  const step = (endScale - startScale) / hold.length;
+  assert.ok(step > 0 && step < 0.05, `small fixed steps, never a jump between sizes: ${step}`);
+  for (let i = 1; i < hold.length; i++) {
+    assert.ok(hold[i].scale > hold[i - 1].scale, `growing at step ${i}`);
+    assert.ok(close(hold[i].scale - hold[i - 1].scale, step, 1e-9), `step ${i}`);
+  }
   assert.ok(close(early, startScale), 'the hold starts at the sphere\'s own size');
   assert.ok(early < mid && mid < late && late < endScale, `${early} < ${mid} < ${late} < ${endScale}`);
-  assert.ok(close(mid, (startScale + endScale) / 2, 0.01), 'about halfway grown halfway through the hold');
-  assert.ok(late > endScale - 0.01, 'all but full size just before the blast');
-  // Steady: the same increment every step, never a shrink or a pulse.
-  const step = (endScale - startScale) / hold.length;
-  for (let i = 1; i < hold.length; i++) assert.ok(close(hold[i].scale - hold[i - 1].scale, step, 1e-9), `step ${i}`);
+  assert.ok(close(mid, (startScale + endScale) / 2, step), 'about halfway grown halfway through the hold');
+  assert.ok(close(late, endScale - step, 1e-9), 'one step short of full size just before the blast');
+  assert.ok(mid > 1.9 && late > 2.9, `much bigger, not a subtle swell: ${mid} halfway, ${late} at the end`);
   // The blast bursts at the full size.
   assert.equal(log.at(-1).phase, 'explode');
   assert.equal(log.at(-1).scale, endScale);
@@ -826,6 +832,68 @@ test('the sphere on the target grows steadily through the rasen8 hold, from star
     scales.push(u.sphereScale);
   }
   assert.deepEqual(scales, log.map((s) => s.scale));
+});
+
+test('the growth is visual only: a sphere growing to 3x reaches, hits, binds, ticks, blasts and launches exactly like one that never grows', () => {
+  const { startScale, endScale } = TECH.sphereGrowth;
+  assert.ok(endScale >= 2.75, `the dramatic growth is what is under test: ${endScale}`);
+  const flatDef = { ...def, chargedTechniques: { rasenRush: { ...TECH, sphereGrowth: { startScale, endScale: startScale } } } };
+  const flat = makeFighter({ character: flatDef }).fighter.techniqueDefs.rasenRush;
+  assert.deepEqual({ ...flat.sphereGrowth }, { startScale, endScale: startScale });
+  const hitboxBefore = { ...TECH.sphereHitbox };
+  // One whole Sphere Rush at `gap`, then the flight: every step's owner and
+  // target, the rush's contact box and every hit, all but the drawn scale.
+  const run = (gap, grow) => {
+    const d = hitDuel({ gap });
+    if (!grow) d.attacker.techniqueDefs.rasenRush = flat;
+    const t = start(d);
+    const log = [];
+    const scales = [];
+    for (let i = 0; i < 600 && (d.attacker.technique || i < 30); i++) {
+      d.tick();
+      const { sphereScale, ...owner } = snap(d.attacker);
+      scales.push(sphereScale);
+      const box = t.sphereHitbox();
+      const tb = d.target.body;
+      log.push({
+        owner, box: box && { ...box },
+        target: [tb.x, tb.y, tb.vx, tb.vy, d.target.state, d.target.combat.launchPoint, d.target.combat.isBoundBy(t)],
+        cooldown: d.attacker.combat.cooldowns.get('action2') ?? null,
+      });
+    }
+    const events = d.events.map((e) => ({
+      type: e.type, move: e.move, damage: e.damage, baseLaunch: e.baseLaunch, directionalLaunch: e.directionalLaunch,
+      launchStrength: e.launchStrength, finalLaunch: { ...e.finalLaunch }, launchPointAfter: e.launchPointAfter,
+    }));
+    return { log, events, scales, endReason: t.endReason };
+  };
+  // The first-hit range: the nearest gap (in 10s) the grown rush misses from.
+  let edge = 140;
+  while (run(edge, true).events.length) {
+    edge += 10;
+    assert.ok(edge < 1000, 'the rush has a limit');
+  }
+  // A catch, the last catch before that edge and the first miss past it:
+  // the same either way.
+  for (const gap of [140, edge - 10, edge]) {
+    const grown = run(gap, true);
+    const plain = run(gap, false);
+    assert.deepEqual(grown.log, plain.log, `gap ${gap}: the same every step, the contact box included`);
+    assert.deepEqual(grown.events, plain.events, `gap ${gap}: the same hits, damage and launch`);
+    assert.equal(grown.endReason, plain.endReason);
+    // The dash's box is exactly the authored one, never scaled.
+    const boxes = grown.log.map((s) => s.box).filter(Boolean);
+    assert.ok(boxes.length > 0, 'it searched for contact');
+    for (const box of boxes) assert.deepEqual([box.w, box.h], [TECH.sphereHitbox.w, TECH.sphereHitbox.h]);
+    if (gap < edge) {
+      assert.deepEqual(grown.events.map((e) => [e.type, e.damage]), FULL_RUSH);
+      assert.ok(Math.max(...grown.scales.filter((v) => v !== null)) === endScale, 'this one did grow');
+      assert.ok(plain.scales.every((v) => v === null || v === startScale), 'that one never did');
+    } else {
+      assert.deepEqual(grown.events, [], 'out of reach either way');
+    }
+  }
+  assert.deepEqual({ ...TECH.sphereHitbox }, hitboxBefore, 'the authored box itself untouched');
 });
 
 test('the attached sphere frame is a pure function of the time since the hit (deterministic at 60 Hz)', () => {
@@ -1923,7 +1991,8 @@ test('Battle draws the sphere over both fighters, in the hand then on the target
     '0001_prasen8.png', '0001_prasen9.png', '0001_prasen7.png',
   ]);
   assert.ok(widths.every((w, i) => i === 0 || w >= widths[i - 1]), 'never shrinks');
-  assert.ok(widths.at(-1) > base * 1.3, `grown: ${base} -> ${widths.at(-1)} px`);
+  assert.equal(widths[0], base, 'caught at its own size');
+  assert.ok(widths.at(-1) > base * 2.5, `grown dramatically: ${base} -> ${widths.at(-1)} px`);
   // The blast: rasen9 with the lighter prasen10, at the grown size, then
   // prasen11 still on rasen9.
   assert.deepEqual(draws().slice(1), [EXPLOSION_POSE, '0001_prasen10.png']);

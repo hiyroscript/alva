@@ -5,7 +5,9 @@
 // ring instead of a solid region, so the fighter stays in plain view:
 //
 //   a barely-there black interior, behind the fighter's sprite
-//   a black wavy rim, in front of it, with a thin red line on its inner side
+//   a black wavy rim, in front of it, with a thin red line on its outer side
+//
+// so from the fighter outward it reads interior, black boundary, red edge.
 //
 // Art only. The circle is sized from the character's stable visual height
 // (never the frame on screen, so it does not pulse between poses) and
@@ -25,14 +27,15 @@ export const SHIELD_STYLE = Object.freeze({
 });
 
 // The circle's shape: `radius` of the character's visual height, its
-// perimeter leaning out and in by at most `amp` of the radius. Whole-number
-// wave counts round the circle (`k`) so it always closes, drifting slowly
-// (`speed`, radians per second): a subtle, living edge, never a pulse or a
-// spike. Traced at `points` points.
+// perimeter leaning out and in by at most `amp` of the radius, enough to
+// read as clearly wavy in play, like the Void's edge. Whole-number wave
+// counts round the circle (`k`) so it always closes and its mean radius
+// never changes, drifting slowly (`speed`, radians per second): a living
+// edge, never a pulse or a spike. Traced at `points` points.
 export const SHIELD_SHAPE = Object.freeze({
   radius: 0.62,
-  amp: 0.045,
-  points: 48,
+  amp: 0.1,
+  points: 96,
   waves: [[5, 0.8, 0.6], [8, -0.6, 0.4]], // [k, speed, weight]
 });
 
@@ -95,9 +98,11 @@ export function drawShield(ctx, fighter, view, layer, time = 0, reducedMotion = 
     ctx.lineWidth = SHIELD_STYLE.rimWidth * px;
     ctx.strokeStyle = SHIELD_STYLE.rim;
     ctx.stroke();
-    // The red line on the rim's inner side, on the same waves.
-    const inset = ((SHIELD_STYLE.rimWidth - SHIELD_STYLE.accentWidth) / 2) * px;
-    trace(ctx, shieldOutline(x, y, radius - inset, time, reducedMotion));
+    // The red line on the rim's outer side, on the same waves: pushed out
+    // so it covers the outermost accentWidth of the black, flush with its
+    // outer edge, never a red ring inside it round the fighter.
+    const outset = ((SHIELD_STYLE.rimWidth - SHIELD_STYLE.accentWidth) / 2) * px;
+    trace(ctx, shieldOutline(x, y, radius + outset, time, reducedMotion));
     ctx.lineWidth = SHIELD_STYLE.accentWidth * px;
     ctx.strokeStyle = SHIELD_STYLE.accent;
     ctx.stroke();

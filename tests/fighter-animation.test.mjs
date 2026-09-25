@@ -132,7 +132,7 @@ test('movement, collider and hurtbox data are unchanged', () => {
     airAcceleration: 1500, airDeceleration: 420, gravityScale: 1,
     maxFallSpeed: 1500, coyoteTime: 0.08, jumpBuffer: 0.12, dropThroughTime: 0.28,
     // The Dash's own two (see dash.test.mjs); the top speed stays Speed Power's.
-    dashSpeed: 600, dashTapWindow: 0.22,
+    dashSpeed: 900, dashTapWindow: 0.22,
   });
   assert.deepEqual(def.powers, { jump: 2, speed: 2 });
   assert.equal(getJumpVelocity(def), 920, 'Jump Power 2 is the original jump');

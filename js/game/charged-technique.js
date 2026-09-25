@@ -18,7 +18,7 @@
 //       cooldown: 5, dashSpeed: 1050,
 //       handOffsets: { rasenForm: [{ x, y }, ...], rasenDash: [...] },
 //       sphereHitbox: { x: -24, y: -24, w: 48, h: 48 }, targetOffset: { x: 0, y: -48 },
-//       explosionDelay: 2.0, sphereGrowth: { startScale: 1, endScale: 1.4 },
+//       explosionDelay: 2.0, sphereGrowth: { startScale: 1, endScale: 3 },
 //       firstHit: { damage: 0, ... }, tickInterval: 0.5, tickHit: { damage: 1, ... },
 //       explosionHit: { damage: 15, ... },
 //     },

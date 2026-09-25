@@ -263,7 +263,7 @@ fit the palette.
 ```
 Splash → Home → Select Mode → Select Fighter → Select Stage → Battle
 Home → Practice Ground (starts at once with #0001 and a #0001 practice CPU)
-Home → Discover (Power / Launch / Conditions reference; Back returns Home)
+Home → Discover (Power / Launch / Passives reference; Back returns Home)
 Practice Ground → More → Change Fighter (roster dialog) / Change CPU, or Enable CPU once disabled (CPU roster dialog → Disable CPU) / Return (Home)
 Battle → Pause → Resume / Restart / Return to Home (confirmed); Help is shown but disabled for now
 Battle (a fighter falls into the Void) → the opponent scores a point → that fighter respawns 2 s later; the fight goes on
@@ -546,7 +546,7 @@ read the character database, so it stays the same as fighters are added.
   "Back") and the title **Discover**. Back, Esc / Backspace and gamepad B
   return Home.
 - **Rail:** exactly three sections, **POWER**, **LAUNCH** then
-  **CONDITIONS**, as a
+  **PASSIVES** (ids `power`, `launch`, `passives`), as a
   `tablist` of real buttons (`tab`, `aria-selected`, `aria-controls`, roving
   tabindex; each page a focusable `tabpanel`). Every visit opens on Power.
   The open section wears a green bar on its leading edge, a faint green wash
@@ -605,8 +605,8 @@ read the character database, so it stays the same as fighters are added.
   constants are shown on either page, and there is no fighter list, "Used
   by" label or ownership highlighting. On short landscape windows the
   entries and rows tighten so a page's entries scroll by in a few steps.
-- **Conditions:** intentionally empty — no cards, placeholder or "coming
-  soon" copy — until a Conditions system exists. The section is fully
+- **Passives:** intentionally empty — no cards, placeholder or "coming
+  soon" copy — until a passives registry exists. The section is fully
   selectable and accessible.
 - A new Power type appears here once it is added to `POWERS`, with no
   change to the screen.
@@ -928,14 +928,20 @@ read the character database, so it stays the same as fighters are added.
   fighter, drawn procedurally on the battle canvas (no PNG), kin to the
   Void: a barely-there black interior (`rgba(0, 0, 0, 0.16)`) drawn behind
   the fighter's sprite, then in front of it a black wavy rim (3.5 CSS px)
-  with a thin red line (`#d21f2b`, 1.25 CSS px) on its inner side, both on
-  the same waves. Its centre is the fighter's body middle (half the
-  character's `visual.height` over the interpolated feet) and its mean
+  with a thin red line (`#d21f2b`, 1.25 CSS px) on its outer side, both on
+  the same waves: the red is traced (1.125 CSS px) further out than the
+  black, so it covers the black's outermost 1.25 px, flush with its outer
+  edge. From the fighter outward it reads interior, black boundary, red
+  edge; there is never a red ring inside the black. Its centre is the
+  fighter's body middle (half the character's `visual.height` over the
+  interpolated feet) and its mean
   radius 0.62 × that height (≈55 units for #0001), so it surrounds head and
   feet whatever frame is on screen. The perimeter leans in and out by at
-  most 4.5 % of the radius, a sum of two whole-number sine waves round the
-  circle (so it always closes) drifting slowly; with reduced motion it
-  holds a still, wavy shape. It is drawn only while the Shield is up, under
+  most 10 % of the radius (`SHIELD_SHAPE.amp` 0.1), a sum of two
+  whole-number sine waves round the circle (so it always closes and its
+  mean radius never changes: it wavers like the Void's edge, never pulses)
+  drifting slowly on the Arena's effects clock, traced at 96 points so the
+  curve stays smooth; with reduced motion it holds a still, wavy shape. It is drawn only while the Shield is up, under
   the Void, name tags and status, and never used by collision. The debug
   overlay labels a shielding fighter `shield`; its hurtboxes are drawn as
   usual.
@@ -973,10 +979,10 @@ read the character database, so it stays the same as fighters are added.
   once at `DASH_FPS` 10; without it the Dash is refused and logged, never
   faked with the run). A held Shield and attacks are resolved before it on
   the same step, so either wins over it. The fighter faces the Dash at once and
-  moves at `movement.dashSpeed` (600, about 1.8× Speed Power 2's 330; the
-  top speed itself never changes) for one pass of the clip (0.2 s, ≈120
-  units), ignoring input; afterwards the normal movement takes over from
-  that speed. It obeys collision: a solid stops it (the Dash ends against
+  moves at `movement.dashSpeed` (900, about 2.7× Speed Power 2's 330; the
+  top speed itself never changes) for one pass of the clip (0.2 s, ≈180
+  units on open ground), ignoring input; afterwards the normal movement
+  takes over from that speed. It obeys collision: a solid stops it (the Dash ends against
   it), and leaving the ground ends it (the fighter falls on with its speed).
   Hitstun or a bind end it at once. While it runs the fighter cannot attack,
   shield, jump, charge or Dash again. It has no hitbox, damage, launch or
@@ -1204,7 +1210,8 @@ read the character database, so it stays the same as fighters are added.
      and the bound target holds in its Hurt pose with the sphere still
      spinning on it and growing: `sphereGrowth` draws it from `startScale`
      (1, its own art size) at the start of the hold, by the same amount
-     every step, to `endScale` (1.4) as it explodes. The growth is explicit
+     every step, to `endScale` (3, three times its own size) as it
+     explodes. The growth is explicit
      because the spin frames' own sizes shrink slightly (`prasen7`–`9` are
      ≈116, 106 and 100 px wide); it never shrinks or pulses, and it is
      visual only: the sphere stays centred on the target (the drawn frame

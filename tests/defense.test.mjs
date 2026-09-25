@@ -567,11 +567,12 @@ test('a missed attack costs nothing: no hit, no block event, no Energy', () => {
 
 test('blocking uses the fighter\'s own hurtboxes, never the bigger circle drawn round it', () => {
   // BA1's fist ends 40 units in front of the attacker; at a gap of 60 it is
-  // well inside the drawn Shield (radius ~55 round the target's middle) but
-  // short of the target's hurtboxes: nothing happens.
+  // well inside the drawn Shield (radius ~55 round the target's middle, ~50
+  // where its waves lean in furthest) but short of the target's hurtboxes:
+  // nothing happens.
   const d = duel({ gap: 60 });
   const reach = def.attacks.ba1.hitbox.x + def.attacks.ba1.hitbox.w;
-  assert.ok(60 - reach < shieldRadius(def), 'inside the circle');
+  assert.ok(60 - reach < shieldRadius(def) * (1 - SHIELD_SHAPE.amp), 'inside the circle, wherever its edge is');
   assert.ok(reach < 60 + Math.min(...def.hurtboxes.map((h) => h.x)), 'short of the hurtboxes');
   d.tick({}, DEFENSE);
   d.tick(BA1, HOLD);
@@ -703,8 +704,13 @@ test('missing Shield art refuses the Shield (warned once), and the attack lands 
 
 // ---- The Shield's look --------------------------------------------------------------
 
-test('the Shield\'s outline is a closed wavy circle: mean radius on target, small bounded waves', () => {
+test('the Shield\'s outline is a closed wavy circle: mean radius on target, clearly wavy but bounded waves', () => {
   const r = shieldRadius(def);
+  // Clearly readable in play (the old 4.5 % was all but invisible), never
+  // spiky: the waves' weights add up to 1, so `amp` is the most it leans.
+  assert.ok(SHIELD_SHAPE.amp >= 0.09 && SHIELD_SHAPE.amp <= 0.11, `${SHIELD_SHAPE.amp}`);
+  assert.ok(Math.abs(SHIELD_SHAPE.waves.reduce((sum, [, , w]) => sum + w, 0) - 1) < 1e-9);
+  for (const [k] of SHIELD_SHAPE.waves) assert.ok(Number.isInteger(k) && k >= 2, 'whole waves round the circle, never a pulse (k 0)');
   assert.ok(r >= 0.6 * def.visual.height && r <= 0.7 * def.visual.height, `${r}`);
   assert.ok(r > def.visual.height / 2, 'reaches past the head and the feet');
   for (const time of [0, 0.7, 3.2]) {
@@ -715,7 +721,7 @@ test('the Shield\'s outline is a closed wavy circle: mean radius on target, smal
     const mean = radii.reduce((a, b) => a + b, 0) / radii.length;
     assert.ok(Math.abs(mean - r) < 1e-6, `mean radius ${mean}`);
     const spread = Math.max(...radii) - Math.min(...radii);
-    assert.ok(spread > 0.5, 'wavy, not a ruled circle');
+    assert.ok(spread > 0.1 * r, `visibly wavy, not a ruled circle: ${spread}`);
     for (const d of radii) assert.ok(Math.abs(d - r) <= SHIELD_SHAPE.amp * r + 1e-9, 'never spiky');
     // Evenly round: consecutive points turn by one step every time.
     const angle = (i) => Math.atan2(pts[i * 2 + 1] - 200, pts[i * 2] - 100);
@@ -731,6 +737,25 @@ test('the Shield\'s outline is a closed wavy circle: mean radius on target, smal
   assert.deepEqual(still, shieldOutline(0, 0, r, 0, true));
   assert.deepEqual(still, shieldOutline(0, 0, r, 0));
   for (const [, speed] of SHIELD_SHAPE.waves) assert.ok(Math.abs(speed) <= 1, 'a slow drift, never a pulse');
+  // Over a few seconds the edge clearly moves, but smoothly: frame to frame
+  // (60 Hz) no point jumps, and the mean radius (the circle's size) never
+  // swells or shrinks as it goes.
+  const radiiAt = (time) => {
+    const pts = shieldOutline(0, 0, r, time);
+    return Array.from({ length: SHIELD_SHAPE.points }, (_, i) => Math.hypot(pts[i * 2], pts[i * 2 + 1]));
+  };
+  let moved = 0;
+  let jitter = 0;
+  for (let time = 0; time < 6; time += DT) {
+    const [a, b] = [radiiAt(time), radiiAt(time + DT)];
+    jitter = Math.max(jitter, ...a.map((v, i) => Math.abs(b[i] - v)));
+    const mean = b.reduce((x, y) => x + y, 0) / b.length;
+    assert.ok(Math.abs(mean - r) < 1e-6, 'never a uniform pulse');
+  }
+  const [first, later] = [radiiAt(0), radiiAt(3)];
+  moved = Math.max(...first.map((v, i) => Math.abs(later[i] - v)));
+  assert.ok(moved > 0.1 * r, `visibly drifting over 3 s: ${moved}`);
+  assert.ok(jitter < 0.01 * r, `smooth, never jittery: ${jitter} a frame`);
 });
 
 test('the Shield follows its fighter\'s body centre, sized by its visual height, not the frame on screen', () => {
@@ -793,6 +818,105 @@ test('the Shield is black and red, the fighter visible through it: faint black i
   // No green anywhere in it.
   for (const color of Object.values(SHIELD_STYLE).filter((v) => typeof v === 'string')) {
     assert.doesNotMatch(color, /#[0-9a-f]{2}[89a-f][0-9a-f][0-4][0-9a-f]/i, color);
+  }
+});
+
+// The paths `calls` traced, each with the colour it was stroked or filled in:
+// [{ fn: 'stroke' | 'fill', color, lineWidth, pts: [[x, y], ...] }].
+function tracedPaths(calls) {
+  const paths = [];
+  let pts = [];
+  for (const c of calls) {
+    if (c.fn === 'beginPath') pts = [];
+    else if (c.fn === 'moveTo' || c.fn === 'lineTo') pts.push(c.args);
+    else if (c.fn === 'stroke' || c.fn === 'fill') {
+      paths.push({ fn: c.fn, color: c.fn === 'stroke' ? c.stroke : c.fill, lineWidth: c.lineWidth, pts });
+    }
+  }
+  return paths;
+}
+
+test('the red line sits on the outside of the black rim, flush with its outer edge, locked to the same waves', () => {
+  const { fighter, step } = makeFighter();
+  step(DEFENSE);
+  const [cx, cy] = shieldCenter(fighter);
+  const r = shieldRadius(def);
+  for (const view of [{ x: 0, y: 0, scale: 1.5, dpr: 2 }, { x: 0, y: 0, scale: 0.8, dpr: 1 }]) {
+    for (const time of [0, 1.3, 4.7]) {
+      const { ctx, calls } = recorder();
+      drawShield(ctx, fighter, view, 'rim', time);
+      const [black, red] = tracedPaths(calls);
+      assert.deepEqual([black.color, red.color], [SHIELD_STYLE.rim, EDGE_RED], 'black first, the red over it');
+      // The black rim is the primary outline itself.
+      assert.deepEqual(black.pts.flat(), shieldOutline(cx, cy, r, time));
+      assert.equal(red.pts.length, black.pts.length);
+      const halfBlack = black.lineWidth / 2;
+      const halfRed = red.lineWidth / 2;
+      for (let i = 0; i < black.pts.length; i++) {
+        const [bx, by] = black.pts[i];
+        const [rx, ry] = red.pts[i];
+        const db = Math.hypot(bx - cx, by - cy);
+        const dr = Math.hypot(rx - cx, ry - cy);
+        // Same angle round the centre: the red rides the black's own wave.
+        const cross = (bx - cx) * (ry - cy) - (by - cy) * (rx - cx);
+        assert.ok(Math.abs(cross) < 1e-6 * db * dr, 'on the same ray, locked to the black');
+        assert.ok(dr > db, `outside the primary outline at point ${i}`);
+        // Its whole width in the black's outer half: none of it inside the
+        // rim's centre line, and its outer edge flush with the black's.
+        assert.ok(dr - halfRed >= db - 1e-9, 'never reaching the inner half');
+        // (The red is traced at radius + outset through the same waves, so
+        // they lean it out by up to amp x outset more: a tenth of a pixel.)
+        const slack = SHIELD_SHAPE.amp * (halfBlack - halfRed) + 1e-9;
+        assert.ok(Math.abs(dr + halfRed - (db + halfBlack)) <= slack, 'flush with the outer edge');
+      }
+    }
+  }
+});
+
+test('the Shield\'s drawn waves follow the drift clock, and hold still with reduced motion', () => {
+  const { fighter, step } = makeFighter();
+  step(DEFENSE);
+  const view = { x: 0, y: 0, scale: 1.2, dpr: 1 };
+  const drawn = (time, reducedMotion) => {
+    const { ctx, calls } = recorder();
+    drawShield(ctx, fighter, view, 'interior', time, reducedMotion);
+    drawShield(ctx, fighter, view, 'rim', time, reducedMotion);
+    return tracedPaths(calls).map((p) => p.pts.flat());
+  };
+  assert.notDeepEqual(drawn(0, false), drawn(0.5, false), 'moving');
+  assert.notDeepEqual(drawn(2, false), drawn(2 + DT, false), 'every frame');
+  assert.deepEqual(drawn(0.5, true), drawn(0, true), 'reduced motion: frozen');
+  assert.deepEqual(drawn(9, true), drawn(0, false), 'frozen on the wavy shape at 0');
+  // Frozen and still wavy, red still outside.
+  const [interior, black, red] = drawn(3, true);
+  assert.deepEqual(interior, black, 'the interior fills exactly the rim\'s shape');
+  const [cx, cy] = shieldCenter(fighter);
+  const radii = (pts) => Array.from({ length: pts.length / 2 }, (_, i) => Math.hypot(pts[i * 2] - cx, pts[i * 2 + 1] - cy));
+  const b = radii(black);
+  assert.ok(Math.max(...b) - Math.min(...b) > 0.1 * shieldRadius(def), 'still wavy');
+  radii(red).forEach((d, i) => assert.ok(d > b[i]));
+});
+
+test('no gameplay code reads the Shield\'s look: only the Arena\'s renderer imports it', () => {
+  const files = [];
+  const walk = (dir) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const path = `${dir}/${entry.name}`;
+      if (entry.isDirectory()) walk(path);
+      else if (entry.name.endsWith('.js')) files.push(path);
+    }
+  };
+  walk(`${ROOT}js`);
+  const importers = files.filter((f) => /from '[^']*shield-fx\.js'/.test(readFileSync(f, 'utf8')))
+    .map((f) => f.slice(ROOT.length));
+  assert.deepEqual(importers, ['js/game/arena.js']);
+  // And the Arena only draws it.
+  const arena = readFileSync(`${ROOT}js/game/arena.js`, 'utf8');
+  assert.match(arena, /import \{ drawShield \} from '\.\/shield-fx\.js';/);
+  for (const name of ['shieldRadius', 'shieldOutline', 'SHIELD_SHAPE']) {
+    for (const f of ['combat.js', 'physics.js', 'character.js', 'charged-technique.js', 'projectile.js', 'clone.js']) {
+      assert.doesNotMatch(readFileSync(`${ROOT}js/game/${f}`, 'utf8'), new RegExp(name), `${f} never uses ${name}`);
+    }
   }
 });
 

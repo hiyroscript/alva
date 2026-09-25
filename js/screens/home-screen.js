@@ -36,7 +36,7 @@ export class HomeScreen extends Screen {
       class: 'home-action', type: 'button', 'data-nav': true,
       html: `<span>Practice Ground</span>${ICONS.right}`,
     });
-    // The in-game reference (Power, Conditions), opened directly.
+    // The in-game reference (Power, Launch, Passives), opened directly.
     const discover = el('button', {
       class: 'home-action', type: 'button', 'data-nav': true,
       html: `<span>Discover</span>${ICONS.right}`,

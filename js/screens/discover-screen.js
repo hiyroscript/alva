@@ -1,5 +1,5 @@
 // DISCOVER: the in-game reference. An index rail of sections (Power, Launch,
-// Conditions) beside one scrollable page; on narrow windows the rail runs
+// Passives) beside one scrollable page; on narrow windows the rail runs
 // across the top instead. Each page is built from the registry the game
 // plays by, never the tuning values, so the reference cannot drift from
 // gameplay: Power from POWERS in js/data/powers.js (names, descriptions and
@@ -108,12 +108,12 @@ function buildLaunchPage() {
   ]);
 }
 
-// Conditions has no content yet, on purpose: the section is scaffolding for
-// a future Conditions system, so its page stays empty rather than faked.
+// Passives has no content yet, on purpose: the section is scaffolding for a
+// future passives registry, so its page stays empty rather than faked.
 const SECTIONS = [
   { id: 'power', label: 'Power', build: buildPowerPage },
   { id: 'launch', label: 'Launch', build: buildLaunchPage },
-  { id: 'conditions', label: 'Conditions', build: () => null },
+  { id: 'passives', label: 'Passives', build: () => null },
 ];
 
 export class DiscoverScreen extends Screen {
