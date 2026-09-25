@@ -128,7 +128,11 @@ attack animations. Its touch button has a dashed outline.
   the opponent stood when you pressed BA1; it never follows, so an opponent
   who moves away makes it miss. Its punch is BA1's (6 damage, same hitbox,
   hitstun and knockback, pushing the opponent away from the clone), hits
-  once, and passes through a Dodge's evasive frames like any attack. The
+  once, and passes through a Dodge's evasive frames like any attack. If
+  there is no ground behind the opponent at its foot height (it stands at a
+  platform's edge with its back to the drop, or it is in the air), the clone
+  appears over the opponent instead and performs #0001's Mid-air BA2 kick
+  (6 damage, driving the opponent downward); same cloud, same 25 Energy. The
   impact freezes the opponent and the clone, never #0001. The clone cannot be
   hit, blocks nobody and is not followed by the camera. Once summoned it
   finishes appearing, attacking and vanishing whatever #0001 does next.
@@ -167,7 +171,7 @@ attack animations. Its touch button has a dashed outline.
 - **Menus:** arrow keys or WASD to move, `Enter` to select, `Esc` to go back. Mouse and touch work too.
 - **Touch:** several fingers work at once (hold Right and press Jump, or hold C and press BA1). You can slide your thumb between Left / Charge / Right. **T** is Throw.
 - **Gamepad (standard layout):** D-pad or left stick left / right to move and down to Charge in battle (they still navigate menus), A to jump, X / Square to Throw, B / Circle for Basic Attack 1, LB for Basic Attack 2, Y / Triangle for the reserved Special, RB or RT for Defense, Start to pause.
-- **Debug:** `` ` `` toggles the collider, hurtbox and attack-hitbox overlay in battle (a hitbox shows only while it can connect; hurtboxes turn gray while a Dodge makes the fighter invulnerable; a flying shuriken's hitbox is outlined in magenta and labelled; a clone's BA1 hitbox shows in the attack colour, labelled `clone ba1`, only on its active frame; the Sphere Rush's sphere hitbox is a dashed cyan box labelled `charged ba2 dash` while it can connect, then a dashed cyan cross marks the sphere on the caught opponent, which is labelled `bound`).
+- **Debug:** `` ` `` toggles the collider, hurtbox and attack-hitbox overlay in battle (a hitbox shows only while it can connect; hurtboxes turn gray while a Dodge makes the fighter invulnerable; a flying shuriken's hitbox is outlined in magenta and labelled; a clone's attack hitbox shows in the attack colour, labelled `clone ba1` (or `clone midairBa2` overhead), only on its active frame; the Sphere Rush's sphere hitbox is a dashed cyan box labelled `charged ba2 dash` while it can connect, then a dashed cyan cross marks the sphere on the caught opponent, which is labelled `bound`).
 
 Touch controls show on touch-first devices (coarse pointer, or a touch actually detected). A narrow desktop window doesn't count as a phone. On a phone held in portrait, the game pauses and asks you to rotate.
 
@@ -353,7 +357,7 @@ knockback: { axis: 'vertical', level: 'mid', sign: -1 } // reversed: drives down
 | Mid-air BA1 (kunai slash) | Mid vertical | `{ x: 0, y: 640 }` |
 | Mid-air BA2 (airborne kick) | High vertical, reversed | `{ x: 0, y: -800 }` |
 
-An unblocked BA1 hit sets the opponent's `vx` to 140 away from #0001; BA2 sets `vy = -800`, a strong launch; mid-air BA1 sets `vy = -640`, a lower launch than BA2's; mid-air BA2 sets `vy = +800`, driving it downward with no sideways push. The Clone Attack performs ground BA1's resolved definition, so it inherits Low horizontal Knockback with no tuning of its own.
+An unblocked BA1 hit sets the opponent's `vx` to 140 away from #0001; BA2 sets `vy = -800`, a strong launch; mid-air BA1 sets `vy = -640`, a lower launch than BA2's; mid-air BA2 sets `vy = +800`, driving it downward with no sideways push. The Clone Attack performs ground BA1's resolved definition, so it inherits Low horizontal Knockback with no tuning of its own; overhead (no ground behind the opponent) it performs mid-air BA2's, driving the opponent downward the same way.
 
 The two mid-air Basic Attacks swapped moves: **mid-air BA1** is the three-frame kunai slash (`0001_midair2ba1`–`3`), which used to be mid-air BA2, and **mid-air BA2** is the five-frame airborne kick (`0001_midair1ba1`–`5`), which used to be mid-air BA1. Each move kept its own art, timing, hitbox, damage and stun; only its knockback changed. The frame file names are the originals.
 
@@ -395,7 +399,7 @@ attacks: {
 
 To give a fighter a charged action, map a combat button in `chargedActions` to a typed descriptor. Pressed while already charging, with Charge still held, the button does that instead of its normal attack; `Fighter.tryChargedAction` dispatches on the type:
 
-- `{ type: 'summon', id }` names an entry in `summons` (see the schema in `js/game/clone.js`), as #0001's `action1: { type: 'summon', id: 'ba1Clone' }` (the Clone Attack) does. It pays the summon's `energyCost` and spawns a detached clone that performs one of the fighter's own `attacks` through an `effectAnimations` cloud, while the fighter keeps charging.
+- `{ type: 'summon', id }` names an entry in `summons` (see the schema in `js/game/clone.js`), as #0001's `action1: { type: 'summon', id: 'ba1Clone' }` (the Clone Attack) does. It pays the summon's `energyCost` and spawns a detached clone that performs one of the fighter's own `attacks` through an `effectAnimations` cloud, while the fighter keeps charging. An optional `noGround: { attack, offset }` names another of its attacks, and where to appear relative to the opponent, for when there is no ground behind the opponent at its foot height.
 - `{ type: 'technique', id }` names an entry in `chargedTechniques` (see the schema and phases in `js/game/charged-technique.js`), as #0001's `action2: { type: 'technique', id: 'rasenRush' }` (the Sphere Rush) does. The fighter itself performs it: fighter clips from `animations` for its form / dash / confirm phases, an effect from `effectAnimations` for each stage of the sphere, a dash speed, hand offsets per frame, a sphere hitbox, a delay and the data for its two hits. It may set an `energyCost` (#0001's is 0).
 
 Without the Energy, the art or valid data, the press falls through to the normal attack.

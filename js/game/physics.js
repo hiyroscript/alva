@@ -36,6 +36,13 @@ export class StageCollision {
     }
     return { y: best, ref };
   }
+
+  // Whether something under span [x0, x1] is at height `y` (within EPS) to
+  // stand on: the same horizontal overlap stepBody lands a body with. A lower
+  // surface further down does not count.
+  supportsAt(x0, x1, y) {
+    return Math.abs(this.surfaceBelow(x0, x1, y).y - y) <= EPS;
+  }
 }
 
 export function createBody({ x, y, width, height, gravityScale = 1, maxFall = 1500 }) {
