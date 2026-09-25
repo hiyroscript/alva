@@ -506,6 +506,91 @@ test('the Void is drawn only near its edge, black and wavering, and holds still 
   }
 });
 
+// A context that records each path with the paint it ended in: every
+// stroke or fill, its style and width, and the points traced since the last
+// beginPath.
+function paintingContext() {
+  const paints = [];
+  const state = { fillStyle: null, strokeStyle: null, lineWidth: 1, shadowBlur: 0, shadowColor: 'transparent', filter: 'none' };
+  let path = [];
+  const ctx = new Proxy(state, {
+    get(t, k) {
+      if (k in t) return t[k];
+      if (k === 'beginPath') return () => { path = []; };
+      if (k === 'moveTo' || k === 'lineTo') return (x, y) => path.push([k, x, y]);
+      if (k === 'stroke' || k === 'fill') {
+        return () => paints.push({
+          fn: k, path: [...path], color: k === 'stroke' ? state.strokeStyle : state.fillStyle,
+          lineWidth: state.lineWidth, shadowBlur: state.shadowBlur, filter: state.filter,
+        });
+      }
+      return () => {};
+    },
+    set(t, k, v) { t[k] = v; return true; },
+  });
+  return { ctx, paints };
+}
+
+test('the Void gains a thin red rim on exactly its wavy edge: the same points as the black, cosmetic only', () => {
+  const m = getMap('desert');
+  const v = m.voidBounds;
+  const bounds = { ...v };
+  const base = { scale: 1.25, dpr: 2, w: 1560, h: 880, pxW: 1950, pxH: 1100 };
+  // Near the bottom and left edges at once: two sides, meeting at a corner.
+  const corner = { ...base, x: v.left - 200, y: v.bottom - 700 };
+  const theme = createTheme(m, { reducedMotion: false });
+  theme.time = 0.8;
+  const { ctx, paints } = paintingContext();
+  theme.drawVoid(ctx, { ...corner, ctx });
+  assert.deepEqual(paints.map((p) => [p.fn, p.color]), [['stroke', '#d21f2b'], ['fill', '#000']], 'the red rim, then the black over it');
+  const [rim, black] = paints;
+  // Every point of the rim is a point of the black's edge, in the same
+  // order: the black's path less each side's two outer corners.
+  const key = ([, x, y]) => `${x},${y}`;
+  const fillPoints = new Set(black.path.map(key));
+  assert.ok(rim.path.every((p) => fillPoints.has(key(p))), 'the rim is traced from the black\'s own points');
+  const sides = black.path.filter(([k]) => k === 'moveTo').length;
+  assert.equal(sides, 2);
+  assert.equal(rim.path.length, black.path.length - 2 * sides, 'the whole wavy edge, and only it');
+  assert.equal(rim.path.filter(([k]) => k === 'moveTo').length, sides, 'one rim per side');
+  // Wavy, like the black: never a ruled line.
+  const bottom = rim.path.filter(([, , y]) => Math.abs(y - v.bottom) < 20).map(([, , y]) => y);
+  assert.ok(bottom.length > 10 && Math.max(...bottom) - Math.min(...bottom) > 4);
+  // Thin: stroked twice its visible width, the black covering the Void's
+  // half, so 1.5 CSS px show on the stage's side. No glow, blur or shadow.
+  const visible = (rim.lineWidth * base.scale) / base.dpr / 2;
+  assert.ok(visible >= 1 && visible <= 2, `${visible} CSS px`);
+  assert.equal(rim.shadowBlur, 0);
+  assert.equal(rim.filter, 'none');
+  // Cosmetic: the kill boundary is the data, never the drawn line.
+  assert.deepEqual(m.voidBounds, bounds);
+  const stage = new StageCollision(m);
+  const wavy = rim.path.find(([, x, y]) => x > v.left + 20 && Math.abs(y - v.bottom) < 20 && y < v.bottom - 1);
+  assert.ok(wavy, 'a point of the rim above the fixed line');
+  assert.equal(stage.inVoid({ x: wavy[1], y: wavy[2] + 1, height: 2 }), false, 'crossing the drawn rim is not falling in');
+  // Reduced motion: black and rim both hold the same wavy shape.
+  const still = createTheme(m, { reducedMotion: true });
+  const shots = [0, 2.4].map((time) => {
+    still.time = time;
+    const rec = paintingContext();
+    still.drawVoid(rec.ctx, { ...corner, ctx: rec.ctx });
+    return rec.paints.map((p) => p.path);
+  });
+  assert.deepEqual(shots[0], shots[1], 'reduced motion: the edge and its rim hold still');
+  const moving = [0, 2.4].map((time) => {
+    theme.time = time;
+    const rec = paintingContext();
+    theme.drawVoid(rec.ctx, { ...corner, ctx: rec.ctx });
+    return rec.paints.map((p) => p.path);
+  });
+  assert.notDeepEqual(moving[0], moving[1], 'otherwise both drift together');
+  // Nothing near the edge: neither the black nor the rim.
+  const centre = { ...base, x: 1800 - 780, y: 860 - 616 };
+  const none = paintingContext();
+  theme.drawVoid(none.ctx, { ...centre, ctx: none.ctx });
+  assert.deepEqual(none.paints, []);
+});
+
 test('the Void is drawn over the fighters and everything else on the stage', () => {
   const { battle } = realBattle('desert');
   const order = [];

@@ -1341,7 +1341,7 @@ html:not(.is-pointer-input) .discover-panel:focus { box-shadow: var(--focus-ring
   box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5);
 }
 .hud-dot.is-filled { background: var(--white); border-color: var(--white); }
-/* Read by screen readers only (the card's stamina description). */
+/* Read by screen readers only (the card's Energy description). */
 .hud-sr {
   position: absolute;
   width: 1px;

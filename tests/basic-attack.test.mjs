@@ -527,9 +527,8 @@ test('from the same Launch Point, mid-air BA1 launches less high than ground BA2
   assert.ok(slash < ground, `a lower launch than ground BA2 (${slash.toFixed(1)} < ${ground.toFixed(1)})`);
 });
 
-test('a blocked mid-air BA1 is neither launched nor pushed', () => {
-  const blocker = { ...def, defense: { type: 'block' } };
-  const d = duel({ targetCharacter: blocker });
+test('a Shielded mid-air BA1 is neither launched nor pushed, and adds no Launch Point', () => {
+  const d = duel();
   d.tick(JUMP, { defense: true });
   d.until(() => d.attacker.body.vy > 0 && d.attacker.body.y > 650);
   d.tick(BA1, { defense: true });
@@ -538,8 +537,10 @@ test('a blocked mid-air BA1 is neither launched nor pushed', () => {
   assert.equal(d.events.length, 1);
   assert.equal(d.events[0].type, 'block');
   assert.equal(d.target.body.vy, 0, 'no vertical launch on a block');
-  assert.ok(isZero(d.target.body.vx), 'no horizontal launch to halve');
-  assert.equal(d.target.combat.launchPoint, d.events[0].damage, 'the chip damage still adds to Launch Point');
+  assert.ok(isZero(d.target.body.vx), 'no horizontal launch either');
+  assert.equal(d.events[0].damage, 0);
+  assert.equal(d.target.combat.launchPoint, 0, 'no chip damage');
+  assert.equal(d.target.combat.energy, 75, 'the Shield paid 25 instead');
   assert.equal(d.target.grounded, true);
 });
 

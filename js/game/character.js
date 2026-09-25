@@ -4,7 +4,7 @@
 
 import { SpriteAnimator } from './sprite-animator.js';
 import { createBody, stepBody, dropThrough } from './physics.js';
-import { CombatState, createAttackDefinition, createDefenseDefinition, resolveStamina } from './combat.js';
+import { CombatState, createAttackDefinition, createDefenseDefinition, resolveEnergy } from './combat.js';
 import { createProjectileDefinition } from './projectile.js';
 import { createSummonDefinition, summonProblem } from './clone.js';
 import { ChargedTechnique, createTechniqueDefinition, techniqueProblem } from './charged-technique.js';
@@ -57,20 +57,25 @@ export class Fighter {
     );
     // What the shared Defense input does for this character (null: nothing).
     this.defense = createDefenseDefinition(def.defense);
+    // One pass of the grounded Shield's raise and lower poses; 0 skips them.
+    this.shieldStartDuration = sprites.duration(this.defense?.groundStartAnimation);
+    this.shieldReleaseDuration = sprites.duration(this.defense?.groundReleaseAnimation);
+    // Shield clips already reported missing, so a held Defense warns once.
+    this.missingShieldArt = new Set();
     // The character's Powers (js/data/powers.js), resolved once.
     // Upward speed of the normal jump, from its Jump Power tier. Nothing else
-    // (launches, Dodges, techniques) uses it.
+    // (launches, techniques) uses it.
     this.jumpVelocity = getJumpVelocity(def);
     // Top speed of normal left / right movement, on the ground and in the
     // air, from its Speed Power tier. Nothing else (acceleration, launches,
-    // projectiles, Dodges, techniques) uses it.
+    // projectiles, techniques) uses it.
     this.maxSpeed = getMaxSpeed(def);
     // Seconds of charged-action cooldown recovered per second while in
     // Charge (see recoverChargedCooldowns); 1 per second otherwise.
     this.chargedCooldownRate = def.stats?.chargedCooldownRate ?? 1;
-    // Stamina settings (js/game/combat.js resolveStamina): the maximum, both
-    // refill rates and what Dash, Dodge and Block cost.
-    this.staminaDef = resolveStamina(def.stamina);
+    // Energy settings (js/game/combat.js resolveEnergy): the maximum, both
+    // refill rates, what a Dash costs and what each blocked hit costs.
+    this.energyDef = resolveEnergy(def.energy);
     this.opponent = null;
     this.spawn = spawn;
     this.reset(stage);
@@ -122,9 +127,12 @@ export class Fighter {
     // trackDashTaps): { direction, age }, or null.
     this.dash = null;
     this.dashTap = null;
-    // A fresh combat state: 0 Launch Point, full stamina and every cooldown
-    // ready.
-    this.combat = new CombatState(def.stats, this.staminaDef);
+    // Whether the Shield on screen went up on the ground (so it opens with
+    // its raise pose) rather than in the air (see updateState).
+    this.shieldRaisedOnGround = false;
+    // A fresh combat state: 0 Launch Point, full Energy, Shield down and
+    // every cooldown ready.
+    this.combat = new CombatState(this.energyDef);
     // Projectiles released this step, waiting for the battle to spawn them
     // (see spawnProjectiles in js/game/projectile.js).
     this.releases = [];
@@ -141,9 +149,9 @@ export class Fighter {
 
   // Back at its own spawn after the Void's wait (see Arena.updateRespawns):
   // a clean, neutral state, exactly a reset. Launch Point is back to 0,
-  // stamina full and not exhausted, and every cooldown (charged ones
+  // Energy full and not exhausted, and every cooldown (charged ones
   // included) ready; everything transient goes with the old body: velocity,
-  // attack, Dodge, Dash, stun, freeze, binds, its charged technique and any
+  // attack, Shield, Dash, stun, freeze, binds, its charged technique and any
   // queued projectile or summon. It is in play again at once.
   respawn(stage) {
     this.reset(stage);
@@ -184,21 +192,28 @@ export class Fighter {
     }
     if (combat.hitstop > 0) {
       // Impact freeze: nothing moves or advances, but a fresh hit still
-      // switches to the hurt pose so the freeze holds the reaction. Stamina
-      // keeps refilling, at the normal rate (a frozen fighter is not in its
-      // Charge stance).
-      combat.updateStamina(dt, false);
+      // switches to the hurt pose so the freeze holds the reaction (and a
+      // blocked one keeps the Shield up). Energy keeps refilling, at the
+      // normal rate (a frozen fighter is not in its Charge stance).
+      combat.updateEnergy(dt, false);
       this.updateState(0);
       return;
     }
 
     // ---- Dash ------------------------------------------------------------
-    // A Dash ends by itself after one pass of its clip, like a Dodge: the
-    // fighter is free again from the step it ends.
+    // A Dash ends by itself after one pass of its clip: the fighter is free
+    // again from the step it ends.
     if (this.dash) {
       this.dash.time += dt;
       if (this.dash.time >= this.dash.duration - TIME_EPSILON) this.endDash();
     }
+
+    // ---- Shield: held Defense --------------------------------------------
+    // Decided first: Defense held with a Shield the fighter may raise (its
+    // Defense is a Shield, the Energy for a block, the art for where it is)
+    // takes the step, so no attack, Throw, charged action or Dash starts
+    // while it is held. Let go of Defense to do any of them.
+    const shieldHeld = !!input.defense && this.shieldAllowed();
 
     // ---- Combat intents --------------------------------------------------
     // Actions mapped to null are wired but reserved (see tryAction). A press
@@ -209,22 +224,17 @@ export class Fighter {
     // with a fresh Charge, is a normal attack.
     const charged = wasCharging && !!input.charge;
     for (const action of COMBAT_ACTIONS) {
-      if (!input[`${action}Pressed`]) continue;
+      if (!input[`${action}Pressed`] || shieldHeld) continue;
       if (charged && this.tryChargedAction(action)) continue;
       this.tryAction(action);
     }
-    // ---- Defense ---------------------------------------------------------
-    // A Dodge starts only on a new press, after the attacks so an attack
-    // started this step keeps it (and a Dodge keeps a jump) from starting too.
-    // Stamina spent this step (a Dodge, a Dash or a Block's drain) means no
-    // refill this step (see the end of update).
-    let spent = false;
-    if (input.defensePressed) spent = this.tryDefense();
 
     // ---- Dash: a double tap of left or right -----------------------------
-    // After the attacks and Defense, so either of those started this step
-    // wins over a Dash on the same step (canAct). A double tap that cannot
-    // Dash right now is used up all the same: nothing is queued for later.
+    // After the attacks, so one started this step wins over a Dash on the
+    // same step (canAct). A double tap that cannot Dash right now is used
+    // up all the same: nothing is queued for later. Energy spent this step
+    // means no refill this step (see the end of update).
+    let spent = false;
     const tapped = this.trackDashTaps(input, dt);
     if (tapped && this.tryDash(tapped, input)) spent = true;
 
@@ -237,45 +247,46 @@ export class Fighter {
       if (ended) this.endTechnique(ended);
     }
 
-    // After the intents, so an attack, Dodge or charged technique started
-    // this step also rules out a jump, Block guard, charge or platform drop
-    // on the same step.
+    // After the intents, so an attack or charged technique started this step
+    // also rules out a Shield, jump, charge or platform drop on the same
+    // step.
     const canAct = this.canAct();
-    // Block-type Defense is a held guard; a Dodge fighter never blocks. It
-    // drains stamina while held, never while exhausted, and the step that
-    // empties it ends the guard at once.
-    let blocking = this.defense?.type === 'block' && canAct && body.grounded && !!input.defense && combat.canUseStamina(0);
-    if (blocking) {
-      spent = true;
-      blocking = combat.drainStamina(this.staminaDef.blockDrain * dt);
-    }
-    combat.blocking = blocking;
+    // The Shield is up while Defense is held and the fighter is free to act
+    // (it never cuts an attack, Dash, charged technique, stun or bind short).
+    // A blocked hit's blockstun holds it up until the stun is over, held or
+    // not. Either way only while shieldAllowed: the step Energy falls below
+    // one block's cost (or it has no art for where the fighter is) drops it.
+    // Holding it costs nothing: only the hits it blocks cost Energy (see
+    // CombatSystem.applyHit).
+    combat.shielding =
+      (shieldHeld && canAct) || (combat.shielding && combat.shieldStun > 0 && this.shieldAllowed());
+    if (!combat.shielding) combat.shieldStun = 0;
 
     // ---- Charge: grounded, and only while held ---------------------------
     // The held value alone decides it: no toggle or buffer, so the step that
-    // sees Charge released ends it. Defense interrupts it: a Dodge through
-    // canAct, a held Block guard here. After a charged technique, a Charge
-    // held since before it must be let go and held again.
-    this.charging = canAct && body.grounded && !!input.charge && !combat.blocking && !this.chargeHeldOver;
+    // sees Charge released ends it. A held Shield outranks it. After a
+    // charged technique, a Charge held since before it must be let go and
+    // held again.
+    this.charging = canAct && body.grounded && !!input.charge && !combat.shielding && !this.chargeHeldOver;
 
     // ---- Platform drop (training CPU only) -------------------------------
     // No player key, button or touch control produces `dropPressed`; the
     // training CPU uses it to follow the player down through one-way platforms.
-    if (input.dropPressed && canAct && body.grounded && !combat.blocking) {
+    if (input.dropPressed && canAct && body.grounded && !combat.shielding) {
       dropThrough(body, mv.dropThroughTime);
     }
 
     // ---- Horizontal movement ---------------------------------------------
-    // A Dodge locks it too: no new acceleration, and the current velocity
-    // slows under the normal deceleration (in the air, the gentle air drag),
-    // so the art never moves the body (no dash, lift or teleport). A charged
-    // technique sets the speed itself (still, or its fixed rush), and a bound
-    // fighter is held in place; gravity still applies to both. A Dash holds
-    // its own burst speed, whatever is held, until it ends; then the normal
-    // acceleration takes over from that speed.
+    // A Shield locks it: no walking or running on the ground, no steering in
+    // the air, and the current velocity slows under the normal deceleration
+    // (in the air, the gentle air drag, so momentum carries on and gravity
+    // still pulls). A charged technique sets the speed itself (still, or its
+    // fixed rush), and a bound fighter is held in place; gravity still
+    // applies to both. A Dash holds its own burst speed, whatever is held,
+    // until it ends; then the normal acceleration takes over from that speed.
     let dir = (input.right ? 1 : 0) - (input.left ? 1 : 0);
     const locked =
-      combat.blocking || this.charging || combat.stun > 0 || combat.defenseAction ||
+      combat.shielding || this.charging || combat.stun > 0 ||
       (combat.attack && combat.attack.def.lockMovement) || combat.immobilized || !!this.technique || !!this.dash;
     if (locked) dir = 0;
     this.moveDir = dir;
@@ -303,22 +314,22 @@ export class Fighter {
     if (body.grounded) this.coyote = mv.coyoteTime;
     else this.coyote = Math.max(0, this.coyote - dt);
 
-    if (this.jumpBuffer > 0 && this.coyote > 0 && canAct) {
+    // A held Shield outranks a jump: let go of Defense to jump.
+    if (this.jumpBuffer > 0 && this.coyote > 0 && canAct && !combat.shielding) {
       body.vy = -this.jumpVelocity;
       body.grounded = false;
       body.ground = null;
       this.coyote = 0;
       this.jumpBuffer = 0;
       this.charging = false;
-      combat.blocking = false;
     }
 
     // ---- Voluntary Charge release ----------------------------------------
     // Charging last step, Charge let go this step, and nothing else took over
-    // (a hit, attack, Dodge, guard or jump all rule it out through canAct,
-    // blocking or grounded). Only then does the brief release pose play.
+    // (a hit, attack, Shield or jump all rule it out through canAct,
+    // shielding or grounded). Only then does the brief release pose play.
     this.chargeReleased =
-      wasCharging && !input.charge && canAct && body.grounded && !combat.blocking;
+      wasCharging && !input.charge && canAct && body.grounded && !combat.shielding;
 
     // ---- Integrate -------------------------------------------------------
     stepBody(body, dt, ctx.stage, ctx.gravity);
@@ -344,19 +355,19 @@ export class Fighter {
     // the Dash there.
     if (this.dash && (!body.grounded || body.wall === this.dash.direction)) this.endDash();
 
-    // ---- Stamina refill ----------------------------------------------------
-    // Every step nothing was spent: faster while in the Charge stance
-    // (this.charging: never the release pose, a charged technique or a
-    // Charge held through one).
-    if (!spent) combat.updateStamina(dt, this.charging);
+    // ---- Energy refill -----------------------------------------------------
+    // Every step no Dash was paid for, a held Shield included: faster while
+    // in the Charge stance (this.charging: never the release pose, a
+    // charged technique or a Charge held through one).
+    if (!spent) combat.updateEnergy(dt, this.charging);
 
     this.updateFacing(dir);
     this.updateState(dt);
   }
 
   // Free to start something new: the combat state allows it (no attack,
-  // Dodge, stun or bind), no charged technique owns the fighter and it is
-  // not dashing. Its Launch Point, however high, and the stamina it has
+  // stun, blockstun or bind), no charged technique owns the fighter and it
+  // is not dashing. Its Launch Point, however high, and the Energy it has
   // left never matter.
   canAct() {
     return this.combat.canAct() && !this.technique && !this.dash;
@@ -365,28 +376,26 @@ export class Fighter {
   // One fixed step of recovery for every charged-action cooldown: at
   // chargedCooldownRate while `charging` (the fighter is really in its
   // Charge stance), at 1 otherwise (running, jumping, attacking, stunned,
-  // dodging, frozen, bound or performing a charged technique).
+  // shielding, frozen, bound or performing a charged technique).
   recoverChargedCooldowns(dt, charging) {
     this.combat.chargedCooldowns.update(dt, charging ? this.chargedCooldownRate : 1);
   }
 
-  // Starts one Dodge, if this fighter's Defense is a Dodge, it is free to
-  // act and its stamina allows it (not exhausted, at least dodgeCost left),
-  // paying dodgeCost. Ground or air is chosen here, once, and kept for the
-  // whole clip. Nothing is spent on a Dodge that does not start.
-  tryDefense() {
+  // Whether this fighter may have its Shield up right now: its Defense is a
+  // Shield, it has the Energy to block one more hit (CombatState.canShield:
+  // at least shieldHitCost, never while exhausted) and the held art for
+  // where it is (groundAnimation, or airAnimation in the air). Missing art
+  // is refused, never faked, and reported once.
+  shieldAllowed() {
     const spec = this.defense;
-    if (spec?.type !== 'dodge' || !this.canAct()) return false;
-    const move = this.body.grounded ? spec.ground : spec.air;
-    if (!move) return false;
-    // Never grant invisible invulnerability: require real Dodge frames.
-    if (!move.animation || !this.sprites.has(move.animation)) {
-      console.warn(`[Alva] Dodge "${move.animation}" has no animation frames; ignoring.`);
-      return false;
+    if (spec?.type !== 'shield' || !this.combat.canShield()) return false;
+    const key = this.body.grounded ? spec.groundAnimation : spec.airAnimation;
+    if (key && this.sprites.has(key)) return true;
+    if (!this.missingShieldArt.has(key)) {
+      this.missingShieldArt.add(key);
+      console.warn(`[Alva] Shield "${key}" has no animation frames; ignoring.`);
     }
-    if (!this.combat.spendStamina(this.staminaDef.dodgeCost)) return false;
-    this.combat.defenseAction = { type: 'dodge', def: move, time: 0 };
-    return true;
+    return false;
   }
 
   // Double-tap detection on the horizontal press edges (leftPressed /
@@ -416,22 +425,24 @@ export class Fighter {
   // Starts one Dash toward `direction` (1 right, -1 left): a short grounded
   // burst at movement.dashSpeed for one pass of the dash clip. Movement
   // only: no hitbox, damage, launch or invulnerability. Only while free
-  // to act (no attack, Dodge, stun, bind, charged technique or Dash already
-  // running), grounded, not in or holding Charge, and with the stamina for
-  // it, paying dashCost. The fighter faces the Dash at once. False, with
-  // nothing spent, if it cannot start (a missing dash clip is logged).
-  // `input` is this step's (Charge held rules it out); any caller (a
-  // future AI too) may use it.
+  // to act (no attack, stun, bind, charged technique or Dash already
+  // running), grounded, not in or holding Charge, not shielding or holding
+  // Defense for a Shield it may raise, and with the Energy for it, paying
+  // dashCost. The fighter faces the Dash at once. False, with nothing
+  // spent, if it cannot start (a missing dash clip is logged). `input` is
+  // this step's (Charge or Defense held rules it out); any caller (a future
+  // AI too) may use it.
   tryDash(direction, input = NEUTRAL_INPUT) {
     const speed = this.def.movement.dashSpeed;
     if (!speed || !direction) return false;
     if (!this.canAct() || !this.body.grounded || this.charging || input.charge) return false;
+    if (this.combat.shielding || (input.defense && this.shieldAllowed())) return false;
     // Never a fast run passed off as a Dash: require real dash frames.
     if (!this.dashDuration || !this.sprites.has('dash')) {
       console.warn('[Alva] Dash has no animation frames; ignoring.');
       return false;
     }
-    if (!this.combat.spendStamina(this.staminaDef.dashCost)) return false;
+    if (!this.combat.spendEnergy(this.energyDef.dashCost)) return false;
     this.dash = { direction, time: 0, duration: this.dashDuration };
     this.facing = direction;
     this.body.vx = direction * speed;
@@ -563,10 +574,10 @@ export class Fighter {
   // respawn takes the spawn's. Otherwise it keeps its last facing: it never
   // turns toward its opponent by itself, standing still included, so an
   // opponent crossing behind it stays behind it. Locked while an attack,
-  // Dodge, stun, bind, charged technique or Dash plays.
+  // Shield, stun, bind, charged technique or Dash plays.
   updateFacing(dir) {
     const { body, combat } = this;
-    if (combat.attack || combat.defenseAction || combat.stun > 0 || combat.immobilized || this.technique || this.dash) return;
+    if (combat.attack || combat.shielding || combat.stun > 0 || combat.immobilized || this.technique || this.dash) return;
     if (dir !== 0 && (Math.abs(body.vx) > 20 || !body.grounded)) this.facing = dir;
   }
 
@@ -578,17 +589,18 @@ export class Fighter {
     else if (this.technique) next = 'technique';
     else if (combat.immobilized) next = 'bound';
     else if (combat.attack) next = 'attack';
-    else if (combat.defenseAction) next = 'defense';
     else if (this.dash) next = 'dash';
+    else if (combat.shielding) next = 'shield';
     else if (!body.grounded) next = body.vy < 0 ? 'jump' : 'fall';
     else if (this.isLanding(dt)) next = 'land';
-    else if (combat.blocking) next = 'block';
     else if (this.charging) next = 'charge';
+    else if (this.isReleasingShield(dt)) next = 'shieldRelease';
     else if (this.isReleasingCharge(dt)) next = 'chargeRelease';
     else if ((this.moveDir !== 0 && Math.abs(body.vx) > 20) || Math.abs(body.vx) > 140) next = 'run';
     else next = 'idle';
 
     if (next !== this.state) {
+      if (next === 'shield') this.shieldRaisedOnGround = body.grounded;
       this.state = next;
       this.stateTime = 0;
     } else {
@@ -607,16 +619,25 @@ export class Fighter {
     this.animator.update(dt);
   }
 
-  // Animation key for a visual state. An attack or Dodge plays its own clip
-  // for its whole length, even if the fighter lands or leaves the ground
-  // meanwhile. Hitstun, and being bound by a charged technique, show `hurt`
-  // on the ground and `midairHurt` in the air. A charged technique plays the
-  // clip of its current phase. Charge plays `chargeStart` once, then
-  // `chargeLoop` for the rest of the hold; a new Charge resets stateTime, so
-  // it starts from the first frame.
+  // Animation key for a visual state. An attack plays its own clip for its
+  // whole length, even if the fighter lands or leaves the ground meanwhile.
+  // Hitstun, and being bound by a charged technique, show `hurt` on the
+  // ground and `midairHurt` in the air. A charged technique plays the clip
+  // of its current phase. Charge plays `chargeStart` once, then `chargeLoop`
+  // for the rest of the hold; a new Charge resets stateTime, so it starts
+  // from the first frame. The Shield shows its held pose where the fighter
+  // is (`airAnimation` in the air), opening with `groundStartAnimation` for
+  // one frame when it goes up on the ground; `shieldRelease` is
+  // `groundReleaseAnimation`.
   animationFor(state) {
     if (state === 'attack') return this.combat.attack.def.animation;
-    if (state === 'defense') return this.combat.defenseAction.def.animation;
+    if (state === 'shield') {
+      const spec = this.defense;
+      if (!this.body.grounded) return spec.airAnimation;
+      const raising = this.shieldRaisedOnGround && this.stateTime < this.shieldStartDuration - TIME_EPSILON;
+      return raising ? spec.groundStartAnimation : spec.groundAnimation;
+    }
+    if (state === 'shieldRelease') return this.defense.groundReleaseAnimation;
     if (state === 'technique') return this.technique.animation;
     if (state === 'hitstun' || state === 'bound') return this.body.grounded ? 'hurt' : 'midairHurt';
     if (state === 'charge') {
@@ -633,6 +654,16 @@ export class Fighter {
     return this.state === 'land' && this.stateTime + dt < this.landDuration;
   }
 
+  // A Shield lowered on the ground (Defense let go, or its Energy gone)
+  // starts the shieldRelease state; it then lasts one pass of the lower
+  // pose while nothing of higher priority takes over. Lowered in the air it
+  // has no pose: the fighter goes straight back to jump or fall.
+  isReleasingShield(dt) {
+    if (!this.shieldReleaseDuration) return false;
+    if (this.state === 'shield') return this.body.grounded;
+    return this.state === 'shieldRelease' && this.stateTime + dt < this.shieldReleaseDuration - TIME_EPSILON;
+  }
+
   // A voluntary Charge release starts the chargeRelease state; it then lasts
   // one Charge frame-time while nothing of higher priority takes over. A new
   // Charge outranks it and starts again from charge1.
@@ -644,9 +675,9 @@ export class Fighter {
 
   // Whether the current frame is drawn mirrored. Each clip knows which way its
   // own artwork faces (`sourceFacing`, per animation, else the character's),
-  // so art drawn facing left (e.g. #0001's mid-air Dodge) is mirrored when the
-  // fighter faces right. Rendering only: `facing`, movement and every
-  // hurtbox / hitbox are unaffected.
+  // so a clip drawn facing left is mirrored when the fighter faces right.
+  // Rendering only: `facing`, movement and every hurtbox / hitbox are
+  // unaffected.
   get spriteFlip() {
     const sourceFacing = this.animator.anim?.sourceFacing ?? this.def.sourceFacing ?? 1;
     return this.facing !== sourceFacing;

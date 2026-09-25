@@ -42,25 +42,29 @@
 //   },
 //
 // Defense is the shared player input; each character's `defense` entry says
-// how it defends (see createDefenseDefinition):
+// how it defends (see createDefenseDefinition). The one type so far is the
+// Shield, a held guard all the way round the fighter:
 //
-//   // Dodge: one press, one clip; attacks pass through while invulnerable.
 //   defense: {
-//     type: 'dodge',
-//     ground: { animation: 'dodge', startup: 1 / 12, invulnerable: 1 / 12, recovery: 1 / 12 },
-//     air: { animation: 'midairDodge', ... },
+//     type: 'shield',
+//     groundAnimation: 'shield', airAnimation: 'midairShield',
+//     // Optional one-frame poses around the grounded hold:
+//     groundStartAnimation: 'shieldStart', groundReleaseAnimation: 'shieldRelease',
 //   }
-//   // Block: a held guard that takes chip damage (stats.blockDamageScale)
-//   // and each attack's blockstun instead of a full hit.
-//   defense: { type: 'block' }
 //
-// A hit's `damage` (a blocked hit's chip damage) is added to the target's
-// Launch Point (CombatState.launchPoint) first. Its launch strength is then
-// exactly Base Launch x that new Launch Point, sent along its Directional
-// Launch (see CombatSystem.applyHit). No Launch Point defeats a fighter:
-// only the Void takes one out of play.
+// While it is up (CombatState.shielding, see Fighter.update) any hit that
+// reaches the fighter's own hurtboxes, from either side, is blocked: it adds
+// no Launch Point and launches nothing, and the fighter pays
+// energy.shieldHitCost for that one hit instead. The Shield holds through
+// the hit's hitstop and blockstun (CombatState.shieldStun), never a hurt
+// pose. Holding it costs nothing; it cannot rise or stay up without the
+// Energy for one more block (CombatState.canShield).
 //
-// A Dodge is not an attack: no hitbox, damage, cooldown or combat event.
+// A hit's `damage` is added to the target's Launch Point
+// (CombatState.launchPoint) first. Its launch strength is then exactly Base
+// Launch x that new Launch Point, sent along its Directional Launch (see
+// CombatSystem.applyHit). No Launch Point defeats a fighter: only the Void
+// takes one out of play.
 //
 // A summon (see js/game/clone.js) is a detached attacker: a temporary clone
 // that performs one of its owner's attacks from its own position and facing.
@@ -80,12 +84,12 @@
 // when it is used and apart from the short recovery cooldowns of ordinary
 // attacks (CombatState.cooldowns).
 //
-// Stamina (CombatState.stamina, see resolveStamina) is the one resource a
-// fighter spends, and only on Dash, Dodge and Block: a Dash or a Dodge pays
-// its cost once as it starts, a held Block drains it per second. It refills
-// by itself, faster while the fighter is in its Charge stance. Emptied, it
-// exhausts the fighter: no Dash, Dodge or Block until it is full again.
-// Nothing else (movement, jumps, attacks, charged actions) ever touches it.
+// Energy (CombatState.energy, see resolveEnergy) is the one resource a
+// fighter spends, and only on Dash and Shield: a Dash pays dashCost as it
+// starts, and every hit the Shield blocks costs shieldHitCost. It refills by
+// itself, faster while the fighter is in its Charge stance. Emptied, it
+// exhausts the fighter: no Dash or Shield until it is full again. Nothing
+// else (movement, jumps, attacks, charged actions) ever touches it.
 
 import { resolveHitLaunch, resolveLaunchStrength, resolveDirectionalLaunch } from '../data/launch.js';
 
@@ -95,7 +99,6 @@ const ATTACK_DEFAULTS = {
   active: 0.06,
   recovery: 0.18,
   damage: 0,
-  chipDamage: 0,
   hitbox: { x: 0, y: -60, w: 30, h: 20 },
   hitstun: 0.2,
   blockstun: 0.12,
@@ -131,43 +134,38 @@ export function createAttackDefinition(spec) {
   return Object.freeze(def);
 }
 
-const DODGE_DEFAULTS = { animation: null, startup: 0, invulnerable: 0, recovery: 0 };
-
-function createDodgeMove(spec) {
-  if (!spec) return null;
-  const move = { ...DODGE_DEFAULTS, ...spec };
-  move.total = move.startup + move.invulnerable + move.recovery;
-  return Object.freeze(move);
-}
+const SHIELD_DEFAULTS = Object.freeze({
+  groundAnimation: null,
+  airAnimation: null,
+  groundStartAnimation: null,
+  groundReleaseAnimation: null,
+});
 
 // Frozen form of a character's `defense` entry, or null for a fighter that has
-// no Defense (the input then does nothing).
+// no Defense (the input then does nothing). Typed, so a future fighter can
+// defend in another way; an unknown type is refused.
 export function createDefenseDefinition(spec) {
   if (!spec) return null;
-  if (spec.type === 'dodge') {
-    return Object.freeze({ type: 'dodge', ground: createDodgeMove(spec.ground), air: createDodgeMove(spec.air) });
-  }
-  if (spec.type === 'block') return Object.freeze({ ...spec });
+  if (spec.type === 'shield') return Object.freeze({ ...SHIELD_DEFAULTS, ...spec });
   throw new Error(`[Alva] Unknown defense type "${spec.type}"`);
 }
 
-// A character's `stamina` entry, every field optional:
+// A character's `energy` entry, every field optional:
 //
-//   stamina: {
-//     max: 100,        // full, and where every fighter starts
-//     regen: 12,       // per second, whatever the fighter is doing
-//     chargeRegen: 30, // per second instead, while in the Charge stance
-//     dashCost: 25,    // spent once as a Dash starts
-//     dodgeCost: 25,   // spent once as a Dodge starts
-//     blockDrain: 20,  // per second while a Block guard is held
+//   energy: {
+//     max: 100,          // full, and where every fighter starts
+//     regen: 12,         // per second, whatever the fighter is doing
+//     chargeRegen: 30,   // per second instead, while in the Charge stance
+//     dashCost: 25,      // spent once as a Dash starts
+//     shieldHitCost: 25, // spent once for every hit the Shield blocks
 //   }
-const STAMINA_DEFAULTS = Object.freeze({
-  max: 100, regen: 12, chargeRegen: 30, dashCost: 25, dodgeCost: 25, blockDrain: 20,
+const ENERGY_DEFAULTS = Object.freeze({
+  max: 100, regen: 12, chargeRegen: 30, dashCost: 25, shieldHitCost: 25,
 });
 
-// Frozen stamina settings: the character's entry over the defaults.
-export function resolveStamina(spec) {
-  return Object.freeze({ ...STAMINA_DEFAULTS, ...spec });
+// Frozen Energy settings: the character's entry over the defaults.
+export function resolveEnergy(spec) {
+  return Object.freeze({ ...ENERGY_DEFAULTS, ...spec });
 }
 
 // Named cooldowns that each remember their full length, so progress can be
@@ -228,28 +226,27 @@ export class CooldownTimers {
 
 // Per-fighter combat state.
 export class CombatState {
-  constructor(stats = {}, stamina = resolveStamina()) {
+  constructor(energy = resolveEnergy()) {
     // Launch Point: starts at 0 on every fresh life and only ever grows, by
     // exactly the damage each hit deals (see CombatSystem.applyHit). Never
     // negative, no maximum, and it never stops the fighter acting; a
     // launching hit multiplies it by its Base Launch.
     this.launchPoint = 0;
-    // Stamina for Dash, Dodge and Block (see resolveStamina): full at the
-    // start, never below 0 or above maxStamina. Emptying it exhausts the
-    // fighter, and only a full refill clears that (see setStamina).
-    this.staminaSpec = stamina;
-    this.maxStamina = stamina.max;
-    this.stamina = stamina.max;
-    this.staminaExhausted = false;
-    // Block-type Defense only: the held guard and its chip-damage scale (a
-    // blocked hit adds that share of its damage to Launch Point).
-    this.blockDamageScale = stats.blockDamageScale ?? 0.2;
-    this.blocking = false;
-    this.stun = 0;          // hitstun / blockstun remaining
+    // Energy for Dash and Shield (see resolveEnergy): full at the start,
+    // never below 0 or above maxEnergy. Emptying it exhausts the fighter,
+    // and only a full refill clears that (see setEnergy).
+    this.energySpec = energy;
+    this.maxEnergy = energy.max;
+    this.energy = energy.max;
+    this.energyExhausted = false;
+    // The Shield is up (see Fighter.update): hits that reach the fighter are
+    // blocked (see CombatSystem.applyHit).
+    this.shielding = false;
+    this.stun = 0;          // hitstun remaining
+    this.shieldStun = 0;    // blockstun remaining, held in the Shield
     this.hitstop = 0;       // freeze frames on impact
     this.attack = null;     // { def, time, hasHit, projectileSpawned }
     this.release = null;    // the attack's projectile, released this step (see Fighter.update)
-    this.defenseAction = null; // { type: 'dodge', def, time } while a Dodge plays
     // Ordinary attacks' short recovery cooldowns: attack id -> seconds left.
     this.cooldowns = new Map();
     // Charged actions' own cooldowns (Charged BA1, Charged BA2), by summon or
@@ -268,20 +265,6 @@ export class CombatState {
   get phase() {
     const a = this.attack;
     return a ? attackPhase(a.def, a.time) : null;
-  }
-
-  // 'startup' | 'invulnerable' | 'recovery' while a Dodge plays, else null.
-  get defensePhase() {
-    const d = this.defenseAction;
-    if (!d) return null;
-    if (d.time < d.def.startup - PHASE_EPSILON) return 'startup';
-    if (d.time < d.def.startup + d.def.invulnerable - PHASE_EPSILON) return 'invulnerable';
-    return 'recovery';
-  }
-
-  // Attacks pass through an invulnerable fighter (see CombatSystem.update).
-  get invulnerable() {
-    return this.defensePhase === 'invulnerable';
   }
 
   // Bound: caught and held by a charged technique (see bind). Unlike
@@ -303,69 +286,70 @@ export class CombatState {
     return this.binds.has(source);
   }
 
-  // Free of any attack, Dodge, stun or bind. Launch Point never matters
-  // here, however high it is, and neither does stamina.
+  // Free of any attack, stun (a Shield's blockstun included) or bind.
+  // Launch Point never matters here, however high it is, and neither does
+  // Energy.
   canAct() {
-    return !this.attack && !this.defenseAction && this.stun <= 0 && !this.immobilized;
+    return !this.attack && this.stun <= 0 && this.shieldStun <= 0 && !this.immobilized;
   }
 
-  // ---- Stamina ----------------------------------------------------------------
+  // ---- Energy -----------------------------------------------------------------
 
   // Whether something costing `cost` may start now: never while exhausted,
   // however much has refilled since, and only with at least `cost` left.
-  canUseStamina(cost) {
-    return !this.staminaExhausted && this.stamina >= cost - PHASE_EPSILON;
+  canUseEnergy(cost) {
+    return !this.energyExhausted && this.energy >= cost - PHASE_EPSILON;
   }
 
-  // Pays `cost` at once, if canUseStamina allows it. True when paid.
-  spendStamina(cost) {
-    if (!this.canUseStamina(cost)) return false;
-    this.setStamina(this.stamina - cost);
+  // Whether the Shield may be up: the Energy to block one more hit, and not
+  // exhausted. Below shieldHitCost it waits for the refill to reach it;
+  // exhausted, for a full refill.
+  canShield() {
+    return this.canUseEnergy(this.energySpec.shieldHitCost);
+  }
+
+  // Pays `cost` at once, if canUseEnergy allows it. True when paid.
+  spendEnergy(cost) {
+    if (!this.canUseEnergy(cost)) return false;
+    this.setEnergy(this.energy - cost);
     return true;
   }
 
-  // Takes up to `amount` (a held Block's drain for one step). True while
-  // some is left; false once it has run out and exhausted the fighter.
-  drainStamina(amount) {
-    this.setStamina(this.stamina - amount);
-    return !this.staminaExhausted;
-  }
-
-  regenStamina(amount) {
-    this.setStamina(this.stamina + amount);
+  regenEnergy(amount) {
+    this.setEnergy(this.energy + amount);
   }
 
   // One step of recovery: chargeRegen per second while `charging` (the
   // fighter is really in its Charge stance), regen per second otherwise.
-  updateStamina(dt, charging) {
-    const spec = this.staminaSpec;
-    this.regenStamina(dt * (charging ? spec.chargeRegen : spec.regen));
+  updateEnergy(dt, charging) {
+    const spec = this.energySpec;
+    this.regenEnergy(dt * (charging ? spec.chargeRegen : spec.regen));
   }
 
   // Full again, not exhausted (a fresh fighter, a respawn).
-  refillStamina() {
-    this.setStamina(this.maxStamina);
+  refillEnergy() {
+    this.setEnergy(this.maxEnergy);
   }
 
-  // stamina / maxStamina, from 0 to 1.
-  get staminaRatio() {
-    return this.maxStamina > 0 ? Math.min(1, Math.max(0, this.stamina / this.maxStamina)) : 0;
+  // energy / maxEnergy, from 0 to 1.
+  get energyRatio() {
+    return this.maxEnergy > 0 ? Math.min(1, Math.max(0, this.energy / this.maxEnergy)) : 0;
   }
 
   // Every change goes through here: clamped to [0, max] (to within a little
   // slack, as steps are sums of floats). Reaching 0 exhausts the fighter;
   // only reaching max again clears it.
-  setStamina(value) {
-    const max = this.maxStamina;
+  setEnergy(value) {
+    const max = this.maxEnergy;
     let v = Math.min(max, Math.max(0, value));
     if (v <= PHASE_EPSILON) {
       v = 0;
-      this.staminaExhausted = true;
+      this.energyExhausted = true;
     } else if (v >= max - PHASE_EPSILON) {
       v = max;
-      this.staminaExhausted = false;
+      this.energyExhausted = false;
     }
-    this.stamina = v;
+    this.energy = v;
   }
 
   update(dt) {
@@ -378,6 +362,7 @@ export class CombatState {
       return;
     }
     if (this.stun > 0) this.stun = Math.max(0, this.stun - dt);
+    if (this.shieldStun > 0) this.shieldStun = Math.max(0, this.shieldStun - dt);
     if (this.attack) {
       this.attack.time += dt;
       // One-shot release: the step the attack's time crosses `spawnAt`. A
@@ -391,11 +376,6 @@ export class CombatState {
         this.cooldowns.set(this.attack.def.id, this.attack.def.cooldown);
         this.attack = null;
       }
-    }
-    // A Dodge ends by itself after one pass of its clip.
-    if (this.defenseAction) {
-      this.defenseAction.time += dt;
-      if (this.defenseAction.time >= this.defenseAction.def.total - PHASE_EPSILON) this.defenseAction = null;
     }
   }
 }
@@ -418,22 +398,24 @@ const scratchHurt = {};
 // Resolves hits each simulation step: fighters' melee hitboxes, then live
 // projectiles (see js/game/projectile.js), then summoned clones (see
 // js/game/clone.js), then charged techniques (see
-// js/game/charged-technique.js).
+// js/game/charged-technique.js). A shielding target is struck exactly like
+// any other (its own hurtboxes, never a bigger circle): applyHit decides the
+// hit is blocked, and the hitbox is used up either way.
 export class CombatSystem {
   constructor() {
-    // { type: 'hit' | 'block', attacker, target, move, damage,
+    // { type: 'hit' | 'block', attacker, target, move, damage, energyCost,
     //   launchPointBefore, launchPointAfter, baseLaunch, directionalLaunch,
     //   launchStrength, finalLaunch, projectile, summon, technique }
-    // `damage` is what the hit added to the target's Launch Point, `move`
-    // the id of the attack or hit that dealt it. `baseLaunch` is the hit's
-    // Base Launch (0-3) and `directionalLaunch` its direction;
-    // `launchStrength` is baseLaunch x launchPointAfter, and `finalLaunch`
-    // the world-space velocity { x, y } the target was given: that strength
-    // at LAUNCH_UNIT_SPEED per point along the direction (y grows downward;
-    // on a block, half of it sideways and none vertically; zero for no
-    // launch). `attacker` is the owner for a projectile or clone hit;
-    // `projectile`, `summon` and `technique` are null for the fighter's own
-    // melee.
+    // `damage` is what the hit added to the target's Launch Point (0 on a
+    // block), `move` the id of the attack or hit that dealt it and
+    // `energyCost` what the target's Shield paid for it (0 on a hit).
+    // `baseLaunch` is the hit's Base Launch (0-3) and `directionalLaunch` its
+    // direction; `launchStrength` is baseLaunch x launchPointAfter (0 on a
+    // block), and `finalLaunch` the world-space velocity { x, y } the target
+    // was given: that strength at LAUNCH_UNIT_SPEED per point along the
+    // direction (y grows downward; zero for no launch). `attacker` is the
+    // owner for a projectile or clone hit; `projectile`, `summon` and
+    // `technique` are null for the fighter's own melee.
     this.events = [];
   }
 
@@ -446,11 +428,9 @@ export class CombatSystem {
       const hit = worldBox(attacker, atk.def.hitbox, scratchHit);
       for (const target of fighters) {
         if (target === attacker) continue;
-        // Dodged: the attack passes through without being used up, so it can
-        // still connect if it is active after the invulnerable frames end.
-        if (target.combat.invulnerable) continue;
         const struck = target.def.hurtboxes.some((hb) => intersects(hit, worldBox(target, hb, scratchHurt)));
         if (!struck) continue;
+        // One hit per attack, blocked or not.
         atk.hasHit = true;
         this.applyHit(attacker, target, atk.def);
         break;
@@ -461,12 +441,9 @@ export class CombatSystem {
       const hit = p.hitbox(scratchHit);
       for (const target of fighters) {
         if (target === p.owner) continue;
-        // Dodged: the projectile flies on, unspent, and can still connect if
-        // it overlaps once the invulnerable frames end.
-        if (target.combat.invulnerable) continue;
         const struck = target.def.hurtboxes.some((hb) => intersects(hit, worldBox(target, hb, scratchHurt)));
         if (!struck) continue;
-        // One hit, then it is gone (a blocked projectile included).
+        // One hit, then it is gone (a Shielded projectile included).
         p.alive = false;
         this.applyHit(p.owner, target, p.def, { facing: p.direction, projectile: p });
         break;
@@ -478,14 +455,11 @@ export class CombatSystem {
       if (!hit) continue;
       for (const target of fighters) {
         if (target === c.owner) continue;
-        // Dodged: passes through unspent, exactly like the fighter's own.
-        if (target.combat.invulnerable) continue;
         const struck = target.def.hurtboxes.some((hb) => intersects(hit, worldBox(target, hb, scratchHurt)));
         if (!struck) continue;
         c.hasHit = true;
         // The clone's own facing, never the owner's: a horizontal launch
-        // travels from the clone, and a Block guard must face the clone to
-        // hold.
+        // travels from the clone.
         this.applyHit(c.owner, target, c.attackDef, { facing: c.facing, summon: c });
         c.hitstop = c.attackDef.hitstop;
         break;
@@ -497,9 +471,7 @@ export class CombatSystem {
       // The ticks while it holds its target, one hit each: Launch Point
       // only, no launch. Never on the explosion's step (see
       // ChargedTechnique.update).
-      for (let target = t.takeTick(); target; target = t.takeTick()) {
-        this.applyHit(owner, target, t.def.tickHit, { facing: t.facing, technique: t });
-      }
+      this.applyTicks(owner, t);
       // The delayed explosion, on the step its first frame shows: the target
       // is released first, then takes the big hit and its launch.
       if (t.explosionDue) {
@@ -512,57 +484,76 @@ export class CombatSystem {
       if (!hit) continue;
       for (const target of fighters) {
         if (target === owner) continue;
-        // Dodged: the rush carries on, unspent, and can still connect after
-        // the invulnerable frames.
-        if (target.combat.invulnerable) continue;
         const struck = target.def.hurtboxes.some((hb) => intersects(hit, worldBox(target, hb, scratchHurt)));
         if (!struck) continue;
-        // The contact, exactly once; the sphere stops searching after it.
+        // The contact, exactly once; the sphere stops searching after it. A
+        // Shield blocks it and the technique ends there; otherwise the
+        // target is bound and its first tick lands on this same step.
         const event = this.applyHit(owner, target, t.def.firstHit, { facing: t.facing, technique: t });
         const ended = t.contact(target, event.type === 'block');
         if (ended) owner.endTechnique(ended);
+        else this.applyTicks(owner, t);
         break;
       }
     }
     return this.events;
   }
 
+  // Every tick `t` has due this step, each one tickHit on its target.
+  applyTicks(owner, t) {
+    for (let target = t.takeTick(); target; target = t.takeTick()) {
+      this.applyHit(owner, target, t.def.tickHit, { facing: t.facing, technique: t });
+    }
+  }
+
   // Shared by melee, projectiles, clones and charged techniques. `facing` is
   // the direction the hit travels: the attacker's facing for melee, the
   // projectile's own direction (fixed when thrown), the clone's facing
-  // (fixed when summoned) or the technique's (fixed when it started).
-  // `blocked` needs a Block-type guard facing into it; a Dodge never blocks,
-  // so a hit outside its invulnerable frames is a full hit. A detached hit
-  // (a projectile's, a clone's or a technique's) freezes only its target.
+  // (fixed when summoned) or the technique's (fixed when it started). A
+  // detached hit (a projectile's, a clone's or a technique's) freezes only
+  // its target.
   //
-  // The damage (chip damage when blocked) is added to the target's Launch
-  // Point first, so the hit that raises it already launches from the new
-  // total. The launch strength is exactly Base Launch x that Launch Point,
-  // sent along the hit's Directional Launch at LAUNCH_UNIT_SPEED world units
-  // per second per point (see js/data/launch.js). Block then modifies the
-  // resolved launch: half of it sideways, none of it vertically. A hit that
-  // does not launch (Base Launch 0, no direction, or nothing left after
-  // Block) leaves the target's velocity as it is. Returns the event it
-  // recorded.
+  // A target whose Shield is up blocks the hit, whichever side it comes
+  // from: no Launch Point, no launch and no hitstun, only the hit's hitstop
+  // and its blockstun, held in the Shield. The Shield pays
+  // energy.shieldHitCost for it, once; a block that leaves too little for
+  // another one drops the Shield straight away (a block that empties it
+  // also exhausts the fighter), so a later hit, even on this same step,
+  // lands in full. The block itself stands.
+  //
+  // Otherwise the damage is added to the target's Launch Point first, so
+  // the hit that raises it already launches from the new total. The launch
+  // strength is exactly Base Launch x that Launch Point, sent along the
+  // hit's Directional Launch at LAUNCH_UNIT_SPEED world units per second per
+  // point (see js/data/launch.js). A hit that does not launch (Base Launch
+  // 0 or no direction) leaves the target's velocity as it is. Returns the
+  // event it recorded.
   applyHit(attacker, target, def, {
     facing = attacker.facing, projectile = null, summon = null, technique = null,
     detached = !!(projectile || summon || technique),
   } = {}) {
     const tc = target.combat;
-    const blocked = tc.blocking && target.facing === -facing;
-    // Hitstun always wins: a hit cancels a Dodge in its startup or recovery.
-    tc.defenseAction = null;
-    const damage = blocked ? def.chipDamage || def.damage * tc.blockDamageScale : def.damage;
+    const blocked = tc.shielding;
+    let energyCost = 0;
+    if (blocked) {
+      energyCost = tc.energySpec.shieldHitCost;
+      tc.setEnergy(tc.energy - energyCost);
+      if (!tc.canShield()) tc.shielding = false;
+    }
+    const damage = blocked ? 0 : def.damage;
     const launchPointBefore = tc.launchPoint;
     tc.launchPoint = Math.max(0, launchPointBefore + damage);
     const launchPointAfter = tc.launchPoint;
-    const launchStrength = resolveLaunchStrength(def.baseLaunch, launchPointAfter);
-    const launch = resolveDirectionalLaunch(def.directionalLaunch, launchStrength, facing);
-    const finalLaunch = blocked ? blockLaunch(launch) : launch;
+    const launchStrength = blocked ? 0 : resolveLaunchStrength(def.baseLaunch, launchPointAfter);
+    const finalLaunch = resolveDirectionalLaunch(def.directionalLaunch, launchStrength, facing);
     // A hit with no stun or freeze of its own (a charged technique's tick)
-    // leaves any already running as it is.
-    const stun = blocked ? def.blockstun : def.hitstun;
-    if (stun > 0) tc.stun = stun;
+    // leaves any already running as it is. A block's stun holds the Shield
+    // only while it is still up.
+    if (blocked) {
+      if (tc.shielding && def.blockstun > 0) tc.shieldStun = def.blockstun;
+    } else if (def.hitstun > 0) {
+      tc.stun = def.hitstun;
+    }
     if (def.hitstop > 0) tc.hitstop = def.hitstop;
     if (!detached) attacker.combat.hitstop = def.hitstop;
     // ...and a charged technique: no armour. It ends at once, releasing
@@ -579,20 +570,11 @@ export class CombatSystem {
     }
     const event = {
       type: blocked ? 'block' : 'hit', attacker, target, move: def.id ?? null,
-      damage, launchPointBefore, launchPointAfter,
+      damage, energyCost, launchPointBefore, launchPointAfter,
       baseLaunch: def.baseLaunch, directionalLaunch: def.directionalLaunch, launchStrength, finalLaunch,
       projectile, summon, technique,
     };
     this.events.push(event);
     return event;
   }
-}
-
-// Block's modifier on a resolved launch: a Block rule, not part of the
-// launch strength. The guard takes half of a horizontal launch and none of
-// a vertical or reverse vertical one.
-export const BLOCKED_HORIZONTAL_LAUNCH_SCALE = 0.5;
-
-export function blockLaunch(launch) {
-  return Object.freeze({ x: BLOCKED_HORIZONTAL_LAUNCH_SCALE * launch.x, y: 0 });
 }

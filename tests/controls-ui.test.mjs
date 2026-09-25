@@ -1,6 +1,6 @@
 // Run with node --test tests/controls-ui.test.mjs (no dependencies).
 // Touch controls and Help content for Basic Attacks 1 and 2 (BA1, BA2),
-// Charge, Throw (the primary action) and Defense (#0001's Dodge) on a
+// Charge, Throw (the primary action) and Defense (#0001's Shield) on a
 // minimal fake DOM; layout and paint still need real-browser verification.
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -389,7 +389,7 @@ test('the mobile diagram shows C for Charge between Left and Right', () => {
   assert.doesNotMatch(legend, /Down/);
 });
 
-test('help explains that Charge is held, loops while held, and speeds up the charged cooldowns; no Health or Energy', () => {
+test('help explains that Charge is held, loops while held, and speeds up the charged cooldowns; Energy by name, no Health', () => {
   const help = buildHelp();
   const items = help.querySelectorAll('li').map((li) => li.textContent).join(' ');
   assert.match(items, /Hold Charge \(S \/ ↓, or C on touch\) while grounded/);
@@ -397,7 +397,10 @@ test('help explains that Charge is held, loops while held, and speeds up the cha
   assert.match(items, /two-frame startup once, then loops its sustained pose/);
   assert.match(items, /own 5-second cooldown/);
   assert.match(items, /Charging makes both cooldowns recover twice as fast/);
-  assert.doesNotMatch(help.textContent, /Energy|health/i, 'no Health or Energy anywhere in Help');
+  assert.doesNotMatch(help.textContent, /health|stamina/i, 'no Health, and never the old Stamina, anywhere in Help');
+  assert.match(items, /The purple bar above your fighter is Energy, shown in three segments/);
+  assert.match(items, /If Energy reaches zero, it turns gray and must fully refill before Shield and Dash become available again/);
+  assert.match(items, /refills your Energy faster too/);
   const notes = help.querySelectorAll('.info-note').map((p) => p.textContent).join(' ');
   assert.match(notes, /down to Charge/);
   assert.match(notes, /C is Charge: hold it to charge/);
@@ -420,7 +423,7 @@ test('help explains the Charged BA1 Clone Attack in the Charge & cooldowns card,
   assert.ok(!rows.some((r) => /clone/i.test(r)), 'no control row for it');
 });
 
-// ---- Defense (#0001's Dodge) ---------------------------------------------
+// ---- Defense (#0001's Shield) --------------------------------------------
 
 const CSS = readFileSync(new URL('../styles.css', import.meta.url), 'utf8');
 
@@ -490,7 +493,7 @@ test('help lists Defense on L, never a generic Block control', () => {
   assert.doesNotMatch(help.textContent, /\bblock\b/i, 'no Block anywhere in Help');
 });
 
-test('the mobile diagram shows D for Defense in the old Block spot and says #0001 dodges', () => {
+test('the mobile diagram shows D for Defense in the old Block spot and says #0001 shields', () => {
   const help = buildHelp();
   assert.equal(help.querySelector('.md-block'), null);
   const dot = help.querySelector('.md-defense');
@@ -502,28 +505,33 @@ test('the mobile diagram shows D for Defense in the old Block spot and says #000
   assert.deepEqual(order.slice(4, 8), ['Throw', 'Special', 'Defense', 'Basic Attack 1']);
   const label = help.querySelector('.mobile-diagram').getAttribute('aria-label');
   assert.match(label, /Throw \(T\), Special, Defense \(D\), Basic Attack 1/);
-  assert.match(label, /#0001 uses Dodge as its Defense/);
-  assert.doesNotMatch(label, /Block/);
+  assert.match(label, /#0001 holds Defense to Shield/);
+  assert.doesNotMatch(label, /Block|Dodge/);
   const legend = help.querySelector('.md-legend').textContent;
   assert.match(legend, /Special · D, BA1/);
-  assert.match(legend, /#0001 uses Dodge as its Defense/);
+  assert.match(legend, /Defense; hold it and #0001 shields/);
 });
 
-test('help explains Defense, #0001\'s Dodge and the Charge release', () => {
+test('help explains Defense, #0001\'s Shield, its Energy cost and lockout, and the Charge release', () => {
   const help = buildHelp();
+  assert.doesNotMatch(help.textContent, /dodge|invulnerab/i, 'no Dodge left anywhere in Help');
   const notes = help.querySelectorAll('.info-note').map((p) => p.textContent).join(' ');
   assert.match(notes, /RB \/ RT for Defense/);
-  assert.match(notes, /D is Defense, which #0001 uses to Dodge/);
+  assert.match(notes, /D is Defense: hold it to Shield/);
   const items = help.querySelectorAll('li').map((li) => li.textContent).join(' ');
   assert.match(items, /Defense \(L, RB \/ RT, or D on touch\) is the shared defensive button/);
-  assert.match(items, /#0001 dodges/);
-  assert.match(items, /One press, one Dodge/);
-  assert.match(items, /Holding Defense does not repeat it/);
-  assert.match(items, /never takes chip damage/);
+  assert.match(items, /#0001 shields/);
+  assert.match(items, /Defense — Hold to Shield\. Blocking a hit costs 25 Energy\./);
+  assert.match(items, /a circle all round #0001, on the ground and in the air/);
+  assert.match(items, /from either side: no Launch Point and no launch/);
+  assert.match(items, /Holding it costs nothing, and neither does an attack that misses/);
+  assert.match(items, /In the air he keeps falling/);
+  assert.match(items, /If Energy reaches zero, it turns gray and must fully refill before Shield and Dash become available again/);
   assert.match(items, /Let go and #0001 shows its first Charge pose for a moment/);
-  assert.match(items, /Jump, Throw and Defense \(Dodge\) take over from Charge at once/);
+  assert.match(items, /holding Defense raises the Shield instead/);
+  assert.match(items, /A Shield blocks the sphere: no trap, no explosion/);
   const build = help.querySelectorAll('.info-text').map((p) => p.textContent).join(' ');
-  assert.match(build, /Defense is a ground and mid-air Dodge for #0001/);
+  assert.match(build, /Defense is a held Shield for #0001, on the ground and in the air/);
   assert.doesNotMatch(build, /guard state/);
 });
 
@@ -602,7 +610,7 @@ test('the mobile diagram shows T for Throw in the upper-right slot', () => {
   const legend = help.querySelector('.md-legend').textContent;
   assert.match(legend, /T, Special · D, BA1 · BA2 · Jump/);
   assert.match(legend, /Throw; #0001 throws a shuriken\./);
-  assert.match(legend, /Defense; #0001 uses Dodge as its Defense\./);
+  assert.match(legend, /Defense; hold it and #0001 shields\./);
 });
 
 test('help explains Throw and lists it in this build', () => {
@@ -616,7 +624,7 @@ test('help explains Throw and lists it in this build', () => {
   assert.match(build, /BA1/);
   assert.match(build, /BA2/);
   assert.match(build, /Charge/);
-  assert.match(build, /Dodge/);
+  assert.match(build, /Shield/);
   assert.match(build, /Only Special is still reserved/);
   assert.match(build, /training CPU never attacks/);
   assert.doesNotMatch(build, /mid-air Throw/i);

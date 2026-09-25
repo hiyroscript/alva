@@ -36,7 +36,6 @@ const PROJECTILE_DEFAULTS = {
   lifetime: 1,
   hitbox: { x: -4, y: -4, w: 8, h: 8 },
   damage: 0,
-  chipDamage: 0,
   baseLaunch: 0,
   directionalLaunch: null,
   hitstun: 0.2,

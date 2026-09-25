@@ -552,66 +552,62 @@ test('Jump interrupts Charge through the normal jump', () => {
   assert.ok(!states.includes('chargeRelease'), states.join());
 });
 
-test('a Defense press interrupts Charge with an immediate Dodge; a held Charge restarts from charge1 after it', () => {
+test('held Defense interrupts Charge with the Shield at once; a held Charge restarts from charge1 after it', () => {
   const { fighter, step } = makeFighter();
   chargeIntoLoop(step);
   step({ ...CHARGE, ...DEFENSE });
-  assert.equal(fighter.state, 'defense');
-  assert.equal(fighter.combat.defenseAction.type, 'dodge');
-  assert.equal(fighter.animator.anim.key, 'dodge');
-  assert.equal(frameName(fighter), '0001_dodge1.png', 'no release pose first');
+  assert.equal(fighter.state, 'shield');
+  assert.equal(fighter.combat.shielding, true);
+  assert.equal(fighter.animator.anim.key, 'shieldStart');
+  assert.equal(frameName(fighter), '0001_prepshield.png', 'no release pose first');
   assert.equal(fighter.charging, false);
-  assert.equal(fighter.combat.blocking, false, 'Defense is a Dodge, never a guard');
-  const frames = [];
-  while (fighter.state === 'defense') {
-    frames.push(frameName(fighter));
+  // Held together, the Shield keeps outranking Charge.
+  for (let i = 0; i < steps(1); i++) {
     step({ ...CHARGE, defense: true });
+    assert.equal(fighter.state, 'shield');
+    assert.equal(fighter.charging, false, 'no Charge stance under the Shield');
   }
-  assert.deepEqual(frames.filter((n, i, a) => n !== a[i - 1]), ['0001_dodge1.png', '0001_dodge2.png', '0001_dodge3.png']);
-  assert.equal(frames.length, steps(3 / 12), 'the whole Dodge, once');
-  // Still holding Charge (and Defense): a fresh Charge from charge1, not the loop.
+  // Defense let go, Charge still held: a fresh Charge from charge1, not the
+  // loop and not the Shield's lower pose.
+  step(CHARGE);
   assert.equal(fighter.state, 'charge');
   assert.equal(frameName(fighter), '0001_charge1.png');
   assert.equal(fighter.animator.anim.key, 'chargeStart');
 
-  // Pressing Defense with Charge from idle dodges; Charge waits for the Dodge.
+  // Pressing Defense with Charge from idle shields; Charge waits for Defense.
   const both = makeFighter();
   both.step({ ...CHARGE, ...DEFENSE });
-  assert.equal(both.fighter.state, 'defense');
-  stepUntil(both.step, (f) => f.state !== 'defense', CHARGE);
+  assert.equal(both.fighter.state, 'shield');
+  for (let i = 0; i < 20; i++) both.step({ ...CHARGE, defense: true });
+  assert.equal(both.fighter.state, 'shield');
+  both.step(CHARGE);
   assert.equal(both.fighter.state, 'charge');
   assert.equal(frameName(both.fighter), '0001_charge1.png');
 });
 
-test('letting go of Charge on the step Defense is pressed dodges at once; no release pose', () => {
+test('letting go of Charge on the step Defense is pressed shields at once; no Charge release pose', () => {
   for (const releaseOn of CHARGE_FRAMES) {
     const { fighter, step } = makeFighter();
     stepUntil(step, (f) => frameName(f) === releaseOn, CHARGE);
     step(DEFENSE); // charge: false and defensePressed: true on the same step
-    assert.equal(fighter.state, 'defense', `after ${releaseOn}`);
-    assert.equal(frameName(fighter), '0001_dodge1.png');
+    assert.equal(fighter.state, 'shield', `after ${releaseOn}`);
+    assert.equal(frameName(fighter), '0001_prepshield.png');
     const states = [fighter.state];
+    for (let i = 0; i < steps(0.5); i++) states.push(step({ defense: true }).state);
     for (let i = 0; i < steps(0.5); i++) states.push(step().state);
     assert.ok(!states.includes('chargeRelease'), states.join());
     assert.ok(!states.includes('charge'));
-    assert.equal(fighter.state, 'idle', 'normal state selection after the Dodge');
+    assert.equal(fighter.state, 'idle', 'normal state selection after the Shield');
   }
 });
 
-test('a Block-type fighter\'s held guard still outranks Charge (future blockers)', () => {
-  const blocker = { ...def, defense: { type: 'block' } };
-  const { fighter, step } = makeFighter({ character: blocker });
-  step({ ...CHARGE, defense: true });
-  assert.equal(fighter.state, 'block');
-  assert.equal(fighter.combat.blocking, true);
-  assert.equal(fighter.charging, false);
-
-  chargeIntoLoop(step);
-  step({ ...CHARGE, defense: true });
-  assert.equal(fighter.state, 'block', 'the guard, not the release pose');
-  step(CHARGE);
+test('with too little Energy for a Shield, held Defense leaves Charge alone', () => {
+  const { fighter, step } = makeFighter();
+  fighter.combat.setEnergy(10);
+  for (let i = 0; i < 10; i++) step({ ...CHARGE, defense: true });
+  assert.equal(fighter.combat.shielding, false);
   assert.equal(fighter.state, 'charge');
-  assert.equal(frameName(fighter), '0001_charge1.png');
+  assert.equal(fighter.charging, true);
 });
 
 // ---- No combat effect -------------------------------------------------------------
@@ -949,30 +945,26 @@ test('a cooldown never goes below 0 and is simply ready, and the recovery is det
   assert.deepEqual(run(), run());
 });
 
-test('charging, releasing, dodging, attacking and hits start no charged cooldown: only the charged actions do', () => {
+test('charging, releasing, shielding, attacking and hits start no charged cooldown: only the charged actions do', () => {
   const none = (...fighters) => {
     for (const f of fighters) assert.equal(f.combat.chargedCooldowns.size, 0);
   };
   // Charging and releasing for a while, then repeated ground and mid-air
-  // Dodges, then a BA1 the target dodges clean through.
-  const dodge = duel();
-  for (let i = 0; i < steps(2); i++) dodge.tick(i % 40 < 30 ? CHARGE : {}, i % 40 < 30 ? CHARGE : {});
-  none(dodge.attacker, dodge.target);
+  // Shields, then a BA1 the target's Shield blocks.
+  const guard = duel();
+  for (let i = 0; i < steps(2); i++) guard.tick(i % 40 < 30 ? CHARGE : {}, i % 40 < 30 ? CHARGE : {});
+  none(guard.attacker, guard.target);
   for (let i = 0; i < steps(2); i++) {
-    const press = i % 20 === 0 ? DEFENSE : i === 60 ? JUMP : {};
-    dodge.tick(press, press);
+    const press = i % 20 < 12 ? { defense: true, defensePressed: i % 20 === 0 } : i === 70 ? JUMP : {};
+    guard.tick(press, press);
   }
-  none(dodge.attacker, dodge.target);
-  while (!dodge.target.grounded || dodge.target.combat.defenseAction) dodge.tick();
-  assert.equal(dodge.target.body.x - dodge.attacker.body.x, 44, 'still in BA1 range');
-  // Those Dodges spent its stamina (see stamina.test.mjs): full again for
-  // the one below.
-  assert.ok(dodge.target.combat.stamina < dodge.target.combat.maxStamina);
-  dodge.target.combat.refillStamina();
-  dodge.tick(BA1, DEFENSE);
-  while (dodge.attacker.combat.attack) dodge.tick();
-  assert.deepEqual(dodge.events, [], 'the BA1 passed through the Dodge');
-  none(dodge.attacker, dodge.target);
+  none(guard.attacker, guard.target);
+  while (!guard.target.grounded || guard.target.state !== 'idle') guard.tick();
+  assert.equal(guard.target.body.x - guard.attacker.body.x, 44, 'still in BA1 range');
+  guard.tick(BA1, DEFENSE);
+  while (guard.attacker.combat.attack) guard.tick({}, { defense: true });
+  assert.deepEqual(guard.events.map((e) => e.type), ['block'], 'the BA1 was Shielded');
+  none(guard.attacker, guard.target);
 
   // Clean BA1 and BA2 hits: dealing and taking hits start none either.
   for (const press of [BA1, BA2]) {

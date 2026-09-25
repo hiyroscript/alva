@@ -32,7 +32,8 @@ export class PlayerController {
 // Non-attacking training opponent: keeps a readable distance, follows the
 // player across platforms and occasionally repositions. It never presses
 // combat buttons (Throw and Basic Attacks 1 and 2 included, so it never
-// throws a shuriken), Charge or Defense, so the player can practise on it.
+// throws a shuriken), Charge or Defense (so it never shields), so the player
+// can practise on it.
 // It drops through one-way platforms with `dropPressed`, an intent no player
 // control produces. It never walks off the main floor's edges into open air
 // on its own (see atLedge): it only leaves the stage when knocked off.

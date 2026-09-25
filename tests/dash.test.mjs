@@ -263,8 +263,8 @@ test('a Dash is movement only: no hitbox, damage, launch or invulnerability, eve
   assert.ok(d.attacker.dash);
   for (let i = 0; i < DASH_STEPS; i++) {
     assert.equal(d.attacker.combat.attack, null, 'no attack');
-    assert.equal(d.attacker.combat.invulnerable, false, 'never invulnerable');
-    assert.equal(d.attacker.combat.defenseAction, null);
+    assert.equal('invulnerable' in d.attacker.combat, false, 'no invulnerability of any kind');
+    assert.equal(d.attacker.combat.shielding, false);
     d.tick({ right: true });
   }
   assert.deepEqual(d.events, [], 'no hit of any kind');
@@ -285,15 +285,15 @@ test('a Dash is movement only: no hitbox, damage, launch or invulnerability, eve
 
 // ---- Gating ------------------------------------------------------------------------------
 
-test('no Dash (and nothing spent) while airborne, attacking, stunned, bound, charging, already dashing, exhausted, short of stamina or without dash art', () => {
+test('no Dash (and nothing spent) while airborne, attacking, stunned, bound, charging, shielding, already dashing, exhausted, short of Energy or without dash art', () => {
   const refused = (label, setup) => {
     const f = makeFighter(setup.options);
     setup.before?.(f);
-    const before = f.fighter.combat.stamina;
+    const before = f.fighter.combat.energy;
     const wasDash = f.fighter.dash;
     setup.press(f);
     assert.equal(f.fighter.dash, wasDash, `${label}: no new Dash`);
-    assert.ok(f.fighter.combat.stamina >= before - 1e-9, `${label}: nothing spent`);
+    assert.ok(f.fighter.combat.energy >= before - 1e-9, `${label}: nothing spent`);
   };
   refused('airborne', {
     before: (f) => { f.step({ jump: true, jumpPressed: true }); f.step(RIGHT); },
@@ -315,16 +315,24 @@ test('no Dash (and nothing spent) while airborne, attacking, stunned, bound, cha
     before: (f) => { for (let i = 0; i < 5; i++) f.step({ charge: true }); f.step({ charge: true, ...RIGHT }); },
     press: (f) => f.step({ charge: true, ...RIGHT }),
   });
+  refused('shielding', {
+    before: (f) => { f.step({ defense: true, defensePressed: true }); f.step({ defense: true, ...RIGHT }); },
+    press: (f) => f.step({ defense: true, ...RIGHT }),
+  });
+  refused('holding Defense on the tap', {
+    before: (f) => f.step(RIGHT),
+    press: (f) => f.step({ defense: true, defensePressed: true, ...RIGHT }),
+  });
   refused('already dashing', {
     before: (f) => { f.step(RIGHT); f.step(RIGHT); assert.ok(f.fighter.dash); f.step(RIGHT); },
     press: (f) => f.step(RIGHT),
   });
   refused('exhausted', {
-    before: (f) => { f.fighter.combat.drainStamina(100); f.fighter.combat.regenStamina(60); f.step(RIGHT); },
+    before: (f) => { f.fighter.combat.setEnergy(0); f.fighter.combat.regenEnergy(60); f.step(RIGHT); },
     press: (f) => f.step(RIGHT),
   });
-  refused('short of stamina', {
-    before: (f) => { f.fighter.combat.setStamina(20); f.step(RIGHT); },
+  refused('short of Energy', {
+    before: (f) => { f.fighter.combat.setEnergy(20); f.step(RIGHT); },
     press: (f) => f.step(RIGHT),
   });
   const warnings = [];
@@ -363,18 +371,18 @@ test('a double tap that cannot Dash is used up, never queued for later', () => {
 test('a Dash spends 25 exactly once as it starts, and bursts at dashSpeed for one pass of its clip', () => {
   const { fighter, step } = makeFighter();
   tap(step, RIGHT);
-  const full = fighter.combat.stamina;
+  const full = fighter.combat.energy;
   assert.equal(full, 100);
   step(RIGHT);
-  assert.equal(fighter.combat.stamina, 75, 'exactly 25, no refill on that step');
+  assert.equal(fighter.combat.energy, 75, 'exactly 25, no refill on that step');
   assert.equal(fighter.body.vx, def.movement.dashSpeed, 'dash speed from the first step');
   const x0 = fighter.body.prevX;
   let n = 1;
   let x1 = fighter.body.x;
   while (fighter.dash) {
-    const before = fighter.combat.stamina;
+    const before = fighter.combat.energy;
     step({});
-    assert.ok(fighter.combat.stamina > before, 'refilling, never draining, while it dashes');
+    assert.ok(fighter.combat.energy > before, 'refilling, never draining, while it dashes');
     if (fighter.dash) {
       assert.equal(fighter.body.vx, def.movement.dashSpeed, 'the speed is the Dash\'s, input or not');
       x1 = fighter.body.x;
@@ -417,13 +425,14 @@ test('a solid stops a Dash where it stands; walking off a ledge ends it, and the
 // ---- Priority -------------------------------------------------------------------------------
 
 test('Defense wins over a Dash on the same step; so does an attack; so does Charge', () => {
-  // Defense and the second tap together: a Dodge, one cost only.
-  const dodge = makeFighter();
-  tap(dodge.step, RIGHT);
-  dodge.step({ ...RIGHT, defense: true, defensePressed: true });
-  assert.equal(dodge.fighter.state, 'defense');
-  assert.equal(dodge.fighter.dash, null);
-  assert.equal(dodge.fighter.combat.stamina, 75, 'the Dodge\'s 25 only');
+  // Defense and the second tap together: the Shield, and nothing spent.
+  const shield = makeFighter();
+  tap(shield.step, RIGHT);
+  shield.step({ ...RIGHT, defense: true, defensePressed: true });
+  assert.equal(shield.fighter.state, 'shield');
+  assert.equal(shield.fighter.combat.shielding, true);
+  assert.equal(shield.fighter.dash, null);
+  assert.equal(shield.fighter.combat.energy, 100, 'raising the Shield is free');
   // An attack and the second tap together: the attack.
   const attack = makeFighter();
   tap(attack.step, RIGHT);
@@ -431,21 +440,21 @@ test('Defense wins over a Dash on the same step; so does an attack; so does Char
   assert.equal(attack.fighter.state, 'attack');
   assert.equal(attack.fighter.combat.attack.def.id, 'ba2');
   assert.equal(attack.fighter.dash, null);
-  assert.equal(attack.fighter.combat.stamina, 100);
+  assert.equal(attack.fighter.combat.energy, 100);
   // Charge pressed with the second tap: Charge, no Dash.
   const charge = makeFighter();
   tap(charge.step, RIGHT);
   charge.step({ ...RIGHT, charge: true, chargePressed: true });
   assert.equal(charge.fighter.dash, null);
   assert.equal(charge.fighter.state, 'charge');
-  // And a Dash in progress rules out attacks, Dodges, jumps and Charge.
+  // And a Dash in progress rules out attacks, the Shield, jumps and Charge.
   const busy = makeFighter();
   tap(busy.step, RIGHT);
   busy.step(RIGHT);
   busy.step({ action1: true, action1Pressed: true, defense: true, defensePressed: true, jump: true, charge: true });
   assert.equal(busy.fighter.state, 'dash');
   assert.equal(busy.fighter.combat.attack, null);
-  assert.equal(busy.fighter.combat.defenseAction, null);
+  assert.equal(busy.fighter.combat.shielding, false);
   assert.equal(busy.fighter.grounded, true);
   assert.equal(busy.fighter.charging, false);
 });

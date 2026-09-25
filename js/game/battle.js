@@ -46,7 +46,7 @@ export class Battle extends Arena {
   restart() {
     // Resetting a fighter ends its charged technique and releases whatever
     // it held, and cancels any respawn wait; the fresh combat state carries
-    // no bind, timer or sphere, 0 Launch Point, full stamina and no cooldowns.
+    // no bind, timer or sphere, 0 Launch Point, full Energy and no cooldowns.
     // Both back to 0 points.
     for (const f of this.fighters) f.reset(this.stage);
     this.score.p1 = 0;

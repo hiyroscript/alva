@@ -1,8 +1,9 @@
 // Run with node --test tests/fighter-stats.test.mjs (no dependencies).
 // Every fighter's base combat state: Launch Point starts at 0 with no
 // cooldowns, has no maximum, a reset (a new match) puts it back at 0, and
-// no amount of it ever stops a fighter acting. There is no Health or
-// Energy anywhere in a fighter's data or combat state.
+// no amount of it ever stops a fighter acting. There is no Health anywhere
+// in a fighter's data or combat state; Energy is the Dash and Shield
+// resource (see energy.test.mjs), never a stat.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { CHARACTERS } from '../js/data/characters.js';
@@ -17,16 +18,17 @@ const build = (character, facing = 1) => new Fighter({
   controller: { getInput: () => ({}) }, spawn: { x: 500, facing },
 });
 
-test('no fighter declares Health or Energy, and no combat state carries either', () => {
+test('no fighter declares Health, and no combat state carries it; Energy is its own entry, never a stat', () => {
   assert.ok(CHARACTERS.length > 0);
   for (const character of CHARACTERS) {
-    for (const key of ['health', 'energy', 'maxHealth', 'maxEnergy']) {
+    for (const key of ['health', 'energy', 'maxHealth', 'maxEnergy', 'blockDamageScale']) {
       assert.equal(Object.hasOwn(character.stats ?? {}, key), false, `${character.displayName} stats.${key}`);
     }
     const { combat } = build(character);
-    for (const key of ['health', 'maxHealth', 'energy', 'maxEnergy', 'canSpendEnergy', 'spendEnergy']) {
+    for (const key of ['health', 'maxHealth', 'canSpendEnergy']) {
       assert.equal(key in combat, false, `${character.displayName} combat.${key}`);
     }
+    assert.equal(combat.energy, combat.maxEnergy, `${character.displayName} starts with full Energy`);
   }
 });
 
@@ -58,7 +60,7 @@ test('Launch Point has no maximum: hits keep adding to it far past 100', () => {
   assert.equal(target.combat.launchPoint, 1e6 + 40);
 });
 
-test('a high Launch Point alone never stops a fighter acting: it runs, jumps, attacks, dodges and charges at 100, 200 and 500', () => {
+test('a high Launch Point alone never stops a fighter acting: it runs, jumps, attacks, shields and charges at 100, 200 and 500', () => {
   for (const value of [100, 200, 500]) {
     const { fighter, step } = makeFighter();
     fighter.combat.launchPoint = value;
@@ -71,7 +73,7 @@ test('a high Launch Point alone never stops a fighter acting: it runs, jumps, at
     assert.equal(fighter.combat.attack?.def.id, 'ba1', `attacks at ${value}`);
     for (let i = 0; i < 60; i++) step();
     step({ defense: true, defensePressed: true });
-    assert.equal(fighter.state, 'defense', `dodges at ${value}`);
+    assert.equal(fighter.state, 'shield', `shields at ${value}`);
     for (let i = 0; i < 60; i++) step();
     step({ charge: true, chargePressed: true });
     assert.equal(fighter.charging, true, `charges at ${value}`);

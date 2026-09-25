@@ -19,6 +19,7 @@
 // Void sits a short way past the stage and shows only as the view nears it.
 
 import { Perspective } from './perspective.js';
+import { EDGE_RED, waveOffset } from '../core/organic-edge.js';
 
 // Reference view the layers are authored for: a typical view height at the
 // platform-fighter zoom, with resting feet at 70% of it (the camera's floor
@@ -30,13 +31,17 @@ export const REF_FLOOR_LINE = 0.7;
 // `amp` world units either way of the fixed kill boundary (art only:
 // gameplay tests the boundary itself), traced every `step` units, so it
 // reads as organic rather than a ruled line while staying close enough to
-// the boundary to show where the danger is.
-const VOID = {
+// the boundary to show where the danger is. A thin red rim, `rimWidth` CSS
+// pixels wide, runs along that same edge on the stage's side: no glow, blur
+// or shadow.
+export const VOID = Object.freeze({
   color: '#000',
+  rim: EDGE_RED,
+  rimWidth: 1.5,
   amp: 12,
   step: 14,
   waves: [[2 * Math.PI / 260, 0.9, 0.6], [2 * Math.PI / 97, -1.4, 0.4]], // [k, speed, weight]
-};
+});
 
 export class StageTheme {
   constructor(map, { reducedMotion = false } = {}) {
@@ -87,11 +92,13 @@ export class StageTheme {
   // ---- Void -----------------------------------------------------------------
 
   // The Void: one layer of pure black beyond the stage's kill boundary
-  // (map.voidBounds), with one gently wavering inner edge, drawn over
-  // everything at the fighters' depth. Only the sides the view comes near
-  // are traced, all in one path and one fill, so in neutral play the stage
-  // is never boxed in and no part of the black is ever drawn twice. With
-  // reduced motion the edge holds still.
+  // (map.voidBounds), with one gently wavering inner edge and a thin red rim
+  // along it, drawn over everything at the fighters' depth. Only the sides
+  // the view comes near are traced, all in one path and one fill, so in
+  // neutral play the stage is never boxed in and no part of the black is
+  // ever drawn twice. The rim is stroked from the very points the black is
+  // filled from, so the two never drift apart. With reduced motion the edge,
+  // rim included, holds still.
   drawVoid(ctx, view) {
     const v = this.map.voidBounds;
     if (!v) return;
@@ -111,22 +118,30 @@ export class StageTheme {
     ctx.setTransform(s, 0, 0, s, -view.x * s, -view.y * s);
     // Far past the view, so each region reaches the screen edge.
     const pad = 40;
+    const regions = sides.map((side) => this.voidEdgePoints(side, t, x0 - pad, x1 + pad, y0 - pad, y1 + pad));
+    // The rim first, stroked twice its width along each wavy edge: the black
+    // laid over it hides the half on the Void's side, and wherever another
+    // side's black covers it (a corner), so what shows is a thin red line
+    // hugging the edge on the stage's side.
+    ctx.strokeStyle = VOID.rim;
+    ctx.lineWidth = (2 * VOID.rimWidth * (view.dpr ?? 1)) / s;
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    for (const pts of regions) traceVoidEdge(ctx, pts);
+    ctx.stroke();
     ctx.fillStyle = VOID.color;
     ctx.beginPath();
-    for (const side of sides) this.traceVoidSide(ctx, side, t, x0 - pad, x1 + pad, y0 - pad, y1 + pad);
+    for (const pts of regions) traceVoidRegion(ctx, pts);
     ctx.fill();
   }
 
-  // One side's region: the wavy edge, then out past the view. Every side
-  // winds the same way, so where two meet at a corner the nonzero fill
-  // covers it once.
-  traceVoidSide(ctx, side, t, x0, x1, y0, y1) {
+  // One side's region as flat [x, y, ...] points: an outer corner past the
+  // view, the wavy edge (every `step` units, `amp` either way of the fixed
+  // line), then the other outer corner. Every side winds the same way, so
+  // where two meet at a corner the nonzero fill covers it once.
+  voidEdgePoints(side, t, x0, x1, y0, y1) {
     const v = this.map.voidBounds;
-    const edge = (along) => {
-      let w = 0;
-      for (const [k, speed, weight] of VOID.waves) w += Math.sin(along * k + t * speed) * weight;
-      return VOID.amp * w;
-    };
+    const edge = (along) => VOID.amp * waveOffset(VOID.waves, along, t);
     const step = VOID.step;
     const pts = [];
     if (side === 'bottom' || side === 'top') {
@@ -147,15 +162,26 @@ export class StageTheme {
       pts.push(outer, y1 + step);
     }
     // Bottom and left run clockwise as traced; top and right are reversed.
-    const reverse = side === 'top' || side === 'right';
-    const n = pts.length / 2;
-    for (let i = 0; i < n; i++) {
-      const j = reverse ? n - 1 - i : i;
-      if (i === 0) ctx.moveTo(pts[j * 2], pts[j * 2 + 1]);
-      else ctx.lineTo(pts[j * 2], pts[j * 2 + 1]);
+    if (side === 'top' || side === 'right') {
+      const out = [];
+      for (let i = pts.length - 2; i >= 0; i -= 2) out.push(pts[i], pts[i + 1]);
+      return out;
     }
-    ctx.closePath();
+    return pts;
   }
+}
+
+// The whole region of voidEdgePoints, closed, for the black fill.
+function traceVoidRegion(ctx, pts) {
+  ctx.moveTo(pts[0], pts[1]);
+  for (let i = 2; i < pts.length; i += 2) ctx.lineTo(pts[i], pts[i + 1]);
+  ctx.closePath();
+}
+
+// Only its wavy edge (every point but the two outer corners), for the rim.
+function traceVoidEdge(ctx, pts) {
+  ctx.moveTo(pts[2], pts[3]);
+  for (let i = 4; i < pts.length - 2; i += 2) ctx.lineTo(pts[i], pts[i + 1]);
 }
 
 // ---- Shape helpers --------------------------------------------------------

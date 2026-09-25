@@ -27,9 +27,9 @@ const BA1_FPS = 12;
 const BA2_FPS = 12;
 // Playback rate of the Charge clips (startup, sustained loop and release).
 const CHARGE_FPS = 10;
-// Playback rate of both Dodge clips. The Dodge phases below are whole frames
-// at this rate, so the invulnerable window stays on the evasive art.
-const DODGE_FPS = 12;
+// Playback rate of the Shield clips: the raise and lower poses around the
+// grounded hold each show for one frame at this rate.
+const SHIELD_FPS = 12;
 // Playback rate of the Dash clip. A Dash lasts exactly one pass of it
 // (2 frames = 0.2 s at 10 fps), so tuning it keeps the burst on the art.
 const DASH_FPS = 10;
@@ -58,9 +58,9 @@ export const CHARACTERS = [
     available: true,
     rosterSlot: 0,
 
-    // The source art faces right. A clip drawn the other way overrides this
-    // with its own `sourceFacing` (see midairDodge); it only decides whether
-    // the sprite is mirrored, never the fighter's facing or its boxes.
+    // The source art faces right. A clip drawn the other way would override
+    // this with its own `sourceFacing`; it only decides whether the sprite
+    // is mirrored, never the fighter's facing or its boxes.
     sourceFacing: 1,
 
     animations: {
@@ -185,23 +185,39 @@ export const CHARACTERS = [
         loop: false,
         heightRatio: 1,
       },
-      // Dodge, #0001's Defense: `dodge` on the ground, `midairDodge` in the
-      // air. Each plays once per Defense press; the `defense` entry below
-      // times the invulnerable frames to this art. dodge3 happens to be the
-      // same image as charge1; it is still the Dodge's own recovery frame.
-      dodge: {
-        frames: frames(BASE_0001, 'dodge', 3),
-        fps: DODGE_FPS,
+      // Shield, #0001's Defense (see `defense` below): four single frames,
+      // each drawn at 1x like the Dash, so heightRatio sizes each by its own
+      // height against idle's 52 art pixels (one art pixel per file pixel,
+      // the scale of every other pose). On the ground, shieldStart
+      // (prepshield) raises the guard for one frame, shield (shielding) is
+      // the held guard for as long as Defense is held, and shieldRelease
+      // (releaseblock, the file's name from its upload) lowers it for one
+      // frame after. In the air there is only the held guard,
+      // midairShield (midairshielding): no raise or lower pose. All face
+      // right like the rest of #0001.
+      shieldStart: {
+        frames: [`${BASE_0001}prepshield.png`],
+        fps: SHIELD_FPS,
         loop: false,
-        heightRatio: 1,
+        heightRatio: 51 / 52,
       },
-      // The mid-air Dodge art is drawn facing left, unlike the rest of #0001.
-      midairDodge: {
-        frames: frames(BASE_0001, 'midairdodge', 3),
-        fps: DODGE_FPS,
+      shield: {
+        frames: [`${BASE_0001}shielding.png`],
+        fps: SHIELD_FPS,
         loop: false,
-        heightRatio: 0.96,
-        sourceFacing: -1,
+        heightRatio: 47 / 52,
+      },
+      shieldRelease: {
+        frames: [`${BASE_0001}releaseblock.png`],
+        fps: SHIELD_FPS,
+        loop: false,
+        heightRatio: 45 / 52,
+      },
+      midairShield: {
+        frames: [`${BASE_0001}midairshielding.png`],
+        fps: SHIELD_FPS,
+        loop: false,
+        heightRatio: 49 / 52,
       },
       // Throw, on the primary action: throw1 raises the shuriken by the face,
       // throw2 whips the arm across and lets go (the release frame), throw3
@@ -344,8 +360,8 @@ export const CHARACTERS = [
     // A still idle frame for the airborne, landing, hurt and charge clips if
     // their frames fail to load. `frame` holds a single frame instead of
     // looping, so the fighter never stretches or rotates to fake a pose.
-    // Attacks, Dodges and the Dash never fall back: one whose frames are
-    // missing is refused (see Fighter.tryAction, tryDefense and tryDash).
+    // Attacks, the Shield and the Dash never fall back: one whose frames are
+    // missing is refused (see Fighter.tryAction, shieldAllowed and tryDash).
     animationFallbacks: {
       jump: { animation: 'idle', frame: 0 },
       fall: { animation: 'idle', frame: 0 },
@@ -416,45 +432,35 @@ export const CHARACTERS = [
       chargedCooldownRate: 2,
     },
 
-    // Stamina (see resolveStamina in js/game/combat.js): the purple bar over
-    // the fighter's head, spent only by Dash, Dodge and Block. It refills by
-    // itself at `regen` per second, at `chargeRegen` while in Charge (apart
-    // from, and on top of, Charge's faster charged cooldowns). Emptied, it
-    // turns gray: no Dash, Dodge or Block until it is full again.
-    stamina: {
+    // Energy (see resolveEnergy in js/game/combat.js): 100 at most, shown
+    // over the fighter's head as three purple segments while below full,
+    // spent only by Dash (dashCost, as it starts) and Shield (shieldHitCost,
+    // for each hit it blocks; holding it is free). It refills by itself at
+    // `regen` per second, at `chargeRegen` while in Charge (apart from, and
+    // on top of, Charge's faster charged cooldowns). Emptied, it turns gray:
+    // no Dash or Shield until it is full again.
+    energy: {
       max: 100,
       regen: 12,
       chargeRegen: 30,
       dashCost: 25,
-      dodgeCost: 25,
-      blockDrain: 20,
+      shieldHitCost: 25,
     },
 
     // What the shared Defense input (L, RB / RT, touch D) does for this
-    // fighter. #0001 dodges: each new press plays one Dodge, `ground` or `air`
-    // by whether it is grounded at the press, paying stamina.dodgeCost as it
-    // starts. Phases are whole frames of the
-    // clip (see createDefenseDefinition in js/game/combat.js); attacks pass
-    // through only during `invulnerable`. On the ground that is dodge2, the
-    // side-on lean away (dodge1 braces, dodge3 settles back). In the air it is
-    // midairdodge1-2, the frames drawn breaking up into afterimages
-    // (midairdodge3 is solid again). A future blocking fighter would use
-    // { type: 'block' } instead, with stats.blockDamageScale for chip damage;
-    // its held guard drains stamina.blockDrain per second.
+    // fighter. #0001 shields: held Defense keeps a Shield up all round him,
+    // `groundAnimation` on the ground (raised by `groundStartAnimation`,
+    // lowered by `groundReleaseAnimation`) and `airAnimation` in the air,
+    // where he keeps falling. Every hit it blocks costs energy.shieldHitCost
+    // and deals nothing else: no Launch Point, no launch (see
+    // createDefenseDefinition and CombatSystem.applyHit in
+    // js/game/combat.js).
     defense: {
-      type: 'dodge',
-      ground: {
-        animation: 'dodge',
-        startup: 1 / DODGE_FPS,
-        invulnerable: 1 / DODGE_FPS,
-        recovery: 1 / DODGE_FPS,
-      },
-      air: {
-        animation: 'midairDodge',
-        startup: 0,
-        invulnerable: 2 / DODGE_FPS,
-        recovery: 1 / DODGE_FPS,
-      },
+      type: 'shield',
+      groundAnimation: 'shield',
+      groundStartAnimation: 'shieldStart',
+      groundReleaseAnimation: 'shieldRelease',
+      airAnimation: 'midairShield',
     },
 
     // Controller actions -> attack ids. A string is one attack; { ground, air }
@@ -531,13 +537,15 @@ export const CHARACTERS = [
       // binds the opponent (no damage of its own) and the sphere moves onto
       // it, spinning there (prasen7-9 looped) while rasenConfirm plays
       // rasen7 -> rasen8 and holds rasen8 as the sphere grows. While it is
-      // held, every 0.5 s adds 1 Launch Point, with no launch (0.5, 1 and
-      // 1.5 s after the hit). 2 s after the hit it explodes (prasen10-11)
-      // while #0001 is on rasenExplosion (rasen9): 15 more Launch Point, then
-      // Base Launch 3 sideways, which releases the opponent (18 damage in
-      // all); once the blast is
-      // over he recovers through rasenRelease (rasen10-12). The whole
-      // technique needs ground under #0001.
+      // held, 1 Launch Point is added at once on the hit's own step and then
+      // every 0.5 s, with no launch (0, 0.5, 1 and 1.5 s after the hit). 2 s
+      // after the hit it explodes (prasen10-11) while #0001 is on
+      // rasenExplosion (rasen9): 15 more Launch Point, then Base Launch 3
+      // sideways, which releases the opponent (19 damage in all: 4 ticks and
+      // the blast); once the blast is over he recovers through rasenRelease
+      // (rasen10-12). The whole technique needs ground under #0001. A
+      // Shield blocks the contact: no bind, tick or explosion, and the rush
+      // ends there.
       rasenRush: {
         formAnimation: 'rasenForm',
         dashAnimation: 'rasenDash',
@@ -574,7 +582,8 @@ export const CHARACTERS = [
         // it explodes; the blast bursts at that size. Visual only.
         sphereGrowth: { startScale: 1, endScale: 1.4 },
         // The sphere's contact: the setup, no damage and no launch. The bind
-        // that follows (not this hitstun) is what holds the opponent.
+        // that follows (not this hitstun) is what holds the opponent; its
+        // first tickHit lands on this same step.
         firstHit: {
           damage: 0,
           baseLaunch: 0,
@@ -583,9 +592,10 @@ export const CHARACTERS = [
           blockstun: 0.15,
           hitstop: 0.06,
         },
-        // While the opponent is held, before the explosion: one tickHit
-        // every tickInterval seconds since the contact. Launch Point only: no
-        // launch, stun or freeze, so the hold never stutters.
+        // While the opponent is held, before the explosion: one tickHit on
+        // the contact's own step, then one every tickInterval seconds since
+        // it. Launch Point only: no launch, stun or freeze, so the hold never
+        // stutters.
         tickInterval: 0.5,
         tickHit: {
           damage: 1,

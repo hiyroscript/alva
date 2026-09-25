@@ -7,8 +7,8 @@
 // (LAUNCH_UNIT_SPEED, 10 world units per second per point) turns it into a
 // speed. Covers the registry and
 // its validation, the shared resolvers, the real CombatSystem.applyHit path
-// (melee, projectiles, clones and charged techniques alike), Block's
-// modifier, #0001's authored hits, Void respawns and a guard against the old
+// (melee, projectiles, clones and charged techniques alike), the Shield's
+// blocked hits (no Launch Point, no launch), #0001's authored hits, Void respawns and a guard against the old
 // Knockback architecture coming back. Runs the real Fighter, physics and
 // combat (see fighter-harness.mjs).
 import test from 'node:test';
@@ -20,7 +20,8 @@ import {
 } from '../js/data/launch.js';
 import * as launchModule from '../js/data/launch.js';
 import { CHARACTERS } from '../js/data/characters.js';
-import { CombatState, CombatSystem, createAttackDefinition, blockLaunch, BLOCKED_HORIZONTAL_LAUNCH_SCALE } from '../js/game/combat.js';
+import * as combatModule from '../js/game/combat.js';
+import { CombatState, CombatSystem, createAttackDefinition } from '../js/game/combat.js';
 import { createProjectileDefinition } from '../js/game/projectile.js';
 import { createTechniqueDefinition } from '../js/game/charged-technique.js';
 import { Battle } from '../js/game/battle.js';
@@ -53,10 +54,10 @@ const probe = (damage, baseLaunch, directionalLaunch) => createAttackDefinition(
 
 // Resolves `hitDef` from a fresh duel's attacker onto its target, the target
 // starting at `launchPoint`. `facing` is the direction the hit travels.
-function hitAt(launchPoint, hitDef, { facing = 1, options = {}, targetCharacter, blocking = false } = {}) {
+function hitAt(launchPoint, hitDef, { facing = 1, options = {}, targetCharacter, shielding = false } = {}) {
   const d = duel({ attackerFacing: facing, targetCharacter });
   d.target.combat.launchPoint = launchPoint;
-  d.target.combat.blocking = blocking;
+  d.target.combat.shielding = shielding;
   const event = new CombatSystem().applyHit(d.attacker, d.target, hitDef, { facing, ...options });
   return { ...d, event };
 }
@@ -296,33 +297,29 @@ test('the facing a hit travels in is its own: a projectile\'s direction, a clone
   }
 });
 
-// ---- Block ------------------------------------------------------------------------
+// ---- Shield -----------------------------------------------------------------------
 
-const BLOCKER = { ...def, defense: { type: 'block' }, stats: { ...def.stats, blockDamageScale: 0.2 } };
-
-test('a blocked horizontal hit: chip damage adds to Launch Point, raw strength from the new total, then Block halves it', () => {
-  // 119 + 5 x 0.2 = 120; raw 1 x 120 = 120; the guard takes half.
-  const { target, event } = hitAt(119, probe(5, 1, 'horizontal'), { facing: 1, targetCharacter: BLOCKER, blocking: true });
-  assert.equal(event.type, 'block');
-  assert.equal(event.damage, 1, 'the chip damage actually received');
-  assert.equal(target.combat.launchPoint, 120);
-  assert.equal(event.launchStrength, 120, 'raw, before Block');
-  assert.deepEqual(event.finalLaunch, { x: 60 * U, y: 0 });
-  assert.equal(target.body.vx, 60 * U);
-  assert.equal(BLOCKED_HORIZONTAL_LAUNCH_SCALE, 0.5, 'a Block modifier, not part of Base Launch');
-  assert.deepEqual(blockLaunch({ x: -240, y: 0 }), { x: -120, y: 0 });
-});
-
-test('a blocked vertical or reverse vertical hit: chip damage still adds to Launch Point, and no vertical launch is applied', () => {
-  for (const direction of ['vertical', 'reverseVertical']) {
-    const { target, event } = hitAt(119, probe(5, 2, direction), { facing: 1, targetCharacter: BLOCKER, blocking: true });
-    assert.equal(event.type, 'block');
-    assert.equal(target.combat.launchPoint, 120, `${direction}: 119 + 1`);
-    assert.equal(event.launchStrength, 240, 'raw, before Block');
-    assert.deepEqual(event.finalLaunch, { x: 0, y: 0 });
-    assert.deepEqual([target.body.vx, target.body.vy], [0, 0]);
-    assert.notEqual(target.body.grounded, false, 'not lifted or driven down');
+test('a Shielded hit adds no Launch Point and launches nothing, whatever its Base Launch or direction; the Shield pays 25 Energy instead', () => {
+  for (const [baseLaunch, direction] of [[1, 'horizontal'], [2, 'vertical'], [2, 'reverseVertical'], [3, 'horizontal']]) {
+    for (const facing of [1, -1]) {
+      const { target, event } = hitAt(119, probe(5, baseLaunch, direction), { facing, shielding: true });
+      assert.equal(event.type, 'block');
+      assert.equal(event.damage, 0, 'no chip damage');
+      assert.equal(event.energyCost, 25);
+      assert.deepEqual([event.launchPointBefore, event.launchPointAfter], [119, 119]);
+      assert.equal(target.combat.launchPoint, 119);
+      assert.equal(event.baseLaunch, baseLaunch, 'the hit keeps its own data');
+      assert.equal(event.directionalLaunch, direction);
+      assert.equal(event.launchStrength, 0);
+      assert.deepEqual({ ...event.finalLaunch }, { x: 0, y: 0 });
+      assert.deepEqual([target.body.vx, target.body.vy], [0, 0]);
+      assert.notEqual(target.body.grounded, false, 'not lifted or driven down');
+      assert.equal(target.combat.energy, 75);
+    }
   }
+  // The old Block modifiers (chip damage, a halved sideways launch) are gone.
+  for (const key of ['blockLaunch', 'BLOCKED_HORIZONTAL_LAUNCH_SCALE']) assert.equal(key in combatModule, false, key);
+  assert.equal('chipDamage' in createAttackDefinition({ id: 'x' }), false);
 });
 
 // ---- Events -----------------------------------------------------------------------
@@ -330,9 +327,10 @@ test('a blocked vertical or reverse vertical hit: chip damage still adds to Laun
 test('a hit event describes the new system and nothing of the old one', () => {
   const { event, attacker, target } = hitAt(110, realHits().ba2);
   assert.deepEqual(Object.keys(event).sort(), [
-    'attacker', 'baseLaunch', 'damage', 'directionalLaunch', 'finalLaunch', 'launchPointAfter', 'launchPointBefore',
-    'launchStrength', 'move', 'projectile', 'summon', 'target', 'technique', 'type',
+    'attacker', 'baseLaunch', 'damage', 'directionalLaunch', 'energyCost', 'finalLaunch', 'launchPointAfter',
+    'launchPointBefore', 'launchStrength', 'move', 'projectile', 'summon', 'target', 'technique', 'type',
   ]);
+  assert.equal(event.energyCost, 0, 'a hit costs its target no Energy');
   assert.deepEqual(
     [event.type, event.attacker, event.target, event.move, event.damage, event.launchPointBefore, event.launchPointAfter],
     ['hit', attacker, target, 'ba2', 10, 110, 120],
