@@ -4,24 +4,42 @@
 // collider that is completely independent from sprite dimensions.
 // Integration runs on the fixed simulation step (see battle.js), so movement
 // is identical at 30/60/120/144 Hz.
+//
+// Nothing holds a body inside the stage: there are no side walls. The main
+// floor is finite (see StageCollision), so a body can run, jump or be
+// knocked past either ledge and fall; only the Void (StageCollision.inVoid),
+// far away, ends that, and the game modes decide what it means.
 
 const EPS = 0.5;
 
-export const FLOOR = Object.freeze({ id: '__floor', kind: 'floor', dropThrough: false });
-
 export class StageCollision {
   constructor(map) {
-    this.groundY = map.groundLevel;
-    this.left = map.bounds.left;
-    this.right = map.bounds.right;
+    const main = map.mainStage;
+    // The main floor: a finite solid block whose top is the ground. It
+    // collides like any other solid, so it supports a body only while the
+    // body overlaps it horizontally, and below its top its sides are the
+    // stage's own cliff faces, not walls around the arena.
+    this.floor = Object.freeze({
+      id: '__floor', kind: 'floor', oneWay: false, dropThrough: false,
+      x: main.left, y: main.top, w: main.right - main.left, h: main.bottom - main.top,
+    });
+    this.groundY = main.top;
+    this.centerX = (main.left + main.right) / 2;
     this.platforms = map.platforms.map((p) => ({ dropThrough: true, ...p, oneWay: true }));
-    this.solids = map.solids.map((s) => ({ ...s, oneWay: false, dropThrough: false }));
+    this.solids = [
+      this.floor,
+      ...map.solids.map((s) => ({ ...s, oneWay: false, dropThrough: false })),
+    ];
+    // The kill boundary, a fixed rectangle (see inVoid).
+    this.void = Object.freeze({ ...map.voidBounds });
   }
 
-  // Highest surface at or below `y` under horizontal span [x0, x1].
+  // Highest surface at or below `y` under horizontal span [x0, x1]:
+  // { y, ref }, or { y: Infinity, ref: null } with nothing below at all
+  // (past the main floor's edges, over open air).
   surfaceBelow(x0, x1, y) {
-    let best = this.groundY;
-    let ref = FLOOR;
+    let best = Infinity;
+    let ref = null;
     for (const p of this.platforms) {
       if (p.y >= y - EPS && p.y < best && x1 > p.x && x0 < p.x + p.w) {
         best = p.y;
@@ -43,6 +61,16 @@ export class StageCollision {
   supportsAt(x0, x1, y) {
     return Math.abs(this.surfaceBelow(x0, x1, y).y - y) <= EPS;
   }
+
+  // Whether a body has crossed into the Void: its centre (half its height
+  // above its feet) is outside voidBounds. A fixed, mathematical boundary:
+  // the wavering edge the themes draw is art only and never moves it.
+  inVoid(b) {
+    const v = this.void;
+    const x = b.x;
+    const y = b.y - b.height / 2;
+    return x < v.left || x > v.right || y < v.top || y > v.bottom;
+  }
 }
 
 export function createBody({ x, y, width, height, gravityScale = 1, maxFall = 1500 }) {
@@ -53,10 +81,10 @@ export function createBody({ x, y, width, height, gravityScale = 1, maxFall = 15
     height,
     gravityScale,
     maxFall,
-    grounded: true,
-    ground: FLOOR,
+    grounded: false,
+    ground: null,
     landed: false,   // touched down this step
-    wall: 0,         // -1 / 1 when pressed against a wall this step
+    wall: 0,         // -1 / 1 when pressed against a solid's side this step
     bonked: false,   // hit a ceiling this step
     dropId: null,    // one-way platform currently being dropped through
     dropTimer: 0,
@@ -81,6 +109,8 @@ export function stepBody(b, dt, stage, gravity) {
   if (!b.grounded) b.vy = Math.min(b.vy + gravity * b.gravityScale * dt, b.maxFall);
 
   // ---- Horizontal ----------------------------------------------------------
+  // Solids only (the main floor's body included): nothing else stops a body
+  // sideways, so it can always leave the stage.
   b.x += b.vx * dt;
   for (const s of stage.solids) {
     if (b.y <= s.y + EPS || b.y - b.height >= s.y + s.h) continue;
@@ -94,15 +124,6 @@ export function stepBody(b, dt, stage, gravity) {
     }
     b.vx = 0;
   }
-  if (b.x - b.halfW < stage.left) {
-    b.x = stage.left + b.halfW;
-    if (b.vx < 0) b.vx = 0;
-    b.wall = -1;
-  } else if (b.x + b.halfW > stage.right) {
-    b.x = stage.right - b.halfW;
-    if (b.vx > 0) b.vx = 0;
-    b.wall = 1;
-  }
 
   // ---- Vertical ------------------------------------------------------------
   const prevBottom = b.y;
@@ -112,10 +133,6 @@ export function stepBody(b, dt, stage, gravity) {
   if (b.vy >= 0) {
     let surface = Infinity;
     let ref = null;
-    if (b.y >= stage.groundY - EPS) {
-      surface = stage.groundY;
-      ref = FLOOR;
-    }
     for (const p of stage.platforms) {
       if (p.id === b.dropId) continue;
       if (prevBottom <= p.y + EPS && b.y >= p.y - EPS && p.y < surface && overlapsX(b, p.x, p.x + p.w)) {
@@ -168,6 +185,9 @@ export function dropThrough(b, time) {
 
 // Keep two fighters from overlapping (fighting-game pushboxes). Only applies
 // when their vertical extents overlap, so jumping over an opponent works.
+// The overlap is split evenly: there are no walls to push against, so a
+// fighter at a ledge can be pushed off it. Solids (the main floor's cliff
+// faces included) are resolved afterwards by resolveSolidOverlap.
 export function separate(a, b, aHalf, bHalf, stage) {
   const vertical = a.y - a.height < b.y && b.y - b.height < a.y;
   if (!vertical) return;
@@ -176,22 +196,10 @@ export function separate(a, b, aHalf, bHalf, stage) {
   if (overlap <= 0) return;
   // Only push while both are near the same footing; airborne crossups pass.
   if (!a.grounded && !b.grounded) return;
-  const dir = dx !== 0 ? Math.sign(dx) : a.x < (stage.left + stage.right) / 2 ? 1 : -1;
-  let pushA = overlap / 2;
-  let pushB = overlap / 2;
-  // Walls absorb nothing: push the other fighter the whole way.
-  if (dir < 0 ? a.x + a.halfW + pushA > stage.right : a.x - a.halfW - pushA < stage.left) {
-    pushB += pushA;
-    pushA = 0;
-  }
-  if (dir < 0 ? b.x - b.halfW - pushB < stage.left : b.x + b.halfW + pushB > stage.right) {
-    pushA += pushB;
-    pushB = 0;
-  }
-  a.x -= dir * pushA;
-  b.x += dir * pushB;
-  a.x = Math.min(Math.max(a.x, stage.left + a.halfW), stage.right - a.halfW);
-  b.x = Math.min(Math.max(b.x, stage.left + b.halfW), stage.right - b.halfW);
+  // Exactly level: a fixed tie-break by side of the main stage.
+  const dir = dx !== 0 ? Math.sign(dx) : a.x < stage.centerX ? 1 : -1;
+  a.x -= (dir * overlap) / 2;
+  b.x += (dir * overlap) / 2;
 }
 
 // Push a body horizontally out of any solid it overlaps (used after

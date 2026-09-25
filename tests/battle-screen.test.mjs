@@ -504,6 +504,43 @@ test('a winner still gets the result menu', () => {
   }
 });
 
+test('a Void loss plays the K.O. banner, then the result menu names who fell', () => {
+  const cases = [['p1', 'CPU Wins', 'Player 1 fell into the Void.'], ['p2', 'Player 1 Wins', 'The CPU fell into the Void.']];
+  for (const [lost, title, sub] of cases) {
+    const { app, screen } = setup();
+    const battle = startBattle(screen);
+    // The Battle defeats a fighter the Void takes: out of play, no health.
+    battle[lost].lostToVoid = true;
+    battle[lost].combat.health = 0;
+    battle.phase = 'ko';
+    battle.phaseTime = 0.2;
+    screen.update(1 / 60);
+    assert.equal(screen.bannerState, 'ko');
+    assert.equal(screen.bannerMain.textContent, 'K.O.');
+    assert.equal(screen.bannerSub.textContent, 'VOID');
+    assert.equal(screen.resultOverlay.hidden, true, 'the KO beat plays first');
+
+    battle.frame = () => { battle.phase = 'result'; };
+    screen.update(1 / 60);
+    assert.deepEqual(battle.result, { outcome: lost === 'p1' ? 'p2' : 'p1', reason: 'void' });
+    assert.equal(screen.resultOverlay.hidden, false);
+    assert.equal(screen.resultKicker.textContent, 'K.O.');
+    assert.equal(screen.resultTitle.textContent, title);
+    assert.equal(screen.resultSub.textContent, sub);
+    assert.deepEqual(app.nav.scopes, [screen.resultScope]);
+
+    // The rematch runs to time over: the result reads as time over again.
+    byText(screen.resultOverlay.querySelectorAll('[data-nav]'), 'Rematch').click();
+    battle[lost].lostToVoid = false;
+    battle.p2.combat.health = 40;
+    battle.frame = () => { battle.phase = 'result'; };
+    screen.update(1 / 60);
+    assert.equal(screen.resultKicker.textContent, 'Time over');
+    assert.equal(screen.resultTitle.textContent, 'Player 1 Wins');
+    assert.equal(screen.resultSub.textContent, 'Time ran out. Remaining health decides the round.');
+  }
+});
+
 test('cancelling Return to Home keeps the pause menu and its focus', async () => {
   const { app, screen } = setup();
   startBattle(screen);

@@ -4,6 +4,10 @@
 
 import { range } from '../core/utils.js';
 
+// How far past its own collider the training CPU looks for a ledge ahead
+// (world units): about two steps at its top speed.
+const LEDGE_LOOKAHEAD = 12;
+
 function blankInput() {
   return {
     left: false, right: false, charge: false, jump: false, defense: false,
@@ -30,7 +34,8 @@ export class PlayerController {
 // combat buttons (Throw and Basic Attacks 1 and 2 included, so it never
 // throws a shuriken), Charge or Defense, so the player can practise on it.
 // It drops through one-way platforms with `dropPressed`, an intent no player
-// control produces.
+// control produces. It never walks off the main floor's edges into open air
+// on its own (see atLedge): it only leaves the stage when knocked off.
 export class TrainingAIController {
   constructor({ rng = Math.random } = {}) {
     this.kind = 'cpu';
@@ -56,13 +61,14 @@ export class TrainingAIController {
     this.hopCooldown -= dt;
     if (this.thinkTimer <= 0) this.think(self, foe, ctx);
 
-    // Blocked by a wall or solid while moving -> hop over it.
+    // Blocked by a solid while moving -> hop over it.
     if (this.moveIntent !== 0 && self.body.grounded && self.body.wall === this.moveIntent) {
-      const atStageEdge =
-        self.body.x - self.body.halfW <= ctx.stage.left + 1 ||
-        self.body.x + self.body.halfW >= ctx.stage.right - 1;
-      if (atStageEdge) this.moveIntent = 0;
-      else this.wantJump = true;
+      this.wantJump = true;
+    }
+    // About to walk off a ledge into open air -> stop at the edge.
+    if (this.moveIntent !== 0 && self.body.grounded && this.atLedge(self, ctx.stage)) {
+      this.moveIntent = 0;
+      this.wantJump = false;
     }
 
     if (this.wantJump && self.body.grounded) {
@@ -77,6 +83,15 @@ export class TrainingAIController {
     out.left = this.moveIntent < 0;
     out.right = this.moveIntent > 0;
     return out;
+  }
+
+  // Whether a step in the move direction would leave nothing at all under
+  // the fighter: past the main floor's edge, only open air and the Void.
+  // Dropping from a platform to a surface below is fine.
+  atLedge(self, stage) {
+    const b = self.body;
+    const x = b.x + this.moveIntent * (b.halfW + LEDGE_LOOKAHEAD);
+    return !stage.surfaceBelow(x - b.halfW, x + b.halfW, b.y).ref;
   }
 
   // Closest reachable surface between our height and the foe's.

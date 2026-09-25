@@ -21,6 +21,9 @@
 // Infinite energy (setInfiniteEnergy) is a Practice-only rule for the
 // player's fighter: its Energy is full before and after every step, so any
 // cost can be paid while the moves themselves run as usual.
+//
+// The Void never ends practice: a fighter that falls into it is put back at
+// its own spawn at once (onVoid), still with its health and Energy.
 
 import { Arena } from './arena.js';
 import { Fighter } from './character.js';
@@ -132,6 +135,20 @@ export class PracticeSession extends Arena {
     if (!this.view.pxW) return;
     this.camera.snap(this.primary, this.secondary);
     this.syncView();
+  }
+
+  // ---- Void -------------------------------------------------------------------
+
+  // A fighter fell into the Void: nothing may keep hold of or aim at it
+  // (a technique holding it ends; clones and projectiles aimed at it or its
+  // own go, and so do its damage numbers), then it respawns at its own
+  // spawn, still, with its health and Energy (Fighter.respawn). Practice
+  // simply carries on.
+  onVoid(f) {
+    this.detachFromPlay(f, 'void');
+    const numbers = this.damageNumbers;
+    numbers.splice(0, numbers.length, ...numbers.filter((d) => d.target !== f));
+    f.respawn(this.stage);
   }
 
   // ---- Infinite energy ------------------------------------------------------

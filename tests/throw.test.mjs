@@ -21,7 +21,7 @@ import { SpriteSet } from '../js/game/sprite-normalizer.js';
 import { ACTION_LABELS, CONFIG } from '../js/config.js';
 import {
   def, DT, BASE, STAGE, SIM_CTX, fakeSprites, makeFighter, frameName, stepUntil,
-  steps, recordAttack, sequence, duel,
+  steps, recordAttack, sequence, duel, stageMap,
 } from './fighter-harness.mjs';
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
@@ -543,8 +543,8 @@ test('the thrower cannot hit itself, and a projectile never damages anyone twice
 
 // ---- Cleanup --------------------------------------------------------------------
 
-test('a missed shuriken disappears when its lifetime ends or it leaves the stage', () => {
-  // Right, from x 516: its lifetime runs out before the edge at 2000.
+test('a missed shuriken disappears when its lifetime ends or it flies into the Void, never at a ledge', () => {
+  // Right, from x 516: its lifetime runs out long before the Void.
   const r = range({ facing: 1 });
   r.tick(THROW);
   while (!r.projectiles.length) r.tick(HOLD_THROW);
@@ -552,26 +552,41 @@ test('a missed shuriken disappears when its lifetime ends or it leaves the stage
   while (r.projectiles.length) r.tick();
   assert.equal(p.alive, false);
   assert.ok(Math.abs(p.age - SHURIKEN.lifetime) < DT, `lived ${p.age}s`);
-  assert.ok(p.x < STAGE.right);
+  assert.ok(p.x < STAGE.void.right);
   assert.equal(r.events.length, 0);
-  // Left, from x 484: gone once it has flown past the stage edge at 0.
+  // Left, from x 484: past the main floor's edge at 0 it flies on over the
+  // open air; the Void (x -900) is further than it ever flies.
   const l = range({ facing: -1 });
   l.tick(THROW);
   while (!l.projectiles.length) l.tick(HOLD_THROW);
   const q = l.projectiles[0];
-  while (l.projectiles.length) l.tick();
-  assert.ok(q.age < SHURIKEN.lifetime, 'the edge came first');
-  const box = q.hitbox();
-  assert.ok(box.x + box.w < STAGE.left && box.x + box.w > STAGE.left - SHURIKEN.speed * DT, 'just past the edge');
+  let pastLedge = false;
+  while (l.projectiles.length) {
+    l.tick();
+    if (q.alive && q.hitbox().x + SHURIKEN.hitbox.w < STAGE.floor.x) pastLedge = true;
+  }
+  assert.ok(pastLedge, 'flew on past the ledge');
+  assert.ok(Math.abs(q.age - SHURIKEN.lifetime) < DT, 'its lifetime ended it');
+  // A Void within reach takes it as soon as it has flown clean into it.
+  const near = new StageCollision({ ...stageMap(), voidBounds: { left: -200, right: 2200, top: -600, bottom: 1600 } });
+  const { fighter } = makeFighter({ stage: near });
+  const proj = createProjectileDefinition({ id: 'shuriken', ...SHURIKEN });
+  const v = new Projectile({ owner: fighter, def: proj, anim: fighter.sprites.projectile('shuriken'), x: 100, y: 762, direction: -1 });
+  const list = [v];
+  while (list.length) {
+    v.update(DT, near);
+    removeDeadProjectiles(list);
+  }
+  assert.ok(v.age < SHURIKEN.lifetime, 'the Void came first');
+  const box = v.hitbox();
+  assert.ok(box.x + box.w < -200 && box.x + box.w > -200 - SHURIKEN.speed * DT, 'just into the Void');
 });
 
-test('solid blocks stop a shuriken; one-way platforms and open air do not', () => {
-  const stage = new StageCollision({
-    groundLevel: 800,
-    bounds: { left: 0, right: 2000 },
+test('solid blocks stop a shuriken, the main floor\'s body included; one-way platforms and open air do not', () => {
+  const stage = new StageCollision(stageMap({
     platforms: [{ id: 'ledge', x: 600, y: 760, w: 200, h: 16 }],
     solids: [{ id: 'rock', x: 1000, y: 740, w: 80, h: 60 }],
-  });
+  }));
   const { fighter } = makeFighter();
   const proj = createProjectileDefinition({ id: 'shuriken', ...SHURIKEN });
   const p = new Projectile({ owner: fighter, def: proj, anim: fighter.sprites.projectile('shuriken'), x: 500, y: 762, direction: 1 });
@@ -589,6 +604,13 @@ test('solid blocks stop a shuriken; one-way platforms and open air do not', () =
   const high = new Projectile({ owner: fighter, def: proj, anim: fighter.sprites.projectile('shuriken'), x: 500, y: 700, direction: 1 });
   for (let i = 0; i < 60; i++) high.update(DT, stage);
   assert.ok(high.alive && high.x > 1080);
+  // Below the stage's top, out past its edge, the main floor's cliff face
+  // stops it like any solid.
+  const low = new Projectile({ owner: fighter, def: proj, anim: fighter.sprites.projectile('shuriken'), x: -300, y: 900, direction: 1 });
+  while (low.alive) low.update(DT, stage);
+  assert.ok(low.age < SHURIKEN.lifetime);
+  const lb = low.hitbox();
+  assert.ok(lb.x + lb.w > 0 && lb.x < SHURIKEN.speed * DT, 'stopped at the cliff face');
 });
 
 test('spawnProjectiles consumes each release once; removeDeadProjectiles keeps the rest in order', () => {

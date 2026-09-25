@@ -23,7 +23,7 @@ import { StageCollision } from '../js/game/physics.js';
 import { SpriteSet } from '../js/game/sprite-normalizer.js';
 import { TrainingAIController } from '../js/game/fighter-controller.js';
 import {
-  def, DT, BASE, SIM_CTX, fakeSprites, makeFighter, frameName, steps, duel,
+  def, DT, BASE, SIM_CTX, fakeSprites, makeFighter, frameName, steps, duel, stageMap,
 } from './fighter-harness.mjs';
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
@@ -159,7 +159,7 @@ function hitConfirm(d, targetHeld = () => ({})) {
 
 // A private stage (never the shared one), for ledges and walls.
 const stageWith = ({ platforms = [], solids = [], left = 0, right = 2000 } = {}) =>
-  new StageCollision({ groundLevel: 800, bounds: { left, right }, platforms, solids });
+  new StageCollision(stageMap({ platforms, solids, left, right }));
 
 // Stands a fighter on platform `id` of `stage`.
 function standOn(fighter, stage, id) {
@@ -1324,13 +1324,17 @@ test('a solid wall stops the rush: no pass-through, no hit behind it, and #0001 
   assert.equal(d.target.combat.health, 100);
   assert.equal(d.attacker.state, 'idle');
   assert.equal(t.sphereFrame, null);
-  // The stage's own edge is a wall too: never beyond the bounds.
+  // The main floor's edge is no wall: the rush carries #0001 off it, which
+  // ends the technique as lost ground, and he falls past the edge.
   const edge = duel({ x: 1900, gap: -600, pushboxes: true });
   edge.attacker.opponent = null; // keep it facing the edge
   const u = start(edge);
   edge.until(() => !edge.attacker.technique);
-  assert.equal(u.endReason, 'wall');
-  assert.equal(edge.attacker.body.x, 2000 - edge.attacker.body.halfW);
+  assert.equal(u.endReason, 'ground');
+  assert.ok(edge.attacker.body.x - edge.attacker.body.halfW >= 2000, 'carried clear past the edge');
+  for (let i = 0; i < 10; i++) edge.tick();
+  assert.equal(edge.attacker.body.grounded, false);
+  assert.ok(edge.attacker.body.y > 800, 'falling below the stage');
 });
 
 // ---- Missing art -------------------------------------------------------------------
@@ -1570,7 +1574,7 @@ test('Battle draws the sphere over both fighters, in the hand then on the target
     set: () => true,
   });
   battle.ctx = ctx;
-  battle.theme = { prepare() {}, drawBackground() {}, drawTerrain() {}, drawForeground() {}, update() {}, shadow: { alpha: 0.3, skew: 0, stretch: 1 } };
+  battle.theme = { prepare() {}, drawBackground() {}, drawTerrain() {}, drawForeground() {}, drawVoid() {}, update() {}, shadow: { alpha: 0.3, skew: 0, stretch: 1 } };
   Object.assign(battle.view, { ctx, pxW: 1280, pxH: 720, scale: 1, x: 1000, y: 400, w: 1280, h: 720 });
   battle.pxPerArt = 2;
   const render = () => {
@@ -1693,7 +1697,7 @@ test('Battle draws a miss in either direction: the rush, then rasen12 with no sp
       set: () => true,
     });
     battle.ctx = ctx;
-    battle.theme = { prepare() {}, drawBackground() {}, drawTerrain() {}, drawForeground() {}, update() {}, shadow: { alpha: 0.3, skew: 0, stretch: 1 } };
+    battle.theme = { prepare() {}, drawBackground() {}, drawTerrain() {}, drawForeground() {}, drawVoid() {}, update() {}, shadow: { alpha: 0.3, skew: 0, stretch: 1 } };
     Object.assign(battle.view, { ctx, pxW: 1280, pxH: 720, scale: 1, x: 1000, y: 400, w: 1280, h: 720 });
     battle.pxPerArt = 2;
     const draws = () => {
@@ -1702,13 +1706,14 @@ test('Battle draws a miss in either direction: the rush, then rasen12 with no sp
       battle.render();
       return calls.filter((c) => c[0] === 'drawImage').map((c) => c[1].id);
     };
-    // Open sand both ways (the desert's rocks are far off), the CPU far
-    // behind: nothing to catch or hit.
+    // Open sand both ways (between the desert's rocks), the CPU standing
+    // still well behind, on the mesa: nothing to catch or hit.
     battle.setPhase('fight');
     battle.p1.body.x = battle.p1.body.prevX = 1800;
     battle.p1.facing = facing;
     battle.p1.opponent = null; // keep the facing whatever the CPU does
-    battle.p2.body.x = battle.p2.body.prevX = 1800 - 700 * facing;
+    battle.p2.controller = null;
+    battle.p2.body.x = battle.p2.body.prevX = 1800 - 380 * facing;
     script.held = CHARGE;
     battle.update(DT);
     script.held = {};

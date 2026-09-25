@@ -17,6 +17,13 @@ const BANNERS = {
   round: { sub: 'READY', main: 'ROUND 1' },
   fight: { sub: '', main: 'FIGHT' },
   time: { sub: 'TIME OVER', main: 'TIME' },
+  ko: { sub: 'VOID', main: 'K.O.' },
+};
+
+// Result dialog kicker and line for each way a round ends.
+const RESULT_TEXT = {
+  time: { kicker: 'Time over', sub: () => 'Time ran out. Remaining health decides the round.' },
+  void: { kicker: 'K.O.', sub: (loser) => `${loser} fell into the Void.` },
 };
 
 export class BattleScreen extends Screen {
@@ -255,6 +262,7 @@ export class BattleScreen extends Screen {
     if (b.phase === 'intro') state = b.phaseTime < CONFIG.battle.introSeconds * 0.58 ? 'round' : 'fight';
     else if (b.phase === 'fight' && b.phaseTime < 0.65 && b.timeLeft > 0) state = 'fight';
     else if (b.phase === 'timeup') state = 'time';
+    else if (b.phase === 'ko') state = 'ko';
     this.setBanner(state);
   }
 
@@ -350,17 +358,20 @@ export class BattleScreen extends Screen {
 
   // ---- Result -----------------------------------------------------------------
 
-  // A draw opens no result dialog: once TIME has played out, a fresh battle
-  // starts through the usual restart path. A winner gets the result menu.
+  // A draw opens no result dialog: once TIME (or K.O.) has played out, a
+  // fresh battle starts through the usual restart path. A winner gets the
+  // result menu.
   finishBattle() {
     if (this.battle.result.outcome === 'draw') this.restart();
     else this.showResult();
   }
 
   showResult() {
-    const { outcome } = this.battle.result;
+    const { outcome, reason = 'time' } = this.battle.result;
+    const text = RESULT_TEXT[reason] ?? RESULT_TEXT.time;
+    this.resultKicker.textContent = text.kicker;
     this.resultTitle.textContent = outcome === 'p1' ? 'Player 1 Wins' : 'CPU Wins';
-    this.resultSub.textContent = 'Time ran out. Remaining health decides the round.';
+    this.resultSub.textContent = text.sub(outcome === 'p1' ? 'The CPU' : 'Player 1');
     this.setBanner(null);
     this.app.input.setGameplayActive(false);
     this.touch.setEnabled(false);

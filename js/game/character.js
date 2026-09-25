@@ -73,16 +73,23 @@ export class Fighter {
     if (this.technique) this.endTechnique('reset');
     const { def, spawn } = this;
     const half = def.collider.width / 2;
-    const ground = stage.surfaceBelow(spawn.x - half, spawn.x + half, spawn.y ?? stage.groundY);
+    const from = spawn.y ?? stage.groundY;
+    // On the surface under the spawn; with nothing under it (open air past
+    // the main floor's edges), in the air where it is, and falling.
+    const ground = stage.surfaceBelow(spawn.x - half, spawn.x + half, from);
     this.body = createBody({
       x: spawn.x,
-      y: ground.y,
+      y: ground.ref ? ground.y : from,
       width: def.collider.width,
       height: def.collider.height,
       gravityScale: def.movement.gravityScale,
       maxFall: def.movement.maxFallSpeed,
     });
+    this.body.grounded = !!ground.ref;
     this.body.ground = ground.ref;
+    // Lost to the Void (see Arena.checkVoid): out of play until the next
+    // reset. Only Quick Battle keeps a fighter out; Practice Ground respawns it.
+    this.lostToVoid = false;
     this.facing = spawn.facing || 1;
     this.state = 'idle';
     this.stateTime = 0;
@@ -111,6 +118,17 @@ export class Fighter {
     this.renderX = this.body.x;
     this.renderY = this.body.y;
     this.animator.play('idle', { restart: true });
+  }
+
+  // Back at the spawn after the Void (Practice Ground): a reset that keeps
+  // the fighter's health and Energy. Everything transient goes with the old
+  // body: velocity, attack, Dodge, stun, freeze, binds, cooldowns, its
+  // charged technique and any queued projectile or summon.
+  respawn(stage) {
+    const { health, energy } = this.combat;
+    this.reset(stage);
+    this.combat.health = health;
+    this.combat.energy = energy;
   }
 
   get x() { return this.body.x; }
@@ -251,10 +269,11 @@ export class Fighter {
 
     // ---- Charged technique: ground and walls ------------------------------
     // It needs real ground under the fighter from its first frame to its
-    // last: ground lost (a ledge, a vanished platform) ends it at once and
-    // the fighter falls from where it is. A wall stops the rush as a whiff:
-    // the fighter stays against it and releases, this step counting as the
-    // release's first (see ChargedTechnique.whiff).
+    // last: ground lost (a ledge, the main floor's edge, a vanished
+    // platform) ends it at once and the fighter falls from where it is. A
+    // wall (a solid's side; the stage has no side walls) stops the rush as
+    // a whiff: the fighter stays against it and releases, this step counting
+    // as the release's first (see ChargedTechnique.whiff).
     const technique = this.technique;
     if (technique) {
       if (!body.grounded) this.endTechnique('ground');
@@ -343,7 +362,7 @@ export class Fighter {
 
   // Ends the charged technique in progress, if any, for `reason`: 'miss' or
   // 'wall' (once its release pose has shown), 'blocked', 'ko', 'done',
-  // 'ground', 'hit', 'released', 'reset' or 'destroy'. The sphere is
+  // 'ground', 'hit', 'released', 'void', 'reset' or 'destroy'. The sphere is
   // removed and any opponent it holds released;
   // damage already dealt stays. The rush never carries on as a slide, and a
   // Charge still held from before it does not resume by itself.

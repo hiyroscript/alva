@@ -10,18 +10,20 @@
 //   summons: {
 //     ba1Clone: {
 //       attack: 'ba1', cloud: 'cloneCloud', energyCost: 25,
-//       behindDistance: 48, effectOffset: { x: 0, y: -44 }, stageMargin: 17,
+//       behindDistance: 48, effectOffset: { x: 0, y: -44 },
 //       noGround: { attack: 'midairBa2', offset: { x: 0, y: -36 } },
 //     },
 //   },
 //
 // A clone normally appears on the target's back side, at its foot height,
 // and performs `attack`. The optional `noGround` fallback covers a spot with
-// nothing to stand on at that height (past a platform's edge, or behind an
-// airborne target): the clone then appears at `offset` from the target's
-// origin instead (facing right, mirrored with the clone's facing) and
-// performs the fallback's `attack`. Without `noGround` it always appears
-// behind. Either way it faces the way the target faced at the summon.
+// nothing to stand on at that height (past a platform's or the main floor's
+// edge, or behind an airborne target): the clone then appears at `offset`
+// from the target's origin instead (facing right, mirrored with the clone's
+// facing) and performs the fallback's `attack`. Without `noGround` it always
+// appears behind. Either way it faces the way the target faced at the
+// summon. Nothing keeps it inside the stage: like the fighters, it can
+// appear over the open air past a ledge.
 //
 // A clone lives through exactly three phases:
 //
@@ -49,7 +51,6 @@ const SUMMON_DEFAULTS = {
   energyCost: 0,
   behindDistance: 48, // world units behind the target
   effectOffset: { x: 0, y: 0 }, // cloud centre from the clone origin, facing right
-  stageMargin: 0,     // kept this far inside the stage's horizontal bounds
   noGround: null,     // { attack, offset } where there is no ground behind
 };
 
@@ -122,11 +123,10 @@ export class Clone {
       console.warn(`[Alva] Summon "${id}" not spawned: ${problem}.`);
       return null;
     }
-    const clampX = (x) => (stage ? Math.min(Math.max(x, stage.left + def.stageMargin), stage.right - def.stageMargin) : x);
     // Behind the target: on its back side, at its foot height, facing the
     // way it faces.
     const facing = target.facing;
-    let x = clampX(target.body.x - facing * def.behindDistance);
+    let x = target.body.x - facing * def.behindDistance;
     let y = target.body.y;
     let attack = def.attack;
     // Nothing to stand on there at that height, judged at the spot the clone
@@ -134,7 +134,7 @@ export class Clone {
     // placement and attack instead, if the summon has them.
     const half = owner.def.collider.width / 2;
     if (def.noGround && stage && !stage.supportsAt(x - half, x + half, y)) {
-      x = clampX(target.body.x + def.noGround.offset.x * facing);
+      x = target.body.x + def.noGround.offset.x * facing;
       y = target.body.y + def.noGround.offset.y;
       attack = def.noGround.attack;
     }

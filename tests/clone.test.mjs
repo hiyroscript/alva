@@ -24,7 +24,7 @@ import { StageCollision, createBody, stepBody } from '../js/game/physics.js';
 import { SpriteSet } from '../js/game/sprite-normalizer.js';
 import { TrainingAIController } from '../js/game/fighter-controller.js';
 import {
-  def, DT, BASE, STAGE, SIM_CTX, fakeSprites, makeFighter, frameName, stepUntil, steps, duel,
+  def, DT, BASE, STAGE, SIM_CTX, fakeSprites, makeFighter, frameName, stepUntil, steps, duel, stageMap,
 } from './fighter-harness.mjs';
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
@@ -604,18 +604,23 @@ test('the clone never follows: the target can walk straight through its spot, an
   assert.equal(d.clones.length, 0);
 });
 
-test('stage edges clamp where the clone appears, without moving it afterwards', () => {
+test('no side walls clamp where the clone appears: behind a target at a ledge is open air, so it appears overhead, and never moves afterwards', () => {
   const owner = makeFighter({ x: 90, facing: -1 }).fighter;
+  // Its back to the main floor's left edge (x 0): the spot behind (x -18) is
+  // over open air, so the clone appears over the target instead.
   const nearLeft = makeFighter({ x: 30, facing: 1 }).fighter;
   const l = Clone.summon(owner, { id: 'ba1Clone', target: nearLeft }, STAGE);
-  assert.equal(l.x, STAGE.left + SUMMON.stageMargin, 'inside the left bound, not at -18');
-  assert.equal(l.facing, 1);
+  assert.deepEqual([l.attackDef.id, l.x, l.y, l.facing], ['midairBa2', 30, nearLeft.body.y - 36, 1]);
   const nearRight = makeFighter({ x: 1975, facing: -1 }).fighter;
   const r = Clone.summon(owner, { id: 'ba1Clone', target: nearRight }, STAGE);
-  assert.equal(r.x, STAGE.right - SUMMON.stageMargin);
-  assert.equal(r.facing, -1);
+  assert.deepEqual([r.attackDef.id, r.x, r.facing], ['midairBa2', 1975, -1]);
+  // A step further in, the spot behind still overlaps the floor: the clone
+  // stands there, unclamped (no longer pulled in to 1983).
+  const inside = makeFighter({ x: 1940, facing: -1 }).fighter;
+  const c = Clone.summon(owner, { id: 'ba1Clone', target: inside }, STAGE);
+  assert.deepEqual([c.attackDef.id, c.x, c.y], ['ba1', 1988, inside.body.y]);
   for (let i = 0; i < 60; i++) r.update(DT);
-  assert.equal(r.x, STAGE.right - SUMMON.stageMargin);
+  assert.equal(r.x, 1975);
 });
 
 // ---- No ground behind: the overhead Mid-air BA2 -------------------------------------
@@ -624,15 +629,12 @@ test('stage edges clamp where the clone appears, without moving it afterwards', 
 // right edge (x 1200 - 1400, 100 above the floor): past either roof edge
 // there is only something lower to stand on.
 const ROOF_Y = 600;
-const ROOF = new StageCollision({
-  groundLevel: 800,
-  bounds: { left: 0, right: 2000 },
+const ROOF = new StageCollision(stageMap({
   platforms: [
     { id: 'roof', x: 800, y: ROOF_Y, w: 400, h: 16 },
     { id: 'step', x: 1200, y: 700, w: 200, h: 16 },
   ],
-  solids: [],
-});
+}));
 const MB2 = def.attacks.midairBa2;
 const MB2_FRAMES = ['0001_midair1ba1.png', '0001_midair1ba2.png', '0001_midair1ba3.png', '0001_midair1ba4.png', '0001_midair1ba5.png'];
 const MB2_STEPS = steps(MB2.startup + MB2.active + MB2.recovery);
@@ -672,7 +674,7 @@ test('StageCollision.supportsAt: a surface at that very height under the span, n
   assert.equal(ROOF.supportsAt(1199, 1233, ROOF_Y), true);
   assert.equal(ROOF.supportsAt(1200, 1234, ROOF_Y), false);
   // Solids' tops too, within the physics tolerance of the height.
-  const block = new StageCollision({ groundLevel: 800, bounds: { left: 0, right: 2000 }, platforms: [], solids: [{ id: 'b', x: 100, y: 700, w: 50, h: 100 }] });
+  const block = new StageCollision(stageMap({ solids: [{ id: 'b', x: 100, y: 700, w: 50, h: 100 }] }));
   assert.equal(block.supportsAt(110, 144, 700), true);
   assert.equal(block.supportsAt(110, 144, 700.4), true);
   assert.equal(block.supportsAt(110, 144, 702), false);
@@ -1085,67 +1087,69 @@ test('a summon without a no-ground fallback keeps the old placement: behind at f
   }
 });
 
-test('stage edges: support is judged at the clamped spot behind, and the overhead spot stays inside the margins', () => {
-  // A platform flush with the left bound: the unclamped spot behind (x -18)
-  // is off it, the clamped one (x 17) is on it, so the clone stands behind.
-  const wall = new StageCollision({
-    groundLevel: 800, bounds: { left: 0, right: 2000 },
-    platforms: [{ id: 'sill', x: 0, y: ROOF_Y, w: 100, h: 16 }, { id: 'far', x: 1900, y: ROOF_Y, w: 100, h: 16 }], solids: [],
-  });
-  const owner = makeFighter({ stage: wall }).fighter;
-  const left = makeFighter({ x: 30, y: ROOF_Y, facing: 1, stage: wall }).fighter;
-  const l = Clone.summon(owner, { id: 'ba1Clone', target: left }, wall);
-  assert.equal(l.x, SUMMON.stageMargin);
-  assert.equal(l.y, ROOF_Y);
-  assert.equal(l.attackDef.id, 'ba1');
-  const right = makeFighter({ x: 1975, y: ROOF_Y, facing: -1, stage: wall }).fighter;
-  const r = Clone.summon(owner, { id: 'ba1Clone', target: right }, wall);
-  assert.equal(r.x, 2000 - SUMMON.stageMargin);
-  assert.equal(r.attackDef.id, 'ba1');
+test('stage edges: support is judged at the very spot behind, and neither spot is ever clamped', () => {
+  // Platforms flush with the main floor's edges: the spot behind a target at
+  // the very edge is past them, one a little further in is on them.
+  const edge = new StageCollision(stageMap({
+    platforms: [{ id: 'sill', x: 0, y: ROOF_Y, w: 100, h: 16 }, { id: 'far', x: 1900, y: ROOF_Y, w: 100, h: 16 }],
+  }));
+  const owner = makeFighter({ stage: edge }).fighter;
+  const summonAt = (x, facing, o = owner) => {
+    const target = makeFighter({ x, y: ROOF_Y, facing, stage: edge }).fighter;
+    return Clone.summon(o, { id: 'ba1Clone', target }, edge);
+  };
+  const l = summonAt(30, 1);
+  assert.deepEqual([l.attackDef.id, l.x, l.y], ['midairBa2', 30, ROOF_Y - 36], 'x -18 is off the sill');
+  const inL = summonAt(60, 1);
+  assert.deepEqual([inL.attackDef.id, inL.x, inL.y], ['ba1', 12, ROOF_Y], 'x 12 is on it');
+  const r = summonAt(1975, -1);
+  assert.deepEqual([r.attackDef.id, r.x], ['midairBa2', 1975]);
+  const inR = summonAt(1940, -1);
+  assert.deepEqual([inR.attackDef.id, inR.x], ['ba1', 1988]);
 
-  // Airborne targets at both bounds: overhead, inside the margins.
-  for (const [x, facing] of [[17, 1], [17, -1], [1983, 1], [1983, -1]]) {
-    const target = makeFighter({ x, facing, stage: wall }).fighter;
+  // Airborne targets out past both edges: overhead, wherever they are.
+  for (const [x, facing] of [[-40, 1], [-40, -1], [2040, 1], [2040, -1]]) {
+    const target = makeFighter({ x, facing, stage: edge }).fighter;
     target.body.y = 500;
-    const c = Clone.summon(owner, { id: 'ba1Clone', target }, wall);
+    const c = Clone.summon(owner, { id: 'ba1Clone', target }, edge);
     assert.equal(c.attackDef.id, 'midairBa2');
     assert.equal(c.x, x);
-    assert.ok(c.x >= wall.left + SUMMON.stageMargin && c.x <= wall.right - SUMMON.stageMargin);
   }
 
-  // A sideways offset mirrors with facing and is clamped like the spot behind.
+  // A sideways offset mirrors with facing, unclamped like the spot behind.
   const shifted = { ...def, summons: { ba1Clone: { ...def.summons.ba1Clone, noGround: { attack: 'midairBa2', offset: { x: 40, y: -36 } } } } };
-  const o = makeFighter({ character: shifted, stage: wall }).fighter;
+  const o = makeFighter({ character: shifted, stage: edge }).fighter;
   const at = (x, facing) => {
-    const target = makeFighter({ x, facing, stage: wall }).fighter;
+    const target = makeFighter({ x, facing, stage: edge }).fighter;
     target.body.y = 500;
-    return Clone.summon(o, { id: 'ba1Clone', target }, wall);
+    return Clone.summon(o, { id: 'ba1Clone', target }, edge);
   };
   assert.equal(at(1000, 1).x, 1040);
   assert.equal(at(1000, -1).x, 960);
   assert.equal(at(1000, 1).y, 464);
-  assert.equal(at(1975, 1).x, 2000 - SUMMON.stageMargin, 'not 2015');
-  assert.equal(at(25, -1).x, SUMMON.stageMargin, 'not -15');
+  assert.equal(at(1975, 1).x, 2015);
+  assert.equal(at(25, -1).x, -15);
   const moved = at(1975, 1);
   for (let i = 0; i < 60; i++) moved.update(DT);
-  assert.equal(moved.x, 2000 - SUMMON.stageMargin);
+  assert.equal(moved.x, 2015);
 });
 
 test('on the real City map: behind on a catwalk\'s middle, overhead at its edge', () => {
   const stage = new StageCollision(getMap('city'));
-  const overpass = stage.platforms.find((p) => p.id === 'overpass'); // x 960 - 1340
+  const overpass = stage.platforms.find((p) => p.id === 'overpass');
   const owner = makeFighter({ stage }).fighter;
   const on = (x, facing) => {
     const target = makeFighter({ x, y: overpass.y, facing, stage }).fighter;
     assert.equal(target.body.y, overpass.y);
     return [target, Clone.summon(owner, { id: 'ba1Clone', target }, stage)];
   };
-  const [, mid] = on(1150, 1);
-  assert.deepEqual([mid.attackDef.id, mid.x, mid.y], ['ba1', 1102, overpass.y]);
-  const [t, edge] = on(985, 1);
+  const [, mid] = on(overpass.x + 130, 1);
+  assert.deepEqual([mid.attackDef.id, mid.x, mid.y], ['ba1', overpass.x + 82, overpass.y]);
+  const [t, edge] = on(overpass.x + 25, 1);
   assert.deepEqual([edge.attackDef.id, edge.x, edge.y, edge.facing], ['midairBa2', t.body.x, overpass.y - 36, 1]);
   // The main roof far below is no support at the catwalk's height.
-  assert.equal(stage.surfaceBelow(937 - HALF, 937 + HALF, overpass.y).y, stage.groundY);
+  const behind = overpass.x - 23;
+  assert.equal(stage.surfaceBelow(behind - HALF, behind + HALF, overpass.y).y, stage.groundY);
 });
 
 // ---- Hits ---------------------------------------------------------------------------
@@ -1552,7 +1556,7 @@ test('Battle draws clones behind both fighters, with no shadow, ring or name tag
     set: () => true,
   });
   battle.ctx = ctx;
-  battle.theme = { prepare() {}, drawBackground() {}, drawTerrain() {}, drawForeground() {}, update() {}, shadow: { alpha: 0.3, skew: 0, stretch: 1 } };
+  battle.theme = { prepare() {}, drawBackground() {}, drawTerrain() {}, drawForeground() {}, drawVoid() {}, update() {}, shadow: { alpha: 0.3, skew: 0, stretch: 1 } };
   Object.assign(battle.view, { ctx, pxW: 1280, pxH: 720, scale: 1, x: 1300, y: 400, w: 1280, h: 720 });
   battle.pxPerArt = 2;
 

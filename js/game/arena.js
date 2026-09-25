@@ -30,6 +30,7 @@ export class Arena {
     this.theme = createTheme(map, { reducedMotion });
     this.camera = new Camera();
     this.camera.setBounds(map.cameraBounds);
+    this.camera.setAnchor(this.stage.centerX);
     this.combat = new CombatSystem();
     this.gravity = CONFIG.sim.gravity;
     this.step = CONFIG.sim.step;
@@ -56,9 +57,17 @@ export class Arena {
   }
 
   // The fighter the camera frames alongside Player 1, or null when Player 1
-  // is alone (see Camera.follow).
+  // is alone (see Camera.follow) or it has been lost to the Void.
   get secondary() {
-    return this.fighters[1] ?? null;
+    const f = this.fighters[1];
+    return f && !f.lostToVoid ? f : null;
+  }
+
+  // The fighters still in play: every fighter, less any lost to the Void
+  // (see checkVoid). Only they update, collide, fight and are drawn.
+  get inPlay() {
+    const all = this.fighters;
+    return all.some((f) => f.lostToVoid) ? all.filter((f) => !f.lostToVoid) : all;
   }
 
   // ---- Sizing ---------------------------------------------------------------
@@ -115,8 +124,9 @@ export class Arena {
     // each) and every projectile moves. Live clones advance, then the clones
     // summoned this step spawn (once each, on their cloud's first frame).
     // Melee, projectile, clone and charged-technique hits resolve, and spent
-    // projectiles and finished clones are dropped.
-    const fighters = this.fighters;
+    // projectiles and finished clones are dropped. Last, any fighter now in
+    // the Void is handed to the mode (checkVoid).
+    const fighters = this.inPlay;
     for (const f of fighters) f.update(dt, this.simCtx);
     // Pushboxes keep every pair of fighters apart (a lone fighter has none).
     for (let i = 0; i < fighters.length; i++) {
@@ -134,6 +144,38 @@ export class Arena {
     this.combat.update(fighters, this.projectiles, this.clones);
     removeDeadProjectiles(this.projectiles);
     removeDeadClones(this.clones);
+    this.checkVoid(fighters);
+  }
+
+  // ---- Void -------------------------------------------------------------------
+
+  // Every fighter whose centre has crossed the stage's fixed Void boundary
+  // this step (StageCollision.inVoid, never the animated edge) goes to
+  // onVoid, once.
+  checkVoid(fighters) {
+    for (const f of fighters) {
+      if (!f.lostToVoid && this.stage.inVoid(f.body)) this.onVoid(f);
+    }
+  }
+
+  // What entering the Void means is each mode's rule: Quick Battle defeats
+  // the fighter (Battle.onVoid), Practice Ground puts it back at its spawn
+  // (PracticeSession.onVoid).
+  onVoid() {}
+
+  // Nothing else may keep hold of or aim at `f` once the Void takes it: a
+  // technique holding it ends, and pending summons, clones and projectiles
+  // aimed at it or released by it go. Its own technique ends with `reason`.
+  detachFromPlay(f, reason) {
+    f.endTechnique(reason);
+    for (const other of this.fighters) {
+      if (other === f) continue;
+      if (other.technique?.target === f) other.endTechnique('released');
+      other.summons = other.summons.filter((s) => s.target !== f);
+    }
+    const keep = (e) => e.owner !== f && e.target !== f;
+    this.clones.splice(0, this.clones.length, ...this.clones.filter(keep));
+    this.projectiles.splice(0, this.projectiles.length, ...this.projectiles.filter(keep));
   }
 
   // ---- Rendering --------------------------------------------------------------
@@ -157,24 +199,30 @@ export class Arena {
     theme.drawBackground(ctx, view);
     theme.drawTerrain(ctx, view);
 
+    // A fighter lost to the Void is gone from the stage: no body, shadow or
+    // marker.
+    const fighters = this.inPlay;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-    for (const f of this.fighters) this.drawShadow(f);
+    for (const f of fighters) this.drawShadow(f);
     ctx.imageSmoothingEnabled = false;
     // Clones and their clouds behind the fighters: a clone stands behind
     // its target, so the real fighter stays in front where they overlap.
     for (const c of this.clones) this.drawClone(c);
     // Player 1 last, so it is always drawn on top (behind it, the CPU).
-    for (let i = this.fighters.length - 1; i >= 0; i--) this.drawFighter(this.fighters[i]);
+    for (let i = fighters.length - 1; i >= 0; i--) this.drawFighter(fighters[i]);
     // A charged technique's sphere over the fighters, so the glowing orb is
     // never hidden behind a body, whether in a hand or on a caught opponent.
-    for (const f of this.fighters) if (f.technique) this.drawTechnique(f.technique);
+    for (const f of fighters) if (f.technique) this.drawTechnique(f.technique);
     // Projectiles over the fighters, so a shuriken stays visible in front.
     for (const p of this.projectiles) this.drawProjectile(p);
     ctx.imageSmoothingEnabled = true;
 
     theme.drawForeground(ctx, view);
+    // The Void over everything on the stage: whatever falls into it is
+    // swallowed by the black.
+    theme.drawVoid(ctx, view);
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-    this.drawMarkers();
+    this.drawMarkers(fighters);
     if (this.debug) this.drawDebug();
   }
 
@@ -278,14 +326,14 @@ export class Arena {
     return [x, footY - (f.def.visual.height + 16) * this.view.scale, footY];
   }
 
-  drawMarkers() {
+  drawMarkers(fighters = this.inPlay) {
     const { ctx, view } = this;
     const s = view.scale;
     const font = this.markerFont;
     ctx.font = `700 ${font}px ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'bottom';
-    for (const f of this.fighters) {
+    for (const f of fighters) {
       const color = MARKER[f.slot];
       const [x, top, footY] = this.markerAnchor(f);
       const onScreen = x > -10 && x < view.pxW + 10;
@@ -335,9 +383,17 @@ export class Arena {
       ctx.strokeRect(Math.round(sx) + 0.5, Math.round(sy) + 0.5, Math.round(w * s), Math.round(h * s));
     };
     for (const p of this.stage.platforms) rect(p.x, p.y, p.w, 2, p.dropThrough ? '#ffffff' : '#ff3b3b');
+    // Solids, the main floor's block among them (its top the ground).
     for (const so of this.stage.solids) rect(so.x, so.y, so.w, so.h, '#ff3b3b');
+    // The Void's fixed kill boundary, dashed: the line gameplay tests, not
+    // the wavering edge drawn over it.
+    const v = this.stage.void;
+    ctx.setLineDash([8, 6]);
+    rect(v.left, v.top, v.right - v.left, v.bottom - v.top, '#b06cff');
+    ctx.setLineDash([]);
     const box = {};
-    for (const f of this.fighters) {
+    const fighters = this.inPlay;
+    for (const f of fighters) {
       const b = f.body;
       rect(b.x - b.halfW, b.y - b.height, b.halfW * 2, b.height, '#3cff7a');
       // Hurtboxes turn gray while a Dodge makes the fighter invulnerable.
@@ -381,7 +437,7 @@ export class Arena {
     // fighter is labelled over its hurtboxes.
     ctx.setLineDash([4, 3]);
     ctx.fillStyle = TECHNIQUE_DEBUG;
-    for (const f of this.fighters) {
+    for (const f of fighters) {
       const t = f.technique;
       if (!t) continue;
       const label = `charged ${DEBUG_BUTTON[t.action] ?? t.action} ${t.phase}`;
@@ -401,7 +457,7 @@ export class Arena {
         ctx.fillText(label, Math.round(cx) + 8, Math.round(cy) - 8);
       }
     }
-    for (const f of this.fighters) {
+    for (const f of fighters) {
       if (!f.combat.immobilized) continue;
       const [lx, ly] = this.toScreen(f.renderX - f.body.halfW, f.renderY - f.body.height);
       ctx.fillText('bound', Math.round(lx), Math.round(ly) - 14);
@@ -445,23 +501,30 @@ export class Arena {
   }
 }
 
-// Device pixels per world unit, chosen so the fighter is ~16% of the viewport
-// height and (when possible) each art pixel maps to a whole number of device
-// pixels for crisp pixel art. The view is never allowed to exceed the stage.
+// Device pixels per world unit, chosen so the fighter is ~10% of the viewport
+// height (a platform-fighter view), zoomed out further when needed so the
+// whole main stage and a little air past its ledges fit across the view, but
+// never so far that the fighter drops below fighterScreenRatioMin. When
+// possible each art pixel maps to a whole number of device pixels for crisp
+// pixel art. The view is never allowed to exceed the camera bounds.
 export function computeWorldScale(pxW, pxH, sprites, map) {
   const r = CONFIG.render;
   const artH = sprites.refArtHeight;
-  const ideal = (r.fighterScreenRatio * pxH) / artH;
+  const minPx = (r.fighterScreenRatioMin * pxH) / artH;
+  const maxPx = (r.fighterScreenRatioMax * pxH) / artH;
+  const main = map.mainStage;
+  const frameW = main.right - main.left + 2 * r.stageFrameMargin;
+  const fitPx = (pxW / frameW) * sprites.worldPerArt;
+  const ideal = Math.max(minPx, Math.min((r.fighterScreenRatio * pxH) / artH, fitPx));
   let pxPerArt = ideal;
   if (r.pixelPerfect) {
-    // Snap only when the whole-pixel size stays close to the target; on
+    // Snap only when the whole-pixel size stays close to the target, inside
+    // the min / max ratio, and never closer in than the stage fit allows; on
     // small screens a 2-vs-3 px choice would change the fighter size too much.
+    const limit = Math.max(fitPx, minPx) + 1e-9;
     const opts = [Math.floor(ideal), Math.ceil(ideal)]
       .filter((n) => n >= 1 && Math.abs(n - ideal) / ideal <= 0.12)
-      .filter((n) => {
-        const ratio = (n * artH) / pxH;
-        return ratio >= r.fighterScreenRatioMin && ratio <= r.fighterScreenRatioMax;
-      })
+      .filter((n) => n >= minPx && n <= maxPx && n <= limit)
       .sort((a, b) => Math.abs(a - ideal) - Math.abs(b - ideal));
     if (opts.length) pxPerArt = opts[0];
   }

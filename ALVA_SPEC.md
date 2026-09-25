@@ -257,6 +257,7 @@ Home → Discover (Power / Knockback / Conditions reference; Back returns Home)
 Practice Ground → More → Change Fighter (roster dialog) / Enable CPU or Change CPU (CPU roster dialog → Disable CPU) / Allow or Revoke infinite energy / Return (Home)
 Battle → Pause → Resume / Restart / Return to Home (confirmed); Help is shown but disabled for now
 Battle (time over, one fighter ahead) → Result → Rematch / Change Stage / Return to Home
+Battle (a fighter falls into the Void) → K.O. → Result → Rematch / Change Stage / Return to Home
 Battle (time over, draw) → a fresh battle starts, no dialog
 ```
 
@@ -448,10 +449,15 @@ A solo training room, entered straight from Home.
 - **Training stage:** its own map (`js/data/practice-map.js`), kept out of the
   Quick Battle stage list. Original Canvas artwork of a minimalist combat
   laboratory: a pale, cool-gray room built from one square grid, with a gridded
-  back wall, a broad flat floor in one-point perspective, stronger lines every
-  five cells, a darker centre axis, side walls at the stage bounds and a ruler
-  along the floor's front edge. No scenery, particles, hazards or moving parts.
-  Only the camera moves the room; its static geometry is computed once.
+  back wall (continuing down past the block's edges) and one compact training
+  block in one-point perspective, 1280 units wide, open at both edges: its top
+  gridded with stronger lines every five cells and a darker centre axis, its
+  outer side face past either ledge, and a ruler along its front edge. No side
+  walls, scenery, particles, hazards or moving parts. Only the camera moves the
+  room; its static geometry is computed once. A fighter that falls into the
+  Void is put straight back at its own spawn, still, with its health and
+  Energy; whatever held or aimed at it (a Sphere Rush bind, clones,
+  projectiles, damage numbers) goes, and practice carries on.
 - **HUD:** only the P1 panel (tag, name, health, Energy) top-left and a compact
   glass **More** button (three dots, `aria-label="Practice menu"`,
   `aria-haspopup="dialog"`, `aria-expanded`) centred at the top where Quick
@@ -569,19 +575,54 @@ read the character database, so it stays the same as fighters are added.
 
 ### 7.1 Stages and camera
 
-- Stages are 2.5–4 viewport widths wide, drawn procedurally as six parallax
-  layers (sky, far, mid, near, terrain, atmosphere) cached as `Path2D`.
-- **Desert:** wide, bright, open; mesas, rock formations, sunset haze, drifting
-  sand; two rock outcrops to hop onto.
-- **City:** rooftops at night; dense skyline, vents, girders, warm neon;
-  seven one-way platforms that fighters jump up through from below. The
-  player has no drop-through control and walks off an edge to come down; the
-  training CPU can drop through all of them except the water-tower deck.
+- Stages are compact platform-fighter stages, not enclosed arenas. Each map
+  keeps four things apart: the **main stage** (`mainStage`, a finite main
+  floor: fighters stand on its top only between its edges, and below its top
+  it is a solid block), the **off-stage** open air past both ledges, the
+  **camera bounds** (`cameraBounds`) and **the Void** (`voidBounds`, the
+  kill boundary). There are no side walls, visible or invisible: fighters can
+  run, jump or be knocked off either ledge, fall below the stage and drift
+  back if they can.
+- Main stages are 1280–1440 units wide (Desert 1360, City 1440, Practice
+  Ground 1280); the Void sits 860 units past each ledge, 740 below the
+  stage's top and 1160 above it.
+- Backgrounds are flat parallax layers (sky, far, mid, near, atmosphere)
+  cached as `Path2D`. The playable geometry (main stage, platforms, solids)
+  is drawn in one shared one-point perspective (`js/stages/perspective.js`,
+  Practice Ground's projection): a top that recedes in depth, a front face
+  with thickness and the side face past whichever ledge the view looks
+  beyond, lined up exactly with collision at the fighters' depth.
+- **Desert:** a compact sandstone mesa at golden hour over open desert air;
+  sky, sun, far mesas, dunes, buttes and hoodoos on the desert floor below,
+  warm haze thickening beneath the rim, drifting sand; a rippled sandy top, a
+  strata-banded cliff face fading into the haze, and two faceted rock
+  outcrops to hop onto. No boundary cliffs.
+- **City:** one rooftop block at night over the street canyon; dense skyline,
+  moon, searchlights, the elevated train, warm neon; a roof with its props,
+  a lit facade and seven one-way platforms (racks, catwalks with billboards,
+  a girder, the water-tower deck, a scaffold) that fighters jump up through
+  from below, each a slab with depth, plus a stair bulkhead. No boundary
+  buildings. The player has no drop-through control and walks off an edge
+  to come down; the training CPU can drop through all of them except the
+  water-tower deck, and never walks off the roof's edges on its own.
 - Collision comes only from map data, never from art.
+- **The Void:** a fighter whose centre leaves `voidBounds` (a fixed
+  rectangle, `StageCollision.inVoid`) is taken by it. In Quick Battle that
+  fighter is defeated at once: it leaves play (frozen and no longer drawn,
+  hit or framed) with no health left, anything holding or aiming at it lets
+  go, a **K.O.** banner plays for 1.4 s and the result follows (after time
+  has run out it still loses; both taken is a draw). In Practice Ground it is
+  put back at its spawn. Art: pure black beyond the boundary with a gently
+  wavering edge (a feathered second edge and a dark glow just inside), drawn
+  over everything, only on the sides the view comes near, so neutral play is
+  never boxed in. The wave is art only (the kill line never moves) and holds
+  still with reduced motion.
 - The camera frames both fighters (Practice Ground's fighter alone until a
-  practice CPU is enabled),
-  interpolates smoothly and never shows outside the map. Fighters occupy
-  ≈ 14–18 % of viewport height.
+  practice CPU is enabled), leaning toward the main stage's centre while it
+  does, interpolates smoothly and never shows outside its camera bounds (the
+  stage, the air around it and the Void's edge). Fighters occupy ≈ 10 % of
+  viewport height (8.8–11.5 %): a 16:9 view shows the whole main stage with
+  air past both ledges, and narrower screens zoom out further for it.
 
 ### 7.2 Fighters, physics and combat
 
@@ -704,8 +745,9 @@ read the character database, so it stays the same as fighters are added.
   knockback or event) and can still connect if it overlaps once they end; a
   future Block-type fighter guarding toward it blocks it with the normal chip
   damage and blockstun (no knockback to halve), and it disappears. A missed
-  shuriken disappears after 1.5 s, once it has flown past a stage edge, or when it
-  meets a solid block; one-way platforms do not stop it. No multi-hit,
+  shuriken disappears after 1.5 s, once it has flown into the Void, or when it
+  meets a solid block (the main stage's own cliff face included); one-way
+  platforms and the open air past a ledge do not stop it. No multi-hit,
   homing, bouncing, piercing, explosion or clash. The Battle owns live
   projectiles: each fixed step it updates the fighters, spawns released
   projectiles (once each), moves them, resolves melee and projectile hits,
@@ -817,7 +859,7 @@ read the character database, so it stays the same as fighters are added.
   maps `action1` to the `ba1Clone` summon, which names the attack (`ba1`),
   the cloud effect (`cloneCloud`), `energyCost` 25, `behindDistance` 48 world
   units, the cloud's `effectOffset` (centred 44 units above the clone's feet,
-  half the fighter's height), a `stageMargin` and a `noGround` fallback (the
+  half the fighter's height) and a `noGround` fallback (the
   attack `midairBa2` at `offset` `{ x: 0, y: -36 }` from the opponent's
   origin) for when there is no ground behind the opponent (below). A
   successful summon spends
@@ -851,18 +893,18 @@ read the character database, so it stays the same as fighters are added.
   and has no marker, name, ring, shadow, health or Energy bar. Its position
   facing and attack are snapshotted once, on the summon step, facing the way
   the opponent faced. Normally it stands on the opponent's back side
-  (`x = target.x − target.facing × 48`, clamped inside the stage's
-  horizontal bounds), at the opponent's foot height, and performs BA1. That
+  (`x = target.x − target.facing × 48`, never clamped: there are no side
+  walls), at the opponent's foot height, and performs BA1. That
   spot counts as ground only if something the clone's collider (#0001's, 34
   wide) would stand on lies at the opponent's current foot height (within
   the physics' 0.5-unit tolerance, with the same horizontal overlap a
-  landing body needs), judged at the clamped spot where the clone would
-  really appear. A lower platform or the floor further down does not count,
-  and neither does the opponent itself being grounded. With no such ground
-  (an opponent at a platform's edge with its back to the drop, or an
+  landing body needs), judged at the spot where the clone would really
+  appear. A lower platform or the floor further down does not count, and
+  neither does the opponent itself being grounded. With no such ground (an
+  opponent at a platform's edge or a ledge with its back to the drop, or an
   airborne opponent), the clone appears over the opponent instead, at
   `x = target.x`, `y = target.y − 36` (feet level with its upper body; a
-  sideways `offset.x` would mirror with facing and is clamped the same way),
+  sideways `offset.x` would mirror with facing, unclamped as well),
   and performs #0001's existing Mid-air BA2 kick. Either way it never moves,
   turns, chases, falls, lands or teleports after that, and never re-checks
   the ground or switches attack, so an opponent who moves away before the
@@ -950,8 +992,8 @@ read the character database, so it stays the same as fighters are added.
      has completed its frame time. No movement, no hitbox.
   2. DASH (15 steps, 0.25 s): `rasen4 → rasen5 → rasen6` once, at a fixed
      1050 world units / s in the snapshotted facing, through normal
-     fixed-step physics (≈262 units at most; stage bounds, solids and ground
-     respected; player left / right ignored). The complete `prasen6` stays
+     fixed-step physics (≈262 units at most; solids and ground respected, and
+     running off a ledge is ground lost; player left / right ignored). The complete `prasen6` stays
      in the hand, never rebuilt. This is the only contact search: each step
      the sphere's hitbox (48 × 48 units, centred on the sphere) is tested
      against the opponent's hurtboxes, from the sphere's actual world
@@ -962,8 +1004,8 @@ read the character database, so it stays the same as fighters are added.
      (32, −47) swung in front. So contact is made on the forward swing
      (`rasen6`), after the rush has closed in; pushboxes keep #0001 from
      running through the opponent meanwhile. No contact by the end of
-     `rasen6`, or a solid wall or stage edge reached first (no pass-through),
-     is a miss: WHIFF RELEASE below.
+     `rasen6`, or a solid wall reached first (no pass-through), is a miss:
+     WHIFF RELEASE below.
   3. WHIFF RELEASE (a miss only; 5 steps, one `rasen12` frame at 12 fps,
      1/12 s, the `rasenWhiffRelease` clip):
      from the step after the dash's last (or the very step a wall stops it)
@@ -1067,9 +1109,11 @@ read the character database, so it stays the same as fighters are added.
   remaining health.
 - Physics: acceleration, deceleration, max speed (from the fighter's Speed
   Power, below), gravity, jump impulse (from its Jump Power, below),
-  ground/platform/solid collision,
-  stage bounds, landing detection; collision boxes independent of PNG size;
-  bottom-centre origin; no sinking, floating, jitter or escaping the stage.
+  ground/platform/solid collision on a finite main floor (no side walls:
+  a fighter can leave the stage and fall), landing detection; collision boxes
+  independent of PNG size; bottom-centre origin; no sinking, floating or
+  jitter. Pushboxes split an overlap evenly, so a fighter at a ledge can be
+  shoved off it.
 - **Powers** (`js/data/powers.js`): fighter abilities owned at one of three
   tiers, Jump Power and Speed Power. Each Power is a frozen tier table in
   the one `POWERS` registry, the single source of its names, descriptions,
@@ -1194,7 +1238,8 @@ read the character database, so it stays the same as fighters are added.
   change, from a slightly softened off-white to pure white; the glass never
   changes colour, inverts or flashes.
 - Player markers above fighters and ground rings: P1 white, CPU gray.
-- Round banners ("ROUND 1", "FIGHT", "TIME") in white on a dark band.
+- Round banners ("ROUND 1", "FIGHT", "TIME", and "K.O." under "VOID" when a
+  fighter falls into the Void) in white on a dark band.
 - Pause menu: glass panel over a dimmed battle with "Quick Battle" (no stage
   name), "Paused", green **Resume** (default), **Restart Battle**, **Help** and
   **Return to Home**. Help is shown but disabled for now: muted, no hover or
@@ -1202,6 +1247,9 @@ read the character database, so it stays the same as fighters are added.
 - Time over: if one fighter has more health, a glass result menu offers green
   **Rematch**, **Change Stage** and **Return to Home**. A draw opens no dialog;
   once the TIME banner has played, a fresh battle starts.
+- Void K.O.: once the K.O. banner has played, the same result menu opens with
+  the kicker "K.O." and the line "Player 1 fell into the Void." (or "The CPU
+  fell into the Void.").
 
 ### 7.4 Input
 
@@ -1213,8 +1261,10 @@ read the character database, so it stays the same as fighters are added.
   debug overlay (colliders, hurtboxes, attack hitboxes while active, each
   flying projectile's hitbox in magenta with its name, each clone's attack
   hitbox, labelled `clone ba1` or `clone midairBa2`, on its active frame,
-  and the Sphere Rush's
-  dashed cyan sphere box / centre with a `bound` label on a caught fighter).
+  the Sphere Rush's
+  dashed cyan sphere box / centre with a `bound` label on a caught fighter,
+  solids with the main floor's block among them, and the Void's fixed kill
+  line, dashed violet).
   BA1 pressed while Charge is still held is the Charged BA1 Clone Attack
   and BA2 the Charged BA2 Sphere Rush (7.2): no extra key. In menus S/↓ still navigate down: menu bindings are separate
   from the gameplay `charge` action.
