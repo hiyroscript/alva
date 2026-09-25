@@ -1591,8 +1591,11 @@ test('Battle draws clones behind both fighters, with no shadow, ring or name tag
   assert.equal(drawn[0], CLOUD[0]);
   assert.equal(clone.facing, -1);
   assert.equal(mirrored(CLOUD[0]), false, 'the cloud is never mirrored');
-  // Two shadows + rings and two name tags: none for the clone.
-  assert.equal(calls.filter((c) => c[0] === 'fillText').length, 2);
+  // Two shadows + rings and two name tags: none for the clone (the other
+  // text is the fighters' CAB1 / CAB2 labels, see fighter-status.test.mjs).
+  const nameTags = () => calls.filter((c) => c[0] === 'fillText' && ['P1', 'CPU'].includes(c[1])).length;
+  assert.equal(nameTags(), 2);
+  assert.equal(calls.filter((c) => c[0] === 'fillText' && /^CAB[12]$/.test(c[1])).length, 4, 'CAB1 and CAB2 under each fighter, none for the clone');
   assert.equal(calls.filter((c) => c[0] === 'ellipse').length, 4);
 
   while (clone.phase !== 'attack') battle.update(DT);
@@ -1601,7 +1604,7 @@ test('Battle draws clones behind both fighters, with no shadow, ring or name tag
   assert.equal(drawn[0], '0001_1ba1.png', 'the clone body first, behind the fighters');
   // Facing left, right-facing art: mirrored like the fighters' own frames.
   assert.equal(mirrored('0001_1ba1.png'), true);
-  assert.equal(calls.filter((c) => c[0] === 'fillText').length, 2);
+  assert.equal(nameTags(), 2);
 
   // Debug: the clone's hitbox is drawn (and labelled) only while active.
   battle.debug = true;

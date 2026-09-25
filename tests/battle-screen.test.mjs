@@ -1,6 +1,6 @@
 // Run with node --test tests/battle-screen.test.mjs (no dependencies).
-// Pause menu, the HUD (fighter cards with portrait, name, Knockback and the
-// charged cooldown rings; timer and pause controls) and end-of-battle flow
+// Pause menu, the HUD (fighter cards with portrait, name and Knockback, the
+// score dots under them; timer and pause controls) and end-of-battle flow
 // on a minimal fake DOM; layout/paint still needs real-browser verification.
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -9,8 +9,9 @@ import { MenuNavigator } from '../js/core/menu-navigator.js';
 import { ConfirmDialog } from '../js/ui/overlays.js';
 import { readFileSync } from 'node:fs';
 import { Battle } from '../js/game/battle.js';
-import { CooldownTimers } from '../js/game/combat.js';
-import { formatKnockback, formatCooldown } from '../js/game/hud.js';
+import { CombatState } from '../js/game/combat.js';
+import { formatKnockback, describeStamina } from '../js/game/hud.js';
+import { CONFIG } from '../js/config.js';
 import { duel, def as DEF_0001 } from './fighter-harness.mjs';
 
 class Node {
@@ -147,14 +148,16 @@ function setup() {
 }
 
 // A stand-in for Battle that uses the real draw/winner rule. `p1` / `p2`
-// are the fighters' accumulated Knockback.
-function fakeBattle({ p1 = 0, p2 = 0 } = {}) {
-  const fighter = (knockback) => ({
-    def: { displayName: '#0001', chargedActions: DEF_0001.chargedActions },
-    combat: { knockback, chargedCooldowns: new CooldownTimers() },
-  });
+// are the fighters' accumulated Knockback, `score` their points.
+function fakeBattle({ p1 = 0, p2 = 0, score = { p1: 0, p2: 0 } } = {}) {
+  const fighter = (knockback) => {
+    const combat = new CombatState();
+    combat.knockback = knockback;
+    return { def: { displayName: '#0001', chargedActions: DEF_0001.chargedActions }, combat };
+  };
   const battle = {
     p1: fighter(p1), p2: fighter(p2), phase: 'fight', phaseTime: 1, timeLeft: 0.2, round: 1, restarts: 0,
+    score: { ...score }, pointsToWin: CONFIG.battle.pointsToWin,
     resize: () => false,
     render() {},
     frame() {},
@@ -164,6 +167,8 @@ function fakeBattle({ p1 = 0, p2 = 0 } = {}) {
         f.combat.knockback = 0;
         f.combat.chargedCooldowns.clear();
       }
+      this.score.p1 = 0;
+      this.score.p2 = 0;
       this.timeLeft = 99;
       this.phase = 'intro';
       this.phaseTime = 0;
@@ -286,14 +291,19 @@ test('timer and pause halves both run the one pause path, once', () => {
   assert.deepEqual(app.nav.scopes, [screen.pauseScope]);
 });
 
-test('HUD: one glass card per fighter, portrait | divider | name over Knockback, then the cooldown rings; labelled timer, digits-only urgency', () => {
+test('HUD: one glass card per fighter, portrait | divider | name over Knockback, three score dots beneath; labelled timer, digits-only urgency', () => {
   const { screen } = setup();
   const battle = startBattle(screen, { p2: 40 });
   const { hud } = screen;
   hud.update(battle);
   for (const side of [hud.left, hud.right]) {
     assert.equal(side.root.classList.contains('glass'), true, 'semi-transparent glass');
-    assert.deepEqual(side.root.children, [side.portrait, side.divider, side.info, side.cooldownRow]);
+    assert.equal(side.root.children[0], side.portrait);
+    assert.equal(side.root.children[1], side.divider);
+    assert.equal(side.root.children[2], side.info);
+    assert.equal(side.root.children.length, 4, 'and the stamina description, for screen readers only');
+    assert.equal(side.root.children[3], side.stamina);
+    assert.ok(side.stamina.classList.contains('hud-sr'));
     assert.equal(side.portrait.tagName, 'CANVAS');
     assert.ok(side.portrait.classList.contains('hud-portrait'));
     assert.equal(side.portrait.getAttribute('aria-hidden'), 'true');
@@ -304,9 +314,22 @@ test('HUD: one glass card per fighter, portrait | divider | name over Knockback,
     assert.equal(tagRow.querySelector('.hud-name').textContent, '#0001', 'the character\'s displayName');
     assert.equal(knockback, side.knockback, 'Knockback under the name');
     assert.equal(side.root.querySelector('.hud-sub'), null);
-    assert.equal(side.cooldownRow.querySelectorAll('.hud-cd').length, 2, 'Charged BA1 and Charged BA2');
-    assert.deepEqual(side.cooldowns.map((c) => c.id), ['ba1Clone', 'rasenRush']);
-    assert.deepEqual(side.cooldownRow.querySelectorAll('.hud-cd-name').map((n) => n.textContent), ['BA1', 'BA2']);
+    // No CAB cooldowns in the card any more: they are drawn under the
+    // fighter itself (see fighter-status.test.mjs).
+    for (const cls of ['.hud-cooldowns', '.hud-cd', '.hud-cd-ring', '.hud-cd-name']) {
+      assert.deepEqual(side.wrap.querySelectorAll(cls), [], `no ${cls}`);
+    }
+    assert.equal('cooldowns' in side, false);
+    assert.equal('cooldownRow' in side, false);
+    assert.doesNotMatch(side.wrap.textContent, /CAB|BA1|BA2/);
+    // The card, then exactly three score dots under it, all empty at first.
+    assert.equal(side.wrap.children.length, 2);
+    assert.equal(side.wrap.children[0], side.root);
+    assert.equal(side.wrap.children[1], side.score);
+    assert.ok(side.score.classList.contains('hud-score'));
+    assert.equal(side.score.querySelectorAll('.hud-dot').length, 3);
+    assert.equal(side.dots.length, CONFIG.battle.pointsToWin);
+    assert.ok(side.dots.every((d) => !d.classList.contains('is-filled')));
   }
   assert.deepEqual([hud.left.tag.textContent, hud.right.tag.textContent], ['P1', 'CPU']);
   assert.equal(hud.left.root.classList.contains('hud-p1'), true);
@@ -329,6 +352,71 @@ test('HUD: one glass card per fighter, portrait | divider | name over Knockback,
   assert.equal(hud.timeButton.classList.contains('is-urgent'), false, 'the holder itself never changes');
 });
 
+test('HUD: the cards sit in the inner columns, either side of the timer, their portraits facing it', () => {
+  const { screen } = setup();
+  const battle = startBattle(screen);
+  const { hud } = screen;
+  const [left, center, right] = screen.hudRoot.children;
+  assert.equal(left, hud.left.wrap);
+  assert.ok(center.classList.contains('hud-center'));
+  assert.equal(right, hud.right.wrap);
+  assert.ok(left.classList.contains('hud-fighter--p1') && right.classList.contains('hud-fighter--p2'));
+  // Facing the centre, whatever the fighters' own facing in play.
+  battle.p1.facing = -1;
+  battle.p2.facing = 1;
+  hud.bind(battle.p1, battle.p2);
+  assert.equal(hud.left.portrait.dataset.facing, 'right', 'Player 1 faces the timer');
+  assert.equal(hud.right.portrait.dataset.facing, 'left', 'the CPU faces the timer');
+  // #0001's art faces right: only the CPU's portrait is mirrored.
+  assert.equal(hud.left.portrait.classList.contains('is-mirrored'), false);
+  assert.equal(hud.right.portrait.classList.contains('is-mirrored'), true);
+  // Art drawn facing left is mirrored on the other side instead.
+  const leftFacing = { ...battle.p1, def: { ...battle.p1.def, sourceFacing: -1 } };
+  hud.bind(leftFacing, leftFacing);
+  assert.equal(hud.left.portrait.classList.contains('is-mirrored'), true);
+  assert.equal(hud.right.portrait.classList.contains('is-mirrored'), false);
+  assert.deepEqual([hud.left.portrait.dataset.facing, hud.right.portrait.dataset.facing], ['right', 'left']);
+  // The rules behind the layout (a real browser still has to show it).
+  const css = readFileSync(new URL('../styles.css', import.meta.url), 'utf8');
+  const rule = (selector) => {
+    const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return css.match(new RegExp(`(?:^|\\n)${escaped}\\s*\\{([^}]*)\\}`))?.[1] ?? null;
+  };
+  assert.match(rule('.hud'), /grid-template-columns:\s*minmax\(0, 1fr\) auto minmax\(0, 1fr\)/);
+  assert.match(rule('.hud-fighter--p1'), /justify-self:\s*end/, 'Player 1 hugs the centre');
+  assert.match(rule('.hud-fighter--p2'), /justify-self:\s*start/, 'so does the CPU');
+  assert.match(rule('.hud-portrait.is-mirrored'), /transform:\s*scaleX\(-1\)/);
+  assert.match(rule('.hud-dot'), /border-radius:\s*50%/, 'CSS circles, no image');
+  assert.match(rule('.hud-dot.is-filled'), /background:/);
+  assert.doesNotMatch(css, /hud-cooldowns|hud-cd|--cd-/, 'no card cooldown styles left');
+});
+
+test('HUD: a point fills the scorer\'s next dot at once, and only its own; a rematch empties them', () => {
+  const { screen } = setup();
+  const battle = startBattle(screen);
+  const { hud } = screen;
+  const filled = (side) => side.dots.map((d) => (d.classList.contains('is-filled') ? '●' : '○')).join(' ');
+  hud.update(battle);
+  assert.deepEqual([filled(hud.left), filled(hud.right)], ['○ ○ ○', '○ ○ ○']);
+  assert.equal(hud.left.score.getAttribute('aria-label'), 'Player 1: 0 of 3 points');
+  assert.equal(hud.left.score.getAttribute('role'), 'img');
+  battle.score.p1 = 1;
+  hud.update(battle);
+  assert.deepEqual([filled(hud.left), filled(hud.right)], ['● ○ ○', '○ ○ ○']);
+  assert.equal(hud.left.score.getAttribute('aria-label'), 'Player 1: 1 of 3 points');
+  battle.score.p2 = 1;
+  battle.score.p1 = 2;
+  hud.update(battle);
+  assert.deepEqual([filled(hud.left), filled(hud.right)], ['● ● ○', '● ○ ○']);
+  assert.equal(hud.right.score.getAttribute('aria-label'), 'CPU: 1 of 3 points');
+  battle.score.p1 = 3;
+  hud.update(battle);
+  assert.deepEqual([filled(hud.left), filled(hud.right)], ['● ● ●', '● ○ ○']);
+  battle.restart();
+  hud.update(battle);
+  assert.deepEqual([filled(hud.left), filled(hud.right)], ['○ ○ ○', '○ ○ ○']);
+});
+
 test('HUD: no Health or Energy anywhere: no meter, bar, fill, label or maximum', () => {
   const { screen } = setup();
   const battle = startBattle(screen);
@@ -343,6 +431,9 @@ test('HUD: no Health or Energy anywhere: no meter, bar, fill, label or maximum',
   assert.ok(!all.some((n) => /health|energy/i.test(n.getAttribute('aria-label') ?? '')), 'no Health or Energy labels');
   for (const side of [hud.left, hud.right]) {
     for (const key of ['bar', 'fill', 'ghost', 'energy', 'energyFill']) assert.equal(key in side, false, `no ${key}`);
+    // Stamina is not Energy: described (to screen readers only) by name.
+    assert.equal(side.stamina.textContent, 'Stamina 100 of 100');
+    assert.doesNotMatch(side.stamina.textContent, /energy/i);
     // Knockback: labelled, a plain number with no maximum and no % sign.
     assert.equal(side.knockback.getAttribute('aria-label'), 'Knockback');
     assert.equal(side.knockback.getAttribute('aria-valuemax'), null);
@@ -383,47 +474,26 @@ test('HUD: the Knockback number follows the fighter, touches the DOM only when i
   assert.equal(formatKnockback(99.6), '100');
 });
 
-test('HUD: a cooldown ring starts empty, is half full halfway, and is complete and ready at 0; its number counts down', () => {
+test('HUD: the card describes stamina to screen readers in steps of 5, exhausted included, never as Energy', () => {
   const { screen } = setup();
   const battle = startBattle(screen);
   const { hud } = screen;
-  const cd = battle.p1.combat.chargedCooldowns;
-  const [ba1, ba2] = hud.left.cooldowns;
-  const ring = (c) => c.ring.style['--cd-progress'];
+  const c = battle.p1.combat;
   hud.update(battle);
-  for (const c of [ba1, ba2]) {
-    assert.equal(ring(c), '1', 'ready: complete');
-    assert.equal(c.value.textContent, '');
-    assert.ok(c.root.classList.contains('is-ready'));
-    assert.equal(c.root.getAttribute('role'), 'img');
-  }
-  assert.equal(ba1.root.getAttribute('aria-label'), 'Charged BA1 ready');
-  assert.equal(ba2.root.getAttribute('aria-label'), 'Charged BA2 ready');
-
-  cd.start('ba1Clone', 5);
+  assert.equal(hud.left.stamina.textContent, 'Stamina 100 of 100');
+  c.spendStamina(25);
+  c.regenStamina(1.2);
   hud.update(battle);
-  assert.equal(ba1.value.textContent, '5.0');
-  assert.equal(ring(ba1), '0', 'just started: empty');
-  assert.equal(ba1.root.classList.contains('is-ready'), false);
-  assert.equal(ba1.root.getAttribute('aria-label'), 'Charged BA1 cooldown, 5.0 seconds remaining');
-  assert.equal(ring(ba2), '1', 'Charged BA2 is its own');
-  for (const [dt, shown, progress] of [[0.7, '4.3', '0.14'], [1.8, '2.5', '0.5'], [1.7, '0.8', '0.84']]) {
-    cd.update(dt);
-    hud.update(battle);
-    assert.equal(ba1.value.textContent, shown);
-    assert.equal(ring(ba1), progress, 'progress = 1 - remaining / duration');
-    assert.equal(ba1.root.getAttribute('aria-label'), `Charged BA1 cooldown, ${shown} seconds remaining`);
-  }
-  cd.update(0.8);
+  assert.equal(hud.left.stamina.textContent, 'Stamina 75 of 100');
+  c.spendStamina(76.2);
   hud.update(battle);
-  assert.equal(ring(ba1), '1', 'complete at ready');
-  assert.equal(ba1.value.textContent, '');
-  assert.ok(ba1.root.classList.contains('is-ready'));
-  assert.equal(ba1.root.getAttribute('aria-label'), 'Charged BA1 ready');
-  // Never 0.0 while it is still cooling down.
-  assert.equal(formatCooldown(0.01), '0.1');
-  assert.equal(formatCooldown(4.3), '4.3');
-  assert.equal(formatCooldown(4.31), '4.4');
+  assert.equal(hud.left.stamina.textContent, 'Stamina exhausted, refilling: 0 of 100');
+  c.regenStamina(41);
+  hud.update(battle);
+  assert.equal(hud.left.stamina.textContent, 'Stamina exhausted, refilling: 40 of 100');
+  c.refillStamina();
+  assert.equal(describeStamina(c), 'Stamina 100 of 100');
+  assert.equal(hud.right.stamina.textContent, 'Stamina 100 of 100', 'the other card is its own');
 });
 
 test('HUD: the portrait is the character\'s own crop from its sprites, with nothing about #0001 in the HUD itself', () => {
@@ -449,10 +519,10 @@ test('HUD: the portrait is the character\'s own crop from its sprites, with noth
   assert.match(source, /paintPortrait/, 'the shared portrait painter, as the roster uses');
 });
 
-test('HUD: a real hit raises the Knockback shown, and a real Charged BA1 starts its ring at once; Charge fills it faster', () => {
+test('HUD: a real hit raises the Knockback shown on the target\'s card only', () => {
   const { screen } = setup();
   const d = duel();
-  const battle = { p1: d.attacker, p2: d.target, timeLeft: 99, round: 1 };
+  const battle = { p1: d.attacker, p2: d.target, timeLeft: 99, round: 1, score: { p1: 0, p2: 0 } };
   const { hud } = screen;
   hud.bind(battle.p1, battle.p2);
   hud.update(battle);
@@ -461,58 +531,38 @@ test('HUD: a real hit raises the Knockback shown, and a real Charged BA1 starts 
   hud.update(battle);
   assert.equal(hud.right.knockbackValue.textContent, '5');
   assert.equal(hud.left.knockbackValue.textContent, '0');
-  d.until(() => !d.attacker.combat.attack && d.target.combat.stun <= 0);
-
-  d.tick({ charge: true });
-  d.tick({ charge: true, action1: true, action1Pressed: true });
-  assert.equal(d.clones.length, 1);
-  hud.update(battle);
-  const [ba1, ba2] = hud.left.cooldowns;
-  assert.equal(ba1.value.textContent, '5.0');
-  assert.equal(ba1.ring.style['--cd-progress'], '0');
-  assert.equal(ba2.ring.style['--cd-progress'], '1', 'Charged BA2 stays ready');
-  assert.equal(hud.right.cooldowns[0].ring.style['--cd-progress'], '1', 'the CPU\'s rings do not move');
-  // Half a second of Charge takes a whole second off.
-  for (let i = 0; i < 30; i++) d.tick({ charge: true });
-  hud.update(battle);
-  assert.equal(ba1.value.textContent, '4.0');
-  assert.equal(ba1.ring.style['--cd-progress'], '0.2');
 });
 
-test('HUD: a rematch shows 0 Knockback and ready rings again; on time the lower Knockback wins', () => {
+test('HUD: a rematch shows 0 Knockback and empty dots again; on time and level on points the lower Knockback wins', () => {
   const { screen } = setup();
-  const battle = startBattle(screen, { p1: 12, p2: 40 });
-  battle.p1.combat.chargedCooldowns.start('rasenRush', 5);
+  const battle = startBattle(screen, { p1: 12, p2: 40, score: { p1: 1, p2: 1 } });
   screen.hud.update(battle);
   battle.frame = () => { battle.phase = 'result'; battle.timeLeft = 0; };
   screen.update(1 / 60);
-  assert.equal(battle.result.outcome, 'p1', 'less Knockback is better');
+  assert.deepEqual(battle.result, { outcome: 'p1', reason: 'time' }, 'less Knockback is better');
   assert.equal(screen.resultTitle.textContent, 'Player 1 Wins');
 
   byText(screen.resultOverlay.querySelectorAll('[data-nav]'), 'Rematch').click();
   for (const side of [screen.hud.left, screen.hud.right]) {
     assert.equal(side.knockbackValue.textContent, '0');
-    assert.ok(side.cooldowns.every((c) => c.ring.style['--cd-progress'] === '1'));
+    assert.ok(side.dots.every((d) => !d.classList.contains('is-filled')));
   }
 });
 
-test('Quick Battle time-up compares accumulated Knockback: lower wins, equal draws; the Void always overrides it', () => {
-  const result = (p1, p2, lost = {}) => {
-    const battle = fakeBattle({ p1, p2 });
-    battle.p1.lostToVoid = !!lost.p1;
-    battle.p2.lostToVoid = !!lost.p2;
-    return battle.result;
-  };
-  assert.deepEqual(result(42, 81), { outcome: 'p1', reason: 'time' });
-  assert.deepEqual(result(81, 42), { outcome: 'p2', reason: 'time' });
-  assert.deepEqual(result(0, 5), { outcome: 'p1', reason: 'time' });
-  assert.deepEqual(result(37, 37), { outcome: 'draw', reason: 'time' });
-  assert.deepEqual(result(0, 0), { outcome: 'draw', reason: 'time' });
-  // A Void loss decides it, whatever the Knockback says.
-  assert.deepEqual(result(0, 300, { p1: true }), { outcome: 'p2', reason: 'void' });
-  assert.deepEqual(result(300, 0, { p2: true }), { outcome: 'p1', reason: 'void' });
-  assert.deepEqual(result(10, 90, { p1: true, p2: true }), { outcome: 'draw', reason: 'void' });
-  // The real getter reads Knockback and the Void only.
+test('Quick Battle result: points first (3 wins at once, or more on time), then lower Knockback, then a draw', () => {
+  const result = (p1, p2, score) => fakeBattle({ p1, p2, score }).result;
+  // Level on points at time: Knockback decides.
+  assert.deepEqual(result(42, 81, { p1: 0, p2: 0 }), { outcome: 'p1', reason: 'time' });
+  assert.deepEqual(result(81, 42, { p1: 1, p2: 1 }), { outcome: 'p2', reason: 'time' });
+  assert.deepEqual(result(0, 5, { p1: 2, p2: 2 }), { outcome: 'p1', reason: 'time' });
+  assert.deepEqual(result(37, 37, { p1: 1, p2: 1 }), { outcome: 'draw', reason: 'time' });
+  assert.deepEqual(result(0, 0, { p1: 0, p2: 0 }), { outcome: 'draw', reason: 'time' });
+  // More points wins on time, whatever the Knockback says.
+  assert.deepEqual(result(300, 0, { p1: 1, p2: 0 }), { outcome: 'p1', reason: 'points' });
+  assert.deepEqual(result(0, 300, { p1: 0, p2: 2 }), { outcome: 'p2', reason: 'points' });
+  // Three points: the match is won, by K.O.
+  assert.deepEqual(result(90, 0, { p1: 3, p2: 2 }), { outcome: 'p1', reason: 'void' });
+  assert.deepEqual(result(0, 90, { p1: 0, p2: 3 }), { outcome: 'p2', reason: 'void' });
   const source = readFileSync(new URL('../js/game/battle.js', import.meta.url), 'utf8');
   assert.doesNotMatch(source, /health|energy/i);
 });
@@ -553,7 +603,7 @@ test('a winner still gets the result menu', () => {
     assert.equal(battle.restarts, 0);
     assert.equal(screen.resultOverlay.hidden, false);
     assert.equal(screen.resultTitle.textContent, title);
-    assert.equal(screen.resultSub.textContent, 'Time ran out. Lower Knockback wins the round.');
+    assert.equal(screen.resultSub.textContent, 'Time ran out with the points level. Lower Knockback wins.');
     assert.deepEqual(app.nav.scopes, [screen.resultScope]);
     assert.equal(document.activeElement.textContent, 'Rematch');
     assert.equal(app.input.gameplayActive, false);
@@ -572,15 +622,18 @@ test('a winner still gets the result menu', () => {
   }
 });
 
-test('a Void loss plays the K.O. banner, then the result menu names who fell', () => {
-  const cases = [['p1', 'CPU Wins', 'Player 1 fell into the Void.'], ['p2', 'Player 1 Wins', 'The CPU fell into the Void.']];
+test('the third point plays the K.O. banner with the dots filled, then the result menu names who fell', () => {
+  const cases = [['p1', 'CPU Wins', 'Player 1 fell into the Void for the final point.'], ['p2', 'Player 1 Wins', 'The CPU fell into the Void for the final point.']];
   for (const [lost, title, sub] of cases) {
     const { app, screen } = setup();
     const battle = startBattle(screen);
-    // The Battle defeats a fighter the Void takes: out of play. Its
-    // Knockback (lower here) does not matter.
+    const won = lost === 'p1' ? 'p2' : 'p1';
+    // The Battle scored the winner's third point and took the loser out:
+    // its Knockback (lower here) does not matter.
+    battle.score[won] = 3;
+    battle.score[lost] = 2;
     battle[lost].lostToVoid = true;
-    battle[lost === 'p1' ? 'p2' : 'p1'].combat.knockback = 120;
+    battle[won].combat.knockback = 120;
     battle.phase = 'ko';
     battle.phaseTime = 0.2;
     screen.update(1 / 60);
@@ -588,25 +641,29 @@ test('a Void loss plays the K.O. banner, then the result menu names who fell', (
     assert.equal(screen.bannerMain.textContent, 'K.O.');
     assert.equal(screen.bannerSub.textContent, 'VOID');
     assert.equal(screen.resultOverlay.hidden, true, 'the KO beat plays first');
+    const side = won === 'p1' ? screen.hud.left : screen.hud.right;
+    assert.ok(side.dots.every((d) => d.classList.contains('is-filled')), 'with all three dots already filled');
 
     battle.frame = () => { battle.phase = 'result'; };
     screen.update(1 / 60);
-    assert.deepEqual(battle.result, { outcome: lost === 'p1' ? 'p2' : 'p1', reason: 'void' });
+    assert.deepEqual(battle.result, { outcome: won, reason: 'void' });
     assert.equal(screen.resultOverlay.hidden, false);
     assert.equal(screen.resultKicker.textContent, 'K.O.');
     assert.equal(screen.resultTitle.textContent, title);
     assert.equal(screen.resultSub.textContent, sub);
     assert.deepEqual(app.nav.scopes, [screen.resultScope]);
 
-    // The rematch runs to time over: the result reads as time over again.
+    // The rematch starts from 0 points and runs to time over: ahead on
+    // points, the result reads as time over by points.
     byText(screen.resultOverlay.querySelectorAll('[data-nav]'), 'Rematch').click();
+    assert.deepEqual(battle.score, { p1: 0, p2: 0 });
     battle[lost].lostToVoid = false;
-    battle.p2.combat.knockback = 40;
+    battle.score.p1 = 1;
     battle.frame = () => { battle.phase = 'result'; };
     screen.update(1 / 60);
     assert.equal(screen.resultKicker.textContent, 'Time over');
     assert.equal(screen.resultTitle.textContent, 'Player 1 Wins');
-    assert.equal(screen.resultSub.textContent, 'Time ran out. Lower Knockback wins the round.');
+    assert.equal(screen.resultSub.textContent, 'Time ran out. More points wins the match.');
   }
 });
 

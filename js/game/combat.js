@@ -84,6 +84,13 @@
 // own cooldown (CombatState.chargedCooldowns, see CooldownTimers), started
 // when it is used and apart from the short recovery cooldowns of ordinary
 // attacks (CombatState.cooldowns).
+//
+// Stamina (CombatState.stamina, see resolveStamina) is the one resource a
+// fighter spends, and only on Dash, Dodge and Block: a Dash or a Dodge pays
+// its cost once as it starts, a held Block drains it per second. It refills
+// by itself, faster while the fighter is in its Charge stance. Emptied, it
+// exhausts the fighter: no Dash, Dodge or Block until it is full again.
+// Nothing else (movement, jumps, attacks, charged actions) ever touches it.
 
 import { resolveKnockback, knockbackMultiplier } from '../data/knockback.js';
 
@@ -148,6 +155,25 @@ export function createDefenseDefinition(spec) {
   throw new Error(`[Alva] Unknown defense type "${spec.type}"`);
 }
 
+// A character's `stamina` entry, every field optional:
+//
+//   stamina: {
+//     max: 100,        // full, and where every fighter starts
+//     regen: 12,       // per second, whatever the fighter is doing
+//     chargeRegen: 30, // per second instead, while in the Charge stance
+//     dashCost: 25,    // spent once as a Dash starts
+//     dodgeCost: 25,   // spent once as a Dodge starts
+//     blockDrain: 20,  // per second while a Block guard is held
+//   }
+const STAMINA_DEFAULTS = Object.freeze({
+  max: 100, regen: 12, chargeRegen: 30, dashCost: 25, dodgeCost: 25, blockDrain: 20,
+});
+
+// Frozen stamina settings: the character's entry over the defaults.
+export function resolveStamina(spec) {
+  return Object.freeze({ ...STAMINA_DEFAULTS, ...spec });
+}
+
 // Named cooldowns that each remember their full length, so progress can be
 // read back (1 - remaining / duration) without knowing where they came from.
 // Used for charged actions' cooldowns (CombatState.chargedCooldowns).
@@ -206,11 +232,18 @@ export class CooldownTimers {
 
 // Per-fighter combat state.
 export class CombatState {
-  constructor(stats = {}) {
+  constructor(stats = {}, stamina = resolveStamina()) {
     // Accumulated Knockback: starts at 0 and only ever grows, by each hit's
     // damage (see CombatSystem.applyHit). No maximum, and it never stops the
     // fighter acting; the higher it is, the further hits launch the fighter.
     this.knockback = 0;
+    // Stamina for Dash, Dodge and Block (see resolveStamina): full at the
+    // start, never below 0 or above maxStamina. Emptying it exhausts the
+    // fighter, and only a full refill clears that (see setStamina).
+    this.staminaSpec = stamina;
+    this.maxStamina = stamina.max;
+    this.stamina = stamina.max;
+    this.staminaExhausted = false;
     // Block-type Defense only: the held guard and its chip-damage scale (a
     // blocked hit adds that share of its damage to Knockback).
     this.blockDamageScale = stats.blockDamageScale ?? 0.2;
@@ -274,9 +307,68 @@ export class CombatState {
   }
 
   // Free of any attack, Dodge, stun or bind. Accumulated Knockback never
-  // matters here, however high it is.
+  // matters here, however high it is, and neither does stamina.
   canAct() {
     return !this.attack && !this.defenseAction && this.stun <= 0 && !this.immobilized;
+  }
+
+  // ---- Stamina ----------------------------------------------------------------
+
+  // Whether something costing `cost` may start now: never while exhausted,
+  // however much has refilled since, and only with at least `cost` left.
+  canUseStamina(cost) {
+    return !this.staminaExhausted && this.stamina >= cost - PHASE_EPSILON;
+  }
+
+  // Pays `cost` at once, if canUseStamina allows it. True when paid.
+  spendStamina(cost) {
+    if (!this.canUseStamina(cost)) return false;
+    this.setStamina(this.stamina - cost);
+    return true;
+  }
+
+  // Takes up to `amount` (a held Block's drain for one step). True while
+  // some is left; false once it has run out and exhausted the fighter.
+  drainStamina(amount) {
+    this.setStamina(this.stamina - amount);
+    return !this.staminaExhausted;
+  }
+
+  regenStamina(amount) {
+    this.setStamina(this.stamina + amount);
+  }
+
+  // One step of recovery: chargeRegen per second while `charging` (the
+  // fighter is really in its Charge stance), regen per second otherwise.
+  updateStamina(dt, charging) {
+    const spec = this.staminaSpec;
+    this.regenStamina(dt * (charging ? spec.chargeRegen : spec.regen));
+  }
+
+  // Full again, not exhausted (a fresh fighter, a respawn).
+  refillStamina() {
+    this.setStamina(this.maxStamina);
+  }
+
+  // stamina / maxStamina, from 0 to 1.
+  get staminaRatio() {
+    return this.maxStamina > 0 ? Math.min(1, Math.max(0, this.stamina / this.maxStamina)) : 0;
+  }
+
+  // Every change goes through here: clamped to [0, max] (to within a little
+  // slack, as steps are sums of floats). Reaching 0 exhausts the fighter;
+  // only reaching max again clears it.
+  setStamina(value) {
+    const max = this.maxStamina;
+    let v = Math.min(max, Math.max(0, value));
+    if (v <= PHASE_EPSILON) {
+      v = 0;
+      this.staminaExhausted = true;
+    } else if (v >= max - PHASE_EPSILON) {
+      v = max;
+      this.staminaExhausted = false;
+    }
+    this.stamina = v;
   }
 
   update(dt) {

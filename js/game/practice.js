@@ -1,7 +1,8 @@
 // PracticeSession: Practice Ground's simulation on the shared Arena
 // (js/game/arena.js). Player 1's fighter on the training stage, and at most
-// one optional practice CPU: no intro, timer, rounds or result. It runs until
-// the screen leaves it; the player's fighter can be swapped in place
+// one practice CPU (the Practice Ground screen adds one on every fresh
+// visit): no intro, timer, rounds, points or result. It runs until the
+// screen leaves it; the player's fighter can be swapped in place
 // (setFighter) and the CPU added, replaced or removed (setCPU / removeCPU).
 // DOM concerns (HUD, Practice menu, fighter dialogs) live in the Practice
 // Ground screen.
@@ -11,9 +12,9 @@
 // back to neutral input). It is otherwise a normal fighter: it takes real
 // hits, hitstun, knockback and binds, collides and faces its opponent, and
 // the camera frames it as the secondary fighter. Its Knockback builds up
-// like anyone's (and launches it further as it does), though Practice shows
-// no panel for it: every hit it takes floats the Knockback it added over its
-// head instead (damageNumbers, "+5").
+// like anyone's (and launches it further as it does), shown on its own HUD
+// card, and every hit it takes also floats the Knockback it added over its
+// head (damageNumbers, "+5").
 //
 // With no CPU, moves aimed at an opponent fall back or miss on their own: a
 // Charged BA1 clone has nobody to appear behind, so the press is an ordinary
@@ -21,9 +22,10 @@
 // finds no one to catch and ends as a miss (its cooldown still spent);
 // attacks and shurikens strike nothing.
 //
-// The Void never ends practice: a fighter that falls into it is put back at
-// its own spawn at once (onVoid), fresh: 0 Knockback and every cooldown
-// ready.
+// The Void never ends practice and scores nothing: a fighter that falls into
+// it is out of play for CONFIG.battle.respawnSeconds, then back at its own
+// spawn (onVoid, Arena.updateRespawns), fresh: 0 Knockback, full stamina and
+// every cooldown ready. Player 1 and the CPU each wait on their own.
 
 import { Arena } from './arena.js';
 import { Fighter } from './character.js';
@@ -128,25 +130,20 @@ export class PracticeSession extends Arena {
     this.fighters = cpu ? [player, cpu] : [player];
   }
 
-  // Frames the fighters at once, if the view has been sized.
-  snapCamera() {
-    if (!this.view.pxW) return;
-    this.camera.snap(this.primary, this.secondary);
-    this.syncView();
-  }
-
   // ---- Void -------------------------------------------------------------------
 
-  // A fighter fell into the Void: nothing may keep hold of or aim at it
-  // (a technique holding it ends; clones and projectiles aimed at it or its
-  // own go, and so do its damage numbers), then it respawns at its own
-  // spawn, still, in a fresh training state: 0 Knockback and its charged
-  // cooldowns ready (Fighter.respawn). Practice simply carries on.
+  // A fighter fell into the Void (Arena.checkVoid already took it out of
+  // play): nothing may keep hold of or aim at it (a technique holding it
+  // ends; clones and projectiles aimed at it or its own go, and so do its
+  // damage numbers). After its respawn wait it is back at its own spawn,
+  // still, in a fresh training state: 0 Knockback, full stamina and its
+  // charged cooldowns ready (Fighter.respawn). No point is scored and
+  // practice simply carries on.
   onVoid(f) {
     this.detachFromPlay(f, 'void');
     const numbers = this.damageNumbers;
     numbers.splice(0, numbers.length, ...numbers.filter((d) => d.target !== f));
-    f.respawn(this.stage);
+    this.scheduleRespawn(f);
   }
 
   // ---- Loop -------------------------------------------------------------------
@@ -183,7 +180,7 @@ export class PracticeSession extends Arena {
     if (this.view.pxW) this.drawDamageNumbers();
   }
 
-  // Red, outlined "+N" numbers over the CPU's name tag, following it as it
+  // Red, outlined "+N" numbers over the CPU's stamina bar, following it as it
   // moves: each rises a little (not with reduced motion) and fades out.
   drawDamageNumbers() {
     if (!this.damageNumbers.length) return;
@@ -200,10 +197,11 @@ export class PracticeSession extends Arena {
     ctx.fillStyle = DAMAGE_COLOR;
     for (const d of this.damageNumbers) {
       const t = d.age / DAMAGE_LIFE;
-      const [x, tagTop] = this.markerAnchor(d.target);
+      const [x] = this.markerAnchor(d.target);
       const rise = this.reducedMotion ? 0 : DAMAGE_RISE * t * s;
-      // Clear of the tag itself (see Arena.drawMarkers), stacked by arrival.
-      const y = tagTop - this.markerFont * 1.5 - d.stack * font * 0.95 - rise;
+      // Clear of the tag and the stamina bar over it (see Arena.drawStatus),
+      // stacked by arrival.
+      const y = this.statusTop(d.target) - 2 - d.stack * font * 0.95 - rise;
       ctx.globalAlpha = t < DAMAGE_FADE ? 1 : Math.max(0, 1 - (t - DAMAGE_FADE) / (1 - DAMAGE_FADE));
       ctx.strokeText(d.text, Math.round(x), Math.round(y));
       ctx.fillText(d.text, Math.round(x), Math.round(y));

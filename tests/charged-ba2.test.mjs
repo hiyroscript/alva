@@ -1054,8 +1054,15 @@ test('the Void stops the ticks: a caught target lost to it takes nothing more', 
   battle.update(DT);
   assert.equal(battle.p2.lostToVoid, true);
   assert.equal(t.endReason, 'released');
+  // Out of play for its respawn wait, keeping the Knockback it fell with:
+  // no tick or explosion reaches it.
+  while (battle.p2.lostToVoid) {
+    assert.equal(battle.p2.combat.knockback, 1);
+    battle.update(DT);
+  }
+  // Back from the Void: a fresh 0, and still nothing from the ended rush.
   for (let i = 0; i < DELAY_STEPS; i++) battle.update(DT);
-  assert.equal(battle.p2.combat.knockback, 1);
+  assert.equal(battle.p2.combat.knockback, 0);
 });
 
 // ---- Cooldown ---------------------------------------------------------------------------

@@ -29,6 +29,9 @@ const CHARGE_FPS = 10;
 // Playback rate of both Dodge clips. The Dodge phases below are whole frames
 // at this rate, so the invulnerable window stays on the evasive art.
 const DODGE_FPS = 12;
+// Playback rate of the Dash clip. A Dash lasts exactly one pass of it
+// (2 frames = 0.2 s at 10 fps), so tuning it keeps the burst on the art.
+const DASH_FPS = 10;
 // Playback rate of the Throw clip. The Throw phases and the shuriken's release
 // point below are whole frames at this rate.
 const THROW_FPS = 12;
@@ -90,6 +93,19 @@ export const CHARACTERS = [
         fps: 10,
         loop: false,
         heightRatio: 1,
+      },
+      // Dash: dash1 leans into the burst, dash2 is the low, stretched-out
+      // sprint. Played once per Dash, which lasts exactly one pass of it.
+      // Drawn at 1x (one file pixel per art pixel, unlike the upscaled rest
+      // of #0001), so its grid cannot be detected: heightRatio then sizes it
+      // by its tallest frame, dash1's 41 px against idle's 52, which puts it
+      // at exactly one art pixel per file pixel, the same scale as every
+      // other pose.
+      dash: {
+        frames: frames(BASE_0001, 'dash', 2),
+        fps: DASH_FPS,
+        loop: false,
+        heightRatio: 41 / 52,
       },
       // Plays once on touchdown; the fighter holds the land state for exactly
       // one pass of this clip (frames / fps).
@@ -326,8 +342,8 @@ export const CHARACTERS = [
     // A still idle frame for the airborne, landing, hurt and charge clips if
     // their frames fail to load. `frame` holds a single frame instead of
     // looping, so the fighter never stretches or rotates to fake a pose.
-    // Attacks and Dodges never fall back: one whose frames are missing is
-    // refused (see Fighter.tryAction and Fighter.tryDefense).
+    // Attacks, Dodges and the Dash never fall back: one whose frames are
+    // missing is refused (see Fighter.tryAction, tryDefense and tryDash).
     animationFallbacks: {
       jump: { animation: 'idle', frame: 0 },
       fall: { animation: 'idle', frame: 0 },
@@ -362,7 +378,8 @@ export const CHARACTERS = [
       speed: 2,
     },
 
-    // Every other movement stat. The top speed is Speed Power's.
+    // Every other movement stat. The top speed is Speed Power's; a Dash
+    // never changes it, it owns the horizontal speed for its own length.
     movement: {
       acceleration: 2600,
       deceleration: 3200,
@@ -375,6 +392,11 @@ export const CHARACTERS = [
       jumpBuffer: 0.12,
       // Used only by the training CPU's platform drop; see Fighter.update.
       dropThroughTime: 0.28,
+      // Dash: two presses of the same direction (left or right), the second
+      // within dashTapWindow seconds of the first, start a grounded burst at
+      // dashSpeed (about 1.8x the top speed) for one pass of the dash clip.
+      dashSpeed: 600,
+      dashTapWindow: 0.22,
     },
 
     // Collision is independent from sprite/PNG dimensions.
@@ -392,15 +414,31 @@ export const CHARACTERS = [
       chargedCooldownRate: 2,
     },
 
+    // Stamina (see resolveStamina in js/game/combat.js): the purple bar over
+    // the fighter's head, spent only by Dash, Dodge and Block. It refills by
+    // itself at `regen` per second, at `chargeRegen` while in Charge (apart
+    // from, and on top of, Charge's faster charged cooldowns). Emptied, it
+    // turns gray: no Dash, Dodge or Block until it is full again.
+    stamina: {
+      max: 100,
+      regen: 12,
+      chargeRegen: 30,
+      dashCost: 25,
+      dodgeCost: 25,
+      blockDrain: 20,
+    },
+
     // What the shared Defense input (L, RB / RT, touch D) does for this
     // fighter. #0001 dodges: each new press plays one Dodge, `ground` or `air`
-    // by whether it is grounded at the press. Phases are whole frames of the
+    // by whether it is grounded at the press, paying stamina.dodgeCost as it
+    // starts. Phases are whole frames of the
     // clip (see createDefenseDefinition in js/game/combat.js); attacks pass
     // through only during `invulnerable`. On the ground that is dodge2, the
     // side-on lean away (dodge1 braces, dodge3 settles back). In the air it is
     // midairdodge1-2, the frames drawn breaking up into afterimages
     // (midairdodge3 is solid again). A future blocking fighter would use
-    // { type: 'block' } instead, with stats.blockDamageScale for chip damage.
+    // { type: 'block' } instead, with stats.blockDamageScale for chip damage;
+    // its held guard drains stamina.blockDrain per second.
     defense: {
       type: 'dodge',
       ground: {
@@ -437,9 +475,10 @@ export const CHARACTERS = [
     // still cooling down does nothing at all. If it cannot happen for another
     // reason (no opponent, missing art), the press falls through to the
     // button's normal attack.
+    // Their cooldowns show under the fighter as CAB1 and CAB2.
     chargedActions: {
-      action1: { type: 'summon', id: 'ba1Clone' }, // Charged BA1: Clone Attack
-      action2: { type: 'technique', id: 'rasenRush' }, // Charged BA2: Sphere Rush
+      action1: { type: 'summon', id: 'ba1Clone' }, // Charged BA1 (CAB1): Clone Attack
+      action2: { type: 'technique', id: 'rasenRush' }, // Charged BA2 (CAB2): Sphere Rush
     },
 
     // Summons, keyed by id. See js/game/clone.js for the schema

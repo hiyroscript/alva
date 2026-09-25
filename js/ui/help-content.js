@@ -64,16 +64,18 @@ export function buildHelp() {
   return el('div', { class: 'info-grid' }, [
     card('Desktop controls', [
       controlsTable(),
-      el('p', { class: 'info-note', text: 'Keys can be held together — run and jump at the same time. Gamepads with a standard layout also work (D-pad / left stick left and right to move, down to Charge, A to jump, X / Square for Throw, B for Basic Attack 1, LB for Basic Attack 2, RB / RT for Defense, Start to pause; Y / Triangle is reserved for Special). In menus, S / ↓ and D-pad / stick down still move down.' }),
+      el('p', { class: 'info-note', text: 'Keys can be held together — run and jump at the same time. Gamepads with a standard layout also work (D-pad / left stick left and right to move, twice in a row to Dash, down to Charge, A to jump, X / Square for Throw, B for Basic Attack 1, LB for Basic Attack 2, RB / RT for Defense, Start to pause; Y / Triangle is reserved for Special). In menus, S / ↓ and D-pad / stick down still move down.' }),
     ], 'info-card--wide'),
     card('Mobile controls', [
       mobileDiagram(),
-      el('p', { class: 'info-note', text: 'Play in landscape. Hold a direction and press Jump with your other thumb; you can slide between Left, C and Right without lifting. C is Charge: hold it to charge. T is Throw. D is Defense, which #0001 uses to Dodge. BA1 and BA2 are Basic Attacks 1 and 2; only the dashed Special button is reserved.' }),
+      el('p', { class: 'info-note', text: 'Play in landscape. Hold a direction and press Jump with your other thumb; you can slide between Left, C and Right without lifting, and tap Left or Right twice to Dash. C is Charge: hold it to charge. T is Throw. D is Defense, which #0001 uses to Dodge. BA1 and BA2 are Basic Attacks 1 and 2; only the dashed Special button is reserved.' }),
     ]),
     card('Movement', [
       el('ul', { class: 'info-list' }, [
         el('li', { text: 'Left / Right accelerate into a run. Release to slow to a stop.' }),
         el('li', { text: 'Jump from the ground; you can steer while airborne.' }),
+        el('li', { text: 'Press the same direction twice quickly (Right, Right or Left, Left) on the ground to Dash: a short, fast burst that way. It only moves you: it never hits, and a ledge or a wall ends it.' }),
+        el('li', { text: 'The purple bar above your fighter is stamina. Dash and Dodge each cost a quarter of it, and it refills by itself, faster while you hold Charge. Empty it and it turns gray: no Dash or Dodge until it is completely full again. Running, jumping and attacking never cost stamina.' }),
         el('li', { text: 'Standing still, your fighter turns to face the opponent.' }),
       ]),
     ]),
@@ -86,7 +88,7 @@ export function buildHelp() {
         el('li', { text: 'Hold Charge first, then press BA1 to summon a clone behind the opponent (the Clone Attack). The clone appears in a cloud of smoke, performs BA1 and disappears, while #0001 keeps charging for as long as you hold Charge. With no ground behind the opponent (a platform edge, or in the air), it appears above the opponent and performs Mid-air BA2 instead.' }),
         el('li', { text: 'Hold Charge first, then press BA2 for the Sphere Rush: #0001 forms a blue sphere in his hand, and only once it is complete does he dash forward with it. The rush must connect: a miss stops him and he lets the sphere go, with no explosion. A hit traps the opponent in the spinning sphere, adding 1 Knockback every half second while it grows bigger and bigger until, about two seconds later, it explodes for 15 more and a strong sideways launch. You can let go of Charge once it starts.' }),
         el('li', { text: 'The Sphere Rush needs ground under #0001 from start to finish: losing it (running off an edge mid-rush, for instance) cancels the technique, frees the opponent and #0001 falls. A hit on #0001 cancels it too.' }),
-        el('li', { text: 'Each charged move has its own 5-second cooldown, shown as a ring beside your Knockback. It starts the moment the move is used, hit or miss. While it is cooling down, the charged press does nothing. Charging makes both cooldowns recover twice as fast.' }),
+        el('li', { text: 'Each charged move has its own 5-second cooldown, shown as a white ring under your fighter: CAB1 for Charged BA1, CAB2 for Charged BA2. It starts the moment the move is used, hit or miss. While it is cooling down, the charged press does nothing. Charging makes both cooldowns recover twice as fast, and refills your stamina faster too.' }),
       ]),
     ]),
     card('Throw', [
@@ -101,12 +103,13 @@ export function buildHelp() {
         el('li', { text: 'Defense (L, RB / RT, or D on touch) is the shared defensive button. Each fighter defends in its own way: #0001 dodges.' }),
         el('li', { text: 'One press, one Dodge: a sidestep on the ground, an afterimage dodge in the air. Holding Defense does not repeat it; press again for another.' }),
         el('li', { text: 'Attacks pass through #0001 during the Dodge’s evasive frames and hit normally just before and after them. A Dodge never takes chip damage.' }),
+        el('li', { text: 'Each Dodge costs stamina (the purple bar above your fighter): with too little left, or while the bar is gray, you cannot Dodge.' }),
       ]),
     ]),
     card('Stages & platforms', [
       el('ul', { class: 'info-list' }, [
         el('li', { text: 'Stages are compact and open: there are no walls at their edges. Run, jump or get knocked off a ledge and you fall, so drift back toward the stage while you still can.' }),
-        el('li', { text: 'The Void, the black region with a wavering edge a short way past each stage, is the kill boundary. Fall into it in Quick Battle and you lose the round at once; in Practice Ground you are put back at your spawn with 0 Knockback.' }),
+        el('li', { text: 'The Void, the black region with a wavering edge a short way past each stage, is the kill boundary. Fall into it and you are out for 2 seconds, then back at your spawn with 0 Knockback. In Quick Battle each fall is a point for your opponent (the dots under each card), and the first to 3 points wins; Practice Ground keeps no score.' }),
         el('li', { text: 'Desert is a sandstone mesa with two rock outcrops you can hop onto.' }),
         el('li', { text: 'City stacks one-way platforms over a rooftop. Jump up through them from below, and walk off an edge to come back down.' }),
         el('li', { text: 'The camera follows the action from far enough out to show the whole stage.' }),
@@ -120,7 +123,7 @@ export function buildHelp() {
       ]),
     ]),
     card('This build', [
-      el('p', { class: 'info-text', text: '#0001 has idle, run, jump, fall and land animations, ground and mid-air hurt poses, a held Charge stance, Basic Attack 1 (BA1) and Basic Attack 2 (BA2), each on the ground and in the air, and a ground Throw. BA1 (action1) is a punch on the ground and a kunai slash in the air; BA2 (action2) is a spinning high kick on the ground and a kick in the air. Throw (the primary action) throws an animated shuriken. Only Special is still reserved: it is wired into the input and combat systems but waits for matching attack sprites. Defense is a ground and mid-air Dodge for #0001. Holding Charge turns BA1 into the Clone Attack and BA2 into the Sphere Rush, each on its own cooldown. Every hit adds to the target’s Knockback, which starts at 0; the higher it gets, the further hits launch it. The training CPU never attacks.' }),
+      el('p', { class: 'info-text', text: '#0001 has idle, run, jump, fall and land animations, ground and mid-air hurt poses, a held Charge stance, Basic Attack 1 (BA1) and Basic Attack 2 (BA2), each on the ground and in the air, and a ground Throw. BA1 (action1) is a punch on the ground and a kunai slash in the air; BA2 (action2) is a spinning high kick on the ground and a kick in the air. Throw (the primary action) throws an animated shuriken. Only Special is still reserved: it is wired into the input and combat systems but waits for matching attack sprites. Defense is a ground and mid-air Dodge for #0001. Holding Charge turns BA1 into the Clone Attack and BA2 into the Sphere Rush, each on its own cooldown (CAB1, CAB2). A double tap of Left or Right is a Dash; Dash and Dodge spend stamina. Every hit adds to the target’s Knockback, which starts at 0; the higher it gets, the further hits launch it. The training CPU never attacks.' }),
     ]),
   ]);
 }

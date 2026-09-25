@@ -4,9 +4,13 @@
 // Canvas 2D rendering; DOM concerns (HUD, pause, overlays) live in the battle
 // screen.
 //
-// The round ends at once when a fighter falls into the Void (see onVoid):
-// that fighter is defeated, whatever the timer or Knockback says. If time
-// runs out first, the fighter with less accumulated Knockback wins.
+// First to CONFIG.battle.pointsToWin (3) points wins. A fighter scores a
+// point each time its opponent falls into the Void (see onVoid); the one
+// that fell is out of play for CONFIG.battle.respawnSeconds (2), then back
+// at its spawn, fresh, while the fight (and the timer) carries on. The
+// point that reaches 3 ends the match instead: no respawn, the KO beat,
+// then the result. If time runs out first, more points wins, then less
+// accumulated Knockback; equal on both is a draw.
 
 import { CONFIG } from '../config.js';
 import { Arena } from './arena.js';
@@ -31,15 +35,22 @@ export class Battle extends Arena {
     this.p1.opponent = this.p2;
     this.p2.opponent = this.p1;
     this.fighters = [this.p1, this.p2];
+    // Points that win the match, and each fighter's points so far, by slot.
+    // The match's own: never on a fighter or its character.
+    this.pointsToWin = CONFIG.battle.pointsToWin;
+    this.score = { p1: 0, p2: 0 };
 
     this.restart();
   }
 
   restart() {
     // Resetting a fighter ends its charged technique and releases whatever
-    // it held; the fresh combat state carries no bind, timer or sphere, 0
-    // Knockback and no cooldowns.
+    // it held, and cancels any respawn wait; the fresh combat state carries
+    // no bind, timer or sphere, 0 Knockback, full stamina and no cooldowns.
+    // Both back to 0 points.
     for (const f of this.fighters) f.reset(this.stage);
+    this.score.p1 = 0;
+    this.score.p2 = 0;
     this.projectiles.length = 0;
     this.clones.length = 0;
     this.acc = 0;
@@ -87,24 +98,46 @@ export class Battle extends Arena {
     super.update(dt);
   }
 
-  // A fighter fell into the Void: it is defeated on the spot. It leaves
-  // play (frozen, undrawn, untouchable), nothing keeps holding or aiming at
-  // it, and a round still being fought ends at once with the short KO beat.
-  // Its Knockback stays as it was until the next match. One lost after time
-  // ran out still loses; both lost is a draw.
+  // A fighter fell into the Void (Arena.checkVoid already took it out of
+  // play: frozen, undrawn, untouchable, untargetable). Nothing keeps
+  // holding or aiming at it. While the fight is on, its opponent scores a
+  // point, at once, if the opponent is itself still in play: when both are
+  // out together (taken on the same step, or one taken while the other
+  // still waits to respawn) that fall scores nothing, so a double K.O.
+  // never moves both toward the win. The point that reaches pointsToWin
+  // ends the match: the KO beat, then the result, and the loser stays out.
+  // Otherwise the fighter respawns after its wait, keeping its Knockback
+  // until then. Once time is up or the match is won, a fall changes
+  // nothing more: no point and no respawn.
   onVoid(f) {
-    f.lostToVoid = true;
     this.detachFromPlay(f, 'void');
-    if (this.phase === 'fight') this.setPhase('ko');
+    if (this.phase !== 'fight') return;
+    const scorer = f.opponent;
+    if (scorer && !scorer.lostToVoid) {
+      this.score[scorer.slot] += 1;
+      if (this.score[scorer.slot] >= this.pointsToWin) {
+        this.setPhase('ko');
+        return;
+      }
+    }
+    this.scheduleRespawn(f);
   }
 
-  // The winner: whoever the Void did not take (both taken is a draw), else,
-  // on time, whoever has less accumulated Knockback (equal is a draw).
+  // Respawn waits run only while the fight is on: once time is up or the
+  // match is won, whoever is out stays out, with the Knockback it fell with.
+  updateRespawns(dt) {
+    if (this.phase === 'fight') super.updateRespawns(dt);
+  }
+
+  // The winner: whoever reached pointsToWin ('void': it took the last point
+  // from a fall), else, on time, whoever has more points ('points'), else
+  // whoever has less accumulated Knockback ('time'; a fighter still out
+  // counts with the Knockback it fell with). Equal on both is a draw.
   get result() {
-    const lost = { p1: !!this.p1.lostToVoid, p2: !!this.p2.lostToVoid };
-    if (lost.p1 || lost.p2) {
-      if (lost.p1 && lost.p2) return { outcome: 'draw', reason: 'void' };
-      return { outcome: lost.p1 ? 'p2' : 'p1', reason: 'void' };
+    const { p1, p2 } = this.score;
+    if (p1 !== p2) {
+      const outcome = p1 > p2 ? 'p1' : 'p2';
+      return { outcome, reason: Math.max(p1, p2) >= this.pointsToWin ? 'void' : 'points' };
     }
     const a = this.p1.combat.knockback;
     const b = this.p2.combat.knockback;

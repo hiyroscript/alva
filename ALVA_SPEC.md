@@ -48,8 +48,10 @@ behave, and how it must look. The README covers running and deploying it.
   three Dodge frames `0001_dodge1`–`0001_dodge3` (≈256–288 × 384–416 px),
   three mid-air Dodge frames `0001_midairdodge1`–`0001_midairdodge3`
   (≈288–320 × 376–400 px) and three Throw frames `0001_throw1`–`0001_throw3`
-  (≈280–312 × 360–376 px), and twelve Charged BA2 (Sphere Rush) poses
-  `0001_rasen1`–`0001_rasen12` (≈64–110 × 80–104 px, ≈2× pixel art).
+  (≈280–312 × 360–376 px), twelve Charged BA2 (Sphere Rush) poses
+  `0001_rasen1`–`0001_rasen12` (≈64–110 × 80–104 px, ≈2× pixel art) and two
+  Dash frames `0001_dash1` (47 × 41 px) and `0001_dash2` (48 × 40 px), drawn
+  at 1× (one file pixel per art pixel).
   `0001_dodge3` happens to be the same image as `0001_charge1`; it is kept
   under its own name as the Dodge's recovery frame.
 - The twelve Sphere Rush poses are fighter poses, registered as logical
@@ -126,8 +128,10 @@ behave, and how it must look. The README covers running and deploying it.
   same file, for the Charge release pose.
 - The idle, jump, fall, land and hurt frames (≈16× pixel art), the mid-air
   hurt, Basic Attack 1 and 2, Charge, Dodge, Throw and shuriken frames (≈8×),
-  the run frames (≈4×) and the clone cloud, Sphere Rush pose and sphere
-  frames (≈2×)
+  the run frames (≈4×), the clone cloud, Sphere Rush pose and sphere
+  frames (≈2×) and the Dash frames (1×, whose grid cannot be detected, so
+  the clip's `heightRatio` of 41 / 52 fits its tallest frame at exactly one
+  art pixel per file pixel against idle's 52 art pixels)
   are at very different raw scales. A normalization
   system must, once per frame: read the alpha channel, find the visible bounds,
   detect the pixel-art grid, resample to one pixel per art pixel, and anchor
@@ -170,9 +174,9 @@ behave, and how it must look. The README covers running and deploying it.
 Alva's interface is **near-black/charcoal dominant**, with off-white typography,
 gray hierarchy and **green as the sole interface accent**. It follows Seren's
 visual discipline without copying its assets. Green signals actions, selection
-and progress; it does not fill every card, border or heading; in the
-battle HUD it marks a charged ability that is ready (7.3). Nothing in the
-interface turns blue.
+and progress; it does not fill every card, border or heading. The status
+drawn over fighters in battle (stamina bar, CAB rings, 7.3) uses no green.
+Nothing in the interface turns blue.
 
 | Token | Value | Use |
 | --- | --- | --- |
@@ -251,13 +255,14 @@ fit the palette.
 
 ```
 Splash → Home → Select Mode → Select Fighter → Select Stage → Battle
-Home → Practice Ground (starts at once with #0001)
+Home → Practice Ground (starts at once with #0001 and a #0001 practice CPU)
 Home → Discover (Power / Knockback / Conditions reference; Back returns Home)
-Practice Ground → More → Change Fighter (roster dialog) / Enable CPU or Change CPU (CPU roster dialog → Disable CPU) / Return (Home)
+Practice Ground → More → Change Fighter (roster dialog) / Change CPU, or Enable CPU once disabled (CPU roster dialog → Disable CPU) / Return (Home)
 Battle → Pause → Resume / Restart / Return to Home (confirmed); Help is shown but disabled for now
-Battle (time over, one fighter with less Knockback) → Result → Rematch / Change Stage / Return to Home
-Battle (a fighter falls into the Void) → K.O. → Result → Rematch / Change Stage / Return to Home
-Battle (time over, draw) → a fresh battle starts, no dialog
+Battle (a fighter falls into the Void) → the opponent scores a point → that fighter respawns 2 s later; the fight goes on
+Battle (a fighter scores its 3rd point) → K.O. → Result → Rematch / Change Stage / Return to Home
+Battle (time over, one fighter ahead on points, or level with less Knockback) → Result → Rematch / Change Stage / Return to Home
+Battle (time over, level on points and Knockback: a draw) → a fresh battle starts, no dialog
 ```
 
 Every menu screen except Home has a consistent Back action. Keyboard, mouse,
@@ -419,23 +424,27 @@ no header, build label, eyebrow or keyboard hint bar.
 
 ### 6.8 Practice Ground
 
-A solo training room, entered straight from Home.
+A training room, entered straight from Home.
 
 - **Start:** every fresh entry loads #0001 (character `0001`) through the usual
   loading overlay and gives control at once: no fighter select, countdown,
-  round banner, timer, CPU or result. It runs until the player returns Home.
-  Practice keeps its own fighter and CPU choices; it never reads or changes
-  Quick Battle's selection. Every fresh entry also starts with no CPU and
-  a fresh fighter at 0 Knockback.
+  round banner, timer, points or result. It runs until the player returns
+  Home. Practice keeps its own fighter and CPU choices; it never reads or
+  changes Quick Battle's selection. Every fresh entry starts with a fresh
+  fighter at 0 Knockback and the practice CPU already enabled: the same
+  default fighter (#0001), sharing its one loaded sprite set (one load for
+  both), paired with Player 1, framed by the camera and shown on its own HUD
+  card. A CPU disabled (or changed) on an earlier visit is never
+  remembered.
 - **Player 1:** one fighter under Player 1's control, with normal movement,
-  physics, attacks, projectiles, clones, Charge, Defense, animation, camera
-  and touch controls. Until a CPU is enabled there is no other fighter,
-  hidden or not, and the camera follows Player 1 alone. Moves aimed at an
-  opponent then fall back or miss: Charged BA1 has nobody to appear behind,
-  so it is an ordinary BA1 and starts no cooldown; the Sphere Rush dashes,
-  finds no one and ends as a miss (after its `rasen12` whiff release pose),
-  its cooldown spent.
-- **Practice CPU (optional):** a training dummy, slot `p2`, labelled CPU, at
+  physics, attacks, projectiles, clones, Charge, Dash, Defense, animation,
+  camera and touch controls. With the CPU disabled there is no other
+  fighter, hidden or not, and the camera follows Player 1 alone. Moves aimed
+  at an opponent then fall back or miss: Charged BA1 has nobody to appear
+  behind, so it is an ordinary BA1 and starts no cooldown; the Sphere Rush
+  dashes, finds no one and ends as a miss (after its `rasen12` whiff release
+  pose), its cooldown spent.
+- **Practice CPU (on by default):** a training dummy, slot `p2`, labelled CPU, at
   the stage's second spawn (320 units right of Player 1's, facing it). It has
   no controller, so it never walks, jumps, drops, attacks, throws, charges,
   blocks or dodges; it is otherwise a normal fighter (hurtboxes, real damage
@@ -447,8 +456,8 @@ A solo training room, entered straight from Home.
   Knockback it added (the CombatSystem's resolved hit event) in red over its
   head as a positive `+5`, `+1` or `+15`, rising and fading over 0.8 s;
   simultaneous hits stack, and a hit that adds nothing (the Sphere Rush's
-  contact) shows none. It is never knocked out. No HUD panel, timer or
-  rounds come with it.
+  contact) shows none. It is never knocked out. Its own HUD card follows its
+  Knockback; no timer, rounds or points come with it.
 - **Training stage:** its own map (`js/data/practice-map.js`), kept out of the
   Quick Battle stage list. Original Canvas artwork of a minimalist combat
   laboratory: a pale, cool-gray room built from one square grid, with a gridded
@@ -458,23 +467,27 @@ A solo training room, entered straight from Home.
   outer side face past either ledge, and a ruler along its front edge. No side
   walls, scenery, particles, hazards or moving parts. Only the camera moves the
   room; its static geometry is computed once. A fighter that falls into the
-  Void is put straight back at its own spawn, still, in a fresh training
-  state: its Knockback back to 0, its charged cooldowns cleared (both
-  abilities ready) and its velocity, stun, freeze and attack reset; whatever
-  held or aimed at it (a Sphere Rush bind and its ticks, clones,
-  projectiles, damage numbers) goes, and practice carries on.
-- **HUD:** only the P1 card (the same card as Quick Battle's, 7.3: portrait,
-  divider, tag and name over the Knockback number, the two charged-cooldown
-  rings) top-left and a compact
-  glass **More** button (three dots, `aria-label="Practice menu"`,
-  `aria-haspopup="dialog"`, `aria-expanded`) centred at the top where Quick
-  Battle's timer sits, a responsive 8–14 px lower. No CPU panel (even with a
-  practice CPU), round label, timer or pause control.
+  Void is out of play at once (7.1) and, 2 s later
+  (`CONFIG.battle.respawnSeconds`), back at its own spawn, still, in a fresh
+  training state: its Knockback back to 0, full stamina and not exhausted,
+  its charged cooldowns cleared (both abilities ready) and its velocity,
+  stun, freeze, attack and Dash reset; whatever held or aimed at it (a
+  Sphere Rush bind and its ticks, clones, projectiles, damage numbers) goes.
+  Player 1 and the CPU each wait out their own 2 s. No point is scored, and
+  practice carries on.
+- **HUD:** the P1 card and the CPU card (the same cards as Quick Battle's,
+  7.3: portrait facing the centre, divider, tag and name over the Knockback
+  number), both against a compact glass **More** button (three dots,
+  `aria-label="Practice menu"`, `aria-haspopup="dialog"`, `aria-expanded`)
+  centred at the top where Quick Battle's timer sits, a responsive 8–14 px
+  lower. No score dots (practice has no points), round label, timer or pause
+  control. The CPU card shows only while there is a CPU: rebound when it is
+  changed, hidden when it is disabled.
 - **Practice menu:** More, Esc / P or gamepad Start freezes practice
   (simulation, gameplay input and touch controls stop) and floats a light,
   translucent glass menu centred under the More button over a lightly
   dimmed, still stage. It holds exactly **Change Fighter** (green, focused),
-  **Enable CPU** (**Change CPU** while there is one) and **Return**
+  **Change CPU** (**Enable CPU** once the CPU is disabled) and **Return**
   (outlined).
   More again, Esc / Back, P, Start or a press on the dim resumes. **Return**
   goes Home and tears everything down.
@@ -490,16 +503,16 @@ A solo training room, entered straight from Home.
   Change Fighter, leaving the fighter unchanged. A failed load keeps the
   current fighter and the dialog. A practice CPU stays through the swap, now
   facing the new fighter.
-- **CPU dialog:** Enable CPU / Change CPU opens a second instance of the same
-  roster dialog (its own ids and navigation scope), titled Select CPU or
-  Change CPU. Confirming loads the fighter, puts it on the CPU spawn
-  (replacing any current CPU, never Player 1), closes both overlays and
-  resumes. Back / Esc returns to the menu unchanged. While a CPU exists,
-  **Disable CPU** sits right beside Back: it removes the CPU with everything
-  aimed at it (a technique holding it, clones summoned at it, opponent links,
-  its damage numbers), closes the dialog and leaves practice paused in the
-  menu with focus on Enable CPU. A failed load keeps the current CPU (or
-  none) and the dialog.
+- **CPU dialog:** Change CPU / Enable CPU opens a second instance of the same
+  roster dialog (its own ids and navigation scope), titled Change CPU or
+  Select CPU. Confirming loads the fighter, puts it on the CPU spawn
+  (replacing any current CPU, never Player 1), rebinds the CPU card, closes
+  both overlays and resumes. Back / Esc returns to the menu unchanged. While
+  a CPU exists, **Disable CPU** sits right beside Back: it removes the CPU
+  with everything aimed at it (a technique holding it, clones summoned at
+  it, opponent links, its damage numbers) and its HUD card, closes the
+  dialog and leaves practice paused in the menu with focus on Enable CPU.
+  A failed load keeps the current CPU (or none) and the dialog.
 
 ### 6.9 Discover
 
@@ -616,19 +629,27 @@ read the character database, so it stays the same as fighters are added.
   water-tower deck, and never walks off the roof's edges on its own.
 - Collision comes only from map data, never from art.
 - **The Void:** a fighter whose centre leaves `voidBounds` (a fixed
-  rectangle, `StageCollision.inVoid`) is taken by it. In Quick Battle that
-  fighter is defeated at once: it leaves play (frozen and no longer drawn,
-  hit or framed), anything holding or aiming at it lets go, a **K.O.**
-  banner plays for 1.4 s and the result follows (after time has run out it
-  still loses; both taken is a draw). Its Knockback stays as it was until the
-  next match. In Practice Ground it is put back at its spawn. Art: one
+  rectangle, `StageCollision.inVoid`) is taken by it: it leaves play at once
+  (frozen and no longer updated, drawn, collided, hit, targeted, pushed or
+  framed; its stamina bar, name tag and CAB rings go with it, its HUD card
+  stays), and anything holding or aiming at it lets go. Every fighter taken
+  on one step is out before any is handed on, so a simultaneous fall is one
+  event. After `CONFIG.battle.respawnSeconds` (2 s, counted on the
+  simulation clock, never a timer) it is back at its own spawn (the usual
+  reset onto the surface under it, never inside a solid) in a clean neutral
+  state: 0 Knockback, full stamina and not exhausted, CAB1 / CAB2 ready, no
+  velocity, stun, freeze, attack, technique or Dash; it is active at once,
+  with no respawn invulnerability or platform. Its Knockback stays as it
+  fell until then. In Quick Battle each fall also scores (7.2). Art: one
   solid black layer beyond the boundary with a single gently wavering inner
   edge (±12 units around the line), drawn over everything in one path and
   one fill, only on the sides the view comes near, so neutral play is never
   boxed in: no stacked bands, second edge or glow. The wave is art only (the
   kill line never moves) and holds still with reduced motion.
-- The camera frames both fighters (Practice Ground's fighter alone until a
-  practice CPU is enabled), leaning toward the main stage's centre while it
+- The camera frames both fighters in play (the one still in play alone
+  while the other waits to respawn, and holding still if neither is;
+  Practice Ground's fighter alone while its CPU is disabled), leaning toward
+  the main stage's centre while it
   does, interpolates smoothly and never shows outside its camera bounds (the
   stage, the air around it and a strip past the Void's edge). Fighters occupy ≈ 10 % of
   viewport height (8.8–11.5 %): a 16:9 view shows the whole main stage with
@@ -638,7 +659,7 @@ read the character database, so it stays the same as fighters are added.
 
 - `#0001` has Idle, Run, Jump, Fall, Land, Hurt, Mid-air Hurt, Basic Attack 1,
   Mid-air Basic Attack 1, Basic Attack 2, Mid-air Basic Attack 2, Charge,
-  Dodge, Mid-air Dodge, Throw and the Sphere Rush (six clips), plus the
+  Dodge, Mid-air Dodge, Dash, Throw and the Sphere Rush (six clips), plus the
   Shuriken projectile animation and the clone-cloud and sphere effects.
   No invented frames. Rising uses Jump and
   descending (walking off a ledge included) uses Fall; each plays once at 10 fps
@@ -801,9 +822,9 @@ read the character database, so it stays the same as fighters are added.
   are unchanged. Charge has no hitbox, no damage, no armour and no
   invulnerability, and it is not an attack or a combat action; the one thing
   it does is recover the charged cooldowns faster (see the charged actions
-  below). State
+  below) and, separately, refill stamina faster (below). State
   priority is hitstun > charged technique > bound > attack > Defense (Dodge)
-  > jump / fall > land > charge > charge release > run > idle (a Block-type
+  > Dash > jump / fall > land > charge > charge release > run > idle (a Block-type
   guard would sit between land and charge): a hit shows Hurt at once, Throw
   starts straight out of a held Charge (so do BA1 when the Clone Attack
   cannot happen and BA2 when the Sphere Rush cannot start), Jump
@@ -847,7 +868,51 @@ read the character database, so it stays the same as fighters are added.
   pressed with it does not launch; Defense during an attack or hitstun does
   nothing. If a Dodge clip's frames are missing, that Dodge is refused
   (logged) rather than granting invisible invulnerability. The debug overlay
-  grays a fighter's hurtboxes while it is invulnerable.
+  grays a fighter's hurtboxes while it is invulnerable. Each Dodge pays
+  `stamina.dodgeCost` (25) as it starts: none starts while the fighter is
+  exhausted or has less than that left, and a Dodge that does not start
+  (no Dodge move, missing art, the fighter not free to act) spends nothing.
+  A Block-type guard drains `stamina.blockDrain` (20) per second while held
+  (rate × step, no refill meanwhile); the step that empties it drops the
+  guard at once, and no guard starts while exhausted.
+- **Stamina** (`CombatState.stamina`, `maxStamina`, `staminaExhausted`;
+  settings from the character's `stamina` entry through `resolveStamina`
+  in `js/game/combat.js`, every field optional: `max` 100, `regen` 12 / s,
+  `chargeRegen` 30 / s, `dashCost` 25, `dodgeCost` 25, `blockDrain` 20 / s)
+  is the one resource a fighter spends, and only on Dash, Dodge and Block.
+  It is not the removed Energy and is never called that. Every fighter
+  starts full, and every change goes through `setStamina`, clamped to
+  [0, max]. It refills by itself at `regen` on every step nothing spent it
+  (idle, moving, airborne, attacking, stunned or frozen), at `chargeRegen`
+  instead while the fighter is really in its Charge stance (`charging`:
+  never the release pose, a charged technique or a Charge held through
+  one); this is separate from, and on top of, Charge's faster charged
+  cooldowns. Reaching 0 exhausts the fighter: Dash, Dodge and Block stay
+  unavailable however much has refilled (25, 99) until stamina is back at
+  exactly max, which clears it. Stamina never gates movement, jumps,
+  attacks, Throw, Charge or the charged actions, and none of them spend it.
+  A respawn and a restart start it full.
+- **Dash** (movement, not an attack): two press edges of the same
+  horizontal direction (`leftPressed` / `rightPressed`, 7.4), the second
+  within `movement.dashTapWindow` (0.22 s) of the first, start a Dash that
+  way (`Fighter.trackDashTaps`, `tryDash`); the other direction replaces the
+  waiting tap, both at once cancel it, and a double tap that cannot Dash is
+  used up, never queued. A Dash needs the fighter free to act (no attack,
+  Dodge, stun, bind, charged technique or Dash running), grounded, neither
+  in nor holding Charge, the stamina for it (not exhausted, `dashCost` 25
+  left, paid once as it starts) and its real `dash` clip (`dash1 → dash2`,
+  once at `DASH_FPS` 10; without it the Dash is refused and logged, never
+  faked with the run). Attacks, then Defense, are resolved before it on the
+  same step, so either wins over it. The fighter faces the Dash at once and
+  moves at `movement.dashSpeed` (600, about 1.8× Speed Power 2's 330; the
+  top speed itself never changes) for one pass of the clip (0.2 s, ≈120
+  units), ignoring input; afterwards the normal movement takes over from
+  that speed. It obeys collision: a solid stops it (the Dash ends against
+  it), and leaving the ground ends it (the fighter falls on with its speed).
+  Hitstun or a bind end it at once. While it runs the fighter cannot attack,
+  Dodge, jump, charge or Dash again. It has no hitbox, damage, knockback or
+  invulnerability. The training CPU never dashes (its input never has press
+  edges), though any caller may use `tryDash`.
 - Charged actions are a generic dispatch, not a summon shortcut. The
   character's `chargedActions` maps a combat button to a typed descriptor:
   `{ type: 'summon', id }` (an entry in `summons`: a detached temporary
@@ -1145,7 +1210,7 @@ read the character database, so it stays the same as fighters are added.
 - Every fighter's central combat number
   is its accumulated **Knockback** (`CombatState.knockback`): it starts at 0
   (a new fighter, a Quick Battle restart / rematch, a new Practice fighter
-  and a Practice Void respawn all start from 0), has no maximum and is shown
+  and every respawn after the Void all start from 0), has no maximum and is shown
   as a bare number (no % sign). A hit's `damage` is how much it adds:
   #0001's BA1 5, mid-air BA1 5, BA2 10, mid-air BA2 10, shuriken 1, the
   clone's BA1 5 or overhead mid-air BA2 10, the Sphere Rush 0 on contact, 1
@@ -1158,8 +1223,10 @@ read the character database, so it stays the same as fighters are added.
   High identity are kept) and a zero base launch stays zero. Its event
   carries `damage`, `knockbackBefore`, `knockbackAfter` and
   `launchMultiplier`. Knockback never disables a fighter (`canAct()` never
-  reads it) and never defeats one: only the Void does. On time-up in Quick
-  Battle the fighter with less Knockback wins; equal is a draw.
+  reads it) and never takes one out: only the Void does. On time-up in
+  Quick Battle, level on points, the fighter with less Knockback wins
+  (a fighter still waiting to respawn counts the Knockback it fell with);
+  equal is a draw.
 - Physics: acceleration, deceleration, max speed (from the fighter's Speed
   Power, below), gravity, jump impulse (from its Jump Power, below),
   ground/platform/solid collision on a finite main floor (no side walls:
@@ -1250,12 +1317,29 @@ read the character database, so it stays the same as fighters are added.
   refused (no substitute pose, no invisible hitbox), and so is a Dodge, and so
   is a clone summon whose cloud or attack art is missing (no cooldown starts),
   and so is a charged technique with any of its clips missing.
-- Quick Battle: one round, 99 seconds, against a non-attacking training CPU
-  that uses the same fighter definition. It never attacks, throws, charges,
-  summons clones, uses the Sphere Rush or uses Defense (while bound, its
-  input is simply ignored);
-  it drops through one-way platforms with an internal intent that no player
-  control produces.
+- Quick Battle: 99 seconds, first to `CONFIG.battle.pointsToWin` (3)
+  points, against a non-attacking training CPU that uses the same fighter
+  definition. It never attacks, throws, charges, summons clones, uses the
+  Sphere Rush, dashes or uses Defense (while bound, its input is simply
+  ignored); it drops through one-way platforms with an internal intent that
+  no player control produces, and stands still while its opponent is out of
+  play.
+- Match score (`Battle.score`, `{ p1, p2 }`, the match's own: never on a
+  fighter or its character, and not `round`): both start at 0. A fall into
+  the Void scores exactly one point for the opponent, at once, if the
+  opponent is itself in play; the fighter that fell never scores for it.
+  When both are out together (taken on the same step, or one taken while
+  the other still waits to respawn) that fall scores nothing, so a double
+  K.O. never moves both toward the win. The global phase stays `fight`
+  while a fighter waits to respawn: the timer runs on and the survivor
+  plays on (a Charged BA1 then has nobody to appear behind and falls back to
+  BA1; nothing can hit, hold or aim at the absent fighter). The point that
+  reaches 3 ends the match: no respawn for the loser, the `ko` phase (the
+  K.O. beat) and then the result. Once time is up or the match is won, a
+  fall scores nothing and nobody respawns. The result: 3 points wins
+  (`reason: 'void'`); on time, more points wins (`'points'`), then less
+  Knockback (`'time'`), else a draw. Restart and rematch reset both scores
+  to 0 and cancel any respawn wait.
 
 ### 7.3 Battle chrome
 
@@ -1268,29 +1352,51 @@ read the character database, so it stays the same as fighters are added.
   blur. Pause, result and confirmation panels sit over a paused battle and add
   a light blur where supported, with a denser fill as the fallback. The stage
   stays dimly visible behind every panel.
-- HUD fighter cards: P1 (filled white tag) top-left and CPU (outlined tag)
-  top-right, each one compact, semi-transparent glass card (lighter than
-  the menu panels, so the stage shows through, dark enough to read on every
-  stage): the character's portrait (its own `visual.portrait` crop, painted
-  by the same helper as the roster, pixelated), one thin vertical divider,
-  then the tag and name (`displayName`) with the accumulated Knockback
-  beneath it as a large bare number (`0`, `27`, `143`; no bar, maximum, `/100`
-  or `%`), then the charged-cooldown row. The CPU's card mirrors P1's
-  (portrait on the outer right edge).
-- Charged-cooldown row: one small indicator per charged action in the
-  character's `chargedActions` (for #0001, Charged BA1 then Charged BA2),
-  each a ring with the seconds left inside it (`4.3`, one decimal, rounded
-  up so it never reads `0.0` while cooling) and the button's short name
-  beneath (`BA1`, `BA2`). The ring (CSS `conic-gradient` with a radial mask,
-  driven by `--cd-progress`) fills clockwise from the top as the ability
-  recovers, `progress = 1 − remaining / duration` read straight from the
-  fighter's cooldown state (so Charge visibly speeds it): empty as it
-  starts, half at halfway, complete at ready. Ready, the ring is complete
-  and green (`--accent`) with no number.
+- HUD fighter cards: P1 (filled white tag) and CPU (outlined tag), in the
+  HUD grid's two outer columns but pulled in against the timer (P1's
+  `justify-self: end`, the CPU's `start`), so the top reads [P1 card]
+  [timer] [CPU card], separate elements with little space between, a
+  centred platform-fighter HUD rather than corner health bars; safe areas
+  still apply. Each is one compact, semi-transparent glass card (lighter
+  than the menu panels, so the stage shows through, dark enough to read on
+  every stage): the character's portrait (its own `visual.portrait` crop,
+  painted by the same helper as the roster, pixelated), one thin vertical
+  divider, then the tag and name (`displayName`) with the accumulated
+  Knockback beneath it as a large bare number (`0`, `27`, `143`; no bar,
+  maximum, `/100` or `%`). The CPU's card mirrors P1's (portrait on the
+  outer right edge). Both portraits face the timer, whatever the fighters'
+  facing in play: P1's faces right, the CPU's left, each mirrored
+  (`.is-mirrored`, `data-facing`) only when its art (the portrait clip's
+  `sourceFacing`, else the character's) faces the other way. The cards hold
+  no cooldowns.
+- Score dots (Quick Battle only): under each card, centred, one small CSS
+  circle per point the match is played to (`pointsToWin`, 3), an outlined
+  empty ring (○) filled solid white (●) for each point that fighter has
+  scored, in order, the moment it is scored (the third fills as the K.O.
+  beat starts). They survive respawns and reset only on a new match, a
+  restart or a rematch. Practice Ground shows none.
+- Fighter status (Canvas, `js/game/fighter-status.js`, drawn by the Arena
+  over everything, the Void included, for each fighter in play whose body
+  is on screen, at its interpolated position): a thin **stamina bar** just
+  above the name tag (about the fighter's width, at least 44 CSS px; a black
+  outline, a dark track and a purple fill, `stamina / maxStamina` wide,
+  shrinking from the right; gray instead while exhausted, proportional to
+  what has refilled, purple again at full), and under the feet one row of
+  **CAB1** and **CAB2** rings (Charged BA1, Charged BA2: one per charged
+  action in the character's `chargedActions`), each a white ring with a
+  black outline that fills clockwise from the top as the ability recovers
+  (`progress = 1 − remaining / duration`, read straight from the cooldown
+  state, so Charge visibly speeds it), the seconds left inside it (`4.3`,
+  one decimal, rounded up so it never reads `0.0`) while cooling, and its
+  white `CAB1` / `CAB2` label beneath, all text outlined in black: complete
+  and empty of numbers when ready. No green. A fighter off screen keeps
+  only its edge pointer; one out of play shows none of it.
 - Accessibility: the Knockback number sits in a group labelled "Knockback"
-  (no maximum); each cooldown indicator is an image labelled "Charged BA1
-  cooldown, 3.2 seconds remaining" or "Charged BA1 ready" (BA2 alike). The
-  HUD writes to the DOM only when a shown value changes.
+  (no maximum); each card carries a screen-reader-only stamina description
+  in steps of 5 ("Stamina 75 of 100", "Stamina exhausted, refilling: 40 of
+  100"; never "Energy"), and each score row is an image labelled "Player 1:
+  1 of 3 points". The HUD writes to the DOM only when a shown value
+  changes.
 - Timer + pause: one glass control at top centre. The round label and timer
   sit on top; a rectangular pause section sits directly beneath with no gap,
   the same width and a hairline seam, so only the outer corners are rounded.
@@ -1298,26 +1404,29 @@ read the character database, so it stays the same as fighters are added.
   "Pause game, N seconds remaining". For the last ten seconds only the digits
   change, from a slightly softened off-white to pure white; the glass never
   changes colour, inverts or flashes.
-- Player markers above fighters and ground rings: P1 white, CPU gray.
+- Player markers above fighters (under their stamina bars) and ground
+  rings: P1 white, CPU gray.
 - Round banners ("ROUND 1", "FIGHT", "TIME", and "K.O." under "VOID" when a
-  fighter falls into the Void) in white on a dark band.
+  fighter's fall gives the opponent its third point) in white on a dark
+  band.
 - Pause menu: glass panel over a dimmed battle with "Quick Battle" (no stage
   name), "Paused", green **Resume** (default), **Restart Battle**, **Help** and
   **Return to Home**. Help is shown but disabled for now: muted, no hover or
   press response, skipped by keyboard/gamepad focus.
-- Time over: if one fighter has less accumulated Knockback, it wins, and a
-  glass result menu ("Time ran out. Lower Knockback wins the round.") offers
-  green **Rematch**, **Change Stage** and **Return to Home**. Equal
-  Knockback is a draw: no dialog; once the TIME banner has played, a fresh
-  battle starts.
-- Void K.O.: once the K.O. banner has played, the same result menu opens with
-  the kicker "K.O." and the line "Player 1 fell into the Void." (or "The CPU
-  fell into the Void.").
+- Time over: the fighter with more points wins ("Time ran out. More points
+  wins the match."); level on points, the one with less accumulated
+  Knockback wins ("Time ran out with the points level. Lower Knockback
+  wins."). A glass result menu offers green **Rematch**, **Change Stage**
+  and **Return to Home**. Level on both is a draw: no dialog; once the TIME
+  banner has played, a fresh battle starts.
+- Match K.O.: once the K.O. banner has played, the same result menu opens
+  with the kicker "K.O." and the line "The CPU fell into the Void for the
+  final point." (or "Player 1 fell ...").
 
 ### 7.4 Input
 
 - Keyboard (simultaneous keys, held-state tracking, no reliance on key
-  repeat): A/D or ←/→ move, S/↓ Charge (held), W/Space/↑ jump, J Throw (the
+  repeat): A/D or ←/→ move (twice in a row to Dash), S/↓ Charge (held), W/Space/↑ jump, J Throw (the
   internal `primary` action), K Special (reserved), L Defense, U Basic
   Attack 1 (BA1), I Basic Attack 2 (BA2), Esc/P pause (the Practice menu in
   Practice Ground). `` ` `` toggles a
@@ -1329,7 +1438,14 @@ read the character database, so it stays the same as fighters are added.
   solids with the main floor's block among them, and the Void's fixed kill
   line, dashed violet).
   BA1 pressed while Charge is still held is the Charged BA1 Clone Attack
-  and BA2 the Charged BA2 Sphere Rush (7.2): no extra key. In menus S/↓ still navigate down: menu bindings are separate
+  and BA2 the Charged BA2 Sphere Rush (7.2): no extra key. The input
+  snapshot (`InputManager.sample()`) carries `leftPressed` / `rightPressed`
+  press edges for the Dash's double tap (7.2), from the same normalized
+  press counting as every other action, whichever device made them: a key
+  (never its auto-repeat), a touch button, the D-pad, or the left stick
+  crossing from neutral into its held zone (holding it there makes no more;
+  back near neutral and out again makes another). Fighter never reads raw
+  key timestamps; menus never read these edges. In menus S/↓ still navigate down: menu bindings are separate
   from the gameplay `charge` action.
 - Gamepad (standard layout) for movement (D-pad / left stick left and
   right), Charge in battle (D-pad down / left stick down, held; menus still
