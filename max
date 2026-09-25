@@ -2,973 +2,1613 @@ You are modifying the current Alva repository:
 
 hiyroscript/alva
 
-This is a small corrective pass on top of the existing platform-fighter conversion.
+This is a focused corrective pass for the combat Knockback architecture.
 
-The current repository already contains:
+The current implementation misunderstands how Knockback is supposed to work.
 
-* accumulated Knockback;
-* 3-point elimination scoring;
-* 2-second respawns;
-* Dash;
-* stamina used by Dash/Dodge/Block;
-* stamina passive regeneration;
-* faster stamina regeneration while Charging;
-* exhausted stamina state;
-* CAB1/CAB2 charged cooldowns;
-* fighter-attached CAB cooldown indicators;
-* fighter-attached stamina bar;
-* current fighter facing logic.
+This distinction is extremely important:
 
-Do not redesign these systems.
+THERE ARE TWO DIFFERENT SYSTEMS
 
-For this pass, change only:
+1. DEFAULT KNOCKBACK / ATTACK KNOCKBACK
 
-1. CAB1/CAB2 cooldown indicators should appear only while that ability is actually on cooldown.
-2. The stamina/energy-style purple bar should appear only while it is refilling / not full.
-3. Once stamina reaches 0, it should remain visually gray while refilling and Dash/Dodge/Block must remain locked until it reaches full.
-4. Remove the behavior where fighters automatically turn to face each other.
-5. Preserve all other current combat, scoring, Dash, Knockback, respawn, and HUD behavior.
+Every attack has its own built-in launch strength.
 
-⸻
+This answers:
 
-1. Current implementation details
+“How hard does this move naturally knock someone away?”
 
-Relevant files include:
+Examples:
 
-* js/game/character.js
-    * Fighter movement
-    * Dash
-    * Charge
-    * facing updates
-    * stamina recovery
-* js/game/combat.js
-    * CombatState
-    * stamina state
-    * exhausted state
-    * charged cooldown timers
-* js/game/arena.js
-    * world-space stamina/CAB rendering
-* js/game/hud.js
-    * top character cards
-* js/data/characters.js
-    * #0001 movement/stamina data
-* tests covering Dash, stamina, cooldowns, and facing.
+* a small push should have weak default knockback;
+* BA1 should have its own default launch;
+* BA2 can have stronger default launch;
+* #0001’s Sphere Rush explosion should have very strong default horizontal launch;
+* shuriken can have zero default launch.
 
-Do not reintroduce old Health or old Energy.
+This property belongs to the attack.
 
-For player-facing discussion in this pass, the purple resource may still be referred to as the stamina/action-energy bar, but keep the current implementation naming if it is already established as stamina.
+It represents the attack’s inherent physical force.
 
 ⸻
 
-2. CAB1/CAB2 indicators only appear during cooldown
+2. ACCUMULATED KNOCKBACK
 
-The world-space CAB indicators currently represent:
+Every fighter has a separate accumulated Knockback number.
 
-* CAB1
-* CAB2
-
-They should not be permanently visible.
-
-Desired behavior:
-
-Ability ready
-
-If CAB1 is ready:
-
-* show nothing for CAB1.
-
-If CAB2 is ready:
-
-* show nothing for CAB2.
-
-If both are ready:
-
-* show no CAB indicators at all beneath the fighter.
-
-There should not be:
-
-* completed ready rings;
-* permanent CAB1 text;
-* permanent CAB2 text;
-* empty placeholders.
-
-The UI is purely a temporary cooldown notification.
-
-⸻
-
-3. CAB indicator appears immediately on use
-
-When a charged ability successfully enters cooldown:
-
-show its indicator immediately.
-
-Example:
-
-CAB1 used.
-
-Under fighter:
-
-CAB1
-4.9
-
-with its white/black-outlined circular cooldown progress.
-
-As the timer decreases, continue displaying it.
-
-When cooldown reaches exactly ready:
-
-remove the indicator completely.
-
-Do not leave it visible for an extra frame unnecessarily.
-
-⸻
-
-4. CAB indicators remain independent
-
-If only CAB1 is cooling down:
-
-show only CAB1.
-
-If only CAB2 is cooling down:
-
-show only CAB2.
-
-If both are cooling down:
-
-show both.
-
-Example:
-
-CAB1    CAB2
-
-If CAB1 finishes first:
-
-CAB1 disappears and CAB2 remains.
-
-Do not reserve invisible layout slots that create strange gaps.
-
-The remaining cooldown may recenter beneath the fighter if appropriate.
-
-⸻
-
-5. CAB cooldown data remains unchanged
-
-Do not modify:
-
-* CAB1 cooldown duration;
-* CAB2 cooldown duration;
-* independent timer behavior;
-* faster recovery while Charging;
-* cooldown reset on respawn;
-* cooldown consumption rules.
-
-This pass changes visibility only.
-
-Use:
-
-combat.chargedCooldowns.active(id)
-
-or equivalent existing cooldown state.
-
-Do not infer visibility from formatted remaining text.
-
-⸻
-
-6. CAB ready state should not render
-
-If:
-
-chargedCooldowns.remaining(id) <= 0
-
-or the timer entry no longer exists:
-
-do not render that ability’s world-space cooldown UI.
-
-This should happen naturally because CooldownTimers.update() already removes entries when they finish.
-
-Prefer rendering from active entries rather than rendering every charged action and making ready ones transparent.
-
-That reduces unnecessary clutter.
-
-⸻
-
-7. Stamina bar visibility
-
-The purple stamina bar above the fighter should not be permanently visible.
-
-It should only be visible while the stamina resource is not full.
-
-Desired:
-
-Full stamina
-
-stamina === maxStamina
-
-Bar:
-
-hidden
-
-No purple full bar above the character.
-
-Stamina spent
-
-As soon as Dash/Dodge/Block spends stamina:
-
-bar appears.
-
-Example:
-
-100 → 75
-
-bar appears at 75%.
-
-While regenerating
-
-The bar remains visible while stamina rises back toward full.
-
-Fully refilled
-
-Once stamina reaches full:
-
-bar disappears again.
-
-⸻
-
-8. Stamina bar visibility condition
-
-Use the actual resource state.
-
-Conceptually:
-
-showStamina = stamina < maxStamina
-
-with floating-point tolerance matching the rest of the fixed-step code.
-
-Do not use arbitrary timers like:
-
-“hide bar 1 second after action.”
-
-The bar reflects actual resource state.
-
-Because CombatState.setStamina() already snaps near-max values to the exact maximum, visibility should be straightforward.
-
-⸻
-
-9. Empty stamina behavior
-
-The resource is allowed to reach:
+This starts at:
 
 0
 
-completely.
-
-Do not enforce:
-
-* a 1-point minimum;
-* an invisible reserve;
-* automatic bounce to 1.
-
-At zero:
-
-* stamina = 0;
-* staminaExhausted = true.
-
-The fighter cannot use stamina-dependent actions.
-
-⸻
-
-10. Exhausted bar becomes gray
-
-Once stamina reaches zero, the stamina bar switches from purple to:
-
-gray
-
-This exhausted appearance remains active during the entire refill process.
-
-Example:
-
-* 0/100 → gray
-* 20/100 → still gray
-* 60/100 → still gray
-* 99/100 → still gray
-* 100/100 → exhaustion clears and bar disappears.
-
-Do not change it back to purple early.
-
-⸻
-
-11. Full-refill lockout
-
-The existing mechanic already mostly implements this and must remain exact.
-
-Once the fighter has exhausted the bar:
-
-Dash:
-
-* unavailable.
-
-Dodge:
-
-* unavailable.
-
-Block:
-
-* unavailable.
-
-This remains true even after stamina regenerates partially.
+When the fighter takes damage, that damage is added to this number.
 
 Examples:
 
-At 10:
+* fighter starts at 0;
+* BA1 deals 5 damage → accumulated Knockback becomes 5;
+* another BA1 → 10;
+* BA2 deals 10 → 20;
+* etc.
 
-* unavailable.
+This answers:
+
+“How vulnerable to being launched has this fighter become?”
+
+The higher this number gets, the more additional launch the fighter receives from hits.
+
+This property belongs to the fighter being hit, not the attack.
+
+⸻
+
+3. These are NOT the same thing
+
+Do not treat:
+
+attack default knockback
+
+and:
+
+fighter accumulated Knockback
+
+as one value.
+
+Do not refer to them interchangeably.
+
+They are two separate parts of final launch.
+
+A strong attack is strong because its own default knockback is strong.
+
+A damaged fighter flies farther because their accumulated Knockback creates additional launch.
+
+Both matter.
+
+⸻
+
+4. Current implementation problem
+
+The repository currently uses logic conceptually equivalent to:
+
+finalLaunch = attackBaseLaunch * (1 + accumulatedKnockback / 100)
+
+This is the wrong model.
+
+It makes accumulated Knockback completely dependent on the attack’s base/default knockback.
+
+That means accumulated Knockback is only acting as a multiplier of the attack.
+
+This is exactly what must be corrected.
+
+Remove this architecture.
+
+Specifically inspect:
+
+* js/data/knockback.js
+* knockbackMultiplier()
+* scaleKnockback()
+* js/game/combat.js
+* CombatSystem.applyHit()
+* tests that assert launch multiplier behavior
+* README / ALVA_SPEC comments describing multiplier behavior.
+
+⸻
+
+5. Correct conceptual formula
+
+Final launch must have two independent components:
+
+final launch = attack default launch + accumulated-Knockback bonus launch
+
+The first term comes from the attack.
+
+The second term comes from the target’s accumulated Knockback.
+
+Do not calculate the second term by multiplying the first.
+
+Conceptually:
+
+finalX = defaultX + accumulatedBonusX
+
+finalY = defaultY + accumulatedBonusY
+
+The accumulated bonus should use the attack’s launch direction, but not its default magnitude.
+
+This distinction is critical.
+
+⸻
+
+6. Direction and strength are separate
+
+An attack still decides what direction it launches.
+
+Examples:
+
+* horizontal hit → accumulated Knockback bonus also pushes horizontally;
+* upward launcher → accumulated Knockback bonus also goes upward;
+* downward spike → accumulated Knockback bonus also goes downward.
+
+But the size of the accumulated-Knockback contribution is determined from the fighter’s accumulated Knockback value independently.
+
+The attack tells the system:
+
+which way
+
+The accumulated Knockback number tells the system:
+
+how much additional launch susceptibility
+
+The attack’s default knockback tells the system:
+
+how hard this move inherently hits
+
+⸻
+
+7. Example: weak push versus powerful rush
+
+This example must guide the implementation.
+
+Suppose:
+
+Push
+
+default horizontal knockback:
+
+140
+
+Sphere Rush explosion
+
+default horizontal knockback:
+
+720
+
+Target has accumulated Knockback:
+
+100
+
+The accumulated Knockback system should add the same configured horizontal vulnerability contribution to both attacks.
+
+For example, if accumulated 100 produces:
+
++200 horizontal launch
+
+then:
+
+Push:
+
+140 + 200 = 340
+
+Rush:
+
+720 + 200 = 920
+
+The Rush still has dramatically stronger natural launch because its default knockback is higher.
+
+But the target’s accumulated Knockback adds extra launch independently to both.
+
+Do not do:
+
+Push:
+140 × 2 = 280
+
+Rush:
+720 × 2 = 1440
+
+That is the old incorrect multiplier architecture.
+
+⸻
+
+8. Why this distinction matters
+
+The default attack knockback exists specifically so attacks can have different natural strength.
+
+For example:
+
+* a shove;
+* a normal punch;
+* a launcher;
+* a powerful explosion
+
+should not have identical launch at zero accumulated Knockback.
+
+Likewise, accumulated Knockback exists so a heavily damaged fighter becomes increasingly easy to launch regardless of whether the incoming move’s own default knockback is Low, Mid, High, or bespoke.
+
+The two systems complement each other.
+
+One must not numerically derive the other.
+
+⸻
+
+9. Naming cleanup
+
+The current naming makes this easy to misunderstand.
+
+Use clearer terminology in code/comments.
+
+Recommended terms:
+
+Attack property
+
+baseKnockback
+
+or:
+
+defaultKnockback
+
+This means:
+
+the attack’s inherent launch vector.
+
+Fighter property
+
+Keep:
+
+combat.knockback
+
+because that is the player-facing accumulated Knockback number.
+
+Internally, comments should call it:
+
+accumulated Knockback
+
+not:
+
+* base knockback;
+* attack knockback;
+* force;
+* multiplier.
+
+⸻
+
+10. Character data
+
+Current attack definitions use fields like:
+
+knockback: { axis: 'horizontal', level: 'low' }
+
+This may remain if changing the schema would create unnecessary churn.
+
+However, once resolved, call the result conceptually:
+
+baseKnockback
+
+or:
+
+defaultKnockback
+
+instead of treating it as the entire final launch.
+
+Possible implementation:
+
+def.baseKnockback = resolveKnockback(spec.knockback, ...)
+
+or rename the source schema too if doing so cleanly.
+
+The important requirement is conceptual correctness.
+
+⸻
+
+11. Keep Low / Mid / High
+
+Preserve the current Low/Mid/High attack strength system.
+
+Current values are:
+
+Horizontal
+
+* Low = 140
+* Mid = 180
+* High = 220
+
+Vertical
+
+* Low = 480
+* Mid = 640
+* High = 800
+
+These values represent:
+
+default attack knockback only.
+
+They are not accumulated Knockback values.
+
+They are not multipliers.
+
+They are not the final launch at high damage.
+
+⸻
+
+12. Bespoke default knockback
+
+Some hits use custom numeric launch instead of Low/Mid/High.
+
+Keep this capability.
+
+Examples:
+
+* Sphere Rush explosion;
+* future unique attacks.
+
+These numeric vectors are still:
+
+default attack knockback
+
+only.
+
+Example:
+
+{ x: 720, y: 180 }
+
+means the explosion naturally launches strongly sideways with slight lift.
+
+It does not encode or replace the defender’s accumulated Knockback.
+
+⸻
+
+13. Shuriken exception
+
+#0001’s shuriken:
+
+* deals 1 damage;
+* adds 1 to accumulated Knockback;
+* has zero default knockback;
+* should not physically launch the target.
+
+Preserve that exception.
+
+If an attack explicitly has:
+
+baseKnockback = { x: 0, y: 0 }
+
+and is meant to have no launch, do not automatically give it accumulated-Knockback launch.
+
+This is important.
+
+Therefore the accumulated bonus should only be applied when the hit is a launching hit.
+
+Add an explicit notion such as:
+
+launches: true/false
+
+or infer it safely from a non-zero base/default knockback vector.
+
+For shuriken:
+
+* damage accumulates;
+* no launch;
+* accumulated Knockback does not magically make the shuriken push.
+
+⸻
+
+14. Zero-launch technique ticks
+
+Charged BA2’s repeated:
+
++1
+
+ticks while holding the opponent should also remain zero-launch hits.
+
+They increase accumulated Knockback only.
+
+They should not move the fighter each 0.5 seconds.
+
+Treat them like shuriken in this respect.
+
+⸻
+
+15. Sphere Rush contact
+
+If Sphere Rush’s initial contact is currently designed as a bind/contact with no launch:
+
+preserve that.
+
+Do not let accumulated Knockback create an unintended initial launch.
+
+The explosion is the real launching part of that technique.
+
+⸻
+
+16. Accumulated Knockback bonus formula
+
+Replace the current multiplicative formula with an independent bonus formula.
+
+Use a centralized function.
+
+For example:
+
+accumulatedLaunchBonus(accumulated, axis)
+
+The exact tuning can be data-driven.
+
+Recommended initial model:
+
+Horizontal
+
+bonus = accumulated * 2
+
+world units / second
+
+Vertical
+
+Because vertical launch magnitudes are naturally larger in the current physics, use a separate vertical conversion.
+
+Recommended:
+
+bonus = accumulated * 4
+
+world units / second
+
+These are initial tuning values, not attack-specific values.
+
+Centralize them in:
+
+js/data/knockback.js
+
+Example:
+
+ACCUMULATED_KNOCKBACK_SCALING = {
+  horizontalPerPoint: 2,
+  verticalPerPoint: 4
+}
+
+Do not scatter these constants through combat code.
+
+⸻
+
+17. Example horizontal calculations
+
+Assuming:
+
+horizontalPerPoint = 2
+
+Target accumulated Knockback:
+
+0
+
+Low horizontal attack:
+
+140 + 0 = 140
+
+Target accumulated Knockback:
+
+25
+
+same attack:
+
+140 + 50 = 190
+
+Target accumulated Knockback:
+
+50
+
+same attack:
+
+140 + 100 = 240
+
+Target accumulated Knockback:
+
+100
+
+same attack:
+
+140 + 200 = 340
+
+Target accumulated Knockback:
+
+150
+
+same attack:
+
+140 + 300 = 440
+
+The attack’s default 140 stays 140.
+
+The accumulated portion is the part growing.
+
+⸻
+
+18. Strong horizontal attack comparison
+
+Using the same accumulated values:
+
+Sphere Rush explosion default:
+
+720
+
+At 0 accumulated:
+
+720
+
+At 50 accumulated:
+
+720 + 100 = 820
+
+At 100 accumulated:
+
+720 + 200 = 920
+
+Therefore:
+
+at the same accumulated Knockback, Sphere Rush always retains its stronger natural knockback.
+
+This is the intended relationship.
+
+⸻
+
+19. Vertical launch example
+
+Assuming:
+
+verticalPerPoint = 4
+
+High upward BA2 default:
+
+800
+
+At 0 accumulated:
+
+800
+
+At 25:
+
+800 + 100 = 900
 
 At 50:
 
-* unavailable.
-
-At 99:
-
-* unavailable.
-
-Only after:
-
-stamina === maxStamina
-
-should:
-
-staminaExhausted = false
-
-and the actions become available again.
-
-Do not change this to a normal “if enough stamina, use ability” system after exhaustion.
-
-The entire purpose of exhaustion is a forced full recharge.
-
-⸻
-
-12. Bar disappears when exhaustion ends
-
-When the gray refill reaches full:
-
-1. stamina snaps to max;
-2. exhausted becomes false;
-3. Dash/Dodge/Block become usable again;
-4. stamina bar disappears.
-
-Do not briefly display a full purple bar after recovery.
-
-Full resource means hidden.
-
-⸻
-
-13. Non-exhausted partial refill remains purple
-
-If stamina has been spent but has not reached zero:
-
-example:
-
-100 → Dash → 75
-
-the fighter is not exhausted.
-
-Bar should be:
-
-purple
-
-while it regenerates:
-
-75 → 80 → 90 → 100.
+800 + 200 = 1000
 
 At 100:
 
-* hide.
+800 + 400 = 1200
 
-Gray is specifically reserved for an exhaustion cycle caused by reaching zero.
+Again:
+
+default attack strength remains independent.
 
 ⸻
 
-14. Charging behavior remains unchanged
+20. Downward launch example
 
-Charging still increases stamina regeneration speed.
+Midair BA2 has High reversed vertical default launch.
 
-The visibility logic simply follows the value.
+Base:
+
+-800
+
+Accumulated Knockback adds additional magnitude in the same direction.
+
+At 50 with vertical bonus 200:
+
+final logical knockback Y:
+
+-1000
+
+or body velocity:
+
++1000
+
+depending on the existing coordinate conversion.
+
+Do not accidentally make accumulated Knockback reverse a spike upward.
+
+Use direction/sign from the base attack.
+
+⸻
+
+21. Damage ordering
+
+Damage still increases accumulated Knockback.
+
+A hit should conceptually resolve in this order:
+
+1. determine whether hit/block/dodge occurred;
+2. determine damage;
+3. read target accumulated Knockback before hit;
+4. add damage to target accumulated Knockback;
+5. calculate the accumulated launch bonus;
+6. combine it with the attack’s default/base launch;
+7. apply final velocity;
+8. emit combat event.
+
+Use the new accumulated value after this hit for the launch unless existing design specifically requires pre-hit value.
 
 Example:
 
-fighter has 40 stamina.
+Target = 45.
 
-Bar visible.
+BA1 damage = 5.
 
-Player Charges.
+New accumulated Knockback:
 
-Stamina regenerates faster.
+50
 
-Bar visibly fills faster.
+The launch bonus should use:
 
-At full:
+50
 
-* bar disappears.
-
-If the fighter had previously exhausted stamina:
-
-the faster Charge regeneration still fills the gray bar until full.
-
-Do not clear exhaustion simply because Charge is being held.
+not 45.
 
 ⸻
 
-15. Stamina spending remains unchanged
+22. This does NOT mean damage equals launch
 
-Do not modify current costs unless required to fix a bug.
+A 10-damage attack does not automatically have twice the default knockback of a 5-damage attack.
 
-Preserve existing configured values for:
-
-* Dash;
-* Dodge;
-* Block drain.
-
-Do not make CAB1/CAB2 consume stamina.
-
-Do not make:
-
-* normal attacks;
-* jumps;
-* running;
-* shuriken;
-* Charge
-
-consume stamina.
-
-⸻
-
-16. Hide stamina while fighter is not active
-
-Continue hiding stamina UI for:
-
-* eliminated fighters;
-* fighters during their 2-second respawn absence;
-* fighters not currently rendered;
-* any fighter intentionally detached from active play.
-
-After respawn:
-
-stamina starts full.
-
-Therefore:
-
-* bar should initially be hidden.
-
-It appears again only after stamina is spent.
-
-⸻
-
-17. Remove automatic opponent-facing
-
-The fighter currently has facing logic that automatically turns a grounded idle fighter toward its opponent.
-
-Remove this behavior entirely.
-
-A fighter should not automatically look toward the enemy.
-
-Facing should now be controlled only by the fighter’s own movement/action direction or explicit gameplay mechanics.
-
-⸻
-
-18. Remove opponent-based facing from updateFacing()
-
-Inspect Fighter.updateFacing().
-
-The current behavior includes logic conceptually like:
-
-* if moving, face movement direction;
-* otherwise, while grounded and idle, look at opponent based on opponent X position.
-
-Remove the opponent-position branch.
-
-Do not replace it with another target-tracking system.
-
-The fighter should retain its last facing while stationary.
-
-⸻
-
-19. Desired facing behavior
+Damage and default attack knockback are separate attack properties.
 
 Example:
 
-P1 is facing right.
+Attack A:
 
-Enemy jumps behind P1 to the left.
+* damage 10
+* Low horizontal default knockback
 
-P1 remains facing:
+Attack B:
 
-right
+* damage 5
+* High horizontal default knockback
 
-until P1 performs an input/action that explicitly changes facing.
+Attack B can naturally launch harder even though it deals less damage.
 
-No automatic turn.
+Damage increases future launch vulnerability.
 
-⸻
+Default knockback controls the immediate attack’s inherent force.
 
-20. Movement changes facing
-
-Normal left/right movement should continue to control facing.
-
-If player deliberately moves right:
-
-face right.
-
-If player deliberately moves left:
-
-face left.
-
-Keep the current threshold logic if it is useful for avoiding sprite flicker.
-
-But opponent position must not influence it.
+Do not link them automatically.
 
 ⸻
 
-21. Dash changes facing
+23. Accumulated Knockback number has no attack tiers
 
-Existing Dash behavior should continue to face the Dash direction.
+Accumulated Knockback should not become:
 
-Right Dash:
+* Low;
+* Mid;
+* High.
 
-* face right.
+It remains a plain numeric fighter state:
 
-Left Dash:
+0
+17
+43
+102
+250
 
-* face left.
-
-Do not alter this.
-
-⸻
-
-22. Attack facing behavior
-
-Attacks should continue to use the fighter’s current facing.
-
-Do not automatically rotate toward the opponent when an attack starts.
-
-Example:
-
-fighter faces right;
-opponent is left;
-player presses BA1 without first turning.
-
-BA1 should attack:
-
-right
-
-This is expected under the new manual-facing rule.
+Low/Mid/High belong only to move/default knockback configuration.
 
 ⸻
 
-23. Throw behavior
+24. Remove knockbackMultiplier
 
-Shuriken should continue to travel in the fighter’s current facing.
+The current:
 
-No aim correction toward enemy.
+knockbackMultiplier(accumulated)
 
-If facing right:
+represents the wrong architecture.
 
-* shuriken travels right.
+Remove it from gameplay.
 
-Even if opponent is left.
+Also remove:
 
-⸻
+scaleKnockback(base, accumulated)
 
-24. Charged abilities
+if its purpose is multiplication.
 
-Charged attacks should also respect current facing.
+Replace with clearly named helpers.
 
-Charged BA2/Sphere Rush:
+Suggested:
 
-* should snapshot the fighter’s current facing as it already does.
+accumulatedKnockbackBonus(accumulated, axis)
 
-Do not rotate toward opponent before it starts.
+and:
 
-Charged BA1 clone placement may still be based on opponent position because that move specifically summons relative to its target.
+combineKnockback(base, accumulated)
 
-That is not fighter auto-facing.
+or:
 
-Do not break target-dependent summon placement.
-
-⸻
-
-25. CPU facing
-
-The Practice/Training CPU should follow the same generic Fighter facing rules.
-
-Do not automatically make the dummy turn to face P1.
-
-If its AI moves:
-
-* its movement may update its facing.
-
-If it stops:
-
-* it keeps its last facing.
-
-This is intentional.
-
-Do not add a CPU-only auto-look exception.
+resolveLaunch(baseKnockback, accumulatedKnockback)
 
 ⸻
 
-26. Respawn facing
+25. Suggested helper behavior
 
-On respawn:
+Conceptually:
 
-use the stage spawn’s configured:
+resolveLaunch(base, accumulated)
 
-spawn.facing
+If base is zero:
 
-exactly as currently defined.
-
-After respawn, the fighter retains that facing until movement/Dash/etc. changes it.
-
-Do not immediately turn toward opponent after appearing.
-
-⸻
-
-27. Preserve HUD portrait inward-facing rule
-
-This change applies to the actual fighter sprite, not the HUD profile portraits.
-
-The top HUD portraits should continue to face inward toward the timer as previously requested.
-
-Therefore:
-
-* gameplay fighter facing = manual;
-* HUD portrait orientation = fixed UI composition.
-
-Do not couple those two.
-
-⸻
-
-28. CAB layout when hidden
-
-Because cooldown indicators now exist only when active, make the rendering layout dynamic.
-
-Examples:
-
-No cooldowns
-
-Render nothing.
-
-Only CAB1
-
-Center CAB1 beneath fighter.
-
-Only CAB2
-
-Center CAB2 beneath fighter.
-
-Both
-
-Place side-by-side.
-
-Avoid leaving an empty invisible CAB1 slot when only CAB2 exists.
-
-⸻
-
-29. Stamina/CAB vertical spacing
-
-Because both status systems are conditional:
-
-* stamina may be hidden;
-* CABs may be hidden.
-
-Do not reserve giant fixed empty gaps around the fighter.
-
-World-space layout should collapse cleanly.
-
-Above fighter:
-
-if stamina visible:
-
-* draw it.
+return { x: 0, y: 0 }
 
 Otherwise:
 
-* marker can occupy its normal position.
+Horizontal base
 
-Below fighter:
+If:
 
-if CAB cooldown active:
+base.x !== 0
 
-* draw indicators.
+calculate:
 
-Otherwise:
+extraX = horizontalBonus(accumulated)
 
-* draw nothing.
+then:
 
-⸻
+finalX = sign(base.x) * (abs(base.x) + extraX)
 
-30. Do not modify top info boxes
+Y stays based on existing Y behavior.
 
-Do not move CAB cooldown information back into:
+Vertical base
 
-* top fighter card;
-* portrait;
-* character-name box.
+If:
 
-The previous requirement remains:
+base.y !== 0
 
-cooldowns belong beneath the actual fighter.
+calculate:
 
-This pass only changes when they are visible.
+extraY = verticalBonus(accumulated)
 
-⸻
+then:
 
-31. Tests: cooldown visibility
+finalY = sign(base.y) * (abs(base.y) + extraY)
 
-Add/update tests verifying:
-
-* CAB1 ready → no CAB1 indicator rendered;
-* CAB2 ready → no CAB2 indicator rendered;
-* both ready → no cooldown UI under fighter;
-* CAB1 used → CAB1 appears;
-* CAB2 remains absent if ready;
-* CAB2 used while CAB1 cooling → both appear;
-* CAB1 finishing removes only CAB1;
-* final cooldown finishing removes all cooldown UI.
-
-Test state/renderer calls rather than brittle screenshots.
+This means accumulated Knockback increases magnitude without deciding direction.
 
 ⸻
 
-32. Tests: stamina visibility
+26. Mixed-axis bespoke attacks
 
-Verify:
+Sphere Rush explosion currently has a bespoke mixed vector, such as:
 
-fresh fighter:
+{ x: 720, y: 180 }
 
-* stamina full;
-* no stamina bar rendered.
+For a mixed-axis attack, accumulated bonus should not blindly add a full horizontal bonus and full vertical bonus unless that produces the intended trajectory.
 
-After Dash:
+Preserve the attack’s launch identity.
 
-* stamina below full;
-* bar rendered.
+Recommended approach:
 
-After Dodge:
+apply accumulated bonus primarily along the attack’s dominant launch axis.
 
-* bar rendered.
+Determine:
 
-During regen:
+dominant axis = abs(x) >= abs(y) ? horizontal : vertical
 
-* bar remains rendered.
+For Sphere Rush explosion:
 
-At full:
+horizontal is dominant.
 
-* bar no longer rendered.
+Therefore:
 
-⸻
-
-33. Tests: purple normal refill
-
-Verify:
-
-* spend stamina without reaching zero;
-* staminaExhausted === false;
-* bar uses purple normal style;
-* bar remains purple through partial refill;
-* disappears at full.
-
-⸻
-
-34. Tests: gray exhaustion cycle
-
-Verify:
-
-1. stamina reaches exactly 0;
-2. staminaExhausted === true;
-3. bar visible and gray;
-4. refill to 25 → still gray;
-5. refill to 75 → still gray;
-6. refill to 99 → still gray;
-7. reach 100 → exhausted false;
-8. bar hidden.
-
-Do not allow purple before step 7.
-
-⸻
-
-35. Tests: exhausted ability lock
-
-Verify while exhausted at partial stamina:
-
-* Dash fails;
-* Dodge fails;
-* Block fails.
-
-At full:
-
-* they become available again.
-
-Existing tests may already cover part of this; update only where needed.
-
-⸻
-
-36. Tests: no opponent auto-facing
-
-Create clear facing tests.
+* increase horizontal launch using accumulated horizontal bonus;
+* preserve the small built-in vertical lift unchanged.
 
 Example:
 
-fighter starts facing right.
+Base:
+720, 180
 
-Opponent moves from right side to left side.
+Accumulated 100:
+horizontal bonus = 200
 
-Fighter gives no movement input.
+Final:
+920, 180
 
-After updates:
-
-fighter still faces right.
+This preserves the “high horizontal knockback with slight lift” design.
 
 ⸻
 
-37. Tests: movement facing
+27. Alternative explicit axis for bespoke hits
+
+An even cleaner data-driven implementation is to let bespoke hits declare:
+
+accumulatedKnockbackAxis: 'horizontal'
+
+Then Sphere Rush explosion can explicitly say its accumulated susceptibility applies horizontally.
+
+Likewise a bespoke vertical technique could declare:
+
+'vertical'.
+
+Ordinary Low/Mid/High attacks already know their axis from their descriptor.
+
+Prefer explicit data if it makes the implementation clearer.
+
+Do not infer from arbitrary values when the move definition already knows its intended launch axis.
+
+⸻
+
+28. Block behavior
+
+Preserve the current Block behavior unless necessary.
+
+If blocked hits currently:
+
+* use chip damage;
+* reduce horizontal push;
+* cancel vertical launch;
+
+keep those rules.
+
+But accumulated Knockback and default knockback must still remain conceptually separate before block modifications.
+
+Suggested sequence:
+
+1. resolve damage/chip;
+2. accumulate damage;
+3. resolve base + accumulated launch;
+4. apply block reduction to final launch.
+
+Or preserve existing block-specific behavior if tests/documentation define it differently.
+
+Do not use blocking as a reason to restore multiplicative scaling.
+
+⸻
+
+29. Event data cleanup
+
+Current hit events contain:
+
+* damage
+* knockbackBefore
+* knockbackAfter
+* launchMultiplier
+
+Remove:
+
+launchMultiplier
+
+because there should no longer be a launch multiplier.
+
+Replace with clearer debug/test fields if useful:
+
+* baseKnockback
+* accumulatedKnockbackBonus
+* finalKnockback
+
+or:
+
+* baseLaunch
+* bonusLaunch
+* finalLaunch
+
+This will make future debugging much easier.
+
+Example event:
+
+{
+  damage: 5,
+  knockbackBefore: 45,
+  knockbackAfter: 50,
+  baseLaunch: { x: 140, y: 0 },
+  bonusLaunch: { x: 100, y: 0 },
+  finalLaunch: { x: 240, y: 0 }
+}
+
+Naming can differ, but do not retain misleading launchMultiplier.
+
+⸻
+
+30. Debug terminology
+
+Where the debug overlay or logs display an attack’s inherent force, call it:
+
+Base Knockback
+
+or:
+
+Default Knockback
+
+Do not display it as the fighter’s accumulated Knockback.
+
+The HUD’s numeric value remains:
+
+Knockback
+
+because that is the accumulated fighter state.
+
+⸻
+
+31. README correction
+
+The current README says conceptually:
+
+“Accumulated Knockback scales all of it.”
+
+Remove that explanation.
+
+It is incorrect for the desired system.
+
+Replace it with something equivalent to:
+
+“Each hit has its own default launch strength. Damage also increases the target’s accumulated Knockback. On subsequent hits, accumulated Knockback contributes additional launch independently of the move’s default launch. The attack determines its natural strength and direction; the target’s accumulated Knockback adds extra launch vulnerability.”
+
+Make the separation explicit.
+
+⸻
+
+32. ALVA_SPEC correction
+
+Update any specification wording that says:
+
+* multiply;
+* multiplier;
+* scale the base launch;
+* 1 + Knockback / 100;
+* 2x at 100;
+* base vector scaled by accumulated Knockback.
+
+Those descriptions are obsolete.
+
+Use additive/separate-component terminology.
+
+⸻
+
+33. js/data/knockback.js comments
+
+Rewrite the module header so it explicitly defines both concepts.
+
+Suggested conceptual wording:
+
+Default attack knockback
+
+* belongs to the move;
+* determines natural launch strength and direction.
+
+Accumulated Knockback
+
+* belongs to the fighter;
+* increases as damage is received;
+* adds an independent extra launch contribution when that fighter is hit by a launching move.
+
+Do not describe accumulated Knockback as scaling base launch.
+
+⸻
+
+34. Tests to delete/update
+
+Current tests explicitly validate the wrong model.
+
+Update/remove assertions like:
+
+knockbackMultiplier(100) === 2
+
+vx === 140 * 2
+
+base * multiplier
+
+launchMultiplier
+
+Tests must no longer expect those.
+
+⸻
+
+35. New core test: independence
+
+Create a test proving default attack knockback and accumulated Knockback are independent.
+
+Example:
+
+Two horizontal attacks:
+
+Attack A default:
+140
+
+Attack B default:
+220
+
+Target accumulated:
+100
+
+Assume horizontal accumulated bonus:
+200.
+
+Expected:
+
+A:
+340
+
+B:
+420
+
+Difference:
+
+80
+
+which is exactly the original difference between their default values.
+
+This proves accumulated Knockback adds independently instead of proportionally magnifying one attack more than the other.
+
+⸻
+
+36. Critical regression test: not multiplicative
+
+Explicitly test that:
+
+with target Knockback 100 and base 140:
+
+final launch is not:
+
+280
+
+under the new tuning.
+
+And with base 720:
+
+final is not:
+
+1440.
+
+This prevents the old multiplier architecture from silently returning.
+
+⸻
+
+37. Same accumulated bonus test
+
+For two horizontal attacks against the same target accumulated Knockback:
+
+finalA - baseA
+
+must equal:
+
+finalB - baseB
+
+assuming both use the same accumulated-launch axis and neither has special modifiers.
+
+Example:
+
+Target 100:
+
+Low horizontal:
+340 - 140 = 200
+
+High horizontal:
+420 - 220 = 200
+
+Both receive the same accumulated bonus.
+
+That is a fundamental invariant.
+
+⸻
+
+38. Damage accumulation test
+
+Target starts:
+
+40
+
+BA1 does:
+
+5
+
+After hit:
+
+45
 
 Verify:
 
-* deliberate left movement changes facing left;
-* deliberate right movement changes facing right;
-* stopping preserves last direction;
-* opponent position does not alter it afterward.
+* target combat.knockback === 45;
+* base attack launch remains unchanged;
+* accumulated bonus is calculated from 45;
+* final launch = base + bonus.
 
 ⸻
 
-38. Tests: attack direction
+39. Damage independence test
 
-Verify:
+Create two attacks with identical default knockback but different damage.
 
-* fighter facing right with opponent on left;
-* BA1 starts;
-* hitbox remains on right side;
-* no auto-turn occurs.
+Example:
 
-Do similar lightweight coverage for projectile direction if useful.
+A:
 
-⸻
+* default horizontal 140
+* damage 5
 
-39. Tests: Dash facing
+B:
 
-Verify existing behavior still holds:
+* default horizontal 140
+* damage 10
 
-* left Dash faces left;
-* right Dash faces right;
-* opponent position does not override Dash facing.
+Against target initially 0:
 
-⸻
+A uses accumulated value 5 after damage.
 
-40. Tests: respawn facing
+B uses accumulated value 10 after damage.
 
-Verify:
+Therefore B may launch slightly farther because it just increased the target’s accumulated Knockback more, not because damage directly changes default attack knockback.
 
-* respawn uses configured spawn facing;
-* opponent’s location does not immediately flip it.
+This distinction should be visible in tests/comments.
 
 ⸻
 
-41. Code comments/docs
+40. Default strength independence test
 
-Update stale comments that say:
+Create two attacks with same damage but different default knockback.
 
-* ready cooldowns remain visible;
-* stamina bar is persistent;
-* fighters automatically face opponent.
+Example:
 
-Document:
+A:
 
-* cooldown UI appears only while cooling;
-* stamina UI appears only below full;
-* exhausted refill is gray until fully restored;
-* fighters retain facing until their own directional action changes it.
+* damage 5
+* Low horizontal 140
 
-Keep documentation edits narrowly scoped.
+B:
+
+* damage 5
+* High horizontal 220
+
+Both raise target Knockback by the same amount.
+
+Their accumulated bonus should therefore be identical.
+
+B still launches farther because:
+
+220 > 140
+
+not because accumulated Knockback treats it differently.
 
 ⸻
 
-42. Preserve existing systems
+41. Shuriken regression test
+
+At target Knockback:
+
+0
+50
+100
+500
+
+shuriken:
+
+* adds 1 damage/Knockback;
+* produces zero horizontal launch;
+* produces zero vertical launch.
+
+No accumulated bonus should be applied because this move is intentionally non-launching.
+
+⸻
+
+42. Charged BA2 tick test
+
+At any accumulated Knockback:
+
+each 0.5-second tick:
+
+* adds +1;
+* does not launch;
+* does not receive accumulated launch bonus.
+
+Explosion still launches normally using:
+
+* its strong default launch;
+* plus accumulated bonus on its configured launch axis.
+
+⸻
+
+43. Sphere Rush explosion test
+
+Example target before final explosion:
+
+3
+
+ticks accumulated from CAB2 plus whatever prior damage.
+
+Explosion:
+
+* adds 15;
+* reads the new accumulated total;
+* preserves strong horizontal default launch;
+* adds horizontal accumulated bonus independently;
+* preserves small built-in vertical component;
+* does not multiply the entire vector.
+
+⸻
+
+44. BA1 example
+
+#0001 BA1 currently:
+
+* damage 5;
+* Low horizontal default knockback.
+
+At target 0:
+
+after hit:
+
+* accumulated Knockback = 5.
+
+Final horizontal launch:
+
+140 + horizontalBonus(5)
+
+not:
+
+140 × 1.05.
+
+⸻
+
+45. BA2 example
+
+#0001 ground BA2:
+
+* damage 10;
+* High vertical default knockback = 800 upward.
+
+At target 0:
+
+after hit:
+
+* accumulated Knockback = 10.
+
+Final upward launch magnitude:
+
+800 + verticalBonus(10)
+
+not:
+
+800 × 1.1.
+
+⸻
+
+46. Midair BA2 example
+
+#0001 midair BA2:
+
+* damage 10;
+* High reversed vertical default knockback = 800 downward.
+
+After accumulated damage is updated:
+
+final downward magnitude:
+
+800 + verticalBonus(newKnockback)
+
+Direction remains downward.
+
+⸻
+
+47. Do not change damage numbers
+
+Preserve the current #0001 damage set:
+
+* BA1 = 5
+* midair BA1 = 5
+* BA2 = 10
+* midair BA2 = 10
+* shuriken = 1
+* charged BA2 tick = 1 every 0.5 seconds
+* charged BA2 explosion = 15
+
+This pass is about launch architecture, not damage rebalance.
+
+⸻
+
+48. Do not change attack identity
+
+Preserve:
+
+* BA1’s current horizontal default knockback;
+* midair BA1’s current vertical default knockback;
+* BA2’s current strong upward default knockback;
+* midair BA2’s current strong downward default knockback;
+* shuriken’s zero default knockback;
+* Sphere Rush contact/ticks zero launch;
+* Sphere Rush explosion strong horizontal default launch.
+
+Do not flatten attacks into one universal knockback value.
+
+⸻
+
+49. Do not derive attack strength from damage
+
+Never do:
+
+defaultKnockback = damage * ...
+
+The move definition is authoritative.
+
+A 5-damage move can have:
+
+* high default knockback.
+
+A 10-damage move can have:
+
+* low default knockback.
+
+These are independent design parameters.
+
+⸻
+
+50. Do not derive accumulated bonus from attack strength
+
+Never do:
+
+bonus = baseKnockback * accumulatedValue
+
+or:
+
+bonus = attackLevel * accumulatedValue
+
+Accumulated launch bonus is derived from:
+
+* target accumulated Knockback;
+* launch axis/direction.
+
+Not attack magnitude.
+
+⸻
+
+51. Do not remove default attack knockback
+
+Do not overcorrect by removing Low/Mid/High and using only accumulated Knockback.
+
+That would also be wrong.
+
+At Knockback 0:
+
+attacks still need to launch differently.
+
+A Rush must still feel much stronger than a push.
+
+That comes from default attack knockback.
+
+⸻
+
+52. Do not remove accumulated Knockback influence
+
+Likewise, do not leave attacks at only their default force.
+
+At Knockback 100 or 200:
+
+the same move should launch the victim farther than at Knockback 0.
+
+That comes from the separate accumulated-Knockback contribution.
+
+Both systems are required.
+
+⸻
+
+53. Terminology table
+
+Use this mental model everywhere:
+
+Concept	Belongs to	Meaning
+Damage	Attack/hit	How much gets added to target’s accumulated Knockback
+Default/Base Knockback	Attack/hit	How strongly and in what direction this move naturally launches
+Accumulated Knockback	Fighter	Total damage-like number received over the life
+Accumulated launch bonus	Calculated from fighter	Extra launch caused by being at higher Knockback
+Final launch	Hit result	Base/default launch + accumulated bonus
+
+Do not merge these concepts.
+
+⸻
+
+54. Correct conceptual pipeline
+
+The final implementation should be understandable as:
+
+attack connects
+
+→ attack deals damage
+
+→ target’s Knockback number increases
+
+→ read attack’s default launch direction/strength
+
+→ calculate additional launch from target’s new accumulated Knockback
+
+→ add the two launch contributions
+
+→ apply final velocity
+
+That is the complete intended mechanic.
+
+⸻
+
+55. Acceptance examples
+
+Assuming initial tuning:
+
+horizontal bonus = accumulated × 2
+
+vertical bonus = accumulated × 4
+
+Low horizontal BA1
+
+Target starts 0.
+
+BA1 damage 5.
+
+Accumulated becomes:
+
+5
+
+Default:
+140
+
+Bonus:
+10
+
+Final:
+150
+
+⸻
+
+Target starts 95.
+
+BA1 damage 5.
+
+Accumulated becomes:
+
+100
+
+Default:
+140
+
+Bonus:
+200
+
+Final:
+340
+
+⸻
+
+High horizontal attack
+
+Same target at 100.
+
+Default:
+220
+
+Bonus:
+200
+
+Final:
+420
+
+Notice:
+
+both Low and High attacks got the exact same:
+
++200
+
+from accumulated Knockback.
+
+The High attack remains stronger because:
+
+220 > 140.
+
+⸻
+
+Sphere Rush
+
+Target accumulated after explosion:
+
+100
+
+Base horizontal:
+
+720
+
+Accumulated horizontal bonus:
+
+200
+
+Final horizontal:
+
+920
+
+Not:
+1440.
+
+⸻
+
+56. Acceptance criteria
+
+This correction is complete when:
+
+Architecture
+
+* default attack knockback and accumulated Knockback are clearly separate concepts;
+* no gameplay launch multiplier remains;
+* accumulated Knockback is not multiplied by attack base force;
+* final launch is base/default launch plus an independent accumulated contribution.
+
+Attack identity
+
+* Low/Mid/High remain attack properties;
+* bespoke strong attacks remain possible;
+* Sphere Rush explosion remains much stronger by default than a push;
+* zero-launch attacks remain zero-launch.
+
+Accumulation
+
+* damage still adds to target Knockback;
+* target Knockback stays a plain numeric value;
+* higher accumulated Knockback causes stronger launch;
+* no hard cap is added unless one already exists elsewhere.
+
+Direction
+
+* attack determines launch direction;
+* accumulated Knockback only increases magnitude in that direction;
+* horizontal stays horizontal;
+* upward stays upward;
+* downward stays downward;
+* zero-launch hits remain zero.
+
+Code
+
+* knockbackMultiplier() no longer drives combat;
+* scaleKnockback() multiplicative behavior is removed/replaced;
+* applyHit() combines base launch + accumulated bonus;
+* launchMultiplier event field is removed/replaced;
+* comments/docs no longer describe multiplicative scaling.
+
+Tests
+
+* weak and strong attacks receive the same accumulated bonus at the same target Knockback;
+* their original default strength difference remains;
+* shuriken remains zero-launch at high accumulated Knockback;
+* CAB2 ticks remain zero-launch;
+* CAB2 explosion uses strong base + independent accumulated horizontal bonus;
+* damage and default knockback are tested independently;
+* old multiplier assertions are removed;
+* complete test suite passes.
+
+⸻
+
+57. Strict scope
+
+Only correct the distinction between:
+
+* attack default/base knockback;
+* fighter accumulated Knockback;
+* final launch calculation.
 
 Do not change:
 
-* 3-point scoring;
-* score dots;
-* 2-second respawn;
-* Practice default CPU;
-* Practice CPU info card;
-* Knockback accumulation;
-* damage tuning;
-* Void behavior;
-* Dash timing/speed;
-* stamina costs;
-* stamina regen rates;
-* CAB cooldown durations;
-* Charge cooldown acceleration;
-* Charge stamina acceleration;
-* stage layouts;
-* camera framing.
+* damage values;
+* stages;
+* Void;
+* score system;
+* respawn;
+* stamina;
+* Dash;
+* cooldowns;
+* HUD;
+* CPU;
+* attack timing;
+* hitboxes;
+* animations;
+* facing;
+* movement.
 
-⸻
+The central rule of this pass is:
 
-43. Acceptance criteria
+DEFAULT KNOCKBACK IS THE ATTACK’S OWN NATURAL LAUNCH STRENGTH.
 
-This corrective pass is complete when:
+ACCUMULATED KNOCKBACK IS THE FIGHTER’S DAMAGE-LIKE NUMBER THAT ADDS EXTRA LAUNCH VULNERABILITY.
 
-CAB cooldown indicators
+THEY ARE TWO DIFFERENT VALUES.
 
-* ready abilities show nothing;
-* only cooling abilities appear;
-* indicator disappears immediately when cooldown completes;
-* CAB1 and CAB2 remain independent;
-* indicators stay under actual fighter.
-
-Stamina bar
-
-* full resource = no bar;
-* spending resource makes bar appear;
-* ordinary partial refill = purple;
-* zero stamina = exhausted;
-* exhausted bar = gray;
-* gray remains through partial refill;
-* stamina-dependent actions locked throughout exhaustion;
-* only full refill clears exhaustion;
-* full refill causes bar to disappear.
-
-Facing
-
-* fighters no longer automatically face opponents;
-* idle fighter preserves last facing;
-* movement changes facing;
-* Dash changes facing;
-* attacks use current facing;
-* projectiles use current facing;
-* respawn uses configured spawn facing;
-* HUD portraits still independently face the timer.
-
-Quality
-
-* no duplicate/hidden cooldown placeholders;
-* no permanent stamina bar;
-* no automatic target tracking remains in fighter facing;
-* existing tests pass;
-* add focused regression tests for these changes.
-
-⸻
-
-44. Strict scope
-
-Implement only:
-
-* cooldown indicators visible only during active cooldown;
-* stamina bar visible only while below full;
-* gray exhausted refill until full;
-* retain current full-refill lockout;
-* remove automatic fighter-to-opponent facing;
-* directly affected tests/comments.
-
-Do not expand beyond this scope.
+FINAL LAUNCH COMBINES THEM; IT DOES NOT MULTIPLY ONE BY THE OTHER.
