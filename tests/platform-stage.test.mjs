@@ -301,7 +301,7 @@ test('the Void is a fixed line tested at the body\'s centre', () => {
 
 // ---- Quick Battle: the Void defeats -----------------------------------------------------
 
-test('Quick Battle: falling into the Void defeats that fighter at once, then the KO beat, then the result', () => {
+test('Quick Battle: falling into the Void takes that fighter out of play at once, scores the opponent a point, and 2 s later it is back', () => {
   const { battle, script } = realBattle('city');
   battle.setPhase('fight');
   const { p1, p2 } = battle;
@@ -313,29 +313,32 @@ test('Quick Battle: falling into the Void defeats that fighter at once, then the
   assert.equal(p1.lostToVoid, true);
   assert.ok(steps < 60 * 4, 'long before the timer');
   assert.ok(battle.timeLeft > timeLeft - 4);
-  assert.equal(battle.phase, 'ko');
-  assert.equal('health' in p1.combat, false, 'no Health to empty: the Void alone defeats');
-  assert.equal(p1.combat.knockback, 0, 'its Knockback is left as it was');
-  assert.deepEqual(battle.result, { outcome: 'p2', reason: 'void' });
-  // Out of play: frozen, and neither framed nor fought.
+  assert.deepEqual(battle.score, { p1: 0, p2: 1 }, 'the CPU scores; the one that fell does not');
+  assert.equal(battle.phase, 'fight', 'the match goes on: one point is not three');
+  assert.equal('health' in p1.combat, false, 'no Health to empty: the Void alone takes a fighter out');
+  // Out of play: frozen, and neither framed nor fought; the timer runs on.
   const frozen = { x: p1.body.x, y: p1.body.y };
   assert.equal(battle.secondary, p2);
   assert.deepEqual(battle.inPlay, [p2]);
+  assert.deepEqual(battle.cameraTargets, [p2, null], 'the camera follows the CPU alone meanwhile');
+  const clock = battle.timeLeft;
   for (let i = 0; i < 30; i++) battle.update(DT);
   assert.deepEqual({ x: p1.body.x, y: p1.body.y }, frozen);
-  while (battle.phase === 'ko') battle.update(DT);
-  assert.equal(battle.phase, 'result');
-  assert.ok(Math.abs(battle.phaseTime) < 1e-9);
-  // A rematch brings both back.
-  p2.combat.knockback = 64;
-  battle.restart();
-  assert.equal(p1.lostToVoid, false);
-  assert.deepEqual([p1.combat.knockback, p2.combat.knockback], [0, 0]);
+  assert.ok(battle.timeLeft < clock, 'the timer keeps running');
+  // Back at its spawn, on the roof, once its 2 s are up.
+  script.held = {};
+  while (p1.lostToVoid) battle.update(DT);
+  assert.equal(p1.body.x, battle.map.spawnPoints[0].x);
+  assert.equal(p1.body.grounded, true);
   assert.deepEqual(battle.inPlay, [p1, p2]);
+  assert.deepEqual(battle.score, { p1: 0, p2: 1 }, 'the point stays');
+  // A rematch brings both back to 0 points.
+  battle.restart();
+  assert.deepEqual(battle.score, { p1: 0, p2: 0 });
   assert.equal(battle.result.reason, 'time');
 });
 
-test('Quick Battle: the CPU in the Void loses; a technique holding it lets go, and whatever aimed at it goes', () => {
+test('Quick Battle: the CPU in the Void scores Player 1 a point; a technique holding it lets go, and whatever aimed at it goes', () => {
   const { battle, script } = realBattle('desert');
   battle.setPhase('fight');
   const { p1, p2 } = battle;
@@ -358,21 +361,29 @@ test('Quick Battle: the CPU in the Void loses; a technique holding it lets go, a
   assert.equal(p2.combat.immobilized, false);
   assert.deepEqual(p1.summons, []);
   assert.ok(battle.clones.every((c) => c.target !== p2));
-  assert.equal(battle.phase, 'ko');
-  assert.deepEqual(battle.result, { outcome: 'p1', reason: 'void' });
+  assert.deepEqual(battle.score, { p1: 1, p2: 0 });
+  assert.equal(battle.phase, 'fight');
+  assert.deepEqual(battle.result, { outcome: 'p1', reason: 'points' }, 'ahead on points');
   assert.equal(battle.secondary, null, 'the camera frames Player 1 alone');
 });
 
-test('Quick Battle: after time runs out, a fighter the Void takes still loses; both taken is a draw', () => {
+test('Quick Battle: after time runs out, a fall scores nothing and nobody respawns; points, then Knockback, decide', () => {
   const { battle } = realBattle('city');
   battle.setPhase('timeup');
+  battle.p1.combat.knockback = 30;
   Object.assign(battle.p2.body, { y: battle.stage.void.bottom + 100, grounded: false, ground: null });
   battle.update(DT);
+  assert.equal(battle.p2.lostToVoid, true);
   assert.equal(battle.phase, 'timeup', 'no KO beat once time is up');
-  assert.deepEqual(battle.result, { outcome: 'p1', reason: 'void' });
+  assert.deepEqual(battle.score, { p1: 0, p2: 0 }, 'no point after time');
+  assert.equal(battle.p2.respawnTimer, null, 'and no respawn');
+  // Level on points: the lower Knockback wins, the fall itself decides nothing.
+  assert.deepEqual(battle.result, { outcome: 'p2', reason: 'time' });
   Object.assign(battle.p1.body, { y: battle.stage.void.bottom + 100, grounded: false, ground: null });
-  battle.update(DT);
-  assert.deepEqual(battle.result, { outcome: 'draw', reason: 'void' });
+  for (let i = 0; i < 60 * 3; i++) battle.update(DT);
+  assert.deepEqual(battle.inPlay, [], 'both stay out');
+  battle.p1.combat.knockback = 0;
+  assert.deepEqual(battle.result, { outcome: 'draw', reason: 'time' });
 });
 
 test('the training CPU never walks off a ledge on its own', () => {

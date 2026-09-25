@@ -1,15 +1,16 @@
-// PRACTICE GROUND screen: a training room. It starts at once with #0001
-// alone on the training stage, with no intro, timer or result, and runs until
-// the player returns Home. The three-dots More button (top centre, or Esc / P
-// / Start) freezes it under a light Practice menu: Change Fighter opens the
-// full roster in a large glass dialog over the paused stage and swaps the
-// fighter in place; Enable CPU (Change CPU once there is one) opens a second
-// roster dialog that puts a training-dummy CPU on the stage or replaces it,
-// and whose Disable CPU takes it away again; Return goes Home.
+// PRACTICE GROUND screen: a training room. It starts at once with #0001 and
+// a training-dummy CPU (#0001 too) on the training stage, with no intro,
+// timer, points or result, and runs until the player returns Home. The
+// three-dots More button (top centre, or Esc / P / Start) freezes it under a
+// light Practice menu: Change Fighter opens the full roster in a large glass
+// dialog over the paused stage and swaps the fighter in place; Change CPU
+// (Enable CPU once it has been disabled) opens a second roster dialog that
+// replaces the CPU or puts one back, and whose Disable CPU takes it away;
+// Return goes Home.
 //
 // Practice keeps its own fighter and CPU choices, and every fresh visit
-// starts over (default fighter, no CPU): it never reads or writes Quick
-// Battle's app.selection.
+// starts over (default fighter, default CPU): a disabled CPU is never
+// remembered, and it never reads or writes Quick Battle's app.selection.
 
 import { Screen } from '../core/screen-manager.js';
 import { CONFIG } from '../config.js';
@@ -23,7 +24,8 @@ import { PracticeSession } from '../game/practice.js';
 import { PracticeHUD } from '../game/hud.js';
 import { TouchControls } from '../game/touch-controls.js';
 
-// Every fresh visit from Home starts with this fighter.
+// Every fresh visit from Home starts with this fighter, and a practice CPU
+// of the same fighter, sharing its one loaded sprite set.
 export const PRACTICE_DEFAULT_FIGHTER = '0001';
 
 export class PracticeGroundScreen extends Screen {
@@ -65,12 +67,12 @@ export class PracticeGroundScreen extends Screen {
 
   // ---- DOM builders ---------------------------------------------------------
 
-  // The light Practice menu: exactly Change Fighter, Enable CPU (Change CPU
-  // while there is one) and Return. Esc / Back, Start, the More button or a
+  // The light Practice menu: exactly Change Fighter, Change CPU (Enable CPU
+  // while there is none) and Return. Esc / Back, Start, the More button or a
   // press on the dim around it close it again.
   buildMenu() {
     this.changeBtn = menuButton('Change Fighter', { primary: true });
-    this.cpuBtn = menuButton('Enable CPU');
+    this.cpuBtn = menuButton('Change CPU');
     this.returnBtn = menuButton('Return', { outlineOnly: true });
     this.changeBtn.addEventListener('click', () => this.openRoster());
     this.cpuBtn.addEventListener('click', () => this.openCpuRoster());
@@ -173,9 +175,9 @@ export class PracticeGroundScreen extends Screen {
 
   async enter() {
     const app = this.app;
-    // A fresh visit always starts from the default fighter, whatever Quick
-    // Battle or an earlier visit used (and, with a fresh session, with no
-    // CPU).
+    // A fresh visit always starts from the default fighter and the default
+    // CPU, whatever Quick Battle or an earlier visit used (a CPU disabled
+    // then included).
     this.characterId = PRACTICE_DEFAULT_FIGHTER;
     const def = getCharacter(this.characterId);
     this.token = {};
@@ -206,7 +208,11 @@ export class PracticeGroundScreen extends Screen {
       input: app.input,
       reducedMotion: app.device.reducedMotion,
     });
-    this.hud.bind(this.session.player);
+    // The CPU is on from the start: the same fighter and the same sprite
+    // set (one load for both), at the CPU spawn facing Player 1, paired
+    // with it and framed with it.
+    this.session.setCPU(def, sprites);
+    this.hud.bind(this.session.player, this.session.cpu);
     this.hud.update(this.session);
     this.syncMenu();
     this.needsResize = true;
@@ -414,7 +420,7 @@ export class PracticeGroundScreen extends Screen {
 
     this.characterId = def.id;
     this.session.setFighter(def, sprites);
-    this.hud.bind(this.session.player);
+    this.hud.bind(this.session.player, this.session.cpu);
     this.hud.update(this.session);
     this.closeRoster({ silent: true });
     this.resume();
@@ -483,17 +489,20 @@ export class PracticeGroundScreen extends Screen {
     app.loading.hide();
 
     this.session.setCPU(def, sprites);
+    this.hud.bind(this.session.player, this.session.cpu);
+    this.hud.update(this.session);
     this.syncMenu();
     this.closeCpuRoster({ silent: true });
     this.resume();
   }
 
-  // Disable CPU: removes the CPU and everything aimed at it, closes the
-  // dialog and leaves practice frozen under the menu, focus on Enable CPU.
-  // The still stage is redrawn without it.
+  // Disable CPU: removes the CPU and everything aimed at it (and its HUD
+  // card), closes the dialog and leaves practice frozen under the menu,
+  // focus on Enable CPU. The still stage is redrawn without it.
   disableCpu() {
     if (!this.cpuRosterOpen || this.cpuSwapping || !this.session?.cpu) return;
     this.session.removeCPU();
+    this.hud.bindCpu(null);
     this.syncMenu();
     this.closeCpuRoster();
     this.session.render();

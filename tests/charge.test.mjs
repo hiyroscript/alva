@@ -965,6 +965,10 @@ test('charging, releasing, dodging, attacking and hits start no charged cooldown
   none(dodge.attacker, dodge.target);
   while (!dodge.target.grounded || dodge.target.combat.defenseAction) dodge.tick();
   assert.equal(dodge.target.body.x - dodge.attacker.body.x, 44, 'still in BA1 range');
+  // Those Dodges spent its stamina (see stamina.test.mjs): full again for
+  // the one below.
+  assert.ok(dodge.target.combat.stamina < dodge.target.combat.maxStamina);
+  dodge.target.combat.refillStamina();
   dodge.tick(BA1, DEFENSE);
   while (dodge.attacker.combat.attack) dodge.tick();
   assert.deepEqual(dodge.events, [], 'the BA1 passed through the Dodge');

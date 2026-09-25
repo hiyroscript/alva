@@ -48,7 +48,14 @@ export const CONFIG = Object.freeze({
     roundSeconds: 99,      // set to 0 to disable the round timer
     introSeconds: 1.7,
     timeUpSeconds: 1.4,
-    koSeconds: 1.4,        // the KO beat after a Void loss, before the result
+    koSeconds: 1.4,        // the KO beat after the match-winning point, before the result
+    // First to this many points wins: a point for each time the opponent
+    // falls into the Void. The HUD shows one score dot per point.
+    pointsToWin: 3,
+    // Seconds a fighter the Void took stays out of play before it is back
+    // at its spawn (Quick Battle, unless that fall ended the match, and
+    // Practice Ground alike). Counted on the simulation clock.
+    respawnSeconds: 2,
   },
 
   roster: {

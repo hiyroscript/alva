@@ -1,8 +1,10 @@
 // Arena: the fixed-timestep simulation and Canvas 2D rendering shared by every
 // mode that puts fighters on a stage. Quick Battle (js/game/battle.js) adds an
-// opponent, phases and a round timer; Practice Ground (js/game/practice.js)
-// runs Player 1 with an optional training-dummy CPU and none of them. DOM
-// concerns (HUD, menus, overlays) live in each mode's screen.
+// opponent, phases, a round timer and points; Practice Ground
+// (js/game/practice.js) runs Player 1 with a training-dummy CPU and none of
+// them. Both share the Void's respawn wait (updateRespawns). DOM concerns
+// (HUD, menus, overlays) live in each mode's screen; the status drawn over
+// each fighter (stamina bar, name tag, CAB cooldowns) is drawn here.
 
 import { CONFIG } from '../config.js';
 import { StageCollision, separate, resolveSolidOverlap } from './physics.js';
@@ -11,6 +13,7 @@ import { spawnProjectiles, removeDeadProjectiles } from './projectile.js';
 import { spawnClones, updateClones, removeDeadClones } from './clone.js';
 import { Camera } from './camera.js';
 import { drawFrame, drawCenteredFrame } from './sprite-normalizer.js';
+import { drawStaminaBar, drawCabIndicators, statusOnScreen } from './fighter-status.js';
 import { createTheme } from '../stages/index.js';
 
 // Ground ring + name tag tones: the player is white, the CPU a mid gray.
@@ -36,7 +39,9 @@ export class Arena {
     this.step = CONFIG.sim.step;
     this.acc = 0;
     this.debug = false;
-    this.view = { ctx: this.ctx, x: 0, y: 0, w: 0, h: 0, scale: 1, pxW: 0, pxH: 0 };
+    // `dpr`: device pixels per CSS pixel on the canvas, so drawn UI can keep
+    // a readable size in CSS pixels however far the world zooms out.
+    this.view = { ctx: this.ctx, x: 0, y: 0, w: 0, h: 0, scale: 1, pxW: 0, pxH: 0, dpr: 1 };
     this.simCtx = { stage: this.stage, gravity: this.gravity, battle: this };
     // Fighters in play, Player 1 first; each mode fills it.
     this.fighters = [];
@@ -64,10 +69,19 @@ export class Arena {
   }
 
   // The fighters still in play: every fighter, less any lost to the Void
-  // (see checkVoid). Only they update, collide, fight and are drawn.
+  // (see checkVoid) and still waiting to respawn. Only they update, collide,
+  // fight, are targeted and are drawn.
   get inPlay() {
     const all = this.fighters;
     return all.some((f) => f.lostToVoid) ? all.filter((f) => !f.lostToVoid) : all;
+  }
+
+  // Who the camera frames: the fighters in play, Player 1 first. While
+  // Player 1 waits to respawn the other fighter leads alone; with nobody in
+  // play the camera holds still.
+  get cameraTargets() {
+    const [lead = null, other = null] = this.inPlay;
+    return [lead, other];
   }
 
   // ---- Sizing ---------------------------------------------------------------
@@ -88,11 +102,19 @@ export class Arena {
     const sprites = this.primary.sprites;
     const scale = computeWorldScale(pxW, pxH, sprites, this.map);
     this.pxPerArt = scale * sprites.worldPerArt;
-    Object.assign(this.view, { pxW, pxH, scale });
+    Object.assign(this.view, { pxW, pxH, scale, dpr });
     this.camera.setView(pxW / scale, pxH / scale, scale);
-    this.camera.snap(this.primary, this.secondary);
-    this.syncView();
+    this.snapCamera();
     return true;
+  }
+
+  // Frames the fighters at once (see cameraTargets), if the view has been
+  // sized.
+  snapCamera() {
+    if (!this.view.pxW) return;
+    const [lead, other] = this.cameraTargets;
+    if (lead) this.camera.snap(lead, other);
+    this.syncView();
   }
 
   // ---- Loop -------------------------------------------------------------------
@@ -110,7 +132,8 @@ export class Arena {
     const alpha = this.acc / this.step;
     for (const f of this.fighters) f.interpolate(alpha);
     for (const p of this.projectiles) p.interpolate(alpha);
-    this.camera.follow(this.primary, this.secondary, dt);
+    const [lead, other] = this.cameraTargets;
+    if (lead) this.camera.follow(lead, other, dt);
     this.syncView();
     this.theme.update(dt, this.view);
     this.render();
@@ -119,13 +142,15 @@ export class Arena {
   // One fixed step of the world. Modes with their own rules (phases, a
   // timer) run them first and then call this.
   update(dt) {
-    // Fighters first (a charged technique advances and moves with its
-    // fighter); then the projectiles they released this step spawn (once
-    // each) and every projectile moves. Live clones advance, then the clones
-    // summoned this step spawn (once each, on their cloud's first frame).
-    // Melee, projectile, clone and charged-technique hits resolve, and spent
-    // projectiles and finished clones are dropped. Last, any fighter now in
-    // the Void is handed to the mode (checkVoid).
+    // Any fighter whose respawn wait is over comes back first, and plays
+    // this step. Then the fighters (a charged technique advances and moves
+    // with its fighter); then the projectiles they released this step spawn
+    // (once each) and every projectile moves. Live clones advance, then the
+    // clones summoned this step spawn (once each, on their cloud's first
+    // frame). Melee, projectile, clone and charged-technique hits resolve,
+    // and spent projectiles and finished clones are dropped. Last, any
+    // fighter now in the Void is handed to the mode (checkVoid).
+    this.updateRespawns(dt);
     const fighters = this.inPlay;
     for (const f of fighters) f.update(dt, this.simCtx);
     // Pushboxes keep every pair of fighters apart (a lone fighter has none).
@@ -147,21 +172,44 @@ export class Arena {
     this.checkVoid(fighters);
   }
 
-  // ---- Void -------------------------------------------------------------------
+  // ---- Void and respawn ----------------------------------------------------------
 
   // Every fighter whose centre has crossed the stage's fixed Void boundary
-  // this step (StageCollision.inVoid, never the animated edge) goes to
-  // onVoid, once.
+  // this step (StageCollision.inVoid, never the animated edge) is out of
+  // play (lostToVoid) and goes to onVoid, once. All of this step's are out
+  // before any is handed on, so two taken on the same step are seen as
+  // taken together (see Battle.onVoid).
   checkVoid(fighters) {
-    for (const f of fighters) {
-      if (!f.lostToVoid && this.stage.inVoid(f.body)) this.onVoid(f);
-    }
+    const taken = fighters.filter((f) => !f.lostToVoid && this.stage.inVoid(f.body));
+    for (const f of taken) f.lostToVoid = true;
+    for (const f of taken) this.onVoid(f);
   }
 
-  // What entering the Void means is each mode's rule: Quick Battle defeats
-  // the fighter (Battle.onVoid), Practice Ground puts it back at its spawn
+  // What entering the Void means is each mode's rule: Quick Battle scores a
+  // point for the opponent and respawns the fighter unless that point won
+  // the match (Battle.onVoid); Practice Ground only respawns it
   // (PracticeSession.onVoid).
   onVoid() {}
+
+  // Starts `f`'s wait out of play: CONFIG.battle.respawnSeconds on the
+  // simulation clock (see updateRespawns).
+  scheduleRespawn(f) {
+    f.respawnTimer = CONFIG.battle.respawnSeconds;
+  }
+
+  // One step of every respawn wait. A fighter whose wait is over is back at
+  // its own spawn (Fighter.respawn: 0 Knockback, full stamina, every
+  // cooldown ready, nothing transient) and in play at once. Buffered presses
+  // made while Player 1 was out are dropped, so it comes back neutral.
+  updateRespawns(dt) {
+    for (const f of this.fighters) {
+      if (f.respawnTimer === null) continue;
+      f.respawnTimer -= dt;
+      if (f.respawnTimer > 1e-6) continue;
+      f.respawn(this.stage);
+      if (f.controller?.kind === 'player') this.input.flush();
+    }
+  }
 
   // Nothing else may keep hold of or aim at `f` once the Void takes it: a
   // technique holding it ends, and pending summons, clones and projectiles
@@ -222,7 +270,13 @@ export class Arena {
     // swallowed by the black.
     theme.drawVoid(ctx, view);
     ctx.setTransform(1, 0, 0, 1, 0, 0);
+    // The status of each fighter in play over everything, the Void
+    // included, so it stays readable near its edge: name tags (or the
+    // off-screen pointers), then each on-screen fighter's stamina bar over
+    // its tag and its CAB1 / CAB2 cooldowns under its feet. A fighter out
+    // of play shows none of it.
     this.drawMarkers(fighters);
+    this.drawStatus(fighters);
     if (this.debug) this.drawDebug();
   }
 
@@ -320,10 +374,46 @@ export class Arena {
 
   // Where `f`'s name tag hangs, in device pixels: its centre x, the y just
   // over the head where the tag's box ends and its arrow points down, and
-  // the y of the feet. Practice Ground floats its damage numbers from here.
+  // the y of the feet. Everything drawn over the fighter stacks from here.
   markerAnchor(f) {
     const [x, footY] = this.toScreen(f.renderX, f.renderY);
     return [x, footY - (f.def.visual.height + 16) * this.view.scale, footY];
+  }
+
+  // The top of the name tag's box (see drawMarkers), in device pixels.
+  markerTop(f) {
+    return this.markerAnchor(f)[1] - this.markerFont * 1.25;
+  }
+
+  // `f`'s stamina bar, in device pixels: { x, y, w, h } (y its top), just
+  // over its name tag. Compact: about the fighter's width at this zoom
+  // (roughly 45-60 px on a desktop screen), never narrower than 44 CSS px
+  // or thinner than 4.
+  staminaBarRect(f) {
+    const { scale: s, dpr } = this.view;
+    const [x] = this.markerAnchor(f);
+    const w = Math.round(Math.max(44 * dpr, 50 * s));
+    const h = Math.round(Math.max(4 * dpr, 4.5 * s));
+    const gap = Math.round(Math.max(3 * dpr, 3 * s));
+    return { x: Math.round(x - w / 2), y: Math.round(this.markerTop(f) - gap - h), w, h };
+  }
+
+  // The highest point of what is drawn over `f` (the top of its stamina
+  // bar's outline). Practice Ground floats its damage numbers from here.
+  statusTop(f) {
+    return this.staminaBarRect(f).y - 1;
+  }
+
+  // Stamina bars and CAB cooldowns, for the fighters whose body is on
+  // screen: an off-screen fighter only gets its edge pointer.
+  drawStatus(fighters = this.inPlay) {
+    const { ctx, view } = this;
+    for (const f of fighters) {
+      const [x, , footY] = this.markerAnchor(f);
+      if (!statusOnScreen(x, footY, view)) continue;
+      drawStaminaBar(ctx, f, this.staminaBarRect(f), view.dpr);
+      drawCabIndicators(ctx, f, x, footY, view.scale, view.dpr);
+    }
   }
 
   drawMarkers(fighters = this.inPlay) {

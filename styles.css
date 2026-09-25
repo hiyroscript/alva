@@ -1233,16 +1233,28 @@ html:not(.is-pointer-input) .discover-panel:focus { box-shadow: var(--focus-ring
   padding: max(var(--safe-t), clamp(8px, 1.6vh, 14px)) max(var(--safe-r), 12px) 0 max(var(--safe-l), 12px);
   pointer-events: none;
 }
+.hud-fighter {
+  /* A fighter's card with its score dots beneath, pulled in against the
+     centre control (the timer, or Practice's More button) rather than out
+     at the screen's edge: a centred platform-fighter HUD. */
+  display: grid;
+  justify-items: center;
+  align-content: start;
+  gap: clamp(4px, 0.8vh, 6px);
+  min-width: 0;
+  max-width: 100%;
+}
+.hud-fighter[hidden] { display: none; }
+.hud-fighter--p1 { justify-self: end; }
+.hud-fighter--p2 { justify-self: start; }
 .hud-side {
-  /* One compact card per fighter: portrait | name over Knockback, then the
-     charged-ability cooldown rings. Lighter than a menu panel, so the stage
-     shows through, but dark enough for the text on any stage. */
+  /* One compact card per fighter: portrait | name over Knockback. Lighter
+     than a menu panel, so the stage shows through, but dark enough for the
+     text on any stage. */
   --hud-portrait: clamp(32px, 6.2vh, 46px);
-  --cd-size: clamp(22px, 4.2vh, 30px);
   display: flex;
   align-items: center;
   gap: clamp(6px, 0.9vw, 10px);
-  justify-self: start;
   min-width: 0;
   max-width: 100%;
   padding: 5px 10px 5px 5px;
@@ -1250,7 +1262,7 @@ html:not(.is-pointer-input) .discover-panel:focus { box-shadow: var(--focus-ring
 }
 .hud-side.glass { background: var(--glass-sheen), rgba(10, 11, 13, 0.5); }
 /* The CPU's card mirrors the player's: portrait on the outer (right) edge. */
-.hud-p2 { justify-self: end; flex-direction: row-reverse; padding: 5px 5px 5px 10px; }
+.hud-p2 { flex-direction: row-reverse; padding: 5px 5px 5px 10px; }
 .hud-portrait {
   flex: none;
   width: var(--hud-portrait);
@@ -1259,6 +1271,8 @@ html:not(.is-pointer-input) .discover-panel:focus { box-shadow: var(--focus-ring
   background: rgba(255, 255, 255, 0.06);
   image-rendering: pixelated;
 }
+/* Every portrait faces the centre: mirrored when its art faces away. */
+.hud-portrait.is-mirrored { transform: scaleX(-1); }
 .hud-divider { flex: none; align-self: stretch; width: 1px; margin: 2px 0; background: rgba(255, 255, 255, 0.3); }
 .hud-info { display: grid; gap: 1px; min-width: 0; }
 .hud-p2 .hud-info { justify-items: end; }
@@ -1285,50 +1299,31 @@ html:not(.is-pointer-input) .discover-panel:focus { box-shadow: var(--focus-ring
   font-variant-numeric: tabular-nums;
   color: var(--white);
 }
-/* Charged-ability cooldowns: a ring that fills clockwise from the top as
-   the ability recovers (--cd-progress, 0 -> 1, set by the HUD), the seconds
-   left inside it, the button's name beneath. Ready: the ring is complete
-   and green, and empty of numbers. */
-.hud-cooldowns { display: flex; gap: clamp(4px, 0.6vw, 7px); flex: none; }
-.hud-cooldowns[hidden] { display: none; }
-.hud-cd { display: grid; justify-items: center; gap: 2px; }
-.hud-cd-ring {
-  --cd-progress: 1;
-  position: relative;
-  display: grid;
-  place-items: center;
-  width: var(--cd-size);
-  height: var(--cd-size);
+/* Quick Battle score: one small dot per point the match is played to,
+   filled for each point scored. An outlined empty ring and a solid white
+   dot, each with a dark edge, so both read on any stage. */
+.hud-score { display: flex; gap: clamp(5px, 0.9vh, 7px); }
+.hud-dot {
+  width: clamp(8px, 1.5vh, 11px);
+  height: clamp(8px, 1.5vh, 11px);
   border-radius: 50%;
+  border: 1.5px solid rgba(255, 255, 255, 0.85);
+  background: rgba(10, 11, 13, 0.45);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5);
 }
-.hud-cd-ring::before {
-  content: "";
+.hud-dot.is-filled { background: var(--white); border-color: var(--white); }
+/* Read by screen readers only (the card's stamina description). */
+.hud-sr {
   position: absolute;
-  inset: 0;
-  border-radius: 50%;
-  background: conic-gradient(rgba(255, 255, 255, 0.92) calc(var(--cd-progress) * 360deg), rgba(255, 255, 255, 0.16) 0);
-  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 2.5px), #000 calc(100% - 2px));
-  mask: radial-gradient(farthest-side, transparent calc(100% - 2.5px), #000 calc(100% - 2px));
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
 }
-.hud-cd.is-ready .hud-cd-ring::before { background: var(--accent); }
-.hud-cd-value {
-  position: relative;
-  font-family: var(--font-mono);
-  font-size: clamp(8px, 1.5vh, 10px);
-  font-weight: 700;
-  line-height: 1;
-  font-variant-numeric: tabular-nums;
-  color: var(--text);
-}
-.hud-cd-name {
-  font-family: var(--font-mono);
-  font-size: 8px;
-  font-weight: 600;
-  line-height: 1;
-  letter-spacing: 0.08em;
-  color: var(--scrim-text-muted);
-}
-.hud-cd.is-ready .hud-cd-name { color: var(--text); }
 
 /* Timer on top, pause directly beneath: one glass control split by a
    hairline, both halves the same width. Either half pauses. This is the
@@ -1576,9 +1571,10 @@ html.is-touch .touch-controls { display: block; }
 }
 .screen--practice.is-entering { animation-name: fade-in; animation-duration: 0.4s; }
 
-/* Player 1's panel on the left, no wider than a Quick Battle side panel;
-   the More button in the HUD's centre column, where Quick Battle's timer
-   sits, a little lower. The right column stays empty: no CPU panel. */
+/* The same cards as Quick Battle's, no wider than its side panels: Player
+   1's on the left and the CPU's (while there is one) on the right, both
+   against the More button in the HUD's centre column, where Quick Battle's
+   timer sits, a little lower. No score dots: practice has no points. */
 .practice-hud .hud-side { max-width: min(470px, 44vw); }
 .practice-more {
   justify-self: center;

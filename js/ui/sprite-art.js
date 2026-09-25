@@ -27,6 +27,15 @@ export function paintPortrait(canvas, sprites) {
   return true;
 }
 
+// The way `def`'s portrait art faces (1 right, -1 left): that of the clip
+// its visual.portrait is cropped from (its own `sourceFacing`, else the
+// character's), so a portrait can be mirrored to face wherever the layout
+// wants it, whichever way the art was drawn.
+export function portraitSourceFacing(def) {
+  const clip = def?.animations?.[def.visual?.portrait?.animation ?? 'idle'];
+  return clip?.sourceFacing ?? def?.sourceFacing ?? 1;
+}
+
 // Resize a canvas backing store to its CSS box (capped DPR). Returns
 // { w, h, dpr, changed }.
 export function fitCanvas(canvas, dprCap = 2) {

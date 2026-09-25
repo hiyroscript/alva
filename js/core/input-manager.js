@@ -1,6 +1,10 @@
 // Unified gameplay input: keyboard + touch + gamepad merged into one
 // pressed-state table. Uses held state (never keydown auto-repeat) and counts
-// press edges so taps shorter than a simulation step are never lost.
+// press edges so taps shorter than a simulation step are never lost. Left and
+// right report their press edges too (leftPressed / rightPressed), whichever
+// device made them: a key, a touch button, the D-pad, or the left stick
+// crossing from neutral into its held zone (holding it there makes no more).
+// Fighter reads two of them in a row as a Dash (see Fighter.trackDashTaps).
 
 import { ACTIONS } from '../config.js';
 
@@ -49,6 +53,7 @@ export class InputManager {
     this.frame = {
       left: false, right: false, charge: false, jump: false, defense: false,
       primary: false, special: false, action1: false, action2: false,
+      leftPressed: false, rightPressed: false,
       jumpPressed: false, chargePressed: false, primaryPressed: false,
       specialPressed: false, action1Pressed: false, action2Pressed: false,
       defensePressed: false,
@@ -163,6 +168,8 @@ export class InputManager {
     f.special = this.isHeld('special');
     f.action1 = this.isHeld('action1');
     f.action2 = this.isHeld('action2');
+    f.leftPressed = this.consume('left');
+    f.rightPressed = this.consume('right');
     f.jumpPressed = this.consume('jump');
     f.chargePressed = this.consume('charge');
     f.defensePressed = this.consume('defense');

@@ -12,7 +12,7 @@ function blankInput() {
   return {
     left: false, right: false, charge: false, jump: false, defense: false,
     primary: false, special: false, action1: false, action2: false,
-    jumpPressed: false, chargePressed: false, defensePressed: false,
+    leftPressed: false, rightPressed: false, jumpPressed: false, chargePressed: false, defensePressed: false,
     primaryPressed: false, specialPressed: false, action1Pressed: false, action2Pressed: false,
     dropPressed: false,
   };
@@ -54,8 +54,15 @@ export class TrainingAIController {
     out.jumpPressed = false;
     out.dropPressed = false;
 
+    // Nobody to follow (none, or one lost to the Void and waiting to
+    // respawn): stand still until there is.
     const foe = self.opponent;
-    if (!foe) return out;
+    if (!foe || foe.lostToVoid) {
+      this.moveIntent = 0;
+      out.left = false;
+      out.right = false;
+      return out;
+    }
 
     this.thinkTimer -= dt;
     this.hopCooldown -= dt;

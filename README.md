@@ -13,10 +13,12 @@ Power), a camera, a HUD, touch controls,
 and a data-driven combat system with Low / Mid / High Knockback and
 #0001's two real attacks, Basic Attack 1
 (BA1) and Basic Attack 2 (BA2), a ground and mid-air Dodge on the shared
-Defense input, a held Charge stance, a Charged BA1 Clone Attack and a Charged
-BA2 Sphere Rush, each on its own cooldown, and platform-fighter scoring: every
-hit adds to the target's accumulated Knockback, which makes later hits launch
-it further, and only the Void defeats.
+Defense input, a Dash on a double tap, a stamina bar that Dash, Dodge and
+Block spend, a held Charge stance, a Charged BA1 Clone Attack (CAB1) and a
+Charged BA2 Sphere Rush (CAB2), each on its own cooldown, and
+platform-fighter scoring: every hit adds to the target's accumulated
+Knockback, which makes later hits launch it further, and every fall into the
+Void is a point for the opponent. First to 3 points wins.
 
 The full product specification, including the Alva brand system, is in
 [`ALVA_SPEC.md`](./ALVA_SPEC.md).
@@ -55,6 +57,7 @@ in the code depends on the repository name, so no file changes are needed.
 | Action | Keyboard | Touch (landscape) |
 | --- | --- | --- |
 | Move left / right | `A` `D` or `←` `→` | Lower-left ◀ ▶ |
+| Dash | Double-tap `A` / `D` or `←` / `→` | Double-tap ◀ or ▶ |
 | Charge | `S` or `↓` | Lower-left **C** |
 | Jump | `W`, `Space` or `↑` | Lower-right, bottom corner |
 | Throw | `J` | Lower-right, top (**T**) |
@@ -108,9 +111,32 @@ attack animations. Its touch button has a dashed outline.
   Attacks pass straight through #0001 during the evasive frames (the side-on
   `dodge2`, and the afterimage frames `midairdodge1`–`2`) and hit normally
   before and after them. There is no chip damage, blockstun or guard pose.
-  The Dodge adds no dash or teleport: gravity keeps working in the air, and a
-  mid-air Dodge that lands plays to the end. The touch button reads **D**
-  because #0001's Defense is a Dodge.
+  The Dodge itself adds no movement or teleport: gravity keeps working in the
+  air, and a mid-air Dodge that lands plays to the end. Each Dodge costs 25
+  stamina as it starts (below). The touch button reads **D** because
+  #0001's Defense is a Dodge.
+- **Dash:** press left or right twice in a row (the second press within
+  0.22 s of the first, keyboard, touch, D-pad or left stick alike) while
+  standing on the ground. #0001 bursts that way at about 1.8× its top speed
+  (600 units / s) for one pass of its two-frame dash clip (`dash1 → dash2`,
+  once, at 10 fps: 0.2 s, about 120 units), facing the Dash at once, then
+  runs on from that speed if you keep holding the direction. It costs 25
+  stamina. It is movement only: no hitbox, damage, knockback or
+  invulnerability, and it still obeys the stage: a solid stops it, and
+  running off a ledge ends it and #0001 falls. No Dash in the air, while
+  attacking, dodging, charging (or holding Charge), stunned, bound or
+  already dashing; an attack or a Dodge pressed on the same step wins over
+  it, and a double tap that cannot Dash is used up, never saved for later.
+  Left then right (or right then left) is not a double tap.
+- **Stamina:** the thin purple bar over each fighter's name tag. It starts
+  full (100) and is spent only by Dash (25), Dodge (25) and a held Block
+  (20 per second, for future blocking fighters). It refills by itself at 12
+  per second whatever the fighter is doing, and at 30 per second while it is
+  in the Charge stance. Run it dry and the bar turns gray: the fighter is
+  exhausted, and Dash, Dodge and Block stay locked until the bar is full
+  again (a partial refill does not unlock them). Exhausted, a fighter still
+  moves, jumps, attacks, charges and uses CAB1 / CAB2. It is not the old
+  Energy: nothing else ever costs stamina.
 - **Charge:** hold `S` / `↓` (**C** on touch, D-pad down or left stick down
   on a gamepad) while #0001 is on the ground. Held, it plays
   `charge1 → charge2` once, then loops `chargea ↔ chargeb` for as long as you
@@ -118,8 +144,9 @@ attack animations. Its touch button has a dashed outline.
   `charge1` briefly as a release pose (one Charge frame, 0.1 s), then returns
   to its normal state; the next Charge starts from the beginning again.
   #0001 stays in place while charging. Charge has no hitbox, armour or
-  invulnerability; what it does give is faster recovery of the charged
-  cooldowns (below) for as long as it is held. A Dodge, Jump, Throw or
+  invulnerability; what it does give, for as long as it is held, is faster
+  recovery of the charged cooldowns (below) and a faster stamina refill
+  (above), two separate benefits. A Dodge, Jump, Throw or
   getting hit take over from it at once, without waiting for the release
   pose; so do BA1 and BA2 if you let go of Charge as you press them. Pressed
   while Charge is still held, BA1 is the Clone Attack and BA2 the Sphere Rush
@@ -195,20 +222,24 @@ attack animations. Its touch button has a dashed outline.
   its base launch is multiplied by 1 + Knockback / 100 (0 → 1×, 50 → 1.5×,
   100 → 2×), in the same direction. A hit with no launch (the shuriken, the
   Sphere Rush's contact and ticks) still launches nothing. No amount of
-  Knockback stops a fighter acting or defeats it: only the Void does.
-- **Charged cooldowns:** Charged BA1 and Charged BA2 each have their own
-  5-second cooldown, started the moment the move is used (the clone
-  summoned, the rush started), whether it hits or not. A charged press while
-  it is cooling down does nothing. While #0001 is actually in its Charge
-  stance both recover twice as fast (the character's
-  `stats.chargedCooldownRate`), so a fresh cooldown takes about 2.5 s of
-  uninterrupted charging; running, jumping, attacking, dodging, being hit or
-  performing the Sphere Rush recover at the normal rate. A restart or
-  rematch, a new fighter in Practice Ground and a Practice Void respawn
-  clear them.
+  Knockback stops a fighter acting or takes it out: only the Void does, and
+  each fall is a point for the opponent.
+- **Charged cooldowns (CAB1, CAB2):** Charged BA1 (**CAB1**) and Charged BA2
+  (**CAB2**) each have their own 5-second cooldown, started the moment the
+  move is used (the clone summoned, the rush started), whether it hits or
+  not. A charged press while it is cooling down does nothing. Each shows as
+  a small white ring, outlined in black, in one row under the fighter's
+  feet, labelled CAB1 and CAB2: it fills clockwise as the ability recovers,
+  with the seconds left inside, and is complete (and empty of numbers) when
+  ready. While #0001 is actually in its Charge stance both recover twice as
+  fast (the character's `stats.chargedCooldownRate`), so a fresh cooldown
+  takes about 2.5 s of uninterrupted charging; running, jumping, attacking,
+  dodging, being hit or performing the Sphere Rush recover at the normal
+  rate. A restart or rematch, a new fighter in Practice Ground and every
+  respawn after the Void clear them. They cost no stamina.
 - **Menus:** arrow keys or WASD to move, `Enter` to select, `Esc` to go back. Mouse and touch work too.
-- **Touch:** several fingers work at once (hold Right and press Jump, or hold C and press BA1). You can slide your thumb between Left / Charge / Right. **T** is Throw.
-- **Gamepad (standard layout):** D-pad or left stick left / right to move and down to Charge in battle (they still navigate menus), A to jump, X / Square to Throw, B / Circle for Basic Attack 1, LB for Basic Attack 2, Y / Triangle for the reserved Special, RB or RT for Defense, Start to pause.
+- **Touch:** several fingers work at once (hold Right and press Jump, or hold C and press BA1). You can slide your thumb between Left / Charge / Right, and tap ◀ or ▶ twice to Dash. **T** is Throw.
+- **Gamepad (standard layout):** D-pad or left stick left / right to move (twice in a row to Dash) and down to Charge in battle (they still navigate menus), A to jump, X / Square to Throw, B / Circle for Basic Attack 1, LB for Basic Attack 2, Y / Triangle for the reserved Special, RB or RT for Defense, Start to pause.
 - **Debug:** `` ` `` toggles the collider, hurtbox and attack-hitbox overlay in battle (a hitbox shows only while it can connect; hurtboxes turn gray while a Dodge makes the fighter invulnerable; a flying shuriken's hitbox is outlined in magenta and labelled; a clone's attack hitbox shows in the attack colour, labelled `clone ba1` (or `clone midairBa2` overhead), only on its active frame; the Sphere Rush's sphere hitbox is a dashed cyan box labelled `charged ba2 dash` while it can connect, then a dashed cyan cross marks the sphere on the caught opponent, which is labelled `bound`; solids, the main floor's block among them, are outlined in red and the Void's fixed kill line is dashed violet).
 
 Touch controls show on touch-first devices (coarse pointer, or a touch actually detected). A narrow desktop window doesn't count as a phone. On a phone held in portrait, the game pauses and asks you to rotate.
@@ -217,13 +248,14 @@ Touch controls show on touch-first devices (coarse pointer, or a touch actually 
 
 - **Characters:** #0001
 - **Maps:** Desert (a sandstone mesa with 2 rock outcrops, 1360 units wide) and City (a rooftop with 7 one-way platforms and a stair bulkhead, 1440 wide) for Quick Battle; the Practice Ground training room (one flat training block, 1280 wide) for practice. Each is a compact main stage with open air past both ledges and the Void a short way beyond (see [Stages and the Void](#stages-and-the-void))
-- **Animations:** Idle, Run, Jump, Fall, Land (jump/fall play while airborne; land plays once on touchdown), Hurt and Mid-air Hurt (shown during hitstun on the ground / in the air), Basic Attack 1 (4 frames), Mid-air Basic Attack 1 (the kunai slash, 3 frames: `0001_midair2ba1`–`3`), Basic Attack 2 (7 frames) and Mid-air Basic Attack 2 (the airborne kick, 5 frames: `0001_midair1ba1`–`5`), each played once at 12 fps, Dodge and Mid-air Dodge (3 frames each, played once at 12 fps), Charge (charge1 → charge2 once, then chargea ↔ chargeb while held, at 10 fps, with charge1 shown briefly on release), Throw (3 fighter frames, played once at 12 fps), Shuriken (3 looping projectile frames at 18 fps, normalized and drawn separately from the fighter poses), the clone appear / vanish cloud (`0001_cloneav1`–`0001_cloneav10`, an effect at 20 fps: forwards as a clone appears, the same frames in reverse as it vanishes), the Sphere Rush poses (`0001_rasen1`–`0001_rasen12` as one-shot fighter clips at 12 fps: formation 1–3, rush 4–6, contact 7–8 with 8 held, explosion 9, recovery 10–12, and 12 alone as the whiff release) and its blue sphere (`0001_prasen1`–`0001_prasen11` as three effects at 12 fps: formation 1–6 once, spinning on the opponent 7–9 looped while it is drawn ever larger, explosion 10–11 once)
+- **Animations:** Idle, Run, Jump, Fall, Land (jump/fall play while airborne; land plays once on touchdown), Hurt and Mid-air Hurt (shown during hitstun on the ground / in the air), Basic Attack 1 (4 frames), Mid-air Basic Attack 1 (the kunai slash, 3 frames: `0001_midair2ba1`–`3`), Basic Attack 2 (7 frames) and Mid-air Basic Attack 2 (the airborne kick, 5 frames: `0001_midair1ba1`–`5`), each played once at 12 fps, Dodge and Mid-air Dodge (3 frames each, played once at 12 fps), Dash (`0001_dash1`–`2`, drawn at 1×, played once at 10 fps), Charge (charge1 → charge2 once, then chargea ↔ chargeb while held, at 10 fps, with charge1 shown briefly on release), Throw (3 fighter frames, played once at 12 fps), Shuriken (3 looping projectile frames at 18 fps, normalized and drawn separately from the fighter poses), the clone appear / vanish cloud (`0001_cloneav1`–`0001_cloneav10`, an effect at 20 fps: forwards as a clone appears, the same frames in reverse as it vanishes), the Sphere Rush poses (`0001_rasen1`–`0001_rasen12` as one-shot fighter clips at 12 fps: formation 1–3, rush 4–6, contact 7–8 with 8 held, explosion 9, recovery 10–12, and 12 alone as the whiff release) and its blue sphere (`0001_prasen1`–`0001_prasen11` as three effects at 12 fps: formation 1–6 once, spinning on the opponent 7–9 looped while it is drawn ever larger, explosion 10–11 once)
 - **Attacks:** Basic Attack 1 and Basic Attack 2, each on the ground and in the air, a ground Throw that releases one shuriken, the Charged BA1 Clone Attack and the Charged BA2 Sphere Rush (ground only), each on its own 5-second cooldown. #0001's damage: BA1 5, mid-air BA1 5, BA2 10, mid-air BA2 10, shuriken 1, Sphere Rush 1 every 0.5 s while it holds the opponent and 15 on the explosion. Special is reserved.
-- **Defense:** #0001 dodges, on the ground and in the air.
+- **Defense:** #0001 dodges, on the ground and in the air (25 stamina a Dodge).
+- **Movement:** running, jumping and a grounded Dash on a double tap (25 stamina).
 - **Powers:** Jump Power and Speed Power, each in three tiers. #0001 has Jump Power 2 and Speed Power 2 (its original jump and speed).
 - **Knockback:** each attack's own, Low, Mid or High, pushing sideways or launching upward (or, reversed, driving downward). #0001's BA1 is Low horizontal, its BA2 High vertical, its mid-air BA1 Mid vertical and its mid-air BA2 High vertical reversed (downward). The target's accumulated Knockback scales every launch.
-- **HUD:** each fighter has one compact, semi-transparent glass card: its portrait (the character's own `visual.portrait` crop), one thin divider, its name with its accumulated Knockback beneath it, and two small rings for the Charged BA1 and Charged BA2 cooldowns (the seconds left inside a ring that fills as the ability recovers, complete and green when ready). The CPU's card mirrors Player 1's.
-- **Modes:** Quick Battle: 1 round, 99 seconds, against a non-attacking training CPU; falling into the Void loses the round at once, and if time runs out the fighter with less Knockback wins (equal Knockback is a draw). Practice Ground: training on its own stage, alone or with an optional stand-still CPU dummy, with no timer or rounds; the Void puts a fighter back at its spawn (below).
+- **HUD:** each fighter has one compact, semi-transparent glass card, pulled in close on either side of the timer: its portrait (the character's own `visual.portrait` crop, turned to face the timer whichever way its art is drawn), one thin divider, and its name with its accumulated Knockback beneath it. The CPU's card mirrors Player 1's. In Quick Battle three small dots under each card fill as that fighter scores its points (○ ○ ○, then ● ○ ○ ...). Over each fighter itself, following it: its purple stamina bar above its name tag, and its CAB1 / CAB2 cooldown rings under its feet.
+- **Modes:** Quick Battle: 99 seconds against a non-attacking training CPU, first to 3 points. Each time a fighter falls into the Void its opponent scores a point at once; the one that fell is out of play for 2 seconds, then back at its spawn with 0 Knockback, full stamina and both charged abilities ready, while the fight and the timer carry on. The third point wins the match (a short **K.O.** beat, then the result; the loser does not come back). If both fall together, or one falls while the other is still waiting to come back, that fall scores nothing. If time runs out first, more points wins, then less Knockback; equal on both is a draw. Practice Ground: training on its own stage with a stand-still CPU dummy from the start (which you can change or disable), no timer, rounds or points; the Void takes a fighter out for 2 seconds, then puts it back at its spawn (below).
 
 ## Design
 
@@ -258,10 +290,12 @@ ring with dark separation keep states identifiable beyond colour.
   landscape.
 - **Practice Ground** is a pale, cool-gray simulation room: original Canvas
   artwork with a gridded back wall and one compact training block in
-  perspective, open at both edges. Its HUD keeps Player 1's panel and a three-dots More button, top
-  centre; the Practice menu and the Change Fighter and CPU dialogs are
-  translucent glass over the paused stage. The Knockback each hit adds to the
-  practice CPU floats over its head in red (`+5`).
+  perspective, open at both edges. Its HUD has Player 1's card, a three-dots
+  More button top centre and the practice CPU's card, the same cards as
+  Quick Battle's without the score dots; the Practice menu and the Change
+  Fighter and CPU dialogs are translucent glass over the paused stage. The
+  Knockback each hit adds to the practice CPU floats over its head in red
+  (`+5`).
 - **Other screens** retain their established layouts, controls and navigation;
   only interface colours change. Battle keeps readable dark translucent chrome.
 - Character sprites and stage artwork keep their original colours. No artwork,
@@ -285,7 +319,8 @@ js/
                       session, fighter state machine, physics, camera,
                       combat, projectiles, summoned clones, charged
                       techniques, sprite normalizer/animator, HUDs,
-                      touch controls
+                      fighter status (stamina bar, CAB rings), touch
+                      controls
   stages/             Desert, City and Practice renderers (procedural Canvas 2D),
                       the shared one-point perspective and the Void
   data/               characters.js, maps.js, practice-map.js, powers.js,
@@ -317,9 +352,12 @@ Every stage is a compact platform-fighter stage. Its map (`js/data/maps.js`,
   around the main stage (`voidAround`): 340–380 units past each ledge,
   400–420 below the stage's top and 760–800 above it (clear of any jump from
   the highest footing, so only a launch reaches it). A fighter whose centre
-  leaves this fixed rectangle (`StageCollision.inVoid`) is taken by it: in
-  Quick Battle that fighter is defeated on the spot (a short **K.O.** beat,
-  then the result), in Practice Ground it is put back at its spawn. On screen
+  leaves this fixed rectangle (`StageCollision.inVoid`) is taken by it: out
+  of play at once (not drawn, hit, targeted or framed), and back at its own
+  spawn 2 seconds later (`CONFIG.battle.respawnSeconds`, on the simulation
+  clock), fresh. In Quick Battle each fall is also a point for the opponent,
+  and the third point ends the match instead (a short **K.O.** beat, then
+  the result). On screen
   the Void is one solid black layer with a single gently wavering edge; it
   only shows once the view nears it (never in neutral play), and holds still
   with reduced motion. The drawn edge is art only: the kill line never
@@ -337,30 +375,34 @@ Practice Ground's projection shared by every stage.
 
 ### Practice Ground
 
-**Home → Practice Ground** starts at once with #0001 alone on the training
-stage: no fighter or stage select, countdown, timer, CPU or result. It runs
-until you choose Return.
+**Home → Practice Ground** starts at once with #0001 and a practice CPU
+(#0001 too, sharing its one loaded sprite set) on the training stage: no
+fighter or stage select, countdown, timer, points or result. It runs until you
+choose Return.
 
-- **Your fighter, and an optional CPU.** `PracticeSession`
+- **Your fighter and the practice CPU.** `PracticeSession`
   (`js/game/practice.js`) and Quick Battle's `Battle` both extend `Arena`
   (`js/game/arena.js`), which owns the fixed-step world, the camera and all
-  Canvas drawing. The practice session holds your fighter and, only once you
-  enable one, a practice CPU. Alone, moves aimed at an opponent fall back or
-  miss: Charged BA1 has nobody to appear behind, so it is an ordinary BA1 (no
-  cooldown started); the Sphere Rush dashes, finds no one, releases on
-  `rasen12` and ends (its cooldown spent).
+  Canvas drawing. The practice session holds your fighter and the practice
+  CPU, paired and framed together from the start. With the CPU disabled,
+  moves aimed at an opponent fall back or miss: Charged BA1 has nobody to
+  appear behind, so it is an ordinary BA1 (no cooldown started); the Sphere
+  Rush dashes, finds no one, releases on `rasen12` and ends (its cooldown
+  spent).
 - **Stage.** `PRACTICE_MAP` (`js/data/practice-map.js`) is deliberately not
   in `MAPS`, which feeds Select Stage. `js/stages/practice-theme.js` draws the
   room as one square grid in one-point perspective: a back wall, and a
   compact training block with open edges (its top, its outer side past
   either ledge, a ruler along its front edge). A fighter that falls into the
-  Void is put straight back at its own spawn in a fresh training state: 0
-  Knockback, both charged cooldowns ready and nothing transient left, with
-  nothing keeping hold of or aiming at it; practice goes on.
+  Void is out of play for 2 seconds, then back at its own spawn in a fresh
+  training state: 0 Knockback, full stamina, both charged cooldowns ready and
+  nothing transient left, with nothing keeping hold of or aiming at it. You
+  and the CPU each wait out your own 2 seconds; no point is scored and
+  practice goes on.
 - **More menu.** The three-dots button, top centre where Quick Battle's
   timer sits (or `Esc` / `P` / Start), freezes practice under a light glass
-  menu with **Change Fighter**, **Enable CPU** (**Change CPU** once there is
-  one) and **Return**. Press More, `Esc` or `P` again (or tap the dim) to carry
+  menu with **Change Fighter**, **Change CPU** (**Enable CPU** once you have
+  disabled it) and **Return**. Press More, `Esc` or `P` again (or tap the dim) to carry
   on.
 - **Change Fighter** opens the full roster as a large glass dialog over the
   paused stage. It is the same roster component as Select Fighter
@@ -368,9 +410,10 @@ until you choose Return.
   spawn with 0 Knockback and no cooldowns and resumes; `Esc` / Back returns to the
   menu. Practice keeps its own fighter: Quick Battle's selection never
   changes, and every new visit starts with #0001 again.
-- **Practice CPU.** Enable CPU opens a second copy of the roster dialog
-  (Select CPU). Confirming loads that fighter and puts it 320 units to your
-  right, facing you, labelled CPU, and resumes; the camera frames you both.
+- **Practice CPU.** Change CPU opens a second copy of the roster dialog
+  (Change CPU, or Select CPU once it is disabled). Confirming loads that
+  fighter and puts it 320 units to your right, facing you, labelled CPU, and
+  resumes; the camera frames you both.
   It is a training dummy with no controller: it never moves, jumps, attacks,
   charges or defends, but it takes real hits, hitstun, knockback and binds,
   so clones, shurikens, BA1 / BA2 and the Sphere Rush all land on it. Its
@@ -379,9 +422,11 @@ until you choose Return.
   for the blast) in red over its head for under a second, straight from the
   combat system's resolved hit. Change CPU swaps it for
   another fighter; **Disable CPU**, beside Back in that dialog, removes it
-  and returns you to the paused menu. Changing your own fighter keeps the
-  CPU. It gets no HUD panel.
-- Every new visit starts with #0001 alone, at 0 Knockback.
+  (and its card) and returns you to the paused menu. Changing your own
+  fighter keeps the CPU. Its own HUD card, on the right, shows its portrait,
+  name and Knockback, rebound whenever it changes.
+- Every new visit starts with #0001 and the #0001 CPU again, at 0 Knockback,
+  whatever the last visit changed or disabled.
 
 ### Powers
 
@@ -480,6 +525,8 @@ To give a fighter a charged action, map a combat button in `chargedActions` to a
 While either is cooling down the press does nothing. Without an opponent (for a summon), the art or valid data, the press falls through to the normal attack, and no cooldown starts. A character's `stats.chargedCooldownRate` sets how much faster its charged cooldowns recover while it is in Charge.
 
 To choose how a fighter defends, give it a `defense` entry. `{ type: 'dodge', ground, air }` (like #0001) plays one Dodge clip per press, with `startup` / `invulnerable` / `recovery` timed to whole frames of that clip; `{ type: 'block' }` is a held guard that takes chip damage (`stats.blockDamageScale`, added to Knockback like any damage) and each attack's `blockstun`. Either way the player presses the same Defense button. A Dodge without frames is refused, so it never grants invisible invulnerability.
+
+Stamina and the Dash are data too. A `stamina` entry (`{ max, regen, chargeRegen, dashCost, dodgeCost, blockDrain }`, see `resolveStamina` in `js/game/combat.js`) sets the fighter's bar; every field is optional and defaults to #0001's values (100, 12 / s, 30 / s in Charge, 25, 25, 20 / s). A Dodge pays `dodgeCost` as it starts, a Block guard drains `blockDrain` per second while held, and neither happens while the fighter is exhausted. To give a fighter a Dash, add a `dash` clip to `animations` and `movement.dashSpeed` / `movement.dashTapWindow`: the Dash lasts one pass of the clip and pays `dashCost`. Without the clip (or a `dashSpeed`) it never dashes: a Dash without frames is refused and logged, never faked with the run.
 
 ### Adding a map
 
