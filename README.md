@@ -12,9 +12,10 @@ movement and platform physics, a tiered Power system (Jump Power and Speed
 Power), a camera, a HUD, touch controls,
 and a data-driven combat system built on Launch Point, Base Launch and
 Directional Launch, with #0001's two real attacks, Basic Attack 1
-(BA1) and Basic Attack 2 (BA2), a ground and mid-air Dodge on the shared
-Defense input, a Dash on a double tap, a stamina bar that Dash, Dodge and
-Block spend, a held Charge stance, a Charged BA1 Clone Attack (CAB1) and a
+(BA1) and Basic Attack 2 (BA2), a held ground and mid-air Shield on the
+shared Defense input, a Dash on a double tap, a 100-point Energy meter (drawn
+as three segments) that a Dash and every Shielded hit spend, a held Charge
+stance, a Charged BA1 Clone Attack (CAB1) and a
 Charged BA2 Sphere Rush (CAB2), each on its own cooldown, and
 platform-fighter scoring: every hit's damage adds to the target's Launch
 Point, which makes later launching hits send it further, and every fall into
@@ -76,14 +77,14 @@ attack animations. Its touch button has a dashed outline.
   you press it; a mid-air BA1 that lands keeps playing to the end. Both deal
   5 damage. The punch pushes the opponent away (Base Launch 1, horizontal);
   the mid-air slash launches it upward instead, with no sideways push (Base
-  Launch 2, vertical). A blocked slash does not launch. Internally this is
+  Launch 2, vertical). A Shielded slash does not launch. Internally this is
   the `action1` input.
 - **Basic Attack 2 (BA2):** a slower, heavier spinning high kick on the
   ground, an airborne kick in the air. Both deal 10 damage. The ground kick
   launches the opponent upward (Base Launch 2, vertical); the mid-air kick
   drives it downward just as hard (Base Launch 2, reverse vertical), with no
   sideways push.
-  A blocked BA2 is neither launched nor driven down. It picks the move the
+  A Shielded BA2 is neither launched nor driven down. It picks the move the
   same way, and a mid-air BA2 that lands also plays to the end. Internally
   this is the `action2` input.
 - **Throw:** #0001's projectile attack, on `J`, X / Square on a gamepad and
@@ -100,46 +101,66 @@ attack animations. Its touch button has a dashed outline.
   also vanishes after 1.5 s, in the Void or against a solid rock (the
   stage's own cliff face included); past a ledge it flies on over the open
   air.
-  A Dodge lets it pass through. Throw is ground-only for now because there
+  A Shield blocks it, and it is gone. Throw is ground-only for now because there
   are no mid-air Throw sprites: pressing it in the air does nothing. It has a
   0.25 s cooldown. Internally it is the `primary` input.
 - **Defense:** the game's generic defensive input: `L`, RB / RT on a
   gamepad, **D** on touch. Different characters may implement Defense
-  differently (a Dodge, or in future a Block); the button stays the same.
-  #0001 uses **Dodge**. One press plays one Dodge: a grounded sidestep
-  (`dodge1 → dodge2 → dodge3`) on the ground, or a mid-air Dodge
-  (`midairdodge1 → midairdodge2 → midairdodge3`) in the air, chosen when you
-  press it. Holding Defense does not repeat it; press again for another.
-  Attacks pass straight through #0001 during the evasive frames (the side-on
-  `dodge2`, and the afterimage frames `midairdodge1`–`2`) and hit normally
-  before and after them. There is no chip damage, blockstun or guard pose.
-  The Dodge itself adds no movement or teleport: gravity keeps working in the
-  air, and a mid-air Dodge that lands plays to the end. Each Dodge costs 25
-  stamina as it starts (below). The touch button reads **D** because
-  #0001's Defense is a Dodge.
+  differently; the button stays the same. #0001 uses **Shield**: hold
+  Defense to Shield. The Shield is up for as long as Defense is held
+  (a held state, not a one-press move) and drops the moment it is let go.
+  On the ground #0001 raises it on `prepshield` for one frame, holds
+  `shielding`, and lowers it on `releaseblock` for one frame after (the
+  lower pose is visual only: move, jump or attack straight away). In the
+  air there is only the held pose, `midairshielding`: no raise or lower
+  pose, and #0001 keeps falling under gravity, keeping his momentum but
+  not steering. On the ground the Shield holds him in place: no walking,
+  running, Dash or jump. While Defense is held no attack, Throw, charged
+  move or Dash starts; let go of Defense first. An attack already playing
+  is never cut short: the Shield comes up the moment it ends. Holding
+  Charge and Defense together shields. The Shield is a full circle: any
+  hit that reaches #0001's hurtboxes, from either side, melee, shuriken,
+  clone or Sphere Rush contact alike, is blocked. A blocked hit adds no
+  Launch Point, launches nothing and shows no hurt pose; it costs **25
+  Energy**, once for that hit, and the Shield holds through its hitstop
+  and blockstun. Holding the Shield costs nothing, and neither does an
+  attack that misses. It needs at least 25 Energy to go up or stay up, and
+  never works while exhausted (below): the block that spends the last of
+  it still stands, but the Shield drops at once. It is drawn as a wavy
+  black circle round #0001 with a thin red line on its inner side, over a
+  barely-there black interior so he stays in plain view; it follows him,
+  is sized from his visual height and drifts gently (still with reduced
+  motion). It is art only: what is blocked is decided by his normal
+  hurtboxes, never by the larger circle.
 - **Dash:** press left or right twice in a row (the second press within
   0.22 s of the first, keyboard, touch, D-pad or left stick alike) while
   standing on the ground. #0001 bursts that way at about 1.8× its top speed
   (600 units / s) for one pass of its two-frame dash clip (`dash1 → dash2`,
   once, at 10 fps: 0.2 s, about 120 units), facing the Dash at once, then
   runs on from that speed if you keep holding the direction. It costs 25
-  stamina. It is movement only: no hitbox, damage, launch or
+  Energy. It is movement only: no hitbox, damage, launch or
   invulnerability, and it still obeys the stage: a solid stops it, and
   running off a ledge ends it and #0001 falls. No Dash in the air, while
-  attacking, dodging, charging (or holding Charge), stunned, bound or
-  already dashing; an attack or a Dodge pressed on the same step wins over
-  it, and a double tap that cannot Dash is used up, never saved for later.
+  attacking, shielding (or holding Defense), charging (or holding Charge),
+  stunned, bound or already dashing; an attack or the Shield on the same
+  step wins over it, and a double tap that cannot Dash is used up, never
+  saved for later.
   Left then right (or right then left) is not a double tap.
-- **Stamina:** the thin purple bar over each fighter's name tag, shown only
-  while it is below full. It starts full (100), so hidden, and is spent only
-  by Dash (25), Dodge (25) and a held Block (20 per second, for future
-  blocking fighters). It refills by itself at 12 per second whatever the
-  fighter is doing, and at 30 per second while it is in the Charge stance;
-  once full again the bar disappears. Run it dry and the bar turns gray: the
-  fighter is exhausted, and Dash, Dodge and Block stay locked, the bar gray,
-  until it is full again (a partial refill does not unlock them). Exhausted, a fighter still
-  moves, jumps, attacks, charges and uses CAB1 / CAB2. It is not the old
-  Energy: nothing else ever costs stamina.
+- **Energy:** each fighter's one resource, 100 at most and at the start.
+  It is spent only by a Dash (25, as it starts) and by the Shield (25 for
+  every hit it blocks; holding it is free). It refills by itself at 12 per
+  second whatever the fighter is doing (shielding included), and at 30 per
+  second while it is in the Charge stance. It shows over the fighter's name
+  tag only while below full, as three small adjacent purple segments that
+  together make up the one value (34 + 33 + 33 = 100): spending empties the
+  front (left) segment first, then the middle, then the back, and refilling
+  rebuilds them the other way, back segment first. At exactly 0 the fighter
+  is exhausted: all three segments turn gray and Shield and Dash stay locked
+  until Energy is completely full again (a partial refill does not unlock
+  them); the meter disappears at 100. Below 25 without being exhausted,
+  there is simply not enough for a block or a Dash until the refill reaches
+  25. Exhausted or low, a fighter still moves, jumps, attacks, charges and
+  uses CAB1 / CAB2: nothing else ever costs Energy.
 - **Charge:** hold `S` / `↓` (**C** on touch, D-pad down or left stick down
   on a gamepad) while #0001 is on the ground. Held, it plays
   `charge1 → charge2` once, then loops `chargea ↔ chargeb` for as long as you
@@ -148,8 +169,8 @@ attack animations. Its touch button has a dashed outline.
   to its normal state; the next Charge starts from the beginning again.
   #0001 stays in place while charging. Charge has no hitbox, armour or
   invulnerability; what it does give, for as long as it is held, is faster
-  recovery of the charged cooldowns (below) and a faster stamina refill
-  (above), two separate benefits. A Dodge, Jump, Throw or
+  recovery of the charged cooldowns (below) and a faster Energy refill
+  (above), two separate benefits. The Shield, Jump, Throw or
   getting hit take over from it at once, without waiting for the release
   pose; so do BA1 and BA2 if you let go of Charge as you press them. Pressed
   while Charge is still held, BA1 is the Clone Attack and BA2 the Sphere Rush
@@ -168,7 +189,7 @@ attack animations. Its touch button has a dashed outline.
   who moves away makes it miss. Its punch is BA1's (5 damage, same hitbox
   and hitstun, Base Launch 1 horizontal, pushing the opponent away from the
   clone), hits
-  once, and passes through a Dodge's evasive frames like any attack. If
+  once, and a Shield blocks it like any attack. If
   there is no ground behind the opponent at its foot height (it stands at a
   platform's edge or a ledge with its back to the drop, or it is in the
   air), the clone
@@ -183,8 +204,9 @@ attack animations. Its touch button has a dashed outline.
   forms a blue sphere, dashes forward once it is complete, and must connect
   during the rush. A miss stops him dead and he lets the sphere go on a
   brief release pose before he is free again. A hit traps the opponent in
-  the spinning sphere, adding 1 Launch Point every half second, with no
-  launch, while the sphere keeps growing, until it explodes two seconds later
+  the spinning sphere, adding 1 Launch Point at once and then every half
+  second, with no launch, while the sphere keeps growing, until it explodes
+  two seconds later
   for 15 more and a sideways launch at Base Launch 3 (three times the
   opponent's new Launch Point); #0001 then recovers. The entire technique
   requires ground beneath #0001; losing ground cancels it and makes him
@@ -206,18 +228,19 @@ attack animations. Its touch button has a dashed outline.
   (`prasen7 → prasen8 → prasen9`, looped) and grows steadily larger (drawn
   from its own size to 1.4× by the blast, still centred on the opponent).
   While it is held the opponent takes 1 damage (+1 Launch Point, Base Launch
-  0, no Directional Launch) 0.5, 1.0 and 1.5 s after the hit, counted on the
-  fixed-step clock, with no launch, stun or freeze. Exactly 2 s after the hit it explodes (`prasen10 → prasen11`,
+  0, no Directional Launch) on the very step the sphere catches it, then
+  0.5, 1.0 and 1.5 s after the hit, counted on the fixed-step clock, with no
+  launch, stun or freeze. Exactly 2 s after the hit it explodes (`prasen10 → prasen11`,
   once) with #0001 on `rasen9`, the explosion pose: the opponent is
-  released, then takes 15 (18 in all; the explosion is never also a tick)
-  and is launched sideways, away from #0001, at Base Launch 3: the 15 is
-  added first, then the new Launch Point is tripled (from 105, 105 + 15 =
-  120 and 3 × 120 = 360). It is the technique's only launching hit and uses
+  released, then takes 15 (19 in all: 4 ticks and the blast; the explosion
+  is never also a tick) and is launched sideways, away from #0001, at Base
+  Launch 3: the 15 is added first, then the new Launch Point is tripled
+  (from 0, 4 + 15 = 19 and 3 × 19 = 57; from 106, 106 + 15 = 121 and
+  3 × 121 = 363). It is the technique's only launching hit and uses
   the same shared launch as every other hit. Only once the blast is over does
-  #0001 recover through `rasen10 → rasen11 → rasen12`. A Dodge's
-  evasive frames let the rush pass through without using it up; a Block-type
-  guard blocks the contact normally and ends the technique with no trap,
-  ticks or explosion. Once it starts you can let go of Charge; a hit on
+  #0001 recover through `rasen10 → rasen11 → rasen12`. A Shield blocks the
+  contact (25 Energy, no Launch Point): no trap, no tick, no explosion, and
+  the technique ends there, #0001 free at once. Once it starts you can let go of Charge; a hit on
   #0001 cancels it (no armour), freeing the opponent with no further ticks. Afterwards, Charge must be
   let go and held again to charge. Pressing Charge and BA2 on the same step
   from standing, or letting go of Charge as you press BA2, is an ordinary
@@ -225,8 +248,8 @@ attack animations. Its touch button has a dashed outline.
 - **Launch Point:** every fighter's own number, shown under its name in the
   HUD. It starts at 0 on every fresh life and every hit adds exactly the
   damage it deals: BA1 5, mid-air BA1 5, BA2 10, mid-air BA2 10, the
-  shuriken 1, the Sphere Rush 1 per tick and 15 on the blast (a blocked
-  hit adds its chip damage). It has no maximum and no % sign, never goes
+  shuriken 1, the Sphere Rush 1 per tick and 15 on the blast (a Shielded
+  hit adds nothing). It has no maximum and no % sign, never goes
   below 0 and resets to 0 when the fighter respawns. Each hit then launches
   with its **Base Launch** (0, 1, 2 or 3) times the target's new Launch
   Point, in its **Directional Launch** (see [Launch](#launch)). No amount of
@@ -243,13 +266,13 @@ attack animations. Its touch button has a dashed outline.
   and with both ready nothing is drawn. While #0001 is actually in its Charge stance both recover twice as
   fast (the character's `stats.chargedCooldownRate`), so a fresh cooldown
   takes about 2.5 s of uninterrupted charging; running, jumping, attacking,
-  dodging, being hit or performing the Sphere Rush recover at the normal
+  shielding, being hit or performing the Sphere Rush recover at the normal
   rate. A restart or rematch, a new fighter in Practice Ground and every
-  respawn after the Void clear them. They cost no stamina.
+  respawn after the Void clear them. They cost no Energy.
 - **Menus:** arrow keys or WASD to move, `Enter` to select, `Esc` to go back. Mouse and touch work too.
 - **Touch:** several fingers work at once (hold Right and press Jump, or hold C and press BA1). You can slide your thumb between Left / Charge / Right, and tap ◀ or ▶ twice to Dash. **T** is Throw.
 - **Gamepad (standard layout):** D-pad or left stick left / right to move (twice in a row to Dash) and down to Charge in battle (they still navigate menus), A to jump, X / Square to Throw, B / Circle for Basic Attack 1, LB for Basic Attack 2, Y / Triangle for the reserved Special, RB or RT for Defense, Start to pause.
-- **Debug:** `` ` `` toggles the collider, hurtbox and attack-hitbox overlay in battle (a hitbox shows only while it can connect; hurtboxes turn gray while a Dodge makes the fighter invulnerable; a flying shuriken's hitbox is outlined in magenta and labelled; a clone's attack hitbox shows in the attack colour, labelled `clone ba1` (or `clone midairBa2` overhead), only on its active frame; the Sphere Rush's sphere hitbox is a dashed cyan box labelled `charged ba2 dash` while it can connect, then a dashed cyan cross marks the sphere on the caught opponent, which is labelled `bound`; solids, the main floor's block among them, are outlined in red and the Void's fixed kill line is dashed violet).
+- **Debug:** `` ` `` toggles the collider, hurtbox and attack-hitbox overlay in battle (a hitbox shows only while it can connect; hurtboxes look the same with the Shield up, and a shielding fighter is labelled `shield`; a flying shuriken's hitbox is outlined in magenta and labelled; a clone's attack hitbox shows in the attack colour, labelled `clone ba1` (or `clone midairBa2` overhead), only on its active frame; the Sphere Rush's sphere hitbox is a dashed cyan box labelled `charged ba2 dash` while it can connect, then a dashed cyan cross marks the sphere on the caught opponent, which is labelled `bound`; solids, the main floor's block among them, are outlined in red and the Void's fixed kill line is dashed violet).
 
 Touch controls show on touch-first devices (coarse pointer, or a touch actually detected). A narrow desktop window doesn't count as a phone. On a phone held in portrait, the game pauses and asks you to rotate.
 
@@ -257,14 +280,14 @@ Touch controls show on touch-first devices (coarse pointer, or a touch actually 
 
 - **Characters:** #0001
 - **Maps:** Desert (a sandstone mesa with 2 rock outcrops, 1360 units wide) and City (a rooftop with 7 one-way platforms and a stair bulkhead, 1440 wide) for Quick Battle; the Practice Ground training room (one flat training block, 1280 wide) for practice. Each is a compact main stage with open air past both ledges and the Void a short way beyond (see [Stages and the Void](#stages-and-the-void))
-- **Animations:** Idle, Run, Jump, Fall, Land (jump/fall play while airborne; land plays once on touchdown), Hurt and Mid-air Hurt (shown during hitstun on the ground / in the air), Basic Attack 1 (4 frames), Mid-air Basic Attack 1 (the kunai slash, 3 frames: `0001_midair2ba1`–`3`), Basic Attack 2 (7 frames) and Mid-air Basic Attack 2 (the airborne kick, 5 frames: `0001_midair1ba1`–`5`), each played once at 12 fps, Dodge and Mid-air Dodge (3 frames each, played once at 12 fps), Dash (`0001_dash1`–`2`, drawn at 1×, played once at 10 fps), Charge (charge1 → charge2 once, then chargea ↔ chargeb while held, at 10 fps, with charge1 shown briefly on release), Throw (3 fighter frames, played once at 12 fps), Shuriken (3 looping projectile frames at 18 fps, normalized and drawn separately from the fighter poses), the clone appear / vanish cloud (`0001_cloneav1`–`0001_cloneav10`, an effect at 20 fps: forwards as a clone appears, the same frames in reverse as it vanishes), the Sphere Rush poses (`0001_rasen1`–`0001_rasen12` as one-shot fighter clips at 12 fps: formation 1–3, rush 4–6, contact 7–8 with 8 held, explosion 9, recovery 10–12, and 12 alone as the whiff release) and its blue sphere (`0001_prasen1`–`0001_prasen11` as three effects at 12 fps: formation 1–6 once, spinning on the opponent 7–9 looped while it is drawn ever larger, explosion 10–11 once)
-- **Attacks:** Basic Attack 1 and Basic Attack 2, each on the ground and in the air, a ground Throw that releases one shuriken, the Charged BA1 Clone Attack and the Charged BA2 Sphere Rush (ground only), each on its own 5-second cooldown. #0001's damage: BA1 5, mid-air BA1 5, BA2 10, mid-air BA2 10, shuriken 1, Sphere Rush 1 every 0.5 s while it holds the opponent and 15 on the explosion. Special is reserved.
-- **Defense:** #0001 dodges, on the ground and in the air (25 stamina a Dodge).
-- **Movement:** running, jumping and a grounded Dash on a double tap (25 stamina).
+- **Animations:** Idle, Run, Jump, Fall, Land (jump/fall play while airborne; land plays once on touchdown), Hurt and Mid-air Hurt (shown during hitstun on the ground / in the air), Basic Attack 1 (4 frames), Mid-air Basic Attack 1 (the kunai slash, 3 frames: `0001_midair2ba1`–`3`), Basic Attack 2 (7 frames) and Mid-air Basic Attack 2 (the airborne kick, 5 frames: `0001_midair1ba1`–`5`), each played once at 12 fps, Shield (`0001_prepshield` to raise it, `0001_shielding` held, `0001_releaseblock` to lower it) and Mid-air Shield (`0001_midairshielding`, the held pose only), single frames drawn at 1×, Dash (`0001_dash1`–`2`, drawn at 1×, played once at 10 fps), Charge (charge1 → charge2 once, then chargea ↔ chargeb while held, at 10 fps, with charge1 shown briefly on release), Throw (3 fighter frames, played once at 12 fps), Shuriken (3 looping projectile frames at 18 fps, normalized and drawn separately from the fighter poses), the clone appear / vanish cloud (`0001_cloneav1`–`0001_cloneav10`, an effect at 20 fps: forwards as a clone appears, the same frames in reverse as it vanishes), the Sphere Rush poses (`0001_rasen1`–`0001_rasen12` as one-shot fighter clips at 12 fps: formation 1–3, rush 4–6, contact 7–8 with 8 held, explosion 9, recovery 10–12, and 12 alone as the whiff release) and its blue sphere (`0001_prasen1`–`0001_prasen11` as three effects at 12 fps: formation 1–6 once, spinning on the opponent 7–9 looped while it is drawn ever larger, explosion 10–11 once)
+- **Attacks:** Basic Attack 1 and Basic Attack 2, each on the ground and in the air, a ground Throw that releases one shuriken, the Charged BA1 Clone Attack and the Charged BA2 Sphere Rush (ground only), each on its own 5-second cooldown. #0001's damage: BA1 5, mid-air BA1 5, BA2 10, mid-air BA2 10, shuriken 1, Sphere Rush 1 as it catches the opponent and every 0.5 s after while it holds it (4 in all), then 15 on the explosion. Special is reserved.
+- **Defense:** #0001 shields, on the ground and in the air: held, full circle, free to hold, 25 Energy for each hit it blocks.
+- **Movement:** running, jumping and a grounded Dash on a double tap (25 Energy).
 - **Powers:** Jump Power and Speed Power, each in three tiers. #0001 has Jump Power 2 and Speed Power 2 (its original jump and speed).
 - **Launch:** every hit's damage adds to the target's Launch Point, then the hit launches at its Base Launch (0, 1, 2 or 3) × that new Launch Point, in its Directional Launch. #0001's BA1 is Base Launch 1 horizontal, its BA2 and mid-air BA1 Base Launch 2 vertical, its mid-air BA2 Base Launch 2 reverse vertical (downward), the Sphere Rush blast Base Launch 3 horizontal, and the shuriken and Sphere Rush ticks Base Launch 0 with no direction (they never launch).
-- **HUD:** each fighter has one compact, semi-transparent glass card, pulled in close on either side of the timer: its portrait (the character's own `visual.portrait` crop, turned to face the timer whichever way its art is drawn), one thin divider, and its name with its Launch Point beneath it. The CPU's card mirrors Player 1's. In Quick Battle three small dots under each card fill as that fighter scores its points (○ ○ ○, then ● ○ ○ ...). Over each fighter itself, following it: its purple stamina bar above its name tag while below full, and its CAB1 / CAB2 cooldown rings under its feet while cooling down.
-- **Modes:** Quick Battle: 99 seconds against a non-attacking training CPU, first to 3 points. Each time a fighter falls into the Void its opponent scores a point at once; the one that fell is out of play for 2 seconds, then back at its spawn with 0 Launch Point, full stamina and both charged abilities ready, while the fight and the timer carry on. The third point wins the match (a short **K.O.** beat, then the result; the loser does not come back). If both fall together, or one falls while the other is still waiting to come back, that fall scores nothing. If time runs out first, more points wins, then lower Launch Point; equal on both is a draw. Practice Ground: training on its own stage with a stand-still CPU dummy from the start (which you can change or disable), no timer, rounds or points; the Void takes a fighter out for 2 seconds, then puts it back at its spawn (below).
+- **HUD:** each fighter has one compact, semi-transparent glass card, pulled in close on either side of the timer: its portrait (the character's own `visual.portrait` crop, turned to face the timer whichever way its art is drawn), one thin divider, and its name with its Launch Point beneath it. The CPU's card mirrors Player 1's. In Quick Battle three small dots under each card fill as that fighter scores its points (○ ○ ○, then ● ○ ○ ...). Over each fighter itself, following it: its three-segment purple Energy bar above its name tag while below full, and its CAB1 / CAB2 cooldown rings under its feet while cooling down.
+- **Modes:** Quick Battle: 99 seconds against a non-attacking training CPU, first to 3 points. Each time a fighter falls into the Void its opponent scores a point at once; the one that fell is out of play for 2 seconds, then back at its spawn with 0 Launch Point, full Energy and both charged abilities ready, while the fight and the timer carry on. The third point wins the match (a short **K.O.** beat, then the result; the loser does not come back). If both fall together, or one falls while the other is still waiting to come back, that fall scores nothing. If time runs out first, more points wins, then lower Launch Point; equal on both is a draw. Practice Ground: training on its own stage with a stand-still CPU dummy from the start (which you can change or disable), no timer, rounds or points; the Void takes a fighter out for 2 seconds, then puts it back at its spawn (below).
 
 ## Design
 
@@ -328,7 +351,8 @@ js/
                       session, fighter state machine, physics, camera,
                       combat, projectiles, summoned clones, charged
                       techniques, sprite normalizer/animator, HUDs,
-                      fighter status (stamina bar, CAB rings), touch
+                      fighter status (Energy bar, CAB rings), the Shield's
+                      circle, touch
                       controls
   stages/             Desert, City and Practice renderers (procedural Canvas 2D),
                       the shared one-point perspective and the Void
@@ -338,7 +362,7 @@ js/
                       preview, fighter roster
 ```
 
-- **Sprite normalization.** The idle, jump, fall, land and hurt frames are pixel art at roughly 16× scale, the mid-air hurt, Basic Attack 1 and 2, Charge and Dodge frames at 8×, and the run frames at 4×. When a frame loads, the game reads its alpha channel once and finds the visible bounds. It then detects the pixel grid from every colour transition and resamples the frame to 1 pixel per art pixel. Every frame is drawn at the same world scale, anchored bottom-centre at the upper-body centroid, so the fighter keeps the same size and position when switching between animations. When the size stays close to the target, each art pixel maps to a whole number of device pixels. The Sphere Rush poses are fighter poses at 2×, normalized like the rest. Projectile and effect art (the shuriken at 8×, the clone cloud and the Sphere Rush sphere at 2×) goes through the same grid detection but keeps its own art size, centre-anchored at the fighter's art-pixel scale, and is never fitted to the fighter's height.
+- **Sprite normalization.** The idle, jump, fall, land and hurt frames are pixel art at roughly 16× scale, the mid-air hurt, Basic Attack 1 and 2 and Charge frames at 8×, and the run frames at 4×; the Dash and Shield frames are drawn at 1× (one file pixel per art pixel), so each clip's `heightRatio` sizes it against idle's 52 art pixels at that same scale. When a frame loads, the game reads its alpha channel once and finds the visible bounds. It then detects the pixel grid from every colour transition and resamples the frame to 1 pixel per art pixel. Every frame is drawn at the same world scale, anchored bottom-centre at the upper-body centroid, so the fighter keeps the same size and position when switching between animations. When the size stays close to the target, each art pixel maps to a whole number of device pixels. The Sphere Rush poses are fighter poses at 2×, normalized like the rest. Projectile and effect art (the shuriken at 8×, the clone cloud and the Sphere Rush sphere at 2×) goes through the same grid detection but keeps its own art size, centre-anchored at the fighter's art-pixel scale, and is never fitted to the fighter's height.
 - **Simulation.** Fixed 60 Hz steps with interpolated rendering, so movement is the same at 30, 60 and 120 Hz. Colliders, hurtboxes and pushboxes are set in data and don't depend on PNG size.
 - **Stages.** Flat parallax layers (sky, far, mid, near, atmosphere) are generated once from a seeded RNG into cached `Path2D` geometry; the playable geometry (main stage, platforms, solids) is drawn in one shared one-point perspective (`js/stages/perspective.js`) so it has depth. Collision comes only from `js/data/maps.js`, so any layer can later be swapped for image art.
 
@@ -367,10 +391,13 @@ Every stage is a compact platform-fighter stage. Its map (`js/data/maps.js`,
   clock), fresh. In Quick Battle each fall is also a point for the opponent,
   and the third point ends the match instead (a short **K.O.** beat, then
   the result). On screen
-  the Void is one solid black layer with a single gently wavering edge; it
+  the Void is one solid black layer with a single gently wavering edge,
+  lined on the stage's side by a thin red rim (about 1.5 CSS px, no glow)
+  traced from exactly the same points, so the two never drift apart; it
   only shows once the view nears it (never in neutral play), and holds still
-  with reduced motion. The drawn edge is art only: the kill line never
-  moves.
+  (rim included) with reduced motion. The drawn edge and its rim are art
+  only: the kill line never moves. The Shield's circle (see Defense) shares
+  this look, black with a red line, on the same kind of slow waves.
 
 The camera is a platform-fighter view: fighters stand about a tenth of the
 viewport tall, the whole main stage with some air past its ledges fits across
@@ -404,7 +431,7 @@ choose Return.
   compact training block with open edges (its top, its outer side past
   either ledge, a ruler along its front edge). A fighter that falls into the
   Void is out of play for 2 seconds, then back at its own spawn in a fresh
-  training state: 0 Launch Point, full stamina, both charged cooldowns ready and
+  training state: 0 Launch Point, full Energy, both charged cooldowns ready and
   nothing transient left, with nothing keeping hold of or aiming at it. You
   and the CPU each wait out your own 2 seconds; no point is scored and
   practice goes on.
@@ -449,7 +476,7 @@ Values are in world units per second, at the global gravity of 2500:
 | Speed Power | 270 | 330 | 360 | the top speed of normal left / right movement, on the ground and in the air |
 
 - #0001 declares `powers: { jump: 2, speed: 2 }`: exactly the 920 jump and 330 top speed it always had, so it moves and jumps identically. Movement has no raw `jumpVelocity` or `maxSpeed`: the tiers are the only sources.
-- Speed Power only sets the normal top speed. Acceleration, deceleration, the turn boost, air control, gravity, falling, the jump, launches, projectiles (the shuriken's 700), Dodges and charged techniques (the Sphere Rush's 1050 dash) never depend on it, and neither Power changes the launch a fighter deals or takes.
+- Speed Power only sets the normal top speed. Acceleration, deceleration, the turn boost, air control, gravity, falling, the jump, launches, projectiles (the shuriken's 700), the Shield (which only slows a fighter) and charged techniques (the Sphere Rush's 1050 dash) never depend on it, and neither Power changes the launch a fighter deals or takes.
 - A declared tier the table lacks (or a fighter with no tier of a Power) is logged and gets tier 2.
 - To add another Power, add its tier table and an entry to `POWERS`; Discover lists it with no screen changes. The tiers are not upgradeable or selectable in game.
 
@@ -463,13 +490,13 @@ launch strength = Base Launch × the target's new Launch Point
 
 Base Launch 0 therefore never launches, while 1 uses normal Launch Point strength, 2 doubles it and 3 triples it. That multiplication is the whole strength calculation: no base velocity is added and horizontal and vertical launches use the same strength. Directional Launch only decides where the strength goes. The strength then becomes a speed through one conversion, `LAUNCH_UNIT_SPEED`: 10 world units per second per point, the same for every hit and direction, so a strength of 120 launches at 1200 units/s. Without it launches were on the damage scale, far below the world's (gravity 2500, a jump 920), and nothing visibly moved until very high Launch Points. The source of truth is `js/data/launch.js`.
 
-- **Launch Point** (`combat.launchPoint`, the number on each HUD card) starts at 0 on every fresh life, grows by exactly the damage received (a blocked hit's chip damage included), never goes below 0 and has no maximum. It never defeats a fighter by itself, and it resets to 0 when the fighter respawns from the Void, in a Practice reset and at every round or rematch. On time in Quick Battle, level on points, the lower Launch Point wins.
+- **Launch Point** (`combat.launchPoint`, the number on each HUD card) starts at 0 on every fresh life, grows by exactly the damage received (a Shielded hit adds nothing), never goes below 0 and has no maximum. It never defeats a fighter by itself, and it resets to 0 when the fighter respawns from the Void, in a Practice reset and at every round or rematch. On time in Quick Battle, level on points, the lower Launch Point wins.
 - **Base Launch** (`baseLaunch`) is a multiplier, never a velocity. `BASE_LAUNCH_VALUES` holds the only legal values, `[0, 1, 2, 3]`. At 120 Launch Point: 0 → 0, 1 → 120, 2 → 240, 3 → 360.
 - **Directional Launch** (`directionalLaunch`) is one of `null` (no launch at all, whatever the Base Launch), `'horizontal'` (along the hit's travel: the attacker's facing for melee, the projectile's direction, the clone's facing or the technique's captured facing), `'vertical'` (upward: `vy = −strength × 10`, as world y grows downward) or `'reverseVertical'` (downward: `vy = +strength × 10`). It never changes the magnitude, and it is never encoded as a negative Base Launch.
-- **Order.** `CombatSystem.applyHit` adds the hit's damage (chip damage when blocked) to the target's Launch Point first, then computes `baseLaunch × launchPoint` (`resolveLaunchStrength`) and turns it into a velocity along the direction at `LAUNCH_UNIT_SPEED` per point (`resolveDirectionalLaunch`). A hit that launches replaces the target's sideways speed (a vertical one sends it straight up or down) and, when it has one, its vertical speed; a hit that does not launch leaves the target's velocity alone.
-- **Block** modifies the resolved launch afterward: a Block-type guard takes half of a horizontal launch (`BLOCKED_HORIZONTAL_LAUNCH_SCALE`, a Block rule, not part of Base Launch) and none of a vertical or reverse vertical one.
+- **Order.** `CombatSystem.applyHit` adds the hit's damage to the target's Launch Point first, then computes `baseLaunch × launchPoint` (`resolveLaunchStrength`) and turns it into a velocity along the direction at `LAUNCH_UNIT_SPEED` per point (`resolveDirectionalLaunch`). A hit that launches replaces the target's sideways speed (a vertical one sends it straight up or down) and, when it has one, its vertical speed; a hit that does not launch leaves the target's velocity alone.
+- **Shield.** A hit that a raised Shield blocks is the one exception: it adds no Launch Point and launches nothing (its launch strength is 0, whatever its Base Launch and direction). The Shield pays 25 Energy for it instead. There is no chip damage and no halved launch.
 - **Validation.** `resolveHitLaunch` validates both fields once, when a hit's definition is built (`createAttackDefinition`, `createProjectileDefinition`, `createTechniqueDefinition`). A hit that declares neither has Base Launch 0 and no direction. Any Base Launch other than 0-3 (0.5, 4, −1 ...) is logged and becomes 0; an unknown direction is logged and becomes `null`; a nonzero Base Launch with no direction is logged and never launches. Neither field is ever derived from the damage, the hitbox or the other field.
-- **Events.** Each resolved hit records `damage`, `launchPointBefore`, `launchPointAfter`, `baseLaunch` (0-3), `directionalLaunch`, `launchStrength` (`baseLaunch × launchPointAfter`) and `finalLaunch` (the world-space `{ x, y }` velocity given, after Block).
+- **Events.** Each resolved hit records `damage`, `launchPointBefore`, `launchPointAfter`, `baseLaunch` (0-3), `directionalLaunch`, `launchStrength` (`baseLaunch × launchPointAfter`) and `finalLaunch` (the world-space `{ x, y }` velocity given), plus `energyCost` (25 on a Shield block, 0 on a hit).
 
 Melee, projectiles, summoned clones and charged techniques all resolve through that one path; `applyHit` never checks which fighter, attack or technique it is resolving.
 
@@ -483,10 +510,10 @@ Melee, projectiles, summoned clones and charged techniques all resolve through t
 | Mid-air BA2 (airborne kick) | 10 | 2 | reverse vertical |
 | Shuriken | 1 | 0 | none |
 | Sphere Rush contact | 0 | 0 | none |
-| Sphere Rush tick (every 0.5 s while held) | 1 | 0 | none |
+| Sphere Rush tick (on the contact step, then every 0.5 s while held) | 1 | 0 | none |
 | Sphere Rush explosion | 15 | 3 | horizontal |
 
-So from 115, BA1 adds 5 (120) and pushes at a strength of 120 (1200 units/s); from 110, BA2 adds 10 (120) and launches upward at 240 (2400 units/s), and mid-air BA2 drives downward at 240; from 115, mid-air BA1 launches upward at 240; from 119, a shuriken or a Sphere Rush tick adds 1 (120) and launches at 0 × 120 = 0; from 105, the Sphere Rush explosion adds 15 (120) and launches sideways at 360 (3600 units/s). On a fresh target a BA2 is 2 × 10 = 20, a 200 units/s hop; a BA2 that leaves the target at 30 Launch Point lifts it about 70 units, and at 60 about 280. The Clone Attack performs ground BA1's own definition (or mid-air BA2's, overhead), so it inherits that hit's damage, Base Launch and Directional Launch with nothing of its own.
+So from 115, BA1 adds 5 (120) and pushes at a strength of 120 (1200 units/s); from 110, BA2 adds 10 (120) and launches upward at 240 (2400 units/s), and mid-air BA2 drives downward at 240; from 115, mid-air BA1 launches upward at 240; from 119, a shuriken or a Sphere Rush tick adds 1 (120) and launches at 0 × 120 = 0; from 105, the Sphere Rush explosion adds 15 (120) and launches sideways at 360 (3600 units/s); a whole Sphere Rush on a fresh target adds 4 × 1 + 15 = 19 and launches it at 3 × 19 = 57. On a fresh target a BA2 is 2 × 10 = 20, a 200 units/s hop; a BA2 that leaves the target at 30 Launch Point lifts it about 70 units, and at 60 about 280. The Clone Attack performs ground BA1's own definition (or mid-air BA2's, overhead), so it inherits that hit's damage, Base Launch and Directional Launch with nothing of its own.
 
 The two mid-air Basic Attacks swapped moves: **mid-air BA1** is the three-frame kunai slash (`0001_midair2ba1`–`3`), which used to be mid-air BA2, and **mid-air BA2** is the five-frame airborne kick (`0001_midair1ba1`–`5`), which used to be mid-air BA1. Each move kept its own art, timing, hitbox, damage and stun. The frame file names are the originals.
 
@@ -528,9 +555,9 @@ To give a fighter a charged action, map a combat button in `chargedActions` to a
 
 While either is cooling down the press does nothing. Without an opponent (for a summon), the art or valid data, the press falls through to the normal attack, and no cooldown starts. A character's `stats.chargedCooldownRate` sets how much faster its charged cooldowns recover while it is in Charge.
 
-To choose how a fighter defends, give it a `defense` entry. `{ type: 'dodge', ground, air }` (like #0001) plays one Dodge clip per press, with `startup` / `invulnerable` / `recovery` timed to whole frames of that clip; `{ type: 'block' }` is a held guard that takes chip damage (`stats.blockDamageScale`, added to Launch Point like any damage) and each attack's `blockstun`. Either way the player presses the same Defense button. A Dodge without frames is refused, so it never grants invisible invulnerability.
+To choose how a fighter defends, give it a `defense` entry. The one type so far is `{ type: 'shield', groundAnimation, airAnimation, groundStartAnimation, groundReleaseAnimation }` (like #0001's `shield`, `midairShield`, `shieldStart` and `shieldRelease`): a held, full-circle Shield (see Defense above). The held clips are required: without the one for where the fighter is, the Shield is refused (and logged once), never faked; the raise and lower poses are optional. The type is checked, so a future fighter can defend another way on the same Defense button; an unknown type is an error.
 
-Stamina and the Dash are data too. A `stamina` entry (`{ max, regen, chargeRegen, dashCost, dodgeCost, blockDrain }`, see `resolveStamina` in `js/game/combat.js`) sets the fighter's bar; every field is optional and defaults to #0001's values (100, 12 / s, 30 / s in Charge, 25, 25, 20 / s). A Dodge pays `dodgeCost` as it starts, a Block guard drains `blockDrain` per second while held, and neither happens while the fighter is exhausted. To give a fighter a Dash, add a `dash` clip to `animations` and `movement.dashSpeed` / `movement.dashTapWindow`: the Dash lasts one pass of the clip and pays `dashCost`. Without the clip (or a `dashSpeed`) it never dashes: a Dash without frames is refused and logged, never faked with the run.
+Energy and the Dash are data too. An `energy` entry (`{ max, regen, chargeRegen, dashCost, shieldHitCost }`, see `resolveEnergy` in `js/game/combat.js`) sets the fighter's resource; every field is optional and defaults to #0001's values (100, 12 / s, 30 / s in Charge, 25, 25). A Shield pays `shieldHitCost` for each hit it blocks and needs that much to be up; neither a Dash nor a Shield works while the fighter is exhausted. The three-segment display (`ENERGY_SEGMENTS`, 34 / 33 / 33, in `js/game/fighter-status.js`) is a UI constant over the one value, not fighter data. To give a fighter a Dash, add a `dash` clip to `animations` and `movement.dashSpeed` / `movement.dashTapWindow`: the Dash lasts one pass of the clip and pays `dashCost`. Without the clip (or a `dashSpeed`) it never dashes: a Dash without frames is refused and logged, never faked with the run.
 
 ### Adding a map
 

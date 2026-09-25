@@ -4,7 +4,7 @@
 // fallbacks, the clone's appear -> BA1 -> vanish lifecycle, its placement
 // behind the opponent, the overhead Mid-air BA2 it performs instead where
 // there is no ground behind (platform edges, airborne opponents), detached
-// hits (Dodge, Block, hitstop, attribution), independence from its owner,
+// hits (the Shield, hitstop, attribution), independence from its owner,
 // and battle restart / rendering. Uses the real
 // Fighter, CombatState, CombatSystem, Clone, SpriteSet and Battle (see
 // fighter-harness.mjs); sprite sets carry clip metadata only, so scale,
@@ -310,10 +310,12 @@ test('CooldownTimers: start, remaining, duration and progress; recovery at any r
   c.clear();
   assert.equal(c.size, 0);
   // A fighter's charged cooldowns are apart from its attack recovery.
-  const state = new CombatState(def.stats);
+  const state = new CombatState();
   assert.ok(state.chargedCooldowns instanceof CooldownTimers);
   assert.ok(state.cooldowns instanceof Map);
-  for (const key of ['energy', 'maxEnergy', 'health', 'maxHealth']) assert.equal(key in state, false, key);
+  for (const key of ['health', 'maxHealth']) assert.equal(key in state, false, key);
+  // Charged actions are never paid in Energy.
+  assert.equal('summonCost' in state.energySpec, false);
 });
 
 // ---- Trigger --------------------------------------------------------------------
@@ -495,14 +497,14 @@ test('Charged BA2 (its own Sphere Rush technique), Throw and Defense summon no c
   for (const [press, check] of [
     [BA2, (d) => assert.equal(d.attacker.technique?.def.id, 'rasenRush')],
     [THROW, (d) => assert.equal(d.attacker.combat.attack?.def.id, 'throw')],
-    [DEFENSE, (d) => assert.equal(d.attacker.combat.defenseAction?.type, 'dodge')],
+    [DEFENSE, (d) => assert.equal(d.attacker.combat.shielding, true)],
   ]) {
     const d = duel();
     d.tick(CHARGE);
     d.tick({ ...CHARGE, ...press });
     check(d);
     assert.equal(d.attacker.charging, false, 'it interrupts Charge as before');
-    d.until(() => !d.attacker.combat.attack && !d.attacker.combat.defenseAction && !d.attacker.technique);
+    d.until(() => !d.attacker.combat.attack && !d.attacker.technique);
     for (let i = 0; i < 30; i++) d.tick(CHARGE);
     assert.equal(d.clones.length, 0);
     assert.equal(d.attacker.combat.chargedCooldowns.active('ba1Clone'), false);
@@ -940,75 +942,37 @@ test('the overhead kick hits once, however many steps its active box overlaps th
   assert.equal(clone.hitbox(), null, 'used up');
 });
 
-test('a Dodge\'s invulnerable frames let the overhead kick pass through unspent; after them it can still connect', () => {
-  const dodgeStartup = steps(def.defense.ground.startup);
-  const covered = roofDuel(1180, -1);
-  const clone = summon(covered);
-  let activeSteps = 0;
-  for (let i = 1; covered.clones.includes(clone); i++) {
-    covered.tick(CHARGE, i === MB2_TO_ACTIVE - dodgeStartup ? DEFENSE : {});
-    if (!clone.activeBox()) continue;
-    activeSteps++;
-    assert.equal(covered.target.combat.invulnerable, true, `invulnerable while the kick is live (step ${i})`);
-  }
-  assert.equal(activeSteps, steps(MB2.active));
-  assert.deepEqual(covered.events, []);
-  assert.equal(covered.target.combat.launchPoint, 0);
-  assert.equal(covered.target.combat.stun, 0);
-  assert.equal(covered.target.body.vy, 0, 'no spike');
-  assert.equal(covered.target.grounded, true);
-  assert.equal(clone.hasHit, false, 'not used up by the Dodge');
-  assert.equal(clone.hitstop, 0);
-
-  const late = roofDuel(1180, -1);
-  const c2 = summon(late);
-  const invulnerable = [];
-  let hitAt = null;
-  for (let i = 1; late.clones.includes(c2); i++) {
-    late.tick(CHARGE, i === MB2_TO_ACTIVE - dodgeStartup - 2 ? DEFENSE : {});
-    if (late.target.combat.invulnerable) invulnerable.push(i);
-    if (hitAt === null && late.events.length) hitAt = i;
-  }
-  assert.ok(invulnerable.includes(MB2_TO_ACTIVE), 'the window covered the start of the kick');
-  assert.equal(hitAt, invulnerable.at(-1) + 1, 'it connects on the first step after the window');
-  assert.equal(late.events.length, 1);
-  assert.equal(late.events[0].summon, c2);
-  assert.equal(late.target.combat.launchPoint, 10);
-});
-
-test('Block (future fighters): the overhead kick goes through applyHit like any hit; a block suppresses its spike', () => {
-  const blocker = { ...def, defense: { type: 'block' } };
+test('a Shield blocks the overhead kick like any hit, from whichever side: 25 Energy, no Launch Point, no spike, the kick used up', () => {
   const GUARD = { defense: true };
-  // The guard faces the owner, the way the clone faces: not into it.
-  const open = roofDuel(1180, -1, { targetCharacter: blocker });
-  open.target.combat.launchPoint = 110;
-  const c1 = summon(open, GUARD);
-  assert.equal(c1.attackDef.id, 'midairBa2');
-  while (!open.events.length) open.tick(CHARGE, GUARD);
-  assert.equal(open.target.combat.blocking, true, 'the guard was up');
-  assert.equal(open.events[0].type, 'hit');
-  assert.equal(open.events[0].damage, 10);
-  assert.equal(open.target.body.vy, 240 * U, 'the full spike: 2 x 120');
-
-  // Turned to face the clone: a normal block. Its chip damage still adds
-  // to Launch Point, but the block cancels the reverse vertical launch.
-  const front = roofDuel(1180, -1, { targetCharacter: blocker });
-  const c2 = summon(front, GUARD);
-  front.target.opponent = null;
-  front.target.facing = -c2.facing;
-  while (!front.events.length) front.tick(CHARGE, GUARD);
-  const [e] = front.events;
-  assert.equal(e.type, 'block');
-  assert.equal(e.attacker, front.attacker);
-  assert.equal(e.summon, c2);
-  assert.equal(e.damage, MB2.damage * front.target.combat.blockDamageScale, 'chip damage');
-  assert.equal(front.target.combat.stun, MB2.blockstun);
-  assert.ok(front.target.body.vx === 0);
-  assert.equal(front.target.body.vy, 0, 'no spike on a block');
-  assert.equal(front.target.combat.launchPoint, e.damage, 'the chip damage still counts');
-  assert.equal(front.target.body.grounded, true);
-  assert.equal(c2.hitstop, MB2.hitstop);
-  assert.equal(front.attacker.combat.hitstop, 0);
+  for (const turned of [false, true]) {
+    const d = roofDuel(1180, -1);
+    d.target.combat.launchPoint = 110;
+    const clone = summon(d, GUARD);
+    assert.equal(clone.attackDef.id, 'midairBa2');
+    if (turned) {
+      d.target.opponent = null;
+      d.target.facing = -clone.facing;
+    }
+    while (!d.events.length) d.tick(CHARGE, GUARD);
+    const [e] = d.events;
+    assert.equal(e.type, 'block', `turned: ${turned}`);
+    assert.equal(e.attacker, d.attacker);
+    assert.equal(e.summon, clone);
+    assert.equal(e.damage, 0);
+    assert.equal(e.energyCost, 25);
+    assert.equal(d.target.combat.energy, 75);
+    assert.equal(d.target.combat.launchPoint, 110, 'no chip damage');
+    assert.equal(d.target.combat.stun, 0);
+    assert.equal(d.target.combat.shieldStun, MB2.blockstun);
+    assert.equal(d.target.body.vx, 0);
+    assert.equal(d.target.body.vy, 0, 'no spike on a block');
+    assert.equal(d.target.body.grounded, true);
+    assert.equal(clone.hasHit, true, 'used up by the block');
+    assert.equal(clone.hitstop, MB2.hitstop, 'a blocked kick still pauses the clone');
+    assert.equal(d.attacker.combat.hitstop, 0, 'never the owner');
+    while (d.clones.includes(clone)) d.tick(CHARGE, GUARD);
+    assert.equal(d.events.length, 1, 'one block, one cost');
+  }
 });
 
 test('the overhead clone never follows: position, facing and attack stay put, and the kick whiffs', () => {
@@ -1243,80 +1207,38 @@ test('a clone hit freezes the target and the clone, never the owner, whose Charg
   assert.ok(clone.attackTime > frozenAt, 'then its attack resumes');
 });
 
-test('a Dodge\'s invulnerable frames let the clone BA1 pass through unspent; after them it can still connect', () => {
-  // The Dodge's invulnerable frames exactly cover the clone's active frame.
-  const dodgeStartup = steps(def.defense.ground.startup);
-  const covered = duel();
-  const clone = summon(covered);
-  let activeSteps = 0;
-  for (let i = 1; covered.clones.includes(clone); i++) {
-    covered.tick(CHARGE, i === TO_ACTIVE - dodgeStartup ? DEFENSE : {});
-    if (!clone.activeBox()) continue;
-    activeSteps++;
-    assert.equal(covered.target.combat.invulnerable, true, `invulnerable while the punch is live (step ${i})`);
-  }
-  assert.equal(activeSteps, steps(ATTACK.active));
-  assert.deepEqual(covered.events, []);
-  assert.equal(covered.target.combat.launchPoint, 0);
-  assert.equal(covered.target.combat.stun, 0);
-  assert.equal(covered.target.body.vx, 0, 'no launch');
-  assert.equal(clone.hasHit, false, 'not used up by the Dodge');
-  assert.equal(clone.hitstop, 0, 'no freeze');
-
-  // Invulnerable a little earlier: the punch is still live when the window
-  // ends, and connects as a normal hit.
-  const late = duel();
-  const c2 = summon(late);
-  const invulnerable = [];
-  let hitAt = null;
-  for (let i = 1; late.clones.includes(c2); i++) {
-    late.tick(CHARGE, i === TO_ACTIVE - dodgeStartup - 2 ? DEFENSE : {});
-    if (late.target.combat.invulnerable) invulnerable.push(i);
-    if (hitAt === null && late.events.length) hitAt = i;
-  }
-  assert.ok(invulnerable.includes(TO_ACTIVE), 'the window covered the start of the punch');
-  assert.equal(hitAt, invulnerable.at(-1) + 1, 'it connects on the first step after the window');
-  assert.equal(late.events.length, 1);
-  assert.equal(late.events[0].type, 'hit');
-  assert.equal(late.events[0].summon, c2);
-  assert.equal(late.target.combat.launchPoint, 5);
-});
-
-test('Block (future fighters): a guard facing away does not block the clone; turned toward it, it does', () => {
-  const blocker = { ...def, defense: { type: 'block' } };
+test('a Shield blocks the clone BA1 from behind as from the front: 25 Energy, no Launch Point, no launch, the punch used up', () => {
   const GUARD = { defense: true };
-
-  // The guard faces the owner, so the clone at its back gets through, even
-  // though the owner's own facing points into the guard.
-  const back = duel({ targetCharacter: blocker });
-  summon(back, GUARD);
+  // Facing the owner, the clone at its back: the Shield is all round.
+  const back = duel();
+  back.target.combat.launchPoint = 119;
+  const clone = summon(back, GUARD);
   while (!back.events.length) back.tick(CHARGE, GUARD);
-  assert.equal(back.target.combat.blocking, true, 'the guard was up');
+  assert.equal(back.target.combat.shielding, true, 'the Shield was up');
   assert.equal(back.target.facing, -1, 'toward the owner, away from the clone');
-  assert.equal(back.attacker.facing, 1, 'the owner faces into the guard; its facing does not count');
-  assert.equal(back.events[0].type, 'hit');
-  assert.equal(back.events[0].damage, 5);
-  assert.equal(back.target.combat.stun, ATTACK.hitstun);
-
-  // Turned to face the clone before the punch: a normal block.
-  const front = duel({ targetCharacter: blocker });
-  // 119 + the chip damage (5 x 0.2 = 1) is 120: a raw 1 x 120, halved by
-  // the Block afterward.
-  front.target.combat.launchPoint = 119;
-  const clone = summon(front, GUARD);
-  front.target.opponent = null;
-  front.target.facing = -clone.facing;
-  while (!front.events.length) front.tick(CHARGE, GUARD);
-  const [e] = front.events;
+  const [e] = back.events;
   assert.equal(e.type, 'block');
-  assert.equal(e.attacker, front.attacker);
-  assert.equal(e.damage, ATTACK.damage * front.target.combat.blockDamageScale, 'chip damage');
-  assert.equal(front.target.combat.stun, ATTACK.blockstun);
-  assert.equal(front.target.combat.launchPoint, 120);
-  assert.equal(e.launchStrength, 120, 'the raw strength, before Block');
-  assert.equal(front.target.body.vx, 60 * U * clone.facing, 'half of it, from the clone');
+  assert.equal(e.attacker, back.attacker);
+  assert.equal(e.summon, clone);
+  assert.equal(e.damage, 0);
+  assert.equal(e.energyCost, 25);
+  assert.equal(e.launchStrength, 0);
+  assert.equal(back.target.combat.launchPoint, 119, 'no chip damage');
+  assert.equal(back.target.combat.energy, 75);
+  assert.equal(back.target.body.vx, 0, 'no launch');
+  assert.equal(back.target.combat.stun, 0);
+  assert.equal(back.target.combat.shieldStun, ATTACK.blockstun);
+  assert.equal(clone.hasHit, true);
   assert.equal(clone.hitstop, ATTACK.hitstop, 'a blocked punch still pauses the clone');
-  assert.equal(front.attacker.combat.hitstop, 0);
+  assert.equal(back.attacker.combat.hitstop, 0);
+
+  // Turned to face the clone: the same block.
+  const front = duel();
+  const c2 = summon(front, GUARD);
+  front.target.opponent = null;
+  front.target.facing = -c2.facing;
+  while (!front.events.length) front.tick(CHARGE, GUARD);
+  assert.deepEqual([front.events[0].type, front.events[0].damage, front.target.combat.energy], ['block', 0, 75]);
 });
 
 // ---- Independence ---------------------------------------------------------------
@@ -1360,7 +1282,7 @@ test('letting go of Charge after the summon plays the normal release pose; the c
   assert.equal(d.attacker.state, 'idle');
 });
 
-test('Jump, BA2, Throw or a Dodge by the owner after the summon leave the clone\'s lifecycle intact', () => {
+test('Jump, BA2, Throw or a Shield by the owner after the summon leave the clone\'s lifecycle intact', () => {
   for (const press of [JUMP, BA2, THROW, DEFENSE]) {
     const d = duel({ gap: 150 });
     const clone = summon(d);

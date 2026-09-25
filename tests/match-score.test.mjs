@@ -87,10 +87,11 @@ test('a fall takes the fighter out of play at once; it is back exactly 2 s later
   const { battle, run, script, input } = match();
   const { p1, p2 } = battle;
   const [spawn] = battle.map.spawnPoints;
-  // Make a mess to clear: Launch Point, empty stamina, both charged cooldowns,
-  // a stun and a speed.
+  // Make a mess to clear: Launch Point, empty Energy, a raised Shield, both
+  // charged cooldowns, a stun and a speed.
   p1.combat.launchPoint = 64;
-  p1.combat.drainStamina(100);
+  p1.combat.setEnergy(0);
+  p1.combat.shielding = true;
   p1.combat.chargedCooldowns.start('ba1Clone', 5);
   p1.combat.chargedCooldowns.start('rasenRush', 5);
   intoVoid(battle, p1);
@@ -118,7 +119,8 @@ test('a fall takes the fighter out of play at once; it is back exactly 2 s later
   assert.deepEqual([p1.body.x, p1.body.vx, p1.body.vy, p1.body.grounded], [spawn.x, 0, 0, true]);
   assert.equal(p1.body.y, battle.map.mainStage.top, 'on the stage, never inside a solid');
   assert.equal(p1.combat.launchPoint, 0);
-  assert.deepEqual([p1.combat.stamina, p1.combat.staminaExhausted], [100, false], 'stamina full, not exhausted');
+  assert.deepEqual([p1.combat.energy, p1.combat.energyExhausted], [100, false], 'Energy full, not exhausted');
+  assert.deepEqual([p1.combat.shielding, p1.combat.shieldStun], [false, 0], 'the Shield down');
   assert.equal(p1.combat.chargedCooldowns.size, 0, 'CAB1 and CAB2 ready');
   assert.deepEqual([p1.combat.stun, p1.combat.hitstop, p1.combat.attack, p1.technique, p1.dash], [0, 0, null, null, null]);
   assert.equal(p1.state, 'idle');
@@ -126,7 +128,7 @@ test('a fall takes the fighter out of play at once; it is back exactly 2 s later
   assert.deepEqual(battle.cameraTargets, [p1, p2]);
   // Active at once: no respawn invulnerability, platform or wait.
   assert.equal(p1.canAct(), true);
-  assert.equal(p1.combat.invulnerable, false);
+  assert.equal('invulnerable' in p1.combat, false);
 });
 
 test('whatever held or aimed at a fallen fighter lets go: a Sphere Rush bind, clones and projectiles', () => {

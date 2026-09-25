@@ -49,9 +49,10 @@
 //                 keeps spinning and grows (sphereGrowth: startScale to
 //                 endScale, reached as it explodes), until explosionDelay has
 //                 passed since the hit.
-//                 Through confirm and wait, every whole tickInterval since
-//                 the hit (while the target is still bound) is one tickHit
-//                 on it: Launch Point only, no launch. A tick that would fall on
+//                 Through confirm and wait the target takes one tickHit on
+//                 the hit's own step, then one more at every whole
+//                 tickInterval since the hit (while it is still bound):
+//                 Launch Point only, no launch. A tick that would fall on
 //                 the explosion's step is not dealt: the explosion is the
 //                 last hit, never a tick as well.
 //   explode       the fighter shows explosionAnimation while sphereExplosion
@@ -63,8 +64,9 @@
 //                 search.
 //   done          the fighter is free again.
 //
-// A blocked contact deals the block and ends the technique (no bind, ticks
-// or explosion). The fighter must stay grounded from the first form frame
+// A contact the target's Shield blocks deals the block (see
+// CombatSystem.applyHit) and ends the technique: no bind, no tick, not even
+// the first, and no explosion. The fighter must stay grounded from the first form frame
 // until the technique is over: losing the ground ends it at once, releasing
 // the target, and the fighter falls (see Fighter.update). A hit on the
 // fighter ends it too (see CombatSystem.applyHit): no armour, no
@@ -87,7 +89,6 @@ import { resolveHitLaunch } from '../data/launch.js';
 
 const HIT_DEFAULTS = {
   damage: 0,
-  chipDamage: 0,
   baseLaunch: 0,
   directionalLaunch: null,
   hitstun: 0.2,
@@ -197,7 +198,7 @@ export class ChargedTechnique {
     this.sinceHit = 0;    // seconds since the contact's step
     this.hitConfirmed = false;
     this.firstHitDone = false;
-    this.ticks = 0;     // ticks reached so far while holding the target
+    this.ticks = 0;     // ticks reached so far while holding the target (the contact's included)
     this.ticksDue = 0;  // of those, the ones waiting for the CombatSystem
     this.explosionDue = false; // the explosion hit, waiting for the CombatSystem
     this.explosionDone = false;
@@ -265,11 +266,13 @@ export class ChargedTechnique {
   }
 
   // One tick for every whole tickInterval since the hit not counted yet,
-  // for the CombatSystem to deal this step (see takeTick). Counted from the
-  // fixed-step clock, never from animation frames.
+  // for the CombatSystem to deal this step (see takeTick); the contact's own
+  // tick (see contact) is the first counted. Counted from the fixed-step
+  // clock (a threshold crossed, never an exact float), never from animation
+  // frames.
   queueTicks() {
     if (!this.def.tickHit) return;
-    const reached = Math.floor((this.sinceHit + TIME_EPSILON) / this.def.tickInterval);
+    const reached = 1 + Math.floor((this.sinceHit + TIME_EPSILON) / this.def.tickInterval);
     if (reached <= this.ticks) return;
     this.ticksDue += reached - this.ticks;
     this.ticks = reached;
@@ -416,9 +419,11 @@ export class ChargedTechnique {
 
   // The sphere met `target` and firstHit has been applied (see
   // CombatSystem.update). Returns why this contact ends the technique
-  // ('blocked'), or null when it confirms: the target is bound and
-  // stopped, the sphere moves onto it and the fighter stops its rush. The
-  // search is over either way.
+  // ('blocked', by the target's Shield), or null when it confirms: the
+  // target is bound and stopped, the sphere moves onto it, the fighter stops
+  // its rush and the first tick is due at once, on this same step (the
+  // CombatSystem deals it straight after). The next is due tickInterval
+  // after this step. The search is over either way.
   contact(target, blocked) {
     this.firstHitDone = true;
     this.owner.body.vx = 0;
@@ -428,6 +433,10 @@ export class ChargedTechnique {
     this.phase = 'confirm';
     this.time = 0;
     this.sinceHit = 0;
+    if (this.def.tickHit) {
+      this.ticks = 1;
+      this.ticksDue = 1;
+    }
     target.combat.bind(this);
     target.body.vx = 0;
     // Both fighters chose this step's poses before hits resolved, so show

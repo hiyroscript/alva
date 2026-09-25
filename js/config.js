@@ -66,7 +66,7 @@ export const CONFIG = Object.freeze({
   // these directly, so this table is the single source of truth. S / ↓ are
   // Charge in battle; menus read their own Down from menuBindings below.
   // `defense` is the shared Defense input; each character decides what it
-  // does (#0001 dodges).
+  // does (#0001 holds it to Shield).
   bindings: {
     left: ['KeyA', 'ArrowLeft'],
     right: ['KeyD', 'ArrowRight'],

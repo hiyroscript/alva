@@ -24,8 +24,9 @@
 // strength becomes a speed at LAUNCH_UNIT_SPEED world units per second per
 // point, one factor for every direction and every hit, so it only converts
 // the game's numbers into the physics' units and never changes their
-// proportions. Block is the only thing that changes the result, and only
-// after it is resolved (see CombatSystem.applyHit in js/game/combat.js).
+// proportions. A Shield is the only exception: a hit it blocks adds no
+// Launch Point and launches nothing at all (see CombatSystem.applyHit in
+// js/game/combat.js).
 //
 // Every hit (a fighter's attack, a projectile's, a charged technique's)
 // declares both fields in js/data/characters.js, independently:

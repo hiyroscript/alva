@@ -15,9 +15,9 @@
 // tag and name over its Launch Point (a plain number: no bar, maximum or
 // % sign; named for screen readers). Under it, in Quick Battle only, one dot per point the
 // match is played to (CONFIG.battle.pointsToWin), filled for each point the
-// fighter has scored. The CPU's card mirrors the player's. Stamina and the
+// fighter has scored. The CPU's card mirrors the player's. Energy and the
 // CAB cooldowns are drawn over the fighter itself (js/game/fighter-status.js);
-// the card only describes stamina to screen readers.
+// the card only describes Energy to screen readers.
 
 import { CONFIG } from '../config.js';
 import { el } from '../core/utils.js';
@@ -32,14 +32,14 @@ export function formatLaunchPoint(value) {
   return String(Math.round(value));
 }
 
-// Stamina for screen readers, in steps of 5: "Stamina 75 of 100", or while
-// exhausted "Stamina exhausted, refilling: 40 of 100".
-export function describeStamina(combat) {
-  const max = Math.round(combat.maxStamina);
-  const value = Math.min(max, Math.round(combat.stamina / 5) * 5);
-  return combat.staminaExhausted
-    ? `Stamina exhausted, refilling: ${value} of ${max}`
-    : `Stamina ${value} of ${max}`;
+// Energy for screen readers, in steps of 5: "Energy 75 of 100", or while
+// exhausted "Energy exhausted, refilling: 40 of 100".
+export function describeEnergy(combat) {
+  const max = Math.round(combat.maxEnergy);
+  const value = Math.min(max, Math.round(combat.energy / 5) * 5);
+  return combat.energyExhausted
+    ? `Energy exhausted, refilling: ${value} of ${max}`
+    : `Energy ${value} of ${max}`;
 }
 
 // One fighter's card and, with `points`, its row of score dots under it.
@@ -52,15 +52,15 @@ function sidePanel(side, { inward, points = 0 }) {
   const name = el('span', { class: 'hud-name' });
   const launchPointValue = el('span', { class: 'hud-launch-point-value', text: '0' });
   const launchPoint = el('div', { class: 'hud-launch-point', role: 'group', 'aria-label': 'Launch Point' }, [launchPointValue]);
-  const stamina = el('span', { class: 'hud-sr' });
+  const energy = el('span', { class: 'hud-sr' });
   const info = el('div', { class: 'hud-info' }, [el('div', { class: 'hud-tag' }, [tag, name]), launchPoint]);
-  const root = el('div', { class: `hud-side hud-${side} glass` }, [portrait, divider, info, stamina]);
+  const root = el('div', { class: `hud-side hud-${side} glass` }, [portrait, divider, info, energy]);
   const dots = Array.from({ length: points }, () => el('span', { class: 'hud-dot', 'aria-hidden': 'true' }));
   const score = points ? el('div', { class: 'hud-score', role: 'img' }, dots) : null;
   const wrap = el('div', { class: `hud-fighter hud-fighter--${side}` }, [root, score]);
   return {
-    wrap, root, portrait, divider, tag, name, info, launchPoint, launchPointValue, stamina, score, dots, inward,
-    shownLaunchPoint: null, shownStamina: null, shownScore: null, sprites: null,
+    wrap, root, portrait, divider, tag, name, info, launchPoint, launchPointValue, energy, score, dots, inward,
+    shownLaunchPoint: null, shownEnergy: null, shownScore: null, sprites: null,
   };
 }
 
@@ -78,7 +78,7 @@ function bindPanel(panel, tag, fighter) {
   panel.portrait.classList.toggle('is-mirrored', portraitSourceFacing(fighter.def) !== panel.inward);
   panel.portrait.dataset.facing = panel.inward > 0 ? 'right' : 'left';
   panel.shownLaunchPoint = null;
-  panel.shownStamina = null;
+  panel.shownEnergy = null;
   panel.shownScore = null;
 }
 
@@ -89,10 +89,10 @@ function updatePanel(panel, fighter) {
     panel.shownLaunchPoint = text;
     panel.launchPointValue.textContent = text;
   }
-  const stamina = describeStamina(combat);
-  if (stamina !== panel.shownStamina) {
-    panel.shownStamina = stamina;
-    panel.stamina.textContent = stamina;
+  const energy = describeEnergy(combat);
+  if (energy !== panel.shownEnergy) {
+    panel.shownEnergy = energy;
+    panel.energy.textContent = energy;
   }
 }
 

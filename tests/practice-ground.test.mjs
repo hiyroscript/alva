@@ -500,7 +500,7 @@ test('moves that aim at an opponent fall back or miss with nobody there, without
   assert.equal(seen, 1);
   assert.equal(session.projectiles.length, 0);
 
-  // Movement, jumping, both BAs in the air and Dodges still work alone.
+  // Movement, jumping, both BAs in the air and the Shield still work alone.
   run({ right: true }, 30);
   assert.ok(p.body.x > PRACTICE_MAP.spawnPoints[0].x);
   run({ jump: true, jumpPressed: true });
@@ -510,7 +510,7 @@ test('moves that aim at an opponent fall back or miss with nobody there, without
   assert.equal(p.combat.attack?.def.id, 'midairBa2');
   idle();
   run({ defense: true, defensePressed: true });
-  assert.equal(p.state, 'defense');
+  assert.equal(p.state, 'shield');
   idle();
   assert.equal(p.combat.launchPoint, 0, 'nothing ever hits the lone fighter');
 
@@ -587,7 +587,7 @@ test('the Void never ends practice: a fighter in it is out for 2 s, then back at
   assert.equal(player.combat.attack, null, 'no attack survives it');
   assert.equal(player.combat.launchPoint, 0, 'a fresh 0');
   assert.equal(player.combat.chargedCooldowns.size, 0, 'charged cooldowns cleared: ready again');
-  assert.equal(player.combat.stamina, player.combat.maxStamina, 'full stamina');
+  assert.equal(player.combat.energy, player.combat.maxEnergy, 'full Energy');
   assert.equal(player.combat.stun, 0);
   assert.equal(player.combat.hitstop, 0);
   assert.deepEqual(session.fighters, [player, cpu]);
@@ -667,7 +667,7 @@ test('HUD: Player 1\'s card, the More button and the CPU\'s card; no score dots,
   assert.deepEqual(hudRoot.querySelectorAll('.hud-score'), []);
   assert.deepEqual(hudRoot.querySelectorAll('.hud-dot'), []);
   // The same cards as Quick Battle's: portrait | name over Launch Point. No
-  // cooldown rings (they are under the fighters now), Health or Energy.
+  // cooldown rings (they are under the fighters now), Health or Energy bar.
   for (const [card, tag, side] of [[panel, 'P1', 'hud-p1'], [cpuPanel, 'CPU', 'hud-p2']]) {
     assert.equal(card.wrap.hidden, false);
     assert.ok(card.root.classList.contains(side));
@@ -687,7 +687,11 @@ test('HUD: Player 1\'s card, the More button and the CPU\'s card; no score dots,
     assert.deepEqual(hudRoot.querySelectorAll(cls), [], `no ${cls}`);
   }
   assert.ok(!hudRoot.querySelectorAll('[aria-label]').some((n) => /health|energy/i.test(n.getAttribute('aria-label'))));
-  assert.doesNotMatch(hudRoot.textContent, /energy/i);
+  assert.doesNotMatch(hudRoot.textContent, /health|stamina/i);
+  // Energy is drawn over the fighters; the cards only describe it, for
+  // screen readers.
+  assert.deepEqual([panel.energy.textContent, cpuPanel.energy.textContent], ['Energy 100 of 100', 'Energy 100 of 100']);
+  assert.ok(panel.energy.classList.contains('hud-sr'));
 
   // Each card follows its own fighter's Launch Point: the CPU's number moves
   // when it takes damage, alongside the floating "+N".
@@ -1216,7 +1220,7 @@ test('the practice CPU never acts on its own: no movement, jump, attack, charge,
     states.add(cpu.state);
     const c = cpu.combat;
     if (cpu.body.x !== spawnX || cpu.body.y !== PRACTICE_MAP.mainStage.top || !cpu.body.grounded || cpu.moveDir !== 0 ||
-        c.attack || c.defenseAction || c.blocking || cpu.charging || cpu.technique || cpu.releases.length || cpu.summons.length) {
+        c.attack || c.shielding || cpu.charging || cpu.technique || cpu.releases.length || cpu.summons.length) {
       assert.fail(`the CPU acted on step ${i}: ${cpu.state}`);
     }
   }
@@ -1362,9 +1366,10 @@ test('shuriken, clone and Sphere Rush hits on the CPU each float their own resol
     until(() => !player.technique, 400);
     assert.ok(events.every((e) => e.technique === rush && e.target === cpu));
     const damages = events.map((e) => e.damage);
-    assert.deepEqual(damages, [0, 1, 1, 1, 15]);
-    // The contact adds nothing, so it floats nothing.
-    assert.deepEqual(numbers.map((d) => d.text), ['+1', '+1', '+1', '+15']);
+    assert.deepEqual(damages, [0, 1, 1, 1, 1, 15]);
+    // The contact adds nothing, so it floats nothing; its tick on the same
+    // step floats the first +1.
+    assert.deepEqual(numbers.map((d) => d.text), ['+1', '+1', '+1', '+1', '+15']);
   }
 });
 
@@ -1527,10 +1532,10 @@ test('Disable CPU removes the CPU and every reference to it, then waits, frozen,
   session.update(DT);
   const rush = player.technique;
   for (let i = 0; i < 120 && !rush.hitConfirmed; i++) session.update(DT);
-  for (let i = 0; i < 30; i++) session.update(DT); // its first tick
+  for (let i = 0; i < 30; i++) session.update(DT); // the 0.5 s tick
   assert.equal(rush.target, cpu);
   assert.ok(cpu.combat.isBoundBy(rush));
-  assert.equal(session.damageNumbers.length, 1);
+  assert.equal(session.damageNumbers.length, 2, 'the contact\'s tick and the 0.5 s one');
   const stray = { alive: true, owner: player, target: cpu };
   const shuriken = { alive: true, owner: player };
   session.clones.push(stray);
@@ -1762,7 +1767,7 @@ test('changing Player 1\'s fighter keeps the CPU, rewired to the new fighter', a
 
 // ---- Charged cooldowns and the Void ------------------------------------------
 
-test('a Practice Void respawn is a fresh training state: 0 Launch Point, full stamina and both charged abilities ready again', () => {
+test('a Practice Void respawn is a fresh training state: 0 Launch Point, full Energy and both charged abilities ready again', () => {
   const { session, run, until } = practiceSession();
   const { player } = session;
   // Use both charged abilities for real.
@@ -1774,8 +1779,8 @@ test('a Practice Void respawn is a fresh training state: 0 Launch Point, full st
   assert.ok(cd.active('ba1Clone') && cd.active('rasenRush'));
   until(() => !player.technique, 400);
   player.combat.launchPoint = 88;
-  player.combat.spendStamina(100);
-  assert.equal(player.combat.staminaExhausted, true);
+  player.combat.spendEnergy(100);
+  assert.equal(player.combat.energyExhausted, true);
   Object.assign(player.body, { x: PRACTICE_MAP.voidBounds.right + 20, grounded: false, ground: null });
   run();
   assert.equal(player.lostToVoid, true);
@@ -1783,8 +1788,8 @@ test('a Practice Void respawn is a fresh training state: 0 Launch Point, full st
   run({}, RESPAWN_STEPS);
   assert.equal(player.lostToVoid, false);
   assert.equal(player.combat.launchPoint, 0);
-  assert.equal(player.combat.stamina, player.combat.maxStamina, 'stamina full');
-  assert.equal(player.combat.staminaExhausted, false, 'and no longer exhausted');
+  assert.equal(player.combat.energy, player.combat.maxEnergy, 'Energy full');
+  assert.equal(player.combat.energyExhausted, false, 'and no longer exhausted');
   assert.equal(cd === player.combat.chargedCooldowns ? cd.size : player.combat.chargedCooldowns.size, 0);
   assert.equal(player.combat.chargedCooldowns.active('ba1Clone'), false);
   assert.equal(player.combat.chargedCooldowns.active('rasenRush'), false);

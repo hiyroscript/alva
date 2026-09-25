@@ -8,8 +8,7 @@
 //
 // C is Charge (the `charge` input, held for as long as the pointer stays on
 // it). T is Throw, the `primary` input, in the large top slot. D is Defense
-// (the `defense` input), labelled Defense; it reads D because #0001's
-// Defense is a Dodge. BA1 (Basic Attack 1) is the `action1` input, BA2
+// (the `defense` input), labelled Defense; #0001 holds it to Shield. BA1 (Basic Attack 1) is the `action1` input, BA2
 // (Basic Attack 2) the `action2` input.
 //
 // Every pointer is tracked by pointerId, so Right + Jump (or any combination)

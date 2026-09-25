@@ -10,7 +10,7 @@ import { ConfirmDialog } from '../js/ui/overlays.js';
 import { readFileSync } from 'node:fs';
 import { Battle } from '../js/game/battle.js';
 import { CombatState } from '../js/game/combat.js';
-import { formatLaunchPoint, describeStamina } from '../js/game/hud.js';
+import { formatLaunchPoint, describeEnergy } from '../js/game/hud.js';
 import { CONFIG } from '../js/config.js';
 import { duel, def as DEF_0001 } from './fighter-harness.mjs';
 
@@ -301,9 +301,9 @@ test('HUD: one glass card per fighter, portrait | divider | name over Launch Poi
     assert.equal(side.root.children[0], side.portrait);
     assert.equal(side.root.children[1], side.divider);
     assert.equal(side.root.children[2], side.info);
-    assert.equal(side.root.children.length, 4, 'and the stamina description, for screen readers only');
-    assert.equal(side.root.children[3], side.stamina);
-    assert.ok(side.stamina.classList.contains('hud-sr'));
+    assert.equal(side.root.children.length, 4, 'and the Energy description, for screen readers only');
+    assert.equal(side.root.children[3], side.energy);
+    assert.ok(side.energy.classList.contains('hud-sr'));
     assert.equal(side.portrait.tagName, 'CANVAS');
     assert.ok(side.portrait.classList.contains('hud-portrait'));
     assert.equal(side.portrait.getAttribute('aria-hidden'), 'true');
@@ -417,7 +417,7 @@ test('HUD: a point fills the scorer\'s next dot at once, and only its own; a rem
   assert.deepEqual([filled(hud.left), filled(hud.right)], ['○ ○ ○', '○ ○ ○']);
 });
 
-test('HUD: no Health or Energy anywhere: no meter, bar, fill, label or maximum', () => {
+test('HUD: no Health anywhere, and no Energy meter on the card: no bar, fill, label or maximum', () => {
   const { screen } = setup();
   const battle = startBattle(screen);
   const { hud } = screen;
@@ -428,12 +428,14 @@ test('HUD: no Health or Energy anywhere: no meter, bar, fill, label or maximum',
   }
   const all = root.querySelectorAll('div').concat(root.querySelectorAll('span'));
   assert.ok(!all.some((n) => n.getAttribute('role') === 'meter'), 'no meters');
-  assert.ok(!all.some((n) => /health|energy/i.test(n.getAttribute('aria-label') ?? '')), 'no Health or Energy labels');
+  assert.ok(!all.some((n) => /health|energy/i.test(n.getAttribute('aria-label') ?? '')), 'no Health or Energy meter labels');
   for (const side of [hud.left, hud.right]) {
-    for (const key of ['bar', 'fill', 'ghost', 'energy', 'energyFill']) assert.equal(key in side, false, `no ${key}`);
-    // Stamina is not Energy: described (to screen readers only) by name.
-    assert.equal(side.stamina.textContent, 'Stamina 100 of 100');
-    assert.doesNotMatch(side.stamina.textContent, /energy/i);
+    for (const key of ['bar', 'fill', 'ghost', 'energyFill', 'energyBar', 'stamina']) assert.equal(key in side, false, `no ${key}`);
+    // Energy is drawn over the fighter; the card only describes it, to
+    // screen readers, by name.
+    assert.equal(side.energy.textContent, 'Energy 100 of 100');
+    assert.ok(side.energy.classList.contains('hud-sr'));
+    assert.doesNotMatch(side.energy.textContent, /stamina/i);
     // Launch Point: labelled, a plain number with no maximum and no % sign.
     assert.equal(side.launchPoint.getAttribute('aria-label'), 'Launch Point');
     assert.equal(side.launchPoint.getAttribute('aria-valuemax'), null);
@@ -474,26 +476,26 @@ test('HUD: the Launch Point number follows the fighter, touches the DOM only whe
   assert.equal(formatLaunchPoint(99.6), '100');
 });
 
-test('HUD: the card describes stamina to screen readers in steps of 5, exhausted included, never as Energy', () => {
+test('HUD: the card describes Energy to screen readers in steps of 5, exhausted included, never as Stamina', () => {
   const { screen } = setup();
   const battle = startBattle(screen);
   const { hud } = screen;
   const c = battle.p1.combat;
   hud.update(battle);
-  assert.equal(hud.left.stamina.textContent, 'Stamina 100 of 100');
-  c.spendStamina(25);
-  c.regenStamina(1.2);
+  assert.equal(hud.left.energy.textContent, 'Energy 100 of 100');
+  c.spendEnergy(25);
+  c.regenEnergy(1.2);
   hud.update(battle);
-  assert.equal(hud.left.stamina.textContent, 'Stamina 75 of 100');
-  c.spendStamina(76.2);
+  assert.equal(hud.left.energy.textContent, 'Energy 75 of 100');
+  c.spendEnergy(76.2);
   hud.update(battle);
-  assert.equal(hud.left.stamina.textContent, 'Stamina exhausted, refilling: 0 of 100');
-  c.regenStamina(41);
+  assert.equal(hud.left.energy.textContent, 'Energy exhausted, refilling: 0 of 100');
+  c.regenEnergy(41);
   hud.update(battle);
-  assert.equal(hud.left.stamina.textContent, 'Stamina exhausted, refilling: 40 of 100');
-  c.refillStamina();
-  assert.equal(describeStamina(c), 'Stamina 100 of 100');
-  assert.equal(hud.right.stamina.textContent, 'Stamina 100 of 100', 'the other card is its own');
+  assert.equal(hud.left.energy.textContent, 'Energy exhausted, refilling: 40 of 100');
+  c.refillEnergy();
+  assert.equal(describeEnergy(c), 'Energy 100 of 100');
+  assert.equal(hud.right.energy.textContent, 'Energy 100 of 100', 'the other card is its own');
 });
 
 test('HUD: the portrait is the character\'s own crop from its sprites, with nothing about #0001 in the HUD itself', () => {
@@ -564,7 +566,7 @@ test('Quick Battle result: points first (3 wins at once, or more on time), then 
   assert.deepEqual(result(90, 0, { p1: 3, p2: 2 }), { outcome: 'p1', reason: 'void' });
   assert.deepEqual(result(0, 90, { p1: 0, p2: 3 }), { outcome: 'p2', reason: 'void' });
   const source = readFileSync(new URL('../js/game/battle.js', import.meta.url), 'utf8');
-  assert.doesNotMatch(source, /health|energy/i);
+  assert.doesNotMatch(source, /health|\.energy\b/i, 'results never read Health or Energy');
 });
 
 test('a draw opens no result dialog and starts a fresh battle', () => {

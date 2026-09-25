@@ -116,7 +116,7 @@ export const sequence = (log) => log.map((s) => s.frame).filter((n, i, a) => n !
 
 // Two fighters, their projectiles and clones and the real CombatSystem,
 // stepped in Battle.update()'s order. `targetCharacter` swaps in another
-// definition (e.g. a Block-type fighter); `targetFacing` overrides the
+// definition (e.g. one with no Energy refill); `targetFacing` overrides the
 // target's starting facing (by default it faces the attacker). `stage`
 // and `x` (the attacker's spawn) place them; `pushboxes` also keeps the two
 // bodies apart and out of solids, as Battle.update() does.

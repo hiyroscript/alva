@@ -2,7 +2,7 @@
 // #0001's Throw on the primary action and its shuriken projectile: artwork,
 // registration, one-pass playback, one release per press on the release
 // frame, independent flight, spin animation, hits through the real
-// CombatSystem (no launch either way, Dodge, Block), cleanup, missing-art
+// CombatSystem (no launch either way, the Shield), cleanup, missing-art
 // safety, the ground-only rule, Charge / Defense priority, input and the
 // training CPU. The shuriken is Base Launch 0 with no Directional Launch: a
 // hit adds 1 to the target's Launch Point and stuns it, but never pushes or
@@ -458,76 +458,51 @@ test('the thrower getting hit after the release does not stop the shuriken', () 
   assert.equal(e.attacker.releases.length, 0);
 });
 
-// Ticks a fresh duel, target at `gap`, pressing Defense for the target on
-// tick `dodgeAt` (0 = with the Throw press); returns the log and the duel.
-function shurikenVsDodge(dodgeAt, { gap = 260, setup } = {}) {
-  const d = duel({ gap });
-  setup?.(d);
-  const log = [];
-  for (let i = 0; i < 120; i++) {
-    const before = d.events.length;
-    d.tick(i === 0 ? THROW : {}, i === dodgeAt ? DEFENSE : {});
-    const p = d.projectiles[0];
-    log.push({ i, hit: d.events.length > before, alive: !!p, x: p?.x, invulnerable: d.target.combat.invulnerable });
-    if (d.events.length || (!p && i > 20)) break;
+test('a Shield blocks the shuriken from either side: used up, 25 Energy, no Launch Point, no stun and no launch', () => {
+  for (const facing of [1, -1]) {
+    for (const away of [false, true]) {
+      const d = duel({ gap: 200, attackerFacing: facing });
+      if (away) {
+        d.target.opponent = null;
+        d.target.facing = facing; // its back to the thrower
+      }
+      d.tick(THROW, { defense: true, defensePressed: true });
+      for (let i = 0; i < 120 && !d.events.length; i++) d.tick({}, { defense: true });
+      const label = `facing ${facing}${away ? ', back turned' : ''}`;
+      assert.equal(d.target.combat.shielding, true, label);
+      assert.equal(d.events.length, 1, label);
+      const [e] = d.events;
+      assert.equal(e.type, 'block', label);
+      assert.equal(e.move, 'shuriken');
+      assert.equal(e.damage, 0, 'no chip damage');
+      assert.equal(e.energyCost, 25);
+      assert.equal(d.target.combat.energy, 75);
+      assert.equal(d.target.combat.launchPoint, 0);
+      assert.equal(d.target.combat.stun, 0, 'no hitstun');
+      assert.ok(Math.abs(d.target.combat.shieldStun - SHURIKEN.blockstun) < 1e-9, 'blockstun, held in the Shield');
+      assert.equal(d.target.body.vx, 0, 'no launch');
+      assert.equal(d.projectiles.length, 0, 'gone after the blocked impact, never flying on');
+      for (let i = 0; i < 60; i++) d.tick({}, { defense: true });
+      assert.equal(d.events.length, 1, 'one block, one cost');
+    }
   }
-  return { ...d, log };
-}
-
-test('a shuriken passes through a Dodge\'s invulnerable frames without being used up', () => {
-  // Where an undodged shuriken lands.
-  const probe = shurikenVsDodge(-1);
-  const hitAt = probe.log.find((s) => s.hit).i;
-  // Dodge so the evasive frame (dodge2, 5 steps from the press) meets it.
-  const d = shurikenVsDodge(hitAt - 5);
-  assert.ok(d.log.some((s) => s.i >= hitAt && s.invulnerable), 'overlapped during the evasive frame');
-  assert.deepEqual(d.events, [], 'no hit, no block event');
-  assert.equal(d.target.combat.launchPoint, 0);
-  assert.equal(d.target.combat.stun, 0);
-  assert.equal(d.target.combat.hitstop, 0);
-  assert.equal(d.target.body.vx, 0, 'no launch');
-  const after = d.log.filter((s) => s.i > hitAt + 4 && s.alive);
-  assert.ok(after.length > 10, 'still flying afterwards');
-  assert.ok(Math.max(...after.map((s) => s.x)) > d.target.body.x + 100, 'flew on past #0001');
 });
 
-test('a shuriken still overlapping when the invulnerable frames end connects then', () => {
-  const probe = shurikenVsDodge(-1);
-  const hitAt = probe.log.find((s) => s.hit).i;
-  // The evasive frame ends two steps after the shuriken first overlaps.
-  const d = shurikenVsDodge(hitAt - 8);
-  const hit = d.log.find((s) => s.hit);
-  assert.ok(hit, 'it connects');
-  assert.ok(hit.i > hitAt, 'later than an undodged shuriken');
-  assert.ok(d.log.some((s) => s.i >= hitAt && s.i < hit.i && s.invulnerable), 'passed through first');
-  assert.equal(d.events.length, 1);
+test('a shuriken that arrives before the Shield is up, or after it is let go, hits in full', () => {
+  // Where an unshielded shuriken lands.
+  const probe = duel({ gap: 260 });
+  probe.tick(THROW);
+  for (let i = 0; i < 120 && !probe.events.length; i++) probe.tick();
+  assert.equal(probe.events[0].type, 'hit');
+  // Released a moment before it arrives: a normal hit.
+  const d = duel({ gap: 260 });
+  d.tick(THROW, { defense: true, defensePressed: true });
+  for (let i = 0; i < 5; i++) d.tick({}, { defense: true });
+  for (let i = 0; i < 120 && !d.events.length; i++) d.tick();
+  assert.equal(d.target.combat.shielding, false);
   assert.equal(d.events[0].type, 'hit');
   assert.equal(d.target.combat.launchPoint, SHURIKEN.damage);
-  assert.equal(d.target.combat.defenseAction, null, 'the hit cancels the Dodge recovery');
-});
-
-test('a Block-type fighter guarding toward a shuriken blocks it with chip damage and blockstun, and no launch', () => {
-  const blocker = { ...def, defense: { type: 'block' }, stats: { ...def.stats, blockDamageScale: 0.25 } };
-  for (const facing of [1, -1]) {
-    const d = duel({ gap: 200, attackerFacing: facing, targetCharacter: blocker });
-    d.tick(THROW, { defense: true, defensePressed: true });
-    for (let i = 0; i < 120 && !d.events.length; i++) d.tick({}, { defense: true });
-    assert.equal(d.target.combat.blocking, true);
-    assert.equal(d.events.length, 1);
-    assert.equal(d.events[0].type, 'block');
-    assert.ok(Math.abs(d.events[0].damage - SHURIKEN.damage * 0.25) < 1e-9, 'chip damage');
-    assert.ok(Math.abs(d.target.combat.stun - SHURIKEN.blockstun) < 1e-9, 'blockstun');
-    assert.equal(Math.abs(d.target.body.vx), 0, 'no launch to halve');
-    assert.equal(d.projectiles.length, 0, 'gone after the blocked impact');
-  }
-  // Guarding the other way does not block it.
-  const d = duel({ gap: 200, targetCharacter: blocker });
-  d.target.opponent = null;
-  d.target.facing = 1; // back to the thrower
-  d.tick(THROW, { defense: true, defensePressed: true });
-  for (let i = 0; i < 120 && !d.events.length; i++) d.tick({}, { defense: true });
-  assert.equal(d.target.combat.blocking, true);
-  assert.equal(d.events[0].type, 'hit');
+  assert.equal(d.target.combat.energy, 100, 'nothing paid for a hit');
 });
 
 test('the thrower cannot hit itself, and a projectile never damages anyone twice', () => {
@@ -723,26 +698,29 @@ test('Throw cuts straight out of Charge (no release pose); a held Charge restart
   assert.equal(e.projectiles.length, 1);
 });
 
-test('Throw pressed with Defense wins; no Dodge starts; Defense during the Throw does nothing', () => {
+test('Defense held wins over a Throw pressed with it; a Throw already playing is never cut short by the Shield', () => {
   const d = range();
   d.tick({ ...THROW, ...DEFENSE });
+  assert.equal(d.attacker.combat.attack, null, 'no Throw while Defense is held');
+  assert.equal(d.attacker.combat.shielding, true);
+  assert.deepEqual(d.attacker.releases, []);
+  // Let go of Defense: the Throw works.
+  d.tick(THROW);
   assert.equal(d.attacker.combat.attack?.def.id, 'throw');
-  assert.equal(d.attacker.combat.defenseAction, null, 'never both');
-  // Presses while it plays are ignored, not buffered.
+  // Defense pressed while it plays: the Throw plays out, never both.
   for (let i = 1; i < steps(3 / THROW_FPS); i++) {
     d.tick(DEFENSE);
     assert.equal(d.attacker.combat.attack?.def.id, 'throw');
-    assert.equal(d.attacker.combat.defenseAction, null);
-    assert.notEqual(d.attacker.state, 'defense');
+    assert.equal(d.attacker.combat.shielding, false);
   }
   d.tick({ defense: true });
   assert.equal(d.attacker.combat.attack, null);
-  assert.equal(d.attacker.combat.defenseAction, null, 'nothing was buffered');
-  // BA1's same-step priority over Defense is unchanged.
+  assert.equal(d.attacker.combat.shielding, true, 'up once the Throw is over, Defense still held');
+  // BA1 pressed with Defense: the Shield too.
   const b = range();
   b.tick({ action1: true, action1Pressed: true, ...DEFENSE });
-  assert.equal(b.attacker.combat.attack?.def.id, 'ba1');
-  assert.equal(b.attacker.combat.defenseAction, null);
+  assert.equal(b.attacker.combat.attack, null);
+  assert.equal(b.attacker.combat.shielding, true);
 });
 
 test('a shuriken adds exactly 1 Launch Point and never launches, even a target at 119, 500 or 5000: 0 x the new Launch Point is 0', () => {

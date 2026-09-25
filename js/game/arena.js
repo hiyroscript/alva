@@ -4,7 +4,8 @@
 // (js/game/practice.js) runs Player 1 with a training-dummy CPU and none of
 // them. Both share the Void's respawn wait (updateRespawns). DOM concerns
 // (HUD, menus, overlays) live in each mode's screen; the status drawn over
-// each fighter (stamina bar, name tag, CAB cooldowns) is drawn here.
+// each fighter (Energy bar, name tag, CAB cooldowns) and the Shield round it
+// are drawn here.
 
 import { CONFIG } from '../config.js';
 import { StageCollision, separate, resolveSolidOverlap } from './physics.js';
@@ -13,7 +14,8 @@ import { spawnProjectiles, removeDeadProjectiles } from './projectile.js';
 import { spawnClones, updateClones, removeDeadClones } from './clone.js';
 import { Camera } from './camera.js';
 import { drawFrame, drawCenteredFrame } from './sprite-normalizer.js';
-import { drawStaminaBar, drawCabIndicators, staminaBarState, statusOnScreen } from './fighter-status.js';
+import { drawEnergyBar, drawCabIndicators, energyBarState, statusOnScreen } from './fighter-status.js';
+import { drawShield } from './shield-fx.js';
 import { createTheme } from '../stages/index.js';
 
 // Ground ring + name tag tones: the player is white, the CPU a mid gray.
@@ -31,6 +33,10 @@ export class Arena {
     this.input = input;
     this.stage = new StageCollision(map);
     this.theme = createTheme(map, { reducedMotion });
+    // Effects drawn here (the Shield's drifting edge) run on this clock, and
+    // hold still with reduced motion.
+    this.reducedMotion = reducedMotion;
+    this.fxTime = 0;
     this.camera = new Camera();
     this.camera.setBounds(map.cameraBounds);
     this.camera.setAnchor(this.stage.centerX);
@@ -136,6 +142,7 @@ export class Arena {
     if (lead) this.camera.follow(lead, other, dt);
     this.syncView();
     this.theme.update(dt, this.view);
+    this.fxTime += dt;
     this.render();
   }
 
@@ -198,7 +205,7 @@ export class Arena {
   }
 
   // One step of every respawn wait. A fighter whose wait is over is back at
-  // its own spawn (Fighter.respawn: 0 Launch Point, full stamina, every
+  // its own spawn (Fighter.respawn: 0 Launch Point, full Energy, every
   // cooldown ready, nothing transient) and in play at once. Buffered presses
   // made while Player 1 was out are dropped, so it comes back neutral.
   updateRespawns(dt) {
@@ -256,8 +263,15 @@ export class Arena {
     // Clones and their clouds behind the fighters: a clone stands behind
     // its target, so the real fighter stays in front where they overlap.
     for (const c of this.clones) this.drawClone(c);
-    // Player 1 last, so it is always drawn on top (behind it, the CPU).
-    for (let i = fighters.length - 1; i >= 0; i--) this.drawFighter(fighters[i]);
+    // Player 1 last, so it is always drawn on top (behind it, the CPU). A
+    // raised Shield wraps its fighter: its faint interior behind the sprite,
+    // its rim in front, so the fighter reads as inside it.
+    for (let i = fighters.length - 1; i >= 0; i--) {
+      const f = fighters[i];
+      drawShield(ctx, f, view, 'interior', this.fxTime, this.reducedMotion);
+      this.drawFighter(f);
+      drawShield(ctx, f, view, 'rim', this.fxTime, this.reducedMotion);
+    }
     // A charged technique's sphere over the fighters, so the glowing orb is
     // never hidden behind a body, whether in a hand or on a caught opponent.
     for (const f of fighters) if (f.technique) this.drawTechnique(f.technique);
@@ -272,7 +286,7 @@ export class Arena {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     // The status of each fighter in play over everything, the Void
     // included, so it stays readable near its edge: name tags (or the
-    // off-screen pointers), then each on-screen fighter's stamina bar over
+    // off-screen pointers), then each on-screen fighter's Energy bar over
     // its tag while below full and its CAB1 / CAB2 cooldowns under its feet
     // while cooling down. A fighter out of play shows none of it.
     this.drawMarkers(fighters);
@@ -385,11 +399,12 @@ export class Arena {
     return this.markerAnchor(f)[1] - this.markerFont * 1.25;
   }
 
-  // Where `f`'s stamina bar goes when it shows, in device pixels: { x, y,
-  // w, h } (y its top), just over its name tag. Compact: about the
-  // fighter's width at this zoom (roughly 45-60 px on a desktop screen),
-  // never narrower than 44 CSS px or thinner than 4.
-  staminaBarRect(f) {
+  // Where `f`'s Energy bar goes when it shows, in device pixels: { x, y,
+  // w, h } (y its top), just over its name tag; its three segments share
+  // this width (see energySegmentRects). Compact: about the fighter's width
+  // at this zoom (roughly 45-60 px on a desktop screen), never narrower
+  // than 44 CSS px or thinner than 4.
+  energyBarRect(f) {
     const { scale: s, dpr } = this.view;
     const [x] = this.markerAnchor(f);
     const w = Math.round(Math.max(44 * dpr, 50 * s));
@@ -398,15 +413,15 @@ export class Arena {
     return { x: Math.round(x - w / 2), y: Math.round(this.markerTop(f) - gap - h), w, h };
   }
 
-  // The highest point of what is drawn over `f`: the top of its stamina
+  // The highest point of what is drawn over `f`: the top of its Energy
   // bar's outline while the bar shows, else the top of its name tag, so no
   // room is kept for a hidden bar. Practice Ground floats its damage numbers
   // from here.
   statusTop(f) {
-    return staminaBarState(f).visible ? this.staminaBarRect(f).y - 1 : this.markerTop(f);
+    return energyBarState(f).visible ? this.energyBarRect(f).y - 1 : this.markerTop(f);
   }
 
-  // Stamina bars and CAB cooldowns, for the fighters whose body is on
+  // Energy bars and CAB cooldowns, for the fighters whose body is on
   // screen: an off-screen fighter only gets its edge pointer. Each draws
   // only while it has something to show (see js/game/fighter-status.js).
   drawStatus(fighters = this.inPlay) {
@@ -414,7 +429,7 @@ export class Arena {
     for (const f of fighters) {
       const [x, , footY] = this.markerAnchor(f);
       if (!statusOnScreen(x, footY, view)) continue;
-      drawStaminaBar(ctx, f, this.staminaBarRect(f), view.dpr);
+      drawEnergyBar(ctx, f, this.energyBarRect(f), view.dpr);
       drawCabIndicators(ctx, f, x, footY, view.scale, view.dpr);
     }
   }
@@ -489,10 +504,11 @@ export class Arena {
     for (const f of fighters) {
       const b = f.body;
       rect(b.x - b.halfW, b.y - b.height, b.halfW * 2, b.height, '#3cff7a');
-      // Hurtboxes turn gray while a Dodge makes the fighter invulnerable.
+      // Hurtboxes, the same whether or not the Shield is up: it blocks what
+      // reaches them, never a bigger area.
       for (const hb of f.def.hurtboxes) {
         worldBox(f, hb, box);
-        rect(box.x, box.y, box.w, box.h, f.combat.invulnerable ? '#8a8a8a' : '#4aa8ff');
+        rect(box.x, box.y, box.w, box.h, '#4aa8ff');
       }
       // Attack hitbox, only while it can connect.
       const atk = f.combat.attack;
@@ -551,9 +567,10 @@ export class Arena {
       }
     }
     for (const f of fighters) {
-      if (!f.combat.immobilized) continue;
+      const tag = f.combat.immobilized ? 'bound' : f.combat.shielding ? 'shield' : null;
+      if (!tag) continue;
       const [lx, ly] = this.toScreen(f.renderX - f.body.halfW, f.renderY - f.body.height);
-      ctx.fillText('bound', Math.round(lx), Math.round(ly) - 14);
+      ctx.fillText(tag, Math.round(lx), Math.round(ly) - 14);
     }
     ctx.setLineDash([]);
     ctx.fillStyle = '#fff';
@@ -565,7 +582,7 @@ export class Arena {
       ? ` ${p.technique.def.id} ${p.technique.phase}`
       : p.combat.attack
         ? ` ${p.combat.attack.def.id} ${p.combat.phase}`
-        : p.combat.defenseAction ? ` ${p.combat.defenseAction.def.animation} ${p.combat.defensePhase}` : '';
+        : p.combat.shielding ? ` shield ${Math.round(p.combat.energy)}` : '';
     // The other fighter's state under its own label (the CPU's, in Quick
     // Battle or practice); nothing when Player 1 is alone.
     const other = this.secondary;

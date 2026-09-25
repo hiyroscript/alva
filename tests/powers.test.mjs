@@ -501,17 +501,19 @@ test('Speed Power changes nothing vertical: jump, gravity, fall speed, coyote ti
   assert.equal(CONFIG.sim.gravity, 2500, 'global gravity is untouched');
 });
 
-// A ground Dodge from standing: how many steps it lasts, how far it moved.
-function dodgeFrom(character) {
+// A grounded Shield held from standing, pressing toward a side: how far it
+// moved, and the poses it showed.
+function shieldFrom(character) {
   const { fighter, step } = makeFighter({ character });
   const x = fighter.body.x;
-  step({ defense: true, defensePressed: true });
-  assert.equal(fighter.state, 'defense');
-  const steps = stepUntil(step, (f) => !f.combat.defenseAction);
-  return { steps, moved: fighter.body.x - x };
+  step({ defense: true, defensePressed: true, right: true });
+  assert.equal(fighter.state, 'shield');
+  const poses = [];
+  for (let i = 0; i < 30; i++) poses.push(step({ defense: true, right: true }).animator.anim.key);
+  return { poses, moved: fighter.body.x - x };
 }
 
-test('Speed Power leaves every other velocity alone: launches received, the shuriken, the Sphere Rush and Dodges', () => {
+test('Speed Power leaves every other velocity alone: launches received, the shuriken, the Sphere Rush and the Shield', () => {
   // Launches received: tier 1 and tier 3 targets fly alike, pushed sideways
   // and launched upward.
   const flights = [1, 3].map((tier) => {
@@ -558,10 +560,11 @@ test('Speed Power leaves every other velocity alone: launches received, the shur
     assert.equal(rusher.fighter.body.vx, def.chargedTechniques.rasenRush.dashSpeed, label);
     assert.equal(def.chargedTechniques.rasenRush.dashSpeed, 1050);
 
-    // A Dodge from standing still adds no movement and lasts as long.
-    const dodge = dodgeFrom(character);
-    assert.deepEqual(dodge, dodgeFrom(def), `${label}: the same Dodge, with no movement`);
-    assert.equal(dodge.moved, 0);
+    // A Shield held from standing still adds no movement, however fast the
+    // fighter could run.
+    const shield = shieldFrom(character);
+    assert.deepEqual(shield, shieldFrom(def), `${label}: the same Shield, with no movement`);
+    assert.equal(shield.moved, 0);
 
     // At its own top speed the run clip plays at its own rate.
     const runner = makeFighter({ character });

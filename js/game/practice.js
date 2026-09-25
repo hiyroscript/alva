@@ -8,7 +8,7 @@
 // Ground screen.
 //
 // The practice CPU is a training dummy: it has no controller, so it never
-// moves, jumps, attacks, charges or defends of its own accord (Fighter falls
+// moves, jumps, attacks, charges or shields of its own accord (Fighter falls
 // back to neutral input), and keeps its spawn's facing: like every fighter
 // it never turns toward its opponent by itself. It is otherwise a normal
 // fighter: it takes real hits, hitstun, launches and binds, collides, and
@@ -25,7 +25,7 @@
 //
 // The Void never ends practice and scores nothing: a fighter that falls into
 // it is out of play for CONFIG.battle.respawnSeconds, then back at its own
-// spawn (onVoid, Arena.updateRespawns), fresh: 0 Launch Point, full stamina and
+// spawn (onVoid, Arena.updateRespawns), fresh: 0 Launch Point, full Energy and
 // every cooldown ready. Player 1 and the CPU each wait on their own.
 
 import { Arena } from './arena.js';
@@ -137,7 +137,7 @@ export class PracticeSession extends Arena {
   // play): nothing may keep hold of or aim at it (a technique holding it
   // ends; clones and projectiles aimed at it or its own go, and so do its
   // damage numbers). After its respawn wait it is back at its own spawn,
-  // still, in a fresh training state: 0 Launch Point, full stamina and its
+  // still, in a fresh training state: 0 Launch Point, full Energy and its
   // charged cooldowns ready (Fighter.respawn). No point is scored and
   // practice simply carries on.
   onVoid(f) {
@@ -181,7 +181,7 @@ export class PracticeSession extends Arena {
     if (this.view.pxW) this.drawDamageNumbers();
   }
 
-  // Red, outlined "+N" numbers over the CPU's name tag (and its stamina bar,
+  // Red, outlined "+N" numbers over the CPU's name tag (and its Energy bar,
   // while that shows), following it as it moves: each rises a little (not
   // with reduced motion) and fades out.
   drawDamageNumbers() {
@@ -201,7 +201,7 @@ export class PracticeSession extends Arena {
       const t = d.age / DAMAGE_LIFE;
       const [x] = this.markerAnchor(d.target);
       const rise = this.reducedMotion ? 0 : DAMAGE_RISE * t * s;
-      // Clear of the tag and any stamina bar over it (see Arena.statusTop),
+      // Clear of the tag and any Energy bar over it (see Arena.statusTop),
       // stacked by arrival.
       const y = this.statusTop(d.target) - 2 - d.stack * font * 0.95 - rise;
       ctx.globalAlpha = t < DAMAGE_FADE ? 1 : Math.max(0, 1 - (t - DAMAGE_FADE) / (1 - DAMAGE_FADE));

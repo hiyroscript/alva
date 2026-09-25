@@ -3,7 +3,7 @@
 // playback, phase timing against the art, hit resolution (ground BA2's Base
 // Launch 2 vertical launch; mid-air BA2, the five-frame airborne kick,
 // driving the target downward at Base Launch 2 reverse vertical; and a
-// blocked BA2 that is neither launched nor driven down) and missing-art
+// Shielded BA2 that is neither launched nor driven down) and missing-art
 // safety. Uses the real Fighter, CombatSystem, physics and
 // InputManager (see fighter-harness.mjs). Basic Attack 1 lives in
 // basic-attack.test.mjs.
@@ -612,9 +612,8 @@ test('a mid-air BA2 hit on a rising target reverses it: driven downward instead 
   assert.ok(kicked.log.length < plain.log.length, 'lands sooner than the unhit jump');
 });
 
-test('a blocked mid-air BA2 is neither driven downward nor pushed', () => {
-  const blocker = { ...def, defense: { type: 'block' } };
-  const d = duel({ targetCharacter: blocker });
+test('a Shielded mid-air BA2 is neither driven downward nor pushed', () => {
+  const d = duel();
   d.tick(JUMP, { defense: true });
   d.until(() => d.attacker.body.vy > 0 && d.attacker.body.y > 650);
   d.tick(BA2, { defense: true });
@@ -623,35 +622,36 @@ test('a blocked mid-air BA2 is neither driven downward nor pushed', () => {
   assert.equal(d.events.length, 1);
   assert.equal(d.events[0].type, 'block');
   assert.equal(d.target.body.vy, 0, 'no downward launch on a block');
-  assert.ok(isZero(d.target.body.vx), 'no horizontal launch to halve');
-  assert.equal(d.target.combat.launchPoint, d.events[0].damage, 'the chip damage still adds to Launch Point');
+  assert.ok(isZero(d.target.body.vx), 'no horizontal launch either');
+  assert.equal(d.events[0].damage, 0);
+  assert.equal(d.target.combat.launchPoint, 0, 'no chip damage');
   assert.equal(d.target.grounded, true);
 });
 
-test('a Block-type fighter guarding BA2 takes chip damage, blockstun and hitstop but is not launched; #0001 itself does not block', () => {
-  // #0001's Defense is a Dodge, so the block path is kept for future
-  // characters whose Defense is { type: 'block' }.
-  const blocker = { ...def, defense: { type: 'block' }, stats: { ...def.stats, blockDamageScale: 0.15 } };
-  const { attacker, target, tick, events } = duel({ targetCharacter: blocker });
+test('#0001 Shielding BA2 pays 25 Energy and takes its blockstun and hitstop in the Shield, but no damage or launch', () => {
+  const { attacker, target, tick, events } = duel();
   const groundY = target.body.y;
   const startX = target.body.x;
   tick(BA2, { defense: true });
-  assert.equal(target.combat.blocking, true);
+  assert.equal(target.combat.shielding, true);
   while (!events.length) tick({}, { defense: true });
   assert.equal(events.length, 1);
   assert.equal(events[0].type, 'block');
-  assert.ok(Math.abs(target.combat.launchPoint - 10 * 0.15) < 1e-9, 'chip damage, added to Launch Point');
-  assert.equal(target.combat.stun, attacker.attacks.ba2.blockstun, 'blockstun');
+  assert.equal(events[0].energyCost, 25);
+  assert.equal(target.combat.launchPoint, 0, 'no chip damage');
+  assert.equal(target.combat.stun, 0, 'no hitstun');
+  assert.equal(target.combat.shieldStun, attacker.attacks.ba2.blockstun, 'blockstun, held in the Shield');
   assert.equal(target.combat.hitstop, attacker.attacks.ba2.hitstop, 'hitstop');
-  // A blocked hit never launches, and BA2 has no sideways push to halve.
+  // A Shielded hit never launches.
   assert.equal(target.body.vy, 0);
   assert.equal(target.grounded, true);
   assert.ok(isZero(target.body.vx));
-  while (attacker.combat.attack || target.combat.stun > 0) {
+  while (attacker.combat.attack || target.combat.shieldStun > 0) {
     tick({}, { defense: true });
     assert.equal(target.grounded, true, 'stays on the ground');
     assert.equal(target.body.y, groundY);
     assert.equal(target.body.x, startX, 'no horizontal displacement');
+    assert.equal(target.state, 'shield', 'never a hurt pose');
   }
   assert.equal(events.length, 1);
   assert.equal(def.stats.blockDamageScale, undefined, '#0001 has no chip-damage stat');
