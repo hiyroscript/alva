@@ -13,8 +13,8 @@ Power), a camera, a HUD, touch controls,
 and a data-driven combat system built on Launch Point, Base Launch and
 Directional Launch, with #0001's two real attacks, Basic Attack 1
 (BA1) and Basic Attack 2 (BA2), a held ground and mid-air Shield on the
-shared Defense input, a Dash on a double tap, a 100-point Energy meter (drawn
-as three segments) that a Dash and every Shielded hit spend, a held Charge
+shared Defense input, a Dash on a double tap, a 100-point Energy bar that a
+Dash and every Shielded hit spend, a held Charge
 stance, a Charged BA1 Clone Attack (CAB1) and a
 Charged BA2 Sphere Rush (CAB2), each on its own cooldown, and
 platform-fighter scoring: every hit's damage adds to the target's Launch
@@ -124,9 +124,9 @@ attack animations. Its touch button has a dashed outline.
   Launch Point, launches nothing and shows no hurt pose; it costs **25
   Energy**, once for that hit, and the Shield holds through its hitstop
   and blockstun. Holding the Shield costs nothing, and neither does an
-  attack that misses. It needs at least 25 Energy to go up or stay up, and
-  never works while exhausted (below): the block that spends the last of
-  it still stands, but the Shield drops at once. It is drawn as a wavy
+  attack that misses. It goes up with any Energy left and never works while
+  exhausted (below). A block with less than 25 left still stands but takes
+  all of it, which empties the bar: the Shield drops at once. It is drawn as a wavy
   black circle round #0001 with a thin red line on its inner side, over a
   barely-there black interior so he stays in plain view; it follows him,
   is sized from his visual height and drifts gently (still with reduced
@@ -137,8 +137,8 @@ attack animations. Its touch button has a dashed outline.
   standing on the ground. #0001 bursts that way at about 1.8× its top speed
   (600 units / s) for one pass of its two-frame dash clip (`dash1 → dash2`,
   once, at 10 fps: 0.2 s, about 120 units), facing the Dash at once, then
-  runs on from that speed if you keep holding the direction. It costs 25
-  Energy. It is movement only: no hitbox, damage, launch or
+  runs on from that speed if you keep holding the direction. It costs 15
+  Energy (all that is left, emptying the bar, when there is less). It is movement only: no hitbox, damage, launch or
   invulnerability, and it still obeys the stage: a solid stops it, and
   running off a ledge ends it and #0001 falls. No Dash in the air, while
   attacking, shielding (or holding Defense), charging (or holding Charge),
@@ -147,20 +147,17 @@ attack animations. Its touch button has a dashed outline.
   saved for later.
   Left then right (or right then left) is not a double tap.
 - **Energy:** each fighter's one resource, 100 at most and at the start.
-  It is spent only by a Dash (25, as it starts) and by the Shield (25 for
+  It is spent only by a Dash (15, as it starts) and by the Shield (25 for
   every hit it blocks; holding it is free). It refills by itself at 12 per
   second whatever the fighter is doing (shielding included), and at 30 per
   second while it is in the Charge stance. It shows over the fighter's name
-  tag only while below full, as three small adjacent purple segments that
-  together make up the one value (34 + 33 + 33 = 100): spending empties the
-  front (left) segment first, then the middle, then the back, and refilling
-  rebuilds them the other way, back segment first. At exactly 0 the fighter
-  is exhausted: all three segments turn gray and Shield and Dash stay locked
+  tag only while below full, as one thin bright purple bar that shrinks
+  from the right. A Dash or a block still happens with less Energy left than
+  it costs, but then takes all of it. At 0, however it gets there, the
+  fighter is exhausted: the bar turns gray and Shield and Dash stay locked
   until Energy is completely full again (a partial refill does not unlock
-  them); the meter disappears at 100. Below 25 without being exhausted,
-  there is simply not enough for a block or a Dash until the refill reaches
-  25. Exhausted or low, a fighter still moves, jumps, attacks, charges and
-  uses CAB1 / CAB2: nothing else ever costs Energy.
+  them); the bar disappears at 100. Exhausted, a fighter still moves, jumps,
+  attacks, charges and uses CAB1 / CAB2: nothing else ever costs Energy.
 - **Charge:** hold `S` / `↓` (**C** on touch, D-pad down or left stick down
   on a gamepad) while #0001 is on the ground. Held, it plays
   `charge1 → charge2` once, then loops `chargea ↔ chargeb` for as long as you
@@ -283,10 +280,10 @@ Touch controls show on touch-first devices (coarse pointer, or a touch actually 
 - **Animations:** Idle, Run, Jump, Fall, Land (jump/fall play while airborne; land plays once on touchdown), Hurt and Mid-air Hurt (shown during hitstun on the ground / in the air), Basic Attack 1 (4 frames), Mid-air Basic Attack 1 (the kunai slash, 3 frames: `0001_midair2ba1`–`3`), Basic Attack 2 (7 frames) and Mid-air Basic Attack 2 (the airborne kick, 5 frames: `0001_midair1ba1`–`5`), each played once at 12 fps, Shield (`0001_prepshield` to raise it, `0001_shielding` held, `0001_releaseblock` to lower it) and Mid-air Shield (`0001_midairshielding`, the held pose only), single frames drawn at 1×, Dash (`0001_dash1`–`2`, drawn at 1×, played once at 10 fps), Charge (charge1 → charge2 once, then chargea ↔ chargeb while held, at 10 fps, with charge1 shown briefly on release), Throw (3 fighter frames, played once at 12 fps), Shuriken (3 looping projectile frames at 18 fps, normalized and drawn separately from the fighter poses), the clone appear / vanish cloud (`0001_cloneav1`–`0001_cloneav10`, an effect at 20 fps: forwards as a clone appears, the same frames in reverse as it vanishes), the Sphere Rush poses (`0001_rasen1`–`0001_rasen12` as one-shot fighter clips at 12 fps: formation 1–3, rush 4–6, contact 7–8 with 8 held, explosion 9, recovery 10–12, and 12 alone as the whiff release) and its blue sphere (`0001_prasen1`–`0001_prasen11` as three effects at 12 fps: formation 1–6 once, spinning on the opponent 7–9 looped while it is drawn ever larger, explosion 10–11 once)
 - **Attacks:** Basic Attack 1 and Basic Attack 2, each on the ground and in the air, a ground Throw that releases one shuriken, the Charged BA1 Clone Attack and the Charged BA2 Sphere Rush (ground only), each on its own 5-second cooldown. #0001's damage: BA1 5, mid-air BA1 5, BA2 10, mid-air BA2 10, shuriken 1, Sphere Rush 1 as it catches the opponent and every 0.5 s after while it holds it (4 in all), then 15 on the explosion. Special is reserved.
 - **Defense:** #0001 shields, on the ground and in the air: held, full circle, free to hold, 25 Energy for each hit it blocks.
-- **Movement:** running, jumping and a grounded Dash on a double tap (25 Energy).
+- **Movement:** running, jumping and a grounded Dash on a double tap (15 Energy).
 - **Powers:** Jump Power and Speed Power, each in three tiers. #0001 has Jump Power 2 and Speed Power 2 (its original jump and speed).
 - **Launch:** every hit's damage adds to the target's Launch Point, then the hit launches at its Base Launch (0, 1, 2 or 3) × that new Launch Point, in its Directional Launch. #0001's BA1 is Base Launch 1 horizontal, its BA2 and mid-air BA1 Base Launch 2 vertical, its mid-air BA2 Base Launch 2 reverse vertical (downward), the Sphere Rush blast Base Launch 3 horizontal, and the shuriken and Sphere Rush ticks Base Launch 0 with no direction (they never launch).
-- **HUD:** each fighter has one compact, semi-transparent glass card, pulled in close on either side of the timer: its portrait (the character's own `visual.portrait` crop, turned to face the timer whichever way its art is drawn), one thin divider, and its name with its Launch Point beneath it. The CPU's card mirrors Player 1's. In Quick Battle three small dots under each card fill as that fighter scores its points (○ ○ ○, then ● ○ ○ ...). Over each fighter itself, following it: its three-segment purple Energy bar above its name tag while below full, and its CAB1 / CAB2 cooldown rings under its feet while cooling down.
+- **HUD:** each fighter has one compact, semi-transparent glass card, pulled in close on either side of the timer: its portrait (the character's own `visual.portrait` crop, turned to face the timer whichever way its art is drawn), one thin divider, and its name with its Launch Point beneath it. The CPU's card mirrors Player 1's. In Quick Battle three small dots under each card fill as that fighter scores its points (○ ○ ○, then ● ○ ○ ...). Over each fighter itself, following it: its bright purple Energy bar above its name tag while below full, and its CAB1 / CAB2 cooldown rings under its feet while cooling down.
 - **Modes:** Quick Battle: 99 seconds against a non-attacking training CPU, first to 3 points. Each time a fighter falls into the Void its opponent scores a point at once; the one that fell is out of play for 2 seconds, then back at its spawn with 0 Launch Point, full Energy and both charged abilities ready, while the fight and the timer carry on. The third point wins the match (a short **K.O.** beat, then the result; the loser does not come back). If both fall together, or one falls while the other is still waiting to come back, that fall scores nothing. If time runs out first, more points wins, then lower Launch Point; equal on both is a draw. Practice Ground: training on its own stage with a stand-still CPU dummy from the start (which you can change or disable), no timer, rounds or points; the Void takes a fighter out for 2 seconds, then puts it back at its spawn (below).
 
 ## Design
@@ -557,7 +554,7 @@ While either is cooling down the press does nothing. Without an opponent (for a 
 
 To choose how a fighter defends, give it a `defense` entry. The one type so far is `{ type: 'shield', groundAnimation, airAnimation, groundStartAnimation, groundReleaseAnimation }` (like #0001's `shield`, `midairShield`, `shieldStart` and `shieldRelease`): a held, full-circle Shield (see Defense above). The held clips are required: without the one for where the fighter is, the Shield is refused (and logged once), never faked; the raise and lower poses are optional. The type is checked, so a future fighter can defend another way on the same Defense button; an unknown type is an error.
 
-Energy and the Dash are data too. An `energy` entry (`{ max, regen, chargeRegen, dashCost, shieldHitCost }`, see `resolveEnergy` in `js/game/combat.js`) sets the fighter's resource; every field is optional and defaults to #0001's values (100, 12 / s, 30 / s in Charge, 25, 25). A Shield pays `shieldHitCost` for each hit it blocks and needs that much to be up; neither a Dash nor a Shield works while the fighter is exhausted. The three-segment display (`ENERGY_SEGMENTS`, 34 / 33 / 33, in `js/game/fighter-status.js`) is a UI constant over the one value, not fighter data. To give a fighter a Dash, add a `dash` clip to `animations` and `movement.dashSpeed` / `movement.dashTapWindow`: the Dash lasts one pass of the clip and pays `dashCost`. Without the clip (or a `dashSpeed`) it never dashes: a Dash without frames is refused and logged, never faked with the run.
+Energy and the Dash are data too. An `energy` entry (`{ max, regen, chargeRegen, dashCost, shieldHitCost }`, see `resolveEnergy` in `js/game/combat.js`) sets the fighter's resource; every field is optional and defaults to #0001's values (100, 12 / s, 30 / s in Charge, 15, 25). A Shield pays `shieldHitCost` for each hit it blocks. A cost larger than what is left is still paid by taking the rest, which exhausts the fighter; neither a Dash nor a Shield works while it is exhausted. To give a fighter a Dash, add a `dash` clip to `animations` and `movement.dashSpeed` / `movement.dashTapWindow`: the Dash lasts one pass of the clip and pays `dashCost`. Without the clip (or a `dashSpeed`) it never dashes: a Dash without frames is refused and logged, never faked with the run.
 
 ### Adding a map
 

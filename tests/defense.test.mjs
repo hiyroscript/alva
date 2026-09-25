@@ -580,38 +580,50 @@ test('blocking uses the fighter\'s own hurtboxes, never the bigger circle drawn 
   assert.equal(d.target.combat.energy, 100);
 });
 
-test('below 25 Energy the Shield cannot go up; it rises by itself once the refill reaches 25', () => {
-  const { fighter, step } = makeFighter();
-  fighter.combat.setEnergy(20);
-  assert.equal(fighter.combat.energyExhausted, false, 'low, not exhausted');
-  assert.equal(fighter.combat.canShield(), false);
-  step(DEFENSE);
-  assert.equal(fighter.combat.shielding, false);
-  assert.notEqual(fighter.state, 'shield');
-  let n = 0;
-  while (!fighter.combat.shielding && n++ < 600) {
-    assert.ok(fighter.combat.energy < COST, `still short at ${fighter.combat.energy}`);
-    step(HOLD);
-  }
-  assert.ok(fighter.combat.energy >= COST - 1e-6 && fighter.combat.energy < COST + 0.5, `up at ${fighter.combat.energy}`);
-  assert.ok(Math.abs(n - steps(5 / 12)) <= 1, `5 Energy at 12 / s (${n} steps)`);
-  // Unable to Shield, attacks work normally.
+test('with less than 25 Energy the Shield still goes up and blocks; that block takes all that is left, grays the bar and drops the Shield', () => {
+  const d = duel({ targetCharacter: NO_REGEN });
+  d.target.combat.setEnergy(10);
+  assert.equal(d.target.combat.canShield(), true, 'not exhausted: any Energy will do');
+  d.tick({}, DEFENSE);
+  assert.equal(d.target.combat.shielding, true);
+  assert.equal(d.target.state, 'shield');
+  const [event] = blockedAttack(d);
+  assert.equal(event.type, 'block', 'the block stands');
+  assert.equal(event.damage, 0);
+  assert.equal(event.energyCost, 10, 'all it had, never below 0');
+  assert.equal(d.target.combat.launchPoint, 0);
+  assert.deepEqual([d.target.combat.energy, d.target.combat.energyExhausted], [0, true]);
+  assert.equal(energyBarState(d.target).color, ENERGY_STYLE.exhausted, 'gray');
+  assert.equal(d.target.combat.shielding, false, 'dropped at once');
+  assert.equal(d.target.combat.shieldStun, 0);
+  // Still holding Defense: locked until the bar is full again, and the next
+  // hit lands in full.
+  while (d.attacker.combat.attack || d.attacker.combat.cooldowns.size) d.tick({}, HOLD);
+  const [hit] = blockedAttack(d);
+  assert.equal(hit.type, 'hit');
+  assert.equal(d.target.combat.launchPoint, 5);
+  // Exhausted, attacks work normally even with Defense held.
   const low = makeFighter();
-  low.fighter.combat.setEnergy(10);
+  low.fighter.combat.setEnergy(0);
   low.step({ ...HOLD, ...BA1 });
+  assert.equal(low.fighter.combat.shielding, false);
   assert.equal(low.fighter.combat.attack?.def.id, 'ba1');
 });
 
-test('a block that leaves less than 25 drops the Shield; a later hit, even on the same step, lands in full', () => {
+test('a block that leaves some Energy keeps the Shield up; the one that empties it drops it, and a later hit, even on the same step, lands in full', () => {
   const d = duel({ targetCharacter: NO_REGEN });
   d.tick({}, DEFENSE);
   d.target.combat.setEnergy(40);
   const [event] = blockedAttack(d);
   assert.equal(event.type, 'block');
+  assert.equal(event.energyCost, COST);
   assert.equal(d.target.combat.energy, 15);
-  assert.equal(d.target.combat.energyExhausted, false, 'low, not exhausted');
-  assert.equal(d.target.combat.shielding, false, 'dropped: it could not afford another');
-  assert.equal(d.target.combat.shieldStun, 0);
+  assert.equal(d.target.combat.energyExhausted, false);
+  assert.equal(d.target.combat.shielding, true, 'still up on 15');
+  while (d.attacker.combat.attack || d.attacker.combat.cooldowns.size) d.tick({}, HOLD);
+  const [second] = blockedAttack(d);
+  assert.deepEqual([second.type, second.energyCost], ['block', 15]);
+  assert.deepEqual([d.target.combat.energy, d.target.combat.energyExhausted, d.target.combat.shielding], [0, true, false]);
   // Two hits resolved on one step: 25 blocks the first, the second lands.
   const system = new CombatSystem();
   const { fighter: target } = makeFighter({ x: 544, facing: -1 });
@@ -619,9 +631,9 @@ test('a block that leaves less than 25 drops the Shield; a later hit, even on th
   target.combat.setEnergy(COST);
   target.combat.shielding = true;
   const first = system.applyHit(attacker, target, attacker.attacks.ba1);
-  const second = system.applyHit(attacker, target, attacker.attacks.ba1);
-  assert.deepEqual([first.type, second.type], ['block', 'hit']);
-  assert.deepEqual([first.energyCost, second.energyCost], [COST, 0]);
+  const next = system.applyHit(attacker, target, attacker.attacks.ba1);
+  assert.deepEqual([first.type, next.type], ['block', 'hit']);
+  assert.deepEqual([first.energyCost, next.energyCost], [COST, 0]);
   assert.equal(target.combat.energy, 0);
   assert.equal(target.combat.energyExhausted, true);
   assert.equal(target.combat.launchPoint, 5, 'only the second hit counts');

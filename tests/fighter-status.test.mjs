@@ -1,6 +1,6 @@
 // Run with node --test tests/fighter-status.test.mjs (no dependencies).
-// The status drawn with each fighter on the Arena canvas: the purple
-// three-segment Energy bar over its name tag, only while below full (gray
+// The status drawn with each fighter on the Arena canvas: the bright purple
+// Energy bar over its name tag, only while below full (gray
 // through an exhaustion's whole refill), and the CAB1 / CAB2 cooldown rings
 // under its feet, only while cooling down. The state helpers are checked directly;
 // the drawing through a
@@ -12,8 +12,8 @@ import { readFileSync } from 'node:fs';
 import { Battle } from '../js/game/battle.js';
 import { getMap } from '../js/data/maps.js';
 import {
-  cabIndicators, energyBarState, energySegmentRects, formatCooldown, drawCabIndicators, drawEnergyBar, statusOnScreen,
-  CAB_STYLE, ENERGY_STYLE, ENERGY_SEGMENTS, CHARGED_LABELS,
+  cabIndicators, energyBarState, formatCooldown, drawCabIndicators, drawEnergyBar, statusOnScreen,
+  CAB_STYLE, ENERGY_STYLE, CHARGED_LABELS,
 } from '../js/game/fighter-status.js';
 import { def, DT, fakeSprites, makeFighter, duel } from './fighter-harness.mjs';
 
@@ -178,7 +178,7 @@ test('CAB rings are white with a black outline: ring, number and label; never gr
   assert.ok(l2.args[1] - l1.args[1] > 20, 'apart enough not to overlap');
 });
 
-// ---- Energy bar: three segments, only while below full ------------------------
+// ---- Energy bar: only while below full ------------------------------------------
 
 const HOLD = { defense: true };
 // Two presses of `dir`, one step apart: a Dash's double tap.
@@ -187,9 +187,9 @@ const doubleTap = (step, dir = 'right') => {
   step({});
   return step({ [`${dir}Pressed`]: true, [dir]: true });
 };
-const RECT = { x: 100, y: 50, w: 54, h: 6 };
-// What drawEnergyBar paints for `fighter` in RECT at dpr 1: per segment, its
-// outline, track and (if any) fill rectangles, or null when it draws nothing.
+const RECT = { x: 100, y: 52, w: 52, h: 6 };
+// What drawEnergyBar paints for `fighter` in RECT at dpr 1: its outline,
+// track and (if any) fill rectangles, or null when it draws nothing.
 const barDrawing = (fighter, rect = RECT, dpr = 1) => {
   const { ctx, calls } = recorder();
   const drew = drawEnergyBar(ctx, fighter, rect, dpr);
@@ -218,77 +218,37 @@ const refillUntilHidden = (fighter, step, held = {}) => {
   throw new Error('never refilled');
 };
 
-test('the segments\' layout: three adjacent tracks with small gaps, spanning exactly the bar\'s compact footprint', () => {
-  for (const [rect, dpr] of [[RECT, 1], [{ x: 10, y: 5, w: 44, h: 4 }, 1], [{ x: 0, y: 0, w: 96, h: 9 }, 2], [{ x: 3, y: 7, w: 61, h: 5 }, 1.5]]) {
-    const segs = energySegmentRects(rect, dpr);
-    assert.equal(segs.length, 3);
-    assert.equal(segs[0].x, rect.x, 'starts where the bar does');
-    assert.equal(segs[2].x + segs[2].w, rect.x + rect.w, 'ends where the bar does: the old footprint');
-    const o = Math.max(1, Math.round(dpr));
-    for (let i = 0; i < 3; i++) {
-      const s = segs[i];
-      assert.deepEqual([s.y, s.h], [rect.y, rect.h]);
-      assert.ok(Number.isInteger(s.x) && Number.isInteger(s.w) && s.w > 0, 'whole pixels');
-      if (i) {
-        const gap = s.x - (segs[i - 1].x + segs[i - 1].w);
-        assert.ok(gap > 2 * o, `a clear gap between the outlines (${gap} px)`);
-        assert.ok(gap <= 3 * o + 1, 'a small one');
-      }
-    }
-    // As wide as their shares (34 : 33 : 33), to the pixel.
-    const inner = segs.reduce((a, s) => a + s.w, 0);
-    for (let i = 0; i < 3; i++) assert.ok(Math.abs(segs[i].w - (inner * ENERGY_SEGMENTS[i]) / 100) <= 1, `segment ${i}`);
-  }
-});
-
-test('the Energy bar: hidden at full; three purple segments on dark tracks in black outlines, the front one spent first; gray while exhausted', () => {
+test('the Energy bar: hidden at full; one bright purple fill over a dark track in a black outline, shrinking from the right; gray while exhausted', () => {
   const { fighter } = makeFighter();
   const c = fighter.combat;
   const bar = energyBarState(fighter);
-  assert.deepEqual([bar.visible, bar.energy, bar.maxEnergy, bar.exhausted, bar.color], [false, 100, 100, false, ENERGY_STYLE.fill]);
-  assert.equal(barDrawing(fighter), null, 'full: no bar, no empty placeholders');
-  const [front, middle, back] = energySegmentRects(RECT, 1);
-  c.setEnergy(75);
-  let drawn = barDrawing(fighter);
-  assert.equal(fillsOf(drawn, ENERGY_STYLE.outline).length, 3, 'three outlined segments');
-  assert.equal(fillsOf(drawn, ENERGY_STYLE.track).length, 3);
-  assert.equal(ENERGY_STYLE.outline, '#000000');
-  let fills = fillsOf(drawn, ENERGY_STYLE.fill);
-  // 75: the front one keeps 9 of its 34, held against its back end; the
-  // middle and back ones are full.
-  const part = Math.round(front.w * (9 / 34));
-  assert.deepEqual(fills, [
-    [front.x + front.w - part, front.y, part, front.h],
-    [middle.x, middle.y, middle.w, middle.h],
-    [back.x, back.y, back.w, back.h],
-  ]);
-  // 50: the front one gone, the middle half, the back full.
+  assert.deepEqual([bar.visible, bar.energy, bar.maxEnergy, bar.ratio, bar.exhausted, bar.color], [false, 100, 100, 1, false, ENERGY_STYLE.fill]);
+  assert.equal(barDrawing(fighter), null, 'full: no bar at all');
   c.setEnergy(50);
-  fills = fillsOf(barDrawing(fighter), ENERGY_STYLE.fill);
-  assert.equal(fills.length, 2);
-  assert.deepEqual(fills[0], [middle.x + middle.w - Math.round(middle.w * 17 / 33), middle.y, Math.round(middle.w * 17 / 33), middle.h]);
-  assert.deepEqual(fills[1], [back.x, back.y, back.w, back.h]);
-  // 0: shown, gray-ready, with no fill at all.
+  let drawn = barDrawing(fighter);
+  assert.deepEqual(drawn.map((d) => d.fill), [ENERGY_STYLE.outline, ENERGY_STYLE.track, ENERGY_STYLE.fill], 'one bar: outline, track, fill');
+  assert.equal(ENERGY_STYLE.outline, '#000000');
+  assert.deepEqual(drawn[0].rect, [RECT.x - 1, RECT.y - 1, RECT.w + 2, RECT.h + 2], 'the outline round the whole bar');
+  assert.deepEqual(drawn[2].rect, [100, 52, 26, 6], 'half: the fill contracts from the right');
+  c.setEnergy(85);
+  assert.deepEqual(barDrawing(fighter)[2].rect, [100, 52, Math.round(52 * 0.85), 6]);
   c.setEnergy(0);
   const empty = energyBarState(fighter);
-  assert.deepEqual([empty.visible, empty.exhausted, empty.color], [true, true, ENERGY_STYLE.exhausted]);
+  assert.deepEqual([empty.visible, empty.ratio, empty.exhausted, empty.color], [true, 0, true, ENERGY_STYLE.exhausted]);
   drawn = barDrawing(fighter);
-  assert.equal(fillsOf(drawn, ENERGY_STYLE.outline).length, 3);
-  assert.equal(drawn.filter((d) => d.fill !== ENERGY_STYLE.outline && d.fill !== ENERGY_STYLE.track).length, 0, 'empty');
-  // Refilling while exhausted: gray, from the back segment.
-  c.regenEnergy(25);
-  fills = fillsOf(barDrawing(fighter), ENERGY_STYLE.exhausted);
-  assert.equal(fills.length, 1, 'only the back segment has any yet');
-  assert.equal(fills[0][0] + fills[0][2], back.x + back.w);
-  assert.equal(fillsOf(barDrawing(fighter), ENERGY_STYLE.fill).length, 0, 'never purple while exhausted');
-  c.regenEnergy(74.9);
-  assert.equal(fillsOf(barDrawing(fighter), ENERGY_STYLE.exhausted).length, 3, 'still gray at 99.9, all three');
+  assert.deepEqual(drawn.map((d) => d.fill), [ENERGY_STYLE.outline, ENERGY_STYLE.track], 'empty: shown, with no fill at all');
+  c.regenEnergy(40);
+  drawn = barDrawing(fighter);
+  assert.equal(drawn[2].fill, ENERGY_STYLE.exhausted, 'refilling while exhausted: gray');
+  assert.equal(drawn[2].rect[2], Math.round(52 * 0.4), 'as long as what has come back');
+  c.regenEnergy(59.9);
+  assert.equal(barDrawing(fighter)[2].fill, ENERGY_STYLE.exhausted, 'still gray at 99.9');
   c.regenEnergy(0.1);
   assert.equal(barDrawing(fighter), null, 'exactly full: gone, never a full purple bar');
-  // Purple, not green (nor the Shield's red): red and blue well above green.
+  // Bright purple, not green (nor the Shield's red): full blue, strong red.
   const [r, g, b] = [1, 3, 5].map((i) => parseInt(ENERGY_STYLE.fill.slice(i, i + 2), 16));
   assert.ok(r > g && b > g, ENERGY_STYLE.fill);
-  assert.ok(b > 0xc0, 'blue enough to read purple, never red');
+  assert.ok(b === 0xff && r >= 0xa0 && g <= 0x40, `bright and saturated (${ENERGY_STYLE.fill})`);
 });
 
 test('a fresh fighter shows no bar; a real Dash or blocked hit brings it up at once, it stays through the refill and goes at full', () => {
@@ -301,12 +261,14 @@ test('a fresh fighter shows no bar; a real Dash or blocked hit brings it up at o
   for (let i = 0; i < 30 && !d.events.length; i++) d.tick({}, HOLD);
   assert.equal(d.events[0].type, 'block');
   for (const [label, fighter, step] of [['Dash', dashed.fighter, dashed.step], ['block', d.target, (held) => d.tick({}, held)]]) {
-    assert.equal(fighter.combat.energy, 75, `${label} spent 25`);
+    const spent = label === 'Dash' ? 15 : 25;
+    assert.equal(fighter.combat.energy, 100 - spent, `${label} spent ${spent}`);
     const bar = energyBarState(fighter);
     assert.deepEqual([bar.visible, bar.exhausted, bar.color], [true, false, ENERGY_STYLE.fill], label);
-    assert.deepEqual(bar.segments.map((s) => s.ratio), [9 / 34, 1, 1], `${label}: the front segment spent`);
+    assert.ok(Math.abs(bar.ratio - (100 - spent) / 100) < 1e-9, `${label}: shown at ${100 - spent}%`);
+    assert.equal(barDrawing(fighter)[2].rect[2], Math.round(52 * (100 - spent) / 100));
     const { steps: n, colors } = refillUntilHidden(fighter, step);
-    assert.ok(n > 100, `${label}: shown for the whole refill (${n} steps)`);
+    assert.ok(n >= (spent / 12) * 60 - 1, `${label}: shown for the whole refill (${n} steps)`);
     assert.deepEqual([...colors], [ENERGY_STYLE.fill], `${label}: an ordinary refill is purple throughout`);
   }
 });
@@ -322,17 +284,17 @@ test('Charge only fills the bar faster: it still shows until full, and hides at 
   assert.deepEqual([...fast.colors], [ENERGY_STYLE.fill]);
 });
 
-test('the gray exhaustion cycle: exactly 0 turns all three gray, gray through 25, 75 and 99, gone only when full', () => {
+test('the gray exhaustion cycle: a Dash with too little left empties it, gray through 25, 75 and 99, gone only when full', () => {
   const { fighter, step } = makeFighter();
   const c = fighter.combat;
   step({ rightPressed: true, right: true });
   step({});
-  c.setEnergy(25);
+  c.setEnergy(8);
   step({ rightPressed: true, right: true });
-  assert.ok(fighter.dash, 'a Dash spent the last 25');
+  assert.ok(fighter.dash, 'a Dash on 8, though it costs 15');
   assert.equal(c.energy, 0);
   assert.equal(c.energyExhausted, true);
-  assert.deepEqual(energyBarState(fighter).segments.map((s) => s.ratio), [0, 0, 0]);
+  assert.equal(energyBarState(fighter).ratio, 0);
   assert.equal(energyBarState(fighter).color, ENERGY_STYLE.exhausted);
   // Refilling by itself: gray at every checkpoint.
   for (const mark of [25, 75, 99]) {
@@ -381,8 +343,8 @@ function renderedBattle() {
 test('in play: nothing over or under a fighter with full Energy and both CABs ready; its bar over its tag and rings under its feet once they show, drawn after the Void', () => {
   const { battle, render } = renderedBattle();
   const { p1, p2 } = battle;
-  // A fighter's bar: its three segment outlines, black fillRects of the
-  // bar's height plus the outline (the CAB rings are strokes and text).
+  // A fighter's bar: its black outline fillRect (the CAB rings are strokes
+  // and text).
   const bars = (calls) => calls.filter((c) => c.fn === 'fillRect' && c.fill === ENERGY_STYLE.outline);
   const purple = (calls) => calls.filter((c) => c.fn === 'fillRect' && c.fill === ENERGY_STYLE.fill);
   let calls = render();
@@ -398,8 +360,8 @@ test('in play: nothing over or under a fighter with full Energy and both CABs re
   calls = render();
   const at = (pred) => calls.findIndex(pred);
   const voidAt = at((c) => c.fn === 'void');
-  assert.equal(bars(calls).length, 3, 'P1\'s three segments only');
-  assert.equal(purple(calls).length, 3);
+  assert.equal(bars(calls).length, 1, 'P1\'s bar only');
+  assert.equal(purple(calls).length, 1);
   assert.ok(at((c) => c.fn === 'fillRect' && c.fill === ENERGY_STYLE.fill) > voidAt, 'over the Void');
   assert.ok(at((c) => c.fn === 'fillText' && c.args[0] === 'CAB1') > voidAt);
   assert.deepEqual(texts(calls).filter((t) => /^CAB/.test(t)), ['CAB1'], 'P1\'s CAB1 only');
@@ -409,12 +371,8 @@ test('in play: nothing over or under a fighter with full Energy and both CABs re
   assert.ok(bar.y + bar.h < battle.markerTop(p1), 'the bar sits clear above the name tag');
   assert.ok(Math.abs(bar.x + bar.w / 2 - x) <= 1, 'centred over the fighter');
   assert.ok(bar.w >= 44, 'never too small to read: 44 CSS px at least');
-  assert.ok(bar.w <= 70, 'the three segments together keep the old compact footprint');
-  const segs = energySegmentRects(bar, battle.view.dpr);
-  assert.deepEqual(purple(calls).map((c) => c.args.slice(1, 4)), [
-    [bar.y, Math.round(segs[0].w * 9 / 34), bar.h], [bar.y, segs[1].w, bar.h], [bar.y, segs[2].w, bar.h],
-  ]);
-  assert.equal(purple(calls).at(-1).args[0] + purple(calls).at(-1).args[2], bar.x + bar.w, 'the back segment ends the bar');
+  assert.ok(bar.w <= 70, 'compact: about the fighter\'s width');
+  assert.deepEqual(purple(calls)[0].args, [bar.x, bar.y, Math.round(bar.w * 0.75), bar.h], 'one fill from the left, 75% wide');
   assert.equal(battle.statusTop(p1), bar.y - 1, 'the bar is now the top');
   assert.equal(battle.statusTop(p2), battle.markerTop(p2));
   const tag = calls.find((c) => c.fn === 'fillText' && c.args[0] === p1.label);
@@ -433,12 +391,8 @@ test('in play: nothing over or under a fighter with full Energy and both CABs re
 test('no bar, rings or tag for a fighter out of play (waiting to respawn); back, it starts full and ready, so shows none; off screen only its edge pointer', () => {
   const { battle, render } = renderedBattle();
   const { p1, p2 } = battle;
-  // How many fighters' bars are drawn: three black segment outlines each.
-  const barsDrawn = (calls) => {
-    const outlines = calls.filter((c) => c.fn === 'fillRect' && c.fill === ENERGY_STYLE.outline).length;
-    assert.equal(outlines % 3, 0, 'whole bars only');
-    return { length: outlines / 3 };
-  };
+  // How many fighters' bars are drawn: one black outline each.
+  const barsDrawn = (calls) => calls.filter((c) => c.fn === 'fillRect' && c.fill === ENERGY_STYLE.outline);
   const spend = (f) => {
     f.combat.setEnergy(50);
     f.combat.chargedCooldowns.start('ba1Clone', 5);

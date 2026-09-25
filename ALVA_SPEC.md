@@ -396,7 +396,8 @@ no header, build label, eyebrow or keyboard hint bar.
   Throw, Defense ("Defense — Hold to Shield. Blocking a hit costs 25
   Energy.", the full-circle Shield, and the Energy lockout: at zero it
   turns gray and must fully refill before Shield and Dash come back; the
-  movement card names the three Energy segments), stages and platforms,
+  movement card gives the costs, Dash 15 and a block 25, and that either
+  still works with less left but empties the bar), stages and platforms,
   pause, notes on this build.
 - Home no longer links to this screen (its entry became Practice Ground); the
   screen stays in place, and its shared content still feeds the Home credits
@@ -885,9 +886,9 @@ read the character database, so it stays the same as fighters are added.
   Defense is held and the Shield is allowed, down the step it is let go.
   Allowed means: the fighter is free to act (no attack, stun, bind, charged
   technique or Dash; the Shield never cuts one short, and comes up the step
-  it ends if Defense is still held), it has the Energy for one more block
-  (`CombatState.canShield`: at least `energy.shieldHitCost`, 25, and not
-  exhausted) and the held art for where it is. It is decided before the
+  it ends if Defense is still held), it is not exhausted
+  (`CombatState.canShield`: any Energy left is enough) and the held art
+  for where it is. It is decided before the
   combat intents: while Defense is held with a Shield that can go up, no
   attack, Throw, charged action, Dash or jump starts (let go of Defense
   first), and it outranks Charge. On the ground it shows `shieldStart`
@@ -913,13 +914,13 @@ read the character database, so it stays the same as fighters are added.
   hurt pose and deals no hitstun; the hitbox is used up exactly as by a
   hit (an attack's `hasHit`, a projectile gone, a clone's `hasHit`, the
   technique's contact). The fighter pays `energy.shieldHitCost` (25) for
-  it, once, in `CombatSystem.applyHit`, and the event is a `'block'` with
-  `energyCost` 25. The hit's hitstop still freezes both sides as usual, and
+  it, once, in `CombatSystem.applyHit`, or all it has left when that is
+  less, and the event is a `'block'` with that `energyCost`. The hit's hitstop still freezes both sides as usual, and
   its `blockstun` becomes `CombatState.shieldStun`: the Shield is held up
   through it even if Defense is let go, and the fighter cannot act until it
-  is over. A block that leaves too little for another (below 25) drops the
-  Shield at once and clears the blockstun; one that empties it also
-  exhausts the fighter. That block itself stands, never turned into a hit
+  is over. A block that empties the bar (with 25 or less left) exhausts the
+  fighter and drops the Shield at once, clearing the blockstun. That block
+  itself stands, never turned into a hit
   after the fact, but any later hit, even on the same step, lands in full.
   Holding the Shield costs nothing, and a miss costs nothing: only a
   confirmed block is paid for.
@@ -941,20 +942,22 @@ read the character database, so it stays the same as fighters are added.
 - **Energy** (`CombatState.energy`, `maxEnergy`, `energyExhausted`;
   settings from the character's `energy` entry through `resolveEnergy`
   in `js/game/combat.js`, every field optional: `max` 100, `regen` 12 / s,
-  `chargeRegen` 30 / s, `dashCost` 25, `shieldHitCost` 25) is the one
+  `chargeRegen` 30 / s, `dashCost` 15, `shieldHitCost` 25) is the one
   resource a fighter spends, and only on a Dash (as it starts) and on the
-  Shield (for each hit it blocks). Every fighter starts full, and every
+  Shield (for each hit it blocks). Either works whenever the fighter is not
+  exhausted, however little is left: a cost larger than what remains is
+  paid by taking all of it (`CombatState.spendEnergy`), never going below
+  0. Every fighter starts full, and every
   change goes through `setEnergy`, clamped to [0, max]. It refills by
   itself at `regen` on every step no Dash was paid for (idle, moving,
   airborne, attacking, shielding, stunned or frozen), at `chargeRegen`
   instead while the fighter is really in its Charge stance (`charging`:
   never the release pose, a charged technique or a Charge held through
   one); this is separate from, and on top of, Charge's faster charged
-  cooldowns. Reaching exactly 0 (a Dash or a block alike) exhausts the
-  fighter: Dash and Shield stay unavailable however much has refilled (1,
-  25, 50, 75, 99) until Energy is back at exactly max, which clears it.
-  Below 25 without being exhausted there is simply not enough for a block
-  or a Dash until the refill reaches 25. Energy never gates movement,
+  cooldowns. Reaching 0 (a Dash or a block alike, an overspend included)
+  exhausts the fighter: Dash and Shield stay unavailable however much has
+  refilled (1, 25, 50, 75, 99) until Energy is back at exactly max, which
+  clears it. Energy never gates movement,
   jumps, attacks, Throw, Charge or the charged actions, and none of them
   spend it. A respawn and a restart start it full.
 - **Dash** (movement, not an attack): two press edges of the same
@@ -965,8 +968,8 @@ read the character database, so it stays the same as fighters are added.
   used up, never queued. A Dash needs the fighter free to act (no attack,
   stun, bind, charged technique or Dash running), grounded, neither
   in nor holding Charge, not shielding nor holding Defense for a Shield
-  that can go up, the Energy for it (not exhausted, `dashCost` 25
-  left, paid once as it starts) and its real `dash` clip (`dash1 → dash2`,
+  that can go up, not exhausted (it pays `dashCost` 15 once as it starts,
+  or all that is left when that is less, emptying the bar) and its real `dash` clip (`dash1 → dash2`,
   once at `DASH_FPS` 10; without it the Dash is refused and logged, never
   faked with the run). A held Shield and attacks are resolved before it on
   the same step, so either wins over it. The fighter faces the Dash at once and
@@ -1477,21 +1480,11 @@ read the character database, so it stays the same as fighters are added.
   is on screen, at its interpolated position). Both parts are temporary:
   a thin **Energy bar** just above the name tag, only while Energy is
   below full (`energy < maxEnergy`; hidden at full, so a fresh or
-  respawned fighter shows none, never three empty placeholders). It is
-  one value drawn as three small adjacent segments with a clear gap
-  between them (`energySegmentRects`), together about the fighter's width,
-  at least 44 CSS px, the old bar's footprint, each as wide as its share.
-  The shares are `ENERGY_SEGMENTS` = [34, 33, 33] (exactly 100, front to
-  back, left to right), and `energySegments(energy)` fills them from the
-  back: the back segment holds the first 33, the middle the next 33, the
-  front the last 34. So spending empties the front segment first, then the
-  middle, then the back (75: the front at 9 / 34, the other two full; 50:
-  the front empty, the middle at 17 / 33; 25: only the back, at 25 / 33),
-  and refilling rebuilds them back, middle, front, never all three at
-  once; their amounts always add up to exactly the value. Each segment is
-  a black outline, a dark track and a purple fill held against its back
-  end; all three turn gray from the moment Energy empties and through the
-  whole refill, and the bar goes, never purple, once full. Under the feet a row of
+  respawned fighter shows none): one bar, about the fighter's width, at
+  least 44 CSS px, a black outline, a dark track and a bright purple fill
+  (`#b026ff`), `energy / maxEnergy` wide, shrinking from the right; gray
+  instead from the moment it empties and through the whole refill,
+  proportional to what has come back, and gone, never purple, once full. Under the feet a row of
   **CAB1** / **CAB2** rings (Charged BA1, Charged BA2), one only for each
   charged action actually cooling down (`chargedCooldowns.active`), in the
   character's `chargedActions` order: a lone ring centred under the

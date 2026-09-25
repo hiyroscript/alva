@@ -601,13 +601,20 @@ test('letting go of Charge on the step Defense is pressed shields at once; no Ch
   }
 });
 
-test('with too little Energy for a Shield, held Defense leaves Charge alone', () => {
+test('exhausted, held Defense raises no Shield and leaves Charge alone; any Energy left still raises it', () => {
   const { fighter, step } = makeFighter();
-  fighter.combat.setEnergy(10);
+  fighter.combat.setEnergy(0);
+  fighter.combat.regenEnergy(60);
+  assert.equal(fighter.combat.energyExhausted, true);
   for (let i = 0; i < 10; i++) step({ ...CHARGE, defense: true });
   assert.equal(fighter.combat.shielding, false);
   assert.equal(fighter.state, 'charge');
   assert.equal(fighter.charging, true);
+  const low = makeFighter();
+  low.fighter.combat.setEnergy(5);
+  low.step({ ...CHARGE, defense: true, defensePressed: true });
+  assert.equal(low.fighter.combat.shielding, true, 'less than a block costs, but not exhausted');
+  assert.equal(low.fighter.charging, false);
 });
 
 // ---- No combat effect -------------------------------------------------------------

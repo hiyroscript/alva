@@ -285,7 +285,7 @@ test('a Dash is movement only: no hitbox, damage, launch or invulnerability, eve
 
 // ---- Gating ------------------------------------------------------------------------------
 
-test('no Dash (and nothing spent) while airborne, attacking, stunned, bound, charging, shielding, already dashing, exhausted, short of Energy or without dash art', () => {
+test('no Dash (and nothing spent) while airborne, attacking, stunned, bound, charging, shielding, already dashing, exhausted or without dash art', () => {
   const refused = (label, setup) => {
     const f = makeFighter(setup.options);
     setup.before?.(f);
@@ -331,10 +331,6 @@ test('no Dash (and nothing spent) while airborne, attacking, stunned, bound, cha
     before: (f) => { f.fighter.combat.setEnergy(0); f.fighter.combat.regenEnergy(60); f.step(RIGHT); },
     press: (f) => f.step(RIGHT),
   });
-  refused('short of Energy', {
-    before: (f) => { f.fighter.combat.setEnergy(20); f.step(RIGHT); },
-    press: (f) => f.step(RIGHT),
-  });
   const warnings = [];
   const warn = console.warn;
   console.warn = (msg) => warnings.push(msg);
@@ -348,6 +344,35 @@ test('no Dash (and nothing spent) while airborne, attacking, stunned, bound, cha
     console.warn = warn;
   }
   assert.ok(warnings.some((w) => /Dash has no animation frames/.test(w)), 'logged clearly');
+});
+
+test('short of Energy a Dash still happens, but takes all that is left: the bar is empty, gray, and locks the next one until full', () => {
+  const { fighter, step } = makeFighter();
+  const c = fighter.combat;
+  tap(step, RIGHT);
+  c.setEnergy(10);
+  step(RIGHT);
+  assert.ok(fighter.dash, 'a Dash on 10 Energy');
+  assert.equal(fighter.body.vx, def.movement.dashSpeed, 'the full burst, not a weaker one');
+  assert.deepEqual([c.energy, c.energyExhausted], [0, true]);
+  while (fighter.dash) step({});
+  for (let i = 0; i < 10; i++) step({});
+  tap(step, RIGHT);
+  step(RIGHT);
+  assert.equal(fighter.dash, null, 'exhausted: no Dash until full again');
+  // Exactly its cost left empties it too.
+  const exact = makeFighter();
+  tap(exact.step, RIGHT);
+  exact.fighter.combat.setEnergy(15);
+  exact.step(RIGHT);
+  assert.ok(exact.fighter.dash);
+  assert.deepEqual([exact.fighter.combat.energy, exact.fighter.combat.energyExhausted], [0, true]);
+  // With more left, only 15 goes.
+  const plenty = makeFighter();
+  tap(plenty.step, RIGHT);
+  plenty.fighter.combat.setEnergy(40);
+  plenty.step(RIGHT);
+  assert.deepEqual([plenty.fighter.combat.energy, plenty.fighter.combat.energyExhausted], [25, false]);
 });
 
 test('a double tap that cannot Dash is used up, never queued for later', () => {
@@ -368,13 +393,14 @@ test('a double tap that cannot Dash is used up, never queued for later', () => {
 
 // ---- Cost, movement and ending -----------------------------------------------------------
 
-test('a Dash spends 25 exactly once as it starts, and bursts at dashSpeed for one pass of its clip', () => {
+test('a Dash spends 15 exactly once as it starts, and bursts at dashSpeed for one pass of its clip', () => {
   const { fighter, step } = makeFighter();
   tap(step, RIGHT);
   const full = fighter.combat.energy;
   assert.equal(full, 100);
   step(RIGHT);
-  assert.equal(fighter.combat.energy, 75, 'exactly 25, no refill on that step');
+  assert.equal(def.energy.dashCost, 15);
+  assert.equal(fighter.combat.energy, 85, 'exactly 15, no refill on that step');
   assert.equal(fighter.body.vx, def.movement.dashSpeed, 'dash speed from the first step');
   const x0 = fighter.body.prevX;
   let n = 1;

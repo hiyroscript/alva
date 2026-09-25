@@ -433,17 +433,18 @@ export const CHARACTERS = [
     },
 
     // Energy (see resolveEnergy in js/game/combat.js): 100 at most, shown
-    // over the fighter's head as three purple segments while below full,
+    // over the fighter's head as a bright purple bar while below full,
     // spent only by Dash (dashCost, as it starts) and Shield (shieldHitCost,
-    // for each hit it blocks; holding it is free). It refills by itself at
-    // `regen` per second, at `chargeRegen` while in Charge (apart from, and
-    // on top of, Charge's faster charged cooldowns). Emptied, it turns gray:
-    // no Dash or Shield until it is full again.
+    // for each hit it blocks; holding it is free). Either still works with
+    // less left than it costs, but then takes all of it. It refills by
+    // itself at `regen` per second, at `chargeRegen` while in Charge (apart
+    // from, and on top of, Charge's faster charged cooldowns). Emptied, it
+    // turns gray: no Dash or Shield until it is full again.
     energy: {
       max: 100,
       regen: 12,
       chargeRegen: 30,
-      dashCost: 25,
+      dashCost: 15,
       shieldHitCost: 25,
     },
 

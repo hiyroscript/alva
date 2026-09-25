@@ -210,7 +210,7 @@ export class Fighter {
 
     // ---- Shield: held Defense --------------------------------------------
     // Decided first: Defense held with a Shield the fighter may raise (its
-    // Defense is a Shield, the Energy for a block, the art for where it is)
+    // Defense is a Shield, it is not exhausted, the art for where it is)
     // takes the step, so no attack, Throw, charged action or Dash starts
     // while it is held. Let go of Defense to do any of them.
     const shieldHeld = !!input.defense && this.shieldAllowed();
@@ -254,8 +254,8 @@ export class Fighter {
     // The Shield is up while Defense is held and the fighter is free to act
     // (it never cuts an attack, Dash, charged technique, stun or bind short).
     // A blocked hit's blockstun holds it up until the stun is over, held or
-    // not. Either way only while shieldAllowed: the step Energy falls below
-    // one block's cost (or it has no art for where the fighter is) drops it.
+    // not. Either way only while shieldAllowed: the block that empties the
+    // bar (or having no art for where the fighter is) drops it.
     // Holding it costs nothing: only the hits it blocks cost Energy (see
     // CombatSystem.applyHit).
     combat.shielding =
@@ -382,8 +382,8 @@ export class Fighter {
   }
 
   // Whether this fighter may have its Shield up right now: its Defense is a
-  // Shield, it has the Energy to block one more hit (CombatState.canShield:
-  // at least shieldHitCost, never while exhausted) and the held art for
+  // Shield, it is not exhausted (CombatState.canShield: any Energy left is
+  // enough, a block costing more simply empties it) and the held art for
   // where it is (groundAnimation, or airAnimation in the air). Missing art
   // is refused, never faked, and reported once.
   shieldAllowed() {
@@ -427,8 +427,9 @@ export class Fighter {
   // only: no hitbox, damage, launch or invulnerability. Only while free
   // to act (no attack, stun, bind, charged technique or Dash already
   // running), grounded, not in or holding Charge, not shielding or holding
-  // Defense for a Shield it may raise, and with the Energy for it, paying
-  // dashCost. The fighter faces the Dash at once. False, with nothing
+  // Defense for a Shield it may raise, and not exhausted, paying dashCost
+  // (all that is left, emptying the bar, when that is less). The fighter
+  // faces the Dash at once. False, with nothing
   // spent, if it cannot start (a missing dash clip is logged). `input` is
   // this step's (Charge or Defense held rules it out); any caller (a future
   // AI too) may use it.

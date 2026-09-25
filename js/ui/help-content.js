@@ -75,7 +75,7 @@ export function buildHelp() {
         el('li', { text: 'Left / Right accelerate into a run. Release to slow to a stop.' }),
         el('li', { text: 'Jump from the ground; you can steer while airborne.' }),
         el('li', { text: 'Press the same direction twice quickly (Right, Right or Left, Left) on the ground to Dash: a short, fast burst that way. It only moves you: it never hits, and a ledge or a wall ends it.' }),
-        el('li', { text: 'The purple bar above your fighter is Energy, shown in three segments; it shows only while it is not full. A Dash costs 25 of its 100, and so does every hit your Shield blocks; it refills by itself, faster while you hold Charge. If Energy reaches zero, it turns gray and must fully refill before Shield and Dash become available again. Running, jumping and attacking never cost Energy.' }),
+        el('li', { text: 'The bright purple bar above your fighter is Energy; it shows only while it is not full. A Dash costs 15 of its 100, and every hit your Shield blocks costs 25; it refills by itself, faster while you hold Charge. You can still Dash or Shield with less left than that, but it empties the bar. If Energy reaches zero, it turns gray and must fully refill before Shield and Dash become available again. Running, jumping and attacking never cost Energy.' }),
         el('li', { text: 'Your fighter faces the way it last moved or dashed, and keeps that facing when it stops: it never turns toward the opponent by itself.' }),
       ]),
     ]),
@@ -104,7 +104,7 @@ export function buildHelp() {
         el('li', { text: 'Defense — Hold to Shield. Blocking a hit costs 25 Energy.' }),
         el('li', { text: 'The Shield is a circle all round #0001, on the ground and in the air. While it is up, any attack that reaches him is blocked, from either side: no Launch Point and no launch. Holding it costs nothing, and neither does an attack that misses.' }),
         el('li', { text: 'Shielding holds #0001 in place on the ground: no walking, Dash or jump. In the air he keeps falling. Let go of Defense to attack, throw, Dash or jump.' }),
-        el('li', { text: 'The Shield needs at least 25 Energy to go up. If Energy reaches zero, it turns gray and must fully refill before Shield and Dash become available again.' }),
+        el('li', { text: 'Blocking with less than 25 Energy left still works, but empties the bar. If Energy reaches zero, it turns gray and must fully refill before Shield and Dash become available again.' }),
       ]),
     ]),
     card('Stages & platforms', [
