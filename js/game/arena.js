@@ -246,14 +246,17 @@ export class Arena {
 
   // The technique's sphere frame, centred on the hand or the caught
   // opponent (interpolated like the fighters), at the fighters' art scale
-  // and never mirrored: a round effect only moves its offset with facing.
+  // times the technique's own sphereScale (it grows on the target; the
+  // centre stays put), and never mirrored: a round effect only moves its
+  // offset with facing.
   drawTechnique(t) {
     const sphere = t.sphere;
     const center = sphere && t.sphereCenter(true);
     if (!center) return;
     const [sx, sy] = this.toScreen(...center);
     const source = sphere.anim.sourceFacing;
-    drawCenteredFrame(this.ctx, sphere.anim.frames[sphere.index], sx, sy, this.pxPerArt, !!source && t.facing !== source);
+    const frame = sphere.anim.frames[sphere.index];
+    drawCenteredFrame(this.ctx, frame, sx, sy, this.pxPerArt * t.sphereScale, !!source && t.facing !== source);
   }
 
   // Centred on the projectile's position, at the fighters' art scale.
