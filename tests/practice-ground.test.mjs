@@ -1236,7 +1236,7 @@ test('the practice CPU never acts on its own: no movement, jump, attack, charge,
   }
   assert.ok(session.player.body.x < x);
   assert.equal(cpu.body.x, spawnX);
-  assert.equal(cpu.facing, -1, 'still turned toward Player 1');
+  assert.equal(cpu.facing, -1, 'still its spawn\'s facing');
 });
 
 test('Player 1\'s attacks hit the CPU through the real CombatSystem, and it reacts like any fighter', () => {

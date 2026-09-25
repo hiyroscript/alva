@@ -128,13 +128,14 @@ attack animations. Its touch button has a dashed outline.
   already dashing; an attack or a Dodge pressed on the same step wins over
   it, and a double tap that cannot Dash is used up, never saved for later.
   Left then right (or right then left) is not a double tap.
-- **Stamina:** the thin purple bar over each fighter's name tag. It starts
-  full (100) and is spent only by Dash (25), Dodge (25) and a held Block
-  (20 per second, for future blocking fighters). It refills by itself at 12
-  per second whatever the fighter is doing, and at 30 per second while it is
-  in the Charge stance. Run it dry and the bar turns gray: the fighter is
-  exhausted, and Dash, Dodge and Block stay locked until the bar is full
-  again (a partial refill does not unlock them). Exhausted, a fighter still
+- **Stamina:** the thin purple bar over each fighter's name tag, shown only
+  while it is below full. It starts full (100), so hidden, and is spent only
+  by Dash (25), Dodge (25) and a held Block (20 per second, for future
+  blocking fighters). It refills by itself at 12 per second whatever the
+  fighter is doing, and at 30 per second while it is in the Charge stance;
+  once full again the bar disappears. Run it dry and the bar turns gray: the
+  fighter is exhausted, and Dash, Dodge and Block stay locked, the bar gray,
+  until it is full again (a partial refill does not unlock them). Exhausted, a fighter still
   moves, jumps, attacks, charges and uses CAB1 / CAB2. It is not the old
   Energy: nothing else ever costs stamina.
 - **Charge:** hold `S` / `↓` (**C** on touch, D-pad down or left stick down
@@ -227,11 +228,12 @@ attack animations. Its touch button has a dashed outline.
 - **Charged cooldowns (CAB1, CAB2):** Charged BA1 (**CAB1**) and Charged BA2
   (**CAB2**) each have their own 5-second cooldown, started the moment the
   move is used (the clone summoned, the rush started), whether it hits or
-  not. A charged press while it is cooling down does nothing. Each shows as
-  a small white ring, outlined in black, in one row under the fighter's
-  feet, labelled CAB1 and CAB2: it fills clockwise as the ability recovers,
-  with the seconds left inside, and is complete (and empty of numbers) when
-  ready. While #0001 is actually in its Charge stance both recover twice as
+  not. A charged press while it is cooling down does nothing. While it
+  cools down it shows as a small white ring, outlined in black, under the
+  fighter's feet, labelled CAB1 or CAB2: it fills clockwise as the ability
+  recovers, with the seconds left inside, and disappears the moment it is
+  ready. A lone ring sits centred under the fighter, two sit side by side,
+  and with both ready nothing is drawn. While #0001 is actually in its Charge stance both recover twice as
   fast (the character's `stats.chargedCooldownRate`), so a fresh cooldown
   takes about 2.5 s of uninterrupted charging; running, jumping, attacking,
   dodging, being hit or performing the Sphere Rush recover at the normal
@@ -254,7 +256,7 @@ Touch controls show on touch-first devices (coarse pointer, or a touch actually 
 - **Movement:** running, jumping and a grounded Dash on a double tap (25 stamina).
 - **Powers:** Jump Power and Speed Power, each in three tiers. #0001 has Jump Power 2 and Speed Power 2 (its original jump and speed).
 - **Knockback:** each attack's own, Low, Mid or High, pushing sideways or launching upward (or, reversed, driving downward). #0001's BA1 is Low horizontal, its BA2 High vertical, its mid-air BA1 Mid vertical and its mid-air BA2 High vertical reversed (downward). The target's accumulated Knockback scales every launch.
-- **HUD:** each fighter has one compact, semi-transparent glass card, pulled in close on either side of the timer: its portrait (the character's own `visual.portrait` crop, turned to face the timer whichever way its art is drawn), one thin divider, and its name with its accumulated Knockback beneath it. The CPU's card mirrors Player 1's. In Quick Battle three small dots under each card fill as that fighter scores its points (○ ○ ○, then ● ○ ○ ...). Over each fighter itself, following it: its purple stamina bar above its name tag, and its CAB1 / CAB2 cooldown rings under its feet.
+- **HUD:** each fighter has one compact, semi-transparent glass card, pulled in close on either side of the timer: its portrait (the character's own `visual.portrait` crop, turned to face the timer whichever way its art is drawn), one thin divider, and its name with its accumulated Knockback beneath it. The CPU's card mirrors Player 1's. In Quick Battle three small dots under each card fill as that fighter scores its points (○ ○ ○, then ● ○ ○ ...). Over each fighter itself, following it: its purple stamina bar above its name tag while below full, and its CAB1 / CAB2 cooldown rings under its feet while cooling down.
 - **Modes:** Quick Battle: 99 seconds against a non-attacking training CPU, first to 3 points. Each time a fighter falls into the Void its opponent scores a point at once; the one that fell is out of play for 2 seconds, then back at its spawn with 0 Knockback, full stamina and both charged abilities ready, while the fight and the timer carry on. The third point wins the match (a short **K.O.** beat, then the result; the loser does not come back). If both fall together, or one falls while the other is still waiting to come back, that fall scores nothing. If time runs out first, more points wins, then less Knockback; equal on both is a draw. Practice Ground: training on its own stage with a stand-still CPU dummy from the start (which you can change or disable), no timer, rounds or points; the Void takes a fighter out for 2 seconds, then puts it back at its spawn (below).
 
 ## Design

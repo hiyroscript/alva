@@ -573,7 +573,7 @@ test('the same Fighter speed serves player- and CPU-controlled fighters, with th
     ai.thinkTimer = Infinity; // no decisions of its own: just keep walking right
     ai.moveIntent = 1;
     const cpu = fighterWith(character, ai, 600);
-    // Far away, so neither turns back toward the other.
+    // Someone to follow (the training AI stands still without one), far ahead.
     const decoy = makeFighter({ x: 1900 }).fighter;
     player.opponent = decoy;
     cpu.opponent = decoy;

@@ -572,7 +572,6 @@ test('the clone is summoned behind the target, on its back side, facing it; the 
   // A target facing away from the owner: still its back side, which is now
   // between the two fighters. The owner's side does not decide it.
   const away = duel({ targetFacing: 1 });
-  away.target.opponent = null; // keep it looking away
   const c = summon(away);
   assert.equal(c.x, away.target.body.x - 48);
   assert.equal(c.facing, 1);
@@ -1592,10 +1591,13 @@ test('Battle draws clones behind both fighters, with no shadow, ring or name tag
   assert.equal(clone.facing, -1);
   assert.equal(mirrored(CLOUD[0]), false, 'the cloud is never mirrored');
   // Two shadows + rings and two name tags: none for the clone (the other
-  // text is the fighters' CAB1 / CAB2 labels, see fighter-status.test.mjs).
+  // text is the summoner's CAB1 cooldown, see fighter-status.test.mjs).
   const nameTags = () => calls.filter((c) => c[0] === 'fillText' && ['P1', 'CPU'].includes(c[1])).length;
   assert.equal(nameTags(), 2);
-  assert.equal(calls.filter((c) => c[0] === 'fillText' && /^CAB[12]$/.test(c[1])).length, 4, 'CAB1 and CAB2 under each fighter, none for the clone');
+  assert.deepEqual(
+    calls.filter((c) => c[0] === 'fillText' && /^CAB[12]$/.test(c[1])).map((c) => c[1]), ['CAB1'],
+    'only P1\'s CAB1, cooling down: nothing for its ready CAB2, the CPU or the clone',
+  );
   assert.equal(calls.filter((c) => c[0] === 'ellipse').length, 4);
 
   while (clone.phase !== 'attack') battle.update(DT);

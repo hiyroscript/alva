@@ -392,7 +392,7 @@ export class PracticeGroundScreen extends Screen {
   }
 
   // Swaps the practice fighter in place: loads `def`, puts a fresh fighter
-  // on the spawn (0 Knockback, no cooldowns; a CPU stays, now facing it),
+  // on the spawn (0 Knockback, no cooldowns; a CPU stays as it is),
   // rebinds the HUD, then closes the dialog and the menu and resumes. A
   // failed load keeps the current fighter and the dialog open.
   async changeFighter(def) {

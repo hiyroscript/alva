@@ -32,11 +32,11 @@ test('#0001 declares its stamina: 100 max, 12 / s, 30 / s in Charge, 25 per Dash
   for (const key of ['energy', 'maxEnergy', 'infiniteEnergy']) assert.equal(key in c, false, `no ${key}`);
 });
 
-test('a fighter starts full, purple and not exhausted; stamina never leaves [0, max]', () => {
+test('a fighter starts full, its bar hidden, and not exhausted; stamina never leaves [0, max]', () => {
   const { fighter } = makeFighter();
   const c = fighter.combat;
   assert.deepEqual([c.stamina, c.maxStamina, c.staminaExhausted], [100, 100, false]);
-  assert.deepEqual(staminaBarState(fighter), { ratio: 1, exhausted: false, color: STAMINA_STYLE.fill });
+  assert.deepEqual(staminaBarState(fighter), { visible: false, ratio: 1, exhausted: false, color: STAMINA_STYLE.fill });
   assert.match(STAMINA_STYLE.fill, /^#a8/, 'purple');
   c.regenStamina(50);
   assert.equal(c.stamina, 100, 'never above the maximum');
@@ -45,7 +45,7 @@ test('a fighter starts full, purple and not exhausted; stamina never leaves [0, 
   c.drainStamina(400);
   assert.equal(c.stamina, 0, 'never below 0');
   assert.equal(c.staminaExhausted, true);
-  assert.deepEqual(staminaBarState(fighter), { ratio: 0, exhausted: true, color: STAMINA_STYLE.exhausted });
+  assert.deepEqual(staminaBarState(fighter), { visible: true, ratio: 0, exhausted: true, color: STAMINA_STYLE.exhausted });
 });
 
 test('it refills by itself at 12 per second: standing, running, in the air, attacking and stunned alike', () => {
@@ -193,7 +193,7 @@ test('Block keeps its chip damage: stamina changes nothing about the hit itself'
   assert.ok(attacker.combat.stamina === 100, 'attacking costs nothing');
 });
 
-test('exhaustion lockout: from 0, Dash, Dodge and Block stay locked through 25 and 99, and open at exactly 100', () => {
+test('exhaustion lockout: from 0, Dash, Dodge and Block stay locked through 25, 50 and 99, and open at exactly 100', () => {
   const dodger = makeFighter();
   const blocker = makeFighter({ character: BLOCKER, x: 900 });
   const all = [dodger, blocker];
@@ -225,8 +225,12 @@ test('exhaustion lockout: from 0, Dash, Dodge and Block stay locked through 25 a
   assert.ok(dodger.fighter.combat.canUseStamina(0) === false && dodger.fighter.combat.stamina > 25 - 1e-6);
   assert.equal(dodger.fighter.combat.staminaExhausted, true);
   locked('at 25');
-  // 7-8. 99: still locked.
+  refillTo(50);
+  assert.equal(dodger.fighter.combat.staminaExhausted, true);
+  locked('at 50');
+  // 7-8. 99: still locked, and the bar still gray.
   refillTo(99);
+  assert.equal(staminaBarState(dodger.fighter).color, STAMINA_STYLE.exhausted);
   assert.ok(dodger.fighter.combat.stamina < 100);
   locked('at 99');
   // 9-10. Full: exhaustion clears.
@@ -235,7 +239,7 @@ test('exhaustion lockout: from 0, Dash, Dodge and Block stay locked through 25 a
     assert.equal(fighter.combat.stamina, 100);
     assert.equal(fighter.combat.staminaExhausted, false);
   }
-  assert.deepEqual(staminaBarState(dodger.fighter).color, STAMINA_STYLE.fill, 'purple again');
+  assert.equal(staminaBarState(dodger.fighter).visible, false, 'full: the bar is gone, never purple first');
   // 11. Everything available again.
   assert.equal(dodger.fighter.tryDefense(), true, 'Dodge');
   while (dodger.fighter.combat.defenseAction) dodger.step();

@@ -9,8 +9,9 @@
 //
 // The practice CPU is a training dummy: it has no controller, so it never
 // moves, jumps, attacks, charges or defends of its own accord (Fighter falls
-// back to neutral input). It is otherwise a normal fighter: it takes real
-// hits, hitstun, knockback and binds, collides and faces its opponent, and
+// back to neutral input), and keeps its spawn's facing: like every fighter
+// it never turns toward its opponent by itself. It is otherwise a normal
+// fighter: it takes real hits, hitstun, knockback and binds, collides, and
 // the camera frames it as the secondary fighter. Its Knockback builds up
 // like anyone's (and launches it further as it does), shown on its own HUD
 // card, and every hit it takes also floats the Knockback it added over its
@@ -64,7 +65,7 @@ export class PracticeSession extends Arena {
   // current one: a fresh Fighter at the stage's spawn with 0 Knockback and
   // no cooldowns, driven by Player 1 at once. Nothing of the previous fighter
   // stays: its charged technique ends and its projectiles and clones go. A
-  // CPU stays as it is, now facing the new fighter.
+  // CPU stays as it is.
   setFighter(def, sprites) {
     const old = this.player;
     if (old) {
@@ -180,8 +181,9 @@ export class PracticeSession extends Arena {
     if (this.view.pxW) this.drawDamageNumbers();
   }
 
-  // Red, outlined "+N" numbers over the CPU's stamina bar, following it as it
-  // moves: each rises a little (not with reduced motion) and fades out.
+  // Red, outlined "+N" numbers over the CPU's name tag (and its stamina bar,
+  // while that shows), following it as it moves: each rises a little (not
+  // with reduced motion) and fades out.
   drawDamageNumbers() {
     if (!this.damageNumbers.length) return;
     const { ctx, view } = this;
@@ -199,7 +201,7 @@ export class PracticeSession extends Arena {
       const t = d.age / DAMAGE_LIFE;
       const [x] = this.markerAnchor(d.target);
       const rise = this.reducedMotion ? 0 : DAMAGE_RISE * t * s;
-      // Clear of the tag and the stamina bar over it (see Arena.drawStatus),
+      // Clear of the tag and any stamina bar over it (see Arena.statusTop),
       // stacked by arrival.
       const y = this.statusTop(d.target) - 2 - d.stack * font * 0.95 - rise;
       ctx.globalAlpha = t < DAMAGE_FADE ? 1 : Math.max(0, 1 - (t - DAMAGE_FADE) / (1 - DAMAGE_FADE));

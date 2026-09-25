@@ -369,8 +369,8 @@ test('facing locks for the whole Dodge, then follows input again', () => {
     assert.equal(me.fighter.facing, 1);
     me.step();
   }
-  me.step();
-  assert.equal(me.fighter.facing, -1, 'turns to face the opponent afterwards');
+  for (let i = 0; i < 30; i++) me.step();
+  assert.equal(me.fighter.facing, 1, 'nor afterwards: only its own movement turns it');
 });
 
 // ---- Mid-air Dodge --------------------------------------------------------------
