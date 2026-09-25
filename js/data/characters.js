@@ -197,12 +197,16 @@ export const CHARACTERS = [
         heightRatio: 0.9,
       },
       // Charged BA2, the Sphere Rush: one set of twelve poses (rasen1-12)
-      // split into three clips, each played once by its own technique phase
+      // split into four clips, each played once by its own technique phase
       // (see chargedTechniques.rasenRush). rasenForm: the rear palm opens
       // for the sphere to form in. rasenDash: the rush, sphere carried
       // behind, swung forward on rasen6. rasenConfirm: the palm driven into
-      // the opponent, then the recovery; only a hit ever shows it. Faces
-      // right like the rest of #0001.
+      // the opponent (rasen7-9), then drawn back to watch the sphere
+      // (rasen10-11, held until the explosion); only a hit ever shows it.
+      // rasenRelease: rasen12 alone, the upright release / recovery pose
+      // that lets go of the technique, shown as the sphere explodes after a
+      // hit and for one frame after a rush that caught nobody. Faces right
+      // like the rest of #0001.
       rasenForm: {
         frames: frames(BASE_0001, 'rasen', 3),
         fps: RASEN_FPS,
@@ -216,7 +220,13 @@ export const CHARACTERS = [
         heightRatio: 0.88,
       },
       rasenConfirm: {
-        frames: [7, 8, 9, 10, 11, 12].map((n) => `${BASE_0001}rasen${n}.png`),
+        frames: [7, 8, 9, 10, 11].map((n) => `${BASE_0001}rasen${n}.png`),
+        fps: RASEN_FPS,
+        loop: false,
+        heightRatio: 0.96,
+      },
+      rasenRelease: {
+        frames: [`${BASE_0001}rasen12.png`],
         fps: RASEN_FPS,
         loop: false,
         heightRatio: 1,
@@ -253,11 +263,12 @@ export const CHARACTERS = [
         loop: false,
         sourceFacing: 0,
       },
-      // The Sphere Rush's blue sphere (prasen1-11), split into three one-shot
-      // clips: rasenSphereBuild forms it in the hand (prasen1-6),
-      // rasenSphereImpact intensifies it on the opponent after a hit
-      // (prasen7-9, then held on prasen9) and rasenSphereExplosion is the
-      // delayed blast (prasen10-11). A round effect: never mirrored.
+      // The Sphere Rush's blue sphere (prasen1-11), split into three clips:
+      // rasenSphereBuild forms it in the hand (prasen1-6, once),
+      // rasenSphereImpact is the sphere spinning on the caught opponent
+      // (prasen7 -> 8 -> 9, looped until it explodes) and
+      // rasenSphereExplosion is the delayed blast (prasen10-11, the lighter,
+      // brighter frames, once). A round effect: never mirrored.
       rasenSphereBuild: {
         frames: frames(BASE_0001, 'prasen', 6),
         fps: PRASEN_FPS,
@@ -267,7 +278,7 @@ export const CHARACTERS = [
       rasenSphereImpact: {
         frames: [7, 8, 9].map((n) => `${BASE_0001}prasen${n}.png`),
         fps: PRASEN_FPS,
-        loop: false,
+        loop: true,
         sourceFacing: 0,
       },
       rasenSphereExplosion: {
@@ -458,14 +469,18 @@ export const CHARACTERS = [
       // (rasenForm + rasenSphereBuild, 0.5 s), then he rushes forward for one
       // pass of rasenDash (0.25 s, about 262 world units) carrying it behind
       // him and swinging it forward on rasen6. It must connect during that
-      // rush: a miss ends the technique. A hit (4) binds the opponent, the
-      // sphere moves onto it and rasenConfirm plays; 2 s after the hit it
+      // rush: a miss stops him and he lets the sphere go on the rasenRelease
+      // pose (rasen12, one frame) before he is free. A hit (4) binds the
+      // opponent, the sphere moves onto it and spins there (prasen7-9 looped)
+      // while rasenConfirm plays and holds rasen11; 2 s after the hit it
       // explodes for the big second hit (16, 20 in all), releasing and
-      // launching the opponent. The whole technique needs ground under #0001.
+      // launching the opponent, as #0001 releases it on rasen12. The whole
+      // technique needs ground under #0001.
       rasenRush: {
         formAnimation: 'rasenForm',
         dashAnimation: 'rasenDash',
         confirmAnimation: 'rasenConfirm',
+        releaseAnimation: 'rasenRelease',
         sphereBuild: 'rasenSphereBuild',
         sphereImpact: 'rasenSphereImpact',
         sphereExplosion: 'rasenSphereExplosion',

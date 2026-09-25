@@ -166,8 +166,8 @@ export class Fighter {
 
     // ---- Charged technique -------------------------------------------------
     // While one runs it owns the fighter: its phases advance on their own
-    // clock (a clean miss or a finished explosion ends it here), whether or
-    // not Charge is still held.
+    // clock (the release after a whiff or a finished explosion ends it here),
+    // whether or not Charge is still held.
     if (this.technique) {
       const ended = this.technique.update(dt);
       if (ended) this.endTechnique(ended);
@@ -252,11 +252,13 @@ export class Fighter {
     // ---- Charged technique: ground and walls ------------------------------
     // It needs real ground under the fighter from its first frame to its
     // last: ground lost (a ledge, a vanished platform) ends it at once and
-    // the fighter falls from where it is. A wall ends the rush as a miss.
+    // the fighter falls from where it is. A wall stops the rush as a whiff:
+    // the fighter stays against it and releases, this step counting as the
+    // release's first (see ChargedTechnique.whiff).
     const technique = this.technique;
     if (technique) {
       if (!body.grounded) this.endTechnique('ground');
-      else if (technique.phase === 'dash' && body.wall === technique.facing) this.endTechnique('wall');
+      else if (technique.phase === 'dash' && body.wall === technique.facing) technique.whiff('wall', dt);
     }
 
     this.updateFacing(dir);
@@ -339,9 +341,10 @@ export class Fighter {
     return true;
   }
 
-  // Ends the charged technique in progress, if any, for `reason`: 'miss',
-  // 'wall', 'blocked', 'ko', 'done', 'ground', 'hit', 'released', 'reset'
-  // or 'destroy'. The sphere is removed and any opponent it holds released;
+  // Ends the charged technique in progress, if any, for `reason`: 'miss' or
+  // 'wall' (once its release pose has shown), 'blocked', 'ko', 'done',
+  // 'ground', 'hit', 'released', 'reset' or 'destroy'. The sphere is
+  // removed and any opponent it holds released;
   // damage already dealt stays. The rush never carries on as a slide, and a
   // Charge still held from before it does not resume by itself.
   endTechnique(reason) {

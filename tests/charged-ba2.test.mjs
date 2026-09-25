@@ -2,7 +2,9 @@
 // #0001's Charged BA2, the Sphere Rush: the rasen / prasen artwork and its
 // registration, typed charged actions, the Charge-then-BA2 trigger and its
 // fallbacks, the form -> dash -> confirm -> wait -> explode sequence, the
-// two hits, the bind on the opponent, ground dependency, interruption,
+// release after a whiff, the target's hurt pose on the contact step, the
+// sphere spinning on the target, the two hits, the bind on the opponent,
+// ground dependency, interruption,
 // Dodge, Block, walls, facing, Energy, reset / destroy and rendering. Uses
 // the real Fighter, CombatState, CombatSystem, ChargedTechnique, physics,
 // SpriteSet and Battle (see fighter-harness.mjs); sprite sets carry clip
@@ -38,10 +40,15 @@ const RASEN = Array.from({ length: 12 }, (_, i) => `0001_rasen${i + 1}.png`);
 const PRASEN = Array.from({ length: 11 }, (_, i) => `0001_prasen${i + 1}.png`);
 const NEW_FILES = [...RASEN, ...PRASEN];
 // Fixed steps: the form phase (the 6-frame sphere build at 12 fps), the dash
-// (the 3 rasenDash frames at 12 fps) and the delay from hit to explosion.
+// (the 3 rasenDash frames at 12 fps), the release after a whiff (rasen12's
+// one frame at 12 fps), one sphere frame (12 fps) and the delay from hit to
+// explosion.
 const FORM_STEPS = steps(6 / 12);
 const DASH_STEPS = steps(3 / 12);
+const RELEASE_STEPS = steps(1 / 12);
+const SPHERE_FRAME_STEPS = steps(1 / 12);
 const DELAY_STEPS = steps(TECH.explosionDelay);
+const RELEASE_POSE = '0001_rasen12.png';
 
 // The uploaded PNGs, byte for byte.
 const SHA256 = {
@@ -101,7 +108,8 @@ function snap(f) {
   const t = f.technique;
   return {
     state: f.state, frame: frameName(f), phase: t?.phase ?? null, sphere: name(t?.sphereFrame),
-    sphereOwner: t?.sphereOwner ?? null, x: f.body.x, vx: f.body.vx, grounded: f.grounded, facing: f.facing,
+    sphereOwner: t?.sphereOwner ?? null, searching: !!t?.sphereHitbox(), canAct: f.canAct(),
+    x: f.body.x, vx: f.body.vx, grounded: f.grounded, facing: f.facing,
   };
 }
 
@@ -170,12 +178,16 @@ test('the twelve rasen and eleven prasen frames live only in the canonical #0001
   assert.deepEqual(readdirSync(ROOT).filter((n) => /rasen/i.test(n)), [], 'none left at the repository root');
 });
 
-test('rasen1-12 are three one-shot fighter clips: rasenForm 1-3, rasenDash 4-6, rasenConfirm 7-12', () => {
+test('rasen1-12 are four one-shot fighter clips: rasenForm 1-3, rasenDash 4-6, rasenConfirm 7-11, rasenRelease 12 alone', () => {
   const clip = (key) => def.animations[key].frames.map((u) => u.split('/').pop());
   assert.deepEqual(clip('rasenForm'), RASEN.slice(0, 3));
   assert.deepEqual(clip('rasenDash'), RASEN.slice(3, 6));
-  assert.deepEqual(clip('rasenConfirm'), RASEN.slice(6, 12));
-  for (const key of ['rasenForm', 'rasenDash', 'rasenConfirm']) {
+  assert.deepEqual(clip('rasenConfirm'), RASEN.slice(6, 11));
+  assert.ok(!clip('rasenConfirm').includes(RELEASE_POSE), 'the release pose is not part of the contact');
+  // rasen12 is the release / recovery pose: one frame, one frame-time.
+  assert.deepEqual(clip('rasenRelease'), [RELEASE_POSE]);
+  assert.ok(close(def.animations.rasenRelease.frames.length / def.animations.rasenRelease.fps, 1 / 12));
+  for (const key of ['rasenForm', 'rasenDash', 'rasenConfirm', 'rasenRelease']) {
     const anim = def.animations[key];
     assert.equal(anim.loop, false, `${key} plays once`);
     assert.equal(anim.fps, 12);
@@ -188,24 +200,30 @@ test('rasen1-12 are three one-shot fighter clips: rasenForm 1-3, rasenDash 4-6, 
   // Each pose once, in exactly one clip; no fallback fakes them.
   const all = Object.values(def.animations).flatMap((a) => a.frames).filter((u) => /rasen/.test(u));
   assert.equal(all.length, 12);
-  for (const key of ['rasenForm', 'rasenDash', 'rasenConfirm']) assert.equal(def.animationFallbacks[key], undefined);
+  for (const key of ['rasenForm', 'rasenDash', 'rasenConfirm', 'rasenRelease']) {
+    assert.equal(def.animationFallbacks[key], undefined);
+  }
 });
 
-test('prasen1-11 are three one-shot, direction-neutral sphere effects: build 1-6, impact 7-9, explosion 10-11', () => {
+test('prasen1-11 are three direction-neutral sphere effects: build 1-6 once, impact 7-9 looped, explosion 10-11 once', () => {
   const clip = (key) => def.effectAnimations[key].frames.map((u) => u.split('/').pop());
   assert.deepEqual(clip('rasenSphereBuild'), PRASEN.slice(0, 6));
   assert.deepEqual(clip('rasenSphereImpact'), PRASEN.slice(6, 9));
   assert.deepEqual(clip('rasenSphereExplosion'), PRASEN.slice(9, 11));
+  // The sphere spins on the caught opponent: the impact clip loops. The
+  // lighter blast frames are never part of that loop.
+  assert.equal(def.effectAnimations.rasenSphereImpact.loop, true, 'the attached sphere keeps spinning');
+  assert.ok(!clip('rasenSphereImpact').some((f) => clip('rasenSphereExplosion').includes(f)));
   for (const key of ['rasenSphereBuild', 'rasenSphereImpact', 'rasenSphereExplosion']) {
     const anim = def.effectAnimations[key];
-    assert.equal(anim.loop, false, `${key} plays once`);
+    if (key !== 'rasenSphereImpact') assert.equal(anim.loop, false, `${key} plays once`);
     assert.equal(anim.fps, 12);
     assert.equal(anim.sourceFacing, 0, 'a round effect: never mirrored');
     assert.equal(anim.heightRatio, undefined, 'never fitted to the fighter height');
     assert.equal(def.animations[key], undefined, 'not a fighter pose');
     assert.equal(def.projectileAnimations[key], undefined, 'not a projectile');
   }
-  // Formation 0.5 s, impact 0.25 s, explosion about 0.167 s.
+  // Formation 0.5 s, one turn of the impact 0.25 s, explosion about 0.167 s.
   const pass = (key) => def.effectAnimations[key].frames.length / def.effectAnimations[key].fps;
   assert.ok(close(pass('rasenSphereBuild'), 0.5));
   assert.ok(close(pass('rasenSphereImpact'), 0.25));
@@ -269,7 +287,7 @@ test('SpriteSet normalizes rasen as fighter poses and prasen as effects at their
       ...def,
       animations: {
         idle: { frames: [`${BASE}idle1.png`], fps: 7, loop: true },
-        ...pick(def.animations, ['rasenForm', 'rasenDash', 'rasenConfirm']),
+        ...pick(def.animations, ['rasenForm', 'rasenDash', 'rasenConfirm', 'rasenRelease']),
       },
       projectileAnimations: {},
       effectAnimations: pick(def.effectAnimations, ['rasenSphereBuild', 'rasenSphereImpact', 'rasenSphereExplosion']),
@@ -277,7 +295,7 @@ test('SpriteSet normalizes rasen as fighter poses and prasen as effects at their
     return SpriteSet.build(character, (url) => images.get(url));
   });
   assert.deepEqual(set.missing, []);
-  for (const key of ['rasenForm', 'rasenDash', 'rasenConfirm']) {
+  for (const key of ['rasenForm', 'rasenDash', 'rasenConfirm', 'rasenRelease']) {
     const anim = set.animations[key];
     assert.ok(set.has(key), `${key} is a fighter animation`);
     assert.equal(anim.sourceFacing, 1);
@@ -301,6 +319,12 @@ test('SpriteSet normalizes rasen as fighter poses and prasen as effects at their
       assert.equal(f.anchorArtY, f.artH / 2);
     }
   }
+  // Only the attached sphere loops.
+  assert.deepEqual(
+    ['rasenSphereBuild', 'rasenSphereImpact', 'rasenSphereExplosion'].map((k) => set.effect(k).loop),
+    [false, true, false],
+  );
+  assert.equal(set.animations.rasenRelease.loop, false);
   // The complete sphere (prasen6) is 38 x 41 art pixels: about 64 x 69
   // world units at #0001's scale, whatever the fighter's height.
   const full = set.effect('rasenSphereBuild').frames[5];
@@ -332,6 +356,7 @@ test('the Sphere Rush data: 1050 dash, 4 + 16 = 20 damage, 2.0 s delay, no Energ
   assert.equal(TECH.formAnimation, 'rasenForm');
   assert.equal(TECH.dashAnimation, 'rasenDash');
   assert.equal(TECH.confirmAnimation, 'rasenConfirm');
+  assert.equal(TECH.releaseAnimation, 'rasenRelease');
   assert.equal(TECH.sphereBuild, 'rasenSphereBuild');
   assert.equal(TECH.sphereImpact, 'rasenSphereImpact');
   assert.equal(TECH.sphereExplosion, 'rasenSphereExplosion');
@@ -465,10 +490,10 @@ test('the sphere sits in the hand: its centre follows the hand offset of the pos
     const t = start(d);
     const seen = new Set();
     runUntil(d, () => !d.attacker.technique || d.attacker.technique.phase === 'confirm', () => ({}), () => ({}));
-    // Replay with checks at every step.
+    // Replay with checks at every step the sphere is in the hand.
     const e = duel({ gap: 900, attackerFacing: facing });
     const u = start(e);
-    for (let i = 0; e.attacker.technique && i < 100; i++) {
+    for (let i = 0; u.sphereOwner === 'fighter' && i < 100; i++) {
       const clip = e.attacker.animator.anim.key;
       const offsets = TECH.handOffsets[clip];
       const o = offsets[e.attacker.animator.index];
@@ -478,6 +503,9 @@ test('the sphere sits in the hand: its centre follows the hand offset of the pos
       seen.add(`${clip}:${e.attacker.animator.index}`);
       e.tick();
     }
+    // Let go on the release pose: no sphere, so no hand for it.
+    assert.equal(u.phase, 'release');
+    assert.equal(u.sphereCenter(), null);
     assert.equal(t.endReason, 'miss');
     assert.deepEqual([...seen].sort(), ['rasenDash:0', 'rasenDash:1', 'rasenDash:2', 'rasenForm:0', 'rasenForm:1', 'rasenForm:2']);
   }
@@ -520,29 +548,58 @@ test('the dash: rasen4 -> rasen6 at a fixed 1050 in the locked facing, the compl
 
 // ---- Miss -------------------------------------------------------------------------
 
-test('a clean miss: no hit, bind, rasen7-12 or prasen7-11; the sphere is gone and #0001 is idle at once', () => {
-  const d = duel({ gap: 800, pushboxes: true });
-  const t = start(d);
-  const log = [snap(d.attacker), ...runUntil(d, () => !d.attacker.technique)];
-  assert.equal(t.endReason, 'miss');
-  assert.equal(t.phase, 'done');
-  assert.equal(t.sphereFrame, null, 'no sphere left');
-  assert.equal(log.length, 1 + FORM_STEPS + DASH_STEPS, 'form, dash, then over on the next step');
-  const shown = log.map((s) => s.frame);
-  assert.ok(!shown.some((f) => RASEN.slice(6).includes(f)), 'no confirm frames');
-  assert.ok(!log.some((s) => PRASEN.slice(6).includes(s.sphere)), 'no impact or explosion frames');
-  assert.deepEqual(d.events, []);
-  assert.equal(d.target.combat.health, 100);
-  assert.equal(d.target.combat.immobilized, false);
-  // Straight back to normal: idle, no slide, no recovery sequence.
-  assert.equal(d.attacker.state, 'idle');
-  assert.equal(d.attacker.body.vx, 0);
-  const x = d.attacker.body.x;
-  d.tick();
-  assert.equal(d.attacker.body.x, x);
-  d.tick({ right: true });
-  assert.ok(d.attacker.body.vx > 0, 'free to move again');
-  assert.equal(d.attacker.combat.energy, 100);
+test('a clean miss: the rush stops, #0001 lets go on rasen12 for one frame, then is free; no hit, bind, impact or blast', () => {
+  const noise = [{ right: true }, { left: true }, JUMP, BA1, BA2, CHARGED_BA2, THROW, DEFENSE];
+  for (const facing of [1, -1]) {
+    // `mash`: buttons pressed on every step of the release.
+    const rush = (mash) => {
+      const d = duel({ gap: 800, pushboxes: true, attackerFacing: facing, x: facing > 0 ? 500 : 1500 });
+      const t = start(d);
+      const held = (i) => (mash && t.phase === 'release' ? noise[i % noise.length] : {});
+      return { d, t, log: [snap(d.attacker), ...runUntil(d, () => !d.attacker.technique, held)] };
+    };
+    const { d, t, log } = rush(false);
+    assert.equal(t.endReason, 'miss');
+    assert.equal(t.phase, 'done');
+    assert.equal(t.sphereFrame, null, 'no sphere left');
+    const dash = log.filter((s) => s.phase === 'dash');
+    const release = log.filter((s) => s.phase === 'release');
+    assert.equal(dash.length, DASH_STEPS);
+    assert.equal(release.length, RELEASE_STEPS, 'rasen12 for one frame-time at 12 fps (1 / 12 s)');
+    assert.equal(log.length, FORM_STEPS + DASH_STEPS + RELEASE_STEPS + 1, 'form, dash, release, then over on the next step');
+    // Form and dash poses, then the release pose, and only then neutral:
+    // never a confirm pose, never idle on the step the dash ends.
+    const during = log.slice(0, -1);
+    assert.deepEqual(order(during.map((s) => s.frame)), [...RASEN.slice(0, 6), RELEASE_POSE]);
+    assert.equal(during.at(-1).frame, RELEASE_POSE, 'the last pose before neutral is the release');
+    assert.ok(release.every((s) => s.frame === RELEASE_POSE && s.state === 'technique' && !s.canAct), 'locked while releasing');
+    assert.equal(log.at(-1).state, 'idle');
+    assert.equal(log.at(-1).phase, null);
+    // The rush stops dead where the dash ended: no slide, no turn, no hop.
+    assert.ok(release.every((s) => s.x === dash.at(-1).x && s.vx === 0 && s.grounded && s.facing === facing));
+    // The sphere is let go: no impact, no explosion, no more contact search.
+    assert.ok(release.every((s) => s.sphere === null && s.sphereOwner === null && !s.searching));
+    assert.ok(!log.some((s) => PRASEN.slice(6).includes(s.sphere)), 'no impact or explosion frames');
+    assert.ok(!log.some((s) => RASEN.slice(6, 11).includes(s.frame)), 'no confirm frames');
+    assert.deepEqual(d.events, [], 'no damage, first hit or explosion');
+    assert.equal(d.target.combat.health, 100);
+    assert.equal(d.target.combat.immobilized, false);
+    assert.equal(t.explosionDone, false);
+    assert.deepEqual(d.clones, []);
+    assert.deepEqual(d.projectiles, []);
+    assert.equal(d.attacker.combat.attack, null);
+    // Mashing buttons through the release changes nothing until it is over.
+    assert.deepEqual(rush(true).log.slice(0, -1), during);
+    // Back to normal: idle, still, then free to move.
+    assert.equal(d.attacker.state, 'idle');
+    assert.equal(d.attacker.body.vx, 0);
+    const x = d.attacker.body.x;
+    d.tick();
+    assert.equal(d.attacker.body.x, x);
+    d.tick({ right: true });
+    assert.ok(d.attacker.body.vx > 0, 'free to move again');
+    assert.equal(d.attacker.combat.energy, 100);
+  }
 });
 
 // ---- Hit ---------------------------------------------------------------------------
@@ -574,6 +631,7 @@ test('a hit: exactly one contact, 100 -> 96, the rush stops, and the target is b
   // The confirm sequence starts on the hit step, sphere on the target.
   assert.equal(t.phase, 'confirm');
   assert.equal(frameName(d.attacker), '0001_rasen7.png');
+  assert.equal(frameName(d.target), '0001_hurt.png');
   assert.equal(t.sphereOwner, 'target');
   assert.equal(name(t.sphereFrame), '0001_prasen7.png');
   assert.deepEqual(t.sphereCenter(), [d.target.body.x, d.target.body.y - 48]);
@@ -585,20 +643,98 @@ test('a hit: exactly one contact, 100 -> 96, the rush stops, and the target is b
   assert.equal(t.sphereHitbox(), null);
 });
 
-test('after the hit #0001 plays rasen7 -> rasen12 once and holds it; the sphere plays prasen7 -> prasen9 and holds it', () => {
+test('on the very step the sphere first hits, the target already shows Hurt, bound, with the sphere on it', () => {
+  const d = hitDuel();
+  const t = start(d);
+  const before = frameName(d.target);
+  assert.match(before, /0001_idle\d\.png/);
+  for (let i = 0; d.target.combat.health === 100; i++) {
+    assert.ok(i < 100, 'the rush connects');
+    assert.notEqual(frameName(d.target), '0001_hurt.png', `step ${i}: not hurt before the contact`);
+    d.tick();
+  }
+  // The contact step itself, nothing ticked since: 100 -> 96 now, and the
+  // target on screen is already the caught one.
+  assert.equal(d.target.combat.health, 96);
+  assert.equal(d.events.length, 1);
+  assert.equal(t.phase, 'confirm');
+  assert.equal(d.target.combat.isBoundBy(t), true);
+  assert.equal(d.target.state, 'hitstun');
+  assert.equal(d.target.animator.anim.key, 'hurt');
+  assert.equal(frameName(d.target), '0001_hurt.png', 'no one-step visual delay');
+  assert.deepEqual(t.sphereCenter(), [d.target.body.x, d.target.body.y - 48], 'the sphere is already on it');
+  assert.equal(name(t.sphereFrame), '0001_prasen7.png');
+  assert.equal(frameName(d.attacker), '0001_rasen7.png');
+  // It stays in the hurt pose while caught (hitstun, then the bind).
+  for (let i = 0; t.phase !== 'explode'; i++) {
+    d.tick();
+    if (t.phase === 'explode') break;
+    assert.equal(frameName(d.target), '0001_hurt.png', `step ${i}`);
+  }
+
+  // Caught in the air: the mid-air hurt pose, on the contact step too.
+  const C = contactStep();
+  const a = duel({ gap: 250, pushboxes: true });
+  const u = start(a);
+  runUntil(a, () => a.target.combat.health < 100, () => ({}), (i) => (i + 2 === C - 2 ? JUMP : {}));
+  assert.equal(u.phase, 'confirm');
+  assert.equal(a.target.grounded, false);
+  assert.equal(a.target.combat.isBoundBy(u), true);
+  assert.equal(a.target.state, 'hitstun');
+  assert.equal(frameName(a.target), '0001_midairhurt.png');
+});
+
+test('after the hit #0001 plays rasen7 -> rasen11 once and holds rasen11, never rasen12, while the sphere spins prasen7 -> 8 -> 9 on the target', () => {
   const d = hitDuel();
   const t = hitConfirm(d);
-  const log = [snap(d.attacker), ...runUntil(d, () => t.phase === 'explode')];
+  const log = [snap(d.attacker)];
+  const centres = [t.sphereCenter()];
+  const targets = [[d.target.body.x, d.target.body.y - 48]];
+  while (t.phase !== 'explode') {
+    d.tick();
+    log.push(snap(d.attacker));
+    centres.push(t.sphereCenter());
+    targets.push([d.target.body.x, d.target.body.y - 48]);
+    assert.ok(log.length <= DELAY_STEPS + 1);
+  }
   const before = log.slice(0, -1);
   assert.equal(before.length, DELAY_STEPS, 'every step from the hit to the explosion');
-  assert.deepEqual(order(before.map((s) => s.frame)), RASEN.slice(6, 12), 'exactly rasen7 -> rasen12');
-  assert.deepEqual(runs(before.map((s) => s.frame)).slice(0, 5).map(([, n]) => n), [5, 5, 5, 5, 5], 'at 12 fps');
-  assert.equal(before.at(-1).frame, '0001_rasen12.png', 'rasen12 held through the wait');
-  assert.deepEqual(order(before.map((s) => s.sphere)), PRASEN.slice(6, 9), 'exactly prasen7 -> prasen9, never looped');
-  assert.equal(runs(before.map((s) => s.sphere)).at(-1)[1], DELAY_STEPS - 10, 'prasen9 held until the explosion');
-  assert.ok(before.every((s) => s.sphereOwner === 'target'));
   assert.deepEqual([...new Set(before.map((s) => s.phase))], ['confirm', 'wait']);
-  assert.equal(log.at(-1).frame, '0001_rasen12.png', 'rasen12 still held as it explodes');
+  // #0001: the contact poses once at 12 fps, then rasen11 held.
+  assert.deepEqual(order(before.map((s) => s.frame)), RASEN.slice(6, 11), 'exactly rasen7 -> rasen11');
+  assert.deepEqual(runs(before.map((s) => s.frame)).map(([, n]) => n), [5, 5, 5, 5, DELAY_STEPS - 20]);
+  assert.ok(!before.some((s) => s.frame === RELEASE_POSE), 'the release pose never shows during the wait');
+  assert.equal(before.at(-1).frame, '0001_rasen11.png', 'rasen11 held until the explosion');
+  // The sphere: prasen7 -> 8 -> 9 over and over, one frame per 1 / 12 s,
+  // from the hit step to the explosion; never frozen, never the blast.
+  const spins = runs(before.map((s) => s.sphere));
+  const turns = DELAY_STEPS / (3 * SPHERE_FRAME_STEPS);
+  assert.ok(turns >= 2, 'at least two whole turns');
+  assert.deepEqual(spins, Array.from({ length: 3 * turns }, (_, i) => [PRASEN[6 + (i % 3)], SPHERE_FRAME_STEPS]));
+  assert.ok(!before.some((s) => PRASEN.slice(9).includes(s.sphere)), 'no blast frame while it spins');
+  assert.ok(before.every((s) => s.sphereOwner === 'target'));
+  // Centred on the caught opponent the whole time.
+  assert.deepEqual(centres.slice(0, -1), targets.slice(0, -1));
+  // The explosion step: the blast and the release pose together.
+  assert.equal(log.at(-1).phase, 'explode');
+  assert.equal(log.at(-1).sphere, '0001_prasen10.png');
+  assert.equal(log.at(-1).frame, RELEASE_POSE, 'released as it explodes');
+});
+
+test('the attached sphere frame is a pure function of the time since the hit (deterministic at 60 Hz)', () => {
+  const run = () => {
+    const d = hitDuel();
+    const t = hitConfirm(d);
+    const seen = [];
+    while (t.phase !== 'explode') {
+      seen.push([t.sphere.index, Math.floor(t.sinceHit * 12 + 1e-6) % 3]);
+      d.tick();
+    }
+    return seen;
+  };
+  const first = run();
+  assert.ok(first.every(([index, expected]) => index === expected));
+  assert.deepEqual(run(), first, 'the same every time');
 });
 
 test('the explosion comes exactly 2.0 s after the hit step: prasen10 -> prasen11, 96 -> 80, target released then launched', () => {
@@ -628,9 +764,14 @@ test('the explosion comes exactly 2.0 s after the hit step: prasen10 -> prasen11
   assert.equal(d.target.combat.stun, 0.55);
   assert.equal(d.target.combat.hitstop, 0.12);
   assert.ok(d.target.combat.hitstop > TECH.firstHit.hitstop);
-  // prasen10 -> prasen11 once, then the sphere is gone and #0001 is free.
+  // #0001 lets it go on the release pose as it blows.
+  assert.equal(frameName(d.attacker), RELEASE_POSE);
+  // prasen10 -> prasen11 once (never looped), then the sphere is gone and
+  // #0001 is free; rasen12 is the pose all through the blast.
   const log = [snap(d.attacker), ...runUntil(d, () => !d.attacker.technique)];
-  assert.deepEqual(order(log.map((s) => s.sphere)), ['0001_prasen10.png', '0001_prasen11.png']);
+  assert.deepEqual(runs(log.map((s) => s.sphere)).map(([f]) => f), ['0001_prasen10.png', '0001_prasen11.png', null]);
+  assert.equal(runs(log.map((s) => s.sphere))[0][1], SPHERE_FRAME_STEPS, 'prasen10 for a whole frame');
+  assert.ok(log.slice(0, -1).every((s) => s.phase === 'explode' && s.frame === RELEASE_POSE));
   assert.equal(t.endReason, 'done');
   assert.equal(t.sphereFrame, null);
   assert.equal(d.attacker.state, 'idle');
@@ -861,6 +1002,23 @@ test('dashing off a ledge ends the rush on that step: the sphere is gone and #00
   }
 });
 
+test('ground lost during the release after a miss ends it at once: #0001 falls, nothing else happens', () => {
+  const slab = { id: 'slab', x: 300, y: 700, w: 700, h: 16, dropThrough: true };
+  const stage = stageWith({ platforms: [slab] });
+  const d = duel({ stage, gap: 900 });
+  standOn(d.attacker, stage, 'slab');
+  const t = start(d);
+  runUntil(d, () => t.phase === 'release');
+  assert.equal(d.attacker.grounded, true, 'the rush ended on the slab');
+  stage.platforms.length = 0;
+  d.tick();
+  assert.equal(d.attacker.technique, null);
+  assert.equal(t.endReason, 'ground');
+  assert.equal(d.attacker.state, 'fall');
+  assert.equal(d.attacker.body.vx, 0);
+  assert.deepEqual(d.events, []);
+});
+
 test('ground lost after the hit cancels the rest: hit 1 stays, the target is freed at once, no explosion, #0001 falls', () => {
   // #0001 on a low slab, the opponent on the floor just in front of it.
   const slab = { id: 'slab', x: 200, y: 770, w: 520, h: 16, dropThrough: true };
@@ -886,10 +1044,10 @@ test('ground lost after the hit cancels the rest: hit 1 stays, the target is fre
 
 // ---- Interruption ------------------------------------------------------------------
 
-test('a hit on #0001 cancels the technique in formation, dash or wait: Hurt, no sphere, the target freed, no armour', () => {
+test('a hit on #0001 cancels the technique in formation, dash, wait or a miss\'s release: Hurt, no sphere, the target freed, no armour', () => {
   const system = new CombatSystem();
-  for (const when of ['form', 'dash', 'wait']) {
-    const d = hitDuel();
+  for (const when of ['form', 'dash', 'wait', 'release']) {
+    const d = when === 'release' ? duel({ gap: 900, pushboxes: true }) : hitDuel();
     const t = start(d);
     if (when === 'wait') runUntil(d, () => t.phase === 'wait');
     else runUntil(d, () => t.phase === when);
@@ -1049,7 +1207,7 @@ test('facing is snapshotted: right rushes right, left rushes left, and an oppone
   assert.equal(d.attacker.facing, -1, 'free again, it turns as usual');
 });
 
-test('a solid wall stops the rush: no pass-through, no hit behind it, and the technique ends as a miss', () => {
+test('a solid wall stops the rush: no pass-through, no hit behind it, and #0001 releases against it like a miss', () => {
   const wall = { id: 'wall', x: 640, y: 600, w: 40, h: 200 };
   const stage = stageWith({ solids: [wall] });
   const d = duel({ stage, gap: 260, pushboxes: true });
@@ -1058,6 +1216,14 @@ test('a solid wall stops the rush: no pass-through, no hit behind it, and the te
   assert.equal(t.endReason, 'wall');
   assert.ok(log.every((s) => s.x + d.attacker.body.halfW <= wall.x), 'never inside or past the wall');
   assert.equal(d.attacker.body.x, wall.x - d.attacker.body.halfW);
+  // Stopped on the step it met the wall (that step already the release), a
+  // whole release pose against it, no slide, no search, no sphere; then free.
+  const release = log.filter((s) => s.phase === 'release');
+  assert.equal(release.length, RELEASE_STEPS);
+  assert.ok(log.filter((s) => s.phase === 'dash').length < DASH_STEPS, 'cut short by the wall');
+  assert.ok(release.every((s) => s.frame === RELEASE_POSE && s.vx === 0 && s.x === wall.x - d.attacker.body.halfW));
+  assert.ok(release.every((s) => s.sphere === null && !s.searching));
+  assert.equal(log.at(-2).frame, RELEASE_POSE);
   assert.deepEqual(d.events, []);
   assert.equal(d.target.combat.health, 100);
   assert.equal(d.attacker.state, 'idle');
@@ -1075,7 +1241,7 @@ test('a solid wall stops the rush: no pass-through, no hit behind it, and the te
 
 test('each missing fighter clip or sphere effect refuses the Sphere Rush: normal BA2, a warning, nothing invisible', () => {
   const missing = [
-    ['rasenForm', 'fighter'], ['rasenDash', 'fighter'], ['rasenConfirm', 'fighter'],
+    ['rasenForm', 'fighter'], ['rasenDash', 'fighter'], ['rasenConfirm', 'fighter'], ['rasenRelease', 'fighter'],
     ['rasenSphereBuild', 'effect'], ['rasenSphereImpact', 'effect'], ['rasenSphereExplosion', 'effect'],
   ];
   for (const [key, kind] of missing) {
@@ -1351,12 +1517,87 @@ test('Battle draws the sphere over both fighters, in the hand then on the target
   labels = render().filter((c) => c[0] === 'fillText').map((c) => c[1]);
   assert.ok(!labels.some((l) => /charged|bound/.test(l)), 'nothing of it in normal play');
 
-  // On the target now, still drawn last, centred on it.
+  // On the target now, still drawn last, centred on it; the caught CPU is
+  // drawn in its hurt pose in this very frame.
   const drawn = draws();
-  assert.equal(drawn.at(-1), '0001_prasen7.png');
+  assert.deepEqual(drawn, ['0001_hurt.png', '0001_rasen7.png', '0001_prasen7.png']);
   const [cx, cy] = t.sphereCenter(true);
   assert.deepEqual([cx, cy], [battle.p2.renderX, battle.p2.renderY - 48]);
   assert.deepEqual(translateBefore('0001_prasen7.png'), [Math.round(cx - 1000), Math.round(cy - 400)]);
+  // The sphere drawn on it keeps spinning 7 -> 8 -> 9 -> 7 ... until it
+  // blows, never mirrored, while #0001 holds rasen11 (never rasen12).
+  const spheres = [];
+  const poses = new Set();
+  while (t.phase !== 'explode') {
+    battle.update(DT);
+    const frame = draws();
+    if (t.phase === 'explode') break;
+    spheres.push(frame.at(-1));
+    poses.add(frame[1]);
+    assert.equal(mirrored(frame.at(-1)), false);
+  }
+  assert.deepEqual(order(spheres).slice(0, 7), [
+    '0001_prasen7.png', '0001_prasen8.png', '0001_prasen9.png', '0001_prasen7.png',
+    '0001_prasen8.png', '0001_prasen9.png', '0001_prasen7.png',
+  ]);
+  assert.ok(!poses.has(RELEASE_POSE));
+  // The blast: the lighter prasen10 over the target as #0001 releases.
+  assert.deepEqual(draws().slice(1), [RELEASE_POSE, '0001_prasen10.png']);
   while (battle.p1.technique) battle.update(DT);
   assert.deepEqual(draws().filter((id) => /prasen/.test(id)), [], 'gone once it is over');
+});
+
+test('Battle draws a miss in either direction: the rush, then rasen12 with no sphere at all, then idle', async () => {
+  for (const facing of [1, -1]) {
+    const { battle, script, sprites } = await realBattle();
+    for (const anim of [...Object.values(sprites.animations), ...Object.values(sprites.effects)]) {
+      for (const f of anim.frames) Object.assign(f, { canvas: { id: name(f) }, artW: 10, artH: 20, anchorArtX: 5, anchorArtY: 10 });
+    }
+    const calls = [];
+    const ctx = new Proxy({}, {
+      get: (t, k) => (k in t ? t[k] : (...args) => {
+        calls.push([k, ...args]);
+        return { width: 10 };
+      }),
+      set: () => true,
+    });
+    battle.ctx = ctx;
+    battle.theme = { prepare() {}, drawBackground() {}, drawTerrain() {}, drawForeground() {}, update() {}, shadow: { alpha: 0.3, skew: 0, stretch: 1 } };
+    Object.assign(battle.view, { ctx, pxW: 1280, pxH: 720, scale: 1, x: 1000, y: 400, w: 1280, h: 720 });
+    battle.pxPerArt = 2;
+    const draws = () => {
+      for (const f of battle.fighters) f.interpolate(1);
+      calls.length = 0;
+      battle.render();
+      return calls.filter((c) => c[0] === 'drawImage').map((c) => c[1].id);
+    };
+    // Open sand both ways (the desert's rocks are far off), the CPU far
+    // behind: nothing to catch or hit.
+    battle.setPhase('fight');
+    battle.p1.body.x = battle.p1.body.prevX = 1800;
+    battle.p1.facing = facing;
+    battle.p1.opponent = null; // keep the facing whatever the CPU does
+    battle.p2.body.x = battle.p2.body.prevX = 1800 - 700 * facing;
+    script.held = CHARGE;
+    battle.update(DT);
+    script.held = {};
+    script.once = CHARGED_BA2;
+    battle.update(DT);
+    const t = battle.p1.technique;
+    assert.ok(t);
+    const frames = [];
+    while (battle.p1.technique) {
+      frames.push(draws().slice(1));
+      battle.update(DT);
+    }
+    frames.push(draws().slice(1));
+    assert.equal(t.endReason, 'miss');
+    const poses = order(frames.map((f) => f[0]));
+    assert.deepEqual(poses.slice(-3), ['0001_rasen6.png', RELEASE_POSE, '0001_idle1.png'], `${facing}: the release, then idle`);
+    const released = frames.filter((f) => f[0] === RELEASE_POSE);
+    assert.equal(released.length, RELEASE_STEPS);
+    assert.ok(released.every((f) => f.length === 1), 'no sphere drawn with the release');
+    assert.ok(!frames.flat().some((id) => PRASEN.slice(6).includes(id)), 'no impact or explosion drawn');
+    assert.equal(battle.p2.combat.health, 100);
+  }
 });
