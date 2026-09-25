@@ -1,2129 +1,378 @@
-Objective
+Work in the hiyroscript/alva repository on the current main branch.
 
-Rework Alva’s defense/energy presentation and Sphere Rush tick timing while preserving the newly implemented Launch system.
+First inspect the existing architecture and tests before changing anything. Preserve Alva’s current data-driven approach and do not replace existing systems with one-off hacks. The requested changes are visual/game-feel tuning and a Discover rename; do not redesign unrelated combat mechanics.
 
-This pass has four primary goals:
+Goal
 
-1. Charged BA2 tick damage begins immediately when the sphere successfully contacts the opponent.
-2. Remove Dodge entirely and make #0001 use Shield as its Defense.
-3. Replace the current stamina display/defense economy with a 100-point Energy system visually split into three adjacent bars.
-4. Make Shield and the Void visually connected: black/red organic wavy shield circle, and give the Void a thin red outline along its wavy edge.
+Make these four changes:
 
-Do not modify the current Launch Point/Base Launch/Directional Launch architecture except where Shield interaction needs to integrate with hit resolution.
+1. Make the Shield’s perimeter visibly animate with an organic wavy motion like the Void, and move the red outline to the OUTSIDE of the black Shield boundary instead of the inside.
+2. Make #0001’s blue Sphere Rush sphere grow dramatically larger over time while it is attached to the opponent.
+3. Make the normal double-tap Dash travel farther.
+4. Rename the Discover section currently called “Conditions” to “Passives”.
 
-⸻
-
-1. Preserve the current Launch system
-
-The repo already uses the new architecture:
-
-* launchPoint
-* baseLaunch
-* directionalLaunch
-* launchStrength = baseLaunch × launchPoint
-
-Keep that intact.
-
-Do not restore any previous Knockback system.
-
-The existing #0001 damage/launch values remain unchanged:
-
-Hit	Damage	Base Launch	Direction
-BA1	5	1	horizontal
-BA2	10	2	vertical
-Mid-air BA1	5	2	vertical
-Mid-air BA2	10	2	reverseVertical
-Shuriken	1	0	null
-Charged BA2 tick	1	0	null
-Charged BA2 explosion	15	3	horizontal
-
-This pass is about timing, Shield, Energy, and visuals.
-
-⸻
-
-2. Charged BA2: first tick happens immediately on contact
-
-Current behavior starts the 0.5-second tick cadence after the sphere contacts the target, so the first +1 occurs about 0.5 seconds later.
-
-Change this.
-
-The moment the Sphere Rush successfully contacts and binds the opponent:
-
-contact occurs
-→ immediately deal first tick damage: +1 Launch Point
-→ then every 0.5 seconds after contact deal another +1
-→ explosion still occurs at the existing explosion time
-
-For the existing 2.0-second hold/explosion timing, the intended tick timeline should be:
-
-t = 0.0   contact → +1
-t = 0.5   +1
-t = 1.0   +1
-t = 1.5   +1
-t = 2.0   explosion → +15
-
-Do not also apply a regular tick at the exact explosion step if the explosion replaces that boundary tick.
-
-The clean intended total before the explosion is therefore:
-
-4 tick damage
-
-and then:
-
-+15 explosion damage
-
-for:
-
-19 total damage / Launch Point added
-
-on a fully completed successful Sphere Rush.
-
-The initial rush-contact/setup hit itself should still have:
-
-damage: 0,
-baseLaunch: 0,
-directionalLaunch: null
-
-The immediate +1 should come from the existing tickHit definition, not by changing firstHit.damage to 1.
-
-This distinction matters:
-
-firstHit = contact/bind setup
-tickHit = actual recurring +1 damage
-
-On successful contact, run one tickHit immediately.
-
-Then start the next tick deadline at:
-
-contact + 0.5 s
-
-not at contact itself again.
-
-⸻
-
-3. Avoid double-ticking on the contact simulation step
-
-The current technique tracks sinceHit.
-
-When contact happens, make sure the same fixed simulation step cannot produce:
-
-immediate contact tick
-+
-scheduled 0.5-second tick
-
-at once.
-
-There should be exactly one tick on the contact step.
-
-A clean state model would be something like:
-
-this.nextTickAt = tickInterval;
-this.immediateTickDue = true;
-
-or equivalent.
-
-When contact() succeeds:
-
-queue exactly one immediate tick
-sinceHit = 0
-next normal tick occurs when sinceHit reaches 0.5
-
-Do not depend on float equality.
-
-Continue using the fixed-step simulation and threshold-crossing logic.
-
-⸻
-
-4. Shield completely replaces Dodge for #0001
-
-Dodging should no longer exist as a gameplay mechanic for #0001.
-
-The shared Defense input remains the same:
-
-keyboard Defense
-gamepad Defense
-touch Defense
-
-but pressing/holding it now activates Shield.
-
-Remove #0001’s current Dodge behavior:
-
-* no Dodge startup;
-* no Dodge invulnerability;
-* no Dodge recovery;
-* no Dodge stamina cost;
-* no attacks passing through due to invulnerability;
-* no dodge combat state for #0001;
-* no midairDodge;
-* no dodge-specific fighter logic;
-* no dodge-specific tests for #0001.
-
-Use a held Shield/Block model instead.
-
-⸻
-
-5. Remove Dodge architecture if it is no longer needed anywhere
-
-There is currently only one playable fighter.
-
-If no other current fighter uses Dodge, remove the old Dodge implementation instead of keeping dead machinery around “for future fighters.”
-
-That includes, where applicable:
-
-createDodgeMove
-defenseAction
-defensePhase
-invulnerable derived from Dodge
-startup/invulnerable/recovery Dodge state
-stamina.dodgeCost
-tryDefense Dodge branches
-DODGE_FPS
-dodge-specific comments
-Dodge test expectations
-Help text describing Dodge
-debug logic that grays hurtboxes during Dodge
-
-Keep Defense generic enough that future fighters could receive other defense types later, but do not keep a full unused Dodge subsystem in the active codebase unless another current system genuinely depends on it.
-
-The actual current behavior should be Shield.
-
-⸻
-
-6. Inspect the actual Shield art before wiring filenames
-
-The user has supplied frames for:
-
-* grounded Shield;
-* mid-air Shield.
-
-However, the current GitHub asset directory inspection still exposes the old dodge-named files and does not currently show obvious shield-named files.
-
-Before implementing:
-
-1. inspect assets/characters/0001/;
-2. identify the actual newly uploaded Shield filenames;
-3. inspect frame count/order;
-4. register exactly those files;
-5. do not invent filenames.
-
-Do not blindly reuse:
-
-0001_dodge1.png
-0001_dodge2.png
-0001_dodge3.png
-0001_midairdodge1.png
-...
-
-unless the repository actually shows that those files were intentionally replaced/redefined as the Shield art.
-
-The source assets are authoritative.
-
-⸻
-
-7. Grounded Shield animation
-
-#0001 has Shield frames for normal grounded Shield.
-
-Register them as a dedicated fighter animation, preferably:
-
-shield
-
-The Shield is a held Defense, so animation behavior should reflect the actual uploaded art.
-
-If there are multiple grounded Shield frames, inspect what they depict and map them sensibly to:
-
-enter / raise shield
-held shield
-release
-
-or a held loop if that is what the art clearly supports.
-
-Do not fabricate extra frames or interpolate poses.
-
-While Defense remains held and Shield is active, the fighter should visually remain in the shielding pose/state.
-
-On release, return cleanly to the appropriate neutral state.
-
-⸻
-
-8. Mid-air Shield
-
-There is separate mid-air Shield art.
-
-The user specifically notes:
-
-mid air shield only has shielding
-
-Interpret this as:
-
-* the aerial animation only represents the active held shielding pose/state;
-* do not require an authored aerial startup/release sequence that does not exist;
-* do not fake missing air Shield phases using unrelated art.
-
-When the fighter activates Defense while airborne:
-
-enter mid-air shield immediately using the available mid-air shield art
-hold that shield art/state while Defense is held and Energy allows it
-release back to the normal airborne state when Defense is released
-
-Do not turn the old midair Dodge animation into invulnerability.
-
-The fighter should continue falling / obeying normal aerial physics while shielding unless another existing Block rule explicitly freezes a property.
-
-Shield is defense, not flight.
-
-⸻
-
-9. Shield is a held state, not a one-press action
-
-Defense should behave like a normal held shield:
-
-Defense pressed/held
-→ Shield active
-Defense released
-→ Shield inactive
-
-It should not play once and finish automatically like Dodge.
-
-Shield should remain active as long as all are true:
-
-Defense is held
-fighter can defend
-fighter has sufficient usable Energy state
-fighter is not stunned/bound/respawning/etc.
-
-If the fighter becomes unable to act because of an attack/technique condition, update Shield state consistently with the game’s current state-priority rules.
-
-⸻
-
-10. Shield visuals: fighter inside a black/red wavy circle
-
-When Shield is active, draw a circular shield around the fighter.
-
-The requested appearance is specific:
-
-* circle surrounding the character;
-* no large bubble artwork or extra visual layer inside it;
-* black and red;
-* visually similar to the Void;
-* wavy/organic perimeter.
-
-The circle should encompass the full fighter body with a modest margin.
-
-It should be centered around the fighter’s visual/body center, not at the feet.
-
-For example, derive from:
-
-fighter visual height
-fighter collider/hurtbox dimensions
-
-rather than hardcoding a screen-size circle.
-
-The circle should follow the fighter exactly.
-
-⸻
-
-11. Shield circle should be procedural Canvas rendering
-
-Do not add a shield PNG.
-
-Render it procedurally on the battle canvas.
-
-Create a reusable helper, preferably separate from generic fighter sprite drawing.
-
-For example:
-
-drawShield(fighter)
-
-or a small shared organic-edge utility.
-
-The perimeter should be generated from a circle with small sine/noise perturbations:
-
-radius + wave(angle, time)
-
-The result should remain recognizable as a circle but have the same organic, alive quality as the Void edge.
-
-Do not make the amplitude so large that the shield looks spiky or unstable.
-
-⸻
-
-12. Shield colors
-
-The shield must visually use:
-
-black
-red
-
-Do not use Alva green.
-
-Recommended composition:
-
-mostly transparent / subtle black interior
-black primary boundary/body
-thin red wavy rim/accent
-
-The fighter must remain visible.
-
-Do not fill the whole circle with opaque black and hide the character.
-
-A good interpretation is:
-
-very low-opacity black circular fill
-+
-strong black wavy perimeter
-+
-thin red outer/inner highlight
-
-The visual reference is the Void, but it is still a readable Shield around a character.
-
-⸻
-
-13. Shield must render around the fighter, not behind the entire scene
-
-Integrate it into Arena.render() around fighter rendering.
-
-A reasonable order:
-
-fighter shadow
-shield backing/interior
-fighter sprite
-shield perimeter/rim
-technique/projectiles as appropriate
-
-If the desired visual is “character inside the shield,” the perimeter should clearly appear around/in front of the sprite while the character itself stays readable.
-
-Do not let the Shield be swallowed behind stage foreground art.
-
-Do not draw it over the HUD/status indicators.
-
-⸻
-
-14. Shield gameplay behavior
-
-A successfully Shielded hit should be treated as blocked.
-
-While Shield is active:
-
-* melee attacks can be blocked;
-* projectiles can be blocked;
-* clone attacks can be blocked;
-* charged-technique hits that are blockable can be blocked;
-* the hit should not behave as a Dodge/pass-through;
-* the attacking hit should still count as having connected with the Shield.
-
-Preserve the existing Block semantics unless explicitly changed below.
-
-The current project already has a Block-type path in CombatSystem, so replace #0001’s Dodge with that model and then change its Energy cost semantics.
-
-⸻
-
-15. Successful shielding costs 25 Energy
-
-This is a major change from the current continuous Block drain.
-
-Do not drain Energy just because the fighter is holding Shield.
-
-Holding Shield with nobody attacking should cost:
-
-0 Energy
-
-A successful Shield against an attack costs exactly:
-
-25 Energy
-
-once per successfully blocked hit.
-
-Examples:
-
-100 → block hit → 75
-75 → block hit → 50
-50 → block hit → 25
-25 → block hit → 0
-
-This cost is triggered by the confirmed blocked hit event.
-
-Do not charge 25:
-
-* when Shield begins;
-* every frame Shield is held;
-* every second Shield is held;
-* when an attack misses;
-* when a projectile passes elsewhere;
-* when the player taps Defense without being hit.
-
-Only a successful Shield interaction costs it.
-
-⸻
-
-16. Define “successful Shield” precisely
-
-A successful Shield means the shared hit resolver determines that:
-
-target is currently shielding
-+
-the incoming hit would have struck the fighter
-+
-the hit resolves as a block
-
-At that moment:
-
-spendEnergy(25)
-
-exactly once.
-
-For an ordinary one-hit attack, one collision = one 25-point cost.
-
-For a multihit technique/projectile, each separately resolved blocked hit can cost 25 if it is genuinely a separate hit event.
-
-Do not consume multiple costs for the same hitbox on the same simulation step.
-
-⸻
-
-17. Energy terminology
-
-The user now calls this resource:
-
-Energy
-
-Replace player-facing “Stamina” terminology with “Energy.”
-
-Prefer internal names too where practical:
-
-energy
-maxEnergy
-energyExhausted
-energySpec
-energyRatio
-setEnergy()
-spendEnergy()
-
-rather than leaving everything internally named stamina.
-
-Because this pass is already changing resource semantics substantially, do a clean rename rather than presenting “Energy” in UI while keeping misleading Stamina APIs.
-
-Update comments, documentation, tests, and Help accordingly.
-
-⸻
-
-18. Energy maximum remains 100
-
-Every fighter starts with:
-
-Energy = 100
-
-Maximum:
-
-100
-
-It never exceeds 100 and never becomes negative.
-
-Respawn/reset returns it to:
-
-100
-
-The existing gradual refill mechanic should remain conceptually slow.
-
-Preserve the current normal regeneration rate unless there is a specific incompatibility:
-
-12 Energy per second
-
-is the current configured rate and is a reasonable value to retain.
-
-Charge may continue to accelerate Energy refill using the existing faster refill rate if that current behavior is intended to remain.
-
-Do not invent a new refill speed unless necessary.
-
-⸻
-
-19. Dash still uses Energy
-
-The current resource is shared by Dash and Defense.
-
-Preserve Dash’s existing cost:
-
-25 Energy
-
-unless there is a direct conflicting requirement.
-
-So the key resource costs become:
-
-Dash: 25 Energy when Dash starts
-Shield: 25 Energy only when a hit is successfully blocked
-
-Remove:
-
-Dodge: 25
-continuous Block drain
-
-because Dodge no longer exists and Shield no longer drains continuously.
-
-⸻
-
-20. Three-segment Energy bar
-
-The Energy display still represents a total of:
-
-100
-
-but visually split it into three small adjacent bars.
-
-They should read as one grouped meter:
-
-[ bar 1 ][ bar 2 ][ bar 3 ]
-
-with small gaps between segments.
-
-Do not create three independent resources.
-
-There is still one scalar:
-
-energy: 0–100
-
-The three bars are a visual segmentation of that one number.
-
-⸻
-
-21. Segment capacities
-
-Because 100 cannot be split into three equal integer values, define deterministic segment capacities.
-
-Use:
-
-Bar 1: 34
-Bar 2: 33
-Bar 3: 33
-Total: 100
-
-or an equivalent precise mapping where the total is exactly 100.
-
-The mapping must be centralized and tested.
-
-Recommended:
-
-ENERGY_SEGMENTS = [34, 33, 33]
-
-Do not display inaccurate thirds that sum to 99.
-
-⸻
-
-22. Energy bars should drain from front to back
-
-Define visual order clearly.
-
-Treat the first/front bar as the one consumed first, followed by the next, then the last.
-
-At full:
-
-[ full ][ full ][ full ]
-
-As Energy is spent:
-
-75:
-[first bar partially/fully depleted as mapping dictates]
-[remaining rear bars full]
-
-The meter should visually show Energy disappearing progressively through the three adjacent segments.
-
-The exact pixel fill should be derived from the scalar Energy amount and segment capacities.
-
-⸻
-
-23. Refill order reverses the depletion path
-
-The user specifically requested:
-
-when a bar become empty the refill process starts from the bar behind it
-
-Implement refill so the visually rearward remaining/depleted structure fills naturally in reverse order.
-
-When one segment is emptied and Energy begins regenerating, the refill should visibly begin from the segment behind the one that was depleted.
-
-In practical terms, define and test a consistent three-segment flow rather than independently filling all segments at once.
-
-Recommended visual model:
-
-depletion:
-front → middle → back
-refill:
-back → middle → front
-
-So after heavy consumption, regeneration visually rebuilds from the last/rear bar toward the first/front bar.
-
-This is a presentation rule over the scalar Energy value.
-
-Do not allow all three segments to simultaneously refill from left to right based only on raw percentages.
-
-⸻
-
-24. Preserve one scalar Energy value
-
-Even though the refill display is reverse-ordered, gameplay must still use one exact scalar value.
-
-Avoid storing three separate mutable Energy pools unless absolutely necessary.
-
-Preferred architecture:
-
-combat.energy // 0–100
-
-and a pure visualization function:
-
-energySegments(energy, exhausted)
-
-which returns three fill ratios according to the defined segment/depletion/refill mapping.
-
-If tracking refill direction/state is necessary to render the user-requested rear-to-front behavior, store only minimal state such as:
-
-energyRefilling
-
-or equivalent.
-
-Do not let segment state diverge from total Energy.
-
-⸻
-
-25. Energy exhaustion
-
-The existing “zero → gray → must fully refill” rule remains, now specifically for Shield usability.
-
-When Energy reaches exactly:
-
-0
-
-set:
-
-energyExhausted = true
-
-All three segments become gray.
-
-They stay gray throughout the entire recovery.
-
-The fighter cannot Shield while exhausted.
-
-Exhaustion clears only at:
-
-Energy = 100
-
-Then:
-
-energyExhausted = false
-
-and Shield becomes available again.
-
-Do not clear exhaustion at:
-
-1
-25
-33
-50
-75
-99
-
-Only 100.
-
-⸻
-
-26. Shield failure at zero Energy
-
-Consider the exact hit that spends the final 25 Energy.
-
-Example:
-
-Energy before block = 25
-incoming hit is successfully Shielded
-Shield cost = 25
-Energy after = 0
-
-That hit is still successfully blocked.
-
-Then immediately afterward:
-
-Energy becomes exhausted
-Shield can no longer remain active
-fighter must drop Shield
-all segments turn gray
-Shield cannot reactivate until Energy returns to 100
-
-Do not retroactively make the final blocked hit damage the fighter simply because its cost emptied the meter.
-
-The Shield was valid when contact occurred.
-
-⸻
-
-27. Insufficient nonzero Energy
-
-Shield costs 25 per successful block.
-
-If the fighter has less than 25 usable Energy but is not exhausted yet, Shield should not be able to successfully block a hit it cannot afford.
-
-To keep the system deterministic, use:
-
-Shield can activate / remain block-capable only when Energy >= 25
-
-If Energy falls below 25 because of another Energy action such as Dash:
-
-Shield is unavailable until Energy regenerates back to at least 25
-
-unless the fighter is fully exhausted, in which case the stricter full-refill rule applies.
-
-This prevents a 10-Energy fighter from blocking a hit and going negative.
-
-⸻
-
-28. Exhaustion versus ordinary low Energy
-
-There are two different states:
-
-Low but not exhausted
-
-Example:
-
-Energy = 20
-energyExhausted = false
-
-The fighter cannot Shield because a block costs 25.
-
-But normal regeneration continues.
-
-Once it reaches:
-
-25
-
-Shield is usable again.
-
-Exhausted
-
-Example:
-
-Energy hit 0 at some point
-energyExhausted = true
-Energy has regenerated to 70
-
-Shield is still unavailable.
-
-Only at:
-
-100
-
-does exhaustion clear.
-
-This preserves the existing zero-energy lockout concept.
-
-⸻
-
-29. Dash interaction with exhaustion
-
-Keep the existing resource exhaustion rules consistently shared unless this would conflict with the intended design.
-
-Recommended:
-
-When Energy reaches zero from either:
-
-Dash
-or
-Shield cost
-
-the fighter enters the same exhausted state.
-
-While exhausted:
-
-no Dash
-no Shield
-
-until Energy returns to 100.
-
-This retains the existing unified resource behavior.
-
-Do not create separate Shield Exhaustion and Dash Exhaustion systems.
-
-⸻
-
-30. Energy regeneration
-
-Use the existing fixed-step regeneration architecture.
-
-Normal regeneration:
-
-slow automatic refill
-
-Charge:
-
-faster refill
-
-Holding Shield should not automatically stop regeneration unless deliberately necessary for balance.
-
-However, if the user is actively holding a valid Shield and Energy is already below full, it is acceptable and preferable to let regeneration continue slowly because Shield itself has no passive drain.
-
-The cost comes from successfully blocking attacks.
-
-⸻
-
-31. Energy display visibility
-
-The current stamina bar is hidden at full Energy.
-
-Preserve that behavior:
-
-Energy = 100 and not exhausted
-→ no Energy bars drawn
-
-When Energy drops below 100:
-
-show the three-segment meter
-
-When exhausted:
-
-show all three segments/available refill progress in gray
-
-When it reaches 100:
-
-hide the meter again
-
-Do not leave three empty placeholders permanently over fighters.
-
-⸻
-
-32. Energy bar colors
-
-Preserve the current resource color identity:
-
-normal Energy = purple
-exhausted refill = gray
-outline = black
-track = dark/black
-
-Do not make Energy red to match Shield.
-
-Red/black belongs to the Shield/Void danger visual.
-
-Energy remains the existing purple resource cue.
-
-⸻
-
-33. Three-bar world-space layout
-
-Keep the Energy meter in the same general world-space area above the fighter’s name tag.
-
-Instead of one continuous rectangle, render:
-
-small segment
-small gap
-small segment
-small gap
-small segment
-
-The total combined meter width should remain about the current status-bar width.
-
-Do not make each segment the size of the old whole bar.
-
-Maintain readability at different camera scales and DPR values.
-
-Use the existing CSS-pixel minimum sizing logic in Arena.staminaBarRect() / its renamed Energy equivalent.
-
-⸻
-
-34. Rename fighter status helpers
-
-Refactor:
-
-staminaBarState
-drawStaminaBar
-STAMINA_STYLE
-staminaBarRect
-
-toward:
-
-energyBarState
-drawEnergyBar
-ENERGY_STYLE
-energyBarRect
-
-The state helper should expose useful segment information, for example:
-
-{
-  visible,
-  energy,
-  maxEnergy,
-  exhausted,
-  color,
-  segments: [
-    { ratio: ... },
-    { ratio: ... },
-    { ratio: ... }
-  ]
-}
-
-This allows comprehensive tests without requiring Canvas inspection for all logic.
-
-⸻
-
-35. Remove continuous Block drain
-
-Current data includes:
-
-blockDrain: 20
-
-Remove that resource behavior.
-
-There should no longer be:
-
-Energy per second while Shield is held
-
-Remove the config field if nothing else uses it.
-
-Replace it with an explicit successful-block cost, such as:
-
-shieldHitCost: 25
-
-or:
-
-blockCost: 25
-
-Prefer terminology matching Shield.
-
-Example:
-
-energy: {
-  max: 100,
-  regen: 12,
-  chargeRegen: 30,
-  dashCost: 25,
-  shieldHitCost: 25,
-}
-
-Do not keep obsolete:
-
-dodgeCost
-blockDrain
-
-for #0001.
-
-⸻
-
-36. Shield definition
-
-Change #0001’s defense definition from:
-
-{
-  type: 'dodge',
-  ...
-}
-
-to a Shield/Block definition.
-
-Prefer explicit semantics such as:
-
-defense: {
-  type: 'shield',
-  groundAnimation: 'shield',
-  airAnimation: 'midairShield',
-}
-
-rather than calling the player-facing system Shield while leaving it named type: 'block' everywhere.
-
-If the generic combat resolver still uses “blocked hit” terminology internally, that is fine.
-
-But fighter data should clearly describe Shield.
-
-⸻
-
-37. Shield state on Fighter
-
-Use an explicit state/property, for example:
-
-combat.shielding
-
-rather than misleading:
-
-combat.blocking
-
-if practical.
-
-At minimum, make the public game-state naming clear.
-
-Shield state should be:
-
-false by default
-true while Defense is held and Shield is valid
-false when released/stunned/bound/exhausted/out of Energy/respawning
-
-⸻
-
-38. Direction requirement for Shield
-
-The old Block logic currently appears to require facing the incoming hit.
-
-Retain this concept unless existing gameplay becomes inconsistent:
-
-Shield blocks attacks arriving from the side the fighter is facing.
-
-But the visual shield is a full circle around the fighter.
-
-If the user intends the circle to be omnidirectional, make the gameplay match the visual and remove facing checks.
-
-For this pass, prefer full-circle Shield behavior because the requested Shield completely surrounds the fighter.
-
-That means:
-
-while shielding, a hit that intersects the fighter resolves as blocked regardless of attacker side
-
-This makes the mechanics consistent with the circular visual.
-
-Do not require the fighter to turn toward the attacker.
-
-⸻
-
-39. Mid-air Shield is also full-circle
-
-The same gameplay applies in the air.
-
-While airborne and shielding:
-
-incoming intersecting hit → blocked
-
-if Energy permits.
-
-The aerial Shield does not grant invulnerability.
-
-It resolves hits as Shield blocks.
-
-Physics continues normally.
-
-⸻
-
-40. Shield hit effects
-
-On a successful Shield:
-
-* pay 25 Energy;
-* do not add normal attack damage to Launch Point;
-* do not apply the hit’s normal launch;
-* apply the existing block hitstop/blockstun feel as appropriate;
-* do not trigger hurt animation;
-* keep Shield visible unless that hit exhausted the resource;
-* mark projectile/one-hit attack as consumed exactly as a normal successful block does.
-
-The current old Block system applies chip damage.
-
-Remove chip damage for #0001’s Shield unless the game has an explicit separate reason to retain it.
-
-The requested cost of shielding is the 25 Energy payment.
-
-Do not additionally punish Shield with Launch Point chip damage.
-
-So:
-
-successful Shield:
-Launch Point damage = 0
-Energy cost = 25
-launch = 0
-
-This should be the new #0001 behavior.
-
-⸻
-
-41. Remove blockDamageScale from #0001
-
-The old architecture includes:
-
-stats.blockDamageScale
-
-This is no longer needed for #0001 Shield.
-
-A successfully shielded attack should not add chip damage.
-
-Remove the field from #0001 if present.
-
-If generic infrastructure keeps a chip-damage option for some future defense type, do not make #0001 use it.
-
-⸻
-
-42. Shield against Sphere Rush
-
-Define charged BA2 interaction carefully.
-
-The initial Sphere Rush contact is a hit/contact check.
-
-If the target is Shielding when the sphere reaches them:
-
-the contact is successfully Shielded
-→ target pays 25 Energy
-→ Sphere Rush does not bind the target
-→ no immediate tick occurs
-→ no recurring ticks occur
-→ no explosion-on-target sequence
-→ technique should resolve as a blocked/failed contact cleanly
-
-Do not allow Sphere Rush to bind through an active Shield.
-
-Use the existing technique’s blocked-contact outcome if one already exists, or add a clean blocked termination state.
-
-The Sphere should not remain attached to the Shielding opponent.
+Run and update the relevant tests and documentation afterward.
 
 ⸻
 
-43. Shield against shuriken
+1. Shield: stronger Void-like waviness + red outline outside
 
-Shuriken can be Shielded.
+Relevant files include:
 
-On collision with Shield:
+* js/game/shield-fx.js
+* js/core/organic-edge.js
+* js/stages/stage-theme.js
+* js/game/arena.js
+* tests/defense.test.mjs
 
-shuriken is consumed
-target loses 25 Energy
-target gains 0 Launch Point
-target receives no launch
+The Shield already correctly shares waveOffset() with the Void and receives Arena.fxTime, so keep that architecture.
 
-Do not let a shuriken pass through like Dodge invulnerability.
+Current Shield behavior:
 
-⸻
-
-44. Shield against clone attacks
-
-Clone attacks use the normal attack resolver.
-
-If they intersect Shield:
-
-blocked normally
-25 Energy cost
-0 Launch Point damage
-0 launch
-
-No special clone-specific implementation.
-
-⸻
-
-45. Void: add a thin red outline
-
-The current Void renderer in:
-
-js/stages/stage-theme.js
-
-already draws one black wavy layer.
-
-Preserve that.
-
-Add a thin red outline exactly along the Void’s inner wavy boundary.
-
-The result should be:
-
-stage
-thin red wavy line
-solid black Void
-
-The red line should follow the same animated wave geometry as the black fill.
-
-It must not be a straight rectangle or separate static boundary.
-
-⸻
-
-46. Reuse the exact same Void wave path
-
-Do not calculate a visually similar but different red wave.
-
-The red outline must be derived from the exact points/path used for the black edge so they remain perfectly aligned at all times.
-
-Refactor if needed so traceVoidSide can produce/reuse:
-
-inner edge points
-
-for:
-
-1. black fill region;
-2. red stroke.
-
-Recommended architecture:
-
-const points = voidEdgePoints(side, ...);
-fillVoidRegion(points);
-strokeVoidEdge(points);
-
-or equivalent.
-
-Do not duplicate sine formulas in two functions.
-
-⸻
-
-47. Void outline appearance
-
-Use a dark vivid red appropriate to the requested black/red look.
-
-For example:
-
-#d21f2b
-
-or a comparable strong red.
-
-Keep it thin.
-
-Target roughly:
-
-1–2 CSS px
-
-after DPR handling.
-
-Do not make it a glowing neon border.
-
-No blur.
-
-No shadow.
-
-No thick red band.
-
-The Void should remain overwhelmingly black with only a thin red wavy warning edge.
-
-⸻
-
-48. Reduced-motion behavior
-
-The current Void stops wave movement under reduced motion.
-
-Preserve this:
-
-reduced motion → fixed wavy shape
-
-The red outline should freeze with the exact same shape.
-
-For Shield:
-
-* under normal motion, its perimeter can subtly wave;
-* under reduced motion, use a static wavy circle rather than animated motion.
-
-Do not remove the wavy shape entirely.
-
-⸻
-
-49. Share the organic visual language where sensible
-
-The Shield and Void should feel visually related.
-
-Consider factoring their small sine-wave edge calculation into a reusable helper, but do not overengineer stage code into a generic graphics framework.
-
-The important visual connection is:
-
-black
-red rim
-organic/wavy perimeter
-
-The Void is a dangerous outer boundary.
-
-The Shield is a protective circular boundary.
-
-⸻
-
-50. Shield circle animation
-
-Animate Shield’s wave phase slowly.
-
-Avoid fast pulsing.
-
-Recommended:
-
-subtle continuous drift
-
-The circle’s average radius should remain stable.
-
-Do not scale the whole Shield in and out aggressively.
-
-Its radius should not affect gameplay collision.
-
-Shield visual geometry is purely cosmetic.
-
-⸻
-
-51. Shield gameplay collision remains the fighter hurtbox
-
-Do not create a larger defensive collision circle just because the Shield graphic is larger.
-
-An incoming attack is blocked if it would have hit the fighter’s normal hurtboxes while Shield is active.
-
-The Shield graphic is visual feedback.
-
-Do not extend the fighter’s effective blocking range beyond their body.
-
-⸻
-
-52. Debug overlay
-
-Remove Dodge-specific debug behavior such as graying hurtboxes for invulnerability.
-
-When Shield is active, debug can optionally label:
-
-shield
-
-or show hurtboxes normally.
-
-Do not add a huge debug collision circle because Shield is not a new collision volume.
-
-⸻
-
-53. Update CPU/training behavior
-
-Practice CPU currently never dodges or blocks.
-
-Update terminology to:
-
-Practice CPU never shields
-
-unless its AI is later explicitly given Defense behavior.
-
-Do not make the dummy automatically Shield attacks.
-
-Any generic AI code referring to Dodge should be reviewed.
-
-⸻
-
-54. Help/control text
-
-Replace player-facing Dodge language with Shield.
-
-Help should explain concisely:
-
-Defense — Hold to Shield. Blocking a hit costs 25 Energy.
-
-Also explain the Energy lockout:
-
-If Energy reaches zero, it turns gray and must fully refill before Shield/Dash become available again.
-
-Do not overload Help with internal three-segment math.
-
-But do mention that the Energy display is divided into three segments.
-
-⸻
-
-55. Documentation terminology
-
-Update at minimum:
-
-README.md
-ALVA_SPEC.md
-js/game/combat.js comments
-js/game/character.js comments
-js/data/characters.js comments
-js/game/fighter-status.js
-js/game/arena.js
-tests
-Help content
-
-Replace outdated references to:
-
-Dodge
-mid-air Dodge
-Dodge invulnerability
-dodgeCost
-Block drain
-stamina bar
-staminaExhausted
-
-with the new Shield/Energy behavior.
-
-Do not leave contradictory documentation.
-
-⸻
-
-56. Asset documentation
-
-Once the actual Shield filenames are verified, document them accurately in:
-
-ALVA_SPEC.md
-character data comments
-relevant tests
-
-Do not write guessed filenames into the spec.
-
-If the files were uploaded under an unexpected historical name, document the actual files and their role clearly.
-
-⸻
-
-57. Defense tests: remove Dodge expectations
-
-Rewrite tests/defense.test.mjs.
-
-Delete expectations that:
-
-* one press plays dodge1/dodge2/dodge3;
-* attacks pass through during invulnerability;
-* midair Dodge has special invulnerable frames;
-* Dodge pays 25 on activation;
-* Dodge art is required for invulnerability.
-
-Replace with Shield tests.
-
-⸻
-
-58. Ground Shield tests
-
-Test:
-
-Defense held on ground
-→ shielding = true
-→ ground Shield animation is active
-
-Release:
-
-Defense released
-→ shielding = false
-→ returns to normal state
-
-Holding Defense for several seconds without being attacked:
-
-Energy does not decrease
-
-⸻
-
-59. Mid-air Shield tests
-
-While airborne:
-
-Defense held
-→ mid-air Shield animation/state
-→ shielding = true
-→ normal gravity still applies
-
-Release:
-
-returns to jump/fall animation appropriately
-
-Do not assert nonexistent startup/recovery frames if the actual art only contains the held shielding pose.
-
-⸻
-
-60. Successful Shield cost tests
-
-At:
-
-100 Energy
-
-block one BA1:
-
-Energy = 75
-Launch Point unchanged
-no launch
-
-Block another:
-
-Energy = 50
-
-Then:
-
-25
-
-Then:
-
-0
-energyExhausted = true
-Shield drops
-
-The fourth hit itself remains blocked.
-
-⸻
-
-61. No passive Shield drain test
-
-Hold Shield for, for example:
-
-3 seconds
-
-with no incoming hit.
-
-Assert:
-
-Energy unchanged except any normal regeneration toward max
-
-If starting at full:
-
-100 → 100
-
-No drain.
-
-⸻
-
-62. Missed attack does not cost Energy
-
-Have an opponent attack while the Shielding fighter is out of range.
-
-Assert:
-
-no hit
-no block event
-no Energy cost
-
-⸻
-
-63. Shield cannot block with less than 25 Energy
-
-Set:
-
-Energy = 20
-not exhausted
-
-Hold Defense.
-
-Assert Shield cannot enter a block-capable state.
-
-After regeneration reaches:
-
-25
-
-Shield becomes usable again.
+* SHIELD_SHAPE.amp is only 0.045, which makes the movement very subtle.
+* shieldOutline() correctly produces a time-driven wavy circle.
+* Reduced-motion correctly freezes the animation at time = 0.
+* The black Shield rim is drawn on the primary outline.
+* The red accent is deliberately offset to the INNER half of the black rim using roughly:
+    radius - inset
 
-⸻
-
-64. Exhaustion recovery tests
-
-Spend Energy to exactly zero.
-
-Assert:
-
-energyExhausted = true
-
-Regenerate through:
-
-1
-25
-50
-75
-99
-
-Assert:
-
-Shield unavailable
-Dash unavailable
-segments gray
-
-At:
-
-100
-
-assert:
-
-energyExhausted = false
-Shield available
-Dash available
-meter hidden
-
-⸻
-
-65. Segmented Energy tests
+That red placement is wrong for the desired look.
 
-Test the pure segment-state helper.
+Required Shield look
 
-At full:
+The Shield should read as a living black protective bubble related visually to the Void:
 
-100
+* Keep the subtle translucent black interior behind the fighter.
+* Keep the main black wavy rim in front of the fighter.
+* Keep the same red family used by the Void (EDGE_RED).
+* Make the perimeter animation visibly wavy in normal gameplay rather than almost imperceptible.
+* The shape should continuously and smoothly drift/waver; it must NOT pulse uniformly in and out.
+* It should not look spiky, noisy, or jittery.
+* Preserve the circle’s overall size and its centering around the character.
+* Preserve reduced-motion behavior: reduced-motion still shows the organic irregular shape but freezes its animation.
 
-the hidden state should represent all segments full.
+Increase the Shield wave amplitude enough to make the movement clearly readable. A target around 0.09–0.11 of radius is appropriate instead of the current 0.045, but tune visually if necessary. Keep the slow multi-sine organic approach already used rather than randomizing points per frame.
 
-At representative partial values, verify deterministic segmentation.
+Red outline placement
 
-Test especially:
+The thin red accent must be on the OUTSIDE edge of the black Shield rim.
 
-75
-50
-25
-0
+The current code offsets it inward:
 
-and values near segment boundaries.
+radius - inset
 
-The segment capacities must total exactly:
+Change the geometry so the red accent occupies the outer half of the black perimeter instead. Conceptually this should become the equivalent of:
 
-100
+radius + inset
 
-No lost/gained Energy because of rounding.
+where inset is still derived from the black rim width and red accent width.
 
-⸻
-
-66. Reverse refill visual tests
-
-Test the requested refill order explicitly.
-
-After depletion has emptied front segments, regeneration should visibly rebuild:
-
-back → middle → front
-
-not all simultaneously.
-
-This can be tested using the pure segment-state function or an explicit refill phase/state helper.
-
-Make the intended order obvious in test names so future refactors do not revert it accidentally.
+The final layering should visually read from inside to outside as:
 
-⸻
-
-67. Energy bar rendering tests
-
-Update tests/fighter-status.test.mjs.
-
-Verify:
+fighter/interior → black Shield boundary → thin red outer edge
 
-* hidden at 100;
-* three adjacent segments below 100;
-* normal purple state;
-* black outlines/tracks;
-* gray exhausted state;
-* gray persists until full;
-* gaps exist between the three segments;
-* total visual width remains within the existing compact status footprint.
+The red must not appear as an inner ring around the fighter.
 
-Do not require exact screen pixels where DPR/camera scaling makes that brittle, but test deterministic geometry helpers.
+Do not create a second unrelated Shield shape. Both black and red strokes must follow the exact same animated organic wave so they remain locked together.
 
-⸻
-
-68. Sphere immediate-tick tests
+Update comments in shield-fx.js that currently explicitly describe the red line as being on the “inner side”.
 
-Rewrite the Charged BA2 timing expectations.
+Shield constraints
 
-On the exact successful contact step:
+Do NOT alter:
 
-firstHit damage = 0
-immediate tickHit damage = 1
-target Launch Point increases by 1
-target becomes bound
+* Shield hit detection.
+* Hurtboxes.
+* Shield Energy costs.
+* Shield start/release animations.
+* Blocking rules.
+* Ground/air Shield behavior.
+* Combat timing.
 
-Then assert:
+This is a rendering-only change.
 
-no additional tick before 0.5 s
-+1 at 0.5
-+1 at 1.0
-+1 at 1.5
-explosion at 2.0
+Update/add tests in tests/defense.test.mjs so they verify:
 
-Do not apply another tick at the exact explosion boundary.
+* Shield still shares EDGE_RED.
+* Black and red widths remain intentional.
+* Red outline geometry is outside the primary radius, not inside it.
+* Time changes the Shield outline when reduced motion is false.
+* Reduced motion freezes the wave.
+* No gameplay collision uses the Shield visual radius.
 
 ⸻
-
-69. Completed Sphere Rush total test
-
-Starting target at:
 
-Launch Point 0
+2. Sphere Rush: sphere should become MUCH bigger over time
 
-after a full unblocked successful Sphere Rush:
+Relevant files include:
 
-contact immediate tick = 1
-0.5 tick = 1
-1.0 tick = 1
-1.5 tick = 1
-explosion = 15
+* js/data/characters.js
+* js/game/charged-technique.js
+* js/game/arena.js
+* tests/charged-ba2.test.mjs
+* ALVA_SPEC.md
+* README.md
 
-Final Launch Point:
+#0001’s Charged BA2 / Sphere Rush already has the right runtime behavior.
 
-19
+Current data:
 
-Explosion Base Launch:
+sphereGrowth: { startScale: 1, endScale: 1.4 }
 
-3 × 19 = 57
+ChargedTechnique.sphereScale already interpolates smoothly from startScale to endScale during the hold and uses endScale for the explosion.
 
-horizontal launch strength:
+Keep this implementation model.
 
-57
+Required Sphere behavior
 
-This test is important because it simultaneously verifies:
+After Sphere Rush connects:
 
-* immediate contact tick;
-* four total ticks;
-* no tick at explosion boundary;
-* explosion damage-before-launch;
-* current Launch architecture.
+* The blue sphere initially attaches to the opponent at approximately its normal art size.
+* As the opponent remains bound, the sphere should continuously grow.
+* The growth should be dramatically more obvious than the current 1.0 → 1.4 scaling.
+* By the time it explodes, it should look substantially larger and threatening.
 
-⸻
-
-70. Sphere Rush against Shield test
-
-With target Shield active and enough Energy:
-
-Sphere Rush sphere contacts target
-→ block event
-→ target Energy -25
-→ target Launch Point unchanged
-→ no bind
-→ no immediate tick
-→ no later ticks
-→ no attached sphere explosion sequence
-
-Ensure the technique exits cleanly.
-
-Do not leave the attacker permanently stuck in confirm/hold.
-
-⸻
+Target approximately:
 
-71. Void rendering tests
+startScale: 1
+endScale: 3
 
-Update tests/platform-stage.test.mjs or the relevant stage test.
+A value in the rough 2.75–3.0 range is acceptable if visual testing shows that exactly 3.0 clips badly, but it should remain clearly much larger than the current 1.4.
 
-Verify:
+Keep the existing smooth fixed-step interpolation. Do not make it jump between discrete sizes.
 
-* black Void fill still uses the current wavy inner edge;
-* a red stroke is drawn on the same edge;
-* red edge is thin;
-* reduced motion freezes both black-edge geometry and red stroke geometry consistently;
-* gameplay voidBounds remain unchanged;
-* outline is cosmetic only.
+The sphere’s center must stay fixed on the target while it grows, so the orb expands outward around its center rather than drifting.
 
-Do not tie kill detection to the animated red line.
+The explosion should begin at the sphere’s final grown size, as it already does through sphereScale.
 
-⸻
-
-72. Shield rendering tests
-
-Use pure geometry helpers where possible.
-
-Test that:
+Critical gameplay constraint
 
-* the Shield produces a closed wavy circular perimeter;
-* its mean radius stays close to the intended radius;
-* wave offsets remain bounded;
-* reduced-motion uses a deterministic static shape;
-* the Shield follows fighter center;
-* no Shield is drawn when shielding is false.
+This larger sphere is VISUAL ONLY.
 
-Canvas call recording is fine for stroke/fill assertions.
+Do NOT scale:
 
-⸻
-
-73. Remove obsolete resource tests
+* sphereHitbox
+* target hurtboxes
+* first-hit range
+* damage
+* Launch Point gain
+* tick timing
+* explosion timing
+* bind duration
+* explosion launch
+* cooldown
 
-Remove or rewrite tests asserting:
+The visual growth must not increase its combat reach.
 
-Dodge cost = 25
-Block drains 20 per second
-Dodge exhausts stamina
-Dodge invulnerability
+Update tests/charged-ba2.test.mjs so it expects the new much-larger endScale and verifies:
 
-Replace them with:
+* start is still 1.
+* scale increases monotonically over the hold.
+* final impact scale reaches the configured end scale.
+* explosion uses the final scale.
+* hitbox dimensions remain unchanged by visual scaling.
 
-Dash cost = 25
-Shield successful hit cost = 25
-Shield hold cost = 0
-Energy exhaustion behavior
+Also update comments/spec documentation that currently call 1.4 the intended final size or describe it as only modest growth.
 
 ⸻
 
-74. Recommended Energy data
+3. Normal Dash should travel farther
 
-Use a clean definition such as:
+Relevant files include:
 
-energy: {
-  max: 100,
-  regen: 12,
-  chargeRegen: 30,
-  dashCost: 25,
-  shieldHitCost: 25,
-  segments: [34, 33, 33],
-}
+* js/data/characters.js
+* js/game/character.js
+* tests/dash.test.mjs
+* tests/fighter-animation.test.mjs
+* ALVA_SPEC.md
+* README.md
 
-If segment capacities are a universal UI constant rather than fighter-specific balance, keep them in the Energy/status module instead:
+This refers to #0001’s NORMAL double-tap Dash, not Sphere Rush.
 
-export const ENERGY_SEGMENTS = Object.freeze([34, 33, 33]);
+Current normal Dash:
 
-Do not duplicate the values.
-
-⸻
+* movement.dashSpeed = 600
+* dash clip duration is about 0.2 s
+* current total travel is approximately 120 world units on flat uninterrupted ground.
+* Energy cost is 15.
+* double-tap window is 0.22 s.
 
-75. Recommended Shield data
-
-After inspecting actual assets, #0001 should conceptually have:
-
-animations: {
-  ...
-  shield: {
-    frames: [...actual uploaded grounded Shield files...],
-    ...
-  },
-  midairShield: {
-    frames: [...actual uploaded airborne Shield files...],
-    ...
-  },
-},
-defense: {
-  type: 'shield',
-  groundAnimation: 'shield',
-  airAnimation: 'midairShield',
-},
-
-Adapt to the real number of frames.
-
-Do not make fake frame names.
+Keep the fixed animation duration and make the burst cover more distance by increasing normal movement.dashSpeed.
 
-⸻
+Target approximately 50% more travel than today:
 
-76. Input remains unchanged
+* approximately 180 world units instead of 120.
+* With the existing ~0.2 s clip, a dashSpeed around 900 is an appropriate target.
 
-Do not add a new Shield button.
+If collision integration means a slightly different value feels better, keep the resulting uninterrupted distance approximately in the 170–180 world-unit range.
 
-The existing Defense input remains Shield:
+Preserve normal Dash rules
 
-keyboard Defense
-RB / RT
-touch Defense
+Do NOT change:
 
-Only behavior changes.
+* 0.22 s double-tap window.
+* Dash Energy cost.
+* Dash animation duration.
+* Dash animation frames.
+* grounded-only restriction.
+* action priority.
+* lack of invulnerability.
+* lack of attack/hitbox.
+* collision with solids.
+* ledge behavior.
+* exhaustion behavior.
+* normal running top speed.
 
-Update labels from generic “Defense” to “Shield” only where that improves player-facing clarity, but the internal input action can remain:
+The Dash should still be a short, committed movement burst; it should simply carry the fighter noticeably farther.
 
-defense
+Update tests/dash.test.mjs and tests/fighter-animation.test.mjs so they use the new authored dashSpeed and expected travel distance. Remove/update assertions and comments that hard-code 600, “1.8x”, or “120 units”.
 
-to avoid breaking bindings unnecessarily.
+Do not change Sphere Rush’s separate chargedTechniques.rasenRush.dashSpeed = 1050 as part of this normal Dash request.
 
 ⸻
-
-77. State priority
-
-Shield must not introduce animation/state conflicts.
-
-Use this general priority:
-
-lost/respawning
-bound / forced technique states
-hitstun
-attacking / committed charged action
-Shield if Defense held and allowed
-normal movement/jump/fall/idle
-
-Do not let Shield cancel an attack already in progress unless the game explicitly supports attack canceling.
-
-Do not let pressing an attack while shielding silently preserve Shield and attack simultaneously.
-
-A simple behavior is:
 
-release/leave Shield first, then attack can begin according to normal action rules
+4. Discover: “Conditions” → “Passives”
 
-or require Defense release before attacking.
+Relevant files include:
 
-Keep it deterministic.
+* js/screens/discover-screen.js
+* tests/discover.test.mjs
+* README.md
+* ALVA_SPEC.md
+* possibly comments in js/screens/home-screen.js
 
-⸻
-
-78. Shield and Charge
-
-Shield should outrank Charge when Defense is held.
-
-The old tests already establish Block-over-Charge priority conceptually.
+The third Discover tab currently exists as empty scaffolding:
 
-Preserve that:
+{ id: 'conditions', label: 'Conditions', build: () => null }
 
-holding Shield → no Charge stance
+Rename this section to Passives.
 
-When Shield is released, Charge can resume only according to current input/state behavior.
+User-facing Discover order should become:
 
-Do not regenerate charged cooldowns at the Charge-accelerated rate just because Shield is held.
+1. POWER
+2. LAUNCH
+3. PASSIVES
 
-⸻
+The page should remain intentionally empty unless there is already real passive registry data to display. Do NOT invent fake passive mechanics or placeholder text.
 
-79. Shield and Dash
+For consistency, rename the internal section ID from conditions to passives as well unless some external dependency requires the old ID. Update its generated tab/panel IDs accordingly.
 
-Do not allow a fighter to remain shielding while dashing.
+Preserve:
 
-Starting Dash should require Shield not active.
+* tab semantics.
+* aria-selected.
+* aria-controls.
+* automatic activation.
+* keyboard/gamepad navigation.
+* responsive horizontal/vertical rail behavior.
+* Power as the default section on every visit.
 
-Holding Defense should prevent Dash from starting.
+Update all related tests and comments from Conditions to Passives.
 
-After Shield is released, Dash can start normally if Energy rules permit it.
+Update README/spec language that currently says Conditions is intentionally empty.
 
 ⸻
-
-80. Shield and movement
 
-A grounded Shield should hold the fighter in place.
+Documentation consistency
 
-While grounded and Shielding:
+Search the entire repository for stale references after making the changes.
 
-no walking/running
-no Dash
+At minimum check for:
 
-Airborne Shield should not erase existing horizontal momentum, but it should not allow active air acceleration while Shield is held.
+* Conditions
+* conditions
+* dashSpeed: 600
+* descriptions of Dash being ~120 units / ~1.8x top speed
+* endScale: 1.4
+* descriptions saying the Sphere only grows to 1.4
+* Shield comments saying the red line is on the inner side
 
-Gravity continues.
+Update README.md and ALVA_SPEC.md where those values/behaviors are documented.
 
-This gives Shield a defensive commitment without recreating Dodge movement.
+Do not alter unrelated historical notes unless they describe the current intended behavior.
 
 ⸻
 
-81. Shield visual radius
+Testing
 
-Derive radius from fighter size.
+Run the full existing test suite, not only the files touched.
 
-Recommended baseline:
+At minimum explicitly verify:
 
-radius ≈ 0.6–0.7 × visual height
+* tests/defense.test.mjs
+* tests/dash.test.mjs
+* tests/fighter-animation.test.mjs
+* tests/charged-ba2.test.mjs
+* tests/discover.test.mjs
 
-with enough margin to surround head and feet.
+Fix tests because the intended behavior changed; do not weaken unrelated assertions merely to make the suite pass.
 
-The circle should visibly contain the full sprite, including normal attack-neutral proportions.
+Add useful regression coverage for the outer Shield accent and larger Sphere scaling rather than only replacing constants.
 
-Do not size it from the temporary current animation frame because the circle should not pulse wildly between frame bounds.
-
-Use the character’s stable visual.height / collider dimensions.
-
 ⸻
-
-82. Shield red outline versus Void red outline
 
-Keep the visual relationship clear:
+Manual visual verification
 
-Void
+After tests pass, verify in the actual game if the environment supports it.
 
-solid black region
-thin red wavy inner border
+Check:
 
 Shield
 
-subtle black transparent interior
-black/red wavy circular edge
+* Hold Defense on the ground and in the air.
+* The Shield visibly has a continuously drifting organic perimeter.
+* Motion resembles the Void’s living edge.
+* The thin red line is clearly on the exterior side of the black boundary.
+* There is no red ring on the inside.
+* Fighter remains readable through the subtle interior.
+* No flickering/jittering as fighter animation frames change.
 
-Do not make them identical opaque objects.
+Sphere Rush
 
-The fighter must remain visible inside Shield.
+* Charge, trigger Charged BA2 and connect.
+* Sphere starts around normal size.
+* It becomes progressively much larger during the opponent hold.
+* It reaches a dramatic final size before the explosion.
+* It remains centered on the victim.
+* Combat reach/damage/timing is unchanged.
 
-⸻
+Dash
 
-83. Preserve the Void gameplay boundary
+* Double tap left/right on uninterrupted ground.
+* Dash visibly carries #0001 substantially farther than before.
+* Normal run speed after the Dash is unchanged.
+* Walls and ledges still stop/end it according to current rules.
 
-Do not move:
+Discover
 
-map.voidBounds
-
-Do not change stage margins.
-
-Do not make the wavy visual edge become the actual kill boundary.
-
-As today:
-
-fixed invisible data boundary = gameplay
-wavy black/red edge = artwork
-
-⸻
-
-84. Preserve unrelated systems
-
-Do not modify:
-
-* Launch Point/Base Launch/Directional Launch architecture;
-* #0001 attack damage values;
-* attack hitboxes/timings;
-* three-point match structure;
-* two-second respawn;
-* stage sizes;
-* camera behavior;
-* CAB cooldowns;
-* Charge speedup of CAB cooldown recovery;
-* Dash speed/timing except resource naming;
-* projectiles except Shield interaction;
-* clone behavior except Shield interaction;
-* Sphere Rush art/formation/rush/explosion timing except tick schedule;
-* fighter facing;
-* HUD fighter cards;
-* Discover Launch page;
-* Practice menu;
-* controls layout;
-* artwork unrelated to verified Shield frames.
+* Open Home → Discover.
+* Tabs read POWER / LAUNCH / PASSIVES.
+* Passives is selectable by mouse, keyboard and gamepad navigation.
+* Its page remains cleanly empty.
+* Returning to Discover still opens Power by default.
 
 ⸻
 
-85. Expected final #0001 defense/resource model
+Scope discipline
 
-The finished behavior should be easy to summarize:
+Do not add new art assets.
 
-Energy starts at 100.
-The Energy meter is visually split into 3 adjacent segments totaling 100.
-Dash costs 25 Energy.
-Holding Shield costs nothing.
-Each successfully Shielded hit costs 25 Energy.
-Shielded hits deal no Launch Point damage and cause no launch.
-If Energy reaches 0, all Energy segments turn gray and both Shield and Dash are locked.
-Energy then slowly refills, visually rebuilding the segmented bar from back to front.
-The exhausted state clears only when all 100 Energy has returned.
-Grounded #0001 uses the grounded Shield frames.
-Airborne #0001 uses the mid-air Shield art, which is only the held shielding state.
-Shield is represented by a black/red wavy circle around the fighter.
+Do not refactor unrelated combat systems.
 
-⸻
+Do not alter balance values beyond:
 
-86. Expected final Sphere Rush sequence
+* normal Dash travel tuning,
+* Sphere visual growth,
+* Shield visual wave strength/outer accent.
 
-For an unblocked hit:
+Do not change the Void’s kill geometry or animation unless a tiny shared-helper change is genuinely necessary.
 
-Sphere contacts opponent
-→ setup contact deals 0
-→ opponent is bound
-→ immediate tick: +1 Launch Point
-0.5 s after contact
-→ +1
-1.0 s
-→ +1
-1.5 s
-→ +1
-2.0 s
-→ explosion
-→ +15 Launch Point
-→ Base Launch 3 × new Launch Point
-→ horizontal launch
-→ release
+Keep everything data-driven and consistent with the repository’s existing conventions.
 
-For a Shielded contact:
+When finished, provide:
 
-Sphere contacts Shield
-→ Shield consumes 25 Energy
-→ no Launch Point damage
-→ no bind
-→ no ticks
-→ no target-attached explosion
-→ technique ends cleanly
-
-⸻
-
-87. Acceptance criteria
-
-The pass is complete only when all of the following are true:
-
-1. Sphere Rush deals a +1 tick on the exact successful contact step.
-2. Subsequent ticks occur at 0.5, 1.0, and 1.5 seconds.
-3. No additional tick occurs at the 2.0-second explosion boundary.
-4. A full Sphere Rush adds 19 Launch Point total from 0.
-5. Dodge no longer exists for #0001.
-6. Dodge invulnerability is gone.
-7. Ground Defense uses actual grounded Shield frames.
-8. Air Defense uses actual mid-air Shield frames.
-9. The implementation inspects real assets and does not invent Shield filenames.
-10. Shield is a held Defense.
-11. Ground Shield prevents movement.
-12. Mid-air Shield preserves falling/gravity.
-13. Shield is visually a wavy circular boundary surrounding the character.
-14. Shield uses black and red, visually related to the Void.
-15. Shield does not obscure the fighter.
-16. Shield uses normal hurtbox intersection rather than a larger circular collision area.
-17. Successful Shield costs exactly 25 Energy.
-18. Merely holding Shield costs zero.
-19. Missed attacks cost zero.
-20. Shielded attacks deal zero Launch Point damage.
-21. Shielded attacks apply zero launch.
-22. Shield can block melee, projectiles, clones, and applicable charged-technique contacts.
-23. Sphere Rush cannot bind through Shield.
-24. Shuriken is consumed when Shielded.
-25. Energy maximum is 100.
-26. Energy is represented visually as three adjacent bars totaling exactly 100.
-27. Segment capacities are deterministic and sum to 100.
-28. Energy regeneration is slow and fixed-step.
-29. Charge may retain its faster Energy regeneration.
-30. Dash still costs 25 Energy.
-31. Dodge cost is removed.
-32. Continuous Block drain is removed.
-33. At zero Energy, all segments turn gray.
-34. Zero Energy enters exhaustion.
-35. Exhaustion locks Shield and Dash.
-36. Exhaustion only clears at 100.
-37. Below 25 usable non-exhausted Energy, Shield cannot successfully activate/block.
-38. Refill visually rebuilds from the rear segment toward the front.
-39. Energy bar remains hidden at full.
-40. The old Stamina wording is replaced by Energy in player-facing and preferably internal APIs.
-41. The Void remains solid black.
-42. The Void’s existing wavy edge remains.
-43. The Void gains a thin red outline along that exact same wavy edge.
-44. The red line is cosmetic only.
-45. voidBounds gameplay remains unchanged.
-46. Reduced motion freezes Shield/Void wave animation without removing their wavy shape.
-47. Dodge-specific Help/docs/tests are removed.
-48. README and ALVA_SPEC accurately explain Shield and segmented Energy.
-49. Current Launch architecture remains unchanged.
-50. All tests pass.
-
-The core rules should remain unmistakable in the code:
-
-Shield is a held full-circle defense. Holding it is free; every attack it successfully blocks costs 25 Energy. Energy totals 100, is displayed as three adjacent bars, and reaching zero causes a gray full-refill lockout. Charged BA2 begins its +1 tick damage immediately when the sphere makes successful unblocked contact.
+1. A concise summary of what changed.
+2. Exact important tuning values chosen.
+3. Files changed.
+4. Tests run and their results.
+5. Any visual/manual verification performed.
