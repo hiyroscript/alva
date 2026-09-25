@@ -1,1719 +1,2129 @@
 Objective
 
-Completely replace Alva’s current Knockback / launch architecture with a new, much simpler system built around exactly three concepts:
+Rework Alva’s defense/energy presentation and Sphere Rush tick timing while preserving the newly implemented Launch system.
 
-1. Launch Point — a number stored on each fighter.
-2. Base Launch — a per-hit integer multiplier restricted to 0, 1, 2, or 3.
-3. Directional Launch — a per-hit direction describing how the resulting launch is applied.
+This pass has four primary goals:
 
-This is a full system replacement.
+1. Charged BA2 tick damage begins immediately when the sphere successfully contacts the opponent.
+2. Remove Dodge entirely and make #0001 use Shield as its Defense.
+3. Replace the current stamina display/defense economy with a 100-point Energy system visually split into three adjacent bars.
+4. Make Shield and the Void visually connected: black/red organic wavy shield circle, and give the Void a thin red outline along its wavy edge.
 
-Do not preserve the current Knockback model internally under renamed fields. Remove the old mechanics, formulas, registries, terminology, helper functions, growth values, Low/Mid/High levels, accumulated bonus calculations, and compatibility paths.
-
-The new launch formula is intentionally simple:
-
-launch strength = Base Launch × target's Launch Point
-
-The target’s Launch Point must include the damage from the hit that just connected before calculating that hit’s launch.
-
-Example:
-
-target Launch Point before hit = 115
-attack damage = 5
-target Launch Point after damage = 120
-Base Launch = 2
-launch strength = 2 × 120 = 240
-
-There must be no hidden constant launch strength, no per-axis scaling coefficient, no knockback growth, no additive base velocity, and no conversion from the existing Low/Mid/High system.
+Do not modify the current Launch Point/Base Launch/Directional Launch architecture except where Shield interaction needs to integrate with hit resolution.
 
 ⸻
 
-1. Remove the current Knockback architecture completely
+1. Preserve the current Launch system
 
-The current repository still contains an older system centered around:
+The repo already uses the new architecture:
 
-* CombatState.knockback
-* js/data/knockback.js
-* KNOCKBACK_LEVELS
-* Low / Mid / High Knockback
-* resolveKnockback
-* baseKnockback
-* knockbackGrowth
-* DEFAULT_KNOCKBACK_GROWTH
-* ACCUMULATED_KNOCKBACK_SCALING
-* accumulatedKnockbackBonus
-* accumulatedKnockbackAxis
-* dominantLaunchAxis
-* resolveLaunchAxis
-* the current additive resolveLaunch(...)
-* event fields such as knockbackBefore, knockbackAfter, baseLaunch, and bonusLaunch
-* documentation describing accumulated Knockback
-* Discover’s current Knockback levels and Knockback directions reference
+* launchPoint
+* baseLaunch
+* directionalLaunch
+* launchStrength = baseLaunch × launchPoint
 
-Delete or replace all of this.
+Keep that intact.
 
-Do not leave deprecated aliases such as:
+Do not restore any previous Knockback system.
 
-combat.knockback
-attack.knockback
-baseKnockback
-knockbackGrowth
-accumulatedKnockbackAxis
-KNOCKBACK_LEVELS
+The existing #0001 damage/launch values remain unchanged:
 
-Do not have the new engine calculate the new result by passing through the old machinery.
+Hit	Damage	Base Launch	Direction
+BA1	5	1	horizontal
+BA2	10	2	vertical
+Mid-air BA1	5	2	vertical
+Mid-air BA2	10	2	reverseVertical
+Shuriken	1	0	null
+Charged BA2 tick	1	0	null
+Charged BA2 explosion	15	3	horizontal
 
-The runtime vocabulary should become Launch Point, Base Launch, Directional Launch, and Launch.
-
-Where practical, rename files as well. For example, js/data/knockback.js should no longer remain the source of truth for a system that no longer exists. A clean replacement such as:
-
-js/data/launch.js
-
-is preferable.
-
-Update all imports accordingly.
-
-Search the entire repository for stale references to:
-
-knockback
-Knockback
-KNOCKBACK
-baseKnockback
-knockbackGrowth
-accumulatedKnockback
-Low
-Mid
-High
-
-and remove old combat-system references wherever they refer to this obsolete mechanic.
-
-Do not blindly remove unrelated ordinary English uses if a comment genuinely has another meaning, but the old gameplay concept must be gone.
+This pass is about timing, Shield, Energy, and visuals.
 
 ⸻
 
-2. Launch Point
+2. Charged BA2: first tick happens immediately on contact
 
-Every fighter owns one numerical combat value named:
+Current behavior starts the 0.5-second tick cadence after the sphere contacts the target, so the first +1 occurs about 0.5 seconds later.
 
-launchPoint
+Change this.
 
-It replaces accumulated Knockback.
+The moment the Sphere Rush successfully contacts and binds the opponent:
 
-A fighter starts each fresh life / spawn at:
+contact occurs
+→ immediately deal first tick damage: +1 Launch Point
+→ then every 0.5 seconds after contact deal another +1
+→ explosion still occurs at the existing explosion time
 
-Launch Point = 0
+For the existing 2.0-second hold/explosion timing, the intended tick timeline should be:
 
-Taking damage increases Launch Point by exactly the damage actually received.
+t = 0.0   contact → +1
+t = 0.5   +1
+t = 1.0   +1
+t = 1.5   +1
+t = 2.0   explosion → +15
+
+Do not also apply a regular tick at the exact explosion step if the explosion replaces that boundary tick.
+
+The clean intended total before the explosion is therefore:
+
+4 tick damage
+
+and then:
+
++15 explosion damage
+
+for:
+
+19 total damage / Launch Point added
+
+on a fully completed successful Sphere Rush.
+
+The initial rush-contact/setup hit itself should still have:
+
+damage: 0,
+baseLaunch: 0,
+directionalLaunch: null
+
+The immediate +1 should come from the existing tickHit definition, not by changing firstHit.damage to 1.
+
+This distinction matters:
+
+firstHit = contact/bind setup
+tickHit = actual recurring +1 damage
+
+On successful contact, run one tickHit immediately.
+
+Then start the next tick deadline at:
+
+contact + 0.5 s
+
+not at contact itself again.
+
+⸻
+
+3. Avoid double-ticking on the contact simulation step
+
+The current technique tracks sinceHit.
+
+When contact happens, make sure the same fixed simulation step cannot produce:
+
+immediate contact tick
++
+scheduled 0.5-second tick
+
+at once.
+
+There should be exactly one tick on the contact step.
+
+A clean state model would be something like:
+
+this.nextTickAt = tickInterval;
+this.immediateTickDue = true;
+
+or equivalent.
+
+When contact() succeeds:
+
+queue exactly one immediate tick
+sinceHit = 0
+next normal tick occurs when sinceHit reaches 0.5
+
+Do not depend on float equality.
+
+Continue using the fixed-step simulation and threshold-crossing logic.
+
+⸻
+
+4. Shield completely replaces Dodge for #0001
+
+Dodging should no longer exist as a gameplay mechanic for #0001.
+
+The shared Defense input remains the same:
+
+keyboard Defense
+gamepad Defense
+touch Defense
+
+but pressing/holding it now activates Shield.
+
+Remove #0001’s current Dodge behavior:
+
+* no Dodge startup;
+* no Dodge invulnerability;
+* no Dodge recovery;
+* no Dodge stamina cost;
+* no attacks passing through due to invulnerability;
+* no dodge combat state for #0001;
+* no midairDodge;
+* no dodge-specific fighter logic;
+* no dodge-specific tests for #0001.
+
+Use a held Shield/Block model instead.
+
+⸻
+
+5. Remove Dodge architecture if it is no longer needed anywhere
+
+There is currently only one playable fighter.
+
+If no other current fighter uses Dodge, remove the old Dodge implementation instead of keeping dead machinery around “for future fighters.”
+
+That includes, where applicable:
+
+createDodgeMove
+defenseAction
+defensePhase
+invulnerable derived from Dodge
+startup/invulnerable/recovery Dodge state
+stamina.dodgeCost
+tryDefense Dodge branches
+DODGE_FPS
+dodge-specific comments
+Dodge test expectations
+Help text describing Dodge
+debug logic that grays hurtboxes during Dodge
+
+Keep Defense generic enough that future fighters could receive other defense types later, but do not keep a full unused Dodge subsystem in the active codebase unless another current system genuinely depends on it.
+
+The actual current behavior should be Shield.
+
+⸻
+
+6. Inspect the actual Shield art before wiring filenames
+
+The user has supplied frames for:
+
+* grounded Shield;
+* mid-air Shield.
+
+However, the current GitHub asset directory inspection still exposes the old dodge-named files and does not currently show obvious shield-named files.
+
+Before implementing:
+
+1. inspect assets/characters/0001/;
+2. identify the actual newly uploaded Shield filenames;
+3. inspect frame count/order;
+4. register exactly those files;
+5. do not invent filenames.
+
+Do not blindly reuse:
+
+0001_dodge1.png
+0001_dodge2.png
+0001_dodge3.png
+0001_midairdodge1.png
+...
+
+unless the repository actually shows that those files were intentionally replaced/redefined as the Shield art.
+
+The source assets are authoritative.
+
+⸻
+
+7. Grounded Shield animation
+
+#0001 has Shield frames for normal grounded Shield.
+
+Register them as a dedicated fighter animation, preferably:
+
+shield
+
+The Shield is a held Defense, so animation behavior should reflect the actual uploaded art.
+
+If there are multiple grounded Shield frames, inspect what they depict and map them sensibly to:
+
+enter / raise shield
+held shield
+release
+
+or a held loop if that is what the art clearly supports.
+
+Do not fabricate extra frames or interpolate poses.
+
+While Defense remains held and Shield is active, the fighter should visually remain in the shielding pose/state.
+
+On release, return cleanly to the appropriate neutral state.
+
+⸻
+
+8. Mid-air Shield
+
+There is separate mid-air Shield art.
+
+The user specifically notes:
+
+mid air shield only has shielding
+
+Interpret this as:
+
+* the aerial animation only represents the active held shielding pose/state;
+* do not require an authored aerial startup/release sequence that does not exist;
+* do not fake missing air Shield phases using unrelated art.
+
+When the fighter activates Defense while airborne:
+
+enter mid-air shield immediately using the available mid-air shield art
+hold that shield art/state while Defense is held and Energy allows it
+release back to the normal airborne state when Defense is released
+
+Do not turn the old midair Dodge animation into invulnerability.
+
+The fighter should continue falling / obeying normal aerial physics while shielding unless another existing Block rule explicitly freezes a property.
+
+Shield is defense, not flight.
+
+⸻
+
+9. Shield is a held state, not a one-press action
+
+Defense should behave like a normal held shield:
+
+Defense pressed/held
+→ Shield active
+Defense released
+→ Shield inactive
+
+It should not play once and finish automatically like Dodge.
+
+Shield should remain active as long as all are true:
+
+Defense is held
+fighter can defend
+fighter has sufficient usable Energy state
+fighter is not stunned/bound/respawning/etc.
+
+If the fighter becomes unable to act because of an attack/technique condition, update Shield state consistently with the game’s current state-priority rules.
+
+⸻
+
+10. Shield visuals: fighter inside a black/red wavy circle
+
+When Shield is active, draw a circular shield around the fighter.
+
+The requested appearance is specific:
+
+* circle surrounding the character;
+* no large bubble artwork or extra visual layer inside it;
+* black and red;
+* visually similar to the Void;
+* wavy/organic perimeter.
+
+The circle should encompass the full fighter body with a modest margin.
+
+It should be centered around the fighter’s visual/body center, not at the feet.
+
+For example, derive from:
+
+fighter visual height
+fighter collider/hurtbox dimensions
+
+rather than hardcoding a screen-size circle.
+
+The circle should follow the fighter exactly.
+
+⸻
+
+11. Shield circle should be procedural Canvas rendering
+
+Do not add a shield PNG.
+
+Render it procedurally on the battle canvas.
+
+Create a reusable helper, preferably separate from generic fighter sprite drawing.
+
+For example:
+
+drawShield(fighter)
+
+or a small shared organic-edge utility.
+
+The perimeter should be generated from a circle with small sine/noise perturbations:
+
+radius + wave(angle, time)
+
+The result should remain recognizable as a circle but have the same organic, alive quality as the Void edge.
+
+Do not make the amplitude so large that the shield looks spiky or unstable.
+
+⸻
+
+12. Shield colors
+
+The shield must visually use:
+
+black
+red
+
+Do not use Alva green.
+
+Recommended composition:
+
+mostly transparent / subtle black interior
+black primary boundary/body
+thin red wavy rim/accent
+
+The fighter must remain visible.
+
+Do not fill the whole circle with opaque black and hide the character.
+
+A good interpretation is:
+
+very low-opacity black circular fill
++
+strong black wavy perimeter
++
+thin red outer/inner highlight
+
+The visual reference is the Void, but it is still a readable Shield around a character.
+
+⸻
+
+13. Shield must render around the fighter, not behind the entire scene
+
+Integrate it into Arena.render() around fighter rendering.
+
+A reasonable order:
+
+fighter shadow
+shield backing/interior
+fighter sprite
+shield perimeter/rim
+technique/projectiles as appropriate
+
+If the desired visual is “character inside the shield,” the perimeter should clearly appear around/in front of the sprite while the character itself stays readable.
+
+Do not let the Shield be swallowed behind stage foreground art.
+
+Do not draw it over the HUD/status indicators.
+
+⸻
+
+14. Shield gameplay behavior
+
+A successfully Shielded hit should be treated as blocked.
+
+While Shield is active:
+
+* melee attacks can be blocked;
+* projectiles can be blocked;
+* clone attacks can be blocked;
+* charged-technique hits that are blockable can be blocked;
+* the hit should not behave as a Dodge/pass-through;
+* the attacking hit should still count as having connected with the Shield.
+
+Preserve the existing Block semantics unless explicitly changed below.
+
+The current project already has a Block-type path in CombatSystem, so replace #0001’s Dodge with that model and then change its Energy cost semantics.
+
+⸻
+
+15. Successful shielding costs 25 Energy
+
+This is a major change from the current continuous Block drain.
+
+Do not drain Energy just because the fighter is holding Shield.
+
+Holding Shield with nobody attacking should cost:
+
+0 Energy
+
+A successful Shield against an attack costs exactly:
+
+25 Energy
+
+once per successfully blocked hit.
 
 Examples:
 
-0 + 5 damage = 5 Launch Point
-5 + 10 damage = 15 Launch Point
-115 + 5 damage = 120 Launch Point
+100 → block hit → 75
+75 → block hit → 50
+50 → block hit → 25
+25 → block hit → 0
 
-There is no percentage conversion and no multiplier formula other than the attack’s Base Launch.
+This cost is triggered by the confirmed blocked hit event.
 
-Launch Point:
+Do not charge 25:
 
-* starts at 0;
-* never becomes negative;
-* has no normal maximum;
-* does not defeat a fighter by itself;
-* resets when that fighter is eliminated and respawns, consistent with the game’s stock/point respawn flow;
-* is the number shown in the fighter HUD where the old Knockback number is currently displayed.
+* when Shield begins;
+* every frame Shield is held;
+* every second Shield is held;
+* when an attack misses;
+* when a projectile passes elsewhere;
+* when the player taps Defense without being hit.
 
-Rename the combat state:
-
-this.knockback
-
-to something explicit such as:
-
-this.launchPoint
-
-Every battle, Practice, HUD, reset, respawn, timeout/tiebreak, test, and debug path that currently reads accumulated Knockback must use Launch Point instead.
-
-If the current timed-battle tiebreak uses lower accumulated Knockback after points are compared, preserve that game rule using lower Launch Point instead.
+Only a successful Shield interaction costs it.
 
 ⸻
 
-3. Damage ordering is mandatory
+16. Define “successful Shield” precisely
 
-When an attack connects, process its damage before calculating launch.
+A successful Shield means the shared hit resolver determines that:
 
-For a normal unblocked hit:
+target is currently shielding
++
+the incoming hit would have struck the fighter
++
+the hit resolves as a block
 
-launchPointBefore = target.launchPoint
-damage = hit.damage
-target.launchPoint += damage
-launchPointAfter = target.launchPoint
-launchStrength = baseLaunch × launchPointAfter
+At that moment:
 
-The current hit therefore contributes to its own launch.
+spendEnergy(25)
 
-Example:
+exactly once.
 
-Launch Point before BA1 = 115
-BA1 damage = 5
-Launch Point after BA1 = 120
-BA1 Base Launch = 1
-final launch strength = 1 × 120 = 120
+For an ordinary one-hit attack, one collision = one 25-point cost.
 
-Do not calculate against 115.
+For a multihit technique/projectile, each separately resolved blocked hit can cost 25 if it is genuinely a separate hit event.
+
+Do not consume multiple costs for the same hitbox on the same simulation step.
 
 ⸻
 
-4. Damage values for #0001
+17. Energy terminology
 
-Preserve these exact damage values:
+The user now calls this resource:
 
-Move / hit	Damage added to Launch Point
-Ground BA1	5
-Ground BA2	10
-Mid-air BA1	5
-Mid-air BA2	10
-Shuriken	1
-Charged BA2 tick	1
-Charged BA2 explosion	15
+Energy
 
-For Charged BA2, preserve the existing tick cadence:
+Replace player-facing “Stamina” terminology with “Energy.”
 
-1 damage every 0.5 seconds
+Prefer internal names too where practical:
 
-while the target is held.
+energy
+maxEnergy
+energyExhausted
+energySpec
+energyRatio
+setEnergy()
+spendEnergy()
 
-Do not alter existing attack animation timing, startup, active frames, recovery, hitboxes, cooldowns, hitstop, technique timing, sphere behavior, or visuals unless a change is strictly necessary to connect the new launch fields.
+rather than leaving everything internally named stamina.
 
-Damage and Base Launch remain independent data.
+Because this pass is already changing resource semantics substantially, do a clean rename rather than presenting “Energy” in UI while keeping misleading Stamina APIs.
 
-For example, a 10-damage move does not automatically receive Base Launch 2. Its Base Launch is explicitly authored.
-
-⸻
-
-5. Base Launch
-
-Every damaging hit must have a field named:
-
-baseLaunch
-
-baseLaunch is not a velocity.
-
-It is a multiplier.
-
-The only legal Base Launch numbers are:
-
-0
-1
-2
-3
-
-Their exact meaning is:
-
-Base Launch 0:
-launchStrength = 0 × Launch Point
-therefore the hit causes no launch
-Base Launch 1:
-launchStrength = 1 × Launch Point
-normal Launch Point strength
-Base Launch 2:
-launchStrength = 2 × Launch Point
-double Launch Point strength
-Base Launch 3:
-launchStrength = 3 × Launch Point
-triple Launch Point strength
-
-Example at 120 Launch Point:
-
-Base Launch 0 → 0
-Base Launch 1 → 120
-Base Launch 2 → 240
-Base Launch 3 → 360
-
-This exact multiplication is the complete strength calculation.
-
-Do not add a secondary number afterward.
-
-Wrong:
-
-final = launchPoint * baseLaunch + 140;
-
-Wrong:
-
-final = baseVelocity + launchPoint * growth;
-
-Wrong:
-
-final = levelVelocity * launchPoint;
-
-Wrong:
-
-final = launchPoint * baseLaunch * horizontalScaling;
-
-Correct:
-
-const launchStrength = target.launchPoint * hit.baseLaunch;
-
-The only remaining work is applying that resulting strength in the hit’s Directional Launch.
+Update comments, documentation, tests, and Help accordingly.
 
 ⸻
 
-6. Validate Base Launch data
+18. Energy maximum remains 100
 
-Centralize Base Launch validation.
+Every fighter starts with:
 
-A hit must only be allowed to declare:
+Energy = 100
 
-0
-1
-2
-3
+Maximum:
 
-Do not silently permit arbitrary values such as:
+100
 
-0.5
-4
-10
--1
+It never exceeds 100 and never becomes negative.
 
-A malformed combat definition should produce a clear development-time error or warning and resolve safely according to the project’s existing data-validation conventions.
+Respawn/reset returns it to:
 
-Prefer an exported registry/constant for the legal values, for example:
+100
 
-export const BASE_LAUNCH_VALUES = Object.freeze([0, 1, 2, 3]);
+The existing gradual refill mechanic should remain conceptually slow.
 
-but do not introduce unnecessary tier objects or numerical tuning tables.
+Preserve the current normal regeneration rate unless there is a specific incompatibility:
 
-These four numbers are the actual values.
+12 Energy per second
 
-⸻
+is the current configured rate and is a reasonable value to retain.
 
-7. Directional Launch
+Charge may continue to accelerate Energy refill using the existing faster refill rate if that current behavior is intended to remain.
 
-Every hit also owns a string/null property named:
-
-directionalLaunch
-
-The supported concepts are:
-
-null
-horizontal
-vertical
-reverse vertical
-
-Use clean programmatic IDs. Recommended:
-
-null
-'horizontal'
-'vertical'
-'reverseVertical'
-
-The display copy can say Reverse vertical.
-
-Do not encode direction using an arbitrary {x, y} base velocity anymore.
-
-Do not encode reverse vertical as a negative Base Launch.
-
-Base Launch is always the scalar 0–3.
-
-Direction is a separate field.
+Do not invent a new refill speed unless necessary.
 
 ⸻
 
-8. Direction semantics
+19. Dash still uses Energy
 
-null
+The current resource is shared by Dash and Defense.
 
-directionalLaunch: null
+Preserve Dash’s existing cost:
 
-means no launch direction.
+25 Energy
 
-A hit with a null direction must not alter the target’s launch velocity.
+unless there is a direct conflicting requirement.
 
-It can still:
+So the key resource costs become:
 
-* deal damage;
-* increase Launch Point;
-* cause whatever existing stun/hitstop behavior its hit definition specifies;
-* participate in the rest of the technique.
+Dash: 25 Energy when Dash starts
+Shield: 25 Energy only when a hit is successfully blocked
 
-A null direction is particularly appropriate for non-launching damage such as Charged BA2 ticks.
+Remove:
 
-Even if malformed data combines a nonzero Base Launch with a null direction, null direction must result in no physical launch.
+Dodge: 25
+continuous Block drain
 
-horizontal
-
-Apply:
-
-launch strength = Base Launch × Launch Point
-
-horizontally, traveling in the hit’s existing facing/travel direction.
-
-For fighter melee this uses the attacking fighter’s hit facing.
-
-For a projectile it uses the projectile’s travel direction.
-
-For a clone it uses the clone’s facing.
-
-For a charged technique it uses the technique’s captured facing.
-
-A horizontal hit should not invent vertical launch.
-
-Conceptually:
-
-vx = launchStrength * facing;
-
-Do not multiply launchStrength by another horizontal tuning number.
-
-vertical
-
-Launch upward with exactly the computed launch strength.
-
-The game world currently uses positive Y downward, so implementation will normally resemble:
-
-vy = -launchStrength;
-grounded = false;
-
-Do not apply horizontal launch unless another existing non-launch movement mechanic specifically requires it.
-
-reverseVertical
-
-This is the exact opposite of normal vertical launch.
-
-The target is launched downward with the computed strength.
-
-Conceptually:
-
-vy = launchStrength;
-grounded = false;
-
-This is a direction, not a negative Base Launch.
+because Dodge no longer exists and Shield no longer drains continuously.
 
 ⸻
 
-9. Zero Base Launch must truly cancel launch
+20. Three-segment Energy bar
 
-This is particularly important.
+The Energy display still represents a total of:
 
-If:
+100
 
-Launch Point = 120
-Base Launch = 0
+but visually split it into three small adjacent bars.
 
-then:
+They should read as one grouped meter:
 
-0 × 120 = 0
+[ bar 1 ][ bar 2 ][ bar 3 ]
 
-and the hit causes no launch.
+with small gaps between segments.
 
-This must remain true at every Launch Point:
+Do not create three independent resources.
 
-0 × 5 = 0
-0 × 120 = 0
-0 × 500 = 0
-0 × 10,000 = 0
+There is still one scalar:
 
-There must be no residual old base velocity.
+energy: 0–100
 
-There must be no accumulated bonus.
-
-There must be no minimum launch.
-
-There must be no hidden projectile push.
-
-There must be no legacy knockback path restoring motion.
-
-This property is essential for shurikens and Charged BA2’s non-explosion damage.
+The three bars are a visual segmentation of that one number.
 
 ⸻
 
-10. #0001’s exact Base Launch assignments
+21. Segment capacities
 
-Configure #0001 exactly as follows.
+Because 100 cannot be split into three equal integer values, define deterministic segment capacities.
 
-Ground BA1
+Use:
 
-damage: 5,
-baseLaunch: 1,
-directionalLaunch: 'horizontal'
+Bar 1: 34
+Bar 2: 33
+Bar 3: 33
+Total: 100
 
-At target Launch Point 120 after damage:
+or an equivalent precise mapping where the total is exactly 100.
 
-1 × 120 = 120 horizontal launch
-
-Ground BA2
-
-damage: 10,
-baseLaunch: 2,
-directionalLaunch: 'vertical'
-
-At target Launch Point 120 after damage:
-
-2 × 120 = 240 upward launch
-
-Mid-air BA1
-
-damage: 5,
-baseLaunch: 2,
-directionalLaunch: 'vertical'
-
-At target Launch Point 120 after damage:
-
-2 × 120 = 240 upward launch
-
-Mid-air BA2
-
-damage: 10,
-baseLaunch: 2,
-directionalLaunch: 'reverseVertical'
-
-At target Launch Point 120 after damage:
-
-2 × 120 = 240 downward launch
-
-This move must remain the downward-launching/spiking aerial move.
-
-Do not interpret “opposite direction” as horizontally behind the attacker. For this attack, reverse vertical means the opposite of normal vertical: downward.
-
-Shuriken
-
-damage: 1,
-baseLaunch: 0,
-directionalLaunch: null
-
-The shuriken adds exactly 1 Launch Point and causes no launch at any Launch Point.
-
-Charged BA2 tick
-
-Every 0.5 seconds:
-
-damage: 1,
-baseLaunch: 0,
-directionalLaunch: null
-
-Each tick adds exactly 1 Launch Point.
-
-It causes no physical launch.
-
-The target should remain governed by the existing Charged BA2 hold/bind logic until the technique releases/explodes as it does today.
-
-Charged BA2 explosion
-
-damage: 15,
-baseLaunch: 3,
-directionalLaunch: 'horizontal'
-
-The explosion first adds 15 Launch Point, then uses the resulting total.
-
-Example:
-
-Launch Point before explosion = 105
-explosion damage = 15
-Launch Point after explosion = 120
-3 × 120 = 360 horizontal launch
-
-Remove the current special numeric explosion launch such as {x: 720, y: 180} and its old knockback growth configuration. The explosion now follows the same shared system as every other launching hit.
-
-⸻
-
-11. #0001 data should visibly express the new system
-
-The character data should be easy to read.
-
-The ordinary attacks should look conceptually like:
-
-ba1: {
-  ...
-  damage: 5,
-  baseLaunch: 1,
-  directionalLaunch: 'horizontal',
-  ...
-},
-ba2: {
-  ...
-  damage: 10,
-  baseLaunch: 2,
-  directionalLaunch: 'vertical',
-  ...
-},
-midairBa1: {
-  ...
-  damage: 5,
-  baseLaunch: 2,
-  directionalLaunch: 'vertical',
-  ...
-},
-midairBa2: {
-  ...
-  damage: 10,
-  baseLaunch: 2,
-  directionalLaunch: 'reverseVertical',
-  ...
-},
-
-The shuriken should clearly declare:
-
-damage: 1,
-baseLaunch: 0,
-directionalLaunch: null,
-
-Charged BA2 should use the same field vocabulary for:
-
-* first/contact hit if it deals damage;
-* tick hit;
-* explosion hit.
-
-Do not retain numeric {x, y} baseKnockback fields beside these new fields.
-
-⸻
-
-12. Charged BA2 contact before its ticks
-
-Inspect the current Sphere Rush definition carefully.
-
-The user-required values specifically define:
-
-* tick damage: 1 every 0.5 s;
-* tick Base Launch: 0;
-* tick Directional Launch: null;
-* explosion damage: 15;
-* explosion Base Launch: 3;
-* explosion Directional Launch: horizontal.
-
-If the existing initial Sphere Rush contact currently deals damage separately from the recurring tick, do not invent a new damage value for it.
-
-Preserve its currently intended damage semantics unless existing data shows it is simply part of the first tick.
-
-What is mandatory is that any pre-explosion Sphere Rush damage that should not launch must use:
-
-baseLaunch: 0
-directionalLaunch: null
-
-and that the explosion is the only horizontal Base Launch 3 hit in that technique.
-
-Do not accidentally cause an initial rush-contact launch before the hold.
-
-⸻
-
-13. Shared hit resolver
-
-The new system must be generic.
-
-CombatSystem.applyHit() must not contain checks such as:
-
-if (def.id === 'ba1')
-if (fighter.id === '0001')
-if (technique.id === 'rasenRush')
-
-The shared resolution path should work from hit data.
-
-A clean conceptual sequence is:
-
-const launchPointBefore = target.combat.launchPoint;
-const damage = ...; // full or blocked/chip damage according to existing defense rules
-target.combat.launchPoint =
-  Math.max(0, launchPointBefore + damage);
-const launchPointAfter = target.combat.launchPoint;
-const launchStrength =
-  def.baseLaunch * launchPointAfter;
-const launch = resolveDirectionalLaunch(
-  launchStrength,
-  def.directionalLaunch,
-  facing
-);
-
-Then apply the resulting velocity according to the existing hit/block rules.
-
-Melee, projectiles, summoned clones, and charged-technique hits should all travel through the same underlying launch calculation.
-
-⸻
-
-14. Blocking
-
-Preserve the game’s existing Block mechanics unless they conflict with the new model.
-
-The current resolver treats a blocked hit differently:
-
-* damage becomes chip damage;
-* horizontal movement is reduced;
-* vertical launch is cancelled.
-
-Keep the intended defensive behavior.
-
-However, even a blocked hit’s Launch Point increase must use the actual chip damage that was received.
-
-Recommended sequence:
-
-1. determine whether blocked
-2. determine full damage vs chip damage
-3. add that actual damage to Launch Point
-4. calculate raw launch strength from new Launch Point
-5. apply Block's existing launch suppression/reduction
-
-Do not resurrect old Knockback growth or additive launch math for blocking.
-
-A blocked vertical or reverse-vertical attack should continue producing no vertical launch if that is the current Block rule.
-
-A blocked horizontal attack may continue using the existing half-strength behavior:
-
-blocked horizontal strength = raw launch strength × 0.5
-
-That 0.5 is a Block modifier, not part of Base Launch calculation.
-
-Keep that distinction clear in code and documentation.
-
-⸻
-
-15. Create a small launch data module
-
-Replace the old js/data/knockback.js architecture with a much smaller launch-oriented module, preferably:
-
-js/data/launch.js
-
-Its responsibilities should be limited to things such as:
-
-* legal Base Launch values;
-* legal Directional Launch values;
-* validation;
-* resolving a strength + direction into velocity components;
-* Discover’s generic system descriptions if keeping reference text colocated with gameplay enums is useful.
-
-For example:
-
-export const BASE_LAUNCH_VALUES = Object.freeze([0, 1, 2, 3]);
-export const DIRECTIONAL_LAUNCHES = Object.freeze([
-  ...
-]);
-export function resolveBaseLaunch(value, owner) { ... }
-export function resolveDirectionalLaunch(direction, strength) { ... }
-
-Do not rebuild another complicated growth/scaling subsystem in this file.
-
-There should be no:
-
-per-point rate
-horizontalPerPoint
-verticalPerPoint
-growth
-level
-Low
-Mid
-High
-bonus
-default velocity table
-
-The system does not need any of those concepts.
-
-⸻
-
-16. Attack-definition creation
-
-Update createAttackDefinition().
-
-Currently it converts a Knockback descriptor into a numeric vector and growth metadata.
-
-Remove that behavior.
-
-It should instead validate and freeze the declared:
-
-baseLaunch
-directionalLaunch
-
-fields.
-
-Conceptually:
-
-def.baseLaunch = resolveBaseLaunch(spec.baseLaunch, `Attack "${spec.id}"`);
-def.directionalLaunch =
-  resolveDirectionalLaunchValue(
-    spec.directionalLaunch,
-    `Attack "${spec.id}"`
-  );
-
-Do not derive one from the other.
-
-Do not infer Base Launch from damage.
-
-Do not infer Directional Launch from hitbox orientation.
-
-Do not preserve knockbackGrowth.
-
-⸻
-
-17. Combat events
-
-Rewrite combat event terminology as well.
-
-Remove event fields based on the obsolete architecture:
-
-knockbackBefore
-knockbackAfter
-baseLaunch // if currently this means vector velocity
-bonusLaunch
-
-Use event information that accurately describes the new system.
+The mapping must be centralized and tested.
 
 Recommended:
 
-{
-  type,
-  attacker,
-  target,
-  move,
-  damage,
-  launchPointBefore,
-  launchPointAfter,
-  baseLaunch,
-  directionalLaunch,
-  launchStrength,
-  finalLaunch,
-  projectile,
-  summon,
-  technique
-}
+ENERGY_SEGMENTS = [34, 33, 33]
 
-Where:
-
-baseLaunch
-
-is the integer 0–3, not a {x, y} vector.
-
-launchStrength
-
-is:
-
-baseLaunch × launchPointAfter
-finalLaunch
-
-can remain an {x, y} resolved velocity object if useful for debugging/tests.
-
-There must be no bonusLaunch because the concept no longer exists.
+Do not display inaccurate thirds that sum to 99.
 
 ⸻
 
-18. HUD terminology
+22. Energy bars should drain from front to back
 
-The battle and Practice HUD currently show the fighter’s accumulated Knockback value.
+Define visual order clearly.
 
-Replace this with Launch Point.
+Treat the first/front bar as the one consumed first, followed by the next, then the last.
 
-Use the existing compact fighter cards and layout.
+At full:
 
-Do not redesign the whole HUD.
+[ full ][ full ][ full ]
 
-The displayed number must read the new:
+As Energy is spent:
 
-fighter.combat.launchPoint
+75:
+[first bar partially/fully depleted as mapping dictates]
+[remaining rear bars full]
 
-value.
+The meter should visually show Energy disappearing progressively through the three adjacent segments.
 
-If the card currently labels it Knockback, change that label to:
-
-Launch Point
-
-or the shortest existing-card-compatible representation if space is constrained, while still clearly calling the mechanic Launch Point.
-
-Do not continue exposing the word Knockback for this mechanic.
+The exact pixel fill should be derived from the scalar Energy amount and segment capacities.
 
 ⸻
 
-19. Respawn/reset behavior
+23. Refill order reverses the depletion path
 
-When a fighter is eliminated by the Void and later respawns:
+The user specifically requested:
 
-Launch Point → 0
+when a bar become empty the refill process starts from the bar behind it
 
-This must happen at the correct life reset point.
+Implement refill so the visually rearward remaining/depleted structure fills naturally in reverse order.
 
-The fighter must not carry Launch Point across eliminations.
+When one segment is emptied and Energy begins regenerating, the refill should visibly begin from the segment behind the one that was depleted.
 
-Practice resets/respawns must also restore Launch Point to 0.
+In practical terms, define and test a consistent three-segment flow rather than independently filling all segments at once.
 
-Round/rematch/restart initialization must start every fighter at 0.
+Recommended visual model:
 
-⸻
+depletion:
+front → middle → back
+refill:
+back → middle → front
 
-20. Discover: rename Knockback to Launch
+So after heavy consumption, regeneration visually rebuilds from the last/rear bar toward the first/front bar.
 
-The Discover screen currently has:
+This is a presentation rule over the scalar Energy value.
 
-Power
-Knockback
-Conditions
-
-Change it to:
-
-Power
-Launch
-Conditions
-
-This means:
-
-* section ID should preferably become launch;
-* tab label becomes Launch;
-* panel/page heading becomes Launch;
-* ARIA labels and test selectors should use Launch terminology;
-* comments and imports should no longer describe Discover as Power / Knockback / Conditions.
-
-Completely remove the current Discover Knockback presentation.
-
-Do not show:
-
-* Low;
-* Mid;
-* High;
-* the old Knockback levels;
-* old numeric launch-speed values;
-* Knockback growth;
-* accumulated Knockback bonuses;
-* the old formulas.
-
-Rewrite the section around the new generic system.
+Do not allow all three segments to simultaneously refill from left to right based only on raw percentages.
 
 ⸻
 
-21. Discover must explain the new system without mentioning any fighter or attack
+24. Preserve one scalar Energy value
 
-This is mandatory.
+Even though the refill display is reverse-ordered, gameplay must still use one exact scalar value.
 
-The Launch page must explain the system generically.
+Avoid storing three separate mutable Energy pools unless absolutely necessary.
 
-It must not mention:
+Preferred architecture:
 
-#0001
-BA1
-BA2
-shuriken
-charged BA2
-Sphere Rush
-any named fighter
-any named attack
+combat.energy // 0–100
 
-A good structure is three entries:
+and a pure visualization function:
 
-Launch Point
+energySegments(energy, exhausted)
 
-Explain that:
+which returns three fill ratios according to the defined segment/depletion/refill mapping.
 
-* every fighter starts at 0;
-* damage received adds to Launch Point;
-* higher Launch Point produces stronger launch when hit by an attack with Base Launch greater than zero;
-* Launch Point resets after elimination/respawn.
+If tracking refill direction/state is necessary to render the user-requested rear-to-front behavior, store only minimal state such as:
 
-Suggested copy:
+energyRefilling
 
-Launch Point is a fighter’s accumulated damage value. Taking damage increases it. When a launching hit connects, the current Launch Point is used to determine how strongly the fighter is launched.
+or equivalent.
 
-Avoid fighter-specific examples.
+Do not let segment state diverge from total Energy.
 
-Base Launch
+⸻
 
-Show the four actual values:
+25. Energy exhaustion
+
+The existing “zero → gray → must fully refill” rule remains, now specifically for Shield usability.
+
+When Energy reaches exactly:
 
 0
+
+set:
+
+energyExhausted = true
+
+All three segments become gray.
+
+They stay gray throughout the entire recovery.
+
+The fighter cannot Shield while exhausted.
+
+Exhaustion clears only at:
+
+Energy = 100
+
+Then:
+
+energyExhausted = false
+
+and Shield becomes available again.
+
+Do not clear exhaustion at:
+
 1
-2
-3
+25
+33
+50
+75
+99
 
-Explain them clearly:
-
-0 — No launch. The Launch Point is multiplied by zero.
-1 — Normal launch. Uses the Launch Point once.
-2 — Double launch. Uses twice the Launch Point.
-3 — Triple launch. Uses three times the Launch Point.
-
-The page may show the formula generically:
-
-Launch strength = Base Launch × Launch Point
-
-This is not hidden tuning information; it is the actual public mechanic and should be documented.
-
-Do not call these Low/Mid/High tiers.
-
-They are literal Base Launch numbers.
-
-Directional Launch
-
-Explain:
-
-None
-Horizontal
-Vertical
-Reverse vertical
-
-Suggested meanings:
-
-None — The hit deals damage but causes no directional launch.
-Horizontal — Launches in the direction the hit is traveling.
-Vertical — Launches upward.
-Reverse vertical — Launches downward.
-
-Again, no named attacks or fighters.
+Only 100.
 
 ⸻
 
-22. Discover data should come from the new system
+26. Shield failure at zero Energy
 
-The current Discover page imports:
+Consider the exact hit that spends the final 25 Energy.
 
-KNOCKBACK_LEVELS
-KNOCKBACK_SUMMARY
-KNOCKBACK_DIRECTIONS
-KNOCKBACK_DIRECTION_SUMMARY
+Example:
 
-Delete that dependency.
+Energy before block = 25
+incoming hit is successfully Shielded
+Shield cost = 25
+Energy after = 0
 
-If the new Launch page is data-driven, read from the new launch registry/constants instead.
+That hit is still successfully blocked.
+
+Then immediately afterward:
+
+Energy becomes exhausted
+Shield can no longer remain active
+fighter must drop Shield
+all segments turn gray
+Shield cannot reactivate until Energy returns to 100
+
+Do not retroactively make the final blocked hit damage the fighter simply because its cost emptied the meter.
+
+The Shield was valid when contact occurred.
+
+⸻
+
+27. Insufficient nonzero Energy
+
+Shield costs 25 per successful block.
+
+If the fighter has less than 25 usable Energy but is not exhausted yet, Shield should not be able to successfully block a hit it cannot afford.
+
+To keep the system deterministic, use:
+
+Shield can activate / remain block-capable only when Energy >= 25
+
+If Energy falls below 25 because of another Energy action such as Dash:
+
+Shield is unavailable until Energy regenerates back to at least 25
+
+unless the fighter is fully exhausted, in which case the stricter full-refill rule applies.
+
+This prevents a 10-Energy fighter from blocking a hit and going negative.
+
+⸻
+
+28. Exhaustion versus ordinary low Energy
+
+There are two different states:
+
+Low but not exhausted
+
+Example:
+
+Energy = 20
+energyExhausted = false
+
+The fighter cannot Shield because a block costs 25.
+
+But normal regeneration continues.
+
+Once it reaches:
+
+25
+
+Shield is usable again.
+
+Exhausted
+
+Example:
+
+Energy hit 0 at some point
+energyExhausted = true
+Energy has regenerated to 70
+
+Shield is still unavailable.
+
+Only at:
+
+100
+
+does exhaustion clear.
+
+This preserves the existing zero-energy lockout concept.
+
+⸻
+
+29. Dash interaction with exhaustion
+
+Keep the existing resource exhaustion rules consistently shared unless this would conflict with the intended design.
+
+Recommended:
+
+When Energy reaches zero from either:
+
+Dash
+or
+Shield cost
+
+the fighter enters the same exhausted state.
+
+While exhausted:
+
+no Dash
+no Shield
+
+until Energy returns to 100.
+
+This retains the existing unified resource behavior.
+
+Do not create separate Shield Exhaustion and Dash Exhaustion systems.
+
+⸻
+
+30. Energy regeneration
+
+Use the existing fixed-step regeneration architecture.
+
+Normal regeneration:
+
+slow automatic refill
+
+Charge:
+
+faster refill
+
+Holding Shield should not automatically stop regeneration unless deliberately necessary for balance.
+
+However, if the user is actively holding a valid Shield and Energy is already below full, it is acceptable and preferable to let regeneration continue slowly because Shield itself has no passive drain.
+
+The cost comes from successfully blocking attacks.
+
+⸻
+
+31. Energy display visibility
+
+The current stamina bar is hidden at full Energy.
+
+Preserve that behavior:
+
+Energy = 100 and not exhausted
+→ no Energy bars drawn
+
+When Energy drops below 100:
+
+show the three-segment meter
+
+When exhausted:
+
+show all three segments/available refill progress in gray
+
+When it reaches 100:
+
+hide the meter again
+
+Do not leave three empty placeholders permanently over fighters.
+
+⸻
+
+32. Energy bar colors
+
+Preserve the current resource color identity:
+
+normal Energy = purple
+exhausted refill = gray
+outline = black
+track = dark/black
+
+Do not make Energy red to match Shield.
+
+Red/black belongs to the Shield/Void danger visual.
+
+Energy remains the existing purple resource cue.
+
+⸻
+
+33. Three-bar world-space layout
+
+Keep the Energy meter in the same general world-space area above the fighter’s name tag.
+
+Instead of one continuous rectangle, render:
+
+small segment
+small gap
+small segment
+small gap
+small segment
+
+The total combined meter width should remain about the current status-bar width.
+
+Do not make each segment the size of the old whole bar.
+
+Maintain readability at different camera scales and DPR values.
+
+Use the existing CSS-pixel minimum sizing logic in Arena.staminaBarRect() / its renamed Energy equivalent.
+
+⸻
+
+34. Rename fighter status helpers
+
+Refactor:
+
+staminaBarState
+drawStaminaBar
+STAMINA_STYLE
+staminaBarRect
+
+toward:
+
+energyBarState
+drawEnergyBar
+ENERGY_STYLE
+energyBarRect
+
+The state helper should expose useful segment information, for example:
+
+{
+  visible,
+  energy,
+  maxEnergy,
+  exhausted,
+  color,
+  segments: [
+    { ratio: ... },
+    { ratio: ... },
+    { ratio: ... }
+  ]
+}
+
+This allows comprehensive tests without requiring Canvas inspection for all logic.
+
+⸻
+
+35. Remove continuous Block drain
+
+Current data includes:
+
+blockDrain: 20
+
+Remove that resource behavior.
+
+There should no longer be:
+
+Energy per second while Shield is held
+
+Remove the config field if nothing else uses it.
+
+Replace it with an explicit successful-block cost, such as:
+
+shieldHitCost: 25
+
+or:
+
+blockCost: 25
+
+Prefer terminology matching Shield.
+
+Example:
+
+energy: {
+  max: 100,
+  regen: 12,
+  chargeRegen: 30,
+  dashCost: 25,
+  shieldHitCost: 25,
+}
+
+Do not keep obsolete:
+
+dodgeCost
+blockDrain
+
+for #0001.
+
+⸻
+
+36. Shield definition
+
+Change #0001’s defense definition from:
+
+{
+  type: 'dodge',
+  ...
+}
+
+to a Shield/Block definition.
+
+Prefer explicit semantics such as:
+
+defense: {
+  type: 'shield',
+  groundAnimation: 'shield',
+  airAnimation: 'midairShield',
+}
+
+rather than calling the player-facing system Shield while leaving it named type: 'block' everywhere.
+
+If the generic combat resolver still uses “blocked hit” terminology internally, that is fine.
+
+But fighter data should clearly describe Shield.
+
+⸻
+
+37. Shield state on Fighter
+
+Use an explicit state/property, for example:
+
+combat.shielding
+
+rather than misleading:
+
+combat.blocking
+
+if practical.
+
+At minimum, make the public game-state naming clear.
+
+Shield state should be:
+
+false by default
+true while Defense is held and Shield is valid
+false when released/stunned/bound/exhausted/out of Energy/respawning
+
+⸻
+
+38. Direction requirement for Shield
+
+The old Block logic currently appears to require facing the incoming hit.
+
+Retain this concept unless existing gameplay becomes inconsistent:
+
+Shield blocks attacks arriving from the side the fighter is facing.
+
+But the visual shield is a full circle around the fighter.
+
+If the user intends the circle to be omnidirectional, make the gameplay match the visual and remove facing checks.
+
+For this pass, prefer full-circle Shield behavior because the requested Shield completely surrounds the fighter.
+
+That means:
+
+while shielding, a hit that intersects the fighter resolves as blocked regardless of attacker side
+
+This makes the mechanics consistent with the circular visual.
+
+Do not require the fighter to turn toward the attacker.
+
+⸻
+
+39. Mid-air Shield is also full-circle
+
+The same gameplay applies in the air.
+
+While airborne and shielding:
+
+incoming intersecting hit → blocked
+
+if Energy permits.
+
+The aerial Shield does not grant invulnerability.
+
+It resolves hits as Shield blocks.
+
+Physics continues normally.
+
+⸻
+
+40. Shield hit effects
+
+On a successful Shield:
+
+* pay 25 Energy;
+* do not add normal attack damage to Launch Point;
+* do not apply the hit’s normal launch;
+* apply the existing block hitstop/blockstun feel as appropriate;
+* do not trigger hurt animation;
+* keep Shield visible unless that hit exhausted the resource;
+* mark projectile/one-hit attack as consumed exactly as a normal successful block does.
+
+The current old Block system applies chip damage.
+
+Remove chip damage for #0001’s Shield unless the game has an explicit separate reason to retain it.
+
+The requested cost of shielding is the 25 Energy payment.
+
+Do not additionally punish Shield with Launch Point chip damage.
+
+So:
+
+successful Shield:
+Launch Point damage = 0
+Energy cost = 25
+launch = 0
+
+This should be the new #0001 behavior.
+
+⸻
+
+41. Remove blockDamageScale from #0001
+
+The old architecture includes:
+
+stats.blockDamageScale
+
+This is no longer needed for #0001 Shield.
+
+A successfully shielded attack should not add chip damage.
+
+Remove the field from #0001 if present.
+
+If generic infrastructure keeps a chip-damage option for some future defense type, do not make #0001 use it.
+
+⸻
+
+42. Shield against Sphere Rush
+
+Define charged BA2 interaction carefully.
+
+The initial Sphere Rush contact is a hit/contact check.
+
+If the target is Shielding when the sphere reaches them:
+
+the contact is successfully Shielded
+→ target pays 25 Energy
+→ Sphere Rush does not bind the target
+→ no immediate tick occurs
+→ no recurring ticks occur
+→ no explosion-on-target sequence
+→ technique should resolve as a blocked/failed contact cleanly
+
+Do not allow Sphere Rush to bind through an active Shield.
+
+Use the existing technique’s blocked-contact outcome if one already exists, or add a clean blocked termination state.
+
+The Sphere should not remain attached to the Shielding opponent.
+
+⸻
+
+43. Shield against shuriken
+
+Shuriken can be Shielded.
+
+On collision with Shield:
+
+shuriken is consumed
+target loses 25 Energy
+target gains 0 Launch Point
+target receives no launch
+
+Do not let a shuriken pass through like Dodge invulnerability.
+
+⸻
+
+44. Shield against clone attacks
+
+Clone attacks use the normal attack resolver.
+
+If they intersect Shield:
+
+blocked normally
+25 Energy cost
+0 Launch Point damage
+0 launch
+
+No special clone-specific implementation.
+
+⸻
+
+45. Void: add a thin red outline
+
+The current Void renderer in:
+
+js/stages/stage-theme.js
+
+already draws one black wavy layer.
+
+Preserve that.
+
+Add a thin red outline exactly along the Void’s inner wavy boundary.
+
+The result should be:
+
+stage
+thin red wavy line
+solid black Void
+
+The red line should follow the same animated wave geometry as the black fill.
+
+It must not be a straight rectangle or separate static boundary.
+
+⸻
+
+46. Reuse the exact same Void wave path
+
+Do not calculate a visually similar but different red wave.
+
+The red outline must be derived from the exact points/path used for the black edge so they remain perfectly aligned at all times.
+
+Refactor if needed so traceVoidSide can produce/reuse:
+
+inner edge points
+
+for:
+
+1. black fill region;
+2. red stroke.
+
+Recommended architecture:
+
+const points = voidEdgePoints(side, ...);
+fillVoidRegion(points);
+strokeVoidEdge(points);
+
+or equivalent.
+
+Do not duplicate sine formulas in two functions.
+
+⸻
+
+47. Void outline appearance
+
+Use a dark vivid red appropriate to the requested black/red look.
 
 For example:
 
-BASE_LAUNCH_VALUES
-DIRECTIONAL_LAUNCHES
-LAUNCH_POINT_SUMMARY
-BASE_LAUNCH_SUMMARY
-DIRECTIONAL_LAUNCH_SUMMARY
+#d21f2b
 
-Keep Discover as a mechanics reference, not a hardcoded #0001 move list.
+or a comparable strong red.
 
-⸻
+Keep it thin.
 
-23. Discover styling
+Target roughly:
 
-Reuse the existing Discover visual language where appropriate.
+1–2 CSS px
 
-The old tier meter may no longer make conceptual sense because Base Launch 0–3 are literal numeric multipliers rather than Low/Mid/High qualitative tiers.
+after DPR handling.
 
-Adjust the presentation so the numbers themselves are clear.
+Do not make it a glowing neon border.
 
-For example, each Base Launch row can display a small numeric marker:
+No blur.
 
-0
-1
-2
-3
+No shadow.
 
-instead of progressively filled Low/Mid/High bars.
+No thick red band.
 
-Directional Launch can continue using arrow-style icons:
-
-* horizontal → right arrow;
-* vertical → up arrow;
-* reverse vertical → down arrow;
-* none → neutral/dash/zero marker.
-
-Keep accessibility intact:
-
-* visible text must explain every icon;
-* decorative arrows should remain aria-hidden;
-* lists should have useful ARIA labels.
-
-Do not redesign the whole Discover screen.
+The Void should remain overwhelmingly black with only a thin red wavy warning edge.
 
 ⸻
 
-24. Documentation
+48. Reduced-motion behavior
 
-Update all project documentation to make the new system authoritative.
+The current Void stops wave movement under reduced motion.
 
-At minimum inspect and update:
+Preserve this:
+
+reduced motion → fixed wavy shape
+
+The red outline should freeze with the exact same shape.
+
+For Shield:
+
+* under normal motion, its perimeter can subtly wave;
+* under reduced motion, use a static wavy circle rather than animated motion.
+
+Do not remove the wavy shape entirely.
+
+⸻
+
+49. Share the organic visual language where sensible
+
+The Shield and Void should feel visually related.
+
+Consider factoring their small sine-wave edge calculation into a reusable helper, but do not overengineer stage code into a generic graphics framework.
+
+The important visual connection is:
+
+black
+red rim
+organic/wavy perimeter
+
+The Void is a dangerous outer boundary.
+
+The Shield is a protective circular boundary.
+
+⸻
+
+50. Shield circle animation
+
+Animate Shield’s wave phase slowly.
+
+Avoid fast pulsing.
+
+Recommended:
+
+subtle continuous drift
+
+The circle’s average radius should remain stable.
+
+Do not scale the whole Shield in and out aggressively.
+
+Its radius should not affect gameplay collision.
+
+Shield visual geometry is purely cosmetic.
+
+⸻
+
+51. Shield gameplay collision remains the fighter hurtbox
+
+Do not create a larger defensive collision circle just because the Shield graphic is larger.
+
+An incoming attack is blocked if it would have hit the fighter’s normal hurtboxes while Shield is active.
+
+The Shield graphic is visual feedback.
+
+Do not extend the fighter’s effective blocking range beyond their body.
+
+⸻
+
+52. Debug overlay
+
+Remove Dodge-specific debug behavior such as graying hurtboxes for invulnerability.
+
+When Shield is active, debug can optionally label:
+
+shield
+
+or show hurtboxes normally.
+
+Do not add a huge debug collision circle because Shield is not a new collision volume.
+
+⸻
+
+53. Update CPU/training behavior
+
+Practice CPU currently never dodges or blocks.
+
+Update terminology to:
+
+Practice CPU never shields
+
+unless its AI is later explicitly given Defense behavior.
+
+Do not make the dummy automatically Shield attacks.
+
+Any generic AI code referring to Dodge should be reviewed.
+
+⸻
+
+54. Help/control text
+
+Replace player-facing Dodge language with Shield.
+
+Help should explain concisely:
+
+Defense — Hold to Shield. Blocking a hit costs 25 Energy.
+
+Also explain the Energy lockout:
+
+If Energy reaches zero, it turns gray and must fully refill before Shield/Dash become available again.
+
+Do not overload Help with internal three-segment math.
+
+But do mention that the Energy display is divided into three segments.
+
+⸻
+
+55. Documentation terminology
+
+Update at minimum:
 
 README.md
 ALVA_SPEC.md
 js/game/combat.js comments
+js/game/character.js comments
 js/data/characters.js comments
-Discover comments
-projectile comments
-charged-technique comments
-clone comments where relevant
-tests/comments
+js/game/fighter-status.js
+js/game/arena.js
+tests
+Help content
 
-Remove explanations of:
+Replace outdated references to:
 
-Low / Mid / High Knockback
-default Knockback vectors
-accumulated Knockback
-Knockback growth
-per-point launch scaling
-base + bonus
-horizontal/vertical accumulated bonus rates
+Dodge
+mid-air Dodge
+Dodge invulnerability
+dodgeCost
+Block drain
+stamina bar
+staminaExhausted
+
+with the new Shield/Energy behavior.
+
+Do not leave contradictory documentation.
+
+⸻
+
+56. Asset documentation
+
+Once the actual Shield filenames are verified, document them accurately in:
+
+ALVA_SPEC.md
+character data comments
+relevant tests
+
+Do not write guessed filenames into the spec.
+
+If the files were uploaded under an unexpected historical name, document the actual files and their role clearly.
+
+⸻
+
+57. Defense tests: remove Dodge expectations
+
+Rewrite tests/defense.test.mjs.
+
+Delete expectations that:
+
+* one press plays dodge1/dodge2/dodge3;
+* attacks pass through during invulnerability;
+* midair Dodge has special invulnerable frames;
+* Dodge pays 25 on activation;
+* Dodge art is required for invulnerability.
+
+Replace with Shield tests.
+
+⸻
+
+58. Ground Shield tests
+
+Test:
+
+Defense held on ground
+→ shielding = true
+→ ground Shield animation is active
+
+Release:
+
+Defense released
+→ shielding = false
+→ returns to normal state
+
+Holding Defense for several seconds without being attacked:
+
+Energy does not decrease
+
+⸻
+
+59. Mid-air Shield tests
+
+While airborne:
+
+Defense held
+→ mid-air Shield animation/state
+→ shielding = true
+→ normal gravity still applies
+
+Release:
+
+returns to jump/fall animation appropriately
+
+Do not assert nonexistent startup/recovery frames if the actual art only contains the held shielding pose.
+
+⸻
+
+60. Successful Shield cost tests
+
+At:
+
+100 Energy
+
+block one BA1:
+
+Energy = 75
+Launch Point unchanged
+no launch
+
+Block another:
+
+Energy = 50
+
+Then:
+
+25
+
+Then:
+
+0
+energyExhausted = true
+Shield drops
+
+The fourth hit itself remains blocked.
+
+⸻
+
+61. No passive Shield drain test
+
+Hold Shield for, for example:
+
+3 seconds
+
+with no incoming hit.
+
+Assert:
+
+Energy unchanged except any normal regeneration toward max
+
+If starting at full:
+
+100 → 100
+
+No drain.
+
+⸻
+
+62. Missed attack does not cost Energy
+
+Have an opponent attack while the Shielding fighter is out of range.
+
+Assert:
+
+no hit
+no block event
+no Energy cost
+
+⸻
+
+63. Shield cannot block with less than 25 Energy
+
+Set:
+
+Energy = 20
+not exhausted
+
+Hold Defense.
+
+Assert Shield cannot enter a block-capable state.
+
+After regeneration reaches:
+
+25
+
+Shield becomes usable again.
+
+⸻
+
+64. Exhaustion recovery tests
+
+Spend Energy to exactly zero.
+
+Assert:
+
+energyExhausted = true
+
+Regenerate through:
+
+1
+25
+50
+75
+99
+
+Assert:
+
+Shield unavailable
+Dash unavailable
+segments gray
+
+At:
+
+100
+
+assert:
+
+energyExhausted = false
+Shield available
+Dash available
+meter hidden
+
+⸻
+
+65. Segmented Energy tests
+
+Test the pure segment-state helper.
+
+At full:
+
+100
+
+the hidden state should represent all segments full.
+
+At representative partial values, verify deterministic segmentation.
+
+Test especially:
+
+75
+50
+25
+0
+
+and values near segment boundaries.
+
+The segment capacities must total exactly:
+
+100
+
+No lost/gained Energy because of rounding.
+
+⸻
+
+66. Reverse refill visual tests
+
+Test the requested refill order explicitly.
+
+After depletion has emptied front segments, regeneration should visibly rebuild:
+
+back → middle → front
+
+not all simultaneously.
+
+This can be tested using the pure segment-state function or an explicit refill phase/state helper.
+
+Make the intended order obvious in test names so future refactors do not revert it accidentally.
+
+⸻
+
+67. Energy bar rendering tests
+
+Update tests/fighter-status.test.mjs.
+
+Verify:
+
+* hidden at 100;
+* three adjacent segments below 100;
+* normal purple state;
+* black outlines/tracks;
+* gray exhausted state;
+* gray persists until full;
+* gaps exist between the three segments;
+* total visual width remains within the existing compact status footprint.
+
+Do not require exact screen pixels where DPR/camera scaling makes that brittle, but test deterministic geometry helpers.
+
+⸻
+
+68. Sphere immediate-tick tests
+
+Rewrite the Charged BA2 timing expectations.
+
+On the exact successful contact step:
+
+firstHit damage = 0
+immediate tickHit damage = 1
+target Launch Point increases by 1
+target becomes bound
+
+Then assert:
+
+no additional tick before 0.5 s
++1 at 0.5
++1 at 1.0
++1 at 1.5
+explosion at 2.0
+
+Do not apply another tick at the exact explosion boundary.
+
+⸻
+
+69. Completed Sphere Rush total test
+
+Starting target at:
+
+Launch Point 0
+
+after a full unblocked successful Sphere Rush:
+
+contact immediate tick = 1
+0.5 tick = 1
+1.0 tick = 1
+1.5 tick = 1
+explosion = 15
+
+Final Launch Point:
+
+19
+
+Explosion Base Launch:
+
+3 × 19 = 57
+
+horizontal launch strength:
+
+57
+
+This test is important because it simultaneously verifies:
+
+* immediate contact tick;
+* four total ticks;
+* no tick at explosion boundary;
+* explosion damage-before-launch;
+* current Launch architecture.
+
+⸻
+
+70. Sphere Rush against Shield test
+
+With target Shield active and enough Energy:
+
+Sphere Rush sphere contacts target
+→ block event
+→ target Energy -25
+→ target Launch Point unchanged
+→ no bind
+→ no immediate tick
+→ no later ticks
+→ no attached sphere explosion sequence
+
+Ensure the technique exits cleanly.
+
+Do not leave the attacker permanently stuck in confirm/hold.
+
+⸻
+
+71. Void rendering tests
+
+Update tests/platform-stage.test.mjs or the relevant stage test.
+
+Verify:
+
+* black Void fill still uses the current wavy inner edge;
+* a red stroke is drawn on the same edge;
+* red edge is thin;
+* reduced motion freezes both black-edge geometry and red stroke geometry consistently;
+* gameplay voidBounds remain unchanged;
+* outline is cosmetic only.
+
+Do not tie kill detection to the animated red line.
+
+⸻
+
+72. Shield rendering tests
+
+Use pure geometry helpers where possible.
+
+Test that:
+
+* the Shield produces a closed wavy circular perimeter;
+* its mean radius stays close to the intended radius;
+* wave offsets remain bounded;
+* reduced-motion uses a deterministic static shape;
+* the Shield follows fighter center;
+* no Shield is drawn when shielding is false.
+
+Canvas call recording is fine for stroke/fill assertions.
+
+⸻
+
+73. Remove obsolete resource tests
+
+Remove or rewrite tests asserting:
+
+Dodge cost = 25
+Block drains 20 per second
+Dodge exhausts stamina
+Dodge invulnerability
 
 Replace them with:
 
-Launch Point
-Base Launch 0–3
-Directional Launch
-Base Launch × Launch Point
-
-Documentation must clearly establish that the hit’s damage is added first.
-
-A concise canonical description should be:
-
-Every fighter has a Launch Point that starts at 0 and increases by damage received.
-Every hit declares a Base Launch of 0, 1, 2, or 3 and a Directional Launch.
-After a hit's damage is added, its launch strength is:
-Base Launch × the target's new Launch Point.
-Base Launch 0 therefore never launches, while 1 uses normal Launch Point strength, 2 doubles it, and 3 triples it.
+Dash cost = 25
+Shield successful hit cost = 25
+Shield hold cost = 0
+Energy exhaustion behavior
 
 ⸻
 
-25. Remove obsolete tests rather than adapting their old assumptions
+74. Recommended Energy data
 
-The current tests strongly enforce the outgoing architecture, including tests for:
+Use a clean definition such as:
 
-* Low/Mid/High launch levels;
-* numeric baseKnockback;
-* accumulated Knockback bonuses;
-* knockbackGrowth;
-* axis-dependent per-point scaling;
-* additive launch;
-* old Discover Knockback content.
+energy: {
+  max: 100,
+  regen: 12,
+  chargeRegen: 30,
+  dashCost: 25,
+  shieldHitCost: 25,
+  segments: [34, 33, 33],
+}
 
-These expectations must be deleted or rewritten.
+If segment capacities are a universal UI constant rather than fighter-specific balance, keep them in the Energy/status module instead:
 
-Do not leave tests that force the implementation to preserve both systems.
+export const ENERGY_SEGMENTS = Object.freeze([34, 33, 33]);
 
-⸻
-
-26. Core new Launch-system tests
-
-Create comprehensive tests for the new mechanics.
-
-Launch Point initialization
-
-Assert:
-
-new fighter Launch Point = 0
-
-Damage accumulation
-
-Starting at 0:
-
-+5 → 5
-+10 → 15
-+1 → 16
-
-Verify it is actual received damage/chip damage that gets added.
-
-Damage-before-launch ordering
-
-Start target at:
-
-115 Launch Point
-
-Apply:
-
-damage 5
-Base Launch 1
-
-Assert:
-
-Launch Point after = 120
-launch strength = 120
-
-not 115.
+Do not duplicate the values.
 
 ⸻
 
-27. Exact multiplication tests
+75. Recommended Shield data
 
-At target Launch Point 120, directly verify:
+After inspecting actual assets, #0001 should conceptually have:
 
-Base Launch 0 → 0
-Base Launch 1 → 120
-Base Launch 2 → 240
-Base Launch 3 → 360
+animations: {
+  ...
+  shield: {
+    frames: [...actual uploaded grounded Shield files...],
+    ...
+  },
+  midairShield: {
+    frames: [...actual uploaded airborne Shield files...],
+    ...
+  },
+},
+defense: {
+  type: 'shield',
+  groundAnimation: 'shield',
+  airAnimation: 'midairShield',
+},
 
-Do this using the shared runtime resolver, not a duplicate test-only formula.
+Adapt to the real number of frames.
 
-Also test another value, for example 37:
-
-0 × 37 = 0
-1 × 37 = 37
-2 × 37 = 74
-3 × 37 = 111
-
-This prevents accidental constants from being introduced.
-
-⸻
-
-28. No hidden launch constants test
-
-Explicitly ensure the formula contains no old velocity contribution.
-
-For Base Launch 1 and Launch Point 120, final raw launch strength must be exactly:
-
-120
-
-not:
-
-260
-600
-620
-800
-120 + some default
-
-For Base Launch 2:
-
-240
-
-exactly.
-
-For Base Launch 3:
-
-360
-
-exactly.
+Do not make fake frame names.
 
 ⸻
 
-29. Zero Base Launch regression tests
+76. Input remains unchanged
 
-At several Launch Point values:
+Do not add a new Shield button.
 
-0
-1
-50
-120
-500
-1000
+The existing Defense input remains Shield:
 
-a hit with:
+keyboard Defense
+RB / RT
+touch Defense
 
-baseLaunch: 0
+Only behavior changes.
 
-must have zero launch strength.
+Update labels from generic “Defense” to “Shield” only where that improves player-facing clarity, but the internal input action can remain:
 
-Test both:
+defense
 
-directionalLaunch: null
-
-and, defensively, a non-null direction with Base Launch 0.
-
-No velocity should be introduced by the launch system.
+to avoid breaking bindings unnecessarily.
 
 ⸻
 
-30. Direction tests
+77. State priority
 
-For a positive launch strength such as 120:
+Shield must not introduce animation/state conflicts.
 
-Horizontal facing right
+Use this general priority:
 
-vx = +120
-no launch-system vertical velocity
+lost/respawning
+bound / forced technique states
+hitstun
+attacking / committed charged action
+Shield if Defense held and allowed
+normal movement/jump/fall/idle
 
-Horizontal facing left
+Do not let Shield cancel an attack already in progress unless the game explicitly supports attack canceling.
 
-vx = -120
+Do not let pressing an attack while shielding silently preserve Shield and attack simultaneously.
 
-Vertical
+A simple behavior is:
 
-vy = -120
+release/leave Shield first, then attack can begin according to normal action rules
 
-because world Y increases downward.
+or require Defense release before attacking.
 
-Reverse vertical
-
-vy = +120
-
-Null
-
-No launch velocity is applied.
-
-These direction tests should exercise the shared runtime helper/path.
+Keep it deterministic.
 
 ⸻
 
-31. #0001 move-data tests
+78. Shield and Charge
 
-Assert the exact authored data:
+Shield should outrank Charge when Defense is held.
 
-ground BA1
-damage 5
-Base Launch 1
-Directional Launch horizontal
-ground BA2
-damage 10
-Base Launch 2
-Directional Launch vertical
-mid-air BA1
-damage 5
-Base Launch 2
-Directional Launch vertical
-mid-air BA2
-damage 10
-Base Launch 2
-Directional Launch reverse vertical
-shuriken
-damage 1
-Base Launch 0
-Directional Launch null
-charged BA2 tick
-damage 1
-Base Launch 0
-Directional Launch null
-charged BA2 explosion
-damage 15
-Base Launch 3
-Directional Launch horizontal
+The old tests already establish Block-over-Charge priority conceptually.
 
-Preserve all unrelated timing/hitbox/art expectations in their existing move-specific test suites.
+Preserve that:
+
+holding Shield → no Charge stance
+
+When Shield is released, Charge can resume only according to current input/state behavior.
+
+Do not regenerate charged cooldowns at the Charge-accelerated rate just because Shield is held.
 
 ⸻
 
-32. #0001 behavioral examples
+79. Shield and Dash
 
-Add behavior-level regression tests.
+Do not allow a fighter to remain shielding while dashing.
 
-Starting from 115 Launch Point:
+Starting Dash should require Shield not active.
 
-BA1
+Holding Defense should prevent Dash from starting.
 
-+5 damage
-new Launch Point = 120
-1 × 120 = 120
-horizontal launch = 120
-
-BA2
-
-Starting from 110:
-
-+10 = 120
-2 × 120 = 240
-upward launch = 240
-
-Mid-air BA1
-
-Starting from 115:
-
-+5 = 120
-2 × 120 = 240
-upward launch = 240
-
-Mid-air BA2
-
-Starting from 110:
-
-+10 = 120
-2 × 120 = 240
-downward launch = 240
-
-Shuriken
-
-Starting from 119:
-
-+1 = 120
-0 × 120 = 0
-no launch
-
-Charged BA2 tick
-
-Starting from 119:
-
-+1 = 120
-0 × 120 = 0
-no launch
-
-Charged BA2 explosion
-
-Starting from 105:
-
-+15 = 120
-3 × 120 = 360
-horizontal launch = 360
+After Shield is released, Dash can start normally if Energy rules permit it.
 
 ⸻
 
-33. Charged BA2 timing test
+80. Shield and movement
 
-Preserve and explicitly verify:
+A grounded Shield should hold the fighter in place.
 
-tick interval = 0.5 seconds
-tick damage = 1
+While grounded and Shielding:
 
-Each tick must increase Launch Point by exactly one and apply zero launch.
+no walking/running
+no Dash
 
-The delayed explosion must:
+Airborne Shield should not erase existing horizontal momentum, but it should not allow active air acceleration while Shield is held.
 
-1. add 15;
-2. calculate the new Launch Point;
-3. multiply it by 3;
-4. launch horizontally.
+Gravity continues.
 
-The explosion must not use the old bespoke {x:720,y:180} vector.
+This gives Shield a defensive commitment without recreating Dodge movement.
 
 ⸻
 
-34. Projectile integration test
+81. Shield visual radius
 
-Verify the actual shuriken path:
+Derive radius from fighter size.
 
-* projectile hits;
-* projectile disappears as currently designed;
-* target receives 1 Launch Point;
-* target receives normal existing shuriken hitstun/hitstop;
-* launch strength is 0;
-* no horizontal or vertical launch is introduced.
+Recommended baseline:
 
-Test this at high Launch Point too.
+radius ≈ 0.6–0.7 × visual height
 
-A target at 500 that gets hit by the shuriken becomes:
+with enough margin to surround head and feet.
 
-501 Launch Point
+The circle should visibly contain the full sprite, including normal attack-neutral proportions.
 
-but is still not launched.
+Do not size it from the temporary current animation frame because the circle should not pulse wildly between frame bounds.
+
+Use the character’s stable visual.height / collider dimensions.
 
 ⸻
 
-35. Clone integration
+82. Shield red outline versus Void red outline
 
-Charged BA1’s clone uses ordinary #0001 attacks through the shared combat path.
+Keep the visual relationship clear:
 
-Make sure clones automatically use the attacks’ new:
+Void
 
-baseLaunch
-directionalLaunch
+solid black region
+thin red wavy inner border
 
-fields.
+Shield
 
-Do not create clone-specific Launch calculations.
+subtle black transparent interior
+black/red wavy circular edge
 
-If the clone performs BA1, its hit uses BA1’s:
+Do not make them identical opaque objects.
 
-damage 5
-Base Launch 1
-horizontal
-
-If another clone path performs another ordinary attack, it should inherit that attack’s authored launch data normally.
+The fighter must remain visible inside Shield.
 
 ⸻
 
-36. Block integration tests
+83. Preserve the Void gameplay boundary
 
-Test at least:
+Do not move:
 
-Horizontal blocked hit
+map.voidBounds
 
-* chip damage adds to Launch Point;
-* raw strength is calculated from the new Launch Point;
-* existing horizontal Block reduction is applied afterward.
+Do not change stage margins.
 
-Vertical blocked hit
+Do not make the wavy visual edge become the actual kill boundary.
 
-* chip damage still adds to Launch Point;
-* no vertical launch is applied.
+As today:
 
-Reverse-vertical blocked hit
-
-* chip damage still adds to Launch Point;
-* no downward launch is applied.
-
-This proves defense modifies the result rather than reverting to old Knockback logic.
+fixed invisible data boundary = gameplay
+wavy black/red edge = artwork
 
 ⸻
 
-37. Respawn tests
+84. Preserve unrelated systems
 
-Verify that a fighter with a nonzero Launch Point who falls into the Void:
+Do not modify:
 
-* is eliminated normally;
-* awards the opponent’s point normally;
-* enters the existing respawn flow;
-* returns after the existing respawn delay;
-* respawns with:
-
-Launch Point = 0
-
-Do the equivalent Practice reset/respawn assertion.
-
-⸻
-
-38. Discover tests
-
-Rewrite tests/discover.test.mjs.
-
-It should now assert that the sections are:
-
-Power
-Launch
-Conditions
-
-The Launch page should contain generic information for:
-
-Launch Point
-Base Launch
-Directional Launch
-
-Verify the page contains Base Launch values:
-
-0
-1
-2
-3
-
-Verify it describes:
-
-None
-Horizontal
-Vertical
-Reverse vertical
-
-Verify it communicates the formula:
-
-Base Launch × Launch Point
-
-or equivalent text.
-
-Verify it does not contain:
-
-Low
-Mid
-High
-Knockback growth
-accumulated Knockback
-
-And preserve the important existing rule that Discover does not mention any fighter or attack.
-
-Explicitly check that the Launch page does not contain terms such as:
-
-#0001
-BA1
-BA2
-shuriken
-Sphere Rush
+* Launch Point/Base Launch/Directional Launch architecture;
+* #0001 attack damage values;
+* attack hitboxes/timings;
+* three-point match structure;
+* two-second respawn;
+* stage sizes;
+* camera behavior;
+* CAB cooldowns;
+* Charge speedup of CAB cooldown recovery;
+* Dash speed/timing except resource naming;
+* projectiles except Shield interaction;
+* clone behavior except Shield interaction;
+* Sphere Rush art/formation/rush/explosion timing except tick schedule;
+* fighter facing;
+* HUD fighter cards;
+* Discover Launch page;
+* Practice menu;
+* controls layout;
+* artwork unrelated to verified Shield frames.
 
 ⸻
 
-39. Repository-wide obsolete-system regression
+85. Expected final #0001 defense/resource model
 
-Add a targeted source-regression test or equivalent checks to ensure the old architecture cannot quietly return.
+The finished behavior should be easy to summarize:
 
-Relevant gameplay/data files should no longer contain identifiers such as:
-
-KNOCKBACK_LEVELS
-ACCUMULATED_KNOCKBACK_SCALING
-DEFAULT_KNOCKBACK_GROWTH
-knockbackGrowth
-accumulatedKnockbackAxis
-accumulatedKnockbackBonus
-baseKnockback
-resolveKnockback
-resolveLaunchAxis
-
-Do not make a brittle repository-wide assertion against every English occurrence of the word knockback if unrelated historical text would make that unsafe, but the obsolete engine API must be gone.
-
-⸻
-
-40. Naming consistency
-
-Use these exact gameplay concepts consistently:
-
-Launch Point
-Base Launch
-Directional Launch
-Launch
-
-Recommended JS names:
-
-launchPoint
-baseLaunch
-directionalLaunch
-launchStrength
-finalLaunch
-
-Do not mix in:
-
-damage percentage
-knockback points
-knockback level
-launch level
-power level
-growth
-bonus knockback
-default knockback
-
-unless discussing migration/removal in a test comment.
+Energy starts at 100.
+The Energy meter is visually split into 3 adjacent segments totaling 100.
+Dash costs 25 Energy.
+Holding Shield costs nothing.
+Each successfully Shielded hit costs 25 Energy.
+Shielded hits deal no Launch Point damage and cause no launch.
+If Energy reaches 0, all Energy segments turn gray and both Shield and Dash are locked.
+Energy then slowly refills, visually rebuilding the segmented bar from back to front.
+The exhausted state clears only when all 100 Energy has returned.
+Grounded #0001 uses the grounded Shield frames.
+Airborne #0001 uses the mid-air Shield art, which is only the held shielding state.
+Shield is represented by a black/red wavy circle around the fighter.
 
 ⸻
 
-41. Do not confuse Base Launch with movement velocity
+86. Expected final Sphere Rush sequence
 
-This architectural distinction is important.
+For an unblocked hit:
 
-baseLaunch is one of:
+Sphere contacts opponent
+→ setup contact deals 0
+→ opponent is bound
+→ immediate tick: +1 Launch Point
+0.5 s after contact
+→ +1
+1.0 s
+→ +1
+1.5 s
+→ +1
+2.0 s
+→ explosion
+→ +15 Launch Point
+→ Base Launch 3 × new Launch Point
+→ horizontal launch
+→ release
 
-0
-1
-2
-3
+For a Shielded contact:
 
-It is not:
-
-140 px/s
-800 px/s
-{ x: 720, y: 180 }
-
-The resulting velocity magnitude comes from:
-
-baseLaunch × launchPoint
-
-So with Launch Point 120:
-
-baseLaunch 1 = velocity strength 120
-baseLaunch 2 = velocity strength 240
-baseLaunch 3 = velocity strength 360
-
-The direction then determines the velocity axis/sign.
-
-⸻
-
-42. Do not normalize horizontal and vertical strength differently
-
-The old system uses very different horizontal and vertical launch constants.
-
-Remove that concept.
-
-If launch strength is:
-
-240
-
-then:
-
-horizontal → |vx| = 240
-vertical → |vy| = 240
-reverse vertical → |vy| = 240
-
-There is no hidden vertical ×4 or horizontal ×2 scaling.
-
-Directional Launch changes direction only.
-
-It does not change magnitude.
+Sphere contacts Shield
+→ Shield consumes 25 Energy
+→ no Launch Point damage
+→ no bind
+→ no ticks
+→ no target-attached explosion
+→ technique ends cleanly
 
 ⸻
 
-43. Preserve unrelated gameplay
+87. Acceptance criteria
 
-This pass is specifically a complete rework of the launch/damage-accumulation system.
+The pass is complete only when all of the following are true:
 
-Do not redesign unrelated systems.
+1. Sphere Rush deals a +1 tick on the exact successful contact step.
+2. Subsequent ticks occur at 0.5, 1.0, and 1.5 seconds.
+3. No additional tick occurs at the 2.0-second explosion boundary.
+4. A full Sphere Rush adds 19 Launch Point total from 0.
+5. Dodge no longer exists for #0001.
+6. Dodge invulnerability is gone.
+7. Ground Defense uses actual grounded Shield frames.
+8. Air Defense uses actual mid-air Shield frames.
+9. The implementation inspects real assets and does not invent Shield filenames.
+10. Shield is a held Defense.
+11. Ground Shield prevents movement.
+12. Mid-air Shield preserves falling/gravity.
+13. Shield is visually a wavy circular boundary surrounding the character.
+14. Shield uses black and red, visually related to the Void.
+15. Shield does not obscure the fighter.
+16. Shield uses normal hurtbox intersection rather than a larger circular collision area.
+17. Successful Shield costs exactly 25 Energy.
+18. Merely holding Shield costs zero.
+19. Missed attacks cost zero.
+20. Shielded attacks deal zero Launch Point damage.
+21. Shielded attacks apply zero launch.
+22. Shield can block melee, projectiles, clones, and applicable charged-technique contacts.
+23. Sphere Rush cannot bind through Shield.
+24. Shuriken is consumed when Shielded.
+25. Energy maximum is 100.
+26. Energy is represented visually as three adjacent bars totaling exactly 100.
+27. Segment capacities are deterministic and sum to 100.
+28. Energy regeneration is slow and fixed-step.
+29. Charge may retain its faster Energy regeneration.
+30. Dash still costs 25 Energy.
+31. Dodge cost is removed.
+32. Continuous Block drain is removed.
+33. At zero Energy, all segments turn gray.
+34. Zero Energy enters exhaustion.
+35. Exhaustion locks Shield and Dash.
+36. Exhaustion only clears at 100.
+37. Below 25 usable non-exhausted Energy, Shield cannot successfully activate/block.
+38. Refill visually rebuilds from the rear segment toward the front.
+39. Energy bar remains hidden at full.
+40. The old Stamina wording is replaced by Energy in player-facing and preferably internal APIs.
+41. The Void remains solid black.
+42. The Void’s existing wavy edge remains.
+43. The Void gains a thin red outline along that exact same wavy edge.
+44. The red line is cosmetic only.
+45. voidBounds gameplay remains unchanged.
+46. Reduced motion freezes Shield/Void wave animation without removing their wavy shape.
+47. Dodge-specific Help/docs/tests are removed.
+48. README and ALVA_SPEC accurately explain Shield and segmented Energy.
+49. Current Launch architecture remains unchanged.
+50. All tests pass.
 
-Preserve:
+The core rules should remain unmistakable in the code:
 
-* three-point match win condition;
-* Void elimination;
-* two-second respawns;
-* stage layouts;
-* camera;
-* CPU behavior except where it reads the renamed Launch Point;
-* fighter controls;
-* Dash;
-* stamina;
-* exhaustion;
-* Dodge;
-* Block except its integration with the new Launch calculation;
-* Charge;
-* charged-action cooldowns;
-* cooldown indicators;
-* stamina bar visibility;
-* player-facing behavior;
-* hitboxes;
-* hurtboxes;
-* animation timings;
-* movement;
-* #0001 artwork;
-* shuriken movement/lifetime;
-* clone visuals/behavior;
-* Charged BA2 animation/effect sequencing;
-* Sphere Rush binding/hold behavior;
-* UI styling outside terminology and Discover content.
-
-Do not add:
-
-* DI;
-* weight;
-* launch resistance;
-* rage;
-* launch decay;
-* gravity scaling based on Launch Point;
-* caps;
-* minimum launch;
-* random variation;
-* attack-specific hidden velocity constants;
-* air-dash changes;
-* new attacks.
-
-⸻
-
-44. Expected implementation shape
-
-The finished architecture should be understandable at a glance.
-
-A normal hit should conceptually reduce to:
-
-const damage = resolveDamage(...);
-const launchPointBefore = target.combat.launchPoint;
-target.combat.launchPoint += damage;
-const launchPointAfter = target.combat.launchPoint;
-const launchStrength =
-  def.baseLaunch * launchPointAfter;
-const finalLaunch =
-  directionalLaunchVector(
-    def.directionalLaunch,
-    launchStrength,
-    facing
-  );
-applyVelocity(target, finalLaunch);
-
-with Block modifying the resolved physical launch afterward.
-
-That is the core system.
-
-Do not make it more complicated than necessary.
-
-⸻
-
-45. Acceptance criteria
-
-The work is complete only when all of the following are true:
-
-1. Fighters use Launch Point, not accumulated Knockback.
-2. Every fresh fighter/life starts at 0.
-3. Damage adds directly to Launch Point.
-4. The current hit’s damage is added before its launch is calculated.
-5. Base Launch supports only 0, 1, 2, 3.
-6. Final raw launch strength is exactly:
-
-Base Launch × Launch Point
-
-7. There are no per-axis strength multipliers.
-8. There is no old base velocity added to the result.
-9. Base Launch 0 always causes zero launch.
-10. Directional Launch is separate from Base Launch.
-11. horizontal launches along hit facing.
-12. vertical launches upward.
-13. reverseVertical launches downward.
-14. null causes no launch.
-15. #0001 ground BA1 = damage 5, Base Launch 1, horizontal.
-16. #0001 ground BA2 = damage 10, Base Launch 2, vertical.
-17. #0001 mid-air BA1 = damage 5, Base Launch 2, vertical.
-18. #0001 mid-air BA2 = damage 10, Base Launch 2, reverse vertical.
-19. #0001 shuriken = damage 1, Base Launch 0, null direction.
-20. Charged BA2 ticks = damage 1 every 0.5 s, Base Launch 0, null direction.
-21. Charged BA2 explosion = damage 15, Base Launch 3, horizontal.
-22. The old Low/Mid/High Knockback system is removed.
-23. knockbackGrowth is removed.
-24. baseKnockback vector data is removed.
-25. accumulated-knockback bonus/scaling code is removed.
-26. old CombatState.knockback is replaced with launchPoint.
-27. HUD displays Launch Point.
-28. respawning resets Launch Point to zero.
-29. Discover’s Knockback tab becomes Launch.
-30. Discover explains Launch Point, Base Launch, and Directional Launch.
-31. Discover contains no named fighters or attacks.
-32. README/spec/comments describe only the new model.
-33. Tests enforce the exact multiplication formula and #0001 data.
-34. Existing unrelated gameplay remains working.
-
-Run the complete test suite after the migration and fix every test based on the new intended architecture rather than weakening assertions to accommodate old behavior.
-
-The central rule must remain unmistakable throughout the codebase:
-
-Damage increases the fighter’s Launch Point. A hit’s Base Launch is 0, 1, 2, or 3. After damage is added, launch strength is exactly Base Launch multiplied by the target’s Launch Point, and Directional Launch decides where that strength sends the fighter.
+Shield is a held full-circle defense. Holding it is free; every attack it successfully blocks costs 25 Energy. Energy totals 100, is displayed as three adjacent bars, and reaching zero causes a gray full-refill lockout. Charged BA2 begins its +1 tick damage immediately when the sphere makes successful unblocked contact.
