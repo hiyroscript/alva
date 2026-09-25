@@ -1,737 +1,443 @@
-Work in the hiyroscript/alva repository on the current main branch.
+Work in the hiyroscript/alva repository and fix #0001’s Charged BA2 / Sphere Rush (chargedActions.action2 -> chargedTechniques.rasenRush).
 
-Implement an improvement to #0001’s Charged BA1 Clone Attack.
+Do not redesign the move from scratch. Preserve the existing charged-action architecture, combat system, physics, damage values, controls, Energy behavior, facing behavior, grounding requirements, cancellation rules, and normal BA2. The problem is primarily that the current charged BA2 state/animation sequence does not represent the supplied artwork correctly.
 
-Goal
+Before changing code, inspect every relevant source sprite carefully:
 
-The clone already spawns behind the opponent and performs ground BA1.
+* assets/characters/0001/0001_rasen1.png through 0001_rasen12.png
+* assets/characters/0001/0001_prasen1.png through 0001_prasen11.png
+* assets/characters/0001/0001_hurt.png
+* assets/characters/0001/0001_midairhurt.png
 
-Keep that exact behavior whenever there is valid ground/support behind the opponent.
+Do not modify, redraw, regenerate, duplicate, rename, or replace any PNG. The existing tests/charged-ba2.test.mjs intentionally verifies the exact uploaded bytes.
 
-However, when the normal behind-the-opponent spawn point has no ground/support at the opponent’s current foot height, the clone must instead:
+The important correction is that 0001_rasen12.png is a release/recovery frame. It is not part of the actual rush/contact animation.
 
-1. spawn directly above/on top of the opponent,
-2. use #0001’s existing midairBa2 animation/attack,
-3. hit downward using midairBa2’s existing combat data,
-4. then vanish normally through the existing clone cloud.
+Intended move
 
-Do not create a new attack or new artwork. Reuse the existing midairBa2.
+Charged BA2 is a committed forward rush with the blue sphere. If the sphere catches an opponent, the opponent is held by the spinning sphere until it explodes. If the rush catches nobody, #0001 still needs to visibly perform the final release/recovery frame before returning to neutral.
 
-Existing architecture you must preserve
+The move should read visually as:
 
-Read these files before changing anything:
+1. sphere forms;
+2. #0001 rushes forward;
+3. either:
+    * miss -> release/recovery frame -> neutral, or
+    * hit -> enemy immediately shows Hurt -> sphere stays attached and visibly rotates -> delayed explosion -> #0001 uses the release frame;
+4. move ends.
 
-* js/game/clone.js
+Correct the rasen fighter animation split
+
+The current code defines:
+
+* rasenForm = rasen1-3
+* rasenDash = rasen4-6
+* rasenConfirm = rasen7-12
+
+That last split is wrong because rasen12 is being treated as part of the confirm sequence and then held for almost the entire explosion delay.
+
+Change the animation registration so rasen12 is isolated as a dedicated release animation.
+
+The intended structural split should be along these lines after visually confirming the frames:
+
+* rasenForm: rasen1-rasen3
+* rasenDash: rasen4-rasen6
+* rasenConfirm: rasen7-rasen11
+* rasenRelease: only rasen12
+
+rasenRelease should be a one-shot, one-frame fighter animation at RASEN_FPS.
+
+Do not leave rasen12 inside rasenConfirm.
+
+Update comments/specification accordingly.
+
+Clean whiff behavior
+
+This is currently definitely wrong.
+
+At the moment, ChargedTechnique.update() returns 'miss' as soon as the dash animation completes. Fighter.endTechnique('miss') then destroys the technique immediately, removes the sphere, and returns #0001 directly to idle.
+
+The existing test even explicitly expects:
+
+“no rasen7-12 … idle at once”
+
+That behavior must be replaced.
+
+When the forward rush finishes without hitting anyone:
+
+* stop horizontal rush movement;
+* stop contact searching;
+* do not deal any damage;
+* do not bind anyone;
+* do not play the impact or explosion sphere frames;
+* transition into a short release/recovery phase;
+* show 0001_rasen12.png;
+* do not return to idle on the same simulation step;
+* keep control locked for the release frame’s intended duration, normally one RASEN_FPS frame (1 / 12 s);
+* after that release frame completes, finish the technique and return control.
+
+The blue sphere does not explode on a miss. This is a release/recovery of the failed rush, not an explosion.
+
+The final visible fighter frame of a clean miss must therefore be 0001_rasen12.png, followed by the normal idle/run state.
+
+Keep velocity at zero during this release.
+
+A wall-ending rush should not accidentally continue sliding. Preserve existing wall/ground safety behavior. Do not invent new combat effects for a whiff.
+
+Successful contact
+
+When the rushing sphere overlaps an opponent:
+
+* first hit happens exactly once;
+* preserve the existing first-hit damage unless another existing design source says otherwise: currently 4 damage;
+* stop #0001’s rush immediately;
+* move the sphere onto the opponent;
+* bind/immobilize the opponent;
+* begin the contact/confirm fighter frames;
+* start the delayed explosion timer;
+* there must be no additional rush contact checks after confirmation.
+
+The existing targetOffset, sphere hitbox, facing snapshot, grounding requirement and bind ownership model are useful and should be retained.
+
+Enemy must show Hurt immediately on sphere contact
+
+This needs to happen on the exact simulation step on which the sphere first damages the target.
+
+Currently CombatSystem.applyHit() gives the victim hitstun, but charged-technique collision resolution happens after both fighters have already updated their visual state for that fixed step. As a result, the target can render its previous animation for the initial collision frame.
+
+Fix that.
+
+Immediately after the sphere’s first hit is successfully applied/bound, force the caught target’s visual state to reflect the new combat state before that step is rendered.
+
+For a grounded target, the rendered fighter frame on the contact step must be:
+
+0001_hurt.png
+
+For an airborne target, use the existing:
+
+0001_midairhurt.png
+
+The victim should remain on the appropriate Hurt pose while caught/bound, as the current hitstun / bound animation rules already intend.
+
+Prefer a targeted solution for the technique if possible instead of casually changing timing semantics for every attack in the game. If you decide the correct fix belongs in shared hit handling, run all combat tests and make sure ordinary attacks, Dodge, hitstop, projectiles and clones are unchanged.
+
+Add a regression test that checks the target frame immediately after the contact tick, not one tick later.
+
+The sphere must rotate continuously while attached to the enemy
+
+This is another current bug.
+
+Right now:
+
+* rasenSphereImpact contains prasen7, prasen8, prasen9;
+* ChargedTechnique.sphere uses frameAt(...);
+* frameAt() clamps to the final frame;
+* therefore it plays 7 -> 8 -> 9 once and then freezes permanently on prasen9 until the explosion.
+
+That is not correct.
+
+The attached blue sphere is supposed to visibly keep rotating on the enemy until it explodes.
+
+Use the authored prasen7, prasen8, prasen9 frames as the rotating cycle:
+
+prasen7 -> prasen8 -> prasen9 -> prasen7 -> prasen8 -> prasen9 -> ...
+
+Continue at the appropriate PRASEN_FPS for the entire bound/wait period.
+
+Do not just hold prasen9.
+
+Do not rotate the entire canvas sprite artificially if these three PNG frames are themselves the authored rotational animation. Use the actual animation frames.
+
+Implementation can either:
+
+* make the impact effect explicitly looping and teach the charged-technique frame selection to honor looping; or
+* use a dedicated modulo-based frame calculation for the attached-sphere phase.
+
+Whichever approach is cleaner, ensure the frame progression is deterministic at the fixed 60 Hz simulation rate.
+
+The sphere center must continue following the caught opponent using the existing targetOffset.
+
+Explosion
+
+The last two sphere frames are the explosion.
+
+Keep:
+
+* prasen10
+* prasen11
+
+as the two-frame rasenSphereExplosion one-shot.
+
+These are visually lighter/brighter because this is when the actual blast happens. They must not participate in the attached rotation loop.
+
+So the effect sequence on a successful hit should be:
+
+prasen7 -> 8 -> 9 -> 7 -> 8 -> 9 -> ... repeatedly
+
+until the explosion time, then:
+
+prasen10 -> prasen11
+
+once.
+
+The second hit should still occur on the first explosion frame (prasen10) unless inspection of existing design/tests establishes a deliberate different timing.
+
+Preserve the existing important ordering:
+
+1. explosion becomes due;
+2. release the target from the bind;
+3. apply explosion damage/knockback;
+4. target can then be launched normally.
+
+Do not let the bind cancel the explosion knockback.
+
+Current values can remain:
+
+* first hit: 4 damage
+* explosion: 16 damage
+* total successful unblocked damage: 20
+* explosionDelay: 2.0 seconds
+
+unless there is an authoritative existing value elsewhere in the repository.
+
+Use rasen12 as the actual release frame
+
+This is the central animation correction.
+
+rasen12 should not be sitting on screen for almost two seconds while the sphere is attached to the opponent.
+
+During the wait before explosion, #0001 should hold the final appropriate pre-release/contact pose from the real contact sequence — after inspecting the art, this will most likely mean the last frame of the new rasenConfirm (rasen11).
+
+Then when the sphere is released/explodes, transition #0001 to:
+
+0001_rasen12.png
+
+That is the release frame.
+
+Use the same release artwork when the rush completely misses.
+
+In other words, rasen12 represents leaving/releasing the technique, not continuing the actual rush.
+
+A good phase model would be something like:
+
+* form
+* dash
+* confirm
+* wait
+* explode
+* missRelease or a generic release
+* done
+
+You do not have to use those exact names if there is a cleaner state model, but the distinction must exist behaviorally.
+
+For a hit:
+
+* form
+* dash
+* confirm (rasen7-rasen11)
+* wait while holding the correct contact pose and continuously rotating prasen7-9
+* explosion starts
+* fighter displays rasen12 as the release
+* sphere displays prasen10-11
+* finish
+
+For a miss:
+
+* form
+* dash
+* no target found
+* fighter displays rasen12 for its release/recovery duration
+* no impact/explosion sphere sequence
+* finish
+
+Rendering
+
+Relevant renderer:
+
+js/game/arena.js -> Arena.drawTechnique()
+
+The renderer currently draws whatever t.sphere returns, centered at t.sphereCenter(true). That architecture is fine.
+
+Do not introduce a second independent visual sphere.
+
+Make the technique runtime return the correct frame index and let the existing renderer draw it.
+
+Preserve:
+
+* interpolation;
+* center anchoring;
+* effect art scale;
+* direction-neutral sphere art;
+* sphere drawn above fighters;
+* left/right fighter mirroring behavior.
+
+Files likely requiring changes
+
+Inspect at minimum:
+
 * js/data/characters.js
-* js/game/physics.js
-* js/game/combat.js
+* js/game/charged-technique.js
 * js/game/character.js
-* tests/clone.test.mjs
-* tests/basic-attack-2.test.mjs
-* tests/fighter-harness.mjs
-* js/data/maps.js
+* js/game/combat.js
+* js/game/arena.js
+* tests/charged-ba2.test.mjs
 * ALVA_SPEC.md
 
-Important existing facts:
+The majority of the actual fix should probably remain concentrated in:
 
-Current clone
+* characters.js
+* charged-technique.js
+* the Charged BA2 tests
 
-js/game/clone.js currently:
+Only touch shared systems where genuinely required.
 
-* snapshots its target once when summoned;
-* spawns behind the target with:
+Tests that are currently encoding the wrong behavior
 
-const facing = target.facing;
-const x = target.body.x - facing * def.behindDistance;
+Update the existing Charged BA2 tests rather than working around them.
 
-* uses target.body.y as its Y position;
-* uses owner.attacks[def.attack];
-* has no physics body;
-* never moves, falls, turns, or retargets;
-* appears through cloneCloud;
-* performs one attack;
-* vanishes through the same cloud in reverse;
-* resolves hits through the normal shared CombatSystem.
+In particular, these current expectations are obsolete:
 
-Preserve all of these properties.
+1. The animation registration test currently expects:
 
-Existing normal clone attack
+rasenConfirm = rasen7-12
 
-characters.js defines:
+It should instead verify the corrected confirm/release split.
 
-summons: {
-  ba1Clone: {
-    attack: 'ba1',
-    cloud: 'cloneCloud',
-    energyCost: 25,
-    behindDistance: 48,
-    effectOffset: { x: 0, y: -44 },
-    stageMargin: 17,
-  },
-},
+2. The clean-miss test currently says:
 
-Ground BA1 remains the normal supported-ground clone attack.
+a clean miss: no hit, bind, rasen7-12 ... #0001 is idle at once
 
-Existing midair BA2
+This is wrong.
 
-#0001 already has:
+Replace it with a test proving:
 
-midairBa2: {
-  animation: 'midairBa2',
-  startup: 2 / BA2_FPS,
-  active: 1 / BA2_FPS,
-  recovery: 2 / BA2_FPS,
-  damage: 6,
-  hitbox: { x: 8, y: -44, w: 40, h: 40 },
-  knockback: { axis: 'vertical', level: 'high', sign: -1 },
-  hitstun: 0.22,
-  blockstun: 0.14,
-  hitstop: 0.06,
-  cooldown: 0.1,
-},
+* no hit;
+* no bind;
+* no impact/explosion frames;
+* dash stops;
+* rasen12 is shown as the release frame;
+* fighter does not become idle until the release has completed;
+* no explosion damage occurs.
 
-That attack already resolves to High downward knockback. Because world Y increases downward, CombatSystem.applyHit() ultimately gives the victim positive downward body.vy.
+3. The successful-hit test currently expects:
 
-Do not duplicate or special-case this damage/knockback in clone.js.
+rasen7 -> rasen12 once and holds it
 
-The airborne clone must simply use the existing resolved owner.attacks.midairBa2 definition and therefore automatically inherit its animation, timings, hitbox, damage, stun, hitstop, and downward knockback.
+That is wrong.
 
-Make this data-driven
+It should prove that rasen12 is not shown during the pre-explosion wait.
 
-Do not hard-code 0001, ba1Clone, or midairBa2 inside generic clone engine logic.
+4. The sphere test currently expects:
 
-Extend the summon definition in characters.js with data describing what to do when its normal position is unsupported.
+prasen7 -> prasen9 and holds it
 
-Use a clean schema along these lines:
+That is wrong.
 
-summons: {
-  ba1Clone: {
-    attack: 'ba1',
-    cloud: 'cloneCloud',
-    energyCost: 25,
-    behindDistance: 48,
-    effectOffset: { x: 0, y: -44 },
-    stageMargin: 17,
-    noGround: {
-      attack: 'midairBa2',
-      offset: { x: 0, y: -36 },
-    },
-  },
-},
+Replace this with an assertion that prasen7, 8, and 9 cycle repeatedly throughout the wait.
 
-The exact internal naming can vary if there is a strong architectural reason, but the behavior must remain entirely character-data-driven.
+Test enough time to verify at least two complete loops.
 
-offset is relative to the target origin.
+5. Add an exact-contact-frame test:
 
-For #0001, use approximately:
+On the same tick that the first sphere hit changes health from 100 to 96:
 
-{ x: 0, y: -36 }
+* target is already bound;
+* target state is hitstun or the appropriate caught state;
+* grounded victim’s visible frame is already 0001_hurt.png;
+* sphere is already positioned on the target.
 
-This intentionally puts the clone’s feet around the target’s upper body rather than a full fighter-height above it.
+There must be no one-tick visual delay.
 
-With the existing midairBa2 box:
+6. Explosion test should verify:
 
-{ x: 8, y: -44, w: 40, h: 40 }
+* no explosion before the configured delay;
+* first explosion frame is prasen10;
+* second is prasen11;
+* those two do not loop;
+* target is released before launch;
+* second hit happens once;
+* total health becomes 80;
+* rasen12 is being used as the release frame around the actual explosion/end, not held during the whole wait.
 
-a clone at:
+Preserve all existing non-bug behavior
 
-x = target.body.x
-y = target.body.y - 36
+Do not regress:
 
-has its active kick aligned with the opponent’s existing hurtboxes.
+* normal ground BA2 (2ba1-2ba7, 8 damage);
+* mid-air BA2;
+* Charged BA1 Clone Attack;
+* Charge input requirements;
+* Energy behavior;
+* fixed facing throughout the technique;
+* left-facing mirroring;
+* grounded-only startup;
+* technique cancellation when #0001 is hit;
+* ground-loss cancellation;
+* wall collision handling;
+* Dodge interaction;
+* Block interaction;
+* knockout handling;
+* reset/rematch cleanup;
+* destroy cleanup;
+* exact one-first-hit + one-explosion-hit rule;
+* no duplicated projectiles/clones;
+* sphere hitbox centered on the actual hand/sphere;
+* target following/binding logic;
+* fixed-step determinism.
 
-Do not place the clone a full 80 world units above the opponent unless testing proves the existing attack box still connects reliably. The goal is a visually overhead clone whose actual midairBa2 hitbox naturally hits the target.
+Do not “fix” this by turning Charged BA2 into a normal attack, projectile, summon, or huge melee hitbox. Keep the dedicated ChargedTechnique architecture.
 
-Ground/support detection
+Documentation
 
-The fallback must be based on whether the actual normal clone spawn position is supported at the target’s current foot Y.
+Update stale comments in characters.js, charged-technique.js, tests and ALVA_SPEC.md.
 
-Do not merely check:
+The spec currently documents:
 
-target.body.grounded
+* rasen7-12 as hit-confirm continuation;
+* prasen7-9 as a one-shot impact clip that holds on prasen9;
+* a miss ending immediately.
 
-That is insufficient.
+Those statements must match the corrected implementation.
 
-Example:
+Document rasen12 explicitly as the release/recovery pose.
 
-* opponent is standing at the edge of a City platform;
-* opponent itself is grounded;
-* the normal 48-unit-behind clone location is already beyond the edge;
-* therefore there is no platform under the clone at that height.
+Validation
 
-That case must trigger the overhead midairBa2.
+Run at least:
 
-Use the stage collision geometry.
-
-StageCollision.surfaceBelow(x0, x1, y) already exists and returns the nearest platform/solid/floor surface at or below y.
-
-Suggested process:
-
-1. Determine target facing.
-2. Calculate normal behind X:
-
-target.body.x - facing * def.behindDistance
-
-3. Apply the existing horizontal stage clamp first.
-4. Determine the clone’s horizontal footprint using the owner character collider:
-
-const halfW = owner.def.collider.width / 2;
-
-5. Query:
-
-stage.surfaceBelow(
-  behindX - halfW,
-  behindX + halfW,
-  target.body.y
-)
-
-6. Treat the behind position as supported only when that surface is effectively at the same Y as the target’s feet.
-
-Use a small tolerance consistent with the physics system, roughly 0.5–1 world unit.
-
-Conceptually:
-
-const support = stage.surfaceBelow(
-  behindX - halfW,
-  behindX + halfW,
-  target.body.y,
-);
-const supported =
-  Math.abs(support.y - target.body.y) <= SUPPORT_EPSILON;
-
-You may add an appropriately named helper to StageCollision if doing so makes this clearer and reusable, but do not unnecessarily rewrite the physics system.
-
-Match the game’s existing platform-overlap semantics: if enough of the clone collider horizontally overlaps a valid surface for the normal physics system to consider it supported, the normal behind spawn should remain valid.
-
-Important examples
-
-Main ground
-
-Target stands on the desert/main floor.
-
-The surface behind the target is the same floor at the same Y.
-
-Result:
-
-* clone stays behind target;
-* clone performs ba1;
-* no behavior change.
-
-Middle of a platform
-
-Target stands well inside a City platform.
-
-The normal behind position is still over the same platform.
-
-Result:
-
-* normal behind BA1 clone.
-
-Edge of a platform
-
-Target stands close enough to a platform edge that the 48-unit-behind position has no platform at that Y.
-
-surfaceBelow() may find the main roof/floor much farther below, but that does NOT count as support at the target’s current height.
-
-Result:
-
-* use overhead spawn;
-* use midairBa2.
-
-Airborne target
-
-If the opponent is airborne, there will normally be no surface exactly at target.body.y.
-
-Result:
-
-* use overhead spawn;
-* use midairBa2.
-
-Overhead spawn behavior
-
-When unsupported:
-
-clone.x = target.body.x + configuredOffsetX
-clone.y = target.body.y + configuredOffsetY
-clone.attackDef = owner.attacks[configuredNoGroundAttack]
-
-For #0001 this means approximately:
-
-x = target.body.x
-y = target.body.y - 36
-attack = owner.attacks.midairBa2
-
-Mirror horizontal offset with facing if you implement non-zero configurable X offsets, consistent with the rest of the character data.
-
-Keep the spawn inside the existing stage horizontal margin.
-
-The overhead clone must retain:
-
-facing = target.facing
-
-Do not make it track the target after spawning.
-
-Its position, facing, chosen attack, and target must still be snapshotted exactly once.
-
-The clone must remain a detached, non-physical entity.
-
-Do NOT:
-
-* give it a physics body;
-* apply gravity;
-* make it land;
-* make it fall;
-* add a pushbox;
-* add hurtboxes;
-* let other attacks hit it;
-* make it follow the opponent;
-* retarget it.
-
-It simply appears in midair, performs midairBa2, and vanishes.
-
-Attack selection must be snapshot-based
-
-Choose the clone’s attack during Clone.summon().
-
-Once created:
-
-* a normal clone permanently has attackDef === owner.attacks.ba1;
-* an unsupported/overhead clone permanently has attackDef === owner.attacks.midairBa2.
-
-Do not reevaluate support later.
-
-If the opponent walks underneath or away during the cloud startup, the clone stays where it originally spawned and may whiff, just like the existing ground clone.
-
-Facing and hit direction
-
-Preserve the current rule:
-
-facing = target.facing
-
-For a behind clone, this makes the clone face from the target’s back toward it.
-
-For the overhead clone, keep the same snapshotted facing.
-
-Do not special-case knockback direction.
-
-midairBa2 has vertical-only knockback, so its resolved X knockback is already zero.
-
-The existing CombatSystem.applyHit() must remain responsible for applying it.
-
-A successful overhead clone kick should therefore naturally produce approximately:
-
-target.body.vx === 0
-target.body.vy === 800
-target.body.grounded === false
-
-using the current High vertical knockback table.
-
-Do not write 800 into clone code.
-
-Clone lifecycle
-
-Normal supported clone:
-
-cloneCloud forwards
-→ BA1
-→ cloneCloud backwards
-→ removed
-
-Unsupported overhead clone:
-
-cloneCloud forwards
-→ midairBa2
-→ cloneCloud backwards
-→ removed
-
-The cloud behavior itself must remain unchanged.
-
-For the overhead case, the first visible clone body underneath the end of the appearance cloud should be midairBa2 frame 1 rather than BA1 frame 1.
-
-During the attack:
-
-0001_midair1ba1.png
-0001_midair1ba2.png
-0001_midair1ba3.png
-0001_midair1ba4.png
-0001_midair1ba5.png
-
-with the hitbox active only during the existing frame-3 active phase.
-
-Do not alter the midairBa2 timings to accommodate the clone.
-
-Energy behavior
-
-Charged BA1 still costs exactly 25 Energy once per accepted summon.
-
-Do not introduce a second charge.
-
-The overhead fallback is not a different player action and does not cost additional Energy.
-
-It is simply the alternate execution of the same paid ba1Clone summon.
-
-Maintain the existing guarantee that missing required art/data does not consume Energy for an invisible/broken summon.
-
-Because Fighter.trySummon() currently runs summonProblem() before spending Energy, extend validation appropriately for the optional no-ground attack.
-
-For #0001, both:
-
-ba1
-midairBa2
-
-must have valid definitions, hitboxes and animation frames before this summon is considered fully usable.
-
-Do not create location-dependent energy loss where Energy is paid and then Clone.summon() silently fails because the fallback attack is unavailable.
-
-summonProblem()
-
-Update summonProblem() generically.
-
-It currently validates:
-
-* cloud;
-* def.attack;
-* attack hitbox;
-* attack animation frames.
-
-When a summon declares a noGround/fallback attack, validate that attack as well.
-
-Avoid #0001-specific strings.
-
-A helper for validating an attack ID would be appropriate.
-
-For example conceptually:
-
-validateSummonAttack(owner, attackId)
-
-called for the primary attack and optional no-ground attack.
-
-Existing summon definitions without a no-ground fallback must continue to work exactly as before.
-
-Stage bounds
-
-Keep the current stageMargin behavior.
-
-Normal behind X must continue to be clamped.
-
-Overhead X must also be kept within the stage margins, although target.body.x will normally already be valid.
-
-Ground detection must happen using the final clamped normal behind X, because that is where the clone would actually spawn.
-
-Do not test support at an unclamped off-stage coordinate and then spawn somewhere else.
-
-Tests
-
-Expand tests/clone.test.mjs substantially.
-
-Do not remove the existing clone coverage.
-
-First fix the test harness
-
-In tests/fighter-harness.mjs, duel() accepts a custom stage, but the clone spawn call currently uses the global STAGE:
-
-spawnClones(fighters, clones, STAGE);
-
-Change that to:
-
-spawnClones(fighters, clones, stage);
-
-Otherwise custom ledge/platform tests will not exercise the intended collision map.
-
-This should not change production behavior; it fixes the harness so it respects its own stage argument.
-
-Required new tests
-
-Add tests covering at least all of these:
-
-1. Existing supported-ground behavior is unchanged
-
-On normal floor:
-
-* clone X is still target.x ± 48 according to facing;
-* clone Y equals target.body.y;
-* attack is ba1;
-* facing behavior is unchanged;
-* cloud → BA1 → reverse cloud is unchanged;
-* BA1 still deals 6 and Low horizontal knockback.
-
-Test both target facings if practical.
-
-2. Platform with support behind still uses BA1
-
-Create a custom StageCollision with a one-way platform.
-
-Put the opponent far enough inside it that the clone collider at the 48-unit-behind position still overlaps the platform.
-
-Verify:
-
-clone.attackDef.id === 'ba1'
-clone.y === target.body.y
-
-and it remains at the behind X.
-
-3. Platform edge with no support behind triggers overhead mode
-
-Put the opponent on a platform edge such that:
-
-* opponent itself is supported;
-* the normal behind point is not supported at the same Y.
-
-Verify:
-
-clone.attackDef.id === 'midairBa2'
-clone.animator.anim.key === 'midairBa2'
-clone.x === target.body.x // assuming x offset 0
-clone.y === target.body.y - 36
-clone.facing === target.facing
-
-Do this for both left- and right-facing targets, or otherwise prove mirroring/facing works for both sides.
-
-4. Lower floor does not count as same-height support
-
-This is important.
-
-If the target is on a platform at Y 600 and the behind point only has the main floor at Y 800 underneath it, it must still use overhead mode.
-
-The existence of some lower surface must not cause BA1.
-
-Support must mean support at approximately the target’s current foot Y.
-
-5. Airborne target uses overhead mode
-
-Place/move the opponent into the air.
-
-Summon while its feet are not resting on a surface at that Y.
-
-Verify overhead midairBa2.
-
-6. Overhead clone uses the real midair BA2 frames and timing
-
-Record the clone lifecycle.
-
-Verify the body frame sequence is:
-
-0001_midair1ba1.png
-0001_midair1ba2.png
-0001_midair1ba3.png
-0001_midair1ba4.png
-0001_midair1ba5.png
-
-The active phase must still correspond to the existing frame-3 kick.
-
-The total attack time must be the existing five-frame midairBa2 duration, plus clone hitstop only if it connects.
-
-Do not create clone-specific BA2 timing.
-
-7. Overhead kick actually overlaps and hits the stationary target
-
-This test is essential.
-
-A stationary target at the fallback spawn position must get hit naturally by the existing attack/hurtbox intersection code.
-
-Do not fake the hit.
-
-Verify:
-
-* exactly one summon hit;
-* event attacker is the real owner;
-* event target is the opponent;
-* event.summon === clone;
-* damage is 6;
-* health goes 100 → 94;
-* hitstun is existing midairBa2.hitstun;
-* hitstop is existing midairBa2.hitstop;
-* clone gets its own hitstop;
-* owner does not get detached-hit hitstop.
-
-8. Overhead clone spikes downward
-
-After an unblocked overhead midairBa2 hit:
-
-target.body.vx === 0
-target.body.vy > 0
-target.body.grounded === false
-
-Using the existing High vertical Knockback values, the current result should be about:
-
-target.body.vy === 800
-
-Assert against KNOCKBACK_LEVELS.high.vertical rather than hard-coding combat behavior if possible.
-
-This proves the clone is genuinely using midairBa2, not a renamed BA1.
-
-9. Still only one hit
-
-Even if the active box overlaps for multiple fixed simulation steps:
-
-* only one hit event;
-* one damage application;
-* clone.hasHit === true;
-* its hitbox becomes unavailable afterward exactly like current clone BA1 behavior.
-
-10. Dodge interaction remains generic
-
-An opponent invulnerable during the midair BA2 active window should let the clone attack pass through unspent.
-
-If invulnerability ends while the attack is still active, it may connect afterward exactly according to existing combat rules.
-
-Do not add special clone-vs-Dodge logic.
-
-11. Block interaction remains generic
-
-If using the existing future Block test fixture, verify the overhead attack goes through CombatSystem.applyHit() normally.
-
-Vertical knockback must still be suppressed on a successful block because that is existing combat behavior.
-
-Do not add clone-specific block handling.
-
-12. Snapshot behavior remains
-
-After an overhead clone appears:
-
-* move the opponent away;
-* clone X/Y/facing/attack choice never change;
-* kick may whiff;
-* clone still finishes all five midairBa2 frames and vanishes.
-
-13. Missing fallback attack/art is safe
-
-Test the no-ground attack validation.
-
-If the configured midairBa2 definition/art is unavailable:
-
-* Charged BA1 summon is not accepted as a broken summon;
-* 25 Energy is not lost;
-* no invisible overhead clone appears;
-* preserve the existing charged-action fallback behavior where appropriate.
-
-14. Stage-edge clamping remains correct
-
-Keep all current edge tests passing.
-
-Also ensure the newly calculated fallback X cannot escape the configured stage margin.
-
-Existing tests that must continue passing
-
-Run the full test suite, not only clone tests.
-
-At minimum ensure these still pass:
-
-node --test tests/clone.test.mjs
-node --test tests/basic-attack.test.mjs
-node --test tests/basic-attack-2.test.mjs
-node --test tests/charge.test.mjs
 node --test tests/charged-ba2.test.mjs
-node --test tests/defense.test.mjs
-node --test tests/knockback.test.mjs
-node --test
 
-Fix regressions rather than weakening assertions.
+Then run the complete test suite:
 
-Documentation/comments
+node --test tests/*.test.mjs
 
-Update comments in:
+Do not stop merely because existing tests pass. Several existing Charged BA2 tests encode the behavior that needs to be corrected, so update them to test the intended animation semantics.
 
-* js/data/characters.js
-* js/game/clone.js
+Finally, manually verify the move visually in the game in both directions and in both outcomes:
 
-so they no longer claim every clone always performs only the configured ground attack behind the target.
+Miss
 
-Explain that a summon may optionally provide a no-ground fallback attack/placement.
+* sphere forms;
+* rush happens;
+* no contact;
+* rush stops;
+* rasen12 visibly releases/recovers;
+* sphere disappears without explosion;
+* neutral control returns.
 
-Update ALVA_SPEC.md because it is the repository’s canonical product specification.
+Hit
 
-Document #0001’s Charged BA1 behavior as:
+* sphere forms;
+* rush makes contact;
+* target changes to Hurt immediately;
+* #0001 stops;
+* sphere attaches to target;
+* prasen7-9 visibly keeps rotating instead of freezing;
+* rasen12 is not prematurely held during the delay;
+* at the explosion moment the lighter/brighter prasen10-11 frames play;
+* #0001 uses the rasen12 release frame;
+* target is released and launched by the explosion;
+* sphere disappears;
+* technique ends cleanly.
 
-* normally appears behind the opponent and performs BA1;
-* if the behind spawn point has no support at the opponent’s current foot height, appears overhead and performs the existing Mid-air BA2 downward kick;
-* position/facing/attack mode are snapshotted at summon time;
-* clone remains detached/non-physical;
-* same cloud lifecycle;
-* still costs 25 Energy.
-
-Do not unnecessarily modify README/UI copy unless existing text becomes inaccurate.
-
-Do not change
-
-Do not modify:
-
-* #0001 sprite files;
-* clone cloud art;
-* BA1 artwork;
-* Mid-air BA2 artwork;
-* Mid-air BA2 damage;
-* Mid-air BA2 hitbox unless testing exposes an unavoidable existing alignment bug;
-* Knockback tables;
-* input bindings;
-* Charge controls;
-* Energy cost;
-* normal clone behind distance;
-* normal clone BA1 behavior;
-* clone cloud timing;
-* combat hit resolution;
-* stage layouts.
-
-Do not add dependencies.
-
-Alva is plain HTML/CSS/vanilla ES-module JavaScript with no build system.
-
-Preferred implementation shape
-
-Keep the patch small.
-
-The expected core change should mainly be:
-
-characters.js
-
-Add no-ground fallback data to ba1Clone.
-
-clone.js
-
-* support optional no-ground summon data;
-* validate its attack;
-* calculate and clamp normal behind position;
-* check support beneath that intended position;
-* choose normal or overhead mode once;
-* choose the corresponding attack definition once;
-* construct the Clone exactly as before.
-
-physics.js
-
-Only change this if a tiny reusable support-query helper makes the code cleaner. Do not rewrite collision handling.
-
-combat.js
-
-Ideally no functional changes are needed.
-
-The existing clone hit path is already generic and should handle midairBa2.
-
-fighter-harness.mjs
-
-Fix duel() so custom stage reaches spawnClones().
-
-clone.test.mjs
-
-Add the new supported/unsupported platform and overhead BA2 coverage.
-
-Definition of done
-
-The implementation is complete when all of the following are true:
-
-1. Charged BA1 on normal ground behaves exactly as it does now.
-2. A clone behind an opponent remains BA1 whenever that behind position has support at the opponent’s current foot level.
-3. If that position has no same-height support, the clone instead appears above the opponent.
-4. The overhead clone plays the existing five-frame midairBa2.
-5. Its real existing hitbox naturally connects with a stationary target.
-6. A hit does 6 damage and applies existing High reversed vertical Knockback, driving the target downward.
-7. It is still a detached clone hit credited to #0001.
-8. The clone remains stationary/non-physical and does not track.
-9. Cloud appearance and disappearance remain unchanged.
-10. Energy cost remains 25.
-11. Missing required fallback art/data cannot consume Energy for a broken summon.
-12. Stage-edge behavior remains correct.
-13. The implementation is generic/data-driven, with no 0001 or midairBa2 special case inside the clone engine.
-14. Existing tests pass and new regression tests cover the platform-edge and airborne cases.
-15. ALVA_SPEC.md accurately describes the final behavior.
-
-Before finishing, inspect the diff for unnecessary unrelated changes and remove them.
+The final result should look like the supplied rasen/prasen artwork was authored for the mechanic, rather than forcing the artwork into the old phase assumptions.
