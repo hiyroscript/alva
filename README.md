@@ -127,16 +127,16 @@ attack animations. Its touch button has a dashed outline.
   attack that misses. It goes up with any Energy left and never works while
   exhausted (below). A block with less than 25 left still stands but takes
   all of it, which empties the bar: the Shield drops at once. It is drawn as a wavy
-  black circle round #0001 with a thin red line on its inner side, over a
+  black circle round #0001 with a thin red line on its outer side, over a
   barely-there black interior so he stays in plain view; it follows him,
-  is sized from his visual height and drifts gently (still with reduced
-  motion). It is art only: what is blocked is decided by his normal
-  hurtboxes, never by the larger circle.
+  is sized from his visual height and its edge visibly wavers like the
+  Void's, drifting slowly (still with reduced motion). It is art only: what
+  is blocked is decided by his normal hurtboxes, never by the larger circle.
 - **Dash:** press left or right twice in a row (the second press within
   0.22 s of the first, keyboard, touch, D-pad or left stick alike) while
-  standing on the ground. #0001 bursts that way at about 1.8× its top speed
-  (600 units / s) for one pass of its two-frame dash clip (`dash1 → dash2`,
-  once, at 10 fps: 0.2 s, about 120 units), facing the Dash at once, then
+  standing on the ground. #0001 bursts that way at about 2.7× its top speed
+  (900 units / s) for one pass of its two-frame dash clip (`dash1 → dash2`,
+  once, at 10 fps: 0.2 s, about 180 units), facing the Dash at once, then
   runs on from that speed if you keep holding the direction. It costs 15
   Energy (all that is left, emptying the bar, when there is less). It is movement only: no hitbox, damage, launch or
   invulnerability, and it still obeys the stage: a solid stops it, and
@@ -222,8 +222,10 @@ attack animations. Its touch button has a dashed outline.
   hurt on that very frame: it can't move, jump, attack, Charge, Throw or
   Defend, but gravity still applies. #0001 plays `rasen7 → rasen8` and
   holds `rasen8` while the sphere on the opponent keeps spinning
-  (`prasen7 → prasen8 → prasen9`, looped) and grows steadily larger (drawn
-  from its own size to 1.4× by the blast, still centred on the opponent).
+  (`prasen7 → prasen8 → prasen9`, looped) and grows steadily, dramatically
+  larger (drawn from its own size to 3× by the blast, which bursts at that
+  size, still centred on the opponent; art only, its reach and hits never
+  change).
   While it is held the opponent takes 1 damage (+1 Launch Point, Base Launch
   0, no Directional Launch) on the very step the sphere catches it, then
   0.5, 1.0 and 1.5 s after the hit, counted on the fixed-step clock, with no
@@ -312,7 +314,7 @@ ring with dark separation keep states identifiable beyond colour.
   Play, opens the training room directly, and **Discover** beneath it opens
   the in-game reference. The strip shifts outward on narrow screens.
 - **Discover** takes its composition from Seren's Cars & more reference: an
-  index rail (**POWER**, **LAUNCH**, **CONDITIONS**) beside one scrollable page of
+  index rail (**POWER**, **LAUNCH**, **PASSIVES**) beside one scrollable page of
   structured entries, in Alva's charcoal, off-white and green. The open
   section wears a green bar, a faint wash and bolder type; the rail runs
   across the top on narrow windows but stays at the side in short
@@ -516,7 +518,7 @@ The two mid-air Basic Attacks swapped moves: **mid-air BA1** is the three-frame 
 
 ### Discover
 
-**Home → Discover** opens the reference, a character-neutral explanation of Alva's mechanics. **POWER** (open by default) explains Jump Power and Speed Power, each with its three tiers. **LAUNCH** explains the launch system generically, straight from `js/data/launch.js`: Launch Point, the four Base Launch values (0 no launch, 1 normal, 2 double, 3 triple, each marked with its own number) with the formula `Launch strength = Base Launch × Launch Point`, and the four Directional Launches (none, horizontal, vertical, reverse vertical). Neither page says which fighter or attack uses a Power, tier, Base Launch or direction, and neither shows tuning numbers. **CONDITIONS** is intentionally empty until Alva has Conditions. Arrow keys, the D-pad or the stick move between Back, the sections and the page (↑ / ↓ scroll a long page); Back, `Esc` or gamepad B returns Home.
+**Home → Discover** opens the reference, a character-neutral explanation of Alva's mechanics. **POWER** (open by default) explains Jump Power and Speed Power, each with its three tiers. **LAUNCH** explains the launch system generically, straight from `js/data/launch.js`: Launch Point, the four Base Launch values (0 no launch, 1 normal, 2 double, 3 triple, each marked with its own number) with the formula `Launch strength = Base Launch × Launch Point`, and the four Directional Launches (none, horizontal, vertical, reverse vertical). Neither page says which fighter or attack uses a Power, tier, Base Launch or direction, and neither shows tuning numbers. **PASSIVES** is intentionally empty until Alva has passives. Arrow keys, the D-pad or the stick move between Back, the sections and the page (↑ / ↓ scroll a long page); Back, `Esc` or gamepad B returns Home.
 
 ### Adding a fighter (#0002)
 

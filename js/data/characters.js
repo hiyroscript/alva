@@ -412,8 +412,9 @@ export const CHARACTERS = [
       dropThroughTime: 0.28,
       // Dash: two presses of the same direction (left or right), the second
       // within dashTapWindow seconds of the first, start a grounded burst at
-      // dashSpeed (about 1.8x the top speed) for one pass of the dash clip.
-      dashSpeed: 600,
+      // dashSpeed (about 2.7x the top speed) for one pass of the dash clip:
+      // 0.2 s, about 180 units on open ground.
+      dashSpeed: 900,
       dashTapWindow: 0.22,
     },
 
@@ -579,9 +580,10 @@ export const CHARACTERS = [
         // Seconds from the hit to the explosion.
         explosionDelay: 2.0,
         // The sphere on the opponent, drawn at its own art size from the hit,
-        // grows steadily through the rasen8 hold to this multiple of it as
-        // it explodes; the blast bursts at that size. Visual only.
-        sphereGrowth: { startScale: 1, endScale: 1.4 },
+        // grows steadily through the rasen8 hold to three times that as it
+        // explodes, a looming threat by then; the blast bursts at that size.
+        // Visual only: sphereHitbox, hurtboxes and every hit stay as they are.
+        sphereGrowth: { startScale: 1, endScale: 3 },
         // The sphere's contact: the setup, no damage and no launch. The bind
         // that follows (not this hitstun) is what holds the opponent; its
         // first tickHit lands on this same step.
