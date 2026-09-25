@@ -20,6 +20,7 @@ import { fileURLToPath } from 'node:url';
 import { characterFramePaths } from '../js/data/characters.js';
 import { getMap } from '../js/data/maps.js';
 import { CombatSystem } from '../js/game/combat.js';
+import { LAUNCH_UNIT_SPEED as U } from '../js/data/launch.js';
 import { ChargedTechnique } from '../js/game/charged-technique.js';
 import { StageCollision } from '../js/game/physics.js';
 import { SpriteSet } from '../js/game/sprite-normalizer.js';
@@ -860,15 +861,15 @@ test('the explosion comes exactly 2.0 s after the hit step on rasen9: prasen10 -
   assert.equal(blast.technique, t);
   assert.equal(d.target.combat.launchPoint, 18, '3 ticks, then 15');
   // Released before the launch, so it is intact: 3 + 15 = 18 first, then
-  // exactly 3 x 18 = 54, sideways away from #0001, with no lift and nothing
-  // added.
+  // exactly 3 x 18 = 54 of strength, sideways away from #0001 at 54 x U,
+  // with no lift and nothing added.
   assert.equal(d.target.combat.immobilized, false);
   assert.equal('launchMultiplier' in blast, false);
   assert.equal('bonusLaunch' in blast, false);
   assert.deepEqual([blast.launchPointBefore, blast.launchPointAfter], [3, 18]);
   assert.deepEqual([blast.baseLaunch, blast.directionalLaunch, blast.launchStrength], [3, 'horizontal', 54]);
-  assert.deepEqual(blast.finalLaunch, { x: 54, y: 0 });
-  assert.equal(d.target.body.vx, 54);
+  assert.deepEqual(blast.finalLaunch, { x: 54 * U, y: 0 });
+  assert.equal(d.target.body.vx, 54 * U);
   assert.equal(d.target.body.vy, 0, 'horizontal only');
   assert.equal(d.target.grounded, true, 'a horizontal launch invents no lift');
   assert.equal(d.target.combat.stun, 0.55);
@@ -1019,18 +1020,18 @@ test('the blast adds its 15 first, then launches at exactly 3 x the new Launch P
   for (const facing of [1, -1]) {
     const fresh = blastAt(0, facing);
     assert.equal(fresh.k, 18);
-    assert.equal(fresh.vx, 54 * facing, '3 x 18, away from #0001');
+    assert.equal(fresh.vx, 54 * U * facing, '3 x 18, away from #0001');
     assert.equal(fresh.vy, 0, 'no lift');
     const worn = blastAt(102, facing);
     assert.equal(worn.blast.launchPointBefore, 105, '102 + three ticks');
     assert.equal(worn.k, 120, '105 + 15');
     assert.equal(worn.blast.launchStrength, 360, '3 x 120, not 3 x 105');
-    assert.deepEqual(worn.blast.finalLaunch, { x: 360 * facing, y: 0 });
-    assert.equal(worn.vx, 360 * facing);
+    assert.deepEqual(worn.blast.finalLaunch, { x: 360 * U * facing, y: 0 });
+    assert.equal(worn.vx, 360 * U * facing);
     assert.equal(worn.vy, 0);
-    // Not the old bespoke { x: 720, y: 180 } vector, or anything added to it.
-    assert.notEqual(Math.abs(worn.vx), 720);
-    assert.notEqual(Math.abs(fresh.vx), 720);
+    // Not the old bespoke { x: 720, y: 180 } vector, or anything added to it:
+    // the speed stays proportional to the strength.
+    assert.equal(worn.vx / fresh.vx, 360 / 54);
   }
 });
 

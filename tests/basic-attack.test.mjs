@@ -11,6 +11,7 @@ import assert from 'node:assert/strict';
 import { COMBAT_ACTIONS } from '../js/game/character.js';
 import { worldBox, createAttackDefinition } from '../js/game/combat.js';
 import { TrainingAIController } from '../js/game/fighter-controller.js';
+import { LAUNCH_UNIT_SPEED as U } from '../js/data/launch.js';
 import { CONFIG } from '../js/config.js';
 import {
   def, DT, SIM_CTX, fakeSprites, makeFighter, frameName, stepUntil,
@@ -371,7 +372,7 @@ test('ground BA1 hits an opponent in front during the active phase only', () => 
   assert.equal(hitPhase, 'active');
 });
 
-test('a ground BA1 hit adds its 5 first, then pushes the target sideways at 1 x its new Launch Point: 115 + 5 = 120, vx 120, with no launch', () => {
+test('a ground BA1 hit adds its 5 first, then pushes the target sideways at 1 x its new Launch Point: 115 + 5 = 120, a strength of 120, with no launch', () => {
   for (const facing of [1, -1]) {
     const { attacker, target, tick, events } = duel({ attackerFacing: facing });
     target.combat.launchPoint = 115;
@@ -380,7 +381,7 @@ test('a ground BA1 hit adds its 5 first, then pushes the target sideways at 1 x 
     // At impact, before the target's next step: CombatSystem.applyHit set it.
     assert.equal(target.combat.launchPoint, 120);
     assert.equal(events[0].launchStrength, 120, '1 x 120, not 1 x 115');
-    assert.equal(target.body.vx, 120 * facing, 'away from the attacker');
+    assert.equal(target.body.vx, 120 * U * facing, 'away from the attacker, at the strength\'s speed');
     assert.equal(target.body.vy, 0);
     assert.equal(target.grounded, true, 'BA1 never launches upward');
     assert.equal(attacker.facing, facing);
@@ -476,7 +477,7 @@ test('mid-air BA1 hits a grounded opponent below and in front while still airbor
   assert.equal(target.combat.launchPoint, 5);
 });
 
-test('a mid-air BA1 hit adds its 5 first, then launches a grounded target straight up at 2 x its new Launch Point: 115 + 5 = 120, vy -240', () => {
+test('a mid-air BA1 hit adds its 5 first, then launches a grounded target straight up at 2 x its new Launch Point: 115 + 5 = 120, a strength of 240', () => {
   for (const facing of [1, -1]) {
     const { attacker, target, tick, until, events } = midairBa1Duel({ attackerFacing: facing });
     target.combat.launchPoint = 115;
@@ -490,7 +491,7 @@ test('a mid-air BA1 hit adds its 5 first, then launches a grounded target straig
     assert.equal(events[0].launchStrength, 240);
     // At impact, before the target's next step: CombatSystem.applyHit set it.
     assert.ok(isZero(target.body.vx), 'no horizontal launch');
-    assert.equal(target.body.vy, -240, 'negative body vy: launched upward');
+    assert.equal(target.body.vy, -240 * U, 'negative body vy: launched upward');
     assert.equal(target.grounded, false);
     // It rises, then gravity brings it back down where it stood.
     let top = floor;

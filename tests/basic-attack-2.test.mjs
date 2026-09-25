@@ -13,6 +13,7 @@ import { readFileSync } from 'node:fs';
 import { COMBAT_ACTIONS } from '../js/game/character.js';
 import { worldBox, CombatSystem, createAttackDefinition } from '../js/game/combat.js';
 import { ACTIONS, CONFIG } from '../js/config.js';
+import { LAUNCH_UNIT_SPEED } from '../js/data/launch.js';
 import {
   def, DT, SIM_CTX, fakeSprites, makeFighter, frameName, stepUntil,
   steps, frameNo, recordAttack, sequence, duel,
@@ -29,10 +30,12 @@ const CONTACT = { ba2: [4, 5], midairBa2: [3] };
 
 // Either BA2 adds 10 to the target's Launch Point first, then launches at
 // Base Launch 2 x that new Launch Point: ground BA2 upward, mid-air BA2
-// downward. The launch tests start the target at 110, so 110 + 10 = 120 and
-// 2 x 120 = 240.
-const LAUNCH_FROM = 110;
-const LAUNCHED = 240;
+// downward. The launch tests start the target at 20, so 20 + 10 = 30, a
+// strength of 2 x 30 = 60, and a speed of 60 x LAUNCH_UNIT_SPEED (600): a
+// clear launch that still lands on the stage.
+const LAUNCH_FROM = 20;
+const STRENGTH = 60;
+const LAUNCHED = STRENGTH * LAUNCH_UNIT_SPEED;
 const BA2_LAUNCH = {
   ba2: { baseLaunch: 2, directionalLaunch: 'vertical' },
   midairBa2: { baseLaunch: 2, directionalLaunch: 'reverseVertical' },
@@ -455,7 +458,7 @@ test('a normal BA2 hit launches a grounded target straight up through the shared
     assert.equal(target.grounded, true);
     tick(BA2);
     while (!events.length) tick();
-    // At impact, before any gravity: vx 0, vy -240 (2 x 120), off the ground.
+    // At impact, before any gravity: vx 0, upward at 2 x 30, off the ground.
     assert.ok(isZero(target.body.vx), `facing ${facing}: no sideways push`);
     assert.equal(target.body.vy, -LAUNCHED);
     assert.equal(target.grounded, false);
@@ -492,9 +495,8 @@ test('a normal BA2 hit launches a grounded target straight up through the shared
 
 test('a ground BA2 hit shows the target in its hurt poses while it is launched', () => {
   const { attacker, target, tick, until, events } = duel();
-  // 190 + 10 = 200, launched at 2 x 200 = 400: long enough in the air to
-  // outlast its hitstun.
-  target.combat.launchPoint = 190;
+  // Launched at 2 x 30: long enough in the air to outlast its hitstun.
+  target.combat.launchPoint = LAUNCH_FROM;
   tick(BA2);
   until(() => events.length > 0, 60);
   const frozenAt = { x: target.body.x, y: target.body.y, attackerFrame: frameName(attacker) };
@@ -533,7 +535,7 @@ function midairBa2Duel({ attackerFacing = 1, gap = 44 } = {}) {
   return d;
 }
 
-test('a mid-air BA2 hit adds its 10 first, then drives a grounded target downward at 2 x its new Launch Point: 110 + 10 = 120, vy +240, no sideways push', () => {
+test('a mid-air BA2 hit adds its 10 first, then drives a grounded target downward at 2 x its new Launch Point: 20 + 10 = 30, a strength of 60, no sideways push', () => {
   for (const facing of [1, -1]) {
     const { attacker, target, tick, events } = midairBa2Duel({ attackerFacing: facing });
     target.combat.launchPoint = LAUNCH_FROM;
@@ -542,8 +544,8 @@ test('a mid-air BA2 hit adds its 10 first, then drives a grounded target downwar
     while (!events.length) tick();
     assert.equal(events[0].type, 'hit');
     assert.equal(events[0].target, target);
-    assert.equal(target.combat.launchPoint, 120, '110 + the kick\'s own 10');
-    assert.equal(events[0].launchStrength, 240);
+    assert.equal(target.combat.launchPoint, 30, '20 + the kick\'s own 10');
+    assert.equal(events[0].launchStrength, STRENGTH);
     assert.equal(attacker.facing, facing);
     // At impact, before the target's next step: CombatSystem.applyHit set it.
     assert.ok(isZero(target.body.vx), 'no horizontal launch');
@@ -596,7 +598,7 @@ test('a mid-air BA2 hit on a rising target reverses it: driven downward instead 
   const impact = kicked.log[at];
   assert.equal(impact.grounded, false, 'hit in the air');
   assert.ok(impact.before.vy < 0, 'rising until the kick');
-  assert.equal(impact.vy, LAUNCHED, 'positive body vy: driven downward at 2 x 120');
+  assert.equal(impact.vy, LAUNCHED, 'positive body vy: driven downward at 2 x 30');
   assert.ok(isZero(impact.vx), 'and never pushed sideways');
   // Without the kick the target carries on up; with it, from the hit to
   // touchdown it only ever moves down (or holds, frozen by the impact's
@@ -875,12 +877,13 @@ test('damage accumulates as Launch Point: BA1 -> BA1 -> BA2 on a fresh target is
   }
   assert.deepEqual(events.map((e) => e.damage), [5, 5, 10]);
   // Each hit's strength is its Base Launch x the Launch Point it leaves the
-  // target at, sent along its own direction: BA1 1 x 5 and 1 x 10
-  // sideways, BA2 2 x 20 upward.
+  // target at, sent along its own direction at LAUNCH_UNIT_SPEED per point:
+  // BA1 1 x 5 and 1 x 10 sideways, BA2 2 x 20 upward.
+  const U = LAUNCH_UNIT_SPEED;
   assert.deepEqual(events.map((e) => [e.launchPointBefore, e.launchPointAfter, e.baseLaunch, e.directionalLaunch, e.launchStrength, e.finalLaunch]), [
-    [0, 5, 1, 'horizontal', 5, { x: 5, y: 0 }],
-    [5, 10, 1, 'horizontal', 10, { x: 10, y: 0 }],
-    [10, 20, 2, 'vertical', 40, { x: 0, y: -40 }],
+    [0, 5, 1, 'horizontal', 5, { x: 5 * U, y: 0 }],
+    [5, 10, 1, 'horizontal', 10, { x: 10 * U, y: 0 }],
+    [10, 20, 2, 'vertical', 40, { x: 0, y: -40 * U }],
   ]);
   assert.equal(attacker.combat.launchPoint, 0);
 });

@@ -17,6 +17,7 @@ import { fileURLToPath } from 'node:url';
 import { characterFramePaths } from '../js/data/characters.js';
 import { getMap } from '../js/data/maps.js';
 import { Fighter } from '../js/game/character.js';
+import { LAUNCH_UNIT_SPEED as U } from '../js/data/launch.js';
 import { CombatState, CooldownTimers } from '../js/game/combat.js';
 import { Clone } from '../js/game/clone.js';
 import { StageCollision, createBody, stepBody } from '../js/game/physics.js';
@@ -734,7 +735,7 @@ test('supported ground is unchanged: behind the target either way it faces, BA1,
   const [e] = d.events;
   assert.deepEqual([e.damage, e.baseLaunch, e.directionalLaunch], [5, 1, 'horizontal']);
   assert.deepEqual([e.launchPointBefore, e.launchPointAfter, e.launchStrength], [115, 120, 120]);
-  assert.equal(d.target.body.vx, 120 * clone.facing);
+  assert.equal(d.target.body.vx, 120 * U * clone.facing);
   assert.equal(d.target.body.vy, 0);
 });
 
@@ -910,7 +911,7 @@ test('the overhead kick lands on a stationary target through the real hitbox and
   }
 });
 
-test('the overhead kick drives the target downward with mid-air BA2\'s Base Launch 2 reverse vertical: 110 + 10 = 120, vy +240', () => {
+test('the overhead kick drives the target downward with mid-air BA2\'s Base Launch 2 reverse vertical: 110 + 10 = 120, a strength of 240', () => {
   for (const [targetX, facing] of EDGES) {
     const d = roofDuel(targetX, facing);
     d.target.combat.launchPoint = 110;
@@ -919,7 +920,7 @@ test('the overhead kick drives the target downward with mid-air BA2\'s Base Laun
     assert.ok(d.target.body.vx === 0, 'no sideways push');
     assert.ok(d.target.body.vy > 0, 'downward: world y grows down');
     assert.equal(d.events[0].launchStrength, 240);
-    assert.equal(d.target.body.vy, 240, '2 x 120, downward');
+    assert.equal(d.target.body.vy, 240 * U, '2 x 120, downward');
     assert.equal(d.target.body.grounded, false);
   }
 });
@@ -987,7 +988,7 @@ test('Block (future fighters): the overhead kick goes through applyHit like any 
   assert.equal(open.target.combat.blocking, true, 'the guard was up');
   assert.equal(open.events[0].type, 'hit');
   assert.equal(open.events[0].damage, 10);
-  assert.equal(open.target.body.vy, 240, 'the full spike: 2 x 120');
+  assert.equal(open.target.body.vy, 240 * U, 'the full spike: 2 x 120');
 
   // Turned to face the clone: a normal block. Its chip damage still adds
   // to Launch Point, but the block cancels the reverse vertical launch.
@@ -1191,7 +1192,7 @@ test('the clone BA1 hits once with BA1\'s damage, stun and launch from the clone
   // Launched along the clone's facing (left, away from the clone), even
   // though the owner faces right.
   assert.equal(d.attacker.facing, 1);
-  assert.equal(d.target.body.vx, -120);
+  assert.equal(d.target.body.vx, -120 * U);
   assert.equal(clone.hasHit, true);
   assert.equal(clone.attackPhase, 'active');
   assert.equal(clone.hitbox(), null, 'used up');
@@ -1313,7 +1314,7 @@ test('Block (future fighters): a guard facing away does not block the clone; tur
   assert.equal(front.target.combat.stun, ATTACK.blockstun);
   assert.equal(front.target.combat.launchPoint, 120);
   assert.equal(e.launchStrength, 120, 'the raw strength, before Block');
-  assert.equal(front.target.body.vx, 60 * clone.facing, 'half of it, from the clone');
+  assert.equal(front.target.body.vx, 60 * U * clone.facing, 'half of it, from the clone');
   assert.equal(clone.hitstop, ATTACK.hitstop, 'a blocked punch still pauses the clone');
   assert.equal(front.attacker.combat.hitstop, 0);
 });

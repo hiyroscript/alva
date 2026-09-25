@@ -38,11 +38,12 @@ const SPEEDS = [[1, 270], [2, 330], [3, 360]];
 // Bespoke hits (like the Sphere Rush's explosion) that launch upward and
 // push sideways, for checking what a target's Powers do, or don't do, to its
 // flight. On a fresh target (0 Launch Point) the damage is the whole new
-// Launch Point: 3 x 160 = 480 upward, 2 x 130 = 260 sideways, whatever the
-// target's Powers.
+// Launch Point: 3 x 16 = 48 of strength, 480 upward, and 2 x 13 = 26, 260
+// sideways (10 world units per second per point), whatever the target's
+// Powers.
 const HIT = { chipDamage: 0, hitstun: 0.4, blockstun: 0.12, hitstop: 0 };
-const LAUNCH_UP = Object.freeze({ ...HIT, damage: 160, baseLaunch: 3, directionalLaunch: 'vertical' });
-const LAUNCH_SIDEWAYS = Object.freeze({ ...HIT, damage: 130, baseLaunch: 2, directionalLaunch: 'horizontal' });
+const LAUNCH_UP = Object.freeze({ ...HIT, damage: 16, baseLaunch: 3, directionalLaunch: 'vertical' });
+const LAUNCH_SIDEWAYS = Object.freeze({ ...HIT, damage: 13, baseLaunch: 2, directionalLaunch: 'horizontal' });
 
 // Holds `held` until horizontal speed stops changing; returns the settled vx.
 function settledSpeed(step, fighter, held = RIGHT) {
@@ -306,7 +307,7 @@ test('launches ignore Jump Power: tier 1 and tier 3 targets fly identically', ()
     const attacker = makeFighter({ x: 400 });
     const target = makeFighter({ character: withJump(tier), x: 460, facing: -1 });
     new CombatSystem().applyHit(attacker.fighter, target.fighter, LAUNCH_UP);
-    assert.equal(target.fighter.body.vy, -480, 'Base Launch x Launch Point, nothing else');
+    assert.equal(target.fighter.body.vy, -480, 'Base Launch x Launch Point at 10 per point, nothing else');
     const path = [];
     while (target.fighter.combat.stun > 0 || !target.fighter.grounded) {
       target.step();

@@ -428,9 +428,10 @@ export class CombatSystem {
     // the id of the attack or hit that dealt it. `baseLaunch` is the hit's
     // Base Launch (0-3) and `directionalLaunch` its direction;
     // `launchStrength` is baseLaunch x launchPointAfter, and `finalLaunch`
-    // the world-space velocity { x, y } the target was given (y grows
-    // downward; on a block, half of it sideways and none vertically; zero
-    // for no launch). `attacker` is the owner for a projectile or clone hit;
+    // the world-space velocity { x, y } the target was given: that strength
+    // at LAUNCH_UNIT_SPEED per point along the direction (y grows downward;
+    // on a block, half of it sideways and none vertically; zero for no
+    // launch). `attacker` is the owner for a projectile or clone hit;
     // `projectile`, `summon` and `technique` are null for the fighter's own
     // melee.
     this.events = [];
@@ -537,7 +538,8 @@ export class CombatSystem {
   // The damage (chip damage when blocked) is added to the target's Launch
   // Point first, so the hit that raises it already launches from the new
   // total. The launch strength is exactly Base Launch x that Launch Point,
-  // sent along the hit's Directional Launch. Block then modifies the
+  // sent along the hit's Directional Launch at LAUNCH_UNIT_SPEED world units
+  // per second per point (see js/data/launch.js). Block then modifies the
   // resolved launch: half of it sideways, none of it vertically. A hit that
   // does not launch (Base Launch 0, no direction, or nothing left after
   // Block) leaves the target's velocity as it is. Returns the event it
