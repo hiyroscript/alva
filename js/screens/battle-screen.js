@@ -22,7 +22,7 @@ const BANNERS = {
 
 // Result dialog kicker and line for each way a round ends.
 const RESULT_TEXT = {
-  time: { kicker: 'Time over', sub: () => 'Time ran out. Remaining health decides the round.' },
+  time: { kicker: 'Time over', sub: () => 'Time ran out. Lower Knockback wins the round.' },
   void: { kicker: 'K.O.', sub: (loser) => `${loser} fell into the Void.` },
 };
 

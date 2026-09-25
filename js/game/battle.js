@@ -4,9 +4,9 @@
 // Canvas 2D rendering; DOM concerns (HUD, pause, overlays) live in the battle
 // screen.
 //
-// The round ends when time runs out (remaining health decides it) or at
-// once when a fighter falls into the Void (see onVoid): that fighter is
-// defeated, whatever the timer or health says.
+// The round ends at once when a fighter falls into the Void (see onVoid):
+// that fighter is defeated, whatever the timer or Knockback says. If time
+// runs out first, the fighter with less accumulated Knockback wins.
 
 import { CONFIG } from '../config.js';
 import { Arena } from './arena.js';
@@ -37,7 +37,8 @@ export class Battle extends Arena {
 
   restart() {
     // Resetting a fighter ends its charged technique and releases whatever
-    // it held; the fresh combat state carries no bind, timer or sphere.
+    // it held; the fresh combat state carries no bind, timer or sphere, 0
+    // Knockback and no cooldowns.
     for (const f of this.fighters) f.reset(this.stage);
     this.projectiles.length = 0;
     this.clones.length = 0;
@@ -87,25 +88,27 @@ export class Battle extends Arena {
   }
 
   // A fighter fell into the Void: it is defeated on the spot. It leaves
-  // play (frozen, undrawn, untouchable) with no health left, nothing keeps
-  // holding or aiming at it, and a round still being fought ends at once
-  // with the short KO beat. One lost after time ran out still loses; both
-  // lost is a draw.
+  // play (frozen, undrawn, untouchable), nothing keeps holding or aiming at
+  // it, and a round still being fought ends at once with the short KO beat.
+  // Its Knockback stays as it was until the next match. One lost after time
+  // ran out still loses; both lost is a draw.
   onVoid(f) {
     f.lostToVoid = true;
-    f.combat.health = 0;
     this.detachFromPlay(f, 'void');
     if (this.phase === 'fight') this.setPhase('ko');
   }
 
-  // The winner: whoever the Void did not take, else whoever has more health
-  // left (a Void loss leaves none).
+  // The winner: whoever the Void did not take (both taken is a draw), else,
+  // on time, whoever has less accumulated Knockback (equal is a draw).
   get result() {
     const lost = { p1: !!this.p1.lostToVoid, p2: !!this.p2.lostToVoid };
-    const reason = lost.p1 || lost.p2 ? 'void' : 'time';
-    const a = this.p1.combat.health / this.p1.combat.maxHealth;
-    const b = this.p2.combat.health / this.p2.combat.maxHealth;
-    if (Math.abs(a - b) < 1e-6) return { outcome: 'draw', reason };
-    return { outcome: a > b ? 'p1' : 'p2', reason };
+    if (lost.p1 || lost.p2) {
+      if (lost.p1 && lost.p2) return { outcome: 'draw', reason: 'void' };
+      return { outcome: lost.p1 ? 'p2' : 'p1', reason: 'void' };
+    }
+    const a = this.p1.combat.knockback;
+    const b = this.p2.combat.knockback;
+    if (Math.abs(a - b) < 1e-6) return { outcome: 'draw', reason: 'time' };
+    return { outcome: a < b ? 'p1' : 'p2', reason: 'time' };
   }
 }

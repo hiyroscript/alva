@@ -3,8 +3,8 @@
 // surface the feet rest on.
 //
 // Every stage is a finite platform-fighter stage: a compact main stage with
-// open air past both ledges, and the Void far beyond. Four separate things,
-// each its own field:
+// open air past both ledges, and the Void a short way beyond: a blast zone,
+// not a distant world edge. Four separate things, each its own field:
 //
 // mainStage:    the main floor, finite. Fighters stand on its top (`top`)
 //               only between `left` and `right`; past either edge there is
@@ -17,12 +17,43 @@
 //               `h` is visual slab thickness only; `kind` picks the art.
 // solids:       full AABB blocks (collide on every side).
 // cameraBounds: where the camera may travel to frame the fight: the stage,
-//               the open air around it and the Void's edge.
+//               the open air around it and a strip of the Void past its
+//               edge (cameraAround), never far into the black.
 // voidBounds:   the Void, the kill boundary (see StageCollision.inVoid): a
-//               fighter whose centre leaves this rectangle is lost to it. It
-//               sits far past the ledges, well below the stage and high above
-//               it, independent of the stage and the camera.
+//               fighter whose centre leaves this rectangle is lost to it.
+//               Set by margins around the main stage (voidAround): past
+//               each ledge by enough to be knocked off, fight briefly and
+//               drift back; below the stage's top by enough to fall a
+//               little way first; and above it clear of every jump from the
+//               highest footing, so only a launch reaches it.
 // theme:        key into the stage theme registry (js/stages/index.js).
+
+// The Void's rectangle from margins around `main`: `side` world units past
+// each ledge, `top` above the stage's top and `bottom` below it (measured at
+// a fighter's centre, like StageCollision.inVoid).
+export function voidAround(main, { side, top, bottom }) {
+  return Object.freeze({
+    left: main.left - side, right: main.right + side, top: main.top - top, bottom: main.top + bottom,
+  });
+}
+
+// Camera bounds: the Void's rectangle and `margin` world units more on every
+// side, so the black edge comes into view as a fighter nears it but the
+// camera never wanders deep into it.
+export function cameraAround(bounds, margin) {
+  return Object.freeze({
+    left: bounds.left - margin, right: bounds.right + margin, top: bounds.top - margin, bottom: bounds.bottom + margin,
+  });
+}
+
+const DESERT_MAIN = Object.freeze({ left: 1120, right: 2480, top: 860, bottom: 2000 });
+// No platforms: the rock outcrops are the highest footing.
+const DESERT_VOID = voidAround(DESERT_MAIN, { side: 360, top: 760, bottom: 400 });
+
+const CITY_MAIN = Object.freeze({ left: 1080, right: 2520, top: 980, bottom: 2120 });
+// A little more headroom than Desert, over its highest deck (272 above the
+// roof), and a little more fall below the roof.
+const CITY_VOID = voidAround(CITY_MAIN, { side: 340, top: 800, bottom: 420 });
 
 export const MAPS = [
   {
@@ -37,9 +68,9 @@ export const MAPS = [
       ['Platforms', 'None'],
       ['Light', 'Sunset'],
     ],
-    mainStage: { left: 1120, right: 2480, top: 860, bottom: 2000 },
-    cameraBounds: { left: 100, right: 3500, top: -460, bottom: 1760 },
-    voidBounds: { left: 260, right: 3340, top: -300, bottom: 1600 },
+    mainStage: DESERT_MAIN,
+    cameraBounds: cameraAround(DESERT_VOID, 140),
+    voidBounds: DESERT_VOID,
     spawnPoints: [
       { x: 1640, facing: 1 },
       { x: 1960, facing: -1 },
@@ -63,9 +94,9 @@ export const MAPS = [
       ['Platforms', '7 one-way'],
       ['Light', 'Night'],
     ],
-    mainStage: { left: 1080, right: 2520, top: 980, bottom: 2120 },
-    cameraBounds: { left: 60, right: 3540, top: -340, bottom: 1880 },
-    voidBounds: { left: 220, right: 3380, top: -180, bottom: 1720 },
+    mainStage: CITY_MAIN,
+    cameraBounds: cameraAround(CITY_VOID, 140),
+    voidBounds: CITY_VOID,
     spawnPoints: [
       { x: 1630, facing: 1 },
       { x: 1970, facing: -1 },

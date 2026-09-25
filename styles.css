@@ -40,9 +40,6 @@
 
   /* Battle chrome (dark, over stage art) */
   --scrim-text-muted: #ababab;
-  /* Energy meter: a gameplay-resource colour, the one deliberate blue in the
-     interface. Buttons, selection, focus and health stay green/neutral. */
-  --energy: #3b82f6;
   /* Battle glass: translucent charcoal with a faint top sheen and a light
      hairline. Darker than the Home strip so white type stays readable over
      bright and dark stage art. */
@@ -1237,54 +1234,101 @@ html:not(.is-pointer-input) .discover-panel:focus { box-shadow: var(--focus-ring
   pointer-events: none;
 }
 .hud-side {
-  display: grid;
-  gap: 4px;
+  /* One compact card per fighter: portrait | name over Knockback, then the
+     charged-ability cooldown rings. Lighter than a menu panel, so the stage
+     shows through, but dark enough for the text on any stage. */
+  --hud-portrait: clamp(32px, 6.2vh, 46px);
+  --cd-size: clamp(22px, 4.2vh, 30px);
+  display: flex;
+  align-items: center;
+  gap: clamp(6px, 0.9vw, 10px);
+  justify-self: start;
   min-width: 0;
-  width: 100%;
-  max-width: 470px;
-  padding: 6px 10px 7px;
+  max-width: 100%;
+  padding: 5px 10px 5px 5px;
   border-radius: var(--radius-sm);
 }
-.hud-p2 { justify-self: end; }
-.hud-tag { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.hud-side.glass { background: var(--glass-sheen), rgba(10, 11, 13, 0.5); }
+/* The CPU's card mirrors the player's: portrait on the outer (right) edge. */
+.hud-p2 { justify-self: end; flex-direction: row-reverse; padding: 5px 5px 5px 10px; }
+.hud-portrait {
+  flex: none;
+  width: var(--hud-portrait);
+  height: var(--hud-portrait);
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.06);
+  image-rendering: pixelated;
+}
+.hud-divider { flex: none; align-self: stretch; width: 1px; margin: 2px 0; background: rgba(255, 255, 255, 0.3); }
+.hud-info { display: grid; gap: 1px; min-width: 0; }
+.hud-p2 .hud-info { justify-items: end; }
+.hud-tag { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .hud-p2 .hud-tag { flex-direction: row-reverse; }
 .hud-slot {
-  padding: 1px 6px;
+  padding: 1px 5px;
   border-radius: 4px;
   border: 1px solid var(--white);
   background: var(--white);
   color: var(--black);
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 700;
   letter-spacing: 0.06em;
 }
 .hud-p2 .hud-slot { background: transparent; color: var(--white); border-color: rgba(255, 255, 255, 0.55); }
-.hud-name { font-weight: 700; font-size: clamp(12px, 2.3vh, 16px); white-space: nowrap; }
-.hud-bar {
-  position: relative;
-  height: clamp(8px, 1.7vh, 13px);
-  border-radius: 3px;
-  overflow: hidden;
-  background: rgba(255, 255, 255, 0.14);
+.hud-name { font-weight: 700; font-size: clamp(11px, 2vh, 14px); line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Accumulated Knockback: a bare number, no bar, maximum or % sign. */
+.hud-knockback {
+  font-weight: 800;
+  font-size: clamp(19px, 4vh, 30px);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--white);
 }
-/* Both fighters share the green fill; tags and names tell them apart. */
-.hud-bar-fill, .hud-bar-ghost { position: absolute; inset: 0; transform-origin: left center; background: var(--accent); }
-.hud-p2 .hud-bar-fill, .hud-p2 .hud-bar-ghost { transform-origin: right center; }
-.hud-bar-ghost { opacity: 0.38; transition: transform 0.6s ease 0.25s; }
-.hud-side.is-low .hud-bar-fill { animation: low-hp 0.8s ease-in-out infinite alternate; }
-@keyframes low-hp { to { opacity: 0.5; } }
-/* Energy sits directly under health: same width and track, a little
-   shorter, one solid blue fill mirrored for the CPU like its health. */
-.hud-energy {
+/* Charged-ability cooldowns: a ring that fills clockwise from the top as
+   the ability recovers (--cd-progress, 0 -> 1, set by the HUD), the seconds
+   left inside it, the button's name beneath. Ready: the ring is complete
+   and green, and empty of numbers. */
+.hud-cooldowns { display: flex; gap: clamp(4px, 0.6vw, 7px); flex: none; }
+.hud-cooldowns[hidden] { display: none; }
+.hud-cd { display: grid; justify-items: center; gap: 2px; }
+.hud-cd-ring {
+  --cd-progress: 1;
   position: relative;
-  height: clamp(5px, 1.1vh, 8px);
-  border-radius: 3px;
-  overflow: hidden;
-  background: rgba(255, 255, 255, 0.14);
+  display: grid;
+  place-items: center;
+  width: var(--cd-size);
+  height: var(--cd-size);
+  border-radius: 50%;
 }
-.hud-energy-fill { position: absolute; inset: 0; transform-origin: left center; background: var(--energy); }
-.hud-p2 .hud-energy-fill { transform-origin: right center; }
+.hud-cd-ring::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: conic-gradient(rgba(255, 255, 255, 0.92) calc(var(--cd-progress) * 360deg), rgba(255, 255, 255, 0.16) 0);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 2.5px), #000 calc(100% - 2px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 2.5px), #000 calc(100% - 2px));
+}
+.hud-cd.is-ready .hud-cd-ring::before { background: var(--accent); }
+.hud-cd-value {
+  position: relative;
+  font-family: var(--font-mono);
+  font-size: clamp(8px, 1.5vh, 10px);
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+.hud-cd-name {
+  font-family: var(--font-mono);
+  font-size: 8px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0.08em;
+  color: var(--scrim-text-muted);
+}
+.hud-cd.is-ready .hud-cd-name { color: var(--text); }
 
 /* Timer on top, pause directly beneath: one glass control split by a
    hairline, both halves the same width. Either half pauses. This is the
@@ -1780,7 +1824,8 @@ html.is-portrait-blocked .rotate-overlay { display: grid; }
   .screen-heading .kicker { display: none; }
   .mode-desc { display: none; }
   .map-card-tag { display: none; }
-  .hud-side { padding: 4px 8px 5px; }
+  .hud-side { padding: 3px 8px 3px 3px; }
+  .hud-p2 { padding: 3px 3px 3px 8px; }
   .hud-time { padding: 2px 6px 3px; }
 }
 

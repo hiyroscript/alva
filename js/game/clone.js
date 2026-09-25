@@ -1,15 +1,15 @@
 // Summoned clones: temporary attack entities, not fighters.
 //
 // A summon-type charged action (`{ type: 'summon', id }` in `chargedActions`,
-// js/data/characters.js) makes the Fighter pay the summon's Energy and queue
-// one summon request. The Battle then turns each request into a live Clone,
+// js/data/characters.js) makes the Fighter start the summon's cooldown and
+// queue one summon request. The Battle then turns each request into a live Clone,
 // owns it, updates it every fixed step, resolves its hit through
 // CombatSystem and removes it once it is done. Behaviour is data on the
 // character (`summons`):
 //
 //   summons: {
 //     ba1Clone: {
-//       attack: 'ba1', cloud: 'cloneCloud', energyCost: 25,
+//       attack: 'ba1', cloud: 'cloneCloud', cooldown: 5,
 //       behindDistance: 48, effectOffset: { x: 0, y: -44 },
 //       noGround: { attack: 'midairBa2', offset: { x: 0, y: -36 } },
 //     },
@@ -36,11 +36,11 @@
 //
 // and is then removed. Its position, facing and attack are chosen once, at
 // the summon, and it never moves, turns, falls or retargets after that. It
-// has no health, Energy, controller, pushbox, hurtboxes, physics, camera or
-// HUD presence: it cannot be hit and nothing collides with it. Its hitbox
-// exists only during the attack's active phase and connects at most once;
-// the hit credits the owner but freezes only the target and the clone
-// itself, never the owner.
+// has no Knockback of its own, controller, pushbox, hurtboxes, physics,
+// camera or HUD presence: it cannot be hit and nothing collides with it. Its
+// hitbox exists only during the attack's active phase and connects at most
+// once, with the attack's own damage and launch; the hit credits the owner
+// but freezes only the target and the clone itself, never the owner.
 
 import { SpriteAnimator } from './sprite-animator.js';
 import { attackPhase } from './combat.js';
@@ -48,7 +48,7 @@ import { attackPhase } from './combat.js';
 const SUMMON_DEFAULTS = {
   attack: null,       // owner attack id the clone performs
   cloud: null,        // owner effect animation it appears / vanishes through
-  energyCost: 0,
+  cooldown: 0,        // seconds before the owner can summon it again
   behindDistance: 48, // world units behind the target
   effectOffset: { x: 0, y: 0 }, // cloud centre from the clone origin, facing right
   noGround: null,     // { attack, offset } where there is no ground behind
@@ -80,7 +80,7 @@ function attackProblem(owner, id, label) {
 }
 
 // Why `owner` cannot summon `def` right now, or null when it can. Checked
-// before any Energy is spent: never pay for an invisible clone or punch.
+// before its cooldown starts: never spend it on an invisible clone or punch.
 // The no-ground attack is checked too, wherever the target stands, so
 // whether a summon works never depends on where the clone would appear.
 export function summonProblem(owner, def) {

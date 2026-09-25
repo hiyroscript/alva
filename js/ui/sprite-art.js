@@ -14,6 +14,19 @@ export function tintFrame(frame, color, alpha = 1) {
   return c;
 }
 
+// Paints `sprites`' portrait (the character's own visual.portrait crop, see
+// SpriteSet.makePortrait) into `canvas` at 1 px per art pixel; CSS scales it
+// up crisply (image-rendering: pixelated). False, leaving the canvas as it
+// is, when there is no portrait to paint.
+export function paintPortrait(canvas, sprites) {
+  const img = sprites?.makePortrait?.();
+  if (!img) return false;
+  canvas.width = img.width;
+  canvas.height = img.height;
+  canvas.getContext('2d').drawImage(img, 0, 0);
+  return true;
+}
+
 // Resize a canvas backing store to its CSS box (capped DPR). Returns
 // { w, h, dpr, changed }.
 export function fitCanvas(canvas, dprCap = 2) {

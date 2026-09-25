@@ -312,9 +312,10 @@ export const CHARACTERS = [
         speed: 700,
         lifetime: 1.5,
         hitbox: { x: -5, y: -5, w: 10, h: 10 },
-        damage: 4,
-        // No knockback: a hit deals its damage and stun without pushing or
-        // launching the target.
+        // Adds 1 to the target's Knockback.
+        damage: 1,
+        // No knockback: a hit adds its damage and stun without pushing or
+        // launching the target, however much Knockback it has.
         knockback: { x: 0, y: 0 },
         hitstun: 0.16,
         blockstun: 0.1,
@@ -385,11 +386,10 @@ export const CHARACTERS = [
     ],
 
     stats: {
-      health: 100,
-      // Energy capacity. Fighters start full. #0001's Charged BA1 Clone
-      // Attack costs 25 (summons.ba1Clone); no Energy regeneration or gain
-      // exists yet.
-      energy: 100,
+      // Charged actions' cooldowns (summons.ba1Clone, chargedTechniques.
+      // rasenRush) recover this many seconds per second while the fighter
+      // is actually in Charge; 1 per second otherwise.
+      chargedCooldownRate: 2,
     },
 
     // What the shared Defense input (L, RB / RT, touch D) does for this
@@ -432,8 +432,11 @@ export const CHARACTERS = [
     // Charge, instead of its normal attack. Each is typed: a `summon` (see
     // `summons`) sends out a detached entity while the fighter keeps
     // charging; a `technique` (see `chargedTechniques`) is performed by the
-    // fighter itself. If it cannot happen (too little Energy, missing art),
-    // the press falls through to the button's normal attack.
+    // fighter itself. Each has its own cooldown (the summon's or technique's
+    // `cooldown`), started when it is used, hit or miss; a press while it is
+    // still cooling down does nothing at all. If it cannot happen for another
+    // reason (no opponent, missing art), the press falls through to the
+    // button's normal attack.
     chargedActions: {
       action1: { type: 'summon', id: 'ba1Clone' }, // Charged BA1: Clone Attack
       action2: { type: 'technique', id: 'rasenRush' }, // Charged BA2: Sphere Rush
@@ -451,8 +454,10 @@ export const CHARACTERS = [
       ba1Clone: {
         attack: 'ba1',
         cloud: 'cloneCloud',
-        // Spent once, when the summon is accepted, whichever way it appears.
-        energyCost: 25,
+        // Seconds before Charged BA1 can be used again, from the moment the
+        // summon is accepted, whichever way it appears and whether or not it
+        // hits. Its hit is the attack's own: 5 as BA1, 10 as mid-air BA2.
+        cooldown: 5,
         // World units behind the opponent (on its back side) at the summon;
         // BA1's punch reaches forward from there into the opponent.
         behindDistance: 48,
@@ -482,13 +487,15 @@ export const CHARACTERS = [
       // him and swinging it forward on rasen6. It must connect during that
       // rush: a miss stops him and he lets the sphere go on the
       // rasenWhiffRelease pose (rasen12, one frame) before he is free. A hit
-      // (4) binds the opponent and the sphere moves onto it, spinning there
-      // (prasen7-9 looped) while rasenConfirm plays rasen7 -> rasen8 and
-      // holds rasen8 as the sphere grows. 2 s after the hit it explodes
-      // (prasen10-11) while #0001 is on rasenExplosion (rasen9), for the big
-      // second hit (16, 20 in all) that releases and launches the opponent;
-      // once the blast is over he recovers through rasenRelease
-      // (rasen10-12). The whole technique needs ground under #0001.
+      // binds the opponent (no damage of its own) and the sphere moves onto
+      // it, spinning there (prasen7-9 looped) while rasenConfirm plays
+      // rasen7 -> rasen8 and holds rasen8 as the sphere grows. While it is
+      // held, every 0.5 s adds 1 Knockback (0.5, 1 and 1.5 s after the hit).
+      // 2 s after the hit it explodes (prasen10-11) while #0001 is on
+      // rasenExplosion (rasen9): 15 more Knockback and a strong sideways
+      // launch that releases the opponent (18 in all); once the blast is
+      // over he recovers through rasenRelease (rasen10-12). The whole
+      // technique needs ground under #0001.
       rasenRush: {
         formAnimation: 'rasenForm',
         dashAnimation: 'rasenDash',
@@ -499,8 +506,10 @@ export const CHARACTERS = [
         sphereBuild: 'rasenSphereBuild',
         sphereImpact: 'rasenSphereImpact',
         sphereExplosion: 'rasenSphereExplosion',
-        // No Energy cost for now; the field is here so one can be set.
-        energyCost: 0,
+        // Seconds before Charged BA2 can be used again, from the moment the
+        // rush starts forming: spent on a hit, a miss, a wall or an
+        // interruption alike.
+        cooldown: 5,
         // World units per second, in the facing snapshotted at the start.
         dashSpeed: 1050,
         // Sphere centre from #0001's origin (bottom-centre), facing right,
@@ -522,19 +531,33 @@ export const CHARACTERS = [
         // grows steadily through the rasen8 hold to this multiple of it as
         // it explodes; the blast bursts at that size. Visual only.
         sphereGrowth: { startScale: 1, endScale: 1.4 },
-        // Hit 1, the sphere's contact: the setup, no launch. The bind that
-        // follows (not this hitstun) is what holds the opponent.
+        // The sphere's contact: the setup, no damage and no launch. The bind
+        // that follows (not this hitstun) is what holds the opponent.
         firstHit: {
-          damage: 4,
+          damage: 0,
           knockback: { x: 0, y: 0 },
           hitstun: 0.2,
           blockstun: 0.15,
           hitstop: 0.06,
         },
-        // Hit 2, the explosion: the big one.
+        // While the opponent is held, before the explosion: one tickHit
+        // every tickInterval seconds since the contact. Knockback only: no
+        // launch, stun or freeze, so the hold never stutters.
+        tickInterval: 0.5,
+        tickHit: {
+          damage: 1,
+          knockback: { x: 0, y: 0 },
+          hitstun: 0,
+          blockstun: 0,
+          hitstop: 0,
+        },
+        // The explosion: the big one. A strong, mostly horizontal blast
+        // away from #0001 (with a slight lift so it carries through the air
+        // instead of scraping along the ground), scaled like every hit by
+        // the target's Knockback.
         explosionHit: {
-          damage: 16,
-          knockback: { x: 420, y: 220 },
+          damage: 15,
+          knockback: { x: 720, y: 180 },
           hitstun: 0.55,
           blockstun: 0.3,
           hitstop: 0.12,
@@ -550,7 +573,9 @@ export const CHARACTERS = [
     // (js/data/knockback.js): ground BA1 pushes sideways (Low horizontal),
     // mid-air BA1 launches the target upward (Mid vertical), ground BA2
     // launches it upward hard (High vertical) and mid-air BA2 drives it
-    // downward hard (High vertical, reversed).
+    // downward hard (High vertical, reversed). That is each move's base
+    // launch; the target's accumulated Knockback scales it. `damage` is how
+    // much Knockback a hit adds: 5 for either BA1, 10 for either BA2.
     attacks: {
       // Frame 1 wind-up, frame 2 punch, frames 3-4 recovery.
       ba1: {
@@ -558,7 +583,7 @@ export const CHARACTERS = [
         startup: 1 / BA1_FPS,
         active: 1 / BA1_FPS,
         recovery: 2 / BA1_FPS,
-        damage: 6,
+        damage: 5,
         hitbox: { x: 12, y: -64, w: 28, h: 16 },
         knockback: { axis: 'horizontal', level: 'low' },
         hitstun: 0.22,
@@ -577,7 +602,7 @@ export const CHARACTERS = [
         startup: 2 / BA1_FPS,
         active: 1 / BA1_FPS,
         recovery: 0,
-        damage: 8,
+        damage: 5,
         hitbox: { x: 14, y: -100, w: 22, h: 80 },
         knockback: { axis: 'vertical', level: 'mid' },
         hitstun: 0.24,
@@ -596,7 +621,7 @@ export const CHARACTERS = [
         startup: 3 / BA2_FPS,
         active: 2 / BA2_FPS,
         recovery: 2 / BA2_FPS,
-        damage: 8,
+        damage: 10,
         hitbox: { x: 10, y: -88, w: 24, h: 78 },
         knockback: { axis: 'vertical', level: 'high' },
         hitstun: 0.24,
@@ -613,7 +638,7 @@ export const CHARACTERS = [
         startup: 2 / BA2_FPS,
         active: 1 / BA2_FPS,
         recovery: 2 / BA2_FPS,
-        damage: 6,
+        damage: 10,
         hitbox: { x: 8, y: -44, w: 40, h: 40 },
         knockback: { axis: 'vertical', level: 'high', sign: -1 },
         hitstun: 0.22,
@@ -622,7 +647,7 @@ export const CHARACTERS = [
         cooldown: 0.1,
       },
       // Frame 1 wind-up, frame 2 release, frame 3 follow-through. No melee
-      // hitbox: the damage is the shuriken's, released once, as the attack
+      // hitbox: the damage is the shuriken's (1), released once, as the attack
       // reaches frame 2, from the throwing hand (`offset` is from the
       // fighter's origin, facing right, and mirrors with facing).
       throw: {

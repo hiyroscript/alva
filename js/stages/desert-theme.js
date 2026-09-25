@@ -1,7 +1,7 @@
 // DESERT — a compact sandstone mesa at golden hour, standing over open
 // desert air. Bright, warm and open: the fight happens on the mesa's top,
-// and past either ledge there is nothing but the drop and, far below, the
-// Void.
+// and past either ledge there is nothing but the drop and, a short way
+// below, the Void.
 //
 // The background is flat parallax (sky, sun, far mesas and dunes, buttes,
 // mid dunes, hoodoos on the desert floor below), with a warm haze thickening

@@ -5,12 +5,11 @@
 // full roster in a large glass dialog over the paused stage and swaps the
 // fighter in place; Enable CPU (Change CPU once there is one) opens a second
 // roster dialog that puts a training-dummy CPU on the stage or replaces it,
-// and whose Disable CPU takes it away again; Allow / Revoke infinite energy
-// toggles the player's infinite Energy; Return goes Home.
+// and whose Disable CPU takes it away again; Return goes Home.
 //
 // Practice keeps its own fighter and CPU choices, and every fresh visit
-// starts over (default fighter, no CPU, finite Energy): it never reads or
-// writes Quick Battle's app.selection.
+// starts over (default fighter, no CPU): it never reads or writes Quick
+// Battle's app.selection.
 
 import { Screen } from '../core/screen-manager.js';
 import { CONFIG } from '../config.js';
@@ -67,17 +66,14 @@ export class PracticeGroundScreen extends Screen {
   // ---- DOM builders ---------------------------------------------------------
 
   // The light Practice menu: exactly Change Fighter, Enable CPU (Change CPU
-  // while there is one), Allow infinite energy (Revoke infinite energy while
-  // it is on) and Return. Esc / Back, Start, the More button or a press on
-  // the dim around it close it again.
+  // while there is one) and Return. Esc / Back, Start, the More button or a
+  // press on the dim around it close it again.
   buildMenu() {
     this.changeBtn = menuButton('Change Fighter', { primary: true });
     this.cpuBtn = menuButton('Enable CPU');
-    this.energyBtn = menuButton('Allow infinite energy');
     this.returnBtn = menuButton('Return', { outlineOnly: true });
     this.changeBtn.addEventListener('click', () => this.openRoster());
     this.cpuBtn.addEventListener('click', () => this.openCpuRoster());
-    this.energyBtn.addEventListener('click', () => this.toggleInfiniteEnergy());
     this.returnBtn.addEventListener('click', () => this.leave());
 
     this.menuOverlay = el('div', {
@@ -85,7 +81,7 @@ export class PracticeGroundScreen extends Screen {
       role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'practice-menu-title',
     }, [el('div', { class: 'pause-panel practice-menu-panel glass glass--panel' }, [
       el('h2', { class: 'kicker practice-menu-title', id: 'practice-menu-title', text: 'Practice Ground' }),
-      el('div', { class: 'pause-menu' }, [this.changeBtn, this.cpuBtn, this.energyBtn, this.returnBtn]),
+      el('div', { class: 'pause-menu' }, [this.changeBtn, this.cpuBtn, this.returnBtn]),
     ])]);
     this.menuOverlay.addEventListener('click', (e) => {
       if (e.target === this.menuOverlay) this.resume();
@@ -178,8 +174,8 @@ export class PracticeGroundScreen extends Screen {
   async enter() {
     const app = this.app;
     // A fresh visit always starts from the default fighter, whatever Quick
-    // Battle or an earlier visit used (and, with a fresh session, with no CPU
-    // and finite Energy).
+    // Battle or an earlier visit used (and, with a fresh session, with no
+    // CPU).
     this.characterId = PRACTICE_DEFAULT_FIGHTER;
     const def = getCharacter(this.characterId);
     this.token = {};
@@ -355,23 +351,9 @@ export class PracticeGroundScreen extends Screen {
     this.app.screens.go('home', {}, { reset: true });
   }
 
-  // The menu's stateful labels, from the session: Enable CPU / Change CPU and
-  // Allow / Revoke infinite energy.
+  // The menu's stateful label, from the session: Enable CPU / Change CPU.
   syncMenu() {
-    const session = this.session;
-    this.cpuBtn.textContent = session?.cpu ? 'Change CPU' : 'Enable CPU';
-    this.energyBtn.textContent = session?.infiniteEnergy ? 'Revoke infinite energy' : 'Allow infinite energy';
-  }
-
-  // Allow / Revoke infinite energy: toggles the rule for the player's
-  // fighter. The menu stays open with focus on the same button, so its new
-  // label shows at once; the HUD's Energy bar refills at once when allowed.
-  toggleInfiniteEnergy() {
-    if (!this.session || !this.menuOpen || this.dialogOpen || this.loadingFighter) return;
-    this.session.setInfiniteEnergy(!this.session.infiniteEnergy);
-    this.syncMenu();
-    this.hud.update(this.session);
-    this.energyBtn.focus({ preventScroll: true });
+    this.cpuBtn.textContent = this.session?.cpu ? 'Change CPU' : 'Enable CPU';
   }
 
   // ---- Change Fighter ---------------------------------------------------------
@@ -404,7 +386,7 @@ export class PracticeGroundScreen extends Screen {
   }
 
   // Swaps the practice fighter in place: loads `def`, puts a fresh fighter
-  // on the spawn (a CPU stays, now facing it; infinite energy stays on),
+  // on the spawn (0 Knockback, no cooldowns; a CPU stays, now facing it),
   // rebinds the HUD, then closes the dialog and the menu and resumes. A
   // failed load keeps the current fighter and the dialog open.
   async changeFighter(def) {

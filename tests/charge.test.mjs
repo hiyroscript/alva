@@ -2,7 +2,8 @@
 // #0001 Charge: artwork registration, the startup-then-loop frame order, the
 // voluntary-release pose, held (never toggled) input, grounded-only entry,
 // movement lock, state priority (interruptions skip the release pose), no
-// combat effect, the gameplay Down -> Charge rename, and the Energy stat.
+// combat effect, the gameplay Down -> Charge rename, and Charge's faster
+// recovery of the charged-action cooldowns.
 // Charged BA1 (the Clone Attack) is covered in detail by clone.test.mjs.
 // Uses the real Fighter, CombatSystem, physics and InputManager (see
 // fighter-harness.mjs).
@@ -407,8 +408,8 @@ test('a real hit on a charging fighter shows Hurt through the impact freeze, wit
   }
   assert.equal(events.length, 1);
   assert.equal(events[0].type, 'hit', 'Charge grants no guard');
-  assert.equal(events[0].damage, 6, 'or armour');
-  assert.equal(target.combat.health, 94);
+  assert.equal(events[0].damage, 5, 'or armour');
+  assert.equal(target.combat.knockback, 5);
   assert.match(frameName(target), /^0001_charge[ab]\.png$/, 'still the loop at impact');
   tick({}, CHARGE);
   assert.ok(target.combat.hitstop > 0 || target.combat.stun > 0);
@@ -449,7 +450,8 @@ test('BA2 while already charging, Charge still held, starts the Charged BA2 Sphe
   assert.equal(step(CHARGE).state, 'charge');
   assert.equal(frameName(fighter), '0001_charge1.png');
   assert.equal(clones.length, 0, 'the Sphere Rush is no summon');
-  assert.equal(fighter.combat.energy, 100);
+  assert.ok(fighter.combat.chargedCooldowns.active('rasenRush'), 'its cooldown was spent');
+  assert.equal(fighter.combat.chargedCooldowns.active('ba1Clone'), false, 'and only its own');
 });
 
 test('without its art, Charged BA2 falls back to BA2, which interrupts Charge; Charge then restarts from charge1', (t) => {
@@ -479,7 +481,7 @@ test('without its art, Charged BA2 falls back to BA2, which interrupts Charge; C
   assert.equal(fighter.state, 'charge');
   assert.equal(frameName(fighter), '0001_charge1.png');
   assert.equal(clones.length, 0);
-  assert.equal(fighter.combat.energy, 100);
+  assert.equal(fighter.combat.chargedCooldowns.size, 0, 'no cooldown for a technique that never started');
 });
 
 test('BA1 while already charging, Charge still held, summons a clone: the owner stays in Charge', () => {
@@ -492,7 +494,7 @@ test('BA1 while already charging, Charge still held, summons a clone: the owner 
   const loopFrame = frameName(fighter);
   step({ ...CHARGE, ...BA1 });
   assert.equal(clones.length, 1, 'the Charged BA1 Clone Attack');
-  assert.equal(fighter.combat.energy, 75);
+  assert.equal(fighter.combat.chargedCooldowns.remaining('ba1Clone'), 5, 'its 5-second cooldown starts');
   // The owner neither attacks nor releases: the Charge loop just carries on.
   assert.equal(fighter.state, 'charge');
   assert.equal(fighter.charging, true);
@@ -522,9 +524,9 @@ for (const [name, press, id, first] of [['BA1', BA1, 'ba1', '0001_1ba1.png'], ['
     // The attack ended Charge, so its end goes straight to idle.
     assert.ok(!states.includes('chargeRelease'), states.join());
     assert.equal(fighter.state, 'idle');
-    // Not a Charged BA1: no clone and nothing spent.
+    // Not a charged action: no clone and no charged cooldown.
     assert.equal(clones.length, 0);
-    assert.equal(fighter.combat.energy, 100);
+    assert.equal(fighter.combat.chargedCooldowns.size, 0);
   });
 }
 
@@ -628,7 +630,7 @@ test('charging next to an opponent creates no attack, hitbox, damage, hitstop or
     assert.equal(attacker.combat.cooldowns.size, 0);
   }
   assert.deepEqual(events, []);
-  assert.equal(target.combat.health, 100);
+  assert.equal(target.combat.knockback, 0);
   assert.equal(target.body.x, x, 'Charge pushes nobody');
 });
 
@@ -810,57 +812,171 @@ test('the training CPU never charges or attacks, and still drops through platfor
   assert.ok(!states.has('charge'));
 });
 
-// ---- Energy -----------------------------------------------------------------------
+// ---- Charged cooldowns: Charge recovers them faster -------------------------------
 
-test('every fighter starts with full Energy, and a reset refills it', () => {
-  assert.equal(def.stats.energy, 100);
-  const { fighter, step } = makeFighter();
-  assert.equal(fighter.combat.maxEnergy, 100);
-  assert.equal(fighter.combat.energy, 100);
-  fighter.combat.energy = 30;
-  assert.equal(fighter.combat.health, 100, 'energy is not health');
-  step();
-  assert.equal(fighter.combat.energy, 30);
-  fighter.reset(STAGE);
-  assert.equal(fighter.combat.energy, 100);
-  assert.equal(fighter.combat.maxEnergy, 100);
-  // A character without an energy stat still gets a full default meter.
-  const plain = makeFighter({ character: { ...def, stats: { health: 100 } } });
-  assert.equal(plain.fighter.combat.maxEnergy, 100);
-  assert.equal(plain.fighter.combat.energy, 100);
+// Seconds left on `id` for `fighter`.
+const left = (fighter, id = 'rasenRush') => fighter.combat.chargedCooldowns.remaining(id);
+
+// A fresh fighter with a 5-second `id` cooldown just started.
+function cooling(id = 'rasenRush', opts) {
+  const f = makeFighter(opts);
+  f.fighter.combat.chargedCooldowns.start(id, 5);
+  return f;
+}
+
+test('the charged cooldowns recover at 2x while Charging: data-driven, from the character', () => {
+  assert.equal(def.stats.chargedCooldownRate, 2);
+  const { fighter } = makeFighter();
+  assert.equal(fighter.chargedCooldownRate, 2);
+  const plain = makeFighter({ character: { ...def, stats: {} } });
+  assert.equal(plain.fighter.chargedCooldownRate, 1, 'no rate declared: no faster recovery');
 });
 
-test('only the Clone Attack spends Energy: charging, releasing, dodging, attacking and hits leave it full', () => {
-  const full = (...fighters) => {
-    for (const f of fighters) {
-      assert.equal(f.combat.energy, 100);
-      assert.equal(f.combat.maxEnergy, 100);
+test('a 5 s charged cooldown: about 4 s left after 1 s not charging, about 3 s after 1 s of Charge', () => {
+  const idle = cooling();
+  for (let i = 0; i < steps(1); i++) idle.step();
+  assert.ok(Math.abs(left(idle.fighter) - 4) < 1e-6, `idle: ${left(idle.fighter)}`);
+
+  const charged = cooling();
+  for (let i = 0; i < steps(1); i++) charged.step(CHARGE);
+  assert.equal(charged.fighter.state, 'charge');
+  // Charge's first step starts the stance; every step after it recovers two.
+  assert.ok(Math.abs(left(charged.fighter) - 3) <= 2 * DT, `charging: ${left(charged.fighter)}`);
+
+  // Charged for the whole cooldown it is ready in about 2.5 s instead of 5.
+  const full = cooling();
+  const n = stepUntil(full.step, (f) => !f.combat.chargedCooldowns.active('rasenRush'), CHARGE);
+  assert.ok(Math.abs(n * DT - 2.5) <= 2 * DT, `${n} steps`);
+  const rest = cooling();
+  const m = stepUntil(rest.step, (f) => !f.combat.chargedCooldowns.active('rasenRush'));
+  assert.ok(Math.abs(m * DT - 5) <= DT, `${m} steps`);
+});
+
+test('Charge only speeds it while really in the Charge stance: never at once, and not while running, jumping or attacking', () => {
+  // Starting to Charge takes nothing off by itself.
+  const start = cooling();
+  start.step(CHARGE);
+  assert.equal(start.fighter.charging, true);
+  assert.ok(Math.abs(left(start.fighter) - (5 - DT)) < 1e-9, 'one normal step, no instant reset');
+  // Running, jumping and attacking, the last two with Charge held all along:
+  // every step not continuing a real Charge (Fighter.charging) recovers at 1x.
+  for (const [label, held] of [
+    ['running', () => ({ right: true })],
+    ['jumping with Charge held', (i) => ({ ...CHARGE, jump: true, jumpPressed: i % 45 === 0 })],
+    ['attacking with Charge held', (i) => ({ ...CHARGE, action1: true, action1Pressed: i % 20 === 0 })],
+  ]) {
+    const f = cooling();
+    const states = new Set();
+    let normal = 0;
+    for (let i = 0; i < steps(1); i++) {
+      const before = left(f.fighter);
+      const charging = f.fighter.charging;
+      f.step(held(i));
+      states.add(f.fighter.state);
+      if (charging) continue;
+      assert.ok(Math.abs(before - left(f.fighter) - DT) < 1e-9, `${label}, step ${i}: ${before} -> ${left(f.fighter)}`);
+      normal++;
     }
+    assert.ok(normal > steps(0.5), `${label}: ${normal} steps checked`);
+    assert.ok(states.has(label.startsWith('running') ? 'run' : label.startsWith('jumping') ? 'jump' : 'attack'), [...states].join());
+  }
+});
+
+test('a charged technique is no Charge, even with Charge held right through it', () => {
+  // The Sphere Rush starts its own cooldown; watch Charged BA1's meanwhile.
+  const d = duel();
+  d.attacker.combat.chargedCooldowns.start('ba1Clone', 5);
+  d.tick(CHARGE);
+  d.tick(CHARGE);
+  d.tick({ ...CHARGE, ...BA2 });
+  assert.ok(d.attacker.technique, 'the Sphere Rush started');
+  const before = left(d.attacker, 'ba1Clone');
+  let n = 0;
+  while (d.attacker.technique && n < steps(1)) {
+    d.tick(CHARGE);
+    n++;
+  }
+  assert.equal(n, steps(1));
+  assert.ok(Math.abs(before - left(d.attacker, 'ba1Clone') - 1) < 1e-6, 'normal rate through the technique');
+});
+
+test('letting go of Charge is no sustained Charge: the release pose and after recover at the normal rate', () => {
+  const { fighter, step } = cooling();
+  chargeIntoLoop(step);
+  step();
+  assert.equal(fighter.state, 'chargeRelease');
+  const released = left(fighter);
+  for (let i = 0; i < steps(1); i++) step();
+  assert.ok(Math.abs(released - left(fighter) - 1) < 1e-6, `${released} -> ${left(fighter)}`);
+});
+
+test('a hit or its freeze stops the faster recovery at once', () => {
+  const d = duel();
+  d.target.combat.chargedCooldowns.start('rasenRush', 5);
+  for (let i = 0; i < steps(0.5); i++) d.tick({}, CHARGE);
+  d.tick(BA1, CHARGE);
+  d.until(() => d.events.length > 0);
+  const hit = left(d.target);
+  let n = 0;
+  while (d.target.combat.stun > 0 || d.target.combat.hitstop > 0) {
+    d.tick({}, CHARGE);
+    n++;
+  }
+  assert.ok(n > 5);
+  assert.ok(Math.abs(hit - left(d.target) - n * DT) < 1e-6, 'normal rate while hit');
+});
+
+test('a cooldown never goes below 0 and is simply ready, and the recovery is deterministic', () => {
+  const { fighter, step } = cooling();
+  fighter.combat.chargedCooldowns.start('rasenRush', 0.05);
+  for (let i = 0; i < 30; i++) {
+    step(CHARGE);
+    assert.ok(left(fighter) >= 0);
+  }
+  assert.equal(fighter.combat.chargedCooldowns.active('rasenRush'), false);
+  assert.equal(left(fighter), 0);
+  assert.equal(fighter.combat.chargedCooldowns.progress('rasenRush'), 1);
+  // Two identical runs recover identically, step for step.
+  const run = () => {
+    const f = cooling();
+    const out = [];
+    for (let i = 0; i < steps(2); i++) {
+      f.step(i % 50 < 30 ? CHARGE : {});
+      out.push(left(f.fighter));
+    }
+    return out;
+  };
+  assert.deepEqual(run(), run());
+});
+
+test('charging, releasing, dodging, attacking and hits start no charged cooldown: only the charged actions do', () => {
+  const none = (...fighters) => {
+    for (const f of fighters) assert.equal(f.combat.chargedCooldowns.size, 0);
   };
   // Charging and releasing for a while, then repeated ground and mid-air
   // Dodges, then a BA1 the target dodges clean through.
   const dodge = duel();
   for (let i = 0; i < steps(2); i++) dodge.tick(i % 40 < 30 ? CHARGE : {}, i % 40 < 30 ? CHARGE : {});
-  full(dodge.attacker, dodge.target);
+  none(dodge.attacker, dodge.target);
   for (let i = 0; i < steps(2); i++) {
     const press = i % 20 === 0 ? DEFENSE : i === 60 ? JUMP : {};
     dodge.tick(press, press);
   }
-  full(dodge.attacker, dodge.target);
+  none(dodge.attacker, dodge.target);
   while (!dodge.target.grounded || dodge.target.combat.defenseAction) dodge.tick();
   assert.equal(dodge.target.body.x - dodge.attacker.body.x, 44, 'still in BA1 range');
   dodge.tick(BA1, DEFENSE);
   while (dodge.attacker.combat.attack) dodge.tick();
   assert.deepEqual(dodge.events, [], 'the BA1 passed through the Dodge');
-  full(dodge.attacker, dodge.target);
+  none(dodge.attacker, dodge.target);
 
-  // Clean BA1 and BA2 hits: dealing and taking damage change nothing.
+  // Clean BA1 and BA2 hits: dealing and taking hits start none either.
   for (const press of [BA1, BA2]) {
     const { attacker, target, tick, until, events } = duel();
     tick(press);
     until(() => events.length > 0);
     until(() => !attacker.combat.attack && target.combat.stun <= 0);
-    assert.ok(target.combat.health < 100);
-    full(attacker, target);
+    assert.ok(target.combat.knockback > 0);
+    none(attacker, target);
   }
 });

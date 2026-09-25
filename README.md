@@ -13,8 +13,10 @@ Power), a camera, a HUD, touch controls,
 and a data-driven combat system with Low / Mid / High Knockback and
 #0001's two real attacks, Basic Attack 1
 (BA1) and Basic Attack 2 (BA2), a ground and mid-air Dodge on the shared
-Defense input, a held Charge stance, a Charged BA1 Clone Attack, a Charged
-BA2 Sphere Rush and a blue Energy meter under each health bar.
+Defense input, a held Charge stance, a Charged BA1 Clone Attack and a Charged
+BA2 Sphere Rush, each on its own cooldown, and platform-fighter scoring: every
+hit adds to the target's accumulated Knockback, which makes later hits launch
+it further, and only the Void defeats.
 
 The full product specification, including the Alva brand system, is in
 [`ALVA_SPEC.md`](./ALVA_SPEC.md).
@@ -87,15 +89,15 @@ attack animations. Its touch button has a dashed outline.
   throw again. The shuriken leaves the throwing hand and flies straight the
   way #0001 was facing at the release, spinning through its own three-frame
   loop (`shuriken1 → shuriken2 → shuriken3`, 18 fps). Turning, jumping or
-  getting hit afterwards does not change its course. It hits once (4 damage
-  and a short hitstun, with no knockback: it neither pushes nor launches) and
-  disappears; it
+  getting hit afterwards does not change its course. It hits once (1 damage,
+  so +1 Knockback, and a short hitstun, with no knockback: it neither pushes
+  nor launches, however much Knockback the opponent has) and disappears; it
   also vanishes after 1.5 s, in the Void or against a solid rock (the
   stage's own cliff face included); past a ledge it flies on over the open
   air.
   A Dodge lets it pass through. Throw is ground-only for now because there
   are no mid-air Throw sprites: pressing it in the air does nothing. It has a
-  0.25 s cooldown and no Energy cost. Internally it is the `primary` input.
+  0.25 s cooldown. Internally it is the `primary` input.
 - **Defense:** the game's generic defensive input: `L`, RB / RT on a
   gamepad, **D** on touch. Different characters may implement Defense
   differently (a Dodge, or in future a Block); the button stays the same.
@@ -116,28 +118,31 @@ attack animations. Its touch button has a dashed outline.
   `charge1` briefly as a release pose (one Charge frame, 0.1 s), then returns
   to its normal state; the next Charge starts from the beginning again.
   #0001 stays in place while charging. Charge has no hitbox, armour or
-  invulnerability, and it does not generate Energy. A Dodge, Jump, Throw or
+  invulnerability; what it does give is faster recovery of the charged
+  cooldowns (below) for as long as it is held. A Dodge, Jump, Throw or
   getting hit take over from it at once, without waiting for the release
   pose; so do BA1 and BA2 if you let go of Charge as you press them. Pressed
   while Charge is still held, BA1 is the Clone Attack and BA2 the Sphere Rush
   (below). It works on one-way platforms without dropping through them.
   There is no drop-through control: walk off an edge to come down.
-- **Clone Attack (Charged BA1):** while already holding Charge, press BA1. If
-  #0001 has at least 25 Energy, 25 Energy is spent and a clone appears behind
-  the opponent in a smoke cloud (`cloneav1 → … → cloneav10`, 20 fps),
-  performs #0001's normal BA1, then vanishes through the cloud animation in
-  reverse (`cloneav10 → … → cloneav1`). #0001 remains in Charge while the
-  button stays held. With less than 25 Energy, BA1 behaves normally instead.
+- **Clone Attack (Charged BA1):** while already holding Charge, press BA1. A
+  clone appears behind the opponent in a smoke cloud (`cloneav1 → … →
+  cloneav10`, 20 fps), performs #0001's normal BA1, then vanishes through the
+  cloud animation in reverse (`cloneav10 → … → cloneav1`). #0001 remains in
+  Charge while the button stays held. Charged BA1 then cools down for 5 s
+  (below), hit or miss; pressed while it is still cooling down it does
+  nothing at all (no BA1 in its place). With no opponent to appear behind,
+  the press is an ordinary BA1 and no cooldown starts.
   The clone appears on the opponent's back side, facing it, at the spot where
   the opponent stood when you pressed BA1; it never follows, so an opponent
-  who moves away makes it miss. Its punch is BA1's (6 damage, same hitbox,
+  who moves away makes it miss. Its punch is BA1's (5 damage, same hitbox,
   hitstun and knockback, pushing the opponent away from the clone), hits
   once, and passes through a Dodge's evasive frames like any attack. If
   there is no ground behind the opponent at its foot height (it stands at a
   platform's edge or a ledge with its back to the drop, or it is in the
   air), the clone
   appears over the opponent instead and performs #0001's Mid-air BA2 kick
-  (6 damage, driving the opponent downward); same cloud, same 25 Energy. The
+  (10 damage, driving the opponent downward); same cloud, same cooldown. The
   impact freezes the opponent and the clone, never #0001. The clone cannot be
   hit, blocks nobody and is not followed by the camera. Once summoned it
   finishes appearing, attacking and vanishing whatever #0001 does next.
@@ -146,10 +151,12 @@ attack animations. Its touch button has a dashed outline.
   forms a blue sphere, dashes forward once it is complete, and must connect
   during the rush. A miss stops him dead and he lets the sphere go on a
   brief release pose before he is free again. A hit traps the opponent in
-  the spinning sphere, which keeps growing until it explodes about two
-  seconds later for a much larger second hit; #0001 then recovers. The entire technique
+  the spinning sphere, adding 1 Knockback every half second while the sphere
+  keeps growing, until it explodes two seconds later for 15 more and a
+  strong sideways launch; #0001 then recovers. The entire technique
   requires ground beneath #0001; losing ground cancels it and makes him
-  fall. Charged BA2 currently has no Energy cost.
+  fall. Starting it spends its 5-second cooldown, whether it then hits,
+  misses, meets a wall or is interrupted.
   In detail: #0001 leaves Charge (no release pose) and stands still while
   the sphere forms in his rear palm (`rasen1 → rasen3`, holding `rasen3`,
   with `prasen1 → prasen6`, 0.5 s). Only then does he rush forward at a
@@ -158,29 +165,47 @@ attack animations. Its touch button has a dashed outline.
   `rasen6`; the sphere itself is what has to touch the opponent. No contact
   by the end of the rush (or a wall first) is a miss: #0001 stops where he
   is, the sphere vanishes without exploding, and he shows the release pose
-  `rasen12` alone for one frame (1/12 s) before he is free. A hit (4
-  damage, no launch) stops the rush at once and traps the opponent, shown
+  `rasen12` alone for one frame (1/12 s) before he is free. A hit (no
+  damage and no launch) stops the rush at once and traps the opponent, shown
   hurt on that very frame: it can't move, jump, attack, Charge, Throw or
   Defend, but gravity still applies. #0001 plays `rasen7 → rasen8` and
   holds `rasen8` while the sphere on the opponent keeps spinning
   (`prasen7 → prasen8 → prasen9`, looped) and grows steadily larger (drawn
   from its own size to 1.4× by the blast, still centred on the opponent).
-  Exactly 2 s after the hit it explodes (`prasen10 → prasen11`, once) with
-  #0001 on `rasen9`, the explosion pose: the opponent is released, then
-  takes 16 (20 in all) and is launched. Only once the blast is over does
+  While it is held the opponent takes 1 damage (+1 Knockback) 0.5, 1.0 and
+  1.5 s after the hit, counted on the fixed-step clock, with no launch, stun
+  or freeze. Exactly 2 s after the hit it explodes (`prasen10 → prasen11`,
+  once) with #0001 on `rasen9`, the explosion pose: the opponent is
+  released, then takes 15 (18 in all; the explosion is never also a tick)
+  and is launched hard sideways, away from #0001, with a slight lift, scaled
+  by its Knockback like any hit. Only once the blast is over does
   #0001 recover through `rasen10 → rasen11 → rasen12`. A Dodge's
   evasive frames let the rush pass through without using it up; a Block-type
-  guard blocks the contact normally and ends the technique with no trap or
-  explosion. Once it starts you can let go of Charge; a hit on #0001
-  cancels it (no armour), freeing the opponent. Afterwards, Charge must be
+  guard blocks the contact normally and ends the technique with no trap,
+  ticks or explosion. Once it starts you can let go of Charge; a hit on
+  #0001 cancels it (no armour), freeing the opponent with no further ticks. Afterwards, Charge must be
   let go and held again to charge. Pressing Charge and BA2 on the same step
   from standing, or letting go of Charge as you press BA2, is an ordinary
   BA2.
-- **Energy:** the blue bar under each health bar. Every fighter has 100
-  health and 100 Energy (its character's `stats`), and both begin full. The
-  Clone Attack spends 25 Energy (a full bar pays for four); nothing else
-  spends it (the Sphere Rush is free), nothing restores it yet, and it
-  refills on restart or rematch.
+- **Knockback (accumulated):** every fighter's own number, shown under its
+  name in the HUD. It starts at 0 and every hit adds its damage: BA1 5,
+  mid-air BA1 5, BA2 10, mid-air BA2 10, the shuriken 1, the Sphere Rush 1
+  per tick and 15 on the blast. It has no maximum and no % sign. The more a
+  fighter has, the further hits launch it: a hit adds its damage first, then
+  its base launch is multiplied by 1 + Knockback / 100 (0 → 1×, 50 → 1.5×,
+  100 → 2×), in the same direction. A hit with no launch (the shuriken, the
+  Sphere Rush's contact and ticks) still launches nothing. No amount of
+  Knockback stops a fighter acting or defeats it: only the Void does.
+- **Charged cooldowns:** Charged BA1 and Charged BA2 each have their own
+  5-second cooldown, started the moment the move is used (the clone
+  summoned, the rush started), whether it hits or not. A charged press while
+  it is cooling down does nothing. While #0001 is actually in its Charge
+  stance both recover twice as fast (the character's
+  `stats.chargedCooldownRate`), so a fresh cooldown takes about 2.5 s of
+  uninterrupted charging; running, jumping, attacking, dodging, being hit or
+  performing the Sphere Rush recover at the normal rate. A restart or
+  rematch, a new fighter in Practice Ground and a Practice Void respawn
+  clear them.
 - **Menus:** arrow keys or WASD to move, `Enter` to select, `Esc` to go back. Mouse and touch work too.
 - **Touch:** several fingers work at once (hold Right and press Jump, or hold C and press BA1). You can slide your thumb between Left / Charge / Right. **T** is Throw.
 - **Gamepad (standard layout):** D-pad or left stick left / right to move and down to Charge in battle (they still navigate menus), A to jump, X / Square to Throw, B / Circle for Basic Attack 1, LB for Basic Attack 2, Y / Triangle for the reserved Special, RB or RT for Defense, Start to pause.
@@ -191,14 +216,14 @@ Touch controls show on touch-first devices (coarse pointer, or a touch actually 
 ## Current content
 
 - **Characters:** #0001
-- **Maps:** Desert (a sandstone mesa with 2 rock outcrops, 1360 units wide) and City (a rooftop with 7 one-way platforms and a stair bulkhead, 1440 wide) for Quick Battle; the Practice Ground training room (one flat training block, 1280 wide) for practice. Each is a compact main stage with open air past both ledges and the Void far beyond (see [Stages and the Void](#stages-and-the-void))
+- **Maps:** Desert (a sandstone mesa with 2 rock outcrops, 1360 units wide) and City (a rooftop with 7 one-way platforms and a stair bulkhead, 1440 wide) for Quick Battle; the Practice Ground training room (one flat training block, 1280 wide) for practice. Each is a compact main stage with open air past both ledges and the Void a short way beyond (see [Stages and the Void](#stages-and-the-void))
 - **Animations:** Idle, Run, Jump, Fall, Land (jump/fall play while airborne; land plays once on touchdown), Hurt and Mid-air Hurt (shown during hitstun on the ground / in the air), Basic Attack 1 (4 frames), Mid-air Basic Attack 1 (the kunai slash, 3 frames: `0001_midair2ba1`–`3`), Basic Attack 2 (7 frames) and Mid-air Basic Attack 2 (the airborne kick, 5 frames: `0001_midair1ba1`–`5`), each played once at 12 fps, Dodge and Mid-air Dodge (3 frames each, played once at 12 fps), Charge (charge1 → charge2 once, then chargea ↔ chargeb while held, at 10 fps, with charge1 shown briefly on release), Throw (3 fighter frames, played once at 12 fps), Shuriken (3 looping projectile frames at 18 fps, normalized and drawn separately from the fighter poses), the clone appear / vanish cloud (`0001_cloneav1`–`0001_cloneav10`, an effect at 20 fps: forwards as a clone appears, the same frames in reverse as it vanishes), the Sphere Rush poses (`0001_rasen1`–`0001_rasen12` as one-shot fighter clips at 12 fps: formation 1–3, rush 4–6, contact 7–8 with 8 held, explosion 9, recovery 10–12, and 12 alone as the whiff release) and its blue sphere (`0001_prasen1`–`0001_prasen11` as three effects at 12 fps: formation 1–6 once, spinning on the opponent 7–9 looped while it is drawn ever larger, explosion 10–11 once)
-- **Attacks:** Basic Attack 1 and Basic Attack 2, each on the ground and in the air, a ground Throw that releases one shuriken, the Charged BA1 Clone Attack (25 Energy) and the Charged BA2 Sphere Rush (ground only, two hits, no Energy cost). Special is reserved.
+- **Attacks:** Basic Attack 1 and Basic Attack 2, each on the ground and in the air, a ground Throw that releases one shuriken, the Charged BA1 Clone Attack and the Charged BA2 Sphere Rush (ground only), each on its own 5-second cooldown. #0001's damage: BA1 5, mid-air BA1 5, BA2 10, mid-air BA2 10, shuriken 1, Sphere Rush 1 every 0.5 s while it holds the opponent and 15 on the explosion. Special is reserved.
 - **Defense:** #0001 dodges, on the ground and in the air.
 - **Powers:** Jump Power and Speed Power, each in three tiers. #0001 has Jump Power 2 and Speed Power 2 (its original jump and speed).
-- **Knockback:** each attack's own, Low, Mid or High, pushing sideways or launching upward (or, reversed, driving downward). #0001's BA1 is Low horizontal, its BA2 High vertical, its mid-air BA1 Mid vertical and its mid-air BA2 High vertical reversed (downward).
-- **HUD:** each fighter panel shows a green health bar with a blue Energy bar directly beneath it. Both start full; the Energy bar drops by a quarter with each clone summoned.
-- **Modes:** Quick Battle: 1 round, 99 seconds, against a non-attacking training CPU; falling into the Void loses the round at once. Practice Ground: training on its own stage, alone or with an optional stand-still CPU dummy, with no timer or rounds; the Void puts a fighter back at its spawn (below).
+- **Knockback:** each attack's own, Low, Mid or High, pushing sideways or launching upward (or, reversed, driving downward). #0001's BA1 is Low horizontal, its BA2 High vertical, its mid-air BA1 Mid vertical and its mid-air BA2 High vertical reversed (downward). The target's accumulated Knockback scales every launch.
+- **HUD:** each fighter has one compact, semi-transparent glass card: its portrait (the character's own `visual.portrait` crop), one thin divider, its name with its accumulated Knockback beneath it, and two small rings for the Charged BA1 and Charged BA2 cooldowns (the seconds left inside a ring that fills as the ability recovers, complete and green when ready). The CPU's card mirrors Player 1's.
+- **Modes:** Quick Battle: 1 round, 99 seconds, against a non-attacking training CPU; falling into the Void loses the round at once, and if time runs out the fighter with less Knockback wins (equal Knockback is a draw). Practice Ground: training on its own stage, alone or with an optional stand-still CPU dummy, with no timer or rounds; the Void puts a fighter back at its spawn (below).
 
 ## Design
 
@@ -206,13 +231,10 @@ Alva's interface follows Seren's restrained visual discipline: near-black and
 charcoal surfaces, off-white typography, gray hierarchy and thin translucent
 borders. Green is the sole interface accent, used sparingly for primary actions,
 selection and progress. Check marks, filled indicators and an off-white focus
-ring with dark separation keep states identifiable beyond colour. The one
-deliberate exception is the blue Energy meter in the battle HUD, a
-gameplay-resource colour; buttons, selection, focus and health stay green or
-neutral.
+ring with dark separation keep states identifiable beyond colour.
 
 - **Tokens** live at the top of `styles.css` (`--bg`, `--surface*`, `--text*`,
-  `--border*`, `--accent*`, `--action*`, `--energy`, radii, shadows, `--focus-ring`). Deeper
+  `--border*`, `--accent*`, `--action*`, radii, shadows, `--focus-ring`). Deeper
   green action fills preserve contrast for white labels; muted text is lifted
   for legibility on charcoal.
 - **Wordmark:** `js/ui/logo.js` draws ALVA from geometric SVG letterforms and
@@ -238,8 +260,8 @@ neutral.
   artwork with a gridded back wall and one compact training block in
   perspective, open at both edges. Its HUD keeps Player 1's panel and a three-dots More button, top
   centre; the Practice menu and the Change Fighter and CPU dialogs are
-  translucent glass over the paused stage. Damage dealt to the practice CPU
-  floats over its head in red.
+  translucent glass over the paused stage. The Knockback each hit adds to the
+  practice CPU floats over its head in red (`+5`).
 - **Other screens** retain their established layouts, controls and navigation;
   only interface colours change. Battle keeps readable dark translucent chrome.
 - Character sprites and stage artwork keep their original colours. No artwork,
@@ -287,16 +309,21 @@ Every stage is a compact platform-fighter stage. Its map (`js/data/maps.js`,
 - **Off-stage space**: the open air past both ledges. There are no side walls,
   visible or invisible: fighters can run, jump or be knocked off either ledge
   and fall below the stage, and drift back if they still can.
-- **Camera bounds** (`cameraBounds`): where the camera may travel, far enough
-  out to follow a fighter over the drop to the Void's edge.
-- **The Void** (`voidBounds`): the kill boundary, far past the ledges, well
-  below the stage and high above it. A fighter whose centre leaves this fixed
-  rectangle (`StageCollision.inVoid`) is taken by it: in Quick Battle that
-  fighter is defeated on the spot (a short **K.O.** beat, then the result),
-  in Practice Ground it is put back at its spawn. On screen the Void is pure
-  black with a gently wavering edge and a dark glow inside it; it only shows
-  once the view nears it, and holds still with reduced motion. The drawn edge
-  is art only: the kill line never moves.
+- **Camera bounds** (`cameraBounds`): where the camera may travel: the Void's
+  rectangle plus a 140-unit strip past it (`cameraAround`), so the black edge
+  comes into view as a fighter nears it but the camera never wanders deep
+  into it.
+- **The Void** (`voidBounds`): the kill boundary, a blast zone set by margins
+  around the main stage (`voidAround`): 340–380 units past each ledge,
+  400–420 below the stage's top and 760–800 above it (clear of any jump from
+  the highest footing, so only a launch reaches it). A fighter whose centre
+  leaves this fixed rectangle (`StageCollision.inVoid`) is taken by it: in
+  Quick Battle that fighter is defeated on the spot (a short **K.O.** beat,
+  then the result), in Practice Ground it is put back at its spawn. On screen
+  the Void is one solid black layer with a single gently wavering edge; it
+  only shows once the view nears it (never in neutral play), and holds still
+  with reduced motion. The drawn edge is art only: the kill line never
+  moves.
 
 The camera is a platform-fighter view: fighters stand about a tenth of the
 viewport tall, the whole main stage with some air past its ledges fits across
@@ -320,25 +347,25 @@ until you choose Return.
   Canvas drawing. The practice session holds your fighter and, only once you
   enable one, a practice CPU. Alone, moves aimed at an opponent fall back or
   miss: Charged BA1 has nobody to appear behind, so it is an ordinary BA1 (no
-  Energy spent); the Sphere Rush dashes, finds no one, releases on `rasen12`
-  and ends.
+  cooldown started); the Sphere Rush dashes, finds no one, releases on
+  `rasen12` and ends (its cooldown spent).
 - **Stage.** `PRACTICE_MAP` (`js/data/practice-map.js`) is deliberately not
   in `MAPS`, which feeds Select Stage. `js/stages/practice-theme.js` draws the
   room as one square grid in one-point perspective: a back wall, and a
   compact training block with open edges (its top, its outer side past
   either ledge, a ruler along its front edge). A fighter that falls into the
-  Void is put straight back at its own spawn, with its health and Energy,
-  and nothing keeps hold of or aims at it; practice goes on.
+  Void is put straight back at its own spawn in a fresh training state: 0
+  Knockback, both charged cooldowns ready and nothing transient left, with
+  nothing keeping hold of or aiming at it; practice goes on.
 - **More menu.** The three-dots button, top centre where Quick Battle's
   timer sits (or `Esc` / `P` / Start), freezes practice under a light glass
   menu with **Change Fighter**, **Enable CPU** (**Change CPU** once there is
-  one), **Allow infinite energy** (**Revoke infinite energy** while it is on)
-  and **Return**. Press More, `Esc` or `P` again (or tap the dim) to carry
+  one) and **Return**. Press More, `Esc` or `P` again (or tap the dim) to carry
   on.
 - **Change Fighter** opens the full roster as a large glass dialog over the
   paused stage. It is the same roster component as Select Fighter
   (`js/ui/fighter-roster.js`). Confirming swaps the fighter in place at the
-  spawn with full health and Energy and resumes; `Esc` / Back returns to the
+  spawn with 0 Knockback and no cooldowns and resumes; `Esc` / Back returns to the
   menu. Practice keeps its own fighter: Quick Battle's selection never
   changes, and every new visit starts with #0001 again.
 - **Practice CPU.** Enable CPU opens a second copy of the roster dialog
@@ -346,18 +373,15 @@ until you choose Return.
   right, facing you, labelled CPU, and resumes; the camera frames you both.
   It is a training dummy with no controller: it never moves, jumps, attacks,
   charges or defends, but it takes real hits, hitstun, knockback and binds,
-  so clones, shurikens, BA1 / BA2 and the Sphere Rush all land on it. Each hit
-  floats its damage (`-6`, `-2.5`) in red over its head for under a second,
-  straight from the combat system's resolved hit. Knocked out, it gets back
-  up with full health once its hit reaction ends. Change CPU swaps it for
+  so clones, shurikens, BA1 / BA2 and the Sphere Rush all land on it. Its
+  Knockback builds up (and launches it further) like anyone's. Each hit
+  floats the Knockback it added (`+5`, `+1` for each Sphere Rush tick, `+15`
+  for the blast) in red over its head for under a second, straight from the
+  combat system's resolved hit. Change CPU swaps it for
   another fighter; **Disable CPU**, beside Back in that dialog, removes it
   and returns you to the paused menu. Changing your own fighter keeps the
   CPU. It gets no HUD panel.
-- **Infinite energy.** Allow infinite energy keeps your fighter's Energy full
-  (the CPU's is unaffected): every Energy cost can be paid while moves keep
-  their normal rules and cooldowns. The menu stays open and the button reads
-  Revoke infinite energy until you turn it off. It survives Change Fighter.
-- Every new visit starts with no CPU and infinite energy off.
+- Every new visit starts with #0001 alone, at 0 Knockback.
 
 ### Powers
 
@@ -396,7 +420,8 @@ knockback: { axis: 'vertical', level: 'mid', sign: -1 } // reversed: drives down
 - **Horizontal** Knockback pushes the opponent away along the hit's facing, so it takes no sign. **Vertical** Knockback launches the opponent upward; `sign: -1` reverses it, driving the opponent downward at the same level's strength. Only vertical Knockback can be reversed, and a sign is only ever 1 (the default) or −1.
 - `createAttackDefinition` (`js/game/combat.js`) resolves the descriptor once, through `resolveKnockback`, into the attack's numeric `knockback: { x, y }`: `{ axis: 'horizontal', level: 'low' }` is `{ x: 140, y: 0 }`, `{ axis: 'vertical', level: 'high' }` is `{ x: 0, y: 800 }` and `{ axis: 'vertical', level: 'mid', sign: -1 }` is `{ x: 0, y: -640 }`. `CombatSystem.applyHit` stays generic: it sets `vx = x × facing` (halved when blocked) and, on an unblocked hit only, `vy = −y`, so a positive `y` launches upward and a negative one drives downward. Clones and the debug overlay read the same numbers.
 - An attack that declares no `knockback` has none. A malformed descriptor (an unknown axis or level, a bad sign, a reversed horizontal, an unknown field or anything that is not a descriptor) is logged and also gets no knockback, so bad data never pushes anyone with a force nobody chose.
-- Bespoke hits that are not ordinary attacks keep their own numeric `knockback: { x, y }`: the shuriken's is `{ x: 0, y: 0 }`, no knockback at all, and the Sphere Rush's contact and explosion hits have their own.
+- Bespoke hits that are not ordinary attacks keep their own numeric `knockback: { x, y }`: the shuriken's is `{ x: 0, y: 0 }`, no knockback at all, the Sphere Rush's contact and ticks have none either, and its explosion has its own strong, mostly horizontal `{ x: 720, y: 180 }`.
+- **Accumulated Knockback scales all of it.** `CombatSystem.applyHit` adds the hit's damage to the target's `combat.knockback` first, then multiplies the base launch by `knockbackMultiplier` (`js/data/knockback.js`): `1 + knockback / 100`, with no cap. Both axes scale together, so direction and sign never change, and a zero axis stays zero. The resolved hit event carries `damage`, `knockbackBefore`, `knockbackAfter` and `launchMultiplier`.
 
 #0001's Basic Attacks:
 
@@ -407,7 +432,7 @@ knockback: { axis: 'vertical', level: 'mid', sign: -1 } // reversed: drives down
 | Mid-air BA1 (kunai slash) | Mid vertical | `{ x: 0, y: 640 }` |
 | Mid-air BA2 (airborne kick) | High vertical, reversed | `{ x: 0, y: -800 }` |
 
-An unblocked BA1 hit sets the opponent's `vx` to 140 away from #0001; BA2 sets `vy = -800`, a strong launch; mid-air BA1 sets `vy = -640`, a lower launch than BA2's; mid-air BA2 sets `vy = +800`, driving it downward with no sideways push. The Clone Attack performs ground BA1's resolved definition, so it inherits Low horizontal Knockback with no tuning of its own; overhead (no ground behind the opponent) it performs mid-air BA2's, driving the opponent downward the same way.
+At 0 Knockback (before the hit's own damage scales it), an unblocked BA1 hit sets the opponent's `vx` to 140 away from #0001; BA2 sets `vy = -800`, a strong launch; mid-air BA1 sets `vy = -640`, a lower launch than BA2's; mid-air BA2 sets `vy = +800`, driving it downward with no sideways push. The Clone Attack performs ground BA1's resolved definition, so it inherits Low horizontal Knockback with no tuning of its own; overhead (no ground behind the opponent) it performs mid-air BA2's, driving the opponent downward the same way.
 
 The two mid-air Basic Attacks swapped moves: **mid-air BA1** is the three-frame kunai slash (`0001_midair2ba1`–`3`), which used to be mid-air BA2, and **mid-air BA2** is the five-frame airborne kick (`0001_midair1ba1`–`5`), which used to be mid-air BA1. Each move kept its own art, timing, hitbox, damage and stun; only its knockback changed. The frame file names are the originals.
 
@@ -449,12 +474,12 @@ attacks: {
 
 To give a fighter a charged action, map a combat button in `chargedActions` to a typed descriptor. Pressed while already charging, with Charge still held, the button does that instead of its normal attack; `Fighter.tryChargedAction` dispatches on the type:
 
-- `{ type: 'summon', id }` names an entry in `summons` (see the schema in `js/game/clone.js`), as #0001's `action1: { type: 'summon', id: 'ba1Clone' }` (the Clone Attack) does. It pays the summon's `energyCost` and spawns a detached clone that performs one of the fighter's own `attacks` through an `effectAnimations` cloud, while the fighter keeps charging. An optional `noGround: { attack, offset }` names another of its attacks, and where to appear relative to the opponent, for when there is no ground behind the opponent at its foot height.
-- `{ type: 'technique', id }` names an entry in `chargedTechniques` (see the schema and phases in `js/game/charged-technique.js`), as #0001's `action2: { type: 'technique', id: 'rasenRush' }` (the Sphere Rush) does. The fighter itself performs it: fighter clips from `animations` for its form / dash / confirm / explosion / release phases and its whiff release, an effect from `effectAnimations` for each stage of the sphere, a dash speed, hand offsets per frame, a sphere hitbox, a delay, the sphere's growth on the target and the data for its two hits. It may set an `energyCost` (#0001's is 0).
+- `{ type: 'summon', id }` names an entry in `summons` (see the schema in `js/game/clone.js`), as #0001's `action1: { type: 'summon', id: 'ba1Clone' }` (the Clone Attack) does. It starts the summon's `cooldown` and spawns a detached clone that performs one of the fighter's own `attacks` through an `effectAnimations` cloud, while the fighter keeps charging. An optional `noGround: { attack, offset }` names another of its attacks, and where to appear relative to the opponent, for when there is no ground behind the opponent at its foot height.
+- `{ type: 'technique', id }` names an entry in `chargedTechniques` (see the schema and phases in `js/game/charged-technique.js`), as #0001's `action2: { type: 'technique', id: 'rasenRush' }` (the Sphere Rush) does. The fighter itself performs it: fighter clips from `animations` for its form / dash / confirm / explosion / release phases and its whiff release, an effect from `effectAnimations` for each stage of the sphere, a dash speed, hand offsets per frame, a sphere hitbox, a delay, the sphere's growth on the target and the data for its hits (the contact, an optional `tickHit` every `tickInterval` while the target is held, and the explosion). Its `cooldown` starts when it starts.
 
-Without the Energy, the art or valid data, the press falls through to the normal attack.
+While either is cooling down the press does nothing. Without an opponent (for a summon), the art or valid data, the press falls through to the normal attack, and no cooldown starts. A character's `stats.chargedCooldownRate` sets how much faster its charged cooldowns recover while it is in Charge.
 
-To choose how a fighter defends, give it a `defense` entry. `{ type: 'dodge', ground, air }` (like #0001) plays one Dodge clip per press, with `startup` / `invulnerable` / `recovery` timed to whole frames of that clip; `{ type: 'block' }` is a held guard that takes chip damage (`stats.blockDamageScale`) and each attack's `blockstun`. Either way the player presses the same Defense button. A Dodge without frames is refused, so it never grants invisible invulnerability.
+To choose how a fighter defends, give it a `defense` entry. `{ type: 'dodge', ground, air }` (like #0001) plays one Dodge clip per press, with `startup` / `invulnerable` / `recovery` timed to whole frames of that clip; `{ type: 'block' }` is a held guard that takes chip damage (`stats.blockDamageScale`, added to Knockback like any damage) and each attack's `blockstun`. Either way the player presses the same Defense button. A Dodge without frames is refused, so it never grants invisible invulnerability.
 
 ### Adding a map
 

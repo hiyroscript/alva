@@ -13,7 +13,7 @@ import { CONFIG } from '../config.js';
 import { el } from '../core/utils.js';
 import { ICONS } from './icons.js';
 import { CHARACTERS, getCharacter } from '../data/characters.js';
-import { fitCanvas, drawFrameAt } from './sprite-art.js';
+import { fitCanvas, drawFrameAt, paintPortrait } from './sprite-art.js';
 
 export class FighterRoster {
   // `host` carries the is-locked-preview state while a locked slot is shown.
@@ -119,12 +119,7 @@ export class FighterRoster {
   }
 
   drawPortrait(slot, set) {
-    const img = set.makePortrait();
-    if (!img) return;
-    const c = slot._portrait;
-    c.width = img.width;
-    c.height = img.height;
-    c.getContext('2d').drawImage(img, 0, 0);
+    paintPortrait(slot._portrait, set);
   }
 
   select(slot) {

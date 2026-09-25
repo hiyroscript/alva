@@ -62,6 +62,9 @@ export class Fighter {
     // air, from its Speed Power tier. Nothing else (acceleration, knockback,
     // projectiles, Dodges, techniques) uses it.
     this.maxSpeed = getMaxSpeed(def);
+    // Seconds of charged-action cooldown recovered per second while in
+    // Charge (see recoverChargedCooldowns); 1 per second otherwise.
+    this.chargedCooldownRate = def.stats?.chargedCooldownRate ?? 1;
     this.opponent = null;
     this.spawn = spawn;
     this.reset(stage);
@@ -105,6 +108,7 @@ export class Fighter {
     this.jumpBuffer = 0;
     this.lastGroundY = this.body.y;
     this.inputLocked = false;
+    // A fresh combat state: 0 Knockback and every cooldown ready.
     this.combat = new CombatState(def.stats);
     // Projectiles released this step, waiting for the battle to spawn them
     // (see spawnProjectiles in js/game/projectile.js).
@@ -120,15 +124,13 @@ export class Fighter {
     this.animator.play('idle', { restart: true });
   }
 
-  // Back at the spawn after the Void (Practice Ground): a reset that keeps
-  // the fighter's health and Energy. Everything transient goes with the old
-  // body: velocity, attack, Dodge, stun, freeze, binds, cooldowns, its
+  // Back at the spawn after the Void (Practice Ground): a fresh, neutral
+  // training state, exactly a reset. Knockback is back to 0 and every
+  // cooldown (charged ones included) is ready; everything transient goes
+  // with the old body: velocity, attack, Dodge, stun, freeze, binds, its
   // charged technique and any queued projectile or summon.
   respawn(stage) {
-    const { health, energy } = this.combat;
     this.reset(stage);
-    this.combat.health = health;
-    this.combat.energy = energy;
   }
 
   get x() { return this.body.x; }
@@ -147,6 +149,12 @@ export class Fighter {
     if (!this.chargeHeld) this.chargeHeldOver = false;
 
     combat.update(dt);
+    // Charged cooldowns recover by this step first, so one started below
+    // ends the step at its full length. Faster only while a Charge held
+    // since an earlier step is still held and nothing has interrupted it.
+    this.recoverChargedCooldowns(
+      dt, wasCharging && !!input.charge && combat.stun <= 0 && combat.hitstop <= 0 && !combat.immobilized,
+    );
     // Hitstun always wins over a charged technique (CombatSystem.applyHit
     // normally ends it on the hit itself).
     if (this.technique && combat.stun > 0) this.endTechnique('hit');
@@ -167,10 +175,10 @@ export class Fighter {
     // ---- Combat intents --------------------------------------------------
     // Actions mapped to null are wired but reserved (see tryAction). A press
     // while already Charging (since an earlier step) with Charge still held
-    // is a charged action first (see tryChargedAction): one that starts
-    // consumes the press, otherwise the normal attack gets it. Letting go of
-    // Charge on the press step, or pressing it with a fresh Charge, is a
-    // normal attack.
+    // is a charged action first (see tryChargedAction): one that starts, or
+    // one still cooling down, consumes the press; otherwise the normal
+    // attack gets it. Letting go of Charge on the press step, or pressing it
+    // with a fresh Charge, is a normal attack.
     const charged = wasCharging && !!input.charge;
     for (const action of COMBAT_ACTIONS) {
       if (!input[`${action}Pressed`]) continue;
@@ -285,9 +293,18 @@ export class Fighter {
   }
 
   // Free to start something new: the combat state allows it (no attack,
-  // Dodge, stun, bind or knockout) and no charged technique owns the fighter.
+  // Dodge, stun or bind) and no charged technique owns the fighter. However
+  // much Knockback it has taken never matters.
   canAct() {
     return this.combat.canAct() && !this.technique;
+  }
+
+  // One fixed step of recovery for every charged-action cooldown: at
+  // chargedCooldownRate while `charging` (the fighter is really in its
+  // Charge stance), at 1 otherwise (running, jumping, attacking, stunned,
+  // dodging, frozen, bound or performing a charged technique).
+  recoverChargedCooldowns(dt, charging) {
+    this.combat.chargedCooldowns.update(dt, charging ? this.chargedCooldownRate : 1);
   }
 
   // Starts one Dodge, if this fighter's Defense is a Dodge and it is free to
@@ -309,22 +326,24 @@ export class Fighter {
   // The charged action for `action`, dispatched on its type: a `summon`
   // (#0001's Charged BA1 Clone Attack, see trySummon) or a `technique`
   // (#0001's Charged BA2 Sphere Rush, see tryTechnique). True when it
-  // happened and consumed the press; false leaves the press to the normal
-  // attack.
+  // consumed the press: it happened, or it is still cooling down (then
+  // nothing happens at all: no normal attack instead, and the cooldown is
+  // left as it is). False leaves the press to the normal attack.
   tryChargedAction(action) {
     const charged = this.def.chargedActions?.[action];
     if (!charged) return false;
+    if (this.combat.chargedCooldowns.active(charged.id)) return true;
     if (charged.type === 'summon') return this.trySummon(action, charged.id);
     if (charged.type === 'technique') return this.tryTechnique(action, charged.id);
     console.warn(`[Alva] Charged ${action} has an unknown type "${charged.type}"; ignoring.`);
     return false;
   }
 
-  // Summon `id` from `action`: pays its Energy, once, and queues one summon
-  // at the opponent for the battle to spawn. The fighter itself performs
-  // nothing and keeps charging. False, with nothing spent, if there is no
-  // such summon, the fighter cannot act, there is no opponent, the art is
-  // missing (logged) or there is too little Energy.
+  // Summon `id` from `action`: starts its cooldown and queues one summon at
+  // the opponent for the battle to spawn. The fighter itself performs
+  // nothing and keeps charging. False, with no cooldown started, if there is
+  // no such summon, the fighter cannot act, there is no opponent or the art
+  // is missing (logged).
   trySummon(action, id) {
     const summon = this.summonDefs[id];
     if (!summon || !this.opponent || !this.canAct()) return false;
@@ -333,7 +352,8 @@ export class Fighter {
       console.warn(`[Alva] Summon "${id}" is unavailable: ${problem}; ignoring.`);
       return false;
     }
-    if (!this.combat.spendEnergy(summon.energyCost)) return false;
+    // Accepted: its cooldown runs from now, whether or not the clone hits.
+    this.combat.chargedCooldowns.start(id, summon.cooldown);
     this.combat.lastIntent = action;
     this.summons.push({ id, target: this.opponent });
     return true;
@@ -341,9 +361,9 @@ export class Fighter {
 
   // Start technique `id` from `action`: the fighter leaves Charge (no
   // release pose) and the technique owns it from this step (see
-  // js/game/charged-technique.js). Grounded only. False, with nothing spent,
-  // if there is no such technique, the fighter cannot act or is airborne,
-  // its art or data is missing (logged) or there is too little Energy.
+  // js/game/charged-technique.js). Grounded only. False, with no cooldown
+  // started, if there is no such technique, the fighter cannot act or is
+  // airborne, or its art or data is missing (logged).
   tryTechnique(action, id) {
     const def = this.techniqueDefs[id];
     if (!def || !this.canAct() || !this.body.grounded) return false;
@@ -352,7 +372,9 @@ export class Fighter {
       console.warn(`[Alva] Charged technique "${id}" is unavailable: ${problem}; ignoring.`);
       return false;
     }
-    if (!this.combat.spendEnergy(def.energyCost)) return false;
+    // Started: its cooldown runs from now, whether it hits, misses, meets a
+    // wall or is interrupted.
+    this.combat.chargedCooldowns.start(id, def.cooldown);
     this.combat.lastIntent = action;
     this.charging = false;
     this.body.vx = 0;
@@ -361,11 +383,11 @@ export class Fighter {
   }
 
   // Ends the charged technique in progress, if any, for `reason`: 'miss' or
-  // 'wall' (once its release pose has shown), 'blocked', 'ko', 'done',
-  // 'ground', 'hit', 'released', 'void', 'reset' or 'destroy'. The sphere is
-  // removed and any opponent it holds released;
-  // damage already dealt stays. The rush never carries on as a slide, and a
-  // Charge still held from before it does not resume by itself.
+  // 'wall' (once its release pose has shown), 'blocked', 'done', 'ground',
+  // 'hit', 'released', 'void', 'reset' or 'destroy'. The sphere is removed
+  // and any opponent it holds released; Knockback already added stays, and
+  // no further tick or explosion follows. The rush never carries on as a
+  // slide, and a Charge still held from before it does not resume by itself.
   endTechnique(reason) {
     const t = this.technique;
     if (!t) return;
