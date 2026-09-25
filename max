@@ -1,339 +1,354 @@
-Work in the current main branch of hiyroscript/alva.
+Work in the hiyroscript/alva repository on the current main branch.
 
-Refactor Alva’s combat architecture to completely remove Horizontal Knockback Power and Vertical Knockback Power and replace them with a new, much simpler standalone system called Knockback, with exactly three strength levels:
+Implement an improvement to #0001’s Charged BA1 Clone Attack.
 
-* Low
-* Mid
-* High
+Goal
 
-This must no longer be part of the Power system.
+The clone already spawns behind the opponent and performs ground BA1.
 
-Jump Power and Speed Power remain Powers and should continue working exactly as they do now.
+Keep that exact behavior whenever there is valid ground/support behind the opponent.
 
-The goal is to make ordinary attack knockback data easy to read:
+However, when the normal behind-the-opponent spawn point has no ground/support at the opponent’s current foot height, the clone must instead:
 
-knockback: { axis: 'horizontal', level: 'low' }
+1. spawn directly above/on top of the opponent,
+2. use #0001’s existing midairBa2 animation/attack,
+3. hit downward using midairBa2’s existing combat data,
+4. then vanish normally through the existing clone cloud.
 
-or:
+Do not create a new attack or new artwork. Reuse the existing midairBa2.
 
-knockback: { axis: 'vertical', level: 'high' }
+Existing architecture you must preserve
 
-and for reversed vertical knockback:
+Read these files before changing anything:
 
-knockback: { axis: 'vertical', level: 'mid', sign: -1 }
+* js/game/clone.js
+* js/data/characters.js
+* js/game/physics.js
+* js/game/combat.js
+* js/game/character.js
+* tests/clone.test.mjs
+* tests/basic-attack-2.test.mjs
+* tests/fighter-harness.mjs
+* js/data/maps.js
+* ALVA_SPEC.md
 
-sign: -1 on vertical knockback means the force is reversed and therefore drives the opponent downward.
+Important existing facts:
 
-Do not retain the old horizontalKnockback, verticalKnockback, positive/negative Power tiers, attack-Power scopes, or attack powers declarations as a compatibility layer. This is a real migration and cleanup.
+Current clone
 
-1. Remove Knockback from the Power system
+js/game/clone.js currently:
 
-js/data/powers.js currently contains:
+* snapshots its target once when summoned;
+* spawns behind the target with:
 
-* Jump Power
-* Speed Power
-* Horizontal Knockback Power
-* Vertical Knockback Power
-* HORIZONTAL_KNOCKBACK_POWER_TIERS
-* VERTICAL_KNOCKBACK_POWER_TIERS
-* attack-Power resolution
-* signed Vertical Knockback Power logic
-* ATTACK_POWERS
-* getAttackPowerTier
-* getHorizontalKnockback
-* getVerticalKnockback
-* getAttackKnockback
+const facing = target.facing;
+const x = target.body.x - facing * def.behindDistance;
 
-Remove the knockback-related parts completely.
+* uses target.body.y as its Y position;
+* uses owner.attacks[def.attack];
+* has no physics body;
+* never moves, falls, turns, or retargets;
+* appears through cloneCloud;
+* performs one attack;
+* vanishes through the same cloud in reverse;
+* resolves hits through the normal shared CombatSystem.
 
-After this change, powers.js should only be responsible for actual fighter Powers such as Jump Power and Speed Power.
+Preserve all of these properties.
 
-There should be no:
+Existing normal clone attack
 
-powers: { horizontalKnockback: ... }
+characters.js defines:
 
-or:
+summons: {
+  ba1Clone: {
+    attack: 'ba1',
+    cloud: 'cloneCloud',
+    energyCost: 25,
+    behindDistance: 48,
+    effectOffset: { x: 0, y: -44 },
+    stageMargin: 17,
+  },
+},
 
-powers: { verticalKnockback: ... }
+Ground BA1 remains the normal supported-ground clone attack.
 
-on attacks anywhere in the game.
+Existing midair BA2
 
-There should also be no concept of an “attack Power” remaining solely for knockback.
+#0001 already has:
 
-If scope: 'attack', ATTACK_POWERS, signed Power handling, or related generic code becomes unused after this migration, remove it instead of leaving dead abstractions behind.
+midairBa2: {
+  animation: 'midairBa2',
+  startup: 2 / BA2_FPS,
+  active: 1 / BA2_FPS,
+  recovery: 2 / BA2_FPS,
+  damage: 6,
+  hitbox: { x: 8, y: -44, w: 40, h: 40 },
+  knockback: { axis: 'vertical', level: 'high', sign: -1 },
+  hitstun: 0.22,
+  blockstun: 0.14,
+  hitstop: 0.06,
+  cooldown: 0.1,
+},
 
-Do not disturb Jump Power or Speed Power behavior, values, Discover presentation, movement behavior, or fighter definitions.
+That attack already resolves to High downward knockback. Because world Y increases downward, CombatSystem.applyHit() ultimately gives the victim positive downward body.vy.
 
-2. Add the new standalone Knockback system
+Do not duplicate or special-case this damage/knockback in clone.js.
 
-Create a small authoritative knockback module, preferably:
+The airborne clone must simply use the existing resolved owner.attacks.midairBa2 definition and therefore automatically inherit its animation, timings, hitbox, damage, stun, hitstop, and downward knockback.
 
-js/data/knockback.js
+Make this data-driven
 
-The new system has exactly three named levels:
+Do not hard-code 0001, ba1Clone, or midairBa2 inside generic clone engine logic.
 
-low
-mid
-high
+Extend the summon definition in characters.js with data describing what to do when its normal position is unsupported.
 
-Preserve the current gameplay magnitudes that were previously represented by tiers 1, 2, and 3.
+Use a clean schema along these lines:
 
-Use these values:
+summons: {
+  ba1Clone: {
+    attack: 'ba1',
+    cloud: 'cloneCloud',
+    energyCost: 25,
+    behindDistance: 48,
+    effectOffset: { x: 0, y: -44 },
+    stageMargin: 17,
+    noGround: {
+      attack: 'midairBa2',
+      offset: { x: 0, y: -36 },
+    },
+  },
+},
 
-Low:
-  horizontal = 140
-  vertical = 480
-Mid:
-  horizontal = 180
-  vertical = 640
-High:
-  horizontal = 220
-  vertical = 800
+The exact internal naming can vary if there is a strong architectural reason, but the behavior must remain entirely character-data-driven.
 
-These are world-units-per-second magnitudes.
+offset is relative to the target origin.
 
-The level data should be the single source of truth. Do not scatter 140, 180, 220, 480, 640, and 800 throughout individual fighter attacks.
+For #0001, use approximately:
 
-A suitable conceptual structure is:
+{ x: 0, y: -36 }
 
-export const KNOCKBACK_LEVELS = Object.freeze({
-  low: Object.freeze({
-    name: 'Low',
-    horizontal: 140,
-    vertical: 480,
-  }),
-  mid: Object.freeze({
-    name: 'Mid',
-    horizontal: 180,
-    vertical: 640,
-  }),
-  high: Object.freeze({
-    name: 'High',
-    horizontal: 220,
-    vertical: 800,
-  }),
-});
+This intentionally puts the clone’s feet around the target’s upper body rather than a full fighter-height above it.
 
-The exact implementation may differ if there is a cleaner fit with the codebase, but Low / Mid / High must be the public data model.
+With the existing midairBa2 box:
 
-Provide a resolver that turns an ordinary attack’s Knockback descriptor into the numeric vector used by combat.
+{ x: 8, y: -44, w: 40, h: 40 }
 
-For example:
+a clone at:
 
-{ axis: 'horizontal', level: 'low' }
+x = target.body.x
+y = target.body.y - 36
 
-resolves to:
+has its active kick aligned with the opponent’s existing hurtboxes.
 
-{ x: 140, y: 0 }
-{ axis: 'vertical', level: 'high' }
+Do not place the clone a full 80 world units above the opponent unless testing proves the existing attack box still connects reliably. The goal is a visually overhead clone whose actual midairBa2 hitbox naturally hits the target.
 
-resolves to:
+Ground/support detection
 
-{ x: 0, y: 800 }
+The fallback must be based on whether the actual normal clone spawn position is supported at the target’s current foot Y.
 
-and:
+Do not merely check:
 
-{ axis: 'vertical', level: 'mid', sign: -1 }
+target.body.grounded
 
-resolves to:
+That is insufficient.
 
-{ x: 0, y: -640 }
+Example:
 
-For normal vertical knockback, sign should be omitted or treated as +1.
+* opponent is standing at the edge of a City platform;
+* opponent itself is grounded;
+* the normal 48-unit-behind clone location is already beyond the edge;
+* therefore there is no platform under the clone at that height.
 
-Only vertical Knockback needs the negative/reversed form for this task.
+That case must trigger the overhead midairBa2.
 
-Horizontal Knockback should continue traveling according to the attack’s facing. Do not require sign for ordinary horizontal hits.
+Use the stage collision geometry.
 
-Validate descriptors. Invalid axes, levels, signs, or malformed values should not silently produce arbitrary force. Follow Alva’s existing pattern of logging a useful warning and choosing a safe behavior.
+StageCollision.surfaceBelow(x0, x1, y) already exists and returns the nearest platform/solid/floor surface at or below y.
 
-Do not accept old numeric tiers as valid Knockback levels.
+Suggested process:
 
-For example, this must no longer be valid ordinary attack data:
+1. Determine target facing.
+2. Calculate normal behind X:
 
-powers: { verticalKnockback: 2 }
+target.body.x - facing * def.behindDistance
 
-Neither should this become valid:
+3. Apply the existing horizontal stage clamp first.
+4. Determine the clone’s horizontal footprint using the owner character collider:
 
-knockback: { axis: 'vertical', level: 2 }
+const halfW = owner.def.collider.width / 2;
 
-The level is explicitly one of the strings:
+5. Query:
 
-low
-mid
-high
+stage.surfaceBelow(
+  behindX - halfW,
+  behindX + halfW,
+  target.body.y
+)
 
-3. Integrate it with createAttackDefinition
+6. Treat the behind position as supported only when that surface is effectively at the same Y as the target’s feet.
 
-js/game/combat.js currently imports getAttackKnockback from powers.js and converts attack Powers into numeric { x, y } knockback.
+Use a small tolerance consistent with the physics system, roughly 0.5–1 world unit.
 
-Remove that Power dependency.
+Conceptually:
 
-Instead, import the new Knockback resolver.
+const support = stage.surfaceBelow(
+  behindX - halfW,
+  behindX + halfW,
+  target.body.y,
+);
+const supported =
+  Math.abs(support.y - target.body.y) <= SUPPORT_EPSILON;
 
-Ordinary fighter attacks should declare their semantic Knockback descriptor in character data, while the frozen runtime attack definition should still contain the numeric:
+You may add an appropriately named helper to StageCollision if doing so makes this clearer and reusable, but do not unnecessarily rewrite the physics system.
 
-knockback: { x, y }
+Match the game’s existing platform-overlap semantics: if enough of the clone collider horizontally overlaps a valid surface for the normal physics system to consider it supported, the normal behind spawn should remain valid.
 
-that CombatSystem.applyHit() already knows how to process.
+Important examples
 
-In other words:
+Main ground
 
-character attack data
-    ↓
-Low / Mid / High Knockback resolver
-    ↓
-numeric { x, y }
-    ↓
-CombatSystem.applyHit()
+Target stands on the desert/main floor.
 
-CombatSystem.applyHit() should remain generic.
+The surface behind the target is the same floor at the same Y.
 
-Its existing vertical behavior is already suitable:
+Result:
 
-target.body.vy = -def.knockback.y;
+* clone stays behind target;
+* clone performs ba1;
+* no behavior change.
 
-Therefore:
+Middle of a platform
 
-{ x: 0, y: 640 }
+Target stands well inside a City platform.
 
-gives:
+The normal behind position is still over the same platform.
 
-vy = -640
+Result:
 
-which launches upward.
+* normal behind BA1 clone.
 
-And:
+Edge of a platform
 
-{ x: 0, y: -640 }
+Target stands close enough to a platform edge that the 48-unit-behind position has no platform at that Y.
 
-gives:
+surfaceBelow() may find the main roof/floor much farther below, but that does NOT count as support at the target’s current height.
 
-vy = 640
+Result:
 
-which drives downward.
+* use overhead spawn;
+* use midairBa2.
 
-Do not hard-code BA1, BA2, #0001, Low, Mid, or High inside applyHit().
+Airborne target
 
-Blocked-hit behavior should continue using the existing combat rules.
+If the opponent is airborne, there will normally be no surface exactly at target.body.y.
 
-Bespoke hits that are not ordinary fighter attacks, such as Sphere Rush’s separately defined contact/explosion hits, may continue to use their explicit numeric { x, y } values. They are not the old Knockback Power system and do not need to be forced into Low/Mid/High as part of this task.
+Result:
 
-The shuriken should remain:
+* use overhead spawn;
+* use midairBa2.
 
-knockback: { x: 0, y: 0 }
+Overhead spawn behavior
 
-with no knockback.
+When unsupported:
 
-4. #0001 ground BA1 — Low horizontal Knockback
+clone.x = target.body.x + configuredOffsetX
+clone.y = target.body.y + configuredOffsetY
+clone.attackDef = owner.attacks[configuredNoGroundAttack]
 
-Change #0001’s ground ba1 from the old:
+For #0001 this means approximately:
 
-powers: { horizontalKnockback: 2 }
+x = target.body.x
+y = target.body.y - 36
+attack = owner.attacks.midairBa2
 
-to the new semantic Knockback declaration:
+Mirror horizontal offset with facing if you implement non-zero configurable X offsets, consistent with the rest of the character data.
 
-knockback: {
-  axis: 'horizontal',
-  level: 'low',
-}
+Keep the spawn inside the existing stage horizontal margin.
 
-Its resolved runtime knockback must be:
+The overhead clone must retain:
 
-{ x: 140, y: 0 }
+facing = target.facing
 
-An unblocked hit while facing right therefore gives the opponent:
+Do not make it track the target after spawning.
 
-vx = 140
+Its position, facing, chosen attack, and target must still be snapshotted exactly once.
 
-Facing left must naturally reverse that horizontal velocity through the existing facing logic.
+The clone must remain a detached, non-physical entity.
 
-Do not change ground BA1’s animation, timing, damage, hitbox, hitstun, blockstun, hitstop, cooldown, or Clone Attack behavior.
+Do NOT:
 
-The Charged BA1 clone performs ground BA1 and must automatically inherit the new Low horizontal Knockback through the same resolved attack definition.
+* give it a physics body;
+* apply gravity;
+* make it land;
+* make it fall;
+* add a pushbox;
+* add hurtboxes;
+* let other attacks hit it;
+* make it follow the opponent;
+* retarget it.
 
-5. #0001 ground BA2 — High vertical Knockback
+It simply appears in midair, performs midairBa2, and vanishes.
 
-Change ground ba2 from the old Vertical Knockback Power 2 to:
+Attack selection must be snapshot-based
 
-knockback: {
-  axis: 'vertical',
-  level: 'high',
-}
+Choose the clone’s attack during Clone.summon().
 
-It must resolve to:
+Once created:
 
-{ x: 0, y: 800 }
+* a normal clone permanently has attackDef === owner.attacks.ba1;
+* an unsupported/overhead clone permanently has attackDef === owner.attacks.midairBa2.
 
-An unblocked hit must therefore produce:
+Do not reevaluate support later.
 
-vy = -800
+If the opponent walks underneath or away during the cloud startup, the clone stays where it originally spawned and may whiff, just like the existing ground clone.
 
-which is a strong upward launch.
+Facing and hit direction
 
-Do not add horizontal knockback.
+Preserve the current rule:
 
-Do not change the ground BA2 art, startup, active frames, recovery, damage, hitbox, hitstun, blockstun, hitstop, cooldown, or ground-only restriction.
+facing = target.facing
 
-6. Swap #0001’s two mid-air Basic Attacks
+For a behind clone, this makes the clone face from the target’s back toward it.
 
-The current game has:
+For the overhead clone, keep the same snapshotted facing.
 
-midairBa1
+Do not special-case knockback direction.
 
-* current animation source: midair1ba1 through midair1ba5
-* five-frame airborne kick
-* current BA1-style attack timing/hitbox/combat package
+midairBa2 has vertical-only knockback, so its resolved X knockback is already zero.
 
-midairBa2
+The existing CombatSystem.applyHit() must remain responsible for applying it.
 
-* current animation source: midair2ba1 through midair2ba3
-* three-frame kunai/downward-slash move
-* current BA2-style attack timing/hitbox/combat package
+A successful overhead clone kick should therefore naturally produce approximately:
 
-Swap these two airborne moves completely.
+target.body.vx === 0
+target.body.vy === 800
+target.body.grounded === false
 
-After the refactor:
+using the current High vertical knockback table.
 
-New midairBa1
+Do not write 800 into clone code.
 
-midairBa1 must be the move that is currently midairBa2.
+Clone lifecycle
 
-That means the 3-frame midair2ba kunai/slash artwork becomes the airborne Basic Attack 1 move.
+Normal supported clone:
 
-Its animation key should still cleanly correspond to the final move identity midairBa1; update the animation definitions so the final data is not misleading.
+cloneCloud forwards
+→ BA1
+→ cloneCloud backwards
+→ removed
 
-For example, after the swap, animations.midairBa1 should point at the current:
+Unsupported overhead clone:
 
-0001_midair2ba1.png
-0001_midair2ba2.png
-0001_midair2ba3.png
+cloneCloud forwards
+→ midairBa2
+→ cloneCloud backwards
+→ removed
 
-and use the current midairBa2 visual sizing.
+The cloud behavior itself must remain unchanged.
 
-Move the current midairBa2 art-aware attack package with it:
+For the overhead case, the first visible clone body underneath the end of the appearance cloud should be midairBa2 frame 1 rather than BA1 frame 1.
 
-* startup/recovery timing appropriate to the 3-frame clip
-* its active slash frame
-* its current slash hitbox
-* damage
-* hitstun
-* blockstun
-* hitstop
-* cooldown
-* other attack-specific behavior
-
-Do not leave the old five-frame kick timing or hitbox attached to the three-frame kunai animation.
-
-Then replace its knockback with the new required value described below.
-
-New midairBa2
-
-midairBa2 must be the move that is currently midairBa1.
-
-That means the 5-frame midair1ba airborne kick artwork becomes the airborne Basic Attack 2 move.
-
-After the swap, animations.midairBa2 should point at the current:
+During the attack:
 
 0001_midair1ba1.png
 0001_midair1ba2.png
@@ -341,486 +356,382 @@ After the swap, animations.midairBa2 should point at the current:
 0001_midair1ba4.png
 0001_midair1ba5.png
 
-and use the current midairBa1 visual sizing.
+with the hitbox active only during the existing frame-3 active phase.
 
-Move the current midairBa1 art-aware attack package with it:
+Do not alter the midairBa2 timings to accommodate the clone.
 
-* startup/recovery timing appropriate to the 5-frame clip
-* its contact frame
-* its kick hitbox
-* damage
-* hitstun
-* blockstun
-* hitstop
-* cooldown
-* other attack-specific behavior
+Energy behavior
 
-Again, the move, artwork, timing, hitbox, and combat characteristics must stay internally consistent after the swap.
+Charged BA1 still costs exactly 25 Energy once per accepted summon.
 
-Only its knockback is replaced by the requested new Knockback value below.
+Do not introduce a second charge.
 
-7. Final airborne action mapping
+The overhead fallback is not a different player action and does not cost additional Energy.
 
-Keep the semantic controller mapping clean:
+It is simply the alternate execution of the same paid ba1Clone summon.
 
-actions: {
-  primary: 'throw',
-  special: null,
-  action1: { ground: 'ba1', air: 'midairBa1' },
-  action2: { ground: 'ba2', air: 'midairBa2' },
-}
+Maintain the existing guarantee that missing required art/data does not consume Energy for an invisible/broken summon.
 
-Do not solve the swap by permanently mapping:
+Because Fighter.trySummon() currently runs summonProblem() before spending Energy, extend validation appropriately for the optional no-ground attack.
 
-action1.air = 'midairBa2'
-action2.air = 'midairBa1'
-
-That would leave the internal move names backwards forever.
-
-Instead, swap the underlying airborne move definitions/art so that after the migration:
-
-* BA1 input in the air starts the newly swapped midairBa1
-* BA2 input in the air starts the newly swapped midairBa2
-
-The final internal names must match what the player is doing.
-
-8. New midairBa1 — Mid negative vertical Knockback
-
-After the airborne move swap, the final midairBa1 must use:
-
-knockback: {
-  axis: 'vertical',
-  level: 'mid',
-  sign: -1,
-}
-
-It must resolve to:
-
-{ x: 0, y: -640 }
-
-On an unblocked hit:
-
-target.body.vy = 640
-
-so the opponent is driven downward.
-
-This attack must have no horizontal knockback.
-
-This intentionally removes the current mid-air BA1’s combined horizontal + downward knockback behavior.
-
-Final expected vector:
-
-midairBa1.knockback === { x: 0, y: -640 }
-
-9. New midairBa2 — Low vertical Knockback
-
-After the airborne move swap, the final midairBa2 must use:
-
-knockback: {
-  axis: 'vertical',
-  level: 'low',
-}
-
-It must resolve to:
-
-{ x: 0, y: 480 }
-
-On an unblocked hit:
-
-target.body.vy = -480
-
-so the target is launched upward lightly.
-
-It must have no horizontal knockback.
-
-Final expected vector:
-
-midairBa2.knockback === { x: 0, y: 480 }
-
-10. Final #0001 Basic Attack Knockback matrix
-
-The final ordinary Basic Attacks must resolve exactly as follows:
+For #0001, both:
 
 ba1
-Low Horizontal
-{x: 140, y: 0}
-ba2
-High Vertical
-{x: 0, y: 800}
-midairBa1
-Mid Negative Vertical
-{x: 0, y: -640}
 midairBa2
-Low Vertical
-{x: 0, y: 480}
 
-These four cases should have direct regression tests.
+must have valid definitions, hitboxes and animation frames before this summon is considered fully usable.
 
-11. Preserve Throw and shuriken behavior
+Do not create location-dependent energy loss where Energy is paid and then Clone.summon() silently fails because the fallback attack is unavailable.
 
-The current shuriken already has:
+summonProblem()
 
-knockback: { x: 0, y: 0 }
+Update summonProblem() generically.
 
-Keep it that way.
+It currently validates:
 
-Do not give Throw or the shuriken a Low/Mid/High Knockback level just for consistency. A zero-knockback projectile is a valid bespoke hit.
+* cloud;
+* def.attack;
+* attack hitbox;
+* attack animation frames.
 
-It must continue to:
+When a summon declares a noGround/fallback attack, validate that attack as well.
 
-* deal 4 damage
-* apply its existing stun/hitstop/block behavior
-* travel at 700 units/second
-* use the same animation
-* spawn on the same Throw frame
-* disappear after a successful hit
-* have zero horizontal knockback
-* have zero vertical knockback
+Avoid #0001-specific strings.
 
-12. Discover UI
+A helper for validating an attack ID would be appropriate.
 
-The current Discover Power page is generated directly from POWERS, and therefore currently displays:
+For example conceptually:
 
-* Jump Power
-* Speed Power
-* Horizontal Knockback Power
-* Vertical Knockback Power
+validateSummonAttack(owner, attackId)
 
-After the migration, Horizontal Knockback Power and Vertical Knockback Power must disappear entirely from Discover.
+called for the primary attack and optional no-ground attack.
 
-The Power page should now describe only actual Powers:
+Existing summon definitions without a no-ground fallback must continue to work exactly as before.
 
-* Jump Power
-* Speed Power
+Stage bounds
 
-Add Knockback as its own mechanic in Discover rather than pretending it is still a Power.
+Keep the current stageMargin behavior.
 
-A clean final section order is:
+Normal behind X must continue to be clamped.
 
-Power
-Knockback
-Conditions
+Overhead X must also be kept within the stage margins, although target.body.x will normally already be valid.
 
-The Knockback page should be generated from the same Knockback level registry gameplay uses.
+Ground detection must happen using the final clamped normal behind X, because that is where the clone would actually spawn.
 
-It should explain, without exposing tuning numbers:
+Do not test support at an unclamped off-stage coordinate and then spawn somewhere else.
 
-Knockback
+Tests
 
-Controls how strongly an attack moves an opponent when it connects.
+Expand tests/clone.test.mjs substantially.
 
-Low
-Light knockback.
+Do not remove the existing clone coverage.
 
-Mid
-Medium knockback.
+First fix the test harness
 
-High
-Strong knockback.
+In tests/fighter-harness.mjs, duel() accepts a custom stage, but the clone spawn call currently uses the global STAGE:
 
-Also explain direction in ordinary language:
+spawnClones(fighters, clones, STAGE);
 
-* horizontal Knockback pushes away from the direction of the hit
-* positive vertical Knockback launches upward
-* reversed/negative vertical Knockback drives downward
+Change that to:
 
-Do not mention #0001 or specific attacks on the generic Discover mechanics page.
+spawnClones(fighters, clones, stage);
 
-Do not display world-unit numbers there, matching the current Discover philosophy.
+Otherwise custom ledge/platform tests will not exercise the intended collision map.
 
-Reuse the existing Discover visual language where appropriate rather than creating unrelated UI styling.
+This should not change production behavior; it fixes the harness so it respects its own stage argument.
 
-13. Update tests/powers.test.mjs
+Required new tests
 
-Remove every test whose purpose is the deleted Knockback Power system.
+Add tests covering at least all of these:
 
-The Power tests should no longer import or reference:
+1. Existing supported-ground behavior is unchanged
 
-ATTACK_POWERS
-HORIZONTAL_KNOCKBACK_POWER_TIERS
-VERTICAL_KNOCKBACK_POWER_TIERS
-getAttackPowerTier
-getHorizontalKnockback
-getVerticalKnockback
-getAttackKnockback
-horizontalKnockback
-verticalKnockback
-signed attack Powers
+On normal floor:
 
-POWERS should now describe only the remaining fighter Powers.
+* clone X is still target.x ± 48 according to facing;
+* clone Y equals target.body.y;
+* attack is ba1;
+* facing behavior is unchanged;
+* cloud → BA1 → reverse cloud is unchanged;
+* BA1 still deals 6 and Low horizontal knockback.
 
-Continue testing Jump Power and Speed Power thoroughly.
+Test both target facings if practical.
 
-Do not leave tests asserting that four Powers exist.
+2. Platform with support behind still uses BA1
 
-14. Add dedicated Knockback tests
+Create a custom StageCollision with a one-way platform.
 
-Create a focused test file such as:
-
-tests/knockback.test.mjs
-
-Test the new standalone system directly.
-
-At minimum verify:
-
-Low horizontal = 140
-Mid horizontal = 180
-High horizontal = 220
-Low vertical = 480
-Mid vertical = 640
-High vertical = 800
-
-Verify resolution:
-
-{ axis: 'horizontal', level: 'low' }
-=> { x: 140, y: 0 }
-{ axis: 'vertical', level: 'high' }
-=> { x: 0, y: 800 }
-{ axis: 'vertical', level: 'mid', sign: -1 }
-=> { x: 0, y: -640 }
-
-Verify actual combat physics through CombatSystem.applyHit():
-
-Low horizontal while facing right:
-
-vx === 140
-
-Low horizontal while facing left:
-
-vx === -140
-
-High vertical:
-
-vy === -800
-
-Mid negative vertical:
-
-vy === 640
-
-Verify malformed level names do not silently resolve as legitimate values.
-
-Verify numeric old tiers are rejected as Knockback level names.
-
-Verify Knockback resolution is independent of Jump Power and Speed Power.
-
-15. Update BA1 tests for the airborne swap
-
-tests/basic-attack.test.mjs currently assumes midairBa1 is the five-frame midair1ba kick.
-
-After this work, that is no longer true.
-
-Update the tests so midairBa1 is the current three-frame midair2ba kunai/slash move.
-
-Tests should validate the final move, not preserve outdated historical assumptions.
-
-They should verify:
-
-ground ba1:
-  unchanged animation/package
-  Low horizontal Knockback
-  resolved {x: 140, y: 0}
-midairBa1:
-  uses the former midairBa2 / midair2ba art
-  correct 3-frame animation
-  correct slash contact frame
-  correct swapped timing/hitbox/combat package
-  Mid negative vertical Knockback
-  resolved {x: 0, y: -640}
-
-Airborne action1 must start midairBa1.
-
-Landing during it should continue following the existing rule that an already-started airborne attack finishes its chosen attack clip rather than changing into a ground move halfway through.
-
-16. Update BA2 tests for the airborne swap
-
-tests/basic-attack-2.test.mjs currently assumes midairBa2 is the three-frame midair2ba kunai slash.
-
-After this work, midairBa2 is the former five-frame airborne kick.
-
-Update the tests accordingly.
+Put the opponent far enough inside it that the clone collider at the 48-unit-behind position still overlaps the platform.
 
 Verify:
 
-ground ba2:
-  existing ground animation/package
-  High vertical Knockback
-  resolved {x: 0, y: 800}
-midairBa2:
-  uses the former midairBa1 / midair1ba art
-  correct 5-frame animation
-  correct kick contact frame
-  correct swapped timing/hitbox/combat package
-  Low vertical Knockback
-  resolved {x: 0, y: 480}
+clone.attackDef.id === 'ba1'
+clone.y === target.body.y
 
-Airborne action2 must start midairBa2.
+and it remains at the behind X.
 
-17. Update integration tests
+3. Platform edge with no support behind triggers overhead mode
 
-Review tests that depend on the old move identity or old numeric launch values, including at least:
+Put the opponent on a platform edge such that:
 
-tests/practice-ground.test.mjs
-tests/basic-attack.test.mjs
-tests/basic-attack-2.test.mjs
-tests/discover.test.mjs
-tests/powers.test.mjs
-tests/clone.test.mjs
+* opponent itself is supported;
+* the normal behind point is not supported at the same Y.
 
-and any other tests found by repository-wide search.
+Verify:
 
-Ground BA1 tests expecting 180 horizontal knockback must become 140.
+clone.attackDef.id === 'midairBa2'
+clone.animator.anim.key === 'midairBa2'
+clone.x === target.body.x // assuming x offset 0
+clone.y === target.body.y - 36
+clone.facing === target.facing
 
-Ground BA2 tests expecting 640 vertical knockback must become 800.
+Do this for both left- and right-facing targets, or otherwise prove mirroring/facing works for both sides.
 
-Any test expecting midair BA1 to use midair1ba art must account for the swap.
+4. Lower floor does not count as same-height support
 
-Any test expecting midair BA2 to use midair2ba art must account for the swap.
+This is important.
 
-The clone uses ground BA1, so tests involving Clone Attack knockback must expect Low horizontal Knockback / 140.
+If the target is on a platform at Y 600 and the behind point only has the main floor at Y 800 underneath it, it must still use overhead mode.
 
-Do not weaken unrelated assertions simply to make the suite pass.
+The existence of some lower surface must not cause BA1.
 
-18. Repository-wide cleanup
+Support must mean support at approximately the target’s current foot Y.
 
-Search the entire repository for these concepts and remove stale references:
+5. Airborne target uses overhead mode
 
-Horizontal Knockback Power
-Vertical Knockback Power
-horizontalKnockback
-verticalKnockback
-ATTACK_POWERS
-HORIZONTAL_KNOCKBACK_POWER_TIERS
-VERTICAL_KNOCKBACK_POWER_TIERS
-getAttackPowerTier
-getHorizontalKnockback
-getVerticalKnockback
-getAttackKnockback
-attack Power
-signed Vertical Knockback Power
-Knockback Power 1
-Knockback Power 2
-Knockback Power 3
+Place/move the opponent into the air.
 
-After the migration, those terms should not survive in production code, tests, comments, README, or the design specification except where explicitly discussing historical migration—which is not necessary here.
+Summon while its feet are not resting on a surface at that Y.
 
-Update comments at the top of js/data/characters.js. They currently instruct future fighters to give attacks Knockback Power tiers; that guidance must instead describe Low/Mid/High Knockback.
+Verify overhead midairBa2.
 
-Update the comments in js/game/combat.js describing attack Powers.
+6. Overhead clone uses the real midair BA2 frames and timing
 
-19. README and ALVA_SPEC.md
+Record the clone lifecycle.
 
-Rewrite the relevant documentation so it reflects the final architecture.
+Verify the body frame sequence is:
 
-The Power documentation should explain only Jump Power and Speed Power.
+0001_midair1ba1.png
+0001_midair1ba2.png
+0001_midair1ba3.png
+0001_midair1ba4.png
+0001_midair1ba5.png
 
-Add a separate Knockback section describing:
+The active phase must still correspond to the existing frame-3 kick.
 
-Low
-Mid
-High
+The total attack time must be the existing five-frame midairBa2 duration, plus clone hitstop only if it connects.
 
-Explain that axis and strength are separate.
+Do not create clone-specific BA2 timing.
 
-Explain that reversed vertical Knockback drives downward.
+7. Overhead kick actually overlaps and hits the stationary target
 
-Document the values where the technical README/spec currently documents tuning:
+This test is essential.
 
-           Low   Mid   High
-Horizontal 140   180   220
-Vertical   480   640   800
+A stationary target at the fallback spawn position must get hit naturally by the existing attack/hurtbox intersection code.
 
-Document #0001’s final moves:
+Do not fake the hit.
 
-BA1: Low horizontal
-BA2: High vertical
-Mid-air BA1: Mid negative vertical
-Mid-air BA2: Low vertical
+Verify:
 
-Also document the airborne move swap accurately:
+* exactly one summon hit;
+* event attacker is the real owner;
+* event target is the opponent;
+* event.summon === clone;
+* damage is 6;
+* health goes 100 → 94;
+* hitstun is existing midairBa2.hitstun;
+* hitstop is existing midairBa2.hitstop;
+* clone gets its own hitstop;
+* owner does not get detached-hit hitstop.
 
-* Mid-air BA1 is now the three-frame kunai/slash move that previously belonged to Mid-air BA2.
-* Mid-air BA2 is now the five-frame airborne kick that previously belonged to Mid-air BA1.
+8. Overhead clone spikes downward
 
-Update animation/frame documentation wherever the old associations appear.
+After an unblocked overhead midairBa2 hit:
 
-Update the Adding a Fighter / Adding an Attack documentation to demonstrate the new syntax instead of powers: { horizontalKnockback: 2 }.
+target.body.vx === 0
+target.body.vy > 0
+target.body.grounded === false
 
-For example:
+Using the existing High vertical Knockback values, the current result should be about:
 
-knockback: {
-  axis: 'horizontal',
-  level: 'low',
-}
+target.body.vy === 800
 
-and:
+Assert against KNOCKBACK_LEVELS.high.vertical rather than hard-coding combat behavior if possible.
 
-knockback: {
-  axis: 'vertical',
-  level: 'mid',
-  sign: -1,
-}
+This proves the clone is genuinely using midairBa2, not a renamed BA1.
 
-20. Do not change unrelated systems
+9. Still only one hit
 
-Do not alter:
+Even if the active box overlaps for multiple fixed simulation steps:
 
-* health or Energy
-* Jump Power tuning
-* Speed Power tuning
-* gravity
-* general physics
-* controls
-* Charge behavior
-* Dodge behavior
-* Throw timing
-* shuriken speed/damage
-* Clone Attack Energy cost
-* Sphere Rush timing or bespoke hit values
-* stage behavior
-* HUD
-* input mappings
-* gamepad mappings
-* touch controls
-* animation assets themselves
-* Special being reserved
+* only one hit event;
+* one damage application;
+* clone.hasHit === true;
+* its hitbox becomes unavailable afterward exactly like current clone BA1 behavior.
 
-The task is the Knockback-system replacement, the requested four Basic Attack Knockback values, and the airborne BA1/BA2 move swap.
+10. Dodge interaction remains generic
 
-21. Final acceptance criteria
+An opponent invulnerable during the midair BA2 active window should let the clone attack pass through unspent.
 
-The work is complete only when all of the following are true:
+If invulnerability ends while the attack is still active, it may connect afterward exactly according to existing combat rules.
 
-1. Horizontal Knockback Power no longer exists.
-2. Vertical Knockback Power no longer exists.
-3. powers.js contains no attack Knockback system.
-4. No ordinary attack declares horizontalKnockback or verticalKnockback.
-5. No old attack Knockback tier resolver remains.
-6. A standalone Low/Mid/High Knockback registry/resolver exists.
-7. Low/Mid/High preserve the former tier-1/2/3 magnitudes:
-    horizontal 140/180/220 and vertical 480/640/800.
-8. Ground BA1 declares Low horizontal Knockback and resolves to { x: 140, y: 0 }.
-9. Ground BA2 declares High vertical Knockback and resolves to { x: 0, y: 800 }.
-10. Final Mid-air BA1 declares Mid reversed vertical Knockback and resolves to { x: 0, y: -640 }.
-11. Final Mid-air BA2 declares Low vertical Knockback and resolves to { x: 0, y: 480 }.
-12. An actual Mid-air BA1 hit gives the opponent positive vy and drives it downward.
-13. An actual BA2 hit gives the opponent vy === -800.
-14. Ground BA1 still reverses horizontal velocity correctly with fighter facing.
-15. Mid-air BA1 and Mid-air BA2 have completely exchanged their previous airborne move identities.
-16. The final midairBa1 uses the former midair2ba 3-frame kunai/slash artwork and corresponding move package.
-17. The final midairBa2 uses the former midair1ba 5-frame kick artwork and corresponding move package.
-18. action1.air still semantically starts midairBa1.
-19. action2.air still semantically starts midairBa2.
-20. The shuriken remains zero knockback.
-21. Clone Attack inherits ground BA1’s new Low horizontal Knockback.
-22. Jump Power and Speed Power remain unchanged.
-23. Discover’s Power page contains only the remaining Powers.
-24. Discover exposes Knockback Low/Mid/High as its own mechanic rather than as Powers.
-25. There are no stale old Knockback Power names in production code, tests, README, or ALVA_SPEC.md.
-26. Relevant targeted tests pass.
-27. The complete Node test suite passes.
+Do not add special clone-vs-Dodge logic.
 
-Run the focused Knockback, Power, BA1, BA2, Discover, Clone, Throw, and Practice tests first. Then run the complete test suite.
+11. Block interaction remains generic
 
-Fix regressions caused by this migration rather than deleting assertions or adding compatibility hacks for the removed Knockback Power architecture.
+If using the existing future Block test fixture, verify the overhead attack goes through CombatSystem.applyHit() normally.
 
-Keep the result clean, data-driven, and easy for future fighters to configure.
+Vertical knockback must still be suppressed on a successful block because that is existing combat behavior.
+
+Do not add clone-specific block handling.
+
+12. Snapshot behavior remains
+
+After an overhead clone appears:
+
+* move the opponent away;
+* clone X/Y/facing/attack choice never change;
+* kick may whiff;
+* clone still finishes all five midairBa2 frames and vanishes.
+
+13. Missing fallback attack/art is safe
+
+Test the no-ground attack validation.
+
+If the configured midairBa2 definition/art is unavailable:
+
+* Charged BA1 summon is not accepted as a broken summon;
+* 25 Energy is not lost;
+* no invisible overhead clone appears;
+* preserve the existing charged-action fallback behavior where appropriate.
+
+14. Stage-edge clamping remains correct
+
+Keep all current edge tests passing.
+
+Also ensure the newly calculated fallback X cannot escape the configured stage margin.
+
+Existing tests that must continue passing
+
+Run the full test suite, not only clone tests.
+
+At minimum ensure these still pass:
+
+node --test tests/clone.test.mjs
+node --test tests/basic-attack.test.mjs
+node --test tests/basic-attack-2.test.mjs
+node --test tests/charge.test.mjs
+node --test tests/charged-ba2.test.mjs
+node --test tests/defense.test.mjs
+node --test tests/knockback.test.mjs
+node --test
+
+Fix regressions rather than weakening assertions.
+
+Documentation/comments
+
+Update comments in:
+
+* js/data/characters.js
+* js/game/clone.js
+
+so they no longer claim every clone always performs only the configured ground attack behind the target.
+
+Explain that a summon may optionally provide a no-ground fallback attack/placement.
+
+Update ALVA_SPEC.md because it is the repository’s canonical product specification.
+
+Document #0001’s Charged BA1 behavior as:
+
+* normally appears behind the opponent and performs BA1;
+* if the behind spawn point has no support at the opponent’s current foot height, appears overhead and performs the existing Mid-air BA2 downward kick;
+* position/facing/attack mode are snapshotted at summon time;
+* clone remains detached/non-physical;
+* same cloud lifecycle;
+* still costs 25 Energy.
+
+Do not unnecessarily modify README/UI copy unless existing text becomes inaccurate.
+
+Do not change
+
+Do not modify:
+
+* #0001 sprite files;
+* clone cloud art;
+* BA1 artwork;
+* Mid-air BA2 artwork;
+* Mid-air BA2 damage;
+* Mid-air BA2 hitbox unless testing exposes an unavoidable existing alignment bug;
+* Knockback tables;
+* input bindings;
+* Charge controls;
+* Energy cost;
+* normal clone behind distance;
+* normal clone BA1 behavior;
+* clone cloud timing;
+* combat hit resolution;
+* stage layouts.
+
+Do not add dependencies.
+
+Alva is plain HTML/CSS/vanilla ES-module JavaScript with no build system.
+
+Preferred implementation shape
+
+Keep the patch small.
+
+The expected core change should mainly be:
+
+characters.js
+
+Add no-ground fallback data to ba1Clone.
+
+clone.js
+
+* support optional no-ground summon data;
+* validate its attack;
+* calculate and clamp normal behind position;
+* check support beneath that intended position;
+* choose normal or overhead mode once;
+* choose the corresponding attack definition once;
+* construct the Clone exactly as before.
+
+physics.js
+
+Only change this if a tiny reusable support-query helper makes the code cleaner. Do not rewrite collision handling.
+
+combat.js
+
+Ideally no functional changes are needed.
+
+The existing clone hit path is already generic and should handle midairBa2.
+
+fighter-harness.mjs
+
+Fix duel() so custom stage reaches spawnClones().
+
+clone.test.mjs
+
+Add the new supported/unsupported platform and overhead BA2 coverage.
+
+Definition of done
+
+The implementation is complete when all of the following are true:
+
+1. Charged BA1 on normal ground behaves exactly as it does now.
+2. A clone behind an opponent remains BA1 whenever that behind position has support at the opponent’s current foot level.
+3. If that position has no same-height support, the clone instead appears above the opponent.
+4. The overhead clone plays the existing five-frame midairBa2.
+5. Its real existing hitbox naturally connects with a stationary target.
+6. A hit does 6 damage and applies existing High reversed vertical Knockback, driving the target downward.
+7. It is still a detached clone hit credited to #0001.
+8. The clone remains stationary/non-physical and does not track.
+9. Cloud appearance and disappearance remain unchanged.
+10. Energy cost remains 25.
+11. Missing required fallback art/data cannot consume Energy for a broken summon.
+12. Stage-edge behavior remains correct.
+13. The implementation is generic/data-driven, with no 0001 or midairBa2 special case inside the clone engine.
+14. Existing tests pass and new regression tests cover the platform-edge and airborne cases.
+15. ALVA_SPEC.md accurately describes the final behavior.
+
+Before finishing, inspect the diff for unnecessary unrelated changes and remove them.
