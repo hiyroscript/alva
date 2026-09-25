@@ -1,7 +1,12 @@
 // Battle: one Quick Battle on the shared Arena (js/game/arena.js): Player 1
-// against the training CPU, with the intro / fight / time-up / result phases
-// and the round timer. The Arena owns the fixed-timestep world and its Canvas
-// 2D rendering; DOM concerns (HUD, pause, overlays) live in the battle screen.
+// against the training CPU, with the intro / fight / time-up / KO / result
+// phases and the round timer. The Arena owns the fixed-timestep world and its
+// Canvas 2D rendering; DOM concerns (HUD, pause, overlays) live in the battle
+// screen.
+//
+// The round ends when time runs out (remaining health decides it) or at
+// once when a fighter falls into the Void (see onVoid): that fighter is
+// defeated, whatever the timer or health says.
 
 import { CONFIG } from '../config.js';
 import { Arena } from './arena.js';
@@ -72,16 +77,35 @@ export class Battle extends Arena {
       case 'timeup':
         if (this.phaseTime >= CONFIG.battle.timeUpSeconds) this.setPhase('result');
         break;
+      case 'ko':
+        if (this.phaseTime >= CONFIG.battle.koSeconds) this.setPhase('result');
+        break;
       default:
         break;
     }
     super.update(dt);
   }
 
+  // A fighter fell into the Void: it is defeated on the spot. It leaves
+  // play (frozen, undrawn, untouchable) with no health left, nothing keeps
+  // holding or aiming at it, and a round still being fought ends at once
+  // with the short KO beat. One lost after time ran out still loses; both
+  // lost is a draw.
+  onVoid(f) {
+    f.lostToVoid = true;
+    f.combat.health = 0;
+    this.detachFromPlay(f, 'void');
+    if (this.phase === 'fight') this.setPhase('ko');
+  }
+
+  // The winner: whoever the Void did not take, else whoever has more health
+  // left (a Void loss leaves none).
   get result() {
+    const lost = { p1: !!this.p1.lostToVoid, p2: !!this.p2.lostToVoid };
+    const reason = lost.p1 || lost.p2 ? 'void' : 'time';
     const a = this.p1.combat.health / this.p1.combat.maxHealth;
     const b = this.p2.combat.health / this.p2.combat.maxHealth;
-    if (Math.abs(a - b) < 1e-6) return { outcome: 'draw' };
-    return { outcome: a > b ? 'p1' : 'p2' };
+    if (Math.abs(a - b) < 1e-6) return { outcome: 'draw', reason };
+    return { outcome: a > b ? 'p1' : 'p2', reason };
   }
 }

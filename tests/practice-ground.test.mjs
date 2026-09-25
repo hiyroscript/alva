@@ -353,7 +353,7 @@ test('a fresh entry always starts with #0001, whatever Quick Battle or an earlie
   assert.deepEqual(app.nav.scopes, []);
   const spawn = PRACTICE_MAP.spawnPoints[0];
   assert.equal(screen.session.player.body.x, spawn.x);
-  assert.equal(screen.session.player.body.y, PRACTICE_MAP.groundLevel);
+  assert.equal(screen.session.player.body.y, PRACTICE_MAP.mainStage.top);
 });
 
 test('a failed load uses the loading error, and Back returns Home', async () => {
@@ -479,21 +479,83 @@ test('moves that aim at an opponent fall back or miss with nobody there, without
   session.frame(DT);
 });
 
-test('the bounds hold the fighter on the training floor', () => {
+test('no walls hold the fighter: it runs off either edge of the training block, falls, and the Void puts it back at its spawn', () => {
   const input = fakeInput();
   const session = new PracticeSession({ canvas: new Element('canvas'), map: PRACTICE_MAP, def: DEF_0001, sprites: fakeSprites(), input });
   const p = session.player;
-  for (let i = 0; i < 60 * 12; i++) {
-    input.script.push({ left: true });
-    session.update(DT);
+  const { left, right, top } = PRACTICE_MAP.mainStage;
+  const [spawn] = PRACTICE_MAP.spawnPoints;
+  for (const dir of ['left', 'right']) {
+    let pastEdge = false;
+    let fell = false;
+    let back = false;
+    for (let i = 0; i < 60 * 10 && !back; i++) {
+      input.script.push({ [dir]: true });
+      session.update(DT);
+      const b = p.body;
+      if (dir === 'left' ? b.x + b.halfW < left : b.x - b.halfW > right) pastEdge = true;
+      if (b.y > top + 200) fell = true;
+      back = fell && b.x === spawn.x;
+    }
+    assert.ok(pastEdge, `ran clear past the ${dir} edge: no wall there`);
+    assert.ok(fell, 'and fell below the block');
+    assert.ok(back, 'until the Void put it back');
+    assert.equal(session.player, p, 'the same fighter');
+    assert.deepEqual([p.body.x, p.body.y, p.body.vx, p.body.vy, p.body.grounded], [spawn.x, top, 0, 0, true]);
+    assert.equal(p.lostToVoid, false, 'practice goes on');
   }
-  assert.equal(p.body.x - p.body.halfW, PRACTICE_MAP.bounds.left);
-  for (let i = 0; i < 60 * 20; i++) {
-    input.script.push({ right: true });
-    session.update(DT);
-  }
-  assert.equal(p.body.x + p.body.halfW, PRACTICE_MAP.bounds.right);
-  assert.equal(p.body.y, PRACTICE_MAP.groundLevel);
+});
+
+test('the Void never ends practice: a fighter in it is back at its spawn at once, and nothing keeps hold of or aims at it', () => {
+  const { session, run, until } = practiceSession();
+  const { player, cpu } = session;
+  const v = PRACTICE_MAP.voidBounds;
+  const { top } = PRACTICE_MAP.mainStage;
+  const [p1Spawn, cpuSpawn] = PRACTICE_MAP.spawnPoints;
+  // Player 1, a shuriken of its in flight, is carried just past the Void's
+  // fixed line: its next step puts it back, still, with its own shuriken
+  // gone and its health and Energy kept.
+  player.combat.spendEnergy(25);
+  player.combat.health = 70;
+  run({ primary: true, primaryPressed: true });
+  until(() => session.projectiles.length === 1);
+  Object.assign(player.body, { x: v.left - 2, y: 1200, vx: -300, vy: 900, grounded: false, ground: null });
+  run();
+  assert.equal(session.player, player);
+  assert.deepEqual(
+    [player.body.x, player.body.y, player.body.vx, player.body.vy, player.body.grounded],
+    [p1Spawn.x, top, 0, 0, true],
+  );
+  assert.equal(player.combat.attack, null, 'no attack survives it');
+  assert.deepEqual(session.projectiles, [], 'its shuriken went with it');
+  assert.equal(player.combat.energy, player.combat.maxEnergy - 25);
+  assert.equal(player.combat.health, 70);
+  assert.deepEqual(session.fighters, [player, cpu]);
+  assert.equal(player.opponent, cpu);
+
+  // The CPU, caught in Player 1's Sphere Rush, falls into the Void while
+  // bound: the rush holding it ends, and it is back at its own spawn, free,
+  // its damage numbers gone.
+  run({}, 60);
+  run({ charge: true }, 10);
+  run({ charge: true, action2: true, action2Pressed: true });
+  const rush = player.technique;
+  until(() => rush.hitConfirmed, 120);
+  assert.ok(cpu.combat.immobilized);
+  assert.ok(session.damageNumbers.some((d) => d.target === cpu));
+  const health = cpu.combat.health;
+  Object.assign(cpu.body, { y: v.bottom + cpu.body.height, grounded: false, ground: null });
+  run();
+  assert.equal(player.technique, null, 'the rush holding it ended');
+  assert.equal(rush.endReason, 'released');
+  assert.equal(rush.target, null);
+  assert.equal(cpu.combat.immobilized, false);
+  assert.deepEqual([cpu.body.x, cpu.body.y, cpu.body.grounded, cpu.facing], [cpuSpawn.x, top, true, cpuSpawn.facing]);
+  assert.equal(cpu.combat.health, health, 'its health kept');
+  assert.ok(!session.damageNumbers.some((d) => d.target === cpu));
+  assert.deepEqual(session.fighters, [player, cpu]);
+  run({}, 30);
+  assert.equal(cpu.body.x, cpuSpawn.x, 'standing still again');
 });
 
 // ---- HUD ------------------------------------------------------------------------
@@ -782,7 +844,7 @@ test('confirming a fighter swaps it in place and resumes practice', async () => 
   assert.deepEqual(session.fighters, [p]);
   assert.ok(p.controller instanceof PlayerController);
   assert.equal(p.body.x, PRACTICE_MAP.spawnPoints[0].x);
-  assert.equal(p.body.y, PRACTICE_MAP.groundLevel);
+  assert.equal(p.body.y, PRACTICE_MAP.mainStage.top);
   assert.equal(p.combat.health, p.combat.maxHealth);
   assert.equal(p.combat.energy, p.combat.maxEnergy);
   assert.equal(p.technique, null);
@@ -943,7 +1005,7 @@ test('selecting a CPU loads it and puts it on the stage as a p2 / CPU training d
   assert.equal(session.primary, player);
   assert.equal(session.secondary, cpu);
   assert.equal(cpu.body.x, PRACTICE_MAP.spawnPoints[1].x);
-  assert.equal(cpu.body.y, PRACTICE_MAP.groundLevel);
+  assert.equal(cpu.body.y, PRACTICE_MAP.mainStage.top);
   assert.equal(cpu.facing, -1, 'facing Player 1');
   assert.equal(cpu.combat.health, cpu.combat.maxHealth);
 
@@ -988,7 +1050,7 @@ test('the practice CPU never acts on its own: no movement, jump, attack, charge,
     screen.update(DT);
     states.add(cpu.state);
     const c = cpu.combat;
-    if (cpu.body.x !== spawnX || cpu.body.y !== PRACTICE_MAP.groundLevel || !cpu.body.grounded || cpu.moveDir !== 0 ||
+    if (cpu.body.x !== spawnX || cpu.body.y !== PRACTICE_MAP.mainStage.top || !cpu.body.grounded || cpu.moveDir !== 0 ||
         c.attack || c.defenseAction || c.blocking || cpu.charging || cpu.technique || cpu.releases.length || cpu.summons.length) {
       assert.fail(`the CPU acted on step ${i}: ${cpu.state}`);
     }
@@ -1698,8 +1760,11 @@ test('the training stage is its own map, outside MAPS and so outside Select Stag
   // Player 1's spawn, then the CPU's: as far apart as Quick Battle's two
   // starting fighters, each facing the other.
   assert.equal(PRACTICE_MAP.spawnPoints.length, 2);
-  const { left, right } = PRACTICE_MAP.bounds;
-  assert.ok(right - left >= 3000, 'a generous floor');
+  const { left, right, top } = PRACTICE_MAP.mainStage;
+  assert.ok(right - left >= 1200 && right - left <= 1500, 'a compact training block');
+  // The Void far past its edges, well below it and high above.
+  const v = PRACTICE_MAP.voidBounds;
+  assert.ok(v.left <= left - 600 && v.right >= right + 600 && v.bottom >= top + 600 && v.top <= top - 900);
   const [p1, cpu] = PRACTICE_MAP.spawnPoints;
   assert.deepEqual(p1, { x: 2000, facing: 1 }, 'Player 1\'s spawn is unchanged');
   for (const { x } of [p1, cpu]) assert.ok(x > left && x < right);

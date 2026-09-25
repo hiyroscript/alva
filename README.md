@@ -1,11 +1,13 @@
 # Alva
 
 A 2D sprite fighting game for the browser by **hiyroscript**. Pure HTML, CSS and
-JavaScript with Canvas 2D: no frameworks, no build step, no 3D. It runs on desktop
-and on phones and tablets in landscape.
+JavaScript with Canvas 2D: no frameworks, no build step, no WebGL or 3D engine
+(the stages' depth is pseudo-3D perspective drawn in Canvas 2D). It runs on
+desktop and on phones and tablets in landscape.
 
 This is the first playable foundation: full menu flow, a 48-slot roster, two
-large stages, a Practice Ground training room, a Discover reference screen,
+compact platform-fighter stages with open ledges and a Void kill boundary, a
+Practice Ground training room, a Discover reference screen,
 movement and platform physics, a tiered Power system (Jump Power and Speed
 Power), a camera, a HUD, touch controls,
 and a data-driven combat system with Low / Mid / High Knockback and
@@ -88,7 +90,9 @@ attack animations. Its touch button has a dashed outline.
   getting hit afterwards does not change its course. It hits once (4 damage
   and a short hitstun, with no knockback: it neither pushes nor launches) and
   disappears; it
-  also vanishes after 1.5 s, at a stage edge or against a solid rock or wall.
+  also vanishes after 1.5 s, in the Void or against a solid rock (the
+  stage's own cliff face included); past a ledge it flies on over the open
+  air.
   A Dodge lets it pass through. Throw is ground-only for now because there
   are no mid-air Throw sprites: pressing it in the air does nothing. It has a
   0.25 s cooldown and no Energy cost. Internally it is the `primary` input.
@@ -130,7 +134,8 @@ attack animations. Its touch button has a dashed outline.
   hitstun and knockback, pushing the opponent away from the clone), hits
   once, and passes through a Dodge's evasive frames like any attack. If
   there is no ground behind the opponent at its foot height (it stands at a
-  platform's edge with its back to the drop, or it is in the air), the clone
+  platform's edge or a ledge with its back to the drop, or it is in the
+  air), the clone
   appears over the opponent instead and performs #0001's Mid-air BA2 kick
   (6 damage, driving the opponent downward); same cloud, same 25 Energy. The
   impact freezes the opponent and the clone, never #0001. The clone cannot be
@@ -179,21 +184,21 @@ attack animations. Its touch button has a dashed outline.
 - **Menus:** arrow keys or WASD to move, `Enter` to select, `Esc` to go back. Mouse and touch work too.
 - **Touch:** several fingers work at once (hold Right and press Jump, or hold C and press BA1). You can slide your thumb between Left / Charge / Right. **T** is Throw.
 - **Gamepad (standard layout):** D-pad or left stick left / right to move and down to Charge in battle (they still navigate menus), A to jump, X / Square to Throw, B / Circle for Basic Attack 1, LB for Basic Attack 2, Y / Triangle for the reserved Special, RB or RT for Defense, Start to pause.
-- **Debug:** `` ` `` toggles the collider, hurtbox and attack-hitbox overlay in battle (a hitbox shows only while it can connect; hurtboxes turn gray while a Dodge makes the fighter invulnerable; a flying shuriken's hitbox is outlined in magenta and labelled; a clone's attack hitbox shows in the attack colour, labelled `clone ba1` (or `clone midairBa2` overhead), only on its active frame; the Sphere Rush's sphere hitbox is a dashed cyan box labelled `charged ba2 dash` while it can connect, then a dashed cyan cross marks the sphere on the caught opponent, which is labelled `bound`).
+- **Debug:** `` ` `` toggles the collider, hurtbox and attack-hitbox overlay in battle (a hitbox shows only while it can connect; hurtboxes turn gray while a Dodge makes the fighter invulnerable; a flying shuriken's hitbox is outlined in magenta and labelled; a clone's attack hitbox shows in the attack colour, labelled `clone ba1` (or `clone midairBa2` overhead), only on its active frame; the Sphere Rush's sphere hitbox is a dashed cyan box labelled `charged ba2 dash` while it can connect, then a dashed cyan cross marks the sphere on the caught opponent, which is labelled `bound`; solids, the main floor's block among them, are outlined in red and the Void's fixed kill line is dashed violet).
 
 Touch controls show on touch-first devices (coarse pointer, or a touch actually detected). A narrow desktop window doesn't count as a phone. On a phone held in portrait, the game pauses and asks you to rotate.
 
 ## Current content
 
 - **Characters:** #0001
-- **Maps:** Desert (wide, open, 3.8 screens) and City (rooftops with 7 one-way platforms, 3.1 screens) for Quick Battle; the Practice Ground training room (one broad flat floor, about 3.5 screens) for practice
+- **Maps:** Desert (a sandstone mesa with 2 rock outcrops, 1360 units wide) and City (a rooftop with 7 one-way platforms and a stair bulkhead, 1440 wide) for Quick Battle; the Practice Ground training room (one flat training block, 1280 wide) for practice. Each is a compact main stage with open air past both ledges and the Void far beyond (see [Stages and the Void](#stages-and-the-void))
 - **Animations:** Idle, Run, Jump, Fall, Land (jump/fall play while airborne; land plays once on touchdown), Hurt and Mid-air Hurt (shown during hitstun on the ground / in the air), Basic Attack 1 (4 frames), Mid-air Basic Attack 1 (the kunai slash, 3 frames: `0001_midair2ba1`–`3`), Basic Attack 2 (7 frames) and Mid-air Basic Attack 2 (the airborne kick, 5 frames: `0001_midair1ba1`–`5`), each played once at 12 fps, Dodge and Mid-air Dodge (3 frames each, played once at 12 fps), Charge (charge1 → charge2 once, then chargea ↔ chargeb while held, at 10 fps, with charge1 shown briefly on release), Throw (3 fighter frames, played once at 12 fps), Shuriken (3 looping projectile frames at 18 fps, normalized and drawn separately from the fighter poses), the clone appear / vanish cloud (`0001_cloneav1`–`0001_cloneav10`, an effect at 20 fps: forwards as a clone appears, the same frames in reverse as it vanishes), the Sphere Rush poses (`0001_rasen1`–`0001_rasen12` as one-shot fighter clips at 12 fps: formation 1–3, rush 4–6, contact 7–8 with 8 held, explosion 9, recovery 10–12, and 12 alone as the whiff release) and its blue sphere (`0001_prasen1`–`0001_prasen11` as three effects at 12 fps: formation 1–6 once, spinning on the opponent 7–9 looped while it is drawn ever larger, explosion 10–11 once)
 - **Attacks:** Basic Attack 1 and Basic Attack 2, each on the ground and in the air, a ground Throw that releases one shuriken, the Charged BA1 Clone Attack (25 Energy) and the Charged BA2 Sphere Rush (ground only, two hits, no Energy cost). Special is reserved.
 - **Defense:** #0001 dodges, on the ground and in the air.
 - **Powers:** Jump Power and Speed Power, each in three tiers. #0001 has Jump Power 2 and Speed Power 2 (its original jump and speed).
 - **Knockback:** each attack's own, Low, Mid or High, pushing sideways or launching upward (or, reversed, driving downward). #0001's BA1 is Low horizontal, its BA2 High vertical, its mid-air BA1 Mid vertical and its mid-air BA2 High vertical reversed (downward).
 - **HUD:** each fighter panel shows a green health bar with a blue Energy bar directly beneath it. Both start full; the Energy bar drops by a quarter with each clone summoned.
-- **Modes:** Quick Battle: 1 round, 99 seconds, against a non-attacking training CPU. Practice Ground: training on its own stage, alone or with an optional stand-still CPU dummy, with no timer or rounds (below).
+- **Modes:** Quick Battle: 1 round, 99 seconds, against a non-attacking training CPU; falling into the Void loses the round at once. Practice Ground: training on its own stage, alone or with an optional stand-still CPU dummy, with no timer or rounds; the Void puts a fighter back at its spawn (below).
 
 ## Design
 
@@ -230,8 +235,8 @@ neutral.
   across the top on narrow windows but stays at the side in short
   landscape.
 - **Practice Ground** is a pale, cool-gray simulation room: original Canvas
-  artwork with a gridded back wall, a perspective floor and side walls at the
-  bounds. Its HUD keeps Player 1's panel and a three-dots More button, top
+  artwork with a gridded back wall and one compact training block in
+  perspective, open at both edges. Its HUD keeps Player 1's panel and a three-dots More button, top
   centre; the Practice menu and the Change Fighter and CPU dialogs are
   translucent glass over the paused stage. Damage dealt to the practice CPU
   floats over its head in red.
@@ -259,7 +264,8 @@ js/
                       combat, projectiles, summoned clones, charged
                       techniques, sprite normalizer/animator, HUDs,
                       touch controls
-  stages/             Desert, City and Practice renderers (procedural Canvas 2D)
+  stages/             Desert, City and Practice renderers (procedural Canvas 2D),
+                      the shared one-point perspective and the Void
   data/               characters.js, maps.js, practice-map.js, powers.js,
                       knockback.js
   ui/                 wordmark, icons, overlays, shared help content, stage
@@ -268,7 +274,39 @@ js/
 
 - **Sprite normalization.** The idle, jump, fall, land and hurt frames are pixel art at roughly 16× scale, the mid-air hurt, Basic Attack 1 and 2, Charge and Dodge frames at 8×, and the run frames at 4×. When a frame loads, the game reads its alpha channel once and finds the visible bounds. It then detects the pixel grid from every colour transition and resamples the frame to 1 pixel per art pixel. Every frame is drawn at the same world scale, anchored bottom-centre at the upper-body centroid, so the fighter keeps the same size and position when switching between animations. When the size stays close to the target, each art pixel maps to a whole number of device pixels. The Sphere Rush poses are fighter poses at 2×, normalized like the rest. Projectile and effect art (the shuriken at 8×, the clone cloud and the Sphere Rush sphere at 2×) goes through the same grid detection but keeps its own art size, centre-anchored at the fighter's art-pixel scale, and is never fitted to the fighter's height.
 - **Simulation.** Fixed 60 Hz steps with interpolated rendering, so movement is the same at 30, 60 and 120 Hz. Colliders, hurtboxes and pushboxes are set in data and don't depend on PNG size.
-- **Stages.** Six parallax layers (sky, far, mid, near, terrain, atmosphere) are generated once from a seeded RNG into cached `Path2D` geometry. Collision comes only from `js/data/maps.js`, so any layer can later be swapped for image art.
+- **Stages.** Flat parallax layers (sky, far, mid, near, atmosphere) are generated once from a seeded RNG into cached `Path2D` geometry; the playable geometry (main stage, platforms, solids) is drawn in one shared one-point perspective (`js/stages/perspective.js`) so it has depth. Collision comes only from `js/data/maps.js`, so any layer can later be swapped for image art.
+
+### Stages and the Void
+
+Every stage is a compact platform-fighter stage. Its map (`js/data/maps.js`,
+`js/data/practice-map.js`) keeps four things apart:
+
+- **Main stage** (`mainStage`): the finite main floor. Fighters stand on its
+  top only between its `left` and `right` edges; below its top it is a solid
+  block (a cliff, facade or block face), drawn and collided exactly alike.
+- **Off-stage space**: the open air past both ledges. There are no side walls,
+  visible or invisible: fighters can run, jump or be knocked off either ledge
+  and fall below the stage, and drift back if they still can.
+- **Camera bounds** (`cameraBounds`): where the camera may travel, far enough
+  out to follow a fighter over the drop to the Void's edge.
+- **The Void** (`voidBounds`): the kill boundary, far past the ledges, well
+  below the stage and high above it. A fighter whose centre leaves this fixed
+  rectangle (`StageCollision.inVoid`) is taken by it: in Quick Battle that
+  fighter is defeated on the spot (a short **K.O.** beat, then the result),
+  in Practice Ground it is put back at its spawn. On screen the Void is pure
+  black with a gently wavering edge and a dark glow inside it; it only shows
+  once the view nears it, and holds still with reduced motion. The drawn edge
+  is art only: the kill line never moves.
+
+The camera is a platform-fighter view: fighters stand about a tenth of the
+viewport tall, the whole main stage with some air past its ledges fits across
+a 16:9 view (narrower screens zoom out further, never below 8.8 %), and the
+framing leans toward the stage's centre while it follows the fight.
+
+Desert is a sandstone mesa over open desert air; City a rooftop block over
+the street canyon; Practice Ground a training block against its gridded
+wall. All three are drawn in the same pseudo-3D perspective, with the
+Practice Ground's projection shared by every stage.
 
 ### Practice Ground
 
@@ -286,8 +324,11 @@ until you choose Return.
   and ends.
 - **Stage.** `PRACTICE_MAP` (`js/data/practice-map.js`) is deliberately not
   in `MAPS`, which feeds Select Stage. `js/stages/practice-theme.js` draws the
-  room as one square grid in one-point perspective (back wall, floor, side
-  walls at the bounds, a ruler along the front edge).
+  room as one square grid in one-point perspective: a back wall, and a
+  compact training block with open edges (its top, its outer side past
+  either ledge, a ruler along its front edge). A fighter that falls into the
+  Void is put straight back at its own spawn, with its health and Energy,
+  and nothing keeps hold of or aims at it; practice goes on.
 - **More menu.** The three-dots button, top centre where Quick Battle's
   timer sits (or `Esc` / `P` / Start), freezes practice under a light glass
   menu with **Change Fighter**, **Enable CPU** (**Change CPU** once there is

@@ -1,8 +1,21 @@
-// CITY — dense rooftop district at night. Vertical routes over platforms,
-// dark structures with warm neon accent lighting. These are scene colours of
-// the stage artwork, not part of the monochrome Alva interface palette.
+// CITY — one rooftop block in a dense district at night. Vertical routes
+// over platforms, dark structures with warm neon accent lighting. These are
+// scene colours of the stage artwork, not part of the monochrome Alva
+// interface palette.
+//
+// The skyline is flat parallax (stars, moon, searchlights, far and mid
+// skylines with the elevated train, near towers), darkening into the street
+// canyon below the roof. The rooftop block, its platforms and the stair
+// bulkhead are drawn in the shared one-point perspective
+// (js/stages/perspective.js), like Practice Ground: a roof that recedes in
+// depth with its props standing on it, a lit facade in front and the
+// building's side past whichever ledge the view looks beyond; every
+// platform is a slab with depth, with its legs, rails and structures on
+// planes at its back and front. Their edges are exactly the collision's
+// (map.mainStage, map.platforms, map.solids).
 
 import { StageTheme, ParticleField } from './stage-theme.js';
+import { fillQuad, quadGradient, clipAboveRim } from './perspective.js';
 import { mulberry32, range } from '../core/utils.js';
 
 const C = {
@@ -18,31 +31,75 @@ const C = {
   near: '#1d1d22',
   nearEdge: '#2b2b32',
   nearWarm: 'rgba(255, 172, 92, 0.85)',
+  canyon: [[0, 'rgba(4, 4, 6, 0)'], [0.3, 'rgba(4, 4, 6, 0.62)'], [1, 'rgba(4, 4, 6, 0.9)']],
   orange: '#ff7a00',
   orangeHi: '#ff9a2e',
-  roofTop: '#5a5a62',
-  roof: '#2e2e34',
-  facade: '#19191d',
+  // The rooftop block.
+  roofTop: [[0, '#26262c'], [1, '#3a3a42']],
+  roofSeam: 'rgba(12, 12, 14, 0.45)',
+  coping: '#6a6a74',
+  corner: [[0, 'rgba(150, 150, 164, 0.75)'], [1, 'rgba(150, 150, 164, 0)']],
+  copingShadow: 'rgba(0, 0, 0, 0.45)',
+  facade: [[0, '#222228'], [0.3, '#19191d'], [1, '#111114']],
+  facadeSide: [[0, '#141417'], [1, '#0b0b0d']],
+  facadeLit: [[0, '#2a2a31'], [1, '#17171b']],
+  facadeWin: 'rgba(255, 170, 90, 0.42)',
+  facadeBand: 'rgba(0, 0, 0, 0.35)',
+  canyonFace: [[0, 'rgba(6, 6, 8, 0)'], [1, 'rgba(6, 6, 8, 0.92)']],
+  prop: '#26262c',
+  // Platforms and the bulkhead.
   metalTop: '#6a6a74',
   metal: '#3c3c44',
+  metalSide: '#2c2c33',
   metalDark: '#26262c',
   rail: '#4c4c55',
+  railBack: '#34343b',
   wood: '#5b5048',
+  woodTop: '#766960',
+  woodSide: '#3f3731',
   concrete: '#2f2f35',
+  concreteTop: '#44444c',
+  concreteSide: '#232328',
+  panel: '#131316',
+  tank: '#2c2a29',
+  tankRoof: '#232122',
+  tankBand: '#3d3a38',
 };
+
+// Depth of the roof (back edge to front edge), of every platform slab and
+// of the billboards and tanks standing behind or on them. The fighters stand
+// at 1.
+const ROOF = { back: 0.66, front: 1.06 };
+const PLAT = { back: 0.93, front: 1.05 };
+const SIGN_DEPTH = 0.9;
+const TANK_DEPTH = 0.97;
+const BULK = { back: 0.9, front: 1.05 };
+// Roof props stand on the roof at these depths.
+const PROP_DEPTHS = [0.74, 0.84];
+// Camera height over the roof at the reference view (world units).
+const RISE = 240;
+// Where the facade fades into the dark street canyon below (world units
+// under the roof).
+const CANYON_FROM = 160;
+const CANYON_TO = 760;
 
 export class CityTheme extends StageTheme {
   constructor(map, opts) {
     super(map, opts);
     this.shadow = { alpha: 0.38, skew: 0, stretch: 1 };
+    this.persp = this.perspective(RISE);
+    this.faces = {};
     this.build();
   }
 
   build() {
     const m = this.map;
     const rng = mulberry32(0xc17e);
-    const G = m.groundLevel;
-    const bottom = m.worldHeight + 800;
+    const G = this.groundY;
+    const cb = m.cameraBounds;
+    // Far enough down and across for every camera position, at any parallax.
+    const bottom = cb.bottom + 600;
+    const end = (p) => cb.right * p + 2400;
 
     // Stars (screen-space fractions)
     this.stars = Array.from({ length: 70 }, () => ({
@@ -54,7 +111,7 @@ export class CityTheme extends StageTheme {
     this.farWin = new Path2D();
     this.beacons = [];
     let x = -200;
-    const farEnd = m.worldWidth * 0.1 + 1800;
+    const farEnd = end(0.1);
     while (x < farEnd) {
       const w = range(rng, 40, 110);
       const h = range(rng, 70, 260);
@@ -83,7 +140,7 @@ export class CityTheme extends StageTheme {
     this.midCool = new Path2D();
     this.flicker = [];
     x = -200;
-    const midEnd = m.worldWidth * 0.28 + 1800;
+    const midEnd = end(0.28);
     while (x < midEnd) {
       const w = range(rng, 70, 160);
       const h = range(rng, 170, 430);
@@ -123,7 +180,7 @@ export class CityTheme extends StageTheme {
     this.nearWarm = new Path2D();
     this.neon = [];
     x = -150;
-    const nearEnd = m.worldWidth * 0.55 + 1800;
+    const nearEnd = end(0.55);
     let n = 0;
     while (x < nearEnd) {
       const w = range(rng, 150, 280);
@@ -133,7 +190,9 @@ export class CityTheme extends StageTheme {
       this.near.rect(x, top, w, bottom - top);
       this.nearEdge.rect(x, top, w, 4);
       this.nearEdge.rect(x + w - 5, top, 5, h);
-      for (let wy = top + 22; wy < base - 20; wy += 26) {
+      // Windows all the way down: past the ledges these towers are the
+      // street canyon's walls.
+      for (let wy = top + 22; wy < G + 820; wy += 26) {
         for (let wx = x + 14; wx < x + w - 18; wx += 22) {
           if (rng() < 0.13) this.nearWarm.rect(wx, wy, 8, 12);
         }
@@ -146,9 +205,8 @@ export class CityTheme extends StageTheme {
       n++;
     }
 
-    // Layer 4: roof, bounds buildings, platform structures
+    // Layer 4: the rooftop block, its platforms and the bulkhead
     this.buildRoof(rng);
-    this.buildBounds(rng);
     this.buildPlatforms(rng);
 
     // Layer 5: atmosphere
@@ -210,180 +268,210 @@ export class CityTheme extends StageTheme {
     this.beaconsNear.push({ x, y: roofY - mastH - 30, p: x % 3 });
   }
 
+  // The roof's art, authored in world units on flat planes and cached: its
+  // facade (windows and floor bands down the front face) and the props
+  // standing on it at a couple of depths behind the fighters.
   buildRoof(rng) {
-    const m = this.map;
-    const G = m.groundLevel;
-    this.roofDetail = new Path2D();
-    this.roofLights = new Path2D();
+    const { left, right, bottom } = this.map.mainStage;
+    const G = this.groundY;
     this.facadeWin = new Path2D();
-    // Facade windows below the roof line
-    for (let wy = G + 40; wy < m.worldHeight + 60; wy += 34) {
-      for (let wx = m.bounds.left + 20; wx < m.bounds.right - 20; wx += 30) {
+    this.facadeBands = new Path2D();
+    for (let wy = G + 40; wy < bottom - 40; wy += 34) {
+      for (let wx = left + 20; wx < right - 20; wx += 30) {
         if (rng() < 0.18) this.facadeWin.rect(wx, wy, 12, 16);
       }
     }
-    // Background roof props (behind fighters)
-    for (let px = m.bounds.left + 90; px < m.bounds.right - 60; px += range(rng, 180, 360)) {
-      const kind = rng();
-      if (kind < 0.35) {
-        // antenna mast
-        this.roofDetail.rect(px, G - 120, 3, 120);
-        this.roofDetail.rect(px - 14, G - 100, 31, 2);
-        this.roofDetail.rect(px - 10, G - 80, 23, 2);
-        this.roofLights.rect(px - 1, G - 124, 5, 5);
-      } else if (kind < 0.6) {
-        // low AC box
-        const w = range(rng, 40, 70);
-        this.roofDetail.rect(px, G - 30, w, 30);
-      } else if (kind < 0.8) {
-        // pipe run
-        this.roofDetail.rect(px, G - 12, range(rng, 90, 180), 6);
-        this.roofDetail.rect(px, G - 18, 6, 18);
-      } else {
-        // satellite dish
-        this.roofDetail.moveTo(px, G - 44);
-        this.roofDetail.quadraticCurveTo(px + 16, G - 20, px + 34, G - 50);
-        this.roofDetail.lineTo(px, G - 44);
-        this.roofDetail.rect(px + 14, G - 30, 4, 30);
-      }
-    }
-  }
-
-  buildBounds(rng) {
-    const m = this.map;
-    const G = m.groundLevel;
-    const top = -300;
-    this.bounds = new Path2D();
-    this.boundsEdge = new Path2D();
-    this.boundsWin = new Path2D();
-    const wall = (x0, x1, faceX) => {
-      this.bounds.rect(x0, top, x1 - x0, m.worldHeight - top + 400);
-      this.boundsEdge.rect(faceX - 3, top, 6, G - top);
-      for (let wy = top + 30; wy < G - 30; wy += 30) {
-        for (let wx = x0 + 18; wx < x1 - 14; wx += 26) {
-          if (rng() < 0.2) this.boundsWin.rect(wx, wy, 10, 14);
+    for (let by = G + 24; by < bottom; by += 102) this.facadeBands.rect(left, by, right - left, 5);
+    // Props on the roof, one row per depth.
+    this.props = PROP_DEPTHS.map((f) => {
+      const detail = new Path2D();
+      const lights = new Path2D();
+      for (let px = left + range(rng, 60, 180); px < right - 80; px += range(rng, 220, 420)) {
+        const kind = rng();
+        if (kind < 0.35) {
+          // antenna mast
+          detail.rect(px, G - 120, 3, 120);
+          detail.rect(px - 14, G - 100, 31, 2);
+          detail.rect(px - 10, G - 80, 23, 2);
+          lights.rect(px - 1, G - 124, 5, 5);
+        } else if (kind < 0.6) {
+          // low AC box
+          const w = range(rng, 40, 70);
+          detail.rect(px, G - 30, w, 30);
+        } else if (kind < 0.8) {
+          // pipe run
+          detail.rect(px, G - 12, range(rng, 90, 180), 6);
+          detail.rect(px, G - 18, 6, 18);
+        } else {
+          // satellite dish
+          detail.moveTo(px, G - 44);
+          detail.quadraticCurveTo(px + 16, G - 20, px + 34, G - 50);
+          detail.lineTo(px, G - 44);
+          detail.rect(px + 14, G - 30, 4, 30);
         }
       }
-    };
-    wall(-400, m.bounds.left, m.bounds.left);
-    wall(m.bounds.right, m.worldWidth + 400, m.bounds.right);
+      return { f, detail, lights };
+    });
   }
 
+  // Each platform as a slab in depth (its box, drawn each frame) with its
+  // structures on flat planes, cached: `back` behind the slab (back legs and
+  // rail, billboards, ducting), `front` in front of it (front legs, rail,
+  // lights, trusses) and `on` for things standing on the deck (a tank).
   buildPlatforms(rng) {
     const m = this.map;
-    const G = m.groundLevel;
-    const P = {
-      top: new Path2D(), metal: new Path2D(), dark: new Path2D(), rail: new Path2D(),
-      wood: new Path2D(), concrete: new Path2D(), hazard: new Path2D(), lights: new Path2D(),
-      panel: new Path2D(), stroke: new Path2D(), tank: new Path2D(), tankRoof: new Path2D(), tankBand: new Path2D(),
-    };
-    this.plat = P;
-    this.signs = [];
-
+    const G = this.groundY;
+    const layer = () => ({
+      metal: new Path2D(), dark: new Path2D(), rail: new Path2D(), stroke: new Path2D(),
+      concrete: new Path2D(), hazard: new Path2D(), lights: new Path2D(), panel: new Path2D(),
+      tank: new Path2D(), tankRoof: new Path2D(), tankBand: new Path2D(),
+    });
+    this.platformArt = [];
     for (const p of m.platforms) {
       const { x, y, w } = p;
       const h = p.h || 16;
+      const back = layer();
+      const front = layer();
+      const on = layer();
+      const signs = [];
+      const box = { x0: x, x1: x + w, top: y, bottom: y + h, ...PLAT };
+      let paint = 'metal';
+      // Legs from the slab's underside to the roof, on both planes.
+      const legs = (xs, lw) => {
+        for (const lx of xs) {
+          back.dark.rect(lx, y + h, lw, G - y - h);
+          front.dark.rect(lx, y + h, lw, G - y - h);
+        }
+      };
       switch (p.kind) {
         case 'rack': {
-          P.metal.rect(x, y, w, h);
-          P.top.rect(x, y, w, 3);
-          for (let gx = x + 6; gx < x + w - 4; gx += 8) P.dark.rect(gx, y + 5, 3, h - 7);
-          for (const lx of [x + 8, x + w / 2 - 3, x + w - 14]) P.dark.rect(lx, y + h, 6, G - y - h);
-          P.stroke.moveTo(x + 11, y + h);
-          P.stroke.lineTo(x + w / 2, G - 4);
-          P.stroke.moveTo(x + w - 11, y + h);
-          P.stroke.lineTo(x + w / 2, G - 4);
+          legs([x + 8, x + w / 2 - 3, x + w - 14], 6);
+          front.stroke.moveTo(x + 11, y + h);
+          front.stroke.lineTo(x + w / 2, G - 4);
+          front.stroke.moveTo(x + w - 11, y + h);
+          front.stroke.lineTo(x + w / 2, G - 4);
+          for (let gx = x + 6; gx < x + w - 4; gx += 8) front.dark.rect(gx, y + 5, 3, h - 7);
           // ducting running behind
-          P.dark.rect(x - 20, G - 34, w + 40, 18);
+          back.dark.rect(x - 20, G - 34, w + 40, 18);
           break;
         }
         case 'catwalk': {
-          // Billboard structure above, walkway below
+          // Billboard structure behind, walkway in front of it
           const bh = 118;
           const by = y - bh - 30;
-          P.dark.rect(x + 18, by, 10, G - by);
-          P.dark.rect(x + w - 28, by, 10, G - by);
-          P.panel.rect(x - 6, by, w + 12, bh);
-          P.metal.rect(x - 6, by, w + 12, 4);
-          P.metal.rect(x - 6, by + bh - 4, w + 12, 4);
-          this.signs.push({ x: x + 16, y: by + 20, w: w - 32, h: bh - 40, phase: rng() * 10 });
-          // railing
-          for (let rx = x + 4; rx < x + w; rx += 28) P.rail.rect(rx, y - 26, 3, 26);
-          P.rail.rect(x, y - 27, w, 3);
-          P.rail.rect(x, y - 14, w, 2);
-          P.metal.rect(x, y, w, h);
-          P.top.rect(x, y, w, 3);
-          P.lights.rect(x + 6, y + h - 4, w - 12, 2);
+          const sign = layer();
+          sign.dark.rect(x + 18, by, 10, G - by);
+          sign.dark.rect(x + w - 28, by, 10, G - by);
+          sign.panel.rect(x - 6, by, w + 12, bh);
+          sign.metal.rect(x - 6, by, w + 12, 4);
+          sign.metal.rect(x - 6, by + bh - 4, w + 12, 4);
+          signs.push({ art: sign, x: x + 16, y: by + 20, w: w - 32, h: bh - 40, phase: rng() * 10 });
+          legs([x + 10, x + w - 16], 6);
+          for (const r of [back, front]) {
+            for (let rx = x + 4; rx < x + w; rx += 28) r.rail.rect(rx, y - 26, 3, 26);
+            r.rail.rect(x, y - 27, w, 3);
+            r.rail.rect(x, y - 14, w, 2);
+          }
+          front.lights.rect(x + 6, y + h - 4, w - 12, 2);
           break;
         }
         case 'girder': {
           // I-beam + truss + concrete piers
-          P.top.rect(x, y, w, 4);
-          P.metal.rect(x, y + 4, w, h - 8);
-          P.top.rect(x, y + h - 4, w, 4);
-          for (let rx = x + 10; rx < x + w - 6; rx += 20) P.dark.rect(rx, y + h / 2 - 1, 3, 3);
+          for (let rx = x + 10; rx < x + w - 6; rx += 20) front.dark.rect(rx, y + h / 2 - 1, 3, 3);
+          front.metal.rect(x, y + 4, w, 2);
+          front.metal.rect(x, y + h - 6, w, 2);
           const ty = y + h;
           const tb = ty + 36;
-          P.stroke.moveTo(x + 8, ty);
-          for (let tx = x + 8, up = false; tx <= x + w - 8; tx += 32, up = !up) P.stroke.lineTo(tx, up ? ty : tb);
-          P.dark.rect(x + 8, tb - 3, w - 16, 4);
-          for (const px of [x + 14, x + w - 38]) {
-            P.concrete.rect(px, tb, 24, G - tb);
-            P.hazard.rect(px, tb + 6, 24, 6);
+          for (const r of [back, front]) {
+            r.stroke.moveTo(x + 8, ty);
+            for (let tx = x + 8, up = false; tx <= x + w - 8; tx += 32, up = !up) r.stroke.lineTo(tx, up ? ty : tb);
+            r.dark.rect(x + 8, tb - 3, w - 16, 4);
+            for (const px of [x + 14, x + w - 38]) {
+              r.concrete.rect(px, tb, 24, G - tb);
+              r.hazard.rect(px, tb + 6, 24, 6);
+            }
           }
           break;
         }
         case 'deck': {
-          // Water tower on legs; the deck is its walkway
-          P.metal.rect(x, y, w, h);
-          P.top.rect(x, y, w, 3);
-          for (const lx of [x + 10, x + w - 18]) P.dark.rect(lx, y + h, 8, G - y - h);
-          P.stroke.moveTo(x + 14, y + h);
-          P.stroke.lineTo(x + w - 14, G - 2);
-          P.stroke.moveTo(x + w - 14, y + h);
-          P.stroke.lineTo(x + 14, G - 2);
+          // Water tower standing on the deck; the deck is its walkway
+          legs([x + 10, x + w - 18], 8);
+          front.stroke.moveTo(x + 14, y + h);
+          front.stroke.lineTo(x + w - 14, G - 2);
+          front.stroke.moveTo(x + w - 14, y + h);
+          front.stroke.lineTo(x + 14, G - 2);
           const tx = x + 28;
           const tw = w - 56;
           const tH = 104;
-          P.tank.rect(tx, y - tH, tw, tH);
-          P.tankRoof.moveTo(tx - 8, y - tH + 2);
-          P.tankRoof.lineTo(tx + tw / 2, y - tH - 34);
-          P.tankRoof.lineTo(tx + tw + 8, y - tH + 2);
-          P.tankRoof.closePath();
-          for (let by = y - tH + 18; by < y - 6; by += 24) P.tankBand.rect(tx - 2, by, tw + 4, 3);
-          for (let sx = tx + 12; sx < tx + tw - 4; sx += 14) P.tankBand.rect(sx, y - tH + 4, 1.5, tH - 8);
-          for (let rx = x + 4; rx < x + w; rx += 30) P.rail.rect(rx, y - 24, 3, 24);
-          P.rail.rect(x, y - 25, w, 3);
-          P.lights.rect(tx + tw / 2 - 2, y - tH - 40, 4, 4);
+          on.tank.rect(tx, y - tH, tw, tH);
+          on.tankRoof.moveTo(tx - 8, y - tH + 2);
+          on.tankRoof.lineTo(tx + tw / 2, y - tH - 34);
+          on.tankRoof.lineTo(tx + tw + 8, y - tH + 2);
+          on.tankRoof.closePath();
+          for (let by = y - tH + 18; by < y - 6; by += 24) on.tankBand.rect(tx - 2, by, tw + 4, 3);
+          for (let sx = tx + 12; sx < tx + tw - 4; sx += 14) on.tankBand.rect(sx, y - tH + 4, 1.5, tH - 8);
+          on.lights.rect(tx + tw / 2 - 2, y - tH - 40, 4, 4);
+          for (const r of [back, front]) {
+            for (let rx = x + 4; rx < x + w; rx += 30) r.rail.rect(rx, y - 24, 3, 24);
+            r.rail.rect(x, y - 25, w, 3);
+          }
           break;
         }
         case 'scaffold': {
-          P.wood.rect(x, y, w, h);
-          P.top.rect(x, y, w, 2);
-          for (let sx = x + 6; sx <= x + w - 6; sx += 48) P.rail.rect(sx, y + h, 4, G - y - h);
-          for (let sy = y + h + 40; sy < G - 10; sy += 44) P.rail.rect(x + 6, sy, w - 12, 3);
-          for (let sx = x + 6; sx + 48 <= x + w - 6; sx += 96) {
-            P.stroke.moveTo(sx + 2, y + h);
-            P.stroke.lineTo(sx + 50, G - 4);
+          paint = 'wood';
+          for (const r of [back, front]) {
+            for (let sx = x + 6; sx <= x + w - 6; sx += 48) r.rail.rect(sx, y + h, 4, G - y - h);
+            for (let sy = y + h + 40; sy < G - 10; sy += 44) r.rail.rect(x + 6, sy, w - 12, 3);
+            for (let sx = x + 6; sx + 48 <= x + w - 6; sx += 96) {
+              r.stroke.moveTo(sx + 2, y + h);
+              r.stroke.lineTo(sx + 50, G - 4);
+            }
           }
-          P.hazard.rect(x, y + h, w, 3);
+          front.hazard.rect(x, y + h - 3, w, 3);
           break;
         }
-        default: {
-          P.metal.rect(x, y, w, h);
-          P.top.rect(x, y, w, 3);
-        }
+        default:
+          legs([x + 8, x + w - 14], 6);
       }
+      this.platformArt.push({ box, paint, back, front, on, signs });
     }
 
-    // Solid bulkheads
-    for (const s of m.solids) {
-      P.concrete.rect(s.x, s.y, s.w, s.h);
-      P.top.rect(s.x - 2, s.y, s.w + 4, 4);
-      P.dark.rect(s.x + s.w * 0.3, s.y + 22, 36, s.h - 22);
-      P.lights.rect(s.x + s.w * 0.3 + 14, s.y + 12, 8, 4);
-      for (let ly = s.y + 26; ly < s.y + s.h - 14; ly += 8) P.dark.rect(s.x + s.w - 44, ly, 30, 3);
-    }
+    // The stair bulkhead(s): a concrete box with a door and a lit sign.
+    this.bulkheads = m.solids.map((so) => {
+      const art = layer();
+      const dw = Math.min(30, so.w * 0.4);
+      art.dark.rect(so.x + so.w * 0.2, so.y + 22, dw, so.h - 22);
+      art.lights.rect(so.x + so.w * 0.2 + dw / 2 - 4, so.y + 12, 8, 4);
+      for (let ly = so.y + 26; ly < so.y + so.h - 14; ly += 8) art.dark.rect(so.x + so.w - 30, ly, 20, 3);
+      return { box: { x0: so.x, x1: so.x + so.w, top: so.y, bottom: so.y + so.h, ...BULK }, art };
+    });
+  }
+
+  // Fills a platform art layer (see buildPlatforms), back to front; its
+  // railings in `rail` (darker on the back plane).
+  paintLayer(ctx, L, rail = C.rail) {
+    ctx.fillStyle = C.panel;
+    ctx.fill(L.panel);
+    ctx.fillStyle = rail;
+    ctx.fill(L.rail);
+    ctx.fillStyle = C.metalDark;
+    ctx.fill(L.dark);
+    ctx.strokeStyle = C.metalDark;
+    ctx.lineWidth = 3;
+    ctx.stroke(L.stroke);
+    ctx.fillStyle = C.concrete;
+    ctx.fill(L.concrete);
+    ctx.fillStyle = C.tank;
+    ctx.fill(L.tank);
+    ctx.fillStyle = C.tankRoof;
+    ctx.fill(L.tankRoof);
+    ctx.fillStyle = C.tankBand;
+    ctx.fill(L.tankBand);
+    ctx.fillStyle = C.metal;
+    ctx.fill(L.metal);
+    ctx.fillStyle = C.orange;
+    ctx.fill(L.hazard);
+    ctx.fill(L.lights);
   }
 
   resize(view) {
@@ -413,8 +501,7 @@ export class CityTheme extends StageTheme {
   }
 
   drawBackground(ctx, view) {
-    const m = this.map;
-    const G = m.groundLevel;
+    const G = this.groundY;
     const s = view.scale;
     const t = this.time;
     const still = this.reducedMotion;
@@ -542,67 +629,153 @@ export class CityTheme extends StageTheme {
         if (still || Math.sin(t * 1.8 + b.p) > 0) ctx.fillRect(b.x - 2, b.y - 2, 4, 4);
       }
     }
+
+    // The street canyon darkening below the roof's level: past the ledges
+    // there is only a long drop between the towers.
+    const rim = this.persp.y(view, G, ROOF.back);
+    const depth = 520 * s;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.fillStyle = quadGradient(ctx, [0, rim, 0, rim, 0, rim + depth, 0, rim + depth], C.canyon);
+    ctx.fillRect(0, rim, view.pxW, view.pxH - rim);
   }
 
+  // The rooftop block, then every platform and the bulkhead on it (never
+  // below the roof's front edge).
   drawTerrain(ctx, view) {
-    const m = this.map;
-    const G = m.groundLevel;
+    this.drawRoof(ctx, view);
+    clipAboveRim(ctx, this.persp, view, this.groundY, ROOF.front);
+    for (const art of this.platformArt) this.drawPlatform(ctx, view, art);
+    for (const b of this.bulkheads) this.drawBulkhead(ctx, view, b);
+    ctx.restore();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+  }
+
+  // The roof in perspective with its props standing on it, the building's
+  // side past whichever ledge the view looks beyond, then the facade in
+  // front: windows and floor bands, the lit coping at the roof's edge, and
+  // the dark of the street canyon swallowing it below.
+  drawRoof(ctx, view) {
+    const { left, right, bottom } = this.map.mainStage;
+    const G = this.groundY;
+    const p = this.persp;
     const t = this.time;
-    this.layer(ctx, view, 1, 1);
-
-    // Boundary buildings
-    ctx.fillStyle = '#141418';
-    ctx.fill(this.bounds);
-    ctx.fillStyle = C.nearEdge;
-    ctx.fill(this.boundsEdge);
-    ctx.fillStyle = 'rgba(255, 170, 90, 0.55)';
-    ctx.fill(this.boundsWin);
-
-    // Roof props behind the play area
-    ctx.fillStyle = '#26262c';
-    ctx.fill(this.roofDetail);
-    ctx.fillStyle = C.orange;
-    if (this.reducedMotion || Math.sin(t * 2) > -0.3) ctx.fill(this.roofLights);
-
-    // Platform structures
-    const P = this.plat;
-    ctx.fillStyle = '#131316';
-    ctx.fill(P.panel);
-    for (const sgn of this.signs) this.drawSign(ctx, sgn, t);
-    ctx.fillStyle = C.metalDark;
-    ctx.fill(P.dark);
-    ctx.strokeStyle = C.metalDark;
-    ctx.lineWidth = 3;
-    ctx.stroke(P.stroke);
-    ctx.fillStyle = C.concrete;
-    ctx.fill(P.concrete);
-    ctx.fillStyle = C.rail;
-    ctx.fill(P.rail);
-    ctx.fillStyle = C.wood;
-    ctx.fill(P.wood);
-    ctx.fillStyle = '#2c2a29';
-    ctx.fill(P.tank);
-    ctx.fillStyle = '#232122';
-    ctx.fill(P.tankRoof);
-    ctx.fillStyle = '#3d3a38';
-    ctx.fill(P.tankBand);
-    ctx.fillStyle = C.metal;
-    ctx.fill(P.metal);
-    ctx.fillStyle = C.metalTop;
-    ctx.fill(P.top);
-    ctx.fillStyle = C.orange;
-    ctx.fill(P.hazard);
-    ctx.fill(P.lights);
-
-    // Main roof
-    ctx.fillStyle = C.facade;
-    ctx.fillRect(-100, G, m.worldWidth + 200, m.worldHeight - G + 400);
-    ctx.fillStyle = C.roof;
-    ctx.fillRect(-100, G, m.worldWidth + 200, 16);
-    ctx.fillStyle = C.roofTop;
-    ctx.fillRect(-100, G, m.worldWidth + 200, 3);
-    ctx.fillStyle = 'rgba(255, 170, 90, 0.4)';
+    const f = p.box(view, { x0: left, x1: right, top: G, bottom, ...ROOF }, this.faces);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    if (f.top) {
+      fillQuad(ctx, f.top, quadGradient(ctx, f.top, C.roofTop));
+      // Tar seams at constant depth.
+      ctx.beginPath();
+      for (const d of [0.72, 0.8, 0.88, 0.97]) {
+        const y = p.y(view, G, d);
+        ctx.moveTo(p.x(view, left, d), y);
+        ctx.lineTo(p.x(view, right, d), y);
+      }
+      ctx.strokeStyle = C.roofSeam;
+      ctx.lineWidth = Math.max(1, view.scale * 0.8);
+      ctx.stroke();
+      const lightsOn = this.reducedMotion || Math.sin(t * 2) > -0.3;
+      for (const row of this.props) {
+        p.plane(ctx, view, row.f);
+        ctx.fillStyle = C.prop;
+        ctx.fill(row.detail);
+        ctx.fillStyle = C.orange;
+        if (lightsOn) ctx.fill(row.lights);
+      }
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+    }
+    for (const [q, stops] of [[f.left, C.facadeSide], [f.right, C.facadeLit]]) {
+      if (!q) continue;
+      fillQuad(ctx, q, quadGradient(ctx, q, stops));
+      // Floor bands carried back along the side.
+      const x = q === f.left ? left : right;
+      ctx.beginPath();
+      for (let d = 24; d < 900; d += 102) {
+        const [bx, by] = p.point(view, x, G + d, ROOF.back);
+        const [fx, fy] = p.point(view, x, G + d, ROOF.front);
+        if (by > view.pxH && fy > view.pxH) break;
+        ctx.moveTo(bx, by);
+        ctx.lineTo(fx, fy);
+      }
+      ctx.strokeStyle = C.facadeBand;
+      ctx.lineWidth = Math.max(1, view.scale * 2);
+      ctx.stroke();
+      const y0 = p.y(view, G + CANYON_FROM, ROOF.front);
+      const y1 = p.y(view, G + CANYON_TO, ROOF.front);
+      fillQuad(ctx, q, quadGradient(ctx, [0, y0, 0, y0, 0, y1, 0, y1], C.canyonFace));
+    }
+    // The facade, on its own plane with cached art.
+    p.plane(ctx, view, ROOF.front);
+    ctx.fillStyle = this.facadeGrad ??= this.worldGradient(ctx, G, G + 700, C.facade);
+    ctx.fillRect(left, G, right - left, bottom - G);
+    ctx.fillStyle = C.facadeBand;
+    ctx.fill(this.facadeBands);
+    ctx.fillStyle = C.facadeWin;
     ctx.fill(this.facadeWin);
+    // The building's corners catch the light, so its edges read against
+    // the dark towers beyond.
+    ctx.fillStyle = this.cornerGrad ??= this.worldGradient(ctx, G, G + 520, C.corner);
+    ctx.fillRect(left, G, 3, 520);
+    ctx.fillRect(right - 3, G, 3, 520);
+    ctx.fillStyle = C.coping;
+    ctx.fillRect(left, G, right - left, 4);
+    ctx.fillStyle = C.copingShadow;
+    ctx.fillRect(left, G + 4, right - left, 10);
+    ctx.fillStyle = this.canyonGrad ??= this.worldGradient(ctx, G + CANYON_FROM, G + CANYON_TO, C.canyonFace);
+    ctx.fillRect(left, G + CANYON_FROM, right - left, bottom - G - CANYON_FROM);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+  }
+
+  // One platform: its back structures (legs, rail, billboard with its neon
+  // sign), the slab itself (top, the side facing the view's centre line,
+  // front), what stands on the deck, then its front structures.
+  drawPlatform(ctx, view, art) {
+    const p = this.persp;
+    const t = this.time;
+    for (const sign of art.signs) {
+      p.plane(ctx, view, SIGN_DEPTH);
+      this.paintLayer(ctx, sign.art);
+      this.drawSign(ctx, sign, t);
+    }
+    p.plane(ctx, view, PLAT.back);
+    this.paintLayer(ctx, art.back, C.railBack);
+    const wood = art.paint === 'wood';
+    const f = p.box(view, art.box, this.faces);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    fillQuad(ctx, f.top, wood ? C.woodTop : C.metalTop);
+    fillQuad(ctx, f.left, wood ? C.woodSide : C.metalSide);
+    fillQuad(ctx, f.right, wood ? C.woodSide : C.metalSide);
+    fillQuad(ctx, f.front, wood ? C.wood : C.metal);
+    p.plane(ctx, view, TANK_DEPTH);
+    this.paintLayer(ctx, art.on);
+    p.plane(ctx, view, PLAT.front);
+    this.paintLayer(ctx, art.front, C.rail);
+    // The deck's lit front edge.
+    ctx.fillStyle = wood ? C.woodTop : C.metalTop;
+    ctx.fillRect(art.box.x0, art.box.top, art.box.x1 - art.box.x0, 2);
+  }
+
+  // The stair bulkhead: a concrete box with a door, a vent and a lamp.
+  drawBulkhead(ctx, view, b) {
+    const p = this.persp;
+    const f = p.box(view, b.box, this.faces);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    fillQuad(ctx, f.top, C.concreteTop);
+    fillQuad(ctx, f.left, C.concreteSide);
+    fillQuad(ctx, f.right, C.concreteSide);
+    fillQuad(ctx, f.front, C.concrete);
+    p.plane(ctx, view, b.box.front);
+    this.paintLayer(ctx, b.art);
+    ctx.fillStyle = C.metalTop;
+    ctx.fillRect(b.box.x0, b.box.top, b.box.x1 - b.box.x0, 3);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+  }
+
+  // A world-space vertical gradient (for art drawn on a depth plane): its
+  // coordinates scale with the plane, so it is built once.
+  worldGradient(ctx, y0, y1, stops) {
+    const g = ctx.createLinearGradient(0, y0, 0, y1);
+    for (const [at, color] of stops) g.addColorStop(at, color);
+    return g;
   }
 
   drawSign(ctx, s, t) {

@@ -1,10 +1,20 @@
-// Renders a live stage preview (same theme renderers + scale rules as battle)
-// into a menu canvas. Optionally shows idle fighters at the spawn points.
+// Renders a live stage preview (same theme renderers as battle) into a menu
+// canvas. Optionally shows idle fighters at the spawn points.
+//
+// A preview frames the compact stage itself: the main stage across the
+// width with a little air past each ledge, never mostly open air or the
+// far-off Void.
 
 import { createTheme } from '../stages/index.js';
-import { computeWorldScale } from '../game/arena.js';
 import { drawFrame } from '../game/sprite-normalizer.js';
 import { fitCanvas } from './sprite-art.js';
+
+// View width as a multiple of the main stage's width.
+const FRAME_WIDTH = 1.16;
+// Where the main stage's top sits, as a fraction of the view height.
+const FLOOR_LINE = 0.7;
+// Gentle pan, as a fraction of the main stage's width either way.
+const PAN_SWING = 0.05;
 
 export class StagePreview {
   constructor(canvas, { animated = true, pan = true, reducedMotion = false } = {}) {
@@ -38,27 +48,22 @@ export class StagePreview {
     if (!size.w || size.w < 2) return;
     const v = this.view;
     const m = this.map;
+    const main = m.mainStage;
+    const stageW = main.right - main.left;
     if (size.changed || force || v.pxW !== size.w) {
       v.pxW = size.w;
       v.pxH = size.h;
-      const scaleSource = this.sprites?.usable ? this.sprites : { refArtHeight: 52, worldPerArt: 88 / 52 };
-      // Menu previews show a slightly wider slice than battle.
-      v.scale = computeWorldScale(size.w, size.h, scaleSource, m) * 0.82;
-      v.scale = Math.max(v.scale, size.w / m.worldWidth, size.h / m.worldHeight);
+      // Never taller than the camera could ever frame.
+      const cb = m.cameraBounds;
+      v.scale = Math.max(size.w / (stageW * FRAME_WIDTH), size.h / (cb.bottom - cb.top));
       v.w = size.w / v.scale;
       v.h = size.h / v.scale;
     }
     this.time += dt;
 
-    const [a, b] = m.spawnPoints;
-    const mid = (a.x + b.x) / 2;
-    const maxX = m.cameraBounds.right - v.w;
-    const minX = m.cameraBounds.left;
-    const swing = Math.min(900, (maxX - minX) / 2);
-    let cx = mid - v.w / 2 + (this.pan ? Math.sin(this.time * 0.12) * swing : 0);
-    cx = Math.min(Math.max(cx, minX), maxX);
-    let cy = m.groundLevel - v.h * 0.78;
-    cy = Math.min(Math.max(cy, m.cameraBounds.top), m.cameraBounds.bottom - v.h);
+    const mid = (main.left + main.right) / 2;
+    const cx = mid - v.w / 2 + (this.pan ? Math.sin(this.time * 0.12) * stageW * PAN_SWING : 0);
+    const cy = main.top - v.h * FLOOR_LINE;
     v.x = Math.round(cx * v.scale) / v.scale;
     v.y = Math.round(cy * v.scale) / v.scale;
 
@@ -91,7 +96,7 @@ export class StagePreview {
     const pxPerArt = v.scale * set.worldPerArt;
     this.map.spawnPoints.forEach((sp, i) => {
       const sx = (sp.x - v.x) * v.scale;
-      const sy = (this.map.groundLevel - v.y) * v.scale;
+      const sy = (this.map.mainStage.top - v.y) * v.scale;
       ctx.globalAlpha = 0.28;
       ctx.fillStyle = '#000';
       ctx.beginPath();

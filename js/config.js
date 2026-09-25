@@ -11,10 +11,16 @@ export const CONFIG = Object.freeze({
   render: {
     // Backing-buffer devicePixelRatio cap (performance on high-DPI phones).
     dprCap: 2,
-    // Target on-screen fighter height as a fraction of the viewport height.
-    fighterScreenRatio: 0.16,
-    fighterScreenRatioMin: 0.13,
-    fighterScreenRatioMax: 0.195,
+    // Target on-screen fighter height as a fraction of the viewport height:
+    // a platform-fighter view, far enough out for the whole main stage, the
+    // air above it and open space past its ledges.
+    fighterScreenRatio: 0.1,
+    fighterScreenRatioMin: 0.088,
+    fighterScreenRatioMax: 0.115,
+    // The view is kept at least as wide as the main stage plus this much open
+    // air past each ledge (world units): narrow screens zoom out further for
+    // it, but never below fighterScreenRatioMin.
+    stageFrameMargin: 100,
     // Snap sprite scale to whole device pixels per art pixel when the snapped
     // size stays inside the min/max ratio above.
     pixelPerfect: true,
@@ -42,6 +48,7 @@ export const CONFIG = Object.freeze({
     roundSeconds: 99,      // set to 0 to disable the round timer
     introSeconds: 1.7,
     timeUpSeconds: 1.4,
+    koSeconds: 1.4,        // the KO beat after a Void loss, before the result
   },
 
   roster: {

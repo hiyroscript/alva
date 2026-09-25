@@ -5,25 +5,63 @@
 //   1 very distant       (parallax ~0.1)
 //   2 mid silhouettes    (parallax ~0.3)
 //   3 near background    (parallax ~0.6)
-//   4 playable terrain   (parallax 1, matches collision data exactly)
+//   4 playable terrain   (in perspective, matching collision data exactly
+//                         at the fighters' depth)
 //   5 foreground atmosphere / particles
+//   6 the Void           (drawVoid, over everything, the fighters included)
 //
 // Geometry is generated once from a seeded RNG into Path2D objects (cached);
 // screen-space gradients are rebuilt only on resize. Any layer can later be
 // swapped for image art without touching stage physics.
+//
+// The playable geometry (the main stage, platforms, solids) is drawn in
+// one-point perspective (js/stages/perspective.js) so it has depth; the
+// Void sits far past the stage and shows only as the view nears it.
 
-export const REF_VIEW_H = 540;
+import { Perspective } from './perspective.js';
+
+// Reference view the layers are authored for: a typical view height at the
+// platform-fighter zoom, with resting feet at 70% of it (the camera's floor
+// line).
+export const REF_VIEW_H = 860;
+export const REF_FLOOR_LINE = 0.7;
+
+// The Void's look. Its edge wavers `amp` world units either way of the fixed
+// kill boundary (art only: gameplay tests the boundary itself), traced every
+// `step` units, with a feathered second edge just inside it and a dark glow
+// reaching `glow` units further in, so it reads as soft, deep and organic
+// rather than a ruled line.
+const VOID = {
+  color: '#000',
+  amp: 16,
+  step: 14,
+  waves: [[2 * Math.PI / 260, 0.9, 0.6], [2 * Math.PI / 97, -1.4, 0.4]], // [k, speed, weight]
+  glow: 170,
+  glowAlpha: 0.6,
+  layers: [
+    { inset: 26, alpha: 0.45, phase: 2.6 },
+    { inset: 0, alpha: 1, phase: 0 },
+  ],
+};
 
 export class StageTheme {
   constructor(map, { reducedMotion = false } = {}) {
     this.map = map;
     this.reducedMotion = reducedMotion;
     this.time = 0;
-    // Camera y at which layers are authored (feet at 76% of a 540-unit view).
-    this.refY = map.groundLevel - REF_VIEW_H * 0.76;
+    // The main stage's top: the ground every layer is authored around.
+    this.groundY = map.mainStage.top;
+    // Camera y at which layers are authored (see REF_VIEW_H).
+    this.refY = this.groundY - REF_VIEW_H * REF_FLOOR_LINE;
     this.lastPxH = 0;
     this.lastPxW = 0;
     this.shadow = { alpha: 0.3, skew: 0, stretch: 1 };
+  }
+
+  // The shared projection for this stage's playable geometry, with the
+  // camera `rise` world units above the ground at refY.
+  perspective(rise) {
+    return new Perspective({ groundY: this.groundY, refY: this.refY, rise });
   }
 
   // Called by renderers before drawing; rebuilds screen-space caches only
@@ -50,6 +88,99 @@ export class StageTheme {
     const oy = this.refY + (view.y - this.refY) * fy;
     const s = view.scale;
     ctx.setTransform(s, 0, 0, s, -Math.round(ox * s), -Math.round(oy * s));
+  }
+
+  // ---- Void -----------------------------------------------------------------
+
+  // The Void: pure black beyond the stage's kill boundary (map.voidBounds),
+  // with a gently wavering inner edge and a dark glow just inside it, drawn
+  // over everything at the fighters' depth. Only the sides the view comes
+  // near are traced, so in neutral play the stage is never boxed in. With
+  // reduced motion the edge holds still.
+  drawVoid(ctx, view) {
+    const v = this.map.voidBounds;
+    if (!v) return;
+    const reach = VOID.amp + VOID.glow;
+    const x0 = view.x;
+    const x1 = view.x + view.w;
+    const y0 = view.y;
+    const y1 = view.y + view.h;
+    const sides = [];
+    if (x0 < v.left + reach) sides.push('left');
+    if (x1 > v.right - reach) sides.push('right');
+    if (y0 < v.top + reach) sides.push('top');
+    if (y1 > v.bottom - reach) sides.push('bottom');
+    if (!sides.length) return;
+    const t = this.reducedMotion ? 0 : this.time;
+    const s = view.scale;
+    ctx.setTransform(s, 0, 0, s, -view.x * s, -view.y * s);
+    // Far past the view, so each region reaches the screen edge.
+    const pad = 40;
+    // The glow: darkness gathering toward each edge from inside.
+    for (const side of sides) {
+      const horizontal = side === 'left' || side === 'right';
+      const edge = side === 'left' ? v.left : side === 'right' ? v.right : side === 'top' ? v.top : v.bottom;
+      const inward = side === 'left' || side === 'top' ? 1 : -1;
+      const inner = edge + inward * VOID.glow;
+      const g = horizontal
+        ? ctx.createLinearGradient(edge, 0, inner, 0)
+        : ctx.createLinearGradient(0, edge, 0, inner);
+      g.addColorStop(0, `rgba(0, 0, 0, ${VOID.glowAlpha})`);
+      g.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      ctx.fillStyle = g;
+      const a = Math.min(edge, inner);
+      const b = Math.max(edge, inner);
+      if (horizontal) ctx.fillRect(a, y0 - pad, b - a, y1 - y0 + pad * 2);
+      else ctx.fillRect(x0 - pad, a, x1 - x0 + pad * 2, b - a);
+    }
+    ctx.fillStyle = VOID.color;
+    for (const layer of VOID.layers) {
+      ctx.globalAlpha = layer.alpha;
+      ctx.beginPath();
+      for (const side of sides) this.traceVoidSide(ctx, side, layer, t, x0 - pad, x1 + pad, y0 - pad, y1 + pad);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // One side's region for a layer: the wavy edge (inset toward the stage
+  // for the feathered layer), then out past the view. Every side winds the same
+  // way, so where two meet at a corner the nonzero fill covers it once.
+  traceVoidSide(ctx, side, layer, t, x0, x1, y0, y1) {
+    const v = this.map.voidBounds;
+    const edge = (along) => {
+      let w = 0;
+      for (const [k, speed, weight] of VOID.waves) w += Math.sin(along * k + t * speed + layer.phase) * weight;
+      return VOID.amp * w;
+    };
+    const step = VOID.step;
+    const pts = [];
+    if (side === 'bottom' || side === 'top') {
+      const down = side === 'bottom';
+      const line = down ? v.bottom - layer.inset : v.top + layer.inset;
+      const outer = down ? y1 : y0;
+      const a = Math.floor(x0 / step) * step;
+      pts.push(a, outer);
+      for (let x = a; x <= x1 + step; x += step) pts.push(x, line + edge(x));
+      pts.push(x1 + step, outer);
+    } else {
+      const right = side === 'right';
+      const line = right ? v.right - layer.inset : v.left + layer.inset;
+      const outer = right ? x1 : x0;
+      const a = Math.floor(y0 / step) * step;
+      pts.push(outer, a);
+      for (let y = a; y <= y1 + step; y += step) pts.push(line + edge(y), y);
+      pts.push(outer, y1 + step);
+    }
+    // Bottom and left run clockwise as traced; top and right are reversed.
+    const reverse = side === 'top' || side === 'right';
+    const n = pts.length / 2;
+    for (let i = 0; i < n; i++) {
+      const j = reverse ? n - 1 - i : i;
+      if (i === 0) ctx.moveTo(pts[j * 2], pts[j * 2 + 1]);
+      else ctx.lineTo(pts[j * 2], pts[j * 2 + 1]);
+    }
+    ctx.closePath();
   }
 }
 

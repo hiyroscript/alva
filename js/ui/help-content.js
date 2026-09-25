@@ -105,9 +105,11 @@ export function buildHelp() {
     ]),
     card('Stages & platforms', [
       el('ul', { class: 'info-list' }, [
-        el('li', { text: 'Desert is wide and open, with two rock outcrops you can hop onto.' }),
-        el('li', { text: 'City stacks one-way platforms over the rooftop. Jump up through them from below, and walk off an edge to come back down.' }),
-        el('li', { text: 'The camera follows the action; stage edges are walled off.' }),
+        el('li', { text: 'Stages are compact and open: there are no walls at their edges. Run, jump or get knocked off a ledge and you fall, so drift back toward the stage while you still can.' }),
+        el('li', { text: 'The Void, the black region with a wavering edge far beyond each stage, is the kill boundary. Fall into it in Quick Battle and you lose the round at once; in Practice Ground you are put back at your spawn.' }),
+        el('li', { text: 'Desert is a sandstone mesa with two rock outcrops you can hop onto.' }),
+        el('li', { text: 'City stacks one-way platforms over a rooftop. Jump up through them from below, and walk off an edge to come back down.' }),
+        el('li', { text: 'The camera follows the action from far enough out to show the whole stage.' }),
       ]),
     ]),
     card('Pause', [

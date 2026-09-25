@@ -459,8 +459,6 @@ export const CHARACTERS = [
         // Cloud centre from the clone's origin (bottom-centre), facing right:
         // half the fighter's visual height, so the smoke wraps the body.
         effectOffset: { x: 0, y: -44 },
-        // Keeps the clone this far inside the stage's horizontal bounds.
-        stageMargin: 17,
         // No ground behind the opponent at its foot height (past a platform's
         // edge, or the opponent is airborne): the clone appears over it
         // instead and performs the mid-air BA2 kick, driving it downward.

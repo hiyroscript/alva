@@ -18,9 +18,10 @@
 //
 // A projectile flies straight in the direction it was released, hits at most
 // once and then disappears. It also disappears when its lifetime runs out,
-// when it leaves the stage bounds or when it meets a solid block; one-way
-// platforms never stop it. Its hitbox is centred on its position and mirrors
-// with its direction.
+// when it flies into the Void (the stage's kill boundary; the open air past
+// the ledges does not stop it) or when it meets a solid block, the main
+// floor's body included; one-way platforms never stop it. Its hitbox is
+// centred on its position and mirrors with its direction.
 
 const PROJECTILE_DEFAULTS = {
   animation: null,
@@ -94,9 +95,10 @@ export class Projectile {
       this.alive = false;
       return;
     }
-    // Gone once it has flown clean past a stage edge or into a solid block.
+    // Gone once it has flown clean into the Void or into a solid block.
     const box = this.hitbox(scratch);
-    if (box.x + box.w < stage.left || box.x > stage.right) this.alive = false;
+    const v = stage.void;
+    if (box.x + box.w < v.left || box.x > v.right || box.y + box.h < v.top || box.y > v.bottom) this.alive = false;
     else if (stage.solids.some((s) => overlaps(box, s))) this.alive = false;
   }
 

@@ -51,12 +51,21 @@ export function fakeSprites(
   return set;
 }
 
-export const STAGE = new StageCollision({
-  groundLevel: 800,
-  bounds: { left: 0, right: 2000 },
+// A test stage in the maps' schema (js/data/maps.js): a finite main floor
+// with its top at `top` from `left` to `right`, and the Void far around it.
+export function stageMap({ left = 0, right = 2000, top = 800, platforms = [], solids = [] } = {}) {
+  return {
+    mainStage: { left, right, top, bottom: top + 800 },
+    voidBounds: { left: left - 900, right: right + 900, top: top - 1400, bottom: top + 800 },
+    cameraBounds: { left: left - 1000, right: right + 1000, top: top - 1500, bottom: top + 900 },
+    platforms,
+    solids,
+  };
+}
+
+export const STAGE = new StageCollision(stageMap({
   platforms: [{ id: 'ledge', x: 900, y: 600, w: 200, h: 16 }],
-  solids: [],
-});
+}));
 
 export const SIM_CTX = { stage: STAGE, gravity: CONFIG.sim.gravity };
 

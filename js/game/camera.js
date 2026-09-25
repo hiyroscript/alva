@@ -1,9 +1,15 @@
 // 2D follow camera working in world units. Frames both fighters when they fit,
 // otherwise keeps Player 1 comfortably in view (with no second fighter, as in
-// Practice Ground without its CPU, it follows Player 1 alone); always clamped
-// to the stage.
+// Practice Ground without its CPU, it follows Player 1 alone). While it frames
+// them it leans toward the main stage's centre, so the stage stays in view
+// and a fighter off a ledge still sees the way back; always clamped to its
+// camera bounds (the stage, the air around it and the Void's edge).
 
 import { clamp, damp } from '../core/utils.js';
+
+// How far the framing leans toward the main stage's centre (0 none, 1 all
+// the way), as long as every framed fighter stays inside the margin.
+const STAGE_LEAN = 0.35;
 
 export class Camera {
   constructor() {
@@ -13,13 +19,20 @@ export class Camera {
     this.h = 540;
     this.scale = 1; // device pixels per world unit
     this.bounds = { left: 0, right: 960, top: 0, bottom: 540 };
-    this.floorLine = 0.76; // where resting feet sit, as a fraction of view height
+    this.anchorX = null; // the main stage's centre, leaned toward (setAnchor)
+    // Where resting feet sit, as a fraction of view height: plenty of air
+    // above, and room below to follow a fall past a ledge.
+    this.floorLine = 0.7;
     this.tx = 0;
     this.ty = 0;
   }
 
   setBounds(bounds) {
     this.bounds = { ...bounds };
+  }
+
+  setAnchor(x) {
+    this.anchorX = x;
   }
 
   setView(w, h, scale) {
@@ -42,19 +55,29 @@ export class Camera {
     const w = this.w;
     const margin = w * 0.2;
     const px = primary.renderX + primary.body.vx * 0.12;
+    const maxSpan = w - margin * 2;
     let fx = px;
     let fy = Camera.trackY(primary);
+    // The x range every framed fighter must stay inside the margin of.
+    let lo = primary.renderX;
+    let hi = primary.renderX;
+    let framed = true;
     if (secondary) {
       const sx = secondary.renderX;
       const span = Math.abs(sx - primary.renderX);
-      const maxSpan = w - margin * 2;
       if (span <= maxSpan) {
         fx = (primary.renderX + sx) / 2;
         fy = fy * 0.7 + Camera.trackY(secondary) * 0.3;
+        lo = Math.min(lo, sx);
+        hi = Math.max(hi, sx);
       } else {
         // Keep P1 inside the margin while leaning toward the opponent.
         fx = primary.renderX + Math.sign(sx - primary.renderX) * (maxSpan / 2);
+        framed = false;
       }
+    }
+    if (framed && this.anchorX !== null) {
+      fx = clamp(fx + (this.anchorX - fx) * STAGE_LEAN, hi - maxSpan / 2, lo + maxSpan / 2);
     }
     let tx = fx - w / 2;
     let ty = fy - this.h * this.floorLine;
