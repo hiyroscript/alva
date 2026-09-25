@@ -1486,7 +1486,7 @@ test('a Shield blocks the contact: 25 Energy, no Launch Point, no bind, no tick,
   assert.ok(d.attacker.body.vx > 0, 'free to move');
 });
 
-test('the Shield blocks the rush from behind and when raised just before it lands; without the Energy for one, the rush binds', () => {
+test('the Shield blocks the rush from behind, when raised just before it lands, and with too little Energy (emptying it); exhausted, the rush binds', () => {
   // From behind: the Shield is all round.
   const behind = hitDuel({ targetFacing: 1 });
   const t = start(behind, { defense: true });
@@ -1501,15 +1501,26 @@ test('the Shield blocks the rush from behind and when raised just before it land
   runUntil(late, () => !late.attacker.technique, () => ({}), (i) => (i + 2 >= C - 1 ? { defense: true } : {}));
   assert.equal(u.endReason, 'blocked');
   assert.equal(late.target.combat.immobilized, false);
-  // 20 Energy (and no refill over the rush) cannot pay for a block: no
-  // Shield, a normal catch.
-  const low = hitDuel({ targetCharacter: { ...def, energy: { ...def.energy, regen: 0 } } });
+  // 20 Energy (and no refill over the rush): the block still stands, and
+  // takes all 20.
+  const NO_REGEN = { ...def, energy: { ...def.energy, regen: 0 } };
+  const low = hitDuel({ targetCharacter: NO_REGEN });
   low.target.combat.setEnergy(20);
-  const v = start(low, { defense: true });
-  runUntil(low, () => v.phase !== 'form' && v.phase !== 'dash', () => ({}), () => ({ defense: true }));
+  const w = start(low, { defense: true });
+  runUntil(low, () => !low.attacker.technique, () => ({}), () => ({ defense: true }));
+  assert.equal(w.endReason, 'blocked');
+  assert.deepEqual([low.events[0].type, low.events[0].energyCost], ['block', 20]);
+  assert.deepEqual([low.target.combat.energy, low.target.combat.energyExhausted], [0, true]);
+  assert.equal(low.target.combat.shielding, false, 'emptied: the Shield drops');
+  assert.equal(low.target.combat.immobilized, false);
+  // Exhausted: no Shield at all, a normal catch.
+  const spent = hitDuel({ targetCharacter: NO_REGEN });
+  spent.target.combat.setEnergy(0);
+  const v = start(spent, { defense: true });
+  runUntil(spent, () => v.phase !== 'form' && v.phase !== 'dash', () => ({}), () => ({ defense: true }));
   assert.equal(v.phase, 'confirm');
-  assert.deepEqual(low.events.map((e) => e.type), ['hit', 'hit'], 'the contact and its tick');
-  assert.equal(low.target.combat.immobilized, true);
+  assert.deepEqual(spent.events.map((e) => e.type), ['hit', 'hit'], 'the contact and its tick');
+  assert.equal(spent.target.combat.immobilized, true);
 });
 
 // ---- Airborne target, facing, walls -----------------------------------------------

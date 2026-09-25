@@ -1,15 +1,17 @@
 // Run with node --test tests/energy.test.mjs (no dependencies).
 // Energy: the one resource, spent only by Dash (as it starts) and by the
 // Shield (for each hit it blocks). Its defaults, clamping, passive and
-// Charge refill, what each action costs, the exhaustion lockout that only a
-// full refill clears, and the three-segment view of the one value. Uses the
-// real Fighter, CombatState and physics (see fighter-harness.mjs).
+// Charge refill, what each action costs, spending more than is left (it
+// still happens, and empties the bar), the exhaustion lockout that only a
+// full refill clears, and the one bright purple bar. Uses the real Fighter,
+// CombatState and physics (see fighter-harness.mjs).
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { CombatState, resolveEnergy } from '../js/game/combat.js';
-import { energyBarState, energySegments, ENERGY_SEGMENTS, ENERGY_STYLE } from '../js/game/fighter-status.js';
+import * as status from '../js/game/fighter-status.js';
+import { energyBarState, ENERGY_STYLE } from '../js/game/fighter-status.js';
 import { def, DT, makeFighter, duel, steps } from './fighter-harness.mjs';
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
@@ -22,10 +24,9 @@ const dash = (step, dir = 'right') => {
   step({});
   return step({ [`${dir}Pressed`]: true, [dir]: true });
 };
-const ratios = (energy) => energySegments(energy).map((s) => s.ratio);
 
-test('#0001 declares its Energy: 100 max, 12 / s, 30 / s in Charge, 25 per Dash, 25 per blocked hit', () => {
-  assert.deepEqual(def.energy, { max: 100, regen: 12, chargeRegen: 30, dashCost: 25, shieldHitCost: 25 });
+test('#0001 declares its Energy: 100 max, 12 / s, 30 / s in Charge, 15 per Dash, 25 per blocked hit', () => {
+  assert.deepEqual(def.energy, { max: 100, regen: 12, chargeRegen: 30, dashCost: 15, shieldHitCost: 25 });
   assert.equal(def.stamina, undefined, 'the old name is gone');
   // Defaults for a future fighter that declares none (or only some).
   assert.deepEqual({ ...resolveEnergy(undefined) }, def.energy);
@@ -52,15 +53,17 @@ test('a fighter starts at 100, its bar hidden, and not exhausted; Energy never l
   assert.deepEqual([c.energy, c.maxEnergy, c.energyExhausted], [100, 100, false]);
   const bar = energyBarState(fighter);
   assert.deepEqual([bar.visible, bar.energy, bar.ratio, bar.exhausted, bar.color], [false, 100, 1, false, ENERGY_STYLE.fill]);
-  assert.deepEqual(bar.segments.map((s) => s.ratio), [1, 1, 1], 'hidden at full, all three full');
+  assert.equal('segments' in bar, false, 'one bar, never segments');
+  for (const key of ['ENERGY_SEGMENTS', 'energySegments', 'energySegmentRects']) assert.equal(key in status, false, key);
   c.regenEnergy(50);
   assert.equal(c.energy, 100, 'never above the maximum');
-  assert.equal(c.spendEnergy(150), false, 'a cost it cannot pay is refused, nothing spent');
-  assert.equal(c.energy, 100);
+  assert.equal(c.spendEnergy(150), true, 'a cost larger than what is left is still paid...');
+  assert.deepEqual([c.energy, c.energyExhausted], [0, true], '...by emptying the bar');
+  c.refillEnergy();
   c.setEnergy(-40);
   assert.equal(c.energy, 0, 'never below 0');
   assert.equal(c.energyExhausted, true);
-  assert.deepEqual(energyBarState(fighter).segments.map((s) => s.ratio), [0, 0, 0]);
+  assert.equal(energyBarState(fighter).ratio, 0);
   // A respawn or reset fills it again.
   c.refillEnergy();
   assert.deepEqual([c.energy, c.energyExhausted], [100, false]);
@@ -141,19 +144,19 @@ test('a charged technique is not ordinary charging: Sphere Rush refills at the n
   near(c.energy, 44, 'normal rate');
 });
 
-test('a Dash spends exactly 25 as it starts, and only then; spending the last of it exhausts', () => {
+test('a Dash spends exactly 15 as it starts, and only then; spending the last of it exhausts', () => {
   const { fighter, step } = makeFighter();
   const c = fighter.combat;
   dash(step);
   assert.ok(fighter.dash);
-  assert.equal(c.energy, 75, 'exactly 25, and no refill on the step it was spent');
+  assert.equal(c.energy, 85, 'exactly 15, and no refill on the step it was spent');
   step();
-  near(c.energy, 75.2, 'then the refill carries on');
+  near(c.energy, 85.2, 'then the refill carries on');
   // Exactly enough: it happens, and empties the bar.
   while (fighter.dash || fighter.state !== 'idle') step();
   step({ leftPressed: true, left: true });
   step({});
-  c.setEnergy(25);
+  c.setEnergy(15);
   step({ leftPressed: true, left: true });
   assert.ok(fighter.dash);
   assert.equal(c.energy, 0);
@@ -217,21 +220,43 @@ test('exhaustion lockout: from 0, Dash and Shield stay locked through 25, 50 and
   assert.equal(fighter.tryDash(1), true, 'Dash');
 });
 
-test('low is not exhausted: 20 blocks nothing and cannot Dash, but both come back at 25 with no full refill', () => {
+test('too little left still pays: a Dash or a block with less than it costs takes all of it, and the bar turns gray until full', () => {
+  // A Dash on 5 (it costs 15).
   const { fighter, step } = makeFighter();
   const c = fighter.combat;
-  c.setEnergy(20);
+  c.setEnergy(5);
   assert.equal(c.energyExhausted, false);
-  assert.equal(energyBarState(fighter).color, ENERGY_STYLE.fill, 'purple, not gray');
-  assert.equal(c.canShield(), false);
-  assert.equal(fighter.tryDash(1), false);
-  while (c.energy < 25) c.updateEnergy(DT, false);
+  assert.equal(energyBarState(fighter).color, ENERGY_STYLE.fill, 'low is still purple');
+  assert.equal(c.canUseEnergy(), true);
   assert.equal(c.canShield(), true);
-  step(HOLD);
-  assert.equal(c.shielding, true);
-  step();
-  while (fighter.state !== 'idle') step();
-  assert.equal(fighter.tryDash(1), true);
+  assert.equal(fighter.tryDash(1), true, 'it happens');
+  assert.deepEqual([c.energy, c.energyExhausted], [0, true]);
+  assert.equal(energyBarState(fighter).color, ENERGY_STYLE.exhausted, 'gray at once');
+  // A block on 20 (it costs 25).
+  const d = duel();
+  d.target.combat.setEnergy(20);
+  d.tick({}, HOLD);
+  d.tick({ action1: true, action1Pressed: true }, HOLD);
+  for (let i = 0; i < 30 && !d.events.length; i++) d.tick({}, HOLD);
+  assert.equal(d.events[0].type, 'block', 'the block stands');
+  assert.ok(d.events[0].energyCost > 20 && d.events[0].energyCost < 25, `all it had (${d.events[0].energyCost})`);
+  assert.deepEqual([d.target.combat.energy, d.target.combat.energyExhausted], [0, true]);
+  // Nothing more until the bar is completely full.
+  const lockedUntilFull = (f) => {
+    const cs = f.combat;
+    while (cs.energy < 99) cs.updateEnergy(DT, false);
+    assert.equal(cs.canUseEnergy(), false, 'still locked at 99');
+    while (cs.energy < 100) cs.updateEnergy(DT, false);
+    assert.equal(cs.canUseEnergy(), true, 'open again at 100');
+  };
+  lockedUntilFull(fighter);
+  lockedUntilFull(d.target);
+  // spendEnergy never goes below 0 and refuses nothing but an exhausted bar.
+  const s = new CombatState();
+  s.setEnergy(3);
+  assert.equal(s.spendEnergy(40), true);
+  assert.deepEqual([s.energy, s.energyExhausted], [0, true]);
+  assert.equal(s.spendEnergy(1), false, 'exhausted: refused, nothing taken');
 });
 
 test('exhausted, a fighter still moves, jumps, attacks, charges and uses its charged actions', () => {
@@ -286,69 +311,21 @@ test('nothing but Dash and blocked hits ever spends it: runs, jumps, attacks, sh
   for (let i = 0; i < 60; i++) t(CHARGE);
 });
 
-// ---- Three segments over one value ---------------------------------------------------
+// ---- The bar ------------------------------------------------------------------------
 
-test('three segments of 34, 33 and 33: exactly 100, one value, no Energy lost or gained to rounding', () => {
-  assert.deepEqual([...ENERGY_SEGMENTS], [34, 33, 33]);
-  assert.ok(Object.isFrozen(ENERGY_SEGMENTS));
-  assert.equal(ENERGY_SEGMENTS.reduce((a, b) => a + b, 0), 100);
-  for (let e = 0; e <= 100; e += 0.5) {
-    const segs = energySegments(e);
-    assert.equal(segs.length, 3);
-    near(segs.reduce((a, s) => a + s.amount, 0), e, `amounts add up at ${e}`);
-    assert.deepEqual(segs.map((s) => s.capacity), [34, 33, 33]);
-    for (const s of segs) assert.ok(s.ratio >= 0 && s.ratio <= 1);
+test('the bar is one bright purple fill that shrinks as Energy is spent, gray while exhausted', () => {
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(ENERGY_STYLE.fill.slice(i, i + 2), 16));
+  assert.ok(r > g && b > g, `purple: red and blue over green (${ENERGY_STYLE.fill})`);
+  assert.ok(b === 0xff && r >= 0xa0 && g <= 0x40, `bright: full blue, strong red, little green (${ENERGY_STYLE.fill})`);
+  assert.notEqual(ENERGY_STYLE.fill, '#a855f7', 'brighter than the old muted purple');
+  const { fighter } = makeFighter();
+  for (const [value, ratio] of [[100, 1], [85, 0.85], [50, 0.5], [10, 0.1]]) {
+    fighter.combat.setEnergy(value);
+    const bar = energyBarState(fighter);
+    assert.ok(Math.abs(bar.ratio - ratio) < 1e-9, `${value}`);
+    assert.equal(bar.color, ENERGY_STYLE.fill);
   }
-  // Clamped like the value itself.
-  assert.deepEqual(ratios(-5), [0, 0, 0]);
-  assert.deepEqual(ratios(140), [1, 1, 1]);
-});
-
-test('spending empties the segments front to back: 100, 75, 66, 50, 33, 25 and 0', () => {
-  assert.deepEqual(ratios(100), [1, 1, 1]);
-  assert.deepEqual(ratios(75), [9 / 34, 1, 1], '75: the front one partly spent');
-  assert.deepEqual(ratios(67), [1 / 34, 1, 1]);
-  assert.deepEqual(ratios(66), [0, 1, 1], 'the front one exactly empty');
-  assert.deepEqual(ratios(50), [0, 17 / 33, 1], '50: the middle one half gone');
-  assert.deepEqual(ratios(34), [0, 1 / 33, 1]);
-  assert.deepEqual(ratios(33), [0, 0, 1], 'only the back one left');
-  assert.deepEqual(ratios(25), [0, 0, 25 / 33]);
-  assert.deepEqual(ratios(0), [0, 0, 0]);
-  // Every drop from 100 to 0 only ever takes from the frontmost non-empty one.
-  let prev = ratios(100);
-  for (let e = 99; e >= 0; e--) {
-    const now = ratios(e);
-    const changed = now.map((r, i) => r !== prev[i]);
-    assert.equal(changed.filter(Boolean).length, 1, `one segment changes at ${e}`);
-    const i = changed.indexOf(true);
-    assert.ok(prev.slice(0, i).every((r) => r === 0), `the ones in front of ${i} are already empty at ${e}`);
-    prev = now;
-  }
-});
-
-test('refilling rebuilds back to front: the back segment first, then the middle, then the front, never all at once', () => {
-  const order = [];
-  let prev = ratios(0);
-  for (let e = 0.5; e <= 100; e += 0.5) {
-    const now = ratios(e);
-    const growing = now.map((r, i) => r > prev[i]).flatMap((g, i) => (g ? [i] : []));
-    assert.equal(growing.length, 1, `exactly one segment fills at ${e}: ${now}`);
-    if (order.at(-1) !== growing[0]) order.push(growing[0]);
-    // The segments behind the one filling are full.
-    for (let j = growing[0] + 1; j < 3; j++) assert.equal(now[j], 1, `behind ${growing[0]} is full at ${e}`);
-    prev = now;
-  }
-  assert.deepEqual(order, [2, 1, 0], 'back, middle, front');
-  // A real refill from an exhaustion: gray, and the rear rebuilt first.
-  const { fighter, step } = makeFighter();
   fighter.combat.setEnergy(0);
-  for (let i = 0; i < steps(2); i++) step();
-  const bar = energyBarState(fighter);
-  const round = (list) => list.map((x) => +x.toFixed(6));
-  assert.equal(bar.color, ENERGY_STYLE.exhausted);
-  assert.deepEqual(round(bar.segments.map((s) => s.ratio)), round([0, 0, 24 / 33]),
-    'two seconds in: only the back segment, 24 of 33');
-  for (let i = 0; i < steps(2); i++) step();
-  assert.deepEqual(round(energyBarState(fighter).segments.map((s) => s.ratio)), round([0, 15 / 33, 1]),
-    'four seconds in: back full, middle filling, front still empty');
+  fighter.combat.regenEnergy(60);
+  assert.deepEqual([energyBarState(fighter).ratio, energyBarState(fighter).color], [0.6, ENERGY_STYLE.exhausted]);
 });

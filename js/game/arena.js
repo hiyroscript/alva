@@ -400,10 +400,9 @@ export class Arena {
   }
 
   // Where `f`'s Energy bar goes when it shows, in device pixels: { x, y,
-  // w, h } (y its top), just over its name tag; its three segments share
-  // this width (see energySegmentRects). Compact: about the fighter's width
-  // at this zoom (roughly 45-60 px on a desktop screen), never narrower
-  // than 44 CSS px or thinner than 4.
+  // w, h } (y its top), just over its name tag. Compact: about the
+  // fighter's width at this zoom (roughly 45-60 px on a desktop screen),
+  // never narrower than 44 CSS px or thinner than 4.
   energyBarRect(f) {
     const { scale: s, dpr } = this.view;
     const [x] = this.markerAnchor(f);

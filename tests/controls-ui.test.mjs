@@ -398,7 +398,11 @@ test('help explains that Charge is held, loops while held, and speeds up the cha
   assert.match(items, /own 5-second cooldown/);
   assert.match(items, /Charging makes both cooldowns recover twice as fast/);
   assert.doesNotMatch(help.textContent, /health|stamina/i, 'no Health, and never the old Stamina, anywhere in Help');
-  assert.match(items, /The purple bar above your fighter is Energy, shown in three segments/);
+  assert.match(items, /The bright purple bar above your fighter is Energy; it shows only while it is not full/);
+  assert.match(items, /A Dash costs 15 of its 100, and every hit your Shield blocks costs 25/);
+  assert.match(items, /You can still Dash or Shield with less left than that, but it empties the bar/);
+  assert.match(items, /Blocking with less than 25 Energy left still works, but empties the bar/);
+  assert.doesNotMatch(help.textContent, /segment/i, 'one bar, no segments');
   assert.match(items, /If Energy reaches zero, it turns gray and must fully refill before Shield and Dash become available again/);
   assert.match(items, /refills your Energy faster too/);
   const notes = help.querySelectorAll('.info-note').map((p) => p.textContent).join(' ');

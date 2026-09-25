@@ -57,8 +57,8 @@
 // no Launch Point and launches nothing, and the fighter pays
 // energy.shieldHitCost for that one hit instead. The Shield holds through
 // the hit's hitstop and blockstun (CombatState.shieldStun), never a hurt
-// pose. Holding it costs nothing; it cannot rise or stay up without the
-// Energy for one more block (CombatState.canShield).
+// pose. Holding it costs nothing; it cannot rise or stay up while the
+// fighter is exhausted (CombatState.canShield).
 //
 // A hit's `damage` is added to the target's Launch Point
 // (CombatState.launchPoint) first. Its launch strength is then exactly Base
@@ -86,7 +86,8 @@
 //
 // Energy (CombatState.energy, see resolveEnergy) is the one resource a
 // fighter spends, and only on Dash and Shield: a Dash pays dashCost as it
-// starts, and every hit the Shield blocks costs shieldHitCost. It refills by
+// starts, and every hit the Shield blocks costs shieldHitCost. Either works
+// with less left than it costs, but then takes all of it. It refills by
 // itself, faster while the fighter is in its Charge stance. Emptied, it
 // exhausts the fighter: no Dash or Shield until it is full again. Nothing
 // else (movement, jumps, attacks, charged actions) ever touches it.
@@ -156,11 +157,14 @@ export function createDefenseDefinition(spec) {
 //     max: 100,          // full, and where every fighter starts
 //     regen: 12,         // per second, whatever the fighter is doing
 //     chargeRegen: 30,   // per second instead, while in the Charge stance
-//     dashCost: 25,      // spent once as a Dash starts
+//     dashCost: 15,      // spent once as a Dash starts
 //     shieldHitCost: 25, // spent once for every hit the Shield blocks
 //   }
+//
+// A cost larger than what is left is still paid: it takes the rest, which
+// empties the bar and exhausts the fighter (see CombatState.spendEnergy).
 const ENERGY_DEFAULTS = Object.freeze({
-  max: 100, regen: 12, chargeRegen: 30, dashCost: 25, shieldHitCost: 25,
+  max: 100, regen: 12, chargeRegen: 30, dashCost: 15, shieldHitCost: 25,
 });
 
 // Frozen Energy settings: the character's entry over the defaults.
@@ -233,8 +237,9 @@ export class CombatState {
     // launching hit multiplies it by its Base Launch.
     this.launchPoint = 0;
     // Energy for Dash and Shield (see resolveEnergy): full at the start,
-    // never below 0 or above maxEnergy. Emptying it exhausts the fighter,
-    // and only a full refill clears that (see setEnergy).
+    // never below 0 or above maxEnergy. Emptying it (however it happens)
+    // exhausts the fighter, and only a full refill clears that (see
+    // setEnergy).
     this.energySpec = energy;
     this.maxEnergy = energy.max;
     this.energy = energy.max;
@@ -295,22 +300,23 @@ export class CombatState {
 
   // ---- Energy -----------------------------------------------------------------
 
-  // Whether something costing `cost` may start now: never while exhausted,
-  // however much has refilled since, and only with at least `cost` left.
-  canUseEnergy(cost) {
-    return !this.energyExhausted && this.energy >= cost - PHASE_EPSILON;
+  // Whether something that costs Energy may start now: any time the fighter
+  // is not exhausted, however little is left (see spendEnergy).
+  canUseEnergy() {
+    return !this.energyExhausted;
   }
 
-  // Whether the Shield may be up: the Energy to block one more hit, and not
-  // exhausted. Below shieldHitCost it waits for the refill to reach it;
-  // exhausted, for a full refill.
+  // Whether the Shield may be up: never while exhausted. A block it cannot
+  // fully pay for still stands; it empties the bar (see CombatSystem.applyHit).
   canShield() {
-    return this.canUseEnergy(this.energySpec.shieldHitCost);
+    return this.canUseEnergy();
   }
 
-  // Pays `cost` at once, if canUseEnergy allows it. True when paid.
+  // Pays `cost` at once, if canUseEnergy allows it. True when paid. With
+  // less than `cost` left it takes all of it: the bar is empty and the
+  // fighter exhausted until it refills completely.
   spendEnergy(cost) {
-    if (!this.canUseEnergy(cost)) return false;
+    if (!this.canUseEnergy()) return false;
     this.setEnergy(this.energy - cost);
     return true;
   }
@@ -408,7 +414,8 @@ export class CombatSystem {
     //   launchStrength, finalLaunch, projectile, summon, technique }
     // `damage` is what the hit added to the target's Launch Point (0 on a
     // block), `move` the id of the attack or hit that dealt it and
-    // `energyCost` what the target's Shield paid for it (0 on a hit).
+    // `energyCost` what the target's Shield paid for it: shieldHitCost, or
+    // whatever was left when that was less (0 on a hit).
     // `baseLaunch` is the hit's Base Launch (0-3) and `directionalLaunch` its
     // direction; `launchStrength` is baseLaunch x launchPointAfter (0 on a
     // block), and `finalLaunch` the world-space velocity { x, y } the target
@@ -516,10 +523,10 @@ export class CombatSystem {
   // A target whose Shield is up blocks the hit, whichever side it comes
   // from: no Launch Point, no launch and no hitstun, only the hit's hitstop
   // and its blockstun, held in the Shield. The Shield pays
-  // energy.shieldHitCost for it, once; a block that leaves too little for
-  // another one drops the Shield straight away (a block that empties it
-  // also exhausts the fighter), so a later hit, even on this same step,
-  // lands in full. The block itself stands.
+  // energy.shieldHitCost for it, once, or all that is left when that is
+  // less: a block that empties the bar exhausts the fighter and drops the
+  // Shield straight away, so a later hit, even on this same step, lands in
+  // full. The block itself stands.
   //
   // Otherwise the damage is added to the target's Launch Point first, so
   // the hit that raises it already launches from the new total. The launch
@@ -536,8 +543,8 @@ export class CombatSystem {
     const blocked = tc.shielding;
     let energyCost = 0;
     if (blocked) {
-      energyCost = tc.energySpec.shieldHitCost;
-      tc.setEnergy(tc.energy - energyCost);
+      energyCost = Math.min(tc.energySpec.shieldHitCost, tc.energy);
+      tc.spendEnergy(tc.energySpec.shieldHitCost);
       if (!tc.canShield()) tc.shielding = false;
     }
     const damage = blocked ? 0 : def.damage;
