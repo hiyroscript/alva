@@ -197,16 +197,16 @@ export const CHARACTERS = [
         heightRatio: 0.9,
       },
       // Charged BA2, the Sphere Rush: one set of twelve poses (rasen1-12)
-      // split into four clips, each played once by its own technique phase
-      // (see chargedTechniques.rasenRush). rasenForm: the rear palm opens
-      // for the sphere to form in. rasenDash: the rush, sphere carried
-      // behind, swung forward on rasen6. rasenConfirm: the palm driven into
-      // the opponent (rasen7-9), then drawn back to watch the sphere
-      // (rasen10-11, held until the explosion); only a hit ever shows it.
-      // rasenRelease: rasen12 alone, the upright release / recovery pose
-      // that lets go of the technique, shown as the sphere explodes after a
-      // hit and for one frame after a rush that caught nobody. Faces right
-      // like the rest of #0001.
+      // split into logical clips, each played once by its own technique
+      // phase (see chargedTechniques.rasenRush). rasenForm (1-3): the rear
+      // palm opens for the sphere to form in. rasenDash (4-6): the rush,
+      // sphere carried behind, swung forward on rasen6. The rest only a hit
+      // shows: rasenConfirm (7-8), the palm driven into the opponent, rasen8
+      // held while the sphere on it grows; rasenExplosion (9), the pose of
+      // the blast itself; rasenRelease (10-12), the recovery once the blast
+      // is over. rasenWhiffRelease reuses rasen12 (the same file, never a
+      // copy) alone, for one frame after a rush that caught nobody. Faces
+      // right like the rest of #0001.
       rasenForm: {
         frames: frames(BASE_0001, 'rasen', 3),
         fps: RASEN_FPS,
@@ -220,12 +220,24 @@ export const CHARACTERS = [
         heightRatio: 0.88,
       },
       rasenConfirm: {
-        frames: [7, 8, 9, 10, 11].map((n) => `${BASE_0001}rasen${n}.png`),
+        frames: [7, 8].map((n) => `${BASE_0001}rasen${n}.png`),
         fps: RASEN_FPS,
         loop: false,
-        heightRatio: 0.96,
+        heightRatio: 0.79,
+      },
+      rasenExplosion: {
+        frames: [`${BASE_0001}rasen9.png`],
+        fps: RASEN_FPS,
+        loop: false,
+        heightRatio: 0.77,
       },
       rasenRelease: {
+        frames: [10, 11, 12].map((n) => `${BASE_0001}rasen${n}.png`),
+        fps: RASEN_FPS,
+        loop: false,
+        heightRatio: 1,
+      },
+      rasenWhiffRelease: {
         frames: [`${BASE_0001}rasen12.png`],
         fps: RASEN_FPS,
         loop: false,
@@ -266,9 +278,10 @@ export const CHARACTERS = [
       // The Sphere Rush's blue sphere (prasen1-11), split into three clips:
       // rasenSphereBuild forms it in the hand (prasen1-6, once),
       // rasenSphereImpact is the sphere spinning on the caught opponent
-      // (prasen7 -> 8 -> 9, looped until it explodes) and
-      // rasenSphereExplosion is the delayed blast (prasen10-11, the lighter,
-      // brighter frames, once). A round effect: never mirrored.
+      // (prasen7 -> 8 -> 9, looped until it explodes, drawn ever larger by
+      // the technique's sphereGrowth) and rasenSphereExplosion is the
+      // delayed blast (prasen10-11, the lighter, brighter frames, once). A
+      // round effect: never mirrored.
       rasenSphereBuild: {
         frames: frames(BASE_0001, 'prasen', 6),
         fps: PRASEN_FPS,
@@ -469,18 +482,22 @@ export const CHARACTERS = [
       // (rasenForm + rasenSphereBuild, 0.5 s), then he rushes forward for one
       // pass of rasenDash (0.25 s, about 262 world units) carrying it behind
       // him and swinging it forward on rasen6. It must connect during that
-      // rush: a miss stops him and he lets the sphere go on the rasenRelease
-      // pose (rasen12, one frame) before he is free. A hit (4) binds the
-      // opponent, the sphere moves onto it and spins there (prasen7-9 looped)
-      // while rasenConfirm plays and holds rasen11; 2 s after the hit it
-      // explodes for the big second hit (16, 20 in all), releasing and
-      // launching the opponent, as #0001 releases it on rasen12. The whole
-      // technique needs ground under #0001.
+      // rush: a miss stops him and he lets the sphere go on the
+      // rasenWhiffRelease pose (rasen12, one frame) before he is free. A hit
+      // (4) binds the opponent and the sphere moves onto it, spinning there
+      // (prasen7-9 looped) while rasenConfirm plays rasen7 -> rasen8 and
+      // holds rasen8 as the sphere grows. 2 s after the hit it explodes
+      // (prasen10-11) while #0001 is on rasenExplosion (rasen9), for the big
+      // second hit (16, 20 in all) that releases and launches the opponent;
+      // once the blast is over he recovers through rasenRelease
+      // (rasen10-12). The whole technique needs ground under #0001.
       rasenRush: {
         formAnimation: 'rasenForm',
         dashAnimation: 'rasenDash',
         confirmAnimation: 'rasenConfirm',
+        explosionAnimation: 'rasenExplosion',
         releaseAnimation: 'rasenRelease',
+        whiffReleaseAnimation: 'rasenWhiffRelease',
         sphereBuild: 'rasenSphereBuild',
         sphereImpact: 'rasenSphereImpact',
         sphereExplosion: 'rasenSphereExplosion',
@@ -503,6 +520,10 @@ export const CHARACTERS = [
         targetOffset: { x: 0, y: -48 },
         // Seconds from the hit to the explosion.
         explosionDelay: 2.0,
+        // The sphere on the opponent, drawn at its own art size from the hit,
+        // grows steadily through the rasen8 hold to this multiple of it as
+        // it explodes; the blast bursts at that size. Visual only.
+        sphereGrowth: { startScale: 1, endScale: 1.4 },
         // Hit 1, the sphere's contact: the setup, no launch. The bind that
         // follows (not this hitstun) is what holds the opponent.
         firstHit: {
@@ -625,11 +646,12 @@ export function getCharacter(id) {
 }
 
 // Every frame a character needs before battle: fighter poses, projectiles
-// and effects.
+// and effects, each file once (two clips may share one, e.g. #0001's
+// rasen12 in rasenRelease and rasenWhiffRelease).
 export function characterFramePaths(def) {
   const out = [];
   for (const anim of Object.values(def.animations)) out.push(...anim.frames);
   for (const anim of Object.values(def.projectileAnimations || {})) out.push(...anim.frames);
   for (const anim of Object.values(def.effectAnimations || {})) out.push(...anim.frames);
-  return out;
+  return [...new Set(out)];
 }

@@ -52,16 +52,18 @@ behave, and how it must look. The README covers running and deploying it.
   `0001_rasen1`–`0001_rasen12` (≈64–110 × 80–104 px, ≈2× pixel art).
   `0001_dodge3` happens to be the same image as `0001_charge1`; it is kept
   under its own name as the Dodge's recovery frame.
-- The twelve Sphere Rush poses are fighter poses, registered as four
-  logical one-shot clips in `animations` rather than one blind animation:
-  `rasenForm` (`rasen1`–`rasen3`, preparation: the rear palm opens for the
-  sphere), `rasenDash` (`rasen4`–`rasen6`, the rush: the sphere carried
-  behind, swung forward on `rasen6`), `rasenConfirm` (`rasen7`–`rasen11`,
-  the palm driven into the opponent on `rasen7`–`rasen9`, then drawn back
-  to watch the sphere on `rasen10`–`rasen11`) and `rasenRelease` (`rasen12`
-  alone, one frame: the upright release / recovery pose that lets go of the
-  technique, after a miss and as the sphere explodes; it is never part of
-  the rush or the contact). They use the normal
+- The twelve Sphere Rush poses are fighter poses, registered as logical
+  one-shot clips in `animations` rather than one blind animation, each with
+  one role: `rasenForm` (`rasen1`–`rasen3`, formation: the rear palm opens
+  for the sphere), `rasenDash` (`rasen4`–`rasen6`, the rush: the sphere
+  carried behind, swung forward on `rasen6`), `rasenConfirm`
+  (`rasen7`–`rasen8`, the successful contact and stop; `rasen8` is held
+  while the sphere on the opponent spins and grows), `rasenExplosion`
+  (`rasen9` alone, the pose of the blast itself) and `rasenRelease`
+  (`rasen10`–`rasen12`, the release / recovery after the blast). A rush
+  that catches nobody has its own one-frame `rasenWhiffRelease`: `rasen12`
+  alone. That clip and `rasenRelease` share the one `0001_rasen12.png` (the
+  same URL, preloaded once, never a copy on disk). They use the normal
   fighter normalization (bottom-centre anchor, fighter height, per-clip
   source facing, pixel-grid detection) and inherit the character's
   `sourceFacing: 1`.
@@ -91,7 +93,8 @@ behave, and how it must look. The README covers running and deploying it.
   `rasenSphereBuild` (`prasen1`–`prasen6`, energy gathering into the
   complete orb, once, 0.5 s), `rasenSphereImpact` (`prasen7`–`prasen9`, the
   authored rotation of the orb spinning on the caught opponent, looped
-  `7 → 8 → 9 → 7 → …`, 0.25 s a turn, `loop: true`) and
+  `7 → 8 → 9 → 7 → …`, 0.25 s a turn, `loop: true`; the technique draws it
+  ever larger through the hold, since the frames' own sizes do not grow) and
   `rasenSphereExplosion` (`prasen10`–`prasen11`, the lighter, brighter
   blast, once, ≈0.167 s; never part of the spin). Normalized like the clone
   cloud (own art size, centre anchor, the fighter's world-per-art-pixel
@@ -429,7 +432,7 @@ A solo training room, entered straight from Home.
   hidden or not, and the camera follows Player 1 alone. Moves aimed at an
   opponent then fall back or miss: Charged BA1 has nobody to appear behind,
   so it is an ordinary BA1 and costs no Energy; the Sphere Rush dashes, finds
-  no one and ends as a miss (after its `rasen12` release pose).
+  no one and ends as a miss (after its `rasen12` whiff release pose).
 - **Practice CPU (optional):** a training dummy, slot `p2`, labelled CPU, at
   the stage's second spawn (320 units right of Player 1's, facing it). It has
   no controller, so it never walks, jumps, drops, attacks, throws, charges,
@@ -584,7 +587,7 @@ read the character database, so it stays the same as fighters are added.
 
 - `#0001` has Idle, Run, Jump, Fall, Land, Hurt, Mid-air Hurt, Basic Attack 1,
   Mid-air Basic Attack 1, Basic Attack 2, Mid-air Basic Attack 2, Charge,
-  Dodge, Mid-air Dodge, Throw and the Sphere Rush (four clips), plus the
+  Dodge, Mid-air Dodge, Throw and the Sphere Rush (six clips), plus the
   Shuriken projectile animation and the clone-cloud and sphere effects.
   No invented frames. Rising uses Jump and
   descending (walking off a ledge included) uses Fall; each plays once at 10 fps
@@ -911,9 +914,9 @@ read the character database, so it stays the same as fighters are added.
   `js/game/charged-technique.js`). Not a summon, a projectile, ordinary BA2
   or a big melee hitbox: #0001 himself changes animation, holds the sphere,
   dashes and makes contact, driven by a dedicated technique runtime with
-  explicit phases (`form`, `dash`, then `release` after a miss or
-  `confirm`, `wait`, `explode` after a hit, and `done`), never inferred from
-  animation frames. It sets no `combat.attack`. Trigger:
+  explicit phases (`form`, `dash`, then `whiffRelease` after a miss, or
+  `confirm`, `wait`, `explode`, `release` after a hit, and `done`), never
+  inferred from animation frames. It sets no `combat.attack`. Trigger:
   the shared charged-action rule with BA2 (`action2`: I, LB, touch **BA2**);
   no new control. Charge and BA2 pressed together from idle, or BA2 pressed
   on the step Charge is let go, is ordinary BA2 (8 damage, `2ba1`–`2ba7`,
@@ -925,12 +928,14 @@ read the character database, so it stays the same as fighters are added.
 
   | Frames | Clip | Role |
   | --- | --- | --- |
-  | `rasen1`–`3` | `rasenForm` | preparation |
-  | `rasen4`–`6` | `rasenDash` | dash / contact search |
-  | `rasen7`–`11` | `rasenConfirm` | contact, `rasen11` held until the explosion |
-  | `rasen12` | `rasenRelease` | release / recovery (after a miss, and as it explodes) |
+  | `rasen1`–`3` | `rasenForm` | formation |
+  | `rasen4`–`6` | `rasenDash` | rush / contact search |
+  | `rasen7`–`8` | `rasenConfirm` | successful contact and stop; `rasen8` held while the sphere grows |
+  | `rasen9` | `rasenExplosion` | the explosion pose |
+  | `rasen10`–`12` | `rasenRelease` | release / recovery after the explosion |
+  | `rasen12` | `rasenWhiffRelease` | release after a rush that caught nobody |
   | `prasen1`–`6` | `rasenSphereBuild` | sphere formation (once) |
-  | `prasen7`–`9` | `rasenSphereImpact` | sphere spinning on the target (looped) |
+  | `prasen7`–`9` | `rasenSphereImpact` | sphere spinning on the target (looped), drawn larger over the hold |
   | `prasen10`–`11` | `rasenSphereExplosion` | explosion (once) |
 
   Deterministic sequence, in 60 Hz fixed steps (all clips at 12 fps; the
@@ -958,13 +963,15 @@ read the character database, so it stays the same as fighters are added.
      (`rasen6`), after the rush has closed in; pushboxes keep #0001 from
      running through the opponent meanwhile. No contact by the end of
      `rasen6`, or a solid wall or stage edge reached first (no pass-through),
-     is a miss: RELEASE below.
-  3. RELEASE (a miss only; 5 steps, one `rasen12` frame at 12 fps, 1/12 s):
+     is a miss: WHIFF RELEASE below.
+  3. WHIFF RELEASE (a miss only; 5 steps, one `rasen12` frame at 12 fps,
+     1/12 s, the `rasenWhiffRelease` clip):
      from the step after the dash's last (or the very step a wall stops it)
      the rush stops dead where it is (`vx` 0, no slide) and the contact
      search ends. The sphere is let go: it simply vanishes, with no impact
-     or explosion frames (`prasen7`–`11`), no hit, damage or bind, and no
-     confirm pose (`rasen7`–`11`). #0001 shows `rasen12`, still committed
+     or explosion frames (`prasen7`–`11`), no hit, damage or bind, and none
+     of the successful-hit poses (`rasen7`–`11`, nor the full
+     `rasen10`–`12` recovery). #0001 shows `rasen12` alone, still committed
      (controls and facing locked, buttons ignored), and is back in Idle /
      normal control only on the step after that frame: the last pose of a
      clean miss is always `rasen12`, never a jump straight from `rasen6` to
@@ -982,23 +989,36 @@ read the character database, so it stays the same as fighters are added.
      spins there: `prasen7 → prasen8 → prasen9 → prasen7 → …`, one frame
      every 1/12 s counted from the contact step, for as long as it holds
      the target (eight turns in the 2 s delay). #0001 plays
-     `rasen7 → … → rasen11` exactly once from the same step.
-  5. WAIT: #0001 holds `rasen11` (never `rasen12`), committed (no movement,
-     attack, summon, Dodge, Throw, jump or Charge), and the bound target
-     holds in its Hurt pose with the sphere still spinning on it.
+     `rasen7 → rasen8` once from the same step (`rasen7` 5 steps, then
+     `rasen8`; 10 steps in all).
+  5. WAIT: #0001 holds `rasen8` (never `rasen9`–`12` before the blast),
+     committed (no movement, attack, summon, Dodge, Throw, jump or Charge),
+     and the bound target holds in its Hurt pose with the sphere still
+     spinning on it and growing: `sphereGrowth` draws it from `startScale`
+     (1, its own art size) at the start of the hold, by the same amount
+     every step, to `endScale` (1.4) as it explodes. The growth is explicit
+     because the spin frames' own sizes shrink slightly (`prasen7`–`9` are
+     ≈116, 106 and 100 px wide); it never shrinks or pulses, and it is
+     visual only: the sphere stays centred on the target (the drawn frame
+     grows about its centre), and no hitbox, hurtbox, collision or hit ever
+     reads it (the rush's hitbox is gone since the contact).
   6. EXPLODE: exactly 2.0 s (`explosionDelay`, 120 steps) after the
-     contact step, counted from the hit, never from formation: the sphere
-     stops spinning and plays `prasen10 → prasen11` once, while #0001 lets
-     go of the technique on the release pose `rasen12`. On the step
-     `prasen10` first shows the target is released from the bind and then
-     takes hit 2: 16 damage (96 → 80; 20 in all), knockback 420 along the
-     rush and a 220 launch, 0.55 s hitstun, 0.12 s hitstop (twice the first
-     hit's), 0.3 s blockstun. Releasing first keeps the bind from cancelling
-     the launch. It lasts the longer of the explosion and the release pose.
-  7. DONE: after `prasen11` the sphere is removed and the technique cleared;
-     #0001 returns to Idle / normal control. Exactly two damage events for a
-     full sequence. A Charge still held does not restart by itself: it has to
-     be let go and held again.
+     contact step, counted from the hit, never from formation: #0001
+     switches to `rasen9`, the explosion pose, and the sphere stops spinning
+     and growing and plays `prasen10 → prasen11` once at the grown size. On
+     the step `prasen10` first shows the target is released from the bind
+     and then takes hit 2: 16 damage (96 → 80; 20 in all), knockback 420
+     along the rush and a 220 launch, 0.55 s hitstun, 0.12 s hitstop (twice
+     the first hit's), 0.3 s blockstun. Releasing first keeps the bind from
+     cancelling the launch. `rasen9` is held for the whole blast (it lasts
+     the longer of the blast and the explosion pose).
+  7. RELEASE: only once the blast is over, the sphere is gone and #0001
+     recovers through `rasen10 → rasen11 → rasen12` once (15 steps, 0.25 s),
+     still committed: no sphere, hit, bind or contact search.
+  8. DONE: after `rasen12` the technique is cleared and #0001 returns to
+     Idle / normal control. Exactly two damage events for a full sequence.
+     A Charge still held does not restart by itself: it has to be let go
+     and held again.
   The bind is a combat status separate from hitstun (`CombatState.bind` /
   `unbind`, keyed by the technique as a token so it only ever releases its
   own hold). While bound a fighter can't act (`canAct()` is false): no walk,
@@ -1010,8 +1030,8 @@ read the character database, so it stays the same as fighters are added.
   #0001 must be supported by real ground, checked every step
   (`body.grounded`, not remembered from the start). Losing it in formation,
   mid-dash (running off a ledge; no hover over the gap, no snap back),
-  during a miss's release or after the hit cancels the technique on that
-  step: sphere removed, any bind
+  during a miss's whiff release or after the hit (the recovery included)
+  cancels the technique on that step: sphere removed, any bind
   released at once (hit 1's damage stays, hit 2 never happens) and #0001
   enters Fall, straight down. A hit on #0001 in any phase cancels it the same
   way and shows the normal Hurt (no armour, no invulnerability). A Dodge's
@@ -1022,7 +1042,7 @@ read the character database, so it stays the same as fighters are added.
   blockstun; then there is no bind or explosion and the technique ends. A
   first hit that knocks the target out ends it at once (no bind, no
   explosion), as does the target being knocked out or losing its bind
-  meanwhile. Before starting, the technique requires all four fighter clips
+  meanwhile. Before starting, the technique requires all six fighter clips
   and all three sphere effects (and valid data); anything missing logs a
   warning and the same press becomes an ordinary BA2: never a sphere around
   the wrong pose, an invisible sphere, bind or delayed hit. Energy cost 0

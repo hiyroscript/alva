@@ -11,13 +11,14 @@
 //   chargedTechniques: {
 //     rasenRush: {
 //       formAnimation: 'rasenForm', dashAnimation: 'rasenDash', confirmAnimation: 'rasenConfirm',
-//       releaseAnimation: 'rasenRelease',
+//       explosionAnimation: 'rasenExplosion', releaseAnimation: 'rasenRelease',
+//       whiffReleaseAnimation: 'rasenWhiffRelease',
 //       sphereBuild: 'rasenSphereBuild', sphereImpact: 'rasenSphereImpact',
 //       sphereExplosion: 'rasenSphereExplosion',
 //       energyCost: 0, dashSpeed: 1050,
 //       handOffsets: { rasenForm: [{ x, y }, ...], rasenDash: [...] },
 //       sphereHitbox: { x: -24, y: -24, w: 48, h: 48 }, targetOffset: { x: 0, y: -48 },
-//       explosionDelay: 2.0,
+//       explosionDelay: 2.0, sphereGrowth: { startScale: 1, endScale: 1.4 },
 //       firstHit: { damage: 4, ... }, explosionHit: { damage: 16, ... },
 //     },
 //   },
@@ -29,27 +30,32 @@
 //            frame held) while sphereBuild plays once in its hand. Lasts the
 //            longer of the two, so the rush never starts on a half-formed
 //            sphere.
-//   dash     one pass of dashAnimation at a fixed dashSpeed in the facing
-//            snapshotted at the start, the sphere complete (sphereBuild's
-//            last frame) in hand. Its hitbox, centred on the sphere, is the
-//            only contact search. No contact by the end of the pass, or a
-//            wall first: a whiff, and the fighter releases (below).
-//   release  a whiff only: the fighter stops dead, the sphere is let go (no
-//            hit, bind, impact or explosion) and releaseAnimation shows for
-//            one pass, the fighter still locked. Then the technique ends
-//            ('miss', or 'wall').
-//   confirm  contact: firstHit, then the target is bound (see
-//            CombatState.bind), shown in its hurt pose on the hit step, and
-//            the sphere moves onto it, spinning there (sphereImpact, a
-//            looping clip, from the hit until the explosion);
-//            confirmAnimation plays once.
-//   wait     confirmAnimation's last frame is held, the sphere still
-//            spinning, until explosionDelay has passed since the hit.
-//   explode  sphereExplosion plays once while the fighter shows
-//            releaseAnimation, letting the technique go. On its first frame
-//            the target is released, then takes explosionHit. Lasts the
-//            longer of the two clips.
-//   done     the sphere is gone; the fighter is free again.
+//   dash          one pass of dashAnimation at a fixed dashSpeed in the
+//                 facing snapshotted at the start, the sphere complete
+//                 (sphereBuild's last frame) in hand. Its hitbox, centred on
+//                 the sphere, is the only contact search. No contact by the
+//                 end of the pass, or a wall first: a whiff (below).
+//   whiffRelease  a whiff only: the fighter stops dead, the sphere is let go
+//                 (no hit, bind, impact or explosion) and
+//                 whiffReleaseAnimation shows for one pass, the fighter still
+//                 locked. Then the technique ends ('miss', or 'wall').
+//   confirm       contact: firstHit, then the target is bound (see
+//                 CombatState.bind), shown in its hurt pose on the hit step,
+//                 and the sphere moves onto it, spinning there (sphereImpact,
+//                 a looping clip, from the hit until the explosion);
+//                 confirmAnimation plays once.
+//   wait          confirmAnimation's last frame is held while the sphere
+//                 keeps spinning and grows (sphereGrowth: startScale to
+//                 endScale, reached as it explodes), until explosionDelay has
+//                 passed since the hit.
+//   explode       the fighter shows explosionAnimation while sphereExplosion
+//                 plays once at the grown size. On its first frame the target
+//                 is released, then takes explosionHit. Lasts the longer of
+//                 the two clips, so the blast is always over first.
+//   release       after the blast: the sphere is gone and releaseAnimation
+//                 plays once, the fighter still locked; no hit, bind or
+//                 search.
+//   done          the fighter is free again.
 //
 // A blocked contact deals the block and ends the technique (no bind, no
 // explosion), as does a first hit that knocks the target out. The fighter
@@ -77,7 +83,9 @@ const TECHNIQUE_DEFAULTS = {
   formAnimation: null,
   dashAnimation: null,
   confirmAnimation: null,
+  explosionAnimation: null,
   releaseAnimation: null,
+  whiffReleaseAnimation: null,
   sphereBuild: null,
   sphereImpact: null,
   sphereExplosion: null,
@@ -90,6 +98,10 @@ const TECHNIQUE_DEFAULTS = {
   sphereHitbox: { x: -18, y: -18, w: 36, h: 36 }, // around the sphere centre
   targetOffset: { x: 0, y: 0 }, // sphere centre from the target's origin after contact
   explosionDelay: 2,
+  // Size of the sphere on the target, as a multiple of its art's own size:
+  // startScale from the hit, growing steadily over the wait to endScale as
+  // it explodes; the blast keeps endScale. Visual only.
+  sphereGrowth: { startScale: 1, endScale: 1 },
   firstHit: null,
   explosionHit: null,
 };
@@ -107,6 +119,7 @@ function createHit(id, spec) {
 export function createTechniqueDefinition(spec) {
   if (!spec?.id) throw new Error('[Alva] Charged technique definitions need an id');
   const def = { ...TECHNIQUE_DEFAULTS, ...spec };
+  def.sphereGrowth = Object.freeze({ ...TECHNIQUE_DEFAULTS.sphereGrowth, ...spec.sphereGrowth });
   def.firstHit = createHit(`${spec.id}.firstHit`, spec.firstHit);
   def.explosionHit = createHit(`${spec.id}.explosionHit`, spec.explosionHit);
   return Object.freeze(def);
@@ -116,7 +129,11 @@ export function createTechniqueDefinition(spec) {
 // before anything happens: never a blue sphere around the wrong pose, nor
 // an invisible sphere, bind or delayed hit.
 export function techniqueProblem(owner, def) {
-  for (const key of [def.formAnimation, def.dashAnimation, def.confirmAnimation, def.releaseAnimation]) {
+  const clips = [
+    def.formAnimation, def.dashAnimation, def.confirmAnimation,
+    def.explosionAnimation, def.releaseAnimation, def.whiffReleaseAnimation,
+  ];
+  for (const key of clips) {
     if (!key || !owner.sprites.has(key)) return `its fighter clip "${key}" has no animation frames`;
   }
   for (const key of [def.sphereBuild, def.sphereImpact, def.sphereExplosion]) {
@@ -125,6 +142,8 @@ export function techniqueProblem(owner, def) {
   if (!(def.dashSpeed > 0)) return 'its dashSpeed is not a positive speed';
   if (!def.firstHit || !def.explosionHit) return 'it needs both a firstHit and an explosionHit';
   if (!(def.explosionDelay >= 0)) return 'its explosionDelay is not a delay';
+  const { startScale, endScale } = def.sphereGrowth;
+  if (!(startScale > 0 && endScale >= startScale)) return 'its sphereGrowth shrinks or does not start above 0';
   return null;
 }
 
@@ -166,8 +185,12 @@ export class ChargedTechnique {
     this.formDuration = Math.max(passOf(this.formAnim), passOf(this.build));
     this.dashDuration = passOf(this.dashAnim);
     this.confirmDuration = sprites.duration(def.confirmAnimation);
+    this.explodeDuration = Math.max(passOf(this.explosion), sprites.duration(def.explosionAnimation));
     this.releaseDuration = sprites.duration(def.releaseAnimation);
-    this.explodeDuration = Math.max(passOf(this.explosion), this.releaseDuration);
+    this.whiffDuration = sprites.duration(def.whiffReleaseAnimation);
+    // The sphere grows from the hold's start (confirmAnimation over, its last
+    // frame held) to the explosion.
+    this.growFrom = Math.min(this.confirmDuration, def.explosionDelay);
   }
 
   // Advances one fixed step of the fighter's update. Returns why the
@@ -181,9 +204,13 @@ export class ChargedTechnique {
       this.time = 0;
     } else if (this.phase === 'dash' && this.time >= this.dashDuration - TIME_EPSILON) {
       this.whiff('miss');
-    } else if (this.phase === 'release' && this.time >= this.releaseDuration - TIME_EPSILON) {
+    } else if (this.phase === 'whiffRelease' && this.time >= this.whiffDuration - TIME_EPSILON) {
       return this.whiffReason;
     } else if (this.phase === 'explode' && this.time >= this.explodeDuration - TIME_EPSILON) {
+      // The blast is over: the sphere is gone and the fighter recovers.
+      this.phase = 'release';
+      this.time = 0;
+    } else if (this.phase === 'release' && this.time >= this.releaseDuration - TIME_EPSILON) {
       return 'done';
     }
     // ...then this step counts.
@@ -211,26 +238,29 @@ export class ChargedTechnique {
   // The rush is over and caught nobody: its pass ran out ('miss') or a wall
   // stopped it ('wall'). The fighter stops dead and lets the sphere go: no
   // hit, bind, impact or explosion, and no more contact search. It shows
-  // the release pose, still locked, for one pass of releaseAnimation; then
-  // the technique ends for `reason`. `time` is how much of the release has
-  // already passed: 0 from update, which then counts its own step; one step
-  // from a wall found after the fighter moved (see Fighter.update).
+  // the whiff release pose, still locked, for one pass of
+  // whiffReleaseAnimation; then the technique ends for `reason`. `time` is
+  // how much of it has already passed: 0 from update, which then counts its
+  // own step; one step from a wall found after the fighter moved (see
+  // Fighter.update).
   whiff(reason, time = 0) {
-    this.phase = 'release';
+    this.phase = 'whiffRelease';
     this.time = time;
     this.whiffReason = reason;
     this.owner.body.vx = 0;
   }
 
   // Fighter clip for the current phase (see Fighter.animationFor). The
-  // confirm clip is one-shot, so wait holds its last frame; the release
-  // pose follows as the sphere explodes, or after a whiff.
+  // confirm clip is one-shot, so wait holds its last frame, and so does the
+  // explosion clip for as long as the blast lasts.
   get animation() {
     switch (this.phase) {
       case 'form': return this.def.formAnimation;
       case 'dash': return this.def.dashAnimation;
+      case 'whiffRelease': return this.def.whiffReleaseAnimation;
       case 'confirm':
       case 'wait': return this.def.confirmAnimation;
+      case 'explode': return this.def.explosionAnimation;
       default: return this.def.releaseAnimation;
     }
   }
@@ -242,9 +272,9 @@ export class ChargedTechnique {
   }
 
   // 'fighter' while the sphere is in the hand, 'target' once it has hit,
-  // null once it is gone (let go after a whiff, or over).
+  // null once it is gone (let go after a whiff, blown up, or over).
   get sphereOwner() {
-    if (this.phase === 'done' || this.phase === 'release') return null;
+    if (this.phase === 'done' || this.phase === 'whiffRelease' || this.phase === 'release') return null;
     return this.hitConfirmed ? 'target' : 'fighter';
   }
 
@@ -273,6 +303,25 @@ export class ChargedTechnique {
   get sphereFrame() {
     const s = this.sphere;
     return s ? s.anim.frames[s.index] : null;
+  }
+
+  // Size of the sphere on screen, as a multiple of its art's own size (see
+  // Arena.drawTechnique): 1 in the hand; on the target sphereGrowth's
+  // startScale through the contact poses, then growing steadily over the
+  // hold, never shrinking, to reach endScale as it explodes; the blast
+  // bursts at endScale. A pure function of the fixed-step clocks, and art
+  // only: no hitbox, hurtbox or collision ever reads it.
+  get sphereScale() {
+    const { startScale, endScale } = this.def.sphereGrowth;
+    switch (this.spherePhase) {
+      case 'impact': {
+        const span = this.def.explosionDelay - this.growFrom;
+        const p = span > 0 ? Math.min(Math.max((this.sinceHit - this.growFrom) / span, 0), 1) : 1;
+        return startScale + (endScale - startScale) * p;
+      }
+      case 'explosion': return endScale;
+      default: return 1;
+    }
   }
 
   // Sphere centre from the fighter's origin while it is in the hand (facing
