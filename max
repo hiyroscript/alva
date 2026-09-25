@@ -1,443 +1,682 @@
-Work in the hiyroscript/alva repository and fix #0001’s Charged BA2 / Sphere Rush (chargedActions.action2 -> chargedTechniques.rasenRush).
+Work in the current `hiyroscript/alva` repository on `main` and fix #0001’s Charged BA2 / Sphere Rush again.
 
-Do not redesign the move from scratch. Preserve the existing charged-action architecture, combat system, physics, damage values, controls, Energy behavior, facing behavior, grounding requirements, cancellation rules, and normal BA2. The problem is primarily that the current charged BA2 state/animation sequence does not represent the supplied artwork correctly.
+IMPORTANT: inspect the CURRENT implementation first. The previous fix has already been merged. Do not revert it wholesale.
 
-Before changing code, inspect every relevant source sprite carefully:
+Current main already correctly has:
+- a dedicated ChargedTechnique architecture;
+- immediate Hurt / Mid-air Hurt on the exact contact tick;
+- prasen7-9 rotating on the enemy;
+- a whiff release instead of snapping instantly to Idle;
+- correct first-hit + delayed-explosion combat structure;
+- bind ownership and release-before-knockback;
+- fixed facing, grounding rules, wall behavior, interruption handling, etc.
 
-* assets/characters/0001/0001_rasen1.png through 0001_rasen12.png
-* assets/characters/0001/0001_prasen1.png through 0001_prasen11.png
-* assets/characters/0001/0001_hurt.png
-* assets/characters/0001/0001_midairhurt.png
+Keep all of those good parts.
 
-Do not modify, redraw, regenerate, duplicate, rename, or replace any PNG. The existing tests/charged-ba2.test.mjs intentionally verifies the exact uploaded bytes.
+The remaining problem is that the fighter frames and the pre-explosion sphere behavior are still interpreted incorrectly.
 
-The important correction is that 0001_rasen12.png is a release/recovery frame. It is not part of the actual rush/contact animation.
+I inspected the actual `0001_rasen*.png` and `0001_prasen*.png` artwork. The intended successful-hit animation is:
 
-Intended move
+FORM
+rasen1 -> rasen2 -> rasen3
 
-Charged BA2 is a committed forward rush with the blue sphere. If the sphere catches an opponent, the opponent is held by the spinning sphere until it explodes. If the rush catches nobody, #0001 still needs to visibly perform the final release/recovery frame before returning to neutral.
+RUSH
+rasen4 -> rasen5 -> rasen6
 
-The move should read visually as:
+CONTACT / HOLD
+rasen7 -> rasen8
+then HOLD rasen8 while the sphere stays attached, rotates, and grows larger and larger.
 
-1. sphere forms;
-2. #0001 rushes forward;
-3. either:
-    * miss -> release/recovery frame -> neutral, or
-    * hit -> enemy immediately shows Hurt -> sphere stays attached and visibly rotates -> delayed explosion -> #0001 uses the release frame;
-4. move ends.
+EXPLOSION
+rasen9
+The actual blast happens while #0001 is on rasen9.
 
-Correct the rasen fighter animation split
+POST-EXPLOSION RELEASE / RECOVERY
+rasen10 -> rasen11 -> rasen12
 
-The current code defines:
+That is the critical correction.
 
-* rasenForm = rasen1-3
-* rasenDash = rasen4-6
-* rasenConfirm = rasen7-12
+Do NOT keep rasen10/11 in the pre-explosion confirm sequence.
+Do NOT hold rasen11 waiting for the explosion.
+Do NOT use rasen12 during the explosion.
+rasen9 is the explosion pose.
+rasen10 is where the post-explosion release/recovery starts.
 
-That last split is wrong because rasen12 is being treated as part of the confirm sequence and then held for almost the entire explosion delay.
+--------------------------------------------------
+1. CORRECT THE FIGHTER ANIMATION SPLIT
+--------------------------------------------------
 
-Change the animation registration so rasen12 is isolated as a dedicated release animation.
+Current `js/data/characters.js` has approximately:
 
-The intended structural split should be along these lines after visually confirming the frames:
+rasenForm      = rasen1-3
+rasenDash      = rasen4-6
+rasenConfirm   = rasen7-11
+rasenRelease   = rasen12
 
-* rasenForm: rasen1-rasen3
-* rasenDash: rasen4-rasen6
-* rasenConfirm: rasen7-rasen11
-* rasenRelease: only rasen12
+That is still wrong for a successful hit.
 
-rasenRelease should be a one-shot, one-frame fighter animation at RASEN_FPS.
+Change the logical clips to represent the actual artwork:
 
-Do not leave rasen12 inside rasenConfirm.
+rasenForm:
+  rasen1, rasen2, rasen3
 
-Update comments/specification accordingly.
+rasenDash:
+  rasen4, rasen5, rasen6
 
-Clean whiff behavior
+rasenConfirm:
+  rasen7, rasen8
 
-This is currently definitely wrong.
+rasenExplosion:
+  rasen9 only
 
-At the moment, ChargedTechnique.update() returns 'miss' as soon as the dash animation completes. Fighter.endTechnique('miss') then destroys the technique immediately, removes the sphere, and returns #0001 directly to idle.
+rasenRelease:
+  rasen10, rasen11, rasen12
+
+A clean rush miss still needs the special behavior established previously:
+the final visible miss/release pose should be rasen12.
+
+Therefore it is fine to add a dedicated logical clip such as:
+
+rasenWhiffRelease:
+  rasen12 only
+
+This reuses the same existing PNG. Do NOT duplicate, regenerate, rename, redraw, or modify the PNG file itself.
+
+It is okay for `rasen12.png` to be referenced by two logical animation clips:
+- the last frame of successful post-explosion `rasenRelease`;
+- the one-frame `rasenWhiffRelease` for a failed rush.
 
-The existing test even explicitly expects:
+The old test that assumes every rasen source path can occur in exactly one logical clip must be updated accordingly. What matters is that there is still exactly one physical PNG file on disk.
 
-“no rasen7-12 … idle at once”
+All fighter clips remain right-facing source art and one-shot at RASEN_FPS.
 
-That behavior must be replaced.
+--------------------------------------------------
+2. CORRECT THE SUCCESSFUL-HIT STATE MACHINE
+--------------------------------------------------
+
+The current successful path is roughly:
+
+form
+-> dash
+-> confirm rasen7-11
+-> wait holding rasen11
+-> explode while showing rasen12
+-> done
+
+Replace that successful path with:
+
+form
+-> dash
+-> confirm
+-> wait
+-> explode
+-> release
+-> done
+
+Meaning:
+
+FORM
+- unchanged.
+
+DASH
+- unchanged.
+- rasen4-6.
+- fixed rush velocity.
+- sphere carried in the hand.
+- this remains the ONLY contact-search phase.
+
+CONFIRM
+- contact applies first hit exactly once.
+- rush stops immediately.
+- target becomes bound.
+- target immediately displays Hurt/Mid-air Hurt on the same collision tick.
+- sphere moves onto the enemy.
+- #0001 plays rasen7 -> rasen8.
+- sphere begins its attached rotation.
+
+WAIT
+- #0001 HOLDS rasen8.
+- absolutely do not advance him to rasen9 yet.
+- rasen9 belongs to the explosion itself.
+- while rasen8 is held, the sphere continues rotating and gradually becomes larger and larger.
+- the target remains bound/Hurt.
+- #0001 remains locked and stationary.
+- this lasts until the existing `explosionDelay`.
+
+EXPLODE
+- when the delayed explosion begins, immediately switch #0001 to rasen9.
+- rasen9 is the fighter’s explosion pose.
+- sphere stops using its normal attached-state visuals and switches to the authored explosion effect.
+- explosion hit still happens on the first explosion frame.
+- release the target from the bind BEFORE applying explosion knockback, as the code already does.
+- hold rasen9 for the duration of the visible sphere explosion if necessary; do not start rasen10 until the explosion effect itself has finished.
 
-When the forward rush finishes without hitting anyone:
+RELEASE
+- only AFTER the visible explosion completes:
+  rasen10 -> rasen11 -> rasen12
+- no sphere remains during this phase.
+- no more damage.
+- no contact search.
+- no bind.
+- no additional explosion.
+- fighter remains committed/locked during this short recovery.
+- after rasen12 finishes, technique ends and normal control returns.
 
-* stop horizontal rush movement;
-* stop contact searching;
-* do not deal any damage;
-* do not bind anyone;
-* do not play the impact or explosion sphere frames;
-* transition into a short release/recovery phase;
-* show 0001_rasen12.png;
-* do not return to idle on the same simulation step;
-* keep control locked for the release frame’s intended duration, normally one RASEN_FPS frame (1 / 12 s);
-* after that release frame completes, finish the technique and return control.
+This means the successful sequence on screen should read unmistakably as:
 
-The blue sphere does not explode on a miss. This is a release/recovery of the failed rush, not an explosion.
+rasen7
+rasen8
+rasen8 held...
+rasen8 held...
+rasen8 held...
+EXPLOSION -> rasen9
+then
+rasen10
+rasen11
+rasen12
+then neutral.
 
-The final visible fighter frame of a clean miss must therefore be 0001_rasen12.png, followed by the normal idle/run state.
+Do not let rasen10 or rasen11 appear before the blast.
 
-Keep velocity at zero during this release.
+--------------------------------------------------
+3. KEEP THE CLEAN-MISS BEHAVIOR SEPARATE
+--------------------------------------------------
 
-A wall-ending rush should not accidentally continue sliding. Preserve existing wall/ground safety behavior. Do not invent new combat effects for a whiff.
+Do not accidentally make a whiff play the whole rasen10-12 successful recovery if that changes the intended failed-rush look.
 
-Successful contact
+The earlier requirement still applies:
 
-When the rushing sphere overlaps an opponent:
+If #0001 rushes and hits nobody:
+- rush ends;
+- velocity becomes 0;
+- contact search ends;
+- no enemy is damaged;
+- no enemy is bound;
+- no prasen7-11 attached/blast sequence occurs;
+- the sphere disappears without exploding;
+- #0001 displays the LAST rasen frame, rasen12, as the whiff release;
+- hold it for the intended one-frame duration;
+- then return to neutral.
 
-* first hit happens exactly once;
-* preserve the existing first-hit damage unless another existing design source says otherwise: currently 4 damage;
-* stop #0001’s rush immediately;
-* move the sphere onto the opponent;
-* bind/immobilize the opponent;
-* begin the contact/confirm fighter frames;
-* start the delayed explosion timer;
-* there must be no additional rush contact checks after confirmation.
+A wall-stopped rush should use the same whiff-release semantics.
 
-The existing targetOffset, sphere hitbox, facing snapshot, grounding requirement and bind ownership model are useful and should be retained.
+So a clean implementation can use separate data/runtime fields such as:
 
-Enemy must show Hurt immediately on sphere contact
+confirmAnimation
+explosionAnimation
+releaseAnimation
+whiffReleaseAnimation
 
-This needs to happen on the exact simulation step on which the sphere first damages the target.
+Do not hard-code #0001 filenames directly inside the generic runtime. Keep ChargedTechnique data-driven.
 
-Currently CombatSystem.applyHit() gives the victim hitstun, but charged-technique collision resolution happens after both fighters have already updated their visual state for that fixed step. As a result, the target can render its previous animation for the initial collision frame.
+--------------------------------------------------
+4. THE SPHERE MUST STILL ROTATE ON THE TARGET
+--------------------------------------------------
 
-Fix that.
+Preserve the previous correction that made the attached blue sphere rotate.
 
-Immediately after the sphere’s first hit is successfully applied/bound, force the caught target’s visual state to reflect the new combat state before that step is rendered.
+The attached sphere should keep cycling:
 
-For a grounded target, the rendered fighter frame on the contact step must be:
+prasen7 -> prasen8 -> prasen9 -> prasen7 -> ...
 
-0001_hurt.png
+until the explosion starts.
 
-For an airborne target, use the existing:
+Do not freeze on one frame.
 
-0001_midairhurt.png
+Do not put prasen10 or prasen11 into this rotation loop.
 
-The victim should remain on the appropriate Hurt pose while caught/bound, as the current hitstun / bound animation rules already intend.
+prasen10 and prasen11 are the bright explosion frames.
 
-Prefer a targeted solution for the technique if possible instead of casually changing timing semantics for every attack in the game. If you decide the correct fix belongs in shared hit handling, run all combat tests and make sure ordinary attacks, Dodge, hitstop, projectiles and clones are unchanged.
+Keep the attached sphere direction-neutral and centre-anchored.
 
-Add a regression test that checks the target frame immediately after the contact tick, not one tick later.
+Keep its centre following the target through the existing `targetOffset`, including an airborne caught enemy.
 
-The sphere must rotate continuously while attached to the enemy
+--------------------------------------------------
+5. ADD REAL SPHERE GROWTH BEFORE THE EXPLOSION
+--------------------------------------------------
 
-This is another current bug.
+Rotation alone is not sufficient.
 
-Right now:
+While #0001 is stopped/holding rasen8, the sphere is supposed to become progressively bigger and bigger before exploding.
 
-* rasenSphereImpact contains prasen7, prasen8, prasen9;
-* ChargedTechnique.sphere uses frameAt(...);
-* frameAt() clamps to the final frame;
-* therefore it plays 7 -> 8 -> 9 once and then freezes permanently on prasen9 until the explosion.
+Implement explicit visual scale growth for the sphere while it is attached to the enemy.
 
-That is not correct.
+Important: do NOT assume cycling prasen7-9 provides the growth.
 
-The attached blue sphere is supposed to visibly keep rotating on the enemy until it explodes.
+The actual source PNG canvas sizes are approximately:
 
-Use the authored prasen7, prasen8, prasen9 frames as the rotating cycle:
+prasen7: 116 x 118 source pixels
+prasen8: 106 x 110
+prasen9: 100 x 106
 
-prasen7 -> prasen8 -> prasen9 -> prasen7 -> prasen8 -> prasen9 -> ...
+So their native dimensions actually trend smaller rather than monotonically larger.
 
-Continue at the appropriate PRASEN_FPS for the entire bound/wait period.
+Therefore growth must be represented explicitly in the technique/rendering logic.
 
-Do not just hold prasen9.
+A clean implementation would expose a data-driven attached-sphere growth configuration on the technique definition, for example conceptually:
 
-Do not rotate the entire canvas sprite artificially if these three PNG frames are themselves the authored rotational animation. Use the actual animation frames.
+sphereGrowth: {
+  startScale: ...,
+  endScale: ...,
+}
 
-Implementation can either:
+or equivalent.
 
-* make the impact effect explicitly looping and teach the charged-technique frame selection to honor looping; or
-* use a dedicated modulo-based frame calculation for the attached-sphere phase.
+Do not bury #0001-specific magic constants directly in Arena.drawTechnique.
 
-Whichever approach is cleaner, ensure the frame progression is deterministic at the fixed 60 Hz simulation rate.
+The technique runtime should expose something like a visual `sphereScale` derived deterministically from its state/time, and the renderer should render the centered sphere with that scale multiplier.
 
-The sphere center must continue following the caught opponent using the existing targetOffset.
+Requirements for growth:
 
-Explosion
+- sphere stays centred on the caught opponent;
+- its centre must NOT drift as it becomes larger;
+- it continues rotating through prasen7-9 while scaling;
+- scaling affects visuals only;
+- it must not create repeated hits;
+- it must not enlarge/re-enable the rush hitbox after contact;
+- it must not alter the target hurtbox or collision;
+- growth must be deterministic under the fixed 60 Hz update;
+- it should visibly increase continuously/progressively, not randomly pulse;
+- scale should never shrink during this pre-explosion growth period.
 
-The last two sphere frames are the explosion.
+Begin the growth once #0001 has reached the rasen8 hold portion of the contact sequence.
 
-Keep:
+The visual should communicate:
+sphere caught enemy -> energy keeps building -> sphere becomes increasingly large -> blast.
 
-* prasen10
-* prasen11
+Use a configurable start/end scale rather than sprinkling renderer constants around the code.
 
-as the two-frame rasenSphereExplosion one-shot.
+Tune the final scale visually against the actual game so the growth is obvious but does not become absurdly oversized.
 
-These are visually lighter/brighter because this is when the actual blast happens. They must not participate in the attached rotation loop.
+Add tests for the scale progression:
+- scale at beginning of attached hold;
+- scale partway through delay;
+- scale immediately before explosion;
+- assert start < middle < end;
+- assert repeated calls at the same fixed-step time return identical values.
 
-So the effect sequence on a successful hit should be:
+--------------------------------------------------
+6. EXPLOSION VISUAL TIMING
+--------------------------------------------------
 
-prasen7 -> 8 -> 9 -> 7 -> 8 -> 9 -> ... repeatedly
+The current sphere explosion art is:
 
-until the explosion time, then:
+prasen10
+prasen11
 
-prasen10 -> prasen11
+Keep those as the explosion animation.
 
-once.
+They are visibly much lighter/brighter than the attached sphere and represent the blast.
 
-The second hit should still occur on the first explosion frame (prasen10) unless inspection of existing design/tests establishes a deliberate different timing.
+At exactly the configured explosion time:
 
-Preserve the existing important ordering:
+1. #0001 switches from held rasen8 to rasen9.
+2. attached sphere growth/rotation stops.
+3. first sphere blast frame prasen10 appears.
+4. target is released from the bind.
+5. explosion hit is applied.
+6. target receives the existing launch/knockback.
+7. prasen11 follows once.
+8. after the explosion animation finishes, the sphere disappears.
+9. only then does #0001 begin rasen10 -> rasen11 -> rasen12 recovery.
 
-1. explosion becomes due;
-2. release the target from the bind;
-3. apply explosion damage/knockback;
-4. target can then be launched normally.
+Do NOT start rasen10 on the same instant that prasen10 first appears.
 
-Do not let the bind cancel the explosion knockback.
+The explosion visual belongs with rasen9.
 
-Current values can remain:
+Because rasenExplosion may only contain one fighter frame while the sphere blast contains two frames, it is acceptable and preferable to hold rasen9 for the full sphere-explosion duration.
 
-* first hit: 4 damage
-* explosion: 16 damage
-* total successful unblocked damage: 20
-* explosionDelay: 2.0 seconds
+Then transition to release.
 
-unless there is an authoritative existing value elsewhere in the repository.
+--------------------------------------------------
+7. DAMAGE / COMBAT VALUES SHOULD NOT CHANGE
+--------------------------------------------------
 
-Use rasen12 as the actual release frame
+Unless another authoritative repo source explicitly contradicts them, preserve the existing combat values:
 
-This is the central animation correction.
+first contact:
+- 4 damage;
+- no launch;
+- existing hitstun/blockstun/hitstop.
 
-rasen12 should not be sitting on screen for almost two seconds while the sphere is attached to the opponent.
+delayed explosion:
+- 16 damage;
+- existing 420 horizontal / 220 upward launch;
+- existing stun/hitstop/blockstun.
 
-During the wait before explosion, #0001 should hold the final appropriate pre-release/contact pose from the real contact sequence — after inspecting the art, this will most likely mean the last frame of the new rasenConfirm (rasen11).
+Total unblocked successful move:
+20 damage.
 
-Then when the sphere is released/explodes, transition #0001 to:
+Keep exactly one contact damage event and exactly one explosion damage event.
 
-0001_rasen12.png
+Do not make the growing sphere deal repeated damage.
 
-That is the release frame.
+Do not turn the growth phase into a multihit.
 
-Use the same release artwork when the rush completely misses.
+--------------------------------------------------
+8. IMMEDIATE HURT FRAME MUST REMAIN FIXED
+--------------------------------------------------
 
-In other words, rasen12 represents leaving/releasing the technique, not continuing the actual rush.
+The previous fix correctly forces the caught opponent into Hurt/Mid-air Hurt on the exact collision tick.
 
-A good phase model would be something like:
+Do NOT regress this.
 
-* form
-* dash
-* confirm
-* wait
-* explode
-* missRelease or a generic release
-* done
+On the exact tick health changes 100 -> 96:
+- target is already bound;
+- target is already in Hurt or Mid-air Hurt;
+- sphere is already centred on the target;
+- attacker is already on the first contact pose;
+- rush velocity is already stopped.
 
-You do not have to use those exact names if there is a cleaner state model, but the distinction must exist behaviorally.
+The successful first contact should begin at rasen7.
 
-For a hit:
+--------------------------------------------------
+9. UPDATE THE GENERIC TECHNIQUE RUNTIME CLEANLY
+--------------------------------------------------
 
-* form
-* dash
-* confirm (rasen7-rasen11)
-* wait while holding the correct contact pose and continuously rotating prasen7-9
-* explosion starts
-* fighter displays rasen12 as the release
-* sphere displays prasen10-11
-* finish
+Relevant file:
 
-For a miss:
+`js/game/charged-technique.js`
 
-* form
-* dash
-* no target found
-* fighter displays rasen12 for its release/recovery duration
-* no impact/explosion sphere sequence
-* finish
+Do not special-case frame names like `"rasen8"` or `"rasen9"` inside the runtime.
 
-Rendering
+Extend the definition schema so the phases remain data-driven.
 
-Relevant renderer:
+Conceptually the definition now needs enough fighter animation roles to distinguish:
 
-js/game/arena.js -> Arena.drawTechnique()
+- formAnimation
+- dashAnimation
+- confirmAnimation
+- explosionAnimation
+- releaseAnimation
+- whiffReleaseAnimation
 
-The renderer currently draws whatever t.sphere returns, centered at t.sphereCenter(true). That architecture is fine.
+along with the existing sphere animation roles.
 
-Do not introduce a second independent visual sphere.
+Update `TECHNIQUE_DEFAULTS`, validation in `techniqueProblem`, constructor-resolved animation metadata/durations, and `animation` selection accordingly.
 
-Make the technique runtime return the correct frame index and let the existing renderer draw it.
+A clean explicit phase model would be:
+
+form
+dash
+whiffRelease          // miss/wall only
+confirm
+wait
+explode
+release               // successful post-explosion recovery
+done
+
+Exact names can differ, but do not conflate these behaviors again.
+
+Important duration rules:
+
+confirm:
+plays rasen7-8 once.
+
+wait:
+holds rasen8.
+
+explode:
+plays/holds rasen9 for the visible prasen10-11 blast duration.
+
+release:
+plays rasen10-12 once.
+
+whiffRelease:
+shows rasen12 for the intended short whiff recovery.
+
+`velocityX` remains nonzero ONLY during dash.
+
+--------------------------------------------------
+10. RENDERER CHANGES
+--------------------------------------------------
+
+Relevant code:
+
+`js/game/arena.js`
+`Arena.drawTechnique()`
+
+The renderer currently:
+- asks the technique for its sphere frame;
+- asks for sphere centre;
+- draws the effect centred using the fighter art scale.
+
+Keep that architecture.
+
+Add the sphere growth multiplier cleanly.
+
+For example, conceptually:
+
+const scale = this.pxPerArt * t.sphereScale;
+
+and pass the resulting art scale to the centered effect renderer.
+
+Do not alter global fighter scale.
+Do not resize the opponent.
+Do not mutate normalized sprite frames.
+Do not create new canvases each frame.
+Do not rotate the entire canvas artificially; frame cycling already provides the authored sphere rotation.
+
+The sphere must remain precisely centre-anchored as its scale increases.
+
+During successful release rasen10-12 there should be no sphere to draw.
+
+--------------------------------------------------
+11. UPDATE TESTS THAT CURRENTLY ENCODE THE WRONG SEQUENCE
+--------------------------------------------------
+
+The current `tests/charged-ba2.test.mjs` explicitly encodes the previous interpretation and MUST be updated.
+
+Current wrong expectations include things like:
+
+- rasenConfirm = rasen7-11
+- rasen11 held until the explosion
+- rasen12 shown during the explosion
+- successful blast and release happening in the same phase
+
+Replace those expectations.
+
+Add/modify tests to prove the corrected behavior.
+
+A. Animation registration
+
+Assert:
+
+rasenForm      = 1-3
+rasenDash      = 4-6
+rasenConfirm   = 7-8
+rasenExplosion = 9
+rasenRelease   = 10-12
+
+and whichever logical one-frame clip is used for whiff:
+rasenWhiffRelease = 12
+
+Do not require every source PNG to be referenced by exactly one logical clip, because rasen12 can legitimately be reused by the whiff clip.
+
+Still verify no duplicate physical PNG files exist.
+
+B. Contact / pre-explosion fighter frames
+
+After contact:
+- rasen7 appears;
+- then rasen8;
+- rasen8 remains held for the rest of the delay;
+- rasen9 does NOT appear early;
+- rasen10/11/12 do NOT appear early.
+
+C. Sphere rotation
+
+Before explosion:
+prasen7 -> 8 -> 9 -> 7 -> ...
+continues correctly.
+
+D. Sphere growth
+
+Sample attached-sphere scale at multiple points during the rasen8 hold:
+- early;
+- midpoint;
+- immediately pre-explosion.
+
+Assert monotonically increasing scale.
+
+Also ensure its world/render centre stays the target centre despite the changing size.
+
+E. Exact explosion transition
+
+At the explosion tick:
+- phase becomes explode;
+- fighter frame is rasen9;
+- sphere is prasen10;
+- second damage event happens;
+- target is released before knockback;
+- target health becomes 80;
+- launch remains intact.
+
+On subsequent explosion visual frame:
+- fighter still shows/holds rasen9;
+- sphere advances to prasen11.
+
+F. Post-explosion release
+
+Only after prasen10-11 finish:
+- sphere becomes null;
+- phase enters release;
+- rasen10 -> rasen11 -> rasen12 play once;
+- no new damage events;
+- controls remain locked until rasen12 completes;
+- then technique clears and normal control returns.
+
+G. Clean miss
 
 Preserve:
+- rasen12 is the whiff release pose;
+- no prasen7-11;
+- no damage;
+- no bind;
+- no successful-hit rasen7-11 sequence;
+- then neutral.
 
-* interpolation;
-* center anchoring;
-* effect art scale;
-* direction-neutral sphere art;
-* sphere drawn above fighters;
-* left/right fighter mirroring behavior.
+H. Rendering test
 
-Files likely requiring changes
+Current Battle render test says the sphere spins while #0001 holds rasen11 and then expects rasen12 beside prasen10.
 
-Inspect at minimum:
+That test is obsolete.
 
-* js/data/characters.js
-* js/game/charged-technique.js
-* js/game/character.js
-* js/game/combat.js
-* js/game/arena.js
-* tests/charged-ba2.test.mjs
-* ALVA_SPEC.md
+Replace it so it verifies:
+- target Hurt + rasen7 + prasen7 on contact;
+- rasen8 held while the sphere rotates and gets progressively larger;
+- rasen9 + prasen10 on explosion;
+- rasen9 + prasen11 for the rest of the visible blast;
+- then no sphere while rasen10, rasen11, rasen12 play.
 
-The majority of the actual fix should probably remain concentrated in:
+If the fake canvas records destination width/height or transforms, explicitly assert that the rendered attached-sphere dimensions increase over the hold while its center translation stays unchanged.
 
-* characters.js
-* charged-technique.js
-* the Charged BA2 tests
+--------------------------------------------------
+12. UPDATE DOCUMENTATION
+--------------------------------------------------
 
-Only touch shared systems where genuinely required.
+Update all stale descriptions in:
 
-Tests that are currently encoding the wrong behavior
+- `js/data/characters.js`
+- `js/game/charged-technique.js`
+- `tests/charged-ba2.test.mjs`
+- `ALVA_SPEC.md`
+- README/help text if they currently describe the old frame roles
 
-Update the existing Charged BA2 tests rather than working around them.
+Remove statements such as:
 
-In particular, these current expectations are obsolete:
+- rasen7-11 are all confirm frames;
+- rasen11 is held until explosion;
+- rasen12 is used as the explosion release pose.
 
-1. The animation registration test currently expects:
+Document instead:
 
-rasenConfirm = rasen7-12
+rasen1-3   formation
+rasen4-6   rush
+rasen7-8   successful contact / stop
+rasen8     held while attached sphere builds in size
+rasen9     explosion pose
+rasen10-12 post-explosion release/recovery
+rasen12    also used alone as the clean-whiff release pose
 
-It should instead verify the corrected confirm/release split.
+prasen1-6  formation
+prasen7-9  rotating attached sphere, visually scaled larger over the hold
+prasen10-11 explosion
 
-2. The clean-miss test currently says:
+--------------------------------------------------
+13. DO NOT REGRESS THE REST OF THE GAME
+--------------------------------------------------
 
-a clean miss: no hit, bind, rasen7-12 ... #0001 is idle at once
+Preserve all existing behavior for:
 
-This is wrong.
+- ordinary ground BA2;
+- mid-air BA2;
+- Charged BA1 Clone Attack;
+- Throw;
+- Dodge;
+- Charge activation requirements;
+- Energy;
+- facing snapshot;
+- left-facing mirroring;
+- hand offsets;
+- grounded-only startup;
+- ground-loss cancellation;
+- wall stopping;
+- attacker being hit during the technique;
+- Block interaction;
+- Dodge interaction;
+- knockout handling;
+- reset/rematch cleanup;
+- destroy cleanup;
+- target bind ownership;
+- airborne caught target falling/landing normally;
+- immediate target Hurt pose;
+- exactly two successful damage events;
+- no extra hitboxes;
+- fixed-step determinism.
 
-Replace it with a test proving:
+Do not turn Sphere Rush into a normal attack/projectile/summon.
+Do not rewrite unrelated systems.
 
-* no hit;
-* no bind;
-* no impact/explosion frames;
-* dash stops;
-* rasen12 is shown as the release frame;
-* fighter does not become idle until the release has completed;
-* no explosion damage occurs.
+--------------------------------------------------
+14. VALIDATION
+--------------------------------------------------
 
-3. The successful-hit test currently expects:
-
-rasen7 -> rasen12 once and holds it
-
-That is wrong.
-
-It should prove that rasen12 is not shown during the pre-explosion wait.
-
-4. The sphere test currently expects:
-
-prasen7 -> prasen9 and holds it
-
-That is wrong.
-
-Replace this with an assertion that prasen7, 8, and 9 cycle repeatedly throughout the wait.
-
-Test enough time to verify at least two complete loops.
-
-5. Add an exact-contact-frame test:
-
-On the same tick that the first sphere hit changes health from 100 to 96:
-
-* target is already bound;
-* target state is hitstun or the appropriate caught state;
-* grounded victim’s visible frame is already 0001_hurt.png;
-* sphere is already positioned on the target.
-
-There must be no one-tick visual delay.
-
-6. Explosion test should verify:
-
-* no explosion before the configured delay;
-* first explosion frame is prasen10;
-* second is prasen11;
-* those two do not loop;
-* target is released before launch;
-* second hit happens once;
-* total health becomes 80;
-* rasen12 is being used as the release frame around the actual explosion/end, not held during the whole wait.
-
-Preserve all existing non-bug behavior
-
-Do not regress:
-
-* normal ground BA2 (2ba1-2ba7, 8 damage);
-* mid-air BA2;
-* Charged BA1 Clone Attack;
-* Charge input requirements;
-* Energy behavior;
-* fixed facing throughout the technique;
-* left-facing mirroring;
-* grounded-only startup;
-* technique cancellation when #0001 is hit;
-* ground-loss cancellation;
-* wall collision handling;
-* Dodge interaction;
-* Block interaction;
-* knockout handling;
-* reset/rematch cleanup;
-* destroy cleanup;
-* exact one-first-hit + one-explosion-hit rule;
-* no duplicated projectiles/clones;
-* sphere hitbox centered on the actual hand/sphere;
-* target following/binding logic;
-* fixed-step determinism.
-
-Do not “fix” this by turning Charged BA2 into a normal attack, projectile, summon, or huge melee hitbox. Keep the dedicated ChargedTechnique architecture.
-
-Documentation
-
-Update stale comments in characters.js, charged-technique.js, tests and ALVA_SPEC.md.
-
-The spec currently documents:
-
-* rasen7-12 as hit-confirm continuation;
-* prasen7-9 as a one-shot impact clip that holds on prasen9;
-* a miss ending immediately.
-
-Those statements must match the corrected implementation.
-
-Document rasen12 explicitly as the release/recovery pose.
-
-Validation
-
-Run at least:
+Run:
 
 node --test tests/charged-ba2.test.mjs
 
-Then run the complete test suite:
+Then:
 
 node --test tests/*.test.mjs
 
-Do not stop merely because existing tests pass. Several existing Charged BA2 tests encode the behavior that needs to be corrected, so update them to test the intended animation semantics.
+Also manually inspect the move in the browser.
 
-Finally, manually verify the move visually in the game in both directions and in both outcomes:
+Successful hit must visibly read:
 
-Miss
+sphere forms
+-> rush
+-> contact on rasen7
+-> settle on rasen8
+-> #0001 remains frozen on rasen8
+-> sphere continues rotating on the Hurt enemy
+-> sphere steadily gets larger and larger
+-> blast begins
+-> #0001 is on rasen9 while prasen10-11 explode
+-> sphere disappears
+-> #0001 releases/recoveries through rasen10
+-> rasen11
+-> rasen12
+-> neutral
 
-* sphere forms;
-* rush happens;
-* no contact;
-* rush stops;
-* rasen12 visibly releases/recovers;
-* sphere disappears without explosion;
-* neutral control returns.
+Clean miss must visibly read:
 
-Hit
+sphere forms
+-> rush
+-> catches nobody
+-> rush stops
+-> no explosion
+-> final rasen12 release pose
+-> neutral
 
-* sphere forms;
-* rush makes contact;
-* target changes to Hurt immediately;
-* #0001 stops;
-* sphere attaches to target;
-* prasen7-9 visibly keeps rotating instead of freezing;
-* rasen12 is not prematurely held during the delay;
-* at the explosion moment the lighter/brighter prasen10-11 frames play;
-* #0001 uses the rasen12 release frame;
-* target is released and launched by the explosion;
-* sphere disappears;
-* technique ends cleanly.
-
-The final result should look like the supplied rasen/prasen artwork was authored for the mechanic, rather than forcing the artwork into the old phase assumptions.
+This is an animation-semantics fix, not a combat redesign. The finished move should make the role of each supplied sprite obvious from the gameplay instead of forcing the late rasen frames into the wrong phases.
