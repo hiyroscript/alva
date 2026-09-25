@@ -176,7 +176,7 @@ test('the Clone Attack is data: a Charged BA1 summon on a 5-second cooldown, reu
     { ...ATTACK },
     {
       animation: 'ba1', startup: 1 / 12, active: 1 / 12, recovery: 2 / 12, damage: 5,
-      hitbox: { x: 12, y: -64, w: 28, h: 16 }, knockback: { axis: 'horizontal', level: 'low' },
+      hitbox: { x: 12, y: -64, w: 28, h: 16 }, knockback: { axis: 'horizontal', level: 'low' }, knockbackGrowth: 0.5,
       hitstun: 0.22, blockstun: 0.14, hitstop: 0.06, cooldown: 0.1, groundOnly: true,
     },
   );
@@ -693,7 +693,7 @@ test('the no-ground fallback is data: the summon reuses midairBa2 over the targe
     { ...MB2 },
     {
       animation: 'midairBa2', startup: 2 / 12, active: 1 / 12, recovery: 2 / 12, damage: 10,
-      hitbox: { x: 8, y: -44, w: 40, h: 40 }, knockback: { axis: 'vertical', level: 'high', sign: -1 },
+      hitbox: { x: 8, y: -44, w: 40, h: 40 }, knockback: { axis: 'vertical', level: 'high', sign: -1 }, knockbackGrowth: 1,
       hitstun: 0.22, blockstun: 0.14, hitstop: 0.06, cooldown: 0.1,
     },
   );
@@ -730,7 +730,8 @@ test('supported ground is unchanged: behind the target either way it faces, BA1,
   const d = duel();
   const clone = summon(d);
   d.until(() => d.events.length > 0);
-  assert.equal(d.target.body.vx, (KNOCKBACK_LEVELS.low.horizontal + accumulatedKnockbackBonus(5, 'horizontal')) * clone.facing);
+  // BA1's own default launch and knockback growth (0.5), inherited.
+  assert.equal(d.target.body.vx, (KNOCKBACK_LEVELS.low.horizontal + accumulatedKnockbackBonus(5, 'horizontal', 0.5)) * clone.facing);
   assert.equal(d.target.body.vy, 0);
 });
 
@@ -1182,7 +1183,7 @@ test('the clone BA1 hits once with BA1\'s damage, stun and knockback from the cl
   // Knockback along the clone's facing (left, away from the clone), even
   // though the owner faces right.
   assert.equal(d.attacker.facing, 1);
-  assert.equal(d.target.body.vx, -(140 + accumulatedKnockbackBonus(5, 'horizontal')));
+  assert.equal(d.target.body.vx, -(140 + accumulatedKnockbackBonus(5, 'horizontal', 0.5)));
   assert.equal(clone.hasHit, true);
   assert.equal(clone.attackPhase, 'active');
   assert.equal(clone.hitbox(), null, 'used up');
@@ -1299,7 +1300,7 @@ test('Block (future fighters): a guard facing away does not block the clone; tur
   assert.equal(e.attacker, front.attacker);
   assert.equal(e.damage, ATTACK.damage * front.target.combat.blockDamageScale, 'chip damage');
   assert.equal(front.target.combat.stun, ATTACK.blockstun);
-  assert.equal(front.target.body.vx, 0.5 * (140 + accumulatedKnockbackBonus(front.target.combat.knockback, 'horizontal')) * clone.facing, 'half knockback, from the clone');
+  assert.equal(front.target.body.vx, 0.5 * (140 + accumulatedKnockbackBonus(front.target.combat.knockback, 'horizontal', 0.5)) * clone.facing, 'half knockback, from the clone');
   assert.equal(clone.hitstop, ATTACK.hitstop, 'a blocked punch still pauses the clone');
   assert.equal(front.attacker.combat.hitstop, 0);
 });

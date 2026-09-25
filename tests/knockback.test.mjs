@@ -7,8 +7,8 @@
 // CombatSystem.applyHit physics those numbers produce, and #0001's four
 // Basic Attacks. Then the two separate parts of every launch: the attack's
 // default Knockback and the separate bonus from the target's accumulated
-// Knockback (accumulatedKnockbackBonus / resolveLaunch), added, never one
-// multiplying the other. Knockback is not a Power: it is independent of
+// Knockback at the attack's own knockback growth (accumulatedKnockbackBonus
+// / resolveLaunch), added, never one multiplying the other. Knockback is not a Power: it is independent of
 // Jump Power and Speed Power. Runs the real Fighter, physics and combat (see
 // fighter-harness.mjs).
 import test from 'node:test';
@@ -16,13 +16,15 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
   KNOCKBACK_LEVELS, KNOCKBACK_AXES, KNOCKBACK_DIRECTIONS, KNOCKBACK_SUMMARY, KNOCKBACK_DIRECTION_SUMMARY,
-  ACCUMULATED_KNOCKBACK_SCALING, getKnockbackLevel, resolveKnockback, accumulatedKnockbackBonus,
-  dominantLaunchAxis, resolveLaunchAxis, resolveLaunch,
+  ACCUMULATED_KNOCKBACK_SCALING, DEFAULT_KNOCKBACK_GROWTH, getKnockbackLevel, resolveKnockback,
+  resolveKnockbackGrowth, accumulatedKnockbackBonus, dominantLaunchAxis, resolveLaunchAxis, resolveLaunch,
 } from '../js/data/knockback.js';
 import * as knockbackModule from '../js/data/knockback.js';
 import { POWERS } from '../js/data/powers.js';
 import { CHARACTERS } from '../js/data/characters.js';
 import { CombatSystem, createAttackDefinition } from '../js/game/combat.js';
+import { createProjectileDefinition } from '../js/game/projectile.js';
+import { createTechniqueDefinition } from '../js/game/charged-technique.js';
 import { def, DT, STAGE, makeFighter, stepUntil, duel } from './fighter-harness.mjs';
 
 // Silences and collects console.warn while `fn` runs.
@@ -39,9 +41,9 @@ function warnings(fn) {
 
 // An attack definition with `knockback`, hitting on its first step. No
 // damage by default, so a target at 0 Knockback stays there and takes
-// exactly the move's default launch.
-const probe = (knockback, damage = 0) => createAttackDefinition({
-  id: 'probe', animation: 'ba1', startup: 0, active: DT, recovery: 0, damage, hitstun: 0.3, hitstop: 0, knockback,
+// exactly the move's default launch. `extra` adds fields (a knockbackGrowth).
+const probe = (knockback, damage = 0, extra = {}) => createAttackDefinition({
+  id: 'probe', animation: 'ba1', startup: 0, active: DT, recovery: 0, damage, hitstun: 0.3, hitstop: 0, knockback, ...extra,
 });
 
 // A bespoke hit (like a technique's) with its own numeric default launch.
@@ -52,9 +54,10 @@ const bespoke = (baseKnockback, extra = {}) => ({
 // An unblocked hit from an attack with Knockback `knockback` on a target in
 // front, through the real CombatSystem.applyHit; the attacker faces `facing`.
 // `attacker` / `target` swap in other definitions; `accumulated` is the
-// target's Knockback before the hit, `damage` the probe's.
-function hitWith(knockback, { damage = 0, ...options } = {}) {
-  return strike(probe(knockback, damage), options);
+// target's Knockback before the hit, `damage` and `growth` (its
+// knockbackGrowth, the standard one by default) the probe's.
+function hitWith(knockback, { damage = 0, growth, ...options } = {}) {
+  return strike(probe(knockback, damage, growth === undefined ? {} : { knockbackGrowth: growth }), options);
 }
 
 // The same, with any hit definition `atk`.
@@ -238,7 +241,7 @@ test('createAttackDefinition resolves the descriptor once, into the frozen defau
 
 test('combat stays generic: nothing in it names a level, an attack or a fighter', () => {
   const source = readFileSync(new URL('../js/game/combat.js', import.meta.url), 'utf8');
-  assert.match(source, /import \{ resolveKnockback, resolveLaunch \} from '\.\.\/data\/knockback\.js';/);
+  assert.match(source, /import \{ resolveKnockback, resolveKnockbackGrowth, resolveLaunch \} from '\.\.\/data\/knockback\.js';/);
   assert.doesNotMatch(source, /powers\.js/);
   // The code itself, without the schema examples in its comments.
   const code = source.replace(/^\s*\/\/.*$/gm, '');
@@ -364,6 +367,12 @@ test('#0001\'s Basic Attacks: ba1 Low horizontal, ba2 High vertical, midairBa1 M
     ['ba1', 'ba2', 'midairBa1', 'midairBa2'].map((id) => fighter.attacks[id].accumulatedKnockbackAxis),
     ['horizontal', 'vertical', 'vertical', 'vertical'],
   );
+  // Knockback growth, like Smash's: the jab barely grows, the light launcher
+  // a little more, either BA2 at the standard rate.
+  assert.deepEqual(
+    ['ba1', 'midairBa1', 'ba2', 'midairBa2'].map((id) => [def.attacks[id].knockbackGrowth, fighter.attacks[id].knockbackGrowth]),
+    [[0.5, 0.5], [0.75, 0.75], [1, 1], [1, 1]],
+  );
   for (const [id, attack] of Object.entries(def.attacks)) assert.equal('powers' in attack, false, `${id} declares no Powers`);
 });
 
@@ -390,6 +399,11 @@ test('#0001\'s bespoke hits keep their own numeric default launch: Throw, the sh
   assert.ok(x >= 3 * y && y >= 0, 'primarily horizontal, with at most a slight lift');
   assert.equal(rush.explosionHit.accumulatedKnockbackAxis, 'horizontal');
   assert.equal(tech.explosionHit.accumulatedKnockbackAxis, 'horizontal');
+  // #0001's finisher: the highest knockback growth it has.
+  assert.equal(tech.explosionHit.knockbackGrowth, 2);
+  for (const id of ['ba1', 'midairBa1', 'ba2', 'midairBa2']) {
+    assert.ok(tech.explosionHit.knockbackGrowth > fighter.attacks[id].knockbackGrowth, `grows faster than ${id}`);
+  }
   // No bespoke hit still uses the old field name.
   for (const hit of [def.projectiles.shuriken, rush.firstHit, rush.tickHit, rush.explosionHit]) {
     assert.equal('knockback' in hit, false);
@@ -401,6 +415,10 @@ test('#0001\'s bespoke hits keep their own numeric default launch: Throw, the sh
 test('the accumulated-Knockback bonus is fighter-side tuning: 2 per point sideways, 4 per point vertically, no cap', () => {
   assert.deepEqual(ACCUMULATED_KNOCKBACK_SCALING, { horizontalPerPoint: 2, verticalPerPoint: 4 });
   assert.ok(Object.isFrozen(ACCUMULATED_KNOCKBACK_SCALING));
+  assert.equal(DEFAULT_KNOCKBACK_GROWTH, 1, 'the rates are for the standard growth');
+  assert.equal(accumulatedKnockbackBonus(100, 'horizontal', 0.5), 100);
+  assert.equal(accumulatedKnockbackBonus(100, 'vertical', 2), 800);
+  assert.equal(accumulatedKnockbackBonus(100, 'horizontal', 0), 0);
   for (const [value, h, v] of [[0, 0, 0], [5, 10, 20], [25, 50, 100], [50, 100, 200], [100, 200, 400], [150, 300, 600]]) {
     assert.equal(accumulatedKnockbackBonus(value, 'horizontal'), h, `${value} horizontal`);
     assert.equal(accumulatedKnockbackBonus(value, 'vertical'), v, `${value} vertical`);
@@ -437,12 +455,15 @@ test('resolveLaunch adds the bonus in the base\'s own sign along one axis, and a
   assert.deepEqual(resolveLaunch({ x: 720, y: 180 }, 100).final, { x: 920, y: 180 });
   assert.deepEqual(resolveLaunch({ x: 720, y: 180 }, 0).final, { x: 720, y: 180 });
   // An explicit axis wins over the dominant one.
-  assert.deepEqual(resolveLaunch({ x: 720, y: 180 }, 100, 'vertical').final, { x: 720, y: 580 });
+  assert.deepEqual(resolveLaunch({ x: 720, y: 180 }, 100, { axis: 'vertical' }).final, { x: 720, y: 580 });
+  // The move's growth scales only the bonus.
+  assert.deepEqual(resolveLaunch({ x: 140, y: 0 }, 100, { growth: 0.5 }), { base: { x: 140, y: 0 }, bonus: { x: 100, y: 0 }, final: { x: 240, y: 0 } });
+  assert.deepEqual(resolveLaunch({ x: 0, y: -800 }, 50, { growth: 2 }).final, { x: 0, y: -1200 });
   // No axis, or no default launch: no bonus, whatever the Knockback.
   for (const value of [0, 1, 99, 1e4]) {
     assert.deepEqual(resolveLaunch({ x: 0, y: 0 }, value).final, { x: 0, y: 0 });
-    assert.deepEqual(resolveLaunch({ x: 0, y: 0 }, value, 'horizontal').final, { x: 0, y: 0 });
-    assert.deepEqual(resolveLaunch({ x: 140, y: 0 }, value, null).final, { x: 140, y: 0 });
+    assert.deepEqual(resolveLaunch({ x: 0, y: 0 }, value, { axis: 'horizontal', growth: 3 }).final, { x: 0, y: 0 });
+    assert.deepEqual(resolveLaunch({ x: 140, y: 0 }, value, { axis: null }).final, { x: 140, y: 0 });
   }
 });
 
@@ -468,7 +489,7 @@ test('a bespoke hit\'s accumulated-Knockback axis: declared when it launches alo
   }
 });
 
-test('independence: a Low (140) and a High (220) push against a target at 100 both gain exactly +200, keeping their 80 apart', () => {
+test('independence: a Low (140) and a High (220) push at the same growth against a target at 100 both gain exactly +200, keeping their 80 apart', () => {
   const low = hitWith({ axis: 'horizontal', level: 'low' }, { accumulated: 100 });
   const high = hitWith({ axis: 'horizontal', level: 'high' }, { accumulated: 100 });
   assert.equal(low.target.fighter.body.vx, 340);
@@ -587,22 +608,35 @@ test('#0001\'s shuriken and Sphere Rush contact and ticks stay zero-launch at 0,
   }
 });
 
-test('#0001\'s Sphere Rush explosion: its strong default launch plus a horizontal bonus for the new total, the lift unchanged', () => {
+test('#0001\'s Sphere Rush explosion: its strong default launch plus a horizontal bonus for the new total at its growth of 2, the lift unchanged', () => {
   const { fighter } = makeFighter();
   const blast = fighter.techniqueDefs.rasenRush.explosionHit;
   // 3 ticks already on the target, then the blast's 15: 18.
   const { event, target } = strike(blast, { accumulated: 3 });
   assert.equal(target.fighter.combat.knockback, 18);
   assert.deepEqual(event.baseLaunch, { x: 720, y: 180 });
-  assert.deepEqual(event.bonusLaunch, { x: 36, y: 0 });
-  assert.deepEqual([target.fighter.body.vx, target.fighter.body.vy], [756, -180]);
-  // At 100 after the blast: 920 sideways, never 1440.
+  assert.deepEqual(event.bonusLaunch, { x: 72, y: 0 });
+  assert.deepEqual([target.fighter.body.vx, target.fighter.body.vy], [792, -180]);
+  // At 100 after the blast: 720 + 400 sideways, never 1440, and its lift
+  // still the slight 180.
   const worn = strike(blast, { accumulated: 85 });
   assert.equal(worn.target.fighter.combat.knockback, 100);
-  assert.deepEqual([worn.target.fighter.body.vx, worn.target.fighter.body.vy], [920, -180]);
+  assert.deepEqual([worn.target.fighter.body.vx, worn.target.fighter.body.vy], [1120, -180]);
 });
 
-test('#0001\'s real BA1 through the CombatSystem: 140 + 10 from a fresh target, 140 + 200 from one at 95 (both +5)', () => {
+test('#0001\'s finisher pulls away from its jab as Knockback rises: the blast gains four times BA1\'s sideways bonus', () => {
+  const { fighter } = makeFighter();
+  const blast = fighter.techniqueDefs.rasenRush.explosionHit;
+  const jab = fighter.attacks.ba1;
+  for (const accumulated of [0, 50, 100, 200]) {
+    const b = strike({ ...blast, damage: 0 }, { accumulated });
+    const j = strike({ ...jab, damage: 0 }, { accumulated });
+    assert.equal(b.event.bonusLaunch.x, 4 * j.event.bonusLaunch.x, `at ${accumulated}`);
+    assert.equal(b.event.finalLaunch.x - j.event.finalLaunch.x, 580 + 3 * j.event.bonusLaunch.x, `at ${accumulated}`);
+  }
+});
+
+test('#0001\'s real BA1 through the CombatSystem: 140 + 5 from a fresh target, 140 + 100 from one at 95 (both +5, at the jab\'s 0.5 growth)', () => {
   const speeds = [0, 95].map((accumulated) => {
     const d = duel();
     d.target.combat.knockback = accumulated;
@@ -612,5 +646,71 @@ test('#0001\'s real BA1 through the CombatSystem: 140 + 10 from a fresh target, 
     assert.equal(d.target.combat.knockback, accumulated + 5);
     return d.target.body.vx;
   });
-  assert.deepEqual(speeds, [150, 340], 'not 140 x 1.05 or 140 x 2');
+  assert.deepEqual(speeds, [145, 240], 'not 140 x 1.05 or 140 x 2');
+});
+
+// ---- Knockback growth ------------------------------------------------------------------
+
+test('knockback growth is the move\'s own: it scales only the accumulated bonus, never the default launch', () => {
+  // The same Low push as a jab (0.5), a standard move (1) and a finisher (2).
+  const at = (growth, accumulated) => hitWith(LOW_HORIZONTAL, { growth, accumulated });
+  for (const growth of [0.5, 1, 2]) {
+    assert.equal(at(growth, 0).target.fighter.body.vx, 140, `growth ${growth} at 0: its default launch alone`);
+    assert.deepEqual(at(growth, 100).event.baseLaunch, { x: 140, y: 0 }, `growth ${growth}: the default launch is untouched`);
+  }
+  assert.deepEqual([0.5, 1, 2].map((g) => at(g, 100).target.fighter.body.vx), [240, 340, 540]);
+  // Vertical and reversed alike, in the move's own direction.
+  assert.equal(hitWith(HIGH_VERTICAL, { growth: 2, accumulated: 50 }).target.fighter.body.vy, -1200);
+  assert.equal(hitWith({ axis: 'vertical', level: 'high', sign: -1 }, { growth: 0.5, accumulated: 50, airborne: true }).target.fighter.body.vy, 900);
+  // Two moves with the same growth still gain exactly the same bonus.
+  const low = hitWith(LOW_HORIZONTAL, { growth: 2, accumulated: 100 });
+  const high = hitWith({ axis: 'horizontal', level: 'high' }, { growth: 2, accumulated: 100 });
+  assert.deepEqual(low.event.bonusLaunch, high.event.bonusLaunch);
+});
+
+test('growth 0 is fixed knockback: the same launch at any Knockback', () => {
+  for (const accumulated of [0, 100, 500]) {
+    const { event, target } = hitWith(LOW_HORIZONTAL, { growth: 0, accumulated, damage: 5 });
+    assert.equal(target.fighter.body.vx, 140, `at ${accumulated}`);
+    assert.deepEqual(event.bonusLaunch, { x: 0, y: 0 });
+    assert.equal(event.knockbackAfter, accumulated + 5, 'its damage still adds to the target\'s Knockback');
+  }
+});
+
+test('growth is declared, never derived from the move\'s damage or default launch; none is the standard 1', () => {
+  const plain = probe(LOW_HORIZONTAL);
+  assert.equal(plain.knockbackGrowth, DEFAULT_KNOCKBACK_GROWTH);
+  for (const [knockback, damage] of [[LOW_HORIZONTAL, 1], [{ axis: 'horizontal', level: 'high' }, 30], [HIGH_VERTICAL, 10]]) {
+    assert.equal(probe(knockback, damage).knockbackGrowth, 1, `${JSON.stringify(knockback)}, ${damage} damage`);
+  }
+  const declared = probe(LOW_HORIZONTAL, 5, { knockbackGrowth: 1.5 });
+  assert.equal(declared.knockbackGrowth, 1.5);
+  assert.deepEqual(declared.baseKnockback, { x: 140, y: 0 }, 'growth never changes the default launch');
+  // Bespoke hits too.
+  assert.equal(createProjectileDefinition({ id: 'star', baseKnockback: { x: 100, y: 0 } }).knockbackGrowth, 1);
+  assert.equal(createProjectileDefinition({ id: 'star', baseKnockback: { x: 100, y: 0 }, knockbackGrowth: 0.25 }).knockbackGrowth, 0.25);
+});
+
+test('malformed knockback growth is logged and grows at the standard rate, never an arbitrary one', () => {
+  const { value, warnings: quiet } = warnings(() => [undefined, null, 0, 0.25, 1, 3].map((g) => resolveKnockbackGrowth(g)));
+  assert.deepEqual(value, [1, 1, 0, 0.25, 1, 3]);
+  assert.deepEqual(quiet, []);
+  for (const growth of [-1, Number.NaN, Infinity, '2', [1], {}, true]) {
+    const { value: g, warnings: logged } = warnings(() => resolveKnockbackGrowth(growth, 'Attack "probe"'));
+    assert.equal(g, 1, String(growth));
+    assert.equal(logged.length, 1, `${String(growth)} is logged`);
+    assert.match(logged[0], /Attack "probe" declares invalid knockbackGrowth/);
+  }
+  // Every kind of hit names itself.
+  const attack = warnings(() => createAttackDefinition({ id: 'jab', knockback: LOW_HORIZONTAL, knockbackGrowth: -2 }));
+  assert.equal(attack.value.knockbackGrowth, 1);
+  assert.match(attack.warnings.join('\n'), /Attack "jab" declares invalid knockbackGrowth/);
+  const projectile = warnings(() => createProjectileDefinition({ id: 'star', knockbackGrowth: 'fast' }));
+  assert.equal(projectile.value.knockbackGrowth, 1);
+  assert.match(projectile.warnings.join('\n'), /Projectile "star" declares invalid knockbackGrowth/);
+  const technique = warnings(() => createTechniqueDefinition({
+    id: 'rush', firstHit: {}, explosionHit: { baseKnockback: { x: 500, y: 0 }, knockbackGrowth: Infinity },
+  }));
+  assert.equal(technique.value.explosionHit.knockbackGrowth, 1);
+  assert.match(technique.warnings.join('\n'), /Hit "rush.explosionHit" declares invalid knockbackGrowth/);
 });

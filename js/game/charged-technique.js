@@ -79,10 +79,11 @@
 // Each hit (firstHit, tickHit, explosionHit) is resolved by applyHit like an
 // attack's, with its own numeric default launch, `baseKnockback: { x, y }`,
 // and optionally the `accumulatedKnockbackAxis` the target's accumulated
-// Knockback adds launch along (see js/data/knockback.js). A hit with no
-// default launch (a contact that only binds, a tick) never launches.
+// Knockback adds launch along and the `knockbackGrowth` it adds it at (see
+// js/data/knockback.js). A hit with no default launch (a contact that only
+// binds, a tick) never launches.
 
-import { resolveLaunchAxis } from '../data/knockback.js';
+import { resolveKnockbackGrowth, resolveLaunchAxis } from '../data/knockback.js';
 
 const HIT_DEFAULTS = {
   damage: 0,
@@ -136,6 +137,7 @@ function createHit(id, spec) {
   if (!spec) return null;
   const hit = { ...HIT_DEFAULTS, ...spec, id };
   hit.accumulatedKnockbackAxis = resolveLaunchAxis(hit.baseKnockback, spec.accumulatedKnockbackAxis, `Hit "${id}"`);
+  hit.knockbackGrowth = resolveKnockbackGrowth(spec.knockbackGrowth, `Hit "${id}"`);
   return Object.freeze(hit);
 }
 

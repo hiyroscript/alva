@@ -207,7 +207,8 @@ attack animations. Its touch button has a dashed outline.
   released, then takes 15 (18 in all; the explosion is never also a tick)
   and is launched hard sideways, away from #0001, with a slight lift; like
   any launching hit, its accumulated Knockback adds extra sideways launch on
-  top (the lift stays the blast's own). Only once the blast is over does
+  top, here at twice the standard knockback growth (it is #0001's finisher),
+  while the lift stays the blast's own. Only once the blast is over does
   #0001 recover through `rasen10 → rasen11 → rasen12`. A Dodge's
   evasive frames let the rush pass through without using it up; a Block-type
   guard blocks the contact normally and ends the technique with no trap,
@@ -222,12 +223,15 @@ attack animations. Its touch button has a dashed outline.
   per tick and 15 on the blast. It has no maximum and no % sign. It is not
   the attack's own knockback: each hit has its own default launch strength
   (Low, Mid, High or bespoke), and the target's accumulated Knockback adds
-  extra launch on top of it, separately. A hit adds its damage first, then
-  launches with its default launch plus a bonus from the new total, in the
-  move's own direction: 2 per point sideways, 4 per point vertically (a Low
-  push of 140 at 100 Knockback is 140 + 200 = 340, never 140 × 2). A hit with
-  no launch (the shuriken, the Sphere Rush's contact and ticks) still
-  launches nothing. No amount of
+  extra launch on top of it, separately, at the move's own **knockback
+  growth**, as in Smash. A hit adds its damage first, then launches with its
+  default launch plus a bonus from the new total, in the move's own
+  direction: 2 per point sideways, 4 per point vertically at the standard
+  growth (1), scaled by the move's growth. So BA1, a jab (growth 0.5),
+  pushes a target at 100 Knockback at 140 + 100 = 240, never 140 × 2, while
+  the Sphere Rush blast, #0001's finisher (growth 2), gains 400 on its own
+  720. A hit with no launch (the shuriken, the Sphere Rush's contact and
+  ticks) still launches nothing. No amount of
   Knockback stops a fighter acting or takes it out: only the Void does, and
   each fall is a point for the opponent.
 - **Charged cooldowns (CAB1, CAB2):** Charged BA1 (**CAB1**) and Charged BA2
@@ -260,7 +264,7 @@ Touch controls show on touch-first devices (coarse pointer, or a touch actually 
 - **Defense:** #0001 dodges, on the ground and in the air (25 stamina a Dodge).
 - **Movement:** running, jumping and a grounded Dash on a double tap (25 stamina).
 - **Powers:** Jump Power and Speed Power, each in three tiers. #0001 has Jump Power 2 and Speed Power 2 (its original jump and speed).
-- **Knockback:** each attack's own, Low, Mid or High, pushing sideways or launching upward (or, reversed, driving downward). #0001's BA1 is Low horizontal, its BA2 High vertical, its mid-air BA1 Mid vertical and its mid-air BA2 High vertical reversed (downward). That is each move's default launch; the target's accumulated Knockback adds its own separate extra launch on top.
+- **Knockback:** each attack's own, Low, Mid or High, pushing sideways or launching upward (or, reversed, driving downward). #0001's BA1 is Low horizontal, its BA2 High vertical, its mid-air BA1 Mid vertical and its mid-air BA2 High vertical reversed (downward). That is each move's default launch; the target's accumulated Knockback adds its own separate extra launch on top, at each move's knockback growth (BA1 0.5, mid-air BA1 0.75, either BA2 1, the Sphere Rush blast 2).
 - **HUD:** each fighter has one compact, semi-transparent glass card, pulled in close on either side of the timer: its portrait (the character's own `visual.portrait` crop, turned to face the timer whichever way its art is drawn), one thin divider, and its name with its accumulated Knockback beneath it. The CPU's card mirrors Player 1's. In Quick Battle three small dots under each card fill as that fighter scores its points (○ ○ ○, then ● ○ ○ ...). Over each fighter itself, following it: its purple stamina bar above its name tag while below full, and its CAB1 / CAB2 cooldown rings under its feet while cooling down.
 - **Modes:** Quick Battle: 99 seconds against a non-attacking training CPU, first to 3 points. Each time a fighter falls into the Void its opponent scores a point at once; the one that fell is out of play for 2 seconds, then back at its spawn with 0 Knockback, full stamina and both charged abilities ready, while the fight and the timer carry on. The third point wins the match (a short **K.O.** beat, then the result; the loser does not come back). If both fall together, or one falls while the other is still waiting to come back, that fall scores nothing. If time runs out first, more points wins, then less Knockback; equal on both is a draw. Practice Ground: training on its own stage with a stand-still CPU dummy from the start (which you can change or disable), no timer, rounds or points; the Void takes a fighter out for 2 seconds, then puts it back at its spawn (below).
 
@@ -453,7 +457,7 @@ Values are in world units per second, at the global gravity of 2500:
 
 ### Knockback
 
-Knockback is how strongly an ordinary attack moves an opponent when it connects. Two separate values decide every launch, and neither is derived from the other: the attack's own **default Knockback** (how hard and which way the move naturally launches) and the target's **accumulated Knockback** (how vulnerable to launches it has become, below). Default Knockback is not a Power: each attack declares its own, in `js/data/characters.js`, as an **axis** and a **strength level**, which are independent of each other:
+Knockback is how strongly an ordinary attack moves an opponent when it connects, modelled on platform fighters like Smash. Three separate values decide every launch, and none is derived from another: the attack's own **default Knockback** (how hard and which way the move naturally launches), its **knockback growth** (how much the target's Knockback adds to it) and the target's **accumulated Knockback** (how vulnerable to launches it has become, below). Default Knockback is not a Power: each attack declares its own, in `js/data/characters.js`, as an **axis** and a **strength level**, which are independent of each other:
 
 ```js
 knockback: { axis: 'horizontal', level: 'low' }         // pushes away along the hit
@@ -471,27 +475,31 @@ knockback: { axis: 'vertical', level: 'mid', sign: -1 } // reversed: drives down
   World units per second. A level is named only by those strings: tier numbers (`level: 2`) and display names (`'Low'`) are not levels.
 - **Horizontal** Knockback pushes the opponent away along the hit's facing, so it takes no sign. **Vertical** Knockback launches the opponent upward; `sign: -1` reverses it, driving the opponent downward at the same level's strength. Only vertical Knockback can be reversed, and a sign is only ever 1 (the default) or −1.
 - These values are **default (base) Knockback** only: the attack's own natural launch. They are not accumulated Knockback, not multipliers and not the launch at high Knockback.
+- **Knockback growth** (`knockbackGrowth`, Smash's knockback growth) is each move's other knockback property: how strongly the target's accumulated Knockback adds to that move's launch. `1` is the standard rate and the default for a move that declares none; a jab's is low, so it stays a poke however high Knockback gets; a finisher's is high, so it becomes a kill move; `0` never grows (the same launch at any Knockback). It is set per move, never derived from the move's default launch or damage. Any number of 0 or more; anything else is logged and grows at the standard rate. Attacks declare it beside their descriptor (`knockback: { axis: 'horizontal', level: 'low' }, knockbackGrowth: 0.5`); bespoke hits beside their `baseKnockback`.
 - `createAttackDefinition` (`js/game/combat.js`) resolves the descriptor once, through `resolveKnockback`, into the attack's numeric default launch, `baseKnockback: { x, y }`, and keeps its axis as `accumulatedKnockbackAxis`: `{ axis: 'horizontal', level: 'low' }` is `{ x: 140, y: 0 }`, `{ axis: 'vertical', level: 'high' }` is `{ x: 0, y: 800 }` and `{ axis: 'vertical', level: 'mid', sign: -1 }` is `{ x: 0, y: -640 }`. `CombatSystem.applyHit` stays generic: from the final launch (below) it sets `vx = x × facing` (halved when blocked) and, on an unblocked hit only, `vy = −y`, so a positive `y` launches upward and a negative one drives downward. Clones read the same numbers.
 - An attack that declares no `knockback` has none. A malformed descriptor (an unknown axis or level, a bad sign, a reversed horizontal, an unknown field or anything that is not a descriptor) is logged and also gets no knockback, so bad data never pushes anyone with a force nobody chose.
-- Bespoke hits that are not ordinary attacks declare their own numeric default launch, `baseKnockback: { x, y }`, and may name the `accumulatedKnockbackAxis` their bonus follows (otherwise their dominant axis): the shuriken's is `{ x: 0, y: 0 }`, no knockback at all, the Sphere Rush's contact and ticks have none either, and its explosion has its own strong, mostly horizontal `{ x: 720, y: 180 }` with `accumulatedKnockbackAxis: 'horizontal'`.
+- Bespoke hits that are not ordinary attacks declare their own numeric default launch, `baseKnockback: { x, y }`, and may name the `accumulatedKnockbackAxis` their bonus follows (otherwise their dominant axis): the shuriken's is `{ x: 0, y: 0 }`, no knockback at all, the Sphere Rush's contact and ticks have none either, and its explosion has its own strong, mostly horizontal `{ x: 720, y: 180 }` with `accumulatedKnockbackAxis: 'horizontal'` and `knockbackGrowth: 2`.
 - **Accumulated Knockback adds launch; it never scales it.** Each hit has its own default launch strength. Damage also increases the target's accumulated Knockback (`combat.knockback`). On every launching hit, accumulated Knockback contributes additional launch independently of the move's default launch: the attack determines its natural strength and direction; the target's accumulated Knockback adds extra launch vulnerability. `CombatSystem.applyHit` adds the hit's damage first, then `resolveLaunch` (`js/data/knockback.js`) sums the two:
 
   ```
-  final launch = default launch + accumulatedKnockbackBonus(new total, axis)
+  final launch = default launch + bonus
+  bonus        = accumulated Knockback (after this hit) × per-point rate × the move's knockbackGrowth
   ```
 
-  The bonus is `ACCUMULATED_KNOCKBACK_SCALING`: 2 per point of Knockback horizontally and 4 per point vertically (world units per second, no cap), fighter-side tuning that never depends on the attack's size. It goes along the move's own axis, in the sign its default launch already has there, so a push stays a push, a launch rises and a spike still drives down; a mixed bespoke launch gains it only on its `accumulatedKnockbackAxis`, keeping the other part (the explosion's lift) as it is. A hit with no default launch is not a launching hit and gets no bonus. So at 100 Knockback a Low push (140) is 340 and a High push (220) is 420, both +200, and the Sphere Rush explosion is 920 sideways with its 180 lift, never 1440. A block then halves the sideways launch and cancels the vertical one. The resolved hit event carries `damage`, `knockbackBefore`, `knockbackAfter`, and `baseLaunch`, `bonusLaunch` and `finalLaunch` (in the move's frame: x away from the attacker, y upward).
+  The per-point rates are `ACCUMULATED_KNOCKBACK_SCALING`: 2 per point of Knockback horizontally and 4 per point vertically (world units per second, no cap) at the standard growth. The bonus never depends on the attack's default launch. It goes along the move's own axis, in the sign its default launch already has there, so a push stays a push, a launch rises and a spike still drives down; a mixed bespoke launch gains it only on its `accumulatedKnockbackAxis`, keeping the other part (the explosion's lift) as it is. A hit with no default launch is not a launching hit and gets no bonus. So at 100 Knockback and the standard growth, a Low push (140) is 340 and a High push (220) is 420, both +200; at the same Knockback BA1 (growth 0.5) is 240, and the Sphere Rush explosion (growth 2) is 1120 sideways with its 180 lift, never 1440. A block then halves the sideways launch and cancels the vertical one. The resolved hit event carries `damage`, `knockbackBefore`, `knockbackAfter`, and `baseLaunch`, `bonusLaunch` and `finalLaunch` (in the move's frame: x away from the attacker, y upward).
 
 #0001's Basic Attacks:
 
-| Attack | Knockback | Resolved default launch |
-| --- | --- | --- |
-| BA1 (ground punch) | Low horizontal | `{ x: 140, y: 0 }` |
-| BA2 (ground spinning kick) | High vertical | `{ x: 0, y: 800 }` |
-| Mid-air BA1 (kunai slash) | Mid vertical | `{ x: 0, y: 640 }` |
-| Mid-air BA2 (airborne kick) | High vertical, reversed | `{ x: 0, y: -800 }` |
+| Attack | Knockback | Resolved default launch | Knockback growth |
+| --- | --- | --- | --- |
+| BA1 (ground punch) | Low horizontal | `{ x: 140, y: 0 }` | 0.5 (a jab) |
+| BA2 (ground spinning kick) | High vertical | `{ x: 0, y: 800 }` | 1 |
+| Mid-air BA1 (kunai slash) | Mid vertical | `{ x: 0, y: 640 }` | 0.75 (a light launcher) |
+| Mid-air BA2 (airborne kick) | High vertical, reversed | `{ x: 0, y: -800 }` | 1 |
 
-At 0 Knockback (before the bonus for the hit's own damage is added), an unblocked BA1 hit sets the opponent's `vx` to 140 away from #0001; BA2 sets `vy = -800`, a strong launch; mid-air BA1 sets `vy = -640`, a lower launch than BA2's; mid-air BA2 sets `vy = +800`, driving it downward with no sideways push. The Clone Attack performs ground BA1's resolved definition, so it inherits Low horizontal Knockback with no tuning of its own; overhead (no ground behind the opponent) it performs mid-air BA2's, driving the opponent downward the same way.
+The Sphere Rush explosion, #0001's finisher, has growth 2, so at high Knockback it rings an opponent out well before any Basic Attack does, and BA1 stays a poke.
+
+At 0 Knockback (before the bonus for the hit's own damage is added), an unblocked BA1 hit sets the opponent's `vx` to 140 away from #0001; BA2 sets `vy = -800`, a strong launch; mid-air BA1 sets `vy = -640`, a lower launch than BA2's; mid-air BA2 sets `vy = +800`, driving it downward with no sideways push. The Clone Attack performs ground BA1's resolved definition, so it inherits Low horizontal Knockback and BA1's growth with no tuning of its own; overhead (no ground behind the opponent) it performs mid-air BA2's, driving the opponent downward the same way.
 
 The two mid-air Basic Attacks swapped moves: **mid-air BA1** is the three-frame kunai slash (`0001_midair2ba1`–`3`), which used to be mid-air BA2, and **mid-air BA2** is the five-frame airborne kick (`0001_midair1ba1`–`5`), which used to be mid-air BA1. Each move kept its own art, timing, hitbox, damage and stun; only its knockback changed. The frame file names are the originals.
 

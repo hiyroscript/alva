@@ -33,8 +33,8 @@ const CONTACT = { ba2: [4, 5], midairBa2: [3] };
 const LAUNCH = 800;
 const SPIKE = 800;
 // Either BA2 adds 10 Knockback, and the hit launches at its own default
-// speed plus the separate vertical bonus for that new total: from 0,
-// 800 + 40, never 800 x 1.1.
+// speed plus the separate vertical bonus for that new total at the standard
+// growth (1): from 0, 800 + 40, never 800 x 1.1.
 const LAUNCHED = LAUNCH + accumulatedKnockbackBonus(10, 'vertical');
 const SPIKED = SPIKE + accumulatedKnockbackBonus(10, 'vertical');
 // Each BA2's declared Knockback and its resolved default launch.
@@ -53,12 +53,12 @@ const RESOLVED = {
 const ENTRIES = {
   ba2: {
     animation: 'ba2', startup: 3 / 12, active: 2 / 12, recovery: 2 / 12, damage: 10,
-    hitbox: { x: 10, y: -88, w: 24, h: 78 }, knockback: KNOCKBACK.ba2,
+    hitbox: { x: 10, y: -88, w: 24, h: 78 }, knockback: KNOCKBACK.ba2, knockbackGrowth: 1,
     hitstun: 0.24, blockstun: 0.15, hitstop: 0.07, cooldown: 0.15, groundOnly: true,
   },
   midairBa2: {
     animation: 'midairBa2', startup: 2 / 12, active: 1 / 12, recovery: 2 / 12, damage: 10,
-    hitbox: { x: 8, y: -44, w: 40, h: 40 }, knockback: KNOCKBACK.midairBa2,
+    hitbox: { x: 8, y: -44, w: 40, h: 40 }, knockback: KNOCKBACK.midairBa2, knockbackGrowth: 1,
     hitstun: 0.22, blockstun: 0.14, hitstop: 0.06, cooldown: 0.1,
   },
 };
@@ -144,6 +144,7 @@ test('BA2 attack definitions match their clips: the ground spinning kick launchi
     // and no sideways push.
     assert.deepEqual(atk.baseKnockback, RESOLVED[id]);
     assert.equal(atk.accumulatedKnockbackAxis, 'vertical', 'accumulated Knockback adds launch vertically too');
+    assert.equal(atk.knockbackGrowth, 1, 'the standard knockback growth');
     // Not BA1 under another name: its own art and hitbox.
     const ba1 = fighter.attacks[id === 'ba2' ? 'ba1' : 'midairBa1'];
     assert.notEqual(atk.animation, ba1.animation);
@@ -876,10 +877,11 @@ test('damage accumulates as Knockback: BA1 -> BA1 -> BA2 on a fresh target is 5 
   assert.deepEqual(events.map((e) => e.damage), [5, 5, 10]);
   // Each move keeps its own default launch; only the bonus from the target's
   // growing accumulated Knockback (5, 10, then 20) changes, along the move's
-  // own axis: 2 per point sideways, 4 per point vertically.
+  // own axis (2 per point sideways, 4 per point vertically) at its own
+  // growth: BA1's 0.5, BA2's 1.
   assert.deepEqual(events.map((e) => [e.baseLaunch, e.bonusLaunch, e.finalLaunch]), [
+    [{ x: 140, y: 0 }, { x: 5, y: 0 }, { x: 145, y: 0 }],
     [{ x: 140, y: 0 }, { x: 10, y: 0 }, { x: 150, y: 0 }],
-    [{ x: 140, y: 0 }, { x: 20, y: 0 }, { x: 160, y: 0 }],
     [{ x: 0, y: 800 }, { x: 0, y: 80 }, { x: 0, y: 880 }],
   ]);
   assert.equal(attacker.combat.knockback, 0);

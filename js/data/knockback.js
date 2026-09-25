@@ -1,10 +1,20 @@
-// Knockback: how an attack moves an opponent when it connects. Two separate
-// values decide every launch, and neither is ever derived from the other:
+// Knockback: how an attack moves an opponent when it connects, modelled on
+// platform fighters like Smash: every move has its own base launch, and the
+// target's accumulated Knockback adds more on top, at the move's own rate.
+// Three separate values decide every launch, and none is ever derived from
+// another:
 //
 //   Default (base) Knockback: the attack's own. Belongs to the move and says
 //   which way it launches and how hard it naturally does. A shove, a punch, a
 //   launcher and an explosion each have their own, even against a fighter
 //   that has taken nothing yet. Not a Power, and not the fighter's.
+//
+//   Knockback growth: also the attack's own (`knockbackGrowth`, Smash's
+//   "knockback growth"). How strongly the target's accumulated Knockback
+//   adds to this move's launch: 1 is the standard rate, a jab's is low (it
+//   stays a poke however high Knockback gets), a finisher's is high (it
+//   becomes a kill move), and 0 never grows. Not derived from the default
+//   launch or the damage: a move's designer sets it.
 //
 //   Accumulated Knockback: the fighter's own number (CombatState.knockback,
 //   the one the HUD shows). Starts at 0 and grows by the damage of every hit
@@ -32,19 +42,22 @@
 // descriptions (never the values). Bespoke hits that are not fighter attacks
 // (a projectile's, a charged technique's) declare a numeric `baseKnockback`
 // directly, and may name their `accumulatedKnockbackAxis` (see
-// resolveLaunchAxis).
+// resolveLaunchAxis). Any hit may declare its `knockbackGrowth`
+// (resolveKnockbackGrowth); without one it grows at the standard rate.
 //
 // A hit's final launch is the sum of two parts (resolveLaunch):
 //
 //   final launch = default launch + accumulated-Knockback bonus
+//   bonus        = target's accumulated Knockback x per-point rate x growth
 //
-// The bonus comes from the target's accumulated Knockback alone
-// (accumulatedKnockbackBonus), after the hit's damage has been added. It
-// follows the move's launch axis and direction but never its size, so at
-// the same accumulated Knockback a weak push and a strong blast gain exactly
-// the same extra launch and keep their natural difference. A move with no
-// default launch (a shuriken, a technique's ticks) is not a launching hit:
-// it gains no bonus either, however much Knockback the target has.
+// The bonus comes from the target's accumulated Knockback, after the hit's
+// damage has been added, at the move's own growth (accumulatedKnockbackBonus).
+// It follows the move's launch axis and direction but never its size: two
+// moves with the same growth gain exactly the same extra launch at the same
+// Knockback and keep their natural difference, and a move with higher
+// growth pulls further ahead the more Knockback the target has. A move with
+// no default launch (a shuriken, a technique's ticks) is not a launching
+// hit: it gains no bonus either, however much Knockback the target has.
 
 // ---- Levels ------------------------------------------------------------------
 
@@ -71,18 +84,35 @@ export function getKnockbackLevel(id) {
 // ---- Accumulated Knockback ---------------------------------------------------------
 
 // How much extra launch (world units / s) each point of a target's
-// accumulated Knockback adds, per axis: vertical launches are naturally
-// larger, so that axis gets its own rate. Fighter-side tuning, the same for
-// every attack; never an attack's strength. No maximum.
+// accumulated Knockback adds, per axis, for a move with the standard growth
+// (1): vertical launches are naturally larger, so that axis gets its own
+// rate. A move's knockbackGrowth scales it. No maximum.
 export const ACCUMULATED_KNOCKBACK_SCALING = Object.freeze({ horizontalPerPoint: 2, verticalPerPoint: 4 });
 
+// The standard knockback growth: a move that declares none grows at the
+// per-point rates above exactly.
+export const DEFAULT_KNOCKBACK_GROWTH = 1;
+
+// A hit's knockback growth from its `knockbackGrowth`, declared by `owner`
+// (named in any warning): any number of 0 or more (0: the same launch at any
+// Knockback). None (undefined or null) is the standard growth, and so is
+// anything else, logged, so bad data never makes a move grow at a rate
+// nobody chose.
+export function resolveKnockbackGrowth(growth, owner = 'A hit') {
+  if (growth == null) return DEFAULT_KNOCKBACK_GROWTH;
+  if (typeof growth === 'number' && Number.isFinite(growth) && growth >= 0) return growth;
+  console.warn(`[Alva] ${owner} declares invalid knockbackGrowth (${show(growth)} is not a number of 0 or more); it grows at the standard rate.`);
+  return DEFAULT_KNOCKBACK_GROWTH;
+}
+
 // The extra launch speed a fighter with `accumulated` Knockback takes along
-// `axis` ('horizontal' or 'vertical'): 0 at 0, growing steadily (linearly)
-// with no cap. Knockback never goes below 0, and no axis (null) is no bonus.
-export function accumulatedKnockbackBonus(accumulated, axis) {
+// `axis` ('horizontal' or 'vertical') from a move with knockback growth
+// `growth`: 0 at 0, growing steadily (linearly) with no cap. Knockback never
+// goes below 0, and no axis (null) is no bonus.
+export function accumulatedKnockbackBonus(accumulated, axis, growth = DEFAULT_KNOCKBACK_GROWTH) {
   const { horizontalPerPoint, verticalPerPoint } = ACCUMULATED_KNOCKBACK_SCALING;
   const perPoint = axis === 'horizontal' ? horizontalPerPoint : axis === 'vertical' ? verticalPerPoint : 0;
-  return Math.max(0, accumulated) * perPoint;
+  return Math.max(0, accumulated) * perPoint * growth;
 }
 
 // ---- Launch ----------------------------------------------------------------------
@@ -112,16 +142,19 @@ export function resolveLaunchAxis(base, declared, owner = 'A hit') {
 // The launch a hit with default launch `base` gives a target that now has
 // `accumulated` Knockback, in the move's own frame (x away from the
 // attacker, y upward): `{ base, bonus, final }`, with final = base + bonus.
-// The bonus is the target's accumulatedKnockbackBonus along `axis` (by
-// default the dominant one), in the sign `base` already has there, so a
-// push stays a push, a launch rises and a spike still drives down; the other
-// axis keeps its default unchanged. It never depends on the size of `base`,
-// and a hit with no default launch gets none.
-export function resolveLaunch(base, accumulated, axis = dominantLaunchAxis(base)) {
+// The bonus is the target's accumulatedKnockbackBonus at the move's `growth`
+// (by default the standard one) along `axis` (by default the dominant one),
+// in the sign `base` already has there, so a push stays a push, a launch
+// rises and a spike still drives down; the other axis keeps its default
+// unchanged. It never depends on the size of `base`, and a hit with no
+// default launch gets none.
+export function resolveLaunch(base, accumulated, {
+  axis = dominantLaunchAxis(base), growth = DEFAULT_KNOCKBACK_GROWTH,
+} = {}) {
   let bx = 0;
   let by = 0;
-  if (axis === 'horizontal' && base.x) bx = Math.sign(base.x) * accumulatedKnockbackBonus(accumulated, axis);
-  else if (axis === 'vertical' && base.y) by = Math.sign(base.y) * accumulatedKnockbackBonus(accumulated, axis);
+  if (axis === 'horizontal' && base.x) bx = Math.sign(base.x) * accumulatedKnockbackBonus(accumulated, axis, growth);
+  else if (axis === 'vertical' && base.y) by = Math.sign(base.y) * accumulatedKnockbackBonus(accumulated, axis, growth);
   return {
     base: { x: base.x, y: base.y },
     bonus: { x: bx, y: by },

@@ -25,7 +25,8 @@ const JUMP = { jump: true, jumpPressed: true };
 
 // Each BA1's declared Knockback and its resolved default launch: ground BA1
 // pushes 140 sideways (Low horizontal); mid-air BA1 launches the target
-// upward at 640 (Mid vertical) and pushes it nowhere.
+// upward at 640 (Mid vertical) and pushes it nowhere. Their knockback
+// growth: ground BA1 is a jab (0.5), mid-air BA1 a light launcher (0.75).
 const BA1_KNOCKBACK = {
   ba1: { axis: 'horizontal', level: 'low' },
   midairBa1: { axis: 'vertical', level: 'mid' },
@@ -34,6 +35,7 @@ const BA1_RESOLVED = {
   ba1: { x: 140, y: 0 },
   midairBa1: { x: 0, y: 640 },
 };
+const BA1_GROWTH = { ba1: 0.5, midairBa1: 0.75 };
 
 // Each BA1's whole data entry. Ground BA1 is the four-frame punch; mid-air
 // BA1 is the three-frame kunai slash (midair2ba1-3), with the slash's own
@@ -41,12 +43,12 @@ const BA1_RESOLVED = {
 const BA1_ENTRIES = {
   ba1: {
     animation: 'ba1', startup: 1 / 12, active: 1 / 12, recovery: 2 / 12, damage: 5,
-    hitbox: { x: 12, y: -64, w: 28, h: 16 }, knockback: BA1_KNOCKBACK.ba1,
+    hitbox: { x: 12, y: -64, w: 28, h: 16 }, knockback: BA1_KNOCKBACK.ba1, knockbackGrowth: 0.5,
     hitstun: 0.22, blockstun: 0.14, hitstop: 0.06, cooldown: 0.1, groundOnly: true,
   },
   midairBa1: {
     animation: 'midairBa1', startup: 2 / 12, active: 1 / 12, recovery: 0, damage: 5,
-    hitbox: { x: 14, y: -100, w: 22, h: 80 }, knockback: BA1_KNOCKBACK.midairBa1,
+    hitbox: { x: 14, y: -100, w: 22, h: 80 }, knockback: BA1_KNOCKBACK.midairBa1, knockbackGrowth: 0.75,
     hitstun: 0.24, blockstun: 0.15, hitstop: 0.07, cooldown: 0.18,
   },
 };
@@ -84,6 +86,7 @@ test('BA1 attack definitions match their clips: the ground punch and the mid-air
     // the target's accumulated Knockback adds launch along.
     assert.deepEqual(atk.baseKnockback, BA1_RESOLVED[id]);
     assert.equal(atk.accumulatedKnockbackAxis, BA1_KNOCKBACK[id].axis);
+    assert.equal(atk.knockbackGrowth, BA1_GROWTH[id]);
     // In front of the fighter and above the feet.
     assert.ok(atk.hitbox.x > 0, `${id} hitbox is in front`);
     assert.ok(atk.hitbox.y < 0 && atk.hitbox.y + atk.hitbox.h <= 0, `${id} hitbox is above the feet`);
@@ -393,9 +396,10 @@ test('a ground BA1 hit pushes the target sideways at 140 (Low horizontal) plus t
     tick(BA1);
     while (!events.length) tick();
     // At impact, before the target's next step: CombatSystem.applyHit set it.
-    // Its own 140 plus the horizontal bonus for 5 Knockback: 150, not 140 x 1.05.
-    assert.equal(target.body.vx, (140 + accumulatedKnockbackBonus(5, 'horizontal')) * facing);
-    assert.equal(target.body.vx, 150 * facing);
+    // Its own 140 plus the horizontal bonus for 5 Knockback at the jab's 0.5
+    // growth: 145, not 140 x 1.05.
+    assert.equal(target.body.vx, (140 + accumulatedKnockbackBonus(5, 'horizontal', 0.5)) * facing);
+    assert.equal(target.body.vx, 145 * facing);
     assert.equal(target.body.vy, 0);
     assert.equal(target.grounded, true, 'BA1 never launches');
     assert.equal(attacker.facing, facing);
@@ -500,7 +504,7 @@ test('a mid-air BA1 hit launches a grounded target straight up with no sideways 
     assert.equal(attacker.facing, facing);
     // At impact, before the target's next step: CombatSystem.applyHit set it.
     assert.ok(isZero(target.body.vx), 'no horizontal knockback');
-    assert.equal(target.body.vy, -(640 + accumulatedKnockbackBonus(5, 'vertical')), 'negative body vy: launched upward');
+    assert.equal(target.body.vy, -(640 + accumulatedKnockbackBonus(5, 'vertical', 0.75)), 'negative body vy: launched upward');
     assert.equal(target.grounded, false);
     // It rises, then gravity brings it back down where it stood.
     let top = floor;

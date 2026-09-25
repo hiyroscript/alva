@@ -596,11 +596,14 @@ export const CHARACTERS = [
         // mostly horizontal blast away from #0001 (with a slight lift so it
         // carries through the air instead of scraping along the ground).
         // The target's accumulated Knockback adds its extra launch
-        // horizontally only, so the lift stays the same slight one.
+        // horizontally only, so the lift stays the same slight one. #0001's
+        // finisher: twice the standard knockback growth, so it rings an
+        // opponent out well before anything else does.
         explosionHit: {
           damage: 15,
           baseKnockback: { x: 720, y: 180 },
           accumulatedKnockbackAxis: 'horizontal',
+          knockbackGrowth: 2,
           hitstun: 0.55,
           blockstun: 0.3,
           hitstop: 0.12,
@@ -618,8 +621,11 @@ export const CHARACTERS = [
     // launches it upward hard (High vertical) and mid-air BA2 drives it
     // downward hard (High vertical, reversed). That is each move's default
     // launch; the target's accumulated Knockback adds its own separate extra
-    // launch along the same axis. `damage` is how much accumulated Knockback
-    // a hit adds: 5 for either BA1, 10 for either BA2.
+    // launch along the same axis, at the move's `knockbackGrowth`: ground
+    // BA1 is a jab (0.5: it stays a poke however high Knockback gets),
+    // mid-air BA1 a light launcher (0.75), and either BA2 the standard (1).
+    // `damage` is how much accumulated Knockback a hit adds: 5 for either
+    // BA1, 10 for either BA2.
     attacks: {
       // Frame 1 wind-up, frame 2 punch, frames 3-4 recovery.
       ba1: {
@@ -630,6 +636,7 @@ export const CHARACTERS = [
         damage: 5,
         hitbox: { x: 12, y: -64, w: 28, h: 16 },
         knockback: { axis: 'horizontal', level: 'low' },
+        knockbackGrowth: 0.5,
         hitstun: 0.22,
         blockstun: 0.14,
         hitstop: 0.06,
@@ -649,6 +656,7 @@ export const CHARACTERS = [
         damage: 5,
         hitbox: { x: 14, y: -100, w: 22, h: 80 },
         knockback: { axis: 'vertical', level: 'mid' },
+        knockbackGrowth: 0.75,
         hitstun: 0.24,
         blockstun: 0.15,
         hitstop: 0.07,
@@ -668,6 +676,7 @@ export const CHARACTERS = [
         damage: 10,
         hitbox: { x: 10, y: -88, w: 24, h: 78 },
         knockback: { axis: 'vertical', level: 'high' },
+        knockbackGrowth: 1,
         hitstun: 0.24,
         blockstun: 0.15,
         hitstop: 0.07,
@@ -685,6 +694,7 @@ export const CHARACTERS = [
         damage: 10,
         hitbox: { x: 8, y: -44, w: 40, h: 40 },
         knockback: { axis: 'vertical', level: 'high', sign: -1 },
+        knockbackGrowth: 1,
         hitstun: 0.22,
         blockstun: 0.14,
         hitstop: 0.06,

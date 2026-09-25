@@ -19,7 +19,8 @@
 // `baseKnockback` is the projectile's own default launch (see
 // js/data/knockback.js); an optional `accumulatedKnockbackAxis` names the
 // axis the target's accumulated Knockback adds launch along (by default its
-// dominant one). A projectile with no default launch never launches.
+// dominant one), and an optional `knockbackGrowth` how strongly (by default
+// the standard rate). A projectile with no default launch never launches.
 //
 // A projectile flies straight in the direction it was released, hits at most
 // once and then disappears. It also disappears when its lifetime runs out,
@@ -28,7 +29,7 @@
 // floor's body included; one-way platforms never stop it. Its hitbox is
 // centred on its position and mirrors with its direction.
 
-import { resolveLaunchAxis } from '../data/knockback.js';
+import { resolveKnockbackGrowth, resolveLaunchAxis } from '../data/knockback.js';
 
 const PROJECTILE_DEFAULTS = {
   animation: null,
@@ -51,6 +52,7 @@ export function createProjectileDefinition(spec) {
   if (!spec?.id) throw new Error('[Alva] Projectile definitions need an id');
   const def = { ...PROJECTILE_DEFAULTS, ...spec };
   def.accumulatedKnockbackAxis = resolveLaunchAxis(def.baseKnockback, spec.accumulatedKnockbackAxis, `Projectile "${spec.id}"`);
+  def.knockbackGrowth = resolveKnockbackGrowth(spec.knockbackGrowth, `Projectile "${spec.id}"`);
   return Object.freeze(def);
 }
 
