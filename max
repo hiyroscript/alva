@@ -2,2219 +2,973 @@ You are modifying the current Alva repository:
 
 hiyroscript/alva
 
-This is the next focused platform-fighter conversion pass.
+This is a small corrective pass on top of the existing platform-fighter conversion.
 
-The current repository already includes:
+The current repository already contains:
 
-* finite platform-fighter stages with open ledges;
-* nearby Void blast zones;
-* accumulated Knockback instead of Health;
-* no Energy resource;
-* #0001’s updated damage values;
-* charged BA1 / charged BA2 cooldowns;
-* charge-accelerated charged cooldown recovery;
-* character portrait/name/Knockback HUD cards;
-* charged-action cooldown rings;
-* Quick Battle Void elimination;
-* Practice Void respawn.
+* accumulated Knockback;
+* 3-point elimination scoring;
+* 2-second respawns;
+* Dash;
+* stamina used by Dash/Dodge/Block;
+* stamina passive regeneration;
+* faster stamina regeneration while Charging;
+* exhausted stamina state;
+* CAB1/CAB2 charged cooldowns;
+* fighter-attached CAB cooldown indicators;
+* fighter-attached stamina bar;
+* current fighter facing logic.
 
-Do not rebuild those systems from scratch.
+Do not redesign these systems.
 
-For this pass, implement only:
+For this pass, change only:
 
-1. 2-second fighter respawn after elimination.
-2. First-to-3-eliminations / 3-point match scoring.
-3. Three score dots below each fighter HUD card.
-4. Reposition the HUD cards closer to the center.
-5. Make both HUD portraits face inward toward the timer.
-6. Practice CPU enabled by default.
-7. Give Practice CPU a full HUD card just like P1.
-8. Remove charged cooldown indicators from the HUD cards.
-9. Render CAB1/CAB2 cooldown indicators beneath the actual fighter in world/screen space.
-10. Change those cooldown indicators to white with black outlines.
-11. Add #0001 dash animation support using the newly added dash sprite frames.
-12. Double-tapping horizontal movement performs a dash.
-13. Add a new purple stamina/action-energy bar above each fighter’s head.
-14. Dash, Dodge, and Block consume this new bar.
-15. The bar regenerates slowly by itself.
-16. Charging regenerates it faster.
-17. Empty bar enters a gray exhausted state.
-18. Once exhausted, Dash/Dodge/Block remain unusable until the bar has fully refilled.
-19. Preserve existing Knockback combat, charged attacks, Void, stage, and damage systems.
-
-Do not add unrelated mechanics.
+1. CAB1/CAB2 cooldown indicators should appear only while that ability is actually on cooldown.
+2. The stamina/energy-style purple bar should appear only while it is refilling / not full.
+3. Once stamina reaches 0, it should remain visually gray while refilling and Dash/Dodge/Block must remain locked until it reaches full.
+4. Remove the behavior where fighters automatically turn to face each other.
+5. Preserve all other current combat, scoring, Dash, Knockback, respawn, and HUD behavior.
 
 ⸻
 
-1. Current architecture to preserve
+1. Current implementation details
 
-Relevant current files include:
+Relevant files include:
 
 * js/game/character.js
-    * Fighter runtime
-    * Charge state
-    * Dodge
-    * movement
-    * charged actions
-    * animation selection
+    * Fighter movement
+    * Dash
+    * Charge
+    * facing updates
+    * stamina recovery
 * js/game/combat.js
     * CombatState
-    * Knockback
-    * charged cooldown state
-    * Dodge/block state
-* js/game/fighter-controller.js
-    * PlayerController
-    * TrainingAIController
-* js/core/input-manager.js
-    * held input
-    * press-edge tracking
-    * keyboard/touch/gamepad merging
-* js/data/characters.js
-    * #0001 animations
-    * movement
-    * defense
-    * attacks
-    * cooldown data
-* js/game/hud.js
-    * Quick Battle and Practice DOM HUD
-* js/game/battle.js
-    * Quick Battle phase/result logic
-* js/game/practice.js
-    * Practice fighter/CPU/session behavior
-* js/screens/practice-screen.js
-    * Practice setup and CPU selection
+    * stamina state
+    * exhausted state
+    * charged cooldown timers
 * js/game/arena.js
-    * fighter rendering
-    * world-to-screen conversion
-    * Void handling
-* styles.css
-    * current HUD/card/cooldown styles.
+    * world-space stamina/CAB rendering
+* js/game/hud.js
+    * top character cards
+* js/data/characters.js
+    * #0001 movement/stamina data
+* tests covering Dash, stamina, cooldowns, and facing.
 
-Preserve the existing fixed-step simulation.
+Do not reintroduce old Health or old Energy.
+
+For player-facing discussion in this pass, the purple resource may still be referred to as the stamina/action-energy bar, but keep the current implementation naming if it is already established as stamina.
 
 ⸻
 
-2. Match format: first to 3 eliminations
+2. CAB1/CAB2 indicators only appear during cooldown
 
-Quick Battle should no longer end after the first Void elimination.
+The world-space CAB indicators currently represent:
 
-Each fighter now has a score:
+* CAB1
+* CAB2
 
-0–3
+They should not be permanently visible.
 
-The first fighter to reach:
+Desired behavior:
 
-3
+Ability ready
 
-wins the match.
+If CAB1 is ready:
 
-Call these:
+* show nothing for CAB1.
 
-* points;
-* eliminations;
-* score;
+If CAB2 is ready:
 
-but do not introduce stock/life icon terminology yet unless needed internally.
+* show nothing for CAB2.
 
-A fighter earns exactly one point when the opponent is eliminated by entering the Void.
+If both are ready:
+
+* show no CAB indicators at all beneath the fighter.
+
+There should not be:
+
+* completed ready rings;
+* permanent CAB1 text;
+* permanent CAB2 text;
+* empty placeholders.
+
+The UI is purely a temporary cooldown notification.
+
+⸻
+
+3. CAB indicator appears immediately on use
+
+When a charged ability successfully enters cooldown:
+
+show its indicator immediately.
 
 Example:
 
-P1 knocks CPU into Void.
+CAB1 used.
 
-P1 score:
-1
+Under fighter:
 
-CPU score:
-0
+CAB1
+4.9
 
-The eliminated CPU then respawns after 2 seconds and the match continues.
+with its white/black-outlined circular cooldown progress.
 
-At:
+As the timer decreases, continue displaying it.
 
-3
+When cooldown reaches exactly ready:
 
-points, the scoring fighter wins and the normal result flow begins.
+remove the indicator completely.
+
+Do not leave it visible for an extra frame unnecessarily.
 
 ⸻
 
-3. Score ownership
+4. CAB indicators remain independent
 
-The point belongs to the surviving opponent, not the fighter that entered the Void.
+If only CAB1 is cooling down:
+
+show only CAB1.
+
+If only CAB2 is cooling down:
+
+show only CAB2.
+
+If both are cooling down:
+
+show both.
 
 Example:
-
-P1 enters Void.
-
-CPU receives:
-
-+1 point
-
-If both fighters are eliminated on effectively the same fixed-step window, do not arbitrarily grant both a point without defining the behavior.
-
-Use a deterministic simultaneous-elimination rule.
-
-Preferred behavior:
-
-* if both cross the Void before either respawns, no point is awarded;
-* both enter their respawn process;
-* play continues.
-
-This prevents a simultaneous KO from advancing both toward victory.
-
-Test this.
-
-⸻
-
-4. Three score dots
-
-Under each fighter’s top HUD card add:
-
-three small dots
-
-At match start:
-
-○ ○ ○
-
-After that fighter earns one point:
-
-● ○ ○
-
-After two:
-
-● ● ○
-
-After three:
-
-● ● ●
-
-and that fighter wins.
-
-Use CSS circles, not image assets.
-
-Requirements:
-
-* exactly 3;
-* visually aligned below the fighter card;
-* empty state clearly visible;
-* filled state clearly visible;
-* no large stock icons;
-* responsive;
-* accessible.
-
-The dots belong to the fighter who earned the points.
-
-Do not reset them when that fighter respawns.
-
-Reset them only on:
-
-* a fresh match;
-* rematch/restart.
-
-⸻
-
-5. 2-second respawn delay
-
-After a fighter is eliminated by the Void during Quick Battle:
-
-* remove them from active play immediately;
-* award the opponent the point if appropriate;
-* if the opponent has not yet reached 3 points, begin a respawn delay;
-* respawn the eliminated fighter exactly 2.0 seconds later.
-
-Make the delay fixed-step deterministic.
-
-Recommended config:
-
-respawnSeconds: 2
-
-inside the battle config.
-
-Do not use setTimeout().
-
-Use the simulation clock.
-
-⸻
-
-6. Respawn state
-
-Add an explicit fighter/battle respawn state instead of overloading lostToVoid indefinitely.
-
-Possible approach:
-
-* lostToVoid
-* respawning
-* respawnTimer
-
-or a battle-owned respawn record.
-
-During respawn delay the fighter:
-
-* is not rendered;
-* is not included in collision;
-* cannot attack;
-* cannot be hit;
-* cannot be targeted;
-* is ignored by pushboxes;
-* is ignored by the camera’s secondary follow target where appropriate;
-* has projectiles/clones/binds detached using existing cleanup.
-
-After 2 seconds:
-
-* return them to their own normal spawn;
-* reset transient combat state;
-* reset accumulated Knockback to 0;
-* reset velocity;
-* clear hitstun/hitstop;
-* clear current attacks/techniques;
-* clear charged cooldowns unless the existing desired match behavior intentionally preserves them.
-
-For this pass, use:
-
-clear charged cooldowns on respawn.
-
-Respawn should be a clean neutral state.
-
-⸻
-
-7. Stamina/action-energy on respawn
-
-The new purple movement/defense resource described later in this prompt should also return to full on respawn.
-
-Respawn state:
-
-* Knockback = 0
-* action/stamina bar = full
-* not exhausted
-* CAB1/CAB2 cooldowns ready
-* neutral input/state.
-
-⸻
-
-8. Match win flow
-
-When a fighter earns their third point:
-
-do not respawn the eliminated opponent.
-
-Instead:
-
-* freeze/clean up the fight as appropriate;
-* enter the existing KO/result sequence;
-* report the scoring fighter as the winner.
-
-The existing timer may remain.
-
-On time-up before anyone reaches three:
-
-use the existing lower-Knockback rule as the first tiebreaker only after comparing score.
-
-Time-up result order should be:
-
-1. fighter with more points wins;
-2. if points equal, fighter with lower Knockback wins;
-3. if both equal, draw.
-
-Do not discard the score because time expired.
-
-⸻
-
-9. HUD cards more centered
-
-The fighter info cards currently sit relatively far toward the left and right screen edges.
-
-Move both cards inward toward the timer.
-
-Desired top-level visual arrangement:
-
-[ P1 CARD ]      [ TIMER ]      [ CPU CARD ]
-
-with noticeably less empty horizontal space between the timer and cards.
-
-Do not literally merge all three into one panel.
-
-Keep them separate elements.
-
-The HUD should feel more like a centered platform-fighter match HUD rather than corner-based fighting-game health bars.
-
-Maintain safe-area support on phones.
-
-⸻
-
-10. Portraits must face the timer
-
-The fighter portraits inside the top info cards should face inward toward the center timer.
-
-That means:
-
-P1 card on the left
-
-Portrait should visually face:
-
-right
-
-toward the timer.
-
-P2/CPU card on the right
-
-Portrait should visually face:
-
-left
-
-toward the timer.
-
-Do not depend on the fighter’s current gameplay facing.
-
-The HUD portrait orientation is purely a UI composition choice.
-
-Use the portrait’s declared/source orientation and mirror the canvas/render where necessary.
-
-For #0001, source art currently faces right.
-
-Therefore:
-
-* P1 portrait can normally remain source-facing right.
-* CPU/P2 portrait should be mirrored left.
-
-Future characters with a different source orientation must still face inward correctly.
-
-Do not hardcode #0001 into the generic HUD painter.
-
-⸻
-
-11. Preserve portrait crop
-
-Continue using:
-
-fighter.def.visual.portrait
-
-and the existing portrait rendering utility.
-
-Only change orientation/composition.
-
-Do not replace portraits with:
-
-* live fighter animations;
-* screenshots;
-* arbitrary idle sprite scaling.
-
-⸻
-
-12. Practice CPU enabled by default
-
-Practice currently starts with:
-
-* P1 present;
-* no CPU.
-
-Change this.
-
-Every fresh entry into Practice Ground should automatically start with:
-
-* P1 = default fighter;
-* CPU = enabled by default.
-
-For the current roster, this means both may initially be #0001.
-
-The CPU remains the existing Practice training dummy behavior unless explicitly changed later.
-
-Do not make it attack.
-
-⸻
-
-13. Loading the default Practice CPU
-
-Because the CPU needs real sprite art, Practice entry must ensure the CPU’s sprites are loaded.
-
-Do this cleanly.
-
-Possible approaches:
-
-* load the default fighter once and share the same immutable sprite set between P1/CPU;
-* or use the existing app character cache.
-
-Do not make duplicate network loads unnecessarily.
-
-After the Practice session is created:
-
-* immediately call/set the default CPU;
-* pair both fighters;
-* frame both in camera;
-* bind both HUD cards.
-
-⸻
-
-14. Practice CPU info box
-
-Practice HUD currently intentionally shows only P1.
-
-Change it to show:
-
-* P1 card;
-* center More/menu control;
-* CPU card.
-
-The CPU card should be the same generic fighter card component used in Quick Battle.
-
-It must display:
-
-* CPU tag;
-* portrait;
-* character name;
-* Knockback number;
-* score dots only if Practice score dots make sense.
-
-For Practice:
-
-do not show match score dots.
-
-Practice has no point-based win condition.
-
-So make score dots optional per HUD mode.
-
-Everything else should look consistent.
-
-⸻
-
-15. Practice CPU card updates
-
-When the CPU takes damage:
-
-its top HUD Knockback number must update normally.
-
-This means Practice no longer relies solely on floating +5 numbers to communicate the CPU’s accumulated Knockback.
-
-Keep the floating numbers unless otherwise specified.
-
-When the CPU is changed through the Practice menu:
-
-rebind the CPU HUD card to the new fighter.
-
-When CPU is disabled manually:
-
-hide/remove the right card cleanly.
-
-The default state is enabled, but the existing disable/change functionality may remain.
-
-⸻
-
-16. Remove charged cooldown displays from top HUD
-
-The current fighter cards contain charged ability cooldown rings.
-
-Remove them completely from the top info cards.
-
-The top cards should now focus on:
-
-* portrait;
-* divider;
-* player tag/name;
-* Knockback;
-* score dots in Quick Battle.
-
-Do not show CAB cooldowns inside those boxes.
-
-Remove obsolete card layout/CSS used only for their current location.
-
-⸻
-
-17. CAB naming
-
-Rename the player-facing charged ability labels:
-
-* Charged BA1 → CAB1
-* Charged BA2 → CAB2
-
-These labels should be used for the new world-space cooldown displays beneath the fighter.
-
-Do not show plain:
-
-BA1
-BA2
-
-for those cooldown indicators.
-
-Use exactly:
-
-CAB1
-
-CAB2
-
-⸻
-
-18. World-space CAB cooldown indicators
-
-The charged ability cooldown indicators should now appear beneath the actual fighter sprite in gameplay, not beneath or inside the HUD portrait/card.
-
-For each fighter, render:
-
-CAB1
-CAB2
-
-under the fighter.
-
-These displays should follow the fighter’s screen position as the fighter moves.
-
-Think of them as small gameplay status indicators attached to the character.
-
-Do not attach them to the profile portrait.
-
-⸻
-
-19. CAB indicator positioning
-
-Use existing world-to-screen/marker infrastructure in Arena.
-
-The indicators should appear:
-
-* below the fighter’s feet or just below the fighter marker region;
-* separated enough not to overlap each other;
-* not so low that they disappear into stage geometry unnecessarily.
-
-Suggested layout:
 
 CAB1    CAB2
 
-in one horizontal row beneath the fighter.
+If CAB1 finishes first:
 
-If the fighter is airborne, they follow the fighter.
+CAB1 disappears and CAB2 remains.
 
-If offscreen, do not clutter the edge indicator with CAB cooldowns.
+Do not reserve invisible layout slots that create strange gaps.
 
-Only render them while the fighter itself is reasonably onscreen.
-
-⸻
-
-20. CAB visual style
-
-The existing cooldown rings are currently styled around the HUD theme/green accent.
-
-The new fighter-attached CAB cooldowns should be:
-
-* white
-* with a black outline
-
-Do not make them green.
-
-This applies to:
-
-* ring/progress line;
-* text.
-
-Preferred style:
-
-* white progress ring;
-* thin black outside/inside contrast stroke or text shadow;
-* white number;
-* black outline;
-* white CAB1 / CAB2 label;
-* black outline/shadow.
-
-They must stay legible against:
-
-* Desert;
-* City;
-* Practice;
-* black Void.
+The remaining cooldown may recenter beneath the fighter if appropriate.
 
 ⸻
 
-21. CAB cooldown behavior
+5. CAB cooldown data remains unchanged
 
-Retain the current functional behavior:
+Do not modify:
 
-* independent CAB1/CAB2 cooldowns;
-* 5 seconds each;
-* charge speeds recovery;
-* ring completes toward ready.
+* CAB1 cooldown duration;
+* CAB2 cooldown duration;
+* independent timer behavior;
+* faster recovery while Charging;
+* cooldown reset on respawn;
+* cooldown consumption rules.
 
-Move only the presentation.
-
-When ready:
-
-* ring should appear complete;
-* remaining-time number can disappear;
-* CAB1 or CAB2 remains readable.
-
-Do not reset/rework the underlying charged cooldown mechanic except where respawn explicitly clears it.
-
-⸻
-
-22. CAB render location architecture
-
-Do not put DOM elements over every fighter if avoidable.
-
-Because the game already renders fighter markers and world-space UI through Canvas, prefer rendering the CAB cooldown indicators through the Arena canvas near each fighter.
+This pass changes visibility only.
 
 Use:
 
-* toScreen()
-* fighter interpolated position;
-* existing marker rendering order.
+combat.chargedCooldowns.active(id)
 
-If the existing DOM overlay architecture can cleanly support world-tracked elements without jitter, it is acceptable, but Canvas is preferable here.
+or equivalent existing cooldown state.
 
-The indicators should use the interpolated fighter position, not raw fixed-step position.
+Do not infer visibility from formatted remaining text.
 
 ⸻
 
-23. New #0001 dash animation
+6. CAB ready state should not render
 
-Add support for the newly added #0001 Dash sprite frames.
+If:
 
-Inspect:
+chargedCooldowns.remaining(id) <= 0
 
-assets/characters/0001/
+or the timer entry no longer exists:
 
-at implementation time.
+do not render that ability’s world-space cooldown UI.
 
-Use the actual dash filenames that exist in the repo.
+This should happen naturally because CooldownTimers.update() already removes entries when they finish.
 
-Do not invent placeholder filenames.
+Prefer rendering from active entries rather than rendering every charged action and making ready ones transparent.
 
-At the time this prompt was prepared, the public branch did not yet list 0001_dash*.png, so assume the user may add them immediately before implementation.
-
-Once present:
-
-* register every intended dash frame under a dash animation in js/data/characters.js;
-* use a dedicated dash FPS constant;
-* play once;
-* do not loop unless the supplied art clearly requires looping.
-
-Do not reuse run sprites as the final dash animation if real dash frames exist.
-
-If the dash files are absent during implementation, fail gracefully/log that the dash animation is unavailable rather than referencing nonexistent files.
+That reduces unnecessary clutter.
 
 ⸻
 
-24. Dash input: double-tap Run direction
+7. Stamina bar visibility
 
-A Dash is triggered by quickly pressing the same horizontal direction twice.
+The purple stamina bar above the fighter should not be permanently visible.
 
-Examples:
+It should only be visible while the stamina resource is not full.
 
-Right → release/neutral → Right
+Desired:
 
-or:
+Full stamina
 
-Left → release/neutral → Left
+stamina === maxStamina
 
-within a short timing window.
+Bar:
 
-Do not require the second press to come after a full key-up if the input abstraction already provides clean directional press edges.
+hidden
 
-The important signal is:
+No purple full bar above the character.
 
-two distinct press edges of the same horizontal direction within the dash window.
+Stamina spent
 
-⸻
+As soon as Dash/Dodge/Block spends stamina:
 
-25. Add horizontal press edges
-
-InputManager already stores press counts for actions, but its sample() currently exposes only held state for left/right.
-
-Expose:
-
-* leftPressed
-* rightPressed
-
-in the fighter input snapshot.
-
-Update:
-
-* InputManager.frame
-* sample()
-* blank/neutral fighter inputs
-* CPU input shape where needed
-* tests.
-
-Do not detect double taps from browser keydown timestamps directly inside Fighter.
-
-Keep controller/input normalization centralized.
-
-⸻
-
-26. Dash timing window
-
-Use a configurable double-tap window.
-
-Recommended starting value:
-
-0.22 seconds
-
-approximately.
-
-Store it in character movement data or another appropriate configuration source.
+bar appears.
 
 Example:
 
-movement.dashTapWindow: 0.22
+100 → 75
 
-Do not hardcode it in multiple places.
+bar appears at 75%.
 
-⸻
+While regenerating
 
-27. Dash detection state
+The bar remains visible while stamina rises back toward full.
 
-Fighter should track enough state to determine:
+Fully refilled
 
-* most recent horizontal press direction;
-* time since that press.
+Once stamina reaches full:
 
-A second press of the same direction inside the window attempts Dash.
-
-Opposite direction should replace/reset the tracked direction.
-
-Example:
-
-Left
-then Right
-
-should not trigger a right dash merely because both happened quickly.
+bar disappears again.
 
 ⸻
 
-28. Dash requirements
+8. Stamina bar visibility condition
 
-Dash should only start if:
+Use the actual resource state.
 
-* fighter can act;
-* fighter is grounded;
-* fighter is not charging;
-* fighter is not stunned;
-* fighter is not bound;
-* fighter is not attacking;
-* fighter is not already dashing;
-* fighter has permission from the new stamina/action bar system.
+Conceptually:
 
-Dash is a movement action, not an attack.
+showStamina = stamina < maxStamina
 
-Do not create:
+with floating-point tolerance matching the rest of the fixed-step code.
 
-* hitbox;
-* damage;
-* invulnerability;
-* knockback.
+Do not use arbitrary timers like:
+
+“hide bar 1 second after action.”
+
+The bar reflects actual resource state.
+
+Because CombatState.setStamina() already snaps near-max values to the exact maximum, visibility should be straightforward.
 
 ⸻
 
-29. Dash movement
+9. Empty stamina behavior
 
-Dash should be a short fast burst in the double-tapped direction.
-
-Use a data-driven speed/duration.
-
-Recommended starting point for #0001:
-
-* dash speed roughly 1.6×–1.9× normal run top speed;
-* duration tied to one pass of the dash animation where possible.
-
-Since #0001’s Speed Power resolves normal top speed to its existing value, do not mutate normal maxSpeed.
-
-Instead Dash temporarily owns horizontal velocity, similar in principle to other special movement states.
-
-Add configurable fields such as:
-
-* dashSpeed
-* dashDuration or derive from animation;
-* dashTapWindow.
-
-Tune after observing the supplied art.
-
-⸻
-
-30. Dash collision
-
-Dash must still obey stage collision.
-
-It may:
-
-* stop against solid structures;
-* leave platform ledges;
-* fall if the ground disappears.
-
-Do not give it wall-phasing.
-
-If the fighter runs off a platform during Dash:
-
-* the dash may continue briefly horizontally while gravity takes over;
-* or end when ground is lost.
-
-Choose the cleaner feel consistent with the current grounded Dash requirement.
-
-Preferred:
-
-Dash ends when the fighter leaves the ground.
-
-⸻
-
-31. Dash state priority
-
-Add a proper visual/gameplay dash state.
-
-Suggested animation state priority:
-
-1. hitstun
-2. technique
-3. bound
-4. attack
-5. defense
-6. dash
-7. airborne
-8. land
-9. block
-10. charge
-11. chargeRelease
-12. run
-13. idle
-
-Dash should not be represented merely as a fast run.
-
-Use the new dash animation.
-
-⸻
-
-32. New fighter stamina/action bar
-
-Add a new resource used specifically by:
-
-* Dash
-* Dodge
-* Block
-
-This is not the old Energy system.
-
-Do not call it Energy in code/docs/UI.
-
-Use a name such as:
-
-stamina
-
-or:
-
-actionMeter
-
-Player-facing UI does not need a text label because it is shown directly above the fighter.
-
-For implementation clarity, stamina is recommended.
-
-⸻
-
-33. Stamina maximum
-
-Each fighter has:
-
-100
-
-maximum stamina by default.
-
-Starts:
-
-100
-
-Store it in CombatState or Fighter state.
-
-Recommended:
-
-* maxStamina
-* stamina
-* staminaExhausted
-
-Make values character-data-driven where practical.
-
-⸻
-
-34. Purple bar above fighter head
-
-Render a thin horizontal purple stamina bar above each fighter’s head.
-
-This bar belongs in world/screen space and follows the actual fighter.
-
-Placement order around the fighter should be something like:
-
-[ purple stamina bar ]
-[ player/name marker if still used ]
-[ fighter sprite ]
-[ CAB1   CAB2 ]
-
-Avoid direct overlap with the existing P1/CPU marker.
-
-Adjust marker spacing as required.
-
-⸻
-
-35. Stamina bar style
-
-Normal state:
-
-* purple fill;
-* dark/black background track;
-* thin black outline;
-* compact width approximately related to fighter visual width, but wider enough to read;
-* not a giant RPG health bar.
-
-Suggested world/screen visual width:
-
-around 45–60 screen pixels depending on zoom.
-
-Scale responsively but keep a sensible minimum.
-
-Do not use green.
-
-⸻
-
-36. Exhausted state
-
-When stamina reaches:
+The resource is allowed to reach:
 
 0
 
-the fighter enters an exhausted/locked state for Dash/Dodge/Block.
+completely.
 
-The bar turns:
+Do not enforce:
+
+* a 1-point minimum;
+* an invisible reserve;
+* automatic bounce to 1.
+
+At zero:
+
+* stamina = 0;
+* staminaExhausted = true.
+
+The fighter cannot use stamina-dependent actions.
+
+⸻
+
+10. Exhausted bar becomes gray
+
+Once stamina reaches zero, the stamina bar switches from purple to:
 
 gray
 
-while exhausted.
-
-Important:
-
-Once empty, the fighter does not regain ability access as soon as it reaches 1 stamina.
-
-It must refill completely back to:
-
-100
-
-before Dash, Dodge, and Block are usable again.
-
-This is a full lockout cycle.
-
-Pseudo-rule:
-
-if stamina hits 0:
-
-* staminaExhausted = true
-
-while exhausted:
-
-* Dash unavailable
-* Dodge unavailable
-* Block unavailable
-
-once stamina reaches max:
-
-* staminaExhausted = false
-
-Only then abilities become usable.
-
-⸻
-
-37. Stamina regeneration
-
-Stamina automatically regenerates slowly over time.
-
-Use a data-driven value.
-
-Recommended baseline:
-
-12 stamina / second
-
-during normal gameplay.
-
-This should occur while:
-
-* idle;
-* moving;
-* airborne;
-* attacking;
-* stunned;
-
-unless spending is happening that frame.
-
-Do not make it instant.
-
-⸻
-
-38. Charging regenerates stamina faster
-
-While the fighter is actively in the existing Charge stance:
-
-stamina regenerates faster.
-
-Recommended:
-
-30 stamina / second
-
-or roughly 2.5× normal regen.
-
-Keep this separate from charged-ability cooldown acceleration.
-
-Charge now has two benefits:
-
-1. CAB cooldowns recover faster.
-2. stamina refills faster.
-
-Do not conflate the two resources.
-
-Both should read the actual existing fighter.charging state.
-
-⸻
-
-39. Dash stamina cost
-
-Dashing spends stamina.
-
-Recommended initial cost:
-
-25
-
-per Dash.
-
-Deduct the cost once when Dash starts.
-
-If current stamina is below the required cost:
-
-Dash does not start.
-
-If spending brings stamina to exactly zero:
-
-immediately mark exhausted.
-
-Do not allow negative stamina.
-
-⸻
-
-40. Dodge stamina cost
-
-#0001’s Dodge now spends stamina.
-
-Recommended initial cost:
-
-25
-
-per Dodge.
-
-Spend once when the Dodge successfully starts.
-
-If stamina is insufficient:
-
-* Dodge does not begin.
-
-If exhausted:
-
-* Dodge does not begin regardless of current partial recharge.
-
-Do not spend stamina if the Dodge cannot start because:
-
-* animation missing;
-* fighter cannot act;
-* no relevant dodge move.
-
-⸻
-
-41. Block stamina cost
-
-The generic block system should also consume stamina.
-
-Because #0001 currently uses Dodge rather than Block, implement this generically for future block-type fighters.
-
-Block should drain while actively held.
-
-Recommended:
-
-20 stamina / second
-
-while successfully blocking.
-
-Do not charge the full cost on each simulation step.
-
-Use rate × dt.
-
-When stamina hits zero:
-
-* immediately end the block;
-* enter exhausted state;
-* cannot block again until full.
-
-If a future character declares a block defense, it should work automatically.
-
-⸻
-
-42. Stamina cost data
-
-Avoid hardcoding all costs globally if these may differ by fighter later.
-
-Recommended character schema:
-
-stats or movement/defense config such as:
-
-stamina: {
-  max: 100,
-  regen: 12,
-  chargeRegen: 30,
-  dashCost: 25,
-  dodgeCost: 25,
-  blockDrain: 20
-}
-
-Names may differ.
-
-Make defaults available so future characters do not require every field.
-
-⸻
-
-43. Stamina spending helper
-
-Add clean helpers.
-
-For example:
-
-* canUseStamina(cost)
-* spendStamina(cost)
-* regenStamina(amount)
-* updateStamina(dt, charging)
-* exhausted
-
-Do not scatter:
-
-combat.stamina -= 25
-
-through Fighter code.
-
-Centralize clamp/exhaustion logic.
-
-⸻
-
-44. Interaction with charge
-
-Charge should remain possible at zero stamina.
-
-This is important because charging is how the player can recover stamina faster.
-
-Therefore:
-
-stamina does not gate Charge.
-
-A fully exhausted fighter can:
-
-* move normally;
-* jump normally;
-* attack normally;
-* charge;
-* use normal attacks;
-* use CAB attacks if their separate cooldown permits.
-
-It cannot:
-
-* Dash;
-* Dodge;
-* Block
-
-until stamina is full again.
-
-⸻
-
-45. Interaction with CAB cooldowns
-
-Do not make CAB1/CAB2 spend stamina.
-
-They continue to use their own separate 5-second cooldown system.
-
-The new stamina bar is only for:
-
-* Dash
-* Dodge
-* Block.
-
-Keep both systems independent.
-
-⸻
-
-46. Interaction with normal movement
-
-Running does not consume stamina.
-
-Jumping does not consume stamina.
-
-Normal attacks do not consume stamina.
-
-Shuriken does not consume stamina.
-
-Charged attacks do not consume stamina unless later requested.
-
-⸻
-
-47. Dash and charge conflict
-
-Dash cannot start while charging.
-
-Starting Charge should not automatically dash even if a double-tap was just detected.
-
-A horizontal double tap that occurs while the fighter cannot Dash should not queue a delayed Dash for later.
-
-Consume/expire the attempt normally.
-
-⸻
-
-48. Dash and Dodge conflict
-
-Only one can start on a given fixed step.
-
-Respect existing input/action priority.
-
-If Defense and the second tap of Dash occur on the same simulation step, define a deterministic priority.
-
-Preferred:
-
-Defense/Dodge takes priority over Dash.
-
-Reason:
-
-* Defense is an explicit combat action;
-* Dash comes from movement gesture detection.
-
-Test this.
-
-⸻
-
-49. Dash and attacks
-
-If an attack starts in the same step as a dash request:
-
-prefer the explicit attack.
-
-Do not let Dash cancel an attack before it starts.
-
-Suggested action order:
-
-1. charged/normal attacks
-2. defense
-3. dash
-4. jump/movement.
-
-Integrate cleanly into current Fighter.update().
-
-⸻
-
-50. Dash facing
-
-Dash direction immediately becomes the fighter’s facing direction.
-
-A right dash faces right.
-
-A left dash faces left.
-
-Do not wait for ordinary run turning thresholds.
-
-⸻
-
-51. Dash animation fallback
-
-Do not silently use run if the declared dash animation is missing.
-
-The existing project philosophy refuses gameplay states that lack required real art.
-
-Follow that pattern.
-
-If dash art is required and missing:
-
-* log a clear warning;
-* do not start the Dash.
-
-Once the user has added the new files, this should work automatically through the declared animation.
-
-⸻
-
-52. Add dash frames to preload
-
-Update:
-
-characterFramePaths(def)
-
-indirectly through the animations table so all new dash frames are preloaded with the rest of #0001.
-
-Do not add special one-off preloading logic.
-
-⸻
-
-53. Training CPU and Dash
-
-Do not make the existing Training AI dash in this pass.
-
-It can continue using normal movement.
-
-The dash is available to player-controlled fighters through double-tap input.
-
-Keep the underlying Fighter method generic enough that AI could request a dash later.
-
-⸻
-
-54. Touch and gamepad double-tap
-
-Because input is action-based, Dash detection should work for:
-
-* keyboard left/right;
-* touch left/right buttons;
-* D-pad left/right;
-* analog stick directional press edges if the current input manager can produce distinct transitions.
-
-For analog:
-
-crossing from neutral into the horizontal held zone should produce one press edge.
-
-Holding the stick should not repeatedly generate dash presses.
-
-Returning near neutral and pushing the same direction again within the window should count.
-
-Do not implement Dash only for keyboard.
-
-⸻
-
-55. InputManager horizontal presses
-
-Modify InputManager.sample() to expose:
-
-* leftPressed
-* rightPressed
-
-using the existing consume() system.
-
-Be careful:
-
-consuming left/right press edges must not break menu navigation because gameplay sampling only occurs while gameplay is active.
-
-Update neutral CPU/player input objects to include them.
-
-⸻
-
-56. Existing top player marker
-
-Arena currently renders P1/CPU name markers over fighters.
-
-Keep them unless the new stamina bar makes the display too crowded.
-
-Do not remove them automatically.
-
-Instead, adjust vertical spacing:
-
-top:
-
-* stamina bar
-
-then:
-
-* P1/CPU marker/name
-
-then fighter.
-
-CAB indicators go below fighter.
-
-Make all world-space status elements readable.
-
-⸻
-
-57. Respawn visual flow
-
-During the 2-second respawn delay:
-
-do not render the eliminated fighter’s:
-
-* sprite;
-* stamina bar;
-* CAB indicators;
-* marker.
-
-The top HUD card remains visible.
-
-Its Knockback can display:
-0
-
-only once the actual respawn occurs.
-
-Until then, either:
-
-* retain eliminated Knockback;
-* or display it until respawn.
-
-Preferred:
-retain old Knockback during the 2-second elimination delay, reset to 0 at respawn.
-
-This visually distinguishes elimination from immediate reset.
-
-⸻
-
-58. Score dot timing
-
-Fill the winner’s new score dot immediately when the opponent is eliminated.
-
-Do not wait 2 seconds.
+This exhausted appearance remains active during the entire refill process.
 
 Example:
 
-CPU enters Void:
+* 0/100 → gray
+* 20/100 → still gray
+* 60/100 → still gray
+* 99/100 → still gray
+* 100/100 → exhaustion clears and bar disappears.
 
-* P1 first dot fills immediately.
-* CPU disappears.
-* 2 seconds later CPU respawns at 0 Knockback.
-
-This provides clear feedback.
-
-⸻
-
-59. Timer during respawn
-
-Keep the match timer running during the 2-second respawn delay.
-
-Do not pause the entire game.
-
-The surviving fighter may remain active during the opponent’s respawn delay.
-
-However, prevent exploitation of any nonexistent target.
-
-Charged BA1 requiring an opponent should fail cleanly while opponent is absent.
-
-Camera should center reasonably on the surviving fighter during this period.
+Do not change it back to purple early.
 
 ⸻
 
-60. Respawn and spawn safety
+11. Full-refill lockout
 
-When the eliminated fighter respawns:
+The existing mechanic already mostly implements this and must remain exact.
 
-* use its normal spawn point;
-* do not spawn inside a solid;
-* use the existing Fighter.reset/respawn surface logic.
+Once the fighter has exhausted the bar:
 
-No respawn platform or invulnerability is requested.
+Dash:
 
-Do not add one.
+* unavailable.
 
-The fighter becomes active immediately at the end of the 2 seconds.
+Dodge:
 
-⸻
+* unavailable.
 
-61. Practice respawn timing
+Block:
 
-The user’s “takes 2 seconds to respawn after being eliminated” should apply to Practice as well for consistency.
+* unavailable.
 
-Currently Practice respawns immediately after Void.
+This remains true even after stamina regenerates partially.
 
-Change Practice Void behavior to:
+Examples:
 
-* remove fighter from play;
-* wait 2.0 seconds;
-* respawn them at spawn;
-* reset Knockback to 0;
-* stamina full;
-* cooldowns clear.
+At 10:
 
-Practice does not award points.
+* unavailable.
 
-If both player and CPU are eliminated, each tracks its own 2-second respawn timer independently.
+At 50:
 
-⸻
+* unavailable.
 
-62. Practice default CPU after player swap
+At 99:
 
-When P1 changes fighter:
+* unavailable.
 
-the CPU should remain.
+Only after:
 
-When CPU is changed:
+stamina === maxStamina
 
-rebind right info card.
+should:
 
-When CPU is disabled:
+staminaExhausted = false
 
-Practice can temporarily operate solo.
+and the actions become available again.
 
-On leaving Practice and entering again:
+Do not change this to a normal “if enough stamina, use ability” system after exhaustion.
 
-CPU should once again be enabled by default.
-
-Do not persist disabled state between visits.
+The entire purpose of exhaustion is a forced full recharge.
 
 ⸻
 
-63. Practice menu text
+12. Bar disappears when exhaustion ends
 
-Since CPU is enabled by default, the Practice menu should initially say:
+When the gray refill reaches full:
 
-Change CPU
+1. stamina snaps to max;
+2. exhausted becomes false;
+3. Dash/Dodge/Block become usable again;
+4. stamina bar disappears.
 
-rather than:
+Do not briefly display a full purple bar after recovery.
 
-Enable CPU
-
-because a CPU already exists.
-
-The existing Disable CPU option remains in the CPU roster dialog.
-
-⸻
-
-64. Quick Battle HUD score dots
-
-Update the generic side panel to support optional score indicators.
-
-Possible API:
-
-bindPanel(panel, tag, fighter, { score })
-
-or keep score binding at HUD level.
-
-Do not store match score on the fighter’s character definition.
-
-Score belongs to the Battle/match state.
+Full resource means hidden.
 
 ⸻
 
-65. Score data model
+13. Non-exhausted partial refill remains purple
 
-Recommended Battle fields:
+If stamina has been spent but has not reached zero:
 
-* p1Score
-* p2Score
+example:
 
-or a slot-keyed object:
+100 → Dash → 75
 
-score = { p1: 0, p2: 0 }
+the fighter is not exhausted.
 
-Winning score:
+Bar should be:
 
-CONFIG.battle.pointsToWin = 3
+purple
 
-Do not hardcode 3 in UI and battle logic independently.
+while it regenerates:
 
-HUD should read the configured/declared maximum where practical, though this pass always renders exactly 3 dots.
+75 → 80 → 90 → 100.
 
-⸻
+At 100:
 
-66. Do not use round as score
+* hide.
 
-Current Battle has:
-
-this.round = 1
-
-Do not repurpose round as points.
-
-The score is a separate match concept.
-
-You may remove or simplify round display later only if necessary, but for this pass preserve the timer center UI unless directly conflicting.
+Gray is specifically reserved for an exhaustion cycle caused by reaching zero.
 
 ⸻
 
-67. Existing KO phase
+14. Charging behavior remains unchanged
 
-Current Battle uses a ko phase and then immediately goes to result.
+Charging still increases stamina regeneration speed.
 
-Refactor this carefully.
+The visibility logic simply follows the value.
 
-A non-final elimination should not enter the final result.
+Example:
 
-Possible phase structure:
+fighter has 40 stamina.
 
-* intro
-* fight
-* respawn
-* fight
-* …
-* matchko
-* result
+Bar visible.
 
-However, because the surviving fighter should remain active during the opponent’s respawn delay, a global respawn phase that locks everyone is not ideal.
+Player Charges.
 
-Preferred:
+Stamina regenerates faster.
 
-keep global phase as:
+Bar visibly fills faster.
 
-fight
+At full:
 
-while individual fighters respawn.
+* bar disappears.
 
-Only enter the existing/final KO phase when someone earns the third point.
+If the fighter had previously exhausted stamina:
 
-This minimizes disruption.
+the faster Charge regeneration still fills the gray bar until full.
+
+Do not clear exhaustion simply because Charge is being held.
 
 ⸻
 
-68. Time-up during a respawn delay
+15. Stamina spending remains unchanged
 
-If the timer reaches zero while one fighter is awaiting respawn:
+Do not modify current costs unless required to fix a bug.
 
-the already-awarded score still counts.
-
-Determine result using:
-
-1. points;
-2. lower Knockback among active/respawning fighters.
-
-For the eliminated fighter whose Knockback has not yet reset, its pre-elimination Knockback remains until respawn, so time-up can compare it normally.
-
-Do not grant an extra point just because the timer expired.
-
-⸻
-
-69. Stamina rendering order
-
-In Arena.render() add the stamina bars after fighters or markers in a way that guarantees readability.
-
-Recommended:
-
-* fighter sprites;
-* technique/projectiles;
-* foreground/Void as currently appropriate;
-* world-space status/markers;
-* stamina/CAB indicators.
-
-The Void should not cover UI intended to remain readable for a still-active fighter near its edge.
-
-But once fighter enters Void and is eliminated, its UI disappears.
-
-⸻
-
-70. Stamina interpolation
-
-The bar follows:
-
-* fighter.renderX
-* fighter.renderY
-
-not raw body X/Y.
-
-This avoids fixed-step jitter.
-
-⸻
-
-71. Stamina visual ratio
-
-Use:
-
-ratio = stamina / maxStamina
-
-clamped [0,1].
-
-Purple fill contracts horizontally.
-
-Exhausted gray state should visually override purple until full.
-
-While exhausted and partially refilled:
-
-show gray fill proportional to current stamina.
-
-At exactly full:
-
-switch back to purple and clear exhausted status.
-
-This communicates that the resource is recovering but still locked.
-
-⸻
-
-72. Accessibility for stamina
-
-Because stamina is canvas-rendered above the fighter, the persistent DOM HUD does not need a duplicate giant meter.
-
-However, expose useful state in the fighter HUD card through an accessible-only description if straightforward.
-
-At minimum ensure no existing accessible DOM claims the old removed Energy system returned.
-
-Do not call stamina “Energy” in aria labels.
-
-⸻
-
-73. CAB indicators and respawn
-
-While fighter is eliminated/respawning:
-
-hide CAB1/CAB2 world indicators.
-
-At respawn:
-
-* cooldowns reset;
-* both display as ready.
-
-⸻
-
-74. Score dots and Practice
-
-Do not show the three score dots in Practice.
-
-They are a Quick Battle win-condition UI.
-
-Practice still has no winner.
-
-⸻
-
-75. Score dots and result
-
-At final point:
-
-the third dot fills before/while the result transition starts.
-
-Do not jump straight to result without visibly updating the score HUD.
-
-⸻
-
-76. Preserve current Knockback system
-
-Do not change:
-
-* BA1 damage;
-* BA2 damage;
-* shuriken damage;
-* charged BA2 tick damage;
-* accumulated Knockback formula;
-* launch scaling formula;
-* attack knockback axes;
-* Void dimensions;
-* stage layouts;
-* camera zoom.
-
-This pass does not retune combat damage.
-
-⸻
-
-77. Preserve current CAB cooldown mechanics
-
-Keep:
-
-* CAB1 5 sec;
-* CAB2 5 sec;
-* separate cooldowns;
-* charge acceleration;
-* cooldown consumed on use;
-* CAB2 cooldown consumed even on whiff.
-
-Only:
-
-* move UI under fighter;
-* rename labels CAB1/CAB2;
-* reset cooldowns on respawn.
-
-⸻
-
-78. Tests: scoring
-
-Add tests for:
-
-* both fighters start with 0 points;
-* one Void elimination awards opponent exactly one point;
-* eliminated fighter does not receive the point;
-* second elimination increments to 2;
-* third increments to 3;
-* reaching 3 ends match;
-* score persists across respawns;
-* rematch resets score;
-* simultaneous elimination awards no point under the chosen rule.
-
-⸻
-
-79. Tests: respawn
-
-Verify:
-
-* Void removes fighter from play immediately;
-* fighter does not respawn before 2.0 sec;
-* fighter respawns at 2.0 sec;
-* Knockback resets to 0 on respawn;
-* stamina resets full;
-* exhaustion clears;
-* CAB cooldowns clear;
-* projectiles/clones/binds targeting eliminated fighter are detached;
-* final third-point elimination does not respawn loser.
-
-⸻
-
-80. Tests: Practice respawn
-
-Verify:
-
-* Practice fighter entering Void disappears;
-* remains absent for 2 sec;
-* respawns after 2 sec;
-* CPU independently follows same rule;
-* no Practice score is awarded;
-* Practice session continues.
-
-⸻
-
-81. Tests: Practice CPU default
-
-Verify fresh Practice entry:
-
-* CPU exists automatically;
-* CPU uses default fighter;
-* fighters.length === 2;
-* P1/CPU opponents are paired;
-* camera has a secondary fighter;
-* menu label begins as Change CPU;
-* disabling CPU still works;
-* re-entering Practice restores default CPU.
-
-⸻
-
-82. Tests: Practice HUD
-
-Verify Practice HUD contains:
-
-* P1 card;
-* More button;
-* CPU card.
-
-Verify CPU card updates its:
-
-* portrait;
-* display name;
-* Knockback.
-
-Verify changing CPU rebinds card.
-
-Verify disabling CPU removes/hides card.
-
-Verify no score dots appear in Practice.
-
-⸻
-
-83. Tests: HUD positioning/orientation
-
-Do not assert fragile pixel coordinates.
-
-Instead verify:
-
-* HUD grid/layout has both cards in inner columns around center;
-* P1 and CPU cards use inward portrait orientation classes/state;
-* P1 portrait faces center;
-* CPU portrait faces center;
-* card internals contain no CAB cooldown row anymore;
-* Quick Battle cards each have 3 score dots.
-
-⸻
-
-84. Tests: CAB world UI
-
-Test rendering state/helper logic for:
-
-* CAB1 label exists;
-* CAB2 label exists;
-* white style is selected;
-* black outline style is selected;
-* cooldown progress is correct;
-* ready state is complete;
-* cooling state shows remaining time;
-* indicators hidden for respawning/offscreen fighters;
-* indicators are not DOM children of top HUD card.
-
-Avoid pixel-perfect canvas snapshots unless project already uses them.
-
-⸻
-
-85. Tests: horizontal press edges
-
-InputManager tests should verify:
-
-* first left press produces leftPressed;
-* holding left does not repeatedly produce leftPressed;
-* release + repress produces a new edge;
-* same for right;
-* keyboard/touch/gamepad transitions use same normalized behavior.
-
-⸻
-
-86. Tests: dash double tap
-
-Verify:
-
-* one press does not Dash;
-* two same-direction presses inside window Dash;
-* presses outside window do not;
-* left then right does not;
-* right then left does not count as same-direction double tap;
-* dash faces requested direction;
-* dash uses dash animation;
-* dash does not create damage/hitbox/invulnerability.
-
-⸻
-
-87. Tests: dash gating
-
-Verify Dash fails when:
-
-* airborne;
-* attacking;
-* stunned;
-* bound;
-* charging;
-* already dashing;
-* exhausted;
-* insufficient stamina;
-* dash art missing.
-
-Verify no stamina is spent on failed Dash.
-
-⸻
-
-88. Tests: dash cost
-
-Verify successful Dash:
-
-* spends configured amount exactly once;
-* does not drain continuously;
-* starts with dash velocity;
-* ends after configured duration/animation;
-* stops/ends appropriately at solids;
-* ends on leaving ground under chosen behavior.
-
-⸻
-
-89. Tests: stamina defaults
-
-Verify:
-
-* fighter starts at full stamina;
-* max is expected value;
-* normal state purple;
-* passive regen occurs;
-* stamina never exceeds max;
-* stamina never drops below zero.
-
-⸻
-
-90. Tests: stamina regeneration
-
-Verify:
-
-normal:
-
-* regenerates at normal configured rate.
-
-charging:
-
-* regenerates at faster configured rate.
-
-Verify:
-
-* actual Charge state is required;
-* charge-release animation does not retain fast regen;
-* charged technique itself is not ordinary charging.
-
-⸻
-
-91. Tests: Dodge stamina
-
-Verify:
-
-* successful Dodge spends exact configured cost;
-* no stamina means Dodge unavailable;
-* exhausted fighter cannot Dodge;
-* failed/missing-art Dodge does not spend;
-* spending to zero triggers exhaustion.
-
-⸻
-
-92. Tests: Block stamina
-
-Using a test fighter with block-type defense:
-
-verify:
-
-* held Block drains per second;
-* drain is fixed-step deterministic;
-* zero stamina ends block;
-* exhaustion prevents immediate re-block;
-* no additional unrelated damage changes.
-
-⸻
-
-93. Tests: exhaustion lockout
-
-Critical test:
-
-1. reduce stamina to 0;
-2. confirm exhausted;
-3. regenerate to 25;
-4. Dash still unavailable;
-5. Dodge still unavailable;
-6. Block still unavailable;
-7. regenerate to 99;
-8. still unavailable;
-9. reach 100;
-10. exhaustion clears;
-11. abilities available again.
-
-This behavior must be exact.
-
-⸻
-
-94. CSS cleanup
-
-Remove/rework top-HUD styles for:
-
-* .hud-cooldowns
-* old card-based cooldown rings
-* old CAB labels.
-
-Add styles for:
-
-* more centered HUD grid;
-* inward portrait orientation;
-* score dots;
-* optional Practice CPU card.
-
-World-space stamina and CAB indicators are Canvas-rendered and do not need DOM CSS if implemented there.
-
-⸻
-
-95. Documentation/comments
-
-Update relevant README/spec/comments to reflect:
-
-* first to 3 eliminations;
-* 2-second respawn;
-* score dots;
-* default Practice CPU;
-* Dash double tap;
-* stamina mechanic;
-* exhausted full-refill lock;
-* CAB cooldown display moved under fighter.
-
-Do not rewrite unrelated sections.
-
-⸻
-
-96. Do not reintroduce old Energy
-
-The purple stamina/action bar is a new constrained movement/defense resource, not the deleted old Energy system.
-
-Do not:
-
-* call it Energy;
-* restore Energy HUD;
-* charge CAB attacks with it;
-* restore Infinite Energy Practice options.
-
-Its only costs in this pass:
+Preserve existing configured values for:
 
 * Dash;
 * Dodge;
-* Block.
+* Block drain.
+
+Do not make CAB1/CAB2 consume stamina.
+
+Do not make:
+
+* normal attacks;
+* jumps;
+* running;
+* shuriken;
+* Charge
+
+consume stamina.
 
 ⸻
 
-97. Do not add unrelated mechanics
+16. Hide stamina while fighter is not active
 
-Do not add:
+Continue hiding stamina UI for:
 
-* air dash;
-* multiple dashes;
-* dash attacks;
-* wave dash;
-* dash cancel attacks;
-* sprint stamina drain;
-* jump stamina cost;
-* CAB stamina costs;
-* respawn invulnerability;
-* respawn platform;
-* ledge grabs;
-* DI;
-* wall jumps;
-* lives icons;
-* item system;
-* new characters;
-* new stages;
-* new damage values.
+* eliminated fighters;
+* fighters during their 2-second respawn absence;
+* fighters not currently rendered;
+* any fighter intentionally detached from active play.
+
+After respawn:
+
+stamina starts full.
+
+Therefore:
+
+* bar should initially be hidden.
+
+It appears again only after stamina is spent.
 
 ⸻
 
-98. Final acceptance criteria
+17. Remove automatic opponent-facing
 
-This pass is complete when:
+The fighter currently has facing logic that automatically turns a grounded idle fighter toward its opponent.
 
-Match
+Remove this behavior entirely.
 
-* Quick Battle is first to 3 eliminations.
-* each elimination fills one winner score dot.
-* three dots means match victory.
-* non-final eliminated fighter respawns after exactly 2 seconds.
-* score persists through respawns.
-* final loser does not respawn.
+A fighter should not automatically look toward the enemy.
 
-HUD
-
-* fighter info cards are moved inward toward timer.
-* P1 portrait faces timer.
-* CPU portrait faces timer.
-* top cards no longer contain cooldown rings.
-* Quick Battle shows 3 score dots below each card.
-* Practice does not show score dots.
-
-Practice
-
-* CPU is enabled by default.
-* Practice starts with two fighters.
-* CPU has a working right-side info box just like P1.
-* changing CPU updates the box.
-* disabling CPU still works.
-* Practice Void respawn takes 2 seconds.
-
-CAB cooldown display
-
-* CAB1/CAB2 appear under actual fighter.
-* not under profile card.
-* labels read exactly CAB1 and CAB2.
-* indicators are white with black outlines.
-* ring progress still reflects real cooldown.
-* hidden while fighter is respawning.
-
-Dash
-
-* new #0001 dash frames are loaded from actual repository assets.
-* double-tap left/right triggers grounded Dash.
-* dash uses real dash animation.
-* Dash has no attack/hitbox/invulnerability.
-* Dash costs stamina.
-
-Stamina
-
-* thin purple bar appears above fighter.
-* starts full.
-* Dash spends it.
-* Dodge spends it.
-* Block drains it.
-* regenerates slowly.
-* Charge regenerates faster.
-* zero turns bar gray.
-* zero enters exhausted state.
-* partial refill does not unlock abilities.
-* full refill clears exhaustion.
-* respawn restores full stamina.
-
-Existing gameplay
-
-* accumulated Knockback remains intact.
-* damage values remain intact.
-* CAB cooldown behavior remains intact.
-* stages/Void remain intact.
-* movement/jumps/attacks remain unchanged except for new Dash/stamina gating.
-* full test suite passes.
+Facing should now be controlled only by the fighter’s own movement/action direction or explicit gameplay mechanics.
 
 ⸻
 
-99. Strict scope
+18. Remove opponent-based facing from updateFacing()
+
+Inspect Fighter.updateFacing().
+
+The current behavior includes logic conceptually like:
+
+* if moving, face movement direction;
+* otherwise, while grounded and idle, look at opponent based on opponent X position.
+
+Remove the opponent-position branch.
+
+Do not replace it with another target-tracking system.
+
+The fighter should retain its last facing while stationary.
+
+⸻
+
+19. Desired facing behavior
+
+Example:
+
+P1 is facing right.
+
+Enemy jumps behind P1 to the left.
+
+P1 remains facing:
+
+right
+
+until P1 performs an input/action that explicitly changes facing.
+
+No automatic turn.
+
+⸻
+
+20. Movement changes facing
+
+Normal left/right movement should continue to control facing.
+
+If player deliberately moves right:
+
+face right.
+
+If player deliberately moves left:
+
+face left.
+
+Keep the current threshold logic if it is useful for avoiding sprite flicker.
+
+But opponent position must not influence it.
+
+⸻
+
+21. Dash changes facing
+
+Existing Dash behavior should continue to face the Dash direction.
+
+Right Dash:
+
+* face right.
+
+Left Dash:
+
+* face left.
+
+Do not alter this.
+
+⸻
+
+22. Attack facing behavior
+
+Attacks should continue to use the fighter’s current facing.
+
+Do not automatically rotate toward the opponent when an attack starts.
+
+Example:
+
+fighter faces right;
+opponent is left;
+player presses BA1 without first turning.
+
+BA1 should attack:
+
+right
+
+This is expected under the new manual-facing rule.
+
+⸻
+
+23. Throw behavior
+
+Shuriken should continue to travel in the fighter’s current facing.
+
+No aim correction toward enemy.
+
+If facing right:
+
+* shuriken travels right.
+
+Even if opponent is left.
+
+⸻
+
+24. Charged abilities
+
+Charged attacks should also respect current facing.
+
+Charged BA2/Sphere Rush:
+
+* should snapshot the fighter’s current facing as it already does.
+
+Do not rotate toward opponent before it starts.
+
+Charged BA1 clone placement may still be based on opponent position because that move specifically summons relative to its target.
+
+That is not fighter auto-facing.
+
+Do not break target-dependent summon placement.
+
+⸻
+
+25. CPU facing
+
+The Practice/Training CPU should follow the same generic Fighter facing rules.
+
+Do not automatically make the dummy turn to face P1.
+
+If its AI moves:
+
+* its movement may update its facing.
+
+If it stops:
+
+* it keeps its last facing.
+
+This is intentional.
+
+Do not add a CPU-only auto-look exception.
+
+⸻
+
+26. Respawn facing
+
+On respawn:
+
+use the stage spawn’s configured:
+
+spawn.facing
+
+exactly as currently defined.
+
+After respawn, the fighter retains that facing until movement/Dash/etc. changes it.
+
+Do not immediately turn toward opponent after appearing.
+
+⸻
+
+27. Preserve HUD portrait inward-facing rule
+
+This change applies to the actual fighter sprite, not the HUD profile portraits.
+
+The top HUD portraits should continue to face inward toward the timer as previously requested.
+
+Therefore:
+
+* gameplay fighter facing = manual;
+* HUD portrait orientation = fixed UI composition.
+
+Do not couple those two.
+
+⸻
+
+28. CAB layout when hidden
+
+Because cooldown indicators now exist only when active, make the rendering layout dynamic.
+
+Examples:
+
+No cooldowns
+
+Render nothing.
+
+Only CAB1
+
+Center CAB1 beneath fighter.
+
+Only CAB2
+
+Center CAB2 beneath fighter.
+
+Both
+
+Place side-by-side.
+
+Avoid leaving an empty invisible CAB1 slot when only CAB2 exists.
+
+⸻
+
+29. Stamina/CAB vertical spacing
+
+Because both status systems are conditional:
+
+* stamina may be hidden;
+* CABs may be hidden.
+
+Do not reserve giant fixed empty gaps around the fighter.
+
+World-space layout should collapse cleanly.
+
+Above fighter:
+
+if stamina visible:
+
+* draw it.
+
+Otherwise:
+
+* marker can occupy its normal position.
+
+Below fighter:
+
+if CAB cooldown active:
+
+* draw indicators.
+
+Otherwise:
+
+* draw nothing.
+
+⸻
+
+30. Do not modify top info boxes
+
+Do not move CAB cooldown information back into:
+
+* top fighter card;
+* portrait;
+* character-name box.
+
+The previous requirement remains:
+
+cooldowns belong beneath the actual fighter.
+
+This pass only changes when they are visible.
+
+⸻
+
+31. Tests: cooldown visibility
+
+Add/update tests verifying:
+
+* CAB1 ready → no CAB1 indicator rendered;
+* CAB2 ready → no CAB2 indicator rendered;
+* both ready → no cooldown UI under fighter;
+* CAB1 used → CAB1 appears;
+* CAB2 remains absent if ready;
+* CAB2 used while CAB1 cooling → both appear;
+* CAB1 finishing removes only CAB1;
+* final cooldown finishing removes all cooldown UI.
+
+Test state/renderer calls rather than brittle screenshots.
+
+⸻
+
+32. Tests: stamina visibility
+
+Verify:
+
+fresh fighter:
+
+* stamina full;
+* no stamina bar rendered.
+
+After Dash:
+
+* stamina below full;
+* bar rendered.
+
+After Dodge:
+
+* bar rendered.
+
+During regen:
+
+* bar remains rendered.
+
+At full:
+
+* bar no longer rendered.
+
+⸻
+
+33. Tests: purple normal refill
+
+Verify:
+
+* spend stamina without reaching zero;
+* staminaExhausted === false;
+* bar uses purple normal style;
+* bar remains purple through partial refill;
+* disappears at full.
+
+⸻
+
+34. Tests: gray exhaustion cycle
+
+Verify:
+
+1. stamina reaches exactly 0;
+2. staminaExhausted === true;
+3. bar visible and gray;
+4. refill to 25 → still gray;
+5. refill to 75 → still gray;
+6. refill to 99 → still gray;
+7. reach 100 → exhausted false;
+8. bar hidden.
+
+Do not allow purple before step 7.
+
+⸻
+
+35. Tests: exhausted ability lock
+
+Verify while exhausted at partial stamina:
+
+* Dash fails;
+* Dodge fails;
+* Block fails.
+
+At full:
+
+* they become available again.
+
+Existing tests may already cover part of this; update only where needed.
+
+⸻
+
+36. Tests: no opponent auto-facing
+
+Create clear facing tests.
+
+Example:
+
+fighter starts facing right.
+
+Opponent moves from right side to left side.
+
+Fighter gives no movement input.
+
+After updates:
+
+fighter still faces right.
+
+⸻
+
+37. Tests: movement facing
+
+Verify:
+
+* deliberate left movement changes facing left;
+* deliberate right movement changes facing right;
+* stopping preserves last direction;
+* opponent position does not alter it afterward.
+
+⸻
+
+38. Tests: attack direction
+
+Verify:
+
+* fighter facing right with opponent on left;
+* BA1 starts;
+* hitbox remains on right side;
+* no auto-turn occurs.
+
+Do similar lightweight coverage for projectile direction if useful.
+
+⸻
+
+39. Tests: Dash facing
+
+Verify existing behavior still holds:
+
+* left Dash faces left;
+* right Dash faces right;
+* opponent position does not override Dash facing.
+
+⸻
+
+40. Tests: respawn facing
+
+Verify:
+
+* respawn uses configured spawn facing;
+* opponent’s location does not immediately flip it.
+
+⸻
+
+41. Code comments/docs
+
+Update stale comments that say:
+
+* ready cooldowns remain visible;
+* stamina bar is persistent;
+* fighters automatically face opponent.
+
+Document:
+
+* cooldown UI appears only while cooling;
+* stamina UI appears only below full;
+* exhausted refill is gray until fully restored;
+* fighters retain facing until their own directional action changes it.
+
+Keep documentation edits narrowly scoped.
+
+⸻
+
+42. Preserve existing systems
+
+Do not change:
+
+* 3-point scoring;
+* score dots;
+* 2-second respawn;
+* Practice default CPU;
+* Practice CPU info card;
+* Knockback accumulation;
+* damage tuning;
+* Void behavior;
+* Dash timing/speed;
+* stamina costs;
+* stamina regen rates;
+* CAB cooldown durations;
+* Charge cooldown acceleration;
+* Charge stamina acceleration;
+* stage layouts;
+* camera framing.
+
+⸻
+
+43. Acceptance criteria
+
+This corrective pass is complete when:
+
+CAB cooldown indicators
+
+* ready abilities show nothing;
+* only cooling abilities appear;
+* indicator disappears immediately when cooldown completes;
+* CAB1 and CAB2 remain independent;
+* indicators stay under actual fighter.
+
+Stamina bar
+
+* full resource = no bar;
+* spending resource makes bar appear;
+* ordinary partial refill = purple;
+* zero stamina = exhausted;
+* exhausted bar = gray;
+* gray remains through partial refill;
+* stamina-dependent actions locked throughout exhaustion;
+* only full refill clears exhaustion;
+* full refill causes bar to disappear.
+
+Facing
+
+* fighters no longer automatically face opponents;
+* idle fighter preserves last facing;
+* movement changes facing;
+* Dash changes facing;
+* attacks use current facing;
+* projectiles use current facing;
+* respawn uses configured spawn facing;
+* HUD portraits still independently face the timer.
+
+Quality
+
+* no duplicate/hidden cooldown placeholders;
+* no permanent stamina bar;
+* no automatic target tracking remains in fighter facing;
+* existing tests pass;
+* add focused regression tests for these changes.
+
+⸻
+
+44. Strict scope
 
 Implement only:
 
-* 3-point elimination scoring;
-* 3 score dots;
-* 2-second respawn;
-* centered/inward-facing fighter HUD cards;
-* default Practice CPU;
-* Practice CPU HUD;
-* relocation/restyle/rename of CAB cooldown indicators;
-* #0001 Dash using new actual sprite frames;
-* double-tap Dash input;
-* purple stamina bar;
-* stamina spending for Dash/Dodge/Block;
-* stamina passive/Charge regeneration;
-* gray full-refill exhaustion lockout;
-* directly affected tests/docs.
+* cooldown indicators visible only during active cooldown;
+* stamina bar visible only while below full;
+* gray exhausted refill until full;
+* retain current full-refill lockout;
+* remove automatic fighter-to-opponent facing;
+* directly affected tests/comments.
 
 Do not expand beyond this scope.
