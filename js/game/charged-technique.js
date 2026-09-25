@@ -4,7 +4,7 @@
 // a summon, a detached temporary entity (js/game/clone.js), or a technique:
 // a multi-phase move the real fighter performs, driven by this runtime. The
 // Fighter starts one (Fighter.tryTechnique), advances it every fixed step,
-// moves its body and ends it; the CombatSystem resolves its two hits. It is
+// moves its body and ends it; the CombatSystem resolves its hits. It is
 // not an attack (no combat.attack), a projectile or a summon. Behaviour is
 // data on the character (`chargedTechniques`), e.g. #0001's Sphere Rush:
 //
@@ -15,11 +15,12 @@
 //       whiffReleaseAnimation: 'rasenWhiffRelease',
 //       sphereBuild: 'rasenSphereBuild', sphereImpact: 'rasenSphereImpact',
 //       sphereExplosion: 'rasenSphereExplosion',
-//       energyCost: 0, dashSpeed: 1050,
+//       cooldown: 5, dashSpeed: 1050,
 //       handOffsets: { rasenForm: [{ x, y }, ...], rasenDash: [...] },
 //       sphereHitbox: { x: -24, y: -24, w: 48, h: 48 }, targetOffset: { x: 0, y: -48 },
 //       explosionDelay: 2.0, sphereGrowth: { startScale: 1, endScale: 1.4 },
-//       firstHit: { damage: 4, ... }, explosionHit: { damage: 16, ... },
+//       firstHit: { damage: 0, ... }, tickInterval: 0.5, tickHit: { damage: 1, ... },
+//       explosionHit: { damage: 15, ... },
 //     },
 //   },
 //
@@ -48,6 +49,11 @@
 //                 keeps spinning and grows (sphereGrowth: startScale to
 //                 endScale, reached as it explodes), until explosionDelay has
 //                 passed since the hit.
+//                 Through confirm and wait, every whole tickInterval since
+//                 the hit (while the target is still bound) is one tickHit
+//                 on it: Knockback only, no launch. A tick that would fall on
+//                 the explosion's step is not dealt: the explosion is the
+//                 last hit, never a tick as well.
 //   explode       the fighter shows explosionAnimation while sphereExplosion
 //                 plays once at the grown size. On its first frame the target
 //                 is released, then takes explosionHit. Lasts the longer of
@@ -57,12 +63,12 @@
 //                 search.
 //   done          the fighter is free again.
 //
-// A blocked contact deals the block and ends the technique (no bind, no
-// explosion), as does a first hit that knocks the target out. The fighter
-// must stay grounded from the first form frame until the technique is over:
-// losing the ground ends it at once, releasing the target, and the fighter
-// falls (see Fighter.update). A hit on the fighter ends it too (see
-// CombatSystem.applyHit): no armour, no invulnerability.
+// A blocked contact deals the block and ends the technique (no bind, ticks
+// or explosion). The fighter must stay grounded from the first form frame
+// until the technique is over: losing the ground ends it at once, releasing
+// the target, and the fighter falls (see Fighter.update). A hit on the
+// fighter ends it too (see CombatSystem.applyHit): no armour, no
+// invulnerability.
 //
 // Clocks follow the fighter's SpriteAnimator: a phase entered during the
 // fighter's own update counts that step (its first frame shows at `time` =
@@ -89,7 +95,9 @@ const TECHNIQUE_DEFAULTS = {
   sphereBuild: null,
   sphereImpact: null,
   sphereExplosion: null,
-  energyCost: 0,
+  // Seconds before the technique can be used again, from its start (see
+  // Fighter.tryTechnique): spent whether it hits or not.
+  cooldown: 0,
   dashSpeed: 0,
   // Sphere centre from the fighter's origin (bottom-centre), facing right,
   // one entry per frame of each fighter clip the sphere is held through;
@@ -103,6 +111,10 @@ const TECHNIQUE_DEFAULTS = {
   // it explodes; the blast keeps endScale. Visual only.
   sphereGrowth: { startScale: 1, endScale: 1 },
   firstHit: null,
+  // Optional: one tickHit every tickInterval seconds while the target is
+  // held, before the explosion.
+  tickInterval: 0.5,
+  tickHit: null,
   explosionHit: null,
 };
 
@@ -121,6 +133,7 @@ export function createTechniqueDefinition(spec) {
   const def = { ...TECHNIQUE_DEFAULTS, ...spec };
   def.sphereGrowth = Object.freeze({ ...TECHNIQUE_DEFAULTS.sphereGrowth, ...spec.sphereGrowth });
   def.firstHit = createHit(`${spec.id}.firstHit`, spec.firstHit);
+  def.tickHit = createHit(`${spec.id}.tickHit`, spec.tickHit);
   def.explosionHit = createHit(`${spec.id}.explosionHit`, spec.explosionHit);
   return Object.freeze(def);
 }
@@ -142,6 +155,7 @@ export function techniqueProblem(owner, def) {
   if (!(def.dashSpeed > 0)) return 'its dashSpeed is not a positive speed';
   if (!def.firstHit || !def.explosionHit) return 'it needs both a firstHit and an explosionHit';
   if (!(def.explosionDelay >= 0)) return 'its explosionDelay is not a delay';
+  if (def.tickHit && !(def.tickInterval > 0)) return 'its tickInterval is not a positive interval';
   const { startScale, endScale } = def.sphereGrowth;
   if (!(startScale > 0 && endScale >= startScale)) return 'its sphereGrowth shrinks or does not start above 0';
   return null;
@@ -168,9 +182,11 @@ export class ChargedTechnique {
     this.target = null;
     this.phase = 'form';
     this.time = 0;        // seconds into the current phase (see update)
-    this.sinceHit = 0;    // seconds since the first hit's step
+    this.sinceHit = 0;    // seconds since the contact's step
     this.hitConfirmed = false;
     this.firstHitDone = false;
+    this.ticks = 0;     // ticks reached so far while holding the target
+    this.ticksDue = 0;  // of those, the ones waiting for the CombatSystem
     this.explosionDue = false; // the explosion hit, waiting for the CombatSystem
     this.explosionDone = false;
     this.whiffReason = null; // why a rush that caught nobody ends ('miss' | 'wall')
@@ -194,9 +210,9 @@ export class ChargedTechnique {
   }
 
   // Advances one fixed step of the fighter's update. Returns why the
-  // technique ended this step ('miss' | 'wall' | 'done' | 'ko' |
-  // 'released'), or null while it goes on. Ground and walls are checked
-  // after the fighter moves (see Fighter.update).
+  // technique ended this step ('miss' | 'wall' | 'done' | 'released'), or
+  // null while it goes on. Ground and walls are checked after the fighter
+  // moves (see Fighter.update).
   update(dt) {
     // A pass completed on an earlier step ends its phase first...
     if (this.phase === 'form' && this.time >= this.formDuration - TIME_EPSILON) {
@@ -218,21 +234,47 @@ export class ChargedTechnique {
     if (!this.hitConfirmed) return null;
     this.sinceHit += dt;
     if (this.phase === 'confirm' || this.phase === 'wait') {
-      // The bind holds only while the target does: knocked out by something
-      // else, or its bind lost (a reset), there is nothing left to explode.
-      if (this.target.combat.health <= 0) return 'ko';
+      // The bind holds only while the target does: its bind lost (a reset),
+      // there is nothing left to tick or explode.
       if (!this.target.combat.isBoundBy(this)) return 'released';
       if (this.sinceHit >= this.def.explosionDelay - TIME_EPSILON) {
         // Exactly explosionDelay after the hit step: the blast's first frame
         // shows now, and the CombatSystem applies its hit this same step.
+        // No tick is due on this step: the explosion is the only hit.
         this.phase = 'explode';
         this.time = 0;
         this.explosionDue = true;
-      } else if (this.phase === 'confirm' && this.sinceHit >= this.confirmDuration - TIME_EPSILON) {
-        this.phase = 'wait';
+      } else {
+        this.queueTicks();
+        if (this.phase === 'confirm' && this.sinceHit >= this.confirmDuration - TIME_EPSILON) this.phase = 'wait';
       }
     }
     return null;
+  }
+
+  // One tick for every whole tickInterval since the hit not counted yet,
+  // for the CombatSystem to deal this step (see takeTick). Counted from the
+  // fixed-step clock, never from animation frames.
+  queueTicks() {
+    if (!this.def.tickHit) return;
+    const reached = Math.floor((this.sinceHit + TIME_EPSILON) / this.def.tickInterval);
+    if (reached <= this.ticks) return;
+    this.ticksDue += reached - this.ticks;
+    this.ticks = reached;
+  }
+
+  // Takes one tick due this step: the target, for the CombatSystem to hit
+  // with tickHit, or null when none is due. Only while the target is still
+  // held by this technique: a released or lost target takes none.
+  takeTick() {
+    if (this.ticksDue <= 0) return null;
+    const target = this.target;
+    if (!target || !target.combat.isBoundBy(this)) {
+      this.ticksDue = 0;
+      return null;
+    }
+    this.ticksDue--;
+    return target;
   }
 
   // The rush is over and caught nobody: its pass ran out ('miss') or a wall
@@ -362,14 +404,13 @@ export class ChargedTechnique {
 
   // The sphere met `target` and firstHit has been applied (see
   // CombatSystem.update). Returns why this contact ends the technique
-  // ('blocked' | 'ko'), or null when it confirms: the target is bound and
+  // ('blocked'), or null when it confirms: the target is bound and
   // stopped, the sphere moves onto it and the fighter stops its rush. The
   // search is over either way.
   contact(target, blocked) {
     this.firstHitDone = true;
     this.owner.body.vx = 0;
     if (blocked) return 'blocked';
-    if (target.combat.health <= 0) return 'ko';
     this.target = target;
     this.hitConfirmed = true;
     this.phase = 'confirm';
@@ -395,7 +436,7 @@ export class ChargedTechnique {
     this.explosionDone = true;
     const target = this.target;
     this.releaseTarget();
-    return target && target.combat.health > 0 ? target : null;
+    return target;
   }
 
   releaseTarget() {
@@ -409,6 +450,7 @@ export class ChargedTechnique {
     this.phase = 'done';
     this.endReason = reason;
     this.explosionDue = false;
+    this.ticksDue = 0;
     this.target = null;
     this.owner = null;
   }

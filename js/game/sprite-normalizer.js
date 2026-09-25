@@ -330,12 +330,14 @@ export class SpriteSet {
     return { anim: first, hold: null };
   }
 
-  // Square portrait canvas cropped around the head (1 px per art pixel).
+  // Square portrait canvas cropped around the head (1 px per art pixel), or
+  // null without a decoded frame to crop.
   makePortrait() {
     const cfg = this.def.visual.portrait || {};
     const anim = this.animations[cfg.animation] || this.animations.idle || Object.values(this.animations)[0];
     if (!anim) return null;
     const f = anim.frames[Math.min(cfg.frame || 0, anim.frames.length - 1)];
+    if (!f?.canvas) return null;
     const size = Math.round(f.artH * (cfg.size ?? 0.5));
     const cx = f.headArtX;
     const cy = f.artH * (cfg.centerY ?? 0.25);

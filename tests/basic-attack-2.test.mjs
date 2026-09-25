@@ -12,7 +12,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { COMBAT_ACTIONS } from '../js/game/character.js';
 import { worldBox, CombatSystem, createAttackDefinition } from '../js/game/combat.js';
-import { KNOCKBACK_LEVELS } from '../js/data/knockback.js';
+import { KNOCKBACK_LEVELS, knockbackMultiplier } from '../js/data/knockback.js';
 import { ACTIONS, CONFIG } from '../js/config.js';
 import {
   def, DT, SIM_CTX, fakeSprites, makeFighter, frameName, stepUntil,
@@ -32,6 +32,10 @@ const CONTACT = { ba2: [4, 5], midairBa2: [3] };
 // BA2's downward speed (the same level, reversed).
 const LAUNCH = 800;
 const SPIKE = 800;
+// Either BA2 adds 10 Knockback, and the hit launches at the multiplier for
+// that new total: from 0, the base speed x 1.1.
+const LAUNCHED = LAUNCH * knockbackMultiplier(10);
+const SPIKED = SPIKE * knockbackMultiplier(10);
 // Each BA2's declared Knockback and its resolved numbers.
 const KNOCKBACK = {
   ba2: { axis: 'vertical', level: 'high' },
@@ -47,12 +51,12 @@ const RESOLVED = {
 // kick's own timing, hitbox and combat values.
 const ENTRIES = {
   ba2: {
-    animation: 'ba2', startup: 3 / 12, active: 2 / 12, recovery: 2 / 12, damage: 8,
+    animation: 'ba2', startup: 3 / 12, active: 2 / 12, recovery: 2 / 12, damage: 10,
     hitbox: { x: 10, y: -88, w: 24, h: 78 }, knockback: KNOCKBACK.ba2,
     hitstun: 0.24, blockstun: 0.15, hitstop: 0.07, cooldown: 0.15, groundOnly: true,
   },
   midairBa2: {
-    animation: 'midairBa2', startup: 2 / 12, active: 1 / 12, recovery: 2 / 12, damage: 6,
+    animation: 'midairBa2', startup: 2 / 12, active: 1 / 12, recovery: 2 / 12, damage: 10,
     hitbox: { x: 8, y: -44, w: 40, h: 40 }, knockback: KNOCKBACK.midairBa2,
     hitstun: 0.22, blockstun: 0.14, hitstop: 0.06, cooldown: 0.1,
   },
@@ -155,7 +159,7 @@ test('BA2 attack definitions match their clips: the ground spinning kick launchi
   assert.equal(def.animations.ba2.frames.length, 7);
   assert.deepEqual([g.startup, g.active, g.recovery], [3 / 12, 2 / 12, 2 / 12]);
   assert.equal(g.groundOnly, true);
-  assert.equal(g.damage, 8);
+  assert.equal(g.damage, 10, 'adds 10 Knockback');
   assert.deepEqual([g.hitstun, g.blockstun, g.hitstop, g.cooldown], [0.24, 0.15, 0.07, 0.15]);
   assert.ok(g.total > ba1.total, 'slower than ground BA1');
   assert.ok(g.damage > ba1.damage && g.hitstun > ba1.hitstun, 'heavier than ground BA1');
@@ -169,7 +173,7 @@ test('BA2 attack definitions match their clips: the ground spinning kick launchi
   assert.equal(def.animations.midairBa2.frames.length, 5);
   assert.deepEqual([a.startup, a.active, a.recovery], [2 / 12, 1 / 12, 2 / 12]);
   assert.equal(a.groundOnly, false);
-  assert.equal(a.damage, 6);
+  assert.equal(a.damage, 10, 'adds 10 Knockback');
   assert.deepEqual([a.hitstun, a.blockstun, a.hitstop, a.cooldown], [0.22, 0.14, 0.06, 0.1]);
   assert.ok(a.hitbox.x + a.hitbox.w <= 60, 'midairBa2 hitbox is within reach');
   assert.ok(a.hitbox.w <= def.collider.width + 10 && a.hitbox.h <= def.collider.height / 2, 'midairBa2 hitbox is not oversized');
@@ -434,7 +438,7 @@ test('ground BA2 hits an opponent in front once, during the active phase, with i
       assert.equal(target.combat.hitstop, 0.07);
       assert.equal(attacker.combat.hitstop, 0.07);
       assert.ok(isZero(target.body.vx), 'no sideways push');
-      assert.equal(target.body.vy, -LAUNCH, 'launched upward');
+      assert.equal(target.body.vy, -LAUNCHED, 'launched upward');
       assert.equal(target.grounded, false);
     }
     // Keep the target overlapping: one attack still hits only once.
@@ -443,8 +447,8 @@ test('ground BA2 hits an opponent in front once, during the active phase, with i
   assert.equal(events.length, 1, 'one hit per attack');
   assert.equal(events[0].type, 'hit');
   assert.equal(events[0].attacker, attacker);
-  assert.equal(events[0].damage, 8);
-  assert.equal(target.combat.health, 92);
+  assert.equal(events[0].damage, 10);
+  assert.equal(target.combat.knockback, 10);
   assert.equal(hitPhase, 'active');
   assert.ok(CONTACT.ba2.includes(hitFrame), `hit on frame ${hitFrame}`);
 });
@@ -461,7 +465,7 @@ test('a normal BA2 hit launches a grounded target straight up through the shared
     while (!events.length) tick();
     // At impact, before any gravity: vx 0, vy -640, off the ground.
     assert.ok(isZero(target.body.vx), `facing ${facing}: no sideways push`);
-    assert.equal(target.body.vy, -LAUNCH);
+    assert.equal(target.body.vy, -LAUNCHED);
     assert.equal(target.grounded, false);
     // Through the one shared applyHit, with BA2's own resolved definition.
     assert.equal(applyHit.mock.callCount(), 1);
@@ -534,7 +538,7 @@ function midairBa2Duel({ attackerFacing = 1, gap = 44 } = {}) {
   return d;
 }
 
-test('a mid-air BA2 hit drives a grounded target downward with no sideways push: vx 0, vy +800', () => {
+test('a mid-air BA2 hit drives a grounded target downward with no sideways push: vx 0, vy +800 scaled by its 10 Knockback', () => {
   for (const facing of [1, -1]) {
     const { attacker, target, tick, events } = midairBa2Duel({ attackerFacing: facing });
     const floor = target.body.y;
@@ -542,11 +546,11 @@ test('a mid-air BA2 hit drives a grounded target downward with no sideways push:
     while (!events.length) tick();
     assert.equal(events[0].type, 'hit');
     assert.equal(events[0].target, target);
-    assert.equal(target.combat.health, 94, 'the kick\'s own damage');
+    assert.equal(target.combat.knockback, 10, 'the kick\'s own damage');
     assert.equal(attacker.facing, facing);
     // At impact, before the target's next step: CombatSystem.applyHit set it.
     assert.ok(isZero(target.body.vx), 'no horizontal knockback');
-    assert.equal(target.body.vy, SPIKE, 'positive body vy: downward, not a launch');
+    assert.equal(target.body.vy, SPIKED, 'positive body vy: downward, not a launch');
     // Knocked into the floor it stands on: it never rises, and settles back
     // on the ground.
     while (target.combat.stun > 0 || target.combat.hitstop > 0) {
@@ -594,7 +598,7 @@ test('a mid-air BA2 hit on a rising target reverses it: driven downward instead 
   const impact = kicked.log[at];
   assert.equal(impact.grounded, false, 'hit in the air');
   assert.ok(impact.before.vy < 0, 'rising until the kick');
-  assert.equal(impact.vy, SPIKE, 'positive body vy: driven downward');
+  assert.equal(impact.vy, SPIKED, 'positive body vy: driven downward');
   assert.ok(isZero(impact.vx), 'and never pushed sideways');
   // Without the kick the target carries on up; with it, from the hit to
   // touchdown it only ever moves down (or holds, frozen by the impact's
@@ -635,7 +639,7 @@ test('a Block-type fighter guarding BA2 takes chip damage, blockstun and hitstop
   while (!events.length) tick({}, { defense: true });
   assert.equal(events.length, 1);
   assert.equal(events[0].type, 'block');
-  assert.ok(Math.abs(target.combat.health - (100 - 8 * 0.15)) < 1e-9, 'chip damage');
+  assert.ok(Math.abs(target.combat.knockback - 10 * 0.15) < 1e-9, 'chip damage, added to Knockback');
   assert.equal(target.combat.stun, attacker.attacks.ba2.blockstun, 'blockstun');
   assert.equal(target.combat.hitstop, attacker.attacks.ba2.hitstop, 'hitstop');
   // A blocked hit never launches, and BA2 has no sideways push to halve.
@@ -674,8 +678,8 @@ test('mid-air BA2 hits a grounded opponent in front while still airborne', () =>
   }
   assert.equal(events.length, 1);
   assert.equal(airborneAtHit, true);
-  assert.equal(events[0].damage, 6);
-  assert.equal(target.combat.health, 94);
+  assert.equal(events[0].damage, 10);
+  assert.equal(target.combat.knockback, 10);
 });
 
 test('mid-air BA2 hits an airborne opponent at the same height, showing its mid-air hurt pose', () => {
@@ -690,7 +694,7 @@ test('mid-air BA2 hits an airborne opponent at the same height, showing its mid-
   tick();
   assert.equal(target.state, 'hitstun');
   assert.equal(frameName(target), '0001_midairhurt.png');
-  assert.equal(target.combat.health, 94);
+  assert.equal(target.combat.knockback, 10);
 });
 
 test('BA2 hitboxes mirror with facing', () => {
@@ -710,7 +714,7 @@ test('BA2 hitboxes mirror with facing', () => {
   tick(BA2);
   while (!events.length) tick();
   assert.equal(events.length, 1, 'hits the opponent on the left');
-  assert.equal(target.body.vy, -LAUNCH, 'launched upward');
+  assert.equal(target.body.vy, -LAUNCHED, 'launched upward');
   assert.ok(isZero(target.body.vx), 'not pushed either way');
   while (attacker.combat.attack) tick();
   assert.equal(target.body.x, startX);
@@ -731,7 +735,7 @@ test('BA2 misses an opponent out of reach or behind the attacker', () => {
       assert.equal(attacker.combat.attack?.def.id, air ? 'midairBa2' : 'ba2');
       while (attacker.combat.attack) tick();
       assert.equal(events.length, 0, `gap ${gap}${air ? ' in the air' : ''}`);
-      assert.equal(target.combat.health, 100);
+      assert.equal(target.combat.knockback, 0);
     }
   }
 });
@@ -751,7 +755,7 @@ test('BA2 whose frames failed to load is refused, not faked, and never hits', (t
     assert.equal(attacker.combat.phase, null, 'no hitbox');
   }
   assert.equal(events.length, 0);
-  assert.equal(target.combat.health, 100);
+  assert.equal(target.combat.knockback, 0);
 
   // In the air, too.
   tick(JUMP);
@@ -837,9 +841,9 @@ test('Quick Battle: a BA2 hit launches the training CPU straight up through the 
   assert.ok(hit, 'BA2 connected');
   assert.equal(hit.attacker, p1);
   assert.equal(hit.target, p2);
-  assert.equal(p2.combat.health, 92);
+  assert.equal(p2.combat.knockback, 10);
   assert.ok(isZero(p2.body.vx), 'no sideways push');
-  assert.equal(p2.body.vy, -LAUNCH);
+  assert.equal(p2.body.vy, -LAUNCHED);
   assert.equal(p2.grounded, false);
   let top = groundY;
   for (let i = 0; i < 120 && !(p2.grounded && i > 0); i++) {
@@ -851,4 +855,25 @@ test('Quick Battle: a BA2 hit launches the training CPU straight up through the 
   assert.equal(p2.body.y, groundY);
   assert.equal(p2.body.x, startX, 'straight up and down');
   battle.destroy();
+});
+
+test('damage accumulates as Knockback: BA1 -> BA1 -> BA2 on a fresh target is 5 + 5 + 10 = 20, each hit launching a little harder', () => {
+  const { attacker, target, tick, until, events } = duel();
+  const multipliers = [];
+  for (const [press, total] of [[{ action1: true, action1Pressed: true }, 5], [{ action1: true, action1Pressed: true }, 10], [BA2, 20]]) {
+    // Back in reach and settled for each hit: this is about the numbers.
+    until(() => !attacker.combat.attack && !attacker.combat.cooldowns.size && target.combat.stun <= 0 && target.grounded && target.combat.hitstop <= 0);
+    target.body.x = attacker.body.x + 44;
+    target.body.vx = 0;
+    const before = events.length;
+    tick(press);
+    until(() => events.length > before);
+    const e = events.at(-1);
+    assert.equal(e.knockbackAfter, total);
+    assert.equal(target.combat.knockback, total);
+    multipliers.push(e.launchMultiplier);
+  }
+  assert.deepEqual(events.map((e) => e.damage), [5, 5, 10]);
+  assert.deepEqual(multipliers, [knockbackMultiplier(5), knockbackMultiplier(10), knockbackMultiplier(20)]);
+  assert.equal(attacker.combat.knockback, 0);
 });

@@ -1,8 +1,8 @@
 // PRACTICE GROUND — Alva's minimalist combat laboratory: a pale, cool-gray
 // simulation room built from one square grid. A gridded back wall and one
 // compact training block in one-point perspective give it depth; the block
-// has open edges, with nothing past them but the back wall and, far below,
-// the Void. No scenery, particles, hazards or moving parts. Original Canvas
+// has open edges, with nothing past them but the back wall and, a short way
+// below, the Void. No scenery, particles, hazards or moving parts. Original Canvas
 // artwork.
 //
 // The room is seen head-on through the shared projection

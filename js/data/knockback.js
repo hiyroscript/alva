@@ -19,6 +19,14 @@
 // resolveKnockback, once, into the numeric `knockback: { x, y }` that
 // CombatSystem.applyHit reads; the Discover screen reads the same names and
 // descriptions (never the values).
+//
+// That numeric vector is the move's base launch. Every fighter also carries
+// an accumulated Knockback number (CombatState.knockback), starting at 0 and
+// raised by each hit's damage. CombatSystem.applyHit adds a hit's damage
+// first, then scales the base launch by knockbackMultiplier() of the new
+// total (scaleKnockback), so the same attack sends a fighter further the
+// more Knockback it has taken. Direction never changes, and a move with no
+// base launch still has none.
 
 // ---- Levels ------------------------------------------------------------------
 
@@ -38,6 +46,27 @@ export const KNOCKBACK_AXES = Object.freeze(['horizontal', 'vertical']);
 // a level.
 export function getKnockbackLevel(id) {
   return typeof id === 'string' && Object.hasOwn(KNOCKBACK_LEVELS, id) ? KNOCKBACK_LEVELS[id] : null;
+}
+
+// ---- Accumulated Knockback ---------------------------------------------------------
+
+// How accumulated Knockback scales a move's base launch: `perPoint` more
+// launch per point of Knockback, so 0 Knockback launches at 1x, 50 at 1.5x
+// and 100 at 2x. No maximum.
+export const KNOCKBACK_SCALING = Object.freeze({ perPoint: 1 / 100 });
+
+// Launch multiplier for a fighter with `accumulated` Knockback: 1 at 0, and
+// growing steadily (linearly) with no cap. Knockback never goes below 0.
+export function knockbackMultiplier(accumulated) {
+  return 1 + Math.max(0, accumulated) * KNOCKBACK_SCALING.perPoint;
+}
+
+// A move's base launch `{ x, y }` scaled for a target with `accumulated`
+// Knockback: both axes by the same multiplier, so direction (including a
+// downward `y`) is kept, and a zero axis stays zero.
+export function scaleKnockback(base, accumulated) {
+  const m = knockbackMultiplier(accumulated);
+  return { x: base.x * m, y: base.y * m };
 }
 
 // ---- Reference copy --------------------------------------------------------------

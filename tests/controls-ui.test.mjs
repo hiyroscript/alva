@@ -389,15 +389,15 @@ test('the mobile diagram shows C for Charge between Left and Right', () => {
   assert.doesNotMatch(legend, /Down/);
 });
 
-test('help explains that Charge is held, loops while held, and that Energy starts full', () => {
+test('help explains that Charge is held, loops while held, and speeds up the charged cooldowns; no Health or Energy', () => {
   const help = buildHelp();
   const items = help.querySelectorAll('li').map((li) => li.textContent).join(' ');
   assert.match(items, /Hold Charge \(S \/ ↓, or C on touch\) while grounded/);
   assert.match(items, /Charge must be held: release it to stop charging/);
   assert.match(items, /two-frame startup once, then loops its sustained pose/);
-  assert.match(items, /blue Energy meter .* begins full/);
-  assert.doesNotMatch(items, /restores Energy\b(?! yet)/);
-  assert.doesNotMatch(items, /Charge (generates|builds|fills|restores)/i, 'Charge never gives Energy');
+  assert.match(items, /own 5-second cooldown/);
+  assert.match(items, /Charging makes both cooldowns recover twice as fast/);
+  assert.doesNotMatch(help.textContent, /Energy|health/i, 'no Health or Energy anywhere in Help');
   const notes = help.querySelectorAll('.info-note').map((p) => p.textContent).join(' ');
   assert.match(notes, /down to Charge/);
   assert.match(notes, /C is Charge: hold it to charge/);
@@ -405,17 +405,16 @@ test('help explains that Charge is held, loops while held, and that Energy start
   assert.match(build, /held Charge stance/);
 });
 
-test('help explains the Charged BA1 Clone Attack in the Charge & Energy card, with no new control row', () => {
+test('help explains the Charged BA1 Clone Attack in the Charge & cooldowns card, with no new control row', () => {
   const help = buildHelp();
-  const card = help.querySelectorAll('.info-card').find((c) => /Charge & Energy/.test(c.textContent));
+  const card = help.querySelectorAll('.info-card').find((c) => /Charge & cooldowns/.test(c.textContent));
   const items = card.querySelectorAll('li').map((li) => li.textContent).join(' ');
-  assert.match(items, /Hold Charge first, then press BA1 to spend 25 Energy and summon a clone behind the opponent/);
+  assert.match(items, /Hold Charge first, then press BA1 to summon a clone behind the opponent/);
   assert.match(items, /The clone appears .*, performs BA1 and disappears/);
   assert.match(items, /keeps charging for as long as you hold Charge/);
-  assert.match(items, /less than 25 Energy, BA1 works normally/);
   assert.match(items, /Letting go of Charge as you press BA1 gives a normal BA1/);
-  assert.match(items, /Only the Clone Attack spends it, and nothing restores Energy yet/);
-  assert.doesNotMatch(items, /nothing spends/i);
+  assert.match(items, /It starts the moment the move is used, hit or miss/);
+  assert.match(items, /While it is cooling down, the charged press does nothing/);
   // The combo uses the existing Charge and BA1 controls.
   const rows = help.querySelectorAll('tr').map((tr) => tr.textContent);
   assert.ok(!rows.some((r) => /clone/i.test(r)), 'no control row for it');

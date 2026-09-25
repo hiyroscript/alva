@@ -59,6 +59,12 @@
 //   // and each attack's blockstun instead of a full hit.
 //   defense: { type: 'block' }
 //
+// A hit's `damage` (a blocked hit's chip damage) is how much it adds to the
+// target's accumulated Knockback (CombatState.knockback); the hit's base
+// launch is then scaled by that new total (see knockbackMultiplier in
+// js/data/knockback.js). No amount of Knockback defeats a fighter: only the
+// Void takes one out of play.
+//
 // A Dodge is not an attack: no hitbox, damage, cooldown or combat event.
 //
 // A summon (see js/game/clone.js) is a detached attacker: a temporary clone
@@ -67,13 +73,19 @@
 // a projectile's, they never freeze the owner.
 //
 // A charged technique (see js/game/charged-technique.js) is performed by the
-// fighter itself but is not an attack either: its sphere's contact and its
-// delayed explosion are its two hits, resolved here through applyHit with
-// their own data. They freeze only the target. A confirmed contact binds the
-// target (CombatState.bind): a hold on it, separate from hitstun, that only
-// the technique which placed it releases.
+// fighter itself but is not an attack either: its sphere's contact, the
+// ticks while it holds the target and its delayed explosion are its hits,
+// resolved here through applyHit with their own data. They freeze only the
+// target. A confirmed contact binds the target (CombatState.bind): a hold on
+// it, separate from hitstun, that only the technique which placed it
+// releases.
+//
+// Charged actions (a summon or a technique) are not paid for: each has its
+// own cooldown (CombatState.chargedCooldowns, see CooldownTimers), started
+// when it is used and apart from the short recovery cooldowns of ordinary
+// attacks (CombatState.cooldowns).
 
-import { resolveKnockback } from '../data/knockback.js';
+import { resolveKnockback, knockbackMultiplier } from '../data/knockback.js';
 
 const ATTACK_DEFAULTS = {
   animation: null,
@@ -136,18 +148,71 @@ export function createDefenseDefinition(spec) {
   throw new Error(`[Alva] Unknown defense type "${spec.type}"`);
 }
 
+// Named cooldowns that each remember their full length, so progress can be
+// read back (1 - remaining / duration) without knowing where they came from.
+// Used for charged actions' cooldowns (CombatState.chargedCooldowns).
+export class CooldownTimers {
+  constructor() {
+    this.entries = new Map(); // id -> { remaining, duration } in seconds
+  }
+
+  // Starts (or restarts) `id` at `seconds`. A cooldown of 0 is no cooldown.
+  start(id, seconds) {
+    if (seconds > 0) this.entries.set(id, { remaining: seconds, duration: seconds });
+    else this.entries.delete(id);
+  }
+
+  // Whether `id` is still cooling down.
+  active(id) {
+    return this.entries.has(id);
+  }
+
+  // Seconds left on `id`, 0 when it is ready.
+  remaining(id) {
+    return this.entries.get(id)?.remaining ?? 0;
+  }
+
+  // Full length of `id`'s current cooldown, 0 when it is ready.
+  duration(id) {
+    return this.entries.get(id)?.duration ?? 0;
+  }
+
+  // How far `id` has recovered, from 0 as it starts to 1 once it is ready.
+  progress(id) {
+    const e = this.entries.get(id);
+    if (!e) return 1;
+    return Math.min(1, Math.max(0, 1 - e.remaining / e.duration));
+  }
+
+  // Every cooldown recovers `dt * rate` seconds; one that reaches 0 (to
+  // within a little slack, as the steps are sums of floats) is over. Never
+  // negative.
+  update(dt, rate = 1) {
+    const amount = dt * rate;
+    for (const [id, e] of this.entries) {
+      if (e.remaining - amount <= PHASE_EPSILON) this.entries.delete(id);
+      else e.remaining -= amount;
+    }
+  }
+
+  clear() {
+    this.entries.clear();
+  }
+
+  get size() {
+    return this.entries.size;
+  }
+}
+
 // Per-fighter combat state.
 export class CombatState {
-  constructor(stats) {
-    this.maxHealth = stats.health;
-    this.health = stats.health;
-    // Energy resource shown under the health bar. Starts full, and a reset
-    // (new CombatState) refills it. Only spendEnergy() lowers it: #0001's
-    // Charged BA1 Clone Attack costs 25. No Energy regeneration or gain
-    // exists yet.
-    this.maxEnergy = stats.energy ?? 100;
-    this.energy = this.maxEnergy;
-    // Block-type Defense only: the held guard and its chip-damage scale.
+  constructor(stats = {}) {
+    // Accumulated Knockback: starts at 0 and only ever grows, by each hit's
+    // damage (see CombatSystem.applyHit). No maximum, and it never stops the
+    // fighter acting; the higher it is, the further hits launch the fighter.
+    this.knockback = 0;
+    // Block-type Defense only: the held guard and its chip-damage scale (a
+    // blocked hit adds that share of its damage to Knockback).
     this.blockDamageScale = stats.blockDamageScale ?? 0.2;
     this.blocking = false;
     this.stun = 0;          // hitstun / blockstun remaining
@@ -155,7 +220,11 @@ export class CombatState {
     this.attack = null;     // { def, time, hasHit, projectileSpawned }
     this.release = null;    // the attack's projectile, released this step (see Fighter.update)
     this.defenseAction = null; // { type: 'dodge', def, time } while a Dodge plays
+    // Ordinary attacks' short recovery cooldowns: attack id -> seconds left.
     this.cooldowns = new Map();
+    // Charged actions' own cooldowns (Charged BA1, Charged BA2), by summon or
+    // technique id; the Fighter starts and recovers them.
+    this.chargedCooldowns = new CooldownTimers();
     this.lastIntent = null; // last combat button pressed (for future buffering/UI)
     // Whatever holds this fighter in place (a charged technique that caught
     // it), each by its own token so a source only ever releases its own hold.
@@ -204,21 +273,10 @@ export class CombatState {
     return this.binds.has(source);
   }
 
+  // Free of any attack, Dodge, stun or bind. Accumulated Knockback never
+  // matters here, however high it is.
   canAct() {
-    return !this.attack && !this.defenseAction && this.stun <= 0 && this.health > 0 && !this.immobilized;
-  }
-
-  // Whether `amount` Energy is available to spend.
-  canSpendEnergy(amount) {
-    return amount >= 0 && this.energy >= amount;
-  }
-
-  // Spends `amount` Energy, once, if there is enough: true when paid. With
-  // too little it changes nothing and returns false; it never goes below 0.
-  spendEnergy(amount) {
-    if (!this.canSpendEnergy(amount)) return false;
-    this.energy = Math.max(0, this.energy - amount);
-    return true;
+    return !this.attack && !this.defenseAction && this.stun <= 0 && !this.immobilized;
   }
 
   update(dt) {
@@ -274,9 +332,12 @@ const scratchHurt = {};
 // js/game/charged-technique.js).
 export class CombatSystem {
   constructor() {
-    // { type: 'hit' | 'block', attacker, target, damage, projectile, summon, technique }
-    // `attacker` is the owner for a projectile or clone hit; `projectile`,
-    // `summon` and `technique` are null for the fighter's own melee.
+    // { type: 'hit' | 'block', attacker, target, move, damage, knockbackBefore,
+    //   knockbackAfter, launchMultiplier, projectile, summon, technique }
+    // `damage` is what the hit added to the target's Knockback, `move` the id
+    // of the attack or hit that dealt it. `attacker` is the owner for a
+    // projectile or clone hit; `projectile`, `summon` and `technique` are
+    // null for the fighter's own melee.
     this.events = [];
   }
 
@@ -288,7 +349,7 @@ export class CombatSystem {
       if (!atk || !atk.def.hitbox || atk.hasHit || attacker.combat.phase !== 'active') continue;
       const hit = worldBox(attacker, atk.def.hitbox, scratchHit);
       for (const target of fighters) {
-        if (target === attacker || target.combat.health <= 0) continue;
+        if (target === attacker) continue;
         // Dodged: the attack passes through without being used up, so it can
         // still connect if it is active after the invulnerable frames end.
         if (target.combat.invulnerable) continue;
@@ -303,7 +364,7 @@ export class CombatSystem {
       if (!p.alive) continue;
       const hit = p.hitbox(scratchHit);
       for (const target of fighters) {
-        if (target === p.owner || target.combat.health <= 0) continue;
+        if (target === p.owner) continue;
         // Dodged: the projectile flies on, unspent, and can still connect if
         // it overlaps once the invulnerable frames end.
         if (target.combat.invulnerable) continue;
@@ -320,7 +381,7 @@ export class CombatSystem {
       const hit = c.hitbox(scratchHit);
       if (!hit) continue;
       for (const target of fighters) {
-        if (target === c.owner || target.combat.health <= 0) continue;
+        if (target === c.owner) continue;
         // Dodged: passes through unspent, exactly like the fighter's own.
         if (target.combat.invulnerable) continue;
         const struck = target.def.hurtboxes.some((hb) => intersects(hit, worldBox(target, hb, scratchHurt)));
@@ -336,6 +397,11 @@ export class CombatSystem {
     for (const owner of fighters) {
       const t = owner.technique;
       if (!t) continue;
+      // The ticks while it holds its target, one hit each: Knockback only,
+      // no launch. Never on the explosion's step (see ChargedTechnique.update).
+      for (let target = t.takeTick(); target; target = t.takeTick()) {
+        this.applyHit(owner, target, t.def.tickHit, { facing: t.facing, technique: t });
+      }
       // The delayed explosion, on the step its first frame shows: the target
       // is released first, then takes the big hit and its launch.
       if (t.explosionDue) {
@@ -347,13 +413,13 @@ export class CombatSystem {
       const hit = t.sphereHitbox(scratchHit);
       if (!hit) continue;
       for (const target of fighters) {
-        if (target === owner || target.combat.health <= 0) continue;
+        if (target === owner) continue;
         // Dodged: the rush carries on, unspent, and can still connect after
         // the invulnerable frames.
         if (target.combat.invulnerable) continue;
         const struck = target.def.hurtboxes.some((hb) => intersects(hit, worldBox(target, hb, scratchHurt)));
         if (!struck) continue;
-        // Hit 1 of 2, exactly once; the sphere stops searching after it.
+        // The contact, exactly once; the sphere stops searching after it.
         const event = this.applyHit(owner, target, t.def.firstHit, { facing: t.facing, technique: t });
         const ended = t.contact(target, event.type === 'block');
         if (ended) owner.endTechnique(ended);
@@ -370,7 +436,11 @@ export class CombatSystem {
   // `blocked` needs a Block-type guard facing into it; a Dodge never blocks,
   // so a hit outside its invulnerable frames is a full hit. A detached hit
   // (a projectile's, a clone's or a technique's) freezes only its target.
-  // Returns the event it recorded.
+  //
+  // The damage (chip damage when blocked) is added to the target's
+  // accumulated Knockback first; the move's base launch is then scaled by
+  // the multiplier for that new total, so the hit that raises it already
+  // launches harder. Returns the event it recorded.
   applyHit(attacker, target, def, {
     facing = attacker.facing, projectile = null, summon = null, technique = null,
     detached = !!(projectile || summon || technique),
@@ -380,23 +450,33 @@ export class CombatSystem {
     // Hitstun always wins: a hit cancels a Dodge in its startup or recovery.
     tc.defenseAction = null;
     const damage = blocked ? def.chipDamage || def.damage * tc.blockDamageScale : def.damage;
-    tc.health = Math.max(0, tc.health - damage);
-    tc.stun = blocked ? def.blockstun : def.hitstun;
-    tc.hitstop = def.hitstop;
+    const knockbackBefore = tc.knockback;
+    tc.knockback = knockbackBefore + damage;
+    const launchMultiplier = knockbackMultiplier(tc.knockback);
+    // A hit with no stun or freeze of its own (a charged technique's tick)
+    // leaves any already running as it is.
+    const stun = blocked ? def.blockstun : def.hitstun;
+    if (stun > 0) tc.stun = stun;
+    if (def.hitstop > 0) tc.hitstop = def.hitstop;
     if (!detached) attacker.combat.hitstop = def.hitstop;
     // ...and a charged technique: no armour. It ends at once, releasing
     // whatever it held, before the knockback below moves the fighter.
     target.endTechnique?.('hit');
-    const kx = (blocked ? 0.5 : 1) * def.knockback.x * facing;
+    // Zero base launch stays zero whatever the multiplier.
+    const kx = (blocked ? 0.5 : 1) * def.knockback.x * launchMultiplier * facing;
     target.body.vx = kx;
     // Vertical knockback, unblocked hits only: world y grows downward, so a
     // positive knockback.y launches upward and a negative one drives the
     // target down.
     if (!blocked && def.knockback.y) {
-      target.body.vy = -def.knockback.y;
+      target.body.vy = -def.knockback.y * launchMultiplier;
       target.body.grounded = false;
     }
-    const event = { type: blocked ? 'block' : 'hit', attacker, target, damage, projectile, summon, technique };
+    const event = {
+      type: blocked ? 'block' : 'hit', attacker, target, move: def.id ?? null,
+      damage, knockbackBefore, knockbackAfter: tc.knockback, launchMultiplier,
+      projectile, summon, technique,
+    };
     this.events.push(event);
     return event;
   }

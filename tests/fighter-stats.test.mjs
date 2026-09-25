@@ -1,15 +1,15 @@
 // Run with node --test tests/fighter-stats.test.mjs (no dependencies).
-// Every fighter's base stats: each definition in CHARACTERS declares 100
-// health and 100 Energy, and a Fighter built from it (player or CPU, any
-// roster slot) starts at full health and full Energy, read from its own
-// stats rather than from anything the engine hard-codes.
+// Every fighter's base combat state: accumulated Knockback starts at 0 with
+// no cooldowns, has no maximum, a reset (a new match) puts it back at 0,
+// and no amount of it ever stops a fighter acting. There is no Health or
+// Energy anywhere in a fighter's data or combat state.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { CHARACTERS } from '../js/data/characters.js';
 import { Fighter } from '../js/game/character.js';
-import { CombatState } from '../js/game/combat.js';
+import { CombatState, CombatSystem } from '../js/game/combat.js';
 import { SpriteSet } from '../js/game/sprite-normalizer.js';
-import { STAGE } from './fighter-harness.mjs';
+import { STAGE, makeFighter, duel } from './fighter-harness.mjs';
 
 // A real Fighter for `character`, with its own (art-less) sprite set.
 const build = (character, facing = 1) => new Fighter({
@@ -17,40 +17,67 @@ const build = (character, facing = 1) => new Fighter({
   controller: { getInput: () => ({}) }, spawn: { x: 500, facing },
 });
 
-test('every fighter in CHARACTERS declares exactly 100 health and 100 Energy', () => {
+test('no fighter declares Health or Energy, and no combat state carries either', () => {
   assert.ok(CHARACTERS.length > 0);
   for (const character of CHARACTERS) {
-    assert.equal(character.stats.health, 100, `${character.displayName} health`);
-    assert.equal(character.stats.energy, 100, `${character.displayName} Energy`);
-  }
-});
-
-test('every fighter starts at 100 / 100 health and 100 / 100 Energy, and a reset refills both', () => {
-  for (const character of CHARACTERS) {
-    for (const facing of [1, -1]) {
-      const fighter = build(character, facing);
-      const { combat } = fighter;
-      assert.equal(combat.maxHealth, 100, `${character.displayName} max health`);
-      assert.equal(combat.health, 100, `${character.displayName} starts at full health`);
-      assert.equal(combat.maxEnergy, 100, `${character.displayName} max Energy`);
-      assert.equal(combat.energy, 100, `${character.displayName} starts with full Energy`);
-      combat.health = 40;
-      combat.energy = 25;
-      fighter.reset(STAGE);
-      assert.deepEqual(
-        [fighter.combat.health, fighter.combat.maxHealth, fighter.combat.energy, fighter.combat.maxEnergy],
-        [100, 100, 100, 100], `${character.displayName} after a reset`,
-      );
+    for (const key of ['health', 'energy', 'maxHealth', 'maxEnergy']) {
+      assert.equal(Object.hasOwn(character.stats ?? {}, key), false, `${character.displayName} stats.${key}`);
+    }
+    const { combat } = build(character);
+    for (const key of ['health', 'maxHealth', 'energy', 'maxEnergy', 'canSpendEnergy', 'spendEnergy']) {
+      assert.equal(key in combat, false, `${character.displayName} combat.${key}`);
     }
   }
 });
 
-test('health and Energy capacity come from the character\'s own stats, not the engine', () => {
-  // The combat state reads whatever the definition declares.
-  const other = new CombatState({ health: 70, energy: 40 });
-  assert.deepEqual([other.maxHealth, other.health, other.maxEnergy, other.energy], [70, 70, 40, 40]);
+test('every new fighter starts at 0 Knockback with every cooldown ready, and a reset returns it there', () => {
   for (const character of CHARACTERS) {
-    const state = new CombatState(character.stats);
-    assert.deepEqual([state.maxHealth, state.health, state.maxEnergy, state.energy], [100, 100, 100, 100]);
+    for (const facing of [1, -1]) {
+      const fighter = build(character, facing);
+      assert.equal(fighter.combat.knockback, 0, `${character.displayName} starts at 0`);
+      assert.equal(fighter.combat.cooldowns.size, 0);
+      assert.equal(fighter.combat.chargedCooldowns.size, 0);
+      fighter.combat.knockback = 87;
+      fighter.combat.chargedCooldowns.start('ba1Clone', 5);
+      fighter.reset(STAGE);
+      assert.equal(fighter.combat.knockback, 0, `${character.displayName} after a reset`);
+      assert.equal(fighter.combat.chargedCooldowns.size, 0);
+    }
+  }
+  assert.equal(new CombatState().knockback, 0);
+});
+
+test('Knockback has no maximum: hits keep adding to it far past 100', () => {
+  const { attacker, target } = duel();
+  const system = new CombatSystem();
+  const hit = { id: 'probe', damage: 40, knockback: { x: 0, y: 0 }, hitstun: 0, blockstun: 0, hitstop: 0 };
+  for (let i = 0; i < 20; i++) system.applyHit(attacker, target, hit);
+  assert.equal(target.combat.knockback, 800);
+  target.combat.knockback = 1e6;
+  system.applyHit(attacker, target, hit);
+  assert.equal(target.combat.knockback, 1e6 + 40);
+});
+
+test('high Knockback alone never stops a fighter acting: it runs, jumps, attacks, dodges and charges at 100, 200 and 500', () => {
+  for (const value of [100, 200, 500]) {
+    const { fighter, step } = makeFighter();
+    fighter.combat.knockback = value;
+    assert.equal(fighter.canAct(), true, `can act at ${value}`);
+    assert.equal(fighter.combat.canAct(), true);
+    step({ right: true });
+    assert.ok(fighter.body.vx > 0, `runs at ${value}`);
+    for (let i = 0; i < 30; i++) step();
+    step({ action1: true, action1Pressed: true });
+    assert.equal(fighter.combat.attack?.def.id, 'ba1', `attacks at ${value}`);
+    for (let i = 0; i < 60; i++) step();
+    step({ defense: true, defensePressed: true });
+    assert.equal(fighter.state, 'defense', `dodges at ${value}`);
+    for (let i = 0; i < 60; i++) step();
+    step({ charge: true, chargePressed: true });
+    assert.equal(fighter.charging, true, `charges at ${value}`);
+    for (let i = 0; i < 10; i++) step();
+    step({ jump: true, jumpPressed: true });
+    assert.equal(fighter.grounded, false, `jumps at ${value}`);
+    assert.equal(fighter.combat.knockback, value, 'acting never changes Knockback');
   }
 });

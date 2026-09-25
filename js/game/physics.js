@@ -8,7 +8,8 @@
 // Nothing holds a body inside the stage: there are no side walls. The main
 // floor is finite (see StageCollision), so a body can run, jump or be
 // knocked past either ledge and fall; only the Void (StageCollision.inVoid),
-// far away, ends that, and the game modes decide what it means.
+// a short way past the ledges, ends that, and the game modes decide what it
+// means.
 
 const EPS = 0.5;
 

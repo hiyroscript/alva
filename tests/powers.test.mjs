@@ -37,8 +37,10 @@ const SPEEDS = [[1, 270], [2, 330], [3, 360]];
 
 // A bespoke hit (like the Sphere Rush's explosion) that pushes and launches,
 // for checking what a target's Powers do, or don't do, to its flight.
+// No damage, so it launches a fresh target (0 Knockback) at exactly its base
+// speed: whatever the target's Powers, the launch is the hit's own.
 const LAUNCH = Object.freeze({
-  damage: 5, chipDamage: 0, knockback: Object.freeze({ x: 260, y: 480 }), hitstun: 0.4, blockstun: 0.12, hitstop: 0,
+  damage: 0, chipDamage: 0, knockback: Object.freeze({ x: 260, y: 480 }), hitstun: 0.4, blockstun: 0.12, hitstop: 0,
 });
 
 // Holds `held` until horizontal speed stops changing; returns the settled vx.

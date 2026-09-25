@@ -10,20 +10,20 @@
 // moves, jumps, attacks, charges or defends of its own accord (Fighter falls
 // back to neutral input). It is otherwise a normal fighter: it takes real
 // hits, hitstun, knockback and binds, collides and faces its opponent, and
-// the camera frames it as the secondary fighter. Every hit it takes floats
-// its damage over its head (damageNumbers).
+// the camera frames it as the secondary fighter. Its Knockback builds up
+// like anyone's (and launches it further as it does), though Practice shows
+// no panel for it: every hit it takes floats the Knockback it added over its
+// head instead (damageNumbers, "+5").
 //
 // With no CPU, moves aimed at an opponent fall back or miss on their own: a
 // Charged BA1 clone has nobody to appear behind, so the press is an ordinary
-// BA1 and no Energy is spent (Fighter.trySummon); the Sphere Rush finds no
-// one to catch and ends as a miss; attacks and shurikens strike nothing.
-//
-// Infinite energy (setInfiniteEnergy) is a Practice-only rule for the
-// player's fighter: its Energy is full before and after every step, so any
-// cost can be paid while the moves themselves run as usual.
+// BA1 and its cooldown does not start (Fighter.trySummon); the Sphere Rush
+// finds no one to catch and ends as a miss (its cooldown still spent);
+// attacks and shurikens strike nothing.
 //
 // The Void never ends practice: a fighter that falls into it is put back at
-// its own spawn at once (onVoid), still with its health and Energy.
+// its own spawn at once (onVoid), fresh: 0 Knockback and every cooldown
+// ready.
 
 import { Arena } from './arena.js';
 import { Fighter } from './character.js';
@@ -41,9 +41,9 @@ const DAMAGE_FADE = 0.45;
 const DAMAGE_STACK = 0.2;
 const DAMAGE_COLOR = '#ff3434';
 
-// "-6", "-15", "-2.5": the resolved damage, negative, with no float noise.
+// "+5", "+15", "+2.5": the Knockback a hit added, with no float noise.
 export function formatDamage(damage) {
-  return `-${Number(damage.toFixed(2))}`;
+  return `+${Number(damage.toFixed(2))}`;
 }
 
 export class PracticeSession extends Arena {
@@ -52,7 +52,6 @@ export class PracticeSession extends Arena {
     this.reducedMotion = reducedMotion;
     this.player = null;
     this.cpu = null;
-    this.infiniteEnergy = false;
     // Live damage numbers over the CPU, oldest first:
     // { target, damage, text, age, stack }.
     this.damageNumbers = [];
@@ -60,8 +59,8 @@ export class PracticeSession extends Arena {
   }
 
   // Puts `def` on the training floor as the practice fighter, replacing the
-  // current one: a fresh Fighter at the stage's spawn with full health and
-  // Energy, driven by Player 1 at once. Nothing of the previous fighter
+  // current one: a fresh Fighter at the stage's spawn with 0 Knockback and
+  // no cooldowns, driven by Player 1 at once. Nothing of the previous fighter
   // stays: its charged technique ends and its projectiles and clones go. A
   // CPU stays as it is, now facing the new fighter.
   setFighter(def, sprites) {
@@ -74,7 +73,6 @@ export class PracticeSession extends Arena {
       def, sprites, spawn: this.map.spawnPoints[0], stage: this.stage,
       slot: 'p1', label: 'P1', controller: new PlayerController(this.input),
     });
-    if (this.infiniteEnergy) this.refillEnergy();
     this.pairFighters();
     this.projectiles.length = 0;
     this.clones.length = 0;
@@ -142,8 +140,8 @@ export class PracticeSession extends Arena {
   // A fighter fell into the Void: nothing may keep hold of or aim at it
   // (a technique holding it ends; clones and projectiles aimed at it or its
   // own go, and so do its damage numbers), then it respawns at its own
-  // spawn, still, with its health and Energy (Fighter.respawn). Practice
-  // simply carries on.
+  // spawn, still, in a fresh training state: 0 Knockback and its charged
+  // cooldowns ready (Fighter.respawn). Practice simply carries on.
   onVoid(f) {
     this.detachFromPlay(f, 'void');
     const numbers = this.damageNumbers;
@@ -151,46 +149,17 @@ export class PracticeSession extends Arena {
     f.respawn(this.stage);
   }
 
-  // ---- Infinite energy ------------------------------------------------------
-
-  // Turns the player's infinite energy on (refilled at once) or off (it is
-  // simply no longer refilled). The CPU never has it.
-  setInfiniteEnergy(on) {
-    this.infiniteEnergy = !!on;
-    if (this.infiniteEnergy) this.refillEnergy();
-  }
-
-  refillEnergy() {
-    const c = this.player.combat;
-    c.energy = c.maxEnergy;
-  }
-
   // ---- Loop -------------------------------------------------------------------
 
-  // Infinite energy around the shared world step: full before it, so every
-  // cost can be paid, and full again after it, so the HUD never shows a
-  // drop. Then this step's hits on the CPU become damage numbers.
+  // The shared world step, then this step's hits on the CPU become damage
+  // numbers.
   update(dt) {
-    this.reviveCPU();
-    if (this.infiniteEnergy) this.refillEnergy();
     super.update(dt);
-    if (this.infiniteEnergy) this.refillEnergy();
     this.updateDamageNumbers(dt);
   }
 
-  // A knocked-out training dummy gets back up: once its hit reaction is
-  // over (no hitstun or freeze, grounded, held by nothing) it is back to full
-  // health, so it can always be hit again.
-  reviveCPU() {
-    const cpu = this.cpu;
-    if (!cpu) return;
-    const c = cpu.combat;
-    if (c.health > 0 || c.stun > 0 || c.hitstop > 0 || c.immobilized || !cpu.body.grounded) return;
-    c.health = c.maxHealth;
-  }
-
   // Ages the numbers already up, then adds one per hit the CPU took this
-  // step, from the CombatSystem's own resolved damage.
+  // step, from the Knockback the CombatSystem's resolved hit added.
   updateDamageNumbers(dt) {
     const list = this.damageNumbers;
     let n = 0;
@@ -214,8 +183,8 @@ export class PracticeSession extends Arena {
     if (this.view.pxW) this.drawDamageNumbers();
   }
 
-  // Red, outlined numbers over the CPU's name tag, following it as it moves:
-  // each rises a little (not with reduced motion) and fades out.
+  // Red, outlined "+N" numbers over the CPU's name tag, following it as it
+  // moves: each rises a little (not with reduced motion) and fades out.
   drawDamageNumbers() {
     if (!this.damageNumbers.length) return;
     const { ctx, view } = this;

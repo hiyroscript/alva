@@ -4,20 +4,21 @@
 // { axis, level, sign } descriptor into numeric { x, y } knockback, its
 // validation of malformed data, the attack definitions that resolve it once
 // (createAttackDefinition), the real CombatSystem.applyHit physics those
-// numbers produce, and #0001's four Basic Attacks. Knockback is not a Power:
-// it is independent of Jump Power and Speed Power. Runs the real Fighter,
-// physics and combat (see fighter-harness.mjs).
+// numbers produce, the accumulated-Knockback multiplier that scales them
+// (knockbackMultiplier / scaleKnockback), and #0001's four Basic Attacks.
+// Knockback is not a Power: it is independent of Jump Power and Speed Power.
+// Runs the real Fighter, physics and combat (see fighter-harness.mjs).
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
   KNOCKBACK_LEVELS, KNOCKBACK_AXES, KNOCKBACK_DIRECTIONS, KNOCKBACK_SUMMARY, KNOCKBACK_DIRECTION_SUMMARY,
-  getKnockbackLevel, resolveKnockback,
+  KNOCKBACK_SCALING, getKnockbackLevel, resolveKnockback, knockbackMultiplier, scaleKnockback,
 } from '../js/data/knockback.js';
 import { POWERS } from '../js/data/powers.js';
 import { CHARACTERS } from '../js/data/characters.js';
 import { CombatSystem, createAttackDefinition } from '../js/game/combat.js';
-import { def, DT, STAGE, makeFighter, stepUntil } from './fighter-harness.mjs';
+import { def, DT, STAGE, makeFighter, stepUntil, duel } from './fighter-harness.mjs';
 
 // Silences and collects console.warn while `fn` runs.
 function warnings(fn) {
@@ -31,18 +32,22 @@ function warnings(fn) {
   }
 }
 
-// An attack definition with `knockback`, hitting on its first step.
-const probe = (knockback) => createAttackDefinition({
-  id: 'probe', animation: 'ba1', startup: 0, active: DT, recovery: 0, damage: 5, hitstun: 0.3, hitstop: 0, knockback,
+// An attack definition with `knockback`, hitting on its first step. No
+// damage by default, so a target at 0 Knockback stays there and takes
+// exactly the move's base launch.
+const probe = (knockback, damage = 0) => createAttackDefinition({
+  id: 'probe', animation: 'ba1', startup: 0, active: DT, recovery: 0, damage, hitstun: 0.3, hitstop: 0, knockback,
 });
 
 // An unblocked hit from an attack with Knockback `knockback` on a target in
 // front, through the real CombatSystem.applyHit; the attacker faces `facing`.
-// `attacker` / `target` swap in other definitions.
+// `attacker` / `target` swap in other definitions; `accumulated` is the
+// target's Knockback before the hit, `damage` the probe's.
 function hitWith(knockback, {
   facing = 1, airborne = false, blocker = false, attacker: attackerDef = def, target: targetDef = def,
+  accumulated = 0, damage = 0,
 } = {}) {
-  const atk = probe(knockback);
+  const atk = probe(knockback, damage);
   const attacker = makeFighter({ x: 500, facing, character: attackerDef });
   const target = makeFighter({
     x: 500 + 50 * facing, facing: -facing,
@@ -50,6 +55,7 @@ function hitWith(knockback, {
   });
   if (airborne) Object.assign(target.fighter.body, { y: 500, vy: 0, grounded: false, ground: null });
   if (blocker) target.fighter.combat.blocking = true;
+  target.fighter.combat.knockback = accumulated;
   const event = new CombatSystem().applyHit(attacker.fighter, target.fighter, atk);
   return { atk, event, target };
 }
@@ -210,7 +216,7 @@ test('createAttackDefinition resolves the descriptor once, into the frozen numer
 
 test('combat stays generic: nothing in it names a level, an attack or a fighter', () => {
   const source = readFileSync(new URL('../js/game/combat.js', import.meta.url), 'utf8');
-  assert.match(source, /import \{ resolveKnockback \} from '\.\.\/data\/knockback\.js';/);
+  assert.match(source, /import \{ resolveKnockback, knockbackMultiplier \} from '\.\.\/data\/knockback\.js';/);
   assert.doesNotMatch(source, /powers\.js/);
   // The code itself, without the schema examples in its comments.
   const code = source.replace(/^\s*\/\/.*$/gm, '');
@@ -218,7 +224,7 @@ test('combat stays generic: nothing in it names a level, an attack or a fighter'
   assert.doesNotMatch(code, /'0001'|'ba1'|'ba2'|'midairBa1'|'midairBa2'/);
 });
 
-// ---- Physics ------------------------------------------------------------------------
+// ---- Physics (base launch, at 0 Knockback) ------------------------------------------
 
 test('Low horizontal: vx +140 facing right, -140 facing left, with no launch', () => {
   for (const facing of [1, -1]) {
@@ -341,6 +347,87 @@ test('#0001\'s bespoke hits keep their own numeric knockback: Throw and the shur
   assert.deepEqual(fighter.attacks.throw.knockback, { x: 0, y: 0 });
   assert.deepEqual(def.projectiles.shuriken.knockback, { x: 0, y: 0 });
   assert.deepEqual(fighter.projectileDefs.shuriken.knockback, { x: 0, y: 0 });
-  assert.deepEqual(def.chargedTechniques.rasenRush.firstHit.knockback, { x: 0, y: 0 });
-  assert.deepEqual(def.chargedTechniques.rasenRush.explosionHit.knockback, { x: 420, y: 220 });
+  const rush = def.chargedTechniques.rasenRush;
+  assert.deepEqual(rush.firstHit.knockback, { x: 0, y: 0 });
+  assert.deepEqual(rush.tickHit.knockback, { x: 0, y: 0 });
+  // The explosion: a strong, mostly horizontal blast, far past High.
+  const { x, y } = rush.explosionHit.knockback;
+  assert.ok(x > 3 * KNOCKBACK_LEVELS.high.horizontal, 'strong: over three times High horizontal');
+  assert.ok(x >= 3 * y && y >= 0, 'primarily horizontal, with at most a slight lift');
+});
+
+// ---- Accumulated Knockback scaling -------------------------------------------------------
+
+test('the launch multiplier is 1 + Knockback / 100: 0 -> 1x, 25 -> 1.25x, 50 -> 1.5x, 100 -> 2x, 150 -> 2.5x', () => {
+  assert.equal(KNOCKBACK_SCALING.perPoint, 1 / 100);
+  assert.ok(Object.isFrozen(KNOCKBACK_SCALING));
+  for (const [value, m] of [[0, 1], [5, 1.05], [25, 1.25], [50, 1.5], [100, 2], [150, 2.5], [300, 4]]) {
+    assert.ok(Math.abs(knockbackMultiplier(value) - m) < 1e-12, `${value} -> ${m}`);
+  }
+  // It only grows, steadily, with no cap; nothing below 0 counts.
+  for (let v = 0; v < 1000; v += 7) assert.ok(knockbackMultiplier(v + 7) > knockbackMultiplier(v));
+  assert.equal(knockbackMultiplier(-20), 1);
+});
+
+test('scaleKnockback keeps direction and sign, and a zero axis stays zero at any Knockback', () => {
+  assert.deepEqual(scaleKnockback({ x: 140, y: 0 }, 100), { x: 280, y: 0 });
+  assert.deepEqual(scaleKnockback({ x: 0, y: -800 }, 50), { x: 0, y: -1200 });
+  assert.deepEqual(scaleKnockback({ x: 720, y: 180 }, 0), { x: 720, y: 180 });
+  for (const value of [0, 1, 99, 1e4]) assert.deepEqual(scaleKnockback({ x: 0, y: 0 }, value), { x: 0, y: 0 });
+});
+
+test('a hit adds its damage before launching: 45 + 5 = 50, so that very hit launches at 1.5x', () => {
+  const { event, target } = hitWith(LOW_HORIZONTAL, { accumulated: 45, damage: 5 });
+  assert.equal(target.fighter.combat.knockback, 50);
+  assert.equal(event.damage, 5);
+  assert.equal(event.knockbackBefore, 45);
+  assert.equal(event.knockbackAfter, 50);
+  assert.equal(event.launchMultiplier, 1.5);
+  assert.equal(target.fighter.body.vx, 140 * 1.5);
+});
+
+test('an identical hit launches harder at 100 Knockback than at 0, along the same direction', () => {
+  for (const facing of [1, -1]) {
+    // Horizontal: faster sideways, still away from the attacker, no lift.
+    const low = hitWith(LOW_HORIZONTAL, { facing }).target.fighter.body;
+    const high = hitWith(LOW_HORIZONTAL, { facing, accumulated: 100 }).target.fighter.body;
+    assert.equal(low.vx, 140 * facing);
+    assert.equal(high.vx, 280 * facing);
+    assert.ok(Math.abs(high.vx) > Math.abs(low.vx));
+    assert.equal(Math.sign(high.vx), facing, 'away from the attacker');
+    assert.equal(high.vy, 0);
+    // Vertical stays vertical: straight up, faster.
+    const up = hitWith(HIGH_VERTICAL, { facing, accumulated: 100 }).target.fighter.body;
+    assert.equal(up.vy, -1600);
+    assert.ok(isZero(up.vx));
+    // Reversed stays downward.
+    const down = hitWith(MID_REVERSED, { facing, accumulated: 100, airborne: true }).target.fighter.body;
+    assert.equal(down.vy, 1280);
+    assert.ok(isZero(down.vx));
+  }
+});
+
+test('a move with no base launch never launches, however much Knockback the target has', () => {
+  for (const accumulated of [0, 100, 500, 1e5]) {
+    const { event, target } = hitWith(null, { accumulated, damage: 3 });
+    assert.equal(event.knockbackAfter, accumulated + 3);
+    assert.ok(isZero(target.fighter.body.vx), `vx at ${accumulated}`);
+    assert.equal(target.fighter.body.vy, 0, `vy at ${accumulated}`);
+    assert.equal(target.fighter.grounded, true);
+  }
+});
+
+test('#0001\'s real BA1 through the CombatSystem pushes a target at 100 Knockback twice as fast as one at 0 (both +5)', () => {
+  const speeds = [0, 100].map((accumulated) => {
+    const d = duel();
+    d.target.combat.knockback = accumulated;
+    d.tick({ action1: true, action1Pressed: true });
+    d.until(() => d.events.length > 0);
+    assert.equal(d.events[0].damage, 5);
+    assert.equal(d.target.combat.knockback, accumulated + 5);
+    return d.target.body.vx;
+  });
+  assert.equal(speeds[0], 140 * 1.05);
+  assert.equal(speeds[1], 140 * 2.05);
+  assert.ok(speeds[1] > speeds[0] && speeds[0] > 0);
 });

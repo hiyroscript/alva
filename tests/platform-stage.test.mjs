@@ -7,9 +7,11 @@
 // recording stand-in, so paint still needs real-browser verification.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { MAPS, getMap } from '../js/data/maps.js';
+import { MAPS, getMap, voidAround, cameraAround } from '../js/data/maps.js';
 import { PRACTICE_MAP } from '../js/data/practice-map.js';
 import { StageCollision, createBody, stepBody, separate, resolveSolidOverlap } from '../js/game/physics.js';
+import { Camera } from '../js/game/camera.js';
+import { getJumpVelocity } from '../js/data/powers.js';
 import { CONFIG } from '../js/config.js';
 import { def, DT, STAGE, SIM_CTX, fakeSprites, makeFighter, stageMap } from './fighter-harness.mjs';
 
@@ -41,22 +43,154 @@ function realBattle(mapId = 'desert') {
 
 // ---- Stage data: four separate areas ---------------------------------------------
 
-test('every stage keeps its main stage, camera bounds and Void apart, the Void far past the ledges', () => {
+// Each stage's Void before this pass, as margins from its main stage: 860
+// past each ledge, 740 below its top and 1160 above it.
+const OLD_VOID_MARGINS = {
+  desert: { side: 860, top: 1160, bottom: 740 },
+  city: { side: 860, top: 1160, bottom: 740 },
+  practice: { side: 860, top: 1160, bottom: 740 },
+};
+
+// The Void's margins around a map's main stage.
+const margins = (m) => ({
+  left: m.mainStage.left - m.voidBounds.left,
+  right: m.voidBounds.right - m.mainStage.right,
+  top: m.mainStage.top - m.voidBounds.top,
+  bottom: m.voidBounds.bottom - m.mainStage.top,
+});
+
+test('every stage keeps its main stage, camera bounds and Void apart, the Void a short way past the ledges', () => {
   for (const m of ALL_MAPS) {
     const { left, right, top, bottom } = m.mainStage;
     const v = m.voidBounds;
     const cb = m.cameraBounds;
     assert.equal(m.bounds, undefined, `${m.id}: no arena wall bounds`);
     assert.ok(right > left && bottom > top, m.id);
-    // Real off-stage space on every side of the main stage.
-    assert.ok(v.left <= left - 600 && v.right >= right + 600, `${m.id}: the Void is far past both ledges`);
-    assert.ok(v.bottom >= top + 600, `${m.id}: and well below the stage`);
-    assert.ok(v.top <= top - 900, `${m.id}: and high above it`);
-    // The camera can reach just past the Void's edge, never the other way round.
+    // Outside the physical main stage on every side, with room to recover:
+    // a blast zone, neither against the ledge nor a distant world edge.
+    const g = margins(m);
+    for (const side of ['left', 'right']) {
+      assert.ok(g[side] >= 250 && g[side] <= 400, `${m.id}: ${g[side]} past the ${side} ledge`);
+    }
+    assert.ok(g.bottom >= 300 && g.bottom <= 450, `${m.id}: ${g.bottom} below the stage's top`);
+    assert.ok(g.top > 0, `${m.id}: above the stage`);
+    // Stage-relative and data-driven: exactly the margins around the stage.
+    assert.deepEqual(v, voidAround(m.mainStage, { side: g.left, top: g.top, bottom: g.bottom }), m.id);
+    assert.equal(g.left, g.right, `${m.id}: the same room past either ledge`);
+    // The camera can reach a strip past the Void's edge, never the other
+    // way round, and never deep into it.
     assert.ok(cb.left < v.left && cb.right > v.right && cb.top < v.top && cb.bottom > v.bottom, `${m.id}: camera bounds`);
+    assert.ok(v.left - cb.left <= 200 && cb.right - v.right <= 200 && v.top - cb.top <= 200 && cb.bottom - v.bottom <= 200, `${m.id}: no giant area past the Void`);
+    assert.notDeepEqual(cb, v, `${m.id}: camera bounds are not the Void`);
     // Spawns, platforms and solids all on the main stage.
     for (const s of m.spawnPoints) assert.ok(s.x - HALF > left && s.x + HALF < right, `${m.id}: spawn ${s.x}`);
     for (const p of [...m.platforms, ...m.solids]) assert.ok(p.x >= left && p.x + p.w <= right, `${m.id}: ${p.id}`);
+  }
+});
+
+test('the Void is much closer than before on every stage: at least 30% nearer on every side, over half nearer past the ledges', () => {
+  for (const m of ALL_MAPS) {
+    const old = OLD_VOID_MARGINS[m.id];
+    const g = margins(m);
+    assert.ok(g.left <= old.side * 0.5 && g.right <= old.side * 0.5, `${m.id}: sides ${g.left} / ${g.right} vs ${old.side}`);
+    assert.ok(g.bottom <= old.bottom * 0.7, `${m.id}: bottom ${g.bottom} vs ${old.bottom}`);
+    assert.ok(g.top <= old.top * 0.7, `${m.id}: top ${g.top} vs ${old.top}`);
+  }
+  // The helpers build the rectangles from the margins, nothing else.
+  const main = { left: 100, right: 500, top: 300, bottom: 900 };
+  assert.deepEqual(voidAround(main, { side: 50, top: 70, bottom: 30 }), { left: 50, right: 550, top: 230, bottom: 330 });
+  assert.deepEqual(cameraAround({ left: 0, right: 10, top: 0, bottom: 10 }, 5), { left: -5, right: 15, top: -5, bottom: 15 });
+});
+
+test('ordinary jumps never reach the upper Void, even from each stage\'s highest footing', () => {
+  const g = CONFIG.sim.gravity * def.movement.gravityScale;
+  // Tier 3 is the highest normal jump any fighter can own.
+  const rise = 1000 ** 2 / (2 * g);
+  assert.ok(getJumpVelocity(def) <= 1000);
+  for (const m of ALL_MAPS) {
+    const footing = Math.min(m.mainStage.top, ...m.platforms.map((p) => p.y), ...m.solids.map((s) => s.y));
+    // The body's centre at the top of the jump (see StageCollision.inVoid).
+    const apex = footing - rise - def.collider.height / 2;
+    assert.ok(apex - m.voidBounds.top > 100, `${m.id}: apex ${apex.toFixed(0)} vs Void ${m.voidBounds.top}`);
+  }
+  // And a real jump from the main stage stays well inside it.
+  for (const m of ALL_MAPS) {
+    const stage = new StageCollision(m);
+    const { fighter, step } = makeFighter({ stage, x: m.spawnPoints[0].x });
+    step({ jump: true, jumpPressed: true });
+    let top = fighter.body.y;
+    for (let i = 0; i < 120; i++) {
+      step({ jump: true });
+      top = Math.min(top, fighter.body.y);
+      assert.equal(stage.inVoid(fighter.body), false, `${m.id}: jumping`);
+    }
+    assert.ok(top < m.mainStage.top - 100, `${m.id}: it really jumped`);
+  }
+});
+
+test('on every stage a fighter can leave either ledge and live a moment, but keeps going into the Void', () => {
+  for (const m of ALL_MAPS) {
+    const stage = new StageCollision(m);
+    for (const dir of ['left', 'right']) {
+      const sign = dir === 'right' ? 1 : -1;
+      const edge = dir === 'right' ? m.mainStage.right : m.mainStage.left;
+      // Standing right at the ledge (past City's bulkhead), facing out.
+      const { fighter, step } = makeFighter({ stage, x: edge + sign * (HALF - 5), facing: sign });
+      assert.equal(fighter.grounded, true);
+      let offAt = null;
+      let lostAt = null;
+      for (let i = 0; i < 60 * 5 && lostAt === null; i++) {
+        step({ [dir]: true });
+        if (offAt === null && !fighter.grounded && sign * (fighter.body.x - edge) > 0) offAt = i;
+        if (stage.inVoid(fighter.body)) lostAt = i;
+      }
+      assert.ok(offAt !== null, `${m.id}: left the ${dir} ledge`);
+      assert.ok(lostAt !== null, `${m.id}: kept going into the Void`);
+      // Time off the stage before the Void: enough for a reaction.
+      assert.ok(lostAt - offAt >= 15, `${m.id} ${dir}: ${lostAt - offAt} steps off the stage first`);
+    }
+  }
+});
+
+test('falling off a ledge ends in the bottom Void, much sooner than the old bounds would have allowed', () => {
+  for (const m of ALL_MAPS) {
+    const stage = new StageCollision(m);
+    // A body dropped just past the right ledge, straight down.
+    const body = createBody({ x: m.mainStage.right + 40, y: m.mainStage.top, width: 34, height: 80 });
+    const old = new StageCollision({ ...m, voidBounds: voidAround(m.mainStage, OLD_VOID_MARGINS[m.id]) });
+    let steps = 0;
+    let oldSteps = null;
+    let lost = null;
+    for (; steps < 600 && (lost === null || oldSteps === null); steps++) {
+      stepBody(body, DT, stage, CONFIG.sim.gravity);
+      if (lost === null && stage.inVoid(body)) lost = steps;
+      if (oldSteps === null && old.inVoid(body)) oldSteps = steps;
+    }
+    assert.ok(lost !== null && oldSteps !== null);
+    assert.ok(lost >= 20, `${m.id}: a real fall first (${lost} steps)`);
+    assert.ok(lost < oldSteps * 0.8, `${m.id}: ${lost} steps, was ${oldSteps}`);
+  }
+});
+
+test('the neutral camera shows no Void: both fighters on their spawns at common screen sizes', () => {
+  const sprites = fakeSprites();
+  for (const m of ALL_MAPS) {
+    const stage = new StageCollision(m);
+    const [a, b] = m.spawnPoints.map((s, i) => makeFighter({ stage, x: s.x, facing: s.facing }).fighter);
+    for (const f of [a, b]) f.interpolate(1);
+    for (const [w, h] of [[1280, 720], [1920, 1080], [1688, 780], [1440, 900]]) {
+      const scale = computeWorldScale(w, h, sprites, m);
+      const cam = new Camera();
+      cam.setBounds(m.cameraBounds);
+      cam.setAnchor(stage.centerX);
+      cam.setView(w / scale, h / scale, scale);
+      cam.snap(a, m.id === 'practice' ? null : b);
+      const v = m.voidBounds;
+      const label = `${m.id} ${w}x${h}`;
+      // Clear of the Void's wavering edge (12 world units either way).
+      assert.ok(cam.x > v.left + 12 && cam.x + cam.w < v.right - 12, `${label}: sides`);
+      assert.ok(cam.y > v.top + 12 && cam.y + cam.h < v.bottom - 12, `${label}: top and bottom`);
+    }
   }
 });
 
@@ -180,7 +314,8 @@ test('Quick Battle: falling into the Void defeats that fighter at once, then the
   assert.ok(steps < 60 * 4, 'long before the timer');
   assert.ok(battle.timeLeft > timeLeft - 4);
   assert.equal(battle.phase, 'ko');
-  assert.equal(p1.combat.health, 0);
+  assert.equal('health' in p1.combat, false, 'no Health to empty: the Void alone defeats');
+  assert.equal(p1.combat.knockback, 0, 'its Knockback is left as it was');
   assert.deepEqual(battle.result, { outcome: 'p2', reason: 'void' });
   // Out of play: frozen, and neither framed nor fought.
   const frozen = { x: p1.body.x, y: p1.body.y };
@@ -192,9 +327,10 @@ test('Quick Battle: falling into the Void defeats that fighter at once, then the
   assert.equal(battle.phase, 'result');
   assert.ok(Math.abs(battle.phaseTime) < 1e-9);
   // A rematch brings both back.
+  p2.combat.knockback = 64;
   battle.restart();
   assert.equal(p1.lostToVoid, false);
-  assert.equal(p1.combat.health, p1.combat.maxHealth);
+  assert.deepEqual([p1.combat.knockback, p2.combat.knockback], [0, 0]);
   assert.deepEqual(battle.inPlay, [p1, p2]);
   assert.equal(battle.result.reason, 'time');
 });
@@ -294,13 +430,20 @@ test('the camera leans toward the stage while framing, never past a framed fight
   const cx = cam.tx + cam.w / 2;
   assert.ok(cx < right && cx > centre, `centre ${cx}`);
   assert.ok(right - cam.tx > cam.w * 0.2, 'the fighter stays inside the margin');
-  // Far out near the Void, the fighter still sits inside the margin.
+  // Out by the Void, the fighter still sits inside the margin, the view
+  // still leaning back toward the stage.
   const far = battle.stage.void.right - 20;
   cam.computeTarget(fighter(far), null);
-  assert.ok(Math.abs(far - (cam.tx + cam.w * 0.8)) < 1e-6, 'held right at the margin');
-  // Camera bounds are not the stage: the view may go out over the open air.
+  assert.ok(far <= cam.tx + cam.w * 0.8 + 1e-6 && far >= cam.tx + cam.w * 0.2, 'inside the margin');
+  assert.ok(cam.tx + cam.w / 2 < far, 'leaning back toward the stage');
+  // Further out than the lean allows, it is held right at the margin.
+  const beyond = far + 600;
+  cam.computeTarget(fighter(beyond), null);
+  assert.ok(Math.abs(beyond - (cam.tx + cam.w * 0.8)) < 1e-6, 'held right at the margin');
+  // Camera bounds are not the stage: the view may go out over the open air
+  // and a little way past the Void's edge, never further.
   cam.snap(fighter(far), null);
-  assert.ok(cam.x + cam.w > right + 600);
+  assert.ok(cam.x + cam.w > battle.stage.void.right);
   assert.ok(cam.x + cam.w <= battle.map.cameraBounds.right + 1e-6);
 });
 

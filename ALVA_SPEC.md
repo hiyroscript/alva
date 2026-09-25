@@ -170,9 +170,9 @@ behave, and how it must look. The README covers running and deploying it.
 Alva's interface is **near-black/charcoal dominant**, with off-white typography,
 gray hierarchy and **green as the sole interface accent**. It follows Seren's
 visual discipline without copying its assets. Green signals actions, selection
-and progress; it does not fill every card, border or heading. The single
-exception is the blue battle-HUD Energy meter (`--energy`, 7.3), a
-gameplay-resource colour; nothing else in the interface turns blue.
+and progress; it does not fill every card, border or heading; in the
+battle HUD it marks a charged ability that is ready (7.3). Nothing in the
+interface turns blue.
 
 | Token | Value | Use |
 | --- | --- | --- |
@@ -187,7 +187,6 @@ gameplay-resource colour; nothing else in the interface turns blue.
 | `--accent-wash` | `rgba(47,191,99,.14)` | Subtle selected fill |
 | `--action` / `--action-hover` / `--action-pressed` | `#197a3d` / `#1b8141` / `#146332` | Green fills with ≥ 4.5:1 white label contrast |
 | `--surface-overlay` | `rgba(10,11,12,.94)` | Readable map detail chrome |
-| `--energy` | `#3b82f6` | Battle HUD Energy meter fill only (gameplay-resource exception) |
 | `--focus-ring` | Dark 2 px separation, off-white 4 px outer ring | Keyboard/gamepad focus |
 
 ### 5.2 Component rules
@@ -254,9 +253,9 @@ fit the palette.
 Splash → Home → Select Mode → Select Fighter → Select Stage → Battle
 Home → Practice Ground (starts at once with #0001)
 Home → Discover (Power / Knockback / Conditions reference; Back returns Home)
-Practice Ground → More → Change Fighter (roster dialog) / Enable CPU or Change CPU (CPU roster dialog → Disable CPU) / Allow or Revoke infinite energy / Return (Home)
+Practice Ground → More → Change Fighter (roster dialog) / Enable CPU or Change CPU (CPU roster dialog → Disable CPU) / Return (Home)
 Battle → Pause → Resume / Restart / Return to Home (confirmed); Help is shown but disabled for now
-Battle (time over, one fighter ahead) → Result → Rematch / Change Stage / Return to Home
+Battle (time over, one fighter with less Knockback) → Result → Rematch / Change Stage / Return to Home
 Battle (a fighter falls into the Void) → K.O. → Result → Rematch / Change Stage / Return to Home
 Battle (time over, draw) → a fresh battle starts, no dialog
 ```
@@ -375,12 +374,13 @@ no header, build label, eyebrow or keyboard hint bar.
 - Two tabs (Help, Credits) sharing one scrollable panel; ←/→ switch tabs,
   ↑/↓ scroll.
 - Help: desktop controls rendered from the live key bindings, mobile control
-  diagram, movement, Charge & Energy (including Charge + BA1 = Clone Attack,
-  25 Energy, and Charge + BA2 = Sphere Rush: already Charging, forms before
-  dashing, needs a hit to continue, two hits with the second delayed, ground
-  needed throughout; no extra control row: both use the existing Charge,
-  BA1 and BA2 controls), Throw, Defense, stages and platforms, pause, notes
-  on this build.
+  diagram, movement, Charge & cooldowns (including Charge + BA1 = Clone
+  Attack and Charge + BA2 = Sphere Rush: already Charging, forms before
+  dashing, needs a hit to continue, +1 Knockback every half second while it
+  holds the opponent and 15 on the delayed blast, ground needed throughout;
+  each on its own 5-second cooldown that Charge recovers twice as fast; no
+  extra control row: both use the existing Charge, BA1 and BA2 controls),
+  Throw, Defense, stages and platforms, pause, notes on this build.
 - Home no longer links to this screen (its entry became Practice Ground); the
   screen stays in place, and its shared content still feeds the Home credits
   roll and the pause Help view.
@@ -426,26 +426,29 @@ A solo training room, entered straight from Home.
   round banner, timer, CPU or result. It runs until the player returns Home.
   Practice keeps its own fighter and CPU choices; it never reads or changes
   Quick Battle's selection. Every fresh entry also starts with no CPU and
-  infinite energy off.
+  a fresh fighter at 0 Knockback.
 - **Player 1:** one fighter under Player 1's control, with normal movement,
   physics, attacks, projectiles, clones, Charge, Defense, animation, camera
   and touch controls. Until a CPU is enabled there is no other fighter,
   hidden or not, and the camera follows Player 1 alone. Moves aimed at an
   opponent then fall back or miss: Charged BA1 has nobody to appear behind,
-  so it is an ordinary BA1 and costs no Energy; the Sphere Rush dashes, finds
-  no one and ends as a miss (after its `rasen12` whiff release pose).
+  so it is an ordinary BA1 and starts no cooldown; the Sphere Rush dashes,
+  finds no one and ends as a miss (after its `rasen12` whiff release pose),
+  its cooldown spent.
 - **Practice CPU (optional):** a training dummy, slot `p2`, labelled CPU, at
   the stage's second spawn (320 units right of Player 1's, facing it). It has
   no controller, so it never walks, jumps, drops, attacks, throws, charges,
-  blocks or dodges; it is otherwise a normal fighter (hurtboxes, real damage,
-  hitstun, hurt animations, knockback, gravity, stage and pushbox
+  blocks or dodges; it is otherwise a normal fighter (hurtboxes, real damage
+  adding to its own accumulated Knockback, so hits launch it further as it
+  builds up, hitstun, hurt animations, knockback, gravity, stage and pushbox
   collisions, binds, facing its opponent). With it, Player 1 and the CPU are
   each other's opponent, so clones, projectiles, the Sphere Rush and melee
-  target it and the camera frames both. Each hit it takes shows its resolved
-  damage (the CombatSystem's hit event) in red over its head, `-6` or `-2.5`,
-  rising and fading over 0.8 s; simultaneous hits stack. Knocked out, it is
-  restored to full health once its hit reaction ends. No HUD panel,
-  timer or rounds come with it.
+  target it and the camera frames both. Each hit it takes shows the
+  Knockback it added (the CombatSystem's resolved hit event) in red over its
+  head as a positive `+5`, `+1` or `+15`, rising and fading over 0.8 s;
+  simultaneous hits stack, and a hit that adds nothing (the Sphere Rush's
+  contact) shows none. It is never knocked out. No HUD panel, timer or
+  rounds come with it.
 - **Training stage:** its own map (`js/data/practice-map.js`), kept out of the
   Quick Battle stage list. Original Canvas artwork of a minimalist combat
   laboratory: a pale, cool-gray room built from one square grid, with a gridded
@@ -455,10 +458,14 @@ A solo training room, entered straight from Home.
   outer side face past either ledge, and a ruler along its front edge. No side
   walls, scenery, particles, hazards or moving parts. Only the camera moves the
   room; its static geometry is computed once. A fighter that falls into the
-  Void is put straight back at its own spawn, still, with its health and
-  Energy; whatever held or aimed at it (a Sphere Rush bind, clones,
+  Void is put straight back at its own spawn, still, in a fresh training
+  state: its Knockback back to 0, its charged cooldowns cleared (both
+  abilities ready) and its velocity, stun, freeze and attack reset; whatever
+  held or aimed at it (a Sphere Rush bind and its ticks, clones,
   projectiles, damage numbers) goes, and practice carries on.
-- **HUD:** only the P1 panel (tag, name, health, Energy) top-left and a compact
+- **HUD:** only the P1 card (the same card as Quick Battle's, 7.3: portrait,
+  divider, tag and name over the Knockback number, the two charged-cooldown
+  rings) top-left and a compact
   glass **More** button (three dots, `aria-label="Practice menu"`,
   `aria-haspopup="dialog"`, `aria-expanded`) centred at the top where Quick
   Battle's timer sits, a responsive 8–14 px lower. No CPU panel (even with a
@@ -467,28 +474,22 @@ A solo training room, entered straight from Home.
   (simulation, gameplay input and touch controls stop) and floats a light,
   translucent glass menu centred under the More button over a lightly
   dimmed, still stage. It holds exactly **Change Fighter** (green, focused),
-  **Enable CPU** (**Change CPU** while there is one), **Allow infinite
-  energy** (**Revoke infinite energy** while on) and **Return** (outlined).
+  **Enable CPU** (**Change CPU** while there is one) and **Return**
+  (outlined).
   More again, Esc / Back, P, Start or a press on the dim resumes. **Return**
   goes Home and tears everything down.
-- **Infinite energy:** a Practice-only rule for Player 1: its Energy is full
-  before and after every simulation step, so every cost can be paid while the
-  moves keep their normal rules and cooldowns, and the HUD bar stays full.
-  Allowing it refills at once; revoking it just stops the refills. The
-  toggle keeps the menu open and focus on the button. It survives Change
-  Fighter; the CPU never has it.
 - **Change Fighter:** opens the fighter roster (the same component, rules and
   look as Select Fighter, 6.4) as one large translucent glass dialog
   (`role="dialog"`, `aria-modal`, titled "Change Fighter"; about 90 vw ×
   88 dvh, safe-area aware, the roster scrolling inside it) over the paused
   stage. The current fighter starts selected, previewed and focused; the
   menu beneath is inert. Confirming loads the fighter, replaces the practice
-  fighter in place at the spawn with full health and Energy, clears the old
+  fighter in place at the spawn with 0 Knockback and no cooldowns, clears the old
   fighter's projectiles, clones and technique, rebinds the HUD, closes both
   overlays and resumes. Back / Esc closes only the dialog and returns focus to
   Change Fighter, leaving the fighter unchanged. A failed load keeps the
   current fighter and the dialog. A practice CPU stays through the swap, now
-  facing the new fighter, and infinite energy stays on.
+  facing the new fighter.
 - **CPU dialog:** Enable CPU / Change CPU opens a second instance of the same
   roster dialog (its own ids and navigation scope), titled Select CPU or
   Change CPU. Confirming loads the fighter, puts it on the CPU spawn
@@ -584,8 +585,16 @@ read the character database, so it stays the same as fighters are added.
   run, jump or be knocked off either ledge, fall below the stage and drift
   back if they can.
 - Main stages are 1280–1440 units wide (Desert 1360, City 1440, Practice
-  Ground 1280); the Void sits 860 units past each ledge, 740 below the
-  stage's top and 1160 above it.
+  Ground 1280). The Void is a blast zone set by margins around the main
+  stage (`voidAround` in `js/data/maps.js`, data per stage): Desert 360
+  past each ledge, 400 below the stage's top and 760 above it; City 340,
+  420 and 800 (over its highest deck); Practice Ground 380 (its block is the
+  narrowest), 400 and 760. There is room to be knocked off, fight briefly
+  and drift back, but a fighter carried on outward is lost soon after; no
+  jump from any stage's highest footing reaches the upper line. Camera
+  bounds are the Void's rectangle plus 140 on every side (`cameraAround`),
+  so the neutral view never shows the Void and the camera never wanders deep
+  into it.
 - Backgrounds are flat parallax layers (sky, far, mid, near, atmosphere)
   cached as `Path2D`. The playable geometry (main stage, platforms, solids)
   is drawn in one shared one-point perspective (`js/stages/perspective.js`,
@@ -609,18 +618,19 @@ read the character database, so it stays the same as fighters are added.
 - **The Void:** a fighter whose centre leaves `voidBounds` (a fixed
   rectangle, `StageCollision.inVoid`) is taken by it. In Quick Battle that
   fighter is defeated at once: it leaves play (frozen and no longer drawn,
-  hit or framed) with no health left, anything holding or aiming at it lets
-  go, a **K.O.** banner plays for 1.4 s and the result follows (after time
-  has run out it still loses; both taken is a draw). In Practice Ground it is
-  put back at its spawn. Art: pure black beyond the boundary with a gently
-  wavering edge (a feathered second edge and a dark glow just inside), drawn
-  over everything, only on the sides the view comes near, so neutral play is
-  never boxed in. The wave is art only (the kill line never moves) and holds
-  still with reduced motion.
+  hit or framed), anything holding or aiming at it lets go, a **K.O.**
+  banner plays for 1.4 s and the result follows (after time has run out it
+  still loses; both taken is a draw). Its Knockback stays as it was until the
+  next match. In Practice Ground it is put back at its spawn. Art: one
+  solid black layer beyond the boundary with a single gently wavering inner
+  edge (±12 units around the line), drawn over everything in one path and
+  one fill, only on the sides the view comes near, so neutral play is never
+  boxed in: no stacked bands, second edge or glow. The wave is art only (the
+  kill line never moves) and holds still with reduced motion.
 - The camera frames both fighters (Practice Ground's fighter alone until a
   practice CPU is enabled), leaning toward the main stage's centre while it
   does, interpolates smoothly and never shows outside its camera bounds (the
-  stage, the air around it and the Void's edge). Fighters occupy ≈ 10 % of
+  stage, the air around it and a strip past the Void's edge). Fighters occupy ≈ 10 % of
   viewport height (8.8–11.5 %): a 16:9 view shows the whole main stage with
   air past both ledges, and narrower screens zoom out further for it.
 
@@ -653,12 +663,13 @@ read the character database, so it stays the same as fighters are added.
   whole frames: ground BA1 is frame 1 startup, frame 2 active, frames 3–4
   recovery; mid-air BA1 is frames 1–2 startup (kunai drawn back, then
   overhead) and frame 3 active (the slash arc), with no recovery frame, so
-  the attack ends with its clip. Ground BA1 hits once for 6 damage, 0.22 s
+  the attack ends with its clip. Ground BA1 hits once for 5 damage, 0.22 s
   hitstun, 0.14 s blockstun, 0.06 s hitstop and a 0.1 s cooldown, and
   declares Low horizontal Knockback (`knockback: { axis: 'horizontal',
   level: 'low' }`, resolved `{ x: 140, y: 0 }`): an unblocked hit pushes the
-  opponent 140 away (at impact vx 140 × facing) with no vertical knockback.
-  Mid-air BA1 hits once for 8 damage, 0.24 s hitstun, 0.15 s blockstun,
+  opponent away at 140 (at impact vx 140 × facing, before the Knockback
+  scaling in 7.2) with no vertical knockback.
+  Mid-air BA1 hits once for 5 damage, 0.24 s hitstun, 0.15 s blockstun,
   0.07 s hitstop and a 0.18 s cooldown (longer, making up for the missing
   recovery), and declares Mid vertical Knockback (`knockback: { axis:
   'vertical', level: 'mid' }`, resolved `{ x: 0, y: 640 }`): an unblocked
@@ -679,12 +690,12 @@ read the character database, so it stays the same as fighters are added.
   drawn with motion trails), frames 6–7 recovery; mid-air BA2 is frames 1–2
   startup, frame 3 active (the kick's forward-low arc) and frames 4–5
   recovery. Ground BA2 is slower and heavier than ground BA1: it hits once
-  for 8 damage, 0.24 s hitstun, 0.15 s blockstun and 0.07 s hitstop, with a
+  for 10 damage, 0.24 s hitstun, 0.15 s blockstun and 0.07 s hitstop, with a
   0.15 s cooldown, and declares High vertical Knockback (`knockback: { axis:
   'vertical', level: 'high' }`, resolved `{ x: 0, y: 800 }`): an unblocked
   hit launches the opponent upward at 800 (at impact vx 0, vy −800,
   airborne, rising well above a fighter's height before normal gravity
-  brings it down). Mid-air BA2 hits once for 6 damage, 0.22 s hitstun,
+  brings it down). Mid-air BA2 hits once for 10 damage, 0.22 s hitstun,
   0.14 s blockstun and 0.06 s hitstop, with a 0.1 s cooldown, and declares
   High vertical Knockback, reversed (`knockback: { axis: 'vertical', level:
   'high', sign: -1 }`, resolved `{ x: 0, y: −800 }`): an unblocked hit
@@ -692,7 +703,7 @@ read the character database, so it stays the same as fighters are added.
   grounded opponent is knocked straight back onto the ground it stands on;
   an airborne one is sent down toward it. Neither has horizontal knockback.
   Both come from the shared knockback path, not special BA2 code. A blocked
-  BA2 still takes chip damage, blockstun and hitstop, but is never launched
+  BA2 still takes chip damage (added to Knockback), blockstun and hitstop, but is never launched
   or driven down (vertical knockback applies only to unblocked hits) and is
   not pushed. Hitboxes cover the ground kick's arc and the airborne
   kick's forward-low arc in front of the fighter and mirror with facing.
@@ -722,7 +733,7 @@ read the character database, so it stays the same as fighters are added.
   never after the Throw ends), at the throwing hand (16 units in front of
   the origin, 38 up, mirrored with facing). A Throw hit before its release
   throws nothing. Movement and facing lock like other attacks, gravity keeps
-  working, and there is a 0.25 s cooldown after it. No Energy cost. Like
+  working, and there is a 0.25 s cooldown after it. Like
   BA1 / BA2, Throw pressed on the same step as Defense wins and no Dodge
   starts, and it cuts straight out of Charge without the release pose. If
   the Throw frames or the shuriken frames are missing, Throw is refused
@@ -735,9 +746,10 @@ read the character database, so it stays the same as fighters are added.
   even if #0001 turns, jumps, dodges, charges or is hit. It flies straight at
   700 units/s, looping `shuriken1 → shuriken2 → shuriken3` at 18 fps (art
   only; speed never depends on it). Its hitbox is 10 × 10 units, centred.
-  It hits at most once: 4 damage, 0.16 s hitstun, 0.10 s blockstun, 0.04 s
-  hitstop on the target only (the thrower does not freeze) and no knockback
-  at all (`knockback: { x: 0, y: 0 }`: it neither pushes nor launches), then
+  It hits at most once: 1 damage (+1 Knockback), 0.16 s hitstun, 0.10 s
+  blockstun, 0.04 s hitstop on the target only (the thrower does not freeze)
+  and no knockback at all (`knockback: { x: 0, y: 0 }`: it neither pushes
+  nor launches, however much Knockback the target has), then
   it disappears. Hits resolve through the same `CombatSystem.applyHit` as melee,
   with the shuriken's direction in place of the attacker's facing, and credit
   #0001 as the attacker. It never hits its thrower. During a Dodge's
@@ -771,14 +783,14 @@ read the character database, so it stays the same as fighters are added.
   the Sphere Rush) do not play `chargeRelease` first, and letting go of
   Charge on the same step as one of them goes straight to it. BA1 interrupts Charge only when
   Charge is let go on the BA1 press step (an ordinary BA1, with no release
-  pose and no clone) or when the Clone Attack cannot be paid for: BA1 while
-  Charge is still held and sufficient Energy is available summons a clone
+  pose and no clone) or when the Clone Attack cannot happen (no opponent, or
+  missing art): BA1 while Charge is still held summons a clone
   instead of making the owner perform BA1, and the owner stays in Charge
   (see the Charged BA1 Clone Attack below). Likewise BA2 pressed while Charge
   is still held starts the Charged BA2 Sphere Rush instead of BA2 (below),
   and BA2 interrupts Charge as an ordinary BA2 only when Charge is let go on
   the press step or the Sphere Rush cannot start. The release pose is visual only: no
-  damage, hitbox, invulnerability, armour, Energy change, knockback or
+  damage, hitbox, invulnerability, armour, cooldown change, knockback or
   special movement, and movement resumes normally while it shows. Every new
   Charge, including one started during the release pose, restarts from
   `charge1`. Charge is grounded
@@ -787,12 +799,14 @@ read the character database, so it stays the same as fighters are added.
   While charging, horizontal movement is locked (a run decelerates normally
   to a stop) while gravity and collision still apply. Collider and hurtboxes
   are unchanged. Charge has no hitbox, no damage, no armour and no
-  invulnerability, and it is not an attack or a combat action. State
+  invulnerability, and it is not an attack or a combat action; the one thing
+  it does is recover the charged cooldowns faster (see the charged actions
+  below). State
   priority is hitstun > charged technique > bound > attack > Defense (Dodge)
   > jump / fall > land > charge > charge release > run > idle (a Block-type
   guard would sit between land and charge): a hit shows Hurt at once, Throw
   starts straight out of a held Charge (so do BA1 when the Clone Attack
-  cannot be paid for and BA2 when the Sphere Rush cannot start), Jump
+  cannot happen and BA2 when the Sphere Rush cannot start), Jump
   interrupts it, and a Defense press interrupts it with a Dodge. If Charge is still held when that Dodge ends, a fresh Charge starts
   from `charge1`, never from `chargea` / `chargeb`. Charge on a one-way
   platform charges in place and never drops through. If the charge frames
@@ -823,11 +837,11 @@ read the character database, so it stays the same as fighters are added.
   frames 1–2 are invulnerable (drawn breaking up into afterimages) and frame 3
   recovery (solid again). Like attack phases, the window may trail the art by
   one simulation step. An attack whose active hitbox overlaps the
-  invulnerable frames passes through: no health loss, hitstun, blockstun,
+  invulnerable frames passes through: no Knockback added, hitstun, blockstun,
   knockback or hitstop, and the attack is not used up, so it can still
   connect if it is active after the window ends. A hit during startup or
   recovery is a full, normal hit that cancels the Dodge. A Dodge causes no
-  chip damage, no blockstun and no block event, and gives no Energy, sound,
+  chip damage, no blockstun and no block event, and gives no cooldown, sound,
   particles or counter. Priority: an attack pressed on the same step wins and
   no Dodge starts; a Dodge that starts on the ground owns its step, so a Jump
   pressed with it does not launch; Defense during an attack or hitstun does
@@ -846,51 +860,64 @@ read the character database, so it stays the same as fighters are added.
   simulation step) and Charge must still be held on the step the button is
   newly pressed. `Fighter.tryChargedAction` dispatches on the type
   (`trySummon` / `tryTechnique`); one that happens consumes the press, and
-  one that cannot (missing art, invalid data, too little Energy) lets the
-  same press fall through to the button's normal attack. The Clone Attack
-  never depends on technique code, nor the technique on the summon system.
+  one that cannot (no opponent for a summon, missing art, invalid data) lets
+  the same press fall through to the button's normal attack. Each charged
+  action has its own cooldown instead of any cost: the summon's or
+  technique's `cooldown` (5 s for both of #0001's), kept per ability in
+  `CombatState.chargedCooldowns` (a `CooldownTimers`: `{ remaining, duration }`
+  per id, apart from ordinary attacks' short recovery cooldowns in
+  `CombatState.cooldowns`), and started the moment the action happens. While
+  it is cooling down, the charged press is consumed and does nothing at
+  all: no normal attack in its place, no reset, no invisible move. Both
+  recover at 1 s per second, or `stats.chargedCooldownRate` (2 for #0001)
+  while the fighter is really in its Charge stance (a Charge held since an
+  earlier step and still held, not interrupted): a fresh 5 s cooldown takes
+  about 2.5 s of uninterrupted charging. Running, jumping, attacking, being
+  hit or frozen, dodging, a Charge release and a charged technique recover
+  at the normal rate, and starting to Charge never resets anything. Never
+  below 0. The Clone Attack never depends on technique code, nor the
+  technique on the summon system.
 - Charged BA1 Clone Attack (#0001). Trigger: the fighter must already be
   Charging (it entered the Charge state on an earlier simulation step), and
   Charge must still be held on the step BA1 (`action1`: U, B / Circle, touch
   **BA1**) is pressed. There is no new button or key. Charge and BA1 pressed
   together from idle on the same first step is an ordinary BA1 (normal action
   priority), and so is BA1 pressed on the step Charge is let go (no release
-  pose, no clone, no cost). It is data on the character: `chargedActions`
+  pose, no clone, no cooldown). It is data on the character: `chargedActions`
   maps `action1` to the `ba1Clone` summon, which names the attack (`ba1`),
-  the cloud effect (`cloneCloud`), `energyCost` 25, `behindDistance` 48 world
+  the cloud effect (`cloneCloud`), `cooldown` 5, `behindDistance` 48 world
   units, the cloud's `effectOffset` (centred 44 units above the clone's feet,
   half the fighter's height) and a `noGround` fallback (the
   attack `midairBa2` at `offset` `{ x: 0, y: -36 }` from the opponent's
   origin) for when there is no ground behind the opponent (below). A
-  successful summon spends
-  exactly 25 Energy once, when it is accepted (100 → 75 → 50 → 25 → 0; a full
-  meter pays for four; never below 0), and nothing is spent per cloud frame,
-  on the attack, on a hit or miss, or on vanishing; the overhead fallback is
-  the same paid summon, never a second charge. With less than 25 Energy
-  no clone is summoned and nothing is spent: the press falls through to the
-  ordinary grounded BA1. Before paying, the summon checks that the cloud has
+  successful summon starts Charged BA1's 5-second cooldown once, when it is
+  accepted, whether or not the clone then hits; the overhead fallback is the
+  same summon, never a second cooldown. While it cools, a Charged BA1 press
+  does nothing. With no opponent no clone is summoned and no cooldown
+  starts: the press falls through to the ordinary grounded BA1. Before
+  starting its cooldown, the summon checks that the cloud has
   real frames, that both of its attacks (BA1 and the no-ground Mid-air BA2)
   are defined with a hitbox and real frames, and that there is an opponent,
   wherever the opponent stands, so whether it works never depends on where
-  the clone would appear; missing art or data logs a warning, spends
-  nothing, summons nothing and falls back to BA1 (itself refused if BA1's
+  the clone would appear; missing art or data logs a warning, starts no
+  cooldown, summons nothing and falls back to BA1 (itself refused if BA1's
   frames are missing). One press summons exactly one
-  clone; holding BA1 does not repeat it. There is no hidden one-clone limit:
-  each further paid press while still charging summons another, each on its
-  own independent lifecycle.
+  clone; holding BA1 does not repeat it. The cooldown (5 s, or about 2.5 s
+  of Charge) outlasts a clone's life (≈1.3 s), so clones never overlap; each
+  runs its own independent lifecycle.
   The owner does not perform BA1: no `0001_1ba*` art, no attack, no BA1
   cooldown, no `chargeRelease`. While Charge stays held it remains in Charge,
   playing its normal `charge1 → charge2 → chargea ↔ chargeb` art (there is no
   summon pose). Once summoned, the clone is independent: the owner may release
-  Charge (the normal release pose), jump, throw, use BA2, dodge, be hit or
-  even be knocked out, and the clone still finishes appearing, attacking and
-  vanishing, with no refund. It never retargets or summons again.
-  The clone is not a Fighter (`js/game/clone.js`): it has no health, Energy,
+  Charge (the normal release pose), jump, throw, use BA2, dodge or be hit and
+  launched, and the clone still finishes appearing, attacking and
+  vanishing, with no cooldown refund. It never retargets or summons again.
+  The clone is not a Fighter (`js/game/clone.js`): it has no Knockback,
   controller, pushbox, hurtboxes, defence, jump or coyote logic, physics or
   gravity, and it is not in `battle.fighters`. It is untargetable, takes no
   part in fighter separation or solid collision (the opponent can move
   through it), is ignored by the camera (framing still uses P1 and the CPU)
-  and has no marker, name, ring, shadow, health or Energy bar. Its position
+  and has no marker, name, ring, shadow or HUD card. Its position
   facing and attack are snapshotted once, on the summon step, facing the way
   the opponent faced. Normally it stands on the opponent's back side
   (`x = target.x − target.facing × 48`, never clamped: there are no side
@@ -916,7 +943,7 @@ read the character database, so it stays the same as fighters are added.
   real sprites (`0001_1ba1 → 1ba2 → 1ba3 → 1ba4` at 12 fps, the same
   per-clip `sourceFacing` mirroring, no tint, transparency, outline or
   silhouette) and BA1's own resolved attack definition (`attacks.ba1`: frame 1
-  startup, frame 2 active, frames 3–4 recovery, 6 damage, 0.22 s hitstun,
+  startup, frame 2 active, frames 3–4 recovery, 5 damage, 0.22 s hitstun,
   0.14 s blockstun, 0.06 s hitstop), so its hitbox exists only on the active
   frame and hits at most once. It performs the owner's normalized BA1, so it
   inherits BA1's Low horizontal Knockback (140 horizontal knockback, away
@@ -924,7 +951,7 @@ read the character database, so it stays the same as fighters are added.
   own and never resolves Knockback itself. The overhead clone instead plays
   Mid-air BA2 from frame 1 (`0001_midair1ba1 → … → midair1ba5` at 12 fps)
   with its own resolved definition (`attacks.midairBa2`: frames 1–2
-  startup, frame 3 active, frames 4–5 recovery, 6 damage, 0.22 s hitstun,
+  startup, frame 3 active, frames 4–5 recovery, 10 damage, 0.22 s hitstun,
   0.14 s blockstun, 0.06 s hitstop), whose hitbox, from the overhead spot,
   lands on a stationary opponent's hurtboxes, and whose High reversed
   vertical Knockback drives the opponent downward (`vy = +800`, no sideways
@@ -961,11 +988,14 @@ read the character database, so it stays the same as fighters are added.
   inferred from animation frames. It sets no `combat.attack`. Trigger:
   the shared charged-action rule with BA2 (`action2`: I, LB, touch **BA2**);
   no new control. Charge and BA2 pressed together from idle, or BA2 pressed
-  on the step Charge is let go, is ordinary BA2 (8 damage, `2ba1`–`2ba7`,
+  on the step Charge is let go, is ordinary BA2 (10 damage, `2ba1`–`2ba7`,
   unchanged; mid-air BA2 `midair1ba1`–`5` likewise) with no release pose.
   Grounded only (Charge is too). Once started it owns the fighter and Charge
   no longer needs to be held; it ends only by a miss, a wall, ground loss, a
-  hit on #0001, a blocked contact, a knockout, completion or a reset. Sprite
+  hit on #0001, a blocked contact, a lost bind (the Void included),
+  completion or a reset. Starting it (the BA2 press step) starts Charged
+  BA2's 5-second cooldown, spent whatever follows: a hit, a miss, a Dodge, a
+  wall, ground loss or an interruption. Sprite
   partitioning:
 
   | Frames | Clip | Role |
@@ -1019,9 +1049,10 @@ read the character database, so it stays the same as fighters are added.
      clean miss is always `rasen12`, never a jump straight from `rasen6` to
      Idle. The technique then ends as a `miss` (or `wall`).
   4. CONFIRM (from the contact step): the rush stops at once (`vx` 0, no
-     sliding through). Hit 1 of 2, applied exactly once through
-     `CombatSystem.applyHit`: 4 damage (100 → 96), no knockback or launch,
-     0.2 s hitstun, 0.15 s blockstun, 0.06 s hitstop on the target only.
+     sliding through). The contact, applied exactly once through
+     `CombatSystem.applyHit`: no damage (no large initial hit), no knockback
+     or launch, 0.2 s hitstun, 0.15 s blockstun, 0.06 s hitstop on the
+     target only.
      The target is then bound (below) with its horizontal speed zeroed and,
      on that same contact step (hits resolve after both fighters have picked
      their poses, so the technique re-picks the target's), is already shown
@@ -1044,21 +1075,34 @@ read the character database, so it stays the same as fighters are added.
      visual only: the sphere stays centred on the target (the drawn frame
      grows about its centre), and no hitbox, hurtbox, collision or hit ever
      reads it (the rush's hitbox is gone since the contact).
+     TICKS: through CONFIRM and WAIT, while the target is still bound by the
+     technique, every whole `tickInterval` (0.5 s) since the contact step
+     is one `tickHit` on it through `CombatSystem.applyHit`: 1 damage (+1
+     Knockback), no knockback, stun or hitstop, so the hold never
+     stutters. They fall 0.5, 1.0 and 1.5 s after the contact (steps 30, 60
+     and 90), counted on the fixed-step clock, never from animation frames;
+     none before the contact, none after the technique ends or the bind is
+     lost, and none on the explosion's step (the explosion is never also a
+     tick). Each is one combat event (`move` `rasenRush.tickHit`).
   6. EXPLODE: exactly 2.0 s (`explosionDelay`, 120 steps) after the
      contact step, counted from the hit, never from formation: #0001
      switches to `rasen9`, the explosion pose, and the sphere stops spinning
      and growing and plays `prasen10 → prasen11` once at the grown size. On
      the step `prasen10` first shows the target is released from the bind
-     and then takes hit 2: 16 damage (96 → 80; 20 in all), knockback 420
-     along the rush and a 220 launch, 0.55 s hitstun, 0.12 s hitstop (twice
-     the first hit's), 0.3 s blockstun. Releasing first keeps the bind from
-     cancelling the launch. `rasen9` is held for the whole blast (it lasts
+     and then takes the explosion, exactly once: 15 damage (18 in all with
+     the three ticks), a strong, mostly horizontal launch along the rush
+     (base `{ x: 720, y: 180 }`: over three times High horizontal, with a
+     slight lift so it carries through the air), scaled like every hit by
+     the target's accumulated Knockback, 0.55 s hitstun, 0.12 s hitstop
+     (twice the contact's), 0.3 s blockstun. Releasing first keeps the bind
+     from cancelling the launch. `rasen9` is held for the whole blast (it lasts
      the longer of the blast and the explosion pose).
   7. RELEASE: only once the blast is over, the sphere is gone and #0001
      recovers through `rasen10 → rasen11 → rasen12` once (15 steps, 0.25 s),
      still committed: no sphere, hit, bind or contact search.
   8. DONE: after `rasen12` the technique is cleared and #0001 returns to
-     Idle / normal control. Exactly two damage events for a full sequence.
+     Idle / normal control. A full sequence is exactly five hit events: the
+     contact (0), three ticks (1 each) and the explosion (15).
      A Charge still held does not restart by itself: it has to be let go
      and held again.
   The bind is a combat status separate from hitstun (`CombatState.bind` /
@@ -1074,21 +1118,22 @@ read the character database, so it stays the same as fighters are added.
   mid-dash (running off a ledge; no hover over the gap, no snap back),
   during a miss's whiff release or after the hit (the recovery included)
   cancels the technique on that step: sphere removed, any bind
-  released at once (hit 1's damage stays, hit 2 never happens) and #0001
+  released at once (ticks already dealt stay; no further tick or
+  explosion) and #0001
   enters Fall, straight down. A hit on #0001 in any phase cancels it the same
   way and shows the normal Hurt (no armour, no invulnerability). A Dodge's
   invulnerable frames let the rushing sphere pass without a hit, damage,
   bind or use of the sphere; the search continues and may still connect
   after them, otherwise it is a miss. A Block-type guard (future fighters)
-  facing the rush blocks the contact with the normal chip damage and
-  blockstun; then there is no bind or explosion and the technique ends. A
-  first hit that knocks the target out ends it at once (no bind, no
-  explosion), as does the target being knocked out or losing its bind
-  meanwhile. Before starting, the technique requires all six fighter clips
+  facing the rush blocks the contact with its blockstun (the contact deals
+  no damage, so no chip damage either); then there is no bind, tick or
+  explosion and the technique ends. The target losing its bind meanwhile
+  (a reset, or the Void taking it) ends it too. No amount of Knockback ends
+  the hold: there is no knockout. Before starting, the technique requires all six fighter clips
   and all three sphere effects (and valid data); anything missing logs a
   warning and the same press becomes an ordinary BA2: never a sphere around
-  the wrong pose, an invisible sphere, bind or delayed hit. Energy cost 0
-  (`energyCost` is data-ready; nothing is drained, refunded or gained). The
+  the wrong pose, an invisible sphere, bind or delayed hit, and no cooldown
+  starts. The
   sphere is drawn over both fighters (terrain, shadows, clones, CPU, P1,
   sphere, projectiles, foreground), centred at the fighters' art-pixel
   scale with image smoothing off, never mirrored. Restart / rematch
@@ -1097,16 +1142,24 @@ read the character database, so it stays the same as fighters are added.
   debug overlay draws the rushing sphere's hitbox as a dashed cyan box
   labelled `charged ba2 dash`, then a dashed cyan cross on the attached
   sphere's centre, and labels a bound fighter `bound`.
-- Every fighter has 100 health and an Energy resource of 100: each
-  definition in `CHARACTERS` declares `stats: { health: 100, energy: 100 }`,
-  and its combat state reads `maxHealth` / `health` and `maxEnergy` /
-  `energy` from those stats (nothing in the engine names a fighter). Both
-  start full and refill on restart / rematch. It changes only through the
-  combat state's `canSpendEnergy` / `spendEnergy` helpers, and #0001's
-  Charged BA1 Clone Attack (25) is the only thing that spends it. There is no
-  Energy regeneration or gain: Charge, hits, Dodges and time generate none,
-  and BA1, BA2, Throw, Defense and the Charged BA2 Sphere Rush cost none. The winner is still decided by
-  remaining health.
+- Every fighter's central combat number
+  is its accumulated **Knockback** (`CombatState.knockback`): it starts at 0
+  (a new fighter, a Quick Battle restart / rematch, a new Practice fighter
+  and a Practice Void respawn all start from 0), has no maximum and is shown
+  as a bare number (no % sign). A hit's `damage` is how much it adds:
+  #0001's BA1 5, mid-air BA1 5, BA2 10, mid-air BA2 10, shuriken 1, the
+  clone's BA1 5 or overhead mid-air BA2 10, the Sphere Rush 0 on contact, 1
+  per tick and 15 on the explosion (a blocked hit adds its chip damage). The
+  shared `CombatSystem.applyHit` adds the damage first, then scales the
+  move's base launch by `knockbackMultiplier` (`js/data/knockback.js`,
+  `1 + knockback / 100`, uncapped: 0 → 1×, 25 → 1.25×, 50 → 1.5×, 100 → 2×,
+  150 → 2.5×), so the hit that raises the number already launches harder;
+  both axes scale together (direction, downward spikes and the Low / Mid /
+  High identity are kept) and a zero base launch stays zero. Its event
+  carries `damage`, `knockbackBefore`, `knockbackAfter` and
+  `launchMultiplier`. Knockback never disables a fighter (`canAct()` never
+  reads it) and never defeats one: only the Void does. On time-up in Quick
+  Battle the fighter with less Knockback wins; equal is a draw.
 - Physics: acceleration, deceleration, max speed (from the fighter's Speed
   Power, below), gravity, jump impulse (from its Jump Power, below),
   ground/platform/solid collision on a finite main floor (no side walls:
@@ -1184,9 +1237,9 @@ read the character database, so it stays the same as fighters are added.
 
   Those attacks have no raw numeric `knockback`: the levels are the only
   sources. Knockback never depends on either fighter's Jump or Speed Power.
-- Combat architecture (health, damage, hitboxes, hurtboxes, attack definitions,
+- Combat architecture (accumulated Knockback, damage, hitboxes, hurtboxes, attack definitions,
   Defense with Block / Dodge implementations, invulnerability, knockback,
-  stun and blockstun, hitstop, cooldowns, Energy, binds, charged actions,
+  stun and blockstun, hitstop, cooldowns, charged-action cooldowns, binds, charged actions,
   summons and charged techniques) is data-driven. Basic Attacks 1 and 2,
   Throw (with its shuriken projectile), the Charged BA1 Clone Attack (a
   summoned clone performing BA1, or Mid-air BA2 over an opponent with no
@@ -1195,7 +1248,7 @@ read the character database, so it stays the same as fighters are added.
   (mapped to no attack) until real sprites exist, and no attack, projectile,
   clone or frame is ever fabricated. An attack whose frames fail to load is
   refused (no substitute pose, no invisible hitbox), and so is a Dodge, and so
-  is a clone summon whose cloud or attack art is missing (nothing is spent),
+  is a clone summon whose cloud or attack art is missing (no cooldown starts),
   and so is a charged technique with any of its clips missing.
 - Quick Battle: one round, 99 seconds, against a non-attacking training CPU
   that uses the same fighter definition. It never attacks, throws, charges,
@@ -1215,21 +1268,29 @@ read the character database, so it stays the same as fighters are added.
   blur. Pause, result and confirmation panels sit over a paused battle and add
   a light blur where supported, with a denser fill as the fallback. The stage
   stays dimly visible behind every panel.
-- HUD fighter panels: P1 (filled white tag) top-left and CPU (outlined tag)
-  top-right, identical glass, each with, in order, the tag and fighter name,
-  a green health bar, and a blue Energy bar directly beneath it. There are no
-  subtitle rows. Both health bars use the Alva green (`--accent`) with a
-  lower-opacity green delayed-damage layer; tags and names, not colour, tell
-  the fighters apart.
-- Energy bars (`role="meter"`, `aria-label="Energy"`, reporting the fighter's
-  real energy against its maximum) are the same width as health and slightly
-  shorter, with the same track, and one solid `--energy` blue fill with no
-  delayed-damage layer. Both P1 and CPU show one, both start full, and the CPU's
-  fills from the right like its health bar. Blue here is a deliberate
-  gameplay-resource exception to the green-only interface accent (5.1). The
-  meter changes the moment Energy is spent (each Clone Attack drops it by a
-  quarter: 100 % → 75 % → 50 % → 25 % → 0 %; the Sphere Rush never moves
-  it); no Energy gain is implemented yet.
+- HUD fighter cards: P1 (filled white tag) top-left and CPU (outlined tag)
+  top-right, each one compact, semi-transparent glass card (lighter than
+  the menu panels, so the stage shows through, dark enough to read on every
+  stage): the character's portrait (its own `visual.portrait` crop, painted
+  by the same helper as the roster, pixelated), one thin vertical divider,
+  then the tag and name (`displayName`) with the accumulated Knockback
+  beneath it as a large bare number (`0`, `27`, `143`; no bar, maximum, `/100`
+  or `%`), then the charged-cooldown row. The CPU's card mirrors P1's
+  (portrait on the outer right edge).
+- Charged-cooldown row: one small indicator per charged action in the
+  character's `chargedActions` (for #0001, Charged BA1 then Charged BA2),
+  each a ring with the seconds left inside it (`4.3`, one decimal, rounded
+  up so it never reads `0.0` while cooling) and the button's short name
+  beneath (`BA1`, `BA2`). The ring (CSS `conic-gradient` with a radial mask,
+  driven by `--cd-progress`) fills clockwise from the top as the ability
+  recovers, `progress = 1 − remaining / duration` read straight from the
+  fighter's cooldown state (so Charge visibly speeds it): empty as it
+  starts, half at halfway, complete at ready. Ready, the ring is complete
+  and green (`--accent`) with no number.
+- Accessibility: the Knockback number sits in a group labelled "Knockback"
+  (no maximum); each cooldown indicator is an image labelled "Charged BA1
+  cooldown, 3.2 seconds remaining" or "Charged BA1 ready" (BA2 alike). The
+  HUD writes to the DOM only when a shown value changes.
 - Timer + pause: one glass control at top centre. The round label and timer
   sit on top; a rectangular pause section sits directly beneath with no gap,
   the same width and a hairline seam, so only the outer corners are rounded.
@@ -1244,9 +1305,11 @@ read the character database, so it stays the same as fighters are added.
   name), "Paused", green **Resume** (default), **Restart Battle**, **Help** and
   **Return to Home**. Help is shown but disabled for now: muted, no hover or
   press response, skipped by keyboard/gamepad focus.
-- Time over: if one fighter has more health, a glass result menu offers green
-  **Rematch**, **Change Stage** and **Return to Home**. A draw opens no dialog;
-  once the TIME banner has played, a fresh battle starts.
+- Time over: if one fighter has less accumulated Knockback, it wins, and a
+  glass result menu ("Time ran out. Lower Knockback wins the round.") offers
+  green **Rematch**, **Change Stage** and **Return to Home**. Equal
+  Knockback is a draw: no dialog; once the TIME banner has played, a fresh
+  battle starts.
 - Void K.O.: once the K.O. banner has played, the same result menu opens with
   the kicker "K.O." and the line "Player 1 fell into the Void." (or "The CPU
   fell into the Void.").

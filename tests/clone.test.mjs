@@ -1,6 +1,6 @@
 // Run with node --test tests/clone.test.mjs (no dependencies).
 // #0001's Charged BA1 Clone Attack: the clone-cloud artwork and its effect
-// registration, the Charge-then-BA1 trigger, the Energy cost and its
+// registration, the Charge-then-BA1 trigger, its 5-second cooldown and its
 // fallbacks, the clone's appear -> BA1 -> vanish lifecycle, its placement
 // behind the opponent, the overhead Mid-air BA2 it performs instead where
 // there is no ground behind (platform edges, airborne opponents), detached
@@ -17,8 +17,8 @@ import { fileURLToPath } from 'node:url';
 import { characterFramePaths } from '../js/data/characters.js';
 import { getMap } from '../js/data/maps.js';
 import { Fighter } from '../js/game/character.js';
-import { CombatState } from '../js/game/combat.js';
-import { KNOCKBACK_LEVELS } from '../js/data/knockback.js';
+import { CombatState, CooldownTimers } from '../js/game/combat.js';
+import { KNOCKBACK_LEVELS, knockbackMultiplier } from '../js/data/knockback.js';
 import { Clone } from '../js/game/clone.js';
 import { StageCollision, createBody, stepBody } from '../js/game/physics.js';
 import { SpriteSet } from '../js/game/sprite-normalizer.js';
@@ -95,7 +95,7 @@ function follow(d, clone, held = () => CHARGE, targetHeld = () => ({})) {
   const log = [];
   for (let i = 1; d.clones.includes(clone); i++) {
     assert.ok(i < 600, 'the clone never went away');
-    log.push({ ...snap(clone), owner: d.attacker.state, energy: d.attacker.combat.energy });
+    log.push({ ...snap(clone), owner: d.attacker.state, cooling: d.attacker.combat.chargedCooldowns.active('ba1Clone') });
     d.tick(held(i), targetHeld(i));
   }
   return log;
@@ -159,23 +159,23 @@ test('the cloud is a one-shot, direction-neutral effect animation (1 -> 10 at 20
   assert.deepEqual(withCloud, ['cloneCloud']);
 });
 
-test('the Clone Attack is data: a 25 Energy Charged BA1 summon reusing ba1 and the cloud', () => {
+test('the Clone Attack is data: a Charged BA1 summon on a 5-second cooldown, reusing ba1 and the cloud', () => {
   // Charged actions are typed: Charged BA1 is this summon (Charged BA2, the
   // Sphere Rush, is a technique; see charged-ba2.test.mjs).
   assert.deepEqual(def.chargedActions.action1, { type: 'summon', id: 'ba1Clone' });
-  assert.equal(SUMMON.energyCost, 25);
+  assert.equal(SUMMON.cooldown, 5);
+  assert.equal('energyCost' in SUMMON, false, 'no cost of any kind');
   assert.equal(SUMMON.attack, 'ba1');
   assert.equal(SUMMON.cloud, 'cloneCloud');
   assert.equal(SUMMON.behindDistance, 48);
   assert.equal(SUMMON.effectOffset.x, 0);
   assert.ok(SUMMON.effectOffset.y < 0, 'the cloud centres on the body, above the feet');
-  assert.equal(def.stats.energy / SUMMON.energyCost, 4, 'a full meter pays for four');
   // BA1 itself: its knockback is its Low horizontal Knockback, and the
   // summon has no knockback tuning of its own.
   assert.deepEqual(
     { ...ATTACK },
     {
-      animation: 'ba1', startup: 1 / 12, active: 1 / 12, recovery: 2 / 12, damage: 6,
+      animation: 'ba1', startup: 1 / 12, active: 1 / 12, recovery: 2 / 12, damage: 5,
       hitbox: { x: 12, y: -64, w: 28, h: 16 }, knockback: { axis: 'horizontal', level: 'low' },
       hitstun: 0.22, blockstun: 0.14, hitstop: 0.06, cooldown: 0.1, groundOnly: true,
     },
@@ -286,36 +286,39 @@ test('SpriteSet normalizes the cloud as an effect at its own art size, on the fi
   assert.deepEqual(none.missing, def.effectAnimations.cloneCloud.frames);
 });
 
-// ---- Energy helpers -------------------------------------------------------------
+// ---- Cooldown helpers ------------------------------------------------------------
 
-test('CombatState spends Energy only when it can, exactly once, and never below 0', () => {
-  const c = new CombatState(def.stats);
-  assert.equal(c.energy, 100);
-  assert.equal(c.canSpendEnergy(25), true);
-  const seen = [c.energy];
-  while (c.spendEnergy(25)) seen.push(c.energy);
-  assert.deepEqual(seen, [100, 75, 50, 25, 0]);
-  assert.equal(c.canSpendEnergy(25), false);
-  assert.equal(c.spendEnergy(25), false);
-  assert.equal(c.energy, 0, 'never negative');
-  assert.equal(c.canSpendEnergy(0), true);
-
-  const low = new CombatState(def.stats);
-  low.energy = 24;
-  assert.equal(low.spendEnergy(25), false);
-  assert.equal(low.energy, 24, 'too little: nothing spent');
-  low.energy = 25;
-  assert.equal(low.spendEnergy(25), true);
-  assert.equal(low.energy, 0, 'exactly enough: exactly 0');
-  assert.equal(low.spendEnergy(-5), false, 'a negative cost is refused, not a refund');
-  assert.equal(low.energy, 0);
-  assert.equal(low.maxEnergy, 100);
-  assert.equal(low.health, 100, 'Energy is not Health');
+test('CooldownTimers: start, remaining, duration and progress; recovery at any rate, never below 0', () => {
+  const c = new CooldownTimers();
+  assert.equal(c.active('a'), false);
+  assert.deepEqual([c.remaining('a'), c.duration('a'), c.progress('a')], [0, 0, 1], 'ready: a complete ring');
+  c.start('a', 5);
+  assert.deepEqual([c.active('a'), c.remaining('a'), c.duration('a'), c.progress('a')], [true, 5, 5, 0], 'fresh: an empty ring');
+  c.update(2.5);
+  assert.deepEqual([c.remaining('a'), c.duration('a'), c.progress('a')], [2.5, 5, 0.5], 'halfway: half a ring');
+  c.update(0.5, 2);
+  assert.deepEqual([c.remaining('a'), c.progress('a')], [1.5, 0.7]);
+  c.update(10);
+  assert.deepEqual([c.active('a'), c.remaining('a'), c.progress('a')], [false, 0, 1], 'never negative: simply ready');
+  // Independent entries; a zero cooldown is none.
+  c.start('a', 5);
+  c.start('b', 3);
+  c.update(1);
+  assert.deepEqual([c.remaining('a'), c.remaining('b')], [4, 2]);
+  c.start('c', 0);
+  assert.equal(c.active('c'), false);
+  c.clear();
+  assert.equal(c.size, 0);
+  // A fighter's charged cooldowns are apart from its attack recovery.
+  const state = new CombatState(def.stats);
+  assert.ok(state.chargedCooldowns instanceof CooldownTimers);
+  assert.ok(state.cooldowns instanceof Map);
+  for (const key of ['energy', 'maxEnergy', 'health', 'maxHealth']) assert.equal(key in state, false, key);
 });
 
 // ---- Trigger --------------------------------------------------------------------
 
-test('Charge, then BA1 while still charging: one clone, 25 Energy, and the owner keeps charging', () => {
+test('Charge, then BA1 while still charging: one clone, a 5.0 s cooldown, and the owner keeps charging', () => {
   const d = duel();
   d.tick(CHARGE);
   assert.equal(d.attacker.state, 'charge');
@@ -329,7 +332,9 @@ test('Charge, then BA1 while still charging: one clone, 25 Energy, and the owner
   assert.equal(clone.phase, 'appear');
   assert.equal(name(clone.cloudFrame), CLOUD[0], 'the cloud starts on frame 1');
   assert.equal(clone.frame, null, 'no clone body yet');
-  assert.equal(d.attacker.combat.energy, 75);
+  const cd = d.attacker.combat.chargedCooldowns;
+  assert.deepEqual([cd.remaining('ba1Clone'), cd.duration('ba1Clone')], [5, 5], 'Charged BA1\'s 5.0 s cooldown starts');
+  assert.equal(cd.active('rasenRush'), false, 'Charged BA2 stays ready');
   assert.equal(d.attacker.summons.length, 0, 'the request was consumed');
   // The owner performs nothing: no attack, no BA1 art, no cooldown.
   assert.equal(d.attacker.state, 'charge');
@@ -344,25 +349,25 @@ test('Charge, then BA1 while still charging: one clone, 25 Energy, and the owner
   for (let i = 0; i < steps(1); i++) d.tick({ ...CHARGE, action1: true });
   assert.equal(d.clones.length, 1);
   assert.equal(d.clones[0], clone, 'still the first one, mid-lifecycle');
-  assert.equal(d.attacker.combat.energy, 75);
+  assert.ok(cd.active('ba1Clone'));
   assert.equal(d.attacker.combat.attack, null);
   assert.equal(d.attacker.state, 'charge');
 });
 
-test('Charge and BA1 pressed together from idle is an ordinary BA1: no clone, no cost', () => {
+test('Charge and BA1 pressed together from idle is an ordinary BA1: no clone, no cooldown', () => {
   const d = duel();
   d.tick({ ...CHARGE, chargePressed: true, ...BA1 });
   assert.equal(d.attacker.state, 'attack');
   assert.equal(d.attacker.combat.attack.def.id, 'ba1');
   assert.equal(frameName(d.attacker), '0001_1ba1.png');
-  assert.equal(d.attacker.combat.energy, 100);
+  assert.equal(d.attacker.combat.chargedCooldowns.size, 0);
   assert.equal(d.clones.length, 0);
   d.until(() => !d.attacker.combat.attack);
   assert.equal(d.clones.length, 0);
-  assert.equal(d.attacker.combat.energy, 100);
+  assert.equal(d.attacker.combat.chargedCooldowns.size, 0);
 });
 
-test('letting go of Charge on the BA1 step is an ordinary BA1: no clone, no release pose, no cost', () => {
+test('letting go of Charge on the BA1 step is an ordinary BA1: no clone, no release pose, no cooldown', () => {
   const d = duel();
   stepUntil(() => { d.tick(CHARGE); return d.attacker; }, (f) => f.animator.anim.key === 'chargeLoop');
   d.tick(BA1);
@@ -377,97 +382,98 @@ test('letting go of Charge on the BA1 step is an ordinary BA1: no clone, no rele
   }
   assert.ok(!states.includes('chargeRelease'), states.join());
   assert.equal(d.clones.length, 0);
-  assert.equal(d.attacker.combat.energy, 100);
+  assert.equal(d.attacker.combat.chargedCooldowns.size, 0);
 });
 
-test('Energy goes 100, 75, 50, 25, 0 over four summons; the fifth Charged BA1 is an ordinary BA1', () => {
+test('Charged BA1 cannot be reused while cooling down: the press does nothing at all, and the cooldown runs on', () => {
   const d = duel();
-  d.tick(CHARGE);
-  const energy = [d.attacker.combat.energy];
-  for (let i = 0; i < 4; i++) {
-    d.tick(CHARGED_BA1);
-    energy.push(d.attacker.combat.energy);
-    assert.equal(d.attacker.state, 'charge');
-    d.tick(CHARGE);
-    d.tick(CHARGE);
-  }
-  assert.deepEqual(energy, [100, 75, 50, 25, 0]);
-  assert.equal(d.clones.length, 4);
+  const first = summon(d);
+  const cd = d.attacker.combat.chargedCooldowns;
+  for (let i = 0; i < steps(0.5); i++) d.tick(CHARGE);
+  const before = cd.remaining('ba1Clone');
+  assert.ok(before > 0 && before < 5);
   d.tick(CHARGED_BA1);
-  assert.equal(d.clones.length, 4, 'no fifth clone');
-  assert.equal(d.attacker.combat.energy, 0, 'never negative');
-  assert.equal(d.attacker.combat.attack?.def.id, 'ba1', 'BA1 still works');
-  while (d.clones.length || d.attacker.combat.attack) {
-    d.tick(CHARGE);
-    assert.ok(d.attacker.combat.energy >= 0);
-  }
-  assert.equal(d.attacker.combat.energy, 0, 'nothing restores it');
+  assert.equal(d.clones.length, 1, 'no second clone');
+  assert.equal(d.clones[0], first);
+  assert.deepEqual(d.attacker.summons, []);
+  // Unavailable means unavailable: no ordinary BA1 in its place, no reset.
+  assert.equal(d.attacker.combat.attack, null, 'no BA1 either');
+  assert.equal(d.attacker.state, 'charge', 'still charging');
+  assert.ok(cd.remaining('ba1Clone') < before, 'never restarted');
+  assert.equal(cd.duration('ba1Clone'), 5);
+  // Pressed again and again while it cools: still nothing.
+  for (let i = 0; i < steps(1); i++) d.tick(i % 10 === 0 ? CHARGED_BA1 : CHARGE);
+  assert.equal(d.attacker.combat.attack, null);
+  assert.ok(d.clones.every((c) => c === first));
 });
 
-test('with less than 25 Energy, Charged BA1 is an ordinary BA1 and spends nothing; exactly 25 is enough', () => {
-  for (const energy of [24, 10, 0]) {
+test('Charged BA1 is ready again 5 s after its use at the normal rate, whether or not the clone hit', () => {
+  for (const hit of [true, false]) {
     const d = duel();
-    d.attacker.combat.energy = energy;
+    const clone = summon(d);
+    // Let go of Charge: nothing speeds the cooldown up now. Without a hit,
+    // the target walks away before the punch.
+    const used = d.attacker.combat.chargedCooldowns;
+    let n = 0;
+    while (used.active('ba1Clone')) {
+      d.tick({}, !hit && n < steps(0.5) ? { right: true } : {});
+      n++;
+      assert.ok(n < steps(6));
+    }
+    assert.equal(clone.alive, false);
+    assert.equal(d.events.some((e) => e.summon === clone), hit, hit ? 'the clone hit' : 'the clone missed');
+    // Summoned on the charging step, 5 s at 1x after it.
+    assert.ok(Math.abs(n * DT - 5) <= DT, `${n} steps`);
+    // Ready: the next Charged BA1 summons again.
     d.tick(CHARGE);
     d.tick(CHARGED_BA1);
-    assert.equal(d.clones.length, 0, `${energy} Energy`);
-    assert.equal(d.attacker.state, 'attack');
-    assert.equal(d.attacker.combat.attack.def.id, 'ba1');
-    assert.equal(frameName(d.attacker), '0001_1ba1.png');
-    assert.equal(d.attacker.combat.energy, energy);
-    d.until(() => d.events.length > 0);
-    assert.equal(d.events[0].summon, null, 'the owner\'s own punch');
-    assert.equal(d.attacker.combat.energy, energy);
+    assert.equal(d.clones.length, 1);
+    assert.notEqual(d.clones[0], clone);
+    assert.equal(used.remaining('ba1Clone'), 5);
   }
-  const exact = duel();
-  exact.attacker.combat.energy = 25;
-  summon(exact);
-  assert.equal(exact.attacker.combat.energy, 0);
-  assert.equal(exact.attacker.combat.attack, null);
-  assert.equal(exact.attacker.state, 'charge');
 });
 
-test('missing cloud art: no clone, no Energy spent, a warning, and an ordinary BA1', () => {
+test('missing cloud art: no clone, no cooldown started, a warning, and an ordinary BA1', () => {
   const d = duel({ attackerSprites: fakeSprites(undefined, undefined, []) });
   let warnings = captureWarnings(() => {
     d.tick(CHARGE);
     d.tick(CHARGED_BA1);
   });
   assert.equal(d.clones.length, 0);
-  assert.equal(d.attacker.combat.energy, 100);
+  assert.equal(d.attacker.combat.chargedCooldowns.active('ba1Clone'), false);
   assert.equal(d.attacker.combat.attack?.def.id, 'ba1');
   assert.equal(warnings.length, 1);
   assert.match(warnings[0], /ba1Clone.*cloneCloud.*no animation frames/);
 
-  // Missing BA1 art: no clone, no cost, and (as before) no BA1 either.
+  // Missing BA1 art: no clone, no cooldown, and (as before) no BA1 either.
   const noBa1 = duel({ attackerSprites: fakeSprites(Object.keys(def.animations).filter((k) => k !== 'ba1')) });
   warnings = captureWarnings(() => {
     noBa1.tick(CHARGE);
     noBa1.tick(CHARGED_BA1);
   });
   assert.equal(noBa1.clones.length, 0);
-  assert.equal(noBa1.attacker.combat.energy, 100);
+  assert.equal(noBa1.attacker.combat.chargedCooldowns.active('ba1Clone'), false);
   assert.equal(noBa1.attacker.combat.attack, null);
   assert.equal(noBa1.attacker.state, 'charge');
   assert.ok(warnings.some((w) => /ba1Clone.*"ba1" has no animation frames/.test(w)), warnings.join('\n'));
 
-  // No opponent to appear behind: nothing to summon, nothing spent.
+  // No opponent to appear behind: nothing to summon, no cooldown.
   const alone = makeFighter();
   alone.step(CHARGE);
   alone.step(CHARGED_BA1);
   assert.equal(alone.fighter.summons.length, 0);
-  assert.equal(alone.fighter.combat.energy, 100);
+  assert.equal(alone.fighter.combat.chargedCooldowns.active('ba1Clone'), false);
   assert.equal(alone.fighter.combat.attack?.def.id, 'ba1');
 });
 
 // ---- Regressions ----------------------------------------------------------------
 
-test('ordinary ground and mid-air BA1 are unchanged: no clone and no Energy cost', () => {
+test('ordinary ground and mid-air BA1 are unchanged: no clone and no charged cooldown', () => {
   const ground = duel();
   ground.tick(BA1);
   assert.equal(ground.attacker.combat.attack.def.id, 'ba1');
   ground.until(() => ground.events.length > 0);
-  assert.equal(ground.events[0].damage, 6);
+  assert.equal(ground.events[0].damage, 5);
   assert.equal(ground.events[0].summon, null);
   assert.equal(ground.attacker.combat.hitstop, 0.06, 'the owner\'s own punch still freezes the owner');
 
@@ -481,11 +487,11 @@ test('ordinary ground and mid-air BA1 are unchanged: no clone and no Energy cost
   for (const d of [ground, air]) {
     d.until(() => !d.attacker.combat.attack && d.attacker.grounded);
     assert.equal(d.clones.length, 0);
-    assert.equal(d.attacker.combat.energy, 100);
+    assert.equal(d.attacker.combat.chargedCooldowns.size, 0);
   }
 });
 
-test('Charged BA2 (its own Sphere Rush technique), Throw and Defense summon no clone and cost no Energy', () => {
+test('Charged BA2 (its own Sphere Rush technique), Throw and Defense summon no clone and never start Charged BA1\'s cooldown', () => {
   for (const [press, check] of [
     [BA2, (d) => assert.equal(d.attacker.technique?.def.id, 'rasenRush')],
     [THROW, (d) => assert.equal(d.attacker.combat.attack?.def.id, 'throw')],
@@ -499,7 +505,7 @@ test('Charged BA2 (its own Sphere Rush technique), Throw and Defense summon no c
     d.until(() => !d.attacker.combat.attack && !d.attacker.combat.defenseAction && !d.attacker.technique);
     for (let i = 0; i < 30; i++) d.tick(CHARGE);
     assert.equal(d.clones.length, 0);
-    assert.equal(d.attacker.combat.energy, 100);
+    assert.equal(d.attacker.combat.chargedCooldowns.active('ba1Clone'), false);
   }
   // The Throw still throws its shuriken.
   const t = duel({ gap: 300 });
@@ -544,7 +550,7 @@ test('the clone appears through clouds 1 -> 10, punches with the real BA1 frames
   assert.equal(attack.length, BA1_STEPS + Math.ceil(ATTACK.hitstop / DT));
   // The owner charged throughout and paid once.
   assert.ok(log.every((s) => s.owner === 'charge'));
-  assert.ok(log.every((s) => s.energy === 75));
+  assert.ok(log.every((s) => s.cooling), 'Charged BA1 cools down through the clone\'s whole life');
 });
 
 test('the clone is summoned behind the target, on its back side, facing it; the spot is snapshotted once', () => {
@@ -592,9 +598,9 @@ test('the clone never follows: the target can walk straight through its spot, an
   const log = follow(d, clone, () => CHARGE, (i) => (i < CLOUD_STEPS ? { right: true } : {}));
   assert.ok(d.target.body.x > spot.x + 60, 'no pushbox stopped it');
   for (const s of log) assert.deepEqual({ x: s.x, y: s.y, facing: s.facing }, spot);
-  // Whiff: no damage, and the full BA1 still plays and recovers.
+  // Whiff: no Knockback added, and the full BA1 still plays and recovers.
   assert.deepEqual(d.events, []);
-  assert.equal(d.target.combat.health, 100);
+  assert.equal(d.target.combat.knockback, 0);
   const attack = log.filter((s) => s.phase === 'attack');
   assert.equal(attack.length, BA1_STEPS, 'startup, active and recovery, no freeze');
   // BA1's own 12 fps: every frame for 1/12 s, the hitbox on frame 2.
@@ -683,11 +689,11 @@ test('StageCollision.supportsAt: a surface at that very height under the span, n
 test('the no-ground fallback is data: the summon reuses midairBa2 over the target; nothing about midairBa2 changes', () => {
   assert.deepEqual(SUMMON.noGround, { attack: 'midairBa2', offset: { x: 0, y: -36 } });
   assert.equal(SUMMON.attack, 'ba1', 'BA1 stays the normal clone attack');
-  assert.equal(SUMMON.energyCost, 25, 'one cost, whichever way it appears');
+  assert.equal(SUMMON.cooldown, 5, 'one cooldown, whichever way it appears');
   assert.deepEqual(
     { ...MB2 },
     {
-      animation: 'midairBa2', startup: 2 / 12, active: 1 / 12, recovery: 2 / 12, damage: 6,
+      animation: 'midairBa2', startup: 2 / 12, active: 1 / 12, recovery: 2 / 12, damage: 10,
       hitbox: { x: 8, y: -44, w: 40, h: 40 }, knockback: { axis: 'vertical', level: 'high', sign: -1 },
       hitstun: 0.22, blockstun: 0.14, hitstop: 0.06, cooldown: 0.1,
     },
@@ -701,7 +707,7 @@ test('the no-ground fallback is data: the summon reuses midairBa2 over the targe
   assert.ok(Object.isFrozen(f.summonDefs.ba1Clone.noGround));
 });
 
-test('supported ground is unchanged: behind the target either way it faces, BA1, 6 damage and Low horizontal Knockback', () => {
+test('supported ground is unchanged: behind the target either way it faces, BA1, 5 damage and Low horizontal Knockback', () => {
   for (const attackerFacing of [1, -1]) {
     const d = duel({ attackerFacing });
     const facing = d.target.facing;
@@ -717,15 +723,15 @@ test('supported ground is unchanged: behind the target either way it faces, BA1,
     assert.deepEqual(order(log.map((s) => s.body)), BA1_FRAMES);
     assert.deepEqual(order(log.filter((s) => s.phase === 'vanish').map((s) => s.cloud)), [...CLOUD].reverse());
     assert.equal(d.events.length, 1);
-    assert.equal(d.events[0].damage, 6);
-    assert.equal(d.target.combat.health, 94);
-    assert.equal(d.attacker.combat.energy, 75);
+    assert.equal(d.events[0].damage, 5, 'the clone\'s BA1 adds 5');
+    assert.equal(d.target.combat.knockback, 5);
+    assert.ok(d.attacker.combat.chargedCooldowns.active('ba1Clone'));
   }
   // Knockback read at the hit: along the clone's facing, no launch.
   const d = duel();
   const clone = summon(d);
   d.until(() => d.events.length > 0);
-  assert.equal(d.target.body.vx, KNOCKBACK_LEVELS.low.horizontal * clone.facing);
+  assert.equal(d.target.body.vx, KNOCKBACK_LEVELS.low.horizontal * knockbackMultiplier(5) * clone.facing);
   assert.equal(d.target.body.vy, 0);
 });
 
@@ -784,7 +790,7 @@ test('at a platform edge with nothing behind at its height, the clone appears ov
     assert.equal(clone.facing, facing);
     assert.equal(clone.phase, 'appear');
     assert.equal(name(clone.cloudFrame), CLOUD[0]);
-    assert.equal(d.attacker.combat.energy, 75, 'the same single 25 Energy');
+    assert.ok(d.attacker.combat.chargedCooldowns.active('ba1Clone'), 'the same single cooldown');
     assert.equal(d.attacker.state, 'charge');
     for (const key of ['body', 'pushbox', 'hurtboxes']) assert.equal(key in clone, false, `no ${key}`);
   }
@@ -825,7 +831,7 @@ test('an airborne target gets the overhead midairBa2, snapshotted where it was a
     assert.equal(clone.x, d.target.body.x);
     assert.equal(clone.y, d.target.body.y - 36);
     assert.equal(clone.facing, d.target.facing);
-    assert.equal(d.attacker.combat.energy, 75);
+    assert.ok(d.attacker.combat.chargedCooldowns.active('ba1Clone'));
     const spot = { x: clone.x, y: clone.y, facing: clone.facing };
     const log = follow(d, clone);
     for (const s of log) assert.deepEqual({ x: s.x, y: s.y, facing: s.facing }, spot, 'no gravity, no landing');
@@ -863,7 +869,7 @@ test('the overhead clone appears, kicks with the real five midairBa2 frames on t
     assert.equal(attack.length, MB2_STEPS + Math.ceil(MB2.hitstop / DT));
     // Stationary the whole time, never falling.
     for (const s of log) assert.deepEqual([s.x, s.y, s.facing], [targetX, ROOF_Y - 36, facing]);
-    assert.ok(log.every((s) => s.owner === 'charge' && s.energy === 75));
+    assert.ok(log.every((s) => s.owner === 'charge' && s.cooling));
   }
 });
 
@@ -890,8 +896,8 @@ test('the overhead kick lands on a stationary target through the real hitbox and
     assert.equal(e.summon, clone);
     assert.equal(e.projectile, null);
     assert.equal(e.technique, null);
-    assert.equal(e.damage, 6);
-    assert.equal(d.target.combat.health, 94);
+    assert.equal(e.damage, 10, 'the overhead Mid-air BA2 adds 10');
+    assert.equal(d.target.combat.knockback, 10);
     assert.equal(d.target.combat.stun, MB2.hitstun);
     assert.equal(d.target.combat.hitstop, MB2.hitstop);
     assert.equal(clone.hitstop, MB2.hitstop, 'the clone freezes on impact');
@@ -908,8 +914,8 @@ test('the overhead kick drives the target downward with midairBa2\'s High revers
     d.until(() => d.events.length > 0);
     assert.ok(d.target.body.vx === 0, 'no sideways push');
     assert.ok(d.target.body.vy > 0, 'downward: world y grows down');
-    assert.equal(d.target.body.vy, KNOCKBACK_LEVELS.high.vertical);
-    assert.equal(d.target.body.vy, 800);
+    assert.equal(d.target.body.vy, KNOCKBACK_LEVELS.high.vertical * knockbackMultiplier(10), 'scaled by the 10 it adds');
+    assert.equal(KNOCKBACK_LEVELS.high.vertical, 800);
     assert.equal(d.target.body.grounded, false);
   }
 });
@@ -924,7 +930,7 @@ test('the overhead kick hits once, however many steps its active box overlaps th
   }
   assert.equal(overlapSteps, steps(MB2.active) + Math.ceil(MB2.hitstop / DT), 'live across several steps (and the freeze)');
   assert.equal(d.events.length, 1, 'one hit event');
-  assert.equal(d.target.combat.health, 94, 'one damage application');
+  assert.equal(d.target.combat.knockback, 10, 'one damage application');
   assert.equal(clone.hasHit, true);
   assert.equal(clone.hitbox(), null, 'used up');
 });
@@ -942,7 +948,7 @@ test('a Dodge\'s invulnerable frames let the overhead kick pass through unspent;
   }
   assert.equal(activeSteps, steps(MB2.active));
   assert.deepEqual(covered.events, []);
-  assert.equal(covered.target.combat.health, 100);
+  assert.equal(covered.target.combat.knockback, 0);
   assert.equal(covered.target.combat.stun, 0);
   assert.equal(covered.target.body.vy, 0, 'no spike');
   assert.equal(covered.target.grounded, true);
@@ -962,7 +968,7 @@ test('a Dodge\'s invulnerable frames let the overhead kick pass through unspent;
   assert.equal(hitAt, invulnerable.at(-1) + 1, 'it connects on the first step after the window');
   assert.equal(late.events.length, 1);
   assert.equal(late.events[0].summon, c2);
-  assert.equal(late.target.combat.health, 94);
+  assert.equal(late.target.combat.knockback, 10);
 });
 
 test('Block (future fighters): the overhead kick goes through applyHit like any hit; a block suppresses its spike', () => {
@@ -975,8 +981,8 @@ test('Block (future fighters): the overhead kick goes through applyHit like any 
   while (!open.events.length) open.tick(CHARGE, GUARD);
   assert.equal(open.target.combat.blocking, true, 'the guard was up');
   assert.equal(open.events[0].type, 'hit');
-  assert.equal(open.events[0].damage, 6);
-  assert.equal(open.target.body.vy, KNOCKBACK_LEVELS.high.vertical);
+  assert.equal(open.events[0].damage, 10);
+  assert.equal(open.target.body.vy, KNOCKBACK_LEVELS.high.vertical * knockbackMultiplier(10));
 
   // Turned to face the clone: a normal block, with no vertical knockback.
   const front = roofDuel(1180, -1, { targetCharacter: blocker });
@@ -1008,7 +1014,7 @@ test('the overhead clone never follows: position, facing and attack stay put, an
   for (const s of log) assert.deepEqual({ x: s.x, y: s.y, facing: s.facing }, { x: spot.x, y: spot.y, facing: spot.facing });
   assert.equal(clone.attackDef, spot.attackDef, 'the attack choice never changes');
   assert.deepEqual(d.events, []);
-  assert.equal(d.target.combat.health, 100);
+  assert.equal(d.target.combat.knockback, 0);
   const attack = log.filter((s) => s.phase === 'attack');
   assert.equal(attack.length, MB2_STEPS, 'all five frames, no freeze');
   assert.deepEqual(runs(attack.map((s) => s.body)), MB2_FRAMES.map((f) => [f, steps(1 / 12)]));
@@ -1026,10 +1032,10 @@ test('the overhead clone never follows: position, facing and attack stay put, an
   assert.deepEqual(order(gLog.map((s) => s.body)), BA1_FRAMES);
 });
 
-test('missing no-ground attack art or data: no clone anywhere, no Energy spent, a warning, and an ordinary BA1', () => {
+test('missing no-ground attack art or data: no clone anywhere, no cooldown started, a warning, and an ordinary BA1', () => {
   const noArt = fakeSprites(Object.keys(def.animations).filter((k) => k !== 'midairBa2'));
   // At a roof edge (where it would be needed) and on the floor (where it
-  // would not): the same refusal, so Energy never depends on the spot.
+  // would not): the same refusal, so the cooldown never depends on the spot.
   for (const d of [roofDuel(1180, -1, { attackerSprites: noArt }), duel({ attackerSprites: noArt })]) {
     const warnings = captureWarnings(() => {
       d.tick(CHARGE);
@@ -1037,7 +1043,7 @@ test('missing no-ground attack art or data: no clone anywhere, no Energy spent, 
     });
     assert.equal(d.clones.length, 0, 'no invisible clone');
     assert.equal(d.attacker.summons.length, 0);
-    assert.equal(d.attacker.combat.energy, 100, 'nothing spent');
+    assert.equal(d.attacker.combat.chargedCooldowns.active('ba1Clone'), false, 'no cooldown');
     assert.equal(d.attacker.combat.attack?.def.id, 'ba1', 'the press falls through to BA1');
     assert.equal(warnings.length, 1);
     assert.match(warnings[0], /ba1Clone.*no-ground attack "midairBa2" has no animation frames/);
@@ -1057,7 +1063,7 @@ test('missing no-ground attack art or data: no clone anywhere, no Energy spent, 
       a.step(CHARGED_BA1);
     });
     assert.equal(a.fighter.summons.length, 0);
-    assert.equal(a.fighter.combat.energy, 100);
+    assert.equal(a.fighter.combat.chargedCooldowns.active('ba1Clone'), false);
     assert.equal(a.fighter.combat.attack?.def.id, 'ba1');
     assert.match(warnings.join('\n'), problem);
     // Nor does a request that got through anyway spawn a broken clone.
@@ -1170,14 +1176,14 @@ test('the clone BA1 hits once with BA1\'s damage, stun and knockback from the cl
   assert.equal(e.target, d.target);
   assert.equal(e.summon, clone);
   assert.equal(e.projectile, null);
-  assert.equal(e.damage, 6);
-  assert.equal(d.target.combat.health, 94);
+  assert.equal(e.damage, 5, 'the clone\'s BA1 adds 5');
+  assert.equal(d.target.combat.knockback, 5);
   assert.equal(d.target.combat.stun, ATTACK.hitstun);
   assert.equal(d.target.combat.hitstop, ATTACK.hitstop);
   // Knockback along the clone's facing (left, away from the clone), even
   // though the owner faces right.
   assert.equal(d.attacker.facing, 1);
-  assert.equal(d.target.body.vx, -140);
+  assert.equal(d.target.body.vx, -140 * knockbackMultiplier(5));
   assert.equal(clone.hasHit, true);
   assert.equal(clone.attackPhase, 'active');
   assert.equal(clone.hitbox(), null, 'used up');
@@ -1190,7 +1196,7 @@ test('the clone BA1 hits once with BA1\'s damage, stun and knockback from the cl
   assert.ok(log.some((s) => s.phase === 'attack' && s.body === '0001_1ba4.png'), 'recovery plays out');
   assert.deepEqual(order(log.filter((s) => s.phase === 'vanish').map((s) => s.cloud)), [...CLOUD].reverse());
   assert.equal(d.clones.length, 0);
-  assert.equal(d.target.combat.health, 94);
+  assert.equal(d.target.combat.knockback, 5);
 });
 
 test('a clone hit freezes the target and the clone, never the owner, whose Charge keeps animating', () => {
@@ -1242,7 +1248,7 @@ test('a Dodge\'s invulnerable frames let the clone BA1 pass through unspent; aft
   }
   assert.equal(activeSteps, steps(ATTACK.active));
   assert.deepEqual(covered.events, []);
-  assert.equal(covered.target.combat.health, 100);
+  assert.equal(covered.target.combat.knockback, 0);
   assert.equal(covered.target.combat.stun, 0);
   assert.equal(covered.target.body.vx, 0, 'no knockback');
   assert.equal(clone.hasHit, false, 'not used up by the Dodge');
@@ -1264,7 +1270,7 @@ test('a Dodge\'s invulnerable frames let the clone BA1 pass through unspent; aft
   assert.equal(late.events.length, 1);
   assert.equal(late.events[0].type, 'hit');
   assert.equal(late.events[0].summon, c2);
-  assert.equal(late.target.combat.health, 94);
+  assert.equal(late.target.combat.knockback, 5);
 });
 
 test('Block (future fighters): a guard facing away does not block the clone; turned toward it, it does', () => {
@@ -1280,7 +1286,7 @@ test('Block (future fighters): a guard facing away does not block the clone; tur
   assert.equal(back.target.facing, -1, 'toward the owner, away from the clone');
   assert.equal(back.attacker.facing, 1, 'the owner faces into the guard; its facing does not count');
   assert.equal(back.events[0].type, 'hit');
-  assert.equal(back.events[0].damage, 6);
+  assert.equal(back.events[0].damage, 5);
   assert.equal(back.target.combat.stun, ATTACK.hitstun);
 
   // Turned to face the clone before the punch: a normal block.
@@ -1294,7 +1300,7 @@ test('Block (future fighters): a guard facing away does not block the clone; tur
   assert.equal(e.attacker, front.attacker);
   assert.equal(e.damage, ATTACK.damage * front.target.combat.blockDamageScale, 'chip damage');
   assert.equal(front.target.combat.stun, ATTACK.blockstun);
-  assert.equal(front.target.body.vx, 0.5 * 140 * clone.facing, 'half knockback, from the clone');
+  assert.equal(front.target.body.vx, 0.5 * 140 * knockbackMultiplier(front.target.combat.knockback) * clone.facing, 'half knockback, from the clone');
   assert.equal(clone.hitstop, ATTACK.hitstop, 'a blocked punch still pauses the clone');
   assert.equal(front.attacker.combat.hitstop, 0);
 });
@@ -1349,11 +1355,11 @@ test('Jump, BA2, Throw or a Dodge by the owner after the summon leave the clone\
     assert.deepEqual(order(log.map((s) => s.body)), BA1_FRAMES);
     assert.deepEqual(order(log.filter((s) => s.phase === 'vanish').map((s) => s.cloud)), [...CLOUD].reverse());
     assert.equal(d.clones.length, 0);
-    assert.equal(d.attacker.combat.energy, 75);
+    assert.ok(d.attacker.combat.chargedCooldowns.active('ba1Clone'), 'still cooling down');
   }
 });
 
-test('an owner hit after summoning goes into hitstun; the clone carries on, and there is no refund', () => {
+test('an owner hit after summoning goes into hitstun; the clone carries on, and the cooldown is not refunded', () => {
   const d = duel();
   const clone = summon(d);
   // The target punches the owner right after the summon.
@@ -1361,30 +1367,31 @@ test('an owner hit after summoning goes into hitstun; the clone carries on, and 
   d.until(() => d.events.some((e) => e.target === d.attacker));
   d.tick(CHARGE);
   assert.equal(d.attacker.state, 'hitstun');
-  assert.equal(d.attacker.combat.health, 94);
+  assert.equal(d.attacker.combat.knockback, 5);
   assert.equal(clone.alive, true);
   assert.equal(d.clones.length, 1);
   const log = follow(d, clone);
   assert.deepEqual(order(log.map((s) => s.body)), BA1_FRAMES);
   assert.deepEqual(order(log.filter((s) => s.phase === 'vanish').map((s) => s.cloud)), [...CLOUD].reverse());
-  assert.equal(d.attacker.combat.energy, 75);
+  assert.ok(d.attacker.combat.chargedCooldowns.active('ba1Clone'), 'no refund');
   assert.equal(d.clones.length, 0);
 });
 
-test('an owner knocked out after summoning leaves its clone to finish; nothing new is summoned', () => {
+test('an owner launched after summoning, at high Knockback, leaves its clone to finish; nothing new is summoned', () => {
   const d = duel();
-  d.attacker.combat.health = 5;
+  d.attacker.combat.knockback = 250;
   const clone = summon(d);
-  d.tick(CHARGE, BA1);
-  d.until(() => d.attacker.combat.health === 0);
+  d.tick(CHARGE, BA2);
+  d.until(() => d.events.some((e) => e.target === d.attacker));
+  assert.ok(d.attacker.combat.knockback > 250);
   const log = follow(d, clone, () => CHARGED_BA1);
   assert.deepEqual(order(log.map((s) => s.body)), BA1_FRAMES);
   assert.deepEqual(order(log.filter((s) => s.phase === 'vanish').map((s) => s.cloud)), [...CLOUD].reverse());
   assert.equal(d.clones.length, 0, 'no retarget, no second clone');
-  assert.equal(d.attacker.combat.energy, 75);
+  assert.ok(d.attacker.combat.chargedCooldowns.active('ba1Clone'));
 });
 
-test('several paid clones coexist, each on its own clock; the fifth press finds no Energy', () => {
+test('clones from successive Charged BA1s never overlap: each waits out the 5 s cooldown and runs its own clock', () => {
   const d = duel();
   // Every clone's state after every step, from its spawn step on.
   const logs = new Map();
@@ -1396,22 +1403,18 @@ test('several paid clones coexist, each on its own clock; the fifth press finds 
     }
   };
   tick(CHARGE);
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < 3; i++) {
     tick(CHARGED_BA1);
-    tick(CHARGE);
-    tick(CHARGE);
+    assert.equal(d.clones.length, 1, `clone ${i + 1}`);
+    // Charged all along: the cooldown recovers at 2x, still well after the
+    // clone is gone.
+    while (d.attacker.combat.chargedCooldowns.active('ba1Clone')) {
+      tick(CHARGE);
+      assert.ok(d.clones.length <= 1);
+    }
+    assert.equal(d.clones.length, 0);
   }
-  const clones = [...d.clones];
-  assert.equal(clones.length, 4);
-  assert.equal(new Set(clones).size, 4);
-  assert.equal(d.attacker.combat.energy, 0);
-  // Different ages, different cloud frames: nothing is shared.
-  assert.deepEqual(clones.map((c) => name(c.cloudFrame)), ['0001_cloneav4.png', '0001_cloneav3.png', '0001_cloneav2.png', '0001_cloneav1.png']);
-  tick(CHARGED_BA1);
-  assert.equal(d.clones.length, 4, 'no fifth clone at 0 Energy');
-  assert.equal(d.attacker.combat.energy, 0);
-  while (d.clones.length) tick(CHARGE);
-  assert.equal(logs.size, 4);
+  assert.equal(logs.size, 3);
   for (const [c, log] of logs) {
     assert.deepEqual(order(log.filter((s) => s.phase === 'appear').map((s) => s.cloud)), CLOUD);
     assert.deepEqual(order(log.map((s) => s.body)), BA1_FRAMES);
@@ -1424,11 +1427,11 @@ test('several paid clones coexist, each on its own clock; the fifth press finds 
   assert.ok(d.events.filter((e) => e.summon).every((e) => e.attacker === d.attacker));
 });
 
-test('a clone is not a fighter: no health, Energy, controller, pushbox or hurtboxes', () => {
+test('a clone is not a fighter: no Knockback, controller, pushbox or hurtboxes', () => {
   const d = duel();
   const clone = summon(d);
   assert.equal(clone instanceof Fighter, false);
-  for (const key of ['health', 'energy', 'combat', 'controller', 'body', 'pushbox', 'hurtboxes', 'jumpBuffer', 'coyote', 'label', 'slot']) {
+  for (const key of ['knockback', 'combat', 'controller', 'body', 'pushbox', 'hurtboxes', 'jumpBuffer', 'coyote', 'label', 'slot']) {
     assert.equal(key in clone, false, `no ${key}`);
   }
   // Only fighters are ever hit: the target punching through the clone's
@@ -1442,7 +1445,7 @@ test('a clone is not a fighter: no health, Energy, controller, pushbox or hurtbo
 
 // ---- Training CPU ---------------------------------------------------------------
 
-test('the training CPU never charges, summons or attacks, and its Energy stays full', () => {
+test('the training CPU never charges, summons or attacks, and starts no cooldown of its own', () => {
   const cpu = new TrainingAIController({ rng: () => 0.3 });
   const d = duel({ gap: 200 });
   for (let i = 0; i < steps(12); i++) {
@@ -1454,7 +1457,7 @@ test('the training CPU never charges, summons or attacks, and its Energy stays f
     assert.equal(d.target.summons.length, 0);
     assert.notEqual(d.target.state, 'charge');
     assert.equal(d.target.combat.attack, null);
-    assert.equal(d.target.combat.energy, 100);
+    assert.equal(d.target.combat.chargedCooldowns.size, 0);
   }
   assert.ok(d.events.some((e) => e.summon), 'the player\'s clones did reach it');
   assert.ok(d.clones.every((c) => c.owner === d.attacker));
@@ -1488,7 +1491,7 @@ function realBattle(mapId = 'desert') {
   });
 }
 
-test('Battle summons, owns and drops clones; restart and rematch clear them and refill Energy', async () => {
+test('Battle summons, owns and drops clones; restart and rematch clear them and every cooldown', async () => {
   const { battle, script } = await realBattle();
   battle.setPhase('fight');
   script.held = CHARGE;
@@ -1497,20 +1500,19 @@ test('Battle summons, owns and drops clones; restart and rematch clear them and 
   battle.update(DT);
   assert.equal(battle.clones.length, 1);
   assert.equal(name(battle.clones[0].cloudFrame), CLOUD[0], 'spawned on cloud frame 1 in the same step');
-  assert.equal(battle.p1.combat.energy, 75);
+  assert.equal(battle.p1.combat.chargedCooldowns.remaining('ba1Clone'), 5);
   assert.equal(battle.p1.state, 'charge');
   assert.deepEqual(battle.fighters, [battle.p1, battle.p2], 'never a fighter');
   battle.update(DT);
   script.once = BA1;
   battle.update(DT);
-  assert.equal(battle.clones.length, 2);
-  assert.equal(battle.p1.combat.energy, 50);
-  assert.equal(battle.p2.combat.energy, 100);
+  assert.equal(battle.clones.length, 1, 'still cooling down: no second clone');
+  assert.equal(battle.p2.combat.chargedCooldowns.size, 0);
 
   battle.restart();
   assert.equal(battle.clones.length, 0, 'no clone survives a rematch');
-  assert.equal(battle.p1.combat.energy, 100);
-  assert.equal(battle.p2.combat.energy, 100);
+  assert.equal(battle.p1.combat.chargedCooldowns.size, 0, 'a rematch starts with every cooldown ready');
+  assert.equal(battle.p2.combat.chargedCooldowns.size, 0);
   assert.deepEqual(battle.p1.summons, []);
   for (let i = 0; i < 30; i++) battle.update(DT);
   assert.equal(battle.clones.length, 0, 'intro locks input: nothing is summoned');
@@ -1529,6 +1531,11 @@ test('Battle summons, owns and drops clones; restart and rematch clear them and 
   const freeze = clone.hasHit ? Math.ceil(ATTACK.hitstop / DT) : 0;
   assert.equal(n, CLOUD_STEPS + BA1_STEPS + freeze + CLOUD_STEPS, 'appear, BA1, vanish, then dropped');
 
+  // Still cooling down, then ready again.
+  script.once = BA1;
+  battle.update(DT);
+  assert.equal(battle.clones.length, 0);
+  while (battle.p1.combat.chargedCooldowns.active('ba1Clone')) battle.update(DT);
   script.once = BA1;
   battle.update(DT);
   assert.equal(battle.clones.length, 1);
