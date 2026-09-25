@@ -708,13 +708,13 @@ read the character database, so it stays the same as fighters are added.
   hitstun, 0.14 s blockstun, 0.06 s hitstop and a 0.1 s cooldown, and
   declares `baseLaunch: 1, directionalLaunch: 'horizontal'`: an unblocked
   hit adds its 5 to the opponent's Launch Point, then pushes it away at 1 ×
-  that new Launch Point (from 115: 120, at impact vx 120 × facing) with no
+  that new Launch Point (from 115: 120, at impact vx 1200 × facing) with no
   vertical launch. Mid-air BA1 hits once for 5 damage, 0.24 s hitstun,
   0.15 s blockstun, 0.07 s hitstop and a 0.18 s cooldown (longer, making up
   for the missing recovery), and declares `baseLaunch: 2,
   directionalLaunch: 'vertical'`: an unblocked hit launches the opponent
   upward at 2 × its new Launch Point with no sideways push (from 115: at
-  impact vx 0, vy −240), less high than ground BA2's launch from the same
+  impact vx 0, vy −2400), less high than ground BA2's launch from the same
   Launch Point, as BA2 adds more damage first. A blocked mid-air BA1 is
   neither pushed nor launched. Hitboxes match the
   strike in the contact frame (the punch; the slash arc in front of the
@@ -735,11 +735,11 @@ read the character database, so it stays the same as fighters are added.
   0.15 s cooldown, and declares `baseLaunch: 2, directionalLaunch:
   'vertical'`: an unblocked hit adds its 10, then launches the opponent
   upward at 2 × its new Launch Point (from 110: 120, at impact vx 0,
-  vy −240, airborne, before normal gravity brings it down). Mid-air BA2 hits
+  vy −2400, airborne, before normal gravity brings it down). Mid-air BA2 hits
   once for 10 damage, 0.22 s hitstun, 0.14 s blockstun and 0.06 s hitstop,
   with a 0.1 s cooldown, and declares `baseLaunch: 2, directionalLaunch:
   'reverseVertical'`: an unblocked hit drives the opponent downward just as
-  hard (from 110: at impact vx 0, vy +240). A grounded opponent is knocked
+  hard (from 110: at impact vx 0, vy +2400). A grounded opponent is knocked
   straight back onto the ground it stands on; an airborne one is sent down
   toward it. Neither has a horizontal launch. Both come from the shared
   launch path, not special BA2 code. A blocked BA2 still takes chip damage
@@ -1040,7 +1040,7 @@ read the character database, so it stays the same as fighters are added.
   0.14 s blockstun, 0.06 s hitstop), whose hitbox, from the overhead spot,
   lands on a stationary opponent's hurtboxes, and whose Base Launch 2
   reverse vertical launch drives the opponent downward (from 110: `vy =
-  +240`, no sideways push; none on a block, like any vertical launch). VANISH removes the
+  +2400`, no sideways push; none on a block, like any vertical launch). VANISH removes the
   body and plays
   the same cloud backwards, `cloneav10 → … → cloneav1`, at the same 20 fps
   (0.5 s), with no hitbox; the clone is then removed. The clone's hitbox is
@@ -1178,8 +1178,9 @@ read the character database, so it stays the same as fighters are added.
      the three ticks) with `baseLaunch: 3, directionalLaunch: 'horizontal'`:
      the 15 is added first, then the target's new Launch Point is tripled
      and sent sideways along the rush, through the same shared launch as
-     every other hit (from 105 before the blast: 120, launched at 360; a
-     fresh target, 18 after the ticks and the blast, at 54). It is the
+     every other hit (from 105 before the blast: 120, a strength of 360,
+     launched at 3600 units/s; a fresh target, 18 after the ticks and the
+     blast, at 54, so 540 units/s). It is the
      technique's only launching hit. 0.55 s hitstun, 0.12 s hitstop
      (twice the contact's), 0.3 s blockstun. Releasing first keeps the bind
      from cancelling the launch. `rasen9` is held for the whole blast (it lasts
@@ -1257,14 +1258,17 @@ read the character database, so it stays the same as fighters are added.
   every hit, and none is derived from another. The shared
   `CombatSystem.applyHit` adds the damage first, then computes the strength
   (`resolveLaunchStrength`) and turns it into a velocity
-  (`resolveDirectionalLaunch`, `js/data/launch.js`): horizontal along the
-  hit's travel (`vx = strength × facing`), vertical upward (`vy =
-  −strength`, as world y grows downward), reverse vertical downward (`vy =
-  +strength`), `null` nothing at all. That multiplication is the whole
-  strength: no base velocity is added, nothing grows per point, and
-  horizontal and vertical launches use the same number. At 120 Launch
-  Point, Base Launch 0, 1, 2 and 3 give 0, 120, 240 and 360; at 37, 0, 37,
-  74 and 111. Block modifies the resolved launch afterward: a blocked hit
+  (`resolveDirectionalLaunch`, `js/data/launch.js`) at `LAUNCH_UNIT_SPEED`,
+  10 world units per second per point: horizontal along the hit's travel
+  (`vx = strength × 10 × facing`), vertical upward (`vy = −strength × 10`,
+  as world y grows downward), reverse vertical downward (`vy = +strength ×
+  10`), `null` nothing at all. That multiplication is the whole strength:
+  no base velocity is added, and horizontal and vertical launches use the
+  same number. The one conversion factor is the same for every hit and
+  direction, so it only puts the strength in the world's units (gravity
+  2500, a jump 920) and never changes its proportions. At 120 Launch Point,
+  Base Launch 0, 1, 2 and 3 give strengths of 0, 120, 240 and 360 (speeds
+  0, 1200, 2400 and 3600); at 37, 0, 37, 74 and 111. Block modifies the resolved launch afterward: a blocked hit
   keeps half of a horizontal launch (`BLOCKED_HORIZONTAL_LAUNCH_SCALE`, a
   Block rule, not part of Base Launch) and none of a vertical or reverse
   vertical one. A hit that launches replaces the target's sideways speed (a

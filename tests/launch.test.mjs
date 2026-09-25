@@ -3,7 +3,9 @@
 // Launch 0-3 and Directional Launch on every hit, and the one formula that
 // joins them. A hit's damage is added to the target's Launch Point first;
 // its launch strength is then exactly Base Launch x that new Launch Point,
-// and Directional Launch only decides where it goes. Covers the registry and
+// Directional Launch only decides where it goes, and one factor
+// (LAUNCH_UNIT_SPEED, 10 world units per second per point) turns it into a
+// speed. Covers the registry and
 // its validation, the shared resolvers, the real CombatSystem.applyHit path
 // (melee, projectiles, clones and charged techniques alike), Block's
 // modifier, #0001's authored hits, Void respawns and a guard against the old
@@ -14,7 +16,7 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import {
   BASE_LAUNCH_VALUES, DIRECTIONAL_LAUNCHES, resolveBaseLaunch, resolveDirectionalLaunchValue, resolveHitLaunch,
-  resolveLaunchStrength, resolveDirectionalLaunch,
+  resolveLaunchStrength, resolveDirectionalLaunch, LAUNCH_UNIT_SPEED,
 } from '../js/data/launch.js';
 import * as launchModule from '../js/data/launch.js';
 import { CHARACTERS } from '../js/data/characters.js';
@@ -27,6 +29,8 @@ import { CONFIG } from '../js/config.js';
 import { def, DT, fakeSprites, makeFighter, duel } from './fighter-harness.mjs';
 
 const ROOT = new URL('../', import.meta.url);
+// World units per second per point of launch strength.
+const U = LAUNCH_UNIT_SPEED;
 const read = (path) => readFileSync(new URL(path, ROOT), 'utf8');
 
 // Silences and collects console.warn while `fn` runs.
@@ -91,7 +95,7 @@ test('Directional Launch is none, horizontal, vertical or reverse vertical, by c
 test('the launch module is small: values, directions, validation, resolution and reference copy, with no tuning tables', () => {
   assert.deepEqual(Object.keys(launchModule).sort(), [
     'BASE_LAUNCH_DESCRIPTIONS', 'BASE_LAUNCH_SUMMARY', 'BASE_LAUNCH_VALUES', 'DIRECTIONAL_LAUNCHES',
-    'DIRECTIONAL_LAUNCH_SUMMARY', 'LAUNCH_FORMULA', 'LAUNCH_POINT_SUMMARY', 'resolveBaseLaunch',
+    'DIRECTIONAL_LAUNCH_SUMMARY', 'LAUNCH_FORMULA', 'LAUNCH_POINT_SUMMARY', 'LAUNCH_UNIT_SPEED', 'resolveBaseLaunch',
     'resolveDirectionalLaunch', 'resolveDirectionalLaunchValue', 'resolveHitLaunch', 'resolveLaunchStrength',
   ]);
   const code = read('js/data/launch.js').replace(/^\s*\/\/.*$/gm, '');
@@ -193,7 +197,7 @@ test('the hit\'s own damage is added before its launch: 115 + 5 = 120, so Base L
   assert.equal(target.combat.launchPoint, 120);
   assert.equal(event.launchStrength, 120);
   assert.notEqual(event.launchStrength, 115);
-  assert.equal(target.body.vx, 120);
+  assert.equal(target.body.vx, 120 * U, '120 points of strength, as a speed');
 });
 
 // ---- Strength ---------------------------------------------------------------------
@@ -207,16 +211,26 @@ test('launch strength is exactly Base Launch x Launch Point: 0 / 120 / 240 / 360
   }
 });
 
-test('no hidden launch constant: Base Launch 1 at 120 is exactly 120 (never 260, 600, 620 or 800), 2 is 240 and 3 is 360', () => {
+test('one conversion to speed, 10 per point, the same for every direction: 1 x 120 is a strength of 120 and a speed of 1200', () => {
+  assert.equal(LAUNCH_UNIT_SPEED, 10);
   for (const [baseLaunch, expected] of [[1, 120], [2, 240], [3, 360]]) {
     for (const direction of ['horizontal', 'vertical', 'reverseVertical']) {
       const { target, event } = hitAt(120, probe(0, baseLaunch, direction));
-      assert.equal(event.launchStrength, expected);
+      assert.equal(event.launchStrength, expected, 'the strength is Base Launch x Launch Point, nothing added');
       const speed = Math.abs(target.body.vx) + Math.abs(target.body.vy);
-      assert.equal(speed, expected, `${direction}: the whole velocity is the strength`);
-      for (const old of [140, 260, 480, 600, 620, 640, 720, 800]) assert.notEqual(speed, old);
+      assert.equal(speed, expected * U, `${direction}: exactly the strength x ${U}, nothing added`);
     }
   }
+});
+
+test('no hidden launch constant: speed stays proportional to Base Launch x Launch Point, from 1 point up', () => {
+  // No base velocity: doubling the Launch Point doubles the speed, and the
+  // smallest strength gives the smallest speed.
+  const speedAt = (lp, baseLaunch) => hitAt(lp, probe(0, baseLaunch, 'horizontal')).target.body.vx;
+  assert.equal(speedAt(1, 1), U);
+  assert.equal(speedAt(60, 1) * 2, speedAt(120, 1));
+  assert.equal(speedAt(120, 1) * 3, speedAt(120, 3));
+  assert.equal(speedAt(37, 2), 74 * U);
 });
 
 test('Base Launch 0 never launches, at 0, 1, 50, 120, 500 or 1000 Launch Point, with or without a direction', () => {
@@ -240,35 +254,35 @@ test('Base Launch 0 never launches, at 0, 1, 50, 120, 500 or 1000 Launch Point, 
 // ---- Direction --------------------------------------------------------------------
 
 test('resolveDirectionalLaunch: horizontal along the facing, vertical upward (world y grows down), reverse vertical downward, none nothing', () => {
-  assert.deepEqual(resolveDirectionalLaunch('horizontal', 120, 1), { x: 120, y: 0 });
-  assert.deepEqual(resolveDirectionalLaunch('horizontal', 120, -1), { x: -120, y: 0 });
-  assert.deepEqual(resolveDirectionalLaunch('vertical', 120, 1), { x: 0, y: -120 });
-  assert.deepEqual(resolveDirectionalLaunch('vertical', 120, -1), { x: 0, y: -120 });
-  assert.deepEqual(resolveDirectionalLaunch('reverseVertical', 120, -1), { x: 0, y: 120 });
+  assert.deepEqual(resolveDirectionalLaunch('horizontal', 120, 1), { x: 1200, y: 0 });
+  assert.deepEqual(resolveDirectionalLaunch('horizontal', 120, -1), { x: -1200, y: 0 });
+  assert.deepEqual(resolveDirectionalLaunch('vertical', 120, 1), { x: 0, y: -1200 });
+  assert.deepEqual(resolveDirectionalLaunch('vertical', 120, -1), { x: 0, y: -1200 });
+  assert.deepEqual(resolveDirectionalLaunch('reverseVertical', 120, -1), { x: 0, y: 1200 });
   assert.deepEqual(resolveDirectionalLaunch(null, 120, 1), { x: 0, y: 0 });
   assert.deepEqual(resolveDirectionalLaunch('horizontal', 0, -1), { x: 0, y: 0 });
 });
 
-test('through applyHit: horizontal right +120 and left -120 with no vertical launch; vertical -120; reverse vertical +120; none leaves it be', () => {
+test('through applyHit, at strength 120: horizontal right +1200 and left -1200 with no vertical launch; vertical -1200; reverse vertical +1200; none leaves it be', () => {
   for (const facing of [1, -1]) {
     const { target, event } = hitAt(120, probe(0, 1, 'horizontal'), { facing });
-    assert.equal(target.body.vx, 120 * facing);
+    assert.equal(target.body.vx, 1200 * facing);
     assert.equal(target.body.vy, 0, 'no launch-system vertical velocity');
-    assert.deepEqual(event.finalLaunch, { x: 120 * facing, y: 0 });
+    assert.deepEqual(event.finalLaunch, { x: 1200 * facing, y: 0 });
   }
   const up = hitAt(120, probe(0, 1, 'vertical'));
-  assert.deepEqual([up.target.body.vx, up.target.body.vy, up.target.body.grounded], [0, -120, false]);
+  assert.deepEqual([up.target.body.vx, up.target.body.vy, up.target.body.grounded], [0, -1200, false]);
   const down = hitAt(120, probe(0, 1, 'reverseVertical'));
-  assert.deepEqual([down.target.body.vx, down.target.body.vy, down.target.body.grounded], [0, 120, false]);
+  assert.deepEqual([down.target.body.vx, down.target.body.vy, down.target.body.grounded], [0, 1200, false]);
   const none = hitAt(120, probe(0, 1, null));
   assert.deepEqual([none.target.body.vx, none.target.body.vy], [0, 0]);
   assert.deepEqual(none.event.finalLaunch, { x: 0, y: 0 });
 });
 
-test('direction never changes magnitude: at 240, |vx| or |vy| is 240 whichever way it goes', () => {
+test('direction never changes magnitude: at strength 240, |vx| or |vy| is 2400 whichever way it goes', () => {
   for (const direction of ['horizontal', 'vertical', 'reverseVertical']) {
     const { target } = hitAt(120, probe(0, 2, direction));
-    assert.equal(Math.hypot(target.body.vx, target.body.vy), 240, direction);
+    assert.equal(Math.hypot(target.body.vx, target.body.vy), 240 * U, direction);
   }
 });
 
@@ -277,7 +291,7 @@ test('the facing a hit travels in is its own: a projectile\'s direction, a clone
   // The attacker faces right; each detached hit says where it travels.
   for (const [key, source] of [['projectile', { direction: -1 }], ['summon', { facing: -1 }], ['technique', { facing: -1 }]]) {
     const { target, event } = hitAt(120, hit, { facing: -1, options: { [key]: source } });
-    assert.equal(target.body.vx, -120, key);
+    assert.equal(target.body.vx, -120 * U, key);
     assert.equal(event[key], source);
   }
 });
@@ -293,8 +307,8 @@ test('a blocked horizontal hit: chip damage adds to Launch Point, raw strength f
   assert.equal(event.damage, 1, 'the chip damage actually received');
   assert.equal(target.combat.launchPoint, 120);
   assert.equal(event.launchStrength, 120, 'raw, before Block');
-  assert.deepEqual(event.finalLaunch, { x: 60, y: 0 });
-  assert.equal(target.body.vx, 60);
+  assert.deepEqual(event.finalLaunch, { x: 60 * U, y: 0 });
+  assert.equal(target.body.vx, 60 * U);
   assert.equal(BLOCKED_HORIZONTAL_LAUNCH_SCALE, 0.5, 'a Block modifier, not part of Base Launch');
   assert.deepEqual(blockLaunch({ x: -240, y: 0 }), { x: -120, y: 0 });
 });
@@ -326,7 +340,7 @@ test('a hit event describes the new system and nothing of the old one', () => {
   assert.equal(event.baseLaunch, 2, 'the integer multiplier, not a vector');
   assert.equal(event.directionalLaunch, 'vertical');
   assert.equal(event.launchStrength, 240);
-  assert.deepEqual(event.finalLaunch, { x: 0, y: -240 });
+  assert.deepEqual(event.finalLaunch, { x: 0, y: -240 * U });
 });
 
 // ---- #0001 ------------------------------------------------------------------------
@@ -366,14 +380,14 @@ test('#0001\'s authored hits: damage, Base Launch and Directional Launch, exactl
 test('#0001 at work: each hit adds its damage, then launches at Base Launch x the new Launch Point along its direction', () => {
   const hits = realHits();
   const cases = [
-    // [hit, from, to, strength, finalLaunch facing right]
-    ['ba1', 115, 120, 120, { x: 120, y: 0 }],
-    ['ba2', 110, 120, 240, { x: 0, y: -240 }],
-    ['midairBa1', 115, 120, 240, { x: 0, y: -240 }],
-    ['midairBa2', 110, 120, 240, { x: 0, y: 240 }],
+    // [hit, from, to, strength, finalLaunch facing right (strength x 10)]
+    ['ba1', 115, 120, 120, { x: 1200, y: 0 }],
+    ['ba2', 110, 120, 240, { x: 0, y: -2400 }],
+    ['midairBa1', 115, 120, 240, { x: 0, y: -2400 }],
+    ['midairBa2', 110, 120, 240, { x: 0, y: 2400 }],
     ['shuriken', 119, 120, 0, { x: 0, y: 0 }],
     ['tickHit', 119, 120, 0, { x: 0, y: 0 }],
-    ['explosionHit', 105, 120, 360, { x: 360, y: 0 }],
+    ['explosionHit', 105, 120, 360, { x: 3600, y: 0 }],
   ];
   for (const [id, from, to, strength, final] of cases) {
     const { target, event } = hitAt(from, hits[id]);
@@ -388,8 +402,8 @@ test('#0001 at work: each hit adds its damage, then launches at Base Launch x th
     }
   }
   // Facing left, the sideways hits travel left.
-  assert.equal(hitAt(115, hits.ba1, { facing: -1 }).target.body.vx, -120);
-  assert.equal(hitAt(105, hits.explosionHit, { facing: -1 }).target.body.vx, -360);
+  assert.equal(hitAt(115, hits.ba1, { facing: -1 }).target.body.vx, -1200);
+  assert.equal(hitAt(105, hits.explosionHit, { facing: -1 }).target.body.vx, -3600);
 });
 
 // ---- Respawn ----------------------------------------------------------------------

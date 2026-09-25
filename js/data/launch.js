@@ -17,11 +17,14 @@
 //
 //   launch strength = Base Launch x the target's new Launch Point
 //
-// with nothing added or scaled afterward: Base Launch 0 never launches, 1
-// uses the Launch Point once, 2 doubles it and 3 triples it. Directional
-// Launch then sends that strength along the hit's facing ('horizontal'),
-// upward ('vertical') or downward ('reverseVertical'); a null direction
-// never launches. Block is the only thing that changes the result, and only
+// with nothing added to it: Base Launch 0 never launches, 1 uses the Launch
+// Point once, 2 doubles it and 3 triples it. Directional Launch then sends
+// that strength along the hit's facing ('horizontal'), upward ('vertical')
+// or downward ('reverseVertical'); a null direction never launches. The
+// strength becomes a speed at LAUNCH_UNIT_SPEED world units per second per
+// point, one factor for every direction and every hit, so it only converts
+// the game's numbers into the physics' units and never changes their
+// proportions. Block is the only thing that changes the result, and only
 // after it is resolved (see CombatSystem.applyHit in js/game/combat.js).
 //
 // Every hit (a fighter's attack, a projectile's, a charged technique's)
@@ -95,18 +98,26 @@ export function resolveLaunchStrength(baseLaunch, launchPoint) {
   return baseLaunch * launchPoint;
 }
 
+// World units per second of launch speed for each point of launch
+// strength: the one conversion from launch strength to physics, the same for
+// every direction and every hit. Without it a launch would be measured on the
+// same scale as damage, far below the world's (gravity 2500, a jump 920), and
+// no hit would visibly move anyone until very high Launch Points.
+export const LAUNCH_UNIT_SPEED = 10;
+
 const NO_LAUNCH = Object.freeze({ x: 0, y: 0 });
 
 // The world-space launch velocity `{ x, y }` of `strength` sent along
-// `direction`, for a hit traveling toward `facing` (1 right, -1 left).
-// World y grows downward, so a vertical launch is negative y. The strength
-// is used as it is: direction never changes the magnitude. A null
-// direction, or no strength, is no launch at all.
+// `direction`, for a hit traveling toward `facing` (1 right, -1 left): a
+// speed of strength x LAUNCH_UNIT_SPEED. World y grows downward, so a
+// vertical launch is negative y. Direction never changes the magnitude. A
+// null direction, or no strength, is no launch at all.
 export function resolveDirectionalLaunch(direction, strength, facing = 1) {
   if (!(strength > 0)) return NO_LAUNCH;
-  if (direction === 'horizontal') return Object.freeze({ x: strength * facing, y: 0 });
-  if (direction === 'vertical') return Object.freeze({ x: 0, y: -strength });
-  if (direction === 'reverseVertical') return Object.freeze({ x: 0, y: strength });
+  const speed = strength * LAUNCH_UNIT_SPEED;
+  if (direction === 'horizontal') return Object.freeze({ x: speed * facing, y: 0 });
+  if (direction === 'vertical') return Object.freeze({ x: 0, y: -speed });
+  if (direction === 'reverseVertical') return Object.freeze({ x: 0, y: speed });
   return NO_LAUNCH;
 }
 

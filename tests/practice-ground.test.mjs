@@ -1287,7 +1287,7 @@ test('Player 1\'s BA2 launches the CPU straight up (Base Launch 2, vertical), th
   const groundY = cpu.body.y;
   const startX = cpu.body.x;
   assert.equal(cpu.grounded, true);
-  cpu.combat.launchPoint = 110;
+  cpu.combat.launchPoint = 20;
 
   run({ action2: true, action2Pressed: true });
   until(() => events.length > 0, 30);
@@ -1297,10 +1297,11 @@ test('Player 1\'s BA2 launches the CPU straight up (Base Launch 2, vertical), th
   assert.equal(hit.damage, player.attacks.ba2.damage);
   assert.equal(numbers[0].text, '+10');
   // At impact: launched upward, not pushed sideways, at BA2's Base Launch 2
-  // x the CPU's new Launch Point: 110 + 10 = 120, so 240.
+  // x the CPU's new Launch Point: 20 + 10 = 30, a strength of 60, so 600.
   assert.ok(cpu.body.vx === 0, 'no sideways push');
-  assert.equal(cpu.combat.launchPoint, 120);
-  assert.equal(cpu.body.vy, -240);
+  assert.equal(cpu.combat.launchPoint, 30);
+  assert.equal(hit.launchStrength, 60);
+  assert.equal(cpu.body.vy, -600);
   assert.equal(cpu.grounded, false);
   let top = groundY;
   for (let i = 0; i < 120 && !cpu.grounded; i++) {
