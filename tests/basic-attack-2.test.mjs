@@ -12,7 +12,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { COMBAT_ACTIONS } from '../js/game/character.js';
 import { worldBox, CombatSystem, createAttackDefinition } from '../js/game/combat.js';
-import { KNOCKBACK_LEVELS, knockbackMultiplier } from '../js/data/knockback.js';
+import { KNOCKBACK_LEVELS, accumulatedKnockbackBonus } from '../js/data/knockback.js';
 import { ACTIONS, CONFIG } from '../js/config.js';
 import {
   def, DT, SIM_CTX, fakeSprites, makeFighter, frameName, stepUntil,
@@ -32,11 +32,12 @@ const CONTACT = { ba2: [4, 5], midairBa2: [3] };
 // BA2's downward speed (the same level, reversed).
 const LAUNCH = 800;
 const SPIKE = 800;
-// Either BA2 adds 10 Knockback, and the hit launches at the multiplier for
-// that new total: from 0, the base speed x 1.1.
-const LAUNCHED = LAUNCH * knockbackMultiplier(10);
-const SPIKED = SPIKE * knockbackMultiplier(10);
-// Each BA2's declared Knockback and its resolved numbers.
+// Either BA2 adds 10 Knockback, and the hit launches at its own default
+// speed plus the separate vertical bonus for that new total at the standard
+// growth (1): from 0, 800 + 40, never 800 x 1.1.
+const LAUNCHED = LAUNCH + accumulatedKnockbackBonus(10, 'vertical');
+const SPIKED = SPIKE + accumulatedKnockbackBonus(10, 'vertical');
+// Each BA2's declared Knockback and its resolved default launch.
 const KNOCKBACK = {
   ba2: { axis: 'vertical', level: 'high' },
   midairBa2: { axis: 'vertical', level: 'high', sign: -1 },
@@ -52,12 +53,12 @@ const RESOLVED = {
 const ENTRIES = {
   ba2: {
     animation: 'ba2', startup: 3 / 12, active: 2 / 12, recovery: 2 / 12, damage: 10,
-    hitbox: { x: 10, y: -88, w: 24, h: 78 }, knockback: KNOCKBACK.ba2,
+    hitbox: { x: 10, y: -88, w: 24, h: 78 }, knockback: KNOCKBACK.ba2, knockbackGrowth: 1,
     hitstun: 0.24, blockstun: 0.15, hitstop: 0.07, cooldown: 0.15, groundOnly: true,
   },
   midairBa2: {
     animation: 'midairBa2', startup: 2 / 12, active: 1 / 12, recovery: 2 / 12, damage: 10,
-    hitbox: { x: 8, y: -44, w: 40, h: 40 }, knockback: KNOCKBACK.midairBa2,
+    hitbox: { x: 8, y: -44, w: 40, h: 40 }, knockback: KNOCKBACK.midairBa2, knockbackGrowth: 1,
     hitstun: 0.22, blockstun: 0.14, hitstop: 0.06, cooldown: 0.1,
   },
 };
@@ -141,7 +142,9 @@ test('BA2 attack definitions match their clips: the ground spinning kick launchi
     assert.equal(atk.lockMovement, true);
     // High vertical: an 800 launch on the ground, 800 downward in mid-air,
     // and no sideways push.
-    assert.deepEqual(atk.knockback, RESOLVED[id]);
+    assert.deepEqual(atk.baseKnockback, RESOLVED[id]);
+    assert.equal(atk.accumulatedKnockbackAxis, 'vertical', 'accumulated Knockback adds launch vertically too');
+    assert.equal(atk.knockbackGrowth, 1, 'the standard knockback growth');
     // Not BA1 under another name: its own art and hitbox.
     const ba1 = fighter.attacks[id === 'ba2' ? 'ba1' : 'midairBa1'];
     assert.notEqual(atk.animation, ba1.animation);
@@ -163,8 +166,8 @@ test('BA2 attack definitions match their clips: the ground spinning kick launchi
   assert.deepEqual([g.hitstun, g.blockstun, g.hitstop, g.cooldown], [0.24, 0.15, 0.07, 0.15]);
   assert.ok(g.total > ba1.total, 'slower than ground BA1');
   assert.ok(g.damage > ba1.damage && g.hitstun > ba1.hitstun, 'heavier than ground BA1');
-  assert.ok(g.knockback.x === 0 && ba1.knockback.x > 0, 'BA1 pushes sideways; BA2 does not');
-  assert.ok(g.knockback.y > 0 && ba1.knockback.y === 0, 'BA2 launches upward; BA1 does not');
+  assert.ok(g.baseKnockback.x === 0 && ba1.baseKnockback.x > 0, 'BA1 pushes sideways; BA2 does not');
+  assert.ok(g.baseKnockback.y > 0 && ba1.baseKnockback.y === 0, 'BA2 launches upward; BA1 does not');
   assert.ok(g.hitbox.x + g.hitbox.w <= 40, 'ba2 hitbox stays within reach');
   assert.ok(g.hitbox.w < def.collider.width, 'ba2 hitbox is narrower than the fighter');
   // Mid-air BA2: frames 1-2 wind-up, frame 3 the kick, frames 4-5 recovery.
@@ -179,8 +182,8 @@ test('BA2 attack definitions match their clips: the ground spinning kick launchi
   assert.ok(a.hitbox.w <= def.collider.width + 10 && a.hitbox.h <= def.collider.height / 2, 'midairBa2 hitbox is not oversized');
   // Ground BA2's strength, reversed: where mid-air BA1 launches upward,
   // mid-air BA2 drives the target down.
-  assert.equal(a.knockback.y, -g.knockback.y, 'the same level as ground BA2, reversed');
-  assert.ok(a.knockback.y < 0 && fighter.attacks.midairBa1.knockback.y > 0, 'mid-air BA2 drives downward; mid-air BA1 launches');
+  assert.equal(a.baseKnockback.y, -g.baseKnockback.y, 'the same level as ground BA2, reversed');
+  assert.ok(a.baseKnockback.y < 0 && fighter.attacks.midairBa1.baseKnockback.y > 0, 'mid-air BA2 drives downward; mid-air BA1 launches');
 });
 
 test('BA2 knockback comes only from its Knockback level, not a raw value: High vertical on the ground, High reversed in mid-air', () => {
@@ -195,7 +198,7 @@ test('BA2 knockback comes only from its Knockback level, not a raw value: High v
     const direction = source.knockback.sign ?? 1;
     for (const level of Object.keys(KNOCKBACK_LEVELS)) {
       const atk = createAttackDefinition({ id, ...source, knockback: { ...source.knockback, level } });
-      assert.deepEqual(atk.knockback, { x: 0, y: direction * KNOCKBACK_LEVELS[level].vertical }, `${id} at ${level}`);
+      assert.deepEqual(atk.baseKnockback, { x: 0, y: direction * KNOCKBACK_LEVELS[level].vertical }, `${id} at ${level}`);
     }
     // Damage, stun, hitstop, timing, hitbox and cooldown are the entry's own.
     const { fighter } = makeFighter();
@@ -538,7 +541,7 @@ function midairBa2Duel({ attackerFacing = 1, gap = 44 } = {}) {
   return d;
 }
 
-test('a mid-air BA2 hit drives a grounded target downward with no sideways push: vx 0, vy +800 scaled by its 10 Knockback', () => {
+test('a mid-air BA2 hit drives a grounded target downward with no sideways push: vx 0, vy +800 plus the bonus for its 10 Knockback', () => {
   for (const facing of [1, -1]) {
     const { attacker, target, tick, events } = midairBa2Duel({ attackerFacing: facing });
     const floor = target.body.y;
@@ -858,7 +861,6 @@ test('Quick Battle: a BA2 hit launches the training CPU straight up through the 
 
 test('damage accumulates as Knockback: BA1 -> BA1 -> BA2 on a fresh target is 5 + 5 + 10 = 20, each hit launching a little harder', () => {
   const { attacker, target, tick, until, events } = duel();
-  const multipliers = [];
   for (const [press, total] of [[{ action1: true, action1Pressed: true }, 5], [{ action1: true, action1Pressed: true }, 10], [BA2, 20]]) {
     // Back in reach and settled for each hit: this is about the numbers.
     until(() => !attacker.combat.attack && !attacker.combat.cooldowns.size && target.combat.stun <= 0 && target.grounded && target.combat.hitstop <= 0);
@@ -870,9 +872,17 @@ test('damage accumulates as Knockback: BA1 -> BA1 -> BA2 on a fresh target is 5 
     const e = events.at(-1);
     assert.equal(e.knockbackAfter, total);
     assert.equal(target.combat.knockback, total);
-    multipliers.push(e.launchMultiplier);
+    assert.equal('launchMultiplier' in e, false, 'no launch multiplier');
   }
   assert.deepEqual(events.map((e) => e.damage), [5, 5, 10]);
-  assert.deepEqual(multipliers, [knockbackMultiplier(5), knockbackMultiplier(10), knockbackMultiplier(20)]);
+  // Each move keeps its own default launch; only the bonus from the target's
+  // growing accumulated Knockback (5, 10, then 20) changes, along the move's
+  // own axis (2 per point sideways, 4 per point vertically) at its own
+  // growth: BA1's 0.5, BA2's 1.
+  assert.deepEqual(events.map((e) => [e.baseLaunch, e.bonusLaunch, e.finalLaunch]), [
+    [{ x: 140, y: 0 }, { x: 5, y: 0 }, { x: 145, y: 0 }],
+    [{ x: 140, y: 0 }, { x: 10, y: 0 }, { x: 150, y: 0 }],
+    [{ x: 0, y: 800 }, { x: 0, y: 80 }, { x: 0, y: 880 }],
+  ]);
   assert.equal(attacker.combat.knockback, 0);
 });

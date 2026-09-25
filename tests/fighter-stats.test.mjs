@@ -50,7 +50,7 @@ test('every new fighter starts at 0 Knockback with every cooldown ready, and a r
 test('Knockback has no maximum: hits keep adding to it far past 100', () => {
   const { attacker, target } = duel();
   const system = new CombatSystem();
-  const hit = { id: 'probe', damage: 40, knockback: { x: 0, y: 0 }, hitstun: 0, blockstun: 0, hitstop: 0 };
+  const hit = { id: 'probe', damage: 40, baseKnockback: { x: 0, y: 0 }, hitstun: 0, blockstun: 0, hitstop: 0 };
   for (let i = 0; i < 20; i++) system.applyHit(attacker, target, hit);
   assert.equal(target.combat.knockback, 800);
   target.combat.knockback = 1e6;

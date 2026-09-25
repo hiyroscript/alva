@@ -10,7 +10,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { COMBAT_ACTIONS } from '../js/game/character.js';
 import { worldBox, createAttackDefinition } from '../js/game/combat.js';
-import { KNOCKBACK_LEVELS, knockbackMultiplier } from '../js/data/knockback.js';
+import { KNOCKBACK_LEVELS, accumulatedKnockbackBonus } from '../js/data/knockback.js';
 import { TrainingAIController } from '../js/game/fighter-controller.js';
 import { CONFIG } from '../js/config.js';
 import {
@@ -23,9 +23,10 @@ const BA2 = { action2: true, action2Pressed: true };
 
 const JUMP = { jump: true, jumpPressed: true };
 
-// Each BA1's declared Knockback and its resolved numbers: ground BA1 pushes
-// 140 sideways (Low horizontal); mid-air BA1 launches the target upward at
-// 640 (Mid vertical) and pushes it nowhere.
+// Each BA1's declared Knockback and its resolved default launch: ground BA1
+// pushes 140 sideways (Low horizontal); mid-air BA1 launches the target
+// upward at 640 (Mid vertical) and pushes it nowhere. Their knockback
+// growth: ground BA1 is a jab (0.5), mid-air BA1 a light launcher (0.75).
 const BA1_KNOCKBACK = {
   ba1: { axis: 'horizontal', level: 'low' },
   midairBa1: { axis: 'vertical', level: 'mid' },
@@ -34,6 +35,7 @@ const BA1_RESOLVED = {
   ba1: { x: 140, y: 0 },
   midairBa1: { x: 0, y: 640 },
 };
+const BA1_GROWTH = { ba1: 0.5, midairBa1: 0.75 };
 
 // Each BA1's whole data entry. Ground BA1 is the four-frame punch; mid-air
 // BA1 is the three-frame kunai slash (midair2ba1-3), with the slash's own
@@ -41,12 +43,12 @@ const BA1_RESOLVED = {
 const BA1_ENTRIES = {
   ba1: {
     animation: 'ba1', startup: 1 / 12, active: 1 / 12, recovery: 2 / 12, damage: 5,
-    hitbox: { x: 12, y: -64, w: 28, h: 16 }, knockback: BA1_KNOCKBACK.ba1,
+    hitbox: { x: 12, y: -64, w: 28, h: 16 }, knockback: BA1_KNOCKBACK.ba1, knockbackGrowth: 0.5,
     hitstun: 0.22, blockstun: 0.14, hitstop: 0.06, cooldown: 0.1, groundOnly: true,
   },
   midairBa1: {
     animation: 'midairBa1', startup: 2 / 12, active: 1 / 12, recovery: 0, damage: 5,
-    hitbox: { x: 14, y: -100, w: 22, h: 80 }, knockback: BA1_KNOCKBACK.midairBa1,
+    hitbox: { x: 14, y: -100, w: 22, h: 80 }, knockback: BA1_KNOCKBACK.midairBa1, knockbackGrowth: 0.75,
     hitstun: 0.24, blockstun: 0.15, hitstop: 0.07, cooldown: 0.18,
   },
 };
@@ -80,8 +82,11 @@ test('BA1 attack definitions match their clips: the ground punch and the mid-air
     assert.ok(Math.abs(atk.total - clip.frames.length / clip.fps) < 1e-9, `${id} lasts one pass of its clip`);
     assert.ok(atk.active < atk.total / 2, `${id} is not active for its whole clip`);
     assert.equal(atk.lockMovement, true);
-    // The declared Knockback, resolved.
-    assert.deepEqual(atk.knockback, BA1_RESOLVED[id]);
+    // The declared Knockback, resolved into its default launch, and the axis
+    // the target's accumulated Knockback adds launch along.
+    assert.deepEqual(atk.baseKnockback, BA1_RESOLVED[id]);
+    assert.equal(atk.accumulatedKnockbackAxis, BA1_KNOCKBACK[id].axis);
+    assert.equal(atk.knockbackGrowth, BA1_GROWTH[id]);
     // In front of the fighter and above the feet.
     assert.ok(atk.hitbox.x > 0, `${id} hitbox is in front`);
     assert.ok(atk.hitbox.y < 0 && atk.hitbox.y + atk.hitbox.h <= 0, `${id} hitbox is above the feet`);
@@ -115,8 +120,8 @@ test('BA1 knockback comes only from its Knockback level, not a raw value: Low ho
   assert.equal(KNOCKBACK_LEVELS.low.horizontal, 140);
   assert.equal(KNOCKBACK_LEVELS.mid.vertical, 640);
   const { fighter } = makeFighter();
-  assert.deepEqual(fighter.attacks.ba1.knockback, { x: KNOCKBACK_LEVELS.low.horizontal, y: 0 });
-  assert.deepEqual(fighter.attacks.midairBa1.knockback, { x: 0, y: KNOCKBACK_LEVELS.mid.vertical });
+  assert.deepEqual(fighter.attacks.ba1.baseKnockback, { x: KNOCKBACK_LEVELS.low.horizontal, y: 0 });
+  assert.deepEqual(fighter.attacks.midairBa1.baseKnockback, { x: 0, y: KNOCKBACK_LEVELS.mid.vertical });
   for (const id of ['ba1', 'midairBa1']) {
     const source = def.attacks[id];
     assert.deepEqual(source.knockback, BA1_KNOCKBACK[id], `${id} declares a Knockback descriptor`);
@@ -129,7 +134,7 @@ test('BA1 knockback comes only from its Knockback level, not a raw value: Low ho
       const expected = id === 'ba1'
         ? { x: KNOCKBACK_LEVELS[level].horizontal, y: 0 }
         : { x: 0, y: KNOCKBACK_LEVELS[level].vertical };
-      assert.deepEqual(atk.knockback, expected, `${id} at ${level}`);
+      assert.deepEqual(atk.baseKnockback, expected, `${id} at ${level}`);
     }
     // Everything else about BA1 is its entry's own.
     const atk = fighter.attacks[id];
@@ -385,13 +390,16 @@ test('ground BA1 hits an opponent in front during the active phase only', () => 
   assert.equal(hitPhase, 'active');
 });
 
-test('a ground BA1 hit pushes the target sideways at 140 (Low horizontal) scaled by the 5 Knockback it adds, away from the attacker, with no launch', () => {
+test('a ground BA1 hit pushes the target sideways at 140 (Low horizontal) plus the bonus for the 5 Knockback it adds, away from the attacker, with no launch', () => {
   for (const facing of [1, -1]) {
     const { attacker, target, tick, events } = duel({ attackerFacing: facing });
     tick(BA1);
     while (!events.length) tick();
     // At impact, before the target's next step: CombatSystem.applyHit set it.
-    assert.equal(target.body.vx, 140 * knockbackMultiplier(5) * facing);
+    // Its own 140 plus the horizontal bonus for 5 Knockback at the jab's 0.5
+    // growth: 145, not 140 x 1.05.
+    assert.equal(target.body.vx, (140 + accumulatedKnockbackBonus(5, 'horizontal', 0.5)) * facing);
+    assert.equal(target.body.vx, 145 * facing);
     assert.equal(target.body.vy, 0);
     assert.equal(target.grounded, true, 'BA1 never launches');
     assert.equal(attacker.facing, facing);
@@ -485,7 +493,7 @@ test('mid-air BA1 hits a grounded opponent below and in front while still airbor
   assert.equal(target.combat.knockback, 5);
 });
 
-test('a mid-air BA1 hit launches a grounded target straight up with no sideways push: vx 0, vy -640 scaled by its 5 Knockback', () => {
+test('a mid-air BA1 hit launches a grounded target straight up with no sideways push: vx 0, vy -640 plus the bonus for its 5 Knockback', () => {
   for (const facing of [1, -1]) {
     const { attacker, target, tick, until, events } = midairBa1Duel({ attackerFacing: facing });
     const floor = target.body.y;
@@ -496,7 +504,7 @@ test('a mid-air BA1 hit launches a grounded target straight up with no sideways 
     assert.equal(attacker.facing, facing);
     // At impact, before the target's next step: CombatSystem.applyHit set it.
     assert.ok(isZero(target.body.vx), 'no horizontal knockback');
-    assert.equal(target.body.vy, -640 * knockbackMultiplier(5), 'negative body vy: launched upward');
+    assert.equal(target.body.vy, -(640 + accumulatedKnockbackBonus(5, 'vertical', 0.75)), 'negative body vy: launched upward');
     assert.equal(target.grounded, false);
     // It rises, then gravity brings it back down where it stood.
     let top = floor;

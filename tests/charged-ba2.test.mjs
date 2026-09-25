@@ -19,7 +19,7 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { characterFramePaths } from '../js/data/characters.js';
 import { getMap } from '../js/data/maps.js';
-import { KNOCKBACK_LEVELS, knockbackMultiplier } from '../js/data/knockback.js';
+import { KNOCKBACK_LEVELS, accumulatedKnockbackBonus } from '../js/data/knockback.js';
 import { CombatSystem } from '../js/game/combat.js';
 import { ChargedTechnique } from '../js/game/charged-technique.js';
 import { StageCollision } from '../js/game/physics.js';
@@ -397,14 +397,19 @@ test('the Sphere Rush data: 1050 dash, a contact that only binds, +1 every 0.5 s
   assert.equal(TECH.cooldown, 5);
   assert.equal('energyCost' in TECH, false, 'no cost of any kind');
   assert.equal(TECH.firstHit.damage, 0, 'no large contact hit');
-  assert.deepEqual(TECH.firstHit.knockback, { x: 0, y: 0 }, 'the setup never launches');
+  assert.deepEqual(TECH.firstHit.baseKnockback, { x: 0, y: 0 }, 'the setup never launches');
   assert.equal(TECH.tickInterval, 0.5);
-  assert.deepEqual(TECH.tickHit, { damage: 1, knockback: { x: 0, y: 0 }, hitstun: 0, blockstun: 0, hitstop: 0 });
+  assert.deepEqual(TECH.tickHit, { damage: 1, baseKnockback: { x: 0, y: 0 }, hitstun: 0, blockstun: 0, hitstop: 0 });
   assert.equal(TECH.explosionHit.damage, 15);
-  // The blast: a strong, mostly horizontal launch, far past BA1's push.
-  const { x, y } = TECH.explosionHit.knockback;
+  // The blast: a strong, mostly horizontal default launch, far past BA1's
+  // push, whose accumulated-Knockback bonus is declared horizontal, at the
+  // finisher's knockback growth: twice the standard.
+  const { x, y } = TECH.explosionHit.baseKnockback;
   assert.ok(x > 3 * KNOCKBACK_LEVELS.high.horizontal && x > 4 * KNOCKBACK_LEVELS.low.horizontal);
   assert.ok(x >= 3 * y && y >= 0, 'primarily horizontal');
+  assert.equal(TECH.explosionHit.accumulatedKnockbackAxis, 'horizontal');
+  assert.equal(TECH.explosionHit.knockbackGrowth, 2);
+  assert.ok(TECH.explosionHit.knockbackGrowth > def.attacks.ba2.knockbackGrowth, 'grows faster than any Basic Attack');
   assert.equal(TECH.explosionHit.hitstun, 0.55);
   assert.ok(TECH.explosionHit.hitstop > TECH.firstHit.hitstop);
   // A hand offset for every frame the sphere is held through, and a box
@@ -421,7 +426,7 @@ test('the Sphere Rush data: 1050 dash, a contact that only binds, +1 every 0.5 s
     { ...def.attacks.ba2 },
     {
       animation: 'ba2', startup: 3 / 12, active: 2 / 12, recovery: 2 / 12, damage: 10,
-      hitbox: { x: 10, y: -88, w: 24, h: 78 }, knockback: { axis: 'vertical', level: 'high' },
+      hitbox: { x: 10, y: -88, w: 24, h: 78 }, knockback: { axis: 'vertical', level: 'high' }, knockbackGrowth: 1,
       hitstun: 0.24, blockstun: 0.15, hitstop: 0.07, cooldown: 0.15, groundOnly: true,
     },
   );
@@ -856,12 +861,18 @@ test('the explosion comes exactly 2.0 s after the hit step on rasen9: prasen10 -
   assert.equal(blast.technique, t);
   assert.equal(d.target.combat.knockback, 18, '3 ticks, then 15');
   // Released before the knockback, so the launch is intact: sideways and
-  // hard, away from #0001, scaled by the 18 Knockback the target now has.
+  // hard, away from #0001. Its own default launch plus the horizontal bonus
+  // for the 18 Knockback the target now has at the blast's growth (2); the
+  // slight lift is its own, unchanged, and nothing multiplies the whole
+  // vector.
   assert.equal(d.target.combat.immobilized, false);
-  const { x, y } = TECH.explosionHit.knockback;
-  assert.equal(blast.launchMultiplier, knockbackMultiplier(18));
-  assert.equal(d.target.body.vx, x * knockbackMultiplier(18));
-  assert.equal(d.target.body.vy, -y * knockbackMultiplier(18));
+  const { x, y } = TECH.explosionHit.baseKnockback;
+  assert.equal('launchMultiplier' in blast, false);
+  assert.deepEqual(blast.baseLaunch, { x: 720, y: 180 });
+  assert.deepEqual(blast.bonusLaunch, { x: 72, y: 0 });
+  assert.deepEqual(blast.finalLaunch, { x: 792, y: 180 });
+  assert.equal(d.target.body.vx, x + accumulatedKnockbackBonus(18, 'horizontal', 2));
+  assert.equal(d.target.body.vy, -y);
   assert.ok(d.target.body.vx > 3 * Math.abs(d.target.body.vy), 'mostly horizontal');
   assert.equal(d.target.grounded, false);
   assert.equal(d.target.combat.stun, 0.55);
@@ -1006,10 +1017,16 @@ test('the blast is a strong sideways launch, harder than BA1 and growing with th
     assert.equal(Math.sign(fresh.vx), facing, 'away from #0001');
     assert.ok(Math.abs(fresh.vx) > 3 * Math.abs(fresh.vy), 'mostly horizontal');
     // Far harder than BA1 would push the same target.
-    assert.ok(Math.abs(fresh.vx) > 4 * KNOCKBACK_LEVELS.low.horizontal * knockbackMultiplier(fresh.k));
+    const ba1Growth = def.attacks.ba1.knockbackGrowth;
+    assert.ok(Math.abs(fresh.vx) > 4 * (KNOCKBACK_LEVELS.low.horizontal + accumulatedKnockbackBonus(fresh.k, 'horizontal', ba1Growth)));
     const worn = blastAt(100, facing);
     assert.equal(worn.k, 118);
-    assert.ok(close(worn.vx / fresh.vx, knockbackMultiplier(118) / knockbackMultiplier(18)), 'scaled by the accumulated Knockback');
+    // 100 more Knockback adds exactly 100 points' horizontal bonus at the
+    // blast's own growth, twice what a standard-growth hit gains: added,
+    // never a ratio of its default launch.
+    assert.equal(worn.vx - fresh.vx, facing * accumulatedKnockbackBonus(100, 'horizontal', 2), 'plus the accumulated-Knockback bonus');
+    assert.equal(worn.vx - fresh.vx, facing * 2 * accumulatedKnockbackBonus(100, 'horizontal'));
+    assert.equal(worn.vy, fresh.vy, 'the slight lift is the blast\'s own, whatever the Knockback');
     assert.ok(Math.abs(worn.vx) > Math.abs(fresh.vx));
   }
 });

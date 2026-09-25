@@ -12,9 +12,15 @@
 //     shuriken: {
 //       animation: 'shuriken', speed: 700, lifetime: 1.5,
 //       hitbox: { x: -5, y: -5, w: 10, h: 10 },
-//       damage: 1, knockback: { x: 0, y: 0 }, hitstun: 0.16, blockstun: 0.1, hitstop: 0.04,
+//       damage: 1, baseKnockback: { x: 0, y: 0 }, hitstun: 0.16, blockstun: 0.1, hitstop: 0.04,
 //     },
 //   },
+//
+// `baseKnockback` is the projectile's own default launch (see
+// js/data/knockback.js); an optional `accumulatedKnockbackAxis` names the
+// axis the target's accumulated Knockback adds launch along (by default its
+// dominant one), and an optional `knockbackGrowth` how strongly (by default
+// the standard rate). A projectile with no default launch never launches.
 //
 // A projectile flies straight in the direction it was released, hits at most
 // once and then disappears. It also disappears when its lifetime runs out,
@@ -23,6 +29,8 @@
 // floor's body included; one-way platforms never stop it. Its hitbox is
 // centred on its position and mirrors with its direction.
 
+import { resolveKnockbackGrowth, resolveLaunchAxis } from '../data/knockback.js';
+
 const PROJECTILE_DEFAULTS = {
   animation: null,
   speed: 0,
@@ -30,7 +38,7 @@ const PROJECTILE_DEFAULTS = {
   hitbox: { x: -4, y: -4, w: 8, h: 8 },
   damage: 0,
   chipDamage: 0,
-  knockback: { x: 0, y: 0 },
+  baseKnockback: { x: 0, y: 0 },
   hitstun: 0.2,
   blockstun: 0.12,
   hitstop: 0.06,
@@ -42,7 +50,10 @@ const TIME_EPSILON = 1e-6;
 
 export function createProjectileDefinition(spec) {
   if (!spec?.id) throw new Error('[Alva] Projectile definitions need an id');
-  return Object.freeze({ ...PROJECTILE_DEFAULTS, ...spec });
+  const def = { ...PROJECTILE_DEFAULTS, ...spec };
+  def.accumulatedKnockbackAxis = resolveLaunchAxis(def.baseKnockback, spec.accumulatedKnockbackAxis, `Projectile "${spec.id}"`);
+  def.knockbackGrowth = resolveKnockbackGrowth(spec.knockbackGrowth, `Projectile "${spec.id}"`);
+  return Object.freeze(def);
 }
 
 const overlaps = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
