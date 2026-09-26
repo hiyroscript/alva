@@ -1,1038 +1,1266 @@
-ALVA — Fluid Movement, Combat Feel & Combo Rework
+ALVA — Launch Bounce / Wall Ricochet Combat Rework
 
-Objective
+Reference
 
-Rework ALVA’s movement and combat game-feel so controlling #0001 feels substantially smoother, faster to respond, more expressive, and more satisfying, using MultiVersus as a feel reference, NOT as a mechanics specification.
+Use this video as the visual/game-feel reference for the launch-and-bounce behavior:
 
-Do not turn ALVA into MultiVersus.
+https://youtu.be/C95FpcRLsbE?si=HoYArRHPnqhwB9rF
 
-Do not copy MultiVersus’s combat systems.
+Study specifically the moments where a fighter is launched with significant knockback, collides with stage geometry, rebounds from that surface, travels toward another surface, and can potentially bounce again.
 
-Do not introduce mechanics simply because MultiVersus has them.
-
-Instead, study what makes movement and attacks in a polished platform fighter feel:
-
-* responsive
-* smooth
-* controllable
-* momentum-driven
-* easy to redirect
-* satisfying on hit
-* easy to chain intentionally
-* forgiving enough for players to create combos
-* expressive without becoming uncontrollable
-
-Then achieve those qualities using ALVA’s existing mechanics and abilities.
-
-The final game must still unmistakably be ALVA.
+The target is the feel and readability of that interaction, not a copy of MultiVersus’s internal mechanics.
 
 ⸻
 
-1. READ AND UNDERSTAND THE EXISTING GAME FIRST
+PRIMARY OBJECTIVE
 
-Before changing code, read ALVA_SPEC.md completely.
+Add a launch ricochet/bounce system to ALVA.
 
-Then inspect the complete implementation surrounding:
-
-* js/game/character.js
-* js/game/physics.js
-* js/game/combat.js
-* js/data/characters.js
-* js/data/powers.js
-* js/data/launch.js
-* player/input controllers
-* sprite animator
-* arena/fixed-step simulation
-* projectile system
-* clone system
-* charged-technique system
-* existing movement/combat tests
-
-Understand the current state machine before modifying it.
-
-Do not perform a superficial constants-only pass.
-
-The problem is not simply that ALVA needs larger speed numbers.
-
-This is a game-feel and combat-flow rework.
-
-⸻
-
-2. NON-NEGOTIABLE: PRESERVE ALVA
-
-Preserve #0001’s existing identity and abilities.
-
-Keep:
-
-* normal left/right movement
-* jump
-* existing Dash
-* Shield
-* Charge
-* Shuriken
-* ground BA1
-* ground BA2
-* air BA1
-* air BA2
-* Charged BA1 clone
-* Charged BA2 Sphere Rush
-* Energy
-* charged cooldowns
-* Launch Point
-* Base Launch
-* Directional Launch
-* hitstop
-* hitstun
-* blockstun
-* existing ring-out/Void rules
-
-Do not replace ALVA’s attacks with MultiVersus-style attacks.
-
-Do not add a MultiVersus dodge meter.
-
-Do not add dodge-jumping merely because MultiVersus has it.
-
-Do not redesign Shield around MultiVersus.
-
-Do not change ALVA’s control scheme unnecessarily.
-
-Do not replace the existing character art.
-
-This task concerns feel, responsiveness and combo flow, not copying another game’s feature list.
-
-⸻
-
-3. PRIMARY TARGET: CONTROLLER FEEL
-
-The player should notice the improvement almost immediately after touching the controls.
-
-Currently ALVA already has acceleration, deceleration, turn boosting, air acceleration, coyote time and jump buffering.
-
-Build upon those systems rather than throwing them away.
-
-Movement should have three simultaneous qualities:
-
-Immediate
-
-The fighter responds quickly when the player gives an input.
-
-Smooth
-
-Velocity should transition naturally instead of looking like the fighter is snapping between unrelated states.
-
-Precise
-
-The player must still be capable of small positioning corrections.
-
-Do not confuse responsiveness with excessive speed.
-
-⸻
-
-4. GROUND MOVEMENT
-
-Improve the relationship between:
-
-* acceleration
-* maximum speed
-* deceleration
-* reversing
-* animation
-* attacks
-
-Starting to move should feel immediate.
-
-Reversing direction should be responsive without instantly teleporting velocity from full left to full right.
-
-Use a strong but controlled turn acceleration.
-
-The fighter should have enough acceleration to make close-range spacing practical.
-
-Stopping should happen quickly enough that the player can intentionally position beside an opponent.
-
-Avoid excessive ground sliding after releasing movement.
-
-At the same time, do not completely destroy momentum.
-
-There should be a short, natural-feeling deceleration rather than an artificial instant stop.
-
-Desired result
-
-The player should be able to perform:
-
-run right → stop beside opponent → BA1
-
-without constantly overshooting.
-
-They should also be able to perform:
-
-run right → reverse left → immediately reposition
-
-without waiting for a sluggish turnaround.
-
-⸻
-
-5. AIR MOVEMENT
-
-Air control is one of the most important parts of this rework.
-
-ALVA should feel substantially better to steer after jumping.
-
-The player should be able to:
-
-* chase an opponent after launching them
-* correct a jump that was slightly misplaced
-* drift toward or away from an opponent
-* reverse aerial direction with reasonable responsiveness
-* position an aerial attack intentionally
-
-Do not make aerial movement identical to ground movement.
-
-The fighter should retain momentum.
-
-Air acceleration should influence velocity rather than simply replacing it.
-
-Opposite-direction input should provide enough air braking/turning force that aerial positioning feels intentional.
-
-The result should feel permissive without making trajectory meaningless.
-
-⸻
-
-6. JUMP FEEL
-
-Preserve ALVA’s existing jump ability and Jump Power system.
-
-Improve the FEEL surrounding the jump.
-
-Keep and refine:
-
-* jump buffering
-* coyote time
-
-Make takeoff feel immediate.
-
-Ensure horizontal velocity carries naturally into the jump.
-
-Running before jumping should produce a natural forward-moving jump.
-
-A standing jump should remain controllable.
-
-Avoid arbitrary horizontal speed resets when entering the jump state.
-
-The player should feel continuous motion:
-
-run → jump → aerial movement
-
-rather than:
-
-run → separate jump state.
-
-⸻
-
-7. ADD FAST FALL AS A MOVEMENT QUALITY TOOL
-
-Implement a simple fast-fall if it integrates cleanly with ALVA.
-
-This is not being added “because MultiVersus has fast falling.”
-
-It is useful because ALVA needs better vertical positioning and faster return-to-neutral.
-
-When airborne and already descending, holding down should increase downward velocity toward a controlled fast-fall maximum.
-
-Requirements:
-
-* cannot trigger while rising
-* should not teleport velocity
-* accelerates smoothly
-* should be immediately understandable
-* should make aerial combat less floaty
-* should allow players to intentionally return to the ground after an aerial attack
-* should work with platform interaction cleanly
-
-Expose the relevant values through character movement data rather than scattering magic constants throughout the fighter state machine.
-
-⸻
-
-8. MOMENTUM MUST SURVIVE ATTACKS
-
-This is critical.
-
-Normal attacks should not automatically make movement feel disconnected.
-
-Review the current lockMovement behavior and attack state handling.
-
-Separate the concepts of:
-
-* cannot freely accelerate
-* cannot move at all
-* retain existing momentum
-* attack applies its own movement
-
-These should NOT all mean the same thing.
-
-For most normal attacks, entering an attack should preserve some existing velocity.
+When a fighter is launched hard enough by an attack and collides with solid stage geometry, instead of the collision simply deleting their velocity, they should be able to rebound from that geometry.
 
 Example:
 
-running → BA1
+Attack connects
+→ fighter is launched horizontally
+→ fighter hits a wall
+→ fighter rebounds away from the wall
+→ fighter flies across the arena
+→ fighter hits another wall/floor/ceiling
+→ fighter can rebound again if enough launch energy remains
+→ eventually the launch loses enough energy that ordinary physics takes over.
 
-should not feel as though an invisible wall instantly stopped the character unless the attack intentionally requires that behavior.
+The result should make powerful hits feel dynamic and should create situations where opponents can ricochet around enclosed or geometry-heavy stages.
 
-Likewise:
+This is specifically a combat launch behavior.
 
-jumping forward → air BA1
+DO NOT make normal movement physics universally bouncy.
 
-should retain meaningful forward drift.
+A character walking into a wall should still stop.
 
-The attack can reduce steering while active without deleting momentum.
+A character jumping into a ceiling normally should still bonk and stop vertically.
 
-⸻
+A character landing normally should still land.
 
-9. ATTACK MOBILITY
-
-Give attacks individual movement behavior where appropriate.
-
-Extend attack definitions with optional data-driven movement properties rather than hardcoding behavior for #0001.
-
-Possible schema:
-
-movementControl
-
-* amount of normal steering retained during attack
-
-momentumMultiplier
-
-* modifies existing horizontal momentum when attack starts
-
-activeMovement
-
-* optional velocity/impulse generated by the attack
-
-airControl
-
-* attack-specific aerial steering multiplier
-
-These names are suggestions; use the architecture that fits the project best.
-
-Examples:
-
-BA1:
-
-* keeps some forward momentum
-* little additional movement
-* recovers quickly
-
-BA2:
-
-* slightly more commitment
-* can have subtle forward movement during the strike
-* longer recovery than BA1
-
-Air BA1:
-
-* preserves aerial drift
-* retains moderate steering
-* should be useful while pursuing airborne opponents
-
-Air BA2:
-
-* retains horizontal momentum
-* its downward attack identity remains intact
-* should not arbitrarily freeze the fighter horizontally
-
-Shuriken:
-
-* should not feel like the character becomes rooted to the floor longer than necessary
-
-Do not change the identity of the attacks.
-
-Improve how they coexist with movement.
+Only sufficiently strong combat launch velocity should trigger ricochet behavior.
 
 ⸻
 
-10. COMBOS ARE A MAJOR GOAL
+FIRST: READ THE CURRENT ALVA ARCHITECTURE
 
-ALVA’s attacks should intentionally support short combos.
+Read ALVA_SPEC.md fully.
 
-The player should not need frame-perfect execution.
+Inspect at minimum:
 
-The game should recognize that after landing certain attacks, the attacker is supposed to have an opportunity to follow up.
+* js/game/physics.js
+* js/game/character.js
+* js/game/combat.js
+* js/data/launch.js
+* js/data/characters.js
+* stage/map definitions
+* StageCollision
+* fighter hitstun / launch state
+* arena fixed-step update
+* Void/ring-out handling
+* combat tests
+* launch tests
+* physics tests
 
-This does NOT mean every attack should combo into everything.
-
-Create intentional routes.
-
-Target primarily:
-
-* 2-hit combos
-* 3-hit combos
-* occasional longer sequences created through positioning or charged abilities
-
-Avoid designing infinite combos.
+Do not implement this as an isolated hack without understanding how launch velocity moves through the game.
 
 ⸻
 
-11. WHY COMBOS CURRENTLY FEEL DIFFICULT
+IMPORTANT CURRENT IMPLEMENTATION DETAIL
 
-Inspect the interaction between:
+ALVA’s current stepBody() behavior intentionally stops velocity when colliding with solids.
 
-* attack recovery
-* cooldown
+On horizontal solid collision it effectively does:
+
+vx = 0
+
+On a ceiling collision it effectively does:
+
+vy = 0
+
+On landing it effectively does:
+
+vy = 0
+
+That behavior is correct for ordinary movement.
+
+DO NOT replace those rules with universal reflection.
+
+Instead, introduce a mechanism that lets the fighter/combat system distinguish:
+
+NORMAL PHYSICS COLLISION
+
+from
+
+LAUNCHED COMBAT COLLISION.
+
+Only the latter should produce a ricochet.
+
+⸻
+
+PRESERVE ALVA’S EXISTING LAUNCH SYSTEM
+
+ALVA already uses:
+
+* Base Launch
+* Directional Launch
+* Launch Point
+* resolved launch velocity
+* hitstun
 * hitstop
-* target hitstun
-* launch velocity
-* attacker movement
-* air acceleration
-* input timing
-* attack startup
-* hitbox position
-* knockback scaling through Launch Point
 
-Do not solve combos using only longer hitstun.
+Preserve those concepts.
 
-For a combo to feel good:
+Do not replace them with another knockback system.
 
-1. the first hit must place the opponent somewhere useful;
-2. the attacker must recover soon enough;
-3. the attacker must be able to move into follow-up range;
-4. the next attack must start quickly enough;
-5. the opponent must have a fair eventual escape.
+The new bounce system should happen after ALVA has already calculated the launch velocity.
 
-Treat all five as one system.
+Conceptually:
 
-⸻
+attack hit
+→ damage
+→ Launch Point changes
+→ Base Launch × Launch Point resolves launch
+→ directional launch resolves velocity
+→ fighter enters launched/hitstun state
+→ physics moves fighter
+→ fighter hits solid geometry
+→ launch-bounce logic reflects part of that velocity.
 
-12. INTENTIONAL COMBO ROUTES
-
-Tune #0001 so several understandable routes are possible.
-
-Exact balance should be determined through testing, but the desired relationships include routes such as:
-
-BA1 → BA1
-
-At low Launch Point and appropriate spacing, a successful light attack should sometimes allow another light attack.
-
-Do not make this an endless loop.
-
-Pushback, hitstun, attack recovery and accumulated Launch Point should naturally end the sequence.
+The ricochet system therefore extends ALVA’s Launch system instead of replacing it.
 
 ⸻
 
-BA1 → BA2
+DISTINGUISH “HITSTUN” FROM “ACTIVE LAUNCH”
 
-This should be one of the basic grounded combo routes.
+Do not assume every stunned fighter should bounce.
 
-BA1 creates the opening.
+Introduce or derive a clear concept such as:
 
-BA2 acts as the stronger follow-up and launcher.
+* launchActive
+* launchVelocity
+* launchEnergy
+* canRicochet
+* or an equivalent clean design
 
-The player should have enough time to input BA2 without requiring near-frame-perfect execution.
+The exact architecture is up to you.
 
-⸻
+What matters is that the engine can answer:
 
-BA1 → jump → air BA1
+“Is this fighter currently moving because of meaningful combat knockback?”
 
-This should reward pursuit.
+A fighter should not ricochet just because they happen to have hitstun remaining.
 
-After connecting the opening attack, the player can jump after the opponent and continue pressure.
-
-Movement must be responsive enough to make this practical.
-
-⸻
-
-BA2 → aerial follow-up
-
-Since BA2 launches vertically, the attacker should have a reasonable opportunity at lower Launch Point to jump and pursue.
-
-Possible follow-ups:
-
-* air BA1
-* air BA2 depending on positioning
-
-The Launch Point system should eventually make the target travel too far for the same sequence to remain guaranteed.
-
-That naturally prevents repetitive permanent combos.
+They should ricochet because their collision occurs while meaningful launch velocity remains.
 
 ⸻
 
-Air BA1 → aerial/ground continuation
+BOUNCE THRESHOLD
 
-If the attacker lands appropriately after an aerial hit, recovery and landing behavior should allow pressure to continue without an awkward dead period.
+Small impacts should NOT bounce.
 
-⸻
-
-Air BA2 → grounded pressure
-
-Because air BA2 drives the target downward, landing it near the stage should potentially create a grounded continuation.
-
-Preserve its downward-launch identity.
-
-⸻
-
-13. DO NOT MAKE COMBOS FRAME-PERFECT
-
-Add a small combat input buffer.
-
-This is extremely important.
-
-If the player presses an attack slightly before their current attack/recovery finishes, remember that input briefly.
-
-When the fighter becomes actionable, execute the buffered action if it is still valid.
-
-Use a small window approximately in the range of:
-
-80–150 ms
-
-and tune through testing.
-
-The exact final value should feel forgiving without allowing ancient inputs to fire unexpectedly.
-
-Buffer:
-
-* normal combat actions
-* jump where appropriate
-
-Do not blindly buffer every possible control.
-
-Existing jump buffering should integrate cleanly with this system.
-
-⸻
-
-14. HITSTUN AND RECOVERY
-
-Rebalance attack recovery relative to hitstun.
-
-For attacks intended to start combos:
-
-attacker recovery should finish sufficiently before the target fully recovers that the attacker has time to reposition and attempt the intended follow-up.
-
-Do NOT simply give every attack enormous hitstun.
-
-Different attacks should have different roles.
+Introduce a minimum impact-speed threshold.
 
 For example:
 
-BA1:
-quick startup
-short recovery
-moderate hitstun
-low/moderate launch
+bounceMinImpactSpeed
 
-BA2:
-more startup
-more commitment
-stronger launch
-primarily launcher/finisher
+If the velocity component into the collided surface is below this threshold:
 
-Air BA1:
-pursuit/combo tool
+do ordinary collision behavior.
 
-Air BA2:
-downward positioning/finisher tool
+If it exceeds the threshold:
 
-Shuriken:
-spacing/interruption tool rather than the universal combo starter
+perform a combat bounce.
+
+This prevents weak BA1 hits from making characters endlessly ping-pong around walls.
+
+The threshold must be data-driven and tunable.
+
+Do not scatter threshold numbers through physics code.
 
 ⸻
 
-15. LAUNCH POINT MUST NATURALLY CHANGE COMBOS
+WALL BOUNCE
 
-Preserve ALVA’s Launch Point system.
+This is the most important behavior.
 
-It should actually help solve combo scaling.
+Suppose a fighter is launched rightward:
 
-At low Launch Point:
+vx > 0
 
-* opponents remain relatively close
-* basic follow-ups are practical
+They collide with a solid wall on their right.
 
-At medium Launch Point:
+Instead of:
 
-* routes require better movement/readjustment
-* fewer sequences remain guaranteed
+vx = 0
 
-At high Launch Point:
+during a valid combat ricochet:
 
-* attacks send opponents far enough that many ordinary combos naturally stop
-* combat becomes more about pursuit and ring-outs
+vx should reverse direction.
 
-Do not introduce an unrelated combo percentage system.
+Conceptually:
 
-Use ALVA’s existing Launch Point mechanics.
+vx = -vx * restitution
 
-⸻
+Do not necessarily implement exactly that expression if a better architecture fits the engine, but the physical result should be equivalent.
 
-16. HIT FEEL
+The fighter should visibly rebound away from the wall.
 
-Improve impact without making gameplay sluggish.
+Example:
 
-Preserve ALVA’s existing hitstop architecture.
+Before impact:
 
-Tune hitstop per attack according to strength.
+vx = +900
 
-Light attacks:
-short, crisp freeze
+With a wall restitution around 0.70:
 
-Heavy attacks:
-slightly stronger freeze
+After impact:
 
-Large Sphere Rush explosion:
-strongest impact
+vx ≈ -630
 
-Avoid excessive freeze on repeated light attacks.
-
-Hitstop should communicate:
-
-“I connected.”
-
-It should not make controls feel delayed.
+Now the fighter travels back across the stage.
 
 ⸻
 
-17. ATTACK INPUT FEEL
+BOUNCE MUST LOSE ENERGY
 
-An attack button should feel responsive even when the character cannot execute the attack on that exact simulation step.
+Each bounce should lose speed.
 
-Use the combat input buffer described earlier.
+This is essential.
 
-If:
+Never create endless ricochets.
 
-BA1 is recovering
+Use configurable restitution.
 
-and the player presses BA2 shortly before BA1 ends,
+Potential starting range:
 
-then BA2 should begin on the earliest legal actionable frame, provided the buffered input remains valid.
+0.60–0.80
 
-This will dramatically improve perceived responsiveness and combo accessibility without requiring attacks themselves to become unrealistically fast.
+Do not blindly lock the final value to that range.
 
-⸻
+Tune it by gameplay.
 
-18. LANDING AFTER AERIAL ATTACKS
+A strong first hit might produce:
 
-Inspect aerial attack → landing transitions carefully.
+launch
+→ strong first wall bounce
+→ weaker second bounce
+→ small third collision
+→ ordinary fall/recovery.
 
-Do not create unnecessary landing lockout.
-
-When an aerial attack has already completed and the fighter lands, they should transition naturally back to grounded control.
-
-If an attack is still legitimately in recovery when landing, preserve the remaining commitment.
-
-Do not arbitrarily restart a complete recovery period solely because the character touched the ground.
-
-The animation/state machine should reflect gameplay state rather than imposing additional invisible punishment.
+That is the desired progression.
 
 ⸻
 
-19. FACING
+FLOOR BOUNCE
 
-Facing should update naturally during neutral movement.
+A sufficiently hard downward combat launch should be capable of bouncing off solid ground.
 
-Attacks should generally snapshot/lock the relevant attack direction once their committed strike begins so hitboxes do not unpredictably flip halfway through a move.
+Example:
 
-However, movement immediately before attacking should make turning attacks feel responsive.
+Air BA2 sends opponent downward.
 
-The sequence:
+Opponent hits a solid floor with enough downward speed.
 
-run left → quickly reverse → BA1
+Instead of immediately entering an ordinary landing:
 
-should reliably attack toward the player’s intended side.
+they rebound upward.
 
-Avoid stale facing.
+Conceptually:
 
-⸻
+Before:
 
-20. DASH
+vy > 0
 
-Keep ALVA’s existing Dash concept.
+After:
 
-Do NOT automatically turn it into MultiVersus’s dodge system.
+vy = -vy * floorRestitution
 
-Improve its feel within ALVA.
+Remember ALVA’s coordinate convention when implementing this.
 
-The Dash should:
-
-* begin immediately after valid input
-* have a clear burst
-* preserve sensible momentum when ending
-* transition smoothly back into ordinary movement
-* retain its Energy cost
-* remain grounded unless ALVA’s design is deliberately expanded later
-
-Review the current behavior where normal acceleration resumes from dash velocity.
-
-Tune the handoff so it feels smooth rather than creating an awkward velocity spike or abrupt brake.
-
-Do not add attack-cancel-out-of-dash solely because the reference game has it.
-
-If allowing attacks near the end of Dash materially improves ALVA, implement it only as an ALVA-specific quality-of-life window and test it carefully.
+This should make downward-launch attacks much more satisfying around stage geometry.
 
 ⸻
 
-21. SHIELD
+CEILING BOUNCE
 
-Preserve ALVA’s Shield system.
+A fighter launched upward into a solid ceiling with sufficient impact speed should rebound downward.
 
-Shield should remain:
+Example:
 
-* held Defense
-* Energy-based
-* capable of blocking attacks
-* governed by existing blockstun rules
+BA2 launches vertically.
 
-Improve only transitions into and out of Shield where necessary.
+Target hits the underside of a solid platform/ceiling.
 
-Releasing Shield should return control cleanly.
+Instead of simply setting:
 
-Do not recreate MultiVersus’s defensive system.
+vy = 0
 
-⸻
+perform:
 
-22. CHARGE
+upward launch
+→ ceiling impact
+→ downward rebound.
 
-Preserve Charge exactly as an important ALVA mechanic.
-
-Charge must continue to:
-
-* accelerate Energy regeneration
-* accelerate charged-action cooldown recovery
-* enable Charged BA1
-* enable Charged BA2
-
-Do not make the new movement/combo system accidentally bypass Charge’s role.
+Again, only when the impact exceeds the configured combat-bounce threshold.
 
 ⸻
 
-23. CLONE ATTACK
+MULTIPLE BOUNCES
 
-Preserve Charged BA1’s existing behavior.
+Multiple sequential ricochets are specifically desired.
 
-The clone remains independent after being summoned.
+Example:
 
-Its ability to attack from behind or use the aerial fallback should remain.
+strong horizontal launch
+→ right wall
+→ left wall
+→ floor
+→ recovery.
 
-The movement rework must not break:
+Do NOT arbitrarily limit every launch to one bounce.
 
-* clone spawn positioning
-* clone facing
-* clone hitboxes
-* clone cloud animation
-* cooldown
-* detached hit behavior
+Instead, let remaining velocity/launch energy naturally determine whether another bounce can happen.
 
-The player’s improved movement should simply make it easier to capitalize on clone pressure.
+However, include safeguards against pathological loops.
 
-⸻
+Possible safeguards:
 
-24. SPHERE RUSH
+* minimum bounce velocity
+* restitution/energy loss
+* maximum ricochet count as a final safety cap
+* minimum time between impacts if necessary
 
-Preserve Sphere Rush’s identity and phase structure:
+A safety cap should be generous enough that normal gameplay almost never reaches it.
 
-formation
-→ rush
-→ contact
-→ hold/ticks
-→ explosion
-→ recovery
-
-Do not apply ordinary attack-movement rules to Sphere Rush.
-
-Sphere Rush already owns its movement through the charged-technique system.
-
-Keep that separation.
-
-Ensure the broader movement changes do not alter its authored rush speed, ground requirement, binding behavior or explosion behavior unintentionally.
+For example, the system might permit several bounces while velocity naturally decays.
 
 ⸻
 
-25. DATA-DRIVEN IMPLEMENTATION
+CORNER COLLISIONS
 
-Avoid #0001-specific hacks inside Fighter.update().
+Handle corners carefully.
 
-If attacks need different movement characteristics, represent them in attack definitions.
+A fighter may hit both a horizontal and vertical surface during one simulation step.
 
-If movement needs new tunables, add them to the movement definition.
+Do not produce unstable rapid reflection or teleportation.
 
-Potential movement properties could include:
+If both meaningful axes collide:
 
-* fastFallAcceleration
-* fastFallSpeed
-* attackMomentumRetention
-* combatInputBuffer
+reflect each valid impact component once.
 
-Potential attack properties could include:
+For example:
 
-* movementControl
-* airMovementControl
-* momentumMultiplier
-* movementImpulse
+fighter traveling down-right
+→ hits bottom-right corner
+→ X reverses
+→ Y reverses
+→ fighter leaves the corner up-left.
 
-Use sensible names consistent with the existing codebase.
+Make the resolution deterministic.
 
-Provide defaults so future fighters do not require every property.
+Do not let the fighter remain embedded in geometry.
 
 ⸻
 
-26. ANIMATION MUST FOLLOW PHYSICS
+ONE-WAY PLATFORMS
 
-Do not use animation frames to physically drag the fighter around unless a move explicitly owns movement.
+Respect ALVA’s existing platform semantics.
 
-The physics/state system is authoritative.
+One-way platforms should continue behaving like one-way platforms.
 
-Animation communicates what physics is doing.
+A fighter traveling upward through a one-way platform should NOT bounce off its underside.
 
-Maintain ALVA’s existing sprite normalization and bottom-center anchoring.
+If a launched fighter is traveling downward and legitimately collides with the top of a one-way platform, decide based on gameplay tuning whether sufficiently strong downward launch can rebound from it.
 
-Do not change sprite dimensions to fake movement.
+Preferred behavior:
 
-Do not alter artwork.
+Allow downward combat bounce from the top of a one-way platform if the landing collision is valid.
 
-⸻
-
-27. TARGET FEEL FOR #0001
-
-The finished #0001 should feel like an agile fighter.
-
-Not weightless.
-
-Not slippery.
-
-Not hyperactive.
-
-The ideal sensation is:
-
-“I pressed it and he responded.”
-
-“I can correct my movement.”
-
-“I can chase after my hit.”
-
-“My attack didn’t randomly kill all my momentum.”
-
-“I can tell when my next attack is available.”
-
-“I pressed the next attack slightly early and the game understood me.”
-
-“I can actually perform the combo I intended.”
-
-“I can improvise when positioning changes.”
+Do not turn one-way platforms into fully solid boxes.
 
 ⸻
 
-28. TEST SPECIFIC SCENARIOS
+MAIN FLOOR AND CLIFF FACES
 
-Do not finish after changing constants.
+Be careful with ALVA’s main floor.
 
-Play/test these scenarios individually.
+The existing main floor is a finite solid block.
 
-Movement test
+Its top acts as ground.
 
-Repeatedly:
+Its side surfaces are actual cliff faces rather than invisible arena walls.
 
-stand
-→ run
-→ stop
-→ reverse
-→ jump
-→ reverse in air
-→ land
+That distinction must remain.
 
-All transitions should feel controlled.
+Therefore:
 
-Microspacing test
+A fighter launched into the SIDE of that physical stage block may bounce from it.
 
-Try to stop immediately outside BA1 range.
+A fighter launched beyond the ledge where there is no geometry should continue flying/falling toward the Void.
 
-Then move slightly forward and attack.
+Do not create invisible walls at stage boundaries.
 
-This should be practical rather than frustrating.
+⸻
 
-Running attack test
+VOID / RING-OUT
 
-run
-→ BA1
+The bounce system must NEVER override the Void.
 
-Momentum should transition naturally into the attack.
+If a fighter crosses the existing Void boundary:
 
-Aerial pursuit test
+normal game-mode ring-out/death behavior wins.
 
-BA2
-→ jump toward opponent
-→ air BA1
+Do not bounce from voidBounds.
 
-At low Launch Point this should be realistically executable.
+The Void is not physical geometry.
 
-Basic combo test
+There must be no invisible bounce at the edge of the screen or kill boundary.
 
-BA1
-→ BA2
+⸻
 
-This should be reliable at appropriate low Launch Point and spacing.
+LAUNCH POINT AND BOUNCE INTENSITY
 
-Buffered combo test
+Launch Point should naturally interact with bounce behavior through launch velocity.
 
-Press BA2 slightly before BA1 recovery ends.
+Do not create a completely unrelated “bounce percentage.”
 
-The input should execute when BA2 becomes legal.
+Because higher Launch Point already creates stronger launch:
 
-Air combo test
+low Launch Point
+→ weak knockback
+→ often no bounce or a mild bounce
 
-jump
-→ air BA1
-→ reposition
-→ follow-up
+medium Launch Point
+→ meaningful wall ricochet
 
-The fighter should remain steerable enough for this to feel intentional.
+high Launch Point
+→ strong ricochet and larger travel distance
 
-Downward attack test
+extreme launch
+→ potentially ricochets across multiple surfaces or exits into the Void.
 
-air BA2
-→ opponent driven downward
-→ land
-→ attempt grounded continuation
+This allows the existing ALVA system to determine when bounce becomes dramatic.
 
-Transitions should remain smooth.
+⸻
 
-High Launch Point test
+DO NOT AUTOMATICALLY BOUNCE EVERY ATTACK
 
-Repeat combo attempts against a target with high Launch Point.
+Attack identity must remain important.
 
-The increased launch should naturally break routes that worked at low Launch Point.
+The bounce occurs because of launch speed and geometry.
 
-This is desired.
+Do not simply add:
 
-Shield test
+wallBounce: true
+
+to every attack and force it regardless of velocity.
+
+However, the architecture may support optional attack-specific bounce tuning in the future.
+
+For now, prefer global launch physics plus data-driven fighter/stage tuning.
+
+⸻
+
+HITSTUN DURING BOUNCES
+
+This is extremely important for combos.
+
+A wall bounce should create a brief continuation opportunity.
+
+When a launched fighter ricochets from a wall/floor/ceiling, they should not instantly regain full control while still violently flying through the arena.
+
+Preserve or extend an appropriate amount of hitstun.
+
+Consider adding:
+
+bounceHitstun
+
+or
+
+bounceHitstunBonus
+
+if necessary.
+
+Do NOT create huge guaranteed stun periods.
+
+The goal is:
 
 attack
-→ recover
-→ Shield
-
-and
-
-Shield
-→ release
-→ move/attack
-
-Neither transition should feel unnecessarily delayed.
-
-Dash test
-
-run
-→ Dash
-→ movement
-
-The handoff back into normal locomotion should be smooth.
-
-⸻
-
-29. AUTOMATED TESTS
-
-Update/add tests for the new behavior.
-
-At minimum verify:
-
-* fixed-step determinism remains intact
-* jump buffer still works
-* coyote time still works
-* fast fall activates only during valid descending state
-* attack input buffer fires at the first legal opportunity
-* expired buffered attacks do not execute
-* attack momentum behavior matches attack definitions
-* aerial attacks preserve expected momentum
-* hitstun/recovery permits intended low-Launch-Point routes
-* high Launch Point produces enough separation to break appropriate routes
-* Dash Energy behavior remains correct
-* Shield Energy behavior remains correct
-* charged actions still work
-* clone behavior remains correct
-* Sphere Rush behavior remains correct
-* Void/ring-out behavior remains correct
-
-Do not delete existing tests merely because they fail after the rework.
-
-Determine whether each failure represents an obsolete expectation or an actual regression.
-
-⸻
-
-30. TUNING PRIORITY
-
-Tune in this order:
-
-1. raw ground responsiveness
-2. jump responsiveness
-3. aerial steering
-4. momentum preservation
-5. attack recovery
-6. combat input buffering
-7. hitstun
-8. launch distance
-9. individual combo routes
-10. hitstop/impact polish
-
-Do not begin by massively increasing hitstun.
-
-Movement and recovery should do much of the work.
-
-⸻
-
-31. IMPORTANT DESIGN RULE
-
-Do not ask:
-
-“How do we put MultiVersus mechanics into ALVA?”
-
-Ask:
-
-“Why does the reference feel so responsive and connected, and how do we create those qualities using ALVA’s mechanics?”
-
-That distinction should guide every implementation decision.
-
-MultiVersus is a reference for:
-
-* responsiveness
-* fluidity
-* momentum
-* aerial control
-* combat pacing
-* satisfying hits
-* ease of chaining actions
-* ability to pursue opponents
-
-It is NOT the specification for ALVA’s mechanics.
-
-⸻
-
-32. SUCCESS CRITERIA
-
-The rework is successful when a player familiar with the old ALVA can immediately notice:
-
-* movement reacts faster
-* ground positioning is easier
-* aerial positioning is much better
-* jumps preserve natural momentum
-* attacks integrate with movement
-* attacks do not unnecessarily freeze the fighter
-* early attack inputs are buffered
-* successful hits create understandable follow-up opportunities
-* BA1 can function as a real combo starter
-* BA2 can function as a launcher
-* aerial attacks can continue pressure
-* low Launch Point supports short combos
-* high Launch Point naturally breaks those combos through increased launch
-* Dash feels integrated rather than separate
-* Shield and Charge still behave like ALVA
-* Clone and Sphere Rush remain fully intact
-
-reference video: https://youtu.be/C95FpcRLsbE?si=s63RRAeC_hj84QD5
-
-Most importantly:
-
-ALVA should feel significantly more polished without feeling like its combat system was replaced.
-
-The intended player experience is:
-
-MOVE → HIT → FOLLOW → HIT → REPOSITION
+→ launch
+→ wall bounce
+→ attacker can chase
+→ possible follow-up
 
 rather than:
 
-MOVE → ATTACK → WAIT → MOVE → ATTACK.
+attack
+→ wall bounce
+→ target immediately air-controls away before the bounce visually finishes.
 
-Implement this as a coherent movement/combat rework, test it thoroughly, and tune the values by actually exercising the intended combo routes rather than changing constants in isolation.
+⸻
+
+BOUNCES AND COMBOS
+
+The bounce system should integrate with the combo-focused combat changes.
+
+Desired examples:
+
+BA1
+→ BA2 launcher
+→ target hits nearby wall
+→ target rebounds
+→ attacker can chase with air BA1.
+
+Or:
+
+air BA2
+→ target is driven downward
+→ floor bounce
+→ attacker lands
+→ grounded follow-up.
+
+Or:
+
+strong horizontal launch
+→ wall bounce
+→ opponent crosses back toward attacker
+→ attacker reads trajectory
+→ follow-up attack.
+
+These should not all be guaranteed combos.
+
+Some should be positional opportunities.
+
+The point is that stage geometry becomes part of combat.
+
+⸻
+
+PLAYER CONTROL WHILE LAUNCHED
+
+Do not let ordinary movement immediately erase bounce velocity.
+
+When the fighter is still under strong combat launch:
+
+their launch trajectory should dominate.
+
+If ALVA allows some aerial influence during hitstun/recovery, keep it subtle.
+
+The player should not be able to hold left and instantly cancel a +900 launch velocity.
+
+Once launch speed falls and hitstun ends:
+
+ordinary aerial control gradually/cleanly resumes.
+
+⸻
+
+VISUAL FEEDBACK
+
+Make bounce impacts readable using existing rendering capabilities.
+
+Do not require new art.
+
+Possible polish:
+
+* brief hitstop at meaningful surface impact
+* tiny camera shake for strong bounces if ALVA already has camera-shake infrastructure
+* existing impact VFX if reusable
+* stronger sound hook if sound infrastructure exists
+
+Do NOT add huge effects that obscure fighters.
+
+The physical rebound itself should communicate most of the impact.
+
+⸻
+
+BOUNCE HITSTOP
+
+Consider a very short impact freeze for sufficiently strong ricochets.
+
+The sequence should feel like:
+
+FLY
+→ IMPACT
+→ tiny pause
+→ REBOUND.
+
+Keep it shorter than or comparable to strong attack hitstop.
+
+Do not freeze every tiny collision.
+
+Expose a threshold so only meaningful bounces receive impact freeze.
+
+⸻
+
+DATA-DRIVEN CONFIGURATION
+
+Create a clean bounce configuration rather than hardcoded constants.
+
+Potential structure:
+
+launchBounce: {
+  enabled: true,
+  minImpactSpeed: ...,
+  wallRestitution: ...,
+  floorRestitution: ...,
+  ceilingRestitution: ...,
+  minExitSpeed: ...,
+  maxBounces: ...,
+  bounceHitstun: ...,
+  impactHitstop: ...,
+}
+
+This is only a suggested schema.
+
+Adapt it to ALVA’s existing architecture.
+
+Important values must be centralized and easily tunable.
+
+⸻
+
+PHYSICS ARCHITECTURE
+
+Do not make stepBody() know about attacks, BA1, BA2, characters, or combat definitions.
+
+Keep physics generic.
+
+A good architecture could be:
+
+stepBody() detects and reports collision information.
+
+For example:
+
+* horizontal collision
+* horizontal collision normal
+* vertical collision
+* ceiling collision
+* landing collision
+* impact velocity BEFORE it was zeroed
+
+Then Fighter/combat launch logic can decide whether to turn the collision into a combat bounce.
+
+Alternatively, extend stepBody() with a generic collision callback or controlled reflection option.
+
+Choose whichever keeps responsibilities clean.
+
+What should NOT happen is logic like this inside physics:
+
+if (fighter.hitstun && fighter.character.id === '0001') {
+  ...
+}
+
+Never do that.
+
+⸻
+
+PRESERVE PRE-IMPACT VELOCITY
+
+This is a major implementation requirement.
+
+Currently the physics solver can zero velocity when resolving the collision.
+
+For bounce calculations, you need the velocity immediately BEFORE that component is destroyed.
+
+Example information:
+
+impactXVelocity
+impactYVelocity
+collisionNormalX
+collisionNormalY
+
+or equivalent.
+
+Without pre-impact velocity, restitution cannot be calculated correctly.
+
+Design collision reporting appropriately.
+
+⸻
+
+COLLISION NORMALS
+
+Use surface direction rather than guessing based purely on position.
+
+Useful normals:
+
+left-facing wall:
+
+normal = (-1, 0)
+
+right-facing wall:
+
+normal = (1, 0)
+
+floor:
+
+normal = (0, -1)
+
+ceiling:
+
+normal = (0, 1)
+
+Exact sign conventions can follow ALVA’s coordinate system.
+
+The important part is knowing which velocity component points into the surface.
+
+Only reflect velocity that was moving into the surface.
+
+⸻
+
+DETERMINISM
+
+ALVA uses deterministic fixed-step simulation.
+
+Preserve that.
+
+No random bounce angles.
+
+No frame-rate-dependent bounce strength.
+
+No visual-frame-based physics.
+
+Given:
+
+same fighter position
+same incoming velocity
+same geometry
+same fixed step
+
+the resulting bounce must always be identical.
+
+⸻
+
+DO NOT USE PURE REALISTIC PHYSICS
+
+This is a fighting game.
+
+Prioritize satisfying trajectories over physically perfect simulation.
+
+For example, you may want a minimum outward rebound velocity after an especially strong wall collision so that the bounce is visually clear.
+
+Likewise, extremely shallow wall impacts may need different handling so characters do not jitter along a surface.
+
+Tune for combat readability.
+
+⸻
+
+GLANCING IMPACTS
+
+If a fighter barely clips a wall while mostly traveling vertically:
+
+do not cause an enormous horizontal rebound.
+
+Bounce strength should derive primarily from the velocity component directed into that surface.
+
+Likewise:
+
+fast downward + tiny horizontal movement into wall
+
+should remain mostly a downward trajectory after the wall interaction.
+
+Preserve tangential velocity wherever reasonable.
+
+This produces better ricochet trajectories.
+
+⸻
+
+RESTITUTION SHOULD APPLY TO NORMAL VELOCITY
+
+Conceptually:
+
+incoming velocity can be decomposed into:
+
+* velocity into surface
+* velocity parallel to surface
+
+Reflect and reduce the component into the surface.
+
+Preserve most or all of the tangential component.
+
+Example:
+
+fighter moving diagonally down-right hits a vertical wall.
+
+Before:
+
+vx = +800
+vy = +300
+
+After a 0.7 wall bounce:
+
+vx ≈ -560
+vy ≈ +300
+
+This creates a natural-looking ricochet instead of reversing the entire velocity vector.
+
+⸻
+
+BOUNCE COUNT
+
+Track bounce count for the current launched sequence if useful.
+
+Reset it when:
+
+* fighter has fully recovered from combat launch
+* fighter returns to ordinary grounded neutral
+* fighter is hit by another launching attack and begins a new launch sequence
+* fighter respawns
+
+A new attack should establish a new launch sequence.
+
+⸻
+
+BEING HIT DURING A BOUNCE
+
+A bounced fighter must remain a valid combat target unless existing ALVA rules say otherwise.
+
+If Fighter A launches Fighter B:
+
+B hits wall
+→ B rebounds
+→ A hits B again in the air
+
+the new hit should:
+
+* apply its own damage
+* update Launch Point
+* calculate a fresh launch
+* replace/modify velocity according to ALVA’s existing hit rules
+* start a new launch/bounce sequence
+
+Do not combine the old ricochet velocity incorrectly with a fresh attack launch unless ALVA’s combat design intentionally does so.
+
+Existing launch-hit semantics should remain authoritative.
+
+⸻
+
+SHIELD
+
+Shield should behave exactly as ALVA intends.
+
+A blocked attack that produces no launch should not cause bounce.
+
+Do not let shielded characters ricochet simply because the attack had potential launch data.
+
+Bounce comes from actual resulting fighter velocity, not theoretical attack strength.
+
+⸻
+
+PROJECTILES
+
+Existing projectile launch can use the same system.
+
+If a projectile genuinely launches a fighter hard enough into geometry:
+
+the resulting fighter may ricochet.
+
+Do not special-case projectiles unless necessary.
+
+⸻
+
+CLONE ATTACKS
+
+Clone attacks ultimately resolve the owner’s attack behavior through ALVA’s combat architecture.
+
+If a clone attack launches the target strongly enough:
+
+the target should use the same launch-bounce system.
+
+Do not put bounce calculations into the clone itself.
+
+⸻
+
+SPHERE RUSH
+
+Preserve Sphere Rush completely.
+
+Its final explosion already produces a significant launch.
+
+That explosion should naturally be capable of causing a strong ricochet when the opponent collides with nearby stage geometry.
+
+Example:
+
+Sphere Rush explosion
+→ opponent launched toward wall
+→ strong wall impact
+→ rebound across arena.
+
+This could become one of the most satisfying uses of the new system.
+
+Do not alter Sphere Rush’s internal formation/rush/bind/tick/explosion sequence just to implement bounce.
+
+⸻
+
+COMBO PHILOSOPHY
+
+Bounce should expand ALVA’s combo and pressure possibilities without making infinite combos easy.
+
+Use:
+
+* restitution
+* Launch Point
+* increasing travel distance
+* hitstun tuning
+* positioning
+* attack recovery
+* player movement
+
+to naturally control combo length.
+
+A bounce is primarily a trajectory opportunity.
+
+Not every wall bounce has to guarantee another hit.
+
+⸻
+
+EXPECTED GAME FEEL
+
+When a powerful attack sends someone toward a solid surface, the player should immediately think:
+
+“They’re going to bounce back.”
+
+And then be able to react to that trajectory.
+
+The game should produce visually understandable arcs:
+
+HIT
+→ FLY
+→ WALL IMPACT
+→ REBOUND
+→ CHASE
+→ FOLLOW-UP.
+
+At very high Launch Point:
+
+HIT
+→ FLY
+→ WALL IMPACT
+→ HUGE REBOUND
+→ OTHER WALL / FLOOR
+→ POSSIBLE SECOND RICOCHET
+→ VOID OR RECOVERY.
+
+That is the desired feeling.
+
+⸻
+
+TEST CASES
+
+Add automated tests covering at minimum:
+
+Normal wall collision
+
+Walk normally into wall.
+
+Expected:
+
+vx becomes zero.
+
+No bounce.
+
+Normal ceiling collision
+
+Jump normally into ceiling.
+
+Expected:
+
+vy becomes zero.
+
+No bounce.
+
+Weak launched wall collision
+
+Target enters wall below bounce threshold.
+
+Expected:
+
+ordinary stopping/collision behavior.
+
+No ricochet.
+
+Strong horizontal launch
+
+Target enters wall above threshold.
+
+Expected:
+
+horizontal velocity reverses.
+
+Magnitude is reduced by restitution.
+
+Downward floor launch
+
+Target is launched downward strongly enough.
+
+Expected:
+
+vertical velocity becomes upward after impact.
+
+Target does not immediately become ordinary grounded neutral.
+
+Upward ceiling launch
+
+Target is launched upward strongly enough.
+
+Expected:
+
+vertical velocity reverses downward.
+
+Diagonal wall impact
+
+Target has X and Y velocity.
+
+Hits vertical wall.
+
+Expected:
+
+X reflects/reduces.
+
+Y remains substantially unchanged.
+
+Corner impact
+
+Target collides with valid horizontal and vertical surfaces during the same step.
+
+Expected:
+
+both applicable components resolve once.
+
+No embedding.
+
+No repeated instant bounce.
+
+Multi-bounce
+
+Strong launch into first wall.
+
+Expected:
+
+bounce 1.
+
+Target crosses arena.
+
+Hits second wall with enough remaining velocity.
+
+Expected:
+
+bounce 2 with reduced magnitude.
+
+Bounce decay
+
+Repeated collisions.
+
+Expected:
+
+eventually impact speed drops below threshold.
+
+Ricochet stops.
+
+Normal physics resumes.
+
+One-way platform
+
+Upward travel through underside.
+
+Expected:
+
+no collision/bounce.
+
+Strong downward valid collision with top.
+
+Expected:
+
+configured top-surface bounce behavior.
+
+Void
+
+Target launched beyond stage without hitting geometry.
+
+Expected:
+
+Void behavior unchanged.
+
+No invisible bounce.
+
+New attack during bounce
+
+Target bounces and is hit again.
+
+Expected:
+
+new hit’s launch replaces/updates the old launch according to existing combat rules.
+
+Bounce sequence resets appropriately.
+
+Shield
+
+Attack is blocked.
+
+Expected:
+
+no launch-generated bounce.
+
+Sphere Rush explosion
+
+Explosion launches target into wall.
+
+Expected:
+
+normal bounce system applies.
+
+⸻
+
+TUNING
+
+Start conservatively.
+
+Suggested INITIAL tuning territory, not final mandated values:
+
+min impact speed:
+roughly 400–550 px/s
+wall restitution:
+roughly 0.68–0.78
+floor restitution:
+roughly 0.58–0.72
+ceiling restitution:
+roughly 0.60–0.72
+max bounce safety cap:
+roughly 4–6
+very short bounce impact hitstop:
+roughly 0.025–0.050 seconds
+
+These are starting points only.
+
+Actually test gameplay.
+
+The important outcome is:
+
+* weak hits rarely bounce
+* medium launch creates a clear single ricochet
+* strong launch can produce multiple ricochets
+* each bounce visibly loses energy
+* trajectories stay controllable/readable
+* no infinite pinball loops
+
+⸻
+
+DO NOT
+
+Do NOT:
+
+* make every wall universally bouncy
+* create invisible arena walls
+* bounce from Void boundaries
+* replace Launch Point
+* replace Base Launch
+* replace Directional Launch
+* rewrite ALVA into MultiVersus
+* add MultiVersus-specific defensive mechanics
+* change #0001’s abilities
+* remove Shield
+* remove Dash
+* remove Charge
+* remove Clone
+* remove Sphere Rush
+* change existing art
+* make velocity random after bounce
+* create frame-rate-dependent physics
+* put character-specific attack rules inside physics.js
+* let weak knockback create silly constant bouncing
+* allow infinite wall loops
+
+⸻
+
+ALSO PRESERVE THE PREVIOUS MOVEMENT/COMBO GOAL
+
+This bounce system should work alongside ALVA’s desired fluid combat direction:
+
+* responsive movement
+* smooth aerial control
+* momentum through attacks
+* combat input buffering
+* more accessible combos
+* short intentional combo routes
+* pursuit after launch
+
+Do not interpret the bounce work as permission to introduce MultiVersus’s complete combat mechanics.
+
+The reference game is still being used primarily for feel.
+
+⸻
+
+IMPLEMENTATION PRIORITY
+
+Implement in this order:
+
+1. inspect current collision and launch architecture
+2. expose reliable collision/impact information from physics
+3. track whether Fighter is under meaningful combat launch
+4. add bounce threshold
+5. implement horizontal wall ricochet
+6. implement floor bounce
+7. implement ceiling bounce
+8. handle diagonal/corner collisions
+9. support multiple diminishing bounces
+10. integrate hitstun and combat continuation
+11. verify one-way platforms
+12. verify Void behavior
+13. verify projectiles/clones/Sphere Rush
+14. add automated tests
+15. tune through actual gameplay
+16. update ALVA_SPEC.md
+
+⸻
+
+FINAL ACCEPTANCE CRITERIA
+
+The work is complete when all of these are true:
+
+A fighter walking into a wall simply stops.
+
+A fighter normally jumping into a ceiling simply bonks.
+
+A weak combat launch does not automatically bounce.
+
+A sufficiently strong combat launch hitting a solid wall rebounds.
+
+A sufficiently strong downward launch can bounce from a floor.
+
+A sufficiently strong upward launch can bounce from a ceiling.
+
+Diagonal impacts preserve sensible tangential momentum.
+
+A powerful fighter can bounce from one wall toward another.
+
+Second and subsequent bounces are weaker.
+
+The fighter eventually exits the ricochet state naturally.
+
+Void behavior remains untouched.
+
+Launch Point continues controlling overall knockback strength.
+
+Shield continues working.
+
+Dash continues working.
+
+Charge continues working.
+
+Shuriken continues working.
+
+Clone continues working.
+
+Sphere Rush continues working.
+
+Existing abilities remain ALVA abilities.
+
+Combos can capitalize on bounce trajectories.
+
+The physics remains deterministic at ALVA’s fixed simulation rate.
+
+And most importantly:
+
+A strong launch into stage geometry should produce that satisfying “WHAM → rebound → fly across the stage → potentially hit another surface and bounce again” feeling shown in the reference video, without turning normal ALVA movement into pinball physics.
