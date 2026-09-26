@@ -1,852 +1,916 @@
-Work directly in the hiyroscript/alva repository.
+You are working in the GitHub repository hiyroscript/alva on the current main branch.
 
-Implement a mobile-control UX update for Alva. Read the existing code first and preserve the game’s current combat, input, physics, multi-touch behavior, control positions, and desktop controls. This task is primarily a mobile presentation/input-ergonomics change.
+Before changing anything, inspect the existing implementation carefully, especially:
+
+index.html
+styles.css
+js/core/app.js
+js/core/screen-manager.js
+js/core/menu-navigator.js
+js/ui/components.js
+js/screens/mode-select-screen.js
+js/screens/character-select-screen.js
+js/screens/map-select-screen.js
+js/screens/battle-screen.js
+js/screens/practice-screen.js
+js/game/arena.js
+js/game/battle.js
+js/game/fighter-controller.js
+js/game/character.js
+js/game/combat.js
+js/game/projectile.js
+js/game/charged-technique.js
+js/game/practice.js
+js/data/characters.js
+ALVA_SPEC.md
+README.md
+and the existing files under tests/.
+
+Also inspect the current hiyroscript/seren repository, specifically its difficulty-selection screen in index.html, the corresponding .difficulty-scale styling in css/app.css, the DIFFS configuration in js/data.js, and the AI design in js/ai.js.
+
+Do not copy Seren literally. Seren is the design reference. Alva must keep its own visual language, architecture, controls, combat rules, and code style.
 
 Goal
 
-Mobile gameplay should stop showing internal/code-like combat labels such as T, D, BA1, and BA2.
+Add a new mandatory Select Difficulty step to Quick Battle between Select Mode and Select Fighter.
 
-Replace those labels with clear ability icons.
+The Quick Battle setup flow must become:
 
-For fighter #0001, the mobile action cluster should become:
+Splash → Home → Select Mode → Select Difficulty → Select Fighter → Select Stage → Battle
 
-* primary / Throw: shuriken icon
-* special: keep the existing Special/star icon and keep it visually reserved/pending
-* defense: shield icon
-* action1 / BA1: punch/fist icon
-* action2 / BA2: kick icon
-* jump: keep the existing Jump icon
+The player must choose exactly one of:
 
-Do not alter the current physical arrangement of the buttons.
+Easy
+Medium
+Hard
+Brutal
 
-The current mobile action layout must remain:
+That selected difficulty controls the CPU fighter in Quick Battle.
 
-                  [ SHURIKEN ]
-             [ SPECIAL ] [ SHIELD ]
-          [ PUNCH ] [ KICK ] [ JUMP ]
+The CPU must no longer be a passive training dummy in Quick Battle. It must actually fight the player using Alva’s real movement, attacks, Shield, Charge, charged actions, projectiles, jumps, stage movement, etc.
 
-The lower-left controls remain:
+Difficulty must affect the CPU’s reaction speed, perception/reassessment cadence, decision quality, risk assessment, planning, mistakes, defense, aggression, punish ability, and randomness.
 
-[ LEFT ] [ C ] [ RIGHT ]
+Difficulty must NOT give the CPU artificial character-stat advantages.
 
-Charge may continue to display C; this task is specifically replacing the combat ability code labels.
+Practice Ground must remain a training environment and its existing TrainingAIController must remain passive exactly as intended.
 
-Important architecture requirement
+Current architecture that must be respected
 
-Do not simply hardcode #0001’s shuriken/punch/kick icons directly into ACTION_BUTTONS in js/game/touch-controls.js.
+Alva already has a clean controller boundary:
 
-The repo is structured for multiple fighters, and Practice Ground supports changing fighters during the session.
+Fighter.update() asks its controller for a standard FighterInput snapshot.
 
-Make the mobile ability presentation character-aware.
+PlayerController supplies human inputs.
 
-The touch-control system should have:
+TrainingAIController supplies movement-only training behavior.
 
-1. universal controls/icons where appropriate;
-2. character-specific ability presentation for fighter-specific attacks.
+Keep this architecture.
 
-The Shield is considered the universal defensive ability for the mobile UI, so its mobile presentation does not need to live in #0001’s custom attack icon configuration.
+Do not put CPU decision logic directly into Fighter, CombatSystem, BattleScreen, or character data.
 
-Keep the existing internal input action named defense unless there is a compelling technical reason to refactor it. The player-facing mobile control should simply be called Shield.
+Create a separate combat-capable controller, preferably named something like:
 
-Do not refactor combat code from defense to shield. That would create unnecessary risk.
+CombatAIController
 
-Existing code to understand before changing anything
+or another clear equivalent.
 
-Review at minimum:
+Keep TrainingAIController for Practice Ground.
 
-* js/game/touch-controls.js
-* js/ui/icons.js
-* js/data/characters.js
-* js/screens/battle-screen.js
-* js/screens/practice-screen.js
-* js/ui/help-content.js
-* js/config.js
-* styles.css
-* index.html
-* tests/controls-ui.test.mjs
-* relevant battle/practice tests
+Quick Battle should use the new combat AI controller.
 
-Important current behavior:
+The CPU must interact with the game by generating the same input fields a human controller generates:
 
-* TouchControls uses Pointer Events.
-* It tracks every pointer separately by pointerId.
-* Multi-touch already works.
-* A player can hold a direction while pressing attacks/jump.
-* The left thumb can slide between Left / Charge / Right.
-* primary currently displays T.
-* defense currently displays D.
-* action1 currently displays BA1.
-* action2 currently displays BA2.
-* Special already uses an icon.
-* Jump already uses an icon.
-* Only Special is currently pending/reserved.
-* BattleScreen creates one TouchControls instance and knows the selected fighter definition during enter().
-* Practice Ground creates one TouchControls instance but can later change the player fighter with session.setFighter(...).
-
-Preserve all of that behavior.
-
-1. Add the new ability icons
-
-Use the existing inline SVG icon architecture in:
-
-js/ui/icons.js
-
-Do not add an icon library or external dependency.
-
-Add clean monochrome currentColor icons matching Alva’s existing geometric visual language.
-
-At minimum add:
-
-ICONS.shuriken
-ICONS.shield
-ICONS.punch
-ICONS.kick
-
-Requirements:
-
-Shuriken
-
-Create a recognizable throwing-star/shuriken silhouette or outline.
-
-It must remain legible around the existing mobile button size.
-
-Do not use the actual animated sprite PNG as the UI icon. The control icon should be a simple SVG UI glyph.
-
-Shield
-
-Use a conventional shield outline/silhouette.
-
-It should read immediately as defensive protection, even at small scale.
-
-Punch
-
-Use a recognizable fist/punch glyph.
-
-Avoid excessive internal detail that disappears on small phone screens.
-
-Kick
-
-Use a simple leg/foot or striking-kick glyph.
-
-It needs to be visually distinguishable from the fist.
-
-All icons must:
-
-* inherit currentColor;
-* work with .icon;
-* not contain hardcoded colors;
-* use aria-hidden="true" through the existing icon helper;
-* remain clear in pressed, normal and pending control states.
-
-Do not use emoji or text characters as the icons.
-
-2. Make fighter-specific mobile ability metadata
-
-Add a small, explicit piece of character UI metadata to the character definition rather than inferring the icon from attack animation names.
-
-For #0001, define the equivalent of:
-
-mobileAbilities: {
-  primary: {
-    label: 'Shuriken',
-    icon: 'shuriken',
-  },
-  action1: {
-    label: 'Punch',
-    icon: 'punch',
-  },
-  action2: {
-    label: 'Kick',
-    icon: 'kick',
-  },
-},
-
-The exact property name can differ if another name fits the codebase better, but keep the data:
-
-* declarative;
-* small;
-* character-owned;
-* independent from combat calculations.
-
-Do not make touch-controls inspect things like attacks.ba1.animation === 'ba1' to guess what icon to display.
-
-UI presentation should be authored explicitly.
-
-For missing character mobile ability metadata, provide a safe fallback rather than crashing. A future unfinished fighter should still produce usable controls.
-
-A reasonable fallback can use the generic player-facing action name or another neutral representation.
-
-3. Update TouchControls to accept the active fighter
-
-Refactor TouchControls so that the universal button structure remains reusable, but the fighter-dependent action buttons can update their icon and accessible name.
-
-Add an API along the lines of:
-
-touch.setCharacter(def);
-
-or:
-
-touch.setAbilityProfile(def);
-
-Use whichever design best fits the code.
-
-Calling it should update at least:
-
-* primary
-* action1
-* action2
-
-For #0001:
-
-primary  -> shuriken icon, aria-label "Shuriken"
-action1  -> punch icon, aria-label "Punch"
-action2  -> kick icon, aria-label "Kick"
-
-The internal data-action values must remain:
-
+left
+right
+charge
+jump
+defense
 primary
+special
 action1
 action2
 
-Input dispatch must therefore remain exactly the same.
+and their appropriate ...Pressed edge values.
 
-Do not introduce new input actions such as:
+Do not have the AI call attacks, damage functions, techniques, Shield methods, projectile spawners, movement methods, etc. directly.
 
-shuriken
-punch
-kick
-shield
+A CPU attack must happen because the controller pressed the same action that a human would press.
 
-Those are UI/gameplay names, not new controller inputs.
+A CPU Shield must happen because defense was held.
 
-4. Replace D with the universal Shield icon
+A charged action must happen through the existing Charge + action interaction.
 
-The mobile defense button should no longer display:
+A Dash must use the existing dash input semantics rather than directly changing velocity.
 
-D
+This principle from Seren is essential:
 
-It should display ICONS.shield.
+Difficulty changes how well the CPU thinks, not what its fighter is allowed to do.
 
-Its mobile accessible/player-facing label should be:
+1. Add Difficulty to Quick Battle state
 
-Shield
+Extend the Quick Battle selection object in js/core/app.js.
 
-Keep:
-
-data-action="defense"
-
-and keep dispatching the existing:
-
-input.setTouch('defense', ...)
-
-Do not change the gameplay mechanics of the existing shield.
-
-The button should continue supporting held input:
-
-* pointer down = shield held;
-* pointer up/cancel = shield released.
-
-Do not turn Shield into a one-tap action.
-
-5. #0001 mapping
-
-For fighter #0001 specifically:
-
-Throw / primary
-
-Current:
-
-T
-
-New:
-
-shuriken SVG icon
-
-Accessible name:
-
-Shuriken
-
-or Throw Shuriken if that reads better with the existing accessibility conventions.
-
-Prefer Shuriken if all mobile action labels describe the actual ability.
-
-Do not change the underlying primary input or the Throw projectile mechanics.
-
-BA1 / action1
-
-Current:
-
-BA1
-
-New:
-
-punch/fist SVG icon
-
-Accessible name:
-
-Punch
-
-This represents #0001’s primary BA1 ground identity.
-
-Do not change the fact that the same action1 input selects the appropriate ground or airborne attack.
-
-The icon represents the button/ability family, not every possible situational animation.
-
-BA2 / action2
-
-Current:
-
-BA2
-
-New:
-
-kick SVG icon
-
-Accessible name:
-
-Kick
-
-Again, keep all current ground/air action selection and charged behavior.
-
-6. Keep charged abilities working exactly as they do now
-
-This UI change must not break Charge combinations.
-
-Currently:
-
-* hold Charge, then action1 = Clone Attack;
-* hold Charge, then action2 = Sphere Rush.
-
-Those mechanics must remain identical.
-
-The player simply presses:
-
-* Charge + Punch icon
-* Charge + Kick icon
-
-Do not add separate Clone Attack or Sphere Rush touch buttons.
-
-Do not change charged cooldown behavior.
-
-Do not change CAB1/CAB2 fighter-status rendering in this task unless necessary for an explicitly related mobile-help wording change.
-
-The request is about the actual touch buttons, not renaming the combat system’s internal charged-action concepts.
-
-7. BattleScreen must configure the touch icons
-
-When BattleScreen.enter() resolves:
-
-const def = getCharacter(...)
-
-configure the touch controls for that fighter before gameplay begins.
-
-For example:
-
-this.touch.setCharacter(def);
-
-The controls must always reflect Player 1’s selected fighter.
-
-Do not use the CPU fighter to choose Player 1’s touch controls.
-
-8. Practice Ground must update icons after Change Fighter
-
-This is important.
-
-Practice Ground allows the player to change fighters without rebuilding the whole screen.
-
-When the initial practice fighter loads, configure TouchControls with that fighter.
-
-When changeFighter(def) succeeds and the code currently performs:
-
-this.characterId = def.id;
-this.session.setFighter(def, sprites);
-
-also refresh the touch controls for def.
-
-The icon update should happen as part of the successful fighter swap.
-
-Do not leave #0001’s Punch/Kick/Shuriken icons on-screen after a future different fighter is selected.
-
-Changing the CPU must not alter Player 1’s mobile ability icons.
-
-9. Preserve the existing button geometry
-
-Do not redesign the mobile layout in this task.
-
-Keep the existing CSS coordinates for:
-
-* .tc-throw
-* .tc-special
-* .tc-defense
-* .tc-a1
-* .tc-a2
-* .tc-jump
-* lower-left movement/Charge buttons
-
-The shuriken should stay in the current large upper-right Throw button.
-
-Shield stays in the current Defense position.
-
-Punch stays in the current BA1 position.
-
-Kick stays in the current BA2 position.
-
-Special and Jump stay where they are.
-
-Preserve button sizing and touch target sizes.
-
-If the new SVG glyphs visually need minor icon-size normalization, do that through an icon-specific class or sensible SVG viewBox, not by moving the buttons.
-
-10. Keep tap feedback
-
-All new icons must respond to the existing .is-pressed state exactly like the current controls.
-
-Press feedback must remain immediate.
-
-Do not add slow animations that make high-frequency combat tapping feel delayed.
-
-The game will involve a lot of tapping.
-
-Input responsiveness has priority over decorative animation.
-
-11. Prevent browser zoom during gameplay
-
-Alva is a web game and repeated rapid taps must not cause the browser to zoom the webpage.
-
-The repo already has several protections:
-
-* .screen--battle { touch-action: none; }
-* .battle-canvas { touch-action: none; }
-* .screen--practice { touch-action: none; }
-* .tc-btn { touch-action: none; }
-* .tc-dpad { touch-action: none; }
-* the document is already non-scrolling.
-
-Do not delete or weaken those.
-
-However, the current viewport is:
-
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-
-Strengthen the game viewport so browser pinch/double-tap zoom does not activate during play.
+It currently stores mode, fighter and map selection. Add a difficulty value.
 
 Use:
 
-<meta
-  name="viewport"
-  content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
->
+difficulty: 'medium'
 
-Keep viewport-fit=cover.
+as the initial/default selection.
 
-Do not implement a JavaScript timer that tries to detect double taps.
+Valid values are exactly:
 
-Do not globally preventDefault() every touchstart/touchend event.
+easy
+medium
+hard
+brutal
 
-Do not add old Touch Events code beside the existing Pointer Events system.
+Keep Practice Ground’s state independent from Quick Battle, as it is now.
 
-The existing Pointer Events architecture should remain the source of gameplay input.
+Changing Quick Battle difficulty must not affect the Practice Ground CPU.
 
-Also preserve:
+2. Add the Difficulty screen to the application flow
 
-touch-action: none;
+Create a dedicated screen module following the existing screen architecture, for example:
 
-on the battle/practice gameplay surfaces and the actual touch controls.
+js/screens/difficulty-select-screen.js
 
-The end result must prevent rapid attack tapping from enlarging or shrinking the browser page.
+Register it in js/core/app.js.
 
-12. Do not break menu scrolling or navigation
+Add its corresponding <section> in index.html between the mode and character sections.
 
-The zoom prevention is for the web-game viewport and gameplay interaction.
+Use a screen id such as:
 
-Do not accidentally make the internal Help/Discover interfaces unusable.
+difficulty
 
-Verify that any intentionally scrollable panels still scroll normally.
+The mode-selection screen currently goes directly to:
 
-Do not add blanket JavaScript gesture cancellation to every element in the application.
+app.screens.go('character')
 
-13. Update Mobile Help
+Change that so choosing Quick Battle goes to:
 
-js/ui/help-content.js currently draws a miniature mobile controller diagram containing:
+app.screens.go('difficulty')
 
-* T
-* D
-* BA1
-* BA2
+Choosing a difficulty must:
 
-Update the diagram to match the real controls.
+set app.selection.difficulty,
+then navigate to character.
 
-For #0001, show:
+Back from Difficulty must return to Mode through the normal screen navigation model.
 
-* shuriken icon;
-* Special icon;
-* shield icon;
-* punch icon;
-* kick icon;
-* Jump icon.
+Back from Fighter must now return to Difficulty.
 
-Remove the old visible mobile abbreviations:
+Back from Stage must continue to return to Fighter.
 
-T
-D
-BA1
-BA2
+Do not create a separate navigation system for this.
 
-from the diagram.
+3. Update the setup progress indicator
 
-Update titles/accessibility labels so the diagram is understandable without seeing the icons.
+js/ui/components.js currently defines:
 
-Use terminology such as:
+Mode → Fighter → Stage
 
-Shuriken
-Special
-Shield
-Punch
-Kick
-Jump
+Change this to:
 
-Update the mobile legend/note to describe the abilities rather than explaining code labels.
+Mode → Difficulty → Fighter → Stage
 
-For example, the mobile help should communicate the equivalent of:
+The setup header therefore has four steps.
 
-Lower right: Shuriken, Special, Shield, Punch, Kick and Jump.
+Use these step indexes consistently:
 
-It can also explain:
+Screen	Step
+Select Mode	0
+Select Difficulty	1
+Select Fighter	2
+Select Stage	3
 
-* Shuriken throws #0001’s projectile.
-* Shield is held.
-* Punch is the BA1/action1 control internally.
-* Kick is the BA2/action2 control internally.
+Update the current Character and Map screen step indexes accordingly.
 
-Do not expose the internal names primary, action1, action2, or defense to players.
+Completed steps should continue using the existing checkmark treatment.
 
-The broader technical documentation may continue discussing BA1/BA2 where describing combat systems. The mobile UI itself should no longer look like developer/controller shorthand.
+Keep the existing accessible aria-current behavior.
 
-14. Terminology boundaries
+4. Difficulty screen visual design
 
-This change is primarily mobile presentation.
+Take direct inspiration from Seren’s Difficulty screen concept, especially its four-level ascending scale, but translate it into Alva’s existing design system.
 
-Do not recklessly rename every BA1/BA2 reference throughout the engine.
+Do NOT paste Seren’s red visual language into Alva.
 
-Internal concepts such as:
+Alva uses near-black/charcoal surfaces, off-white type and restrained green accents. Continue using the existing CSS variables and visual language.
 
-action1
-action2
-ba1
-ba2
-CAB1
-CAB2
-primary
-defense
+The screen heading should be:
 
-may remain where they are part of the engine/data architecture.
+Select Difficulty
 
-Player-facing mobile controls should instead show ability icons and meaningful accessible labels.
+The kicker should be:
 
-This avoids a large unrelated combat refactor.
+Quick Battle
 
-15. Special remains pending
+Present four large selectable options in ascending order:
 
-Do not accidentally activate Special.
+Index	Difficulty	Suggested description
+01	Easy	Slower reactions. Leaves openings.
+02	Medium	Balanced reactions and decisions.
+03	Hard	Fast reactions. Defends and punishes.
+04	Brutal	Sharp reactions. Relentless decisions.
 
-It should continue using:
+The wording can be refined slightly to fit Alva’s tone, but keep it short, professional and understated.
 
-ICONS.special
+Visually take inspiration from Seren’s ascending four-bar motif:
 
-and remain the only .is-pending action button.
+Easy shows 1 active bar.
+Medium shows 2.
+Hard shows 3.
+Brutal shows 4.
 
-Keep its dashed/pending appearance.
+Use Alva’s accent color for active bars. Brutal may receive a slightly stronger accent treatment using existing Alva tokens, but do not introduce an unrelated bright-red Seren theme.
 
-The new shuriken, shield, punch and kick buttons must be active/solid like their existing T/D/BA1/BA2 versions.
+Each difficulty should also show its large 01, 02, 03, 04 index.
 
-16. CSS icon treatment
+Desktop should comfortably display all four as one row when space permits.
 
-Ensure the new icons use the existing mobile icon styling cleanly.
+On narrow/mobile screens, use a clean 2 × 2 arrangement rather than shrinking everything until it becomes unreadable.
 
-Current mobile icons use:
+Account for short landscape phones as the rest of Alva does. The decision area may scroll if necessary, but Back and the important selection controls must remain usable.
 
-.tc-btn .icon
+Use Alva’s existing data-nav/MenuNavigator conventions so keyboard and gamepad navigation work correctly.
 
-Keep that model.
+Pointer, keyboard and gamepad selection must all work.
 
-If necessary, make the combat ability glyphs slightly larger than the existing general icons, but keep it restrained and consistent.
+When returning to the screen, focus the currently selected difficulty. Since medium is the initial value, Medium should be the initial default focus on a fresh Quick Battle flow.
 
-They should be readable without text.
+The screen should be accessible and usable without relying on color alone.
 
-Do not add text under the icon.
+5. Preserve Alva’s existing interface conventions
 
-Do not put both an icon and BA1, BA2, T, or D in the button.
+Audit styles.css for selectors that explicitly include:
 
-Icon only.
+.screen--mode
+.screen--character
+.screen--map
 
-Accessible names provide the textual meaning.
+and determine whether the new Difficulty screen belongs in those shared menu treatments.
 
-17. Tests
+For example, its Back button should receive the same radius/treatment as the existing Quick Battle setup screens.
 
-Update tests/controls-ui.test.mjs substantially.
+Do not globally restyle unrelated screens.
 
-Remove assertions that require the mobile buttons to contain:
+Do not redesign Mode, Fighter, Stage, Home, Practice or Battle.
 
-T
-D
-BA1
-BA2
+This feature should look like it was always part of Alva.
 
-Replace them with assertions for the new SVG icons and labels.
+6. Replace Quick Battle’s passive CPU with a real combat AI
 
-At minimum test:
+The current Battle creates P2 with:
 
-#0001 primary
+TrainingAIController
 
-* contains an SVG icon;
-* uses the shuriken icon;
-* does not contain visible T;
-* data-action === 'primary';
-* accessible label is Shuriken / Throw Shuriken;
-* pointerdown still dispatches ['primary', true];
-* pointerup still dispatches ['primary', false].
+That is intentionally a non-attacking practice opponent.
 
-Shield
+Do not turn TrainingAIController into the combat AI, because Practice Ground relies on its current passive behavior and existing tests explicitly verify that behavior.
 
-* contains ICONS.shield;
-* has no visible D;
-* aria-label === 'Shield';
-* data-action === 'defense';
-* remains a held input;
-* multi-touch with a direction still works.
+Instead add a separate combat controller.
 
-Punch
+Conceptually the structure should become:
 
-* #0001 action1 uses the punch icon;
-* no BA1 text in the actual touch button;
-* accessible label is Punch;
-* still dispatches action1.
+Human Quick Battle fighter → PlayerController
 
-Kick
+Quick Battle CPU fighter → CombatAIController
 
-* #0001 action2 uses the kick icon;
-* no BA2 text in the actual touch button;
-* accessible label is Kick;
-* still dispatches action2.
+Practice CPU → TrainingAIController
 
-Special
+The new combat AI must be data-driven enough to work with future fighters instead of hard-coding #0001 throughout the controller.
 
-Assert that Special remains the only pending action.
+It can inspect the fighter’s normal data and resolved capabilities, such as its action mappings, attack definitions, charged actions, projectiles, Shield availability, energy state and cooldowns.
 
-Character switching
+If an action is mapped to null, such as #0001’s currently reserved Special, the CPU must not attempt to invent behavior for it.
 
-Add coverage proving that setCharacter() / the chosen equivalent can refresh the character-specific mobile ability buttons without reconstructing the input system.
+7. Pass difficulty into Battle cleanly
 
-At minimum show that a newly supplied profile replaces the primary/action1/action2 visuals and accessible labels.
+Have BattleScreen resolve the selected difficulty when entering Quick Battle and pass it to Battle.
 
-Practice fighter switching
+For example, the Battle constructor can gain a difficulty option.
 
-If practical with the existing practice test harness, assert that a successful player fighter change refreshes the player’s touch-control profile.
+Battle should then construct its combat AI using that difficulty.
 
-Changing only the CPU should not.
+The selected value must survive:
 
-Mobile diagram
+battle start,
+pause/resume,
+restart,
+rematch,
+Void respawns.
 
-Update Help tests to verify that the miniature controller uses icons rather than:
+A restart/rematch must not silently return the CPU to Medium.
 
-T
-D
-BA1
-BA2
+If an invalid or missing difficulty somehow reaches the battle layer, safely fall back to medium.
 
-and that its accessibility description names:
+Keep this validation near the difficulty configuration instead of scattering string checks throughout the code.
 
-Shuriken
-Shield
-Punch
-Kick
+8. Difficulty profiles
 
-Zoom regression
+Create one centralized configuration describing CPU capability at each level.
 
-Add a lightweight source-level regression test that reads index.html and verifies the viewport contains:
+Take conceptual inspiration from Seren’s DIFFS, where difficulty independently controls things such as reaction time, thinking frequency, lapse probability, planning depth and decision noise.
 
-width=device-width
-initial-scale=1
-maximum-scale=1
-user-scalable=no
-viewport-fit=cover
+For Alva, use a fighting-game-appropriate configuration along these lines:
 
-Also retain/assert the important gameplay touch-action: none declarations rather than accidentally removing them.
+Trait	Easy	Medium	Hard	Brutal
+Reaction delay	high	moderate	low	very low
+Reassessment interval	slow	normal	fast	very fast
+Mistake/lapse chance	high	moderate	low	very low
+Decision randomness	high	moderate	low	minimal
+Defensive awareness	low	moderate	high	very high
+Punish awareness	low	moderate	high	very high
+Charged-action judgment	rare/simple	situational	strong	very strong
+Dash usage	rare/none	occasional	deliberate	deliberate
+Planning persistence	none/short	short	medium	medium/high
+Threat prediction	current danger	limited	good	strong
 
-18. Preserve gameplay behavior
+Put concrete numeric values behind these traits.
 
-This task must not change:
+A reasonable starting point is approximately:
 
-* damage;
-* Launch Point calculations;
-* launch directions;
-* attack timing;
-* hitboxes;
-* hurtboxes;
-* animations;
-* shuriken projectile behavior;
-* Shield Energy costs;
-* Dash Energy costs;
-* Charge behavior;
-* charged cooldowns;
-* Clone Attack;
-* Sphere Rush;
-* movement;
-* camera;
-* stage geometry;
-* CPU behavior;
-* keyboard bindings;
-* gamepad bindings;
-* scoring;
-* respawning.
+Easy reaction window: 0.45–0.85 s
+Medium: 0.22–0.45 s
+Hard: 0.10–0.24 s
+Brutal: 0.05–0.14 s
 
-This is a mobile control UI/UX change plus browser gesture handling.
+Do not treat those exact values as sacred. Tune them against Alva’s actual attack startup times and simulation speed so Easy is visibly forgiving while Brutal is demanding but still physically believable.
 
-19. Documentation
+The important property is monotonic behavior:
 
-Update comments that currently describe the touch layout as:
+Easy should never systematically have better reactions or more accurate judgment than Medium.
 
-[T]
-[SPECIAL] [D]
-[BA1] [BA2] [JUMP]
+Medium should not outperform Hard by configuration.
 
-Replace them with semantic ability names/icons, for example:
+Hard should not have better decision parameters than Brutal.
 
-[SHURIKEN]
-[SPECIAL] [SHIELD]
-[PUNCH] [KICK] [JUMP]
+Randomness may create individual moments where a lower difficulty makes a good choice, which is desirable, but the underlying capability should clearly increase.
 
-Update README/ALVA_SPEC only where they explicitly document the mobile control presentation or viewport behavior.
+9. AI architecture: Sense → Evaluate → Act
 
-Do not rewrite unrelated game documentation.
+Follow Seren’s useful separation between sensing, weighing choices and acting.
 
-Make it clear in technical documentation that the internal input names are intentionally unchanged.
+The combat AI should not select a totally new random action every simulation frame.
 
-20. Browser/mobile verification
+It should maintain internal state such as:
 
-After implementation, manually verify at least these scenarios in responsive/mobile browser testing:
+a think/reassessment timer,
+reaction timer(s),
+current movement intention,
+short-term plan,
+plan expiration,
+held inputs,
+queued one-frame input edges,
+charge intention,
+defensive intention,
+dash tap state,
+and injected RNG.
 
-Rapid tapping
+On each relevant decision cycle:
 
-Repeatedly tap Punch or Kick very quickly.
+Sense
 
-Expected:
+Build a snapshot from information available in the simulation.
 
-* every legitimate pointer press reaches the game;
-* browser does not double-tap zoom;
-* page scale does not change;
-* no text selection;
-* no touch callout.
+Useful information includes:
 
-Multi-touch
+the CPU fighter’s position and velocity,
+grounded/airborne state,
+current surface,
+facing,
+energy,
+Shield exhaustion,
+Launch Point,
+current attack/recovery/stun state,
+charged-action cooldowns,
+opponent position and velocity,
+opponent grounded/airborne state,
+opponent attack phase,
+opponent Shield state,
+opponent Charge state,
+opponent technique state,
+relative horizontal and vertical distance,
+ledge/void danger,
+platform geometry,
+live enemy projectiles,
+live summons/clones,
+battle score,
+time remaining,
+and whether either fighter is temporarily out because of the Void.
 
-Hold Right and repeatedly tap Punch/Kick.
+Use ctx.stage and ctx.battle rather than introducing global game state.
 
-Expected:
+Evaluate
 
-* Right remains held;
-* each attack registers normally.
+Score reasonable candidate intentions according to the situation and difficulty.
 
-Hold Charge, then press Punch.
+Examples include:
 
-Expected:
+hold position,
+approach,
+retreat,
+jump,
+drop through a one-way platform,
+dash forward,
+dash away,
+Shield,
+ground BA1,
+ground BA2,
+air BA1,
+air BA2,
+Throw/projectile,
+Charge,
+charged BA1,
+charged BA2,
+or wait/bait.
 
-* existing charged action1 behavior occurs.
+Do not assume every fighter supports every candidate. Derive legal actions from that fighter’s data.
 
-Hold Charge, then press Kick.
+Act
 
-Expected:
+Translate the selected intention into normal FighterInput.
 
-* existing charged action2 behavior occurs.
+The controller decides.
 
-Shield
+The existing fighter/combat engine executes.
 
-Hold Shield while using another pointer elsewhere.
+10. Reaction behavior
 
-Expected:
+Difficulty must affect actual reaction behavior, not just attack frequency.
 
-* defense remains held for exactly the pointer lifetime;
-* release lowers Shield normally.
+Do not let every CPU notice a player startup or projectile on the same simulation frame.
 
-Practice fighter switch
+When a new threat is perceived, response should be delayed according to the selected difficulty.
 
-Change Player fighter.
+Easy should often see an attack too late or fail to respond at all.
 
-Expected:
+Medium should react to obvious, slower threats but still get caught.
 
-* player’s combat ability icons update immediately to the selected fighter’s profile.
+Hard should respond reliably to telegraphed attacks and obvious projectiles.
 
-Change CPU only.
+Brutal should react rapidly and make strong choices, but should still have a small human-like response delay.
 
-Expected:
+Do NOT give Brutal literal zero-frame reactions.
 
-* player’s icons do not change.
+Do NOT read the player’s raw InputManager state to know what button they just pressed before the fighter expresses it in the simulation.
 
-Orientation
+The CPU may observe things the fighter itself makes visible to the simulation, such as an opponent entering attack startup, moving, jumping, Charging, Shielding, beginning a technique or releasing a projectile.
 
-Verify landscape phone layout and safe-area spacing are unchanged.
+That is fair information.
 
-Desktop
+11. No cheating
 
-Desktop/keyboard gameplay should behave identically to before.
+Difficulty may NEVER directly alter:
 
-21. Implementation quality
+fighter damage,
+Base Launch,
+Directional Launch,
+hitstun,
+attack startup,
+attack recovery,
+movement speed,
+gravity,
+jump speed,
+Dash speed,
+Dash cost,
+Shield cost,
+maximum Energy,
+Energy recovery,
+cooldowns,
+invulnerability,
+hitboxes,
+hurtboxes,
+score,
+respawn time,
+or any other core fighter mechanic.
 
-Keep the implementation small and data-driven.
+There must not be logic such as:
 
-Prefer something like:
+if brutal -> damage *= 1.2
 
-Character definition
-        ↓
-mobile ability presentation
-        ↓
-TouchControls.setCharacter(...)
-        ↓
-existing primary/action1/action2 input actions
+or:
 
-over:
+if easy -> CPU fighter speed *= 0.8
 
-if character id === '0001' ...
+The fighter is mechanically identical regardless of difficulty.
 
-spread throughout the UI.
+Only the controller gets smarter/faster.
 
-A single fallback branch is fine, but do not build a growing character switch statement into TouchControls.
+Likewise, the AI must not teleport, cancel recovery illegally, ignore stun, attack during states where a human cannot, create projectiles directly, or bypass charged-action cooldowns.
 
-Reuse the existing SVG/icon infrastructure.
+12. Neutral movement and stage awareness
 
-Do not add dependencies.
+Preserve and reuse the good stage-following ideas already present in TrainingAIController, but do not tightly couple the two controllers if that makes the training behavior fragile.
 
-Do not add image assets for these four UI glyphs.
+The combat CPU needs to:
 
-Do not change button coordinates.
+follow the opponent across platforms,
+navigate toward useful fighting distance,
+jump to higher platforms when appropriate,
+drop through one-way platforms when appropriate,
+avoid casually walking straight into the Void,
+stop or turn before unsafe ledges,
+recover its positioning after being separated,
+and stand still while its opponent is currently lost to the Void and awaiting respawn.
 
-Do not replace Pointer Events.
+It should understand vertical separation instead of endlessly running into the platform underneath the player.
 
-Do not create a separate mobile combat engine.
+Higher difficulty should make better navigation decisions and commit fewer positioning mistakes, but every level must remain functional.
 
-Definition of done
+13. Fighting-distance logic
 
-The task is complete when all of the following are true:
+The CPU needs meaningful spacing.
 
-* #0001’s mobile Throw button displays a shuriken icon instead of T.
-* #0001’s mobile BA1/action1 button displays a punch icon instead of BA1.
-* the mobile Defense button displays a shield icon instead of D.
-* the mobile Defense button is player-facing as Shield.
-* #0001’s mobile BA2/action2 button displays a kick icon instead of BA2.
-* Special still uses its current icon and is still reserved.
-* Jump remains unchanged.
-* Charge remains unchanged.
-* Left/Right remain unchanged.
-* the action layout is unchanged.
-* multi-touch behavior is unchanged.
-* all underlying input action names remain compatible with the existing combat system.
-* #0001’s character-specific icons come from character/UI metadata rather than being hardcoded into the touch component.
-* Practice Ground refreshes those icons when the player’s fighter changes.
-* CPU changes do not affect Player 1 controls.
-* mobile Help reflects the icon-based controls.
-* the viewport no longer zooms from rapid gameplay tapping/pinch gestures.
-* existing gameplay logic and balance are untouched.
-* relevant automated tests pass.
-* no external dependencies are introduced.
+Do not implement combat as:
 
-Before finishing, review the final diff specifically for accidental combat/input refactors. Keep this change focused on mobile presentation, character-aware ability icon configuration, accessibility labels, Help consistency, and browser zoom prevention.
+“if opponent exists, hold toward them and mash BA1.”
+
+Use the actual fighter attack data where practical.
+
+At close range the CPU can consider BA1/BA2, Shield, retreating, jumping or a charged option.
+
+At medium range it can approach, bait, Throw, reposition or prepare Charge.
+
+At long range it should close distance intelligently or use available ranged tools.
+
+Where practical, calculate approximate attack reach from the character’s resolved attack hitbox rather than hard-coding #0001-specific pixel distances.
+
+Account for whether an action uses a different ground or air attack.
+
+14. Offensive decision-making
+
+The CPU must actually fight at every difficulty.
+
+Easy should still attack. It is inexperienced, not disabled.
+
+Suggested feel:
+
+Easy: approaches imperfectly, pauses often, attacks at obvious opportunities, sometimes uses the wrong move for the spacing, rarely uses advanced charged actions, misses punish windows, has substantial decision noise.
+
+Medium: gives a normal competent fight, uses both basic attacks, Throw, occasional Shield and Charge, understands basic spacing, sometimes uses charged actions and sometimes makes mistakes.
+
+Hard: actively controls spacing, punishes obvious recovery, uses projectiles and air attacks appropriately, Shields real threats, uses Charge and charged actions deliberately, understands stage position, and makes fewer wasted inputs.
+
+Brutal: reassesses quickly, capitalizes on recovery and bad positioning, makes strong attack/defense choices, uses the full moveset intelligently, manages charged cooldowns and Energy well, pressures without simply holding forward, and rarely throws away a safe advantage.
+
+Do not turn Brutal into constant aggression. Sometimes the strongest choice is waiting, spacing, Shielding, retreating, or Charging.
+
+15. Defense and threat assessment
+
+The CPU should understand the existing Shield mechanic.
+
+Shield is a held Defense input, costs Energy only when it blocks a hit, and becomes unavailable while Energy-exhausted.
+
+The AI should therefore consider:
+
+whether a threat can actually reach it,
+how soon the threat becomes active,
+whether Shield is currently legal,
+whether its Energy can support blocking,
+whether moving/jumping away is better,
+and whether the opponent is simply whiffing outside range.
+
+Easy should Shield infrequently and often late.
+
+Medium should block obvious threats some of the time.
+
+Hard should make solid defensive choices.
+
+Brutal should react quickly and intelligently but not hold Shield permanently.
+
+A Brutal CPU that simply turtles forever is not a successful implementation.
+
+16. Projectiles and Throw
+
+#0001’s primary input is Throw and creates the shuriken through the normal attack/projectile pipeline.
+
+The CPU should understand projectiles on both offense and defense.
+
+On offense, Throw is a useful ranged option when spacing supports it.
+
+On defense, harder difficulties should notice enemy projectiles earlier and choose between Shielding, repositioning or another legal response.
+
+Easy may simply get hit by many projectiles.
+
+Do not despawn, redirect or otherwise manipulate projectiles from the controller.
+
+17. Charge and charged actions
+
+The CPU must be capable of using Alva’s actual Charge system.
+
+Remember the existing semantics:
+
+Charge is held.
+The fighter must already have been Charging before a charged action press can trigger the charged version.
+Charged actions have their own cooldowns.
+A charged action may be a summon or a full charged technique.
+If an action cannot perform its charged form for the normal gameplay reasons, existing Fighter behavior decides the fallback.
+
+Therefore the AI needs stateful input across multiple simulation steps.
+
+It cannot emit charge + actionPressed for one isolated frame and assume a charged move happens.
+
+It should be able to:
+
+enter Charge when there is enough space/time,
+remain in Charge long enough to qualify,
+select an available charged action,
+respect cooldowns,
+release Charge when the situation becomes unsafe,
+and avoid repeatedly pressing a charged action that is unavailable.
+
+For #0001 specifically this means the CPU can eventually make intelligent use of both the Clone Attack and Sphere Rush through the existing character data.
+
+Easy should rarely execute them well.
+
+Medium may use them in obvious situations.
+
+Hard and Brutal should use them deliberately.
+
+Keep the implementation generic enough for future characters with different charged actions.
+
+18. Dash
+
+Alva’s Dash is triggered through horizontal double-tap semantics and spends Energy.
+
+The combat AI may use Dash, especially on Hard and Brutal, but it must do so through the existing input path.
+
+Do not set velocity directly.
+
+The AI should understand that Dash competes with attacks and Energy/Shield needs.
+
+Easy can use it rarely or not at all.
+
+Medium may occasionally Dash to close a clear gap.
+
+Hard and Brutal can use it intentionally for positioning, approach or escape.
+
+19. Punishing and recovery awareness
+
+Higher difficulty should understand when an opponent has committed to an action.
+
+Do this using existing observable combat state such as attack phase/recovery rather than reading future input.
+
+Easy largely ignores punish windows.
+
+Medium occasionally notices an obvious whiff.
+
+Hard should punish significant recovery when properly positioned.
+
+Brutal should capitalize quickly on clear whiffs and recovery while still respecting range and stage safety.
+
+Do not create animation cancels that the normal fighter cannot perform.
+
+20. Match awareness
+
+The AI may use Quick Battle state as part of its strategy.
+
+Quick Battle is a scored match with Void points, respawns and a timer.
+
+Use ctx.battle when useful.
+
+Examples:
+
+A CPU leading near the end of the timer may value stage safety slightly more.
+
+A CPU behind may take slightly more offensive risk.
+
+A fighter with a dangerous Launch Point near a ledge should value center-stage recovery.
+
+A high-difficulty CPU should understand that knocking the player toward the Void is strategically useful.
+
+Keep these effects restrained. Difficulty should not create bizarre personality changes every second.
+
+21. Fair perception and limited prediction
+
+Hard and Brutal may project short-term motion from current position/velocity and visible attack state.
+
+For example, they may estimate where a projectile or opponent will be a short time into the future.
+
+The prediction horizon should increase with difficulty.
+
+That is acceptable.
+
+They may NOT inspect future inputs, queued browser events, hidden player intentions or anything outside the game state a fighter could conceptually react to.
+
+Brutal should feel observant, not psychic.
+
+22. Randomness and reproducibility
+
+Follow the existing pattern of injecting RNG into controllers.
+
+The AI should accept an RNG function so tests can be deterministic.
+
+Battle can continue creating a seeded RNG through the existing mulberry32 utility.
+
+Do not scatter direct Math.random() calls throughout the combat AI if they make deterministic testing impossible.
+
+Difficulty should control decision noise and lapse probability.
+
+Randomness exists to make fights less robotic, not to replace decision-making.
+
+23. Input-edge correctness
+
+Be extremely careful with ...Pressed.
+
+A one-frame press should only be true on the transition/decision frame where the CPU intends to press the action.
+
+Do not leave:
+
+action1Pressed
+action2Pressed
+primaryPressed
+jumpPressed
+etc.
+
+stuck true across frames.
+
+Held actions such as movement, Defense and Charge should remain held only for the intended duration.
+
+The CPU controller must output complete, predictable input snapshots consistent with the format expected by Fighter.update().
+
+24. Practice Ground must remain unchanged
+
+This is an important regression requirement.
+
+Practice Ground’s CPU is a training dummy.
+
+It should continue using TrainingAIController.
+
+It should continue to avoid combat buttons.
+
+Existing behavior around following the player, platform navigation, changing/disabling the Practice CPU, and Practice-specific fighter state must remain intact.
+
+Do not make the Practice CPU fight merely because Quick Battle now has combat AI.
+
+Any Help/Discover copy that says the training CPU does not attack should stay true.
+
+Update copy only where the project incorrectly describes the Quick Battle opponent as a training CPU.
+
+25. Battle behavior that should remain unchanged
+
+Do not redesign Quick Battle rules.
+
+Keep the existing:
+
+intro/FIGHT sequence,
+round timer,
+first-to-points behavior,
+Void scoring,
+respawn timing,
+Launch Point behavior,
+HUD,
+pause menu,
+result screen,
+rematch flow,
+stage selection,
+camera,
+touch controls,
+and result calculation.
+
+The feature is a new setup step plus a capable CPU opponent, not a battle-rules rewrite.
+
+P2 can continue using the same fighter definition as Player 1 unless another existing system already specifies otherwise.
+
+26. Tests
+
+Add focused automated coverage for the new feature and update old tests only where their assumptions intentionally changed.
+
+Add a Difficulty screen test or equivalent coverage proving:
+
+the screen exists and is registered,
+Mode → Difficulty,
+Difficulty → Fighter,
+Back navigation is correct,
+all four difficulty buttons work,
+the chosen id is written to app.selection.difficulty,
+Medium is the fresh default,
+the current difficulty receives default focus on re-entry,
+and the four-step progress indicator is correct.
+
+Add combat AI tests using injected deterministic RNG and lightweight fighter/stage fixtures.
+
+Test meaningful behavior rather than exact random movement traces.
+
+Cover at least:
+
+the combat CPU can generate real attack inputs,
+the combat CPU can produce a defensive response,
+the combat CPU can navigate toward an opponent,
+it stops chasing an opponent that is lost to the Void,
+it respects ledges,
+it can maintain Charge over multiple frames and request a charged action,
+pressed edges are one-frame edges,
+invalid difficulty safely resolves to Medium,
+difficulty profiles are ordered sensibly,
+Easy reacts measurably more slowly / unreliably than Brutal under a deterministic scenario,
+Hard/Brutal reassess more frequently than Easy,
+the controller does not mutate fighter stats,
+and Practice Ground’s TrainingAIController still never presses combat, Charge or Defense inputs.
+
+Update existing Quick Battle tests that explicitly assume P2 is a TrainingAIController.
+
+Do not weaken Practice tests to make them pass.
+
+Preserve the existing combat tests for BA1, BA2, Throw, Charge, charged BA2, Clone, Shield, Dash, Energy, launch and scoring.
+
+Run the entire existing test suite, not only the new test file.
+
+This project is a static browser app and currently does not require an npm install; respect the repository’s current tooling rather than adding a framework just for this feature.
+
+27. Documentation
+
+Update README.md and ALVA_SPEC.md where they describe the Quick Battle flow.
+
+The documented flow must become:
+
+Splash → Home → Select Mode → Select Difficulty → Select Fighter → Select Stage → Battle
+
+Update descriptions that currently call the Quick Battle opponent a passive/training CPU.
+
+Clearly distinguish:
+
+Quick Battle CPU = combat AI whose behavior is chosen by difficulty.
+
+Practice Ground CPU = passive training opponent.
+
+Document the four difficulty choices and the principle that difficulty changes AI decision-making rather than fighter stats.
+
+Keep documentation consistent with the final implementation.
+
+28. Code quality constraints
+
+Keep the feature modular.
+
+Avoid a giant if (difficulty === 'brutal') tree scattered across the AI.
+
+Prefer centralized difficulty profiles and shared decision code whose weights/timing are controlled by that profile.
+
+Do not introduce duplicated fighter mechanics into the controller.
+
+Do not hard-code #0001 asset names into the AI.
+
+Do not add dependencies unless genuinely required; this work should not need any.
+
+Follow the repository’s existing plain-JavaScript style.
+
+Keep comments focused on non-obvious behavior, especially reaction timing, edge inputs, planning and fair-information constraints.
+
+Do not remove useful existing comments merely to shorten files.
+
+29. Definition of done
+
+This work is complete only when all of the following are true:
+
+Play → Quick Battle now goes to a polished Difficulty screen before Fighter selection.
+
+Easy, Medium, Hard and Brutal are all selectable with mouse, keyboard and gamepad.
+
+The four-step setup progress indicator is correct.
+
+The chosen difficulty reaches the actual Battle instance.
+
+Quick Battle’s CPU genuinely fights using the normal fighter input/mechanics pipeline.
+
+Easy is clearly forgiving.
+
+Medium provides a balanced normal opponent.
+
+Hard reacts and plans substantially better.
+
+Brutal is fast and strategically strong without cheating.
+
+All four difficulties use identical fighter stats and mechanics.
+
+The CPU can use normal attacks, movement, jumps, Defense, Charge, ranged tools and charged actions when available.
+
+Practice Ground remains a passive training environment.
+
+Mobile and short-landscape layouts remain usable.
+
+No existing battle rules are unintentionally changed.
+
+The complete automated test suite passes.
+
+README and ALVA_SPEC accurately describe the new behavior.
+
+Final implementation response
+
+Do not stop after proposing an architecture.
+
+Implement the feature completely.
+
+After implementation, report:
+
+the files changed,
+the Difficulty screen behavior,
+how the combat AI is structured,
+how each difficulty differs,
+how fair/no-cheat behavior is enforced,
+what tests were added or updated,
+and the result of running the complete test suite.
+
+If an implementation detail differs from the suggestions above because the existing Alva architecture provides a cleaner solution, preserve the intent and explain the deviation in the final summary.
