@@ -20,8 +20,8 @@ globalThis.Path2D ??= class {
   }
 };
 
-const BA1 = { action1: true, action1Pressed: true };
-const THROW = { primary: true, primaryPressed: true };
+const BA1 = { ba1: true, ba1Pressed: true };
+const THROW = { uniqueba: true, uniquebaPressed: true };
 // Two presses of `dir`, one step apart: a Dash's double tap.
 const doubleTap = (step, dir) => {
   step({ [`${dir}Pressed`]: true, [dir]: true });
@@ -55,7 +55,7 @@ test('movement turns it: left faces left, right faces right, and stopping keeps 
   const me = makeFighter({ x: 1000, facing: 1 });
   const foe = makeFighter({ x: 1300 });
   me.fighter.opponent = foe.fighter;
-  for (let i = 0; i < 20; i++) me.step({ left: true });
+  for (let i = 0; i < 20; i++) me.step({ runLeft: true });
   assert.equal(me.fighter.facing, -1, 'walked left: faces left');
   // Stopped, with the opponent on its right: keeps facing left.
   for (let i = 0; i < 90; i++) me.step();
@@ -64,14 +64,14 @@ test('movement turns it: left faces left, right faces right, and stopping keeps 
   place(foe.fighter, me.fighter.body.x + 40);
   for (let i = 0; i < 60; i++) me.step();
   assert.equal(me.fighter.facing, -1, 'an opponent right behind changes nothing');
-  for (let i = 0; i < 20; i++) me.step({ right: true });
+  for (let i = 0; i < 20; i++) me.step({ runRight: true });
   assert.equal(me.fighter.facing, 1, 'walked right: faces right');
   place(foe.fighter, me.fighter.body.x - 200);
   for (let i = 0; i < 90; i++) me.step();
   assert.equal(me.fighter.facing, 1, 'stopped: keeps facing right with the opponent on its left');
   // Steering in the air turns it too, and it keeps that on landing.
   me.step({ jump: true, jumpPressed: true });
-  me.step({ left: true });
+  me.step({ runLeft: true });
   assert.equal(me.fighter.grounded, false);
   assert.equal(me.fighter.facing, -1);
   while (!me.fighter.grounded) me.step();
@@ -80,7 +80,7 @@ test('movement turns it: left faces left, right faces right, and stopping keeps 
 });
 
 test('a Dash faces its own direction, and the opponent never overrides it afterwards', () => {
-  for (const [dir, facing] of [['left', -1], ['right', 1]]) {
+  for (const [dir, facing] of [['runLeft', -1], ['runRight', 1]]) {
     const me = makeFighter({ x: 1000, facing: -facing });
     // The opponent on the side the Dash turns away from.
     const foe = makeFighter({ x: 1000 - 300 * facing });

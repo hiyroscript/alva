@@ -30,7 +30,7 @@ test('a harder launch stuns longer, up to a cap; a hit that launches nothing kee
   // Through the real CombatSystem: BA2 on a target at 55 launches at 1200.
   const d = duel({ gap: 40 });
   d.target.combat.launchPoint = 55;
-  d.tick(P('action2'));
+  d.tick(P('ba2'));
   d.until(() => d.events.length > 0, 30);
   const [e] = d.events;
   assert.equal(e.launchSpeed, 120 * U);
@@ -39,7 +39,7 @@ test('a harder launch stuns longer, up to a cap; a hit that launches nothing kee
   // The shuriken never launches: its stun is its own.
   const s = duel({ gap: 200 });
   s.target.combat.launchPoint = 300;
-  s.tick(P('primary'));
+  s.tick(P('uniqueba'));
   s.until(() => s.events.length > 0, 60);
   assert.equal(s.events[0].launchSpeed, 0);
   assert.equal(s.events[0].hitstun, def.projectiles.shuriken.hitstun);
@@ -48,7 +48,7 @@ test('a harder launch stuns longer, up to a cap; a hit that launches nothing kee
 test('launched hard, a fighter tumbles in its mid-air hurt pose past the stun, until it acts or lands', () => {
   const d = duel({ gap: 40 });
   d.target.combat.launchPoint = 80;
-  d.tick(P('action2'));
+  d.tick(P('ba2'));
   d.until(() => d.events.length > 0, 30);
   assert.ok(d.events[0].launchSpeed >= R.tumbleSpeed);
   assert.equal(d.target.tumbling, true);
@@ -58,7 +58,7 @@ test('launched hard, a fighter tumbles in its mid-air hurt pose past the stun, u
   assert.equal(d.target.state, 'tumble', 'free, but still tumbling');
   assert.equal(frameName(d.target), '0001_midairhurt.png');
   // Steering alone does not end it...
-  d.tick({}, { left: true });
+  d.tick({}, { runLeft: true });
   assert.equal(d.target.state, 'tumble');
   // ...an air jump does.
   d.tick({}, P('jump'));
@@ -68,12 +68,12 @@ test('launched hard, a fighter tumbles in its mid-air hurt pose past the stun, u
   // A slower launch never tumbles; landing ends one.
   const slow = duel({ gap: 40 });
   slow.target.combat.launchPoint = 20;
-  slow.tick(P('action2'));
+  slow.tick(P('ba2'));
   slow.until(() => slow.events.length > 0, 30);
   assert.equal(slow.target.tumbling, false);
   const land = duel({ gap: 40 });
   land.target.combat.launchPoint = 80;
-  land.tick(P('action2'));
+  land.tick(P('ba2'));
   land.until(() => land.target.grounded && land.events.length > 0, 240);
   assert.equal(land.target.tumbling, false);
 });
@@ -101,7 +101,7 @@ test('in play, the target\'s held direction steers the launch; with nothing held
   const launched = (held) => {
     const d = duel({ gap: 40 });
     d.target.combat.launchPoint = 65;
-    d.tick(P('action2'));
+    d.tick(P('ba2'));
     // Held on the step the kick lands (walking away any sooner would dodge it).
     const landing = () => d.attacker.combat.attack.time + DT >= d.attacker.combat.attack.def.startup - 1e-6;
     for (let i = 0; i < 30 && !d.events.length; i++) d.tick({}, landing() ? held : {});
@@ -109,7 +109,7 @@ test('in play, the target\'s held direction steers the launch; with nothing held
   };
   const plain = launched({});
   assert.deepEqual({ ...plain.finalLaunch }, { x: 0, y: -140 * U }, 'straight up, exactly');
-  for (const [held, sign] of [[{ right: true }, 1], [{ left: true }, -1]]) {
+  for (const [held, sign] of [[{ runRight: true }, 1], [{ runLeft: true }, -1]]) {
     const e = launched(held);
     assert.equal(Math.sign(e.finalLaunch.x), sign);
     assert.ok(close(Math.hypot(e.finalLaunch.x, e.finalLaunch.y), 140 * U), 'the strength untouched');
@@ -118,7 +118,7 @@ test('in play, the target\'s held direction steers the launch; with nothing held
   // Standing, Down bends nothing into the floor.
   const d = duel({ gap: 40 });
   d.target.combat.launchPoint = 60;
-  d.tick(P('action1'), { charge: true });
+  d.tick(P('ba1'), { charge: true });
   d.until(() => d.events.length > 0, 30);
   assert.equal(d.events[0].finalLaunch.y, 0);
 });

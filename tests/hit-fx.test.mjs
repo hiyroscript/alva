@@ -14,7 +14,7 @@ const ARENA = (stage) => ({ stage, gravity: CONFIG.sim.gravity, step: DT });
 
 // A real hit through the real CombatSystem: `lp` on the target, `press` from
 // the attacker, `targetHeld` for the target.
-function hitWith({ lp = 0, press = P('action1'), targetHeld = {}, stage, x, gap = 40 } = {}) {
+function hitWith({ lp = 0, press = P('ba1'), targetHeld = {}, stage, x, gap = 40 } = {}) {
   const d = duel({ gap, stage, x });
   d.target.combat.launchPoint = lp;
   d.tick(press, targetHeld);
@@ -37,7 +37,7 @@ test('a hit shakes the screen by its strength, flashes its target white for one 
   fx.update(1 / 60);
   assert.equal(fx.flashing(light.e.target), false);
   // A harder hit shakes harder.
-  const heavy = hitWith({ lp: 80, press: P('action2') });
+  const heavy = hitWith({ lp: 80, press: P('ba2') });
   const fx2 = new HitEffects();
   fx2.take([heavy.e], ARENA(new StageCollision(stageMap())));
   assert.ok(fx2.shake.amp > lightShake);
@@ -63,7 +63,7 @@ test('a block shows a red ring and a small shake, a perfect one a white ring; ne
 
 test('reduced motion: no shake and no zoom; the flash, sparks and trails stay', () => {
   const stage = new StageCollision(stageMap({ left: 0, right: 700 }));
-  const { e } = hitWith({ lp: 200, stage, x: 560, gap: 40, press: P('action1') });
+  const { e } = hitWith({ lp: 200, stage, x: 560, gap: 40, press: P('ba1') });
   const fx = new HitEffects({ reducedMotion: true });
   fx.take([e], ARENA(stage));
   assert.equal(fx.shake.amp, 0);
@@ -115,7 +115,7 @@ test('a lethal launch slows the clock and closes the view in on its fighter, the
 });
 
 test('a fighter tumbling fast leaves a fading trail of its own poses; slower, the trail fades out', () => {
-  const { d } = hitWith({ lp: 90, press: P('action2') });
+  const { d } = hitWith({ lp: 90, press: P('ba2') });
   const f = d.target;
   assert.equal(f.tumbling, true);
   f.renderX = f.body.x;
@@ -155,7 +155,7 @@ test('effects never change a step: the same fight, stepped with and without them
       flush() {},
       sample() {
         const k = i++ % 50;
-        return { right: k < 20, action1: k === 22, action1Pressed: k === 22, action2: k === 40, action2Pressed: k === 40, jump: k === 30, jumpPressed: k === 30 };
+        return { runRight: k < 20, ba1: k === 22, ba1Pressed: k === 22, ba2: k === 40, ba2Pressed: k === 40, jump: k === 30, jumpPressed: k === 30 };
       },
     };
     const battle = new Battle({ canvas: { getContext: () => ({}) }, map: getMap('city'), p1Def: def, p2Def: def, p1Sprites: sprites, p2Sprites: sprites, input });
@@ -197,7 +197,7 @@ test('a flash set during a frame\'s steps is drawn by that frame\'s render, then
   battle.p2.body.x = battle.p1.body.x + 44;
   const drawn = [];
   battle.render = () => drawn.push(battle.fx.flashing(battle.p2));
-  once = P('action1');
+  once = P('ba1');
   for (let i = 0; i < 30; i++) battle.frame(1 / 60 + 1e-9);
   assert.equal(drawn.filter(Boolean).length, 1, 'exactly one frame drawn white');
   battle.destroy();

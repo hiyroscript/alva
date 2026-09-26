@@ -1,11 +1,11 @@
 // Run with node --test tests/defense.test.mjs (no dependencies).
-// Defense, the shared defensive input (L / RB / RT / touch D), and #0001's
-// Shield, the way #0001 defends: artwork registration (the real uploaded
-// frames), the held ground and mid-air Shield, its poses, physics, priority,
-// the 25-Energy cost of each blocked hit (and nothing else), full-circle
-// blocking on the fighter's own hurtboxes, the low-Energy and exhaustion
-// rules, missing-art safety, the Shield's black-and-red circle and the
-// training CPU. Uses the real Fighter, CombatSystem, physics and InputManager
+// `shield`, the shared defensive input (L / RB / RT / the touch Shield
+// button), and #0001's Shield, what its `defense` entry makes of it:
+// artwork registration (the real uploaded frames), the held ground and
+// mid-air Shield, its poses, physics, priority, the 25-Energy cost of each
+// blocked hit (and nothing else), full-circle blocking on the fighter's own
+// hurtboxes, the low-Energy and exhaustion rules, missing-art safety, the
+// Shield's black-and-red circle and the training CPU. Uses the real Fighter, CombatSystem, physics and InputManager
 // (see fighter-harness.mjs).
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -27,12 +27,12 @@ import {
 } from './fighter-harness.mjs';
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
-const DEFENSE = { defense: true, defensePressed: true };
-const HOLD = { defense: true };
-const BA1 = { action1: true, action1Pressed: true };
-const BA2 = { action2: true, action2Pressed: true };
+const SHIELD = { shield: true, shieldPressed: true };
+const HOLD = { shield: true };
+const BA1 = { ba1: true, ba1Pressed: true };
+const BA2 = { ba2: true, ba2Pressed: true };
 const JUMP = { jump: true, jumpPressed: true };
-const RIGHT = { right: true };
+const RIGHT = { runRight: true };
 const SHIELD_FPS = 12;
 const POSE = steps(1 / SHIELD_FPS); // simulation steps the raise / lower pose shows
 const COST = 25;
@@ -53,12 +53,12 @@ const pngSize = (path) => {
   return [bytes.readUInt32BE(16), bytes.readUInt32BE(20)];
 };
 
-// Steps a duel with the target holding Defense until the attacker's attack
+// Steps a duel with the target holding Shield until the attacker's attack
 // has connected (or `limit` steps pass), the attack pressed on the first.
 // Raises the target's Shield and holds it past its perfect window: the
 // blocks after it are ordinary ones (see the perfect Shield tests).
 function raiseShield(d) {
-  d.tick({}, DEFENSE);
+  d.tick({}, SHIELD);
   for (let i = 0; i < steps(def.defense.perfectWindow) + 2; i++) d.tick({}, HOLD);
 }
 
@@ -114,7 +114,7 @@ test('Dodge is gone: no Dodge clip, frame, move or fighter state is registered',
   }
   assert.equal(typeof fighter.tryDefense, 'undefined');
   const seen = new Set();
-  step(DEFENSE);
+  step(SHIELD);
   for (let i = 0; i < 30; i++) seen.add(step(HOLD).state);
   for (let i = 0; i < 30; i++) seen.add(step().state);
   assert.ok(!seen.has('defense') && !seen.has('block'), [...seen].join());
@@ -127,7 +127,7 @@ test('SpriteSet.build keeps every Shield clip right-facing', (t) => {
   for (const facing of [1, -1]) {
     const { fighter, step } = makeFighter({ facing });
     step(JUMP);
-    step(DEFENSE);
+    step(SHIELD);
     assert.equal(fighter.animator.anim.key, 'midairShield');
     assert.equal(fighter.spriteFlip, facing === -1, 'mirrored only when facing left, like idle');
   }
@@ -160,17 +160,17 @@ test('#0001 defends with a Shield: typed data, no Dodge fields, no chip-damage s
   assert.throws(() => createDefenseDefinition({ type: 'block' }), /Unknown defense type/);
   const none = makeFighter({ character: { ...def, defense: undefined } });
   assert.equal(none.fighter.defense, null);
-  none.step(DEFENSE);
+  none.step(SHIELD);
   assert.equal(none.fighter.combat.shielding, false);
   assert.equal(none.fighter.state, 'idle');
 });
 
-test('the Shield is a Defense state, never an attack or combat action', () => {
-  assert.ok(!COMBAT_ACTIONS.includes('defense'));
-  assert.equal(def.actions.defense, undefined);
+test('the Shield is a held-state control (its `defense`), never an attack or combat action', () => {
+  assert.ok(!COMBAT_ACTIONS.includes('shield'));
+  assert.equal(def.actions.shield, undefined);
   for (const id of Object.keys(def.attacks)) assert.doesNotMatch(id, /shield|dodge/i);
   const { fighter, step } = makeFighter();
-  step(DEFENSE);
+  step(SHIELD);
   for (let i = 0; i < 20; i++) step(HOLD);
   assert.equal(fighter.combat.attack, null, 'no attack, hitbox or hasHit');
   assert.equal(fighter.combat.cooldowns.size, 0, 'no cooldown entry');
@@ -179,15 +179,16 @@ test('the Shield is a Defense state, never an attack or combat action', () => {
 
 // ---- Input ---------------------------------------------------------------------
 
-test('the generic input is defense on L; no block or dodge action', () => {
-  assert.ok(ACTIONS.includes('defense'));
-  for (const name of ['block', 'dodge', 'shield']) assert.ok(!ACTIONS.includes(name), `no ${name} action`);
-  assert.deepEqual(CONFIG.bindings.defense, ['KeyL']);
-  assert.equal(ACTION_LABELS.defense, 'Defense');
-  assert.deepEqual(ACTIONS, ['left', 'right', 'charge', 'jump', 'primary', 'special', 'defense', 'action1', 'action2', 'pause']);
+test('the shared input is shield on L; no block, dodge or defense action', () => {
+  assert.ok(ACTIONS.includes('shield'));
+  for (const name of ['block', 'dodge', 'defense']) assert.ok(!ACTIONS.includes(name), `no ${name} action`);
+  assert.deepEqual(CONFIG.bindings.shield, ['KeyL']);
+  assert.equal(CONFIG.bindings.defense, undefined, 'no alias for the retired name');
+  assert.equal(ACTION_LABELS.shield, 'Shield');
+  assert.deepEqual(ACTIONS, ['runLeft', 'runRight', 'charge', 'jump', 'uniqueba', 'transform', 'shield', 'ba1', 'ba2', 'pause']);
 });
 
-test('InputManager exposes defense / defensePressed from L, RB and RT; other pad buttons are unchanged', async () => {
+test('InputManager exposes shield / shieldPressed from L, RB and RT; other pad buttons are unchanged', async () => {
   const listeners = {};
   globalThis.window = { addEventListener: (type, fn) => { listeners[type] = fn; } };
   globalThis.document = { addEventListener() {}, hidden: false };
@@ -198,18 +199,18 @@ test('InputManager exposes defense / defensePressed from L, RB and RT; other pad
   const key = (type, code) => listeners[type]({ code, repeat: false, preventDefault() {} });
 
   const frame = input.sample();
-  assert.ok('defense' in frame && 'defensePressed' in frame);
-  assert.ok(!('block' in frame) && !('shield' in frame));
+  assert.ok('shield' in frame && 'shieldPressed' in frame);
+  assert.ok(!('block' in frame) && !('defense' in frame) && !('defensePressed' in frame));
 
   key('keydown', 'KeyL');
   let f = input.sample();
-  assert.equal(f.defense, true);
-  assert.equal(f.defensePressed, true);
+  assert.equal(f.shield, true);
+  assert.equal(f.shieldPressed, true);
   f = input.sample();
-  assert.equal(f.defense, true, 'held');
-  assert.equal(f.defensePressed, false, 'one press edge per press');
+  assert.equal(f.shield, true, 'held');
+  assert.equal(f.shieldPressed, false, 'one press edge per press');
   key('keyup', 'KeyL');
-  assert.equal(input.sample().defense, false);
+  assert.equal(input.sample().shield, false);
 
   listeners.gamepadconnected();
   const button = (i, down) => {
@@ -219,25 +220,25 @@ test('InputManager exposes defense / defensePressed from L, RB and RT; other pad
   for (const i of [5, 7]) { // RB, RT
     button(i, true);
     f = input.sample();
-    assert.equal(f.defense, true, `button ${i}`);
-    assert.equal(f.defensePressed, true, `button ${i}`);
+    assert.equal(f.shield, true, `button ${i}`);
+    assert.equal(f.shieldPressed, true, `button ${i}`);
     button(i, false);
-    assert.equal(input.sample().defense, false);
+    assert.equal(input.sample().shield, false);
   }
-  for (const [i, action] of [[0, 'jump'], [1, 'action1'], [4, 'action2'], [13, 'charge'], [2, 'primary'], [3, 'special']]) {
+  for (const [i, action] of [[0, 'jump'], [1, 'ba1'], [4, 'ba2'], [13, 'charge'], [2, 'uniqueba'], [3, 'transform']]) {
     button(i, true);
     f = input.sample();
     assert.equal(f[action], true, `button ${i} -> ${action}`);
-    assert.equal(f.defense, false, `button ${i} is not Defense`);
+    assert.equal(f.shield, false, `button ${i} is not Shield`);
     button(i, false);
   }
 });
 
 // ---- Ground Shield ----------------------------------------------------------------
 
-test('Defense held on the ground: the Shield goes up at once, raises on prepshield, then holds shielding', () => {
+test('Shield held on the ground: the Shield goes up at once, raises on prepshield, then holds shielding', () => {
   const { fighter, step } = makeFighter();
-  step(DEFENSE);
+  step(SHIELD);
   assert.equal(fighter.combat.shielding, true, 'up on the press step');
   assert.equal(fighter.state, 'shield');
   assert.equal(fighter.animator.anim.key, 'shieldStart');
@@ -250,16 +251,16 @@ test('Defense held on the ground: the Shield goes up at once, raises on prepshie
   }
   assert.equal(frames.filter((n) => n === '0001_prepshield.png').length, POSE, 'the raise pose for one frame');
   assert.deepEqual([...new Set(frames)], ['0001_prepshield.png', '0001_shielding.png']);
-  assert.equal(frames.at(-1), '0001_shielding.png', 'held for as long as Defense is');
+  assert.equal(frames.at(-1), '0001_shielding.png', 'held for as long as Shield is');
   // Held without a fresh press it still goes up (a held input, not a tap).
   const held = makeFighter();
   held.step(HOLD);
   assert.equal(held.fighter.combat.shielding, true);
 });
 
-test('releasing Defense lowers the Shield at once: releaseblock for one frame, then idle', () => {
+test('releasing Shield lowers the Shield at once: releaseblock for one frame, then idle', () => {
   const { fighter, step } = makeFighter();
-  step(DEFENSE);
+  step(SHIELD);
   for (let i = 0; i < 20; i++) step(HOLD);
   const frames = [];
   step();
@@ -274,7 +275,7 @@ test('releasing Defense lowers the Shield at once: releaseblock for one frame, t
   assert.equal(frameName(fighter), '0001_idle1.png');
   // Moving straight away still works: the pose is visual only.
   const quick = makeFighter();
-  quick.step(DEFENSE);
+  quick.step(SHIELD);
   for (let i = 0; i < 10; i++) quick.step(HOLD);
   const x = quick.fighter.body.x;
   for (let i = 0; i < 10; i++) quick.step(RIGHT);
@@ -283,7 +284,7 @@ test('releasing Defense lowers the Shield at once: releaseblock for one frame, t
 
 test('holding the Shield costs nothing: 3 s held at full stays at 100, and a low bar keeps refilling', () => {
   const { fighter, step } = makeFighter();
-  step(DEFENSE);
+  step(SHIELD);
   for (let i = 0; i < steps(3); i++) {
     step(HOLD);
     assert.equal(fighter.combat.energy, 100);
@@ -291,7 +292,7 @@ test('holding the Shield costs nothing: 3 s held at full stays at 100, and a low
   assert.equal(fighter.combat.shielding, true);
   const low = makeFighter();
   low.fighter.combat.setEnergy(60);
-  low.step(DEFENSE);
+  low.step(SHIELD);
   for (let i = 0; i < steps(1) - 1; i++) low.step(HOLD);
   assert.ok(Math.abs(low.fighter.combat.energy - 72) < 1e-6, `regen carries on while held (${low.fighter.combat.energy})`);
   assert.equal(low.fighter.combat.shielding, true);
@@ -303,7 +304,7 @@ test('a grounded Shield holds the fighter in place: no walking, Dash, jump or tu
   stepUntil(step, (f) => f.body.vx >= f.maxSpeed, RIGHT);
   stepUntil(plain.step, (f) => f.body.vx >= f.maxSpeed, RIGHT);
   // Holding right with the Shield up slows exactly like letting go.
-  step({ ...DEFENSE, ...RIGHT });
+  step({ ...SHIELD, ...RIGHT });
   plain.step();
   for (let i = 0; i < 20; i++) {
     assert.equal(fighter.body.vx, plain.fighter.body.vx, `step ${i}: vx`);
@@ -313,13 +314,13 @@ test('a grounded Shield holds the fighter in place: no walking, Dash, jump or tu
   }
   assert.equal(fighter.body.vx, 0, 'stopped');
   const x = fighter.body.x;
-  for (let i = 0; i < 30; i++) step({ ...HOLD, left: true });
+  for (let i = 0; i < 30; i++) step({ ...HOLD, runLeft: true });
   assert.equal(fighter.body.x, x, 'no walking');
   assert.equal(fighter.facing, 1, 'no turning');
   // No Dash: a double tap while shielding starts nothing and costs nothing.
-  step({ ...HOLD, right: true, rightPressed: true });
+  step({ ...HOLD, runRight: true, runRightPressed: true });
   step(HOLD);
-  step({ ...HOLD, right: true, rightPressed: true });
+  step({ ...HOLD, runRight: true, runRightPressed: true });
   assert.equal(fighter.dash, null);
   assert.equal(fighter.combat.energy, 100);
   // No jump.
@@ -339,12 +340,12 @@ for (const [when, setup] of [
   ['rising', (step) => { step(JUMP); step(); }],
   ['falling', (step) => { step(JUMP); stepUntil(step, (f) => f.body.vy > 0 && f.body.y < 700, { jump: true }); }],
 ]) {
-  test(`Defense while ${when} holds midairshielding at once, and gravity keeps working`, () => {
+  test(`Shield while ${when} holds midairshielding at once, and gravity keeps working`, () => {
     const { fighter, step } = makeFighter();
     const plain = makeFighter();
     setup(step);
     setup(plain.step);
-    step(DEFENSE);
+    step(SHIELD);
     plain.step();
     assert.equal(fighter.combat.shielding, true);
     assert.equal(fighter.state, 'shield');
@@ -374,7 +375,7 @@ test('a mid-air Shield keeps horizontal momentum under the normal air drag, with
     r({ ...JUMP, ...RIGHT });
     r(RIGHT);
   }
-  step({ ...DEFENSE, ...RIGHT });
+  step({ ...SHIELD, ...RIGHT });
   plain.step();
   for (let i = 0; i < 15; i++) {
     assert.equal(fighter.body.vx, plain.fighter.body.vx, `step ${i}: vx`);
@@ -390,7 +391,7 @@ test('landing with the Shield up holds the grounded shielding pose: no raise pos
   const { fighter, step } = makeFighter();
   step(JUMP);
   step();
-  step(DEFENSE);
+  step(SHIELD);
   const states = [];
   const frames = [];
   while (!fighter.grounded) {
@@ -410,16 +411,16 @@ test('landing with the Shield up holds the grounded shielding pose: no raise pos
 
 // ---- Priority --------------------------------------------------------------------
 
-test('Defense held wins over a new attack; an attack already playing is never cut short', () => {
-  for (const press of [BA1, BA2, { primary: true, primaryPressed: true }]) {
+test('Shield held wins over a new attack; an attack already playing is never cut short', () => {
+  for (const press of [BA1, BA2, { uniqueba: true, uniquebaPressed: true }]) {
     const { fighter, step } = makeFighter();
-    step({ ...press, ...DEFENSE });
-    assert.equal(fighter.combat.attack, null, 'no attack while Defense is held');
+    step({ ...press, ...SHIELD });
+    assert.equal(fighter.combat.attack, null, 'no attack while Shield is held');
     assert.equal(fighter.combat.shielding, true);
     step({ ...press, ...HOLD });
     assert.equal(fighter.combat.attack, null, 'nor pressed while shielding');
     assert.equal(fighter.combat.shielding, true);
-    // Let go of Defense first: then the attack starts.
+    // Let go of Shield first: then the attack starts.
     step(press);
     assert.ok(fighter.combat.attack, 'the attack after the release');
     assert.equal(fighter.combat.shielding, false);
@@ -441,16 +442,16 @@ test('Defense held wins over a new attack; an attack already playing is never cu
 test('no Shield while stunned, bound or performing a charged technique', () => {
   const stunned = makeFighter();
   stunned.fighter.combat.stun = 0.2;
-  stunned.step(DEFENSE);
+  stunned.step(SHIELD);
   assert.equal(stunned.fighter.combat.shielding, false);
   assert.equal(stunned.fighter.state, 'hitstun');
   stepUntil(stunned.step, (f) => f.combat.stun <= 0, HOLD);
-  assert.equal(stunned.fighter.combat.shielding, true, 'held Defense raises it once the stun is over');
+  assert.equal(stunned.fighter.combat.shielding, true, 'held Shield raises it once the stun is over');
 
   const bound = makeFighter();
   const token = {};
   bound.fighter.combat.bind(token);
-  for (let i = 0; i < 10; i++) bound.step(DEFENSE);
+  for (let i = 0; i < 10; i++) bound.step(SHIELD);
   assert.equal(bound.fighter.combat.shielding, false);
   assert.equal(bound.fighter.state, 'bound');
   bound.fighter.combat.unbind(token);
@@ -496,7 +497,7 @@ test('each blocked hit costs exactly 25 Energy: 100 -> 75 -> 50 -> 25 -> 0, and 
   assert.equal(d.target.combat.energyExhausted, true);
   assert.equal(d.target.combat.shielding, false);
   assert.equal(energyBarState(d.target).color, ENERGY_STYLE.exhausted);
-  // Still holding Defense: it stays down, and the next hit lands in full.
+  // Still holding Shield: it stays down, and the next hit lands in full.
   const [hit] = blockedAttack(d);
   assert.equal(hit.type, 'hit');
   assert.equal(hit.damage, 3);
@@ -510,7 +511,7 @@ test('a blocked hit shows no hurt pose: the Shield holds through the freeze and 
   assert.equal(event.type, 'block');
   const blockstun = def.attacks.ba1.blockstun;
   assert.ok(Math.abs(d.target.combat.shieldStun - blockstun) < 1e-9, 'blockstun, held in the Shield');
-  // Defense let go at once: the Shield stays up until the freeze and the
+  // Shield let go at once: the Shield stays up until the freeze and the
   // blockstun are over, never a hurt pose.
   const states = [];
   let up = 0;
@@ -526,7 +527,7 @@ test('a blocked hit shows no hurt pose: the Shield holds through the freeze and 
   assert.equal(d.target.state, 'shieldRelease');
   // Unable to act while held there.
   const d2 = duel();
-  d2.tick({}, DEFENSE);
+  d2.tick({}, SHIELD);
   blockedAttack(d2);
   d2.tick({}, { ...JUMP });
   assert.equal(d2.target.grounded, true, 'no jump out of blockstun');
@@ -535,7 +536,7 @@ test('a blocked hit shows no hurt pose: the Shield holds through the freeze and 
 test('the Shield blocks from every side: an attack from behind is blocked just the same', () => {
   // The target faces away from the attacker.
   const d = duel({ targetFacing: 1 });
-  d.tick({}, DEFENSE);
+  d.tick({}, SHIELD);
   const [event] = blockedAttack(d, BA2);
   assert.equal(d.target.facing, 1, 'still facing away');
   assert.equal(event.type, 'block');
@@ -548,10 +549,10 @@ test('the Shield blocks from every side: an attack from behind is blocked just t
 test('a mid-air Shield blocks too: no launch, and the fighter keeps falling', () => {
   const d = duel({ gap: 40 });
   d.tick(JUMP, JUMP);
-  d.tick({}, DEFENSE);
+  d.tick({}, SHIELD);
   const [event] = blockedAttack(d, BA1);
   assert.equal(event.type, 'block');
-  assert.equal(event.move, 'midairBa1');
+  assert.equal(event.move, 'maba1');
   assert.equal(d.target.combat.launchPoint, 0);
   assert.equal(d.target.combat.energy, 75);
   const vy = d.target.body.vy;
@@ -564,7 +565,7 @@ test('a mid-air Shield blocks too: no launch, and the fighter keeps falling', ()
 
 test('a missed attack costs nothing: no hit, no block event, no Energy', () => {
   const d = duel({ gap: 120 });
-  d.tick({}, DEFENSE);
+  d.tick({}, SHIELD);
   d.tick(BA1, HOLD);
   while (d.attacker.combat.attack) d.tick({}, HOLD);
   d.tick(BA2, HOLD);
@@ -583,7 +584,7 @@ test('blocking uses the fighter\'s own hurtboxes, never the bigger circle drawn 
   const reach = def.attacks.ba1.hitbox.x + def.attacks.ba1.hitbox.w;
   assert.ok(60 - reach < shieldRadius(def) * (1 - SHIELD_SHAPE.amp), 'inside the circle, wherever its edge is');
   assert.ok(reach < 60 + Math.min(...def.hurtboxes.map((h) => h.x)), 'short of the hurtboxes');
-  d.tick({}, DEFENSE);
+  d.tick({}, SHIELD);
   d.tick(BA1, HOLD);
   while (d.attacker.combat.attack) d.tick({}, HOLD);
   assert.deepEqual(d.events, []);
@@ -606,13 +607,13 @@ test('with less than 25 Energy the Shield still goes up and blocks; that block t
   assert.equal(energyBarState(d.target).color, ENERGY_STYLE.exhausted, 'gray');
   assert.equal(d.target.combat.shielding, false, 'dropped at once');
   assert.equal(d.target.combat.shieldStun, 0);
-  // Still holding Defense: locked until the bar is full again, and the next
+  // Still holding Shield: locked until the bar is full again, and the next
   // hit lands in full.
   while (d.attacker.combat.attack || d.attacker.combat.cooldowns.size) d.tick({}, HOLD);
   const [hit] = blockedAttack(d);
   assert.equal(hit.type, 'hit');
   assert.equal(d.target.combat.launchPoint, 3);
-  // Exhausted, attacks work normally even with Defense held.
+  // Exhausted, attacks work normally even with Shield held.
   const low = makeFighter();
   low.fighter.combat.setEnergy(0);
   low.step({ ...HOLD, ...BA1 });
@@ -656,7 +657,7 @@ test('exhausted: no Shield (and no Dash) through 1, 25, 50, 75 and 99; both back
   assert.equal(c.energyExhausted, true);
   for (const mark of [1, 25, 50, 75, 99]) {
     while (c.energy < mark) c.updateEnergy(DT, false);
-    step(DEFENSE);
+    step(SHIELD);
     assert.equal(c.shielding, false, `no Shield at ${c.energy.toFixed(1)}`);
     assert.equal(fighter.tryDash(1), false, `no Dash at ${c.energy.toFixed(1)}`);
     assert.equal(energyBarState(fighter).color, ENERGY_STYLE.exhausted, 'gray');
@@ -665,7 +666,7 @@ test('exhausted: no Shield (and no Dash) through 1, 25, 50, 75 and 99; both back
   while (c.energy < 100) c.updateEnergy(DT, false);
   assert.equal(c.energyExhausted, false);
   assert.equal(energyBarState(fighter).visible, false, 'full: the meter is gone');
-  step(DEFENSE);
+  step(SHIELD);
   assert.equal(c.shielding, true, 'Shield');
   step();
   while (fighter.state !== 'idle') step();
@@ -681,7 +682,7 @@ test('missing Shield art refuses the Shield (warned once), and the attack lands 
   try {
     const noShield = Object.keys(def.animations).filter((k) => !/shield/i.test(k));
     const { attacker, target, tick, until, events } = duel({ targetSprites: fakeSprites(noShield) });
-    tick(BA1, DEFENSE);
+    tick(BA1, SHIELD);
     assert.equal(target.combat.shielding, false);
     assert.equal(target.state, 'idle', 'no idle-as-shield');
     for (let i = 0; i < 30 && !events.length; i++) tick({}, HOLD);
@@ -692,7 +693,7 @@ test('missing Shield art refuses the Shield (warned once), and the attack lands 
 
     // Only the air clip missing: the ground Shield works, the air one is refused.
     const noAir = makeFighter({ sprites: fakeSprites(Object.keys(def.animations).filter((k) => k !== 'midairShield')) });
-    noAir.step(DEFENSE);
+    noAir.step(SHIELD);
     assert.equal(noAir.fighter.combat.shielding, true);
     noAir.step();
     noAir.step(JUMP);
@@ -702,7 +703,7 @@ test('missing Shield art refuses the Shield (warned once), and the attack lands 
     // Without its raise or lower pose the held Shield still works, just
     // without those poses.
     const bare = makeFighter({ sprites: fakeSprites(Object.keys(def.animations).filter((k) => !/shield(Start|Release)/.test(k))) });
-    bare.step(DEFENSE);
+    bare.step(SHIELD);
     assert.equal(bare.fighter.animator.anim.key, 'shield');
     bare.step();
     assert.equal(bare.fighter.state, 'idle');
@@ -769,7 +770,7 @@ test('the Shield\'s outline is a closed wavy circle: mean radius on target, clea
 
 test('the Shield follows its fighter\'s body centre, sized by its visual height, not the frame on screen', () => {
   const { fighter, step } = makeFighter();
-  step(DEFENSE);
+  step(SHIELD);
   fighter.renderX = 321;
   fighter.renderY = 654;
   assert.deepEqual(shieldCenter(fighter), [321, 654 - def.visual.height / 2]);
@@ -803,7 +804,7 @@ test('the Shield is black and red, the fighter visible through it: faint black i
   assert.equal(drawShield(none.ctx, fighter, view, 'interior'), false);
   assert.equal(drawShield(none.ctx, fighter, view, 'rim'), false);
   assert.deepEqual(none.calls, [], 'no Shield, nothing drawn');
-  step(DEFENSE);
+  step(SHIELD);
   const inside = recorder();
   assert.equal(drawShield(inside.ctx, fighter, view, 'interior'), true);
   const fills = inside.calls.filter((c) => c.fn === 'fill');
@@ -847,7 +848,7 @@ function tracedPaths(calls) {
 
 test('the red line sits on the outside of the black rim, flush with its outer edge, locked to the same waves', () => {
   const { fighter, step } = makeFighter();
-  step(DEFENSE);
+  step(SHIELD);
   const [cx, cy] = shieldCenter(fighter);
   const r = shieldRadius(def);
   for (const view of [{ x: 0, y: 0, scale: 1.5, dpr: 2 }, { x: 0, y: 0, scale: 0.8, dpr: 1 }]) {
@@ -884,7 +885,7 @@ test('the red line sits on the outside of the black rim, flush with its outer ed
 
 test('the Shield\'s drawn waves follow the drift clock, and hold still with reduced motion', () => {
   const { fighter, step } = makeFighter();
-  step(DEFENSE);
+  step(SHIELD);
   const view = { x: 0, y: 0, scale: 1.2, dpr: 1 };
   const drawn = (time, reducedMotion) => {
     const { ctx, calls } = recorder();
@@ -982,7 +983,7 @@ test('in a real render the Shield wraps its fighter: interior behind the sprite,
 
 // ---- Training CPU -----------------------------------------------------------------
 
-test('the training CPU never presses Defense and never shields', async () => {
+test('the training CPU never presses Shield and never shields', async () => {
   const { TrainingAIController } = await import('../js/game/fighter-controller.js');
   const cpu = new TrainingAIController({ rng: () => 0.3 });
   const player = makeFighter({ x: 700 });
@@ -990,10 +991,10 @@ test('the training CPU never presses Defense and never shields', async () => {
   player.fighter.opponent = bot.fighter;
   bot.fighter.opponent = player.fighter;
   for (let i = 0; i < 1200; i++) {
-    player.step(i % 300 < 150 ? { right: true, ...(i % 50 === 0 ? DEFENSE : {}) } : { left: true });
+    player.step(i % 300 < 150 ? { runRight: true, ...(i % 50 === 0 ? SHIELD : {}) } : { runLeft: true });
     const out = cpu.getInput(bot.fighter, DT, SIM_CTX);
-    assert.equal(out.defense, false);
-    assert.equal(out.defensePressed, false);
+    assert.equal(out.shield, false);
+    assert.equal(out.shieldPressed, false);
     bot.step(out);
     assert.equal(bot.fighter.combat.shielding, false);
     assert.notEqual(bot.fighter.state, 'shield');
@@ -1017,7 +1018,7 @@ test('a Shield raised just before the hit blocks perfectly: no Energy, no blocks
   // The punch lands 5 steps after its press: raise the Shield 3 steps before.
   d.tick(BA1);
   d.tick();
-  d.tick({}, DEFENSE);
+  d.tick({}, SHIELD);
   for (let i = 0; i < 20 && !d.events.length; i++) d.tick({}, HOLD);
   const [e] = d.events;
   assert.equal(e.type, 'block');
@@ -1044,7 +1045,7 @@ test('only a fresh raise is perfect: held long, or tapped again too soon after l
     return d.events.at(-1);
   };
   const held = block((d) => {
-    d.tick({}, DEFENSE);
+    d.tick({}, SHIELD);
     for (let i = 0; i < 10; i++) d.tick({}, HOLD);
   });
   assert.equal(held.perfect, false, 'up long before the hit');
@@ -1053,14 +1054,14 @@ test('only a fresh raise is perfect: held long, or tapped again too soon after l
   const tapped = block((d) => {
     for (let i = 0; i < 3; i++) d.tick({}, HOLD);
     d.tick({}, {});
-    d.tick({}, DEFENSE);
+    d.tick({}, SHIELD);
   });
-  assert.equal(tapped.perfect, false, 'tapping Defense never keeps a window open');
+  assert.equal(tapped.perfect, false, 'tapping Shield never keeps a window open');
   // Down long enough first: fresh again.
   const fresh = block((d) => {
     for (let i = 0; i < 3; i++) d.tick({}, HOLD);
     for (let i = 0; i < steps(def.defense.perfectRearm) + 1; i++) d.tick({}, {});
-    d.tick({}, DEFENSE);
+    d.tick({}, SHIELD);
   });
   assert.equal(fresh.perfect, true);
   // A hit is never perfect.

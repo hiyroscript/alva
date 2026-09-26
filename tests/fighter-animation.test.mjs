@@ -43,7 +43,7 @@ const NEW_CLIPS = {
   midairHurt: [`${BASE}midairhurt.png`],
   ba1: [`${BASE}1ba1.png`, `${BASE}1ba2.png`, `${BASE}1ba3.png`, `${BASE}1ba4.png`],
   // Mid-air BA1 is the three-frame kunai slash, drawn as midair1ba1-3.
-  midairBa1: [`${BASE}midair1ba1.png`, `${BASE}midair1ba2.png`, `${BASE}midair1ba3.png`],
+  maba1: [`${BASE}midair1ba1.png`, `${BASE}midair1ba2.png`, `${BASE}midair1ba3.png`],
 };
 
 test('#0001 registers hurt, mid-air hurt and both Basic Attack 1 clips', () => {
@@ -63,9 +63,9 @@ test('#0001 registers hurt, mid-air hurt and both Basic Attack 1 clips', () => {
     }
   }
   assert.equal(def.animations.ba1.frames.length, 4);
-  assert.equal(def.animations.midairBa1.frames.length, 3);
+  assert.equal(def.animations.maba1.frames.length, 3);
   assert.equal(def.animations.ba1.fps, 12);
-  assert.equal(def.animations.midairBa1.fps, 12);
+  assert.equal(def.animations.maba1.fps, 12);
   // Hurt art that fails to load holds a still idle frame.
   assert.deepEqual(def.animationFallbacks.hurt, { animation: 'idle', frame: 0 });
   assert.deepEqual(def.animationFallbacks.midairHurt, { animation: 'idle', frame: 0 });
@@ -75,7 +75,7 @@ test('#0001 registers both Basic Attack 2 clips from the canonical asset folder'
   const expected = {
     ba2: Array.from({ length: 7 }, (_, i) => `${BASE}2ba${i + 1}.png`),
     // Mid-air BA2 is the five-frame airborne kick, drawn as midair2ba1-5.
-    midairBa2: Array.from({ length: 5 }, (_, i) => `${BASE}midair2ba${i + 1}.png`),
+    maba2: Array.from({ length: 5 }, (_, i) => `${BASE}midair2ba${i + 1}.png`),
   };
   const paths = characterFramePaths(def);
   for (const [key, frames] of Object.entries(expected)) {
@@ -96,8 +96,8 @@ test('#0001 registers both Basic Attack 2 clips from the canonical asset folder'
   }
   const dir = readdirSync(ROOT + 'assets/characters/0001/');
   assert.deepEqual(dir.filter((n) => /^0001_2ba\d\.png$/.test(n)).sort(), expected.ba2.map((u) => u.split('/').pop()));
-  assert.deepEqual(dir.filter((n) => /^0001_midair2ba\d\.png$/.test(n)).sort(), expected.midairBa2.map((u) => u.split('/').pop()));
-  assert.deepEqual(dir.filter((n) => /^0001_midair1ba\d\.png$/.test(n)).sort(), NEW_CLIPS.midairBa1.map((u) => u.split('/').pop()));
+  assert.deepEqual(dir.filter((n) => /^0001_midair2ba\d\.png$/.test(n)).sort(), expected.maba2.map((u) => u.split('/').pop()));
+  assert.deepEqual(dir.filter((n) => /^0001_midair1ba\d\.png$/.test(n)).sort(), NEW_CLIPS.maba1.map((u) => u.split('/').pop()));
 });
 
 test('the misspelled 2ab frame names are gone for good', () => {
@@ -204,7 +204,7 @@ test('a jump plays jump1, jump2, fall1, fall2, land1, land2, then idle', () => {
 
 test('landing while holding a direction returns to run', () => {
   const { fighter, step } = makeFighter();
-  const right = { right: true };
+  const right = { runRight: true };
   step({ ...right, jump: true, jumpPressed: true });
   stepUntil(step, (f) => f.state === 'land', right);
   stepUntil(step, (f) => f.state !== 'land', right);
@@ -215,8 +215,8 @@ test('the land state is visual only: the trajectory matches a fighter without la
   const withLand = makeFighter();
   const without = makeFighter({ sprites: fakeSprites(['idle', 'run']) });
   const script = (i) => {
-    if (i === 0 || i === 50 || i === 51) return { jump: true, jumpPressed: true, right: true };
-    return i < 120 ? { right: true } : {};
+    if (i === 0 || i === 50 || i === 51) return { jump: true, jumpPressed: true, runRight: true };
+    return i < 120 ? { runRight: true } : {};
   };
   const states = new Set();
   for (let i = 0; i < 200; i++) {
@@ -283,7 +283,7 @@ test('grounded hitstun shows 0001_hurt.png, then idle resumes', () => {
 
 test('hitstun takes priority over run, and run resumes when it ends', () => {
   const { fighter, step } = makeFighter();
-  const right = { right: true };
+  const right = { runRight: true };
   stepUntil(step, (f) => f.state === 'run', right);
   fighter.combat.stun = 0.2;
   step(right);
@@ -330,7 +330,7 @@ test('the hurt poses are visual only: hitstun movement matches a fighter without
   const withHurt = makeFighter();
   const without = makeFighter({ sprites: fakeSprites(['idle', 'run', 'jump', 'fall', 'land']) });
   for (let i = 0; i < 160; i++) {
-    const held = i === 0 ? { jump: true, jumpPressed: true, right: true } : { right: true };
+    const held = i === 0 ? { jump: true, jumpPressed: true, runRight: true } : { runRight: true };
     if (i === 20 || i === 90) for (const r of [withHurt, without]) r.fighter.combat.stun = 0.3;
     const a = withHurt.step(held);
     const b = without.step(held);
@@ -394,7 +394,7 @@ test('the training CPU\'s platform drop still uses fall, then lands', () => {
 
 test('walking off a ledge uses fall, not jump', () => {
   const { fighter, step } = makeFighter({ x: 1080, y: 600 });
-  stepUntil(step, (f) => !f.grounded, { right: true });
+  stepUntil(step, (f) => !f.grounded, { runRight: true });
   assert.equal(fighter.state, 'fall');
 });
 

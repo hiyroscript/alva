@@ -319,14 +319,14 @@ test('HUD: one glass card per fighter, portrait | divider | name over Launch Poi
     assert.equal(tagRow.querySelector('.hud-name').textContent, '#0001', 'the character\'s displayName');
     assert.equal(launchPoint, side.launchPoint, 'Launch Point under the name');
     assert.equal(side.root.querySelector('.hud-sub'), null);
-    // No CAB cooldowns in the card any more: they are drawn under the
+    // No CBA cooldowns in the card any more: they are drawn under the
     // fighter itself (see fighter-status.test.mjs).
     for (const cls of ['.hud-cooldowns', '.hud-cd', '.hud-cd-ring', '.hud-cd-name']) {
       assert.deepEqual(side.wrap.querySelectorAll(cls), [], `no ${cls}`);
     }
     assert.equal('cooldowns' in side, false);
     assert.equal('cooldownRow' in side, false);
-    assert.doesNotMatch(side.wrap.textContent, /CAB|BA1|BA2/);
+    assert.doesNotMatch(side.wrap.textContent, /CBA|BA1|BA2/);
     // The card, then exactly three score dots under it, all empty at first.
     assert.equal(side.wrap.children.length, 2);
     assert.equal(side.wrap.children[0], side.root);
@@ -532,7 +532,7 @@ test('HUD: the portrait is the character\'s own crop from its sprites, with noth
   screen.hud.bind(battle.p1, battle.p2);
   assert.equal(made, 1);
   const code = readFileSync(new URL('../js/game/hud.js', import.meta.url), 'utf8').replace(/^\s*\/\/.*$/gm, '');
-  assert.doesNotMatch(code, /assets\/|0001|ba1Clone|rasenRush/, 'data-driven: no character paths or ids');
+  assert.doesNotMatch(code, /assets\/|0001|cba1|cba2/, 'data-driven: no character paths or ids');
   const source = code;
   assert.match(source, /paintPortrait/, 'the shared portrait painter, as the roster uses');
 });
@@ -544,7 +544,7 @@ test('HUD: a real hit raises the Launch Point shown on the target\'s card only',
   const { hud } = screen;
   hud.bind(battle.p1, battle.p2);
   hud.update(battle);
-  d.tick({ action1: true, action1Pressed: true });
+  d.tick({ ba1: true, ba1Pressed: true });
   d.until(() => d.events.length > 0);
   hud.update(battle);
   assert.equal(hud.right.launchPointValue.textContent, '3');
@@ -755,7 +755,7 @@ test('entering Quick Battle shows Player 1\'s fighter on the touch ability butto
   const { MAPS } = await import('../js/data/maps.js');
   const touch = screen.touch;
   // Neutral until a fighter is named.
-  assert.equal(touch.buttons.get('primary').getAttribute('aria-label'), 'Throw');
+  assert.equal(touch.buttons.get('uniqueba').getAttribute('aria-label'), 'Throw');
   const calls = [];
   const set = touch.setCharacter.bind(touch);
   touch.setCharacter = (def) => { calls.push(def?.id); set(def); };
@@ -770,14 +770,14 @@ test('entering Quick Battle shows Player 1\'s fighter on the touch ability butto
   await screen.enter();
   assert.deepEqual(loadsBefore, ['0001'], 'configured as soon as the fighter is known, before gameplay');
   assert.deepEqual(calls, ['0001']);
-  const shown = ['primary', 'defense', 'action1', 'action2'].map((a) => [
+  const shown = ['uniqueba', 'shield', 'ba1', 'ba2'].map((a) => [
     touch.buttons.get(a).getAttribute('aria-label'), touch.buttons.get(a).html, touch.buttons.get(a).getAttribute('data-action'),
   ]);
   assert.deepEqual(shown, [
-    ['Shuriken', ICONS.shuriken, 'primary'],
-    ['Shield', ICONS.shield, 'defense'],
-    ['Punch', ICONS.punch, 'action1'],
-    ['Kick', ICONS.kick, 'action2'],
+    ['Shuriken', ICONS.shuriken, 'uniqueba'],
+    ['Shield', ICONS.shield, 'shield'],
+    ['Punch', ICONS.punch, 'ba1'],
+    ['Kick', ICONS.kick, 'ba2'],
   ]);
   assert.equal(touch.enabled, false, 'no play without sprites');
 });
@@ -809,5 +809,5 @@ test('Quick Battle uses the Mobile Controls setting: Joystick by default, Classi
   assert.equal(touch.scheme, 'joystick');
   // The fighter's combat buttons were never rebuilt along the way.
   for (const [action, b] of elements) assert.equal(touch.actionButtons.get(action), b, action);
-  assert.equal(touch.buttons.get('action1').getAttribute('aria-label'), 'Punch');
+  assert.equal(touch.buttons.get('ba1').getAttribute('aria-label'), 'Punch');
 });

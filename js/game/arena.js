@@ -4,7 +4,7 @@
 // (js/game/practice.js) runs Player 1 with a training-dummy CPU and none of
 // them. Both share the Void's respawn wait (updateRespawns). DOM concerns
 // (HUD, menus, overlays) live in each mode's screen; the status drawn over
-// each fighter (Energy bar, name tag, CAB cooldowns) and the Shield round it
+// each fighter (Energy bar, name tag, CBA cooldowns) and the Shield round it
 // are drawn here.
 
 import { CONFIG } from '../config.js';
@@ -15,7 +15,7 @@ import { spawnProjectiles, removeDeadProjectiles } from './projectile.js';
 import { spawnClones, updateClones, removeDeadClones } from './clone.js';
 import { Camera } from './camera.js';
 import { drawFrame, drawCenteredFrame } from './sprite-normalizer.js';
-import { drawEnergyBar, drawCabIndicators, energyBarState, statusOnScreen } from './fighter-status.js';
+import { drawEnergyBar, drawCbaIndicators, energyBarState, statusOnScreen } from './fighter-status.js';
 import { drawShield } from './shield-fx.js';
 import { HIT_FX, HitEffects, whiteFrame } from './hit-fx.js';
 import { createTheme } from '../stages/index.js';
@@ -25,7 +25,6 @@ const MARKER = { p1: '#ffffff', p2: '#a3a3a3' };
 // Debug overlay: charged techniques get their own dashed colour, apart from
 // melee / clone (orange) and projectile (magenta) boxes.
 const TECHNIQUE_DEBUG = '#29f0ff';
-const DEBUG_BUTTON = { primary: 'throw', special: 'special', action1: 'ba1', action2: 'ba2' };
 
 export class Arena {
   constructor({ canvas, map, input, reducedMotion = false }) {
@@ -332,7 +331,7 @@ export class Arena {
     // The status of each fighter in play over everything, the Void
     // included, so it stays readable near its edge: name tags (or the
     // off-screen pointers), then each on-screen fighter's Energy bar over
-    // its tag while below full and its CAB1 / CAB2 cooldowns under its feet
+    // its tag while below full and its CBA1 / CBA2 cooldowns under its feet
     // while cooling down. A fighter out of play shows none of it.
     this.drawMarkers(fighters);
     this.drawStatus(fighters);
@@ -481,7 +480,7 @@ export class Arena {
     return energyBarState(f).visible ? this.energyBarRect(f).y - 1 : this.markerTop(f);
   }
 
-  // Energy bars and CAB cooldowns, for the fighters whose body is on
+  // Energy bars and CBA cooldowns, for the fighters whose body is on
   // screen: an off-screen fighter only gets its edge pointer. Each draws
   // only while it has something to show (see js/game/fighter-status.js).
   drawStatus(fighters = this.inPlay) {
@@ -490,7 +489,7 @@ export class Arena {
       const [x, , footY] = this.markerAnchor(f);
       if (!statusOnScreen(x, footY, view)) continue;
       drawEnergyBar(ctx, f, this.energyBarRect(f), view.dpr);
-      drawCabIndicators(ctx, f, x, footY, view.scale, view.dpr);
+      drawCbaIndicators(ctx, f, x, footY, view.scale, view.dpr);
     }
   }
 
@@ -610,7 +609,9 @@ export class Arena {
     for (const f of fighters) {
       const t = f.technique;
       if (!t) continue;
-      const label = `charged ${DEBUG_BUTTON[t.action] ?? t.action} ${t.phase}`;
+      // Labelled by the control it was charged from (its codename, e.g.
+      // "charged ba2 dash" for #0001's cba2).
+      const label = `charged ${t.action} ${t.phase}`;
       if (t.sphereHitbox(box, true)) {
         rect(box.x, box.y, box.w, box.h, TECHNIQUE_DEBUG);
         const [lx, ly] = this.toScreen(box.x, box.y);

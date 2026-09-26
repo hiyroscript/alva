@@ -40,7 +40,7 @@ test('every new fighter starts at 0 Launch Point with every cooldown ready, and 
       assert.equal(fighter.combat.cooldowns.size, 0);
       assert.equal(fighter.combat.chargedCooldowns.size, 0);
       fighter.combat.launchPoint = 87;
-      fighter.combat.chargedCooldowns.start('ba1Clone', 5);
+      fighter.combat.chargedCooldowns.start('cba1', 5);
       fighter.reset(STAGE);
       assert.equal(fighter.combat.launchPoint, 0, `${character.displayName} after a reset`);
       assert.equal(fighter.combat.chargedCooldowns.size, 0);
@@ -66,13 +66,13 @@ test('a high Launch Point alone never stops a fighter acting: it runs, jumps, at
     fighter.combat.launchPoint = value;
     assert.equal(fighter.canAct(), true, `can act at ${value}`);
     assert.equal(fighter.combat.canAct(), true);
-    step({ right: true });
+    step({ runRight: true });
     assert.ok(fighter.body.vx > 0, `runs at ${value}`);
     for (let i = 0; i < 30; i++) step();
-    step({ action1: true, action1Pressed: true });
+    step({ ba1: true, ba1Pressed: true });
     assert.equal(fighter.combat.attack?.def.id, 'ba1', `attacks at ${value}`);
     for (let i = 0; i < 60; i++) step();
-    step({ defense: true, defensePressed: true });
+    step({ shield: true, shieldPressed: true });
     assert.equal(fighter.state, 'shield', `shields at ${value}`);
     for (let i = 0; i < 60; i++) step();
     step({ charge: true, chargePressed: true });

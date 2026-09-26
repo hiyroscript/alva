@@ -63,20 +63,21 @@ export const CONFIG = Object.freeze({
   },
 
   // Player 1 keyboard bindings (KeyboardEvent.code), the single source of
-  // truth for gameplay keys. S / ↓ are Charge in battle; menus read their
-  // own Down from menuBindings below.
-  // `defense` is the shared Defense input; each character decides what it
-  // does (#0001 holds it to Shield).
+  // truth for gameplay keys, keyed by control codename. S / ↓ are Charge in
+  // battle; menus read their own Down (and Left / Right) from menuBindings
+  // below.
+  // `shield` is the shared Shield button; each character's `defense` entry
+  // decides what it does (#0001 holds it to Shield).
   bindings: {
-    left: ['KeyA', 'ArrowLeft'],
-    right: ['KeyD', 'ArrowRight'],
+    runLeft: ['KeyA', 'ArrowLeft'],
+    runRight: ['KeyD', 'ArrowRight'],
     charge: ['KeyS', 'ArrowDown'],
     jump: ['KeyW', 'Space', 'ArrowUp'],
-    primary: ['KeyJ'],
-    special: ['KeyK'],
-    defense: ['KeyL'],
-    action1: ['KeyU'],
-    action2: ['KeyI'],
+    uniqueba: ['KeyJ'],
+    transform: ['KeyK'],
+    shield: ['KeyL'],
+    ba1: ['KeyU'],
+    ba2: ['KeyI'],
     pause: ['Escape', 'KeyP'],
   },
 
@@ -96,20 +97,20 @@ export const CONFIG = Object.freeze({
 });
 
 export const ACTIONS = Object.freeze([
-  'left', 'right', 'charge', 'jump',
-  'primary', 'special', 'defense', 'action1', 'action2',
+  'runLeft', 'runRight', 'charge', 'jump',
+  'uniqueba', 'transform', 'shield', 'ba1', 'ba2',
   'pause',
 ]);
 
 export const ACTION_LABELS = Object.freeze({
-  left: 'Move left',
-  right: 'Move right',
+  runLeft: 'Move left',
+  runRight: 'Move right',
   charge: 'Charge',
   jump: 'Jump',
-  primary: 'Throw', // the internal action keeps its generic name
-  special: 'Special',
-  defense: 'Defense',
-  action1: 'Basic Attack 1',
-  action2: 'Basic Attack 2',
+  uniqueba: 'Throw', // #0001's unique basic attack is its shuriken Throw
+  transform: 'Transform',
+  shield: 'Shield',
+  ba1: 'Basic Attack 1',
+  ba2: 'Basic Attack 2',
   pause: 'Pause',
 });

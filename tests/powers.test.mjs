@@ -24,7 +24,7 @@ import { CONFIG } from '../js/config.js';
 import { def, DT, STAGE, SIM_CTX, fakeSprites, makeFighter, stepUntil } from './fighter-harness.mjs';
 
 const JUMP = { jump: true, jumpPressed: true };
-const RIGHT = { right: true };
+const RIGHT = { runRight: true };
 // One step with gravity switched off: the velocity the jump itself set,
 // before any gravity is integrated.
 const NO_GRAVITY = { stage: STAGE, gravity: 0 };
@@ -230,7 +230,7 @@ test('Jump Power changes nothing but the jump\'s initial speed: gravity, fall sp
   }
   // The same run-up and jump: horizontal motion is identical step for step,
   // and every airborne step applies the same gravity.
-  const right = { right: true };
+  const right = { runRight: true };
   const logs = fighters.map(({ fighter, step }) => {
     for (let i = 0; i < 20; i++) step(right);
     step({ ...right, ...JUMP });
@@ -385,7 +385,7 @@ test('only the jump reads Jump Power: a fighter at rest or running has the same 
     const a = makeFighter();
     const b = makeFighter({ character: withJump(tier) });
     for (let i = 0; i < 40; i++) {
-      const held = i < 25 ? { right: true } : {};
+      const held = i < 25 ? { runRight: true } : {};
       a.step(held);
       b.step(held);
       assert.deepEqual(
@@ -435,7 +435,7 @@ test('a held run caps at exactly the tier\'s top speed, on the ground and in the
     assert.equal(settledSpeed(right.step, right.fighter), speed, `Speed Power ${tier} right`);
     assert.equal(right.fighter.state, 'run');
     const left = makeFighter({ character });
-    assert.equal(settledSpeed(left.step, left.fighter, { left: true }), -speed, `Speed Power ${tier} left`);
+    assert.equal(settledSpeed(left.step, left.fighter, { runLeft: true }), -speed, `Speed Power ${tier} left`);
 
     // The same target in the air: from a standing jump, air control builds
     // up to the tier's speed and no further.
@@ -477,7 +477,7 @@ test('Speed Power changes only the top speed: acceleration, deceleration, air co
     assert.ok(deltas(step, fighter, RIGHT, accel).every((d) => close(d, mv.acceleration * DT)), `${label}: acceleration`);
     settledSpeed(step, fighter);
     // The turn boost on the first step against the run.
-    const [turn] = deltas(step, fighter, { left: true }, 1);
+    const [turn] = deltas(step, fighter, { runLeft: true }, 1);
     assert.ok(close(turn, -mv.acceleration * mv.turnBoost * DT), `${label}: turn boost`);
     // Ground deceleration from the tier's top speed.
     settledSpeed(step, fighter);
@@ -518,10 +518,10 @@ test('Speed Power changes nothing vertical: jump, gravity, fall speed, coyote ti
 function shieldFrom(character) {
   const { fighter, step } = makeFighter({ character });
   const x = fighter.body.x;
-  step({ defense: true, defensePressed: true, right: true });
+  step({ shield: true, shieldPressed: true, runRight: true });
   assert.equal(fighter.state, 'shield');
   const poses = [];
-  for (let i = 0; i < 30; i++) poses.push(step({ defense: true, right: true }).animator.anim.key);
+  for (let i = 0; i < 30; i++) poses.push(step({ shield: true, runRight: true }).animator.anim.key);
   return { poses, moved: fighter.body.x - x };
 }
 
@@ -555,7 +555,7 @@ test('Speed Power leaves every other velocity alone: launches received, the shur
     const thrower = makeFighter({ character });
     const projectiles = [];
     for (let i = 0; i < 30 && !projectiles.length; i++) {
-      thrower.step(i === 0 ? { primary: true, primaryPressed: true } : {});
+      thrower.step(i === 0 ? { uniqueba: true, uniquebaPressed: true } : {});
       spawnProjectiles([thrower.fighter], projectiles);
     }
     assert.equal(projectiles.length, 1);
@@ -565,12 +565,12 @@ test('Speed Power leaves every other velocity alone: launches received, the shur
     // The Sphere Rush dashes at its own 1050.
     const rusher = makeFighter({ character });
     rusher.step({ charge: true });
-    rusher.step({ charge: true, action2: true, action2Pressed: true });
+    rusher.step({ charge: true, ba2: true, ba2Pressed: true });
     const technique = rusher.fighter.technique;
     assert.ok(technique, `${label}: the Sphere Rush started`);
     stepUntil(rusher.step, () => technique.phase === 'dash');
-    assert.equal(rusher.fighter.body.vx, def.chargedTechniques.rasenRush.dashSpeed, label);
-    assert.equal(def.chargedTechniques.rasenRush.dashSpeed, 1050);
+    assert.equal(rusher.fighter.body.vx, def.chargedTechniques.cba2.dashSpeed, label);
+    assert.equal(def.chargedTechniques.cba2.dashSpeed, 1050);
 
     // A Shield held from standing still adds no movement, however fast the
     // fighter could run.

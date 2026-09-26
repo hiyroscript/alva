@@ -48,9 +48,11 @@ import { techniqueProblem } from './charged-technique.js';
 import { blankInput } from './fighter-controller.js';
 import { DEFAULT_DIFFICULTY, getDifficultyProfile, resolveDifficulty } from '../data/difficulty.js';
 
-// The buttons a controller holds; each has a matching `…Pressed` edge.
-const BUTTONS = ['left', 'right', 'charge', 'jump', 'defense', 'primary', 'special', 'action1', 'action2'];
-const DIR_KEY = { [-1]: 'left', 1: 'right' };
+// The buttons a controller holds, by control codename; each has a matching
+// `…Pressed` edge. The mouvement buttons are touch-only: it Dashes by
+// double-tapping runLeft / runRight, as a keyboard or gamepad player does.
+const BUTTONS = ['runLeft', 'runRight', 'charge', 'jump', 'shield', 'uniqueba', 'transform', 'ba1', 'ba2'];
+const DIR_KEY = { [-1]: 'runLeft', 1: 'runRight' };
 
 // Threats further off than this (seconds to contact) wait for a later look.
 const DEFENSE_HORIZON = 0.45;
@@ -118,7 +120,7 @@ const MOVESETS = new WeakMap();
 // Read once per fighter (and again if its definition or art changes): every
 // attack a button starts, on the ground and in the air, split into melee and
 // ranged; its charged actions; whether it has a Shield and a Dash. An action
-// mapped to null (a reserved button, like #0001's Special) is left out, as is
+// mapped to null (a reserved button, like #0001's transform) is left out, as is
 // anything the fighter would refuse for missing art, so the AI never presses
 // a button that cannot do anything.
 export function readMoveset(f) {
@@ -287,8 +289,8 @@ export class CombatAIController {
     // Only the training CPU drops through platforms; no player control can,
     // so neither does this one (it walks off an edge instead).
     out.dropPressed = false;
-    if (out.leftPressed && out.rightPressed) this.tap = { dir: 0, age: Infinity };
-    else if (out.leftPressed || out.rightPressed) this.tap = { dir: out.rightPressed ? 1 : -1, age: 0 };
+    if (out.runLeftPressed && out.runRightPressed) this.tap = { dir: 0, age: Infinity };
+    else if (out.runLeftPressed || out.runRightPressed) this.tap = { dir: out.runRightPressed ? 1 : -1, age: 0 };
     return out;
   }
 
@@ -645,7 +647,7 @@ export class CombatAIController {
     const ready = s.canAct || s.charging;
     const options = [{ score: (1 - p.guard) * 0.8 + (threat.severity < 3 ? 0.6 : 0), intent: { kind: 'take' } }];
 
-    // Shield: up the step Defense is held, from either side; costs Energy
+    // Shield: up the step `shield` is held, from either side; costs Energy
     // only if it blocks. Held through the threat, never much longer. Raised
     // this close to contact it is a perfect Shield (see
     // Fighter.perfectShield), free: a timing the level has to earn, so a
@@ -957,7 +959,7 @@ export class CombatAIController {
         break;
       case 'shield':
         if (clock > it.until) it.done = true;
-        else held.defense = true;
+        else held.shield = true;
         break;
       case 'move':
         if (clock > it.until || (!it.air && !b.grounded)) it.done = true;
@@ -1219,7 +1221,7 @@ export class CombatAIController {
   // Dash by accident.
   guard(self, ctx, held) {
     const b = self.body;
-    const dir = held.right === held.left ? 0 : held.right ? 1 : -1;
+    const dir = held.runRight === held.runLeft ? 0 : held.runRight ? 1 : -1;
     if (!dir) return;
     const key = DIR_KEY[dir];
     const dashing = this.intent?.kind === 'dash' && !this.intent.done;

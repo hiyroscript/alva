@@ -1543,11 +1543,11 @@ html.is-touch .touch-controls[hidden] { display: none; }
 .tc-btn.is-pressed .icon, .tc-btn.is-pressed .tc-text { opacity: 1; }
 .tc-act { position: absolute; }
 .tc-jump { right: 0; bottom: 0; }
-.tc-a2 { right: var(--tc-pitch); bottom: 0; }
-.tc-a1 { right: calc(var(--tc-pitch) * 2); bottom: 0; }
-.tc-defense { right: calc(var(--tc-pitch) * 0.5); bottom: calc(var(--tc-pitch) * 0.87); }
-.tc-special { right: calc(var(--tc-pitch) * 1.5); bottom: calc(var(--tc-pitch) * 0.87); }
-.tc-throw {
+.tc-ba2 { right: var(--tc-pitch); bottom: 0; }
+.tc-ba1 { right: calc(var(--tc-pitch) * 2); bottom: 0; }
+.tc-shield { right: calc(var(--tc-pitch) * 0.5); bottom: calc(var(--tc-pitch) * 0.87); }
+.tc-transform { right: calc(var(--tc-pitch) * 1.5); bottom: calc(var(--tc-pitch) * 0.87); }
+.tc-uniqueba {
   right: calc(var(--tc-pitch) * 0.02);
   bottom: calc(var(--tc-pitch) * 1.74);
   width: calc(var(--tc) * 1.12);

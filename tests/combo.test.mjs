@@ -10,9 +10,9 @@ import { def, DT, makeFighter, duel } from './fighter-harness.mjs';
 
 const mv = def.movement;
 const P = (k) => ({ [k]: true, [`${k}Pressed`]: true });
-const BA1 = P('action1');
-const BA2 = P('action2');
-const THROW = P('primary');
+const BA1 = P('ba1');
+const BA2 = P('ba2');
+const THROW = P('uniqueba');
 const JUMP = P('jump');
 const BUFFER_STEPS = Math.floor(mv.attackBuffer / DT + 1e-6);
 
@@ -89,7 +89,7 @@ test('a press during a cooldown comes out as the cooldown ends; the latest press
   const early = makeFighter();
   early.step(THROW);
   while (early.fighter.combat.attack) early.step({});
-  assert.ok(early.fighter.combat.cooldowns.get('throw') > mv.attackBuffer + 2 * DT);
+  assert.ok(early.fighter.combat.cooldowns.get('uniqueba') > mv.attackBuffer + 2 * DT);
   early.step(THROW);
   for (let i = 0; i < 30; i++) early.step({});
   assert.equal(early.fighter.combat.attack, null);
@@ -100,26 +100,26 @@ test('a press during a cooldown comes out as the cooldown ends; the latest press
   latest.step(BA2);
   latest.step(THROW);
   while (latest.fighter.combat.attack?.def.id === 'ba1') latest.step({});
-  assert.equal(latest.fighter.combat.attack?.def.id, 'throw');
+  assert.equal(latest.fighter.combat.attack?.def.id, 'uniqueba');
 });
 
-test('only presses that could start are kept: never Special, an air Throw or an attack without art; charged presses never', () => {
+test('only presses that could start are kept: never transform, an air Throw or an attack without art; charged presses never', () => {
   const { fighter, step } = makeFighter();
   step(BA1);
-  step(P('special'));
+  step(P('transform'));
   assert.equal(fighter.bufferedAttack, null, 'reserved');
   const air = makeFighter();
   air.step(JUMP);
   air.step(BA1);
-  assert.equal(air.fighter.combat.attack?.def.id, 'midairBa1');
+  assert.equal(air.fighter.combat.attack?.def.id, 'maba1');
   air.step(BA2);
   air.step(THROW);
-  assert.equal(air.fighter.bufferedAttack?.action, 'action2', 'an air Throw never replaces it');
+  assert.equal(air.fighter.bufferedAttack?.action, 'ba2', 'an air Throw never replaces it');
   // A Charged BA1 press on its cooldown is used up, never kept for later.
   const d = duel({ gap: 600 });
   d.tick({ charge: true });
   d.tick({ charge: true, ...BA1 });
-  assert.ok(d.attacker.combat.chargedCooldowns.active('ba1Clone'));
+  assert.ok(d.attacker.combat.chargedCooldowns.active('cba1'));
   d.tick({ charge: true, ...BA1 });
   assert.equal(d.attacker.bufferedAttack, null);
   for (let i = 0; i < 20; i++) d.tick({});
@@ -133,18 +133,18 @@ test('presses made during an impact freeze are kept, and do not age through it',
   assert.ok(d.attacker.combat.hitstop > 0, 'frozen');
   d.run(() => BA2, 1);
   const buffered = d.attacker.bufferedAttack;
-  assert.equal(buffered?.action, 'action2');
+  assert.equal(buffered?.action, 'ba2');
   while (d.attacker.combat.hitstop > 0) d.run(() => ({}), 1);
   assert.equal(d.attacker.combat.attack?.def.id, 'ba2', 'out as soon as the freeze is over');
 });
 
-test('a press while Defense holds the Shield up comes out the step the Shield is let go', () => {
+test('a press while Shield holds the Shield up comes out the step the Shield is let go', () => {
   const { fighter, step } = makeFighter();
-  step({ defense: true });
-  step({ defense: true, ...BA1 });
+  step({ shield: true });
+  step({ shield: true, ...BA1 });
   assert.equal(fighter.combat.shielding, true);
   assert.equal(fighter.combat.attack, null);
-  step({ defense: true });
+  step({ shield: true });
   step({});
   assert.equal(fighter.combat.shielding, false);
   assert.equal(fighter.combat.attack?.def.id, 'ba1', 'Shield -> release -> attack, without delay');
@@ -160,7 +160,7 @@ test('buffered presses keep their order: jump then BA1 is a jump and an air BA1;
   assert.equal(fighter.grounded, false, 'the jump first');
   assert.equal(fighter.combat.attack, null);
   step({});
-  assert.equal(fighter.combat.attack?.def.id, 'midairBa1', 'then the attack, in the air');
+  assert.equal(fighter.combat.attack?.def.id, 'maba1', 'then the attack, in the air');
 
   const same = makeFighter();
   same.step(BA2);
@@ -183,7 +183,7 @@ test('a BA1 that hits may be cut short by BA2 the step its freeze ends; its cool
 
 test('a whiffed or blocked attack keeps its whole recovery: no cut short', () => {
   for (const blocked of [false, true]) {
-    const d = combo({ gap: blocked ? 40 : 300, targetHeld: () => (blocked ? { defense: true } : {}) });
+    const d = combo({ gap: blocked ? 40 : 300, targetHeld: () => (blocked ? { shield: true } : {}) });
     d.run((i) => (i === 0 ? BA1 : {}), 1);
     const atk = d.attacker.combat.attack;
     let n = 0;
@@ -208,14 +208,14 @@ test('a jump or a Dash cuts a connected BA2 short; walking, the Shield and Charg
   assert.equal(j.attacker.combat.attack, null);
   assert.equal(j.attacker.grounded, false, 'jumping after the launched target');
 
-  for (const held of [{ right: true }, { defense: true }, { charge: true }]) {
+  for (const held of [{ runRight: true }, { shield: true }, { charge: true }]) {
     const d = hitBa2();
     const atk = d.attacker.combat.attack;
     d.run(() => held, 3);
     assert.equal(d.attacker.combat.attack, atk, `${Object.keys(held)[0]}: the attack plays on`);
   }
   const dash = hitBa2();
-  dash.run((i) => (i % 2 ? {} : { right: true, rightPressed: true }), 3);
+  dash.run((i) => (i % 2 ? {} : { runRight: true, runRightPressed: true }), 3);
   assert.ok(dash.attacker.dash, 'a double tap Dashes out of it');
   assert.equal(dash.attacker.combat.attack, null);
   assert.ok(dash.attacker.combat.cooldowns.has('ba2'), 'BA2\'s cooldown from the cut');
@@ -223,13 +223,13 @@ test('a jump or a Dash cuts a connected BA2 short; walking, the Shield and Charg
 
 // ---- Dash cancel ----------------------------------------------------------------------
 
-const DASH_RIGHT = { right: true, dashRightPressed: true };
-const DASH_LEFT = { left: true, dashLeftPressed: true };
+const MOUVEMENT_RIGHT = { runRight: true, mouvementRightPressed: true };
+const MOUVEMENT_LEFT = { runLeft: true, mouvementLeftPressed: true };
 
 test('a Dash cancel: out of a BA1 that hit, either way, for dashCancelCost instead of dashCost', () => {
   const energy = def.energy;
   assert.ok(energy.dashCancelCost > energy.dashCost);
-  for (const [press, direction] of [[DASH_RIGHT, 1], [DASH_LEFT, -1]]) {
+  for (const [press, direction] of [[MOUVEMENT_RIGHT, 1], [MOUVEMENT_LEFT, -1]]) {
     const d = combo({ gap: 40 });
     d.run((i) => (i === 0 ? BA1 : {}), 6);
     assert.ok(d.attacker.combat.hitstop > 0, 'the hit\'s freeze');
@@ -245,7 +245,7 @@ test('a Dash cancel: out of a BA1 that hit, either way, for dashCancelCost inste
   }
   // A plain Dash still costs its own price.
   const { fighter, step } = makeFighter();
-  step(DASH_RIGHT);
+  step(MOUVEMENT_RIGHT);
   assert.ok(fighter.dash);
   assert.equal(fighter.combat.energy, 100 - energy.dashCost);
 });
@@ -255,7 +255,7 @@ test('no Dash cancel out of a whiff, a block, an aerial or while exhausted: noth
     const atk = d.attacker.combat.attack;
     assert.ok(atk, `${what}: attacking`);
     const energy = d.attacker.combat.energy;
-    d.run(() => DASH_RIGHT, 1);
+    d.run(() => MOUVEMENT_RIGHT, 1);
     assert.equal(d.attacker.dash, null, what);
     assert.equal(d.attacker.combat.attack, atk, `${what}: the attack plays on`);
     assert.ok(d.attacker.combat.energy >= energy, `${what}: nothing spent`);
@@ -263,7 +263,7 @@ test('no Dash cancel out of a whiff, a block, an aerial or while exhausted: noth
   const whiff = combo({ gap: 300 });
   whiff.run((i) => (i === 0 ? BA1 : {}), 9);
   tryCancel(whiff, 'whiffed');
-  const block = combo({ gap: 40, targetHeld: () => ({ defense: true }) });
+  const block = combo({ gap: 40, targetHeld: () => ({ shield: true }) });
   block.run((i) => (i === 0 ? BA1 : {}), 9);
   assert.equal(block.events[0]?.type, 'block');
   tryCancel(block, 'blocked');
@@ -294,7 +294,7 @@ test('BA1 -> Dash -> BA1 chases a push BA1 -> BA2 no longer reaches, into high L
       if (i === 0) return BA1;
       if (dashAt < 0 && d.attacker.combat.cancellable) {
         dashAt = i;
-        return DASH_RIGHT;
+        return MOUVEMENT_RIGHT;
       }
       return dashAt > 0 && i === dashAt + 6 ? BA1 : {};
     }, 70);
@@ -312,7 +312,7 @@ test('BA1 -> Dash -> BA1 never loops: Energy allows two cancels and the third em
       if (i === 0) return BA1;
       if (dashAt < 0 && d.attacker.combat.cancellable) {
         dashAt = i;
-        return DASH_RIGHT;
+        return MOUVEMENT_RIGHT;
       }
       if (dashAt >= 0 && d.attacker.dash && d.attacker.dash.time === 0) cancels++;
       if (dashAt >= 0 && i === dashAt + 5) {
@@ -373,7 +373,7 @@ test('BA1 -> BA1 combos at LP 0 close in; its own pushback ends the string withi
   assert.ok(chain >= 2 && chain <= 6, `a ${chain}-hit string, never a loop`);
   // Holding forward adds no more: the punch does not creep after its target.
   const f = combo({ gap: 38 });
-  f.run((i) => ({ right: true, ...(i % 12 === 0 ? BA1 : {}) }), 300);
+  f.run((i) => ({ runRight: true, ...(i % 12 === 0 ? BA1 : {}) }), 300);
   let fchain = 1;
   while (fchain < f.hits.length && f.held(fchain - 1, fchain)) fchain++;
   assert.ok(fchain <= 6, `still ${fchain}`);
@@ -388,7 +388,7 @@ test('BA2 -> jump -> air BA1 is a true combo at medium Launch Point; BA2 -> BA1 
     const d = combo({ gap: 40, lp });
     // Jump held on after the press: the full jump after the launch.
     d.run((i) => ({ ...(i === 0 ? BA2 : i === 18 ? JUMP : i === 21 ? BA1 : {}), jump: i >= 18 && i < 30 }), 70);
-    assert.deepEqual(d.hits.map((h) => h.move), ['ba2', 'midairBa1'], `LP ${lp}`);
+    assert.deepEqual(d.hits.map((h) => h.move), ['ba2', 'maba1'], `LP ${lp}`);
     assert.ok(d.held(0, 1), `LP ${lp}: the launched target never got to act`);
   }
   for (const lp of [0, 10]) {
@@ -404,10 +404,10 @@ test('mid-air BA2 drives a grounded target into the ground; landing (fast) leads
     const d = combo({ gap: 20, lp });
     Object.assign(d.attacker.body, { y: 800 - 130, vy: 0, grounded: false, ground: null });
     d.run((i) => ({ charge: true, ...(i === 0 ? BA2 : {}) }), 16);
-    assert.deepEqual(d.hits.map((h) => h.move), ['midairBa2'], `LP ${lp}: the spike`);
+    assert.deepEqual(d.hits.map((h) => h.move), ['maba2'], `LP ${lp}: the spike`);
     d.run(() => BA1, 1);
     d.run(() => ({}), 30);
-    assert.deepEqual(d.hits.map((h) => h.move), ['midairBa2', 'ba1'], `LP ${lp}`);
+    assert.deepEqual(d.hits.map((h) => h.move), ['maba2', 'ba1'], `LP ${lp}`);
     assert.ok(d.held(0, 1), `LP ${lp}: grounded pressure, unbroken`);
   }
 });
@@ -455,12 +455,12 @@ test('a hit interrupts the target\'s own attack; two that connect on one step st
 
 // ---- Shield --------------------------------------------------------------------------
 
-test('attack -> recover -> Shield: held Defense raises it the step the attack is over', () => {
+test('attack -> recover -> Shield: held Shield raises it the step the attack is over', () => {
   const { fighter, step } = makeFighter();
   step(BA1);
   let n = 0;
   while (fighter.combat.attack) {
-    step({ defense: true });
+    step({ shield: true });
     n++;
     if (fighter.combat.attack) assert.equal(fighter.combat.shielding, false, 'never cuts the attack short');
   }

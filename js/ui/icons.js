@@ -10,9 +10,9 @@ export const ICONS = {
   down: svg('<path d="M4.5 9 12 16.5 19.5 9"/>'),
   up: svg('<path d="M4.5 15 12 7.5 19.5 15"/>'),
   jump: svg('<path d="M12 17.5V5.5"/><path d="M6.5 11 12 5.5l5.5 5.5"/><path d="M5 20.5h14"/>'),
-  special: svg('<path d="M12 2.5l2.3 7.2 7.2 2.3-7.2 2.3-2.3 7.2-2.3-7.2-7.2-2.3 7.2-2.3z"/>', { fill: true }),
+  transform: svg('<path d="M12 2.5l2.3 7.2 7.2 2.3-7.2 2.3-2.3 7.2-2.3-7.2-7.2-2.3 7.2-2.3z"/>', { fill: true }),
   // Ability glyphs for the touch combat buttons (see js/ui/mobile-abilities.js).
-  // Shield is the universal defensive button's; shuriken, punch and kick are
+  // Shield is the universal `shield` button's; shuriken, punch and kick are
   // #0001's own, picked by its mobileAbilities.
   shield: svg('<path d="M12 3C10 4.4 7.6 5.2 5.2 5.5Q4.4 5.6 4.4 6.4V10C4.4 15.2 7.6 18.8 12 21C16.4 18.8 19.6 15.2 19.6 10V6.4Q19.6 5.6 18.8 5.5C16.4 5.2 14 4.4 12 3Z"/>'),
   // Four hooked blades around a hole: one blade turned four times.

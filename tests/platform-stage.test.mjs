@@ -141,7 +141,7 @@ test('on every stage a fighter can leave either ledge and live a moment, but kee
       let offAt = null;
       let lostAt = null;
       for (let i = 0; i < 60 * 5 && lostAt === null; i++) {
-        step({ [dir]: true });
+        step({ [dir === 'right' ? 'runRight' : 'runLeft']: true });
         if (offAt === null && !fighter.grounded && sign * (fighter.body.x - edge) > 0) offAt = i;
         if (stage.inVoid(fighter.body)) lostAt = i;
       }
@@ -225,7 +225,7 @@ test('a fighter runs straight off either ledge: no wall stops it, the floor stop
     const sign = dir === 'right' ? 1 : -1;
     let leftGround = null;
     for (let i = 0; i < 90; i++) {
-      step({ [dir]: true });
+      step({ [dir === 'right' ? 'runRight' : 'runLeft']: true });
       const b = fighter.body;
       assert.equal(b.wall, 0, 'never against a wall');
       if (leftGround === null && !b.grounded) {
@@ -308,7 +308,7 @@ test('Quick Battle: falling into the Void takes that fighter out of play at once
   const { p1, p2 } = battle;
   const timeLeft = battle.timeLeft;
   // Player 1 runs off the roof's west edge (under the one-way platforms).
-  script.held = { left: true };
+  script.held = { runLeft: true };
   let steps = 0;
   while (!p1.lostToVoid && steps++ < 60 * 6) battle.update(DT);
   assert.equal(p1.lostToVoid, true);
@@ -347,13 +347,13 @@ test('Quick Battle: the CPU in the Void scores Player 1 a point; a technique hol
   p2.body.x = p1.body.x + 120;
   script.held = { charge: true };
   for (let i = 0; i < 10; i++) battle.update(DT);
-  script.held = { charge: true, action2: true, action2Pressed: true };
+  script.held = { charge: true, ba2: true, ba2Pressed: true };
   battle.update(DT);
   script.held = {};
   const rush = p1.technique;
   for (let i = 0; i < 120 && !rush.hitConfirmed; i++) battle.update(DT);
   assert.ok(p2.combat.immobilized);
-  p1.summons.push({ id: 'ba1Clone', target: p2 });
+  p1.summons.push({ id: 'cba1', target: p2 });
   Object.assign(p2.body, { x: battle.stage.void.right + 50, grounded: false, ground: null });
   battle.update(DT);
   assert.equal(p2.lostToVoid, true);

@@ -2,9 +2,10 @@
 //
 // Attacks are pure data on the character definition; Fighter turns each entry
 // into a frozen definition with createAttackDefinition(). #0001's Basic
-// Attack 1 (ground `ba1`, mid-air `midairBa1`, both on action1), Basic
-// Attack 2 (`ba2` / `midairBa2` on action2) and Throw (`throw` on primary)
-// are the real attacks so far; see js/data/characters.js. The general shape:
+// Attack 1 (ground `ba1`, mid-air `maba1`, both on the ba1 button), Basic
+// Attack 2 (`ba2` / `maba2` on the ba2 button) and Throw (`uniqueba` on the
+// uniqueba button) are the real attacks so far; see js/data/characters.js.
+// The general shape:
 //
 //   attacks: {
 //     jab: {
@@ -15,8 +16,8 @@
 //     launcher: { ..., baseLaunch: 2, directionalLaunch: 'vertical' },
 //     airSpike: { animation: 'airSpike', ..., baseLaunch: 2, directionalLaunch: 'reverseVertical' },
 //   },
-//   // One attack per action, or { ground, air } chosen by grounded state.
-//   actions: { primary: 'jab', action1: { ground: 'jab', air: 'airSpike' }, ... }
+//   // One attack per control codename, or { ground, air } chosen by grounded state.
+//   actions: { uniqueba: 'jab', ba1: { ground: 'jab', air: 'airSpike' }, ... }
 //
 // Every hit (an attack's, a projectile's, a charged technique's) declares
 // its Base Launch (`baseLaunch`: 0, 1, 2 or 3, a multiplier, never a
@@ -44,8 +45,8 @@
 // normal friction.
 //
 //   ba2: { ..., momentum: 0.5, friction: 0.5, step: { at: 0, speed: 280 } },
-//   midairBa1: { ..., airMomentum: 1, airControl: 0.6 },
-//   throw: { ..., momentum: 0.5, control: 0.3, friction: 0.6 },
+//   maba1: { ..., airMomentum: 1, airControl: 0.6 },
+//   uniqueba: { ..., momentum: 0.5, control: 0.3, friction: 0.6 },
 //
 // `hitCancel` (seconds into the attack, or null for never) is how a
 // connected attack makes room for a follow-up: once it has hit (a Shield's
@@ -61,15 +62,16 @@
 // exactly once, from `offset` (facing right from the origin, mirrored).
 // See js/game/projectile.js.
 //
-//   throw: {
-//     animation: 'throw', startup: 1 / 12, active: 1 / 12, recovery: 1 / 12,
+//   uniqueba: {
+//     animation: 'uniqueba', startup: 1 / 12, active: 1 / 12, recovery: 1 / 12,
 //     hitbox: null, projectile: { id: 'shuriken', spawnAt: 1 / 12, offset: { x: 16, y: -38 } },
 //     cooldown: 0.25, groundOnly: true,
 //   },
 //
-// Defense is the shared player input; each character's `defense` entry says
-// how it defends (see createDefenseDefinition). The one type so far is the
-// Shield, a held guard all the way round the fighter:
+// `shield` is the shared player input; each character's `defense` entry says
+// what it does, that is how the character defends (see
+// createDefenseDefinition). The one type so far is the Shield, a held guard
+// all the way round the fighter:
 //
 //   defense: {
 //     type: 'shield',
@@ -178,15 +180,15 @@ const SHIELD_DEFAULTS = Object.freeze({
   groundReleaseAnimation: null,
   // A hit that lands within perfectWindow seconds of the Shield going up is
   // a perfect block: free, with no blockstun. Only a Shield raised after
-  // being down for perfectRearm seconds has that window, so tapping Defense
+  // being down for perfectRearm seconds has that window, so tapping `shield`
   // over and over never keeps one open. 0 is none.
   perfectWindow: 0,
   perfectRearm: 0,
 });
 
-// Frozen form of a character's `defense` entry, or null for a fighter that has
-// no Defense (the input then does nothing). Typed, so a future fighter can
-// defend in another way; an unknown type is refused.
+// Frozen form of a character's `defense` entry, or null for a fighter that
+// has none (the `shield` input then does nothing). Typed, so a future
+// fighter can defend in another way; an unknown type is refused.
 export function createDefenseDefinition(spec) {
   if (!spec) return null;
   if (spec.type === 'shield') return Object.freeze({ ...SHIELD_DEFAULTS, ...spec });
@@ -304,7 +306,7 @@ export class CombatState {
     this.release = null;    // the attack's projectile, released this step (see Fighter.update)
     // Ordinary attacks' short recovery cooldowns: attack id -> seconds left.
     this.cooldowns = new Map();
-    // Charged actions' own cooldowns (Charged BA1, Charged BA2), by summon or
+    // Charged actions' own cooldowns (#0001's cba1 and cba2), by summon or
     // technique id; the Fighter starts and recovers them.
     this.chargedCooldowns = new CooldownTimers();
     this.lastIntent = null; // last combat button pressed (see Fighter.tryAction)

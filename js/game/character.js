@@ -14,7 +14,11 @@ import { ChargedTechnique, createTechniqueDefinition, techniqueProblem } from '.
 import { getJumpVelocity, getMaxSpeed } from '../data/powers.js';
 import { approach, clamp, sign } from '../core/utils.js';
 
-export const COMBAT_ACTIONS = ['primary', 'special', 'action1', 'action2'];
+// The combat buttons, by control codename: each maps to an attack through
+// the character's `actions`, and ba1 / ba2 to a charged action (cba1 / cba2)
+// through its `chargedActions`. shield, jump and charge are held-state
+// controls, read separately.
+export const COMBAT_ACTIONS = ['uniqueba', 'transform', 'ba1', 'ba2'];
 
 // stateTime is a sum of fixed steps, which drifts just below whole-step
 // boundaries (12 steps of 1/60 s sum to 0.19999...), so timed clip phases
@@ -22,11 +26,11 @@ export const COMBAT_ACTIONS = ['primary', 'special', 'action1', 'action2'];
 const TIME_EPSILON = 1e-6;
 
 const NEUTRAL_INPUT = Object.freeze({
-  left: false, right: false, charge: false, jump: false, defense: false,
-  primary: false, special: false, action1: false, action2: false,
-  leftPressed: false, rightPressed: false, dashLeftPressed: false, dashRightPressed: false,
-  jumpPressed: false, chargePressed: false, defensePressed: false,
-  primaryPressed: false, specialPressed: false, action1Pressed: false, action2Pressed: false,
+  runLeft: false, runRight: false, charge: false, jump: false, shield: false,
+  uniqueba: false, transform: false, ba1: false, ba2: false,
+  runLeftPressed: false, runRightPressed: false, mouvementLeftPressed: false, mouvementRightPressed: false,
+  jumpPressed: false, chargePressed: false, shieldPressed: false,
+  uniquebaPressed: false, transformPressed: false, ba1Pressed: false, ba2Pressed: false,
   dropPressed: false,
 });
 
@@ -69,12 +73,13 @@ export class Fighter {
     this.techniqueDefs = Object.fromEntries(
       Object.entries(def.chargedTechniques || {}).map(([id, spec]) => [id, createTechniqueDefinition({ id, ...spec })]),
     );
-    // What the shared Defense input does for this character (null: nothing).
+    // What the shared `shield` input does for this character (its `defense`
+    // entry; null: nothing).
     this.defense = createDefenseDefinition(def.defense);
     // One pass of the grounded Shield's raise and lower poses; 0 skips them.
     this.shieldStartDuration = sprites.duration(this.defense?.groundStartAnimation);
     this.shieldReleaseDuration = sprites.duration(this.defense?.groundReleaseAnimation);
-    // Shield clips already reported missing, so a held Defense warns once.
+    // Shield clips already reported missing, so a held Shield warns once.
     this.missingShieldArt = new Set();
     // The character's Powers (js/data/powers.js), resolved once.
     // Upward speed of the normal jump, from its Jump Power tier. Nothing else
@@ -167,7 +172,7 @@ export class Fighter {
     // buffered attack's.
     this.steps = 0;
     this.jumpPressedAt = -1;
-    // The latest Throw / BA1 / BA2 press the fighter could not act on yet
+    // The latest uniqueba / ba1 / ba2 press the fighter could not act on yet
     // ({ action, age, at }), tried again every step for
     // movement.attackBuffer seconds (see bufferAttack), or null.
     this.bufferedAttack = null;
@@ -251,7 +256,7 @@ export class Fighter {
     this.fastFalling = false;
     this.airJumped = false;
     this.bounce = null;
-    this.steerHeld.x = (input.right ? 1 : 0) - (input.left ? 1 : 0);
+    this.steerHeld.x = (input.runRight ? 1 : 0) - (input.runLeft ? 1 : 0);
     this.steerHeld.y = (input.charge ? 1 : 0) - (input.jump ? 1 : 0);
 
     combat.update(dt);
@@ -309,16 +314,16 @@ export class Fighter {
       if (this.dash.time >= this.dash.duration - TIME_EPSILON) this.endDash();
     }
 
-    // ---- Shield: held Defense --------------------------------------------
-    // Decided first: Defense held with a Shield the fighter may raise (its
-    // Defense is a Shield, it is not exhausted, the art for where it is)
+    // ---- Shield: held shield ---------------------------------------------
+    // Decided first: `shield` held with a Shield the fighter may raise (its
+    // `defense` is a Shield, it is not exhausted, the art for where it is)
     // takes the step, so no attack, Throw, charged action or Dash starts
-    // while it is held. Let go of Defense to do any of them.
-    const shieldHeld = !!input.defense && this.shieldAllowed();
+    // while it is held. Let go of the Shield button to do any of them.
+    const shieldHeld = !!input.shield && this.shieldAllowed();
 
     // The held direction: what steering, a turning attack and a cut-short
     // attack all read.
-    const held = (input.right ? 1 : 0) - (input.left ? 1 : 0);
+    const held = (input.runRight ? 1 : 0) - (input.runLeft ? 1 : 0);
 
     // ---- Combat intents --------------------------------------------------
     // Actions mapped to null are wired but reserved (see tryAction). A press
@@ -329,7 +334,7 @@ export class Fighter {
     // with a fresh Charge, is a normal attack.
     //
     // A press the fighter cannot act on yet (an attack or its recovery, a
-    // stun, a Dash, a cooldown, Defense held for its Shield) is buffered
+    // stun, a Dash, a cooldown, the Shield button held) is buffered
     // (see bufferAttack) and tried again every later step until it starts
     // or expires, so an attack pressed slightly early comes out on the
     // first step it can. A newer press replaces it. Only ever an ordinary
@@ -370,16 +375,16 @@ export class Fighter {
       else if (!this.attackMayStart(action)) this.bufferedAttack = null;
     }
 
-    // ---- Dash: a double tap of left or right, or one asked for ----------
+    // ---- Dash: a double tap of runLeft or runRight, or a mouvement ------
     // After the attacks, so one started this step wins over a Dash on the
     // same step (canFollowUp). A Dash may cut short an attack that hit, as
     // a jump may. A double tap that cannot Dash right now is used up all
     // the same: nothing is queued for later. Energy spent this step
     // means no refill this step (see the end of update).
     //
-    // dashLeftPressed / dashRightPressed ask for one Dash outright (the
-    // Joystick touch layout's single-tap Dash buttons, see
-    // InputManager.queueTouchDash). The request goes through the very same
+    // mouvementLeftPressed / mouvementRightPressed ask for one Dash outright
+    // (the Joystick touch layout's single-tap mouvement buttons, see
+    // InputManager.queueTouchMouvement). The request goes through the very same
     // tryDash, so every rule and cost of a double-tap Dash applies, and it
     // is used up the same way. It is not a tap: it forgets any first tap
     // waiting, so it never pairs with one, and this step's own direction
@@ -404,7 +409,7 @@ export class Fighter {
     // also rules out a Shield, jump, charge or platform drop on the same
     // step.
     const canAct = this.canAct();
-    // The Shield is up while Defense is held and the fighter is free to act
+    // The Shield is up while `shield` is held and the fighter is free to act
     // (it never cuts an attack, Dash, charged technique, stun or bind short).
     // A blocked hit's blockstun holds it up until the stun is over, held or
     // not. Either way only while shieldAllowed: the block that empties the
@@ -478,7 +483,7 @@ export class Fighter {
     if (body.grounded) this.coyote = mv.coyoteTime;
     else this.coyote = Math.max(0, this.coyote - dt);
 
-    // A held Shield outranks a jump: let go of Defense to jump. A jump may
+    // A held Shield outranks a jump: let go of the Shield to jump. A jump may
     // also cut short an attack that hit (see CombatState.cancellable). It
     // only sets the upward speed: whatever horizontal speed the fighter has
     // carries straight into the air. Its height is decided over its first
@@ -769,7 +774,7 @@ export class Fighter {
       this.shieldUpTime <= spec.perfectWindow + TIME_EPSILON;
   }
 
-  // Whether this fighter may have its Shield up right now: its Defense is a
+  // Whether this fighter may have its Shield up right now: its `defense` is a
   // Shield, it is not exhausted (CombatState.canShield: any Energy left is
   // enough, a block costing more simply empties it) and the held art for
   // where it is (groundAnimation, or airAnimation in the air). Missing art
@@ -787,19 +792,20 @@ export class Fighter {
   }
 
   // The Dash this step's input asks for (1 right, -1 left, 0 none): a
-  // one-step request (dashLeftPressed / dashRightPressed; both at once is
-  // none), which forgets any first tap waiting, or else a double tap (see
-  // trackDashTaps) whose waiting tap ages by `dt`.
+  // one-step mouvement request (mouvementLeftPressed /
+  // mouvementRightPressed; both at once is none), which forgets any first
+  // tap waiting, or else a double tap (see trackDashTaps) whose waiting tap
+  // ages by `dt`.
   dashAsked(input, dt) {
-    if (input.dashLeftPressed || input.dashRightPressed) {
+    if (input.mouvementLeftPressed || input.mouvementRightPressed) {
       this.dashTap = null;
-      return (input.dashRightPressed ? 1 : 0) - (input.dashLeftPressed ? 1 : 0);
+      return (input.mouvementRightPressed ? 1 : 0) - (input.mouvementLeftPressed ? 1 : 0);
     }
     return this.trackDashTaps(input, dt);
   }
 
-  // Double-tap detection on the horizontal press edges (leftPressed /
-  // rightPressed, from any device). A press of the same direction as the
+  // Double-tap detection on the run press edges (runLeftPressed /
+  // runRightPressed, from any device). A press of the same direction as the
   // one waiting, within movement.dashTapWindow seconds of it, is a double
   // tap: returns its direction (1 right, -1 left) and starts over. Any
   // other press (the other direction, or one too late) becomes the new
@@ -807,12 +813,12 @@ export class Fighter {
   trackDashTaps(input, dt) {
     const tap = this.dashTap;
     if (tap) tap.age += dt;
-    if (!input.leftPressed && !input.rightPressed) return 0;
-    if (input.leftPressed && input.rightPressed) {
+    if (!input.runLeftPressed && !input.runRightPressed) return 0;
+    if (input.runLeftPressed && input.runRightPressed) {
       this.dashTap = null;
       return 0;
     }
-    const direction = input.rightPressed ? 1 : -1;
+    const direction = input.runRightPressed ? 1 : -1;
     const window = this.def.movement.dashTapWindow ?? 0;
     if (tap && tap.direction === direction && tap.age <= window + TIME_EPSILON) {
       this.dashTap = null;
@@ -828,19 +834,19 @@ export class Fighter {
   // to act (no attack, stun, bind, charged technique or Dash already
   // running) or in an attack that hit and may be cut short (see
   // CombatState.cancellable: a Dash chases what it sent flying), grounded,
-  // not in or holding Charge, not shielding or holding Defense for a
+  // not in or holding Charge, not shielding or holding `shield` for a
   // Shield it may raise, and not exhausted, paying dashCost, or
   // dashCancelCost for one that cuts an attack short (all that is left,
   // emptying the bar, when that is less): the extra is what keeps a
   // hit-Dash-hit chase from looping. The fighter faces the Dash at once.
   // False, with nothing spent and the attack left as it is, if it cannot
   // start (a missing dash clip is logged). `input` is this step's (Charge or
-  // Defense held rules it out); any caller (a future AI too) may use it.
+  // Shield held rules it out); any caller (a future AI too) may use it.
   tryDash(direction, input = NEUTRAL_INPUT) {
     const speed = this.def.movement.dashSpeed;
     if (!speed || !direction) return false;
     if (!this.canFollowUp() || !this.body.grounded || this.charging || input.charge) return false;
-    if (this.combat.shielding || (input.defense && this.shieldAllowed())) return false;
+    if (this.combat.shielding || (input.shield && this.shieldAllowed())) return false;
     // Never a fast run passed off as a Dash: require real dash frames.
     if (!this.dashDuration || !this.sprites.has('dash')) {
       console.warn('[Alva] Dash has no animation frames; ignoring.');
@@ -865,8 +871,8 @@ export class Fighter {
   }
 
   // The charged action for `action`, dispatched on its type: a `summon`
-  // (#0001's Charged BA1 Clone Attack, see trySummon) or a `technique`
-  // (#0001's Charged BA2 Sphere Rush, see tryTechnique). True when it
+  // (#0001's cba1, the Clone Attack, see trySummon) or a `technique`
+  // (#0001's cba2, the Sphere Rush, see tryTechnique). True when it
   // consumed the press: it happened, or it is still cooling down (then
   // nothing happens at all: no normal attack instead, and the cooldown is
   // left as it is). False leaves the press to the normal attack.
@@ -981,7 +987,8 @@ export class Fighter {
   // once the fighter is free (the combat input buffer keeps only those): it
   // maps to an attack for where the fighter is, and that attack could start
   // here at all (on the ground if ground-only, with its art). Never a
-  // reserved button, an air Throw or an attack without frames.
+  // reserved button (transform), an air uniqueba or an attack without
+  // frames.
   attackMayStart(action) {
     const attackId = this.attackFor(action);
     const atk = attackId ? this.attacks[attackId] : null;
@@ -1090,7 +1097,7 @@ export class Fighter {
     return this.state === 'land' && this.stateTime + dt < this.landDuration;
   }
 
-  // A Shield lowered on the ground (Defense let go, or its Energy gone)
+  // A Shield lowered on the ground (`shield` let go, or its Energy gone)
   // starts the shieldRelease state; it then lasts one pass of the lower
   // pose while nothing of higher priority takes over. Lowered in the air it
   // has no pose: the fighter goes straight back to jump or fall.
