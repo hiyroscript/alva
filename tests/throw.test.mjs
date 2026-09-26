@@ -1,9 +1,9 @@
 // Run with node --test tests/throw.test.mjs (no dependencies).
-// #0001's Throw on the primary action and its shuriken projectile: artwork,
-// registration, one-pass playback, one release per press on the release
-// frame, independent flight, spin animation, hits through the real
+// #0001's Throw (uniqueba, its unique basic attack) and its shuriken
+// projectile: artwork, registration, one-pass playback, one release per press
+// on the release frame, independent flight, spin animation, hits through the real
 // CombatSystem (no launch either way, the Shield), cleanup, missing-art
-// safety, the ground-only rule, Charge / Defense priority, input and the
+// safety, the ground-only rule, Charge / Shield priority, input and the
 // training CPU. The shuriken is Base Launch 0 with no Directional Launch: a
 // hit adds 1 to the target's Launch Point and stuns it, but never pushes or
 // launches it, however high its Launch Point. Uses the real Fighter, CombatSystem,
@@ -26,10 +26,10 @@ import {
 } from './fighter-harness.mjs';
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
-const THROW = { primary: true, primaryPressed: true };
-const HOLD_THROW = { primary: true };
+const THROW = { uniqueba: true, uniquebaPressed: true };
+const HOLD_THROW = { uniqueba: true };
 const JUMP = { jump: true, jumpPressed: true };
-const DEFENSE = { defense: true, defensePressed: true };
+const SHIELD = { shield: true, shieldPressed: true };
 const THROW_FPS = 12;
 const SHURIKEN_FPS = 18;
 const FRAMES = ['0001_throw1.png', '0001_throw2.png', '0001_throw3.png'];
@@ -89,14 +89,14 @@ test('the six Throw and shuriken sprites live in the canonical #0001 folder, unc
 });
 
 test('Throw is a three-frame, play-once fighter clip; the shuriken is projectile art, not a fighter pose', () => {
-  const clip = def.animations.throw;
+  const clip = def.animations.uniqueba;
   assert.deepEqual(clip.frames, FRAMES.map((n) => `${BASE}${n.slice(5)}`));
   assert.equal(clip.frames.length, 3);
   assert.equal(clip.fps, THROW_FPS);
   assert.equal(clip.loop, false);
   assert.ok(clip.heightRatio > 0.8 && clip.heightRatio <= 1);
   assert.equal(clip.sourceFacing, undefined, 'Throw art faces right like the rest of #0001');
-  assert.equal(def.animationFallbacks.throw, undefined, 'never faked with other art');
+  assert.equal(def.animationFallbacks.uniqueba, undefined, 'never faked with other art');
 
   // Kept out of the fighter animations, so it is never fitted to fighter height.
   for (const key of Object.keys(def.animations)) assert.doesNotMatch(key, /shuriken/i);
@@ -138,22 +138,27 @@ test('SpriteSet.build normalizes the shuriken separately: centre anchor, fighter
 
 // ---- Registration -------------------------------------------------------------
 
-test('primary is Throw; Special stays reserved; BA1 and BA2 are unchanged', () => {
-  assert.equal(def.actions.primary, 'throw');
-  assert.equal(def.actions.special, null);
-  assert.deepEqual(def.actions.action1, { ground: 'ba1', air: 'midairBa1' });
-  assert.deepEqual(def.actions.action2, { ground: 'ba2', air: 'midairBa2' });
-  assert.ok(COMBAT_ACTIONS.includes('primary'), 'the internal action keeps its name');
-  assert.ok(!COMBAT_ACTIONS.includes('throw'));
-  assert.equal(ACTION_LABELS.primary, 'Throw');
-  assert.deepEqual(CONFIG.bindings.primary, ['KeyJ']);
+test('uniqueba is the Throw; transform stays reserved; BA1 and BA2 are unchanged', () => {
+  assert.equal(def.actions.uniqueba, 'uniqueba', 'one canonical identity: the uniqueba button starts the uniqueba attack');
+  assert.equal(def.actions.transform, null);
+  assert.deepEqual(def.actions.ba1, { ground: 'ba1', air: 'maba1' });
+  assert.deepEqual(def.actions.ba2, { ground: 'ba2', air: 'maba2' });
+  assert.ok(COMBAT_ACTIONS.includes('uniqueba'), 'the combat button');
+  for (const retired of ['primary', 'throw']) {
+    assert.ok(!COMBAT_ACTIONS.includes(retired), `no ${retired} action`);
+    assert.equal(def.actions[retired], undefined, `no ${retired} mapping`);
+    assert.equal(def.attacks[retired], undefined, `no ${retired} attack`);
+    assert.equal(def.animations[retired], undefined, `no ${retired} animation key`);
+  }
+  assert.equal(ACTION_LABELS.uniqueba, 'Unique Basic Attack');
+  assert.deepEqual(CONFIG.bindings.uniqueba, ['KeyJ']);
 });
 
 test('the Throw attack: its own clip, ground-only, one pass, no melee hitbox, one shuriken', () => {
   const { fighter } = makeFighter();
-  const atk = fighter.attacks.throw;
-  const clip = def.animations.throw;
-  assert.equal(atk.animation, 'throw');
+  const atk = fighter.attacks.uniqueba;
+  const clip = def.animations.uniqueba;
+  assert.equal(atk.animation, 'uniqueba');
   assert.equal(atk.groundOnly, true);
   assert.equal(atk.lockMovement, true);
   assert.equal(atk.hitbox, null, 'no fighter-attached damage');
@@ -191,12 +196,12 @@ test('one Throw press plays throw1, throw2, throw3 once, then idle', () => {
   const { fighter, step } = makeFighter();
   const log = recordAttack(step, THROW);
   assert.deepEqual(sequence(log), FRAMES);
-  assert.ok(log.every((s) => s.id === 'throw' && s.anim === 'throw' && s.grounded));
+  assert.ok(log.every((s) => s.id === 'uniqueba' && s.anim === 'uniqueba' && s.grounded));
   assert.equal(log.length, steps(3 / THROW_FPS), 'exactly one pass');
   assert.equal(fighter.state, 'idle');
   assert.equal(frameName(fighter), '0001_idle1.png');
   assert.equal(fighter.combat.attack, null);
-  assert.ok(fighter.combat.cooldowns.has('throw'), 'cooldown after the Throw');
+  assert.ok(fighter.combat.cooldowns.has('uniqueba'), 'cooldown after the Throw');
 });
 
 test('holding Throw neither loops the clip nor throws again; a new press after the cooldown does', () => {
@@ -223,9 +228,9 @@ test('a press during the cooldown is refused; one right after it throws', () => 
   throwOnce(d, {});
   d.tick(THROW);
   assert.equal(d.attacker.combat.attack, null, 'still cooling down');
-  stepUntil(() => { d.tick(); return d.attacker; }, (f) => !f.combat.cooldowns.has('throw'));
+  stepUntil(() => { d.tick(); return d.attacker; }, (f) => !f.combat.cooldowns.has('uniqueba'));
   d.tick(THROW);
-  assert.equal(d.attacker.combat.attack?.def.id, 'throw');
+  assert.equal(d.attacker.combat.attack?.def.id, 'uniqueba');
 });
 
 test('the shuriken appears exactly once, on throw2, the release frame', () => {
@@ -257,7 +262,7 @@ test('the shuriken starts at the throwing hand, not the feet or the fighter cent
     d.tick(THROW);
     while (!d.projectiles.length) d.tick(HOLD_THROW);
     const p = d.projectiles[0];
-    const { offset } = def.attacks.throw.projectile;
+    const { offset } = def.attacks.uniqueba.projectile;
     const body = d.attacker.body;
     // Spawned at the offset (mirrored with facing), then one step of flight.
     assert.equal(p.prevX, body.x + offset.x * facing);
@@ -278,7 +283,7 @@ test('a shuriken flies the way #0001 faced at release, every step, even after #0
     assert.equal(p.direction, facing);
     assert.equal(p.vx, SHURIKEN.speed * facing);
     let x = p.x;
-    const turn = facing === 1 ? { left: true } : { right: true };
+    const turn = facing === 1 ? { runLeft: true } : { runRight: true };
     for (let i = 0; i < 30; i++) {
       // Once the Throw ends, run the other way: the shuriken does not care.
       d.tick(d.attacker.combat.attack ? {} : turn);
@@ -338,14 +343,14 @@ test('the shuriken art mirrors with its direction; movement never depends on it'
 
 test('the Throw locks movement and facing; the release keeps #0001\'s logical facing', () => {
   const { fighter, step } = makeFighter();
-  stepUntil(step, (f) => f.state === 'run', { right: true });
-  step({ right: true, ...THROW });
+  stepUntil(step, (f) => f.state === 'run', { runRight: true });
+  step({ runRight: true, ...THROW });
   assert.equal(fighter.state, 'attack');
   const vx = [];
   while (fighter.state === 'attack') {
     assert.equal(fighter.facing, 1, 'holding Left never turns the Throw around');
     vx.push(fighter.body.vx);
-    step({ left: true, primary: true });
+    step({ runLeft: true, uniqueba: true });
   }
   assert.ok(vx.every((v, i) => i === 0 || v <= vx[i - 1]), 'slows under normal deceleration');
   assert.equal(fighter.releases.length, 1, 'queued for the battle to spawn');
@@ -398,7 +403,7 @@ test('a shuriken pushes the target neither way, whichever way it flies and where
     d.tick(THROW);
     while (d.attacker.combat.attack) d.tick(HOLD_THROW);
     // Turn around before the shuriken arrives.
-    const back = facing === 1 ? { left: true } : { right: true };
+    const back = facing === 1 ? { runLeft: true } : { runRight: true };
     d.tick(back);
     d.tick(back);
     assert.equal(d.attacker.facing, -facing);
@@ -466,8 +471,8 @@ test('a Shield blocks the shuriken from either side: used up, 25 Energy, no Laun
         d.target.opponent = null;
         d.target.facing = facing; // its back to the thrower
       }
-      d.tick(THROW, { defense: true, defensePressed: true });
-      for (let i = 0; i < 120 && !d.events.length; i++) d.tick({}, { defense: true });
+      d.tick(THROW, { shield: true, shieldPressed: true });
+      for (let i = 0; i < 120 && !d.events.length; i++) d.tick({}, { shield: true });
       const label = `facing ${facing}${away ? ', back turned' : ''}`;
       assert.equal(d.target.combat.shielding, true, label);
       assert.equal(d.events.length, 1, label);
@@ -482,7 +487,7 @@ test('a Shield blocks the shuriken from either side: used up, 25 Energy, no Laun
       assert.ok(Math.abs(d.target.combat.shieldStun - SHURIKEN.blockstun) < 1e-9, 'blockstun, held in the Shield');
       assert.equal(d.target.body.vx, 0, 'no launch');
       assert.equal(d.projectiles.length, 0, 'gone after the blocked impact, never flying on');
-      for (let i = 0; i < 60; i++) d.tick({}, { defense: true });
+      for (let i = 0; i < 60; i++) d.tick({}, { shield: true });
       assert.equal(d.events.length, 1, 'one block, one cost');
     }
   }
@@ -496,8 +501,8 @@ test('a shuriken that arrives before the Shield is up, or after it is let go, hi
   assert.equal(probe.events[0].type, 'hit');
   // Released a moment before it arrives: a normal hit.
   const d = duel({ gap: 260 });
-  d.tick(THROW, { defense: true, defensePressed: true });
-  for (let i = 0; i < 5; i++) d.tick({}, { defense: true });
+  d.tick(THROW, { shield: true, shieldPressed: true });
+  for (let i = 0; i < 5; i++) d.tick({}, { shield: true });
   for (let i = 0; i < 120 && !d.events.length; i++) d.tick();
   assert.equal(d.target.combat.shielding, false);
   assert.equal(d.events[0].type, 'hit');
@@ -613,7 +618,7 @@ test('spawnProjectiles consumes each release once; removeDeadProjectiles keeps t
 
 test('missing Throw art refuses the Throw: no pose, no shuriken', (t) => {
   const warn = t.mock.method(console, 'warn', () => {});
-  const keys = Object.keys(def.animations).filter((k) => k !== 'throw');
+  const keys = Object.keys(def.animations).filter((k) => k !== 'uniqueba');
   const d = duel({ gap: 200, attackerSprites: fakeSprites(keys) });
   d.tick(THROW);
   assert.equal(d.attacker.combat.attack, null);
@@ -621,7 +626,7 @@ test('missing Throw art refuses the Throw: no pose, no shuriken', (t) => {
   for (let i = 0; i < 60; i++) d.tick(HOLD_THROW);
   assert.equal(d.projectiles.length, 0);
   assert.deepEqual(d.events, []);
-  assert.match(warn.mock.calls[0].arguments[0], /Attack "throw" has no animation frames/);
+  assert.match(warn.mock.calls[0].arguments[0], /Attack "uniqueba" has no animation frames/);
 });
 
 test('missing shuriken art refuses the Throw: never an invisible damaging projectile', (t) => {
@@ -658,11 +663,11 @@ test('Throw in the air does nothing: no ground art in the air, no shuriken, Jump
     assert.ok(d.attacker.body.vy > plain, 'gravity carries on');
     for (let i = 0; i < 30 && !d.attacker.grounded; i++) {
       d.tick(i % 5 ? HOLD_THROW : THROW);
-      assert.notEqual(d.attacker.animator.anim.key, 'throw');
+      assert.notEqual(d.attacker.animator.anim.key, 'uniqueba');
     }
     assert.equal(d.projectiles.length, 0);
     assert.deepEqual(d.attacker.releases, []);
-    assert.equal(d.attacker.combat.cooldowns.has('throw'), false);
+    assert.equal(d.attacker.combat.cooldowns.has('uniqueba'), false);
   }
 });
 
@@ -698,27 +703,27 @@ test('Throw cuts straight out of Charge (no release pose); a held Charge restart
   assert.equal(e.projectiles.length, 1);
 });
 
-test('Defense held wins over a Throw pressed with it; a Throw already playing is never cut short by the Shield', () => {
+test('Shield held wins over a Throw pressed with it; a Throw already playing is never cut short by the Shield', () => {
   const d = range();
-  d.tick({ ...THROW, ...DEFENSE });
-  assert.equal(d.attacker.combat.attack, null, 'no Throw while Defense is held');
+  d.tick({ ...THROW, ...SHIELD });
+  assert.equal(d.attacker.combat.attack, null, 'no Throw while Shield is held');
   assert.equal(d.attacker.combat.shielding, true);
   assert.deepEqual(d.attacker.releases, []);
-  // Let go of Defense: the Throw works.
+  // Let go of Shield: the Throw works.
   d.tick(THROW);
-  assert.equal(d.attacker.combat.attack?.def.id, 'throw');
-  // Defense pressed while it plays: the Throw plays out, never both.
+  assert.equal(d.attacker.combat.attack?.def.id, 'uniqueba');
+  // Shield pressed while it plays: the Throw plays out, never both.
   for (let i = 1; i < steps(3 / THROW_FPS); i++) {
-    d.tick(DEFENSE);
-    assert.equal(d.attacker.combat.attack?.def.id, 'throw');
+    d.tick(SHIELD);
+    assert.equal(d.attacker.combat.attack?.def.id, 'uniqueba');
     assert.equal(d.attacker.combat.shielding, false);
   }
-  d.tick({ defense: true });
+  d.tick({ shield: true });
   assert.equal(d.attacker.combat.attack, null);
-  assert.equal(d.attacker.combat.shielding, true, 'up once the Throw is over, Defense still held');
-  // BA1 pressed with Defense: the Shield too.
+  assert.equal(d.attacker.combat.shielding, true, 'up once the Throw is over, Shield still held');
+  // BA1 pressed with Shield: the Shield too.
   const b = range();
-  b.tick({ action1: true, action1Pressed: true, ...DEFENSE });
+  b.tick({ ba1: true, ba1Pressed: true, ...SHIELD });
   assert.equal(b.attacker.combat.attack, null);
   assert.equal(b.attacker.combat.shielding, true);
 });
@@ -758,7 +763,7 @@ test('Throw and its shuriken start no charged-action cooldown on either side', (
 
 // ---- Input and CPU ----------------------------------------------------------------
 
-test('J and gamepad X / Square still press the internal primary action, labelled Throw', async () => {
+test('J and gamepad X / Square still press the uniqueba action, labelled Unique Basic Attack when neutral', async () => {
   const listeners = {};
   globalThis.window = { addEventListener: (type, fn) => { listeners[type] = fn; } };
   globalThis.document = { addEventListener() {}, hidden: false };
@@ -770,21 +775,21 @@ test('J and gamepad X / Square still press the internal primary action, labelled
     const f = input.sample();
     return COMBAT_ACTIONS.filter((a) => f[`${a}Pressed`]);
   };
-  assert.deepEqual(CONFIG.bindings.primary, ['KeyJ']);
-  assert.equal(ACTION_LABELS.primary, 'Throw');
+  assert.deepEqual(CONFIG.bindings.uniqueba, ['KeyJ']);
+  assert.equal(ACTION_LABELS.uniqueba, 'Unique Basic Attack');
   listeners.keydown({ code: 'KeyJ', repeat: false, preventDefault() {} });
-  assert.deepEqual(pressed(), ['primary']);
-  assert.equal(input.sample().primaryPressed, false, 'one press edge per press');
+  assert.deepEqual(pressed(), ['uniqueba']);
+  assert.equal(input.sample().uniquebaPressed, false, 'one press edge per press');
   listeners.keyup({ code: 'KeyJ', repeat: false, preventDefault() {} });
   listeners.gamepadconnected();
   pad.buttons[2] = { pressed: true, value: 1 };
   input.pollGamepads(0);
-  assert.deepEqual(pressed(), ['primary']);
+  assert.deepEqual(pressed(), ['uniqueba']);
   pad.buttons[2] = { pressed: false, value: 0 };
   input.pollGamepads(0);
   pad.buttons[3] = { pressed: true, value: 1 };
   input.pollGamepads(0);
-  assert.deepEqual(pressed(), ['special'], 'Y / Triangle is still Special');
+  assert.deepEqual(pressed(), ['transform'], 'Y / Triangle is still Transform');
 });
 
 test('the training CPU never throws', async () => {
@@ -793,9 +798,9 @@ test('the training CPU never throws', async () => {
   const d = duel({ gap: 300 });
   for (let i = 0; i < 1500; i++) {
     const out = cpu.getInput(d.target, DT, SIM_CTX);
-    assert.equal(out.primary, false);
-    assert.equal(out.primaryPressed, false);
-    d.tick(i % 200 < 100 ? { right: true } : { left: true }, out);
+    assert.equal(out.uniqueba, false);
+    assert.equal(out.uniquebaPressed, false);
+    d.tick(i % 200 < 100 ? { runRight: true } : { runLeft: true }, out);
     assert.equal(d.target.combat.attack, null);
     assert.deepEqual(d.target.releases, []);
     assert.ok(d.projectiles.every((p) => p.owner !== d.target));

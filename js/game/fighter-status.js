@@ -4,11 +4,11 @@
 //   [ Energy bar   ]    only while below full; bright purple, gray while exhausted
 //   [ P1 / CPU tag ]    (Arena.drawMarkers)
 //   [ fighter      ]
-//   [ CAB1   CAB2  ]    only the charged actions cooling down, under the feet
+//   [ CBA1   CBA2  ]    only the charged actions cooling down, under the feet
 //
 // Both are temporary: full Energy and a ready charged action draw nothing,
 // so a fighter with full Energy and nothing cooling down carries only its
-// tag. The state helpers (energyBarState, cabIndicators) are pure, so what
+// tag. The state helpers (energyBarState, cbaIndicators) are pure, so what
 // is drawn can be checked without a canvas; the draw functions only paint
 // it. Nothing
 // here is character-specific: the rings come from the character's own
@@ -24,18 +24,19 @@ export const ENERGY_STYLE = Object.freeze({
   outline: '#000000',
 });
 
-// CAB rings: white ring, number and label, each with a black outline so
+// CBA rings: white ring, number and label, each with a black outline so
 // they read on any stage (Desert's sand, City's night, Practice's pale
 // grid) and against the black Void.
-export const CAB_STYLE = Object.freeze({
+export const CBA_STYLE = Object.freeze({
   fill: '#ffffff',
   track: 'rgba(255, 255, 255, 0.3)',
   outline: '#000000',
 });
 
 // Player-facing names of charged actions, by the button they are charged
-// from: Charged BA1 is CAB1, Charged BA2 is CAB2.
-export const CHARGED_LABELS = Object.freeze({ action1: 'CAB1', action2: 'CAB2' });
+// from: Charged BA1 (cba1, charged from ba1) is CBA1, Charged BA2 (cba2,
+// charged from ba2) is CBA2.
+export const CHARGED_LABELS = Object.freeze({ ba1: 'CBA1', ba2: 'CBA2' });
 
 // Seconds left on a cooldown as shown in its ring, one decimal, rounded up
 // so it never reads 0.0 while still cooling ("4.3", "0.1").
@@ -68,7 +69,7 @@ export function energyBarState(fighter) {
 // nothing is drawn for it. progress = 1 - remaining / duration, read
 // straight from the fighter's cooldowns, so a Charge that speeds recovery
 // speeds the ring too.
-export function cabIndicators(fighter) {
+export function cbaIndicators(fighter) {
   const cooldowns = fighter.combat.chargedCooldowns;
   return Object.entries(fighter.def.chargedActions ?? {})
     .filter(([, charged]) => cooldowns.active(charged.id))
@@ -116,13 +117,13 @@ const MONO = 'ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace';
 // at (x, footY), device pixels: no slot is kept for a ready one, so a lone
 // ring sits straight under the fighter and nothing at all is drawn while
 // both are ready. The ring completes clockwise from the top as the ability
-// recovers, the seconds left inside it, its CAB name beneath. White,
+// recovers, the seconds left inside it, its CBA name beneath. White,
 // outlined in black. Sized with the world (`scale`, device pixels per world
 // unit) but never below a readable size in CSS pixels (`dpr`, device pixels
 // per CSS pixel), the number always inside its ring. Returns how many rings
 // it drew.
-export function drawCabIndicators(ctx, fighter, x, footY, scale, dpr = 1) {
-  const list = cabIndicators(fighter);
+export function drawCbaIndicators(ctx, fighter, x, footY, scale, dpr = 1) {
+  const list = cbaIndicators(fighter);
   if (!list.length) return 0;
   const r = Math.round(Math.max(10 * dpr, 9.5 * scale));
   const ring = Math.max(2, Math.round(r * 0.2));
@@ -143,20 +144,20 @@ export function drawCabIndicators(ctx, fighter, x, footY, scale, dpr = 1) {
     ctx.beginPath();
     ctx.arc(cx, cy, r, 0, Math.PI * 2);
     ctx.lineWidth = ring + o * 2;
-    ctx.strokeStyle = CAB_STYLE.outline;
+    ctx.strokeStyle = CBA_STYLE.outline;
     ctx.stroke();
     ctx.lineWidth = ring;
-    ctx.strokeStyle = CAB_STYLE.track;
+    ctx.strokeStyle = CBA_STYLE.track;
     ctx.stroke();
     if (c.progress > 0) {
       ctx.beginPath();
       ctx.arc(cx, cy, r, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * c.progress);
-      ctx.strokeStyle = CAB_STYLE.fill;
+      ctx.strokeStyle = CBA_STYLE.fill;
       ctx.stroke();
     }
     ctx.lineWidth = Math.max(2, o * 2.5);
-    ctx.strokeStyle = CAB_STYLE.outline;
-    ctx.fillStyle = CAB_STYLE.fill;
+    ctx.strokeStyle = CBA_STYLE.outline;
+    ctx.fillStyle = CBA_STYLE.fill;
     ctx.font = `800 ${valueFont}px ${MONO}`;
     ctx.textBaseline = 'middle';
     ctx.strokeText(c.text, cx, cy + 1);

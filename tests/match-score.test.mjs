@@ -92,8 +92,8 @@ test('a fall takes the fighter out of play at once; it is back exactly 2 s later
   p1.combat.launchPoint = 64;
   p1.combat.setEnergy(0);
   p1.combat.shielding = true;
-  p1.combat.chargedCooldowns.start('ba1Clone', 5);
-  p1.combat.chargedCooldowns.start('rasenRush', 5);
+  p1.combat.chargedCooldowns.start('cba1', 5);
+  p1.combat.chargedCooldowns.start('cba2', 5);
   intoVoid(battle, p1);
   p1.body.vx = 400;
   run();
@@ -103,7 +103,7 @@ test('a fall takes the fighter out of play at once; it is back exactly 2 s later
   assert.deepEqual(battle.cameraTargets, [p2, null], 'the camera follows the CPU meanwhile');
   const frozen = { x: p1.body.x, y: p1.body.y };
   // Not a step early; its Launch Point stays until it is back.
-  script.held = { right: true, jump: true, jumpPressed: true };
+  script.held = { runRight: true, jump: true, jumpPressed: true };
   for (let i = 1; i < RESPAWN_STEPS; i++) {
     run();
     assert.equal(p1.lostToVoid, true, `still out after ${i} steps`);
@@ -121,7 +121,7 @@ test('a fall takes the fighter out of play at once; it is back exactly 2 s later
   assert.equal(p1.combat.launchPoint, 0);
   assert.deepEqual([p1.combat.energy, p1.combat.energyExhausted], [100, false], 'Energy full, not exhausted');
   assert.deepEqual([p1.combat.shielding, p1.combat.shieldStun], [false, 0], 'the Shield down');
-  assert.equal(p1.combat.chargedCooldowns.size, 0, 'CAB1 and CAB2 ready');
+  assert.equal(p1.combat.chargedCooldowns.size, 0, 'CBA1 and CBA2 ready');
   assert.deepEqual([p1.combat.stun, p1.combat.hitstop, p1.combat.attack, p1.technique, p1.dash], [0, 0, null, null, null]);
   assert.equal(p1.state, 'idle');
   assert.deepEqual(battle.inPlay, [p1, p2]);
@@ -137,13 +137,13 @@ test('whatever held or aimed at a fallen fighter lets go: a Sphere Rush bind, cl
   p2.body.x = p1.body.x + 120;
   script.held = { charge: true };
   run(10);
-  script.held = { charge: true, action2: true, action2Pressed: true };
+  script.held = { charge: true, ba2: true, ba2Pressed: true };
   run();
   script.held = {};
   const rush = p1.technique;
   for (let i = 0; i < 120 && !rush.hitConfirmed; i++) run();
   assert.ok(p2.combat.immobilized);
-  p1.summons.push({ id: 'ba1Clone', target: p2 });
+  p1.summons.push({ id: 'cba1', target: p2 });
   // A shuriken of the CPU's own, far off (it strikes nothing).
   const far = { x: -1e5, y: -1e5, w: 1, h: 1 };
   battle.projectiles.push({ alive: true, owner: p2, update() {}, interpolate() {}, hitbox: (out) => Object.assign(out, far) });
@@ -157,15 +157,15 @@ test('whatever held or aimed at a fallen fighter lets go: a Sphere Rush bind, cl
   assert.ok(battle.clones.every((c) => c.target !== p2 && c.owner !== p2));
   assert.ok(battle.projectiles.every((p) => p.owner !== p2), 'its own shuriken went too');
   // While it is out, a Charged BA1 has nobody to appear behind: an ordinary
-  // BA1, and CAB1's cooldown is not spent.
+  // BA1, and CBA1's cooldown is not spent.
   run(60);
   script.held = { charge: true };
   run(10);
-  script.held = { charge: true, action1: true, action1Pressed: true };
+  script.held = { charge: true, ba1: true, ba1Pressed: true };
   run();
   script.held = {};
   assert.equal(p1.combat.attack?.def.id, 'ba1');
-  assert.equal(p1.combat.chargedCooldowns.active('ba1Clone'), false);
+  assert.equal(p1.combat.chargedCooldowns.active('cba1'), false);
   assert.deepEqual(battle.clones, []);
 });
 

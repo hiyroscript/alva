@@ -65,12 +65,12 @@ function hitAt(launchPoint, hitDef, { facing = 1, options = {}, targetCharacter,
 // #0001's own resolved hits, as the engine holds them.
 function realHits() {
   const { fighter } = makeFighter();
-  const rush = fighter.techniqueDefs.rasenRush;
+  const rush = fighter.techniqueDefs.cba2;
   return {
     ba1: fighter.attacks.ba1,
     ba2: fighter.attacks.ba2,
-    midairBa1: fighter.attacks.midairBa1,
-    midairBa2: fighter.attacks.midairBa2,
+    maba1: fighter.attacks.maba1,
+    maba2: fighter.attacks.maba2,
     shuriken: fighter.projectileDefs.shuriken,
     firstHit: rush.firstHit,
     tickHit: rush.tickHit,
@@ -345,12 +345,12 @@ test('a hit event describes the new system and nothing of the old one', () => {
 // ---- #0001 ------------------------------------------------------------------------
 
 test('#0001\'s authored hits: damage, Base Launch and Directional Launch, exactly', () => {
-  const rush = def.chargedTechniques.rasenRush;
+  const rush = def.chargedTechniques.cba2;
   const authored = {
     ba1: def.attacks.ba1,
     ba2: def.attacks.ba2,
-    midairBa1: def.attacks.midairBa1,
-    midairBa2: def.attacks.midairBa2,
+    maba1: def.attacks.maba1,
+    maba2: def.attacks.maba2,
     shuriken: def.projectiles.shuriken,
     tickHit: rush.tickHit,
     explosionHit: rush.explosionHit,
@@ -359,8 +359,8 @@ test('#0001\'s authored hits: damage, Base Launch and Directional Launch, exactl
   assert.deepEqual(table, {
     ba1: [3, 1, 'horizontal'],
     ba2: [5, 2, 'vertical'],
-    midairBa1: [3, 2, 'vertical'],
-    midairBa2: [5, 2, 'reverseVertical'],
+    maba1: [3, 2, 'vertical'],
+    maba2: [5, 2, 'reverseVertical'],
     shuriken: [1, 0, null],
     tickHit: [1, 0, null],
     explosionHit: [10, 3, 'horizontal'],
@@ -382,8 +382,8 @@ test('#0001 at work: each hit adds its damage, then launches at Base Launch x th
     // [hit, from, to, strength, finalLaunch facing right (strength x 10)]
     ['ba1', 117, 120, 120, { x: 1200, y: 0 }],
     ['ba2', 115, 120, 240, { x: 0, y: -2400 }],
-    ['midairBa1', 117, 120, 240, { x: 0, y: -2400 }],
-    ['midairBa2', 115, 120, 240, { x: 0, y: 2400 }],
+    ['maba1', 117, 120, 240, { x: 0, y: -2400 }],
+    ['maba2', 115, 120, 240, { x: 0, y: 2400 }],
     ['shuriken', 119, 120, 0, { x: 0, y: 0 }],
     ['tickHit', 119, 120, 0, { x: 0, y: 0 }],
     ['explosionHit', 110, 120, 360, { x: 3600, y: 0 }],
@@ -493,7 +493,7 @@ test('the documentation describes only the new system: no obsolete engine names 
 test('the launch path is shared and generic: no fighter, attack or technique singled out anywhere in combat', () => {
   const combat = read('js/game/combat.js').replace(/^\s*\/\/.*$/gm, '');
   assert.doesNotMatch(combat, /(?:\.id|attack|attackId|fighter\.id|technique\.id)\s*===?\s*['"]/);
-  assert.doesNotMatch(combat, /'0001'|'ba1'|'ba2'|'midairBa\d'|'shuriken'|'rasenRush'/);
+  assert.doesNotMatch(combat, /'0001'|'ba1'|'ba2'|'maba\d'|'uniqueba'|'shuriken'|'cba2'/);
   // Projectiles, clones and techniques never compute a launch of their own.
   for (const file of ['js/game/projectile.js', 'js/game/clone.js', 'js/game/charged-technique.js']) {
     const code = read(file).replace(/^\s*\/\/.*$/gm, '');

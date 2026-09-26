@@ -10,14 +10,15 @@ import { range } from '../core/utils.js';
 // (world units): about two steps at its top speed.
 const LEDGE_LOOKAHEAD = 12;
 
-// Every field Fighter.update reads, all false: a complete, neutral snapshot.
+// Every field Fighter.update reads, all false: a complete, neutral snapshot,
+// keyed by control codename.
 export function blankInput() {
   return {
-    left: false, right: false, charge: false, jump: false, defense: false,
-    primary: false, special: false, action1: false, action2: false,
-    leftPressed: false, rightPressed: false, dashLeftPressed: false, dashRightPressed: false,
-    jumpPressed: false, chargePressed: false, defensePressed: false,
-    primaryPressed: false, specialPressed: false, action1Pressed: false, action2Pressed: false,
+    runLeft: false, runRight: false, charge: false, jump: false, shield: false,
+    uniqueba: false, transform: false, ba1: false, ba2: false,
+    runLeftPressed: false, runRightPressed: false, mouvementLeftPressed: false, mouvementRightPressed: false,
+    jumpPressed: false, chargePressed: false, shieldPressed: false,
+    uniquebaPressed: false, transformPressed: false, ba1Pressed: false, ba2Pressed: false,
     dropPressed: false,
   };
 }
@@ -35,9 +36,9 @@ export class PlayerController {
 
 // Non-attacking training opponent: keeps a readable distance, follows the
 // player across platforms and occasionally repositions. It never presses
-// combat buttons (Throw and Basic Attacks 1 and 2 included, so it never
-// throws a shuriken), Charge or Defense (so it never shields), so the player
-// can practise on it.
+// combat buttons (uniqueba, ba1 and ba2 included, so it never throws a
+// shuriken), Charge or Shield (so it never shields), so the player can
+// practise on it.
 // It drops through one-way platforms with `dropPressed`, an intent no player
 // control produces. It never walks off the main floor's edges into open air
 // on its own (see atLedge): it only leaves the stage when knocked off.
@@ -67,8 +68,8 @@ export class TrainingAIController {
     const foe = self.opponent;
     if (!foe || foe.lostToVoid) {
       this.moveIntent = 0;
-      out.left = false;
-      out.right = false;
+      out.runLeft = false;
+      out.runRight = false;
       return out;
     }
 
@@ -98,8 +99,8 @@ export class TrainingAIController {
       this.wantDrop = false;
     }
 
-    out.left = this.moveIntent < 0;
-    out.right = this.moveIntent > 0;
+    out.runLeft = this.moveIntent < 0;
+    out.runRight = this.moveIntent > 0;
     return out;
   }
 

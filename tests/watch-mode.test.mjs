@@ -766,7 +766,7 @@ test('in a seeded mirror match the two CPUs decide for themselves', () => {
     battle.update(DT);
     for (const side of ['p1', 'p2']) {
       const out = battle[side].controller.out;
-      samples[side].push([out.left, out.right, out.jump, out.primary, out.action1, out.action2, out.defense, out.charge].join());
+      samples[side].push([out.runLeft, out.runRight, out.jump, out.uniqueba, out.ba1, out.ba2, out.shield, out.charge].join());
     }
   }
   // Were they one stream, the same position mirrored would bring the same
@@ -801,7 +801,7 @@ test('spectating: nothing reads gameplay input, and held buttons change nothing 
   // fight would change.
   const all = fakeInput();
   const everything = {};
-  for (const k of ['left', 'right', 'charge', 'jump', 'defense', 'primary', 'special', 'action1', 'action2']) {
+  for (const k of ['runLeft', 'runRight', 'charge', 'jump', 'shield', 'uniqueba', 'transform', 'ba1', 'ba2']) {
     everything[k] = true;
     everything[`${k}Pressed`] = true;
   }
@@ -933,8 +933,8 @@ test('spectating: no touch controls and no gameplay input, through pause, resume
   assert.equal(screen.isRunning, true, 'the match runs');
   assert.ok(screen.el.classList.contains('is-watch'));
   // No fighter's own ability icons.
-  assert.equal(screen.touch.buttons.get('primary').getAttribute('aria-label'), 'Throw');
-  assert.equal(screen.touch.buttons.get('action1').getAttribute('aria-label'), 'Basic Attack 1');
+  assert.equal(screen.touch.buttons.get('uniqueba').getAttribute('aria-label'), 'Unique Basic Attack');
+  assert.equal(screen.touch.buttons.get('ba1').getAttribute('aria-label'), 'Basic Attack 1');
   screen.pause();
   off();
   screen.resume();
@@ -947,16 +947,16 @@ test('spectating: no touch controls and no gameplay input, through pause, resume
   screen.rematch();
   off();
   // Touch presses never reach the input while spectating: not a button, not
-  // the joystick, not a Dash button (whatever the Mobile Controls setting).
+  // the joystick, not a mouvement button (whatever the Mobile Controls setting).
   const touches = [];
   app.input.setTouch = (action, held) => touches.push([action, held]);
-  app.input.queueTouchDash = (direction) => touches.push(['dash', direction]);
+  app.input.queueTouchMouvement = (direction) => touches.push(['mouvement', direction]);
   const tryEverything = () => {
     const down = { pointerId: 1, clientX: 500, clientY: 0, preventDefault: noop };
     screen.touch.buttons.get('jump').dispatch('pointerdown', down);
     screen.touch.buttons.get('charge').dispatch('pointerdown', { ...down, pointerId: 2 });
     screen.touch.stick.dispatch('pointerdown', { ...down, pointerId: 3 });
-    for (const b of screen.touch.dashButtons.values()) b.dispatch('pointerdown', { ...down, pointerId: 4 });
+    for (const b of screen.touch.mouvementButtons.values()) b.dispatch('pointerdown', { ...down, pointerId: 4 });
   };
   assert.equal(screen.touch.scheme, 'joystick');
   tryEverything();
@@ -981,7 +981,7 @@ test('spectating: no touch controls and no gameplay input, through pause, resume
   assert.equal(screen.touch.enabled, true);
   assert.equal(screen.touchRoot.hidden, false);
   assert.ok(!screen.el.classList.contains('is-watch'));
-  assert.equal(screen.touch.buttons.get('primary').getAttribute('aria-label'), 'Shuriken', 'Player 1\'s fighter again');
+  assert.equal(screen.touch.buttons.get('uniqueba').getAttribute('aria-label'), 'Shuriken', 'Player 1\'s fighter again');
   screen.exit();
 });
 

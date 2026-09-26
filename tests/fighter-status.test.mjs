@@ -1,7 +1,7 @@
 // Run with node --test tests/fighter-status.test.mjs (no dependencies).
 // The status drawn with each fighter on the Arena canvas: the bright purple
 // Energy bar over its name tag, only while below full (gray
-// through an exhaustion's whole refill), and the CAB1 / CAB2 cooldown rings
+// through an exhaustion's whole refill), and the CBA1 / CBA2 cooldown rings
 // under its feet, only while cooling down. The state helpers are checked directly;
 // the drawing through a
 // canvas context that records what it is asked to paint (layout and paint
@@ -12,8 +12,8 @@ import { readFileSync } from 'node:fs';
 import { Battle } from '../js/game/battle.js';
 import { getMap } from '../js/data/maps.js';
 import {
-  cabIndicators, energyBarState, formatCooldown, drawCabIndicators, drawEnergyBar, statusOnScreen,
-  CAB_STYLE, ENERGY_STYLE, CHARGED_LABELS,
+  cbaIndicators, energyBarState, formatCooldown, drawCbaIndicators, drawEnergyBar, statusOnScreen,
+  CBA_STYLE, ENERGY_STYLE, CHARGED_LABELS,
 } from '../js/game/fighter-status.js';
 import { def, DT, fakeSprites, makeFighter, duel } from './fighter-harness.mjs';
 
@@ -43,122 +43,122 @@ function recorder() {
 
 const texts = (calls, fn = 'fillText') => calls.filter((c) => c.fn === fn).map((c) => c.args[0]);
 
-const labels = (fighter) => cabIndicators(fighter).map((c) => c.label);
-// What drawCabIndicators paints for `fighter` under feet at (400, 300): each
-// ring's CAB label and its x, in drawing order.
+const labels = (fighter) => cbaIndicators(fighter).map((c) => c.label);
+// What drawCbaIndicators paints for `fighter` under feet at (400, 300): each
+// ring's CBA label and its x, in drawing order.
 const drawnRings = (fighter) => {
   const { ctx, calls } = recorder();
-  const count = drawCabIndicators(ctx, fighter, 400, 300, 1.2);
-  const rings = calls.filter((c) => c.fn === 'fillText' && /^CAB[12]$/.test(c.args[0])).map((c) => ({ label: c.args[0], x: c.args[1] }));
+  const count = drawCbaIndicators(ctx, fighter, 400, 300, 1.2);
+  const rings = calls.filter((c) => c.fn === 'fillText' && /^CBA[12]$/.test(c.args[0])).map((c) => ({ label: c.args[0], x: c.args[1] }));
   assert.equal(count, rings.length);
   return { rings, calls };
 };
 
-// ---- CAB1 / CAB2: only while cooling down ------------------------------------
+// ---- CBA1 / CBA2: only while cooling down ------------------------------------
 
-test('CAB1 and CAB2 are named after their buttons, never plain BA1 / BA2; ready, neither has any indicator at all', () => {
-  assert.deepEqual({ ...CHARGED_LABELS }, { action1: 'CAB1', action2: 'CAB2' });
+test('CBA1 and CBA2 are named after their buttons, never plain BA1 / BA2; ready, neither has any indicator at all', () => {
+  assert.deepEqual({ ...CHARGED_LABELS }, { ba1: 'CBA1', ba2: 'CBA2' });
   const { fighter } = makeFighter();
-  assert.deepEqual(Object.values(def.chargedActions).map((c) => c.id), ['ba1Clone', 'rasenRush']);
-  assert.deepEqual(cabIndicators(fighter), [], 'both ready: no entries, not ready ones made invisible');
+  assert.deepEqual(Object.values(def.chargedActions).map((c) => c.id), ['cba1', 'cba2']);
+  assert.deepEqual(cbaIndicators(fighter), [], 'both ready: no entries, not ready ones made invisible');
   const { rings, calls } = drawnRings(fighter);
   assert.deepEqual(rings, []);
   assert.deepEqual(calls, [], 'nothing under the fighter: no ring, label, number or empty slot');
-  // Each one is its own: CAB2 alone, then CAB1 alone.
-  fighter.combat.chargedCooldowns.start('rasenRush', 5);
-  assert.deepEqual(cabIndicators(fighter).map((c) => [c.label, c.id, c.action]), [['CAB2', 'rasenRush', 'action2']]);
+  // Each one is its own: CBA2 alone, then CBA1 alone.
+  fighter.combat.chargedCooldowns.start('cba2', 5);
+  assert.deepEqual(cbaIndicators(fighter).map((c) => [c.label, c.id, c.action]), [['CBA2', 'cba2', 'ba2']]);
   fighter.combat.chargedCooldowns.clear();
-  fighter.combat.chargedCooldowns.start('ba1Clone', 5);
-  assert.deepEqual(cabIndicators(fighter).map((c) => [c.label, c.id, c.action]), [['CAB1', 'ba1Clone', 'action1']]);
+  fighter.combat.chargedCooldowns.start('cba1', 5);
+  assert.deepEqual(cbaIndicators(fighter).map((c) => [c.label, c.id, c.action]), [['CBA1', 'cba1', 'ba1']]);
 });
 
 test('the rings read the real cooldowns: empty as one starts, half way at half, the seconds left counting down, gone when ready', () => {
   const { fighter } = makeFighter();
   const cd = fighter.combat.chargedCooldowns;
-  cd.start('ba1Clone', 5);
-  let [cab1, cab2] = cabIndicators(fighter);
-  assert.deepEqual([cab1.label, cab1.progress, cab1.text], ['CAB1', 0, '5.0']);
-  assert.equal(cab2, undefined, 'CAB2 is ready: absent');
+  cd.start('cba1', 5);
+  let [cba1, cba2] = cbaIndicators(fighter);
+  assert.deepEqual([cba1.label, cba1.progress, cba1.text], ['CBA1', 0, '5.0']);
+  assert.equal(cba2, undefined, 'CBA2 is ready: absent');
   for (const [dt, text, progress] of [[0.7, '4.3', 0.14], [1.8, '2.5', 0.5], [1.7, '0.8', 0.84]]) {
     cd.update(dt);
-    [cab1] = cabIndicators(fighter);
-    assert.equal(cab1.text, text);
-    assert.ok(Math.abs(cab1.progress - progress) < 1e-9, `progress = 1 - remaining / duration (${cab1.progress})`);
+    [cba1] = cbaIndicators(fighter);
+    assert.equal(cba1.text, text);
+    assert.ok(Math.abs(cba1.progress - progress) < 1e-9, `progress = 1 - remaining / duration (${cba1.progress})`);
   }
   cd.update(0.8);
-  assert.equal(cd.active('ba1Clone'), false);
-  assert.deepEqual(cabIndicators(fighter), [], 'ready: removed, not left complete');
+  assert.equal(cd.active('cba1'), false);
+  assert.deepEqual(cbaIndicators(fighter), [], 'ready: removed, not left complete');
   // Never 0.0 while still cooling down.
   assert.equal(formatCooldown(0.01), '0.1');
   assert.equal(formatCooldown(4.3), '4.3');
   assert.equal(formatCooldown(4.31), '4.4');
 });
 
-test('real Charged BA1 then Charged BA2: CAB1 appears at once, CAB2 joins it, CAB1 goes first, the last one leaves nothing', () => {
+test('real Charged BA1 then Charged BA2: CBA1 appears at once, CBA2 joins it, CBA1 goes first, the last one leaves nothing', () => {
   const d = duel({ gap: 200 });
   const f = d.attacker;
   const cd = f.combat.chargedCooldowns;
   d.tick({ charge: true });
   assert.deepEqual(labels(f), []);
-  // CAB1 used: its ring on the very step, CAB2 still absent.
-  d.tick({ charge: true, action1: true, action1Pressed: true });
+  // CBA1 used: its ring on the very step, CBA2 still absent.
+  d.tick({ charge: true, ba1: true, ba1Pressed: true });
   assert.equal(d.clones.length, 1);
-  let [cab1, cab2] = cabIndicators(f);
-  assert.deepEqual([cab1.label, cab1.text, cab1.progress], ['CAB1', '5.0', 0]);
-  assert.equal(cab2, undefined);
+  let [cba1, cba2] = cbaIndicators(f);
+  assert.deepEqual([cba1.label, cba1.text, cba1.progress], ['CBA1', '5.0', 0]);
+  assert.equal(cba2, undefined);
   assert.deepEqual(labels(d.target), [], 'the other fighter shows nothing');
   // Charge fills it faster: half a second of Charge takes a whole second off.
   for (let i = 0; i < 30; i++) d.tick({ charge: true });
-  [cab1] = cabIndicators(f);
-  assert.equal(cab1.text, '4.0');
-  assert.ok(Math.abs(cab1.progress - 0.2) < 1e-9);
-  // CAB2 used while CAB1 cools: both, side by side, CAB1 on the left.
-  d.tick({ charge: true, action2: true, action2Pressed: true });
+  [cba1] = cbaIndicators(f);
+  assert.equal(cba1.text, '4.0');
+  assert.ok(Math.abs(cba1.progress - 0.2) < 1e-9);
+  // CBA2 used while CBA1 cools: both, side by side, CBA1 on the left.
+  d.tick({ charge: true, ba2: true, ba2Pressed: true });
   assert.ok(f.technique, 'the Sphere Rush started');
-  assert.deepEqual(labels(f), ['CAB1', 'CAB2']);
+  assert.deepEqual(labels(f), ['CBA1', 'CBA2']);
   const both = drawnRings(f).rings;
-  assert.deepEqual(both.map((r) => r.label), ['CAB1', 'CAB2']);
+  assert.deepEqual(both.map((r) => r.label), ['CBA1', 'CBA2']);
   assert.ok(both[0].x < 400 && both[1].x > 400, 'side by side, centred under the fighter as a pair');
   // Every step: exactly the active cooldowns, none ever shown ready.
   const seen = [];
   for (let i = 0; i < 600 && cd.size; i++) {
     d.tick();
-    const list = cabIndicators(f);
-    assert.deepEqual(list.map((c) => c.id), ['ba1Clone', 'rasenRush'].filter((id) => cd.active(id)));
+    const list = cbaIndicators(f);
+    assert.deepEqual(list.map((c) => c.id), ['cba1', 'cba2'].filter((id) => cd.active(id)));
     for (const c of list) assert.ok(c.progress < 1 && c.text !== '0.0', `${c.label} still cooling (${c.text})`);
     const key = list.map((c) => c.label).join(' ');
     if (seen.at(-1) !== key) {
       seen.push(key);
-      if (key === 'CAB2') {
-        // CAB1 finished: only CAB1 went, and CAB2 moved to the centre.
-        assert.deepEqual(drawnRings(f).rings, [{ label: 'CAB2', x: 400 }]);
+      if (key === 'CBA2') {
+        // CBA1 finished: only CBA1 went, and CBA2 moved to the centre.
+        assert.deepEqual(drawnRings(f).rings, [{ label: 'CBA2', x: 400 }]);
       }
     }
   }
-  assert.deepEqual(seen, ['CAB1 CAB2', 'CAB2', ''], 'CAB1 first, then CAB2, then nothing');
+  assert.deepEqual(seen, ['CBA1 CBA2', 'CBA2', ''], 'CBA1 first, then CBA2, then nothing');
   assert.deepEqual(drawnRings(f).calls, [], 'all ready: no cooldown UI under the fighter');
 });
 
-test('CAB rings are white with a black outline: ring, number and label; never green; a lone ring is centred', () => {
-  assert.equal(CAB_STYLE.fill, '#ffffff');
-  assert.equal(CAB_STYLE.outline, '#000000');
+test('CBA rings are white with a black outline: ring, number and label; never green; a lone ring is centred', () => {
+  assert.equal(CBA_STYLE.fill, '#ffffff');
+  assert.equal(CBA_STYLE.outline, '#000000');
   const { fighter } = makeFighter();
-  fighter.combat.chargedCooldowns.start('rasenRush', 5);
+  fighter.combat.chargedCooldowns.start('cba2', 5);
   fighter.combat.chargedCooldowns.update(2.5);
   let { rings, calls } = drawnRings(fighter);
-  assert.deepEqual(texts(calls), ['2.5', 'CAB2'], 'CAB2 cooling (2.5 left), nothing for the ready CAB1');
-  assert.deepEqual(rings, [{ label: 'CAB2', x: 400 }], 'alone: straight under the fighter, no slot kept for CAB1');
-  for (const c of calls.filter((x) => x.fn === 'fillText')) assert.equal(c.fill, CAB_STYLE.fill, `${c.args[0]} in white`);
-  for (const c of calls.filter((x) => x.fn === 'strokeText')) assert.equal(c.stroke, CAB_STYLE.outline, `${c.args[0]} outlined in black`);
+  assert.deepEqual(texts(calls), ['2.5', 'CBA2'], 'CBA2 cooling (2.5 left), nothing for the ready CBA1');
+  assert.deepEqual(rings, [{ label: 'CBA2', x: 400 }], 'alone: straight under the fighter, no slot kept for CBA1');
+  for (const c of calls.filter((x) => x.fn === 'fillText')) assert.equal(c.fill, CBA_STYLE.fill, `${c.args[0]} in white`);
+  for (const c of calls.filter((x) => x.fn === 'strokeText')) assert.equal(c.stroke, CBA_STYLE.outline, `${c.args[0]} outlined in black`);
   assert.deepEqual(texts(calls, 'strokeText'), texts(calls), 'every text outlined');
   // Each ring: a black stroke under it wider than the ring, a faint track,
   // then the white progress arc.
   const strokes = calls.filter((c) => c.fn === 'stroke');
-  const outline = strokes.find((s) => s.stroke === CAB_STYLE.outline);
-  const ring = strokes.find((s) => s.stroke === CAB_STYLE.fill);
+  const outline = strokes.find((s) => s.stroke === CBA_STYLE.outline);
+  const ring = strokes.find((s) => s.stroke === CBA_STYLE.fill);
   assert.ok(outline && ring);
   assert.ok(outline.lineWidth > ring.lineWidth, 'the outline shows on both sides of the ring');
-  // CAB2's progress arc ends half way round, from the top.
+  // CBA2's progress arc ends half way round, from the top.
   const arcs = calls.filter((c) => c.fn === 'arc');
   const half = arcs.find((a) => Math.abs(a.args[4] - (-Math.PI / 2 + Math.PI)) < 1e-9);
   assert.ok(half, 'an arc from the top to half way');
@@ -166,12 +166,12 @@ test('CAB rings are white with a black outline: ring, number and label; never gr
   // Nothing but white, its faint track and black: no green (the old HUD
   // rings' accent) anywhere.
   const used = new Set(calls.filter((c) => ['stroke', 'fillText', 'strokeText'].includes(c.fn)).map((c) => (c.fn === 'fillText' ? c.fill : c.stroke)));
-  assert.deepEqual([...used].sort(), [CAB_STYLE.outline, CAB_STYLE.fill, CAB_STYLE.track].sort());
-  // Both cooling: one row, CAB1 left of CAB2, under the feet (y below 300).
-  fighter.combat.chargedCooldowns.start('ba1Clone', 5);
+  assert.deepEqual([...used].sort(), [CBA_STYLE.outline, CBA_STYLE.fill, CBA_STYLE.track].sort());
+  // Both cooling: one row, CBA1 left of CBA2, under the feet (y below 300).
+  fighter.combat.chargedCooldowns.start('cba1', 5);
   ({ calls } = drawnRings(fighter));
-  assert.deepEqual(texts(calls), ['5.0', 'CAB1', '2.5', 'CAB2']);
-  const [l1, l2] = calls.filter((c) => c.fn === 'fillText' && /^CAB/.test(c.args[0]));
+  assert.deepEqual(texts(calls), ['5.0', 'CBA1', '2.5', 'CBA2']);
+  const [l1, l2] = calls.filter((c) => c.fn === 'fillText' && /^CBA/.test(c.args[0]));
   assert.ok(l1.args[1] < 400 && l2.args[1] > 400, 'side by side, centred under the fighter');
   assert.ok(Math.abs((l1.args[1] + l2.args[1]) / 2 - 400) <= 1, 'the pair centred');
   assert.ok(l1.args[2] > 300 && l1.args[2] === l2.args[2], 'in one row below the feet');
@@ -180,9 +180,9 @@ test('CAB rings are white with a black outline: ring, number and label; never gr
 
 // ---- Energy bar: only while below full ------------------------------------------
 
-const HOLD = { defense: true };
+const HOLD = { shield: true };
 // Two presses of `dir`, one step apart: a Dash's double tap.
-const doubleTap = (step, dir = 'right') => {
+const doubleTap = (step, dir = 'runRight') => {
   step({ [`${dir}Pressed`]: true, [dir]: true });
   step({});
   return step({ [`${dir}Pressed`]: true, [dir]: true });
@@ -258,7 +258,7 @@ test('a fresh fighter shows no bar; a real Dash or blocked hit brings it up at o
   const d = duel();
   // Up well before the hit: an ordinary block, never a perfect one.
   for (let i = 0; i < 9; i++) d.tick({}, HOLD);
-  d.tick({ action1: true, action1Pressed: true }, HOLD);
+  d.tick({ ba1: true, ba1Pressed: true }, HOLD);
   for (let i = 0; i < 30 && !d.events.length; i++) d.tick({}, HOLD);
   assert.equal(d.events[0].type, 'block');
   for (const [label, fighter, step] of [['Dash', dashed.fighter, dashed.step], ['block', d.target, (held) => d.tick({}, held)]]) {
@@ -288,10 +288,10 @@ test('Charge only fills the bar faster: it still shows until full, and hides at 
 test('the gray exhaustion cycle: a Dash with too little left empties it, gray through 25, 75 and 99, gone only when full', () => {
   const { fighter, step } = makeFighter();
   const c = fighter.combat;
-  step({ rightPressed: true, right: true });
+  step({ runRightPressed: true, runRight: true });
   step({});
   c.setEnergy(8);
-  step({ rightPressed: true, right: true });
+  step({ runRightPressed: true, runRight: true });
   assert.ok(fighter.dash, 'a Dash on 8, though it costs 15');
   assert.equal(c.energy, 0);
   assert.equal(c.energyExhausted, true);
@@ -341,31 +341,31 @@ function renderedBattle() {
   return { battle, render };
 }
 
-test('in play: nothing over or under a fighter with full Energy and both CABs ready; its bar over its tag and rings under its feet once they show, drawn after the Void', () => {
+test('in play: nothing over or under a fighter with full Energy and both CBAs ready; its bar over its tag and rings under its feet once they show, drawn after the Void', () => {
   const { battle, render } = renderedBattle();
   const { p1, p2 } = battle;
-  // A fighter's bar: its black outline fillRect (the CAB rings are strokes
+  // A fighter's bar: its black outline fillRect (the CBA rings are strokes
   // and text).
   const bars = (calls) => calls.filter((c) => c.fn === 'fillRect' && c.fill === ENERGY_STYLE.outline);
   const purple = (calls) => calls.filter((c) => c.fn === 'fillRect' && c.fill === ENERGY_STYLE.fill);
   let calls = render();
   assert.deepEqual(bars(calls), [], 'full: no bars');
-  assert.ok(!texts(calls).some((t) => /^CAB/.test(t)), 'all ready: no rings');
+  assert.ok(!texts(calls).some((t) => /^CBA/.test(t)), 'all ready: no rings');
   assert.deepEqual(texts(calls).sort(), ['CPU', 'P1'], 'only the name tags');
   // Nothing kept above the tag for a hidden bar.
   for (const f of [p1, p2]) assert.equal(battle.statusTop(f), battle.markerTop(f));
-  // P1 spends Energy and uses CAB1: its bar and CAB1, nothing more; the
+  // P1 spends Energy and uses CBA1: its bar and CBA1, nothing more; the
   // CPU still shows neither.
   p1.combat.setEnergy(75);
-  p1.combat.chargedCooldowns.start('ba1Clone', 5);
+  p1.combat.chargedCooldowns.start('cba1', 5);
   calls = render();
   const at = (pred) => calls.findIndex(pred);
   const voidAt = at((c) => c.fn === 'void');
   assert.equal(bars(calls).length, 1, 'P1\'s bar only');
   assert.equal(purple(calls).length, 1);
   assert.ok(at((c) => c.fn === 'fillRect' && c.fill === ENERGY_STYLE.fill) > voidAt, 'over the Void');
-  assert.ok(at((c) => c.fn === 'fillText' && c.args[0] === 'CAB1') > voidAt);
-  assert.deepEqual(texts(calls).filter((t) => /^CAB/.test(t)), ['CAB1'], 'P1\'s CAB1 only');
+  assert.ok(at((c) => c.fn === 'fillText' && c.args[0] === 'CBA1') > voidAt);
+  assert.deepEqual(texts(calls).filter((t) => /^CBA/.test(t)), ['CBA1'], 'P1\'s CBA1 only');
   // Stacked: bar, then the tag, then the fighter; the ring below its feet.
   const bar = battle.energyBarRect(p1);
   const [x, , footY] = battle.markerAnchor(p1);
@@ -378,7 +378,7 @@ test('in play: nothing over or under a fighter with full Energy and both CABs re
   assert.equal(battle.statusTop(p2), battle.markerTop(p2));
   const tag = calls.find((c) => c.fn === 'fillText' && c.args[0] === p1.label);
   assert.ok(tag.args[2] > bar.y + bar.h, 'P1\'s tag under its bar');
-  const label = calls.find((c) => c.fn === 'fillText' && c.args[0] === 'CAB1');
+  const label = calls.find((c) => c.fn === 'fillText' && c.args[0] === 'CBA1');
   assert.ok(label.args[2] > footY, 'the ring under the feet');
   assert.ok(Math.abs(label.args[1] - x) <= 1, 'alone: centred under the fighter');
   // The bar follows the interpolated position, not the raw body.
@@ -396,7 +396,7 @@ test('no bar, rings or tag for a fighter out of play (waiting to respawn); back,
   const barsDrawn = (calls) => calls.filter((c) => c.fn === 'fillRect' && c.fill === ENERGY_STYLE.outline);
   const spend = (f) => {
     f.combat.setEnergy(50);
-    f.combat.chargedCooldowns.start('ba1Clone', 5);
+    f.combat.chargedCooldowns.start('cba1', 5);
   };
   spend(p1);
   spend(p2);
@@ -406,25 +406,25 @@ test('no bar, rings or tag for a fighter out of play (waiting to respawn); back,
   assert.equal(p2.lostToVoid, true);
   let calls = render();
   assert.equal(barsDrawn(calls).length, 1, 'Player 1\'s only');
-  assert.equal(texts(calls).filter((t) => t === 'CAB1').length, 1);
+  assert.equal(texts(calls).filter((t) => t === 'CBA1').length, 1);
   assert.ok(!texts(calls).includes('CPU'), 'no tag either');
   // Back after its wait: full Energy and every cooldown ready, so only its
   // tag shows.
   for (let i = 0; i < 120; i++) battle.update(DT);
   assert.equal(p2.lostToVoid, false);
   assert.equal(p2.combat.energy, p2.combat.maxEnergy);
-  assert.deepEqual(cabIndicators(p2), []);
+  assert.deepEqual(cbaIndicators(p2), []);
   assert.equal(energyBarState(p2).visible, false);
   calls = render();
   assert.ok(texts(calls).includes('CPU'));
-  assert.equal(texts(calls).filter((t) => t === 'CAB1').length, 1, 'P1\'s CAB1, still cooling');
+  assert.equal(texts(calls).filter((t) => t === 'CBA1').length, 1, 'P1\'s CBA1, still cooling');
   assert.equal(barsDrawn(calls).length, 1, 'P1\'s bar, still refilling');
   // Off screen, with something to show: the tag's edge pointer only.
   spend(p2);
   p2.renderX = battle.view.x + battle.view.w + 400;
   calls = render();
   assert.equal(barsDrawn(calls).length, 1);
-  assert.equal(texts(calls).filter((t) => t === 'CAB1').length, 1);
+  assert.equal(texts(calls).filter((t) => t === 'CBA1').length, 1);
   assert.ok(texts(calls).includes('CPU'), 'the edge pointer still names it');
   assert.ok(p1.combat.energy < p1.combat.maxEnergy);
   const view = { pxW: 1280, pxH: 720 };
@@ -436,7 +436,7 @@ test('no bar, rings or tag for a fighter out of play (waiting to respawn); back,
 
 test('the rings and bar are canvas-drawn, never DOM in a HUD card', () => {
   const hud = readFileSync(new URL('../js/game/hud.js', import.meta.url), 'utf8').replace(/^\s*\/\/.*$/gm, '');
-  assert.doesNotMatch(hud, /CAB|cooldown|chargedCooldowns/i, 'the HUD knows nothing of them');
+  assert.doesNotMatch(hud, /CBA|cooldown|chargedCooldowns/i, 'the HUD knows nothing of them');
   const status = readFileSync(new URL('../js/game/fighter-status.js', import.meta.url), 'utf8');
   assert.doesNotMatch(status, /document\.|createElement/, 'no DOM');
   assert.doesNotMatch(status, /stamina/i, 'Energy, never the old Stamina');

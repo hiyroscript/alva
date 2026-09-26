@@ -8,10 +8,10 @@
 // character (`summons`):
 //
 //   summons: {
-//     ba1Clone: {
+//     cba1: {
 //       attack: 'ba1', cloud: 'cloneCloud', cooldown: 5,
 //       behindDistance: 48, effectOffset: { x: 0, y: -44 },
-//       noGround: { attack: 'midairBa2', offset: { x: 0, y: -36 } },
+//       noGround: { attack: 'maba2', offset: { x: 0, y: -36 } },
 //     },
 //   },
 //

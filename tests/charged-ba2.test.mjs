@@ -33,15 +33,15 @@ import { resolveLaunchStun } from '../js/game/combat.js';
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
 const CHARGE = { charge: true };
-const BA1 = { action1: true, action1Pressed: true };
-const BA2 = { action2: true, action2Pressed: true };
-const THROW = { primary: true, primaryPressed: true };
+const BA1 = { ba1: true, ba1Pressed: true };
+const BA2 = { ba2: true, ba2Pressed: true };
+const THROW = { uniqueba: true, uniquebaPressed: true };
 const JUMP = { jump: true, jumpPressed: true };
-const DEFENSE = { defense: true, defensePressed: true };
+const SHIELD = { shield: true, shieldPressed: true };
 const CHARGED_BA1 = { ...CHARGE, ...BA1 };
 const CHARGED_BA2 = { ...CHARGE, ...BA2 };
 
-const TECH = def.chargedTechniques.rasenRush;
+const TECH = def.chargedTechniques.cba2;
 const RASEN = Array.from({ length: 12 }, (_, i) => `0001_rasen${i + 1}.png`);
 const PRASEN = Array.from({ length: 11 }, (_, i) => `0001_prasen${i + 1}.png`);
 const NEW_FILES = [...RASEN, ...PRASEN];
@@ -258,8 +258,8 @@ test('prasen1-11 are three direction-neutral sphere effects: build 1-6 once, imp
   assert.ok(close(pass('rasenSphereBuild'), 0.5));
   assert.ok(close(pass('rasenSphereImpact'), 0.25));
   assert.ok(close(pass('rasenSphereExplosion'), 1 / 6));
-  assert.equal(def.projectiles.rasenRush, undefined);
-  assert.equal(def.summons.rasenRush, undefined);
+  assert.equal(def.projectiles.cba2, undefined);
+  assert.equal(def.summons.cba2, undefined);
 });
 
 // A decoded-image stand-in: `artW` x `artH` art pixels, each a `px` x `px`
@@ -366,20 +366,20 @@ test('SpriteSet normalizes rasen as fighter poses and prasen as effects at their
 
 test('charged actions are typed: Charged BA1 is the Clone summon, Charged BA2 the Sphere Rush technique', () => {
   assert.deepEqual(def.chargedActions, {
-    action1: { type: 'summon', id: 'ba1Clone' },
-    action2: { type: 'technique', id: 'rasenRush' },
+    ba1: { type: 'summon', id: 'cba1' },
+    ba2: { type: 'technique', id: 'cba2' },
   });
   // The normal buttons are untouched.
-  assert.deepEqual(def.actions.action2, { ground: 'ba2', air: 'midairBa2' });
-  assert.deepEqual(def.actions.action1, { ground: 'ba1', air: 'midairBa1' });
+  assert.deepEqual(def.actions.ba2, { ground: 'ba2', air: 'maba2' });
+  assert.deepEqual(def.actions.ba1, { ground: 'ba1', air: 'maba1' });
   // The Sphere Rush is its own data: not an attack, summon or projectile.
-  assert.equal(def.attacks.rasenRush, undefined);
-  assert.equal(def.summons.rasenRush, undefined);
-  assert.equal(def.projectiles.rasenRush, undefined);
+  assert.equal(def.attacks.cba2, undefined);
+  assert.equal(def.summons.cba2, undefined);
+  assert.equal(def.projectiles.cba2, undefined);
   const { fighter } = makeFighter();
-  assert.ok(fighter.techniqueDefs.rasenRush);
-  assert.ok(Object.isFrozen(fighter.techniqueDefs.rasenRush));
-  assert.deepEqual(Object.keys(fighter.summonDefs), ['ba1Clone']);
+  assert.ok(fighter.techniqueDefs.cba2);
+  assert.ok(Object.isFrozen(fighter.techniqueDefs.cba2));
+  assert.deepEqual(Object.keys(fighter.summonDefs), ['cba1']);
 });
 
 test('the Sphere Rush data: 1050 dash, a contact that only binds, +1 every 0.5 s, a 10 blast, 2.0 s delay, a 5 s cooldown, and normal BA2 is unchanged', () => {
@@ -449,7 +449,7 @@ test('Charge, then BA2 while still charging: the Sphere Rush starts on rasen1 an
   d.tick(CHARGED_BA2);
   const t = d.attacker.technique;
   assert.ok(t instanceof ChargedTechnique);
-  assert.equal(t.def.id, 'rasenRush');
+  assert.equal(t.def.id, 'cba2');
   assert.equal(t.phase, 'form');
   assert.equal(d.attacker.state, 'technique');
   assert.equal(d.attacker.charging, false, 'left Charge');
@@ -460,16 +460,16 @@ test('Charge, then BA2 while still charging: the Sphere Rush starts on rasen1 an
   assert.equal(name(t.sphereFrame), '0001_prasen1.png');
   assert.equal(t.sphereOwner, 'fighter');
   const cd = d.attacker.combat.chargedCooldowns;
-  assert.deepEqual([cd.remaining('rasenRush'), cd.duration('rasenRush')], [5, 5]);
-  assert.equal(cd.active('ba1Clone'), false, 'Charged BA1 stays ready');
-  assert.equal(d.attacker.combat.lastIntent, 'action2');
+  assert.deepEqual([cd.remaining('cba2'), cd.duration('cba2')], [5, 5]);
+  assert.equal(cd.active('cba1'), false, 'Charged BA1 stays ready');
+  assert.equal(d.attacker.combat.lastIntent, 'ba2');
   assert.deepEqual(d.clones, []);
   assert.deepEqual(d.projectiles, []);
   assert.deepEqual(d.events, []);
   assert.equal(d.attacker.canAct(), false, 'the technique owns the fighter');
 
   // Holding BA2 (no new press) never restarts it.
-  d.tick({ ...CHARGE, action2: true });
+  d.tick({ ...CHARGE, ba2: true });
   assert.equal(d.attacker.technique, t);
   assert.equal(frameName(d.attacker), '0001_rasen1.png');
 });
@@ -491,7 +491,7 @@ test('letting go of Charge on the BA2 step is an ordinary BA2: no technique, no 
   const d = duel();
   for (let i = 0; i < 20; i++) d.tick(CHARGE);
   assert.equal(d.attacker.animator.anim.key, 'chargeLoop');
-  d.tick(BA2); // charge: false with action2Pressed: true
+  d.tick(BA2); // charge: false with ba2Pressed: true
   assert.equal(d.attacker.technique, null);
   assert.equal(d.attacker.combat.attack.def.id, 'ba2');
   assert.equal(frameName(d.attacker), '0001_2ba1.png', 'straight into BA2');
@@ -580,7 +580,7 @@ test('the dash: rasen4 -> rasen6 at a fixed 1050 in the locked facing, the compl
     const t = start(d);
     runUntil(d, () => t.phase === 'dash');
     const log = [snap(d.attacker)];
-    const noise = [{ left: true }, { right: true }, JUMP, DEFENSE, BA1, THROW, CHARGED_BA1, { right: true, left: false }];
+    const noise = [{ runLeft: true }, { runRight: true }, JUMP, SHIELD, BA1, THROW, CHARGED_BA1, { runRight: true, runLeft: false }];
     log.push(...runUntil(d, () => !d.attacker.technique, (i) => noise[i % noise.length]));
     const dash = log.filter((s) => s.phase === 'dash');
     assert.equal(dash.length, DASH_STEPS, 'one pass of rasenDash (0.25 s)');
@@ -600,7 +600,7 @@ test('the dash: rasen4 -> rasen6 at a fixed 1050 in the locked facing, the compl
 // ---- Miss -------------------------------------------------------------------------
 
 test('a clean miss: the rush stops, #0001 lets go on rasen12 alone for one frame, then is free; no hit, bind, impact or blast', () => {
-  const noise = [{ right: true }, { left: true }, JUMP, BA1, BA2, CHARGED_BA2, THROW, DEFENSE];
+  const noise = [{ runRight: true }, { runLeft: true }, JUMP, BA1, BA2, CHARGED_BA2, THROW, SHIELD];
   for (const facing of [1, -1]) {
     // `mash`: buttons pressed on every step of the release.
     const rush = (mash) => {
@@ -648,9 +648,9 @@ test('a clean miss: the rush stops, #0001 lets go on rasen12 alone for one frame
     const x = d.attacker.body.x;
     d.tick();
     assert.equal(d.attacker.body.x, x);
-    d.tick({ right: true });
+    d.tick({ runRight: true });
     assert.ok(d.attacker.body.vx > 0, 'free to move again');
-    assert.ok(d.attacker.combat.chargedCooldowns.active('rasenRush'), 'the whiff still spent the cooldown');
+    assert.ok(d.attacker.combat.chargedCooldowns.active('cba2'), 'the whiff still spent the cooldown');
   }
 });
 
@@ -663,7 +663,7 @@ test('a hit: exactly one contact that adds nothing, its first tick on the same s
   const [event, tick] = d.events;
   assert.equal(event.type, 'hit');
   assert.equal(event.damage, 0, 'no large contact hit');
-  assert.equal(event.move, 'rasenRush.firstHit');
+  assert.equal(event.move, 'cba2.firstHit');
   assert.equal(event.attacker, d.attacker);
   assert.equal(event.target, d.target);
   assert.equal(event.technique, t);
@@ -671,7 +671,7 @@ test('a hit: exactly one contact that adds nothing, its first tick on the same s
   assert.equal(event.projectile, null);
   assert.deepEqual([event.launchPointBefore, event.launchPointAfter], [0, 0]);
   // The first tick lands on the contact's own step, straight after it.
-  assert.equal(tick.move, 'rasenRush.tickHit');
+  assert.equal(tick.move, 'cba2.tickHit');
   assert.equal(tick.damage, 1);
   assert.equal(tick.technique, t);
   assert.deepEqual([tick.launchPointBefore, tick.launchPointAfter], [0, 1]);
@@ -715,7 +715,7 @@ test('on the very step the sphere first hits, the target already shows Hurt, bou
   // The contact step itself, with its own tick: the target on screen is
   // already the caught one.
   assert.equal(d.target.combat.launchPoint, 1);
-  assert.deepEqual(d.events.map((e) => e.move), ['rasenRush.firstHit', 'rasenRush.tickHit']);
+  assert.deepEqual(d.events.map((e) => e.move), ['cba2.firstHit', 'cba2.tickHit']);
   assert.equal(t.phase, 'confirm');
   assert.equal(d.target.combat.isBoundBy(t), true);
   assert.equal(d.target.state, 'hitstun');
@@ -870,7 +870,7 @@ test('the explosion comes exactly 2.0 s after the hit step on rasen9: prasen10 -
   const blast = d.events.at(-1);
   assert.equal(blast.type, 'hit');
   assert.equal(blast.damage, 10);
-  assert.equal(blast.move, 'rasenRush.explosionHit');
+  assert.equal(blast.move, 'cba2.explosionHit');
   assert.equal(blast.technique, t);
   assert.equal(d.target.combat.launchPoint, 14, '4 ticks, then 10');
   // Released before the launch, so it is intact: 4 + 10 = 14 first, then
@@ -932,8 +932,8 @@ test('a full Sphere Rush from 0: nothing from the contact itself, +1 on its step
   for (let i = 0; i < steps(1); i++) d.tick();
   assert.deepEqual(d.events.map((e) => [e.type, e.damage]), FULL_RUSH);
   assert.deepEqual(d.events.map((e) => e.move), [
-    'rasenRush.firstHit', 'rasenRush.tickHit', 'rasenRush.tickHit', 'rasenRush.tickHit', 'rasenRush.tickHit',
-    'rasenRush.explosionHit',
+    'cba2.firstHit', 'cba2.tickHit', 'cba2.tickHit', 'cba2.tickHit', 'cba2.tickHit',
+    'cba2.explosionHit',
   ]);
   assert.ok(d.events.every((e) => e.technique && e.attacker === d.attacker && e.target === d.target));
   assert.equal(d.target.combat.launchPoint, 14);
@@ -954,8 +954,8 @@ function tickSteps(d, t, held = () => ({})) {
     const before = d.events.length;
     d.tick(held(i));
     for (const e of d.events.slice(before)) {
-      if (e.move === 'rasenRush.tickHit') out.ticks.push(i);
-      if (e.move === 'rasenRush.explosionHit') out.explosions.push(i);
+      if (e.move === 'cba2.tickHit') out.ticks.push(i);
+      if (e.move === 'cba2.explosionHit') out.explosions.push(i);
     }
   }
   return out;
@@ -965,7 +965,7 @@ test('while bound: one 1-damage tick on the contact step itself, then one every 
   const d = hitDuel();
   const t = hitConfirm(d);
   // The contact step: the setup hit (0), then exactly one tick (1), no more.
-  assert.deepEqual(d.events.map((e) => [e.move, e.damage]), [['rasenRush.firstHit', 0], ['rasenRush.tickHit', 1]]);
+  assert.deepEqual(d.events.map((e) => [e.move, e.damage]), [['cba2.firstHit', 0], ['cba2.tickHit', 1]]);
   assert.equal(d.target.combat.launchPoint, 1);
   assert.equal(d.target.combat.isBoundBy(t), true);
   assert.equal(t.ticks, 1);
@@ -1005,7 +1005,7 @@ test('a tick adds 1 Launch Point and nothing else: no launch, no stun or freeze,
   const { x, y } = d.target.body;
   d.tick();
   const tick = d.events.at(-1);
-  assert.equal(tick.move, 'rasenRush.tickHit');
+  assert.equal(tick.move, 'cba2.tickHit');
   assert.deepEqual([tick.damage, tick.launchPointBefore, tick.launchPointAfter], [1, 1, 2]);
   assert.deepEqual([tick.baseLaunch, tick.directionalLaunch, tick.launchStrength], [0, null, 0]);
   assert.deepEqual(tick.finalLaunch, { x: 0, y: 0 });
@@ -1041,7 +1041,7 @@ test('the blast adds its 10 first, then launches at exactly 3 x the new Launch P
     const t = hitConfirm(d);
     while (t.phase !== 'explode') d.tick();
     const blast = d.events.at(-1);
-    assert.equal(blast.move, 'rasenRush.explosionHit');
+    assert.equal(blast.move, 'cba2.explosionHit');
     return { blast, vx: d.target.body.vx, vy: d.target.body.vy, k: d.target.combat.launchPoint };
   };
   for (const facing of [1, -1]) {
@@ -1117,12 +1117,12 @@ test('the Void stops the ticks: a caught target lost to it takes nothing more', 
 
 test('Charged BA2 is ready at first; starting it spends 5.0 s whatever happens next: a hit, a miss, a wall or an interruption', () => {
   const fresh = duel();
-  assert.equal(fresh.attacker.combat.chargedCooldowns.active('rasenRush'), false, 'initially ready');
-  const spent = (d) => d.attacker.combat.chargedCooldowns.active('rasenRush');
+  assert.equal(fresh.attacker.combat.chargedCooldowns.active('cba2'), false, 'initially ready');
+  const spent = (d) => d.attacker.combat.chargedCooldowns.active('cba2');
   // A hit, run to the end.
   const hit = hitDuel();
   start(hit);
-  assert.equal(hit.attacker.combat.chargedCooldowns.remaining('rasenRush'), 5);
+  assert.equal(hit.attacker.combat.chargedCooldowns.remaining('cba2'), 5);
   hit.until(() => !hit.attacker.technique);
   assert.ok(spent(hit), 'a hit');
   // A whiff.
@@ -1132,8 +1132,8 @@ test('Charged BA2 is ready at first; starting it spends 5.0 s whatever happens n
   assert.ok(spent(miss), 'a miss');
   // Blocked by a Shield.
   const shielded = hitDuel();
-  const ts = start(shielded, { defense: true });
-  runUntil(shielded, () => !shielded.attacker.technique, () => ({}), () => ({ defense: true }));
+  const ts = start(shielded, { shield: true });
+  runUntil(shielded, () => !shielded.attacker.technique, () => ({}), () => ({ shield: true }));
   assert.equal(ts.endReason, 'blocked');
   assert.ok(spent(shielded), 'blocked');
   // Interrupted during formation.
@@ -1144,7 +1144,7 @@ test('Charged BA2 is ready at first; starting it spends 5.0 s whatever happens n
   assert.equal(tc.endReason, 'hit');
   assert.ok(spent(cut), 'interrupted');
   // Each spends its own cooldown only.
-  for (const d of [hit, miss, shielded, cut]) assert.equal(d.attacker.combat.chargedCooldowns.active('ba1Clone'), false);
+  for (const d of [hit, miss, shielded, cut]) assert.equal(d.attacker.combat.chargedCooldowns.active('cba1'), false);
 });
 
 test('Charged BA2 cannot restart while cooling down: the press does nothing, and it is ready again after 5 s', () => {
@@ -1156,16 +1156,16 @@ test('Charged BA2 cannot restart while cooling down: the press does nothing, and
   d.tick();
   d.tick(CHARGE);
   d.tick(CHARGE);
-  const before = cd.remaining('rasenRush');
+  const before = cd.remaining('cba2');
   d.tick(CHARGED_BA2);
   assert.equal(d.attacker.technique, null);
   assert.equal(d.attacker.combat.attack, null, 'no ordinary BA2 in its place');
   assert.equal(d.attacker.state, 'charge');
-  assert.ok(cd.remaining('rasenRush') < before, 'the cooldown runs on, never restarted');
+  assert.ok(cd.remaining('cba2') < before, 'the cooldown runs on, never restarted');
   // Let go: at the normal rate it is ready exactly 5 s after the start.
-  const used = 5 - cd.remaining('rasenRush');
+  const used = 5 - cd.remaining('cba2');
   let n = 0;
-  while (cd.active('rasenRush')) {
+  while (cd.active('cba2')) {
     d.tick();
     n++;
   }
@@ -1184,8 +1184,8 @@ test('a bound target can neither move, jump, charge, throw, attack, shield nor t
   const x = target.body.x;
   const facing = target.facing;
   const presses = [
-    { left: true }, { right: true }, JUMP, CHARGE, BA1, BA2, THROW, DEFENSE,
-    { ...CHARGE, left: true }, CHARGED_BA1, CHARGED_BA2, { ...DEFENSE, right: true }, { dropPressed: true },
+    { runLeft: true }, { runRight: true }, JUMP, CHARGE, BA1, BA2, THROW, SHIELD,
+    { ...CHARGE, runLeft: true }, CHARGED_BA1, CHARGED_BA2, { ...SHIELD, runRight: true }, { dropPressed: true },
   ];
   for (let i = 0; t.phase !== 'explode'; i++) {
     d.tick({}, presses[i % presses.length]);
@@ -1210,7 +1210,7 @@ test('a bound target can neither move, jump, charge, throw, attack, shield nor t
   // Released and recovered, it moves again.
   d.until(() => target.combat.stun <= 0 && target.grounded && target.combat.hitstop <= 0);
   const before = target.body.x;
-  for (let i = 0; i < 10; i++) d.tick({}, { right: true });
+  for (let i = 0; i < 10; i++) d.tick({}, { runRight: true });
   assert.ok(target.body.x > before);
 });
 
@@ -1243,7 +1243,7 @@ test('#0001 stays committed through the wait: no run, attack, clone, Shield, Thr
   const t = hitConfirm(d);
   const x = d.attacker.body.x;
   const presses = [
-    { right: true }, { left: true }, JUMP, BA1, BA2, CHARGED_BA1, CHARGED_BA2, THROW, DEFENSE, CHARGE, { ...CHARGE, left: true },
+    { runRight: true }, { runLeft: true }, JUMP, BA1, BA2, CHARGED_BA1, CHARGED_BA2, THROW, SHIELD, CHARGE, { ...CHARGE, runLeft: true },
   ];
   for (let i = 0; t.phase !== 'explode'; i++) {
     d.tick(presses[i % presses.length]);
@@ -1257,7 +1257,7 @@ test('#0001 stays committed through the wait: no run, attack, clone, Shield, Thr
   }
   assert.deepEqual(d.clones, []);
   assert.deepEqual(d.projectiles, []);
-  assert.equal(d.attacker.combat.chargedCooldowns.active('ba1Clone'), false, 'no clone either');
+  assert.equal(d.attacker.combat.chargedCooldowns.active('cba1'), false, 'no clone either');
 });
 
 test('once it is over, a Charge still held does not charge again until it is let go and held anew', () => {
@@ -1324,7 +1324,7 @@ test('ground lost during formation cancels it: no sphere, no hit, and #0001 fall
   assert.equal(d.attacker.body.y, 800, 'down to the floor, no invisible platform');
   assert.deepEqual(d.events, []);
   assert.equal(d.target.combat.launchPoint, 0);
-  assert.ok(d.attacker.combat.chargedCooldowns.active('rasenRush'), 'the cooldown is spent all the same');
+  assert.ok(d.attacker.combat.chargedCooldowns.active('cba2'), 'the cooldown is spent all the same');
 });
 
 test('dashing off a ledge ends the rush on that step: the sphere is gone and #0001 falls from where he is', () => {
@@ -1465,13 +1465,13 @@ function contactStep(extra = {}) {
 
 test('a Shield blocks the contact: 25 Energy, no Launch Point, no bind, no tick, no explosion, and the rush ends cleanly', () => {
   const d = hitDuel();
-  const t = start(d, { defense: true });
-  const log = [snap(d.attacker), ...runUntil(d, () => !d.attacker.technique, () => ({}), () => ({ defense: true }))];
+  const t = start(d, { shield: true });
+  const log = [snap(d.attacker), ...runUntil(d, () => !d.attacker.technique, () => ({}), () => ({ shield: true }))];
   assert.equal(t.endReason, 'blocked');
   assert.equal(d.events.length, 1, 'the contact only: no tick on its step');
   const [event] = d.events;
   assert.equal(event.type, 'block');
-  assert.equal(event.move, 'rasenRush.firstHit');
+  assert.equal(event.move, 'cba2.firstHit');
   assert.equal(event.technique, t);
   assert.equal(event.damage, 0);
   assert.equal(event.energyCost, 25);
@@ -1487,18 +1487,18 @@ test('a Shield blocks the contact: 25 Energy, no Launch Point, no bind, no tick,
   assert.equal(d.attacker.technique, null);
   assert.equal(d.attacker.state, 'idle');
   assert.equal(d.attacker.canAct(), true);
-  for (let i = 0; i < DELAY_STEPS + 20; i++) d.tick({}, { defense: true });
+  for (let i = 0; i < DELAY_STEPS + 20; i++) d.tick({}, { shield: true });
   assert.equal(d.events.length, 1, 'no ticks or delayed explosion');
   assert.equal(d.target.combat.launchPoint, 0);
-  d.tick({ right: true });
+  d.tick({ runRight: true });
   assert.ok(d.attacker.body.vx > 0, 'free to move');
 });
 
 test('the Shield blocks the rush from behind, when raised just before it lands, and with too little Energy (emptying it); exhausted, the rush binds', () => {
   // From behind: the Shield is all round.
   const behind = hitDuel({ targetFacing: 1 });
-  const t = start(behind, { defense: true });
-  runUntil(behind, () => !behind.attacker.technique, () => ({}), () => ({ defense: true }));
+  const t = start(behind, { shield: true });
+  runUntil(behind, () => !behind.attacker.technique, () => ({}), () => ({ shield: true }));
   assert.equal(t.endReason, 'blocked');
   assert.equal(behind.events[0].type, 'block');
   // Raised on the step before the contact.
@@ -1506,7 +1506,7 @@ test('the Shield blocks the rush from behind, when raised just before it lands, 
   assert.equal(C, FORM_STEPS + 11, 'contact on the second rasen6 step');
   const late = duel({ gap: 250, pushboxes: true });
   const u = start(late);
-  runUntil(late, () => !late.attacker.technique, () => ({}), (i) => (i + 2 >= C - 1 ? { defense: true } : {}));
+  runUntil(late, () => !late.attacker.technique, () => ({}), (i) => (i + 2 >= C - 1 ? { shield: true } : {}));
   assert.equal(u.endReason, 'blocked');
   assert.equal(late.target.combat.immobilized, false);
   // 20 Energy (and no refill over the rush): the block still stands, and
@@ -1514,8 +1514,8 @@ test('the Shield blocks the rush from behind, when raised just before it lands, 
   const NO_REGEN = { ...def, energy: { ...def.energy, regen: 0 } };
   const low = hitDuel({ targetCharacter: NO_REGEN });
   low.target.combat.setEnergy(20);
-  const w = start(low, { defense: true });
-  runUntil(low, () => !low.attacker.technique, () => ({}), () => ({ defense: true }));
+  const w = start(low, { shield: true });
+  runUntil(low, () => !low.attacker.technique, () => ({}), () => ({ shield: true }));
   assert.equal(w.endReason, 'blocked');
   assert.deepEqual([low.events[0].type, low.events[0].energyCost], ['block', 20]);
   assert.deepEqual([low.target.combat.energy, low.target.combat.energyExhausted], [0, true]);
@@ -1524,8 +1524,8 @@ test('the Shield blocks the rush from behind, when raised just before it lands, 
   // Exhausted: no Shield at all, a normal catch.
   const spent = hitDuel({ targetCharacter: NO_REGEN });
   spent.target.combat.setEnergy(0);
-  const v = start(spent, { defense: true });
-  runUntil(spent, () => v.phase !== 'form' && v.phase !== 'dash', () => ({}), () => ({ defense: true }));
+  const v = start(spent, { shield: true });
+  runUntil(spent, () => v.phase !== 'form' && v.phase !== 'dash', () => ({}), () => ({ shield: true }));
   assert.equal(v.phase, 'confirm');
   assert.deepEqual(spent.events.map((e) => e.type), ['hit', 'hit'], 'the contact and its tick');
   assert.equal(spent.target.combat.immobilized, true);
@@ -1543,7 +1543,7 @@ test('a target caught in the air stays locked but keeps falling under gravity, t
   assert.equal(d.target.combat.immobilized, true);
   const ys = [];
   while (!d.target.grounded) {
-    d.tick({}, { left: true, jump: true });
+    d.tick({}, { runLeft: true, jump: true });
     ys.push(d.target.body.y);
     const [cx, cy] = t.sphereCenter();
     assert.equal(cx, d.target.body.x);
@@ -1604,7 +1604,7 @@ test('a solid wall stops the rush: no pass-through, no hit behind it, and #0001 
   assert.equal(log.at(-2).frame, WHIFF_POSE);
   assert.deepEqual(d.events, []);
   assert.equal(d.target.combat.launchPoint, 0);
-  assert.ok(d.attacker.combat.chargedCooldowns.active('rasenRush'), 'a wall still spends the cooldown');
+  assert.ok(d.attacker.combat.chargedCooldowns.active('cba2'), 'a wall still spends the cooldown');
   assert.equal(d.attacker.state, 'idle');
   assert.equal(t.sphereFrame, null);
   // The main floor's edge is no wall: the rush carries #0001 off it, which
@@ -1640,34 +1640,34 @@ test('each missing fighter clip or sphere effect refuses the Sphere Rush: normal
     assert.equal(d.attacker.combat.attack?.def.id, 'ba2', `${key}: the same press is a normal BA2`);
     assert.equal(frameName(d.attacker), '0001_2ba1.png');
     assert.equal(warnings.length, 1, key);
-    assert.match(warnings[0], new RegExp(`rasenRush.*"${key}" has no animation frames`));
+    assert.match(warnings[0], new RegExp(`cba2.*"${key}" has no animation frames`));
     d.until(() => !d.attacker.combat.attack);
     assert.ok(d.events.every((e) => e.technique === null && e.damage === 5), `${key}: only BA2's own hit`);
     assert.equal(d.target.combat.immobilized, false);
-    assert.equal(d.attacker.combat.chargedCooldowns.active('rasenRush'), false, `${key}: no cooldown for a technique that never started`);
+    assert.equal(d.attacker.combat.chargedCooldowns.active('cba2'), false, `${key}: no cooldown for a technique that never started`);
   }
   // Bad data is refused the same way.
-  const bad = { ...def, chargedTechniques: { rasenRush: { ...TECH, dashSpeed: 0 } } };
+  const bad = { ...def, chargedTechniques: { cba2: { ...TECH, dashSpeed: 0 } } };
   const d = duel();
-  d.attacker.techniqueDefs.rasenRush = makeFighter({ character: bad }).fighter.techniqueDefs.rasenRush;
+  d.attacker.techniqueDefs.cba2 = makeFighter({ character: bad }).fighter.techniqueDefs.cba2;
   const warnings = captureWarnings(() => {
     d.tick(CHARGE);
     d.tick(CHARGED_BA2);
   });
   assert.equal(d.attacker.technique, null);
   assert.equal(d.attacker.combat.attack?.def.id, 'ba2');
-  assert.match(warnings[0], /rasenRush.*dashSpeed/);
+  assert.match(warnings[0], /cba2.*dashSpeed/);
   // So is a sphere that would shrink.
-  const shrinking = { ...def, chargedTechniques: { rasenRush: { ...TECH, sphereGrowth: { startScale: 1.2, endScale: 1 } } } };
+  const shrinking = { ...def, chargedTechniques: { cba2: { ...TECH, sphereGrowth: { startScale: 1.2, endScale: 1 } } } };
   const e = duel();
-  e.attacker.techniqueDefs.rasenRush = makeFighter({ character: shrinking }).fighter.techniqueDefs.rasenRush;
+  e.attacker.techniqueDefs.cba2 = makeFighter({ character: shrinking }).fighter.techniqueDefs.cba2;
   const shrinkWarnings = captureWarnings(() => {
     e.tick(CHARGE);
     e.tick(CHARGED_BA2);
   });
   assert.equal(e.attacker.technique, null);
   assert.equal(e.attacker.combat.attack?.def.id, 'ba2');
-  assert.match(shrinkWarnings[0], /rasenRush.*sphereGrowth/);
+  assert.match(shrinkWarnings[0], /cba2.*sphereGrowth/);
 });
 
 // ---- Regressions -------------------------------------------------------------------
@@ -1677,8 +1677,8 @@ test('Charged BA1 is still the Clone Attack and keeps #0001 charging; it starts 
   d.tick(CHARGE);
   d.tick(CHARGED_BA1);
   assert.equal(d.clones.length, 1);
-  assert.ok(d.attacker.combat.chargedCooldowns.active('ba1Clone'));
-  assert.equal(d.attacker.combat.chargedCooldowns.active('rasenRush'), false, 'Charged BA1 never cools Charged BA2');
+  assert.ok(d.attacker.combat.chargedCooldowns.active('cba1'));
+  assert.equal(d.attacker.combat.chargedCooldowns.active('cba2'), false, 'Charged BA1 never cools Charged BA2');
   assert.equal(d.attacker.state, 'charge');
   assert.equal(d.attacker.technique, null);
   // Clone first, then the Sphere Rush from the same Charge.
@@ -1686,7 +1686,7 @@ test('Charged BA1 is still the Clone Attack and keeps #0001 charging; it starts 
   d.tick(CHARGED_BA2);
   assert.ok(d.attacker.technique, 'Charged BA2 is ready though Charged BA1 is cooling down');
   assert.equal(d.clones.length, 1, 'the Sphere Rush summons nothing');
-  assert.ok(d.attacker.combat.chargedCooldowns.active('rasenRush'));
+  assert.ok(d.attacker.combat.chargedCooldowns.active('cba2'));
 });
 
 test('normal BA2 is unchanged outside Charge: 2ba1-2ba7 for 5 on the ground, midair2ba1-5 in the air, no sphere', () => {
@@ -1705,7 +1705,7 @@ test('normal BA2 is unchanged outside Charge: 2ba1-2ba7 for 5 on the ground, mid
   air.tick(JUMP);
   for (let i = 0; i < 6; i++) air.tick({ ...CHARGE, jump: true });
   air.tick(CHARGED_BA2); // Charge is ground-only, so this is mid-air BA2
-  assert.equal(air.attacker.combat.attack?.def.id, 'midairBa2');
+  assert.equal(air.attacker.combat.attack?.def.id, 'maba2');
   const airFrames = [];
   while (air.attacker.combat.attack) {
     airFrames.push(frameName(air.attacker));
@@ -1721,7 +1721,7 @@ test('the training CPU never charges or presses BA2, and its neutral input is si
   start(d, cpu.getInput(d.target, DT, SIM_CTX));
   for (let i = 0; d.attacker.technique && i < 400; i++) {
     const out = cpu.getInput(d.target, DT, SIM_CTX);
-    for (const k of ['charge', 'chargePressed', 'action1Pressed', 'action2Pressed', 'primaryPressed', 'defensePressed']) {
+    for (const k of ['charge', 'chargePressed', 'ba1Pressed', 'ba2Pressed', 'uniquebaPressed', 'shieldPressed']) {
       assert.equal(out[k], false, k);
     }
     d.tick({}, out);

@@ -6,10 +6,11 @@
 // Fighter starts one (Fighter.tryTechnique), advances it every fixed step,
 // moves its body and ends it; the CombatSystem resolves its hits. It is
 // not an attack (no combat.attack), a projectile or a summon. Behaviour is
-// data on the character (`chargedTechniques`), e.g. #0001's Sphere Rush:
+// data on the character (`chargedTechniques`), e.g. #0001's Sphere Rush
+// (cba2):
 //
 //   chargedTechniques: {
-//     rasenRush: {
+//     cba2: {
 //       formAnimation: 'rasenForm', dashAnimation: 'rasenDash', confirmAnimation: 'rasenConfirm',
 //       explosionAnimation: 'rasenExplosion', releaseAnimation: 'rasenRelease',
 //       whiffReleaseAnimation: 'rasenWhiffRelease',

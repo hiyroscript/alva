@@ -2,13 +2,18 @@
 //
 // Adding a fighter (e.g. #0002) should only require:
 //   1. dropping frames into ./assets/characters/<id>/
-//   2. adding a definition to CHARACTERS below, including its Power tiers
+//   2. adding a definition to CHARACTERS below, its moves keyed by the
+//      universal move codenames (MOVES in js/config.js: ba1, maba1, cba1,
+//      ba2, maba2, cba2, uniqueba, transform) whatever it calls them in
+//      game, including its Power tiers
 //      (`powers`, see js/data/powers.js) and each hit's `damage`, Base
 //      Launch (`baseLaunch`: 0, 1, 2 or 3) and Directional Launch
 //      (`directionalLaunch`: null, 'horizontal', 'vertical' or
 //      'reverseVertical'), e.g. `damage: 10, baseLaunch: 2,
 //      directionalLaunch: 'vertical'` (see js/data/launch.js)
 //   3. giving it a rosterSlot
+//   4. optionally, naming its moves in `abilityNames` (keyed by move
+//      codename; see js/data/abilities.js)
 //
 // Every field the engine reads lives here; nothing about #0001 is hard-coded
 // in the game systems.
@@ -33,8 +38,8 @@ const SHIELD_FPS = 12;
 // Playback rate of the Dash clip. A Dash lasts exactly one pass of it
 // (2 frames = 0.2 s at 10 fps), so tuning it keeps the burst on the art.
 const DASH_FPS = 10;
-// Playback rate of the Throw clip. The Throw phases and the shuriken's release
-// point below are whole frames at this rate.
+// Playback rate of the Throw clip (uniqueba). The Throw phases and the
+// shuriken's release point below are whole frames at this rate.
 const THROW_FPS = 12;
 // Playback rate of the shuriken's in-flight spin. Art only: it never changes
 // how fast the projectile travels.
@@ -43,7 +48,7 @@ const SHURIKEN_FPS = 18;
 // as the clone appears and backwards as it vanishes, so both take one pass
 // of the clip (10 frames = 0.5 s at 20 fps).
 const CLONE_CLOUD_FPS = 20;
-// Playback rate of #0001's Charged BA2 (Sphere Rush) poses. The dash lasts
+// Playback rate of #0001's Charged BA2 (cba2, the Sphere Rush) poses. The dash lasts
 // exactly one pass of rasenDash at this rate, so tuning it keeps the rush's
 // contact window on the dash art.
 const RASEN_FPS = 12;
@@ -130,30 +135,31 @@ export const CHARACTERS = [
         loop: false,
         heightRatio: 0.65,
       },
-      // Basic Attack 1 (BA1), ground and mid-air. Each plays once; the attack
-      // definitions below time startup / active / recovery to these frames.
-      // Mid-air BA1 is the three-frame kunai slash drawn as midair1ba1-3.
+      // Basic Attack 1, ground (ba1) and mid-air (maba1). Each plays once;
+      // the attack definitions below time startup / active / recovery to
+      // these frames. maba1 is the three-frame kunai slash drawn as
+      // midair1ba1-3.
       ba1: {
         frames: frames(BASE_0001, '1ba', 4),
         fps: BA1_FPS,
         loop: false,
         heightRatio: 1.04,
       },
-      midairBa1: {
+      maba1: {
         frames: frames(BASE_0001, 'midair1ba', 3),
         fps: BA1_FPS,
         loop: false,
         heightRatio: 1.29,
       },
-      // Basic Attack 2 (BA2), ground and mid-air. Played once, like BA1.
-      // Mid-air BA2 is the five-frame airborne kick drawn as midair2ba1-5.
+      // Basic Attack 2, ground (ba2) and mid-air (maba2). Played once, like
+      // BA1. maba2 is the five-frame airborne kick drawn as midair2ba1-5.
       ba2: {
         frames: frames(BASE_0001, '2ba', 7),
         fps: BA2_FPS,
         loop: false,
         heightRatio: 1.02,
       },
-      midairBa2: {
+      maba2: {
         frames: frames(BASE_0001, 'midair2ba', 5),
         fps: BA2_FPS,
         loop: false,
@@ -184,14 +190,14 @@ export const CHARACTERS = [
         loop: false,
         heightRatio: 1,
       },
-      // Shield, #0001's Defense (see `defense` below): four single frames,
-      // each drawn at 1x like the Dash, so heightRatio sizes each by its own
-      // height against idle's 52 art pixels (one art pixel per file pixel,
-      // the scale of every other pose). On the ground, shieldStart
-      // (prepshield) raises the guard for one frame, shield (shielding) is
-      // the held guard for as long as Defense is held, and shieldRelease
-      // (releaseblock, the file's name from its upload) lowers it for one
-      // frame after. In the air there is only the held guard,
+      // Shield, what #0001's `shield` button does (see `defense` below): four
+      // single frames, each drawn at 1x like the Dash, so heightRatio sizes
+      // each by its own height against idle's 52 art pixels (one art pixel
+      // per file pixel, the scale of every other pose). On the ground,
+      // shieldStart (prepshield) raises the guard for one frame, shield
+      // (shielding) is the held guard for as long as `shield` is held, and
+      // shieldRelease (releaseblock, the file's name from its upload) lowers
+      // it for one frame after. In the air there is only the held guard,
       // midairShield (midairshielding): no raise or lower pose. All face
       // right like the rest of #0001.
       shieldStart: {
@@ -218,19 +224,19 @@ export const CHARACTERS = [
         loop: false,
         heightRatio: 49 / 52,
       },
-      // Throw, on the primary action: throw1 raises the shuriken by the face,
-      // throw2 whips the arm across and lets go (the release frame), throw3
-      // follows through. Faces right like the rest of #0001. Ground only:
-      // there is no mid-air Throw art.
-      throw: {
+      // Throw, #0001's unique basic attack (uniqueba): throw1 raises the
+      // shuriken by the face, throw2 whips the arm across and lets go (the
+      // release frame), throw3 follows through. Faces right like the rest of
+      // #0001. Ground only: there is no mid-air Throw art.
+      uniqueba: {
         frames: frames(BASE_0001, 'throw', 3),
         fps: THROW_FPS,
         loop: false,
         heightRatio: 0.9,
       },
-      // Charged BA2, the Sphere Rush: one set of twelve poses (rasen1-12)
-      // split into logical clips, each played once by its own technique
-      // phase (see chargedTechniques.rasenRush). rasenForm (1-3): the rear
+      // Charged BA2 (cba2), the Sphere Rush: one set of twelve poses
+      // (rasen1-12) split into logical clips, each played once by its own
+      // technique phase (see chargedTechniques.cba2). rasenForm (1-3): the rear
       // palm opens for the sphere to form in. rasenDash (4-6): the rush,
       // sphere carried behind, swung forward on rasen6. The rest only a hit
       // shows: rasenConfirm (7-8), the palm driven into the opponent, rasen8
@@ -461,9 +467,9 @@ export const CHARACTERS = [
     ],
 
     stats: {
-      // Charged actions' cooldowns (summons.ba1Clone, chargedTechniques.
-      // rasenRush) recover this many seconds per second while the fighter
-      // is actually in Charge; 1 per second otherwise.
+      // Charged actions' cooldowns (summons.cba1, chargedTechniques.cba2)
+      // recover this many seconds per second while the fighter is actually
+      // in Charge; 1 per second otherwise.
       chargedCooldownRate: 2,
     },
 
@@ -502,8 +508,8 @@ export const CHARACTERS = [
       shieldHitCost: 25,
     },
 
-    // What the shared Defense input (L, RB / RT, the touch Shield button)
-    // does for this fighter. #0001 shields: held Defense keeps a Shield up
+    // What the shared `shield` input (L, RB / RT, the touch Shield button)
+    // does for this fighter. #0001 shields: held `shield` keeps a Shield up
     // all round him, `groundAnimation` on the ground (raised by
     // `groundStartAnimation`, lowered by `groundReleaseAnimation`) and
     // `airAnimation` in the air, where he keeps falling. Every hit it
@@ -523,27 +529,43 @@ export const CHARACTERS = [
       perfectRearm: 0.25,
     },
 
-    // Controller actions -> attack ids. A string is one attack; { ground, air }
-    // picks by whether the fighter is grounded when the button is pressed.
-    // Null means the input is wired but reserved: no artwork, no attack.
+    // Control codenames -> move codenames (both universal, see js/config.js).
+    // A string is one attack; { ground, air } picks by whether the fighter is
+    // grounded when the button is pressed. Null means the input is wired but
+    // reserved: no artwork, no attack.
     actions: {
-      primary: 'throw', // Throw (the player-facing name of primary)
-      special: null,
-      action1: { ground: 'ba1', air: 'midairBa1' }, // Basic Attack 1 (BA1)
-      action2: { ground: 'ba2', air: 'midairBa2' }, // Basic Attack 2 (BA2)
+      uniqueba: 'uniqueba', // unique basic attack: #0001's shuriken Throw
+      transform: null, // reserved: no Transform move yet
+      ba1: { ground: 'ba1', air: 'maba1' }, // Basic Attack 1 / mid-air Basic Attack 1
+      ba2: { ground: 'ba2', air: 'maba2' }, // Basic Attack 2 / mid-air Basic Attack 2
     },
 
     // How the touch controls present this fighter's own buttons: an icon
     // (a key of ICONS in js/ui/icons.js) and an accessible name for each.
     // UI only (see js/ui/mobile-abilities.js): the buttons still send
-    // primary, action1 and action2, and nothing here reaches combat. Each
-    // names the button's ability family, not every move it makes: Punch is
-    // also the mid-air kunai slash, and with Charge held the Clone Attack.
-    // The Shield, Special, Jump and movement buttons are universal.
+    // uniqueba, transform, ba1 and ba2, and nothing here reaches combat.
+    // Each names the button's ability family, not every move it makes: Punch
+    // is also maba1 (the mid-air kunai slash), and with Charge held cba1 (the
+    // Clone Attack). With no `transform` entry (no Transform yet) its
+    // Transform button stays reserved (dashed). The Shield, Jump and
+    // movement buttons are universal.
     mobileAbilities: {
-      primary: { label: 'Shuriken', icon: 'shuriken' },
-      action1: { label: 'Punch', icon: 'punch' },
-      action2: { label: 'Kick', icon: 'kick' },
+      uniqueba: { label: 'Shuriken', icon: 'shuriken' },
+      ba1: { label: 'Punch', icon: 'punch' },
+      ba2: { label: 'Kick', icon: 'kick' },
+    },
+
+    // #0001's in-game ability names, keyed by the universal move codenames
+    // (MOVES in js/config.js). Read through abilityName (js/data/abilities.js),
+    // which gives a move left out here its neutral name: maba1 and maba2 are
+    // still unnamed. Names only: no screen shows them yet, and nothing here
+    // reaches combat.
+    abilityNames: {
+      uniqueba: 'Shuriken',
+      ba1: 'Punch',
+      ba2: 'Kick',
+      cba1: 'Clone Attack',
+      cba2: 'Sphere Rush',
     },
 
     // Charged actions: what a combat button does when pressed while the
@@ -556,10 +578,12 @@ export const CHARACTERS = [
     // still cooling down does nothing at all. If it cannot happen for another
     // reason (no opponent, missing art), the press falls through to the
     // button's normal attack.
-    // Their cooldowns show under the fighter as CAB1 and CAB2.
+    // Keyed by the button they are charged from; each id is the charged
+    // move's own codename. Their cooldowns show under the fighter as CBA1
+    // and CBA2.
     chargedActions: {
-      action1: { type: 'summon', id: 'ba1Clone' }, // Charged BA1 (CAB1): Clone Attack
-      action2: { type: 'technique', id: 'rasenRush' }, // Charged BA2 (CAB2): Sphere Rush
+      ba1: { type: 'summon', id: 'cba1' }, // Charged BA1 (cba1): Clone Attack
+      ba2: { type: 'technique', id: 'cba2' }, // Charged BA2 (cba2): Sphere Rush
     },
 
     // Summons, keyed by id. See js/game/clone.js for the schema
@@ -571,12 +595,12 @@ export const CHARACTERS = [
     // there at the opponent's foot height, the optional `noGround` fallback
     // places it and picks its attack instead.
     summons: {
-      ba1Clone: {
+      cba1: {
         attack: 'ba1',
         cloud: 'cloneCloud',
-        // Seconds before Charged BA1 can be used again, from the moment the
-        // summon is accepted, whichever way it appears and whether or not it
-        // hits. Its hit is the attack's own: 3 as BA1, 5 as mid-air BA2.
+        // Seconds before Charged BA1 (cba1) can be used again, from the
+        // moment the summon is accepted, whichever way it appears and whether
+        // or not it hits. Its hit is the attack's own: 3 as ba1, 5 as maba2.
         cooldown: 5,
         // World units behind the opponent (on its back side) at the summon;
         // BA1's punch reaches forward from there into the opponent.
@@ -586,12 +610,12 @@ export const CHARACTERS = [
         effectOffset: { x: 0, y: -44 },
         // No ground behind the opponent at its foot height (past a platform's
         // edge, or the opponent is airborne): the clone appears over it
-        // instead and performs the mid-air BA2 kick, driving it downward.
-        // `offset` is the clone's origin from the opponent's (facing right,
-        // mirrored): feet at its upper body, where midairBa2's own hitbox
-        // lands on its hurtboxes.
+        // instead and performs the mid-air BA2 kick (maba2), driving it
+        // downward. `offset` is the clone's origin from the opponent's
+        // (facing right, mirrored): feet at its upper body, where maba2's own
+        // hitbox lands on its hurtboxes.
         noGround: {
-          attack: 'midairBa2',
+          attack: 'maba2',
           offset: { x: 0, y: -36 },
         },
       },
@@ -601,7 +625,7 @@ export const CHARACTERS = [
     // the schema (createTechniqueDefinition) and the phases. Not an attack, a
     // projectile or a summon: #0001 performs it himself.
     chargedTechniques: {
-      // Charged BA2, the Sphere Rush. The sphere forms in #0001's rear palm
+      // Charged BA2 (cba2), the Sphere Rush. The sphere forms in #0001's rear palm
       // (rasenForm + rasenSphereBuild, 0.5 s), then he rushes forward for one
       // pass of rasenDash (0.25 s, about 262 world units) carrying it behind
       // him and swinging it forward on rasen6. It must connect during that
@@ -619,7 +643,7 @@ export const CHARACTERS = [
       // (rasen10-12). The whole technique needs ground under #0001. A
       // Shield blocks the contact: no bind, tick or explosion, and the rush
       // ends there.
-      rasenRush: {
+      cba2: {
         formAnimation: 'rasenForm',
         dashAnimation: 'rasenDash',
         confirmAnimation: 'rasenConfirm',
@@ -629,7 +653,7 @@ export const CHARACTERS = [
         sphereBuild: 'rasenSphereBuild',
         sphereImpact: 'rasenSphereImpact',
         sphereExplosion: 'rasenSphereExplosion',
-        // Seconds before Charged BA2 can be used again, from the moment the
+        // Seconds before Charged BA2 (cba2) can be used again, from the moment the
         // rush starts forming: spent on a hit, a miss, a wall or an
         // interruption alike.
         cooldown: 5,
@@ -699,15 +723,15 @@ export const CHARACTERS = [
     // Each also says how #0001 moves through it (momentum, control,
     // friction, a step-in) and, for the Basic Attacks, when a hit opens a
     // follow-up (hitCancel, from the strike: another attack, a jump or, on
-    // the ground, a Dash). Roles: BA1 the quick combo starter (a long stun,
-    // the lightest freeze), BA2 the committed
-    // launcher (a step-in, a heavier freeze), mid-air BA1 the pursuit tool,
-    // mid-air BA2 the spike into grounded pressure, Throw spacing only.
-    // Each attack's `damage` is added to the target's Launch Point first;
-    // its Base Launch then multiplies that new Launch Point and its
-    // Directional Launch sends the result: ground BA1 pushes sideways (1,
-    // horizontal), ground BA2 and mid-air BA1 launch upward (2, vertical)
-    // and mid-air BA2 drives the target downward (2, reverse vertical).
+    // the ground, a Dash). Roles: ba1 the quick combo starter (a long stun,
+    // the lightest freeze), ba2 the committed
+    // launcher (a step-in, a heavier freeze), maba1 the pursuit tool,
+    // maba2 the spike into grounded pressure, uniqueba (the Throw) spacing
+    // only. Each attack's `damage` is added to the target's Launch Point
+    // first; its Base Launch then multiplies that new Launch Point and its
+    // Directional Launch sends the result: ba1 pushes sideways (1,
+    // horizontal), ba2 and maba1 launch upward (2, vertical) and maba2
+    // drives the target downward (2, reverse vertical).
     // Damage and Base Launch are authored separately: neither is derived
     // from the other.
     attacks: {
@@ -736,11 +760,11 @@ export const CHARACTERS = [
       // downward kunai slash. The clip has no recovery frame, so the attack
       // ends with it; the longer cooldown makes up for the missing recovery.
       // The hitbox covers the slash arc in front of the fighter, and it
-      // launches the target upward. Chosen only by action1's `air` branch.
+      // launches the target upward. Chosen only by ba1's `air` branch.
       // Keeps all its drift and nearly all the air steering, for pursuit;
       // its stun holds a juggled target for the next aerial.
-      midairBa1: {
-        animation: 'midairBa1',
+      maba1: {
+        animation: 'maba1',
         startup: 2 / BA1_FPS,
         active: 1 / BA1_FPS,
         recovery: 0,
@@ -784,11 +808,11 @@ export const CHARACTERS = [
         hitCancel: 3 / BA2_FPS,
       },
       // Frames 1-2 wind-up, frame 3 kick (the forward-low arc), frames 4-5
-      // recovery. Drives the target hard downward. Chosen only by action2's
+      // recovery. Drives the target hard downward. Chosen only by ba2's
       // `air` branch. Keeps its drift and most of the steering: never
       // frozen sideways.
-      midairBa2: {
-        animation: 'midairBa2',
+      maba2: {
+        animation: 'maba2',
         startup: 2 / BA2_FPS,
         active: 1 / BA2_FPS,
         recovery: 2 / BA2_FPS,
@@ -804,14 +828,15 @@ export const CHARACTERS = [
         airControl: 0.7,
         hitCancel: 2 / BA2_FPS,
       },
-      // Frame 1 wind-up, frame 2 release, frame 3 follow-through. No melee
-      // hitbox: the damage is the shuriken's (1), released once, as the attack
-      // reaches frame 2, from the throwing hand (`offset` is from the
-      // fighter's origin, facing right, and mirrors with facing). Keeps half
-      // a run and some steering, so #0001 is never rooted while he throws;
-      // no hitCancel: a spacing tool, not a combo starter.
-      throw: {
-        animation: 'throw',
+      // The Throw (uniqueba). Frame 1 wind-up, frame 2 release, frame 3
+      // follow-through. No melee hitbox: the damage is the shuriken's (1),
+      // released once, as the attack reaches frame 2, from the throwing hand
+      // (`offset` is from the fighter's origin, facing right, and mirrors
+      // with facing). Keeps half a run and some steering, so #0001 is never
+      // rooted while he throws; no hitCancel: a spacing tool, not a combo
+      // starter.
+      uniqueba: {
+        animation: 'uniqueba',
         startup: 1 / THROW_FPS,
         active: 1 / THROW_FPS,
         recovery: 1 / THROW_FPS,

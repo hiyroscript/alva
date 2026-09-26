@@ -82,11 +82,15 @@ Values it changed, old → new, for undoing any one of them:
 | `movement` | `airTurnBoost` | 1.8 | 2.0 |
 | `movement` | `fastFallAcceleration` | 7500 | 12000 |
 | `movement` | `attackBuffer` | 0.12 | 0.15 |
-| `attacks.midairBa1` | `airControl` | 0.6 | 0.85 |
-| `attacks.midairBa1` | `hitstun` | 0.28 | 0.32 |
-| `attacks.midairBa1` | `cooldown` | 0.18 | 0.16 |
-| `attacks.midairBa2` | `airControl` | 0.4 | 0.7 |
+| `attacks.maba1` | `airControl` | 0.6 | 0.85 |
+| `attacks.maba1` | `hitstun` | 0.28 | 0.32 |
+| `attacks.maba1` | `cooldown` | 0.18 | 0.16 |
+| `attacks.maba2` | `airControl` | 0.4 | 0.7 |
 | `energy` | `dashCancelCost` | (none) | 40 |
+
+The mid-air attacks were named `midairBa1` and `midairBa2` when this pass
+was made; they are `maba1` and `maba2` now (see
+[Control and move codenames](#control-and-move-codenames)).
 
 It also added the Dash cancel itself (`Fighter.tryDash` accepts an attack
 that may be cut short), and kept a Dash asked for during a hit's freeze
@@ -215,6 +219,35 @@ ceiling and landing are unchanged.
 
 **Tests:** `tests/launch-bounce.test.mjs`, plus the BA2 spike tests in
 `tests/basic-attack-2.test.mjs`.
+
+## Control and move codenames
+
+Not a named update, and it changes no behaviour or tuning: later work
+renamed the gameplay controls and the moves to one canonical codename each.
+The codenames are universal, the same for every character (`ACTIONS` and
+`MOVES` in `js/config.js`); a character's own ability names are separate. Where an entry above names a field, it names where that field lives
+now. Old → new:
+
+| Old | New |
+| --- | --- |
+| `left` / `right` (controls) | `runLeft` / `runRight` |
+| `leftPressed` / `rightPressed` | `runLeftPressed` / `runRightPressed` |
+| `dashLeftPressed` / `dashRightPressed` | `mouvementLeftPressed` / `mouvementRightPressed` |
+| `queueTouchDash` / `touchDash` | `queueTouchMouvement` / `touchMouvement` |
+| `primary` (control), `throw` (attack and clip) | `uniqueba` |
+| `special` | `transform` |
+| `defense` (control) | `shield` |
+| `action1` / `action2` | `ba1` / `ba2` |
+| `midairBa1` / `midairBa2` | `maba1` / `maba2` |
+| `ba1Clone` (summon) | `cba1` |
+| `rasenRush` (technique) | `cba2` |
+| CAB1 / CAB2 (cooldown labels) | CBA1 / CBA2 |
+
+A character's `defense` entry (what the `shield` button does, with the
+perfect Shield's `perfectWindow` and `perfectRearm`) keeps its name, as
+`movement` does, and so do the art files (`throw1`–`3`,
+`midair1ba1`–`3`, `midair2ba1`–`5`). The regression checks are in
+`tests/codenames.test.mjs`.
 
 ## Adding a named update
 

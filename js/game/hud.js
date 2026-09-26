@@ -17,7 +17,7 @@
 // P1 and CPU in Quick Battle, CPU 1 and CPU 2 in Watch Mode. Under it, in a
 // Battle only, one dot per point the match is played to
 // (CONFIG.battle.pointsToWin), filled for each point the fighter has scored.
-// The right-hand card mirrors the left-hand one. Energy and the CAB
+// The right-hand card mirrors the left-hand one. Energy and the CBA
 // cooldowns are drawn over the fighter itself (js/game/fighter-status.js);
 // the card only describes Energy to screen readers.
 

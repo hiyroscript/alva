@@ -21,10 +21,10 @@ import {
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
 const CHARGE = { charge: true };
-const BA1 = { action1: true, action1Pressed: true };
-const BA2 = { action2: true, action2Pressed: true };
+const BA1 = { ba1: true, ba1Pressed: true };
+const BA2 = { ba2: true, ba2Pressed: true };
 const JUMP = { jump: true, jumpPressed: true };
-const DEFENSE = { defense: true, defensePressed: true };
+const SHIELD = { shield: true, shieldPressed: true };
 const CHARGE_FRAMES = ['0001_charge1.png', '0001_charge2.png', '0001_chargea.png', '0001_chargeb.png'];
 const isChargeFrame = (name) => CHARGE_FRAMES.includes(name);
 
@@ -184,7 +184,7 @@ test('the release pose never freezes movement: a held direction moves at once, t
   chargeIntoLoop(step);
   const x = fighter.body.x;
   const plain = makeFighter();
-  const right = { right: true };
+  const right = { runRight: true };
   const states = [];
   for (let i = 0; i < 20; i++) {
     step(right);
@@ -312,11 +312,11 @@ test('Charge is grounded: held in the air it keeps Jump / Fall (the fast fall\'s
 test('Charge holds its ground at a ledge edge, and falling never shows charge art', () => {
   const { fighter, step } = makeFighter({ x: 1080, y: 600 });
   // Charging locks movement, so a held direction cannot walk off the edge.
-  for (let i = 0; i < steps(1); i++) step({ ...CHARGE, right: true });
+  for (let i = 0; i < steps(1); i++) step({ ...CHARGE, runRight: true });
   assert.equal(fighter.body.ground.id, 'ledge');
   assert.equal(fighter.state, 'charge');
   // Walk off, then hold Charge on the way down.
-  stepUntil(step, (f) => !f.grounded, { right: true });
+  stepUntil(step, (f) => !f.grounded, { runRight: true });
   while (!fighter.grounded) {
     assert.equal(fighter.state, 'fall');
     assert.ok(!isChargeFrame(frameName(fighter)));
@@ -328,7 +328,7 @@ test('Charge holds its ground at a ledge edge, and falling never shows charge ar
 
 test('Charge locks horizontal movement: a run decelerates to a stop and stays put', () => {
   const { fighter, step } = makeFighter();
-  const right = { right: true };
+  const right = { runRight: true };
   stepUntil(step, (f) => f.body.vx >= f.maxSpeed, right);
 
   let vx = fighter.body.vx;
@@ -343,7 +343,7 @@ test('Charge locks horizontal movement: a run decelerates to a stop and stays pu
     step({ ...CHARGE, ...right });
   }
   const x = fighter.body.x;
-  for (const held of [right, { left: true }, { left: true, right: true }]) {
+  for (const held of [right, { runLeft: true }, { runLeft: true, runRight: true }]) {
     for (let i = 0; i < steps(0.5); i++) {
       step({ ...CHARGE, ...held });
       assert.equal(fighter.state, 'charge');
@@ -445,7 +445,7 @@ test('BA2 while already charging, Charge still held, starts the Charged BA2 Sphe
   chargeIntoLoop(step);
   step({ ...CHARGE, ...BA2 });
   assert.equal(fighter.state, 'technique');
-  assert.equal(fighter.technique.def.id, 'rasenRush');
+  assert.equal(fighter.technique.def.id, 'cba2');
   assert.equal(fighter.combat.attack, null, 'not the normal BA2');
   assert.equal(fighter.charging, false);
   assert.equal(frameName(fighter), '0001_rasen1.png', 'straight into the technique, no charge1 release pose');
@@ -459,8 +459,8 @@ test('BA2 while already charging, Charge still held, starts the Charged BA2 Sphe
   assert.equal(step(CHARGE).state, 'charge');
   assert.equal(frameName(fighter), '0001_charge1.png');
   assert.equal(clones.length, 0, 'the Sphere Rush is no summon');
-  assert.ok(fighter.combat.chargedCooldowns.active('rasenRush'), 'its cooldown was spent');
-  assert.equal(fighter.combat.chargedCooldowns.active('ba1Clone'), false, 'and only its own');
+  assert.ok(fighter.combat.chargedCooldowns.active('cba2'), 'its cooldown was spent');
+  assert.equal(fighter.combat.chargedCooldowns.active('cba1'), false, 'and only its own');
 });
 
 test('without its art, Charged BA2 falls back to BA2, which interrupts Charge; Charge then restarts from charge1', (t) => {
@@ -503,7 +503,7 @@ test('BA1 while already charging, Charge still held, summons a clone: the owner 
   const loopFrame = frameName(fighter);
   step({ ...CHARGE, ...BA1 });
   assert.equal(clones.length, 1, 'the Charged BA1 Clone Attack');
-  assert.equal(fighter.combat.chargedCooldowns.remaining('ba1Clone'), 5, 'its 5-second cooldown starts');
+  assert.equal(fighter.combat.chargedCooldowns.remaining('cba1'), 5, 'its 5-second cooldown starts');
   // The owner neither attacks nor releases: the Charge loop just carries on.
   assert.equal(fighter.state, 'charge');
   assert.equal(fighter.charging, true);
@@ -561,10 +561,10 @@ test('Jump interrupts Charge through the normal jump', () => {
   assert.ok(!states.includes('chargeRelease'), states.join());
 });
 
-test('held Defense interrupts Charge with the Shield at once; a held Charge restarts from charge1 after it', () => {
+test('held Shield interrupts Charge with the Shield at once; a held Charge restarts from charge1 after it', () => {
   const { fighter, step } = makeFighter();
   chargeIntoLoop(step);
-  step({ ...CHARGE, ...DEFENSE });
+  step({ ...CHARGE, ...SHIELD });
   assert.equal(fighter.state, 'shield');
   assert.equal(fighter.combat.shielding, true);
   assert.equal(fighter.animator.anim.key, 'shieldStart');
@@ -572,37 +572,37 @@ test('held Defense interrupts Charge with the Shield at once; a held Charge rest
   assert.equal(fighter.charging, false);
   // Held together, the Shield keeps outranking Charge.
   for (let i = 0; i < steps(1); i++) {
-    step({ ...CHARGE, defense: true });
+    step({ ...CHARGE, shield: true });
     assert.equal(fighter.state, 'shield');
     assert.equal(fighter.charging, false, 'no Charge stance under the Shield');
   }
-  // Defense let go, Charge still held: a fresh Charge from charge1, not the
+  // Shield let go, Charge still held: a fresh Charge from charge1, not the
   // loop and not the Shield's lower pose.
   step(CHARGE);
   assert.equal(fighter.state, 'charge');
   assert.equal(frameName(fighter), '0001_charge1.png');
   assert.equal(fighter.animator.anim.key, 'chargeStart');
 
-  // Pressing Defense with Charge from idle shields; Charge waits for Defense.
+  // Pressing Shield with Charge from idle shields; Charge waits for Shield.
   const both = makeFighter();
-  both.step({ ...CHARGE, ...DEFENSE });
+  both.step({ ...CHARGE, ...SHIELD });
   assert.equal(both.fighter.state, 'shield');
-  for (let i = 0; i < 20; i++) both.step({ ...CHARGE, defense: true });
+  for (let i = 0; i < 20; i++) both.step({ ...CHARGE, shield: true });
   assert.equal(both.fighter.state, 'shield');
   both.step(CHARGE);
   assert.equal(both.fighter.state, 'charge');
   assert.equal(frameName(both.fighter), '0001_charge1.png');
 });
 
-test('letting go of Charge on the step Defense is pressed shields at once; no Charge release pose', () => {
+test('letting go of Charge on the step Shield is pressed shields at once; no Charge release pose', () => {
   for (const releaseOn of CHARGE_FRAMES) {
     const { fighter, step } = makeFighter();
     stepUntil(step, (f) => frameName(f) === releaseOn, CHARGE);
-    step(DEFENSE); // charge: false and defensePressed: true on the same step
+    step(SHIELD); // charge: false and shieldPressed: true on the same step
     assert.equal(fighter.state, 'shield', `after ${releaseOn}`);
     assert.equal(frameName(fighter), '0001_prepshield.png');
     const states = [fighter.state];
-    for (let i = 0; i < steps(0.5); i++) states.push(step({ defense: true }).state);
+    for (let i = 0; i < steps(0.5); i++) states.push(step({ shield: true }).state);
     for (let i = 0; i < steps(0.5); i++) states.push(step().state);
     assert.ok(!states.includes('chargeRelease'), states.join());
     assert.ok(!states.includes('charge'));
@@ -610,18 +610,18 @@ test('letting go of Charge on the step Defense is pressed shields at once; no Ch
   }
 });
 
-test('exhausted, held Defense raises no Shield and leaves Charge alone; any Energy left still raises it', () => {
+test('exhausted, held Shield raises no Shield and leaves Charge alone; any Energy left still raises it', () => {
   const { fighter, step } = makeFighter();
   fighter.combat.setEnergy(0);
   fighter.combat.regenEnergy(60);
   assert.equal(fighter.combat.energyExhausted, true);
-  for (let i = 0; i < 10; i++) step({ ...CHARGE, defense: true });
+  for (let i = 0; i < 10; i++) step({ ...CHARGE, shield: true });
   assert.equal(fighter.combat.shielding, false);
   assert.equal(fighter.state, 'charge');
   assert.equal(fighter.charging, true);
   const low = makeFighter();
   low.fighter.combat.setEnergy(5);
-  low.step({ ...CHARGE, defense: true, defensePressed: true });
+  low.step({ ...CHARGE, shield: true, shieldPressed: true });
   assert.equal(low.fighter.combat.shielding, true, 'less than a block costs, but not exhausted');
   assert.equal(low.fighter.charging, false);
 });
@@ -671,7 +671,7 @@ test('missing charge art holds a still idle frame; the fighter keeps working', (
   const { fighter, step } = makeFighter({ sprites: fakeSprites(noCharge) });
   assert.equal(fighter.chargeStartDuration, 0);
   for (let i = 0; i < steps(1); i++) {
-    step({ ...CHARGE, right: true });
+    step({ ...CHARGE, runRight: true });
     assert.equal(fighter.state, 'charge');
     assert.equal(fighter.animator.hold, 0);
     assert.equal(frameName(fighter), '0001_idle1.png');
@@ -708,7 +708,7 @@ test('missing charge art holds a still idle frame; the fighter keeps working', (
 test('the gameplay down action is now charge on S / ↓; menu Down is untouched', () => {
   assert.ok(ACTIONS.includes('charge'));
   assert.ok(!ACTIONS.includes('down'));
-  assert.deepEqual(ACTIONS.slice(0, 4), ['left', 'right', 'charge', 'jump']);
+  assert.deepEqual(ACTIONS.slice(0, 4), ['runLeft', 'runRight', 'charge', 'jump']);
   assert.deepEqual(CONFIG.bindings.charge, ['KeyS', 'ArrowDown']);
   assert.equal(CONFIG.bindings.down, undefined);
   assert.ok(!Object.values(CONFIG.bindings).flat().includes('KeyC'), 'no extra C key');
@@ -774,7 +774,7 @@ test('InputManager samples a held charge from S, ↓, D-pad down and the left st
   assert.equal(input.sample().charge, false);
 
   // Other pad mappings are unchanged.
-  for (const [i, action] of [[0, 'jump'], [1, 'action1'], [4, 'action2'], [5, 'defense'], [7, 'defense'], [2, 'primary'], [3, 'special']]) {
+  for (const [i, action] of [[0, 'jump'], [1, 'ba1'], [4, 'ba2'], [5, 'shield'], [7, 'shield'], [2, 'uniqueba'], [3, 'transform']]) {
     pad.buttons[i] = { pressed: true, value: 1 };
     input.pollGamepads(4000);
     const f = input.sample();
@@ -795,7 +795,7 @@ test('the training CPU never charges or attacks, and still drops through platfor
   player.fighter.opponent = bot.fighter;
   bot.fighter.opponent = player.fighter;
   for (let i = 0; i < 1200; i++) {
-    player.step(i % 300 < 150 ? { right: true } : { left: true, ...(i % 97 === 0 ? CHARGE : {}) });
+    player.step(i % 300 < 150 ? { runRight: true } : { runLeft: true, ...(i % 97 === 0 ? CHARGE : {}) });
     const out = cpu.getInput(bot.fighter, DT, SIM_CTX);
     assert.equal(out.charge, false);
     assert.equal(out.chargePressed, false);
@@ -827,10 +827,10 @@ test('the training CPU never charges or attacks, and still drops through platfor
 // ---- Charged cooldowns: Charge recovers them faster -------------------------------
 
 // Seconds left on `id` for `fighter`.
-const left = (fighter, id = 'rasenRush') => fighter.combat.chargedCooldowns.remaining(id);
+const left = (fighter, id = 'cba2') => fighter.combat.chargedCooldowns.remaining(id);
 
 // A fresh fighter with a 5-second `id` cooldown just started.
-function cooling(id = 'rasenRush', opts) {
+function cooling(id = 'cba2', opts) {
   const f = makeFighter(opts);
   f.fighter.combat.chargedCooldowns.start(id, 5);
   return f;
@@ -857,10 +857,10 @@ test('a 5 s charged cooldown: about 4 s left after 1 s not charging, about 3 s a
 
   // Charged for the whole cooldown it is ready in about 2.5 s instead of 5.
   const full = cooling();
-  const n = stepUntil(full.step, (f) => !f.combat.chargedCooldowns.active('rasenRush'), CHARGE);
+  const n = stepUntil(full.step, (f) => !f.combat.chargedCooldowns.active('cba2'), CHARGE);
   assert.ok(Math.abs(n * DT - 2.5) <= 2 * DT, `${n} steps`);
   const rest = cooling();
-  const m = stepUntil(rest.step, (f) => !f.combat.chargedCooldowns.active('rasenRush'));
+  const m = stepUntil(rest.step, (f) => !f.combat.chargedCooldowns.active('cba2'));
   assert.ok(Math.abs(m * DT - 5) <= DT, `${m} steps`);
 });
 
@@ -873,9 +873,9 @@ test('Charge only speeds it while really in the Charge stance: never at once, an
   // Running, jumping and attacking, the last two with Charge held all along:
   // every step not continuing a real Charge (Fighter.charging) recovers at 1x.
   for (const [label, held] of [
-    ['running', () => ({ right: true })],
+    ['running', () => ({ runRight: true })],
     ['jumping with Charge held', (i) => ({ ...CHARGE, jump: true, jumpPressed: i % 45 === 0 })],
-    ['attacking with Charge held', (i) => ({ ...CHARGE, action1: true, action1Pressed: i % 20 === 0 })],
+    ['attacking with Charge held', (i) => ({ ...CHARGE, ba1: true, ba1Pressed: i % 20 === 0 })],
   ]) {
     const f = cooling();
     const states = new Set();
@@ -897,19 +897,19 @@ test('Charge only speeds it while really in the Charge stance: never at once, an
 test('a charged technique is no Charge, even with Charge held right through it', () => {
   // The Sphere Rush starts its own cooldown; watch Charged BA1's meanwhile.
   const d = duel();
-  d.attacker.combat.chargedCooldowns.start('ba1Clone', 5);
+  d.attacker.combat.chargedCooldowns.start('cba1', 5);
   d.tick(CHARGE);
   d.tick(CHARGE);
   d.tick({ ...CHARGE, ...BA2 });
   assert.ok(d.attacker.technique, 'the Sphere Rush started');
-  const before = left(d.attacker, 'ba1Clone');
+  const before = left(d.attacker, 'cba1');
   let n = 0;
   while (d.attacker.technique && n < steps(1)) {
     d.tick(CHARGE);
     n++;
   }
   assert.equal(n, steps(1));
-  assert.ok(Math.abs(before - left(d.attacker, 'ba1Clone') - 1) < 1e-6, 'normal rate through the technique');
+  assert.ok(Math.abs(before - left(d.attacker, 'cba1') - 1) < 1e-6, 'normal rate through the technique');
 });
 
 test('letting go of Charge is no sustained Charge: the release pose and after recover at the normal rate', () => {
@@ -924,7 +924,7 @@ test('letting go of Charge is no sustained Charge: the release pose and after re
 
 test('a hit or its freeze stops the faster recovery at once', () => {
   const d = duel();
-  d.target.combat.chargedCooldowns.start('rasenRush', 5);
+  d.target.combat.chargedCooldowns.start('cba2', 5);
   for (let i = 0; i < steps(0.5); i++) d.tick({}, CHARGE);
   d.tick(BA1, CHARGE);
   d.until(() => d.events.length > 0);
@@ -940,14 +940,14 @@ test('a hit or its freeze stops the faster recovery at once', () => {
 
 test('a cooldown never goes below 0 and is simply ready, and the recovery is deterministic', () => {
   const { fighter, step } = cooling();
-  fighter.combat.chargedCooldowns.start('rasenRush', 0.05);
+  fighter.combat.chargedCooldowns.start('cba2', 0.05);
   for (let i = 0; i < 30; i++) {
     step(CHARGE);
     assert.ok(left(fighter) >= 0);
   }
-  assert.equal(fighter.combat.chargedCooldowns.active('rasenRush'), false);
+  assert.equal(fighter.combat.chargedCooldowns.active('cba2'), false);
   assert.equal(left(fighter), 0);
-  assert.equal(fighter.combat.chargedCooldowns.progress('rasenRush'), 1);
+  assert.equal(fighter.combat.chargedCooldowns.progress('cba2'), 1);
   // Two identical runs recover identically, step for step.
   const run = () => {
     const f = cooling();
@@ -971,14 +971,14 @@ test('charging, releasing, shielding, attacking and hits start no charged cooldo
   for (let i = 0; i < steps(2); i++) guard.tick(i % 40 < 30 ? CHARGE : {}, i % 40 < 30 ? CHARGE : {});
   none(guard.attacker, guard.target);
   for (let i = 0; i < steps(2); i++) {
-    const press = i % 20 < 12 ? { defense: true, defensePressed: i % 20 === 0 } : i === 70 ? JUMP : {};
+    const press = i % 20 < 12 ? { shield: true, shieldPressed: i % 20 === 0 } : i === 70 ? JUMP : {};
     guard.tick(press, press);
   }
   none(guard.attacker, guard.target);
   while (!guard.target.grounded || guard.target.state !== 'idle') guard.tick();
   assert.equal(guard.target.body.x - guard.attacker.body.x, 44, 'still in BA1 range');
-  guard.tick(BA1, DEFENSE);
-  while (guard.attacker.combat.attack) guard.tick({}, { defense: true });
+  guard.tick(BA1, SHIELD);
+  while (guard.attacker.combat.attack) guard.tick({}, { shield: true });
   assert.deepEqual(guard.events.map((e) => e.type), ['block'], 'the BA1 was Shielded');
   none(guard.attacker, guard.target);
 
