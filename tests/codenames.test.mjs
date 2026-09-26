@@ -14,6 +14,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { def, fakeSprites, makeFighter, STAGE } from './fighter-harness.mjs';
 import { ACTIONS, ACTION_LABELS, CONFIG, MOVES } from '../js/config.js';
 import { CHARACTERS } from '../js/data/characters.js';
+import { SAMPLE_FIGHTER } from './sample-fighter.mjs';
 import { COMBAT_ACTIONS, Fighter } from '../js/game/character.js';
 import { blankInput } from '../js/game/fighter-controller.js';
 import { readMoveset } from '../js/game/combat-ai.js';
@@ -65,7 +66,7 @@ test('the gameplay controls are the canonical codenames, keys unchanged', () => 
 test('COMBAT_ACTIONS are uniqueba, transform, ba1 and ba2; shield, jump and charge stay held-state controls', () => {
   assert.deepEqual(COMBAT_ACTIONS, ['uniqueba', 'transform', 'ba1', 'ba2']);
   for (const held of ['shield', 'jump', 'charge']) assert.ok(!COMBAT_ACTIONS.includes(held), held);
-  assert.deepEqual([...ABILITY_ACTIONS], ['uniqueba', 'ba1', 'ba2']);
+  assert.deepEqual([...ABILITY_ACTIONS], ['uniqueba', 'transform', 'ba1', 'ba2'], 'the touch buttons a fighter presents');
 });
 
 test('the move codenames are universal: each belongs to one combat button, on the ground, in the air or charged', () => {
@@ -88,12 +89,12 @@ test('the move codenames are universal: each belongs to one combat button, on th
   }
 });
 
-test('every character keys its moves by the universal codenames, each on its own button', () => {
+test('every character (and the tests\' sample fighter) keys its moves by the universal codenames, each on its own button', () => {
   // The move a button makes where the fighter is (`variants`): its own
   // variant, or the button's one move (no variant).
   const onButton = (id, button, variants) =>
     MOVES[id]?.button === button && (MOVES[id].variant === null || variants.includes(MOVES[id].variant));
-  for (const c of CHARACTERS) {
+  for (const c of [...CHARACTERS, SAMPLE_FIGHTER]) {
     const who = `#${c.id}`;
     for (const id of Object.keys(c.attacks ?? {})) {
       assert.ok(MOVES[id] && MOVES[id].variant !== 'charged', `${who}: attack ${id} is a universal ground / air / single move`);

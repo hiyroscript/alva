@@ -24,11 +24,12 @@
 // nothing.
 //
 // C is Charge (the `charge` input, held for as long as the pointer stays on
-// it). The large top slot is the `uniqueba` input, the lower row's first two
-// buttons `ba1` and `ba2`: their look is the fighter's own (#0001's
-// Shuriken, Punch and Kick; see setCharacter and js/ui/mobile-abilities.js).
-// Shield is the universal `shield` input, held for as long as the pointer
-// stays on it, and Transform the universal, still reserved `transform`.
+// it). The large top slot is the `uniqueba` input, the middle row's first
+// button `transform` and the lower row's first two `ba1` and `ba2`: their
+// look is the fighter's own (#0001's Shuriken, Punch and Kick; see
+// setCharacter and js/ui/mobile-abilities.js), and Transform shows as
+// reserved (dashed) while the fighter presents none. Shield is the
+// universal `shield` input, held for as long as the pointer stays on it.
 // Only the icons and accessible names are player-facing: the input
 // codenames never change with them, so Charge + Punch is Charge + ba1 (cba1,
 // the Clone Attack), and Charge + Kick is Charge + ba2 (cba2, the Sphere
@@ -50,14 +51,14 @@ const DPAD = [
   { action: 'runRight', label: 'Move right', icon: ICONS.right },
 ];
 
-// Lower-right cluster, in on-screen order. `pending` marks reserved actions
-// that wait on future attack animations. `ability` marks the combat ability
-// glyphs (drawn a little larger); the fighter-specific ones (uniqueba, ba1,
-// ba2) carry no icon or label here: setCharacter fills them in. `pos` is the
-// button's slot in the cluster (its tc-<pos> class).
+// Lower-right cluster, in on-screen order. `ability` marks the combat
+// ability glyphs (drawn a little larger); the fighter-specific ones
+// (uniqueba, transform, ba1, ba2) carry no icon or label here: setCharacter
+// fills them in, and marks a reserved one. `pos` is the button's slot in the
+// cluster (its tc-<pos> class).
 const ACTION_BUTTONS = [
   { action: 'uniqueba', pos: 'uniqueba', ability: true },
-  { action: 'transform', label: 'Transform', icon: ICONS.transform, pos: 'transform', pending: true },
+  { action: 'transform', pos: 'transform' },
   { action: 'shield', label: 'Shield', icon: ICONS.shield, pos: 'shield', ability: true },
   { action: 'ba1', pos: 'ba1', ability: true },
   { action: 'ba2', pos: 'ba2', ability: true },
@@ -101,7 +102,7 @@ function makeButton(spec, cls) {
   const content = spec.icon || (spec.text && el('span', { class: 'tc-text', text: spec.text }));
   const btn = el('button', {
     type: 'button',
-    class: `tc-btn ${cls}${spec.ability ? ' tc-ability' : ''}${spec.pending ? ' is-pending' : ''}`,
+    class: `tc-btn ${cls}${spec.ability ? ' tc-ability' : ''}`,
     'aria-label': spec.label,
     'data-action': spec.action,
     tabindex: '-1',
@@ -394,16 +395,18 @@ export class TouchControls {
   }
 
   // Shows `def`'s own abilities (its mobileAbilities) on the fighter-specific
-  // buttons: each one's icon and accessible name, nothing else. The buttons
-  // stay the same elements with the same data-action and pointer handling,
-  // so input, held state and multi-touch carry on untouched. Null (or a
-  // fighter that authors none) gives the neutral fallback.
+  // buttons: each one's icon and accessible name, and whether it shows as
+  // reserved, nothing else. The buttons stay the same elements with the same
+  // data-action and pointer handling, so input, held state and multi-touch
+  // carry on untouched. Null (or a fighter that authors none) gives the
+  // neutral fallback, with Transform reserved.
   setCharacter(def) {
     for (const action of ABILITY_ACTIONS) {
-      const { label, icon } = mobileAbility(def, action);
+      const { label, icon, pending } = mobileAbility(def, action);
       const b = this.actionButtons.get(action);
       b.setAttribute('aria-label', label);
       b.innerHTML = icon;
+      b.classList.toggle('is-pending', pending);
     }
   }
 }

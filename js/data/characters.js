@@ -543,11 +543,12 @@ export const CHARACTERS = [
     // How the touch controls present this fighter's own buttons: an icon
     // (a key of ICONS in js/ui/icons.js) and an accessible name for each.
     // UI only (see js/ui/mobile-abilities.js): the buttons still send
-    // uniqueba, ba1 and ba2, and nothing here reaches combat. Each names the
-    // button's ability family, not every move it makes: Punch is also maba1
-    // (the mid-air kunai slash), and with Charge held cba1 (the Clone
-    // Attack). The Shield, Transform, Jump and movement buttons are
-    // universal.
+    // uniqueba, transform, ba1 and ba2, and nothing here reaches combat.
+    // Each names the button's ability family, not every move it makes: Punch
+    // is also maba1 (the mid-air kunai slash), and with Charge held cba1 (the
+    // Clone Attack). With no `transform` entry (no Transform yet) its
+    // Transform button stays reserved (dashed). The Shield, Jump and
+    // movement buttons are universal.
     mobileAbilities: {
       uniqueba: { label: 'Shuriken', icon: 'shuriken' },
       ba1: { label: 'Punch', icon: 'punch' },

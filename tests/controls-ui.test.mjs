@@ -82,6 +82,7 @@ const { ACTION_LABELS, CONFIG } = await import('../js/config.js');
 const { ICONS } = await import('../js/ui/icons.js');
 const { ABILITY_ACTIONS, mobileAbility } = await import('../js/ui/mobile-abilities.js');
 const { getCharacter } = await import('../js/data/characters.js');
+const { SAMPLE_FIGHTER } = await import('./sample-fighter.mjs');
 
 const ROOT = new URL('../', import.meta.url);
 const read = (path) => readFileSync(new URL(path, ROOT), 'utf8');
@@ -156,7 +157,9 @@ test('#0001 authors its mobile abilities as small, declarative UI data', () => {
   // Every icon it names exists; the Shield is universal, not #0001's.
   for (const { icon } of Object.values(DEF_0001.mobileAbilities)) assert.ok(ICONS[icon], icon);
   assert.equal(DEF_0001.mobileAbilities.shield, undefined);
-  assert.deepEqual([...ABILITY_ACTIONS], ['uniqueba', 'ba1', 'ba2']);
+  // No Transform of its own yet: its Transform button stays reserved.
+  assert.equal(DEF_0001.mobileAbilities.transform, undefined);
+  assert.deepEqual([...ABILITY_ACTIONS], ['uniqueba', 'transform', 'ba1', 'ba2']);
   // UI only: no combat module reads it, and the controls never guess an
   // icon from attack data or animation names.
   const code = (file) => read(file).replace(/\/\/.*$/gm, '');
@@ -170,23 +173,53 @@ test('#0001 authors its mobile abilities as small, declarative UI data', () => {
 });
 
 test('mobileAbility falls back safely: generic names and neutral glyphs, never a crash', () => {
-  assert.deepEqual(mobileAbility(DEF_0001, 'uniqueba'), { label: 'Shuriken', icon: ICONS.shuriken });
-  assert.deepEqual(mobileAbility(DEF_0001, 'ba1'), { label: 'Punch', icon: ICONS.punch });
-  assert.deepEqual(mobileAbility(DEF_0001, 'ba2'), { label: 'Kick', icon: ICONS.kick });
+  assert.deepEqual(mobileAbility(DEF_0001, 'uniqueba'), { label: 'Shuriken', icon: ICONS.shuriken, pending: false });
+  assert.deepEqual(mobileAbility(DEF_0001, 'ba1'), { label: 'Punch', icon: ICONS.punch, pending: false });
+  assert.deepEqual(mobileAbility(DEF_0001, 'ba2'), { label: 'Kick', icon: ICONS.kick, pending: false });
+  assert.deepEqual(mobileAbility(DEF_0001, 'transform'), { label: 'Transform', icon: ICONS.transform, pending: true });
   for (const def of [null, undefined, {}, { mobileAbilities: {} }]) {
-    assert.deepEqual(mobileAbility(def, 'uniqueba'), { label: ACTION_LABELS.uniqueba, icon: ICONS.ring });
-    assert.deepEqual(mobileAbility(def, 'ba1'), { label: ACTION_LABELS.ba1, icon: ICONS.pip1 });
-    assert.deepEqual(mobileAbility(def, 'ba2'), { label: ACTION_LABELS.ba2, icon: ICONS.pip2 });
+    assert.deepEqual(mobileAbility(def, 'uniqueba'), { label: ACTION_LABELS.uniqueba, icon: ICONS.ring, pending: false });
+    assert.deepEqual(mobileAbility(def, 'ba1'), { label: ACTION_LABELS.ba1, icon: ICONS.pip1, pending: false });
+    assert.deepEqual(mobileAbility(def, 'ba2'), { label: ACTION_LABELS.ba2, icon: ICONS.pip2, pending: false });
+    assert.deepEqual(mobileAbility(def, 'transform'), { label: 'Transform', icon: ICONS.transform, pending: true }, 'reserved until a fighter presents one');
   }
   // Half-authored: whatever is missing or unknown falls back on its own.
-  const partial = { mobileAbilities: { uniqueba: { label: 'Kunai' }, ba1: { icon: 'nope', label: 'Jab' } } };
-  assert.deepEqual(mobileAbility(partial, 'uniqueba'), { label: 'Kunai', icon: ICONS.ring });
-  assert.deepEqual(mobileAbility(partial, 'ba1'), { label: 'Jab', icon: ICONS.pip1 });
-  assert.deepEqual(mobileAbility(partial, 'ba2'), { label: 'Basic Attack 2', icon: ICONS.pip2 });
+  const partial = { mobileAbilities: { uniqueba: { label: 'Kunai' }, ba1: { icon: 'nope', label: 'Jab' }, transform: { label: 'Awaken' } } };
+  assert.deepEqual(mobileAbility(partial, 'uniqueba'), { label: 'Kunai', icon: ICONS.ring, pending: false });
+  assert.deepEqual(mobileAbility(partial, 'ba1'), { label: 'Jab', icon: ICONS.pip1, pending: false });
+  assert.deepEqual(mobileAbility(partial, 'ba2'), { label: 'Basic Attack 2', icon: ICONS.pip2, pending: false });
+  assert.deepEqual(mobileAbility(partial, 'transform'), { label: 'Awaken', icon: ICONS.transform, pending: false }, 'its own Transform: no longer reserved');
   // The three fallbacks tell the buttons apart and never borrow #0001's look.
   const glyphs = ['ring', 'pip1', 'pip2'].map((n) => ICONS[n]);
   assert.equal(new Set(glyphs).size, 3);
   for (const g of glyphs) assert.ok(![ICONS.shuriken, ICONS.punch, ICONS.kick].includes(g));
+});
+
+// ---- Touch buttons: a fighter that is not #0001 ----------------------------------
+
+test('another fighter presents its own buttons: its Transform is a real button, a button it leaves out is neutral', () => {
+  for (const scheme of ['joystick', 'classic']) {
+    const { tc, calls } = touchControls(SAMPLE_FIGHTER, { scheme });
+    const b = (a) => tc.buttons.get(a);
+    assert.deepEqual(['uniqueba', 'transform', 'ba1', 'ba2'].map((a) => [a, b(a).getAttribute('aria-label'), b(a).innerHTML]), [
+      ['uniqueba', 'Palm Strike', ICONS.arrow],
+      ['transform', 'Awakening', ICONS.up],
+      ['ba1', 'Jab', ICONS.punch],
+      ['ba2', ACTION_LABELS.ba2, ICONS.pip2],
+    ], scheme);
+    assert.equal(b('transform').classList.contains('is-pending'), false, `${scheme}: its own Transform, not reserved`);
+    assert.deepEqual([...tc.buttons].filter(([, el]) => el.classList.contains('is-pending')), [], `${scheme}: nothing reserved`);
+    // The same elements and codenames whatever it looks like.
+    press(b('transform'), 1);
+    lift(b('transform'), 1);
+    assert.deepEqual(calls, [['transform', true], ['transform', false]]);
+    // Back to #0001, which has no Transform: the neutral star, reserved again.
+    tc.setCharacter(DEF_0001);
+    assert.equal(b('transform').getAttribute('aria-label'), 'Transform');
+    assert.equal(b('transform').innerHTML, ICONS.transform);
+    assert.ok(b('transform').classList.contains('is-pending'), `${scheme}: reserved for #0001`);
+    assert.equal(b('uniqueba').getAttribute('aria-label'), 'Shuriken');
+  }
 });
 
 // ---- Touch buttons: #0001 -----------------------------------------------------

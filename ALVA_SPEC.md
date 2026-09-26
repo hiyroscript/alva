@@ -2163,20 +2163,23 @@ Back return Home). It holds the player's settings, saved on this device.
   Every combat button shows an original monochrome SVG icon
   (`currentColor`, from `js/ui/icons.js`) and no text: no **T**, **D**,
   **BA1** or **BA2**. Its accessible name says what it is. The fighter's
-  own buttons, the large top one (`uniqueba`), and the first two of the
-  bottom row (`ba1`, `ba2`), take their icon and name from the
-  character's `mobileAbilities` (UI data, never read by combat): for #0001
+  own buttons, the large top one (`uniqueba`), the first of the middle
+  row (`transform`) and the first two of the bottom row (`ba1`, `ba2`),
+  take their icon and name from the character's `mobileAbilities` (UI
+  data, never read by combat): for #0001
   **Shuriken** (a four-bladed throwing star), **Punch** (a fist) and
   **Kick** (a leg and foot). `TouchControls.setCharacter(def)` applies them
   without rebuilding anything; Quick Battle calls it with Player 1's
   fighter as it enters (Watch Mode, where nobody plays, hides the touch
   controls instead), Practice Ground as it enters and on every
   successful Change Fighter (a CPU change never touches them). A fighter
-  with no `mobileAbilities` gets the generic names (Throw, Basic Attack 1,
-  Basic Attack 2) and neutral glyphs (a ring, one pip, two pips). The
-  universal buttons belong to the controls: **Shield** (the shield
-  outline, labelled "Shield"; held for as long as the pointer stays on it)
-  in the old Block slot, Transform (a star, labelled "Transform") and Jump.
+  with no `mobileAbilities` gets the generic names (Unique Basic Attack,
+  Basic Attack 1, Basic Attack 2) and neutral glyphs (a ring, one pip, two
+  pips). Transform is reserved until a fighter presents its own: with no
+  `transform` entry (#0001 has none) it is the neutral star, labelled
+  "Transform", with a dashed outline. The universal buttons belong to the
+  controls: **Shield** (the shield outline, labelled "Shield"; held for as
+  long as the pointer stays on it) in the old Block slot, and Jump.
   Only the presentation is per fighter: each button's `data-action` is its
   control codename (`uniqueba`, `transform`, `shield`, `ba1`, `ba2`,
   `jump`, `charge`, `runLeft`, `runRight`), whatever it looks like, so
@@ -2187,8 +2190,9 @@ Back return Home). It holds the player's settings, saved on this device.
   Tapping the timer or the pause section beneath it (top centre, 7.3) pauses.
   Original circular icons, translucent dark fill, white outlines; pressed
   buttons scale down and brighten to white — no hue.
-  Reserved actions (only Transform now) use dashed outlines and never show
-  nagging alerts; Shuriken, Shield, Punch and Kick are solid.
+  A reserved button (only Transform, and only while the fighter has none)
+  uses a dashed outline and never shows nagging alerts; Shuriken, Shield,
+  Punch and Kick are solid.
 - Touch controls appear only on touch-first devices (coarse pointer or an
   observed touch), never merely because a desktop window is narrow.
 - Gameplay pauses when the pause menu (Practice Ground: the Practice menu,

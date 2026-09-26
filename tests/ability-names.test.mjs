@@ -9,6 +9,7 @@ import { readFileSync } from 'node:fs';
 import { MOVES } from '../js/config.js';
 import { CHARACTERS, getCharacter } from '../js/data/characters.js';
 import { abilityName } from '../js/data/abilities.js';
+import { SAMPLE_FIGHTER } from './sample-fighter.mjs';
 
 const DEF_0001 = getCharacter('0001');
 
@@ -45,7 +46,7 @@ test('only move codenames have ability names: never a control, a retired name or
 });
 
 test('every character\'s ability names are non-empty names of universal moves', () => {
-  for (const c of CHARACTERS) {
+  for (const c of [...CHARACTERS, SAMPLE_FIGHTER]) {
     for (const [move, name] of Object.entries(c.abilityNames ?? {})) {
       assert.ok(Object.hasOwn(MOVES, move), `#${c.id}: ${move} is a move codename`);
       assert.equal(typeof name, 'string', `#${c.id}: ${move}`);

@@ -16,7 +16,7 @@ export const def = getCharacter('0001');
 export const DT = CONFIG.sim.step;
 export const BASE = './assets/characters/0001/0001_';
 
-// SpriteSet with the definition's clip metadata in place of decoded frames.
+// SpriteSet with #0001's clip metadata in place of decoded frames.
 // `projectileKeys` and `effectKeys` pick which projectile and effect
 // animations have art.
 export function fakeSprites(
@@ -24,24 +24,35 @@ export function fakeSprites(
   projectileKeys = Object.keys(def.projectileAnimations),
   effectKeys = Object.keys(def.effectAnimations),
 ) {
-  const set = new SpriteSet(def);
+  return fakeSpritesOf(def, keys, projectileKeys, effectKeys);
+}
+
+// The same for any character: every clip, projectile and effect it
+// declares has art unless the keys say otherwise.
+export function fakeSpritesOf(
+  character,
+  keys = Object.keys(character.animations),
+  projectileKeys = Object.keys(character.projectileAnimations ?? {}),
+  effectKeys = Object.keys(character.effectAnimations ?? {}),
+) {
+  const set = new SpriteSet(character);
   for (const key of keys) {
-    const anim = def.animations[key];
+    const anim = character.animations[key];
     set.animations[key] = {
       key, fps: anim.fps, loop: anim.loop !== false,
-      sourceFacing: anim.sourceFacing ?? def.sourceFacing ?? 1,
+      sourceFacing: anim.sourceFacing ?? character.sourceFacing ?? 1,
       frames: anim.frames.map((url) => ({ url })),
     };
   }
   for (const key of projectileKeys) {
-    const anim = def.projectileAnimations[key];
+    const anim = character.projectileAnimations[key];
     set.projectiles[key] = {
       key, fps: anim.fps, loop: anim.loop !== false, sourceFacing: anim.sourceFacing ?? 0,
       frames: anim.frames.map((url) => ({ url })),
     };
   }
   for (const key of effectKeys) {
-    const anim = def.effectAnimations[key];
+    const anim = character.effectAnimations[key];
     set.effects[key] = {
       key, fps: anim.fps, loop: anim.loop !== false, sourceFacing: anim.sourceFacing ?? 0,
       frames: anim.frames.map((url) => ({ url })),
@@ -115,16 +126,17 @@ export function recordAttack(step, held) {
 export const sequence = (log) => log.map((s) => s.frame).filter((n, i, a) => n !== a[i - 1]);
 
 // Two fighters, their projectiles and clones and the real CombatSystem,
-// stepped in Battle.update()'s order. `targetCharacter` swaps in another
-// definition (e.g. one with no Energy refill); `targetFacing` overrides the
+// stepped in Battle.update()'s order. `attackerCharacter` and
+// `targetCharacter` swap in other definitions (e.g. one with no Energy
+// refill); `targetFacing` overrides the
 // target's starting facing (by default it faces the attacker). `stage`
 // and `x` (the attacker's spawn) place them; `pushboxes` also keeps the two
 // bodies apart and out of solids, as Battle.update() does.
 export function duel({
-  gap = 44, attackerFacing = 1, attackerSprites, targetSprites, targetCharacter, targetFacing = -attackerFacing,
+  gap = 44, attackerFacing = 1, attackerSprites, attackerCharacter, targetSprites, targetCharacter, targetFacing = -attackerFacing,
   stage = STAGE, x = 500, pushboxes = false,
 } = {}) {
-  const a = makeFighter({ x, facing: attackerFacing, sprites: attackerSprites, stage });
+  const a = makeFighter({ x, facing: attackerFacing, sprites: attackerSprites, character: attackerCharacter, stage });
   const b = makeFighter({
     x: x + gap * attackerFacing, facing: targetFacing, sprites: targetSprites, character: targetCharacter, stage,
   });
