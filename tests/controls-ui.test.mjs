@@ -1,10 +1,14 @@
 // Run with node --test tests/controls-ui.test.mjs (no dependencies).
-// The touch controls and Help content on a minimal fake DOM: the icon-based
-// combat buttons (#0001's Shuriken, Punch and Kick from its mobileAbilities,
-// the universal Shield), their character-aware refresh, the unchanged
-// internal inputs behind them (primary, defense, action1, action2), Charge,
-// the Help diagram and the page-zoom guard. Layout, paint and real gestures
-// still need real-browser verification.
+// The touch controls on a minimal fake DOM, in both Mobile Controls schemes:
+// the icon-based combat buttons (#0001's Shuriken, Punch and Kick from its
+// mobileAbilities, the universal Shield), their character-aware refresh, the
+// unchanged internal inputs behind them (primary, defense, action1,
+// action2), Classic Buttons' Left / C / Right cluster exactly as before,
+// the Joystick scheme's stick (deadzone, release, crossing the centre,
+// multi-touch), its single-tap Left mouvement / Right mouvement Dash
+// buttons and its down-arrow Charge under Jump, switching schemes, the
+// unchanged desktop bindings and the page-zoom guard. Layout, paint and
+// real gestures still need real-browser verification.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
@@ -21,6 +25,7 @@ class Element extends Node {
   listeners = new Map();
   dataset = {};
   html = '';
+  style = {};
   rect = { left: 0, top: 0, width: 40, height: 40 };
   constructor(tag) {
     super();
@@ -71,8 +76,7 @@ globalThis.document = {
   createTextNode: (text) => new Text(text),
 };
 
-const { TouchControls } = await import('../js/game/touch-controls.js');
-const { buildHelp } = await import('../js/ui/help-content.js');
+const { TouchControls, JOYSTICK, joystickDirection } = await import('../js/game/touch-controls.js');
 const { ACTION_LABELS, CONFIG } = await import('../js/config.js');
 const { ICONS } = await import('../js/ui/icons.js');
 const { ABILITY_ACTIONS, mobileAbility } = await import('../js/ui/mobile-abilities.js');
@@ -84,11 +88,17 @@ const CSS = read('styles.css');
 const DEF_0001 = getCharacter('0001');
 
 // Touch controls wired to a recording input; `def` is the fighter they
-// present (#0001 unless given; null leaves them neutral).
-function touchControls(def = DEF_0001) {
+// present (#0001 unless given; null leaves them neutral) and `scheme` their
+// layout (Classic Buttons here, the layout these checks were written for;
+// the Joystick tests below ask for theirs). Dash requests are recorded as
+// ['dash', direction].
+function touchControls(def = DEF_0001, { scheme = 'classic' } = {}) {
   const calls = [];
-  const input = { setTouch: (action, held) => calls.push([action, held]) };
-  const tc = new TouchControls(new Element('div'), input);
+  const input = {
+    setTouch: (action, held) => calls.push([action, held]),
+    queueTouchDash: (direction) => calls.push(['dash', direction]),
+  };
+  const tc = new TouchControls(new Element('div'), input, { scheme });
   if (def) tc.setCharacter(def);
   tc.setEnabled(true);
   return { tc, calls, input };
@@ -402,58 +412,33 @@ test('before any fighter is named the controls are usable and neutral; a held bu
   assert.deepEqual(calls, [['action1', true], ['action1', false]]);
 });
 
-// ---- Help: the desktop table -----------------------------------------------
+// ---- Desktop controls ---------------------------------------------------------
 
-test('help labels action1 Basic Attack 1 and no longer marks it Reserved', () => {
-  assert.equal(ACTION_LABELS.action1, 'Basic Attack 1');
-  assert.deepEqual(CONFIG.bindings.action1, ['KeyU']);
-  const help = buildHelp();
-  const rows = Object.fromEntries(help.querySelectorAll('tr').slice(1).map((tr) => {
-    const th = tr.querySelector('th');
-    return [th.children[0].textContent, !!th.querySelector('.tag')];
-  }));
-  assert.equal(rows['Basic Attack 1'], false);
-  assert.equal(rows.Throw, false);
-  assert.equal(rows.Primary, undefined);
-  assert.equal(rows.Special, true);
-  assert.equal(rows.Defense, false);
-  assert.equal(rows.Block, undefined);
-  assert.equal(rows['Action 1'], undefined);
-});
-
-test('help labels action2 Basic Attack 2 and no longer marks it Reserved', () => {
-  assert.equal(ACTION_LABELS.action2, 'Basic Attack 2');
-  assert.deepEqual(CONFIG.bindings.action2, ['KeyI']);
-  const help = buildHelp();
-  const rows = help.querySelectorAll('tr').slice(1).map((tr) => {
-    const th = tr.querySelector('th');
-    return { label: th.children[0].textContent, reserved: !!th.querySelector('.tag'), keys: tr.querySelector('td').textContent };
+test('keyboard bindings and action names are unchanged by the touch layouts', () => {
+  assert.deepEqual({ ...CONFIG.bindings }, {
+    left: ['KeyA', 'ArrowLeft'],
+    right: ['KeyD', 'ArrowRight'],
+    charge: ['KeyS', 'ArrowDown'],
+    jump: ['KeyW', 'Space', 'ArrowUp'],
+    primary: ['KeyJ'],
+    special: ['KeyK'],
+    defense: ['KeyL'],
+    action1: ['KeyU'],
+    action2: ['KeyI'],
+    pause: ['Escape', 'KeyP'],
   });
-  const ba2 = rows.find((r) => r.label === 'Basic Attack 2');
-  assert.ok(ba2, 'Basic Attack 2 row');
-  assert.equal(ba2.reserved, false);
-  assert.equal(ba2.keys, 'I');
-  assert.equal(rows.find((r) => r.label === 'Basic Attack 1').keys, 'U');
-  assert.equal(rows.find((r) => r.label === 'Action 2'), undefined);
-  assert.deepEqual(rows.filter((r) => r.reserved).map((r) => r.label), ['Special']);
+  assert.deepEqual({ ...ACTION_LABELS }, {
+    left: 'Move left', right: 'Move right', charge: 'Charge', jump: 'Jump', primary: 'Throw', special: 'Special',
+    defense: 'Defense', action1: 'Basic Attack 1', action2: 'Basic Attack 2', pause: 'Pause',
+  });
+  // No Down, Block or dash key: Dash stays a double tap on the keyboard.
+  for (const name of ['down', 'block', 'dash', 'dashLeft', 'dashRight']) {
+    assert.equal(CONFIG.bindings[name], undefined, name);
+    assert.equal(ACTION_LABELS[name], undefined, name);
+  }
 });
 
-test('the build notes say BA1, BA2 and Throw are available and only Special is reserved', () => {
-  const text = buildHelp().querySelectorAll('.info-text').map((p) => p.textContent).join(' ');
-  assert.match(text, /Basic Attack 1/);
-  assert.match(text, /Basic Attack 2/);
-  assert.match(text, /on the ground and in the air/);
-  assert.match(text, /BA1 \(action1\)/);
-  assert.match(text, /BA2 \(action2\)/);
-  assert.match(text, /jump, fall and land/);
-  assert.match(text, /Only Special is still reserved/);
-  assert.doesNotMatch(text, /Primary/);
-  assert.match(text, /training CPU never attacks/);
-  assert.doesNotMatch(text, /Action [12]/);
-  assert.doesNotMatch(text, /idle and run animations\./);
-});
-
-// ---- Charge ---------------------------------------------------------------
+// ---- Classic Buttons: Charge ------------------------------------------------
 
 // Lays the lower-left cluster out left to right, 50 px apart.
 function layoutDpad(tc) {
@@ -559,244 +544,419 @@ test('Charge works alongside Punch, Kick, Shield and Jump (multi-touch)', () => 
   }
 });
 
-test('help lists Charge on S / ↓ in place of Down / drop through', () => {
-  assert.equal(ACTION_LABELS.charge, 'Charge');
-  assert.equal(ACTION_LABELS.down, undefined);
-  assert.deepEqual(CONFIG.bindings.charge, ['KeyS', 'ArrowDown']);
-  const help = buildHelp();
-  const rows = help.querySelectorAll('tr').slice(1).map((tr) => ({
-    label: tr.querySelector('th').children[0].textContent,
-    reserved: !!tr.querySelector('th').querySelector('.tag'),
-    keys: tr.querySelector('td').querySelectorAll('kbd').map((k) => k.textContent),
-  }));
-  assert.deepEqual(rows.map((r) => r.label).slice(0, 4), ['Move left', 'Move right', 'Charge', 'Jump']);
-  const charge = rows.find((r) => r.label === 'Charge');
-  assert.deepEqual(charge.keys, ['S', '↓']);
-  assert.equal(charge.reserved, false);
-  const text = help.textContent;
-  assert.doesNotMatch(text, /drop through/i);
-  assert.doesNotMatch(text, /crouch/i);
-  assert.doesNotMatch(text, /Down \/ drop/);
-  assert.doesNotMatch(text, /(Hold|Press) Down/);
-});
+// ---- Schemes -------------------------------------------------------------------
 
-test('the mobile diagram shows C for Charge between Left and Right', () => {
-  const help = buildHelp();
-  assert.equal(help.querySelector('.md-down'), null);
-  const dot = help.querySelector('.md-charge');
-  assert.ok(dot, 'Charge dot');
-  assert.equal(dot.getAttribute('title'), 'Charge');
-  const icon = dot.querySelector('.md-icon').innerHTML;
-  assert.equal(icon, '<b>C</b>');
-  assert.notEqual(icon, ICONS.down);
-  const screen = help.querySelector('.md-screen').children;
-  const order = screen.map((d) => d.getAttribute('title'));
-  assert.deepEqual(order.slice(1, 4), ['Left', 'Charge', 'Right']);
-  const diagram = help.querySelector('.mobile-diagram');
-  assert.match(diagram.getAttribute('aria-label'), /Left, Charge and Right controls at the lower left/);
-  assert.doesNotMatch(diagram.getAttribute('aria-label'), /Down/);
-  const legend = help.querySelector('.md-legend').textContent;
-  assert.match(legend, /Left · Charge · Right/);
-  assert.doesNotMatch(legend, /Down/);
-});
+const actionsOf = (cluster) => cluster.children.map((c) => c.getAttribute('data-action'));
 
-test('help explains that Charge is held, loops while held, and speeds up the charged cooldowns; Energy by name, no Health', () => {
-  const help = buildHelp();
-  const items = help.querySelectorAll('li').map((li) => li.textContent).join(' ');
-  assert.match(items, /Hold Charge \(S \/ ↓, or C on touch\) while grounded/);
-  assert.match(items, /Charge must be held: release it to stop charging/);
-  assert.match(items, /two-frame startup once, then loops its sustained pose/);
-  assert.match(items, /own 5-second cooldown/);
-  assert.match(items, /Charging makes both cooldowns recover twice as fast/);
-  assert.doesNotMatch(help.textContent, /health|stamina/i, 'no Health, and never the old Stamina, anywhere in Help');
-  assert.match(items, /The bright purple bar above your fighter is Energy; it shows only while it is not full/);
-  assert.match(items, /A Dash costs 15 of its 100, and every hit your Shield blocks costs 25/);
-  assert.match(items, /You can still Dash or Shield with less left than that, but it empties the bar/);
-  assert.match(items, /Blocking with less than 25 Energy left still works, but empties the bar/);
-  assert.doesNotMatch(help.textContent, /segment/i, 'one bar, no segments');
-  assert.match(items, /If Energy reaches zero, it turns gray and must fully refill before Shield and Dash become available again/);
-  assert.match(items, /refills your Energy faster too/);
-  const notes = help.querySelectorAll('.info-note').map((p) => p.textContent).join(' ');
-  assert.match(notes, /down to Charge/);
-  assert.match(notes, /C is Charge: hold it to charge/);
-  const build = help.querySelectorAll('.info-text').map((p) => p.textContent).join(' ');
-  assert.match(build, /held Charge stance/);
-});
-
-test('help explains the Charged BA1 Clone Attack in the Charge & cooldowns card, with no new control row', () => {
-  const help = buildHelp();
-  const card = help.querySelectorAll('.info-card').find((c) => /Charge & cooldowns/.test(c.textContent));
-  const items = card.querySelectorAll('li').map((li) => li.textContent).join(' ');
-  assert.match(items, /Hold Charge first, then press BA1 to summon a clone behind the opponent/);
-  assert.match(items, /The clone appears .*, performs BA1 and disappears/);
-  assert.match(items, /keeps charging for as long as you hold Charge/);
-  assert.match(items, /Letting go of Charge as you press BA1 gives a normal BA1/);
-  assert.match(items, /It starts the moment the move is used, hit or miss/);
-  assert.match(items, /While it is cooling down, the charged press does nothing/);
-  // The combo uses the existing Charge and BA1 controls.
-  const rows = help.querySelectorAll('tr').map((tr) => tr.textContent);
-  assert.ok(!rows.some((r) => /clone/i.test(r)), 'no control row for it');
-});
-
-
-// ---- Help: the mobile diagram ---------------------------------------------
-
-test('the mobile diagram draws the real icons, never T, D, BA1 or BA2', () => {
-  const help = buildHelp();
-  const diagram = help.querySelector('.mobile-diagram');
-  const dots = Object.fromEntries(help.querySelector('.md-screen').children.map((d) => [d.getAttribute('title'), d.querySelector('.md-icon').innerHTML]));
-  assert.deepEqual(Object.keys(dots), ['Pause', 'Left', 'Charge', 'Right', 'Shuriken', 'Special', 'Shield', 'Punch', 'Kick', 'Jump']);
-  assert.equal(dots.Shuriken, ICONS.shuriken);
-  assert.equal(dots.Special, ICONS.special);
-  assert.equal(dots.Shield, ICONS.shield);
-  assert.equal(dots.Punch, ICONS.punch);
-  assert.equal(dots.Kick, ICONS.kick);
-  assert.equal(dots.Jump, ICONS.jump);
-  // #0001's own come from its mobileAbilities, exactly as the touch controls show them.
-  const { tc } = touchControls();
-  assert.equal(help.querySelector('.md-throw').querySelector('.md-icon').innerHTML, tc.buttons.get('primary').innerHTML);
-  assert.equal(help.querySelector('.md-a1').querySelector('.md-icon').innerHTML, tc.buttons.get('action1').innerHTML);
-  assert.equal(help.querySelector('.md-a2').querySelector('.md-icon').innerHTML, tc.buttons.get('action2').innerHTML);
-  assert.equal(help.querySelector('.md-defense').querySelector('.md-icon').innerHTML, tc.buttons.get('defense').innerHTML);
-  // Same slots as ever.
-  for (const cls of ['md-throw', 'md-special', 'md-defense', 'md-a1', 'md-a2', 'md-jump']) assert.ok(help.querySelector(`.${cls}`), cls);
-  assert.equal(help.querySelector('.md-primary'), null);
-  assert.equal(help.querySelector('.md-block'), null);
-  // No old abbreviations drawn anywhere in it.
-  for (const icon of Object.values(dots)) {
-    assert.doesNotMatch(icon, /<b>(T|D|BA1|BA2)<\/b>/);
+test('Joystick is the default scheme; setScheme switches layouts and anything unknown is the Joystick', () => {
+  const input = { setTouch() {}, queueTouchDash() {} };
+  const tc = new TouchControls(new Element('div'), input);
+  assert.equal(tc.scheme, 'joystick', 'a player who never chose');
+  assert.equal(tc.root.dataset.scheme, 'joystick');
+  assert.ok(tc.root.classList.contains('is-joystick'));
+  assert.equal(tc.root.classList.contains('is-classic'), false);
+  tc.setScheme('classic');
+  assert.equal(tc.scheme, 'classic');
+  assert.equal(tc.root.dataset.scheme, 'classic');
+  assert.ok(tc.root.classList.contains('is-classic'));
+  assert.equal(tc.root.classList.contains('is-joystick'), false);
+  for (const bad of ['dpad', '', null, undefined, 'Classic']) {
+    tc.setScheme('classic');
+    tc.setScheme(bad);
+    assert.equal(tc.scheme, 'joystick', String(bad));
   }
-  assert.doesNotMatch(Object.values(dots).join(''), /<b>(?!C<)/, 'only Charge still reads a letter');
-  const label = diagram.getAttribute('aria-label');
-  for (const word of ['Shuriken', 'Special', 'Shield', 'Punch', 'Kick', 'Jump']) assert.match(label, new RegExp(word));
-  assert.match(label, /Left, Charge and Right controls at the lower left/);
-  assert.match(label, /Shuriken, Special, Shield, Punch, Kick and Jump staggered at the lower right/);
-  assert.doesNotMatch(label, /\((T|D|BA1|BA2)\)|\b(Primary|primary|action1|action2|defense|Block|Dodge|Down)\b/);
+  assert.equal(new TouchControls(new Element('div'), input, { scheme: 'classic' }).scheme, 'classic');
 });
 
-test('the mobile legend and note describe the abilities, not code labels or internal names', () => {
-  const help = buildHelp();
-  const legend = help.querySelector('.md-legend').textContent;
-  assert.match(legend, /Left · Charge · Right/);
-  assert.match(legend, /Shuriken, Special, Shield, Punch, Kick and Jump/);
-  assert.match(legend, /Throws #0001’s shuriken\./);
-  assert.match(legend, /Hold it to keep #0001’s Shield up/);
-  assert.match(legend, /Basic Attacks 1 and 2/);
-  assert.match(legend, /Clone Attack or the Sphere Rush/);
-  assert.match(legend, /Timer · Pause/);
-  const card = help.querySelectorAll('.info-card').find((c) => /Mobile controls/.test(c.textContent));
-  const note = card.querySelector('.info-note').textContent;
-  assert.match(note, /C is Charge: hold it to charge/);
-  assert.match(note, /Shuriken throws; hold Shield to keep it up/);
-  assert.match(note, /Punch \(the fist\) and Kick \(the leg\) are Basic Attacks 1 and 2/);
-  assert.match(note, /hold C first to turn them into the Clone Attack and the Sphere Rush/);
-  assert.match(note, /Only the dashed Special button is reserved/);
-  for (const text of [legend, note]) {
-    assert.doesNotMatch(text, /\b(T|D|BA1|BA2)\b/, 'no code labels');
-    assert.doesNotMatch(text, /\b(primary|action1|action2|defense)\b/, 'no internal names');
+test('Classic Buttons is the original layout exactly: Left / C / Right at the lower left, the six actions at the lower right', () => {
+  const { tc } = touchControls(DEF_0001, { scheme: 'classic' });
+  assert.deepEqual(tc.root.children, [tc.dpad, tc.actions]);
+  assert.deepEqual(actionsOf(tc.dpad), ['left', 'charge', 'right']);
+  assert.deepEqual(tc.dpad.children.map((b) => b.getAttribute('aria-label')), ['Move left', 'Charge', 'Move right']);
+  assert.equal(tc.dpad.getAttribute('aria-label'), 'Movement and Charge');
+  assert.deepEqual(actionsOf(tc.actions), ['primary', 'special', 'defense', 'action1', 'action2', 'jump'], 'no Charge under Jump');
+  assert.equal(tc.buttons.get('charge').textContent, 'C');
+  // Nothing of the Joystick scheme is on screen.
+  assert.equal(tc.root.querySelectorAll('.tc-stick').length, 0);
+  assert.equal(tc.root.querySelectorAll('.tc-dash').length, 0);
+  assert.equal(tc.root.querySelectorAll('.tc-charge-down').length, 0);
+  // Left and Right are ordinary held directions: a Dash still needs two taps.
+  const { tc: tc2, calls } = touchControls(DEF_0001, { scheme: 'classic' });
+  const at = layoutDpad(tc2);
+  tc2.dpad.dispatch('pointerdown', { pointerId: 1, ...at('right'), preventDefault() {} });
+  tc2.dpad.dispatch('pointerup', { pointerId: 1 });
+  tc2.dpad.dispatch('pointerdown', { pointerId: 2, ...at('right'), preventDefault() {} });
+  tc2.dpad.dispatch('pointerup', { pointerId: 2 });
+  assert.deepEqual(calls, [['right', true], ['right', false], ['right', true], ['right', false]], 'two taps are two presses, no Dash request');
+});
+
+test('the Joystick scheme: a movement joystick between Left mouvement and Right mouvement, and Charge (a down arrow) under Jump', () => {
+  const { tc } = touchControls(DEF_0001, { scheme: 'joystick' });
+  assert.deepEqual(tc.root.children, [tc.joystick, tc.actions]);
+  const [dashLeft, stick, dashRight] = tc.joystick.children;
+  assert.equal(stick, tc.stick);
+  assert.equal(stick.getAttribute('role'), 'group');
+  assert.equal(stick.getAttribute('aria-label'), 'Movement joystick');
+  assert.ok(stick.children.includes(tc.knob));
+  // The Dash buttons: real buttons with exactly these names, spelling kept,
+  // and the readable arrow glyphs.
+  for (const [b, name, icon, side] of [[dashLeft, 'Left mouvement', ICONS.left, 'left'], [dashRight, 'Right mouvement', ICONS.right, 'right']]) {
+    assert.equal(b.tagName, 'BUTTON');
+    assert.equal(b.getAttribute('type'), 'button');
+    assert.equal(b.getAttribute('aria-label'), name);
+    assert.equal(b.innerHTML, icon);
+    assert.ok(b.classList.contains('tc-btn'));
+    assert.ok(b.classList.contains(`tc-dash-${side}`));
+    assert.equal(b.getAttribute('data-action'), null, 'not a held action');
+    assert.equal(tc.dashButtons.get(side), b);
   }
-  // Nor any "on touch" reference to the old letters anywhere in Help.
-  assert.doesNotMatch(help.textContent, /\b(T|D|BA1|BA2) on touch\b|touch (T|D|BA1|BA2)\b/);
-  assert.match(help.textContent, /or the Shuriken button on touch/);
-  assert.match(help.textContent, /or the Shield button on touch/);
-  assert.match(help.textContent, /Charge \+ BA1 \(Punch on touch\) = Clone Attack; Charge \+ BA2 \(Kick on touch\) = Sphere Rush/);
+  assert.doesNotMatch(dashLeft.getAttribute('aria-label') + dashRight.getAttribute('aria-label'), /movement/, 'mouvement, as written');
+  // The old cluster is gone from the screen, C included.
+  assert.equal(tc.root.querySelectorAll('.tc-dpad').length, 0);
+  assert.deepEqual(tc.root.querySelectorAll('.tc-text'), [], 'no C anywhere');
+  // Charge sits right after Jump in the lower-right cluster: the down arrow,
+  // announced as Charge, sending the same held charge.
+  assert.deepEqual(actionsOf(tc.actions), ['primary', 'special', 'defense', 'action1', 'action2', 'jump', 'charge']);
+  const charge = tc.actions.children.at(-1);
+  assert.equal(charge, tc.buttons.get('charge'));
+  assert.equal(charge.innerHTML, ICONS.down);
+  assert.equal(charge.getAttribute('aria-label'), 'Charge', 'Charge, not Down');
+  assert.ok(charge.classList.contains('tc-charge-down'));
+  assert.equal(charge.tagName, 'BUTTON');
+  // The same seven held inputs, no left / right buttons: the stick holds those.
+  assert.deepEqual([...tc.buttons.keys()].sort(), ['action1', 'action2', 'charge', 'defense', 'jump', 'primary', 'special']);
 });
 
-// ---- Help: Defense and Throw -------------------------------------------------
+// ---- Joystick: steering --------------------------------------------------------
+
+// The stick's base laid out 200 px wide with its centre at (100, 200): a
+// radius of 100, so offsets read as hundredths of it.
+function joystickControls() {
+  const made = touchControls(DEF_0001, { scheme: 'joystick' });
+  made.tc.stick.rect = { left: 0, top: 100, width: 200, height: 200 };
+  const at = (x, y = 0) => ({ clientX: 100 + x, clientY: 200 + y });
+  const down = (x, y = 0, pointerId = 1) => made.tc.stick.dispatch('pointerdown', { pointerId, ...at(x, y), preventDefault() {} });
+  const move = (x, y = 0, pointerId = 1) => made.tc.stick.dispatch('pointermove', { pointerId, ...at(x, y) });
+  const end = (type = 'pointerup', pointerId = 1) => made.tc.stick.dispatch(type, { pointerId });
+  return { ...made, down, move, end };
+}
+
+test('joystick thresholds: a deadzone round the centre, a little hysteresis, sideways only', () => {
+  assert.deepEqual({ ...JOYSTICK }, { deadzone: 0.24, engage: 0.34, travel: 0.56 });
+  assert.equal(joystickDirection(0), null);
+  assert.equal(joystickDirection(0.3), null, 'inside the engage line: nothing');
+  assert.equal(joystickDirection(0.34), 'right');
+  assert.equal(joystickDirection(-0.34), 'left');
+  assert.equal(joystickDirection(0.3, 'right'), 'right', 'held until back in the deadzone');
+  assert.equal(joystickDirection(0.2, 'right'), null);
+  assert.equal(joystickDirection(-0.3, 'left'), 'left');
+  assert.equal(joystickDirection(-0.2, 'left'), null);
+  assert.equal(joystickDirection(-0.5, 'right'), 'left', 'straight across');
+  assert.equal(joystickDirection(0.3, 'left'), null, 'crossing drops the old direction');
+});
+
+test('the joystick holds Right past the deadzone and lets go back inside it; small movements never drift', () => {
+  const { tc, calls, down, move, end } = joystickControls();
+  down(10, 4);
+  assert.deepEqual(calls, [], 'a thumb near the centre holds nothing');
+  assert.ok(tc.stick.classList.contains('is-active'));
+  assert.deepEqual(tc.knobOffset, { x: 10, y: 4 }, 'the knob follows it all the same');
+  for (const x of [-20, 18, 30, -30]) move(x);
+  assert.deepEqual(calls, [], 'wobbling round the centre: still nothing');
+  move(50);
+  assert.deepEqual(calls, [['right', true]]);
+  assert.ok(tc.stick.classList.contains('is-right'));
+  for (const x of [60, 45, 30, 26]) move(x, 12);
+  assert.deepEqual(calls, [['right', true]], 'no repeat presses while it stays out');
+  move(10);
+  assert.deepEqual(calls, [['right', true], ['right', false]], 'back in the deadzone: released');
+  assert.equal(tc.stick.classList.contains('is-right'), false);
+  move(-50);
+  assert.deepEqual(calls.at(-1), ['left', true]);
+  assert.ok(tc.stick.classList.contains('is-left'));
+  end();
+  assert.deepEqual(calls.at(-1), ['left', false]);
+  assert.deepEqual(tc.knobOffset, { x: 0, y: 0 }, 'recentred');
+  assert.equal(tc.knob.style.transform, '');
+  assert.equal(tc.stick.classList.contains('is-active'), false);
+  assert.equal(tc.stick.classList.contains('is-left'), false);
+  assert.equal(tc.pointers.size, 0);
+});
+
+test('crossing the centre releases the old direction before holding the new one', () => {
+  const { tc, calls, down, move, end } = joystickControls();
+  down(60);
+  move(-60);
+  assert.deepEqual(calls, [['right', true], ['right', false], ['left', true]], 'in one move');
+  assert.ok(tc.stick.classList.contains('is-left'));
+  assert.equal(tc.stick.classList.contains('is-right'), false);
+  move(0);
+  move(70);
+  assert.deepEqual(calls.slice(3), [['left', false], ['right', true]], 'or through the centre');
+  assert.equal(tc.counts.get('left'), 0);
+  assert.equal(tc.counts.get('right'), 1);
+  end();
+  assert.deepEqual(calls.at(-1), ['right', false]);
+});
+
+test('up and down move the knob only: never Jump or Charge; the knob stays inside the base', () => {
+  const { tc, calls, down, move, end } = joystickControls();
+  down(0, -90);
+  move(5, 95);
+  move(-10, -200);
+  assert.deepEqual(calls, [], 'no Jump, no Charge, no direction');
+  const travel = 100 * JOYSTICK.travel;
+  assert.ok(Math.abs(Math.hypot(tc.knobOffset.x, tc.knobOffset.y) - travel) < 1e-9, 'clamped to its travel');
+  move(300, 0);
+  assert.ok(Math.abs(tc.knobOffset.x - travel) < 1e-9 && tc.knobOffset.y === 0, 'straight right, at its travel');
+  assert.equal(tc.knob.style.transform, `translate(${travel.toFixed(1)}px, 0.0px)`);
+  assert.deepEqual(calls, [['right', true]], 'pushed all the way: the same digital Right');
+  move(30, 90);
+  assert.ok(Math.hypot(tc.knobOffset.x, tc.knobOffset.y) <= travel + 1e-9);
+  end();
+});
+
+test('cancelling, losing capture, disabling or releaseAll() always recentres and lets go', () => {
+  for (const type of ['pointercancel', 'lostpointercapture', 'pointerup']) {
+    const { tc, calls, down, end } = joystickControls();
+    down(70, 20);
+    end(type);
+    assert.deepEqual(calls, [['right', true], ['right', false]], type);
+    assert.deepEqual(tc.knobOffset, { x: 0, y: 0 });
+    assert.equal(tc.stickPointer, null);
+  }
+  for (const stop of [(tc) => tc.setEnabled(false), (tc) => tc.releaseAll()]) {
+    const { tc, calls, down, move } = joystickControls();
+    down(-70);
+    stop(tc);
+    assert.deepEqual(calls, [['left', true], ['left', false]]);
+    assert.deepEqual(tc.knobOffset, { x: 0, y: 0 });
+    assert.equal(tc.stick.classList.contains('is-active'), false);
+    // The thumb still on the glass steers nothing until it lands again.
+    move(-80);
+    assert.deepEqual(calls, [['left', true], ['left', false]]);
+  }
+  // Disabled (paused, over): a press does nothing at all.
+  const { tc, calls, down } = joystickControls();
+  tc.setEnabled(false);
+  down(80);
+  assert.deepEqual(calls, []);
+  assert.equal(tc.stickPointer, null);
+});
+
+test('one thumb steers: a second pointer on the stick is ignored, and another pointer ending changes nothing', () => {
+  const { tc, calls, down, move, end } = joystickControls();
+  down(70, 0, 1);
+  down(-70, 0, 2);
+  move(-70, 0, 2);
+  end('pointerup', 2);
+  assert.deepEqual(calls, [['right', true]]);
+  assert.equal(tc.stickPointer, 1);
+  end('pointerup', 1);
+  assert.deepEqual(calls, [['right', true], ['right', false]]);
+});
+
+test('the joystick works alongside Jump, Punch, Kick, Shield, Shuriken, Special and Charge (multi-touch)', () => {
+  for (const other of ['jump', 'action1', 'action2', 'defense', 'primary', 'special', 'charge']) {
+    const { tc, calls, down, end } = joystickControls();
+    down(70);
+    const b = tc.buttons.get(other);
+    press(b, 9);
+    assert.deepEqual(calls, [['right', true], [other, true]], other);
+    assert.ok(b.classList.contains('is-pressed'), `${other}: pressed feedback`);
+    lift(b, 9);
+    assert.deepEqual(calls.at(-1), [other, false]);
+    assert.equal(tc.counts.get('right'), 1, `${other}: Right still held`);
+    assert.ok(tc.stick.classList.contains('is-right'));
+    end();
+    assert.deepEqual(calls.at(-1), ['right', false]);
+  }
+  // Several at once, in any order of release.
+  const { tc, calls, down, end } = joystickControls();
+  down(-70);
+  press(tc.buttons.get('charge'), 2);
+  press(tc.buttons.get('action1'), 3);
+  press(tc.buttons.get('jump'), 4);
+  end();
+  lift(tc.buttons.get('jump'), 4);
+  lift(tc.buttons.get('action1'), 3);
+  lift(tc.buttons.get('charge'), 2);
+  assert.deepEqual(calls, [
+    ['left', true], ['charge', true], ['action1', true], ['jump', true],
+    ['left', false], ['jump', false], ['action1', false], ['charge', false],
+  ]);
+});
+
+// ---- Joystick: Dash buttons ----------------------------------------------------
+
+test('one tap of Left mouvement / Right mouvement asks for exactly one Dash, and holds nothing', () => {
+  const { tc, calls } = touchControls(DEF_0001, { scheme: 'joystick' });
+  const left = tc.dashButtons.get('left');
+  const right = tc.dashButtons.get('right');
+  press(right, 1);
+  assert.deepEqual(calls, [['dash', 1]], 'one request, the moment it goes down');
+  assert.ok(right.classList.contains('is-pressed'), 'pressed at once');
+  // Held down: no more requests, and no direction held.
+  right.dispatch('pointermove', { pointerId: 1 });
+  lift(right, 1);
+  assert.deepEqual(calls, [['dash', 1]]);
+  assert.equal(right.classList.contains('is-pressed'), false);
+  assert.ok(!calls.some(([a]) => a === 'left' || a === 'right'), 'never a held Left or Right');
+  assert.equal(tc.pointers.size, 0);
+  assert.equal(tc.counts.get('right') ?? 0, 0);
+  press(left, 2);
+  left.dispatch('pointercancel', { pointerId: 2 });
+  assert.deepEqual(calls, [['dash', 1], ['dash', -1]]);
+  assert.equal(left.classList.contains('is-pressed'), false, 'a cancelled pointer lets go too');
+  // Each tap is its own request (whether it Dashes is the fighter's call).
+  for (let i = 0; i < 3; i++) {
+    press(right, 10 + i);
+    lift(right, 10 + i);
+  }
+  assert.deepEqual(calls.slice(2), [['dash', 1], ['dash', 1], ['dash', 1]]);
+  // Alongside the joystick, from another finger.
+  tc.stick.rect = { left: 0, top: 100, width: 200, height: 200 };
+  tc.stick.dispatch('pointerdown', { pointerId: 20, clientX: 30, clientY: 200, preventDefault() {} });
+  press(right, 21);
+  assert.deepEqual(calls.slice(5), [['left', true], ['dash', 1]]);
+  assert.equal(tc.counts.get('left'), 1, 'the stick\'s Left is untouched by the tap');
+  // Disabled: nothing.
+  tc.setEnabled(false);
+  assert.equal(right.classList.contains('is-pressed'), false, 'disabling clears the pressed look');
+  const before = calls.length;
+  press(left, 30);
+  assert.equal(calls.length, before + 0);
+});
+
+test('assistive technology: activating a Dash button asks for one Dash; activating Charge taps it', () => {
+  const { tc, calls } = touchControls(DEF_0001, { scheme: 'joystick' });
+  const click = (target) => tc.root.dispatch('click', { detail: 0, target: { closest: () => target } });
+  click(tc.dashButtons.get('left'));
+  assert.deepEqual(calls, [['dash', -1]]);
+  click(tc.buttons.get('charge'));
+  assert.deepEqual(calls.at(-1), ['charge', true]);
+});
+
+// ---- Joystick: Charge under Jump -------------------------------------------------
+
+test('the down-arrow Charge is held for exactly the pointer\'s lifetime and never sticks', () => {
+  const { tc, calls } = touchControls(DEF_0001, { scheme: 'joystick' });
+  const charge = tc.buttons.get('charge');
+  press(charge, 1);
+  assert.deepEqual(calls, [['charge', true]]);
+  assert.ok(charge.classList.contains('is-pressed'));
+  press(tc.buttons.get('action2'), 2); // Charge + Kick
+  lift(tc.buttons.get('action2'), 2);
+  assert.ok(charge.classList.contains('is-pressed'), 'still held after Kick');
+  assert.equal(tc.counts.get('charge'), 1);
+  lift(charge, 1);
+  assert.deepEqual(calls.at(-1), ['charge', false]);
+  for (const end of ['pointercancel', 'lostpointercapture']) {
+    press(charge, 3);
+    charge.dispatch(end, { pointerId: 3 });
+    assert.deepEqual(calls.at(-1), ['charge', false], end);
+  }
+  press(charge, 4);
+  tc.setEnabled(false);
+  assert.deepEqual(calls.at(-1), ['charge', false]);
+  assert.equal(charge.classList.contains('is-pressed'), false);
+});
+
+// ---- Switching schemes -----------------------------------------------------------
+
+test('switching schemes lets go of everything first: no direction, Charge, Jump or Defense left down', () => {
+  const { tc, calls } = touchControls(DEF_0001, { scheme: 'joystick' });
+  tc.stick.rect = { left: 0, top: 100, width: 200, height: 200 };
+  tc.stick.dispatch('pointerdown', { pointerId: 1, clientX: 180, clientY: 200, preventDefault() {} });
+  for (const [action, id] of [['charge', 2], ['jump', 3], ['defense', 4]]) press(tc.buttons.get(action), id);
+  press(tc.dashButtons.get('left'), 5);
+  const down = calls.length;
+  tc.setScheme('classic');
+  assert.deepEqual(calls.slice(down).sort(), [['charge', false], ['defense', false], ['jump', false], ['right', false]]);
+  assert.equal(tc.pointers.size, 0);
+  assert.ok([...tc.counts.values()].every((n) => n === 0));
+  assert.deepEqual(tc.knobOffset, { x: 0, y: 0 }, 'the stick recentred');
+  assert.equal(tc.stickPointer, null);
+  assert.ok(tc.allButtons.every((b) => !b.classList.contains('is-pressed')), 'no pressed look left anywhere');
+  // Late ends from the old layout's pointers change nothing.
+  tc.stick.dispatch('pointerup', { pointerId: 1 });
+  lift(tc.buttons.get('jump'), 3);
+  assert.equal(calls.length, down + 4);
+
+  // And back: a held Classic direction and C are let go too.
+  const at = layoutDpad(tc);
+  tc.dpad.dispatch('pointerdown', { pointerId: 6, ...at('left'), preventDefault() {} });
+  tc.dpad.dispatch('pointerdown', { pointerId: 7, ...at('charge'), preventDefault() {} });
+  tc.setScheme('joystick');
+  assert.deepEqual(calls.slice(-2).sort(), [['charge', false], ['left', false]]);
+  assert.equal(tc.padButtons.get('left').classList.contains('is-pressed'), false);
+  // Even re-applying the same scheme releases.
+  press(tc.buttons.get('action1'), 8);
+  tc.setScheme('joystick');
+  assert.deepEqual(calls.at(-1), ['action1', false]);
+});
+
+test('a scheme switch keeps the fighter\'s combat buttons: the same elements, icons and names', () => {
+  const { tc, calls } = touchControls(DEF_0001, { scheme: 'joystick' });
+  const before = new Map(tc.actionButtons);
+  for (const scheme of ['classic', 'joystick', 'classic']) {
+    tc.setScheme(scheme);
+    for (const [action, b] of before) assert.equal(tc.buttons.get(action), b, `${scheme}: ${action}`);
+    assert.deepEqual(['primary', 'action1', 'action2'].map((a) => [tc.buttons.get(a).getAttribute('aria-label'), tc.buttons.get(a).innerHTML]),
+      [['Shuriken', ICONS.shuriken], ['Punch', ICONS.punch], ['Kick', ICONS.kick]]);
+    assert.equal(tc.actions.children[0], before.get('primary'));
+  }
+  // setCharacter still works in either layout, and never moves a button.
+  tc.setScheme('joystick');
+  tc.setCharacter(null);
+  assert.equal(tc.buttons.get('primary').getAttribute('aria-label'), 'Throw');
+  assert.deepEqual(actionsOf(tc.actions).at(-1), 'charge');
+  press(tc.buttons.get('primary'), 1);
+  assert.deepEqual(calls, [['primary', true]]);
+});
+
+test('the Joystick layout\'s geometry: the stick in the old lower-left corner, Dash buttons above its top corners, Charge under Jump', () => {
+  const rule = (selector) => CSS.match(new RegExp(`(^|\\n)${selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} \\{([^}]*)\\}`))?.[2] ?? '';
+  // The same corner as the Classic cluster, safe areas included.
+  assert.match(rule('.tc-dpad'), /left: calc\(max\(var\(--safe-l\), 12px\) \+ 1\.4vw\);/);
+  assert.match(rule('.tc-joystick'), /left: calc\(max\(var\(--safe-l\), 12px\) \+ 1\.4vw\);/);
+  assert.match(rule('.tc-cluster'), /bottom: var\(--tc-bottom\);/);
+  assert.match(CSS, /--tc-bottom: calc\(max\(var\(--safe-b\), 10px\) \+ 1\.6vh\);/);
+  // A round, translucent base that takes the pointer and never scrolls or zooms.
+  const stick = rule('.tc-stick');
+  assert.match(stick, /border-radius: 50%;/);
+  assert.match(stick, /touch-action: none;/);
+  assert.match(stick, /pointer-events: auto;/);
+  assert.match(rule('.tc-stick-knob'), /pointer-events: none;/);
+  // Dash buttons: small, above the stick (whose top is at 1.92 --tc), at its left and right.
+  assert.match(CSS, /--tc-stick: calc\(var\(--tc\) \* 1\.92\);/);
+  assert.match(rule('.tc-dash'), /bottom: calc\(var\(--tc\) \* 1\.82\);/);
+  assert.match(rule('.tc-dash'), /width: var\(--tc-dash\);/);
+  assert.match(CSS, /--tc-dash: calc\(var\(--tc\) \* 0\.62\);/);
+  assert.match(rule('.tc-dash-left'), /left: /);
+  assert.match(rule('.tc-dash-right'), /right: /);
+  // Charge: centred under Jump (right: 0, bottom: 0), one gap below it; the
+  // cluster rises by exactly that much in the Joystick layout only.
+  assert.match(rule('.tc-charge-down'), /right: calc\(\(var\(--tc\) - var\(--tc-charge\)\) \/ 2\);/);
+  assert.match(rule('.tc-charge-down'), /bottom: calc\(-1 \* \(var\(--tc-charge\) \+ var\(--tc-gap\)\)\);/);
+  assert.match(CSS, /\.touch-controls\.is-joystick \.tc-actions \{ bottom: calc\(var\(--tc-bottom\) \+ var\(--tc-charge\) \+ var\(--tc-gap\)\); \}/);
+  // The rest of the lower-right cluster is untouched.
+  assert.match(CSS, /\.tc-jump \{ right: 0; bottom: 0; \}/);
+  assert.match(CSS, /\.tc-a2 \{ right: var\(--tc-pitch\); bottom: 0; \}/);
+  assert.match(CSS, /\.tc-a1 \{ right: calc\(var\(--tc-pitch\) \* 2\); bottom: 0; \}/);
+  assert.match(CSS, /\.tc-special \{ right: calc\(var\(--tc-pitch\) \* 1\.5\); bottom: calc\(var\(--tc-pitch\) \* 0\.87\); \}/);
+});
+
+// ---- Button geometry -----------------------------------------------------------
 
 test('the Shield touch button keeps the old Defense / Block coordinates', () => {
   assert.match(CSS, /\.tc-defense \{ right: calc\(var\(--tc-pitch\) \* 0\.5\); bottom: calc\(var\(--tc-pitch\) \* 0\.87\); \}/);
-  assert.match(CSS, /\.md-defense \{ left: 85%; top: 54%; \}/);
   assert.doesNotMatch(CSS, /\.tc-block\b/);
-  assert.doesNotMatch(CSS, /\.md-block\b/);
-});
-
-test('help lists Defense on L, never a generic Block control', () => {
-  assert.equal(ACTION_LABELS.defense, 'Defense');
-  assert.equal(ACTION_LABELS.block, undefined);
-  assert.deepEqual(CONFIG.bindings.defense, ['KeyL']);
-  assert.equal(CONFIG.bindings.block, undefined);
-  const help = buildHelp();
-  const rows = help.querySelectorAll('tr').slice(1).map((tr) => ({
-    label: tr.querySelector('th').children[0].textContent,
-    reserved: !!tr.querySelector('th').querySelector('.tag'),
-    keys: tr.querySelector('td').querySelectorAll('kbd').map((k) => k.textContent),
-  }));
-  const defense = rows.find((r) => r.label === 'Defense');
-  assert.ok(defense, 'Defense row');
-  assert.deepEqual(defense.keys, ['L']);
-  assert.equal(defense.reserved, false);
-  assert.equal(rows.find((r) => r.label === 'Block'), undefined);
-  assert.deepEqual(rows.map((r) => r.label).slice(4, 8), ['Throw', 'Special', 'Defense', 'Basic Attack 1']);
-  assert.doesNotMatch(help.textContent, /\bblock\b/i, 'no Block anywhere in Help');
-});
-
-test('help explains Defense, #0001\'s Shield, its Energy cost and lockout, and the Charge release', () => {
-  const help = buildHelp();
-  assert.doesNotMatch(help.textContent, /dodge|invulnerab/i, 'no Dodge left anywhere in Help');
-  const notes = help.querySelectorAll('.info-note').map((p) => p.textContent).join(' ');
-  assert.match(notes, /RB \/ RT for Defense/);
-  assert.match(notes, /hold Shield to keep it up/);
-  const items = help.querySelectorAll('li').map((li) => li.textContent).join(' ');
-  assert.match(items, /Defense \(L, RB \/ RT, or the Shield button on touch\) is the shared defensive button/);
-  assert.match(items, /#0001 shields/);
-  assert.match(items, /Defense — Hold to Shield\. Blocking a hit costs 25 Energy\./);
-  assert.match(items, /a circle all round #0001, on the ground and in the air/);
-  assert.match(items, /from either side: no Launch Point and no launch/);
-  assert.match(items, /Holding it costs nothing, and neither does an attack that misses/);
-  assert.match(items, /In the air he keeps falling/);
-  assert.match(items, /If Energy reaches zero, it turns gray and must fully refill before Shield and Dash become available again/);
-  assert.match(items, /Let go and #0001 shows its first Charge pose for a moment/);
-  assert.match(items, /holding Defense raises the Shield instead/);
-  assert.match(items, /A Shield blocks the sphere: no trap, no explosion/);
-  const build = help.querySelectorAll('.info-text').map((p) => p.textContent).join(' ');
-  assert.match(build, /Defense is a held Shield for #0001, on the ground and in the air/);
-  assert.doesNotMatch(build, /guard state/);
 });
 
 test('the Shuriken touch button keeps the old Throw / Primary coordinates and size', () => {
   assert.match(CSS, /\.tc-throw \{\n  right: calc\(var\(--tc-pitch\) \* 0\.02\);\n  bottom: calc\(var\(--tc-pitch\) \* 1\.74\);\n  width: calc\(var\(--tc\) \* 1\.12\);\n  height: calc\(var\(--tc\) \* 1\.12\);/);
-  assert.match(CSS, /\.md-throw \{ left: 88%; top: 27%; width: 12\.5%;/);
   assert.doesNotMatch(CSS, /\.tc-primary\b/);
-  assert.doesNotMatch(CSS, /\.md-primary\b/);
-});
-
-test('help lists Throw on J, active, and only Special as reserved', () => {
-  assert.equal(ACTION_LABELS.primary, 'Throw');
-  assert.deepEqual(CONFIG.bindings.primary, ['KeyJ']);
-  const help = buildHelp();
-  const rows = help.querySelectorAll('tr').slice(1).map((tr) => ({
-    label: tr.querySelector('th').children[0].textContent,
-    reserved: !!tr.querySelector('th').querySelector('.tag'),
-    keys: tr.querySelector('td').querySelectorAll('kbd').map((k) => k.textContent),
-  }));
-  const row = rows.find((r) => r.label === 'Throw');
-  assert.ok(row, 'Throw row');
-  assert.deepEqual(row.keys, ['J']);
-  assert.equal(row.reserved, false);
-  assert.equal(rows.find((r) => r.label === 'Primary'), undefined);
-  assert.deepEqual(rows.filter((r) => r.reserved).map((r) => r.label), ['Special']);
-  const text = help.textContent;
-  assert.doesNotMatch(text, /Primary/, 'no player-facing Primary left');
-  assert.match(text, /X \/ Square for Throw/);
-  assert.match(text, /Only the dashed Special button is reserved/);
-});
-
-test('help explains Throw and lists it in this build', () => {
-  const help = buildHelp();
-  const items = help.querySelectorAll('li').map((li) => li.textContent).join(' ');
-  assert.match(items, /Throw \(J, X \/ Square, or the Shuriken button on touch\) makes #0001 throw one shuriken per press/);
-  assert.match(items, /flies straight the way #0001 was facing/);
-  assert.match(items, /ground only/);
-  const build = help.querySelectorAll('.info-text').map((p) => p.textContent).join(' ');
-  assert.match(build, /Throw \(the primary action\) throws an animated shuriken/);
-  assert.match(build, /BA1/);
-  assert.match(build, /BA2/);
-  assert.match(build, /Charge/);
-  assert.match(build, /Shield/);
-  assert.match(build, /Only Special is still reserved/);
-  assert.match(build, /training CPU never attacks/);
-  assert.doesNotMatch(build, /mid-air Throw/i);
 });
 
 // ---- Page zoom and gestures -----------------------------------------------
@@ -818,15 +978,17 @@ test('the gameplay surfaces and touch buttons keep touch-action: none; menus sti
     assert.ok(m, `${selector} rule`);
     return m[2];
   };
-  for (const selector of ['.screen--battle', '.battle-canvas', '.screen--practice', '.tc-btn', '.tc-dpad']) {
+  for (const selector of ['.screen--battle', '.battle-canvas', '.screen--practice', '.tc-btn', '.tc-dpad', '.tc-stick']) {
     assert.match(rule(selector), /touch-action: none;/, selector);
   }
   // The document never scrolls, and never selects text or shows a callout.
   assert.match(rule('html, body'), /overflow: hidden;/);
   assert.match(rule('body'), /user-select: none;/);
   assert.match(rule('body'), /-webkit-touch-callout: none;/);
-  // Intentionally scrollable panels (Help, Discover, pause Help) still pan.
-  assert.ok((CSS.match(/touch-action: pan-y;/g) || []).length >= 3, 'scroll panels keep pan-y');
+  // Intentionally scrollable panels (the fighter roster, Discover) still pan.
+  assert.ok((CSS.match(/touch-action: pan-y;/g) || []).length >= 2, 'scroll panels keep pan-y');
+  assert.match(rule('.roster-scroll'), /touch-action: pan-y;/);
+  assert.match(rule('.discover-panel'), /touch-action: pan-y;/);
   // Press feedback stays immediate: no animation on the buttons, only the
   // short transition they already had.
   assert.match(rule('.tc-btn'), /transition: transform 90ms ease-out/);

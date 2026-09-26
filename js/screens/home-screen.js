@@ -6,7 +6,7 @@ import { CONFIG } from '../config.js';
 import { el } from '../core/utils.js';
 import { logoSVG } from '../ui/logo.js';
 import { ICONS } from '../ui/icons.js';
-import { CREDITS } from '../ui/help-content.js';
+import { CREDITS } from '../ui/credits.js';
 
 const CREDITS_RESUME_DELAY = 2000;
 const ROLL_SPEED = 22; // credits roll, CSS px per second
@@ -34,7 +34,8 @@ export class HomeScreen extends Screen {
     // The secondary actions, outlined with a chevron. Watch Mode (CPU vs
     // CPU) opens its own setup, never Select Mode; Practice Ground goes
     // straight into the training room (no mode, fighter or stage select);
-    // Discover opens the in-game reference (Power, Launch, Passives).
+    // Discover opens the in-game reference (Power, Launch, Passives);
+    // Settings holds the player's settings (Mobile Controls).
     const secondary = (id, label) => el('button', {
       class: 'home-action', type: 'button', 'data-nav': true,
       'data-home-action': id, html: `<span>${label}</span>${ICONS.right}`,
@@ -42,12 +43,14 @@ export class HomeScreen extends Screen {
     const watch = secondary('watch', 'Watch Mode');
     const practice = secondary('practice', 'Practice Ground');
     const discover = secondary('discover', 'Discover');
+    const settings = secondary('settings', 'Settings');
     play.addEventListener('click', () => app.screens.go('mode'));
     watch.addEventListener('click', () => app.screens.go('watch-difficulty'));
     practice.addEventListener('click', () => app.screens.go('practice'));
     discover.addEventListener('click', () => app.screens.go('discover'));
+    settings.addEventListener('click', () => app.screens.go('settings'));
     // By name, in menu order.
-    this.actions = { play, watch, practice, discover };
+    this.actions = { play, watch, practice, discover, settings };
 
     this.rollTrack = el('div', { class: 'home-credits-track' }, [creditsSequence(), creditsSequence({ copy: true })]);
     this.rollOffset = 0;

@@ -165,6 +165,7 @@ const { DifficultySelectScreen } = await import('../js/screens/difficulty-select
 const { CharacterSelectScreen } = await import('../js/screens/character-select-screen.js');
 const { MapSelectScreen } = await import('../js/screens/map-select-screen.js');
 const { BattleScreen } = await import('../js/screens/battle-screen.js');
+const { Settings } = await import('../js/core/settings.js');
 const { Battle } = await import('../js/game/battle.js');
 const { CombatAIController } = await import('../js/game/combat-ai.js');
 const { mulberry32 } = await import('../js/core/utils.js');
@@ -508,6 +509,7 @@ test('the Battle screen hands the selected level to its Battle, and a rematch or
   const app = {
     selection: { mode: 'quick-battle', difficulty: 'brutal', characterId: '0001', mapId: MAPS[0].id },
     input,
+    settings: new Settings(null),
     device: { reducedMotion: true, blockedPortrait: false },
     audio: { play: noop },
     dialog: { resolve: null },

@@ -5,6 +5,10 @@
 // device made them: a key, a touch button, the D-pad, or the left stick
 // crossing from neutral into its held zone (holding it there makes no more).
 // Fighter reads two of them in a row as a Dash (see Fighter.trackDashTaps).
+// The Joystick touch layout's Left mouvement / Right mouvement buttons ask
+// for one Dash with a single tap instead (queueTouchDash): a one-step
+// request (dashLeftPressed / dashRightPressed), never a held direction or a
+// press edge, that Fighter hands to the same Dash as a double tap.
 
 import { ACTIONS } from '../config.js';
 
@@ -41,6 +45,9 @@ export class InputManager {
     this.pad = new Set();
     this.state = {};
     for (const a of ACTIONS) this.state[a] = { held: false, presses: 0 };
+    // The Dash a touch button asked for since the last sample: 1 right,
+    // -1 left, 0 none (see queueTouchDash).
+    this.touchDash = 0;
 
     this.gameplayActive = false;
     this.lastDevice = 'keyboard';
@@ -53,7 +60,7 @@ export class InputManager {
     this.frame = {
       left: false, right: false, charge: false, jump: false, defense: false,
       primary: false, special: false, action1: false, action2: false,
-      leftPressed: false, rightPressed: false,
+      leftPressed: false, rightPressed: false, dashLeftPressed: false, dashRightPressed: false,
       jumpPressed: false, chargePressed: false, primaryPressed: false,
       specialPressed: false, action1Pressed: false, action2Pressed: false,
       defensePressed: false,
@@ -129,6 +136,17 @@ export class InputManager {
     this._refresh(action);
   }
 
+  // One Dash toward `direction` (1 right, -1 left), asked for by a single
+  // tap of a touch Dash button. It reaches the next sample only, as
+  // dashLeftPressed / dashRightPressed, and is gone after it: nothing is
+  // held, and Left / Right see no press. The latest request wins. Whether a
+  // Dash actually starts is Fighter.tryDash's call, as for a double tap.
+  queueTouchDash(direction) {
+    if (direction !== 1 && direction !== -1) return;
+    this.touchDash = direction;
+    this.lastDevice = 'touch';
+  }
+
   isHeld(action) {
     return this.state[action]?.held ?? false;
   }
@@ -144,6 +162,7 @@ export class InputManager {
   // Drop buffered presses (e.g. after closing a menu with the same key).
   flush() {
     for (const st of Object.values(this.state)) st.presses = 0;
+    this.touchDash = 0;
   }
 
   clear() {
@@ -154,6 +173,7 @@ export class InputManager {
       st.held = false;
       st.presses = 0;
     }
+    this.touchDash = 0;
   }
 
   // Build the per-simulation-step input snapshot for Player 1.
@@ -170,6 +190,9 @@ export class InputManager {
     f.action2 = this.isHeld('action2');
     f.leftPressed = this.consume('left');
     f.rightPressed = this.consume('right');
+    f.dashLeftPressed = this.touchDash === -1;
+    f.dashRightPressed = this.touchDash === 1;
+    this.touchDash = 0;
     f.jumpPressed = this.consume('jump');
     f.chargePressed = this.consume('charge');
     f.defensePressed = this.consume('defense');

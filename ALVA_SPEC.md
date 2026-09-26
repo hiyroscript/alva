@@ -32,8 +32,8 @@ behave, and how it must look. The README covers running and deploying it.
   pinches never zoom the page. Together with `touch-action: none` on the
   battle and practice screens, the battle canvas and every touch button,
   this is the whole zoom guard: no JavaScript double-tap detection and no
-  blanket `preventDefault()` on touch events. Help and Discover panels
-  still scroll (`touch-action: pan-y`).
+  blanket `preventDefault()` on touch events. The fighter roster and
+  Discover panels still scroll (`touch-action: pan-y`).
 - The page never scrolls; every screen fits the viewport and respects
   `env(safe-area-inset-*)`.
 
@@ -163,8 +163,9 @@ behave, and how it must look. The README covers running and deploying it.
   machine, controllers (player / combat AI for Quick Battle and Watch Mode /
   training AI),
   physics, camera, combat, launch bounce,
-  projectiles, summoned clones, charged techniques, HUD, touch controls,
-  stage themes, fighter roster.
+  projectiles, summoned clones, charged techniques, HUD, touch controls
+  (two layouts, 7.4), stage themes, fighter roster, and the player's
+  settings (`js/core/settings.js`, 6.10).
 - One arena (`js/game/arena.js`) owns the fixed-step world and its Canvas
   rendering. `Battle` adds the combat-AI CPU at the chosen difficulty (in
   Watch Mode one on each side), phases and round timer; Practice Ground (`PracticeSession`)
@@ -273,8 +274,9 @@ Splash → Home → Select Mode → Select Difficulty → Select Fighter → Sel
 Home → Watch Mode → Select Difficulty → Select CPU 1 → Select CPU 2 → Select Stage → CPU vs CPU Battle (6.5a)
 Home → Practice Ground (starts at once with #0001 and a #0001 practice CPU)
 Home → Discover (Power / Launch / Passives reference; Back returns Home)
+Home → Settings (Mobile Controls: Joystick / Classic Buttons; Back returns Home)
 Practice Ground → More → Change Fighter (roster dialog) / Change CPU, or Enable CPU once disabled (CPU roster dialog → Disable CPU) / Return (Home)
-Battle → Pause → Resume / Restart / Return to Home (confirmed); Help is shown but disabled for now
+Battle → Pause → Resume / Restart Battle / Return to Home (confirmed)
 Battle (a fighter falls into the Void) → the opponent scores a point → that fighter respawns 2 s later; the fight goes on
 Battle (a fighter scores its 3rd point) → K.O. → Result → Rematch / Change Stage / Return to Home
 Battle (time over, one fighter ahead on points, or level with the lower Launch Point) → Result → Rematch / Change Stage / Return to Home
@@ -320,18 +322,16 @@ no header, build label, eyebrow or keyboard hint bar.
 - **Intro:** the dramatically enlarged original ALVA SVG wordmark, then the
   supporting line "Fan project. Big heart." The wordmark's first visible stroke
   lines up with the start of that line.
-- **Actions:** exactly four, in this order — **Play** (green, white text,
+- **Actions:** exactly five, in this order — **Play** (green, white text,
   arrow) opens Select Mode and is focused by default; **Watch Mode**
   (outlined, chevron) beneath it opens Watch Mode's Select Difficulty (6.5a)
   directly, never Select Mode; **Practice Ground** (outlined, chevron)
   beneath that opens Practice Ground (6.8) straight away, with no mode,
-  fighter or stage select. Practice Ground replaced the former, disabled
-  Help & Credits entry; the Help & Credits screen and the pause Help view
-  remain in place (the pause-menu Help is still disabled, 7.3). **Discover**
-  (outlined, chevron, like Practice Ground) directly beneath it opens the
-  Discover reference (6.9). All four are in keyboard / gamepad menu
-  navigation, in that order, which the DOM order matches whatever the
-  layout. Home buttons have a small 3 px radius.
+  fighter or stage select; **Discover** (outlined, chevron, like Practice
+  Ground) directly beneath it opens the Discover reference (6.9); and
+  **Settings** (outlined, chevron) last opens Settings (6.10). All five are
+  in keyboard / gamepad menu navigation, in that order, which the DOM order
+  matches whatever the layout. Home buttons have a small 3 px radius.
 - **Footer:** "by hiyroscript" in gray monospace, full width under a subtle
   top hairline.
 - **Credits strip:** two walls. The back wall is the same near-black as the
@@ -340,8 +340,8 @@ no header, build label, eyebrow or keyboard hint bar.
   a faint sheen and edge highlights. A stable 3 px green slash with a
   restrained bloom runs along its left edge, and the strip fades out at the
   top and bottom. No fighter preview or Canvas.
-- **Credits roll:** plain upright text (group titles and lines from the shared
-  credits data, see 6.6; no cards or boxes), centred in a column inside the
+- **Credits roll:** plain upright text (group titles and lines from the
+  credits data in `js/ui/credits.js`, see 6.6; no cards or boxes), centred in a column inside the
   glass and clipped to it. It rolls upward at a slow constant speed and loops
   seamlessly without end. The roll is driven by the app's frame loop, so
   re-entering Home never stacks timers. The animation-only duplicate is
@@ -350,9 +350,12 @@ no header, build label, eyebrow or keyboard hint bar.
   strip moves farther right and the credits column narrows; when the window is
   taller than it is wide the strip is mostly off-screen and the credits remain
   for assistive technology only. Short landscape heights reduce title size,
-  gaps, action height and credit type, so the four actions fit above the
-  footer down to a 568 × 320 window, or 812 × 375 with a home-indicator
-  inset, clear of the credits column. Reduced motion stops the roll and
+  gaps, action height and credit type, so the five actions fit above the
+  footer down to a 568 × 320 window, or 844 × 390 with a home-indicator
+  inset, clear of the credits column. The wordmark keeps its size wherever
+  there is room and shrinks only as much as a short window needs: its width
+  is capped by the height left once the padding, footer, tagline and
+  actions are counted. Reduced motion stops the roll and
   entrance animations and shows one still copy of the credits that can be
   scrolled by hand.
 - All other screens retain their layout, structure, spacing and behaviour.
@@ -469,46 +472,22 @@ Select CPU 2 → Select Stage → CPU vs CPU Battle.
   through the usual loading overlay (once for a mirror match); a failure of
   either uses the usual error with Retry and Back (to Select Stage).
 - **Spectator only.** No gameplay input is read and the touch controls are
-  hidden. Pause (`Esc`, `P`, gamepad Start, the HUD's timer or pause
-  button), Resume, Restart Battle, Help (still disabled) and Return to Home
-  work as in Quick Battle, and so do Rematch and Change Stage (which returns
-  to Watch Mode's Select Stage).
+  hidden, whichever Mobile Controls layout is chosen (no joystick, Dash
+  buttons or Charge either). Pause (`Esc`, `P`, gamepad Start, the HUD's
+  timer or pause button), Resume, Restart Battle and Return to Home work as
+  in Quick Battle, and so do Rematch and Change Stage (which returns to
+  Watch Mode's Select Stage).
 - **Names.** The HUD tags, the markers over the fighters and the results
   say **CPU 1** and **CPU 2** ("CPU 1 Wins", "CPU 2 fell into the Void for
   the final point."); the pause dialog's kicker is "Watch Mode"; the canvas
   is labelled "Watch Mode battle: CPU 1, #0001, against CPU 2, #0001".
 
-### 6.6 Help & Credits
+### 6.6 Credits
 
-- Two tabs (Help, Credits) sharing one scrollable panel; ←/→ switch tabs,
-  ↑/↓ scroll.
-- Help: desktop controls rendered from the live key bindings, mobile control
-  diagram (the real icons, no T / D / BA1 / BA2: #0001's Shuriken, Punch and
-  Kick from its `mobileAbilities`, the universal Shield, Special and Jump,
-  each named in the diagram's accessible description), movement (the run
-  carrying into a jump, Charge held in the air while falling as the fast
-  fall, attacks keeping momentum, early presses coming out as soon as they
-  can, and a hit opening a follow-up whose chances shrink as Launch Point
-  grows), Charge &
-  cooldowns (Charge held in the air is the fast fall, held again after
-  landing to charge; including Charge + BA1 = Clone Attack and Charge + BA2 =
-  Sphere Rush: already Charging, forms before dashing, needs a hit to
-  continue, +1 Launch Point at once and every half
-  second while it holds the opponent and 15 on the delayed blast, blocked
-  by a Shield, ground needed throughout;
-  each on its own 5-second cooldown that Charge recovers twice as fast; no
-  extra control row: both use the existing Charge, BA1 and BA2 controls),
-  Throw, Defense ("Defense — Hold to Shield. Blocking a hit costs 25
-  Energy.", the full-circle Shield, and the Energy lockout: at zero it
-  turns gray and must fully refill before Shield and Dash come back; the
-  movement card gives the costs, Dash 15 and a block 25, and that either
-  still works with less left but empties the bar), stages and platforms,
-  pause, notes on this build.
-- Home no longer links to this screen (its entry became Practice Ground); the
-  screen stays in place, and its shared content still feeds the Home credits
-  roll and the pause Help view.
-- Credits (must remain visible and readable). One list in
-  `js/ui/help-content.js` feeds both this tab and the Home credits roll:
+- There is no in-game Help: no Help screen or tab, and no Help in the pause
+  menu (7.3). The controls are documented in the README and in 7.4.
+- Credits (must remain visible and readable) are the Home credits roll
+  (6.2). One list in `js/ui/credits.js` feeds it:
   - **ALVA** — created by hiyroscript.
   - **Original work** — game design, code, interface, ALVA wordmark, and
     Desert / City stage artwork by hiyroscript.
@@ -715,6 +694,38 @@ read the character database, so it stays the same as fighters are added.
   selectable and accessible.
 - A new Power type appears here once it is added to `POWERS`, with no
   change to the screen.
+
+### 6.10 Settings
+
+Entered from Home's Settings action; a menu screen like the others (header
+with Back and the title "Settings", kicker "ALVA"; Back, `Esc` and gamepad
+Back return Home). It holds the player's settings, saved on this device.
+
+- **Mobile Controls** — the touch layout Quick Battle and Practice Ground
+  use (7.4), with exactly two choices shown as two cards, each with a small
+  drawing of its lower-left corner and a line on what it gives:
+  - **Joystick** (marked "Default") — a circular joystick to move, the
+    single-tap **Left mouvement** / **Right mouvement** Dash buttons above
+    it, and Charge as a down arrow under Jump.
+  - **Classic Buttons** — the original layout: Left, C (Charge) and Right
+    at the lower left, a double tap of Left or Right to Dash.
+- The cards are a `radiogroup` of two `radio` buttons (`aria-checked`, each
+  described by its line), reached by keyboard / gamepad focus; hover only
+  previews. The one in use carries a green "Selected" pill and border and
+  takes focus on entry. Choosing one saves it at once and the screen stays
+  open; the next battle or practice uses it.
+- Presentation and input configuration only: keyboard bindings, gamepad
+  mappings, fighters and rules never change, and Watch Mode stays free of
+  player controls whichever layout is chosen.
+- **Storage.** `js/core/settings.js` is the only module that touches
+  storage: one versioned object, `{ "version": 1, "mobileControls":
+  "joystick" | "classic" }`, under the `localStorage` key `alva.settings`,
+  read once at start (`app.settings`) and written whole on each change.
+  Nothing stored, corrupt JSON, another version or an unknown value all
+  mean the defaults (Joystick); storage that is missing or throws keeps the
+  choice for the visit only.
+- On short landscape windows the cards stay side by side and the area
+  scrolls on its own if needed, so Back stays put.
 
 ## 7. Battle
 
@@ -1235,7 +1246,12 @@ read the character database, so it stays the same as fighters are added.
   within `movement.dashTapWindow` (0.22 s) of the first, start a Dash that
   way (`Fighter.trackDashTaps`, `tryDash`); the other direction replaces the
   waiting tap, both at once cancel it, and a double tap that cannot Dash is
-  used up, never queued. A Dash needs the fighter free to act (no attack,
+  used up, never queued. A one-step request (`dashLeftPressed` /
+  `dashRightPressed`, 7.4: one tap of the Joystick touch layout's Left
+  mouvement / Right mouvement) goes straight to the same `tryDash`, so every
+  rule, cost and effect below applies unchanged; it is not a direction
+  press (it never pairs with one), it forgets any first tap waiting, it is
+  used up whether or not it Dashes, and both at once ask for nothing. A Dash needs the fighter free to act (no attack,
   stun, bind, charged technique or Dash running), grounded, neither
   in nor holding Charge, not shielding nor holding Defense for a Shield
   that can go up, not exhausted (it pays `dashCost` 15 once as it starts,
@@ -1680,7 +1696,7 @@ read the character database, so it stays the same as fighters are added.
     jump and an air jump from a stage's highest footing still stay well
     clear of the upper Void.
   - *Fast fall.* Down (the Charge input: S / ↓, D-pad or stick down, touch
-    C) held in the air while already descending speeds the fall up toward
+    C, or the down arrow under Jump in the Joystick layout) held in the air while already descending speeds the fall up toward
     `fastFallSpeed` (1400) at `fastFallAcceleration` (7500) on top of
     gravity: never while rising, never a jump in speed and never slower
     than the fall already is; it lands on platforms like any fall. Aerial
@@ -2023,9 +2039,8 @@ read the character database, so it stays the same as fighters are added.
   fighter's fall gives the opponent its third point) in white on a dark
   band.
 - Pause menu: glass panel over a dimmed battle with "Quick Battle" ("Watch
-  Mode" in Watch Mode; no stage name), "Paused", green **Resume** (default), **Restart Battle**, **Help** and
-  **Return to Home**. Help is shown but disabled for now: muted, no hover or
-  press response, skipped by keyboard/gamepad focus.
+  Mode" in Watch Mode; no stage name), "Paused", green **Resume** (default), **Restart Battle** and
+  **Return to Home**, nothing else. `Esc` / Back resumes.
 - Time over: the fighter with more points wins ("Time ran out. More points
   wins the match."); level on points, the one with the lower Launch Point
   wins ("Time ran out with the points level. Lower Launch Point wins."). A glass result menu offers green **Rematch**, **Change Stage**
@@ -2059,7 +2074,13 @@ read the character database, so it stays the same as fighters are added.
   press counting as every other action, whichever device made them: a key
   (never its auto-repeat), a touch button, the D-pad, or the left stick
   crossing from neutral into its held zone (holding it there makes no more;
-  back near neutral and out again makes another). Fighter never reads raw
+  back near neutral and out again makes another). It also carries
+  `dashLeftPressed` / `dashRightPressed`: a Dash asked for in one tap
+  (`InputManager.queueTouchDash(direction)`, from the Joystick layout's
+  Dash buttons), true for exactly one sample and then gone (`flush()` and
+  `clear()` drop it too); it holds no direction and makes no press edge.
+  Every controller's snapshot carries both, false (the combat AI still
+  Dashes by double tap). Fighter never reads raw
   key timestamps; menus never read these edges. In menus S/↓ still navigate down: menu bindings are separate
   from the gameplay `charge` action.
 - Gamepad (standard layout) for movement (D-pad / left stick left and
@@ -2067,16 +2088,48 @@ read the character database, so it stays the same as fighters are added.
   fall in the air; menus still read them as Down), jump (A), Throw (X / Square), Basic Attack 1
   (B / Circle), Basic Attack 2 (LB), Special (Y / Triangle, reserved),
   Defense (RB / RT) and Start to pause/menus.
-- Touch (landscape, Pointer Events, true multi-touch): lower-left
-  Left · C · Right with thumb sliding, where the middle button reads **C**, is
-  labelled "Charge" and stays pressed for as long as the pointer holds it
-  (held in the air while falling, it is the fast fall);
-  lower-right staggered cluster, the same positions and sizes as ever —
+- Touch (landscape, Pointer Events, true multi-touch), in one of two
+  layouts chosen under Home → Settings → Mobile Controls (6.10);
+  `TouchControls.setScheme('joystick' | 'classic')` switches them (anything
+  else is Joystick), and Quick Battle and Practice Ground apply the saved
+  one each time they are entered. A switch first lets go of everything held
+  (every pointer, direction, Charge, Jump, Defense and the rest) and
+  recentres the joystick, so nothing is ever left down.
+  - **Joystick** (the default): the lower-left corner holds one circular
+    joystick (a translucent round base with faint ◀ ▶ marks and a movable
+    knob, in the buttons' style; a group named "Movement joystick"). It
+    captures one pointer and holds the existing `left` or `right` input
+    once pushed sideways past 0.34 of its radius, letting go back inside
+    0.24 (a deadzone with a little hysteresis, so a resting thumb never
+    drifts or flickers). Crossing the centre releases one direction before
+    holding the other. Only the sideways part counts: up and down move the
+    knob, never Jump or Charge. The knob follows the thumb, clamped to
+    0.56 of the radius, and eases back to the centre on release, cancel,
+    lost capture, pause, disabling or a scheme switch. It is digital like
+    the rest of ALVA's input: how far it is pushed never changes speed.
+    Pushing it out twice quickly is a double tap, as with the gamepad stick.
+    Above its top-left and top-right sit two small Dash buttons named
+    exactly **Left mouvement** and **Right mouvement** (◀ ▶ glyphs): one
+    tap asks for one Dash that way (`queueTouchDash`, 7.2) and holds
+    nothing; each shows pressed while touched. **Charge** is a down-arrow
+    button (`ICONS.down`, named "Charge") directly under Jump, holding the
+    same `charge` input (Charge on the ground, the fast fall in the air,
+    Charge + Punch / Kick as ever); the lower-right cluster rises just
+    enough for it, the six buttons above keeping their places.
+  - **Classic Buttons**: the original layout, exactly: lower-left
+    Left · C · Right with thumb sliding, where the middle button reads **C**, is
+    labelled "Charge" and stays pressed for as long as the pointer holds it
+    (held in the air while falling, it is the fast fall); Left and Right
+    Dash on a double tap; no joystick, Dash buttons or down-arrow Charge.
+
+  Both layouts share the lower-right staggered cluster, the same positions
+  and sizes as ever (the Joystick layout adds only Charge under Jump) —
 
   ```
                  [SHURIKEN]
           [SPECIAL] [SHIELD]
      [PUNCH] [KICK] [JUMP]
+                   [CHARGE]   (Joystick only: a down arrow)
   ```
 
   Every combat button shows an original monochrome SVG icon
@@ -2116,8 +2169,13 @@ read the character database, so it stays the same as fighters are added.
 ## 8. Accessibility
 
 - Semantic buttons, headings, lists, tabs (`tablist`/`tab`/`tabpanel`),
-  dialogs (`dialog`/`alertdialog`, `aria-modal`, labelled/described),
-  `aria-pressed`/`aria-checked` for selections, `aria-live` previews.
+  radio groups (Settings), dialogs (`dialog`/`alertdialog`, `aria-modal`,
+  labelled/described), `aria-pressed`/`aria-checked` for selections,
+  `aria-live` previews.
+- Every touch control is a real button with its own name, whatever its
+  glyph: the joystick is a group named "Movement joystick", its Dash
+  buttons "Left mouvement" and "Right mouvement", and the down arrow
+  "Charge" (never "Down").
 - Visible focus everywhere; focus is managed on every screen and overlay.
 - Never rely on colour alone for focus, selection, availability, errors or
   the current setup step — use borders, check marks, filled indicators, labels

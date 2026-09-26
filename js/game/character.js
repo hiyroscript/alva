@@ -24,7 +24,8 @@ const TIME_EPSILON = 1e-6;
 const NEUTRAL_INPUT = Object.freeze({
   left: false, right: false, charge: false, jump: false, defense: false,
   primary: false, special: false, action1: false, action2: false,
-  leftPressed: false, rightPressed: false, jumpPressed: false, chargePressed: false, defensePressed: false,
+  leftPressed: false, rightPressed: false, dashLeftPressed: false, dashRightPressed: false,
+  jumpPressed: false, chargePressed: false, defensePressed: false,
   primaryPressed: false, specialPressed: false, action1Pressed: false, action2Pressed: false,
   dropPressed: false,
 });
@@ -364,14 +365,30 @@ export class Fighter {
       else if (!this.attackMayStart(action)) this.bufferedAttack = null;
     }
 
-    // ---- Dash: a double tap of left or right -----------------------------
+    // ---- Dash: a double tap of left or right, or one asked for ----------
     // After the attacks, so one started this step wins over a Dash on the
     // same step (canAct). A double tap that cannot Dash right now is used
     // up all the same: nothing is queued for later. Energy spent this step
     // means no refill this step (see the end of update).
+    //
+    // dashLeftPressed / dashRightPressed ask for one Dash outright (the
+    // Joystick touch layout's single-tap Dash buttons, see
+    // InputManager.queueTouchDash). The request goes through the very same
+    // tryDash, so every rule and cost of a double-tap Dash applies, and it
+    // is used up the same way. It is not a tap: it forgets any first tap
+    // waiting, so it never pairs with one, and this step's own direction
+    // press (if any) is not counted as one either. Both at once ask for
+    // nothing.
     let spent = false;
-    const tapped = this.trackDashTaps(input, dt);
-    if (tapped && this.tryDash(tapped, input)) spent = true;
+    const requested = input.dashLeftPressed || input.dashRightPressed;
+    let dashDirection;
+    if (requested) {
+      this.dashTap = null;
+      dashDirection = (input.dashRightPressed ? 1 : 0) - (input.dashLeftPressed ? 1 : 0);
+    } else {
+      dashDirection = this.trackDashTaps(input, dt);
+    }
+    if (dashDirection && this.tryDash(dashDirection, input)) spent = true;
 
     // ---- Charged technique -------------------------------------------------
     // While one runs it owns the fighter: its phases advance on their own

@@ -3,8 +3,10 @@
 // edges InputManager exposes (keyboard, touch, D-pad and stick alike), the
 // double tap, what a Dash needs to start, what it costs, how it moves (and
 // stops), its priority against attacks, Defense and Charge, and that it is
-// movement only. Uses the real Fighter, InputManager and physics (see
-// fighter-harness.mjs).
+// movement only. Also the one-tap request of the Joystick touch layout's
+// Dash buttons (InputManager.queueTouchDash → dashLeftPressed /
+// dashRightPressed), which goes through the same tryDash and its rules.
+// Uses the real Fighter, InputManager and physics (see fighter-harness.mjs).
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
@@ -490,4 +492,269 @@ test('Defense wins over a Dash on the same step; so does an attack; so does Char
   assert.equal(busy.fighter.combat.shielding, false);
   assert.equal(busy.fighter.grounded, true);
   assert.equal(busy.fighter.charging, false);
+});
+
+// ---- A Dash asked for in one tap (the Joystick layout's Dash buttons) ------------
+
+const DASH_RIGHT = { dashRightPressed: true };
+const DASH_LEFT = { dashLeftPressed: true };
+
+test('InputManager.queueTouchDash is a one-sample request: never a held direction or a press edge', async () => {
+  globalThis.window = { addEventListener() {} };
+  globalThis.document = { addEventListener() {}, hidden: false };
+  const { InputManager } = await import('../js/core/input-manager.js');
+  const input = new InputManager(CONFIG.bindings);
+  const f0 = input.sample();
+  assert.equal(f0.dashLeftPressed, false);
+  assert.equal(f0.dashRightPressed, false);
+  const pick = (f) => ({
+    dashLeft: f.dashLeftPressed, dashRight: f.dashRightPressed,
+    left: f.left, right: f.right, leftPressed: f.leftPressed, rightPressed: f.rightPressed,
+  });
+  input.queueTouchDash(1);
+  assert.equal(input.lastDevice, 'touch');
+  assert.deepEqual(pick(input.sample()),
+    { dashLeft: false, dashRight: true, left: false, right: false, leftPressed: false, rightPressed: false });
+  assert.deepEqual(pick(input.sample()),
+    { dashLeft: false, dashRight: false, left: false, right: false, leftPressed: false, rightPressed: false }, 'gone after one sample');
+  input.queueTouchDash(-1);
+  assert.deepEqual(pick(input.sample()),
+    { dashLeft: true, dashRight: false, left: false, right: false, leftPressed: false, rightPressed: false });
+  assert.equal(input.isHeld('left'), false);
+  // The latest request wins; never both.
+  input.queueTouchDash(-1);
+  input.queueTouchDash(1);
+  const both = input.sample();
+  assert.deepEqual([both.dashLeftPressed, both.dashRightPressed], [false, true]);
+  // Anything but 1 or -1 is ignored.
+  for (const bad of [0, 2, -2, 'right', null, undefined, NaN]) {
+    input.queueTouchDash(bad);
+    const f = input.sample();
+    assert.deepEqual([f.dashLeftPressed, f.dashRightPressed], [false, false], String(bad));
+  }
+  // flush() (a menu closing, a respawn) and clear() (blur, pause) drop it.
+  input.queueTouchDash(1);
+  input.flush();
+  assert.equal(input.sample().dashRightPressed, false);
+  input.queueTouchDash(-1);
+  input.clear();
+  assert.equal(input.sample().dashLeftPressed, false);
+  // Alongside a held touch direction it leaves that direction alone.
+  input.setTouch('left', true);
+  input.sample();
+  input.queueTouchDash(1);
+  const f = input.sample();
+  assert.deepEqual([f.left, f.leftPressed, f.right, f.rightPressed, f.dashRightPressed], [true, false, false, false, true]);
+  input.setTouch('left', false);
+});
+
+test('every controller\'s input carries the request fields, false unless asked', async () => {
+  const { blankInput } = await import('../js/game/fighter-controller.js');
+  const blank = blankInput();
+  assert.equal(blank.dashLeftPressed, false);
+  assert.equal(blank.dashRightPressed, false);
+  const cpu = new TrainingAIController({ rng: () => 0.3 });
+  const player = makeFighter({ x: 700 });
+  const bot = makeFighter({ x: 900, facing: -1 });
+  player.fighter.opponent = bot.fighter;
+  bot.fighter.opponent = player.fighter;
+  for (let i = 0; i < 600; i++) {
+    player.step(i % 200 < 100 ? { right: true } : { left: true });
+    const out = cpu.getInput(bot.fighter, DT, SIM_CTX);
+    assert.equal(out.dashLeftPressed, false);
+    assert.equal(out.dashRightPressed, false);
+    bot.step(out);
+  }
+  const source = readFileSync(ROOT + 'js/game/combat-ai.js', 'utf8');
+  assert.doesNotMatch(source, /dash(Left|Right)Pressed|queueTouchDash/, 'the combat AI still dashes by double tap only');
+});
+
+test('one request Dashes at once through tryDash: no double tap, no held direction, the same cost, speed, clip and facing', () => {
+  for (const [held, direction] of [[DASH_RIGHT, 1], [DASH_LEFT, -1]]) {
+    const { fighter, step } = makeFighter({ facing: -direction });
+    const calls = [];
+    const tryDash = fighter.tryDash.bind(fighter);
+    fighter.tryDash = (...args) => { calls.push(args[0]); return tryDash(...args); };
+    step(held);
+    assert.deepEqual(calls, [direction], 'the same tryDash as a double tap');
+    assert.ok(fighter.dash, 'one step, one request');
+    assert.equal(fighter.dash.direction, direction);
+    assert.equal(fighter.facing, direction, 'faces the Dash at once');
+    assert.equal(fighter.state, 'dash');
+    assert.equal(fighter.animator.anim.key, 'dash');
+    assert.equal(frameName(fighter), '0001_dash1.png', 'the clip from its first frame');
+    assert.equal(fighter.body.vx, direction * def.movement.dashSpeed);
+    assert.equal(fighter.combat.energy, 100 - def.energy.dashCost, 'exactly the Dash cost');
+    // It runs its one pass of the clip, then the fighter stands.
+    let n = 1;
+    while (fighter.dash) {
+      step({});
+      n++;
+    }
+    assert.equal(n, DASH_STEPS + 1);
+    assert.equal(fighter.dashTap, null, 'never a waiting first tap');
+  }
+});
+
+test('a request is not a direction press: it never pairs with a tap before it or after it', () => {
+  // A first tap waiting, then a request that is refused (Defense held): the
+  // tap is forgotten, so the next Right press is a first tap again.
+  const { fighter, step } = makeFighter();
+  step(RIGHT);
+  assert.ok(fighter.dashTap, 'a first tap waiting');
+  step({ ...DASH_RIGHT, defense: true, defensePressed: true });
+  assert.equal(fighter.dash, null, 'refused while Defense is held');
+  assert.equal(fighter.dashTap, null, 'and the waiting tap is gone');
+  step({});
+  step(RIGHT);
+  assert.equal(fighter.dash, null, 'one Right press after it is only a first tap');
+  // A request with this step's own Right press: that press is not a tap.
+  const same = makeFighter();
+  same.step({ ...RIGHT, ...DASH_LEFT });
+  assert.equal(same.fighter.dash?.direction, -1, 'the request\'s own direction');
+  assert.equal(same.fighter.dashTap, null);
+  // Both directions at once ask for nothing (and spend nothing).
+  const both = makeFighter();
+  both.step({ ...DASH_LEFT, ...DASH_RIGHT });
+  assert.equal(both.fighter.dash, null);
+  assert.equal(both.fighter.combat.energy, 100);
+  // The keyboard double tap is unchanged beside it.
+  const keys = makeFighter();
+  tap(keys.step, RIGHT);
+  keys.step(RIGHT);
+  assert.ok(keys.fighter.dash);
+});
+
+test('a request obeys every Dash rule: no Dash (and nothing spent) airborne, attacking, stunned, bound, charging, shielding, dashing, exhausted or without art', () => {
+  const refused = (label, setup) => {
+    const f = makeFighter(setup.options);
+    setup.before?.(f);
+    const before = f.fighter.combat.energy;
+    const wasDash = f.fighter.dash;
+    setup.press(f);
+    assert.equal(f.fighter.dash, wasDash, `${label}: no new Dash`);
+    assert.ok(f.fighter.combat.energy >= before - 1e-9, `${label}: nothing spent`);
+  };
+  refused('airborne', {
+    before: (f) => { f.step({ jump: true, jumpPressed: true }); f.step({}); },
+    press: (f) => f.step(DASH_RIGHT),
+  });
+  refused('attacking', {
+    before: (f) => f.step({ action1: true, action1Pressed: true }),
+    press: (f) => f.step(DASH_RIGHT),
+  });
+  refused('stunned', {
+    before: (f) => { f.fighter.combat.stun = 0.3; },
+    press: (f) => f.step(DASH_RIGHT),
+  });
+  refused('bound', {
+    before: (f) => f.fighter.combat.bind('rush'),
+    press: (f) => f.step(DASH_RIGHT),
+  });
+  refused('charging', {
+    before: (f) => { for (let i = 0; i < 5; i++) f.step({ charge: true }); },
+    press: (f) => f.step({ charge: true, ...DASH_RIGHT }),
+  });
+  refused('holding Charge on the request', {
+    press: (f) => f.step({ charge: true, chargePressed: true, ...DASH_RIGHT }),
+  });
+  refused('shielding', {
+    before: (f) => f.step({ defense: true, defensePressed: true }),
+    press: (f) => f.step({ defense: true, ...DASH_RIGHT }),
+  });
+  refused('holding Defense on the request', {
+    press: (f) => f.step({ defense: true, defensePressed: true, ...DASH_RIGHT }),
+  });
+  refused('already dashing', {
+    before: (f) => { f.step(DASH_RIGHT); assert.ok(f.fighter.dash); f.step({}); },
+    press: (f) => f.step(DASH_RIGHT),
+  });
+  refused('exhausted', {
+    before: (f) => { f.fighter.combat.setEnergy(0); f.fighter.combat.regenEnergy(60); f.step({}); },
+    press: (f) => f.step(DASH_RIGHT),
+  });
+  refused('locked input (intro, time-up)', {
+    before: (f) => { f.fighter.inputLocked = true; },
+    press: (f) => f.step(DASH_RIGHT),
+  });
+  const warnings = [];
+  const warn = console.warn;
+  console.warn = (msg) => warnings.push(msg);
+  try {
+    refused('no dash art', {
+      options: { sprites: fakeSprites(Object.keys(def.animations).filter((k) => k !== 'dash')) },
+      press: (f) => f.step(DASH_RIGHT),
+    });
+  } finally {
+    console.warn = warn;
+  }
+  assert.ok(warnings.some((w) => /Dash has no animation frames/.test(w)));
+  // A refused request is used up, never queued for later.
+  const { fighter, step } = makeFighter();
+  step({ action1: true, action1Pressed: true });
+  step(DASH_RIGHT);
+  while (fighter.combat.attack) step({});
+  for (let i = 0; i < 20; i++) step({});
+  assert.equal(fighter.dash, null);
+});
+
+test('a request short of Energy empties the bar like any Dash; walls and ledges end it; attacks, Defense and Charge win the step', () => {
+  const low = makeFighter();
+  low.fighter.combat.setEnergy(10);
+  low.step(DASH_RIGHT);
+  assert.ok(low.fighter.dash);
+  assert.deepEqual([low.fighter.combat.energy, low.fighter.combat.energyExhausted], [0, true]);
+
+  const walled = new StageCollision(stageMap({ solids: [{ id: 'crate', x: 640, y: 700, w: 60, h: 100 }] }));
+  const w = makeFighter({ x: 560, stage: walled });
+  w.step(DASH_RIGHT);
+  for (let i = 0; i < DASH_STEPS && w.fighter.dash; i++) w.step({});
+  assert.equal(w.fighter.dash, null);
+  assert.equal(w.fighter.body.x, 640 - w.fighter.body.halfW, 'against the crate, never through it');
+
+  const edge = makeFighter({ x: 1960 });
+  edge.step(DASH_RIGHT);
+  let steps = 0;
+  while (edge.fighter.grounded && steps++ < DASH_STEPS) edge.step({});
+  assert.equal(edge.fighter.grounded, false, 'off the ledge');
+  assert.equal(edge.fighter.dash, null);
+
+  const attack = makeFighter();
+  attack.step({ ...DASH_RIGHT, action2: true, action2Pressed: true });
+  assert.equal(attack.fighter.state, 'attack');
+  assert.equal(attack.fighter.dash, null);
+  const shield = makeFighter();
+  shield.step({ ...DASH_RIGHT, defense: true, defensePressed: true });
+  assert.equal(shield.fighter.combat.shielding, true);
+  assert.equal(shield.fighter.dash, null);
+  const charge = makeFighter();
+  charge.step({ ...DASH_RIGHT, charge: true, chargePressed: true });
+  assert.equal(charge.fighter.state, 'charge');
+  assert.equal(charge.fighter.dash, null);
+});
+
+test('end to end: a Right mouvement tap through the real InputManager and PlayerController Dashes once', async () => {
+  globalThis.window = { addEventListener() {} };
+  globalThis.document = { addEventListener() {}, hidden: false };
+  const { InputManager } = await import('../js/core/input-manager.js');
+  const { PlayerController } = await import('../js/game/fighter-controller.js');
+  const { Fighter } = await import('../js/game/character.js');
+  const { STAGE } = await import('./fighter-harness.mjs');
+  const input = new InputManager(CONFIG.bindings);
+  const fighter = new Fighter({
+    def, sprites: fakeSprites(), stage: STAGE, slot: 0, label: 'P1',
+    controller: new PlayerController(input), spawn: { x: 500, facing: -1 },
+  });
+  fighter.update(DT, SIM_CTX);
+  input.queueTouchDash(1);
+  fighter.update(DT, SIM_CTX);
+  assert.equal(fighter.dash?.direction, 1);
+  assert.equal(fighter.combat.energy, 100 - def.energy.dashCost);
+  const dashes = [];
+  for (let i = 0; i < 40; i++) {
+    fighter.update(DT, SIM_CTX);
+    if (fighter.dash && fighter.dash.time === 0) dashes.push(i);
+  }
+  assert.deepEqual(dashes, [], 'one tap, one Dash: nothing repeats');
+  assert.equal(input.isHeld('right'), false);
 });

@@ -1,10 +1,25 @@
-// Multi-touch landscape controls built on Pointer Events.
+// Multi-touch landscape controls built on Pointer Events, in one of two
+// layouts ("schemes", the Mobile Controls setting; see js/core/settings.js):
 //
-// Layout (matches the reference ergonomics):
-//   lower-left : [LEFT] [C] [RIGHT]  — thumb can slide between them
+// Joystick (the default):
+//   lower-left : a circular joystick for Left / Right, with two small Dash
+//                buttons, Left mouvement and Right mouvement, just above its
+//                top-left and top-right
 //   lower-right:                [SHURIKEN]
 //                       [SPECIAL] [SHIELD]
 //                    [PUNCH] [KICK] [JUMP]
+//                                  [CHARGE]   (a down arrow, under Jump)
+//
+// Classic Buttons (the original layout):
+//   lower-left : [LEFT] [C] [RIGHT]  — thumb can slide between them
+//   lower-right: the same six buttons, with no Charge under Jump
+//
+// Both schemes drive the same internal inputs. The joystick holds `left` or
+// `right` exactly as the Left / Right buttons do (a digital hold: how far it
+// is pushed never changes the speed), and C or the down arrow is the same
+// held `charge`. The Dash buttons are the only thing new: a single tap asks
+// InputManager for one Dash (queueTouchDash), which Fighter.tryDash accepts
+// or refuses under the usual rules. They hold nothing.
 //
 // C is Charge (the `charge` input, held for as long as the pointer stays on
 // it). The large top slot is the `primary` input, the lower row's first two
@@ -16,14 +31,16 @@
 // action1 (the Clone Attack), and Charge + Kick is Charge + action2 (the
 // Sphere Rush).
 //
-// Every pointer is tracked by pointerId, so Right + Jump (or any combination)
-// works simultaneously. State is pushed into InputManager.setTouch().
+// Every pointer is tracked by pointerId, so the joystick (or Left / Right)
+// and Jump, or any other combination, work simultaneously. State is pushed
+// into InputManager.setTouch().
 
 import { el } from '../core/utils.js';
 import { ICONS } from '../ui/icons.js';
 import { ABILITY_ACTIONS, mobileAbility } from '../ui/mobile-abilities.js';
+import { DEFAULT_MOBILE_CONTROLS, resolveSetting } from '../core/settings.js';
 
-// Lower-left cluster, in on-screen order.
+// Classic Buttons' lower-left cluster, in on-screen order.
 const DPAD = [
   { action: 'left', label: 'Move left', icon: ICONS.left },
   { action: 'charge', label: 'Charge', text: 'C' },
@@ -43,6 +60,38 @@ const ACTION_BUTTONS = [
   { action: 'jump', label: 'Jump', icon: ICONS.jump, pos: 'jump' },
 ];
 
+// The Joystick scheme's Charge: the same held `charge`, as a down arrow in
+// the lower-right cluster, directly under Jump.
+const CHARGE_DOWN = { action: 'charge', label: 'Charge', icon: ICONS.down, pos: 'charge-down' };
+
+// The Joystick scheme's single-tap Dash buttons. Their names are exactly
+// these, spelling included.
+const DASH_BUTTONS = [
+  { direction: -1, side: 'left', label: 'Left mouvement', icon: ICONS.left },
+  { direction: 1, side: 'right', label: 'Right mouvement', icon: ICONS.right },
+];
+
+// The joystick, in fractions of its radius. Pushed sideways past `engage` it
+// holds Left or Right; back inside `deadzone` it lets go. The gap between
+// the two keeps a thumb resting near the edge from flickering the direction
+// (every flicker would be a fresh press, and two quick presses a Dash). Only
+// the sideways part counts: pushing up or down moves the knob, never Jump or
+// Charge. The knob follows the thumb and stops `travel` from the centre, so
+// it stays inside the base.
+export const JOYSTICK = Object.freeze({ deadzone: 0.24, engage: 0.34, travel: 0.56 });
+
+// The direction a joystick at sideways offset `x` (a fraction of its radius,
+// + right) holds, given the one it holds now: 'left', 'right' or null.
+export function joystickDirection(x, current = null) {
+  if (x >= JOYSTICK.engage) return 'right';
+  if (x <= -JOYSTICK.engage) return 'left';
+  if (current === 'right' && x > JOYSTICK.deadzone) return 'right';
+  if (current === 'left' && x < -JOYSTICK.deadzone) return 'left';
+  return null;
+}
+
+const END_EVENTS = ['pointerup', 'pointercancel', 'lostpointercapture'];
+
 function makeButton(spec, cls) {
   const content = spec.icon || (spec.text && el('span', { class: 'tc-text', text: spec.text }));
   const btn = el('button', {
@@ -58,73 +107,157 @@ function makeButton(spec, cls) {
 }
 
 export class TouchControls {
-  constructor(root, input) {
+  constructor(root, input, { scheme = DEFAULT_MOBILE_CONTROLS } = {}) {
     this.root = root;
     this.input = input;
     this.enabled = false;
-    this.buttons = new Map(); // action -> element
+    this.scheme = null;
+    this.buttons = new Map(); // action -> the element holding it in this scheme
     this.pointers = new Map(); // pointerId -> action
     this.counts = new Map(); // action -> number of pointers holding it
+    // The joystick's pointer (only one steers it) and the base's centre and
+    // radius, measured as it goes down; null while nothing holds it.
+    this.stickPointer = null;
+    this.stickFrame = null;
+    this.knobOffset = { x: 0, y: 0 };
+    this.dashPointers = new Map(); // pointerId -> Dash button
     this.build();
+    this.setScheme(scheme);
   }
 
   build() {
+    // Classic Buttons' lower-left cluster.
+    this.padButtons = new Map();
     const dpad = el('div', { class: 'tc-cluster tc-dpad', role: 'group', 'aria-label': 'Movement and Charge' });
     for (const spec of DPAD) {
       const b = makeButton(spec, `tc-pad tc-${spec.action}`);
-      this.buttons.set(spec.action, b);
+      this.padButtons.set(spec.action, b);
       dpad.append(b);
     }
+
+    // The Joystick scheme's lower-left cluster: the stick, between its two
+    // Dash buttons.
+    this.knob = el('div', { class: 'tc-stick-knob' });
+    this.stick = el('div', { class: 'tc-stick', role: 'group', 'aria-label': 'Movement joystick' }, [
+      el('span', { class: 'tc-stick-arrow tc-stick-arrow--left', 'aria-hidden': 'true', html: ICONS.left }),
+      el('span', { class: 'tc-stick-arrow tc-stick-arrow--right', 'aria-hidden': 'true', html: ICONS.right }),
+      this.knob,
+    ]);
+    this.dashButtons = new Map(); // side ('left' / 'right') -> button
+    for (const spec of DASH_BUTTONS) {
+      const b = el('button', {
+        type: 'button', class: `tc-btn tc-dash tc-dash-${spec.side}`,
+        'aria-label': spec.label, 'data-dash': spec.side, tabindex: '-1', html: spec.icon,
+      });
+      b._direction = spec.direction;
+      this.dashButtons.set(spec.side, b);
+    }
+    const joystick = el('div', { class: 'tc-cluster tc-joystick' }, [
+      this.dashButtons.get('left'), this.stick, this.dashButtons.get('right'),
+    ]);
+
+    // Lower-right cluster, shared by both schemes.
+    this.actionButtons = new Map();
     const actions = el('div', { class: 'tc-cluster tc-actions', role: 'group', 'aria-label': 'Actions' });
     for (const spec of ACTION_BUTTONS) {
       const b = makeButton(spec, `tc-act tc-${spec.pos}`);
-      this.buttons.set(spec.action, b);
+      this.actionButtons.set(spec.action, b);
       actions.append(b);
     }
+    this.chargeDown = makeButton(CHARGE_DOWN, `tc-act tc-${CHARGE_DOWN.pos}`);
+
     this.dpad = dpad;
+    this.joystick = joystick;
     this.actions = actions;
-    this.root.replaceChildren(dpad, actions);
+    // Every button either scheme shows, for clearing their pressed looks.
+    this.allButtons = [...this.padButtons.values(), ...this.actionButtons.values(), this.chargeDown, ...this.dashButtons.values()];
     // Neutral until a screen names the fighter.
     this.setCharacter(null);
 
-    // Lower-left cluster: it captures the pointer so a thumb can slide between
-    // LEFT / C / RIGHT without lifting.
+    // Classic lower-left cluster: it captures the pointer so a thumb can
+    // slide between LEFT / C / RIGHT without lifting.
     dpad.addEventListener('pointerdown', (e) => this.onDpadDown(e));
     dpad.addEventListener('pointermove', (e) => this.onDpadMove(e));
-    for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) {
-      dpad.addEventListener(type, (e) => this.onPointerEnd(e));
+    for (const type of END_EVENTS) dpad.addEventListener(type, (e) => this.onPointerEnd(e));
+
+    // The joystick captures its one pointer and follows it until it lifts.
+    this.stick.addEventListener('pointerdown', (e) => this.onStickDown(e));
+    this.stick.addEventListener('pointermove', (e) => this.onStickMove(e));
+    for (const type of END_EVENTS) {
+      this.stick.addEventListener(type, (e) => {
+        if (e.pointerId === this.stickPointer) this.releaseStick();
+      });
     }
 
-    // Action buttons: each button owns its pointers.
-    for (const spec of ACTION_BUTTONS) {
-      const b = this.buttons.get(spec.action);
+    // Held buttons (the six actions and the down-arrow Charge): each button
+    // owns its pointers.
+    for (const b of [...this.actionButtons.values(), this.chargeDown]) {
+      const action = b.getAttribute('data-action');
       b.addEventListener('pointerdown', (e) => {
         if (!this.enabled) return;
         e.preventDefault();
         b.setPointerCapture?.(e.pointerId);
-        this.assign(e.pointerId, spec.action);
+        this.assign(e.pointerId, action);
       });
-      for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) {
-        b.addEventListener(type, (e) => this.onPointerEnd(e));
-      }
+      for (const type of END_EVENTS) b.addEventListener(type, (e) => this.onPointerEnd(e));
+    }
+
+    // Dash buttons: a press asks for one Dash and shows the button pressed
+    // until the pointer lifts; it never holds a direction.
+    for (const b of this.dashButtons.values()) {
+      b.addEventListener('pointerdown', (e) => {
+        if (!this.enabled) return;
+        e.preventDefault();
+        b.setPointerCapture?.(e.pointerId);
+        this.dashPointers.set(e.pointerId, b);
+        b.classList.add('is-pressed');
+        this.input.queueTouchDash(b._direction);
+      });
+      for (const type of END_EVENTS) b.addEventListener(type, (e) => this.onDashEnd(e));
     }
 
     // Assistive-technology activation (click without a pointer) = short tap.
     this.root.addEventListener('click', (e) => {
       const b = e.target.closest('.tc-btn');
       if (!b || e.detail !== 0 || !this.enabled) return;
-      const action = b.dataset.action;
+      if (b._direction) {
+        this.input.queueTouchDash(b._direction);
+        return;
+      }
+      const action = b.getAttribute('data-action');
       this.input.setTouch(action, true);
       setTimeout(() => this.input.setTouch(action, (this.counts.get(action) || 0) > 0), 120);
     });
     this.root.addEventListener('contextmenu', (e) => e.preventDefault());
   }
 
+  // Shows the 'joystick' or 'classic' layout (anything else is the
+  // default, Joystick). Everything held is let go first, so a switch never
+  // leaves a direction, Charge or any other button down. The fighter's own
+  // icons are untouched: the combat buttons are the same elements in both.
+  setScheme(scheme) {
+    const next = resolveSetting('mobileControls', scheme);
+    this.releaseAll();
+    if (next === this.scheme) return;
+    this.scheme = next;
+    const joystick = next === 'joystick';
+    this.buttons = new Map([
+      ...(joystick ? [] : this.padButtons),
+      ...this.actionButtons,
+      ...(joystick ? [['charge', this.chargeDown]] : []),
+    ]);
+    this.actions.replaceChildren(...this.actionButtons.values(), ...(joystick ? [this.chargeDown] : []));
+    this.root.replaceChildren(joystick ? this.joystick : this.dpad, this.actions);
+    this.root.classList.toggle('is-joystick', joystick);
+    this.root.classList.toggle('is-classic', !joystick);
+    this.root.dataset.scheme = next;
+  }
+
   hitDpad(x, y) {
     let best = null;
     let bestD = Infinity;
     for (const spec of DPAD) {
-      const r = this.buttons.get(spec.action).getBoundingClientRect();
+      const r = this.padButtons.get(spec.action).getBoundingClientRect();
       const cx = r.left + r.width / 2;
       const cy = r.top + r.height / 2;
       const d = Math.hypot(x - cx, y - cy);
@@ -158,6 +291,67 @@ export class TouchControls {
     this.assign(e.pointerId, null);
   }
 
+  // ---- Joystick -------------------------------------------------------------
+
+  onStickDown(e) {
+    if (!this.enabled) return;
+    e.preventDefault();
+    // One thumb steers; another landing on the base is ignored.
+    if (this.stickPointer !== null) return;
+    const r = this.stick.getBoundingClientRect();
+    this.stickPointer = e.pointerId;
+    this.stickFrame = { x: r.left + r.width / 2, y: r.top + r.height / 2, radius: r.width / 2 };
+    this.stick.setPointerCapture?.(e.pointerId);
+    this.stick.classList.add('is-active');
+    this.steer(e.clientX, e.clientY);
+  }
+
+  onStickMove(e) {
+    if (e.pointerId !== this.stickPointer) return;
+    this.steer(e.clientX, e.clientY);
+  }
+
+  // Moves the knob toward the thumb at (x, y), and holds whatever direction
+  // that offset means (see joystickDirection).
+  steer(x, y) {
+    const { x: cx, y: cy, radius } = this.stickFrame;
+    const dx = x - cx;
+    const dy = y - cy;
+    const held = joystickDirection(radius > 0 ? dx / radius : 0, this.pointers.get(this.stickPointer) ?? null);
+    const max = radius * JOYSTICK.travel;
+    const len = Math.hypot(dx, dy);
+    const k = len > max ? max / len : 1;
+    this.setKnob(dx * k, dy * k);
+    this.assign(this.stickPointer, held);
+    this.stick.classList.toggle('is-left', held === 'left');
+    this.stick.classList.toggle('is-right', held === 'right');
+  }
+
+  // Lets go of the joystick: no direction held, the knob back in the middle.
+  releaseStick() {
+    if (this.stickPointer !== null) this.assign(this.stickPointer, null);
+    this.stickPointer = null;
+    this.stickFrame = null;
+    this.stick.classList.remove('is-active', 'is-left', 'is-right');
+    this.setKnob(0, 0);
+  }
+
+  setKnob(x, y) {
+    this.knobOffset = { x, y };
+    this.knob.style.transform = x || y ? `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px)` : '';
+  }
+
+  // ---- Dash buttons -----------------------------------------------------------
+
+  onDashEnd(e) {
+    const b = this.dashPointers.get(e.pointerId);
+    if (!b) return;
+    this.dashPointers.delete(e.pointerId);
+    if (![...this.dashPointers.values()].includes(b)) b.classList.remove('is-pressed');
+  }
+
+  // ---- Held actions -------------------------------------------------------------
+
   assign(pointerId, action) {
     const prev = this.pointers.get(pointerId);
     if (prev === action) return;
@@ -179,10 +373,14 @@ export class TouchControls {
     this.input.setTouch(action, held);
   }
 
+  // Lets go of everything: every held action, the joystick (recentred) and
+  // the Dash buttons' pressed look.
   releaseAll() {
+    this.releaseStick();
     for (const id of [...this.pointers.keys()]) this.assign(id, null);
     this.counts.clear();
-    for (const b of this.buttons.values()) b.classList.remove('is-pressed');
+    this.dashPointers.clear();
+    for (const b of this.allButtons) b.classList.remove('is-pressed');
   }
 
   setEnabled(enabled) {
@@ -198,7 +396,7 @@ export class TouchControls {
   setCharacter(def) {
     for (const action of ABILITY_ACTIONS) {
       const { label, icon } = mobileAbility(def, action);
-      const b = this.buttons.get(action);
+      const b = this.actionButtons.get(action);
       b.setAttribute('aria-label', label);
       b.innerHTML = icon;
     }
