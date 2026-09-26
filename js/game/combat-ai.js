@@ -219,6 +219,9 @@ export class CombatAIController {
     // drags on, the more it wants to commit (see urge).
     this.lastOffence = 0;
     this.turning = false;
+    // A jump's button stays held until this clock time, so it is the full
+    // jump rather than a short hop (see holdJump).
+    this.jumpHoldUntil = -Infinity;
   }
 
   getInput(self, dt, ctx) {
@@ -249,6 +252,7 @@ export class CombatAIController {
       this.intent = null;
       this.events.length = 0;
       if (this.offStage(self, ctx.stage)) this.steerHome(self, ctx.stage, held);
+      this.holdJump(self, held);
       return this.emit();
     }
 
@@ -258,7 +262,17 @@ export class CombatAIController {
     if (this.thinkTimer <= 0 || urgent) this.think(self, foe, ctx, urgent);
     this.act(self, foe, ctx, held);
     this.guard(self, ctx, held);
+    this.holdJump(self, held);
     return this.emit();
+  }
+
+  // Every jump it presses is a full one: the button stays held through the
+  // fighter's short-hop window (a tap would be a short hop, see
+  // Fighter.shortHop), then is let go so a later press (the air jump) is a
+  // fresh one.
+  holdJump(self, held) {
+    if (held.jump && !this.prev.jump) this.jumpHoldUntil = this.clock + (self.def.movement.shortHopWindow ?? 0) + 2 / 60;
+    if (this.clock <= this.jumpHoldUntil) held.jump = true;
   }
 
   // The snapshot for this step: what is held, and a press edge for each
@@ -632,10 +646,14 @@ export class CombatAIController {
     const options = [{ score: (1 - p.guard) * 0.8 + (threat.severity < 3 ? 0.6 : 0), intent: { kind: 'take' } }];
 
     // Shield: up the step Defense is held, from either side; costs Energy
-    // only if it blocks. Held through the threat, never much longer.
-    if (s.ms.shield && self.shieldAllowed()) {
+    // only if it blocks. Held through the threat, never much longer. Raised
+    // this close to contact it is a perfect Shield (see
+    // Fighter.perfectShield), free: a timing the level has to earn, so a
+    // lower one mostly fumbles it and takes the hit instead.
+    const justInTime = !self.combat.shielding && threat.contactIn <= (self.defense?.perfectWindow ?? 0);
+    if (s.ms.shield && self.shieldAllowed() && (!justInTime || this.rng() < p.guard ** 4)) {
       const cost = self.energyDef.shieldHitCost;
-      const drain = cost >= s.energy ? 1.2 : (cost / s.energy) * 0.8;
+      const drain = justInTime ? 0 : cost >= s.energy ? 1.2 : (cost / s.energy) * 0.8;
       const linger = 0.04 + (1 - p.guard) * 0.25;
       const hold = Math.min(threat.endIn + linger, SHIELD_MAX_HOLD);
       options.push({ score: weight - p.energyCare * drain, intent: { kind: 'shield', until: this.clock + hold } });
@@ -1179,6 +1197,11 @@ export class CombatAIController {
   steerHome(self, stage, held) {
     const dx = stage.centerX - self.body.x;
     if (Math.abs(dx) > 8) held[DIR_KEY[Math.sign(dx)]] = true;
+    // Falling past the stage's top with its air jump left: jump back up.
+    const b = self.body;
+    if (!b.grounded && b.vy > 0 && b.y > stage.groundY - 40 && self.airJumps > 0 && self.combat.stun <= 0 && !this.prev.jump) {
+      held.jump = true;
+    }
   }
 
   // ---- Safety on every level --------------------------------------------------------

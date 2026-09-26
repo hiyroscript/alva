@@ -51,6 +51,9 @@ export class TrainingAIController {
     this.wantDrop = false;
     this.hopCooldown = 2;
     this.idleUntilSettled = 0;
+    // Seconds Jump stays held after a press: always the full jump, never a
+    // short hop (see Fighter.shortHop).
+    this.jumpHold = 0;
   }
 
   getInput(self, dt, ctx) {
@@ -85,7 +88,10 @@ export class TrainingAIController {
     if (this.wantJump && self.body.grounded) {
       out.jumpPressed = true;
       this.wantJump = false;
+      this.jumpHold = (self.def.movement.shortHopWindow ?? 0) + 2 / 60;
     }
+    out.jump = this.jumpHold > 0;
+    this.jumpHold -= dt;
     if (this.wantDrop && self.body.grounded) {
       out.dropPressed = true;
       this.wantDrop = false;

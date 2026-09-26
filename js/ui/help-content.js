@@ -83,9 +83,10 @@ export function buildHelp() {
     card('Movement', [
       el('ul', { class: 'info-list' }, [
         el('li', { text: 'Left / Right accelerate into a run. Release to slow to a stop.' }),
-        el('li', { text: 'Jump from the ground; your run carries into the jump, and you can steer while airborne.' }),
+        el('li', { text: 'Jump from the ground; your run carries into the jump, and you can steer while airborne. Tap Jump for a short hop, hold it for a full jump, and press it again in the air for one more jump. Landing, or being hit, gives that air jump back.' }),
         el('li', { text: 'Hold Charge (S / ↓, D-pad or stick down, or C on touch) in the air while falling to fast-fall back to the ground.' }),
         el('li', { text: 'Attacks keep some of your momentum. Press your next attack a little early and it comes out the moment it can. Land a hit and you can go straight into another attack or a jump: Punch → Kick, or Kick → Jump → Punch in the air. The higher the opponent’s Launch Point, the further each hit sends them, and the sooner a combo runs out.' }),
+        el('li', { text: 'A hard hit sends a fighter tumbling and keeps it helpless a little longer: chase it. When you are hit, hold a direction to bend your launch a little that way, toward the stage to survive or away from a follow-up.' }),
         el('li', { text: 'Press the same direction twice quickly (Right, Right or Left, Left) on the ground to Dash: a short, fast burst that way. It only moves you: it never hits, and a ledge or a wall ends it.' }),
         el('li', { text: 'The bright purple bar above your fighter is Energy; it shows only while it is not full. A Dash costs 15 of its 100, and every hit your Shield blocks costs 25; it refills by itself, faster while you hold Charge. You can still Dash or Shield with less left than that, but it empties the bar. If Energy reaches zero, it turns gray and must fully refill before Shield and Dash become available again. Running, jumping and attacking never cost Energy.' }),
         el('li', { text: 'Your fighter faces the way it last moved or dashed, and keeps that facing when it stops: it never turns toward the opponent by itself.' }),
@@ -114,6 +115,7 @@ export function buildHelp() {
       el('ul', { class: 'info-list' }, [
         el('li', { text: 'Defense (L, RB / RT, or the Shield button on touch) is the shared defensive button. Each fighter defends in its own way: #0001 shields.' }),
         el('li', { text: 'Defense — Hold to Shield. Blocking a hit costs 25 Energy.' }),
+        el('li', { text: 'Raise the Shield just before a hit lands for a perfect Shield: it costs nothing and you can strike back at once. Tapping Defense over and over does not count.' }),
         el('li', { text: 'The Shield is a circle all round #0001, on the ground and in the air. While it is up, any attack that reaches him is blocked, from either side: no Launch Point and no launch. Holding it costs nothing, and neither does an attack that misses.' }),
         el('li', { text: 'Shielding holds #0001 in place on the ground: no walking, Dash or jump. In the air he keeps falling. Let go of Defense to attack, throw, Dash or jump.' }),
         el('li', { text: 'Blocking with less than 25 Energy left still works, but empties the bar. If Energy reaches zero, it turns gray and must fully refill before Shield and Dash become available again.' }),

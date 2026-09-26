@@ -78,7 +78,7 @@ test('it refills by itself at 12 per second: standing, running, in the air, atta
   for (let i = 0; i < 30; i++) step({ right: true });
   near(c.energy, 28, 'half a second running');
   step({ jump: true, jumpPressed: true });
-  for (let i = 0; i < 29; i++) step();
+  for (let i = 0; i < 29; i++) step({ jump: true }); // the full jump
   assert.equal(fighter.grounded, false);
   near(c.energy, 34, 'half a second jumping');
   while (!fighter.grounded) step();
@@ -174,7 +174,8 @@ test('the Shield costs 25 per blocked hit and nothing else: not raising it, hold
   }
   assert.equal(fighter.combat.energy, 100, 'taps and holds are free');
   const d = duel();
-  d.tick({}, HOLD);
+  // Up well before the hit: an ordinary block, never a perfect one.
+  for (let i = 0; i < 9; i++) d.tick({}, HOLD);
   d.tick({ action1: true, action1Pressed: true }, HOLD);
   for (let i = 0; i < 30 && !d.events.length; i++) d.tick({}, HOLD);
   assert.equal(d.events[0].type, 'block');
@@ -235,7 +236,8 @@ test('too little left still pays: a Dash or a block with less than it costs take
   // A block on 20 (it costs 25).
   const d = duel();
   d.target.combat.setEnergy(20);
-  d.tick({}, HOLD);
+  // Up well before the hit: an ordinary block, never a perfect one.
+  for (let i = 0; i < 9; i++) d.tick({}, HOLD);
   d.tick({ action1: true, action1Pressed: true }, HOLD);
   for (let i = 0; i < 30 && !d.events.length; i++) d.tick({}, HOLD);
   assert.equal(d.events[0].type, 'block', 'the block stands');

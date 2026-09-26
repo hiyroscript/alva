@@ -104,8 +104,9 @@ test('the Void is much closer than before on every stage: at least 30% nearer on
 
 test('ordinary jumps never reach the upper Void, even from each stage\'s highest footing', () => {
   const g = CONFIG.sim.gravity * def.movement.gravityScale;
-  // Tier 3 is the highest normal jump any fighter can own.
-  const rise = 1000 ** 2 / (2 * g);
+  // Tier 3 is the highest normal jump any fighter can own, and its air jump
+  // (taken at the apex, the highest it can start) adds its own rise.
+  const rise = (1000 ** 2 + (1000 * def.movement.airJumpRatio) ** 2 * def.movement.airJumps) / (2 * g);
   assert.ok(getJumpVelocity(def) <= 1000);
   for (const m of ALL_MAPS) {
     const footing = Math.min(m.mainStage.top, ...m.platforms.map((p) => p.y), ...m.solids.map((s) => s.y));

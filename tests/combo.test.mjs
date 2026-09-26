@@ -276,7 +276,8 @@ test('BA1 -> BA1 combos at LP 0 close in; its own pushback ends the string withi
 test('BA2 -> jump -> air BA1 is a true combo at medium Launch Point; BA2 -> BA1 at low', () => {
   for (const lp of [30, 40, 50]) {
     const d = combo({ gap: 40, lp });
-    d.run((i) => (i === 0 ? BA2 : i === 18 ? JUMP : i === 21 ? BA1 : {}), 70);
+    // Jump held on after the press: the full jump after the launch.
+    d.run((i) => ({ ...(i === 0 ? BA2 : i === 18 ? JUMP : i === 21 ? BA1 : {}), jump: i >= 18 && i < 30 }), 70);
     assert.deepEqual(d.hits.map((h) => h.move), ['ba2', 'midairBa1'], `LP ${lp}`);
     assert.ok(d.held(0, 1), `LP ${lp}: the launched target never got to act`);
   }

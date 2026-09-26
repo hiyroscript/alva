@@ -18,6 +18,7 @@ import {
   def, DT, SIM_CTX, fakeSprites, makeFighter, frameName, stepUntil,
   steps, frameNo, recordAttack, sequence, duel,
 } from './fighter-harness.mjs';
+import { resolveLaunchStun } from '../js/game/combat.js';
 
 const BA1 = { action1: true, action1Pressed: true };
 const BA2 = { action2: true, action2Pressed: true };
@@ -299,23 +300,25 @@ test('the mid-air BA2 hitbox is live only on the kick frame (midair1ba3)', () =>
 
 test('airborne action2 plays the five-frame mid-air BA2 (the airborne kick) during the ascent, under normal gravity', () => {
   const { fighter, step } = makeFighter();
-  // The same jump without an attack, for comparison.
+  // The same jump without an attack, for comparison. Jump held on: the full
+  // jump (a tap would be a short hop).
   const plain = makeFighter();
+  const HELD = { jump: true };
   step(JUMP);
   plain.step(JUMP);
-  step();
-  plain.step();
+  step(HELD);
+  plain.step(HELD);
   assert.ok(fighter.body.vy < 0, 'rising');
-  step(BA2);
-  plain.step();
+  step({ ...BA2, ...HELD });
+  plain.step(HELD);
   assert.equal(fighter.combat.attack.def.id, 'midairBa2');
   assert.equal(fighter.animator.anim.key, 'midairBa2');
   assert.equal(frameName(fighter), '0001_midair1ba1.png');
   const log = [{ frame: frameName(fighter) }];
   const vys = [fighter.body.vy];
   while (fighter.state === 'attack') {
-    step();
-    plain.step();
+    step(HELD);
+    plain.step(HELD);
     // Gravity keeps working: no freeze, no extra lift.
     for (const k of ['x', 'y', 'vx', 'vy']) assert.equal(fighter.body[k], plain.fighter.body[k], `body.${k}`);
     vys.push(fighter.body.vy);
@@ -395,15 +398,16 @@ test('BA2 locks facing while it plays; the ground kick is steered by nothing, th
   for (const air of [false, true]) {
     const { fighter, step } = makeFighter();
     stepUntil(step, (f) => f.state === 'run', { right: true });
+    // In the air: the full jump (Jump held on).
     if (air) step({ right: true, ...JUMP });
-    step({ right: true, ...BA2 });
+    step({ right: true, jump: air, ...BA2 });
     const atk = fighter.combat.attack.def;
     assert.equal(atk.id, air ? 'midairBa2' : 'ba2');
     const log = [];
     while (fighter.state === 'attack') {
       log.push(fighter.body.vx);
       assert.equal(fighter.facing, 1, 'holding Left never turns an attack around');
-      step({ left: true });
+      step({ left: true, jump: air });
     }
     for (let i = 1; i < log.length; i++) assert.ok(log[i] <= log[i - 1], 'Left never speeds it up');
     if (!air) {
@@ -445,7 +449,7 @@ test('ground BA2 hits an opponent in front once, during the active phase, with i
       // CombatSystem runs after the fighters, on the phase they just reached.
       hitPhase = attacker.combat.phase;
       hitFrame = frameNo(frameName(attacker));
-      assert.equal(target.combat.stun, 0.28);
+      assert.equal(target.combat.stun, 0.28 + resolveLaunchStun(events.at(-1).launchSpeed, target.launchReaction));
       assert.equal(target.combat.hitstop, 0.09);
       assert.equal(attacker.combat.hitstop, 0.09);
       assert.ok(isZero(target.body.vx), 'no sideways push');
@@ -689,7 +693,7 @@ test('mid-air BA2 hits a grounded opponent in front while still airborne', () =>
       assert.equal(attacker.combat.phase, 'active');
       assert.equal(frameName(attacker), '0001_midair1ba3.png');
       // The kick's own stun and freeze, on both fighters.
-      assert.equal(target.combat.stun, 0.28);
+      assert.equal(target.combat.stun, 0.28 + resolveLaunchStun(events.at(-1).launchSpeed, target.launchReaction));
       assert.equal(target.combat.hitstop, 0.08);
       assert.equal(attacker.combat.hitstop, 0.08);
     }

@@ -16,6 +16,7 @@ import { Camera } from './camera.js';
 import { drawFrame, drawCenteredFrame } from './sprite-normalizer.js';
 import { drawEnergyBar, drawCabIndicators, energyBarState, statusOnScreen } from './fighter-status.js';
 import { drawShield } from './shield-fx.js';
+import { HIT_FX, HitEffects, whiteFrame } from './hit-fx.js';
 import { createTheme } from '../stages/index.js';
 
 // Ground ring + name tag tones: the player is white, the CPU a mid gray.
@@ -41,6 +42,11 @@ export class Arena {
     this.camera.setBounds(map.cameraBounds);
     this.camera.setAnchor(this.stage.centerX);
     this.combat = new CombatSystem();
+    // Hit effects (js/game/hit-fx.js): screen shake, hit flashes, sparks,
+    // speed trails and a lethal launch's slow motion. Presentation only:
+    // they slow the clock the fixed steps are fed from, never a step.
+    this.fx = new HitEffects({ reducedMotion });
+    this.shakePx = { x: 0, y: 0 };
     this.gravity = CONFIG.sim.gravity;
     this.step = CONFIG.sim.step;
     this.acc = 0;
@@ -107,6 +113,9 @@ export class Arena {
 
     const sprites = this.primary.sprites;
     const scale = computeWorldScale(pxW, pxH, sprites, this.map);
+    // The view's own scale, before any zoom (see syncView).
+    this.baseScale = scale;
+    this.worldPerArt = sprites.worldPerArt;
     this.pxPerArt = scale * sprites.worldPerArt;
     Object.assign(this.view, { pxW, pxH, scale, dpr });
     this.camera.setView(pxW / scale, pxH / scale, scale);
@@ -127,7 +136,9 @@ export class Arena {
 
   frame(dt) {
     dt = Math.min(dt, CONFIG.sim.maxFrameDelta);
-    this.acc += dt;
+    // A lethal launch's slow motion feeds the fixed steps more slowly (see
+    // HitEffects.timeScale); each step is still exactly one step.
+    this.acc += dt * this.fx.timeScale;
     let steps = 0;
     while (this.acc >= this.step && steps < CONFIG.sim.maxStepsPerFrame) {
       this.update(this.step);
@@ -138,12 +149,16 @@ export class Arena {
     const alpha = this.acc / this.step;
     for (const f of this.fighters) f.interpolate(alpha);
     for (const p of this.projectiles) p.interpolate(alpha);
+    for (const f of this.fighters) this.fx.sampleTrail(f, dt);
     const [lead, other] = this.cameraTargets;
     if (lead) this.camera.follow(lead, other, dt);
     this.syncView();
     this.theme.update(dt, this.view);
     this.fxTime += dt;
     this.render();
+    // Aged after drawing, so what this frame's steps started (a one-frame
+    // flash, a spark at age 0) is drawn at least once.
+    this.fx.update(dt);
   }
 
   // One fixed step of the world. Modes with their own rules (phases, a
@@ -174,6 +189,7 @@ export class Arena {
     updateClones(this.clones, dt);
     spawnClones(fighters, this.clones, this.stage);
     this.combat.update(fighters, this.projectiles, this.clones);
+    this.fx.take(this.combat.events, this);
     removeDeadProjectiles(this.projectiles);
     removeDeadClones(this.clones);
     this.checkVoid(fighters);
@@ -238,11 +254,37 @@ export class Arena {
   syncView() {
     const v = this.view;
     const cam = this.camera;
+    // A lethal launch's zoom closes in, leaning toward the launched fighter
+    // and never past the camera's bounds; the screen shake nudges the whole
+    // view. Both are presentation only (see HitEffects).
+    const zoom = this.fx.zoom;
+    const scale = (this.baseScale ?? v.scale) * zoom;
+    let x = cam.x;
+    let y = cam.y;
+    let w = cam.w;
+    let h = cam.h;
+    const focus = this.fx.zoomFocus;
+    if (zoom > 1 && focus) {
+      const { zoom: most, pull: lean } = HIT_FX.lethal;
+      const pull = lean * Math.min(1, (zoom - 1) / (most - 1));
+      w = cam.w / zoom;
+      h = cam.h / zoom;
+      const cx = cam.x + cam.w / 2 + (focus.renderX - (cam.x + cam.w / 2)) * pull;
+      const cy = cam.y + cam.h / 2 + (focus.renderY - focus.body.height / 2 - (cam.y + cam.h / 2)) * pull;
+      const b = cam.bounds;
+      x = Math.min(Math.max(cx - w / 2, b.left), b.right - w);
+      y = Math.min(Math.max(cy - h / 2, b.top), b.bottom - h);
+    }
+    const shake = this.fx.shakeOffset(this.shakePx);
+    x += (shake.x * v.dpr) / scale;
+    y += (shake.y * v.dpr) / scale;
     // Snap the camera to whole device pixels so layers and sprites agree.
-    v.x = Math.round(cam.x * v.scale) / v.scale;
-    v.y = Math.round(cam.y * v.scale) / v.scale;
-    v.w = cam.w;
-    v.h = cam.h;
+    v.scale = scale;
+    v.x = Math.round(x * scale) / scale;
+    v.y = Math.round(y * scale) / scale;
+    v.w = w;
+    v.h = h;
+    if (this.worldPerArt) this.pxPerArt = scale * this.worldPerArt;
   }
 
   render() {
@@ -268,6 +310,7 @@ export class Arena {
     // its rim in front, so the fighter reads as inside it.
     for (let i = fighters.length - 1; i >= 0; i--) {
       const f = fighters[i];
+      this.drawTrail(f);
       drawShield(ctx, f, view, 'interior', this.fxTime, this.reducedMotion);
       this.drawFighter(f);
       drawShield(ctx, f, view, 'rim', this.fxTime, this.reducedMotion);
@@ -278,6 +321,8 @@ export class Arena {
     // Projectiles over the fighters, so a shuriken stays visible in front.
     for (const p of this.projectiles) this.drawProjectile(p);
     ctx.imageSmoothingEnabled = true;
+    // Hit sparks over all of it, where each hit landed.
+    this.fx.drawSparks(ctx, (x, y) => this.toScreen(x, y), view.dpr);
 
     theme.drawForeground(ctx, view);
     // The Void over everything on the stage: whatever falls into it is
@@ -340,8 +385,24 @@ export class Arena {
     const frame = f.animator.frame;
     if (!frame) return;
     const [sx, sy] = this.toScreen(f.renderX, f.renderY);
-    // Mirroring follows the playing clip's own source orientation.
-    drawFrame(this.ctx, frame, sx, sy, this.pxPerArt, f.spriteFlip);
+    // Mirroring follows the playing clip's own source orientation. Just
+    // hit, it shows for one frame as a white silhouette of the same pose.
+    drawFrame(this.ctx, this.fx.flashing(f) ? whiteFrame(frame) : frame, sx, sy, this.pxPerArt, f.spriteFlip);
+  }
+
+  // `f`'s speed trail: fading afterimages of its own poses where it just
+  // was, behind it (see HitEffects.sampleTrail).
+  drawTrail(f) {
+    const ghosts = this.fx.ghosts(f);
+    if (!ghosts.length) return;
+    const { ctx } = this;
+    ctx.save();
+    for (const g of ghosts) {
+      ctx.globalAlpha = g.alpha;
+      const [sx, sy] = this.toScreen(g.x, g.y);
+      drawFrame(ctx, g.frame, sx, sy, this.pxPerArt, g.flip);
+    }
+    ctx.restore();
   }
 
   // The clone's body (the owner's real art, mirrored by the same per-clip

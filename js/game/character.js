@@ -4,7 +4,9 @@
 
 import { SpriteAnimator } from './sprite-animator.js';
 import { createBody, stepBody, dropThrough } from './physics.js';
-import { CombatState, createAttackDefinition, createDefenseDefinition, resolveEnergy } from './combat.js';
+import {
+  CombatState, createAttackDefinition, createDefenseDefinition, resolveEnergy, resolveLaunchReaction,
+} from './combat.js';
 import { createProjectileDefinition } from './projectile.js';
 import { createSummonDefinition, summonProblem } from './clone.js';
 import { ChargedTechnique, createTechniqueDefinition, techniqueProblem } from './charged-technique.js';
@@ -76,6 +78,10 @@ export class Fighter {
     // Energy settings (js/game/combat.js resolveEnergy): the maximum, both
     // refill rates, what a Dash costs and what each blocked hit costs.
     this.energyDef = resolveEnergy(def.energy);
+    // How it responds to being launched (resolveLaunchReaction in
+    // js/game/combat.js): longer stun for
+    // a harder launch, tumbling past a speed, and how far it may steer one.
+    this.launchReaction = resolveLaunchReaction(def.launchReaction);
     this.opponent = null;
     this.spawn = spawn;
     this.reset(stage);
@@ -120,6 +126,21 @@ export class Fighter {
     this.chargeHeldOver = false;
     this.coyote = 0;
     this.jumpBuffer = 0;
+    // Jumps left in the air before landing again (movement.airJumps),
+    // refreshed on the ground and by a hit (see takeHit).
+    this.airJumps = def.movement.airJumps ?? 0;
+    // Jumped in the air this step (the jump clip starts over).
+    this.airJumped = false;
+    // The direction held this step ({ x, y }, y -1 up with Jump, 1 down with
+    // Charge), read by a hit landing on it to steer its launch.
+    this.steerHeld = { x: 0, y: 0 };
+    // Launched hard (launchReaction.tumbleSpeed or faster): it tumbles in its
+    // mid-air hurt pose, stunned or not, until it acts or lands.
+    this.tumbling = false;
+    // A ground jump whose height is still being decided ({ time, fromY }):
+    // let go of Jump within movement.shortHopWindow of takeoff and it is a
+    // short hop (see shortHop). Null once decided.
+    this.hop = null;
     // Steps this fighter has lived (frozen ones included), to keep buffered
     // presses in the order they were made: the jump's press step, and each
     // buffered attack's.
@@ -145,6 +166,11 @@ export class Fighter {
     // Whether the Shield on screen went up on the ground (so it opens with
     // its raise pose) rather than in the air (see updateState).
     this.shieldRaisedOnGround = false;
+    // Seconds the Shield has been up (from the step it went up) and down;
+    // and whether this raise may block perfectly (see perfectShield).
+    this.shieldUpTime = 0;
+    this.shieldDownTime = Infinity;
+    this.shieldPerfectReady = false;
     // A fresh combat state: 0 Launch Point, full Energy, Shield down and
     // every cooldown ready.
     this.combat = new CombatState(this.energyDef);
@@ -192,6 +218,9 @@ export class Fighter {
     if (!this.chargeHeld) this.chargeFromAir = false;
     else if (!body.grounded) this.chargeFromAir = true;
     this.fastFalling = false;
+    this.airJumped = false;
+    this.steerHeld.x = (input.right ? 1 : 0) - (input.left ? 1 : 0);
+    this.steerHeld.y = (input.charge ? 1 : 0) - (input.jump ? 1 : 0);
 
     combat.update(dt);
     // Charged cooldowns recover by this step first, so one started below
@@ -273,8 +302,9 @@ export class Fighter {
     // out on a later step, in the air. Pressed on the same step, the attack
     // goes first, on the ground.
     const charged = wasCharging && !!input.charge;
+    const canJump = this.coyote > 0 || (!body.grounded && this.airJumps > 0);
     const jumpFirst = (at) =>
-      this.jumpBuffer > 0 && this.coyote > 0 && this.jumpPressedAt < at && this.canFollowUp() && !shieldHeld;
+      this.jumpBuffer > 0 && canJump && this.jumpPressedAt < at && this.canFollowUp() && !shieldHeld;
     let started = false;
     for (const action of COMBAT_ACTIONS) {
       if (!input[`${action}Pressed`]) continue;
@@ -331,9 +361,20 @@ export class Fighter {
     // bar (or having no art for where the fighter is) drops it.
     // Holding it costs nothing: only the hits it blocks cost Energy (see
     // CombatSystem.applyHit).
+    const wasShielding = combat.shielding;
     combat.shielding =
       (shieldHeld && canAct) || (combat.shielding && combat.shieldStun > 0 && this.shieldAllowed());
     if (!combat.shielding) combat.shieldStun = 0;
+    // The perfect Shield's clock: a raise after the Shield has been down
+    // for perfectRearm opens a perfectWindow from this very step.
+    if (combat.shielding && !wasShielding) {
+      this.shieldPerfectReady = this.shieldDownTime >= (this.defense?.perfectRearm ?? 0) - TIME_EPSILON;
+      this.shieldUpTime = 0;
+    } else if (combat.shielding) {
+      this.shieldUpTime += dt;
+    }
+    if (combat.shielding) this.shieldDownTime = 0;
+    else this.shieldDownTime += dt;
 
     // ---- Charge: grounded, and only while held ---------------------------
     // The held value alone decides it: no toggle or buffer, so the step that
@@ -390,15 +431,48 @@ export class Fighter {
     // A held Shield outranks a jump: let go of Defense to jump. A jump may
     // also cut short an attack that hit (see CombatState.cancellable). It
     // only sets the upward speed: whatever horizontal speed the fighter has
-    // carries straight into the air.
-    if (this.jumpBuffer > 0 && this.coyote > 0 && (canAct || combat.cancellable) && !combat.shielding) {
+    // carries straight into the air. Its height is decided over its first
+    // moments: Jump let go within shortHopWindow is a short hop, held on it
+    // is the full jump (see shortHop).
+    const free = (canAct || combat.cancellable) && !combat.shielding;
+    let jumped = false;
+    if (this.jumpBuffer > 0 && this.coyote > 0 && free) {
       this.cutAttack();
+      this.hop = { time: 0, fromY: body.y };
       body.vy = -this.jumpVelocity;
       body.grounded = false;
       body.ground = null;
       this.coyote = 0;
       this.jumpBuffer = 0;
       this.charging = false;
+      jumped = true;
+    } else if (this.jumpBuffer > 0 && !body.grounded && this.coyote <= 0 && this.airJumps > 0 && free && !this.technique) {
+      // ---- Air jump -------------------------------------------------------
+      // Jump pressed in the air (past coyote time), with one left: a fresh
+      // jump from wherever the fighter is, at airJumpRatio x the normal
+      // jump's speed, the jump clip from its first frame. A held direction
+      // sets off that way at least at top speed, so it can change course;
+      // with none held the drift carries on. Always the full height.
+      this.cutAttack();
+      body.vy = -this.jumpVelocity * (mv.airJumpRatio ?? 1);
+      if (held) body.vx = held * Math.max(held * body.vx, this.maxSpeed);
+      this.airJumps--;
+      this.jumpBuffer = 0;
+      this.hop = null;
+      this.airJumped = true;
+      jumped = true;
+    }
+
+    // ---- Short hop ---------------------------------------------------------
+    // A ground jump whose Jump is let go within shortHopWindow of takeoff (a
+    // tap, the takeoff step included) tops out at shortHopHeight x the full
+    // jump's height; held past it, the full jump. Decided once: after the
+    // window, the apex, a hit or the ground, it no longer changes.
+    if (this.hop) {
+      if (!jumped) this.hop.time += dt;
+      const open = this.hop.time <= (mv.shortHopWindow ?? 0) + TIME_EPSILON && body.vy < 0 && combat.stun <= 0;
+      if (open && !input.jump) this.shortHop(ctx.gravity);
+      if (!open || !input.jump) this.hop = null;
     }
 
     // ---- Fast fall ---------------------------------------------------------
@@ -424,7 +498,18 @@ export class Fighter {
 
     // ---- Integrate -------------------------------------------------------
     stepBody(body, dt, ctx.stage, ctx.gravity);
-    if (body.grounded) this.lastGroundY = body.y;
+    if (body.grounded) {
+      this.lastGroundY = body.y;
+      this.airJumps = mv.airJumps ?? 0;
+      this.hop = null;
+      this.tumbling = false;
+    }
+    // A tumble lasts past the stun until the fighter does something: an
+    // attack, a jump, the Shield or a fast fall. Steering alone does not end
+    // it.
+    if (this.tumbling && combat.stun <= 0 && (combat.attack || combat.shielding || jumped || this.fastFalling || this.technique || combat.immobilized)) {
+      this.tumbling = false;
+    }
 
     // ---- Charged technique: ground and walls ------------------------------
     // It needs real ground under the fighter from its first frame to its
@@ -537,6 +622,30 @@ export class Fighter {
     this.bufferedAttack = { action, age: 0, at: this.steps };
   }
 
+  // A hit (never a block) just landed on this fighter (see
+  // CombatSystem.applyHit): it gets its air jump back, so a launch never
+  // strands it without one, and a jump still deciding its height is done.
+  //
+  // A launch at launchReaction.tumbleSpeed or faster sets it tumbling; a
+  // slower one ends a tumble, and a hit that launches nothing leaves it.
+  takeHit(event) {
+    this.airJumps = this.def.movement.airJumps ?? 0;
+    this.hop = null;
+    if (event.launchSpeed > 0) this.tumbling = event.launchSpeed >= this.launchReaction.tumbleSpeed;
+  }
+
+  // Cuts a ground jump down to a short hop: from here it rises only as far as
+  // movement.shortHopHeight x the full jump's height above its takeoff
+  // (never lower than it already is), under the same gravity.
+  shortHop(gravity) {
+    const { body, hop } = this;
+    const g = gravity * body.gravityScale;
+    const full = (this.jumpVelocity * this.jumpVelocity) / (2 * g);
+    const left = full * (this.def.movement.shortHopHeight ?? 1) - (hop.fromY - body.y);
+    const v = left > 0 ? Math.sqrt(2 * g * left) : 0;
+    if (-body.vy > v) body.vy = -v;
+  }
+
   // Cuts the attack in progress short, if it may be (see
   // CombatState.cancellable): another attack or a jump is starting.
   cutAttack() {
@@ -563,6 +672,16 @@ export class Fighter {
   // shielding, frozen, bound or performing a charged technique).
   recoverChargedCooldowns(dt, charging) {
     this.combat.chargedCooldowns.update(dt, charging ? this.chargedCooldownRate : 1);
+  }
+
+  // A hit landing now would meet a perfect Shield: one raised no more than
+  // defense.perfectWindow seconds ago, after being down for at least
+  // perfectRearm. It blocks for free, with no blockstun (see
+  // CombatSystem.applyHit).
+  get perfectShield() {
+    const spec = this.defense;
+    return !!spec && this.combat.shielding && this.shieldPerfectReady && spec.perfectWindow > 0 &&
+      this.shieldUpTime <= spec.perfectWindow + TIME_EPSILON;
   }
 
   // Whether this fighter may have its Shield up right now: its Defense is a
@@ -801,6 +920,7 @@ export class Fighter {
     else if (combat.attack) next = 'attack';
     else if (this.dash) next = 'dash';
     else if (combat.shielding) next = 'shield';
+    else if (this.tumbling && !body.grounded) next = 'tumble';
     else if (!body.grounded) next = body.vy < 0 ? 'jump' : 'fall';
     else if (this.isLanding(dt)) next = 'land';
     else if (this.charging) next = 'charge';
@@ -809,7 +929,10 @@ export class Fighter {
     else if ((this.moveDir !== 0 && Math.abs(body.vx) > 20) || Math.abs(body.vx) > 140) next = 'run';
     else next = 'idle';
 
-    if (next !== this.state) {
+    // An air jump starts the jump clip over, even straight out of another
+    // rise.
+    const restart = next === 'jump' && this.airJumped;
+    if (next !== this.state || restart) {
       if (next === 'shield') this.shieldRaisedOnGround = body.grounded;
       this.state = next;
       this.stateTime = 0;
@@ -817,7 +940,7 @@ export class Fighter {
       this.stateTime += dt;
     }
 
-    this.animator.play(this.animationFor(next));
+    this.animator.play(this.animationFor(next), { restart });
     if (next === 'run') {
       // The clip's own rate at the fighter's own top speed, whatever its tier.
       const anim = this.animator.anim;
@@ -850,6 +973,7 @@ export class Fighter {
     if (state === 'shieldRelease') return this.defense.groundReleaseAnimation;
     if (state === 'technique') return this.technique.animation;
     if (state === 'hitstun' || state === 'bound') return this.body.grounded ? 'hurt' : 'midairHurt';
+    if (state === 'tumble') return 'midairHurt';
     if (state === 'charge') {
       return this.stateTime < this.chargeStartDuration - TIME_EPSILON ? 'chargeStart' : 'chargeLoop';
     }
