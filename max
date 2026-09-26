@@ -1,916 +1,1038 @@
-You are working in the GitHub repository hiyroscript/alva on the current main branch.
+ALVA — Fluid Movement, Combat Feel & Combo Rework
 
-Before changing anything, inspect the existing implementation carefully, especially:
+Objective
 
-index.html
-styles.css
-js/core/app.js
-js/core/screen-manager.js
-js/core/menu-navigator.js
-js/ui/components.js
-js/screens/mode-select-screen.js
-js/screens/character-select-screen.js
-js/screens/map-select-screen.js
-js/screens/battle-screen.js
-js/screens/practice-screen.js
-js/game/arena.js
-js/game/battle.js
-js/game/fighter-controller.js
-js/game/character.js
-js/game/combat.js
-js/game/projectile.js
-js/game/charged-technique.js
-js/game/practice.js
-js/data/characters.js
-ALVA_SPEC.md
-README.md
-and the existing files under tests/.
+Rework ALVA’s movement and combat game-feel so controlling #0001 feels substantially smoother, faster to respond, more expressive, and more satisfying, using MultiVersus as a feel reference, NOT as a mechanics specification.
 
-Also inspect the current hiyroscript/seren repository, specifically its difficulty-selection screen in index.html, the corresponding .difficulty-scale styling in css/app.css, the DIFFS configuration in js/data.js, and the AI design in js/ai.js.
+Do not turn ALVA into MultiVersus.
 
-Do not copy Seren literally. Seren is the design reference. Alva must keep its own visual language, architecture, controls, combat rules, and code style.
+Do not copy MultiVersus’s combat systems.
 
-Goal
+Do not introduce mechanics simply because MultiVersus has them.
 
-Add a new mandatory Select Difficulty step to Quick Battle between Select Mode and Select Fighter.
+Instead, study what makes movement and attacks in a polished platform fighter feel:
 
-The Quick Battle setup flow must become:
+* responsive
+* smooth
+* controllable
+* momentum-driven
+* easy to redirect
+* satisfying on hit
+* easy to chain intentionally
+* forgiving enough for players to create combos
+* expressive without becoming uncontrollable
 
-Splash → Home → Select Mode → Select Difficulty → Select Fighter → Select Stage → Battle
+Then achieve those qualities using ALVA’s existing mechanics and abilities.
 
-The player must choose exactly one of:
+The final game must still unmistakably be ALVA.
 
-Easy
-Medium
-Hard
-Brutal
+⸻
 
-That selected difficulty controls the CPU fighter in Quick Battle.
+1. READ AND UNDERSTAND THE EXISTING GAME FIRST
 
-The CPU must no longer be a passive training dummy in Quick Battle. It must actually fight the player using Alva’s real movement, attacks, Shield, Charge, charged actions, projectiles, jumps, stage movement, etc.
+Before changing code, read ALVA_SPEC.md completely.
 
-Difficulty must affect the CPU’s reaction speed, perception/reassessment cadence, decision quality, risk assessment, planning, mistakes, defense, aggression, punish ability, and randomness.
+Then inspect the complete implementation surrounding:
 
-Difficulty must NOT give the CPU artificial character-stat advantages.
+* js/game/character.js
+* js/game/physics.js
+* js/game/combat.js
+* js/data/characters.js
+* js/data/powers.js
+* js/data/launch.js
+* player/input controllers
+* sprite animator
+* arena/fixed-step simulation
+* projectile system
+* clone system
+* charged-technique system
+* existing movement/combat tests
 
-Practice Ground must remain a training environment and its existing TrainingAIController must remain passive exactly as intended.
+Understand the current state machine before modifying it.
 
-Current architecture that must be respected
+Do not perform a superficial constants-only pass.
 
-Alva already has a clean controller boundary:
+The problem is not simply that ALVA needs larger speed numbers.
 
-Fighter.update() asks its controller for a standard FighterInput snapshot.
+This is a game-feel and combat-flow rework.
 
-PlayerController supplies human inputs.
+⸻
 
-TrainingAIController supplies movement-only training behavior.
+2. NON-NEGOTIABLE: PRESERVE ALVA
 
-Keep this architecture.
+Preserve #0001’s existing identity and abilities.
 
-Do not put CPU decision logic directly into Fighter, CombatSystem, BattleScreen, or character data.
+Keep:
 
-Create a separate combat-capable controller, preferably named something like:
+* normal left/right movement
+* jump
+* existing Dash
+* Shield
+* Charge
+* Shuriken
+* ground BA1
+* ground BA2
+* air BA1
+* air BA2
+* Charged BA1 clone
+* Charged BA2 Sphere Rush
+* Energy
+* charged cooldowns
+* Launch Point
+* Base Launch
+* Directional Launch
+* hitstop
+* hitstun
+* blockstun
+* existing ring-out/Void rules
 
-CombatAIController
+Do not replace ALVA’s attacks with MultiVersus-style attacks.
 
-or another clear equivalent.
+Do not add a MultiVersus dodge meter.
 
-Keep TrainingAIController for Practice Ground.
+Do not add dodge-jumping merely because MultiVersus has it.
 
-Quick Battle should use the new combat AI controller.
+Do not redesign Shield around MultiVersus.
 
-The CPU must interact with the game by generating the same input fields a human controller generates:
+Do not change ALVA’s control scheme unnecessarily.
 
-left
-right
-charge
-jump
-defense
-primary
-special
-action1
-action2
+Do not replace the existing character art.
 
-and their appropriate ...Pressed edge values.
+This task concerns feel, responsiveness and combo flow, not copying another game’s feature list.
 
-Do not have the AI call attacks, damage functions, techniques, Shield methods, projectile spawners, movement methods, etc. directly.
+⸻
 
-A CPU attack must happen because the controller pressed the same action that a human would press.
+3. PRIMARY TARGET: CONTROLLER FEEL
 
-A CPU Shield must happen because defense was held.
+The player should notice the improvement almost immediately after touching the controls.
 
-A charged action must happen through the existing Charge + action interaction.
+Currently ALVA already has acceleration, deceleration, turn boosting, air acceleration, coyote time and jump buffering.
 
-A Dash must use the existing dash input semantics rather than directly changing velocity.
+Build upon those systems rather than throwing them away.
 
-This principle from Seren is essential:
+Movement should have three simultaneous qualities:
 
-Difficulty changes how well the CPU thinks, not what its fighter is allowed to do.
+Immediate
 
-1. Add Difficulty to Quick Battle state
+The fighter responds quickly when the player gives an input.
 
-Extend the Quick Battle selection object in js/core/app.js.
+Smooth
 
-It currently stores mode, fighter and map selection. Add a difficulty value.
+Velocity should transition naturally instead of looking like the fighter is snapping between unrelated states.
 
-Use:
+Precise
 
-difficulty: 'medium'
+The player must still be capable of small positioning corrections.
 
-as the initial/default selection.
+Do not confuse responsiveness with excessive speed.
 
-Valid values are exactly:
+⸻
 
-easy
-medium
-hard
-brutal
+4. GROUND MOVEMENT
 
-Keep Practice Ground’s state independent from Quick Battle, as it is now.
+Improve the relationship between:
 
-Changing Quick Battle difficulty must not affect the Practice Ground CPU.
+* acceleration
+* maximum speed
+* deceleration
+* reversing
+* animation
+* attacks
 
-2. Add the Difficulty screen to the application flow
+Starting to move should feel immediate.
 
-Create a dedicated screen module following the existing screen architecture, for example:
+Reversing direction should be responsive without instantly teleporting velocity from full left to full right.
 
-js/screens/difficulty-select-screen.js
+Use a strong but controlled turn acceleration.
 
-Register it in js/core/app.js.
+The fighter should have enough acceleration to make close-range spacing practical.
 
-Add its corresponding <section> in index.html between the mode and character sections.
+Stopping should happen quickly enough that the player can intentionally position beside an opponent.
 
-Use a screen id such as:
+Avoid excessive ground sliding after releasing movement.
 
-difficulty
+At the same time, do not completely destroy momentum.
 
-The mode-selection screen currently goes directly to:
+There should be a short, natural-feeling deceleration rather than an artificial instant stop.
 
-app.screens.go('character')
+Desired result
 
-Change that so choosing Quick Battle goes to:
+The player should be able to perform:
 
-app.screens.go('difficulty')
+run right → stop beside opponent → BA1
 
-Choosing a difficulty must:
+without constantly overshooting.
 
-set app.selection.difficulty,
-then navigate to character.
+They should also be able to perform:
 
-Back from Difficulty must return to Mode through the normal screen navigation model.
+run right → reverse left → immediately reposition
 
-Back from Fighter must now return to Difficulty.
+without waiting for a sluggish turnaround.
 
-Back from Stage must continue to return to Fighter.
+⸻
 
-Do not create a separate navigation system for this.
+5. AIR MOVEMENT
 
-3. Update the setup progress indicator
+Air control is one of the most important parts of this rework.
 
-js/ui/components.js currently defines:
+ALVA should feel substantially better to steer after jumping.
 
-Mode → Fighter → Stage
+The player should be able to:
 
-Change this to:
+* chase an opponent after launching them
+* correct a jump that was slightly misplaced
+* drift toward or away from an opponent
+* reverse aerial direction with reasonable responsiveness
+* position an aerial attack intentionally
 
-Mode → Difficulty → Fighter → Stage
+Do not make aerial movement identical to ground movement.
 
-The setup header therefore has four steps.
+The fighter should retain momentum.
 
-Use these step indexes consistently:
+Air acceleration should influence velocity rather than simply replacing it.
 
-Screen	Step
-Select Mode	0
-Select Difficulty	1
-Select Fighter	2
-Select Stage	3
+Opposite-direction input should provide enough air braking/turning force that aerial positioning feels intentional.
 
-Update the current Character and Map screen step indexes accordingly.
+The result should feel permissive without making trajectory meaningless.
 
-Completed steps should continue using the existing checkmark treatment.
+⸻
 
-Keep the existing accessible aria-current behavior.
+6. JUMP FEEL
 
-4. Difficulty screen visual design
+Preserve ALVA’s existing jump ability and Jump Power system.
 
-Take direct inspiration from Seren’s Difficulty screen concept, especially its four-level ascending scale, but translate it into Alva’s existing design system.
+Improve the FEEL surrounding the jump.
 
-Do NOT paste Seren’s red visual language into Alva.
+Keep and refine:
 
-Alva uses near-black/charcoal surfaces, off-white type and restrained green accents. Continue using the existing CSS variables and visual language.
+* jump buffering
+* coyote time
 
-The screen heading should be:
+Make takeoff feel immediate.
 
-Select Difficulty
+Ensure horizontal velocity carries naturally into the jump.
 
-The kicker should be:
+Running before jumping should produce a natural forward-moving jump.
 
-Quick Battle
+A standing jump should remain controllable.
 
-Present four large selectable options in ascending order:
+Avoid arbitrary horizontal speed resets when entering the jump state.
 
-Index	Difficulty	Suggested description
-01	Easy	Slower reactions. Leaves openings.
-02	Medium	Balanced reactions and decisions.
-03	Hard	Fast reactions. Defends and punishes.
-04	Brutal	Sharp reactions. Relentless decisions.
+The player should feel continuous motion:
 
-The wording can be refined slightly to fit Alva’s tone, but keep it short, professional and understated.
+run → jump → aerial movement
 
-Visually take inspiration from Seren’s ascending four-bar motif:
+rather than:
 
-Easy shows 1 active bar.
-Medium shows 2.
-Hard shows 3.
-Brutal shows 4.
+run → separate jump state.
 
-Use Alva’s accent color for active bars. Brutal may receive a slightly stronger accent treatment using existing Alva tokens, but do not introduce an unrelated bright-red Seren theme.
+⸻
 
-Each difficulty should also show its large 01, 02, 03, 04 index.
+7. ADD FAST FALL AS A MOVEMENT QUALITY TOOL
 
-Desktop should comfortably display all four as one row when space permits.
+Implement a simple fast-fall if it integrates cleanly with ALVA.
 
-On narrow/mobile screens, use a clean 2 × 2 arrangement rather than shrinking everything until it becomes unreadable.
+This is not being added “because MultiVersus has fast falling.”
 
-Account for short landscape phones as the rest of Alva does. The decision area may scroll if necessary, but Back and the important selection controls must remain usable.
+It is useful because ALVA needs better vertical positioning and faster return-to-neutral.
 
-Use Alva’s existing data-nav/MenuNavigator conventions so keyboard and gamepad navigation work correctly.
+When airborne and already descending, holding down should increase downward velocity toward a controlled fast-fall maximum.
 
-Pointer, keyboard and gamepad selection must all work.
+Requirements:
 
-When returning to the screen, focus the currently selected difficulty. Since medium is the initial value, Medium should be the initial default focus on a fresh Quick Battle flow.
+* cannot trigger while rising
+* should not teleport velocity
+* accelerates smoothly
+* should be immediately understandable
+* should make aerial combat less floaty
+* should allow players to intentionally return to the ground after an aerial attack
+* should work with platform interaction cleanly
 
-The screen should be accessible and usable without relying on color alone.
+Expose the relevant values through character movement data rather than scattering magic constants throughout the fighter state machine.
 
-5. Preserve Alva’s existing interface conventions
+⸻
 
-Audit styles.css for selectors that explicitly include:
+8. MOMENTUM MUST SURVIVE ATTACKS
 
-.screen--mode
-.screen--character
-.screen--map
+This is critical.
 
-and determine whether the new Difficulty screen belongs in those shared menu treatments.
+Normal attacks should not automatically make movement feel disconnected.
 
-For example, its Back button should receive the same radius/treatment as the existing Quick Battle setup screens.
+Review the current lockMovement behavior and attack state handling.
 
-Do not globally restyle unrelated screens.
+Separate the concepts of:
 
-Do not redesign Mode, Fighter, Stage, Home, Practice or Battle.
+* cannot freely accelerate
+* cannot move at all
+* retain existing momentum
+* attack applies its own movement
 
-This feature should look like it was always part of Alva.
+These should NOT all mean the same thing.
 
-6. Replace Quick Battle’s passive CPU with a real combat AI
+For most normal attacks, entering an attack should preserve some existing velocity.
 
-The current Battle creates P2 with:
+Example:
 
-TrainingAIController
+running → BA1
 
-That is intentionally a non-attacking practice opponent.
+should not feel as though an invisible wall instantly stopped the character unless the attack intentionally requires that behavior.
 
-Do not turn TrainingAIController into the combat AI, because Practice Ground relies on its current passive behavior and existing tests explicitly verify that behavior.
+Likewise:
 
-Instead add a separate combat controller.
+jumping forward → air BA1
 
-Conceptually the structure should become:
+should retain meaningful forward drift.
 
-Human Quick Battle fighter → PlayerController
+The attack can reduce steering while active without deleting momentum.
 
-Quick Battle CPU fighter → CombatAIController
+⸻
 
-Practice CPU → TrainingAIController
+9. ATTACK MOBILITY
 
-The new combat AI must be data-driven enough to work with future fighters instead of hard-coding #0001 throughout the controller.
+Give attacks individual movement behavior where appropriate.
 
-It can inspect the fighter’s normal data and resolved capabilities, such as its action mappings, attack definitions, charged actions, projectiles, Shield availability, energy state and cooldowns.
+Extend attack definitions with optional data-driven movement properties rather than hardcoding behavior for #0001.
 
-If an action is mapped to null, such as #0001’s currently reserved Special, the CPU must not attempt to invent behavior for it.
+Possible schema:
 
-7. Pass difficulty into Battle cleanly
+movementControl
 
-Have BattleScreen resolve the selected difficulty when entering Quick Battle and pass it to Battle.
+* amount of normal steering retained during attack
 
-For example, the Battle constructor can gain a difficulty option.
+momentumMultiplier
 
-Battle should then construct its combat AI using that difficulty.
+* modifies existing horizontal momentum when attack starts
 
-The selected value must survive:
+activeMovement
 
-battle start,
-pause/resume,
-restart,
-rematch,
-Void respawns.
+* optional velocity/impulse generated by the attack
 
-A restart/rematch must not silently return the CPU to Medium.
+airControl
 
-If an invalid or missing difficulty somehow reaches the battle layer, safely fall back to medium.
+* attack-specific aerial steering multiplier
 
-Keep this validation near the difficulty configuration instead of scattering string checks throughout the code.
-
-8. Difficulty profiles
-
-Create one centralized configuration describing CPU capability at each level.
-
-Take conceptual inspiration from Seren’s DIFFS, where difficulty independently controls things such as reaction time, thinking frequency, lapse probability, planning depth and decision noise.
-
-For Alva, use a fighting-game-appropriate configuration along these lines:
-
-Trait	Easy	Medium	Hard	Brutal
-Reaction delay	high	moderate	low	very low
-Reassessment interval	slow	normal	fast	very fast
-Mistake/lapse chance	high	moderate	low	very low
-Decision randomness	high	moderate	low	minimal
-Defensive awareness	low	moderate	high	very high
-Punish awareness	low	moderate	high	very high
-Charged-action judgment	rare/simple	situational	strong	very strong
-Dash usage	rare/none	occasional	deliberate	deliberate
-Planning persistence	none/short	short	medium	medium/high
-Threat prediction	current danger	limited	good	strong
-
-Put concrete numeric values behind these traits.
-
-A reasonable starting point is approximately:
-
-Easy reaction window: 0.45–0.85 s
-Medium: 0.22–0.45 s
-Hard: 0.10–0.24 s
-Brutal: 0.05–0.14 s
-
-Do not treat those exact values as sacred. Tune them against Alva’s actual attack startup times and simulation speed so Easy is visibly forgiving while Brutal is demanding but still physically believable.
-
-The important property is monotonic behavior:
-
-Easy should never systematically have better reactions or more accurate judgment than Medium.
-
-Medium should not outperform Hard by configuration.
-
-Hard should not have better decision parameters than Brutal.
-
-Randomness may create individual moments where a lower difficulty makes a good choice, which is desirable, but the underlying capability should clearly increase.
-
-9. AI architecture: Sense → Evaluate → Act
-
-Follow Seren’s useful separation between sensing, weighing choices and acting.
-
-The combat AI should not select a totally new random action every simulation frame.
-
-It should maintain internal state such as:
-
-a think/reassessment timer,
-reaction timer(s),
-current movement intention,
-short-term plan,
-plan expiration,
-held inputs,
-queued one-frame input edges,
-charge intention,
-defensive intention,
-dash tap state,
-and injected RNG.
-
-On each relevant decision cycle:
-
-Sense
-
-Build a snapshot from information available in the simulation.
-
-Useful information includes:
-
-the CPU fighter’s position and velocity,
-grounded/airborne state,
-current surface,
-facing,
-energy,
-Shield exhaustion,
-Launch Point,
-current attack/recovery/stun state,
-charged-action cooldowns,
-opponent position and velocity,
-opponent grounded/airborne state,
-opponent attack phase,
-opponent Shield state,
-opponent Charge state,
-opponent technique state,
-relative horizontal and vertical distance,
-ledge/void danger,
-platform geometry,
-live enemy projectiles,
-live summons/clones,
-battle score,
-time remaining,
-and whether either fighter is temporarily out because of the Void.
-
-Use ctx.stage and ctx.battle rather than introducing global game state.
-
-Evaluate
-
-Score reasonable candidate intentions according to the situation and difficulty.
-
-Examples include:
-
-hold position,
-approach,
-retreat,
-jump,
-drop through a one-way platform,
-dash forward,
-dash away,
-Shield,
-ground BA1,
-ground BA2,
-air BA1,
-air BA2,
-Throw/projectile,
-Charge,
-charged BA1,
-charged BA2,
-or wait/bait.
-
-Do not assume every fighter supports every candidate. Derive legal actions from that fighter’s data.
-
-Act
-
-Translate the selected intention into normal FighterInput.
-
-The controller decides.
-
-The existing fighter/combat engine executes.
-
-10. Reaction behavior
-
-Difficulty must affect actual reaction behavior, not just attack frequency.
-
-Do not let every CPU notice a player startup or projectile on the same simulation frame.
-
-When a new threat is perceived, response should be delayed according to the selected difficulty.
-
-Easy should often see an attack too late or fail to respond at all.
-
-Medium should react to obvious, slower threats but still get caught.
-
-Hard should respond reliably to telegraphed attacks and obvious projectiles.
-
-Brutal should react rapidly and make strong choices, but should still have a small human-like response delay.
-
-Do NOT give Brutal literal zero-frame reactions.
-
-Do NOT read the player’s raw InputManager state to know what button they just pressed before the fighter expresses it in the simulation.
-
-The CPU may observe things the fighter itself makes visible to the simulation, such as an opponent entering attack startup, moving, jumping, Charging, Shielding, beginning a technique or releasing a projectile.
-
-That is fair information.
-
-11. No cheating
-
-Difficulty may NEVER directly alter:
-
-fighter damage,
-Base Launch,
-Directional Launch,
-hitstun,
-attack startup,
-attack recovery,
-movement speed,
-gravity,
-jump speed,
-Dash speed,
-Dash cost,
-Shield cost,
-maximum Energy,
-Energy recovery,
-cooldowns,
-invulnerability,
-hitboxes,
-hurtboxes,
-score,
-respawn time,
-or any other core fighter mechanic.
-
-There must not be logic such as:
-
-if brutal -> damage *= 1.2
-
-or:
-
-if easy -> CPU fighter speed *= 0.8
-
-The fighter is mechanically identical regardless of difficulty.
-
-Only the controller gets smarter/faster.
-
-Likewise, the AI must not teleport, cancel recovery illegally, ignore stun, attack during states where a human cannot, create projectiles directly, or bypass charged-action cooldowns.
-
-12. Neutral movement and stage awareness
-
-Preserve and reuse the good stage-following ideas already present in TrainingAIController, but do not tightly couple the two controllers if that makes the training behavior fragile.
-
-The combat CPU needs to:
-
-follow the opponent across platforms,
-navigate toward useful fighting distance,
-jump to higher platforms when appropriate,
-drop through one-way platforms when appropriate,
-avoid casually walking straight into the Void,
-stop or turn before unsafe ledges,
-recover its positioning after being separated,
-and stand still while its opponent is currently lost to the Void and awaiting respawn.
-
-It should understand vertical separation instead of endlessly running into the platform underneath the player.
-
-Higher difficulty should make better navigation decisions and commit fewer positioning mistakes, but every level must remain functional.
-
-13. Fighting-distance logic
-
-The CPU needs meaningful spacing.
-
-Do not implement combat as:
-
-“if opponent exists, hold toward them and mash BA1.”
-
-Use the actual fighter attack data where practical.
-
-At close range the CPU can consider BA1/BA2, Shield, retreating, jumping or a charged option.
-
-At medium range it can approach, bait, Throw, reposition or prepare Charge.
-
-At long range it should close distance intelligently or use available ranged tools.
-
-Where practical, calculate approximate attack reach from the character’s resolved attack hitbox rather than hard-coding #0001-specific pixel distances.
-
-Account for whether an action uses a different ground or air attack.
-
-14. Offensive decision-making
-
-The CPU must actually fight at every difficulty.
-
-Easy should still attack. It is inexperienced, not disabled.
-
-Suggested feel:
-
-Easy: approaches imperfectly, pauses often, attacks at obvious opportunities, sometimes uses the wrong move for the spacing, rarely uses advanced charged actions, misses punish windows, has substantial decision noise.
-
-Medium: gives a normal competent fight, uses both basic attacks, Throw, occasional Shield and Charge, understands basic spacing, sometimes uses charged actions and sometimes makes mistakes.
-
-Hard: actively controls spacing, punishes obvious recovery, uses projectiles and air attacks appropriately, Shields real threats, uses Charge and charged actions deliberately, understands stage position, and makes fewer wasted inputs.
-
-Brutal: reassesses quickly, capitalizes on recovery and bad positioning, makes strong attack/defense choices, uses the full moveset intelligently, manages charged cooldowns and Energy well, pressures without simply holding forward, and rarely throws away a safe advantage.
-
-Do not turn Brutal into constant aggression. Sometimes the strongest choice is waiting, spacing, Shielding, retreating, or Charging.
-
-15. Defense and threat assessment
-
-The CPU should understand the existing Shield mechanic.
-
-Shield is a held Defense input, costs Energy only when it blocks a hit, and becomes unavailable while Energy-exhausted.
-
-The AI should therefore consider:
-
-whether a threat can actually reach it,
-how soon the threat becomes active,
-whether Shield is currently legal,
-whether its Energy can support blocking,
-whether moving/jumping away is better,
-and whether the opponent is simply whiffing outside range.
-
-Easy should Shield infrequently and often late.
-
-Medium should block obvious threats some of the time.
-
-Hard should make solid defensive choices.
-
-Brutal should react quickly and intelligently but not hold Shield permanently.
-
-A Brutal CPU that simply turtles forever is not a successful implementation.
-
-16. Projectiles and Throw
-
-#0001’s primary input is Throw and creates the shuriken through the normal attack/projectile pipeline.
-
-The CPU should understand projectiles on both offense and defense.
-
-On offense, Throw is a useful ranged option when spacing supports it.
-
-On defense, harder difficulties should notice enemy projectiles earlier and choose between Shielding, repositioning or another legal response.
-
-Easy may simply get hit by many projectiles.
-
-Do not despawn, redirect or otherwise manipulate projectiles from the controller.
-
-17. Charge and charged actions
-
-The CPU must be capable of using Alva’s actual Charge system.
-
-Remember the existing semantics:
-
-Charge is held.
-The fighter must already have been Charging before a charged action press can trigger the charged version.
-Charged actions have their own cooldowns.
-A charged action may be a summon or a full charged technique.
-If an action cannot perform its charged form for the normal gameplay reasons, existing Fighter behavior decides the fallback.
-
-Therefore the AI needs stateful input across multiple simulation steps.
-
-It cannot emit charge + actionPressed for one isolated frame and assume a charged move happens.
-
-It should be able to:
-
-enter Charge when there is enough space/time,
-remain in Charge long enough to qualify,
-select an available charged action,
-respect cooldowns,
-release Charge when the situation becomes unsafe,
-and avoid repeatedly pressing a charged action that is unavailable.
-
-For #0001 specifically this means the CPU can eventually make intelligent use of both the Clone Attack and Sphere Rush through the existing character data.
-
-Easy should rarely execute them well.
-
-Medium may use them in obvious situations.
-
-Hard and Brutal should use them deliberately.
-
-Keep the implementation generic enough for future characters with different charged actions.
-
-18. Dash
-
-Alva’s Dash is triggered through horizontal double-tap semantics and spends Energy.
-
-The combat AI may use Dash, especially on Hard and Brutal, but it must do so through the existing input path.
-
-Do not set velocity directly.
-
-The AI should understand that Dash competes with attacks and Energy/Shield needs.
-
-Easy can use it rarely or not at all.
-
-Medium may occasionally Dash to close a clear gap.
-
-Hard and Brutal can use it intentionally for positioning, approach or escape.
-
-19. Punishing and recovery awareness
-
-Higher difficulty should understand when an opponent has committed to an action.
-
-Do this using existing observable combat state such as attack phase/recovery rather than reading future input.
-
-Easy largely ignores punish windows.
-
-Medium occasionally notices an obvious whiff.
-
-Hard should punish significant recovery when properly positioned.
-
-Brutal should capitalize quickly on clear whiffs and recovery while still respecting range and stage safety.
-
-Do not create animation cancels that the normal fighter cannot perform.
-
-20. Match awareness
-
-The AI may use Quick Battle state as part of its strategy.
-
-Quick Battle is a scored match with Void points, respawns and a timer.
-
-Use ctx.battle when useful.
+These names are suggestions; use the architecture that fits the project best.
 
 Examples:
 
-A CPU leading near the end of the timer may value stage safety slightly more.
+BA1:
 
-A CPU behind may take slightly more offensive risk.
+* keeps some forward momentum
+* little additional movement
+* recovers quickly
 
-A fighter with a dangerous Launch Point near a ledge should value center-stage recovery.
+BA2:
 
-A high-difficulty CPU should understand that knocking the player toward the Void is strategically useful.
+* slightly more commitment
+* can have subtle forward movement during the strike
+* longer recovery than BA1
 
-Keep these effects restrained. Difficulty should not create bizarre personality changes every second.
+Air BA1:
 
-21. Fair perception and limited prediction
+* preserves aerial drift
+* retains moderate steering
+* should be useful while pursuing airborne opponents
 
-Hard and Brutal may project short-term motion from current position/velocity and visible attack state.
+Air BA2:
 
-For example, they may estimate where a projectile or opponent will be a short time into the future.
+* retains horizontal momentum
+* its downward attack identity remains intact
+* should not arbitrarily freeze the fighter horizontally
 
-The prediction horizon should increase with difficulty.
+Shuriken:
 
-That is acceptable.
+* should not feel like the character becomes rooted to the floor longer than necessary
 
-They may NOT inspect future inputs, queued browser events, hidden player intentions or anything outside the game state a fighter could conceptually react to.
+Do not change the identity of the attacks.
 
-Brutal should feel observant, not psychic.
+Improve how they coexist with movement.
 
-22. Randomness and reproducibility
+⸻
 
-Follow the existing pattern of injecting RNG into controllers.
+10. COMBOS ARE A MAJOR GOAL
 
-The AI should accept an RNG function so tests can be deterministic.
+ALVA’s attacks should intentionally support short combos.
 
-Battle can continue creating a seeded RNG through the existing mulberry32 utility.
+The player should not need frame-perfect execution.
 
-Do not scatter direct Math.random() calls throughout the combat AI if they make deterministic testing impossible.
+The game should recognize that after landing certain attacks, the attacker is supposed to have an opportunity to follow up.
 
-Difficulty should control decision noise and lapse probability.
+This does NOT mean every attack should combo into everything.
 
-Randomness exists to make fights less robotic, not to replace decision-making.
+Create intentional routes.
 
-23. Input-edge correctness
+Target primarily:
 
-Be extremely careful with ...Pressed.
+* 2-hit combos
+* 3-hit combos
+* occasional longer sequences created through positioning or charged abilities
 
-A one-frame press should only be true on the transition/decision frame where the CPU intends to press the action.
+Avoid designing infinite combos.
 
-Do not leave:
+⸻
 
-action1Pressed
-action2Pressed
-primaryPressed
-jumpPressed
-etc.
+11. WHY COMBOS CURRENTLY FEEL DIFFICULT
 
-stuck true across frames.
+Inspect the interaction between:
 
-Held actions such as movement, Defense and Charge should remain held only for the intended duration.
+* attack recovery
+* cooldown
+* hitstop
+* target hitstun
+* launch velocity
+* attacker movement
+* air acceleration
+* input timing
+* attack startup
+* hitbox position
+* knockback scaling through Launch Point
 
-The CPU controller must output complete, predictable input snapshots consistent with the format expected by Fighter.update().
+Do not solve combos using only longer hitstun.
 
-24. Practice Ground must remain unchanged
+For a combo to feel good:
 
-This is an important regression requirement.
+1. the first hit must place the opponent somewhere useful;
+2. the attacker must recover soon enough;
+3. the attacker must be able to move into follow-up range;
+4. the next attack must start quickly enough;
+5. the opponent must have a fair eventual escape.
 
-Practice Ground’s CPU is a training dummy.
+Treat all five as one system.
 
-It should continue using TrainingAIController.
+⸻
 
-It should continue to avoid combat buttons.
+12. INTENTIONAL COMBO ROUTES
 
-Existing behavior around following the player, platform navigation, changing/disabling the Practice CPU, and Practice-specific fighter state must remain intact.
+Tune #0001 so several understandable routes are possible.
 
-Do not make the Practice CPU fight merely because Quick Battle now has combat AI.
+Exact balance should be determined through testing, but the desired relationships include routes such as:
 
-Any Help/Discover copy that says the training CPU does not attack should stay true.
+BA1 → BA1
 
-Update copy only where the project incorrectly describes the Quick Battle opponent as a training CPU.
+At low Launch Point and appropriate spacing, a successful light attack should sometimes allow another light attack.
 
-25. Battle behavior that should remain unchanged
+Do not make this an endless loop.
 
-Do not redesign Quick Battle rules.
+Pushback, hitstun, attack recovery and accumulated Launch Point should naturally end the sequence.
 
-Keep the existing:
+⸻
 
-intro/FIGHT sequence,
-round timer,
-first-to-points behavior,
-Void scoring,
-respawn timing,
-Launch Point behavior,
-HUD,
-pause menu,
-result screen,
-rematch flow,
-stage selection,
-camera,
-touch controls,
-and result calculation.
+BA1 → BA2
 
-The feature is a new setup step plus a capable CPU opponent, not a battle-rules rewrite.
+This should be one of the basic grounded combo routes.
 
-P2 can continue using the same fighter definition as Player 1 unless another existing system already specifies otherwise.
+BA1 creates the opening.
 
-26. Tests
+BA2 acts as the stronger follow-up and launcher.
 
-Add focused automated coverage for the new feature and update old tests only where their assumptions intentionally changed.
+The player should have enough time to input BA2 without requiring near-frame-perfect execution.
 
-Add a Difficulty screen test or equivalent coverage proving:
+⸻
 
-the screen exists and is registered,
-Mode → Difficulty,
-Difficulty → Fighter,
-Back navigation is correct,
-all four difficulty buttons work,
-the chosen id is written to app.selection.difficulty,
-Medium is the fresh default,
-the current difficulty receives default focus on re-entry,
-and the four-step progress indicator is correct.
+BA1 → jump → air BA1
 
-Add combat AI tests using injected deterministic RNG and lightweight fighter/stage fixtures.
+This should reward pursuit.
 
-Test meaningful behavior rather than exact random movement traces.
+After connecting the opening attack, the player can jump after the opponent and continue pressure.
 
-Cover at least:
+Movement must be responsive enough to make this practical.
 
-the combat CPU can generate real attack inputs,
-the combat CPU can produce a defensive response,
-the combat CPU can navigate toward an opponent,
-it stops chasing an opponent that is lost to the Void,
-it respects ledges,
-it can maintain Charge over multiple frames and request a charged action,
-pressed edges are one-frame edges,
-invalid difficulty safely resolves to Medium,
-difficulty profiles are ordered sensibly,
-Easy reacts measurably more slowly / unreliably than Brutal under a deterministic scenario,
-Hard/Brutal reassess more frequently than Easy,
-the controller does not mutate fighter stats,
-and Practice Ground’s TrainingAIController still never presses combat, Charge or Defense inputs.
+⸻
 
-Update existing Quick Battle tests that explicitly assume P2 is a TrainingAIController.
+BA2 → aerial follow-up
 
-Do not weaken Practice tests to make them pass.
+Since BA2 launches vertically, the attacker should have a reasonable opportunity at lower Launch Point to jump and pursue.
 
-Preserve the existing combat tests for BA1, BA2, Throw, Charge, charged BA2, Clone, Shield, Dash, Energy, launch and scoring.
+Possible follow-ups:
 
-Run the entire existing test suite, not only the new test file.
+* air BA1
+* air BA2 depending on positioning
 
-This project is a static browser app and currently does not require an npm install; respect the repository’s current tooling rather than adding a framework just for this feature.
+The Launch Point system should eventually make the target travel too far for the same sequence to remain guaranteed.
 
-27. Documentation
+That naturally prevents repetitive permanent combos.
 
-Update README.md and ALVA_SPEC.md where they describe the Quick Battle flow.
+⸻
 
-The documented flow must become:
+Air BA1 → aerial/ground continuation
 
-Splash → Home → Select Mode → Select Difficulty → Select Fighter → Select Stage → Battle
+If the attacker lands appropriately after an aerial hit, recovery and landing behavior should allow pressure to continue without an awkward dead period.
 
-Update descriptions that currently call the Quick Battle opponent a passive/training CPU.
+⸻
 
-Clearly distinguish:
+Air BA2 → grounded pressure
 
-Quick Battle CPU = combat AI whose behavior is chosen by difficulty.
+Because air BA2 drives the target downward, landing it near the stage should potentially create a grounded continuation.
 
-Practice Ground CPU = passive training opponent.
+Preserve its downward-launch identity.
 
-Document the four difficulty choices and the principle that difficulty changes AI decision-making rather than fighter stats.
+⸻
 
-Keep documentation consistent with the final implementation.
+13. DO NOT MAKE COMBOS FRAME-PERFECT
 
-28. Code quality constraints
+Add a small combat input buffer.
 
-Keep the feature modular.
+This is extremely important.
 
-Avoid a giant if (difficulty === 'brutal') tree scattered across the AI.
+If the player presses an attack slightly before their current attack/recovery finishes, remember that input briefly.
 
-Prefer centralized difficulty profiles and shared decision code whose weights/timing are controlled by that profile.
+When the fighter becomes actionable, execute the buffered action if it is still valid.
 
-Do not introduce duplicated fighter mechanics into the controller.
+Use a small window approximately in the range of:
 
-Do not hard-code #0001 asset names into the AI.
+80–150 ms
 
-Do not add dependencies unless genuinely required; this work should not need any.
+and tune through testing.
 
-Follow the repository’s existing plain-JavaScript style.
+The exact final value should feel forgiving without allowing ancient inputs to fire unexpectedly.
 
-Keep comments focused on non-obvious behavior, especially reaction timing, edge inputs, planning and fair-information constraints.
+Buffer:
 
-Do not remove useful existing comments merely to shorten files.
+* normal combat actions
+* jump where appropriate
 
-29. Definition of done
+Do not blindly buffer every possible control.
 
-This work is complete only when all of the following are true:
+Existing jump buffering should integrate cleanly with this system.
 
-Play → Quick Battle now goes to a polished Difficulty screen before Fighter selection.
+⸻
 
-Easy, Medium, Hard and Brutal are all selectable with mouse, keyboard and gamepad.
+14. HITSTUN AND RECOVERY
 
-The four-step setup progress indicator is correct.
+Rebalance attack recovery relative to hitstun.
 
-The chosen difficulty reaches the actual Battle instance.
+For attacks intended to start combos:
 
-Quick Battle’s CPU genuinely fights using the normal fighter input/mechanics pipeline.
+attacker recovery should finish sufficiently before the target fully recovers that the attacker has time to reposition and attempt the intended follow-up.
 
-Easy is clearly forgiving.
+Do NOT simply give every attack enormous hitstun.
 
-Medium provides a balanced normal opponent.
+Different attacks should have different roles.
 
-Hard reacts and plans substantially better.
+For example:
 
-Brutal is fast and strategically strong without cheating.
+BA1:
+quick startup
+short recovery
+moderate hitstun
+low/moderate launch
 
-All four difficulties use identical fighter stats and mechanics.
+BA2:
+more startup
+more commitment
+stronger launch
+primarily launcher/finisher
 
-The CPU can use normal attacks, movement, jumps, Defense, Charge, ranged tools and charged actions when available.
+Air BA1:
+pursuit/combo tool
 
-Practice Ground remains a passive training environment.
+Air BA2:
+downward positioning/finisher tool
 
-Mobile and short-landscape layouts remain usable.
+Shuriken:
+spacing/interruption tool rather than the universal combo starter
 
-No existing battle rules are unintentionally changed.
+⸻
 
-The complete automated test suite passes.
+15. LAUNCH POINT MUST NATURALLY CHANGE COMBOS
 
-README and ALVA_SPEC accurately describe the new behavior.
+Preserve ALVA’s Launch Point system.
 
-Final implementation response
+It should actually help solve combo scaling.
 
-Do not stop after proposing an architecture.
+At low Launch Point:
 
-Implement the feature completely.
+* opponents remain relatively close
+* basic follow-ups are practical
 
-After implementation, report:
+At medium Launch Point:
 
-the files changed,
-the Difficulty screen behavior,
-how the combat AI is structured,
-how each difficulty differs,
-how fair/no-cheat behavior is enforced,
-what tests were added or updated,
-and the result of running the complete test suite.
+* routes require better movement/readjustment
+* fewer sequences remain guaranteed
 
-If an implementation detail differs from the suggestions above because the existing Alva architecture provides a cleaner solution, preserve the intent and explain the deviation in the final summary.
+At high Launch Point:
+
+* attacks send opponents far enough that many ordinary combos naturally stop
+* combat becomes more about pursuit and ring-outs
+
+Do not introduce an unrelated combo percentage system.
+
+Use ALVA’s existing Launch Point mechanics.
+
+⸻
+
+16. HIT FEEL
+
+Improve impact without making gameplay sluggish.
+
+Preserve ALVA’s existing hitstop architecture.
+
+Tune hitstop per attack according to strength.
+
+Light attacks:
+short, crisp freeze
+
+Heavy attacks:
+slightly stronger freeze
+
+Large Sphere Rush explosion:
+strongest impact
+
+Avoid excessive freeze on repeated light attacks.
+
+Hitstop should communicate:
+
+“I connected.”
+
+It should not make controls feel delayed.
+
+⸻
+
+17. ATTACK INPUT FEEL
+
+An attack button should feel responsive even when the character cannot execute the attack on that exact simulation step.
+
+Use the combat input buffer described earlier.
+
+If:
+
+BA1 is recovering
+
+and the player presses BA2 shortly before BA1 ends,
+
+then BA2 should begin on the earliest legal actionable frame, provided the buffered input remains valid.
+
+This will dramatically improve perceived responsiveness and combo accessibility without requiring attacks themselves to become unrealistically fast.
+
+⸻
+
+18. LANDING AFTER AERIAL ATTACKS
+
+Inspect aerial attack → landing transitions carefully.
+
+Do not create unnecessary landing lockout.
+
+When an aerial attack has already completed and the fighter lands, they should transition naturally back to grounded control.
+
+If an attack is still legitimately in recovery when landing, preserve the remaining commitment.
+
+Do not arbitrarily restart a complete recovery period solely because the character touched the ground.
+
+The animation/state machine should reflect gameplay state rather than imposing additional invisible punishment.
+
+⸻
+
+19. FACING
+
+Facing should update naturally during neutral movement.
+
+Attacks should generally snapshot/lock the relevant attack direction once their committed strike begins so hitboxes do not unpredictably flip halfway through a move.
+
+However, movement immediately before attacking should make turning attacks feel responsive.
+
+The sequence:
+
+run left → quickly reverse → BA1
+
+should reliably attack toward the player’s intended side.
+
+Avoid stale facing.
+
+⸻
+
+20. DASH
+
+Keep ALVA’s existing Dash concept.
+
+Do NOT automatically turn it into MultiVersus’s dodge system.
+
+Improve its feel within ALVA.
+
+The Dash should:
+
+* begin immediately after valid input
+* have a clear burst
+* preserve sensible momentum when ending
+* transition smoothly back into ordinary movement
+* retain its Energy cost
+* remain grounded unless ALVA’s design is deliberately expanded later
+
+Review the current behavior where normal acceleration resumes from dash velocity.
+
+Tune the handoff so it feels smooth rather than creating an awkward velocity spike or abrupt brake.
+
+Do not add attack-cancel-out-of-dash solely because the reference game has it.
+
+If allowing attacks near the end of Dash materially improves ALVA, implement it only as an ALVA-specific quality-of-life window and test it carefully.
+
+⸻
+
+21. SHIELD
+
+Preserve ALVA’s Shield system.
+
+Shield should remain:
+
+* held Defense
+* Energy-based
+* capable of blocking attacks
+* governed by existing blockstun rules
+
+Improve only transitions into and out of Shield where necessary.
+
+Releasing Shield should return control cleanly.
+
+Do not recreate MultiVersus’s defensive system.
+
+⸻
+
+22. CHARGE
+
+Preserve Charge exactly as an important ALVA mechanic.
+
+Charge must continue to:
+
+* accelerate Energy regeneration
+* accelerate charged-action cooldown recovery
+* enable Charged BA1
+* enable Charged BA2
+
+Do not make the new movement/combo system accidentally bypass Charge’s role.
+
+⸻
+
+23. CLONE ATTACK
+
+Preserve Charged BA1’s existing behavior.
+
+The clone remains independent after being summoned.
+
+Its ability to attack from behind or use the aerial fallback should remain.
+
+The movement rework must not break:
+
+* clone spawn positioning
+* clone facing
+* clone hitboxes
+* clone cloud animation
+* cooldown
+* detached hit behavior
+
+The player’s improved movement should simply make it easier to capitalize on clone pressure.
+
+⸻
+
+24. SPHERE RUSH
+
+Preserve Sphere Rush’s identity and phase structure:
+
+formation
+→ rush
+→ contact
+→ hold/ticks
+→ explosion
+→ recovery
+
+Do not apply ordinary attack-movement rules to Sphere Rush.
+
+Sphere Rush already owns its movement through the charged-technique system.
+
+Keep that separation.
+
+Ensure the broader movement changes do not alter its authored rush speed, ground requirement, binding behavior or explosion behavior unintentionally.
+
+⸻
+
+25. DATA-DRIVEN IMPLEMENTATION
+
+Avoid #0001-specific hacks inside Fighter.update().
+
+If attacks need different movement characteristics, represent them in attack definitions.
+
+If movement needs new tunables, add them to the movement definition.
+
+Potential movement properties could include:
+
+* fastFallAcceleration
+* fastFallSpeed
+* attackMomentumRetention
+* combatInputBuffer
+
+Potential attack properties could include:
+
+* movementControl
+* airMovementControl
+* momentumMultiplier
+* movementImpulse
+
+Use sensible names consistent with the existing codebase.
+
+Provide defaults so future fighters do not require every property.
+
+⸻
+
+26. ANIMATION MUST FOLLOW PHYSICS
+
+Do not use animation frames to physically drag the fighter around unless a move explicitly owns movement.
+
+The physics/state system is authoritative.
+
+Animation communicates what physics is doing.
+
+Maintain ALVA’s existing sprite normalization and bottom-center anchoring.
+
+Do not change sprite dimensions to fake movement.
+
+Do not alter artwork.
+
+⸻
+
+27. TARGET FEEL FOR #0001
+
+The finished #0001 should feel like an agile fighter.
+
+Not weightless.
+
+Not slippery.
+
+Not hyperactive.
+
+The ideal sensation is:
+
+“I pressed it and he responded.”
+
+“I can correct my movement.”
+
+“I can chase after my hit.”
+
+“My attack didn’t randomly kill all my momentum.”
+
+“I can tell when my next attack is available.”
+
+“I pressed the next attack slightly early and the game understood me.”
+
+“I can actually perform the combo I intended.”
+
+“I can improvise when positioning changes.”
+
+⸻
+
+28. TEST SPECIFIC SCENARIOS
+
+Do not finish after changing constants.
+
+Play/test these scenarios individually.
+
+Movement test
+
+Repeatedly:
+
+stand
+→ run
+→ stop
+→ reverse
+→ jump
+→ reverse in air
+→ land
+
+All transitions should feel controlled.
+
+Microspacing test
+
+Try to stop immediately outside BA1 range.
+
+Then move slightly forward and attack.
+
+This should be practical rather than frustrating.
+
+Running attack test
+
+run
+→ BA1
+
+Momentum should transition naturally into the attack.
+
+Aerial pursuit test
+
+BA2
+→ jump toward opponent
+→ air BA1
+
+At low Launch Point this should be realistically executable.
+
+Basic combo test
+
+BA1
+→ BA2
+
+This should be reliable at appropriate low Launch Point and spacing.
+
+Buffered combo test
+
+Press BA2 slightly before BA1 recovery ends.
+
+The input should execute when BA2 becomes legal.
+
+Air combo test
+
+jump
+→ air BA1
+→ reposition
+→ follow-up
+
+The fighter should remain steerable enough for this to feel intentional.
+
+Downward attack test
+
+air BA2
+→ opponent driven downward
+→ land
+→ attempt grounded continuation
+
+Transitions should remain smooth.
+
+High Launch Point test
+
+Repeat combo attempts against a target with high Launch Point.
+
+The increased launch should naturally break routes that worked at low Launch Point.
+
+This is desired.
+
+Shield test
+
+attack
+→ recover
+→ Shield
+
+and
+
+Shield
+→ release
+→ move/attack
+
+Neither transition should feel unnecessarily delayed.
+
+Dash test
+
+run
+→ Dash
+→ movement
+
+The handoff back into normal locomotion should be smooth.
+
+⸻
+
+29. AUTOMATED TESTS
+
+Update/add tests for the new behavior.
+
+At minimum verify:
+
+* fixed-step determinism remains intact
+* jump buffer still works
+* coyote time still works
+* fast fall activates only during valid descending state
+* attack input buffer fires at the first legal opportunity
+* expired buffered attacks do not execute
+* attack momentum behavior matches attack definitions
+* aerial attacks preserve expected momentum
+* hitstun/recovery permits intended low-Launch-Point routes
+* high Launch Point produces enough separation to break appropriate routes
+* Dash Energy behavior remains correct
+* Shield Energy behavior remains correct
+* charged actions still work
+* clone behavior remains correct
+* Sphere Rush behavior remains correct
+* Void/ring-out behavior remains correct
+
+Do not delete existing tests merely because they fail after the rework.
+
+Determine whether each failure represents an obsolete expectation or an actual regression.
+
+⸻
+
+30. TUNING PRIORITY
+
+Tune in this order:
+
+1. raw ground responsiveness
+2. jump responsiveness
+3. aerial steering
+4. momentum preservation
+5. attack recovery
+6. combat input buffering
+7. hitstun
+8. launch distance
+9. individual combo routes
+10. hitstop/impact polish
+
+Do not begin by massively increasing hitstun.
+
+Movement and recovery should do much of the work.
+
+⸻
+
+31. IMPORTANT DESIGN RULE
+
+Do not ask:
+
+“How do we put MultiVersus mechanics into ALVA?”
+
+Ask:
+
+“Why does the reference feel so responsive and connected, and how do we create those qualities using ALVA’s mechanics?”
+
+That distinction should guide every implementation decision.
+
+MultiVersus is a reference for:
+
+* responsiveness
+* fluidity
+* momentum
+* aerial control
+* combat pacing
+* satisfying hits
+* ease of chaining actions
+* ability to pursue opponents
+
+It is NOT the specification for ALVA’s mechanics.
+
+⸻
+
+32. SUCCESS CRITERIA
+
+The rework is successful when a player familiar with the old ALVA can immediately notice:
+
+* movement reacts faster
+* ground positioning is easier
+* aerial positioning is much better
+* jumps preserve natural momentum
+* attacks integrate with movement
+* attacks do not unnecessarily freeze the fighter
+* early attack inputs are buffered
+* successful hits create understandable follow-up opportunities
+* BA1 can function as a real combo starter
+* BA2 can function as a launcher
+* aerial attacks can continue pressure
+* low Launch Point supports short combos
+* high Launch Point naturally breaks those combos through increased launch
+* Dash feels integrated rather than separate
+* Shield and Charge still behave like ALVA
+* Clone and Sphere Rush remain fully intact
+
+reference video: https://youtu.be/C95FpcRLsbE?si=s63RRAeC_hj84QD5
+
+Most importantly:
+
+ALVA should feel significantly more polished without feeling like its combat system was replaced.
+
+The intended player experience is:
+
+MOVE → HIT → FOLLOW → HIT → REPOSITION
+
+rather than:
+
+MOVE → ATTACK → WAIT → MOVE → ATTACK.
+
+Implement this as a coherent movement/combat rework, test it thoroughly, and tune the values by actually exercising the intended combo routes rather than changing constants in isolation.
