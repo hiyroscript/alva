@@ -1,746 +1,185 @@
-ALVA — Add Watch Mode (CPU vs CPU Spectator Mode)
+Work directly in the current hiyroscript/alva repository. First inspect the existing implementation and tests before editing anything. Preserve the visual identity, architecture, gameplay behavior, accessibility conventions, touch-first behavior, and existing fighter-specific mobile ability system. Do not perform unrelated refactors.
 
-Implement a complete spectator mode named “Watch Mode” in the Alva repository.
+The current game has a shared TouchControls implementation in js/game/touch-controls.js. Quick Battle and Practice Ground both instantiate it. Watch Mode intentionally hides/disables touch gameplay controls. The current lower-left mobile cluster is [LEFT] [C/Charge] [RIGHT], while the combat/action buttons live on the lower right. Left/right press edges are consumed by Fighter.trackDashTaps() and a successful dash ultimately goes through Fighter.tryDash(). Keep Fighter.tryDash() as the single source of truth for dash legality, Energy cost, exhaustion, animation, grounded requirements, Charge/Defense restrictions, walls, ledges, speed, duration, facing, and interruption behavior.
 
-Before changing code, inspect the existing architecture and preserve its patterns, visual language, accessibility, keyboard/gamepad navigation, battle rules, and tests. Do not create a second combat implementation. Watch Mode must use Alva’s existing Battle, Fighter, CombatAIController, roster, stage, HUD, navigation, and difficulty systems.
+1. Add a Mobile Controls setting
 
-Current architecture to preserve
+Add a real Settings entry to the Home screen and a Settings screen/panel consistent with the existing ALVA menu design.
 
-The repository currently has:
+The Home menu should contain the existing Play, Watch Mode, Practice Ground, and Discover actions plus a new Settings action. It must participate normally in keyboard, touch, and gamepad menu navigation and must not break narrow-landscape Home layouts or overlap the Home credits column.
 
-* Home actions in js/screens/home-screen.js.
-* Quick Battle flow:
-    Home → Select Mode → Select Difficulty → Select Fighter → Select Stage → Battle.
-* Shared selection state in js/core/app.js.
-* Difficulty definitions and AI profiles in js/data/difficulty.js.
-* Shared fighter roster in js/ui/fighter-roster.js.
-* Setup headers in js/ui/components.js.
-* Stage selection in js/screens/map-select-screen.js.
-* Battle DOM/UI orchestration in js/screens/battle-screen.js.
-* Match simulation in js/game/battle.js.
-* CPU combat intelligence in js/game/combat-ai.js.
-* Screen/back-stack navigation in js/core/screen-manager.js.
-* Screen sections in index.html.
+Inside Settings, add a setting named Mobile Controls with exactly two choices:
 
-Currently Battle creates:
+Joystick — the new control layout described below.
 
-* P1 with PlayerController.
-* P2 with CombatAIController.
+Classic Buttons — the existing mobile layout exactly as it works today.
 
-The existing tests already demonstrate that P1 can be replaced with another CombatAIController and the complete battle simulation continues to work. Build Watch Mode around that capability instead of duplicating battle logic.
+Use the new Joystick layout as the default for a user who has never stored a preference. Persist the choice locally so reloading/reopening ALVA preserves it. Use a small versioned settings object/key rather than scattering raw localStorage calls throughout the UI. Handle unavailable/corrupt storage safely and fall back to Joystick.
 
-⸻
+Keep this as presentation/input configuration only. Do not alter desktop keyboard bindings or gamepad mappings.
 
-Feature
+The setting must affect both Quick Battle and Practice Ground because both use TouchControls. Watch Mode must continue to have no gameplay touch controls.
 
-Add a new Home action:
+Give TouchControls an explicit layout/scheme API such as setScheme('joystick') / setScheme('classic'), or an equivalent clean design. Changing schemes must release active pointers/held states first so switching layouts can never leave Left, Right, Charge, Jump, Defense, or another action stuck down.
 
-Watch Mode
+Do not rebuild fighter-specific combat buttons unnecessarily when the fighter changes. Existing setCharacter(def) behavior and mobileAbilities data should continue to control Shuriken/Punch/Kick presentation independently of the movement layout.
 
-This is Alva’s CPU-vs-CPU spectator mode.
+2. Preserve the Classic Buttons scheme
 
-Place the Watch Mode button in the Home action stack between Play and Discover, while preserving Practice Ground. It should use the same Home action styling and navigation behavior as the existing secondary actions and have the normal right-chevron treatment.
+Classic Buttons means the current implementation, not a redesigned approximation.
 
-The intended Home hierarchy is:
+Its lower-left control cluster must remain Left / C (Charge) / Right with the existing pointer sliding behavior. Left and Right continue generating their normal movement input and continue requiring the existing two quick taps to Dash. Charge continues behaving exactly as it currently does. The current lower-right combat layout remains unchanged.
 
-Play → Watch Mode → Practice Ground → Discover
+This option exists specifically so players can return to the old controls.
 
-If responsive CSS changes the visual layout, preserve this DOM/navigation order.
+3. Build the new circular joystick scheme
 
-Watch Mode should be a direct Home mode. Do not send the user through the existing Select Mode screen.
+For the Joystick scheme, replace the old lower-left Left / C / Right cluster with one circular mobile joystick.
 
-Clicking Watch Mode begins this flow:
+Place the joystick in the lower-left area currently occupied by the movement controls and respect safe-area insets. It should visually match ALVA’s translucent circular touch-control style rather than looking like an unrelated third-party joystick.
 
-Watch Mode → Difficulty → CPU 1 Fighter → CPU 2 Fighter → Stage → Watch Battle
+The joystick needs a circular outer base and a movable inner thumb/knob. Use Pointer Events and pointer capture, consistent with the existing control system. Do not introduce an external joystick library.
 
-There are exactly four setup steps:
+The joystick is for horizontal movement. Dragging sufficiently left holds the existing internal left action. Dragging sufficiently right holds the existing internal right action. Returning to the deadzone releases both. Crossing from one side through the center to the other must release the previous direction and hold the new one cleanly. Releasing/cancelling/losing pointer capture returns the stick to center and clears movement.
 
-1. Difficulty
-2. CPU 1
-3. CPU 2
-4. Stage
+Use a sensible deadzone so small thumb movement near the center does not make the fighter drift. Clamp the visible knob to the joystick radius. Vertical thumb displacement can affect the visual knob position, but it must not become Jump or Charge. Jump and Charge remain dedicated buttons.
 
-The selected difficulty applies equally to both CPUs.
+Do not change the actual run acceleration or top speed based on analog distance. ALVA’s gameplay input is currently digital; the joystick should translate naturally into the existing Left/Right held actions.
 
-Do not add separate CPU 1 and CPU 2 difficulty settings.
+The joystick must coexist with multi-touch. A player must be able to hold the joystick right while simultaneously pressing Jump, Punch, Kick, Shield, Shuriken, Special, or Charge with another finger.
 
-⸻
+Maintain touch-action: none, page-zoom protection, and all existing pointer-cancel/visibility/pause cleanup behavior.
 
-Watch Mode selection state
+4. Add Left mouvement and Right mouvement dash buttons
 
-Do not overload Quick Battle’s existing characterId in a way that causes the two modes to overwrite each other.
+In the new Joystick scheme only, add two small dedicated directional dash buttons around the top of the joystick.
 
-Give Watch Mode its own selection state, preferably grouped separately, for example conceptually:
+The left button should sit slightly above the joystick at its top-left side.
 
-selection.watch = {
-  difficulty: DEFAULT_DIFFICULTY,
-  cpu1CharacterId: defaultAvailableCharacterId,
-  cpu2CharacterId: defaultAvailableCharacterId,
-  mapId: MAPS[0].id,
-}
+The right button should sit slightly above the joystick at its top-right side.
 
-The exact structure can follow the project’s conventions, but these requirements are mandatory:
+Their player-facing/accessibility names must be exactly:
 
-* Watch selections must not corrupt Quick Battle selections.
-* Quick Battle must still remember/use its existing difficulty, characterId, and mapId.
-* Going Back during Watch setup must preserve already chosen Watch values.
-* CPU 1 and CPU 2 may choose the same fighter. Do not artificially prohibit mirror matches.
-* Invalid/stale fighter, stage, or difficulty values should continue to use the project’s normal fallback behavior.
+Left mouvement
 
-⸻
+Right mouvement
 
-Setup screens
+Preserve that spelling.
 
-Reuse the existing UI components wherever practical.
+They can use the existing left/right arrow glyphs so they remain readable at mobile size, but their aria-label/accessible name must use the names above.
 
-Do not copy the entire roster implementation or difficulty implementation into independent versions.
+A single tap of Left mouvement must request one dash to the left.
 
-Header/progress component
+A single tap of Right mouvement must request one dash to the right.
 
-js/ui/components.js currently hard-codes:
+These buttons are NOT replacement movement holds. They are dedicated one-shot dash controls. Tapping one must not leave Left or Right held, and it must not require a double tap.
 
-['Mode', 'Difficulty', 'Fighter', 'Stage']
+Do not reproduce dash physics in TouchControls. Do not directly manipulate fighter velocity from the UI. Do not fake the dash by rapidly toggling Left/Right twice.
 
-and labels the progress list as Quick Battle setup.
+Instead, introduce a clean one-shot dash input request through InputManager, for example a queueTouchDash(direction) API producing transient dashLeftPressed / dashRightPressed fields in the sampled gameplay input. The exact API name can differ, but it must be a transient edge rather than a persistent held action.
 
-Refactor this component so it can render configurable setup steps while preserving the current Quick Battle API/appearance.
+In Fighter.update(), feed that explicit dash request into the same existing tryDash(direction, input) path used after normal double-tap recognition. The dedicated dash request should be consumed once and should not also count as an ordinary Left/Right press edge. Clear any pending dashTap state when an explicit dash request is consumed so the dedicated button cannot accidentally combine with a previous normal direction tap.
 
-Quick Battle must continue to show:
+For #0001, one valid tap therefore starts #0001’s existing movement Dash with all current gameplay rules intact. If a future fighter lacks valid Dash data/art, tryDash() should simply reject the request normally. Do not hardcode id === '0001' inside the touch UI or input manager.
 
-1. Mode
-2. Difficulty
-3. Fighter
-4. Stage
+The dedicated dash button must therefore still fail naturally when the fighter is airborne, attacking/unable to act, already dashing, charging, holding Charge, shielding, appropriately holding Defense, exhausted, missing dash artwork, etc. It must pay the normal Dash Energy cost and play the existing Dash animation. Never bypass these checks.
 
-Watch Mode must show:
+Keyboard and gamepad players must retain the current double-tap behavior unchanged.
 
-1. Difficulty
-2. CPU 1
-3. CPU 2
-4. Stage
+5. Move Charge to a down-arrow button in the Joystick scheme
 
-The accessible label should also describe the correct mode rather than claiming Watch Mode is “Quick Battle setup.”
+The Joystick layout no longer has the C button in the lower-left movement area.
 
-Completed steps must retain the existing checkmark behavior.
+Instead, add a dedicated circular Charge button directly underneath the existing Jump button in the lower-right action area.
 
-⸻
+Use the existing ICONS.down down-arrow SVG. Its accessible name remains Charge.
 
-Difficulty
+This is still the same existing internal charge action. It must be holdable, not a one-shot click. Holding it on the ground must enter Charge exactly as today. Holding it while descending in the air must continue to fast-fall exactly as today. Charge + Punch and Charge + Kick must still produce #0001’s existing charged actions according to the existing timing rules.
 
-Watch Mode uses the existing four difficulty definitions:
+The Charge button must support simultaneous touch with the joystick and combat buttons.
 
-* Easy
-* Medium
-* Hard
-* Brutal
+In Classic Buttons, do not show this extra down-arrow Charge button; keep the original C button in the lower-left cluster instead.
 
-Do not create new AI profiles.
+Adjust the right action-cluster geometry only as much as required to place Charge underneath Jump safely. Do not disturb the established Shuriken, Special, Shield, Punch, Kick, and Jump hierarchy more than necessary.
 
-Use the exact same DIFFICULTIES, resolveDifficulty, and CombatAIController behavior already used by Quick Battle.
+6. Completely remove in-game Help
 
-The Watch difficulty screen should visually be the same difficulty UI, but its kicker should say:
+Delete the in-game Help feature rather than merely hiding or disabling it.
 
-Watch Mode
+The current battle pause menu contains a disabled Help button and still has a complete hidden Help view. Remove the Help button entirely. The Battle pause menu should become:
 
-Selecting the difficulty advances to CPU 1 selection.
+Resume
 
-Back returns Home.
+Restart Battle
 
-⸻
+Return to Home
 
-CPU 1 fighter selection
+Remove the Help view, Help scroll area, Help Back button, Help open/close logic, helpOpen state, direction-scrolling code, imports of buildHelp, and help-specific pause-overlay state/classes that no longer serve a purpose.
 
-Use the shared FighterRoster component.
+Remove the standalone Help & Credits screen completely. js/screens/help-credits-screen.js should no longer be registered by App. Remove its section from index.html. Remove its import and registration from js/core/app.js.
 
-Screen:
+Credits must NOT disappear.
 
-Select CPU 1
+The Home-screen rolling credits are the credits experience that should remain. Preserve the current Home credits appearance and behavior: scrolling roll, duplicate sequence for looping, manual wheel/drag/keyboard scrolling, reduced-motion behavior, accessibility region, and existing content.
 
-Kicker:
+Currently Home imports CREDITS from js/ui/help-content.js. Since Help is being removed, separate credits from help cleanly. Prefer moving CREDITS into a dedicated module such as js/ui/credits.js, then make home-screen.js import it from there. Once nothing needs help-content.js, delete that file instead of leaving dead Help builders and diagrams behind.
 
-Watch Mode
+Remove obsolete Help-only CSS such as Help screen/tab/mobile-help-diagram/control-table rules and pause-help rules where they are no longer referenced. Do not remove generic styles that are still used elsewhere.
 
-Progress step:
+There should be no runtime Help screen, no Help tab, no Help pause button, no hidden Help DOM, and no unreachable Help implementation left in the shipped game.
 
-CPU 1
+7. Preserve Credits on Home
 
-Confirming a fighter writes cpu1CharacterId and advances to CPU 2.
+The Home credits roll is explicitly required and must remain visible/readable.
 
-The selected CPU 1 fighter should be restored when navigating Back to this screen.
+Do not replace it with a Settings panel, do not move it away from Home, and do not make Settings cover it permanently. Adding the fifth Home action must still work on short/narrow landscape screens without menu overflow or collisions with the credits column.
 
-⸻
+If extracting the credits data to a new module, keep the displayed credit content unchanged unless a stale Help-specific line absolutely requires cleanup.
 
-CPU 2 fighter selection
+8. Accessibility and interaction requirements
 
-Use another instance of the shared FighterRoster.
+Every button must remain a real button where appropriate.
 
-Screen:
+The joystick itself should have an accessible group/region label such as Movement joystick. The two dash buttons must expose the exact accessible names Left mouvement and Right mouvement. The down-arrow button must be announced as Charge, not merely Down.
 
-Select CPU 2
+Preserve immediate pressed visual feedback on ordinary touch buttons. Provide a clear active visual state for the dash buttons on touch-down even though their gameplay request is one-shot.
 
-Kicker:
+Pointer cancellation, disabling gameplay, pausing, leaving a screen, hiding the page, and switching control schemes must clear active touch state and visually recenter the joystick.
 
-Watch Mode
+Watch Mode must remain free of player controls.
 
-Progress step:
+9. Tests
 
-CPU 2
+Update the existing tests rather than weakening them.
 
-Confirming writes cpu2CharacterId and advances to Stage.
+tests/controls-ui.test.mjs currently assumes the old Left/Charge/Right cluster and contains Help-content tests. Replace Help-specific assertions with coverage for both mobile-control schemes. Test that Classic preserves the existing actions and behavior. Test Joystick left/right/deadzone/release/cross-center behavior, simultaneous joystick + action touches, the down-arrow Charge button, and the exact accessible dash names.
 
-Use a unique previewId so multiple roster screen instances cannot create duplicate DOM IDs.
+Add coverage proving a dedicated dash button emits only one transient dash request and does not become a held Left/Right action.
 
-Back must return to CPU 1 and retain CPU 1’s selection.
+Add or extend input/dash tests to prove the explicit dash request reaches the existing tryDash() logic and therefore obeys current grounding, Energy/exhaustion, Defense/Charge, animation, wall/ledge, and availability rules. Existing keyboard/touch-direction/gamepad double-tap tests must remain valid.
 
-⸻
+Update tests/battle-screen.test.mjs and Watch Mode tests so the pause menu expects only Resume, Restart Battle, and Return to Home. Delete assertions concerning the disabled Help button or hidden Help view.
 
-Stage selection
+Add tests for Settings persistence, invalid stored-value fallback, Home navigation to Settings, switching between Joystick and Classic, and the new setting being used by both Battle and Practice Ground.
 
-Reuse Alva’s normal MAPS registry and StagePreview.
+Update Home navigation tests that rely on fixed positional indices so they locate actions semantically when possible.
 
-Screen title remains:
+Keep a test proving the Home credits still render after Help removal.
 
-Select Stage
+Run the entire Node test suite after the changes, not only new tests. Fix regressions rather than skipping tests.
 
-Kicker:
+10. Documentation cleanup
 
-Watch Mode
+Update README.md and ALVA_SPEC.md to match the shipped behavior.
 
-Progress step:
+Describe the two mobile control modes, with Joystick as the default and Classic Buttons as the optional legacy layout. Document the circular joystick, single-tap directional Dash buttons, the Charge down-arrow below Jump, and the Settings path.
 
-Stage
+Remove stale documentation claiming an in-game Help screen/pause Help exists. Keep documentation of controls/gameplay itself where useful; removing the runtime Help feature does not mean deleting useful developer/player documentation from README/spec files.
 
-The stage UI should otherwise behave like Quick Battle’s existing stage selection.
+Document that keyboard/gamepad Dash remains the current double-tap gesture while the dedicated Joystick-mode dash buttons request it with one tap.
 
-The primary button may say:
+11. Completion criteria
 
-Confirm and watch battle
+The task is complete only when the new Joystick mode works in Quick Battle and Practice Ground; Classic Buttons reproduces the old touch layout; the preference persists; the joystick supports proper multi-touch horizontal movement; the two mouvement buttons single-tap the existing Dash system without bypassing any Dash rules; Charge is a holdable down-arrow directly under Jump in Joystick mode; Watch Mode still exposes no player controls; in-game Help is actually removed from code and UI; Home credits remain intact; Home/Settings layouts work in compact landscape; and the complete test suite passes.
 
-or an equally concise Watch-specific equivalent.
-
-Starting the battle must pass all of these values:
-
-* Watch/spectator mode flag
-* selected map
-* CPU 1 fighter ID
-* CPU 2 fighter ID
-* selected difficulty
-
-Back returns to CPU 2 fighter selection.
-
-⸻
-
-Screen architecture
-
-Do not try to push the same fighter-selection screen onto ScreenManager twice in succession in a way that breaks its Back stack.
-
-Use distinct Watch screen IDs/instances for CPU 1 and CPU 2, while still sharing the underlying FighterRoster implementation.
-
-A sensible screen structure would be along the lines of:
-
-* watch-difficulty
-* watch-cpu1
-* watch-cpu2
-* watch-map
-
-You may refactor existing setup screen classes into configurable/reusable classes if that results in cleaner code.
-
-Add the necessary <section> elements to index.html and register the screens in App.start().
-
-Do not regress the existing:
-
-* mode
-* difficulty
-* character
-* map
-* battle
-* practice
-* discover
-
-screens.
-
-⸻
-
-Battle engine changes
-
-Watch Mode must use the real Battle simulation.
-
-Do not make a separate WatchBattle simulation.
-
-Extend Battle cleanly so its controller configuration can represent:
-
-Quick Battle
-
-* P1 → PlayerController
-* P2 → CombatAIController
-
-Watch Mode
-
-* P1 → CombatAIController
-* P2 → CombatAIController
-
-Both Watch CPUs use the selected difficulty.
-
-Their fighter definitions remain independent:
-
-CPU 1 → selected cpu1CharacterId
-CPU 2 → selected cpu2CharacterId
-
-Everything else remains normal Battle behavior:
-
-* 99-second timer/current configured round time
-* first to the configured points-to-win
-* Void scoring
-* respawns
-* Launch Point
-* Energy
-* shields
-* charged attacks
-* clones
-* projectiles
-* stage physics
-* camera
-* hit FX
-* result rules
-* rematches
-* restarts
-
-Difficulty must continue to affect only how the AI thinks. It must never modify fighter stats or combat rules.
-
-⸻
-
-Independent AI randomness
-
-Do not give both AI controllers the exact same RNG stream.
-
-This is especially important for mirror matches.
-
-When Watch Mode creates two CombatAIController instances, initialize them from independent deterministic RNG streams derived from the battle seed.
-
-Tests must still be reproducible when a seed is provided.
-
-Production battles should still vary naturally when no seed is supplied.
-
-A seeded Watch match should therefore produce deterministic results without making CPU 1 and CPU 2 make artificially identical random decisions.
-
-⸻
-
-Fighter labels
-
-Quick Battle remains:
-
-* P1 label: P1
-* P2 label: CPU
-
-Watch Mode becomes:
-
-* P1 label: CPU 1
-* P2 label: CPU 2
-
-Use those labels consistently anywhere fighter identity is presented.
-
-⸻
-
-BattleScreen
-
-js/screens/battle-screen.js currently assumes both fighters use the same selected fighter and loads one sprite set.
-
-Update it to support Watch Mode with two potentially different fighters.
-
-For Watch Mode:
-
-1. Resolve CPU 1 fighter definition.
-2. Resolve CPU 2 fighter definition.
-3. Resolve selected map.
-4. Resolve difficulty.
-5. Load both fighters’ sprite sets.
-6. If both CPUs use the same character, reuse the same cached sprite set rather than performing unnecessary duplicate work.
-7. Handle a load failure for either fighter using the existing loading/error conventions.
-8. Respect the existing cancellation token so leaving during asynchronous loading cannot start an abandoned battle.
-
-Instantiate Battle with the two selected fighter definitions and sprite sets.
-
-Quick Battle’s existing loading behavior must remain unchanged.
-
-⸻
-
-Spectator input behavior
-
-Watch Mode must be spectator-only.
-
-The user must not control CPU 1 or CPU 2.
-
-Therefore:
-
-* No PlayerController in Watch Mode.
-* Gameplay movement/action input must not affect either fighter.
-* Touch combat controls should be hidden/disabled in Watch Mode.
-* Do not show fighter-specific touch action buttons.
-
-However, spectators must still be able to:
-
-* pause
-* resume
-* restart
-* return Home
-* use keyboard/gamepad pause controls
-* use result/rematch controls
-
-Make sure disabling gameplay input does not accidentally disable the pause command or gamepad Start.
-
-⸻
-
-Pause UI
-
-The existing battle pause interface can be reused.
-
-In Watch Mode its kicker must say:
-
-Watch Mode
-
-instead of:
-
-Quick Battle
-
-Keep the existing useful actions:
-
-* Resume
-* Restart Battle
-* Help, with its current enabled/disabled behavior
-* Return to Home
-
-Do not introduce fighter controls into this menu.
-
-⸻
-
-HUD
-
-Use the existing HUD.
-
-Watch Mode should show both normal fighter HUD panels and the normal timer/score UI.
-
-The identity tags should make the match clearly CPU-vs-CPU:
-
-* CPU 1
-* CPU 2
-
-Do not create a special simplified spectator HUD unless technically required.
-
-⸻
-
-Results
-
-BattleScreen.showResult() currently assumes outcomes mean “Player 1” versus “CPU.”
-
-Make result text mode-aware.
-
-Quick Battle must remain unchanged:
-
-* Player 1 Wins
-* CPU Wins
-
-Watch Mode must use:
-
-* CPU 1 Wins
-* CPU 2 Wins
-
-Any sentence identifying the loser should likewise use CPU 1 / CPU 2.
-
-Draw behavior should remain exactly as Battle currently defines it.
-
-⸻
-
-Rematch/restart
-
-In Watch Mode:
-
-Restart Battle and Rematch must keep:
-
-* CPU 1 fighter
-* CPU 2 fighter
-* difficulty
-* stage
-* Watch Mode controller configuration
-
-Both AI controllers must reset their transient planning/input state correctly.
-
-A rematch must not accidentally convert CPU 1 back to a PlayerController.
-
-⸻
-
-Change Stage
-
-The result screen’s existing Change Stage behavior should return to the Watch Mode Stage selection screen when the match came from Watch Mode.
-
-It must continue returning to the normal Quick Battle stage screen for a Quick Battle.
-
-Use the normal navigation stack rather than hard-coded mode assumptions where possible.
-
-⸻
-
-Home navigation
-
-Add the new Watch Mode button to HomeScreen.
-
-Requirements:
-
-* keyboard reachable
-* gamepad reachable
-* pointer reachable
-* correct spatial/menu navigation order
-* same focus/accessibility conventions as the current Home actions
-* Play remains the default Home focus
-* Practice Ground remains available
-* Discover remains available
-
-Do not depend on .home-action array indexes in new code.
-
-Existing tests currently contain brittle assumptions such as Discover being .home-action[2]; update those tests to locate the intended action semantically where appropriate.
-
-⸻
-
-Styling
-
-Watch Mode should look native to Alva.
-
-Reuse:
-
-* Home action styles
-* setup screen styles
-* difficulty cards
-* fighter roster
-* stage selector
-* Battle/HUD
-* glass panels
-* typography
-* accent/focus styles
-* responsive behavior
-
-Only add CSS when necessary for the new screens or action count.
-
-Do not introduce a separate visual design language.
-
-Check narrow landscape layouts so the fourth Home action does not overflow or collide with the credits column.
-
-Respect reduced-motion behavior.
-
-⸻
-
-Accessibility
-
-Maintain the existing accessibility standard.
-
-Verify:
-
-* all Watch setup screens have useful aria-labels
-* each progress list announces “Watch Mode setup” or equivalent
-* CPU 1 and CPU 2 selection screens have distinct accessible headings
-* roster preview IDs are unique
-* current/selected states are announced
-* Back works through keyboard, gamepad, and button
-* focus lands on the previously selected value when returning Back
-* Watch Battle canvas has an appropriate accessible label
-* Watch result dialog announces CPU 1 / CPU 2 correctly
-* no inaccessible touch controls remain active while spectating
-
-⸻
-
-Tests
-
-Add comprehensive tests for Watch Mode and update existing tests affected by the fourth Home action.
-
-Prefer a dedicated file such as:
-
-tests/watch-mode.test.mjs
-
-At minimum test all of the following.
-
-Home
-
-* Watch Mode button exists.
-* It is located in the intended Home navigation order.
-* Play is still default.
-* Practice and Discover still exist.
-* keyboard/gamepad navigation reaches Watch Mode.
-* clicking Watch Mode begins Watch setup directly, not Select Mode.
-
-Full setup flow
-
-Verify:
-
-Home → Watch Difficulty → CPU 1 → CPU 2 → Stage → Battle
-
-And Back retraces:
-
-Battle/Stage ← CPU 2 ← CPU 1 ← Difficulty ← Home
-
-Verify selection is retained while navigating backward.
-
-Progress header
-
-Watch screens show:
-
-1. Difficulty
-2. CPU 1
-3. CPU 2
-4. Stage
-
-Quick Battle still shows:
-
-1. Mode
-2. Difficulty
-3. Fighter
-4. Stage
-
-Fighter selection
-
-* CPU 1 and CPU 2 can select different fighters.
-* CPU 1 and CPU 2 can select the same fighter.
-* each roster uses unique preview IDs.
-* unavailable roster slots remain unavailable exactly as before.
-
-Selection isolation
-
-Starting/changing Watch Mode must not mutate Quick Battle’s fighter choice.
-
-Quick Battle must not overwrite Watch CPU choices.
-
-Battle construction
-
-For Watch Mode assert:
-
-battle.p1.controller instanceof CombatAIController
-battle.p2.controller instanceof CombatAIController
-
-Assert both controller difficulties equal the selected difficulty.
-
-Assert:
-
-battle.p1.def.id === cpu1CharacterId
-battle.p2.def.id === cpu2CharacterId
-
-Assert labels:
-
-CPU 1
-CPU 2
-
-For normal Quick Battle continue asserting:
-
-battle.p1.controller instanceof PlayerController
-battle.p2.controller instanceof CombatAIController
-
-RNG
-
-A seeded Watch battle should be deterministic.
-
-CPU 1 and CPU 2 should not share one identical RNG stream.
-
-Battle screen
-
-Test:
-
-* two different sprite sets can be loaded.
-* mirror matches work.
-* failed CPU 1 loading is handled.
-* failed CPU 2 loading is handled.
-* leaving during loading does not create a stale battle.
-* touch controls are disabled in Watch Mode.
-* pause still works.
-* restart still works.
-* rematch still works.
-
-Results
-
-For Watch Mode:
-
-* P1 outcome displays CPU 1 Wins.
-* P2 outcome displays CPU 2 Wins.
-* loser descriptions use CPU 1 / CPU 2.
-
-Quick Battle result wording must remain unchanged.
-
-Regression
-
-Run the complete existing test suite.
-
-Do not weaken or delete existing Quick Battle, Practice Ground, Discover, movement, combat, AI, scoring, stage, or accessibility assertions simply to make Watch Mode pass.
-
-Fix any index-based Home tests that became invalid because a fourth action was intentionally added.
-
-⸻
-
-Documentation
-
-Update the repository documentation so the game flow reflects Watch Mode.
-
-At minimum update:
-
-* README.md
-* ALVA_SPEC.md
-
-Document the new route approximately as:
-
-Home → Watch Mode → Select Difficulty → Select CPU 1 → Select CPU 2 → Select Stage → CPU vs CPU Battle
-
-Explain that:
-
-* Watch Mode is spectator-only.
-* both fighters use CombatAIController.
-* both use the selected difficulty.
-* difficulty changes decision-making only.
-* normal Battle scoring and combat rules are unchanged.
-* CPU 1 and CPU 2 may use different or identical fighters.
-
-Also update any Home menu documentation that currently describes Play → Practice Ground → Discover as the complete action list.
-
-⸻
-
-Important non-regression rules
-
-Do not:
-
-* rewrite the combat engine for Watch Mode
-* duplicate CombatAIController
-* create separate Watch-only fighter physics
-* make difficulty alter fighter stats
-* remove Practice Ground
-* remove Discover
-* change Quick Battle into CPU-vs-CPU
-* let spectator input control a fighter
-* hard-code Watch Mode to fighter 0001
-* hard-code Watch Mode to one map
-* prohibit mirror matches
-* use one fighter selection for both CPUs
-* leave result text saying “Player 1” in Watch Mode
-* break keyboard/gamepad Back navigation
-* introduce duplicate DOM IDs from multiple fighter rosters
-* leave existing tests silently broken because Home now has four actions
-
-⸻
-
-Definition of done
-
-The feature is complete when a user can:
-
-1. Open Alva.
-2. Highlight or click Watch Mode from Home.
-3. Select Easy, Medium, Hard, or Brutal.
-4. Select CPU 1’s fighter.
-5. Select CPU 2’s fighter.
-6. Select a stage.
-7. Start the match.
-8. Watch two independently controlled combat AIs fight using the complete normal Alva battle system.
-9. Pause/resume the match without controlling either fighter.
-10. See CPU 1 / CPU 2 correctly identified in the HUD and results.
-11. Restart or rematch without losing the selected setup.
-12. Change Stage and return to the Watch Stage screen.
-13. Return Home.
-14. Start a normal Quick Battle afterward and find its existing behavior unchanged.
-
-Finish by running the complete test suite and report:
-
-* files changed
-* architectural refactors made
-* Watch Mode tests added
-* full test results
-* any remaining browser-only/manual checks
+Do not change combat balance, movement values, Dash cost/speed/duration, Charge mechanics, fighter attacks, CPU behavior, desktop bindings, gamepad mappings, Home credits content, or unrelated screens unless a change is strictly necessary to implement the requirements above.
