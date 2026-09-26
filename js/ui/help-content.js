@@ -83,7 +83,9 @@ export function buildHelp() {
     card('Movement', [
       el('ul', { class: 'info-list' }, [
         el('li', { text: 'Left / Right accelerate into a run. Release to slow to a stop.' }),
-        el('li', { text: 'Jump from the ground; you can steer while airborne.' }),
+        el('li', { text: 'Jump from the ground; your run carries into the jump, and you can steer while airborne.' }),
+        el('li', { text: 'Hold Charge (S / ↓, D-pad or stick down, or C on touch) in the air while falling to fast-fall back to the ground.' }),
+        el('li', { text: 'Attacks keep some of your momentum. Press your next attack a little early and it comes out the moment it can. Land a hit and you can go straight into another attack or a jump: Punch → Kick, or Kick → Jump → Punch in the air. The higher the opponent’s Launch Point, the further each hit sends them, and the sooner a combo runs out.' }),
         el('li', { text: 'Press the same direction twice quickly (Right, Right or Left, Left) on the ground to Dash: a short, fast burst that way. It only moves you: it never hits, and a ledge or a wall ends it.' }),
         el('li', { text: 'The bright purple bar above your fighter is Energy; it shows only while it is not full. A Dash costs 15 of its 100, and every hit your Shield blocks costs 25; it refills by itself, faster while you hold Charge. You can still Dash or Shield with less left than that, but it empties the bar. If Energy reaches zero, it turns gray and must fully refill before Shield and Dash become available again. Running, jumping and attacking never cost Energy.' }),
         el('li', { text: 'Your fighter faces the way it last moved or dashed, and keeps that facing when it stops: it never turns toward the opponent by itself.' }),
@@ -91,7 +93,7 @@ export function buildHelp() {
     ]),
     card('Charge & cooldowns', [
       el('ul', { class: 'info-list' }, [
-        el('li', { text: 'Hold Charge (S / ↓, or C on touch) while grounded to enter #0001’s charging stance. Charge must be held: release it to stop charging.' }),
+        el('li', { text: 'Hold Charge (S / ↓, or C on touch) while grounded to enter #0001’s charging stance. Charge must be held: release it to stop charging. Held in the air it is the fast fall instead; after landing, let go and hold it again to charge.' }),
         el('li', { text: 'Charge plays its two-frame startup once, then loops its sustained pose for as long as you hold it. Each new Charge starts again from the startup.' }),
         el('li', { text: 'You stay in place while charging. Let go and #0001 shows its first Charge pose for a moment before returning to normal. Jump and Throw take over from Charge at once, holding Defense raises the Shield instead, and a hit interrupts it. Letting go of Charge as you press BA1 gives a normal BA1, and the same goes for BA2.' }),
         el('li', { text: 'While already charging: Charge + BA1 (Punch on touch) = Clone Attack; Charge + BA2 (Kick on touch) = Sphere Rush. Pressing Charge and the button together from a standstill gives the normal attack.' }),

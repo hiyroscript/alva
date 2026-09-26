@@ -1328,8 +1328,8 @@ test('Player 1\'s attacks hit the CPU through the real CombatSystem, and it reac
   assert.equal(cpu.facing, -1);
 
   assert.equal(cpu.combat.launchPoint, 0);
-  // From 115, BA1's 5 makes 120: a push of 1 x 120.
-  cpu.combat.launchPoint = 115;
+  // From 95, BA1's 5 makes 100: a push of 1 x 100, well short of the ledge.
+  cpu.combat.launchPoint = 95;
   run({ action1: true, action1Pressed: true });
   until(() => events.length > 0, 30);
   const [hit] = events;
@@ -1338,8 +1338,8 @@ test('Player 1\'s attacks hit the CPU through the real CombatSystem, and it reac
   assert.equal(hit.target, cpu);
   assert.equal(hit.damage, player.attacks.ba1.damage);
   assert.deepEqual([hit.projectile, hit.summon, hit.technique], [null, null, null]);
-  assert.equal(cpu.combat.launchPoint, 115 + hit.damage, 'its Launch Point builds up');
-  assert.equal(hit.launchStrength, 120);
+  assert.equal(cpu.combat.launchPoint, 95 + hit.damage, 'its Launch Point builds up');
+  assert.equal(hit.launchStrength, 100);
   assert.ok(cpu.combat.stun > 0, 'hitstun');
   run(); // the reaction shows from the CPU's next update
   assert.equal(cpu.state, 'hitstun');
@@ -1375,6 +1375,9 @@ test('Player 1\'s BA2 launches the CPU straight up (Base Launch 2, vertical), th
   assert.equal(numbers[0].text, '+10');
   // At impact: launched upward, not pushed sideways, at BA2's Base Launch 2
   // x the CPU's new Launch Point: 20 + 10 = 30, a strength of 60, so 600.
+  // (Measured from where the kick struck: BA2's step-in may have shoved it
+  // along a little through the pushboxes first.)
+  const hitX = cpu.body.x;
   assert.ok(cpu.body.vx === 0, 'no sideways push');
   assert.equal(cpu.combat.launchPoint, 30);
   assert.equal(hit.launchStrength, 60);
@@ -1388,7 +1391,8 @@ test('Player 1\'s BA2 launches the CPU straight up (Base Launch 2, vertical), th
   assert.ok(top < groundY, 'it left the ground');
   assert.equal(cpu.grounded, true, 'and came back down');
   assert.equal(cpu.body.y, groundY);
-  assert.equal(cpu.body.x, startX, 'straight up and down');
+  assert.equal(cpu.body.x, hitX, 'straight up and down');
+  assert.ok(Math.abs(cpu.body.x - startX) < 10, 'about where it stood');
   run({}, 40);
   assert.equal(cpu.state, 'idle');
   assert.equal(events.length, 1);

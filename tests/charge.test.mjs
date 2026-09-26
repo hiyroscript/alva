@@ -278,7 +278,7 @@ test('Charge follows the held value: a tap does not latch, and the press edge al
 
 // ---- Grounded ---------------------------------------------------------------------
 
-test('Charge is grounded: held in the air it keeps Jump / Fall, then charges after Land', () => {
+test('Charge is grounded: held in the air it keeps Jump / Fall (the fast fall\'s Down), and after Land it must be held again', () => {
   const { fighter, step } = makeFighter();
   step({ ...JUMP, ...CHARGE });
   const air = [];
@@ -286,11 +286,12 @@ test('Charge is grounded: held in the air it keeps Jump / Fall, then charges aft
     air.push({ state: fighter.state, frame: frameName(fighter) });
     step(CHARGE);
   }
-  assert.ok(air.length > 20);
+  assert.ok(air.length > 15);
   assert.ok(air.every((s) => s.state === 'jump' || s.state === 'fall'));
   assert.ok(air.every((s) => !isChargeFrame(s.frame)), 'no charge art in the air');
 
-  // Touchdown: Land plays its whole clip, then Charge starts from charge1.
+  // Touchdown: Land plays its whole clip. Down held from the air was the
+  // fast fall's: it never turns into a Charge by itself.
   assert.equal(fighter.state, 'land');
   const landSteps = [];
   while (fighter.state === 'land') {
@@ -298,6 +299,12 @@ test('Charge is grounded: held in the air it keeps Jump / Fall, then charges aft
     step(CHARGE);
   }
   assert.equal(landSteps.length, Math.round(fighter.landDuration / DT));
+  for (let i = 0; i < 10; i++) step(CHARGE);
+  assert.equal(fighter.charging, false, 'still held from the air: no Charge');
+  assert.equal(fighter.state, 'idle');
+  // Let go and held again on the ground: a Charge, from charge1.
+  step({});
+  step(CHARGE);
   assert.equal(fighter.state, 'charge');
   assert.equal(frameName(fighter), '0001_charge1.png');
 });
@@ -360,12 +367,14 @@ test('Charge changes no collider, hurtbox, gravity or jump data', () => {
     { x: -17, y: -46, w: 34, h: 46 },
   ]);
   // A jump out of Charge follows exactly the same arc as one from idle.
+  // (Charge let go after takeoff: held on down the descent it is the fast
+  // fall, see movement.test.mjs.)
   const plain = makeFighter();
   step({ ...CHARGE, ...JUMP });
   plain.step(JUMP);
   for (let i = 0; i < steps(1); i++) {
     for (const k of ['y', 'vy', 'grounded']) assert.equal(fighter.body[k], plain.fighter.body[k], `step ${i}: body.${k}`);
-    step(CHARGE);
+    step(fighter.body.vy < 0 ? CHARGE : {});
     plain.step();
   }
 });

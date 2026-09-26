@@ -177,7 +177,10 @@ test('the Clone Attack is data: a Charged BA1 summon on a 5-second cooldown, reu
     {
       animation: 'ba1', startup: 1 / 12, active: 1 / 12, recovery: 2 / 12, damage: 5,
       hitbox: { x: 12, y: -64, w: 28, h: 16 }, baseLaunch: 1, directionalLaunch: 'horizontal',
-      hitstun: 0.22, blockstun: 0.14, hitstop: 0.06, cooldown: 0.1, groundOnly: true,
+      hitstun: 0.32, blockstun: 0.14, hitstop: 0.05, cooldown: 0.15, groundOnly: true,
+      // The owner's own movement and follow-up data: a clone never moves or
+      // follows up, so it reads none of it.
+      momentum: 0.75, friction: 0.4, hitCancel: 1 / 12,
     },
   );
   for (const key of ['baseLaunch', 'directionalLaunch', 'launchPoint', 'powers']) assert.equal(key in SUMMON, false, `no summon ${key}`);
@@ -477,7 +480,7 @@ test('ordinary ground and mid-air BA1 are unchanged: no clone and no charged coo
   ground.until(() => ground.events.length > 0);
   assert.equal(ground.events[0].damage, 5);
   assert.equal(ground.events[0].summon, null);
-  assert.equal(ground.attacker.combat.hitstop, 0.06, 'the owner\'s own punch still freezes the owner');
+  assert.equal(ground.attacker.combat.hitstop, ATTACK.hitstop, 'the owner\'s own punch still freezes the owner');
 
   const air = duel({ gap: 200 });
   air.tick(JUMP);
@@ -696,7 +699,8 @@ test('the no-ground fallback is data: the summon reuses midairBa2 over the targe
     {
       animation: 'midairBa2', startup: 2 / 12, active: 1 / 12, recovery: 2 / 12, damage: 10,
       hitbox: { x: 8, y: -44, w: 40, h: 40 }, baseLaunch: 2, directionalLaunch: 'reverseVertical',
-      hitstun: 0.22, blockstun: 0.14, hitstop: 0.06, cooldown: 0.1,
+      hitstun: 0.28, blockstun: 0.14, hitstop: 0.08, cooldown: 0.1,
+      airMomentum: 1, airControl: 0.4, hitCancel: 2 / 12,
     },
   );
   assert.equal(def.attacks.ba1Clone, undefined);

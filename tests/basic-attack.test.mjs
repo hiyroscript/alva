@@ -32,17 +32,22 @@ const BA1_LAUNCH = {
 
 // Each BA1's whole data entry. Ground BA1 is the four-frame punch; mid-air
 // BA1 is the three-frame kunai slash (midair2ba1-3), with the slash's own
-// timing, hitbox and combat values.
+// timing, hitbox and combat values, and each its own movement: the punch
+// keeps some of a run's speed and slides on it, the slash keeps all of its
+// drift and most of the air steering. Both open a follow-up once they hit
+// (hitCancel, from their strike).
 const BA1_ENTRIES = {
   ba1: {
     animation: 'ba1', startup: 1 / 12, active: 1 / 12, recovery: 2 / 12, damage: 5,
     hitbox: { x: 12, y: -64, w: 28, h: 16 }, ...BA1_LAUNCH.ba1,
-    hitstun: 0.22, blockstun: 0.14, hitstop: 0.06, cooldown: 0.1, groundOnly: true,
+    hitstun: 0.32, blockstun: 0.14, hitstop: 0.05, cooldown: 0.15, groundOnly: true,
+    momentum: 0.75, friction: 0.4, hitCancel: 1 / 12,
   },
   midairBa1: {
     animation: 'midairBa1', startup: 2 / 12, active: 1 / 12, recovery: 0, damage: 5,
     hitbox: { x: 14, y: -100, w: 22, h: 80 }, ...BA1_LAUNCH.midairBa1,
-    hitstun: 0.24, blockstun: 0.15, hitstop: 0.07, cooldown: 0.18,
+    hitstun: 0.28, blockstun: 0.15, hitstop: 0.05, cooldown: 0.18,
+    airMomentum: 1, airControl: 0.6, hitCancel: 2 / 12,
   },
 };
 
@@ -88,7 +93,13 @@ test('BA1 attack definitions match their clips: the ground punch and the mid-air
   assert.deepEqual([g.startup, g.active, g.recovery], [1 / 12, 1 / 12, 2 / 12]);
   assert.equal(g.groundOnly, true);
   assert.equal(g.damage, 5, 'adds 5 Launch Point');
-  assert.deepEqual([g.hitstun, g.blockstun, g.hitstop, g.cooldown], [0.22, 0.14, 0.06, 0.1]);
+  assert.deepEqual([g.hitstun, g.blockstun, g.hitstop, g.cooldown], [0.32, 0.14, 0.05, 0.15]);
+  // A combo starter: once it hits it may be cut short from its strike, and
+  // its stun outlasts that (with room for BA2's wind-up); its freeze is
+  // short, so repeated jabs stay crisp.
+  assert.equal(g.hitCancel, g.startup);
+  assert.ok(g.hitstun > fighter.attacks.ba2.startup, 'the stun covers BA2\'s wind-up');
+  assert.ok(g.hitstop < fighter.attacks.ba2.hitstop, 'a lighter freeze than BA2');
   assert.ok(g.hitbox.x + g.hitbox.w <= 60, 'ba1 hitbox is within reach');
   assert.ok(g.hitbox.w <= def.collider.width + 10 && g.hitbox.h <= def.collider.height / 2, 'ba1 hitbox is not oversized');
   // Mid-air BA1: frames 1-2 wind-up, frame 3 the slash, and no recovery
@@ -100,7 +111,8 @@ test('BA1 attack definitions match their clips: the ground punch and the mid-air
   assert.deepEqual([a.startup, a.active, a.recovery], [2 / 12, 1 / 12, 0]);
   assert.equal(a.groundOnly, false);
   assert.equal(a.damage, 5, 'adds 5 Launch Point');
-  assert.deepEqual([a.hitstun, a.blockstun, a.hitstop, a.cooldown], [0.24, 0.15, 0.07, 0.18]);
+  assert.deepEqual([a.hitstun, a.blockstun, a.hitstop, a.cooldown], [0.28, 0.15, 0.05, 0.18]);
+  assert.equal(a.hitCancel, a.startup, 'a follow-up from its slash on');
   assert.ok(a.hitbox.x + a.hitbox.w > def.collider.width / 2 && a.hitbox.x + a.hitbox.w <= 40, 'midairBa1 hitbox reach');
   assert.ok(a.hitbox.w < def.collider.width, 'midairBa1 hitbox is narrower than the fighter');
   assert.ok(a.cooldown > g.cooldown);
@@ -393,7 +405,7 @@ test('a hit shows the target in its hurt pose through the impact freeze', () => 
   target.combat.launchPoint = 115;
   tick(BA1);
   until(() => events.length > 0, 60);
-  assert.equal(target.combat.stun, 0.22);
+  assert.equal(target.combat.stun, 0.32);
   assert.ok(target.combat.hitstop > 0);
   const frozenAt = { x: target.body.x, attackerFrame: frameName(attacker) };
   tick(); // hitstop: nothing moves, but the pose updates
@@ -466,9 +478,9 @@ test('mid-air BA1 hits a grounded opponent below and in front while still airbor
       assert.equal(attacker.combat.phase, 'active');
       assert.equal(frameName(attacker), '0001_midair2ba3.png');
       // The slash's own stun and freeze, on both fighters.
-      assert.equal(target.combat.stun, 0.24);
-      assert.equal(target.combat.hitstop, 0.07);
-      assert.equal(attacker.combat.hitstop, 0.07);
+      assert.equal(target.combat.stun, 0.28);
+      assert.equal(target.combat.hitstop, 0.05);
+      assert.equal(attacker.combat.hitstop, 0.05);
     }
   }
   assert.equal(events.length, 1);

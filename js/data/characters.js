@@ -396,18 +396,42 @@ export const CHARACTERS = [
       speed: 2,
     },
 
-    // Every other movement stat. The top speed is Speed Power's; a Dash
-    // never changes it, it owns the horizontal speed for its own length.
+    // Every other movement stat (see Fighter.moveHorizontal). The top speed
+    // is Speed Power's; a Dash never changes it, it owns the horizontal
+    // speed for its own length.
     movement: {
-      acceleration: 2600,
-      deceleration: 3200,
-      turnBoost: 1.6,
-      airAcceleration: 1500,
-      airDeceleration: 420,
+      // Ground: from rest to top speed in about 0.1 s; letting go stops a
+      // run in under 0.09 s (about 14 units of slide), so it can stop right
+      // beside an opponent; pressing the other way brakes at acceleration x
+      // turnBoost, then accelerates: a full turn in about 0.14 s.
+      acceleration: 3400,
+      deceleration: 3800,
+      turnBoost: 2.4,
+      // Faster than top speed on the ground (the end of a Dash): the excess
+      // bleeds off at this rate, whatever is held.
+      overspeedDeceleration: 6000,
+      // Air: steering bends the drift rather than replacing it. Top speed
+      // in about 0.14 s, a turn braking at airAcceleration x airTurnBoost
+      // (a full reversal in about 13 steps, softer than the ground's), and a
+      // light drag so a running jump carries its speed.
+      airAcceleration: 2400,
+      airDeceleration: 380,
+      airTurnBoost: 1.8,
       gravityScale: 1,
       maxFallSpeed: 1500,
-      coyoteTime: 0.08,
+      // Fast fall: Down (the Charge input) held in the air while already
+      // descending speeds the fall up toward fastFallSpeed.
+      fastFallAcceleration: 7500,
+      fastFallSpeed: 1400,
+      coyoteTime: 0.1,
       jumpBuffer: 0.12,
+      // Combat input buffer: a Throw / BA1 / BA2 press the fighter cannot
+      // act on yet is kept this long and comes out on the first step it can.
+      attackBuffer: 0.12,
+      // How a hit's push or launch runs down while this fighter is stunned
+      // (ground, air): its own, apart from the movement stats above.
+      hitstunFriction: 1600,
+      hitstunAirDrag: 210,
       // Used only by the training CPU's platform drop; see Fighter.update.
       dropThroughTime: 0.28,
       // Dash: two presses of the same direction (left or right), the second
@@ -638,6 +662,12 @@ export const CHARACTERS = [
     // (createAttackDefinition). Phases are whole frames of the attack's clip,
     // so the hitbox is live only while the strike is on screen. Hitboxes face
     // right from the fighter's origin (bottom-centre) and mirror with facing.
+    // Each also says how #0001 moves through it (momentum, control,
+    // friction, a step-in) and, for the Basic Attacks, when a hit opens a
+    // follow-up (hitCancel, from the strike). Roles: BA1 the quick combo
+    // starter (the longest stun, the lightest freeze), BA2 the committed
+    // launcher (a step-in, a heavier freeze), mid-air BA1 the pursuit tool,
+    // mid-air BA2 the spike into grounded pressure, Throw spacing only.
     // Each attack's `damage` is added to the target's Launch Point first;
     // its Base Launch then multiplies that new Launch Point and its
     // Directional Launch sends the result: ground BA1 pushes sideways (1,
@@ -646,7 +676,9 @@ export const CHARACTERS = [
     // Damage and Base Launch are authored separately: neither is derived
     // from the other.
     attacks: {
-      // Frame 1 wind-up, frame 2 punch, frames 3-4 recovery.
+      // Frame 1 wind-up, frame 2 punch, frames 3-4 recovery. Keeps 0.75 of
+      // a run and slides on it (no steering, so a jab string never creeps
+      // after its target); its stun covers BA2's wind-up.
       ba1: {
         animation: 'ba1',
         startup: 1 / BA1_FPS,
@@ -656,17 +688,21 @@ export const CHARACTERS = [
         baseLaunch: 1,
         directionalLaunch: 'horizontal',
         hitbox: { x: 12, y: -64, w: 28, h: 16 },
-        hitstun: 0.22,
+        hitstun: 0.32,
         blockstun: 0.14,
-        hitstop: 0.06,
-        cooldown: 0.1,
+        hitstop: 0.05,
+        cooldown: 0.15,
         groundOnly: true,
+        momentum: 0.75,
+        friction: 0.4,
+        hitCancel: 1 / BA1_FPS,
       },
       // Frames 1-2 wind-up (kunai drawn back, then overhead), frame 3 the
       // downward kunai slash. The clip has no recovery frame, so the attack
       // ends with it; the longer cooldown makes up for the missing recovery.
       // The hitbox covers the slash arc in front of the fighter, and it
       // launches the target upward. Chosen only by action1's `air` branch.
+      // Keeps all its drift and most of the air steering, for pursuit.
       midairBa1: {
         animation: 'midairBa1',
         startup: 2 / BA1_FPS,
@@ -676,10 +712,13 @@ export const CHARACTERS = [
         baseLaunch: 2,
         directionalLaunch: 'vertical',
         hitbox: { x: 14, y: -100, w: 22, h: 80 },
-        hitstun: 0.24,
+        hitstun: 0.28,
         blockstun: 0.15,
-        hitstop: 0.07,
+        hitstop: 0.05,
         cooldown: 0.18,
+        airMomentum: 1,
+        airControl: 0.6,
+        hitCancel: 2 / BA1_FPS,
       },
       // Frames 1-3 wind-up (step in, lead jab, spin), frames 4-5 the kick
       // (low sweep rising into a high kick, both drawn with motion trails),
@@ -687,6 +726,8 @@ export const CHARACTERS = [
       // lead jab is part of the wind-up. The hitbox spans the kick's arc in
       // front of the fighter, knee height to overhead. Slower and heavier than
       // BA1, and it launches the opponent upward instead of pushing it away.
+      // Steps in on frame 1 (forward speed raised to 280: about 20 units)
+      // and keeps half a run.
       ba2: {
         animation: 'ba2',
         startup: 3 / BA2_FPS,
@@ -696,15 +737,20 @@ export const CHARACTERS = [
         baseLaunch: 2,
         directionalLaunch: 'vertical',
         hitbox: { x: 10, y: -88, w: 24, h: 78 },
-        hitstun: 0.24,
+        hitstun: 0.28,
         blockstun: 0.15,
-        hitstop: 0.07,
+        hitstop: 0.09,
         cooldown: 0.15,
         groundOnly: true,
+        momentum: 0.5,
+        friction: 0.5,
+        step: { at: 0, speed: 280 },
+        hitCancel: 3 / BA2_FPS,
       },
       // Frames 1-2 wind-up, frame 3 kick (the forward-low arc), frames 4-5
       // recovery. Drives the target hard downward. Chosen only by action2's
-      // `air` branch.
+      // `air` branch. Keeps its drift and some steering: never frozen
+      // sideways.
       midairBa2: {
         animation: 'midairBa2',
         startup: 2 / BA2_FPS,
@@ -714,15 +760,20 @@ export const CHARACTERS = [
         baseLaunch: 2,
         directionalLaunch: 'reverseVertical',
         hitbox: { x: 8, y: -44, w: 40, h: 40 },
-        hitstun: 0.22,
+        hitstun: 0.28,
         blockstun: 0.14,
-        hitstop: 0.06,
+        hitstop: 0.08,
         cooldown: 0.1,
+        airMomentum: 1,
+        airControl: 0.4,
+        hitCancel: 2 / BA2_FPS,
       },
       // Frame 1 wind-up, frame 2 release, frame 3 follow-through. No melee
       // hitbox: the damage is the shuriken's (1), released once, as the attack
       // reaches frame 2, from the throwing hand (`offset` is from the
-      // fighter's origin, facing right, and mirrors with facing).
+      // fighter's origin, facing right, and mirrors with facing). Keeps half
+      // a run and some steering, so #0001 is never rooted while he throws;
+      // no hitCancel: a spacing tool, not a combo starter.
       throw: {
         animation: 'throw',
         startup: 1 / THROW_FPS,
@@ -732,6 +783,9 @@ export const CHARACTERS = [
         projectile: { id: 'shuriken', spawnAt: 1 / THROW_FPS, offset: { x: 16, y: -38 } },
         cooldown: 0.25,
         groundOnly: true,
+        momentum: 0.5,
+        control: 0.3,
+        friction: 0.6,
       },
     },
   },

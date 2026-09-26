@@ -428,9 +428,15 @@ test('the Sphere Rush data: 1050 dash, a contact that only binds, +1 every 0.5 s
     {
       animation: 'ba2', startup: 3 / 12, active: 2 / 12, recovery: 2 / 12, damage: 10,
       hitbox: { x: 10, y: -88, w: 24, h: 78 }, baseLaunch: 2, directionalLaunch: 'vertical',
-      hitstun: 0.24, blockstun: 0.15, hitstop: 0.07, cooldown: 0.15, groundOnly: true,
+      hitstun: 0.28, blockstun: 0.15, hitstop: 0.09, cooldown: 0.15, groundOnly: true,
+      momentum: 0.5, friction: 0.5, step: { at: 0, speed: 280 }, hitCancel: 3 / 12,
     },
   );
+  // The blast is the strongest impact in the game: a longer freeze than
+  // any ordinary attack's.
+  for (const atk of Object.values(def.attacks)) {
+    assert.ok(TECH.explosionHit.hitstop > (atk.hitstop ?? 0), `the blast freezes longer than ${atk.animation}`);
+  }
 });
 
 // ---- Trigger ----------------------------------------------------------------------

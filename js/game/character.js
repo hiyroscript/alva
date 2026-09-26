@@ -120,6 +120,21 @@ export class Fighter {
     this.chargeHeldOver = false;
     this.coyote = 0;
     this.jumpBuffer = 0;
+    // Steps this fighter has lived (frozen ones included), to keep buffered
+    // presses in the order they were made: the jump's press step, and each
+    // buffered attack's.
+    this.steps = 0;
+    this.jumpPressedAt = -1;
+    // The latest Throw / BA1 / BA2 press the fighter could not act on yet
+    // ({ action, age, at }), tried again every step for
+    // movement.attackBuffer seconds (see bufferAttack), or null.
+    this.bufferedAttack = null;
+    // Down (the Charge input) is held in the air: the fast fall's (see
+    // update). Such a hold does not become a Charge on landing; it must be
+    // let go and held again.
+    this.chargeFromAir = false;
+    // Fast-falling this step: Down held in the air while descending.
+    this.fastFalling = false;
     this.lastGroundY = this.body.y;
     this.inputLocked = false;
     // The Dash in progress ({ direction, time, duration }), or null; and the
@@ -168,9 +183,15 @@ export class Fighter {
     const raw = this.controller ? this.controller.getInput(this, dt, ctx) : NEUTRAL_INPUT;
     const input = this.inputLocked ? NEUTRAL_INPUT : raw;
     const wasCharging = this.charging;
+    this.steps++;
     this.chargeReleased = false;
     this.chargeHeld = !!input.charge;
     if (!this.chargeHeld) this.chargeHeldOver = false;
+    // Down held in the air is the fast fall's, never a Charge waiting for
+    // the ground: it has to be let go and held again there.
+    if (!this.chargeHeld) this.chargeFromAir = false;
+    else if (!body.grounded) this.chargeFromAir = true;
+    this.fastFalling = false;
 
     combat.update(dt);
     // Charged cooldowns recover by this step first, so one started below
@@ -183,6 +204,11 @@ export class Fighter {
     // normally ends it on the hit itself), and over a Dash, as does a bind.
     if (this.technique && combat.stun > 0) this.endTechnique('hit');
     if (this.dash && (combat.stun > 0 || combat.immobilized)) this.endDash();
+    // A hit (or a bind) takes the fighter out of its own attack: nothing of
+    // it is left to strike, release a projectile or recover from. Checked
+    // here, on the fighter's next step, so two attacks that connect on the
+    // same step still trade.
+    if (combat.attack && (combat.stun > 0 || combat.immobilized)) combat.interruptAttack();
     // ---- Projectile release ----------------------------------------------
     // The attack crossed its release point this step: queue one projectile,
     // aimed where the fighter faces now. Its direction never changes after.
@@ -190,11 +216,19 @@ export class Fighter {
       this.releases.push({ id: combat.release.id, offset: combat.release.offset, direction: this.facing });
       combat.release = null;
     }
+    // Jump presses count from the step they are made, the freeze included.
+    if (input.jumpPressed) {
+      this.jumpBuffer = mv.jumpBuffer;
+      this.jumpPressedAt = this.steps;
+    }
     if (combat.hitstop > 0) {
       // Impact freeze: nothing moves or advances, but a fresh hit still
       // switches to the hurt pose so the freeze holds the reaction (and a
       // blocked one keeps the Shield up). Energy keeps refilling, at the
-      // normal rate (a frozen fighter is not in its Charge stance).
+      // normal rate (a frozen fighter is not in its Charge stance). Presses
+      // made during it are kept, not lost, and do not age: the attack
+      // pressed through the impact comes out as soon as it can.
+      for (const action of COMBAT_ACTIONS) if (input[`${action}Pressed`]) this.bufferAttack(action);
       combat.updateEnergy(dt, false);
       this.updateState(0);
       return;
@@ -215,6 +249,10 @@ export class Fighter {
     // while it is held. Let go of Defense to do any of them.
     const shieldHeld = !!input.defense && this.shieldAllowed();
 
+    // The held direction: what steering, a turning attack and a cut-short
+    // attack all read.
+    const held = (input.right ? 1 : 0) - (input.left ? 1 : 0);
+
     // ---- Combat intents --------------------------------------------------
     // Actions mapped to null are wired but reserved (see tryAction). A press
     // while already Charging (since an earlier step) with Charge still held
@@ -222,11 +260,46 @@ export class Fighter {
     // one still cooling down, consumes the press; otherwise the normal
     // attack gets it. Letting go of Charge on the press step, or pressing it
     // with a fresh Charge, is a normal attack.
+    //
+    // A press the fighter cannot act on yet (an attack or its recovery, a
+    // stun, a Dash, a cooldown, Defense held for its Shield) is buffered
+    // (see bufferAttack) and tried again every later step until it starts
+    // or expires, so an attack pressed slightly early comes out on the
+    // first step it can. A newer press replaces it. Only ever an ordinary
+    // attack: a charged action needs its own press, while Charging.
+    //
+    // Buffered presses keep their order: a jump pressed before the attack
+    // (both waiting on the same recovery) goes first, and the attack comes
+    // out on a later step, in the air. Pressed on the same step, the attack
+    // goes first, on the ground.
     const charged = wasCharging && !!input.charge;
+    const jumpFirst = (at) =>
+      this.jumpBuffer > 0 && this.coyote > 0 && this.jumpPressedAt < at && this.canFollowUp() && !shieldHeld;
+    let started = false;
     for (const action of COMBAT_ACTIONS) {
-      if (!input[`${action}Pressed`] || shieldHeld) continue;
-      if (charged && this.tryChargedAction(action)) continue;
-      this.tryAction(action);
+      if (!input[`${action}Pressed`]) continue;
+      if (shieldHeld || jumpFirst(this.steps)) {
+        this.bufferAttack(action);
+        continue;
+      }
+      if (charged && this.tryChargedAction(action)) {
+        this.bufferedAttack = null;
+        started = true;
+        continue;
+      }
+      if (this.tryAction(action, held)) {
+        this.bufferedAttack = null;
+        started = true;
+      } else if (!started) {
+        // Not a press that lost to another made on this same step.
+        this.bufferAttack(action);
+      }
+    }
+    const waiting = this.bufferedAttack;
+    if (!started && waiting && waiting.at < this.steps && !shieldHeld && !jumpFirst(waiting.at)) {
+      const { action } = waiting;
+      if (this.tryAction(action, held)) this.bufferedAttack = null;
+      else if (!this.attackMayStart(action)) this.bufferedAttack = null;
     }
 
     // ---- Dash: a double tap of left or right -----------------------------
@@ -266,8 +339,9 @@ export class Fighter {
     // The held value alone decides it: no toggle or buffer, so the step that
     // sees Charge released ends it. A held Shield outranks it. After a
     // charged technique, a Charge held since before it must be let go and
-    // held again.
-    this.charging = canAct && body.grounded && !!input.charge && !combat.shielding && !this.chargeHeldOver;
+    // held again, and so must one held down from the air (the fast fall).
+    this.charging =
+      canAct && body.grounded && !!input.charge && !combat.shielding && !this.chargeHeldOver && !this.chargeFromAir;
 
     // ---- Platform drop (training CPU only) -------------------------------
     // No player key, button or touch control produces `dropPressed`; the
@@ -277,51 +351,68 @@ export class Fighter {
     }
 
     // ---- Horizontal movement ---------------------------------------------
-    // A Shield locks it: no walking or running on the ground, no steering in
-    // the air, and the current velocity slows under the normal deceleration
-    // (in the air, the gentle air drag, so momentum carries on and gravity
-    // still pulls). A charged technique sets the speed itself (still, or its
-    // fixed rush), and a bound fighter is held in place; gravity still
-    // applies to both. A Dash holds its own burst speed, whatever is held,
-    // until it ends; then the normal acceleration takes over from that speed.
-    let dir = (input.right ? 1 : 0) - (input.left ? 1 : 0);
-    const locked =
-      combat.shielding || this.charging || combat.stun > 0 ||
-      (combat.attack && combat.attack.def.lockMovement) || combat.immobilized || !!this.technique || !!this.dash;
-    if (locked) dir = 0;
-    this.moveDir = dir;
+    // See moveHorizontal, and moveAttack while an attack plays.
+    const atk = combat.attack;
+    let dir = held;
+    if (combat.shielding || this.charging || combat.stun > 0 || combat.immobilized || this.technique || this.dash) dir = 0;
+    // Normal locomotion only: an attack steers with its own share of it.
+    this.moveDir = atk?.def.lockMovement ? 0 : dir;
 
-    const accel = body.grounded ? mv.acceleration : mv.airAcceleration;
-    const decel = body.grounded ? mv.deceleration : mv.airDeceleration;
     if (this.technique) {
       body.vx = this.technique.velocityX;
     } else if (combat.immobilized) {
       body.vx = 0;
     } else if (combat.stun > 0) {
-      body.vx = approach(body.vx, 0, decel * 0.5 * dt);
+      // Launched or pushed: the speed runs down at the fighter's own hitstun
+      // rates, whatever is held.
+      const drag = body.grounded ? mv.hitstunFriction ?? mv.deceleration * 0.5 : mv.hitstunAirDrag ?? mv.airDeceleration * 0.5;
+      body.vx = approach(body.vx, 0, drag * dt);
     } else if (this.dash) {
-      body.vx = this.dash.direction * this.def.movement.dashSpeed;
-    } else if (dir !== 0) {
-      const turning = body.vx !== 0 && sign(body.vx) !== dir;
-      body.vx = approach(body.vx, dir * this.maxSpeed, accel * (turning ? mv.turnBoost : 1) * dt);
+      body.vx = this.dash.direction * mv.dashSpeed;
+    } else if (combat.shielding || this.charging) {
+      // A Shield or Charge locks it: no walking or running on the ground,
+      // no steering in the air; the current speed runs down under the normal
+      // deceleration (the gentle air drag in the air, so momentum carries on).
+      this.moveHorizontal(0, 0, 1, dt);
+    } else if (atk?.def.lockMovement) {
+      this.moveAttack(atk, dir, dt);
     } else {
-      body.vx = approach(body.vx, 0, decel * dt);
+      this.moveHorizontal(dir, 1, 1, dt);
     }
 
     // ---- Jump (buffered + coyote time) -----------------------------------
-    if (input.jumpPressed) this.jumpBuffer = mv.jumpBuffer;
-    else this.jumpBuffer = Math.max(0, this.jumpBuffer - dt);
+    // The press itself was taken in above (the freeze included); it counts
+    // down on every step after it.
+    if (!input.jumpPressed) this.jumpBuffer = Math.max(0, this.jumpBuffer - dt);
     if (body.grounded) this.coyote = mv.coyoteTime;
     else this.coyote = Math.max(0, this.coyote - dt);
 
-    // A held Shield outranks a jump: let go of Defense to jump.
-    if (this.jumpBuffer > 0 && this.coyote > 0 && canAct && !combat.shielding) {
+    // A held Shield outranks a jump: let go of Defense to jump. A jump may
+    // also cut short an attack that hit (see CombatState.cancellable). It
+    // only sets the upward speed: whatever horizontal speed the fighter has
+    // carries straight into the air.
+    if (this.jumpBuffer > 0 && this.coyote > 0 && (canAct || combat.cancellable) && !combat.shielding) {
+      this.cutAttack();
       body.vy = -this.jumpVelocity;
       body.grounded = false;
       body.ground = null;
       this.coyote = 0;
       this.jumpBuffer = 0;
       this.charging = false;
+    }
+
+    // ---- Fast fall ---------------------------------------------------------
+    // Down (the Charge input) held in the air while already descending
+    // speeds the fall up toward movement.fastFallSpeed at
+    // fastFallAcceleration: never while rising, never a jump in speed, and
+    // never slower than the fall already is. Aerial attacks may fast-fall;
+    // a stun, a bind or an air Shield may not.
+    if (
+      !body.grounded && input.charge && body.vy > 0 && mv.fastFallSpeed > 0 &&
+      combat.stun <= 0 && !combat.immobilized && !combat.shielding && !this.technique
+    ) {
+      this.fastFalling = true;
+      if (body.vy < mv.fastFallSpeed) body.vy = Math.min(mv.fastFallSpeed, body.vy + mv.fastFallAcceleration * dt);
     }
 
     // ---- Voluntary Charge release ----------------------------------------
@@ -361,8 +452,101 @@ export class Fighter {
     // charged technique or a Charge held through one).
     if (!spent) combat.updateEnergy(dt, this.charging);
 
+    // A buffered press ages only on steps the fighter lives through (never
+    // in a freeze) and is gone once it is older than the buffer.
+    if (this.bufferedAttack) {
+      this.bufferedAttack.age += dt;
+      if (this.bufferedAttack.age > (mv.attackBuffer ?? 0) + TIME_EPSILON) this.bufferedAttack = null;
+    }
+
     this.updateFacing(dir);
     this.updateState(dt);
+  }
+
+  // One step of horizontal steering on whatever the fighter stands on (or
+  // in the air), with `control` (0-1) of its normal steering: that share of
+  // its acceleration and top speed. `friction` scales the ground
+  // deceleration that slows it while it is not steering.
+  //
+  // Ground: from rest to top speed at `acceleration`; letting go stops it at
+  // `deceleration`; pressing against the way it moves brakes at
+  // acceleration x `turnBoost` until that way is spent, then accelerates the
+  // new way, so a turn is quick but never a jump from one full speed to the
+  // other. Faster than top speed (a Dash's burst, run down after it ends)
+  // the excess bleeds off at `overspeedDeceleration`, whatever is held.
+  // Air: the same shape with `airAcceleration`, `airTurnBoost` and the
+  // gentle `airDeceleration` drag, so steering bends the drift instead of
+  // replacing it. Holding the way it already moves never slows the fighter
+  // beyond the drag, however fast it goes.
+  moveHorizontal(dir, control, friction, dt) {
+    const { body } = this;
+    const mv = this.def.movement;
+    const grounded = body.grounded;
+    const v = body.vx;
+    const top = this.maxSpeed * control;
+    const accel = (grounded ? mv.acceleration : mv.airAcceleration) * control;
+    const boost = grounded ? mv.turnBoost : mv.airTurnBoost ?? mv.turnBoost;
+    let drag = grounded ? mv.deceleration * friction : mv.airDeceleration;
+    if (grounded && Math.abs(v) > this.maxSpeed + TIME_EPSILON) drag = Math.max(drag, mv.overspeedDeceleration ?? 0);
+    if (!dir || control <= 0) {
+      body.vx = approach(v, 0, drag * dt);
+    } else if (v !== 0 && sign(v) !== dir) {
+      // Reversing: brake hard (never softer than letting go), then whatever
+      // is left of this step accelerates the new way.
+      const brake = Math.max(accel * boost, drag) * dt;
+      body.vx = brake <= Math.abs(v) ? v + dir * brake : dir * Math.min(top, Math.min(brake - Math.abs(v), accel * dt));
+    } else if (Math.abs(v) > top) {
+      body.vx = approach(v, dir * top, drag * dt);
+    } else {
+      body.vx = approach(v, dir * top, accel * dt);
+    }
+  }
+
+  // One step of an attack's own movement (see the attack fields in
+  // js/game/combat.js): its step-in once its time reaches it, then steering
+  // with the attack's share of control (none by default) over the speed it
+  // started with, the rest running down under its friction.
+  moveAttack(atk, dir, dt) {
+    const { body } = this;
+    const def = atk.def;
+    const step = def.step;
+    if (step && !atk.stepped && atk.time >= step.at - TIME_EPSILON) {
+      atk.stepped = true;
+      if (body.grounded && body.vx * this.facing < step.speed) body.vx = this.facing * step.speed;
+    }
+    const grounded = body.grounded;
+    this.moveHorizontal(dir, grounded ? def.control : def.airControl, grounded ? def.friction : 1, dt);
+  }
+
+  // The horizontal speed an attack starting now keeps of `vx`: its momentum
+  // share (airMomentum in the air), and on the ground never more than the
+  // fighter's top speed, so a Dash's burst never becomes a lunge.
+  attackStartSpeed(atk, vx, grounded) {
+    if (!atk.lockMovement) return vx;
+    if (!grounded) return vx * atk.airMomentum;
+    const kept = vx * atk.momentum;
+    return clamp(kept, -this.maxSpeed * atk.momentum, this.maxSpeed * atk.momentum);
+  }
+
+  // Remembers `action`'s press for the combat input buffer: the latest
+  // press that may start at all (see attackMayStart) wins, starting its own
+  // movement.attackBuffer seconds. Any other press leaves the buffer as it
+  // is.
+  bufferAttack(action) {
+    if (!(this.def.movement.attackBuffer > 0) || !this.attackMayStart(action)) return;
+    this.bufferedAttack = { action, age: 0, at: this.steps };
+  }
+
+  // Cuts the attack in progress short, if it may be (see
+  // CombatState.cancellable): another attack or a jump is starting.
+  cutAttack() {
+    if (this.combat.cancellable) this.combat.endAttack();
+  }
+
+  // Free to start an attack or a jump: free to act, or in an attack that
+  // hit and may now be cut short (see CombatState.cancellable).
+  canFollowUp() {
+    return this.canAct() || (this.combat.cancellable && !this.technique && !this.dash);
   }
 
   // Free to start something new: the combat state allows it (no attack,
@@ -535,13 +719,22 @@ export class Fighter {
     this.updateState(0);
   }
 
-  tryAction(action) {
+  // Starts the attack mapped to `action`, if it can start now. `dir` is the
+  // direction held on this step: an attack faces it as it starts (so a
+  // turn made on the press step is never stale), and otherwise keeps the
+  // fighter's facing, fixed from then until it ends. Starting it cuts short
+  // an attack that may be (its hit confirmed; see CombatState.cancellable),
+  // though never into itself while its own cooldown would still run.
+  tryAction(action, dir = 0) {
     const combat = this.combat;
     combat.lastIntent = action;
     const attackId = this.attackFor(action);
     if (!attackId) return false; // reserved: wired, but no attack mapped
     const atk = this.attacks[attackId];
-    if (!atk || !this.canAct() || combat.cooldowns.has(attackId)) return false;
+    if (!atk || !this.canFollowUp() || combat.cooldowns.has(attackId)) return false;
+    // Into itself only once its own cooldown would be over, counted from
+    // when it became cancellable.
+    if (combat.attack?.def.id === attackId && combat.cancellableFor < atk.cooldown - TIME_EPSILON) return false;
     if (atk.groundOnly && !this.body.grounded) return false;
     // Never fake an attack pose: require real frames for the attack.
     if (!atk.animation || !this.sprites.has(atk.animation)) {
@@ -556,8 +749,23 @@ export class Fighter {
         return false;
       }
     }
-    combat.attack = { def: atk, time: 0, hasHit: false, projectileSpawned: false };
+    this.cutAttack();
+    if (dir) this.facing = dir;
+    this.body.vx = this.attackStartSpeed(atk, this.body.vx, this.body.grounded);
+    combat.attack = { def: atk, time: 0, hasHit: false, confirmed: false, projectileSpawned: false, stepped: false };
     return true;
+  }
+
+  // Whether a press of `action` that could not start now may still start
+  // once the fighter is free (the combat input buffer keeps only those): it
+  // maps to an attack for where the fighter is, and that attack could start
+  // here at all (on the ground if ground-only, with its art). Never a
+  // reserved button, an air Throw or an attack without frames.
+  attackMayStart(action) {
+    const attackId = this.attackFor(action);
+    const atk = attackId ? this.attacks[attackId] : null;
+    if (!atk || (atk.groundOnly && !this.body.grounded)) return false;
+    return !!atk.animation && this.sprites.has(atk.animation);
   }
 
   // Attack id for a controller action. The character's `actions` entry is a
@@ -571,7 +779,8 @@ export class Fighter {
 
   // Facing follows only the fighter's own movement: the way it is running
   // (once past a small speed on the ground, so a turn does not flicker) or
-  // steering in the air. A Dash sets it as it starts (tryDash); a spawn or
+  // steering in the air. A Dash sets it as it starts (tryDash), and so does
+  // an attack started with a direction held (tryAction); a spawn or
   // respawn takes the spawn's. Otherwise it keeps its last facing: it never
   // turns toward its opponent by itself, standing still included, so an
   // opponent crossing behind it stays behind it. Locked while an attack,
