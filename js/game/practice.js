@@ -44,7 +44,7 @@ const DAMAGE_FADE = 0.45;
 const DAMAGE_STACK = 0.2;
 const DAMAGE_COLOR = '#ff3434';
 
-// "+5", "+15", "+2.5": the Launch Point a hit added, with no float noise.
+// "+5", "+10", "+2.5": the Launch Point a hit added, with no float noise.
 export function formatDamage(damage) {
   return `+${Number(damage.toFixed(2))}`;
 }

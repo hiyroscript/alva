@@ -39,13 +39,13 @@ const BA1_LAUNCH = {
 // (hitCancel, from their strike).
 const BA1_ENTRIES = {
   ba1: {
-    animation: 'ba1', startup: 1 / 12, active: 1 / 12, recovery: 2 / 12, damage: 5,
+    animation: 'ba1', startup: 1 / 12, active: 1 / 12, recovery: 2 / 12, damage: 3,
     hitbox: { x: 12, y: -64, w: 28, h: 16 }, ...BA1_LAUNCH.ba1,
     hitstun: 0.32, blockstun: 0.14, hitstop: 0.05, cooldown: 0.15, groundOnly: true,
     momentum: 0.75, friction: 0.4, hitCancel: 1 / 12,
   },
   midairBa1: {
-    animation: 'midairBa1', startup: 2 / 12, active: 1 / 12, recovery: 0, damage: 5,
+    animation: 'midairBa1', startup: 2 / 12, active: 1 / 12, recovery: 0, damage: 3,
     hitbox: { x: 14, y: -100, w: 22, h: 80 }, ...BA1_LAUNCH.midairBa1,
     hitstun: 0.32, blockstun: 0.15, hitstop: 0.05, cooldown: 0.16,
     airMomentum: 1, airControl: 0.85, hitCancel: 2 / 12,
@@ -93,7 +93,7 @@ test('BA1 attack definitions match their clips: the ground punch and the mid-air
   assert.equal(def.animations.ba1.frames.length, 4);
   assert.deepEqual([g.startup, g.active, g.recovery], [1 / 12, 1 / 12, 2 / 12]);
   assert.equal(g.groundOnly, true);
-  assert.equal(g.damage, 5, 'adds 5 Launch Point');
+  assert.equal(g.damage, 3, 'adds 3 Launch Point');
   assert.deepEqual([g.hitstun, g.blockstun, g.hitstop, g.cooldown], [0.32, 0.14, 0.05, 0.15]);
   // A combo starter: once it hits it may be cut short from its strike, and
   // its stun outlasts that (with room for BA2's wind-up); its freeze is
@@ -111,7 +111,7 @@ test('BA1 attack definitions match their clips: the ground punch and the mid-air
   assert.equal(def.animations.midairBa1.frames.length, 3);
   assert.deepEqual([a.startup, a.active, a.recovery], [2 / 12, 1 / 12, 0]);
   assert.equal(a.groundOnly, false);
-  assert.equal(a.damage, 5, 'adds 5 Launch Point');
+  assert.equal(a.damage, 3, 'adds 3 Launch Point');
   assert.deepEqual([a.hitstun, a.blockstun, a.hitstop, a.cooldown], [0.32, 0.15, 0.05, 0.16]);
   assert.equal(a.hitCancel, a.startup, 'a follow-up from its slash on');
   assert.ok(a.hitbox.x + a.hitbox.w > def.collider.width / 2 && a.hitbox.x + a.hitbox.w <= 40, 'midairBa1 hitbox reach');
@@ -127,11 +127,11 @@ test('BA1\'s launch is exactly its declared Base Launch and Directional Launch, 
     const source = def.attacks[id];
     assert.equal('powers' in source, false, `${id} declares no Powers`);
     // The same entry with any other legal Base Launch keeps that one: it is
-    // authored, not inferred from the 5 damage (which never changes).
+    // authored, not inferred from the 3 damage (which never changes).
     for (const baseLaunch of [0, 1, 2, 3]) {
       const atk = createAttackDefinition({ id, ...source, baseLaunch });
       assert.equal(atk.baseLaunch, baseLaunch, `${id} at Base Launch ${baseLaunch}`);
-      assert.equal(atk.damage, 5);
+      assert.equal(atk.damage, 3);
       assert.equal(atk.directionalLaunch, source.directionalLaunch);
     }
     // Everything about BA1 is its entry's own.
@@ -380,20 +380,20 @@ test('ground BA1 hits an opponent in front during the active phase only', () => 
   assert.equal(events.length, 1, 'one hit per attack');
   assert.equal(events[0].type, 'hit');
   assert.equal(events[0].attacker, attacker);
-  assert.equal(events[0].damage, 5);
-  assert.equal(target.combat.launchPoint, 5, '0 + 5');
+  assert.equal(events[0].damage, 3);
+  assert.equal(target.combat.launchPoint, 3, '0 + 3');
   assert.equal(hitPhase, 'active');
 });
 
-test('a ground BA1 hit adds its 5 first, then pushes the target sideways at 1 x its new Launch Point: 115 + 5 = 120, a strength of 120, with no launch', () => {
+test('a ground BA1 hit adds its 3 first, then pushes the target sideways at 1 x its new Launch Point: 117 + 3 = 120, a strength of 120, with no launch', () => {
   for (const facing of [1, -1]) {
     const { attacker, target, tick, events } = duel({ attackerFacing: facing });
-    target.combat.launchPoint = 115;
+    target.combat.launchPoint = 117;
     tick(BA1);
     while (!events.length) tick();
     // At impact, before the target's next step: CombatSystem.applyHit set it.
     assert.equal(target.combat.launchPoint, 120);
-    assert.equal(events[0].launchStrength, 120, '1 x 120, not 1 x 115');
+    assert.equal(events[0].launchStrength, 120, '1 x 120, not 1 x 117');
     assert.equal(target.body.vx, 120 * U * facing, 'away from the attacker, at the strength\'s speed');
     assert.equal(target.body.vy, 0);
     assert.equal(target.grounded, true, 'BA1 never launches upward');
@@ -488,14 +488,14 @@ test('mid-air BA1 hits a grounded opponent below and in front while still airbor
   }
   assert.equal(events.length, 1);
   assert.equal(airborneAtHit, true);
-  assert.equal(events[0].damage, 5);
-  assert.equal(target.combat.launchPoint, 5);
+  assert.equal(events[0].damage, 3);
+  assert.equal(target.combat.launchPoint, 3);
 });
 
-test('a mid-air BA1 hit adds its 5 first, then launches a grounded target straight up at 2 x its new Launch Point: 115 + 5 = 120, a strength of 240', () => {
+test('a mid-air BA1 hit adds its 3 first, then launches a grounded target straight up at 2 x its new Launch Point: 117 + 3 = 120, a strength of 240', () => {
   for (const facing of [1, -1]) {
     const { attacker, target, tick, until, events } = midairBa1Duel({ attackerFacing: facing });
-    target.combat.launchPoint = 115;
+    target.combat.launchPoint = 117;
     const floor = target.body.y;
     const startX = target.body.x;
     while (!events.length) tick();
@@ -520,14 +520,14 @@ test('a mid-air BA1 hit adds its 5 first, then launches a grounded target straig
   }
 });
 
-test('from the same Launch Point, mid-air BA1 launches less high than ground BA2: both Base Launch 2 upward, BA1 adds 5 and BA2 adds 10', () => {
+test('from the same Launch Point, mid-air BA1 launches less high than ground BA2: both Base Launch 2 upward, BA1 adds 3 and BA2 adds 5', () => {
   // Highest point a grounded target at 110 reaches after the hit.
   const peak = (air) => {
     const d = air ? midairBa1Duel() : duel();
     d.target.combat.launchPoint = 110;
     if (!air) d.tick(BA2);
     while (!d.events.length) d.tick();
-    assert.equal(d.events[0].launchStrength, air ? 2 * 115 : 2 * 120);
+    assert.equal(d.events[0].launchStrength, air ? 2 * 113 : 2 * 115);
     const floor = d.target.body.y;
     let top = floor;
     d.until(() => {

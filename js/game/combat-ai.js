@@ -739,7 +739,7 @@ export class CombatAIController {
   // Point it leaves, more when it sends the opponent toward a near edge.
   hitValue(hit, s, face) {
     const lp = s.foeLP + (hit.damage ?? 0);
-    let v = (hit.damage ?? 0) / 10 + ((hit.baseLaunch ?? 0) * lp) / 60;
+    let v = (hit.damage ?? 0) / 6 + ((hit.baseLaunch ?? 0) * lp) / 60;
     if (hit.directionalLaunch === 'horizontal') {
       const f = s.stage.floor;
       const room = face > 0 ? f.x + f.w - s.foe.body.x : s.foe.body.x - f.x;

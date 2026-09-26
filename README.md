@@ -140,7 +140,7 @@ out twice quickly is a double tap too, as with a gamepad stick.
   hit gives it back. A harder launch **stuns longer** (0.2 s more per 1000
   units/s, at most 0.7 s more), and a hard one sets the fighter
   **tumbling** in its mid-air hurt pose until it acts or lands, so with the
-  air jump a juggle can reach three hits around 30–40 Launch Point. Hold a
+  air jump a juggle can reach three hits around 35–45 Launch Point. Hold a
   direction as you are hit to **steer your launch** up to 15 degrees that
   way (never its strength). A launch that slams its fighter hard into a
   wall, the floor or a ceiling **rebounds** off it (see
@@ -158,12 +158,12 @@ out twice quickly is a double tap too, as with a gamepad stick.
 - **Basic Attack 1 (BA1):** a punch on the ground, a kunai slash in the
   air. The same button picks the move from whether #0001 is grounded when
   you press it; a mid-air BA1 that lands keeps playing to the end. Both deal
-  5 damage. The punch pushes the opponent away (Base Launch 1, horizontal);
+  3 damage. The punch pushes the opponent away (Base Launch 1, horizontal);
   the mid-air slash launches it upward instead, with no sideways push (Base
   Launch 2, vertical). A Shielded slash does not launch. Internally this is
   the `action1` input.
 - **Basic Attack 2 (BA2):** a slower, heavier spinning high kick on the
-  ground, an airborne kick in the air. Both deal 10 damage. The ground kick
+  ground, an airborne kick in the air. Both deal 5 damage. The ground kick
   launches the opponent upward (Base Launch 2, vertical); the mid-air kick
   drives it downward just as hard (Base Launch 2, reverse vertical), with no
   sideways push.
@@ -277,7 +277,7 @@ out twice quickly is a double tap too, as with a gamepad stick.
   the press is an ordinary BA1 and no cooldown starts.
   The clone appears on the opponent's back side, facing it, at the spot where
   the opponent stood when you pressed BA1; it never follows, so an opponent
-  who moves away makes it miss. Its punch is BA1's (5 damage, same hitbox
+  who moves away makes it miss. Its punch is BA1's (3 damage, same hitbox
   and hitstun, Base Launch 1 horizontal, pushing the opponent away from the
   clone), hits
   once, and a Shield blocks it like any attack. If
@@ -285,7 +285,7 @@ out twice quickly is a double tap too, as with a gamepad stick.
   platform's edge or a ledge with its back to the drop, or it is in the
   air), the clone
   appears over the opponent instead and performs #0001's Mid-air BA2 kick
-  (10 damage, Base Launch 2 reverse vertical, driving the opponent
+  (5 damage, Base Launch 2 reverse vertical, driving the opponent
   downward); same cloud, same cooldown. The
   impact freezes the opponent and the clone, never #0001. The clone cannot be
   hit, blocks nobody and is not followed by the camera. Once summoned it
@@ -298,7 +298,7 @@ out twice quickly is a double tap too, as with a gamepad stick.
   the spinning sphere, adding 1 Launch Point at once and then every half
   second, with no launch, while the sphere keeps growing, until it explodes
   two seconds later
-  for 15 more and a sideways launch at Base Launch 3 (three times the
+  for 10 more and a sideways launch at Base Launch 3 (three times the
   opponent's new Launch Point); #0001 then recovers. The entire technique
   requires ground beneath #0001; losing ground cancels it and makes him
   fall. Starting it spends its 5-second cooldown, whether it then hits,
@@ -323,10 +323,10 @@ out twice quickly is a double tap too, as with a gamepad stick.
   0.5, 1.0 and 1.5 s after the hit, counted on the fixed-step clock, with no
   launch, stun or freeze. Exactly 2 s after the hit it explodes (`prasen10 → prasen11`,
   once) with #0001 on `rasen9`, the explosion pose: the opponent is
-  released, then takes 15 (19 in all: 4 ticks and the blast; the explosion
+  released, then takes 10 (14 in all: 4 ticks and the blast; the explosion
   is never also a tick) and is launched sideways, away from #0001, at Base
-  Launch 3: the 15 is added first, then the new Launch Point is tripled
-  (from 0, 4 + 15 = 19 and 3 × 19 = 57; from 106, 106 + 15 = 121 and
+  Launch 3: the 10 is added first, then the new Launch Point is tripled
+  (from 0, 4 + 10 = 14 and 3 × 14 = 42; from 111, 111 + 10 = 121 and
   3 × 121 = 363). It is the technique's only launching hit and uses
   the same shared launch as every other hit. Only once the blast is over does
   #0001 recover through `rasen10 → rasen11 → rasen12`. A Shield blocks the
@@ -338,8 +338,8 @@ out twice quickly is a double tap too, as with a gamepad stick.
   BA2.
 - **Launch Point:** every fighter's own number, shown under its name in the
   HUD. It starts at 0 on every fresh life and every hit adds exactly the
-  damage it deals: BA1 5, mid-air BA1 5, BA2 10, mid-air BA2 10, the
-  shuriken 1, the Sphere Rush 1 per tick and 15 on the blast (a Shielded
+  damage it deals: BA1 3, mid-air BA1 3, BA2 5, mid-air BA2 5, the
+  shuriken 1, the Sphere Rush 1 per tick and 10 on the blast (a Shielded
   hit adds nothing). It has no maximum and no % sign, never goes
   below 0 and resets to 0 when the fighter respawns. Each hit then launches
   with its **Base Launch** (0, 1, 2 or 3) times the target's new Launch
@@ -372,7 +372,7 @@ Touch controls show on touch-first devices (coarse pointer, or a touch actually 
 - **Characters:** #0001
 - **Maps:** Desert (a sandstone mesa with 2 rock outcrops, 1360 units wide) and City (a rooftop with 7 one-way platforms and a stair bulkhead, 1440 wide) for Quick Battle and Watch Mode; the Practice Ground training room (one flat training block, 1280 wide) for practice. Each is a compact main stage with open air past both ledges and the Void a short way beyond (see [Stages and the Void](#stages-and-the-void))
 - **Animations:** Idle, Run, Jump, Fall, Land (jump/fall play while airborne; land plays once on touchdown), Hurt and Mid-air Hurt (shown during hitstun on the ground / in the air), Basic Attack 1 (4 frames), Mid-air Basic Attack 1 (the kunai slash, 3 frames: `0001_midair1ba1`–`3`), Basic Attack 2 (7 frames) and Mid-air Basic Attack 2 (the airborne kick, 5 frames: `0001_midair2ba1`–`5`), each played once at 12 fps, Shield (`0001_prepshield` to raise it, `0001_shielding` held, `0001_releaseblock` to lower it) and Mid-air Shield (`0001_midairshielding`, the held pose only), single frames drawn at 1×, Dash (`0001_dash1`–`2`, drawn at 1×, played once at 10 fps), Charge (charge1 → charge2 once, then chargea ↔ chargeb while held, at 10 fps, with charge1 shown briefly on release), Throw (3 fighter frames, played once at 12 fps), Shuriken (3 looping projectile frames at 18 fps, normalized and drawn separately from the fighter poses), the clone appear / vanish cloud (`0001_cloneav1`–`0001_cloneav10`, an effect at 20 fps: forwards as a clone appears, the same frames in reverse as it vanishes), the Sphere Rush poses (`0001_rasen1`–`0001_rasen12` as one-shot fighter clips at 12 fps: formation 1–3, rush 4–6, contact 7–8 with 8 held, explosion 9, recovery 10–12, and 12 alone as the whiff release) and its blue sphere (`0001_prasen1`–`0001_prasen11` as three effects at 12 fps: formation 1–6 once, spinning on the opponent 7–9 looped while it is drawn ever larger, explosion 10–11 once)
-- **Attacks:** Basic Attack 1 and Basic Attack 2, each on the ground and in the air, a ground Throw that releases one shuriken, the Charged BA1 Clone Attack and the Charged BA2 Sphere Rush (ground only), each on its own 5-second cooldown. #0001's damage: BA1 5, mid-air BA1 5, BA2 10, mid-air BA2 10, shuriken 1, Sphere Rush 1 as it catches the opponent and every 0.5 s after while it holds it (4 in all), then 15 on the explosion. Special is reserved.
+- **Attacks:** Basic Attack 1 and Basic Attack 2, each on the ground and in the air, a ground Throw that releases one shuriken, the Charged BA1 Clone Attack and the Charged BA2 Sphere Rush (ground only), each on its own 5-second cooldown. #0001's damage: BA1 3, mid-air BA1 3, BA2 5, mid-air BA2 5, shuriken 1, Sphere Rush 1 as it catches the opponent and every 0.5 s after while it holds it (4 in all), then 10 on the explosion. Special is reserved.
 - **Defense:** #0001 shields, on the ground and in the air: held, full circle, free to hold, 25 Energy for each hit it blocks.
 - **Movement:** running, jumping (a short hop on a tap, one air jump), air steering, the fast fall and a grounded Dash on a double tap (15 Energy); attacks keep and add their own momentum, early presses are buffered, and a hit opens a follow-up, a Dash cancel included (see Controls above).
 - **Powers:** Jump Power and Speed Power, each in three tiers. #0001 has Jump Power 2 and Speed Power 2 (its original jump and speed).
@@ -435,7 +435,7 @@ ring with dark separation keep states identifiable beyond colour.
   Quick Battle's without the score dots; the Practice menu and the Change
   Fighter and CPU dialogs are translucent glass over the paused stage. The
   Launch Point each hit adds to the practice CPU floats over its head in red
-  (`+5`).
+  (`+3`).
 - **Other screens** retain their established layouts, controls and navigation;
   only interface colours change. Battle keeps readable dark translucent chrome.
 - Character sprites and stage artwork keep their original colours. No artwork,
@@ -653,7 +653,7 @@ choose Return.
   charges or defends, but it takes real hits, hitstun, launches and binds,
   so clones, shurikens, BA1 / BA2 and the Sphere Rush all land on it. Its
   Launch Point builds up (and launching hits send it further) like anyone's.
-  Each hit floats the Launch Point it added (`+5`, `+1` for each Sphere Rush tick, `+15`
+  Each hit floats the Launch Point it added (`+3`, `+1` for each Sphere Rush tick, `+10`
   for the blast) in red over its head for under a second, straight from the
   combat system's resolved hit. Change CPU swaps it for
   another fighter; **Disable CPU**, beside Back in that dialog, removes it
@@ -703,16 +703,16 @@ Melee, projectiles, summoned clones and charged techniques all resolve through t
 
 | Hit | Damage | Base Launch | Directional Launch |
 | --- | --- | --- | --- |
-| BA1 (ground punch) | 5 | 1 | horizontal |
-| BA2 (ground spinning kick) | 10 | 2 | vertical |
-| Mid-air BA1 (kunai slash) | 5 | 2 | vertical |
-| Mid-air BA2 (airborne kick) | 10 | 2 | reverse vertical |
+| BA1 (ground punch) | 3 | 1 | horizontal |
+| BA2 (ground spinning kick) | 5 | 2 | vertical |
+| Mid-air BA1 (kunai slash) | 3 | 2 | vertical |
+| Mid-air BA2 (airborne kick) | 5 | 2 | reverse vertical |
 | Shuriken | 1 | 0 | none |
 | Sphere Rush contact | 0 | 0 | none |
 | Sphere Rush tick (on the contact step, then every 0.5 s while held) | 1 | 0 | none |
-| Sphere Rush explosion | 15 | 3 | horizontal |
+| Sphere Rush explosion | 10 | 3 | horizontal |
 
-So from 115, BA1 adds 5 (120) and pushes at a strength of 120 (1200 units/s); from 110, BA2 adds 10 (120) and launches upward at 240 (2400 units/s), and mid-air BA2 drives downward at 240; from 115, mid-air BA1 launches upward at 240; from 119, a shuriken or a Sphere Rush tick adds 1 (120) and launches at 0 × 120 = 0; from 105, the Sphere Rush explosion adds 15 (120) and launches sideways at 360 (3600 units/s); a whole Sphere Rush on a fresh target adds 4 × 1 + 15 = 19 and launches it at 3 × 19 = 57. On a fresh target a BA2 is 2 × 10 = 20, a 200 units/s hop; a BA2 that leaves the target at 30 Launch Point lifts it about 70 units, and at 60 about 280. The Clone Attack performs ground BA1's own definition (or mid-air BA2's, overhead), so it inherits that hit's damage, Base Launch and Directional Launch with nothing of its own.
+So from 117, BA1 adds 3 (120) and pushes at a strength of 120 (1200 units/s); from 115, BA2 adds 5 (120) and launches upward at 240 (2400 units/s), and mid-air BA2 drives downward at 240; from 117, mid-air BA1 launches upward at 240; from 119, a shuriken or a Sphere Rush tick adds 1 (120) and launches at 0 × 120 = 0; from 110, the Sphere Rush explosion adds 10 (120) and launches sideways at 360 (3600 units/s); a whole Sphere Rush on a fresh target adds 4 × 1 + 10 = 14 and launches it at 3 × 14 = 42. On a fresh target a BA2 is 2 × 5 = 10, a 100 units/s hop; a BA2 that leaves the target at 30 Launch Point lifts it about 70 units, and at 60 about 280. The Clone Attack performs ground BA1's own definition (or mid-air BA2's, overhead), so it inherits that hit's damage, Base Launch and Directional Launch with nothing of its own.
 
 #### Launch bounce
 

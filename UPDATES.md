@@ -99,6 +99,24 @@ air reversal 13 → 10, a fast fall from a jump's apex 11 → 9. The longest
 true combo from 0 Launch Point is still 9 hits. At 40–60 it went from one
 or two hits to a four-hit Dash chase.
 
+### Later: #0001's damage cut
+
+Not part of the update, but it moves the numbers above. #0001's damage was
+lowered afterwards: BA1 and mid-air BA1 5 → 3, BA2 and mid-air BA2 10 → 5,
+the Sphere Rush blast 15 → 10 (`damage` in `js/data/characters.js`). Each
+hit now pushes and launches a little less, so:
+
+- From 0 Launch Point, BA1 → BA1 strings up to 6 hits (was 4) and the
+  BA1 → Dash → BA1 chase up to 7 (was 5): the same three Dashes empty the
+  bar, then plain BA1s carry on until the push ends it. Neither loops;
+  `tests/combo.test.mjs` allows 6 and 7.
+- Each route's Launch Point limit moved up, by about 2 for the BA1 routes
+  and about 5 for the BA2 routes: BA2 → jump → mid-air BA1 now reaches
+  about 65, and the third aerial through the air jump about 45.
+- The combat AI weighs a hit's damage at `damage / 6` instead of `/ 10`
+  (`hitValue` in `js/game/combat-ai.js`), so it values its hits, and so its
+  charged actions, as it did before the cut.
+
 ## Effect update
 
 Named for its hit effects, but it also holds the jump, launch and Shield

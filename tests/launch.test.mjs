@@ -173,7 +173,7 @@ test('Launch Point starts at 0 on every new combat state and every new fighter',
   assert.equal('knockback' in new CombatState(), false, 'the old accumulated Knockback is gone');
 });
 
-test('damage adds exactly the damage received: 0 + 5 = 5, + 10 = 15, + 1 = 16', () => {
+test('damage adds exactly the damage received: 0 + 3 = 3, + 5 = 8, + 1 = 9', () => {
   const { ba1, ba2, shuriken } = realHits();
   const d = duel();
   const system = new CombatSystem();
@@ -182,8 +182,8 @@ test('damage adds exactly the damage received: 0 + 5 = 5, + 10 = 15, + 1 = 16', 
     const e = system.applyHit(d.attacker, d.target, hit);
     seen.push([e.launchPointBefore, e.damage, e.launchPointAfter]);
   }
-  assert.deepEqual(seen, [[0, 5, 5], [5, 10, 15], [15, 1, 16]]);
-  assert.equal(d.target.combat.launchPoint, 16);
+  assert.deepEqual(seen, [[0, 3, 3], [3, 5, 8], [8, 1, 9]]);
+  assert.equal(d.target.combat.launchPoint, 9);
 });
 
 test('Launch Point never becomes negative', () => {
@@ -325,7 +325,7 @@ test('a Shielded hit adds no Launch Point and launches nothing, whatever its Bas
 // ---- Events -----------------------------------------------------------------------
 
 test('a hit event describes the new system and nothing of the old one', () => {
-  const { event, attacker, target } = hitAt(110, realHits().ba2);
+  const { event, attacker, target } = hitAt(115, realHits().ba2);
   assert.deepEqual(Object.keys(event).sort(), [
     'attacker', 'baseLaunch', 'damage', 'directionalLaunch', 'energyCost', 'finalLaunch', 'hitstun',
     'launchPointAfter', 'launchPointBefore', 'launchSpeed', 'launchStrength', 'move', 'perfect', 'point',
@@ -334,7 +334,7 @@ test('a hit event describes the new system and nothing of the old one', () => {
   assert.equal(event.energyCost, 0, 'a hit costs its target no Energy');
   assert.deepEqual(
     [event.type, event.attacker, event.target, event.move, event.damage, event.launchPointBefore, event.launchPointAfter],
-    ['hit', attacker, target, 'ba2', 10, 110, 120],
+    ['hit', attacker, target, 'ba2', 5, 115, 120],
   );
   assert.equal(event.baseLaunch, 2, 'the integer multiplier, not a vector');
   assert.equal(event.directionalLaunch, 'vertical');
@@ -357,13 +357,13 @@ test('#0001\'s authored hits: damage, Base Launch and Directional Launch, exactl
   };
   const table = Object.fromEntries(Object.entries(authored).map(([id, h]) => [id, [h.damage, h.baseLaunch, h.directionalLaunch]]));
   assert.deepEqual(table, {
-    ba1: [5, 1, 'horizontal'],
-    ba2: [10, 2, 'vertical'],
-    midairBa1: [5, 2, 'vertical'],
-    midairBa2: [10, 2, 'reverseVertical'],
+    ba1: [3, 1, 'horizontal'],
+    ba2: [5, 2, 'vertical'],
+    midairBa1: [3, 2, 'vertical'],
+    midairBa2: [5, 2, 'reverseVertical'],
     shuriken: [1, 0, null],
     tickHit: [1, 0, null],
-    explosionHit: [15, 3, 'horizontal'],
+    explosionHit: [10, 3, 'horizontal'],
   });
   assert.equal(rush.tickInterval, 0.5, 'one tick every 0.5 s');
   // The contact before the hold deals no damage and never launches: the
@@ -380,13 +380,13 @@ test('#0001 at work: each hit adds its damage, then launches at Base Launch x th
   const hits = realHits();
   const cases = [
     // [hit, from, to, strength, finalLaunch facing right (strength x 10)]
-    ['ba1', 115, 120, 120, { x: 1200, y: 0 }],
-    ['ba2', 110, 120, 240, { x: 0, y: -2400 }],
-    ['midairBa1', 115, 120, 240, { x: 0, y: -2400 }],
-    ['midairBa2', 110, 120, 240, { x: 0, y: 2400 }],
+    ['ba1', 117, 120, 120, { x: 1200, y: 0 }],
+    ['ba2', 115, 120, 240, { x: 0, y: -2400 }],
+    ['midairBa1', 117, 120, 240, { x: 0, y: -2400 }],
+    ['midairBa2', 115, 120, 240, { x: 0, y: 2400 }],
     ['shuriken', 119, 120, 0, { x: 0, y: 0 }],
     ['tickHit', 119, 120, 0, { x: 0, y: 0 }],
-    ['explosionHit', 105, 120, 360, { x: 3600, y: 0 }],
+    ['explosionHit', 110, 120, 360, { x: 3600, y: 0 }],
   ];
   for (const [id, from, to, strength, final] of cases) {
     const { target, event } = hitAt(from, hits[id]);
@@ -401,8 +401,8 @@ test('#0001 at work: each hit adds its damage, then launches at Base Launch x th
     }
   }
   // Facing left, the sideways hits travel left.
-  assert.equal(hitAt(115, hits.ba1, { facing: -1 }).target.body.vx, -1200);
-  assert.equal(hitAt(105, hits.explosionHit, { facing: -1 }).target.body.vx, -3600);
+  assert.equal(hitAt(117, hits.ba1, { facing: -1 }).target.body.vx, -1200);
+  assert.equal(hitAt(110, hits.explosionHit, { facing: -1 }).target.body.vx, -3600);
 });
 
 // ---- Respawn ----------------------------------------------------------------------
@@ -425,7 +425,7 @@ test('a fighter with Launch Point that falls into the Void is eliminated, scores
   assert.deepEqual([p1.combat.launchPoint, p2.combat.launchPoint], [0, 0], 'every fighter starts the round at 0');
   // Launched off with a real, heavy Launch Point.
   const e = new CombatSystem().applyHit(p1, p2, realHits().ba1);
-  assert.equal(e.launchPointAfter, 5);
+  assert.equal(e.launchPointAfter, 3);
   p2.combat.launchPoint = 240;
   Object.assign(p2.body, { y: battle.stage.void.bottom + 100, vy: 0, grounded: false, ground: null });
   battle.update(DT);

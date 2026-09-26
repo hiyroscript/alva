@@ -417,8 +417,8 @@ test('a real hit on a charging fighter shows Hurt through the impact freeze, wit
   }
   assert.equal(events.length, 1);
   assert.equal(events[0].type, 'hit', 'Charge grants no guard');
-  assert.equal(events[0].damage, 5, 'or armour');
-  assert.equal(target.combat.launchPoint, 5);
+  assert.equal(events[0].damage, 3, 'or armour');
+  assert.equal(target.combat.launchPoint, 3);
   assert.match(frameName(target), /^0001_charge[ab]\.png$/, 'still the loop at impact');
   tick({}, CHARGE);
   assert.ok(target.combat.hitstop > 0 || target.combat.stun > 0);

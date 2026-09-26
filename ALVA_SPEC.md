@@ -552,7 +552,7 @@ A training room, entered straight from Home.
   each other's opponent, so clones, projectiles, the Sphere Rush and melee
   target it and the camera frames both. Each hit it takes shows the
   Launch Point it added (the CombatSystem's resolved hit event) in red over its
-  head as a positive `+5`, `+1` or `+15`, rising and fading over 0.8 s;
+  head as a positive `+3`, `+1` or `+10`, rising and fading over 0.8 s;
   simultaneous hits stack, and a hit that adds nothing (the Sphere Rush's
   contact) shows none. It is never knocked out. Its own HUD card follows its
   Launch Point; no timer, rounds or points come with it.
@@ -953,16 +953,16 @@ Back return Home). It holds the player's settings, saved on this device.
   whole frames: ground BA1 is frame 1 startup, frame 2 active, frames 3–4
   recovery; mid-air BA1 is frames 1–2 startup (kunai drawn back, then
   overhead) and frame 3 active (the slash arc), with no recovery frame, so
-  the attack ends with its clip. Ground BA1 hits once for 5 damage, 0.32 s
+  the attack ends with its clip. Ground BA1 hits once for 3 damage, 0.32 s
   hitstun, 0.14 s blockstun, 0.05 s hitstop and a 0.15 s cooldown, and
   declares `baseLaunch: 1, directionalLaunch: 'horizontal'`: an unblocked
-  hit adds its 5 to the opponent's Launch Point, then pushes it away at 1 ×
-  that new Launch Point (from 115: 120, at impact vx 1200 × facing) with no
-  vertical launch. Mid-air BA1 hits once for 5 damage, 0.32 s hitstun,
+  hit adds its 3 to the opponent's Launch Point, then pushes it away at 1 ×
+  that new Launch Point (from 117: 120, at impact vx 1200 × facing) with no
+  vertical launch. Mid-air BA1 hits once for 3 damage, 0.32 s hitstun,
   0.15 s blockstun, 0.05 s hitstop and a 0.16 s cooldown (longer, making up
   for the missing recovery), and declares `baseLaunch: 2,
   directionalLaunch: 'vertical'`: an unblocked hit launches the opponent
-  upward at 2 × its new Launch Point with no sideways push (from 115: at
+  upward at 2 × its new Launch Point with no sideways push (from 117: at
   impact vx 0, vy −2400), less high than ground BA2's launch from the same
   Launch Point, as BA2 adds more damage first. A Shielded mid-air BA1 is
   neither pushed nor launched. Hitboxes match the
@@ -988,15 +988,15 @@ Back return Home). It holds the player's settings, saved on this device.
   drawn with motion trails), frames 6–7 recovery; mid-air BA2 is frames 1–2
   startup, frame 3 active (the kick's forward-low arc) and frames 4–5
   recovery. Ground BA2 is slower, more committed and heavier than ground
-  BA1: it hits once for 10 damage, 0.28 s hitstun, 0.15 s blockstun and
+  BA1: it hits once for 5 damage, 0.28 s hitstun, 0.15 s blockstun and
   0.09 s hitstop, with a 0.15 s cooldown, and declares `baseLaunch: 2, directionalLaunch:
-  'vertical'`: an unblocked hit adds its 10, then launches the opponent
-  upward at 2 × its new Launch Point (from 110: 120, at impact vx 0,
+  'vertical'`: an unblocked hit adds its 5, then launches the opponent
+  upward at 2 × its new Launch Point (from 115: 120, at impact vx 0,
   vy −2400, airborne, before normal gravity brings it down). Mid-air BA2 hits
-  once for 10 damage, 0.28 s hitstun, 0.14 s blockstun and 0.08 s hitstop,
+  once for 5 damage, 0.28 s hitstun, 0.14 s blockstun and 0.08 s hitstop,
   with a 0.1 s cooldown, and declares `baseLaunch: 2, directionalLaunch:
   'reverseVertical'`: an unblocked hit drives the opponent downward just as
-  hard (from 110: at impact vx 0, vy +2400). A grounded opponent is knocked
+  hard (from 115: at impact vx 0, vy +2400). A grounded opponent is knocked
   straight back onto the ground it stands on; an airborne one is sent down
   toward it. Driven into the ground hard enough (500 units / s, from about
   25 Launch Point), either rebounds off it once (see Launch bounce). Neither
@@ -1378,7 +1378,7 @@ Back return Home). It holds the player's settings, saved on this device.
   real sprites (`0001_1ba1 → 1ba2 → 1ba3 → 1ba4` at 12 fps, the same
   per-clip `sourceFacing` mirroring, no tint, transparency, outline or
   silhouette) and BA1's own resolved attack definition (`attacks.ba1`: frame 1
-  startup, frame 2 active, frames 3–4 recovery, 5 damage, 0.32 s hitstun,
+  startup, frame 2 active, frames 3–4 recovery, 3 damage, 0.32 s hitstun,
   0.14 s blockstun, 0.05 s hitstop; the clone never moves or follows up, so
   it reads none of the attack's movement or hit-cancel data), so its hitbox exists only on the active
   frame and hits at most once. It performs the owner's normalized BA1, so it
@@ -1388,10 +1388,10 @@ Back return Home). It holds the player's settings, saved on this device.
   never computes a launch itself. The overhead clone instead plays
   Mid-air BA2 from frame 1 (`0001_midair2ba1 → … → midair2ba5` at 12 fps)
   with its own resolved definition (`attacks.midairBa2`: frames 1–2
-  startup, frame 3 active, frames 4–5 recovery, 10 damage, 0.28 s hitstun,
+  startup, frame 3 active, frames 4–5 recovery, 5 damage, 0.28 s hitstun,
   0.14 s blockstun, 0.08 s hitstop), whose hitbox, from the overhead spot,
   lands on a stationary opponent's hurtboxes, and whose Base Launch 2
-  reverse vertical launch drives the opponent downward (from 110: `vy =
+  reverse vertical launch drives the opponent downward (from 115: `vy =
   +2400`, no sideways push; none on a block, like any vertical launch). VANISH removes the
   body and plays
   the same cloud backwards, `cloneav10 → … → cloneav1`, at the same 20 fps
@@ -1425,7 +1425,7 @@ Back return Home). It holds the player's settings, saved on this device.
   inferred from animation frames. It sets no `combat.attack`. Trigger:
   the shared charged-action rule with BA2 (`action2`: I, LB, touch **Kick**);
   no new control. Charge and BA2 pressed together from idle, or BA2 pressed
-  on the step Charge is let go, is ordinary BA2 (10 damage, `2ba1`–`2ba7`,
+  on the step Charge is let go, is ordinary BA2 (5 damage, `2ba1`–`2ba7`,
   unchanged; mid-air BA2 `midair2ba1`–`5` likewise) with no release pose.
   Grounded only (Charge is too). Once started it owns the fighter and Charge
   no longer needs to be held; it ends only by a miss, a wall, ground loss, a
@@ -1531,13 +1531,13 @@ Back return Home). It holds the player's settings, saved on this device.
      switches to `rasen9`, the explosion pose, and the sphere stops spinning
      and growing and plays `prasen10 → prasen11` once at the grown size. On
      the step `prasen10` first shows the target is released from the bind
-     and then takes the explosion, exactly once: 15 damage (19 in all with
+     and then takes the explosion, exactly once: 10 damage (14 in all with
      the four ticks) with `baseLaunch: 3, directionalLaunch: 'horizontal'`:
-     the 15 is added first, then the target's new Launch Point is tripled
+     the 10 is added first, then the target's new Launch Point is tripled
      and sent sideways along the rush, through the same shared launch as
-     every other hit (from 105 before the blast: 120, a strength of 360,
-     launched at 3600 units/s; a fresh target, 19 after the ticks and the
-     blast, at 3 × 19 = 57, so 570 units/s). It is the
+     every other hit (from 110 before the blast: 120, a strength of 360,
+     launched at 3600 units/s; a fresh target, 14 after the ticks and the
+     blast, at 3 × 14 = 42, so 420 units/s). It is the
      technique's only launching hit. 0.55 s hitstun, 0.12 s hitstop
      (twice the contact's), 0.3 s blockstun. Releasing first keeps the bind
      from cancelling the launch. `rasen9` is held for the whole blast (it lasts
@@ -1548,7 +1548,7 @@ Back return Home). It holds the player's settings, saved on this device.
   8. DONE: after `rasen12` the technique is cleared and #0001 returns to
      Idle / normal control. A full sequence is exactly six hit events: the
      contact (0), four ticks (1 each, the first on the contact step) and the
-     explosion (15): 19 in all.
+     explosion (10): 14 in all.
      A Charge still held does not restart by itself: it has to be let go
      and held again.
   The bind is a combat status separate from hitstun (`CombatState.bind` /
@@ -1591,9 +1591,9 @@ Back return Home). It holds the player's settings, saved on this device.
   Battle restart / rematch, a new Practice fighter and every respawn after
   the Void all start from 0), grows by exactly the damage received, never
   goes below 0, has no maximum and is shown as a bare number (no % sign). A
-  hit's `damage` is how much it adds: #0001's BA1 5, mid-air BA1 5, BA2 10,
-  mid-air BA2 10, shuriken 1, the clone's BA1 5 or overhead mid-air BA2 10,
-  the Sphere Rush 0 on contact, 1 per tick and 15 on the explosion (a hit a
+  hit's `damage` is how much it adds: #0001's BA1 3, mid-air BA1 3, BA2 5,
+  mid-air BA2 5, shuriken 1, the clone's BA1 3 or overhead mid-air BA2 5,
+  the Sphere Rush 0 on contact, 1 per tick and 10 on the explosion (a hit a
   Shield blocks adds nothing).
   Every fighter has a Launch Point that starts at 0 and increases by damage
   received. Every hit declares a Base Launch of 0, 1, 2 or 3 and a
@@ -1762,17 +1762,17 @@ Back return Home). It holds the player's settings, saved on this device.
     shuriken spacing only. At low Launch Point these are true combos (the
     target never gets to act between the hits): BA1 → BA2 (BA2 pressed
     anywhere in about 0.2 s after BA1), BA1 → BA1 at close range (a string
-    of two to four that BA1's own push ends), BA2 → BA1 while the launch is
+    of two to six that BA1's own push ends), BA2 → BA1 while the launch is
     still a hop, BA2 → jump → mid-air BA1 once it launches properly (Launch
-    Point about 25–60), and mid-air BA2 → land (fast) → BA1 on a grounded
+    Point about 25–65), and mid-air BA2 → land (fast) → BA1 on a grounded
     target. BA1 → Dash → BA1 chases BA1's push from 0 to about 85 Launch
     Point, so the starter has a follow-up where BA1 → BA2 no longer
     reaches. Launch Point breaks them by itself, with no combo counter: BA1's
     push carries the target out of BA2's reach past about 25, out of a Dash's
-    past about 85, and BA2's launch out of a jump's reach past about 60, so
+    past about 85, and BA2's launch out of a jump's reach past about 65, so
     at high Launch Point combat turns into pursuit and ring-outs. None loops:
     every hit adds to the Launch Point that sends the next one further, and
-    a Dash chase spends the Energy the Shield needs, ending within five
+    a Dash chase spends the Energy the Shield needs, ending within seven
     hits. Stage geometry bends
     that into new routes (a rebound off a wall or a spiked floor is a moment
     to chase), never a loop: a wall's rebounds are capped until the target
@@ -1785,9 +1785,9 @@ Back return Home). It holds the player's settings, saved on this device.
     frozen fighter is drawn still where it stopped.
   - *Air combos.* With the air jump, the launch stun and aerials that
     steer, BA2 → jump → mid-air BA1 leads on to a third hit: straight into
-    another mid-air BA1 or a mid-air BA2 spike below about 15 Launch Point,
-    and through the air jump into a mid-air BA2 up to about 35 or a mid-air
-    BA1 up to about 40. Gone by about 60, when BA2 launches past any jump.
+    another mid-air BA1 or a mid-air BA2 spike below about 20 Launch Point,
+    and through the air jump into a mid-air BA2 up to about 40 or a mid-air
+    BA1 up to about 45. Gone by about 65, when BA2 launches past any jump.
 - **Powers** (`js/data/powers.js`): fighter abilities owned at one of three
   tiers, Jump Power and Speed Power. Each Power is a frozen tier table in
   the one `POWERS` registry, the single source of its names, descriptions,
@@ -1822,9 +1822,9 @@ Back return Home). It holds the player's settings, saved on this device.
   not a Power: every hit (an attack's, a projectile's, a charged
   technique's) declares its own `baseLaunch` and `directionalLaunch` beside
   its `damage`, independently of each other:
-  `damage: 5, baseLaunch: 1, directionalLaunch: 'horizontal'`,
-  `damage: 10, baseLaunch: 2, directionalLaunch: 'vertical'`, or
-  `damage: 10, baseLaunch: 2, directionalLaunch: 'reverseVertical'` to drive
+  `damage: 3, baseLaunch: 1, directionalLaunch: 'horizontal'`,
+  `damage: 5, baseLaunch: 2, directionalLaunch: 'vertical'`, or
+  `damage: 5, baseLaunch: 2, directionalLaunch: 'reverseVertical'` to drive
   the target downward. `BASE_LAUNCH_VALUES` (`[0, 1, 2, 3]`) holds the only
   legal Base Launch values: literal multipliers, not tiers, levels or
   velocities. `DIRECTIONAL_LAUNCHES` holds the only legal directions:
@@ -1841,14 +1841,14 @@ Back return Home). It holds the player's settings, saved on this device.
 
   | Hit | Damage | Base Launch | Directional Launch |
   | --- | --- | --- | --- |
-  | Ground BA1 | 5 | 1 | horizontal |
-  | Ground BA2 | 10 | 2 | vertical |
-  | Mid-air BA1 | 5 | 2 | vertical |
-  | Mid-air BA2 | 10 | 2 | reverse vertical |
+  | Ground BA1 | 3 | 1 | horizontal |
+  | Ground BA2 | 5 | 2 | vertical |
+  | Mid-air BA1 | 3 | 2 | vertical |
+  | Mid-air BA2 | 5 | 2 | reverse vertical |
   | Shuriken | 1 | 0 | none |
   | Sphere Rush contact | 0 | 0 | none |
   | Sphere Rush tick (on the contact step, then every 0.5 s while held) | 1 | 0 | none |
-  | Sphere Rush explosion | 15 | 3 | horizontal |
+  | Sphere Rush explosion | 10 | 3 | horizontal |
 
   Launch never depends on either fighter's Jump or Speed Power.
 - Combat architecture (Launch Point, Base Launch, Directional Launch, damage, hitboxes, hurtboxes, attack definitions,

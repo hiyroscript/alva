@@ -547,7 +547,7 @@ test('HUD: a real hit raises the Launch Point shown on the target\'s card only',
   d.tick({ action1: true, action1Pressed: true });
   d.until(() => d.events.length > 0);
   hud.update(battle);
-  assert.equal(hud.right.launchPointValue.textContent, '5');
+  assert.equal(hud.right.launchPointValue.textContent, '3');
   assert.equal(hud.left.launchPointValue.textContent, '0');
 });
 
