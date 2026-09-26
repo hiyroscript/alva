@@ -1,1266 +1,746 @@
-ALVA — Launch Bounce / Wall Ricochet Combat Rework
+ALVA — Add Watch Mode (CPU vs CPU Spectator Mode)
 
-Reference
+Implement a complete spectator mode named “Watch Mode” in the Alva repository.
 
-Use this video as the visual/game-feel reference for the launch-and-bounce behavior:
+Before changing code, inspect the existing architecture and preserve its patterns, visual language, accessibility, keyboard/gamepad navigation, battle rules, and tests. Do not create a second combat implementation. Watch Mode must use Alva’s existing Battle, Fighter, CombatAIController, roster, stage, HUD, navigation, and difficulty systems.
 
-https://youtu.be/C95FpcRLsbE?si=HoYArRHPnqhwB9rF
+Current architecture to preserve
 
-Study specifically the moments where a fighter is launched with significant knockback, collides with stage geometry, rebounds from that surface, travels toward another surface, and can potentially bounce again.
+The repository currently has:
 
-The target is the feel and readability of that interaction, not a copy of MultiVersus’s internal mechanics.
+* Home actions in js/screens/home-screen.js.
+* Quick Battle flow:
+    Home → Select Mode → Select Difficulty → Select Fighter → Select Stage → Battle.
+* Shared selection state in js/core/app.js.
+* Difficulty definitions and AI profiles in js/data/difficulty.js.
+* Shared fighter roster in js/ui/fighter-roster.js.
+* Setup headers in js/ui/components.js.
+* Stage selection in js/screens/map-select-screen.js.
+* Battle DOM/UI orchestration in js/screens/battle-screen.js.
+* Match simulation in js/game/battle.js.
+* CPU combat intelligence in js/game/combat-ai.js.
+* Screen/back-stack navigation in js/core/screen-manager.js.
+* Screen sections in index.html.
 
-⸻
+Currently Battle creates:
 
-PRIMARY OBJECTIVE
+* P1 with PlayerController.
+* P2 with CombatAIController.
 
-Add a launch ricochet/bounce system to ALVA.
-
-When a fighter is launched hard enough by an attack and collides with solid stage geometry, instead of the collision simply deleting their velocity, they should be able to rebound from that geometry.
-
-Example:
-
-Attack connects
-→ fighter is launched horizontally
-→ fighter hits a wall
-→ fighter rebounds away from the wall
-→ fighter flies across the arena
-→ fighter hits another wall/floor/ceiling
-→ fighter can rebound again if enough launch energy remains
-→ eventually the launch loses enough energy that ordinary physics takes over.
-
-The result should make powerful hits feel dynamic and should create situations where opponents can ricochet around enclosed or geometry-heavy stages.
-
-This is specifically a combat launch behavior.
-
-DO NOT make normal movement physics universally bouncy.
-
-A character walking into a wall should still stop.
-
-A character jumping into a ceiling normally should still bonk and stop vertically.
-
-A character landing normally should still land.
-
-Only sufficiently strong combat launch velocity should trigger ricochet behavior.
+The existing tests already demonstrate that P1 can be replaced with another CombatAIController and the complete battle simulation continues to work. Build Watch Mode around that capability instead of duplicating battle logic.
 
 ⸻
 
-FIRST: READ THE CURRENT ALVA ARCHITECTURE
+Feature
 
-Read ALVA_SPEC.md fully.
+Add a new Home action:
 
-Inspect at minimum:
+Watch Mode
 
-* js/game/physics.js
-* js/game/character.js
-* js/game/combat.js
-* js/data/launch.js
-* js/data/characters.js
-* stage/map definitions
-* StageCollision
-* fighter hitstun / launch state
-* arena fixed-step update
-* Void/ring-out handling
-* combat tests
-* launch tests
-* physics tests
+This is Alva’s CPU-vs-CPU spectator mode.
 
-Do not implement this as an isolated hack without understanding how launch velocity moves through the game.
+Place the Watch Mode button in the Home action stack between Play and Discover, while preserving Practice Ground. It should use the same Home action styling and navigation behavior as the existing secondary actions and have the normal right-chevron treatment.
 
-⸻
+The intended Home hierarchy is:
 
-IMPORTANT CURRENT IMPLEMENTATION DETAIL
+Play → Watch Mode → Practice Ground → Discover
 
-ALVA’s current stepBody() behavior intentionally stops velocity when colliding with solids.
+If responsive CSS changes the visual layout, preserve this DOM/navigation order.
 
-On horizontal solid collision it effectively does:
+Watch Mode should be a direct Home mode. Do not send the user through the existing Select Mode screen.
 
-vx = 0
+Clicking Watch Mode begins this flow:
 
-On a ceiling collision it effectively does:
+Watch Mode → Difficulty → CPU 1 Fighter → CPU 2 Fighter → Stage → Watch Battle
 
-vy = 0
+There are exactly four setup steps:
 
-On landing it effectively does:
+1. Difficulty
+2. CPU 1
+3. CPU 2
+4. Stage
 
-vy = 0
+The selected difficulty applies equally to both CPUs.
 
-That behavior is correct for ordinary movement.
-
-DO NOT replace those rules with universal reflection.
-
-Instead, introduce a mechanism that lets the fighter/combat system distinguish:
-
-NORMAL PHYSICS COLLISION
-
-from
-
-LAUNCHED COMBAT COLLISION.
-
-Only the latter should produce a ricochet.
+Do not add separate CPU 1 and CPU 2 difficulty settings.
 
 ⸻
 
-PRESERVE ALVA’S EXISTING LAUNCH SYSTEM
+Watch Mode selection state
 
-ALVA already uses:
+Do not overload Quick Battle’s existing characterId in a way that causes the two modes to overwrite each other.
 
-* Base Launch
-* Directional Launch
+Give Watch Mode its own selection state, preferably grouped separately, for example conceptually:
+
+selection.watch = {
+  difficulty: DEFAULT_DIFFICULTY,
+  cpu1CharacterId: defaultAvailableCharacterId,
+  cpu2CharacterId: defaultAvailableCharacterId,
+  mapId: MAPS[0].id,
+}
+
+The exact structure can follow the project’s conventions, but these requirements are mandatory:
+
+* Watch selections must not corrupt Quick Battle selections.
+* Quick Battle must still remember/use its existing difficulty, characterId, and mapId.
+* Going Back during Watch setup must preserve already chosen Watch values.
+* CPU 1 and CPU 2 may choose the same fighter. Do not artificially prohibit mirror matches.
+* Invalid/stale fighter, stage, or difficulty values should continue to use the project’s normal fallback behavior.
+
+⸻
+
+Setup screens
+
+Reuse the existing UI components wherever practical.
+
+Do not copy the entire roster implementation or difficulty implementation into independent versions.
+
+Header/progress component
+
+js/ui/components.js currently hard-codes:
+
+['Mode', 'Difficulty', 'Fighter', 'Stage']
+
+and labels the progress list as Quick Battle setup.
+
+Refactor this component so it can render configurable setup steps while preserving the current Quick Battle API/appearance.
+
+Quick Battle must continue to show:
+
+1. Mode
+2. Difficulty
+3. Fighter
+4. Stage
+
+Watch Mode must show:
+
+1. Difficulty
+2. CPU 1
+3. CPU 2
+4. Stage
+
+The accessible label should also describe the correct mode rather than claiming Watch Mode is “Quick Battle setup.”
+
+Completed steps must retain the existing checkmark behavior.
+
+⸻
+
+Difficulty
+
+Watch Mode uses the existing four difficulty definitions:
+
+* Easy
+* Medium
+* Hard
+* Brutal
+
+Do not create new AI profiles.
+
+Use the exact same DIFFICULTIES, resolveDifficulty, and CombatAIController behavior already used by Quick Battle.
+
+The Watch difficulty screen should visually be the same difficulty UI, but its kicker should say:
+
+Watch Mode
+
+Selecting the difficulty advances to CPU 1 selection.
+
+Back returns Home.
+
+⸻
+
+CPU 1 fighter selection
+
+Use the shared FighterRoster component.
+
+Screen:
+
+Select CPU 1
+
+Kicker:
+
+Watch Mode
+
+Progress step:
+
+CPU 1
+
+Confirming a fighter writes cpu1CharacterId and advances to CPU 2.
+
+The selected CPU 1 fighter should be restored when navigating Back to this screen.
+
+⸻
+
+CPU 2 fighter selection
+
+Use another instance of the shared FighterRoster.
+
+Screen:
+
+Select CPU 2
+
+Kicker:
+
+Watch Mode
+
+Progress step:
+
+CPU 2
+
+Confirming writes cpu2CharacterId and advances to Stage.
+
+Use a unique previewId so multiple roster screen instances cannot create duplicate DOM IDs.
+
+Back must return to CPU 1 and retain CPU 1’s selection.
+
+⸻
+
+Stage selection
+
+Reuse Alva’s normal MAPS registry and StagePreview.
+
+Screen title remains:
+
+Select Stage
+
+Kicker:
+
+Watch Mode
+
+Progress step:
+
+Stage
+
+The stage UI should otherwise behave like Quick Battle’s existing stage selection.
+
+The primary button may say:
+
+Confirm and watch battle
+
+or an equally concise Watch-specific equivalent.
+
+Starting the battle must pass all of these values:
+
+* Watch/spectator mode flag
+* selected map
+* CPU 1 fighter ID
+* CPU 2 fighter ID
+* selected difficulty
+
+Back returns to CPU 2 fighter selection.
+
+⸻
+
+Screen architecture
+
+Do not try to push the same fighter-selection screen onto ScreenManager twice in succession in a way that breaks its Back stack.
+
+Use distinct Watch screen IDs/instances for CPU 1 and CPU 2, while still sharing the underlying FighterRoster implementation.
+
+A sensible screen structure would be along the lines of:
+
+* watch-difficulty
+* watch-cpu1
+* watch-cpu2
+* watch-map
+
+You may refactor existing setup screen classes into configurable/reusable classes if that results in cleaner code.
+
+Add the necessary <section> elements to index.html and register the screens in App.start().
+
+Do not regress the existing:
+
+* mode
+* difficulty
+* character
+* map
+* battle
+* practice
+* discover
+
+screens.
+
+⸻
+
+Battle engine changes
+
+Watch Mode must use the real Battle simulation.
+
+Do not make a separate WatchBattle simulation.
+
+Extend Battle cleanly so its controller configuration can represent:
+
+Quick Battle
+
+* P1 → PlayerController
+* P2 → CombatAIController
+
+Watch Mode
+
+* P1 → CombatAIController
+* P2 → CombatAIController
+
+Both Watch CPUs use the selected difficulty.
+
+Their fighter definitions remain independent:
+
+CPU 1 → selected cpu1CharacterId
+CPU 2 → selected cpu2CharacterId
+
+Everything else remains normal Battle behavior:
+
+* 99-second timer/current configured round time
+* first to the configured points-to-win
+* Void scoring
+* respawns
 * Launch Point
-* resolved launch velocity
-* hitstun
-* hitstop
+* Energy
+* shields
+* charged attacks
+* clones
+* projectiles
+* stage physics
+* camera
+* hit FX
+* result rules
+* rematches
+* restarts
 
-Preserve those concepts.
-
-Do not replace them with another knockback system.
-
-The new bounce system should happen after ALVA has already calculated the launch velocity.
-
-Conceptually:
-
-attack hit
-→ damage
-→ Launch Point changes
-→ Base Launch × Launch Point resolves launch
-→ directional launch resolves velocity
-→ fighter enters launched/hitstun state
-→ physics moves fighter
-→ fighter hits solid geometry
-→ launch-bounce logic reflects part of that velocity.
-
-The ricochet system therefore extends ALVA’s Launch system instead of replacing it.
+Difficulty must continue to affect only how the AI thinks. It must never modify fighter stats or combat rules.
 
 ⸻
 
-DISTINGUISH “HITSTUN” FROM “ACTIVE LAUNCH”
+Independent AI randomness
 
-Do not assume every stunned fighter should bounce.
+Do not give both AI controllers the exact same RNG stream.
 
-Introduce or derive a clear concept such as:
+This is especially important for mirror matches.
 
-* launchActive
-* launchVelocity
-* launchEnergy
-* canRicochet
-* or an equivalent clean design
+When Watch Mode creates two CombatAIController instances, initialize them from independent deterministic RNG streams derived from the battle seed.
 
-The exact architecture is up to you.
+Tests must still be reproducible when a seed is provided.
 
-What matters is that the engine can answer:
+Production battles should still vary naturally when no seed is supplied.
 
-“Is this fighter currently moving because of meaningful combat knockback?”
-
-A fighter should not ricochet just because they happen to have hitstun remaining.
-
-They should ricochet because their collision occurs while meaningful launch velocity remains.
+A seeded Watch match should therefore produce deterministic results without making CPU 1 and CPU 2 make artificially identical random decisions.
 
 ⸻
 
-BOUNCE THRESHOLD
+Fighter labels
 
-Small impacts should NOT bounce.
+Quick Battle remains:
 
-Introduce a minimum impact-speed threshold.
+* P1 label: P1
+* P2 label: CPU
 
-For example:
+Watch Mode becomes:
 
-bounceMinImpactSpeed
+* P1 label: CPU 1
+* P2 label: CPU 2
 
-If the velocity component into the collided surface is below this threshold:
-
-do ordinary collision behavior.
-
-If it exceeds the threshold:
-
-perform a combat bounce.
-
-This prevents weak BA1 hits from making characters endlessly ping-pong around walls.
-
-The threshold must be data-driven and tunable.
-
-Do not scatter threshold numbers through physics code.
+Use those labels consistently anywhere fighter identity is presented.
 
 ⸻
 
-WALL BOUNCE
+BattleScreen
 
-This is the most important behavior.
+js/screens/battle-screen.js currently assumes both fighters use the same selected fighter and loads one sprite set.
 
-Suppose a fighter is launched rightward:
+Update it to support Watch Mode with two potentially different fighters.
 
-vx > 0
+For Watch Mode:
 
-They collide with a solid wall on their right.
+1. Resolve CPU 1 fighter definition.
+2. Resolve CPU 2 fighter definition.
+3. Resolve selected map.
+4. Resolve difficulty.
+5. Load both fighters’ sprite sets.
+6. If both CPUs use the same character, reuse the same cached sprite set rather than performing unnecessary duplicate work.
+7. Handle a load failure for either fighter using the existing loading/error conventions.
+8. Respect the existing cancellation token so leaving during asynchronous loading cannot start an abandoned battle.
 
-Instead of:
+Instantiate Battle with the two selected fighter definitions and sprite sets.
 
-vx = 0
-
-during a valid combat ricochet:
-
-vx should reverse direction.
-
-Conceptually:
-
-vx = -vx * restitution
-
-Do not necessarily implement exactly that expression if a better architecture fits the engine, but the physical result should be equivalent.
-
-The fighter should visibly rebound away from the wall.
-
-Example:
-
-Before impact:
-
-vx = +900
-
-With a wall restitution around 0.70:
-
-After impact:
-
-vx ≈ -630
-
-Now the fighter travels back across the stage.
+Quick Battle’s existing loading behavior must remain unchanged.
 
 ⸻
 
-BOUNCE MUST LOSE ENERGY
+Spectator input behavior
 
-Each bounce should lose speed.
+Watch Mode must be spectator-only.
 
-This is essential.
-
-Never create endless ricochets.
-
-Use configurable restitution.
-
-Potential starting range:
-
-0.60–0.80
-
-Do not blindly lock the final value to that range.
-
-Tune it by gameplay.
-
-A strong first hit might produce:
-
-launch
-→ strong first wall bounce
-→ weaker second bounce
-→ small third collision
-→ ordinary fall/recovery.
-
-That is the desired progression.
-
-⸻
-
-FLOOR BOUNCE
-
-A sufficiently hard downward combat launch should be capable of bouncing off solid ground.
-
-Example:
-
-Air BA2 sends opponent downward.
-
-Opponent hits a solid floor with enough downward speed.
-
-Instead of immediately entering an ordinary landing:
-
-they rebound upward.
-
-Conceptually:
-
-Before:
-
-vy > 0
-
-After:
-
-vy = -vy * floorRestitution
-
-Remember ALVA’s coordinate convention when implementing this.
-
-This should make downward-launch attacks much more satisfying around stage geometry.
-
-⸻
-
-CEILING BOUNCE
-
-A fighter launched upward into a solid ceiling with sufficient impact speed should rebound downward.
-
-Example:
-
-BA2 launches vertically.
-
-Target hits the underside of a solid platform/ceiling.
-
-Instead of simply setting:
-
-vy = 0
-
-perform:
-
-upward launch
-→ ceiling impact
-→ downward rebound.
-
-Again, only when the impact exceeds the configured combat-bounce threshold.
-
-⸻
-
-MULTIPLE BOUNCES
-
-Multiple sequential ricochets are specifically desired.
-
-Example:
-
-strong horizontal launch
-→ right wall
-→ left wall
-→ floor
-→ recovery.
-
-Do NOT arbitrarily limit every launch to one bounce.
-
-Instead, let remaining velocity/launch energy naturally determine whether another bounce can happen.
-
-However, include safeguards against pathological loops.
-
-Possible safeguards:
-
-* minimum bounce velocity
-* restitution/energy loss
-* maximum ricochet count as a final safety cap
-* minimum time between impacts if necessary
-
-A safety cap should be generous enough that normal gameplay almost never reaches it.
-
-For example, the system might permit several bounces while velocity naturally decays.
-
-⸻
-
-CORNER COLLISIONS
-
-Handle corners carefully.
-
-A fighter may hit both a horizontal and vertical surface during one simulation step.
-
-Do not produce unstable rapid reflection or teleportation.
-
-If both meaningful axes collide:
-
-reflect each valid impact component once.
-
-For example:
-
-fighter traveling down-right
-→ hits bottom-right corner
-→ X reverses
-→ Y reverses
-→ fighter leaves the corner up-left.
-
-Make the resolution deterministic.
-
-Do not let the fighter remain embedded in geometry.
-
-⸻
-
-ONE-WAY PLATFORMS
-
-Respect ALVA’s existing platform semantics.
-
-One-way platforms should continue behaving like one-way platforms.
-
-A fighter traveling upward through a one-way platform should NOT bounce off its underside.
-
-If a launched fighter is traveling downward and legitimately collides with the top of a one-way platform, decide based on gameplay tuning whether sufficiently strong downward launch can rebound from it.
-
-Preferred behavior:
-
-Allow downward combat bounce from the top of a one-way platform if the landing collision is valid.
-
-Do not turn one-way platforms into fully solid boxes.
-
-⸻
-
-MAIN FLOOR AND CLIFF FACES
-
-Be careful with ALVA’s main floor.
-
-The existing main floor is a finite solid block.
-
-Its top acts as ground.
-
-Its side surfaces are actual cliff faces rather than invisible arena walls.
-
-That distinction must remain.
+The user must not control CPU 1 or CPU 2.
 
 Therefore:
 
-A fighter launched into the SIDE of that physical stage block may bounce from it.
+* No PlayerController in Watch Mode.
+* Gameplay movement/action input must not affect either fighter.
+* Touch combat controls should be hidden/disabled in Watch Mode.
+* Do not show fighter-specific touch action buttons.
 
-A fighter launched beyond the ledge where there is no geometry should continue flying/falling toward the Void.
+However, spectators must still be able to:
 
-Do not create invisible walls at stage boundaries.
+* pause
+* resume
+* restart
+* return Home
+* use keyboard/gamepad pause controls
+* use result/rematch controls
 
-⸻
-
-VOID / RING-OUT
-
-The bounce system must NEVER override the Void.
-
-If a fighter crosses the existing Void boundary:
-
-normal game-mode ring-out/death behavior wins.
-
-Do not bounce from voidBounds.
-
-The Void is not physical geometry.
-
-There must be no invisible bounce at the edge of the screen or kill boundary.
+Make sure disabling gameplay input does not accidentally disable the pause command or gamepad Start.
 
 ⸻
 
-LAUNCH POINT AND BOUNCE INTENSITY
+Pause UI
 
-Launch Point should naturally interact with bounce behavior through launch velocity.
+The existing battle pause interface can be reused.
 
-Do not create a completely unrelated “bounce percentage.”
+In Watch Mode its kicker must say:
 
-Because higher Launch Point already creates stronger launch:
+Watch Mode
 
-low Launch Point
-→ weak knockback
-→ often no bounce or a mild bounce
+instead of:
 
-medium Launch Point
-→ meaningful wall ricochet
+Quick Battle
 
-high Launch Point
-→ strong ricochet and larger travel distance
+Keep the existing useful actions:
 
-extreme launch
-→ potentially ricochets across multiple surfaces or exits into the Void.
+* Resume
+* Restart Battle
+* Help, with its current enabled/disabled behavior
+* Return to Home
 
-This allows the existing ALVA system to determine when bounce becomes dramatic.
+Do not introduce fighter controls into this menu.
 
 ⸻
 
-DO NOT AUTOMATICALLY BOUNCE EVERY ATTACK
+HUD
 
-Attack identity must remain important.
+Use the existing HUD.
 
-The bounce occurs because of launch speed and geometry.
+Watch Mode should show both normal fighter HUD panels and the normal timer/score UI.
 
-Do not simply add:
+The identity tags should make the match clearly CPU-vs-CPU:
 
-wallBounce: true
+* CPU 1
+* CPU 2
 
-to every attack and force it regardless of velocity.
-
-However, the architecture may support optional attack-specific bounce tuning in the future.
-
-For now, prefer global launch physics plus data-driven fighter/stage tuning.
+Do not create a special simplified spectator HUD unless technically required.
 
 ⸻
 
-HITSTUN DURING BOUNCES
+Results
 
-This is extremely important for combos.
+BattleScreen.showResult() currently assumes outcomes mean “Player 1” versus “CPU.”
 
-A wall bounce should create a brief continuation opportunity.
+Make result text mode-aware.
 
-When a launched fighter ricochets from a wall/floor/ceiling, they should not instantly regain full control while still violently flying through the arena.
+Quick Battle must remain unchanged:
 
-Preserve or extend an appropriate amount of hitstun.
+* Player 1 Wins
+* CPU Wins
 
-Consider adding:
+Watch Mode must use:
 
-bounceHitstun
+* CPU 1 Wins
+* CPU 2 Wins
 
-or
+Any sentence identifying the loser should likewise use CPU 1 / CPU 2.
 
-bounceHitstunBonus
-
-if necessary.
-
-Do NOT create huge guaranteed stun periods.
-
-The goal is:
-
-attack
-→ launch
-→ wall bounce
-→ attacker can chase
-→ possible follow-up
-
-rather than:
-
-attack
-→ wall bounce
-→ target immediately air-controls away before the bounce visually finishes.
+Draw behavior should remain exactly as Battle currently defines it.
 
 ⸻
 
-BOUNCES AND COMBOS
+Rematch/restart
 
-The bounce system should integrate with the combo-focused combat changes.
+In Watch Mode:
 
-Desired examples:
+Restart Battle and Rematch must keep:
 
-BA1
-→ BA2 launcher
-→ target hits nearby wall
-→ target rebounds
-→ attacker can chase with air BA1.
+* CPU 1 fighter
+* CPU 2 fighter
+* difficulty
+* stage
+* Watch Mode controller configuration
 
-Or:
+Both AI controllers must reset their transient planning/input state correctly.
 
-air BA2
-→ target is driven downward
-→ floor bounce
-→ attacker lands
-→ grounded follow-up.
-
-Or:
-
-strong horizontal launch
-→ wall bounce
-→ opponent crosses back toward attacker
-→ attacker reads trajectory
-→ follow-up attack.
-
-These should not all be guaranteed combos.
-
-Some should be positional opportunities.
-
-The point is that stage geometry becomes part of combat.
+A rematch must not accidentally convert CPU 1 back to a PlayerController.
 
 ⸻
 
-PLAYER CONTROL WHILE LAUNCHED
+Change Stage
 
-Do not let ordinary movement immediately erase bounce velocity.
+The result screen’s existing Change Stage behavior should return to the Watch Mode Stage selection screen when the match came from Watch Mode.
 
-When the fighter is still under strong combat launch:
+It must continue returning to the normal Quick Battle stage screen for a Quick Battle.
 
-their launch trajectory should dominate.
-
-If ALVA allows some aerial influence during hitstun/recovery, keep it subtle.
-
-The player should not be able to hold left and instantly cancel a +900 launch velocity.
-
-Once launch speed falls and hitstun ends:
-
-ordinary aerial control gradually/cleanly resumes.
+Use the normal navigation stack rather than hard-coded mode assumptions where possible.
 
 ⸻
 
-VISUAL FEEDBACK
+Home navigation
 
-Make bounce impacts readable using existing rendering capabilities.
+Add the new Watch Mode button to HomeScreen.
 
-Do not require new art.
+Requirements:
 
-Possible polish:
+* keyboard reachable
+* gamepad reachable
+* pointer reachable
+* correct spatial/menu navigation order
+* same focus/accessibility conventions as the current Home actions
+* Play remains the default Home focus
+* Practice Ground remains available
+* Discover remains available
 
-* brief hitstop at meaningful surface impact
-* tiny camera shake for strong bounces if ALVA already has camera-shake infrastructure
-* existing impact VFX if reusable
-* stronger sound hook if sound infrastructure exists
+Do not depend on .home-action array indexes in new code.
 
-Do NOT add huge effects that obscure fighters.
-
-The physical rebound itself should communicate most of the impact.
-
-⸻
-
-BOUNCE HITSTOP
-
-Consider a very short impact freeze for sufficiently strong ricochets.
-
-The sequence should feel like:
-
-FLY
-→ IMPACT
-→ tiny pause
-→ REBOUND.
-
-Keep it shorter than or comparable to strong attack hitstop.
-
-Do not freeze every tiny collision.
-
-Expose a threshold so only meaningful bounces receive impact freeze.
+Existing tests currently contain brittle assumptions such as Discover being .home-action[2]; update those tests to locate the intended action semantically where appropriate.
 
 ⸻
 
-DATA-DRIVEN CONFIGURATION
+Styling
 
-Create a clean bounce configuration rather than hardcoded constants.
+Watch Mode should look native to Alva.
 
-Potential structure:
+Reuse:
 
-launchBounce: {
-  enabled: true,
-  minImpactSpeed: ...,
-  wallRestitution: ...,
-  floorRestitution: ...,
-  ceilingRestitution: ...,
-  minExitSpeed: ...,
-  maxBounces: ...,
-  bounceHitstun: ...,
-  impactHitstop: ...,
-}
+* Home action styles
+* setup screen styles
+* difficulty cards
+* fighter roster
+* stage selector
+* Battle/HUD
+* glass panels
+* typography
+* accent/focus styles
+* responsive behavior
 
-This is only a suggested schema.
+Only add CSS when necessary for the new screens or action count.
 
-Adapt it to ALVA’s existing architecture.
+Do not introduce a separate visual design language.
 
-Important values must be centralized and easily tunable.
+Check narrow landscape layouts so the fourth Home action does not overflow or collide with the credits column.
 
-⸻
-
-PHYSICS ARCHITECTURE
-
-Do not make stepBody() know about attacks, BA1, BA2, characters, or combat definitions.
-
-Keep physics generic.
-
-A good architecture could be:
-
-stepBody() detects and reports collision information.
-
-For example:
-
-* horizontal collision
-* horizontal collision normal
-* vertical collision
-* ceiling collision
-* landing collision
-* impact velocity BEFORE it was zeroed
-
-Then Fighter/combat launch logic can decide whether to turn the collision into a combat bounce.
-
-Alternatively, extend stepBody() with a generic collision callback or controlled reflection option.
-
-Choose whichever keeps responsibilities clean.
-
-What should NOT happen is logic like this inside physics:
-
-if (fighter.hitstun && fighter.character.id === '0001') {
-  ...
-}
-
-Never do that.
+Respect reduced-motion behavior.
 
 ⸻
 
-PRESERVE PRE-IMPACT VELOCITY
+Accessibility
 
-This is a major implementation requirement.
+Maintain the existing accessibility standard.
 
-Currently the physics solver can zero velocity when resolving the collision.
+Verify:
 
-For bounce calculations, you need the velocity immediately BEFORE that component is destroyed.
-
-Example information:
-
-impactXVelocity
-impactYVelocity
-collisionNormalX
-collisionNormalY
-
-or equivalent.
-
-Without pre-impact velocity, restitution cannot be calculated correctly.
-
-Design collision reporting appropriately.
+* all Watch setup screens have useful aria-labels
+* each progress list announces “Watch Mode setup” or equivalent
+* CPU 1 and CPU 2 selection screens have distinct accessible headings
+* roster preview IDs are unique
+* current/selected states are announced
+* Back works through keyboard, gamepad, and button
+* focus lands on the previously selected value when returning Back
+* Watch Battle canvas has an appropriate accessible label
+* Watch result dialog announces CPU 1 / CPU 2 correctly
+* no inaccessible touch controls remain active while spectating
 
 ⸻
 
-COLLISION NORMALS
+Tests
 
-Use surface direction rather than guessing based purely on position.
+Add comprehensive tests for Watch Mode and update existing tests affected by the fourth Home action.
 
-Useful normals:
+Prefer a dedicated file such as:
 
-left-facing wall:
+tests/watch-mode.test.mjs
 
-normal = (-1, 0)
+At minimum test all of the following.
 
-right-facing wall:
+Home
 
-normal = (1, 0)
+* Watch Mode button exists.
+* It is located in the intended Home navigation order.
+* Play is still default.
+* Practice and Discover still exist.
+* keyboard/gamepad navigation reaches Watch Mode.
+* clicking Watch Mode begins Watch setup directly, not Select Mode.
 
-floor:
+Full setup flow
 
-normal = (0, -1)
+Verify:
 
-ceiling:
+Home → Watch Difficulty → CPU 1 → CPU 2 → Stage → Battle
 
-normal = (0, 1)
+And Back retraces:
 
-Exact sign conventions can follow ALVA’s coordinate system.
+Battle/Stage ← CPU 2 ← CPU 1 ← Difficulty ← Home
 
-The important part is knowing which velocity component points into the surface.
+Verify selection is retained while navigating backward.
 
-Only reflect velocity that was moving into the surface.
+Progress header
 
-⸻
+Watch screens show:
 
-DETERMINISM
+1. Difficulty
+2. CPU 1
+3. CPU 2
+4. Stage
 
-ALVA uses deterministic fixed-step simulation.
+Quick Battle still shows:
 
-Preserve that.
+1. Mode
+2. Difficulty
+3. Fighter
+4. Stage
 
-No random bounce angles.
+Fighter selection
 
-No frame-rate-dependent bounce strength.
+* CPU 1 and CPU 2 can select different fighters.
+* CPU 1 and CPU 2 can select the same fighter.
+* each roster uses unique preview IDs.
+* unavailable roster slots remain unavailable exactly as before.
 
-No visual-frame-based physics.
+Selection isolation
 
-Given:
+Starting/changing Watch Mode must not mutate Quick Battle’s fighter choice.
 
-same fighter position
-same incoming velocity
-same geometry
-same fixed step
+Quick Battle must not overwrite Watch CPU choices.
 
-the resulting bounce must always be identical.
+Battle construction
 
-⸻
+For Watch Mode assert:
 
-DO NOT USE PURE REALISTIC PHYSICS
+battle.p1.controller instanceof CombatAIController
+battle.p2.controller instanceof CombatAIController
 
-This is a fighting game.
+Assert both controller difficulties equal the selected difficulty.
 
-Prioritize satisfying trajectories over physically perfect simulation.
+Assert:
 
-For example, you may want a minimum outward rebound velocity after an especially strong wall collision so that the bounce is visually clear.
+battle.p1.def.id === cpu1CharacterId
+battle.p2.def.id === cpu2CharacterId
 
-Likewise, extremely shallow wall impacts may need different handling so characters do not jitter along a surface.
+Assert labels:
 
-Tune for combat readability.
+CPU 1
+CPU 2
 
-⸻
+For normal Quick Battle continue asserting:
 
-GLANCING IMPACTS
+battle.p1.controller instanceof PlayerController
+battle.p2.controller instanceof CombatAIController
 
-If a fighter barely clips a wall while mostly traveling vertically:
+RNG
 
-do not cause an enormous horizontal rebound.
+A seeded Watch battle should be deterministic.
 
-Bounce strength should derive primarily from the velocity component directed into that surface.
+CPU 1 and CPU 2 should not share one identical RNG stream.
 
-Likewise:
+Battle screen
 
-fast downward + tiny horizontal movement into wall
+Test:
 
-should remain mostly a downward trajectory after the wall interaction.
+* two different sprite sets can be loaded.
+* mirror matches work.
+* failed CPU 1 loading is handled.
+* failed CPU 2 loading is handled.
+* leaving during loading does not create a stale battle.
+* touch controls are disabled in Watch Mode.
+* pause still works.
+* restart still works.
+* rematch still works.
 
-Preserve tangential velocity wherever reasonable.
+Results
 
-This produces better ricochet trajectories.
+For Watch Mode:
 
-⸻
+* P1 outcome displays CPU 1 Wins.
+* P2 outcome displays CPU 2 Wins.
+* loser descriptions use CPU 1 / CPU 2.
 
-RESTITUTION SHOULD APPLY TO NORMAL VELOCITY
+Quick Battle result wording must remain unchanged.
 
-Conceptually:
+Regression
 
-incoming velocity can be decomposed into:
+Run the complete existing test suite.
 
-* velocity into surface
-* velocity parallel to surface
+Do not weaken or delete existing Quick Battle, Practice Ground, Discover, movement, combat, AI, scoring, stage, or accessibility assertions simply to make Watch Mode pass.
 
-Reflect and reduce the component into the surface.
-
-Preserve most or all of the tangential component.
-
-Example:
-
-fighter moving diagonally down-right hits a vertical wall.
-
-Before:
-
-vx = +800
-vy = +300
-
-After a 0.7 wall bounce:
-
-vx ≈ -560
-vy ≈ +300
-
-This creates a natural-looking ricochet instead of reversing the entire velocity vector.
-
-⸻
-
-BOUNCE COUNT
-
-Track bounce count for the current launched sequence if useful.
-
-Reset it when:
-
-* fighter has fully recovered from combat launch
-* fighter returns to ordinary grounded neutral
-* fighter is hit by another launching attack and begins a new launch sequence
-* fighter respawns
-
-A new attack should establish a new launch sequence.
+Fix any index-based Home tests that became invalid because a fourth action was intentionally added.
 
 ⸻
 
-BEING HIT DURING A BOUNCE
+Documentation
 
-A bounced fighter must remain a valid combat target unless existing ALVA rules say otherwise.
+Update the repository documentation so the game flow reflects Watch Mode.
 
-If Fighter A launches Fighter B:
+At minimum update:
 
-B hits wall
-→ B rebounds
-→ A hits B again in the air
+* README.md
+* ALVA_SPEC.md
 
-the new hit should:
+Document the new route approximately as:
 
-* apply its own damage
-* update Launch Point
-* calculate a fresh launch
-* replace/modify velocity according to ALVA’s existing hit rules
-* start a new launch/bounce sequence
+Home → Watch Mode → Select Difficulty → Select CPU 1 → Select CPU 2 → Select Stage → CPU vs CPU Battle
 
-Do not combine the old ricochet velocity incorrectly with a fresh attack launch unless ALVA’s combat design intentionally does so.
+Explain that:
 
-Existing launch-hit semantics should remain authoritative.
+* Watch Mode is spectator-only.
+* both fighters use CombatAIController.
+* both use the selected difficulty.
+* difficulty changes decision-making only.
+* normal Battle scoring and combat rules are unchanged.
+* CPU 1 and CPU 2 may use different or identical fighters.
 
-⸻
-
-SHIELD
-
-Shield should behave exactly as ALVA intends.
-
-A blocked attack that produces no launch should not cause bounce.
-
-Do not let shielded characters ricochet simply because the attack had potential launch data.
-
-Bounce comes from actual resulting fighter velocity, not theoretical attack strength.
+Also update any Home menu documentation that currently describes Play → Practice Ground → Discover as the complete action list.
 
 ⸻
 
-PROJECTILES
+Important non-regression rules
 
-Existing projectile launch can use the same system.
+Do not:
 
-If a projectile genuinely launches a fighter hard enough into geometry:
-
-the resulting fighter may ricochet.
-
-Do not special-case projectiles unless necessary.
-
-⸻
-
-CLONE ATTACKS
-
-Clone attacks ultimately resolve the owner’s attack behavior through ALVA’s combat architecture.
-
-If a clone attack launches the target strongly enough:
-
-the target should use the same launch-bounce system.
-
-Do not put bounce calculations into the clone itself.
-
-⸻
-
-SPHERE RUSH
-
-Preserve Sphere Rush completely.
-
-Its final explosion already produces a significant launch.
-
-That explosion should naturally be capable of causing a strong ricochet when the opponent collides with nearby stage geometry.
-
-Example:
-
-Sphere Rush explosion
-→ opponent launched toward wall
-→ strong wall impact
-→ rebound across arena.
-
-This could become one of the most satisfying uses of the new system.
-
-Do not alter Sphere Rush’s internal formation/rush/bind/tick/explosion sequence just to implement bounce.
+* rewrite the combat engine for Watch Mode
+* duplicate CombatAIController
+* create separate Watch-only fighter physics
+* make difficulty alter fighter stats
+* remove Practice Ground
+* remove Discover
+* change Quick Battle into CPU-vs-CPU
+* let spectator input control a fighter
+* hard-code Watch Mode to fighter 0001
+* hard-code Watch Mode to one map
+* prohibit mirror matches
+* use one fighter selection for both CPUs
+* leave result text saying “Player 1” in Watch Mode
+* break keyboard/gamepad Back navigation
+* introduce duplicate DOM IDs from multiple fighter rosters
+* leave existing tests silently broken because Home now has four actions
 
 ⸻
 
-COMBO PHILOSOPHY
-
-Bounce should expand ALVA’s combo and pressure possibilities without making infinite combos easy.
-
-Use:
-
-* restitution
-* Launch Point
-* increasing travel distance
-* hitstun tuning
-* positioning
-* attack recovery
-* player movement
-
-to naturally control combo length.
-
-A bounce is primarily a trajectory opportunity.
-
-Not every wall bounce has to guarantee another hit.
-
-⸻
-
-EXPECTED GAME FEEL
-
-When a powerful attack sends someone toward a solid surface, the player should immediately think:
-
-“They’re going to bounce back.”
-
-And then be able to react to that trajectory.
-
-The game should produce visually understandable arcs:
-
-HIT
-→ FLY
-→ WALL IMPACT
-→ REBOUND
-→ CHASE
-→ FOLLOW-UP.
-
-At very high Launch Point:
-
-HIT
-→ FLY
-→ WALL IMPACT
-→ HUGE REBOUND
-→ OTHER WALL / FLOOR
-→ POSSIBLE SECOND RICOCHET
-→ VOID OR RECOVERY.
-
-That is the desired feeling.
-
-⸻
-
-TEST CASES
-
-Add automated tests covering at minimum:
-
-Normal wall collision
-
-Walk normally into wall.
-
-Expected:
-
-vx becomes zero.
-
-No bounce.
-
-Normal ceiling collision
-
-Jump normally into ceiling.
-
-Expected:
-
-vy becomes zero.
-
-No bounce.
-
-Weak launched wall collision
-
-Target enters wall below bounce threshold.
-
-Expected:
-
-ordinary stopping/collision behavior.
-
-No ricochet.
-
-Strong horizontal launch
-
-Target enters wall above threshold.
-
-Expected:
-
-horizontal velocity reverses.
-
-Magnitude is reduced by restitution.
-
-Downward floor launch
-
-Target is launched downward strongly enough.
-
-Expected:
-
-vertical velocity becomes upward after impact.
-
-Target does not immediately become ordinary grounded neutral.
-
-Upward ceiling launch
-
-Target is launched upward strongly enough.
-
-Expected:
-
-vertical velocity reverses downward.
-
-Diagonal wall impact
-
-Target has X and Y velocity.
-
-Hits vertical wall.
-
-Expected:
-
-X reflects/reduces.
-
-Y remains substantially unchanged.
-
-Corner impact
-
-Target collides with valid horizontal and vertical surfaces during the same step.
-
-Expected:
-
-both applicable components resolve once.
-
-No embedding.
-
-No repeated instant bounce.
-
-Multi-bounce
-
-Strong launch into first wall.
-
-Expected:
-
-bounce 1.
-
-Target crosses arena.
-
-Hits second wall with enough remaining velocity.
-
-Expected:
-
-bounce 2 with reduced magnitude.
-
-Bounce decay
-
-Repeated collisions.
-
-Expected:
-
-eventually impact speed drops below threshold.
-
-Ricochet stops.
-
-Normal physics resumes.
-
-One-way platform
-
-Upward travel through underside.
-
-Expected:
-
-no collision/bounce.
-
-Strong downward valid collision with top.
-
-Expected:
-
-configured top-surface bounce behavior.
-
-Void
-
-Target launched beyond stage without hitting geometry.
-
-Expected:
-
-Void behavior unchanged.
-
-No invisible bounce.
-
-New attack during bounce
-
-Target bounces and is hit again.
-
-Expected:
-
-new hit’s launch replaces/updates the old launch according to existing combat rules.
-
-Bounce sequence resets appropriately.
-
-Shield
-
-Attack is blocked.
-
-Expected:
-
-no launch-generated bounce.
-
-Sphere Rush explosion
-
-Explosion launches target into wall.
-
-Expected:
-
-normal bounce system applies.
-
-⸻
-
-TUNING
-
-Start conservatively.
-
-Suggested INITIAL tuning territory, not final mandated values:
-
-min impact speed:
-roughly 400–550 px/s
-wall restitution:
-roughly 0.68–0.78
-floor restitution:
-roughly 0.58–0.72
-ceiling restitution:
-roughly 0.60–0.72
-max bounce safety cap:
-roughly 4–6
-very short bounce impact hitstop:
-roughly 0.025–0.050 seconds
-
-These are starting points only.
-
-Actually test gameplay.
-
-The important outcome is:
-
-* weak hits rarely bounce
-* medium launch creates a clear single ricochet
-* strong launch can produce multiple ricochets
-* each bounce visibly loses energy
-* trajectories stay controllable/readable
-* no infinite pinball loops
-
-⸻
-
-DO NOT
-
-Do NOT:
-
-* make every wall universally bouncy
-* create invisible arena walls
-* bounce from Void boundaries
-* replace Launch Point
-* replace Base Launch
-* replace Directional Launch
-* rewrite ALVA into MultiVersus
-* add MultiVersus-specific defensive mechanics
-* change #0001’s abilities
-* remove Shield
-* remove Dash
-* remove Charge
-* remove Clone
-* remove Sphere Rush
-* change existing art
-* make velocity random after bounce
-* create frame-rate-dependent physics
-* put character-specific attack rules inside physics.js
-* let weak knockback create silly constant bouncing
-* allow infinite wall loops
-
-⸻
-
-ALSO PRESERVE THE PREVIOUS MOVEMENT/COMBO GOAL
-
-This bounce system should work alongside ALVA’s desired fluid combat direction:
-
-* responsive movement
-* smooth aerial control
-* momentum through attacks
-* combat input buffering
-* more accessible combos
-* short intentional combo routes
-* pursuit after launch
-
-Do not interpret the bounce work as permission to introduce MultiVersus’s complete combat mechanics.
-
-The reference game is still being used primarily for feel.
-
-⸻
-
-IMPLEMENTATION PRIORITY
-
-Implement in this order:
-
-1. inspect current collision and launch architecture
-2. expose reliable collision/impact information from physics
-3. track whether Fighter is under meaningful combat launch
-4. add bounce threshold
-5. implement horizontal wall ricochet
-6. implement floor bounce
-7. implement ceiling bounce
-8. handle diagonal/corner collisions
-9. support multiple diminishing bounces
-10. integrate hitstun and combat continuation
-11. verify one-way platforms
-12. verify Void behavior
-13. verify projectiles/clones/Sphere Rush
-14. add automated tests
-15. tune through actual gameplay
-16. update ALVA_SPEC.md
-
-⸻
-
-FINAL ACCEPTANCE CRITERIA
-
-The work is complete when all of these are true:
-
-A fighter walking into a wall simply stops.
-
-A fighter normally jumping into a ceiling simply bonks.
-
-A weak combat launch does not automatically bounce.
-
-A sufficiently strong combat launch hitting a solid wall rebounds.
-
-A sufficiently strong downward launch can bounce from a floor.
-
-A sufficiently strong upward launch can bounce from a ceiling.
-
-Diagonal impacts preserve sensible tangential momentum.
-
-A powerful fighter can bounce from one wall toward another.
-
-Second and subsequent bounces are weaker.
-
-The fighter eventually exits the ricochet state naturally.
-
-Void behavior remains untouched.
-
-Launch Point continues controlling overall knockback strength.
-
-Shield continues working.
-
-Dash continues working.
-
-Charge continues working.
-
-Shuriken continues working.
-
-Clone continues working.
-
-Sphere Rush continues working.
-
-Existing abilities remain ALVA abilities.
-
-Combos can capitalize on bounce trajectories.
-
-The physics remains deterministic at ALVA’s fixed simulation rate.
-
-And most importantly:
-
-A strong launch into stage geometry should produce that satisfying “WHAM → rebound → fly across the stage → potentially hit another surface and bounce again” feeling shown in the reference video, without turning normal ALVA movement into pinball physics.
+Definition of done
+
+The feature is complete when a user can:
+
+1. Open Alva.
+2. Highlight or click Watch Mode from Home.
+3. Select Easy, Medium, Hard, or Brutal.
+4. Select CPU 1’s fighter.
+5. Select CPU 2’s fighter.
+6. Select a stage.
+7. Start the match.
+8. Watch two independently controlled combat AIs fight using the complete normal Alva battle system.
+9. Pause/resume the match without controlling either fighter.
+10. See CPU 1 / CPU 2 correctly identified in the HUD and results.
+11. Restart or rematch without losing the selected setup.
+12. Change Stage and return to the Watch Stage screen.
+13. Return Home.
+14. Start a normal Quick Battle afterward and find its existing behavior unchanged.
+
+Finish by running the complete test suite and report:
+
+* files changed
+* architectural refactors made
+* Watch Mode tests added
+* full test results
+* any remaining browser-only/manual checks
