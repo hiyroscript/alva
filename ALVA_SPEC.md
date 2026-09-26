@@ -27,7 +27,13 @@ behave, and how it must look. The README covers running and deploying it.
   paths: the project page may live under `/alva/` (or the current repository
   name) and must work under any sub-path.
 - Must be served over HTTP(S); sprite normalization reads pixel data.
-- Viewport: `width=device-width, initial-scale=1, viewport-fit=cover`.
+- Viewport: `width=device-width, initial-scale=1, maximum-scale=1,
+  user-scalable=no, viewport-fit=cover`: a web game, so rapid taps and
+  pinches never zoom the page. Together with `touch-action: none` on the
+  battle and practice screens, the battle canvas and every touch button,
+  this is the whole zoom guard: no JavaScript double-tap detection and no
+  blanket `preventDefault()` on touch events. Help and Discover panels
+  still scroll (`touch-action: pan-y`).
 - The page never scrolls; every screen fits the viewport and respects
   `env(safe-area-inset-*)`.
 
@@ -64,7 +70,7 @@ behave, and how it must look. The README covers running and deploying it.
   for the sphere), `rasenDash` (`rasen4`–`rasen6`, the rush: the sphere
   carried behind, swung forward on `rasen6`), `rasenConfirm`
   (`rasen7`–`rasen8`, the successful contact and stop; `rasen8` is held
-  while the sphere on the opponent spins and grows), `rasenExplosion`
+  while the sphere on the opponent spins and shrinks), `rasenExplosion`
   (`rasen9` alone, the pose of the blast itself) and `rasenRelease`
   (`rasen10`–`rasen12`, the release / recovery after the blast). A rush
   that catches nobody has its own one-frame `rasenWhiffRelease`: `rasen12`
@@ -100,7 +106,7 @@ behave, and how it must look. The README covers running and deploying it.
   complete orb, once, 0.5 s), `rasenSphereImpact` (`prasen7`–`prasen9`, the
   authored rotation of the orb spinning on the caught opponent, looped
   `7 → 8 → 9 → 7 → …`, 0.25 s a turn, `loop: true`; the technique draws it
-  ever larger through the hold, since the frames' own sizes do not grow) and
+  ever smaller through the hold, from 3× its own size down to it) and
   `rasenSphereExplosion` (`prasen10`–`prasen11`, the lighter, brighter
   blast, once, ≈0.167 s; never part of the spin). Normalized like the clone
   cloud (own art size, centre anchor, the fighter's world-per-art-pixel
@@ -386,9 +392,12 @@ no header, build label, eyebrow or keyboard hint bar.
 - Two tabs (Help, Credits) sharing one scrollable panel; ←/→ switch tabs,
   ↑/↓ scroll.
 - Help: desktop controls rendered from the live key bindings, mobile control
-  diagram, movement, Charge & cooldowns (including Charge + BA1 = Clone
-  Attack and Charge + BA2 = Sphere Rush: already Charging, forms before
-  dashing, needs a hit to continue, +1 Launch Point at once and every half
+  diagram (the real icons, no T / D / BA1 / BA2: #0001's Shuriken, Punch and
+  Kick from its `mobileAbilities`, the universal Shield, Special and Jump,
+  each named in the diagram's accessible description), movement, Charge &
+  cooldowns (including Charge + BA1 = Clone Attack and Charge + BA2 =
+  Sphere Rush: already Charging, forms before dashing, needs a hit to
+  continue, +1 Launch Point at once and every half
   second while it holds the opponent and 15 on the delayed blast, blocked
   by a Shield, ground needed throughout;
   each on its own 5-second cooldown that Charge recovers twice as fast; no
@@ -775,7 +784,8 @@ read the character database, so it stays the same as fighters are added.
   cooldown); only its launch changed, to the values above. The frame
   files keep their original names.
 - Throw is #0001's projectile attack, on the internal `primary` action
-  (player-facing name Throw; keyboard J, gamepad X / Square, touch **T**).
+  (player-facing name Throw; keyboard J, gamepad X / Square, the touch
+  **Shuriken** button).
   The character data maps `primary: 'throw'`. It is ground-only: there is no
   mid-air Throw art, so pressing it in the air does nothing (no pose, no
   shuriken, Jump / Fall continue). One press plays the 3-frame `throw` clip
@@ -872,8 +882,8 @@ read the character database, so it stays the same as fighters are added.
   platform charges in place and never drops through. If the charge frames
   fail to load, the fighter holds a still idle frame; without the release
   clip the release pose is skipped.
-- Defense is the shared player action (keyboard L, gamepad RB / RT, touch
-  **D**). How a fighter defends is character data (`defense` in
+- Defense is the shared player action (keyboard L, gamepad RB / RT, the
+  touch **Shield** button). How a fighter defends is character data (`defense` in
   `js/data/characters.js`, frozen by `createDefenseDefinition`), not part of
   the input system. The one defense type is the Shield, `{ type: 'shield',
   groundAnimation, airAnimation, groundStartAnimation,
@@ -1019,8 +1029,8 @@ read the character database, so it stays the same as fighters are added.
   technique on the summon system.
 - Charged BA1 Clone Attack (#0001). Trigger: the fighter must already be
   Charging (it entered the Charge state on an earlier simulation step), and
-  Charge must still be held on the step BA1 (`action1`: U, B / Circle, touch
-  **BA1**) is pressed. There is no new button or key. Charge and BA1 pressed
+  Charge must still be held on the step BA1 (`action1`: U, B / Circle, the
+  touch **Punch** button) is pressed. There is no new button or key. Charge and BA1 pressed
   together from idle on the same first step is an ordinary BA1 (normal action
   priority), and so is BA1 pressed on the step Charge is let go (no release
   pose, no clone, no cooldown). It is data on the character: `chargedActions`
@@ -1126,7 +1136,7 @@ read the character database, so it stays the same as fighters are added.
   explicit phases (`form`, `dash`, then `whiffRelease` after a miss, or
   `confirm`, `wait`, `explode`, `release` after a hit, and `done`), never
   inferred from animation frames. It sets no `combat.attack`. Trigger:
-  the shared charged-action rule with BA2 (`action2`: I, LB, touch **BA2**);
+  the shared charged-action rule with BA2 (`action2`: I, LB, touch **Kick**);
   no new control. Charge and BA2 pressed together from idle, or BA2 pressed
   on the step Charge is let go, is ordinary BA2 (10 damage, `2ba1`–`2ba7`,
   unchanged; mid-air BA2 `midair1ba1`–`5` likewise) with no release pose.
@@ -1142,12 +1152,12 @@ read the character database, so it stays the same as fighters are added.
   | --- | --- | --- |
   | `rasen1`–`3` | `rasenForm` | formation |
   | `rasen4`–`6` | `rasenDash` | rush / contact search |
-  | `rasen7`–`8` | `rasenConfirm` | successful contact and stop; `rasen8` held while the sphere grows |
+  | `rasen7`–`8` | `rasenConfirm` | successful contact and stop; `rasen8` held while the sphere shrinks |
   | `rasen9` | `rasenExplosion` | the explosion pose |
   | `rasen10`–`12` | `rasenRelease` | release / recovery after the explosion |
   | `rasen12` | `rasenWhiffRelease` | release after a rush that caught nobody |
   | `prasen1`–`6` | `rasenSphereBuild` | sphere formation (once) |
-  | `prasen7`–`9` | `rasenSphereImpact` | sphere spinning on the target (looped), drawn larger over the hold |
+  | `prasen7`–`9` | `rasenSphereImpact` | sphere spinning on the target (looped), drawn smaller over the hold |
   | `prasen10`–`11` | `rasenSphereExplosion` | explosion (once) |
 
   Deterministic sequence, in 60 Hz fixed steps (all clips at 12 fps; the
@@ -1208,15 +1218,17 @@ read the character database, so it stays the same as fighters are added.
   5. WAIT: #0001 holds `rasen8` (never `rasen9`–`12` before the blast),
      committed (no movement, attack, summon, Shield, Throw, jump or Charge),
      and the bound target holds in its Hurt pose with the sphere still
-     spinning on it and growing: `sphereGrowth` draws it from `startScale`
-     (1, its own art size) at the start of the hold, by the same amount
-     every step, to `endScale` (3, three times its own size) as it
-     explodes. The growth is explicit
-     because the spin frames' own sizes shrink slightly (`prasen7`–`9` are
-     ≈116, 106 and 100 px wide); it never shrinks or pulses, and it is
-     visual only: the sphere stays centred on the target (the drawn frame
-     grows about its centre), and no hitbox, hurtbox, collision or hit ever
-     reads it (the rush's hitbox is gone since the contact).
+     spinning on it and shrinking, the growth reversed: `sphereGrowth`
+     draws it at `startScale` (3, three times its own art size) from the
+     contact through the contact poses and the start of the hold, then
+     smaller by the same amount every step, to `endScale` (1, its own
+     size) as it explodes. The change is explicit and one way only (never
+     growing back or pulsing; the spin frames' own sizes, ≈116, 106 and
+     100 px wide for `prasen7`–`9`, never drive it), and it is visual only:
+     the sphere stays centred on the target (the drawn frame shrinks about
+     its centre), and no hitbox, hurtbox, collision or hit ever reads it
+     (the rush's hitbox is gone since the contact). `sphereGrowth` may run
+     either way; the technique is refused only if a scale is not above 0.
      TICKS: the contact queues exactly one `tickHit` at once, dealt on the
      contact step itself right after the contact; then, through CONFIRM
      and WAIT, while the target is still bound by the technique, every
@@ -1233,7 +1245,7 @@ read the character database, so it stays the same as fighters are added.
   6. EXPLODE: exactly 2.0 s (`explosionDelay`, 120 steps) after the
      contact step, counted from the hit, never from formation: #0001
      switches to `rasen9`, the explosion pose, and the sphere stops spinning
-     and growing and plays `prasen10 → prasen11` once at the grown size. On
+     and shrinking and plays `prasen10 → prasen11` once at `endScale`. On
      the step `prasen10` first shows the target is released from the bind
      and then takes the explosion, exactly once: 15 damage (19 in all with
      the four ticks) with `baseLaunch: 3, directionalLaunch: 'horizontal'`:
@@ -1568,19 +1580,41 @@ read the character database, so it stays the same as fighters are added.
 - Touch (landscape, Pointer Events, true multi-touch): lower-left
   Left · C · Right with thumb sliding, where the middle button reads **C**, is
   labelled "Charge" and stays pressed for as long as the pointer holds it;
-  lower-right staggered cluster —
-  Throw (top, the larger button, reading exactly **T** and labelled
-  "Throw"; it sends the internal `primary` action) · Special, Defense · BA1,
-  BA2, Jump (bottom-right). The
-  Defense button sits in the old Block slot; it reads exactly **D** (no
-  icon) and is labelled "Defense"; #0001 holds it to Shield.
-  The BA1 button (Basic Attack 1, internally `action1`) and the BA2 button
-  (Basic Attack 2, internally `action2`) are solid like Defense and Jump.
+  lower-right staggered cluster, the same positions and sizes as ever —
+
+  ```
+                 [SHURIKEN]
+          [SPECIAL] [SHIELD]
+     [PUNCH] [KICK] [JUMP]
+  ```
+
+  Every combat button shows an original monochrome SVG icon
+  (`currentColor`, from `js/ui/icons.js`) and no text: no **T**, **D**,
+  **BA1** or **BA2**. Its accessible name says what it is. The fighter's
+  own buttons, the large top one (`primary`), and the first two of the
+  bottom row (`action1`, `action2`), take their icon and name from the
+  character's `mobileAbilities` (UI data, never read by combat): for #0001
+  **Shuriken** (a four-bladed throwing star), **Punch** (a fist) and
+  **Kick** (a leg and foot). `TouchControls.setCharacter(def)` applies them
+  without rebuilding anything; Quick Battle calls it with Player 1's
+  fighter as it enters, Practice Ground as it enters and on every
+  successful Change Fighter (a CPU change never touches them). A fighter
+  with no `mobileAbilities` gets the generic names (Throw, Basic Attack 1,
+  Basic Attack 2) and neutral glyphs (a ring, one pip, two pips). The
+  universal buttons belong to the controls: **Shield** (the shield
+  outline, labelled "Shield"; held for as long as the pointer stays on it)
+  in the old Block slot, Special and Jump.
+  Only the presentation changed: the buttons keep their `data-action`
+  and still send the unchanged internal inputs `primary`, `defense`,
+  `action1` and `action2`, so Charge + Punch is the Charged BA1 Clone
+  Attack and Charge + Kick the Charged BA2 Sphere Rush. The combat glyphs
+  are drawn slightly larger (`.tc-ability .icon`) and share the pressed
+  state of every button.
   Tapping the timer or the pause section beneath it (top centre, 7.3) pauses.
   Original circular icons, translucent dark fill, white outlines; pressed
   buttons scale down and brighten to white — no hue.
   Reserved actions (only Special now) use dashed outlines and never show
-  nagging alerts; Throw is solid.
+  nagging alerts; Shuriken, Shield, Punch and Kick are solid.
 - Touch controls appear only on touch-first devices (coarse pointer or an
   observed touch), never merely because a desktop window is narrow.
 - Gameplay pauses when the pause menu (Practice Ground: the Practice menu,

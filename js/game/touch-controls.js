@@ -2,20 +2,26 @@
 //
 // Layout (matches the reference ergonomics):
 //   lower-left : [LEFT] [C] [RIGHT]  — thumb can slide between them
-//   lower-right:              [T]
-//                       [SPECIAL] [D]
-//                    [BA1] [BA2] [JUMP]
+//   lower-right:                [SHURIKEN]
+//                       [SPECIAL] [SHIELD]
+//                    [PUNCH] [KICK] [JUMP]
 //
 // C is Charge (the `charge` input, held for as long as the pointer stays on
-// it). T is Throw, the `primary` input, in the large top slot. D is Defense
-// (the `defense` input), labelled Defense; #0001 holds it to Shield. BA1 (Basic Attack 1) is the `action1` input, BA2
-// (Basic Attack 2) the `action2` input.
+// it). The large top slot is the `primary` input, the lower row's first two
+// buttons `action1` and `action2`: their look is the fighter's own (#0001's
+// Shuriken, Punch and Kick; see setCharacter and js/ui/mobile-abilities.js).
+// Shield is the universal `defense` input, held for as long as the pointer
+// stays on it. Only the icons and accessible names are player-facing: the
+// internal input names are unchanged, so Charge + Punch is still Charge +
+// action1 (the Clone Attack), and Charge + Kick is Charge + action2 (the
+// Sphere Rush).
 //
 // Every pointer is tracked by pointerId, so Right + Jump (or any combination)
 // works simultaneously. State is pushed into InputManager.setTouch().
 
 import { el } from '../core/utils.js';
 import { ICONS } from '../ui/icons.js';
+import { ABILITY_ACTIONS, mobileAbility } from '../ui/mobile-abilities.js';
 
 // Lower-left cluster, in on-screen order.
 const DPAD = [
@@ -24,27 +30,30 @@ const DPAD = [
   { action: 'right', label: 'Move right', icon: ICONS.right },
 ];
 
-// `pending` marks reserved actions that wait on future attack animations.
+// Lower-right cluster, in on-screen order. `pending` marks reserved actions
+// that wait on future attack animations. `ability` marks the combat ability
+// glyphs (drawn a little larger); the fighter-specific ones (primary,
+// action1, action2) carry no icon or label here: setCharacter fills them in.
 const ACTION_BUTTONS = [
-  { action: 'primary', label: 'Throw', text: 'T', pos: 'throw' },
+  { action: 'primary', pos: 'throw', ability: true },
   { action: 'special', label: 'Special', icon: ICONS.special, pos: 'special', pending: true },
-  { action: 'defense', label: 'Defense', text: 'D', pos: 'defense' },
-  { action: 'action1', label: 'Basic Attack 1', text: 'BA1', pos: 'a1' },
-  { action: 'action2', label: 'Basic Attack 2', text: 'BA2', pos: 'a2' },
+  { action: 'defense', label: 'Shield', icon: ICONS.shield, pos: 'defense', ability: true },
+  { action: 'action1', pos: 'a1', ability: true },
+  { action: 'action2', pos: 'a2', ability: true },
   { action: 'jump', label: 'Jump', icon: ICONS.jump, pos: 'jump' },
 ];
 
 function makeButton(spec, cls) {
-  const content = spec.icon || el('span', { class: 'tc-text', text: spec.text });
+  const content = spec.icon || (spec.text && el('span', { class: 'tc-text', text: spec.text }));
   const btn = el('button', {
     type: 'button',
-    class: `tc-btn ${cls}${spec.pending ? ' is-pending' : ''}`,
+    class: `tc-btn ${cls}${spec.ability ? ' tc-ability' : ''}${spec.pending ? ' is-pending' : ''}`,
     'aria-label': spec.label,
     'data-action': spec.action,
     tabindex: '-1',
   });
   if (typeof content === 'string') btn.innerHTML = content;
-  else btn.append(content);
+  else if (content) btn.append(content);
   return btn;
 }
 
@@ -75,6 +84,8 @@ export class TouchControls {
     this.dpad = dpad;
     this.actions = actions;
     this.root.replaceChildren(dpad, actions);
+    // Neutral until a screen names the fighter.
+    this.setCharacter(null);
 
     // Lower-left cluster: it captures the pointer so a thumb can slide between
     // LEFT / C / RIGHT without lifting.
@@ -177,5 +188,19 @@ export class TouchControls {
   setEnabled(enabled) {
     this.enabled = enabled;
     if (!enabled) this.releaseAll();
+  }
+
+  // Shows `def`'s own abilities (its mobileAbilities) on the fighter-specific
+  // buttons: each one's icon and accessible name, nothing else. The buttons
+  // stay the same elements with the same data-action and pointer handling,
+  // so input, held state and multi-touch carry on untouched. Null (or a
+  // fighter that authors none) gives the neutral fallback.
+  setCharacter(def) {
+    for (const action of ABILITY_ACTIONS) {
+      const { label, icon } = mobileAbility(def, action);
+      const b = this.buttons.get(action);
+      b.setAttribute('aria-label', label);
+      b.innerHTML = icon;
+    }
   }
 }

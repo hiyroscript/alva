@@ -235,7 +235,7 @@ export const CHARACTERS = [
       // palm opens for the sphere to form in. rasenDash (4-6): the rush,
       // sphere carried behind, swung forward on rasen6. The rest only a hit
       // shows: rasenConfirm (7-8), the palm driven into the opponent, rasen8
-      // held while the sphere on it grows; rasenExplosion (9), the pose of
+      // held while the sphere on it shrinks; rasenExplosion (9), the pose of
       // the blast itself; rasenRelease (10-12), the recovery once the blast
       // is over. rasenWhiffRelease reuses rasen12 (the same file, never a
       // copy) alone, for one frame after a rush that caught nobody. Faces
@@ -311,7 +311,7 @@ export const CHARACTERS = [
       // The Sphere Rush's blue sphere (prasen1-11), split into three clips:
       // rasenSphereBuild forms it in the hand (prasen1-6, once),
       // rasenSphereImpact is the sphere spinning on the caught opponent
-      // (prasen7 -> 8 -> 9, looped until it explodes, drawn ever larger by
+      // (prasen7 -> 8 -> 9, looped until it explodes, drawn ever smaller by
       // the technique's sphereGrowth) and rasenSphereExplosion is the
       // delayed blast (prasen10-11, the lighter, brighter frames, once). A
       // round effect: never mirrored.
@@ -449,14 +449,14 @@ export const CHARACTERS = [
       shieldHitCost: 25,
     },
 
-    // What the shared Defense input (L, RB / RT, touch D) does for this
-    // fighter. #0001 shields: held Defense keeps a Shield up all round him,
-    // `groundAnimation` on the ground (raised by `groundStartAnimation`,
-    // lowered by `groundReleaseAnimation`) and `airAnimation` in the air,
-    // where he keeps falling. Every hit it blocks costs energy.shieldHitCost
-    // and deals nothing else: no Launch Point, no launch (see
-    // createDefenseDefinition and CombatSystem.applyHit in
-    // js/game/combat.js).
+    // What the shared Defense input (L, RB / RT, the touch Shield button)
+    // does for this fighter. #0001 shields: held Defense keeps a Shield up
+    // all round him, `groundAnimation` on the ground (raised by
+    // `groundStartAnimation`, lowered by `groundReleaseAnimation`) and
+    // `airAnimation` in the air, where he keeps falling. Every hit it
+    // blocks costs energy.shieldHitCost and deals nothing else: no Launch
+    // Point, no launch (see createDefenseDefinition and
+    // CombatSystem.applyHit in js/game/combat.js).
     defense: {
       type: 'shield',
       groundAnimation: 'shield',
@@ -473,6 +473,19 @@ export const CHARACTERS = [
       special: null,
       action1: { ground: 'ba1', air: 'midairBa1' }, // Basic Attack 1 (BA1)
       action2: { ground: 'ba2', air: 'midairBa2' }, // Basic Attack 2 (BA2)
+    },
+
+    // How the touch controls present this fighter's own buttons: an icon
+    // (a key of ICONS in js/ui/icons.js) and an accessible name for each.
+    // UI only (see js/ui/mobile-abilities.js): the buttons still send
+    // primary, action1 and action2, and nothing here reaches combat. Each
+    // names the button's ability family, not every move it makes: Punch is
+    // also the mid-air kunai slash, and with Charge held the Clone Attack.
+    // The Shield, Special, Jump and movement buttons are universal.
+    mobileAbilities: {
+      primary: { label: 'Shuriken', icon: 'shuriken' },
+      action1: { label: 'Punch', icon: 'punch' },
+      action2: { label: 'Kick', icon: 'kick' },
     },
 
     // Charged actions: what a combat button does when pressed while the
@@ -538,7 +551,7 @@ export const CHARACTERS = [
       // rasenWhiffRelease pose (rasen12, one frame) before he is free. A hit
       // binds the opponent (no damage of its own) and the sphere moves onto
       // it, spinning there (prasen7-9 looped) while rasenConfirm plays
-      // rasen7 -> rasen8 and holds rasen8 as the sphere grows. While it is
+      // rasen7 -> rasen8 and holds rasen8 as the sphere shrinks. While it is
       // held, 1 Launch Point is added at once on the hit's own step and then
       // every 0.5 s, with no launch (0, 0.5, 1 and 1.5 s after the hit). 2 s
       // after the hit it explodes (prasen10-11) while #0001 is on
@@ -579,11 +592,12 @@ export const CHARACTERS = [
         targetOffset: { x: 0, y: -48 },
         // Seconds from the hit to the explosion.
         explosionDelay: 2.0,
-        // The sphere on the opponent, drawn at its own art size from the hit,
-        // grows steadily through the rasen8 hold to three times that as it
-        // explodes, a looming threat by then; the blast bursts at that size.
-        // Visual only: sphereHitbox, hurtboxes and every hit stay as they are.
-        sphereGrowth: { startScale: 1, endScale: 3 },
+        // The sphere on the opponent, drawn at three times its own art size
+        // from the hit, shrinks steadily through the rasen8 hold back to its
+        // own size as it explodes, the growth reversed: it closes in on the
+        // opponent, and the blast bursts at that size. Visual only:
+        // sphereHitbox, hurtboxes and every hit stay as they are.
+        sphereGrowth: { startScale: 3, endScale: 1 },
         // The sphere's contact: the setup, no damage and no launch. The bind
         // that follows (not this hitstun) is what holds the opponent; its
         // first tickHit lands on this same step.

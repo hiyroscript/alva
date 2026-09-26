@@ -388,9 +388,9 @@ test('the Sphere Rush data: 1050 dash, a contact that only binds, +1 every 0.5 s
   assert.equal(TECH.explosionAnimation, 'rasenExplosion');
   assert.equal(TECH.releaseAnimation, 'rasenRelease');
   assert.equal(TECH.whiffReleaseAnimation, 'rasenWhiffRelease');
-  // The sphere on the target grows dramatically, from its own size to three
-  // times it by the blast, never shrinking.
-  assert.deepEqual(TECH.sphereGrowth, { startScale: 1, endScale: 3 });
+  // The growth reversed: the sphere catches the target at three times its
+  // own size and shrinks steadily back to it by the blast, never growing.
+  assert.deepEqual(TECH.sphereGrowth, { startScale: 3, endScale: 1 });
   assert.equal(TECH.sphereBuild, 'rasenSphereBuild');
   assert.equal(TECH.sphereImpact, 'rasenSphereImpact');
   assert.equal(TECH.sphereExplosion, 'rasenSphereExplosion');
@@ -777,7 +777,7 @@ test('after the hit #0001 plays rasen7 -> rasen8 and holds rasen8 until the blas
   assert.equal(log.at(-1).frame, EXPLOSION_POSE, 'the blast belongs with rasen9');
 });
 
-test('the sphere on the target grows steadily through the rasen8 hold, from startScale to endScale at the blast, centred on the target', () => {
+test('the sphere on the target shrinks steadily through the rasen8 hold, from startScale to endScale at the blast, centred on the target', () => {
   const { startScale, endScale } = TECH.sphereGrowth;
   const d = hitDuel();
   const t = hitConfirm(d);
@@ -797,33 +797,35 @@ test('the sphere on the target grows steadily through the rasen8 hold, from star
   const before = log.slice(0, -1);
   const confirm = before.filter((s) => s.phase === 'confirm');
   const hold = before.filter((s) => s.phase === 'wait');
-  // Its own size through the contact poses; the growth is the rasen8 hold.
+  // Caught at startScale through the contact poses; the shrink is the
+  // rasen8 hold.
   assert.ok(confirm.every((s) => s.scale === startScale));
   assert.ok(hold.every((s) => s.frame === HOLD_POSE));
   const early = hold[0].scale;
   const mid = hold[Math.floor(hold.length / 2)].scale;
   const late = hold.at(-1).scale;
-  // Steady: the same increment every step, never a shrink, a jump or a pulse.
+  // Steady: the same decrement every step, never a growth, a jump or a pulse.
   const step = (endScale - startScale) / hold.length;
-  assert.ok(step > 0 && step < 0.05, `small fixed steps, never a jump between sizes: ${step}`);
+  assert.ok(step < 0 && step > -0.05, `small fixed steps, never a jump between sizes: ${step}`);
   for (let i = 1; i < hold.length; i++) {
-    assert.ok(hold[i].scale > hold[i - 1].scale, `growing at step ${i}`);
+    assert.ok(hold[i].scale < hold[i - 1].scale, `shrinking at step ${i}`);
     assert.ok(close(hold[i].scale - hold[i - 1].scale, step, 1e-9), `step ${i}`);
   }
-  assert.ok(close(early, startScale), 'the hold starts at the sphere\'s own size');
-  assert.ok(early < mid && mid < late && late < endScale, `${early} < ${mid} < ${late} < ${endScale}`);
-  assert.ok(close(mid, (startScale + endScale) / 2, step), 'about halfway grown halfway through the hold');
-  assert.ok(close(late, endScale - step, 1e-9), 'one step short of full size just before the blast');
-  assert.ok(mid > 1.9 && late > 2.9, `much bigger, not a subtle swell: ${mid} halfway, ${late} at the end`);
-  // The blast bursts at the full size.
+  assert.ok(close(early, startScale), 'the hold starts at the size it caught the target at');
+  assert.ok(early > mid && mid > late && late > endScale, `${early} > ${mid} > ${late} > ${endScale}`);
+  assert.ok(close(mid, (startScale + endScale) / 2, -step), 'about halfway shrunk halfway through the hold');
+  assert.ok(close(late, endScale - step, 1e-9), 'one step short of its own size just before the blast');
+  assert.ok(early > 2.9 && mid < 2.1 && late < 1.1, `the growth reversed, not a subtle change: ${early}, ${mid} halfway, ${late} at the end`);
+  // The blast bursts at the final size, the sphere's own.
   assert.equal(log.at(-1).phase, 'explode');
   assert.equal(log.at(-1).scale, endScale);
+  assert.equal(endScale, 1);
   // Visual only: the centre stays on the target, no contact box comes back
-  // and nothing more is hit while it grows.
+  // and nothing more is hit while it shrinks.
   assert.deepEqual(before.map((s) => s.centre), before.map((s) => s.target), 'the centre never drifts');
   assert.ok(before.every((s) => !s.searching));
   assert.deepEqual(d.events.map((e) => [e.type, e.damage]), FULL_RUSH, 'the contact, the ticks, then only the explosion');
-  // Deterministic at the fixed 60 Hz step: a second catch grows identically.
+  // Deterministic at the fixed 60 Hz step: a second catch shrinks identically.
   const again = hitDuel();
   const u = hitConfirm(again);
   const scales = [u.sphereScale];
@@ -834,12 +836,12 @@ test('the sphere on the target grows steadily through the rasen8 hold, from star
   assert.deepEqual(scales, log.map((s) => s.scale));
 });
 
-test('the growth is visual only: a sphere growing to 3x reaches, hits, binds, ticks, blasts and launches exactly like one that never grows', () => {
+test('the size change is visual only: a sphere shrinking from 3x reaches, hits, binds, ticks, blasts and launches exactly like one that stays its own size', () => {
   const { startScale, endScale } = TECH.sphereGrowth;
-  assert.ok(endScale >= 2.75, `the dramatic growth is what is under test: ${endScale}`);
-  const flatDef = { ...def, chargedTechniques: { rasenRush: { ...TECH, sphereGrowth: { startScale, endScale: startScale } } } };
+  assert.ok(startScale >= 2.75 && endScale === 1, `the dramatic reversed growth is what is under test: ${startScale} -> ${endScale}`);
+  const flatDef = { ...def, chargedTechniques: { rasenRush: { ...TECH, sphereGrowth: { startScale: 1, endScale: 1 } } } };
   const flat = makeFighter({ character: flatDef }).fighter.techniqueDefs.rasenRush;
-  assert.deepEqual({ ...flat.sphereGrowth }, { startScale, endScale: startScale });
+  assert.deepEqual({ ...flat.sphereGrowth }, { startScale: 1, endScale: 1 });
   const hitboxBefore = { ...TECH.sphereHitbox };
   // One whole Sphere Rush at `gap`, then the flight: every step's owner and
   // target, the rush's contact box and every hit, all but the drawn scale.
@@ -887,8 +889,9 @@ test('the growth is visual only: a sphere growing to 3x reaches, hits, binds, ti
     for (const box of boxes) assert.deepEqual([box.w, box.h], [TECH.sphereHitbox.w, TECH.sphereHitbox.h]);
     if (gap < edge) {
       assert.deepEqual(grown.events.map((e) => [e.type, e.damage]), FULL_RUSH);
-      assert.ok(Math.max(...grown.scales.filter((v) => v !== null)) === endScale, 'this one did grow');
-      assert.ok(plain.scales.every((v) => v === null || v === startScale), 'that one never did');
+      assert.ok(Math.max(...grown.scales.filter((v) => v !== null)) === startScale, 'this one did change size');
+      assert.ok(grown.scales.includes(endScale));
+      assert.ok(plain.scales.every((v) => v === null || v === 1), 'that one never did');
     } else {
       assert.deepEqual(grown.events, [], 'out of reach either way');
     }
@@ -1717,8 +1720,9 @@ test('each missing fighter clip or sphere effect refuses the Sphere Rush: normal
   assert.equal(d.attacker.technique, null);
   assert.equal(d.attacker.combat.attack?.def.id, 'ba2');
   assert.match(warnings[0], /rasenRush.*dashSpeed/);
-  // So is a sphere that would shrink.
-  const shrinking = { ...def, chargedTechniques: { rasenRush: { ...TECH, sphereGrowth: { startScale: 1.2, endScale: 1 } } } };
+  // So is a sphere that would shrink away to nothing (shrinking to a size
+  // above 0, #0001's own reversed growth, is fine).
+  const shrinking = { ...def, chargedTechniques: { rasenRush: { ...TECH, sphereGrowth: { startScale: 3, endScale: 0 } } } };
   const e = duel();
   e.attacker.techniqueDefs.rasenRush = makeFighter({ character: shrinking }).fighter.techniqueDefs.rasenRush;
   const shrinkWarnings = captureWarnings(() => {
@@ -1964,7 +1968,7 @@ test('Battle draws the sphere over both fighters, in the hand then on the target
   assert.deepEqual([cx, cy], [battle.p2.renderX, battle.p2.renderY - 48]);
   assert.deepEqual(translateBefore('0001_prasen7.png'), [Math.round(cx - 1000), Math.round(cy - 400)]);
   // #0001 settles on rasen8 and holds it while the sphere on the target
-  // keeps spinning 7 -> 8 -> 9 -> 7 ..., never mirrored, drawn ever larger
+  // keeps spinning 7 -> 8 -> 9 -> 7 ..., never mirrored, drawn ever smaller
   // about the same centre, until it blows.
   const at = (id) => calls.find((c) => c[0] === 'drawImage' && c[1].id === id);
   const base = at('0001_prasen7.png')[4]; // drawn width on the contact step
@@ -1982,7 +1986,7 @@ test('Battle draws the sphere over both fighters, in the hand then on the target
     poses.push(frame[1]);
     widths.push(w);
     assert.equal(mirrored(sphere), false);
-    assert.deepEqual(translateBefore(sphere), centre, 'the centre never drifts as it grows');
+    assert.deepEqual(translateBefore(sphere), centre, 'the centre never drifts as it shrinks');
     assert.ok(Math.abs(dx + w / 2) <= 1 && Math.abs(dy + h / 2) <= 1, 'drawn about that centre');
   }
   assert.deepEqual(order(poses), ['0001_rasen7.png', HOLD_POSE], 'rasen7, then rasen8 held: no rasen9-12 before the blast');
@@ -1990,13 +1994,15 @@ test('Battle draws the sphere over both fighters, in the hand then on the target
     '0001_prasen7.png', '0001_prasen8.png', '0001_prasen9.png', '0001_prasen7.png',
     '0001_prasen8.png', '0001_prasen9.png', '0001_prasen7.png',
   ]);
-  assert.ok(widths.every((w, i) => i === 0 || w >= widths[i - 1]), 'never shrinks');
-  assert.equal(widths[0], base, 'caught at its own size');
-  assert.ok(widths.at(-1) > base * 2.5, `grown dramatically: ${base} -> ${widths.at(-1)} px`);
-  // The blast: rasen9 with the lighter prasen10, at the grown size, then
-  // prasen11 still on rasen9.
+  const { startScale, endScale } = TECH.sphereGrowth;
+  assert.ok(widths.every((w, i) => i === 0 || w <= widths[i - 1]), 'never grows back');
+  assert.equal(base, Math.round(10 * 2 * startScale), 'caught at three times its own size');
+  assert.equal(widths[0], base);
+  assert.ok(widths.at(-1) < base / 2.5, `shrunk dramatically: ${base} -> ${widths.at(-1)} px`);
+  // The blast: rasen9 with the lighter prasen10, at the final size (its
+  // own), then prasen11 still on rasen9.
   assert.deepEqual(draws().slice(1), [EXPLOSION_POSE, '0001_prasen10.png']);
-  assert.equal(at('0001_prasen10.png')[4], Math.round(base * TECH.sphereGrowth.endScale));
+  assert.equal(at('0001_prasen10.png')[4], Math.round(10 * 2 * endScale));
   const blast = [];
   for (battle.update(DT); t.phase === 'explode'; battle.update(DT)) blast.push(draws().slice(1).join());
   assert.deepEqual(order(blast), [`${EXPLOSION_POSE},0001_prasen10.png`, `${EXPLOSION_POSE},0001_prasen11.png`]);

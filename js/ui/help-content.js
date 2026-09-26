@@ -4,7 +4,9 @@
 
 import { CONFIG, ACTION_LABELS, keyLabel } from '../config.js';
 import { el } from '../core/utils.js';
+import { getCharacter } from '../data/characters.js';
 import { ICONS } from './icons.js';
+import { mobileAbility } from './mobile-abilities.js';
 
 // Wired into input and combat but reserved until it has attack artwork.
 const PENDING = new Set(['special']);
@@ -34,27 +36,35 @@ function controlsTable() {
   ]);
 }
 
+// The mobile layout as #0001 plays it: its own Shuriken, Punch and Kick
+// come from its mobileAbilities, exactly as the real touch controls show
+// them, beside the universal Shield, Special and Jump.
 function mobileDiagram() {
   const dot = (cls, icon, label) =>
     el('span', { class: `md-btn ${cls}`, title: label }, [el('span', { class: 'md-icon', html: icon })]);
-  return el('div', { class: 'mobile-diagram', role: 'img', 'aria-label': 'Landscape phone layout: Left, Charge and Right controls at the lower left; Throw (T), Special, Defense (D), Basic Attack 1 (BA1), Basic Attack 2 (BA2) and Jump staggered at the lower right; the timer and Pause at the top centre. Throw makes #0001 throw a shuriken. #0001 holds Defense to Shield.' }, [
+  const own = (cls, action) => {
+    const { icon, label } = mobileAbility(getCharacter('0001'), action);
+    return dot(cls, icon, label);
+  };
+  return el('div', { class: 'mobile-diagram', role: 'img', 'aria-label': 'Landscape phone layout for #0001: Left, Charge and Right controls at the lower left; Shuriken, Special, Shield, Punch, Kick and Jump staggered at the lower right; the timer and Pause at the top centre. Shuriken throws #0001’s shuriken. Hold Shield to keep #0001’s Shield up. Punch and Kick are Basic Attacks 1 and 2.' }, [
     el('div', { class: 'md-screen' }, [
       dot('md-pause', ICONS.pause, 'Pause'),
       dot('md-left', ICONS.left, 'Left'),
       dot('md-charge', '<b>C</b>', 'Charge'),
       dot('md-right', ICONS.right, 'Right'),
-      dot('md-throw', '<b>T</b>', 'Throw'),
+      own('md-throw', 'primary'),
       dot('md-special', ICONS.special, 'Special'),
-      dot('md-defense', '<b>D</b>', 'Defense'),
-      dot('md-a1', '<b>BA1</b>', 'Basic Attack 1'),
-      dot('md-a2', '<b>BA2</b>', 'Basic Attack 2'),
+      dot('md-defense', ICONS.shield, 'Shield'),
+      own('md-a1', 'action1'),
+      own('md-a2', 'action2'),
       dot('md-jump', ICONS.jump, 'Jump'),
     ]),
     el('dl', { class: 'detail-list md-legend' }, [
       el('dt', { text: 'Lower left' }), el('dd', { text: 'Left · Charge · Right' }),
-      el('dt', { text: 'Lower right' }), el('dd', { text: 'T, Special · D, BA1 · BA2 · Jump' }),
-      el('dt', { text: 'T' }), el('dd', { text: 'Throw; #0001 throws a shuriken.' }),
-      el('dt', { text: 'D' }), el('dd', { text: 'Defense; hold it and #0001 shields.' }),
+      el('dt', { text: 'Lower right' }), el('dd', { text: 'Shuriken, Special, Shield, Punch, Kick and Jump' }),
+      el('dt', { text: 'Shuriken' }), el('dd', { text: 'Throws #0001’s shuriken.' }),
+      el('dt', { text: 'Shield' }), el('dd', { text: 'Hold it to keep #0001’s Shield up; let go to lower it.' }),
+      el('dt', { text: 'Punch · Kick' }), el('dd', { text: 'Basic Attacks 1 and 2, on the ground and in the air. Hold Charge first for the Clone Attack or the Sphere Rush.' }),
       el('dt', { text: 'Top centre' }), el('dd', { text: 'Timer · Pause' }),
     ]),
   ]);
@@ -68,7 +78,7 @@ export function buildHelp() {
     ], 'info-card--wide'),
     card('Mobile controls', [
       mobileDiagram(),
-      el('p', { class: 'info-note', text: 'Play in landscape. Hold a direction and press Jump with your other thumb; you can slide between Left, C and Right without lifting, and tap Left or Right twice to Dash. C is Charge: hold it to charge. T is Throw. D is Defense: hold it to Shield. BA1 and BA2 are Basic Attacks 1 and 2; only the dashed Special button is reserved.' }),
+      el('p', { class: 'info-note', text: 'Play in landscape. Hold a direction and press Jump with your other thumb; you can slide between Left, C and Right without lifting, and tap Left or Right twice to Dash. C is Charge: hold it to charge. Shuriken throws; hold Shield to keep it up. Punch (the fist) and Kick (the leg) are Basic Attacks 1 and 2: hold C first to turn them into the Clone Attack and the Sphere Rush. Only the dashed Special button is reserved.' }),
     ]),
     card('Movement', [
       el('ul', { class: 'info-list' }, [
@@ -84,23 +94,23 @@ export function buildHelp() {
         el('li', { text: 'Hold Charge (S / ↓, or C on touch) while grounded to enter #0001’s charging stance. Charge must be held: release it to stop charging.' }),
         el('li', { text: 'Charge plays its two-frame startup once, then loops its sustained pose for as long as you hold it. Each new Charge starts again from the startup.' }),
         el('li', { text: 'You stay in place while charging. Let go and #0001 shows its first Charge pose for a moment before returning to normal. Jump and Throw take over from Charge at once, holding Defense raises the Shield instead, and a hit interrupts it. Letting go of Charge as you press BA1 gives a normal BA1, and the same goes for BA2.' }),
-        el('li', { text: 'While already charging: Charge + BA1 = Clone Attack; Charge + BA2 = Sphere Rush. Pressing Charge and the button together from a standstill gives the normal attack.' }),
+        el('li', { text: 'While already charging: Charge + BA1 (Punch on touch) = Clone Attack; Charge + BA2 (Kick on touch) = Sphere Rush. Pressing Charge and the button together from a standstill gives the normal attack.' }),
         el('li', { text: 'Hold Charge first, then press BA1 to summon a clone behind the opponent (the Clone Attack). The clone appears in a cloud of smoke, performs BA1 and disappears, while #0001 keeps charging for as long as you hold Charge. With no ground behind the opponent (a platform edge, or in the air), it appears above the opponent and performs Mid-air BA2 instead.' }),
-        el('li', { text: 'Hold Charge first, then press BA2 for the Sphere Rush: #0001 forms a blue sphere in his hand, and only once it is complete does he dash forward with it. The rush must connect: a miss stops him and he lets the sphere go, with no explosion. A hit traps the opponent in the spinning sphere, adding 1 Launch Point at once and 1 more every half second, with no launch, while it grows bigger and bigger until, about two seconds later, it explodes for 15 more and launches sideways at Base Launch 3: three times the opponent’s new Launch Point. You can let go of Charge once it starts. A Shield blocks the sphere: no trap, no explosion.' }),
+        el('li', { text: 'Hold Charge first, then press BA2 for the Sphere Rush: #0001 forms a blue sphere in his hand, and only once it is complete does he dash forward with it. The rush must connect: a miss stops him and he lets the sphere go, with no explosion. A hit traps the opponent in the spinning sphere, adding 1 Launch Point at once and 1 more every half second, with no launch, while it shrinks from three times its size back down to its own until, about two seconds later, it explodes for 15 more and launches sideways at Base Launch 3: three times the opponent’s new Launch Point. You can let go of Charge once it starts. A Shield blocks the sphere: no trap, no explosion.' }),
         el('li', { text: 'The Sphere Rush needs ground under #0001 from start to finish: losing it (running off an edge mid-rush, for instance) cancels the technique, frees the opponent and #0001 falls. A hit on #0001 cancels it too.' }),
         el('li', { text: 'Each charged move has its own 5-second cooldown, shown while it counts down as a white ring under your fighter: CAB1 for Charged BA1, CAB2 for Charged BA2. It starts the moment the move is used, hit or miss. While it is cooling down, the charged press does nothing. Charging makes both cooldowns recover twice as fast, and refills your Energy faster too.' }),
       ]),
     ]),
     card('Throw', [
       el('ul', { class: 'info-list' }, [
-        el('li', { text: 'Throw (J, X / Square, or T on touch) makes #0001 throw one shuriken per press. Holding it does not throw again; press again for another.' }),
+        el('li', { text: 'Throw (J, X / Square, or the Shuriken button on touch) makes #0001 throw one shuriken per press. Holding it does not throw again; press again for another.' }),
         el('li', { text: 'The shuriken leaves #0001’s hand as the arm whips forward and flies straight the way #0001 was facing, spinning. It hits once, then disappears, whether it strikes or a Shield blocks it.' }),
         el('li', { text: 'Throw works on the ground only: there is no mid-air Throw yet.' }),
       ]),
     ]),
     card('Defense', [
       el('ul', { class: 'info-list' }, [
-        el('li', { text: 'Defense (L, RB / RT, or D on touch) is the shared defensive button. Each fighter defends in its own way: #0001 shields.' }),
+        el('li', { text: 'Defense (L, RB / RT, or the Shield button on touch) is the shared defensive button. Each fighter defends in its own way: #0001 shields.' }),
         el('li', { text: 'Defense — Hold to Shield. Blocking a hit costs 25 Energy.' }),
         el('li', { text: 'The Shield is a circle all round #0001, on the ground and in the air. While it is up, any attack that reaches him is blocked, from either side: no Launch Point and no launch. Holding it costs nothing, and neither does an attack that misses.' }),
         el('li', { text: 'Shielding holds #0001 in place on the ground: no walking, Dash or jump. In the air he keeps falling. Let go of Defense to attack, throw, Dash or jump.' }),
