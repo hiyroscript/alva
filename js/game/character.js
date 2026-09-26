@@ -3,7 +3,8 @@
 // controller (player / AI) feeds it input.
 
 import { SpriteAnimator } from './sprite-animator.js';
-import { createBody, stepBody, dropThrough } from './physics.js';
+import { createBody, stepBody, dropThrough, separate } from './physics.js';
+import { startLaunch, bounceLaunch, resolveLaunchBounce } from './launch-bounce.js';
 import {
   CombatState, createAttackDefinition, createDefenseDefinition, resolveEnergy, resolveLaunchReaction,
 } from './combat.js';
@@ -27,6 +28,16 @@ const NEUTRAL_INPUT = Object.freeze({
   primaryPressed: false, specialPressed: false, action1Pressed: false, action2Pressed: false,
   dropPressed: false,
 });
+
+// Keeps two fighters' pushboxes apart (see separate in js/game/physics.js),
+// as every fixed step does after the fighters move. A fighter flying off a
+// rebound (see Fighter.ricocheting) passes the other instead: a ricochet is
+// never pinned against a body in its way, so it cannot be held in front of
+// an attacker at a wall.
+export function separateFighters(a, b, stage) {
+  if (a.ricocheting || b.ricocheting) return;
+  separate(a.body, b.body, a.def.pushbox.width / 2, b.def.pushbox.width / 2, stage);
+}
 
 export class Fighter {
   constructor({ def, sprites, spawn, stage, slot, controller, label }) {
@@ -82,6 +93,10 @@ export class Fighter {
     // js/game/combat.js): longer stun for
     // a harder launch, tumbling past a speed, and how far it may steer one.
     this.launchReaction = resolveLaunchReaction(def.launchReaction);
+    // How a launch that drives it into a wall, floor or ceiling rebounds
+    // (js/game/launch-bounce.js: LAUNCH_BOUNCE, under the character's own
+    // `launchBounce`).
+    this.launchBounce = resolveLaunchBounce(def.launchBounce, `Character "${def.id}"`);
     this.opponent = null;
     this.spawn = spawn;
     this.reset(stage);
@@ -137,6 +152,11 @@ export class Fighter {
     // Launched hard (launchReaction.tumbleSpeed or faster): it tumbles in its
     // mid-air hurt pose, stunned or not, until it acts or lands.
     this.tumbling = false;
+    // The launch sequence it is flying in (see js/game/launch-bounce.js),
+    // from the launching hit until it is back in ordinary play; null
+    // otherwise. And this step's rebound off stage geometry, if any.
+    this.launch = null;
+    this.bounce = null;
     // A ground jump whose height is still being decided ({ time, fromY }):
     // let go of Jump within movement.shortHopWindow of takeoff and it is a
     // short hop (see shortHop). Null once decided.
@@ -198,6 +218,13 @@ export class Fighter {
     this.reset(stage);
   }
 
+  // Flying off a rebound: its launch has ricocheted off the stage at least
+  // once and is not over yet (see js/game/launch-bounce.js). Such a fighter
+  // passes other fighters' pushboxes (see separateFighters).
+  get ricocheting() {
+    return !!this.launch && this.launch.bounces > 0;
+  }
+
   get x() { return this.body.x; }
   get y() { return this.body.y; }
   get grounded() { return this.body.grounded; }
@@ -219,6 +246,7 @@ export class Fighter {
     else if (!body.grounded) this.chargeFromAir = true;
     this.fastFalling = false;
     this.airJumped = false;
+    this.bounce = null;
     this.steerHeld.x = (input.right ? 1 : 0) - (input.left ? 1 : 0);
     this.steerHeld.y = (input.charge ? 1 : 0) - (input.jump ? 1 : 0);
 
@@ -256,7 +284,11 @@ export class Fighter {
       // blocked one keeps the Shield up). Energy keeps refilling, at the
       // normal rate (a frozen fighter is not in its Charge stance). Presses
       // made during it are kept, not lost, and do not age: the attack
-      // pressed through the impact comes out as soon as it can.
+      // pressed through the impact comes out as soon as it can. The body
+      // is drawn where it stopped, not between its last two steps (a
+      // rebound freezes it at the surface it struck).
+      body.prevX = body.x;
+      body.prevY = body.y;
       for (const action of COMBAT_ACTIONS) if (input[`${action}Pressed`]) this.bufferAttack(action);
       combat.updateEnergy(dt, false);
       this.updateState(0);
@@ -498,6 +530,22 @@ export class Fighter {
 
     // ---- Integrate -------------------------------------------------------
     stepBody(body, dt, ctx.stage, ctx.gravity);
+
+    // ---- Launch bounce -----------------------------------------------------
+    // Physics stopped the body at whatever it met. If a launch drove it
+    // into that wall, floor or ceiling hard enough, it rebounds instead (see
+    // js/game/launch-bounce.js): a floor it rebounds from is no landing. A
+    // rebound never hands control back mid-flight (at least
+    // launchBounce.stun of hitstun), and a hard one freezes the fighter at
+    // the surface for a moment first.
+    const bounce = this.launch ? bounceLaunch(body, this.launch, this.launchBounce) : null;
+    if (bounce) {
+      const spec = this.launchBounce;
+      combat.stun = Math.max(combat.stun, spec.stun);
+      if (bounce.speed >= spec.hitstopSpeed) combat.hitstop = Math.max(combat.hitstop, spec.hitstop);
+      this.bounce = bounce;
+    }
+
     if (body.grounded) {
       this.lastGroundY = body.y;
       this.airJumps = mv.airJumps ?? 0;
@@ -507,8 +555,18 @@ export class Fighter {
     // A tumble lasts past the stun until the fighter does something: an
     // attack, a jump, the Shield or a fast fall. Steering alone does not end
     // it.
-    if (this.tumbling && combat.stun <= 0 && (combat.attack || combat.shielding || jumped || this.fastFalling || this.technique || combat.immobilized)) {
+    const acted = combat.attack || combat.shielding || jumped || this.fastFalling || this.technique;
+    if (this.tumbling && combat.stun <= 0 && (acted || combat.immobilized)) {
       this.tumbling = false;
+    }
+    // A launch sequence ends once the fighter is back in ordinary play: on
+    // the ground with its stun over, acting again once free (as a tumble
+    // ends) or held by a bind. Until then a stunned fighter sliding on from
+    // a landing may still rebound off a wall, and a hit that launches it
+    // again carries the sequence's rebounds on (see startLaunch): past
+    // maxBounces it stops at surfaces like anyone until it has recovered.
+    if (this.launch && ((body.grounded && combat.stun <= 0) || (combat.stun <= 0 && acted) || combat.immobilized)) {
+      this.launch = null;
     }
 
     // ---- Charged technique: ground and walls ------------------------------
@@ -628,10 +686,19 @@ export class Fighter {
   //
   // A launch at launchReaction.tumbleSpeed or faster sets it tumbling; a
   // slower one ends a tumble, and a hit that launches nothing leaves it.
+  //
+  // A launch also starts a new launch sequence (see js/game/launch-bounce.js):
+  // the new launch replaced its velocity, so the sequence takes its heading.
+  // Rebounds already made count on until the fighter recovers (startLaunch),
+  // so a wall can never keep a combo going. A hit that launches nothing
+  // leaves the sequence it is flying in as it is.
   takeHit(event) {
     this.airJumps = this.def.movement.airJumps ?? 0;
     this.hop = null;
-    if (event.launchSpeed > 0) this.tumbling = event.launchSpeed >= this.launchReaction.tumbleSpeed;
+    if (event.launchSpeed > 0) {
+      this.tumbling = event.launchSpeed >= this.launchReaction.tumbleSpeed;
+      this.launch = startLaunch(event.finalLaunch, this.launch);
+    }
   }
 
   // Cuts a ground jump down to a short hop: from here it rises only as far as

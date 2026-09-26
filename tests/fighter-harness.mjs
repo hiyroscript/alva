@@ -4,11 +4,11 @@
 // and paint still need real-browser verification.
 import assert from 'node:assert/strict';
 import { getCharacter } from '../js/data/characters.js';
-import { Fighter } from '../js/game/character.js';
+import { Fighter, separateFighters } from '../js/game/character.js';
 import { CombatSystem } from '../js/game/combat.js';
 import { spawnProjectiles, removeDeadProjectiles } from '../js/game/projectile.js';
 import { spawnClones, updateClones, removeDeadClones } from '../js/game/clone.js';
-import { StageCollision, separate, resolveSolidOverlap } from '../js/game/physics.js';
+import { StageCollision, resolveSolidOverlap } from '../js/game/physics.js';
 import { SpriteSet } from '../js/game/sprite-normalizer.js';
 import { CONFIG } from '../js/config.js';
 
@@ -139,7 +139,7 @@ export function duel({
     a.step(held);
     b.step(targetHeld);
     if (pushboxes) {
-      separate(a.fighter.body, b.fighter.body, a.fighter.def.pushbox.width / 2, b.fighter.def.pushbox.width / 2, stage);
+      separateFighters(a.fighter, b.fighter, stage);
       for (const f of fighters) resolveSolidOverlap(f.body, stage);
     }
     spawnProjectiles(fighters, projectiles);

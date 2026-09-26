@@ -571,14 +571,21 @@ test('a mid-air BA2 hit adds its 10 first, then drives a grounded target downwar
     // At impact, before the target's next step: CombatSystem.applyHit set it.
     assert.ok(isZero(target.body.vx), 'no horizontal launch');
     assert.equal(target.body.vy, LAUNCHED, 'positive body vy: downward, not upward');
-    // Knocked into the floor it stands on: it never rises, and settles back
-    // on the ground.
-    while (target.combat.stun > 0 || target.combat.hitstop > 0) {
+    // Knocked into the floor it stands on: never pushed through it or
+    // sideways. 600 units/s into it is hard enough to rebound (a launch
+    // bounce, see launch-bounce.test.mjs): it rises off that floor once,
+    // straight up, then settles back on it.
+    let bounce = null;
+    while (target.combat.stun > 0 || target.combat.hitstop > 0 || !target.grounded) {
       tick();
-      assert.equal(target.body.y, floor, 'never lifted, and never pushed through the floor');
+      bounce ??= target.bounce;
+      assert.ok(target.body.y <= floor, 'never pushed through the floor');
+      assert.equal(target.body.x, startX, 'never pushed sideways');
     }
+    assert.equal(bounce?.normalY, -1, 'rebounds off the floor it was driven into');
+    assert.equal(bounce.normalX, 0);
     assert.equal(target.grounded, true);
-    assert.equal(target.body.x, startX, 'never pushed sideways');
+    assert.equal(target.body.y, floor, 'back on the ground it stood on');
   }
 });
 
@@ -597,7 +604,10 @@ test('a mid-air BA2 hit on a rising target reverses it: driven downward instead 
       const before = { y: d.target.body.y, vy: d.target.body.vy };
       d.tick(i === 0 && kick ? BA2 : {}, i === delay ? JUMP : {});
       if (i >= delay) {
-        log.push({ before, y: d.target.body.y, vx: d.target.body.vx, vy: d.target.body.vy, hit: d.events.length > hits, grounded: d.target.grounded });
+        log.push({
+          before, y: d.target.body.y, vx: d.target.body.vx, vy: d.target.body.vy,
+          hit: d.events.length > hits, grounded: d.target.grounded, bounce: d.target.bounce,
+        });
       }
     }
     return { d, log };
@@ -621,16 +631,22 @@ test('a mid-air BA2 hit on a rising target reverses it: driven downward instead 
   assert.ok(impact.before.vy < 0, 'rising until the kick');
   assert.equal(impact.vy, LAUNCHED, 'positive body vy: driven downward at 2 x 30');
   assert.ok(isZero(impact.vx), 'and never pushed sideways');
-  // Without the kick the target carries on up; with it, from the hit to
-  // touchdown it only ever moves down (or holds, frozen by the impact's
-  // hitstop).
+  // Without the kick the target carries on up; with it, from the hit until
+  // it strikes the floor it only ever moves down (or holds, frozen by the
+  // impact's hitstop). Driven into the floor at 600 units/s and more, it
+  // rebounds off it (a launch bounce, see launch-bounce.test.mjs), then
+  // lands.
   assert.ok(plain.log[at + 1].y < plain.log[at].y, 'unhit, it keeps rising');
-  for (let i = at + 1; i < kicked.log.length; i++) {
-    assert.ok(kicked.log[i].y >= kicked.log[i - 1].y, `tick ${i}: never lifted`);
+  const struck = kicked.log.findIndex((s) => s.bounce);
+  assert.ok(struck > at, 'strikes the floor after the kick');
+  assert.equal(kicked.log[struck].bounce.normalY, -1, 'and rebounds off it');
+  for (let i = at + 1; i <= struck; i++) {
+    assert.ok(kicked.log[i].y >= kicked.log[i - 1].y, `tick ${i}: never lifted before it strikes the floor`);
   }
-  assert.ok(Math.min(...kicked.log.slice(at).map((s) => s.y)) >= impact.y, 'never above where it was hit');
+  assert.ok(Math.min(...kicked.log.slice(at, struck + 1).map((s) => s.y)) >= impact.y, 'never above where it was hit on the way down');
+  assert.equal(kicked.log.filter((s) => s.bounce).length, 1, 'one rebound: falling back, it lands');
   assert.equal(kicked.d.target.grounded, true, 'lands');
-  assert.ok(kicked.log.length < plain.log.length, 'lands sooner than the unhit jump');
+  assert.ok(struck + 1 < plain.log.length, 'driven into the floor sooner than the unhit jump lands');
 });
 
 test('a Shielded mid-air BA2 is neither driven downward nor pushed', () => {

@@ -104,13 +104,17 @@ attack animations. Its touch button has a dashed outline.
   **tumbling** in its mid-air hurt pose until it acts or lands, so with the
   air jump a juggle can reach three hits around 30–40 Launch Point. Hold a
   direction as you are hit to **steer your launch** up to 15 degrees that
-  way (never its strength). Raise the Shield just before a hit lands for a
-  **perfect Shield**: free and with no blockstun, so you can punish; it
+  way (never its strength). A launch that slams its fighter hard into a
+  wall, the floor or a ceiling **rebounds** off it (see
+  [Launch bounce](#launch-bounce)): chase the ricochet. Raise the Shield
+  just before a hit lands for a **perfect Shield**: free and with no
+  blockstun, so you can punish; it
   needs a fresh raise, so tapping Defense does not count.
 - **Hit effects:** screen shake scaled to the hit, a one-frame white flash
   on the fighter hit, sparks where it landed (red rings for blocks, white
-  for a perfect Shield), fading speed trails behind a tumbling fighter, and
-  a short slow-motion zoom on a launch that will carry its fighter into the
+  for a perfect Shield), fading speed trails behind a tumbling fighter,
+  sparks and a small shake where a launch rebounds off the stage, and a
+  short slow-motion zoom on a launch that will carry its fighter into the
   Void. Presentation only (`js/game/hit-fx.js`): they never change a
   simulation step. Reduced motion drops the shake and the zoom.
 - **Basic Attack 1 (BA1):** a punch on the ground, a kunai slash in the
@@ -402,7 +406,7 @@ js/
   game/               arena (shared loop + rendering), Quick Battle, Practice
                       session, controllers (player, combat AI, training),
                       fighter state machine, physics, camera,
-                      combat, projectiles, summoned clones, charged
+                      combat, launch bounces, projectiles, summoned clones, charged
                       techniques, sprite normalizer/animator, HUDs,
                       fighter status (Energy bar, CAB rings), the Shield's
                       circle, touch
@@ -619,6 +623,17 @@ Melee, projectiles, summoned clones and charged techniques all resolve through t
 | Sphere Rush explosion | 15 | 3 | horizontal |
 
 So from 115, BA1 adds 5 (120) and pushes at a strength of 120 (1200 units/s); from 110, BA2 adds 10 (120) and launches upward at 240 (2400 units/s), and mid-air BA2 drives downward at 240; from 115, mid-air BA1 launches upward at 240; from 119, a shuriken or a Sphere Rush tick adds 1 (120) and launches at 0 × 120 = 0; from 105, the Sphere Rush explosion adds 15 (120) and launches sideways at 360 (3600 units/s); a whole Sphere Rush on a fresh target adds 4 × 1 + 15 = 19 and launches it at 3 × 19 = 57. On a fresh target a BA2 is 2 × 10 = 20, a 200 units/s hop; a BA2 that leaves the target at 30 Launch Point lifts it about 70 units, and at 60 about 280. The Clone Attack performs ground BA1's own definition (or mid-air BA2's, overhead), so it inherits that hit's damage, Base Launch and Directional Launch with nothing of its own.
+
+#### Launch bounce
+
+A launch that drives its fighter hard into stage geometry **rebounds** off it instead of stopping dead, and can ricochet on to the next surface: hit → fly → wall → rebound → chase. It never changes a launch's strength; only the velocity the launch leaves the fighter with can rebound, so the Launch Point decides it by itself. The runtime and every tuning value live in `js/game/launch-bounce.js` (`LAUNCH_BOUNCE`; a character may override any of them with its own `launchBounce`).
+
+- **Only launches.** Physics (`stepBody`) still stops a body at whatever it meets and never bounces anything; it reports the speed each contact stopped (`impactVx`, `impactVy`). A launching hit starts a launch sequence on the fighter, and only then can a stop become a rebound. Walking into a wall, jumping into a ceiling and landing are unchanged, and so is falling back down after an upward or sideways launch: a surface only rebounds a fighter the launch is carrying into it (a spike into the floor, say), never one gravity brought there.
+- **Threshold and restitution.** A contact rebounds at 500 units/s or more into the surface (only what crosses it counts, so glancing contacts don't); slower is an ordinary stop. The speed comes back reversed × 0.72 off a wall, 0.6 off a floor or platform top, 0.65 off a ceiling, and what ran along the surface is kept, so diagonal impacts ricochet. Corners rebound on both axes at once. Every rebound is weaker, so a ricochet dies away: BA1 rebounds its target off a wall right behind it from about 50 Launch Point, a mid-air BA2 spike off the floor from about 25 (once, then it lands), and a big launch between two walls ricochets two or three times.
+- **Geometry only.** Solids (Desert's rock outcrops, City's bulkhead) and the main floor's cliff faces rebound; one-way platforms only from above; the Void never (it is not geometry), and there are still no side walls.
+- **Stun and freeze.** A rebound keeps its fighter stunned at least 0.2 s, and a hard one (1200 units/s or more) freezes it at the surface for 0.05 s first: fly, impact, pause, rebound.
+- **No wall loops.** A rebounding fighter can be hit like any other (a new launch replaces its velocity), but its rebounds count on until it recovers, at most 5, and it flies through the attacker's pushbox instead of being pinned in reach, so punching someone into a wall over and over ends within a few hits.
+- **Every launch.** Clones' hits and the Sphere Rush explosion rebound like any launch (the blast into a rock ricochets back across the mesa); a Shield's block and the shuriken never launch, so they never rebound.
 
 The two mid-air Basic Attacks swapped moves: **mid-air BA1** is the three-frame kunai slash (`0001_midair2ba1`–`3`), which used to be mid-air BA2, and **mid-air BA2** is the five-frame airborne kick (`0001_midair1ba1`–`5`), which used to be mid-air BA1. Each move kept its own art, timing, hitbox, damage and stun. The frame file names are the originals.
 
