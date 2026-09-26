@@ -13,10 +13,12 @@
 // the character's own portrait crop (visual.portrait), turned to face the
 // centre whichever way its art was drawn, one thin divider, then its slot
 // tag and name over its Launch Point (a plain number: no bar, maximum or
-// % sign; named for screen readers). Under it, in Quick Battle only, one dot per point the
-// match is played to (CONFIG.battle.pointsToWin), filled for each point the
-// fighter has scored. The CPU's card mirrors the player's. Energy and the
-// CAB cooldowns are drawn over the fighter itself (js/game/fighter-status.js);
+// % sign; named for screen readers). The tag is the fighter's own label:
+// P1 and CPU in Quick Battle, CPU 1 and CPU 2 in Watch Mode. Under it, in a
+// Battle only, one dot per point the match is played to
+// (CONFIG.battle.pointsToWin), filled for each point the fighter has scored.
+// The right-hand card mirrors the left-hand one. Energy and the CAB
+// cooldowns are drawn over the fighter itself (js/game/fighter-status.js);
 // the card only describes Energy to screen readers.
 
 import { CONFIG } from '../config.js';
@@ -130,9 +132,11 @@ export class HUD {
     this.shownRound = null;
   }
 
+  // Each card is tagged with its fighter's label (Quick Battle's P1 and CPU
+  // for a fighter that has none).
   bind(p1, p2) {
-    bindPanel(this.left, 'P1', p1);
-    bindPanel(this.right, 'CPU', p2);
+    bindPanel(this.left, p1.label ?? 'P1', p1);
+    bindPanel(this.right, p2.label ?? 'CPU', p2);
     this.shownTime = null;
     this.shownRound = null;
   }

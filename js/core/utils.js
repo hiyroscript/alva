@@ -31,6 +31,17 @@ export function mulberry32(seed) {
   };
 }
 
+// Seed `stream` of `seed`, for several generators that must not share one
+// sequence (two CPUs in one battle): stream 0 is the seed itself, and every
+// other stream a scrambled but reproducible one (a splitmix32 finalizer).
+export function deriveSeed(seed, stream) {
+  if (stream === 0) return seed >>> 0;
+  let z = (seed + Math.imul(stream, 0x9e3779b9)) | 0;
+  z = Math.imul(z ^ (z >>> 16), 0x85ebca6b);
+  z = Math.imul(z ^ (z >>> 13), 0xc2b2ae35);
+  return (z ^ (z >>> 16)) >>> 0;
+}
+
 export const range = (rng, lo, hi) => lo + rng() * (hi - lo);
 
 export function el(tag, attrs = {}, children = []) {

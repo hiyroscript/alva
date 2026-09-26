@@ -20,6 +20,7 @@ import { ModeSelectScreen } from '../screens/mode-select-screen.js';
 import { DifficultySelectScreen } from '../screens/difficulty-select-screen.js';
 import { CharacterSelectScreen } from '../screens/character-select-screen.js';
 import { MapSelectScreen } from '../screens/map-select-screen.js';
+import { WatchDifficultyScreen, WatchFighterScreen, WatchMapScreen } from '../screens/watch-screens.js';
 import { HelpCreditsScreen } from '../screens/help-credits-screen.js';
 import { BattleScreen } from '../screens/battle-screen.js';
 import { PracticeGroundScreen } from '../screens/practice-screen.js';
@@ -37,13 +38,21 @@ export class App {
     this.loading = new LoadingOverlay(document.getElementById('loading-overlay'));
     this.dialog = new ConfirmDialog(document.getElementById('confirm-dialog'), this);
 
-    // Quick Battle's choices. Practice Ground keeps its own fighter, and its
-    // training-dummy CPU never reads the difficulty.
+    // Quick Battle's choices, and Watch Mode's apart from them (one
+    // difficulty for both CPUs, a fighter each). Practice Ground keeps its
+    // own fighter, and its training-dummy CPU never reads the difficulty.
+    const firstFighter = CHARACTERS.find((c) => c.available)?.id ?? null;
     this.selection = {
       mode: 'quick-battle',
       difficulty: DEFAULT_DIFFICULTY,
-      characterId: CHARACTERS.find((c) => c.available)?.id ?? null,
+      characterId: firstFighter,
       mapId: MAPS[0].id,
+      watch: {
+        difficulty: DEFAULT_DIFFICULTY,
+        cpu1CharacterId: firstFighter,
+        cpu2CharacterId: firstFighter,
+        mapId: MAPS[0].id,
+      },
     };
 
     this.spriteSets = new Map();   // characterId -> SpriteSet
@@ -61,6 +70,11 @@ export class App {
     s.register(new DifficultySelectScreen(this));
     s.register(new CharacterSelectScreen(this));
     s.register(new MapSelectScreen(this));
+    // Watch Mode's setup: Difficulty → CPU 1 → CPU 2 → Stage.
+    s.register(new WatchDifficultyScreen(this));
+    s.register(new WatchFighterScreen(this, 1));
+    s.register(new WatchFighterScreen(this, 2));
+    s.register(new WatchMapScreen(this));
     // No longer linked from Home (Practice Ground took its entry); kept in place.
     s.register(new HelpCreditsScreen(this));
     s.register(new BattleScreen(this));

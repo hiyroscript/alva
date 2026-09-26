@@ -325,15 +325,15 @@ function practiceSession({ cpu = true } = {}) {
 
 // ---- Home ---------------------------------------------------------------------
 
-test('Home: Play, Practice Ground, then Discover; Practice Ground and Discover open directly', () => {
+test('Home: Play, Watch Mode, Practice Ground, then Discover; Practice Ground and Discover open directly', () => {
   const { app } = fakeApp();
   const home = new HomeScreen(app);
-  const actions = home.el.querySelectorAll('.home-action');
-  assert.equal(actions.length, 3);
-  const [play, practice, discover] = actions;
+  const { play, watch, practice, discover } = home.actions;
   assert.ok(play.html.includes('<span>Play</span>'));
+  assert.ok(watch.html.includes('<span>Watch Mode</span>'));
   assert.ok(practice.html.includes('<span>Practice Ground</span>'));
   assert.ok(discover.html.includes('<span>Discover</span>'));
+  assert.deepEqual(home.el.querySelectorAll('.home-action'), [play, watch, practice, discover], 'Watch Mode, the fourth action, sits under Play');
   // Discover matches Practice Ground: the same outlined action and chevron.
   for (const action of [practice, discover]) {
     assert.ok(action.html.includes(ICONS.right), 'keeps the Home chevron');
@@ -342,8 +342,9 @@ test('Home: Play, Practice Ground, then Discover; Practice Ground and Discover o
     assert.equal(action.hasAttribute('data-nav'), true);
   }
   assert.ok(!home.el.querySelectorAll('.home-action').some((b) => b.html.includes('Help')));
-  assert.deepEqual(app.nav.candidates(home.el), [play, practice, discover], 'keyboard / gamepad reach them, in order');
+  assert.deepEqual(app.nav.candidates(home.el), [play, watch, practice, discover], 'keyboard / gamepad reach them, in order');
   assert.equal(home.el.querySelector('.home-actions').children.at(-1), discover, 'Discover sits directly under Practice Ground');
+  assert.equal(home.el.querySelector('.home-actions').children.at(-2), practice);
 
   practice.click();
   assert.deepEqual(app.screens.calls, [['practice']], 'no mode, fighter or stage select first');
@@ -2004,9 +2005,11 @@ test('the practice theme is registered and draws without building paths each fra
 
 test('Quick Battle still creates its AI CPU, round intro, 99-second timer and two-panel HUD, with none of Practice\'s rules', () => {
   const input = fakeInput();
+  // Seeded: unseeded, about one CPU in twelve lands a hit in the first
+  // second and the Launch Point check below would fail at random.
   const battle = new Battle({
     canvas: new Element('canvas'), map: getMap('desert'),
-    p1Def: DEF_0001, p2Def: DEF_0001, p1Sprites: fakeSprites(), p2Sprites: fakeSprites(), input,
+    p1Def: DEF_0001, p2Def: DEF_0001, p1Sprites: fakeSprites(), p2Sprites: fakeSprites(), input, seed: 1,
   });
   assert.equal(battle.fighters.length, 2);
   assert.ok(battle.p1.controller instanceof PlayerController);

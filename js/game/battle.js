@@ -1,8 +1,11 @@
-// Battle: one Quick Battle on the shared Arena (js/game/arena.js): Player 1
-// against the combat AI (js/game/combat-ai.js) at the chosen difficulty,
-// with the intro / fight / time-up / KO / result phases and the round timer. The Arena owns the fixed-timestep world and its
-// Canvas 2D rendering; DOM concerns (HUD, pause, overlays) live in the battle
-// screen.
+// Battle: one match on the shared Arena (js/game/arena.js), with the intro /
+// fight / time-up / KO / result phases and the round timer. In Quick Battle
+// it is Player 1 against the combat AI (js/game/combat-ai.js) at the chosen
+// difficulty; in Watch Mode both fighters are the combat AI, each with its
+// own controller, at the one chosen difficulty (see BATTLE_MODES). Every
+// rule below is the same in both. The Arena owns the fixed-timestep world
+// and its Canvas 2D rendering; DOM concerns (HUD, pause, overlays) live in
+// the battle screen.
 //
 // First to CONFIG.battle.pointsToWin (3) points wins. A fighter scores a
 // point each time its opponent falls into the Void (see onVoid); the one
@@ -18,28 +21,51 @@ import { Fighter } from './character.js';
 import { PlayerController } from './fighter-controller.js';
 import { CombatAIController } from './combat-ai.js';
 import { resolveDifficulty } from '../data/difficulty.js';
-import { mulberry32 } from '../core/utils.js';
+import { mulberry32, deriveSeed } from '../core/utils.js';
+
+// Who plays each side, by mode, and the tag it is shown under (HUD cards,
+// markers, results). `stream` picks a CPU's randomness from the battle's
+// seed (see deriveSeed): each CPU has its own, so two CPUs never share one
+// sequence, not even in a mirror match, and Quick Battle's CPU keeps the
+// seed itself.
+export const BATTLE_MODES = Object.freeze({
+  'quick-battle': Object.freeze({
+    p1: Object.freeze({ cpu: false, label: 'P1' }),
+    p2: Object.freeze({ cpu: true, label: 'CPU', stream: 0 }),
+  }),
+  watch: Object.freeze({
+    p1: Object.freeze({ cpu: true, label: 'CPU 1', stream: 1 }),
+    p2: Object.freeze({ cpu: true, label: 'CPU 2', stream: 0 }),
+  }),
+});
 
 export class Battle extends Arena {
-  // `difficulty` is the CPU's level (js/data/difficulty.js); anything
-  // missing or unknown is Medium. It shapes only the CPU's controller: both
-  // fighters are built from their definitions alone. `seed` fixes the CPU's
-  // randomness (tests); by default every battle differs.
-  constructor({ canvas, map, p1Def, p2Def, p1Sprites, p2Sprites, input, reducedMotion = false, onPhase, difficulty, seed }) {
+  // `mode` is 'quick-battle' (the default, also for anything unknown) or
+  // 'watch' (see BATTLE_MODES). `difficulty` is the level of every CPU
+  // (js/data/difficulty.js); anything missing or unknown is Medium. It shapes
+  // only the CPUs' controllers: both fighters are built from their
+  // definitions alone. `seed` fixes the CPUs' randomness (tests); by default
+  // every battle differs.
+  constructor({ canvas, map, p1Def, p2Def, p1Sprites, p2Sprites, input, reducedMotion = false, onPhase, difficulty, seed, mode }) {
     super({ canvas, map, input, reducedMotion });
     this.onPhase = onPhase || (() => {});
-    // Kept for the whole battle: restarts, rematches and respawns keep it.
+    // Kept for the whole battle: restarts, rematches and respawns keep them.
+    this.mode = Object.keys(BATTLE_MODES).includes(mode) ? mode : 'quick-battle';
     this.difficulty = resolveDifficulty(difficulty);
+    this.seed = seed ?? (Date.now() & 0xffff);
 
+    const sides = BATTLE_MODES[this.mode];
+    const controllerFor = (side) => (side.cpu
+      ? new CombatAIController({ difficulty: this.difficulty, rng: mulberry32(deriveSeed(this.seed, side.stream)) })
+      : new PlayerController(input));
     const [s1, s2] = map.spawnPoints;
     this.p1 = new Fighter({
       def: p1Def, sprites: p1Sprites, spawn: s1, stage: this.stage,
-      slot: 'p1', label: 'P1', controller: new PlayerController(input),
+      slot: 'p1', label: sides.p1.label, controller: controllerFor(sides.p1),
     });
     this.p2 = new Fighter({
       def: p2Def, sprites: p2Sprites, spawn: s2, stage: this.stage,
-      slot: 'p2', label: 'CPU',
-      controller: new CombatAIController({ difficulty: this.difficulty, rng: mulberry32(seed ?? (Date.now() & 0xffff)) }),
+      slot: 'p2', label: sides.p2.label, controller: controllerFor(sides.p2),
     });
     this.p1.opponent = this.p2;
     this.p2.opponent = this.p1;
@@ -56,8 +82,8 @@ export class Battle extends Arena {
     // Resetting a fighter ends its charged technique and releases whatever
     // it held, and cancels any respawn wait; the fresh combat state carries
     // no bind, timer or sphere, 0 Launch Point, full Energy and no cooldowns.
-    // Both back to 0 points. The CPU's controller starts over too (nothing
-    // held or planned), at the same difficulty.
+    // Both back to 0 points. Every CPU's controller starts over too (nothing
+    // held or planned), at the same difficulty, and Player 1 stays Player 1.
     for (const f of this.fighters) {
       f.reset(this.stage);
       f.controller?.reset?.();

@@ -246,7 +246,7 @@ test('Discover is a registered screen with its own labelled section', () => {
 
 test('Home → Discover opens on Power; Back returns Home', () => {
   const { app, home, discover } = boot();
-  const button = home.el.querySelectorAll('.home-action')[2];
+  const button = home.actions.discover;
   assert.ok(button.html.includes('<span>Discover</span>'));
   button.click();
   assert.equal(app.screens.current, discover);
@@ -270,13 +270,13 @@ test('Home → Discover opens on Power; Back returns Home', () => {
 test('Esc, Backspace and gamepad Back leave Discover for Home', () => {
   for (const code of ['Escape', 'Backspace', 'KeyK']) {
     const { app, home, discover } = boot();
-    home.el.querySelectorAll('.home-action')[2].click();
+    home.actions.discover.click();
     assert.equal(app.screens.current, discover);
     app.input.key(code);
     assert.equal(app.screens.current, home, code);
   }
   const { app, home, discover } = boot();
-  home.el.querySelectorAll('.home-action')[2].click();
+  home.actions.discover.click();
   app.nav.command('back', null); // what onPadMenu sends for B / Circle
   assert.equal(app.screens.current, home);
   assert.equal(discover.el.hidden, true);
@@ -286,11 +286,11 @@ test('every visit opens on Power, whatever the last one left open', () => {
   const { app, home, discover } = boot();
   const { power, launch, passives } = sectionsOf(discover);
   for (const last of [launch, passives]) {
-    home.el.querySelectorAll('.home-action')[2].click();
+    home.actions.discover.click();
     last.tab.click();
     assert.deepEqual(selected(discover), [last.id]);
     app.screens.back();
-    home.el.querySelectorAll('.home-action')[2].click();
+    home.actions.discover.click();
     assert.deepEqual(selected(discover), ['power']);
     assert.equal(power.panel.hidden, false);
     assert.equal(launch.panel.hidden, true);
@@ -303,7 +303,7 @@ test('every visit opens on Power, whatever the last one left open', () => {
 
 test('Power, Launch and Passives are real, labelled tabs; Power is selected by default', () => {
   const { app, home, discover } = boot();
-  home.el.querySelectorAll('.home-action')[2].click();
+  home.actions.discover.click();
   const rail = discover.el.querySelector('.discover-rail');
   assert.equal(rail.getAttribute('role'), 'tablist');
   assert.equal(rail.getAttribute('aria-label'), 'Discover sections');
@@ -350,7 +350,7 @@ test('Power, Launch and Passives are real, labelled tabs; Power is selected by d
 
 test('Launch and Passives are selectable by click and by focus; a hidden page takes no focus', () => {
   const { app, home, discover } = boot();
-  home.el.querySelectorAll('.home-action')[2].click();
+  home.actions.discover.click();
   const { power, launch, passives } = sectionsOf(discover);
 
   launch.tab.click();
@@ -389,7 +389,7 @@ test('Launch and Passives are selectable by click and by focus; a hidden page ta
 
 test('the Power page lists every registry Power, in order, each with its three tiers: Jump Power and Speed Power only', () => {
   const { home, discover } = boot();
-  home.el.querySelectorAll('.home-action')[2].click();
+  home.actions.discover.click();
   const page = discover.sections[0].panel;
   assert.equal(text(page.querySelector('.discover-page-title')), 'Power');
   const entries = page.querySelectorAll('.discover-entry');
@@ -440,7 +440,7 @@ test('the Power page lists every registry Power, in order, each with its three t
 
 test('the Power page shows no tuning numbers and nothing interactive', () => {
   const { home, discover } = boot();
-  home.el.querySelectorAll('.home-action')[2].click();
+  home.actions.discover.click();
   const page = discover.sections[0].panel;
   const numbers = new Set(POWERS.flatMap((p) => p.tiers.flatMap((t) => Object.values(t).filter((v) => typeof v === 'number' && v > 3))));
   assert.deepEqual([...numbers].sort((a, b) => a - b), [270, 330, 360, 650, 920, 1000]);
@@ -452,7 +452,7 @@ test('the Power page shows no tuning numbers and nothing interactive', () => {
 
 test('the Launch page explains Launch Point, then Base Launch 0-3 and its formula, then every Directional Launch', () => {
   const { home, discover } = boot();
-  home.el.querySelectorAll('.home-action')[2].click();
+  home.actions.discover.click();
   const { launch } = sectionsOf(discover);
   launch.tab.click();
   const page = launch.panel;
@@ -521,7 +521,7 @@ test('the Launch page explains Launch Point, then Base Launch 0-3 and its formul
 
 test('the Launch page carries none of the old Knockback system: no Low / Mid / High, growth or accumulated Knockback', () => {
   const { home, discover } = boot();
-  home.el.querySelectorAll('.home-action')[2].click();
+  home.actions.discover.click();
   const { launch } = sectionsOf(discover);
   launch.tab.click();
   const all = everything(launch.panel);
@@ -535,7 +535,7 @@ test('the Launch page carries none of the old Knockback system: no Low / Mid / H
 
 test('the Launch page shows no tuning numbers, no fighter or attack, and nothing interactive', () => {
   const { home, discover } = boot();
-  home.el.querySelectorAll('.home-action')[2].click();
+  home.actions.discover.click();
   const { launch } = sectionsOf(discover);
   launch.tab.click();
   const page = launch.panel;
@@ -547,7 +547,7 @@ test('the Launch page shows no tuning numbers, no fighter or attack, and nothing
 
 test('Discover names no fighter: no roster, ownership or character data anywhere', () => {
   const { home, discover } = boot();
-  home.el.querySelectorAll('.home-action')[2].click();
+  home.actions.discover.click();
   const names = CHARACTERS.filter((c) => c.available).map((c) => c.displayName);
   assert.ok(names.includes('#0001'));
   for (const section of discover.sections) {
@@ -581,7 +581,7 @@ test('Discover names no fighter: no roster, ownership or character data anywhere
 test('the Power and Launch pages stay the same as the roster grows', () => {
   const render = () => {
     const { home, discover } = boot();
-    home.el.querySelectorAll('.home-action')[2].click();
+    home.actions.discover.click();
     const { power, launch } = sectionsOf(discover);
     return everything(power.panel) + everything(launch.panel);
   };
@@ -604,7 +604,7 @@ test('the Power and Launch pages stay the same as the roster grows', () => {
 
 test('Passives is intentionally empty: no cards, placeholder or invented copy', () => {
   const { home, discover } = boot();
-  home.el.querySelectorAll('.home-action')[2].click();
+  home.actions.discover.click();
   const { passives } = sectionsOf(discover);
   passives.tab.click();
   assert.equal(passives.panel.hidden, false);
@@ -625,8 +625,12 @@ test('keyboard and gamepad reach Discover from Home and every control on it (wid
   const { power, launch, passives } = sectionsOf(discover);
   const back = discover.el.querySelector('.btn-back');
 
-  // Home: Play → Practice Ground → Discover, then confirm (J / A).
+  // Home: Play → Watch Mode → Practice Ground → Discover, then confirm (J / A).
+  assert.equal(document.activeElement, home.actions.play);
   app.input.key('ArrowDown');
+  assert.equal(document.activeElement, home.actions.watch);
+  app.input.key('ArrowDown');
+  assert.equal(document.activeElement, home.actions.practice);
   app.input.key('ArrowDown');
   assert.ok(document.activeElement.html.includes('<span>Discover</span>'));
   app.input.key('KeyJ');
@@ -680,7 +684,7 @@ test('keyboard and gamepad reach Discover from Home and every control on it (wid
 test('↑ / ↓ scroll a long page while it can scroll, then move on', () => {
   const { app, home, discover } = boot();
   layOutWide(discover);
-  home.el.querySelectorAll('.home-action')[2].click();
+  home.actions.discover.click();
   const [power] = discover.sections;
   Object.assign(power.panel, { scrollHeight: 1000, clientHeight: 400, scrollTop: 0 });
 
@@ -704,7 +708,7 @@ test('narrow layout: the rail runs across the top and arrows follow it', () => {
   try {
     const { app, home, discover } = boot();
     layOutNarrow(discover);
-    home.el.querySelectorAll('.home-action')[2].click();
+    home.actions.discover.click();
     assert.equal(discover.el.querySelector('.discover-rail').getAttribute('aria-orientation'), 'horizontal');
     const { power, launch, passives } = sectionsOf(discover);
     app.input.key('ArrowRight');

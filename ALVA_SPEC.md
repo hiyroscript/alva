@@ -162,19 +162,21 @@ behave, and how it must look. The README covers running and deploying it.
   reloads); inactive screens are `hidden` and `inert`.
 - Systems: asset loader, input (keyboard, touch, gamepad), menu navigator,
   device detection, audio stub, sprite normalizer/animator, fighter state
-  machine, controllers (player / Quick Battle combat AI / training AI),
+  machine, controllers (player / combat AI for Quick Battle and Watch Mode /
+  training AI),
   physics, camera, combat, launch bounce,
   projectiles, summoned clones, charged techniques, HUD, touch controls,
   stage themes, fighter roster.
 - One arena (`js/game/arena.js`) owns the fixed-step world and its Canvas
-  rendering. Quick Battle (`Battle`) adds the combat-AI CPU at the chosen
-  difficulty, phases and round timer; Practice Ground (`PracticeSession`)
+  rendering. `Battle` adds the combat-AI CPU at the chosen difficulty (in
+  Watch Mode one on each side), phases and round timer; Practice Ground (`PracticeSession`)
   runs Player 1, and an optional training-dummy CPU, with none of them.
 - Data-driven content: `js/data/characters.js`, `js/data/maps.js` (the Quick
   Battle stages), `js/data/practice-map.js` (the training stage) and
   `js/data/powers.js` (the Power tier tables, 7.2) and `js/data/launch.js`
   (the Base Launch values and Directional Launches, 7.2) and
-  `js/data/difficulty.js` (Quick Battle's four CPU levels, 6.3a). Adding a fighter
+  `js/data/difficulty.js` (the four CPU levels, 6.3a, used by Quick Battle
+  and Watch Mode). Adding a fighter
   means adding frames, a definition (including its Power tiers and each
   hit's damage, Base Launch and Directional Launch) and a roster slot —
   never editing engine code.
@@ -270,6 +272,7 @@ fit the palette.
 
 ```
 Splash → Home → Select Mode → Select Difficulty → Select Fighter → Select Stage → Battle
+Home → Watch Mode → Select Difficulty → Select CPU 1 → Select CPU 2 → Select Stage → CPU vs CPU Battle (6.5a)
 Home → Practice Ground (starts at once with #0001 and a #0001 practice CPU)
 Home → Discover (Power / Launch / Passives reference; Back returns Home)
 Practice Ground → More → Change Fighter (roster dialog) / Change CPU, or Enable CPU once disabled (CPU roster dialog → Disable CPU) / Return (Home)
@@ -279,6 +282,9 @@ Battle (a fighter scores its 3rd point) → K.O. → Result → Rematch / Change
 Battle (time over, one fighter ahead on points, or level with the lower Launch Point) → Result → Rematch / Change Stage / Return to Home
 Battle (time over, level on points and Launch Point: a draw) → a fresh battle starts, no dialog
 ```
+
+A Watch Mode battle follows the same Battle lines (pause, points, K.O.,
+result, draw); its Change Stage returns to Watch Mode's Select Stage.
 
 Every menu screen except Home has a consistent Back action. Keyboard, mouse,
 touch and gamepad all navigate menus with one shared highlight (mouse hover
@@ -316,15 +322,18 @@ no header, build label, eyebrow or keyboard hint bar.
 - **Intro:** the dramatically enlarged original ALVA SVG wordmark, then the
   supporting line "Fan project. Big heart." The wordmark's first visible stroke
   lines up with the start of that line.
-- **Actions:** exactly three — **Play** (green, white text, arrow) opens Select
-  Mode and is focused by default; **Practice Ground** (outlined, chevron)
-  beneath it opens Practice Ground (6.8) straight away, with no mode, fighter
-  or stage select. It replaced the former, disabled Help & Credits entry; the
-  Help & Credits screen and the pause Help view remain in place (the
-  pause-menu Help is still disabled, 7.3). **Discover** (outlined, chevron,
-  like Practice Ground) directly beneath it opens the Discover reference
-  (6.9). All three are in keyboard / gamepad menu navigation, in that order.
-  Home buttons have a small 3 px radius.
+- **Actions:** exactly four, in this order — **Play** (green, white text,
+  arrow) opens Select Mode and is focused by default; **Watch Mode**
+  (outlined, chevron) beneath it opens Watch Mode's Select Difficulty (6.5a)
+  directly, never Select Mode; **Practice Ground** (outlined, chevron)
+  beneath that opens Practice Ground (6.8) straight away, with no mode,
+  fighter or stage select. Practice Ground replaced the former, disabled
+  Help & Credits entry; the Help & Credits screen and the pause Help view
+  remain in place (the pause-menu Help is still disabled, 7.3). **Discover**
+  (outlined, chevron, like Practice Ground) directly beneath it opens the
+  Discover reference (6.9). All four are in keyboard / gamepad menu
+  navigation, in that order, which the DOM order matches whatever the
+  layout. Home buttons have a small 3 px radius.
 - **Footer:** "by hiyroscript" in gray monospace, full width under a subtle
   top hairline.
 - **Credits strip:** two walls. The back wall is the same near-black as the
@@ -343,7 +352,9 @@ no header, build label, eyebrow or keyboard hint bar.
   strip moves farther right and the credits column narrows; when the window is
   taller than it is wide the strip is mostly off-screen and the credits remain
   for assistive technology only. Short landscape heights reduce title size,
-  gaps, action height and credit type. Reduced motion stops the roll and
+  gaps, action height and credit type, so the four actions fit above the
+  footer down to a 568 × 320 window, or 812 × 375 with a home-indicator
+  inset, clear of the credits column. Reduced motion stops the roll and
   entrance animations and shows one still copy of the credits that can be
   scrolled by hand.
 - All other screens retain their layout, structure, spacing and behaviour.
@@ -393,6 +404,7 @@ no header, build label, eyebrow or keyboard hint bar.
 - Between the full header and the phone layout (≤ 1100 px wide) the setup
   steps keep only the current step's name, so four steps fit; completed steps
   keep their check.
+- Watch Mode's first step is another instance of this screen (6.5a).
 
 ### 6.4 Select Fighter
 
@@ -409,6 +421,8 @@ no header, build label, eyebrow or keyboard hint bar.
   No animation controls, frame facts, attack-set or roster-slot metadata,
   preview floor line, roster availability count, or bottom control hints.
   Keyboard/gamepad activation confirms immediately; pointer selects first and confirms on a second press.
+- Watch Mode's Select CPU 1 and Select CPU 2 are two more instances of this
+  screen, each with its own roster (6.5a).
 
 ### 6.5 Select Stage
 
@@ -421,6 +435,50 @@ no header, build label, eyebrow or keyboard hint bar.
   the standard neutral focus ring.
 - "Confirm and start battle" primary action (same label for every
   stage). No bottom control hints.
+
+### 6.5a Watch Mode
+
+Alva's CPU-vs-CPU spectator mode (`js/screens/watch-screens.js`), opened
+straight from Home: Home → Watch Mode → Select Difficulty → Select CPU 1 →
+Select CPU 2 → Select Stage → CPU vs CPU Battle.
+
+- **Setup.** Four steps, shown in the header's progress steps (Difficulty ·
+  CPU 1 · CPU 2 · Stage, the list named "Watch Mode setup", completed steps
+  checked) under the kicker "Watch Mode". Each is Quick Battle's own screen
+  configured for Watch Mode, with its own screen id and section: Select
+  Difficulty (`watch-difficulty`, the same four cards, 6.3a), **Select CPU
+  1** (`watch-cpu1`) and **Select CPU 2** (`watch-cpu2`), each its own
+  instance of the shared fighter roster (6.4) with its own preview id, and
+  Select Stage (`watch-map`, 6.5, primary action "Confirm and watch
+  battle"). Choosing a level opens Select CPU 1, confirming a fighter opens
+  the next step, and Back retraces them to Home, landing on each choice.
+- **One difficulty.** The chosen level applies to both CPUs; there is no
+  per-CPU setting. It changes how they decide, never their fighters or the
+  rules (6.3a, 7.2).
+- **Any two fighters.** CPU 1 and CPU 2 may be different fighters or the
+  same one; mirror matches are allowed.
+- **Its own selection.** `app.selection.watch` (`difficulty`,
+  `cpu1CharacterId`, `cpu2CharacterId`, `mapId`; Medium, the first available
+  fighter for both and the first stage on a fresh start) is apart from Quick
+  Battle's, so neither setup changes the other's. Stale values fall back as
+  Quick Battle's do (Medium, the first available fighter, the first stage).
+- **The battle.** Starting hands the Battle screen `mode: 'watch'`, the
+  stage, both fighters and the level. It is the real `Battle` (7.2) with a
+  `CombatAIController` on each side and no `PlayerController`; everything
+  else, timer, points, Void scoring, respawns, Launch Point, Energy, Shields,
+  charged attacks, clones, projectiles, stage physics, camera, hit effects,
+  results, rematch and restart, is unchanged. Both fighters' sprites load
+  through the usual loading overlay (once for a mirror match); a failure of
+  either uses the usual error with Retry and Back (to Select Stage).
+- **Spectator only.** No gameplay input is read and the touch controls are
+  hidden. Pause (`Esc`, `P`, gamepad Start, the HUD's timer or pause
+  button), Resume, Restart Battle, Help (still disabled) and Return to Home
+  work as in Quick Battle, and so do Rematch and Change Stage (which returns
+  to Watch Mode's Select Stage).
+- **Names.** The HUD tags, the markers over the fighters and the results
+  say **CPU 1** and **CPU 2** ("CPU 1 Wins", "CPU 2 fell into the Void for
+  the final point."); the pause dialog's kicker is "Watch Mode"; the canvas
+  is labelled "Watch Mode battle: CPU 1, #0001, against CPU 2, #0001".
 
 ### 6.6 Help & Credits
 
@@ -1785,6 +1843,16 @@ read the character database, so it stays the same as fighters are added.
   battle (restart, rematch and every respawn keep it; a restart also clears
   the controller's plans) and builds the CPU's controller with it and a
   seeded `mulberry32` RNG.
+- Watch Mode (6.5a): the same `Battle` with `mode: 'watch'`
+  (`BATTLE_MODES` in `js/game/battle.js`): P1 and P2 are both
+  `CombatAIController`s at the one chosen difficulty, labelled CPU 1 and
+  CPU 2, each from its own fighter definition. Each CPU has its own RNG
+  stream derived from the battle's seed (`deriveSeed`: P2 keeps the seed
+  itself, as Quick Battle's CPU does, P1 a scrambled one), so a seeded match
+  is reproducible and the two never share one sequence, not even in a mirror
+  match; unseeded, the seed comes from the clock. Restart and rematch keep
+  both controllers and reset their plans. Every rule below is the same as in
+  Quick Battle.
   - **Input only.** Like `PlayerController`, it only returns the standard
     input snapshot (`left`, `right`, `charge`, `jump`, `defense`, `primary`,
     `special`, `action1`, `action2` and their `…Pressed` edges, each edge true
@@ -1824,7 +1892,7 @@ read the character database, so it stays the same as fighters are added.
   Practice Ground's CPU is a different thing: a controller-less training
   dummy that never moves or attacks, whatever the Quick Battle difficulty.
   The older non-attacking `TrainingAIController` remains in
-  `js/game/fighter-controller.js`, unused by either mode.
+  `js/game/fighter-controller.js`, unused by every mode.
 - Match score (`Battle.score`, `{ p1, p2 }`, the match's own: never on a
   fighter or its character, and not `round`): both start at 0. A fall into
   the Void scores exactly one point for the opponent, at once, if the
@@ -1869,8 +1937,9 @@ read the character database, so it stays the same as fighters are added.
   facing in play: P1's faces right, the CPU's left, each mirrored
   (`.is-mirrored`, `data-facing`) only when its art (the portrait clip's
   `sourceFacing`, else the character's) faces the other way. The cards hold
-  no cooldowns.
-- Score dots (Quick Battle only): under each card, centred, one small CSS
+  no cooldowns. Each tag is its fighter's label: in Watch Mode the left card
+  is CPU 1 and the right CPU 2, in the same two tag styles.
+- Score dots (battles only, Quick Battle and Watch Mode): under each card, centred, one small CSS
   circle per point the match is played to (`pointsToWin`, 3), an outlined
   empty ring (○) filled solid white (●) for each point that fighter has
   scored, in order, the moment it is scored (the third fills as the K.O.
@@ -1952,8 +2021,8 @@ read the character database, so it stays the same as fighters are added.
 - Round banners ("ROUND 1", "FIGHT", "TIME", and "K.O." under "VOID" when a
   fighter's fall gives the opponent its third point) in white on a dark
   band.
-- Pause menu: glass panel over a dimmed battle with "Quick Battle" (no stage
-  name), "Paused", green **Resume** (default), **Restart Battle**, **Help** and
+- Pause menu: glass panel over a dimmed battle with "Quick Battle" ("Watch
+  Mode" in Watch Mode; no stage name), "Paused", green **Resume** (default), **Restart Battle**, **Help** and
   **Return to Home**. Help is shown but disabled for now: muted, no hover or
   press response, skipped by keyboard/gamepad focus.
 - Time over: the fighter with more points wins ("Time ran out. More points
@@ -1964,6 +2033,8 @@ read the character database, so it stays the same as fighters are added.
 - Match K.O.: once the K.O. banner has played, the same result menu opens
   with the kicker "K.O." and the line "The CPU fell into the Void for the
   final point." (or "Player 1 fell ...").
+- Result titles: "Player 1 Wins" or "CPU Wins" in Quick Battle, "CPU 1 Wins"
+  or "CPU 2 Wins" in Watch Mode, whose K.O. line names CPU 1 or CPU 2.
 
 ### 7.4 Input
 
@@ -2016,7 +2087,8 @@ read the character database, so it stays the same as fighters are added.
   **Shuriken** (a four-bladed throwing star), **Punch** (a fist) and
   **Kick** (a leg and foot). `TouchControls.setCharacter(def)` applies them
   without rebuilding anything; Quick Battle calls it with Player 1's
-  fighter as it enters, Practice Ground as it enters and on every
+  fighter as it enters (Watch Mode, where nobody plays, hides the touch
+  controls instead), Practice Ground as it enters and on every
   successful Change Fighter (a CPU change never touches them). A fighter
   with no `mobileAbilities` gets the generic names (Throw, Basic Attack 1,
   Basic Attack 2) and neutral glyphs (a ring, one pip, two pips). The

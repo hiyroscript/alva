@@ -4,20 +4,29 @@
 // its name and a short line. Choosing one makes it Quick Battle's difficulty
 // (app.selection.difficulty) and moves on to Select Fighter; the level only
 // changes how the CPU thinks (js/data/difficulty.js), never its fighter.
+//
+// Watch Mode's first step is another instance (js/screens/watch-screens.js):
+// the options below name its screen, its setup and step, where its choice is
+// kept and the screen that follows. Left out, they are Quick Battle's.
 
 import { Screen } from '../core/screen-manager.js';
 import { el } from '../core/utils.js';
 import { ICONS } from '../ui/icons.js';
-import { screenHeader } from '../ui/components.js';
+import { screenHeader, QUICK_BATTLE_SETUP } from '../ui/components.js';
 import { DIFFICULTIES, resolveDifficulty } from '../data/difficulty.js';
 
 const LEVELS = DIFFICULTIES.length;
 
 export class DifficultySelectScreen extends Screen {
-  constructor(app) {
-    super(app, 'difficulty');
+  constructor(app, {
+    id = 'difficulty', setup = QUICK_BATTLE_SETUP, step = 1, selection = () => app.selection, next = 'character',
+  } = {}) {
+    super(app, id);
+    // The object holding this setup's `difficulty`, read on every use.
+    this.selection = selection;
+    this.next = next;
     this.cards = DIFFICULTIES.map((d) => {
-      const descId = `difficulty-desc-${d.id}`;
+      const descId = `${id}-desc-${d.id}`;
       // The scale is a shape as well as a tone: lit bars are solid, the rest
       // hollow, so the level never relies on colour alone.
       const bars = Array.from({ length: LEVELS }, (_, i) => el('i', { class: i < d.level ? 'is-on' : null }));
@@ -44,7 +53,7 @@ export class DifficultySelectScreen extends Screen {
     });
 
     this.el.replaceChildren(
-      screenHeader({ title: 'Select Difficulty', kicker: 'Quick Battle', step: 1, onBack: () => this.onBack() }),
+      screenHeader({ title: 'Select Difficulty', kicker: setup.name, setup, step, onBack: () => this.onBack() }),
       el('div', { class: 'screen-body difficulty-layout' }, [
         el('div', { class: 'difficulty-scale', role: 'group', 'aria-label': 'Difficulty' }, this.cards),
       ]),
@@ -52,7 +61,7 @@ export class DifficultySelectScreen extends Screen {
   }
 
   get current() {
-    return resolveDifficulty(this.app.selection.difficulty);
+    return resolveDifficulty(this.selection().difficulty);
   }
 
   cardFor(id) {
@@ -60,7 +69,7 @@ export class DifficultySelectScreen extends Screen {
   }
 
   // Returning here (Back from Select Fighter) lands on the level already
-  // chosen; a fresh Quick Battle lands on Medium, the default.
+  // chosen; a fresh setup lands on Medium, the default.
   focusDefault() {
     this.cardFor(this.current).focus({ preventScroll: true });
   }
@@ -79,8 +88,8 @@ export class DifficultySelectScreen extends Screen {
   }
 
   choose(id) {
-    this.app.selection.difficulty = resolveDifficulty(id);
+    this.selection().difficulty = resolveDifficulty(id);
     this.markCurrent();
-    this.app.screens.go('character');
+    this.app.screens.go(this.next);
   }
 }

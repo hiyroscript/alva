@@ -626,8 +626,9 @@ html[data-screen="splash"] .overlay { display: none; }
   .home-intro { --lede-size: 13px; }
   .logo--display { width: min(100%, 69vh); }
   .home-lede { margin-top: 10px; }
-  .home-actions { margin-top: 16px; gap: 6px; }
-  .home-action { height: 40px; }
+  /* Four actions still fit a 375 px landscape phone above its home bar. */
+  .home-actions { margin-top: 14px; gap: 5px; }
+  .home-action { height: 38px; }
   .home-footer { min-height: calc(32px + var(--safe-b)); }
   .home-credit + .home-credit { margin-top: 20px; }
   .home-credit-lead { font-size: 14px; }
@@ -637,7 +638,7 @@ html[data-screen="splash"] .overlay { display: none; }
 @media (max-height: 360px) {
   .logo--display { width: min(100%, 63vh); }
   .home-lede { margin-top: 8px; }
-  .home-actions { margin-top: 10px; gap: 5px; }
+  .home-actions { margin-top: 8px; gap: 4px; }
   .home-action { height: 36px; }
 }
 /* Still credits: one readable copy, clear of the fades, scrollable by hand. */
@@ -1489,6 +1490,8 @@ html:not(.is-pointer-input) .discover-panel:focus { box-shadow: var(--focus-ring
   pointer-events: none;
 }
 html.is-touch .touch-controls { display: block; }
+/* A Watch Mode spectator controls no fighter: no touch controls at all. */
+html.is-touch .touch-controls[hidden] { display: none; }
 .is-paused .touch-controls { opacity: 0.25; }
 .tc-cluster { position: absolute; bottom: calc(max(var(--safe-b), 10px) + 1.6vh); }
 .tc-dpad {
