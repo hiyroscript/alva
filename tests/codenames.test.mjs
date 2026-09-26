@@ -1,16 +1,19 @@
 // Run with node --test tests/codenames.test.mjs (no dependencies).
-// The canonical control and move codenames, in one place: every gameplay
-// control (runLeft, runRight, mouvementLeft, mouvementRight, jump, charge,
-// shield, uniqueba, transform, ba1, ba2, pause) and every #0001 move (ba1,
-// maba1, cba1, ba2, maba2, cba2, uniqueba) goes by exactly one name, from the
-// bindings and input snapshots through the character data, the charged
-// actions, their cooldowns and the combat AI. The retired generic names
-// survive nowhere as an alias. Behaviour lives in the other test files.
+// The canonical control and move codenames, in one place. They are
+// universal, the same for every character (a character's own ability names
+// are per character): every gameplay control (runLeft, runRight,
+// mouvementLeft, mouvementRight, jump, charge, shield, uniqueba, transform,
+// ba1, ba2, pause) and every move (ba1, maba1, cba1, ba2, maba2, cba2,
+// uniqueba, transform) goes by exactly one name, from the bindings and input
+// snapshots through every character's data, the charged actions, their
+// cooldowns and the combat AI. The retired generic names survive nowhere as
+// an alias. Behaviour lives in the other test files.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 import { def, fakeSprites, makeFighter, STAGE } from './fighter-harness.mjs';
-import { ACTIONS, ACTION_LABELS, CONFIG } from '../js/config.js';
+import { ACTIONS, ACTION_LABELS, CONFIG, MOVES } from '../js/config.js';
+import { CHARACTERS } from '../js/data/characters.js';
 import { COMBAT_ACTIONS, Fighter } from '../js/game/character.js';
 import { blankInput } from '../js/game/fighter-controller.js';
 import { readMoveset } from '../js/game/combat-ai.js';
@@ -63,6 +66,59 @@ test('COMBAT_ACTIONS are uniqueba, transform, ba1 and ba2; shield, jump and char
   assert.deepEqual(COMBAT_ACTIONS, ['uniqueba', 'transform', 'ba1', 'ba2']);
   for (const held of ['shield', 'jump', 'charge']) assert.ok(!COMBAT_ACTIONS.includes(held), held);
   assert.deepEqual([...ABILITY_ACTIONS], ['uniqueba', 'ba1', 'ba2']);
+});
+
+test('the move codenames are universal: each belongs to one combat button, on the ground, in the air or charged', () => {
+  assert.deepEqual(Object.keys(MOVES), ['ba1', 'maba1', 'cba1', 'ba2', 'maba2', 'cba2', 'uniqueba', 'transform']);
+  assert.deepEqual(Object.entries(MOVES).map(([id, m]) => [id, m.button, m.variant]), [
+    ['ba1', 'ba1', 'ground'], ['maba1', 'ba1', 'air'], ['cba1', 'ba1', 'charged'],
+    ['ba2', 'ba2', 'ground'], ['maba2', 'ba2', 'air'], ['cba2', 'ba2', 'charged'],
+    ['uniqueba', 'uniqueba', null], ['transform', 'transform', null],
+  ]);
+  for (const m of Object.values(MOVES)) assert.ok(COMBAT_ACTIONS.includes(m.button), m.button);
+  // Neutral names, never one character's: its own ability names go on top.
+  assert.deepEqual(Object.values(MOVES).map((m) => m.label), [
+    'Basic Attack 1', 'Mid-air Basic Attack 1', 'Charged Basic Attack 1',
+    'Basic Attack 2', 'Mid-air Basic Attack 2', 'Charged Basic Attack 2',
+    'Unique Basic Attack', 'Transform',
+  ]);
+  assert.equal(ACTION_LABELS.uniqueba, 'Unique Basic Attack');
+  for (const label of [...Object.values(ACTION_LABELS), ...Object.values(MOVES).map((m) => m.label)]) {
+    assert.doesNotMatch(label, /Throw|Shuriken|Punch|Kick|Clone|Sphere|#0001/, `${label}: not a character's own name`);
+  }
+});
+
+test('every character keys its moves by the universal codenames, each on its own button', () => {
+  // The move a button makes where the fighter is (`variants`): its own
+  // variant, or the button's one move (no variant).
+  const onButton = (id, button, variants) =>
+    MOVES[id]?.button === button && (MOVES[id].variant === null || variants.includes(MOVES[id].variant));
+  for (const c of CHARACTERS) {
+    const who = `#${c.id}`;
+    for (const id of Object.keys(c.attacks ?? {})) {
+      assert.ok(MOVES[id] && MOVES[id].variant !== 'charged', `${who}: attack ${id} is a universal ground / air / single move`);
+    }
+    for (const id of [...Object.keys(c.summons ?? {}), ...Object.keys(c.chargedTechniques ?? {})]) {
+      assert.equal(MOVES[id]?.variant, 'charged', `${who}: charged move ${id} is cba1 or cba2`);
+    }
+    for (const [button, mapping] of Object.entries(c.actions ?? {})) {
+      assert.ok(COMBAT_ACTIONS.includes(button), `${who}: actions.${button} is a combat button`);
+      if (mapping === null) continue;
+      if (typeof mapping === 'string') {
+        assert.ok(onButton(mapping, button, ['ground', 'air']), `${who}: ${button} -> ${mapping}`);
+      } else {
+        if (mapping.ground) assert.ok(onButton(mapping.ground, button, ['ground']), `${who}: ${button} on the ground -> ${mapping.ground}`);
+        if (mapping.air) assert.ok(onButton(mapping.air, button, ['air']), `${who}: ${button} in the air -> ${mapping.air}`);
+      }
+    }
+    for (const [button, charged] of Object.entries(c.chargedActions ?? {})) {
+      assert.ok(onButton(charged.id, button, ['charged']) && MOVES[charged.id].variant === 'charged',
+        `${who}: Charge + ${button} -> ${charged.id}`);
+    }
+    for (const button of Object.keys(c.mobileAbilities ?? {})) {
+      assert.ok(ACTIONS.includes(button), `${who}: mobileAbilities.${button} names a control`);
+    }
+  }
 });
 
 test('every controller builds the same canonical input snapshot', async () => {

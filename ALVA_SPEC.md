@@ -2078,9 +2078,13 @@ Back return Home). It holds the player's settings, saved on this device.
   Practice Ground). Each control goes by that one codename: its key in
   `CONFIG.bindings` and `ACTIONS`, its field in every input snapshot, and
   for the combat buttons (`COMBAT_ACTIONS`: `uniqueba`, `transform`, `ba1`,
-  `ba2`) its key in a character's `actions`. #0001's moves are `ba1`,
-  `maba1` (mid-air BA1), `cba1` (Charged BA1), `ba2`, `maba2` (mid-air BA2),
-  `cba2` (Charged BA2) and `uniqueba`. `` ` `` toggles a
+  `ba2`) its key in a character's `actions`. The moves have universal
+  codenames too (`MOVES` in `js/config.js`), the same for every character,
+  whatever it calls them in game: `ba1`, `maba1` (mid-air BA1), `cba1`
+  (Charged BA1), `ba2`, `maba2` (mid-air BA2), `cba2` (Charged BA2),
+  `uniqueba` (the unique basic attack) and `transform` (reserved). A
+  character's own ability names (#0001's Shuriken, Punch, Kick, Clone Attack
+  and Sphere Rush) are presentation only. `` ` `` toggles a
   debug overlay (colliders, hurtboxes, attack hitboxes while active, each
   flying projectile's hitbox in magenta with its name, each clone's attack
   hitbox, labelled `clone ba1` or `clone maba2`, on its active frame,

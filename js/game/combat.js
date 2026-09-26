@@ -1,23 +1,25 @@
 // Combat architecture.
 //
 // Attacks are pure data on the character definition; Fighter turns each entry
-// into a frozen definition with createAttackDefinition(). #0001's Basic
-// Attack 1 (ground `ba1`, mid-air `maba1`, both on the ba1 button), Basic
-// Attack 2 (`ba2` / `maba2` on the ba2 button) and Throw (`uniqueba` on the
-// uniqueba button) are the real attacks so far; see js/data/characters.js.
-// The general shape:
+// into a frozen definition with createAttackDefinition(). Every character
+// keys its attacks by the universal move codenames (MOVES in js/config.js),
+// whatever it calls them in game: Basic Attack 1 is `ba1` on the ground and
+// `maba1` in the air (both on the ba1 button), Basic Attack 2 `ba2` /
+// `maba2` (the ba2 button), the unique basic attack `uniqueba`. #0001's
+// (its punch, kunai slash, kick, air kick and Throw) are the real attacks so
+// far; see js/data/characters.js. The general shape:
 //
 //   attacks: {
-//     jab: {
-//       animation: 'jab', startup: 0.07, active: 0.05, recovery: 0.16,
+//     ba1: {
+//       animation: 'ba1', startup: 0.07, active: 0.05, recovery: 0.16,
 //       damage: 6, hitbox: { x: 18, y: -62, w: 34, h: 18 },
 //       baseLaunch: 1, directionalLaunch: 'horizontal', hitstun: 0.22, blockstun: 0.14, cooldown: 0.1,
 //     },
-//     launcher: { ..., baseLaunch: 2, directionalLaunch: 'vertical' },
-//     airSpike: { animation: 'airSpike', ..., baseLaunch: 2, directionalLaunch: 'reverseVertical' },
+//     ba2: { ..., baseLaunch: 2, directionalLaunch: 'vertical' },
+//     maba2: { animation: 'maba2', ..., baseLaunch: 2, directionalLaunch: 'reverseVertical' },
 //   },
 //   // One attack per control codename, or { ground, air } chosen by grounded state.
-//   actions: { uniqueba: 'jab', ba1: { ground: 'jab', air: 'airSpike' }, ... }
+//   actions: { uniqueba: 'uniqueba', ba1: { ground: 'ba1', air: 'maba1' }, ba2: { ground: 'ba2', air: 'maba2' } }
 //
 // Every hit (an attack's, a projectile's, a charged technique's) declares
 // its Base Launch (`baseLaunch`: 0, 1, 2 or 3, a multiplier, never a

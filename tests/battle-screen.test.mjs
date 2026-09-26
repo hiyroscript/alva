@@ -755,7 +755,7 @@ test('entering Quick Battle shows Player 1\'s fighter on the touch ability butto
   const { MAPS } = await import('../js/data/maps.js');
   const touch = screen.touch;
   // Neutral until a fighter is named.
-  assert.equal(touch.buttons.get('uniqueba').getAttribute('aria-label'), 'Throw');
+  assert.equal(touch.buttons.get('uniqueba').getAttribute('aria-label'), 'Unique Basic Attack');
   const calls = [];
   const set = touch.setCharacter.bind(touch);
   touch.setCharacter = (def) => { calls.push(def?.id); set(def); };

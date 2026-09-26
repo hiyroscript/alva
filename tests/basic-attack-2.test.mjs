@@ -209,7 +209,8 @@ test('BA2\'s launch is exactly its declared Base Launch and Directional Launch, 
   }
   // The launch is the shared launch path's: nothing in combat singles out
   // an attack or a fighter.
-  const combat = readFileSync(new URL('../js/game/combat.js', import.meta.url), 'utf8');
+  // Its code, that is: the schema comments show example move codenames.
+  const combat = readFileSync(new URL('../js/game/combat.js', import.meta.url), 'utf8').replace(/^\s*\/\/.*$/gm, '');
   assert.doesNotMatch(combat, /(?:\.id|attack|attackId)\s*===?\s*['"]/);
   assert.doesNotMatch(combat, /'0001'|'ba2'|'maba2'/);
 });

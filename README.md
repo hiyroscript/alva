@@ -75,14 +75,25 @@ in the code depends on the repository name, so no file changes are needed.
 | Pause | `pause` | `Esc` or `P` | Timer or pause button, top centre |
 | Practice menu (Practice Ground) | `pause` | `Esc` or `P` | Three-dots button, top centre |
 
-The codename is the control's one internal name: the key in
-`CONFIG.bindings`, the field in every input snapshot (with a matching
-`…Pressed` edge, e.g. `ba1Pressed`) and, for the combat buttons
-(`COMBAT_ACTIONS`: `uniqueba`, `transform`, `ba1`, `ba2`), the key in a
-character's `actions`. There are no separate charged-attack buttons: Charge
-held + `ba1` is `cba1`, Charge held + `ba2` is `cba2`. The mouvement buttons
-send one-step requests (`mouvementLeftPressed` / `mouvementRightPressed`),
-never a held direction.
+The codenames are universal: every character has the same controls and the
+same move slots, and only its own ability names (#0001's Shuriken, Punch,
+Kick, Clone Attack, Sphere Rush) differ. A control's codename is its one
+internal name: the key in `CONFIG.bindings`, the field in every input
+snapshot (with a matching `…Pressed` edge, e.g. `ba1Pressed`) and, for the
+combat buttons (`COMBAT_ACTIONS`: `uniqueba`, `transform`, `ba1`, `ba2`), the
+key in a character's `actions`. The moves (`MOVES` in `js/config.js`) are
+named after the button that makes them:
+
+| Move | Codename | Button |
+| --- | --- | --- |
+| Basic Attack 1 / mid-air / charged | `ba1` / `maba1` / `cba1` | `ba1` (on the ground / in the air / with Charge held) |
+| Basic Attack 2 / mid-air / charged | `ba2` / `maba2` / `cba2` | `ba2` (the same) |
+| Unique basic attack | `uniqueba` | `uniqueba` |
+| Transform | `transform` | `transform` (reserved: no character has one yet) |
+
+There are no separate charged-attack buttons: Charge held + `ba1` is `cba1`,
+Charge held + `ba2` is `cba2`. The mouvement buttons send one-step requests
+(`mouvementLeftPressed` / `mouvementRightPressed`), never a held direction.
 
 \* Reserved: wired into input and combat, but inactive until #0001 has matching
 attack animations. Its touch button has a dashed outline.
@@ -750,15 +761,15 @@ The two mid-air Basic Attacks swapped moves: **mid-air BA1** is the three-frame 
 ### Adding a fighter (#0002)
 
 1. Put the frames in `assets/characters/0002/`.
-2. Add a definition to `CHARACTERS` in `js/data/characters.js` (animations, movement, Power tiers such as `powers: { jump: 2, speed: 2 }`, collider, hurtboxes, stats). Movement is ground `acceleration` / `deceleration` / `turnBoost` / `overspeedDeceleration`, air `airAcceleration` / `airDeceleration` / `airTurnBoost`, `gravityScale`, `maxFallSpeed`, `fastFallAcceleration` / `fastFallSpeed`, `coyoteTime`, `jumpBuffer`, `shortHopWindow` / `shortHopHeight`, `airJumps` / `airJumpRatio`, `attackBuffer`, `hitstunFriction` / `hitstunAirDrag` and the Dash's two; the newer fields are optional (see `Fighter.moveHorizontal`). How it responds to launches is `launchReaction` (`stunPerThousand`, `maxStun`, `tumbleSpeed`, `steerAngle`; see `resolveLaunchReaction` in `js/game/combat.js`), and a Shield's `perfectWindow` / `perfectRearm` set its perfect block.
+2. Add a definition to `CHARACTERS` in `js/data/characters.js`, its moves keyed by the universal move codenames (see [Controls](#controls)) whatever it calls them in game (animations, movement, Power tiers such as `powers: { jump: 2, speed: 2 }`, collider, hurtboxes, stats). Movement is ground `acceleration` / `deceleration` / `turnBoost` / `overspeedDeceleration`, air `airAcceleration` / `airDeceleration` / `airTurnBoost`, `gravityScale`, `maxFallSpeed`, `fastFallAcceleration` / `fastFallSpeed`, `coyoteTime`, `jumpBuffer`, `shortHopWindow` / `shortHopHeight`, `airJumps` / `airJumpRatio`, `attackBuffer`, `hitstunFriction` / `hitstunAirDrag` and the Dash's two; the newer fields are optional (see `Fighter.moveHorizontal`). How it responds to launches is `launchReaction` (`stunPerThousand`, `maxStun`, `tumbleSpeed`, `steerAngle`; see `resolveLaunchReaction` in `js/game/combat.js`), and a Shield's `perfectWindow` / `perfectRearm` set its perfect block.
 3. Give it a free `rosterSlot`.
 
-To add attacks, create animations with real frames, define them in `attacks` (see the schema in `js/game/combat.js`), give each its `damage`, `baseLaunch` and `directionalLaunch`, optionally how it moves (`momentum` / `airMomentum`, `control` / `airControl`, `friction`, a `step`) and when a hit opens a follow-up (`hitCancel`), and map them in `actions`: a string for one attack, or `{ ground, air }` to pick by whether the fighter is grounded (as #0001's `ba1: { ground: 'ba1', air: 'maba1' }` and `ba2: { ground: 'ba2', air: 'maba2' }` do; its `uniqueba: 'uniqueba'` is one attack, and `transform: null` is reserved). Time `startup` / `active` / `recovery` to whole frames of the clip so the hitbox is live only while the strike is on screen. An attack without frames is refused rather than faked. Base Launch and Directional Launch are declared separately from damage (see [Launch](#launch)):
+To add attacks, create animations with real frames, define them in `attacks` under their universal codenames (`ba1`, `maba1`, `ba2`, `maba2`, `uniqueba`; see the schema in `js/game/combat.js`), give each its `damage`, `baseLaunch` and `directionalLaunch`, optionally how it moves (`momentum` / `airMomentum`, `control` / `airControl`, `friction`, a `step`) and when a hit opens a follow-up (`hitCancel`), and map them in `actions`: a string for one attack, or `{ ground, air }` to pick by whether the fighter is grounded (as #0001's `ba1: { ground: 'ba1', air: 'maba1' }` and `ba2: { ground: 'ba2', air: 'maba2' }` do; its `uniqueba: 'uniqueba'` is one attack, and `transform: null` is reserved). Time `startup` / `active` / `recovery` to whole frames of the clip so the hitbox is live only while the strike is on screen. An attack without frames is refused rather than faked. Base Launch and Directional Launch are declared separately from damage (see [Launch](#launch)):
 
 ```js
 attacks: {
-  jab: {
-    animation: 'jab', startup: 1 / 12, active: 1 / 12, recovery: 2 / 12, damage: 6,
+  ba1: {
+    animation: 'ba1', startup: 1 / 12, active: 1 / 12, recovery: 2 / 12, damage: 6,
     hitbox: { x: 12, y: -64, w: 28, h: 16 },
     baseLaunch: 1,                   // 1 x the target's new Launch Point
     directionalLaunch: 'horizontal', // along the hit's facing
@@ -766,8 +777,8 @@ attacks: {
     momentum: 0.75, friction: 0.4,   // keeps most of a run and slides on it
     hitCancel: 1 / 12,               // once it hits, an attack, a jump or a Dash may cut it short from here
   },
-  airSpike: {
-    animation: 'airSpike', startup: 2 / 12, active: 1 / 12, recovery: 0, damage: 8,
+  maba2: {
+    animation: 'maba2', startup: 2 / 12, active: 1 / 12, recovery: 0, damage: 8,
     hitbox: { x: 14, y: -100, w: 22, h: 80 },
     baseLaunch: 2,                        // twice the target's new Launch Point
     directionalLaunch: 'reverseVertical', // drives the opponent downward
@@ -777,7 +788,7 @@ attacks: {
 },
 ```
 
-To give a fighter a charged action, map a combat button in `chargedActions` to a typed descriptor. Pressed while already charging, with Charge still held, the button does that instead of its normal attack; `Fighter.tryChargedAction` dispatches on the type:
+To give a fighter a charged action, map a combat button in `chargedActions` to a typed descriptor whose `id` is the charged move's universal codename: `cba1` for Charge + `ba1`, `cba2` for Charge + `ba2`, whichever type it is. Pressed while already charging, with Charge still held, the button does that instead of its normal attack; `Fighter.tryChargedAction` dispatches on the type:
 
 - `{ type: 'summon', id }` names an entry in `summons` (see the schema in `js/game/clone.js`), as #0001's `ba1: { type: 'summon', id: 'cba1' }` (the Clone Attack) does. It starts the summon's `cooldown` and spawns a detached clone that performs one of the fighter's own `attacks` through an `effectAnimations` cloud, while the fighter keeps charging. An optional `noGround: { attack, offset }` names another of its attacks, and where to appear relative to the opponent, for when there is no ground behind the opponent at its foot height.
 - `{ type: 'technique', id }` names an entry in `chargedTechniques` (see the schema and phases in `js/game/charged-technique.js`), as #0001's `ba2: { type: 'technique', id: 'cba2' }` (the Sphere Rush) does. The fighter itself performs it: fighter clips from `animations` for its form / dash / confirm / explosion / release phases and its whiff release, an effect from `effectAnimations` for each stage of the sphere, a dash speed, hand offsets per frame, a sphere hitbox, a delay, the sphere's growth on the target and the data for its hits (the contact, an optional `tickHit` every `tickInterval` while the target is held, and the explosion). Its `cooldown` starts when it starts.

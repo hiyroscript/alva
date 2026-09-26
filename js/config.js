@@ -96,21 +96,44 @@ export const CONFIG = Object.freeze({
   },
 });
 
+// The control codenames: universal, the same for every character.
 export const ACTIONS = Object.freeze([
   'runLeft', 'runRight', 'charge', 'jump',
   'uniqueba', 'transform', 'shield', 'ba1', 'ba2',
   'pause',
 ]);
 
+// Neutral names of the controls, the same for every character. A
+// character's own names for its buttons (its `mobileAbilities`, e.g.
+// #0001's Shuriken, Punch and Kick) take their place where it has them.
 export const ACTION_LABELS = Object.freeze({
   runLeft: 'Move left',
   runRight: 'Move right',
   charge: 'Charge',
   jump: 'Jump',
-  uniqueba: 'Throw', // #0001's unique basic attack is its shuriken Throw
+  uniqueba: 'Unique Basic Attack',
   transform: 'Transform',
   shield: 'Shield',
   ba1: 'Basic Attack 1',
   ba2: 'Basic Attack 2',
   pause: 'Pause',
+});
+
+// The move codenames: universal, the same for every character. A
+// character's moves are keyed by these (in its `attacks`, `summons` and
+// `chargedTechniques`) whatever it calls them in game; its own ability
+// names are per character. Each move belongs to the button that makes it:
+// `ground` and `air` are picked by where the fighter is as the button is
+// pressed (its `actions`), `charged` needs Charge held (its
+// `chargedActions`), and a move with no variant is the button's one move.
+// `label` is the neutral name, for a character with no name of its own.
+export const MOVES = Object.freeze({
+  ba1: Object.freeze({ button: 'ba1', variant: 'ground', label: 'Basic Attack 1' }),
+  maba1: Object.freeze({ button: 'ba1', variant: 'air', label: 'Mid-air Basic Attack 1' }),
+  cba1: Object.freeze({ button: 'ba1', variant: 'charged', label: 'Charged Basic Attack 1' }),
+  ba2: Object.freeze({ button: 'ba2', variant: 'ground', label: 'Basic Attack 2' }),
+  maba2: Object.freeze({ button: 'ba2', variant: 'air', label: 'Mid-air Basic Attack 2' }),
+  cba2: Object.freeze({ button: 'ba2', variant: 'charged', label: 'Charged Basic Attack 2' }),
+  uniqueba: Object.freeze({ button: 'uniqueba', variant: null, label: 'Unique Basic Attack' }),
+  transform: Object.freeze({ button: 'transform', variant: null, label: 'Transform' }),
 });

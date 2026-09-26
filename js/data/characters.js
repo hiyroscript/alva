@@ -2,7 +2,10 @@
 //
 // Adding a fighter (e.g. #0002) should only require:
 //   1. dropping frames into ./assets/characters/<id>/
-//   2. adding a definition to CHARACTERS below, including its Power tiers
+//   2. adding a definition to CHARACTERS below, its moves keyed by the
+//      universal move codenames (MOVES in js/config.js: ba1, maba1, cba1,
+//      ba2, maba2, cba2, uniqueba, transform) whatever it calls them in
+//      game, including its Power tiers
 //      (`powers`, see js/data/powers.js) and each hit's `damage`, Base
 //      Launch (`baseLaunch`: 0, 1, 2 or 3) and Directional Launch
 //      (`directionalLaunch`: null, 'horizontal', 'vertical' or
@@ -524,9 +527,10 @@ export const CHARACTERS = [
       perfectRearm: 0.25,
     },
 
-    // Control codenames -> attack ids. A string is one attack; { ground, air }
-    // picks by whether the fighter is grounded when the button is pressed.
-    // Null means the input is wired but reserved: no artwork, no attack.
+    // Control codenames -> move codenames (both universal, see js/config.js).
+    // A string is one attack; { ground, air } picks by whether the fighter is
+    // grounded when the button is pressed. Null means the input is wired but
+    // reserved: no artwork, no attack.
     actions: {
       uniqueba: 'uniqueba', // unique basic attack: #0001's shuriken Throw
       transform: null, // reserved: no Transform move yet

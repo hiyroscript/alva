@@ -394,7 +394,7 @@ test('setCharacter swaps the fighter\'s icons and names in place, without rebuil
   // A fighter that authors nothing: neutral, never #0001's leftovers.
   tc.setCharacter({ id: '9997' });
   assert.deepEqual(['uniqueba', 'ba1', 'ba2'].map((a) => [b(a).innerHTML, b(a).getAttribute('aria-label')]),
-    [[ICONS.ring, 'Throw'], [ICONS.pip1, 'Basic Attack 1'], [ICONS.pip2, 'Basic Attack 2']]);
+    [[ICONS.ring, 'Unique Basic Attack'], [ICONS.pip1, 'Basic Attack 1'], [ICONS.pip2, 'Basic Attack 2']]);
   // And back.
   tc.setCharacter(DEF_0001);
   assert.deepEqual(['uniqueba', 'ba1', 'ba2'].map((a) => b(a).getAttribute('aria-label')), ['Shuriken', 'Punch', 'Kick']);
@@ -403,7 +403,7 @@ test('setCharacter swaps the fighter\'s icons and names in place, without rebuil
 test('before any fighter is named the controls are usable and neutral; a held button survives a swap', () => {
   const { tc, calls } = touchControls(null);
   assert.deepEqual(['uniqueba', 'ba1', 'ba2'].map((a) => tc.buttons.get(a).getAttribute('aria-label')),
-    ['Throw', 'Basic Attack 1', 'Basic Attack 2']);
+    ['Unique Basic Attack', 'Basic Attack 1', 'Basic Attack 2']);
   const b = tc.buttons.get('ba1');
   assert.equal(b.innerHTML, ICONS.pip1);
   press(b, 4);
@@ -430,7 +430,7 @@ test('keyboard bindings are unchanged by the touch layouts, keyed by control cod
     pause: ['Escape', 'KeyP'],
   });
   assert.deepEqual({ ...ACTION_LABELS }, {
-    runLeft: 'Move left', runRight: 'Move right', charge: 'Charge', jump: 'Jump', uniqueba: 'Throw', transform: 'Transform',
+    runLeft: 'Move left', runRight: 'Move right', charge: 'Charge', jump: 'Jump', uniqueba: 'Unique Basic Attack', transform: 'Transform',
     shield: 'Shield', ba1: 'Basic Attack 1', ba2: 'Basic Attack 2', pause: 'Pause',
   });
   // No Down, Block or dash key: Dash stays a double tap on the keyboard, and
@@ -920,7 +920,7 @@ test('a scheme switch keeps the fighter\'s combat buttons: the same elements, ic
   // setCharacter still works in either layout, and never moves a button.
   tc.setScheme('joystick');
   tc.setCharacter(null);
-  assert.equal(tc.buttons.get('uniqueba').getAttribute('aria-label'), 'Throw');
+  assert.equal(tc.buttons.get('uniqueba').getAttribute('aria-label'), 'Unique Basic Attack');
   assert.deepEqual(actionsOf(tc.actions).at(-1), 'charge');
   press(tc.buttons.get('uniqueba'), 1);
   assert.deepEqual(calls, [['uniqueba', true]]);

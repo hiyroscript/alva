@@ -223,8 +223,9 @@ ceiling and landing are unchanged.
 ## Control and move codenames
 
 Not a named update, and it changes no behaviour or tuning: later work
-renamed the gameplay controls and #0001's moves to one canonical codename
-each. Where an entry above names a field, it names where that field lives
+renamed the gameplay controls and the moves to one canonical codename each.
+The codenames are universal, the same for every character (`ACTIONS` and
+`MOVES` in `js/config.js`); a character's own ability names are separate. Where an entry above names a field, it names where that field lives
 now. Old → new:
 
 | Old | New |

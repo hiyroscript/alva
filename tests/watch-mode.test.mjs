@@ -933,7 +933,7 @@ test('spectating: no touch controls and no gameplay input, through pause, resume
   assert.equal(screen.isRunning, true, 'the match runs');
   assert.ok(screen.el.classList.contains('is-watch'));
   // No fighter's own ability icons.
-  assert.equal(screen.touch.buttons.get('uniqueba').getAttribute('aria-label'), 'Throw');
+  assert.equal(screen.touch.buttons.get('uniqueba').getAttribute('aria-label'), 'Unique Basic Attack');
   assert.equal(screen.touch.buttons.get('ba1').getAttribute('aria-label'), 'Basic Attack 1');
   screen.pause();
   off();

@@ -150,7 +150,7 @@ test('uniqueba is the Throw; transform stays reserved; BA1 and BA2 are unchanged
     assert.equal(def.attacks[retired], undefined, `no ${retired} attack`);
     assert.equal(def.animations[retired], undefined, `no ${retired} animation key`);
   }
-  assert.equal(ACTION_LABELS.uniqueba, 'Throw');
+  assert.equal(ACTION_LABELS.uniqueba, 'Unique Basic Attack');
   assert.deepEqual(CONFIG.bindings.uniqueba, ['KeyJ']);
 });
 
@@ -763,7 +763,7 @@ test('Throw and its shuriken start no charged-action cooldown on either side', (
 
 // ---- Input and CPU ----------------------------------------------------------------
 
-test('J and gamepad X / Square still press the uniqueba action, labelled Throw', async () => {
+test('J and gamepad X / Square still press the uniqueba action, labelled Unique Basic Attack when neutral', async () => {
   const listeners = {};
   globalThis.window = { addEventListener: (type, fn) => { listeners[type] = fn; } };
   globalThis.document = { addEventListener() {}, hidden: false };
@@ -776,7 +776,7 @@ test('J and gamepad X / Square still press the uniqueba action, labelled Throw',
     return COMBAT_ACTIONS.filter((a) => f[`${a}Pressed`]);
   };
   assert.deepEqual(CONFIG.bindings.uniqueba, ['KeyJ']);
-  assert.equal(ACTION_LABELS.uniqueba, 'Throw');
+  assert.equal(ACTION_LABELS.uniqueba, 'Unique Basic Attack');
   listeners.keydown({ code: 'KeyJ', repeat: false, preventDefault() {} });
   assert.deepEqual(pressed(), ['uniqueba']);
   assert.equal(input.sample().uniquebaPressed, false, 'one press edge per press');
