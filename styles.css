@@ -1433,10 +1433,13 @@ html:not(.is-pointer-input) .discover-panel:focus { box-shadow: var(--focus-ring
 
 /* Timer on top, pause directly beneath: one glass control split by a
    hairline, both halves the same width. Either half pauses. This is the
-   only part of the HUD that takes the pointer. */
+   only part of the HUD that takes the pointer. It grows past its usual
+   width only to fit a minutes clock ("5:00"); tabular digits keep that
+   width steady as it counts down. */
 .hud-center {
   display: grid;
-  width: clamp(64px, 8.4vw, 92px);
+  width: max-content;
+  min-width: clamp(64px, 8.4vw, 92px);
   border-radius: var(--radius-sm);
   pointer-events: auto;
 }

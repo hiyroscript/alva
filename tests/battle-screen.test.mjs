@@ -341,12 +341,23 @@ test('HUD: one glass card per fighter, portrait | divider | name over Launch Poi
 
   battle.timeLeft = 86.2;
   hud.update(battle);
-  assert.equal(hud.timer.textContent, '87');
-  assert.equal(hud.timeButton.getAttribute('aria-label'), 'Pause game, 87 seconds remaining');
+  assert.equal(hud.timer.textContent, '1:27');
+  assert.equal(hud.timeButton.getAttribute('aria-label'), 'Pause game, 1 minute 27 seconds remaining');
   assert.equal(hud.timer.classList.contains('is-urgent'), false);
+
+  battle.timeLeft = 300;
+  hud.update(battle);
+  assert.equal(hud.timer.textContent, '5:00');
+  assert.equal(hud.timeButton.getAttribute('aria-label'), 'Pause game, 5 minutes remaining');
+
+  battle.timeLeft = 8.5;
+  hud.update(battle);
+  assert.equal(hud.timer.textContent, '0:09');
+  assert.equal(hud.timeButton.getAttribute('aria-label'), 'Pause game, 9 seconds remaining');
 
   battle.timeLeft = 0.4;
   hud.update(battle);
+  assert.equal(hud.timer.textContent, '0:01');
   assert.equal(hud.timeButton.getAttribute('aria-label'), 'Pause game, 1 second remaining');
   assert.equal(hud.timer.classList.contains('is-urgent'), true);
   assert.equal(hud.timeButton.classList.contains('is-urgent'), false, 'the holder itself never changes');
@@ -585,7 +596,7 @@ test('a draw opens no result dialog and starts a fresh battle', () => {
   assert.equal(screen.isRunning, true);
   assert.equal(app.input.gameplayActive, true);
   assert.equal(screen.touch.enabled, true);
-  assert.equal(screen.hud.timer.textContent, '99');
+  assert.equal(screen.hud.timer.textContent, '1:39');
   assert.equal(screen.bannerState, null);
 
   let frames = 0;

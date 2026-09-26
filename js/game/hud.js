@@ -107,9 +107,21 @@ function setScore(panel, points) {
   panel.score.setAttribute('aria-label', `${who}: ${points} of ${panel.dots.length} points`);
 }
 
+// Whole seconds left as the clock shows them: 300 -> "5:00", 87 -> "1:27".
+function clockText(t) {
+  if (t === '∞') return t;
+  return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`;
+}
+
+function unit(n, name) {
+  return `${n} ${name}${n === 1 ? '' : 's'}`;
+}
+
 function timeLabel(t) {
   if (t === '∞') return 'Pause game, no time limit';
-  return `Pause game, ${t} ${t === 1 ? 'second' : 'seconds'} remaining`;
+  const m = Math.floor(t / 60), s = t % 60;
+  const left = [m && unit(m, 'minute'), (s || !m) && unit(s, 'second')].filter(Boolean).join(' ');
+  return `Pause game, ${left} remaining`;
 }
 
 export class HUD {
@@ -152,7 +164,7 @@ export class HUD {
     const t = Number.isFinite(battle.timeLeft) ? Math.ceil(battle.timeLeft) : '∞';
     if (t !== this.shownTime) {
       this.shownTime = t;
-      this.timer.textContent = String(t);
+      this.timer.textContent = clockText(t);
       this.timer.classList.toggle('is-urgent', Number.isFinite(battle.timeLeft) && battle.timeLeft <= 10);
       this.timeButton.setAttribute('aria-label', timeLabel(t));
     }
