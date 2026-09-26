@@ -449,14 +449,14 @@ export const CHARACTERS = [
       shieldHitCost: 25,
     },
 
-    // What the shared Defense input (L, RB / RT, touch D) does for this
-    // fighter. #0001 shields: held Defense keeps a Shield up all round him,
-    // `groundAnimation` on the ground (raised by `groundStartAnimation`,
-    // lowered by `groundReleaseAnimation`) and `airAnimation` in the air,
-    // where he keeps falling. Every hit it blocks costs energy.shieldHitCost
-    // and deals nothing else: no Launch Point, no launch (see
-    // createDefenseDefinition and CombatSystem.applyHit in
-    // js/game/combat.js).
+    // What the shared Defense input (L, RB / RT, the touch Shield button)
+    // does for this fighter. #0001 shields: held Defense keeps a Shield up
+    // all round him, `groundAnimation` on the ground (raised by
+    // `groundStartAnimation`, lowered by `groundReleaseAnimation`) and
+    // `airAnimation` in the air, where he keeps falling. Every hit it
+    // blocks costs energy.shieldHitCost and deals nothing else: no Launch
+    // Point, no launch (see createDefenseDefinition and
+    // CombatSystem.applyHit in js/game/combat.js).
     defense: {
       type: 'shield',
       groundAnimation: 'shield',
@@ -473,6 +473,19 @@ export const CHARACTERS = [
       special: null,
       action1: { ground: 'ba1', air: 'midairBa1' }, // Basic Attack 1 (BA1)
       action2: { ground: 'ba2', air: 'midairBa2' }, // Basic Attack 2 (BA2)
+    },
+
+    // How the touch controls present this fighter's own buttons: an icon
+    // (a key of ICONS in js/ui/icons.js) and an accessible name for each.
+    // UI only (see js/ui/mobile-abilities.js): the buttons still send
+    // primary, action1 and action2, and nothing here reaches combat. Each
+    // names the button's ability family, not every move it makes: Punch is
+    // also the mid-air kunai slash, and with Charge held the Clone Attack.
+    // The Shield, Special, Jump and movement buttons are universal.
+    mobileAbilities: {
+      primary: { label: 'Shuriken', icon: 'shuriken' },
+      action1: { label: 'Punch', icon: 'punch' },
+      action2: { label: 'Kick', icon: 'kick' },
     },
 
     // Charged actions: what a combat button does when pressed while the

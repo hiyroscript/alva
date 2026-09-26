@@ -1444,6 +1444,9 @@ html.is-touch .touch-controls { display: block; }
   transition: transform 90ms ease-out, background-color 120ms ease, border-color 120ms ease, box-shadow 120ms ease;
 }
 .tc-btn .icon { stroke-width: 2.8; filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.8)); }
+/* Combat ability glyphs (the fighter's own, and Shield) read without text,
+   so they sit a touch larger in the same buttons. */
+.tc-ability .icon { font-size: 1.14em; }
 .tc-text { font-weight: 800; font-size: 0.62em; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8); }
 .tc-btn.is-pending .icon, .tc-btn.is-pending .tc-text { opacity: 0.62; }
 .tc-btn.is-pending { border-style: dashed; border-color: rgba(255, 255, 255, 0.3); }

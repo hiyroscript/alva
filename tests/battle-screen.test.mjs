@@ -733,3 +733,36 @@ test('Keep Playing is outline-only for Return to Home? alone', async () => {
   cancelBtn.click();
   assert.equal(await pending, false);
 });
+
+test('entering Quick Battle shows Player 1\'s fighter on the touch ability buttons before play', async () => {
+  const { app, screen } = setup();
+  const { ICONS } = await import('../js/ui/icons.js');
+  const { MAPS } = await import('../js/data/maps.js');
+  const touch = screen.touch;
+  // Neutral until a fighter is named.
+  assert.equal(touch.buttons.get('primary').getAttribute('aria-label'), 'Throw');
+  const calls = [];
+  const set = touch.setCharacter.bind(touch);
+  touch.setCharacter = (def) => { calls.push(def?.id); set(def); };
+  app.selection = { characterId: '0001', mapId: MAPS[0].id };
+  // Stop at the load (no real sprites here): the icons are already set by then.
+  let loadsBefore = null;
+  app.loadCharacter = () => {
+    loadsBefore = [...calls];
+    return Promise.resolve({ usable: false });
+  };
+  app.loading = { show() {}, hide() {}, setProgress() {}, showError() {} };
+  await screen.enter();
+  assert.deepEqual(loadsBefore, ['0001'], 'configured as soon as the fighter is known, before gameplay');
+  assert.deepEqual(calls, ['0001']);
+  const shown = ['primary', 'defense', 'action1', 'action2'].map((a) => [
+    touch.buttons.get(a).getAttribute('aria-label'), touch.buttons.get(a).html, touch.buttons.get(a).getAttribute('data-action'),
+  ]);
+  assert.deepEqual(shown, [
+    ['Shuriken', ICONS.shuriken, 'primary'],
+    ['Shield', ICONS.shield, 'defense'],
+    ['Punch', ICONS.punch, 'action1'],
+    ['Kick', ICONS.kick, 'action2'],
+  ]);
+  assert.equal(touch.enabled, false, 'no play without sprites');
+});

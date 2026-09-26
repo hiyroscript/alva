@@ -138,6 +138,8 @@ export class BattleScreen extends Screen {
     const map = getMap(params?.mapId || app.selection.mapId);
     this.def = def;
     this.map = map;
+    // Player 1's fighter decides the touch ability icons, never the CPU's.
+    this.touch.setCharacter(def);
     this.el.dataset.map = map.id;
     this.token = {};
     const token = this.token;

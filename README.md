@@ -88,7 +88,7 @@ attack animations. Its touch button has a dashed outline.
   same way, and a mid-air BA2 that lands also plays to the end. Internally
   this is the `action2` input.
 - **Throw:** #0001's projectile attack, on `J`, X / Square on a gamepad and
-  **T** on touch. One press plays one three-frame Throw
+  the **Shuriken** button on touch. One press plays one three-frame Throw
   (`throw1 → throw2 → throw3`, once, at 12 fps) and releases exactly one
   shuriken as the arm whips forward on `throw2`; holding the button does not
   throw again. The shuriken leaves the throwing hand and flies straight the
@@ -269,7 +269,7 @@ attack animations. Its touch button has a dashed outline.
   rate. A restart or rematch, a new fighter in Practice Ground and every
   respawn after the Void clear them. They cost no Energy.
 - **Menus:** arrow keys or WASD to move, `Enter` to select, `Esc` to go back. Mouse and touch work too.
-- **Touch:** several fingers work at once (hold Right and press Jump, or hold C and press BA1). You can slide your thumb between Left / Charge / Right, and tap ◀ or ▶ twice to Dash. **T** is Throw.
+- **Touch:** several fingers work at once (hold Right and press Jump, or hold C and press Punch). You can slide your thumb between Left / Charge / Right, and tap ◀ or ▶ twice to Dash. The combat buttons show icons, not letters: for #0001, **Shuriken** (Throw), **Shield** (held, Defense), **Punch** (Basic Attack 1) and **Kick** (Basic Attack 2), beside Special and Jump. Hold C, then press Punch for the Clone Attack or Kick for the Sphere Rush. The icons of the fighter's own buttons (Shuriken, Punch, Kick) come from its `mobileAbilities` in `js/data/characters.js` and follow Player 1's fighter, in Practice Ground too when you change fighter; Shield, Special, Jump and Charge are the same for everyone. Only the presentation is per fighter: the buttons still send the unchanged internal inputs (`primary`, `defense`, `action1`, `action2`). The viewport disables page zoom (`maximum-scale=1, user-scalable=no`) and the play surfaces and buttons set `touch-action: none`, so rapid taps never zoom or scroll the page.
 - **Gamepad (standard layout):** D-pad or left stick left / right to move (twice in a row to Dash) and down to Charge in battle (they still navigate menus), A to jump, X / Square to Throw, B / Circle for Basic Attack 1, LB for Basic Attack 2, Y / Triangle for the reserved Special, RB or RT for Defense, Start to pause.
 - **Debug:** `` ` `` toggles the collider, hurtbox and attack-hitbox overlay in battle (a hitbox shows only while it can connect; hurtboxes look the same with the Shield up, and a shielding fighter is labelled `shield`; a flying shuriken's hitbox is outlined in magenta and labelled; a clone's attack hitbox shows in the attack colour, labelled `clone ba1` (or `clone midairBa2` overhead), only on its active frame; the Sphere Rush's sphere hitbox is a dashed cyan box labelled `charged ba2 dash` while it can connect, then a dashed cyan cross marks the sphere on the caught opponent, which is labelled `bound`; solids, the main floor's block among them, are outlined in red and the Void's fixed kill line is dashed violet).
 

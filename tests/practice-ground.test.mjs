@@ -1058,6 +1058,78 @@ test('a failed fighter load keeps the current fighter and the dialog', async () 
   assert.equal(document.activeElement, slotFor(screen, '9999'), 'back to choosing');
 });
 
+test('the touch ability icons follow Player 1\'s fighter: set on entry, refreshed by Change Fighter, never by the CPU', async () => {
+  // #9999 authors its own mobile presentation for this test only (the rest
+  // of the file sees #0001's, which it copies).
+  const saved = DEF_9999.mobileAbilities;
+  DEF_9999.mobileAbilities = {
+    primary: { label: 'Kunai', icon: 'arrow' },
+    action1: { label: 'Palm Strike', icon: 'up' },
+  };
+  try {
+    const { app, screen } = await enterPractice();
+    const touch = screen.touch;
+    const buttons = new Map(touch.buttons);
+    const shown = () => ['primary', 'action1', 'action2'].map((a) => [touch.buttons.get(a).getAttribute('aria-label'), touch.buttons.get(a).innerHTML]);
+    const OWN_0001 = [['Shuriken', ICONS.shuriken], ['Punch', ICONS.punch], ['Kick', ICONS.kick]];
+    assert.deepEqual(shown(), OWN_0001, 'the default fighter\'s icons from the start');
+    const calls = [];
+    const set = touch.setCharacter.bind(touch);
+    touch.setCharacter = (def) => { calls.push(def?.id ?? null); set(def); };
+
+    // A new CPU, even #9999, leaves Player 1's icons alone.
+    await enableCpu(screen, '9999');
+    assert.equal(screen.session.cpu.def.id, '9999');
+    assert.deepEqual(calls, []);
+    assert.deepEqual(shown(), OWN_0001);
+
+    // A failed fighter load keeps them too.
+    const load = app.loadCharacter;
+    app.loadCharacter = () => Promise.resolve({ usable: false });
+    screen.openMenu();
+    screen.openRoster();
+    slotFor(screen, '9999').click(0);
+    await flush();
+    assert.equal(screen.session.player.def.id, '0001');
+    assert.deepEqual(calls, []);
+    assert.deepEqual(shown(), OWN_0001);
+    app.loadCharacter = load;
+    app.loading.error.opts.onBack();
+    screen.closeRoster();
+    screen.resume();
+
+    // Change Fighter to #9999: its own look, the rest neutral, at once.
+    screen.openMenu();
+    screen.openRoster();
+    slotFor(screen, '9999').click(0);
+    await flush();
+    assert.equal(screen.session.player.def.id, '9999');
+    assert.deepEqual(calls, ['9999'], 'refreshed with the new fighter, exactly once');
+    assert.deepEqual(shown(), [['Kunai', ICONS.arrow], ['Palm Strike', ICONS.up], ['Basic Attack 2', ICONS.pip2]]);
+    assert.equal(touch.buttons.get('defense').innerHTML, ICONS.shield, 'Shield is universal');
+    assert.equal(touch.enabled, true, 'playing again');
+    // The same controls, refreshed in place, still sending the same inputs.
+    for (const [action, b] of buttons) assert.equal(touch.buttons.get(action), b, action);
+    assert.equal(touch.buttons.get('action1').getAttribute('data-action'), 'action1');
+
+    // Changing the CPU back to #0001 does not bring #0001's icons back.
+    await enableCpu(screen, '0001');
+    assert.equal(screen.session.cpu.def.id, '0001');
+    assert.deepEqual(calls, ['9999']);
+    assert.equal(touch.buttons.get('primary').getAttribute('aria-label'), 'Kunai');
+
+    // Back to #0001: Shuriken, Punch and Kick again.
+    screen.openMenu();
+    screen.openRoster();
+    slotFor(screen, '0001').click(0);
+    await flush();
+    assert.deepEqual(calls, ['9999', '0001']);
+    assert.deepEqual(shown(), OWN_0001);
+  } finally {
+    DEF_9999.mobileAbilities = saved;
+  }
+});
+
 // ---- Practice CPU ---------------------------------------------------------------
 
 test('Enable CPU (once the CPU is disabled) opens a second shared roster in its own glass dialog, titled Select CPU, with no Disable CPU', async () => {
