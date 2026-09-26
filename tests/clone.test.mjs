@@ -647,7 +647,7 @@ const ROOF = new StageCollision(stageMap({
   ],
 }));
 const MB2 = def.attacks.midairBa2;
-const MB2_FRAMES = ['0001_midair1ba1.png', '0001_midair1ba2.png', '0001_midair1ba3.png', '0001_midair1ba4.png', '0001_midair1ba5.png'];
+const MB2_FRAMES = ['0001_midair2ba1.png', '0001_midair2ba2.png', '0001_midair2ba3.png', '0001_midair2ba4.png', '0001_midair2ba5.png'];
 const MB2_STEPS = steps(MB2.startup + MB2.active + MB2.recovery);
 const MB2_TO_ACTIVE = CLOUD_STEPS + steps(MB2.startup);
 const HALF = def.collider.width / 2;
@@ -874,7 +874,7 @@ test('the overhead clone appears, kicks with the real five midairBa2 frames on t
     assert.ok(appear.every((s) => !s.active) && vanish.every((s) => !s.active));
     const active = attack.filter((s) => s.active);
     assert.equal(active.length, steps(MB2.active) + Math.ceil(MB2.hitstop / DT), 'its active time, held through the freeze');
-    assert.ok(active.every((s) => s.body === '0001_midair1ba3.png'));
+    assert.ok(active.every((s) => s.body === '0001_midair2ba3.png'));
     // The stationary target was hit: its five frames plus the clone's freeze.
     assert.equal(d.events.length, 1);
     assert.equal(attack.length, MB2_STEPS + Math.ceil(MB2.hitstop / DT));
@@ -898,7 +898,7 @@ test('the overhead kick lands on a stationary target through the real hitbox and
     }
     assert.equal(n, MB2_TO_ACTIVE);
     assert.equal(clone.attackPhase, 'active');
-    assert.equal(name(clone.frame), '0001_midair1ba3.png');
+    assert.equal(name(clone.frame), '0001_midair2ba3.png');
     assert.equal(d.events.length, 1);
     const [e] = d.events;
     assert.equal(e.type, 'hit');
@@ -995,7 +995,7 @@ test('the overhead clone never follows: position, facing and attack stay put, an
   const attack = log.filter((s) => s.phase === 'attack');
   assert.equal(attack.length, MB2_STEPS, 'all five frames, no freeze');
   assert.deepEqual(runs(attack.map((s) => s.body)), MB2_FRAMES.map((f) => [f, steps(1 / 12)]));
-  assert.deepEqual(attack.filter((s) => s.active).map((s) => s.body), Array(steps(MB2.active)).fill('0001_midair1ba3.png'));
+  assert.deepEqual(attack.filter((s) => s.active).map((s) => s.body), Array(steps(MB2.active)).fill('0001_midair2ba3.png'));
   assert.deepEqual(order(log.filter((s) => s.phase === 'vanish').map((s) => s.cloud)), [...CLOUD].reverse());
   assert.equal(d.clones.length, 0);
 

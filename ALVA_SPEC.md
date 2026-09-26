@@ -45,10 +45,10 @@ behave, and how it must look. The README covers running and deploying it.
   560–688 px), one hurt frame (608 × 752 px), one mid-air hurt frame
   (424 × 272 px), four Basic Attack 1 frames `0001_1ba1`–`0001_1ba4`
   (≈264–376 × 392–432 px), three mid-air Basic Attack 1 frames (the kunai
-  slash) `0001_midair2ba1`–`0001_midair2ba3` (≈216–352 × 424–536 px), seven
+  slash) `0001_midair1ba1`–`0001_midair1ba3` (≈216–352 × 424–536 px), seven
   Basic Attack 2 frames `0001_2ba1`–`0001_2ba7` (≈224–336 × 384–424 px),
   five mid-air Basic Attack 2 frames (the airborne kick)
-  `0001_midair1ba1`–`0001_midair1ba5` (≈248–424 × 344–448 px), four Charge
+  `0001_midair2ba1`–`0001_midair2ba5` (≈248–424 × 344–448 px), four Charge
   frames `0001_charge1`,
   `0001_charge2`, `0001_chargea` and `0001_chargeb` (≈272–288 × 416 px),
   three Throw frames `0001_throw1`–`0001_throw3`
@@ -128,11 +128,9 @@ behave, and how it must look. The README covers running and deploying it.
 - File names: `ba` means basic attack; the digit before it says which one
   (`1ba` is Basic Attack 1, `2ba` Basic Attack 2). The number at the very end
   is always the frame number (`0001_1ba3.png` is Basic Attack 1, frame 3).
-  The two mid-air sets are the exception to the first rule: they keep their
-  original names after the mid-air moves swapped buttons, so
-  `0001_midair2ba1.png` is Mid-air Basic Attack 1 (the kunai slash), frame
-  1, and `0001_midair1ba1.png` Mid-air Basic Attack 2 (the airborne kick),
-  frame 1. Charge is the
+  The mid-air sets follow the same rule: `0001_midair1ba1.png` is Mid-air
+  Basic Attack 1 (the kunai slash), frame 1, and `0001_midair2ba1.png`
+  Mid-air Basic Attack 2 (the airborne kick), frame 1. Charge is the
   exception: `charge1` / `charge2` are its startup frames and the lettered
   `chargea` / `chargeb` its sustained loop; `charge1` is also reused, as the
   same file, for the Charge release pose.
@@ -938,7 +936,7 @@ read the character database, so it stays the same as fighters are added.
     launch (the blast into a rock outcrop ricochets back across the mesa).
 - Basic Attack 1 (BA1) is #0001's first attack, on the `action1` input. On the
   ground it is a punch (`ba1`, 4 frames); in the air a kunai slash
-  (`midairBa1`, 3 frames: `midair2ba1`–`midair2ba3`); the character data
+  (`midairBa1`, 3 frames: `midair1ba1`–`midair1ba3`); the character data
   maps `action1: { ground, air }` and the fighter picks by grounded state
   when the button is pressed. Both play once at 12 fps, and the phases are
   whole frames: ground BA1 is frame 1 startup, frame 2 active, frames 3–4
@@ -973,7 +971,7 @@ read the character database, so it stays the same as fighters are added.
 - Basic Attack 2 (BA2) is #0001's secondary basic attack, on the `action2`
   input, selected the same way (`action2: { ground, air }`). On the ground it
   is a spinning high kick (`ba2`, 7 real frames); in the air an airborne kick
-  (`midairBa2`, 5 real frames: `midair1ba1`–`midair1ba5`). Both play once at
+  (`midairBa2`, 5 real frames: `midair2ba1`–`midair2ba5`). Both play once at
   12 fps, and the phases are the frames that visibly strike: ground BA2 is
   frames 1–3 startup (step in, lead jab, spin), frames 4–5 active (the kick,
   drawn with motion trails), frames 6–7 recovery; mid-air BA2 is frames 1–2
@@ -1012,7 +1010,8 @@ read the character database, so it stays the same as fighters are added.
   five-frame airborne kick that used to be mid-air BA1. Each move took its
   whole package with it (art, timing, hitbox, damage, stun, hitstop and
   cooldown); only its launch changed, to the values above. The frame
-  files keep their original names.
+  files were renamed to match: `midair1ba1`–`3` is the slash and
+  `midair2ba1`–`5` the kick.
 - Throw is #0001's projectile attack, on the internal `primary` action
   (player-facing name Throw; keyboard J, gamepad X / Square, the touch
   **Shuriken** button).
@@ -1351,7 +1350,7 @@ read the character database, so it stays the same as fighters are added.
   the ground or switches attack, so an opponent who moves away before the
   strike makes it whiff. Lifecycle, all on fixed steps: APPEAR plays
   `cloneav1 → … → cloneav10` once at 20 fps (0.5 s), with no hitbox; the
-  clone's first attack frame (`1ba1`, or `midair1ba1` overhead) shows
+  clone's first attack frame (`1ba1`, or `midair2ba1` overhead) shows
   beneath the last cloud frame as the smoke clears. ATTACK plays one
   ordinary grounded BA1 from frame 1 with the owner's
   real sprites (`0001_1ba1 → 1ba2 → 1ba3 → 1ba4` at 12 fps, the same
@@ -1365,7 +1364,7 @@ read the character database, so it stays the same as fighters are added.
   clone's facing, away from the clone) automatically through the shared
   `CombatSystem.applyHit`; the summon has no launch data of its own and
   never computes a launch itself. The overhead clone instead plays
-  Mid-air BA2 from frame 1 (`0001_midair1ba1 → … → midair1ba5` at 12 fps)
+  Mid-air BA2 from frame 1 (`0001_midair2ba1 → … → midair2ba5` at 12 fps)
   with its own resolved definition (`attacks.midairBa2`: frames 1–2
   startup, frame 3 active, frames 4–5 recovery, 10 damage, 0.28 s hitstun,
   0.14 s blockstun, 0.08 s hitstop), whose hitbox, from the overhead spot,
@@ -1405,7 +1404,7 @@ read the character database, so it stays the same as fighters are added.
   the shared charged-action rule with BA2 (`action2`: I, LB, touch **Kick**);
   no new control. Charge and BA2 pressed together from idle, or BA2 pressed
   on the step Charge is let go, is ordinary BA2 (10 damage, `2ba1`–`2ba7`,
-  unchanged; mid-air BA2 `midair1ba1`–`5` likewise) with no release pose.
+  unchanged; mid-air BA2 `midair2ba1`–`5` likewise) with no release pose.
   Grounded only (Charge is too). Once started it owns the fighter and Charge
   no longer needs to be held; it ends only by a miss, a wall, ground loss, a
   hit on #0001, a contact blocked by a Shield, a lost bind (the Void
