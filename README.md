@@ -7,6 +7,7 @@ desktop and on phones and tablets in landscape.
 
 This is the first playable foundation: full menu flow, a 48-slot roster, two
 compact platform-fighter stages with open ledges and a Void kill boundary, a
+Watch Mode for CPU-vs-CPU matches, a
 Practice Ground training room, a Discover reference screen,
 movement and platform physics, a tiered Power system (Jump Power and Speed
 Power), a camera, a HUD, touch controls,
@@ -327,15 +328,15 @@ Touch controls show on touch-first devices (coarse pointer, or a touch actually 
 ## Current content
 
 - **Characters:** #0001
-- **Maps:** Desert (a sandstone mesa with 2 rock outcrops, 1360 units wide) and City (a rooftop with 7 one-way platforms and a stair bulkhead, 1440 wide) for Quick Battle; the Practice Ground training room (one flat training block, 1280 wide) for practice. Each is a compact main stage with open air past both ledges and the Void a short way beyond (see [Stages and the Void](#stages-and-the-void))
+- **Maps:** Desert (a sandstone mesa with 2 rock outcrops, 1360 units wide) and City (a rooftop with 7 one-way platforms and a stair bulkhead, 1440 wide) for Quick Battle and Watch Mode; the Practice Ground training room (one flat training block, 1280 wide) for practice. Each is a compact main stage with open air past both ledges and the Void a short way beyond (see [Stages and the Void](#stages-and-the-void))
 - **Animations:** Idle, Run, Jump, Fall, Land (jump/fall play while airborne; land plays once on touchdown), Hurt and Mid-air Hurt (shown during hitstun on the ground / in the air), Basic Attack 1 (4 frames), Mid-air Basic Attack 1 (the kunai slash, 3 frames: `0001_midair2ba1`–`3`), Basic Attack 2 (7 frames) and Mid-air Basic Attack 2 (the airborne kick, 5 frames: `0001_midair1ba1`–`5`), each played once at 12 fps, Shield (`0001_prepshield` to raise it, `0001_shielding` held, `0001_releaseblock` to lower it) and Mid-air Shield (`0001_midairshielding`, the held pose only), single frames drawn at 1×, Dash (`0001_dash1`–`2`, drawn at 1×, played once at 10 fps), Charge (charge1 → charge2 once, then chargea ↔ chargeb while held, at 10 fps, with charge1 shown briefly on release), Throw (3 fighter frames, played once at 12 fps), Shuriken (3 looping projectile frames at 18 fps, normalized and drawn separately from the fighter poses), the clone appear / vanish cloud (`0001_cloneav1`–`0001_cloneav10`, an effect at 20 fps: forwards as a clone appears, the same frames in reverse as it vanishes), the Sphere Rush poses (`0001_rasen1`–`0001_rasen12` as one-shot fighter clips at 12 fps: formation 1–3, rush 4–6, contact 7–8 with 8 held, explosion 9, recovery 10–12, and 12 alone as the whiff release) and its blue sphere (`0001_prasen1`–`0001_prasen11` as three effects at 12 fps: formation 1–6 once, spinning on the opponent 7–9 looped while it is drawn ever larger, explosion 10–11 once)
 - **Attacks:** Basic Attack 1 and Basic Attack 2, each on the ground and in the air, a ground Throw that releases one shuriken, the Charged BA1 Clone Attack and the Charged BA2 Sphere Rush (ground only), each on its own 5-second cooldown. #0001's damage: BA1 5, mid-air BA1 5, BA2 10, mid-air BA2 10, shuriken 1, Sphere Rush 1 as it catches the opponent and every 0.5 s after while it holds it (4 in all), then 15 on the explosion. Special is reserved.
 - **Defense:** #0001 shields, on the ground and in the air: held, full circle, free to hold, 25 Energy for each hit it blocks.
 - **Movement:** running, jumping (a short hop on a tap, one air jump), air steering, the fast fall and a grounded Dash on a double tap (15 Energy); attacks keep and add their own momentum, early presses are buffered, and a hit opens a follow-up (see Controls above).
 - **Powers:** Jump Power and Speed Power, each in three tiers. #0001 has Jump Power 2 and Speed Power 2 (its original jump and speed).
 - **Launch:** every hit's damage adds to the target's Launch Point, then the hit launches at its Base Launch (0, 1, 2 or 3) × that new Launch Point, in its Directional Launch. #0001's BA1 is Base Launch 1 horizontal, its BA2 and mid-air BA1 Base Launch 2 vertical, its mid-air BA2 Base Launch 2 reverse vertical (downward), the Sphere Rush blast Base Launch 3 horizontal, and the shuriken and Sphere Rush ticks Base Launch 0 with no direction (they never launch).
-- **HUD:** each fighter has one compact, semi-transparent glass card, pulled in close on either side of the timer: its portrait (the character's own `visual.portrait` crop, turned to face the timer whichever way its art is drawn), one thin divider, and its name with its Launch Point beneath it. The CPU's card mirrors Player 1's. In Quick Battle three small dots under each card fill as that fighter scores its points (○ ○ ○, then ● ○ ○ ...). Over each fighter itself, following it: its bright purple Energy bar above its name tag while below full, and its CAB1 / CAB2 cooldown rings under its feet while cooling down.
-- **Modes:** Quick Battle (Splash → Home → Select Mode → Select Difficulty → Select Fighter → Select Stage → Battle): 99 seconds against a CPU that fights with the whole moveset at the difficulty you choose (Easy, Medium, Hard or Brutal; see [Quick Battle difficulty](#quick-battle-difficulty)), first to 3 points. Each time a fighter falls into the Void its opponent scores a point at once; the one that fell is out of play for 2 seconds, then back at its spawn with 0 Launch Point, full Energy and both charged abilities ready, while the fight and the timer carry on. The third point wins the match (a short **K.O.** beat, then the result; the loser does not come back). If both fall together, or one falls while the other is still waiting to come back, that fall scores nothing. If time runs out first, more points wins, then lower Launch Point; equal on both is a draw. Practice Ground: training on its own stage with a stand-still, non-attacking CPU dummy from the start (which you can change or disable; difficulty never applies to it), no timer, rounds or points; the Void takes a fighter out for 2 seconds, then puts it back at its spawn (below).
+- **HUD:** each fighter has one compact, semi-transparent glass card, pulled in close on either side of the timer: its portrait (the character's own `visual.portrait` crop, turned to face the timer whichever way its art is drawn), one thin divider, and its name with its Launch Point beneath it, under its tag: **P1** and **CPU** in Quick Battle, **CPU 1** and **CPU 2** in Watch Mode. The right-hand card mirrors the left-hand one. In a battle three small dots under each card fill as that fighter scores its points (○ ○ ○, then ● ○ ○ ...). Over each fighter itself, following it: its bright purple Energy bar above its name tag while below full, and its CAB1 / CAB2 cooldown rings under its feet while cooling down.
+- **Modes:** Quick Battle (Splash → Home → Select Mode → Select Difficulty → Select Fighter → Select Stage → Battle): 99 seconds against a CPU that fights with the whole moveset at the difficulty you choose (Easy, Medium, Hard or Brutal; see [Quick Battle difficulty](#quick-battle-difficulty)), first to 3 points. Each time a fighter falls into the Void its opponent scores a point at once; the one that fell is out of play for 2 seconds, then back at its spawn with 0 Launch Point, full Energy and both charged abilities ready, while the fight and the timer carry on. The third point wins the match (a short **K.O.** beat, then the result; the loser does not come back). If both fall together, or one falls while the other is still waiting to come back, that fall scores nothing. If time runs out first, more points wins, then lower Launch Point; equal on both is a draw. Watch Mode (Home → Watch Mode → Select Difficulty → Select CPU 1 → Select CPU 2 → Select Stage → CPU vs CPU Battle): the same battle with the combat AI on both sides, for watching only (see [Watch Mode](#watch-mode)). Practice Ground: training on its own stage with a stand-still, non-attacking CPU dummy from the start (which you can change or disable; difficulty never applies to it), no timer, rounds or points; the Void takes a fighter out for 2 seconds, then puts it back at its spawn (below).
 
 ## Design
 
@@ -359,9 +360,12 @@ ring with dark separation keep states identifiable beyond colour.
   still for reduced-motion users. Wheel/trackpad, pointer or touch dragging,
   and focused arrow/Page keys scroll the credits manually. Automatic movement
   resumes from that position after about 2 seconds of inactivity; reduced-motion
-  mode remains manual-only. **Practice Ground**, the secondary action under
-  Play, opens the training room directly, and **Discover** beneath it opens
-  the in-game reference. The strip shifts outward on narrow screens.
+  mode remains manual-only. Under Play come three outlined secondary actions,
+  in this order: **Watch Mode** opens its CPU-vs-CPU setup directly (never
+  Select Mode), **Practice Ground** opens the training room directly, and
+  **Discover** opens the in-game reference. The strip shifts outward on
+  narrow screens, and short landscape screens tighten the four actions so
+  they fit above the footer.
 - **Select Difficulty** takes Seren's four-level ascending scale into Alva's
   own language: four large charcoal cards (01 Easy, 02 Medium, 03 Hard, 04
   Brutal), each with its big mono index, a four-bar scale lit one to four
@@ -403,9 +407,11 @@ js/
   main.js, config.js  boot + global config (bindings, render, timing)
   core/               app controller, screen manager, menu navigation,
                       asset loader, input (keyboard/touch/gamepad), device, audio stub
-  screens/            splash, home, mode, difficulty, character, map, help,
-                      battle, practice, discover
-  game/               arena (shared loop + rendering), Quick Battle, Practice
+  screens/            splash, home, mode, difficulty, character, map, Watch
+                      Mode's setup (watch-screens.js), help, battle,
+                      practice, discover
+  game/               arena (shared loop + rendering), battle (Quick Battle
+                      and Watch Mode), Practice
                       session, controllers (player, combat AI, training),
                       fighter state machine, physics, camera,
                       combat, launch bounces, projectiles, summoned clones, charged
@@ -519,6 +525,39 @@ floor, follows the opponent up platforms and down by walking off their edges
 (the platform drop is the training CPU's alone), and stands still while its
 opponent is out in the Void. Its randomness is an injected seeded RNG, so
 tests are deterministic.
+
+### Watch Mode
+
+**Home → Watch Mode** is Alva's CPU-vs-CPU spectator mode: Home → Watch
+Mode → Select Difficulty → Select CPU 1 → Select CPU 2 → Select Stage →
+CPU vs CPU Battle. Its four setup steps (Difficulty, CPU 1, CPU 2, Stage)
+show in the header's progress steps under the kicker "Watch Mode", and Back
+retraces them to Home, landing on each choice.
+
+- **Spectator only.** Both fighters are `CombatAIController`s, one each, and
+  nobody controls either: no gameplay input is read and the touch controls
+  are hidden. Pause (`Esc`, `P`, gamepad Start or the HUD's pause button),
+  Resume, Restart Battle, Rematch, Change Stage and Return to Home work as in
+  Quick Battle.
+- **One difficulty for both.** The chosen level (Easy, Medium, Hard or
+  Brutal) drives both CPUs. As in Quick Battle, it changes only how they
+  decide, never their fighters or the rules.
+- **Any two fighters.** CPU 1 and CPU 2 each pick from the shared roster,
+  and may be different fighters or the same one. A mirror match loads its
+  fighter once.
+- **The normal battle.** It is the real `Battle` (`mode: 'watch'`), so the
+  99-second timer, first to 3 points, Void scoring and respawns, Launch
+  Point, Energy, Shields, charged attacks, clones, projectiles, stage
+  physics, camera, hit effects and result rules are all unchanged. The HUD
+  and the results name the sides **CPU 1** and **CPU 2** ("CPU 1 Wins",
+  "CPU 2 fell into the Void for the final point.").
+- **Its own choices.** Watch Mode keeps them in `app.selection.watch`
+  (difficulty, `cpu1CharacterId`, `cpu2CharacterId`, stage), apart from
+  Quick Battle's, so neither setup changes the other's.
+- **Two random streams.** Each CPU draws from its own seeded RNG, both
+  derived from the battle's seed (`deriveSeed` in `js/core/utils.js`), so a
+  seeded match is reproducible while the two CPUs never make the same random
+  choices, even in a mirror match. Unseeded, every match differs.
 
 ### Practice Ground
 
@@ -686,7 +725,7 @@ Energy and the Dash are data too. An `energy` entry (`{ max, regen, chargeRegen,
 
 ### Adding a map
 
-Add an entry to `MAPS` in `js/data/maps.js` (size, ground, bounds, spawns, platforms, solids), then register a theme renderer in `js/stages/index.js`. Every `MAPS` entry becomes a Quick Battle stage on Select Stage; the Practice Ground stage lives apart in `js/data/practice-map.js`.
+Add an entry to `MAPS` in `js/data/maps.js` (size, ground, bounds, spawns, platforms, solids), then register a theme renderer in `js/stages/index.js`. Every `MAPS` entry becomes a stage on Quick Battle's and Watch Mode's Select Stage; the Practice Ground stage lives apart in `js/data/practice-map.js`.
 
 ## Credits
 

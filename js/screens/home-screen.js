@@ -29,21 +29,25 @@ export class HomeScreen extends Screen {
 
     const play = el('button', {
       class: 'home-action home-action--primary', type: 'button', 'data-nav': true, 'data-nav-default': true,
-      html: `<span>Play</span>${ICONS.arrow}`,
+      'data-home-action': 'play', html: `<span>Play</span>${ICONS.arrow}`,
     });
-    // Straight into the training room: no mode, fighter or stage select.
-    const practice = el('button', {
+    // The secondary actions, outlined with a chevron. Watch Mode (CPU vs
+    // CPU) opens its own setup, never Select Mode; Practice Ground goes
+    // straight into the training room (no mode, fighter or stage select);
+    // Discover opens the in-game reference (Power, Launch, Passives).
+    const secondary = (id, label) => el('button', {
       class: 'home-action', type: 'button', 'data-nav': true,
-      html: `<span>Practice Ground</span>${ICONS.right}`,
+      'data-home-action': id, html: `<span>${label}</span>${ICONS.right}`,
     });
-    // The in-game reference (Power, Launch, Passives), opened directly.
-    const discover = el('button', {
-      class: 'home-action', type: 'button', 'data-nav': true,
-      html: `<span>Discover</span>${ICONS.right}`,
-    });
+    const watch = secondary('watch', 'Watch Mode');
+    const practice = secondary('practice', 'Practice Ground');
+    const discover = secondary('discover', 'Discover');
     play.addEventListener('click', () => app.screens.go('mode'));
+    watch.addEventListener('click', () => app.screens.go('watch-difficulty'));
     practice.addEventListener('click', () => app.screens.go('practice'));
     discover.addEventListener('click', () => app.screens.go('discover'));
+    // By name, in menu order.
+    this.actions = { play, watch, practice, discover };
 
     this.rollTrack = el('div', { class: 'home-credits-track' }, [creditsSequence(), creditsSequence({ copy: true })]);
     this.rollOffset = 0;
@@ -110,7 +114,7 @@ export class HomeScreen extends Screen {
         el('div', { class: 'home-intro' }, [
           el('h1', { class: 'home-title', id: 'home-title', html: logoSVG({ className: 'logo logo--display' }) }),
           el('p', { class: 'home-lede', text: 'Fan project. Big heart.' }),
-          el('nav', { class: 'home-actions', 'aria-label': 'Main menu' }, [play, practice, discover]),
+          el('nav', { class: 'home-actions', 'aria-label': 'Main menu' }, Object.values(this.actions)),
         ]),
       ]),
       el('footer', { class: 'home-footer' }, [

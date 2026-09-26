@@ -1,15 +1,25 @@
 // SELECT STAGE: large live preview of the highlighted stage + selectable cards.
+// Confirming starts Quick Battle's Battle.
+//
+// Watch Mode's Select Stage is another instance (js/screens/watch-screens.js):
+// the options below name its screen, its setup and step, where its choice is
+// kept and its start button's label; it also says what starting hands the
+// Battle screen (battleParams). Left out, they are Quick Battle's.
 
 import { Screen } from '../core/screen-manager.js';
 import { el } from '../core/utils.js';
 import { ICONS } from '../ui/icons.js';
-import { screenHeader } from '../ui/components.js';
+import { screenHeader, QUICK_BATTLE_SETUP } from '../ui/components.js';
 import { MAPS, getMap } from '../data/maps.js';
 import { StagePreview } from '../ui/stage-preview.js';
 
 export class MapSelectScreen extends Screen {
-  constructor(app) {
-    super(app, 'map');
+  constructor(app, {
+    id = 'map', setup = QUICK_BATTLE_SETUP, step = 3, selection = () => app.selection, startLabel = 'Confirm and start battle',
+  } = {}) {
+    super(app, id);
+    // The object holding this setup's `mapId`, read on every use.
+    this.selection = selection;
     const reduced = app.device.reducedMotion;
     this.heroCanvas = el('canvas', { class: 'map-hero-canvas', 'aria-hidden': 'true' });
     this.hero = new StagePreview(this.heroCanvas, { animated: true, pan: true, reducedMotion: reduced });
@@ -37,12 +47,12 @@ export class MapSelectScreen extends Screen {
 
     this.startBtn = el('button', {
       class: 'btn btn--primary btn--start', type: 'button', 'data-nav': true,
-      html: `<span>Confirm and start battle</span>${ICONS.arrow}`,
+      html: `<span>${startLabel}</span>${ICONS.arrow}`,
     });
     this.startBtn.addEventListener('click', () => this.start());
 
     this.el.replaceChildren(
-      screenHeader({ title: 'Select Stage', kicker: 'Quick Battle', step: 3, onBack: () => this.onBack() }),
+      screenHeader({ title: 'Select Stage', kicker: setup.name, setup, step, onBack: () => this.onBack() }),
       el('div', { class: 'screen-body map-layout' }, [
         this.heroEl,
         el('div', { class: 'map-side' }, [
@@ -59,13 +69,13 @@ export class MapSelectScreen extends Screen {
   }
 
   focusDefault() {
-    const card = this.cards.find((c) => c._map.id === this.app.selection.mapId) || this.cards[0];
+    const card = this.cards.find((c) => c._map.id === this.selection().mapId) || this.cards[0];
     card.focus({ preventScroll: true });
   }
 
   enter() {
-    this.select(getMap(this.app.selection.mapId) || MAPS[0]);
-    this.showHero(getMap(this.app.selection.mapId) || MAPS[0]);
+    this.select(getMap(this.selection().mapId) || MAPS[0]);
+    this.showHero(getMap(this.selection().mapId) || MAPS[0]);
     this.renderThumbs();
   }
 
@@ -77,7 +87,7 @@ export class MapSelectScreen extends Screen {
   }
 
   select(map) {
-    this.app.selection.mapId = map.id;
+    this.selection().mapId = map.id;
     for (const c of this.cards) {
       const on = c._map.id === map.id;
       c.classList.toggle('is-selected', on);
@@ -95,15 +105,21 @@ export class MapSelectScreen extends Screen {
   }
 
   activate(card, e) {
-    const wasSelected = this.app.selection.mapId === card._map.id;
+    const wasSelected = this.selection().mapId === card._map.id;
     this.select(card._map);
     this.showHero(card._map);
     if (e.detail === 0 || wasSelected) this.start();
   }
 
   start() {
-    const { mapId, characterId, difficulty } = this.app.selection;
-    this.app.screens.go('battle', { mapId, characterId, difficulty });
+    this.app.screens.go('battle', this.battleParams());
+  }
+
+  // Quick Battle: its stage, Player 1's fighter (the CPU plays the same one)
+  // and the CPU's level.
+  battleParams() {
+    const { mapId, characterId, difficulty } = this.selection();
+    return { mapId, characterId, difficulty };
   }
 
   update(dt) {

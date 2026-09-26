@@ -1,5 +1,11 @@
 // BATTLE screen: hosts the canvas, HUD, touch controls, pause + result
 // overlays, and drives the Battle simulation from the app loop.
+//
+// It runs both kinds of Battle: Quick Battle (Player 1 against the CPU, one
+// fighter for both) and Watch Mode (params.mode 'watch': CPU 1 against
+// CPU 2, a fighter each, one difficulty for both). Watch Mode is for
+// watching only: no gameplay input and no touch controls, while pause,
+// restart, rematch and Return to Home work as in Quick Battle.
 
 import { Screen } from '../core/screen-manager.js';
 import { CONFIG } from '../config.js';
@@ -28,6 +34,25 @@ const RESULT_TEXT = {
   time: { kicker: 'Time over', sub: () => 'Time ran out with the points level. Lower Launch Point wins.' },
 };
 
+// How each mode names the two sides: the result title when a side wins, the
+// side as it starts a sentence (the K.O. line names who fell), and the
+// pause dialog's kicker.
+const MODE_TEXT = {
+  'quick-battle': {
+    kicker: 'Quick Battle',
+    p1: { wins: 'Player 1 Wins', name: 'Player 1' },
+    p2: { wins: 'CPU Wins', name: 'The CPU' },
+  },
+  watch: {
+    kicker: 'Watch Mode',
+    p1: { wins: 'CPU 1 Wins', name: 'CPU 1' },
+    p2: { wins: 'CPU 2 Wins', name: 'CPU 2' },
+  },
+};
+
+// "#0001", or "#0001 and #0002".
+const fighterNames = (defs) => defs.map((d) => d.displayName).join(' and ');
+
 export class BattleScreen extends Screen {
   constructor(app) {
     super(app, 'battle');
@@ -53,6 +78,8 @@ export class BattleScreen extends Screen {
     );
 
     this.battle = null;
+    // 'quick-battle' or 'watch', set as each battle is entered.
+    this.mode = 'quick-battle';
     this.paused = false;
     this.needsResize = true;
     this.resizeObserver = new ResizeObserver(() => { this.needsResize = true; });
@@ -77,8 +104,9 @@ export class BattleScreen extends Screen {
     this.helpBtn.addEventListener('click', () => this.openHelp());
     home.addEventListener('click', () => this.confirmHome());
 
+    this.pauseKicker = el('span', { class: 'kicker', text: MODE_TEXT['quick-battle'].kicker });
     this.pauseMenuView = el('div', { class: 'pause-view' }, [
-      el('span', { class: 'kicker', text: 'Quick Battle' }),
+      this.pauseKicker,
       el('h2', { class: 'pause-title', id: 'pause-title', text: 'Paused' }),
       el('div', { class: 'pause-menu' }, [resume, restart, this.helpBtn, home]),
     ]);
@@ -134,29 +162,51 @@ export class BattleScreen extends Screen {
 
   async enter(params) {
     const app = this.app;
-    const def = getCharacter(params?.characterId || app.selection.characterId);
-    const map = getMap(params?.mapId || app.selection.mapId);
-    // The CPU's level: Quick Battle's selection, checked by Battle (an
-    // unknown value is Medium).
-    const difficulty = params?.difficulty ?? app.selection.difficulty;
-    this.def = def;
+    // Watch Mode reads its own selection (app.selection.watch), Quick Battle
+    // the main one; params from the stage screen come first.
+    const mode = params?.mode === 'watch' ? 'watch' : 'quick-battle';
+    const watch = mode === 'watch';
+    const selection = watch ? app.selection.watch : app.selection;
+    const pick = (key) => params?.[key] || selection[key];
+    const p1Def = getCharacter(pick(watch ? 'cpu1CharacterId' : 'characterId'));
+    // Quick Battle's CPU plays Player 1's fighter.
+    const p2Def = watch ? getCharacter(pick('cpu2CharacterId')) : p1Def;
+    const map = getMap(pick('mapId'));
+    // The CPUs' level: the setup's selection, checked by Battle (an unknown
+    // value is Medium).
+    const difficulty = params?.difficulty ?? selection.difficulty;
+    this.mode = mode;
+    this.def = p1Def;
+    this.p2Def = p2Def;
     this.map = map;
     this.difficulty = difficulty;
+    this.pauseKicker.textContent = MODE_TEXT[mode].kicker;
+    this.canvas.setAttribute('aria-label', watch
+      ? `Watch Mode battle: CPU 1, ${p1Def.displayName}, against CPU 2, ${p2Def.displayName}`
+      : 'Battle');
     // Player 1's fighter decides the touch ability icons, never the CPU's.
-    this.touch.setCharacter(def);
+    // A spectator has no touch controls at all.
+    this.touch.setCharacter(watch ? null : p1Def);
+    this.touchRoot.hidden = watch;
+    this.el.classList.toggle('is-watch', watch);
     this.el.dataset.map = map.id;
     this.token = {};
     const token = this.token;
 
-    app.loading.show(`Loading ${def.displayName}`);
-    const sprites = await app.loadCharacter(def.id, (done, total) => app.loading.setProgress(done, total));
+    // Each fighter once: a mirror match loads, and shares, one sprite set.
+    const defs = [...new Map([p1Def, p2Def].map((d) => [d.id, d])).values()];
+    app.loading.show(`Loading ${fighterNames(defs)}`);
+    const sprites = await this.loadFighters(defs);
     if (token !== this.token) return; // left the screen while loading
 
-    if (!sprites?.usable) {
-      app.loading.showError(`${def.displayName}'s sprite frames could not be loaded. Check your connection and that the files in assets/characters/${def.id}/ exist.`, {
+    const failed = defs.filter((d) => !sprites.get(d.id)?.usable);
+    if (failed.length) {
+      const whose = failed.map((d) => `${d.displayName}'s`).join(' and ');
+      const where = failed.map((d) => `assets/characters/${d.id}/`).join(' and ');
+      app.loading.showError(`${whose} sprite frames could not be loaded. Check your connection and that the files in ${where} exist.`, {
         nav: app.nav,
         onRetry: () => {
-          app.resetCharacter(def.id);
+          for (const d of failed) app.resetCharacter(d.id);
           this.enter(params);
         },
         onBack: () => app.screens.back(),
@@ -168,10 +218,11 @@ export class BattleScreen extends Screen {
     this.battle = new Battle({
       canvas: this.canvas,
       map,
-      p1Def: def,
-      p2Def: def,
-      p1Sprites: sprites,
-      p2Sprites: sprites,
+      mode,
+      p1Def,
+      p2Def,
+      p1Sprites: sprites.get(p1Def.id),
+      p2Sprites: sprites.get(p2Def.id),
       input: app.input,
       reducedMotion: app.device.reducedMotion,
       difficulty,
@@ -186,11 +237,41 @@ export class BattleScreen extends Screen {
     this.unsubKey = app.input.onKey((e) => this.onKey(e));
     document.addEventListener('visibilitychange', this.onVisibility);
     document.activeElement?.blur?.();
-    app.input.setGameplayActive(true);
-    this.touch.setEnabled(true);
+    this.setPlayActive(true);
     this.el.classList.add('is-live');
 
     if (app.device.blockedPortrait) this.pause();
+  }
+
+  // Loads each of `defs` through the app's cache, reporting their combined
+  // progress. Resolves to a Map of fighter id → SpriteSet.
+  async loadFighters(defs) {
+    const app = this.app;
+    const progress = new Map();
+    const report = () => {
+      let done = 0;
+      let total = 0;
+      for (const [d, t] of progress.values()) {
+        done += d;
+        total += t;
+      }
+      app.loading.setProgress(done, total);
+    };
+    const sets = await Promise.all(defs.map((d) => app.loadCharacter(d.id, (done, total) => {
+      progress.set(d.id, [done, total]);
+      report();
+    })));
+    return new Map(defs.map((d, i) => [d.id, sets[i]]));
+  }
+
+  // Gameplay input and the touch controls follow play (on while it runs,
+  // off while paused, over or gone), and only while someone plays: in Watch
+  // Mode nobody controls a fighter, so they stay off throughout. Pause keys,
+  // gamepad Start and the menus never depend on them.
+  setPlayActive(on) {
+    const playing = on && this.mode !== 'watch';
+    this.app.input.setGameplayActive(playing);
+    this.touch.setEnabled(playing);
   }
 
   exit() {
@@ -198,8 +279,7 @@ export class BattleScreen extends Screen {
     this.unsubKey?.();
     this.unsubKey = null;
     document.removeEventListener('visibilitychange', this.onVisibility);
-    this.app.input.setGameplayActive(false);
-    this.touch.setEnabled(false);
+    this.setPlayActive(false);
     this.hidePause();
     this.hideResult();
     this.app.loading.hide();
@@ -293,8 +373,7 @@ export class BattleScreen extends Screen {
   pause() {
     if (!this.battle || this.paused || this.battle.phase === 'result') return;
     this.paused = true;
-    this.app.input.setGameplayActive(false);
-    this.touch.setEnabled(false);
+    this.setPlayActive(false);
     this.el.classList.add('is-paused');
     this.pauseOverlay.hidden = false;
     this.closeHelp(true);
@@ -307,8 +386,7 @@ export class BattleScreen extends Screen {
     if (this.app.device.blockedPortrait) return; // stay paused until landscape
     this.hidePause();
     this.paused = false;
-    this.app.input.setGameplayActive(true);
-    this.touch.setEnabled(true);
+    this.setPlayActive(true);
     document.activeElement?.blur?.();
   }
 
@@ -378,12 +456,12 @@ export class BattleScreen extends Screen {
   showResult() {
     const { outcome, reason = 'time' } = this.battle.result;
     const text = RESULT_TEXT[reason] ?? RESULT_TEXT.time;
+    const sides = MODE_TEXT[this.mode];
     this.resultKicker.textContent = text.kicker;
-    this.resultTitle.textContent = outcome === 'p1' ? 'Player 1 Wins' : 'CPU Wins';
-    this.resultSub.textContent = text.sub(outcome === 'p1' ? 'The CPU' : 'Player 1');
+    this.resultTitle.textContent = sides[outcome].wins;
+    this.resultSub.textContent = text.sub(sides[outcome === 'p1' ? 'p2' : 'p1'].name);
     this.setBanner(null);
-    this.app.input.setGameplayActive(false);
-    this.touch.setEnabled(false);
+    this.setPlayActive(false);
     this.resultOverlay.hidden = false;
     this.app.nav.pushScope(this.resultScope);
     this.resultOverlay.querySelector('[data-nav-default]').focus({ preventScroll: true });
@@ -399,8 +477,7 @@ export class BattleScreen extends Screen {
     this.battle.restart();
     this.hud.update(this.battle);
     this.paused = false;
-    this.app.input.setGameplayActive(true);
-    this.touch.setEnabled(true);
+    this.setPlayActive(true);
     document.activeElement?.blur?.();
   }
 }

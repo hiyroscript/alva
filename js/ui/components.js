@@ -3,10 +3,13 @@
 import { el } from '../core/utils.js';
 import { ICONS } from './icons.js';
 
-// Quick Battle's setup, in order; each setup screen passes its own index.
-const STEPS = ['Mode', 'Difficulty', 'Fighter', 'Stage'];
+// The setups that end in a Battle, each with its steps in order. A setup
+// screen passes its setup (Quick Battle unless it says otherwise) and its
+// own index in it.
+export const QUICK_BATTLE_SETUP = Object.freeze({ name: 'Quick Battle', steps: Object.freeze(['Mode', 'Difficulty', 'Fighter', 'Stage']) });
+export const WATCH_SETUP = Object.freeze({ name: 'Watch Mode', steps: Object.freeze(['Difficulty', 'CPU 1', 'CPU 2', 'Stage']) });
 
-export function screenHeader({ title, kicker, step = null, onBack }) {
+export function screenHeader({ title, kicker, step = null, setup = QUICK_BATTLE_SETUP, onBack }) {
   const back = el('button', {
     class: 'btn-back',
     type: 'button',
@@ -18,8 +21,8 @@ export function screenHeader({ title, kicker, step = null, onBack }) {
 
   let steps = null;
   if (step !== null) {
-    steps = el('ol', { class: 'steps', 'aria-label': 'Quick Battle setup' },
-      STEPS.map((name, i) =>
+    steps = el('ol', { class: 'steps', 'aria-label': `${setup.name} setup` },
+      setup.steps.map((name, i) =>
         el('li', {
           class: i < step ? 'is-done' : i === step ? 'is-current' : '',
           'aria-current': i === step ? 'step' : null,
