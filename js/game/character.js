@@ -184,6 +184,9 @@ export class Fighter {
     // trackDashTaps): { direction, age }, or null.
     this.dash = null;
     this.dashTap = null;
+    // A Dash asked for during an impact freeze (1 right, -1 left, 0 none),
+    // tried on the step the freeze ends (see dashAsked).
+    this.frozenDash = 0;
     // Whether the Shield on screen went up on the ground (so it opens with
     // its raise pose) rather than in the air (see updateState).
     this.shieldRaisedOnGround = false;
@@ -285,12 +288,14 @@ export class Fighter {
       // blocked one keeps the Shield up). Energy keeps refilling, at the
       // normal rate (a frozen fighter is not in its Charge stance). Presses
       // made during it are kept, not lost, and do not age: the attack
-      // pressed through the impact comes out as soon as it can. The body
-      // is drawn where it stopped, not between its last two steps (a
-      // rebound freezes it at the surface it struck).
+      // pressed through the impact comes out as soon as it can, and so
+      // does a Dash asked for (a Dash cancel out of the hit). The body is
+      // drawn where it stopped, not between its last two steps (a rebound
+      // freezes it at the surface it struck).
       body.prevX = body.x;
       body.prevY = body.y;
       for (const action of COMBAT_ACTIONS) if (input[`${action}Pressed`]) this.bufferAttack(action);
+      this.frozenDash = this.dashAsked(input, 0) || this.frozenDash;
       combat.updateEnergy(dt, false);
       this.updateState(0);
       return;
@@ -367,8 +372,9 @@ export class Fighter {
 
     // ---- Dash: a double tap of left or right, or one asked for ----------
     // After the attacks, so one started this step wins over a Dash on the
-    // same step (canAct). A double tap that cannot Dash right now is used
-    // up all the same: nothing is queued for later. Energy spent this step
+    // same step (canFollowUp). A Dash may cut short an attack that hit, as
+    // a jump may. A double tap that cannot Dash right now is used up all
+    // the same: nothing is queued for later. Energy spent this step
     // means no refill this step (see the end of update).
     //
     // dashLeftPressed / dashRightPressed ask for one Dash outright (the
@@ -378,16 +384,11 @@ export class Fighter {
     // is used up the same way. It is not a tap: it forgets any first tap
     // waiting, so it never pairs with one, and this step's own direction
     // press (if any) is not counted as one either. Both at once ask for
-    // nothing.
+    // nothing. A Dash asked for during an impact freeze is tried here, on
+    // the step it ends, unless this step asks for one itself.
     let spent = false;
-    const requested = input.dashLeftPressed || input.dashRightPressed;
-    let dashDirection;
-    if (requested) {
-      this.dashTap = null;
-      dashDirection = (input.dashRightPressed ? 1 : 0) - (input.dashLeftPressed ? 1 : 0);
-    } else {
-      dashDirection = this.trackDashTaps(input, dt);
-    }
+    const dashDirection = this.dashAsked(input, dt) || this.frozenDash;
+    this.frozenDash = 0;
     if (dashDirection && this.tryDash(dashDirection, input)) spent = true;
 
     // ---- Charged technique -------------------------------------------------
@@ -731,13 +732,13 @@ export class Fighter {
   }
 
   // Cuts the attack in progress short, if it may be (see
-  // CombatState.cancellable): another attack or a jump is starting.
+  // CombatState.cancellable): another attack, a jump or a Dash is starting.
   cutAttack() {
     if (this.combat.cancellable) this.combat.endAttack();
   }
 
-  // Free to start an attack or a jump: free to act, or in an attack that
-  // hit and may now be cut short (see CombatState.cancellable).
+  // Free to start an attack, a jump or a Dash: free to act, or in an attack
+  // that hit and may now be cut short (see CombatState.cancellable).
   canFollowUp() {
     return this.canAct() || (this.combat.cancellable && !this.technique && !this.dash);
   }
@@ -785,6 +786,18 @@ export class Fighter {
     return false;
   }
 
+  // The Dash this step's input asks for (1 right, -1 left, 0 none): a
+  // one-step request (dashLeftPressed / dashRightPressed; both at once is
+  // none), which forgets any first tap waiting, or else a double tap (see
+  // trackDashTaps) whose waiting tap ages by `dt`.
+  dashAsked(input, dt) {
+    if (input.dashLeftPressed || input.dashRightPressed) {
+      this.dashTap = null;
+      return (input.dashRightPressed ? 1 : 0) - (input.dashLeftPressed ? 1 : 0);
+    }
+    return this.trackDashTaps(input, dt);
+  }
+
   // Double-tap detection on the horizontal press edges (leftPressed /
   // rightPressed, from any device). A press of the same direction as the
   // one waiting, within movement.dashTapWindow seconds of it, is a double
@@ -813,24 +826,29 @@ export class Fighter {
   // burst at movement.dashSpeed for one pass of the dash clip. Movement
   // only: no hitbox, damage, launch or invulnerability. Only while free
   // to act (no attack, stun, bind, charged technique or Dash already
-  // running), grounded, not in or holding Charge, not shielding or holding
-  // Defense for a Shield it may raise, and not exhausted, paying dashCost
-  // (all that is left, emptying the bar, when that is less). The fighter
-  // faces the Dash at once. False, with nothing
-  // spent, if it cannot start (a missing dash clip is logged). `input` is
-  // this step's (Charge or Defense held rules it out); any caller (a future
-  // AI too) may use it.
+  // running) or in an attack that hit and may be cut short (see
+  // CombatState.cancellable: a Dash chases what it sent flying), grounded,
+  // not in or holding Charge, not shielding or holding Defense for a
+  // Shield it may raise, and not exhausted, paying dashCost, or
+  // dashCancelCost for one that cuts an attack short (all that is left,
+  // emptying the bar, when that is less): the extra is what keeps a
+  // hit-Dash-hit chase from looping. The fighter faces the Dash at once.
+  // False, with nothing spent and the attack left as it is, if it cannot
+  // start (a missing dash clip is logged). `input` is this step's (Charge or
+  // Defense held rules it out); any caller (a future AI too) may use it.
   tryDash(direction, input = NEUTRAL_INPUT) {
     const speed = this.def.movement.dashSpeed;
     if (!speed || !direction) return false;
-    if (!this.canAct() || !this.body.grounded || this.charging || input.charge) return false;
+    if (!this.canFollowUp() || !this.body.grounded || this.charging || input.charge) return false;
     if (this.combat.shielding || (input.defense && this.shieldAllowed())) return false;
     // Never a fast run passed off as a Dash: require real dash frames.
     if (!this.dashDuration || !this.sprites.has('dash')) {
       console.warn('[Alva] Dash has no animation frames; ignoring.');
       return false;
     }
-    if (!this.combat.spendEnergy(this.energyDef.dashCost)) return false;
+    const cutting = !!this.combat.attack;
+    if (!this.combat.spendEnergy(cutting ? this.energyDef.dashCancelCost : this.energyDef.dashCost)) return false;
+    this.cutAttack();
     this.dash = { direction, time: 0, duration: this.dashDuration };
     this.facing = direction;
     this.body.vx = direction * speed;

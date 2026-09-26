@@ -958,8 +958,8 @@ Back return Home). It holds the player's settings, saved on this device.
   declares `baseLaunch: 1, directionalLaunch: 'horizontal'`: an unblocked
   hit adds its 5 to the opponent's Launch Point, then pushes it away at 1 ×
   that new Launch Point (from 115: 120, at impact vx 1200 × facing) with no
-  vertical launch. Mid-air BA1 hits once for 5 damage, 0.28 s hitstun,
-  0.15 s blockstun, 0.05 s hitstop and a 0.18 s cooldown (longer, making up
+  vertical launch. Mid-air BA1 hits once for 5 damage, 0.32 s hitstun,
+  0.15 s blockstun, 0.05 s hitstop and a 0.16 s cooldown (longer, making up
   for the missing recovery), and declares `baseLaunch: 2,
   directionalLaunch: 'vertical'`: an unblocked hit launches the opponent
   upward at 2 × its new Launch Point with no sideways push (from 115: at
@@ -973,7 +973,7 @@ Back return Home). It holds the player's settings, saved on this device.
   share of top speed) and slides on it under 0.4 of the ground
   deceleration, with no steering, so a running punch carries on about 20
   units instead of stopping dead; mid-air BA1 keeps all of its drift and
-  0.6 of the air steering, for chasing airborne opponents. Gravity still
+  0.85 of the air steering, for chasing airborne opponents. Gravity still
   applies, and a mid-air BA1 that lands finishes its own clip (only what
   is left of it: never restarted) instead of switching to ground BA1 or
   Land. Both are combo starters: once they hit, the rest may be cut short
@@ -1009,7 +1009,7 @@ Back return Home). It holds the player's settings, saved on this device.
   with, slides under half the ground deceleration and, on its first frame
   (the step in), raises its forward speed to 280, a subtle step of about 20
   units that shoves an opponent standing close along through the
-  pushboxes; mid-air BA2 keeps all of its drift and 0.4 of the air
+  pushboxes; mid-air BA2 keeps all of its drift and 0.7 of the air
   steering, never frozen sideways. Gravity keeps working, and a mid-air
   BA2 that lands finishes what is left of its own clip instead of
   switching to ground BA2 or Land. Both are launchers: once they hit, the
@@ -1223,9 +1223,11 @@ Back return Home). It holds the player's settings, saved on this device.
 - **Energy** (`CombatState.energy`, `maxEnergy`, `energyExhausted`;
   settings from the character's `energy` entry through `resolveEnergy`
   in `js/game/combat.js`, every field optional: `max` 100, `regen` 12 / s,
-  `chargeRegen` 30 / s, `dashCost` 15, `shieldHitCost` 25) is the one
-  resource a fighter spends, and only on a Dash (as it starts) and on the
-  Shield (for each hit it blocks). Either works whenever the fighter is not
+  `chargeRegen` 30 / s, `dashCost` 15, `dashCancelCost` 40, `shieldHitCost`
+  25) is the one resource a fighter spends, and only on a Dash (as it
+  starts: `dashCost`, or `dashCancelCost` for a Dash that cuts short an
+  attack that hit, which is the fighter's `dashCost` when it declares none)
+  and on the Shield (for each hit it blocks). Either works whenever the fighter is not
   exhausted, however little is left: a cost larger than what remains is
   paid by taking all of it (`CombatState.spendEnergy`), never going below
   0. Every fighter starts full, and every
@@ -1252,10 +1254,12 @@ Back return Home). It holds the player's settings, saved on this device.
   rule, cost and effect below applies unchanged; it is not a direction
   press (it never pairs with one), it forgets any first tap waiting, it is
   used up whether or not it Dashes, and both at once ask for nothing. A Dash needs the fighter free to act (no attack,
-  stun, bind, charged technique or Dash running), grounded, neither
+  stun, bind, charged technique or Dash running) or in an attack that hit
+  and may be cut short (a **Dash cancel**, see Hit-cancels), grounded, neither
   in nor holding Charge, not shielding nor holding Defense for a Shield
   that can go up, not exhausted (it pays `dashCost` 15 once as it starts,
-  or all that is left when that is less, emptying the bar) and its real `dash` clip (`dash1 → dash2`,
+  `dashCancelCost` 40 for a Dash cancel, or all that is left when that is
+  less, emptying the bar) and its real `dash` clip (`dash1 → dash2`,
   once at `DASH_FPS` 10; without it the Dash is refused and logged, never
   faked with the run). A held Shield and attacks are resolved before it on
   the same step, so either wins over it. The fighter faces the Dash at once and
@@ -1272,7 +1276,9 @@ Back return Home). It holds the player's settings, saved on this device.
   shield, jump, charge or Dash again (an attack or a jump pressed late in
   it is kept by the input buffers and comes out the step it ends: a Dash
   into a punch, keeping at most the punch's share of top speed, never a
-  lunge; there is no attack-cancel out of a Dash). It has no hitbox,
+  lunge; there is no attack-cancel out of a Dash). A Dash asked for during
+  an impact freeze (a double tap or a one-step request) is kept and tried
+  on the step the freeze ends, like the attack presses made then. It has no hitbox,
   damage, launch or invulnerability. The training CPU never dashes (its
   input never has press edges); Quick Battle's combat AI dashes only
   through the same double tap a player uses (a press, a release and a
@@ -1654,19 +1660,19 @@ Back return Home). It holds the player's settings, saved on this device.
   character (`movement`, and each attack's movement fields), read by
   `Fighter.moveHorizontal` / `moveAttack`, with defaults so a fighter that
   declares none of the new fields still moves. #0001's values:
-  - *Ground.* `acceleration` 3400 (rest to top speed in about 0.1 s),
-    `deceleration` 3800 (letting go stops a run in under 0.09 s, about 14
-    units of slide: a short, natural stop, never an instant one, so it can
-    stop right beside an opponent), `turnBoost` 2.4 (pressing against the
-    way it moves brakes at acceleration × 2.4 until that way is spent; the
-    rest of that step accelerates the new way: a full turn in about 8
+  - *Ground.* `acceleration` 4200 (rest to top speed in 5 steps, about
+    0.08 s), `deceleration` 4200 (letting go stops a run in 5 steps, about
+    10 units of slide: a short, natural stop, never an instant one, so it
+    can stop right beside an opponent), `turnBoost` 2.6 (pressing against
+    the way it moves brakes at acceleration × 2.6 until that way is spent;
+    the rest of that step accelerates the new way: a full turn in about 7
     steps, never a one-step flip). Above top speed (after a Dash) the
     excess bleeds off at `overspeedDeceleration` (6000).
-  - *Air.* `airAcceleration` 2400, `airTurnBoost` 1.8 and a light
+  - *Air.* `airAcceleration` 3000, `airTurnBoost` 2.0 and a light
     `airDeceleration` drag of 380: steering bends the drift instead of
     replacing it, a running jump carries its speed, a standing jump can be
-    steered to full speed in under 9 steps, and a full reversal takes about
-    13 steps of a 44-step jump (the ground's takes 8: not the same). Above
+    steered to full speed in 7 steps, and a full reversal takes about 10
+    steps of a 44-step jump (the ground's takes 7: not the same). Above
     top speed (a launch, a jump out of a Dash), holding the way it already
     moves never slows the fighter beyond the drag; pressing against it
     brakes.
@@ -1697,12 +1703,12 @@ Back return Home). It holds the player's settings, saved on this device.
     clear of the upper Void.
   - *Fast fall.* Down (the Charge input: S / ↓, D-pad or stick down, touch
     C, or the down arrow under Jump in the Joystick layout) held in the air while already descending speeds the fall up toward
-    `fastFallSpeed` (1400) at `fastFallAcceleration` (7500) on top of
+    `fastFallSpeed` (1400) at `fastFallAcceleration` (12000) on top of
     gravity: never while rising, never a jump in speed and never slower
     than the fall already is; it lands on platforms like any fall. Aerial
     attacks may fast-fall (back to the ground after an aerial); a stun, a
     bind or an air Shield may not. A descent from a jump's apex takes
-    about 11 steps instead of 21. `Fighter.fastFalling` is true on the
+    about 9 steps instead of 21. `Fighter.fastFalling` is true on the
     steps it applies.
   - *Attack movement.* Normal locomotion is off while an attack plays, but
     that is not the same as standing still: an attack keeps a share of the
@@ -1716,13 +1722,14 @@ Back return Home). It holds the player's settings, saved on this device.
     (`momentum` 1, `control` 0, `friction` 1, no step) are a planted
     attack; `lockMovement: false` keeps full locomotion. #0001: BA1 0.75 /
     0 / 0.4 (a running punch slides on, no creep), BA2 0.5 / 0 / 0.5 with
-    its step-in, Throw 0.5 / 0.3 / 0.6, mid-air BA1 all its drift and 0.6
-    steering, mid-air BA2 all its drift and 0.4. A charged technique owns
+    its step-in, Throw 0.5 / 0.3 / 0.6, mid-air BA1 all its drift and 0.85
+    steering, mid-air BA2 all its drift and 0.7: aerials follow the stick,
+    so a juggle can be steered after. A charged technique owns
     its own movement instead (the Sphere Rush's 1050 rush) and a clone
     never moves: neither reads these.
   - *Combat input buffer.* A Throw / BA1 / BA2 press the fighter cannot act
     on yet (an attack or its recovery, a stun, a Dash, a cooldown, Defense
-    held for its Shield) is kept for `movement.attackBuffer` (0.12 s) and
+    held for its Shield) is kept for `movement.attackBuffer` (0.15 s) and
     comes out on the first step it can, if it still maps to an attack that
     can start there (on the ground or in the air as the fighter is then).
     The latest such press wins; one older than the buffer never fires.
@@ -1738,13 +1745,16 @@ Back return Home). It holds the player's settings, saved on this device.
   - *Hit-cancels.* An attack that hits (a Shield's block does not count)
     may be cut short once its time reaches its `hitCancel` (seconds in, or
     null for never; the step its freeze ends at the earliest), by another
-    attack or a jump only: walking, a Dash, the Shield and Charge still
-    wait for its end, and left alone it plays out in full. It cuts into
-    itself only once its own cooldown has run since it became cancellable.
-    The cut attack's cooldown starts as it is cut. A whiff or a block keeps
-    the whole recovery, so commitment is unchanged where it matters.
-    #0001's BA1, BA2, mid-air BA1 and mid-air BA2 open theirs from their
-    strike; the Throw has none.
+    attack, a jump or, on the ground, a Dash (a **Dash cancel**, for
+    `energy.dashCancelCost`, 40 for #0001 against a plain Dash's 15: two
+    from a full bar, and a third empties it, Shield included): walking, the
+    Shield and Charge still wait for its end, and left alone it plays out in
+    full. A Dash asked for during the hit's freeze comes out the step it
+    ends. It cuts into itself only once its own cooldown has run since it
+    became cancellable. The cut attack's cooldown starts as it is cut. A
+    whiff or a block keeps the whole recovery (and never Dash-cancels), so
+    commitment is unchanged where it matters. #0001's BA1, BA2, mid-air BA1
+    and mid-air BA2 open theirs from their strike; the Throw has none.
   - *Combo routes.* Movement, recovery and the buffer do most of the work;
     hitstun is only long enough for the intended follow-up to arrive.
     BA1 (0.32 s) is the starter, BA2 (0.28 s, a stronger freeze) the
@@ -1755,11 +1765,15 @@ Back return Home). It holds the player's settings, saved on this device.
     of two to four that BA1's own push ends), BA2 → BA1 while the launch is
     still a hop, BA2 → jump → mid-air BA1 once it launches properly (Launch
     Point about 25–60), and mid-air BA2 → land (fast) → BA1 on a grounded
-    target. Launch Point breaks them by itself, with no combo counter: BA1's
-    push carries the target out of BA2's reach past about 25, and BA2's
-    launch out of a jump's reach past about 60, so at high Launch Point
-    combat turns into pursuit and ring-outs. None loops: every hit adds to
-    the Launch Point that sends the next one further. Stage geometry bends
+    target. BA1 → Dash → BA1 chases BA1's push from 0 to about 85 Launch
+    Point, so the starter has a follow-up where BA1 → BA2 no longer
+    reaches. Launch Point breaks them by itself, with no combo counter: BA1's
+    push carries the target out of BA2's reach past about 25, out of a Dash's
+    past about 85, and BA2's launch out of a jump's reach past about 60, so
+    at high Launch Point combat turns into pursuit and ring-outs. None loops:
+    every hit adds to the Launch Point that sends the next one further, and
+    a Dash chase spends the Energy the Shield needs, ending within five
+    hits. Stage geometry bends
     that into new routes (a rebound off a wall or a spiked floor is a moment
     to chase), never a loop: a wall's rebounds are capped until the target
     recovers, and a rebound flies past the attacker (Launch bounce).
@@ -1769,10 +1783,11 @@ Back return Home). It holds the player's settings, saved on this device.
     off the stage freezes its fighter alone for 0.05 s. It freezes the
     fighters, never the controls: presses made during it are kept, and a
     frozen fighter is drawn still where it stopped.
-  - *Air combos.* With the air jump and the launch stun, BA2 → jump →
-    mid-air BA1 → air jump → mid-air BA1 is a three-hit juggle around 30–40
-    Launch Point; never longer, and gone by about 60, when BA2 launches
-    past any jump.
+  - *Air combos.* With the air jump, the launch stun and aerials that
+    steer, BA2 → jump → mid-air BA1 leads on to a third hit: straight into
+    another mid-air BA1 or a mid-air BA2 spike below about 15 Launch Point,
+    and through the air jump into a mid-air BA2 up to about 35 or a mid-air
+    BA1 up to about 40. Gone by about 60, when BA2 launches past any jump.
 - **Powers** (`js/data/powers.js`): fighter abilities owned at one of three
   tiers, Jump Power and Speed Power. Each Power is a frozen tier table in
   the one `POWERS` registry, the single source of its names, descriptions,

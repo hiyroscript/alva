@@ -25,12 +25,14 @@ const dash = (step, dir = 'right') => {
   return step({ [`${dir}Pressed`]: true, [dir]: true });
 };
 
-test('#0001 declares its Energy: 100 max, 12 / s, 30 / s in Charge, 15 per Dash, 25 per blocked hit', () => {
-  assert.deepEqual(def.energy, { max: 100, regen: 12, chargeRegen: 30, dashCost: 15, shieldHitCost: 25 });
+test('#0001 declares its Energy: 100 max, 12 / s, 30 / s in Charge, 15 per Dash, 40 per Dash cancel, 25 per blocked hit', () => {
+  assert.deepEqual(def.energy, { max: 100, regen: 12, chargeRegen: 30, dashCost: 15, dashCancelCost: 40, shieldHitCost: 25 });
   assert.equal(def.stamina, undefined, 'the old name is gone');
-  // Defaults for a future fighter that declares none (or only some).
-  assert.deepEqual({ ...resolveEnergy(undefined) }, def.energy);
-  assert.deepEqual({ ...resolveEnergy({ max: 80, dashCost: 10 }) }, { ...def.energy, max: 80, dashCost: 10 });
+  // Defaults for a future fighter that declares none (or only some): a Dash
+  // cancel costs what its Dash does unless it says otherwise.
+  assert.deepEqual({ ...resolveEnergy(undefined) }, { ...def.energy, dashCancelCost: 15 });
+  assert.deepEqual({ ...resolveEnergy({ max: 80, dashCost: 10 }) }, { ...def.energy, max: 80, dashCost: 10, dashCancelCost: 10 });
+  assert.equal(resolveEnergy({ dashCost: 10, dashCancelCost: 30 }).dashCancelCost, 30);
   const bare = makeFighter({ character: { ...def, energy: undefined } }).fighter;
   assert.equal(bare.combat.maxEnergy, 100);
   // Renamed all the way through, never Stamina under an Energy label.

@@ -47,8 +47,8 @@ const BA1_ENTRIES = {
   midairBa1: {
     animation: 'midairBa1', startup: 2 / 12, active: 1 / 12, recovery: 0, damage: 5,
     hitbox: { x: 14, y: -100, w: 22, h: 80 }, ...BA1_LAUNCH.midairBa1,
-    hitstun: 0.28, blockstun: 0.15, hitstop: 0.05, cooldown: 0.18,
-    airMomentum: 1, airControl: 0.6, hitCancel: 2 / 12,
+    hitstun: 0.32, blockstun: 0.15, hitstop: 0.05, cooldown: 0.16,
+    airMomentum: 1, airControl: 0.85, hitCancel: 2 / 12,
   },
 };
 
@@ -112,7 +112,7 @@ test('BA1 attack definitions match their clips: the ground punch and the mid-air
   assert.deepEqual([a.startup, a.active, a.recovery], [2 / 12, 1 / 12, 0]);
   assert.equal(a.groundOnly, false);
   assert.equal(a.damage, 5, 'adds 5 Launch Point');
-  assert.deepEqual([a.hitstun, a.blockstun, a.hitstop, a.cooldown], [0.28, 0.15, 0.05, 0.18]);
+  assert.deepEqual([a.hitstun, a.blockstun, a.hitstop, a.cooldown], [0.32, 0.15, 0.05, 0.16]);
   assert.equal(a.hitCancel, a.startup, 'a follow-up from its slash on');
   assert.ok(a.hitbox.x + a.hitbox.w > def.collider.width / 2 && a.hitbox.x + a.hitbox.w <= 40, 'midairBa1 hitbox reach');
   assert.ok(a.hitbox.w < def.collider.width, 'midairBa1 hitbox is narrower than the fighter');
@@ -481,7 +481,7 @@ test('mid-air BA1 hits a grounded opponent below and in front while still airbor
       assert.equal(attacker.combat.phase, 'active');
       assert.equal(frameName(attacker), '0001_midair1ba3.png');
       // The slash's own stun and freeze, on both fighters.
-      assert.equal(target.combat.stun, 0.28 + resolveLaunchStun(events[0].launchSpeed, target.launchReaction));
+      assert.equal(target.combat.stun, 0.32 + resolveLaunchStun(events[0].launchSpeed, target.launchReaction));
       assert.equal(target.combat.hitstop, 0.05);
       assert.equal(attacker.combat.hitstop, 0.05);
     }

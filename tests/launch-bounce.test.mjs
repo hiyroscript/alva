@@ -509,9 +509,11 @@ test('a rebound keeps the fighter stunned while it flies off the surface, then c
   assert.equal(fighter.canAct(), false);
   assert.equal(fighter.state, 'hitstun');
   // Held left (away from the wall) or not, nothing changes until it is over.
+  // (The press comes early enough to be older than the attack buffer by
+  // then: it never fires.)
   const steps = Math.round(B.stun / DT) - 1;
   for (let i = 0; i < steps; i++) {
-    step({ left: true, ...(i === 3 ? P('action1') : {}) });
+    step({ left: true, ...(i === 0 ? P('action1') : {}) });
     assert.equal(fighter.combat.attack, null, 'cannot attack while it flies off');
   }
   // Grounded and free: the launch is over, and normal movement resumes.

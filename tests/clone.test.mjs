@@ -701,7 +701,7 @@ test('the no-ground fallback is data: the summon reuses midairBa2 over the targe
       animation: 'midairBa2', startup: 2 / 12, active: 1 / 12, recovery: 2 / 12, damage: 10,
       hitbox: { x: 8, y: -44, w: 40, h: 40 }, baseLaunch: 2, directionalLaunch: 'reverseVertical',
       hitstun: 0.28, blockstun: 0.14, hitstop: 0.08, cooldown: 0.1,
-      airMomentum: 1, airControl: 0.4, hitCancel: 2 / 12,
+      airMomentum: 1, airControl: 0.7, hitCancel: 2 / 12,
     },
   );
   assert.equal(def.attacks.ba1Clone, undefined);

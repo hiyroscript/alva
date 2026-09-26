@@ -49,12 +49,12 @@
 //
 // `hitCancel` (seconds into the attack, or null for never) is how a
 // connected attack makes room for a follow-up: once it has hit (a Shield's
-// block does not count) and its time has reached hitCancel, another attack
-// or a jump may cut the rest of it short (see CombatState.cancellable), its
-// cooldown starting as if it had finished. Nothing else does: walking,
-// a Dash, the Shield and Charge still wait for its end. Left alone, it
-// plays out in full, and a whiffed or blocked attack keeps its whole
-// recovery.
+// block does not count) and its time has reached hitCancel, another attack,
+// a jump or a Dash may cut the rest of it short (see
+// CombatState.cancellable), its cooldown starting as if it had finished.
+// Nothing else does: walking, the Shield and Charge still wait for its end.
+// Left alone, it plays out in full, and a whiffed or blocked attack keeps
+// its whole recovery.
 //
 // A projectile attack has `hitbox: null` (no melee strike) and a `projectile`
 // event instead: once its time crosses `spawnAt` it releases that projectile,
@@ -112,7 +112,8 @@
 //
 // Energy (CombatState.energy, see resolveEnergy) is the one resource a
 // fighter spends, and only on Dash and Shield: a Dash pays dashCost as it
-// starts, and every hit the Shield blocks costs shieldHitCost. Either works
+// starts (dashCancelCost when it cuts short an attack that hit), and every
+// hit the Shield blocks costs shieldHitCost. Either works
 // with less left than it costs, but then takes all of it. It refills by
 // itself, faster while the fighter is in its Charge stance. Emptied, it
 // exhausts the fighter: no Dash or Shield until it is full again. Nothing
@@ -141,7 +142,7 @@ const ATTACK_DEFAULTS = {
   airControl: 0,     // the same in the air
   friction: 1,       // x the ground deceleration while it is not steered
   step: null,        // { at, speed }: forward speed raised to `speed` as its time crosses `at`
-  hitCancel: null,   // seconds in: from then on, once it has hit, an attack or a jump may cut it short
+  hitCancel: null,   // seconds in: from then on, once it has hit, an attack, a jump or a Dash may cut it short
   baseLaunch: 0,
   directionalLaunch: null,
   projectile: null, // { id, spawnAt, offset } for a projectile attack
@@ -195,22 +196,26 @@ export function createDefenseDefinition(spec) {
 // A character's `energy` entry, every field optional:
 //
 //   energy: {
-//     max: 100,          // full, and where every fighter starts
-//     regen: 12,         // per second, whatever the fighter is doing
-//     chargeRegen: 30,   // per second instead, while in the Charge stance
-//     dashCost: 15,      // spent once as a Dash starts
-//     shieldHitCost: 25, // spent once for every hit the Shield blocks
+//     max: 100,           // full, and where every fighter starts
+//     regen: 12,          // per second, whatever the fighter is doing
+//     chargeRegen: 30,    // per second instead, while in the Charge stance
+//     dashCost: 15,       // spent once as a Dash starts
+//     dashCancelCost: 40, // ...instead, by a Dash that cuts short an attack that hit
+//     shieldHitCost: 25,  // spent once for every hit the Shield blocks
 //   }
 //
 // A cost larger than what is left is still paid: it takes the rest, which
 // empties the bar and exhausts the fighter (see CombatState.spendEnergy).
+// Left out, dashCancelCost is the fighter's dashCost.
 const ENERGY_DEFAULTS = Object.freeze({
   max: 100, regen: 12, chargeRegen: 30, dashCost: 15, shieldHitCost: 25,
 });
 
 // Frozen Energy settings: the character's entry over the defaults.
 export function resolveEnergy(spec) {
-  return Object.freeze({ ...ENERGY_DEFAULTS, ...spec });
+  const energy = { ...ENERGY_DEFAULTS, ...spec };
+  energy.dashCancelCost ??= energy.dashCost;
+  return Object.freeze(energy);
 }
 
 // Named cooldowns that each remember their full length, so progress can be
@@ -313,9 +318,9 @@ export class CombatState {
   }
 
   // The attack in progress hit (a block does not count) and has reached its
-  // hitCancel time: another attack or a jump may cut the rest of it short
-  // (see Fighter.tryAction and the jump in Fighter.update). Never during the
-  // hit's freeze, a stun or a bind.
+  // hitCancel time: another attack, a jump or a Dash may cut the rest of it
+  // short (see Fighter.tryAction, Fighter.tryDash and the jump in
+  // Fighter.update). Never during the hit's freeze, a stun or a bind.
   get cancellable() {
     const a = this.attack;
     const at = a?.def.hitCancel;

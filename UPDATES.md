@@ -7,7 +7,7 @@ which tests cover it. Anything not listed under an update is unchanged by it.
 
 | Name | Pull request | Commit | In one line |
 | --- | --- | --- | --- |
-| **Movement update** | [#49](https://github.com/hiyroscript/alva/pull/49) | `a34fbdd` | Movement feel, attack momentum and combo flow for #0001 |
+| **Movement update** | [#49](https://github.com/hiyroscript/alva/pull/49), then [#57](https://github.com/hiyroscript/alva/pull/57) ([second pass](#second-pass)) | `a34fbdd`, then `e75dbb6` | Movement feel, attack momentum and combo flow for #0001 |
 | **Effect update** | [#50](https://github.com/hiyroscript/alva/pull/50) | `487b9af` | Short hop, air jump, launch reaction, perfect Shield and hit effects |
 | **Bounce update** | [#51](https://github.com/hiyroscript/alva/pull/51) | `f7c1e28` | Hard launches rebound off walls, floors and ceilings |
 
@@ -18,10 +18,12 @@ assumes the movement update, and the bounce update assumes both.
 
 Makes #0001's movement quicker and its attacks flow into each other.
 MultiVersus was the reference for the feel only; every ALVA mechanic is kept.
+A [second pass](#second-pass) later made it snappier and opened the combos
+further; the list below is the update as it stands now.
 
 **What it added**
 
-- **Ground movement:** top speed in about 0.1 s, a short natural stop, and
+- **Ground movement:** top speed in about 0.08 s, a short natural stop, and
   turns that brake hard before accelerating.
 - **Air steering:** bends the drift instead of replacing it, so a running
   jump carries its speed.
@@ -29,16 +31,22 @@ MultiVersus was the reference for the feel only; every ALVA mechanic is kept.
   Charge held from the air no longer starts charging on landing.
 - **Dash handoff:** a Dash eases into the run instead of sliding on.
 - **Attack momentum:** a running BA1 slides on, BA2 steps in, aerials keep
-  their drift, and the Throw can back off. An attack faces the direction
-  held as it starts.
+  their drift and follow the stick almost fully, and the Throw can back
+  off. An attack faces the direction held as it starts.
 - **Combat input buffer:** a Throw, BA1 or BA2 press that comes too early is
-  kept for 0.12 s and fires on the first step it can.
+  kept for 0.15 s and fires on the first step it can.
 - **Hit-cancel:** a hit that connects (not a block or a whiff) can be cut
-  short into another attack or a jump.
+  short into another attack, a jump or, on the ground, a Dash.
+- **Dash cancel:** the Dash out of a hit costs 40 Energy instead of 15, so
+  a full bar allows two and a third empties it (the Shield goes with it).
+  That is what keeps BA1 → Dash → BA1 from looping. A Dash asked for during
+  the hit's freeze comes out the step it ends.
 - A hit now interrupts the target's own attack.
 - **Combo routes:** at low Launch Point, BA1 → BA2, BA1 → BA1,
-  BA2 → jump → mid-air BA1 and mid-air BA2 → land → BA1 all connect. They
-  break naturally as Launch Point grows.
+  BA2 → jump → mid-air BA1 and mid-air BA2 → land → BA1 all connect;
+  BA1 → Dash → BA1 chases BA1's push up to about 85 Launch Point, and
+  BA2 → jump → mid-air BA1 carries on into a third aerial (through the air
+  jump up to about 40). They break naturally as Launch Point grows.
 
 **Where to tune it** (`js/data/characters.js`, #0001)
 
@@ -46,15 +54,50 @@ MultiVersus was the reference for the feel only; every ALVA mechanic is kept.
   `overspeedDeceleration`, `airAcceleration`, `airDeceleration`,
   `airTurnBoost`, `fastFallAcceleration`, `fastFallSpeed`, `attackBuffer`,
   `hitstunFriction`, `hitstunAirDrag`.
+- `energy.dashCancelCost`: what a Dash cancel costs.
 - Each attack in `attacks`: `momentum` / `airMomentum`, `control` /
   `airControl`, `friction`, `step`, `hitCancel`, plus `hitstun`,
   `hitstop` and `cooldown`, which set the combo routes.
 
-**Code:** `Fighter.moveHorizontal`, `moveAttack` and `attackStartSpeed` in
-`js/game/character.js`; `CombatState` in `js/game/combat.js`. The combat
-AI (`js/game/combat-ai.js`) predicts attack drift from the same data.
+**Code:** `Fighter.moveHorizontal`, `moveAttack`, `attackStartSpeed`,
+`tryDash` and `dashAsked` in `js/game/character.js`; `CombatState` and
+`resolveEnergy` in `js/game/combat.js`. The combat AI
+(`js/game/combat-ai.js`) predicts attack drift from the same data.
 
-**Tests:** `tests/movement.test.mjs`, `tests/combo.test.mjs`.
+**Tests:** `tests/movement.test.mjs`, `tests/combo.test.mjs` (the Dash
+cancel included), and the Dash cancel's cost in `tests/energy.test.mjs`.
+
+### Second pass
+
+Pull request [#57](https://github.com/hiyroscript/alva/pull/57), commit `e75dbb6`. Asked for as "the
+movement update needs to feel better and combos to be even more open".
+Values it changed, old → new, for undoing any one of them:
+
+| Where | Field | Before | After |
+| --- | --- | --- | --- |
+| `movement` | `acceleration` | 3400 | 4200 |
+| `movement` | `deceleration` | 3800 | 4200 |
+| `movement` | `turnBoost` | 2.4 | 2.6 |
+| `movement` | `airAcceleration` | 2400 | 3000 |
+| `movement` | `airTurnBoost` | 1.8 | 2.0 |
+| `movement` | `fastFallAcceleration` | 7500 | 12000 |
+| `movement` | `attackBuffer` | 0.12 | 0.15 |
+| `attacks.midairBa1` | `airControl` | 0.6 | 0.85 |
+| `attacks.midairBa1` | `hitstun` | 0.28 | 0.32 |
+| `attacks.midairBa1` | `cooldown` | 0.18 | 0.16 |
+| `attacks.midairBa2` | `airControl` | 0.4 | 0.7 |
+| `energy` | `dashCancelCost` | (none) | 40 |
+
+It also added the Dash cancel itself (`Fighter.tryDash` accepts an attack
+that may be cut short), and kept a Dash asked for during a hit's freeze
+(`Fighter.dashAsked`, `frozenDash`). Setting `dashCancelCost` does not turn
+Dash cancels off. To take them out, put back `canAct()` in place of
+`canFollowUp()` in `tryDash`.
+
+Measured, in steps of 1/60 s: top speed 6 → 5, a full turn 8 → 7, a full
+air reversal 13 → 10, a fast fall from a jump's apex 11 → 9. The longest
+true combo from 0 Launch Point is still 9 hits. At 40–60 it went from one
+or two hits to a four-hit Dash chase.
 
 ## Effect update
 

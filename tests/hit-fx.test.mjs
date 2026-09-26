@@ -161,7 +161,7 @@ test('effects never change a step: the same fight, stepped with and without them
     const battle = new Battle({ canvas: { getContext: () => ({}) }, map: getMap('city'), p1Def: def, p2Def: def, p1Sprites: sprites, p2Sprites: sprites, input });
     battle.p2.controller = null;
     battle.p2.combat.launchPoint = 40;
-    if (!withFx) battle.fx = { take() {}, reset() {}, timeScale: 1 };
+    if (!withFx) battle.fx = { take() {}, takeBounce() {}, reset() {}, timeScale: 1 };
     battle.setPhase('fight');
     battle.p2.body.x = battle.p1.body.x + 44;
     const out = [];
