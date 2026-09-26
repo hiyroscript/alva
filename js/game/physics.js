@@ -10,6 +10,13 @@
 // knocked past either ledge and fall; only the Void (StageCollision.inVoid),
 // a short way past the ledges, ends that, and the game modes decide what it
 // means.
+//
+// A collision always stops the body on that axis: a solid's side zeroes vx,
+// a landing or a ceiling zeroes vy. Physics never bounces anything. It
+// reports what each contact stopped instead (impactVx / impactVy, with the
+// contact's side in wall / landed / bonked), so a caller that knows why the
+// body was moving can turn it into a rebound (a hard combat launch, see
+// js/game/launch-bounce.js). Physics itself never knows why.
 
 const EPS = 0.5;
 
@@ -87,6 +94,14 @@ export function createBody({ x, y, width, height, gravityScale = 1, maxFall = 15
     landed: false,   // touched down this step
     wall: 0,         // -1 / 1 when pressed against a solid's side this step
     bonked: false,   // hit a ceiling this step
+    // The velocity this step's contacts stopped, just before they zeroed it:
+    // impactVx for a solid's side (the side is `wall`), impactVy for a
+    // landing (`landed`, or a grounded body's resting contact: 0) or a
+    // ceiling (`bonked`). 0 when nothing was stopped on that axis. The
+    // contact normals follow: (-wall, 0) for a side, (0, -1) for a floor,
+    // (0, 1) for a ceiling (world y grows downward).
+    impactVx: 0,
+    impactVy: 0,
     dropId: null,    // one-way platform currently being dropped through
     dropTimer: 0,
   };
@@ -100,6 +115,8 @@ export function stepBody(b, dt, stage, gravity) {
   b.landed = false;
   b.wall = 0;
   b.bonked = false;
+  b.impactVx = 0;
+  b.impactVy = 0;
   const wasGrounded = b.grounded;
 
   if (b.dropTimer > 0) {
@@ -123,6 +140,9 @@ export function stepBody(b, dt, stage, gravity) {
       b.x = s.x + s.w + b.halfW;
       b.wall = -1;
     }
+    // The first solid met keeps the speed it stopped (any later one this
+    // step meets a body already at rest).
+    if (b.vx !== 0) b.impactVx = b.vx;
     b.vx = 0;
   }
 
@@ -149,6 +169,7 @@ export function stepBody(b, dt, stage, gravity) {
     }
     if (ref) {
       b.y = surface;
+      b.impactVy = b.vy;
       b.vy = 0;
       b.grounded = true;
       b.ground = ref;
@@ -164,6 +185,7 @@ export function stepBody(b, dt, stage, gravity) {
       const top = b.y - b.height;
       if (prevTop >= s.y + s.h - EPS && top < s.y + s.h && overlapsX(b, s.x, s.x + s.w)) {
         b.y = s.y + s.h + b.height;
+        if (b.vy !== 0) b.impactVy = b.vy;
         b.vy = 0;
         b.bonked = true;
       }

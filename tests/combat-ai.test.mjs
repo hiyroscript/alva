@@ -12,11 +12,11 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { def, DT, fakeSprites, stageMap } from './fighter-harness.mjs';
 import { CONFIG } from '../js/config.js';
-import { Fighter } from '../js/game/character.js';
+import { Fighter, separateFighters } from '../js/game/character.js';
 import { CombatSystem } from '../js/game/combat.js';
 import { spawnProjectiles, removeDeadProjectiles } from '../js/game/projectile.js';
 import { spawnClones, updateClones, removeDeadClones } from '../js/game/clone.js';
-import { StageCollision, separate, resolveSolidOverlap } from '../js/game/physics.js';
+import { StageCollision, resolveSolidOverlap } from '../js/game/physics.js';
 import { CombatAIController, readMoveset } from '../js/game/combat-ai.js';
 import { TrainingAIController } from '../js/game/fighter-controller.js';
 import { DIFFICULTY_IDS, getDifficultyProfile } from '../js/data/difficulty.js';
@@ -62,9 +62,7 @@ function ring({
       f.update(DT, ctx);
       if (f === cpu) log.push({ ...ai.out, step: n, intent: ai.intent?.kind ?? null });
     }
-    if (fighters.length === 2) {
-      separate(fighters[0].body, fighters[1].body, def.pushbox.width / 2, def.pushbox.width / 2, stage);
-    }
+    if (fighters.length === 2) separateFighters(fighters[0], fighters[1], stage);
     for (const f of fighters) resolveSolidOverlap(f.body, stage);
     spawnProjectiles(fighters, world.projectiles);
     for (const p of world.projectiles) p.update(DT, stage);

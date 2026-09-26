@@ -163,7 +163,7 @@ behave, and how it must look. The README covers running and deploying it.
 - Systems: asset loader, input (keyboard, touch, gamepad), menu navigator,
   device detection, audio stub, sprite normalizer/animator, fighter state
   machine, controllers (player / Quick Battle combat AI / training AI),
-  physics, camera, combat,
+  physics, camera, combat, launch bounce,
   projectiles, summoned clones, charged techniques, HUD, touch controls,
   stage themes, fighter roster.
 - One arena (`js/game/arena.js`) owns the fixed-step world and its Canvas
@@ -710,7 +710,8 @@ read the character database, so it stays the same as fighters are added.
   framed; its Energy bar, name tag and CAB rings go with it, its HUD card
   stays), and anything holding or aiming at it lets go. Every fighter taken
   on one step is out before any is handed on, so a simultaneous fall is one
-  event. After `CONFIG.battle.respawnSeconds` (2 s, counted on the
+  event. It is not geometry: nothing rebounds off it (see Launch bounce,
+  7.2). After `CONFIG.battle.respawnSeconds` (2 s, counted on the
   simulation clock, never a timer) it is back at its own spawn (the usual
   reset onto the surface under it, never inside a solid) in a clean neutral
   state: 0 Launch Point, full Energy and not exhausted, CAB1 / CAB2 ready,
@@ -801,6 +802,82 @@ read the character database, so it stays the same as fighters are added.
     formula exactly.
   - A hit (never a block) also gives the target its air jump back, so a
     launch never strands it without one.
+- **Launch bounce** (`js/game/launch-bounce.js`: every fighter's
+  `LAUNCH_BOUNCE` settings, which a character may override with its own
+  `launchBounce`, `enabled: false` included; #0001 overrides none). A launch
+  that drives its fighter hard into stage geometry rebounds off it instead
+  of stopping dead, and may ricochet on to the next surface. It is not part
+  of a launch's strength: Launch Point, Base Launch and Directional Launch
+  resolve exactly as below, and only the velocity the launch leaves the
+  fighter with can rebound, so the Launch Point decides it by itself: a
+  weak launch never bounces, a harder one rebounds, a huge one can ricochet
+  from surface to surface or on into the Void.
+  - *Physics stays generic.* `stepBody` still stops a body at whatever it
+    meets (a solid's side zeroes `vx`, a landing or a ceiling `vy`) and never
+    bounces anything or knows why the body moves. It reports the speed each
+    contact stopped, just before zeroing it (`impactVx`, `impactVy`; the
+    contact is `wall`, `landed` or `bonked`, its normal (−wall, 0), (0, −1)
+    or (0, 1)). After the fighter's step, `bounceLaunch` decides whether that
+    stop was a launch's impact and turns it back into a rebound.
+  - *Only a launch.* A launching hit starts a launch sequence
+    (`Fighter.launch`, from `Fighter.takeHit`): which way the launch carries
+    the fighter on each axis, and how many times it has rebounded. It lasts
+    until the fighter is back in ordinary play: on the ground with its stun
+    over, acting again once free (an attack, a jump or air jump, the Shield,
+    a fast fall, a technique) or bound. A hit that launches nothing leaves it
+    as it is. So walking or running into a wall, jumping into a ceiling and
+    landing stay ordinary stops. A surface also rebounds a fighter only if
+    the launch, or its latest rebound, is carrying it into that surface:
+    falling back down after an upward or sideways launch is an ordinary
+    landing (gravity alone never bounces anyone), while a spike drives into
+    the floor and a rebound off a ceiling drives back down to it.
+  - *Threshold.* A contact rebounds when the speed it stopped into the
+    surface is at least `minImpactSpeed` (500 units / s). Only what crosses
+    the surface counts, so a glancing contact never rebounds hard. Slower, it
+    is an ordinary stop, and that surface spends the launch on that axis.
+    Ground BA1 rebounds its target off a wall right behind it from about 50
+    Launch Point, mid-air BA2 off the floor from about 25; the body's
+    `maxFallSpeed` (1500) still caps a downward launch.
+  - *Rebound.* The stopped speed comes back reversed and scaled by the
+    surface's restitution: a solid's side (`wallRestitution` 0.72), a floor
+    (the main floor's top, a solid's top, a one-way platform's top:
+    `floorRestitution` 0.6) or a solid's underside (`ceilingRestitution`
+    0.65). What ran along the surface is kept, so a diagonal impact
+    ricochets instead of reversing (into a wall at vx 800, vy 300, it leaves
+    at about vx −576, vy 300). A corner, a side and a floor or ceiling met on
+    one step, rebounds on both axes, once each, as one rebound. The body is
+    left at the surface it struck, never inside it. A floor rebound is no
+    landing: the fighter is airborne at once, with no Land pose and no air
+    jump back. Every rebound is weaker than its impact, so a ricochet always
+    dies away: a spike rebounds once and then lands, and a hard sideways
+    launch between two walls ricochets wall to wall two or three times.
+    Deterministic: no randomness, fixed steps only.
+  - *Where.* Solids (the Desert's rock outcrops, the City's bulkhead) and the
+    main floor's own cliff faces below its top are geometry. One-way
+    platforms are geometry only from above: a launch up through one passes as
+    ever, and a spike onto one's top rebounds off it. There are no side
+    walls, and the Void is not geometry: a launch past a ledge flies on into
+    it, and nothing rebounds off its edge.
+  - *Stun and freeze.* A rebound leaves the fighter at least `stun` (0.2 s)
+    of hitstun, so it never gets control back while it flies off the surface
+    (a longer stun of its own runs on). A rebound at least `hitstopSpeed`
+    (1200 units / s) into the surface first freezes the fighter where it
+    struck for `hitstop` (0.05 s, two steps): fly, impact, pause, rebound.
+    Softer ones never freeze.
+  - *Hit again.* A rebounding fighter is a target like any other. A new
+    launch replaces its velocity (the usual launch rules) and its heading,
+    but the sequence's rebounds count on until the fighter has recovered:
+    past `maxBounces` (5) every surface is an ordinary stop for it. A
+    fighter flying off a rebound (`Fighter.ricocheting`) also passes through
+    the other fighter's pushbox (`separateFighters`), so a rebound carries
+    it past the attacker instead of pinning it in reach. Together they keep
+    a wall from holding a combo forever (hit, rebound back into reach, hit
+    again...): punching a battered opponent into a wall over and over ends
+    within about six hits.
+  - A Shield's block launches nothing, so it never rebounds, and neither
+    does the shuriken's hit. A clone's hit and the Sphere Rush explosion
+    launch through the same `CombatSystem.applyHit` and rebound like any
+    launch (the blast into a rock outcrop ricochets back across the mesa).
 - Basic Attack 1 (BA1) is #0001's first attack, on the `action1` input. On the
   ground it is a punch (`ba1`, 4 frames); in the air a kunai slash
   (`midairBa1`, 3 frames: `midair2ba1`–`midair2ba3`); the character data
@@ -854,7 +931,9 @@ read the character database, so it stays the same as fighters are added.
   'reverseVertical'`: an unblocked hit drives the opponent downward just as
   hard (from 110: at impact vx 0, vy +2400). A grounded opponent is knocked
   straight back onto the ground it stands on; an airborne one is sent down
-  toward it. Neither has a horizontal launch. Both come from the shared
+  toward it. Driven into the ground hard enough (500 units / s, from about
+  25 Launch Point), either rebounds off it once (see Launch bounce). Neither
+  has a horizontal launch. Both come from the shared
   launch path, not special BA2 code. A Shielded BA2 adds no Launch Point
   and launches nothing (the Shield pays 25 Energy and takes its blockstun
   and hitstop). Hitboxes cover the ground kick's arc and the airborne
@@ -1493,8 +1572,10 @@ read the character database, so it stays the same as fighters are added.
   ground/platform/solid collision on a finite main floor (no side walls:
   a fighter can leave the stage and fall), landing detection; collision boxes
   independent of PNG size; bottom-centre origin; no sinking, floating or
-  jitter. Pushboxes split an overlap evenly, so a fighter at a ledge can be
-  shoved off it.
+  jitter. A collision stops the body on that axis and reports the speed it
+  stopped; only a launch turns that into a rebound (Launch bounce). Pushboxes
+  split an overlap evenly, so a fighter at a ledge can be shoved off it; a
+  fighter flying off a rebound passes through them.
 - **Movement and game feel.** Movement is immediate, smooth and precise;
   fast to respond, never simply fast. Everything below is data on the
   character (`movement`, and each attack's movement fields), read by
@@ -1605,11 +1686,16 @@ read the character database, so it stays the same as fighters are added.
     push carries the target out of BA2's reach past about 25, and BA2's
     launch out of a jump's reach past about 60, so at high Launch Point
     combat turns into pursuit and ring-outs. None loops: every hit adds to
-    the Launch Point that sends the next one further.
+    the Launch Point that sends the next one further. Stage geometry bends
+    that into new routes (a rebound off a wall or a spiked floor is a moment
+    to chase), never a loop: a wall's rebounds are capped until the target
+    recovers, and a rebound flies past the attacker (Launch bounce).
   - *Hitstop.* Per hit, by strength: 0.05 s for BA1 and mid-air BA1 (a
     crisp tap, never sticky on repeated jabs), 0.08–0.09 s for the kicks,
-    0.12 s for the Sphere Rush blast, still the strongest. It freezes the
-    fighters, never the controls: presses made during it are kept.
+    0.12 s for the Sphere Rush blast, still the strongest; a hard rebound
+    off the stage freezes its fighter alone for 0.05 s. It freezes the
+    fighters, never the controls: presses made during it are kept, and a
+    frozen fighter is drawn still where it stopped.
   - *Air combos.* With the air jump and the launch stun, BA2 → jump →
     mid-air BA1 → air jump → mid-air BA1 is a three-hit juggle around 30–40
     Launch Point; never longer, and gone by about 60, when BA2 launches
@@ -1847,10 +1933,16 @@ read the character database, so it stays the same as fighters are added.
     block.
   - *Speed trails:* a tumbling fighter moving at 900 units / s or faster
     leaves up to six fading afterimages of its own poses behind it.
+  - *Rebounds:* a launch rebounding off the stage (`Fighter.bounce`, handed
+    over by the Arena each step) throws the hit's sparks off the surface
+    where it struck, sized by its speed into it, and one at 900 units / s or
+    faster shakes the screen a little (1 px per 450 units / s, up to 7). No
+    flash: a surface is not a hit.
   - *Lethal launch:* a launch that would carry its fighter into the Void
     if it did nothing (its body stepped on with the stage's own physics
     through the stun and 0.3 s more, at its hitstun rates and then its
-    normal ones, no steering or jump; `launchIsLethal`) slows the clock the
+    normal ones, no steering or jump, rebounding as the fighter's launch
+    would, each rebound's stun included; `launchIsLethal`) slows the clock the
     fixed steps are fed from to a quarter for 0.45 s, easing back over
     0.3 s, while the view closes in to 1.35 × on that fighter (never past
     the camera bounds) with a big shake. One at a time. Every step is
@@ -1885,6 +1977,7 @@ read the character database, so it stays the same as fighters are added.
   hitbox, labelled `clone ba1` or `clone midairBa2`, on its active frame,
   the Sphere Rush's
   dashed cyan sphere box / centre with a `bound` label on a caught fighter,
+  a `ricochet n` label on a fighter flying off its n-th rebound,
   solids with the main floor's block among them, and the Void's fixed kill
   line, dashed violet).
   BA1 pressed while Charge is still held is the Charged BA1 Clone Attack

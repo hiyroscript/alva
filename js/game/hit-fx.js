@@ -18,10 +18,14 @@
 //   to tumble, while it flies fast.
 // - A short slow-motion zoom on a launch that will carry its fighter into
 //   the Void if it does nothing (see launchIsLethal).
+// - A launch's rebound off a wall, floor or ceiling (see
+//   js/game/launch-bounce.js): sparks thrown off the surface it struck and,
+//   for a hard one, a small shake. The rebound itself says the rest.
 //
 // With reduced motion there is no shake and no zoom; the rest stays.
 
 import { stepBody } from './physics.js';
+import { bounceLaunch } from './launch-bounce.js';
 import { approach } from '../core/utils.js';
 
 // All tuning in one place. Times are real seconds; sizes are CSS pixels
@@ -45,6 +49,12 @@ export const HIT_FX = Object.freeze({
     count: 6,
     life: 0.16, // seconds each afterimage takes to fade
     alpha: 0.42,
+  },
+  bounce: {
+    shakeSpeed: 900, // world units/s into the surface: slower rebounds do not shake
+    perSpeed: 1 / 450, // px per unit/s of that speed
+    max: 7,
+    spark: 0.22, // lifetime
   },
   lethal: {
     scale: 0.25, // the clock's speed at its slowest
@@ -73,13 +83,18 @@ function seeded(seed) {
 // the Void if it does nothing more: its body stepped on with the stage's own
 // physics, its speed running down at its hitstun rates for the stun, then
 // at its normal ones for `grace` seconds more, with no steering, jump or
-// fast fall. Only then is the finishing blow shown in slow motion.
+// fast fall. Its launch rebounds off whatever it meets on the way, exactly
+// as the fighter's would (see js/game/launch-bounce.js), each rebound
+// keeping it stunned at least as long as the fighter's. Only then is the
+// finishing blow shown in slow motion.
 export function launchIsLethal(event, stage, gravity, dt, grace = HIT_FX.lethal.grace) {
   const target = event.target;
   if (!target?.body || !(event.launchSpeed > 0) || !stage?.inVoid) return false;
   const mv = target.def.movement;
   const body = { ...target.body };
-  const stun = event.hitstun ?? 0;
+  const bounce = target.launchBounce;
+  const launch = target.launch ? { ...target.launch } : null;
+  let stun = event.hitstun ?? 0;
   for (let t = 0; t < stun + grace; t += dt) {
     const stunned = t < stun;
     const drag = body.grounded
@@ -87,6 +102,7 @@ export function launchIsLethal(event, stage, gravity, dt, grace = HIT_FX.lethal.
       : (stunned ? mv.hitstunAirDrag ?? mv.airDeceleration * 0.5 : mv.airDeceleration);
     body.vx = approach(body.vx, 0, drag * dt);
     stepBody(body, dt, stage, gravity);
+    if (launch && bounceLaunch(body, launch, bounce)) stun = Math.max(stun, t + dt + bounce.stun);
     if (stage.inVoid(body)) return true;
   }
   return false;
@@ -130,6 +146,21 @@ export class HitEffects {
         this.addShake(s.lethal);
       }
     }
+  }
+
+  // A launched fighter's rebound off stage geometry this step (`bounce`, see
+  // Fighter.bounce): sparks thrown off the surface where it struck, sized
+  // by its speed into it, and a small shake for a hard one. No flash: the
+  // surface is not a hit.
+  takeBounce(bounce) {
+    const b = HIT_FX.bounce;
+    if (bounce.speed >= b.shakeSpeed) this.addShake(Math.min(b.max, bounce.speed * b.perSpeed));
+    const n = Math.hypot(bounce.normalX, bounce.normalY) || 1;
+    this.sparks.push({
+      kind: 'hit', x: bounce.x, y: bounce.y, dx: bounce.normalX / n, dy: bounce.normalY / n,
+      size: Math.min(1.6, 0.6 + bounce.speed / 3000), age: 0, life: b.spark,
+      seed: bounce.x * 0.29 + bounce.y * 0.17 + bounce.bounces,
+    });
   }
 
   addShake(amp) {

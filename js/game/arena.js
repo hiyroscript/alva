@@ -8,7 +8,8 @@
 // are drawn here.
 
 import { CONFIG } from '../config.js';
-import { StageCollision, separate, resolveSolidOverlap } from './physics.js';
+import { StageCollision, resolveSolidOverlap } from './physics.js';
+import { separateFighters } from './character.js';
 import { CombatSystem, worldBox } from './combat.js';
 import { spawnProjectiles, removeDeadProjectiles } from './projectile.js';
 import { spawnClones, updateClones, removeDeadClones } from './clone.js';
@@ -175,13 +176,12 @@ export class Arena {
     this.updateRespawns(dt);
     const fighters = this.inPlay;
     for (const f of fighters) f.update(dt, this.simCtx);
-    // Pushboxes keep every pair of fighters apart (a lone fighter has none).
+    // A launch that rebounded off the stage this step shows its impact.
+    for (const f of fighters) if (f.bounce) this.fx.takeBounce(f.bounce);
+    // Pushboxes keep every pair of fighters apart (a lone fighter has none;
+    // a ricochet passes, see separateFighters).
     for (let i = 0; i < fighters.length; i++) {
-      for (let j = i + 1; j < fighters.length; j++) {
-        const a = fighters[i];
-        const b = fighters[j];
-        separate(a.body, b.body, a.def.pushbox.width / 2, b.def.pushbox.width / 2, this.stage);
-      }
+      for (let j = i + 1; j < fighters.length; j++) separateFighters(fighters[i], fighters[j], this.stage);
     }
     for (const f of fighters) resolveSolidOverlap(f.body, this.stage);
     spawnProjectiles(fighters, this.projectiles);
@@ -602,8 +602,9 @@ export class Arena {
     }
     // Charged techniques, dashed cyan: the rushing sphere's hitbox while it
     // can connect, then a cross on the sphere's centre once it is attached
-    // to the caught opponent, drawn where the sphere is drawn. A bound
-    // fighter is labelled over its hurtboxes.
+    // to the caught opponent, drawn where the sphere is drawn. A bound,
+    // shielding or ricocheting fighter is labelled over its hurtboxes (a
+    // ricochet with its rebound count).
     ctx.setLineDash([4, 3]);
     ctx.fillStyle = TECHNIQUE_DEBUG;
     for (const f of fighters) {
@@ -627,7 +628,8 @@ export class Arena {
       }
     }
     for (const f of fighters) {
-      const tag = f.combat.immobilized ? 'bound' : f.combat.shielding ? 'shield' : null;
+      const tag = f.combat.immobilized ? 'bound' : f.combat.shielding ? 'shield'
+        : f.ricocheting ? `ricochet ${f.launch.bounces}` : null;
       if (!tag) continue;
       const [lx, ly] = this.toScreen(f.renderX - f.body.halfW, f.renderY - f.body.height);
       ctx.fillText(tag, Math.round(lx), Math.round(ly) - 14);
