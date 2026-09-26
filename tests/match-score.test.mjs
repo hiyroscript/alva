@@ -230,7 +230,7 @@ test('the timer keeps running through a respawn wait; time up during one keeps t
   assert.deepEqual(battle.result, { outcome: 'p2', reason: 'time' });
 });
 
-test('the training CPU stands still while its opponent is out, then follows it again', () => {
+test('the Quick Battle CPU stands still while its opponent is out, then plays on', () => {
   const sprites = fakeSprites();
   const input = { flush() {}, sample: () => ({}) };
   const battle = new Battle({

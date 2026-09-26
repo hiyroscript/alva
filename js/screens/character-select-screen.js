@@ -17,7 +17,7 @@ export class CharacterSelectScreen extends Screen {
     });
 
     this.el.replaceChildren(
-      screenHeader({ title: 'Select Fighter', kicker: 'Quick Battle', step: 1, onBack: () => this.onBack() }),
+      screenHeader({ title: 'Select Fighter', kicker: 'Quick Battle', step: 2, onBack: () => this.onBack() }),
       el('div', { class: 'screen-body char-layout' }, [this.roster.rosterPanel, this.roster.previewPanel]),
     );
   }

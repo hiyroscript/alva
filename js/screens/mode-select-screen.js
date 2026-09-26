@@ -12,7 +12,7 @@ const MODES = [
     id: 'quick-battle',
     index: '01',
     name: 'Quick Battle',
-    description: 'Choose a fighter and stage, then enter battle.',
+    description: 'Choose a difficulty, a fighter and a stage, then enter battle.',
   },
 ];
 
@@ -32,7 +32,7 @@ export class ModeSelectScreen extends Screen {
     ]);
     card.addEventListener('click', () => {
       app.selection.mode = mode.id;
-      app.screens.go('character');
+      app.screens.go('difficulty');
     });
 
     const info = el('aside', { class: 'mode-info', 'aria-label': 'Mode details' }, [

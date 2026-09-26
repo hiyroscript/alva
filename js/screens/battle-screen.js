@@ -136,8 +136,12 @@ export class BattleScreen extends Screen {
     const app = this.app;
     const def = getCharacter(params?.characterId || app.selection.characterId);
     const map = getMap(params?.mapId || app.selection.mapId);
+    // The CPU's level: Quick Battle's selection, checked by Battle (an
+    // unknown value is Medium).
+    const difficulty = params?.difficulty ?? app.selection.difficulty;
     this.def = def;
     this.map = map;
+    this.difficulty = difficulty;
     // Player 1's fighter decides the touch ability icons, never the CPU's.
     this.touch.setCharacter(def);
     this.el.dataset.map = map.id;
@@ -170,6 +174,7 @@ export class BattleScreen extends Screen {
       p2Sprites: sprites,
       input: app.input,
       reducedMotion: app.device.reducedMotion,
+      difficulty,
     });
     this.hud.bind(this.battle.p1, this.battle.p2);
     this.needsResize = true;

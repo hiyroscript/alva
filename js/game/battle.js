@@ -1,6 +1,6 @@
 // Battle: one Quick Battle on the shared Arena (js/game/arena.js): Player 1
-// against the training CPU, with the intro / fight / time-up / KO / result
-// phases and the round timer. The Arena owns the fixed-timestep world and its
+// against the combat AI (js/game/combat-ai.js) at the chosen difficulty,
+// with the intro / fight / time-up / KO / result phases and the round timer. The Arena owns the fixed-timestep world and its
 // Canvas 2D rendering; DOM concerns (HUD, pause, overlays) live in the battle
 // screen.
 //
@@ -15,13 +15,21 @@
 import { CONFIG } from '../config.js';
 import { Arena } from './arena.js';
 import { Fighter } from './character.js';
-import { PlayerController, TrainingAIController } from './fighter-controller.js';
+import { PlayerController } from './fighter-controller.js';
+import { CombatAIController } from './combat-ai.js';
+import { resolveDifficulty } from '../data/difficulty.js';
 import { mulberry32 } from '../core/utils.js';
 
 export class Battle extends Arena {
-  constructor({ canvas, map, p1Def, p2Def, p1Sprites, p2Sprites, input, reducedMotion = false, onPhase }) {
+  // `difficulty` is the CPU's level (js/data/difficulty.js); anything
+  // missing or unknown is Medium. It shapes only the CPU's controller: both
+  // fighters are built from their definitions alone. `seed` fixes the CPU's
+  // randomness (tests); by default every battle differs.
+  constructor({ canvas, map, p1Def, p2Def, p1Sprites, p2Sprites, input, reducedMotion = false, onPhase, difficulty, seed }) {
     super({ canvas, map, input, reducedMotion });
     this.onPhase = onPhase || (() => {});
+    // Kept for the whole battle: restarts, rematches and respawns keep it.
+    this.difficulty = resolveDifficulty(difficulty);
 
     const [s1, s2] = map.spawnPoints;
     this.p1 = new Fighter({
@@ -30,7 +38,8 @@ export class Battle extends Arena {
     });
     this.p2 = new Fighter({
       def: p2Def, sprites: p2Sprites, spawn: s2, stage: this.stage,
-      slot: 'p2', label: 'CPU', controller: new TrainingAIController({ rng: mulberry32(Date.now() & 0xffff) }),
+      slot: 'p2', label: 'CPU',
+      controller: new CombatAIController({ difficulty: this.difficulty, rng: mulberry32(seed ?? (Date.now() & 0xffff)) }),
     });
     this.p1.opponent = this.p2;
     this.p2.opponent = this.p1;
@@ -47,8 +56,12 @@ export class Battle extends Arena {
     // Resetting a fighter ends its charged technique and releases whatever
     // it held, and cancels any respawn wait; the fresh combat state carries
     // no bind, timer or sphere, 0 Launch Point, full Energy and no cooldowns.
-    // Both back to 0 points.
-    for (const f of this.fighters) f.reset(this.stage);
+    // Both back to 0 points. The CPU's controller starts over too (nothing
+    // held or planned), at the same difficulty.
+    for (const f of this.fighters) {
+      f.reset(this.stage);
+      f.controller?.reset?.();
+    }
     this.score.p1 = 0;
     this.score.p2 = 0;
     this.projectiles.length = 0;

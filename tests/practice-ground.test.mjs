@@ -182,6 +182,7 @@ const { FighterRoster } = await import('../js/ui/fighter-roster.js');
 const { Battle } = await import('../js/game/battle.js');
 const { HUD } = await import('../js/game/hud.js');
 const { PlayerController, TrainingAIController } = await import('../js/game/fighter-controller.js');
+const { CombatAIController } = await import('../js/game/combat-ai.js');
 const { MenuNavigator } = await import('../js/core/menu-navigator.js');
 const { ICONS } = await import('../js/ui/icons.js');
 const { HomeScreen } = await import('../js/screens/home-screen.js');
@@ -2005,7 +2006,11 @@ test('Quick Battle still creates its AI CPU, round intro, 99-second timer and tw
   });
   assert.equal(battle.fighters.length, 2);
   assert.ok(battle.p1.controller instanceof PlayerController);
-  assert.ok(battle.p2.controller instanceof TrainingAIController);
+  // Quick Battle's CPU is the combat AI (Medium when no difficulty is
+  // given); Practice Ground's dummy has no controller at all (above).
+  assert.ok(battle.p2.controller instanceof CombatAIController);
+  assert.equal(battle.p2.controller.difficulty, 'medium');
+  assert.ok(!(battle.p2.controller instanceof TrainingAIController));
   assert.equal(battle.p2.label, 'CPU');
   assert.equal(battle.p1.opponent, battle.p2);
   assert.equal(battle.secondary, battle.p2);

@@ -19,7 +19,10 @@ stance, a Charged BA1 Clone Attack (CAB1) and a
 Charged BA2 Sphere Rush (CAB2), each on its own cooldown, and
 platform-fighter scoring: every hit's damage adds to the target's Launch
 Point, which makes later launching hits send it further, and every fall into
-the Void is a point for the opponent. First to 3 points wins.
+the Void is a point for the opponent. First to 3 points wins. Quick Battle's
+CPU really fights, at the difficulty you choose (Easy, Medium, Hard or
+Brutal): difficulty changes how well it thinks, never what its fighter can
+do.
 
 The full product specification, including the Alva brand system, is in
 [`ALVA_SPEC.md`](./ALVA_SPEC.md).
@@ -286,7 +289,7 @@ Touch controls show on touch-first devices (coarse pointer, or a touch actually 
 - **Powers:** Jump Power and Speed Power, each in three tiers. #0001 has Jump Power 2 and Speed Power 2 (its original jump and speed).
 - **Launch:** every hit's damage adds to the target's Launch Point, then the hit launches at its Base Launch (0, 1, 2 or 3) × that new Launch Point, in its Directional Launch. #0001's BA1 is Base Launch 1 horizontal, its BA2 and mid-air BA1 Base Launch 2 vertical, its mid-air BA2 Base Launch 2 reverse vertical (downward), the Sphere Rush blast Base Launch 3 horizontal, and the shuriken and Sphere Rush ticks Base Launch 0 with no direction (they never launch).
 - **HUD:** each fighter has one compact, semi-transparent glass card, pulled in close on either side of the timer: its portrait (the character's own `visual.portrait` crop, turned to face the timer whichever way its art is drawn), one thin divider, and its name with its Launch Point beneath it. The CPU's card mirrors Player 1's. In Quick Battle three small dots under each card fill as that fighter scores its points (○ ○ ○, then ● ○ ○ ...). Over each fighter itself, following it: its bright purple Energy bar above its name tag while below full, and its CAB1 / CAB2 cooldown rings under its feet while cooling down.
-- **Modes:** Quick Battle: 99 seconds against a non-attacking training CPU, first to 3 points. Each time a fighter falls into the Void its opponent scores a point at once; the one that fell is out of play for 2 seconds, then back at its spawn with 0 Launch Point, full Energy and both charged abilities ready, while the fight and the timer carry on. The third point wins the match (a short **K.O.** beat, then the result; the loser does not come back). If both fall together, or one falls while the other is still waiting to come back, that fall scores nothing. If time runs out first, more points wins, then lower Launch Point; equal on both is a draw. Practice Ground: training on its own stage with a stand-still CPU dummy from the start (which you can change or disable), no timer, rounds or points; the Void takes a fighter out for 2 seconds, then puts it back at its spawn (below).
+- **Modes:** Quick Battle (Splash → Home → Select Mode → Select Difficulty → Select Fighter → Select Stage → Battle): 99 seconds against a CPU that fights with the whole moveset at the difficulty you choose (Easy, Medium, Hard or Brutal; see [Quick Battle difficulty](#quick-battle-difficulty)), first to 3 points. Each time a fighter falls into the Void its opponent scores a point at once; the one that fell is out of play for 2 seconds, then back at its spawn with 0 Launch Point, full Energy and both charged abilities ready, while the fight and the timer carry on. The third point wins the match (a short **K.O.** beat, then the result; the loser does not come back). If both fall together, or one falls while the other is still waiting to come back, that fall scores nothing. If time runs out first, more points wins, then lower Launch Point; equal on both is a draw. Practice Ground: training on its own stage with a stand-still, non-attacking CPU dummy from the start (which you can change or disable; difficulty never applies to it), no timer, rounds or points; the Void takes a fighter out for 2 seconds, then puts it back at its spawn (below).
 
 ## Design
 
@@ -313,6 +316,14 @@ ring with dark separation keep states identifiable beyond colour.
   mode remains manual-only. **Practice Ground**, the secondary action under
   Play, opens the training room directly, and **Discover** beneath it opens
   the in-game reference. The strip shifts outward on narrow screens.
+- **Select Difficulty** takes Seren's four-level ascending scale into Alva's
+  own language: four large charcoal cards (01 Easy, 02 Medium, 03 Hard, 04
+  Brutal), each with its big mono index, a four-bar scale lit one to four
+  bars in the green accent (the rest hollow, so the level reads by shape as
+  well as tone; Brutal's top bar is a step brighter), its name and one short
+  line. One row on wide screens, 2 × 2 on narrow ones, compact in short
+  landscape. The current level wears the same green "Current" check pill as
+  the selected stage.
 - **Discover** takes its composition from Seren's Cars & more reference: an
   index rail (**POWER**, **LAUNCH**, **PASSIVES**) beside one scrollable page of
   structured entries, in Alva's charcoal, off-white and green. The open
@@ -344,10 +355,11 @@ js/
   main.js, config.js  boot + global config (bindings, render, timing)
   core/               app controller, screen manager, menu navigation,
                       asset loader, input (keyboard/touch/gamepad), device, audio stub
-  screens/            splash, home, mode, character, map, help, battle,
-                      practice, discover
+  screens/            splash, home, mode, difficulty, character, map, help,
+                      battle, practice, discover
   game/               arena (shared loop + rendering), Quick Battle, Practice
-                      session, fighter state machine, physics, camera,
+                      session, controllers (player, combat AI, training),
+                      fighter state machine, physics, camera,
                       combat, projectiles, summoned clones, charged
                       techniques, sprite normalizer/animator, HUDs,
                       fighter status (Energy bar, CAB rings), the Shield's
@@ -356,7 +368,7 @@ js/
   stages/             Desert, City and Practice renderers (procedural Canvas 2D),
                       the shared one-point perspective and the Void
   data/               characters.js, maps.js, practice-map.js, powers.js,
-                      launch.js
+                      launch.js, difficulty.js
   ui/                 wordmark, icons, overlays, shared help content, stage
                       preview, fighter roster
 ```
@@ -407,6 +419,58 @@ Desert is a sandstone mesa over open desert air; City a rooftop block over
 the street canyon; Practice Ground a training block against its gridded
 wall. All three are drawn in the same pseudo-3D perspective, with the
 Practice Ground's projection shared by every stage.
+
+### Quick Battle difficulty
+
+**Play → Quick Battle** goes through four setup steps (Mode, Difficulty,
+Fighter, Stage), shown in the header's progress steps: Splash → Home → Select
+Mode → Select Difficulty → Select Fighter → Select Stage → Battle. Back from
+Select Fighter returns to Select Difficulty, and Back from there to Select
+Mode. The choice is Quick Battle's own (`app.selection.difficulty`, Medium
+on a fresh start) and stays through Restart Battle, Rematch and every Void
+respawn; Practice Ground never reads it.
+
+- **Easy:** slower reactions, often too late or not at all; pauses, misjudges
+  spacing, rarely uses Charge. Still attacks: inexperienced, not disabled.
+- **Medium:** a balanced opponent: both Basic Attacks, Throw, occasional
+  Shield and Charge, answers slow threats, still gets caught.
+- **Hard:** fast reactions; Shields and dodges real threats, punishes
+  recovery, spaces, jumps in, dashes and uses charged actions deliberately.
+- **Brutal:** reacts within a few frames (never instantly), reassesses
+  constantly, manages Energy and cooldowns, and uses the full moveset. It
+  still waits, spaces and retreats when that is the stronger choice.
+
+**Difficulty changes how well the CPU thinks, not what its fighter is
+allowed to do.** `js/data/difficulty.js` holds one profile per level, the
+only place a level is validated (anything unknown is Medium): reaction
+window, lapse chance, reassessment interval, decision noise, hesitation,
+spacing error, motion lookahead, and weights for defense, punishing, charged
+actions, Dash, planning, aggression, stage sense and Energy care. Every trait
+is ordered from Easy to Brutal. None of it touches a fighter: damage, launch,
+speed, jumps, Dash, Shield, Energy, cooldowns, hitboxes, respawns and scoring
+are the character's and the match's own, identical on every level.
+
+The CPU is `CombatAIController` (`js/game/combat-ai.js`), a controller like
+Player 1's: `Fighter.update` asks it for the same input snapshot a player
+produces, and it only ever holds and presses buttons (movement, Jump,
+Defense, Charge, Throw, BA1, BA2, and a double tap for a Dash). The fighter
+and combat engine decide what those do, so the CPU cannot attack while
+stunned, skip recovery, bypass a cooldown or spawn anything itself. Each
+step it **senses** the fight from what the simulation shows (both fighters,
+their attacks and phases, Shield, Charge, Energy, cooldowns, projectiles,
+clones, the stage, the score and the clock; never the player's raw input),
+**evaluates** options built from the fighter's own move data (reach from its
+hitboxes, Throw range from its projectile, charged actions from
+`chargedActions`, nothing hard-coded for #0001; a reserved button is never
+pressed), and **acts** over as many steps as needed (turn then strike, hold
+Charge then press the charged action, tap-release-tap to Dash). Something new
+the opponent does is only answered after a reaction delay sampled from the
+level (or missed on a lapse), and prediction is limited to projecting
+current motion a short, level-set horizon ahead. It never walks off the main
+floor, follows the opponent up platforms and down by walking off their edges
+(the platform drop is the training CPU's alone), and stands still while its
+opponent is out in the Void. Its randomness is an injected seeded RNG, so
+tests are deterministic.
 
 ### Practice Ground
 

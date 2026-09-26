@@ -1,6 +1,8 @@
 // Controllers turn intent into a FighterInput snapshot. Player 1 and the CPU
-// are completely separate so a future combat AI can replace TrainingAI
-// without touching Fighter.
+// are completely separate: Quick Battle's CPU is the combat AI
+// (CombatAIController, js/game/combat-ai.js), which plugs in here without
+// touching Fighter. TrainingAIController below is the older non-attacking
+// training opponent, kept as a standalone controller.
 
 import { range } from '../core/utils.js';
 
@@ -8,7 +10,8 @@ import { range } from '../core/utils.js';
 // (world units): about two steps at its top speed.
 const LEDGE_LOOKAHEAD = 12;
 
-function blankInput() {
+// Every field Fighter.update reads, all false: a complete, neutral snapshot.
+export function blankInput() {
   return {
     left: false, right: false, charge: false, jump: false, defense: false,
     primary: false, special: false, action1: false, action2: false,

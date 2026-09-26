@@ -3,7 +3,8 @@
 import { el } from '../core/utils.js';
 import { ICONS } from './icons.js';
 
-const STEPS = ['Mode', 'Fighter', 'Stage'];
+// Quick Battle's setup, in order; each setup screen passes its own index.
+const STEPS = ['Mode', 'Difficulty', 'Fighter', 'Stage'];
 
 export function screenHeader({ title, kicker, step = null, onBack }) {
   const back = el('button', {

@@ -1401,8 +1401,9 @@ test('the training CPU never charges, summons or attacks, and starts no cooldown
 
 // ---- Battle -----------------------------------------------------------------------
 
-// A real Battle with scripted Player 1 input. Stage themes build Path2D art,
-// which Node lacks, so a do-nothing stand-in takes its place.
+// A real Battle with scripted Player 1 input and a still CPU (these tests are
+// about the player's clones, not the combat AI's). Stage themes build Path2D
+// art, which Node lacks, so a do-nothing stand-in takes its place.
 function realBattle(mapId = 'desert') {
   globalThis.Path2D ??= class {
     constructor() {
@@ -1423,6 +1424,7 @@ function realBattle(mapId = 'desert') {
     const battle = new Battle({
       canvas: { getContext: () => ({}) }, map: getMap(mapId), p1Def: def, p2Def: def, p1Sprites: sprites, p2Sprites: sprites, input,
     });
+    battle.p2.controller = null;
     return { battle, script, sprites };
   });
 }
