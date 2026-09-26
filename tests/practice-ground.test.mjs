@@ -738,7 +738,7 @@ test('HUD: the CPU card follows real hits, rebinds when the CPU changes and goes
   const { app, screen } = await enterPractice();
   const { hud, session } = screen;
   const cpuPanel = hud.cpuPanel;
-  // Walk up to the CPU and hit it with BA1: its card reads 5.
+  // Walk up to the CPU and hit it with BA1: its card reads 3.
   const step = (held = {}) => {
     app.input.script.push(held);
     session.update(DT);
@@ -748,9 +748,9 @@ test('HUD: the CPU card follows real hits, rebinds when the CPU changes and goes
   for (let i = 0; i < 30; i++) step();
   step({ action1: true, action1Pressed: true });
   for (let i = 0; i < 30; i++) step();
-  assert.equal(session.cpu.combat.launchPoint, 5);
-  assert.equal(cpuPanel.launchPointValue.textContent, '5');
-  assert.ok(session.damageNumbers.some((d) => d.text === '+5'), 'the floating number too');
+  assert.equal(session.cpu.combat.launchPoint, 3);
+  assert.equal(cpuPanel.launchPointValue.textContent, '3');
+  assert.ok(session.damageNumbers.some((d) => d.text === '+3'), 'the floating number too');
 
   // Change CPU: the card is the new fighter's.
   const cpu = await enableCpu(screen, '9999');
@@ -1358,8 +1358,8 @@ test('Player 1\'s attacks hit the CPU through the real CombatSystem, and it reac
   assert.equal(cpu.facing, -1);
 
   assert.equal(cpu.combat.launchPoint, 0);
-  // From 95, BA1's 5 makes 100: a push of 1 x 100, well short of the ledge.
-  cpu.combat.launchPoint = 95;
+  // From 97, BA1's 3 makes 100: a push of 1 x 100, well short of the ledge.
+  cpu.combat.launchPoint = 97;
   run({ action1: true, action1Pressed: true });
   until(() => events.length > 0, 30);
   const [hit] = events;
@@ -1368,7 +1368,7 @@ test('Player 1\'s attacks hit the CPU through the real CombatSystem, and it reac
   assert.equal(hit.target, cpu);
   assert.equal(hit.damage, player.attacks.ba1.damage);
   assert.deepEqual([hit.projectile, hit.summon, hit.technique], [null, null, null]);
-  assert.equal(cpu.combat.launchPoint, 95 + hit.damage, 'its Launch Point builds up');
+  assert.equal(cpu.combat.launchPoint, 97 + hit.damage, 'its Launch Point builds up');
   assert.equal(hit.launchStrength, 100);
   assert.ok(cpu.combat.stun > 0, 'hitstun');
   run(); // the reaction shows from the CPU's next update
@@ -1376,7 +1376,7 @@ test('Player 1\'s attacks hit the CPU through the real CombatSystem, and it reac
   assert.equal(cpu.animator.anim.key, 'hurt');
   // Its number, straight from the resolved event.
   assert.deepEqual(numbers.map((d) => [d.target, d.damage, d.text]), [[cpu, hit.damage, `+${hit.damage}`]]);
-  assert.equal(numbers[0].text, '+5');
+  assert.equal(numbers[0].text, '+3');
   // Launched away, then idle again, never hitting back.
   const x = cpu.body.x;
   run({}, 40);
@@ -1394,7 +1394,7 @@ test('Player 1\'s BA2 launches the CPU straight up (Base Launch 2, vertical), th
   const groundY = cpu.body.y;
   const startX = cpu.body.x;
   assert.equal(cpu.grounded, true);
-  cpu.combat.launchPoint = 20;
+  cpu.combat.launchPoint = 25;
 
   run({ action2: true, action2Pressed: true });
   until(() => events.length > 0, 30);
@@ -1402,9 +1402,9 @@ test('Player 1\'s BA2 launches the CPU straight up (Base Launch 2, vertical), th
   assert.equal(hit.type, 'hit');
   assert.equal(hit.target, cpu);
   assert.equal(hit.damage, player.attacks.ba2.damage);
-  assert.equal(numbers[0].text, '+10');
+  assert.equal(numbers[0].text, '+5');
   // At impact: launched upward, not pushed sideways, at BA2's Base Launch 2
-  // x the CPU's new Launch Point: 20 + 10 = 30, a strength of 60, so 600.
+  // x the CPU's new Launch Point: 25 + 5 = 30, a strength of 60, so 600.
   // (Measured from where the kick struck: BA2's step-in may have shoved it
   // along a little through the pushboxes first.)
   const hitX = cpu.body.x;
@@ -1456,10 +1456,10 @@ test('shuriken, clone and Sphere Rush hits on the CPU each float their own resol
     assert.ok(hit.summon);
     assert.equal(hit.attacker, player);
     assert.equal(hit.target, cpu);
-    assert.deepEqual(numbers.map((d) => d.text), ['+5']);
+    assert.deepEqual(numbers.map((d) => d.text), ['+3']);
   }
-  // Charged BA2: the Sphere Rush catches the CPU, ticks +1 three times,
-  // then explodes on it for +15.
+  // Charged BA2: the Sphere Rush catches the CPU, ticks +1 four times,
+  // then explodes on it for +10.
   {
     const { session, run, until, events, numbers } = practiceSession();
     const { player, cpu } = session;
@@ -1473,10 +1473,10 @@ test('shuriken, clone and Sphere Rush hits on the CPU each float their own resol
     until(() => !player.technique, 400);
     assert.ok(events.every((e) => e.technique === rush && e.target === cpu));
     const damages = events.map((e) => e.damage);
-    assert.deepEqual(damages, [0, 1, 1, 1, 1, 15]);
+    assert.deepEqual(damages, [0, 1, 1, 1, 1, 10]);
     // The contact adds nothing, so it floats nothing; its tick on the same
     // step floats the first +1.
-    assert.deepEqual(numbers.map((d) => d.text), ['+1', '+1', '+1', '+1', '+15']);
+    assert.deepEqual(numbers.map((d) => d.text), ['+1', '+1', '+1', '+1', '+10']);
   }
 });
 

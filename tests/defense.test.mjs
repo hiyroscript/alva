@@ -499,8 +499,8 @@ test('each blocked hit costs exactly 25 Energy: 100 -> 75 -> 50 -> 25 -> 0, and 
   // Still holding Defense: it stays down, and the next hit lands in full.
   const [hit] = blockedAttack(d);
   assert.equal(hit.type, 'hit');
-  assert.equal(hit.damage, 5);
-  assert.equal(d.target.combat.launchPoint, 5);
+  assert.equal(hit.damage, 3);
+  assert.equal(d.target.combat.launchPoint, 3);
 });
 
 test('a blocked hit shows no hurt pose: the Shield holds through the freeze and the blockstun, held or not', () => {
@@ -611,7 +611,7 @@ test('with less than 25 Energy the Shield still goes up and blocks; that block t
   while (d.attacker.combat.attack || d.attacker.combat.cooldowns.size) d.tick({}, HOLD);
   const [hit] = blockedAttack(d);
   assert.equal(hit.type, 'hit');
-  assert.equal(d.target.combat.launchPoint, 5);
+  assert.equal(d.target.combat.launchPoint, 3);
   // Exhausted, attacks work normally even with Defense held.
   const low = makeFighter();
   low.fighter.combat.setEnergy(0);
@@ -646,7 +646,7 @@ test('a block that leaves some Energy keeps the Shield up; the one that empties 
   assert.deepEqual([first.energyCost, next.energyCost], [COST, 0]);
   assert.equal(target.combat.energy, 0);
   assert.equal(target.combat.energyExhausted, true);
-  assert.equal(target.combat.launchPoint, 5, 'only the second hit counts');
+  assert.equal(target.combat.launchPoint, 3, 'only the second hit counts');
 });
 
 test('exhausted: no Shield (and no Dash) through 1, 25, 50, 75 and 99; both back at exactly 100', () => {
@@ -686,7 +686,7 @@ test('missing Shield art refuses the Shield (warned once), and the attack lands 
     assert.equal(target.state, 'idle', 'no idle-as-shield');
     for (let i = 0; i < 30 && !events.length; i++) tick({}, HOLD);
     assert.equal(events[0].type, 'hit');
-    assert.equal(target.combat.launchPoint, 5);
+    assert.equal(target.combat.launchPoint, 3);
     while (attacker.combat.attack) tick({}, HOLD);
     assert.equal(warnings.filter((w) => /Shield "shield" has no animation frames/.test(w)).length, 1, 'once');
 

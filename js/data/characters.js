@@ -576,7 +576,7 @@ export const CHARACTERS = [
         cloud: 'cloneCloud',
         // Seconds before Charged BA1 can be used again, from the moment the
         // summon is accepted, whichever way it appears and whether or not it
-        // hits. Its hit is the attack's own: 5 as BA1, 10 as mid-air BA2.
+        // hits. Its hit is the attack's own: 3 as BA1, 5 as mid-air BA2.
         cooldown: 5,
         // World units behind the opponent (on its back side) at the summon;
         // BA1's punch reaches forward from there into the opponent.
@@ -613,8 +613,8 @@ export const CHARACTERS = [
       // held, 1 Launch Point is added at once on the hit's own step and then
       // every 0.5 s, with no launch (0, 0.5, 1 and 1.5 s after the hit). 2 s
       // after the hit it explodes (prasen10-11) while #0001 is on
-      // rasenExplosion (rasen9): 15 more Launch Point, then Base Launch 3
-      // sideways, which releases the opponent (19 damage in all: 4 ticks and
+      // rasenExplosion (rasen9): 10 more Launch Point, then Base Launch 3
+      // sideways, which releases the opponent (14 damage in all: 4 ticks and
       // the blast); once the blast is over he recovers through rasenRelease
       // (rasen10-12). The whole technique needs ground under #0001. A
       // Shield blocks the contact: no bind, tick or explosion, and the rush
@@ -679,10 +679,10 @@ export const CHARACTERS = [
           hitstop: 0,
         },
         // The explosion: the big one, and the technique's only launching
-        // hit. Its 15 damage is added first, then the target's new Launch
+        // hit. Its 10 damage is added first, then the target's new Launch
         // Point is tripled and sent sideways along the technique's facing.
         explosionHit: {
-          damage: 15,
+          damage: 10,
           baseLaunch: 3,
           directionalLaunch: 'horizontal',
           hitstun: 0.55,
@@ -719,7 +719,7 @@ export const CHARACTERS = [
         startup: 1 / BA1_FPS,
         active: 1 / BA1_FPS,
         recovery: 2 / BA1_FPS,
-        damage: 5,
+        damage: 3,
         baseLaunch: 1,
         directionalLaunch: 'horizontal',
         hitbox: { x: 12, y: -64, w: 28, h: 16 },
@@ -744,7 +744,7 @@ export const CHARACTERS = [
         startup: 2 / BA1_FPS,
         active: 1 / BA1_FPS,
         recovery: 0,
-        damage: 5,
+        damage: 3,
         baseLaunch: 2,
         directionalLaunch: 'vertical',
         hitbox: { x: 14, y: -100, w: 22, h: 80 },
@@ -769,7 +769,7 @@ export const CHARACTERS = [
         startup: 3 / BA2_FPS,
         active: 2 / BA2_FPS,
         recovery: 2 / BA2_FPS,
-        damage: 10,
+        damage: 5,
         baseLaunch: 2,
         directionalLaunch: 'vertical',
         hitbox: { x: 10, y: -88, w: 24, h: 78 },
@@ -792,7 +792,7 @@ export const CHARACTERS = [
         startup: 2 / BA2_FPS,
         active: 1 / BA2_FPS,
         recovery: 2 / BA2_FPS,
-        damage: 10,
+        damage: 5,
         baseLaunch: 2,
         directionalLaunch: 'reverseVertical',
         hitbox: { x: 8, y: -44, w: 40, h: 40 },

@@ -303,7 +303,7 @@ test('BA1 -> Dash -> BA1 chases a push BA1 -> BA2 no longer reaches, into high L
   }
 });
 
-test('BA1 -> Dash -> BA1 never loops: Energy allows two cancels and the third empties the bar, so the chase ends within five hits', () => {
+test('BA1 -> Dash -> BA1 never loops: Energy allows two cancels and the third empties the bar, so the chase ends within seven hits', () => {
   for (const lp of [0, 30]) {
     const d = combo({ gap: 40, lp });
     let dashAt = -1;
@@ -324,7 +324,7 @@ test('BA1 -> Dash -> BA1 never loops: Energy allows two cancels and the third em
     let chain = 1;
     while (chain < d.hits.length && d.held(chain - 1, chain)) chain++;
     assert.ok(chain >= 3, `LP ${lp}: a real chase (${chain} hits)`);
-    assert.ok(chain <= 5, `LP ${lp}: ${chain} hits, never a loop`);
+    assert.ok(chain <= 7, `LP ${lp}: ${chain} hits, never a loop`);
     assert.ok(d.attacker.combat.energyExhausted || d.attacker.combat.energy < def.energy.dashCancelCost,
       'the chase spent the Energy the Shield needs');
   }
@@ -370,15 +370,15 @@ test('BA1 -> BA1 combos at LP 0 close in; its own pushback ends the string withi
   assert.ok(d.hits.length >= 2 && d.held(0, 1), 'another light attack');
   let chain = 1;
   while (chain < d.hits.length && d.held(chain - 1, chain)) chain++;
-  assert.ok(chain >= 2 && chain <= 4, `a ${chain}-hit string, never a loop`);
+  assert.ok(chain >= 2 && chain <= 6, `a ${chain}-hit string, never a loop`);
   // Holding forward adds no more: the punch does not creep after its target.
   const f = combo({ gap: 38 });
   f.run((i) => ({ right: true, ...(i % 12 === 0 ? BA1 : {}) }), 300);
   let fchain = 1;
   while (fchain < f.hits.length && f.held(fchain - 1, fchain)) fchain++;
-  assert.ok(fchain <= 4, `still ${fchain}`);
-  // From LP 20, BA1's push already carries the target out of a second one.
-  const mid = combo({ gap: 40, lp: 20 });
+  assert.ok(fchain <= 6, `still ${fchain}`);
+  // From LP 25, BA1's push already carries the target out of a second one.
+  const mid = combo({ gap: 40, lp: 25 });
   mid.run((i) => (i % 12 === 0 ? BA1 : {}), 40);
   assert.ok(mid.hits.length < 2 || !mid.held(0, 1));
 });
