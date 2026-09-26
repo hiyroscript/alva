@@ -42,7 +42,7 @@ export class MapSelectScreen extends Screen {
     this.startBtn.addEventListener('click', () => this.start());
 
     this.el.replaceChildren(
-      screenHeader({ title: 'Select Stage', kicker: 'Quick Battle', step: 2, onBack: () => this.onBack() }),
+      screenHeader({ title: 'Select Stage', kicker: 'Quick Battle', step: 3, onBack: () => this.onBack() }),
       el('div', { class: 'screen-body map-layout' }, [
         this.heroEl,
         el('div', { class: 'map-side' }, [
@@ -102,7 +102,8 @@ export class MapSelectScreen extends Screen {
   }
 
   start() {
-    this.app.screens.go('battle', { mapId: this.app.selection.mapId, characterId: this.app.selection.characterId });
+    const { mapId, characterId, difficulty } = this.app.selection;
+    this.app.screens.go('battle', { mapId, characterId, difficulty });
   }
 
   update(dt) {

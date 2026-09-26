@@ -386,12 +386,16 @@ test('Quick Battle: after time runs out, a fall scores nothing and nobody respaw
   assert.deepEqual(battle.result, { outcome: 'draw', reason: 'time' });
 });
 
-test('the training CPU never walks off a ledge on its own', () => {
+test('the training CPU never walks off a ledge on its own', async () => {
+  const { TrainingAIController } = await import('../js/game/fighter-controller.js');
   const sprites = fakeSprites();
   const input = { flush() {}, sample: () => ({}) };
   const battle = new Battle({
     canvas: { getContext: () => ({}) }, map: getMap('desert'), p1Def: def, p2Def: def, p1Sprites: sprites, p2Sprites: sprites, input,
   });
+  // Quick Battle's CPU is the combat AI now (see combat-ai.test.mjs for its
+  // ledges); the training controller keeps its own guarantee.
+  battle.p2.controller = new TrainingAIController({ rng: () => 0.5 });
   battle.setPhase('fight');
   const { right } = battle.map.mainStage;
   // Player 1 hovers out past the east ledge; the CPU follows it to the edge.

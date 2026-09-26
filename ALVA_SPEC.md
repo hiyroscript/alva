@@ -162,17 +162,19 @@ behave, and how it must look. The README covers running and deploying it.
   reloads); inactive screens are `hidden` and `inert`.
 - Systems: asset loader, input (keyboard, touch, gamepad), menu navigator,
   device detection, audio stub, sprite normalizer/animator, fighter state
-  machine, controllers (player / training AI), physics, camera, combat,
+  machine, controllers (player / Quick Battle combat AI / training AI),
+  physics, camera, combat,
   projectiles, summoned clones, charged techniques, HUD, touch controls,
   stage themes, fighter roster.
 - One arena (`js/game/arena.js`) owns the fixed-step world and its Canvas
-  rendering. Quick Battle (`Battle`) adds the CPU, phases and round timer;
-  Practice Ground (`PracticeSession`) runs Player 1, and an optional
-  training-dummy CPU, with none of them.
+  rendering. Quick Battle (`Battle`) adds the combat-AI CPU at the chosen
+  difficulty, phases and round timer; Practice Ground (`PracticeSession`)
+  runs Player 1, and an optional training-dummy CPU, with none of them.
 - Data-driven content: `js/data/characters.js`, `js/data/maps.js` (the Quick
   Battle stages), `js/data/practice-map.js` (the training stage) and
   `js/data/powers.js` (the Power tier tables, 7.2) and `js/data/launch.js`
-  (the Base Launch values and Directional Launches, 7.2). Adding a fighter
+  (the Base Launch values and Directional Launches, 7.2) and
+  `js/data/difficulty.js` (Quick Battle's four CPU levels, 6.3a). Adding a fighter
   means adding frames, a definition (including its Power tiers and each
   hit's damage, Base Launch and Directional Launch) and a roster slot —
   never editing engine code.
@@ -267,7 +269,7 @@ fit the palette.
 ## 6. Screens and flow
 
 ```
-Splash → Home → Select Mode → Select Fighter → Select Stage → Battle
+Splash → Home → Select Mode → Select Difficulty → Select Fighter → Select Stage → Battle
 Home → Practice Ground (starts at once with #0001 and a #0001 practice CPU)
 Home → Discover (Power / Launch / Passives reference; Back returns Home)
 Practice Ground → More → Change Fighter (roster dialog) / Change CPU, or Enable CPU once disabled (CPU roster dialog → Disable CPU) / Return (Home)
@@ -280,7 +282,8 @@ Battle (time over, level on points and Launch Point: a draw) → a fresh battle 
 
 Every menu screen except Home has a consistent Back action. Keyboard, mouse,
 touch and gamepad all navigate menus with one shared highlight (mouse hover
-moves focus, except on preview-only items such as the Select Mode card).
+moves focus, except on preview-only items such as the Select Mode and Select
+Difficulty cards).
 
 ### 6.1 Splash
 
@@ -347,17 +350,49 @@ no header, build label, eyebrow or keyboard hint bar.
 
 ### 6.3 Select Mode
 
-- Header "Select Mode" with setup steps (Mode · Fighter · Stage).
+- Header "Select Mode" with setup steps (Mode · Difficulty · Fighter · Stage).
 - A compact Quick Battle card and a full-height Mode details panel, top-aligned.
   No artwork and no keyboard hint bar.
-- Quick Battle card (Mode 01, name, description "Choose a fighter and stage,
-  then enter battle.", green Select action) in a rail built for future modes.
+- Quick Battle card (Mode 01, name, description "Choose a difficulty, a
+  fighter and a stage, then enter battle.", green Select action) in a rail
+  built for future modes.
 - Mode details panel: only its heading and a hairline beneath it.
 - Mouse hover only previews the card (lighter surface and border) and does not
   move focus. A click, Enter or gamepad confirm selects Quick Battle and opens
-  Select Fighter. Keyboard/gamepad focus shows the standard focus ring, which
+  Select Difficulty. Keyboard/gamepad focus shows the standard focus ring, which
   stays hidden while the last menu input was a pointer press.
 - No fake modes or online matchmaking.
+
+### 6.3a Select Difficulty
+
+- Quick Battle's second setup step (`js/screens/difficulty-select-screen.js`,
+  screen id `difficulty`): kicker "Quick Battle", header "Select Difficulty",
+  setup steps with Difficulty current (Mode checked). Back returns to Select
+  Mode; Back from Select Fighter returns here.
+- Four large selectable cards in ascending order, inspired by Seren's
+  four-level scale but in Alva's charcoal, off-white and green:
+  **01 Easy** "Slower reactions. Leaves openings.", **02 Medium** "Balanced
+  reactions and decisions.", **03 Hard** "Fast reactions. Defends and
+  punishes.", **04 Brutal** "Sharp reactions. Relentless decisions." Each
+  shows its large mono index, a four-bar ascending scale (1 to 4 bars lit in
+  the green accent, the rest hollow outlines, so the level reads by shape and
+  label, never by colour alone; Brutal's top bar is a step brighter, the same
+  accent family), its name and its line. Each card is a button named "Easy,
+  level 1 of 4" (etc.) and described by its line.
+- The current level carries the green "Current" check pill (the selected
+  stage card's), a green-tinted border and `aria-current="true"`. A fresh
+  Quick Battle starts on Medium; returning to the screen focuses the current
+  level. Choosing a card (click, Enter / J, gamepad A) sets
+  `app.selection.difficulty` and opens Select Fighter. Hover previews only
+  (it does not move keyboard/gamepad focus), as on Select Mode.
+- One row of four on wide screens; a 2 × 2 grid on narrow windows (≤ 720 px)
+  and tall/narrow ones; compact cards in short landscape (the kicker hides
+  below 420 px of height). The card area scrolls on its own if a window is
+  too short, so Back stays reachable. Back uses the setup screens' 3 px
+  radius.
+- Between the full header and the phone layout (≤ 1100 px wide) the setup
+  steps keep only the current step's name, so four steps fit; completed steps
+  keep their check.
 
 ### 6.4 Select Fighter
 
@@ -660,8 +695,9 @@ read the character database, so it stays the same as fighters are added.
   a girder, the water-tower deck, a scaffold) that fighters jump up through
   from below, each a slab with depth, plus a stair bulkhead. No boundary
   buildings. The player has no drop-through control and walks off an edge
-  to come down; the training CPU can drop through all of them except the
-  water-tower deck, and never walks off the roof's edges on its own.
+  to come down, and so does Quick Battle's combat AI; the training CPU can
+  drop through all of them except the water-tower deck. Neither CPU ever
+  walks off the roof's edges on its own.
 - Collision comes only from map data, never from art.
 - **The Void:** a fighter whose centre leaves `voidBounds` (a fixed
   rectangle, `StageCollision.inVoid`) is taken by it: it leaves play at once
@@ -713,9 +749,10 @@ read the character database, so it stays the same as fighters are added.
   the fighter's own movement (running past a small speed on the ground,
   steering in the air) and a Dash turn it, a spawn or respawn takes the
   spawn's `facing`, and otherwise it keeps its last facing. It never turns
-  toward the opponent by itself (the player, the training CPU and the
+  toward the opponent by itself (the player, both CPU controllers and the
   practice dummy alike), so attacks, Throws and the Sphere Rush go the way
-  the fighter already faces. The HUD portraits facing the timer (7.3) are a
+  the fighter already faces; the combat AI turns by pressing a direction
+  first, as a player does. The HUD portraits facing the timer (7.3) are a
   separate, fixed rule.
 - Hitstun shows Hurt while grounded and Mid-air Hurt while airborne, switching
   to Hurt if the fighter lands still stunned; the pose also holds through the
@@ -997,7 +1034,9 @@ read the character database, so it stays the same as fighters are added.
   Hitstun or a bind end it at once. While it runs the fighter cannot attack,
   shield, jump, charge or Dash again. It has no hitbox, damage, launch or
   invulnerability. The training CPU never dashes (its input never has press
-  edges), though any caller may use `tryDash`.
+  edges); Quick Battle's combat AI dashes only through the same double tap a
+  player uses (a press, a release and a press within the window), and
+  guards against double-tapping by accident.
 - Charged actions are a generic dispatch, not a summon shortcut. The
   character's `chargedActions` maps a combat button to a typed descriptor:
   `{ type: 'summon', id }` (an entry in `summons`: a detached temporary
@@ -1437,12 +1476,54 @@ read the character database, so it stays the same as fighters are added.
   is a clone summon whose cloud or attack art is missing (no cooldown starts),
   and so is a charged technique with any of its clips missing.
 - Quick Battle: 99 seconds, first to `CONFIG.battle.pointsToWin` (3)
-  points, against a non-attacking training CPU that uses the same fighter
-  definition. It never attacks, throws, charges, summons clones, uses the
-  Sphere Rush, dashes or uses Defense (while bound, its input is simply
-  ignored); it drops through one-way platforms with an internal intent that
-  no player control produces, and stands still while its opponent is out of
-  play.
+  points, against a CPU that uses the same fighter definition and fights with
+  it at the difficulty chosen on Select Difficulty (6.3a): Quick Battle's
+  combat AI, `CombatAIController` (`js/game/combat-ai.js`). `BattleScreen`
+  passes `app.selection.difficulty` to `Battle`, which validates it once
+  (`resolveDifficulty`: anything unknown is Medium), keeps it for the whole
+  battle (restart, rematch and every respawn keep it; a restart also clears
+  the controller's plans) and builds the CPU's controller with it and a
+  seeded `mulberry32` RNG.
+  - **Input only.** Like `PlayerController`, it only returns the standard
+    input snapshot (`left`, `right`, `charge`, `jump`, `defense`, `primary`,
+    `special`, `action1`, `action2` and their `…Pressed` edges, each edge true
+    only on the step its button goes down). Attacks, Throws, the Shield,
+    Charge, charged actions (Charge held from an earlier step, then the
+    button), jumps and the Dash (a double tap) all go through the fighter
+    exactly as a player's do. It never writes to a fighter, never spawns or
+    moves anything, never reads the player's raw input, and never uses the
+    training CPU's platform drop: it walks off platform edges instead.
+  - **Sense → evaluate → act.** It senses what the simulation shows (both
+    fighters' positions, motion, attacks and their phases, Shield, Charge,
+    Energy, Launch Point, cooldowns, techniques, projectiles, clones, the
+    stage's ledges and platforms, the score and the clock through
+    `ctx.stage` / `ctx.battle`), scores the options that fit (answer a threat
+    with Shield / a step / a jump / a Dash / a strike first; strike; Throw;
+    approach; hold a spacing; jump in; Dash in; Charge for a Clone Attack,
+    a Sphere Rush or Energy; make for the centre; wait), each built from the
+    fighter's own data (reach from its hitboxes, Throw range and flight from
+    its projectile, charged actions from `chargedActions`; a button mapped to
+    null is never pressed), and acts over as many steps as needed.
+  - **Reaction.** A new attack startup, projectile, clone, charged technique,
+    whiff or Charge is an event, taken in after a delay sampled from the
+    level's reaction window, or never on a lapse; only then can it be
+    answered. Neutral decisions follow the level's reassessment cadence and
+    planning time. Prediction is limited to projecting current motion over a
+    short, level-set horizon.
+  - **Difficulty** (`js/data/difficulty.js`) sets only these traits: reaction
+    window, lapse chance, reassessment interval, decision noise, hesitation,
+    spacing error, motion lookahead, and weights for defense, punishing,
+    charged actions, Dash, planning, aggression, stage sense and Energy care.
+    Every trait is ordered Easy → Brutal; Brutal's reaction is fast but never
+    zero. No level changes damage, launch, hitstun, startup or recovery,
+    speed, gravity, jumps, Dash, Shield, Energy, cooldowns, hitboxes,
+    invulnerability, score or respawns.
+  - It never walks off the main floor on its own, follows its opponent up and
+    down platforms, and stands still while its opponent is out of play.
+  Practice Ground's CPU is a different thing: a controller-less training
+  dummy that never moves or attacks, whatever the Quick Battle difficulty.
+  The older non-attacking `TrainingAIController` remains in
+  `js/game/fighter-controller.js`, unused by either mode.
 - Match score (`Battle.score`, `{ p1, p2 }`, the match's own: never on a
   fighter or its character, and not `round`): both start at 0. A fall into
   the Void scores exactly one point for the opponent, at once, if the

@@ -11,11 +11,13 @@ import { MenuNavigator } from './menu-navigator.js';
 import { LoadingOverlay, ConfirmDialog } from '../ui/overlays.js';
 import { CHARACTERS, getCharacter, characterFramePaths } from '../data/characters.js';
 import { MAPS } from '../data/maps.js';
+import { DEFAULT_DIFFICULTY } from '../data/difficulty.js';
 import { SpriteSet } from '../game/sprite-normalizer.js';
 
 import { SplashScreen } from '../screens/splash-screen.js';
 import { HomeScreen } from '../screens/home-screen.js';
 import { ModeSelectScreen } from '../screens/mode-select-screen.js';
+import { DifficultySelectScreen } from '../screens/difficulty-select-screen.js';
 import { CharacterSelectScreen } from '../screens/character-select-screen.js';
 import { MapSelectScreen } from '../screens/map-select-screen.js';
 import { HelpCreditsScreen } from '../screens/help-credits-screen.js';
@@ -35,9 +37,11 @@ export class App {
     this.loading = new LoadingOverlay(document.getElementById('loading-overlay'));
     this.dialog = new ConfirmDialog(document.getElementById('confirm-dialog'), this);
 
-    // Quick Battle's choices. Practice Ground keeps its own fighter.
+    // Quick Battle's choices. Practice Ground keeps its own fighter, and its
+    // training-dummy CPU never reads the difficulty.
     this.selection = {
       mode: 'quick-battle',
+      difficulty: DEFAULT_DIFFICULTY,
       characterId: CHARACTERS.find((c) => c.available)?.id ?? null,
       mapId: MAPS[0].id,
     };
@@ -54,6 +58,7 @@ export class App {
     s.register(new SplashScreen(this));
     s.register(new HomeScreen(this));
     s.register(new ModeSelectScreen(this));
+    s.register(new DifficultySelectScreen(this));
     s.register(new CharacterSelectScreen(this));
     s.register(new MapSelectScreen(this));
     // No longer linked from Home (Practice Ground took its entry); kept in place.
