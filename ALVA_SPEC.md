@@ -1834,8 +1834,8 @@ read the character database, so it stays the same as fighters are added.
   refused (no substitute pose, no invisible hitbox), and so is a Shield, and so
   is a clone summon whose cloud or attack art is missing (no cooldown starts),
   and so is a charged technique with any of its clips missing.
-- Quick Battle: 99 seconds, first to `CONFIG.battle.pointsToWin` (3)
-  points, against a CPU that uses the same fighter definition and fights with
+- Quick Battle: 5 minutes (`CONFIG.battle.roundSeconds`, 300 seconds),
+  first to `CONFIG.battle.pointsToWin` (3) points, against a CPU that uses the same fighter definition and fights with
   it at the difficulty chosen on Select Difficulty (6.3a): Quick Battle's
   combat AI, `CombatAIController` (`js/game/combat-ai.js`). `BattleScreen`
   passes `app.selection.difficulty` to `Battle`, which validates it once
@@ -1977,10 +1977,12 @@ read the character database, so it stays the same as fighters are added.
 - Timer + pause: one glass control at top centre. The round label and timer
   sit on top; a rectangular pause section sits directly beneath with no gap,
   the same width and a hairline seam, so only the outer corners are rounded.
-  Both halves are buttons that pause the game; the timer half is labelled
-  "Pause game, N seconds remaining". For the last ten seconds only the digits
-  change, from a slightly softened off-white to pure white; the glass never
-  changes colour, inverts or flashes.
+  The timer reads minutes and seconds (`5:00`, `1:27`, `0:09`). Both halves
+  are buttons that pause the game; the timer half is labelled "Pause game,
+  M minutes S seconds remaining" (just the minutes or just the seconds when
+  the other is 0). For the last ten seconds only the digits change, from a
+  slightly softened off-white to pure white; the glass never changes colour,
+  inverts or flashes.
 - Player markers above fighters (under their Energy bars) and ground
   rings: P1 white, CPU gray.
 - **Hit effects** (`js/game/hit-fx.js`, owned by the Arena, so Quick Battle

@@ -847,7 +847,7 @@ test('entering Watch Mode loads each fighter once and builds the Battle, HUD and
   assert.equal(hud.left.score.getAttribute('aria-label'), 'CPU 1: 0 of 3 points');
   assert.equal(hud.right.score.getAttribute('aria-label'), 'CPU 2: 0 of 3 points');
   assert.equal(hud.left.dots.length, CONFIG.battle.pointsToWin, 'the normal score dots');
-  assert.equal(hud.timer.textContent, String(CONFIG.battle.roundSeconds), 'the normal timer');
+  assert.equal(hud.timer.textContent, '5:00', 'the normal timer');
   assert.equal(canvas.getAttribute('aria-label'), 'Watch Mode battle: CPU 1, #9999, against CPU 2, #0001');
   assert.equal(canvas.getAttribute('role'), 'img');
   screens.battle.exit();

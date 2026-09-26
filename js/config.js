@@ -45,7 +45,7 @@ export const CONFIG = Object.freeze({
   },
 
   battle: {
-    roundSeconds: 99,      // set to 0 to disable the round timer
+    roundSeconds: 300,     // 5 minutes; set to 0 to disable the round timer
     introSeconds: 1.7,
     timeUpSeconds: 1.4,
     koSeconds: 1.4,        // the KO beat after the match-winning point, before the result
