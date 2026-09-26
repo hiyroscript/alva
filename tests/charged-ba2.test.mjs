@@ -1689,7 +1689,7 @@ test('Charged BA1 is still the Clone Attack and keeps #0001 charging; it starts 
   assert.ok(d.attacker.combat.chargedCooldowns.active('rasenRush'));
 });
 
-test('normal BA2 is unchanged outside Charge: 2ba1-2ba7 for 10 on the ground, midair1ba1-5 in the air, no sphere', () => {
+test('normal BA2 is unchanged outside Charge: 2ba1-2ba7 for 10 on the ground, midair2ba1-5 in the air, no sphere', () => {
   const ground = duel();
   ground.tick(BA2);
   const frames = [];
@@ -1711,7 +1711,7 @@ test('normal BA2 is unchanged outside Charge: 2ba1-2ba7 for 10 on the ground, mi
     airFrames.push(frameName(air.attacker));
     air.tick();
   }
-  assert.deepEqual(order(airFrames), Array.from({ length: 5 }, (_, i) => `0001_midair1ba${i + 1}.png`));
+  assert.deepEqual(order(airFrames), Array.from({ length: 5 }, (_, i) => `0001_midair2ba${i + 1}.png`));
   assert.equal(air.attacker.technique, null);
 });
 

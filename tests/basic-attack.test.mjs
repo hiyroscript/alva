@@ -32,7 +32,7 @@ const BA1_LAUNCH = {
 };
 
 // Each BA1's whole data entry. Ground BA1 is the four-frame punch; mid-air
-// BA1 is the three-frame kunai slash (midair2ba1-3), with the slash's own
+// BA1 is the three-frame kunai slash (midair1ba1-3), with the slash's own
 // timing, hitbox and combat values, and each its own movement: the punch
 // keeps some of a run's speed and slides on it, the slash keeps all of its
 // drift and most of the air steering. Both open a follow-up once they hit
@@ -168,7 +168,7 @@ test('the hitbox is live only around the contact frame', () => {
   const cases = {
     ba1: { contact: '0001_1ba2.png', setup: () => makeFighter() },
     midairBa1: {
-      contact: '0001_midair2ba3.png',
+      contact: '0001_midair1ba3.png',
       setup: () => {
         const r = makeFighter();
         r.step({ jump: true, jumpPressed: true });
@@ -206,7 +206,7 @@ test('airborne action1 plays the three-frame mid-air BA1 (the kunai slash) durin
   plain.step();
   assert.equal(fighter.combat.attack.def.id, 'midairBa1');
   assert.equal(fighter.animator.anim.key, 'midairBa1');
-  assert.equal(frameName(fighter), '0001_midair2ba1.png');
+  assert.equal(frameName(fighter), '0001_midair1ba1.png');
   const log = [{ frame: frameName(fighter) }];
   while (fighter.state === 'attack') {
     step();
@@ -215,7 +215,7 @@ test('airborne action1 plays the three-frame mid-air BA1 (the kunai slash) durin
     for (const k of ['x', 'y', 'vx', 'vy']) assert.equal(fighter.body[k], plain.fighter.body[k], `body.${k}`);
     if (fighter.state === 'attack') log.push({ frame: frameName(fighter) });
   }
-  assert.deepEqual(sequence(log), ['0001_midair2ba1.png', '0001_midair2ba2.png', '0001_midair2ba3.png']);
+  assert.deepEqual(sequence(log), ['0001_midair1ba1.png', '0001_midair1ba2.png', '0001_midair1ba3.png']);
   assert.equal(log.length, steps(3 / 12), 'one pass of the clip');
   assert.equal(fighter.grounded, false);
   assert.ok(['jump', 'fall'].includes(fighter.state));
@@ -229,9 +229,9 @@ test('airborne action1 also triggers mid-air BA1 during the descent', () => {
   step(BA1);
   assert.equal(fighter.state, 'attack');
   assert.equal(fighter.combat.attack.def.id, 'midairBa1');
-  assert.equal(frameName(fighter), '0001_midair2ba1.png');
+  assert.equal(frameName(fighter), '0001_midair1ba1.png');
   const log = recordAttack(step);
-  assert.equal(sequence(log).at(-1), '0001_midair2ba3.png');
+  assert.equal(sequence(log).at(-1), '0001_midair1ba3.png');
   assert.ok(log.every((s) => s.id === 'midairBa1' && !s.grounded));
 });
 
@@ -253,10 +253,10 @@ test('landing during mid-air BA1 finishes the mid-air clip instead of switching 
   for (const s of log) {
     assert.equal(s.id, 'midairBa1');
     assert.equal(s.anim, 'midairBa1');
-    assert.match(s.frame, /^0001_midair2ba\d\.png$/);
+    assert.match(s.frame, /^0001_midair1ba\d\.png$/);
   }
   assert.ok(!states.includes('land'));
-  assert.deepEqual(sequence(log), ['0001_midair2ba1.png', '0001_midair2ba2.png', '0001_midair2ba3.png']);
+  assert.deepEqual(sequence(log), ['0001_midair1ba1.png', '0001_midair1ba2.png', '0001_midair1ba3.png']);
   assert.equal(log.length, steps(3 / 12), 'the attack runs its full length');
   // Touchdown happened mid-attack, so there is no late land clip afterwards.
   assert.equal(fighter.grounded, true);
@@ -479,7 +479,7 @@ test('mid-air BA1 hits a grounded opponent below and in front while still airbor
     if (events.length && airborneAtHit === null) {
       airborneAtHit = !attacker.grounded;
       assert.equal(attacker.combat.phase, 'active');
-      assert.equal(frameName(attacker), '0001_midair2ba3.png');
+      assert.equal(frameName(attacker), '0001_midair1ba3.png');
       // The slash's own stun and freeze, on both fighters.
       assert.equal(target.combat.stun, 0.28 + resolveLaunchStun(events[0].launchSpeed, target.launchReaction));
       assert.equal(target.combat.hitstop, 0.05);

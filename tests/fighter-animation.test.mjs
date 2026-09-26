@@ -42,8 +42,8 @@ const NEW_CLIPS = {
   hurt: [`${BASE}hurt.png`],
   midairHurt: [`${BASE}midairhurt.png`],
   ba1: [`${BASE}1ba1.png`, `${BASE}1ba2.png`, `${BASE}1ba3.png`, `${BASE}1ba4.png`],
-  // Mid-air BA1 is the three-frame kunai slash, drawn as midair2ba1-3.
-  midairBa1: [`${BASE}midair2ba1.png`, `${BASE}midair2ba2.png`, `${BASE}midair2ba3.png`],
+  // Mid-air BA1 is the three-frame kunai slash, drawn as midair1ba1-3.
+  midairBa1: [`${BASE}midair1ba1.png`, `${BASE}midair1ba2.png`, `${BASE}midair1ba3.png`],
 };
 
 test('#0001 registers hurt, mid-air hurt and both Basic Attack 1 clips', () => {
@@ -74,8 +74,8 @@ test('#0001 registers hurt, mid-air hurt and both Basic Attack 1 clips', () => {
 test('#0001 registers both Basic Attack 2 clips from the canonical asset folder', () => {
   const expected = {
     ba2: Array.from({ length: 7 }, (_, i) => `${BASE}2ba${i + 1}.png`),
-    // Mid-air BA2 is the five-frame airborne kick, drawn as midair1ba1-5.
-    midairBa2: Array.from({ length: 5 }, (_, i) => `${BASE}midair1ba${i + 1}.png`),
+    // Mid-air BA2 is the five-frame airborne kick, drawn as midair2ba1-5.
+    midairBa2: Array.from({ length: 5 }, (_, i) => `${BASE}midair2ba${i + 1}.png`),
   };
   const paths = characterFramePaths(def);
   for (const [key, frames] of Object.entries(expected)) {
@@ -96,8 +96,8 @@ test('#0001 registers both Basic Attack 2 clips from the canonical asset folder'
   }
   const dir = readdirSync(ROOT + 'assets/characters/0001/');
   assert.deepEqual(dir.filter((n) => /^0001_2ba\d\.png$/.test(n)).sort(), expected.ba2.map((u) => u.split('/').pop()));
-  assert.deepEqual(dir.filter((n) => /^0001_midair1ba\d\.png$/.test(n)).sort(), expected.midairBa2.map((u) => u.split('/').pop()));
-  assert.deepEqual(dir.filter((n) => /^0001_midair2ba\d\.png$/.test(n)).sort(), NEW_CLIPS.midairBa1.map((u) => u.split('/').pop()));
+  assert.deepEqual(dir.filter((n) => /^0001_midair2ba\d\.png$/.test(n)).sort(), expected.midairBa2.map((u) => u.split('/').pop()));
+  assert.deepEqual(dir.filter((n) => /^0001_midair1ba\d\.png$/.test(n)).sort(), NEW_CLIPS.midairBa1.map((u) => u.split('/').pop()));
 });
 
 test('the misspelled 2ab frame names are gone for good', () => {

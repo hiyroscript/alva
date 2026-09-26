@@ -132,8 +132,7 @@ export const CHARACTERS = [
       },
       // Basic Attack 1 (BA1), ground and mid-air. Each plays once; the attack
       // definitions below time startup / active / recovery to these frames.
-      // Mid-air BA1 is the three-frame kunai slash drawn as midair2ba1-3 (the
-      // file names predate the move's place on BA1).
+      // Mid-air BA1 is the three-frame kunai slash drawn as midair1ba1-3.
       ba1: {
         frames: frames(BASE_0001, '1ba', 4),
         fps: BA1_FPS,
@@ -141,13 +140,13 @@ export const CHARACTERS = [
         heightRatio: 1.04,
       },
       midairBa1: {
-        frames: frames(BASE_0001, 'midair2ba', 3),
+        frames: frames(BASE_0001, 'midair1ba', 3),
         fps: BA1_FPS,
         loop: false,
         heightRatio: 1.29,
       },
       // Basic Attack 2 (BA2), ground and mid-air. Played once, like BA1.
-      // Mid-air BA2 is the five-frame airborne kick drawn as midair1ba1-5.
+      // Mid-air BA2 is the five-frame airborne kick drawn as midair2ba1-5.
       ba2: {
         frames: frames(BASE_0001, '2ba', 7),
         fps: BA2_FPS,
@@ -155,7 +154,7 @@ export const CHARACTERS = [
         heightRatio: 1.02,
       },
       midairBa2: {
-        frames: frames(BASE_0001, 'midair1ba', 5),
+        frames: frames(BASE_0001, 'midair2ba', 5),
         fps: BA2_FPS,
         loop: false,
         heightRatio: 1.08,

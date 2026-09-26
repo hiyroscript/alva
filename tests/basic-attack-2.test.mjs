@@ -26,7 +26,7 @@ const JUMP = { jump: true, jumpPressed: true };
 
 // The frames each attack is live on, chosen from the art: ground BA2's kick
 // (2ba4 low sweep, 2ba5 rising kick, both with motion trails) and mid-air
-// BA2's kick (midair1ba3, the forward-low arc).
+// BA2's kick (midair2ba3, the forward-low arc).
 const CONTACT = { ba2: [4, 5], midairBa2: [3] };
 
 // Either BA2 adds 10 to the target's Launch Point first, then launches at
@@ -43,7 +43,7 @@ const BA2_LAUNCH = {
 };
 
 // Each BA2's whole data entry. Ground BA2 is the seven-frame spinning high
-// kick; mid-air BA2 is the five-frame airborne kick (midair1ba1-5), with the
+// kick; mid-air BA2 is the five-frame airborne kick (midair2ba1-5), with the
 // kick's own timing, hitbox and combat values, and each its own movement:
 // the spinning kick keeps half a run's speed and steps in on its first
 // frame; the airborne kick keeps all of its drift and some steering. Both
@@ -288,7 +288,7 @@ test('the ground BA2 hitbox is live only on the kick frames (2ba4-2ba5)', () => 
   assertActiveOnContactFrames(log, 'ba2');
 });
 
-test('the mid-air BA2 hitbox is live only on the kick frame (midair1ba3)', () => {
+test('the mid-air BA2 hitbox is live only on the kick frame (midair2ba3)', () => {
   const { step } = makeFighter();
   step(JUMP);
   const log = recordAttack(step, BA2);
@@ -313,7 +313,7 @@ test('airborne action2 plays the five-frame mid-air BA2 (the airborne kick) duri
   plain.step(HELD);
   assert.equal(fighter.combat.attack.def.id, 'midairBa2');
   assert.equal(fighter.animator.anim.key, 'midairBa2');
-  assert.equal(frameName(fighter), '0001_midair1ba1.png');
+  assert.equal(frameName(fighter), '0001_midair2ba1.png');
   const log = [{ frame: frameName(fighter) }];
   const vys = [fighter.body.vy];
   while (fighter.state === 'attack') {
@@ -325,8 +325,8 @@ test('airborne action2 plays the five-frame mid-air BA2 (the airborne kick) duri
     if (fighter.state === 'attack') log.push({ frame: frameName(fighter) });
   }
   assert.deepEqual(sequence(log), [
-    '0001_midair1ba1.png', '0001_midair1ba2.png', '0001_midair1ba3.png',
-    '0001_midair1ba4.png', '0001_midair1ba5.png',
+    '0001_midair2ba1.png', '0001_midair2ba2.png', '0001_midair2ba3.png',
+    '0001_midair2ba4.png', '0001_midair2ba5.png',
   ]);
   assert.equal(log.length, steps(5 / 12), 'one pass of the clip');
   for (let i = 1; i < vys.length; i++) assert.ok(vys[i] > vys[i - 1], 'falling faster every step');
@@ -343,10 +343,10 @@ test('airborne action2 also triggers mid-air BA2 during the descent', () => {
   step(BA2);
   assert.equal(fighter.state, 'attack');
   assert.equal(fighter.combat.attack.def.id, 'midairBa2');
-  assert.equal(frameName(fighter), '0001_midair1ba1.png');
+  assert.equal(frameName(fighter), '0001_midair2ba1.png');
   const log = recordAttack(step);
   assert.equal(log[0].grounded, false);
-  assert.equal(sequence(log).at(-1), '0001_midair1ba5.png');
+  assert.equal(sequence(log).at(-1), '0001_midair2ba5.png');
   assert.ok(log.every((s) => s.id === 'midairBa2'));
   // The press step, then the rest of the clip: its full length, landing or not.
   assert.equal(1 + log.length, steps(5 / 12));
@@ -370,12 +370,12 @@ test('landing during mid-air BA2 finishes the mid-air clip instead of switching 
   for (const s of log) {
     assert.equal(s.id, 'midairBa2');
     assert.equal(s.anim, 'midairBa2');
-    assert.match(s.frame, /^0001_midair1ba\d\.png$/);
+    assert.match(s.frame, /^0001_midair2ba\d\.png$/);
   }
   assert.ok(!states.includes('land'));
   assert.deepEqual(sequence(log), [
-    '0001_midair1ba1.png', '0001_midair1ba2.png', '0001_midair1ba3.png',
-    '0001_midair1ba4.png', '0001_midair1ba5.png',
+    '0001_midair2ba1.png', '0001_midair2ba2.png', '0001_midair2ba3.png',
+    '0001_midair2ba4.png', '0001_midair2ba5.png',
   ]);
   assert.equal(log.length, steps(5 / 12), 'the attack runs its full length');
   // Touchdown happened mid-attack, so there is no late land clip afterwards.
@@ -707,7 +707,7 @@ test('mid-air BA2 hits a grounded opponent in front while still airborne', () =>
     if (events.length && airborneAtHit === null) {
       airborneAtHit = !attacker.grounded;
       assert.equal(attacker.combat.phase, 'active');
-      assert.equal(frameName(attacker), '0001_midair1ba3.png');
+      assert.equal(frameName(attacker), '0001_midair2ba3.png');
       // The kick's own stun and freeze, on both fighters.
       assert.equal(target.combat.stun, 0.28 + resolveLaunchStun(events.at(-1).launchSpeed, target.launchReaction));
       assert.equal(target.combat.hitstop, 0.08);
