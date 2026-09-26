@@ -7,7 +7,7 @@ which tests cover it. Anything not listed under an update is unchanged by it.
 
 | Name | Pull request | Commit | In one line |
 | --- | --- | --- | --- |
-| **Movement update** | [#49](https://github.com/hiyroscript/alva/pull/49), then a [second pass](#second-pass) | `a34fbdd`, second pass `e75dbb6` | Movement feel, attack momentum and combo flow for #0001 |
+| **Movement update** | [#49](https://github.com/hiyroscript/alva/pull/49), then [#57](https://github.com/hiyroscript/alva/pull/57) ([second pass](#second-pass)) | `a34fbdd`, then `e75dbb6` | Movement feel, attack momentum and combo flow for #0001 |
 | **Effect update** | [#50](https://github.com/hiyroscript/alva/pull/50) | `487b9af` | Short hop, air jump, launch reaction, perfect Shield and hit effects |
 | **Bounce update** | [#51](https://github.com/hiyroscript/alva/pull/51) | `f7c1e28` | Hard launches rebound off walls, floors and ceilings |
 
@@ -69,7 +69,7 @@ cancel included), and the Dash cancel's cost in `tests/energy.test.mjs`.
 
 ### Second pass
 
-Commit `e75dbb6` (branch `claude/tender-darwin-1dfum1`). Asked for as "the
+Pull request [#57](https://github.com/hiyroscript/alva/pull/57), commit `e75dbb6`. Asked for as "the
 movement update needs to feel better and combos to be even more open".
 Values it changed, old → new, for undoing any one of them:
 
