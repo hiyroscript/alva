@@ -43,17 +43,22 @@ const BA2_LAUNCH = {
 
 // Each BA2's whole data entry. Ground BA2 is the seven-frame spinning high
 // kick; mid-air BA2 is the five-frame airborne kick (midair1ba1-5), with the
-// kick's own timing, hitbox and combat values.
+// kick's own timing, hitbox and combat values, and each its own movement:
+// the spinning kick keeps half a run's speed and steps in on its first
+// frame; the airborne kick keeps all of its drift and some steering. Both
+// open a follow-up once they hit (hitCancel, from their kick).
 const ENTRIES = {
   ba2: {
     animation: 'ba2', startup: 3 / 12, active: 2 / 12, recovery: 2 / 12, damage: 10,
     hitbox: { x: 10, y: -88, w: 24, h: 78 }, ...BA2_LAUNCH.ba2,
-    hitstun: 0.24, blockstun: 0.15, hitstop: 0.07, cooldown: 0.15, groundOnly: true,
+    hitstun: 0.28, blockstun: 0.15, hitstop: 0.09, cooldown: 0.15, groundOnly: true,
+    momentum: 0.5, friction: 0.5, step: { at: 0, speed: 280 }, hitCancel: 3 / 12,
   },
   midairBa2: {
     animation: 'midairBa2', startup: 2 / 12, active: 1 / 12, recovery: 2 / 12, damage: 10,
     hitbox: { x: 8, y: -44, w: 40, h: 40 }, ...BA2_LAUNCH.midairBa2,
-    hitstun: 0.22, blockstun: 0.14, hitstop: 0.06, cooldown: 0.1,
+    hitstun: 0.28, blockstun: 0.14, hitstop: 0.08, cooldown: 0.1,
+    airMomentum: 1, airControl: 0.4, hitCancel: 2 / 12,
   },
 };
 
@@ -155,9 +160,10 @@ test('BA2 attack definitions match their clips: the ground spinning kick launchi
   assert.deepEqual([g.startup, g.active, g.recovery], [3 / 12, 2 / 12, 2 / 12]);
   assert.equal(g.groundOnly, true);
   assert.equal(g.damage, 10, 'adds 10 Launch Point');
-  assert.deepEqual([g.hitstun, g.blockstun, g.hitstop, g.cooldown], [0.24, 0.15, 0.07, 0.15]);
-  assert.ok(g.total > ba1.total, 'slower than ground BA1');
-  assert.ok(g.damage > ba1.damage && g.hitstun > ba1.hitstun, 'heavier than ground BA1');
+  assert.deepEqual([g.hitstun, g.blockstun, g.hitstop, g.cooldown], [0.28, 0.15, 0.09, 0.15]);
+  assert.ok(g.total > ba1.total && g.startup > ba1.startup, 'slower than ground BA1, more committed');
+  assert.ok(g.damage > ba1.damage && g.hitstop > ba1.hitstop, 'heavier than ground BA1: more damage, a stronger freeze');
+  assert.equal(g.hitCancel, g.startup, 'a follow-up from its kick on, once it hits');
   assert.equal(ba1.directionalLaunch, 'horizontal', 'BA1 pushes sideways');
   assert.equal(g.directionalLaunch, 'vertical', 'BA2 launches upward instead');
   assert.ok(g.baseLaunch > ba1.baseLaunch, 'BA2 doubles the Launch Point; BA1 uses it once');
@@ -170,7 +176,8 @@ test('BA2 attack definitions match their clips: the ground spinning kick launchi
   assert.deepEqual([a.startup, a.active, a.recovery], [2 / 12, 1 / 12, 2 / 12]);
   assert.equal(a.groundOnly, false);
   assert.equal(a.damage, 10, 'adds 10 Launch Point');
-  assert.deepEqual([a.hitstun, a.blockstun, a.hitstop, a.cooldown], [0.22, 0.14, 0.06, 0.1]);
+  assert.deepEqual([a.hitstun, a.blockstun, a.hitstop, a.cooldown], [0.28, 0.14, 0.08, 0.1]);
+  assert.equal(a.hitCancel, a.startup, 'a follow-up from its kick on, once it hits');
   assert.ok(a.hitbox.x + a.hitbox.w <= 60, 'midairBa2 hitbox is within reach');
   assert.ok(a.hitbox.w <= def.collider.width + 10 && a.hitbox.h <= def.collider.height / 2, 'midairBa2 hitbox is not oversized');
   // Ground BA2's Base Launch, reversed: where mid-air BA1 launches upward,
@@ -384,22 +391,32 @@ test('BA2 on the same step as a jump attacks on the ground; the jump is dropped'
   assert.equal(fighter.grounded, true);
 });
 
-test('BA2 locks movement and facing while it plays', () => {
+test('BA2 locks facing while it plays; the ground kick is steered by nothing, the airborne kick by its airControl', () => {
   for (const air of [false, true]) {
     const { fighter, step } = makeFighter();
     stepUntil(step, (f) => f.state === 'run', { right: true });
     if (air) step({ right: true, ...JUMP });
     step({ right: true, ...BA2 });
-    assert.equal(fighter.combat.attack.def.id, air ? 'midairBa2' : 'ba2');
+    const atk = fighter.combat.attack.def;
+    assert.equal(atk.id, air ? 'midairBa2' : 'ba2');
     const log = [];
     while (fighter.state === 'attack') {
       log.push(fighter.body.vx);
       assert.equal(fighter.facing, 1, 'holding Left never turns an attack around');
       step({ left: true });
     }
-    assert.ok(log.every((vx) => vx >= 0), 'no steering against the attack');
-    for (let i = 1; i < log.length; i++) assert.ok(log[i] <= log[i - 1], 'only decelerates');
-    if (!air) assert.equal(log.at(-1), 0, 'decelerates to a stop');
+    for (let i = 1; i < log.length; i++) assert.ok(log[i] <= log[i - 1], 'Left never speeds it up');
+    if (!air) {
+      assert.ok(log.every((vx) => vx >= 0), 'no steering against the ground kick');
+      assert.equal(log.at(-1), 0, 'decelerates to a stop');
+    } else {
+      // The airborne kick keeps its drift and steers with its share of the
+      // air control: holding Left brakes it harder than the air drag alone.
+      assert.equal(atk.airControl, 0.4);
+      const braked = log[0] - log[3];
+      assert.ok(braked > 3 * def.movement.airDeceleration * DT, 'steered against its drift');
+      assert.ok(log.at(-1) < 0, 'and on into the other way before it ends');
+    }
     // Once it ends, the held direction applies again.
     stepUntil(step, (f) => f.facing === -1, { left: true }, 30);
   }
@@ -428,9 +445,9 @@ test('ground BA2 hits an opponent in front once, during the active phase, with i
       // CombatSystem runs after the fighters, on the phase they just reached.
       hitPhase = attacker.combat.phase;
       hitFrame = frameNo(frameName(attacker));
-      assert.equal(target.combat.stun, 0.24);
-      assert.equal(target.combat.hitstop, 0.07);
-      assert.equal(attacker.combat.hitstop, 0.07);
+      assert.equal(target.combat.stun, 0.28);
+      assert.equal(target.combat.hitstop, 0.09);
+      assert.equal(attacker.combat.hitstop, 0.09);
       assert.ok(isZero(target.body.vx), 'no sideways push');
       assert.equal(target.body.vy, -LAUNCHED, 'launched upward');
       assert.equal(target.grounded, false);
@@ -672,9 +689,9 @@ test('mid-air BA2 hits a grounded opponent in front while still airborne', () =>
       assert.equal(attacker.combat.phase, 'active');
       assert.equal(frameName(attacker), '0001_midair1ba3.png');
       // The kick's own stun and freeze, on both fighters.
-      assert.equal(target.combat.stun, 0.22);
-      assert.equal(target.combat.hitstop, 0.06);
-      assert.equal(attacker.combat.hitstop, 0.06);
+      assert.equal(target.combat.stun, 0.28);
+      assert.equal(target.combat.hitstop, 0.08);
+      assert.equal(attacker.combat.hitstop, 0.08);
     }
   }
   assert.equal(events.length, 1);
@@ -833,7 +850,6 @@ test('Quick Battle: a BA2 hit launches the training CPU straight up through the 
   battle.update(DT); // pushboxes settle them side by side; P2 turns to face P1
   p2.combat.launchPoint = LAUNCH_FROM;
   const groundY = p2.body.y;
-  const startX = p2.body.x;
   once = BA2;
   let hit = null;
   for (let i = 0; i < 60 && !hit; i++) {
@@ -841,6 +857,9 @@ test('Quick Battle: a BA2 hit launches the training CPU straight up through the 
     hit = battle.combat.events.find((e) => e.type === 'hit') ?? null;
   }
   assert.ok(hit, 'BA2 connected');
+  // Where it was struck: BA2's step-in may have shoved it along a little
+  // through the pushboxes before the kick landed.
+  const hitX = p2.body.x;
   assert.equal(hit.attacker, p1);
   assert.equal(hit.target, p2);
   assert.equal(p2.combat.launchPoint, LAUNCH_FROM + 10);
@@ -855,7 +874,7 @@ test('Quick Battle: a BA2 hit launches the training CPU straight up through the 
   assert.ok(top < groundY, 'visibly left the ground');
   assert.equal(p2.grounded, true, 'gravity brought it back down');
   assert.equal(p2.body.y, groundY);
-  assert.equal(p2.body.x, startX, 'straight up and down');
+  assert.equal(p2.body.x, hitX, 'straight up and down');
   battle.destroy();
 });
 

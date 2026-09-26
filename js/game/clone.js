@@ -156,9 +156,10 @@ export class Clone {
   update(dt) {
     if (!this.alive) return;
     if (this.phase === 'attack') {
-      // Impact freeze: the attack clock and its art hold still.
+      // Impact freeze: the attack clock and its art hold still, for as many
+      // steps as the target's (the same slack as CombatState.update).
       if (this.hitstop > 0) {
-        this.hitstop = Math.max(0, this.hitstop - dt);
+        this.hitstop = this.hitstop - dt <= TIME_EPSILON ? 0 : this.hitstop - dt;
         return;
       }
       this.attackTime += dt;

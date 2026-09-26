@@ -30,6 +30,32 @@
 // Hitboxes are defined facing right relative to the fighter's origin
 // (bottom-centre) and mirrored automatically.
 //
+// Every attack also says how the fighter moves while it plays (see
+// Fighter.moveHorizontal). Normal locomotion is off, but that is not the
+// same as standing still: the attack keeps a share of the speed the fighter
+// carried into it (`momentum` on the ground, `airMomentum` in the air; on
+// the ground never more than that share of the fighter's top speed), lets the fighter
+// steer with a share of its normal acceleration and top speed (`control`,
+// `airControl`: 0 is none, 1 is all), and lets the rest of that speed run
+// down under `friction` x the ground deceleration (the air drag in the air).
+// A `step` is movement the attack makes itself: as its time crosses `at`,
+// the fighter's forward speed is raised to at least `speed` (on the ground
+// only). The defaults are a planted attack: all the speed kept, no steering,
+// normal friction.
+//
+//   ba2: { ..., momentum: 0.5, friction: 0.5, step: { at: 0, speed: 280 } },
+//   midairBa1: { ..., airMomentum: 1, airControl: 0.6 },
+//   throw: { ..., momentum: 0.5, control: 0.3, friction: 0.6 },
+//
+// `hitCancel` (seconds into the attack, or null for never) is how a
+// connected attack makes room for a follow-up: once it has hit (a Shield's
+// block does not count) and its time has reached hitCancel, another attack
+// or a jump may cut the rest of it short (see CombatState.cancellable), its
+// cooldown starting as if it had finished. Nothing else does: walking,
+// a Dash, the Shield and Charge still wait for its end. Left alone, it
+// plays out in full, and a whiffed or blocked attack keeps its whole
+// recovery.
+//
 // A projectile attack has `hitbox: null` (no melee strike) and a `projectile`
 // event instead: once its time crosses `spawnAt` it releases that projectile,
 // exactly once, from `offset` (facing right from the origin, mirrored).
@@ -106,7 +132,16 @@ const ATTACK_DEFAULTS = {
   hitstop: 0.06,
   cooldown: 0,
   groundOnly: false,
+  // The attack governs the fighter's movement while it plays (see the
+  // fields below). False leaves normal locomotion on throughout.
   lockMovement: true,
+  momentum: 1,       // x the horizontal speed kept as it starts on the ground
+  airMomentum: 1,    // the same, starting in the air
+  control: 0,        // share (0-1) of normal steering kept on the ground
+  airControl: 0,     // the same in the air
+  friction: 1,       // x the ground deceleration while it is not steered
+  step: null,        // { at, speed }: forward speed raised to `speed` as its time crosses `at`
+  hitCancel: null,   // seconds in: from then on, once it has hit, an attack or a jump may cut it short
   baseLaunch: 0,
   directionalLaunch: null,
   projectile: null, // { id, spawnAt, offset } for a projectile attack
@@ -250,14 +285,18 @@ export class CombatState {
     this.stun = 0;          // hitstun remaining
     this.shieldStun = 0;    // blockstun remaining, held in the Shield
     this.hitstop = 0;       // freeze frames on impact
-    this.attack = null;     // { def, time, hasHit, projectileSpawned }
+    // { def, time, hasHit, confirmed, confirmedAt, projectileSpawned,
+    // stepped }: hasHit once its hitbox has struck anyone, confirmed (at its
+    // time confirmedAt) only for a hit a Shield did not block, stepped once
+    // its `step` has moved the fighter.
+    this.attack = null;
     this.release = null;    // the attack's projectile, released this step (see Fighter.update)
     // Ordinary attacks' short recovery cooldowns: attack id -> seconds left.
     this.cooldowns = new Map();
     // Charged actions' own cooldowns (Charged BA1, Charged BA2), by summon or
     // technique id; the Fighter starts and recovers them.
     this.chargedCooldowns = new CooldownTimers();
-    this.lastIntent = null; // last combat button pressed (for future buffering/UI)
+    this.lastIntent = null; // last combat button pressed (see Fighter.tryAction)
     // Whatever holds this fighter in place (a charged technique that caught
     // it), each by its own token so a source only ever releases its own hold.
     this.binds = new Set();
@@ -265,6 +304,42 @@ export class CombatState {
 
   get attacking() {
     return !!this.attack;
+  }
+
+  // The attack in progress hit (a block does not count) and has reached its
+  // hitCancel time: another attack or a jump may cut the rest of it short
+  // (see Fighter.tryAction and the jump in Fighter.update). Never during the
+  // hit's freeze, a stun or a bind.
+  get cancellable() {
+    const a = this.attack;
+    const at = a?.def.hitCancel;
+    return !!a && a.confirmed && at != null && this.hitstop <= 0 && this.stun <= 0 && !this.immobilized &&
+      a.time >= at - PHASE_EPSILON;
+  }
+
+  // Seconds the attack in progress has been cancellable (see cancellable),
+  // or -1 while it is not: it may cut itself short into itself only once
+  // its own cooldown has run for that long.
+  get cancellableFor() {
+    if (!this.cancellable) return -1;
+    const a = this.attack;
+    return a.time - Math.max(a.def.hitCancel, a.confirmedAt);
+  }
+
+  // Ends the attack in progress now: finished, or cut short once it is
+  // cancellable. Its cooldown starts either way.
+  endAttack() {
+    const a = this.attack;
+    if (!a) return;
+    if (a.def.cooldown > 0) this.cooldowns.set(a.def.id, a.def.cooldown);
+    this.attack = null;
+  }
+
+  // Drops the attack in progress with nothing left behind (no cooldown): a
+  // hit or a bind took the fighter out of it (see Fighter.update).
+  interruptAttack() {
+    this.attack = null;
+    this.release = null;
   }
 
   get phase() {
@@ -293,7 +368,8 @@ export class CombatState {
 
   // Free of any attack, stun (a Shield's blockstun included) or bind.
   // Launch Point never matters here, however high it is, and neither does
-  // Energy.
+  // Energy. (An attack that hit may still be cut short by another attack or
+  // a jump: see cancellable.)
   canAct() {
     return !this.attack && this.stun <= 0 && this.shieldStun <= 0 && !this.immobilized;
   }
@@ -364,7 +440,9 @@ export class CombatState {
       else this.cooldowns.set(id, t - dt);
     }
     if (this.hitstop > 0) {
-      this.hitstop = Math.max(0, this.hitstop - dt);
+      // To within a little slack, so a freeze a whole number of steps long
+      // (0.05 s) lasts exactly that many.
+      this.hitstop = this.hitstop - dt <= PHASE_EPSILON ? 0 : this.hitstop - dt;
       return;
     }
     if (this.stun > 0) this.stun = Math.max(0, this.stun - dt);
@@ -378,10 +456,7 @@ export class CombatState {
         this.attack.projectileSpawned = true;
         if (this.stun <= 0) this.release = proj;
       }
-      if (this.attack.time >= this.attack.def.total - PHASE_EPSILON) {
-        this.cooldowns.set(this.attack.def.id, this.attack.def.cooldown);
-        this.attack = null;
-      }
+      if (this.attack.time >= this.attack.def.total - PHASE_EPSILON) this.endAttack();
     }
   }
 }
@@ -437,9 +512,11 @@ export class CombatSystem {
         if (target === attacker) continue;
         const struck = target.def.hurtboxes.some((hb) => intersects(hit, worldBox(target, hb, scratchHurt)));
         if (!struck) continue;
-        // One hit per attack, blocked or not.
+        // One hit per attack, blocked or not; only a real hit (never a
+        // block) opens its hitCancel.
         atk.hasHit = true;
-        this.applyHit(attacker, target, atk.def);
+        atk.confirmed = this.applyHit(attacker, target, atk.def).type === 'hit';
+        atk.confirmedAt = atk.time;
         break;
       }
     }

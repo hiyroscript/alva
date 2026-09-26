@@ -70,6 +70,23 @@ const jumpHeight = (v, g, t) => v * t - 0.5 * g * t * t;
 // How far a body sliding at `vx` travels in `t` seconds while braking at `decel`.
 const slide = (vx, decel, t) => Math.sign(vx) * Math.min(Math.abs(vx) * t, (vx * vx) / (2 * decel));
 
+// How far an attack `self` starts now at speed `vx` carries it in `t`
+// seconds (see Fighter.moveAttack), toward `face` for its step-in: the share
+// of that speed it keeps, then its step-in once its time reaches it, all
+// running down under the attack's friction (the air drag in the air). Its
+// steering is left out: the CPU does not steer through its attacks.
+function attackDrift(self, atk, vx, t, air, face) {
+  const mv = self.def.movement;
+  const drag = air ? mv.airDeceleration : mv.deceleration * atk.friction;
+  const v = self.attackStartSpeed(atk, vx, !air);
+  const step = air ? null : atk.step;
+  if (!step || step.at > t) return slide(v, drag, t);
+  const before = slide(v, drag, step.at);
+  const left = Math.sign(v) * Math.max(0, Math.abs(v) - drag * step.at);
+  const stepped = face * Math.max(left * face, step.speed);
+  return before + slide(stepped, drag, t - step.at);
+}
+
 // Horizontal half-width and vertical span of a fighter's hurtboxes (their
 // union, either facing), read from its own data.
 export function hurtExtent(def) {
@@ -675,19 +692,20 @@ export class CombatAIController {
 
   // The melee attacks that would connect now (with this level's spacing
   // error), strongest first: where each one's hitbox will be when it comes
-  // out (the fighter slides under the attack's movement lock), against where
-  // the opponent's motion takes it by then, as far as the level projects.
+  // out (the fighter carried by the attack's own movement: the speed it
+  // keeps and its step-in), against where the opponent's motion takes it by
+  // then, as far as the level projects.
   meleeOptions(s, air = !s.grounded) {
     const { self, foe, p } = s;
     const out = [];
     const fb = foe.body;
-    const mv = self.def.movement;
+    const toward = Math.sign(fb.x - s.x) || s.facing;
     for (const m of s.ms.melee) {
       if (m.air !== air || self.combat.cooldowns.has(m.id)) continue;
       const atk = m.atk;
       const t = atk.startup;
       const lt = Math.min(t, p.lookahead);
-      const sx = s.x + slide(s.vx, air ? mv.airDeceleration : mv.deceleration, t);
+      const sx = s.x + attackDrift(self, atk, s.vx, t, air, toward);
       const fx = fb.x + fb.vx * lt;
       const fy = fb.grounded ? fb.y : fb.y + fb.vy * lt + 0.5 * s.g * lt * lt;
       const face = Math.sign(fx - sx) || s.facing;

@@ -62,7 +62,7 @@ in the code depends on the repository name, so no file changes are needed.
 | --- | --- | --- |
 | Move left / right | `A` `D` or `←` `→` | Lower-left ◀ ▶ |
 | Dash | Double-tap `A` / `D` or `←` / `→` | Double-tap ◀ or ▶ |
-| Charge | `S` or `↓` | Lower-left **C** |
+| Charge (in the air: fast fall) | `S` or `↓` | Lower-left **C** |
 | Jump | `W`, `Space` or `↑` | Lower-right, bottom corner |
 | Throw | `J` | Lower-right, top (**T**) |
 | Special* | `K` | Lower-right, middle row |
@@ -75,6 +75,26 @@ in the code depends on the repository name, so no file changes are needed.
 \* Reserved: wired into input and combat, but inactive until #0001 has matching
 attack animations. Its touch button has a dashed outline.
 
+- **Movement and combos:** #0001 starts, stops and turns quickly (top
+  speed in about 0.1 s, a short stop, a full turn in about 0.14 s) and
+  steers well in the air, where steering bends the drift rather than
+  replacing it. A running jump carries its speed. Holding Charge (`S` /
+  `↓`, **C**) in the air while falling is a **fast fall**. Attacks keep
+  some of the speed you carry into them: a running punch slides on, the
+  kick steps in, aerials keep their drift and can be steered, and the
+  Throw can back off as it throws. Press your next attack slightly early
+  and it is **buffered** (0.12 s): it comes out on the first step it can,
+  including right after the Shield is let go or a Dash ends; presses made
+  during a hit's freeze are kept too. An attack that **hits** (a block
+  does not count) can be cut short by another attack or a jump from its
+  strike on, so the intended follow-ups arrive while the opponent is still
+  stunned: BA1 → BA2, BA1 → BA1 up close, BA2 → jump → mid-air BA1, mid-air
+  BA2 → land → BA1. A whiffed or blocked attack keeps its whole recovery.
+  Nothing caps a combo but the Launch Point: the higher it is, the further
+  each hit sends the opponent, so the same routes stop working and the
+  fight turns into pursuit and ring-outs. An attack faces the direction
+  you hold as it starts, and a hit interrupts the attack the opponent was
+  making.
 - **Basic Attack 1 (BA1):** a punch on the ground, a kunai slash in the
   air. The same button picks the move from whether #0001 is grounded when
   you press it; a mid-air BA1 that lands keeps playing to the end. Both deal
@@ -119,7 +139,8 @@ attack animations. Its touch button has a dashed outline.
   pose, and #0001 keeps falling under gravity, keeping his momentum but
   not steering. On the ground the Shield holds him in place: no walking,
   running, Dash or jump. While Defense is held no attack, Throw, charged
-  move or Dash starts; let go of Defense first. An attack already playing
+  move or Dash starts; let go of Defense first (an attack pressed
+  meanwhile comes out as you let go). An attack already playing
   is never cut short: the Shield comes up the moment it ends. Holding
   Charge and Defense together shields. The Shield is a full circle: any
   hit that reaches #0001's hurtboxes, from either side, melee, shuriken,
@@ -143,7 +164,10 @@ attack animations. Its touch button has a dashed outline.
   runs on from that speed if you keep holding the direction. It costs 15
   Energy (all that is left, emptying the bar, when there is less). It is movement only: no hitbox, damage, launch or
   invulnerability, and it still obeys the stage: a solid stops it, and
-  running off a ledge ends it and #0001 falls. No Dash in the air, while
+  running off a ledge ends it and #0001 falls. When it ends, the burst
+  eases back into the run within a few steps if you hold the direction, or
+  into a short slide if you let go; an attack pressed late in the Dash
+  comes out as it ends. No Dash in the air, while
   attacking, shielding (or holding Defense), charging (or holding Charge),
   stunned, bound or already dashing; an attack or the Shield on the same
   step wins over it, and a double tap that cannot Dash is used up, never
@@ -175,7 +199,9 @@ attack animations. Its touch button has a dashed outline.
   pose; so do BA1 and BA2 if you let go of Charge as you press them. Pressed
   while Charge is still held, BA1 is the Clone Attack and BA2 the Sphere Rush
   (below). It works on one-way platforms without dropping through them.
-  There is no drop-through control: walk off an edge to come down.
+  There is no drop-through control: walk off an edge to come down. In the
+  air, the same key is the fast fall, and a Charge held down from the air
+  does not start on landing: let go and hold it again to charge.
 - **Clone Attack (Charged BA1):** while already holding Charge, press BA1. A
   clone appears behind the opponent in a smoke cloud (`cloneav1 → … →
   cloneav10`, 20 fps), performs #0001's normal BA1, then vanishes through the
@@ -283,7 +309,7 @@ Touch controls show on touch-first devices (coarse pointer, or a touch actually 
 - **Animations:** Idle, Run, Jump, Fall, Land (jump/fall play while airborne; land plays once on touchdown), Hurt and Mid-air Hurt (shown during hitstun on the ground / in the air), Basic Attack 1 (4 frames), Mid-air Basic Attack 1 (the kunai slash, 3 frames: `0001_midair2ba1`–`3`), Basic Attack 2 (7 frames) and Mid-air Basic Attack 2 (the airborne kick, 5 frames: `0001_midair1ba1`–`5`), each played once at 12 fps, Shield (`0001_prepshield` to raise it, `0001_shielding` held, `0001_releaseblock` to lower it) and Mid-air Shield (`0001_midairshielding`, the held pose only), single frames drawn at 1×, Dash (`0001_dash1`–`2`, drawn at 1×, played once at 10 fps), Charge (charge1 → charge2 once, then chargea ↔ chargeb while held, at 10 fps, with charge1 shown briefly on release), Throw (3 fighter frames, played once at 12 fps), Shuriken (3 looping projectile frames at 18 fps, normalized and drawn separately from the fighter poses), the clone appear / vanish cloud (`0001_cloneav1`–`0001_cloneav10`, an effect at 20 fps: forwards as a clone appears, the same frames in reverse as it vanishes), the Sphere Rush poses (`0001_rasen1`–`0001_rasen12` as one-shot fighter clips at 12 fps: formation 1–3, rush 4–6, contact 7–8 with 8 held, explosion 9, recovery 10–12, and 12 alone as the whiff release) and its blue sphere (`0001_prasen1`–`0001_prasen11` as three effects at 12 fps: formation 1–6 once, spinning on the opponent 7–9 looped while it is drawn ever larger, explosion 10–11 once)
 - **Attacks:** Basic Attack 1 and Basic Attack 2, each on the ground and in the air, a ground Throw that releases one shuriken, the Charged BA1 Clone Attack and the Charged BA2 Sphere Rush (ground only), each on its own 5-second cooldown. #0001's damage: BA1 5, mid-air BA1 5, BA2 10, mid-air BA2 10, shuriken 1, Sphere Rush 1 as it catches the opponent and every 0.5 s after while it holds it (4 in all), then 15 on the explosion. Special is reserved.
 - **Defense:** #0001 shields, on the ground and in the air: held, full circle, free to hold, 25 Energy for each hit it blocks.
-- **Movement:** running, jumping and a grounded Dash on a double tap (15 Energy).
+- **Movement:** running, jumping, air steering, the fast fall and a grounded Dash on a double tap (15 Energy); attacks keep and add their own momentum, early presses are buffered, and a hit opens a follow-up (see Controls above).
 - **Powers:** Jump Power and Speed Power, each in three tiers. #0001 has Jump Power 2 and Speed Power 2 (its original jump and speed).
 - **Launch:** every hit's damage adds to the target's Launch Point, then the hit launches at its Base Launch (0, 1, 2 or 3) × that new Launch Point, in its Directional Launch. #0001's BA1 is Base Launch 1 horizontal, its BA2 and mid-air BA1 Base Launch 2 vertical, its mid-air BA2 Base Launch 2 reverse vertical (downward), the Sphere Rush blast Base Launch 3 horizontal, and the shuriken and Sphere Rush ticks Base Launch 0 with no direction (they never launch).
 - **HUD:** each fighter has one compact, semi-transparent glass card, pulled in close on either side of the timer: its portrait (the character's own `visual.portrait` crop, turned to face the timer whichever way its art is drawn), one thin divider, and its name with its Launch Point beneath it. The CPU's card mirrors Player 1's. In Quick Battle three small dots under each card fill as that fighter scores its points (○ ○ ○, then ● ○ ○ ...). Over each fighter itself, following it: its bright purple Energy bar above its name tag while below full, and its CAB1 / CAB2 cooldown rings under its feet while cooling down.
@@ -585,10 +611,10 @@ The two mid-air Basic Attacks swapped moves: **mid-air BA1** is the three-frame 
 ### Adding a fighter (#0002)
 
 1. Put the frames in `assets/characters/0002/`.
-2. Add a definition to `CHARACTERS` in `js/data/characters.js` (animations, movement, Power tiers such as `powers: { jump: 2, speed: 2 }`, collider, hurtboxes, stats).
+2. Add a definition to `CHARACTERS` in `js/data/characters.js` (animations, movement, Power tiers such as `powers: { jump: 2, speed: 2 }`, collider, hurtboxes, stats). Movement is ground `acceleration` / `deceleration` / `turnBoost` / `overspeedDeceleration`, air `airAcceleration` / `airDeceleration` / `airTurnBoost`, `gravityScale`, `maxFallSpeed`, `fastFallAcceleration` / `fastFallSpeed`, `coyoteTime`, `jumpBuffer`, `attackBuffer`, `hitstunFriction` / `hitstunAirDrag` and the Dash's two; the newer fields are optional (see `Fighter.moveHorizontal`).
 3. Give it a free `rosterSlot`.
 
-To add attacks, create animations with real frames, define them in `attacks` (see the schema in `js/game/combat.js`), give each its `damage`, `baseLaunch` and `directionalLaunch`, and map them in `actions`: a string for one attack, or `{ ground, air }` to pick by whether the fighter is grounded (as #0001's `action1: { ground: 'ba1', air: 'midairBa1' }` and `action2: { ground: 'ba2', air: 'midairBa2' }` do). Time `startup` / `active` / `recovery` to whole frames of the clip so the hitbox is live only while the strike is on screen. An attack without frames is refused rather than faked. Base Launch and Directional Launch are declared separately from damage (see [Launch](#launch)):
+To add attacks, create animations with real frames, define them in `attacks` (see the schema in `js/game/combat.js`), give each its `damage`, `baseLaunch` and `directionalLaunch`, optionally how it moves (`momentum` / `airMomentum`, `control` / `airControl`, `friction`, a `step`) and when a hit opens a follow-up (`hitCancel`), and map them in `actions`: a string for one attack, or `{ ground, air }` to pick by whether the fighter is grounded (as #0001's `action1: { ground: 'ba1', air: 'midairBa1' }` and `action2: { ground: 'ba2', air: 'midairBa2' }` do). Time `startup` / `active` / `recovery` to whole frames of the clip so the hitbox is live only while the strike is on screen. An attack without frames is refused rather than faked. Base Launch and Directional Launch are declared separately from damage (see [Launch](#launch)):
 
 ```js
 attacks: {
@@ -597,7 +623,9 @@ attacks: {
     hitbox: { x: 12, y: -64, w: 28, h: 16 },
     baseLaunch: 1,                   // 1 x the target's new Launch Point
     directionalLaunch: 'horizontal', // along the hit's facing
-    hitstun: 0.22, blockstun: 0.14, hitstop: 0.06,
+    hitstun: 0.3, blockstun: 0.14, hitstop: 0.05,
+    momentum: 0.75, friction: 0.4,   // keeps most of a run and slides on it
+    hitCancel: 1 / 12,               // once it hits, an attack or a jump may cut it short from here
   },
   airSpike: {
     animation: 'airSpike', startup: 2 / 12, active: 1 / 12, recovery: 0, damage: 8,
@@ -605,6 +633,7 @@ attacks: {
     baseLaunch: 2,                        // twice the target's new Launch Point
     directionalLaunch: 'reverseVertical', // drives the opponent downward
     hitstun: 0.24, blockstun: 0.15, hitstop: 0.07,
+    airMomentum: 1, airControl: 0.4,      // keeps its drift, steers with 40% of the air control
   },
 },
 ```

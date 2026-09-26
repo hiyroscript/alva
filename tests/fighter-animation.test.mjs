@@ -123,14 +123,21 @@ test('the third ground BA1 frame is exactly 0001_1ba3.png, with no U+FFFC anywhe
   assert.deepEqual(readdirSync(ROOT).filter((n) => /^0001_.*\.png$/i.test(n)), []);
 });
 
-test('movement, collider and hurtbox data are unchanged', () => {
+test('movement, collider and hurtbox data are as tuned', () => {
   // The jump's strength and the top speed moved to the Power system
   // (js/data/powers.js): movement keeps every other stat, and no raw
   // jumpVelocity or maxSpeed can drift from the tiers that now decide them.
+  // The rest is the movement rework's tuning (see movement.test.mjs for
+  // what each value does).
   assert.deepEqual(def.movement, {
-    acceleration: 2600, deceleration: 3200, turnBoost: 1.6,
-    airAcceleration: 1500, airDeceleration: 420, gravityScale: 1,
-    maxFallSpeed: 1500, coyoteTime: 0.08, jumpBuffer: 0.12, dropThroughTime: 0.28,
+    acceleration: 3400, deceleration: 3800, turnBoost: 2.4, overspeedDeceleration: 6000,
+    airAcceleration: 2400, airDeceleration: 380, airTurnBoost: 1.8, gravityScale: 1,
+    maxFallSpeed: 1500, fastFallAcceleration: 7500, fastFallSpeed: 1400,
+    coyoteTime: 0.1, jumpBuffer: 0.12, attackBuffer: 0.12,
+    // A launch or push runs down at the same rates as before the rework, so
+    // Launch Point sends a fighter exactly as far.
+    hitstunFriction: 1600, hitstunAirDrag: 210,
+    dropThroughTime: 0.28,
     // The Dash's own two (see dash.test.mjs); the top speed stays Speed Power's.
     dashSpeed: 900, dashTapWindow: 0.22,
   });

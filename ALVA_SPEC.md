@@ -429,8 +429,13 @@ no header, build label, eyebrow or keyboard hint bar.
 - Help: desktop controls rendered from the live key bindings, mobile control
   diagram (the real icons, no T / D / BA1 / BA2: #0001's Shuriken, Punch and
   Kick from its `mobileAbilities`, the universal Shield, Special and Jump,
-  each named in the diagram's accessible description), movement, Charge &
-  cooldowns (including Charge + BA1 = Clone Attack and Charge + BA2 =
+  each named in the diagram's accessible description), movement (the run
+  carrying into a jump, Charge held in the air while falling as the fast
+  fall, attacks keeping momentum, early presses coming out as soon as they
+  can, and a hit opening a follow-up whose chances shrink as Launch Point
+  grows), Charge &
+  cooldowns (Charge held in the air is the fast fall, held again after
+  landing to charge; including Charge + BA1 = Clone Attack and Charge + BA2 =
   Sphere Rush: already Charging, forms before dashing, needs a hit to
   continue, +1 Launch Point at once and every half
   second while it holds the opponent and 15 on the delayed blast, blocked
@@ -747,19 +752,30 @@ read the character database, so it stays the same as fighters are added.
   idle frame without stretching or rotating. Facing flips the sprite (per
   clip, against that clip's source orientation; see 3). It is manual: only
   the fighter's own movement (running past a small speed on the ground,
-  steering in the air) and a Dash turn it, a spawn or respawn takes the
-  spawn's `facing`, and otherwise it keeps its last facing. It never turns
-  toward the opponent by itself (the player, both CPU controllers and the
-  practice dummy alike), so attacks, Throws and the Sphere Rush go the way
-  the fighter already faces; the combat AI turns by pressing a direction
-  first, as a player does. The HUD portraits facing the timer (7.3) are a
-  separate, fixed rule.
+  steering in the air), a Dash and an attack started with a direction held
+  turn it (the attack faces that direction as it starts, so a turn made on
+  the press step, run left → press right and BA1 together, strikes right,
+  never the stale way), a spawn or respawn takes the spawn's `facing`, and
+  otherwise it keeps its last facing. It never turns toward the opponent by
+  itself (the player, both CPU controllers and the practice dummy alike),
+  so attacks, Throws and the Sphere Rush go the way the fighter faces (or
+  is steered as the attack starts); the combat AI turns by pressing a
+  direction first, as a player does. The HUD portraits facing the timer
+  (7.3) are a separate, fixed rule.
 - Hitstun shows Hurt while grounded and Mid-air Hurt while airborne, switching
   to Hurt if the fighter lands still stunned; the pose also holds through the
   impact freeze. Hitstun outranks every other state (charged technique,
   bound, attack, Defense, jump, fall, land, charge, charge release, run and
-  idle), and normal states resume when it ends. It is a visual state only:
-  no physics or collider changes. Missing hurt art holds an idle frame.
+  idle), and normal states resume when it ends. The pose is visual only (no
+  collider changes), but being hit is not: a hit (never a block) or a bind
+  takes the fighter out of its own attack on its next step, so nothing of
+  that attack is left to strike, release a shuriken or recover from (no
+  cooldown either). Checked on the fighter's next step, two attacks that
+  connect on the same step still trade. A stunned fighter's push or
+  launch runs down at its own `movement.hitstunFriction` (1600) on the
+  ground and `hitstunAirDrag` (210) in the air, whatever is held: the rates
+  Launch Point was tuned against, apart from the movement rework. Missing
+  hurt art holds an idle frame.
 - Basic Attack 1 (BA1) is #0001's first attack, on the `action1` input. On the
   ground it is a punch (`ba1`, 4 frames); in the air a kunai slash
   (`midairBa1`, 3 frames: `midair2ba1`–`midair2ba3`); the character data
@@ -768,13 +784,13 @@ read the character database, so it stays the same as fighters are added.
   whole frames: ground BA1 is frame 1 startup, frame 2 active, frames 3–4
   recovery; mid-air BA1 is frames 1–2 startup (kunai drawn back, then
   overhead) and frame 3 active (the slash arc), with no recovery frame, so
-  the attack ends with its clip. Ground BA1 hits once for 5 damage, 0.22 s
-  hitstun, 0.14 s blockstun, 0.06 s hitstop and a 0.1 s cooldown, and
+  the attack ends with its clip. Ground BA1 hits once for 5 damage, 0.32 s
+  hitstun, 0.14 s blockstun, 0.05 s hitstop and a 0.15 s cooldown, and
   declares `baseLaunch: 1, directionalLaunch: 'horizontal'`: an unblocked
   hit adds its 5 to the opponent's Launch Point, then pushes it away at 1 ×
   that new Launch Point (from 115: 120, at impact vx 1200 × facing) with no
-  vertical launch. Mid-air BA1 hits once for 5 damage, 0.24 s hitstun,
-  0.15 s blockstun, 0.07 s hitstop and a 0.18 s cooldown (longer, making up
+  vertical launch. Mid-air BA1 hits once for 5 damage, 0.28 s hitstun,
+  0.15 s blockstun, 0.05 s hitstop and a 0.18 s cooldown (longer, making up
   for the missing recovery), and declares `baseLaunch: 2,
   directionalLaunch: 'vertical'`: an unblocked hit launches the opponent
   upward at 2 × its new Launch Point with no sideways push (from 115: at
@@ -782,10 +798,18 @@ read the character database, so it stays the same as fighters are added.
   Launch Point, as BA2 adds more damage first. A Shielded mid-air BA1 is
   neither pushed nor launched. Hitboxes match the
   strike in the contact frame (the punch; the slash arc in front of the
-  fighter) and mirror with facing. Movement and facing lock while an attack
-  plays; gravity still applies, and a mid-air BA1 that lands finishes its
-  own clip instead of switching to ground BA1 or Land. Ground BA1 is
-  ground-only.
+  fighter) and mirror with facing. Facing locks while an attack plays;
+  movement follows the attack's own data (see Attack movement below):
+  ground BA1 keeps 0.75 of the speed it started with (never more than that
+  share of top speed) and slides on it under 0.4 of the ground
+  deceleration, with no steering, so a running punch carries on about 20
+  units instead of stopping dead; mid-air BA1 keeps all of its drift and
+  0.6 of the air steering, for chasing airborne opponents. Gravity still
+  applies, and a mid-air BA1 that lands finishes its own clip (only what
+  is left of it: never restarted) instead of switching to ground BA1 or
+  Land. Both are combo starters: once they hit, the rest may be cut short
+  from their strike on (`hitCancel` 1/12 s, 2/12 s; see Hit-cancels
+  below). Ground BA1 is ground-only.
 - Basic Attack 2 (BA2) is #0001's secondary basic attack, on the `action2`
   input, selected the same way (`action2: { ground, air }`). On the ground it
   is a spinning high kick (`ba2`, 7 real frames); in the air an airborne kick
@@ -794,13 +818,13 @@ read the character database, so it stays the same as fighters are added.
   frames 1–3 startup (step in, lead jab, spin), frames 4–5 active (the kick,
   drawn with motion trails), frames 6–7 recovery; mid-air BA2 is frames 1–2
   startup, frame 3 active (the kick's forward-low arc) and frames 4–5
-  recovery. Ground BA2 is slower and heavier than ground BA1: it hits once
-  for 10 damage, 0.24 s hitstun, 0.15 s blockstun and 0.07 s hitstop, with a
-  0.15 s cooldown, and declares `baseLaunch: 2, directionalLaunch:
+  recovery. Ground BA2 is slower, more committed and heavier than ground
+  BA1: it hits once for 10 damage, 0.28 s hitstun, 0.15 s blockstun and
+  0.09 s hitstop, with a 0.15 s cooldown, and declares `baseLaunch: 2, directionalLaunch:
   'vertical'`: an unblocked hit adds its 10, then launches the opponent
   upward at 2 × its new Launch Point (from 110: 120, at impact vx 0,
   vy −2400, airborne, before normal gravity brings it down). Mid-air BA2 hits
-  once for 10 damage, 0.22 s hitstun, 0.14 s blockstun and 0.06 s hitstop,
+  once for 10 damage, 0.28 s hitstun, 0.14 s blockstun and 0.08 s hitstop,
   with a 0.1 s cooldown, and declares `baseLaunch: 2, directionalLaunch:
   'reverseVertical'`: an unblocked hit drives the opponent downward just as
   hard (from 110: at impact vx 0, vy +2400). A grounded opponent is knocked
@@ -810,10 +834,17 @@ read the character database, so it stays the same as fighters are added.
   and launches nothing (the Shield pays 25 Energy and takes its blockstun
   and hitstop). Hitboxes cover the ground kick's arc and the airborne
   kick's forward-low arc in front of the fighter and mirror with facing.
-  The same movement/facing lock applies, gravity keeps working, and a
-  mid-air BA2 that lands finishes its own clip instead of switching to
-  ground BA2 or Land. Ground BA2 is ground-only; pressing BA2 and Jump on
-  the same step attacks on the ground.
+  The same facing lock applies. Ground BA2 keeps half the speed it started
+  with, slides under half the ground deceleration and, on its first frame
+  (the step in), raises its forward speed to 280, a subtle step of about 20
+  units that shoves an opponent standing close along through the
+  pushboxes; mid-air BA2 keeps all of its drift and 0.4 of the air
+  steering, never frozen sideways. Gravity keeps working, and a mid-air
+  BA2 that lands finishes what is left of its own clip instead of
+  switching to ground BA2 or Land. Both are launchers: once they hit, the
+  rest may be cut short from their kick on (`hitCancel` 3/12 s, 2/12 s).
+  Ground BA2 is ground-only; pressing BA2 and Jump on the same step attacks
+  on the ground.
 - The two mid-air Basic Attacks swapped moves: mid-air BA1 is the
   three-frame kunai slash that used to be mid-air BA2, and mid-air BA2 the
   five-frame airborne kick that used to be mid-air BA1. Each move took its
@@ -836,10 +867,16 @@ read the character database, so it stays the same as fighters are added.
   trail the art by one simulation step, never before the release pose and
   never after the Throw ends), at the throwing hand (16 units in front of
   the origin, 38 up, mirrored with facing). A Throw hit before its release
-  throws nothing. Movement and facing lock like other attacks, gravity keeps
-  working, and there is a 0.25 s cooldown after it. Like
-  BA1 / BA2, Throw never starts while Defense is held with a Shield that
-  can go up (the Shield takes the step; let go of Defense to throw), and it
+  throws nothing. Facing locks like other attacks; it keeps half the speed
+  it started with, slides under 0.6 of the ground deceleration and keeps
+  0.3 of the steering, so the thrower is never rooted to the spot (it can
+  back off while it throws). Gravity keeps working, and there is a 0.25 s
+  cooldown after it. It is a spacing and interruption tool, never a combo
+  starter: no hit-cancel, and the shuriken's short stun leaves no
+  follow-up. Like BA1 / BA2, Throw never starts while Defense is held with
+  a Shield that can go up (the Shield takes the step; let go of Defense to
+  throw, and a Throw pressed meanwhile comes out as it is let go, see the
+  combat input buffer below), and it
   cuts straight out of Charge without the release pose. If
   the Throw frames or the shuriken frames are missing, Throw is refused
   (logged): never a faked pose or an invisible projectile.
@@ -900,7 +937,11 @@ read the character database, so it stays the same as fighters are added.
   Charge, including one started during the release pose, restarts from
   `charge1`. Charge is grounded
   only: held in the air, the fighter keeps Jump / Fall (no charge art is
-  shown); held through touchdown, Land plays out first and Charge follows.
+  shown), and the same Down is the fast fall there (see Movement and game
+  feel below). A Charge held down from the air never becomes a Charge on
+  touchdown: Land plays out and the fighter stays free, so a fast fall
+  never lands into a locked stance or turns the next BA1 / BA2 into a
+  charged action; let go and hold Charge again on the ground to charge.
   While charging, horizontal movement is locked (a run decelerates normally
   to a stop) while gravity and collision still apply. Collider and hurtboxes
   are unchanged. Charge has no hitbox, no damage, no armour and no
@@ -938,7 +979,9 @@ read the character database, so it stays the same as fighters are added.
   for where it is. It is decided before the
   combat intents: while Defense is held with a Shield that can go up, no
   attack, Throw, charged action, Dash or jump starts (let go of Defense
-  first), and it outranks Charge. On the ground it shows `shieldStart`
+  first: an attack or a jump pressed meanwhile is buffered and comes out
+  the step the Shield is let go, if that is soon enough), and it outranks
+  Charge. On the ground it shows `shieldStart`
   (`prepshield`) for one Shield frame (12 fps, 1/12 s) as it goes up, then
   `shield` (`shielding`) for as long as it is held; lowered on the ground,
   `shieldRelease` (`releaseblock`) shows for one frame while nothing of
@@ -1029,14 +1072,21 @@ read the character database, so it stays the same as fighters are added.
   moves at `movement.dashSpeed` (900, about 2.7× Speed Power 2's 330; the
   top speed itself never changes) for one pass of the clip (0.2 s, ≈180
   units on open ground), ignoring input; afterwards the normal movement
-  takes over from that speed. It obeys collision: a solid stops it (the Dash ends against
+  takes over from that speed, its excess over top speed bleeding off at
+  `movement.overspeedDeceleration` (6000) whatever is held: holding on it
+  eases into the run at top speed within about four steps, letting go
+  slides about 50 units to a stop, and pressing back brakes harder still.
+  No speed spike, no dead stop. It obeys collision: a solid stops it (the Dash ends against
   it), and leaving the ground ends it (the fighter falls on with its speed).
   Hitstun or a bind end it at once. While it runs the fighter cannot attack,
-  shield, jump, charge or Dash again. It has no hitbox, damage, launch or
-  invulnerability. The training CPU never dashes (its input never has press
-  edges); Quick Battle's combat AI dashes only through the same double tap a
-  player uses (a press, a release and a press within the window), and
-  guards against double-tapping by accident.
+  shield, jump, charge or Dash again (an attack or a jump pressed late in
+  it is kept by the input buffers and comes out the step it ends: a Dash
+  into a punch, keeping at most the punch's share of top speed, never a
+  lunge; there is no attack-cancel out of a Dash). It has no hitbox,
+  damage, launch or invulnerability. The training CPU never dashes (its
+  input never has press edges); Quick Battle's combat AI dashes only
+  through the same double tap a player uses (a press, a release and a
+  press within the window), and guards against double-tapping by accident.
 - Charged actions are a generic dispatch, not a summon shortcut. The
   character's `chargedActions` maps a combat button to a typed descriptor:
   `{ type: 'summon', id }` (an entry in `summons`: a detached temporary
@@ -1132,8 +1182,9 @@ read the character database, so it stays the same as fighters are added.
   real sprites (`0001_1ba1 → 1ba2 → 1ba3 → 1ba4` at 12 fps, the same
   per-clip `sourceFacing` mirroring, no tint, transparency, outline or
   silhouette) and BA1's own resolved attack definition (`attacks.ba1`: frame 1
-  startup, frame 2 active, frames 3–4 recovery, 5 damage, 0.22 s hitstun,
-  0.14 s blockstun, 0.06 s hitstop), so its hitbox exists only on the active
+  startup, frame 2 active, frames 3–4 recovery, 5 damage, 0.32 s hitstun,
+  0.14 s blockstun, 0.05 s hitstop; the clone never moves or follows up, so
+  it reads none of the attack's movement or hit-cancel data), so its hitbox exists only on the active
   frame and hits at most once. It performs the owner's normalized BA1, so it
   inherits BA1's Base Launch 1 and horizontal Directional Launch (along the
   clone's facing, away from the clone) automatically through the shared
@@ -1141,8 +1192,8 @@ read the character database, so it stays the same as fighters are added.
   never computes a launch itself. The overhead clone instead plays
   Mid-air BA2 from frame 1 (`0001_midair1ba1 → … → midair1ba5` at 12 fps)
   with its own resolved definition (`attacks.midairBa2`: frames 1–2
-  startup, frame 3 active, frames 4–5 recovery, 10 damage, 0.22 s hitstun,
-  0.14 s blockstun, 0.06 s hitstop), whose hitbox, from the overhead spot,
+  startup, frame 3 active, frames 4–5 recovery, 10 damage, 0.28 s hitstun,
+  0.14 s blockstun, 0.08 s hitstop), whose hitbox, from the overhead spot,
   lands on a stationary opponent's hurtboxes, and whose Base Launch 2
   reverse vertical launch drives the opponent downward (from 110: `vy =
   +2400`, no sideways push; none on a block, like any vertical launch). VANISH removes the
@@ -1153,7 +1204,8 @@ read the character database, so it stays the same as fighters are added.
   credits the owner as the attacker (the combat event also names the clone as
   its `summon`) and pushes the target along the clone's facing, away from the
   clone. It is a detached hit: the target gets the attack's hitstop and the
-  clone pauses its own attack clock for the same 0.06 s, but the owner is never
+  clone pauses its own attack clock for the same 0.05 s (as many steps as
+  the target's freeze), but the owner is never
   frozen (like a projectile's thrower). A raised Shield blocks it from
   either side, a clone at its back included: the attack is used up, the
   target pays 25 Energy and takes no Launch Point or launch (the overhead
@@ -1392,13 +1444,109 @@ read the character database, so it stays the same as fighters are added.
   out: only the Void does. On time-up in Quick Battle, level on points, the
   fighter with the lower Launch Point wins (a fighter still waiting to
   respawn counts the Launch Point it fell with); equal is a draw.
-- Physics: acceleration, deceleration, max speed (from the fighter's Speed
-  Power, below), gravity, jump impulse (from its Jump Power, below),
+- Physics: acceleration, deceleration, turn braking, max speed (from the
+  fighter's Speed Power, below), air steering and drag, gravity, jump
+  impulse (from its Jump Power, below), the fast fall,
   ground/platform/solid collision on a finite main floor (no side walls:
   a fighter can leave the stage and fall), landing detection; collision boxes
   independent of PNG size; bottom-centre origin; no sinking, floating or
   jitter. Pushboxes split an overlap evenly, so a fighter at a ledge can be
   shoved off it.
+- **Movement and game feel.** Movement is immediate, smooth and precise;
+  fast to respond, never simply fast. Everything below is data on the
+  character (`movement`, and each attack's movement fields), read by
+  `Fighter.moveHorizontal` / `moveAttack`, with defaults so a fighter that
+  declares none of the new fields still moves. #0001's values:
+  - *Ground.* `acceleration` 3400 (rest to top speed in about 0.1 s),
+    `deceleration` 3800 (letting go stops a run in under 0.09 s, about 14
+    units of slide: a short, natural stop, never an instant one, so it can
+    stop right beside an opponent), `turnBoost` 2.4 (pressing against the
+    way it moves brakes at acceleration × 2.4 until that way is spent; the
+    rest of that step accelerates the new way: a full turn in about 8
+    steps, never a one-step flip). Above top speed (after a Dash) the
+    excess bleeds off at `overspeedDeceleration` (6000).
+  - *Air.* `airAcceleration` 2400, `airTurnBoost` 1.8 and a light
+    `airDeceleration` drag of 380: steering bends the drift instead of
+    replacing it, a running jump carries its speed, a standing jump can be
+    steered to full speed in under 9 steps, and a full reversal takes about
+    13 steps of a 44-step jump (the ground's takes 8: not the same). Above
+    top speed (a launch, a jump out of a Dash), holding the way it already
+    moves never slows the fighter beyond the drag; pressing against it
+    brakes.
+  - *Jump.* Unchanged in strength (Jump Power) and still buffered
+    (`jumpBuffer` 0.12 s) with coyote time (`coyoteTime` 0.1 s). Takeoff
+    is on the press step, and the jump only sets the upward speed: the run
+    carries straight into the air (no horizontal reset), so run → jump →
+    drift is one continuous motion.
+  - *Fast fall.* Down (the Charge input: S / ↓, D-pad or stick down, touch
+    C) held in the air while already descending speeds the fall up toward
+    `fastFallSpeed` (1400) at `fastFallAcceleration` (7500) on top of
+    gravity: never while rising, never a jump in speed and never slower
+    than the fall already is; it lands on platforms like any fall. Aerial
+    attacks may fast-fall (back to the ground after an aerial); a stun, a
+    bind or an air Shield may not. A descent from a jump's apex takes
+    about 11 steps instead of 21. `Fighter.fastFalling` is true on the
+    steps it applies.
+  - *Attack movement.* Normal locomotion is off while an attack plays, but
+    that is not the same as standing still: an attack keeps a share of the
+    horizontal speed it started with (`momentum` on the ground, never more
+    than that share of top speed; `airMomentum` in the air), may be
+    steered with a share of the normal acceleration and top speed
+    (`control`, `airControl`), lets the rest of its speed run down under
+    `friction` × the ground deceleration (the air drag in the air), and may
+    move by itself (`step: { at, speed }`: forward speed raised to at
+    least `speed` as its time crosses `at`, on the ground). Defaults
+    (`momentum` 1, `control` 0, `friction` 1, no step) are a planted
+    attack; `lockMovement: false` keeps full locomotion. #0001: BA1 0.75 /
+    0 / 0.4 (a running punch slides on, no creep), BA2 0.5 / 0 / 0.5 with
+    its step-in, Throw 0.5 / 0.3 / 0.6, mid-air BA1 all its drift and 0.6
+    steering, mid-air BA2 all its drift and 0.4. A charged technique owns
+    its own movement instead (the Sphere Rush's 1050 rush) and a clone
+    never moves: neither reads these.
+  - *Combat input buffer.* A Throw / BA1 / BA2 press the fighter cannot act
+    on yet (an attack or its recovery, a stun, a Dash, a cooldown, Defense
+    held for its Shield) is kept for `movement.attackBuffer` (0.12 s) and
+    comes out on the first step it can, if it still maps to an attack that
+    can start there (on the ground or in the air as the fighter is then).
+    The latest such press wins; one older than the buffer never fires.
+    Presses made during an impact freeze are kept and do not age through
+    it. Only ordinary attacks: a charged action needs its own press while
+    Charging (one cooling down still uses the press up), and a reserved
+    button, an air Throw or an attack without art is never kept. Kept
+    presses keep their order with a buffered jump: a jump pressed before
+    the attack goes first and the attack comes out next step, in the air;
+    pressed on the same step, the ground attack goes first. So BA2 pressed
+    shortly before BA1 ends starts on BA1's last step, and Shield → release
+    → attack has no gap.
+  - *Hit-cancels.* An attack that hits (a Shield's block does not count)
+    may be cut short once its time reaches its `hitCancel` (seconds in, or
+    null for never; the step its freeze ends at the earliest), by another
+    attack or a jump only: walking, a Dash, the Shield and Charge still
+    wait for its end, and left alone it plays out in full. It cuts into
+    itself only once its own cooldown has run since it became cancellable.
+    The cut attack's cooldown starts as it is cut. A whiff or a block keeps
+    the whole recovery, so commitment is unchanged where it matters.
+    #0001's BA1, BA2, mid-air BA1 and mid-air BA2 open theirs from their
+    strike; the Throw has none.
+  - *Combo routes.* Movement, recovery and the buffer do most of the work;
+    hitstun is only long enough for the intended follow-up to arrive.
+    BA1 (0.32 s) is the starter, BA2 (0.28 s, a stronger freeze) the
+    launcher, mid-air BA1 the pursuit tool, mid-air BA2 the spike, the
+    shuriken spacing only. At low Launch Point these are true combos (the
+    target never gets to act between the hits): BA1 → BA2 (BA2 pressed
+    anywhere in about 0.2 s after BA1), BA1 → BA1 at close range (a string
+    of two to four that BA1's own push ends), BA2 → BA1 while the launch is
+    still a hop, BA2 → jump → mid-air BA1 once it launches properly (Launch
+    Point about 25–60), and mid-air BA2 → land (fast) → BA1 on a grounded
+    target. Launch Point breaks them by itself, with no combo counter: BA1's
+    push carries the target out of BA2's reach past about 25, and BA2's
+    launch out of a jump's reach past about 60, so at high Launch Point
+    combat turns into pursuit and ring-outs. None loops: every hit adds to
+    the Launch Point that sends the next one further.
+  - *Hitstop.* Per hit, by strength: 0.05 s for BA1 and mid-air BA1 (a
+    crisp tap, never sticky on repeated jabs), 0.08–0.09 s for the kicks,
+    0.12 s for the Sphere Rush blast, still the strongest. It freezes the
+    fighters, never the controls: presses made during it are kept.
 - **Powers** (`js/data/powers.js`): fighter abilities owned at one of three
   tiers, Jump Power and Speed Power. Each Power is a frozen tier table in
   the one `POWERS` registry, the single source of its names, descriptions,
@@ -1419,10 +1567,13 @@ read the character database, so it stays the same as fighters are added.
   are the only sources: movement has no raw `jumpVelocity` or `maxSpeed`.
   Speed Power feeds the same normal left / right target speed on the ground
   and in the air (and the run clip's playback rate, relative to the
-  fighter's own top speed); acceleration, deceleration, the turn boost, air
-  control, gravity, fall speed, coyote time, the jump buffer, launches,
-  projectiles, the Shield and charged techniques (the Sphere Rush's 1050 dash)
-  never depend on it, just as none of them depend on Jump Power. The shared
+  fighter's own top speed; an attack's steering and the speed it may keep on
+  the ground are shares of that top speed); acceleration, deceleration, the
+  turn boosts, the overspeed bleed, air control and drag, gravity, fall
+  speed, the fast fall, coyote time, the jump and attack buffers, hitstun
+  friction, launches, projectiles, the Shield and charged techniques (the
+  Sphere Rush's 1050 dash) never depend on it, just as none of them depend
+  on Jump Power. The shared
   Fighter applies both for Player 1, the CPU and Practice Ground alike. A
   declared tier the table lacks (or a fighter missing a Power) is logged and
   gets tier 2.
@@ -1629,7 +1780,7 @@ read the character database, so it stays the same as fighters are added.
 ### 7.4 Input
 
 - Keyboard (simultaneous keys, held-state tracking, no reliance on key
-  repeat): A/D or ←/→ move (twice in a row to Dash), S/↓ Charge (held), W/Space/↑ jump, J Throw (the
+  repeat): A/D or ←/→ move (twice in a row to Dash), S/↓ Charge (held; held in the air while falling, the fast fall), W/Space/↑ jump, J Throw (the
   internal `primary` action), K Special (reserved), L Defense, U Basic
   Attack 1 (BA1), I Basic Attack 2 (BA2), Esc/P pause (the Practice menu in
   Practice Ground). `` ` `` toggles a
@@ -1651,13 +1802,14 @@ read the character database, so it stays the same as fighters are added.
   key timestamps; menus never read these edges. In menus S/↓ still navigate down: menu bindings are separate
   from the gameplay `charge` action.
 - Gamepad (standard layout) for movement (D-pad / left stick left and
-  right), Charge in battle (D-pad down / left stick down, held; menus still
-  read them as Down), jump (A), Throw (X / Square), Basic Attack 1
+  right), Charge in battle (D-pad down / left stick down, held; the fast
+  fall in the air; menus still read them as Down), jump (A), Throw (X / Square), Basic Attack 1
   (B / Circle), Basic Attack 2 (LB), Special (Y / Triangle, reserved),
   Defense (RB / RT) and Start to pause/menus.
 - Touch (landscape, Pointer Events, true multi-touch): lower-left
   Left · C · Right with thumb sliding, where the middle button reads **C**, is
-  labelled "Charge" and stays pressed for as long as the pointer holds it;
+  labelled "Charge" and stays pressed for as long as the pointer holds it
+  (held in the air while falling, it is the fast fall);
   lower-right staggered cluster, the same positions and sizes as ever —
 
   ```
