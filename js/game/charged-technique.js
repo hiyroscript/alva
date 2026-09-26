@@ -18,7 +18,7 @@
 //       cooldown: 5, dashSpeed: 1050,
 //       handOffsets: { rasenForm: [{ x, y }, ...], rasenDash: [...] },
 //       sphereHitbox: { x: -24, y: -24, w: 48, h: 48 }, targetOffset: { x: 0, y: -48 },
-//       explosionDelay: 2.0, sphereGrowth: { startScale: 1, endScale: 3 },
+//       explosionDelay: 2.0, sphereGrowth: { startScale: 3, endScale: 1 },
 //       firstHit: { damage: 0, ... }, tickInterval: 0.5, tickHit: { damage: 1, ... },
 //       explosionHit: { damage: 15, ... },
 //     },
@@ -46,9 +46,9 @@
 //                 a looping clip, from the hit until the explosion);
 //                 confirmAnimation plays once.
 //   wait          confirmAnimation's last frame is held while the sphere
-//                 keeps spinning and grows (sphereGrowth: startScale to
-//                 endScale, reached as it explodes), until explosionDelay has
-//                 passed since the hit.
+//                 keeps spinning and steadily changes size (sphereGrowth:
+//                 startScale to endScale, reached as it explodes; #0001's
+//                 shrinks), until explosionDelay has passed since the hit.
 //                 Through confirm and wait the target takes one tickHit on
 //                 the hit's own step, then one more at every whole
 //                 tickInterval since the hit (while it is still bound):
@@ -56,7 +56,7 @@
 //                 the explosion's step is not dealt: the explosion is the
 //                 last hit, never a tick as well.
 //   explode       the fighter shows explosionAnimation while sphereExplosion
-//                 plays once at the grown size. On its first frame the target
+//                 plays once at endScale. On its first frame the target
 //                 is released, then takes explosionHit. Lasts the longer of
 //                 the two clips, so the blast is always over first.
 //   release       after the blast: the sphere is gone and releaseAnimation
@@ -118,8 +118,9 @@ const TECHNIQUE_DEFAULTS = {
   targetOffset: { x: 0, y: 0 }, // sphere centre from the target's origin after contact
   explosionDelay: 2,
   // Size of the sphere on the target, as a multiple of its art's own size:
-  // startScale from the hit, growing steadily over the wait to endScale as
-  // it explodes; the blast keeps endScale. Visual only.
+  // startScale from the hit, changing steadily over the wait to endScale as
+  // it explodes (growing, or shrinking when endScale is the smaller); the
+  // blast keeps endScale. Visual only.
   sphereGrowth: { startScale: 1, endScale: 1 },
   firstHit: null,
   // Optional: one tickHit every tickInterval seconds while the target is
@@ -170,7 +171,7 @@ export function techniqueProblem(owner, def) {
   if (!(def.explosionDelay >= 0)) return 'its explosionDelay is not a delay';
   if (def.tickHit && !(def.tickInterval > 0)) return 'its tickInterval is not a positive interval';
   const { startScale, endScale } = def.sphereGrowth;
-  if (!(startScale > 0 && endScale >= startScale)) return 'its sphereGrowth shrinks or does not start above 0';
+  if (!(startScale > 0 && endScale > 0)) return 'its sphereGrowth does not stay above 0';
   return null;
 }
 
@@ -217,8 +218,8 @@ export class ChargedTechnique {
     this.explodeDuration = Math.max(passOf(this.explosion), sprites.duration(def.explosionAnimation));
     this.releaseDuration = sprites.duration(def.releaseAnimation);
     this.whiffDuration = sprites.duration(def.whiffReleaseAnimation);
-    // The sphere grows from the hold's start (confirmAnimation over, its last
-    // frame held) to the explosion.
+    // The sphere changes size from the hold's start (confirmAnimation over,
+    // its last frame held) to the explosion.
     this.growFrom = Math.min(this.confirmDuration, def.explosionDelay);
   }
 
@@ -364,10 +365,10 @@ export class ChargedTechnique {
 
   // Size of the sphere on screen, as a multiple of its art's own size (see
   // Arena.drawTechnique): 1 in the hand; on the target sphereGrowth's
-  // startScale through the contact poses, then growing steadily over the
-  // hold, never shrinking, to reach endScale as it explodes; the blast
-  // bursts at endScale. A pure function of the fixed-step clocks, and art
-  // only: no hitbox, hurtbox or collision ever reads it.
+  // startScale through the contact poses, then changing steadily over the
+  // hold, one way only, never pulsing, to reach endScale as it explodes;
+  // the blast bursts at endScale. A pure function of the fixed-step clocks,
+  // and art only: no hitbox, hurtbox or collision ever reads it.
   get sphereScale() {
     const { startScale, endScale } = this.def.sphereGrowth;
     switch (this.spherePhase) {

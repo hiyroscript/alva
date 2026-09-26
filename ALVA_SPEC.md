@@ -70,7 +70,7 @@ behave, and how it must look. The README covers running and deploying it.
   for the sphere), `rasenDash` (`rasen4`–`rasen6`, the rush: the sphere
   carried behind, swung forward on `rasen6`), `rasenConfirm`
   (`rasen7`–`rasen8`, the successful contact and stop; `rasen8` is held
-  while the sphere on the opponent spins and grows), `rasenExplosion`
+  while the sphere on the opponent spins and shrinks), `rasenExplosion`
   (`rasen9` alone, the pose of the blast itself) and `rasenRelease`
   (`rasen10`–`rasen12`, the release / recovery after the blast). A rush
   that catches nobody has its own one-frame `rasenWhiffRelease`: `rasen12`
@@ -106,7 +106,7 @@ behave, and how it must look. The README covers running and deploying it.
   complete orb, once, 0.5 s), `rasenSphereImpact` (`prasen7`–`prasen9`, the
   authored rotation of the orb spinning on the caught opponent, looped
   `7 → 8 → 9 → 7 → …`, 0.25 s a turn, `loop: true`; the technique draws it
-  ever larger through the hold, since the frames' own sizes do not grow) and
+  ever smaller through the hold, from 3× its own size down to it) and
   `rasenSphereExplosion` (`prasen10`–`prasen11`, the lighter, brighter
   blast, once, ≈0.167 s; never part of the spin). Normalized like the clone
   cloud (own art size, centre anchor, the fighter's world-per-art-pixel
@@ -1152,12 +1152,12 @@ read the character database, so it stays the same as fighters are added.
   | --- | --- | --- |
   | `rasen1`–`3` | `rasenForm` | formation |
   | `rasen4`–`6` | `rasenDash` | rush / contact search |
-  | `rasen7`–`8` | `rasenConfirm` | successful contact and stop; `rasen8` held while the sphere grows |
+  | `rasen7`–`8` | `rasenConfirm` | successful contact and stop; `rasen8` held while the sphere shrinks |
   | `rasen9` | `rasenExplosion` | the explosion pose |
   | `rasen10`–`12` | `rasenRelease` | release / recovery after the explosion |
   | `rasen12` | `rasenWhiffRelease` | release after a rush that caught nobody |
   | `prasen1`–`6` | `rasenSphereBuild` | sphere formation (once) |
-  | `prasen7`–`9` | `rasenSphereImpact` | sphere spinning on the target (looped), drawn larger over the hold |
+  | `prasen7`–`9` | `rasenSphereImpact` | sphere spinning on the target (looped), drawn smaller over the hold |
   | `prasen10`–`11` | `rasenSphereExplosion` | explosion (once) |
 
   Deterministic sequence, in 60 Hz fixed steps (all clips at 12 fps; the
@@ -1218,15 +1218,17 @@ read the character database, so it stays the same as fighters are added.
   5. WAIT: #0001 holds `rasen8` (never `rasen9`–`12` before the blast),
      committed (no movement, attack, summon, Shield, Throw, jump or Charge),
      and the bound target holds in its Hurt pose with the sphere still
-     spinning on it and growing: `sphereGrowth` draws it from `startScale`
-     (1, its own art size) at the start of the hold, by the same amount
-     every step, to `endScale` (3, three times its own size) as it
-     explodes. The growth is explicit
-     because the spin frames' own sizes shrink slightly (`prasen7`–`9` are
-     ≈116, 106 and 100 px wide); it never shrinks or pulses, and it is
-     visual only: the sphere stays centred on the target (the drawn frame
-     grows about its centre), and no hitbox, hurtbox, collision or hit ever
-     reads it (the rush's hitbox is gone since the contact).
+     spinning on it and shrinking, the growth reversed: `sphereGrowth`
+     draws it at `startScale` (3, three times its own art size) from the
+     contact through the contact poses and the start of the hold, then
+     smaller by the same amount every step, to `endScale` (1, its own
+     size) as it explodes. The change is explicit and one way only (never
+     growing back or pulsing; the spin frames' own sizes, ≈116, 106 and
+     100 px wide for `prasen7`–`9`, never drive it), and it is visual only:
+     the sphere stays centred on the target (the drawn frame shrinks about
+     its centre), and no hitbox, hurtbox, collision or hit ever reads it
+     (the rush's hitbox is gone since the contact). `sphereGrowth` may run
+     either way; the technique is refused only if a scale is not above 0.
      TICKS: the contact queues exactly one `tickHit` at once, dealt on the
      contact step itself right after the contact; then, through CONFIRM
      and WAIT, while the target is still bound by the technique, every
@@ -1243,7 +1245,7 @@ read the character database, so it stays the same as fighters are added.
   6. EXPLODE: exactly 2.0 s (`explosionDelay`, 120 steps) after the
      contact step, counted from the hit, never from formation: #0001
      switches to `rasen9`, the explosion pose, and the sphere stops spinning
-     and growing and plays `prasen10 → prasen11` once at the grown size. On
+     and shrinking and plays `prasen10 → prasen11` once at `endScale`. On
      the step `prasen10` first shows the target is released from the bind
      and then takes the explosion, exactly once: 15 damage (19 in all with
      the four ticks) with `baseLaunch: 3, directionalLaunch: 'horizontal'`:
