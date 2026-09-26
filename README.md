@@ -395,6 +395,8 @@ ring with dark separation keep states identifiable beyond colour.
 index.html            entry point
 styles.css            all UI styling (Alva dark/green design tokens + screens)
 ALVA_SPEC.md          product specification
+UPDATES.md            named updates (movement, effect, bounce): what each changed
+CLAUDE.md             notes for Claude sessions working on the repo
 alvafav.PNG           site favicon
 assets/characters/0001/   #0001 sprite frames (unchanged originals)
 js/
