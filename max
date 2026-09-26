@@ -1,185 +1,647 @@
-Work directly in the current hiyroscript/alva repository. First inspect the existing implementation and tests before editing anything. Preserve the visual identity, architecture, gameplay behavior, accessibility conventions, touch-first behavior, and existing fighter-specific mobile ability system. Do not perform unrelated refactors.
+ALVA — Full Control / Move Codename Refactor
+
+Work directly in the current Alva repository and perform a complete, behavior-preserving refactor of the gameplay control/action/move codenames.
+
+Before editing, inspect the existing architecture and follow the established data-driven design. This is a browser-based 2D Canvas fighting game with no build framework. The relevant systems currently span at least:
+
+* js/config.js
+* js/core/input-manager.js
+* js/game/touch-controls.js
+* js/game/fighter-controller.js
+* js/game/character.js
+* js/game/combat.js
+* js/game/combat-ai.js
+* js/game/arena.js
+* js/game/fighter-status.js
+* js/game/clone.js
+* js/game/charged-technique.js
+* js/data/characters.js
+* js/ui/mobile-abilities.js
+* gameplay tests under tests/
+* README.md
+* ALVA_SPEC.md
+* any other file discovered by repository-wide search
+
+The objective is naming only. Do not rebalance, redesign, simplify, or otherwise alter gameplay.
+
+Canonical new names
+
+Use these exact code-facing names.
+
+Concept	Canonical codename
+Run left	runLeft
+Run right	runRight
+Dedicated movement/dash left request	mouvementLeft
+Dedicated movement/dash right request	mouvementRight
+Basic Attack 1	ba1
+Mid-air Basic Attack 1	maba1
+Charged Basic Attack 1	cba1
+Basic Attack 2	ba2
+Mid-air Basic Attack 2	maba2
+Charged Basic Attack 2	cba2
+Jump	jump
+Defense / Shield button	shield
+Throw / unique basic attack	uniqueba
+Special	transform
+Charge button	charge
+Pause	pause
+
+Important: mouvement is intentionally spelled exactly that way. Do not “correct” it to movement.
+
+Also, do not rename the existing movement character tuning/config object. For example, def.movement.dashSpeed, acceleration, air movement, etc. stay under movement. The mouvementLeft / mouvementRight names are specifically control codenames.
+
+Existing names to replace
+
+The current normalized gameplay controls include generic names such as:
+
+* left
+* right
+* primary
+* special
+* defense
+* action1
+* action2
+* leftPressed
+* rightPressed
+* dashLeftPressed
+* dashRightPressed
+* primaryPressed
+* specialPressed
+* defensePressed
+* action1Pressed
+* action2Pressed
 
-The current game has a shared TouchControls implementation in js/game/touch-controls.js. Quick Battle and Practice Ground both instantiate it. Watch Mode intentionally hides/disables touch gameplay controls. The current lower-left mobile cluster is [LEFT] [C/Charge] [RIGHT], while the combat/action buttons live on the lower right. Left/right press edges are consumed by Fighter.trackDashTaps() and a successful dash ultimately goes through Fighter.tryDash(). Keep Fighter.tryDash() as the single source of truth for dash legality, Energy cost, exhaustion, animation, grounded requirements, Charge/Defense restrictions, walls, ledges, speed, duration, facing, and interruption behavior.
+Refactor the gameplay input API to use the canonical names.
+
+The normalized fighter input snapshot should conceptually become:
+
+{
+  runLeft: false,
+  runRight: false,
+  charge: false,
+  jump: false,
+  shield: false,
+  uniqueba: false,
+  transform: false,
+  ba1: false,
+  ba2: false,
+  runLeftPressed: false,
+  runRightPressed: false,
+  mouvementLeftPressed: false,
+  mouvementRightPressed: false,
+  jumpPressed: false,
+  chargePressed: false,
+  shieldPressed: false,
+  uniquebaPressed: false,
+  transformPressed: false,
+  ba1Pressed: false,
+  ba2Pressed: false,
+  dropPressed: false,
+}
 
-1. Add a Mobile Controls setting
+dropPressed is an AI/training intent rather than a player button and can remain unchanged.
 
-Add a real Settings entry to the Home screen and a Settings screen/panel consistent with the existing ALVA menu design.
+Movement naming
 
-The Home menu should contain the existing Play, Watch Mode, Practice Ground, and Discover actions plus a new Settings action. It must participate normally in keyboard, touch, and gamepad menu navigation and must not break narrow-landscape Home layouts or overlap the Home credits column.
+Normal held horizontal movement currently uses left / right.
 
-Inside Settings, add a setting named Mobile Controls with exactly two choices:
+Rename those gameplay controls to:
 
-Joystick — the new control layout described below.
+runLeft
+runRight
 
-Classic Buttons — the existing mobile layout exactly as it works today.
+Their press edges become:
 
-Use the new Joystick layout as the default for a user who has never stored a preference. Persist the choice locally so reloading/reopening ALVA preserves it. Use a small versioned settings object/key rather than scattering raw localStorage calls throughout the UI. Handle unavailable/corrupt storage safely and fall back to Joystick.
+runLeftPressed
+runRightPressed
 
-Keep this as presentation/input configuration only. Do not alter desktop keyboard bindings or gamepad mappings.
+These press edges must continue powering the existing double-tap Dash detection.
 
-The setting must affect both Quick Battle and Practice Ground because both use TouchControls. Watch Mode must continue to have no gameplay touch controls.
+The dedicated one-tap mobile Dash requests currently represented by:
 
-Give TouchControls an explicit layout/scheme API such as setScheme('joystick') / setScheme('classic'), or an equivalent clean design. Changing schemes must release active pointers/held states first so switching layouts can never leave Left, Right, Charge, Jump, Defense, or another action stuck down.
+dashLeftPressed
+dashRightPressed
 
-Do not rebuild fighter-specific combat buttons unnecessarily when the fighter changes. Existing setCharacter(def) behavior and mobileAbilities data should continue to control Shuriken/Punch/Kick presentation independently of the movement layout.
+must instead use:
 
-2. Preserve the Classic Buttons scheme
+mouvementLeftPressed
+mouvementRightPressed
 
-Classic Buttons means the current implementation, not a redesigned approximation.
+If there are associated transient variables/APIs such as touchDash or queueTouchDash(), rename their control-facing terminology to match the new mouvement naming where appropriate, for example:
 
-Its lower-left control cluster must remain Left / C (Charge) / Right with the existing pointer sliding behavior. Left and Right continue generating their normal movement input and continue requiring the existing two quick taps to Dash. Charge continues behaving exactly as it currently does. The current lower-right combat layout remains unchanged.
+touchMouvement
+queueTouchMouvement(direction)
 
-This option exists specifically so players can return to the old controls.
+The actual gameplay mechanic can still be called a Dash internally where it describes the mechanic rather than the button codename. Functions such as tryDash, dash physics, dash animation, dash Energy costs, fighter.dash, dashSpeed, dashTapWindow, etc. do not need arbitrary renaming.
 
-3. Build the new circular joystick scheme
+Preserve all existing Dash behavior:
 
-For the Joystick scheme, replace the old lower-left Left / C / Right cluster with one circular mobile joystick.
+* keyboard/gamepad/normal directional input still requires the existing double tap;
+* dedicated Joystick layout mouvement buttons still issue exactly one transient dash request;
+* they must not create a held run input;
+* they must not count as a normal directional press edge;
+* existing dash validation goes through the same tryDash() path;
+* attack cancel rules remain identical;
+* Energy costs remain identical;
+* hitstop buffering remains identical;
+* pending double-tap state must still be handled correctly.
 
-Place the joystick in the lower-left area currently occupied by the movement controls and respect safe-area insets. It should visually match ALVA’s translucent circular touch-control style rather than looking like an unrelated third-party joystick.
+Combat button names
 
-The joystick needs a circular outer base and a movable inner thumb/knob. Use Pointer Events and pointer capture, consistent with the existing control system. Do not introduce an external joystick library.
+Replace the generic combat action layer:
 
-The joystick is for horizontal movement. Dragging sufficiently left holds the existing internal left action. Dragging sufficiently right holds the existing internal right action. Returning to the deadzone releases both. Crossing from one side through the center to the other must release the previous direction and hold the new one cleanly. Releasing/cancelling/losing pointer capture returns the stick to center and clears movement.
+primary -> uniqueba
+special -> transform
+action1 -> ba1
+action2 -> ba2
+defense -> shield
 
-Use a sensible deadzone so small thumb movement near the center does not make the fighter drift. Clamp the visible knob to the joystick radius. Vertical thumb displacement can affect the visual knob position, but it must not become Jump or Charge. Jump and Charge remain dedicated buttons.
+For example, COMBAT_ACTIONS should no longer be:
 
-Do not change the actual run acceleration or top speed based on analog distance. ALVA’s gameplay input is currently digital; the joystick should translate naturally into the existing Left/Right held actions.
+['primary', 'special', 'action1', 'action2']
 
-The joystick must coexist with multi-touch. A player must be able to hold the joystick right while simultaneously pressing Jump, Punch, Kick, Shield, Shuriken, Special, or Charge with another finger.
+It should use:
 
-Maintain touch-action: none, page-zoom protection, and all existing pointer-cancel/visibility/pause cleanup behavior.
+['uniqueba', 'transform', 'ba1', 'ba2']
 
-4. Add Left mouvement and Right mouvement dash buttons
+Do not add shield, jump, or charge to COMBAT_ACTIONS unless the existing architecture already treats them as combat actions. Preserve the current distinction between attacks and held state controls.
 
-In the new Joystick scheme only, add two small dedicated directional dash buttons around the top of the joystick.
+Character action mappings
 
-The left button should sit slightly above the joystick at its top-left side.
+Update #0001’s character data so the canonical action mapping is equivalent to:
 
-The right button should sit slightly above the joystick at its top-right side.
+actions: {
+  uniqueba: 'uniqueba',
+  transform: null,
+  ba1: { ground: 'ba1', air: 'maba1' },
+  ba2: { ground: 'ba2', air: 'maba2' },
+}
 
-Their player-facing/accessibility names must be exactly:
+transform remains reserved/inactive if Special is currently reserved. This refactor must not invent a transformation mechanic.
 
-Left mouvement
+BA1 family
 
-Right mouvement
+Ground BA1 already uses the desired name:
 
-Preserve that spelling.
+ba1
 
-They can use the existing left/right arrow glyphs so they remain readable at mobile size, but their aria-label/accessible name must use the names above.
+Keep it.
 
-A single tap of Left mouvement must request one dash to the left.
+Rename:
 
-A single tap of Right mouvement must request one dash to the right.
+midairBa1 -> maba1
 
-These buttons are NOT replacement movement holds. They are dedicated one-shot dash controls. Tapping one must not leave Left or Right held, and it must not require a double tap.
+This includes the actual attack ID and any one-to-one code-facing animation key where appropriate.
 
-Do not reproduce dash physics in TouchControls. Do not directly manipulate fighter velocity from the UI. Do not fake the dash by rapidly toggling Left/Right twice.
+Do not rename image files merely for this task. Existing files such as midair1ba1.png, etc. may stay exactly as they are; the animation configuration can point at the existing assets.
 
-Instead, introduce a clean one-shot dash input request through InputManager, for example a queueTouchDash(direction) API producing transient dashLeftPressed / dashRightPressed fields in the sampled gameplay input. The exact API name can differ, but it must be a transient edge rather than a persistent held action.
+BA2 family
 
-In Fighter.update(), feed that explicit dash request into the same existing tryDash(direction, input) path used after normal double-tap recognition. The dedicated dash request should be consumed once and should not also count as an ordinary Left/Right press edge. Clear any pending dashTap state when an explicit dash request is consumed so the dedicated button cannot accidentally combine with a previous normal direction tap.
+Ground BA2 remains:
 
-For #0001, one valid tap therefore starts #0001’s existing movement Dash with all current gameplay rules intact. If a future fighter lacks valid Dash data/art, tryDash() should simply reject the request normally. Do not hardcode id === '0001' inside the touch UI or input manager.
+ba2
 
-The dedicated dash button must therefore still fail naturally when the fighter is airborne, attacking/unable to act, already dashing, charging, holding Charge, shielding, appropriately holding Defense, exhausted, missing dash artwork, etc. It must pay the normal Dash Energy cost and play the existing Dash animation. Never bypass these checks.
+Rename:
 
-Keyboard and gamepad players must retain the current double-tap behavior unchanged.
+midairBa2 -> maba2
 
-5. Move Charge to a down-arrow button in the Joystick scheme
+Again, update attack IDs, references, tests, action mappings, clone fallback data, AI moveset discovery, documentation, debug data, and other references.
 
-The Joystick layout no longer has the C button in the lower-left movement area.
+Charged attacks
 
-Instead, add a dedicated circular Charge button directly underneath the existing Jump button in the lower-right action area.
+There must not be separate physical cba1 / cba2 buttons.
 
-Use the existing ICONS.down down-arrow SVG. Its accessible name remains Charge.
+Charged attacks must continue to be produced exactly as they are now:
 
-This is still the same existing internal charge action. It must be holdable, not a one-shot click. Holding it on the ground must enter Charge exactly as today. Holding it while descending in the air must continue to fast-fall exactly as today. Charge + Punch and Charge + Kick must still produce #0001’s existing charged actions according to the existing timing rules.
+hold Charge + press BA1 -> CBA1
+hold Charge + press BA2 -> CBA2
 
-The Charge button must support simultaneous touch with the joystick and combat buttons.
+The activation logic and cooldown behavior must stay unchanged.
 
-In Classic Buttons, do not show this extra down-arrow Charge button; keep the original C button in the lower-left cluster instead.
+Charged BA1
 
-Adjust the right action-cluster geometry only as much as required to place Charge underneath Jump safely. Do not disturb the established Shuriken, Special, Shield, Punch, Kick, and Jump hierarchy more than necessary.
+The existing Charged BA1 Clone Attack uses identifiers such as:
 
-6. Completely remove in-game Help
+action1
+ba1Clone
 
-Delete the in-game Help feature rather than merely hiding or disabling it.
+Its canonical charged move ID must become:
 
-The current battle pause menu contains a disabled Help button and still has a complete hidden Help view. Remove the Help button entirely. The Battle pause menu should become:
+cba1
 
-Resume
+For example, the data should conceptually become:
 
-Restart Battle
+chargedActions: {
+  ba1: { type: 'summon', id: 'cba1' },
+  ...
+}
+summons: {
+  cba1: {
+    attack: 'ba1',
+    ...
+  }
+}
 
-Return to Home
+If its no-ground fallback currently references midairBa2, update it to:
 
-Remove the Help view, Help scroll area, Help Back button, Help open/close logic, helpOpen state, direction-scrolling code, imports of buildHelp, and help-specific pause-overlay state/classes that no longer serve a purpose.
+maba2
 
-Remove the standalone Help & Credits screen completely. js/screens/help-credits-screen.js should no longer be registered by App. Remove its section from index.html. Remove its import and registration from js/core/app.js.
+Do not alter how the Clone Attack behaves, where it spawns, its cooldown, cloud effect, attack used by the clone, fallback rules, or targeting.
 
-Credits must NOT disappear.
+Charged BA2
 
-The Home-screen rolling credits are the credits experience that should remain. Preserve the current Home credits appearance and behavior: scrolling roll, duplicate sequence for looping, manual wheel/drag/keyboard scrolling, reduced-motion behavior, accessibility region, and existing content.
+The current Charged BA2 Sphere Rush internally uses the technique ID:
 
-Currently Home imports CREDITS from js/ui/help-content.js. Since Help is being removed, separate credits from help cleanly. Prefer moving CREDITS into a dedicated module such as js/ui/credits.js, then make home-screen.js import it from there. Once nothing needs help-content.js, delete that file instead of leaving dead Help builders and diagrams behind.
+rasenRush
 
-Remove obsolete Help-only CSS such as Help screen/tab/mobile-help-diagram/control-table rules and pause-help rules where they are no longer referenced. Do not remove generic styles that are still used elsewhere.
+Its canonical move ID must become:
 
-There should be no runtime Help screen, no Help tab, no Help pause button, no hidden Help DOM, and no unreachable Help implementation left in the shipped game.
+cba2
 
-7. Preserve Credits on Home
+For example:
 
-The Home credits roll is explicitly required and must remain visible/readable.
+chargedActions: {
+  ba2: { type: 'technique', id: 'cba2' },
+}
+chargedTechniques: {
+  cba2: {
+    ...
+  }
+}
 
-Do not replace it with a Settings panel, do not move it away from Home, and do not make Settings cover it permanently. Adding the fifth Home action must still work on short/narrow landscape screens without menu overflow or collisions with the credits column.
+Preserve all Sphere Rush implementation data and behavior.
 
-If extracting the credits data to a new module, keep the displayed credit content unchanged unless a stale Help-specific line absolutely requires cleanup.
+Its individual implementation-phase animation/effect names such as form, dash, confirm, explosion, release, sphere effects, etc. do not need arbitrary renaming just because they belong to CBA2. Only the canonical move/technique identity needs to become cba2.
 
-8. Accessibility and interaction requirements
+Unique basic attack
 
-Every button must remain a real button where appropriate.
+The current Throw button/action uses the generic input primary and the attack ID throw.
 
-The joystick itself should have an accessible group/region label such as Movement joystick. The two dash buttons must expose the exact accessible names Left mouvement and Right mouvement. The down-arrow button must be announced as Charge, not merely Down.
+Replace the button/action codename with:
 
-Preserve immediate pressed visual feedback on ordinary touch buttons. Provide a clear active visual state for the dash buttons on touch-down even though their gameplay request is one-shot.
+uniqueba
 
-Pointer cancellation, disabling gameplay, pausing, leaving a screen, hiding the page, and switching control schemes must clear active touch state and visually recenter the joystick.
+The code-facing move ID should also use uniqueba where practical so there is one canonical identity.
 
-Watch Mode must remain free of player controls.
+The move is still visually/mechanically #0001’s shuriken throw.
 
-9. Tests
+Do not rename sprite files just for this refactor. Existing throw1, throw2, throw3, shuriken sprites, etc. may remain as asset filenames.
 
-Update the existing tests rather than weakening them.
+Do not change:
 
-tests/controls-ui.test.mjs currently assumes the old Left/Charge/Right cluster and contains Help-content tests. Replace Help-specific assertions with coverage for both mobile-control schemes. Test that Classic preserves the existing actions and behavior. Test Joystick left/right/deadzone/release/cross-center behavior, simultaneous joystick + action touches, the down-arrow Charge button, and the exact accessible dash names.
+* projectile timing;
+* projectile speed;
+* damage;
+* Launch behavior;
+* release frame;
+* cooldown;
+* ground-only restriction;
+* collision behavior.
 
-Add coverage proving a dedicated dash button emits only one transient dash request and does not become a held Left/Right action.
+The mobile button may continue to display the character-specific Shuriken icon/name. uniqueba is the code identifier, not necessarily the visible label.
 
-Add or extend input/dash tests to prove the explicit dash request reaches the existing tryDash() logic and therefore obeys current grounding, Energy/exhaustion, Defense/Charge, animation, wall/ledge, and availability rules. Existing keyboard/touch-direction/gamepad double-tap tests must remain valid.
+Shield
 
-Update tests/battle-screen.test.mjs and Watch Mode tests so the pause menu expects only Resume, Restart Battle, and Return to Home. Delete assertions concerning the disabled Help button or hidden Help view.
+Replace the gameplay input codename:
 
-Add tests for Settings persistence, invalid stored-value fallback, Home navigation to Settings, switching between Joystick and Classic, and the new setting being used by both Battle and Practice Ground.
+defense -> shield
 
-Update Home navigation tests that rely on fixed positional indices so they locate actions semantically when possible.
+and:
 
-Keep a test proving the Home credits still render after Help removal.
+defensePressed -> shieldPressed
 
-Run the entire Node test suite after the changes, not only new tests. Fix regressions rather than skipping tests.
+Touch controls, keyboard bindings, gamepad bindings, Fighter input reads, AI output, test fixtures, etc. must use shield.
 
-10. Documentation cleanup
+Preserve the Shield mechanic completely:
 
-Update README.md and ALVA_SPEC.md to match the shipped behavior.
+* held input;
+* ground and mid-air shield behavior;
+* perfect Shield;
+* Energy cost on blocks;
+* exhaustion behavior;
+* blockstun;
+* artwork;
+* shield FX;
+* attack buffering while Shield is held.
 
-Describe the two mobile control modes, with Joystick as the default and Classic Buttons as the optional legacy layout. Document the circular joystick, single-tap directional Dash buttons, the Charge down-arrow below Jump, and the Settings path.
+Do not blindly rename unrelated generic engine abstractions simply because they contain the word “defense.” The goal is canonical button/action/move codenames, not an unrelated architectural rewrite.
 
-Remove stale documentation claiming an in-game Help screen/pause Help exists. Keep documentation of controls/gameplay itself where useful; removing the runtime Help feature does not mean deleting useful developer/player documentation from README/spec files.
+Transform
 
-Document that keyboard/gamepad Dash remains the current double-tap gesture while the dedicated Joystick-mode dash buttons request it with one tap.
+Rename the Special control codename:
 
-11. Completion criteria
+special -> transform
+specialPressed -> transformPressed
 
-The task is complete only when the new Joystick mode works in Quick Battle and Practice Ground; Classic Buttons reproduces the old touch layout; the preference persists; the joystick supports proper multi-touch horizontal movement; the two mouvement buttons single-tap the existing Dash system without bypassing any Dash rules; Charge is a holdable down-arrow directly under Jump in Joystick mode; Watch Mode still exposes no player controls; in-game Help is actually removed from code and UI; Home credits remain intact; Home/Settings layouts work in compact landscape; and the complete test suite passes.
+If its visible universal touch label currently says Special, update it to Transform.
 
-Do not change combat balance, movement values, Dash cost/speed/duration, Charge mechanics, fighter attacks, CPU behavior, desktop bindings, gamepad mappings, Home credits content, or unrelated screens unless a change is strictly necessary to implement the requirements above.
+It remains reserved/null until a real Transform move exists.
+
+Do not implement a transformation system as part of this task.
+
+Input bindings
+
+Keep all physical controls unchanged.
+
+The keyboard should still effectively be:
+
+* A / Left Arrow → runLeft
+* D / Right Arrow → runRight
+* S / Down Arrow → charge
+* W / Space / Up Arrow → jump
+* J → uniqueba
+* K → transform
+* L → shield
+* U → ba1
+* I → ba2
+* Esc / P → pause behavior as currently implemented
+
+Gamepad mappings must continue using the same physical buttons, but output the new action names.
+
+Menu navigation is a separate system. Do not rename menu left / right navigation to runLeft / runRight.
+
+Touch controls
+
+Refactor js/game/touch-controls.js and supporting UI code so its data-action, InputManager calls, button maps, pointer tracking, and character-specific ability lookup use the canonical names.
+
+Normal joystick direction:
+
+runLeft
+runRight
+
+Dedicated Dash buttons:
+
+mouvementLeft
+mouvementRight
+
+Keep their visible names:
+
+* Left mouvement
+* Right mouvement
+
+Character-specific lower-right combat abilities should be keyed by:
+
+uniqueba
+ba1
+ba2
+
+instead of:
+
+primary
+action1
+action2
+
+For #0001 they may still display:
+
+* uniqueba → Shuriken
+* ba1 → Punch
+* ba2 → Kick
+
+The universal controls should use:
+
+* transform
+* shield
+* jump
+* charge
+
+AI
+
+Update both the normal fighter input snapshots and Combat AI to output/read the canonical names.
+
+AI gameplay behavior must remain exactly the same.
+
+readMoveset() must discover:
+
+* uniqueba
+* transform
+* ba1
+* ba2
+
+and the new move IDs:
+
+* ba1
+* maba1
+* cba1
+* ba2
+* maba2
+* cba2
+* uniqueba
+
+Do not alter difficulty tuning, decision timing, reaction windows, probabilities, movement planning, attack selection, or charged-action logic.
+
+Cooldown/status UI
+
+The current charged status system still refers to CAB1/CAB2 and generic action1/action2.
+
+Update it to match the canonical names.
+
+Use:
+
+ba1 -> CBA1
+ba2 -> CBA2
+
+for the displayed cooldown labels if uppercase labels are needed.
+
+Charged cooldown IDs themselves should be:
+
+cba1
+cba2
+
+Do not change cooldown durations or recovery behavior.
+
+Debugging data
+
+Update debug mappings such as the current mapping of:
+
+primary
+special
+action1
+action2
+
+to the canonical control names.
+
+Debug overlays must otherwise behave exactly as before.
+
+Tests
+
+Update the entire test suite to the new naming scheme.
+
+This includes fixture input objects such as:
+
+{ action1: true, action1Pressed: true }
+
+which should become:
+
+{ ba1: true, ba1Pressed: true }
+
+and equivalent changes for every action.
+
+Update assertions for:
+
+* ACTIONS
+* COMBAT_ACTIONS
+* keyboard bindings
+* InputManager sampled frames
+* touch controls
+* joystick controls
+* dash/mouvement requests
+* BA1
+* MABA1
+* CBA1
+* BA2
+* MABA2
+* CBA2
+* Unique BA
+* Shield
+* Transform
+* charged cooldown IDs
+* clone data
+* Sphere Rush/CBA2 data
+* AI moveset discovery
+* combo tests
+* launch tests
+* movement tests
+* Energy tests
+* facing tests
+* practice mode
+* match reset/respawn tests
+* HUD/status tests
+
+Add or update explicit regression assertions confirming the canonical names.
+
+Examples:
+
+COMBAT_ACTIONS === ['uniqueba', 'transform', 'ba1', 'ba2']
+
+Character actions should resolve to the new IDs.
+
+Charged descriptors should use:
+
+ba1 -> cba1
+ba2 -> cba2
+
+Repository-wide cleanup
+
+Perform a repository-wide search after implementation.
+
+Remove stale use of old gameplay action/move identifiers including, where applicable:
+
+primary
+special
+defense
+action1
+action2
+dashLeftPressed
+dashRightPressed
+midairBa1
+midairBa2
+ba1Clone
+rasenRush
+
+Do not blindly replace ordinary English words or unrelated identifiers.
+
+Examples of things that should NOT be accidentally changed:
+
+* menu left / right
+* CSS left / right
+* geometry directions
+* generic prose where “right” means direction
+* movement physics configuration
+* unrelated uses of JavaScript/CSS transform
+* asset filenames unless actually required
+
+Old names should not remain as active runtime compatibility aliases. This is a real refactor to one canonical naming system, not a second naming layer sitting on top of the old one.
+
+Documentation
+
+Update README.md, ALVA_SPEC.md, code comments, and any relevant update/reference documentation so they describe the new internal terminology accurately.
+
+Player-facing move descriptions can still say:
+
+* Dash
+* Shuriken
+* Punch
+* Kick
+* Shield
+* Clone Attack
+* Sphere Rush
+
+but whenever documentation discusses the internal codename, use:
+
+runLeft
+runRight
+mouvementLeft
+mouvementRight
+uniqueba
+transform
+shield
+ba1
+maba1
+cba1
+ba2
+maba2
+cba2
+jump
+charge
+
+Non-negotiable behavior preservation
+
+This refactor must not change:
+
+* movement speeds;
+* acceleration/deceleration;
+* Dash distance;
+* Dash timing;
+* Dash double-tap window;
+* Dash Energy costs;
+* cancel windows;
+* attack frame data;
+* hitboxes/hurtboxes;
+* damage;
+* Launch Point;
+* Base Launch;
+* Directional Launch;
+* hitstun;
+* attack buffering;
+* jump behavior;
+* air jump;
+* fast fall;
+* Shield behavior;
+* perfect Shield timing;
+* charged action cooldowns;
+* Clone Attack mechanics;
+* Sphere Rush mechanics;
+* projectile behavior;
+* AI difficulty;
+* touch layout positioning;
+* sprite artwork;
+* input physical bindings.
+
+This is a semantic naming refactor only.
+
+Final verification
+
+Before finishing:
+
+1. Run the complete existing test suite.
+2. Fix every failure caused by the rename.
+3. Search the repository for all old gameplay identifiers and manually inspect remaining matches.
+4. Verify desktop keyboard input.
+5. Verify gamepad mappings.
+6. Verify both mobile control schemes.
+7. Verify normal directional double-tap Dash.
+8. Verify the Joystick layout’s one-tap Left/Right mouvement buttons.
+9. Verify BA1, MABA1, CBA1, BA2, MABA2, and CBA2.
+10. Verify Unique BA/Shuriken.
+11. Verify Shield.
+12. Verify Transform remains reserved.
+13. Verify Charge + BA1 still triggers CBA1 and Charge + BA2 still triggers CBA2.
+14. Confirm there are no compatibility aliases preserving primary, action1, etc. in the gameplay API.
+15. Confirm the final diff contains no gameplay tuning changes.
+
+At completion, provide a concise summary of:
+
+* files changed;
+* old → new identifier mapping;
+* tests run and results;
+* any old-name matches deliberately retained and why.
