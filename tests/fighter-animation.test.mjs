@@ -130,13 +130,13 @@ test('movement, collider and hurtbox data are as tuned', () => {
   // The rest is the movement rework's tuning (see movement.test.mjs for
   // what each value does).
   assert.deepEqual(def.movement, {
-    acceleration: 3400, deceleration: 3800, turnBoost: 2.4, overspeedDeceleration: 6000,
-    airAcceleration: 2400, airDeceleration: 380, airTurnBoost: 1.8, gravityScale: 1,
-    maxFallSpeed: 1500, fastFallAcceleration: 7500, fastFallSpeed: 1400,
+    acceleration: 4200, deceleration: 4200, turnBoost: 2.6, overspeedDeceleration: 6000,
+    airAcceleration: 3000, airDeceleration: 380, airTurnBoost: 2.0, gravityScale: 1,
+    maxFallSpeed: 1500, fastFallAcceleration: 12000, fastFallSpeed: 1400,
     coyoteTime: 0.1, jumpBuffer: 0.12,
     // A tap is a short hop (0.35 of the jump's height); one air jump at 0.9.
     shortHopWindow: 0.1, shortHopHeight: 0.35, airJumps: 1, airJumpRatio: 0.9,
-    attackBuffer: 0.12,
+    attackBuffer: 0.15,
     // A launch or push runs down at the same rates as before the rework, so
     // Launch Point sends a fighter exactly as far.
     hitstunFriction: 1600, hitstunAirDrag: 210,

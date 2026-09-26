@@ -31,10 +31,10 @@ function running(opts) {
 
 // ---- Ground ----------------------------------------------------------------------
 
-test('ground: top speed in about 0.1 s; letting go stops in under 0.1 s on a short slide, never dead', () => {
+test('ground: top speed in about 0.08 s; letting go stops in under 0.1 s on a short slide, never dead', () => {
   const { fighter, step } = makeFighter();
   const toTop = stepUntil(step, (f) => f.body.vx >= f.maxSpeed, RIGHT);
-  assert.ok(toTop <= 7, `${toTop} steps to top speed`);
+  assert.ok(toTop <= 5, `${toTop} steps to top speed`);
   const x = fighter.body.x;
   const vx = [];
   while (fighter.body.vx > 0) {
@@ -52,7 +52,7 @@ test('ground: reversing brakes hard, then accelerates the other way: a quick tur
   const log = [fighter.body.vx];
   while (fighter.body.vx > -fighter.maxSpeed) log.push(step(LEFT).body.vx);
   const n = log.length - 1;
-  assert.ok(n >= 5 && n <= 9, `a full turn in ${n} steps`);
+  assert.ok(n >= 5 && n <= 7, `a full turn in ${n} steps`);
   const hardest = Math.max(mv.acceleration * mv.turnBoost, mv.deceleration) * DT;
   for (let i = 1; i < log.length; i++) {
     const d = log[i - 1] - log[i];
@@ -110,7 +110,7 @@ test('air steering bends the drift: a standing jump can be steered, and reversin
   const stand = makeFighter();
   stand.step(JUMP);
   const toTop = stepUntil(stand.step, (f) => f.body.vx >= f.maxSpeed, RIGHT);
-  assert.ok(toTop <= 9, `${toTop} steps to full air speed`);
+  assert.ok(toTop <= 7, `${toTop} steps to full air speed`);
 
   const { fighter, step } = running();
   step({ ...RIGHT, ...JUMP });
@@ -208,7 +208,7 @@ test('fast fall: Down held while descending speeds the fall up smoothly toward f
     plain.step();
     plainSteps++;
   }
-  assert.ok(steps < plainSteps * 0.65, `down in ${steps} steps instead of ${plainSteps}`);
+  assert.ok(steps < plainSteps * 0.5, `down in ${steps} steps instead of ${plainSteps}`);
 });
 
 test('fast fall only while free to fall: never on the ground, in hitstun or behind an air Shield; an aerial attack may', () => {

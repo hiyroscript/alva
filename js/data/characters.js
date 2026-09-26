@@ -399,28 +399,29 @@ export const CHARACTERS = [
     // is Speed Power's; a Dash never changes it, it owns the horizontal
     // speed for its own length.
     movement: {
-      // Ground: from rest to top speed in about 0.1 s; letting go stops a
-      // run in under 0.09 s (about 14 units of slide), so it can stop right
+      // Ground: from rest to top speed in about 0.08 s; letting go stops a
+      // run in about 0.08 s (about 10 units of slide), so it can stop right
       // beside an opponent; pressing the other way brakes at acceleration x
-      // turnBoost, then accelerates: a full turn in about 0.14 s.
-      acceleration: 3400,
-      deceleration: 3800,
-      turnBoost: 2.4,
+      // turnBoost, then accelerates: a full turn in about 0.12 s.
+      acceleration: 4200,
+      deceleration: 4200,
+      turnBoost: 2.6,
       // Faster than top speed on the ground (the end of a Dash): the excess
       // bleeds off at this rate, whatever is held.
       overspeedDeceleration: 6000,
       // Air: steering bends the drift rather than replacing it. Top speed
-      // in about 0.14 s, a turn braking at airAcceleration x airTurnBoost
-      // (a full reversal in about 13 steps, softer than the ground's), and a
+      // in about 0.12 s, a turn braking at airAcceleration x airTurnBoost
+      // (a full reversal in about 10 steps, softer than the ground's), and a
       // light drag so a running jump carries its speed.
-      airAcceleration: 2400,
+      airAcceleration: 3000,
       airDeceleration: 380,
-      airTurnBoost: 1.8,
+      airTurnBoost: 2.0,
       gravityScale: 1,
       maxFallSpeed: 1500,
       // Fast fall: Down (the Charge input) held in the air while already
-      // descending speeds the fall up toward fastFallSpeed.
-      fastFallAcceleration: 7500,
+      // descending speeds the fall up toward fastFallSpeed, reaching it in
+      // about 0.1 s.
+      fastFallAcceleration: 12000,
       fastFallSpeed: 1400,
       coyoteTime: 0.1,
       jumpBuffer: 0.12,
@@ -436,7 +437,7 @@ export const CHARACTERS = [
       airJumpRatio: 0.9,
       // Combat input buffer: a Throw / BA1 / BA2 press the fighter cannot
       // act on yet is kept this long and comes out on the first step it can.
-      attackBuffer: 0.12,
+      attackBuffer: 0.15,
       // How a hit's push or launch runs down while this fighter is stunned
       // (ground, air): its own, apart from the movement stats above.
       hitstunFriction: 1600,
@@ -484,8 +485,10 @@ export const CHARACTERS = [
 
     // Energy (see resolveEnergy in js/game/combat.js): 100 at most, shown
     // over the fighter's head as a bright purple bar while below full,
-    // spent only by Dash (dashCost, as it starts) and Shield (shieldHitCost,
-    // for each hit it blocks; holding it is free). Either still works with
+    // spent only by Dash (dashCost, as it starts; dashCancelCost for one
+    // that cuts short an attack that hit: two from a full bar, and a third
+    // empties it) and Shield (shieldHitCost, for each hit it blocks;
+    // holding it is free). Either still works with
     // less left than it costs, but then takes all of it. It refills by
     // itself at `regen` per second, at `chargeRegen` while in Charge (apart
     // from, and on top of, Charge's faster charged cooldowns). Emptied, it
@@ -495,6 +498,7 @@ export const CHARACTERS = [
       regen: 12,
       chargeRegen: 30,
       dashCost: 15,
+      dashCancelCost: 40,
       shieldHitCost: 25,
     },
 
@@ -694,8 +698,9 @@ export const CHARACTERS = [
     // right from the fighter's origin (bottom-centre) and mirror with facing.
     // Each also says how #0001 moves through it (momentum, control,
     // friction, a step-in) and, for the Basic Attacks, when a hit opens a
-    // follow-up (hitCancel, from the strike). Roles: BA1 the quick combo
-    // starter (the longest stun, the lightest freeze), BA2 the committed
+    // follow-up (hitCancel, from the strike: another attack, a jump or, on
+    // the ground, a Dash). Roles: BA1 the quick combo starter (a long stun,
+    // the lightest freeze), BA2 the committed
     // launcher (a step-in, a heavier freeze), mid-air BA1 the pursuit tool,
     // mid-air BA2 the spike into grounded pressure, Throw spacing only.
     // Each attack's `damage` is added to the target's Launch Point first;
@@ -732,7 +737,8 @@ export const CHARACTERS = [
       // ends with it; the longer cooldown makes up for the missing recovery.
       // The hitbox covers the slash arc in front of the fighter, and it
       // launches the target upward. Chosen only by action1's `air` branch.
-      // Keeps all its drift and most of the air steering, for pursuit.
+      // Keeps all its drift and nearly all the air steering, for pursuit;
+      // its stun holds a juggled target for the next aerial.
       midairBa1: {
         animation: 'midairBa1',
         startup: 2 / BA1_FPS,
@@ -742,12 +748,12 @@ export const CHARACTERS = [
         baseLaunch: 2,
         directionalLaunch: 'vertical',
         hitbox: { x: 14, y: -100, w: 22, h: 80 },
-        hitstun: 0.28,
+        hitstun: 0.32,
         blockstun: 0.15,
         hitstop: 0.05,
-        cooldown: 0.18,
+        cooldown: 0.16,
         airMomentum: 1,
-        airControl: 0.6,
+        airControl: 0.85,
         hitCancel: 2 / BA1_FPS,
       },
       // Frames 1-3 wind-up (step in, lead jab, spin), frames 4-5 the kick
@@ -779,8 +785,8 @@ export const CHARACTERS = [
       },
       // Frames 1-2 wind-up, frame 3 kick (the forward-low arc), frames 4-5
       // recovery. Drives the target hard downward. Chosen only by action2's
-      // `air` branch. Keeps its drift and some steering: never frozen
-      // sideways.
+      // `air` branch. Keeps its drift and most of the steering: never
+      // frozen sideways.
       midairBa2: {
         animation: 'midairBa2',
         startup: 2 / BA2_FPS,
@@ -795,7 +801,7 @@ export const CHARACTERS = [
         hitstop: 0.08,
         cooldown: 0.1,
         airMomentum: 1,
-        airControl: 0.4,
+        airControl: 0.7,
         hitCancel: 2 / BA2_FPS,
       },
       // Frame 1 wind-up, frame 2 release, frame 3 follow-through. No melee

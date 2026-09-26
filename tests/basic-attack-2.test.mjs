@@ -59,7 +59,7 @@ const ENTRIES = {
     animation: 'midairBa2', startup: 2 / 12, active: 1 / 12, recovery: 2 / 12, damage: 10,
     hitbox: { x: 8, y: -44, w: 40, h: 40 }, ...BA2_LAUNCH.midairBa2,
     hitstun: 0.28, blockstun: 0.14, hitstop: 0.08, cooldown: 0.1,
-    airMomentum: 1, airControl: 0.4, hitCancel: 2 / 12,
+    airMomentum: 1, airControl: 0.7, hitCancel: 2 / 12,
   },
 };
 
@@ -416,7 +416,7 @@ test('BA2 locks facing while it plays; the ground kick is steered by nothing, th
     } else {
       // The airborne kick keeps its drift and steers with its share of the
       // air control: holding Left brakes it harder than the air drag alone.
-      assert.equal(atk.airControl, 0.4);
+      assert.equal(atk.airControl, 0.7);
       const braked = log[0] - log[3];
       assert.ok(braked > 3 * def.movement.airDeceleration * DT, 'steered against its drift');
       assert.ok(log.at(-1) < 0, 'and on into the other way before it ends');

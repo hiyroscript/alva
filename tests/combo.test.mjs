@@ -85,12 +85,13 @@ test('a press during a cooldown comes out as the cooldown ends; the latest press
   while (fighter.combat.cooldowns.has('ba1')) step({});
   assert.equal(fighter.combat.attack?.def.id, 'ba1', 'the step the cooldown is over');
   // Pressed as the attack ends, far longer before that than the buffer
-  // keeps it: gone.
+  // keeps it: gone. (The Throw's cooldown outlasts the buffer.)
   const early = makeFighter();
-  early.step(BA1);
+  early.step(THROW);
   while (early.fighter.combat.attack) early.step({});
-  early.step(BA1);
-  for (let i = 0; i < 20; i++) early.step({});
+  assert.ok(early.fighter.combat.cooldowns.get('throw') > mv.attackBuffer + 2 * DT);
+  early.step(THROW);
+  for (let i = 0; i < 30; i++) early.step({});
   assert.equal(early.fighter.combat.attack, null);
 
   const latest = makeFighter();
@@ -193,7 +194,7 @@ test('a whiffed or blocked attack keeps its whole recovery: no cut short', () =>
   }
 });
 
-test('a jump cuts a connected BA2 short; walking, a Dash, the Shield and Charge never do', () => {
+test('a jump or a Dash cuts a connected BA2 short; walking, the Shield and Charge never do', () => {
   const hitBa2 = () => {
     const d = combo({ gap: 40 });
     d.run((i) => (i === 0 ? BA2 : {}), 16);
@@ -214,10 +215,119 @@ test('a jump cuts a connected BA2 short; walking, a Dash, the Shield and Charge 
     assert.equal(d.attacker.combat.attack, atk, `${Object.keys(held)[0]}: the attack plays on`);
   }
   const dash = hitBa2();
-  const atk = dash.attacker.combat.attack;
-  dash.run((i) => (i % 2 ? {} : { right: true, rightPressed: true }), 4);
-  assert.equal(dash.attacker.dash, null);
-  assert.equal(dash.attacker.combat.attack, atk);
+  dash.run((i) => (i % 2 ? {} : { right: true, rightPressed: true }), 3);
+  assert.ok(dash.attacker.dash, 'a double tap Dashes out of it');
+  assert.equal(dash.attacker.combat.attack, null);
+  assert.ok(dash.attacker.combat.cooldowns.has('ba2'), 'BA2\'s cooldown from the cut');
+});
+
+// ---- Dash cancel ----------------------------------------------------------------------
+
+const DASH_RIGHT = { right: true, dashRightPressed: true };
+const DASH_LEFT = { left: true, dashLeftPressed: true };
+
+test('a Dash cancel: out of a BA1 that hit, either way, for dashCancelCost instead of dashCost', () => {
+  const energy = def.energy;
+  assert.ok(energy.dashCancelCost > energy.dashCost);
+  for (const [press, direction] of [[DASH_RIGHT, 1], [DASH_LEFT, -1]]) {
+    const d = combo({ gap: 40 });
+    d.run((i) => (i === 0 ? BA1 : {}), 6);
+    assert.ok(d.attacker.combat.hitstop > 0, 'the hit\'s freeze');
+    d.run(() => press, 1);
+    assert.equal(d.attacker.dash, null, 'never during it...');
+    assert.equal(d.attacker.combat.energy, 100);
+    while (d.attacker.combat.hitstop > 0) d.run(() => ({}), 1);
+    assert.equal(d.attacker.dash?.direction, direction, '...but asked for in it, out the step it ends');
+    assert.equal(d.attacker.facing, direction, 'facing the Dash');
+    assert.equal(d.attacker.combat.attack, null);
+    assert.ok(d.attacker.combat.cooldowns.has('ba1'));
+    assert.equal(d.attacker.combat.energy, 100 - energy.dashCancelCost);
+  }
+  // A plain Dash still costs its own price.
+  const { fighter, step } = makeFighter();
+  step(DASH_RIGHT);
+  assert.ok(fighter.dash);
+  assert.equal(fighter.combat.energy, 100 - energy.dashCost);
+});
+
+test('no Dash cancel out of a whiff, a block, an aerial or while exhausted: nothing is spent and the attack plays on', () => {
+  const tryCancel = (d, what) => {
+    const atk = d.attacker.combat.attack;
+    assert.ok(atk, `${what}: attacking`);
+    const energy = d.attacker.combat.energy;
+    d.run(() => DASH_RIGHT, 1);
+    assert.equal(d.attacker.dash, null, what);
+    assert.equal(d.attacker.combat.attack, atk, `${what}: the attack plays on`);
+    assert.ok(d.attacker.combat.energy >= energy, `${what}: nothing spent`);
+  };
+  const whiff = combo({ gap: 300 });
+  whiff.run((i) => (i === 0 ? BA1 : {}), 9);
+  tryCancel(whiff, 'whiffed');
+  const block = combo({ gap: 40, targetHeld: () => ({ defense: true }) });
+  block.run((i) => (i === 0 ? BA1 : {}), 9);
+  assert.equal(block.events[0]?.type, 'block');
+  tryCancel(block, 'blocked');
+  const tired = combo({ gap: 40 });
+  tired.attacker.combat.setEnergy(0);
+  tired.run((i) => (i === 0 ? BA1 : {}), 9);
+  assert.ok(tired.attacker.combat.cancellable);
+  tryCancel(tired, 'exhausted');
+  // A mid-air BA1 that hits may be cut short by an air jump, never a Dash.
+  const air = combo({ gap: 40 });
+  for (const f of [air.attacker, air.target]) Object.assign(f.body, { y: 700, vy: 0, grounded: false, ground: null });
+  air.run((i) => (i === 0 ? BA1 : {}), 1);
+  while (!air.hits.length) air.run(() => ({}), 1);
+  while (air.attacker.combat.hitstop > 0) air.run(() => ({}), 1);
+  assert.ok(air.attacker.combat.cancellable);
+  tryCancel(air, 'in the air');
+});
+
+test('BA1 -> Dash -> BA1 chases a push BA1 -> BA2 no longer reaches, into high Launch Point', () => {
+  for (const lp of [30, 50, 70]) {
+    const direct = combo({ gap: 40, lp });
+    direct.run((i) => (i === 0 ? BA1 : i === 6 ? BA2 : {}), 60);
+    assert.ok(direct.hits.length < 2 || !direct.held(0, 1), `LP ${lp}: BA2 alone is out of reach`);
+
+    const d = combo({ gap: 40, lp });
+    let dashAt = -1;
+    d.run((i) => {
+      if (i === 0) return BA1;
+      if (dashAt < 0 && d.attacker.combat.cancellable) {
+        dashAt = i;
+        return DASH_RIGHT;
+      }
+      return dashAt > 0 && i === dashAt + 6 ? BA1 : {};
+    }, 70);
+    assert.deepEqual(d.hits.map((h) => h.move), ['ba1', 'ba1'], `LP ${lp}`);
+    assert.ok(d.held(0, 1), `LP ${lp}: the target never got to act`);
+  }
+});
+
+test('BA1 -> Dash -> BA1 never loops: Energy allows two cancels and the third empties the bar, so the chase ends within five hits', () => {
+  for (const lp of [0, 30]) {
+    const d = combo({ gap: 40, lp });
+    let dashAt = -1;
+    let cancels = 0;
+    d.run((i) => {
+      if (i === 0) return BA1;
+      if (dashAt < 0 && d.attacker.combat.cancellable) {
+        dashAt = i;
+        return DASH_RIGHT;
+      }
+      if (dashAt >= 0 && d.attacker.dash && d.attacker.dash.time === 0) cancels++;
+      if (dashAt >= 0 && i === dashAt + 5) {
+        dashAt = -1;
+        return BA1;
+      }
+      return {};
+    }, 400);
+    let chain = 1;
+    while (chain < d.hits.length && d.held(chain - 1, chain)) chain++;
+    assert.ok(chain >= 3, `LP ${lp}: a real chase (${chain} hits)`);
+    assert.ok(chain <= 5, `LP ${lp}: ${chain} hits, never a loop`);
+    assert.ok(d.attacker.combat.energyExhausted || d.attacker.combat.energy < def.energy.dashCancelCost,
+      'the chase spent the Energy the Shield needs');
+  }
 });
 
 test('left alone, a connected attack plays out its whole clip; into itself only once its cooldown has run', () => {

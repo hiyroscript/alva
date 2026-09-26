@@ -110,20 +110,24 @@ The keyboard and gamepad Dash stays the double tap. Pushing the joystick
 out twice quickly is a double tap too, as with a gamepad stick.
 
 - **Movement and combos:** #0001 starts, stops and turns quickly (top
-  speed in about 0.1 s, a short stop, a full turn in about 0.14 s) and
+  speed in about 0.08 s, a short stop, a full turn in about 0.12 s) and
   steers well in the air, where steering bends the drift rather than
   replacing it. A running jump carries its speed. Holding Charge (`S` /
   `↓`, **C**) in the air while falling is a **fast fall**. Attacks keep
   some of the speed you carry into them: a running punch slides on, the
-  kick steps in, aerials keep their drift and can be steered, and the
-  Throw can back off as it throws. Press your next attack slightly early
-  and it is **buffered** (0.12 s): it comes out on the first step it can,
-  including right after the Shield is let go or a Dash ends; presses made
-  during a hit's freeze are kept too. An attack that **hits** (a block
-  does not count) can be cut short by another attack or a jump from its
-  strike on, so the intended follow-ups arrive while the opponent is still
-  stunned: BA1 → BA2, BA1 → BA1 up close, BA2 → jump → mid-air BA1, mid-air
-  BA2 → land → BA1. A whiffed or blocked attack keeps its whole recovery.
+  kick steps in, aerials keep their drift and follow the stick almost
+  fully, and the Throw can back off as it throws. Press your next attack
+  slightly early and it is **buffered** (0.15 s): it comes out on the
+  first step it can, including right after the Shield is let go or a Dash
+  ends; presses made during a hit's freeze are kept too, a Dash included.
+  An attack that **hits** (a block does not count) can be cut short by
+  another attack, a jump or, on the ground, a **Dash** from its strike
+  on, so the follow-ups arrive while the opponent is still stunned:
+  BA1 → BA2, BA1 → BA1 up close, BA1 → Dash → BA1 to chase a push, BA2 →
+  jump → mid-air BA1 (and on through the air jump), mid-air BA2 → land →
+  BA1. A Dash cancel costs 40 Energy instead of 15: two from a full bar,
+  and a third empties it (and the Shield with it). A whiffed or blocked
+  attack keeps its whole recovery.
   Nothing caps a combo but the Launch Point: the higher it is, the further
   each hit sends the opponent, so the same routes stop working and the
   fight turns into pursuit and ring-outs. An attack faces the direction
@@ -226,15 +230,17 @@ out twice quickly is a double tap too, as with a gamepad stick.
   running off a ledge ends it and #0001 falls. When it ends, the burst
   eases back into the run within a few steps if you hold the direction, or
   into a short slide if you let go; an attack pressed late in the Dash
-  comes out as it ends. No Dash in the air, while
-  attacking, shielding (or holding Defense), charging (or holding Charge),
-  stunned, bound or already dashing; an attack or the Shield on the same
-  step wins over it, and a double tap that cannot Dash is used up, never
-  saved for later.
+  comes out as it ends. An attack that hit can be cut short by a Dash
+  (a Dash cancel, 40 Energy). No Dash in the air, while
+  attacking (unless the attack hit), shielding (or holding Defense),
+  charging (or holding Charge), stunned, bound or already dashing; an
+  attack or the Shield on the same step wins over it, and a double tap
+  that cannot Dash is used up, never saved for later (except through a
+  hit's freeze, when it comes out as the freeze ends).
   Left then right (or right then left) is not a double tap.
 - **Energy:** each fighter's one resource, 100 at most and at the start.
-  It is spent only by a Dash (15, as it starts) and by the Shield (25 for
-  every hit it blocks; holding it is free). It refills by itself at 12 per
+  It is spent only by a Dash (15, as it starts; 40 for a Dash cancel) and
+  by the Shield (25 for every hit it blocks; holding it is free). It refills by itself at 12 per
   second whatever the fighter is doing (shielding included), and at 30 per
   second while it is in the Charge stance. It shows over the fighter's name
   tag only while below full, as one thin bright purple bar that shrinks
@@ -368,7 +374,7 @@ Touch controls show on touch-first devices (coarse pointer, or a touch actually 
 - **Animations:** Idle, Run, Jump, Fall, Land (jump/fall play while airborne; land plays once on touchdown), Hurt and Mid-air Hurt (shown during hitstun on the ground / in the air), Basic Attack 1 (4 frames), Mid-air Basic Attack 1 (the kunai slash, 3 frames: `0001_midair1ba1`–`3`), Basic Attack 2 (7 frames) and Mid-air Basic Attack 2 (the airborne kick, 5 frames: `0001_midair2ba1`–`5`), each played once at 12 fps, Shield (`0001_prepshield` to raise it, `0001_shielding` held, `0001_releaseblock` to lower it) and Mid-air Shield (`0001_midairshielding`, the held pose only), single frames drawn at 1×, Dash (`0001_dash1`–`2`, drawn at 1×, played once at 10 fps), Charge (charge1 → charge2 once, then chargea ↔ chargeb while held, at 10 fps, with charge1 shown briefly on release), Throw (3 fighter frames, played once at 12 fps), Shuriken (3 looping projectile frames at 18 fps, normalized and drawn separately from the fighter poses), the clone appear / vanish cloud (`0001_cloneav1`–`0001_cloneav10`, an effect at 20 fps: forwards as a clone appears, the same frames in reverse as it vanishes), the Sphere Rush poses (`0001_rasen1`–`0001_rasen12` as one-shot fighter clips at 12 fps: formation 1–3, rush 4–6, contact 7–8 with 8 held, explosion 9, recovery 10–12, and 12 alone as the whiff release) and its blue sphere (`0001_prasen1`–`0001_prasen11` as three effects at 12 fps: formation 1–6 once, spinning on the opponent 7–9 looped while it is drawn ever larger, explosion 10–11 once)
 - **Attacks:** Basic Attack 1 and Basic Attack 2, each on the ground and in the air, a ground Throw that releases one shuriken, the Charged BA1 Clone Attack and the Charged BA2 Sphere Rush (ground only), each on its own 5-second cooldown. #0001's damage: BA1 5, mid-air BA1 5, BA2 10, mid-air BA2 10, shuriken 1, Sphere Rush 1 as it catches the opponent and every 0.5 s after while it holds it (4 in all), then 15 on the explosion. Special is reserved.
 - **Defense:** #0001 shields, on the ground and in the air: held, full circle, free to hold, 25 Energy for each hit it blocks.
-- **Movement:** running, jumping (a short hop on a tap, one air jump), air steering, the fast fall and a grounded Dash on a double tap (15 Energy); attacks keep and add their own momentum, early presses are buffered, and a hit opens a follow-up (see Controls above).
+- **Movement:** running, jumping (a short hop on a tap, one air jump), air steering, the fast fall and a grounded Dash on a double tap (15 Energy); attacks keep and add their own momentum, early presses are buffered, and a hit opens a follow-up, a Dash cancel included (see Controls above).
 - **Powers:** Jump Power and Speed Power, each in three tiers. #0001 has Jump Power 2 and Speed Power 2 (its original jump and speed).
 - **Launch:** every hit's damage adds to the target's Launch Point, then the hit launches at its Base Launch (0, 1, 2 or 3) × that new Launch Point, in its Directional Launch. #0001's BA1 is Base Launch 1 horizontal, its BA2 and mid-air BA1 Base Launch 2 vertical, its mid-air BA2 Base Launch 2 reverse vertical (downward), the Sphere Rush blast Base Launch 3 horizontal, and the shuriken and Sphere Rush ticks Base Launch 0 with no direction (they never launch).
 - **HUD:** each fighter has one compact, semi-transparent glass card, pulled in close on either side of the timer: its portrait (the character's own `visual.portrait` crop, turned to face the timer whichever way its art is drawn), one thin divider, and its name with its Launch Point beneath it, under its tag: **P1** and **CPU** in Quick Battle, **CPU 1** and **CPU 2** in Watch Mode. The right-hand card mirrors the left-hand one. In a battle three small dots under each card fill as that fighter scores its points (○ ○ ○, then ● ○ ○ ...). Over each fighter itself, following it: its bright purple Energy bar above its name tag while below full, and its CAB1 / CAB2 cooldown rings under its feet while cooling down.
@@ -742,7 +748,7 @@ attacks: {
     directionalLaunch: 'horizontal', // along the hit's facing
     hitstun: 0.3, blockstun: 0.14, hitstop: 0.05,
     momentum: 0.75, friction: 0.4,   // keeps most of a run and slides on it
-    hitCancel: 1 / 12,               // once it hits, an attack or a jump may cut it short from here
+    hitCancel: 1 / 12,               // once it hits, an attack, a jump or a Dash may cut it short from here
   },
   airSpike: {
     animation: 'airSpike', startup: 2 / 12, active: 1 / 12, recovery: 0, damage: 8,
@@ -764,7 +770,7 @@ While either is cooling down the press does nothing. Without an opponent (for a 
 
 To choose how a fighter defends, give it a `defense` entry. The one type so far is `{ type: 'shield', groundAnimation, airAnimation, groundStartAnimation, groundReleaseAnimation }` (like #0001's `shield`, `midairShield`, `shieldStart` and `shieldRelease`): a held, full-circle Shield (see Defense above). The held clips are required: without the one for where the fighter is, the Shield is refused (and logged once), never faked; the raise and lower poses are optional. The type is checked, so a future fighter can defend another way on the same Defense button; an unknown type is an error.
 
-Energy and the Dash are data too. An `energy` entry (`{ max, regen, chargeRegen, dashCost, shieldHitCost }`, see `resolveEnergy` in `js/game/combat.js`) sets the fighter's resource; every field is optional and defaults to #0001's values (100, 12 / s, 30 / s in Charge, 15, 25). A Shield pays `shieldHitCost` for each hit it blocks. A cost larger than what is left is still paid by taking the rest, which exhausts the fighter; neither a Dash nor a Shield works while it is exhausted. To give a fighter a Dash, add a `dash` clip to `animations` and `movement.dashSpeed` / `movement.dashTapWindow`: the Dash lasts one pass of the clip and pays `dashCost`. Without the clip (or a `dashSpeed`) it never dashes: a Dash without frames is refused and logged, never faked with the run.
+Energy and the Dash are data too. An `energy` entry (`{ max, regen, chargeRegen, dashCost, dashCancelCost, shieldHitCost }`, see `resolveEnergy` in `js/game/combat.js`) sets the fighter's resource; every field is optional and defaults to 100, 12 / s, 30 / s in Charge, 15, the fighter's `dashCost` and 25 (#0001 sets `dashCancelCost` to 40). A Shield pays `shieldHitCost` for each hit it blocks. A cost larger than what is left is still paid by taking the rest, which exhausts the fighter; neither a Dash nor a Shield works while it is exhausted. To give a fighter a Dash, add a `dash` clip to `animations` and `movement.dashSpeed` / `movement.dashTapWindow`: the Dash lasts one pass of the clip and pays `dashCost`. Without the clip (or a `dashSpeed`) it never dashes: a Dash without frames is refused and logged, never faked with the run.
 
 ### Adding a map
 
