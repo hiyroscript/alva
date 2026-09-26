@@ -327,8 +327,9 @@ test('a Shielded hit adds no Launch Point and launches nothing, whatever its Bas
 test('a hit event describes the new system and nothing of the old one', () => {
   const { event, attacker, target } = hitAt(110, realHits().ba2);
   assert.deepEqual(Object.keys(event).sort(), [
-    'attacker', 'baseLaunch', 'damage', 'directionalLaunch', 'energyCost', 'finalLaunch', 'launchPointAfter',
-    'launchPointBefore', 'launchStrength', 'move', 'projectile', 'summon', 'target', 'technique', 'type',
+    'attacker', 'baseLaunch', 'damage', 'directionalLaunch', 'energyCost', 'finalLaunch', 'hitstun',
+    'launchPointAfter', 'launchPointBefore', 'launchSpeed', 'launchStrength', 'move', 'perfect', 'point',
+    'projectile', 'summon', 'target', 'technique', 'type',
   ]);
   assert.equal(event.energyCost, 0, 'a hit costs its target no Energy');
   assert.deepEqual(

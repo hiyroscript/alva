@@ -79,6 +79,7 @@ export class PracticeSession extends Arena {
     this.pairFighters();
     this.projectiles.length = 0;
     this.clones.length = 0;
+    this.fx.reset();
     this.acc = 0;
     this.input.flush();
     // Another fighter's art can change the world scale: refit, which also

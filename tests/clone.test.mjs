@@ -26,6 +26,7 @@ import { TrainingAIController } from '../js/game/fighter-controller.js';
 import {
   def, DT, BASE, STAGE, SIM_CTX, fakeSprites, makeFighter, frameName, stepUntil, steps, duel, stageMap,
 } from './fighter-harness.mjs';
+import { resolveLaunchStun } from '../js/game/combat.js';
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
 const CHARGE = { charge: true };
@@ -908,7 +909,7 @@ test('the overhead kick lands on a stationary target through the real hitbox and
     assert.equal(e.technique, null);
     assert.equal(e.damage, 10, 'the overhead Mid-air BA2 adds 10');
     assert.equal(d.target.combat.launchPoint, 10);
-    assert.equal(d.target.combat.stun, MB2.hitstun);
+    assert.equal(d.target.combat.stun, MB2.hitstun + resolveLaunchStun(e.launchSpeed, d.target.launchReaction));
     assert.equal(d.target.combat.hitstop, MB2.hitstop);
     assert.equal(clone.hitstop, MB2.hitstop, 'the clone freezes on impact');
     assert.equal(d.attacker.combat.hitstop, 0, 'the owner never does');
@@ -1155,7 +1156,7 @@ test('the clone BA1 hits once with BA1\'s damage, stun and launch from the clone
   assert.equal(e.damage, 5, 'the clone\'s BA1 adds 5');
   assert.equal(d.target.combat.launchPoint, 120, '115 + 5');
   assert.equal(e.launchStrength, 120, '1 x 120');
-  assert.equal(d.target.combat.stun, ATTACK.hitstun);
+  assert.equal(d.target.combat.stun, ATTACK.hitstun + resolveLaunchStun(e.launchSpeed, d.target.launchReaction));
   assert.equal(d.target.combat.hitstop, ATTACK.hitstop);
   // Launched along the clone's facing (left, away from the clone), even
   // though the owner faces right.

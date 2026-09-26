@@ -17,6 +17,7 @@ import {
   def, DT, SIM_CTX, fakeSprites, makeFighter, frameName, stepUntil,
   steps, frameNo, recordAttack, sequence, duel,
 } from './fighter-harness.mjs';
+import { resolveLaunchStun } from '../js/game/combat.js';
 
 const BA1 = { action1: true, action1Pressed: true };
 const BA2 = { action2: true, action2Pressed: true };
@@ -223,7 +224,7 @@ test('airborne action1 plays the three-frame mid-air BA1 (the kunai slash) durin
 test('airborne action1 also triggers mid-air BA1 during the descent', () => {
   const { fighter, step } = makeFighter();
   step(JUMP);
-  stepUntil(step, (f) => f.body.vy > 0);
+  stepUntil(step, (f) => f.body.vy > 0, { jump: true }); // held: the full jump
   assert.equal(fighter.state, 'fall');
   step(BA1);
   assert.equal(fighter.state, 'attack');
@@ -405,7 +406,9 @@ test('a hit shows the target in its hurt pose through the impact freeze', () => 
   target.combat.launchPoint = 115;
   tick(BA1);
   until(() => events.length > 0, 60);
-  assert.equal(target.combat.stun, 0.32);
+  // BA1's own 0.32 s, plus what the launch adds (see resolveLaunchStun).
+  assert.equal(target.combat.stun, 0.32 + resolveLaunchStun(events[0].launchSpeed, target.launchReaction));
+  assert.ok(events[0].launchSpeed > 0 && target.combat.stun > 0.32, 'a hard push stuns longer');
   assert.ok(target.combat.hitstop > 0);
   const frozenAt = { x: target.body.x, attackerFrame: frameName(attacker) };
   tick(); // hitstop: nothing moves, but the pose updates
@@ -478,7 +481,7 @@ test('mid-air BA1 hits a grounded opponent below and in front while still airbor
       assert.equal(attacker.combat.phase, 'active');
       assert.equal(frameName(attacker), '0001_midair2ba3.png');
       // The slash's own stun and freeze, on both fighters.
-      assert.equal(target.combat.stun, 0.28);
+      assert.equal(target.combat.stun, 0.28 + resolveLaunchStun(events[0].launchSpeed, target.launchReaction));
       assert.equal(target.combat.hitstop, 0.05);
       assert.equal(attacker.combat.hitstop, 0.05);
     }

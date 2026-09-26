@@ -425,6 +425,16 @@ export const CHARACTERS = [
       fastFallSpeed: 1400,
       coyoteTime: 0.1,
       jumpBuffer: 0.12,
+      // Short hop: Jump let go within shortHopWindow of takeoff (a tap)
+      // tops out at shortHopHeight x the full jump's height (about 59 of
+      // Jump Power 2's 169 units), low enough for an aerial to reach a
+      // standing opponent; held, the full jump.
+      shortHopWindow: 0.1,
+      shortHopHeight: 0.35,
+      // One more jump in the air before landing again, at airJumpRatio x
+      // the normal jump's speed; landing, or being hit, gives it back.
+      airJumps: 1,
+      airJumpRatio: 0.9,
       // Combat input buffer: a Throw / BA1 / BA2 press the fighter cannot
       // act on yet is kept this long and comes out on the first step it can.
       attackBuffer: 0.12,
@@ -457,6 +467,22 @@ export const CHARACTERS = [
       chargedCooldownRate: 2,
     },
 
+    // How #0001 responds to being launched (see resolveLaunchReaction in
+    // js/game/combat.js). A harder launch stuns longer: 0.2 s more per 1000
+    // units/s, 0.7 s more at most, so a big hit is a clear moment to chase
+    // (and the air jump can extend a juggle at middling Launch Point, never
+    // past three hits). Launched at 1100 units/s or faster it tumbles
+    // (its mid-air hurt pose) until it acts or lands. Left / Right, Jump and
+    // Charge held as a hit lands bend its launch by up to 15 degrees toward
+    // them (never its strength): a skill for surviving, and for slipping a
+    // follow-up.
+    launchReaction: {
+      stunPerThousand: 0.2,
+      maxStun: 0.7,
+      tumbleSpeed: 1100,
+      steerAngle: 15,
+    },
+
     // Energy (see resolveEnergy in js/game/combat.js): 100 at most, shown
     // over the fighter's head as a bright purple bar while below full,
     // spent only by Dash (dashCost, as it starts) and Shield (shieldHitCost,
@@ -487,6 +513,11 @@ export const CHARACTERS = [
       groundStartAnimation: 'shieldStart',
       groundReleaseAnimation: 'shieldRelease',
       airAnimation: 'midairShield',
+      // Perfect Shield: a hit within 0.1 s of raising it (after at least
+      // 0.25 s down) is blocked for free, with no blockstun: time it and
+      // punish the attacker's recovery.
+      perfectWindow: 0.1,
+      perfectRearm: 0.25,
     },
 
     // Controller actions -> attack ids. A string is one attack; { ground, air }

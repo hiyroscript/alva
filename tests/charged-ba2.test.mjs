@@ -29,6 +29,7 @@ import { TrainingAIController } from '../js/game/fighter-controller.js';
 import {
   def, DT, BASE, SIM_CTX, fakeSprites, makeFighter, frameName, steps, duel, stageMap,
 } from './fighter-harness.mjs';
+import { resolveLaunchStun } from '../js/game/combat.js';
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
 const CHARGE = { charge: true };
@@ -884,7 +885,8 @@ test('the explosion comes exactly 2.0 s after the hit step on rasen9: prasen10 -
   assert.equal(d.target.body.vx, 57 * U);
   assert.equal(d.target.body.vy, 0, 'horizontal only');
   assert.equal(d.target.grounded, true, 'a horizontal launch invents no lift');
-  assert.equal(d.target.combat.stun, 0.55);
+  // Its own 0.55 s, plus what a 570 units/s launch adds.
+  assert.equal(d.target.combat.stun, 0.55 + resolveLaunchStun(570, d.target.launchReaction));
   assert.equal(d.target.combat.hitstop, 0.12);
   assert.ok(d.target.combat.hitstop > TECH.firstHit.hitstop);
   const launchX = d.target.body.x;

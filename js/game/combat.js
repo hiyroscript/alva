@@ -175,6 +175,12 @@ const SHIELD_DEFAULTS = Object.freeze({
   airAnimation: null,
   groundStartAnimation: null,
   groundReleaseAnimation: null,
+  // A hit that lands within perfectWindow seconds of the Shield going up is
+  // a perfect block: free, with no blockstun. Only a Shield raised after
+  // being down for perfectRearm seconds has that window, so tapping Defense
+  // over and over never keeps one open. 0 is none.
+  perfectWindow: 0,
+  perfectRearm: 0,
 });
 
 // Frozen form of a character's `defense` entry, or null for a fighter that has
@@ -461,6 +467,52 @@ export class CombatState {
   }
 }
 
+// How a fighter responds to being launched (the character's
+// `launchReaction`, every field optional; the defaults change nothing):
+//
+//   launchReaction: {
+//     stunPerThousand: 0.2,  // extra hitstun, seconds per 1000 units/s of launch speed
+//     maxStun: 0.7,          // ...never more than this
+//     tumbleSpeed: 1100,     // launched at least this fast, it tumbles
+//     steerAngle: 15,        // degrees a held direction may bend a launch
+//   }
+//
+// None of it changes a launch's strength: Launch Point, Base Launch and the
+// direction's own speed stay exactly as js/data/launch.js resolves them.
+const NO_REACTION = Object.freeze({ stunPerThousand: 0, maxStun: 0, tumbleSpeed: Infinity, steerAngle: 0 });
+
+export function resolveLaunchReaction(spec) {
+  return Object.freeze({ ...NO_REACTION, ...spec });
+}
+
+// The extra hitstun a launch at `speed` (world units per second) adds for
+// `reaction`: stunPerThousand per 1000 units/s, up to maxStun. A harder
+// launch keeps its target helpless longer, so a big hit reads as one.
+export function resolveLaunchStun(speed, reaction = NO_REACTION) {
+  if (!(speed > 0)) return 0;
+  return Math.min(reaction.maxStun, (speed / 1000) * reaction.stunPerThousand);
+}
+
+// Launch steering: `launch` (a world-space velocity { x, y }, y downward)
+// bent toward the direction `held` ({ x, y }: -1, 0 or 1 each; y -1 is up)
+// by up to `maxDegrees`. Only the part of `held` across the launch counts
+// (the sine of the angle between them), so holding along it or against it
+// bends nothing; the speed never changes. No launch, no direction or no
+// angle: `launch` as it is.
+export function steerLaunch(launch, held, maxDegrees) {
+  const speed = Math.hypot(launch.x, launch.y);
+  const hl = Math.hypot(held?.x ?? 0, held?.y ?? 0);
+  if (!(speed > 0) || !(hl > 0) || !(maxDegrees > 0)) return launch;
+  const lx = launch.x / speed;
+  const ly = launch.y / speed;
+  const across = lx * (held.y / hl) - ly * (held.x / hl);
+  if (!across) return launch;
+  const a = (across * maxDegrees * Math.PI) / 180;
+  const c = Math.cos(a);
+  const s = Math.sin(a);
+  return Object.freeze({ x: (lx * c - ly * s) * speed, y: (lx * s + ly * c) * speed });
+}
+
 // World-space rectangle for a box defined relative to a fighter origin.
 export function worldBox(fighter, box, out = {}) {
   const facing = fighter.facing;
@@ -472,6 +524,25 @@ export function worldBox(fighter, box, out = {}) {
 }
 
 const intersects = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+
+// Where hitbox `hit` meets `target`'s hurtboxes: the centre of its overlap
+// with the first one it touches ({ x, y }, world units), or null when it
+// touches none. The point only places the hit's effects.
+function strikePoint(hit, target) {
+  for (const hb of target.def.hurtboxes) {
+    const box = worldBox(target, hb, scratchHurt);
+    if (!intersects(hit, box)) continue;
+    const x0 = Math.max(hit.x, box.x);
+    const x1 = Math.min(hit.x + hit.w, box.x + box.w);
+    const y0 = Math.max(hit.y, box.y);
+    const y1 = Math.min(hit.y + hit.h, box.y + box.h);
+    return { x: (x0 + x1) / 2, y: (y0 + y1) / 2 };
+  }
+  return null;
+}
+
+// The middle of `target`'s body, where a hit with no box of its own lands.
+const bodyPoint = (target) => ({ x: target.body.x, y: target.body.y - target.body.height / 2 });
 
 const scratchHit = {};
 const scratchHurt = {};
@@ -486,7 +557,8 @@ export class CombatSystem {
   constructor() {
     // { type: 'hit' | 'block', attacker, target, move, damage, energyCost,
     //   launchPointBefore, launchPointAfter, baseLaunch, directionalLaunch,
-    //   launchStrength, finalLaunch, projectile, summon, technique }
+    //   launchStrength, finalLaunch, launchSpeed, hitstun, perfect, point,
+    //   projectile, summon, technique }
     // `damage` is what the hit added to the target's Launch Point (0 on a
     // block), `move` the id of the attack or hit that dealt it and
     // `energyCost` what the target's Shield paid for it: shieldHitCost, or
@@ -495,7 +567,11 @@ export class CombatSystem {
     // direction; `launchStrength` is baseLaunch x launchPointAfter (0 on a
     // block), and `finalLaunch` the world-space velocity { x, y } the target
     // was given: that strength at LAUNCH_UNIT_SPEED per point along the
-    // direction (y grows downward; zero for no launch). `attacker` is the
+    // direction (y grows downward; zero for no launch), bent by the
+    // target's launch steering; `launchSpeed` its length and `hitstun` the
+    // stun it dealt, a harder launch's longer. `perfect` marks a block by a
+    // Shield raised just in time (see Fighter.perfectShield) and `point` is
+    // where the hit landed, for the effects. `attacker` is the
     // owner for a projectile or clone hit; `projectile`, `summon` and
     // `technique` are null for the fighter's own melee.
     this.events = [];
@@ -510,12 +586,12 @@ export class CombatSystem {
       const hit = worldBox(attacker, atk.def.hitbox, scratchHit);
       for (const target of fighters) {
         if (target === attacker) continue;
-        const struck = target.def.hurtboxes.some((hb) => intersects(hit, worldBox(target, hb, scratchHurt)));
-        if (!struck) continue;
+        const point = strikePoint(hit, target);
+        if (!point) continue;
         // One hit per attack, blocked or not; only a real hit (never a
         // block) opens its hitCancel.
         atk.hasHit = true;
-        atk.confirmed = this.applyHit(attacker, target, atk.def).type === 'hit';
+        atk.confirmed = this.applyHit(attacker, target, atk.def, { point }).type === 'hit';
         atk.confirmedAt = atk.time;
         break;
       }
@@ -525,11 +601,10 @@ export class CombatSystem {
       const hit = p.hitbox(scratchHit);
       for (const target of fighters) {
         if (target === p.owner) continue;
-        const struck = target.def.hurtboxes.some((hb) => intersects(hit, worldBox(target, hb, scratchHurt)));
-        if (!struck) continue;
+        if (!strikePoint(hit, target)) continue;
         // One hit, then it is gone (a Shielded projectile included).
         p.alive = false;
-        this.applyHit(p.owner, target, p.def, { facing: p.direction, projectile: p });
+        this.applyHit(p.owner, target, p.def, { facing: p.direction, projectile: p, point: { x: p.x, y: p.y } });
         break;
       }
     }
@@ -539,12 +614,12 @@ export class CombatSystem {
       if (!hit) continue;
       for (const target of fighters) {
         if (target === c.owner) continue;
-        const struck = target.def.hurtboxes.some((hb) => intersects(hit, worldBox(target, hb, scratchHurt)));
-        if (!struck) continue;
+        const point = strikePoint(hit, target);
+        if (!point) continue;
         c.hasHit = true;
         // The clone's own facing, never the owner's: a horizontal launch
         // travels from the clone.
-        this.applyHit(c.owner, target, c.attackDef, { facing: c.facing, summon: c });
+        this.applyHit(c.owner, target, c.attackDef, { facing: c.facing, summon: c, point });
         c.hitstop = c.attackDef.hitstop;
         break;
       }
@@ -568,12 +643,12 @@ export class CombatSystem {
       if (!hit) continue;
       for (const target of fighters) {
         if (target === owner) continue;
-        const struck = target.def.hurtboxes.some((hb) => intersects(hit, worldBox(target, hb, scratchHurt)));
-        if (!struck) continue;
+        const point = strikePoint(hit, target);
+        if (!point) continue;
         // The contact, exactly once; the sphere stops searching after it. A
         // Shield blocks it and the technique ends there; otherwise the
         // target is bound and its first tick lands on this same step.
-        const event = this.applyHit(owner, target, t.def.firstHit, { facing: t.facing, technique: t });
+        const event = this.applyHit(owner, target, t.def.firstHit, { facing: t.facing, technique: t, point });
         const ended = t.contact(target, event.type === 'block');
         if (ended) owner.endTechnique(ended);
         else this.applyTicks(owner, t);
@@ -614,12 +689,16 @@ export class CombatSystem {
   // event it recorded.
   applyHit(attacker, target, def, {
     facing = attacker.facing, projectile = null, summon = null, technique = null,
-    detached = !!(projectile || summon || technique),
+    detached = !!(projectile || summon || technique), point = bodyPoint(target),
   } = {}) {
     const tc = target.combat;
     const blocked = tc.shielding;
+    // A perfect Shield (raised just in time, see Fighter.perfectShield)
+    // blocks for free: no Energy and no blockstun, so its fighter can answer
+    // at once.
+    const perfect = blocked && !!target.perfectShield;
     let energyCost = 0;
-    if (blocked) {
+    if (blocked && !perfect) {
       energyCost = Math.min(tc.energySpec.shieldHitCost, tc.energy);
       tc.spendEnergy(tc.energySpec.shieldHitCost);
       if (!tc.canShield()) tc.shielding = false;
@@ -629,14 +708,24 @@ export class CombatSystem {
     tc.launchPoint = Math.max(0, launchPointBefore + damage);
     const launchPointAfter = tc.launchPoint;
     const launchStrength = blocked ? 0 : resolveLaunchStrength(def.baseLaunch, launchPointAfter);
-    const finalLaunch = resolveDirectionalLaunch(def.directionalLaunch, launchStrength, facing);
+    // The target may bend its launch a little with the direction it holds
+    // as the hit lands (launch steering: never the strength, only the angle;
+    // see steerLaunch), and a harder launch stuns it longer.
+    // Standing on the ground, Down bends nothing: the floor is in the way.
+    const reaction = target.launchReaction;
+    const held = target.steerHeld && target.body.grounded && target.steerHeld.y > 0 ? { x: target.steerHeld.x, y: 0 } : target.steerHeld;
+    const finalLaunch = steerLaunch(
+      resolveDirectionalLaunch(def.directionalLaunch, launchStrength, facing), held, reaction?.steerAngle,
+    );
+    const launchSpeed = Math.hypot(finalLaunch.x, finalLaunch.y);
+    const hitstun = def.hitstun > 0 ? def.hitstun + resolveLaunchStun(launchSpeed, reaction) : 0;
     // A hit with no stun or freeze of its own (a charged technique's tick)
     // leaves any already running as it is. A block's stun holds the Shield
     // only while it is still up.
     if (blocked) {
-      if (tc.shielding && def.blockstun > 0) tc.shieldStun = def.blockstun;
-    } else if (def.hitstun > 0) {
-      tc.stun = def.hitstun;
+      if (tc.shielding && def.blockstun > 0 && !perfect) tc.shieldStun = def.blockstun;
+    } else if (hitstun > 0) {
+      tc.stun = hitstun;
     }
     if (def.hitstop > 0) tc.hitstop = def.hitstop;
     if (!detached) attacker.combat.hitstop = def.hitstop;
@@ -656,8 +745,12 @@ export class CombatSystem {
       type: blocked ? 'block' : 'hit', attacker, target, move: def.id ?? null,
       damage, energyCost, launchPointBefore, launchPointAfter,
       baseLaunch: def.baseLaunch, directionalLaunch: def.directionalLaunch, launchStrength, finalLaunch,
+      launchSpeed, hitstun: blocked ? 0 : hitstun, perfect, point,
       projectile, summon, technique,
     };
+    // The target's own reaction to a real hit (its air jump back, see
+    // Fighter.takeHit).
+    if (!blocked) target.takeHit?.(event);
     this.events.push(event);
     return event;
   }

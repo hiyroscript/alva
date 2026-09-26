@@ -679,7 +679,7 @@ read the character database, so it stays the same as fighters are added.
   420 and 800 (over its highest deck); Practice Ground 380 (its block is the
   narrowest), 400 and 760. There is room to be knocked off, fight briefly
   and drift back, but a fighter carried on outward is lost soon after; no
-  jump from any stage's highest footing reaches the upper line. Camera
+  jump (its air jump included) from any stage's highest footing reaches the upper line. Camera
   bounds are the Void's rectangle plus 140 on every side (`cameraAround`),
   so the neutral view never shows the Void and the camera never wanders deep
   into it.
@@ -776,6 +776,31 @@ read the character database, so it stays the same as fighters are added.
   ground and `hitstunAirDrag` (210) in the air, whatever is held: the rates
   Launch Point was tuned against, apart from the movement rework. Missing
   hurt art holds an idle frame.
+- **Launch reaction** (the character's `launchReaction`, resolved by
+  `resolveLaunchReaction` in `js/game/combat.js`; every field optional,
+  the defaults change nothing). None of it changes a launch's strength.
+  - *Launch stun.* A launching hit stuns for its own `hitstun` plus
+    `stunPerThousand` (0.2 s for #0001) per 1000 units / s of launch
+    speed, never more than `maxStun` (0.7 s) extra: a big hit at a high
+    Launch Point is a clear moment to chase. BA2 at 50 Launch Point (1200
+    units / s) stuns 0.28 + 0.24 s. The event's `hitstun` is the total.
+  - *Tumble.* Launched at `tumbleSpeed` (1100 units / s) or faster, the
+    fighter tumbles (`Fighter.tumbling`, the `tumble` state, drawn with
+    `midairHurt`): through the stun and on past it, until it acts (an
+    attack, a jump or air jump, the Shield, a fast fall) or lands.
+    Steering alone does not end it. A slower launch ends a tumble; a hit
+    that launches nothing leaves it.
+  - *Launch steering.* The direction the target holds as a hit lands
+    (Left / Right, Jump up, Charge down) bends the launch toward it by up
+    to `steerAngle` (15 degrees): only the part of it across the launch
+    counts (the sine of the angle between them), so holding along a launch
+    or against it bends nothing, and the speed never changes. Standing on
+    the ground, Down bends nothing (the floor is in the way). It is the
+    defender's skill: surviving a launch, or slipping out of a follow-up.
+    `finalLaunch` is the steered velocity; with nothing held it is the
+    formula exactly.
+  - A hit (never a block) also gives the target its air jump back, so a
+    launch never strands it without one.
 - Basic Attack 1 (BA1) is #0001's first attack, on the `action1` input. On the
   ground it is a punch (`ba1`, 4 frames); in the air a kunai slash
   (`midairBa1`, 3 frames: `midair2ba1`–`midair2ba3`); the character data
@@ -949,7 +974,7 @@ read the character database, so it stays the same as fighters are added.
   it does is recover the charged cooldowns faster (see the charged actions
   below) and, separately, refill Energy faster (below). State
   priority is hitstun > charged technique > bound > attack > Dash > Shield
-  > jump / fall > land > charge > Shield lower pose > charge release > run
+  > tumble > jump / fall > land > charge > Shield lower pose > charge release > run
   > idle: a hit shows Hurt at once, Throw
   starts straight out of a held Charge (so do BA1 when the Clone Attack
   cannot happen and BA2 when the Sphere Rush cannot start), Jump
@@ -1014,6 +1039,19 @@ read the character database, so it stays the same as fighters are added.
   after the fact, but any later hit, even on the same step, lands in full.
   Holding the Shield costs nothing, and a miss costs nothing: only a
   confirmed block is paid for.
+- **Perfect Shield.** A hit that lands within `defense.perfectWindow`
+  (0.1 s) of the Shield going up is a perfect block (`Fighter.perfectShield`,
+  the event's `perfect`): it costs no Energy and deals no blockstun, so the
+  fighter can let go and answer at once, while the attacker, whose attack
+  was blocked, still has its whole recovery (no hit-cancel). The hit's
+  hitstop still freezes both. Only a raise after the Shield has been down
+  for `perfectRearm` (0.25 s) has that window, so tapping Defense over and
+  over never keeps one open; held up longer, or raised again too soon, a
+  block is an ordinary one. It is drawn as a white ring bursting from the
+  block (see Hit effects, 7.3). Quick Battle's CPU pulls one off only as
+  often as its level earns it: a raise that close to contact succeeds with
+  a chance of its `guard` trait to the fourth power (Brutal often, Easy almost never),
+  and otherwise it takes the hit.
 - The Shield's look (`js/game/shield-fx.js`): a wavy circle round the
   fighter, drawn procedurally on the battle canvas (no PNG), kin to the
   Void: a barely-there black interior (`rgba(0, 0, 0, 0.16)`) drawn behind
@@ -1435,11 +1473,16 @@ read the character database, so it stays the same as fighters are added.
   launches replaces the target's sideways speed (a
   vertical one sends it straight up or down) and, when it has one, its
   vertical speed; a hit that does not launch (Base Launch 0, no direction,
-  or blocked) leaves the target's velocity alone. Its
+  or blocked) leaves the target's velocity alone. The target may bend a
+  launch's direction by up to 15 degrees with the direction it holds
+  (launch steering, see Launch reaction above), never its speed. Its
   event carries `damage`, `launchPointBefore`, `launchPointAfter`,
   `baseLaunch` (the integer), `directionalLaunch`, `launchStrength`,
-  `finalLaunch` (the world-space `{ x, y }` velocity given) and
-  `energyCost` (25 on a block, 0 on a hit). Launch Point
+  `finalLaunch` (the world-space `{ x, y }` velocity given, steered),
+  `launchSpeed` (its length), `hitstun` (the stun dealt, launch stun
+  included), `perfect` (a perfect block), `point` (where the hit landed,
+  for its effects) and `energyCost` (25 on a block, 0 on a hit or a
+  perfect block). Launch Point
   never disables a fighter (`canAct()` never reads it) and never takes one
   out: only the Void does. On time-up in Quick Battle, level on points, the
   fighter with the lower Launch Point wins (a fighter still waiting to
@@ -1478,6 +1521,26 @@ read the character database, so it stays the same as fighters are added.
     is on the press step, and the jump only sets the upward speed: the run
     carries straight into the air (no horizontal reset), so run → jump →
     drift is one continuous motion.
+  - *Short hop.* Jump let go within `shortHopWindow` (0.1 s) of takeoff (a
+    tap; a buffered press already let go counts) tops out at
+    `shortHopHeight` (0.35) × the full jump's height, about 59 units of
+    Jump Power 2's 169: low enough for a mid-air BA1 to reach a standing
+    opponent on the way up. Held past the window it is the full jump.
+    Decided once (`Fighter.hop`, `shortHop`): after the window, the apex,
+    a hit or the ground, it no longer changes, and it is never lower than
+    the fighter already is. Both CPUs hold Jump through the window: their
+    jumps are full ones.
+  - *Air jump.* `airJumps` (1) more jump in the air, past coyote time, at
+    `airJumpRatio` (0.9) × the normal jump's speed (about 137 units of
+    rise), always full height, the jump clip from its first frame. A
+    direction held sets off that way at least at top speed (a change of
+    course); with none held the drift carries on. Landing gives it back,
+    and so does a hit. Not while stunned, bound, shielding or in a charged
+    technique; a jump pressed in the air with none left waits (the jump
+    buffer) for the ground. It may cut short an attack that hit, like a
+    ground jump. Quick Battle's CPU uses it to get back to the stage. A
+    jump and an air jump from a stage's highest footing still stay well
+    clear of the upper Void.
   - *Fast fall.* Down (the Charge input: S / ↓, D-pad or stick down, touch
     C) held in the air while already descending speeds the fall up toward
     `fastFallSpeed` (1400) at `fastFallAcceleration` (7500) on top of
@@ -1547,6 +1610,10 @@ read the character database, so it stays the same as fighters are added.
     crisp tap, never sticky on repeated jabs), 0.08–0.09 s for the kicks,
     0.12 s for the Sphere Rush blast, still the strongest. It freezes the
     fighters, never the controls: presses made during it are kept.
+  - *Air combos.* With the air jump and the launch stun, BA2 → jump →
+    mid-air BA1 → air jump → mid-air BA1 is a three-hit juggle around 30–40
+    Launch Point; never longer, and gone by about 60, when BA2 launches
+    past any jump.
 - **Powers** (`js/data/powers.js`): fighter abilities owned at one of three
   tiers, Jump Power and Speed Power. Each Power is a frozen tier table in
   the one `POWERS` registry, the single source of its names, descriptions,
@@ -1761,6 +1828,35 @@ read the character database, so it stays the same as fighters are added.
   changes colour, inverts or flashes.
 - Player markers above fighters (under their Energy bars) and ground
   rings: P1 white, CPU gray.
+- **Hit effects** (`js/game/hit-fx.js`, owned by the Arena, so Quick Battle
+  and Practice Ground alike): presentation only, fed each step's combat
+  events. They never change a simulation step; a test steps the same fight
+  with and without them and compares every step.
+  - *Screen shake* scaled to the hit: 1.5 CSS px, plus 0.18 per point of
+    damage and 1 per 320 units / s of launch speed, up to 14, dying away
+    over about a quarter of a second; a block and a perfect block give a
+    small one. Charged-technique ticks (no stun, no launch) show nothing.
+  - *Hit flash:* the fighter hit is drawn for one frame as a white
+    silhouette of its own current pose (the frame itself where no canvas
+    can be made). Never on a block.
+  - *Sparks* where the hit landed (the event's `point`: the middle of the
+    hitbox's overlap with the hurtbox it touched, or the shuriken, or the
+    target's body): a white core with amber streaks, each over a thin
+    dark line, thrown mostly along the launch and bigger for a stronger
+    hit; a red ring for a block; a white ring edged in red for a perfect
+    block.
+  - *Speed trails:* a tumbling fighter moving at 900 units / s or faster
+    leaves up to six fading afterimages of its own poses behind it.
+  - *Lethal launch:* a launch that would carry its fighter into the Void
+    if it did nothing (its body stepped on with the stage's own physics
+    through the stun and 0.3 s more, at its hitstun rates and then its
+    normal ones, no steering or jump; `launchIsLethal`) slows the clock the
+    fixed steps are fed from to a quarter for 0.45 s, easing back over
+    0.3 s, while the view closes in to 1.35 × on that fighter (never past
+    the camera bounds) with a big shake. One at a time. Every step is
+    still exactly one step.
+  - Reduced motion drops the shake and the zoom; the flash, sparks, trails
+    and slow motion stay.
 - Round banners ("ROUND 1", "FIGHT", "TIME", and "K.O." under "VOID" when a
   fighter's fall gives the opponent its third point) in white on a dark
   band.
@@ -1780,7 +1876,7 @@ read the character database, so it stays the same as fighters are added.
 ### 7.4 Input
 
 - Keyboard (simultaneous keys, held-state tracking, no reliance on key
-  repeat): A/D or ←/→ move (twice in a row to Dash), S/↓ Charge (held; held in the air while falling, the fast fall), W/Space/↑ jump, J Throw (the
+  repeat): A/D or ←/→ move (twice in a row to Dash), S/↓ Charge (held; held in the air while falling, the fast fall), W/Space/↑ jump (tapped, a short hop; held, the full jump; again in the air, the air jump), J Throw (the
   internal `primary` action), K Special (reserved), L Defense, U Basic
   Attack 1 (BA1), I Basic Attack 2 (BA2), Esc/P pause (the Practice menu in
   Practice Ground). `` ` `` toggles a

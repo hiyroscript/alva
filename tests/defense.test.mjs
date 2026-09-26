@@ -55,6 +55,13 @@ const pngSize = (path) => {
 
 // Steps a duel with the target holding Defense until the attacker's attack
 // has connected (or `limit` steps pass), the attack pressed on the first.
+// Raises the target's Shield and holds it past its perfect window: the
+// blocks after it are ordinary ones (see the perfect Shield tests).
+function raiseShield(d) {
+  d.tick({}, DEFENSE);
+  for (let i = 0; i < steps(def.defense.perfectWindow) + 2; i++) d.tick({}, HOLD);
+}
+
 function blockedAttack(d, press = BA1, targetHeld = HOLD, limit = 60) {
   const before = d.events.length;
   d.tick(press, targetHeld);
@@ -135,6 +142,8 @@ test('#0001 defends with a Shield: typed data, no Dodge fields, no chip-damage s
     groundStartAnimation: 'shieldStart',
     groundReleaseAnimation: 'shieldRelease',
     airAnimation: 'midairShield',
+    perfectWindow: 0.1,
+    perfectRearm: 0.25,
   });
   const { fighter } = makeFighter();
   assert.equal(fighter.defense.type, 'shield');
@@ -328,7 +337,7 @@ test('a grounded Shield holds the fighter in place: no walking, Dash, jump or tu
 
 for (const [when, setup] of [
   ['rising', (step) => { step(JUMP); step(); }],
-  ['falling', (step) => { step(JUMP); stepUntil(step, (f) => f.body.vy > 0 && f.body.y < 700); }],
+  ['falling', (step) => { step(JUMP); stepUntil(step, (f) => f.body.vy > 0 && f.body.y < 700, { jump: true }); }],
 ]) {
   test(`Defense while ${when} holds midairshielding at once, and gravity keeps working`, () => {
     const { fighter, step } = makeFighter();
@@ -461,7 +470,7 @@ test('no Shield while stunned, bound or performing a charged technique', () => {
 
 test('each blocked hit costs exactly 25 Energy: 100 -> 75 -> 50 -> 25 -> 0, and the fourth still blocks', () => {
   const d = duel({ targetCharacter: NO_REGEN });
-  d.tick({}, DEFENSE);
+  raiseShield(d);
   const trail = [];
   for (const expected of [75, 50, 25, 0]) {
     const [event, ...rest] = blockedAttack(d);
@@ -496,7 +505,7 @@ test('each blocked hit costs exactly 25 Energy: 100 -> 75 -> 50 -> 25 -> 0, and 
 
 test('a blocked hit shows no hurt pose: the Shield holds through the freeze and the blockstun, held or not', () => {
   const d = duel();
-  d.tick({}, DEFENSE);
+  raiseShield(d);
   const [event] = blockedAttack(d);
   assert.equal(event.type, 'block');
   const blockstun = def.attacks.ba1.blockstun;
@@ -585,7 +594,7 @@ test('with less than 25 Energy the Shield still goes up and blocks; that block t
   const d = duel({ targetCharacter: NO_REGEN });
   d.target.combat.setEnergy(10);
   assert.equal(d.target.combat.canShield(), true, 'not exhausted: any Energy will do');
-  d.tick({}, DEFENSE);
+  raiseShield(d);
   assert.equal(d.target.combat.shielding, true);
   assert.equal(d.target.state, 'shield');
   const [event] = blockedAttack(d);
@@ -613,7 +622,7 @@ test('with less than 25 Energy the Shield still goes up and blocks; that block t
 
 test('a block that leaves some Energy keeps the Shield up; the one that empties it drops it, and a later hit, even on the same step, lands in full', () => {
   const d = duel({ targetCharacter: NO_REGEN });
-  d.tick({}, DEFENSE);
+  raiseShield(d);
   d.target.combat.setEnergy(40);
   const [event] = blockedAttack(d);
   assert.equal(event.type, 'block');
@@ -999,4 +1008,64 @@ test('CombatState starts with the Shield down and nothing held; resolveEnergy ca
   assert.equal(c.energySpec.shieldHitCost, COST);
   assert.equal(resolveEnergy({ shieldHitCost: 10 }).shieldHitCost, 10);
   assert.equal(BASE, './assets/characters/0001/0001_');
+});
+
+// ---- Perfect Shield ---------------------------------------------------------------
+
+test('a Shield raised just before the hit blocks perfectly: no Energy, no blockstun, free to answer at once', () => {
+  const d = duel({ targetCharacter: NO_REGEN });
+  // The punch lands 5 steps after its press: raise the Shield 3 steps before.
+  d.tick(BA1);
+  d.tick();
+  d.tick({}, DEFENSE);
+  for (let i = 0; i < 20 && !d.events.length; i++) d.tick({}, HOLD);
+  const [e] = d.events;
+  assert.equal(e.type, 'block');
+  assert.equal(e.perfect, true);
+  assert.equal(e.energyCost, 0, 'free');
+  assert.equal(d.target.combat.energy, 100);
+  assert.equal(d.target.combat.shieldStun, 0, 'no blockstun');
+  assert.ok(d.target.combat.hitstop > 0, 'the impact still freezes both');
+  // Let go once the freeze is over: straight into its own punch, while the
+  // attacker is still recovering from its blocked one.
+  while (d.target.combat.hitstop > 0) d.tick({}, HOLD);
+  d.tick({}, BA1);
+  assert.equal(d.target.combat.attack?.def.id, 'ba1');
+  assert.ok(d.attacker.combat.attack, 'the attacker still in its recovery');
+});
+
+test('only a fresh raise is perfect: held long, or tapped again too soon after lowering, it is an ordinary block', () => {
+  const block = (setup) => {
+    const d = duel({ targetCharacter: NO_REGEN });
+    setup(d);
+    const before = d.events.length;
+    d.tick(BA1, HOLD);
+    for (let i = 0; i < 20 && d.events.length === before; i++) d.tick({}, HOLD);
+    return d.events.at(-1);
+  };
+  const held = block((d) => {
+    d.tick({}, DEFENSE);
+    for (let i = 0; i < 10; i++) d.tick({}, HOLD);
+  });
+  assert.equal(held.perfect, false, 'up long before the hit');
+  assert.equal(held.energyCost, COST);
+  // Lowered and raised again within perfectRearm: no fresh window.
+  const tapped = block((d) => {
+    for (let i = 0; i < 3; i++) d.tick({}, HOLD);
+    d.tick({}, {});
+    d.tick({}, DEFENSE);
+  });
+  assert.equal(tapped.perfect, false, 'tapping Defense never keeps a window open');
+  // Down long enough first: fresh again.
+  const fresh = block((d) => {
+    for (let i = 0; i < 3; i++) d.tick({}, HOLD);
+    for (let i = 0; i < steps(def.defense.perfectRearm) + 1; i++) d.tick({}, {});
+    d.tick({}, DEFENSE);
+  });
+  assert.equal(fresh.perfect, true);
+  // A hit is never perfect.
+  const hit = duel();
+  hit.tick(BA1);
+  hit.until(() => hit.events.length > 0, 20);
+  assert.equal(hit.events[0].perfect, false);
 });

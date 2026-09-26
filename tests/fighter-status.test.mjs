@@ -256,7 +256,8 @@ test('a fresh fighter shows no bar; a real Dash or blocked hit brings it up at o
   assert.equal(energyBarState(dashed.fighter).visible, false, 'fresh, full, hidden');
   doubleTap(dashed.step);
   const d = duel();
-  d.tick({}, HOLD);
+  // Up well before the hit: an ordinary block, never a perfect one.
+  for (let i = 0; i < 9; i++) d.tick({}, HOLD);
   d.tick({ action1: true, action1Pressed: true }, HOLD);
   for (let i = 0; i < 30 && !d.events.length; i++) d.tick({}, HOLD);
   assert.equal(d.events[0].type, 'block');

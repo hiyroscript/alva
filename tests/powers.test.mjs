@@ -237,7 +237,7 @@ test('Jump Power changes nothing but the jump\'s initial speed: gravity, fall sp
     const log = [];
     while (!fighter.grounded) {
       const vy = fighter.body.vy;
-      step(right);
+      step({ ...right, jump: true }); // held: the full jump, never cut short
       log.push({ vx: fighter.body.vx, x: fighter.body.x, dvy: fighter.grounded ? null : fighter.body.vy - vy });
     }
     return log;
@@ -270,27 +270,39 @@ function checkCoyoteAndBuffer(character, velocity, label) {
   ledge.fighter.update(DT, NO_GRAVITY);
   assert.equal(ledge.fighter.body.vy, -velocity, `${label}: a coyote-time jump`);
 
-  // Past coyote time, the same press does not jump.
+  // Past coyote time, the same press is no ground jump: the air jump
+  // instead, at its own share of the same Jump Power, and nothing at all
+  // once that is spent.
   const late = makeFighter({ character, x: 1000, y: 600 });
   stepUntil(late.step, (f) => !f.grounded, RIGHT);
   for (let i = 0; i < coyoteSteps + 2; i++) late.step(RIGHT);
-  const vy = late.fighter.body.vy;
   late.fighter.controller = { getInput: () => JUMP };
   late.fighter.update(DT, NO_GRAVITY);
-  assert.equal(late.fighter.body.vy, vy, `${label}: no jump after coyote time`);
+  assert.equal(late.fighter.body.vy, -velocity * def.movement.airJumpRatio, `${label}: the air jump after coyote time`);
+  const spent = makeFighter({ character, x: 1000, y: 600 });
+  stepUntil(spent.step, (f) => !f.grounded, RIGHT);
+  for (let i = 0; i < coyoteSteps + 2; i++) spent.step(RIGHT);
+  spent.fighter.airJumps = 0;
+  const vy = spent.fighter.body.vy;
+  spent.fighter.controller = { getInput: () => JUMP };
+  spent.fighter.update(DT, NO_GRAVITY);
+  assert.equal(spent.fighter.body.vy, vy, `${label}: no jump after coyote time`);
 
-  // Pressed a few steps before touchdown, the buffered press jumps on the
-  // step after landing; pressed too early, it has expired by then.
+  // Pressed a few steps before touchdown, its air jump spent, the buffered
+  // press jumps on the step after landing; pressed too early, it has
+  // expired by then.
   const ref = makeFighter({ character });
   ref.step(JUMP);
   const airborne = stepUntil(ref.step, (f) => f.grounded);
   for (const [early, jumps] of [[bufferSteps - 2, true], [bufferSteps + 3, false]]) {
     const run = makeFighter({ character });
     run.step(JUMP);
+    run.fighter.airJumps = 0;
     for (let i = 1; i < airborne - early; i++) run.step();
+    // Held on from the press: the full jump on landing (a tap is a short hop).
     run.step(JUMP);
-    stepUntil(run.step, (f) => f.grounded);
-    run.step();
+    stepUntil(run.step, (f) => f.grounded, { jump: true });
+    run.step({ jump: true });
     assert.equal(!run.fighter.grounded, jumps, `${label}: pressed ${early} steps before landing`);
     if (jumps) assert.equal(run.fighter.body.vy, -velocity + CONFIG.sim.gravity * def.movement.gravityScale * DT);
   }
