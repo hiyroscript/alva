@@ -282,21 +282,6 @@ html.is-touch .hint-bar { display: none; }
 .panel-meta b { color: var(--text-strong); font-weight: 700; }
 .panel-note { color: var(--text-secondary); font-size: 13px; line-height: 1.5; }
 
-.detail-list {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 8px 16px;
-  align-items: baseline;
-}
-.detail-list dt {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-}
-.detail-list dd { font-weight: 600; text-align: right; color: var(--text); }
-
 /* ---------------------------------------------------------------------
    Menu screen frame
    --------------------------------------------------------------------- */
@@ -456,6 +441,14 @@ html[data-screen="splash"] .overlay { display: none; }
 }
 .home-intro {
   --lede-size: clamp(13px, 2.1vh, 17px);
+  /* Everything that shares the screen's height with the wordmark: the
+     padding round the intro, the footer, the tagline and the five actions
+     (the same values as their own rules below, plus a little slack). The
+     wordmark keeps its size wherever that leaves room, and shrinks only as
+     much as a short screen needs, so the menu is never pushed off it. */
+  --below-logo: calc(max(var(--safe-t), 24px) + 24px + clamp(34px, 8vh, 64px) + var(--safe-b)
+    + clamp(14px, 3vh, 28px) + var(--lede-size) * 1.45
+    + clamp(18px, 5vh, 48px) + 5 * clamp(42px, 7.4vh, 58px) + 4 * 8px + 8px);
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -468,7 +461,14 @@ html[data-screen="splash"] .overlay { display: none; }
    and the A starts on the box edge instead of being centred in a wider box.
    The shift matches the side bearing of the tagline's first letter, so the
    A's first stroke lines up with the tagline's visible start. */
-.logo--display { width: min(100%, 72vh); height: auto; transform: translateX(calc(var(--lede-size) * 0.085)); }
+.logo--display {
+  /* 3 is just under the wordmark's 303:100, so its height fits the room;
+     it never shrinks below 96 px, even on an absurdly short window. */
+  width: min(100%, 72vh, max(96px, (100vh - var(--below-logo)) * 3));
+  width: min(100%, 72vh, max(96px, (100dvh - var(--below-logo)) * 3));
+  height: auto;
+  transform: translateX(calc(var(--lede-size) * 0.085));
+}
 .home-lede {
   margin-top: clamp(14px, 3vh, 28px);
   max-width: 34ch;
@@ -623,12 +623,19 @@ html[data-screen="splash"] .overlay { display: none; }
 }
 @media (max-height: 500px) {
   .home-main { padding-top: max(var(--safe-t), 12px); padding-bottom: 12px; }
-  .home-intro { --lede-size: 13px; }
-  .logo--display { width: min(100%, 69vh); }
+  .home-intro {
+    --lede-size: 13px;
+    --below-logo: calc(max(var(--safe-t), 12px) + 12px + 32px + var(--safe-b)
+      + 10px + var(--lede-size) * 1.45 + 12px + 5 * 36px + 4 * 5px + 6px);
+  }
+  .logo--display {
+    width: min(100%, 69vh, max(96px, (100vh - var(--below-logo)) * 3));
+    width: min(100%, 69vh, max(96px, (100dvh - var(--below-logo)) * 3));
+  }
   .home-lede { margin-top: 10px; }
-  /* Four actions still fit a 375 px landscape phone above its home bar. */
-  .home-actions { margin-top: 14px; gap: 5px; }
-  .home-action { height: 38px; }
+  /* Five actions still fit a 360 px landscape phone above its home bar. */
+  .home-actions { margin-top: 12px; gap: 5px; }
+  .home-action { height: 36px; }
   .home-footer { min-height: calc(32px + var(--safe-b)); }
   .home-credit + .home-credit { margin-top: 20px; }
   .home-credit-lead { font-size: 14px; }
@@ -636,10 +643,17 @@ html[data-screen="splash"] .overlay { display: none; }
   .home-credit-title { margin-top: 0; }
 }
 @media (max-height: 360px) {
-  .logo--display { width: min(100%, 63vh); }
+  .home-intro {
+    --below-logo: calc(max(var(--safe-t), 12px) + 12px + 32px + var(--safe-b)
+      + 8px + var(--lede-size) * 1.45 + 8px + 5 * clamp(30px, 10vh, 36px) + 4 * 4px + 6px);
+  }
+  .logo--display {
+    width: min(100%, 63vh, max(96px, (100vh - var(--below-logo)) * 3));
+    width: min(100%, 63vh, max(96px, (100dvh - var(--below-logo)) * 3));
+  }
   .home-lede { margin-top: 8px; }
   .home-actions { margin-top: 8px; gap: 4px; }
-  .home-action { height: 36px; }
+  .home-action { height: clamp(30px, 10vh, 36px); }
 }
 /* Still credits: one readable copy, clear of the fades, scrollable by hand. */
 @media (prefers-reduced-motion: reduce) {
@@ -979,131 +993,6 @@ html:not(.is-pointer-input) .difficulty-card:focus { box-shadow: var(--focus-rin
 .btn--start span { text-wrap: balance; }
 
 /* ---------------------------------------------------------------------
-   Help & credits
-   --------------------------------------------------------------------- */
-
-.help-layout { grid-template-rows: auto minmax(0, 1fr); gap: clamp(8px, 1.6vh, 14px); }
-.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); }
-.tab {
-  padding: 10px 16px 11px;
-  margin-bottom: -1px;
-  border-bottom: 2px solid transparent;
-  border-radius: var(--radius-xs) var(--radius-xs) 0 0;
-  font-weight: 600;
-  font-size: 14px;
-  color: var(--text-muted);
-  transition: color 120ms ease, border-color 120ms ease, background-color 120ms ease, box-shadow 120ms ease;
-}
-.tab:hover { color: var(--text); }
-.tab.is-active { color: var(--text-strong); border-bottom-color: var(--accent); }
-.tab:focus { background: var(--surface-subtle); box-shadow: var(--focus-ring-inset); }
-.tab-panels { min-height: 0; display: grid; }
-.tab-panel {
-  min-height: 0;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  padding: 2px 6px 6px 2px;
-  scrollbar-width: thin;
-  scrollbar-color: var(--border-strong) transparent;
-  touch-action: pan-y;
-  user-select: text;
-  -webkit-user-select: text;
-}
-.tab-panel:focus { outline: none; }
-/* Same cue as the Home credits: green headings rather than a frame. */
-.tab-panel:focus-visible { outline: 2px solid transparent; outline-offset: -2px; }
-.tab-panel:focus-visible .info-title { color: var(--accent); }
-
-.info-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
-  gap: clamp(8px, 1.4vw, 14px);
-  align-items: start;
-}
-.info-card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  padding: clamp(12px, 2.2vh, 20px) clamp(14px, 1.6vw, 20px);
-}
-.info-card--wide { grid-column: span 2; }
-.info-title {
-  margin-bottom: 10px;
-  font-family: var(--font-mono);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--text-strong);
-}
-.info-list { margin: 0; padding-left: 18px; display: grid; gap: 6px; color: var(--text-secondary); font-size: 14px; line-height: 1.45; }
-.info-list li::marker { color: var(--text-faint); }
-.info-text, .info-note { color: var(--text-secondary); font-size: 14px; line-height: 1.55; }
-.info-text + .info-text, .info-note { margin-top: 10px; }
-.credit-lead { font-size: clamp(17px, 2.8vh, 22px); font-weight: 700; color: var(--text-strong); margin-bottom: 8px; }
-
-.controls-table { width: 100%; border-collapse: collapse; font-size: 14px; }
-.controls-table th, .controls-table td { padding: 7px 0; border-bottom: 1px solid var(--border); text-align: left; font-weight: 500; }
-.controls-table thead th {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-  font-weight: 600;
-}
-.controls-table td { text-align: right; }
-.controls-table thead th:last-child { text-align: right; }
-.keys { display: inline-flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
-.tag {
-  margin-left: 8px;
-  padding: 1px 6px;
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-pill);
-  font-family: var(--font-mono);
-  font-size: 9px;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-  vertical-align: 2px;
-}
-
-.mobile-diagram { margin-top: 2px; }
-.md-screen {
-  position: relative;
-  aspect-ratio: 19.5 / 9;
-  border: 2px solid var(--border-strong);
-  border-radius: 18px;
-  background: var(--surface-subtle);
-}
-.md-btn {
-  position: absolute;
-  width: 11%;
-  aspect-ratio: 1;
-  border-radius: 50%;
-  border: 1.5px solid var(--border-hover);
-  background: var(--surface);
-  display: grid;
-  place-items: center;
-  transform: translate(-50%, -50%);
-  color: var(--text);
-}
-.md-icon { display: grid; font-size: clamp(9px, 1.4vw, 14px); }
-.md-icon b { font-size: 0.75em; }
-.md-legend { margin-top: 12px; gap: 6px 14px; font-size: 13px; }
-.md-legend dd { font-weight: 500; color: var(--text-secondary); }
-.md-pause { width: 6.5%; left: 50%; top: 12%; }
-.md-left { left: 9%; top: 78%; }
-.md-charge { left: 21.5%; top: 78%; }
-.md-right { left: 34%; top: 78%; }
-.md-jump { left: 91%; top: 80%; }
-.md-a2 { left: 78.5%; top: 80%; }
-.md-a1 { left: 66%; top: 80%; }
-.md-defense { left: 85%; top: 54%; }
-.md-special { left: 72.5%; top: 54%; }
-.md-throw { left: 88%; top: 27%; width: 12.5%; border: 2px solid var(--accent); }
-
-/* ---------------------------------------------------------------------
    Discover — the in-game reference: an index rail beside one page
    --------------------------------------------------------------------- */
 
@@ -1291,6 +1180,111 @@ html:not(.is-pointer-input) .discover-panel:focus { box-shadow: var(--focus-ring
   }
   .discover-tab.is-active { border-bottom-color: var(--accent); }
 }
+
+/* ---------------------------------------------------------------------
+   Settings — one group per setting, its choices as cards
+   --------------------------------------------------------------------- */
+
+/* The area scrolls on its own if a very short window cannot fit the cards,
+   so the header's Back stays put. */
+.settings-layout { align-content: start; overflow-y: auto; }
+.settings-group { display: grid; align-content: start; gap: clamp(10px, 2vh, 18px); max-width: 880px; padding: 4px; /* room for the focus ring */ }
+.settings-group-head { display: grid; gap: 4px; }
+.settings-group-title {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-strong);
+}
+.settings-group-note { color: var(--text-secondary); font-size: clamp(12px, 1.9vh, 14px); line-height: 1.45; }
+.settings-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: clamp(8px, 1.4vw, 16px); }
+/* Like the difficulty cards: hover is a preview, the ring is for keys and
+   pads, and the chosen card says so with a label, not a tint alone. */
+.settings-option {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(10px, 2.2vh, 18px);
+  padding: clamp(12px, 2.4vh, 20px) clamp(14px, 1.6vw, 20px);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  text-align: left;
+  transition: background-color var(--dur-fast) ease, border-color var(--dur-fast) ease, box-shadow var(--dur) ease, transform var(--dur) var(--ease);
+}
+.settings-option:hover { background: var(--surface-subtle); border-color: var(--border-hover); box-shadow: var(--shadow-md); }
+html:not(.is-pointer-input) .settings-option:focus { box-shadow: var(--focus-ring), var(--shadow-md); }
+.settings-option:active { transform: scale(0.99); }
+.settings-option.is-current { border-color: rgba(47, 191, 99, 0.5); }
+.settings-option-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.settings-option-current {
+  display: none;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px 4px 7px;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+  color: var(--black);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.settings-option-current .icon { stroke-width: 3.2; }
+.settings-option.is-current .settings-option-current { display: inline-flex; }
+.settings-option-text { display: grid; gap: 4px; }
+.settings-option-name {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 700;
+  font-size: clamp(17px, 3.4vh, 24px);
+  line-height: 1.15;
+  letter-spacing: -0.015em;
+  color: var(--text-strong);
+}
+.settings-option-tag {
+  padding: 1px 7px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-pill);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.settings-option-desc { color: var(--text-secondary); font-size: clamp(12px, 1.9vh, 14px); line-height: 1.45; }
+
+/* A small drawing of each layout's lower-left corner, in the touch
+   controls' round, outlined style. */
+.settings-preview {
+  --sp: clamp(22px, 5.4vh, 34px);
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  height: calc(var(--sp) * 1.9);
+  color: var(--text);
+}
+.settings-preview i {
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 1.5px solid var(--border-hover);
+  background: var(--surface-subtle);
+}
+.settings-preview .icon { font-size: calc(var(--sp) * 0.5); stroke-width: 2.8; }
+.settings-preview b { font-size: calc(var(--sp) * 0.38); font-style: normal; }
+.settings-preview--classic { gap: calc(var(--sp) * 0.18); }
+.sp-pad { width: var(--sp); height: var(--sp); }
+.settings-preview--joystick { width: calc(var(--sp) * 2.2); }
+.sp-stick { position: absolute; left: calc(var(--sp) * 0.35); bottom: 0; width: calc(var(--sp) * 1.5); height: calc(var(--sp) * 1.5); }
+.settings-preview .sp-knob { width: calc(var(--sp) * 0.66); height: calc(var(--sp) * 0.66); border-color: var(--text-secondary); }
+.sp-dash { position: absolute; top: 0; width: calc(var(--sp) * 0.5); height: calc(var(--sp) * 0.5); }
+.sp-dash--left { left: calc(var(--sp) * 0.18); }
+.sp-dash--right { right: calc(var(--sp) * 0.18); }
+.settings-option.is-current .settings-preview i { border-color: rgba(47, 191, 99, 0.6); }
 
 /* ---------------------------------------------------------------------
    Battle — dark chrome over the original-colour stage art
@@ -1486,6 +1480,13 @@ html:not(.is-pointer-input) .discover-panel:focus { box-shadow: var(--focus-ring
   --tc: clamp(52px, min(15.5vh, 10.5vw), 96px);
   --tc-gap: calc(var(--tc) * 0.17);
   --tc-pitch: calc(var(--tc) + var(--tc-gap));
+  --tc-bottom: calc(max(var(--safe-b), 10px) + 1.6vh);
+  /* Joystick scheme: the stick's base, its knob, its two Dash buttons and
+     the down-arrow Charge under Jump. */
+  --tc-stick: calc(var(--tc) * 1.92);
+  --tc-knob: calc(var(--tc) * 0.84);
+  --tc-dash: calc(var(--tc) * 0.62);
+  --tc-charge: calc(var(--tc) * 0.8);
   display: none;
   position: absolute;
   inset: 0;
@@ -1496,7 +1497,7 @@ html.is-touch .touch-controls { display: block; }
 /* A Watch Mode spectator controls no fighter: no touch controls at all. */
 html.is-touch .touch-controls[hidden] { display: none; }
 .is-paused .touch-controls { opacity: 0.25; }
-.tc-cluster { position: absolute; bottom: calc(max(var(--safe-b), 10px) + 1.6vh); }
+.tc-cluster { position: absolute; bottom: var(--tc-bottom); }
 .tc-dpad {
   left: calc(max(var(--safe-l), 12px) + 1.4vw);
   display: flex;
@@ -1556,6 +1557,84 @@ html.is-touch .touch-controls[hidden] { display: none; }
   background: rgba(255, 255, 255, 0.1);
 }
 .tc-jump { background: rgba(255, 255, 255, 0.1); border-color: rgba(255, 255, 255, 0.5); }
+
+/* Joystick scheme (the Mobile Controls setting's default). The lower-left
+   cluster is one round stick in the same translucent style as the buttons,
+   with a small Dash button just above each of its top corners (their
+   centres sit 120deg and 60deg round from the stick's, clear of its rim). */
+.tc-joystick {
+  left: calc(max(var(--safe-l), 12px) + 1.4vw);
+  width: var(--tc-stick);
+  height: calc(var(--tc) * 2.44);
+}
+.tc-stick {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: var(--tc-stick);
+  height: var(--tc-stick);
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: rgba(22, 22, 22, 0.32);
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 0 0 1.5px rgba(0, 0, 0, 0.55), inset 0 0 0 1px rgba(0, 0, 0, 0.35);
+  color: var(--white);
+  pointer-events: auto;
+  touch-action: none;
+  transition: border-color 120ms ease, background-color 120ms ease;
+}
+.tc-stick.is-active { border-color: rgba(255, 255, 255, 0.5); background: rgba(22, 22, 22, 0.42); }
+/* Faint arrows on the base, lit while their direction is held. */
+.tc-stick-arrow {
+  position: absolute;
+  top: 50%;
+  display: grid;
+  font-size: calc(var(--tc) * 0.3);
+  opacity: 0.4;
+  transform: translateY(-50%);
+  transition: opacity 90ms ease;
+}
+.tc-stick-arrow--left { left: 7%; }
+.tc-stick-arrow--right { right: 7%; }
+.tc-stick .icon { stroke-width: 2.8; filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.8)); }
+.tc-stick.is-left .tc-stick-arrow--left, .tc-stick.is-right .tc-stick-arrow--right { opacity: 1; }
+/* The knob follows the thumb (TouchControls.steer) and eases back to the
+   centre on release; it never takes the pointer itself. */
+.tc-stick-knob {
+  grid-area: 1 / 1;
+  width: var(--tc-knob);
+  height: var(--tc-knob);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.14);
+  border: 2px solid rgba(255, 255, 255, 0.55);
+  box-shadow: 0 0 0 1.5px rgba(0, 0, 0, 0.55), 0 2px 8px rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+  transition: transform 120ms ease-out, background-color 120ms ease, border-color 120ms ease;
+}
+.tc-stick.is-active .tc-stick-knob {
+  background: rgba(255, 255, 255, 0.28);
+  border-color: var(--white);
+  transition: background-color 120ms ease, border-color 120ms ease;
+}
+.tc-dash {
+  position: absolute;
+  bottom: calc(var(--tc) * 1.82);
+  width: var(--tc-dash);
+  height: var(--tc-dash);
+  font-size: calc(var(--tc-dash) * 0.46);
+}
+.tc-dash-left { left: calc(var(--tc) * -0.03); }
+.tc-dash-right { right: calc(var(--tc) * -0.03); }
+/* The lower-right cluster rises just enough for Charge to sit under Jump;
+   the six buttons above keep their places relative to each other. */
+.touch-controls.is-joystick .tc-actions { bottom: calc(var(--tc-bottom) + var(--tc-charge) + var(--tc-gap)); }
+.tc-charge-down {
+  right: calc((var(--tc) - var(--tc-charge)) / 2);
+  bottom: calc(-1 * (var(--tc-charge) + var(--tc-gap)));
+  width: var(--tc-charge);
+  height: var(--tc-charge);
+}
 
 /* Banner ---------------------------------------------------------------- */
 
@@ -1624,9 +1703,7 @@ html.is-touch .touch-controls[hidden] { display: none; }
   padding: clamp(14px, 3.2vh, 26px) clamp(16px, 2.4vw, 26px);
   overflow: hidden;
 }
-.pause-overlay.is-help .pause-panel { width: min(900px, 100%); }
 .pause-view { display: grid; gap: clamp(8px, 1.8vh, 14px); min-height: 0; }
-.pause-view[hidden] { display: none; }
 .pause-title, .result-title {
   font-weight: 700;
   font-size: clamp(22px, 5vh, 34px);
@@ -1654,14 +1731,10 @@ html.is-touch .touch-controls[hidden] { display: none; }
 .pause-btn-item.is-primary { background: var(--action); border-color: var(--action); color: var(--white); }
 .pause-btn-item.is-primary:hover { background: var(--action-hover); border-color: var(--action-hover); }
 .pause-btn-item.is-primary:active { background: var(--action-pressed); }
-/* Unavailable for now (Help): quieter outline, muted label, no hover or
-   press response. Kept after the interactive states so it overrides them. */
+/* A disabled item (menuButton's `disabled`; none today): quieter outline,
+   muted label, no hover or press response. Kept after the interactive
+   states so it overrides them. */
 .pause-btn-item:disabled { background: transparent; border-color: var(--border); color: var(--text-muted); cursor: not-allowed; transform: none; }
-.pause-view--help { grid-template-rows: auto minmax(0, 1fr); max-height: calc(100dvh - 2 * max(var(--safe-t), 12px) - 60px); }
-.pause-help-head { display: flex; align-items: center; gap: 14px; }
-.pause-help-scroll { min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 4px 4px 4px 2px; touch-action: pan-y; scrollbar-width: thin; scrollbar-color: var(--border-strong) transparent; }
-.pause-help-scroll:focus { outline: none; }
-.pause-help-scroll .info-card { background: var(--surface-subtle); }
 .result-sub { color: var(--text-secondary); font-size: 14px; }
 
 /* ---------------------------------------------------------------------
@@ -1827,6 +1900,7 @@ html.is-touch .touch-controls[hidden] { display: none; }
 .screen--character .btn-back,
 .screen--map .btn-back,
 .screen--discover .btn-back,
+.screen--settings .btn-back,
 .mode-card,
 .mode-info,
 .mode-cta,
@@ -1842,7 +1916,6 @@ html.is-touch .touch-controls[hidden] { display: none; }
 .hud-center,
 .pause-overlay .pause-panel,
 .pause-overlay .pause-btn-item,
-.pause-overlay .btn-back,
 .practice-more,
 .practice-menu-overlay .pause-panel,
 .practice-menu-overlay .pause-btn-item,
@@ -1928,8 +2001,6 @@ html.is-portrait-blocked .rotate-overlay { display: grid; }
   .step-name { display: none; }
   .hint-bar { display: none; }
   .preview-info { gap: 7px; }
-  .info-card--wide { grid-column: auto; }
-  .tab { padding: 6px 14px 7px; }
 }
 
 /* Four setup steps: between the full header and the phone layout (where
@@ -1961,7 +2032,6 @@ html.is-portrait-blocked .rotate-overlay { display: grid; }
 }
 
 @media (max-width: 760px) {
-  .info-card--wide { grid-column: auto; }
   .steps { display: none; }
 }
 

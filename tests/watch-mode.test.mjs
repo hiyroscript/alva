@@ -162,6 +162,7 @@ const { DIFFICULTIES, DIFFICULTY_IDS, DEFAULT_DIFFICULTY, getDifficultyProfile }
 const { MAPS, getMap } = await import('../js/data/maps.js');
 const { ICONS } = await import('../js/ui/icons.js');
 const { ConfirmDialog } = await import('../js/ui/overlays.js');
+const { Settings } = await import('../js/core/settings.js');
 const { WATCH_SETUP, QUICK_BATTLE_SETUP } = await import('../js/ui/components.js');
 const { ScreenManager } = await import('../js/core/screen-manager.js');
 const { MenuNavigator } = await import('../js/core/menu-navigator.js');
@@ -223,6 +224,7 @@ function boot({ sets = { '0001': fakeSprites(), '9999': fakeSprites() } } = {}) 
       watch: { difficulty: DEFAULT_DIFFICULTY, cpu1CharacterId: '0001', cpu2CharacterId: '0001', mapId: MAPS[0].id },
     },
     input: fakeInput(),
+    settings: new Settings(null),
     device: { reducedMotion: true, blockedPortrait: false },
     audio: { play: noop },
     loading,
@@ -330,9 +332,9 @@ function trace(battle, steps) {
 test('Home: Watch Mode sits between Play and Practice Ground, styled like the secondary actions; Play stays the default', () => {
   const { app, screens } = boot();
   const home = screens.home;
-  const { play, watch, practice, discover } = home.actions;
-  assert.deepEqual(home.el.querySelectorAll('.home-action'), [play, watch, practice, discover], 'Play → Watch Mode → Practice Ground → Discover');
-  assert.deepEqual(home.el.querySelector('.home-actions').children, [play, watch, practice, discover], 'in the DOM in that order');
+  const { play, watch, practice, discover, settings } = home.actions;
+  assert.deepEqual(home.el.querySelectorAll('.home-action'), [play, watch, practice, discover, settings], 'Play → Watch Mode → Practice Ground → Discover → Settings');
+  assert.deepEqual(home.el.querySelector('.home-actions').children, [play, watch, practice, discover, settings], 'in the DOM in that order');
   assert.ok(watch.html.includes('<span>Watch Mode</span>'));
   assert.ok(watch.html.includes(ICONS.right), 'the secondary actions\' chevron');
   assert.equal(watch.className, practice.className, 'the same outlined Home action as Practice Ground and Discover');
@@ -343,7 +345,7 @@ test('Home: Watch Mode sits between Play and Practice Ground, styled like the se
   assert.equal(watch.hasAttribute('data-nav-default'), false);
   assert.equal(watch.disabled, false);
   assert.equal(document.activeElement, play, 'Play is still focused by default');
-  assert.deepEqual(app.nav.candidates(home.el), [play, watch, practice, discover], 'keyboard / gamepad reach all four, in order');
+  assert.deepEqual(app.nav.candidates(home.el), [play, watch, practice, discover, settings], 'keyboard / gamepad reach all five, in order');
   // Practice Ground and Discover still open their screens (their stand-ins).
   assert.ok(practice.html.includes('<span>Practice Ground</span>'));
   assert.ok(discover.html.includes('<span>Discover</span>'));
@@ -944,12 +946,34 @@ test('spectating: no touch controls and no gameplay input, through pause, resume
   off();
   screen.rematch();
   off();
-  // Touch presses never reach the input while spectating.
+  // Touch presses never reach the input while spectating: not a button, not
+  // the joystick, not a Dash button (whatever the Mobile Controls setting).
   const touches = [];
   app.input.setTouch = (action, held) => touches.push([action, held]);
-  screen.touch.buttons.get('jump').dispatch('pointerdown', { pointerId: 1, preventDefault: noop });
+  app.input.queueTouchDash = (direction) => touches.push(['dash', direction]);
+  const tryEverything = () => {
+    const down = { pointerId: 1, clientX: 500, clientY: 0, preventDefault: noop };
+    screen.touch.buttons.get('jump').dispatch('pointerdown', down);
+    screen.touch.buttons.get('charge').dispatch('pointerdown', { ...down, pointerId: 2 });
+    screen.touch.stick.dispatch('pointerdown', { ...down, pointerId: 3 });
+    for (const b of screen.touch.dashButtons.values()) b.dispatch('pointerdown', { ...down, pointerId: 4 });
+  };
+  assert.equal(screen.touch.scheme, 'joystick');
+  tryEverything();
   assert.deepEqual(touches, []);
   screen.exit();
+
+  // Classic Buttons: just as absent.
+  app.settings.set('mobileControls', 'classic');
+  app.screens.go('home', {}, { reset: true });
+  await startWatch(booted, { mapId: MAPS[0].id });
+  off();
+  assert.equal(screen.touch.scheme, 'classic');
+  tryEverything();
+  screen.touch.dpad.dispatch('pointerdown', { pointerId: 5, clientX: 0, clientY: 0, preventDefault: noop });
+  assert.deepEqual(touches, []);
+  screen.exit();
+  app.settings.set('mobileControls', 'joystick');
 
   app.screens.go('home', {}, { reset: true });
   await startQuickBattle(booted);
@@ -971,8 +995,7 @@ test('pause still works while spectating: P, Esc, gamepad Start and the HUD, wit
   app.input.key('KeyP');
   assert.equal(screen.paused, true, 'P pauses');
   assert.equal(screen.pauseMenuView.querySelector('.kicker').textContent, 'Watch Mode');
-  assert.deepEqual(items(), ['Resume', 'Restart Battle', 'Help', 'Return to Home'], 'no fighter controls');
-  assert.equal(screen.helpBtn.disabled, true, 'Help keeps its current state');
+  assert.deepEqual(items(), ['Resume', 'Restart Battle', 'Return to Home'], 'no fighter controls, and no Help');
   assert.equal(document.activeElement.textContent, 'Resume');
   assert.deepEqual(app.nav.scopes, [screen.pauseScope]);
   app.input.key('KeyP');

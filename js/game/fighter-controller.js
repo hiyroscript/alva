@@ -15,7 +15,8 @@ export function blankInput() {
   return {
     left: false, right: false, charge: false, jump: false, defense: false,
     primary: false, special: false, action1: false, action2: false,
-    leftPressed: false, rightPressed: false, jumpPressed: false, chargePressed: false, defensePressed: false,
+    leftPressed: false, rightPressed: false, dashLeftPressed: false, dashRightPressed: false,
+    jumpPressed: false, chargePressed: false, defensePressed: false,
     primaryPressed: false, specialPressed: false, action1Pressed: false, action2Pressed: false,
     dropPressed: false,
   };

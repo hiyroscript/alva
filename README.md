@@ -8,13 +8,15 @@ desktop and on phones and tablets in landscape.
 This is the first playable foundation: full menu flow, a 48-slot roster, two
 compact platform-fighter stages with open ledges and a Void kill boundary, a
 Watch Mode for CPU-vs-CPU matches, a
-Practice Ground training room, a Discover reference screen,
-movement and platform physics, a tiered Power system (Jump Power and Speed
-Power), a camera, a HUD, touch controls,
+Practice Ground training room, a Discover reference screen, a Settings
+screen, movement and platform physics, a tiered Power system (Jump Power and
+Speed Power), a camera, a HUD, touch controls in two layouts (a joystick by
+default, or the classic buttons),
 and a data-driven combat system built on Launch Point, Base Launch and
 Directional Launch, with #0001's two real attacks, Basic Attack 1
 (BA1) and Basic Attack 2 (BA2), a held ground and mid-air Shield on the
-shared Defense input, a Dash on a double tap, a 100-point Energy bar that a
+shared Defense input, a Dash on a double tap (or one tap of a touch Dash
+button), a 100-point Energy bar that a
 Dash and every Shielded hit spend, a held Charge
 stance, a Charged BA1 Clone Attack (CAB1) and a
 Charged BA2 Sphere Rush (CAB2), each on its own cooldown, and
@@ -61,20 +63,51 @@ in the code depends on the repository name, so no file changes are needed.
 
 | Action | Keyboard | Touch (landscape) |
 | --- | --- | --- |
-| Move left / right | `A` `D` or `←` `→` | Lower-left ◀ ▶ |
-| Dash | Double-tap `A` / `D` or `←` / `→` | Double-tap ◀ or ▶ |
-| Charge (in the air: fast fall) | `S` or `↓` | Lower-left **C** |
+| Move left / right | `A` `D` or `←` `→` | **Joystick:** push the joystick left / right · **Classic:** lower-left ◀ ▶ |
+| Dash | Double-tap `A` / `D` or `←` / `→` | **Joystick:** one tap of **Left mouvement** / **Right mouvement** (the small ◀ ▶ above the joystick) · **Classic:** double-tap ◀ or ▶ |
+| Charge (in the air: fast fall) | `S` or `↓` | **Joystick:** hold the down arrow under Jump · **Classic:** hold lower-left **C** |
 | Jump (tap: short hop; hold: full; again in the air: air jump) | `W`, `Space` or `↑` | Lower-right, bottom corner |
-| Throw | `J` | Lower-right, top (**T**) |
+| Throw | `J` | **Shuriken**, lower-right, top |
 | Special* | `K` | Lower-right, middle row |
-| Defense | `L` | Lower-right, middle row (**D**) |
-| Basic Attack 1 (BA1) | `U` | Lower-right, bottom row (**BA1**) |
-| Basic Attack 2 (BA2) | `I` | Lower-right, bottom row (**BA2**) |
+| Defense | `L` | **Shield**, lower-right, middle row |
+| Basic Attack 1 (BA1) | `U` | **Punch**, lower-right, bottom row |
+| Basic Attack 2 (BA2) | `I` | **Kick**, lower-right, bottom row |
 | Pause | `Esc` or `P` | Timer or pause button, top centre |
 | Practice menu (Practice Ground) | `Esc` or `P` | Three-dots button, top centre |
 
 \* Reserved: wired into input and combat, but inactive until #0001 has matching
 attack animations. Its touch button has a dashed outline.
+
+### Mobile Controls
+
+Touch play has two layouts. Pick one under **Home → Settings → Mobile
+Controls**; it is saved on the device (one small versioned object in
+`localStorage`, `alva.settings`) and used by Quick Battle and Practice
+Ground from their next start. Watch Mode never shows player controls.
+Keyboard and gamepad controls are the same whichever layout is chosen.
+
+- **Joystick** (the default, for anyone who never chose): the lower-left
+  corner is one round joystick. Push it left or right to run; it holds the
+  same Left / Right as the keys, so how far you push never changes the
+  speed. A small deadzone round the centre keeps a resting thumb from
+  drifting, crossing the centre switches direction cleanly, and letting go
+  recentres it. Pushing it up or down only moves the knob: Jump and Charge
+  keep their own buttons. Above the joystick's top corners sit two small
+  Dash buttons, **Left mouvement** and **Right mouvement**: one tap is one
+  Dash that way. They hold nothing and need no second tap, and the Dash
+  itself is the usual one (grounded only, 15 Energy, its animation, and
+  refused while attacking, charging, shielding, exhausted and so on).
+  **Charge** is a down-arrow button directly under Jump: hold it to charge
+  on the ground or to fast-fall in the air, and press Punch or Kick while
+  holding it for the charged attacks. The joystick works with any other
+  button at once (hold it right and press Jump, Punch, Kick, Shield,
+  Shuriken, Special or Charge with another finger).
+- **Classic Buttons**: the original layout, unchanged: Left, **C**
+  (Charge) and Right at the lower left, with thumb sliding between them;
+  tap Left or Right twice quickly to Dash.
+
+The keyboard and gamepad Dash stays the double tap. Pushing the joystick
+out twice quickly is a double tap too, as with a gamepad stick.
 
 - **Movement and combos:** #0001 starts, stops and turns quickly (top
   speed in about 0.1 s, a short stop, a full turn in about 0.14 s) and
@@ -181,7 +214,10 @@ attack animations. Its touch button has a dashed outline.
   is blocked is decided by his normal hurtboxes, never by the larger circle.
 - **Dash:** press left or right twice in a row (the second press within
   0.22 s of the first, keyboard, touch, D-pad or left stick alike) while
-  standing on the ground. #0001 bursts that way at about 2.7× its top speed
+  standing on the ground, or tap **Left mouvement** / **Right mouvement**
+  once in the Joystick touch layout: that one-tap request
+  (`InputManager.queueTouchDash`) goes through the same `Fighter.tryDash`,
+  with every rule and cost below, and forgets any first tap waiting. #0001 bursts that way at about 2.7× its top speed
   (900 units / s) for one pass of its two-frame dash clip (`dash1 → dash2`,
   once, at 10 fps: 0.2 s, about 180 units), facing the Dash at once, then
   runs on from that speed if you keep holding the direction. It costs 15
@@ -208,8 +244,8 @@ attack animations. Its touch button has a dashed outline.
   until Energy is completely full again (a partial refill does not unlock
   them); the bar disappears at 100. Exhausted, a fighter still moves, jumps,
   attacks, charges and uses CAB1 / CAB2: nothing else ever costs Energy.
-- **Charge:** hold `S` / `↓` (**C** on touch, D-pad down or left stick down
-  on a gamepad) while #0001 is on the ground. Held, it plays
+- **Charge:** hold `S` / `↓` (on touch the down arrow under Jump, or **C**
+  in Classic Buttons; D-pad down or left stick down on a gamepad) while #0001 is on the ground. Held, it plays
   `charge1 → charge2` once, then loops `chargea ↔ chargeb` for as long as you
   hold it. Charge must be held; it never toggles. Let go and #0001 shows
   `charge1` briefly as a release pose (one Charge frame, 0.1 s), then returns
@@ -319,7 +355,7 @@ attack animations. Its touch button has a dashed outline.
   rate. A restart or rematch, a new fighter in Practice Ground and every
   respawn after the Void clear them. They cost no Energy.
 - **Menus:** arrow keys or WASD to move, `Enter` to select, `Esc` to go back. Mouse and touch work too.
-- **Touch:** several fingers work at once (hold Right and press Jump, or hold C and press Punch). You can slide your thumb between Left / Charge / Right, and tap ◀ or ▶ twice to Dash. The combat buttons show icons, not letters: for #0001, **Shuriken** (Throw), **Shield** (held, Defense), **Punch** (Basic Attack 1) and **Kick** (Basic Attack 2), beside Special and Jump. Hold C, then press Punch for the Clone Attack or Kick for the Sphere Rush. The icons of the fighter's own buttons (Shuriken, Punch, Kick) come from its `mobileAbilities` in `js/data/characters.js` and follow Player 1's fighter, in Practice Ground too when you change fighter; Shield, Special, Jump and Charge are the same for everyone. Only the presentation is per fighter: the buttons still send the unchanged internal inputs (`primary`, `defense`, `action1`, `action2`). The viewport disables page zoom (`maximum-scale=1, user-scalable=no`) and the play surfaces and buttons set `touch-action: none`, so rapid taps never zoom or scroll the page.
+- **Touch:** two layouts, Joystick (the default) and Classic Buttons (see [Mobile Controls](#mobile-controls)). Several fingers work at once (hold the joystick or Right and press Jump, or hold Charge and press Punch). The combat buttons show icons, not letters: for #0001, **Shuriken** (Throw), **Shield** (held, Defense), **Punch** (Basic Attack 1) and **Kick** (Basic Attack 2), beside Special and Jump. Hold Charge, then press Punch for the Clone Attack or Kick for the Sphere Rush. The icons of the fighter's own buttons (Shuriken, Punch, Kick) come from its `mobileAbilities` in `js/data/characters.js` and follow Player 1's fighter, in Practice Ground too when you change fighter; Shield, Special, Jump and Charge are the same for everyone. Only the presentation is per fighter: the buttons still send the unchanged internal inputs (`primary`, `defense`, `action1`, `action2`). The combat buttons are the same elements in both layouts: switching (`TouchControls.setScheme`) only swaps the lower-left corner and adds or removes the Charge under Jump, after letting go of everything held. The viewport disables page zoom (`maximum-scale=1, user-scalable=no`) and the play surfaces, joystick and buttons set `touch-action: none`, so rapid taps never zoom or scroll the page.
 - **Gamepad (standard layout):** D-pad or left stick left / right to move (twice in a row to Dash) and down to Charge in battle (they still navigate menus), A to jump, X / Square to Throw, B / Circle for Basic Attack 1, LB for Basic Attack 2, Y / Triangle for the reserved Special, RB or RT for Defense, Start to pause.
 - **Debug:** `` ` `` toggles the collider, hurtbox and attack-hitbox overlay in battle (a hitbox shows only while it can connect; hurtboxes look the same with the Shield up, and a shielding fighter is labelled `shield`; a flying shuriken's hitbox is outlined in magenta and labelled; a clone's attack hitbox shows in the attack colour, labelled `clone ba1` (or `clone midairBa2` overhead), only on its active frame; the Sphere Rush's sphere hitbox is a dashed cyan box labelled `charged ba2 dash` while it can connect, then a dashed cyan cross marks the sphere on the caught opponent, which is labelled `bound`; solids, the main floor's block among them, are outlined in red and the Void's fixed kill line is dashed violet).
 
@@ -360,12 +396,18 @@ ring with dark separation keep states identifiable beyond colour.
   still for reduced-motion users. Wheel/trackpad, pointer or touch dragging,
   and focused arrow/Page keys scroll the credits manually. Automatic movement
   resumes from that position after about 2 seconds of inactivity; reduced-motion
-  mode remains manual-only. Under Play come three outlined secondary actions,
+  mode remains manual-only. Under Play come four outlined secondary actions,
   in this order: **Watch Mode** opens its CPU-vs-CPU setup directly (never
-  Select Mode), **Practice Ground** opens the training room directly, and
-  **Discover** opens the in-game reference. The strip shifts outward on
-  narrow screens, and short landscape screens tighten the four actions so
-  they fit above the footer.
+  Select Mode), **Practice Ground** opens the training room directly,
+  **Discover** opens the in-game reference, and **Settings** opens the
+  settings (Mobile Controls). The strip shifts outward on narrow screens,
+  and short landscape screens tighten the five actions, and shrink the
+  wordmark only as much as they need, so they fit above the footer.
+- **Settings** has one setting today, **Mobile Controls**, as two cards
+  (Joystick, marked Default, and Classic Buttons), each with a small drawing
+  of its lower-left corner. They are a radio group reached by keyboard and
+  gamepad like any menu; the one in use is marked Selected. Choosing one
+  saves it at once.
 - **Select Difficulty** takes Seren's four-level ascending scale into Alva's
   own language: four large charcoal cards (01 Easy, 02 Medium, 03 Hard, 04
   Brutal), each with its big mono index, a four-bar scale lit one to four
@@ -406,10 +448,11 @@ assets/characters/0001/   #0001 sprite frames (unchanged originals)
 js/
   main.js, config.js  boot + global config (bindings, render, timing)
   core/               app controller, screen manager, menu navigation,
-                      asset loader, input (keyboard/touch/gamepad), device, audio stub
+                      asset loader, input (keyboard/touch/gamepad), device,
+                      audio stub, settings (saved Mobile Controls)
   screens/            splash, home, mode, difficulty, character, map, Watch
-                      Mode's setup (watch-screens.js), help, battle,
-                      practice, discover
+                      Mode's setup (watch-screens.js), battle, practice,
+                      discover, settings
   game/               arena (shared loop + rendering), battle (Quick Battle
                       and Watch Mode), Practice
                       session, controllers (player, combat AI, training),
@@ -417,14 +460,14 @@ js/
                       combat, launch bounces, projectiles, summoned clones, charged
                       techniques, sprite normalizer/animator, HUDs,
                       fighter status (Energy bar, CAB rings), the Shield's
-                      circle, touch
-                      controls
+                      circle, touch controls (Joystick and Classic
+                      Buttons)
   stages/             Desert, City and Practice renderers (procedural Canvas 2D),
                       the shared one-point perspective and the Void
   data/               characters.js, maps.js, practice-map.js, powers.js,
                       launch.js, difficulty.js
-  ui/                 wordmark, icons, overlays, shared help content, stage
-                      preview, fighter roster
+  ui/                 wordmark, icons, overlays, credits, stage preview,
+                      fighter roster, mobile ability icons
 ```
 
 - **Sprite normalization.** The idle, jump, fall, land and hurt frames are pixel art at roughly 16× scale, the mid-air hurt, Basic Attack 1 and 2 and Charge frames at 8×, and the run frames at 4×; the Dash and Shield frames are drawn at 1× (one file pixel per art pixel), so each clip's `heightRatio` sizes it against idle's 52 art pixels at that same scale. When a frame loads, the game reads its alpha channel once and finds the visible bounds. It then detects the pixel grid from every colour transition and resamples the frame to 1 pixel per art pixel. Every frame is drawn at the same world scale, anchored bottom-centre at the upper-body centroid, so the fighter keeps the same size and position when switching between animations. When the size stays close to the target, each art pixel maps to a whole number of device pixels. The Sphere Rush poses are fighter poses at 2×, normalized like the rest. Projectile and effect art (the shuriken at 8×, the clone cloud and the Sphere Rush sphere at 2×) goes through the same grid detection but keeps its own art size, centre-anchored at the fighter's art-pixel scale, and is never fitted to the fighter's height.
@@ -536,7 +579,7 @@ retraces them to Home, landing on each choice.
 
 - **Spectator only.** Both fighters are `CombatAIController`s, one each, and
   nobody controls either: no gameplay input is read and the touch controls
-  are hidden. Pause (`Esc`, `P`, gamepad Start or the HUD's pause button),
+  are hidden, in either Mobile Controls layout. Pause (`Esc`, `P`, gamepad Start or the HUD's pause button),
   Resume, Restart Battle, Rematch, Change Stage and Return to Home work as in
   Quick Battle.
 - **One difficulty for both.** The chosen level (Easy, Medium, Hard or
@@ -745,5 +788,7 @@ properties belong to their respective rights holders.
 
 **Project.** Unofficial fan project. No affiliation or endorsement is implied.
 
-The in-game credits (Home credits roll and Credits tab) render from one list in
-`js/ui/help-content.js`. The game ships with no audio.
+The in-game credits (the Home credits roll) render from one list in
+`js/ui/credits.js`. There is no in-game Help screen; this README and
+[`ALVA_SPEC.md`](./ALVA_SPEC.md) document the controls. The game ships with
+no audio.

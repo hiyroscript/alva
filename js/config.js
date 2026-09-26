@@ -62,9 +62,9 @@ export const CONFIG = Object.freeze({
     totalSlots: 48,
   },
 
-  // Player 1 keyboard bindings (KeyboardEvent.code). The Help screen renders
-  // these directly, so this table is the single source of truth. S / ↓ are
-  // Charge in battle; menus read their own Down from menuBindings below.
+  // Player 1 keyboard bindings (KeyboardEvent.code), the single source of
+  // truth for gameplay keys. S / ↓ are Charge in battle; menus read their
+  // own Down from menuBindings below.
   // `defense` is the shared Defense input; each character decides what it
   // does (#0001 holds it to Shield).
   bindings: {
@@ -113,16 +113,3 @@ export const ACTION_LABELS = Object.freeze({
   action2: 'Basic Attack 2',
   pause: 'Pause',
 });
-
-const KEY_NAMES = {
-  ArrowLeft: '←', ArrowRight: '→', ArrowUp: '↑', ArrowDown: '↓',
-  Space: 'Space', Escape: 'Esc', Enter: 'Enter', Backspace: 'Backspace',
-  Backquote: '`',
-};
-
-export function keyLabel(code) {
-  if (KEY_NAMES[code]) return KEY_NAMES[code];
-  if (code.startsWith('Key')) return code.slice(3);
-  if (code.startsWith('Digit')) return code.slice(5);
-  return code;
-}

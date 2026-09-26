@@ -184,6 +184,7 @@ const { HUD } = await import('../js/game/hud.js');
 const { PlayerController, TrainingAIController } = await import('../js/game/fighter-controller.js');
 const { CombatAIController } = await import('../js/game/combat-ai.js');
 const { MenuNavigator } = await import('../js/core/menu-navigator.js');
+const { Settings } = await import('../js/core/settings.js');
 const { ICONS } = await import('../js/ui/icons.js');
 const { HomeScreen } = await import('../js/screens/home-screen.js');
 const { CharacterSelectScreen } = await import('../js/screens/character-select-screen.js');
@@ -238,6 +239,7 @@ function fakeApp() {
   const app = {
     selection: { mode: 'quick-battle', characterId: '0001', mapId: MAPS[0].id },
     input: fakeInput(),
+    settings: new Settings(null),
     device: { blockedPortrait: false, reducedMotion: false, noteKeyboard: noop },
     screens: { current: null, calls: [], go(...args) { this.calls.push(args); }, back: noop },
     loading: { labels: [], show(label) { this.labels.push(label); }, hide: noop, setProgress: noop, showError(message, opts) { this.error = { message, opts }; } },
@@ -325,36 +327,63 @@ function practiceSession({ cpu = true } = {}) {
 
 // ---- Home ---------------------------------------------------------------------
 
-test('Home: Play, Watch Mode, Practice Ground, then Discover; Practice Ground and Discover open directly', () => {
+test('Home: Play, Watch Mode, Practice Ground, Discover, then Settings; Practice Ground, Discover and Settings open directly', () => {
   const { app } = fakeApp();
   const home = new HomeScreen(app);
-  const { play, watch, practice, discover } = home.actions;
+  const { play, watch, practice, discover, settings } = home.actions;
   assert.ok(play.html.includes('<span>Play</span>'));
   assert.ok(watch.html.includes('<span>Watch Mode</span>'));
   assert.ok(practice.html.includes('<span>Practice Ground</span>'));
   assert.ok(discover.html.includes('<span>Discover</span>'));
-  assert.deepEqual(home.el.querySelectorAll('.home-action'), [play, watch, practice, discover], 'Watch Mode, the fourth action, sits under Play');
-  // Discover matches Practice Ground: the same outlined action and chevron.
-  for (const action of [practice, discover]) {
+  assert.ok(settings.html.includes('<span>Settings</span>'));
+  assert.deepEqual(home.el.querySelectorAll('.home-action'), [play, watch, practice, discover, settings], 'Watch Mode under Play, Settings last');
+  // Discover and Settings match Practice Ground: the same outlined action and chevron.
+  for (const action of [practice, discover, settings]) {
     assert.ok(action.html.includes(ICONS.right), 'keeps the Home chevron');
     assert.equal(action.className, 'home-action');
     assert.equal(action.disabled, false);
     assert.equal(action.hasAttribute('data-nav'), true);
   }
   assert.ok(!home.el.querySelectorAll('.home-action').some((b) => b.html.includes('Help')));
-  assert.deepEqual(app.nav.candidates(home.el), [play, watch, practice, discover], 'keyboard / gamepad reach them, in order');
-  assert.equal(home.el.querySelector('.home-actions').children.at(-1), discover, 'Discover sits directly under Practice Ground');
-  assert.equal(home.el.querySelector('.home-actions').children.at(-2), practice);
+  assert.deepEqual(app.nav.candidates(home.el), [play, watch, practice, discover, settings], 'keyboard / gamepad reach them, in order');
+  const actions = home.el.querySelector('.home-actions').children;
+  assert.equal(actions.indexOf(discover), actions.indexOf(practice) + 1, 'Discover sits directly under Practice Ground');
+  assert.equal(actions.indexOf(settings), actions.indexOf(discover) + 1, 'Settings sits directly under Discover');
 
   practice.click();
   assert.deepEqual(app.screens.calls, [['practice']], 'no mode, fighter or stage select first');
   discover.click();
   assert.deepEqual(app.screens.calls[1], ['discover'], 'Discover opens the Discover screen');
+  settings.click();
+  assert.deepEqual(app.screens.calls[2], ['settings'], 'Settings opens the Settings screen');
   play.click();
-  assert.deepEqual(app.screens.calls[2], ['mode'], 'Play still opens Select Mode');
+  assert.deepEqual(app.screens.calls[3], ['mode'], 'Play still opens Select Mode');
 });
 
 // ---- Entering -----------------------------------------------------------------
+
+test('Practice Ground uses the Mobile Controls setting on every entry, and a scheme change never touches the fighter\'s buttons', async () => {
+  const { app } = fakeApp();
+  const screen = new PracticeGroundScreen(app);
+  app.screens.current = screen;
+  const elements = new Map(screen.touch.actionButtons);
+  await screen.enter();
+  assert.equal(screen.touch.scheme, 'joystick', 'the default');
+  assert.equal(screen.touch.root.children[0], screen.touch.joystick);
+  assert.equal(screen.touch.enabled, true);
+  screen.exit();
+
+  app.settings.set('mobileControls', 'classic');
+  await screen.enter();
+  assert.equal(screen.touch.scheme, 'classic');
+  assert.equal(screen.touch.root.children[0], screen.touch.dpad);
+  assert.deepEqual(screen.touch.dpad.children.map((b) => b.getAttribute('aria-label')), ['Move left', 'Charge', 'Move right']);
+  assert.equal(screen.touch.enabled, true);
+  for (const [action, b] of elements) assert.equal(screen.touch.actionButtons.get(action), b, action);
+  assert.equal(screen.touch.buttons.get('primary').getAttribute('aria-label'), 'Shuriken', '#0001\'s own, whatever the layout');
+  screen.exit();
+  assert.equal(screen.touch.enabled, false, 'leaving turns them off');
+});
 
 test('a fresh entry always starts with #0001, whatever Quick Battle or an earlier visit chose', async () => {
   assert.equal(PRACTICE_DEFAULT_FIGHTER, '0001');

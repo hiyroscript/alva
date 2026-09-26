@@ -10,9 +10,7 @@
 import { Screen } from '../core/screen-manager.js';
 import { CONFIG } from '../config.js';
 import { el } from '../core/utils.js';
-import { ICONS } from '../ui/icons.js';
 import { menuButton } from '../ui/components.js';
-import { buildHelp } from '../ui/help-content.js';
 import { getCharacter } from '../data/characters.js';
 import { getMap } from '../data/maps.js';
 import { Battle } from '../game/battle.js';
@@ -95,43 +93,26 @@ export class BattleScreen extends Screen {
   buildPause() {
     const resume = menuButton('Resume', { primary: true });
     const restart = menuButton('Restart Battle', { outlineOnly: true });
-    // Help is disabled for now. Disabled buttons ignore clicks and the menu
-    // navigator skips them; drop `disabled` to bring the Help view back.
-    this.helpBtn = menuButton('Help', { disabled: true });
     const home = menuButton('Return to Home', { outlineOnly: true });
     resume.addEventListener('click', () => this.resume());
     restart.addEventListener('click', () => this.restart());
-    this.helpBtn.addEventListener('click', () => this.openHelp());
     home.addEventListener('click', () => this.confirmHome());
 
     this.pauseKicker = el('span', { class: 'kicker', text: MODE_TEXT['quick-battle'].kicker });
     this.pauseMenuView = el('div', { class: 'pause-view' }, [
       this.pauseKicker,
       el('h2', { class: 'pause-title', id: 'pause-title', text: 'Paused' }),
-      el('div', { class: 'pause-menu' }, [resume, restart, this.helpBtn, home]),
-    ]);
-
-    const helpBack = el('button', { class: 'btn-back', type: 'button', 'data-nav': true, 'data-nav-default': true, 'aria-label': 'Back to pause menu', html: `${ICONS.back}<span>Back</span>` });
-    helpBack.addEventListener('click', () => this.closeHelp());
-    this.helpScroll = el('div', { class: 'pause-help-scroll', tabindex: '0' }, [buildHelp()]);
-    this.pauseHelpView = el('div', { class: 'pause-view pause-view--help', hidden: true }, [
-      el('div', { class: 'pause-help-head' }, [helpBack, el('h2', { class: 'pause-title', text: 'Help' })]),
-      this.helpScroll,
+      el('div', { class: 'pause-menu' }, [resume, restart, home]),
     ]);
 
     this.pauseOverlay = el('div', {
       class: 'overlay pause-overlay', hidden: true, role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'pause-title',
-    }, [el('div', { class: 'pause-panel glass glass--panel' }, [this.pauseMenuView, this.pauseHelpView])]);
+    }, [el('div', { class: 'pause-panel glass glass--panel' }, [this.pauseMenuView])]);
 
     this.pauseScope = {
       el: this.pauseOverlay,
-      onBack: () => (this.helpOpen ? this.closeHelp() : this.resume()),
+      onBack: () => this.resume(),
       onStart: () => this.resume(),
-      onDirection: (dir) => {
-        if (!this.helpOpen || (dir !== 'up' && dir !== 'down')) return false;
-        this.helpScroll.scrollBy({ top: (dir === 'down' ? 1 : -1) * this.helpScroll.clientHeight * 0.4 });
-        return true;
-      },
     };
   }
 
@@ -184,8 +165,10 @@ export class BattleScreen extends Screen {
     this.canvas.setAttribute('aria-label', watch
       ? `Watch Mode battle: CPU 1, ${p1Def.displayName}, against CPU 2, ${p2Def.displayName}`
       : 'Battle');
-    // Player 1's fighter decides the touch ability icons, never the CPU's.
-    // A spectator has no touch controls at all.
+    // The touch layout the player chose (Home › Settings › Mobile Controls),
+    // and Player 1's fighter for the ability icons, never the CPU's. A
+    // spectator has no touch controls at all.
+    this.touch.setScheme(app.settings.mobileControls);
     this.touch.setCharacter(watch ? null : p1Def);
     this.touchRoot.hidden = watch;
     this.el.classList.toggle('is-watch', watch);
@@ -327,7 +310,7 @@ export class BattleScreen extends Screen {
     if (this.isRunning) {
       e.preventDefault();
       this.pause();
-    } else if (this.paused && e.code === 'KeyP' && !this.helpOpen) {
+    } else if (this.paused && e.code === 'KeyP') {
       e.preventDefault();
       this.resume();
     }
@@ -376,7 +359,6 @@ export class BattleScreen extends Screen {
     this.setPlayActive(false);
     this.el.classList.add('is-paused');
     this.pauseOverlay.hidden = false;
-    this.closeHelp(true);
     this.app.nav.pushScope(this.pauseScope);
     this.pauseMenuView.querySelector('[data-nav-default]').focus({ preventScroll: true });
   }
@@ -394,26 +376,6 @@ export class BattleScreen extends Screen {
     this.pauseOverlay.hidden = true;
     this.el.classList.remove('is-paused');
     this.app.nav.popScope(this.pauseScope);
-    this.helpOpen = false;
-  }
-
-  openHelp() {
-    this.helpOpen = true;
-    this.pauseOverlay.classList.add('is-help');
-    this.pauseMenuView.hidden = true;
-    this.pauseHelpView.hidden = false;
-    this.helpScroll.scrollTop = 0;
-    this.pauseHelpView.querySelector('[data-nav-default]').focus({ preventScroll: true });
-  }
-
-  closeHelp(silent = false) {
-    this.helpOpen = false;
-    this.pauseOverlay.classList.remove('is-help');
-    this.pauseHelpView.hidden = true;
-    this.pauseMenuView.hidden = false;
-    if (silent) return;
-    const target = this.helpBtn.disabled ? this.pauseMenuView.querySelector('[data-nav-default]') : this.helpBtn;
-    target.focus({ preventScroll: true });
   }
 
   restart() {

@@ -8,6 +8,7 @@ import { AudioManager } from './audio-manager.js';
 import { Device } from './device.js';
 import { ScreenManager } from './screen-manager.js';
 import { MenuNavigator } from './menu-navigator.js';
+import { Settings } from './settings.js';
 import { LoadingOverlay, ConfirmDialog } from '../ui/overlays.js';
 import { CHARACTERS, getCharacter, characterFramePaths } from '../data/characters.js';
 import { MAPS } from '../data/maps.js';
@@ -21,16 +22,18 @@ import { DifficultySelectScreen } from '../screens/difficulty-select-screen.js';
 import { CharacterSelectScreen } from '../screens/character-select-screen.js';
 import { MapSelectScreen } from '../screens/map-select-screen.js';
 import { WatchDifficultyScreen, WatchFighterScreen, WatchMapScreen } from '../screens/watch-screens.js';
-import { HelpCreditsScreen } from '../screens/help-credits-screen.js';
 import { BattleScreen } from '../screens/battle-screen.js';
 import { PracticeGroundScreen } from '../screens/practice-screen.js';
 import { DiscoverScreen } from '../screens/discover-screen.js';
+import { SettingsScreen } from '../screens/settings-screen.js';
 
 export class App {
   constructor() {
     this.config = CONFIG;
     this.device = new Device().init();
     this.input = new InputManager(CONFIG.bindings);
+    // The player's saved settings (Home › Settings), read once here.
+    this.settings = new Settings();
     this.audio = new AudioManager();
     this.assets = new AssetLoader();
     this.screens = new ScreenManager(this);
@@ -75,11 +78,10 @@ export class App {
     s.register(new WatchFighterScreen(this, 1));
     s.register(new WatchFighterScreen(this, 2));
     s.register(new WatchMapScreen(this));
-    // No longer linked from Home (Practice Ground took its entry); kept in place.
-    s.register(new HelpCreditsScreen(this));
     s.register(new BattleScreen(this));
     s.register(new PracticeGroundScreen(this));
     s.register(new DiscoverScreen(this));
+    s.register(new SettingsScreen(this));
 
     // Preload every available fighter while the splash plays.
     for (const def of CHARACTERS) if (def.available) this.loadCharacter(def.id);

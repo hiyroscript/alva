@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import { BattleScreen } from '../js/screens/battle-screen.js';
 import { MenuNavigator } from '../js/core/menu-navigator.js';
 import { ConfirmDialog } from '../js/ui/overlays.js';
+import { Settings } from '../js/core/settings.js';
 import { readFileSync } from 'node:fs';
 import { Battle } from '../js/game/battle.js';
 import { CombatState } from '../js/game/combat.js';
@@ -135,6 +136,7 @@ function setup() {
       setGameplayActive(on) { this.gameplayActive = on; },
       flush() {},
     },
+    settings: new Settings(null),
     device: { blockedPortrait: false, reducedMotion: false },
     screens: { current: null, back() {}, go() {} },
     loading: { hide() {} },
@@ -190,30 +192,48 @@ function startBattle(screen, opts) {
 const pauseItems = (screen) => screen.pauseMenuView.querySelectorAll('[data-nav]');
 const byText = (items, text) => items.find(b => b.textContent === text);
 
-test('pause Help is visible but disabled, and navigation skips it', () => {
+test('the pause menu is exactly Resume, Restart Battle and Return to Home, in that order', () => {
   const { app, screen } = setup();
   startBattle(screen);
   screen.pause();
   const items = pauseItems(screen);
-  assert.deepEqual(items.map(b => b.textContent), ['Resume', 'Restart Battle', 'Help', 'Return to Home']);
-  const [resume, restart, help, home] = items;
-  assert.equal(help.disabled, true);
-  assert.equal(help.hidden, false);
+  assert.deepEqual(items.map(b => b.textContent), ['Resume', 'Restart Battle', 'Return to Home']);
+  const [resume, restart, home] = items;
+  assert.ok(items.every(b => !b.disabled && !b.hidden), 'all three are live');
   assert.equal(document.activeElement, resume);
   assert.deepEqual(app.nav.candidates(screen.pauseOverlay), [resume, restart, home]);
 
   items.forEach((b, i) => { b.rect = { left: 0, top: i * 50, width: 300, height: 44 }; });
-  restart.focus();
+  app.nav.move('down', screen.pauseOverlay);
+  assert.equal(document.activeElement, restart);
   app.nav.move('down', screen.pauseOverlay);
   assert.equal(document.activeElement, home);
   app.nav.move('up', screen.pauseOverlay);
   assert.equal(document.activeElement, restart);
+});
 
-  help.focus();
-  assert.equal(document.activeElement, restart, 'disabled Help never takes focus');
-  help.click();
-  assert.equal(screen.helpOpen, false);
-  assert.equal(screen.pauseHelpView.hidden, true);
+test('Help is gone from the pause overlay: no button, view, scroll area, state or class', () => {
+  const { screen } = setup();
+  startBattle(screen);
+  screen.pause();
+  const everything = [];
+  const walk = (n) => {
+    if (!(n instanceof Element)) return everything.push(n.textContent);
+    everything.push(...n.attrs.values(), [...n.classNames].join(' '));
+    n.children.forEach(walk);
+  };
+  walk(screen.pauseOverlay);
+  assert.doesNotMatch(everything.join(' '), /help/i, 'no Help text, label, id or class');
+  assert.equal(screen.pauseOverlay.querySelector('.pause-panel').children.length, 1, 'one view: the menu');
+  for (const key of ['helpBtn', 'helpOpen', 'helpScroll', 'pauseHelpView', 'openHelp', 'closeHelp']) {
+    assert.equal(screen[key], undefined, key);
+  }
+  assert.equal(screen.pauseScope.onDirection, undefined, 'arrows only move between the three items');
+  // Esc / Back resumes straight away.
+  screen.pauseScope.onBack();
+  assert.equal(screen.paused, false);
+  const source = readFileSync(new URL('../js/screens/battle-screen.js', import.meta.url), 'utf8');
+  assert.doesNotMatch(source, /help/i, 'no Help code left in the Battle screen');
 });
 
 test('S and ↓ still move down through menus; gameplay Charge leaves menu Down alone', () => {
@@ -222,30 +242,15 @@ test('S and ↓ still move down through menus; gameplay Charge leaves menu Down 
   screen.pause();
   const items = pauseItems(screen);
   items.forEach((b, i) => { b.rect = { left: 0, top: i * 50, width: 300, height: 44 }; });
-  const [resume, restart, , home] = items;
+  const [resume, restart, home] = items;
   assert.equal(document.activeElement, resume);
   const key = (code) => app.nav.onKey({ code, repeat: false, preventDefault() {} });
   key('KeyS');
   assert.equal(document.activeElement, restart);
   key('ArrowDown');
-  assert.equal(document.activeElement, home, 'skips the disabled Help');
+  assert.equal(document.activeElement, home);
   key('KeyW');
   assert.equal(document.activeElement, restart);
-});
-
-test('leaving the Help view focuses a live pause item, not a positional index', () => {
-  const { screen } = setup();
-  startBattle(screen);
-  screen.pause();
-  const [resume, , help] = pauseItems(screen);
-  screen.openHelp();
-  screen.closeHelp();
-  assert.equal(document.activeElement, resume, 'falls back to Resume while Help is disabled');
-
-  help.disabled = false; // how Help comes back later
-  screen.openHelp();
-  screen.closeHelp();
-  assert.equal(document.activeElement, help);
 });
 
 test('pause dialog shows Quick Battle without the stage name', () => {
@@ -704,12 +709,11 @@ const outlineOnly = (b) => b.classList.contains('is-outline-only');
 
 test('only Restart Battle and Return to Home drop their fill in the pause menu', () => {
   const { screen } = setup();
-  const [resume, restart, help, home] = pauseItems(screen);
+  const [resume, restart, home] = pauseItems(screen);
   assert.equal(outlineOnly(restart), true);
   assert.equal(outlineOnly(home), true);
   assert.equal(outlineOnly(resume), false);
   assert.equal(resume.classList.contains('is-primary'), true);
-  assert.equal(outlineOnly(help), false);
   for (const b of screen.resultOverlay.querySelectorAll('[data-nav]')) {
     assert.equal(outlineOnly(b), false, `${b.textContent} keeps its fill states`);
   }
@@ -776,4 +780,34 @@ test('entering Quick Battle shows Player 1\'s fighter on the touch ability butto
     ['Kick', ICONS.kick, 'action2'],
   ]);
   assert.equal(touch.enabled, false, 'no play without sprites');
+});
+
+test('Quick Battle uses the Mobile Controls setting: Joystick by default, Classic Buttons once chosen, read on every entry', async () => {
+  const { app, screen } = setup();
+  const { MAPS } = await import('../js/data/maps.js');
+  app.selection = { characterId: '0001', mapId: MAPS[0].id };
+  app.loadCharacter = () => Promise.resolve({ usable: false });
+  app.loading = { show() {}, hide() {}, setProgress() {}, showError() {} };
+  const touch = screen.touch;
+  const elements = new Map(touch.actionButtons);
+  const lowerLeft = () => touch.root.children[0];
+
+  await screen.enter();
+  assert.equal(app.settings.mobileControls, 'joystick', 'nothing stored: the default');
+  assert.equal(touch.scheme, 'joystick');
+  assert.equal(lowerLeft(), touch.joystick);
+  assert.equal(touch.buttons.get('charge'), touch.chargeDown);
+
+  app.settings.set('mobileControls', 'classic');
+  await screen.enter();
+  assert.equal(touch.scheme, 'classic');
+  assert.equal(lowerLeft(), touch.dpad);
+  assert.equal(touch.buttons.get('charge').textContent, 'C');
+
+  app.settings.set('mobileControls', 'joystick');
+  await screen.enter();
+  assert.equal(touch.scheme, 'joystick');
+  // The fighter's combat buttons were never rebuilt along the way.
+  for (const [action, b] of elements) assert.equal(touch.actionButtons.get(action), b, action);
+  assert.equal(touch.buttons.get('action1').getAttribute('aria-label'), 'Punch');
 });

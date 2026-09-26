@@ -180,6 +180,8 @@ export class PracticeGroundScreen extends Screen {
     // then included).
     this.characterId = PRACTICE_DEFAULT_FIGHTER;
     const def = getCharacter(this.characterId);
+    // The touch layout the player chose (Home › Settings › Mobile Controls).
+    this.touch.setScheme(app.settings.mobileControls);
     this.touch.setCharacter(def);
     this.token = {};
     const token = this.token;
