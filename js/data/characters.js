@@ -12,6 +12,8 @@
 //      'reverseVertical'), e.g. `damage: 10, baseLaunch: 2,
 //      directionalLaunch: 'vertical'` (see js/data/launch.js)
 //   3. giving it a rosterSlot
+//   4. optionally, naming its moves in `abilityNames` (keyed by move
+//      codename; see js/data/abilities.js)
 //
 // Every field the engine reads lives here; nothing about #0001 is hard-coded
 // in the game systems.
@@ -550,6 +552,19 @@ export const CHARACTERS = [
       uniqueba: { label: 'Shuriken', icon: 'shuriken' },
       ba1: { label: 'Punch', icon: 'punch' },
       ba2: { label: 'Kick', icon: 'kick' },
+    },
+
+    // #0001's in-game ability names, keyed by the universal move codenames
+    // (MOVES in js/config.js). Read through abilityName (js/data/abilities.js),
+    // which gives a move left out here its neutral name: maba1 and maba2 are
+    // still unnamed. Names only: no screen shows them yet, and nothing here
+    // reaches combat.
+    abilityNames: {
+      uniqueba: 'Shuriken',
+      ba1: 'Punch',
+      ba2: 'Kick',
+      cba1: 'Clone Attack',
+      cba2: 'Sphere Rush',
     },
 
     // Charged actions: what a combat button does when pressed while the

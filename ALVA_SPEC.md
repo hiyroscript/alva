@@ -2084,7 +2084,9 @@ Back return Home). It holds the player's settings, saved on this device.
   (Charged BA1), `ba2`, `maba2` (mid-air BA2), `cba2` (Charged BA2),
   `uniqueba` (the unique basic attack) and `transform` (reserved). A
   character's own ability names (#0001's Shuriken, Punch, Kick, Clone Attack
-  and Sphere Rush) are presentation only. `` ` `` toggles a
+  and Sphere Rush) are presentation only: its `abilityNames`, keyed by move
+  codename and read through `abilityName` (`js/data/abilities.js`), which
+  gives an unnamed move its neutral `MOVES` label. No screen shows them yet. `` ` `` toggles a
   debug overlay (colliders, hurtboxes, attack hitboxes while active, each
   flying projectile's hitbox in magenta with its name, each clone's attack
   hitbox, labelled `clone ba1` or `clone maba2`, on its active frame,

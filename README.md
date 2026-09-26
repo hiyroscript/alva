@@ -77,7 +77,10 @@ in the code depends on the repository name, so no file changes are needed.
 
 The codenames are universal: every character has the same controls and the
 same move slots, and only its own ability names (#0001's Shuriken, Punch,
-Kick, Clone Attack, Sphere Rush) differ. A control's codename is its one
+Kick, Clone Attack, Sphere Rush) differ. Those live in the character's
+`abilityNames`, keyed by move codename; `abilityName(def, move)`
+(`js/data/abilities.js`) gives a move left unnamed its neutral name, e.g.
+"Mid-air Basic Attack 1". No screen shows them yet. A control's codename is its one
 internal name: the key in `CONFIG.bindings`, the field in every input
 snapshot (with a matching `…Pressed` edge, e.g. `ba1Pressed`) and, for the
 combat buttons (`COMBAT_ACTIONS`: `uniqueba`, `transform`, `ba1`, `ba2`), the
@@ -763,6 +766,7 @@ The two mid-air Basic Attacks swapped moves: **mid-air BA1** is the three-frame 
 1. Put the frames in `assets/characters/0002/`.
 2. Add a definition to `CHARACTERS` in `js/data/characters.js`, its moves keyed by the universal move codenames (see [Controls](#controls)) whatever it calls them in game (animations, movement, Power tiers such as `powers: { jump: 2, speed: 2 }`, collider, hurtboxes, stats). Movement is ground `acceleration` / `deceleration` / `turnBoost` / `overspeedDeceleration`, air `airAcceleration` / `airDeceleration` / `airTurnBoost`, `gravityScale`, `maxFallSpeed`, `fastFallAcceleration` / `fastFallSpeed`, `coyoteTime`, `jumpBuffer`, `shortHopWindow` / `shortHopHeight`, `airJumps` / `airJumpRatio`, `attackBuffer`, `hitstunFriction` / `hitstunAirDrag` and the Dash's two; the newer fields are optional (see `Fighter.moveHorizontal`). How it responds to launches is `launchReaction` (`stunPerThousand`, `maxStun`, `tumbleSpeed`, `steerAngle`; see `resolveLaunchReaction` in `js/game/combat.js`), and a Shield's `perfectWindow` / `perfectRearm` set its perfect block.
 3. Give it a free `rosterSlot`.
+4. Optionally, name its moves in `abilityNames`, keyed by move codename (e.g. `cba2: 'Sphere Rush'`); a move it leaves out keeps its neutral name.
 
 To add attacks, create animations with real frames, define them in `attacks` under their universal codenames (`ba1`, `maba1`, `ba2`, `maba2`, `uniqueba`; see the schema in `js/game/combat.js`), give each its `damage`, `baseLaunch` and `directionalLaunch`, optionally how it moves (`momentum` / `airMomentum`, `control` / `airControl`, `friction`, a `step`) and when a hit opens a follow-up (`hitCancel`), and map them in `actions`: a string for one attack, or `{ ground, air }` to pick by whether the fighter is grounded (as #0001's `ba1: { ground: 'ba1', air: 'maba1' }` and `ba2: { ground: 'ba2', air: 'maba2' }` do; its `uniqueba: 'uniqueba'` is one attack, and `transform: null` is reserved). Time `startup` / `active` / `recovery` to whole frames of the clip so the hitbox is live only while the strike is on screen. An attack without frames is refused rather than faked. Base Launch and Directional Launch are declared separately from damage (see [Launch](#launch)):
 

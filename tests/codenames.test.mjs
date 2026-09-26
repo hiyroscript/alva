@@ -118,6 +118,9 @@ test('every character keys its moves by the universal codenames, each on its own
     for (const button of Object.keys(c.mobileAbilities ?? {})) {
       assert.ok(ACTIONS.includes(button), `${who}: mobileAbilities.${button} names a control`);
     }
+    for (const move of Object.keys(c.abilityNames ?? {})) {
+      assert.ok(Object.hasOwn(MOVES, move), `${who}: abilityNames.${move} names a universal move`);
+    }
   }
 });
 
