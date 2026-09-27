@@ -996,8 +996,8 @@ test('the dialog shows the full configured roster; locked slots stay non-interac
   assert.equal(grid.children.length, CONFIG.roster.totalSlots);
   const available = slots.filter((s) => s._def?.available);
   const locked = slots.filter((s) => !s._def?.available);
-  assert.deepEqual(available.map((s) => s._def.id), ['0001', '9999']);
-  assert.equal(locked.length, CONFIG.roster.totalSlots - 2);
+  assert.deepEqual(available.map((s) => s._def.id), ['0001', '0002', '9999']);
+  assert.equal(locked.length, CONFIG.roster.totalSlots - 3);
   for (const s of locked) {
     assert.equal(s.tagName, 'DIV');
     assert.equal(s.hasAttribute('data-nav'), false);

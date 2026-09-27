@@ -857,9 +857,9 @@ The two mid-air Basic Attacks swapped moves: **mid-air BA1** is the three-frame 
 
 **Home → Discover** opens the reference, a character-neutral explanation of Alva's mechanics. **POWER** (open by default) explains Jump Power and Speed Power, each with its three tiers. **LAUNCH** explains the launch system generically, straight from `js/data/launch.js`: Launch Point, the four Base Launch values (0 no launch, 1 normal, 2 double, 3 triple, each marked with its own number) with the formula `Launch strength = Base Launch × Launch Point`, and the four Directional Launches (none, horizontal, vertical, reverse vertical). Neither page says which fighter or attack uses a Power, tier, Base Launch or direction, and neither shows tuning numbers. **PASSIVES** is intentionally empty until Alva has passives. Arrow keys, the D-pad or the stick move between Back, the sections and the page (↑ / ↓ scroll a long page); Back, `Esc` or gamepad B returns Home.
 
-### Adding a fighter (#0002)
+### Adding a fighter
 
-1. Put the frames in `assets/characters/0002/`.
+1. Put the frames in `assets/characters/<id>/`.
 2. Add a definition to `CHARACTERS` in `js/data/characters.js`, its moves keyed by the universal move codenames (see [Controls](#controls)) whatever it calls them in game (animations, movement, Power tiers such as `powers: { jump: 2, speed: 2 }`, collider, hurtboxes, stats). Movement is ground `acceleration` / `deceleration` / `turnBoost` / `overspeedDeceleration`, air `airAcceleration` / `airDeceleration` / `airTurnBoost`, `gravityScale`, `maxFallSpeed`, `fastFallAcceleration` / `fastFallSpeed`, `coyoteTime`, `jumpBuffer`, `highJumpWindow` / `highJumpHeight`, `airJumps` / `airJumpRatio`, `attackBuffer`, `hitstunFriction` / `hitstunAirDrag` and the Dash's two; the newer fields are optional (see `Fighter.moveHorizontal`). How it responds to launches is `launchReaction` (`stunPerThousand`, `maxStun`, `tumbleSpeed`, `steerAngle`; see `resolveLaunchReaction` in `js/game/combat.js`), and a Shield's `perfectWindow` / `perfectRearm` set its perfect block and `slowFallSpeed` / `slowFallBrake` its slow fall in the air.
 3. Give it a free `rosterSlot`.
 4. Optionally, name its moves in `abilityNames`, keyed by move codename (e.g. `cba2: 'Sphere Rush'`); a move it leaves out keeps its neutral name.
@@ -927,3 +927,11 @@ The in-game credits (the Home credits roll) render from one list in
 `js/ui/credits.js`. There is no in-game Help screen; this README and
 [`ALVA_SPEC.md`](./ALVA_SPEC.md) document the controls. The game ships with
 no audio.
+
+### Fighter #0002
+
+Slot 02 is playable in Quick Battle, Watch Mode and Practice. Its five idle and two walking frames are the only finished animations. Missing universal states hold its own idle frame. Its combat kit is intentionally unimplemented: attacks, defense and transformation are unavailable, with no borrowed moves or artwork. Double-tap Dash requires dedicated art and is unavailable.
+
+Void losses produce a short fighter-colored disappearance burst above the Void layer, without changing scoring or respawn timing.
+
+**#0002 sprite source.** Sprite attribution: Xmaygrrr. Source sheet uploaded by renatoooferreiraaa on [DeviantArt](https://www.deviantart.com/deviation/1374753835). The source uses its numeric artwork URL so the source title is not displayed.
