@@ -48,6 +48,6 @@ export function mobileAbility(def, action) {
   return {
     label: key ? t(key) : own.label,
     icon: ICONS[own?.icon] || ICONS[FALLBACK_ICONS[action]],
-    pending: !own && RESERVED.has(action),
+    pending: !own && (RESERVED.has(action) || (def?.actions?.[action] === null)),
   };
 }

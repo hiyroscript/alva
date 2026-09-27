@@ -204,7 +204,10 @@ export class Arena {
   // taken together (see Battle.onVoid).
   checkVoid(fighters) {
     const taken = fighters.filter((f) => !f.lostToVoid && this.stage.inVoid(f.body));
-    for (const f of taken) f.lostToVoid = true;
+    for (const f of taken) {
+      this.fx.takeVoid(f);
+      f.lostToVoid = true;
+    }
     for (const f of taken) this.onVoid(f);
   }
 
@@ -328,6 +331,7 @@ export class Arena {
     // The Void over everything on the stage: whatever falls into it is
     // swallowed by the black.
     theme.drawVoid(ctx, view);
+    this.fx.drawVoidBursts(ctx, (x, y) => this.toScreen(x, y), view.dpr);
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     // The status of each fighter in play over everything, the Void
     // included, so it stays readable near its edge: name tags (or the
@@ -669,6 +673,7 @@ export class Arena {
   }
 
   destroy() {
+    this.fx.reset();
     // No technique may keep its owner, target or bind past the arena.
     for (const f of this.fighters) f.endTechnique('destroy');
     this.fighters = [];

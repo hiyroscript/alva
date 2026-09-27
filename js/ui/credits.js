@@ -25,6 +25,10 @@ export const CREDITS = [
     ],
   },
   {
+    title: 'credits.sprites2.title',
+    lines: ['credits.sprites2.site'],
+  },
+  {
     title: 'credits.rights.title',
     lines: [['credits.rights.ownership', { developer }], 'credits.rights.holders'],
   },
