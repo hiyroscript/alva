@@ -1,647 +1,374 @@
-ALVA — Full Control / Move Codename Refactor
-
-Work directly in the current Alva repository and perform a complete, behavior-preserving refactor of the gameplay control/action/move codenames.
-
-Before editing, inspect the existing architecture and follow the established data-driven design. This is a browser-based 2D Canvas fighting game with no build framework. The relevant systems currently span at least:
-
-* js/config.js
-* js/core/input-manager.js
-* js/game/touch-controls.js
-* js/game/fighter-controller.js
-* js/game/character.js
-* js/game/combat.js
-* js/game/combat-ai.js
-* js/game/arena.js
-* js/game/fighter-status.js
-* js/game/clone.js
-* js/game/charged-technique.js
-* js/data/characters.js
-* js/ui/mobile-abilities.js
-* gameplay tests under tests/
-* README.md
-* ALVA_SPEC.md
-* any other file discovered by repository-wide search
-
-The objective is naming only. Do not rebalance, redesign, simplify, or otherwise alter gameplay.
-
-Canonical new names
-
-Use these exact code-facing names.
-
-Concept	Canonical codename
-Run left	runLeft
-Run right	runRight
-Dedicated movement/dash left request	mouvementLeft
-Dedicated movement/dash right request	mouvementRight
-Basic Attack 1	ba1
-Mid-air Basic Attack 1	maba1
-Charged Basic Attack 1	cba1
-Basic Attack 2	ba2
-Mid-air Basic Attack 2	maba2
-Charged Basic Attack 2	cba2
-Jump	jump
-Defense / Shield button	shield
-Throw / unique basic attack	uniqueba
-Special	transform
-Charge button	charge
-Pause	pause
-
-Important: mouvement is intentionally spelled exactly that way. Do not “correct” it to movement.
-
-Also, do not rename the existing movement character tuning/config object. For example, def.movement.dashSpeed, acceleration, air movement, etc. stay under movement. The mouvementLeft / mouvementRight names are specifically control codenames.
-
-Existing names to replace
-
-The current normalized gameplay controls include generic names such as:
-
-* left
-* right
-* primary
-* special
-* defense
-* action1
-* action2
-* leftPressed
-* rightPressed
-* dashLeftPressed
-* dashRightPressed
-* primaryPressed
-* specialPressed
-* defensePressed
-* action1Pressed
-* action2Pressed
+You are working in the GitHub repository hiyroscript/alva.
 
-Refactor the gameplay input API to use the canonical names.
-
-The normalized fighter input snapshot should conceptually become:
-
-{
-  runLeft: false,
-  runRight: false,
-  charge: false,
-  jump: false,
-  shield: false,
-  uniqueba: false,
-  transform: false,
-  ba1: false,
-  ba2: false,
-  runLeftPressed: false,
-  runRightPressed: false,
-  mouvementLeftPressed: false,
-  mouvementRightPressed: false,
-  jumpPressed: false,
-  chargePressed: false,
-  shieldPressed: false,
-  uniquebaPressed: false,
-  transformPressed: false,
-  ba1Pressed: false,
-  ba2Pressed: false,
-  dropPressed: false,
-}
+Implement this feature completely in the existing architecture. Do not replace the project with a framework and do not rewrite unrelated game systems. Preserve the current visual identity, gameplay behavior, keyboard/gamepad behavior, accessibility patterns, responsive landscape design, safe-area handling, reduced-motion support, and existing test philosophy.
 
-dropPressed is an AI/training intent rather than a player button and can remain unchanged.
+Context you must understand before editing
 
-Movement naming
+Alva is a vanilla JavaScript browser fighting game.
 
-Normal held horizontal movement currently uses left / right.
+The central application controller is js/core/app.js. It creates app.settings, ScreenManager, MenuNavigator, loading/confirmation overlays, registers all screens, starts at SplashScreen, and runs the animation loop.
 
-Rename those gameplay controls to:
+The splash flow is in js/screens/splash-screen.js. At present it finishes by navigating to Home.
 
-runLeft
-runRight
+The Home UI is in js/screens/home-screen.js. Its menu currently contains Play, Watch Mode, Practice Ground, Discover, and Settings. Settings is currently a normal full screen reached through that fifth Home menu button.
 
-Their press edges become:
+The current Settings screen is js/screens/settings-screen.js. It only manages the mobile control scheme, with Joystick and Classic Buttons options.
 
-runLeftPressed
-runRightPressed
+Persistent user preferences are deliberately centralized in js/core/settings.js. It is currently the only game module that directly touches localStorage, using the alva.settings key and a versioned object. Preserve this architectural rule: no other module should directly read or write localStorage.
 
-These press edges must continue powering the existing double-tap Dash detection.
+Touch controls live in js/game/touch-controls.js, with their positioning and sizes primarily defined in styles.css. There are two existing schemes: joystick and classic. Both must continue driving exactly the same internal input actions. Quick Battle and Practice Ground create TouchControls; Watch Mode intentionally has no player touch controls.
 
-The dedicated one-tap mobile Dash requests currently represented by:
+Overlay keyboard/gamepad handling already has a good pattern. js/ui/overlays.js uses app.nav.pushScope() / popScope(), and js/core/menu-navigator.js supports modal navigation, Back/Escape handling, spatial navigation, focus management, and gamepad controls. Reuse that pattern instead of building a second navigation system.
 
-dashLeftPressed
-dashRightPressed
+The game already has extensive dependency-free Node tests, especially tests/settings.test.mjs, tests/controls-ui.test.mjs, tests/splash-screen.test.mjs, tests/battle-screen.test.mjs, tests/practice-ground.test.mjs, and tests/watch-mode.test.mjs.
 
-must instead use:
+Goal
 
-mouvementLeftPressed
-mouvementRightPressed
+Add a proper player-preferences system with English/French language selection, replace the Home Settings menu item with a top-right settings icon that opens a translucent modal dialog, and add a full touch-control layout editor allowing players to freely move and resize their mobile controls.
 
-If there are associated transient variables/APIs such as touchDash or queueTouchDash(), rename their control-facing terminology to match the new mouvement naming where appropriate, for example:
+The feature must feel native to the existing Alva UI rather than like a separate tool bolted onto it.
 
-touchMouvement
-queueTouchMouvement(direction)
+First-launch language selection
 
-The actual gameplay mechanic can still be called a Dash internally where it describes the mechanic rather than the button codename. Functions such as tryDash, dash physics, dash animation, dash Energy costs, fighter.dash, dashSpeed, dashTapWindow, etc. do not need arbitrary renaming.
+The first time a player launches Alva on a device, show a one-time language-selection dialog offering exactly:
 
-Preserve all existing Dash behavior:
+English
 
-* keyboard/gamepad/normal directional input still requires the existing double tap;
-* dedicated Joystick layout mouvement buttons still issue exactly one transient dash request;
-* they must not create a held run input;
-* they must not count as a normal directional press edge;
-* existing dash validation goes through the same tryDash() path;
-* attack cancel rules remain identical;
-* Energy costs remain identical;
-* hitstop buffering remains identical;
-* pending double-tap state must still be handled correctly.
+Français
 
-Combat button names
+Do not force the player through the normal Settings UI first.
 
-Replace the generic combat action layer:
+This first-run dialog should appear before the normal game experience begins, ideally before the splash sequence so that once a language is chosen all subsequent player-facing UI can use the selected language. A clean flow is:
 
-primary -> uniqueba
-special -> transform
-action1 -> ba1
-action2 -> ba2
-defense -> shield
+App initialization → determine whether a valid language preference exists → if not, display the language dialog over the initial black background → player selects English or Français → persist the preference → start the normal splash → Home.
 
-For example, COMBAT_ACTIONS should no longer be:
+Returning players with a stored language preference must not see this first-run dialog again.
 
-['primary', 'special', 'action1', 'action2']
+The first-run language chooser itself should be understandable without an existing locale. Use a neutral/bilingual presentation such as a title that clearly communicates language selection and buttons whose names are self-identifying: “English” and “Français”.
 
-It should use:
+The language choice must be persisted through the existing Settings abstraction, never by directly using localStorage from the dialog.
 
-['uniqueba', 'transform', 'ba1', 'ba2']
+If storage is unavailable or blocked, keep the selected language for the current session just as the existing settings implementation does. It is acceptable that it cannot survive a future browser visit when persistent storage itself is unavailable.
 
-Do not add shield, jump, or charge to COMBAT_ACTIONS unless the existing architecture already treats them as combat actions. Preserve the current distinction between attacks and held state controls.
+Do not mistake “default to English” for “the player selected English.” The application needs to know whether the initial language choice has actually been completed so the one-time prompt works correctly.
 
-Character action mappings
+Localization
 
-Update #0001’s character data so the canonical action mapping is equivalent to:
+Add a small maintainable localization layer supporting exactly en and fr for now.
 
-actions: {
-  uniqueba: 'uniqueba',
-  transform: null,
-  ba1: { ground: 'ba1', air: 'maba1' },
-  ba2: { ground: 'ba2', air: 'maba2' },
-}
+Use stable translation keys rather than scattering checks such as language === 'fr' ? ... : ... throughout the codebase.
 
-transform remains reserved/inactive if Special is currently reserved. This refactor must not invent a transformation mechanic.
+A sensible architecture would be a module such as js/core/i18n.js or equivalent, owned by App, exposing something like t(key, params) and the active language. The exact implementation is flexible, but there must be one clear source of translations.
 
-BA1 family
+Translate player-facing UI, not internal game identifiers.
 
-Ground BA1 already uses the desired name:
+Internal IDs and gameplay codenames such as quick-battle, mobileControls, runLeft, uniqueba, ba1, ba2, character IDs, map IDs, input actions, CSS classes, and data keys must remain unchanged.
 
-ba1
+At minimum localization must cover the Home menu, screen headings and setup labels, Back/Confirm/Cancel-type UI, difficulty/interface text, Discover UI, Settings UI, pause/practice menus, battle/result dialogs, loading/error UI, HUD player-facing labels, touch-control accessible names, menu hints, and other visible or screen-reader-facing interface strings.
 
-Keep it.
+Character and project names should remain proper names unless there is an intentional translated display name.
 
-Rename:
+Do not translate technical internal data merely for the sake of translation.
 
-midairBa1 -> maba1
+Changing Language from Settings must update the active interface immediately without requiring a page reload.
 
-This includes the actual attack ID and any one-to-one code-facing animation key where appropriate.
+Update the root document language (document.documentElement.lang) to en or fr whenever the preference changes.
 
-Do not rename image files merely for this task. Existing files such as midair1ba1.png, etc. may stay exactly as they are; the animation configuration can point at the existing assets.
+Ensure dynamically generated UI such as dialogs and touch-control aria-labels uses the current language.
 
-BA2 family
+French copy should be natural Canadian/international French rather than literal broken translations. Preserve concise game terminology.
 
-Ground BA2 remains:
+Persistent settings and migration
 
-ba2
+Extend js/core/settings.js; do not create another storage system.
 
-Rename:
+The persisted settings now need to represent at least the selected language, current mobile control scheme, and custom touch-control layout information.
 
-midairBa2 -> maba2
+Introduce a backward-compatible schema migration. Existing users may already have the current version-1 object containing only mobileControls. Their Joystick/Classic preference must not silently disappear after this update.
 
-Again, update attack IDs, references, tests, action mappings, clone fallback data, AI moveset discovery, documentation, debug data, and other references.
+A good solution is to increment the settings schema version and explicitly migrate version 1 into the new schema, preserving mobileControls while leaving language unselected so the new language chooser is shown once.
 
-Charged attacks
+Malformed, unsupported, corrupt, or partially invalid settings must still fail safely.
 
-There must not be separate physical cba1 / cba2 buttons.
+Validate every loaded value before using it.
 
-Charged attacks must continue to be produced exactly as they are now:
+Control-layout coordinates and scale values must be sanitized and clamped rather than trusting arbitrary stored JSON.
 
-hold Charge + press BA1 -> CBA1
-hold Charge + press BA2 -> CBA2
+Continue writing the settings as one versioned object under alva.settings.
 
-The activation logic and cooldown behavior must stay unchanged.
+Replace Home’s Settings menu item
 
-Charged BA1
+Remove the large “Settings” button from the Home action list.
 
-The existing Charged BA1 Clone Attack uses identifiers such as:
+Home should contain Play, Watch Mode, Practice Ground, and Discover as its normal main menu actions.
 
-action1
-ba1Clone
+Add a compact Settings icon button in the top-right corner of the Home screen.
 
-Its canonical charged move ID must become:
+Add an original inline SVG gear/settings glyph to js/ui/icons.js, following the existing ICONS style: geometric SVG, currentColor, no external asset.
 
-cba1
+The button must have a localized accessible label such as “Settings” / “Paramètres”.
 
-For example, the data should conceptually become:
+It must be reachable using keyboard and gamepad navigation as well as pointer/touch input.
 
-chargedActions: {
-  ba1: { type: 'summon', id: 'cba1' },
-  ...
-}
-summons: {
-  cba1: {
-    attack: 'ba1',
-    ...
-  }
-}
+Its placement should respect env(safe-area-inset-top) and env(safe-area-inset-right) using the project’s existing safe-area variables/tokens.
 
-If its no-ground fallback currently references midairBa2, update it to:
+Do not add a permanent settings gear over live Battle or Practice gameplay. This requirement replaces the Settings Home action; it is Home chrome.
 
-maba2
+Update Home tests that currently assume five vertically ordered actions.
 
-Do not alter how the Clone Attack behaves, where it spawns, its cooldown, cloud effect, attack used by the clone, fallback rules, or targeting.
+Settings is now a translucent dialog, not a separate screen
 
-Charged BA2
+Opening the Home gear must no longer navigate to a full SettingsScreen.
 
-The current Charged BA2 Sphere Rush internally uses the technique ID:
+Settings should open as a semi-transparent glass/modal dialog over Home.
 
-rasenRush
+Use the visual language already present in Alva’s overlays and Practice dialogs: subtle dark dimming, translucent dark glass, border/sheen, readable text, and backdrop blur where supported.
 
-Its canonical move ID must become:
+The Home scene should remain visible behind it.
 
-cba2
+Settings currently only needs two top-level sections:
 
-For example:
+Language
 
-chargedActions: {
-  ba2: { type: 'technique', id: 'cba2' },
-}
-chargedTechniques: {
-  cba2: {
-    ...
-  }
-}
+Controls
 
-Preserve all Sphere Rush implementation data and behavior.
+Do not add audio, graphics, difficulty, account, or unrelated settings.
 
-Its individual implementation-phase animation/effect names such as form, dash, confirm, explosion, release, sphere effects, etc. do not need arbitrary renaming just because they belong to CBA2. Only the canonical move/technique identity needs to become cba2.
+The modal should be responsive to short landscape screens and may scroll internally when required without scrolling the Home screen underneath.
 
-Unique basic attack
+Provide a clear close control.
 
-The current Throw button/action uses the generic input primary and the attack ID throw.
+Escape / gamepad Back must close the dialog.
 
-Replace the button/action codename with:
+Click/tap on the dimmed backdrop may close it if that is consistent with the rest of the UI, but clicking inside the panel must not.
 
-uniqueba
+Opening the dialog must push a MenuNavigator scope. Closing it must remove that exact scope.
 
-The code-facing move ID should also use uniqueba where practical so there is one canonical identity.
+Focus should enter the dialog on open and return to the settings gear on close.
 
-The move is still visually/mechanically #0001’s shuriken throw.
+Use role="dialog", aria-modal="true", appropriate labelling, and the existing [data-nav] convention.
 
-Do not rename sprite files just for this refactor. Existing throw1, throw2, throw3, shuriken sprites, etc. may remain as asset filenames.
+Avoid keeping a dead Settings screen just for historical reasons. If SettingsScreen, its <section data-screen="settings">, registration, imports, CSS, or tests become obsolete after this change, remove/refactor them cleanly.
 
-Do not change:
+A reasonable new module is js/ui/settings-dialog.js, although the exact filename is flexible.
 
-* projectile timing;
-* projectile speed;
-* damage;
-* Launch behavior;
-* release frame;
-* cooldown;
-* ground-only restriction;
-* collision behavior.
+Language section
 
-The mobile button may continue to display the character-specific Shuriken icon/name. uniqueba is the code identifier, not necessarily the visible label.
+The Language section must contain English and Français as an accessible single-choice control.
 
-Shield
+Use native buttons with radio semantics or an equally accessible pattern consistent with the existing Settings implementation.
 
-Replace the gameplay input codename:
+The active choice must be visually clear.
 
-defense -> shield
+Selecting a language saves immediately.
 
-and:
+The Settings dialog stays open after selection.
 
-defensePressed -> shieldPressed
+All currently visible Settings text should switch immediately into the new language.
 
-Touch controls, keyboard bindings, gamepad bindings, Fighter input reads, AI output, test fixtures, etc. must use shield.
+Controls section
 
-Preserve the Shield mechanic completely:
+Keep the existing Mobile Controls scheme choice:
 
-* held input;
-* ground and mid-air shield behavior;
-* perfect Shield;
-* Energy cost on blocks;
-* exhaustion behavior;
-* blockstun;
-* artwork;
-* shield FX;
-* attack buffering while Shield is held.
+Joystick
 
-Do not blindly rename unrelated generic engine abstractions simply because they contain the word “defense.” The goal is canonical button/action/move codenames, not an unrelated architectural rewrite.
+Classic Buttons
 
-Transform
+Move this choice into the new Controls section.
 
-Rename the Special control codename:
+Changing schemes must retain the existing semantics in TouchControls.setScheme() and must never change keyboard or gamepad mappings.
 
-special -> transform
-specialPressed -> transformPressed
+Also add an obvious action such as “Customize touch controls” / “Personnaliser les commandes tactiles”.
 
-If its visible universal touch label currently says Special, update it to Transform.
+This opens a dedicated touch-layout editor inside the Settings experience or as a second modal layer.
 
-It remains reserved/null until a real Transform move exists.
+Touch-control layout editor
 
-Do not implement a transformation system as part of this task.
+This is a real editor, not a handful of fixed presets.
 
-Input bindings
+The player must be able to freely reposition every visible mobile gameplay control and freely change its size.
 
-Keep all physical controls unchanged.
+For Classic Buttons, the editable controls include Move Left, Charge/C, Move Right, and all six right-side action buttons.
 
-The keyboard should still effectively be:
+For Joystick, the editable controls include the joystick itself, its Charge button, both mouvement/Dash buttons, and all six right-side action buttons.
 
-* A / Left Arrow → runLeft
-* D / Right Arrow → runRight
-* S / Down Arrow → charge
-* W / Space / Up Arrow → jump
-* J → uniqueba
-* K → transform
-* L → shield
-* U → ba1
-* I → ba2
-* Esc / P → pause behavior as currently implemented
+Treat the joystick as an editable control even though it is not a <button>.
 
-Gamepad mappings must continue using the same physical buttons, but output the new action names.
+Every editable control must have a stable control ID that is independent of its translated label.
 
-Menu navigation is a separate system. Do not rename menu left / right navigation to runLeft / runRight.
+The editor should display a representative landscape game/control surface so players can position controls where they will actually appear.
 
-Touch controls
+Dragging a control moves it.
 
-Refactor js/game/touch-controls.js and supporting UI code so its data-action, InputManager calls, button maps, pointer tracking, and character-specific ability lookup use the canonical names.
+Selecting a control must provide an explicit size adjustment UI, such as a slider and/or +/- controls, so resizing is possible without requiring a multitouch pinch gesture. Pointer pinch resizing may be added but must not be the only way.
 
-Normal joystick direction:
+Changes should preview immediately.
 
-runLeft
-runRight
+Include a “Reset to defaults” action that restores the exact current Alva layout for the selected scheme.
 
-Dedicated Dash buttons:
+Include a clear Done/Back action.
 
-mouvementLeft
-mouvementRight
+Save edits automatically or when leaving the editor, but the behavior must be deterministic and covered by tests.
 
-Keep their visible names:
+Players should be able to customize Joystick and Classic layouts independently. Switching control scheme later must restore that scheme’s own saved layout.
 
-* Left mouvement
-* Right mouvement
+Responsive layout representation
 
-Character-specific lower-right combat abilities should be keyed by:
+Do not persist raw desktop pixel coordinates.
 
-uniqueba
-ba1
-ba2
+Store positions in a resolution-independent form so a layout customized on one landscape viewport remains usable on another.
 
-instead of:
+Use normalized coordinates or percentages relative to the touch-control viewport/safe play area. Store each control around its center, for example an x, y, and scale.
 
-primary
-action1
-action2
+At runtime translate normalized positions into the current viewport.
 
-For #0001 they may still display:
+Respect safe-area insets.
 
-* uniqueba → Shuriken
-* ba1 → Punch
-* ba2 → Kick
+Clamp controls so their usable hit area cannot be moved completely off-screen.
 
-The universal controls should use:
+Allow meaningful freedom, including moving controls away from their default clusters, but prevent permanently inaccessible configurations.
 
-* transform
-* shield
-* jump
-* charge
+Choose sensible scale limits. They should provide clearly smaller and clearly larger controls without allowing zero-sized or absurdly giant buttons. Something in the approximate 0.6–1.8x range is reasonable unless the existing geometry suggests better limits.
 
-AI
+A control’s visual size and touch hitbox must scale together.
 
-Update both the normal fighter input snapshots and Combat AI to output/read the canonical names.
+Window resize/orientation changes must recompute positions correctly.
 
-AI gameplay behavior must remain exactly the same.
+Default behavior when no custom layout exists must remain pixel-for-pixel or effectively visually equivalent to the current layout.
 
-readMoveset() must discover:
+TouchControls integration
 
-* uniqueba
-* transform
-* ba1
-* ba2
+Refactor js/game/touch-controls.js carefully.
 
-and the new move IDs:
+Do not change what any control does.
 
-* ba1
-* maba1
-* cba1
-* ba2
-* maba2
-* cba2
-* uniqueba
+Do not change the combat input names.
 
-Do not alter difficulty tuning, decision timing, reaction windows, probabilities, movement planning, attack selection, or charged-action logic.
+Do not break Pointer Events multi-touch.
 
-Cooldown/status UI
+Do not break held buttons.
 
-The current charged status system still refers to CAB1/CAB2 and generic action1/action2.
+Do not break joystick deadzone/engage behavior.
 
-Update it to match the canonical names.
+Do not break Dash/mouvement tap behavior.
 
-Use:
+Do not break setCharacter() changing ability icons.
 
-ba1 -> CBA1
-ba2 -> CBA2
+Do not break setScheme().
 
-for the displayed cooldown labels if uppercase labels are needed.
+Do not introduce input latency.
 
-Charged cooldown IDs themselves should be:
+Apply the saved custom layout when Battle and Practice instantiate/activate their touch controls.
 
-cba1
-cba2
+If settings change between sessions, the next battle/practice must use the updated layout.
 
-Do not change cooldown durations or recovery behavior.
+Watch Mode must continue hiding touch controls entirely.
 
-Debugging data
+If useful, add methods such as setLayout(layout), applyLayout(), getControlElements(), or equivalent rather than coupling Battle/Practice directly to CSS internals.
 
-Update debug mappings such as the current mapping of:
+Because Classic Buttons currently has cluster-level pointer behavior for sliding between Left/C/Right, preserve that behavior even when those buttons have custom positions. Refactor hit testing/pointer capture as needed rather than silently losing slide-to-change functionality.
 
-primary
-special
-action1
-action2
+Styling
 
-to the canonical control names.
+Extend styles.css using the existing design tokens and glass styling.
 
-Debug overlays must otherwise behave exactly as before.
+Do not introduce an unrelated design system.
+
+The settings gear should visually fit the Home page.
+
+The Settings panel should be semi-transparent, not an opaque full-screen replacement.
+
+Editor controls should be obvious without making the actual game buttons look unlike their real gameplay appearance.
+
+During edit mode, show a selection state around the active control and enough visual affordance to make dragging understandable.
+
+Do not leave developer-only control IDs visible to the player.
+
+Maintain good contrast for text and focus states.
+
+Respect prefers-reduced-motion / the existing device.reducedMotion behavior.
+
+Accessibility and input requirements
+
+Everything in Settings must work with mouse, touch, keyboard, and gamepad where applicable.
+
+The first-launch language dialog must be keyboard/gamepad navigable.
+
+The settings gear must be keyboard/gamepad navigable.
+
+The Settings modal must use a navigation scope so navigation cannot escape behind it.
+
+The touch-layout editor must have a non-drag way to make meaningful changes. Keyboard/gamepad users should be able to select a control, move it in small steps with directional input while in an explicit edit mode, and adjust size using navigable controls.
+
+Do not make gameplay touch buttons keyboard-focusable during actual battle; preserve the existing design there.
+
+Translate aria-label, dialog labels, and descriptions when the language changes.
+
+Focus must never be left in hidden content when a modal closes.
 
 Tests
 
-Update the entire test suite to the new naming scheme.
+Update existing tests rather than deleting coverage simply because the UI changed.
 
-This includes fixture input objects such as:
+Add focused tests for the new behavior.
 
-{ action1: true, action1Pressed: true }
+Run the full test suite with Node’s built-in test runner after implementation.
 
-which should become:
+The tests and final implementation must verify at least the following:
 
-{ ba1: true, ba1Pressed: true }
-
-and equivalent changes for every action.
-
-Update assertions for:
-
-* ACTIONS
-* COMBAT_ACTIONS
-* keyboard bindings
-* InputManager sampled frames
-* touch controls
-* joystick controls
-* dash/mouvement requests
-* BA1
-* MABA1
-* CBA1
-* BA2
-* MABA2
-* CBA2
-* Unique BA
-* Shield
-* Transform
-* charged cooldown IDs
-* clone data
-* Sphere Rush/CBA2 data
-* AI moveset discovery
-* combo tests
-* launch tests
-* movement tests
-* Energy tests
-* facing tests
-* practice mode
-* match reset/respawn tests
-* HUD/status tests
-
-Add or update explicit regression assertions confirming the canonical names.
-
-Examples:
-
-COMBAT_ACTIONS === ['uniqueba', 'transform', 'ba1', 'ba2']
-
-Character actions should resolve to the new IDs.
-
-Charged descriptors should use:
-
-ba1 -> cba1
-ba2 -> cba2
-
-Repository-wide cleanup
-
-Perform a repository-wide search after implementation.
-
-Remove stale use of old gameplay action/move identifiers including, where applicable:
-
-primary
-special
-defense
-action1
-action2
-dashLeftPressed
-dashRightPressed
-midairBa1
-midairBa2
-ba1Clone
-rasenRush
-
-Do not blindly replace ordinary English words or unrelated identifiers.
-
-Examples of things that should NOT be accidentally changed:
-
-* menu left / right
-* CSS left / right
-* geometry directions
-* generic prose where “right” means direction
-* movement physics configuration
-* unrelated uses of JavaScript/CSS transform
-* asset filenames unless actually required
-
-Old names should not remain as active runtime compatibility aliases. This is a real refactor to one canonical naming system, not a second naming layer sitting on top of the old one.
+1. A fresh settings store has no completed language preference, so first launch requests a choice; choosing English or French persists it, while returning users skip the chooser. Version-1 settings migrate without losing the existing mobileControls value.
+2. Invalid languages, invalid control schemes, malformed custom layout objects, non-finite coordinates, and out-of-range scales are rejected or sanitized safely.
+3. document.documentElement.lang reflects the current language.
+4. Changing language at runtime updates visible Settings UI and representative UI elsewhere without reloading the page.
+5. Home has exactly the intended normal menu actions after Settings is removed, and it has a separate top-right settings gear.
+6. Activating the gear opens the Settings dialog rather than navigating to a Settings screen. Escape/gamepad Back closes it and focus returns correctly.
+7. The Settings dialog exposes exactly the intended Language and Controls sections.
+8. Joystick and Classic Buttons remain selectable and persisted.
+9. Both schemes have complete, stable editable-control IDs.
+10. Custom positions and size scales round-trip through Settings.
+11. Joystick and Classic custom layouts are stored independently.
+12. Reset returns a scheme to its original default geometry.
+13. TouchControls applies saved layout values without changing any input action generated by a button, Dash control, joystick, held action, or fighter-specific ability.
+14. Classic Left/C/Right sliding still behaves correctly after the layout refactor.
+15. Battle and Practice use saved control scheme/layout values. Watch Mode still has no touch controls.
+16. Existing touch multi-pointer behavior continues working.
+17. Existing combat/gameplay tests remain unchanged in behavior and continue passing.
+18. No module other than js/core/settings.js directly accesses localStorage or sessionStorage.
+19. The settings and first-run dialogs expose correct modal semantics and navigation scopes.
+20. Existing viewport zoom prevention, safe-area handling, and touch-action rules remain intact.
 
 Documentation
 
-Update README.md, ALVA_SPEC.md, code comments, and any relevant update/reference documentation so they describe the new internal terminology accurately.
+Update the relevant documentation after the implementation.
 
-Player-facing move descriptions can still say:
+At minimum update README.md and the Settings/touch-controls portions of ALVA_SPEC.md so they describe the new language preference, Home settings gear/modal, and custom touch layouts.
 
-* Dash
-* Shuriken
-* Punch
-* Kick
-* Shield
-* Clone Attack
-* Sphere Rush
+Keep documentation consistent with the code rather than describing planned behavior.
 
-but whenever documentation discusses the internal codename, use:
+Read CLAUDE.md before changing UPDATES.md. Do not invent a named update. Only add an UPDATES.md named-update entry if the owner has actually named this work.
 
-runLeft
-runRight
-mouvementLeft
-mouvementRight
-uniqueba
-transform
-shield
-ba1
-maba1
-cba1
-ba2
-maba2
-cba2
-jump
-charge
+Implementation constraints
 
-Non-negotiable behavior preservation
+Preserve the game’s existing internal gameplay behavior.
 
-This refactor must not change:
+Do not add external dependencies unless absolutely unavoidable; this feature should not need any.
 
-* movement speeds;
-* acceleration/deceleration;
-* Dash distance;
-* Dash timing;
-* Dash double-tap window;
-* Dash Energy costs;
-* cancel windows;
-* attack frame data;
-* hitboxes/hurtboxes;
-* damage;
-* Launch Point;
-* Base Launch;
-* Directional Launch;
-* hitstun;
-* attack buffering;
-* jump behavior;
-* air jump;
-* fast fall;
-* Shield behavior;
-* perfect Shield timing;
-* charged action cooldowns;
-* Clone Attack mechanics;
-* Sphere Rush mechanics;
-* projectile behavior;
-* AI difficulty;
-* touch layout positioning;
-* sprite artwork;
-* input physical bindings.
+Do not introduce React, Vue, a build system, a state-management library, or a translation package.
 
-This is a semantic naming refactor only.
+Do not use external SVG/icon packages.
 
-Final verification
+Do not scatter persistence across modules.
 
-Before finishing:
+Do not use translated strings as keys or internal identifiers.
 
-1. Run the complete existing test suite.
-2. Fix every failure caused by the rename.
-3. Search the repository for all old gameplay identifiers and manually inspect remaining matches.
-4. Verify desktop keyboard input.
-5. Verify gamepad mappings.
-6. Verify both mobile control schemes.
-7. Verify normal directional double-tap Dash.
-8. Verify the Joystick layout’s one-tap Left/Right mouvement buttons.
-9. Verify BA1, MABA1, CBA1, BA2, MABA2, and CBA2.
-10. Verify Unique BA/Shuriken.
-11. Verify Shield.
-12. Verify Transform remains reserved.
-13. Verify Charge + BA1 still triggers CBA1 and Charge + BA2 still triggers CBA2.
-14. Confirm there are no compatibility aliases preserving primary, action1, etc. in the gameplay API.
-15. Confirm the final diff contains no gameplay tuning changes.
+Do not remove accessibility behavior to make pointer editing easier.
 
-At completion, provide a concise summary of:
+Do not leave obsolete Settings-screen code, registrations, tests, or CSS behind if Settings is converted into a true modal.
 
-* files changed;
-* old → new identifier mapping;
-* tests run and results;
-* any old-name matches deliberately retained and why.
+Avoid broad unrelated refactors.
+
+Definition of done
+
+The work is complete only when a brand-new player is asked once whether they prefer English or French; that choice changes and persists the game’s interface language; the preference can later be changed from a semi-transparent Settings dialog opened through a top-right Home gear; the old Settings Home menu item is gone; Settings contains Language and Controls; players can still choose Joystick or Classic Buttons; every mobile gameplay control can be individually repositioned and resized with responsive persisted layouts; the customized controls behave identically to their original gameplay counterparts; Reset restores the original layout; keyboard/gamepad/modal accessibility continues working; Quick Battle and Practice use the custom settings; Watch Mode remains unaffected; documentation is current; and the full existing plus new Node test suite passes.
+
+Before finishing, inspect the diff for obsolete references such as Home → Settings, assumptions that Home has five actions, references to a full SettingsScreen, and documentation saying Mobile Controls is the only stored preference. Update those references where appropriate without altering unrelated historical documentation.
