@@ -341,21 +341,29 @@ test('the shuriken art mirrors with its direction; movement never depends on it'
   assert.equal(neutral.vx, -SHURIKEN.speed);
 });
 
-test('the Throw locks movement and facing; the release keeps #0001\'s logical facing', () => {
+test('the Throw locks movement; the direction held turns it, and the shuriken leaves the way #0001 faces at the release', () => {
   const { fighter, step } = makeFighter();
   stepUntil(step, (f) => f.state === 'run', { runRight: true });
   step({ runRight: true, ...THROW });
   assert.equal(fighter.state, 'attack');
+  assert.equal(fighter.facing, 1);
   const vx = [];
   while (fighter.state === 'attack') {
-    assert.equal(fighter.facing, 1, 'holding Left never turns the Throw around');
     vx.push(fighter.body.vx);
     step({ runLeft: true, uniqueba: true });
+    assert.equal(fighter.facing, -1, 'holding Left turns the Throw around');
   }
   assert.ok(vx.every((v, i) => i === 0 || v <= vx[i - 1]), 'slows under normal deceleration');
   assert.equal(fighter.releases.length, 1, 'queued for the battle to spawn');
-  assert.equal(fighter.releases[0].direction, 1);
+  assert.equal(fighter.releases[0].direction, -1, 'turned before the release: thrown the new way');
   assert.equal(fighter.releases[0].id, 'shuriken');
+  // Turned only once the shuriken is away: it flies the way it was thrown.
+  const late = makeFighter();
+  late.step(THROW);
+  stepUntil(late.step, (f) => f.releases.length > 0);
+  late.step({ runLeft: true });
+  assert.equal(late.fighter.facing, -1);
+  assert.equal(late.fighter.releases[0].direction, 1);
 });
 
 // ---- Hits -----------------------------------------------------------------------

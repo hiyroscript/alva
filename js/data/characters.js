@@ -431,12 +431,12 @@ export const CHARACTERS = [
       fastFallSpeed: 1400,
       coyoteTime: 0.1,
       jumpBuffer: 0.12,
-      // Short hop: Jump let go within shortHopWindow of takeoff (a tap)
-      // tops out at shortHopHeight x the full jump's height (about 59 of
-      // Jump Power 2's 169 units), low enough for an aerial to reach a
-      // standing opponent; held, the full jump.
-      shortHopWindow: 0.1,
-      shortHopHeight: 0.35,
+      // Higher jump: a tap is the normal jump (Jump Power 2's 169 units);
+      // Jump still held highJumpWindow after takeoff (a press a little
+      // longer than a tap) carries it on up to highJumpHeight x that
+      // (about 237 units), rising a little slower from then on.
+      highJumpWindow: 0.15,
+      highJumpHeight: 1.4,
       // One more jump in the air before landing again, at airJumpRatio x
       // the normal jump's speed; landing, or being hit, gives it back.
       airJumps: 1,
@@ -512,7 +512,7 @@ export const CHARACTERS = [
     // does for this fighter. #0001 shields: held `shield` keeps a Shield up
     // all round him, `groundAnimation` on the ground (raised by
     // `groundStartAnimation`, lowered by `groundReleaseAnimation`) and
-    // `airAnimation` in the air, where he keeps falling. Every hit it
+    // `airAnimation` in the air, where he falls slowly. Every hit it
     // blocks costs energy.shieldHitCost and deals nothing else: no Launch
     // Point, no launch (see createDefenseDefinition and
     // CombatSystem.applyHit in js/game/combat.js).
@@ -522,6 +522,12 @@ export const CHARACTERS = [
       groundStartAnimation: 'shieldStart',
       groundReleaseAnimation: 'shieldRelease',
       airAnimation: 'midairShield',
+      // Slow fall: up in the air, the Shield brakes any faster fall to 200
+      // units/s (from the fast fall's 1400 in 0.2 s) and holds it there,
+      // about a seventh of the normal fall's top speed. Sideways he only
+      // drifts, as with any Shield.
+      slowFallSpeed: 200,
+      slowFallBrake: 6000,
       // Perfect Shield: a hit within 0.1 s of raising it (after at least
       // 0.25 s down) is blocked for free, with no blockstun: time it and
       // punish the attacker's recovery.

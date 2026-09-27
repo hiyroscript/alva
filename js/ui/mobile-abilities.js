@@ -10,8 +10,7 @@ import { ACTION_LABELS } from '../config.js';
 import { ICONS } from './icons.js';
 
 // The touch buttons whose look belongs to the fighter. The rest (shield,
-// jump, charge, runLeft, runRight and the mouvement buttons) are universal,
-// the same for everyone.
+// jump, charge, runLeft and runRight) are universal, the same for everyone.
 export const ABILITY_ACTIONS = Object.freeze(['uniqueba', 'transform', 'ba1', 'ba2']);
 
 // A fighter with no entry for one of them (a future, unfinished fighter)

@@ -704,9 +704,9 @@ Back return Home). It holds the player's settings, saved on this device.
 - **Mobile Controls** — the touch layout Quick Battle and Practice Ground
   use (7.4), with exactly two choices shown as two cards, each with a small
   drawing of its lower-left corner and a line on what it gives:
-  - **Joystick** (marked "Default") — a circular joystick to move, the
-    single-tap **Left mouvement** / **Right mouvement** Dash buttons above
-    it, and Charge as a down arrow under Jump.
+  - **Joystick** (marked "Default") — a circular joystick to move, with
+    Charge as a down arrow just above it; pushing the stick the same way
+    twice Dashes.
   - **Classic Buttons** — the original layout: Left, C (Charge) and Right
     at the lower left, a double tap of Left or Right to Dash.
 - The cards are a `radiogroup` of two `radio` buttons (`aria-checked`, each
@@ -823,13 +823,20 @@ Back return Home). It holds the player's settings, saved on this device.
   steering in the air), a Dash and an attack started with a direction held
   turn it (the attack faces that direction as it starts, so a turn made on
   the press step, run left → press right and BA1 together, strikes right,
-  never the stale way), a spawn or respawn takes the spawn's `facing`, and
-  otherwise it keeps its last facing. It never turns toward the opponent by
+  never the stale way). **During an action of its own** (an attack, the
+  Shield or Charge) the direction held turns it at once, left to right or
+  right to left, as often as the player likes (`Fighter.updateFacing`):
+  the hitbox, a step-in still to come, a shuriken not yet released and a
+  Sphere Rush started from the Charge all go the new way. Turning never
+  walks or runs. A stun, a bind, a Dash and a charged technique hold the
+  facing. A spawn or respawn takes the spawn's `facing`, and otherwise it
+  keeps its last facing. It never turns toward the opponent by
   itself (the player, both CPU controllers and the practice dummy alike),
   so attacks, Throws and the Sphere Rush go the way the fighter faces (or
   is steered as the attack starts); the combat AI turns by pressing a
-  direction first, as a player does. The HUD portraits facing the timer
-  (7.3) are a separate, fixed rule.
+  direction first, as a player does, and never holds a direction that
+  would turn its own attack away from its opponent. The HUD portraits
+  facing the timer (7.3) are a separate, fixed rule.
 - Hitstun shows Hurt while grounded and Mid-air Hurt while airborne, switching
   to Hurt if the fighter lands still stunned; the pose also holds through the
   impact freeze. Hitstun outranks every other state (charged technique,
@@ -967,8 +974,8 @@ Back return Home). It holds the player's settings, saved on this device.
   Launch Point, as BA2 adds more damage first. A Shielded mid-air BA1 is
   neither pushed nor launched. Hitboxes match the
   strike in the contact frame (the punch; the slash arc in front of the
-  fighter) and mirror with facing. Facing locks while an attack plays;
-  movement follows the attack's own data (see Attack movement below):
+  fighter) and mirror with facing. A direction held while an attack plays
+  turns it (see the facing rule in 4); movement follows the attack's own data (see Attack movement below):
   ground BA1 keeps 0.75 of the speed it started with (never more than that
   share of top speed) and slides on it under 0.4 of the ground
   deceleration, with no steering, so a running punch carries on about 20
@@ -1005,7 +1012,7 @@ Back return Home). It holds the player's settings, saved on this device.
   and launches nothing (the Shield pays 25 Energy and takes its blockstun
   and hitstop). Hitboxes cover the ground kick's arc and the airborne
   kick's forward-low arc in front of the fighter and mirror with facing.
-  The same facing lock applies. Ground BA2 keeps half the speed it started
+  The same turning applies. Ground BA2 keeps half the speed it started
   with, slides under half the ground deceleration and, on its first frame
   (the step in), raises its forward speed to 280, a subtle step of about 20
   units that shoves an opponent standing close along through the
@@ -1040,10 +1047,10 @@ Back return Home). It holds the player's settings, saved on this device.
   trail the art by one simulation step, never before the release pose and
   never after the Throw ends), at the throwing hand (16 units in front of
   the origin, 38 up, mirrored with facing). A Throw hit before its release
-  throws nothing. Facing locks like other attacks; it keeps half the speed
-  it started with, slides under 0.6 of the ground deceleration and keeps
-  0.3 of the steering, so the thrower is never rooted to the spot (it can
-  back off while it throws). Gravity keeps working, and there is a 0.25 s
+  throws nothing. A direction held turns it like other attacks (before
+  the release, the shuriken goes the new way); it keeps half the speed it
+  started with, slides under 0.6 of the ground deceleration and keeps 0.3
+  of the steering, so the thrower is never rooted to the spot. Gravity keeps working, and there is a 0.25 s
   cooldown after it. It is a spacing and interruption tool, never a combo
   starter: no hit-cancel, and the shuriken's short stun leaves no
   follow-up. Like BA1 / BA2, Throw never starts while Shield is held with
@@ -1163,10 +1170,16 @@ Back return Home). It holds the player's settings, saved on this device.
   the air there is only `midairShield` (`midairshielding`), the held pose:
   no raise or lower pose, and a Shield lowered in the air goes straight
   back to Jump / Fall. Landing with it up keeps the held pose (no raise
-  pose, no Land). While it is up horizontal input is locked (on the ground
-  no walking, running or Dash, the current velocity slowing under the
-  normal deceleration; in the air momentum carries on under the normal air
-  drag with no steering) and facing locks; gravity always applies. A
+  pose, no Land). While it is up horizontal input moves nothing (on the
+  ground no walking, running or Dash, the current velocity slowing under
+  the normal deceleration; in the air momentum carries on under the normal
+  air drag with no steering), though the direction held turns the fighter.
+  In the air it **slows the fall**: a faster fall (a fast fall included)
+  brakes toward `defense.slowFallSpeed` (#0001: 200 units / s) at
+  `slowFallBrake` (6000 / s², so 0.2 s from the fast fall's 1400), and
+  gravity never takes it past that while the Shield stays up; a rise is
+  untouched (`stepBody`'s fall cap, from `Fighter.update`). A Shield without
+  `slowFallSpeed` (0) falls as ever. A
   missing held clip refuses the Shield (logged once per clip); missing
   raise or lower poses are simply skipped.
 - **Blocking.** The Shield is a full circle: while it is up, any hit that
@@ -1251,8 +1264,8 @@ Back return Home). It holds the player's settings, saved on this device.
   way (`Fighter.trackDashTaps`, `tryDash`); the other direction replaces the
   waiting tap, both at once cancel it, and a double tap that cannot Dash is
   used up, never queued. A one-step request (`mouvementLeftPressed` /
-  `mouvementRightPressed`, 7.4: one tap of the Joystick touch layout's Left
-  mouvement / Right mouvement, `mouvementLeft` / `mouvementRight`) goes straight to the same `tryDash`, so every
+  `mouvementRightPressed`, 7.4; no on-screen control makes it since the
+  Joystick layout's Dash buttons were removed) goes straight to the same `tryDash`, so every
   rule, cost and effect below applies unchanged; it is not a direction
   press (it never pairs with one), it forgets any first tap waiting, it is
   used up whether or not it Dashes, and both at once ask for nothing. A Dash needs the fighter free to act (no attack,
@@ -1683,15 +1696,18 @@ Back return Home). It holds the player's settings, saved on this device.
     is on the press step, and the jump only sets the upward speed: the run
     carries straight into the air (no horizontal reset), so run → jump →
     drift is one continuous motion.
-  - *Short hop.* Jump let go within `shortHopWindow` (0.1 s) of takeoff (a
-    tap; a buffered press already let go counts) tops out at
-    `shortHopHeight` (0.35) × the full jump's height, about 59 units of
-    Jump Power 2's 169: low enough for a mid-air BA1 to reach a standing
-    opponent on the way up. Held past the window it is the full jump.
-    Decided once (`Fighter.hop`, `shortHop`): after the window, the apex,
-    a hit or the ground, it no longer changes, and it is never lower than
-    the fighter already is. Both CPUs hold Jump through the window: their
-    jumps are full ones.
+  - *Higher jump.* A tap is the normal jump (Jump Power 2: 169 units),
+    exactly its old arc. Jump still held `highJumpWindow` (0.15 s) after
+    takeoff (held from the takeoff step on: a press a little longer than a
+    tap) makes it the higher jump: from that step to its apex it rises
+    under a lighter share of gravity, set once so it tops out at
+    `highJumpHeight` (1.4) × the normal height, about 237 units
+    (`Fighter.highJump`, `highJumpLift`). No kick in speed: the arc
+    stretches. Decided once and kept whether Jump stays held or not; the
+    apex, a hit, the air jump or the ground ends it. Ground jumps only
+    (coyote time included); the air jump is never a higher one. Both CPUs
+    let go of Jump inside the window (`jumpTapHold`): their jumps are
+    normal ones.
   - *Air jump.* `airJumps` (1) more jump in the air, past coyote time, at
     `airJumpRatio` (0.9) × the normal jump's speed (about 137 units of
     rise), always full height, the jump clip from its first frame. A
@@ -1704,7 +1720,7 @@ Back return Home). It holds the player's settings, saved on this device.
     jump and an air jump from a stage's highest footing still stay well
     clear of the upper Void.
   - *Fast fall.* Down (the Charge input: S / ↓, D-pad or stick down, touch
-    C, or the down arrow under Jump in the Joystick layout) held in the air while already descending speeds the fall up toward
+    C, or the down arrow above the joystick in the Joystick layout) held in the air while already descending speeds the fall up toward
     `fastFallSpeed` (1400) at `fastFallAcceleration` (12000) on top of
     gravity: never while rising, never a jump in speed and never slower
     than the fall already is; it lands on platforms like any fall. Aerial
@@ -2072,7 +2088,7 @@ Back return Home). It holds the player's settings, saved on this device.
 ### 7.4 Input
 
 - Keyboard (simultaneous keys, held-state tracking, no reliance on key
-  repeat): A/D or ←/→ move (`runLeft` / `runRight`; twice in a row to Dash), S/↓ Charge (`charge`; held; held in the air while falling, the fast fall), W/Space/↑ jump (`jump`; tapped, a short hop; held, the full jump; again in the air, the air jump), J Throw (the
+  repeat): A/D or ←/→ move (`runLeft` / `runRight`; twice in a row to Dash), S/↓ Charge (`charge`; held; held in the air while falling, the fast fall), W/Space/↑ jump (`jump`; tapped, the normal jump; held a little longer, the higher jump; again in the air, the air jump), J Throw (the
   `uniqueba` action), K Transform (`transform`, reserved), L Shield (`shield`), U Basic
   Attack 1 (`ba1`), I Basic Attack 2 (`ba2`), Esc/P pause (`pause`; the Practice menu in
   Practice Ground). Each control goes by that one codename: its key in
@@ -2103,9 +2119,9 @@ Back return Home). It holds the player's settings, saved on this device.
   (never its auto-repeat), a touch button, the D-pad, or the left stick
   crossing from neutral into its held zone (holding it there makes no more;
   back near neutral and out again makes another). It also carries
-  `mouvementLeftPressed` / `mouvementRightPressed`: a Dash asked for in one tap
-  (`InputManager.queueTouchMouvement(direction)`, from the Joystick layout's
-  mouvement buttons, `mouvementLeft` / `mouvementRight`), true for exactly one sample and then gone (`flush()` and
+  `mouvementLeftPressed` / `mouvementRightPressed`: a Dash asked for outright
+  (`InputManager.queueTouchMouvement(direction)`, `mouvementLeft` /
+  `mouvementRight`; no on-screen control calls it now), true for exactly one sample and then gone (`flush()` and
   `clear()` drop it too); it holds no direction and makes no press edge.
   Every controller's snapshot carries both, false (the combat AI still
   Dashes by double tap). Fighter never reads raw
@@ -2135,29 +2151,25 @@ Back return Home). It holds the player's settings, saved on this device.
     0.56 of the radius, and eases back to the centre on release, cancel,
     lost capture, pause, disabling or a scheme switch. It is digital like
     the rest of ALVA's input: how far it is pushed never changes speed.
-    Pushing it out twice quickly is a double tap, as with the gamepad stick.
-    Above its top-left and top-right sit two small Dash buttons named
-    exactly **Left mouvement** and **Right mouvement** (◀ ▶ glyphs): one
-    tap asks for one Dash that way (`queueTouchMouvement`, 7.2) and holds
-    nothing; each shows pressed while touched. **Charge** is a down-arrow
-    button (`ICONS.down`, named "Charge") directly under Jump, holding the
-    same `charge` input (Charge on the ground, the fast fall in the air,
-    Charge + Punch / Kick as ever); the lower-right cluster rises just
-    enough for it, the six buttons above keeping their places.
+    Pushing it out twice quickly is a double tap, as with the gamepad stick:
+    that is its Dash (there are no Dash buttons). **Charge** is a
+    down-arrow button (`ICONS.down`, named "Charge", `.tc-charge-down`)
+    just above the stick's top-left, flush with its left edge and about
+    half a gap clear of its rim, holding the same `charge` input (Charge on
+    the ground, the fast fall in the air, Charge + Punch / Kick as ever).
   - **Classic Buttons**: the original layout, exactly: lower-left
     Left · C · Right with thumb sliding, where the middle button reads **C**, is
     labelled "Charge" and stays pressed for as long as the pointer holds it
     (held in the air while falling, it is the fast fall); Left and Right
-    Dash on a double tap; no joystick, Dash buttons or down-arrow Charge.
+    Dash on a double tap; no joystick or down-arrow Charge.
 
   Both layouts share the lower-right staggered cluster, the same positions
-  and sizes as ever (the Joystick layout adds only Charge under Jump) —
+  and sizes as ever, in the same place in both —
 
   ```
                  [SHURIKEN]
         [TRANSFORM] [SHIELD]
      [PUNCH] [KICK] [JUMP]
-                   [CHARGE]   (Joystick only: a down arrow)
   ```
 
   Every combat button shows an original monochrome SVG icon
@@ -2206,9 +2218,8 @@ Back return Home). It holds the player's settings, saved on this device.
   labelled/described), `aria-pressed`/`aria-checked` for selections,
   `aria-live` previews.
 - Every touch control is a real button with its own name, whatever its
-  glyph: the joystick is a group named "Movement joystick", its Dash
-  buttons "Left mouvement" and "Right mouvement", and the down arrow
-  "Charge" (never "Down").
+  glyph: the joystick is a group named "Movement joystick" and the down
+  arrow beside it "Charge" (never "Down").
 - Visible focus everywhere; focus is managed on every screen and overlay.
 - Never rely on colour alone for focus, selection, availability, errors or
   the current setup step — use borders, check marks, filled indicators, labels

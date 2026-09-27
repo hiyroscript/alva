@@ -237,7 +237,7 @@ test('Jump Power changes nothing but the jump\'s initial speed: gravity, fall sp
     const log = [];
     while (!fighter.grounded) {
       const vy = fighter.body.vy;
-      step({ ...right, jump: true }); // held: the full jump, never cut short
+      step(right); // a tap: the normal jump
       log.push({ vx: fighter.body.vx, x: fighter.body.x, dvy: fighter.grounded ? null : fighter.body.vy - vy });
     }
     return log;
@@ -299,10 +299,10 @@ function checkCoyoteAndBuffer(character, velocity, label) {
     run.step(JUMP);
     run.fighter.airJumps = 0;
     for (let i = 1; i < airborne - early; i++) run.step();
-    // Held on from the press: the full jump on landing (a tap is a short hop).
+    // A tap: the normal jump on landing.
     run.step(JUMP);
-    stepUntil(run.step, (f) => f.grounded, { jump: true });
-    run.step({ jump: true });
+    stepUntil(run.step, (f) => f.grounded);
+    run.step();
     assert.equal(!run.fighter.grounded, jumps, `${label}: pressed ${early} steps before landing`);
     if (jumps) assert.equal(run.fighter.body.vy, -velocity + CONFIG.sim.gravity * def.movement.gravityScale * DT);
   }

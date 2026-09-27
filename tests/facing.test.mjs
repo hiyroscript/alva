@@ -1,8 +1,10 @@
 // Run with node --test tests/facing.test.mjs (no dependencies).
 // Facing is manual: a fighter never turns toward its opponent by itself.
-// Only its own movement (and a Dash) turns it; standing still it keeps its
-// last facing, attacks and shurikens go the way it faces, and a respawn
-// takes the spawn's facing. The HUD portraits facing the timer are a
+// Only its own input turns it: its movement, a Dash, and a direction held
+// during an attack, the Shield or Charge (at once, either way); standing
+// still it keeps its last facing, attacks and shurikens go the way it
+// faces, and a respawn takes the spawn's facing. A stun, a bind, a Dash and
+// a charged technique hold it. The HUD portraits facing the timer are a
 // separate, fixed rule (see battle-screen.test.mjs). Uses the real Fighter,
 // CombatSystem, Battle and physics (see fighter-harness.mjs).
 import test from 'node:test';
@@ -21,6 +23,8 @@ globalThis.Path2D ??= class {
 };
 
 const BA1 = { ba1: true, ba1Pressed: true };
+const BA2 = { ba2: true, ba2Pressed: true };
+const CHARGE = { charge: true };
 const THROW = { uniqueba: true, uniquebaPressed: true };
 // Two presses of `dir`, one step apart: a Dash's double tap.
 const doubleTap = (step, dir) => {
@@ -94,7 +98,7 @@ test('a Dash faces its own direction, and the opponent never overrides it afterw
   }
 });
 
-test('attacks use the current facing: BA1 facing right strikes right with the opponent on the left, and nothing turns it', () => {
+test('attacks use the current facing: BA1 facing right strikes right with the opponent on the left, and nothing but a direction turns it', () => {
   const d = duel({ gap: -44 });
   const { attacker, target } = d;
   assert.ok(target.body.x < attacker.body.x, 'the opponent is on the left');
@@ -116,6 +120,60 @@ test('attacks use the current facing: BA1 facing right strikes right with the op
   assert.ok(sawActive);
   assert.equal(d.events.length, 0, 'the opponent behind is not hit');
   assert.equal(attacker.facing, 1, 'still facing right afterwards');
+});
+
+test('a direction held mid-attack turns it at once: BA1 started facing away lands on the opponent behind', () => {
+  for (const facing of [1, -1]) {
+    const d = duel({ gap: -44, attackerFacing: facing, targetFacing: facing });
+    const { attacker, target } = d;
+    assert.equal(Math.sign(target.body.x - attacker.body.x), -facing, 'the opponent is behind');
+    d.tick(BA1);
+    assert.equal(attacker.combat.phase, 'startup');
+    assert.equal(attacker.facing, facing);
+    const back = facing > 0 ? { runLeft: true } : { runRight: true };
+    d.tick(back);
+    assert.equal(attacker.facing, -facing, 'turned during the wind-up');
+    d.until(() => d.events.length > 0 || !attacker.combat.attack, 30);
+    assert.equal(d.events[0]?.target, target, 'the strike lands behind');
+    assert.equal(d.events[0].move, 'ba1');
+  }
+});
+
+test('turning while in Charge: the Sphere Rush goes the way the fighter faces as it starts', () => {
+  const { fighter, step } = makeFighter({ x: 1000, facing: 1 });
+  step({ ...CHARGE, chargePressed: true });
+  for (let i = 0; i < 5; i++) step(CHARGE);
+  assert.equal(fighter.state, 'charge');
+  step({ ...CHARGE, runLeft: true });
+  assert.equal(fighter.facing, -1, 'turned without leaving Charge');
+  assert.equal(fighter.state, 'charge');
+  assert.equal(fighter.body.vx, 0, 'no walking');
+  step({ ...CHARGE, ...BA2 });
+  assert.ok(fighter.technique, 'the Sphere Rush started');
+  assert.equal(fighter.technique.facing, -1);
+  const x = fighter.body.x;
+  while (fighter.technique && fighter.technique.phase !== 'dash') step();
+  for (let i = 0; i < 3 && fighter.technique; i++) step({ runRight: true });
+  assert.ok(fighter.body.x < x, 'rushes left');
+  assert.equal(fighter.facing, -1, 'a charged technique holds its facing');
+});
+
+test('a stun, a Dash or a bind still holds the facing whatever is held', () => {
+  const stunned = makeFighter({ facing: 1 });
+  stunned.fighter.combat.stun = 0.3;
+  for (let i = 0; i < 10; i++) stunned.step({ runLeft: true });
+  assert.equal(stunned.fighter.facing, 1, 'stunned');
+  const dashing = makeFighter({ facing: 1 });
+  doubleTap(dashing.step, 'runRight');
+  assert.ok(dashing.fighter.dash);
+  dashing.step({ runLeft: true });
+  assert.ok(dashing.fighter.dash, 'still dashing');
+  assert.equal(dashing.fighter.facing, 1, 'dashing');
+  const bound = makeFighter({ facing: 1 });
+  bound.fighter.combat.bind('a technique');
+  assert.ok(bound.fighter.combat.immobilized);
+  for (let i = 0; i < 5; i++) bound.step({ runLeft: true });
+  assert.equal(bound.fighter.facing, 1, 'bound');
 });
 
 test('a shuriken flies the way the thrower faces, with no aim toward an opponent behind it', () => {

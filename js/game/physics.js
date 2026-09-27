@@ -109,7 +109,10 @@ export function createBody({ x, y, width, height, gravityScale = 1, maxFall = 15
 
 const overlapsX = (b, x0, x1) => b.x + b.halfW > x0 && b.x - b.halfW < x1;
 
-export function stepBody(b, dt, stage, gravity) {
+// One fixed step of a body's motion through the stage. `maxFall` caps this
+// step's fall speed: the body's own unless given (a fighter's slow fall
+// passes a lower one, see Fighter.update).
+export function stepBody(b, dt, stage, gravity, maxFall = b.maxFall) {
   b.prevX = b.x;
   b.prevY = b.y;
   b.landed = false;
@@ -124,7 +127,7 @@ export function stepBody(b, dt, stage, gravity) {
     if (b.dropTimer <= 0) b.dropId = null;
   }
 
-  if (!b.grounded) b.vy = Math.min(b.vy + gravity * b.gravityScale * dt, b.maxFall);
+  if (!b.grounded) b.vy = Math.min(b.vy + gravity * b.gravityScale * dt, maxFall);
 
   // ---- Horizontal ----------------------------------------------------------
   // Solids only (the main floor's body included): nothing else stops a body

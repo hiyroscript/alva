@@ -105,6 +105,36 @@ test('every level fights: it presses real attack buttons, its fighter attacks th
   }
 });
 
+test('while its own attack plays it never turns away from its opponent (a held direction turns an attack)', () => {
+  let attacks = 0;
+  for (const difficulty of DIFFICULTY_IDS) {
+    for (const seed of [1, 2, 3, 4, 5]) {
+      // Against another CPU, so both close in, cross over and strike. Where
+      // each one's opponent is, as its controller decides (the first to
+      // step has already moved when the second decides).
+      const side = new Map();
+      const decide = (controller) => (self, dt, ctx) => {
+        side.set(self, Math.sign(self.opponent.body.x - self.body.x));
+        return controller.getInput(self, dt, ctx);
+      };
+      const other = decide(new CombatAIController({ difficulty, rng: mulberry32(seed + 100) }));
+      const r = ring({ difficulty, seed, cpuX: 900, foeX: 1100, script: (n, self) => other(self, DT, r.ctx) });
+      r.cpu.controller = { getInput: decide(r.ai) };
+      for (let i = 0; i < seconds(30); i++) {
+        const before = [r.cpu, r.foe].map((f) => ({ f, atk: f.combat.attack, facing: f.facing }));
+        r.step();
+        for (const { f, atk, facing } of before) {
+          if (!atk && f.combat.attack) attacks++;
+          if (!atk || f.combat.attack !== atk || f.facing === facing) continue;
+          assert.equal(f.facing, side.get(f), `${difficulty} seed ${seed}: ${f.label} turned away mid-attack at step ${r.n}`);
+        }
+        if (r.cpu.body.y > 2000 || r.foe.body.y > 2000) break; // one fell into the Void
+      }
+    }
+  }
+  assert.ok(attacks > 300, `plenty of attacks (${attacks})`);
+});
+
 test('it never presses a reserved button, and never drops through a platform', () => {
   assert.equal(def.actions.transform, null, '#0001\'s transform is reserved');
   const moves = readMoveset(new Fighter({ def, sprites: fakeSprites(), stage: FLAT, spawn: { x: 100 } }));

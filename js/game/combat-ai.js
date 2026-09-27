@@ -45,12 +45,12 @@ import { COMBAT_ACTIONS } from './character.js';
 import { worldBox } from './combat.js';
 import { summonProblem } from './clone.js';
 import { techniqueProblem } from './charged-technique.js';
-import { blankInput } from './fighter-controller.js';
+import { blankInput, jumpTapHold } from './fighter-controller.js';
 import { DEFAULT_DIFFICULTY, getDifficultyProfile, resolveDifficulty } from '../data/difficulty.js';
 
 // The buttons a controller holds, by control codename; each has a matching
-// `…Pressed` edge. The mouvement buttons are touch-only: it Dashes by
-// double-tapping runLeft / runRight, as a keyboard or gamepad player does.
+// `…Pressed` edge. It Dashes by double-tapping runLeft / runRight, as every
+// player does.
 const BUTTONS = ['runLeft', 'runRight', 'charge', 'jump', 'shield', 'uniqueba', 'transform', 'ba1', 'ba2'];
 const DIR_KEY = { [-1]: 'runLeft', 1: 'runRight' };
 
@@ -221,8 +221,8 @@ export class CombatAIController {
     // drags on, the more it wants to commit (see urge).
     this.lastOffence = 0;
     this.turning = false;
-    // A jump's button stays held until this clock time, so it is the full
-    // jump rather than a short hop (see holdJump).
+    // A jump's button stays held until this clock time, then is let go in
+    // time for the normal jump (see holdJump).
     this.jumpHoldUntil = -Infinity;
   }
 
@@ -268,12 +268,12 @@ export class CombatAIController {
     return this.emit();
   }
 
-  // Every jump it presses is a full one: the button stays held through the
-  // fighter's short-hop window (a tap would be a short hop, see
-  // Fighter.shortHop), then is let go so a later press (the air jump) is a
-  // fresh one.
+  // Every jump it presses is the normal one: the button stays held a
+  // moment, then is let go inside the fighter's higher-jump window (held
+  // through it would be the higher jump, see Fighter.update), so a later
+  // press (the air jump) is a fresh one.
   holdJump(self, held) {
-    if (held.jump && !this.prev.jump) this.jumpHoldUntil = this.clock + (self.def.movement.shortHopWindow ?? 0) + 2 / 60;
+    if (held.jump && !this.prev.jump) this.jumpHoldUntil = this.clock + jumpTapHold(self);
     if (this.clock <= this.jumpHoldUntil) held.jump = true;
   }
 
@@ -1216,14 +1216,22 @@ export class CombatAIController {
     return !!stage.surfaceBelow(x - b.halfW, x + b.halfW, b.y).ref;
   }
 
-  // Last checks on what the intent holds: never walk off the main floor into
-  // open air, hop a solid block in the way, and never double-tap into a
-  // Dash by accident.
+  // Last checks on what the intent holds: never turn its own attack away
+  // from the opponent, never walk off the main floor into open air, hop a
+  // solid block in the way, and never double-tap into a Dash by accident.
   guard(self, ctx, held) {
     const b = self.body;
     const dir = held.runRight === held.runLeft ? 0 : held.runRight ? 1 : -1;
     if (!dir) return;
     const key = DIR_KEY[dir];
+    // A direction held while its attack plays turns it (see
+    // Fighter.updateFacing): steering back to brake an aerial would swing
+    // the strike away. Only ever toward the opponent, then.
+    const foe = self.opponent;
+    if (self.combat.attack && dir !== self.facing && foe && Math.sign(foe.body.x - b.x) !== dir) {
+      held[key] = false;
+      return;
+    }
     const dashing = this.intent?.kind === 'dash' && !this.intent.done;
     if (b.grounded && !this.intent?.jumped) {
       const decel = self.def.movement.deceleration;
