@@ -139,7 +139,8 @@ const {
   readSettings,
 } = await import('../js/core/settings.js');
 const { t, followSettings, onLanguageChange, localizeTree, getLanguage, setLanguage } = await import('../js/core/i18n.js');
-const { ScreenManager } = await import('../js/core/screen-manager.js');
+const { ScreenManager, Screen } = await import('../js/core/screen-manager.js');
+const { App } = await import('../js/core/app.js');
 const { MenuNavigator } = await import('../js/core/menu-navigator.js');
 const { HomeScreen } = await import('../js/screens/home-screen.js');
 const { SettingsDialog } = await import('../js/ui/settings-dialog.js');
@@ -492,15 +493,12 @@ function languageApp(storage = memoryStorage()) {
   return { app, root, dialog: app.languageDialog, storage };
 }
 
-test('first launch asks once for English or Français, over black, before the intro; a returning player is never asked', async () => {
+test('first launch asks once for English or Français, after the intro; a returning player is never asked', async () => {
   const { app, root, dialog, storage } = languageApp();
-  assert.match(read('js/core/app.js'), /this\.languageDialog\.ensureChosen\(\)\.then\(\(\) => s\.go\('splash'\)\)/,
-    'the intro waits for a language');
-  assert.doesNotMatch(read('js/core/app.js'), /^\s*s\.go\('splash'\);/m, 'and never starts before it');
   let chosen = null;
   const waiting = dialog.ensureChosen().then((language) => { chosen = language; });
   assert.equal(root.hidden, false, 'shown to a new player');
-  assert.equal(app.screens.current, null, 'no screen yet: the black start screen');
+  assert.equal(app.screens.current, null, 'dialog does not navigate; App owns startup ordering');
   // Modal, labelled in both languages at once, with exactly two choices.
   assert.equal(root.getAttribute('role'), 'dialog');
   assert.equal(root.getAttribute('aria-modal'), 'true');
@@ -549,6 +547,99 @@ test('the language chooser saves through the Settings store only, even when stor
   assert.equal(await waiting, 'en');
   assert.equal(app.settings.languageChosen, true, 'kept for this visit');
   assert.equal(app.settings.language, 'en');
+});
+
+test('App.start enters splash directly; language selection belongs to the continuation', () => {
+  const start = App.prototype.start.toString();
+  assert.match(start, /s\.go\('splash'\)/);
+  assert.doesNotMatch(start, /ensureChosen|languageDialog/);
+});
+
+// Application startup uses the real mandatory dialog and navigation reset.
+test('post-splash continuation enters Home once, asks there, then restores focus without replaying onboarding', async () => {
+  for (const language of ['en', 'fr']) {
+    const { app, dialog, root } = languageApp();
+    const unfollow = followSettings(app.settings);
+    const splash = new Screen(app, 'splash');
+    splash.navigable = false;
+    const home = new Screen(app, 'home');
+    let entries = 0;
+    home.enter = () => {
+      entries++;
+      assert.equal(dialog.isOpen, false);
+    };
+    let focuses = 0;
+    home.focusDefault = () => { focuses++; };
+    app.screens.register(splash);
+    app.screens.register(home);
+    app.screens.go('splash');
+    assert.equal(root.hidden, true);
+    assert.deepEqual(app.nav.scopes, []);
+    const waiting = App.prototype.continueAfterSplash.call(app, () => app.screens.current === splash);
+    await Promise.resolve();
+    assert.equal(entries, 1);
+    assert.equal(app.screens.current, home);
+    assert.equal(home.el.hidden, false);
+    assert.equal(home.el.inert, true);
+    assert.equal(root.hidden, false);
+    dialog.scope.onBack();
+    dialog.choose('invalid');
+    assert.equal(entries, 1);
+    assert.equal(dialog.isOpen, true);
+    dialog.choose(language);
+    dialog.choose(language);
+    await waiting;
+    assert.equal(entries, 1);
+    assert.equal(getLanguage(), language);
+    assert.equal(home.el.inert, false);
+    assert.equal(focuses, 2, 'Home focus restored after choosing');
+    assert.deepEqual(app.nav.scopes, []);
+    assert.equal(app.screens.current, home);
+    assert.deepEqual(app.screens.stack, []);
+    assert.equal(app.screens.back(), false);
+    app.screens.go('home', {}, { reset: true });
+    assert.equal(dialog.isOpen, false, 'revisiting Home does not ask again');
+    await dialog.ensureChosen();
+    assert.equal(root.hidden, true);
+    unfollow();
+  }
+  setLanguage('en');
+});
+
+test('returning player continues directly without opening or focusing the language dialog', async () => {
+  const { app, dialog, root } = languageApp(memoryStorage({
+    [SETTINGS_KEY]: JSON.stringify({ version: SETTINGS_VERSION, language: 'fr' }),
+  }));
+  dialog.open = () => assert.fail('returning player must never open the chooser');
+  const focus = document.activeElement;
+  const calls = [];
+  app.screens.go = (...args) => calls.push(args);
+  await App.prototype.continueAfterSplash.call(app, () => true);
+  assert.deepEqual(calls, [['home', {}, { reset: true }]]);
+  assert.equal(root.hidden, true);
+  assert.equal(document.activeElement, focus);
+  assert.deepEqual(app.nav.scopes, []);
+});
+
+test('stale continuation cannot enter Home or open the chooser', async () => {
+  const { app, root } = languageApp();
+  app.screens.go = () => assert.fail('stale splash must not navigate');
+  await App.prototype.continueAfterSplash.call(app, () => false);
+  assert.equal(root.hidden, true);
+  assert.deepEqual(app.nav.scopes, []);
+});
+
+test('choosing after navigation does not restore focus to an inactive Home', async () => {
+  const { app, dialog } = languageApp();
+  const home = new Screen(app, 'home');
+  app.screens.current = home;
+  home.focusDefault = () => assert.fail('inactive Home must not receive focus');
+  const waiting = dialog.ensureChosen();
+  app.screens.current = null;
+  dialog.choose('fr');
+  await waiting;
+  assert.equal(home.el.inert, true);
+  assert.equal(dialog.background, null);
 });
 
 // ---- Home's Settings gear ------------------------------------------------------------

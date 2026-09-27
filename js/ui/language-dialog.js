@@ -1,6 +1,6 @@
 // FIRST-LAUNCH LANGUAGE CHOOSER: the one-time dialog that asks a new player
-// for their language before the intro starts (App.start: no language chosen
-// yet → this dialog over the black start screen → splash → Home). It offers
+// for their language after the complete intro (App.continueAfterSplash:
+// splash → Home → this dialog, only until a language is chosen). It offers
 // exactly English and Français, each named in its own language and marked
 // with its own lang, under a title and prompt given in both languages, so it
 // makes sense before any language is chosen.
@@ -75,6 +75,8 @@ export class LanguageDialog {
   // Shows the chooser and resolves with the language picked.
   open() {
     if (this.resolve) return this.promise;
+    this.background = this.app.screens.current;
+    if (this.background) this.background.el.inert = true;
     this.root.hidden = false;
     this.app.nav.pushScope(this.scope);
     this.optionFor(browserLanguage())?.focus({ preventScroll: true });
@@ -93,6 +95,11 @@ export class LanguageDialog {
     const resolve = this.resolve;
     this.resolve = null;
     document.activeElement?.blur?.();
+    if (this.background && this.app.screens.current === this.background) {
+      this.background.el.inert = false;
+      this.background.focusDefault();
+    }
+    this.background = null;
     resolve(language);
   }
 }

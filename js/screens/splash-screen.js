@@ -107,14 +107,16 @@ export class SplashScreen extends Screen {
   finish(run) {
     if (!this.active(run)) return;
     run.done = true;
-    this.clear();
-    this.app.screens.go('home', {}, { reset: true });
+    this.clear(false);
+    void this.app.continueAfterSplash(() => this.run === run && !run.cancelled);
   }
 
-  clear() {
+  // A completed run stays identifiable until the application enters Home
+  // or another navigation exits/restarts this splash.
+  clear(cancelRun = true) {
     const run = this.run;
     if (run) {
-      run.cancelled = true;
+      if (cancelRun) run.cancelled = true;
       run.cancelDelay?.();
       for (const animation of run.animations) animation.cancel();
     }
@@ -124,7 +126,7 @@ export class SplashScreen extends Screen {
     }
     this.credit.style.opacity = '';
     this.stage.replaceChildren();
-    this.run = null;
+    if (cancelRun) this.run = null;
   }
 
   exit() {
