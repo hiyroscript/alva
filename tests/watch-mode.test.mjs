@@ -164,6 +164,7 @@ const { ICONS } = await import('../js/ui/icons.js');
 const { ConfirmDialog } = await import('../js/ui/overlays.js');
 const { Settings } = await import('../js/core/settings.js');
 const { WATCH_SETUP, QUICK_BATTLE_SETUP } = await import('../js/ui/components.js');
+const { t } = await import('../js/core/i18n.js');
 const { ScreenManager } = await import('../js/core/screen-manager.js');
 const { MenuNavigator } = await import('../js/core/menu-navigator.js');
 const { mulberry32, deriveSeed } = await import('../js/core/utils.js');
@@ -332,9 +333,9 @@ function trace(battle, steps) {
 test('Home: Watch Mode sits between Play and Practice Ground, styled like the secondary actions; Play stays the default', () => {
   const { app, screens } = boot();
   const home = screens.home;
-  const { play, watch, practice, discover, settings } = home.actions;
-  assert.deepEqual(home.el.querySelectorAll('.home-action'), [play, watch, practice, discover, settings], 'Play → Watch Mode → Practice Ground → Discover → Settings');
-  assert.deepEqual(home.el.querySelector('.home-actions').children, [play, watch, practice, discover, settings], 'in the DOM in that order');
+  const { play, watch, practice, discover } = home.actions;
+  assert.deepEqual(home.el.querySelectorAll('.home-action'), [play, watch, practice, discover], 'Play → Watch Mode → Practice Ground → Discover');
+  assert.deepEqual(home.el.querySelector('.home-actions').children, [play, watch, practice, discover], 'in the DOM in that order');
   assert.ok(watch.html.includes('<span>Watch Mode</span>'));
   assert.ok(watch.html.includes(ICONS.right), 'the secondary actions\' chevron');
   assert.equal(watch.className, practice.className, 'the same outlined Home action as Practice Ground and Discover');
@@ -345,7 +346,8 @@ test('Home: Watch Mode sits between Play and Practice Ground, styled like the se
   assert.equal(watch.hasAttribute('data-nav-default'), false);
   assert.equal(watch.disabled, false);
   assert.equal(document.activeElement, play, 'Play is still focused by default');
-  assert.deepEqual(app.nav.candidates(home.el), [play, watch, practice, discover, settings], 'keyboard / gamepad reach all five, in order');
+  assert.deepEqual(app.nav.candidates(home.el), [play, watch, practice, discover, home.settingsButton],
+    'keyboard / gamepad reach all four, in order, then the Settings gear');
   // Practice Ground and Discover still open their screens (their stand-ins).
   assert.ok(practice.html.includes('<span>Practice Ground</span>'));
   assert.ok(discover.html.includes('<span>Discover</span>'));
@@ -430,8 +432,12 @@ test('the app registers the four Watch Mode screens, each with its own labelled 
 
 test('Watch setup screens show Difficulty, CPU 1, CPU 2, Stage under "Watch Mode setup"; Quick Battle\'s header is unchanged', () => {
   const { screens } = boot();
-  assert.deepEqual([...WATCH_SETUP.steps], ['Difficulty', 'CPU 1', 'CPU 2', 'Stage']);
-  assert.deepEqual([...QUICK_BATTLE_SETUP.steps], ['Mode', 'Difficulty', 'Fighter', 'Stage']);
+  // The steps are translation keys ([key, params] for CPU n), English here.
+  const names = (setup) => setup.steps.map((step) => t(...[].concat(step)));
+  assert.deepEqual(names(WATCH_SETUP), ['Difficulty', 'CPU 1', 'CPU 2', 'Stage']);
+  assert.deepEqual(names(QUICK_BATTLE_SETUP), ['Mode', 'Difficulty', 'Fighter', 'Stage']);
+  assert.equal(t(WATCH_SETUP.name), 'Watch Mode');
+  assert.equal(t(QUICK_BATTLE_SETUP.name), 'Quick Battle');
   const check = (screen, names, step, label) => {
     const list = screen.el.querySelector('.steps');
     assert.equal(list.getAttribute('aria-label'), label, screen.id);

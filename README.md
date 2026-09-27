@@ -9,9 +9,10 @@ This is the first playable foundation: full menu flow, a 48-slot roster, two
 compact platform-fighter stages with open ledges and a Void kill boundary, a
 Watch Mode for CPU-vs-CPU matches, a
 Practice Ground training room, a Discover reference screen, a Settings
-screen, movement and platform physics, a tiered Power system (Jump Power and
+dialog, the whole interface in English or French, movement and platform
+physics, a tiered Power system (Jump Power and
 Speed Power), a camera, a HUD, touch controls in two layouts (a joystick by
-default, or the classic buttons),
+default, or the classic buttons) that players can rearrange and resize,
 and a data-driven combat system built on Launch Point, Base Launch and
 Directional Launch, with #0001's two real attacks, Basic Attack 1
 (BA1) and Basic Attack 2 (BA2), a held ground and mid-air Shield (a slow
@@ -101,13 +102,50 @@ Charge held + `ba2` is `cba2`. The mouvement buttons send one-step requests
 \* Reserved: wired into input and combat, but inactive until #0001 has matching
 attack animations. Its touch button has a dashed outline.
 
+### Language
+
+Alva speaks **English** and **French**. The first time it is opened on a
+device, before the intro, it asks once: a small dialog titled "Language ·
+Langue" with two choices, **English** and **Français** (the one matching the
+browser's language has focus, but nothing is chosen for you). The choice is
+saved on the device and applied at once, and a returning player is never
+asked again. Change it later under **Settings → Language** (the gear at the
+top right of Home): the whole interface switches immediately, with no
+reload, and `<html lang>` follows.
+
+Every player-facing string, and every spoken label (`aria-label`s, dialog
+titles, touch-control names), comes from one table in `js/core/i18n.js`,
+looked up by stable key (`t('home.play')`). English game copy (Powers,
+Launch, difficulty levels, stage names, control names, each fighter's own
+touch-button names) is read from the registries that own it, so it cannot
+drift; the French table translates every key, and a test fails if one is
+missing. Internal identifiers (control and move codenames, character, map
+and scheme ids, CSS classes, data keys) are never translated, and proper
+names (ALVA, #0001, Shuriken, the credited sources) stay as they are.
+
+### Settings
+
+The gear at the top right of Home opens **Settings**: a translucent glass
+dialog over Home (Home stays visible, dimmed and blurred, behind it) with
+two sections, **Language** and **Controls**. Everything in it works with
+mouse, touch, keyboard and gamepad; Esc or gamepad Back, the close button or
+a press on the dim closes it, and focus returns to the gear.
+
+Settings are saved on the device as one small versioned object in
+`localStorage` under `alva.settings` (schema version 2: `language`,
+`mobileControls` and each scheme's custom touch layout). Only
+`js/core/settings.js` touches storage. Settings saved by an older version
+(version 1, Mobile Controls only) are migrated: the Joystick / Classic
+choice is kept and the language chooser shows once. Anything missing,
+corrupt or out of range falls back to its default, value by value; where
+storage is blocked, choices last for the visit.
+
 ### Mobile Controls
 
-Touch play has two layouts. Pick one under **Home → Settings → Mobile
-Controls**; it is saved on the device (one small versioned object in
-`localStorage`, `alva.settings`) and used by Quick Battle and Practice
-Ground from their next start. Watch Mode never shows player controls.
-Keyboard and gamepad controls are the same whichever layout is chosen.
+Touch play has two layouts. Pick one under **Settings → Controls → Mobile
+Controls**; Quick Battle and Practice Ground use it from their next start.
+Watch Mode never shows player controls. Keyboard and gamepad controls are
+the same whichever layout is chosen.
 
 - **Joystick** (the default, for anyone who never chose): the lower-left
   corner is one round joystick. Push it left or right to run; it holds the
@@ -133,6 +171,35 @@ Keyboard and gamepad controls are the same whichever layout is chosen.
 
 The keyboard and gamepad Dash stays the double tap. Pushing the joystick
 out twice quickly is a double tap too, as with a gamepad stick.
+
+**Customize touch controls** (under Settings → Controls) opens a layout
+editor for the layout in use: the real touch controls over a still battle
+screen, placed exactly as in play. Every control can be moved and resized,
+the joystick and the Dash buttons included:
+
+- **Drag** a control to move it. It stays whole on screen, inside the safe
+  area.
+- **Select** a control (tap or click it) to resize it with **−** / **+** or
+  the size slider, from 70% to 180% of its size; its touch area grows and
+  shrinks with it.
+- With a **keyboard or gamepad**, move to a control and press Enter / A: the
+  arrows or D-pad then nudge it in small steps until Enter / A or Esc /
+  Back. ← / → on the focused size slider resize it.
+- **Reset to defaults** puts that layout back exactly as Alva draws it;
+  **Done** (or Esc / Back) returns to Settings.
+
+Every change is saved as it lands (a drag when it ends, each nudge, each
+size step, a reset). Joystick and Classic Buttons keep separate layouts, so
+switching layouts later brings back that layout's own arrangement.
+Positions are stored as fractions of the screen's safe play area and sizes
+as scales, never raw pixels, so a layout made on one screen fits another,
+and a resize or rotation re-places everything. A control that has not been
+moved stays exactly where the stylesheet puts it. Moving or resizing never
+changes what a control does: the same codenames, held buttons, joystick
+deadzone, one-tap Dash buttons and multi-touch, and Classic Buttons' Left /
+C / Right still slide into one another wherever they sit. The HUD's pause
+and More buttons always stay on top of the controls, so no arrangement can
+cover them.
 
 - **Movement and combos:** #0001 starts, stops and turns quickly (top
   speed in about 0.08 s, a short stop, a full turn in about 0.12 s) and
@@ -404,7 +471,7 @@ out twice quickly is a double tap too, as with a gamepad stick.
   rate. A restart or rematch, a new fighter in Practice Ground and every
   respawn after the Void clear them. They cost no Energy.
 - **Menus:** arrow keys or WASD to move, `Enter` to select, `Esc` to go back. Mouse and touch work too.
-- **Touch:** two layouts, Joystick (the default) and Classic Buttons (see [Mobile Controls](#mobile-controls)). Several fingers work at once (hold the joystick or Right and press Jump, or hold Charge and press Punch). The combat buttons show icons, not letters: for #0001, **Shuriken** (Throw), **Shield** (held), **Punch** (Basic Attack 1) and **Kick** (Basic Attack 2), beside Transform (dashed: #0001 has none yet) and Jump. Hold Charge, then press Punch for the Clone Attack or Kick for the Sphere Rush. The icons of the fighter's own buttons (Shuriken, Punch, Kick, and Transform once a fighter has one) come from its `mobileAbilities` in `js/data/characters.js` and follow Player 1's fighter, in Practice Ground too when you change fighter; a fighter with no `transform` entry keeps the dashed, reserved Transform star. Shield, Jump and Charge are the same for everyone. Only the presentation is per fighter: the buttons always send the same control codenames (`uniqueba`, `transform`, `shield`, `ba1`, `ba2`). The combat buttons are the same elements in both layouts, in the same places: switching (`TouchControls.setScheme`) only swaps the lower-left corner (Left / C / Right, or Charge and the joystick with its Dash buttons), after letting go of everything held. The viewport disables page zoom (`maximum-scale=1, user-scalable=no`) and the play surfaces, joystick and buttons set `touch-action: none`, so rapid taps never zoom or scroll the page.
+- **Touch:** two layouts, Joystick (the default) and Classic Buttons (see [Mobile Controls](#mobile-controls)). Several fingers work at once (hold the joystick or Right and press Jump, or hold Charge and press Punch). The combat buttons show icons, not letters: for #0001, **Shuriken** (Throw), **Shield** (held), **Punch** (Basic Attack 1) and **Kick** (Basic Attack 2), beside Transform (dashed: #0001 has none yet) and Jump. Hold Charge, then press Punch for the Clone Attack or Kick for the Sphere Rush. The icons of the fighter's own buttons (Shuriken, Punch, Kick, and Transform once a fighter has one) come from its `mobileAbilities` in `js/data/characters.js` and follow Player 1's fighter, in Practice Ground too when you change fighter; a fighter with no `transform` entry keeps the dashed, reserved Transform star. Shield, Jump and Charge are the same for everyone. Only the presentation is per fighter: the buttons always send the same control codenames (`uniqueba`, `transform`, `shield`, `ba1`, `ba2`). The combat buttons are the same elements in both layouts, in the same places: switching (`TouchControls.setScheme`) only swaps the lower-left corner (Left / C / Right, or Charge and the joystick with its Dash buttons), after letting go of everything held. Each layout can also be rearranged and resized by the player (see [Mobile Controls](#mobile-controls)); the buttons keep what they do wherever they sit. The viewport disables page zoom (`maximum-scale=1, user-scalable=no`) and the play surfaces, joystick and buttons set `touch-action: none`, so rapid taps never zoom or scroll the page.
 - **Gamepad (standard layout):** D-pad or left stick left / right to move (twice in a row to Dash) and down to Charge in battle (they still navigate menus), A to jump, X / Square to Throw, B / Circle for Basic Attack 1, LB for Basic Attack 2, Y / Triangle for the reserved Transform, RB or RT for Shield, Start to pause.
 - **Debug:** `` ` `` toggles the collider, hurtbox and attack-hitbox overlay in battle (a hitbox shows only while it can connect; hurtboxes look the same with the Shield up, and a shielding fighter is labelled `shield`; a flying shuriken's hitbox is outlined in magenta and labelled; a clone's attack hitbox shows in the attack colour, labelled `clone ba1` (or `clone maba2` overhead), only on its active frame; the Sphere Rush's sphere hitbox is a dashed cyan box labelled `charged ba2 dash` while it can connect, then a dashed cyan cross marks the sphere on the caught opponent, which is labelled `bound`; solids, the main floor's block among them, are outlined in red and the Void's fixed kill line is dashed violet).
 
@@ -445,18 +512,27 @@ ring with dark separation keep states identifiable beyond colour.
   still for reduced-motion users. Wheel/trackpad, pointer or touch dragging,
   and focused arrow/Page keys scroll the credits manually. Automatic movement
   resumes from that position after about 2 seconds of inactivity; reduced-motion
-  mode remains manual-only. Under Play come four outlined secondary actions,
+  mode remains manual-only. Under Play come three outlined secondary actions,
   in this order: **Watch Mode** opens its CPU-vs-CPU setup directly (never
-  Select Mode), **Practice Ground** opens the training room directly,
-  **Discover** opens the in-game reference, and **Settings** opens the
-  settings (Mobile Controls). The strip shifts outward on narrow screens,
-  and short landscape screens tighten the five actions, and shrink the
-  wordmark only as much as they need, so they fit above the footer.
-- **Settings** has one setting today, **Mobile Controls**, as two cards
-  (Joystick, marked Default, and Classic Buttons), each with a small drawing
-  of its lower-left corner. They are a radio group reached by keyboard and
-  gamepad like any menu; the one in use is marked Selected. Choosing one
-  saves it at once.
+  Select Mode), **Practice Ground** opens the training room directly, and
+  **Discover** opens the in-game reference. A compact gear button in the top
+  right corner (inside the safe area, reached with → or ↑ from the menu)
+  opens Settings. The strip shifts outward on narrow screens, and short
+  landscape screens tighten the four actions, and shrink the wordmark only as
+  much as they need, so they fit above the footer.
+- **Settings** is a translucent glass dialog over Home, in the same glass as
+  the pause and Practice panels: **Language** (English and Français as two
+  radio buttons, the one in use ticked) and **Controls** (Mobile Controls as
+  two cards, Joystick, marked Default, and Classic Buttons, each with a small
+  drawing of its lower-left corner, and **Customize touch controls**). Both
+  choices save at once; the dialog stays open. It scrolls on its own on
+  short landscape screens.
+- **The touch layout editor** fills the screen with a dusk stand-in for a
+  stage and the real touch controls; a compact glass bar across the top
+  holds the layout's name, a short hint, the size controls, Reset to
+  defaults and Done, and fades while a control is dragged. The selected
+  control wears a dashed green ring (solid while it is being moved with the
+  keys).
 - **Select Difficulty** takes Seren's four-level ascending scale into Alva's
   own language: four large charcoal cards (01 Easy, 02 Medium, 03 Hard, 04
   Brutal), each with its big mono index, a four-bar scale lit one to four
@@ -498,10 +574,13 @@ js/
   main.js, config.js  boot + global config (bindings, render, timing)
   core/               app controller, screen manager, menu navigation,
                       asset loader, input (keyboard/touch/gamepad), device,
-                      audio stub, settings (saved Mobile Controls)
+                      audio stub, settings (saved language, Mobile
+                      Controls and custom touch layouts), i18n (every
+                      English and French string), touch-layout (control
+                      ids, layout checks and geometry)
   screens/            splash, home, mode, difficulty, character, map, Watch
                       Mode's setup (watch-screens.js), battle, practice,
-                      discover, settings
+                      discover
   game/               arena (shared loop + rendering), battle (Quick Battle
                       and Watch Mode), Practice
                       session, controllers (player, combat AI, training),
@@ -516,7 +595,9 @@ js/
   data/               characters.js, maps.js, practice-map.js, powers.js,
                       launch.js, difficulty.js
   ui/                 wordmark, icons, overlays, credits, stage preview,
-                      fighter roster, mobile ability icons
+                      fighter roster, mobile ability icons, the first-launch
+                      language dialog, the Settings dialog and the touch
+                      layout editor
 ```
 
 - **Sprite normalization.** The idle, jump, fall, land and hurt frames are pixel art at roughly 16× scale, the mid-air hurt, Basic Attack 1 and 2 and Charge frames at 8×, and the run frames at 4×; the Dash and Shield frames are drawn at 1× (one file pixel per art pixel), so each clip's `heightRatio` sizes it against idle's 52 art pixels at that same scale. When a frame loads, the game reads its alpha channel once and finds the visible bounds. It then detects the pixel grid from every colour transition and resamples the frame to 1 pixel per art pixel. Every frame is drawn at the same world scale, anchored bottom-centre at the upper-body centroid, so the fighter keeps the same size and position when switching between animations. When the size stays close to the target, each art pixel maps to a whole number of device pixels. The Sphere Rush poses are fighter poses at 2×, normalized like the rest. Projectile and effect art (the shuriken at 8×, the clone cloud and the Sphere Rush sphere at 2×) goes through the same grid detection but keeps its own art size, centre-anchored at the fighter's art-pixel scale, and is never fitted to the fighter's height.

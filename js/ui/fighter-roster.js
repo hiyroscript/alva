@@ -11,6 +11,7 @@
 
 import { CONFIG } from '../config.js';
 import { el } from '../core/utils.js';
+import { tx, tattr, setText } from '../core/i18n.js';
 import { ICONS } from './icons.js';
 import { CHARACTERS, getCharacter } from '../data/characters.js';
 import { fitCanvas, drawFrameAt, paintPortrait } from './sprite-art.js';
@@ -31,7 +32,7 @@ export class FighterRoster {
     // ---- Roster ---------------------------------------------------------
     const total = Math.max(CONFIG.roster.totalSlots, CHARACTERS.length);
     const bySlot = new Map(CHARACTERS.map((c) => [c.rosterSlot, c]));
-    this.grid = el('div', { class: 'roster-grid', role: 'list', 'aria-label': 'Fighter roster' });
+    this.grid = el('div', { class: 'roster-grid', role: 'list', ...tattr('aria-label', 'roster.grid') });
     for (let i = 0; i < total; i++) {
       const def = bySlot.get(i) || null;
       const num = String(i + 1).padStart(2, '0');
@@ -40,7 +41,7 @@ export class FighterRoster {
         const portrait = el('canvas', { class: 'slot-portrait', width: 1, height: 1, 'aria-hidden': 'true' });
         slot = el('button', {
           class: 'slot is-available', type: 'button', 'data-nav': true, 'data-char': def.id,
-          'aria-label': `${def.displayName}, available`,
+          ...tattr('aria-label', 'roster.available', { name: def.displayName }),
         }, [
           el('span', { class: 'slot-num', text: num }),
           el('span', { class: 'slot-art' }, [portrait]),
@@ -52,7 +53,7 @@ export class FighterRoster {
         slot.addEventListener('click', (e) => this.activate(slot, e));
       } else {
         // Plain element without data-nav: never focused, hovered into or tabbed to.
-        slot = el('div', { class: 'slot is-locked', role: 'img', 'aria-label': `Slot ${num}, locked` }, [
+        slot = el('div', { class: 'slot is-locked', role: 'img', ...tattr('aria-label', 'roster.locked', { num }) }, [
           el('span', { class: 'slot-num', text: num }),
           el('span', { class: 'slot-art', html: ICONS.silhouette }),
           el('span', { class: 'slot-lock', html: ICONS.lock }),
@@ -64,9 +65,9 @@ export class FighterRoster {
       this.grid.append(el('div', { class: 'slot-cell', role: 'listitem' }, [slot]));
     }
     this.scroller = el('div', { class: 'roster-scroll' }, [this.grid]);
-    this.rosterPanel = el('section', { class: 'roster-panel', 'aria-label': 'Roster' }, [
+    this.rosterPanel = el('section', { class: 'roster-panel', ...tattr('aria-label', 'roster.panel') }, [
       el('div', { class: 'panel-head' }, [
-        el('span', { class: 'panel-title', text: 'Roster' }),
+        el('span', { class: 'panel-title', ...tx('roster.panel') }),
       ]),
       this.scroller,
     ]);
@@ -147,18 +148,19 @@ export class FighterRoster {
     const num = String(slot._index + 1).padStart(2, '0');
     if (!def || !def.available) {
       this.host?.classList.add('is-locked-preview');
-      this.status.textContent = 'Locked';
+      setText(this.status, 'roster.statusLocked');
       this.status.className = 'status-badge is-locked';
-      this.name.textContent = `Slot ${num}`;
+      setText(this.name, 'roster.slot', { num });
       this.previewSprites = null;
       this.clearPreview();
       this.updateConfirm();
       return;
     }
     this.host?.classList.remove('is-locked-preview');
-    this.status.textContent = 'Available';
+    setText(this.status, 'roster.statusAvailable');
     this.status.className = 'status-badge is-available';
     this.name.textContent = def.displayName;
+    this.name.setAttribute('data-i18n', '');
     const set = this.app.getSprites(def.id);
     this.previewSprites = set?.usable ? set : null;
     this.previewIndex = 0;
@@ -170,7 +172,7 @@ export class FighterRoster {
   updateConfirm() {
     const def = getCharacter(this.selectedId);
     this.confirmBtn.disabled = !def;
-    this.confirmBtn.textContent = def ? 'Confirm fighter' : 'Select a fighter';
+    setText(this.confirmBtn, def ? 'roster.confirm' : 'roster.none');
   }
 
   confirm() {

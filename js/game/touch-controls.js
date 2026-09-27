@@ -40,17 +40,36 @@
 // Every pointer is tracked by pointerId, so the joystick (or Left / Right)
 // and Jump, or any other combination, work simultaneously. State is pushed
 // into InputManager.setTouch().
+//
+// Custom layouts (the Mobile Controls setting's editor; see
+// js/core/touch-layout.js): each scheme may carry a layout that moves and
+// resizes any of its controls by stable control id. A control keeps its own
+// element, handlers and codename wherever it sits; applyLayout only shifts
+// it (the CSS `translate` property, from where the stylesheet puts it) and
+// sizes it (`scale`, which grows its hit area with it), so the default
+// layout is the stylesheet's own, untouched, and holding, sliding and
+// multi-touch work exactly as before. Classic Buttons' Left / C / Right
+// still slide into one another wherever they are: their cluster captures the
+// pointer and hit-tests the buttons where they are drawn.
+//
+// Accessible names are translation keys (js/core/i18n.js), marked so they
+// follow the interface language.
 
 import { el } from '../core/utils.js';
+import { tattr, setAttr, setPlainAttr } from '../core/i18n.js';
 import { ICONS } from '../ui/icons.js';
-import { ABILITY_ACTIONS, mobileAbility } from '../ui/mobile-abilities.js';
+import { ABILITY_ACTIONS, mobileAbility, mobileAbilityLabelKey } from '../ui/mobile-abilities.js';
 import { DEFAULT_MOBILE_CONTROLS, resolveSetting } from '../core/settings.js';
+import {
+  TOUCH_CONTROL_IDS, sanitizeTouchLayout, sanitizeTouchLayouts, layoutArea, placeControl,
+} from '../core/touch-layout.js';
 
-// Classic Buttons' lower-left cluster, in on-screen order.
+// Classic Buttons' lower-left cluster, in on-screen order. `label` is the
+// accessible name's translation key.
 const DPAD = [
-  { action: 'runLeft', label: 'Move left', icon: ICONS.left },
-  { action: 'charge', label: 'Charge', text: 'C' },
-  { action: 'runRight', label: 'Move right', icon: ICONS.right },
+  { action: 'runLeft', label: 'control.runLeft', icon: ICONS.left },
+  { action: 'charge', label: 'control.charge', text: 'C' },
+  { action: 'runRight', label: 'control.runRight', icon: ICONS.right },
 ];
 
 // Lower-right cluster, in on-screen order. `ability` marks the combat
@@ -61,22 +80,22 @@ const DPAD = [
 const ACTION_BUTTONS = [
   { action: 'uniqueba', pos: 'uniqueba', ability: true },
   { action: 'transform', pos: 'transform' },
-  { action: 'shield', label: 'Shield', icon: ICONS.shield, pos: 'shield', ability: true },
+  { action: 'shield', label: 'control.shield', icon: ICONS.shield, pos: 'shield', ability: true },
   { action: 'ba1', pos: 'ba1', ability: true },
   { action: 'ba2', pos: 'ba2', ability: true },
-  { action: 'jump', label: 'Jump', icon: ICONS.jump, pos: 'jump' },
+  { action: 'jump', label: 'control.jump', icon: ICONS.jump, pos: 'jump' },
 ];
 
 // The Joystick scheme's Charge: the same held `charge`, as a down arrow in
 // the lower-left cluster, to the left of the stick.
-const CHARGE_DOWN = { action: 'charge', label: 'Charge', icon: ICONS.down, pos: 'charge-down' };
+const CHARGE_DOWN = { action: 'charge', label: 'control.charge', icon: ICONS.down, pos: 'charge-down' };
 
 // The Joystick scheme's single-tap Dash buttons, mouvementLeft and
-// mouvementRight. Their codenames and visible names are exactly these,
-// spelling included.
+// mouvementRight. Their codenames and English names are exactly these,
+// spelling included (Left mouvement, Right mouvement).
 const MOUVEMENT_BUTTONS = [
-  { control: 'mouvementLeft', direction: -1, side: 'left', label: 'Left mouvement', icon: ICONS.left },
-  { control: 'mouvementRight', direction: 1, side: 'right', label: 'Right mouvement', icon: ICONS.right },
+  { control: 'mouvementLeft', direction: -1, side: 'left', label: 'touch.mouvementLeft', icon: ICONS.left },
+  { control: 'mouvementRight', direction: 1, side: 'right', label: 'touch.mouvementRight', icon: ICONS.right },
 ];
 
 // The joystick, in fractions of its radius. Pushed sideways past `engage` it
@@ -105,7 +124,7 @@ function makeButton(spec, cls) {
   const btn = el('button', {
     type: 'button',
     class: `tc-btn ${cls}${spec.ability ? ' tc-ability' : ''}`,
-    'aria-label': spec.label,
+    ...(spec.label ? tattr('aria-label', spec.label) : {}),
     'data-action': spec.action,
     tabindex: '-1',
   });
@@ -129,6 +148,11 @@ export class TouchControls {
     this.stickFrame = null;
     this.knobOffset = { x: 0, y: 0 };
     this.mouvementPointers = new Map(); // pointerId -> mouvement button
+    // Each scheme's custom layout (empty: the stylesheet's own), and where
+    // the last applyLayout put every control of the scheme on show.
+    this.layouts = sanitizeTouchLayouts(null);
+    this.placements = new Map();
+    this.area = null;
     this.build();
     this.setScheme(scheme);
   }
@@ -136,7 +160,7 @@ export class TouchControls {
   build() {
     // Classic Buttons' lower-left cluster.
     this.padButtons = new Map();
-    const dpad = el('div', { class: 'tc-cluster tc-dpad', role: 'group', 'aria-label': 'Movement and Charge' });
+    const dpad = el('div', { class: 'tc-cluster tc-dpad', role: 'group', ...tattr('aria-label', 'touch.dpad') });
     for (const spec of DPAD) {
       const b = makeButton(spec, `tc-pad tc-${spec.action}`);
       this.padButtons.set(spec.action, b);
@@ -147,13 +171,13 @@ export class TouchControls {
     // then the stick between its two mouvement buttons. The stick is a
     // plain base and knob: no arrows in it.
     this.knob = el('div', { class: 'tc-stick-knob' });
-    this.stick = el('div', { class: 'tc-stick', role: 'group', 'aria-label': 'Movement joystick' }, [this.knob]);
+    this.stick = el('div', { class: 'tc-stick', role: 'group', ...tattr('aria-label', 'touch.joystick') }, [this.knob]);
     this.chargeDown = makeButton(CHARGE_DOWN, `tc-${CHARGE_DOWN.pos}`);
     this.mouvementButtons = new Map(); // 'mouvementLeft' / 'mouvementRight' -> button
     for (const spec of MOUVEMENT_BUTTONS) {
       const b = el('button', {
         type: 'button', class: `tc-btn tc-dash tc-dash-${spec.side}`,
-        'aria-label': spec.label, 'data-mouvement': spec.control, tabindex: '-1', html: spec.icon,
+        ...tattr('aria-label', spec.label), 'data-mouvement': spec.control, tabindex: '-1', html: spec.icon,
       });
       b._direction = spec.direction;
       this.mouvementButtons.set(spec.control, b);
@@ -164,7 +188,7 @@ export class TouchControls {
 
     // Lower-right cluster, shared by both schemes.
     this.actionButtons = new Map();
-    const actions = el('div', { class: 'tc-cluster tc-actions', role: 'group', 'aria-label': 'Actions' });
+    const actions = el('div', { class: 'tc-cluster tc-actions', role: 'group', ...tattr('aria-label', 'touch.actions') });
     for (const spec of ACTION_BUTTONS) {
       const b = makeButton(spec, `tc-act tc-${spec.pos}`);
       this.actionButtons.set(spec.action, b);
@@ -237,9 +261,10 @@ export class TouchControls {
   }
 
   // Shows the 'joystick' or 'classic' layout (anything else is the
-  // default, Joystick). Everything held is let go first, so a switch never
-  // leaves a direction, Charge or any other button down. The fighter's own
-  // icons are untouched: the combat buttons are the same elements in both.
+  // default, Joystick), with that scheme's own custom layout. Everything held
+  // is let go first, so a switch never leaves a direction, Charge or any
+  // other button down. The fighter's own icons are untouched: the combat
+  // buttons are the same elements in both.
   setScheme(scheme) {
     const next = resolveSetting('mobileControls', scheme);
     this.releaseAll();
@@ -255,6 +280,96 @@ export class TouchControls {
     this.root.classList.toggle('is-joystick', joystick);
     this.root.classList.toggle('is-classic', !joystick);
     this.root.dataset.scheme = next;
+    this.applyLayout();
+  }
+
+  // ---- Custom layout ----------------------------------------------------------
+
+  // The element of control `id` in `scheme` (the one on show by default),
+  // or null for an id the scheme does not have.
+  controlElement(id, scheme = this.scheme) {
+    if (!TOUCH_CONTROL_IDS[scheme]?.includes(id)) return null;
+    if (scheme === 'classic' && this.padButtons.has(id)) return this.padButtons.get(id);
+    if (scheme === 'joystick') {
+      if (id === 'stick') return this.stick;
+      if (id === 'charge') return this.chargeDown;
+      if (this.mouvementButtons.has(id)) return this.mouvementButtons.get(id);
+    }
+    return this.actionButtons.get(id) ?? null;
+  }
+
+  // Every control of `scheme` as a Map of control id -> element, in the
+  // scheme's order.
+  getControlElements(scheme = this.scheme) {
+    return new Map((TOUCH_CONTROL_IDS[scheme] ?? []).map((id) => [id, this.controlElement(id, scheme)]));
+  }
+
+  // A copy of `scheme`'s custom layout.
+  getLayout(scheme = this.scheme) {
+    return sanitizeTouchLayout(scheme, this.layouts[scheme]);
+  }
+
+  // Gives `scheme` (the one on show by default) the custom `layout`
+  // (checked; {} is the original layout), applied at once if it is on show.
+  setLayout(layout, scheme = this.scheme) {
+    if (!Object.hasOwn(TOUCH_CONTROL_IDS, scheme)) return;
+    this.layouts[scheme] = sanitizeTouchLayout(scheme, layout);
+    if (scheme === this.scheme) this.applyLayout();
+  }
+
+  // The touch-control area in screen px: the root's box inside its padding
+  // (the safe-area insets and margin, see .touch-controls in styles.css).
+  measureArea() {
+    const rect = this.root.getBoundingClientRect();
+    const style = globalThis.getComputedStyle?.(this.root);
+    const px = (value) => Number.parseFloat(value) || 0;
+    return layoutArea(rect, style ? {
+      top: px(style.paddingTop), right: px(style.paddingRight), bottom: px(style.paddingBottom), left: px(style.paddingLeft),
+    } : {});
+  }
+
+  // Puts every control of the scheme on show where its layout says, kept
+  // whole inside the area, at its size. Controls the layout leaves out stay
+  // exactly where the stylesheet puts them. Called on every scheme or
+  // layout change, and by the screens after a resize or orientation change;
+  // while the controls are hidden there is nothing to measure, so it tries
+  // again next time. Records each control's place (placements): its
+  // stylesheet centre (home), its centre now, unscaled size and scale.
+  applyLayout() {
+    const layout = this.layouts[this.scheme] ?? {};
+    const controls = [...this.getControlElements()];
+    // Every control of both schemes starts from the stylesheet's place, so
+    // none keeps a stale one from the scheme shown before.
+    for (const scheme of Object.keys(TOUCH_CONTROL_IDS)) {
+      for (const node of this.getControlElements(scheme).values()) {
+        node.style.translate = '';
+        node.style.scale = '';
+      }
+    }
+    this.placements = new Map();
+    const area = this.measureArea();
+    this.area = area;
+    if (!(area.width > 0 && area.height > 0)) return false;
+    // Measure everything first, then move: one layout pass.
+    const measured = controls.map(([id, node]) => {
+      const r = node.getBoundingClientRect();
+      return {
+        id, node,
+        home: { x: r.left + r.width / 2, y: r.top + r.height / 2 },
+        size: { width: node.offsetWidth || r.width, height: node.offsetHeight || r.height },
+      };
+    });
+    for (const { id, node, home, size } of measured) {
+      const entry = layout[id];
+      const center = entry ? placeControl(area, entry, size) : home;
+      const scale = entry ? entry.scale : 1;
+      if (entry) {
+        node.style.translate = `${(center.x - home.x).toFixed(1)}px ${(center.y - home.y).toFixed(1)}px`;
+        if (scale !== 1) node.style.scale = String(scale);
+      }
+      this.placements.set(id, { home, center, size, scale });
+    }
+    return true;
   }
 
   hitDpad(x, y) {
@@ -304,7 +419,12 @@ export class TouchControls {
     if (this.stickPointer !== null) return;
     const r = this.stick.getBoundingClientRect();
     this.stickPointer = e.pointerId;
-    this.stickFrame = { x: r.left + r.width / 2, y: r.top + r.height / 2, radius: r.width / 2 };
+    // `scale` is how much a custom layout grew or shrank the stick: the
+    // knob moves in the stick's own, unscaled pixels.
+    this.stickFrame = {
+      x: r.left + r.width / 2, y: r.top + r.height / 2, radius: r.width / 2,
+      scale: r.width / (this.stick.offsetWidth || r.width) || 1,
+    };
     this.stick.setPointerCapture?.(e.pointerId);
     this.stick.classList.add('is-active');
     this.steer(e.clientX, e.clientY);
@@ -340,9 +460,11 @@ export class TouchControls {
     this.setKnob(0, 0);
   }
 
+  // Offsets are screen px; the knob is drawn in the stick's own px.
   setKnob(x, y) {
     this.knobOffset = { x, y };
-    this.knob.style.transform = x || y ? `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px)` : '';
+    const k = this.stickFrame?.scale || 1;
+    this.knob.style.transform = x || y ? `translate(${(x / k).toFixed(1)}px, ${(y / k).toFixed(1)}px)` : '';
   }
 
   // ---- Mouvement buttons ------------------------------------------------------
@@ -397,12 +519,15 @@ export class TouchControls {
   // reserved, nothing else. The buttons stay the same elements with the same
   // data-action and pointer handling, so input, held state and multi-touch
   // carry on untouched. Null (or a fighter that authors none) gives the
-  // neutral fallback, with Transform reserved.
+  // neutral fallback, with Transform reserved. A translated name is marked
+  // to follow the language.
   setCharacter(def) {
     for (const action of ABILITY_ACTIONS) {
       const { label, icon, pending } = mobileAbility(def, action);
       const b = this.actionButtons.get(action);
-      b.setAttribute('aria-label', label);
+      const key = mobileAbilityLabelKey(def, action);
+      if (key) setAttr(b, 'aria-label', key);
+      else setPlainAttr(b, 'aria-label', label);
       b.innerHTML = icon;
       b.classList.toggle('is-pending', pending);
     }

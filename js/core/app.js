@@ -1,5 +1,10 @@
 // Central application controller: owns the managers, the main
-// requestAnimationFrame loop and cross-screen selection state.
+// requestAnimationFrame loop and cross-screen selection state, the player's
+// settings and the interface language.
+//
+// Start-up: a player who has never picked a language gets the one-time
+// language chooser over the black start screen first; once a language is
+// chosen (or already was) the intro plays, then Home.
 
 import { CONFIG } from '../config.js';
 import { AssetLoader } from './asset-loader.js';
@@ -9,7 +14,11 @@ import { Device } from './device.js';
 import { ScreenManager } from './screen-manager.js';
 import { MenuNavigator } from './menu-navigator.js';
 import { Settings } from './settings.js';
+import { i18n, followSettings, onLanguageChange, localizeTree } from './i18n.js';
 import { LoadingOverlay, ConfirmDialog } from '../ui/overlays.js';
+import { LanguageDialog } from '../ui/language-dialog.js';
+import { SettingsDialog } from '../ui/settings-dialog.js';
+import { TouchLayoutEditor } from '../ui/touch-layout-editor.js';
 import { CHARACTERS, getCharacter, characterFramePaths } from '../data/characters.js';
 import { MAPS } from '../data/maps.js';
 import { DEFAULT_DIFFICULTY } from '../data/difficulty.js';
@@ -25,21 +34,29 @@ import { WatchDifficultyScreen, WatchFighterScreen, WatchMapScreen } from '../sc
 import { BattleScreen } from '../screens/battle-screen.js';
 import { PracticeGroundScreen } from '../screens/practice-screen.js';
 import { DiscoverScreen } from '../screens/discover-screen.js';
-import { SettingsScreen } from '../screens/settings-screen.js';
 
 export class App {
   constructor() {
     this.config = CONFIG;
     this.device = new Device().init();
     this.input = new InputManager(CONFIG.bindings);
-    // The player's saved settings (Home › Settings), read once here.
+    // The player's saved settings (Home › Settings), read once here, and
+    // the interface language they hold (English until one is chosen). The
+    // language follows every change of the setting, and the whole page
+    // follows the language.
     this.settings = new Settings();
+    this.i18n = i18n;
+    followSettings(this.settings);
+    onLanguageChange(() => this.localize());
     this.audio = new AudioManager();
     this.assets = new AssetLoader();
     this.screens = new ScreenManager(this);
     this.nav = new MenuNavigator(this);
     this.loading = new LoadingOverlay(document.getElementById('loading-overlay'));
     this.dialog = new ConfirmDialog(document.getElementById('confirm-dialog'), this);
+    this.languageDialog = new LanguageDialog(document.getElementById('language-dialog'), this);
+    this.settingsDialog = new SettingsDialog(document.getElementById('settings-dialog'), this);
+    this.touchEditor = new TouchLayoutEditor(document.getElementById('touch-editor'), this);
 
     // Quick Battle's choices, and Watch Mode's apart from them (one
     // difficulty for both CPUs, a fighter each). Practice Ground keeps its
@@ -81,14 +98,27 @@ export class App {
     s.register(new BattleScreen(this));
     s.register(new PracticeGroundScreen(this));
     s.register(new DiscoverScreen(this));
-    s.register(new SettingsScreen(this));
+    // The page's own static labels (index.html) in the language in use.
+    localizeTree(document.body);
 
     // Preload every available fighter while the splash plays.
     for (const def of CHARACTERS) if (def.available) this.loadCharacter(def.id);
 
-    this.device.addEventListener('change', () => this.screens.current?.onDeviceChange?.());
-    s.go('splash');
+    this.device.addEventListener('change', () => {
+      this.screens.current?.onDeviceChange?.();
+      if (this.touchEditor.isOpen) this.touchEditor.refresh();
+    });
     requestAnimationFrame(this.loop);
+    // First launch on this device: ask for a language before anything else
+    // (a returning player goes straight on to the intro).
+    this.languageDialog.ensureChosen().then(() => s.go('splash'));
+  }
+
+  // Re-reads every string on the page in the new language: each marked one
+  // (js/core/i18n.js), then the few a screen composes itself.
+  localize() {
+    localizeTree(document.body);
+    for (const screen of this.screens.screens.values()) screen.localize?.();
   }
 
   // Loads + normalizes a fighter's frames once. Resolves to a SpriteSet

@@ -327,37 +327,40 @@ function practiceSession({ cpu = true } = {}) {
 
 // ---- Home ---------------------------------------------------------------------
 
-test('Home: Play, Watch Mode, Practice Ground, Discover, then Settings; Practice Ground, Discover and Settings open directly', () => {
+test('Home: Play, Watch Mode, Practice Ground, then Discover; Practice Ground and Discover open directly; Settings is the gear, not an action', () => {
   const { app } = fakeApp();
+  const opened = [];
+  app.settingsDialog = { open: (opts) => opened.push(opts) };
   const home = new HomeScreen(app);
-  const { play, watch, practice, discover, settings } = home.actions;
+  const { play, watch, practice, discover } = home.actions;
+  assert.deepEqual(Object.keys(home.actions), ['play', 'watch', 'practice', 'discover'], 'exactly four menu actions');
   assert.ok(play.html.includes('<span>Play</span>'));
   assert.ok(watch.html.includes('<span>Watch Mode</span>'));
   assert.ok(practice.html.includes('<span>Practice Ground</span>'));
   assert.ok(discover.html.includes('<span>Discover</span>'));
-  assert.ok(settings.html.includes('<span>Settings</span>'));
-  assert.deepEqual(home.el.querySelectorAll('.home-action'), [play, watch, practice, discover, settings], 'Watch Mode under Play, Settings last');
-  // Discover and Settings match Practice Ground: the same outlined action and chevron.
-  for (const action of [practice, discover, settings]) {
+  assert.deepEqual(home.el.querySelectorAll('.home-action'), [play, watch, practice, discover], 'Watch Mode under Play, Discover last');
+  // Discover matches Practice Ground: the same outlined action and chevron.
+  for (const action of [practice, discover]) {
     assert.ok(action.html.includes(ICONS.right), 'keeps the Home chevron');
     assert.equal(action.className, 'home-action');
     assert.equal(action.disabled, false);
     assert.equal(action.hasAttribute('data-nav'), true);
   }
-  assert.ok(!home.el.querySelectorAll('.home-action').some((b) => b.html.includes('Help')));
-  assert.deepEqual(app.nav.candidates(home.el), [play, watch, practice, discover, settings], 'keyboard / gamepad reach them, in order');
+  assert.ok(!home.el.querySelectorAll('.home-action').some((b) => /Help|Settings/.test(b.html)), 'no Help or Settings action');
+  assert.deepEqual(app.nav.candidates(home.el), [play, watch, practice, discover, home.settingsButton], 'keyboard / gamepad reach them, in order, then the gear');
   const actions = home.el.querySelector('.home-actions').children;
   assert.equal(actions.indexOf(discover), actions.indexOf(practice) + 1, 'Discover sits directly under Practice Ground');
-  assert.equal(actions.indexOf(settings), actions.indexOf(discover) + 1, 'Settings sits directly under Discover');
+  assert.equal(actions.includes(home.settingsButton), false, 'the gear is not in the menu');
 
   practice.click();
   assert.deepEqual(app.screens.calls, [['practice']], 'no mode, fighter or stage select first');
   discover.click();
   assert.deepEqual(app.screens.calls[1], ['discover'], 'Discover opens the Discover screen');
-  settings.click();
-  assert.deepEqual(app.screens.calls[2], ['settings'], 'Settings opens the Settings screen');
+  home.settingsButton.click();
+  assert.equal(app.screens.calls.length, 2, 'the gear navigates nowhere');
+  assert.deepEqual(opened, [{ returnFocus: home.settingsButton }], 'it opens the Settings dialog, focus to come back to it');
   play.click();
-  assert.deepEqual(app.screens.calls[3], ['mode'], 'Play still opens Select Mode');
+  assert.deepEqual(app.screens.calls[2], ['mode'], 'Play still opens Select Mode');
 });
 
 // ---- Entering -----------------------------------------------------------------
@@ -383,6 +386,33 @@ test('Practice Ground uses the Mobile Controls setting on every entry, and a sch
   assert.equal(screen.touch.buttons.get('uniqueba').getAttribute('aria-label'), 'Shuriken', '#0001\'s own, whatever the layout');
   screen.exit();
   assert.equal(screen.touch.enabled, false, 'leaving turns them off');
+});
+
+test('Practice Ground places the touch controls by the saved custom layout on every entry, and again after a resize', async () => {
+  const { app } = fakeApp();
+  const screen = new PracticeGroundScreen(app);
+  app.screens.current = screen;
+  const touch = screen.touch;
+  touch.root.rect = { left: 0, top: 0, width: 1000, height: 500 };
+  const stick = touch.stick;
+  stick.rect = { left: 80, top: 360, width: 120, height: 120 };
+  app.settings.setTouchLayout('joystick', { stick: { x: 0.5, y: 0.5, scale: 1.2 } });
+  await screen.enter();
+  assert.equal(stick.style.translate, '360.0px -170.0px');
+  assert.equal(stick.style.scale, '1.2');
+  assert.equal(touch.enabled, true, 'and playable at once');
+  // A new size: the screen re-places the controls on its next frame.
+  touch.root.rect = { left: 0, top: 0, width: 800, height: 400 };
+  screen.needsResize = true;
+  screen.update(0);
+  assert.equal(stick.style.translate, '260.0px -220.0px');
+  screen.exit();
+  // Changed in Settings meanwhile: the next visit uses the new one.
+  app.settings.setTouchLayout('joystick', {});
+  await screen.enter();
+  assert.equal(stick.style.translate, '');
+  assert.equal(stick.style.scale, '');
+  screen.exit();
 });
 
 test('a fresh entry always starts with #0001, whatever Quick Battle or an earlier visit chose', async () => {

@@ -19,6 +19,7 @@ import { drawEnergyBar, drawCbaIndicators, energyBarState, statusOnScreen } from
 import { drawShield } from './shield-fx.js';
 import { HIT_FX, HitEffects, whiteFrame } from './hit-fx.js';
 import { createTheme } from '../stages/index.js';
+import { slotLabel } from '../core/i18n.js';
 
 // Ground ring + name tag tones: the player is white, the CPU a mid gray.
 const MARKER = { p1: '#ffffff', p2: '#a3a3a3' };
@@ -502,14 +503,16 @@ export class Arena {
     ctx.textBaseline = 'bottom';
     for (const f of fighters) {
       const color = MARKER[f.slot];
+      // The tag as the HUD shows it, in the interface language (P1 or J1).
+      const tag = slotLabel(f.label);
       const [x, top, footY] = this.markerAnchor(f);
       const onScreen = x > -10 && x < view.pxW + 10;
       if (onScreen) {
         ctx.fillStyle = 'rgba(8,8,8,0.55)';
-        const tw = ctx.measureText(f.label).width + font * 0.8;
+        const tw = ctx.measureText(tag).width + font * 0.8;
         ctx.fillRect(Math.round(x - tw / 2), Math.round(top - font * 1.25), Math.round(tw), Math.round(font * 1.2));
         ctx.fillStyle = color;
-        ctx.fillText(f.label, Math.round(x), Math.round(top - font * 0.2));
+        ctx.fillText(tag, Math.round(x), Math.round(top - font * 0.2));
         ctx.beginPath();
         ctx.moveTo(x - font * 0.35, top + font * 0.05);
         ctx.lineTo(x + font * 0.35, top + font * 0.05);
@@ -533,7 +536,7 @@ export class Arena {
         ctx.closePath();
         ctx.fill();
         ctx.textBaseline = 'middle';
-        ctx.fillText(f.label, ex + edge * font * 0.1 + edge * font * 0.45, ey + font * 2.2);
+        ctx.fillText(tag, ex + edge * font * 0.1 + edge * font * 0.45, ey + font * 2.2);
         ctx.textBaseline = 'bottom';
       }
     }

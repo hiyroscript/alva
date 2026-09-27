@@ -1,12 +1,15 @@
-// Global overlays: loading screen and confirmation dialog.
+// Global overlays: loading screen and confirmation dialog. Their own labels
+// are translation keys (js/core/i18n.js); a caller's loading label, error
+// message and dialog copy arrive already translated.
 
 import { el } from '../core/utils.js';
+import { t, tx, setText } from '../core/i18n.js';
 import { logoSVG } from './logo.js';
 
 export class LoadingOverlay {
   constructor(root) {
     this.root = root;
-    this.label = el('p', { class: 'loading-label', text: 'Loading' });
+    this.label = el('p', { class: 'loading-label', ...tx('common.loading') });
     this.fill = el('div', { class: 'loading-fill' });
     this.bar = el('div', {
       class: 'loading-bar', role: 'progressbar', 'aria-valuemin': '0', 'aria-valuemax': '100', 'aria-valuenow': '0',
@@ -25,8 +28,10 @@ export class LoadingOverlay {
   }
 
   // Shown after a short delay so instant loads don't flash an overlay.
-  show(label = 'Loading', { delay = 120 } = {}) {
+  // `label` is already translated (the generic Loading by default).
+  show(label = t('common.loading'), { delay = 120 } = {}) {
     this.label.textContent = label;
+    this.label.setAttribute('data-i18n', '');
     this.error.hidden = true;
     this.bar.hidden = false;
     this.setProgress(0, 1);
@@ -47,10 +52,10 @@ export class LoadingOverlay {
     clearTimeout(this.showTimer);
     this.root.hidden = false;
     this.root.classList.add('is-visible');
-    this.label.textContent = 'Assets unavailable';
+    setText(this.label, 'common.assetsUnavailable');
     this.bar.hidden = true;
-    const retry = el('button', { class: 'btn btn--primary', 'data-nav': true, 'data-nav-default': true, type: 'button', text: 'Retry' });
-    const back = el('button', { class: 'btn', 'data-nav': true, type: 'button', text: 'Back' });
+    const retry = el('button', { class: 'btn btn--primary', 'data-nav': true, 'data-nav-default': true, type: 'button', ...tx('common.retry') });
+    const back = el('button', { class: 'btn', 'data-nav': true, type: 'button', ...tx('common.back') });
     const done = (fn) => () => {
       this.hide();
       if (this.scope) nav.popScope(this.scope);
@@ -100,9 +105,10 @@ export class ConfirmDialog {
     this.okBtn.addEventListener('click', () => this.close(true));
   }
 
-  // cancelOutlineOnly keeps the cancel button's background transparent through
-  // hover/press. Set per call, so no later dialog inherits it.
-  open({ title, message, confirmLabel = 'Confirm', cancelLabel = 'Cancel', cancelOutlineOnly = false }) {
+  // `title`, `message` and the labels arrive translated. cancelOutlineOnly
+  // keeps the cancel button's background transparent through hover/press.
+  // Set per call, so no later dialog inherits it.
+  open({ title, message, confirmLabel = t('common.confirm'), cancelLabel = t('common.cancel'), cancelOutlineOnly = false }) {
     if (this.resolve) this.close(false);
     this.title.textContent = title;
     this.message.textContent = message;

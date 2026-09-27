@@ -51,6 +51,19 @@ export const ICONS = {
   // Three dots: Practice Ground's More button.
   more: svg('<circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/>', { fill: true }),
   back: svg('<path d="M14.5 5 7.5 12l7 7"/>'),
+  // Home's Settings button: an eight-toothed gear round a hub.
+  settings: svg(
+    '<path d="M10.34 5.1L10.66 2.49L13.34 2.49L13.66 5.1A7.1 7.1 0 0 1 15.71 5.95L17.78 4.33L19.67 6.22L18.05 8.29' +
+      'A7.1 7.1 0 0 1 18.9 10.34L21.51 10.66L21.51 13.34L18.9 13.66A7.1 7.1 0 0 1 18.05 15.71L19.67 17.78L17.78 19.67' +
+      'L15.71 18.05A7.1 7.1 0 0 1 13.66 18.9L13.34 21.51L10.66 21.51L10.34 18.9A7.1 7.1 0 0 1 8.29 18.05L6.22 19.67' +
+      'L4.33 17.78L5.95 15.71A7.1 7.1 0 0 1 5.1 13.66L2.49 13.34L2.49 10.66L5.1 10.34A7.1 7.1 0 0 1 5.95 8.29L4.33 6.22' +
+      'L6.22 4.33L8.29 5.95A7.1 7.1 0 0 1 10.34 5.1Z"/><circle cx="12" cy="12" r="3.2"/>',
+  ),
+  close: svg('<path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/>'),
+  // Reset to defaults: an arrow turning back on itself.
+  reset: svg('<path d="M5.5 12a6.5 6.5 0 1 0 1.9-4.6"/><path d="M5 4.5v4h4"/>'),
+  minus: svg('<path d="M6 12h12"/>'),
+  plus: svg('<path d="M6 12h12M12 6v12"/>'),
   lock: svg('<rect x="5.5" y="10.5" width="13" height="10" rx="2"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/>'),
   check: svg('<path d="M5 12.5 10 17.5 19 7"/>'),
   rotate: svg(

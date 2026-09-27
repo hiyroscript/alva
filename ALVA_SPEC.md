@@ -164,8 +164,10 @@ behave, and how it must look. The README covers running and deploying it.
   training AI),
   physics, camera, combat, launch bounce,
   projectiles, summoned clones, charged techniques, HUD, touch controls
-  (two layouts, 7.4), stage themes, fighter roster, and the player's
-  settings (`js/core/settings.js`, 6.10).
+  (two layouts, each rearrangeable, 7.4), stage themes, fighter roster, the
+  player's settings (`js/core/settings.js`, 6.10) and the interface
+  language (`js/core/i18n.js`, 6.11), which `App` owns and applies to the
+  whole page.
 - One arena (`js/game/arena.js`) owns the fixed-step world and its Canvas
   rendering. `Battle` adds the combat-AI CPU at the chosen difficulty (in
   Watch Mode one on each side), phases and round timer; Practice Ground (`PracticeSession`)
@@ -270,11 +272,12 @@ fit the palette.
 ## 6. Screens and flow
 
 ```
+First launch (no language chosen yet) → Language chooser (6.11) → Splash → Home
 Splash → Home → Select Mode → Select Difficulty → Select Fighter → Select Stage → Battle
 Home → Watch Mode → Select Difficulty → Select CPU 1 → Select CPU 2 → Select Stage → CPU vs CPU Battle (6.5a)
 Home → Practice Ground (starts at once with #0001 and a #0001 practice CPU)
 Home → Discover (Power / Launch / Passives reference; Back returns Home)
-Home → Settings (Mobile Controls: Joystick / Classic Buttons; Back returns Home)
+Home → Settings gear → Settings dialog over Home (Language / Controls; Esc, Back or close returns to Home) → Customize touch controls → layout editor (Done or Back returns to Settings)
 Practice Ground → More → Change Fighter (roster dialog) / Change CPU, or Enable CPU once disabled (CPU roster dialog → Disable CPU) / Return (Home)
 Battle → Pause → Resume / Restart Battle / Return to Home (confirmed)
 Battle (a fighter falls into the Void) → the opponent scores a point → that fighter respawns 2 s later; the fight goes on
@@ -293,13 +296,17 @@ Difficulty cards).
 
 ### 6.1 Splash
 
+- On a device where no language has been chosen yet, the one-time language
+  chooser (6.11) comes first, over the same black; the splash starts once a
+  language is picked, so the intro and everything after it are already in
+  that language. A returning player goes straight to the splash.
 - Start on blank, pure black, with no text, loading UI, Home or rotate overlay.
   Both `./hs.jpg` and `./alvafav.PNG` must load through AssetLoader and fully
   decode before either image appears. Fighter preloading continues independently.
 - Show `hs.jpg` first, centred with its natural proportions, responsive sizing
   and rounded corners. Fade in for 900 ms, hold for 1600 ms, and fade out for
   800 ms. A continuous, gentle forward zoom from 0.96 to 1.04 spans all three phases.
-- "a game by hiyroscript" (exact wording) sits near the bottom centre in soft gray
+- "a game by hiyroscript" (exact wording; "un jeu de hiyroscript" in French) sits near the bottom centre in soft gray
   with generous letter spacing. It fades in and out with `hs.jpg` and does not zoom.
 - After 220 ms of clean black, show `alvafav.PNG` with the same treatment at
   its own appropriate size. The images never overlap visibly.
@@ -320,18 +327,25 @@ the menu on the left and an angled glass credits strip on the right. There is
 no header, build label, eyebrow or keyboard hint bar.
 
 - **Intro:** the dramatically enlarged original ALVA SVG wordmark, then the
-  supporting line "Fan project. Big heart." The wordmark's first visible stroke
-  lines up with the start of that line.
-- **Actions:** exactly five, in this order — **Play** (green, white text,
+  supporting line "Fan project. Big heart." ("Un projet de fan, fait avec
+  cœur." in French). The wordmark's first visible stroke lines up with the
+  start of that line.
+- **Actions:** exactly four, in this order — **Play** (green, white text,
   arrow) opens Select Mode and is focused by default; **Watch Mode**
   (outlined, chevron) beneath it opens Watch Mode's Select Difficulty (6.5a)
   directly, never Select Mode; **Practice Ground** (outlined, chevron)
   beneath that opens Practice Ground (6.8) straight away, with no mode,
-  fighter or stage select; **Discover** (outlined, chevron, like Practice
-  Ground) directly beneath it opens the Discover reference (6.9); and
-  **Settings** (outlined, chevron) last opens Settings (6.10). All five are
-  in keyboard / gamepad menu navigation, in that order, which the DOM order
+  fighter or stage select; and **Discover** (outlined, chevron, like
+  Practice Ground) last opens the Discover reference (6.9). All four are in
+  keyboard / gamepad menu navigation, in that order, which the DOM order
   matches whatever the layout. Home buttons have a small 3 px radius.
+- **Settings gear:** Settings is Home chrome, not a menu action: a compact
+  square button with an original inline SVG gear (`ICONS.settings`,
+  `currentColor`), named "Settings" / "Paramètres", in the top right corner
+  inside the safe area (`--safe-t`, `--safe-r`), above the credits column.
+  It is in keyboard / gamepad navigation (→ from the menu, or ↑ from Play)
+  and opens the Settings dialog over Home (6.10); focus returns to it when
+  the dialog closes. There is no gear over live Battle or Practice play.
 - **Footer:** "by hiyroscript" in gray monospace, full width under a subtle
   top hairline.
 - **Credits strip:** two walls. The back wall is the same near-black as the
@@ -350,7 +364,7 @@ no header, build label, eyebrow or keyboard hint bar.
   strip moves farther right and the credits column narrows; when the window is
   taller than it is wide the strip is mostly off-screen and the credits remain
   for assistive technology only. Short landscape heights reduce title size,
-  gaps, action height and credit type, so the five actions fit above the
+  gaps, action height and credit type, so the four actions fit above the
   footer down to a 568 × 320 window, or 844 × 390 with a home-indicator
   inset, clear of the credits column. The wordmark keeps its size wherever
   there is room and shrinks only as much as a short window needs: its width
@@ -487,7 +501,9 @@ Select CPU 2 → Select Stage → CPU vs CPU Battle.
 - There is no in-game Help: no Help screen or tab, and no Help in the pause
   menu (7.3). The controls are documented in the README and in 7.4.
 - Credits (must remain visible and readable) are the Home credits roll
-  (6.2). One list in `js/ui/credits.js` feeds it:
+  (6.2). One list in `js/ui/credits.js` feeds it, each line a translation
+  key (6.11), so the roll follows the interface language; proper names stay
+  as they are:
   - **ALVA** — created by hiyroscript.
   - **Original work** — game design, code, interface, ALVA wordmark, and
     Desert / City stage artwork by hiyroscript.
@@ -697,35 +713,176 @@ read the character database, so it stays the same as fighters are added.
 
 ### 6.10 Settings
 
-Entered from Home's Settings action; a menu screen like the others (header
-with Back and the title "Settings", kicker "ALVA"; Back, `Esc` and gamepad
-Back return Home). It holds the player's settings, saved on this device.
+A translucent glass dialog over Home (`js/ui/settings-dialog.js`), opened by
+Home's Settings gear. Home stays visible behind a light dim, blurred where
+backdrop blur is supported, in the same glass as the pause and Practice
+panels (`.glass--panel`); the header holds the kicker "ALVA", the title
+"Settings" and a labelled close button. It holds the player's settings,
+saved on this device, in exactly two sections:
 
-- **Mobile Controls** — the touch layout Quick Battle and Practice Ground
-  use (7.4), with exactly two choices shown as two cards, each with a small
-  drawing of its lower-left corner and a line on what it gives:
+- **Language** — **English** and **Français**, each named in its own
+  language and marked with its own `lang`, as a `radiogroup` of two `radio`
+  buttons; the one in use is ticked and outlined in green. Choosing one saves
+  it at once and the whole interface switches immediately (6.11), this
+  dialog included; the dialog stays open.
+- **Controls** — **Mobile Controls**, the touch layout Quick Battle and
+  Practice Ground use (7.4), with exactly two choices shown as two cards,
+  each with a small drawing of its lower-left corner and a line on what it
+  gives:
   - **Joystick** (marked "Default") — a circular joystick to move, the
     single-tap **Left mouvement** / **Right mouvement** Dash buttons above
     it, and Charge as a down arrow to its left.
   - **Classic Buttons** — the original layout: Left, C (Charge) and Right
     at the lower left, a double tap of Left or Right to Dash.
-- The cards are a `radiogroup` of two `radio` buttons (`aria-checked`, each
-  described by its line), reached by keyboard / gamepad focus; hover only
-  previews. The one in use carries a green "Selected" pill and border and
-  takes focus on entry. Choosing one saves it at once and the screen stays
-  open; the next battle or practice uses it.
+
+  The cards are a `radiogroup` of two `radio` buttons (`aria-checked`, each
+  described by its line); hover only previews. The one in use carries a green
+  "Selected" pill and border. Choosing one saves it at once; the next battle
+  or practice uses it. Beneath them, **Customize touch controls** opens the
+  touch layout editor (6.10a) for the layout in use, beside a line naming
+  that layout and a "Custom layout" tag once it has one.
+- **Modal behaviour.** `role="dialog"`, `aria-modal="true"`, labelled by its
+  title. Opening it pushes its own navigation scope (arrows, D-pad, Enter,
+  A move and choose inside it only; nothing behind it can be reached) and
+  makes Home `inert`; focus lands on the language in use. `Esc`, gamepad
+  Back, the close button or a press on the dim around the panel (never
+  inside it) close it, removing exactly its scope, and focus returns to the
+  gear. It is never a screen: the screen stays Home throughout.
+- **Responsive.** Up to 760 px wide; on short landscape screens the body
+  scrolls on its own (`overscroll-behavior: contain`, `touch-action: pan-y`)
+  while Home never scrolls, and the cards drop their lines below 460 px of
+  height. Narrow windows stack the cards.
 - Presentation and input configuration only: keyboard bindings, gamepad
   mappings, fighters and rules never change, and Watch Mode stays free of
   player controls whichever layout is chosen.
 - **Storage.** `js/core/settings.js` is the only module that touches
-  storage: one versioned object, `{ "version": 1, "mobileControls":
-  "joystick" | "classic" }`, under the `localStorage` key `alva.settings`,
-  read once at start (`app.settings`) and written whole on each change.
-  Nothing stored, corrupt JSON, another version or an unknown value all
-  mean the defaults (Joystick); storage that is missing or throws keeps the
-  choice for the visit only.
-- On short landscape windows the cards stay side by side and the area
-  scrolls on its own if needed, so Back stays put.
+  storage (no other module reads or writes `localStorage` or
+  `sessionStorage`): one versioned object under the `localStorage` key
+  `alva.settings`, read once at start (`app.settings`) and written whole on
+  each change —
+
+  ```
+  { "version": 2,
+    "language": "en" | "fr" | null,
+    "mobileControls": "joystick" | "classic",
+    "touchLayouts": { "joystick": { … }, "classic": { … } } }
+  ```
+
+  `language` is null until the player picks one (English is used meanwhile,
+  but the first-launch chooser still asks: a default is never mistaken for a
+  choice). A version 1 object (`{ "version": 1, "mobileControls": … }`) is
+  migrated: its Joystick / Classic choice is kept, no language is chosen yet
+  (so the chooser shows once) and both layouts are empty. Every value is
+  checked on load, one by one: nothing stored, corrupt JSON, any other
+  version, an unknown language or scheme, or a malformed layout entry (see
+  6.10a) falls back to its own default without disturbing valid
+  neighbours. Storage that is missing or throws keeps every choice for the
+  visit only.
+
+### 6.10a Touch layout editor
+
+A second modal layer (`js/ui/touch-layout-editor.js`), full screen, over a
+still stand-in for a battle screen (a dusk sky, a floor, a dashed outline
+where the HUD's centre control sits). It shows the layout in use with its
+real touch controls: a `TouchControls` instance drawn and placed by the same
+code and stylesheet as in battle, never enabled, so nothing it does reaches
+gameplay. Every control of the layout can be moved and resized, the joystick
+itself included:
+
+- **Joystick:** Charge, Left mouvement, the joystick, Right mouvement, and
+  the six actions (Shuriken / `uniqueba`, Transform, Shield, Punch / `ba1`,
+  Kick / `ba2`, Jump).
+- **Classic Buttons:** Left, C (Charge), Right, and the same six actions.
+
+Each control has a stable control id, independent of its translated name
+(`TOUCH_CONTROL_IDS` in `js/core/touch-layout.js`: `charge`,
+`mouvementLeft`, `stick`, `mouvementRight`, `runLeft`, `runRight`,
+`uniqueba`, `transform`, `shield`, `ba1`, `ba2`, `jump`); ids are never
+shown.
+
+- **Drag** a control to move it; the preview follows at once, and the
+  control always stays whole inside the touch-control area. A press that
+  barely moves is a tap: it only selects.
+- **Select** a control (tap, click, or Enter / A on it): it wears a dashed
+  green ring, and the compact glass toolbar across the top names it and
+  enables **Smaller** (−), **Larger** (+) and a size slider, 70 % to 180 %
+  in 10 % steps, with the value beside them. The control grows or shrinks
+  round its centre, and its touch area with it. The size controls are
+  disabled while nothing is selected.
+- **Keyboard / gamepad:** in the editor (only there) the controls are
+  focusable and part of the navigation scope. Enter / A on a focused control
+  starts moving it (announced, a solid ring): the arrows or D-pad nudge it by
+  2 % of the area per press until Enter / A, `Esc` / Back or focus leaving
+  it ends the move. ← / → on the focused slider resize the selected control.
+- **Reset to defaults** puts this layout back exactly on Alva's own; **Done**,
+  or `Esc` / Back when nothing is being moved, returns to Settings with focus
+  on Customize touch controls.
+- **Saving** is automatic and deterministic: each change is saved as it
+  lands — a drag when it ends, each nudge, each size step, a reset — as that
+  layout's own entry in `touchLayouts`; the other layout is never touched,
+  and switching Mobile Controls later brings back that layout's own
+  arrangement.
+- **Stored form.** A layout is `{ [controlId]: { x, y, scale } }`: `x` and `y`
+  are the control's centre as fractions (0 to 1, four decimals) of the
+  touch-control area, the screen inside its safe-area insets and a 6 px
+  margin (the padding of `.touch-controls`); `scale` multiplies its own size.
+  Never raw pixels, so a layout made on one landscape screen fits another. A
+  control a layout leaves out stays where the stylesheet puts it; the empty
+  layout is the original one. On load and on save every entry is checked:
+  unknown ids, the other layout's ids, non-objects and non-finite numbers are
+  dropped; centres are clamped to 0–1 and scales to 0.7–1.8.
+- The toolbar fades and ignores the pointer while a control is dragged; on
+  short landscape screens it tightens and drops its hint. The HUD's pause
+  and More buttons sit above the touch controls in play (`.hud` z-index 4),
+  so no layout can cover them.
+
+### 6.11 Language
+
+Alva's interface is in **English** or **French** (Canadian / international
+French, concise game terms).
+
+- **First launch.** With no language chosen yet, `App.start` shows a
+  one-time chooser (`js/ui/language-dialog.js`) over the black start screen,
+  before the splash: title "Language · Langue", the prompt "Choose your
+  language · Choisissez votre langue" and a note that it can be changed in
+  Settings, all in both languages at once, and exactly two buttons,
+  **English** and **Français**, each with its own `lang`. The browser's
+  preferred language only decides which one has focus first. It is a real
+  modal (`role="dialog"`, `aria-modal`, its own navigation scope; Back does
+  nothing: a choice is required). Choosing saves the language through the
+  Settings store, switches the interface and starts the splash. A returning
+  player never sees it again (`LanguageDialog.ensureChosen()` resolves at
+  once).
+- **One source of strings.** Every player-facing and screen-reader string
+  lives in `js/core/i18n.js` (`STRINGS.en`, `STRINGS.fr`), looked up by
+  stable key with `t(key, params)` (`{name}` placeholders; a placeholder may
+  hold another key as `{ t: key }`; `plural(key, n)` follows each language's
+  rules). Keys name what a string is for, never what it says, and a
+  translated string is never an identifier. English game copy (Powers,
+  Launch, difficulty levels, stage names and taglines, neutral control names,
+  each fighter's own touch-button names) is read from the registries that
+  own it, so it cannot drift; every key exists in both languages, and a key
+  missing from French falls back to English. Internal identifiers (control
+  and move codenames, character, map and scheme ids, CSS classes, data keys)
+  and proper names (ALVA, #0001, Shuriken, the credited sources) never
+  change.
+- **Coverage.** Home (menu, tagline, credits, footer), screen headings,
+  kickers and setup steps, Back, difficulty cards, the roster, stage cards,
+  Discover, Settings and the editor, the pause, result and Return to Home
+  dialogs, Practice Ground's menu and dialogs, loading and error messages,
+  banners, the HUD's labels and spoken descriptions (the slot tags too: P1
+  reads J1 in French, on the cards and over the fighters), touch-control
+  names, keyboard hints (keycaps included), and `index.html`'s own screen
+  labels and rotate prompt.
+- **Switching.** `App` applies the saved language at start and after every
+  change of the setting (`followSettings`). A change sets
+  `document.documentElement.lang` and re-reads every marked string on the
+  page at once (`localizeTree`: each element made with `tx`, `tattr`,
+  `iconLabel`, `setText` or `setAttr` carries its key), plus the few a
+  screen composes itself (`screen.localize()`), with no reload. Strings made
+  later (dialogs, touch names, HUD labels) are made in the language in use.
+- The boot-error and no-script fallbacks, shown before any script runs,
+  carry both languages.
 
 ## 7. Battle
 
@@ -2133,12 +2290,28 @@ Back return Home). It holds the player's settings, saved on this device.
   (B / Circle), Basic Attack 2 (LB), Transform (Y / Triangle, reserved),
   Shield (RB / RT) and Start to pause/menus, sending the same codenames.
 - Touch (landscape, Pointer Events, true multi-touch), in one of two
-  layouts chosen under Home → Settings → Mobile Controls (6.10);
+  layouts chosen under Settings → Controls → Mobile Controls (6.10);
   `TouchControls.setScheme('joystick' | 'classic')` switches them (anything
   else is Joystick), and Quick Battle and Practice Ground apply the saved
-  one each time they are entered. A switch first lets go of everything held
+  one, and that layout's saved custom placement (`setLayout`, 6.10a), each
+  time they are entered. A switch first lets go of everything held
   (every pointer, direction, Charge, Jump, Shield and the rest) and
   recentres the joystick, so nothing is ever left down.
+  - **Custom placement.** `TouchControls.applyLayout()` moves each control
+    the layout names by the CSS `translate` property, from where the
+    stylesheet puts it to its stored centre in the current touch-control
+    area (kept whole inside it), and sizes it by `scale`, which grows its
+    hit area with it; controls the layout leaves out are untouched, so the
+    default layout is the stylesheet's own, pixel for pixel. Battle and
+    Practice Ground re-apply it after every resize, orientation or device
+    change. Every control keeps its element, handlers and codename: held
+    buttons, the one-tap Dash buttons, multi-touch and `setCharacter` work
+    exactly as before; the joystick measures its drawn radius (thresholds
+    and travel are fractions of it) and draws its knob in its own unscaled
+    pixels; Classic Buttons' cluster still captures the pointer and
+    hit-tests Left / C / Right where they are drawn, so a thumb slides
+    between them wherever they sit. In battle the controls are never
+    keyboard-focusable (`tabindex="-1"`); only the editor's copy is.
   - **Joystick** (the default): the lower-left corner holds one circular
     joystick (a translucent round base with no marks on it and a movable
     knob, in the buttons' style; a group named "Movement joystick"). It
@@ -2218,13 +2391,25 @@ Back return Home). It holds the player's settings, saved on this device.
 ## 8. Accessibility
 
 - Semantic buttons, headings, lists, tabs (`tablist`/`tab`/`tabpanel`),
-  radio groups (Settings), dialogs (`dialog`/`alertdialog`, `aria-modal`,
-  labelled/described), `aria-pressed`/`aria-checked` for selections,
-  `aria-live` previews.
+  radio groups (Settings' Language and Mobile Controls), dialogs
+  (`dialog`/`alertdialog`, `aria-modal`, labelled/described: the language
+  chooser, Settings, the layout editor, pause, result and confirm),
+  `aria-pressed`/`aria-checked` for selections, `aria-live` previews and
+  editor announcements.
+- Every modal pushes its own navigation scope and removes exactly that scope
+  when it closes; focus enters it on open and returns to what opened it (or
+  leaves it) on close, never staying in hidden content.
+- `<html lang>` always names the interface language; the language choices
+  carry their own `lang`; every `aria-label` and dialog label follows a
+  language change.
 - Every touch control is a real button with its own name, whatever its
   glyph: the joystick is a group named "Movement joystick", its Dash
   buttons "Left mouvement" and "Right mouvement", and the down arrow
-  "Charge" (never "Down").
+  "Charge" (never "Down") — in French "Joystick de déplacement",
+  "Mouvement à gauche", "Mouvement à droite" and "Charge".
+- The layout editor has a non-drag way to make every change: keyboard and
+  gamepad select a control, nudge it in small steps in an explicit move mode
+  and resize it with the navigable Smaller / Larger buttons and slider.
 - Visible focus everywhere; focus is managed on every screen and overlay.
 - Never rely on colour alone for focus, selection, availability, errors or
   the current setup step — use borders, check marks, filled indicators, labels

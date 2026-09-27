@@ -17,6 +17,7 @@ class Element {
   style = {};
   animations = [];
   replaceChildren(...children) { this.children = children; }
+  setAttribute(name, value) { this[`@${name}`] = value; }
   animate(keyframes) {
     const done = deferred();
     const animation = { keyframes, finished: done.promise, finish: done.resolve, cancel: () => done.reject(new Error('cancelled')) };

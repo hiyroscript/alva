@@ -11,6 +11,7 @@
 
 import { Screen } from '../core/screen-manager.js';
 import { el } from '../core/utils.js';
+import { tx, tattr, iconLabel } from '../core/i18n.js';
 import { ICONS } from '../ui/icons.js';
 import { screenHeader, QUICK_BATTLE_SETUP } from '../ui/components.js';
 import { DIFFICULTIES, resolveDifficulty } from '../data/difficulty.js';
@@ -35,16 +36,17 @@ export class DifficultySelectScreen extends Screen {
       const card = el('button', {
         class: 'difficulty-card', type: 'button', 'data-nav': true, 'data-nav-no-hover-focus': true, 'data-difficulty': d.id,
         'data-level': String(d.level),
-        'aria-label': `${d.name}, level ${d.level} of ${LEVELS}`, 'aria-describedby': descId,
+        ...tattr('aria-label', 'difficulty.card', { name: { t: `difficulty.${d.id}.name` }, level: d.level, count: LEVELS }),
+        'aria-describedby': descId,
       }, [
         el('span', { class: 'difficulty-top' }, [
           el('span', { class: 'difficulty-index', 'aria-hidden': 'true', text: d.index }),
-          el('span', { class: 'difficulty-current', 'aria-hidden': 'true', html: `${ICONS.check}<span>Current</span>` }),
+          el('span', { class: 'difficulty-current', 'aria-hidden': 'true', ...iconLabel('difficulty.current', ICONS.check, { iconFirst: true }) }),
         ]),
         el('span', { class: 'difficulty-bars', 'aria-hidden': 'true' }, bars),
         el('span', { class: 'difficulty-text' }, [
-          el('span', { class: 'difficulty-name', text: d.name }),
-          el('span', { class: 'difficulty-desc', id: descId, text: d.description }),
+          el('span', { class: 'difficulty-name', ...tx(`difficulty.${d.id}.name`) }),
+          el('span', { class: 'difficulty-desc', id: descId, ...tx(`difficulty.${d.id}.description`) }),
         ]),
       ]);
       card._difficulty = d;
@@ -53,9 +55,9 @@ export class DifficultySelectScreen extends Screen {
     });
 
     this.el.replaceChildren(
-      screenHeader({ title: 'Select Difficulty', kicker: setup.name, setup, step, onBack: () => this.onBack() }),
+      screenHeader({ title: 'difficulty.title', kicker: setup.name, setup, step, onBack: () => this.onBack() }),
       el('div', { class: 'screen-body difficulty-layout' }, [
-        el('div', { class: 'difficulty-scale', role: 'group', 'aria-label': 'Difficulty' }, this.cards),
+        el('div', { class: 'difficulty-scale', role: 'group', ...tattr('aria-label', 'difficulty.group') }, this.cards),
       ]),
     );
   }

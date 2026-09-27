@@ -811,3 +811,48 @@ test('Quick Battle uses the Mobile Controls setting: Joystick by default, Classi
   for (const [action, b] of elements) assert.equal(touch.actionButtons.get(action), b, action);
   assert.equal(touch.buttons.get('ba1').getAttribute('aria-label'), 'Punch');
 });
+
+test('Quick Battle places the touch controls by the saved custom layout of the scheme in use, read on every entry; Watch Mode still has none', async () => {
+  const { app, screen } = setup();
+  const { MAPS } = await import('../js/data/maps.js');
+  app.selection = {
+    characterId: '0001', mapId: MAPS[0].id,
+    watch: { difficulty: 'medium', cpu1CharacterId: '0001', cpu2CharacterId: '0001', mapId: MAPS[0].id },
+  };
+  app.loadCharacter = () => Promise.resolve({ usable: false });
+  app.loading = { show() {}, hide() {}, setProgress() {}, showError() {} };
+  const touch = screen.touch;
+  touch.root.rect = { left: 0, top: 0, width: 1000, height: 500 };
+  const jump = touch.actionButtons.get('jump');
+  jump.rect = { left: 920, top: 420, width: 60, height: 60 };
+
+  await screen.enter();
+  assert.equal(jump.style.translate ?? '', '', 'nothing saved: the stylesheet\'s own place');
+  assert.equal(jump.style.scale ?? '', '');
+
+  // Saved in Settings between two battles: the next one uses it.
+  app.settings.setTouchLayout('joystick', { jump: { x: 0.5, y: 0.5, scale: 1.5 } });
+  await screen.enter();
+  assert.equal(jump.style.translate, '-450.0px -200.0px');
+  assert.equal(jump.style.scale, '1.5');
+  assert.equal(jump.getAttribute('data-action'), 'jump', 'the same button, the same input');
+
+  // Classic Buttons has its own layout for the same button.
+  app.settings.set('mobileControls', 'classic');
+  app.settings.setTouchLayout('classic', { jump: { x: 0.2, y: 0.5, scale: 1 } });
+  await screen.enter();
+  assert.equal(touch.scheme, 'classic');
+  assert.equal(jump.style.translate, '-750.0px -200.0px');
+  assert.equal(jump.style.scale, '');
+
+  // Reset in Settings: back on the original layout next time.
+  app.settings.resetTouchLayout('classic');
+  await screen.enter();
+  assert.equal(jump.style.translate, '');
+
+  // Watch Mode: a spectator still has no touch controls at all.
+  app.settings.setTouchLayout('classic', { jump: { x: 0.2, y: 0.5, scale: 1 } });
+  await screen.enter({ mode: 'watch' });
+  assert.equal(screen.touchRoot.hidden, true);
+  assert.equal(touch.enabled, false);
+});

@@ -3,11 +3,13 @@
 //
 // Watch Mode's Select Stage is another instance (js/screens/watch-screens.js):
 // the options below name its screen, its setup and step, where its choice is
-// kept and its start button's label; it also says what starting hands the
-// Battle screen (battleParams). Left out, they are Quick Battle's.
+// kept and its start button's label (a translation key); it also says what
+// starting hands the Battle screen (battleParams). Left out, they are Quick
+// Battle's.
 
 import { Screen } from '../core/screen-manager.js';
 import { el } from '../core/utils.js';
+import { tx, tattr, iconLabel, setAttr, plural } from '../core/i18n.js';
 import { ICONS } from '../ui/icons.js';
 import { screenHeader, QUICK_BATTLE_SETUP } from '../ui/components.js';
 import { MAPS, getMap } from '../data/maps.js';
@@ -15,7 +17,7 @@ import { StagePreview } from '../ui/stage-preview.js';
 
 export class MapSelectScreen extends Screen {
   constructor(app, {
-    id = 'map', setup = QUICK_BATTLE_SETUP, step = 3, selection = () => app.selection, startLabel = 'Confirm and start battle',
+    id = 'map', setup = QUICK_BATTLE_SETUP, step = 3, selection = () => app.selection, startLabel = 'map.start',
   } = {}) {
     super(app, id);
     // The object holding this setup's `mapId`, read on every use.
@@ -29,14 +31,15 @@ export class MapSelectScreen extends Screen {
       const thumb = el('canvas', { class: 'map-thumb', 'aria-hidden': 'true' });
       const card = el('button', {
         class: 'map-card', type: 'button', role: 'radio', 'data-nav': true, 'data-map': map.id,
-        'aria-checked': 'false', 'aria-label': `${map.name}. ${map.tagline}`,
+        'aria-checked': 'false',
+        ...tattr('aria-label', 'map.card', { name: { t: `map.${map.id}.name` }, tagline: { t: `map.${map.id}.tagline` } }),
       }, [
         el('span', { class: 'map-thumb-wrap' }, [thumb]),
         el('span', { class: 'map-card-body' }, [
-          el('span', { class: 'map-card-name', text: map.name }),
-          el('span', { class: 'map-card-tag', text: map.tagline }),
+          el('span', { class: 'map-card-name', ...tx(`map.${map.id}.name`) }),
+          el('span', { class: 'map-card-tag', ...tx(`map.${map.id}.tagline`) }),
         ]),
-        el('span', { class: 'map-card-selected', html: `${ICONS.check}<span>Selected</span>` }),
+        el('span', { class: 'map-card-selected', ...iconLabel('common.selected', ICONS.check, { iconFirst: true }) }),
       ]);
       card._map = map;
       card._preview = new StagePreview(thumb, { animated: false, pan: false, reducedMotion: true });
@@ -47,25 +50,33 @@ export class MapSelectScreen extends Screen {
 
     this.startBtn = el('button', {
       class: 'btn btn--primary btn--start', type: 'button', 'data-nav': true,
-      html: `<span>${startLabel}</span>${ICONS.arrow}`,
+      ...iconLabel(startLabel, ICONS.arrow),
     });
     this.startBtn.addEventListener('click', () => this.start());
+    this.countEl = el('span', { class: 'panel-meta' });
 
     this.el.replaceChildren(
-      screenHeader({ title: 'Select Stage', kicker: setup.name, setup, step, onBack: () => this.onBack() }),
+      screenHeader({ title: 'map.title', kicker: setup.name, setup, step, onBack: () => this.onBack() }),
       el('div', { class: 'screen-body map-layout' }, [
         this.heroEl,
         el('div', { class: 'map-side' }, [
           el('div', { class: 'panel-head' }, [
-            el('span', { class: 'panel-title', text: 'Stages' }),
-            el('span', { class: 'panel-meta', text: `${MAPS.length} available` }),
+            el('span', { class: 'panel-title', ...tx('map.stages') }),
+            this.countEl,
           ]),
-          el('div', { class: 'map-cards', role: 'radiogroup', 'aria-label': 'Stages' }, this.cards),
+          el('div', { class: 'map-cards', role: 'radiogroup', ...tattr('aria-label', 'map.stages') }, this.cards),
           this.startBtn,
         ]),
       ]),
     );
     this.heroMap = null;
+    this.localize();
+  }
+
+  // The stage count follows the language's plural rules, so it is re-read
+  // here on every language change (App calls localize() on each screen).
+  localize() {
+    this.countEl.textContent = plural('map.available', MAPS.length);
   }
 
   focusDefault() {
@@ -98,7 +109,7 @@ export class MapSelectScreen extends Screen {
   showHero(map) {
     if (this.heroMap === map) return;
     this.heroMap = map;
-    this.heroEl.setAttribute('aria-label', `${map.name} stage preview`);
+    setAttr(this.heroEl, 'aria-label', 'map.preview', { name: { t: `map.${map.id}.name` } });
     this.el.dataset.map = map.id;
     // Stage only: no fighters in the hero preview.
     requestAnimationFrame(() => this.hero.setMap(map, null));
