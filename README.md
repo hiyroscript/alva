@@ -14,9 +14,9 @@ Speed Power), a camera, a HUD, touch controls in two layouts (a joystick by
 default, or the classic buttons),
 and a data-driven combat system built on Launch Point, Base Launch and
 Directional Launch, with #0001's two real attacks, Basic Attack 1
-(BA1) and Basic Attack 2 (BA2), a held ground and mid-air Shield on the
-shared Shield button, a Dash on a double tap (or one tap of a touch Dash
-button), a 100-point Energy bar that a
+(BA1) and Basic Attack 2 (BA2), a held ground and mid-air Shield (a slow
+fall in the air) on the shared Shield button, a Dash on a double tap, a
+100-point Energy bar that a
 Dash and every Shielded hit spend, a held Charge
 stance, a Charged BA1 Clone Attack (CBA1) and a
 Charged BA2 Sphere Rush (CBA2), each on its own cooldown, and
@@ -64,9 +64,9 @@ in the code depends on the repository name, so no file changes are needed.
 | Action | Codename | Keyboard | Touch (landscape) |
 | --- | --- | --- | --- |
 | Move left / right | `runLeft` / `runRight` | `A` `D` or `←` `→` | **Joystick:** push the joystick left / right · **Classic:** lower-left ◀ ▶ |
-| Dash | double tap of `runLeft` / `runRight`; `mouvementLeft` / `mouvementRight` on touch | Double-tap `A` / `D` or `←` / `→` | **Joystick:** one tap of **Left mouvement** / **Right mouvement** (the small ◀ ▶ above the joystick) · **Classic:** double-tap ◀ or ▶ |
-| Charge (in the air: fast fall) | `charge` | `S` or `↓` | **Joystick:** hold the down arrow under Jump · **Classic:** hold lower-left **C** |
-| Jump (tap: short hop; hold: full; again in the air: air jump) | `jump` | `W`, `Space` or `↑` | Lower-right, bottom corner |
+| Dash | double tap of `runLeft` / `runRight` | Double-tap `A` / `D` or `←` / `→` | **Joystick:** push the joystick the same way twice · **Classic:** double-tap ◀ or ▶ |
+| Charge (in the air: fast fall) | `charge` | `S` or `↓` | **Joystick:** hold the down arrow just above the joystick · **Classic:** hold lower-left **C** |
+| Jump (tap: the normal jump; held a little longer: a higher jump; again in the air: air jump) | `jump` | `W`, `Space` or `↑` | Lower-right, bottom corner |
 | Throw (unique basic attack) | `uniqueba` | `J` | **Shuriken**, lower-right, top |
 | Transform* | `transform` | `K` | Lower-right, middle row |
 | Shield | `shield` | `L` | **Shield**, lower-right, middle row |
@@ -95,8 +95,11 @@ named after the button that makes them:
 | Transform | `transform` | `transform` (reserved: #0001 has none yet) |
 
 There are no separate charged-attack buttons: Charge held + `ba1` is `cba1`,
-Charge held + `ba2` is `cba2`. The mouvement buttons send one-step requests
-(`mouvementLeftPressed` / `mouvementRightPressed`), never a held direction.
+Charge held + `ba2` is `cba2`. Every device Dashes by double tap: no key or
+button asks for one outright. (`InputManager.queueTouchMouvement` and its
+one-step `mouvementLeftPressed` / `mouvementRightPressed` request are still
+in the input layer, from the removed Joystick Dash buttons, but nothing on
+screen sends them.)
 
 \* Reserved: wired into input and combat, but inactive until #0001 has matching
 attack animations. Its touch button has a dashed outline.
@@ -115,16 +118,14 @@ Keyboard and gamepad controls are the same whichever layout is chosen.
   speed. A small deadzone round the centre keeps a resting thumb from
   drifting, crossing the centre switches direction cleanly, and letting go
   recentres it. Pushing it up or down only moves the knob: Jump and Charge
-  keep their own buttons. Above the joystick's top corners sit two small
-  Dash buttons, **Left mouvement** and **Right mouvement**: one tap is one
-  Dash that way. They hold nothing and need no second tap, and the Dash
-  itself is the usual one (grounded only, 15 Energy, its animation, and
-  refused while attacking, charging, shielding, exhausted and so on).
-  **Charge** is a down-arrow button directly under Jump: hold it to charge
+  keep their own buttons. There are no Dash buttons: push the joystick out
+  the same way twice quickly to Dash, as with Left / Right. **Charge** is a
+  down-arrow button just above the joystick's top-left: hold it to charge
   on the ground or to fast-fall in the air, and press Punch or Kick while
-  holding it for the charged attacks. The joystick works with any other
-  button at once (hold it right and press Jump, Punch, Kick, Shield,
-  Shuriken, Transform or Charge with another finger).
+  holding it for the charged attacks. The lower-right buttons sit exactly
+  where Classic Buttons has them. The joystick works with any other button
+  at once (hold it right and press Jump, Punch, Kick, Shield, Shuriken or
+  Transform with another finger).
 - **Classic Buttons**: the original layout, unchanged: Left, **C**
   (Charge) and Right at the lower left, with thumb sliding between them;
   tap Left or Right twice quickly to Dash.
@@ -139,7 +140,7 @@ out twice quickly is a double tap too, as with a gamepad stick.
   `↓`, **C**) in the air while falling is a **fast fall**. Attacks keep
   some of the speed you carry into them: a running punch slides on, the
   kick steps in, aerials keep their drift and follow the stick almost
-  fully, and the Throw can back off as it throws. Press your next attack
+  fully, and the Throw can be steered as it throws. Press your next attack
   slightly early and it is **buffered** (0.15 s): it comes out on the
   first step it can, including right after the Shield is let go or a Dash
   ends; presses made during a hit's freeze are kept too, a Dash included.
@@ -155,12 +156,20 @@ out twice quickly is a double tap too, as with a gamepad stick.
   each hit sends the opponent, so the same routes stop working and the
   fight turns into pursuit and ring-outs. An attack faces the direction
   you hold as it starts, and a hit interrupts the attack the opponent was
-  making.
-- **Jumps, launches and the Shield:** tap Jump for a **short hop** (about a
-  third of the height, low enough to hit a standing opponent with a rising
-  mid-air BA1), hold it for the full jump, and press it again in the air
-  for one **air jump** (a direction held changes course); landing or being
-  hit gives it back. A harder launch **stuns longer** (0.2 s more per 1000
+  making. **Turning in an action:** during an attack, the Shield or Charge,
+  holding the other direction turns #0001 round at once (as often as you
+  like), so an opponent who crosses behind you mid-attack can still be hit,
+  a shuriken not yet thrown goes the new way and a Sphere Rush can be aimed
+  from the Charge. Turning never walks or runs. A stun, a bind, a Dash and
+  the Sphere Rush itself keep their facing.
+- **Jumps, launches and the Shield:** tap Jump for the normal jump, or hold
+  it a little longer (0.15 s from takeoff) for a **higher jump**, about 1.4×
+  the height: from that moment the rise carries on under lighter gravity,
+  so the arc stretches rather than kicking. Press Jump again in the air for
+  one **air jump** (a direction held changes course; always the same
+  height); landing or being hit gives it back. Holding Charge while falling
+  is the **fast fall**; holding Shield in the air is a **slow fall**
+  (below). A harder launch **stuns longer** (0.2 s more per 1000
   units/s, at most 0.7 s more), and a hard one sets the fighter
   **tumbling** in its mid-air hurt pose until it acts or lands, so with the
   air jump a juggle can reach three hits around 35–45 Launch Point. Hold a
@@ -200,9 +209,10 @@ out twice quickly is a double tap too, as with a gamepad stick.
   (`throw1 → throw2 → throw3`, once, at 12 fps) and releases exactly one
   shuriken as the arm whips forward on `throw2`; holding the button does not
   throw again. The shuriken leaves the throwing hand and flies straight the
-  way #0001 was facing at the release, spinning through its own three-frame
-  loop (`shuriken1 → shuriken2 → shuriken3`, 18 fps). Turning, jumping or
-  getting hit afterwards does not change its course. It hits once (1 damage,
+  way #0001 was facing at the release (turn during the wind-up and it goes
+  the new way), spinning through its own three-frame loop (`shuriken1 →
+  shuriken2 → shuriken3`, 18 fps). Turning, jumping or getting hit after
+  the release does not change its course. It hits once (1 damage,
   so +1 Launch Point, and a short hitstun, with Base Launch 0 and no
   Directional Launch: it neither pushes nor launches, however high the
   opponent's Launch Point) and disappears; it
@@ -223,9 +233,12 @@ out twice quickly is a double tap too, as with a gamepad stick.
   `shielding`, and lowers it on `releaseblock` for one frame after (the
   lower pose is visual only: move, jump or attack straight away). In the
   air there is only the held pose, `midairshielding`: no raise or lower
-  pose, and #0001 keeps falling under gravity, keeping his momentum but
-  not steering. On the ground the Shield holds him in place: no walking,
-  running, Dash or jump. While Shield is held no attack, Throw, charged
+  pose, and #0001 **falls slowly**: a faster fall (a fast fall included)
+  brakes to 200 units/s within 0.2 s and stays there while the Shield is
+  up (a rise is untouched), keeping his sideways momentum but not
+  steering. Let go and he falls normally again. On the ground the Shield
+  holds him in place: no walking, running, Dash or jump, though holding a
+  direction turns him round. While Shield is held no attack, Throw, charged
   move or Dash starts; let go of Shield first (an attack pressed
   meanwhile comes out as you let go). An attack already playing
   is never cut short: the Shield comes up the moment it ends. Holding
@@ -245,11 +258,8 @@ out twice quickly is a double tap too, as with a gamepad stick.
   is blocked is decided by his normal hurtboxes, never by the larger circle.
 - **Dash:** press left or right twice in a row (two `runLeftPressed` /
   `runRightPressed` edges, the second within 0.22 s of the first, keyboard,
-  touch, D-pad or left stick alike) while standing on the ground, or tap
-  **Left mouvement** / **Right mouvement** (`mouvementLeft` /
-  `mouvementRight`) once in the Joystick touch layout: that one-tap request
-  (`InputManager.queueTouchMouvement`) goes through the same `Fighter.tryDash`,
-  with every rule and cost below, and forgets any first tap waiting. #0001 bursts that way at about 2.7× its top speed
+  touch buttons, the touch joystick, D-pad or left stick alike) while
+  standing on the ground. #0001 bursts that way at about 2.7× its top speed
   (900 units / s) for one pass of its two-frame dash clip (`dash1 → dash2`,
   once, at 10 fps: 0.2 s, about 180 units), facing the Dash at once, then
   runs on from that speed if you keep holding the direction. It costs 15
@@ -278,7 +288,7 @@ out twice quickly is a double tap too, as with a gamepad stick.
   until Energy is completely full again (a partial refill does not unlock
   them); the bar disappears at 100. Exhausted, a fighter still moves, jumps,
   attacks, charges and uses CBA1 / CBA2: nothing else ever costs Energy.
-- **Charge:** hold `S` / `↓` (on touch the down arrow under Jump, or **C**
+- **Charge:** hold `S` / `↓` (on touch the down arrow above the joystick, or **C**
   in Classic Buttons; D-pad down or left stick down on a gamepad) while #0001 is on the ground. Held, it plays
   `charge1 → charge2` once, then loops `chargea ↔ chargeb` for as long as you
   hold it. Charge must be held; it never toggles. Let go and #0001 shows
@@ -390,7 +400,7 @@ out twice quickly is a double tap too, as with a gamepad stick.
   rate. A restart or rematch, a new fighter in Practice Ground and every
   respawn after the Void clear them. They cost no Energy.
 - **Menus:** arrow keys or WASD to move, `Enter` to select, `Esc` to go back. Mouse and touch work too.
-- **Touch:** two layouts, Joystick (the default) and Classic Buttons (see [Mobile Controls](#mobile-controls)). Several fingers work at once (hold the joystick or Right and press Jump, or hold Charge and press Punch). The combat buttons show icons, not letters: for #0001, **Shuriken** (Throw), **Shield** (held), **Punch** (Basic Attack 1) and **Kick** (Basic Attack 2), beside Transform (dashed: #0001 has none yet) and Jump. Hold Charge, then press Punch for the Clone Attack or Kick for the Sphere Rush. The icons of the fighter's own buttons (Shuriken, Punch, Kick, and Transform once a fighter has one) come from its `mobileAbilities` in `js/data/characters.js` and follow Player 1's fighter, in Practice Ground too when you change fighter; a fighter with no `transform` entry keeps the dashed, reserved Transform star. Shield, Jump and Charge are the same for everyone. Only the presentation is per fighter: the buttons always send the same control codenames (`uniqueba`, `transform`, `shield`, `ba1`, `ba2`). The combat buttons are the same elements in both layouts: switching (`TouchControls.setScheme`) only swaps the lower-left corner and adds or removes the Charge under Jump, after letting go of everything held. The viewport disables page zoom (`maximum-scale=1, user-scalable=no`) and the play surfaces, joystick and buttons set `touch-action: none`, so rapid taps never zoom or scroll the page.
+- **Touch:** two layouts, Joystick (the default) and Classic Buttons (see [Mobile Controls](#mobile-controls)). Several fingers work at once (hold the joystick or Right and press Jump, or hold Charge and press Punch). The combat buttons show icons, not letters: for #0001, **Shuriken** (Throw), **Shield** (held), **Punch** (Basic Attack 1) and **Kick** (Basic Attack 2), beside Transform (dashed: #0001 has none yet) and Jump. Hold Charge, then press Punch for the Clone Attack or Kick for the Sphere Rush. The icons of the fighter's own buttons (Shuriken, Punch, Kick, and Transform once a fighter has one) come from its `mobileAbilities` in `js/data/characters.js` and follow Player 1's fighter, in Practice Ground too when you change fighter; a fighter with no `transform` entry keeps the dashed, reserved Transform star. Shield, Jump and Charge are the same for everyone. Only the presentation is per fighter: the buttons always send the same control codenames (`uniqueba`, `transform`, `shield`, `ba1`, `ba2`). The combat buttons are the same elements in both layouts, in the same places: switching (`TouchControls.setScheme`) only swaps the lower-left corner (Left / C / Right, or the joystick with its Charge), after letting go of everything held. The viewport disables page zoom (`maximum-scale=1, user-scalable=no`) and the play surfaces, joystick and buttons set `touch-action: none`, so rapid taps never zoom or scroll the page.
 - **Gamepad (standard layout):** D-pad or left stick left / right to move (twice in a row to Dash) and down to Charge in battle (they still navigate menus), A to jump, X / Square to Throw, B / Circle for Basic Attack 1, LB for Basic Attack 2, Y / Triangle for the reserved Transform, RB or RT for Shield, Start to pause.
 - **Debug:** `` ` `` toggles the collider, hurtbox and attack-hitbox overlay in battle (a hitbox shows only while it can connect; hurtboxes look the same with the Shield up, and a shielding fighter is labelled `shield`; a flying shuriken's hitbox is outlined in magenta and labelled; a clone's attack hitbox shows in the attack colour, labelled `clone ba1` (or `clone maba2` overhead), only on its active frame; the Sphere Rush's sphere hitbox is a dashed cyan box labelled `charged ba2 dash` while it can connect, then a dashed cyan cross marks the sphere on the caught opponent, which is labelled `bound`; solids, the main floor's block among them, are outlined in red and the Void's fixed kill line is dashed violet).
 
@@ -403,7 +413,7 @@ Touch controls show on touch-first devices (coarse pointer, or a touch actually 
 - **Animations:** Idle, Run, Jump, Fall, Land (jump/fall play while airborne; land plays once on touchdown), Hurt and Mid-air Hurt (shown during hitstun on the ground / in the air), Basic Attack 1 (4 frames), Mid-air Basic Attack 1 (the kunai slash, 3 frames: `0001_midair1ba1`–`3`), Basic Attack 2 (7 frames) and Mid-air Basic Attack 2 (the airborne kick, 5 frames: `0001_midair2ba1`–`5`), each played once at 12 fps, Shield (`0001_prepshield` to raise it, `0001_shielding` held, `0001_releaseblock` to lower it) and Mid-air Shield (`0001_midairshielding`, the held pose only), single frames drawn at 1×, Dash (`0001_dash1`–`2`, drawn at 1×, played once at 10 fps), Charge (charge1 → charge2 once, then chargea ↔ chargeb while held, at 10 fps, with charge1 shown briefly on release), Throw (3 fighter frames, played once at 12 fps), Shuriken (3 looping projectile frames at 18 fps, normalized and drawn separately from the fighter poses), the clone appear / vanish cloud (`0001_cloneav1`–`0001_cloneav10`, an effect at 20 fps: forwards as a clone appears, the same frames in reverse as it vanishes), the Sphere Rush poses (`0001_rasen1`–`0001_rasen12` as one-shot fighter clips at 12 fps: formation 1–3, rush 4–6, contact 7–8 with 8 held, explosion 9, recovery 10–12, and 12 alone as the whiff release) and its blue sphere (`0001_prasen1`–`0001_prasen11` as three effects at 12 fps: formation 1–6 once, spinning on the opponent 7–9 looped while it is drawn ever larger, explosion 10–11 once)
 - **Attacks:** Basic Attack 1 and Basic Attack 2, each on the ground and in the air, a ground Throw that releases one shuriken, the Charged BA1 Clone Attack and the Charged BA2 Sphere Rush (ground only), each on its own 5-second cooldown. #0001's damage: BA1 3, mid-air BA1 3, BA2 5, mid-air BA2 5, shuriken 1, Sphere Rush 1 as it catches the opponent and every 0.5 s after while it holds it (4 in all), then 10 on the explosion. Transform is reserved.
 - **Shield:** #0001 shields, on the ground and in the air: held, full circle, free to hold, 25 Energy for each hit it blocks.
-- **Movement:** running, jumping (a short hop on a tap, one air jump), air steering, the fast fall and a grounded Dash on a double tap (15 Energy); attacks keep and add their own momentum, early presses are buffered, and a hit opens a follow-up, a Dash cancel included (see Controls above).
+- **Movement:** running, jumping (the normal jump on a tap, a higher jump held a little longer, one air jump), air steering, the fast fall, the air Shield's slow fall and a grounded Dash on a double tap (15 Energy); attacks keep and add their own momentum, turn with the direction held, early presses are buffered, and a hit opens a follow-up, a Dash cancel included (see Controls above).
 - **Powers:** Jump Power and Speed Power, each in three tiers. #0001 has Jump Power 2 and Speed Power 2 (its original jump and speed).
 - **Launch:** every hit's damage adds to the target's Launch Point, then the hit launches at its Base Launch (0, 1, 2 or 3) × that new Launch Point, in its Directional Launch. #0001's BA1 is Base Launch 1 horizontal, its BA2 and mid-air BA1 Base Launch 2 vertical, its mid-air BA2 Base Launch 2 reverse vertical (downward), the Sphere Rush blast Base Launch 3 horizontal, and the shuriken and Sphere Rush ticks Base Launch 0 with no direction (they never launch).
 - **HUD:** each fighter has one compact, semi-transparent glass card, pulled in close on either side of the timer: its portrait (the character's own `visual.portrait` crop, turned to face the timer whichever way its art is drawn), one thin divider, and its name with its Launch Point beneath it, under its tag: **P1** and **CPU** in Quick Battle, **CPU 1** and **CPU 2** in Watch Mode. The right-hand card mirrors the left-hand one. In a battle three small dots under each card fill as that fighter scores its points (○ ○ ○, then ● ○ ○ ...). Over each fighter itself, following it: its bright purple Energy bar above its name tag while below full, and its CBA1 / CBA2 cooldown rings under its feet while cooling down.
@@ -764,7 +774,7 @@ The two mid-air Basic Attacks swapped moves: **mid-air BA1** is the three-frame 
 ### Adding a fighter (#0002)
 
 1. Put the frames in `assets/characters/0002/`.
-2. Add a definition to `CHARACTERS` in `js/data/characters.js`, its moves keyed by the universal move codenames (see [Controls](#controls)) whatever it calls them in game (animations, movement, Power tiers such as `powers: { jump: 2, speed: 2 }`, collider, hurtboxes, stats). Movement is ground `acceleration` / `deceleration` / `turnBoost` / `overspeedDeceleration`, air `airAcceleration` / `airDeceleration` / `airTurnBoost`, `gravityScale`, `maxFallSpeed`, `fastFallAcceleration` / `fastFallSpeed`, `coyoteTime`, `jumpBuffer`, `shortHopWindow` / `shortHopHeight`, `airJumps` / `airJumpRatio`, `attackBuffer`, `hitstunFriction` / `hitstunAirDrag` and the Dash's two; the newer fields are optional (see `Fighter.moveHorizontal`). How it responds to launches is `launchReaction` (`stunPerThousand`, `maxStun`, `tumbleSpeed`, `steerAngle`; see `resolveLaunchReaction` in `js/game/combat.js`), and a Shield's `perfectWindow` / `perfectRearm` set its perfect block.
+2. Add a definition to `CHARACTERS` in `js/data/characters.js`, its moves keyed by the universal move codenames (see [Controls](#controls)) whatever it calls them in game (animations, movement, Power tiers such as `powers: { jump: 2, speed: 2 }`, collider, hurtboxes, stats). Movement is ground `acceleration` / `deceleration` / `turnBoost` / `overspeedDeceleration`, air `airAcceleration` / `airDeceleration` / `airTurnBoost`, `gravityScale`, `maxFallSpeed`, `fastFallAcceleration` / `fastFallSpeed`, `coyoteTime`, `jumpBuffer`, `highJumpWindow` / `highJumpHeight`, `airJumps` / `airJumpRatio`, `attackBuffer`, `hitstunFriction` / `hitstunAirDrag` and the Dash's two; the newer fields are optional (see `Fighter.moveHorizontal`). How it responds to launches is `launchReaction` (`stunPerThousand`, `maxStun`, `tumbleSpeed`, `steerAngle`; see `resolveLaunchReaction` in `js/game/combat.js`), and a Shield's `perfectWindow` / `perfectRearm` set its perfect block and `slowFallSpeed` / `slowFallBrake` its slow fall in the air.
 3. Give it a free `rosterSlot`.
 4. Optionally, name its moves in `abilityNames`, keyed by move codename (e.g. `cba2: 'Sphere Rush'`); a move it leaves out keeps its neutral name.
 
@@ -801,7 +811,7 @@ To give a fighter a charged action, map a combat button in `chargedActions` to a
 
 While either is cooling down the press does nothing. Without an opponent (for a summon), the art or valid data, the press falls through to the normal attack, and no cooldown starts. A character's `stats.chargedCooldownRate` sets how much faster its charged cooldowns recover while it is in Charge.
 
-To choose how a fighter defends, give it a `defense` entry. The one type so far is `{ type: 'shield', groundAnimation, airAnimation, groundStartAnimation, groundReleaseAnimation }` (like #0001's `shield`, `midairShield`, `shieldStart` and `shieldRelease`): a held, full-circle Shield (see Shield above). The held clips are required: without the one for where the fighter is, the Shield is refused (and logged once), never faked; the raise and lower poses are optional. The type is checked, so a future fighter can defend another way on the same Shield button (`shield`); an unknown type is an error.
+To choose how a fighter defends, give it a `defense` entry. The one type so far is `{ type: 'shield', groundAnimation, airAnimation, groundStartAnimation, groundReleaseAnimation }`, optionally with `slowFallSpeed` / `slowFallBrake` for a slow fall while it is up in the air (like #0001's `shield`, `midairShield`, `shieldStart` and `shieldRelease`): a held, full-circle Shield (see Shield above). The held clips are required: without the one for where the fighter is, the Shield is refused (and logged once), never faked; the raise and lower poses are optional. The type is checked, so a future fighter can defend another way on the same Shield button (`shield`); an unknown type is an error.
 
 Energy and the Dash are data too. An `energy` entry (`{ max, regen, chargeRegen, dashCost, dashCancelCost, shieldHitCost }`, see `resolveEnergy` in `js/game/combat.js`) sets the fighter's resource; every field is optional and defaults to 100, 12 / s, 30 / s in Charge, 15, the fighter's `dashCost` and 25 (#0001 sets `dashCancelCost` to 40). A Shield pays `shieldHitCost` for each hit it blocks. A cost larger than what is left is still paid by taking the rest, which exhausts the fighter; neither a Dash nor a Shield works while it is exhausted. To give a fighter a Dash, add a `dash` clip to `animations` and `movement.dashSpeed` / `movement.dashTapWindow`: the Dash lasts one pass of the clip and pays `dashCost`. Without the clip (or a `dashSpeed`) it never dashes: a Dash without frames is refused and logged, never faked with the run.
 

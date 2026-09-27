@@ -163,10 +163,13 @@ export class Fighter {
     // otherwise. And this step's rebound off stage geometry, if any.
     this.launch = null;
     this.bounce = null;
-    // A ground jump whose height is still being decided ({ time, fromY }):
-    // let go of Jump within movement.shortHopWindow of takeoff and it is a
-    // short hop (see shortHop). Null once decided.
-    this.hop = null;
+    // A ground jump that may still become the higher jump, or already is
+    // one ({ time, fromY, lift }): Jump still held movement.highJumpWindow
+    // after takeoff makes it rise on to highJumpHeight x the normal jump's
+    // height, under `lift` x gravity until its apex (see highJumpLift).
+    // `lift` is null while undecided. Null for a normal jump (Jump let go
+    // in time) and once the higher one's rise is over.
+    this.highJump = null;
     // Steps this fighter has lived (frozen ones included), to keep buffered
     // presses in the order they were made: the jump's press step, and each
     // buffered attack's.
@@ -383,8 +386,8 @@ export class Fighter {
     // means no refill this step (see the end of update).
     //
     // mouvementLeftPressed / mouvementRightPressed ask for one Dash outright
-    // (the Joystick touch layout's single-tap mouvement buttons, see
-    // InputManager.queueTouchMouvement). The request goes through the very same
+    // (see InputManager.queueTouchMouvement; no on-screen control makes the
+    // request now). The request goes through the very same
     // tryDash, so every rule and cost of a double-tap Dash applies, and it
     // is used up the same way. It is not a tap: it forgets any first tap
     // waiting, so it never pairs with one, and this step's own direction
@@ -486,14 +489,13 @@ export class Fighter {
     // A held Shield outranks a jump: let go of the Shield to jump. A jump may
     // also cut short an attack that hit (see CombatState.cancellable). It
     // only sets the upward speed: whatever horizontal speed the fighter has
-    // carries straight into the air. Its height is decided over its first
-    // moments: Jump let go within shortHopWindow is a short hop, held on it
-    // is the full jump (see shortHop).
+    // carries straight into the air. A tap is the normal jump; Jump held a
+    // little longer makes it the higher jump (see below).
     const free = (canAct || combat.cancellable) && !combat.shielding;
     let jumped = false;
     if (this.jumpBuffer > 0 && this.coyote > 0 && free) {
       this.cutAttack();
-      this.hop = { time: 0, fromY: body.y };
+      this.highJump = { time: 0, fromY: body.y, lift: null };
       body.vy = -this.jumpVelocity;
       body.grounded = false;
       body.ground = null;
@@ -507,27 +509,35 @@ export class Fighter {
       // jump from wherever the fighter is, at airJumpRatio x the normal
       // jump's speed, the jump clip from its first frame. A held direction
       // sets off that way at least at top speed, so it can change course;
-      // with none held the drift carries on. Always the full height.
+      // with none held the drift carries on. Always the same height, held
+      // or tapped: never a higher jump.
       this.cutAttack();
       body.vy = -this.jumpVelocity * (mv.airJumpRatio ?? 1);
       if (held) body.vx = held * Math.max(held * body.vx, this.maxSpeed);
       this.airJumps--;
       this.jumpBuffer = 0;
-      this.hop = null;
+      this.highJump = null;
       this.airJumped = true;
       jumped = true;
     }
 
-    // ---- Short hop ---------------------------------------------------------
-    // A ground jump whose Jump is let go within shortHopWindow of takeoff (a
-    // tap, the takeoff step included) tops out at shortHopHeight x the full
-    // jump's height; held past it, the full jump. Decided once: after the
-    // window, the apex, a hit or the ground, it no longer changes.
-    if (this.hop) {
-      if (!jumped) this.hop.time += dt;
-      const open = this.hop.time <= (mv.shortHopWindow ?? 0) + TIME_EPSILON && body.vy < 0 && combat.stun <= 0;
-      if (open && !input.jump) this.shortHop(ctx.gravity);
-      if (!open || !input.jump) this.hop = null;
+    // ---- Higher jump -------------------------------------------------------
+    // A ground jump whose Jump is still held highJumpWindow after takeoff (a
+    // press a little longer than a tap, held from the takeoff step on) is
+    // the higher jump: from then until its apex it rises under lighter
+    // gravity, just enough to top out at highJumpHeight x the normal jump's
+    // height (see highJumpLift), so its arc stretches rather than kicking.
+    // Let go sooner, it is the normal jump, exactly as ever. Decided once,
+    // and kept whether Jump stays held or not; the apex, a stun, the air
+    // jump or the ground ends it.
+    const rise = this.highJump;
+    if (rise) {
+      if (!jumped) rise.time += dt;
+      if (body.vy >= 0 || combat.stun > 0) this.highJump = null;
+      else if (!rise.lift) {
+        if (!input.jump) this.highJump = null;
+        else if (rise.time >= (mv.highJumpWindow ?? Infinity) - TIME_EPSILON) rise.lift = this.highJumpLift(ctx.gravity);
+      }
     }
 
     // ---- Fast fall ---------------------------------------------------------
@@ -551,8 +561,20 @@ export class Fighter {
     this.chargeReleased =
       wasCharging && !input.charge && canAct && body.grounded && !combat.shielding;
 
+    // ---- Slow fall ---------------------------------------------------------
+    // The Shield up in the air (held, or kept up by blockstun) slows the
+    // fall: a faster fall brakes toward defense.slowFallSpeed at
+    // slowFallBrake, and gravity never takes it past that. A rise is
+    // untouched, and so is the drift sideways (the Shield's, see above).
+    const defense = this.defense;
+    let maxFall = body.maxFall;
+    if (!body.grounded && combat.shielding && defense?.slowFallSpeed > 0) {
+      maxFall = Math.min(maxFall, Math.max(defense.slowFallSpeed, body.vy - defense.slowFallBrake * dt));
+    }
+
     // ---- Integrate -------------------------------------------------------
-    stepBody(body, dt, ctx.stage, ctx.gravity);
+    // A higher jump's rise falls under its lighter share of gravity.
+    stepBody(body, dt, ctx.stage, ctx.gravity * (this.highJump?.lift ?? 1), maxFall);
 
     // ---- Launch bounce -----------------------------------------------------
     // Physics stopped the body at whatever it met. If a launch drove it
@@ -572,7 +594,7 @@ export class Fighter {
     if (body.grounded) {
       this.lastGroundY = body.y;
       this.airJumps = mv.airJumps ?? 0;
-      this.hop = null;
+      this.highJump = null;
       this.tumbling = false;
     }
     // A tumble lasts past the stun until the fighter does something: an
@@ -625,7 +647,7 @@ export class Fighter {
       if (this.bufferedAttack.age > (mv.attackBuffer ?? 0) + TIME_EPSILON) this.bufferedAttack = null;
     }
 
-    this.updateFacing(dir);
+    this.updateFacing(dir, held);
     this.updateState(dt);
   }
 
@@ -705,7 +727,7 @@ export class Fighter {
 
   // A hit (never a block) just landed on this fighter (see
   // CombatSystem.applyHit): it gets its air jump back, so a launch never
-  // strands it without one, and a jump still deciding its height is done.
+  // strands it without one, and a higher jump (deciding or rising) is over.
   //
   // A launch at launchReaction.tumbleSpeed or faster sets it tumbling; a
   // slower one ends a tumble, and a hit that launches nothing leaves it.
@@ -717,23 +739,26 @@ export class Fighter {
   // leaves the sequence it is flying in as it is.
   takeHit(event) {
     this.airJumps = this.def.movement.airJumps ?? 0;
-    this.hop = null;
+    this.highJump = null;
     if (event.launchSpeed > 0) {
       this.tumbling = event.launchSpeed >= this.launchReaction.tumbleSpeed;
       this.launch = startLaunch(event.finalLaunch, this.launch);
     }
   }
 
-  // Cuts a ground jump down to a short hop: from here it rises only as far as
-  // movement.shortHopHeight x the full jump's height above its takeoff
-  // (never lower than it already is), under the same gravity.
-  shortHop(gravity) {
-    const { body, hop } = this;
+  // The share of gravity (0-1) under which the higher jump rises from here
+  // to top out at movement.highJumpHeight x the normal jump's height above
+  // its takeoff: its upward speed now, spent over the height left. Never
+  // more than full gravity, so it only ever goes higher than the normal
+  // jump would from here.
+  highJumpLift(gravity) {
+    const { body, highJump } = this;
     const g = gravity * body.gravityScale;
-    const full = (this.jumpVelocity * this.jumpVelocity) / (2 * g);
-    const left = full * (this.def.movement.shortHopHeight ?? 1) - (hop.fromY - body.y);
-    const v = left > 0 ? Math.sqrt(2 * g * left) : 0;
-    if (-body.vy > v) body.vy = -v;
+    if (!(g > 0)) return 1;
+    const normal = (this.jumpVelocity * this.jumpVelocity) / (2 * g);
+    const left = normal * (this.def.movement.highJumpHeight ?? 1) - (highJump.fromY - body.y);
+    if (!(left > 0)) return 1;
+    return Math.min(1, (body.vy * body.vy) / (2 * g * left));
   }
 
   // Cuts the attack in progress short, if it may be (see
@@ -1005,17 +1030,26 @@ export class Fighter {
     return (this.body.grounded ? mapping.ground : mapping.air) || null;
   }
 
-  // Facing follows only the fighter's own movement: the way it is running
+  // Facing follows only the fighter's own input: the way it is running
   // (once past a small speed on the ground, so a turn does not flicker) or
-  // steering in the air. A Dash sets it as it starts (tryDash), and so does
-  // an attack started with a direction held (tryAction); a spawn or
-  // respawn takes the spawn's. Otherwise it keeps its last facing: it never
-  // turns toward its opponent by itself, standing still included, so an
-  // opponent crossing behind it stays behind it. Locked while an attack,
-  // Shield, stun, bind, charged technique or Dash plays.
-  updateFacing(dir) {
+  // steering in the air (`dir`). In an action of its own (an attack, the
+  // Shield or Charge) the direction held (`held`) turns it at once, left to
+  // right or right to left, as often as it likes: whatever the action does
+  // from then goes the new way (the hitbox, the attack's step-in, a
+  // shuriken not yet thrown, a Sphere Rush started from the Charge). A Dash
+  // sets it as it starts (tryDash), and so does an attack started with a
+  // direction held (tryAction); a spawn or respawn takes the spawn's.
+  // Otherwise it keeps its last facing: it never turns toward its opponent
+  // by itself, standing still included, so an opponent crossing behind it
+  // stays behind it. Locked while a stun, bind, charged technique or Dash
+  // plays: none of those is the fighter's to steer.
+  updateFacing(dir, held) {
     const { body, combat } = this;
-    if (combat.attack || combat.shielding || combat.stun > 0 || combat.immobilized || this.technique || this.dash) return;
+    if (combat.stun > 0 || combat.immobilized || this.technique || this.dash) return;
+    if (combat.attack || combat.shielding || this.charging) {
+      if (held) this.facing = held;
+      return;
+    }
     if (dir !== 0 && (Math.abs(body.vx) > 20 || !body.grounded)) this.facing = dir;
   }
 

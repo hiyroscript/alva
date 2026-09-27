@@ -23,6 +23,14 @@ export function blankInput() {
   };
 }
 
+// Seconds a CPU holds Jump after pressing it: a step and a half short of the
+// fighter's higher-jump window (movement.highJumpWindow; see
+// Fighter.update), so its jump is always the normal one. The press alone
+// for a fighter without that window.
+export function jumpTapHold(self) {
+  return Math.max(0, (self.def.movement.highJumpWindow ?? 0) - 1.5 / 60);
+}
+
 export class PlayerController {
   constructor(input) {
     this.input = input;
@@ -53,8 +61,8 @@ export class TrainingAIController {
     this.wantDrop = false;
     this.hopCooldown = 2;
     this.idleUntilSettled = 0;
-    // Seconds Jump stays held after a press: always the full jump, never a
-    // short hop (see Fighter.shortHop).
+    // Seconds Jump stays held after a press: let go in time for the normal
+    // jump, never the higher one (see jumpTapHold).
     this.jumpHold = 0;
   }
 
@@ -90,7 +98,7 @@ export class TrainingAIController {
     if (this.wantJump && self.body.grounded) {
       out.jumpPressed = true;
       this.wantJump = false;
-      this.jumpHold = (self.def.movement.shortHopWindow ?? 0) + 2 / 60;
+      this.jumpHold = jumpTapHold(self);
     }
     out.jump = this.jumpHold > 0;
     this.jumpHold -= dt;

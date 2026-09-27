@@ -1281,9 +1281,8 @@ html:not(.is-pointer-input) .settings-option:focus { box-shadow: var(--focus-rin
 .settings-preview--joystick { width: calc(var(--sp) * 2.2); }
 .sp-stick { position: absolute; left: calc(var(--sp) * 0.35); bottom: 0; width: calc(var(--sp) * 1.5); height: calc(var(--sp) * 1.5); }
 .settings-preview .sp-knob { width: calc(var(--sp) * 0.66); height: calc(var(--sp) * 0.66); border-color: var(--text-secondary); }
-.sp-dash { position: absolute; top: 0; width: calc(var(--sp) * 0.5); height: calc(var(--sp) * 0.5); }
-.sp-dash--left { left: calc(var(--sp) * 0.18); }
-.sp-dash--right { right: calc(var(--sp) * 0.18); }
+.sp-charge { position: absolute; top: 0; left: calc(var(--sp) * 0.18); width: calc(var(--sp) * 0.55); height: calc(var(--sp) * 0.55); }
+.settings-preview .sp-charge .icon { font-size: calc(var(--sp) * 0.34); }
 .settings-option.is-current .settings-preview i { border-color: rgba(47, 191, 99, 0.6); }
 
 /* ---------------------------------------------------------------------
@@ -1481,11 +1480,10 @@ html:not(.is-pointer-input) .settings-option:focus { box-shadow: var(--focus-rin
   --tc-gap: calc(var(--tc) * 0.17);
   --tc-pitch: calc(var(--tc) + var(--tc-gap));
   --tc-bottom: calc(max(var(--safe-b), 10px) + 1.6vh);
-  /* Joystick scheme: the stick's base, its knob, its two Dash buttons and
-     the down-arrow Charge under Jump. */
+  /* Joystick scheme: the stick's base, its knob and the down-arrow Charge
+     above it. */
   --tc-stick: calc(var(--tc) * 1.92);
   --tc-knob: calc(var(--tc) * 0.84);
-  --tc-dash: calc(var(--tc) * 0.62);
   --tc-charge: calc(var(--tc) * 0.8);
   display: none;
   position: absolute;
@@ -1560,12 +1558,12 @@ html.is-touch .touch-controls[hidden] { display: none; }
 
 /* Joystick scheme (the Mobile Controls setting's default). The lower-left
    cluster is one round stick in the same translucent style as the buttons,
-   with a small Dash button just above each of its top corners (their
-   centres sit 120deg and 60deg round from the stick's, clear of its rim). */
+   with the down-arrow Charge just above its top-left (flush with the
+   stick's left edge, its rim about half a gap clear of the stick's). */
 .tc-joystick {
   left: calc(max(var(--safe-l), 12px) + 1.4vw);
   width: var(--tc-stick);
-  height: calc(var(--tc) * 2.44);
+  height: calc(var(--tc) * 2.69);
 }
 .tc-stick {
   position: absolute;
@@ -1617,21 +1615,10 @@ html.is-touch .touch-controls[hidden] { display: none; }
   border-color: var(--white);
   transition: background-color 120ms ease, border-color 120ms ease;
 }
-.tc-dash {
-  position: absolute;
-  bottom: calc(var(--tc) * 1.82);
-  width: var(--tc-dash);
-  height: var(--tc-dash);
-  font-size: calc(var(--tc-dash) * 0.46);
-}
-.tc-dash-left { left: calc(var(--tc) * -0.03); }
-.tc-dash-right { right: calc(var(--tc) * -0.03); }
-/* The lower-right cluster rises just enough for Charge to sit under Jump;
-   the six buttons above keep their places relative to each other. */
-.touch-controls.is-joystick .tc-actions { bottom: calc(var(--tc-bottom) + var(--tc-charge) + var(--tc-gap)); }
 .tc-charge-down {
-  right: calc((var(--tc) - var(--tc-charge)) / 2);
-  bottom: calc(-1 * (var(--tc-charge) + var(--tc-gap)));
+  position: absolute;
+  left: 0;
+  bottom: calc(var(--tc) * 1.89);
   width: var(--tc-charge);
   height: var(--tc-charge);
 }

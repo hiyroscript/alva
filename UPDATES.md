@@ -121,6 +121,15 @@ hit now pushes and launches a little less, so:
   (`hitValue` in `js/game/combat-ai.js`), so it values its hits, and so its
   charged actions, as it did before the cut.
 
+### Later: turning during actions
+
+Not part of the update, but it changes one of its rules. "An attack faces
+the direction held as it starts" still holds, and now a direction held
+while the attack plays turns it too, at once, either way (the Shield and
+Charge as well). So holding back during the Throw now turns it rather than
+backing off facing forward. See
+[Jump, Shield, turning and joystick changes](#jump-shield-turning-and-joystick-changes).
+
 ## Effect update
 
 Named for its hit effects, but it also holds the jump, launch and Shield
@@ -158,8 +167,8 @@ launch steering or perfect Shield is about this update.
 **Where to tune it**
 
 - `js/data/characters.js`, #0001:
-  - `movement`: `shortHopWindow`, `shortHopHeight`, `airJumps`,
-    `airJumpRatio`;
+  - `movement`: `airJumps`, `airJumpRatio` (`shortHopWindow` and
+    `shortHopHeight` are gone, see below);
   - `launchReaction`: `stunPerThousand`, `maxStun`, `tumbleSpeed`,
     `steerAngle`;
   - `defense`: `perfectWindow`, `perfectRearm`.
@@ -174,8 +183,15 @@ Shield in `CombatSystem.applyHit` (`js/game/combat.js`); `HitEffects` and
 **Tests:**
 - `tests/hit-fx.test.mjs`
 - `tests/launch-reaction.test.mjs`
-- short hop and air jump in `tests/movement.test.mjs`
+- the air jump in `tests/movement.test.mjs`
 - perfect Shield in `tests/defense.test.mjs`
+
+### Later: the short hop is gone
+
+Not part of the update. The short hop was removed: a tap is the normal
+jump again, exactly as before the update, and Jump held a little longer
+gives a higher jump instead. The air jump is unchanged. See
+[Jump, Shield, turning and joystick changes](#jump-shield-turning-and-joystick-changes).
 
 ## Bounce update
 
@@ -219,6 +235,67 @@ ceiling and landing are unchanged.
 
 **Tests:** `tests/launch-bounce.test.mjs`, plus the BA2 spike tests in
 `tests/basic-attack-2.test.mjs`.
+
+## Jump, Shield, turning and joystick changes
+
+Not a named update (it can become one if the owner names it). Asked for as:
+remove the Joystick's movement buttons, remove the small jump (the jump
+works as before, pressing slightly longer gives a higher jump), shielding
+mid-air performs a slow fall, keep the double jump and the quick fall,
+allow turning left and right while performing an action, and put the
+Joystick layout's Charge on the left.
+
+**What it changed**
+
+- **Joystick touch layout:** the Left / Right mouvement Dash buttons are
+  gone; the stick Dashes by two quick pushes, as Left / Right do. Charge
+  (the down arrow) moved from under Jump to just above the stick's
+  top-left, and the lower-right cluster no longer rises for it. Classic
+  Buttons is unchanged. `InputManager.queueTouchMouvement` and
+  `mouvementLeftPressed` / `mouvementRightPressed` stay in the input layer,
+  but nothing on screen sends them.
+- **Higher jump (the short hop's replacement):** a tap is the normal jump.
+  Jump still held 0.15 s after takeoff makes it rise on to 1.4× the height
+  (about 237 units instead of 169), under lighter gravity from then to the
+  apex, so there is no kick in speed. Decided once; the air jump, a hit,
+  the apex or landing ends it. The air jump is never a higher one. Both
+  CPUs let go of Jump inside the window, so their jumps are the normal
+  ones, as before.
+- **Air Shield slow fall:** with the Shield up in the air, a faster fall
+  brakes to 200 units/s within 0.2 s and stays there; a rise is untouched,
+  sideways it only drifts, and letting go falls normally again.
+- **Turning during actions:** during an attack, the Shield or Charge, the
+  held direction turns the fighter at once, as often as the player likes.
+  Whatever the action does afterwards goes the new way: the hitbox, a step-in
+  still to come, a shuriken not yet thrown, a Sphere Rush started from the
+  Charge. A stun, a bind, a Dash and the Sphere Rush itself still hold the
+  facing. The combat AI never holds a direction that would turn its own
+  attack away from its opponent.
+- The air jump and the fast fall are unchanged.
+
+**Where to tune it** (`js/data/characters.js`, #0001)
+
+- `movement`: `highJumpWindow` (0.15), `highJumpHeight` (1.4).
+- `defense`: `slowFallSpeed` (200), `slowFallBrake` (6000). Left out (or
+  0), a Shield falls as ever (`SHIELD_DEFAULTS` in `js/game/combat.js`).
+- The Joystick layout's geometry: `.tc-charge-down` and `.tc-joystick` in
+  `styles.css`.
+
+**Code:** the higher jump (`Fighter.highJump`, `highJumpLift`), the slow
+fall and `updateFacing` in `js/game/character.js`; the fall cap in
+`stepBody` (`js/game/physics.js`); `jumpTapHold` in
+`js/game/fighter-controller.js` and the mid-attack guard in
+`CombatAIController.guard` (`js/game/combat-ai.js`); the layout in
+`js/game/touch-controls.js`, `styles.css` and the Settings card in
+`js/screens/settings-screen.js`.
+
+**Tests:**
+- the higher jump and the CPUs' jumps in `tests/movement.test.mjs`
+- the slow fall in `tests/defense.test.mjs`
+- turning in `tests/facing.test.mjs`, `tests/basic-attack.test.mjs`,
+  `tests/basic-attack-2.test.mjs`, `tests/throw.test.mjs`, and the CPU's
+  guard in `tests/combat-ai.test.mjs`
+- the Joystick layout in `tests/controls-ui.test.mjs`
 
 ## Control and move codenames
 

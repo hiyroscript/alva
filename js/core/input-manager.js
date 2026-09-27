@@ -6,11 +6,13 @@
 // whichever device made them: a key, a touch button, the D-pad, or the left
 // stick crossing from neutral into its held zone (holding it there makes no
 // more). Fighter reads two of them in a row as a Dash (see
-// Fighter.trackDashTaps). The Joystick touch layout's Left mouvement / Right
-// mouvement buttons (mouvementLeft / mouvementRight) ask for one Dash with a
-// single tap instead (queueTouchMouvement): a one-step request
+// Fighter.trackDashTaps). queueTouchMouvement asks for one Dash outright
+// instead (mouvementLeft / mouvementRight): a one-step request
 // (mouvementLeftPressed / mouvementRightPressed), never a held direction or a
-// press edge, that Fighter hands to the same Dash as a double tap.
+// press edge, that Fighter hands to the same Dash as a double tap. No
+// on-screen control makes that request any more (the Joystick layout's
+// Left / Right mouvement buttons are gone): every device Dashes by double
+// tap.
 
 import { ACTIONS } from '../config.js';
 
@@ -47,8 +49,8 @@ export class InputManager {
     this.pad = new Set();
     this.state = {};
     for (const a of ACTIONS) this.state[a] = { held: false, presses: 0 };
-    // The Dash a touch mouvement button asked for since the last sample:
-    // 1 right, -1 left, 0 none (see queueTouchMouvement).
+    // The Dash asked for outright since the last sample: 1 right, -1 left,
+    // 0 none (see queueTouchMouvement).
     this.touchMouvement = 0;
 
     this.gameplayActive = false;
@@ -138,8 +140,8 @@ export class InputManager {
     this._refresh(action);
   }
 
-  // One Dash toward `direction` (1 right, -1 left), asked for by a single
-  // tap of a touch mouvement button (mouvementLeft / mouvementRight). It
+  // One Dash toward `direction` (1 right, -1 left), asked for outright
+  // (mouvementLeft / mouvementRight; no on-screen control does so now). It
   // reaches the next sample only, as mouvementLeftPressed /
   // mouvementRightPressed, and is gone after it: nothing is held, and
   // runLeft / runRight see no press. The latest request wins. Whether a Dash

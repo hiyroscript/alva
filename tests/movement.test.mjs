@@ -155,19 +155,18 @@ test('coyote time and the jump buffer still work, at their tuned lengths', () =>
   assert.equal(after.airJumps, mv.airJumps - 1);
   assert.ok(late(coyote + 2, 0).vy > 0, 'nothing at all once it is spent');
   // Jump pressed just before landing, its air jump spent: it jumps on
-  // touchdown (the press held on, so the full jump).
+  // touchdown (taps: the normal jump).
   const ref = makeFighter();
   ref.step(JUMP);
-  const airborne = stepUntil(ref.step, (f) => f.grounded, { jump: true });
+  const airborne = stepUntil(ref.step, (f) => f.grounded);
   const buffered = (early) => {
     const { fighter, step } = makeFighter();
     step(JUMP);
     fighter.airJumps = 0;
-    for (let i = 1; i < airborne - early; i++) step({ jump: true });
-    step({});
+    for (let i = 1; i < airborne - early; i++) step({});
     step(JUMP);
-    while (!fighter.grounded) step({ jump: true });
-    step({ jump: true });
+    while (!fighter.grounded) step({});
+    step({});
     return fighter.body.vy < 0;
   };
   assert.ok(buffered(3), 'pressed three steps early');
@@ -328,7 +327,7 @@ test('running into BA1 keeps its momentum share and slides on it under its own f
   }
 });
 
-test('BA2 steps in on its first frame; the Throw keeps half a run and may be steered back while its facing holds', () => {
+test('BA2 steps in on its first frame; the Throw keeps half a run and may be steered, turning the way it is steered', () => {
   const ba2 = def.attacks.ba2;
   const { fighter, step } = makeFighter();
   step(P('ba2'));
@@ -347,12 +346,12 @@ test('BA2 steps in on its first frame; the Throw keeps half a run and may be ste
   assert.equal(t.fighter.combat.attack.def.id, 'uniqueba');
   const kept = t.fighter.body.vx;
   assert.ok(kept > 0 && kept < t.fighter.maxSpeed * thr.momentum);
-  let backing = false;
+  let reversed = false;
   for (t.step(LEFT); t.fighter.state === 'attack'; t.step(LEFT)) {
-    assert.equal(t.fighter.facing, 1);
-    backing ||= t.fighter.body.vx < 0;
+    assert.equal(t.fighter.facing, -1, 'turned by the direction held');
+    reversed ||= t.fighter.body.vx < 0;
   }
-  assert.ok(backing, 'backing off while it throws');
+  assert.ok(reversed, 'steered the other way while it throws');
 });
 
 test('aerials keep their drift and steer with their airControl; landing keeps only what is left of them', () => {
@@ -411,14 +410,18 @@ test('attack movement is data with defaults: an attack that declares none is pla
 
 // ---- Facing -----------------------------------------------------------------------
 
-test('an attack faces the direction held as it starts: run left, reverse and BA1 on one step strikes right, then holds', () => {
+test('an attack faces the direction held as it starts: run left, reverse and BA1 on one step strikes right, and holding on keeps it there', () => {
   const { fighter, step } = makeFighter();
   for (let i = 0; i < 20; i++) step(LEFT);
   assert.equal(fighter.facing, -1);
   step({ ...RIGHT, ...P('ba1') });
   assert.equal(fighter.combat.attack.def.id, 'ba1');
   assert.equal(fighter.facing, 1, 'the way the player turned');
-  for (step(LEFT); fighter.state === 'attack'; step(LEFT)) assert.equal(fighter.facing, 1, 'fixed for the whole attack');
+  for (step(RIGHT); fighter.state === 'attack'; step(RIGHT)) assert.equal(fighter.facing, 1, 'held on: it stays that way');
+  // Let go, it keeps the facing it has; nothing turns it but a direction.
+  for (let i = 0; i < 30; i++) step();
+  step(P('ba1'));
+  for (step(); fighter.state === 'attack'; step()) assert.equal(fighter.facing, 1, 'no direction held: unchanged');
   // With no direction held, the attack keeps the fighter's facing.
   const idle = makeFighter({ facing: -1 });
   idle.step(P('ba2'));
@@ -544,7 +547,7 @@ test('a fresh Fighter with a character that declares no new movement stats still
   assert.equal(fighter.bufferedAttack, null);
 });
 
-// ---- Short hop and air jump --------------------------------------------------------
+// ---- Higher jump and air jump --------------------------------------------------------
 
 // Apex height of a ground jump whose Jump is held for `hold` steps (the
 // press step included), from the ground at 800.
@@ -559,41 +562,106 @@ function apexOf(hold) {
   return 800 - top;
 }
 
-test('a tap is a short hop, held it is the full jump: decided within the short-hop window', () => {
+// The higher-jump window in steps after takeoff: Jump still held on that
+// step (held for window + 1 steps, the press step included) decides it.
+const HIGH_WINDOW = Math.round(mv.highJumpWindow / DT);
+
+test('a tap is the normal jump; held a little longer it is the higher jump, decided at the higher-jump window', () => {
   const g = CONFIG.sim.gravity;
-  const full = (920 * 920) / (2 * g);
-  const short = full * mv.shortHopHeight;
-  const window = Math.floor(mv.shortHopWindow / DT + 1e-6);
-  for (const hold of [1, 2, 3]) {
-    const h = apexOf(hold);
-    assert.ok(Math.abs(h - short) < 8, `a tap of ${hold}: ${h.toFixed(1)} vs ${short.toFixed(1)}`);
+  const normal = (920 * 920) / (2 * g);
+  const high = normal * mv.highJumpHeight;
+  assert.equal(HIGH_WINDOW, 9, 'a press of 0.15 s');
+  // Let go before the window closes (a tap, or a little longer): the normal
+  // jump, the same arc step for step as one never held at all.
+  const arc = (hold) => {
+    const { fighter, step } = makeFighter();
+    step(JUMP);
+    const ys = [fighter.body.y];
+    for (let i = 1; !fighter.grounded; i++) {
+      step(i < hold ? { jump: true } : {});
+      ys.push(fighter.body.y);
+    }
+    return ys;
+  };
+  const tap = arc(1);
+  for (const hold of [2, 5, HIGH_WINDOW]) assert.deepEqual(arc(hold), tap, `held ${hold}: the normal jump`);
+  const h = apexOf(1);
+  assert.ok(Math.abs(h - normal) < 8, `a tap: ${h.toFixed(1)} vs ${normal.toFixed(1)}`);
+  // Held through it: the higher jump, whenever it is let go after.
+  for (const hold of [HIGH_WINDOW + 1, HIGH_WINDOW + 3, 200]) {
+    const hh = apexOf(hold);
+    assert.ok(Math.abs(hh - high) < 8, `held ${hold}: ${hh.toFixed(1)} vs ${high.toFixed(1)}`);
   }
-  // Held past the window: the full jump, whenever it is let go after.
-  for (const hold of [window + 2, 20, 200]) {
-    const h = apexOf(hold);
-    assert.ok(Math.abs(h - full) < 8, `held ${hold}: ${h.toFixed(1)} vs ${full.toFixed(1)}`);
-  }
-  // Let go late in the window: between the two, never lower than it already is.
-  const late = apexOf(window);
-  assert.ok(late > short && late < full * 0.6);
-  // Low enough for a mid-air BA1 (whose slash reaches a standing opponent
-  // below 60 units) to land on the way up.
-  assert.ok(short < 60);
+  assert.ok(high - normal > 60, 'clearly higher');
 });
 
-test('a short hop lets a rising mid-air BA1 strike a standing opponent', () => {
-  const d = duel({ gap: 44 });
-  d.tick(JUMP);
-  d.tick(P('ba1'));
-  assert.equal(d.attacker.combat.attack?.def.id, 'maba1');
-  d.until(() => d.events.length > 0 || d.attacker.grounded, 60);
-  assert.equal(d.events[0]?.move, 'maba1', 'the short-hopped slash connects');
-  // The full jump carries the same slash over its head.
-  const f = duel({ gap: 44 });
-  f.tick(JUMP);
-  f.tick({ ...P('ba1'), jump: true });
-  for (let i = 0; i < 20; i++) f.tick({ jump: true });
-  assert.equal(f.events.length, 0);
+test('the higher jump bends its arc: never a kick upward, lighter gravity from the window to its apex, full gravity after', () => {
+  const { fighter, step } = makeFighter();
+  const g = CONFIG.sim.gravity * DT;
+  step(JUMP);
+  const vys = [fighter.body.vy];
+  while (fighter.body.vy < 0) {
+    step({ jump: true });
+    vys.push(fighter.body.vy);
+  }
+  for (let i = 1; i < vys.length; i++) {
+    const dv = vys[i] - vys[i - 1];
+    if (i < HIGH_WINDOW) assert.ok(close(dv, g, 1e-6), `step ${i}: full gravity until the window`);
+    else assert.ok(dv > 0 && dv < g * 0.8, `step ${i}: slowing, under lighter gravity (${(dv / g).toFixed(2)})`);
+  }
+  // The same lightness all the way up: one share of gravity, set once.
+  const shares = vys.slice(HIGH_WINDOW).map((v, i) => (v - vys[HIGH_WINDOW - 1 + i]) / g);
+  assert.ok(shares.every((k) => close(k, shares[0], 1e-6)));
+  // Over the top: full gravity again from the next step, and it is done.
+  const vy = fighter.body.vy;
+  step({ jump: true });
+  assert.ok(close(fighter.body.vy - vy, g, 1e-6));
+  assert.equal(fighter.highJump, null);
+});
+
+test('the higher jump is decided once: an air jump, a hit or landing ends it, and the air jump is never a higher one', () => {
+  const g = CONFIG.sim.gravity * DT;
+  const rising = () => {
+    const made = makeFighter();
+    made.step(JUMP);
+    for (let i = 0; i < HIGH_WINDOW; i++) made.step({ jump: true });
+    assert.ok(made.fighter.highJump?.lift > 0 && made.fighter.highJump.lift < 1, 'the higher jump');
+    return made;
+  };
+  // The air jump: a fresh jump at the air jump's speed, under full gravity.
+  const air = rising();
+  air.step({});
+  air.step(JUMP);
+  assert.equal(air.fighter.highJump, null);
+  let vy = air.fighter.body.vy;
+  air.step({ jump: true });
+  assert.ok(close(air.fighter.body.vy - vy, g, 1e-6));
+  // Held or tapped, the air jump tops out at the same height.
+  const airApex = (hold) => {
+    const { fighter, step } = makeFighter();
+    step(JUMP);
+    stepUntil(step, (f) => f.body.vy > 0);
+    step(JUMP);
+    const from = fighter.body.y;
+    let top = from;
+    for (let i = 1; fighter.body.vy < 0; i++) {
+      step(i < hold ? { jump: true } : {});
+      top = Math.min(top, fighter.body.y);
+    }
+    return from - top;
+  };
+  assert.equal(airApex(1), airApex(40));
+  // A hit is over it at once.
+  const hit = rising();
+  hit.fighter.takeHit({ launchSpeed: 0 });
+  assert.equal(hit.fighter.highJump, null);
+  vy = hit.fighter.body.vy;
+  hit.step({ jump: true });
+  assert.ok(close(hit.fighter.body.vy - vy, g, 1e-6), 'full gravity at once');
+  // And a new ground jump after landing decides afresh: a tap is normal.
+  const land = rising();
+  stepUntil(land.step, (f) => f.grounded);
+  assert.equal(land.fighter.highJump, null);
 });
 
 test('one air jump: past coyote time, from anywhere in the air, the jump clip from its first frame', () => {
@@ -663,27 +731,42 @@ test('a hit gives the air jump back; a stun, an air Shield or an attack in progr
   assert.equal(shield.fighter.airJumps, 1, 'the Shield outranks it');
 });
 
-test('the CPUs hold Jump through the short-hop window: their jumps are full ones', async () => {
+test('the CPUs let go of Jump inside the higher-jump window: their jumps are normal ones', async () => {
   const { CombatAIController } = await import('../js/game/combat-ai.js');
-  const d = duel({ gap: 600 });
-  const ai = new CombatAIController({ difficulty: 'hard', rng: () => 0.5 });
-  const held = [];
-  d.attacker.controller = {
-    getInput: (self, dt, ctx) => {
-      const out = ai.getInput(self, dt, ctx);
-      held.push(out.jump);
-      return out;
-    },
+  const { TrainingAIController } = await import('../js/game/fighter-controller.js');
+  const normal = (920 * 920) / (2 * CONFIG.sim.gravity);
+  const apexWith = (controller, prepare) => {
+    const d = duel({ gap: 600 });
+    const held = [];
+    d.attacker.controller = {
+      getInput: (self, dt, ctx) => {
+        const out = controller.getInput(self, dt, ctx);
+        held.push(out.jump);
+        return out;
+      },
+    };
+    prepare(d);
+    let top = d.attacker.body.y;
+    for (let i = 0; i < 60; i++) {
+      d.tick();
+      top = Math.min(top, d.attacker.body.y);
+    }
+    const run = held.indexOf(false, held.indexOf(true)) - held.indexOf(true);
+    assert.ok(run > 1 && run <= HIGH_WINDOW, `held ${run} steps: a moment, then let go in time`);
+    return 800 - top;
   };
-  // Hand it a jump to make (as its jump-in or a hop would).
-  ai.getInput(d.attacker, DT, { stage: d.attacker.body && STAGE, gravity: CONFIG.sim.gravity });
-  ai.setIntent({ kind: 'jump', dir: 0 });
-  ai.intent.keepUntil = Infinity;
-  ai.thinkTimer = Infinity;
-  let top = d.attacker.body.y;
-  for (let i = 0; i < 60; i++) {
-    d.tick();
-    top = Math.min(top, d.attacker.body.y);
-  }
-  assert.ok(800 - top > 150, `a full jump (${(800 - top).toFixed(0)})`);
+  // The combat AI, handed a jump to make (as its jump-in or a hop would).
+  const ai = new CombatAIController({ difficulty: 'hard', rng: () => 0.5 });
+  const cpu = apexWith(ai, (d) => {
+    ai.getInput(d.attacker, DT, { stage: d.attacker.body && STAGE, gravity: CONFIG.sim.gravity });
+    ai.setIntent({ kind: 'jump', dir: 0 });
+    ai.intent.keepUntil = Infinity;
+    ai.thinkTimer = Infinity;
+  });
+  assert.ok(Math.abs(cpu - normal) < 8, `the combat AI: a normal jump (${cpu.toFixed(0)})`);
+  // The training CPU, hopping a block in its way.
+  const training = new TrainingAIController({ rng: () => 0.5 });
+  training.thinkTimer = Infinity;
+  const hop = apexWith(training, () => { training.wantJump = true; });
+  assert.ok(Math.abs(hop - normal) < 8, `the training CPU: a normal jump (${hop.toFixed(0)})`);
 });

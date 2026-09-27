@@ -134,8 +134,9 @@ test('movement, collider and hurtbox data are as tuned', () => {
     airAcceleration: 3000, airDeceleration: 380, airTurnBoost: 2.0, gravityScale: 1,
     maxFallSpeed: 1500, fastFallAcceleration: 12000, fastFallSpeed: 1400,
     coyoteTime: 0.1, jumpBuffer: 0.12,
-    // A tap is a short hop (0.35 of the jump's height); one air jump at 0.9.
-    shortHopWindow: 0.1, shortHopHeight: 0.35, airJumps: 1, airJumpRatio: 0.9,
+    // A tap is the normal jump; held 0.15 s, the higher jump (1.4 of its
+    // height); one air jump at 0.9.
+    highJumpWindow: 0.15, highJumpHeight: 1.4, airJumps: 1, airJumpRatio: 0.9,
     attackBuffer: 0.15,
     // A launch or push runs down at the same rates as before the rework, so
     // Launch Point sends a fighter exactly as far.

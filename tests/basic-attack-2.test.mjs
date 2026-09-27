@@ -303,10 +303,9 @@ test('the mid-air BA2 hitbox is live only on the kick frame (midair2ba3)', () =>
 
 test('airborne ba2 plays the five-frame mid-air BA2 (the airborne kick) during the ascent, under normal gravity', () => {
   const { fighter, step } = makeFighter();
-  // The same jump without an attack, for comparison. Jump held on: the full
-  // jump (a tap would be a short hop).
+  // The same jump without an attack, for comparison. A tap: the normal jump.
   const plain = makeFighter();
-  const HELD = { jump: true };
+  const HELD = {};
   step(JUMP);
   plain.step(JUMP);
   step(HELD);
@@ -397,24 +396,29 @@ test('BA2 on the same step as a jump attacks on the ground; the jump is dropped'
   assert.equal(fighter.grounded, true);
 });
 
-test('BA2 locks facing while it plays; the ground kick is steered by nothing, the airborne kick by its airControl', () => {
+test('BA2 turns to the direction held while it plays; the ground kick is steered by nothing, the airborne kick by its airControl', () => {
   for (const air of [false, true]) {
     const { fighter, step } = makeFighter();
     stepUntil(step, (f) => f.state === 'run', { runRight: true });
-    // In the air: the full jump (Jump held on).
+    // In the air: a tap, the normal jump.
     if (air) step({ runRight: true, ...JUMP });
-    step({ runRight: true, jump: air, ...BA2 });
+    step({ runRight: true, ...BA2 });
     const atk = fighter.combat.attack.def;
     assert.equal(atk.id, air ? 'maba2' : 'ba2');
+    assert.equal(fighter.facing, 1, 'started facing the way held');
     const log = [];
     while (fighter.state === 'attack') {
       log.push(fighter.body.vx);
-      assert.equal(fighter.facing, 1, 'holding Left never turns an attack around');
-      step({ runLeft: true, jump: air });
+      step({ runLeft: true });
+      assert.equal(fighter.facing, -1, 'holding Left turns the attack around at once');
+      if (fighter.state === 'attack' && fighter.combat.phase === 'active') {
+        const box = worldBox(fighter, atk.hitbox);
+        assert.ok(box.x + box.w <= fighter.body.x, 'its kick lands on the left now');
+      }
     }
     for (let i = 1; i < log.length; i++) assert.ok(log[i] <= log[i - 1], 'Left never speeds it up');
     if (!air) {
-      assert.ok(log.every((vx) => vx >= 0), 'no steering against the ground kick');
+      assert.ok(log.every((vx) => vx >= 0), 'no steering against the ground kick: turning is not walking');
       assert.equal(log.at(-1), 0, 'decelerates to a stop');
     } else {
       // The airborne kick keeps its drift and steers with its share of the
@@ -424,8 +428,9 @@ test('BA2 locks facing while it plays; the ground kick is steered by nothing, th
       assert.ok(braked > 3 * def.movement.airDeceleration * DT, 'steered against its drift');
       assert.ok(log.at(-1) < 0, 'and on into the other way before it ends');
     }
-    // Once it ends, the held direction applies again.
-    stepUntil(step, (f) => f.facing === -1, { runLeft: true }, 30);
+    // Once it ends, it keeps the facing it turned to.
+    for (let i = 0; i < 10; i++) step();
+    assert.equal(fighter.facing, -1);
   }
 });
 

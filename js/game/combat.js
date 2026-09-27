@@ -80,6 +80,8 @@
 //     groundAnimation: 'shield', airAnimation: 'midairShield',
 //     // Optional one-frame poses around the grounded hold:
 //     groundStartAnimation: 'shieldStart', groundReleaseAnimation: 'shieldRelease',
+//     // Optional slow fall while it is up in the air:
+//     slowFallSpeed: 200, slowFallBrake: 6000,
 //   }
 //
 // While it is up (CombatState.shielding, see Fighter.update) any hit that
@@ -186,6 +188,12 @@ const SHIELD_DEFAULTS = Object.freeze({
   // over and over never keeps one open. 0 is none.
   perfectWindow: 0,
   perfectRearm: 0,
+  // Up in the air, the Shield slows the fall: a faster one brakes toward
+  // slowFallSpeed (world units / s) at slowFallBrake (per second), and it
+  // never falls faster while the Shield stays up. 0 is none: it falls as
+  // ever.
+  slowFallSpeed: 0,
+  slowFallBrake: 6000,
 });
 
 // Frozen form of a character's `defense` entry, or null for a fighter that

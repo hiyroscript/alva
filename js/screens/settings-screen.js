@@ -14,7 +14,7 @@ import { MOBILE_CONTROLS, MOBILE_CONTROLS_LABELS, DEFAULT_MOBILE_CONTROLS } from
 
 // What each layout gives the player, in a line.
 const MOBILE_CONTROLS_TEXT = Object.freeze({
-  joystick: 'A round joystick to move, one-tap Left and Right mouvement buttons to Dash, and Charge under Jump.',
+  joystick: 'A round joystick to move, with Charge just above it. Push the stick the same way twice to Dash.',
   classic: 'The original Left, C and Right buttons. Tap a direction twice to Dash; hold C to Charge.',
 });
 
@@ -22,9 +22,8 @@ const MOBILE_CONTROLS_TEXT = Object.freeze({
 // only (the card's name and line say the same).
 const PREVIEW = Object.freeze({
   joystick: () => el('span', { class: 'settings-preview settings-preview--joystick', 'aria-hidden': 'true' }, [
-    el('i', { class: 'sp-dash sp-dash--left' }),
+    el('i', { class: 'sp-charge', html: ICONS.down }),
     el('i', { class: 'sp-stick' }, [el('i', { class: 'sp-knob' })]),
-    el('i', { class: 'sp-dash sp-dash--right' }),
   ]),
   classic: () => el('span', { class: 'settings-preview settings-preview--classic', 'aria-hidden': 'true' }, [
     el('i', { class: 'sp-pad', html: ICONS.left }),

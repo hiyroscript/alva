@@ -80,7 +80,7 @@ test('it refills by itself at 12 per second: standing, running, in the air, atta
   for (let i = 0; i < 30; i++) step({ runRight: true });
   near(c.energy, 28, 'half a second running');
   step({ jump: true, jumpPressed: true });
-  for (let i = 0; i < 29; i++) step({ jump: true }); // the full jump
+  for (let i = 0; i < 29; i++) step(); // a tap: the normal jump
   assert.equal(fighter.grounded, false);
   near(c.energy, 34, 'half a second jumping');
   while (!fighter.grounded) step();

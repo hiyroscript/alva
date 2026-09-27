@@ -224,7 +224,7 @@ test('airborne ba1 plays the three-frame mid-air BA1 (the kunai slash) during th
 test('airborne ba1 also triggers mid-air BA1 during the descent', () => {
   const { fighter, step } = makeFighter();
   step(JUMP);
-  stepUntil(step, (f) => f.body.vy > 0, { jump: true }); // held: the full jump
+  stepUntil(step, (f) => f.body.vy > 0); // a tap: the normal jump
   assert.equal(fighter.state, 'fall');
   step(BA1);
   assert.equal(fighter.state, 'attack');
@@ -350,21 +350,27 @@ test('an attack whose frames failed to load is refused, not faked', (t) => {
   assert.equal(warn.mock.callCount(), 2);
 });
 
-test('BA1 locks movement and facing while it plays', () => {
+test('BA1 locks movement while it plays; the direction held turns it at once', () => {
   const { fighter, step } = makeFighter();
   stepUntil(step, (f) => f.state === 'run', { runRight: true });
   step({ runRight: true, ...BA1 });
+  assert.equal(fighter.facing, 1);
   const log = [];
   while (fighter.state === 'attack') {
     log.push(fighter.body.vx);
-    assert.equal(fighter.facing, 1, 'holding Left never turns an attack around');
     step({ runLeft: true });
+    assert.equal(fighter.facing, -1, 'holding Left turns the attack around');
   }
   assert.equal(log.at(-1), 0, 'decelerates to a stop');
-  assert.ok(log.every((vx) => vx >= 0));
-  // Once it ends, the held direction applies again.
-  step({ runLeft: true });
-  assert.equal(fighter.facing, -1);
+  assert.ok(log.every((vx) => vx >= 0), 'turning never walks it: the run\'s slide just runs down');
+  // Back and forth, as often as the player likes.
+  for (let i = 0; i < 30; i++) step();
+  step(BA1);
+  for (const [held, facing] of [[{ runRight: true }, 1], [{ runLeft: true }, -1], [{}, -1], [{ runRight: true }, 1]]) {
+    step(held);
+    assert.equal(fighter.combat.attack?.def.id, 'ba1');
+    assert.equal(fighter.facing, facing);
+  }
 });
 
 test('ground BA1 hits an opponent in front during the active phase only', () => {
