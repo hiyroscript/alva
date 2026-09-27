@@ -1,475 +1,619 @@
-You are working in the hiyroscript/alva repository.
+Work directly in the existing hiyroscript/alva repository on the current main codebase.
 
-Alva is a framework-free browser fighting game built with HTML, CSS, ES modules, and Canvas 2D. There is no build step. Preserve the existing architecture, visual identity, accessibility behavior, settings persistence, splash animation, and menu flow.
+Implement the second playable fighter, #0002, and add a fighter-palette explosion effect when any fighter is absorbed by the Void.
 
-Goal
+Before changing anything, inspect the existing code and preserve Alva’s current architecture, coding conventions, comments, accessibility, responsive behavior, localization, game feel, and tests. Do not redesign unrelated systems.
 
-Change Alva’s startup flow so that the first-run language selection dialog appears only after the complete splash sequence has finished.
+Goals
 
-The current implementation does this:
+1. Add #0002 as the second selectable/playable fighter.
+2. #0002 currently only has finished idle and walking artwork. Do not invent attacks, attack animations, defense animations, jump animations, hurt animations, transformations, special moves, or other combat art.
+3. Add the supplied sprite-source credit for #0002.
+4. Never display or introduce the source artwork’s character/title name anywhere in the project. The fighter must only be referred to as #0002.
+5. When a fighter is absorbed by the Void, create a short explosion/burst exactly where that fighter disappears.
+6. The explosion must use a color palette derived from/matched to that fighter rather than one generic color shared by every fighter.
+7. Preserve all existing Void scoring, respawn, double-KO, camera, combat, physics, and timing rules.
 
-First launch → Language dialog → Splash → Home
+Existing architecture to preserve
 
-Change it to:
+The relevant code currently works like this:
 
-First launch → Splash → Language dialog → Home
-
-For a returning player who has already selected a language:
-
-Returning launch → Splash → Home
-
-The language chooser must never appear before or on top of the splash animation.
-
-Existing implementation
-
-Inspect the relevant code before making changes, especially:
-
+* js/data/characters.js
+    * CHARACTERS is the fighter database.
+    * The file is intentionally structured so new fighters are data-driven.
+    * The roster and battle systems should not need fighter-specific branches.
+    * characterFramePaths(def) gathers animation/projectile/effect assets for loading.
+* js/ui/fighter-roster.js
+    * Builds the 48-slot roster directly from CHARACTERS.
+    * Available characters automatically get selectable buttons, portraits, previews, and loading.
+    * The preview uses the fighter’s idle animation.
+    * Do not build a separate #0002 roster implementation.
 * js/core/app.js
-* js/screens/splash-screen.js
-* js/ui/language-dialog.js
-* js/core/settings.js
-* js/core/i18n.js
-* js/core/screen-manager.js
-* index.html
-* styles.css
-* tests/splash-screen.test.mjs
-* tests/settings.test.mjs
-* tests/i18n.test.mjs
-* README.md
+    * Preloads every available fighter.
+    * loadCharacter() and SpriteSet.build() should continue to be the shared loading path.
+* js/game/arena.js
+    * checkVoid(fighters) finds fighters whose centers crossed the fixed Void boundary.
+    * Fighters become lostToVoid, then onVoid(f) is called.
+    * A lostToVoid fighter is immediately removed from inPlay, so it is no longer updated, targeted, collided with, or rendered.
+    * This is the shared hook used by Quick Battle, Watch Mode, and Practice.
+* js/game/battle.js
+    * Battle.onVoid() handles points, match-winning falls, and respawn.
+    * Do not move visual-effect logic into scoring logic.
+* js/game/hit-fx.js
+    * Owns presentation-only combat effects such as flashes, sparks, trails, shake, lethal zoom, and rebound effects.
+    * It must remain presentation-only.
+    * The new Void explosion belongs here or in a similarly presentation-only module, not in physics/combat data.
+* js/game/arena.js rendering order currently paints fighters/effects, foreground, then the actual Void layer.
+    * A Void explosion needs to remain visible even after the fighter has been swallowed.
+    * Draw the new Void explosion after theme.drawVoid(...), but before UI/status/debug overlays as appropriate.
+
+Part 1 — organize #0002 assets
+
+Create:
+
+assets/characters/0002/
+
+The repository currently contains 0002_* sprite PNGs at the root.
+
+For the actual fighter definition, only register the finished idle/walking artwork:
+
+* 0002_idle1.png
+* 0002_idle2.png
+* 0002_idle3.png
+* 0002_idle4.png
+* 0002_idle5.png
+* 0002_run1.png
+* 0002_run2.png
+
+Place the used files under:
+
+assets/characters/0002/
+
+Use Alva’s existing animation key run internally because that is what the movement/animator system expects, but visually treat these two frames as the character’s walking cycle.
+
+There are currently other 0002_* files in the repository such as airborne/landing-looking images. Do not wire those into gameplay yet. The requirement for this change is that #0002 has only idle and walking as finished states.
+
+Do not synthesize missing frames by editing existing art.
+
+Do not copy #0001 artwork into missing #0002 animation states.
+
+Part 2 — add #0002 to CHARACTERS
+
+In js/data/characters.js, add a real second available fighter:
+
+* id: '0002'
+* displayName: '#0002'
+* available: true
+* rosterSlot: 1
+
+This should make slot 02 available automatically.
+
+Define an appropriate base path such as:
+
+./assets/characters/0002/0002_
+
+Animations
+
+Register only:
+
+* idle
+    * 5 supplied frames
+    * looped
+* run
+    * 2 supplied frames
+    * looped
+
+Inspect the actual PNGs before setting:
+
+* FPS
+* sourceFacing
+* heightRatio
+* visual.height
+* pixel-grid behavior
+* portrait crop
+* anchor
+
+The sprite must remain crisp with imageSmoothingEnabled = false through the existing rendering pipeline.
+
+Choose playback speeds that make the supplied art look intentional rather than hyperactive. Since the movement art is a walk rather than a full sprint, do not force an excessively high run-animation FPS just because the engine state is called run.
+
+Missing visual states
+
+#0002 must still be able to exist safely in the current engine even though it does not have full artwork.
+
+Use the existing animation fallback mechanism where appropriate so universal non-offensive states can display a stable idle frame instead of failing.
+
+For example, states such as:
+
+* jump
+* fall
+* land
+* hurt
+* midairHurt
+* chargeStart
+* chargeLoop
+* chargeRelease
+
+may resolve to an idle frame until real art exists.
+
+Do not fake a new animation by rapidly cycling idle frames under another state name.
+
+A double-tap Dash should not use somebody else’s animation. If the engine already refuses Dash when its required clip is missing, retain that behavior rather than fabricating a dash clip.
+
+Gameplay baseline
+
+For now, give #0002 sane baseline body/movement data so the character can move around the stages without introducing a whole balancing pass.
+
+Use #0001’s neutral movement/physics/Powers as the initial reference where appropriate, including the types of data required by Fighter, such as:
+
+* Powers
+* acceleration/deceleration
+* air movement
+* gravity
+* fall limits
+* coyote time
+* jump buffering
+* air jump count
+* launch reaction
+* energy/stat fields required by the engine
+* pushbox/collider/hurtboxes
+
+However:
+
+* inspect #0002’s actual sprite proportions;
+* adjust the visual sizing/collider/hurtboxes enough that the body reasonably fits #0002;
+* do not blindly make sprite dimensions equal to #0001;
+* do not give #0002 attack hitboxes.
+
+No unfinished combat kit
+
+#0002 does not have completed combat animations yet.
+
+Make its unfinished combat inputs explicitly unavailable/reserved rather than borrowing #0001 moves.
+
+The definition should therefore have the equivalent of:
+
+* no projectile animations
+* no projectiles
+* no effect animations specific to attacks
+* no attack definitions
+* no summons
+* no charged techniques
+* no charged actions
+* no defense if there is no finished defense animation/behavior
+* no transformation
+* no made-up ability names
+
+Its universal action mapping should safely reserve/no-op the attack buttons rather than pointing them at nonexistent moves.
+
+In particular, do not make #0002 punch, kick, throw, shield, clone, or use #0001’s sphere technique merely to make the buttons do something.
+
+This character is intentionally incomplete right now.
+
+The game must fail gracefully when an unfinished action is pressed.
+
+Mobile controls
+
+Do not present attack icons/names implying abilities that #0002 does not actually have.
+
+When #0002 is selected, fighter-specific combat buttons with no implemented action should use the game’s existing reserved/unavailable presentation rather than inheriting #0001 labels such as Punch, Kick, or Shuriken.
+
+Universal movement/Jump/Charge controls should continue following existing game rules.
+
+Part 3 — roster and mode integration
+
+Do not special-case screens unnecessarily.
+
+Because FighterRoster already reads CHARACTERS, adding #0002 correctly should automatically make it available in:
+
+* Select Fighter
+* Practice Ground → Change Fighter
+* Practice CPU selection
+* Watch Mode CPU 1
+* Watch Mode CPU 2
+
+Verify each one.
+
+Quick Battle intentionally makes its CPU use Player 1’s selected fighter. Preserve that behavior. Selecting #0002 in Quick Battle therefore means the match can contain two #0002 fighters.
+
+Watch Mode must continue supporting different character combinations, including:
+
+* #0001 vs #0002
+* #0002 vs #0001
+* #0002 vs #0002
+
+Do not change those mode rules just to accommodate the incomplete move set.
+
+Part 4 — #0002 credits
+
+Use the DeviantArt source URL supplied with this task as the source credit for #0002.
+
+Do not use the artwork’s page title as displayed credit text.
+
+Do not use the source artwork’s character name anywhere in:
+
+* UI
+* code comments
+* translation strings
+* README
 * ALVA_SPEC.md
+* tests
+* filenames you create
+* commit-facing documentation
 
-Relevant current behavior:
+Refer only to #0002, the sprite source, and the creator/uploader attribution that is appropriate from the supplied source.
 
-* App.start() registers the screens, localizes the page, starts preloading fighter assets, starts the animation loop, then calls languageDialog.ensureChosen() before navigating to splash.
-* SplashScreen.finish() currently clears the splash and directly calls:
-    this.app.screens.go('home', {}, { reset: true }).
-* LanguageDialog.ensureChosen() immediately resolves for a returning player, but opens the modal and waits for a choice for a first-time player.
-* A null language in Settings means English is temporarily used as the interface default, but it does not count as the player having chosen English.
-* The browser language currently only determines which language option initially receives focus. It must not automatically choose a language.
-* The language dialog cannot be dismissed with Back; the player must choose English or Français.
-* The selected language is saved through the existing Settings store and the existing i18n listeners localize the game immediately.
+Credits implementation
 
-Preserve all of those semantics.
+The current credits are driven by:
 
-Required startup behavior
+* js/ui/credits.js
+* translation keys in js/core/i18n.js
 
-First launch
+Add a distinct #0002 sprite source credits group following the existing #0001 group rather than replacing the existing #0001 attribution.
 
-When alva.settings does not contain a valid chosen language:
+Keep credits localization-compatible.
 
-1. Start Alva normally.
-2. Register all screens and managers.
-3. Start fighter preloading as it does today.
-4. Enter the splash screen immediately.
-5. Play the complete existing splash sequence with no language dialog visible.
-6. Do not reveal Home when the splash finishes.
-7. Clear the splash artwork to its existing black background.
-8. Open the existing first-run language dialog.
-9. Keep the user on that black post-splash state while the dialog is open.
-10. Do not allow navigation to Home until a valid language has been chosen.
-11. When the player chooses English or Français:
-    * save it using the existing Settings API;
-    * allow the existing i18n system to apply it;
-    * close the language dialog;
-    * navigate to Home with the existing reset semantics.
-12. Home must appear directly in the language the player selected. There must be no visible flash of Home in English before the selection.
+Add English and French strings consistent with the existing tone.
 
-The visual sequence should therefore feel like:
+A suitable conceptual structure is:
 
-hiyroscript splash → Alva splash → black → Language / Langue modal → Home
+* #0002 sprite source
+* sprite/source attribution
+* creator/uploader attribution as appropriate
+* source: DeviantArt
+* source URL from this task
 
-Returning player
+If the current credits component only renders text rather than anchors, preserve its architecture unless a small accessible link enhancement can be made without disrupting the rolling credits. At minimum, the source must be clearly identifiable.
 
-If a valid language has already been chosen:
+Keep the existing generic Rights and unofficial-project notices.
 
-1. Play the splash normally.
-2. After it finishes, skip the language dialog completely.
-3. Navigate directly to Home.
-4. Continue using the saved language.
+Update tests/settings.test.mjs, since it currently expects the old exact credits group list and lines.
 
-Do not briefly render or focus the language chooser for returning players.
+Part 5 — fighter-colored Void explosion
 
-Architecture
+When a fighter crosses the stage Void boundary and gets removed from play, create a short visual explosion exactly at the location where the fighter is swallowed.
 
-Keep startup sequencing owned by the application controller rather than making SplashScreen responsible for Settings/i18n details.
+This is a presentation effect only.
 
-A good implementation is to introduce a small application-level continuation method, for example:
+It must not:
 
-App.continueAfterSplash()
+* change velocity
+* deal damage
+* affect Launch Point
+* alter scoring
+* affect respawn timing
+* affect hitstop
+* modify collision
+* alter the Void boundary
+* delay lostToVoid
+* change match results
+* change CPU behavior
 
-or another clear name consistent with the codebase.
+Trigger point
 
-Its responsibility should be conceptually:
+The clean shared trigger is Arena.checkVoid().
 
-* wait for languageDialog.ensureChosen();
-* after that resolves, navigate to Home with { reset: true }.
+For every fighter in that step’s taken list:
 
-Then:
+1. capture the fighter’s disappearance position and palette;
+2. create the visual burst;
+3. mark/process the fighter as lost exactly as the existing code does.
 
-* App.start() should navigate directly to splash;
-* SplashScreen.finish() should notify the App that the splash has completed instead of hard-coding direct navigation to Home.
+Do this once per Void loss.
 
-Keep the dependency direction clean:
+It must work when:
 
-SplashScreen → App startup continuation → LanguageDialog → Home
+* one fighter falls;
+* both fighters fall on the same fixed step;
+* a fighter falls in Practice;
+* a fighter falls in Quick Battle;
+* a fighter falls in Watch Mode;
+* the fall wins the match and the fighter never respawns.
 
-rather than:
+Do not tie the effect to Battle.onVoid() because Practice also needs it.
 
-SplashScreen → LanguageDialog internals.
+Explosion position
 
-Avoid duplicating language-choice logic.
+Snapshot a world-space position before the fighter is removed.
 
-Do not introduce a second first-run flag. Settings.languageChosen / the existing persisted language value remains the source of truth.
+Center it on the fighter rather than blindly using the feet.
 
-Important visual requirement
+A reasonable baseline is around:
 
-The language modal must appear after all splash timing has completed, including:
+* x: body center
+* y: approximately body vertical center
 
-* image loading/decoding;
-* hiyroscript artwork;
-* credit fade;
-* between-image gap;
-* Alva artwork;
-* final black hold;
-* reduced-motion equivalents.
+Use the actual body/render representation already available in Fighter rather than hard-coded stage coordinates.
 
-Do not overlap the modal with the final splash artwork or fade.
+The explosion must stay at that recorded world-space point even after the fighter has been removed from inPlay.
 
-When the dialog opens, the splash screen may remain the current underlying screen in its cleared/black state until the choice is made. That is preferable to navigating to Home underneath the dialog.
+Palette
 
-Do not show Home and then place the language dialog on top of it.
+The effect must visually match whichever fighter disappeared.
 
-Splash behavior
+Do not give every fighter the existing amber hit-spark color.
 
-Do not redesign the splash.
+Do not use Alva’s interface green unless that green genuinely belongs to the fighter art.
 
-Preserve:
+Implement this in a data-driven way.
 
-* hs.jpg;
-* alvafav.PNG;
-* current zoom;
-* fades;
-* timing;
-* hiyroscript credit;
-* reduced-motion handling;
-* strict splash image decode behavior;
-* cancellation/re-entry protection;
-* failure handling;
-* existing black transition behavior.
+Preferred approach:
 
-Because a first-time player has not selected a language yet, the existing temporary/default language may continue to be used for the small splash credit. Do not add browser-language auto-selection or another pre-splash prompt just to localize that line.
+Add character presentation metadata such as a small Void-FX palette to the character definition, for example 3–5 colors derived from that fighter’s actual idle/walk sprites.
 
-If the splash assets fail and the intro is skipped through the existing fallback path, treat the splash as completed:
+Do not put code such as:
 
-* first-time player → language chooser → Home;
-* returning player → Home.
+if (fighter.id === '0001') ... else if (fighter.id === '0002') ...
 
-Language dialog
+inside the effect renderer.
 
-Do not redesign the first-run dialog unless a tiny change is necessary for sequencing.
+Instead the FX system should simply consume fighter data.
 
-Preserve:
+Inspect the real sprite colors and choose representative shades for both currently available fighters.
 
-* exactly English and Français;
-* language names displayed in their own languages;
-* bilingual first-run title/prompt/note;
-* proper lang attributes;
-* role="dialog";
-* aria-modal="true";
-* aria-labelledby;
-* aria-describedby;
-* keyboard navigation;
-* gamepad navigation;
-* browser-language initial focus;
-* no automatic selection;
-* no Back dismissal;
-* Settings-based persistence;
-* blocked-storage in-memory behavior.
+Include:
 
-Update comments in js/ui/language-dialog.js that currently say the chooser appears before the intro.
+* a dominant/base color;
+* a brighter readable color;
+* one or more supporting shades.
 
-They should describe the new sequence accurately.
+Because the Void itself is very dark, ensure a fighter whose palette contains a lot of dark pixels still produces a visible burst. If necessary, derive a lighter tint from one of that fighter’s own colors rather than introducing an unrelated hue.
 
-Settings screen
+A generic fallback is fine for future characters whose definition temporarily lacks palette metadata, but both #0001 and #0002 must have proper palette-matched results.
 
-The normal Home → Settings → Language behavior must remain unchanged.
+Visual design
 
-After initial setup:
+Keep it consistent with Alva’s crisp 2D presentation.
 
-* changing Language from Settings must continue to switch the UI immediately;
-* it must persist normally;
-* it must not replay the splash;
-* it must not invoke the first-run chooser.
+The effect should feel like the fighter was abruptly consumed/disintegrated by the Void:
 
-Do not conflate the Settings language control with the one-time first-run dialog.
+* quick central flash/pop;
+* expanding burst/ring;
+* several short outward fragments, rays, or pixel-like particles;
+* fragments using multiple shades from the fighter’s own palette;
+* fast fade;
+* approximately 0.3–0.5 seconds total;
+* no lingering screen clutter.
 
-Screen navigation
+Favor crisp/blocky/pixel-art-compatible geometry over soft realistic smoke.
 
-Preserve the existing ScreenManager stack/reset behavior.
+No gore.
 
-When startup reaches Home, use the same reset behavior currently used by SplashScreen.finish():
+No giant full-screen explosion.
 
-go('home', {}, { reset: true })
+The effect should be noticeable without obscuring the match.
 
-The startup language dialog must not add fake screen entries to the navigation stack.
+Use deterministic/semi-deterministic seeded variation like the existing hit sparks where appropriate so tests and repeated rendering remain stable.
 
-After Home appears, pressing Back must not lead back to the splash or the first-run language dialog.
+Effect lifetime
 
-Input/focus requirements
+Extend HitEffects cleanly with something like a collection of active Void bursts.
 
-During the splash:
+For example, conceptually:
 
-* the first-run dialog must not exist as an active navigation scope;
-* no language button should be focusable;
-* splash remains non-navigable as it currently is.
+* voidBursts = []
+* takeVoid(...)
+* age/remove them from update(dt)
+* drawVoidBursts(...)
 
-Once the first-run dialog appears:
+Names can differ if a cleaner design fits the codebase.
 
-* its existing navigation scope becomes active;
-* the browser-preferred supported language may receive initial focus as it does now;
-* Enter/gamepad A/click/tap must choose normally;
-* Back remains intentionally ineffective.
+Each burst needs enough snapshotted data to survive after the fighter object leaves play:
 
-Once the language is chosen:
+* x/y
+* age
+* lifetime
+* palette
+* seed/shape information as needed
 
-* remove the dialog’s navigation scope exactly once;
-* hide the dialog;
-* prevent stale focus from remaining on a removed/hidden language button;
-* enter Home normally.
+Do not retain unnecessary references to dead fighter state.
 
-Avoid race conditions or duplicate Home navigation.
+Clear the effects appropriately when the arena is destroyed.
 
-Race/cancellation safety
+Render order
 
-Preserve the splash screen’s existing run/active() protections.
+This is important.
 
-The post-splash continuation should happen exactly once per completed splash run.
+Arena.render() currently draws:
 
-A stale splash run that has been exited or superseded must not later open the language dialog or send the application Home.
+* gameplay objects/effects;
+* foreground;
+* the Void itself;
+* then screen-space fighter status/debug UI.
 
-Do not add arbitrary timers for sequencing. Use the completion of the existing splash lifecycle.
+If the explosion is drawn before the Void layer, the black Void may cover the exact effect we are trying to show.
 
-Tests
+Render the Void explosion after theme.drawVoid() so it is visible at the swallowing point.
 
-Update and/or add tests so the new ordering is explicitly locked in.
-
-Splash tests
-
-tests/splash-screen.test.mjs currently expects the splash to navigate directly to Home.
-
-Update it to test the new application continuation boundary.
-
-The tests should establish that:
-
-* the continuation is not invoked before both splash images load/decode;
-* it is not invoked during the first artwork;
-* it is not invoked during the between-image gap;
-* it is not invoked while the Alva artwork is active;
-* it is not invoked before the final black hold finishes;
-* after the complete sequence, it is invoked exactly once;
-* reduced-motion completes through the same continuation;
-* splash failure/skip still invokes the continuation;
-* stale/cancelled runs never invoke it.
-
-If you introduce an App method such as continueAfterSplash, mock that method in the splash unit test rather than requiring SplashScreen to know about the language dialog.
-
-Startup ordering
-
-Add an explicit test for the application-level continuation if practical.
-
-Verify:
-
-New player
-
-* ensureChosen() is called only after splash completion;
-* Home navigation does not happen while ensureChosen() is unresolved;
-* once it resolves, Home is entered exactly once with reset semantics.
-
-Returning player
-
-* ensureChosen() resolves immediately;
-* Home is entered once;
-* the dialog itself never opens.
-
-The important invariant is:
-
-Splash completion → ensure language → Home
-
-not:
-
-ensure language → Splash → Home
-
-and not:
-
-Splash → Home → language modal.
-
-Existing language tests
-
-Update the test description/assertions in tests/settings.test.mjs that currently describe the chooser as appearing “over black, before the intro.”
-
-The language-dialog unit behavior itself should remain intact:
-
-* shown only when language is unchosen;
-* exactly English/Français;
-* browser language only controls initial focus;
-* choice persists;
-* returning player is not asked again;
-* invalid data still falls back safely.
-
-Do not weaken existing Settings or i18n coverage merely to make the new flow pass.
-
-Documentation
-
-Update all current documentation/comments that describe the old ordering.
-
-At minimum inspect and update:
-
-ALVA_SPEC.md
-
-The current flow says:
-
-First launch (no language chosen yet) → Language chooser → Splash → Home
-
-Change it to:
-
-First launch (no language chosen yet) → Splash → Language chooser → Home
-
-Also update the first-launch language section that explicitly says the dialog is shown before the splash.
-
-Make it clear that:
-
-* the splash is always first;
-* only a new player gets the chooser afterward;
-* a returning player proceeds directly from splash to Home.
-
-README.md
-
-The README currently says the language prompt appears before the intro.
-
-Change that description to the new behavior:
-
-* splash first;
-* language selection after the splash on the first run;
-* subsequent launches skip the chooser.
-
-Keep all existing persistence/migration explanations.
-
-Source comments
-
-Update stale comments in at least:
-
-* js/core/app.js
-* js/ui/language-dialog.js
-
-and anywhere else that explicitly documents the old ordering.
-
-Do not modify historical files merely to rewrite history unless they are clearly used as current product documentation.
-
-Do not change
-
-This task is specifically about startup ordering.
-
-Do not unnecessarily alter:
-
-* combat;
-* character data;
-* stages;
-* CPU;
-* Practice Ground;
-* Watch Mode;
-* Discover;
-* touch controls;
-* input bindings;
-* Settings layout;
-* language translations;
-* splash artwork;
-* splash animation tuning;
-* Home screen design;
-* general screen transitions;
-* storage schema or SETTINGS_VERSION.
-
-A settings migration should not be needed.
-
-Do not introduce dependencies, a framework, a build tool, or a router.
-
-Acceptance criteria
-
-The work is complete when all of the following are true:
-
-1. Clearing Alva’s saved settings and loading the game shows the splash first.
-2. No language modal is visible during any part of the splash.
-3. After the splash fully ends, the screen is black and the language modal appears.
-4. Home has not been entered or visibly rendered behind the language modal.
-5. Choosing English opens Home in English.
-6. Choosing Français opens Home in French.
-7. The choice persists through the existing Settings store.
-8. Reloading after a choice shows splash → Home with no first-run chooser.
-9. Returning French users see splash → French Home.
-10. Browser language only changes which first-run option initially has focus.
-11. Back cannot dismiss the mandatory first-run chooser.
-12. Changing language later through Settings still works.
-13. Reduced-motion splash follows the same order.
-14. A failed splash load still continues to the language chooser for a new player.
-15. A failed splash load continues directly to Home for a returning player.
-16. Splash completion cannot trigger Home twice.
-17. Cancelled/stale splash runs cannot open the chooser or navigate Home.
-18. Back navigation from Home never returns to splash/language onboarding.
-19. README/spec/source comments describe the new sequence.
-20. Existing tests still pass.
-
-Verification
-
-Run the focused tests while developing:
-
-node --test tests/splash-screen.test.mjs
-node --test tests/settings.test.mjs
-node --test tests/i18n.test.mjs
-
-Then run the complete test suite:
-
-node --test tests/*.test.mjs
-
-Also perform a browser smoke test using the project’s normal static-server workflow.
-
-Test at least:
-
-Fresh player
-
-* clear alva.settings;
-* reload;
-* confirm splash → language dialog → Home;
-* choose Français;
-* confirm Home is immediately French.
-
-Returning player
-
-* reload with Français stored;
-* confirm splash → Home;
-* confirm no chooser appears.
-
-Settings
-
-* change back to English through Home → Settings;
-* reload;
-* confirm splash → English Home;
-* confirm no first-run chooser.
+Keep markers/status rules unchanged: a fighter that is out of play must still have no marker, Energy bar, shadow, or sprite.
 
 Reduced motion
 
-* enable reduced-motion;
-* clear settings;
-* confirm reduced-motion splash still completes before the chooser appears.
+Respect the existing reduced-motion philosophy.
 
-Implementation quality
+The Void burst itself can still appear because it communicates a game event, but do not add new camera shake, zoom, or large movement solely for this effect when reduced motion is enabled.
 
-Keep the patch narrowly scoped and idiomatic to the existing repository.
+The burst can use a simplified/less expansive animation under reduced motion if needed.
 
-Prefer a single explicit startup continuation owned by App instead of scattered promises or flags.
+Do not alter the existing lethal-launch presentation beyond integrating cleanly with it.
 
-After implementation, summarize:
+Part 6 — documentation
 
-* the startup-flow change;
-* files changed;
-* test coverage added/updated;
-* test results;
-* any browser-only behavior that still needs manual visual verification.
+Update documentation so it matches the game after this change.
+
+At minimum audit:
+
+README.md
+
+It currently documents adding #0002 as a future example and has #0001 sprite-source material.
+
+Update it to reflect that #0002 is now an actual available fighter.
+
+Document that:
+
+* #0002 currently has only idle/walking artwork;
+* its combat kit is intentionally not implemented yet;
+* missing visual states safely use existing fallback behavior where appropriate;
+* unfinished attacks are unavailable rather than borrowed from another fighter;
+* Void losses now produce a fighter-colored disappearance burst.
+
+Add the #0002 sprite attribution without displaying the prohibited source title/name.
+
+ALVA_SPEC.md
+
+Audit statements that say only #0001 is selectable.
+
+The Select Fighter specification currently describes only #0001 as available. Update it so slots 01 and 02 accurately describe the new roster.
+
+Do not rewrite unrelated design documentation.
+
+Part 7 — tests
+
+Run and update the existing test suite rather than simply patching code until it looks right.
+
+Audit tests that assume there is exactly one available fighter.
+
+Likely affected areas include:
+
+* tests/settings.test.mjs
+    * exact credits structure
+* tests/discover.test.mjs
+    * available fighter names are gathered from CHARACTERS
+    * Discover must remain character-neutral and must not start listing either fighter
+* tests/watch-mode.test.mjs
+    * assumptions about first available fighter
+    * sprite-loading lists/counts
+    * CPU selections
+* tests/practice-ground.test.mjs
+    * it currently creates an artificial second available fighter for switching tests
+    * determine whether this helper still makes sense now that #0002 exists
+    * avoid tests accidentally depending on roster insertion order
+* any roster/character-loading tests whose expected image count assumes one fighter
+* any documentation/assertion tests containing phrases such as “only #0001”
+
+Add #0002 tests
+
+Cover at least:
+
+1. getCharacter('0002') returns a real available fighter.
+2. #0002 occupies roster slot 1.
+3. characterFramePaths(#0002) only requires the animations intentionally registered for it plus any legitimate explicitly configured effects; unused root PNGs must not silently become active gameplay states.
+4. Idle has five frames.
+5. Walking/run has two frames.
+6. Roster portrait/preview can use #0002’s idle art.
+7. #0002 can be instantiated without a crash.
+8. Running switches to its walking clip.
+9. Returning to neutral switches to idle.
+10. Airborne/missing visual states safely display the configured fallback rather than another fighter’s sprite.
+11. Unimplemented attack/defense/transform inputs do not crash and do not create #0001 attacks.
+12. Quick Battle/Watch/Practice can load #0002.
+
+Add Void-FX tests
+
+Test the effect as presentation state, independently of scoring where possible.
+
+Cover:
+
+1. A fighter crossing the Void creates exactly one burst.
+2. The burst snapshots the fighter’s position.
+3. The burst uses that fighter’s palette.
+4. #0001 and #0002 produce different palette data where their artwork differs.
+5. Two fighters lost on the same fixed step produce two independent bursts.
+6. The burst survives after lostToVoid removes the fighter from inPlay.
+7. The burst ages out and is removed.
+8. Respawning does not replay the previous burst.
+9. Repeated render frames do not create duplicate bursts.
+10. Practice and Battle both trigger the shared effect.
+11. Existing point/double-KO/respawn tests remain unchanged in behavior.
+
+Prefer extending tests/hit-fx.test.mjs for effect lifetime/palette logic and the existing arena/battle tests for integration instead of creating redundant harnesses.
+
+Part 8 — visual verification
+
+After automated tests pass, manually verify in the browser at desktop and mobile-landscape sizes.
+
+Check:
+
+Character Select
+
+* Slot 01 = #0001
+* Slot 02 = #0002
+* both selectable
+* locked slots remain unchanged
+* #0002 portrait is correctly cropped
+* idle preview is correctly centered
+* no frame jitter
+* no smoothing/blurring
+
+Gameplay
+
+With #0002:
+
+* idle loop looks stable
+* moving left/right uses walking frames
+* mirroring is correct
+* sprite does not slide due to changing anchors
+* jumping does not crash despite missing dedicated artwork
+* incomplete attack buttons do not borrow moves/art from #0001
+* CPU logic does not throw errors because moves are unavailable
+
+Void
+
+Test falls from:
+
+* left edge
+* right edge
+* bottom
+* high/fast launches if applicable
+
+Verify:
+
+* sprite disappears according to the existing Void rule
+* explosion appears exactly around the disappearance location
+* explosion is rendered above the black Void
+* color visibly corresponds to the fighter that fell
+* #0001 and #0002 are immediately distinguishable by their burst palettes
+* effect is short and clean
+* scoring appears at the same moment as before
+* respawn remains exactly the configured 2 seconds
+* match-winning falls still leave the losing fighter out
+* simultaneous falls show both explosions without changing the existing no-score double-loss behavior
+
+Non-goals / constraints
+
+Do not:
+
+* implement #0002’s future combat kit;
+* invent ability names;
+* recolor or redraw supplied sprite artwork;
+* use #0001 attacks as placeholders;
+* alter stage Void geometry;
+* alter scoring;
+* change points-to-win;
+* change respawn timing;
+* change Quick Battle’s same-fighter CPU rule;
+* introduce fighter-ID conditionals into generic engine systems;
+* replace the existing roster architecture;
+* change the interface palette to match #0002;
+* surface the prohibited source artwork title/name anywhere;
+* make unrelated style/UI refactors.
+
+Definition of done
+
+The change is complete when:
+
+* #0002 appears as the second available fighter throughout the game.
+* Its actual idle and walking art loads from assets/characters/0002/.
+* Only idle/walking are treated as completed #0002 sprite animations.
+* Missing states are handled safely without borrowing another fighter’s art.
+* Its unfinished offensive/defensive moves remain unavailable.
+* Its supplied source is properly credited in the existing credits architecture.
+* The prohibited source title/name appears nowhere in the project.
+* Every fighter creates a short palette-matched explosion when swallowed by the Void.
+* The explosion works in Quick Battle, Watch Mode, and Practice.
+* Double Void losses create two effects correctly.
+* Existing scoring/physics/respawn behavior is unchanged.
+* Documentation accurately reflects the second fighter.
+* All existing and new automated tests pass.
+* Browser verification shows crisp, centered, stable sprites and clearly visible palette-matched Void bursts.
