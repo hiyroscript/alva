@@ -49,8 +49,8 @@ import { blankInput, jumpTapHold } from './fighter-controller.js';
 import { DEFAULT_DIFFICULTY, getDifficultyProfile, resolveDifficulty } from '../data/difficulty.js';
 
 // The buttons a controller holds, by control codename; each has a matching
-// `…Pressed` edge. It Dashes by double-tapping runLeft / runRight, as every
-// player does.
+// `…Pressed` edge. The mouvement buttons are touch-only: it Dashes by
+// double-tapping runLeft / runRight, as a keyboard or gamepad player does.
 const BUTTONS = ['runLeft', 'runRight', 'charge', 'jump', 'shield', 'uniqueba', 'transform', 'ba1', 'ba2'];
 const DIR_KEY = { [-1]: 'runLeft', 1: 'runRight' };
 

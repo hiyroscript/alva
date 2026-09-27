@@ -5,10 +5,11 @@
 // control codenames behind them (uniqueba, shield, ba1, ba2), Classic
 // Buttons' Left / C / Right cluster (runLeft / charge / runRight) exactly as
 // before,
-// the Joystick scheme's stick (deadzone, release, crossing the centre,
-// multi-touch) and its down-arrow Charge beside it (no Dash buttons),
-// switching schemes, the unchanged desktop bindings and the page-zoom
-// guard. Layout, paint and
+// the Joystick scheme's stick (a plain base and knob: deadzone, release,
+// crossing the centre, multi-touch), its single-tap Left mouvement / Right
+// mouvement Dash buttons (mouvementLeft / mouvementRight) and its
+// down-arrow Charge to the left of the stick, switching schemes, the
+// unchanged desktop bindings and the page-zoom guard. Layout, paint and
 // real gestures still need real-browser verification.
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -92,12 +93,13 @@ const DEF_0001 = getCharacter('0001');
 // Touch controls wired to a recording input; `def` is the fighter they
 // present (#0001 unless given; null leaves them neutral) and `scheme` their
 // layout (Classic Buttons here, the layout these checks were written for;
-// the Joystick tests below ask for theirs). The input has nothing but
-// setTouch: no control asks for a Dash outright.
+// the Joystick tests below ask for theirs). Mouvement (Dash) requests are
+// recorded as ['mouvement', direction].
 function touchControls(def = DEF_0001, { scheme = 'classic' } = {}) {
   const calls = [];
   const input = {
     setTouch: (action, held) => calls.push([action, held]),
+    queueTouchMouvement: (direction) => calls.push(['mouvement', direction]),
   };
   const tc = new TouchControls(new Element('div'), input, { scheme });
   if (def) tc.setCharacter(def);
@@ -466,7 +468,7 @@ test('keyboard bindings are unchanged by the touch layouts, keyed by control cod
     shield: 'Shield', ba1: 'Basic Attack 1', ba2: 'Basic Attack 2', pause: 'Pause',
   });
   // No Down, Block or dash key: Dash stays a double tap on the keyboard, and
-  // no key asks for one outright. No retired name survives as an alias.
+  // the mouvement buttons are touch-only. No retired name survives as an alias.
   for (const name of [
     'down', 'block', 'dash', 'dashLeft', 'dashRight', 'mouvementLeft', 'mouvementRight',
     'left', 'right', 'primary', 'special', 'defense', 'action1', 'action2',
@@ -587,7 +589,7 @@ test('Charge works alongside Punch, Kick, Shield and Jump (multi-touch)', () => 
 const actionsOf = (cluster) => cluster.children.map((c) => c.getAttribute('data-action'));
 
 test('Joystick is the default scheme; setScheme switches layouts and anything unknown is the Joystick', () => {
-  const input = { setTouch() {} };
+  const input = { setTouch() {}, queueTouchMouvement() {} };
   const tc = new TouchControls(new Element('div'), input);
   assert.equal(tc.scheme, 'joystick', 'a player who never chose');
   assert.equal(tc.root.dataset.scheme, 'joystick');
@@ -628,32 +630,48 @@ test('Classic Buttons is the original layout exactly: Left / C / Right at the lo
   assert.deepEqual(calls, [['runRight', true], ['runRight', false], ['runRight', true], ['runRight', false]], 'two taps are two presses, no Dash request');
 });
 
-test('the Joystick scheme: Charge (a down arrow) then the movement joystick at the lower left, no Dash buttons', () => {
+test('the Joystick scheme: Charge (a down arrow), then a movement joystick between Left mouvement and Right mouvement', () => {
   const { tc } = touchControls(DEF_0001, { scheme: 'joystick' });
   assert.deepEqual(tc.root.children, [tc.joystick, tc.actions]);
-  const [charge, stick] = tc.joystick.children;
-  assert.equal(tc.joystick.children.length, 2, 'Charge and the stick, nothing else');
+  const [charge, mouvementLeft, stick, mouvementRight] = tc.joystick.children;
+  assert.equal(tc.joystick.children.length, 4);
   assert.equal(stick, tc.stick);
   assert.equal(stick.getAttribute('role'), 'group');
   assert.equal(stick.getAttribute('aria-label'), 'Movement joystick');
-  assert.ok(stick.children.includes(tc.knob));
-  // No Dash buttons anywhere: a Dash is two pushes of the stick.
-  assert.equal(tc.root.querySelectorAll('.tc-dash').length, 0);
-  assert.equal(tc.mouvementButtons, undefined);
-  assert.ok(tc.root.querySelectorAll('button').every((b) => b.getAttribute('data-mouvement') === null));
-  assert.ok(tc.root.querySelectorAll('button').every((b) => !/mouvement/i.test(b.getAttribute('aria-label'))));
+  // A plain base and knob: no arrows (or anything else) inside the stick.
+  assert.deepEqual(stick.children, [tc.knob]);
+  assert.equal(stick.querySelectorAll('.tc-stick-arrow').length, 0);
+  assert.equal(stick.innerHTML, '');
+  // The Dash buttons, mouvementLeft and mouvementRight: real buttons with
+  // exactly these names, spelling kept, and the readable arrow glyphs.
+  for (const [b, name, icon, side, control] of [
+    [mouvementLeft, 'Left mouvement', ICONS.left, 'left', 'mouvementLeft'],
+    [mouvementRight, 'Right mouvement', ICONS.right, 'right', 'mouvementRight'],
+  ]) {
+    assert.equal(b.tagName, 'BUTTON');
+    assert.equal(b.getAttribute('type'), 'button');
+    assert.equal(b.getAttribute('aria-label'), name);
+    assert.equal(b.innerHTML, icon);
+    assert.ok(b.classList.contains('tc-btn'));
+    assert.ok(b.classList.contains(`tc-dash-${side}`));
+    assert.equal(b.getAttribute('data-action'), null, 'not a held action');
+    assert.equal(b.getAttribute('data-mouvement'), control);
+    assert.equal(tc.mouvementButtons.get(control), b);
+  }
+  assert.deepEqual([...tc.mouvementButtons.keys()], ['mouvementLeft', 'mouvementRight'], 'mouvement, as written');
+  assert.doesNotMatch(mouvementLeft.getAttribute('aria-label') + mouvementRight.getAttribute('aria-label'), /movement/, 'mouvement, as written');
   // The old cluster is gone from the screen, C included.
   assert.equal(tc.root.querySelectorAll('.tc-dpad').length, 0);
   assert.deepEqual(tc.root.querySelectorAll('.tc-text'), [], 'no C anywhere');
-  // Charge sits with the stick, not under Jump: the down arrow, announced
-  // as Charge, sending the same held charge.
+  // Charge sits to the left of the stick, not under Jump: the down arrow,
+  // announced as Charge, sending the same held charge.
   assert.deepEqual(actionsOf(tc.actions), ['uniqueba', 'transform', 'shield', 'ba1', 'ba2', 'jump'], 'nothing under Jump');
   assert.equal(charge, tc.buttons.get('charge'));
+  assert.equal(charge.getAttribute('data-action'), 'charge');
+  assert.ok(charge.classList.contains('tc-btn'));
   assert.equal(charge.innerHTML, ICONS.down);
   assert.equal(charge.getAttribute('aria-label'), 'Charge', 'Charge, not Down');
-  assert.equal(charge.getAttribute('data-action'), 'charge');
   assert.ok(charge.classList.contains('tc-charge-down'));
-  assert.ok(charge.classList.contains('tc-btn'));
   assert.equal(charge.tagName, 'BUTTON');
   // The same seven held inputs, no left / right buttons: the stick holds those.
   assert.deepEqual([...tc.buttons.keys()].sort(), ['ba1', 'ba2', 'charge', 'jump', 'shield', 'transform', 'uniqueba']);
@@ -819,33 +837,57 @@ test('the joystick works alongside Jump, Punch, Kick, Shield, Shuriken, Transfor
   ]);
 });
 
-// ---- Joystick: Dash --------------------------------------------------------------
+// ---- Joystick: Dash buttons ----------------------------------------------------
 
-test('the joystick Dashes as Left / Right do: two pushes the same way are two presses, and nothing asks for a Dash outright', () => {
-  const { tc, calls, input, down, move, end } = joystickControls();
-  input.queueTouchMouvement = () => assert.fail('no control asks for a Dash outright');
-  down(70);
-  move(0);
-  move(70);
-  end();
-  assert.deepEqual(calls, [['runRight', true], ['runRight', false], ['runRight', true], ['runRight', false]],
-    'two press edges: the fighter reads them as a double tap');
-  down(-70, 0, 2);
-  end('pointerup', 2);
-  down(-70, 0, 3);
-  end('pointerup', 3);
-  assert.deepEqual(calls.slice(4), [['runLeft', true], ['runLeft', false], ['runLeft', true], ['runLeft', false]]);
+test('one tap of Left mouvement / Right mouvement asks for exactly one Dash, and holds nothing', () => {
+  const { tc, calls } = touchControls(DEF_0001, { scheme: 'joystick' });
+  const left = tc.mouvementButtons.get('mouvementLeft');
+  const right = tc.mouvementButtons.get('mouvementRight');
+  press(right, 1);
+  assert.deepEqual(calls, [['mouvement', 1]], 'one request, the moment it goes down');
+  assert.ok(right.classList.contains('is-pressed'), 'pressed at once');
+  // Held down: no more requests, and no direction held.
+  right.dispatch('pointermove', { pointerId: 1 });
+  lift(right, 1);
+  assert.deepEqual(calls, [['mouvement', 1]]);
+  assert.equal(right.classList.contains('is-pressed'), false);
+  assert.ok(!calls.some(([a]) => a === 'runLeft' || a === 'runRight'), 'never a held Left or Right');
   assert.equal(tc.pointers.size, 0);
+  assert.equal(tc.counts.get('runRight') ?? 0, 0);
+  press(left, 2);
+  left.dispatch('pointercancel', { pointerId: 2 });
+  assert.deepEqual(calls, [['mouvement', 1], ['mouvement', -1]]);
+  assert.equal(left.classList.contains('is-pressed'), false, 'a cancelled pointer lets go too');
+  // Each tap is its own request (whether it Dashes is the fighter's call).
+  for (let i = 0; i < 3; i++) {
+    press(right, 10 + i);
+    lift(right, 10 + i);
+  }
+  assert.deepEqual(calls.slice(2), [['mouvement', 1], ['mouvement', 1], ['mouvement', 1]]);
+  // Alongside the joystick, from another finger.
+  tc.stick.rect = { left: 0, top: 100, width: 200, height: 200 };
+  tc.stick.dispatch('pointerdown', { pointerId: 20, clientX: 30, clientY: 200, preventDefault() {} });
+  press(right, 21);
+  assert.deepEqual(calls.slice(5), [['runLeft', true], ['mouvement', 1]]);
+  assert.equal(tc.counts.get('runLeft'), 1, 'the stick\'s Left is untouched by the tap');
+  // Disabled: nothing.
+  tc.setEnabled(false);
+  assert.equal(right.classList.contains('is-pressed'), false, 'disabling clears the pressed look');
+  const before = calls.length;
+  press(left, 30);
+  assert.equal(calls.length, before + 0);
 });
 
-test('assistive technology: activating Charge taps it', () => {
+test('assistive technology: activating a Dash button asks for one Dash; activating Charge taps it', () => {
   const { tc, calls } = touchControls(DEF_0001, { scheme: 'joystick' });
   const click = (target) => tc.root.dispatch('click', { detail: 0, target: { closest: () => target } });
+  click(tc.mouvementButtons.get('mouvementLeft'));
+  assert.deepEqual(calls, [['mouvement', -1]]);
   click(tc.buttons.get('charge'));
   assert.deepEqual(calls.at(-1), ['charge', true]);
 });
 
-// ---- Joystick: Charge by the stick -----------------------------------------------
+// ---- Joystick: Charge left of the stick ------------------------------------------
 
 test('the down-arrow Charge is held for exactly the pointer\'s lifetime and never sticks', () => {
   const { tc, calls } = touchControls(DEF_0001, { scheme: 'joystick' });
@@ -877,6 +919,7 @@ test('switching schemes lets go of everything first: no direction, Charge, Jump 
   tc.stick.rect = { left: 0, top: 100, width: 200, height: 200 };
   tc.stick.dispatch('pointerdown', { pointerId: 1, clientX: 180, clientY: 200, preventDefault() {} });
   for (const [action, id] of [['charge', 2], ['jump', 3], ['shield', 4]]) press(tc.buttons.get(action), id);
+  press(tc.mouvementButtons.get('mouvementLeft'), 5);
   const down = calls.length;
   tc.setScheme('classic');
   assert.deepEqual(calls.slice(down).sort(), [['charge', false], ['jump', false], ['runRight', false], ['shield', false]]);
@@ -918,11 +961,12 @@ test('a scheme switch keeps the fighter\'s combat buttons: the same elements, ic
   tc.setCharacter(null);
   assert.equal(tc.buttons.get('uniqueba').getAttribute('aria-label'), 'Unique Basic Attack');
   assert.equal(tc.joystick.children[0], tc.buttons.get('charge'));
+  assert.deepEqual(actionsOf(tc.actions).at(-1), 'jump');
   press(tc.buttons.get('uniqueba'), 1);
   assert.deepEqual(calls, [['uniqueba', true]]);
 });
 
-test('the Joystick layout\'s geometry: the stick in the old lower-left corner, Charge just above its top-left, the actions where Classic has them', () => {
+test('the Joystick layout\'s geometry: Charge in the old lower-left corner, the stick one gap to its right with Dash buttons above its top corners', () => {
   const rule = (selector) => CSS.match(new RegExp(`(^|\\n)${selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} \\{([^}]*)\\}`))?.[2] ?? '';
   // The same corner as the Classic cluster, safe areas included.
   assert.match(rule('.tc-dpad'), /left: calc\(max\(var\(--safe-l\), 12px\) \+ 1\.4vw\);/);
@@ -935,23 +979,31 @@ test('the Joystick layout\'s geometry: the stick in the old lower-left corner, C
   assert.match(stick, /touch-action: none;/);
   assert.match(stick, /pointer-events: auto;/);
   assert.match(rule('.tc-stick-knob'), /pointer-events: none;/);
-  // Charge: flush with the stick's left edge, just above its top (the
-  // stick is 1.92 --tc tall; Charge's rim clears the stick's by about half
-  // a gap), and the cluster tall enough to hold it.
+  // No arrows drawn on the base.
+  assert.doesNotMatch(CSS, /\.tc-stick-arrow/);
+  // The stick starts past Charge and one gap; the cluster is that much wider.
+  assert.match(CSS, /--tc-stick-left: calc\(var\(--tc-charge\) \+ var\(--tc-gap\)\);/);
+  assert.match(stick, /left: var\(--tc-stick-left\);/);
+  assert.match(rule('.tc-joystick'), /width: calc\(var\(--tc-stick-left\) \+ var\(--tc-stick\)\);/);
+  // Dash buttons: small, above the stick (whose top is at 1.92 --tc), at its left and right.
   assert.match(CSS, /--tc-stick: calc\(var\(--tc\) \* 1\.92\);/);
-  assert.match(CSS, /--tc-charge: calc\(var\(--tc\) \* 0\.8\);/);
+  assert.match(rule('.tc-dash'), /bottom: calc\(var\(--tc\) \* 1\.82\);/);
+  assert.match(rule('.tc-dash'), /width: var\(--tc-dash\);/);
+  assert.match(CSS, /--tc-dash: calc\(var\(--tc\) \* 0\.62\);/);
+  assert.match(rule('.tc-dash-left'), /left: calc\(var\(--tc-stick-left\) - var\(--tc\) \* 0\.03\);/);
+  assert.match(rule('.tc-dash-right'), /right: calc\(var\(--tc\) \* -0\.03\);/);
+  // Charge: at the cluster's left edge, level with the stick's centre.
   const charge = rule('.tc-charge-down');
   assert.match(charge, /position: absolute;/);
   assert.match(charge, /left: 0;/);
-  assert.match(charge, /bottom: calc\(var\(--tc\) \* 1\.89\);/);
+  assert.match(charge, /bottom: calc\(\(var\(--tc-stick\) - var\(--tc-charge\)\) \/ 2\);/);
   assert.match(charge, /width: var\(--tc-charge\);/);
-  assert.match(rule('.tc-joystick'), /height: calc\(var\(--tc\) \* 2\.69\);/);
-  const [cx, cy, r] = [0.4, 1.89 + 0.4, 0.4];
-  const gap = Math.hypot(cx - 0.96, cy - 0.96) - 0.96 - r;
-  assert.ok(gap > 0.05 && gap < 0.12, `Charge clear of the stick's rim (${gap.toFixed(3)} --tc)`);
-  // No Dash buttons, and the lower-right cluster no longer rises: it sits
-  // exactly where Classic Buttons has it.
-  assert.doesNotMatch(CSS, /\.tc-dash\b|--tc-dash\b/);
+  // Clear of the Left mouvement button above it (in --tc: Charge spans x
+  // 0-0.8, y 0.56-1.36; Left mouvement starts at x 0.94, y 1.82).
+  const [chargeTop, dashBottom, chargeRight, dashLeft] = [(1.92 - 0.8) / 2 + 0.8, 1.82, 0.8, 0.8 + 0.17 - 0.03];
+  assert.ok(chargeTop < dashBottom && chargeRight < dashLeft);
+  // The lower-right cluster no longer rises: it sits exactly where Classic
+  // Buttons has it, untouched.
   assert.doesNotMatch(CSS, /\.is-joystick \.tc-actions/);
   assert.match(CSS, /\.tc-jump \{ right: 0; bottom: 0; \}/);
   assert.match(CSS, /\.tc-ba2 \{ right: var\(--tc-pitch\); bottom: 0; \}/);
