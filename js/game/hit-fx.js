@@ -118,7 +118,6 @@ export class HitEffects {
     this.shake = { amp: 0, time: 0, life: 0 };
     this.clock = 0; // real seconds, for the shake's waves
     this.flashes = new Map(); // fighter -> real seconds of flash left
-    this.voidBursts = []; // Snapshots, independent of fighter lifetime.
     this.sparks = []; // { kind, x, y, dx, dy, size, age, life, seed }
     this.trails = new Map(); // fighter -> { ghosts: [{ x, y, frame, flip, age }], since }
     this.slow = null; // { time, focus: fighter } while the lethal slow motion runs
@@ -164,49 +163,6 @@ export class HitEffects {
     });
   }
 
-  // Capture the body centre before removal. No simulation or camera changes.
-  takeVoid(fighter) {
-    const { x, y, height } = fighter.body;
-    const palette = fighter.def?.voidPalette;
-    this.voidBursts.push({
-      x, y: y - height / 2, age: 0, life: 0.4,
-      palette: [...(palette?.length ? palette : ['#777777', '#eeeeee', '#bbbbbb'])],
-      seed: x * 0.37 + y * 0.11 + this.clock,
-    });
-  }
-
-  // Painted above the Void. Blocky fragments and a diamond ring stay crisp;
-  // reduced motion keeps the pop but shortens its outward travel.
-  drawVoidBursts(ctx, toScreen, dpr) {
-    for (const burst of this.voidBursts) {
-      const [x, y] = toScreen(burst.x, burst.y);
-      const k = burst.age / burst.life;
-      const travel = this.reducedMotion ? 10 : 30;
-      const r = (5 + travel * k) * dpr;
-      const rnd = seeded(burst.seed);
-      ctx.save();
-      ctx.globalAlpha = 1 - k;
-      ctx.strokeStyle = burst.palette[1 % burst.palette.length];
-      ctx.lineWidth = Math.max(1, 2 * dpr * (1 - k));
-      ctx.beginPath();
-      ctx.moveTo(x, y - r); ctx.lineTo(x + r, y);
-      ctx.lineTo(x, y + r); ctx.lineTo(x - r, y); ctx.closePath(); ctx.stroke();
-      for (let i = 0; i < 14; i++) {
-        const angle = (i + rnd() * 0.6) * Math.PI * 2 / 14;
-        const distance = r * (0.65 + rnd() * 0.7);
-        const size = Math.max(1, Math.round((2 + rnd() * 3) * dpr * (1 - k)));
-        ctx.fillStyle = burst.palette[i % burst.palette.length];
-        ctx.fillRect(Math.round(x + Math.cos(angle) * distance), Math.round(y + Math.sin(angle) * distance), size, size);
-      }
-      if (k < 0.3) {
-        const size = Math.round(12 * dpr * (1 - k / 0.3));
-        ctx.fillStyle = burst.palette[1 % burst.palette.length];
-        ctx.fillRect(Math.round(x - size / 2), Math.round(y - size / 2), size, size);
-      }
-      ctx.restore();
-    }
-  }
-
   addShake(amp) {
     if (this.reducedMotion || !(amp > 0)) return;
     if (amp < this.shake.amp * (1 - this.shake.time / (this.shake.life || 1))) return;
@@ -229,8 +185,6 @@ export class HitEffects {
   // Ages everything by `dt` real seconds. Called once per rendered frame.
   update(dt) {
     this.clock += dt;
-    for (const burst of this.voidBursts) burst.age += dt;
-    this.voidBursts = this.voidBursts.filter((burst) => burst.age < burst.life);
     if (this.shake.amp > 0) {
       this.shake.time += dt;
       if (this.shake.time >= this.shake.life) this.shake.amp = 0;

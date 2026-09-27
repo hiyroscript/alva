@@ -427,7 +427,7 @@ no header, build label, eyebrow or keyboard hint bar.
 ### 6.4 Select Fighter
 
 - Deliberately large roster: 48 slots in a responsive, scrollable grid.
-- `#0001` and `#0002` (always shown with the `#`) are selectable in slots 01 and 02; other slots are quiet
+- Only `#0001` (always shown with the `#`) is selectable; other slots are quiet
   locked placeholders (silhouette + lock). No invented names or power ratings.
 - Locked slots are non-interactive: hover, Tab and keyboard/gamepad navigation
   skip them, and they show no hover border or focus ring. Any fighter marked
@@ -2437,5 +2437,3 @@ French, concise game terms).
 - The repository is intended to be named `alva` (GitHub Pages path `/alva/`).
   If it still carries an older name, the site simply serves from that path —
   no code references the repository name.
-
-#0002 currently has five idle and two walking frames only. Missing universal visual states hold its idle pose; combat inputs remain unavailable. Each Void loss emits a 0.4-second fighter-palette burst above the Void, independently of scoring and respawn.

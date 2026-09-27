@@ -1,6 +1,6 @@
 // Character database.
 //
-// Adding a fighter should only require:
+// Adding a fighter (e.g. #0002) should only require:
 //   1. dropping frames into ./assets/characters/<id>/
 //   2. adding a definition to CHARACTERS below, its moves keyed by the
 //      universal move codenames (MOVES in js/config.js: ba1, maba1, cba1,
@@ -62,7 +62,6 @@ export const CHARACTERS = [
     displayName: '#0001',
     available: true,
     rosterSlot: 0,
-    voidPalette: ['#ff8c00', '#ffe763', '#b50000', '#525252'],
 
     // The source art faces right. A clip drawn the other way would override
     // this with its own `sourceFacing`; it only decides whether the sprite
@@ -858,39 +857,6 @@ export const CHARACTERS = [
     },
   },
 ];
-
-
-// #0002 currently has only idle and walking artwork. Missing universal
-// states hold its own idle pose; combat remains reserved until authored.
-CHARACTERS.push({
-  id: '0002', displayName: '#0002', available: true, rosterSlot: 1,
-  sourceFacing: 1,
-  voidPalette: ['#4f4f4f', '#eaeaea', '#c0c0c0', '#272727'],
-  animations: {
-    idle: { frames: frames('./assets/characters/0002/0002_', 'idle', 5), fps: 5, loop: true, heightRatio: 1 },
-    run: { frames: frames('./assets/characters/0002/0002_', 'run', 2), fps: 4, loop: true, heightRatio: 1, minSpeedScale: 0.7 },
-  },
-  animationFallbacks: Object.fromEntries(
-    ['jump', 'fall', 'land', 'hurt', 'midairHurt', 'chargeStart', 'chargeLoop', 'chargeRelease']
-      .map((key) => [key, { animation: 'idle', frame: 0 }]),
-  ),
-  visual: {
-    height: 104, referenceAnimation: 'idle', anchor: 'torso', pixelSize: 8,
-    portrait: { animation: 'idle', frame: 0, centerY: 0.18, size: 0.36 },
-  },
-  powers: { jump: 2, speed: 2 },
-  movement: { ...CHARACTERS[0].movement },
-  launchReaction: { ...CHARACTERS[0].launchReaction },
-  energy: { ...CHARACTERS[0].energy },
-  stats: { chargedCooldownRate: 2 },
-  collider: { width: 26, height: 100 },
-  pushbox: { width: 28 },
-  hurtboxes: [{ x: -11, y: -100, w: 22, h: 48 }, { x: -13, y: -52, w: 26, h: 52 }],
-  actions: { ba1: null, ba2: null, uniqueba: null, transform: null },
-  attacks: {}, projectileAnimations: {}, projectiles: {}, effectAnimations: {},
-  summons: {}, chargedTechniques: {}, chargedActions: {}, defense: null,
-  mobileAbilities: {}, abilityNames: {},
-});
 
 export function getCharacter(id) {
   return CHARACTERS.find((c) => c.id === id) || null;
