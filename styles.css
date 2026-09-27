@@ -405,11 +405,10 @@ html.is-touch .hint-bar { display: none; }
   opacity: 0;
   pointer-events: none;
 }
-/* The first-run chooser can open over the cleared black splash. Other
-   overlays resume on Home; the chooser stays hidden until intro completion. */
+/* Device and application overlays resume normally after the intro. */
 html:not([data-screen]) .rotate-overlay,
 html[data-screen="splash"] .rotate-overlay,
-html[data-screen="splash"] .overlay:not(.language-overlay) { display: none; }
+html[data-screen="splash"] .overlay { display: none; }
 
 /* ---------------------------------------------------------------------
    Home

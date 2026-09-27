@@ -3,7 +3,7 @@
 // settings and the interface language.
 //
 // Start-up: the complete intro plays first. A new player then chooses a
-// language over the cleared black splash before Home; a returning player
+// language in Home; a returning player
 // proceeds directly to Home in their saved language.
 
 import { CONFIG } from '../config.js';
@@ -112,12 +112,12 @@ export class App {
     s.go('splash');
   }
 
-  // Called once by a completed splash. Keep its black screen underneath the
-  // chooser, and ignore a continuation whose splash was exited or restarted.
-  async continueAfterSplash(isCurrent) {
+  // Called once by a completed splash. Enter Home before asking a new player
+  // for a language; an exited or restarted splash cannot continue.
+  continueAfterSplash(isCurrent) {
     if (!isCurrent()) return;
-    await this.languageDialog.ensureChosen();
-    if (isCurrent()) this.screens.go('home', {}, { reset: true });
+    this.screens.go('home', {}, { reset: true });
+    return this.languageDialog.ensureChosen();
   }
 
   // Re-reads every string on the page in the new language: each marked one

@@ -493,7 +493,7 @@ function languageApp(storage = memoryStorage()) {
   return { app, root, dialog: app.languageDialog, storage };
 }
 
-test('first launch asks once for English or Français, over black, after the intro; a returning player is never asked', async () => {
+test('first launch asks once for English or Français, after the intro; a returning player is never asked', async () => {
   const { app, root, dialog, storage } = languageApp();
   let chosen = null;
   const waiting = dialog.ensureChosen().then((language) => { chosen = language; });
@@ -556,7 +556,7 @@ test('App.start enters splash directly; language selection belongs to the contin
 });
 
 // Application startup uses the real mandatory dialog and navigation reset.
-test('post-splash continuation waits for a choice, then enters localized Home once with no Back history', async () => {
+test('post-splash continuation enters Home once, asks there, then restores focus without replaying onboarding', async () => {
   for (const language of ['en', 'fr']) {
     const { app, dialog, root } = languageApp();
     const unfollow = followSettings(app.settings);
@@ -566,9 +566,10 @@ test('post-splash continuation waits for a choice, then enters localized Home on
     let entries = 0;
     home.enter = () => {
       entries++;
-      assert.equal(getLanguage(), language, 'language applied before Home enters');
       assert.equal(dialog.isOpen, false);
     };
+    let focuses = 0;
+    home.focusDefault = () => { focuses++; };
     app.screens.register(splash);
     app.screens.register(home);
     app.screens.go('splash');
@@ -576,22 +577,30 @@ test('post-splash continuation waits for a choice, then enters localized Home on
     assert.deepEqual(app.nav.scopes, []);
     const waiting = App.prototype.continueAfterSplash.call(app, () => app.screens.current === splash);
     await Promise.resolve();
-    assert.equal(entries, 0);
-    assert.equal(app.screens.current, splash);
-    assert.equal(home.el.hidden, true);
+    assert.equal(entries, 1);
+    assert.equal(app.screens.current, home);
+    assert.equal(home.el.hidden, false);
+    assert.equal(home.el.inert, true);
     assert.equal(root.hidden, false);
     dialog.scope.onBack();
     dialog.choose('invalid');
-    assert.equal(entries, 0);
+    assert.equal(entries, 1);
     assert.equal(dialog.isOpen, true);
     dialog.choose(language);
     dialog.choose(language);
     await waiting;
     assert.equal(entries, 1);
+    assert.equal(getLanguage(), language);
+    assert.equal(home.el.inert, false);
+    assert.equal(focuses, 2, 'Home focus restored after choosing');
     assert.deepEqual(app.nav.scopes, []);
     assert.equal(app.screens.current, home);
     assert.deepEqual(app.screens.stack, []);
     assert.equal(app.screens.back(), false);
+    app.screens.go('home', {}, { reset: true });
+    assert.equal(dialog.isOpen, false, 'revisiting Home does not ask again');
+    await dialog.ensureChosen();
+    assert.equal(root.hidden, true);
     unfollow();
   }
   setLanguage('en');
@@ -612,17 +621,25 @@ test('returning player continues directly without opening or focusing the langua
   assert.deepEqual(app.nav.scopes, []);
 });
 
-test('stale continuation cannot open the chooser or navigate after a pending choice', async () => {
-  const { app, dialog, root } = languageApp();
+test('stale continuation cannot enter Home or open the chooser', async () => {
+  const { app, root } = languageApp();
   app.screens.go = () => assert.fail('stale splash must not navigate');
   await App.prototype.continueAfterSplash.call(app, () => false);
   assert.equal(root.hidden, true);
-  let current = true;
-  const waiting = App.prototype.continueAfterSplash.call(app, () => current);
-  current = false;
-  dialog.choose('en');
-  await waiting;
   assert.deepEqual(app.nav.scopes, []);
+});
+
+test('choosing after navigation does not restore focus to an inactive Home', async () => {
+  const { app, dialog } = languageApp();
+  const home = new Screen(app, 'home');
+  app.screens.current = home;
+  home.focusDefault = () => assert.fail('inactive Home must not receive focus');
+  const waiting = dialog.ensureChosen();
+  app.screens.current = null;
+  dialog.choose('fr');
+  await waiting;
+  assert.equal(home.el.inert, true);
+  assert.equal(dialog.background, null);
 });
 
 // ---- Home's Settings gear ------------------------------------------------------------

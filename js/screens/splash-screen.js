@@ -111,8 +111,8 @@ export class SplashScreen extends Screen {
     void this.app.continueAfterSplash(() => this.run === run && !run.cancelled);
   }
 
-  // A completed run stays identifiable until exit/re-entry, including while
-  // the application waits for the first-run language choice.
+  // A completed run stays identifiable until the application enters Home
+  // or another navigation exits/restarts this splash.
   clear(cancelRun = true) {
     const run = this.run;
     if (run) {
