@@ -19,24 +19,26 @@
 </head>
 <body>
   <main id="app" class="app">
-    <section class="screen screen--splash" data-screen="splash" aria-label="Intro" hidden></section>
+    <section data-i18n-aria-label="screen.splash" class="screen screen--splash" data-screen="splash" aria-label="Intro" hidden></section>
     <section class="screen screen--home" data-screen="home" hidden></section>
-    <section class="screen screen--menu screen--mode" data-screen="mode" aria-label="Select mode" hidden></section>
-    <section class="screen screen--menu screen--difficulty" data-screen="difficulty" aria-label="Select difficulty" hidden></section>
-    <section class="screen screen--menu screen--character" data-screen="character" aria-label="Select fighter" hidden></section>
-    <section class="screen screen--menu screen--map" data-screen="map" aria-label="Select map" hidden></section>
-    <section class="screen screen--menu screen--difficulty screen--watch" data-screen="watch-difficulty" aria-label="Watch Mode: select difficulty" hidden></section>
-    <section class="screen screen--menu screen--character screen--watch" data-screen="watch-cpu1" aria-label="Watch Mode: select CPU 1" hidden></section>
-    <section class="screen screen--menu screen--character screen--watch" data-screen="watch-cpu2" aria-label="Watch Mode: select CPU 2" hidden></section>
-    <section class="screen screen--menu screen--map screen--watch" data-screen="watch-map" aria-label="Watch Mode: select stage" hidden></section>
-    <section class="screen screen--battle" data-screen="battle" aria-label="Battle" hidden></section>
-    <section class="screen screen--practice" data-screen="practice" aria-label="Practice Ground" hidden></section>
-    <section class="screen screen--menu screen--discover" data-screen="discover" aria-label="Discover" hidden></section>
-    <section class="screen screen--menu screen--settings" data-screen="settings" aria-label="Settings" hidden></section>
+    <section data-i18n-aria-label="screen.mode" class="screen screen--menu screen--mode" data-screen="mode" aria-label="Select mode" hidden></section>
+    <section data-i18n-aria-label="screen.difficulty" class="screen screen--menu screen--difficulty" data-screen="difficulty" aria-label="Select difficulty" hidden></section>
+    <section data-i18n-aria-label="screen.character" class="screen screen--menu screen--character" data-screen="character" aria-label="Select fighter" hidden></section>
+    <section data-i18n-aria-label="screen.map" class="screen screen--menu screen--map" data-screen="map" aria-label="Select map" hidden></section>
+    <section data-i18n-aria-label="screen.watchDifficulty" class="screen screen--menu screen--difficulty screen--watch" data-screen="watch-difficulty" aria-label="Watch Mode: select difficulty" hidden></section>
+    <section data-i18n-aria-label="screen.watchCpu1" class="screen screen--menu screen--character screen--watch" data-screen="watch-cpu1" aria-label="Watch Mode: select CPU 1" hidden></section>
+    <section data-i18n-aria-label="screen.watchCpu2" class="screen screen--menu screen--character screen--watch" data-screen="watch-cpu2" aria-label="Watch Mode: select CPU 2" hidden></section>
+    <section data-i18n-aria-label="screen.watchMap" class="screen screen--menu screen--map screen--watch" data-screen="watch-map" aria-label="Watch Mode: select stage" hidden></section>
+    <section data-i18n-aria-label="screen.battle" class="screen screen--battle" data-screen="battle" aria-label="Battle" hidden></section>
+    <section data-i18n-aria-label="screen.practice" class="screen screen--practice" data-screen="practice" aria-label="Practice Ground" hidden></section>
+    <section data-i18n-aria-label="screen.discover" class="screen screen--menu screen--discover" data-screen="discover" aria-label="Discover" hidden></section>
   </main>
 
   <div id="loading-overlay" class="overlay loading-overlay" hidden></div>
   <div id="confirm-dialog" class="overlay dialog-overlay" hidden></div>
+  <div id="settings-dialog" class="overlay settings-overlay" hidden></div>
+  <div id="touch-editor" class="touch-editor" hidden></div>
+  <div id="language-dialog" class="overlay language-overlay" hidden></div>
 
   <div id="rotate-overlay" class="rotate-overlay" role="alert">
     <div class="rotate-inner">
@@ -47,14 +49,15 @@
         <path d="M17 15.5l3.5 2.8-3.4 3" class="rotate-arrow"/>
         <rect x="14" y="44" width="36" height="14" rx="3" class="rotate-phone rotate-phone--land"/>
       </svg>
-      <p class="rotate-title">Rotate your device</p>
-      <p class="rotate-text">Alva is designed for landscape play.</p>
+      <p class="rotate-title" data-i18n="rotate.title">Rotate your device</p>
+      <p class="rotate-text" data-i18n="rotate.text">Alva is designed for landscape play.</p>
     </div>
   </div>
 
   <div id="boot-error" class="boot-error" hidden>
-    <p>Alva could not start. Please serve it over http(s) and use a current browser.</p>
+    <p lang="en">Alva could not start. Please serve it over http(s) and use a current browser.</p>
+    <p lang="fr">Alva n’a pas pu démarrer. Servez-le en http(s) et utilisez un navigateur récent.</p>
   </div>
-  <noscript><p class="boot-error">Alva needs JavaScript enabled to run.</p></noscript>
+  <noscript><p class="boot-error"><span lang="en">Alva needs JavaScript enabled to run.</span> <span lang="fr">Alva a besoin de JavaScript pour fonctionner.</span></p></noscript>
 </body>
 </html>

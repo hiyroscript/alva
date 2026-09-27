@@ -30,7 +30,7 @@ export class WatchFighterScreen extends CharacterSelectScreen {
     const id = `watch-cpu${cpu}`;
     super(app, {
       id,
-      title: `Select CPU ${cpu}`,
+      title: ['watch.cpuTitle', { n: cpu }],
       setup: WATCH_SETUP,
       step: cpu,
       selection: () => app.selection.watch,
@@ -45,7 +45,7 @@ export class WatchMapScreen extends MapSelectScreen {
   constructor(app) {
     super(app, {
       id: 'watch-map', setup: WATCH_SETUP, step: 3, selection: () => app.selection.watch,
-      startLabel: 'Confirm and watch battle',
+      startLabel: 'map.watchStart',
     });
   }
 

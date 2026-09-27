@@ -2,6 +2,7 @@
 import { Screen } from '../core/screen-manager.js';
 import { CONFIG } from '../config.js';
 import { el } from '../core/utils.js';
+import { tx } from '../core/i18n.js';
 
 const ARTWORK = [
   { url: './hs.jpg', name: 'hs', alt: 'hiyroscript', credit: true },
@@ -15,7 +16,7 @@ export class SplashScreen extends Screen {
     this.leaveMs = 760; // Keep black underneath Home's existing dissolve.
     this.stage = el('div', { class: 'splash-stage' });
     // Fades in and out with hs.jpg; it stays still while the image zooms.
-    this.credit = el('p', { class: 'splash-credit', text: 'a game by hiyroscript' });
+    this.credit = el('p', { class: 'splash-credit', ...tx('splash.credit', { developer: CONFIG.developer }) });
     this.el.replaceChildren(this.stage, this.credit);
     this.run = null;
   }

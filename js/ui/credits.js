@@ -1,29 +1,45 @@
 // The credits, shown by the Home credits roll. Each group is a title, an
-// optional lead line and plain lines.
+// optional lead line and plain lines, every one a translation key (or
+// [key, params]; see js/core/i18n.js), so the roll follows the language.
+// Proper names (Jump Ultimate Stars, The Spriters Resource, Dazz, FRET)
+// stay as they are in every language.
 
 import { CONFIG } from '../config.js';
+import { t } from '../core/i18n.js';
+
+const developer = CONFIG.developer;
 
 export const CREDITS = [
-  { title: CONFIG.title, lead: `Created by ${CONFIG.developer}` },
+  { title: 'brand.title', lead: ['credits.createdBy', { developer }] },
   {
-    title: 'Original work',
-    lines: [`Game design, code, interface, ${CONFIG.title} wordmark, and Desert / City stage artwork by ${CONFIG.developer}.`],
+    title: 'credits.original.title',
+    lines: [['credits.original.line', { title: CONFIG.title, developer }]],
   },
   {
-    title: '#0001 sprite source',
+    title: 'credits.sprites.title',
     lines: [
-      'Original sprite material from Jump Ultimate Stars',
-      'The Spriters Resource',
-      'Source sheet uploaded by Dazz',
-      'Contributor: FRET',
+      'credits.sprites.material',
+      'credits.sprites.site',
+      'credits.sprites.uploader',
+      'credits.sprites.contributor',
     ],
   },
   {
-    title: 'Rights',
-    lines: [
-      `${CONFIG.developer} did not create or claim ownership of the original third-party character/game artwork.`,
-      'Original characters, games, and related properties belong to their respective rights holders.',
-    ],
+    title: 'credits.rights.title',
+    lines: [['credits.rights.ownership', { developer }], 'credits.rights.holders'],
   },
-  { title: 'Project', lines: ['Unofficial fan project.', 'No affiliation or endorsement is implied.'] },
+  { title: 'credits.project.title', lines: ['credits.project.unofficial', 'credits.project.endorsement'] },
 ];
+
+// A credit label as [key, params].
+export const creditLabel = (spec) => (Array.isArray(spec) ? spec : [spec]);
+
+// The credits as text in the active language: [{ title, lead, lines }].
+export function creditsText() {
+  const read = (spec) => t(...creditLabel(spec));
+  return CREDITS.map((group) => ({
+    title: read(group.title),
+    lead: group.lead ? read(group.lead) : null,
+    lines: (group.lines || []).map(read),
+  }));
+}

@@ -1,12 +1,14 @@
 // HOME: editorial wordmark and navigation beside a glass strip carrying a
-// looping credits roll.
+// looping credits roll, with a compact Settings (gear) button in the top
+// right corner that opens the Settings dialog over Home.
 
 import { Screen } from '../core/screen-manager.js';
 import { CONFIG } from '../config.js';
 import { el } from '../core/utils.js';
+import { tx, tattr, iconLabel } from '../core/i18n.js';
 import { logoSVG } from '../ui/logo.js';
 import { ICONS } from '../ui/icons.js';
-import { CREDITS } from '../ui/credits.js';
+import { CREDITS, creditLabel } from '../ui/credits.js';
 
 const CREDITS_RESUME_DELAY = 2000;
 const ROLL_SPEED = 22; // credits roll, CSS px per second
@@ -16,9 +18,9 @@ const ROLL_SPEED = 22; // credits roll, CSS px per second
 function creditsSequence({ copy = false } = {}) {
   return el('div', { class: 'home-credits-seq', 'aria-hidden': copy ? 'true' : null }, CREDITS.map((group) =>
     el('section', { class: 'home-credit' }, [
-      el('h2', { class: 'home-credit-title', text: group.title }),
-      group.lead ? el('p', { class: 'home-credit-lead', text: group.lead }) : null,
-      ...(group.lines || []).map((line) => el('p', { class: 'home-credit-line', text: line })),
+      el('h2', { class: 'home-credit-title', ...tx(...creditLabel(group.title)) }),
+      group.lead ? el('p', { class: 'home-credit-lead', ...tx(...creditLabel(group.lead)) }) : null,
+      ...(group.lines || []).map((line) => el('p', { class: 'home-credit-line', ...tx(...creditLabel(line)) })),
     ]),
   ));
 }
@@ -29,28 +31,36 @@ export class HomeScreen extends Screen {
 
     const play = el('button', {
       class: 'home-action home-action--primary', type: 'button', 'data-nav': true, 'data-nav-default': true,
-      'data-home-action': 'play', html: `<span>Play</span>${ICONS.arrow}`,
+      'data-home-action': 'play', ...iconLabel('home.play', ICONS.arrow),
     });
     // The secondary actions, outlined with a chevron. Watch Mode (CPU vs
     // CPU) opens its own setup, never Select Mode; Practice Ground goes
     // straight into the training room (no mode, fighter or stage select);
-    // Discover opens the in-game reference (Power, Launch, Passives);
-    // Settings holds the player's settings (Mobile Controls).
-    const secondary = (id, label) => el('button', {
+    // Discover opens the in-game reference (Power, Launch, Passives).
+    const secondary = (id, key) => el('button', {
       class: 'home-action', type: 'button', 'data-nav': true,
-      'data-home-action': id, html: `<span>${label}</span>${ICONS.right}`,
+      'data-home-action': id, ...iconLabel(key, ICONS.right),
     });
-    const watch = secondary('watch', 'Watch Mode');
-    const practice = secondary('practice', 'Practice Ground');
-    const discover = secondary('discover', 'Discover');
-    const settings = secondary('settings', 'Settings');
+    const watch = secondary('watch', 'home.watch');
+    const practice = secondary('practice', 'home.practice');
+    const discover = secondary('discover', 'home.discover');
     play.addEventListener('click', () => app.screens.go('mode'));
     watch.addEventListener('click', () => app.screens.go('watch-difficulty'));
     practice.addEventListener('click', () => app.screens.go('practice'));
     discover.addEventListener('click', () => app.screens.go('discover'));
-    settings.addEventListener('click', () => app.screens.go('settings'));
     // By name, in menu order.
-    this.actions = { play, watch, practice, discover, settings };
+    this.actions = { play, watch, practice, discover };
+
+    // Settings: Home chrome, not a menu action. The gear in the top right
+    // corner opens the Settings dialog over Home (js/ui/settings-dialog.js)
+    // and focus comes back to it when the dialog closes. Keyboard and
+    // gamepad reach it like any menu item (→ or ↑ from the menu).
+    this.settingsButton = el('button', {
+      class: 'home-settings', type: 'button', 'data-nav': true, 'data-home-settings': true,
+      'aria-haspopup': 'dialog', ...tattr('aria-label', 'home.settings'), ...tattr('title', 'home.settings'),
+      html: ICONS.settings,
+    });
+    this.settingsButton.addEventListener('click', () => app.settingsDialog.open({ returnFocus: this.settingsButton }));
 
     this.rollTrack = el('div', { class: 'home-credits-track' }, [creditsSequence(), creditsSequence({ copy: true })]);
     this.rollOffset = 0;
@@ -58,8 +68,7 @@ export class HomeScreen extends Screen {
     this.activePointer = null;
     this.portraitQuery = window.matchMedia('(max-aspect-ratio: 1/1)');
     this.creditsViewport = el('div', {
-      class: 'home-credits-col', tabindex: 0, role: 'region',
-      'aria-label': 'Credits. Scroll or use arrow and Page keys to read.',
+      class: 'home-credits-col', tabindex: 0, role: 'region', ...tattr('aria-label', 'home.creditsRegion'),
     }, [this.rollTrack]);
     // Registered once: Home visits reuse this screen and the app frame loop.
     this.creditsViewport.addEventListener('wheel', (event) => {
@@ -109,19 +118,20 @@ export class HomeScreen extends Screen {
     this.el.replaceChildren(
       el('div', { class: 'home-scene' }, [
         el('div', { class: 'home-glass', 'aria-hidden': 'true' }),
-        el('aside', { class: 'home-credits', 'aria-label': 'Credits' }, [
+        el('aside', { class: 'home-credits', ...tattr('aria-label', 'home.credits') }, [
           this.creditsViewport,
         ]),
       ]),
       el('div', { class: 'home-main' }, [
         el('div', { class: 'home-intro' }, [
           el('h1', { class: 'home-title', id: 'home-title', html: logoSVG({ className: 'logo logo--display' }) }),
-          el('p', { class: 'home-lede', text: 'Fan project. Big heart.' }),
-          el('nav', { class: 'home-actions', 'aria-label': 'Main menu' }, Object.values(this.actions)),
+          el('p', { class: 'home-lede', ...tx('home.lede') }),
+          el('nav', { class: 'home-actions', ...tattr('aria-label', 'home.menu') }, Object.values(this.actions)),
         ]),
       ]),
+      this.settingsButton,
       el('footer', { class: 'home-footer' }, [
-        el('span', { text: `by ${CONFIG.developer}` }),
+        el('span', tx('home.by', { developer: CONFIG.developer })),
       ]),
     );
     this.el.setAttribute('aria-labelledby', 'home-title');

@@ -6,10 +6,15 @@
 // CPU 2, a fighter each, one difficulty for both). Watch Mode is for
 // watching only: no gameplay input and no touch controls, while pause,
 // restart, rematch and Return to Home work as in Quick Battle.
+//
+// Every string is a translation key (js/core/i18n.js); the touch controls
+// use the player's saved scheme and custom layout (Home › Settings ›
+// Controls), read afresh as each battle is entered.
 
 import { Screen } from '../core/screen-manager.js';
 import { CONFIG } from '../config.js';
 import { el } from '../core/utils.js';
+import { t, tx, tattr, setText, joinList } from '../core/i18n.js';
 import { menuButton } from '../ui/components.js';
 import { getCharacter } from '../data/characters.js';
 import { getMap } from '../data/maps.js';
@@ -17,46 +22,40 @@ import { Battle } from '../game/battle.js';
 import { HUD } from '../game/hud.js';
 import { TouchControls } from '../game/touch-controls.js';
 
+// Banner lines by state, as translation keys (with params).
 const BANNERS = {
-  round: { sub: 'READY', main: 'ROUND 1' },
-  fight: { sub: '', main: 'FIGHT' },
-  time: { sub: 'TIME OVER', main: 'TIME' },
-  ko: { sub: 'VOID', main: 'K.O.' },
+  round: { sub: ['banner.ready'], main: ['banner.round', { n: 1 }] },
+  fight: { sub: null, main: ['banner.fight'] },
+  time: { sub: ['banner.timeOver'], main: ['banner.time'] },
+  ko: { sub: ['banner.void'], main: ['banner.ko'] },
 };
 
-// Result dialog kicker and line for each way a match ends (Battle.result):
-// the winning point from a fall, or on time by points, then by Launch Point.
+// Result dialog kicker and line keys for each way a match ends
+// (Battle.result): the winning point from a fall, or on time by points, then
+// by Launch Point. The K.O. line names who fell ({loser}).
 const RESULT_TEXT = {
-  void: { kicker: 'K.O.', sub: (loser) => `${loser} fell into the Void for the final point.` },
-  points: { kicker: 'Time over', sub: () => 'Time ran out. More points wins the match.' },
-  time: { kicker: 'Time over', sub: () => 'Time ran out with the points level. Lower Launch Point wins.' },
+  void: { kicker: 'result.kickerKo', sub: 'result.void' },
+  points: { kicker: 'result.kickerTime', sub: 'result.points' },
+  time: { kicker: 'result.kickerTime', sub: 'result.time' },
 };
 
-// How each mode names the two sides: the result title when a side wins, the
-// side as it starts a sentence (the K.O. line names who fell), and the
-// pause dialog's kicker.
+// How each mode names the two sides (side.<mode>.<p1|p2>.wins, the result
+// title when a side wins, and .name, the side as it starts a sentence), and
+// the pause dialog's kicker.
 const MODE_TEXT = {
-  'quick-battle': {
-    kicker: 'Quick Battle',
-    p1: { wins: 'Player 1 Wins', name: 'Player 1' },
-    p2: { wins: 'CPU Wins', name: 'The CPU' },
-  },
-  watch: {
-    kicker: 'Watch Mode',
-    p1: { wins: 'CPU 1 Wins', name: 'CPU 1' },
-    p2: { wins: 'CPU 2 Wins', name: 'CPU 2' },
-  },
+  'quick-battle': { kicker: 'setup.quickBattle', sides: 'side.quickBattle' },
+  watch: { kicker: 'setup.watch', sides: 'side.watch' },
 };
 
-// "#0001", or "#0001 and #0002".
-const fighterNames = (defs) => defs.map((d) => d.displayName).join(' and ');
+// "#0001", or "#0001 and #0002", in the interface language.
+const fighterNames = (defs) => joinList(defs.map((d) => d.displayName));
 
 export class BattleScreen extends Screen {
   constructor(app) {
     super(app, 'battle');
     this.navigable = false;
 
-    this.canvas = el('canvas', { class: 'battle-canvas', 'aria-label': 'Battle', role: 'img' });
+    this.canvas = el('canvas', { class: 'battle-canvas', ...tattr('aria-label', 'battle.canvas'), role: 'img' });
     this.hudRoot = el('div', { class: 'hud' });
     this.hud = new HUD(this.hudRoot, { onPause: () => this.pause() });
     this.touchRoot = el('div', { class: 'touch-controls' });
@@ -91,17 +90,17 @@ export class BattleScreen extends Screen {
   // ---- DOM builders ---------------------------------------------------------
 
   buildPause() {
-    const resume = menuButton('Resume', { primary: true });
-    const restart = menuButton('Restart Battle', { outlineOnly: true });
-    const home = menuButton('Return to Home', { outlineOnly: true });
+    const resume = menuButton('pause.resume', { primary: true });
+    const restart = menuButton('pause.restart', { outlineOnly: true });
+    const home = menuButton('pause.home', { outlineOnly: true });
     resume.addEventListener('click', () => this.resume());
     restart.addEventListener('click', () => this.restart());
     home.addEventListener('click', () => this.confirmHome());
 
-    this.pauseKicker = el('span', { class: 'kicker', text: MODE_TEXT['quick-battle'].kicker });
+    this.pauseKicker = el('span', { class: 'kicker', ...tx(MODE_TEXT['quick-battle'].kicker) });
     this.pauseMenuView = el('div', { class: 'pause-view' }, [
       this.pauseKicker,
-      el('h2', { class: 'pause-title', id: 'pause-title', text: 'Paused' }),
+      el('h2', { class: 'pause-title', id: 'pause-title', ...tx('pause.title') }),
       el('div', { class: 'pause-menu' }, [resume, restart, home]),
     ]);
 
@@ -117,12 +116,12 @@ export class BattleScreen extends Screen {
   }
 
   buildResult() {
-    this.resultKicker = el('span', { class: 'kicker', text: 'Time over' });
+    this.resultKicker = el('span', { class: 'kicker', ...tx('result.kickerTime') });
     this.resultTitle = el('h2', { class: 'result-title', id: 'result-title' });
     this.resultSub = el('p', { class: 'result-sub' });
-    const rematch = menuButton('Rematch', { primary: true });
-    const stage = menuButton('Change Stage');
-    const home = menuButton('Return to Home');
+    const rematch = menuButton('result.rematch', { primary: true });
+    const stage = menuButton('result.changeStage');
+    const home = menuButton('pause.home');
     rematch.addEventListener('click', () => this.rematch());
     stage.addEventListener('click', () => this.leave(() => this.app.screens.back()));
     home.addEventListener('click', () => this.leave(() => this.app.screens.go('home', {}, { reset: true })));
@@ -161,14 +160,16 @@ export class BattleScreen extends Screen {
     this.p2Def = p2Def;
     this.map = map;
     this.difficulty = difficulty;
-    this.pauseKicker.textContent = MODE_TEXT[mode].kicker;
+    setText(this.pauseKicker, MODE_TEXT[mode].kicker);
     this.canvas.setAttribute('aria-label', watch
-      ? `Watch Mode battle: CPU 1, ${p1Def.displayName}, against CPU 2, ${p2Def.displayName}`
-      : 'Battle');
-    // The touch layout the player chose (Home › Settings › Mobile Controls),
-    // and Player 1's fighter for the ability icons, never the CPU's. A
-    // spectator has no touch controls at all.
+      ? t('battle.watchCanvas', { p1: p1Def.displayName, p2: p2Def.displayName })
+      : t('battle.canvas'));
+    this.canvas.setAttribute('data-i18n-aria-label', '');
+    // The touch layout the player chose (Home › Settings › Controls), its
+    // custom placement and sizes, and Player 1's fighter for the ability
+    // icons, never the CPU's. A spectator has no touch controls at all.
     this.touch.setScheme(app.settings.mobileControls);
+    this.touch.setLayout(app.settings.touchLayout(this.touch.scheme));
     this.touch.setCharacter(watch ? null : p1Def);
     this.touchRoot.hidden = watch;
     this.el.classList.toggle('is-watch', watch);
@@ -178,15 +179,15 @@ export class BattleScreen extends Screen {
 
     // Each fighter once: a mirror match loads, and shares, one sprite set.
     const defs = [...new Map([p1Def, p2Def].map((d) => [d.id, d])).values()];
-    app.loading.show(`Loading ${fighterNames(defs)}`);
+    app.loading.show(t('common.loadingName', { name: fighterNames(defs) }));
     const sprites = await this.loadFighters(defs);
     if (token !== this.token) return; // left the screen while loading
 
     const failed = defs.filter((d) => !sprites.get(d.id)?.usable);
     if (failed.length) {
-      const whose = failed.map((d) => `${d.displayName}'s`).join(' and ');
-      const where = failed.map((d) => `assets/characters/${d.id}/`).join(' and ');
-      app.loading.showError(`${whose} sprite frames could not be loaded. Check your connection and that the files in ${where} exist.`, {
+      const names = failed.map((d) => d.displayName);
+      const where = joinList(failed.map((d) => `assets/characters/${d.id}/`));
+      app.loading.showError(t('common.spritesFailed', { names, where }), {
         nav: app.nav,
         onRetry: () => {
           for (const d of failed) app.resetCharacter(d.id);
@@ -280,6 +281,8 @@ export class BattleScreen extends Screen {
     if (!battle) return;
     if (this.needsResize) {
       this.needsResize = false;
+      // A new size or orientation moves the touch controls with the screen.
+      this.touch.applyLayout();
       if (battle.resize() && !this.isRunning) battle.render();
     }
     if (!this.isRunning || this.app.device.blockedPortrait) return;
@@ -344,8 +347,8 @@ export class BattleScreen extends Screen {
     const cfg = BANNERS[state];
     this.banner.classList.remove('is-shown');
     if (!cfg) return;
-    this.bannerSub.textContent = cfg.sub;
-    this.bannerMain.textContent = cfg.main;
+    this.bannerSub.textContent = cfg.sub ? t(...cfg.sub) : '';
+    this.bannerMain.textContent = t(...cfg.main);
     this.banner.dataset.state = state;
     void this.banner.offsetWidth;
     this.banner.classList.add('is-shown');
@@ -390,10 +393,10 @@ export class BattleScreen extends Screen {
 
   async confirmHome() {
     const ok = await this.app.dialog.open({
-      title: 'Return to Home?',
-      message: 'The current battle will end and its progress will be discarded.',
-      confirmLabel: 'Return Home',
-      cancelLabel: 'Keep Playing',
+      title: t('confirmHome.title'),
+      message: t('confirmHome.message'),
+      confirmLabel: t('confirmHome.confirm'),
+      cancelLabel: t('confirmHome.cancel'),
       cancelOutlineOnly: true,
     });
     if (ok) this.leave(() => this.app.screens.go('home', {}, { reset: true }));
@@ -418,10 +421,11 @@ export class BattleScreen extends Screen {
   showResult() {
     const { outcome, reason = 'time' } = this.battle.result;
     const text = RESULT_TEXT[reason] ?? RESULT_TEXT.time;
-    const sides = MODE_TEXT[this.mode];
-    this.resultKicker.textContent = text.kicker;
-    this.resultTitle.textContent = sides[outcome].wins;
-    this.resultSub.textContent = text.sub(sides[outcome === 'p1' ? 'p2' : 'p1'].name);
+    const sides = MODE_TEXT[this.mode].sides;
+    const loser = outcome === 'p1' ? 'p2' : 'p1';
+    setText(this.resultKicker, text.kicker);
+    setText(this.resultTitle, `${sides}.${outcome}.wins`);
+    setText(this.resultSub, text.sub, { loser: { t: `${sides}.${loser}.name` } });
     this.setBanner(null);
     this.setPlayActive(false);
     this.resultOverlay.hidden = false;

@@ -8,6 +8,7 @@
 // name the screen and its title, its setup and step, where its choice is kept
 // (`selection()[key]`), the screen that follows and the roster's preview id,
 // so the rosters never share an element id. Left out, they are Quick Battle's.
+// The title is a translation key, or [key, params].
 
 import { Screen } from '../core/screen-manager.js';
 import { el } from '../core/utils.js';
@@ -16,7 +17,7 @@ import { FighterRoster } from '../ui/fighter-roster.js';
 
 export class CharacterSelectScreen extends Screen {
   constructor(app, {
-    id = 'character', title = 'Select Fighter', setup = QUICK_BATTLE_SETUP, step = 2,
+    id = 'character', title = 'character.title', setup = QUICK_BATTLE_SETUP, step = 2,
     selection = () => app.selection, key = 'characterId', next = 'map', previewId = 'preview-name',
   } = {}) {
     super(app, id);

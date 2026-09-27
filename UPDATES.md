@@ -287,8 +287,9 @@ fall and `updateFacing` in `js/game/character.js`; the fall cap in
 `stepBody` (`js/game/physics.js`); `jumpTapHold` in
 `js/game/fighter-controller.js` and the mid-attack guard in
 `CombatAIController.guard` (`js/game/combat-ai.js`); the layout in
-`js/game/touch-controls.js`, `styles.css` and the Settings card in
-`js/screens/settings-screen.js`.
+`js/game/touch-controls.js`, `styles.css` and the Settings card, now in
+`js/ui/settings-dialog.js` (it was `js/screens/settings-screen.js` before
+Settings became a dialog).
 
 **Tests:**
 - the higher jump and the CPUs' jumps in `tests/movement.test.mjs`

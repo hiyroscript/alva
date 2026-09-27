@@ -20,14 +20,20 @@
 // The right-hand card mirrors the left-hand one. Energy and the CBA
 // cooldowns are drawn over the fighter itself (js/game/fighter-status.js);
 // the card only describes Energy to screen readers.
+//
+// Every label and spoken description is translated (js/core/i18n.js): the
+// slot tags too (P1 reads J1 in French), while the tag the fighter carries
+// stays the same internally.
 
 import { CONFIG } from '../config.js';
 import { el } from '../core/utils.js';
+import { t, tattr, plural, slotLabel } from '../core/i18n.js';
 import { ICONS } from '../ui/icons.js';
 import { paintPortrait, portraitSourceFacing } from '../ui/sprite-art.js';
 
-// Spoken names of the slot tags, for the score dots' labels.
-const SLOT_NAMES = { P1: 'Player 1', CPU: 'CPU' };
+// Spoken names of the slot tags, for the score dots' labels: Player 1 in
+// full, the others as shown.
+const spokenSlot = (tag) => (tag === 'P1' ? t('hud.player1') : slotLabel(tag));
 
 // The Launch Point on show: whole numbers, with no % sign.
 export function formatLaunchPoint(value) {
@@ -39,9 +45,7 @@ export function formatLaunchPoint(value) {
 export function describeEnergy(combat) {
   const max = Math.round(combat.maxEnergy);
   const value = Math.min(max, Math.round(combat.energy / 5) * 5);
-  return combat.energyExhausted
-    ? `Energy exhausted, refilling: ${value} of ${max}`
-    : `Energy ${value} of ${max}`;
+  return t(combat.energyExhausted ? 'hud.energyExhausted' : 'hud.energy', { value, max });
 }
 
 // One fighter's card and, with `points`, its row of score dots under it.
@@ -53,7 +57,7 @@ function sidePanel(side, { inward, points = 0 }) {
   const tag = el('span', { class: 'hud-slot' });
   const name = el('span', { class: 'hud-name' });
   const launchPointValue = el('span', { class: 'hud-launch-point-value', text: '0' });
-  const launchPoint = el('div', { class: 'hud-launch-point', role: 'group', 'aria-label': 'Launch Point' }, [launchPointValue]);
+  const launchPoint = el('div', { class: 'hud-launch-point', role: 'group', ...tattr('aria-label', 'hud.launchPoint') }, [launchPointValue]);
   const energy = el('span', { class: 'hud-sr' });
   const info = el('div', { class: 'hud-info' }, [el('div', { class: 'hud-tag' }, [tag, name]), launchPoint]);
   const root = el('div', { class: `hud-side hud-${side} glass` }, [portrait, divider, info, energy]);
@@ -70,7 +74,8 @@ function sidePanel(side, { inward, points = 0 }) {
 // name and Launch Point, and forgets the cached values so the next update
 // redraws everything.
 function bindPanel(panel, tag, fighter) {
-  panel.tag.textContent = tag;
+  panel.slot = tag;
+  panel.tag.textContent = slotLabel(tag);
   panel.name.textContent = fighter.def.displayName;
   if (fighter.sprites !== panel.sprites) {
     panel.sprites = fighter.sprites;
@@ -103,25 +108,20 @@ function setScore(panel, points) {
   if (!panel.score || points === panel.shownScore) return;
   panel.shownScore = points;
   panel.dots.forEach((dot, i) => dot.classList.toggle('is-filled', i < points));
-  const who = SLOT_NAMES[panel.tag.textContent] ?? panel.tag.textContent;
-  panel.score.setAttribute('aria-label', `${who}: ${points} of ${panel.dots.length} points`);
+  panel.score.setAttribute('aria-label', plural('hud.score', points, { who: spokenSlot(panel.slot), points, total: panel.dots.length }));
 }
 
 // Whole seconds left as the clock shows them: 300 -> "5:00", 87 -> "1:27".
-function clockText(t) {
-  if (t === '∞') return t;
-  return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`;
+function clockText(time) {
+  if (time === '∞') return time;
+  return `${Math.floor(time / 60)}:${String(time % 60).padStart(2, '0')}`;
 }
 
-function unit(n, name) {
-  return `${n} ${name}${n === 1 ? '' : 's'}`;
-}
-
-function timeLabel(t) {
-  if (t === '∞') return 'Pause game, no time limit';
-  const m = Math.floor(t / 60), s = t % 60;
-  const left = [m && unit(m, 'minute'), (s || !m) && unit(s, 'second')].filter(Boolean).join(' ');
-  return `Pause game, ${left} remaining`;
+function timeLabel(time) {
+  if (time === '∞') return t('hud.pauseNoLimit');
+  const m = Math.floor(time / 60), s = time % 60;
+  const left = [m && plural('unit.minute', m), (s || !m) && plural('unit.second', s)].filter(Boolean).join(' ');
+  return t('hud.pauseTime', { left });
 }
 
 export class HUD {
@@ -132,8 +132,8 @@ export class HUD {
     this.roundLabel = el('span', { class: 'hud-round' });
     this.timer = el('span', { class: 'hud-timer' });
     // Timer and pause are two halves of one glass control; either pauses.
-    this.timeButton = el('button', { class: 'hud-time', type: 'button', 'aria-label': 'Pause game' }, [this.roundLabel, this.timer]);
-    this.pauseButton = el('button', { class: 'hud-pause', type: 'button', 'aria-label': 'Pause', html: ICONS.pause });
+    this.timeButton = el('button', { class: 'hud-time', type: 'button', ...tattr('aria-label', 'hud.pauseGame') }, [this.roundLabel, this.timer]);
+    this.pauseButton = el('button', { class: 'hud-pause', type: 'button', ...tattr('aria-label', 'hud.pause'), html: ICONS.pause });
     if (onPause) {
       this.timeButton.addEventListener('click', onPause);
       this.pauseButton.addEventListener('click', onPause);
@@ -161,16 +161,17 @@ export class HUD {
     updatePanel(this.right, p2);
     setScore(this.left, battle.score?.p1 ?? 0);
     setScore(this.right, battle.score?.p2 ?? 0);
-    const t = Number.isFinite(battle.timeLeft) ? Math.ceil(battle.timeLeft) : '∞';
-    if (t !== this.shownTime) {
-      this.shownTime = t;
-      this.timer.textContent = clockText(t);
+    const time = Number.isFinite(battle.timeLeft) ? Math.ceil(battle.timeLeft) : '∞';
+    if (time !== this.shownTime) {
+      this.shownTime = time;
+      this.timer.textContent = clockText(time);
       this.timer.classList.toggle('is-urgent', Number.isFinite(battle.timeLeft) && battle.timeLeft <= 10);
-      this.timeButton.setAttribute('aria-label', timeLabel(t));
+      this.timeButton.setAttribute('aria-label', timeLabel(time));
+      this.timeButton.setAttribute('data-i18n-aria-label', '');
     }
     if (battle.round !== this.shownRound) {
       this.shownRound = battle.round;
-      this.roundLabel.textContent = `ROUND ${battle.round}`;
+      this.roundLabel.textContent = t('hud.round', { n: battle.round });
     }
   }
 }
@@ -191,7 +192,7 @@ export class PracticeHUD {
     this.cpu = null;
     this.moreButton = el('button', {
       class: 'practice-more glass', type: 'button',
-      'aria-label': 'Practice menu', 'aria-haspopup': 'dialog', 'aria-expanded': 'false',
+      ...tattr('aria-label', 'hud.practiceMenu'), 'aria-haspopup': 'dialog', 'aria-expanded': 'false',
       html: ICONS.more,
     });
     if (onMore) this.moreButton.addEventListener('click', onMore);

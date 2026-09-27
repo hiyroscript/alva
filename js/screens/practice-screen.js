@@ -11,10 +11,14 @@
 // Practice keeps its own fighter and CPU choices, and every fresh visit
 // starts over (default fighter, default CPU): a disabled CPU is never
 // remembered, and it never reads or writes Quick Battle's app.selection.
+//
+// Every string is a translation key (js/core/i18n.js); the touch controls
+// use the player's saved scheme and custom layout, read on every entry.
 
 import { Screen } from '../core/screen-manager.js';
 import { CONFIG } from '../config.js';
 import { el } from '../core/utils.js';
+import { t, tx, tattr, iconLabel, setText } from '../core/i18n.js';
 import { ICONS } from '../ui/icons.js';
 import { menuButton } from '../ui/components.js';
 import { FighterRoster } from '../ui/fighter-roster.js';
@@ -28,12 +32,15 @@ import { TouchControls } from '../game/touch-controls.js';
 // of the same fighter, sharing its one loaded sprite set.
 export const PRACTICE_DEFAULT_FIGHTER = '0001';
 
+// The error shown when `def`'s frames cannot be loaded.
+const spritesFailed = (def) => t('common.spritesFailed', { names: [def.displayName], where: `assets/characters/${def.id}/` });
+
 export class PracticeGroundScreen extends Screen {
   constructor(app) {
     super(app, 'practice');
     this.navigable = false;
 
-    this.canvas = el('canvas', { class: 'battle-canvas', 'aria-label': 'Practice Ground', role: 'img' });
+    this.canvas = el('canvas', { class: 'battle-canvas', ...tattr('aria-label', 'practice.title'), role: 'img' });
     this.hudRoot = el('div', { class: 'hud practice-hud' });
     this.hud = new PracticeHUD(this.hudRoot, { onMore: () => this.toggleMenu() });
     this.touchRoot = el('div', { class: 'touch-controls' });
@@ -71,9 +78,9 @@ export class PracticeGroundScreen extends Screen {
   // while there is none) and Return. Esc / Back, Start, the More button or a
   // press on the dim around it close it again.
   buildMenu() {
-    this.changeBtn = menuButton('Change Fighter', { primary: true });
-    this.cpuBtn = menuButton('Change CPU');
-    this.returnBtn = menuButton('Return', { outlineOnly: true });
+    this.changeBtn = menuButton('practice.changeFighter', { primary: true });
+    this.cpuBtn = menuButton('practice.changeCpu');
+    this.returnBtn = menuButton('practice.return', { outlineOnly: true });
     this.changeBtn.addEventListener('click', () => this.openRoster());
     this.cpuBtn.addEventListener('click', () => this.openCpuRoster());
     this.returnBtn.addEventListener('click', () => this.leave());
@@ -82,7 +89,7 @@ export class PracticeGroundScreen extends Screen {
       class: 'overlay practice-menu-overlay', hidden: true,
       role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'practice-menu-title',
     }, [el('div', { class: 'pause-panel practice-menu-panel glass glass--panel' }, [
-      el('h2', { class: 'kicker practice-menu-title', id: 'practice-menu-title', text: 'Practice Ground' }),
+      el('h2', { class: 'kicker practice-menu-title', id: 'practice-menu-title', ...tx('practice.title') }),
       el('div', { class: 'pause-menu' }, [this.changeBtn, this.cpuBtn, this.returnBtn]),
     ])]);
     this.menuOverlay.addEventListener('click', (e) => {
@@ -98,23 +105,24 @@ export class PracticeGroundScreen extends Screen {
 
   // A roster dialog: its own instance of the shared fighter roster as one
   // large glass panel over the paused stage, under a header with Back (plus
-  // any `actions` right beside it) and a Practice Ground heading. Ids come
-  // from `titleId` and `previewId`, so both dialogs share the page.
+  // any `actions` right beside it) and a Practice Ground heading (`title` is
+  // its translation key). Ids come from `titleId` and `previewId`, so both
+  // dialogs share the page.
   buildRosterDialog({ titleId, title, previewId, onConfirm, onBack, actions = [] }) {
     const back = el('button', {
       class: 'btn-back', type: 'button', 'data-nav': true,
-      'aria-label': 'Back to practice menu', html: `${ICONS.back}<span>Back</span>`,
+      ...tattr('aria-label', 'practice.backToMenu'), ...iconLabel('common.back', ICONS.back, { iconFirst: true }),
     });
     back.addEventListener('click', onBack);
 
     const dialog = el('div', { class: 'practice-roster-dialog glass' });
     const roster = new FighterRoster(this.app, { host: dialog, previewId, onConfirm });
-    const heading = el('h2', { class: 'screen-title', id: titleId, text: title });
+    const heading = el('h2', { class: 'screen-title', id: titleId, ...tx(title) });
     dialog.replaceChildren(
       el('header', { class: 'screen-header practice-roster-head' }, [
         el('div', { class: 'practice-roster-actions' }, [back, ...actions]),
         el('div', { class: 'screen-heading' }, [
-          el('span', { class: 'kicker', text: 'Practice Ground' }),
+          el('span', { class: 'kicker', ...tx('practice.title') }),
           heading,
         ]),
       ]),
@@ -133,7 +141,7 @@ export class PracticeGroundScreen extends Screen {
   buildRoster() {
     const dialog = this.buildRosterDialog({
       titleId: 'practice-roster-title',
-      title: 'Change Fighter',
+      title: 'practice.changeFighter',
       previewId: 'practice-preview-name',
       onConfirm: (def) => this.changeFighter(def),
       onBack: () => this.closeRoster(),
@@ -151,12 +159,12 @@ export class PracticeGroundScreen extends Screen {
   buildCpuRoster() {
     this.disableCpuBtn = el('button', {
       class: 'btn-back practice-cpu-disable', type: 'button', 'data-nav': true,
-      text: 'Disable CPU', hidden: true, disabled: true,
+      ...tx('practice.disableCpu'), hidden: true, disabled: true,
     });
     this.disableCpuBtn.addEventListener('click', () => this.disableCpu());
     const dialog = this.buildRosterDialog({
       titleId: 'practice-cpu-roster-title',
-      title: 'Select CPU',
+      title: 'practice.selectCpu',
       previewId: 'practice-cpu-preview-name',
       onConfirm: (def) => this.selectCpu(def),
       onBack: () => this.closeCpuRoster(),
@@ -180,18 +188,20 @@ export class PracticeGroundScreen extends Screen {
     // then included).
     this.characterId = PRACTICE_DEFAULT_FIGHTER;
     const def = getCharacter(this.characterId);
-    // The touch layout the player chose (Home › Settings › Mobile Controls).
+    // The touch layout the player chose (Home › Settings › Controls), with
+    // its custom placement and sizes.
     this.touch.setScheme(app.settings.mobileControls);
+    this.touch.setLayout(app.settings.touchLayout(this.touch.scheme));
     this.touch.setCharacter(def);
     this.token = {};
     const token = this.token;
 
-    app.loading.show(`Loading ${def.displayName}`);
+    app.loading.show(t('common.loadingName', { name: def.displayName }));
     const sprites = await app.loadCharacter(def.id, (done, total) => app.loading.setProgress(done, total));
     if (token !== this.token) return; // left the screen while loading
 
     if (!sprites?.usable) {
-      app.loading.showError(`${def.displayName}'s sprite frames could not be loaded. Check your connection and that the files in assets/characters/${def.id}/ exist.`, {
+      app.loading.showError(spritesFailed(def), {
         nav: app.nav,
         onRetry: () => {
           app.resetCharacter(def.id);
@@ -265,6 +275,8 @@ export class PracticeGroundScreen extends Screen {
     if (!session) return;
     if (this.needsResize) {
       this.needsResize = false;
+      // A new size or orientation moves the touch controls with the screen.
+      this.touch.applyLayout();
       if (session.resize() && !this.isRunning) session.render();
     }
     if (this.rosterOpen) this.roster.update(dt);
@@ -362,7 +374,7 @@ export class PracticeGroundScreen extends Screen {
 
   // The menu's stateful label, from the session: Enable CPU / Change CPU.
   syncMenu() {
-    this.cpuBtn.textContent = this.session?.cpu ? 'Change CPU' : 'Enable CPU';
+    setText(this.cpuBtn, this.session?.cpu ? 'practice.changeCpu' : 'practice.enableCpu');
   }
 
   // ---- Change Fighter ---------------------------------------------------------
@@ -404,13 +416,13 @@ export class PracticeGroundScreen extends Screen {
     const app = this.app;
     const token = this.token;
     this.swapping = true;
-    app.loading.show(`Loading ${def.displayName}`);
+    app.loading.show(t('common.loadingName', { name: def.displayName }));
     const sprites = await app.loadCharacter(def.id, (done, total) => app.loading.setProgress(done, total));
     if (token !== this.token || !this.session) return; // left Practice Ground meanwhile
     this.swapping = false;
 
     if (!sprites?.usable) {
-      app.loading.showError(`${def.displayName}'s sprite frames could not be loaded. Check your connection and that the files in assets/characters/${def.id}/ exist.`, {
+      app.loading.showError(spritesFailed(def), {
         nav: app.nav,
         onRetry: () => {
           app.resetCharacter(def.id);
@@ -442,7 +454,7 @@ export class PracticeGroundScreen extends Screen {
     if (!this.menuOpen || this.dialogOpen || !this.session) return;
     const cpu = this.session.cpu;
     this.cpuRosterOpen = true;
-    this.cpuRosterTitle.textContent = cpu ? 'Change CPU' : 'Select CPU';
+    setText(this.cpuRosterTitle, cpu ? 'practice.changeCpu' : 'practice.selectCpu');
     this.disableCpuBtn.hidden = !cpu;
     this.disableCpuBtn.disabled = !cpu;
     this.el.classList.add('is-cpu-roster-open');
@@ -476,13 +488,13 @@ export class PracticeGroundScreen extends Screen {
     const app = this.app;
     const token = this.token;
     this.cpuSwapping = true;
-    app.loading.show(`Loading ${def.displayName}`);
+    app.loading.show(t('common.loadingName', { name: def.displayName }));
     const sprites = await app.loadCharacter(def.id, (done, total) => app.loading.setProgress(done, total));
     if (token !== this.token || !this.session) return; // left Practice Ground meanwhile
     this.cpuSwapping = false;
 
     if (!sprites?.usable) {
-      app.loading.showError(`${def.displayName}'s sprite frames could not be loaded. Check your connection and that the files in assets/characters/${def.id}/ exist.`, {
+      app.loading.showError(spritesFailed(def), {
         nav: app.nav,
         onRetry: () => {
           app.resetCharacter(def.id);

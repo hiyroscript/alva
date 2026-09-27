@@ -13,17 +13,18 @@
 // on a section shows it, a click or tap selects it, and mouse hover is only a
 // preview. The open page is itself a stop in menu navigation so a gamepad can
 // scroll it: ↑ / ↓ scroll it, and leave it once it can scroll no further.
+//
+// The copy is read through the translations (js/core/i18n.js), keyed by the
+// registries' own ids: English is the registries' copy itself, French its
+// translation, and the pages follow the interface language.
 
 import { Screen } from '../core/screen-manager.js';
 import { findNeighbor } from '../core/menu-navigator.js';
-import { CONFIG } from '../config.js';
 import { el } from '../core/utils.js';
+import { tx, tattr } from '../core/i18n.js';
 import { screenHeader } from '../ui/components.js';
 import { POWERS } from '../data/powers.js';
-import {
-  BASE_LAUNCH_VALUES, BASE_LAUNCH_DESCRIPTIONS, BASE_LAUNCH_SUMMARY, LAUNCH_FORMULA, LAUNCH_POINT_SUMMARY,
-  DIRECTIONAL_LAUNCHES, DIRECTIONAL_LAUNCH_SUMMARY,
-} from '../data/launch.js';
+import { BASE_LAUNCH_VALUES, DIRECTIONAL_LAUNCHES } from '../data/launch.js';
 
 // Where the rail turns horizontal: narrow windows, but never short landscape
 // ones. Keep in step with the matching rule in styles.css (Discover, narrow).
@@ -47,27 +48,32 @@ function tierMeter(tier, count) {
 const ARROW = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 8h11M9 4l4 4-4 4"/></svg>';
 const DASH = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 8h8"/></svg>';
 
+// A string given as a translation key, or [key, params].
+const label = (spec) => (Array.isArray(spec) ? spec : [spec]);
+
 // One reference entry: a title and what it explains (and any `extra` under
-// it, such as a formula), beside its rows, if it has any.
+// it, such as a formula), beside its rows, if it has any. `title` and `text`
+// are translation keys.
 function entry(id, title, text, list = null, extra = null) {
   const titleId = `discover-${id}`;
   return el('article', { class: 'discover-entry', 'aria-labelledby': titleId }, [
     el('div', { class: 'discover-entry-about' }, [
-      el('h3', { class: 'discover-entry-title', id: titleId, text: title }),
-      el('p', { class: 'discover-entry-text', text }),
+      el('h3', { class: 'discover-entry-title', id: titleId, ...tx(title) }),
+      el('p', { class: 'discover-entry-text', ...tx(text) }),
       extra,
     ]),
     list,
   ]);
 }
 
-// One row: a decorative marker beside a name and its description.
+// One row: a decorative marker beside a name and its description (keys, or
+// [key, params]).
 function row(dataset, marker, name, description) {
   return el('li', { class: 'discover-tier', dataset }, [
     marker,
     el('div', { class: 'discover-tier-copy' }, [
-      el('span', { class: 'discover-tier-name', text: name }),
-      el('span', { class: 'discover-tier-desc', text: description }),
+      el('span', { class: 'discover-tier-name', ...tx(...label(name)) }),
+      el('span', { class: 'discover-tier-desc', ...tx(...label(description)) }),
     ]),
   ]);
 }
@@ -75,14 +81,15 @@ function row(dataset, marker, name, description) {
 // One Power: what it does, beside its tiers. Names and descriptions only.
 function powerEntry(power) {
   const count = power.tiers.length;
-  return entry(`power-${power.id}`, power.name, power.summary,
-    el('ol', { class: 'discover-tiers', 'aria-label': `${power.name} tiers` }, power.tiers.map((tier) =>
-      row({ tier: String(tier.tier) }, tierMeter(tier.tier, count), tier.name, tier.description))));
+  const key = `power.${power.id}`;
+  return entry(`power-${power.id}`, `${key}.name`, `${key}.summary`,
+    el('ol', { class: 'discover-tiers', ...tattr('aria-label', 'discover.tiers', { name: { t: `${key}.name` } }) }, power.tiers.map((tier) =>
+      row({ tier: String(tier.tier) }, tierMeter(tier.tier, count), `${key}.tier.${tier.tier}.name`, `${key}.tier.${tier.tier}.description`))));
 }
 
 function buildPowerPage() {
   return el('div', { class: 'discover-page' }, [
-    el('h2', { class: 'discover-page-title', text: 'Power' }),
+    el('h2', { class: 'discover-page-title', ...tx('discover.power') }),
     ...POWERS.map(powerEntry),
   ]);
 }
@@ -92,28 +99,31 @@ function buildPowerPage() {
 // they follow, then every Directional Launch. Generic mechanics only.
 function buildLaunchPage() {
   return el('div', { class: 'discover-page' }, [
-    el('h2', { class: 'discover-page-title', text: 'Launch' }),
-    entry('launch-point', 'Launch Point', LAUNCH_POINT_SUMMARY),
-    entry('base-launch', 'Base Launch', BASE_LAUNCH_SUMMARY,
-      el('ol', { class: 'discover-tiers', 'aria-label': 'Base Launch values' }, BASE_LAUNCH_VALUES.map((value) =>
+    el('h2', { class: 'discover-page-title', ...tx('discover.launch') }),
+    entry('launch-point', 'discover.launchPointTitle', 'launch.pointSummary'),
+    entry('base-launch', 'discover.baseLaunchTitle', 'launch.baseSummary',
+      el('ol', { class: 'discover-tiers', ...tattr('aria-label', 'discover.baseLaunchValues') }, BASE_LAUNCH_VALUES.map((value) =>
         row({ value: String(value) },
           el('span', { class: 'discover-value', 'aria-hidden': 'true', text: String(value) }),
-          `Base Launch ${value}`, BASE_LAUNCH_DESCRIPTIONS[value]))),
-      el('p', { class: 'discover-formula', text: LAUNCH_FORMULA })),
-    entry('directional-launch', 'Directional Launch', DIRECTIONAL_LAUNCH_SUMMARY,
-      el('ul', { class: 'discover-tiers', 'aria-label': 'Directional Launch directions' }, DIRECTIONAL_LAUNCHES.map((direction) =>
-        row({ direction: direction.id ?? 'none' },
+          ['discover.baseLaunchValue', { value }], `launch.base.${value}`))),
+      el('p', { class: 'discover-formula', ...tx('launch.formula') })),
+    entry('directional-launch', 'discover.directionalLaunchTitle', 'launch.directionalSummary',
+      el('ul', { class: 'discover-tiers', ...tattr('aria-label', 'discover.directions') }, DIRECTIONAL_LAUNCHES.map((direction) => {
+        const key = `launch.direction.${direction.id ?? 'none'}`;
+        return row({ direction: direction.id ?? 'none' },
           el('span', { class: 'discover-direction', 'aria-hidden': 'true', html: direction.id ? ARROW : DASH }),
-          direction.name, direction.description)))),
+          `${key}.name`, `${key}.description`);
+      }))),
   ]);
 }
 
 // Passives has no content yet, on purpose: the section is scaffolding for a
 // future passives registry, so its page stays empty rather than faked.
+// `label` is the tab's translation key.
 const SECTIONS = [
-  { id: 'power', label: 'Power', build: buildPowerPage },
-  { id: 'launch', label: 'Launch', build: buildLaunchPage },
-  { id: 'passives', label: 'Passives', build: () => null },
+  { id: 'power', label: 'discover.power', build: buildPowerPage },
+  { id: 'launch', label: 'discover.launch', build: buildLaunchPage },
+  { id: 'passives', label: 'discover.passives', build: () => null },
 ];
 
 export class DiscoverScreen extends Screen {
@@ -123,7 +133,7 @@ export class DiscoverScreen extends Screen {
       const tab = el('button', {
         class: 'discover-tab', type: 'button', role: 'tab', id: `discover-tab-${section.id}`,
         'aria-controls': `discover-panel-${section.id}`, 'aria-selected': 'false', tabindex: '-1',
-        'data-nav': true, 'data-nav-no-hover-focus': true, text: section.label,
+        'data-nav': true, 'data-nav-no-hover-focus': true, ...tx(section.label),
       });
       const panel = el('div', {
         class: 'discover-panel', role: 'tabpanel', id: `discover-panel-${section.id}`,
@@ -137,13 +147,13 @@ export class DiscoverScreen extends Screen {
     this.tabs = this.sections.map((s) => s.tab);
 
     this.rail = el('div', {
-      class: 'discover-rail', role: 'tablist', 'aria-label': 'Discover sections', 'aria-orientation': 'vertical',
+      class: 'discover-rail', role: 'tablist', ...tattr('aria-label', 'discover.sections'), 'aria-orientation': 'vertical',
     }, this.tabs);
     this.narrowQuery = window.matchMedia?.(NARROW_QUERY) ?? null;
     this.narrowQuery?.addEventListener?.('change', () => this.updateOrientation());
 
     this.el.replaceChildren(
-      screenHeader({ title: 'Discover', kicker: CONFIG.title, onBack: () => this.onBack() }),
+      screenHeader({ title: 'discover.title', kicker: 'brand.title', onBack: () => this.onBack() }),
       el('div', { class: 'screen-body discover-layout' }, [
         this.rail,
         el('div', { class: 'discover-panels' }, this.sections.map((s) => s.panel)),
