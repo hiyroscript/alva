@@ -105,12 +105,13 @@ attack animations. Its touch button has a dashed outline.
 ### Language
 
 Alva speaks **English** and **French**. The first time it is opened on a
-device, before the intro, it asks once: a small dialog titled "Language ·
-Langue" with two choices, **English** and **Français** (the one matching the
+device, after the complete intro, it asks once over black: a small dialog
+titled "Language · Langue" with two choices, **English** and **Français** (the one matching the
 browser's language has focus, but nothing is chosen for you). The choice is
 saved on the device and applied at once, and a returning player is never
-asked again. Change it later under **Settings → Language** (the gear at the
-top right of Home): the whole interface switches immediately, with no
+asked again: subsequent launches go from splash directly to Home. Home stays
+hidden until a language is chosen. Change it later under **Settings → Language**
+(the gear at the top right of Home): the whole interface switches immediately, with no
 reload, and `<html lang>` follows.
 
 Every player-facing string, and every spoken label (`aria-label`s, dialog

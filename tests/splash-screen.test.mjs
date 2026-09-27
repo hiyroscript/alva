@@ -34,7 +34,7 @@ function setup(loadImage, reduced = false) {
   const root = new Element();
   globalThis.document = { querySelector: () => root, createElement: () => new Element() };
   const calls = [];
-  const app = { assets: { loadImage }, device: { reducedMotion: reduced }, screens: { go: (...args) => calls.push(args) } };
+  const app = { assets: { loadImage }, device: { reducedMotion: reduced }, continueAfterSplash: (isCurrent) => calls.push(isCurrent) };
   const splash = new SplashScreen(app);
   return { splash, calls, root };
 }
@@ -47,15 +47,17 @@ function fakeDelays(splash) {
   return delays;
 }
 
-test('both loads and both decodes gate the ordered sequence and single Home navigation', async () => {
+test('both loads and both decodes gate the ordered sequence and single application continuation', async () => {
   const first = deferred(), second = deferred(), decode = deferred();
   const hs = image(), alva = image(() => decode.promise);
   const { splash, calls } = setup(url => url === './hs.jpg' ? first.promise : second.promise);
   const delays = fakeDelays(splash);
   splash.enter();
   first.resolve(hs); await flush();
+  assert.equal(calls.length, 0);
   assert.equal(splash.stage.children.length, 0);
   second.resolve(alva); await flush();
+  assert.equal(calls.length, 0);
   assert.equal(splash.stage.children.length, 0);
   decode.resolve(); await flush();
   assert.deepEqual(splash.stage.children, [hs]);
@@ -70,9 +72,11 @@ test('both loads and both decodes gate the ordered sequence and single Home navi
   assert.deepEqual(splash.stage.children, [hs]); // Still waiting on the credit fade.
   credit.animations.forEach(a => a.finish()); await flush();
   assert.equal(splash.stage.children.length, 0);
+  assert.equal(calls.length, 0);
   assert.equal(delays[0].ms, CONFIG.splash.betweenImages);
   delays.shift().finish(); await flush();
   assert.deepEqual(splash.stage.children, [alva]);
+  assert.equal(calls.length, 0);
   assert.equal(credit.animations.length, 1); // The credit only accompanies hs.jpg.
   alva.animations.forEach(a => a.finish()); await flush();
   assert.equal(splash.stage.children.length, 0);
@@ -81,7 +85,8 @@ test('both loads and both decodes gate the ordered sequence and single Home navi
   const run = splash.run;
   delays.shift().finish(); await flush();
   splash.finish(run);
-  assert.deepEqual(calls, [['home', {}, { reset: true }]]);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0](), true);
 });
 
 test('exit while loading and reentry discard stale work; exit cancels animations', async () => {
@@ -114,6 +119,7 @@ test('reduced motion uses holds without animation; real pending timer is cleared
   assert.equal(splash.credit.style.opacity, '');
   delays.shift().finish(); await flush();
   assert.deepEqual(splash.stage.children, [alva]);
+  assert.equal(calls.length, 0);
   assert.equal(splash.credit.style.opacity, '');
   assert.equal(alva.animations.length, 0);
   splash.exit(); await flush();
@@ -134,8 +140,47 @@ test('null, rejected load, and rejected decode skip the whole intro cleanly', as
       const { splash, calls } = setup(load);
       splash.enter(); await flush();
       assert.equal(splash.stage.children.length, 0);
-      assert.deepEqual(calls, [['home', {}, { reset: true }]]);
+      assert.equal(calls.length, 1);
+      assert.equal(calls[0](), true);
     }
     assert.equal(errors.length, 3);
   } finally { console.error = original; }
+});
+
+test('reduced motion completes once after the final black hold; exit invalidates its continuation', async () => {
+  const { splash, calls } = setup(() => Promise.resolve(image()), true);
+  const delays = fakeDelays(splash);
+  splash.enter(); await flush();
+  const run = splash.run;
+  for (const ms of [CONFIG.splash.reducedMotionHold, CONFIG.splash.betweenImages,
+    CONFIG.splash.reducedMotionHold, CONFIG.splash.finalBlackHold]) {
+    assert.equal(calls.length, 0);
+    assert.equal(delays[0].ms, ms);
+    delays.shift().finish(); await flush();
+  }
+  splash.finish(run);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0](), true);
+  assert.equal(splash.stage.children.length, 0);
+  splash.exit();
+  assert.equal(calls[0](), false);
+  splash.enter();
+  assert.equal(calls[0](), false);
+  splash.exit(); await flush();
+});
+
+test('exit during decode, gap or final hold never continues', async () => {
+  const decode = deferred();
+  const pending = setup(() => Promise.resolve(image(() => decode.promise)));
+  pending.splash.enter(); await flush();
+  pending.splash.exit(); decode.resolve(); await flush();
+  assert.equal(pending.calls.length, 0);
+  for (const hold of [1, 3]) {
+    const { splash, calls } = setup(() => Promise.resolve(image()), true);
+    const delays = fakeDelays(splash);
+    splash.enter(); await flush();
+    for (let i = 0; i < hold; i++) { delays.shift().finish(); await flush(); }
+    splash.exit(); delays.shift().finish(); await flush();
+    assert.equal(calls.length, 0);
+  }
 });

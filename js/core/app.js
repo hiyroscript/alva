@@ -2,9 +2,9 @@
 // requestAnimationFrame loop and cross-screen selection state, the player's
 // settings and the interface language.
 //
-// Start-up: a player who has never picked a language gets the one-time
-// language chooser over the black start screen first; once a language is
-// chosen (or already was) the intro plays, then Home.
+// Start-up: the complete intro plays first. A new player then chooses a
+// language over the cleared black splash before Home; a returning player
+// proceeds directly to Home in their saved language.
 
 import { CONFIG } from '../config.js';
 import { AssetLoader } from './asset-loader.js';
@@ -109,9 +109,15 @@ export class App {
       if (this.touchEditor.isOpen) this.touchEditor.refresh();
     });
     requestAnimationFrame(this.loop);
-    // First launch on this device: ask for a language before anything else
-    // (a returning player goes straight on to the intro).
-    this.languageDialog.ensureChosen().then(() => s.go('splash'));
+    s.go('splash');
+  }
+
+  // Called once by a completed splash. Keep its black screen underneath the
+  // chooser, and ignore a continuation whose splash was exited or restarted.
+  async continueAfterSplash(isCurrent) {
+    if (!isCurrent()) return;
+    await this.languageDialog.ensureChosen();
+    if (isCurrent()) this.screens.go('home', {}, { reset: true });
   }
 
   // Re-reads every string on the page in the new language: each marked one

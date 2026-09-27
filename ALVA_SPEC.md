@@ -272,7 +272,7 @@ fit the palette.
 ## 6. Screens and flow
 
 ```
-First launch (no language chosen yet) → Language chooser (6.11) → Splash → Home
+First launch (no language chosen yet) → Splash → Language chooser (6.11) → Home
 Splash → Home → Select Mode → Select Difficulty → Select Fighter → Select Stage → Battle
 Home → Watch Mode → Select Difficulty → Select CPU 1 → Select CPU 2 → Select Stage → CPU vs CPU Battle (6.5a)
 Home → Practice Ground (starts at once with #0001 and a #0001 practice CPU)
@@ -296,10 +296,11 @@ Difficulty cards).
 
 ### 6.1 Splash
 
-- On a device where no language has been chosen yet, the one-time language
-  chooser (6.11) comes first, over the same black; the splash starts once a
-  language is picked, so the intro and everything after it are already in
-  that language. A returning player goes straight to the splash.
+- The splash always comes first. On a device where no language has been
+  chosen yet, the one-time chooser (6.11) follows the complete sequence over
+  the cleared black splash; Home waits for a choice. The splash credit may
+  use the temporary English default. A returning player uses their saved
+  language and proceeds directly from splash to Home.
 - Start on blank, pure black, with no text, loading UI, Home or rotate overlay.
   Both `./hs.jpg` and `./alvafav.PNG` must load through AssetLoader and fully
   decode before either image appears. Fighter preloading continues independently.
@@ -310,14 +311,16 @@ Difficulty cards).
   with generous letter spacing. It fades in and out with `hs.jpg` and does not zoom.
 - After 220 ms of clean black, show `alvafav.PNG` with the same treatment at
   its own appropriate size. The images never overlap visibly.
-- After the second fade-out and 200 ms of black, navigate to Home. Its existing
+- After the second fade-out and 200 ms of black, the application ensures a
+  language is chosen, then navigates to Home with a reset stack. Its existing
   entrance dissolve reveals it over the still-mounted black splash.
 - Input does not skip loading or the sequence. Leaving or re-entering cancels
   pending animation and delays. A load/decode failure logs an error and skips
-  the entire intro to Home without showing partial or broken artwork.
+  the entire intro without showing partial or broken artwork, then uses the
+  same language-choice continuation before Home.
 - Reduced motion retains the same preload gate and image order, with no zoom
   or fades: each image holds for 1000 ms, separated by the same black beats.
-- The page is black before boot; the rotate overlay resumes normally after splash.
+- The page is black before boot; the rotate overlay resumes normally on Home.
   Asset paths remain relative and the existing favicon reference is unchanged.
 
 ### 6.2 Home
@@ -841,18 +844,20 @@ shown.
 Alva's interface is in **English** or **French** (Canadian / international
 French, concise game terms).
 
-- **First launch.** With no language chosen yet, `App.start` shows a
-  one-time chooser (`js/ui/language-dialog.js`) over the black start screen,
-  before the splash: title "Language · Langue", the prompt "Choose your
+- **First launch.** The splash always plays first. With no language chosen yet,
+  `App.continueAfterSplash` shows a one-time chooser
+  (`js/ui/language-dialog.js`) over the cleared black splash, after its final
+  black hold and before Home: title "Language · Langue", the prompt "Choose your
   language · Choisissez votre langue" and a note that it can be changed in
   Settings, all in both languages at once, and exactly two buttons,
   **English** and **Français**, each with its own `lang`. The browser's
   preferred language only decides which one has focus first. It is a real
   modal (`role="dialog"`, `aria-modal`, its own navigation scope; Back does
   nothing: a choice is required). Choosing saves the language through the
-  Settings store, switches the interface and starts the splash. A returning
-  player never sees it again (`LanguageDialog.ensureChosen()` resolves at
-  once).
+  Settings store, switches the interface and enters Home with a reset stack.
+  Home is never shown behind the chooser. A returning player goes directly
+  from splash to Home in their saved language (`LanguageDialog.ensureChosen()`
+  resolves at once). Failed splash loads use the same continuation.
 - **One source of strings.** Every player-facing and screen-reader string
   lives in `js/core/i18n.js` (`STRINGS.en`, `STRINGS.fr`), looked up by
   stable key with `t(key, params)` (`{name}` placeholders; a placeholder may
