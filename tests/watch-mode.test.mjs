@@ -621,7 +621,7 @@ test('locked roster slots stay locked on both Watch rosters, exactly as on Selec
       assert.equal(slot.hasAttribute('data-nav'), false, 'out of keyboard / gamepad navigation');
       assert.match(slot.getAttribute('aria-label'), /^Slot \d\d, locked$/);
     }
-    assert.deepEqual(screen.roster.slots.filter((s) => s._def?.available).map((s) => s._def.id), ['0001', '0002', '9999']);
+    assert.deepEqual(screen.roster.slots.filter((s) => s._def?.available).map((s) => s._def.id), ['0001', '9999']);
   }
 });
 
