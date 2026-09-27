@@ -1,374 +1,475 @@
-You are working in the GitHub repository hiyroscript/alva.
+You are working in the hiyroscript/alva repository.
 
-Implement this feature completely in the existing architecture. Do not replace the project with a framework and do not rewrite unrelated game systems. Preserve the current visual identity, gameplay behavior, keyboard/gamepad behavior, accessibility patterns, responsive landscape design, safe-area handling, reduced-motion support, and existing test philosophy.
-
-Context you must understand before editing
-
-Alva is a vanilla JavaScript browser fighting game.
-
-The central application controller is js/core/app.js. It creates app.settings, ScreenManager, MenuNavigator, loading/confirmation overlays, registers all screens, starts at SplashScreen, and runs the animation loop.
-
-The splash flow is in js/screens/splash-screen.js. At present it finishes by navigating to Home.
-
-The Home UI is in js/screens/home-screen.js. Its menu currently contains Play, Watch Mode, Practice Ground, Discover, and Settings. Settings is currently a normal full screen reached through that fifth Home menu button.
-
-The current Settings screen is js/screens/settings-screen.js. It only manages the mobile control scheme, with Joystick and Classic Buttons options.
-
-Persistent user preferences are deliberately centralized in js/core/settings.js. It is currently the only game module that directly touches localStorage, using the alva.settings key and a versioned object. Preserve this architectural rule: no other module should directly read or write localStorage.
-
-Touch controls live in js/game/touch-controls.js, with their positioning and sizes primarily defined in styles.css. There are two existing schemes: joystick and classic. Both must continue driving exactly the same internal input actions. Quick Battle and Practice Ground create TouchControls; Watch Mode intentionally has no player touch controls.
-
-Overlay keyboard/gamepad handling already has a good pattern. js/ui/overlays.js uses app.nav.pushScope() / popScope(), and js/core/menu-navigator.js supports modal navigation, Back/Escape handling, spatial navigation, focus management, and gamepad controls. Reuse that pattern instead of building a second navigation system.
-
-The game already has extensive dependency-free Node tests, especially tests/settings.test.mjs, tests/controls-ui.test.mjs, tests/splash-screen.test.mjs, tests/battle-screen.test.mjs, tests/practice-ground.test.mjs, and tests/watch-mode.test.mjs.
+Alva is a framework-free browser fighting game built with HTML, CSS, ES modules, and Canvas 2D. There is no build step. Preserve the existing architecture, visual identity, accessibility behavior, settings persistence, splash animation, and menu flow.
 
 Goal
 
-Add a proper player-preferences system with English/French language selection, replace the Home Settings menu item with a top-right settings icon that opens a translucent modal dialog, and add a full touch-control layout editor allowing players to freely move and resize their mobile controls.
+Change Alva’s startup flow so that the first-run language selection dialog appears only after the complete splash sequence has finished.
 
-The feature must feel native to the existing Alva UI rather than like a separate tool bolted onto it.
+The current implementation does this:
 
-First-launch language selection
+First launch → Language dialog → Splash → Home
 
-The first time a player launches Alva on a device, show a one-time language-selection dialog offering exactly:
+Change it to:
 
-English
+First launch → Splash → Language dialog → Home
 
-Français
+For a returning player who has already selected a language:
 
-Do not force the player through the normal Settings UI first.
+Returning launch → Splash → Home
 
-This first-run dialog should appear before the normal game experience begins, ideally before the splash sequence so that once a language is chosen all subsequent player-facing UI can use the selected language. A clean flow is:
+The language chooser must never appear before or on top of the splash animation.
 
-App initialization → determine whether a valid language preference exists → if not, display the language dialog over the initial black background → player selects English or Français → persist the preference → start the normal splash → Home.
+Existing implementation
 
-Returning players with a stored language preference must not see this first-run dialog again.
+Inspect the relevant code before making changes, especially:
 
-The first-run language chooser itself should be understandable without an existing locale. Use a neutral/bilingual presentation such as a title that clearly communicates language selection and buttons whose names are self-identifying: “English” and “Français”.
+* js/core/app.js
+* js/screens/splash-screen.js
+* js/ui/language-dialog.js
+* js/core/settings.js
+* js/core/i18n.js
+* js/core/screen-manager.js
+* index.html
+* styles.css
+* tests/splash-screen.test.mjs
+* tests/settings.test.mjs
+* tests/i18n.test.mjs
+* README.md
+* ALVA_SPEC.md
 
-The language choice must be persisted through the existing Settings abstraction, never by directly using localStorage from the dialog.
+Relevant current behavior:
 
-If storage is unavailable or blocked, keep the selected language for the current session just as the existing settings implementation does. It is acceptable that it cannot survive a future browser visit when persistent storage itself is unavailable.
+* App.start() registers the screens, localizes the page, starts preloading fighter assets, starts the animation loop, then calls languageDialog.ensureChosen() before navigating to splash.
+* SplashScreen.finish() currently clears the splash and directly calls:
+    this.app.screens.go('home', {}, { reset: true }).
+* LanguageDialog.ensureChosen() immediately resolves for a returning player, but opens the modal and waits for a choice for a first-time player.
+* A null language in Settings means English is temporarily used as the interface default, but it does not count as the player having chosen English.
+* The browser language currently only determines which language option initially receives focus. It must not automatically choose a language.
+* The language dialog cannot be dismissed with Back; the player must choose English or Français.
+* The selected language is saved through the existing Settings store and the existing i18n listeners localize the game immediately.
 
-Do not mistake “default to English” for “the player selected English.” The application needs to know whether the initial language choice has actually been completed so the one-time prompt works correctly.
+Preserve all of those semantics.
 
-Localization
+Required startup behavior
 
-Add a small maintainable localization layer supporting exactly en and fr for now.
+First launch
 
-Use stable translation keys rather than scattering checks such as language === 'fr' ? ... : ... throughout the codebase.
+When alva.settings does not contain a valid chosen language:
 
-A sensible architecture would be a module such as js/core/i18n.js or equivalent, owned by App, exposing something like t(key, params) and the active language. The exact implementation is flexible, but there must be one clear source of translations.
+1. Start Alva normally.
+2. Register all screens and managers.
+3. Start fighter preloading as it does today.
+4. Enter the splash screen immediately.
+5. Play the complete existing splash sequence with no language dialog visible.
+6. Do not reveal Home when the splash finishes.
+7. Clear the splash artwork to its existing black background.
+8. Open the existing first-run language dialog.
+9. Keep the user on that black post-splash state while the dialog is open.
+10. Do not allow navigation to Home until a valid language has been chosen.
+11. When the player chooses English or Français:
+    * save it using the existing Settings API;
+    * allow the existing i18n system to apply it;
+    * close the language dialog;
+    * navigate to Home with the existing reset semantics.
+12. Home must appear directly in the language the player selected. There must be no visible flash of Home in English before the selection.
 
-Translate player-facing UI, not internal game identifiers.
+The visual sequence should therefore feel like:
 
-Internal IDs and gameplay codenames such as quick-battle, mobileControls, runLeft, uniqueba, ba1, ba2, character IDs, map IDs, input actions, CSS classes, and data keys must remain unchanged.
+hiyroscript splash → Alva splash → black → Language / Langue modal → Home
 
-At minimum localization must cover the Home menu, screen headings and setup labels, Back/Confirm/Cancel-type UI, difficulty/interface text, Discover UI, Settings UI, pause/practice menus, battle/result dialogs, loading/error UI, HUD player-facing labels, touch-control accessible names, menu hints, and other visible or screen-reader-facing interface strings.
+Returning player
 
-Character and project names should remain proper names unless there is an intentional translated display name.
+If a valid language has already been chosen:
 
-Do not translate technical internal data merely for the sake of translation.
+1. Play the splash normally.
+2. After it finishes, skip the language dialog completely.
+3. Navigate directly to Home.
+4. Continue using the saved language.
 
-Changing Language from Settings must update the active interface immediately without requiring a page reload.
+Do not briefly render or focus the language chooser for returning players.
 
-Update the root document language (document.documentElement.lang) to en or fr whenever the preference changes.
+Architecture
 
-Ensure dynamically generated UI such as dialogs and touch-control aria-labels uses the current language.
+Keep startup sequencing owned by the application controller rather than making SplashScreen responsible for Settings/i18n details.
 
-French copy should be natural Canadian/international French rather than literal broken translations. Preserve concise game terminology.
+A good implementation is to introduce a small application-level continuation method, for example:
 
-Persistent settings and migration
+App.continueAfterSplash()
 
-Extend js/core/settings.js; do not create another storage system.
+or another clear name consistent with the codebase.
 
-The persisted settings now need to represent at least the selected language, current mobile control scheme, and custom touch-control layout information.
+Its responsibility should be conceptually:
 
-Introduce a backward-compatible schema migration. Existing users may already have the current version-1 object containing only mobileControls. Their Joystick/Classic preference must not silently disappear after this update.
+* wait for languageDialog.ensureChosen();
+* after that resolves, navigate to Home with { reset: true }.
 
-A good solution is to increment the settings schema version and explicitly migrate version 1 into the new schema, preserving mobileControls while leaving language unselected so the new language chooser is shown once.
+Then:
 
-Malformed, unsupported, corrupt, or partially invalid settings must still fail safely.
+* App.start() should navigate directly to splash;
+* SplashScreen.finish() should notify the App that the splash has completed instead of hard-coding direct navigation to Home.
 
-Validate every loaded value before using it.
+Keep the dependency direction clean:
 
-Control-layout coordinates and scale values must be sanitized and clamped rather than trusting arbitrary stored JSON.
+SplashScreen → App startup continuation → LanguageDialog → Home
 
-Continue writing the settings as one versioned object under alva.settings.
+rather than:
 
-Replace Home’s Settings menu item
+SplashScreen → LanguageDialog internals.
 
-Remove the large “Settings” button from the Home action list.
+Avoid duplicating language-choice logic.
 
-Home should contain Play, Watch Mode, Practice Ground, and Discover as its normal main menu actions.
+Do not introduce a second first-run flag. Settings.languageChosen / the existing persisted language value remains the source of truth.
 
-Add a compact Settings icon button in the top-right corner of the Home screen.
+Important visual requirement
 
-Add an original inline SVG gear/settings glyph to js/ui/icons.js, following the existing ICONS style: geometric SVG, currentColor, no external asset.
+The language modal must appear after all splash timing has completed, including:
 
-The button must have a localized accessible label such as “Settings” / “Paramètres”.
+* image loading/decoding;
+* hiyroscript artwork;
+* credit fade;
+* between-image gap;
+* Alva artwork;
+* final black hold;
+* reduced-motion equivalents.
 
-It must be reachable using keyboard and gamepad navigation as well as pointer/touch input.
+Do not overlap the modal with the final splash artwork or fade.
 
-Its placement should respect env(safe-area-inset-top) and env(safe-area-inset-right) using the project’s existing safe-area variables/tokens.
+When the dialog opens, the splash screen may remain the current underlying screen in its cleared/black state until the choice is made. That is preferable to navigating to Home underneath the dialog.
 
-Do not add a permanent settings gear over live Battle or Practice gameplay. This requirement replaces the Settings Home action; it is Home chrome.
+Do not show Home and then place the language dialog on top of it.
 
-Update Home tests that currently assume five vertically ordered actions.
+Splash behavior
 
-Settings is now a translucent dialog, not a separate screen
+Do not redesign the splash.
 
-Opening the Home gear must no longer navigate to a full SettingsScreen.
+Preserve:
 
-Settings should open as a semi-transparent glass/modal dialog over Home.
+* hs.jpg;
+* alvafav.PNG;
+* current zoom;
+* fades;
+* timing;
+* hiyroscript credit;
+* reduced-motion handling;
+* strict splash image decode behavior;
+* cancellation/re-entry protection;
+* failure handling;
+* existing black transition behavior.
 
-Use the visual language already present in Alva’s overlays and Practice dialogs: subtle dark dimming, translucent dark glass, border/sheen, readable text, and backdrop blur where supported.
+Because a first-time player has not selected a language yet, the existing temporary/default language may continue to be used for the small splash credit. Do not add browser-language auto-selection or another pre-splash prompt just to localize that line.
 
-The Home scene should remain visible behind it.
+If the splash assets fail and the intro is skipped through the existing fallback path, treat the splash as completed:
 
-Settings currently only needs two top-level sections:
+* first-time player → language chooser → Home;
+* returning player → Home.
 
-Language
+Language dialog
 
-Controls
+Do not redesign the first-run dialog unless a tiny change is necessary for sequencing.
 
-Do not add audio, graphics, difficulty, account, or unrelated settings.
+Preserve:
 
-The modal should be responsive to short landscape screens and may scroll internally when required without scrolling the Home screen underneath.
+* exactly English and Français;
+* language names displayed in their own languages;
+* bilingual first-run title/prompt/note;
+* proper lang attributes;
+* role="dialog";
+* aria-modal="true";
+* aria-labelledby;
+* aria-describedby;
+* keyboard navigation;
+* gamepad navigation;
+* browser-language initial focus;
+* no automatic selection;
+* no Back dismissal;
+* Settings-based persistence;
+* blocked-storage in-memory behavior.
 
-Provide a clear close control.
+Update comments in js/ui/language-dialog.js that currently say the chooser appears before the intro.
 
-Escape / gamepad Back must close the dialog.
+They should describe the new sequence accurately.
 
-Click/tap on the dimmed backdrop may close it if that is consistent with the rest of the UI, but clicking inside the panel must not.
+Settings screen
 
-Opening the dialog must push a MenuNavigator scope. Closing it must remove that exact scope.
+The normal Home → Settings → Language behavior must remain unchanged.
 
-Focus should enter the dialog on open and return to the settings gear on close.
+After initial setup:
 
-Use role="dialog", aria-modal="true", appropriate labelling, and the existing [data-nav] convention.
+* changing Language from Settings must continue to switch the UI immediately;
+* it must persist normally;
+* it must not replay the splash;
+* it must not invoke the first-run chooser.
 
-Avoid keeping a dead Settings screen just for historical reasons. If SettingsScreen, its <section data-screen="settings">, registration, imports, CSS, or tests become obsolete after this change, remove/refactor them cleanly.
+Do not conflate the Settings language control with the one-time first-run dialog.
 
-A reasonable new module is js/ui/settings-dialog.js, although the exact filename is flexible.
+Screen navigation
 
-Language section
+Preserve the existing ScreenManager stack/reset behavior.
 
-The Language section must contain English and Français as an accessible single-choice control.
+When startup reaches Home, use the same reset behavior currently used by SplashScreen.finish():
 
-Use native buttons with radio semantics or an equally accessible pattern consistent with the existing Settings implementation.
+go('home', {}, { reset: true })
 
-The active choice must be visually clear.
+The startup language dialog must not add fake screen entries to the navigation stack.
 
-Selecting a language saves immediately.
+After Home appears, pressing Back must not lead back to the splash or the first-run language dialog.
 
-The Settings dialog stays open after selection.
+Input/focus requirements
 
-All currently visible Settings text should switch immediately into the new language.
+During the splash:
 
-Controls section
+* the first-run dialog must not exist as an active navigation scope;
+* no language button should be focusable;
+* splash remains non-navigable as it currently is.
 
-Keep the existing Mobile Controls scheme choice:
+Once the first-run dialog appears:
 
-Joystick
+* its existing navigation scope becomes active;
+* the browser-preferred supported language may receive initial focus as it does now;
+* Enter/gamepad A/click/tap must choose normally;
+* Back remains intentionally ineffective.
 
-Classic Buttons
+Once the language is chosen:
 
-Move this choice into the new Controls section.
+* remove the dialog’s navigation scope exactly once;
+* hide the dialog;
+* prevent stale focus from remaining on a removed/hidden language button;
+* enter Home normally.
 
-Changing schemes must retain the existing semantics in TouchControls.setScheme() and must never change keyboard or gamepad mappings.
+Avoid race conditions or duplicate Home navigation.
 
-Also add an obvious action such as “Customize touch controls” / “Personnaliser les commandes tactiles”.
+Race/cancellation safety
 
-This opens a dedicated touch-layout editor inside the Settings experience or as a second modal layer.
+Preserve the splash screen’s existing run/active() protections.
 
-Touch-control layout editor
+The post-splash continuation should happen exactly once per completed splash run.
 
-This is a real editor, not a handful of fixed presets.
+A stale splash run that has been exited or superseded must not later open the language dialog or send the application Home.
 
-The player must be able to freely reposition every visible mobile gameplay control and freely change its size.
-
-For Classic Buttons, the editable controls include Move Left, Charge/C, Move Right, and all six right-side action buttons.
-
-For Joystick, the editable controls include the joystick itself, its Charge button, both mouvement/Dash buttons, and all six right-side action buttons.
-
-Treat the joystick as an editable control even though it is not a <button>.
-
-Every editable control must have a stable control ID that is independent of its translated label.
-
-The editor should display a representative landscape game/control surface so players can position controls where they will actually appear.
-
-Dragging a control moves it.
-
-Selecting a control must provide an explicit size adjustment UI, such as a slider and/or +/- controls, so resizing is possible without requiring a multitouch pinch gesture. Pointer pinch resizing may be added but must not be the only way.
-
-Changes should preview immediately.
-
-Include a “Reset to defaults” action that restores the exact current Alva layout for the selected scheme.
-
-Include a clear Done/Back action.
-
-Save edits automatically or when leaving the editor, but the behavior must be deterministic and covered by tests.
-
-Players should be able to customize Joystick and Classic layouts independently. Switching control scheme later must restore that scheme’s own saved layout.
-
-Responsive layout representation
-
-Do not persist raw desktop pixel coordinates.
-
-Store positions in a resolution-independent form so a layout customized on one landscape viewport remains usable on another.
-
-Use normalized coordinates or percentages relative to the touch-control viewport/safe play area. Store each control around its center, for example an x, y, and scale.
-
-At runtime translate normalized positions into the current viewport.
-
-Respect safe-area insets.
-
-Clamp controls so their usable hit area cannot be moved completely off-screen.
-
-Allow meaningful freedom, including moving controls away from their default clusters, but prevent permanently inaccessible configurations.
-
-Choose sensible scale limits. They should provide clearly smaller and clearly larger controls without allowing zero-sized or absurdly giant buttons. Something in the approximate 0.6–1.8x range is reasonable unless the existing geometry suggests better limits.
-
-A control’s visual size and touch hitbox must scale together.
-
-Window resize/orientation changes must recompute positions correctly.
-
-Default behavior when no custom layout exists must remain pixel-for-pixel or effectively visually equivalent to the current layout.
-
-TouchControls integration
-
-Refactor js/game/touch-controls.js carefully.
-
-Do not change what any control does.
-
-Do not change the combat input names.
-
-Do not break Pointer Events multi-touch.
-
-Do not break held buttons.
-
-Do not break joystick deadzone/engage behavior.
-
-Do not break Dash/mouvement tap behavior.
-
-Do not break setCharacter() changing ability icons.
-
-Do not break setScheme().
-
-Do not introduce input latency.
-
-Apply the saved custom layout when Battle and Practice instantiate/activate their touch controls.
-
-If settings change between sessions, the next battle/practice must use the updated layout.
-
-Watch Mode must continue hiding touch controls entirely.
-
-If useful, add methods such as setLayout(layout), applyLayout(), getControlElements(), or equivalent rather than coupling Battle/Practice directly to CSS internals.
-
-Because Classic Buttons currently has cluster-level pointer behavior for sliding between Left/C/Right, preserve that behavior even when those buttons have custom positions. Refactor hit testing/pointer capture as needed rather than silently losing slide-to-change functionality.
-
-Styling
-
-Extend styles.css using the existing design tokens and glass styling.
-
-Do not introduce an unrelated design system.
-
-The settings gear should visually fit the Home page.
-
-The Settings panel should be semi-transparent, not an opaque full-screen replacement.
-
-Editor controls should be obvious without making the actual game buttons look unlike their real gameplay appearance.
-
-During edit mode, show a selection state around the active control and enough visual affordance to make dragging understandable.
-
-Do not leave developer-only control IDs visible to the player.
-
-Maintain good contrast for text and focus states.
-
-Respect prefers-reduced-motion / the existing device.reducedMotion behavior.
-
-Accessibility and input requirements
-
-Everything in Settings must work with mouse, touch, keyboard, and gamepad where applicable.
-
-The first-launch language dialog must be keyboard/gamepad navigable.
-
-The settings gear must be keyboard/gamepad navigable.
-
-The Settings modal must use a navigation scope so navigation cannot escape behind it.
-
-The touch-layout editor must have a non-drag way to make meaningful changes. Keyboard/gamepad users should be able to select a control, move it in small steps with directional input while in an explicit edit mode, and adjust size using navigable controls.
-
-Do not make gameplay touch buttons keyboard-focusable during actual battle; preserve the existing design there.
-
-Translate aria-label, dialog labels, and descriptions when the language changes.
-
-Focus must never be left in hidden content when a modal closes.
+Do not add arbitrary timers for sequencing. Use the completion of the existing splash lifecycle.
 
 Tests
 
-Update existing tests rather than deleting coverage simply because the UI changed.
+Update and/or add tests so the new ordering is explicitly locked in.
 
-Add focused tests for the new behavior.
+Splash tests
 
-Run the full test suite with Node’s built-in test runner after implementation.
+tests/splash-screen.test.mjs currently expects the splash to navigate directly to Home.
 
-The tests and final implementation must verify at least the following:
+Update it to test the new application continuation boundary.
 
-1. A fresh settings store has no completed language preference, so first launch requests a choice; choosing English or French persists it, while returning users skip the chooser. Version-1 settings migrate without losing the existing mobileControls value.
-2. Invalid languages, invalid control schemes, malformed custom layout objects, non-finite coordinates, and out-of-range scales are rejected or sanitized safely.
-3. document.documentElement.lang reflects the current language.
-4. Changing language at runtime updates visible Settings UI and representative UI elsewhere without reloading the page.
-5. Home has exactly the intended normal menu actions after Settings is removed, and it has a separate top-right settings gear.
-6. Activating the gear opens the Settings dialog rather than navigating to a Settings screen. Escape/gamepad Back closes it and focus returns correctly.
-7. The Settings dialog exposes exactly the intended Language and Controls sections.
-8. Joystick and Classic Buttons remain selectable and persisted.
-9. Both schemes have complete, stable editable-control IDs.
-10. Custom positions and size scales round-trip through Settings.
-11. Joystick and Classic custom layouts are stored independently.
-12. Reset returns a scheme to its original default geometry.
-13. TouchControls applies saved layout values without changing any input action generated by a button, Dash control, joystick, held action, or fighter-specific ability.
-14. Classic Left/C/Right sliding still behaves correctly after the layout refactor.
-15. Battle and Practice use saved control scheme/layout values. Watch Mode still has no touch controls.
-16. Existing touch multi-pointer behavior continues working.
-17. Existing combat/gameplay tests remain unchanged in behavior and continue passing.
-18. No module other than js/core/settings.js directly accesses localStorage or sessionStorage.
-19. The settings and first-run dialogs expose correct modal semantics and navigation scopes.
-20. Existing viewport zoom prevention, safe-area handling, and touch-action rules remain intact.
+The tests should establish that:
+
+* the continuation is not invoked before both splash images load/decode;
+* it is not invoked during the first artwork;
+* it is not invoked during the between-image gap;
+* it is not invoked while the Alva artwork is active;
+* it is not invoked before the final black hold finishes;
+* after the complete sequence, it is invoked exactly once;
+* reduced-motion completes through the same continuation;
+* splash failure/skip still invokes the continuation;
+* stale/cancelled runs never invoke it.
+
+If you introduce an App method such as continueAfterSplash, mock that method in the splash unit test rather than requiring SplashScreen to know about the language dialog.
+
+Startup ordering
+
+Add an explicit test for the application-level continuation if practical.
+
+Verify:
+
+New player
+
+* ensureChosen() is called only after splash completion;
+* Home navigation does not happen while ensureChosen() is unresolved;
+* once it resolves, Home is entered exactly once with reset semantics.
+
+Returning player
+
+* ensureChosen() resolves immediately;
+* Home is entered once;
+* the dialog itself never opens.
+
+The important invariant is:
+
+Splash completion → ensure language → Home
+
+not:
+
+ensure language → Splash → Home
+
+and not:
+
+Splash → Home → language modal.
+
+Existing language tests
+
+Update the test description/assertions in tests/settings.test.mjs that currently describe the chooser as appearing “over black, before the intro.”
+
+The language-dialog unit behavior itself should remain intact:
+
+* shown only when language is unchosen;
+* exactly English/Français;
+* browser language only controls initial focus;
+* choice persists;
+* returning player is not asked again;
+* invalid data still falls back safely.
+
+Do not weaken existing Settings or i18n coverage merely to make the new flow pass.
 
 Documentation
 
-Update the relevant documentation after the implementation.
+Update all current documentation/comments that describe the old ordering.
 
-At minimum update README.md and the Settings/touch-controls portions of ALVA_SPEC.md so they describe the new language preference, Home settings gear/modal, and custom touch layouts.
+At minimum inspect and update:
 
-Keep documentation consistent with the code rather than describing planned behavior.
+ALVA_SPEC.md
 
-Read CLAUDE.md before changing UPDATES.md. Do not invent a named update. Only add an UPDATES.md named-update entry if the owner has actually named this work.
+The current flow says:
 
-Implementation constraints
+First launch (no language chosen yet) → Language chooser → Splash → Home
 
-Preserve the game’s existing internal gameplay behavior.
+Change it to:
 
-Do not add external dependencies unless absolutely unavoidable; this feature should not need any.
+First launch (no language chosen yet) → Splash → Language chooser → Home
 
-Do not introduce React, Vue, a build system, a state-management library, or a translation package.
+Also update the first-launch language section that explicitly says the dialog is shown before the splash.
 
-Do not use external SVG/icon packages.
+Make it clear that:
 
-Do not scatter persistence across modules.
+* the splash is always first;
+* only a new player gets the chooser afterward;
+* a returning player proceeds directly from splash to Home.
 
-Do not use translated strings as keys or internal identifiers.
+README.md
 
-Do not remove accessibility behavior to make pointer editing easier.
+The README currently says the language prompt appears before the intro.
 
-Do not leave obsolete Settings-screen code, registrations, tests, or CSS behind if Settings is converted into a true modal.
+Change that description to the new behavior:
 
-Avoid broad unrelated refactors.
+* splash first;
+* language selection after the splash on the first run;
+* subsequent launches skip the chooser.
 
-Definition of done
+Keep all existing persistence/migration explanations.
 
-The work is complete only when a brand-new player is asked once whether they prefer English or French; that choice changes and persists the game’s interface language; the preference can later be changed from a semi-transparent Settings dialog opened through a top-right Home gear; the old Settings Home menu item is gone; Settings contains Language and Controls; players can still choose Joystick or Classic Buttons; every mobile gameplay control can be individually repositioned and resized with responsive persisted layouts; the customized controls behave identically to their original gameplay counterparts; Reset restores the original layout; keyboard/gamepad/modal accessibility continues working; Quick Battle and Practice use the custom settings; Watch Mode remains unaffected; documentation is current; and the full existing plus new Node test suite passes.
+Source comments
 
-Before finishing, inspect the diff for obsolete references such as Home → Settings, assumptions that Home has five actions, references to a full SettingsScreen, and documentation saying Mobile Controls is the only stored preference. Update those references where appropriate without altering unrelated historical documentation.
+Update stale comments in at least:
+
+* js/core/app.js
+* js/ui/language-dialog.js
+
+and anywhere else that explicitly documents the old ordering.
+
+Do not modify historical files merely to rewrite history unless they are clearly used as current product documentation.
+
+Do not change
+
+This task is specifically about startup ordering.
+
+Do not unnecessarily alter:
+
+* combat;
+* character data;
+* stages;
+* CPU;
+* Practice Ground;
+* Watch Mode;
+* Discover;
+* touch controls;
+* input bindings;
+* Settings layout;
+* language translations;
+* splash artwork;
+* splash animation tuning;
+* Home screen design;
+* general screen transitions;
+* storage schema or SETTINGS_VERSION.
+
+A settings migration should not be needed.
+
+Do not introduce dependencies, a framework, a build tool, or a router.
+
+Acceptance criteria
+
+The work is complete when all of the following are true:
+
+1. Clearing Alva’s saved settings and loading the game shows the splash first.
+2. No language modal is visible during any part of the splash.
+3. After the splash fully ends, the screen is black and the language modal appears.
+4. Home has not been entered or visibly rendered behind the language modal.
+5. Choosing English opens Home in English.
+6. Choosing Français opens Home in French.
+7. The choice persists through the existing Settings store.
+8. Reloading after a choice shows splash → Home with no first-run chooser.
+9. Returning French users see splash → French Home.
+10. Browser language only changes which first-run option initially has focus.
+11. Back cannot dismiss the mandatory first-run chooser.
+12. Changing language later through Settings still works.
+13. Reduced-motion splash follows the same order.
+14. A failed splash load still continues to the language chooser for a new player.
+15. A failed splash load continues directly to Home for a returning player.
+16. Splash completion cannot trigger Home twice.
+17. Cancelled/stale splash runs cannot open the chooser or navigate Home.
+18. Back navigation from Home never returns to splash/language onboarding.
+19. README/spec/source comments describe the new sequence.
+20. Existing tests still pass.
+
+Verification
+
+Run the focused tests while developing:
+
+node --test tests/splash-screen.test.mjs
+node --test tests/settings.test.mjs
+node --test tests/i18n.test.mjs
+
+Then run the complete test suite:
+
+node --test tests/*.test.mjs
+
+Also perform a browser smoke test using the project’s normal static-server workflow.
+
+Test at least:
+
+Fresh player
+
+* clear alva.settings;
+* reload;
+* confirm splash → language dialog → Home;
+* choose Français;
+* confirm Home is immediately French.
+
+Returning player
+
+* reload with Français stored;
+* confirm splash → Home;
+* confirm no chooser appears.
+
+Settings
+
+* change back to English through Home → Settings;
+* reload;
+* confirm splash → English Home;
+* confirm no first-run chooser.
+
+Reduced motion
+
+* enable reduced-motion;
+* clear settings;
+* confirm reduced-motion splash still completes before the chooser appears.
+
+Implementation quality
+
+Keep the patch narrowly scoped and idiomatic to the existing repository.
+
+Prefer a single explicit startup continuation owned by App instead of scattered promises or flags.
+
+After implementation, summarize:
+
+* the startup-flow change;
+* files changed;
+* test coverage added/updated;
+* test results;
+* any browser-only behavior that still needs manual visual verification.
