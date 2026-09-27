@@ -704,9 +704,9 @@ Back return Home). It holds the player's settings, saved on this device.
 - **Mobile Controls** — the touch layout Quick Battle and Practice Ground
   use (7.4), with exactly two choices shown as two cards, each with a small
   drawing of its lower-left corner and a line on what it gives:
-  - **Joystick** (marked "Default") — a circular joystick to move, with
-    Charge as a down arrow just above it; pushing the stick the same way
-    twice Dashes.
+  - **Joystick** (marked "Default") — a circular joystick to move, the
+    single-tap **Left mouvement** / **Right mouvement** Dash buttons above
+    it, and Charge as a down arrow to its left.
   - **Classic Buttons** — the original layout: Left, C (Charge) and Right
     at the lower left, a double tap of Left or Right to Dash.
 - The cards are a `radiogroup` of two `radio` buttons (`aria-checked`, each
@@ -1264,8 +1264,8 @@ Back return Home). It holds the player's settings, saved on this device.
   way (`Fighter.trackDashTaps`, `tryDash`); the other direction replaces the
   waiting tap, both at once cancel it, and a double tap that cannot Dash is
   used up, never queued. A one-step request (`mouvementLeftPressed` /
-  `mouvementRightPressed`, 7.4; no on-screen control makes it since the
-  Joystick layout's Dash buttons were removed) goes straight to the same `tryDash`, so every
+  `mouvementRightPressed`, 7.4: one tap of the Joystick touch layout's Left
+  mouvement / Right mouvement, `mouvementLeft` / `mouvementRight`) goes straight to the same `tryDash`, so every
   rule, cost and effect below applies unchanged; it is not a direction
   press (it never pairs with one), it forgets any first tap waiting, it is
   used up whether or not it Dashes, and both at once ask for nothing. A Dash needs the fighter free to act (no attack,
@@ -1720,7 +1720,7 @@ Back return Home). It holds the player's settings, saved on this device.
     jump and an air jump from a stage's highest footing still stay well
     clear of the upper Void.
   - *Fast fall.* Down (the Charge input: S / ↓, D-pad or stick down, touch
-    C, or the down arrow above the joystick in the Joystick layout) held in the air while already descending speeds the fall up toward
+    C, or the down arrow left of the joystick in the Joystick layout) held in the air while already descending speeds the fall up toward
     `fastFallSpeed` (1400) at `fastFallAcceleration` (12000) on top of
     gravity: never while rising, never a jump in speed and never slower
     than the fall already is; it lands on platforms like any fall. Aerial
@@ -2119,9 +2119,9 @@ Back return Home). It holds the player's settings, saved on this device.
   (never its auto-repeat), a touch button, the D-pad, or the left stick
   crossing from neutral into its held zone (holding it there makes no more;
   back near neutral and out again makes another). It also carries
-  `mouvementLeftPressed` / `mouvementRightPressed`: a Dash asked for outright
-  (`InputManager.queueTouchMouvement(direction)`, `mouvementLeft` /
-  `mouvementRight`; no on-screen control calls it now), true for exactly one sample and then gone (`flush()` and
+  `mouvementLeftPressed` / `mouvementRightPressed`: a Dash asked for in one tap
+  (`InputManager.queueTouchMouvement(direction)`, from the Joystick layout's
+  mouvement buttons, `mouvementLeft` / `mouvementRight`), true for exactly one sample and then gone (`flush()` and
   `clear()` drop it too); it holds no direction and makes no press edge.
   Every controller's snapshot carries both, false (the combat AI still
   Dashes by double tap). Fighter never reads raw
@@ -2140,7 +2140,7 @@ Back return Home). It holds the player's settings, saved on this device.
   (every pointer, direction, Charge, Jump, Shield and the rest) and
   recentres the joystick, so nothing is ever left down.
   - **Joystick** (the default): the lower-left corner holds one circular
-    joystick (a translucent round base with faint ◀ ▶ marks and a movable
+    joystick (a translucent round base with no marks on it and a movable
     knob, in the buttons' style; a group named "Movement joystick"). It
     captures one pointer and holds the existing `runLeft` or `runRight` input
     once pushed sideways past 0.34 of its radius, letting go back inside
@@ -2151,17 +2151,21 @@ Back return Home). It holds the player's settings, saved on this device.
     0.56 of the radius, and eases back to the centre on release, cancel,
     lost capture, pause, disabling or a scheme switch. It is digital like
     the rest of ALVA's input: how far it is pushed never changes speed.
-    Pushing it out twice quickly is a double tap, as with the gamepad stick:
-    that is its Dash (there are no Dash buttons). **Charge** is a
-    down-arrow button (`ICONS.down`, named "Charge", `.tc-charge-down`)
-    just above the stick's top-left, flush with its left edge and about
-    half a gap clear of its rim, holding the same `charge` input (Charge on
+    Pushing it out twice quickly is a double tap, as with the gamepad stick.
+    The base is plain: no arrows are drawn in it, only the knob. Above its
+    top-left and top-right sit two small Dash buttons named exactly **Left
+    mouvement** and **Right mouvement** (◀ ▶ glyphs): one tap asks for one
+    Dash that way (`queueTouchMouvement`, 7.2) and holds nothing; each
+    shows pressed while touched. **Charge** is a down-arrow button
+    (`ICONS.down`, named "Charge", `.tc-charge-down`) at the cluster's
+    left edge, level with the stick's centre, the stick one gap to its
+    right (`--tc-stick-left`); it holds the same `charge` input (Charge on
     the ground, the fast fall in the air, Charge + Punch / Kick as ever).
   - **Classic Buttons**: the original layout, exactly: lower-left
     Left · C · Right with thumb sliding, where the middle button reads **C**, is
     labelled "Charge" and stays pressed for as long as the pointer holds it
     (held in the air while falling, it is the fast fall); Left and Right
-    Dash on a double tap; no joystick or down-arrow Charge.
+    Dash on a double tap; no joystick, Dash buttons or down-arrow Charge.
 
   Both layouts share the lower-right staggered cluster, the same positions
   and sizes as ever, in the same place in both —
@@ -2218,8 +2222,9 @@ Back return Home). It holds the player's settings, saved on this device.
   labelled/described), `aria-pressed`/`aria-checked` for selections,
   `aria-live` previews.
 - Every touch control is a real button with its own name, whatever its
-  glyph: the joystick is a group named "Movement joystick" and the down
-  arrow beside it "Charge" (never "Down").
+  glyph: the joystick is a group named "Movement joystick", its Dash
+  buttons "Left mouvement" and "Right mouvement", and the down arrow
+  "Charge" (never "Down").
 - Visible focus everywhere; focus is managed on every screen and overlay.
 - Never rely on colour alone for focus, selection, availability, errors or
   the current setup step — use borders, check marks, filled indicators, labels

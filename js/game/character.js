@@ -386,8 +386,8 @@ export class Fighter {
     // means no refill this step (see the end of update).
     //
     // mouvementLeftPressed / mouvementRightPressed ask for one Dash outright
-    // (see InputManager.queueTouchMouvement; no on-screen control makes the
-    // request now). The request goes through the very same
+    // (the Joystick touch layout's single-tap mouvement buttons, see
+    // InputManager.queueTouchMouvement). The request goes through the very same
     // tryDash, so every rule and cost of a double-tap Dash applies, and it
     // is used up the same way. It is not a tap: it forgets any first tap
     // waiting, so it never pairs with one, and this step's own direction

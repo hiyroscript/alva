@@ -239,21 +239,22 @@ ceiling and landing are unchanged.
 ## Jump, Shield, turning and joystick changes
 
 Not a named update (it can become one if the owner names it). Asked for as:
-remove the Joystick's movement buttons, remove the small jump (the jump
-works as before, pressing slightly longer gives a higher jump), shielding
-mid-air performs a slow fall, keep the double jump and the quick fall,
-allow turning left and right while performing an action, and put the
-Joystick layout's Charge on the left.
+remove the movement buttons inside the joystick (the ◀ ▶ arrows on its
+base; the Left / Right mouvement buttons on top stay), remove the small
+jump (the jump works as before, pressing slightly longer gives a higher
+jump), shielding mid-air performs a slow fall, keep the double jump and the
+quick fall, allow turning left and right while performing an action, and
+put the Joystick layout's Charge on the left (to the left of the
+joystick).
 
 **What it changed**
 
-- **Joystick touch layout:** the Left / Right mouvement Dash buttons are
-  gone; the stick Dashes by two quick pushes, as Left / Right do. Charge
-  (the down arrow) moved from under Jump to just above the stick's
-  top-left, and the lower-right cluster no longer rises for it. Classic
-  Buttons is unchanged. `InputManager.queueTouchMouvement` and
-  `mouvementLeftPressed` / `mouvementRightPressed` stay in the input layer,
-  but nothing on screen sends them.
+- **Joystick touch layout:** the ◀ ▶ arrows drawn inside the stick are
+  gone (a plain base and knob); the Left / Right mouvement Dash buttons
+  above its top corners are unchanged. Charge (the down arrow) moved from
+  under Jump to the left of the stick, level with its centre, and the
+  lower-right cluster no longer rises for it. Classic Buttons is
+  unchanged.
 - **Higher jump (the short hop's replacement):** a tap is the normal jump.
   Jump still held 0.15 s after takeoff makes it rise on to 1.4× the height
   (about 237 units instead of 169), under lighter gravity from then to the
@@ -278,8 +279,8 @@ Joystick layout's Charge on the left.
 - `movement`: `highJumpWindow` (0.15), `highJumpHeight` (1.4).
 - `defense`: `slowFallSpeed` (200), `slowFallBrake` (6000). Left out (or
   0), a Shield falls as ever (`SHIELD_DEFAULTS` in `js/game/combat.js`).
-- The Joystick layout's geometry: `.tc-charge-down` and `.tc-joystick` in
-  `styles.css`.
+- The Joystick layout's geometry: `--tc-stick-left`, `.tc-charge-down`,
+  `.tc-dash-left` and `.tc-joystick` in `styles.css`.
 
 **Code:** the higher jump (`Fighter.highJump`, `highJumpLift`), the slow
 fall and `updateFacing` in `js/game/character.js`; the fall cap in

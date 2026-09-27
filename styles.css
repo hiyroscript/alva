@@ -1278,11 +1278,14 @@ html:not(.is-pointer-input) .settings-option:focus { box-shadow: var(--focus-rin
 .settings-preview b { font-size: calc(var(--sp) * 0.38); font-style: normal; }
 .settings-preview--classic { gap: calc(var(--sp) * 0.18); }
 .sp-pad { width: var(--sp); height: var(--sp); }
-.settings-preview--joystick { width: calc(var(--sp) * 2.2); }
-.sp-stick { position: absolute; left: calc(var(--sp) * 0.35); bottom: 0; width: calc(var(--sp) * 1.5); height: calc(var(--sp) * 1.5); }
+.settings-preview--joystick { width: calc(var(--sp) * 2.65); }
+.sp-stick { position: absolute; left: calc(var(--sp) * 0.8); bottom: 0; width: calc(var(--sp) * 1.5); height: calc(var(--sp) * 1.5); }
 .settings-preview .sp-knob { width: calc(var(--sp) * 0.66); height: calc(var(--sp) * 0.66); border-color: var(--text-secondary); }
-.sp-charge { position: absolute; top: 0; left: calc(var(--sp) * 0.18); width: calc(var(--sp) * 0.55); height: calc(var(--sp) * 0.55); }
-.settings-preview .sp-charge .icon { font-size: calc(var(--sp) * 0.34); }
+.sp-dash { position: absolute; top: 0; width: calc(var(--sp) * 0.5); height: calc(var(--sp) * 0.5); }
+.sp-dash--left { left: calc(var(--sp) * 0.63); }
+.sp-dash--right { right: calc(var(--sp) * 0.18); }
+.sp-charge { position: absolute; left: 0; bottom: calc(var(--sp) * 0.45); width: calc(var(--sp) * 0.6); height: calc(var(--sp) * 0.6); }
+.settings-preview .sp-charge .icon { font-size: calc(var(--sp) * 0.36); }
 .settings-option.is-current .settings-preview i { border-color: rgba(47, 191, 99, 0.6); }
 
 /* ---------------------------------------------------------------------
@@ -1480,11 +1483,14 @@ html:not(.is-pointer-input) .settings-option:focus { box-shadow: var(--focus-rin
   --tc-gap: calc(var(--tc) * 0.17);
   --tc-pitch: calc(var(--tc) + var(--tc-gap));
   --tc-bottom: calc(max(var(--safe-b), 10px) + 1.6vh);
-  /* Joystick scheme: the stick's base, its knob and the down-arrow Charge
-     above it. */
+  /* Joystick scheme: the stick's base, its knob, its two Dash buttons and
+     the down-arrow Charge to its left; the stick starts one gap past
+     Charge. */
   --tc-stick: calc(var(--tc) * 1.92);
   --tc-knob: calc(var(--tc) * 0.84);
+  --tc-dash: calc(var(--tc) * 0.62);
   --tc-charge: calc(var(--tc) * 0.8);
+  --tc-stick-left: calc(var(--tc-charge) + var(--tc-gap));
   display: none;
   position: absolute;
   inset: 0;
@@ -1557,17 +1563,19 @@ html.is-touch .touch-controls[hidden] { display: none; }
 .tc-jump { background: rgba(255, 255, 255, 0.1); border-color: rgba(255, 255, 255, 0.5); }
 
 /* Joystick scheme (the Mobile Controls setting's default). The lower-left
-   cluster is one round stick in the same translucent style as the buttons,
-   with the down-arrow Charge just above its top-left (flush with the
-   stick's left edge, its rim about half a gap clear of the stick's). */
+   cluster is one round stick in the same translucent style as the buttons
+   (a plain base and knob, no arrows in it), with a small Dash button just
+   above each of its top corners (their centres sit 120deg and 60deg round
+   from the stick's, clear of its rim) and the down-arrow Charge to its
+   left, level with its centre. */
 .tc-joystick {
   left: calc(max(var(--safe-l), 12px) + 1.4vw);
-  width: var(--tc-stick);
-  height: calc(var(--tc) * 2.69);
+  width: calc(var(--tc-stick-left) + var(--tc-stick));
+  height: calc(var(--tc) * 2.44);
 }
 .tc-stick {
   position: absolute;
-  left: 0;
+  left: var(--tc-stick-left);
   bottom: 0;
   width: var(--tc-stick);
   height: var(--tc-stick);
@@ -1583,20 +1591,6 @@ html.is-touch .touch-controls[hidden] { display: none; }
   transition: border-color 120ms ease, background-color 120ms ease;
 }
 .tc-stick.is-active { border-color: rgba(255, 255, 255, 0.5); background: rgba(22, 22, 22, 0.42); }
-/* Faint arrows on the base, lit while their direction is held. */
-.tc-stick-arrow {
-  position: absolute;
-  top: 50%;
-  display: grid;
-  font-size: calc(var(--tc) * 0.3);
-  opacity: 0.4;
-  transform: translateY(-50%);
-  transition: opacity 90ms ease;
-}
-.tc-stick-arrow--left { left: 7%; }
-.tc-stick-arrow--right { right: 7%; }
-.tc-stick .icon { stroke-width: 2.8; filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.8)); }
-.tc-stick.is-left .tc-stick-arrow--left, .tc-stick.is-right .tc-stick-arrow--right { opacity: 1; }
 /* The knob follows the thumb (TouchControls.steer) and eases back to the
    centre on release; it never takes the pointer itself. */
 .tc-stick-knob {
@@ -1615,10 +1609,19 @@ html.is-touch .touch-controls[hidden] { display: none; }
   border-color: var(--white);
   transition: background-color 120ms ease, border-color 120ms ease;
 }
+.tc-dash {
+  position: absolute;
+  bottom: calc(var(--tc) * 1.82);
+  width: var(--tc-dash);
+  height: var(--tc-dash);
+  font-size: calc(var(--tc-dash) * 0.46);
+}
+.tc-dash-left { left: calc(var(--tc-stick-left) - var(--tc) * 0.03); }
+.tc-dash-right { right: calc(var(--tc) * -0.03); }
 .tc-charge-down {
   position: absolute;
   left: 0;
-  bottom: calc(var(--tc) * 1.89);
+  bottom: calc((var(--tc-stick) - var(--tc-charge)) / 2);
   width: var(--tc-charge);
   height: var(--tc-charge);
 }

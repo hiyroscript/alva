@@ -947,14 +947,16 @@ test('spectating: no touch controls and no gameplay input, through pause, resume
   screen.rematch();
   off();
   // Touch presses never reach the input while spectating: not a button, not
-  // the joystick (whatever the Mobile Controls setting).
+  // the joystick, not a mouvement button (whatever the Mobile Controls setting).
   const touches = [];
   app.input.setTouch = (action, held) => touches.push([action, held]);
+  app.input.queueTouchMouvement = (direction) => touches.push(['mouvement', direction]);
   const tryEverything = () => {
     const down = { pointerId: 1, clientX: 500, clientY: 0, preventDefault: noop };
     screen.touch.buttons.get('jump').dispatch('pointerdown', down);
     screen.touch.buttons.get('charge').dispatch('pointerdown', { ...down, pointerId: 2 });
     screen.touch.stick.dispatch('pointerdown', { ...down, pointerId: 3 });
+    for (const b of screen.touch.mouvementButtons.values()) b.dispatch('pointerdown', { ...down, pointerId: 4 });
   };
   assert.equal(screen.touch.scheme, 'joystick');
   tryEverything();

@@ -15,8 +15,8 @@ default, or the classic buttons),
 and a data-driven combat system built on Launch Point, Base Launch and
 Directional Launch, with #0001's two real attacks, Basic Attack 1
 (BA1) and Basic Attack 2 (BA2), a held ground and mid-air Shield (a slow
-fall in the air) on the shared Shield button, a Dash on a double tap, a
-100-point Energy bar that a
+fall in the air) on the shared Shield button, a Dash on a double tap (or one tap of a touch Dash
+button), a 100-point Energy bar that a
 Dash and every Shielded hit spend, a held Charge
 stance, a Charged BA1 Clone Attack (CBA1) and a
 Charged BA2 Sphere Rush (CBA2), each on its own cooldown, and
@@ -64,8 +64,8 @@ in the code depends on the repository name, so no file changes are needed.
 | Action | Codename | Keyboard | Touch (landscape) |
 | --- | --- | --- | --- |
 | Move left / right | `runLeft` / `runRight` | `A` `D` or `←` `→` | **Joystick:** push the joystick left / right · **Classic:** lower-left ◀ ▶ |
-| Dash | double tap of `runLeft` / `runRight` | Double-tap `A` / `D` or `←` / `→` | **Joystick:** push the joystick the same way twice · **Classic:** double-tap ◀ or ▶ |
-| Charge (in the air: fast fall) | `charge` | `S` or `↓` | **Joystick:** hold the down arrow just above the joystick · **Classic:** hold lower-left **C** |
+| Dash | double tap of `runLeft` / `runRight`; `mouvementLeft` / `mouvementRight` on touch | Double-tap `A` / `D` or `←` / `→` | **Joystick:** one tap of **Left mouvement** / **Right mouvement** (the small ◀ ▶ above the joystick) · **Classic:** double-tap ◀ or ▶ |
+| Charge (in the air: fast fall) | `charge` | `S` or `↓` | **Joystick:** hold the down arrow left of the joystick · **Classic:** hold lower-left **C** |
 | Jump (tap: the normal jump; held a little longer: a higher jump; again in the air: air jump) | `jump` | `W`, `Space` or `↑` | Lower-right, bottom corner |
 | Throw (unique basic attack) | `uniqueba` | `J` | **Shuriken**, lower-right, top |
 | Transform* | `transform` | `K` | Lower-right, middle row |
@@ -95,11 +95,8 @@ named after the button that makes them:
 | Transform | `transform` | `transform` (reserved: #0001 has none yet) |
 
 There are no separate charged-attack buttons: Charge held + `ba1` is `cba1`,
-Charge held + `ba2` is `cba2`. Every device Dashes by double tap: no key or
-button asks for one outright. (`InputManager.queueTouchMouvement` and its
-one-step `mouvementLeftPressed` / `mouvementRightPressed` request are still
-in the input layer, from the removed Joystick Dash buttons, but nothing on
-screen sends them.)
+Charge held + `ba2` is `cba2`. The mouvement buttons send one-step requests
+(`mouvementLeftPressed` / `mouvementRightPressed`), never a held direction.
 
 \* Reserved: wired into input and combat, but inactive until #0001 has matching
 attack animations. Its touch button has a dashed outline.
@@ -118,14 +115,18 @@ Keyboard and gamepad controls are the same whichever layout is chosen.
   speed. A small deadzone round the centre keeps a resting thumb from
   drifting, crossing the centre switches direction cleanly, and letting go
   recentres it. Pushing it up or down only moves the knob: Jump and Charge
-  keep their own buttons. There are no Dash buttons: push the joystick out
-  the same way twice quickly to Dash, as with Left / Right. **Charge** is a
-  down-arrow button just above the joystick's top-left: hold it to charge
-  on the ground or to fast-fall in the air, and press Punch or Kick while
-  holding it for the charged attacks. The lower-right buttons sit exactly
-  where Classic Buttons has them. The joystick works with any other button
-  at once (hold it right and press Jump, Punch, Kick, Shield, Shuriken or
-  Transform with another finger).
+  keep their own buttons. The stick is a plain base and knob, with no
+  arrows drawn in it. Above the joystick's top corners sit two small
+  Dash buttons, **Left mouvement** and **Right mouvement**: one tap is one
+  Dash that way. They hold nothing and need no second tap, and the Dash
+  itself is the usual one (grounded only, 15 Energy, its animation, and
+  refused while attacking, charging, shielding, exhausted and so on).
+  **Charge** is a down-arrow button to the left of the joystick, level with
+  its centre: hold it to charge on the ground or to fast-fall in the air,
+  and press Punch or Kick while holding it for the charged attacks. The
+  lower-right buttons sit exactly where Classic Buttons has them. The
+  joystick works with any other button at once (hold it right and press
+  Jump, Punch, Kick, Shield, Shuriken or Transform with another finger).
 - **Classic Buttons**: the original layout, unchanged: Left, **C**
   (Charge) and Right at the lower left, with thumb sliding between them;
   tap Left or Right twice quickly to Dash.
@@ -258,8 +259,11 @@ out twice quickly is a double tap too, as with a gamepad stick.
   is blocked is decided by his normal hurtboxes, never by the larger circle.
 - **Dash:** press left or right twice in a row (two `runLeftPressed` /
   `runRightPressed` edges, the second within 0.22 s of the first, keyboard,
-  touch buttons, the touch joystick, D-pad or left stick alike) while
-  standing on the ground. #0001 bursts that way at about 2.7× its top speed
+  touch, D-pad or left stick alike) while standing on the ground, or tap
+  **Left mouvement** / **Right mouvement** (`mouvementLeft` /
+  `mouvementRight`) once in the Joystick touch layout: that one-tap request
+  (`InputManager.queueTouchMouvement`) goes through the same `Fighter.tryDash`,
+  with every rule and cost below, and forgets any first tap waiting. #0001 bursts that way at about 2.7× its top speed
   (900 units / s) for one pass of its two-frame dash clip (`dash1 → dash2`,
   once, at 10 fps: 0.2 s, about 180 units), facing the Dash at once, then
   runs on from that speed if you keep holding the direction. It costs 15
@@ -288,7 +292,7 @@ out twice quickly is a double tap too, as with a gamepad stick.
   until Energy is completely full again (a partial refill does not unlock
   them); the bar disappears at 100. Exhausted, a fighter still moves, jumps,
   attacks, charges and uses CBA1 / CBA2: nothing else ever costs Energy.
-- **Charge:** hold `S` / `↓` (on touch the down arrow above the joystick, or **C**
+- **Charge:** hold `S` / `↓` (on touch the down arrow left of the joystick, or **C**
   in Classic Buttons; D-pad down or left stick down on a gamepad) while #0001 is on the ground. Held, it plays
   `charge1 → charge2` once, then loops `chargea ↔ chargeb` for as long as you
   hold it. Charge must be held; it never toggles. Let go and #0001 shows
@@ -400,7 +404,7 @@ out twice quickly is a double tap too, as with a gamepad stick.
   rate. A restart or rematch, a new fighter in Practice Ground and every
   respawn after the Void clear them. They cost no Energy.
 - **Menus:** arrow keys or WASD to move, `Enter` to select, `Esc` to go back. Mouse and touch work too.
-- **Touch:** two layouts, Joystick (the default) and Classic Buttons (see [Mobile Controls](#mobile-controls)). Several fingers work at once (hold the joystick or Right and press Jump, or hold Charge and press Punch). The combat buttons show icons, not letters: for #0001, **Shuriken** (Throw), **Shield** (held), **Punch** (Basic Attack 1) and **Kick** (Basic Attack 2), beside Transform (dashed: #0001 has none yet) and Jump. Hold Charge, then press Punch for the Clone Attack or Kick for the Sphere Rush. The icons of the fighter's own buttons (Shuriken, Punch, Kick, and Transform once a fighter has one) come from its `mobileAbilities` in `js/data/characters.js` and follow Player 1's fighter, in Practice Ground too when you change fighter; a fighter with no `transform` entry keeps the dashed, reserved Transform star. Shield, Jump and Charge are the same for everyone. Only the presentation is per fighter: the buttons always send the same control codenames (`uniqueba`, `transform`, `shield`, `ba1`, `ba2`). The combat buttons are the same elements in both layouts, in the same places: switching (`TouchControls.setScheme`) only swaps the lower-left corner (Left / C / Right, or the joystick with its Charge), after letting go of everything held. The viewport disables page zoom (`maximum-scale=1, user-scalable=no`) and the play surfaces, joystick and buttons set `touch-action: none`, so rapid taps never zoom or scroll the page.
+- **Touch:** two layouts, Joystick (the default) and Classic Buttons (see [Mobile Controls](#mobile-controls)). Several fingers work at once (hold the joystick or Right and press Jump, or hold Charge and press Punch). The combat buttons show icons, not letters: for #0001, **Shuriken** (Throw), **Shield** (held), **Punch** (Basic Attack 1) and **Kick** (Basic Attack 2), beside Transform (dashed: #0001 has none yet) and Jump. Hold Charge, then press Punch for the Clone Attack or Kick for the Sphere Rush. The icons of the fighter's own buttons (Shuriken, Punch, Kick, and Transform once a fighter has one) come from its `mobileAbilities` in `js/data/characters.js` and follow Player 1's fighter, in Practice Ground too when you change fighter; a fighter with no `transform` entry keeps the dashed, reserved Transform star. Shield, Jump and Charge are the same for everyone. Only the presentation is per fighter: the buttons always send the same control codenames (`uniqueba`, `transform`, `shield`, `ba1`, `ba2`). The combat buttons are the same elements in both layouts, in the same places: switching (`TouchControls.setScheme`) only swaps the lower-left corner (Left / C / Right, or Charge and the joystick with its Dash buttons), after letting go of everything held. The viewport disables page zoom (`maximum-scale=1, user-scalable=no`) and the play surfaces, joystick and buttons set `touch-action: none`, so rapid taps never zoom or scroll the page.
 - **Gamepad (standard layout):** D-pad or left stick left / right to move (twice in a row to Dash) and down to Charge in battle (they still navigate menus), A to jump, X / Square to Throw, B / Circle for Basic Attack 1, LB for Basic Attack 2, Y / Triangle for the reserved Transform, RB or RT for Shield, Start to pause.
 - **Debug:** `` ` `` toggles the collider, hurtbox and attack-hitbox overlay in battle (a hitbox shows only while it can connect; hurtboxes look the same with the Shield up, and a shielding fighter is labelled `shield`; a flying shuriken's hitbox is outlined in magenta and labelled; a clone's attack hitbox shows in the attack colour, labelled `clone ba1` (or `clone maba2` overhead), only on its active frame; the Sphere Rush's sphere hitbox is a dashed cyan box labelled `charged ba2 dash` while it can connect, then a dashed cyan cross marks the sphere on the caught opponent, which is labelled `bound`; solids, the main floor's block among them, are outlined in red and the Void's fixed kill line is dashed violet).
 
