@@ -934,4 +934,4 @@ Slot 02 is playable in Quick Battle, Watch Mode and Practice. Its five idle and 
 
 Void losses produce a short fighter-colored disappearance burst above the Void layer, without changing scoring or respawn timing.
 
-#0002 sprite source: DeviantArt. The task did not include the source URL or uploader attribution; these remain to be supplied.
+**#0002 sprite source.** Sprite attribution: Xmaygrrr. Source sheet uploaded by renatoooferreiraaa on [DeviantArt](https://www.deviantart.com/deviation/1374753835). The source uses its numeric artwork URL so the source title is not displayed.

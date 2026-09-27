@@ -953,7 +953,7 @@ test('the Home credits still roll: both copies, the second hidden, every credit 
     'Source sheet uploaded by Dazz',
     'Contributor: FRET',
   ]);
-  assert.deepEqual(credits[3].lines, ['Source: DeviantArt']);
+  assert.deepEqual(credits[3].lines, ['Sprite attribution: Xmaygrrr', 'Source sheet uploaded by renatoooferreiraaa', 'Source: DeviantArt', 'https://www.deviantart.com/deviation/1374753835']);
   assert.equal(CREDITS.length, credits.length);
   assert.match(read('js/screens/home-screen.js'), /import \{ CREDITS, creditLabel \} from '\.\.\/ui\/credits\.js';/);
 
@@ -986,7 +986,7 @@ test('in French the credits translate but proper names stay', () => {
     assert.equal(credits[0].lead, `Créé par ${CONFIG.developer}`);
     assert.equal(credits[1].title, 'Création originale');
     assert.equal(credits[3].title, 'Source des sprites de #0002');
-    assert.deepEqual(credits[3].lines, ['Source : DeviantArt']);
+    assert.deepEqual(credits[3].lines, ['Attribution des sprites : Xmaygrrr', 'Planche source publiée par renatoooferreiraaa', 'Source : DeviantArt', 'https://www.deviantart.com/deviation/1374753835']);
     assert.ok(credits[2].lines[0].includes('Jump Ultimate Stars'));
     assert.equal(credits[2].lines[1], 'The Spriters Resource');
     assert.ok(credits[2].lines[2].includes('Dazz'));

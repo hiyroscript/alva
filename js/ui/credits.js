@@ -26,7 +26,7 @@ export const CREDITS = [
   },
   {
     title: 'credits.sprites2.title',
-    lines: ['credits.sprites2.site'],
+    lines: ['credits.sprites2.artist', 'credits.sprites2.uploader', 'credits.sprites2.site', 'credits.sprites2.url'],
   },
   {
     title: 'credits.rights.title',
