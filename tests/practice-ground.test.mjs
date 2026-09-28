@@ -9,7 +9,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { fakeSprites, def as DEF_0001, DT } from './fighter-harness.mjs';
+import { fakeSprites, fakeSpritesOf, def as DEF_0001, DT } from './fighter-harness.mjs';
 
 // ---- Fake DOM + Canvas -------------------------------------------------------
 
@@ -59,6 +59,10 @@ class Element extends Node {
     return this.attrs.has(name) ? this.attrs.get(name) : null;
   }
   hasAttribute(name) { return this.getAttribute(name) !== null; }
+  removeAttribute(name) {
+    if (BOOLEAN_ATTRS.includes(name)) this[name] = false;
+    else this.attrs.delete(name);
+  }
   get id() { return this.getAttribute('id'); }
   set textContent(v) { this.replaceChildren(new Text(String(v))); }
   get textContent() { return this.children.map((c) => c.textContent).join(''); }
@@ -233,8 +237,9 @@ function fakeInput() {
 function fakeApp() {
   const loads = [];
   const sprites = new Map();
+  // Each fighter's own clips (#9999's are #0001's, which it copies).
   const spritesFor = (id) => {
-    if (!sprites.has(id)) sprites.set(id, fakeSprites());
+    if (!sprites.has(id)) sprites.set(id, id === '0002' ? fakeSpritesOf(getCharacter('0002')) : fakeSprites());
     return sprites.get(id);
   };
   const app = {
@@ -1190,6 +1195,57 @@ test('the touch ability icons follow Player 1\'s fighter: set on entry, refreshe
   } finally {
     DEF_9999.mobileAbilities = saved;
   }
+});
+
+test('Change Fighter into and out of #0002, again and again: his own art, controls and name, nothing left over', async () => {
+  const { app, screen, loads } = await enterPractice();
+  const touch = screen.touch;
+  const buttons = new Map(touch.buttons);
+  const input = app.input;
+  for (const id of ['0002', '0001', '0002', '0001', '0002']) {
+    screen.openMenu();
+    screen.openRoster();
+    assert.equal(slotFor(screen, '0002')._index, 1, 'slot 02');
+    slotFor(screen, id).click(0);
+    await flush();
+    const p = screen.session.player;
+    assert.equal(loads.at(-1), id);
+    assert.equal(p.def.id, id);
+    assert.equal(p.sprites, app.getSprites(id), 'its own sprite set');
+    assert.ok(p.animator.frame.url.includes(`/${id}/`), 'its own art from the first frame');
+    assert.equal(screen.hud.panel.name.textContent, `#${id}`);
+    assert.equal(p.combat.chargedCooldowns.size, 0, 'no cooldown carried over');
+    assert.equal(p.combat.launchPoint, 0);
+    assert.equal(screen.session.cpu.def.id, '0001', 'the CPU stays');
+    // The same controls, refreshed: no Unique Basic Attack button for #0002, #0001's Shuriken back for #0001.
+    for (const [action, b] of buttons) assert.equal(touch.buttons.get(action), b, action);
+    const uni = touch.buttons.get('uniqueba');
+    assert.equal(uni.hidden, id === '0002', `${id}: Unique Basic Attack button`);
+    assert.equal(uni.getAttribute('aria-label'), id === '0002' ? null : 'Shuriken');
+    assert.equal(touch.buttons.get('ba1').getAttribute('aria-label'), id === '0002' ? 'Basic Attack 1' : 'Punch');
+    assert.equal(touch.buttons.get('ba2').getAttribute('aria-label'), id === '0002' ? 'Basic Attack 2' : 'Kick');
+    assert.equal(screen.isRunning, true);
+  }
+  // Playing him: Unique Basic Attack does nothing, BA1 plays his own art and hits nothing.
+  const p = screen.session.player;
+  input.script.push({ uniqueba: true, uniquebaPressed: true });
+  screen.session.update(DT);
+  assert.equal(p.combat.attack, null);
+  assert.deepEqual(screen.session.projectiles, []);
+  input.script.push({ ba1: true, ba1Pressed: true });
+  screen.session.update(DT);
+  assert.equal(p.combat.attack?.def.id, 'ba1');
+  assert.ok(p.animator.frame.url.endsWith('0002_ba1_1.png'));
+});
+
+test('#0002 can be the practice CPU, and #0001 can practise against him', async () => {
+  const { screen } = await enterPractice();
+  const cpu = await enableCpu(screen, '0002');
+  assert.equal(cpu.def.id, '0002');
+  assert.equal(screen.session.player.def.id, '0001');
+  assert.equal(screen.touch.buttons.get('uniqueba').getAttribute('aria-label'), 'Shuriken', 'Player 1\'s controls, not the CPU\'s');
+  assert.equal(screen.hud.cpuPanel.name.textContent, '#0002');
+  assert.ok(cpu.animator.frame.url.includes('/0002/'));
 });
 
 // ---- Practice CPU ---------------------------------------------------------------

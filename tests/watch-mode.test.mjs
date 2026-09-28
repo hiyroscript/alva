@@ -9,7 +9,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { fakeSprites, def as DEF_0001, DT } from './fighter-harness.mjs';
+import { fakeSprites, fakeSpritesOf, def as DEF_0001, DT } from './fighter-harness.mjs';
 
 // ---- Fake DOM ------------------------------------------------------------------
 
@@ -57,6 +57,10 @@ class Element extends Node {
     return this.attrs.has(name) ? this.attrs.get(name) : null;
   }
   hasAttribute(name) { return this.getAttribute(name) !== null; }
+  removeAttribute(name) {
+    if (BOOLEAN_ATTRS.includes(name)) this[name] = false;
+    else this.attrs.delete(name);
+  }
   get id() { return this.getAttribute('id'); }
   set textContent(v) { this.replaceChildren(new Text(String(v))); }
   get textContent() { return this.children.map((c) => c.textContent).join(''); }
@@ -157,7 +161,8 @@ globalThis.document = {
 };
 
 const { CONFIG } = await import('../js/config.js');
-const { CHARACTERS } = await import('../js/data/characters.js');
+const { CHARACTERS, getCharacter } = await import('../js/data/characters.js');
+const DEF_0002 = getCharacter('0002');
 const { DIFFICULTIES, DIFFICULTY_IDS, DEFAULT_DIFFICULTY, getDifficultyProfile } = await import('../js/data/difficulty.js');
 const { MAPS, getMap } = await import('../js/data/maps.js');
 const { ICONS } = await import('../js/ui/icons.js');
@@ -211,7 +216,7 @@ function fakeInput() {
 // so screens swap without timers: Home, Quick Battle's setup, Watch Mode's
 // setup and the real Battle screen. Fighters load from `sets` (one fake
 // sprite set per fighter); `loads` lists every load in order.
-function boot({ sets = { '0001': fakeSprites(), '9999': fakeSprites() } } = {}) {
+function boot({ sets = { '0001': fakeSprites(), '0002': fakeSpritesOf(DEF_0002), '9999': fakeSprites() } } = {}) {
   const loads = [];
   const loading = {
     labels: [], progress: [], error: null,
@@ -873,6 +878,43 @@ test('a mirror match loads its fighter once and both CPUs share the sprite set',
   booted.screens.battle.exit();
 });
 
+test('Watch Mode with #0002: #0001 vs #0002, #0002 vs #0001 and #0002 vs #0002 load, fight and draw on their own art', async () => {
+  for (const [cpu1, cpu2] of [[DEF_0001, DEF_0002], [DEF_0002, DEF_0001], [DEF_0002, DEF_0002], [DEF_0001, DEF_0001]]) {
+    const booted = boot();
+    const { app, screens } = booted;
+    // Chosen on the real CPU 1 and CPU 2 rosters, where #0002 is slot 02.
+    screens.home.actions.watch.click();
+    cardOf(screens.watchDifficulty, 'hard').click();
+    for (const [screen, def] of [[screens.watchCpu1, cpu1], [screens.watchCpu2, cpu2]]) {
+      assert.equal(slotOf(screen, '0002')._index, 1, 'slot 02');
+      slotOf(screen, def.id).click(0);
+    }
+    mapCard(screens.watchMap, 'desert').click();
+    app.loads.length = 0;
+    screens.watchMap.start();
+    await settle();
+    const battle = screens.battle.battle;
+    const ids = [cpu1.id, cpu2.id];
+    const label = ids.join(' vs ');
+    assert.deepEqual(app.loads, [...new Set(ids)], `${label}: each fighter loaded once`);
+    assert.deepEqual([battle.p1.def.id, battle.p2.def.id], ids, label);
+    assert.deepEqual([battle.p1.sprites, battle.p2.sprites], [app.sets[cpu1.id], app.sets[cpu2.id]], label);
+    for (const f of battle.fighters) assert.ok(f.animator.frame.url.includes(`/${f.def.id}/`), `${label}: ${f.def.id}'s own art`);
+    screens.battle.hud.update(battle);
+    assert.deepEqual([screens.battle.hud.left.name.textContent, screens.battle.hud.right.name.textContent], ids.map((id) => `#${id}`));
+    // Ten seconds of the real Battle, both CPUs thinking, every step drawn.
+    trace(battle, 600);
+    for (const f of battle.fighters) {
+      assert.ok(Number.isFinite(f.x) && Number.isFinite(f.y), `${label}: ${f.def.id} in the world`);
+      if (f.def === DEF_0002) {
+        assert.equal(f.combat.chargedCooldowns.size, 0, `${label}: no charged action`);
+        assert.ok(battle.projectiles.every((p) => p.owner !== f), `${label}: no projectile of his`);
+      }
+    }
+    screens.battle.exit();
+  }
+});
+
 test('a failed load of either CPU uses the loading error; Retry reloads that fighter and Back returns to the stage', async () => {
   for (const failing of ['9999', '0001']) {
     const booted = boot({ sets: { '0001': fakeSprites(), '9999': fakeSprites() } });
@@ -1148,6 +1190,31 @@ test('Change Stage returns to Watch Mode\'s Select Stage after a Watch battle, a
   screens.battle.finishBattle();
   byText(screens.battle.resultOverlay, 'Change Stage').click();
   assert.equal(current(app), 'map', 'Quick Battle\'s own Select Stage');
+});
+
+test('Quick Battle with #0002: picked from slot 02, the CPU plays him too, and his touch controls have no Unique Basic Attack', async () => {
+  const booted = boot();
+  const { app, screens } = booted;
+  assert.equal(slotOf(screens.character, '0002')._index, 1, 'Select Fighter: slot 02');
+  const battle = await startQuickBattle(booted, { fighter: DEF_0002 });
+  assert.equal(app.selection.characterId, '0002');
+  assert.deepEqual(app.loads, ['0002'], 'one fighter loaded');
+  assert.deepEqual(app.loading.labels.at(-1), 'Loading #0002');
+  assert.deepEqual([battle.p1.def.id, battle.p2.def.id], ['0002', '0002'], 'the CPU plays Player 1\'s fighter');
+  assert.equal(battle.p1.sprites, battle.p2.sprites);
+  const touch = screens.battle.touch;
+  assert.equal(touch.buttons.get('uniqueba').hidden, true);
+  assert.equal(touch.buttons.get('uniqueba').getAttribute('aria-label'), null);
+  assert.equal(touch.buttons.get('ba2').hidden, false);
+  assert.equal(touch.buttons.get('ba2').getAttribute('aria-label'), 'Basic Attack 2');
+  trace(battle, 300);
+  screens.battle.exit();
+  // Back to #0001: the Shuriken button is back.
+  app.screens.go('home', {}, { reset: true });
+  await startQuickBattle(booted, { fighter: DEF_0001 });
+  assert.equal(touch.buttons.get('uniqueba').hidden, false);
+  assert.equal(touch.buttons.get('uniqueba').getAttribute('aria-label'), 'Shuriken');
+  screens.battle.exit();
 });
 
 test('Return to Home after watching, then a Quick Battle behaves exactly as before', async () => {

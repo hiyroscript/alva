@@ -5,8 +5,9 @@ JavaScript with Canvas 2D: no frameworks, no build step, no WebGL or 3D engine
 (the stages' depth is pseudo-3D perspective drawn in Canvas 2D). It runs on
 desktop and on phones and tablets in landscape.
 
-This is the first playable foundation: full menu flow, a 48-slot roster, two
-compact platform-fighter stages with open ledges and a Void kill boundary, a
+This is the first playable foundation: full menu flow, a 48-slot roster with
+two fighters (#0001, and #0002, Slender Man, whose art is all in and whose
+combat attributes are still to come), two compact platform-fighter stages with open ledges and a Void kill boundary, a
 Watch Mode for CPU-vs-CPU matches, a
 Practice Ground training room, a Discover reference screen, a Settings
 dialog, the whole interface in English or French, movement and platform
@@ -101,6 +102,11 @@ Charge held + `ba2` is `cba2`. The mouvement buttons send one-step requests
 
 \* Reserved: wired into input and combat, but inactive until #0001 has matching
 attack animations. Its touch button has a dashed outline.
+
+A fighter may also lack a move altogether. #0002 has no Unique Basic Attack
+and no Charged BA2: `J` (and the gamepad's Throw button) stays bound for
+everyone but does nothing for him, his touch controls have no Unique Basic
+Attack button at all, and Charge + BA2 is simply his BA2.
 
 ### Language
 
@@ -472,7 +478,7 @@ cover them.
   rate. A restart or rematch, a new fighter in Practice Ground and every
   respawn after the Void clear them. They cost no Energy.
 - **Menus:** arrow keys or WASD to move, `Enter` to select, `Esc` to go back. Mouse and touch work too.
-- **Touch:** two layouts, Joystick (the default) and Classic Buttons (see [Mobile Controls](#mobile-controls)). Several fingers work at once (hold the joystick or Right and press Jump, or hold Charge and press Punch). The combat buttons show icons, not letters: for #0001, **Shuriken** (Throw), **Shield** (held), **Punch** (Basic Attack 1) and **Kick** (Basic Attack 2), beside Transform (dashed: #0001 has none yet) and Jump. Hold Charge, then press Punch for the Clone Attack or Kick for the Sphere Rush. The icons of the fighter's own buttons (Shuriken, Punch, Kick, and Transform once a fighter has one) come from its `mobileAbilities` in `js/data/characters.js` and follow Player 1's fighter, in Practice Ground too when you change fighter; a fighter with no `transform` entry keeps the dashed, reserved Transform star. Shield, Jump and Charge are the same for everyone. Only the presentation is per fighter: the buttons always send the same control codenames (`uniqueba`, `transform`, `shield`, `ba1`, `ba2`). The combat buttons are the same elements in both layouts, in the same places: switching (`TouchControls.setScheme`) only swaps the lower-left corner (Left / C / Right, or Charge and the joystick with its Dash buttons), after letting go of everything held. Each layout can also be rearranged and resized by the player (see [Mobile Controls](#mobile-controls)); the buttons keep what they do wherever they sit. The viewport disables page zoom (`maximum-scale=1, user-scalable=no`) and the play surfaces, joystick and buttons set `touch-action: none`, so rapid taps never zoom or scroll the page.
+- **Touch:** two layouts, Joystick (the default) and Classic Buttons (see [Mobile Controls](#mobile-controls)). Several fingers work at once (hold the joystick or Right and press Jump, or hold Charge and press Punch). The combat buttons show icons, not letters: for #0001, **Shuriken** (Throw), **Shield** (held), **Punch** (Basic Attack 1) and **Kick** (Basic Attack 2), beside Transform (dashed: #0001 has none yet) and Jump. For #0002 the Basic Attack buttons keep their neutral names and glyphs (Basic Attack 1 and 2), and there is no Unique Basic Attack button: which buttons a fighter has comes from its `actions` (`abilityPresence` in `js/ui/mobile-abilities.js`), so a move it does not have (left out of `actions`) has its button hidden, unnamed and untouchable, its place left empty, while one mapped to `null` stays reserved (dashed). The touch layout editor still shows every control, so a layout can place a button for the fighters that have it. Hold Charge, then press Punch for the Clone Attack or Kick for the Sphere Rush. The icons of the fighter's own buttons (Shuriken, Punch, Kick, and Transform once a fighter has one) come from its `mobileAbilities` in `js/data/characters.js` and follow Player 1's fighter, in Practice Ground too when you change fighter; a fighter with no `transform` entry keeps the dashed, reserved Transform star. Shield, Jump and Charge are the same for everyone. Only the presentation is per fighter: the buttons always send the same control codenames (`uniqueba`, `transform`, `shield`, `ba1`, `ba2`). The combat buttons are the same elements in both layouts, in the same places: switching (`TouchControls.setScheme`) only swaps the lower-left corner (Left / C / Right, or Charge and the joystick with its Dash buttons), after letting go of everything held. Each layout can also be rearranged and resized by the player (see [Mobile Controls](#mobile-controls)); the buttons keep what they do wherever they sit. The viewport disables page zoom (`maximum-scale=1, user-scalable=no`) and the play surfaces, joystick and buttons set `touch-action: none`, so rapid taps never zoom or scroll the page.
 - **Gamepad (standard layout):** D-pad or left stick left / right to move (twice in a row to Dash) and down to Charge in battle (they still navigate menus), A to jump, X / Square to Throw, B / Circle for Basic Attack 1, LB for Basic Attack 2, Y / Triangle for the reserved Transform, RB or RT for Shield, Start to pause.
 - **Debug:** `` ` `` toggles the collider, hurtbox and attack-hitbox overlay in battle (a hitbox shows only while it can connect; hurtboxes look the same with the Shield up, and a shielding fighter is labelled `shield`; a flying shuriken's hitbox is outlined in magenta and labelled; a clone's attack hitbox shows in the attack colour, labelled `clone ba1` (or `clone maba2` overhead), only on its active frame; the Sphere Rush's sphere hitbox is a dashed cyan box labelled `charged ba2 dash` while it can connect, then a dashed cyan cross marks the sphere on the caught opponent, which is labelled `bound`; solids, the main floor's block among them, are outlined in red and the Void's fixed kill line is dashed violet).
 
@@ -480,13 +486,14 @@ Touch controls show on touch-first devices (coarse pointer, or a touch actually 
 
 ## Current content
 
-- **Characters:** #0001
+- **Characters:** #0001, and #0002 (Slender Man) in roster slot 02. #0002's supplied art is all registered and plays in game; his combat attributes are intentionally still pending (see [#0002](#0002-slender-man) below)
 - **Maps:** Desert (a sandstone mesa with 2 rock outcrops, 1360 units wide) and City (a rooftop with 7 one-way platforms and a stair bulkhead, 1440 wide) for Quick Battle and Watch Mode; the Practice Ground training room (one flat training block, 1280 wide) for practice. Each is a compact main stage with open air past both ledges and the Void a short way beyond (see [Stages and the Void](#stages-and-the-void))
 - **Animations:** Idle, Run, Jump, Fall, Land (jump/fall play while airborne; land plays once on touchdown), Hurt and Mid-air Hurt (shown during hitstun on the ground / in the air), Basic Attack 1 (4 frames), Mid-air Basic Attack 1 (the kunai slash, 3 frames: `0001_midair1ba1`–`3`), Basic Attack 2 (7 frames) and Mid-air Basic Attack 2 (the airborne kick, 5 frames: `0001_midair2ba1`–`5`), each played once at 12 fps, Shield (`0001_prepshield` to raise it, `0001_shielding` held, `0001_releaseblock` to lower it) and Mid-air Shield (`0001_midairshielding`, the held pose only), single frames drawn at 1×, Dash (`0001_dash1`–`2`, drawn at 1×, played once at 10 fps), Charge (charge1 → charge2 once, then chargea ↔ chargeb while held, at 10 fps, with charge1 shown briefly on release), Throw (3 fighter frames, played once at 12 fps), Shuriken (3 looping projectile frames at 18 fps, normalized and drawn separately from the fighter poses), the clone appear / vanish cloud (`0001_cloneav1`–`0001_cloneav10`, an effect at 20 fps: forwards as a clone appears, the same frames in reverse as it vanishes), the Sphere Rush poses (`0001_rasen1`–`0001_rasen12` as one-shot fighter clips at 12 fps: formation 1–3, rush 4–6, contact 7–8 with 8 held, explosion 9, recovery 10–12, and 12 alone as the whiff release) and its blue sphere (`0001_prasen1`–`0001_prasen11` as three effects at 12 fps: formation 1–6 once, spinning on the opponent 7–9 looped while it is drawn ever larger, explosion 10–11 once)
+- **#0002's animations:** Idle (`0002_idle1`–`5`, a slow sway, 6 fps), Run (his movement: `0002_run1`–`2`, his body breaking into static, looped at a steady 8 fps), Jump, Fall and Land (single frames), Charge (one kneeling pose, `0002_charge`, held; no release pose), Basic Attack 1 (`0002_ba1_1`–`4`) and Mid-air Basic Attack 1 (`0002_maba1_1`–`4`), Basic Attack 2 (`0002_ba2_1`–`3`) at 10 fps, Mid-air Basic Attack 2 (`0002_maba2_1`–`4`, a spin inside a vortex of tendrils, 12 fps), the Shield (`0002_prepshield`, `0002_shielding`, `0002_releaseshield`) and the Mid-air Shield (`0002_midairshielding1`–`2`, looped), and the Charged BA1 art (`0002_cba1_1`–`6`, a pool of shadow with two hands rising from it) registered as an effect for when that move is authored
 - **Attacks:** Basic Attack 1 and Basic Attack 2, each on the ground and in the air, a ground Throw that releases one shuriken, the Charged BA1 Clone Attack and the Charged BA2 Sphere Rush (ground only), each on its own 5-second cooldown. #0001's damage: BA1 3, mid-air BA1 3, BA2 5, mid-air BA2 5, shuriken 1, Sphere Rush 1 as it catches the opponent and every 0.5 s after while it holds it (4 in all), then 10 on the explosion. Transform is reserved.
-- **Shield:** #0001 shields, on the ground and in the air: held, full circle, free to hold, 25 Energy for each hit it blocks.
+- **Shield:** #0001 shields, on the ground and in the air: held, full circle, free to hold, 25 Energy for each hit it blocks. #0002 has the same Shield with his own clips (no perfect Shield or slow fall until his are authored).
 - **Movement:** running, jumping (the normal jump on a tap, a higher jump held a little longer, one air jump), air steering, the fast fall, the air Shield's slow fall and a grounded Dash on a double tap (15 Energy); attacks keep and add their own momentum, turn with the direction held, early presses are buffered, and a hit opens a follow-up, a Dash cancel included (see Controls above).
-- **Powers:** Jump Power and Speed Power, each in three tiers. #0001 has Jump Power 2 and Speed Power 2 (its original jump and speed).
+- **Powers:** Jump Power and Speed Power, each in three tiers. #0001 has Jump Power 2 and Speed Power 2 (its original jump and speed). #0002 declares the same tiers only as placeholders (each Power's default), until his are authored.
 - **Launch:** every hit's damage adds to the target's Launch Point, then the hit launches at its Base Launch (0, 1, 2 or 3) × that new Launch Point, in its Directional Launch. #0001's BA1 is Base Launch 1 horizontal, its BA2 and mid-air BA1 Base Launch 2 vertical, its mid-air BA2 Base Launch 2 reverse vertical (downward), the Sphere Rush blast Base Launch 3 horizontal, and the shuriken and Sphere Rush ticks Base Launch 0 with no direction (they never launch).
 - **HUD:** each fighter has one compact, semi-transparent glass card, pulled in close on either side of the timer: its portrait (the character's own `visual.portrait` crop, turned to face the timer whichever way its art is drawn), one thin divider, and its name with its Launch Point beneath it, under its tag: **P1** and **CPU** in Quick Battle, **CPU 1** and **CPU 2** in Watch Mode. The right-hand card mirrors the left-hand one. In a battle three small dots under each card fill as that fighter scores its points (○ ○ ○, then ● ○ ○ ...). Over each fighter itself, following it: its bright purple Energy bar above its name tag while below full, and its CBA1 / CBA2 cooldown rings under its feet while cooling down.
 - **Modes:** Quick Battle (Splash → Home → Select Mode → Select Difficulty → Select Fighter → Select Stage → Battle): 5 minutes against a CPU that fights with the whole moveset at the difficulty you choose (Easy, Medium, Hard or Brutal; see [Quick Battle difficulty](#quick-battle-difficulty)), first to 3 points. Each time a fighter falls into the Void its opponent scores a point at once; the one that fell is out of play for 2 seconds, then back at its spawn with 0 Launch Point, full Energy and both charged abilities ready, while the fight and the timer carry on. The third point wins the match (a short **K.O.** beat, then the result; the loser does not come back). If both fall together, or one falls while the other is still waiting to come back, that fall scores nothing. If time runs out first, more points wins, then lower Launch Point; equal on both is a draw. Watch Mode (Home → Watch Mode → Select Difficulty → Select CPU 1 → Select CPU 2 → Select Stage → CPU vs CPU Battle): the same battle with the combat AI on both sides, for watching only (see [Watch Mode](#watch-mode)). Practice Ground: training on its own stage with a stand-still, non-attacking CPU dummy from the start (which you can change or disable; difficulty never applies to it), no timer, rounds or points; the Void takes a fighter out for 2 seconds, then puts it back at its spawn (below).
@@ -571,6 +578,7 @@ UPDATES.md            named updates (movement, effect, bounce): what each change
 CLAUDE.md             notes for Claude sessions working on the repo
 alvafav.PNG           site favicon
 assets/characters/0001/   #0001 sprite frames (unchanged originals)
+assets/characters/0002/   #0002 sprite frames (the supplied files, all 38)
 js/
   main.js, config.js  boot + global config (bindings, render, timing)
   core/               app controller, screen manager, menu navigation,
@@ -601,7 +609,7 @@ js/
                       layout editor
 ```
 
-- **Sprite normalization.** The idle, jump, fall, land and hurt frames are pixel art at roughly 16× scale, the mid-air hurt, Basic Attack 1 and 2 and Charge frames at 8×, and the run frames at 4×; the Dash and Shield frames are drawn at 1× (one file pixel per art pixel), so each clip's `heightRatio` sizes it against idle's 52 art pixels at that same scale. When a frame loads, the game reads its alpha channel once and finds the visible bounds. It then detects the pixel grid from every colour transition and resamples the frame to 1 pixel per art pixel. Every frame is drawn at the same world scale, anchored bottom-centre at the upper-body centroid, so the fighter keeps the same size and position when switching between animations. When the size stays close to the target, each art pixel maps to a whole number of device pixels. The Sphere Rush poses are fighter poses at 2×, normalized like the rest. Projectile and effect art (the shuriken at 8×, the clone cloud and the Sphere Rush sphere at 2×) goes through the same grid detection but keeps its own art size, centre-anchored at the fighter's art-pixel scale, and is never fitted to the fighter's height.
+- **Sprite normalization.** The idle, jump, fall, land and hurt frames are pixel art at roughly 16× scale, the mid-air hurt, Basic Attack 1 and 2 and Charge frames at 8×, and the run frames at 4×; the Dash and Shield frames are drawn at 1× (one file pixel per art pixel), so each clip's `heightRatio` sizes it against idle's 52 art pixels at that same scale. When a frame loads, the game reads its alpha channel once and finds the visible bounds. It then detects the pixel grid from every colour transition and resamples the frame to 1 pixel per art pixel. Every frame is drawn at the same world scale, anchored bottom-centre at the upper-body centroid, so the fighter keeps the same size and position when switching between animations. When the size stays close to the target, each art pixel maps to a whole number of device pixels. The Sphere Rush poses are fighter poses at 2×, normalized like the rest. #0002's neutral poses are 8×, most of his other clips 2× and two Shield poses 1×, all one art-pixel scale once normalized (idle is 85 art pixels tall). His tendrils would pull the upper-body centroid far off his body, so his grounded clips place their own anchors (`anchorX`, per frame) where his feet stand, and his feet stay planted from idle to run, land, Basic Attack 1, Basic Attack 2 and the Shield. Each fighter is drawn at its own art scale (`Arena.pxPerArtOf`), and the view is sized for a fighter of the reference height (`CONFIG.render.fighterHeight`, #0001's 88 units) whoever is picked, so #0002, 110 units tall, stands a quarter taller than #0001 on the same stage. Projectile and effect art (the shuriken at 8×, the clone cloud and the Sphere Rush sphere at 2×) goes through the same grid detection but keeps its own art size, centre-anchored at the fighter's art-pixel scale, and is never fitted to the fighter's height.
 - **Simulation.** Fixed 60 Hz steps with interpolated rendering, so movement is the same at 30, 60 and 120 Hz. Colliders, hurtboxes and pushboxes are set in data and don't depend on PNG size.
 - **Stages.** Flat parallax layers (sky, far, mid, near, atmosphere) are generated once from a seeded RNG into cached `Path2D` geometry; the playable geometry (main stage, platforms, solids) is drawn in one shared one-point perspective (`js/stages/perspective.js`) so it has depth. Collision comes only from `js/data/maps.js`, so any layer can later be swapped for image art.
 
@@ -857,12 +865,50 @@ The two mid-air Basic Attacks swapped moves: **mid-air BA1** is the three-frame 
 
 **Home → Discover** opens the reference, a character-neutral explanation of Alva's mechanics. **POWER** (open by default) explains Jump Power and Speed Power, each with its three tiers. **LAUNCH** explains the launch system generically, straight from `js/data/launch.js`: Launch Point, the four Base Launch values (0 no launch, 1 normal, 2 double, 3 triple, each marked with its own number) with the formula `Launch strength = Base Launch × Launch Point`, and the four Directional Launches (none, horizontal, vertical, reverse vertical). Neither page says which fighter or attack uses a Power, tier, Base Launch or direction, and neither shows tuning numbers. **PASSIVES** is intentionally empty until Alva has passives. Arrow keys, the D-pad or the stick move between Back, the sections and the page (↑ / ↓ scroll a long page); Back, `Esc` or gamepad B returns Home.
 
-### Adding a fighter (#0002)
+### #0002: Slender Man
 
-1. Put the frames in `assets/characters/0002/`.
+#0002 is Slender Man, the second fighter (roster slot 02; the in-game name
+stays `#0002`). Every file supplied for him is in `assets/characters/0002/`
+and every animation family is registered (see [Current content](#current-content)).
+Two of the supplied files are byte-identical copies of others:
+`0002_mouvmen1.png` is `0002_run1.png` and is not loaded; `0002_land.png` is
+`0002_run2.png`, kept as the land pose it was supplied as.
+
+His gameplay attributes are intentionally not authored yet, and nothing
+guesses them:
+
+- **Basic Attacks are art only.** BA1, mid-air BA1, BA2 and mid-air BA2 are
+  `pending` attacks (`js/game/combat.js`): each plays its own clip once and
+  hits nothing (no damage, launch, hitbox, stun, cooldown or cancel).
+- **No Unique Basic Attack**, not even a reserved one: it is left out of his
+  `actions`, so its input does nothing for him, the CPU never presses it and
+  his touch controls have no button for it.
+- **No Charged BA2**, and no Charged BA1 yet: he has no `chargedActions`, so
+  Charge + either button is that button's own attack and no CBA cooldown ring
+  ever shows under him. The CBA1 art is registered as an effect; what the
+  move does is not authored.
+- **Transform** stays reserved (dashed), as for #0001.
+- **Body and movement** are `TEMPORARY_BASELINE` in `js/data/characters.js`,
+  marked `TODO #0002`: placeholder plumbing so he can load, move, jump,
+  shield, be hit and respawn. The values are #0001's neutral movement and body
+  (collider and hurtboxes 80 units tall, although he is drawn 110 tall), the
+  Powers' default tiers, and no Dash; they are not his designed stats.
+  Energy, launch reaction and launch bounce are the engine's defaults.
+
+The CPU reads all of this from his data like any other fighter: with no
+attack that can hit, it never presses one for him. He works everywhere a
+fighter can be picked: Select Fighter, Quick Battle (its CPU plays him too),
+Practice Ground's Change Fighter and CPU, and Watch Mode's CPU 1 and CPU 2,
+mirror matches included.
+
+### Adding a fighter
+
+1. Put the frames in `assets/characters/<id>/` (the next is `0003`).
 2. Add a definition to `CHARACTERS` in `js/data/characters.js`, its moves keyed by the universal move codenames (see [Controls](#controls)) whatever it calls them in game (animations, movement, Power tiers such as `powers: { jump: 2, speed: 2 }`, collider, hurtboxes, stats). Movement is ground `acceleration` / `deceleration` / `turnBoost` / `overspeedDeceleration`, air `airAcceleration` / `airDeceleration` / `airTurnBoost`, `gravityScale`, `maxFallSpeed`, `fastFallAcceleration` / `fastFallSpeed`, `coyoteTime`, `jumpBuffer`, `highJumpWindow` / `highJumpHeight`, `airJumps` / `airJumpRatio`, `attackBuffer`, `hitstunFriction` / `hitstunAirDrag` and the Dash's two; the newer fields are optional (see `Fighter.moveHorizontal`). How it responds to launches is `launchReaction` (`stunPerThousand`, `maxStun`, `tumbleSpeed`, `steerAngle`; see `resolveLaunchReaction` in `js/game/combat.js`), and a Shield's `perfectWindow` / `perfectRearm` set its perfect block and `slowFallSpeed` / `slowFallBrake` its slow fall in the air.
 3. Give it a free `rosterSlot`.
 4. Optionally, name its moves in `abilityNames`, keyed by move codename (e.g. `cba2: 'Sphere Rush'`); a move it leaves out keeps its neutral name.
+
+A fighter whose art arrives before its attributes, as #0002's did, can still be added: give its attacks `pending: true` (art only: one pass of the clip, no hit; declaring combat fields on one is refused), leave out of `actions` any move it does not have (its touch button is hidden and the CPU never presses it), keep `null` for a move still to come (reserved, dashed), and use `TEMPORARY_BASELINE` for what the engine cannot build a fighter without until the real values are authored. A clip whose art misleads the automatic anchor (effects drawn beside the body) can place each frame's anchor itself with `anchorX`, and `visual.portrait.centerX` centres a portrait crop by hand.
 
 The tests already run a second, made-up fighter (`tests/sample-fighter.mjs`, never in the game) with different moves on the same codenames: a melee `uniqueba` usable in the air, a real `transform`, no mid-air `ba1`, a charged summon on `ba2`, no Shield. It goes through combat, the CPU, the touch buttons and the codename checks (`tests/sample-fighter.test.mjs`), so anything that only works for #0001 shows up there first. A new character is checked against the same codename rules automatically.
 
@@ -917,6 +963,16 @@ stage artwork by hiyroscript.
 - *Jump Ultimate Stars*
 - The Spriters Resource. Source sheet uploaded by Dazz, contributor FRET.
 
+**#0002 / Slender Man.**
+
+- Character: Slender Man was created by Eric Knudsen, under the pseudonym
+  Victor Surge, on the Something Awful forums in 2009.
+- Sprite source: sprites by XmayGrrr, *Upgrade Slenderman Sprites Jus
+  Sheet*.
+- Source page: DeviantArt / renatoooferreiraaa,
+  <https://www.deviantart.com/renatoooferreiraaa/art/Upgrade-Slenderman-Sprites-Jus-Sheet-By-Xmaygrrr-D-1374753835>
+  (the account the sheet was supplied from; the sprite work is XmayGrrr's).
+
 **Rights.** hiyroscript did not create or claim ownership of the original
 third-party character/game artwork. Original characters, games, and related
 properties belong to their respective rights holders.
@@ -924,6 +980,7 @@ properties belong to their respective rights holders.
 **Project.** Unofficial fan project. No affiliation or endorsement is implied.
 
 The in-game credits (the Home credits roll) render from one list in
-`js/ui/credits.js`. There is no in-game Help screen; this README and
+`js/ui/credits.js`; a line there may link to its source (the #0002 source
+page does, opening in a new tab). There is no in-game Help screen; this README and
 [`ALVA_SPEC.md`](./ALVA_SPEC.md) document the controls. The game ships with
 no audio.

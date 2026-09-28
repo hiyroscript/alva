@@ -56,6 +56,10 @@ class Element extends Node {
     return this.attrs.has(name) ? this.attrs.get(name) : null;
   }
   hasAttribute(name) { return this.getAttribute(name) !== null; }
+  removeAttribute(name) {
+    if (BOOLEAN_ATTRS.includes(name)) this[name] = false;
+    else this.attrs.delete(name);
+  }
   set textContent(v) { this.replaceChildren(new Text(String(v))); }
   get textContent() { return this.children.map(c => c.textContent).join(''); }
   set innerHTML(v) { this.replaceChildren(); this.html = v; }
