@@ -1,619 +1,964 @@
 Work directly in the existing hiyroscript/alva repository on the current main codebase.
 
-Implement the second playable fighter, #0002, and add a fighter-palette explosion effect when any fighter is absorbed by the Void.
+Implement the second fighter, #0002, using the supplied 0002_* sprite assets already present at the repository root.
 
-Before changing anything, inspect the existing code and preserve Alva’s current architecture, coding conventions, comments, accessibility, responsive behavior, localization, game feel, and tests. Do not redesign unrelated systems.
+#0002 is Slender Man. Preserve ALVA’s existing numbered fighter presentation where appropriate (#0002 remains the fighter’s in-game roster/display identifier), but the project’s credits must properly identify the character and every relevant creator/source name listed below.
 
-Goals
+Before changing anything, inspect the current implementation and preserve ALVA’s existing architecture, data-driven fighter design, controls, accessibility, localization, mobile layouts, sprite normalization, game modes, AI behavior, tests, comments, and documentation conventions. Do not redesign unrelated systems.
 
-1. Add #0002 as the second selectable/playable fighter.
-2. #0002 currently only has finished idle and walking artwork. Do not invent attacks, attack animations, defense animations, jump animations, hurt animations, transformations, special moves, or other combat art.
-3. Add the supplied sprite-source credit for #0002.
-4. Never display or introduce the source artwork’s character/title name anywhere in the project. The fighter must only be referred to as #0002.
-5. When a fighter is absorbed by the Void, create a short explosion/burst exactly where that fighter disappears.
-6. The explosion must use a color palette derived from/matched to that fighter rather than one generic color shared by every fighter.
-7. Preserve all existing Void scoring, respawn, double-KO, camera, combat, physics, and timing rules.
+Primary requirements
 
-Existing architecture to preserve
+1. Add #0002 as the second available/selectable fighter.
+2. Register all supplied #0002 animation artwork, not just idle/run.
+3. Do not invent the final gameplay/combat attributes yet. Those will be authored later.
+4. #0002 has no cba2.
+5. #0002 has no uniqueba / Unique Basic Attack.
+6. Character-specific controls/affordances that do not exist for #0002 must not be shown for him.
+7. Do not borrow attacks, effects, projectiles, animations, names, hitboxes, or special moves from #0001.
+8. Add complete credits for the character creator and sprite source.
+9. Update tests and documentation so the repo accurately describes two fighters.
 
-The relevant code currently works like this:
+⸻
+
+1. Preserve the existing fighter architecture
+
+The current architecture is intentionally character-data-driven.
+
+Relevant files include at least:
 
 * js/data/characters.js
-    * CHARACTERS is the fighter database.
-    * The file is intentionally structured so new fighters are data-driven.
-    * The roster and battle systems should not need fighter-specific branches.
-    * characterFramePaths(def) gathers animation/projectile/effect assets for loading.
+* js/data/abilities.js
+* js/config.js
+* js/game/character.js
+* js/game/combat.js
+* js/game/combat-ai.js
+* js/game/fighter-status.js
+* js/game/sprite-animator.js
+* js/game/sprite-normalizer.js
+* js/game/touch-controls.js
+* js/ui/mobile-abilities.js
 * js/ui/fighter-roster.js
-    * Builds the 48-slot roster directly from CHARACTERS.
-    * Available characters automatically get selectable buttons, portraits, previews, and loading.
-    * The preview uses the fighter’s idle animation.
-    * Do not build a separate #0002 roster implementation.
+* js/ui/credits.js
+* js/core/i18n.js
 * js/core/app.js
-    * Preloads every available fighter.
-    * loadCharacter() and SpriteSet.build() should continue to be the shared loading path.
-* js/game/arena.js
-    * checkVoid(fighters) finds fighters whose centers crossed the fixed Void boundary.
-    * Fighters become lostToVoid, then onVoid(f) is called.
-    * A lostToVoid fighter is immediately removed from inPlay, so it is no longer updated, targeted, collided with, or rendered.
-    * This is the shared hook used by Quick Battle, Watch Mode, and Practice.
-* js/game/battle.js
-    * Battle.onVoid() handles points, match-winning falls, and respawn.
-    * Do not move visual-effect logic into scoring logic.
-* js/game/hit-fx.js
-    * Owns presentation-only combat effects such as flashes, sparks, trails, shake, lethal zoom, and rebound effects.
-    * It must remain presentation-only.
-    * The new Void explosion belongs here or in a similarly presentation-only module, not in physics/combat data.
-* js/game/arena.js rendering order currently paints fighters/effects, foreground, then the actual Void layer.
-    * A Void explosion needs to remain visible even after the fighter has been swallowed.
-    * Draw the new Void explosion after theme.drawVoid(...), but before UI/status/debug overlays as appropriate.
+* the Character Select / Battle / Practice / Watch screens
+* the associated tests under tests/
 
-Part 1 — organize #0002 assets
+CHARACTERS must remain the source of truth for fighters.
+
+Do not add screen-specific branches such as:
+
+if (character.id === '0002') ...
+
+unless there is genuinely no generic alternative.
+
+Instead, extend the existing character capability/data model where necessary so future incomplete or differently-equipped fighters can express the same thing.
+
+Adding #0002 correctly should make the shared roster/loaders work automatically.
+
+⸻
+
+2. Add the second roster fighter
+
+Add a real second entry to CHARACTERS:
+
+id: '0002'
+displayName: '#0002'
+available: true
+rosterSlot: 1
+
+Slot indexing should continue following the repo’s existing convention, making the visible second roster position available.
+
+Do not replace or reorder #0001.
+
+The roster should become:
+
+* Slot 01 — #0001
+* Slot 02 — #0002
+* remaining locked/unavailable slots unchanged
+
+getCharacter('0002') must return this real definition.
+
+The normal loading path through characterFramePaths(), App.loadCharacter(), SpriteSet.build(), FighterRoster, etc. must be preserved.
+
+⸻
+
+3. Organize the #0002 assets
 
 Create:
 
 assets/characters/0002/
 
-The repository currently contains 0002_* sprite PNGs at the root.
+Move/copy the actual source PNGs currently stored at the repository root into that fighter directory and update references accordingly.
 
-For the actual fighter definition, only register the finished idle/walking artwork:
+The root currently contains these 38 #0002 files:
 
-* 0002_idle1.png
-* 0002_idle2.png
-* 0002_idle3.png
-* 0002_idle4.png
-* 0002_idle5.png
-* 0002_run1.png
-* 0002_run2.png
+0002_ba1_1.png
+0002_ba1_2.png
+0002_ba1_3.png
+0002_ba1_4.png
+0002_ba2_1.png
+0002_ba2_2.png
+0002_ba2_3.png
+0002_cba1_1.png
+0002_cba1_2.png
+0002_cba1_3.png
+0002_cba1_4.png
+0002_cba1_5.png
+0002_cba1_6.png
+0002_charge.png
+0002_fall.png
+0002_idle1.png
+0002_idle2.png
+0002_idle3.png
+0002_idle4.png
+0002_idle5.png
+0002_jump.png
+0002_land.png
+0002_maba1_1.png
+0002_maba1_2.png
+0002_maba1_3.png
+0002_maba1_4.png
+0002_maba2_1.png
+0002_maba2_2.png
+0002_maba2_3.png
+0002_maba2_4.png
+0002_midairshielding1.png
+0002_midairshielding2.png
+0002_mouvmen1.png
+0002_prepshield.png
+0002_releaseshield.png
+0002_run1.png
+0002_run2.png
+0002_shielding.png
 
-Place the used files under:
+Inspect every PNG rather than inferring its visual properties from the filename alone.
 
-assets/characters/0002/
+There are intentional/accidental duplicate source images in the current tree:
 
-Use Alva’s existing animation key run internally because that is what the movement/animator system expects, but visually treat these two frames as the character’s walking cycle.
+* 0002_mouvmen1.png is byte-identical to 0002_run1.png.
+* 0002_land.png is byte-identical to 0002_run2.png.
 
-There are currently other 0002_* files in the repository such as airborne/landing-looking images. Do not wire those into gameplay yet. The requirement for this change is that #0002 has only idle and walking as finished states.
+Do not create duplicate runtime clips merely because duplicate filenames exist. Preserve the source files if useful for provenance, but use the clean logical animation names expected by ALVA.
 
-Do not synthesize missing frames by editing existing art.
+Do not rename ALVA’s universal logical move codenames.
 
-Do not copy #0001 artwork into missing #0002 animation states.
+⸻
 
-Part 2 — add #0002 to CHARACTERS
+4. Register every #0002 animation
 
-In js/data/characters.js, add a real second available fighter:
+Add a BASE_0002, following the current BASE_0001 convention.
 
-* id: '0002'
-* displayName: '#0002'
-* available: true
-* rosterSlot: 1
+Register all authored animation families represented by the supplied art.
 
-This should make slot 02 available automatically.
+Neutral movement
 
-Define an appropriate base path such as:
+idle
 
-./assets/characters/0002/0002_
+Frames:
 
-Animations
+0002_idle1.png
+0002_idle2.png
+0002_idle3.png
+0002_idle4.png
+0002_idle5.png
 
-Register only:
+Five-frame loop.
 
-* idle
-    * 5 supplied frames
-    * looped
-* run
-    * 2 supplied frames
-    * looped
+run
 
-Inspect the actual PNGs before setting:
+The engine expects the logical state name run even if the artwork visually represents walking/movement.
 
-* FPS
-* sourceFacing
-* heightRatio
-* visual.height
-* pixel-grid behavior
-* portrait crop
-* anchor
+Use:
 
-The sprite must remain crisp with imageSmoothingEnabled = false through the existing rendering pipeline.
+0002_run1.png
+0002_run2.png
 
-Choose playback speeds that make the supplied art look intentional rather than hyperactive. Since the movement art is a walk rather than a full sprint, do not force an excessively high run-animation FPS just because the engine state is called run.
+Loop it.
 
-Missing visual states
+Do not create a separate runtime mouvmen state simply because 0002_mouvmen1.png exists; it duplicates run1.
 
-#0002 must still be able to exist safely in the current engine even though it does not have full artwork.
+jump
 
-Use the existing animation fallback mechanism where appropriate so universal non-offensive states can display a stable idle frame instead of failing.
+0002_jump.png
 
-For example, states such as:
+fall
 
-* jump
-* fall
-* land
-* hurt
-* midairHurt
+0002_fall.png
+
+land
+
+0002_land.png
+
+Single-frame clips can be held as appropriate for the engine state.
+
+Charge
+
+The supplied artwork contains:
+
+0002_charge.png
+
+Integrate it with ALVA’s existing:
+
 * chargeStart
 * chargeLoop
 * chargeRelease
 
-may resolve to an idle frame until real art exists.
+semantics in the least artificial way possible.
 
-Do not fake a new animation by rapidly cycling idle frames under another state name.
+Because only one authored Charge pose exists, it is acceptable for more than one logical charge state to reference that same physical PNG. Do not manufacture extra Charge frames.
 
-A double-tap Dash should not use somebody else’s animation. If the engine already refuses Dash when its required clip is missing, retain that behavior rather than fabricating a dash clip.
+For example, if consistent with the animator:
 
-Gameplay baseline
+* chargeStart → charge frame
+* chargeLoop → same charge frame held/looped
+* chargeRelease → same frame or a clean return to neutral
 
-For now, give #0002 sane baseline body/movement data so the character can move around the stages without introducing a whole balancing pass.
+The important rule is: use the real authored art and do not fake animation by cycling unrelated frames.
 
-Use #0001’s neutral movement/physics/Powers as the initial reference where appropriate, including the types of data required by Fighter, such as:
+Ground Basic Attack 1
 
-* Powers
-* acceleration/deceleration
-* air movement
-* gravity
-* fall limits
-* coyote time
-* jump buffering
-* air jump count
-* launch reaction
-* energy/stat fields required by the engine
-* pushbox/collider/hurtboxes
+Logical animation:
 
-However:
+ba1
 
-* inspect #0002’s actual sprite proportions;
-* adjust the visual sizing/collider/hurtboxes enough that the body reasonably fits #0002;
-* do not blindly make sprite dimensions equal to #0001;
-* do not give #0002 attack hitboxes.
+Frames:
 
-No unfinished combat kit
+0002_ba1_1.png
+0002_ba1_2.png
+0002_ba1_3.png
+0002_ba1_4.png
 
-#0002 does not have completed combat animations yet.
+Mid-air Basic Attack 1
 
-Make its unfinished combat inputs explicitly unavailable/reserved rather than borrowing #0001 moves.
+Logical animation:
 
-The definition should therefore have the equivalent of:
+maba1
 
-* no projectile animations
-* no projectiles
-* no effect animations specific to attacks
-* no attack definitions
-* no summons
-* no charged techniques
-* no charged actions
-* no defense if there is no finished defense animation/behavior
-* no transformation
-* no made-up ability names
+Frames:
 
-Its universal action mapping should safely reserve/no-op the attack buttons rather than pointing them at nonexistent moves.
+0002_maba1_1.png
+0002_maba1_2.png
+0002_maba1_3.png
+0002_maba1_4.png
 
-In particular, do not make #0002 punch, kick, throw, shield, clone, or use #0001’s sphere technique merely to make the buttons do something.
+Charged Basic Attack 1
 
-This character is intentionally incomplete right now.
+Logical animation:
 
-The game must fail gracefully when an unfinished action is pressed.
+cba1
 
-Mobile controls
+Frames:
 
-Do not present attack icons/names implying abilities that #0002 does not actually have.
+0002_cba1_1.png
+0002_cba1_2.png
+0002_cba1_3.png
+0002_cba1_4.png
+0002_cba1_5.png
+0002_cba1_6.png
 
-When #0002 is selected, fighter-specific combat buttons with no implemented action should use the game’s existing reserved/unavailable presentation rather than inheriting #0001 labels such as Punch, Kick, or Shuriken.
+Keep all six frames in sequence, including any very small, transparent, or transitional early frames. Do not discard a frame based only on PNG file size.
 
-Universal movement/Jump/Charge controls should continue following existing game rules.
+Important: registering the cba1 artwork does not authorize inventing its final combat behavior. See the combat-attributes section below.
 
-Part 3 — roster and mode integration
+Ground Basic Attack 2
 
-Do not special-case screens unnecessarily.
+Logical animation:
 
-Because FighterRoster already reads CHARACTERS, adding #0002 correctly should automatically make it available in:
+ba2
 
-* Select Fighter
-* Practice Ground → Change Fighter
-* Practice CPU selection
-* Watch Mode CPU 1
-* Watch Mode CPU 2
+Frames:
 
-Verify each one.
+0002_ba2_1.png
+0002_ba2_2.png
+0002_ba2_3.png
 
-Quick Battle intentionally makes its CPU use Player 1’s selected fighter. Preserve that behavior. Selecting #0002 in Quick Battle therefore means the match can contain two #0002 fighters.
+Mid-air Basic Attack 2
 
-Watch Mode must continue supporting different character combinations, including:
+Logical animation:
 
-* #0001 vs #0002
-* #0002 vs #0001
-* #0002 vs #0002
+maba2
 
-Do not change those mode rules just to accommodate the incomplete move set.
+Frames:
 
-Part 4 — #0002 credits
+0002_maba2_1.png
+0002_maba2_2.png
+0002_maba2_3.png
+0002_maba2_4.png
 
-Use the DeviantArt source URL supplied with this task as the source credit for #0002.
+Shield animations
 
-Do not use the artwork’s page title as displayed credit text.
+Map the supplied artwork onto the existing Defense animation vocabulary.
 
-Do not use the source artwork’s character name anywhere in:
+shieldStart
 
-* UI
-* code comments
-* translation strings
-* README
-* ALVA_SPEC.md
-* tests
-* filenames you create
-* commit-facing documentation
+0002_prepshield.png
 
-Refer only to #0002, the sprite source, and the creator/uploader attribution that is appropriate from the supplied source.
+shield
 
-Credits implementation
+0002_shielding.png
 
-The current credits are driven by:
+shieldRelease
 
-* js/ui/credits.js
-* translation keys in js/core/i18n.js
+0002_releaseshield.png
 
-Add a distinct #0002 sprite source credits group following the existing #0001 group rather than replacing the existing #0001 attribution.
+midairShield
 
-Keep credits localization-compatible.
+0002_midairshielding1.png
+0002_midairshielding2.png
 
-Add English and French strings consistent with the existing tone.
+Unlike #0001, #0002 has two supplied mid-air shield frames. Preserve both in order.
 
-A suitable conceptual structure is:
+⸻
 
-* #0002 sprite source
-* sprite/source attribution
-* creator/uploader attribution as appropriate
-* source: DeviantArt
-* source URL from this task
+5. Explicitly absent #0002 animations/moves
 
-If the current credits component only renders text rather than anchors, preserve its architecture unless a small accessible link enhancement can be made without disrupting the rolling credits. At minimum, the source must be clearly identifiable.
+#0002 has no supplied artwork for:
 
-Keep the existing generic Rights and unofficial-project notices.
+uniqueba
+cba2
+transform
 
-Update tests/settings.test.mjs, since it currently expects the old exact credits group list and lines.
+Do not create any of them.
 
-Part 5 — fighter-colored Void explosion
+Specifically:
 
-When a fighter crosses the stage Void boundary and gets removed from play, create a short visual explosion exactly at the location where the fighter is swallowed.
+* no uniqueba animation;
+* no Unique Basic Attack;
+* no projectile pretending to be a Unique Basic Attack;
+* no cba2 animation;
+* no Charged BA2 technique;
+* no chargedActions.ba2;
+* no Sphere Rush;
+* no borrowed #0001 special effects;
+* no Transform artwork or move unless separately requested later.
 
-This is a presentation effect only.
+Do not alias another animation to these missing moves.
 
-It must not:
+⸻
 
-* change velocity
-* deal damage
-* affect Launch Point
-* alter scoring
-* affect respawn timing
-* affect hitstop
-* modify collision
-* alter the Void boundary
-* delay lostToVoid
-* change match results
-* change CPU behavior
+6. Do not invent #0002’s final combat attributes yet
 
-Trigger point
+The supplied task is primarily an animation/character-registration pass.
 
-The clean shared trigger is Arena.checkVoid().
+The final #0002 attributes will be added later.
 
-For every fighter in that step’s taken list:
+Therefore do not invent final values for things such as:
 
-1. capture the fighter’s disappearance position and palette;
-2. create the visual burst;
-3. mark/process the fighter as lost exactly as the existing code does.
+* damage;
+* Base Launch;
+* Directional Launch;
+* hitboxes;
+* hitstun;
+* blockstun;
+* hitstop;
+* attack cooldowns;
+* cancel windows;
+* attack momentum;
+* special movement;
+* projectile behavior;
+* CBA1 gameplay mechanics;
+* charged-action cooldown;
+* special ability names;
+* bespoke Power tiers;
+* final speed/jump balancing;
+* final Energy behavior;
+* final defense tuning;
+* final collider/hurtbox tuning beyond what is strictly needed for safe instantiation.
 
-Do this once per Void loss.
+The presence of attack artwork is not permission to guess the eventual fighting-game attributes.
 
-It must work when:
+Engine-required baseline fields
 
-* one fighter falls;
-* both fighters fall on the same fixed step;
-* a fighter falls in Practice;
-* a fighter falls in Quick Battle;
-* a fighter falls in Watch Mode;
-* the fall wins the match and the fighter never respawns.
+If a Fighter cannot safely instantiate without neutral movement/body/stat data, provide only the minimum temporary baseline necessary to make #0002 load, move, render, and participate in the normal game lifecycle.
 
-Do not tie the effect to Battle.onVoid() because Practice also needs it.
+Prefer one of these approaches, in order:
 
-Explosion position
+1. reuse/extract an existing neutral/default fighter baseline if the architecture supports it;
+2. introduce a small shared default rather than duplicating a large fighter-specific object;
+3. if necessary, temporarily use the current #0001 neutral movement/body defaults strictly as placeholder plumbing.
 
-Snapshot a world-space position before the fighter is removed.
+If placeholders are unavoidable, mark them clearly as temporary, e.g.:
 
-Center it on the fighter rather than blindly using the feet.
+// TODO #0002: replace temporary baseline when authored attributes are supplied.
 
-A reasonable baseline is around:
+Do not describe those placeholder numbers in README/spec documentation as #0002’s actual designed stats.
 
-* x: body center
-* y: approximately body vertical center
+Do not give #0002 any of #0001’s named abilities.
 
-Use the actual body/render representation already available in Fighter rather than hard-coded stage coordinates.
+⸻
 
-The explosion must stay at that recorded world-space point even after the fighter has been removed from inPlay.
+7. Animation-only combat integration
 
-Palette
+The authored attack art should be registered now even though final combat attributes are pending.
 
-The effect must visually match whichever fighter disappeared.
+Do not solve this by giving attacks fake zero-damage or arbitrary hitboxes and pretending those are real attributes.
 
-Do not give every fighter the existing amber hit-spark color.
+Inspect the existing action/combat pipeline and choose the least invasive generic solution.
 
-Do not use Alva’s interface green unless that green genuinely belongs to the fighter art.
+Desired behavior for this phase:
 
-Implement this in a data-driven way.
+* BA1 can use the authored ba1 visual sequence.
+* airborne BA1 can use maba1.
+* BA2 can use ba2.
+* airborne BA2 can use maba2.
+* CBA1 artwork is available for later charged-action wiring and, if the engine already supports an animation-only charged state cleanly, may use it.
+* Shield states use their real supplied animations.
+* Jump/fall/land/charge use their real supplied artwork.
+* None of these should accidentally create #0001 combat behavior.
 
-Preferred approach:
+If ALVA currently requires full attack attributes before an attack animation can be activated, do not quietly make up those attributes.
 
-Add character presentation metadata such as a small Void-FX palette to the character definition, for example 3–5 colors derived from that fighter’s actual idle/walk sprites.
+Either:
 
-Do not put code such as:
+* add a small generic presentation-only/action-placeholder mechanism that can play an authored fighter animation without creating a CombatSystem hit; or
+* register the art now and leave the gameplay action explicitly pending until attributes are supplied.
 
-if (fighter.id === '0001') ... else if (fighter.id === '0002') ...
+Prefer the smaller, cleaner option after inspecting the current implementation.
 
-inside the effect renderer.
+Any generic mechanism must be usable by future incomplete fighters and must not contain a #0002 ID check.
 
-Instead the FX system should simply consume fighter data.
+⸻
 
-Inspect the real sprite colors and choose representative shades for both currently available fighters.
+8. cba2 behavior: #0002 does not have one
 
-Include:
+ALVA currently treats:
 
-* a dominant/base color;
-* a brighter readable color;
-* one or more supporting shades.
+cba2 = Charge + ba2
 
-Because the Void itself is very dark, ensure a fighter whose palette contains a lot of dark pixels still produces a visible burst. If necessary, derive a lighter tint from one of that fighter’s own colors rather than introducing an unrelated hue.
+There is not a separate physical cba2 touch button in the present control system.
 
-A generic fallback is fine for future characters whose definition temporarily lacks palette metadata, but both #0001 and #0002 must have proper palette-matched results.
+For #0002:
 
-Visual design
+chargedActions.ba2
 
-Keep it consistent with Alva’s crisp 2D presentation.
+must not exist.
 
-The effect should feel like the fighter was abruptly consumed/disintegrated by the Void:
+There must be:
 
-* quick central flash/pop;
-* expanding burst/ring;
-* several short outward fragments, rays, or pixel-like particles;
-* fragments using multiple shades from the fighter’s own palette;
-* fast fade;
-* approximately 0.3–0.5 seconds total;
-* no lingering screen clutter.
+* no chargedTechniques.cba2;
+* no CBA2 cooldown;
+* no CBA2 HUD cooldown ring;
+* no CBA2-specific hint/label/indicator;
+* no Sphere Rush;
+* no fallback to #0001’s CBA2.
 
-Favor crisp/blocky/pixel-art-compatible geometry over soft realistic smoke.
+If the existing shared Fighter behavior says that Charge + BA2 falls through to the normal BA2 when a character has no chargedActions.ba2, preserve that generic behavior rather than adding a fighter-specific exception.
 
-No gore.
+The normal BA2 itself still exists because #0002 has ba2 and maba2 artwork.
 
-No giant full-screen explosion.
+Do not hide the normal BA2 control merely because Charged BA2 is absent.
 
-The effect should be noticeable without obscuring the match.
+⸻
 
-Use deterministic/semi-deterministic seeded variation like the existing hit sparks where appropriate so tests and repeated rendering remain stable.
+9. uniqueba: completely unavailable for #0002
 
-Effect lifetime
+This requirement is different because uniqueba is an actual combat control/button.
 
-Extend HitEffects cleanly with something like a collection of active Void bursts.
+For #0002:
 
-For example, conceptually:
+actions.uniqueba
 
-* voidBursts = []
-* takeVoid(...)
-* age/remove them from update(dt)
-* drawVoidBursts(...)
+should be absent or explicitly unavailable according to the cleanest established data convention.
 
-Names can differ if a cleaner design fits the codebase.
+There must be:
 
-Each burst needs enough snapshotted data to survive after the fighter object leaves play:
+* no Unique Basic Attack action;
+* no Unique Basic Attack animation;
+* no projectile;
+* no generic ring button implying a move exists;
+* no Shuriken;
+* no #0001 Throw;
+* no CPU attempt to use it.
 
-* x/y
-* age
-* lifetime
-* palette
-* seed/shape information as needed
+Touch controls
 
-Do not retain unnecessary references to dead fighter state.
+Currently js/ui/mobile-abilities.js has a fixed character-specific set:
 
-Clear the effects appropriately when the arena is destroyed.
+uniqueba
+transform
+ba1
+ba2
 
-Render order
+and an unfinished fighter normally falls back to a generic Unique Basic Attack icon/name.
 
-This is important.
+That fallback is not appropriate for #0002 because the move does not exist.
 
-Arena.render() currently draws:
+Extend the presentation model generically so it can distinguish:
 
-* gameplay objects/effects;
-* foreground;
-* the Void itself;
-* then screen-space fighter status/debug UI.
+1. an implemented ability;
+2. a reserved/pending ability;
+3. an ability that the fighter simply does not possess.
 
-If the explosion is drawn before the Void layer, the black Void may cover the exact effect we are trying to show.
+For #0002, uniqueba is category 3.
 
-Render the Void explosion after theme.drawVoid() so it is visible at the swallowing point.
+When #0002 is active:
 
-Keep markers/status rules unchanged: a fighter that is out of play must still have no marker, Energy bar, shadow, or sprite.
+* the uniqueba touch button must be hidden and non-interactive;
+* it must not retain an accessible name as though usable;
+* it must not receive pointer input;
+* it must not occupy keyboard focus;
+* it must not appear as a generic ring;
+* it must not appear as a dashed “coming soon” button.
 
-Reduced motion
+When switching back to #0001, the exact same persistent control element may be shown again as #0001’s Shuriken/Unique button.
 
-Respect the existing reduced-motion philosophy.
+Do not permanently remove uniqueba from ABILITY_ACTIONS, ACTIONS, keyboard input, gamepad input, or the global control vocabulary because #0001 still uses it.
 
-The Void burst itself can still appear because it communicates a game event, but do not add new camera shake, zoom, or large movement solely for this effect when reduced motion is enabled.
+Keyboard/gamepad bindings can remain globally defined, but pressing the input as #0002 must safely do nothing because the character has no mapped action.
 
-The burst can use a simplified/less expansive animation under reduced motion if needed.
+The Combat AI must derive the same fact from character data and never choose a nonexistent Unique action.
 
-Do not alter the existing lethal-launch presentation beyond integrating cleanly with it.
+⸻
 
-Part 6 — documentation
+10. Transform behavior
 
-Update documentation so it matches the game after this change.
+No Transform art is supplied for #0002.
 
-At minimum audit:
+Preserve ALVA’s existing Transform semantics unless the current architecture is being generalized as part of the capability work.
 
-README.md
+If Transform remains represented as ALVA’s existing reserved/dashed control, that is acceptable.
 
-It currently documents adding #0002 as a future example and has #0001 sprite-source material.
+Do not invent a transformation for Slender Man.
 
-Update it to reflect that #0002 is now an actual available fighter.
+This task specifically requires the nonexistent Unique Basic Attack to disappear and the nonexistent CBA2 capability/indicator not to exist. Do not unnecessarily change the project’s existing reserved-Transform convention.
 
-Document that:
+⸻
 
-* #0002 currently has only idle/walking artwork;
-* its combat kit is intentionally not implemented yet;
-* missing visual states safely use existing fallback behavior where appropriate;
-* unfinished attacks are unavailable rather than borrowed from another fighter;
-* Void losses now produce a fighter-colored disappearance burst.
+11. Sprite normalization and visual setup
 
-Add the #0002 sprite attribution without displaying the prohibited source title/name.
+Inspect the real PNG pixel bounds before choosing:
 
-ALVA_SPEC.md
+* sourceFacing;
+* clip FPS;
+* heightRatio;
+* visual.height;
+* visual.referenceAnimation;
+* anchor mode;
+* pixel-grid handling;
+* portrait crop;
+* animation speed scaling.
 
-Audit statements that say only #0001 is selectable.
+Do not blindly copy #0001’s visual dimensions.
 
-The Select Fighter specification currently describes only #0001 as available. Update it so slots 01 and 02 accurately describe the new roster.
+Use the existing sprite normalization pipeline.
 
-Do not rewrite unrelated design documentation.
+Requirements:
 
-Part 7 — tests
+* crisp pixel art;
+* no interpolation blur;
+* no frame-to-frame size popping;
+* no horizontal anchor jitter;
+* correct left/right mirroring;
+* idle centered correctly;
+* walking/run centered correctly;
+* attack poses do not suddenly change world scale;
+* portrait fills the roster panel cleanly;
+* HUD portrait orientation remains correct.
 
-Run and update the existing test suite rather than simply patching code until it looks right.
+Keep imageSmoothingEnabled = false behavior intact.
 
-Audit tests that assume there is exactly one available fighter.
+Use animation playback rates that make the supplied art readable and natural. Do not assume every #0002 attack must use #0001’s 12 fps.
 
-Likely affected areas include:
+Base timings on the actual sequences.
 
-* tests/settings.test.mjs
-    * exact credits structure
-* tests/discover.test.mjs
-    * available fighter names are gathered from CHARACTERS
-    * Discover must remain character-neutral and must not start listing either fighter
-* tests/watch-mode.test.mjs
-    * assumptions about first available fighter
-    * sprite-loading lists/counts
-    * CPU selections
-* tests/practice-ground.test.mjs
-    * it currently creates an artificial second available fighter for switching tests
-    * determine whether this helper still makes sense now that #0002 exists
-    * avoid tests accidentally depending on roster insertion order
-* any roster/character-loading tests whose expected image count assumes one fighter
-* any documentation/assertion tests containing phrases such as “only #0001”
+⸻
 
-Add #0002 tests
+12. Roster and game-mode integration
 
-Cover at least:
-
-1. getCharacter('0002') returns a real available fighter.
-2. #0002 occupies roster slot 1.
-3. characterFramePaths(#0002) only requires the animations intentionally registered for it plus any legitimate explicitly configured effects; unused root PNGs must not silently become active gameplay states.
-4. Idle has five frames.
-5. Walking/run has two frames.
-6. Roster portrait/preview can use #0002’s idle art.
-7. #0002 can be instantiated without a crash.
-8. Running switches to its walking clip.
-9. Returning to neutral switches to idle.
-10. Airborne/missing visual states safely display the configured fallback rather than another fighter’s sprite.
-11. Unimplemented attack/defense/transform inputs do not crash and do not create #0001 attacks.
-12. Quick Battle/Watch/Practice can load #0002.
-
-Add Void-FX tests
-
-Test the effect as presentation state, independently of scoring where possible.
-
-Cover:
-
-1. A fighter crossing the Void creates exactly one burst.
-2. The burst snapshots the fighter’s position.
-3. The burst uses that fighter’s palette.
-4. #0001 and #0002 produce different palette data where their artwork differs.
-5. Two fighters lost on the same fixed step produce two independent bursts.
-6. The burst survives after lostToVoid removes the fighter from inPlay.
-7. The burst ages out and is removed.
-8. Respawning does not replay the previous burst.
-9. Repeated render frames do not create duplicate bursts.
-10. Practice and Battle both trigger the shared effect.
-11. Existing point/double-KO/respawn tests remain unchanged in behavior.
-
-Prefer extending tests/hit-fx.test.mjs for effect lifetime/palette logic and the existing arena/battle tests for integration instead of creating redundant harnesses.
-
-Part 8 — visual verification
-
-After automated tests pass, manually verify in the browser at desktop and mobile-landscape sizes.
-
-Check:
-
-Character Select
-
-* Slot 01 = #0001
-* Slot 02 = #0002
-* both selectable
-* locked slots remain unchanged
-* #0002 portrait is correctly cropped
-* idle preview is correctly centered
-* no frame jitter
-* no smoothing/blurring
-
-Gameplay
-
-With #0002:
-
-* idle loop looks stable
-* moving left/right uses walking frames
-* mirroring is correct
-* sprite does not slide due to changing anchors
-* jumping does not crash despite missing dedicated artwork
-* incomplete attack buttons do not borrow moves/art from #0001
-* CPU logic does not throw errors because moves are unavailable
-
-Void
-
-Test falls from:
-
-* left edge
-* right edge
-* bottom
-* high/fast launches if applicable
+Because the roster is data-driven, #0002 should automatically appear everywhere fighters are selectable.
 
 Verify:
 
-* sprite disappears according to the existing Void rule
-* explosion appears exactly around the disappearance location
-* explosion is rendered above the black Void
-* color visibly corresponds to the fighter that fell
-* #0001 and #0002 are immediately distinguishable by their burst palettes
-* effect is short and clean
-* scoring appears at the same moment as before
-* respawn remains exactly the configured 2 seconds
-* match-winning falls still leave the losing fighter out
-* simultaneous falls show both explosions without changing the existing no-score double-loss behavior
+* Select Fighter;
+* Quick Battle;
+* Practice Ground → Change Fighter;
+* Practice CPU selection;
+* Watch Mode CPU 1;
+* Watch Mode CPU 2.
 
-Non-goals / constraints
+Do not create a separate #0002 roster component.
+
+Preserve Quick Battle’s current rule that its CPU mirrors Player 1’s selected fighter if that remains the existing behavior.
+
+That means #0002 vs #0002 must not crash.
+
+Watch Mode must support at least:
+
+#0001 vs #0001
+#0001 vs #0002
+#0002 vs #0001
+#0002 vs #0002
+
+Practice must support changing into and out of #0002 repeatedly without stale sprites, controls, cooldowns, or labels.
+
+⸻
+
+13. Credits — include every name and role
+
+Add a distinct credits group for #0002 rather than replacing #0001’s existing sprite credits.
+
+The credits must identify the character as Slender Man while preserving #0002 as ALVA’s in-game fighter ID.
+
+Include all of these names/details:
+
+Character
+
+Slender Man
+
+The one-word form Slenderman appears in the sprite-source title/URL; preserve it when referring to the source title, but use Slender Man for the character name in prose.
+
+Character creator
+
+Eric Knudsen
+
+State that Eric Knudsen created Slender Man in 2009 on the Something Awful forums under the pseudonym:
+
+Victor Surge
+
+A suitable factual credit is:
+
+Slender Man created by Eric Knudsen, under the pseudonym Victor Surge, on the Something Awful forums in 2009.
+
+Sprite artist
+
+XmayGrrr
+
+Credit XmayGrrr for the sprite sheet/art.
+
+The source sheet is known as:
+
+Upgrade Slenderman Sprites Jus Sheet
+
+Provided DeviantArt source account/page
+
+The URL supplied for this task is under the DeviantArt account:
+
+renatoooferreiraaa
+
+Provided asset-credit URL:
+
+https://www.deviantart.com/renatoooferreiraaa/art/Upgrade-Slenderman-Sprites-Jus-Sheet-By-Xmaygrrr-D-1374753835
+
+Do not automatically describe renatoooferreiraaa as the sprite artist if the page itself attributes the sprite work to XmayGrrr.
+
+Keep the roles explicit:
+
+* Eric Knudsen — character creator;
+* Victor Surge — Eric Knudsen’s pseudonym used for the original creation;
+* Something Awful — original forum/context;
+* XmayGrrr — sprite sheet/sprite artist attribution;
+* renatoooferreiraaa — supplied DeviantArt source-page account;
+* DeviantArt — asset source platform.
+
+If inspection of the supplied page reveals additional explicit contributor names, include those too rather than dropping them.
+
+Do not erase the current #0001 credits:
+
+* Jump Ultimate Stars
+* The Spriters Resource
+* Dazz
+* FRET
+
+The final credits should retain those and add #0002 separately.
+
+⸻
+
+14. Credits implementation
+
+Credits currently come from:
+
+js/ui/credits.js
+js/core/i18n.js
+
+Add a new localized credit group after the existing #0001 sprite-source group.
+
+Keep English and French structurally equivalent.
+
+Do not hard-code one language directly into credits.js.
+
+Suggested English structure:
+
+#0002 / Slender Man
+Character:
+Slender Man created by Eric Knudsen, under the pseudonym Victor Surge, on the Something Awful forums in 2009.
+Sprite source:
+Sprites by XmayGrrr.
+Upgrade Slenderman Sprites Jus Sheet.
+Source page: DeviantArt / renatoooferreiraaa.
+
+Include the supplied URL where the current credits architecture can support it accessibly.
+
+If credits currently only support translated text and not hyperlinks, make the smallest accessible extension necessary rather than rebuilding the credits roll.
+
+Preserve the existing:
+
+* Original work;
+* Rights;
+* unofficial-project;
+* non-endorsement
+
+notices.
+
+Update tests/settings.test.mjs and any other exact credits expectations.
+
+⸻
+
+15. Documentation
+
+Audit and update:
+
+README.md
+ALVA_SPEC.md
+UPDATES.md
+
+only where relevant.
+
+Remove/update statements saying only #0001 is available.
+
+Document:
+
+* #0002 is now the second selectable fighter;
+* #0002 is Slender Man;
+* all supplied animation art has been integrated;
+* gameplay attributes are intentionally still pending;
+* #0002 has no Unique Basic Attack;
+* #0002 has no CBA2;
+* the UI only exposes actions the fighter actually possesses;
+* his CBA1 artwork exists but its final gameplay attributes must not be invented;
+* credits for Eric Knudsen / Victor Surge / Something Awful / XmayGrrr / renatoooferreiraaa / DeviantArt.
+
+Update the “Adding a fighter (#0002)” example because #0002 is no longer a hypothetical future fighter. Change the example number or make that section generic.
+
+Do not rewrite unrelated design documentation.
+
+⸻
+
+16. Tests
+
+Run the entire existing test suite and preserve all #0001 behavior.
+
+Add focused #0002 coverage.
+
+At minimum verify:
+
+Character registration
+
+1. getCharacter('0002') returns the real fighter.
+2. available === true.
+3. rosterSlot === 1.
+4. #0001 remains slot 0.
+5. roster availability still comes from CHARACTERS.
+
+Asset registration
+
+6. Five idle frames are registered.
+7. Two run/walking frames are registered.
+8. jump uses 0002_jump.png.
+9. fall uses 0002_fall.png.
+10. land uses 0002_land.png.
+11. Charge uses the supplied 0002_charge.png.
+12. BA1 has four frames.
+13. BA2 has three frames.
+14. MABA1 has four frames.
+15. MABA2 has four frames.
+16. CBA1 has six frames.
+17. Shield Start uses 0002_prepshield.png.
+18. Shield uses 0002_shielding.png.
+19. Shield Release uses 0002_releaseshield.png.
+20. Mid-air Shield uses both supplied mid-air frames.
+21. characterFramePaths(#0002) includes each actually registered source file once.
+22. Duplicate aliases do not cause unnecessary double loading.
+
+Missing capabilities
+
+23. #0002 has no uniqueba attack.
+24. #0002 has no uniqueba animation.
+25. #0002 has no Unique projectile.
+26. #0002 has no chargedActions.ba2.
+27. #0002 has no chargedTechniques.cba2.
+28. #0002 can never start #0001’s Sphere Rush.
+29. #0002 can never throw #0001’s Shuriken.
+30. the CPU never selects either nonexistent move.
+
+Controls
+
+31. Selecting #0001 shows its current Shuriken/Unique button unchanged.
+32. Selecting #0002 hides the uniqueba touch button.
+33. the hidden button cannot dispatch input.
+34. switching #0002 → #0001 restores it correctly.
+35. switching #0001 → #0002 hides it again.
+36. BA2 remains available even though CBA2 does not exist.
+37. #0002 never gets a CBA2 cooldown indicator.
+38. #0001’s existing CBA2 indicator behavior is unchanged.
+39. Transform retains the existing reserved behavior unless deliberately generalized.
+
+Animation/runtime
+
+40. #0002 can be instantiated without crashing.
+41. idle displays the idle clip.
+42. movement displays the run/walk clip.
+43. jumping uses the authored jump pose.
+44. falling uses the authored fall pose.
+45. landing uses the authored land pose.
+46. Charge uses the authored charge art.
+47. shield states resolve to #0002’s shield art.
+48. animation mirroring is correct.
+49. no animation ever resolves to a #0001 frame.
+
+Modes
+
+50. Character Select loads #0002.
+51. Quick Battle loads #0002.
+52. Practice loads #0002.
+53. Practice Change Fighter works both directions.
+54. Watch Mode supports mixed fighters.
+55. #0002 vs #0002 works.
+56. preloading two available characters does not break existing sprite-count assumptions.
+
+Credits
+
+57. The credits still contain the complete #0001 attribution.
+58. A separate #0002 / Slender Man group exists.
+59. It names Eric Knudsen.
+60. It names Victor Surge.
+61. It names Something Awful.
+62. It states 2009.
+63. It names XmayGrrr.
+64. It names renatoooferreiraaa.
+65. It names DeviantArt.
+66. It includes/preserves the supplied source URL in the appropriate data/UI.
+67. English and French credit structures remain synchronized.
+
+Audit tests that currently assume exactly one available fighter, especially:
+
+tests/settings.test.mjs
+tests/controls-ui.test.mjs
+tests/codenames.test.mjs
+tests/i18n.test.mjs
+tests/practice-ground.test.mjs
+tests/watch-mode.test.mjs
+tests/battle-screen.test.mjs
+tests/fighter-animation.test.mjs
+
+and any test that derives exact preload/image counts.
+
+Do not weaken unrelated assertions just to make the suite pass.
+
+⸻
+
+17. Manual visual verification
+
+After automated tests pass, run the game and inspect the actual sprites at desktop and mobile-landscape sizes.
+
+Verify:
+
+Roster
+
+* Slot 01 remains #0001.
+* Slot 02 is #0002.
+* #0002 portrait is centered and cropped correctly.
+* idle preview loops smoothly.
+* no smoothing/blurring.
+* no anchor jitter.
+
+Movement
+
+* idle looks stable;
+* run/walking frames alternate naturally;
+* left/right mirroring is correct;
+* jump/fall/land have the correct art;
+* there is no sudden change in sprite scale.
+
+Combat artwork
+
+Visually inspect:
+
+* BA1 frames 1–4;
+* MABA1 frames 1–4;
+* BA2 frames 1–3;
+* MABA2 frames 1–4;
+* CBA1 frames 1–6;
+* charge;
+* shield start;
+* shielding;
+* shield release;
+* both mid-air shield frames.
+
+Confirm none accidentally use #0001 art.
+
+Controls
+
+With #0001:
+
+* existing Shuriken, Punch, Kick, Transform, Shield, Jump behavior/presentation remains unchanged.
+
+With #0002:
+
+* no Unique Basic Attack button is shown;
+* BA1 remains in its normal position;
+* BA2 remains in its normal position;
+* Shield and Jump remain correct;
+* Charge remains correct;
+* no CBA2-specific affordance appears;
+* missing controls do not leave a broken clickable invisible hit target;
+* the touch layout remains balanced and usable.
+
+Accessibility
+
+Inspect the accessibility tree:
+
+* hidden #0002 Unique control is actually absent/hidden from assistive technology;
+* visible controls retain correct accessible names;
+* no stale #0001 ability name survives after changing fighter;
+* localization continues working after switching character.
+
+⸻
+
+18. Important non-goals
 
 Do not:
 
-* implement #0002’s future combat kit;
-* invent ability names;
-* recolor or redraw supplied sprite artwork;
-* use #0001 attacks as placeholders;
-* alter stage Void geometry;
-* alter scoring;
-* change points-to-win;
-* change respawn timing;
-* change Quick Battle’s same-fighter CPU rule;
-* introduce fighter-ID conditionals into generic engine systems;
-* replace the existing roster architecture;
-* change the interface palette to match #0002;
-* surface the prohibited source artwork title/name anywhere;
-* make unrelated style/UI refactors.
+* invent #0002 damage;
+* invent hitboxes;
+* invent launch attributes;
+* invent a CBA2;
+* invent a Unique Basic Attack;
+* invent projectiles;
+* borrow the Shuriken;
+* borrow Sphere Rush;
+* borrow Clone Attack behavior merely because CBA1 art exists;
+* borrow #0001 attack stats;
+* create a Transform;
+* rename the universal codenames;
+* special-case every screen for character ID 0002;
+* delete global input bindings needed by #0001;
+* change #0001 gameplay;
+* rebalance the game;
+* redesign the roster;
+* redesign mobile controls;
+* remove any existing credits.
+
+This pass is about adding the second fighter, registering the complete supplied animation set, making character capabilities accurately control the UI, and crediting the material correctly. Final authored combat attributes for #0002 come later.
+
+⸻
 
 Definition of done
 
-The change is complete when:
+The work is complete when:
 
-* #0002 appears as the second available fighter throughout the game.
-* Its actual idle and walking art loads from assets/characters/0002/.
-* Only idle/walking are treated as completed #0002 sprite animations.
-* Missing states are handled safely without borrowing another fighter’s art.
-* Its unfinished offensive/defensive moves remain unavailable.
-* Its supplied source is properly credited in the existing credits architecture.
-* The prohibited source title/name appears nowhere in the project.
-* Every fighter creates a short palette-matched explosion when swallowed by the Void.
-* The explosion works in Quick Battle, Watch Mode, and Practice.
-* Double Void losses create two effects correctly.
-* Existing scoring/physics/respawn behavior is unchanged.
-* Documentation accurately reflects the second fighter.
-* All existing and new automated tests pass.
-* Browser verification shows crisp, centered, stable sprites and clearly visible palette-matched Void bursts.
+* #0002 is the second real selectable fighter;
+* all supplied #0002 animation families are registered and render correctly;
+* none of #0001’s sprite art or named moves leak into #0002;
+* #0002 has no Unique Basic Attack;
+* the Unique touch control disappears when #0002 is selected;
+* #0002 has no CBA2 or CBA2 cooldown/indicator;
+* normal BA2 remains independent from the absent CBA2;
+* no fake final combat attributes were invented;
+* the character works through the shared roster/loading architecture;
+* Quick Battle, Practice, and Watch Mode can load him;
+* the credits include Slender Man, Eric Knudsen, Victor Surge, Something Awful, XmayGrrr, renatoooferreiraaa, and DeviantArt, with the supplied source URL;
+* #0001’s existing credits and behavior remain intact;
+* README/spec documentation matches the new state;
+* all automated tests pass;
+* desktop and mobile-landscape visual verification succeeds.
