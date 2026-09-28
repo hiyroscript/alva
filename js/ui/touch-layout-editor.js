@@ -58,7 +58,9 @@ export class TouchLayoutEditor {
     // The real controls on a still, representative battle screen. Their
     // input goes nowhere and they are never enabled.
     this.touchRoot = el('div', { class: 'touch-controls is-editing' });
-    this.touch = new TouchControls(this.touchRoot, { setTouch() {}, queueTouchMouvement() {} });
+    // Every control stays on show, one the fighter lacks included (in its
+    // neutral look): the layout is every fighter's.
+    this.touch = new TouchControls(this.touchRoot, { setTouch() {}, queueTouchMouvement() {} }, { showAbsent: true });
     this.stage = el('div', { class: 'touch-editor-stage', role: 'group', ...tattr('aria-label', 'editor.surface') }, [
       el('div', { class: 'touch-editor-scene', 'aria-hidden': 'true' }, [
         el('i', { class: 'touch-editor-sun' }),

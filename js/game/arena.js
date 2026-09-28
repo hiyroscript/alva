@@ -317,7 +317,7 @@ export class Arena {
     }
     // A charged technique's sphere over the fighters, so the glowing orb is
     // never hidden behind a body, whether in a hand or on a caught opponent.
-    for (const f of fighters) if (f.technique) this.drawTechnique(f.technique);
+    for (const f of fighters) if (f.technique) this.drawTechnique(f.technique, f);
     // Projectiles over the fighters, so a shuriken stays visible in front.
     for (const p of this.projectiles) this.drawProjectile(p);
     ctx.imageSmoothingEnabled = true;
@@ -387,7 +387,15 @@ export class Arena {
     const [sx, sy] = this.toScreen(f.renderX, f.renderY);
     // Mirroring follows the playing clip's own source orientation. Just
     // hit, it shows for one frame as a white silhouette of the same pose.
-    drawFrame(this.ctx, this.fx.flashing(f) ? whiteFrame(frame) : frame, sx, sy, this.pxPerArt, f.spriteFlip);
+    drawFrame(this.ctx, this.fx.flashing(f) ? whiteFrame(frame) : frame, sx, sy, this.pxPerArtOf(f.sprites), f.spriteFlip);
+  }
+
+  // Device pixels per art pixel for art from `sprites`: each fighter's art
+  // (its poses, clones, projectiles and effects) keeps its own world size,
+  // whoever the view was sized for (Player 1's, see resize), so two
+  // different fighters are each drawn at their own visual.height.
+  pxPerArtOf(sprites) {
+    return this.view.scale * (sprites?.worldPerArt ?? this.worldPerArt);
   }
 
   // `f`'s speed trail: fading afterimages of its own poses where it just
@@ -400,46 +408,46 @@ export class Arena {
     for (const g of ghosts) {
       ctx.globalAlpha = g.alpha;
       const [sx, sy] = this.toScreen(g.x, g.y);
-      drawFrame(ctx, g.frame, sx, sy, this.pxPerArt, g.flip);
+      drawFrame(ctx, g.frame, sx, sy, this.pxPerArtOf(f.sprites), g.flip);
     }
     ctx.restore();
   }
 
   // The clone's body (the owner's real art, mirrored by the same per-clip
-  // rule), then its cloud over it, centred at the cloud offset at the
-  // fighters' art scale and never mirrored. No shadow, ring or marker.
+  // rule), then its cloud over it, centred at the cloud offset at its
+  // owner's art scale and never mirrored. No shadow, ring or marker.
   drawClone(c) {
     const body = c.frame;
     if (body) {
       const [sx, sy] = this.toScreen(c.x, c.y);
-      drawFrame(this.ctx, body, sx, sy, this.pxPerArt, c.spriteFlip);
+      drawFrame(this.ctx, body, sx, sy, this.pxPerArtOf(c.owner?.sprites), c.spriteFlip);
     }
     const cloud = c.cloudFrame;
     if (cloud) {
       const [sx, sy] = this.toScreen(...c.cloudCenter());
-      drawCenteredFrame(this.ctx, cloud, sx, sy, this.pxPerArt, false);
+      drawCenteredFrame(this.ctx, cloud, sx, sy, this.pxPerArtOf(c.owner?.sprites), false);
     }
   }
 
   // The technique's sphere frame, centred on the hand or the caught
-  // opponent (interpolated like the fighters), at the fighters' art scale
+  // opponent (interpolated like the fighters), at its owner's art scale
   // times the technique's own sphereScale (it grows on the target; the
   // centre stays put), and never mirrored: a round effect only moves its
   // offset with facing.
-  drawTechnique(t) {
+  drawTechnique(t, owner) {
     const sphere = t.sphere;
     const center = sphere && t.sphereCenter(true);
     if (!center) return;
     const [sx, sy] = this.toScreen(...center);
     const source = sphere.anim.sourceFacing;
     const frame = sphere.anim.frames[sphere.index];
-    drawCenteredFrame(this.ctx, frame, sx, sy, this.pxPerArt * t.sphereScale, !!source && t.facing !== source);
+    drawCenteredFrame(this.ctx, frame, sx, sy, this.pxPerArtOf(owner?.sprites) * t.sphereScale, !!source && t.facing !== source);
   }
 
-  // Centred on the projectile's position, at the fighters' art scale.
+  // Centred on the projectile's position, at its owner's art scale.
   drawProjectile(p) {
     const [sx, sy] = this.toScreen(p.renderX, p.renderY);
-    drawCenteredFrame(this.ctx, p.frame, sx, sy, this.pxPerArt, p.flip);
+    drawCenteredFrame(this.ctx, p.frame, sx, sy, this.pxPerArtOf(p.owner?.sprites), p.flip);
   }
 
   // Name-tag font size, in device pixels.
@@ -677,15 +685,19 @@ export class Arena {
   }
 }
 
-// Device pixels per world unit, chosen so the fighter is ~10% of the viewport
-// height (a platform-fighter view), zoomed out further when needed so the
-// whole main stage and a little air past its ledges fit across the view, but
-// never so far that the fighter drops below fighterScreenRatioMin. When
-// possible each art pixel maps to a whole number of device pixels for crisp
-// pixel art. The view is never allowed to exceed the camera bounds.
+// Device pixels per world unit, chosen so a fighter of the reference height
+// (CONFIG.render.fighterHeight) is ~10% of the viewport height (a
+// platform-fighter view), zoomed out further when needed so the whole main
+// stage and a little air past its ledges fit across the view, but never so
+// far that it drops below fighterScreenRatioMin. The same whoever is
+// picked: a fighter drawn taller or shorter (its own visual.height) is
+// just that on the same stage. When possible each art pixel of `sprites`
+// (Player 1's) maps to a whole number of device pixels for crisp pixel
+// art. The view is never allowed to exceed the camera bounds.
 export function computeWorldScale(pxW, pxH, sprites, map) {
   const r = CONFIG.render;
-  const artH = sprites.refArtHeight;
+  // The reference height in `sprites`' art pixels.
+  const artH = r.fighterHeight / sprites.worldPerArt;
   const minPx = (r.fighterScreenRatioMin * pxH) / artH;
   const maxPx = (r.fighterScreenRatioMax * pxH) / artH;
   const main = map.mainStage;

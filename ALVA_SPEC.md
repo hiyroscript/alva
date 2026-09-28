@@ -115,6 +115,26 @@ behave, and how it must look. The README covers running and deploying it.
   (`sourceFacing: 0`): the round orb is never mirrored, only its position
   offset follows facing. It is not a projectile. None of the 23 files is
   duplicated, and none remains at the repository root.
+- `#0002` (Slender Man) frames live in `assets/characters/0002/`: the 38
+  files supplied for him, all kept. Five idle frames `0002_idle1`–`5`
+  (224–232 × 672–680 px, ≈8×; `idle2` and `idle4` are the same drawing, the
+  sway turning back through it), two run frames `0002_run1`–`2` (his
+  movement: the body breaking into static), single `0002_jump`, `0002_fall`
+  and `0002_land` (≈8×), one kneeling Charge pose `0002_charge`, four Basic
+  Attack 1 frames `0002_ba1_1`–`4`, three Basic Attack 2 frames
+  `0002_ba2_1`–`3`, four mid-air Basic Attack 1 frames `0002_maba1_1`–`4`
+  and four mid-air Basic Attack 2 frames `0002_maba2_1`–`4` (tendril
+  attacks, ≈2×), the Shield poses `0002_prepshield` and `0002_shielding`
+  (1×, 59 × 71 and 41 × 71 px) and `0002_releaseshield` (≈2×), two mid-air
+  Shield frames `0002_midairshielding1`–`2` (≈2×) and six Charged BA1 frames
+  `0002_cba1_1`–`6` (≈2×, 24 × 12 to 120 × 126 px: a pool of shadow and two
+  hands rising from it, drawn apart from his body, so registered as an
+  effect, `effectAnimations.cba1`, every frame kept). File names put an
+  underscore before an attack's frame number (`0002_ba1_3` is Basic Attack
+  1, frame 3). `0002_mouvmen1` is byte-identical to `0002_run1` and is not
+  loaded; `0002_land` is byte-identical to `0002_run2` and is the land pose
+  it was supplied as. He has no hurt, Dash, Throw, Charged BA2 or Transform
+  art. Idle is 85 art pixels tall; every clip shares that art-pixel scale.
 - Source orientation: #0001's art faces right (`sourceFacing: 1` on the
   character), every registered clip included. An animation may override
   the character's orientation with its own `sourceFacing` (none of #0001's
@@ -148,7 +168,8 @@ behave, and how it must look. The README covers running and deploying it.
   switching animations.
 - Sprites render with `imageSmoothingEnabled = false` and, where the size
   allows, whole device pixels per art pixel.
-- **Never redraw, recolour, replace or AI-generate the #0001 artwork.** Do not
+- **Never redraw, recolour, replace or AI-generate the #0001 or #0002
+  artwork.** Do not
   download third-party art. Stage art is original and procedural.
 - `alvafav.PNG` is the site favicon source.
 
@@ -427,8 +448,10 @@ no header, build label, eyebrow or keyboard hint bar.
 ### 6.4 Select Fighter
 
 - Deliberately large roster: 48 slots in a responsive, scrollable grid.
-- Only `#0001` (always shown with the `#`) is selectable; other slots are quiet
-  locked placeholders (silhouette + lock). No invented names or power ratings.
+- `#0001` (slot 01) and `#0002` (slot 02), always shown with the `#`, are
+  selectable; other slots are quiet locked placeholders (silhouette + lock).
+  No invented names or power ratings. The roster is `CHARACTERS`, placed by
+  each fighter's `rosterSlot`.
 - Locked slots are non-interactive: hover, Tab and keyboard/gamepad navigation
   skip them, and they show no hover border or focus ring. Any fighter marked
   available becomes a normal selectable slot.
@@ -513,12 +536,22 @@ Select CPU 2 → Select Stage → CPU vs CPU Battle.
   - **#0001 sprite source** — original sprite material from *Jump Ultimate
     Stars*; The Spriters Resource; source sheet uploaded by
     Dazz; contributor FRET.
+  - **#0002 / Slender Man** — Character: Slender Man created by Eric
+    Knudsen, under the pseudonym Victor Surge, on the Something Awful forums
+    in 2009. Sprite source: sprites by XmayGrrr; *Upgrade Slenderman Sprites
+    Jus Sheet*. Source page: DeviantArt / renatoooferreiraaa, a link (a new
+    tab) to
+    https://www.deviantart.com/renatoooferreiraaa/art/Upgrade-Slenderman-Sprites-Jus-Sheet-By-Xmaygrrr-D-1374753835.
+    The link is in the credits data (`SOURCE_0002` in `js/ui/credits.js`),
+    never translated; the roll holds still while it has keyboard focus, and
+    its hidden second copy is never focusable.
   - **Rights** — hiyroscript did not create or claim ownership of the original
     third-party character/game artwork. Original characters, games, and related
     properties belong to their respective rights holders.
   - **Project** — unofficial fan project. No affiliation or endorsement is
     implied.
-- The UI does not name the character behind #0001. Never imply ownership of
+- The UI does not name the character behind #0001. #0002 stays `#0002` in
+  game and is named Slender Man only in the credits. Never imply ownership of
   original third-party characters, games, artwork, or related properties;
   these belong to their respective rights holders.
 
@@ -962,12 +995,28 @@ French, concise game terms).
   Practice Ground's fighter alone while its CPU is disabled), leaning toward
   the main stage's centre while it
   does, interpolates smoothly and never shows outside its camera bounds (the
-  stage, the air around it and a strip past the Void's edge). Fighters occupy ≈ 10 % of
-  viewport height (8.8–11.5 %): a 16:9 view shows the whole main stage with
-  air past both ledges, and narrower screens zoom out further for it.
+  stage, the air around it and a strip past the Void's edge). A fighter of the reference height
+  (`CONFIG.render.fighterHeight`, #0001's 88 units) occupies ≈ 10 % of
+  viewport height (8.8–11.5 %), whoever is picked; #0002, 110 units tall,
+  stands a quarter taller on the same stage, each fighter drawn at its own
+  art scale. A 16:9 view shows the whole main stage with air past both
+  ledges, and narrower screens zoom out further for it.
 
 ### 7.2 Fighters, physics and combat
 
+- `#0002` (Slender Man) has Idle, Run, Jump, Fall, Land, Charge (one pose,
+  held; no release pose), Basic Attack 1 and 2 and their mid-air versions,
+  Shield (raise, held, lower) and Mid-air Shield (two frames, looped), all
+  his own art, and the Charged BA1 art as an effect nothing plays yet. His
+  combat attributes are intentionally not authored: his Basic Attacks are
+  `pending` (art only: one pass of the clip, no hit), he has no Unique Basic
+  Attack (left out of `actions`: the input does nothing for him, the CPU
+  never presses it, no touch button) and no charged actions (Charge + BA1 /
+  BA2 is that button's attack; no CBA ring). His body, movement and Powers
+  are `TEMPORARY_BASELINE` placeholders (`TODO #0002`), never his designed
+  stats; he has no Dash and no hurt pose (a stun holds his first idle
+  frame). His grounded clips author their anchors (`anchorX`) so his feet
+  stay planted under the tendrils.
 - `#0001` has Idle, Run, Jump, Fall, Land, Hurt, Mid-air Hurt, Basic Attack 1,
   Mid-air Basic Attack 1, Basic Attack 2, Mid-air Basic Attack 2, Charge,
   Shield (raise, held and lower poses), Mid-air Shield (held only), Dash,
@@ -2386,7 +2435,13 @@ French, concise game terms).
   buttons scale down and brighten to white — no hue.
   A reserved button (only Transform, and only while the fighter has none)
   uses a dashed outline and never shows nagging alerts; Shuriken, Shield,
-  Punch and Kick are solid.
+  Punch and Kick are solid. A button for a move the fighter does not have
+  at all (left out of its `actions`, as #0002's Unique Basic Attack is:
+  `abilityPresence` in `js/ui/mobile-abilities.js`) is hidden: not drawn,
+  not named, never focused and never pressed, its place left empty so no
+  other button moves; the same element returns for a fighter that has it.
+  The touch layout editor keeps it on show, neutral, since every fighter
+  shares the layout.
 - Touch controls appear only on touch-first devices (coarse pointer or an
   observed touch), never merely because a desktop window is narrow.
 - Gameplay pauses when the pause menu (Practice Ground: the Practice menu,

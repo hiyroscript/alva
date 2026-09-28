@@ -45,6 +45,7 @@ class Element extends Node {
   get className() { return [...this.classNames].join(' '); }
   setAttribute(name, value) { this.attrs.set(name, String(value)); }
   getAttribute(name) { return this.attrs.has(name) ? this.attrs.get(name) : null; }
+  removeAttribute(name) { this.attrs.delete(name); }
   set textContent(v) { this.replaceChildren(new Text(String(v))); }
   get textContent() { return this.children.map((c) => c.textContent).join(''); }
   set innerHTML(v) { this.replaceChildren(); this.html = v; }
@@ -81,14 +82,16 @@ globalThis.document = {
 const { TouchControls, JOYSTICK, joystickDirection } = await import('../js/game/touch-controls.js');
 const { ACTION_LABELS, CONFIG } = await import('../js/config.js');
 const { ICONS } = await import('../js/ui/icons.js');
-const { ABILITY_ACTIONS, mobileAbility } = await import('../js/ui/mobile-abilities.js');
+const { ABILITY_ACTIONS, abilityPresence, mobileAbility } = await import('../js/ui/mobile-abilities.js');
 const { getCharacter } = await import('../js/data/characters.js');
+const { setLanguage, localizeTree } = await import('../js/core/i18n.js');
 const { SAMPLE_FIGHTER } = await import('./sample-fighter.mjs');
 
 const ROOT = new URL('../', import.meta.url);
 const read = (path) => readFileSync(new URL(path, ROOT), 'utf8');
 const CSS = read('styles.css');
 const DEF_0001 = getCharacter('0001');
+const DEF_0002 = getCharacter('0002');
 
 // Touch controls wired to a recording input; `def` is the fighter they
 // present (#0001 unless given; null leaves them neutral) and `scheme` their
@@ -169,8 +172,16 @@ test('#0001 authors its mobile abilities as small, declarative UI data', () => {
     assert.doesNotMatch(code(`js/game/${file}`), /mobileAbilities|mobile-abilities/, `${file} never reads mobileAbilities`);
   }
   for (const file of ['js/game/touch-controls.js', 'js/ui/mobile-abilities.js']) {
-    assert.doesNotMatch(code(file), /\.(attacks|animations?|chargedActions|projectiles)\b|\bdef\.actions\b|'0001'|displayName/, `${file}: no inference, no fighter special case`);
+    assert.doesNotMatch(code(file), /\.(attacks|animations?|chargedActions|projectiles)\b|'000\d'|displayName/, `${file}: no inference, no fighter special case`);
   }
+  // Whether a button exists at all comes from the fighter's `actions` (the
+  // data combat and the CPU go by), read in one place, abilityPresence:
+  // never its icon or name.
+  const abilities = code('js/ui/mobile-abilities.js');
+  const presence = abilities.match(/export function abilityPresence\([^]*?\n\}\n/)[0];
+  assert.match(presence, /def\?\.actions/);
+  assert.doesNotMatch(abilities.replace(presence, ''), /\bactions\b/, 'actions: read in abilityPresence only');
+  assert.doesNotMatch(code('js/game/touch-controls.js'), /\bdef\??\.actions\b/);
 });
 
 test('mobileAbility falls back safely: generic names and neutral glyphs, never a crash', () => {
@@ -221,6 +232,122 @@ test('another fighter presents its own buttons: its Transform is a real button, 
     assert.ok(b('transform').classList.contains('is-pending'), `${scheme}: reserved for #0001`);
     assert.equal(b('uniqueba').getAttribute('aria-label'), 'Shuriken');
   }
+});
+
+// ---- Touch buttons: #0002, a fighter missing an ability --------------------------
+
+test('abilityPresence reads the fighter\'s actions: implemented, reserved (null) or absent (left out)', () => {
+  assert.deepEqual(ABILITY_ACTIONS.map((a) => abilityPresence(DEF_0001, a)), ['implemented', 'reserved', 'implemented', 'implemented']);
+  assert.deepEqual(ABILITY_ACTIONS.map((a) => abilityPresence(DEF_0002, a)), ['absent', 'reserved', 'implemented', 'implemented']);
+  assert.deepEqual(ABILITY_ACTIONS.map((a) => abilityPresence(SAMPLE_FIGHTER, a)), ['implemented', 'implemented', 'implemented', 'implemented']);
+  // Nothing to go by: every button stays, Transform reserved.
+  for (const def of [null, undefined, {}, { mobileAbilities: {} }]) {
+    assert.deepEqual(ABILITY_ACTIONS.map((a) => abilityPresence(def, a)), ['implemented', 'reserved', 'implemented', 'implemented']);
+  }
+  // A move mapped to null is reserved, whichever button it is.
+  assert.equal(abilityPresence({ actions: { uniqueba: null } }, 'uniqueba'), 'reserved');
+  assert.equal(abilityPresence({ actions: { uniqueba: null } }, 'ba1'), 'absent');
+  // An absent ability has nothing to present, not even the neutral ring.
+  assert.equal(mobileAbility(DEF_0002, 'uniqueba'), null);
+  assert.deepEqual(mobileAbility(DEF_0002, 'transform'), { label: 'Transform', icon: ICONS.transform, pending: true });
+  assert.deepEqual(mobileAbility(DEF_0002, 'ba1'), { label: ACTION_LABELS.ba1, icon: ICONS.pip1, pending: false });
+  assert.deepEqual(mobileAbility(DEF_0002, 'ba2'), { label: ACTION_LABELS.ba2, icon: ICONS.pip2, pending: false });
+});
+
+test('#0002 has no Unique Basic Attack button: hidden, unnamed, blank, never dashed or a ring; the others stay', () => {
+  for (const scheme of ['joystick', 'classic']) {
+    const { tc } = touchControls(DEF_0002, { scheme });
+    const b = (a) => tc.buttons.get(a);
+    const uni = b('uniqueba');
+    assert.equal(uni.hidden, true, `${scheme}: hidden`);
+    assert.equal(uni.getAttribute('aria-label'), null, 'no accessible name');
+    assert.equal(uni.getAttribute('data-i18n-aria-label'), null, 'nor a mark that would name it again');
+    assert.equal(uni.innerHTML, '', 'no glyph: not the generic ring');
+    assert.equal(uni.classList.contains('is-pending'), false, 'not a dashed "coming soon" button');
+    assert.equal(uni.getAttribute('tabindex'), '-1', 'never in the Tab order');
+    // Still the same element in the same place, codename unchanged.
+    assert.equal(uni.getAttribute('data-action'), 'uniqueba');
+    assert.ok(uni.classList.contains('tc-uniqueba'));
+    assert.equal(tc.actions.children[0], uni);
+    // BA1 and BA2 stay (BA2 without any Charged BA2), neutral; Transform reserved; Shield and Jump universal.
+    assert.deepEqual(['transform', 'shield', 'ba1', 'ba2', 'jump'].map((a) => [a, b(a).hidden ?? false, b(a).getAttribute('aria-label')]), [
+      ['transform', false, 'Transform'],
+      ['shield', false, 'Shield'],
+      ['ba1', false, ACTION_LABELS.ba1],
+      ['ba2', false, ACTION_LABELS.ba2],
+      ['jump', false, 'Jump'],
+    ], scheme);
+    assert.equal(b('ba1').innerHTML, ICONS.pip1);
+    assert.equal(b('ba2').innerHTML, ICONS.pip2);
+    assert.ok(b('transform').classList.contains('is-pending'), 'Transform: the existing reserved button');
+  }
+  // The rule that hides it is in the stylesheet: its place kept, nothing drawn or hit.
+  assert.match(CSS, /\.tc-btn\[hidden\] \{ visibility: hidden; \}/);
+});
+
+test('the hidden Unique Basic Attack button dispatches nothing: no press, no assistive click', async () => {
+  const { tc, calls } = touchControls(DEF_0002);
+  const uni = tc.buttons.get('uniqueba');
+  press(uni, 1);
+  lift(uni, 1);
+  tc.root.dispatch('click', { target: { closest: () => uni }, detail: 0 });
+  await new Promise((resolve) => setTimeout(resolve, 150));
+  assert.deepEqual(calls, []);
+  assert.equal(uni.classList.contains('is-pressed'), false);
+  // BA2 still works as ever.
+  press(tc.buttons.get('ba2'), 2);
+  lift(tc.buttons.get('ba2'), 2);
+  assert.deepEqual(calls, [['ba2', true], ['ba2', false]]);
+});
+
+test('switching #0001 -> #0002 -> #0001 hides and restores the very same Shuriken button; a held one is let go', () => {
+  for (const scheme of ['joystick', 'classic']) {
+    const { tc, calls } = touchControls(DEF_0001, { scheme });
+    const uni = tc.buttons.get('uniqueba');
+    const shuriken = () => [uni.hidden ?? false, uni.getAttribute('aria-label'), uni.innerHTML, uni.classList.contains('is-pending')];
+    assert.deepEqual(shuriken(), [false, 'Shuriken', ICONS.shuriken, false]);
+    press(uni, 7);
+    assert.deepEqual(calls, [['uniqueba', true]]);
+    tc.setCharacter(DEF_0002);
+    assert.deepEqual(calls, [['uniqueba', true], ['uniqueba', false]], 'the hold ends as it goes');
+    assert.deepEqual(shuriken(), [true, null, '', false]);
+    tc.setCharacter(DEF_0001);
+    assert.equal(tc.buttons.get('uniqueba'), uni, 'the same element');
+    assert.deepEqual(shuriken(), [false, 'Shuriken', ICONS.shuriken, false]);
+    assert.equal(uni.getAttribute('data-i18n-aria-label'), 'ability.0001.uniqueba');
+    press(uni, 8);
+    assert.deepEqual(calls.at(-1), ['uniqueba', true], 'and it works again');
+    lift(uni, 8);
+    tc.setCharacter(DEF_0002);
+    assert.equal(uni.hidden, true, `${scheme}: hidden again`);
+    assert.equal(tc.buttons.get('ba1').getAttribute('aria-label'), ACTION_LABELS.ba1, 'no stale Punch');
+    assert.equal(tc.buttons.get('ba2').getAttribute('aria-label'), ACTION_LABELS.ba2, 'no stale Kick');
+  }
+});
+
+test('a language change never names the hidden button again', () => {
+  const { tc } = touchControls(DEF_0002);
+  setLanguage('fr');
+  try {
+    localizeTree(tc.root);
+    assert.equal(tc.buttons.get('uniqueba').getAttribute('aria-label'), null);
+    assert.equal(tc.buttons.get('ba2').getAttribute('aria-label'), 'Attaque de base 2');
+    tc.setCharacter(DEF_0001);
+    assert.equal(tc.buttons.get('uniqueba').getAttribute('aria-label'), 'Shuriken');
+    assert.equal(tc.buttons.get('ba1').getAttribute('aria-label'), 'Coup de poing');
+  } finally {
+    setLanguage('en');
+  }
+});
+
+test('the touch layout editor keeps an absent button on show, neutral, so every fighter\'s layout can place it', () => {
+  const tc = new TouchControls(new Element('div'), { setTouch() {}, queueTouchMouvement() {} }, { scheme: 'joystick', showAbsent: true });
+  tc.setCharacter(DEF_0002);
+  const uni = tc.buttons.get('uniqueba');
+  assert.equal(uni.hidden, false);
+  assert.equal(uni.getAttribute('aria-label'), ACTION_LABELS.uniqueba);
+  assert.equal(uni.innerHTML, ICONS.ring);
+  assert.match(read('js/ui/touch-layout-editor.js'), /this\.touch = new TouchControls\(.*\{ showAbsent: true \}\);/);
 });
 
 // ---- Touch buttons: #0001 -----------------------------------------------------

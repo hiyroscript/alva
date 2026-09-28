@@ -59,6 +59,10 @@ further; the list below is the update as it stands now.
   `airControl`, `friction`, `step`, `hitCancel`, plus `hitstun`,
   `hitstop` and `cooldown`, which set the combo routes.
 
+#0002's placeholder movement (`TEMPORARY_BASELINE` in the same file) is a
+copy of #0001's `movement` numbers as they were when #0002 arrived, without
+the Dash. Tuning #0001 never moves it; see [#0002](#0002-slender-man).
+
 **Code:** `Fighter.moveHorizontal`, `moveAttack`, `attackStartSpeed`,
 `tryDash` and `dashAsked` in `js/game/character.js`; `CombatState` and
 `resolveEnergy` in `js/game/combat.js`. The combat AI
@@ -298,6 +302,61 @@ Settings became a dialog).
   `tests/basic-attack-2.test.mjs`, `tests/throw.test.mjs`, and the CPU's
   guard in `tests/combat-ai.test.mjs`
 - the Joystick layout in `tests/controls-ui.test.mjs`
+
+## #0002 (Slender Man)
+
+Not a named update (it can become one if the owner names it). Asked for as:
+add the second fighter, #0002 (Slender Man), from the supplied `0002_*`
+art, register every animation, invent none of his combat attributes, give
+him no Unique Basic Attack and no Charged BA2, show only the controls he
+has, and credit the character and sprite sources. Later: make him a bit
+taller than #0001.
+
+**What it added**
+
+- **#0002** in `CHARACTERS` (roster slot 02), every supplied file moved to
+  `assets/characters/0002/` and every animation family registered, the
+  Charged BA1 art as an effect. #0001 is unchanged.
+- **Pending attacks** (`pending: true`): art only, one pass of the clip,
+  no hit. #0002's four Basic Attacks are these until his attributes exist.
+- **Absent abilities**: a move left out of a fighter's `actions` has no
+  touch button (hidden, unnamed, untouchable, its place kept); `null`
+  still means reserved (dashed). #0002 has no `uniqueba`.
+- **Temporary baseline** (`TEMPORARY_BASELINE`, marked `TODO #0002`) for
+  his body, movement and Powers: #0001's neutral values, no Dash.
+- **Authored anchors** (`anchorX` per clip) keep his feet planted under
+  the tendrils; `visual.portrait.centerX` centres his portrait.
+- **Rendering**: each fighter is drawn at its own art scale, and the view
+  is sized for a reference fighter height, so #0002 (110 units) stands a
+  quarter taller than #0001 (88) on the same stage, whoever is picked.
+- **Credits**: a **#0002 / Slender Man** group (Eric Knudsen as Victor
+  Surge, Something Awful, 2009; sprites by XmayGrrr, *Upgrade Slenderman
+  Sprites Jus Sheet*; DeviantArt / renatoooferreiraaa, linked).
+
+**Where to tune it** (`js/data/characters.js`, #0002)
+
+- `FPS_0002`: his clips' playback rates.
+- `visual.height` (110): how tall he is drawn; `visual.portrait`.
+- Each clip's `anchorX`: where each frame stands.
+- `TEMPORARY_BASELINE`: his placeholder body and movement, to be replaced
+  by his own when they are authored, as are his `pending` attacks.
+- `CONFIG.render.fighterHeight` (88, `js/config.js`): the height the view
+  is sized for.
+
+**Code:** `createAttackDefinition` (pending attacks, `js/game/combat.js`);
+the Fighter's clip timing for them (`js/game/character.js`);
+`abilityPresence` and `mobileAbility` (`js/ui/mobile-abilities.js`) and
+`TouchControls.setCharacter` (`js/game/touch-controls.js`, with
+`showAbsent` for the touch layout editor); `anchorX` and `centerX` in
+`SpriteSet` (`js/game/sprite-normalizer.js`); `Arena.pxPerArtOf` and
+`computeWorldScale` (`js/game/arena.js`); the credits' links
+(`js/ui/credits.js`, `js/screens/home-screen.js`).
+
+**Tests:** `tests/fighter-0002.test.mjs` (registration, assets read from
+the real PNGs, missing moves, pending attacks, animation, anchors, the
+view, CPU fights); his touch buttons in `tests/controls-ui.test.mjs`; his
+credits in `tests/settings.test.mjs`; Practice, Watch Mode and Quick Battle
+in `tests/practice-ground.test.mjs` and `tests/watch-mode.test.mjs`.
 
 ## Control and move codenames
 

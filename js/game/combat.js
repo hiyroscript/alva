@@ -70,6 +70,19 @@
 //     cooldown: 0.25, groundOnly: true,
 //   },
 //
+// A pending attack (`pending: true`) is one whose art is in but whose
+// combat attributes are not authored yet: it plays its clip once, first
+// frame to last, and strikes nothing. It has no hitbox, projectile, damage
+// or launch, and declaring any of them is refused (drop `pending` to author
+// them). Its length is one pass of its clip (the fighter's art decides it:
+// see createAttackDefinition's `clipDuration`), all of it recovery, so the
+// fighter is committed and harmless for exactly as long as the art plays.
+// No cooldown or hit-cancel, and it moves like any planted attack (the
+// defaults below). Nothing about it names a fighter: any fighter whose art
+// arrives before its attributes can use it.
+//
+//   ba1: { animation: 'ba1', pending: true },
+//
 // `shield` is the shared player input; each character's `defense` entry says
 // what it does, that is how the character defends (see
 // createDefenseDefinition). The one type so far is the Shield, a held guard
@@ -152,6 +165,7 @@ const ATTACK_DEFAULTS = {
   baseLaunch: 0,
   directionalLaunch: null,
   projectile: null, // { id, spawnAt, offset } for a projectile attack
+  pending: false,   // art only, its attributes not authored yet (see above)
 };
 
 // Attack time is a sum of fixed steps, so compare phase boundaries with a
@@ -167,11 +181,32 @@ export function attackPhase(def, time) {
   return 'recovery';
 }
 
+// What a pending attack may not declare: everything that would make it hit
+// or time a strike.
+const PENDING_REFUSED = Object.freeze([
+  'startup', 'active', 'recovery', 'damage', 'hitbox', 'projectile', 'baseLaunch', 'directionalLaunch',
+  'hitstun', 'blockstun', 'hitstop', 'cooldown', 'hitCancel',
+]);
+
 // Frozen attack definition from a character's attack entry (plus its `id`).
 // Its `baseLaunch` and `directionalLaunch` are validated here, once, as
 // declared: neither is inferred from the damage, the hitbox or the other.
-export function createAttackDefinition(spec) {
+// A pending attack (see above) lasts `clipDuration` seconds, one pass of
+// its clip, and strikes nothing.
+export function createAttackDefinition(spec, { clipDuration = 0 } = {}) {
   if (!spec?.id) throw new Error('[Alva] Attack definitions need an id');
+  if (spec.pending) {
+    const declared = PENDING_REFUSED.filter((field) => spec[field] !== undefined);
+    if (declared.length) {
+      throw new Error(`[Alva] Attack "${spec.id}" is pending but declares ${declared.join(', ')}: drop \`pending\` to author it`);
+    }
+    const def = {
+      ...ATTACK_DEFAULTS, ...spec,
+      pending: true, startup: 0, active: 0, recovery: Math.max(0, clipDuration), hitbox: null, projectile: null,
+    };
+    def.total = def.recovery;
+    return Object.freeze(def);
+  }
   const def = { ...ATTACK_DEFAULTS, ...spec, ...resolveHitLaunch(spec, `Attack "${spec.id}"`) };
   def.total = def.startup + def.active + def.recovery;
   return Object.freeze(def);

@@ -615,6 +615,19 @@ html[data-screen="splash"] .overlay { display: none; }
 .home-credit-title { font-size: clamp(12px, 1.8vh, 14px); font-weight: 600; color: var(--text); }
 .home-credit-lead { margin-top: 4px; font-size: clamp(16px, 2.4vh, 20px); font-weight: 700; line-height: 1.3; color: var(--text-strong); }
 .home-credit-line { margin-top: 4px; font-size: clamp(13px, 1.9vh, 15px); line-height: 1.5; color: var(--text-secondary); }
+/* A line linking to its source: underlined, in the line's own colour; a
+   visible ring on keyboard focus (the roll holds it still in view). */
+.home-credit-link {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+  overflow-wrap: anywhere;
+  border-radius: 3px;
+}
+.home-credit-link:hover { color: var(--text-strong); }
+.home-credit-link:focus { outline: none; }
+.home-credit-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; color: var(--text-strong); }
 
 .home-footer {
   position: relative;
@@ -1833,6 +1846,10 @@ html.is-touch .touch-controls[hidden] { display: none; }
 .tc-text { font-weight: 800; font-size: 0.62em; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8); }
 .tc-btn.is-pending .icon, .tc-btn.is-pending .tc-text { opacity: 0.62; }
 .tc-btn.is-pending { border-style: dashed; border-color: rgba(255, 255, 255, 0.3); }
+/* A button for an ability the fighter does not have (TouchControls.
+   setCharacter): not drawn, pressed, focused or announced, and its place
+   kept, so no other button moves. */
+.tc-btn[hidden] { visibility: hidden; }
 .tc-btn.is-pressed {
   transform: scale(0.9);
   background: rgba(255, 255, 255, 0.28);
