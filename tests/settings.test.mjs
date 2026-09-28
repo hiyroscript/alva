@@ -945,7 +945,9 @@ test('Help is removed from the game: no Help screen, module, section or registra
 
 test('the Home credits still roll: both copies, the second hidden, every credit unchanged in English', () => {
   const credits = creditsText();
-  assert.deepEqual(credits.map((g) => g.title), [CONFIG.title, 'Original work', '#0001 sprite source', 'Rights', 'Project']);
+  assert.deepEqual(credits.map((g) => g.title), [
+    CONFIG.title, 'Original work', '#0001 sprite source', '#0002 / Slender Man', 'Rights', 'Project',
+  ]);
   assert.equal(credits[0].lead, `Created by ${CONFIG.developer}`);
   assert.deepEqual(credits[2].lines, [
     'Original sprite material from Jump Ultimate Stars',
@@ -954,7 +956,7 @@ test('the Home credits still roll: both copies, the second hidden, every credit 
     'Contributor: FRET',
   ]);
   assert.equal(CREDITS.length, credits.length);
-  assert.match(read('js/screens/home-screen.js'), /import \{ CREDITS, creditLabel \} from '\.\.\/ui\/credits\.js';/);
+  assert.match(read('js/screens/home-screen.js'), /import \{ CREDITS, creditLabel, creditLink \} from '\.\.\/ui\/credits\.js';/);
 
   const { home, done } = boot();
   try {

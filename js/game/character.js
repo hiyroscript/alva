@@ -61,8 +61,12 @@ export class Fighter {
     // One pass of the dash clip: how long a Dash lasts (0 without its art,
     // and then no Dash starts; see tryDash).
     this.dashDuration = sprites.duration('dash');
+    // A pending attack (art only, see js/game/combat.js) lasts one pass of
+    // its own clip.
     this.attacks = Object.fromEntries(
-      Object.entries(def.attacks || {}).map(([id, spec]) => [id, createAttackDefinition({ id, ...spec })]),
+      Object.entries(def.attacks || {}).map(([id, spec]) => [
+        id, createAttackDefinition({ id, ...spec }, { clipDuration: sprites.duration(spec.animation) }),
+      ]),
     );
     this.projectileDefs = Object.fromEntries(
       Object.entries(def.projectiles || {}).map(([id, spec]) => [id, createProjectileDefinition({ id, ...spec })]),

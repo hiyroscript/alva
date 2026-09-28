@@ -8,10 +8,24 @@ import { el } from '../core/utils.js';
 import { tx, tattr, iconLabel } from '../core/i18n.js';
 import { logoSVG } from '../ui/logo.js';
 import { ICONS } from '../ui/icons.js';
-import { CREDITS, creditLabel } from '../ui/credits.js';
+import { CREDITS, creditLabel, creditLink } from '../ui/credits.js';
 
 const CREDITS_RESUME_DELAY = 2000;
 const ROLL_SPEED = 22; // credits roll, CSS px per second
+
+// One credit line: its text, or a link to its source (opened in a new tab,
+// so the game stays where it is). The copy's links are never focusable: it
+// is hidden from assistive technology, and one Tab stop is enough.
+function creditLine(line, copy) {
+  const href = creditLink(line);
+  if (!href) return el('p', { class: 'home-credit-line', ...tx(...creditLabel(line)) });
+  return el('p', { class: 'home-credit-line' }, [
+    el('a', {
+      class: 'home-credit-link', href, target: '_blank', rel: 'noopener noreferrer',
+      tabindex: copy ? '-1' : null, ...tx(...creditLabel(line)),
+    }),
+  ]);
+}
 
 // One pass of the credits. The roll shows it twice; the copy is hidden from
 // assistive technology so the credits are announced once.
@@ -20,7 +34,7 @@ function creditsSequence({ copy = false } = {}) {
     el('section', { class: 'home-credit' }, [
       el('h2', { class: 'home-credit-title', ...tx(...creditLabel(group.title)) }),
       group.lead ? el('p', { class: 'home-credit-lead', ...tx(...creditLabel(group.lead)) }) : null,
-      ...(group.lines || []).map((line) => el('p', { class: 'home-credit-line', ...tx(...creditLabel(line)) })),
+      ...(group.lines || []).map((line) => creditLine(line, copy)),
     ]),
   ));
 }
@@ -63,6 +77,8 @@ export class HomeScreen extends Screen {
     this.settingsButton.addEventListener('click', () => app.settingsDialog.open({ returnFocus: this.settingsButton }));
 
     this.rollTrack = el('div', { class: 'home-credits-track' }, [creditsSequence(), creditsSequence({ copy: true })]);
+    // The source links a keyboard can reach (the first pass's).
+    this.creditLinks = [...this.rollTrack.children[0].querySelectorAll('.home-credit-link')];
     this.rollOffset = 0;
     this.lastInteraction = -Infinity;
     this.activePointer = null;
@@ -77,6 +93,8 @@ export class HomeScreen extends Screen {
       this.scrollCredits(event.deltaY * unit);
     }, { passive: false });
     this.creditsViewport.addEventListener('pointerdown', (event) => {
+      // A press on a source link is the link's: it opens it, never drags.
+      if (event.target.closest?.('.home-credit-link')) return;
       if (event.button !== 0 || this.activePointer !== null) return;
       event.preventDefault();
       // Scripted focus matches :focus-visible, so mark it to keep the keyboard
@@ -98,6 +116,13 @@ export class HomeScreen extends Screen {
         if (event.pointerId === this.activePointer) this.endDrag();
       });
     }
+    // Tab onto a source link brings it to the middle of the roll, which
+    // holds still while it has focus (see update); the browser's own
+    // scroll to reveal it is undone, as the roll moves only by its offset.
+    this.creditsViewport.addEventListener('focusin', (event) => {
+      const link = event.target.closest?.('.home-credit-link');
+      if (link) this.showCredit(link);
+    });
     this.creditsViewport.addEventListener('blur', () => {
       // Switching windows blurs without moving focus; keep the mark then.
       if (document.activeElement !== this.creditsViewport) this.creditsViewport.classList.remove('is-pointer-focus');
@@ -153,6 +178,21 @@ export class HomeScreen extends Screen {
     this.endDrag();
   }
 
+  // Rolls the credits so `node` sits in the middle of the view.
+  showCredit(node) {
+    this.creditsViewport.scrollTop = 0;
+    const box = node.getBoundingClientRect();
+    const at = box.top - this.rollTrack.getBoundingClientRect().top;
+    this.lastInteraction = performance.now();
+    this.rollOffset = at - (this.creditsViewport.clientHeight - box.height) / 2;
+    this.renderCredits();
+  }
+
+  // A source link in the roll has focus.
+  get linkFocused() {
+    return this.creditLinks.includes(document.activeElement);
+  }
+
   scrollCredits(delta) {
     this.lastInteraction = performance.now();
     this.rollOffset += delta;
@@ -168,14 +208,17 @@ export class HomeScreen extends Screen {
       ? Math.max(0, Math.min(this.rollOffset, Math.max(0, period - this.creditsViewport.clientHeight)))
       : ((this.rollOffset % period) + period) % period;
     this.rollTrack.style.transform = `translate3d(0, ${-this.rollOffset}px, 0)`;
+    // Only the offset moves the roll (a focused link's reveal scrolls it).
+    if (this.creditsViewport.scrollTop) this.creditsViewport.scrollTop = 0;
   }
 
   update(dt) {
     const portrait = this.portraitQuery.matches;
     this.creditsViewport.tabIndex = portrait ? -1 : 0;
-    if (portrait && document.activeElement === this.creditsViewport) this.focusDefault();
+    for (const link of this.creditLinks) link.tabIndex = portrait ? -1 : 0;
+    if (portrait && (document.activeElement === this.creditsViewport || this.linkFocused)) this.focusDefault();
     if (this.activePointer !== null && (!document.hasFocus() || portrait)) this.endDrag();
-    if (!this.app.device.reducedMotion && this.activePointer === null &&
+    if (!this.app.device.reducedMotion && this.activePointer === null && !this.linkFocused &&
         performance.now() - this.lastInteraction >= CREDITS_RESUME_DELAY) {
       this.rollOffset += ROLL_SPEED * dt;
     }

@@ -1,6 +1,6 @@
 // Character database.
 //
-// Adding a fighter (e.g. #0002) should only require:
+// Adding a fighter (the next is #0003) should only require:
 //   1. dropping frames into ./assets/characters/<id>/
 //   2. adding a definition to CHARACTERS below, its moves keyed by the
 //      universal move codenames (MOVES in js/config.js: ba1, maba1, cba1,
@@ -15,8 +15,15 @@
 //   4. optionally, naming its moves in `abilityNames` (keyed by move
 //      codename; see js/data/abilities.js)
 //
-// Every field the engine reads lives here; nothing about #0001 is hard-coded
-// in the game systems.
+// A fighter whose art comes before its combat attributes (as #0002's did)
+// can still be added: its attacks are `pending` (art only, see
+// js/game/combat.js), a move it does not have at all is left out of its
+// `actions` (its touch button is hidden), and whatever the engine cannot
+// build a fighter without comes from TEMPORARY_BASELINE below until it is
+// authored.
+//
+// Every field the engine reads lives here; nothing about any one fighter is
+// hard-coded in the game systems.
 
 // `${base}${name}1.png` ... `${base}${name}<count>.png`. The trailing number
 // is always the frame number (e.g. 0001_1ba3.png is Basic Attack 1, frame 3).
@@ -55,6 +62,84 @@ const RASEN_FPS = 12;
 // Playback rate of the Sphere Rush's blue sphere. The rush waits for one full
 // pass of rasenSphereBuild (6 frames = 0.5 s) before it dashes.
 const PRASEN_FPS = 12;
+
+const BASE_0002 = './assets/characters/0002/0002_';
+
+// `${base}${name}_1.png` ... `${base}${name}_<count>.png`: #0002's frames
+// put an underscore before the frame number (0002_ba1_3.png is Basic
+// Attack 1, frame 3).
+const numbered = (base, name, count) =>
+  Array.from({ length: count }, (_, i) => `${base}${name}_${i + 1}.png`);
+
+// #0002's playback rates, from his art: the idle sway is slow (5 frames,
+// 0.83 s a loop), the two static-glitch movement frames flicker at 4 Hz
+// (8 fps, no faster: they flash), and each attack plays its whole clip in
+// about a third of a second (0.3-0.4 s) so every frame of the tendrils
+// reads. Art only: no attack of his times a strike to them yet.
+const FPS_0002 = Object.freeze({
+  idle: 6,
+  run: 8,
+  air: 10,
+  land: 10,
+  charge: 10,
+  ba1: 10,
+  maba1: 10,
+  ba2: 10,
+  maba2: 12,
+  shield: 12,
+  midairShield: 8,
+  cba1: 12,
+});
+
+// Height in art pixels of #0002's idle (the reference clip, 85): every
+// heightRatio below is a clip's tallest frame over it.
+const IDLE_ART_0002 = 85;
+
+// TODO #0002: replace temporary baseline when authored attributes are supplied.
+//
+// What a Fighter cannot be built without, for a fighter whose own values
+// are not authored yet: the Power tiers, the neutral movement and the body
+// (collider, pushbox, hurtboxes). Placeholder plumbing so it can load,
+// move, jump, fall, land, shield, be hit and respawn like any fighter:
+// none of it is anyone's designed stats. The numbers are #0001's neutral
+// ones as they were when #0002 arrived, copied rather than shared so
+// tuning #0001 never moves them; the Powers are each Power's own default
+// tier (defaultTier in js/data/powers.js). No Dash (`dashSpeed`): a Dash
+// needs its own art. Everything else a fighter may declare (energy,
+// launchReaction, launchBounce, stats, a Shield's perfect window or slow
+// fall) is left to the engine's neutral defaults by leaving it out.
+export const TEMPORARY_BASELINE = Object.freeze({
+  powers: Object.freeze({ jump: 2, speed: 2 }),
+  movement: Object.freeze({
+    acceleration: 4200,
+    deceleration: 4200,
+    turnBoost: 2.6,
+    overspeedDeceleration: 6000,
+    airAcceleration: 3000,
+    airDeceleration: 380,
+    airTurnBoost: 2.0,
+    gravityScale: 1,
+    maxFallSpeed: 1500,
+    fastFallAcceleration: 12000,
+    fastFallSpeed: 1400,
+    coyoteTime: 0.1,
+    jumpBuffer: 0.12,
+    highJumpWindow: 0.15,
+    highJumpHeight: 1.4,
+    airJumps: 1,
+    airJumpRatio: 0.9,
+    attackBuffer: 0.15,
+    hitstunFriction: 1600,
+    hitstunAirDrag: 210,
+    dropThroughTime: 0.28,
+  }),
+  collider: Object.freeze({ width: 34, height: 80 }),
+  pushbox: Object.freeze({ width: 36 }),
+  hurtboxes: Object.freeze([
+    Object.freeze({ x: -15, y: -80, w: 30, h: 34 }),
+    Object.freeze({ x: -17, y: -46, w: 34, h: 46 }),
+  ]),
+});
 
 export const CHARACTERS = [
   {
@@ -854,6 +939,262 @@ export const CHARACTERS = [
         control: 0.3,
         friction: 0.6,
       },
+    },
+  },
+
+  // #0002: Slender Man (see the credits, js/ui/credits.js). His art is all
+  // in; his combat attributes are not authored yet and are not guessed
+  // here. His Basic Attacks play their own art and hit nothing (pending),
+  // his Unique Basic Attack and Charged BA2 do not exist, and his body and
+  // movement are TEMPORARY_BASELINE's placeholders.
+  {
+    id: '0002',
+    displayName: '#0002',
+    available: true,
+    rosterSlot: 1,
+
+    // Every #0002 clip is drawn facing right: the tendrils of his attacks
+    // lash out to the right, and his jump, kneeling Charge and hunched
+    // Shield lean that way.
+    sourceFacing: 1,
+
+    // His art comes at three pixel sizes (the neutral poses 8x, most other
+    // clips 2x, prepshield and shielding 1x), all one art-pixel scale once
+    // normalized: idle is 85 art pixels tall and so is the Basic Attack 1
+    // wind-up. heightRatio (tallest frame / 85) only sizes a clip whose
+    // grid cannot be detected, which here is prepshield and shielding.
+    //
+    // Anchors: the automatic torso anchor (visual.anchor) sits a clip's
+    // frames on the upper body's centroid, which his tendrils pull far off
+    // the body. So every grounded clip whose feet are drawn the same way
+    // places its own anchor (`anchorX`, art pixels from the left of each
+    // frame's visible art) 3 art pixels left of the right shoe, as the
+    // torso anchor does for idle: the feet stay planted from idle to run,
+    // land and Basic Attack 1, however far the tendrils reach. Basic
+    // Attack 2 and the grounded Shield, whose shoes are drawn differently,
+    // sit 2 art pixels left of the middle of their stance, as idle does;
+    // the mid-air Basic Attack 1 body does not move at all across its four
+    // frames (only the tendrils grow), and the mid-air Basic Attack 2 spins
+    // round its one leg. Jump, fall, Charge and the mid-air Shield have no
+    // tendrils: their torso anchor is kept.
+    animations: {
+      // The sway: idle2 and idle4 are the same drawing, as the loop turns
+      // back through it; idle5 is idle1 settled one art pixel lower.
+      idle: {
+        frames: frames(BASE_0002, 'idle', 5),
+        fps: FPS_0002.idle,
+        loop: true,
+        heightRatio: 1,
+        anchorX: [13, 14, 13, 14, 13],
+      },
+      // The engine's run is his movement: two frames of his body breaking
+      // into static, looped at a steady flicker whatever his speed
+      // (minSpeedScale 1: nothing strides). 0002_mouvmen1.png is the same
+      // file as 0002_run1.png and is not loaded again.
+      run: {
+        frames: [`${BASE_0002}run1.png`, `${BASE_0002}run2.png`],
+        fps: FPS_0002.run,
+        loop: true,
+        heightRatio: 1,
+        minSpeedScale: 1,
+        anchorX: [16, 13],
+      },
+      // Single frames, held for the rest of the ascent / descent.
+      jump: {
+        frames: [`${BASE_0002}jump.png`],
+        fps: FPS_0002.air,
+        loop: false,
+        heightRatio: 65 / IDLE_ART_0002,
+      },
+      fall: {
+        frames: [`${BASE_0002}fall.png`],
+        fps: FPS_0002.air,
+        loop: false,
+        heightRatio: 76 / IDLE_ART_0002,
+      },
+      // One static frame on touchdown (0.1 s): 0002_land.png, a drawing
+      // identical to 0002_run2.png, supplied under its own name.
+      land: {
+        frames: [`${BASE_0002}land.png`],
+        fps: FPS_0002.land,
+        loop: false,
+        heightRatio: 1,
+        anchorX: [13],
+      },
+      // Charge has one pose, kneeling (0002_charge.png): the startup shows
+      // it for one Charge frame-time and the loop holds it. There is no
+      // chargeRelease clip: letting go returns straight to the normal
+      // state, with no borrowed pose in between.
+      chargeStart: {
+        frames: [`${BASE_0002}charge.png`],
+        fps: FPS_0002.charge,
+        loop: false,
+        heightRatio: 43 / IDLE_ART_0002,
+      },
+      chargeLoop: {
+        frames: [`${BASE_0002}charge.png`],
+        fps: FPS_0002.charge,
+        loop: true,
+        heightRatio: 43 / IDLE_ART_0002,
+      },
+      // Basic Attack 1: ground (ba1) and mid-air (maba1), each played once.
+      // ba1: the arm drawn back, a tendril lashing out, sweeping low with
+      // his lunge, then drawing back in. maba1: the body turns in the air
+      // as three tendrils grow out to their full reach.
+      ba1: {
+        frames: numbered(BASE_0002, 'ba1', 4),
+        fps: FPS_0002.ba1,
+        loop: false,
+        heightRatio: 1,
+        anchorX: [20, 41, 60, 41],
+      },
+      maba1: {
+        frames: numbered(BASE_0002, 'maba1', 4),
+        fps: FPS_0002.maba1,
+        loop: false,
+        heightRatio: 132 / IDLE_ART_0002,
+        anchorX: [20, 20, 20, 20],
+      },
+      // Basic Attack 2: ground (ba2), the arm raised, a tendril rising and
+      // then lashing forward; mid-air (maba2), a spin inside a vortex of
+      // tendrils (frames 2 and 4 the full ring).
+      ba2: {
+        frames: numbered(BASE_0002, 'ba2', 3),
+        fps: FPS_0002.ba2,
+        loop: false,
+        heightRatio: 126 / IDLE_ART_0002,
+        anchorX: [25.5, 26.5, 26.5],
+      },
+      maba2: {
+        frames: numbered(BASE_0002, 'maba2', 4),
+        fps: FPS_0002.maba2,
+        loop: false,
+        heightRatio: 106 / IDLE_ART_0002,
+        anchorX: [46, 60, 44, 74],
+      },
+      // Shield (his `defense` below): on the ground, prepshield raises it
+      // for one frame (a tendril curling up round his head), shielding is
+      // the held guard (the tendril close in front of him) and
+      // releaseshield lowers it for one frame (the tendril uncurling). In
+      // the air, his two mid-air frames loop: the black silhouette and its
+      // static-torn copy with the red grin.
+      shieldStart: {
+        frames: [`${BASE_0002}prepshield.png`],
+        fps: FPS_0002.shield,
+        loop: false,
+        heightRatio: 71 / IDLE_ART_0002,
+        anchorX: [10],
+      },
+      shield: {
+        frames: [`${BASE_0002}shielding.png`],
+        fps: FPS_0002.shield,
+        loop: false,
+        heightRatio: 71 / IDLE_ART_0002,
+        anchorX: [10],
+      },
+      shieldRelease: {
+        frames: [`${BASE_0002}releaseshield.png`],
+        fps: FPS_0002.shield,
+        loop: false,
+        heightRatio: 71 / IDLE_ART_0002,
+        anchorX: [10],
+      },
+      midairShield: {
+        frames: [`${BASE_0002}midairshielding1.png`, `${BASE_0002}midairshielding2.png`],
+        fps: FPS_0002.midairShield,
+        loop: true,
+        heightRatio: 79 / IDLE_ART_0002,
+      },
+    },
+
+    // Charged Basic Attack 1's art (cba1_1-6): a pool of shadow opening on
+    // the ground and two pale hands rising out of it, drawn apart from his
+    // body. So it is an effect, not a pose of his: normalized at its own
+    // size on his art-pixel scale, every frame kept in order (the first
+    // two are the pool's small first spreading), never mirrored. Nothing
+    // plays it yet: what Charged BA1 does is not authored, so he has no
+    // `chargedActions` and Charge + BA1 is his normal Basic Attack 1.
+    effectAnimations: {
+      cba1: {
+        frames: numbered(BASE_0002, 'cba1', 6),
+        fps: FPS_0002.cba1,
+        loop: false,
+        sourceFacing: 0,
+      },
+    },
+
+    // A still idle frame for any clip whose frames fail to load, as for
+    // #0001. He has no hurt art: a stun shows his first idle frame, held.
+    animationFallbacks: {
+      jump: { animation: 'idle', frame: 0 },
+      fall: { animation: 'idle', frame: 0 },
+      land: { animation: 'idle', frame: 0 },
+      hurt: { animation: 'idle', frame: 0 },
+      midairHurt: { animation: 'idle', frame: 0 },
+      chargeStart: { animation: 'idle', frame: 0 },
+      chargeLoop: { animation: 'idle', frame: 0 },
+    },
+
+    visual: {
+      // A quarter taller than #0001 (88): Slender Man stands head and
+      // shoulders above him. The view is sized for the reference height
+      // whoever is picked (computeWorldScale in js/game/arena.js), so the
+      // stage looks the same and he is simply taller on it, each fighter
+      // drawn at its own art scale. Visual only: his placeholder body
+      // (TEMPORARY_BASELINE) is still #0001's 80 units.
+      height: 110,
+      referenceAnimation: 'idle',
+      anchor: 'torso',
+      pixelSize: 'auto',
+      // Head, collar and tie: his head is the top 13 of 85 art pixels,
+      // centred 15.6 across idle1's 28 (the automatic centre would take in
+      // his left shoulder).
+      portrait: { animation: 'idle', frame: 0, centerX: 0.56, centerY: 0.16, size: 0.32 },
+    },
+
+    // TODO #0002: replace temporary baseline when authored attributes are supplied.
+    powers: TEMPORARY_BASELINE.powers,
+    movement: TEMPORARY_BASELINE.movement,
+    collider: TEMPORARY_BASELINE.collider,
+    pushbox: TEMPORARY_BASELINE.pushbox,
+    hurtboxes: TEMPORARY_BASELINE.hurtboxes,
+
+    // His Shield, on the shared `shield` input: the universal Shield with
+    // his own clips. No perfect Shield or mid-air slow fall until they are
+    // authored (SHIELD_DEFAULTS in js/game/combat.js).
+    defense: {
+      type: 'shield',
+      groundAnimation: 'shield',
+      groundStartAnimation: 'shieldStart',
+      groundReleaseAnimation: 'shieldRelease',
+      airAnimation: 'midairShield',
+    },
+
+    // Control codenames -> move codenames, as for #0001. There is no
+    // `uniqueba` entry: #0002 has no Unique Basic Attack at all, not even a
+    // reserved one, so its input does nothing for him, the CPU never
+    // presses it and his touch controls have no button for it. Transform
+    // stays reserved, as it is for every fighter without one.
+    actions: {
+      transform: null, // reserved: no Transform move yet
+      ba1: { ground: 'ba1', air: 'maba1' },
+      ba2: { ground: 'ba2', air: 'maba2' },
+    },
+
+    // No `chargedActions`: no Charged BA1 is wired yet and there is no
+    // Charged BA2, so Charge + either button is that button's own attack,
+    // and no CBA cooldown ever shows under him. No mobileAbilities or
+    // abilityNames either: his buttons and moves keep their neutral names.
+
+    // His Basic Attacks, art only (see `pending` in js/game/combat.js):
+    // each plays its clip once and hits nothing, with no damage, launch,
+    // hitbox, stun, cooldown or cancel. Not the final moves: those come
+    // with his authored attributes.
+    attacks: {
+      ba1: { animation: 'ba1', pending: true },
+      maba1: { animation: 'maba1', pending: true },
+      ba2: { animation: 'ba2', pending: true },
+      maba2: { animation: 'maba2', pending: true },
     },
   },
 ];

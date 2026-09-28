@@ -179,7 +179,8 @@ const { Battle, BATTLE_MODES } = await import('../js/game/battle.js');
 const { CombatAIController } = await import('../js/game/combat-ai.js');
 const { PlayerController } = await import('../js/game/fighter-controller.js');
 
-// A second available fighter, so CPU 1 and CPU 2 can differ.
+// A third available fighter (#0001's art under another id, after the real
+// #0001 and #0002), so CPU 1 and CPU 2 can differ while sharing art.
 const DEF_9999 = { ...DEF_0001, id: '9999', displayName: '#9999', rosterSlot: 5, available: true };
 CHARACTERS.push(DEF_9999);
 
@@ -621,7 +622,7 @@ test('locked roster slots stay locked on both Watch rosters, exactly as on Selec
       assert.equal(slot.hasAttribute('data-nav'), false, 'out of keyboard / gamepad navigation');
       assert.match(slot.getAttribute('aria-label'), /^Slot \d\d, locked$/);
     }
-    assert.deepEqual(screen.roster.slots.filter((s) => s._def?.available).map((s) => s._def.id), ['0001', '9999']);
+    assert.deepEqual(screen.roster.slots.filter((s) => s._def?.available).map((s) => s._def.id), ['0001', '0002', '9999']);
   }
 });
 

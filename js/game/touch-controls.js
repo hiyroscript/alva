@@ -29,9 +29,11 @@
 // it). The large top slot is the `uniqueba` input, the middle row's first
 // button `transform` and the lower row's first two `ba1` and `ba2`: their
 // look is the fighter's own (#0001's Shuriken, Punch and Kick; see
-// setCharacter and js/ui/mobile-abilities.js), and Transform shows as
-// reserved (dashed) while the fighter presents none. Shield is the
-// universal `shield` input, held for as long as the pointer stays on it.
+// setCharacter and js/ui/mobile-abilities.js), Transform shows as reserved
+// (dashed) while the fighter presents none, and a button for an ability the
+// fighter does not have at all (#0002's Unique Basic Attack) is hidden,
+// its place left empty. Shield is the universal `shield` input, held for
+// as long as the pointer stays on it.
 // Only the icons and accessible names are player-facing: the input
 // codenames never change with them, so Charge + Punch is Charge + ba1 (cba1,
 // the Clone Attack), and Charge + Kick is Charge + ba2 (cba2, the Sphere
@@ -58,7 +60,7 @@
 import { el } from '../core/utils.js';
 import { tattr, setAttr, setPlainAttr } from '../core/i18n.js';
 import { ICONS } from '../ui/icons.js';
-import { ABILITY_ACTIONS, mobileAbility, mobileAbilityLabelKey } from '../ui/mobile-abilities.js';
+import { ABILITY_ACTIONS, abilityPresence, mobileAbility, mobileAbilityLabelKey } from '../ui/mobile-abilities.js';
 import { DEFAULT_MOBILE_CONTROLS, resolveSetting } from '../core/settings.js';
 import {
   TOUCH_CONTROL_IDS, sanitizeTouchLayout, sanitizeTouchLayouts, layoutArea, placeControl,
@@ -134,10 +136,13 @@ function makeButton(spec, cls) {
 }
 
 export class TouchControls {
-  constructor(root, input, { scheme = DEFAULT_MOBILE_CONTROLS } = {}) {
+  // `showAbsent` keeps on show the buttons of abilities a fighter does not
+  // have (see setCharacter): only the touch layout editor wants them.
+  constructor(root, input, { scheme = DEFAULT_MOBILE_CONTROLS, showAbsent = false } = {}) {
     this.root = root;
     this.input = input;
     this.enabled = false;
+    this.showAbsent = showAbsent;
     this.scheme = null;
     this.buttons = new Map(); // action -> the element holding it in this scheme
     this.pointers = new Map(); // pointerId -> action
@@ -223,7 +228,8 @@ export class TouchControls {
     for (const b of [...this.actionButtons.values(), this.chargeDown]) {
       const action = b.getAttribute('data-action');
       b.addEventListener('pointerdown', (e) => {
-        if (!this.enabled) return;
+        // A hidden button (an ability the fighter does not have) takes nothing.
+        if (!this.enabled || b.hidden) return;
         e.preventDefault();
         b.setPointerCapture?.(e.pointerId);
         this.assign(e.pointerId, action);
@@ -248,7 +254,7 @@ export class TouchControls {
     // Assistive-technology activation (click without a pointer) = short tap.
     this.root.addEventListener('click', (e) => {
       const b = e.target.closest('.tc-btn');
-      if (!b || e.detail !== 0 || !this.enabled) return;
+      if (!b || b.hidden || e.detail !== 0 || !this.enabled) return;
       if (b._direction) {
         this.input.queueTouchMouvement(b._direction);
         return;
@@ -521,15 +527,46 @@ export class TouchControls {
   // carry on untouched. Null (or a fighter that authors none) gives the
   // neutral fallback, with Transform reserved. A translated name is marked
   // to follow the language.
+  //
+  // A button whose ability the fighter does not have at all (see
+  // abilityPresence: left out of its `actions`, like #0002's Unique Basic
+  // Attack) is hidden: not drawn, not named, never focused and never
+  // pressed, and whatever held it is let go. Its place stays empty, so no
+  // other button moves. The next fighter that has the ability shows the
+  // very same element again. `showAbsent` keeps such a button on show in
+  // its neutral look instead (the touch layout editor, whose layout every
+  // fighter shares).
   setCharacter(def) {
+    let shown = false;
     for (const action of ABILITY_ACTIONS) {
-      const { label, icon, pending } = mobileAbility(def, action);
       const b = this.actionButtons.get(action);
-      const key = mobileAbilityLabelKey(def, action);
+      // An ability the fighter lacks, kept on show: in its neutral look.
+      const from = this.showAbsent && abilityPresence(def, action) === 'absent' ? null : def;
+      const ability = mobileAbility(from, action);
+      const absent = !ability;
+      if (b.hidden && !absent) shown = true;
+      b.hidden = absent;
+      if (absent) {
+        this.releaseAction(action);
+        b.removeAttribute('aria-label');
+        b.removeAttribute('data-i18n-aria-label');
+        b.removeAttribute('data-i18n-aria-label-params');
+        b.innerHTML = '';
+        b.classList.remove('is-pending');
+        continue;
+      }
+      const key = mobileAbilityLabelKey(from, action);
       if (key) setAttr(b, 'aria-label', key);
-      else setPlainAttr(b, 'aria-label', label);
-      b.innerHTML = icon;
-      b.classList.toggle('is-pending', pending);
+      else setPlainAttr(b, 'aria-label', ability.label);
+      b.innerHTML = ability.icon;
+      b.classList.toggle('is-pending', ability.pending);
     }
+    // A button back on show: place it again, as its layout says.
+    if (shown) this.applyLayout();
+  }
+
+  // Lets go of every pointer holding `action`'s button.
+  releaseAction(action) {
+    for (const [id, held] of [...this.pointers]) if (held === action) this.assign(id, null);
   }
 }

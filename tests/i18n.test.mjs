@@ -189,6 +189,8 @@ test('French is really French: only proper names, codes and shared words read th
     'brand.title', // ALVA
     'control.charge', // Charge
     'control.pause', // Pause
+    'credits.0002.sheet', // Upgrade Slenderman Sprites Jus Sheet
+    'credits.0002.title', // #0002 / Slender Man
     'credits.sprites.site', // The Spriters Resource
     'difficulty.brutal.name', // Brutal
     'hud.pause', // Pause

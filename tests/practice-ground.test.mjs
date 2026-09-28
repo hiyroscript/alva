@@ -190,8 +190,9 @@ const { HomeScreen } = await import('../js/screens/home-screen.js');
 const { CharacterSelectScreen } = await import('../js/screens/character-select-screen.js');
 const { PracticeGroundScreen, PRACTICE_DEFAULT_FIGHTER } = await import('../js/screens/practice-screen.js');
 
-// A second available fighter (same art as #0001) so a swap to a different
-// fighter can be checked. Registered before any roster is built.
+// A third available fighter (same art as #0001, after the real #0001 and
+// #0002) so a swap between two fighters of the same art can be checked
+// too. Registered before any roster is built.
 const DEF_9999 = { ...DEF_0001, id: '9999', displayName: '#9999', rosterSlot: 5, available: true };
 CHARACTERS.push(DEF_9999);
 
@@ -996,8 +997,8 @@ test('the dialog shows the full configured roster; locked slots stay non-interac
   assert.equal(grid.children.length, CONFIG.roster.totalSlots);
   const available = slots.filter((s) => s._def?.available);
   const locked = slots.filter((s) => !s._def?.available);
-  assert.deepEqual(available.map((s) => s._def.id), ['0001', '9999']);
-  assert.equal(locked.length, CONFIG.roster.totalSlots - 2);
+  assert.deepEqual(available.map((s) => s._def.id), ['0001', '0002', '9999']);
+  assert.equal(locked.length, CONFIG.roster.totalSlots - 3);
   for (const s of locked) {
     assert.equal(s.tagName, 'DIV');
     assert.equal(s.hasAttribute('data-nav'), false);

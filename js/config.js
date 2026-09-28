@@ -11,6 +11,12 @@ export const CONFIG = Object.freeze({
   render: {
     // Backing-buffer devicePixelRatio cap (performance on high-DPI phones).
     dprCap: 2,
+    // World height (units) of the fighter the ratios below are about:
+    // #0001's visual.height. The view is sized for a fighter this tall
+    // whoever is picked, so the stage frames the same for every fighter and
+    // a taller or shorter one (#0002 is taller) simply stands taller or
+    // shorter on it.
+    fighterHeight: 88,
     // Target on-screen fighter height as a fraction of the viewport height:
     // a platform-fighter view, far enough out for the whole main stage, the
     // air above it and open space past its ledges.

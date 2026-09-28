@@ -8,7 +8,8 @@
 //   1. read the alpha channel and find the visible bounding box
 //   2. detect the pixel-art grid (GCD of every colour transition)
 //   3. resample to 1 canvas pixel per art pixel (exact, block-centre sampling)
-//   4. compute a stable horizontal anchor (upper-body opaque centroid)
+//   4. compute a stable horizontal anchor (upper-body opaque centroid), or
+//      take the clip's own authored one (its `anchorX`)
 //
 // The result is cached; nothing touches pixel data per render frame.
 // Every normalized frame is drawn bottom-centre anchored at a shared
@@ -196,13 +197,19 @@ export class SpriteSet {
 
     for (const [key, anim] of Object.entries(def.animations)) {
       const frames = [];
-      for (const url of anim.frames) {
+      for (const [i, url] of anim.frames.entries()) {
         const img = getImage(url);
         if (!img) {
           set.missing.push(url);
           continue;
         }
-        frames.push(normalizeFrame(img, url, { forcedPixelSize: forced, anchor: def.visual.anchor }));
+        const frame = normalizeFrame(img, url, { forcedPixelSize: forced, anchor: def.visual.anchor });
+        // A clip may place each frame's anchor itself (`anchorX`, art
+        // pixels from the left of the frame's visible art) where the art
+        // misleads visual.anchor: large effects drawn beside the body pull
+        // its centroid off the body (see #0002's tendril attacks).
+        frame.authoredAnchor = anim.anchorX?.[i] ?? null;
+        frames.push(frame);
       }
       if (!frames.length) continue;
 
@@ -275,7 +282,7 @@ export class SpriteSet {
       for (const f of anim.frames) {
         f.artW = f.w / f.unit;
         f.artH = f.h / f.unit;
-        f.anchorArtX = f.anchorX / f.unit;
+        f.anchorArtX = f.authoredAnchor ?? f.anchorX / f.unit;
         f.headArtX = f.headX / f.unit;
       }
       anim.maxArtH = Math.max(...anim.frames.map((f) => f.artH));
@@ -331,7 +338,9 @@ export class SpriteSet {
   }
 
   // Square portrait canvas cropped around the head (1 px per art pixel), or
-  // null without a decoded frame to crop.
+  // null without a decoded frame to crop. Centred on the head's opaque
+  // centroid, or at `centerX` (a fraction of the frame's width) where the
+  // portrait says so.
   makePortrait() {
     const cfg = this.def.visual.portrait || {};
     const anim = this.animations[cfg.animation] || this.animations.idle || Object.values(this.animations)[0];
@@ -339,7 +348,7 @@ export class SpriteSet {
     const f = anim.frames[Math.min(cfg.frame || 0, anim.frames.length - 1)];
     if (!f?.canvas) return null;
     const size = Math.round(f.artH * (cfg.size ?? 0.5));
-    const cx = f.headArtX;
+    const cx = cfg.centerX != null ? f.artW * cfg.centerX : f.headArtX;
     const cy = f.artH * (cfg.centerY ?? 0.25);
     const canvas = document.createElement('canvas');
     canvas.width = size;
