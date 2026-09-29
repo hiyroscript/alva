@@ -410,6 +410,19 @@ and Quick Battle in `tests/practice-ground.test.mjs` and
 `tests/watch-mode.test.mjs`; pending attacks, which no fighter uses now, in
 `tests/basic-attack.test.mjs`.
 
+### Later: #0002's controls are back
+
+Asked for as "add all the controls for #0002". Its four fighter controls,
+Unique Basic Attack, Transform, BA1 and BA2, are reserved instead of left
+out: `actions: { uniqueba: null, transform: null, ba1: null, ba2: null }`.
+Its touch controls now show all four buttons, dashed, under their neutral
+names and glyphs; every input is wired but still does nothing for it (it
+has no move or art for one yet), and the CPU never presses them. To take
+one away again, leave it out of `actions`; to give it a move, map it to an
+`attacks` entry with its own art. The hidden-button path (a move left out
+of `actions`) is unchanged, and now tested with a made-up fighter in
+`tests/controls-ui.test.mjs`.
+
 ## Control and move codenames
 
 Not a named update, and it changes no behaviour or tuning: later work

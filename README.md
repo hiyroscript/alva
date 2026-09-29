@@ -103,12 +103,16 @@ Charge held + `ba2` is `cba2`. The mouvement buttons send one-step requests
 \* Reserved: wired into input and combat, but inactive until #0001 has matching
 attack animations. Its touch button has a dashed outline.
 
-A fighter may also lack a move altogether. #0002 has no move yet: Unique
-Basic Attack, Transform, BA1 and BA2 are all left out of its `actions`, so
-`J`, `K`, `U` and `I` (and their gamepad buttons) stay bound for everyone but
-do nothing for it, and its touch controls have none of those four buttons.
-Without a `defense` the Shield does nothing for it either, and Charge is only
-the stance (it has no charged action).
+#0002 has every control, but no move yet: its Unique Basic Attack,
+Transform, BA1 and BA2 are all reserved (`null` in its `actions`), so `J`,
+`K`, `U` and `I` (and their gamepad buttons) are wired for it but do nothing,
+and its touch controls show all four buttons dashed, under their neutral
+names (Unique Basic Attack, Transform, Basic Attack 1 and 2). Without a
+`defense` the Shield does nothing for it either, and Charge is only the
+stance (it has no charged action).
+
+A fighter may also lack a move altogether: one left out of its `actions`
+has no touch button at all, and its input does nothing for it.
 
 ### Language
 
@@ -480,7 +484,7 @@ cover them.
   rate. A restart or rematch, a new fighter in Practice Ground and every
   respawn after the Void clear them. They cost no Energy.
 - **Menus:** arrow keys or WASD to move, `Enter` to select, `Esc` to go back. Mouse and touch work too.
-- **Touch:** two layouts, Joystick (the default) and Classic Buttons (see [Mobile Controls](#mobile-controls)). Several fingers work at once (hold the joystick or Right and press Jump, or hold Charge and press Punch). The combat buttons show icons, not letters: for #0001, **Shuriken** (Throw), **Shield** (held), **Punch** (Basic Attack 1) and **Kick** (Basic Attack 2), beside Transform (dashed: #0001 has none yet) and Jump. #0002 has none of the four fighter buttons (Unique Basic Attack, Transform, Basic Attack 1 and 2): which buttons a fighter has comes from its `actions` (`abilityPresence` in `js/ui/mobile-abilities.js`), so a move it does not have (left out of `actions`) has its button hidden, unnamed and untouchable, its place left empty, while one mapped to `null` stays reserved (dashed). The touch layout editor still shows every control, so a layout can place a button for the fighters that have it. Hold Charge, then press Punch for the Clone Attack or Kick for the Sphere Rush. The icons of the fighter's own buttons (Shuriken, Punch, Kick, and Transform once a fighter has one) come from its `mobileAbilities` in `js/data/characters.js` and follow Player 1's fighter, in Practice Ground too when you change fighter; a fighter with no `transform` entry keeps the dashed, reserved Transform star. Shield, Jump and Charge are the same for everyone. Only the presentation is per fighter: the buttons always send the same control codenames (`uniqueba`, `transform`, `shield`, `ba1`, `ba2`). The combat buttons are the same elements in both layouts, in the same places: switching (`TouchControls.setScheme`) only swaps the lower-left corner (Left / C / Right, or Charge and the joystick with its Dash buttons), after letting go of everything held. Each layout can also be rearranged and resized by the player (see [Mobile Controls](#mobile-controls)); the buttons keep what they do wherever they sit. The viewport disables page zoom (`maximum-scale=1, user-scalable=no`) and the play surfaces, joystick and buttons set `touch-action: none`, so rapid taps never zoom or scroll the page.
+- **Touch:** two layouts, Joystick (the default) and Classic Buttons (see [Mobile Controls](#mobile-controls)). Several fingers work at once (hold the joystick or Right and press Jump, or hold Charge and press Punch). The combat buttons show icons, not letters: for #0001, **Shuriken** (Throw), **Shield** (held), **Punch** (Basic Attack 1) and **Kick** (Basic Attack 2), beside Transform (dashed: #0001 has none yet) and Jump. #0002 shows all four fighter buttons reserved (dashed, under their neutral names and glyphs: Unique Basic Attack, Transform, Basic Attack 1 and 2), since it has no move yet: which buttons a fighter has comes from its `actions` (`abilityPresence` in `js/ui/mobile-abilities.js`), so a move it does not have (left out of `actions`) has its button hidden, unnamed and untouchable, its place left empty, while one mapped to `null` stays reserved (dashed). The touch layout editor still shows every control, so a layout can place a button for the fighters that have it. Hold Charge, then press Punch for the Clone Attack or Kick for the Sphere Rush. The icons of the fighter's own buttons (Shuriken, Punch, Kick, and Transform once a fighter has one) come from its `mobileAbilities` in `js/data/characters.js` and follow Player 1's fighter, in Practice Ground too when you change fighter; a fighter with no `transform` entry keeps the dashed, reserved Transform star. Shield, Jump and Charge are the same for everyone. Only the presentation is per fighter: the buttons always send the same control codenames (`uniqueba`, `transform`, `shield`, `ba1`, `ba2`). The combat buttons are the same elements in both layouts, in the same places: switching (`TouchControls.setScheme`) only swaps the lower-left corner (Left / C / Right, or Charge and the joystick with its Dash buttons), after letting go of everything held. Each layout can also be rearranged and resized by the player (see [Mobile Controls](#mobile-controls)); the buttons keep what they do wherever they sit. The viewport disables page zoom (`maximum-scale=1, user-scalable=no`) and the play surfaces, joystick and buttons set `touch-action: none`, so rapid taps never zoom or scroll the page.
 - **Gamepad (standard layout):** D-pad or left stick left / right to move (twice in a row to Dash) and down to Charge in battle (they still navigate menus), A to jump, X / Square to Throw, B / Circle for Basic Attack 1, LB for Basic Attack 2, Y / Triangle for the reserved Transform, RB or RT for Shield, Start to pause.
 - **Debug:** `` ` `` toggles the collider, hurtbox and attack-hitbox overlay in battle (a hitbox shows only while it can connect; hurtboxes look the same with the Shield up, and a shielding fighter is labelled `shield`; a flying shuriken's hitbox is outlined in magenta and labelled; a clone's attack hitbox shows in the attack colour, labelled `clone ba1` (or `clone maba2` overhead), only on its active frame; the Sphere Rush's sphere hitbox is a dashed cyan box labelled `charged ba2 dash` while it can connect, then a dashed cyan cross marks the sphere on the caught opponent, which is labelled `bound`; solids, the main floor's block among them, are outlined in red and the Void's fixed kill line is dashed violet).
 
@@ -488,7 +492,7 @@ Touch controls show on touch-first devices (coarse pointer, or a touch actually 
 
 ## Current content
 
-- **Characters:** #0001, and #0002 in roster slot 02. #0002's supplied movement and hurt art is registered and plays in game; it has no moves yet (see [#0002](#0002) below)
+- **Characters:** #0001, and #0002 in roster slot 02. #0002's supplied movement and hurt art is registered and plays in game; it has every control, reserved, but no moves yet (see [#0002](#0002) below)
 - **Maps:** Desert (a sandstone mesa with 2 rock outcrops, 1360 units wide) and City (a rooftop with 7 one-way platforms and a stair bulkhead, 1440 wide) for Quick Battle and Watch Mode; the Practice Ground training room (one flat training block, 1280 wide) for practice. Each is a compact main stage with open air past both ledges and the Void a short way beyond (see [Stages and the Void](#stages-and-the-void))
 - **Animations:** Idle, Run, Jump, Fall, Land (jump/fall play while airborne; land plays once on touchdown), Hurt and Mid-air Hurt (shown during hitstun on the ground / in the air), Basic Attack 1 (4 frames), Mid-air Basic Attack 1 (the kunai slash, 3 frames: `0001_midair1ba1`–`3`), Basic Attack 2 (7 frames) and Mid-air Basic Attack 2 (the airborne kick, 5 frames: `0001_midair2ba1`–`5`), each played once at 12 fps, Shield (`0001_prepshield` to raise it, `0001_shielding` held, `0001_releaseblock` to lower it) and Mid-air Shield (`0001_midairshielding`, the held pose only), single frames drawn at 1×, Dash (`0001_dash1`–`2`, drawn at 1×, played once at 10 fps), Charge (charge1 → charge2 once, then chargea ↔ chargeb while held, at 10 fps, with charge1 shown briefly on release), Throw (3 fighter frames, played once at 12 fps), Shuriken (3 looping projectile frames at 18 fps, normalized and drawn separately from the fighter poses), the clone appear / vanish cloud (`0001_cloneav1`–`0001_cloneav10`, an effect at 20 fps: forwards as a clone appears, the same frames in reverse as it vanishes), the Sphere Rush poses (`0001_rasen1`–`0001_rasen12` as one-shot fighter clips at 12 fps: formation 1–3, rush 4–6, contact 7–8 with 8 held, explosion 9, recovery 10–12, and 12 alone as the whiff release) and its blue sphere (`0001_prasen1`–`0001_prasen11` as three effects at 12 fps: formation 1–6 once, spinning on the opponent 7–9 looped while it is drawn ever larger, explosion 10–11 once)
 - **#0002's animations:** Idle (`0002_idle_1`–`8`, two slow breaths a loop at 8 fps), Run (`0002_run_1`–`4`, the legs a spinning blur: 12 fps at top speed, slower as it slows, down to 0.6 of that), Jump, Fall and Land (single frames; the land frame shows for 1/12 s), Hurt and Mid-air Hurt (single frames held through the stun). No attack, Shield, Charge, Dash, projectile or effect art yet: its Charge stance holds its first idle frame
@@ -878,10 +882,12 @@ are in `assets/characters/0002/`: idle (`0002_idle_1`–`8`), run
 
 Only its movement and hurt art exists so far, and nothing guesses the rest:
 
-- **No moves.** Unique Basic Attack, Transform, BA1 and BA2 are all left out
-  of its `actions`, and its `attacks` are empty: their inputs do nothing for
-  it, the CPU never presses them and its touch controls hide those four
-  buttons. It has no `chargedActions`, so no CBA ring ever shows under it.
+- **Every control, no moves.** Unique Basic Attack, Transform, BA1 and BA2
+  are all reserved (`null` in its `actions`), and its `attacks` are empty:
+  their inputs are wired but do nothing for it, the CPU never presses them,
+  and its touch controls show all four buttons dashed, under their neutral
+  names and glyphs. It has no `chargedActions`, so no CBA ring ever shows
+  under it.
 - **No Shield or Dash.** Without a `defense` the Shield button does nothing
   for it; without `movement.dashSpeed` a double tap never Dashes.
 - **Charge** is the universal stance only (Down in the air is still the fast
@@ -912,7 +918,7 @@ art, so the credits name none yet.
 3. Give it a free `rosterSlot`.
 4. Optionally, name its moves in `abilityNames`, keyed by move codename (e.g. `cba2: 'Sphere Rush'`); a move it leaves out keeps its neutral name.
 
-A fighter whose art arrives before its attributes, as #0002's does, can still be added: give an attack whose art is in `pending: true` (art only: one pass of the clip, no hit; declaring combat fields on one is refused), leave out of `actions` any move it does not have (its touch button is hidden and the CPU never presses it; #0002 leaves out all four), keep `null` for a move still to come (reserved, dashed), and use `TEMPORARY_BASELINE` (Power tiers and neutral movement) for what the engine cannot build a fighter without until the real values are authored. A clip whose art misleads the automatic anchor (effects drawn beside the body, or swinging limbs that nudge it from frame to frame) can place each frame's anchor itself with `anchorX`, and `visual.portrait.centerX` centres a portrait crop by hand.
+A fighter whose art arrives before its attributes, as #0002's does, can still be added: give an attack whose art is in `pending: true` (art only: one pass of the clip, no hit; declaring combat fields on one is refused), leave out of `actions` any move it does not have (its touch button is hidden and the CPU never presses it), keep `null` for a move still to come (reserved, dashed; #0002 keeps all four so), and use `TEMPORARY_BASELINE` (Power tiers and neutral movement) for what the engine cannot build a fighter without until the real values are authored. A clip whose art misleads the automatic anchor (effects drawn beside the body, or swinging limbs that nudge it from frame to frame) can place each frame's anchor itself with `anchorX`, and `visual.portrait.centerX` centres a portrait crop by hand.
 
 The tests already run a second, made-up fighter (`tests/sample-fighter.mjs`, never in the game) with different moves on the same codenames: a melee `uniqueba` usable in the air, a real `transform`, no mid-air `ba1`, a charged summon on `ba2`, no Shield. It goes through combat, the CPU, the touch buttons and the codename checks (`tests/sample-fighter.test.mjs`), so anything that only works for #0001 shows up there first. A new character is checked against the same codename rules automatically.
 

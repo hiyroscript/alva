@@ -18,9 +18,11 @@
 // A fighter whose art comes before its combat attributes (as #0002's does)
 // can still be added: an attack whose art is in is `pending` (art only, see
 // js/game/combat.js), a move it does not have at all is left out of its
-// `actions` (its touch button is hidden; #0002, with only movement and hurt
-// art so far, leaves out every one), and whatever the engine cannot build a
-// fighter without comes from TEMPORARY_BASELINE below until it is authored.
+// `actions` (its touch button is hidden), one still to come is mapped to
+// null (reserved: its button shows, dashed, and does nothing; #0002, with
+// only movement and hurt art so far, reserves all four), and whatever the
+// engine cannot build a fighter without comes from TEMPORARY_BASELINE below
+// until it is authored.
 //
 // Every field the engine reads lives here; nothing about any one fighter is
 // hard-coded in the game systems.
@@ -925,10 +927,11 @@ export const CHARACTERS = [
 
   // #0002: only its movement and hurt art is in so far (idle, run, jump,
   // fall, land, hurt and mid-air hurt). No move of its own is authored or
-  // guessed here: it has no attacks, Unique Basic Attack, Transform, Shield,
-  // Dash, charged action, projectile or effect, and its movement is
-  // TEMPORARY_BASELINE's placeholder. It moves, jumps, falls, lands and is
-  // hit like any fighter.
+  // guessed here: its Unique Basic Attack, Transform, BA1 and BA2 are
+  // reserved (every control shows, none does anything yet), and it has no
+  // attacks, Shield, Dash, charged action, projectile or effect; its
+  // movement is TEMPORARY_BASELINE's placeholder. It moves, jumps, falls,
+  // lands and is hit like any fighter.
   {
     id: '0002',
     displayName: '#0002',
@@ -1065,14 +1068,19 @@ export const CHARACTERS = [
     // No `defense`: the shared `shield` input does nothing for it (no
     // Shield art). No movement.dashSpeed: no Dash (no Dash art).
     //
-    // Control codenames -> move codenames, as for #0001, but every move is
-    // left out: #0002 has none yet, not even a reserved one, so its
-    // Unique Basic Attack, Transform, BA1 and BA2 inputs do nothing for
-    // it, the CPU never presses them and its touch controls have no button
-    // for them (see abilityPresence in js/ui/mobile-abilities.js). Each
-    // comes back here, with its art and its `attacks` entry, once
-    // authored.
-    actions: {},
+    // Control codenames -> move codenames, as for #0001. Every control is
+    // there, and every one is reserved (null): wired into input and combat,
+    // with no move yet. Its touch controls show all four buttons, dashed,
+    // under their neutral names and glyphs (see abilityPresence in
+    // js/ui/mobile-abilities.js); pressing one, on any device, does nothing
+    // and is never buffered, and the CPU never presses them. Each gets its
+    // move here, with its art and its `attacks` entry, once authored.
+    actions: {
+      uniqueba: null, // reserved: no Unique Basic Attack yet
+      transform: null, // reserved: no Transform yet
+      ba1: null, // reserved: no Basic Attack 1 yet
+      ba2: null, // reserved: no Basic Attack 2 yet
+    },
 
     // No attack of its own yet: none to start, none borrowed.
     attacks: {},

@@ -1194,7 +1194,7 @@ test('Change Stage returns to Watch Mode\'s Select Stage after a Watch battle, a
   assert.equal(current(app), 'map', 'Quick Battle\'s own Select Stage');
 });
 
-test('Quick Battle with #0002: picked from slot 02, the CPU plays it too, and its touch controls have no ability buttons', async () => {
+test('Quick Battle with #0002: picked from slot 02, the CPU plays it too, and its touch controls show every button, reserved', async () => {
   const booted = boot();
   const { app, screens } = booted;
   assert.equal(slotOf(screens.character, '0002')._index, 1, 'Select Fighter: slot 02');
@@ -1206,10 +1206,26 @@ test('Quick Battle with #0002: picked from slot 02, the CPU plays it too, and it
   assert.equal(battle.p1.sprites, battle.p2.sprites);
   const touch = screens.battle.touch;
   const abilities = ['uniqueba', 'transform', 'ba1', 'ba2'];
-  for (const action of abilities) {
-    assert.equal(touch.buttons.get(action).hidden, true, action);
-    assert.equal(touch.buttons.get(action).getAttribute('aria-label'), null, action);
+  assert.deepEqual(abilities.map((a) => [touch.buttons.get(a).hidden, touch.buttons.get(a).getAttribute('aria-label'), touch.buttons.get(a).classList.contains('is-pending')]), [
+    [false, 'Unique Basic Attack', true], [false, 'Transform', true], [false, 'Basic Attack 1', true], [false, 'Basic Attack 2', true],
+  ]);
+  // Pressed in battle, each does nothing for it.
+  const sample = app.input.sample;
+  try {
+    for (const action of abilities) {
+      app.input.sample = () => ({ [action]: true, [`${action}Pressed`]: true });
+      trace(battle, 2);
+      assert.equal(battle.p1.combat.attack, null, action);
+      assert.equal(battle.p1.bufferedAttack, null, action);
+    }
+    // The same way in, Jump does reach it.
+    app.input.sample = () => ({ jump: true, jumpPressed: true });
+    trace(battle, 2);
+    assert.equal(battle.p1.grounded, false, 'the input reaches Player 1');
+  } finally {
+    app.input.sample = sample;
   }
+  assert.deepEqual(battle.projectiles, []);
   assert.equal(touch.buttons.get('jump').hidden ?? false, false);
   assert.equal(touch.buttons.get('jump').getAttribute('aria-label'), 'Jump');
   trace(battle, 300);

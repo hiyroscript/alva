@@ -1217,14 +1217,19 @@ test('Change Fighter into and out of #0002, again and again: its own art, contro
     assert.equal(p.combat.chargedCooldowns.size, 0, 'no cooldown carried over');
     assert.equal(p.combat.launchPoint, 0);
     assert.equal(screen.session.cpu.def.id, '0001', 'the CPU stays');
-    // The same controls, refreshed: no ability button for #0002 (it has no
-    // move yet), #0001's Shuriken, Transform, Punch and Kick back for #0001.
+    // The same controls, refreshed: all four of #0002's reserved (dashed,
+    // neutral names: it has no move yet), #0001's Shuriken, Transform, Punch
+    // and Kick back for #0001.
     for (const [action, b] of buttons) assert.equal(touch.buttons.get(action), b, action);
-    const own = { uniqueba: 'Shuriken', transform: 'Transform', ba1: 'Punch', ba2: 'Kick' };
-    for (const [action, name] of Object.entries(own)) {
+    const names = {
+      '0001': { uniqueba: 'Shuriken', transform: 'Transform', ba1: 'Punch', ba2: 'Kick' },
+      '0002': { uniqueba: 'Unique Basic Attack', transform: 'Transform', ba1: 'Basic Attack 1', ba2: 'Basic Attack 2' },
+    };
+    for (const [action, name] of Object.entries(names[id])) {
       const b = touch.buttons.get(action);
-      assert.equal(b.hidden, id === '0002', `${id}: ${action} button`);
-      assert.equal(b.getAttribute('aria-label'), id === '0002' ? null : name, `${id}: ${action}`);
+      assert.equal(b.hidden, false, `${id}: ${action} button shown`);
+      assert.equal(b.getAttribute('aria-label'), name, `${id}: ${action}`);
+      assert.equal(b.classList.contains('is-pending'), id === '0002' || action === 'transform', `${id}: ${action} reserved`);
     }
     assert.equal(touch.buttons.get('jump').hidden ?? false, false, 'Jump is everyone\'s');
     assert.equal(screen.isRunning, true);

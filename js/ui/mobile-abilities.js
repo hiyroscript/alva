@@ -34,12 +34,11 @@ const RESERVED = new Set(['transform']);
 // How `def` has the ability on `action`'s button, from its `actions`:
 //
 //   'implemented'  mapped to a move: the fighter's own button
-//   'reserved'     mapped to null, or Transform with nothing of the
-//                  fighter's own to present: wired, a move still to come,
-//                  shown dashed
+//   'reserved'     mapped to null (every move of #0002's, none authored
+//                  yet), or Transform with nothing of the fighter's own to
+//                  present: wired, a move still to come, shown dashed
 //   'absent'       left out of its `actions`: a move the fighter does not
-//                  possess at all (every move of #0002's, none authored
-//                  yet), so it has no button
+//                  possess at all, so it has no button
 //
 // With no `actions` to go by (no fighter named yet) every button stays,
 // Transform reserved. A fighter that presents its own Transform (in

@@ -997,10 +997,11 @@ French, concise game terms).
   Fall (single frames held for the rise and the descent), Land (one frame,
   1/12 s on touchdown, never holding movement up), Hurt and Mid-air Hurt
   (single frames held through the stun, on the ground / in the air), all
-  its own art. It has no move yet, and none is guessed or borrowed: Unique
-  Basic Attack, Transform, BA1 and BA2 are all left out of its `actions`
-  (their inputs do nothing for it, the CPU never presses them, no touch
-  buttons) and its `attacks` are empty; no `defense` (the Shield input does
+  its own art. It has every control but no move yet, and none is guessed
+  or borrowed: Unique Basic Attack, Transform, BA1 and BA2 are all reserved
+  (`null` in its `actions`: their inputs are wired but do nothing for it,
+  the CPU never presses them, and its touch buttons show dashed under their
+  neutral names and glyphs) and its `attacks` are empty; no `defense` (the Shield input does
   nothing), no Dash, no charged actions (no CBA ring), no projectile or
   effect. Charge is only the universal stance, holding its first idle
   frame. Its Powers and movement are `TEMPORARY_BASELINE` placeholders
@@ -2427,11 +2428,12 @@ French, concise game terms).
   Tapping the timer or the pause section beneath it (top centre, 7.3) pauses.
   Original circular icons, translucent dark fill, white outlines; pressed
   buttons scale down and brighten to white — no hue.
-  A reserved button (only Transform, and only while the fighter has none)
-  uses a dashed outline and never shows nagging alerts; Shuriken, Shield,
-  Punch and Kick are solid. A button for a move the fighter does not have
-  at all (left out of its `actions`, as all four of #0002's are:
-  `abilityPresence` in `js/ui/mobile-abilities.js`) is hidden: not drawn,
+  A reserved button (Transform while the fighter presents none, or any
+  button mapped to `null`, as all four of #0002's are) uses a dashed outline
+  and never shows nagging alerts; Shuriken, Shield, Punch and Kick are
+  solid. A button for a move the fighter does not have at all (left out of
+  its `actions`: `abilityPresence` in `js/ui/mobile-abilities.js`) is
+  hidden: not drawn,
   not named, never focused and never pressed, its place left empty so no
   other button moves; the same element returns for a fighter that has it.
   The touch layout editor keeps it on show, neutral, since every fighter

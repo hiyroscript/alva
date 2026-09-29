@@ -1,9 +1,10 @@
 // Run with node --test tests/fighter-0002.test.mjs (no dependencies).
 // #0002, the second fighter: registered from CHARACTERS alone in roster
 // slot 02, its seven supplied clips (idle, run, jump, fall, land, hurt and
-// mid-air hurt) wired to its own art and read from the real PNGs, no move
-// of its own yet (no attack, Shield, Dash, Charge art, projectile or
-// effect, and none borrowed from #0001), its movement a marked temporary
+// mid-air hurt) wired to its own art and read from the real PNGs, every
+// control there but no move of its own yet (its four fighter controls
+// reserved; no attack, Shield, Dash, Charge art, projectile or effect, and
+// none borrowed from #0001), its movement a marked temporary
 // baseline and its body measured from its art, the CPU going by the same
 // data, and #0001 vs #0002 and #0002 vs #0002 fights that run. Nothing of
 // the fighter that held slot 02 before it is left. Its touch buttons are
@@ -257,8 +258,9 @@ test('no code, page or style asks for a retired file or names the old fighter', 
 
 // ---- What #0002 does not have -----------------------------------------------------------
 
-test('no move at all: every combat input left out, no attack, Shield, Dash, charged action, projectile or effect', () => {
-  assert.deepEqual(DEF.actions, {}, 'Unique Basic Attack, Transform, BA1 and BA2 all left out: not even reserved');
+test('no move yet: every control reserved, no attack, Shield, Dash, charged action, projectile or effect', () => {
+  assert.deepEqual(DEF.actions, { uniqueba: null, transform: null, ba1: null, ba2: null },
+    'Unique Basic Attack, Transform, BA1 and BA2 all there, each reserved (null)');
   assert.deepEqual(DEF.attacks, {});
   for (const key of ['defense', 'chargedActions', 'chargedTechniques', 'summons', 'projectiles', 'projectileAnimations', 'effectAnimations']) {
     assert.equal(DEF[key], undefined, key);

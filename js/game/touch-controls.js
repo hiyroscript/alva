@@ -30,9 +30,10 @@
 // button `transform` and the lower row's first two `ba1` and `ba2`: their
 // look is the fighter's own (#0001's Shuriken, Punch and Kick; see
 // setCharacter and js/ui/mobile-abilities.js), Transform shows as reserved
-// (dashed) while the fighter presents none, and a button for an ability the
-// fighter does not have at all (all four of #0002's, none authored yet) is
-// hidden, its place left empty. Shield is the universal `shield` input, held for
+// (dashed) while the fighter presents none, as does any button the fighter
+// maps to null (all four of #0002's, none authored yet), and a button for
+// an ability the fighter does not have at all is hidden, its place left
+// empty. Shield is the universal `shield` input, held for
 // as long as the pointer stays on it.
 // Only the icons and accessible names are player-facing: the input
 // codenames never change with them, so Charge + Punch is Charge + ba1 (cba1,
@@ -529,9 +530,8 @@ export class TouchControls {
   // to follow the language.
   //
   // A button whose ability the fighter does not have at all (see
-  // abilityPresence: left out of its `actions`, like every one of
-  // #0002's) is hidden: not drawn, not named, never focused and never
-  // pressed, and whatever held it is let go. Its place stays empty, so no
+  // abilityPresence: left out of its `actions`) is hidden: not drawn, not
+  // named, never focused and never pressed, and whatever held it is let go. Its place stays empty, so no
   // other button moves. The next fighter that has the ability shows the
   // very same element again. `showAbsent` keeps such a button on show in
   // its neutral look instead (the touch layout editor, whose layout every
