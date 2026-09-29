@@ -147,7 +147,8 @@ const { SettingsDialog } = await import('../js/ui/settings-dialog.js');
 const { LanguageDialog } = await import('../js/ui/language-dialog.js');
 const { TouchLayoutEditor } = await import('../js/ui/touch-layout-editor.js');
 const { ICONS } = await import('../js/ui/icons.js');
-const { CREDITS, SOURCE_0002, creditsText } = await import('../js/ui/credits.js');
+const creditsModule = await import('../js/ui/credits.js');
+const { CREDITS, creditsText } = creditsModule;
 const { CONFIG } = await import('../js/config.js');
 
 const ROOT = new URL('../', import.meta.url);
@@ -945,9 +946,7 @@ test('Help is removed from the game: no Help screen, module, section or registra
 
 test('the Home credits still roll: both copies, the second hidden, every credit unchanged in English', () => {
   const credits = creditsText();
-  assert.deepEqual(credits.map((g) => g.title), [
-    CONFIG.title, 'Original work', '#0001 sprite source', '#0002 / Slender Man', 'Rights', 'Project',
-  ]);
+  assert.deepEqual(credits.map((g) => g.title), [CONFIG.title, 'Original work', '#0001 sprite source', 'Rights', 'Project']);
   assert.equal(credits[0].lead, `Created by ${CONFIG.developer}`);
   assert.deepEqual(credits[2].lines, [
     'Original sprite material from Jump Ultimate Stars',
@@ -997,39 +996,46 @@ test('in French the credits translate but proper names stay', () => {
   assert.equal(t('credits.rights.title'), 'Rights');
 });
 
-const SLENDER_URL = 'https://www.deviantart.com/renatoooferreiraaa/art/Upgrade-Slenderman-Sprites-Jus-Sheet-By-Xmaygrrr-D-1374753835';
-const SLENDER_NAMES = [
-  'Slender Man', 'Eric Knudsen', 'Victor Surge', 'Something Awful', '2009', 'XmayGrrr',
-  'Upgrade Slenderman Sprites Jus Sheet', 'DeviantArt', 'renatoooferreiraaa',
+// Every name the fighter that held slot 02 before the current #0002 was
+// credited with, and where its sheet came from: none of it applies now.
+const RETIRED_CREDITS = [
+  'Slender', 'Eric Knudsen', 'Victor Surge', 'Something Awful', 'XmayGrrr', 'Jus Sheet', 'DeviantArt', 'renatoooferreiraaa',
 ];
 
-test('#0002 / Slender Man has his own credits group, right after #0001\'s, naming every creator and source', () => {
+test('the credits name no source for #0002: no group of its own, nothing of the old fighter\'s; #0001\'s unchanged', () => {
+  for (const language of ['en', 'fr']) {
+    setLanguage(language);
+    try {
+      const credits = creditsText();
+      assert.ok(!credits.some((g) => /0002/.test(g.title)), `${language}: no #0002 group`);
+      const text = credits.flatMap((g) => [g.title, g.lead ?? '', ...g.lines]).join('\n');
+      for (const name of RETIRED_CREDITS) assert.ok(!text.includes(name), `${language}: ${name}`);
+      assert.doesNotMatch(text, /2009/);
+    } finally {
+      setLanguage('en');
+    }
+  }
+  // Gone from the data, its source address and its translations too.
+  assert.equal('SOURCE_0002' in creditsModule, false);
+  assert.ok(!CREDITS.some((g) => g.title === 'credits.0002.title'));
+  assert.ok(!CREDITS.flatMap((g) => g.lines || []).some((line) => line?.href), 'no linked line left');
+  assert.doesNotMatch(read('js/ui/credits.js'), /deviantart|slender|0002/i);
+  assert.doesNotMatch(read('js/core/i18n.js'), /credits\.0002|slender|deviantart|XmayGrrr/i);
+  // #0001's attribution is all still there, unchanged, and the notices after it.
   const credits = creditsText();
-  const at = credits.findIndex((g) => g.title === '#0002 / Slender Man');
-  assert.equal(at, credits.findIndex((g) => g.title === '#0001 sprite source') + 1, 'right after #0001\'s');
-  const { lines } = credits[at];
-  assert.deepEqual(lines, [
-    'Character: Slender Man created by Eric Knudsen, under the pseudonym Victor Surge, on the Something Awful forums in 2009.',
-    'Sprite source: sprites by XmayGrrr',
-    'Upgrade Slenderman Sprites Jus Sheet',
-    'Source page: DeviantArt / renatoooferreiraaa',
-  ]);
-  for (const name of SLENDER_NAMES) assert.ok(lines.join(' ').includes(name), name);
-  // The roles stay apart: XmayGrrr drew the sprites; renatoooferreiraaa is
-  // only the DeviantArt account the page is on.
-  assert.doesNotMatch(lines.join(' '), /by renatoooferreiraaa|renatoooferreiraaa's sprites/i);
-  // #0001's attribution is all still there, unchanged.
-  assert.deepEqual(credits[at - 1].lines, [
+  const at = credits.findIndex((g) => g.title === '#0001 sprite source');
+  assert.deepEqual(credits[at].lines, [
     'Original sprite material from Jump Ultimate Stars', 'The Spriters Resource', 'Source sheet uploaded by Dazz', 'Contributor: FRET',
   ]);
-  // The notices after it too.
   assert.deepEqual(credits.slice(at + 1).map((g) => g.title), ['Rights', 'Project']);
 });
 
-test('the Slender Man source page is kept in the credits data and linked, accessibly, from the Home roll', () => {
-  assert.equal(SOURCE_0002, SLENDER_URL);
-  const group = CREDITS.find((g) => g.title === 'credits.0002.title');
-  assert.deepEqual(group.lines.filter((line) => line.href), [{ label: 'credits.0002.page', href: SLENDER_URL }]);
+test('a credit line may still link to its source, accessibly, from the Home roll', () => {
+  // A linked line, added for this check only: the address is data, its
+  // label a translation key like any line's.
+  const href = 'https://example.com/source-page';
+  const group = { title: 'credits.sprites.title', lines: [{ label: 'credits.sprites.site', href }] };
+  CREDITS.splice(CREDITS.length - 2, 0, group);
   const { home, done } = boot();
   try {
     const [first, copy] = home.el.querySelectorAll('.home-credits-seq').map((seq) => seq.querySelectorAll('.home-credit-link'));
@@ -1037,11 +1043,11 @@ test('the Slender Man source page is kept in the credits data and linked, access
     assert.equal(copy.length, 1);
     for (const a of [first[0], copy[0]]) {
       assert.equal(a.tagName, 'A');
-      assert.equal(a.getAttribute('href'), SLENDER_URL);
+      assert.equal(a.getAttribute('href'), href);
       assert.equal(a.getAttribute('target'), '_blank');
       assert.equal(a.getAttribute('rel'), 'noopener noreferrer');
-      assert.equal(a.textContent, 'Source page: DeviantArt / renatoooferreiraaa', 'a descriptive name, not a bare address');
-      assert.equal(a.getAttribute('data-i18n'), 'credits.0002.page', 'it follows the language');
+      assert.equal(a.textContent, 'The Spriters Resource', 'a descriptive name, not a bare address');
+      assert.equal(a.getAttribute('data-i18n'), 'credits.sprites.site', 'it follows the language');
       assert.ok(a.parentNode.classList.contains('home-credit-line'));
     }
     assert.equal(first[0].getAttribute('tabindex'), null, 'reachable by Tab');
@@ -1049,11 +1055,11 @@ test('the Slender Man source page is kept in the credits data and linked, access
     assert.deepEqual(home.creditLinks, [first[0]]);
     setLanguage('fr');
     localizeTree(home.el);
-    assert.equal(first[0].textContent, 'Page source\u00a0: DeviantArt / renatoooferreiraaa');
-    assert.equal(first[0].getAttribute('href'), SLENDER_URL, 'the address never translates');
+    assert.equal(first[0].getAttribute('href'), href, 'the address never translates');
   } finally {
     setLanguage('en');
     done();
+    CREDITS.splice(CREDITS.indexOf(group), 1);
   }
 });
 
@@ -1067,8 +1073,8 @@ test('English and French credits keep the same structure, and French keeps every
     setLanguage('en');
   }
   assert.deepEqual(fr.map((g) => [g.lead === null, g.lines.length]), en.map((g) => [g.lead === null, g.lines.length]));
-  const at = en.findIndex((g) => g.title === '#0002 / Slender Man');
-  assert.equal(fr[at].title, '#0002 / Slender Man');
-  for (const name of SLENDER_NAMES) assert.ok(fr[at].lines.join(' ').includes(name), `fr: ${name}`);
-  assert.equal(fr[at].lines[0], 'Personnage\u00a0: Slender Man, créé par Eric Knudsen sous le pseudonyme Victor Surge, sur les forums Something Awful, en 2009.');
+  const at = en.findIndex((g) => g.title === '#0001 sprite source');
+  for (const name of ['Jump Ultimate Stars', 'The Spriters Resource', 'Dazz', 'FRET']) {
+    assert.ok(fr[at].lines.join(' ').includes(name), `fr: ${name}`);
+  }
 });

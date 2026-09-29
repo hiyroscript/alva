@@ -189,8 +189,6 @@ test('French is really French: only proper names, codes and shared words read th
     'brand.title', // ALVA
     'control.charge', // Charge
     'control.pause', // Pause
-    'credits.0002.sheet', // Upgrade Slenderman Sprites Jus Sheet
-    'credits.0002.title', // #0002 / Slender Man
     'credits.sprites.site', // The Spriters Resource
     'difficulty.brutal.name', // Brutal
     'hud.pause', // Pause
@@ -484,4 +482,13 @@ test('internal identifiers never change with the language', () => {
     assert.deepEqual(difficulty.cards.map((c) => c.getAttribute('data-difficulty')), ['easy', 'medium', 'hard', 'brutal']);
     assert.equal(CONFIG.bindings.ba1[0], 'KeyU', 'bindings untouched');
   });
+});
+
+test('no string is left for the fighter that held slot 02 before the current #0002, in either language', () => {
+  for (const language of ['en', 'fr']) {
+    const table = STRINGS[language];
+    assert.deepEqual(Object.keys(table).filter((k) => k.startsWith('credits.0002')), [], language);
+    const text = Object.values(table).filter((v) => typeof v === 'string').join('\n');
+    assert.doesNotMatch(text, /slender|Knudsen|Victor Surge|XmayGrrr|DeviantArt|renatoooferreiraaa/i, language);
+  }
 });

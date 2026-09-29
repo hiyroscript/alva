@@ -593,3 +593,36 @@ function mulberry(seed) {
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
 }
+
+// ---- Pending (art-only) attacks --------------------------------------------------
+
+// Any fighter whose art arrives before its combat attributes can give an
+// attack `pending: true` (see js/game/combat.js). No fighter uses one now;
+// here, #0001's own BA1 clip stands in for such art.
+test('a pending attack plays one pass of its clip and strikes nothing; combat fields are refused', () => {
+  const atk = createAttackDefinition({ id: 'ba1', animation: 'ba1', pending: true }, { clipDuration: 0.4 });
+  assert.equal(atk.pending, true);
+  assert.equal(atk.total, 0.4);
+  assert.deepEqual([atk.startup, atk.active, atk.recovery], [0, 0, 0.4]);
+  assert.deepEqual([atk.hitbox, atk.projectile, atk.damage, atk.baseLaunch, atk.directionalLaunch], [null, null, 0, 0, null]);
+  assert.deepEqual([atk.cooldown, atk.hitCancel], [0, null]);
+  for (const field of ['damage', 'hitbox', 'projectile', 'baseLaunch', 'directionalLaunch', 'hitstun', 'cooldown', 'hitCancel', 'startup']) {
+    const value = field === 'hitbox' ? { x: 0, y: 0, w: 1, h: 1 } : field === 'directionalLaunch' ? 'vertical' : 1;
+    assert.throws(() => createAttackDefinition({ id: 'x', animation: 'x', pending: true, [field]: value }), new RegExp(field), field);
+  }
+  // In a fight: a fighter whose BA1 is pending plays that clip once, every
+  // frame in order, and hits nothing it overlaps.
+  const artOnly = { ...def, attacks: { ...def.attacks, ba1: { animation: 'ba1', pending: true } } };
+  const d = duel({ attackerCharacter: artOnly, gap: 30 });
+  const log = recordAttack((held) => {
+    d.tick(held);
+    return d.attacker;
+  }, BA1);
+  const clip = def.animations.ba1;
+  assert.equal(log.length, Math.round(clip.frames.length / clip.fps / DT), 'one pass of the clip');
+  assert.deepEqual(sequence(log), clip.frames.map((u) => u.split('/').pop()));
+  assert.ok(log.every((s) => s.id === 'ba1' && s.phase === 'recovery'));
+  assert.deepEqual(d.events, []);
+  assert.equal(d.target.combat.launchPoint, 0);
+  assert.equal(d.target.combat.stun, 0);
+});

@@ -60,8 +60,8 @@ further; the list below is the update as it stands now.
   `hitstop` and `cooldown`, which set the combo routes.
 
 #0002's placeholder movement (`TEMPORARY_BASELINE` in the same file) is a
-copy of #0001's `movement` numbers as they were when #0002 arrived, without
-the Dash. Tuning #0001 never moves it; see [#0002](#0002-slender-man).
+copy of #0001's neutral `movement` numbers, without the attack buffer or the
+Dash. Tuning #0001 never moves it; see [#0002 replaced](#0002-replaced).
 
 **Code:** `Fighter.moveHorizontal`, `moveAttack`, `attackStartSpeed`,
 `tryDash` and `dashAsked` in `js/game/character.js`; `CombatState` and
@@ -303,7 +303,15 @@ Settings became a dialog).
   guard in `tests/combat-ai.test.mjs`
 - the Joystick layout in `tests/controls-ui.test.mjs`
 
-## #0002 (Slender Man)
+## The first #0002 (Slender Man, removed)
+
+> **Historical.** This entry describes the first #0002, which has since been
+> removed: none of its files, definition, tuning (`FPS_0002`, its anchors,
+> its 110-unit height), credits or tests remain, and the current #0002 is
+> other art (see [#0002 replaced](#0002-replaced)). The generic pieces it
+> added are still in the engine: pending attacks, absent abilities,
+> `anchorX`, `visual.portrait.centerX`, each fighter drawn at its own art
+> scale, and credit links.
 
 Not a named update (it can become one if the owner names it). Asked for as:
 add the second fighter, #0002 (Slender Man), from the supplied `0002_*`
@@ -357,6 +365,50 @@ the real PNGs, missing moves, pending attacks, animation, anchors, the
 view, CPU fights); his touch buttons in `tests/controls-ui.test.mjs`; his
 credits in `tests/settings.test.mjs`; Practice, Watch Mode and Quick Battle
 in `tests/practice-ground.test.mjs` and `tests/watch-mode.test.mjs`.
+
+## #0002 replaced
+
+Not a named update (it can become one if the owner names it). Asked for as:
+remove the #0002 above completely, then make the newly supplied art
+(uploaded as `0002_idle_1.png` and `0003_*.png`) the new #0002, with no
+#0003 left anywhere.
+
+**What it changed**
+
+- **Removed:** the first #0002's 38 PNGs, its definition, playback rates,
+  anchors, pending Basic Attacks, Shield, Charge pose, Charged BA1 effect and
+  110-unit height; its credits group, source link (`SOURCE_0002`) and
+  English and French strings; and its tests.
+- **#0002** is now the new art, in the same roster slot 02: 17 files in
+  `assets/characters/0002/` (`0002_idle_1`–`8`, `0002_run_1`–`4`,
+  `0002_jump`, `0002_fall`, `0002_land`, `0002_hurt`,
+  `0002_midairhurt`), registered as idle, run, jump, fall, land, hurt and
+  mid-air hurt. It has no move of its own: `actions: {}` and `attacks: {}`,
+  no `defense`, Dash, charged action, projectile or effect, so its four
+  fighter touch buttons are hidden. #0001 is unchanged.
+- **Temporary baseline** (`TEMPORARY_BASELINE`, `TODO #0002`) now holds only
+  the Powers' default tiers and #0001's neutral movement, without the attack
+  buffer or the Dash. The body is #0002's own, measured from its idle and
+  also marked `TODO #0002`.
+- **Size:** drawn at #0001's size per art pixel, 66 units tall.
+- **Credits:** no #0002 group: no source was supplied for the new art.
+
+**Where to tune it** (`js/data/characters.js`, #0002)
+
+- Each clip's `fps` (idle 8; run 12, with `minSpeedScale` 0.6; land 12,
+  which is also how long the land state lasts), `heightRatio` and `anchorX`.
+- `visual.height` (`IDLE_ART_0002 * WORLD_PER_ART_0001`, 66) and
+  `visual.portrait`.
+- `collider`, `pushbox`, `hurtboxes` and `TEMPORARY_BASELINE`: placeholders
+  until its own are authored.
+
+**Tests:** `tests/fighter-0002.test.mjs` (registration, the real PNGs, the
+missing moves, animation at runtime, anchors, body, the view, CPU fights);
+its touch buttons in `tests/controls-ui.test.mjs`; the credits in
+`tests/settings.test.mjs` and `tests/i18n.test.mjs`; Practice, Watch Mode
+and Quick Battle in `tests/practice-ground.test.mjs` and
+`tests/watch-mode.test.mjs`; pending attacks, which no fighter uses now, in
+`tests/basic-attack.test.mjs`.
 
 ## Control and move codenames
 
