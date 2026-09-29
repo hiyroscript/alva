@@ -1,1575 +1,438 @@
-Work directly in the existing hiyroscript/alva repository on the current main codebase.
+Work directly in the hiyroscript/alva repository.
 
-Implement #0002’s Charged Basic Attack 1 (cba1).
+Objective
 
-Before making changes, inspect the current implementation and preserve ALVA’s existing architecture, fixed-step determinism, data-driven fighters, combat/launch rules, sprite normalization, stage collision, AI, Practice Ground, Quick Battle, Watch Mode, accessibility, debug tools, tests, and documentation conventions.
+Completely remove the existing fighter currently known as #0002 from the game, including its Slender Man-specific implementation and assets.
 
-Do not redesign unrelated systems.
+Then promote the new fighter whose files currently use the 0003 prefix into the freed #0002 slot.
 
-Goal
+There must be no playable #0003 after this change. The new fighter is #0002 everywhere: runtime ID, display name, asset directory, filenames, tests, references, and documentation where those references describe the active fighter.
 
-When #0002 is already holding Charge and presses BA1, he performs CBA1.
+Do not alter #0001 except where a generic comment/test/docs sentence must be updated because the roster no longer contains the old #0002.
 
-CBA1 is a two-portal capture/relocation attack:
+Important current repository state
 
-1. A black portal opens on the closest valid stage surface next to the enemy.
-2. Pale hands emerge from that portal and take the enemy.
-3. That first capture deals:
-    * damage: 5
-    * baseLaunch: 0
-    * directionalLaunch: null
-4. The enemy is pulled fully into the portal.
-5. The first portal closes.
-6. A second portal opens directly in front of #0002.
-7. The captured enemy comes out of the second portal.
-8. The release hit deals:
-    * damage: 10
-    * baseLaunch: 1
-    * directionalLaunch: 'vertical'
-9. The portal closes.
-10. CBA1 has a 5-second cooldown.
+The existing old #0002 is a fully implemented Slender Man fighter.
 
-Use the existing 0002_cba1_1.png through 0002_cba1_6.png artwork.
+Its current implementation includes:
 
-Do not add a CBA2 or Unique Basic Attack to #0002.
+* id: '0002'
+* display name #0002
+* character definition in js/data/characters.js
+* sprite assets in assets/characters/0002/
+* Slender Man credits and source attribution
+* i18n strings
+* tests such as tests/fighter-0002.test.mjs
+* references throughout controls, practice, watch mode, docs, comments, etc.
+* old #0002-specific animations, attacks, shields, effects, baseline values and related constants/helpers
 
-⸻
+The new fighter is not yet registered.
 
-1. Existing #0002 state to preserve
+Its loose root files are currently:
 
-Current #0002 already has this effect art registered in js/data/characters.js:
+* 0002_idle_1.png
+* 0003_idle_2.png
+* 0003_idle_3.png
+* 0003_idle_4.png
+* 0003_idle_5.png
+* 0003_idle_6.png
+* 0003_idle_7.png
+* 0003_idle_8.png
+* 0003_run_1.png
+* 0003_run_2.png
+* 0003_run_3.png
+* 0003_run_4.png
+* 0003_jump.png
+* 0003_fall.png
+* 0003_land.png
+* 0003_hurt.png
+* 0003_midairhurt.png
 
-effectAnimations: {
-  cba1: {
-    frames: numbered(BASE_0002, 'cba1', 6),
-    fps: FPS_0002.cba1,
-    loop: false,
-    sourceFacing: 0,
-  },
-},
+Treat 0002_idle_1.png as frame 1 of this same new fighter’s idle animation. It is not part of the old Slender Man implementation.
 
-This is correct.
+The new fighter therefore currently has these animation families:
 
-The artwork is a portal/shadow pool with pale hands and is not a fighter pose.
+* Idle: 8 frames
+* Run: 4 frames
+* Jump: 1 frame
+* Fall: 1 frame
+* Land: 1 frame
+* Hurt: 1 frame
+* Mid-air Hurt: 1 frame
 
-Keep it as an effect animation.
+No attack, shield, charge, projectile, transformation, unique attack, dash, or other fighter-specific art has been supplied for the new fighter yet.
 
-Do not move the CBA1 frames into animations.
+Phase 1 — remove the old #0002 completely
 
-Do not mirror the effect. sourceFacing: 0 should remain direction-neutral.
+Delete the old Slender Man fighter implementation.
 
-Currently #0002 has no chargedActions.
+This means removing all old assets currently inside:
 
-That changes for BA1 only:
+assets/characters/0002/
 
-chargedActions: {
-  ba1: { type: '<new generic type>', id: 'cba1' },
-},
+Do not preserve any of the old Slender Man PNG files simply because the replacement fighter will reuse the 0002 directory name. The contents must be replaced by the new art only.
 
-Do not add:
+Remove all old #0002-specific code that exists solely to support that fighter, including as applicable:
 
-chargedActions.ba2
+* old BASE_0002 assumptions
+* old FPS_0002
+* old Slender Man-specific animation registration
+* old attack definitions
+* old charged/basic attack definitions
+* old shield setup
+* old effect animation registration
+* old move names
+* old mobile ability presentation data
+* old source-facing/anchor overrides that only belonged to Slender Man
+* old Slender Man-specific collider/hurtbox/visual tuning where it is no longer appropriate
+* old source-credit constants such as SOURCE_0002
+* Slender Man credit groups
+* Slender Man i18n strings
+* Slender Man-specific comments
+* Slender Man-specific tests
 
-#0002 must still have no CBA2.
+Do not blindly delete generic engine infrastructure that was originally added while implementing #0002 if that infrastructure is also used by #0001 or is a legitimate generic feature of the engine.
 
-⸻
+The distinction is:
 
-2. Do not implement this as a clone summon
+* delete fighter-specific data and assumptions;
+* retain reusable game-engine capabilities.
 
-Do not reuse js/game/clone.js.
+For example, generic support for per-character animations, pending actions, sprite anchoring, UI fighter selection, etc. should remain if they are part of the architecture rather than Slender Man-only behavior.
 
-This ability is not a clone:
+Phase 2 — rename the new #0003 art to #0002
 
-* no temporary fighter body appears;
-* no copy of #0002 attacks;
-* no clone hurtbox/hitbox;
-* no clone facing;
-* no clone walk/fall;
-* the effect is placed on arbitrary stage surfaces;
-* it binds and relocates the real opponent.
+Move the loose replacement PNG files into:
 
-Keep #0001’s Clone Attack implementation unchanged.
+assets/characters/0002/
 
-⸻
+Rename every 0003_ filename to 0002_.
 
-3. Do not force it into the existing Sphere Rush runtime
+Final replacement asset names should be exactly:
 
-Do not twist js/game/charged-technique.js into a pile of #0002-specific portal branches.
+* assets/characters/0002/0002_idle_1.png
+* assets/characters/0002/0002_idle_2.png
+* assets/characters/0002/0002_idle_3.png
+* assets/characters/0002/0002_idle_4.png
+* assets/characters/0002/0002_idle_5.png
+* assets/characters/0002/0002_idle_6.png
+* assets/characters/0002/0002_idle_7.png
+* assets/characters/0002/0002_idle_8.png
+* assets/characters/0002/0002_run_1.png
+* assets/characters/0002/0002_run_2.png
+* assets/characters/0002/0002_run_3.png
+* assets/characters/0002/0002_run_4.png
+* assets/characters/0002/0002_jump.png
+* assets/characters/0002/0002_fall.png
+* assets/characters/0002/0002_land.png
+* assets/characters/0002/0002_hurt.png
+* assets/characters/0002/0002_midairhurt.png
 
-The current ChargedTechnique runtime is specialized around #0001’s fighter-owned Sphere Rush:
+There must be no replacement-character PNG left at repository root after the migration.
 
-* form;
-* dash;
-* sphere contact;
-* confirm;
-* wait;
-* explosion;
-* release.
+There must be no remaining 0003_*.png files.
 
-#0002’s CBA1 has a fundamentally different lifecycle and spatial ownership.
+There must be no old Slender Man PNG left in assets/characters/0002/.
 
-Add a small generic charged-action type/runtime specifically suitable for remote capture/relocation effects.
+Phase 3 — make the new fighter the actual #0002
 
-A reasonable architecture would be something like:
+Update js/data/characters.js so the replacement fighter is registered as:
 
-js/game/portal-technique.js
+* id: '0002'
+* displayName: '#0002'
+* available in the same roster position formerly occupied by #0002
 
-with generic names such as:
+Use the new sprite filenames above.
 
-createPortalTechniqueDefinition(...)
-portalTechniqueProblem(...)
-PortalTechnique
+Register only animations for which art actually exists.
 
-The exact filename/class names may differ if a cleaner design fits the repo.
+Required animations:
 
-The important requirement is that Fighter.tryChargedAction() remains generic and dispatches by the charged-action descriptor type.
+Idle
 
-For example:
+Frames:
 
-chargedActions: {
-  ba1: { type: 'portal', id: 'cba1' },
-},
+0002_idle_1.png through 0002_idle_8.png
 
-Do not check:
+Loop continuously.
 
-if (this.def.id === '0002')
+Choose a sensible idle FPS after inspecting the frames. Do not inherit Slender Man’s old FPS automatically.
 
-inside Fighter, Arena, CombatSystem, or the new runtime.
+Run
 
-⸻
+Frames:
 
-4. Charged-action dispatch
+0002_run_1.png through 0002_run_4.png
 
-Extend Fighter’s current charged action handling so it recognizes the new type alongside:
+Loop continuously.
 
-summon
-technique
+Use sensible run timing after inspecting the art. The animation should respond naturally to fighter movement if the existing engine supports speed-scaled run playback.
 
-Conceptually:
+Jump
 
-summon     → existing clone request
-technique  → existing ChargedTechnique
-portal     → new portal runtime
+Single frame:
 
-The CBA1 input rule must remain ALVA’s standard rule:
+0002_jump.png
 
-* Charge must already have been active from an earlier step;
-* Charge remains held;
-* BA1 receives a fresh press edge.
+Use while ascending.
 
-A fresh simultaneous Charge + BA1 must remain ordinary BA1, as with the existing charged-action rules.
+Fall
 
-When the portal action successfully starts:
+Single frame:
 
-* consume the BA1 press;
-* start cba1’s 5-second charged cooldown immediately;
-* do not start normal BA1;
-* do not create combat.attack;
-* lock the CBA1 performer appropriately for the move’s startup/lifecycle.
+0002_fall.png
 
-A press while CBA1 is cooling down must follow the same generic charged-action semantics as other charged moves.
+Use while descending.
 
-Do not create a second cooldown system.
+Land
 
-Use:
+Single frame:
 
-fighter.combat.chargedCooldowns
+0002_land.png
 
-so the existing CBA1 HUD ring works automatically.
+Use for the normal touchdown/landing state.
 
-⸻
+Keep the land state short so a single-frame landing pose does not make movement feel unresponsive.
 
-5. Character data
+Hurt
 
-Add a dedicated #0002 CBA1 definition in js/data/characters.js.
+Single frame:
 
-For example conceptually:
+0002_hurt.png
 
-chargedActions: {
-  ba1: { type: 'portal', id: 'cba1' },
-},
-portalTechniques: {
-  cba1: {
-    effect: 'cba1',
-    cooldown: 5,
-    captureHit: {
-      damage: 5,
-      baseLaunch: 0,
-      directionalLaunch: null,
-      ...
-    },
-    releaseHit: {
-      damage: 10,
-      baseLaunch: 1,
-      directionalLaunch: 'vertical',
-      ...
-    },
-  },
-},
+Use for grounded hitstun.
 
-Names can differ, but keep the data declarative.
+Mid-air Hurt
 
-The definition should describe:
+Single frame:
 
-* effect animation key;
-* cooldown;
-* first/capture hit;
-* second/release hit;
-* portal placement spacing;
-* target positioning relative to the portal;
-* exit positioning relative to #0002;
-* phase timing where needed.
+0002_midairhurt.png
 
-Do not hard-code those values in the runtime where they are clearly fighter data.
+Use during airborne hitstun.
 
-⸻
+Unsupported animations/actions
 
-6. Damage and launch rules
+Do not point unsupported states at nonexistent files.
 
-Both damage events must go through the existing CombatSystem.applyHit() path.
+Do not invent asset filenames.
 
-Do not directly mutate Launch Point.
+Do not reuse old Slender Man attacks or old Slender Man art.
 
-First hit — capture
+The replacement fighter currently does not have supplied art for:
 
-Exactly:
+* BA1
+* mid-air BA1
+* charged BA1
+* BA2
+* mid-air BA2
+* charged BA2
+* Unique Basic Attack
+* Transform
+* Shield
+* mid-air shield
+* Charge
+* Dash
+* projectiles
+* fighter-specific effects
 
-damage: 5
-baseLaunch: 0
-directionalLaunch: null
+Handle these cleanly according to the current character architecture.
 
-This means:
+If an action can legitimately be omitted from the character’s actions map so the corresponding UI control becomes unavailable, omit it.
 
-* add 5 Launch Point;
-* no launch;
-* do not replace velocity through launch math.
+Do not expose controls that trigger missing animations or stale Slender Man behavior.
 
-This matches ALVA’s existing launch semantics.
+Do not silently inherit #0001 attacks.
 
-Do not fake “no launch” with a tiny velocity.
+Do not leave the replacement fighter capable of executing old #0002 attacks.
 
-Use actual Base Launch 0 / Directional Launch null.
+The fighter should be playable for movement/jumping and able to enter hurt states even while its combat moves are not authored.
 
-Second hit — release
+If the engine requires baseline movement/collider/power fields to construct a fighter, provide only the minimal temporary baseline necessary, clearly marked as temporary for the new #0002.
 
-Exactly:
+Do not keep Slender Man-specific proportions or tuning just because they previously lived under TEMPORARY_BASELINE.
 
-damage: 10
-baseLaunch: 1
-directionalLaunch: 'vertical'
+Inspect the new sprites and derive sensible visual sizing, collider, pushbox, and hurtboxes so the replacement’s physical body roughly matches the visible art.
 
-The normal combat pipeline must:
+Sprite sizing and anchoring
 
-1. add the 10 damage to Launch Point;
-2. calculate 1 × new Launch Point;
-3. launch vertically upward through the normal launch system.
+Inspect all replacement PNG dimensions and visible sprite bounds.
 
-Do not compute a custom upward velocity in the portal runtime.
+Ensure:
 
-Do not bypass:
+* all frames render at a consistent perceived character scale;
+* feet stay planted consistently between idle/run/land;
+* jumping and falling do not visibly jump horizontally because of differing transparent padding;
+* the sprite’s horizontal facing behaves consistently;
+* collider/hurtbox placement matches the character body rather than transparent margins.
 
-* launch reaction;
-* tumble logic;
-* launch steering;
-* launch events;
-* hit FX;
-* lethal-launch detection;
-* rebound handling.
+Use the engine’s generic sprite normalization and per-animation heightRatio/anchor capabilities where needed.
 
-⸻
+Do not add bespoke renderer hacks for #0002 unless absolutely necessary.
 
-7. Shield behavior
+Character selection and game modes
 
-The two portal hits are real hits and should respect ALVA’s normal Shield rules through CombatSystem.applyHit().
+Verify the replacement #0002 works everywhere a fighter can be selected or instantiated:
 
-Do not bypass Shield simply because this is a portal move.
+* fighter select
+* normal battle
+* #0001 vs #0002
+* #0002 vs #0001
+* #0002 vs #0002 if mirror matches are supported
+* Practice Ground
+* Watch Mode / CPU-controlled matches
+* mobile/touch UI
+* keyboard/gamepad selection flows
 
-Capture hit blocked
+Selecting #0002 must load the new sprites, never an old Slender Man image.
 
-If the target successfully Shields the capture hit:
+UI and controls
 
-* resolve the normal block/perfect-block behavior;
-* deal no Launch Point damage;
-* do not bind;
-* do not pull the target into the portal;
-* do not teleport the target;
-* do not perform the release hit;
-* end the portal action cleanly after its failed/blocked capture presentation.
+Remove any old #0002-specific ability names or icons.
 
-The 5-second cooldown remains spent because the ability was activated.
+Because the replacement currently has no authored attacks, the UI should follow the existing generic “ability absent” behavior rather than displaying Slender Man’s old abilities.
 
-Release hit
+Make sure touch controls do not leave clickable attack buttons wired to stale actions.
 
-A target that has already been captured is bound and cannot raise a new Shield during the capture.
+Do not affect #0001’s buttons, names, attacks, or icons.
 
-The release hit should still go through applyHit() for consistency, but do not add a special second Shield opportunity that does not naturally exist in the state machine.
+Credits and attribution
 
-⸻
+Remove the existing Slender Man-specific credit section and its source URL/constants unless those credits are independently required elsewhere.
 
-8. Target binding
+Remove strings such as:
 
-Use the existing:
+* #0002 / Slender Man
+* Slender Man creator attribution
+* XmayGrrr sprite attribution
+* the old DeviantArt source URL
 
-CombatState.bind(source)
-CombatState.unbind(source)
+Do not invent replacement credits unless replacement attribution already exists elsewhere in the repository or is explicitly encoded in the supplied files/context.
 
-mechanism.
+If no replacement source information exists, simply remove the obsolete fighter-specific source section rather than making one up.
 
-Once the unblocked first hit captures the enemy:
+Retain the project’s general credits and #0001 credits.
 
-target.combat.bind(portalTechnique)
+Documentation
 
-The target must then be immobilized while being taken into the portal and waiting for the exit.
+Update documentation to reflect the actual roster after the migration.
 
-During the bind:
+Audit at minimum:
 
-* no movement;
-* no attacks;
-* no jump;
-* no Dash;
-* no Shield activation;
-* no Charge;
-* no CPU input affecting the body.
+* README.md
+* ALVA_SPEC.md
+* UPDATES.md
+* CLAUDE.md only if its instructions now contain inaccurate fighter-specific wording
+* inline comments in source files
 
-Stop its velocity when capture begins:
+Remove or rewrite statements describing #0002 as Slender Man or describing old #0002 attacks/animation families.
 
-target.body.vx = 0;
-target.body.vy = 0;
+Update any “next fighter is #0003” wording as appropriate. After this change the active roster is still #0001 and #0002; #0003 remains the next unused fighter ID.
 
-Do not give the bind a fake hitstun timer.
+Do not rewrite historical changelog material unnecessarily if it is clearly describing an old historical state, but make sure current-state documentation is not misleading. If a historical entry would now cause confusion because it claims files still exist, clearly mark it as historical rather than silently describing it as current behavior.
 
-The runtime itself owns the hold and explicitly releases it.
+Tests
 
-Use the same source-token safety the existing Sphere Rush uses: the portal may only release its own bind.
+The existing tests/fighter-0002.test.mjs is strongly coupled to the old Slender Man asset list and attacks. Replace or substantially rewrite it for the new fighter.
 
-⸻
+Tests should verify at least:
 
-9. Capture portal placement
+1. getCharacter('0002') returns the new fighter definition.
+2. display name is #0002.
+3. roster slot remains the second fighter slot.
+4. idle contains exactly 8 replacement frames.
+5. run contains exactly 4 replacement frames.
+6. jump/fall/land/hurt/midairHurt point to the expected 0002_*.png files.
+7. every referenced replacement asset exists.
+8. the old Slender Man filenames are no longer referenced.
+9. unsupported attack actions are absent rather than pointing at old moves.
+10. selecting or instantiating #0002 succeeds.
+11. #0001 vs #0002 works.
+12. #0002 vs #0002 works if mirror matches are supported.
+13. Practice Ground can switch to #0002.
+14. Watch Mode can instantiate #0002.
+15. touch controls do not expose stale #0002 attacks.
+16. credits no longer identify #0002 as Slender Man.
+17. i18n tests no longer expect the old Slender Man strings.
 
-This is the central spatial requirement.
+Update related tests including, where applicable:
 
-When CBA1 starts, determine the closest valid stage collision surface next to the enemy.
+* tests/watch-mode.test.mjs
+* tests/practice-ground.test.mjs
+* tests/controls-ui.test.mjs
+* tests/settings.test.mjs
+* tests/i18n.test.mjs
 
-Eligible surfaces are:
+Do not weaken unrelated tests just to make the suite pass.
 
-* main ground/floor top;
-* one-way platform top;
-* solid top;
-* solid left wall;
-* solid right wall;
-* solid underside / roof / ceiling.
+Repository-wide stale-reference audit
 
-The portal placement must use actual StageCollision geometry.
+Before finishing, search the full repository for all of these:
 
-Do not read theme artwork.
+* 0003
+* #0003
+* 0003_
+* Slender
+* Slenderman
+* SOURCE_0002
+* old #0002 asset names such as 0002_ba1_, 0002_maba, 0002_cba, 0002_shield, 0002_charge
+* old #0002-specific move names/source references
 
-Do not hard-code:
+Evaluate every hit.
 
-Desert rock coordinates
-City building coordinates
-Practice floor coordinates
+Expected result:
 
-Do not special-case map IDs.
+* no 0003 references that refer to the replacement fighter;
+* generic documentation may still say the next unused fighter ID is 0003;
+* no active Slender Man implementation or current-state docs remain;
+* no old Slender Man PNGs remain;
+* no code path references files that were deleted.
 
-Relevant current collision data:
+Also inspect the repository root and ensure all replacement PNGs have been moved into the character directory.
 
-stage.floor
-stage.platforms
-stage.solids
+Preserve architecture
 
-stage.solids includes the main floor plus map solids.
+Do not solve this by hardcoding if (id === '0002') behavior into generic systems.
 
-One-way platforms should contribute their top face only.
+The repository deliberately keeps fighter-specific information in js/data/characters.js.
 
-Solids may contribute:
+Continue following that design.
 
-* top;
-* bottom;
-* left;
-* right.
+Prefer data changes over engine changes unless the engine genuinely cannot represent this incomplete fighter cleanly.
 
-The main floor should behave as real stage geometry, but do not place a portal on absurd hidden surfaces deep underneath the huge floor body when that face is not meaningfully the closest playable surface. Use the visible/collision-relevant faces around the fighter.
+Validation
 
-⸻
+Run the complete test suite.
 
-10. Surface representation
+Also run any repository lint/static checks if configured.
 
-Add a deterministic helper for querying nearby stage surfaces.
+Resolve all failures caused by the migration.
 
-A good API would be something like:
+Manually verify, insofar as the repository’s test/runtime setup allows:
 
-stage.closestSurfaceTo(x, y, options)
+* #0001 still renders and behaves exactly as before.
+* #0002 visibly uses the new art.
+* idle animates through all 8 frames.
+* run animates through all 4 frames.
+* jump uses jump art while rising.
+* fall uses fall art while descending.
+* land flashes the land pose on touchdown.
+* grounded damage shows hurt.
+* airborne damage shows midairhurt.
+* no missing-image requests occur.
+* no old Slender Man sprites appear anywhere.
+* no attack input triggers old #0002 logic.
 
-or a separate pure helper:
+Final response
 
-closestStageSurface(stage, point)
+When complete, report:
 
-Return enough information to orient the portal:
+1. every important file changed;
+2. all old #0002 files deleted;
+3. all 0003 files renamed/moved;
+4. the exact final replacement asset list;
+5. what temporary fighter properties were chosen for movement/collider/hurtboxes;
+6. which unsupported abilities are intentionally absent;
+7. tests/checks run and their results;
+8. any remaining generic 0003 references and why they are correct.
 
-{
-  ref,
-  kind,
-  x,
-  y,
-  normal: { x, y },
-  tangent: { x, y }
-}
-
-Examples:
-
-Ground / platform top:
-
-normal = { x: 0, y: -1 }
-
-Ceiling / roof underside:
-
-normal = { x: 0, y: 1 }
-
-Left-facing solid wall:
-
-normal = { x: -1, y: 0 }
-
-Right-facing solid wall:
-
-normal = { x: 1, y: 0 }
-
-Use the closest point on each finite surface segment, not merely the rectangle’s center.
-
-Distance should therefore be from the opponent’s body center to the nearest point on that face.
-
-This prevents a long platform from losing to a shorter but actually farther object merely because its center is farther away.
-
-⸻
-
-11. “Next to the enemy”
-
-Use the enemy’s body center as the reference:
-
-x = target.body.x
-y = target.body.y - target.body.height / 2
-
-Find the nearest valid surface point.
-
-Then offset the portal a small amount along the surface normal so its center/rim remains visually readable rather than z-fighting exactly into the terrain.
-
-The portal should look attached to the selected surface.
-
-Examples:
-
-Enemy standing on ground
-
-Usually choose the floor beneath/near them.
-
-Portal appears horizontally on the floor beside/under the target, hands rising upward.
-
-Enemy beside a wall
-
-If the wall face is closer than the floor/platform:
-
-* portal is attached vertically to the wall;
-* its visual orientation rotates to match the wall;
-* hands emerge perpendicular to the wall.
-
-Enemy underneath a solid roof
-
-If the underside is closest:
-
-* portal appears on the underside;
-* hands emerge downward.
-
-Enemy on/near a one-way platform
-
-The platform top is eligible.
-
-Its underside is not.
-
-⸻
-
-12. Deterministic surface tie-breaking
-
-Portal placement must be deterministic.
-
-When two candidate surfaces are equally distant within a tiny epsilon, use a stable priority.
-
-Use a documented ordering such as:
-
-1. the target’s current body.ground surface, if it is among the tied candidates;
-2. floor/platform/solid top;
-3. side wall facing toward the target;
-4. opposite side wall;
-5. ceiling/bottom face;
-6. stable source-array/index/id order.
-
-The exact order may vary if there is a stronger geometric rationale, but it must be explicit and tested.
-
-Do not use random selection.
-
-⸻
-
-13. Portal orientation and rendering
-
-The existing cba1 effect is direction-neutral source art.
-
-Render it rotated to lie on the selected stage surface.
-
-Do not create four rotated PNG copies.
-
-Rotate the Canvas transform at draw time.
-
-Treat the effect’s authored orientation as the baseline for a portal sitting on horizontal ground with the hands emerging upward.
-
-Then rotate according to the selected surface normal.
-
-For example conceptually:
-
-ground/top:       0°
-right wall:      ±90°
-ceiling:         180°
-left wall:       ∓90°
-
-Choose signs according to ALVA’s y-down coordinate system and verify visually.
-
-The effect should remain crisp:
-
-ctx.imageSmoothingEnabled = false
-
-where sprite/effect pixels are drawn.
-
-The portal itself should be rendered in world space and follow the camera normally.
-
-⸻
-
-14. Portal animation usage
-
-The six existing CBA1 frames show the portal forming and the hands emerging.
-
-Inspect the real frames and divide them into semantically correct phases rather than blindly replaying all six at every stage.
-
-Preferred approach:
-
-Use the sequence forward while the portal opens/captures:
-
-cba1_1
-cba1_2
-cba1_3
-cba1_4
-cba1_5
-cba1_6
-
-Use the same sequence in reverse to close:
-
-cba1_6
-cba1_5
-cba1_4
-cba1_3
-cba1_2
-cba1_1
-
-Do not duplicate reversed files on disk.
-
-The second/exit portal may use the same art:
-
-* opening forward;
-* target emerges;
-* closing reverse.
-
-The runtime should choose frame indices from the existing normalized sprites.effect('cba1').
-
-Do not create another separate effect key unless doing so meaningfully simplifies the generic runtime.
-
-⸻
-
-15. Suggested phase lifecycle
-
-Implement the move as explicit fixed-step phases.
-
-A clean lifecycle is:
-
-openCapture
-capture
-closeCapture
-openExit
-release
-closeExit
-done
-
-Exact names may differ.
-
-openCapture
-
-* snapshot the target;
-* choose the closest stage surface;
-* snapshot portal transform;
-* play CBA1 effect forward;
-* #0002 remains locked in the charged action;
-* target is still free until the capture actually connects.
-
-capture
-
-At the authored hands/contact moment:
-
-* resolve captureHit via CombatSystem.applyHit();
-* use a hit point near the portal/target for sparks/feedback.
-
-If blocked:
-
-* do not bind;
-* transition toward closing;
-* skip all relocation/release-hit phases.
-
-If hit:
-
-* bind the enemy;
-* zero its velocity;
-* begin moving/placing it into the portal.
-
-The first hit occurs exactly once.
-
-closeCapture
-
-* visually take the bound target into the portal;
-* target should become fully hidden by the time it closes;
-* first portal closes using reversed effect frames.
-
-openExit
-
-* snapshot/create the exit portal in front of #0002;
-* open it with the same forward animation;
-* target remains bound and hidden until it starts emerging.
-
-release
-
-* place the enemy at the exit portal;
-* make it visibly emerge;
-* release the bind at the correct release frame;
-* resolve releaseHit exactly once:
-
-damage: 10
-baseLaunch: 1
-directionalLaunch: 'vertical'
-
-The launch therefore sends the enemy upward.
-
-closeExit
-
-* second portal closes;
-* target is now a normal launched fighter;
-* #0002 remains locked only for the authored recovery duration.
-
-done
-
-* clear the runtime;
-* #0002 can act normally.
-
-⸻
-
-16. Enemy movement into/out of portals
-
-Do not instantly teleport the target visibly from one ordinary pose to another on a single frame.
-
-The target should visually be taken by the hands.
-
-During capture:
-
-* bind it;
-* gradually move its render/body position toward the portal along the portal normal;
-* mask or layer it so it appears to sink/be pulled into the black opening.
-
-For a floor portal, that means moving down into the portal.
-
-For a ceiling portal, moving upward.
-
-For a wall portal, moving horizontally into the wall portal.
-
-Keep this deterministic and based on the phase timer.
-
-No ragdoll.
-
-No physics integration while portal-controlled.
-
-Once fully taken:
-
-* keep it bound;
-* it may be hidden until the exit portal opens.
-
-At the exit:
-
-* move it outward along the exit portal’s normal;
-* then release and apply the vertical launch.
-
-Do not leave the target’s body in collision with arbitrary stage solids after relocation.
-
-⸻
-
-17. Exit portal placement
-
-The second portal appears in front of #0002.
-
-Use #0002’s facing at activation, snapshotted when CBA1 starts.
-
-Do not have the exit side flip halfway through if his facing later changes.
-
-Place the portal at a stable offset in front of his body.
-
-Prefer character data such as:
-
-exitOffset: { x: ..., y: ... }
-
-rather than a magic runtime number.
-
-Because the portal needs to release a real opponent safely:
-
-* choose an exit origin that gives enough room for the target collider;
-* resolve overlap with stage solids;
-* avoid placing the target inside #0002’s collider/pushbox;
-* avoid placing it inside the main floor or a wall.
-
-The target should emerge visibly in front of #0002, not behind him.
-
-If #0002 faces right, exit to his right.
-
-If he faces left, mirror the x offset.
-
-⸻
-
-18. Safe exit positioning
-
-Before releasing the target:
-
-1. calculate the intended target feet/body origin at the exit;
-2. account for its own collider width/height;
-3. resolve it against stage solids;
-4. keep it outside #0002’s pushbox;
-5. ensure it is not spawned inside a wall/roof/floor.
-
-Reuse existing collision helpers where possible.
-
-Do not introduce arbitrary map bounds clamping that prevents valid off-stage play.
-
-The portal move may release near a ledge if #0002 is near a ledge, provided the target is not embedded inside collision geometry.
-
-⸻
-
-19. What happens if there is no valid target
-
-CBA1 requires an opponent.
-
-If:
-
-* no opponent exists;
-* opponent is already lostToVoid;
-* target disappears from play before activation can begin;
-* required CBA1 effect art is missing;
-
-then CBA1 must not start.
-
-Do not spend the cooldown on a move that failed its preflight validation.
-
-Use an equivalent to existing:
-
-summonProblem()
-techniqueProblem()
-
-such as:
-
-portalTechniqueProblem(owner, def, stage)
-
-The Fighter should then fall through to normal BA1 according to the existing charged-action rule when the charged action genuinely cannot start.
-
-This is important in Practice with no CPU.
-
-⸻
-
-20. Interruption rules
-
-Define interruption behavior explicitly.
-
-#0002 gets hit before capture
-
-If #0002 is hit while the capture portal is opening but before the target has been captured:
-
-* end CBA1;
-* close/remove the portal immediately or with a short presentation-safe close;
-* target remains free;
-* cooldown remains spent.
-
-#0002 gets hit after target is captured
-
-Once the target is inside/bound, do not leave it permanently bound if #0002 is interrupted.
-
-On interruption:
-
-* release the target;
-* place it safely at the current portal-related location;
-* do not apply the unreached second 10-damage hit;
-* clear portal state.
-
-Do not strand a fighter invisible, immobilized, or inside a solid.
-
-Void / respawn / reset
-
-If either participant is lost to the Void, reset, swapped in Practice, rematched, or otherwise removed:
-
-* cleanly terminate the portal technique;
-* release any bind owned by it;
-* clear visibility overrides;
-* clear portal render state;
-* do not replay pending hits after respawn.
-
-Extend Arena.detachFromPlay() generically so it also understands this new charged-action target ownership.
-
-Do not leave code that only knows how to clean up fighter.technique.
-
-⸻
-
-21. Target visibility
-
-The runtime needs an explicit way to represent a target that has been completely swallowed.
-
-Do not set:
-
-lostToVoid = true
-
-That state has scoring/respawn meaning and is unrelated.
-
-Use a presentation/gameplay field owned by the portal action, such as:
-
-portalHidden
-capturedBy
-
-or derive it from the active portal runtime.
-
-While fully inside the portal:
-
-* do not render the target sprite;
-* do not render its shadow;
-* do not show its ground marker directly over an invisible body;
-* consider whether the HUD/status should remain visible according to current ALVA status conventions.
-
-Do not remove it from Arena.inPlay; it still exists in the match and has not fallen into the Void.
-
-It must remain a valid match participant.
-
-⸻
-
-22. Hit effects and damage numbers
-
-Because both stages call CombatSystem.applyHit(), normal hit events must be emitted.
-
-That means existing systems should continue receiving:
-
-* Launch Point change;
-* hit sparks;
-* hit flash where appropriate;
-* Practice Ground damage numbers;
-* lethal launch checks on the second hit;
-* combat AI observations.
-
-Use meaningful world-space point values for both hit events:
-
-First hit
-
-Portal/target contact point.
-
-Second hit
-
-Exit portal / target center as it is released.
-
-Do not fake separate damage-number logic inside the portal runtime.
-
-⸻
-
-23. CPU/Combat AI
-
-Extend readMoveset() to understand the new charged-action type.
-
-Do not teach the AI “if fighter is #0002”.
-
-The AI should discover it from:
-
-def.chargedActions
-
-and the portal definition.
-
-For evaluation purposes, CBA1 can be represented as a remote charged hit with:
-
-* startup/lead time from the capture portal opening;
-* total damage potential of 5 + 10 = 15;
-* final Base Launch 1 vertical;
-* essentially global target reach while a valid stage surface exists near the target.
-
-Do not give it literal infinite numeric melee range.
-
-Give the charged action a capability representation that tells the AI it does not require ordinary close-range positioning.
-
-The AI should:
-
-1. decide to Charge;
-2. keep Charge held;
-3. press BA1 once;
-4. never repeatedly spam BA1 during cooldown.
-
-All difficulty profiles must continue using the same move.
-
-Difficulty changes decision quality only.
-
-⸻
-
-24. Portal placement and all existing stages
-
-Test the surface finder against actual stage geometry.
-
-At minimum:
-
-Practice Ground
-
-Only the main floor exists.
-
-CBA1 must place the capture portal on the ground near the enemy.
-
-Desert
-
-Test:
-
-* main floor;
-* top of rock-west;
-* top of rock-east;
-* sides of the rocks;
-* underside/roof faces where geometrically applicable.
-
-City
-
-Test:
-
-* rooftop/main floor;
-* all one-way platform tops;
-* solid structure tops;
-* vertical wall faces;
-* solid underside/roof faces.
-
-Do not depend on theme renderer geometry that is not collision geometry.
-
-⸻
-
-25. Portal collision surface helper tests
-
-Add direct unit tests for the closest-surface algorithm.
-
-Cover:
-
-1. point directly above ground → ground top;
-2. point directly above a one-way platform → platform top;
-3. point beside a solid → its nearest wall;
-4. point below a solid → its underside/roof;
-5. point above a solid → its top;
-6. point near a corner → correct closest face;
-7. long surface → nearest point on segment, not center;
-8. equal-distance tie → deterministic documented result;
-9. one-way platform underside is never eligible;
-10. main floor does not expose nonsensical deep hidden faces as a preferred portal location.
-
-⸻
-
-26. Cooldown
-
-Exactly:
-
-5.0 seconds
-
-Start the cooldown when the portal action is accepted.
-
-Use the standard:
-
-combat.chargedCooldowns.start('cba1', 5)
-
-or the generic equivalent through Fighter.
-
-The existing CBA1 cooldown ring under the fighter should then work automatically because the character declares:
-
-chargedActions.ba1
-
-Verify:
-
-* ring appears immediately at 5.0;
-* Charge accelerates recovery according to #0002’s existing temporary chargedCooldownRate behavior;
-* cooldown survives ordinary hits unless current global rules reset it;
-* respawn/reset clears it according to existing fighter reset rules;
-* no CBA2 ring is ever present for #0002.
-
-⸻
-
-27. Ability naming
-
-Give #0002’s CBA1 an actual presentation name only if the game architecture needs one.
-
-Prefer a concise name fitting the move, for example:
-
-Portal Capture
-
-or another neutral project-consistent name.
-
-Do not alter the universal codename:
-
-cba1
-
-The internal move is still CBA1.
-
-If adding a name:
-
-abilityNames: {
-  cba1: 'Portal Capture',
-}
-
-add corresponding localization/presentation behavior consistently with existing character ability naming.
-
-Do not add CBA2 or Unique Basic Attack names.
-
-⸻
-
-28. Debug overlay
-
-Extend the debug overlay so the portal technique is inspectable.
-
-While active, show:
-
-* capture portal anchor;
-* selected surface normal;
-* selected surface segment or a small marker;
-* target capture position;
-* exit portal position;
-* current portal phase;
-* bound target label where relevant.
-
-Use the existing charged-technique debug color or introduce one coherent charged-action color.
-
-Do not clutter normal gameplay.
-
-⸻
-
-29. Rendering order
-
-Portals must remain visible when placed on terrain.
-
-Integrate them into Arena.render() intentionally.
-
-Suggested layering:
-
-Capture portal
-
-For a portal attached to a surface:
-
-* terrain first;
-* portal black opening/effect;
-* target/hands as appropriate;
-* foreground after, unless a foreground object logically covers it.
-
-The hands should visibly overlap the captured fighter where they grab it.
-
-Exit portal
-
-The exit portal should appear behind the emerging target while the hands/rim can appear in front if needed.
-
-If necessary, split the rendering into:
-
-portal background
-fighter/captured body
-portal foreground/hands
-
-without duplicating simulation state.
-
-Do not let stage foreground completely hide the portal on ordinary playable surfaces.
-
-⸻
-
-30. Fixed-step determinism
-
-All portal phases, hits, movement, binding, relocation, cooldown, and surface selection must operate on ALVA’s fixed simulation step.
-
-Do not use:
-
-setTimeout
-requestAnimationFrame timing
-CSS transition timing
-Date.now()
-performance.now()
-
-for gameplay state.
-
-Rendering may interpolate presentation, but simulation outcomes must be identical independent of display refresh rate.
-
-⸻
-
-31. Suggested new runtime API
-
-A clean shape might be:
-
-export function createPortalTechniqueDefinition(spec) { ... }
-export function portalTechniqueProblem(owner, def, stage) { ... }
-export class PortalTechnique {
-  constructor(owner, target, def, stage) { ... }
-  update(dt, stage) { ... }
-  interrupt(reason) { ... }
-  releaseTarget() { ... }
-  get portalFrame() { ... }
-  get portalTransform() { ... }
-  get targetHidden() { ... }
-}
-
-The exact interface may differ.
-
-Keep responsibilities separated:
-
-Character definition
-
-Owns tuning/data.
-
-Portal runtime
-
-Owns move phase state, target bind and portal transforms.
-
-StageCollision/helper
-
-Owns geometry querying.
-
-CombatSystem
-
-Owns hits/damage/launch/blocking.
-
-Arena
-
-Owns shared updating/rendering and cleanup.
-
-Fighter
-
-Owns activation and cooldown dispatch.
-
-⸻
-
-32. Avoid coupling CombatSystem to portal mechanics
-
-Do not add code like:
-
-if (def.id === 'cba1' && attacker.def.id === '0002') ...
-
-to CombatSystem.applyHit().
-
-CombatSystem should only see two normal hit definitions.
-
-The portal runtime decides when to call them.
-
-CombatSystem decides what those hits do.
-
-This preserves the current invariant that combat does not special-case fighters or move IDs.
-
-⸻
-
-33. Tests — #0002 CBA1 data
-
-Add a dedicated test file such as:
-
-tests/0002-cba1.test.mjs
-
-or another name consistent with the suite.
-
-Verify:
-
-1. #0002 declares chargedActions.ba1.
-2. It maps to cba1.
-3. Its type is the new generic portal type.
-4. #0002 still has no chargedActions.ba2.
-5. CBA1 cooldown is exactly 5.
-6. CBA1 uses effectAnimations.cba1.
-7. Effect has six frames.
-8. CBA1 does not use a clone.
-9. CBA1 does not use #0001’s ChargedTechnique.
-10. CBA1 has exactly two hit definitions.
-
-⸻
-
-34. Tests — first hit
-
-Verify an unblocked capture:
-
-target Launch Point 0 → 5
-
-and event fields:
-
-damage === 5
-baseLaunch === 0
-directionalLaunch === null
-launchStrength === 0
-
-Velocity must not be changed by launch.
-
-Then verify:
-
-* target becomes bound;
-* target velocity becomes zero for capture;
-* first hit occurs exactly once.
-
-At a nonzero starting Launch Point, e.g. 120:
-
-120 → 125
-
-with still no launch.
-
-⸻
-
-35. Tests — second hit
-
-Starting from 0 before the whole move:
-
-After capture:
-
-5
-
-After release:
-
-15
-
-The release hit must report:
-
-damage === 10
-baseLaunch === 1
-directionalLaunch === 'vertical'
-launchStrength === 15
-
-and the resulting velocity must be the normal vertical launch derived from 15 Launch Point.
-
-Test from a larger initial Launch Point too.
-
-For example at 100:
-
-capture → 105
-release → 115
-launch strength → 115
-
-Do not assert a custom velocity formula outside the existing launch constants/helpers.
-
-⸻
-
-36. Tests — Shield
-
-Test ordinary Shield:
-
-* portal capture attempts first hit;
-* block event occurs;
-* damage remains 0;
-* target is not bound;
-* no relocation;
-* no second hit;
-* cooldown is spent.
-
-Test Perfect Shield under the normal defense rules too if feasible.
-
-Do not add special portal Shield logic that disagrees with applyHit().
-
-⸻
-
-37. Tests — phase lifecycle
-
-Record every fixed step and verify:
-
-openCapture
-capture
-closeCapture
-openExit
-release
-closeExit
-done
-
-or the equivalent phase names.
-
-Verify:
-
-* no double capture hit;
-* no double release hit;
-* target bound only after successful capture;
-* target unbound exactly once;
-* target hidden only while fully swallowed;
-* exit hit occurs at the authored release moment;
-* portal frames play in proper order;
-* closing sequence reverses the source frames rather than requiring duplicate files.
-
-⸻
-
-38. Tests — target relocation
-
-Test a ground capture:
-
-* initial portal near target;
-* target moves into it;
-* target becomes hidden;
-* exit portal appears in front of #0002;
-* target emerges there;
-* target is not inside #0002;
-* target is not inside terrain;
-* release launch begins from the exit location.
-
-Repeat with #0002 facing left and right.
-
-The exit must mirror correctly.
-
-⸻
-
-39. Tests — surface placement
-
-Use custom StageCollision fixtures.
-
-Test portal selection near:
-
-floor
-platform top
-solid top
-solid left wall
-solid right wall
-solid underside
-
-For every case assert:
-
-* chosen ref;
-* selected face;
-* closest point;
-* normal;
-* portal rotation.
-
-Also test a target airborne between multiple surfaces and prove the closest actual face wins.
-
-⸻
-
-40. Tests — interruptions and cleanup
-
-Cover:
-
-1. #0002 hit before capture → no target bind.
-2. #0002 hit after capture → target released safely, no second hit.
-3. target lost to Void during startup → move ends cleanly.
-4. #0002 lost to Void → target not left bound.
-5. rematch/reset → no active portal.
-6. Practice Change Fighter → no stale portal/bind.
-7. respawn → cooldown/state reset according to existing rules.
-8. missing CBA1 effect art → ability refused before cooldown is spent.
-9. no opponent → CBA1 refused and normal BA1 fallback remains possible.
-10. no duplicate hit or portal after runtime removal.
-
-⸻
-
-41. Tests — Combat AI
-
-Verify readMoveset() discovers #0002 CBA1 as a charged action.
-
-The AI must be able to:
-
-hold Charge
-press BA1
-
-to start it.
-
-Verify it never looks for:
-
-chargedActions.ba2
-uniqueba
-
-on #0002.
-
-Existing #0001 AI behavior must remain unchanged.
-
-⸻
-
-42. Tests — CBA HUD
-
-For #0002:
-
-* ready: no ring;
-* use CBA1: one CBA1 ring;
-* exactly 5.0 seconds at start;
-* no reserved CBA2 slot;
-* never show CBA2.
-
-The existing generic cbaIndicators() behavior should ideally require no #0002 special case.
-
-⸻
-
-43. Practice Ground integration
-
-Test CBA1 against the Practice CPU.
-
-The Practice damage-number system should naturally show:
-
-+5
-
-on capture and:
-
-+10
-
-on release.
-
-Do not add dedicated portal damage-number code.
-
-Test with CPU removed:
-
-* Charge + BA1 cannot portal a nonexistent target;
-* no crash;
-* no lingering CBA state.
-
-⸻
-
-44. Documentation
-
-Update relevant sections of:
-
-README.md
-ALVA_SPEC.md
-
-Document #0002 CBA1 accurately.
-
-Describe it along these lines:
-
-#0002’s Charged BA1 opens a portal on the nearest stage surface to the opponent. Hands pull the opponent inside for 5 Launch Point with Base Launch 0 and no Directional Launch. A second portal then opens in front of #0002, releasing the opponent for 10 more Launch Point with Base Launch 1 vertically. The move has a 5-second cooldown.
-
-Also document:
-
-* portals can attach to ground, one-way platform tops, solid walls, solid tops and solid undersides;
-* closest placement is derived from StageCollision;
-* the first hit can be Shielded;
-* a successful capture binds the target until release;
-* #0002 still has no CBA2;
-* #0002 still has no Unique Basic Attack.
-
-Do not rewrite unrelated documentation.
-
-⸻
-
-45. Manual verification
-
-After all automated tests pass, verify in the browser.
-
-Test #0002 CBA1 on:
-
-Practice Ground
-Desert
-City
-
-At minimum visually inspect:
-
-Ground
-
-Enemy standing on normal floor.
-
-Portal lies flat on ground; hands rise correctly.
-
-Platform
-
-Enemy on a City one-way platform.
-
-Portal aligns to the platform top.
-
-Wall
-
-Enemy close to a Desert rock or City solid wall.
-
-Portal rotates vertically and hands come outward from the wall.
-
-Roof / underside
-
-Enemy below a solid structure.
-
-Portal rotates onto the underside and hands descend from it.
-
-Exit
-
-Test #0002 facing:
-
-left
-right
-
-Exit portal always opens in front of him.
-
-Capture
-
-Confirm the opponent visibly goes into the first portal rather than simply blinking away.
-
-Release
-
-Confirm the opponent visibly comes out before being launched vertically.
-
-Pixel art
-
-* no smoothing;
-* no incorrect portal mirroring;
-* no unstable scaling;
-* no clipping that hides all six source frames;
-* rotations stay crisp.
-
-⸻
-
-46. Preserve unrelated #0002 behavior
-
-Do not change:
-
-* his ordinary pending BA1;
-* his ordinary pending MABA1;
-* his ordinary pending BA2;
-* his ordinary pending MABA2;
-* Shield implementation;
-* movement placeholder stats;
-* current sprite dimensions;
-* roster;
-* credits;
-* absent Unique Basic Attack;
-* absent CBA2.
-
-The only newly authored combat move in this task is CBA1.
-
-⸻
-
-47. Preserve #0001 exactly
-
-Regression-test:
-
-* Clone Attack CBA1;
-* Sphere Rush CBA2;
-* both 5-second cooldowns;
-* summons;
-* binds;
-* charged techniques;
-* AI;
-* CBA HUD;
-* Shield interactions;
-* launch rules.
-
-The new portal-action type must not change #0001’s data or runtime behavior.
-
-⸻
-
-Definition of done
-
-This task is complete when:
-
-* Charge + BA1 activates #0002’s CBA1;
-* activation starts one 5-second CBA1 cooldown;
-* the six existing CBA1 frames are used as portal/hands effect art;
-* the first portal appears on the mathematically closest valid stage collision surface to the opponent;
-* floor, platform top, wall, solid top, and solid underside orientations work;
-* the first hit deals exactly 5 damage/Launch Point;
-* first hit has baseLaunch: 0;
-* first hit has directionalLaunch: null;
-* an unblocked first hit binds and pulls the opponent into the portal;
-* a blocked first hit aborts capture;
-* the first portal closes;
-* a second portal opens in front of #0002;
-* the opponent visibly emerges;
-* the second hit deals exactly 10 damage/Launch Point;
-* second hit has baseLaunch: 1;
-* second hit has directionalLaunch: 'vertical';
-* its launch uses ALVA’s existing launch pipeline;
-* the target is always safely unbound after completion/interruption/reset;
-* neither participant can be left invisible or embedded in terrain;
-* #0002 still has no CBA2;
-* #0002 still has no Unique Basic Attack;
-* Combat AI understands the new move generically;
-* Practice, Quick Battle and Watch Mode work;
-* the CBA1 HUD cooldown works without fighter-specific UI code;
-* #0001 is unchanged;
-* the full automated suite passes;
-* browser verification succeeds on Practice Ground, Desert and City.
+Do not leave a half-migrated state where the old #0002 implementation and the new #0002 art coexist.
