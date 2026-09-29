@@ -908,7 +908,9 @@ test('Watch Mode with #0002: #0001 vs #0002, #0002 vs #0001 and #0002 vs #0002 l
       assert.ok(Number.isFinite(f.x) && Number.isFinite(f.y), `${label}: ${f.def.id} in the world`);
       if (f.def === DEF_0002) {
         assert.equal(f.combat.chargedCooldowns.size, 0, `${label}: no charged action`);
-        assert.ok(battle.projectiles.every((p) => p.owner !== f), `${label}: no projectile of his`);
+        assert.equal(f.combat.attack, null, `${label}: no attack of its own`);
+        assert.ok(battle.projectiles.every((p) => p.owner !== f), `${label}: no projectile of its own`);
+        assert.ok(f.animator.frame.url.startsWith('./assets/characters/0002/0002_'), `${label}: only its own art`);
       }
     }
     screens.battle.exit();
@@ -1192,7 +1194,7 @@ test('Change Stage returns to Watch Mode\'s Select Stage after a Watch battle, a
   assert.equal(current(app), 'map', 'Quick Battle\'s own Select Stage');
 });
 
-test('Quick Battle with #0002: picked from slot 02, the CPU plays him too, and his touch controls have no Unique Basic Attack', async () => {
+test('Quick Battle with #0002: picked from slot 02, the CPU plays it too, and its touch controls have no ability buttons', async () => {
   const booted = boot();
   const { app, screens } = booted;
   assert.equal(slotOf(screens.character, '0002')._index, 1, 'Select Fighter: slot 02');
@@ -1203,17 +1205,22 @@ test('Quick Battle with #0002: picked from slot 02, the CPU plays him too, and h
   assert.deepEqual([battle.p1.def.id, battle.p2.def.id], ['0002', '0002'], 'the CPU plays Player 1\'s fighter');
   assert.equal(battle.p1.sprites, battle.p2.sprites);
   const touch = screens.battle.touch;
-  assert.equal(touch.buttons.get('uniqueba').hidden, true);
-  assert.equal(touch.buttons.get('uniqueba').getAttribute('aria-label'), null);
-  assert.equal(touch.buttons.get('ba2').hidden, false);
-  assert.equal(touch.buttons.get('ba2').getAttribute('aria-label'), 'Basic Attack 2');
+  const abilities = ['uniqueba', 'transform', 'ba1', 'ba2'];
+  for (const action of abilities) {
+    assert.equal(touch.buttons.get(action).hidden, true, action);
+    assert.equal(touch.buttons.get(action).getAttribute('aria-label'), null, action);
+  }
+  assert.equal(touch.buttons.get('jump').hidden ?? false, false);
+  assert.equal(touch.buttons.get('jump').getAttribute('aria-label'), 'Jump');
   trace(battle, 300);
+  for (const f of battle.fighters) assert.ok(f.animator.frame.url.startsWith('./assets/characters/0002/0002_'), 'only its own art');
   screens.battle.exit();
-  // Back to #0001: the Shuriken button is back.
+  // Back to #0001: Shuriken, Transform, Punch and Kick are back.
   app.screens.go('home', {}, { reset: true });
   await startQuickBattle(booted, { fighter: DEF_0001 });
-  assert.equal(touch.buttons.get('uniqueba').hidden, false);
-  assert.equal(touch.buttons.get('uniqueba').getAttribute('aria-label'), 'Shuriken');
+  assert.deepEqual(abilities.map((a) => [touch.buttons.get(a).hidden, touch.buttons.get(a).getAttribute('aria-label')]), [
+    [false, 'Shuriken'], [false, 'Transform'], [false, 'Punch'], [false, 'Kick'],
+  ]);
   screens.battle.exit();
 });
 

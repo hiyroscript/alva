@@ -1197,7 +1197,7 @@ test('the touch ability icons follow Player 1\'s fighter: set on entry, refreshe
   }
 });
 
-test('Change Fighter into and out of #0002, again and again: his own art, controls and name, nothing left over', async () => {
+test('Change Fighter into and out of #0002, again and again: its own art, controls and name, nothing left over', async () => {
   const { app, screen, loads } = await enterPractice();
   const touch = screen.touch;
   const buttons = new Map(touch.buttons);
@@ -1217,28 +1217,33 @@ test('Change Fighter into and out of #0002, again and again: his own art, contro
     assert.equal(p.combat.chargedCooldowns.size, 0, 'no cooldown carried over');
     assert.equal(p.combat.launchPoint, 0);
     assert.equal(screen.session.cpu.def.id, '0001', 'the CPU stays');
-    // The same controls, refreshed: no Unique Basic Attack button for #0002, #0001's Shuriken back for #0001.
+    // The same controls, refreshed: no ability button for #0002 (it has no
+    // move yet), #0001's Shuriken, Transform, Punch and Kick back for #0001.
     for (const [action, b] of buttons) assert.equal(touch.buttons.get(action), b, action);
-    const uni = touch.buttons.get('uniqueba');
-    assert.equal(uni.hidden, id === '0002', `${id}: Unique Basic Attack button`);
-    assert.equal(uni.getAttribute('aria-label'), id === '0002' ? null : 'Shuriken');
-    assert.equal(touch.buttons.get('ba1').getAttribute('aria-label'), id === '0002' ? 'Basic Attack 1' : 'Punch');
-    assert.equal(touch.buttons.get('ba2').getAttribute('aria-label'), id === '0002' ? 'Basic Attack 2' : 'Kick');
+    const own = { uniqueba: 'Shuriken', transform: 'Transform', ba1: 'Punch', ba2: 'Kick' };
+    for (const [action, name] of Object.entries(own)) {
+      const b = touch.buttons.get(action);
+      assert.equal(b.hidden, id === '0002', `${id}: ${action} button`);
+      assert.equal(b.getAttribute('aria-label'), id === '0002' ? null : name, `${id}: ${action}`);
+    }
+    assert.equal(touch.buttons.get('jump').hidden ?? false, false, 'Jump is everyone\'s');
     assert.equal(screen.isRunning, true);
   }
-  // Playing him: Unique Basic Attack does nothing, BA1 plays his own art and hits nothing.
+  // Playing it: every combat button does nothing, and it moves and jumps on its own art.
   const p = screen.session.player;
-  input.script.push({ uniqueba: true, uniquebaPressed: true });
-  screen.session.update(DT);
-  assert.equal(p.combat.attack, null);
+  for (const action of ['uniqueba', 'transform', 'ba1', 'ba2']) {
+    input.script.push({ [action]: true, [`${action}Pressed`]: true });
+    screen.session.update(DT);
+    assert.equal(p.combat.attack, null, action);
+  }
   assert.deepEqual(screen.session.projectiles, []);
-  input.script.push({ ba1: true, ba1Pressed: true });
+  input.script.push({ jump: true, jumpPressed: true });
   screen.session.update(DT);
-  assert.equal(p.combat.attack?.def.id, 'ba1');
-  assert.ok(p.animator.frame.url.endsWith('0002_ba1_1.png'));
+  assert.equal(p.state, 'jump');
+  assert.ok(p.animator.frame.url.endsWith('/0002/0002_jump.png'));
 });
 
-test('#0002 can be the practice CPU, and #0001 can practise against him', async () => {
+test('#0002 can be the practice CPU, and #0001 can practise against it', async () => {
   const { screen } = await enterPractice();
   const cpu = await enableCpu(screen, '0002');
   assert.equal(cpu.def.id, '0002');
