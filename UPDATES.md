@@ -527,6 +527,96 @@ art in `tests/charge.test.mjs`, `tests/defense.test.mjs`,
 `tests/extra-attack.test.mjs`, `tests/clone.test.mjs` and
 `tests/attack4-sphere-rush.test.mjs`.
 
+## #0002, the speedster
+
+Not a named update (it can become one if the owner names it). Asked for
+as: add character #0002 from a supplied sprite sheet, following the
+`codename_rule` and `character_rule` files: abilities with real mechanics
+based on the character's canon, not animations with plain damage; no
+Charge; credited to the sheet's DeviantArt page; and never naming the
+character anywhere.
+
+**What it added**
+
+- **The fighter.** #0002 in roster slot 02, playable: 85 frames cut from
+  the sheet into `assets/characters/0002/` (tight 1× crops, the green
+  background made transparent, every file `0002_<codename>_<frame>.png`),
+  drawn at #0001's size per art pixel (66 units tall). Speed Power 3, a
+  1100 units/s Dash on its figure-eight art, a ground-only guard, no Land
+  clip.
+- **No Charge** (`charge: false`): Down never holds it in a stance (it
+  still fast-falls in the air, and a Dash still starts with it held), and
+  the loadout refuses Charge replacements on it. Three numbered attacks,
+  each a button with its mid-air version (U, I, O; touch slots 1 to 3),
+  plus the extra attack.
+- **Its moves**, each a mechanic: the One-Two (two strikes in one press),
+  the Homing Attack (lock on, dash, re-aim every step, spring off the
+  target with the air jump back; once per airtime), the Rapid Kicks (three
+  holding kicks and a flinging finisher; a Shield stops the flurry), the
+  Bounce Attack (plunge, spike, rebound off the ground or the target;
+  twice per airtime), the Spin Attack (a roll that carries the running
+  speed, as a smaller target, passing through what it bowls over; a Shield
+  stops it dead), the Blue Tornado (a lift that carries its target up, then
+  free fall), and the Whirlwind (a slow, piercing tornado that drags and
+  lifts its target through five strikes).
+- **Engine features they are built on, generic for any fighter:** strikes
+  (`hits`), `carry`, attack `motion` (`homing`, `bounce`, `rise`, `roll`),
+  `airUses`, `freeFall`, `passThrough`, attack `hurtboxes`, piercing
+  projectiles (`pierce`, `finisher`), `charge: false`, and a clip's
+  `anchorY` (the feet, for art that reaches below them). No motion attack
+  starts while its fighter is still flying from a launch.
+- **The CPU** plays it from the data: each attack's reach swept along its
+  motion (`attackReach`), the travel time of a moving strike before it can
+  arrive (for #0001's CPU facing it too), ledge safety for rolls and
+  plunges, the Blue Tornado to recover (fast-falling first to end a
+  launch), and no Charge for a fighter with none. Ground reach now counts a
+  roll's path for every fighter; #0001's attacks have no motion, so its
+  own play is unchanged.
+- **UI:** its touch buttons (Punch, Kick, a new Spin glyph, a new Whirlwind
+  tornado glyph), French names, and a credit group, "#0002 sprite source",
+  linked to the sheet's DeviantArt page (by the deviation's number).
+- **Roster:** the test-only fighter Test A moved from slot 02 to slot 09,
+  and only slot 03's removed fighter is still checked for absence.
+
+**Balance, measured.** Tuned from seeded CPU-vs-CPU fights against #0001
+(120 one-minute fights per level on Desert, Void falls #0001 : #0002):
+Easy 11 : 2, Medium 42 : 6, Hard 26 : 18, Brutal 14 : 10. The first cut
+was far stronger (falls about 40 : 9 at Hard), through three things now
+fixed: its launches could be cancelled by its own aerials (the no-motion-
+out-of-a-launch rule), its recovery was near endless (the Blue Tornado's
+free fall, a shorter air dash), and its sideways launchers were too
+strong for this stage's close side kill lines (the Spin Attack is Base
+Launch 1). The #0002 mirror still scores fewer Void falls than #0001's.
+
+**Where to tune it**
+
+- `js/data/characters.js`, #0002: each attack's damage, launch, timing,
+  `hits`, `motion` fields (`range`, `speed`, `rebound`, `recoil`, `exit`,
+  `fallSpeed`, `keep`, `maxSpeed`, `friction`), `airUses`, `freeFall` and
+  `cooldown`; the tornado's `speed`, `lifetime`, `carry.lift`, `pierce` and
+  `finisher`; `powers`, `movement` and the body.
+- The motion kinds' defaults: `MOTION_DEFAULTS` in `js/game/combat.js`;
+  the homing lock-on's allowance behind: `HOMING_BEHIND` in
+  `js/game/character.js`.
+
+**Code:** `createAttackDefinition` (`resolveStrikes`, `resolveMotion`),
+`attackReach`, `strikeLive`, `CombatSystem.strike` and `carry` in
+`applyHit` (`js/game/combat.js`); `startMotion`, `moveMotion`, `lockOn`,
+`aimAt`, `motionContact`, `attackContact`, `airStartBlocked`,
+`freeFall`, `canCharge`, `hurtboxes` and `passingThrough` in
+`js/game/character.js`; `pierce` / `finisher` in `js/game/projectile.js`;
+`anchorY` in `js/game/sprite-normalizer.js` and `js/ui/sprite-art.js`;
+`charge` in `loadoutProblems` (`js/data/loadout.js`); `motionFits`,
+`travelTime`, `steerHome` and `chargeOption` in `js/game/combat-ai.js`;
+`js/ui/credits.js`, `js/ui/icons.js`, `js/core/i18n.js`.
+
+**Tests:** `tests/fighter-0002.test.mjs` (the real PNGs, crops, scale and
+anchors, no Charge, every move's mechanics, the engine rules and their
+validation, the CPU); the roster, credits and translations in
+`tests/empty-roster.test.mjs`, `tests/settings.test.mjs` and
+`tests/i18n.test.mjs`; the roster screens in
+`tests/practice-ground.test.mjs` and `tests/watch-mode.test.mjs`.
+
 ## Adding a named update
 
 When a new piece of work gets a name, add a row to the table and a section in

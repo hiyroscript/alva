@@ -928,9 +928,9 @@ test('Battle never starts a fighter that is not playable: a disabled one, a remo
 }));
 
 test('Watch Mode refuses a pair with one fighter that cannot play, and Quick Battle a disabled one given directly, while others are playable', () => withTestFighters([TEST_A, TEST_DISABLED], async () => {
-  const [removed1, removed2] = REMOVED_IDS;
+  const [removed] = REMOVED_IDS;
   const off = TEST_DISABLED.id;
-  for (const [cpu1, cpu2] of [[TEST_A.id, off], [off, TEST_A.id], [TEST_A.id, removed2], [removed1, TEST_A.id]]) {
+  for (const [cpu1, cpu2] of [[TEST_A.id, off], [off, TEST_A.id], [TEST_A.id, removed], [removed, TEST_A.id]]) {
     const { screen, loads, errors } = await enterRefused({ params: { mode: 'watch', cpu1CharacterId: cpu1, cpu2CharacterId: cpu2 } });
     assert.equal(screen.battle, null, `${cpu1} vs ${cpu2}`);
     assert.deepEqual(loads, [], 'not even the playable one is loaded');

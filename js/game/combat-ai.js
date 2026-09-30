@@ -47,7 +47,7 @@
 import { range, clamp } from '../core/utils.js';
 import { COMBAT_ACTIONS } from './character.js';
 import { HELD_CONTROLS } from './fighter-controller.js';
-import { worldBox } from './combat.js';
+import { attackReach, worldBox } from './combat.js';
 import { summonProblem } from './clone.js';
 import { techniqueProblem } from './charged-technique.js';
 import { blankInput, jumpTapHold } from './fighter-controller.js';
@@ -127,7 +127,10 @@ const MOVESETS = new WeakMap();
 // Read once per fighter (and again if its definition or art changes): every
 // attack a button starts, on the ground and in the air, split into melee and
 // ranged (only the buttons in its `actions`, attack3 to attack5 included
-// where it has them); its Charge replacements, each with the button that
+// where it has them), each melee one with where its strikes can reach over
+// its own motion (`reach`, see attackReach in js/game/combat.js) and that
+// motion's kind (`motion`: a roll, a homing dash, a plunge, a lift, or
+// null); its Charge replacements, each with the button that
 // makes it (`action`); whether it has a Shield and a Dash. An action
 // mapped to null (a reserved button, like #0001's transform) is left out, as is
 // anything the fighter would refuse for missing art, so the AI never presses
@@ -150,7 +153,7 @@ export function readMoveset(f) {
         if (!proj?.animation || !sprites.projectile(proj.animation) || !(proj.speed > 0)) continue;
         ranged.push({ action, air, id, atk, proj });
       } else if (atk.hitbox) {
-        melee.push({ action, air, id, atk });
+        melee.push({ action, air, id, atk, reach: attackReach(atk), motion: atk.motion?.type ?? null });
       }
     }
   }
@@ -441,8 +444,10 @@ export class CombatAIController {
       offStage: this.offStage(self, stage),
       aggro, stageSense, lead, late, urge,
     };
-    s.foeReach = Math.max(0, ...fms.melee.map((m) => reachOf(m.atk.hitbox, s.me).hi));
-    s.myReach = Math.max(0, ...ms.melee.filter((m) => !m.air).map((m) => reachOf(m.atk.hitbox, s.fe).hi));
+    // How far each side's ground strikes reach, a roll's whole path
+    // included (an air one's lock-on range is not a threat on the ground).
+    s.foeReach = Math.max(0, ...fms.melee.map((m) => reachOf(m.air ? m.atk.hitbox : m.reach, s.me).hi));
+    s.myReach = Math.max(0, ...ms.melee.filter((m) => !m.air).map((m) => reachOf(m.reach, s.fe).hi));
     s.threats = [];
     for (const e of this.known()) {
       const t = e.kind === 'opening' ? null : this.threatOf(e, s);
@@ -506,10 +511,14 @@ export class CombatAIController {
       if (atk.hasHit || !def.hitbox) return null;
       const endIn = def.startup + def.active - atk.time;
       if (endIn <= 0) return null;
-      const box = worldBox(foe, def.hitbox, {});
+      // Where its strikes can reach: a roll's, a plunge's or a lift's path
+      // too, not just where its box is now; and one that travels to its
+      // target first arrives once it has covered the gap.
+      const box = worldBox(foe, attackReach(def), {});
       if (!overlap(box, this.myBox(s, s.x, s.y, 3))) return null;
       const from = Math.sign(foe.body.x - b.x) || foe.facing * -1;
-      return { kind: 'melee', contactIn: Math.max(0, def.startup - atk.time), endIn, box, top: box.y, from, severity: this.severity(def, s, from) };
+      const contactIn = Math.min(endIn, Math.max(0, def.startup - atk.time) + this.travelTime(foe, atk, s));
+      return { kind: 'melee', contactIn, endIn, box, top: box.y, from, severity: this.severity(def, s, from) };
     }
     if (e.kind === 'projectile') return this.projectileThreat(s, e.ref, 0);
     if (e.kind === 'clone') {
@@ -546,6 +555,26 @@ export class CombatAIController {
       return { kind: 'technique', contactIn, endIn: startIn + rushLeft + 0.05, box, top: box.y, from: -t.facing, severity: this.severity(hit, s, -t.facing) + 6 };
     }
     return null;
+  }
+
+  // How long attack `atk` of the opponent's, once under way, travels before
+  // its strike can touch this fighter: a roll or a homing dash covering the
+  // gap at its speed, a plunge or a lift the height between. 0 for one that
+  // strikes where it stands.
+  travelTime(foe, atk, s) {
+    const m = atk.def.motion;
+    if (!m) return 0;
+    const hb = atk.def.hitbox;
+    const fb = foe.body;
+    const e = s.me;
+    if (m.type === 'roll' || m.type === 'homing') {
+      const front = foe.facing > 0 ? fb.x + hb.x + hb.w : fb.x - hb.x - hb.w;
+      const gap = foe.facing > 0 ? s.x - e.hw - front : front - (s.x + e.hw);
+      const speed = m.type === 'roll' ? Math.max(Math.abs(fb.vx), m.speed) : m.speed;
+      return Math.max(0, gap) / speed;
+    }
+    if (m.type === 'bounce') return Math.max(0, s.y + e.top - (fb.y + hb.y + hb.h)) / m.fallSpeed;
+    return Math.max(0, fb.y + hb.y - (s.y + e.bottom)) / m.speed;
   }
 
   // A projectile (live, or one about to be released `delay` seconds from
@@ -722,20 +751,27 @@ export class CombatAIController {
   // error), strongest first: where each one's hitbox will be when it comes
   // out (the fighter carried by the attack's own movement: the speed it
   // keeps and its step-in), against where the opponent's motion takes it by
-  // then, as far as the level projects.
+  // then, as far as the level projects. An attack with a motion of its own
+  // is judged by where that motion takes its strikes instead (see
+  // motionFits). Never one used up until the fighter lands again.
   meleeOptions(s, air = !s.grounded) {
     const { self, foe, p } = s;
     const out = [];
     const fb = foe.body;
     const toward = Math.sign(fb.x - s.x) || s.facing;
     for (const m of s.ms.melee) {
-      if (m.air !== air || self.combat.cooldowns.has(m.id)) continue;
+      if (m.air !== air || self.combat.cooldowns.has(m.id) || self.airStartBlocked(m.atk)) continue;
       const atk = m.atk;
       const t = atk.startup;
       const lt = Math.min(t, p.lookahead);
-      const sx = s.x + attackDrift(self, atk, s.vx, t, air, toward);
       const fx = fb.x + fb.vx * lt;
       const fy = fb.grounded ? fb.y : fb.y + fb.vy * lt + 0.5 * s.g * lt * lt;
+      if (m.motion) {
+        const face = Math.sign(fx - s.x) || s.facing;
+        if (this.motionFits(m, s, fx, fy, face)) out.push({ ...m, face, value: this.hitValue(atk, s, face) });
+        continue;
+      }
+      const sx = s.x + attackDrift(self, atk, s.vx, t, air, toward);
       const face = Math.sign(fx - sx) || s.facing;
       const d = (fx - sx) * face + (this.rng() * 2 - 1) * p.rangeError;
       const dy = fy - this.ownY(s, t);
@@ -743,6 +779,32 @@ export class CombatAIController {
       out.push({ ...m, face, value: this.hitValue(atk, s, face) });
     }
     return out.sort((a, b) => b.value - a.value);
+  }
+
+  // Whether motion attack `m` would reach an opponent whose feet will be at
+  // (fx, fy), turned to `face`, and is safe to start here: a homing dash
+  // when the opponent's middle is well inside its lock-on range; a roll, a
+  // plunge or a lift when its swept reach covers the opponent (with this
+  // level's spacing error), a roll only with ground all along its path and a
+  // plunge only over ground (never into the Void).
+  motionFits(m, s, fx, fy, face) {
+    const { self, foe, p } = s;
+    const spec = m.atk.motion;
+    const err = (this.rng() * 2 - 1) * p.rangeError;
+    if (m.motion === 'homing') {
+      const myMid = this.ownY(s, m.atk.startup) - self.body.height / 2;
+      const foeMid = fy - foe.body.height / 2;
+      return Math.hypot(fx - s.x, foeMid - myMid) + err < spec.range * 0.9;
+    }
+    const d = (fx - s.x) * face + err;
+    const dy = fy - this.ownY(s, m.atk.startup);
+    if (!within(reachOf(m.reach, s.fe), d, dy)) return false;
+    if (m.motion === 'roll') return this.groundAhead(self, s.stage, face, m.reach.w - m.atk.hitbox.w);
+    if (m.motion === 'bounce') {
+      const b = self.body;
+      return !!s.stage.surfaceBelow(b.x - b.halfW, b.x + b.halfW, b.y).ref;
+    }
+    return true;
   }
 
   // What landing `hit` is worth: damage, then its launch from the Launch
@@ -891,7 +953,7 @@ export class CombatAIController {
   // cooldowns at a safe distance.
   chargeOption(s) {
     const { self, p } = s;
-    if (!s.canAct || !s.sameLevel) return null;
+    if (!self.canCharge || !s.canAct || !s.sameLevel) return null;
     const cooling = s.ms.charged.filter((c) => self.combat.chargedCooldowns.active(c.id)).length;
     const energyNeed = 1 - s.energy / self.combat.maxEnergy;
     if (!s.ms.charged.length && energyNeed <= 0) return null;
@@ -1210,10 +1272,25 @@ export class CombatAIController {
     const dx = stage.centerX - self.body.x;
     if (Math.abs(dx) > 8) held[DIR_KEY[Math.sign(dx)]] = true;
     // Falling past the stage's top with its air jump left: jump back up.
+    // With it spent, a lift (an air attack that rises, like #0002's Blue
+    // Tornado) still to use this airtime: that instead.
     const b = self.body;
-    if (!b.grounded && b.vy > 0 && b.y > stage.groundY - 40 && self.airJumps > 0 && self.combat.stun <= 0 && !this.prev.jump) {
-      held.jump = true;
+    if (b.grounded || b.vy <= 0 || b.y <= stage.groundY - 40 || self.combat.stun > 0) return;
+    if (self.airJumps > 0 && !self.freeFall) {
+      if (!this.prev.jump) held.jump = true;
+      return;
     }
+    const lift = readMoveset(self).melee.find((m) => m.air && m.motion === 'rise');
+    if (!lift || !self.canAct() || self.combat.cooldowns.has(lift.id) || this.prev[lift.action]) return;
+    if (!self.airStartBlocked(lift.atk)) {
+      held[lift.action] = true;
+      return;
+    }
+    // Still flying from the launch that sent it out here (no motion starts
+    // until it recovers), with the lift otherwise left: a fast fall ends
+    // the launch, and the lift comes on the next look.
+    const spent = self.freeFall || (lift.atk.airUses > 0 && (self.airAttacks.get(lift.id) ?? 0) >= lift.atk.airUses);
+    if (self.launch && !spent) held.charge = true;
   }
 
   // ---- Safety on every level --------------------------------------------------------

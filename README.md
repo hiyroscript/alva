@@ -6,7 +6,7 @@ JavaScript with Canvas 2D: no frameworks, no build step, no WebGL or 3D engine
 desktop and on phones and tablets in landscape.
 
 This is the first playable foundation: full menu flow, a 48-slot roster
-(with one selectable fighter today, #0001, see [Roster status](#roster-status)), two compact platform-fighter stages with open ledges and a Void kill boundary, a
+(with two selectable fighters today, #0001 and #0002, see [Roster status](#roster-status)), two compact platform-fighter stages with open ledges and a Void kill boundary, a
 Watch Mode for CPU-vs-CPU matches, a
 Practice Ground training room, a Discover reference screen, a Settings
 dialog, the whole interface in English or French, movement and platform
@@ -20,7 +20,11 @@ mid-air Shield (a slow fall in the air) on the shared Shield button, a Dash
 on a double tap (or one tap of a touch Dash button), a 100-point Energy bar
 that a Dash and every Shielded hit spend, a held Charge stance, its attack3
 (the Clone Attack, Charge + attack1) and attack4 (the Sphere Rush, Charge +
-attack2), each on its own cooldown, and
+attack2), each on its own cooldown; #0002's speedster moveset with no
+Charge at all (the One-Two, the lock-on Homing Attack, the Rapid Kicks,
+the Bounce Attack, the rolling Spin Attack, the rising Blue Tornado and the
+travelling Whirlwind, each a mechanic of its own; see
+[#0002, the speedster](#0002-the-speedster)); and
 platform-fighter scoring: every hit's damage adds to the target's Launch
 Point, which makes later launching hits send it further, and every fall into
 the Void is a point for the opponent. First to 3 points wins. Quick Battle's
@@ -66,14 +70,14 @@ in the code depends on the repository name, so no file changes are needed.
 | --- | --- | --- | --- |
 | Move left / right | `runLeft` / `runRight` | `A` `D` or `←` `→` | **Joystick:** push the joystick left / right · **Classic:** lower-left ◀ ▶ |
 | Dash | double tap of `runLeft` / `runRight`; `mouvementLeft` / `mouvementRight` on touch | Double-tap `A` / `D` or `←` / `→` | **Joystick:** one tap of **Left mouvement** / **Right mouvement** (the small ◀ ▶ above the joystick) · **Classic:** double-tap ◀ or ▶ |
-| Charge (in the air: fast fall) | `charge` | `S` or `↓` | **Joystick:** hold the down arrow left of the joystick · **Classic:** hold lower-left **C** |
+| Charge (in the air: fast fall; #0002 has no Charge, so Down only fast-falls) | `charge` | `S` or `↓` | **Joystick:** hold the down arrow left of the joystick · **Classic:** hold lower-left **C** |
 | Jump (tap: the normal jump; held a little longer: a higher jump; again in the air: air jump) | `jump` | `W`, `Space` or `↑` | Lower-right, bottom corner |
-| Extra attack (#0001: the Throw) | `extra_attack` | `J` | **Shuriken**, lower-right, top |
+| Extra attack (#0001: the Throw; #0002: the Whirlwind) | `extra_attack` | `J` | **Shuriken** / **Whirlwind**, lower-right, top |
 | Transform* | `transform` | `K` | Lower-right, middle row |
 | Shield | `shield` | `L` | **Shield**, lower-right, middle row |
 | Attack 1 | `attack1` | `U` | **Punch**, lower-right, bottom row (slot 1) |
 | Attack 2 | `attack2` | `I` | **Kick**, lower-right, bottom row (slot 2) |
-| Attack 3 (a fighter with an attack3 button) | `attack3` | `O` | Slot 3, left of Transform |
+| Attack 3 (a fighter with an attack3 button, like #0002) | `attack3` | `O` | Slot 3, left of Transform (#0002: **Spin**) |
 | Attack 4 (a fighter with an attack4 button) | `attack4` | `M` | Slot 4, top row |
 | Attack 5 (a fighter with an attack5 button) | `attack5` | `,` | Slot 5, top row |
 | Pause | `pause` | `Esc` or `P` | Timer or pause button, top centre |
@@ -86,7 +90,8 @@ D-pad down (or the stick held down) is Charge.
 
 The codenames are universal: every character has the same controls and the
 same move codenames, and only its own ability names (#0001's Shuriken,
-Punch, Kick, Clone Attack, Sphere Rush) differ. Those live in the
+Punch, Kick, Clone Attack, Sphere Rush; #0002's One-Two, Homing Attack,
+Rapid Kicks, Bounce Attack, Spin Attack, Blue Tornado, Whirlwind) differ. Those live in the
 character's `abilityNames`, keyed by move codename; `abilityName(def,
 move)` (`js/data/abilities.js`) gives a move left unnamed its neutral name,
 e.g. "Mid-air Attack 1". No screen shows them yet. A control's codename is
@@ -101,7 +106,7 @@ character's `actions`. The moves (`MOVES` in `js/config.js`):
 | Attack 1 to Attack 5 | `attack1` … `attack5` |
 | Their mid-air versions | `midair_attack1` … `midair_attack5` |
 | Extra attack | `extra_attack` (one optional special move, outside the numbered ones) |
-| Transform | `transform` (reserved: #0001 has none yet) |
+| Transform | `transform` (reserved: no fighter has one yet) |
 
 What role a numbered attack plays is the character's loadout, never its
 number (see [Attack loadouts](#attack-loadouts)). #0001 has four numbered
@@ -109,12 +114,17 @@ attacks and Charge: `attack1` and `attack2` are its buttons, and while it is
 Charging the very same buttons make `attack3` (Charge + `attack1`) and
 `attack4` (Charge + `attack2`). There are no separate charged-attack
 buttons, and #0001 has no `attack3`, `attack4` or `attack5` button: those
-keys and touch slots do nothing for it. The mouvement buttons send one-step
+keys and touch slots do nothing for it. #0002 has three numbered attacks
+and no Charge at all (`charge: false`): `attack1`, `attack2` and `attack3`
+are each a button of its own (U, I and O; touch slots 1 to 3), each with its
+mid-air version, and Down never holds it in a Charge stance (in the air it
+still fast-falls). The mouvement buttons send one-step
 requests (`mouvementLeftPressed` / `mouvementRightPressed`), never a held
 direction.
 
-\* Reserved: wired into input and combat, but inactive until #0001 has matching
-attack animations. Its touch button has a dashed outline.
+\* Reserved: wired into input and combat, but inactive until a fighter has a
+Transform move (neither #0001 nor #0002 has one yet). Its touch button has a
+dashed outline.
 
 A fighter may also lack a move altogether. A button left out of its
 `actions` (`attack3` to `attack5` for a fighter with fewer numbered
@@ -138,6 +148,9 @@ button of its own depends on Charge (`js/data/loadout.js`):
   mid-air versions needed (Charge is grounded). A fifth attack is an
   ordinary third button. With only `attack3` replaced, Charge + `attack2`
   is still `attack2`.
+- **With no Charge at all** (`charge: false`, as #0002) the fighter has no
+  Charge stance, so it can have no Charge replacements either: every
+  numbered attack is a button of its own.
 
 | Numbered attacks | Charge | Buttons (touch slots in order) | While Charging |
 | --- | --- | --- | --- |
@@ -171,8 +184,9 @@ as **A3** or **A4**. `js/data/characters.js` refuses to load a definition
 that breaks any of these rules (`loadoutProblems` names each one): fewer
 than two or more than five numbered attacks, a gap in their numbers, a
 button without its mid-air version, a replacement on another button or
-naming another attack, a move or clip that is not there, or an object not
-named after the attack that makes it.
+naming another attack, a move or clip that is not there, an object not
+named after the attack that makes it, or Charge replacements on a fighter
+with `charge: false`.
 
 ### Language
 
@@ -257,7 +271,7 @@ honeycomb round Transform and Shield in which no two buttons overlap:
 So a fighter with 3 attacks and no Charge fills slots 1–3 and one with 5
 fills all five; with Charge, `attack3` and `attack4` have no button (Charge
 + `attack1` / `attack2` on the same buttons makes them), and a fifth
-attack takes slot 3. #0001 uses slots 1 and 2 only.
+attack takes slot 3. #0001 uses slots 1 and 2 only; #0002 slots 1 to 3.
 
 The keyboard and gamepad Dash stays the double tap. Pushing the joystick
 out twice quickly is a double tap too, as with a gamepad stick.
@@ -565,7 +579,7 @@ cover them.
   rate. A restart or rematch, a new fighter in Practice Ground and every
   respawn after the Void clear them. They cost no Energy.
 - **Menus:** arrow keys or WASD to move, `Enter` to select, `Esc` to go back. Mouse and touch work too.
-- **Touch:** two layouts, Joystick (the default) and Classic Buttons (see [Mobile Controls](#mobile-controls)). Several fingers work at once (hold the joystick or Right and press Jump, or hold Charge and press Punch). The combat buttons show icons, not letters: for #0001, **Shuriken** (Throw), **Shield** (held), **Punch** (attack1) and **Kick** (attack2), beside Transform (dashed: #0001 has none yet) and Jump. Which buttons a fighter has comes from its `actions` (`abilityPresence` in `js/ui/mobile-abilities.js`), so a move it does not have (left out of `actions`) has its button hidden, unnamed and untouchable, its place left empty, while one mapped to `null` stays reserved (dashed). The touch layout editor still shows every control, so a layout can place a button for the fighters that have it. Hold Charge, then press Punch for the Clone Attack or Kick for the Sphere Rush. The icons of the fighter's own buttons (Shuriken, Punch, Kick, and Transform once a fighter has one) come from its `mobileAbilities` in `js/data/characters.js` and follow Player 1's fighter, in Practice Ground too when you change fighter; a fighter with no `transform` entry keeps the dashed, reserved Transform star. Shield, Jump and Charge are the same for everyone. Only the presentation is per fighter: the buttons always send the same control codenames (`extra_attack`, `transform`, `shield`, `attack1` … `attack5`). A fighter with more numbered attack buttons shows up to five, in fixed slots round Transform and Shield (see [Mobile Controls](#mobile-controls)); #0001 shows two, since its `attack3` and `attack4` come from Charge + Punch and Charge + Kick on the very same buttons. The combat buttons are the same elements in both layouts, in the same places: switching (`TouchControls.setScheme`) only swaps the lower-left corner (Left / C / Right, or Charge and the joystick with its Dash buttons), after letting go of everything held. Each layout can also be rearranged and resized by the player (see [Mobile Controls](#mobile-controls)); the buttons keep what they do wherever they sit. The viewport disables page zoom (`maximum-scale=1, user-scalable=no`) and the play surfaces, joystick and buttons set `touch-action: none`, so rapid taps never zoom or scroll the page.
+- **Touch:** two layouts, Joystick (the default) and Classic Buttons (see [Mobile Controls](#mobile-controls)). Several fingers work at once (hold the joystick or Right and press Jump, or hold Charge and press Punch). The combat buttons show icons, not letters: for #0001, **Shuriken** (Throw), **Shield** (held), **Punch** (attack1) and **Kick** (attack2), beside Transform (dashed: #0001 has none yet) and Jump. Which buttons a fighter has comes from its `actions` (`abilityPresence` in `js/ui/mobile-abilities.js`), so a move it does not have (left out of `actions`) has its button hidden, unnamed and untouchable, its place left empty, while one mapped to `null` stays reserved (dashed). The touch layout editor still shows every control, so a layout can place a button for the fighters that have it. Hold Charge, then press Punch for the Clone Attack or Kick for the Sphere Rush. The icons of the fighter's own buttons (Shuriken, Punch, Kick, and Transform once a fighter has one) come from its `mobileAbilities` in `js/data/characters.js` and follow Player 1's fighter, in Practice Ground too when you change fighter; a fighter with no `transform` entry keeps the dashed, reserved Transform star. Shield, Jump and Charge are the same for everyone. Only the presentation is per fighter: the buttons always send the same control codenames (`extra_attack`, `transform`, `shield`, `attack1` … `attack5`). A fighter with more numbered attack buttons shows up to five, in fixed slots round Transform and Shield (see [Mobile Controls](#mobile-controls)); #0001 shows two, since its `attack3` and `attack4` come from Charge + Punch and Charge + Kick on the very same buttons; #0002 shows three, **Punch**, **Kick** and **Spin** (its One-Two / Homing Attack, Rapid Kicks / Bounce Attack and Spin Attack / Blue Tornado), with **Whirlwind** on top. The combat buttons are the same elements in both layouts, in the same places: switching (`TouchControls.setScheme`) only swaps the lower-left corner (Left / C / Right, or Charge and the joystick with its Dash buttons), after letting go of everything held. Each layout can also be rearranged and resized by the player (see [Mobile Controls](#mobile-controls)); the buttons keep what they do wherever they sit. The viewport disables page zoom (`maximum-scale=1, user-scalable=no`) and the play surfaces, joystick and buttons set `touch-action: none`, so rapid taps never zoom or scroll the page.
 - **Gamepad (standard layout):** D-pad or left stick left / right to move (twice in a row to Dash) and down to Charge in battle (they still navigate menus), A to jump, X / Square for the extra attack (#0001's Throw), B / Circle for `attack1`, LB for `attack2`, LT, L3 and R3 for `attack3` to `attack5` (for a fighter with those buttons), Y / Triangle for the reserved Transform, RB or RT for Shield, Start to pause.
 - **Debug:** `` ` `` toggles the collider, hurtbox and attack-hitbox overlay in battle (a hitbox shows only while it can connect; hurtboxes look the same with the Shield up, and a shielding fighter is labelled `shield`; a flying shuriken's hitbox is outlined in magenta and labelled; a clone's attack hitbox shows in the attack colour, labelled `clone attack1` (or `clone midair_attack2` overhead), only on its active frame; the Sphere Rush's sphere hitbox is a dashed cyan box labelled `attack4 from attack2 dash` while it can connect, then a dashed cyan cross marks the sphere on the caught opponent, which is labelled `bound`; solids, the main floor's block among them, are outlined in red and the Void's fixed kill line is dashed violet).
 
@@ -573,13 +587,14 @@ Touch controls show on touch-first devices (coarse pointer, or a touch actually 
 
 ## Current content
 
-- **Characters:** #0001 (roster slot 01), the one playable fighter (`available: true`; see [Roster status](#roster-status)). The other 47 slots are locked
+- **Characters:** #0001 (roster slot 01) and #0002 (roster slot 02), both playable (`available: true`; see [Roster status](#roster-status)). The other 46 slots are locked
 - **Maps:** Desert (a sandstone mesa with 2 rock outcrops, 1360 units wide) and City (a rooftop with 7 one-way platforms and a stair bulkhead, 1440 wide) for Quick Battle and Watch Mode; the Practice Ground training room (one flat training block, 1280 wide) for practice. Each is a compact main stage with open air past both ledges and the Void a short way beyond (see [Stages and the Void](#stages-and-the-void))
 - **Animations:** Idle, Run, Jump, Fall, Land (jump/fall play while airborne; land plays once on touchdown), Hurt and Mid-air Hurt (shown during hitstun on the ground / in the air), attack1 (4 frames), midair_attack1 (the kunai slash, 3 frames: `0001_midair_attack1_1`–`3`), attack2 (7 frames) and midair_attack2 (the airborne kick, 5 frames: `0001_midair_attack2_1`–`5`), each played once at 12 fps, Shield (`0001_prepshield_1` to raise it, `0001_shielding_1` held, `0001_releaseshield_1` to lower it) and Mid-air Shield (`0001_midair_shielding_1`, the held pose only), single frames drawn at 1×, Dash (`0001_mouvment_1`–`2`, drawn at 1×, played once at 10 fps), Charge (charge_1 → charge_2 once, then charge_a ↔ charge_b while held, at 10 fps, with charge_1 shown briefly on release), Throw (3 fighter frames, played once at 12 fps), Shuriken (3 looping projectile frames at 18 fps, normalized and drawn separately from the fighter poses), the clone appear / vanish cloud (`0001_attack3_object_1`–`0001_attack3_object_10`, an effect at 20 fps: forwards as a clone appears, the same frames in reverse as it vanishes), the Sphere Rush poses (`0001_attack4_1`–`0001_attack4_12` as one-shot fighter clips at 12 fps: formation 1–3, rush 4–6, contact 7–8 with 8 held, explosion 9, recovery 10–12, and 12 alone as the whiff release) and its blue sphere (`0001_attack4_object_1`–`0001_attack4_object_11` as three effects at 12 fps: formation 1–6 once, spinning on the opponent 7–9 looped while it is drawn ever larger, explosion 10–11 once)
-- **Attacks:** attack1 and attack2, each on the ground and in the air, a ground Throw that releases one shuriken, the attack3 Clone Attack and the attack4 Sphere Rush (ground only), each on its own 5-second cooldown. #0001's damage: attack1 3, midair_attack1 3, attack2 5, midair_attack2 5, shuriken 1, Sphere Rush 1 as it catches the opponent and every 0.5 s after while it holds it (4 in all), then 10 on the explosion. Transform is reserved.
-- **Shield:** #0001 shields, on the ground and in the air: held, full circle, free to hold, 25 Energy for each hit it blocks. A fighter with no `defense` has no Shield: the Shield button does nothing for it.
+- **#0002's animations:** 85 frames in `assets/characters/0002/`, cut from one sprite sheet, 1× and drawn at #0001's size per art pixel: Idle (8), Run (12), the spin Jump (the ball, 8, looped), Fall (1), the Dash (the figure-eight blur, 4), Hurt and Mid-air Hurt, the ground guard, the One-Two (4), the Rapid Kicks (4, played twice), the Homing Attack, Bounce Attack and Spin Attack balls (8 each), the Blue Tornado (4, looped), the Whirlwind (9) and its travelling tornado (4, a projectile). No Land or Charge clips.
+- **Attacks:** attack1 and attack2, each on the ground and in the air, a ground Throw that releases one shuriken, the attack3 Clone Attack and the attack4 Sphere Rush (ground only), each on its own 5-second cooldown. #0002: see [#0002, the speedster](#0002-the-speedster). #0001's damage: attack1 3, midair_attack1 3, attack2 5, midair_attack2 5, shuriken 1, Sphere Rush 1 as it catches the opponent and every 0.5 s after while it holds it (4 in all), then 10 on the explosion. Transform is reserved.
+- **Shield:** #0001 shields, on the ground and in the air: held, full circle, free to hold, 25 Energy for each hit it blocks. #0002 guards on the ground only (it has no mid-air guard art; in the air the Shield button does nothing for it). A fighter with no `defense` has no Shield: the Shield button does nothing for it.
 - **Movement:** running, jumping (the normal jump on a tap, a higher jump held a little longer, one air jump), air steering, the fast fall, the air Shield's slow fall and a grounded Dash on a double tap (15 Energy); attacks keep and add their own momentum, turn with the direction held, early presses are buffered, and a hit opens a follow-up, a Dash cancel included (see Controls above).
-- **Powers:** Jump Power and Speed Power, each in three tiers. #0001 has Jump Power 2 and Speed Power 2 (its original jump and speed).
+- **Powers:** Jump Power and Speed Power, each in three tiers. #0001 has Jump Power 2 and Speed Power 2 (its original jump and speed); #0002 has Jump Power 2 and Speed Power 3 (the fastest).
 - **Launch:** every hit's damage adds to the target's Launch Point, then the hit launches at its Base Launch (0, 1, 2 or 3) × that new Launch Point, in its Directional Launch. #0001's attack1 is Base Launch 1 horizontal, its attack2 and midair_attack1 Base Launch 2 vertical, its midair_attack2 Base Launch 2 reverse vertical (downward), the Sphere Rush blast Base Launch 3 horizontal, and the shuriken and Sphere Rush ticks Base Launch 0 with no direction (they never launch).
 - **HUD:** each fighter has one compact, semi-transparent glass card, pulled in close on either side of the timer: its portrait (the character's own `visual.portrait` crop, turned to face the timer whichever way its art is drawn), one thin divider, and its name with its Launch Point beneath it, under its tag: **P1** and **CPU** in Quick Battle, **CPU 1** and **CPU 2** in Watch Mode. The right-hand card mirrors the left-hand one. In a battle three small dots under each card fill as that fighter scores its points (○ ○ ○, then ● ○ ○ ...). Over each fighter itself, following it: its bright purple Energy bar above its name tag while below full, and its A3 / A4 cooldown rings under its feet while cooling down.
 - **Modes:** Quick Battle (Splash → Home → Select Mode → Select Difficulty → Select Fighter → Select Stage → Battle): 5 minutes against a CPU that fights with the whole moveset at the difficulty you choose (Easy, Medium, Hard or Brutal; see [Quick Battle difficulty](#quick-battle-difficulty)), first to 3 points. Each time a fighter falls into the Void its opponent scores a point at once; the one that fell is out of play for 2 seconds, then back at its spawn with 0 Launch Point, full Energy and both charged abilities ready, while the fight and the timer carry on. The third point wins the match (a short **K.O.** beat, then the result; the loser does not come back). If both fall together, or one falls while the other is still waiting to come back, that fall scores nothing. If time runs out first, more points wins, then lower Launch Point; equal on both is a draw. Watch Mode (Home → Watch Mode → Select Difficulty → Select CPU 1 → Select CPU 2 → Select Stage → CPU vs CPU Battle): the same battle with the combat AI on both sides, for watching only (see [Watch Mode](#watch-mode)). Practice Ground: training on its own stage with a stand-still, non-attacking CPU dummy from the start (which you can change or disable; difficulty never applies to it), no timer, rounds or points; the Void takes a fighter out for 2 seconds, then puts it back at its spawn (below).
@@ -957,20 +972,58 @@ A launch that drives its fighter hard into stage geometry **rebounds** off it in
 
 #0001's two mid-air attacks: **midair_attack1** is the three-frame kunai slash (`0001_midair_attack1_1`–`3`) and **midair_attack2** the five-frame airborne kick (`0001_midair_attack2_1`–`5`), each with its own art, timing, hitbox, damage and stun, and each file named after the button that makes it.
 
+### #0002, the speedster
+
+#0002 is fast (Speed Power 3, quick off the mark, a 1100 units/s Dash) and
+has **no Charge** (`charge: false`): three numbered attacks, each a button
+of its own with a mid-air version, and an extra attack. Every move is a
+mechanic of its own, built on generic engine features any fighter can use
+(see [Adding a fighter](#adding-a-fighter)):
+
+| Button | On the ground | In the air |
+| --- | --- | --- |
+| `attack1` (U) | **One-Two**: two strikes in one press, the jab holding the target for the straight, which pushes it away | **Homing Attack**: a lock-on dash. It hangs for 0.15 s, then dashes at 1000 units/s at its opponent (within 240 units and not behind it), re-aimed every step; with nobody there it dashes straight ahead. A hit pops the target up and #0002 springs off it with its air jump back. Once per airtime |
+| `attack2` (I) | **Rapid Kicks**: after a 0.2 s wind-up, three kicks hold the target in place and a fourth flings it away sideways. A Shield stops the flurry at the kick it blocks | **Bounce Attack**: it plunges at 1300 units/s until it meets the ground or an opponent (which it spikes downward), and bounces back up about a jump's height, the attack over so it can bounce again. Twice per airtime |
+| `attack3` (O) | **Spin Attack**: it curls up (0.17 s), then rolls at 400 units/s plus 0.8 of the running speed it had, as a smaller target (the ball's hurtbox), rolling on through the opponent it bowls over. A Shield stops it dead and sends it back | **Blue Tornado**: spun into a tornado it rises about 175 units, carrying its target up with it, then flings it upward. Once per airtime, and it leaves #0002 in free fall (no attack or air jump until it lands) |
+| `extra_attack` (J) | **Whirlwind**: it spins up a whirlwind and sends it off as a slow tornado (260 units/s) that catches its target, dragging and lifting it through four strikes, then flings it upward on the fifth. A long cooldown (1.4 s) | — |
+
+Its Homing Attack, Bounce Attack and Blue Tornado never start while it is
+still flying from a launch: it has to recover first (an air jump, a fast
+fall or landing), so none of them can cancel a launch that carries it
+away. Its Shield is the guard on the ground only.
+
+#0002's hits:
+
+| Hit | Damage | Base Launch | Directional Launch |
+| --- | --- | --- | --- |
+| One-Two jab, then straight | 1, 2 | 0, 1 | none, horizontal |
+| Rapid Kicks (three kicks, then the finisher) | 1 each, 3 | 0, 2 | none, horizontal |
+| Homing Attack | 2 | 1 | vertical |
+| Bounce Attack | 2 | 2 | reverse vertical |
+| Spin Attack | 2 | 1 | horizontal |
+| Blue Tornado (three strikes, then the finisher) | 1 each, 2 | 0, 2 | none (carried along), vertical |
+| Whirlwind tornado (four strikes, then the finisher) | 1 each, 2 | 0, 2 | none (carried along), vertical |
+
+Its tuning came out of seeded CPU-vs-CPU fights against #0001 (120
+one-minute fights per level on Desert): at Hard and Brutal the two fall
+into the Void about as often as each other, while at Easy and Medium
+#0002's CPU still wins more (its speed and air game are harder for a slower
+CPU to answer).
+
 ### Discover
 
 **Home → Discover** opens the reference, a character-neutral explanation of Alva's mechanics. **POWER** (open by default) explains Jump Power and Speed Power, each with its three tiers. **LAUNCH** explains the launch system generically, straight from `js/data/launch.js`: Launch Point, the four Base Launch values (0 no launch, 1 normal, 2 double, 3 triple, each marked with its own number) with the formula `Launch strength = Base Launch × Launch Point`, and the four Directional Launches (none, horizontal, vertical, reverse vertical). Neither page says which fighter or attack uses a Power, tier, Base Launch or direction, and neither shows tuning numbers. **PASSIVES** is intentionally empty until Alva has passives. Arrow keys, the D-pad or the stick move between Back, the sections and the page (↑ / ↓ scroll a long page); Back, `Esc` or gamepad B returns Home.
 
 ### Roster status
 
-There is **one selectable fighter**, #0001, in roster slot 01: fully
-implemented (every sprite in `assets/characters/0001/`, its animations,
-attacks, Shield, Dash, Charge replacements, projectile and effect art,
-tuning, body, ability names, credits and the engine tests of its combat)
-and playable, its definition saying `available: true`. So it is the fighter
-preloaded at startup, Quick Battle's initial pick, both Watch Mode CPUs and
-the Practice Ground default. Disabling it again is only setting that to
-`false`: every file of it stays.
+There are **two selectable fighters**: #0001 in roster slot 01 and #0002 in
+slot 02, each fully implemented (every sprite in its own
+`assets/characters/<id>/`, its animations, attacks, Shield, Dash, projectile
+and effect art, tuning, body, ability names, credits and the engine tests of
+its combat) and playable, its definition saying `available: true`. Both are
+preloaded at startup, and #0001, the first playable one, is Quick Battle's
+initial pick, both Watch Mode CPUs and the Practice Ground default.
+Disabling either is only setting that to `false`: every file of it stays.
 
 A definition existing is not the same as it being playable.
 `getCharacter(id)` finds any definition, so the engine and its tests build
@@ -1000,7 +1053,7 @@ fighter goes through them:
   swaps a fighter or CPU that is not playable.
 
 New fighters are added through the same generic definitions (see below).
-`tests/empty-roster.test.mjs` disables #0001 for its own run to check that
+`tests/empty-roster.test.mjs` disables both for its own run to check that
 every route stays closed with no playable fighter, and reopens with one.
 
 ### Adding a fighter
@@ -1010,6 +1063,16 @@ every route stays closed with no playable fighter, and reopens with one.
 3. Give it a free `rosterSlot`.
 4. Set `available: true` once it is ready to be played (see [Roster status](#roster-status)).
 5. Optionally, name its moves in `abilityNames`, keyed by move codename (e.g. `attack4: 'Sphere Rush'`); a move it leaves out keeps its neutral name.
+
+A move can be more than a timed hitbox; each of these is data on the attack (see the schema in `js/game/combat.js`), and #0002 uses them all:
+
+- **`hits`**: a multi-hit attack lists its strikes, each live in its own window (`at`, `active`) with its own damage and launch, its box and stuns defaulting to the attack's. The attack's startup, active phase, overall box, damage and finisher follow from them. A Shield that blocks a strike stops the string.
+- **`motion`**: movement the attack makes itself: `homing` (a lock-on dash that springs off what it meets), `bounce` (a plunge that rebounds off the ground or an opponent, ending the attack), `rise` (a lift) or `roll` (a ground roll that carries the running speed). A motion attack never turns, and never starts while its fighter is still flying from a launch.
+- **`carry: { lift }`**: a hit that lands and launches nothing gives its target the velocity of what struck it, less `lift` upward.
+- **`airUses`**: how many times it may start per airtime (landing or being hit gives them back); **`freeFall: true`**: started in the air, it leaves the fighter in free fall until it lands or is hit.
+- **`passThrough: true`**: no pushbox while it plays; **`hurtboxes`**: the fighter's own replaced while it plays.
+
+A projectile may pierce (`pierce: { hits, interval }`), striking again every `interval` until its last strike, its `finisher`, and it may `carry` too. A fighter with no Charge says `charge: false`. A clip whose art reaches below the feet (a kick's trails under the standing foot) places the feet with `anchorY`, art pixels down from the top of each frame, beside `anchorX`.
 
 A fighter whose art arrives before its attributes can still be added: give an attack whose art is in `pending: true` (art only: one pass of the clip, no hit; declaring combat fields on one is refused), leave out of `actions` any button it does not have (its touch button is hidden and the CPU never presses it), and keep `null` for a `transform` still to come (reserved, dashed). Its `attack1` and `attack2` (each with its mid-air version) are always required. Its `powers` and `movement`, which the engine cannot build a fighter without, are still its own. A clip whose art misleads the automatic anchor (effects drawn beside the body, or swinging limbs that nudge it from frame to frame) can place each frame's anchor itself with `anchorX`, and `visual.portrait.centerX` centres a portrait crop by hand.
 
@@ -1065,6 +1128,9 @@ stage artwork by hiyroscript.
 
 - *Jump Ultimate Stars*
 - The Spriters Resource. Source sheet uploaded by Dazz, contributor FRET.
+
+**#0002 sprite source.** Sprite sheet by thespriteanimations on
+[DeviantArt](https://www.deviantart.com/thespriteanimations/art/Sprite-Sheet-1350194762).
 
 **Rights.** hiyroscript did not create or claim ownership of the original
 third-party character/game artwork. Original characters, games, and related

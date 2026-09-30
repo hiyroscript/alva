@@ -496,16 +496,22 @@ test('every fighter-specific string belongs to a fighter that exists, in either 
     for (const key of Object.keys(table)) {
       const owner = key.match(/^ability\.([^.]+)\./)?.[1];
       if (owner) assert.ok(ids.has(owner), `${language}: ${key} names no fighter that exists`);
-      // #0001's sprite source is the one sprite credit group.
-      assert.doesNotMatch(key, /^credits\.sprites[^.]|^credits\.\d/, `${language}: ${key}`);
+      // A sprite credit group is #0001's (credits.sprites) or another
+      // existing fighter's (credits.sprites<id>), never a removed one's.
+      const credited = key.match(/^credits\.sprites(\d{4})\./)?.[1];
+      if (credited) assert.ok(ids.has(credited), `${language}: ${key} credits no fighter that exists`);
+      assert.doesNotMatch(key, /^credits\.\d/, `${language}: ${key}`);
     }
     const text = Object.values(table).filter((v) => typeof v === 'string').join('\n');
     for (const name of text.match(/#\d{4}\b/g) ?? []) assert.ok(names.has(name), `${language}: ${name} is no fighter`);
-    assert.doesNotMatch(text, /slender|Knudsen|Victor Surge|XmayGrrr|DeviantArt|renatoooferreiraaa/i, `${language}: nothing of an older fighter`);
+    assert.doesNotMatch(text, /slender|Knudsen|Victor Surge|XmayGrrr|renatoooferreiraaa/i, `${language}: nothing of an older fighter`);
   }
-  // #0001's own strings stay: its ability names and its sprite credits.
+  // #0001's own strings stay: its ability names and its sprite credits; and
+  // #0002's are there.
   assert.equal(STRINGS.fr['ability.0001.attack1'], 'Coup de poing');
   assert.equal(STRINGS.en['credits.sprites.title'], '#0001 sprite source');
+  assert.equal(STRINGS.en['credits.sprites0002.title'], '#0002 sprite source');
+  assert.equal(STRINGS.fr['ability.0002.extra_attack'], 'Tourbillon');
 });
 
 test('the empty-roster strings read in both languages', () => {

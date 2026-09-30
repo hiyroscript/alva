@@ -275,13 +275,13 @@ test('Home → Discover opens on Power; Back returns Home', () => withTestFighte
 }));
 
 test('with no playable fighter Discover still opens from Home, and Back returns to it', () => {
-  // #0001 disabled for this test only: nothing is playable.
-  const only = CHARACTERS.find((c) => c.id === '0001');
-  only.available = false;
+  // Every shipped fighter disabled for this test only: nothing is playable.
+  const shipped = CHARACTERS.filter((c) => c.available);
+  for (const c of shipped) c.available = false;
   try {
     noFighters();
   } finally {
-    only.available = true;
+    for (const c of shipped) c.available = true;
   }
 });
 

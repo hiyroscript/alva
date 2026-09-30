@@ -13,7 +13,8 @@ export const ICONS = {
   transform: svg('<path d="M12 2.5l2.3 7.2 7.2 2.3-7.2 2.3-2.3 7.2-2.3-7.2-7.2-2.3 7.2-2.3z"/>', { fill: true }),
   // Ability glyphs for the touch combat buttons (see js/ui/mobile-abilities.js).
   // Shield is the universal `shield` button's; shuriken, punch and kick are
-  // #0001's own, picked by its mobileAbilities.
+  // #0001's own (#0002 has punch and kick too), picked by its
+  // mobileAbilities.
   shield: svg('<path d="M12 3C10 4.4 7.6 5.2 5.2 5.5Q4.4 5.6 4.4 6.4V10C4.4 15.2 7.6 18.8 12 21C16.4 18.8 19.6 15.2 19.6 10V6.4Q19.6 5.6 18.8 5.5C16.4 5.2 14 4.4 12 3Z"/>'),
   // Four hooked blades around a hole: one blade turned four times.
   shuriken: svg(
@@ -42,6 +43,11 @@ export const ICONS = {
       'C12.4 21.1 10.9 22.3 9.1 21.6Z"/>',
     { fill: true },
   ),
+  // #0002's own: its Spin Attack's ball, a spiral spinning out from the
+  // middle, and its Whirlwind's tornado, a funnel of gusts narrowing to the
+  // ground.
+  spin: svg('<path d="M12.5 12a1.5 1.5 0 0 1 3 0a3.5 3.5 0 0 1-7 0a5.5 5.5 0 0 1 11 0a7.5 7.5 0 0 1-15 0"/>'),
+  tornado: svg('<path d="M3 5h18M5 9h13.5M7.5 13h9M9.5 17h5.5M11 20.5h2.5"/>'),
   // Neutral stand-ins for a fighter that authors no mobileAbilities: a ring
   // for the large extra_attack button, and one to five pips for the numbered
   // attack buttons, attack1 to attack5.

@@ -1,11 +1,11 @@
 // Test-only fighters (imported by the *.test.mjs files; not a test file
-// itself, and never in the game). The production roster has one playable
-// fighter, #0001, so a screen test that needs more to pick, preview,
-// practise with or watch registers these for its own run: #0001's
-// definition and art (borrowed: they are not what those tests check) under
-// neutral ids, marked available (all but TEST_DISABLED), in roster slots of
-// their own (slot 01 stays #0001's). Every one registered is taken out
-// again, so the exported CHARACTERS array ends each run as it started.
+// itself, and never in the game). A screen test that needs fighters of its
+// own to pick, preview, practise with or watch registers these for its own
+// run: #0001's definition and art (borrowed: they are not what those tests
+// check) under neutral ids, marked available (all but TEST_DISABLED), in
+// roster slots of their own (slot 01 stays #0001's and slot 02 #0002's).
+// Every one registered is taken out again, so the exported CHARACTERS array
+// ends each run as it started.
 import { after } from 'node:test';
 import { CHARACTERS, getCharacter } from '../js/data/characters.js';
 import { SAMPLE_FIGHTER } from './sample-fighter.mjs';
@@ -18,8 +18,8 @@ export function testFighter(id, displayName, rosterSlot, overrides = {}) {
   return { ...BASE, id, displayName, rosterSlot, available: true, ...overrides };
 }
 
-// The two the screen tests pick from: slots 02 and 03.
-export const TEST_A = testFighter('test-a', 'Test A', 1);
+// The two the screen tests pick from: slots 09 and 03.
+export const TEST_A = testFighter('test-a', 'Test A', 8);
 export const TEST_B = testFighter('test-b', 'Test B', 2);
 
 // A fighter with no moves at all (slot 04): every combat button left out of
@@ -42,10 +42,11 @@ export const TEST_SAMPLE = { ...SAMPLE_FIGHTER, id: 'test-sample', displayName: 
 // definition no route may start, and the roster shows locked.
 export const TEST_DISABLED = testFighter('test-disabled', 'Disabled', 6, { available: false });
 
-// The ids of the fighters removed from the roster (slots 02 and 03). Only
-// ever checked for absence: no definition, art, string or credit of theirs
-// may come back, and a stale selection naming one must be refused.
-export const REMOVED_IDS = Object.freeze(['0002', '0003']);
+// The ids of the fighters removed from the roster: slot 03's. Only ever
+// checked for absence: no definition, art, string or credit of theirs may
+// come back, and a stale selection naming one must be refused. (Slot 02's
+// was removed too, and its id now belongs to the new #0002.)
+export const REMOVED_IDS = Object.freeze(['0003']);
 
 // Adds `defs` to CHARACTERS, after the production entries. Returns the
 // function that takes exactly those out again.

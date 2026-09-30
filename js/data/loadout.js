@@ -53,8 +53,10 @@
 // With a replacement on attack1 only, attack2 pressed while Charging is
 // still attack2. A replacement is typed: a `summon` (js/game/clone.js) or a
 // `technique` (js/game/charged-technique.js), keyed by the attack it is.
-// Charge itself is every fighter's grounded state; only what it replaces is
-// the character's.
+// Charge itself is a grounded stance every fighter has, unless its
+// definition says `charge: false` (#0002): then the Charge input never holds
+// it in a stance (Down only fast-falls, in the air), and it can have no
+// Charge replacements. Only what Charge replaces is the character's.
 //
 // Anything an attack creates is named after it with `object`: a projectile
 // `<attack>_object`, and the art of a summon or a technique
@@ -188,6 +190,12 @@ export function loadoutProblems(def) {
   }
 
   // ---- Charge replacements ----------------------------------------------------------
+  if (def && Object.hasOwn(def, 'charge') && typeof def.charge !== 'boolean') {
+    say(`charge is ${JSON.stringify(def.charge)}: true, false or left out`);
+  }
+  if (def?.charge === false && Object.keys(replacements).length) {
+    say('it has no Charge (charge: false), so it can have no Charge replacements');
+  }
   for (const [button, spec] of Object.entries(replacements)) {
     const target = CHARGE_REPLACES[button];
     if (!target) {

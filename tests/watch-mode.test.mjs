@@ -188,7 +188,7 @@ const { CombatAIController } = await import('../js/game/combat-ai.js');
 const { PlayerController } = await import('../js/game/fighter-controller.js');
 
 // The test-only playable fighters beside #0001 (slot 01), registered before
-// any roster is built and taken out after the last test: Test A (slot 02)
+// any roster is built and taken out after the last test: Test A (slot 09)
 // and #9999 (slot 06), #0001's art under two ids so CPU 1 and CPU 2 can
 // differ while sharing art, plus a fighter with no moves (slot 04) and the
 // sample fighter's different ones (slot 05).
@@ -635,7 +635,7 @@ test('locked roster slots stay locked on both Watch rosters, exactly as on Selec
       assert.equal(slot.hasAttribute('data-nav'), false, 'out of keyboard / gamepad navigation');
       assert.match(slot.getAttribute('aria-label'), /^Slot \d\d, locked$/);
     }
-    assert.deepEqual(screen.roster.slots.filter((s) => s._def?.available).map((s) => s._def.id), ['0001', 'test-a', 'test-moveless', 'test-sample', '9999']);
+    assert.deepEqual(screen.roster.slots.filter((s) => s._def?.available).map((s) => s._def.id), ['0001', '0002', 'test-moveless', 'test-sample', '9999', 'test-a']);
   }
 });
 

@@ -9,7 +9,9 @@
 //   2. detect the pixel-art grid (GCD of every colour transition)
 //   3. resample to 1 canvas pixel per art pixel (exact, block-centre sampling)
 //   4. compute a stable horizontal anchor (upper-body opaque centroid), or
-//      take the clip's own authored one (its `anchorX`)
+//      take the clip's own authored one (its `anchorX`); the vertical anchor
+//      is the bottom of the visible art (the feet), unless the clip authors
+//      its own (`anchorY`)
 //
 // The result is cached; nothing touches pixel data per render frame.
 // Every normalized frame is drawn bottom-centre anchored at a shared
@@ -211,6 +213,11 @@ export class SpriteSet {
         // fraction of an art pixel from frame to frame (a clip can anchor
         // instead on a head its frames all share).
         frame.authoredAnchor = anim.anchorX?.[i] ?? null;
+        // ...and where the feet are (`anchorY`, art pixels down from the
+        // top of the frame's visible art), where the art reaches below them:
+        // a kick's trail swept under the standing foot would otherwise lift
+        // the whole body off the ground by the trail's depth.
+        frame.authoredAnchorY = anim.anchorY?.[i] ?? null;
         frames.push(frame);
       }
       if (!frames.length) continue;
@@ -285,6 +292,9 @@ export class SpriteSet {
         f.artW = f.w / f.unit;
         f.artH = f.h / f.unit;
         f.anchorArtX = f.authoredAnchor ?? f.anchorX / f.unit;
+        // From the top of the art down to the fighter's origin: the bottom
+        // of the art, unless the clip says otherwise.
+        f.anchorArtY = f.authoredAnchorY ?? f.artH;
         f.headArtX = f.headX / f.unit;
       }
       anim.maxArtH = Math.max(...anim.frames.map((f) => f.artH));
@@ -364,16 +374,18 @@ export class SpriteSet {
   }
 }
 
-// Draws a normalized frame with its anchor (bottom-centre) at device pixel
-// position (x, y). `pxPerArt` is device pixels per art pixel.
+// Draws a normalized frame with its anchor (its feet: the bottom of the art
+// unless the clip placed them, see anchorY) at device pixel position (x, y).
+// `pxPerArt` is device pixels per art pixel.
 export function drawFrame(ctx, frame, x, y, pxPerArt, flip) {
   const w = frame.artW * pxPerArt;
   const h = frame.artH * pxPerArt;
   const ax = Math.round(frame.anchorArtX * pxPerArt);
+  const ay = Math.round((frame.anchorArtY ?? frame.artH) * pxPerArt);
   ctx.save();
   ctx.translate(Math.round(x), Math.round(y));
   if (flip) ctx.scale(-1, 1);
-  ctx.drawImage(frame.canvas, -ax, -Math.round(h), Math.round(w), Math.round(h));
+  ctx.drawImage(frame.canvas, -ax, -ay, Math.round(w), Math.round(h));
   ctx.restore();
 }
 

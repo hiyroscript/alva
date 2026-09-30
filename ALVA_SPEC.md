@@ -143,8 +143,42 @@ behave, and how it must look. The README covers running and deploying it.
   (`sourceFacing: 0`): the round orb is never mirrored, only its position
   offset follows facing. It is not a projectile. None of the 23 files is
   duplicated, and none remains at the repository root.
-- `assets/characters/0001/` is the only fighter art in the repository, and
-  any future fighter's frames go in a folder of its own id.
+- `#0002` frames live in `assets/characters/0002/`: 85 frames cut from
+  one supplied sprite sheet, each cropped tight to its art with the sheet's
+  flat green background (0, 90, 20) made transparent and nothing else
+  changed (1×, 8-bit RGBA, one file pixel per art pixel; the visual
+  config forces `pixelSize: 1`, so no grid is looked for). Eight idle
+  frames (the fighting stance, 29–30 × 38–39 px, the reference: 39 art
+  pixels), twelve run frames (≤ 38 × 40), eight jump frames (the spin
+  ball, 30 × 28–30, looped), one fall frame (arms spread, 35 × 48), four
+  mouvment (Dash) frames (the figure-eight blur, 37–39 × 36), one hurt
+  (34 × 42) and one mid-air hurt (38 × 32), one `shielding` guard (29 × 39),
+  four attack1 frames (the One-Two), four attack2 frames (the Rapid Kicks,
+  74–94 × 71–80 px: the kick trails reach far in front and below the
+  standing foot), the eight ball frames again for each of midair_attack1
+  (the Homing Attack), midair_attack2 (the Bounce Attack) and attack3 (the
+  Spin Attack), four midair_attack3 frames (the Blue Tornado, 34–35 ×
+  45–46), nine extra_attack frames (the Whirlwind, 29–56 × 37–39) and four
+  extra_attack_object frames (the tornado it sends, the same drawing as
+  the Blue Tornado's, as a projectile). Every clip is its own files, named
+  for it, so the ball and the tornado are copies on disk under their own
+  codenames. Everything faces right. No Land, Charge or mid-air Shield art.
+  Each clip's `heightRatio` is its tallest frame over 39, so every frame
+  normalizes at exactly one art pixel per file pixel, and `visual.height`
+  (66 world units) puts #0002's art pixels at #0001's size (88 / 52 units
+  each).
+- Where automatic anchoring would drag the body, a clip authors its own
+  anchors: `anchorX` (art pixels from the left of each frame's visible art)
+  on #0002's ball and tornado (their own middle), Whirlwind (the body
+  inside the wind) and One-Two (its planted feet), and `anchorY` (art pixels
+  down from the top of each frame's art to the feet) on its Rapid Kicks,
+  whose trails sweep below the standing foot: without it the bottom-anchored
+  frame would lift the whole body off the ground by the trail's depth. A
+  frame with no `anchorY` stands on the bottom of its art, as every other
+  does (`drawFrame` draws it at `-anchorArtY`).
+- `assets/characters/0001/` and `assets/characters/0002/` are the only
+  fighter art in the repository, and any future fighter's frames go in a
+  folder of its own id.
 - Source orientation: #0001's art faces right (`sourceFacing: 1` on the
   character), every registered clip included. An animation may override
   the character's orientation with its own `sourceFacing` (none of #0001's
@@ -559,6 +593,9 @@ Select CPU 2 → Select Stage → CPU vs CPU Battle.
   - **#0001 sprite source** — original sprite material from *Jump Ultimate
     Stars*; The Spriters Resource; source sheet uploaded by
     Dazz; contributor FRET.
+  - **#0002 sprite source** — sprite sheet by thespriteanimations on
+    DeviantArt, the line linked to the sheet's page (by the deviation's
+    number).
   - **Rights** — hiyroscript did not create or claim ownership of the original
     third-party character/game artwork. Original characters, games, and related
     properties belong to their respective rights holders.
@@ -569,8 +606,9 @@ Select CPU 2 → Select Stage → CPU vs CPU Battle.
   in `js/ui/credits.js`): a new tab, the address never translated, the roll
   holding still while the link has keyboard focus, and its hidden second
   copy never focusable.
-- The UI does not name the character behind #0001 (or any fighter): it
-  stays `#0001` in game. Never imply ownership of
+- The UI does not name the character behind #0001 or #0002 (or any
+  fighter): each stays `#0001` / `#0002` in game, and neither the code,
+  the data, the file names nor the documentation name #0002's. Never imply ownership of
   original third-party characters, games, artwork, or related properties;
   these belong to their respective rights holders.
 
@@ -1032,10 +1070,11 @@ French, concise game terms).
 ### 7.2 Fighters, physics and combat
 
 - **Roster and availability.** `CHARACTERS` (`js/data/characters.js`)
-  holds one definition today, `#0001`, in roster slot 01, fully
-  implemented (everything below) and playable: `available: true`. So it is
-  the one fighter preloaded at startup, the initial Quick Battle choice,
-  both Watch Mode CPUs and the Practice default. A definition existing
+  holds two definitions today, `#0001` in roster slot 01 and `#0002` in
+  slot 02, each fully implemented (everything below) and playable:
+  `available: true`. Both are preloaded at startup, and #0001, the first
+  playable one, is the initial Quick Battle choice, both Watch Mode CPUs
+  and the Practice default. A definition existing
   (`getCharacter`, which the engine and its tests build fighters from) is
   not the same as it being playable (`isPlayable`, `getPlayableCharacter`,
   `playableCharacters`): only a playable fighter is preloaded at startup,
@@ -1082,12 +1121,21 @@ French, concise game terms).
     summon's cloud and a technique's sphere `<attack>_object...` effect
     clips, a technique's own poses `<attack>_...` (#0001's `attack4_form`
     to `attack4_whiff_release`), and the files follow (3).
+  - A fighter whose definition says `charge: false` has no Charge stance
+    at all (Down never holds it in place on the ground; in the air it still
+    fast-falls, and a Dash still starts with it held) and may have no
+    Charge replacements; `charge` is otherwise `true` or left out.
   #0001 has four numbered attacks and Charge: `attack1` (the Punch;
   `midair_attack1`, the kunai slash) and `attack2` (the Kick;
   `midair_attack2`, the airborne kick) are its buttons, `attack3` (the
   Clone Attack, a summon) is Charge + `attack1` and `attack4` (the Sphere
   Rush, a technique) Charge + `attack2`, and `extra_attack` is its Throw.
-  It has no `attack3`, `attack4` or `attack5` button.
+  It has no `attack3`, `attack4` or `attack5` button. #0002 has three
+  numbered attacks and no Charge (`charge: false`): `attack1` (the One-Two;
+  `midair_attack1`, the Homing Attack), `attack2` (the Rapid Kicks;
+  `midair_attack2`, the Bounce Attack) and `attack3` (the Spin Attack;
+  `midair_attack3`, the Blue Tornado) are its buttons, and `extra_attack` is
+  its Whirlwind. It has no `attack4` or `attack5` button.
 - `#0001` has Idle, Run, Jump, Fall, Land, Hurt, Mid-air Hurt, attack1,
   midair_attack1, attack2, midair_attack2, Charge,
   Shield (raise, held and lower poses), Mid-air Shield (held only), Dash (`mouvment`),
@@ -2240,6 +2288,97 @@ French, concise game terms).
   (`reason: 'void'`); on time, more points wins (`'points'`), then the lower
   Launch Point (`'time'`), else a draw. Restart and rematch reset both scores
   to 0 and cancel any respawn wait.
+- **Attack mechanics beyond a timed hitbox** (`js/game/combat.js`,
+  `js/game/character.js`, `js/game/projectile.js`). Each is data on an
+  attack (or a projectile), generic, and validated as its definition is
+  built; #0002 is the fighter that uses them:
+  - **Strikes** (`hits`): a multi-hit attack lists its strikes, each live
+    in its own window (`at` to `at + active`) and striking at most once,
+    with its own `damage`, `baseLaunch` and `directionalLaunch`; its
+    `hitbox`, `hitstun`, `blockstun`, `hitstop` and `carry` default to the
+    attack's. The attack's startup and active phase follow from them
+    (declaring either, or an attack-level damage or launch, is refused), and
+    so do its overall box (round every strike's), damage (their sum) and
+    launch (the last strike's), for readers such as the CPU. Any real hit
+    confirms it (its hit-cancel counts from the first); a Shield that blocks
+    a strike stops the string there, so a flurry never empties a Shield.
+  - **Carry** (`carry: { lift }`, on an attack, a strike or a projectile): a
+    real hit that launches nothing gives its target the velocity of what
+    struck it (the attacker's body, or the projectile), less `lift` upward.
+  - **Motion** (`motion`, one of four kinds; a motion attack never turns
+    while it plays): `homing` hangs through its startup (no gravity), then
+    locks on to its opponent if in play, within `range` of its middle and
+    not behind it, and dashes at `speed`, re-aimed at the target's middle
+    every step, until its active phase ends (straight ahead with no target);
+    contact (hit or block) springs it off the target, `rebound` up and
+    `recoil` back; a dash that ends without contact keeps `exit` of its
+    velocity, and one that reaches the ground stops. `bounce` hangs, then
+    plunges at a fixed `fallSpeed`; meeting the ground or an opponent sends
+    it back up at `rebound` and ends the attack (a ground bounce is no
+    landing). `rise` hangs, then rises at `speed` for its active phase and
+    carries on up under gravity. `roll` curls through its startup (sliding
+    on), then rolls the way it faces at `speed` plus `keep` × the running
+    speed it had, up to `maxSpeed`, losing `friction` per second on the
+    ground (none in the air); a wall stops it, and a Shield that blocks it
+    stops it dead and sends it back at `recoil`. No motion attack starts
+    while its fighter is still flying from a launch (`Fighter.launch`): a
+    hang, dash, plunge or lift would cancel the launch, so it must recover
+    first (an air jump, a fast fall or landing).
+  - **Per airtime** (`airUses`): how many times the attack may start before
+    the fighter lands or is hit. **Free fall** (`freeFall: true`): started
+    in the air, it leaves the fighter with no attack and no air jump until
+    it lands or is hit.
+  - **Body** (`passThrough: true`): no pushbox against other fighters while
+    it plays. (`hurtboxes`): the fighter's own replaced while it plays.
+  - **Piercing projectiles** (`pierce: { hits, interval }`): strike up to
+    `hits` times, at least `interval` seconds apart, staying in play between
+    them; the last resolves as the projectile's `finisher` (its own damage
+    and launch, its stuns defaulting to the projectile's). A block stops it.
+  - The CPU reads all of it from the data: each attack's reach swept along
+    its motion (`attackReach`: a roll's path, a plunge's depth, a lift's
+    height, a homing dash's lock-on range) for choosing and fearing it, the
+    travel time before a moving strike can arrive, per-airtime starts and
+    free fall; it uses a lift (a `rise` air attack) to recover when its air
+    jump is spent, fast-falling first to end a launch, and never plans a
+    Charge for a fighter with none.
+- **#0002, the speedster.** Speed Power 3, Jump Power 2, a quicker start
+  (acceleration 4800, air 3200) and a longer, faster Dash (1100 units/s for
+  one pass of its four-frame clip, ≈220 units). No Charge. Its Shield is a
+  ground guard only (`airAnimation: null`: in the air the Shield input does
+  nothing, quietly). Its body: collider 26 × 62, pushbox 30, hurtboxes
+  `{ -18, -64, 34, 32 }` (head and torso) and `{ -14, -32, 34, 32 }` (legs).
+  Its moves:
+  - **One-Two** (`attack1`, 4 frames at 15 fps): two strikes, the jab
+    (frame 2: 1, no launch, holding the target) and the straight (frame 4:
+    2, Base Launch 1 sideways); hit-cancel once the straight is out.
+  - **Homing Attack** (`midair_attack1`, the ball): `homing`, range 240,
+    speed 1000 for up to 0.22 s after a 0.15 s hang; 2, Base Launch 1
+    upward; springs off at 760 up and 140 back, its air jump given back by a
+    hit; a miss keeps a fifth of its speed. Once per airtime.
+  - **Rapid Kicks** (`attack2`, 4 frames at 20 fps played twice): a 0.2 s
+    wind-up, three kicks (1 each, no launch, each stun outlasting the gap to
+    the next), then the finisher (3, Base Launch 2 sideways); no hit-cancel,
+    a 1.2 s cooldown.
+  - **Bounce Attack** (`midair_attack2`, the ball): `bounce`, a 0.1 s hang,
+    then 1300 units/s down, rebounding at 900; 2, Base Launch 2 downward.
+    Twice per airtime.
+  - **Spin Attack** (`attack3`, the ball): `roll`, 400 + 0.8 × the run (up
+    to 820), friction 420, after a 0.17 s curl; `passThrough`, the ball's
+    hurtbox; 2, Base Launch 1 sideways; recoil 260 off a Shield; 1.6 s
+    cooldown.
+  - **Blue Tornado** (`midair_attack3`, 4 frames looped): `rise` at 460
+    (≈175 units in all), three strikes that carry the target up (1 each),
+    then the finisher (2, Base Launch 2 upward); once per airtime, and free
+    fall after.
+  - **Whirlwind** (`extra_attack`, 9 frames at 18 fps): sends its tornado
+    (`extra_attack_object`) on frame 6: 260 units/s for 1.6 s, piercing
+    five strikes 0.14 s apart, four of 1 that carry the target along and
+    lift it 300 units/s, then the finisher (2, Base Launch 2 upward); a
+    1.4 s cooldown.
+  Its tuning comes from seeded CPU-vs-CPU fights against #0001 (120
+  one-minute fights per level on Desert): at Hard and Brutal both fall
+  into the Void about as often; at Easy and Medium #0002's CPU still wins
+  more.
 
 ### 7.3 Battle chrome
 

@@ -334,7 +334,7 @@ test('SpriteSet normalizes attack4 as fighter poses and attack4_object as effect
       // One art pixel per fighter art pixel, bottom-centre (torso) anchored.
       assert.equal(f.artW, w / 2);
       assert.equal(f.artH, h / 2);
-      assert.equal(f.anchorArtY, undefined, 'bottom-anchored, not centred');
+      assert.equal(f.anchorArtY, f.artH, 'bottom-anchored (its feet at the bottom of its art), not centred');
     }
   }
   for (const key of ['attack4_object_build', 'attack4_object_impact', 'attack4_object_explosion']) {

@@ -955,7 +955,7 @@ test('Help is removed from the game: no Help screen, module, section or registra
 test('the Home credits still roll: both copies, the second hidden, every credit unchanged in English', () => {
   const credits = creditsText();
   assert.deepEqual(credits.map((g) => g.title), [
-    CONFIG.title, 'Original work', '#0001 sprite source', 'Rights', 'Project',
+    CONFIG.title, 'Original work', '#0001 sprite source', '#0002 sprite source', 'Rights', 'Project',
   ]);
   assert.equal(credits[0].lead, `Created by ${CONFIG.developer}`);
   assert.deepEqual(credits[2].lines, [
@@ -964,6 +964,7 @@ test('the Home credits still roll: both copies, the second hidden, every credit 
     'Source sheet uploaded by Dazz',
     'Contributor: FRET',
   ]);
+  assert.deepEqual(credits[3].lines, ['Sprite sheet by thespriteanimations on DeviantArt']);
   assert.equal(CREDITS.length, credits.length);
   assert.match(read('js/screens/home-screen.js'), /import \{ CREDITS, creditLabel, creditLink \} from '\.\.\/ui\/credits\.js';/);
 
@@ -999,7 +1000,9 @@ test('in French the credits translate but proper names stay', () => {
     assert.equal(credits[2].lines[1], 'The Spriters Resource');
     assert.ok(credits[2].lines[2].includes('Dazz'));
     assert.ok(credits[2].lines[3].includes('FRET'));
-    assert.equal(credits[3].title, 'Droits');
+    assert.equal(credits[3].title, 'Source des sprites de #0002');
+    assert.ok(credits[3].lines[0].includes('thespriteanimations') && credits[3].lines[0].includes('DeviantArt'));
+    assert.equal(credits[4].title, 'Droits');
     assert.equal(getLanguage(), 'fr');
   } finally {
     setLanguage('en');
@@ -1007,14 +1010,15 @@ test('in French the credits translate but proper names stay', () => {
   assert.equal(t('credits.rights.title'), 'Rights');
 });
 
-// Every name a removed fighter's art was credited with, and where its sheet
-// came from: none of it applies now.
+// Every name a removed fighter's art was credited with: none of it applies
+// now. (DeviantArt, where the first #0002's sheet came from, is where the
+// new #0002's sheet was published too: credited again, by its own artist.)
 const RETIRED_CREDITS = [
-  'Slender', 'Eric Knudsen', 'Victor Surge', 'Something Awful', 'XmayGrrr', 'Jus Sheet', 'DeviantArt', 'renatoooferreiraaa',
+  'Slender', 'Eric Knudsen', 'Victor Surge', 'Something Awful', 'XmayGrrr', 'Jus Sheet', 'renatoooferreiraaa',
   'Dazz & Fret',
 ];
 
-test('the credits name only fighters that exist: #0001\'s sprite source is the one sprite group, unchanged, and nothing of a removed fighter is left', () => {
+test('the credits name only fighters that exist: a sprite group for each, #0001\'s unchanged, and nothing of a removed fighter is left', () => {
   const names = new Set(CHARACTERS.map((c) => c.displayName));
   for (const language of ['en', 'fr']) {
     setLanguage(language);
@@ -1022,7 +1026,7 @@ test('the credits name only fighters that exist: #0001\'s sprite source is the o
       const credits = creditsText();
       const text = credits.flatMap((g) => [g.title, g.lead ?? '', ...g.lines]).join('\n');
       for (const name of text.match(/#\d{4}\b/g) ?? []) assert.ok(names.has(name), `${language}: ${name} is no fighter`);
-      assert.equal(credits.filter((g) => /#\d{4}/.test(g.title)).length, 1, `${language}: one sprite source group`);
+      assert.equal(credits.filter((g) => /#\d{4}/.test(g.title)).length, CHARACTERS.length, `${language}: one sprite source group per fighter`);
       for (const name of RETIRED_CREDITS) assert.ok(!text.includes(name), `${language}: ${name}`);
       assert.doesNotMatch(text, /2009/);
     } finally {
@@ -1031,18 +1035,22 @@ test('the credits name only fighters that exist: #0001\'s sprite source is the o
   }
   // Gone from the data and its translations too.
   assert.deepEqual(CREDITS.map((g) => g.title), [
-    'brand.title', 'credits.original.title', 'credits.sprites.title', 'credits.rights.title', 'credits.project.title',
+    'brand.title', 'credits.original.title', 'credits.sprites.title', 'credits.sprites0002.title', 'credits.rights.title',
+    'credits.project.title',
   ]);
-  assert.ok(!CREDITS.flatMap((g) => g.lines || []).some((line) => line?.href), 'no linked line left');
-  assert.doesNotMatch(read('js/ui/credits.js'), /deviantart|slender|sprites\d|Dazz & Fret/i);
-  assert.doesNotMatch(read('js/core/i18n.js'), /credits\.\d|credits\.sprites\d|slender|deviantart|XmayGrrr/i);
+  // One linked line: #0002's sheet, on its DeviantArt page.
+  const links = CREDITS.flatMap((g) => g.lines || []).filter((line) => line?.href);
+  assert.equal(links.length, 1);
+  assert.match(links[0].href, /^https:\/\/www\.deviantart\.com\/thespriteanimations\/art\/[\w-]*1350194762$/);
+  assert.doesNotMatch(read('js/ui/credits.js'), /slender|sprites000[13]|Dazz & Fret/i);
+  assert.doesNotMatch(read('js/core/i18n.js'), /credits\.\d|credits\.sprites000[13]|slender|XmayGrrr/i);
   // #0001's attribution is all still there, unchanged, and the notices after it.
   const credits = creditsText();
   const at = credits.findIndex((g) => g.title === '#0001 sprite source');
   assert.deepEqual(credits[at].lines, [
     'Original sprite material from Jump Ultimate Stars', 'The Spriters Resource', 'Source sheet uploaded by Dazz', 'Contributor: FRET',
   ]);
-  assert.deepEqual(credits.slice(at + 1).map((g) => g.title), ['Rights', 'Project']);
+  assert.deepEqual(credits.slice(at + 1).map((g) => g.title), ['#0002 sprite source', 'Rights', 'Project']);
 });
 
 test('a credit line may still link to its source, accessibly, from the Home roll', () => {
@@ -1053,7 +1061,9 @@ test('a credit line may still link to its source, accessibly, from the Home roll
   CREDITS.splice(CREDITS.length - 2, 0, group);
   const { home, done } = boot();
   try {
-    const [first, copy] = home.el.querySelectorAll('.home-credits-seq').map((seq) => seq.querySelectorAll('.home-credit-link'));
+    // Only the line added here (#0002's own linked credit is left aside).
+    const [first, copy] = home.el.querySelectorAll('.home-credits-seq')
+      .map((seq) => seq.querySelectorAll('.home-credit-link').filter((a) => a.getAttribute('href') === href));
     assert.equal(first.length, 1);
     assert.equal(copy.length, 1);
     for (const a of [first[0], copy[0]]) {
@@ -1067,7 +1077,7 @@ test('a credit line may still link to its source, accessibly, from the Home roll
     }
     assert.equal(first[0].getAttribute('tabindex'), null, 'reachable by Tab');
     assert.equal(copy[0].getAttribute('tabindex'), '-1', 'the hidden copy\'s never is');
-    assert.deepEqual(home.creditLinks, [first[0]]);
+    assert.ok(home.creditLinks.includes(first[0]) && !home.creditLinks.includes(copy[0]));
     setLanguage('fr');
     localizeTree(home.el);
     assert.equal(first[0].getAttribute('href'), href, 'the address never translates');
