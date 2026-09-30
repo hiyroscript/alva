@@ -13,25 +13,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
-import { createHash } from 'node:crypto';
-import { inflateSync } from 'node:zlib';
-import { DT, duel, fakeSpritesOf, frameName, makeFighter, stageMap, stepUntil } from './fighter-harness.mjs';
+import { DT, cpuFight, duel, fakeSpritesOf, frameName, makeFighter, stepUntil } from './fighter-harness.mjs';
+import { ROOT, buildReal, firstRun, opaque, rowSpan, sha256, walk } from './real-art.mjs';
 import { CONFIG, MOVES } from '../js/config.js';
 import { CHARACTERS, TEMPORARY_BASELINE, characterFramePaths, getCharacter } from '../js/data/characters.js';
 import { abilityName } from '../js/data/abilities.js';
-import { Fighter, separateFighters } from '../js/game/character.js';
-import { CombatSystem } from '../js/game/combat.js';
-import { spawnProjectiles, removeDeadProjectiles } from '../js/game/projectile.js';
-import { spawnClones, updateClones, removeDeadClones } from '../js/game/clone.js';
-import { StageCollision, resolveSolidOverlap } from '../js/game/physics.js';
-import { CombatAIController, readMoveset } from '../js/game/combat-ai.js';
+import { readMoveset } from '../js/game/combat-ai.js';
 import { cbaIndicators } from '../js/game/fighter-status.js';
-import { SpriteSet } from '../js/game/sprite-normalizer.js';
 import { Arena, computeWorldScale } from '../js/game/arena.js';
 import { getMap } from '../js/data/maps.js';
-import { mulberry32 } from '../js/core/utils.js';
-
-const ROOT = new URL('../', import.meta.url).pathname;
 const DIR = 'assets/characters/0002/';
 const BASE = `./${DIR}0002_`;
 const DEF = getCharacter('0002');
@@ -64,96 +54,8 @@ const RETIRED = [
   '0002_shielding.png', '0002_releaseshield.png', '0002_midairshielding1.png', '0002_midairshielding2.png',
 ];
 
-const sha256 = (path) => createHash('sha256').update(readFileSync(`${ROOT}${path}`)).digest('hex');
+// ---- The real art, decoded (see real-art.mjs) ------------------------------------------
 
-// Every file under `dir` (relative to the repository root), .git aside.
-function walk(dir = '') {
-  return readdirSync(`${ROOT}${dir}`, { withFileTypes: true }).flatMap((e) => {
-    if (e.name === '.git') return [];
-    const path = `${dir}${e.name}`;
-    return e.isDirectory() ? walk(`${path}/`) : [path];
-  });
-}
-
-// ---- The real art, decoded ----------------------------------------------------------
-
-// A decoded PNG (8-bit RGBA, not interlaced, as every #0002 file is) in
-// the shape the normalizer reads: naturalWidth / naturalHeight and pixels.
-function decodePng(path) {
-  const buf = readFileSync(path);
-  let pos = 8;
-  let width = 0;
-  let height = 0;
-  const idat = [];
-  while (pos < buf.length) {
-    const len = buf.readUInt32BE(pos);
-    const type = buf.toString('ascii', pos + 4, pos + 8);
-    const data = buf.subarray(pos + 8, pos + 8 + len);
-    if (type === 'IHDR') {
-      width = data.readUInt32BE(0);
-      height = data.readUInt32BE(4);
-      assert.deepEqual([data[8], data[9], data[12]], [8, 6, 0], `${path}: 8-bit RGBA, not interlaced`);
-    } else if (type === 'IDAT') idat.push(data);
-    pos += 12 + len;
-  }
-  const raw = inflateSync(Buffer.concat(idat));
-  const stride = width * 4;
-  const px = new Uint8ClampedArray(height * stride);
-  for (let y = 0; y < height; y++) {
-    const filter = raw[y * (stride + 1)];
-    for (let x = 0; x < stride; x++) {
-      const a = x >= 4 ? px[y * stride + x - 4] : 0;
-      const b = y > 0 ? px[(y - 1) * stride + x] : 0;
-      const c = x >= 4 && y > 0 ? px[(y - 1) * stride + x - 4] : 0;
-      let v = raw[y * (stride + 1) + 1 + x];
-      if (filter === 1) v += a;
-      else if (filter === 2) v += b;
-      else if (filter === 3) v += (a + b) >> 1;
-      else if (filter === 4) {
-        const p = a + b - c;
-        const pa = Math.abs(p - a);
-        const pb = Math.abs(p - b);
-        const pc = Math.abs(p - c);
-        v += pa <= pb && pa <= pc ? a : pb <= pc ? b : c;
-      }
-      px[y * stride + x] = v & 255;
-    }
-  }
-  return { naturalWidth: width, naturalHeight: height, pixels: px };
-}
-
-// Just enough canvas for the normalizer, keeping the resampled crop it puts
-// (canvas.image) so the test can read it back.
-function withFakeCanvas(fn) {
-  const saved = globalThis.document;
-  globalThis.document = {
-    createElement: () => {
-      let drawn = null;
-      const canvas = {
-        width: 0,
-        height: 0,
-        image: null,
-        getContext: () => ({
-          drawImage: (img) => { drawn = img; },
-          getImageData: () => ({ data: new Uint8ClampedArray(drawn.pixels) }),
-          createImageData: (w, h) => ({ data: new Uint8ClampedArray(w * h * 4) }),
-          putImageData: (image) => { canvas.image = image; },
-        }),
-      };
-      return canvas;
-    },
-  };
-  try {
-    return fn();
-  } finally {
-    globalThis.document = saved;
-  }
-}
-
-const buildReal = (def, urls) => {
-  const images = new Map(urls.map((url) => [url, decodePng(ROOT + url.slice(2))]));
-  return withFakeCanvas(() => SpriteSet.build(def, (url) => images.get(url)));
-};
 const REAL = buildReal(DEF, characterFramePaths(DEF));
 // #0001's reference clip alone (its idle), for its art-pixel size.
 const REAL_0001_IDLE = buildReal(
@@ -161,32 +63,9 @@ const REAL_0001_IDLE = buildReal(
   DEF_0001.animations.idle.frames,
 );
 
-// Whether art pixel (x, y) of normalized frame `f` is drawn.
-const opaque = (f, x, y) => x >= 0 && y >= 0 && x < f.w && y < f.h && f.canvas.image.data[(y * f.w + x) * 4 + 3] > 16;
-// First drawn run of row `y` ([from, to] columns), or null.
-function firstRun(f, y) {
-  let x = 0;
-  while (x < f.w && !opaque(f, x, y)) x++;
-  if (x === f.w) return null;
-  const from = x;
-  while (x + 1 < f.w && opaque(f, x + 1, y)) x++;
-  return [from, x];
-}
-// Leftmost / rightmost drawn column of row `y`, or null.
-function rowSpan(f, y) {
-  let lo = null;
-  let hi = null;
-  for (let x = 0; x < f.w; x++) {
-    if (!opaque(f, x, y)) continue;
-    lo ??= x;
-    hi = x;
-  }
-  return lo === null ? null : [lo, hi];
-}
-
 // ---- Registration ---------------------------------------------------------------
 
-test('#0002 is a real CHARACTERS entry: available, in roster slot 1 (the second), #0001 unchanged in slot 0; no #0003', () => {
+test('#0002 is a real CHARACTERS entry: available, in roster slot 1 (the second), #0001 unchanged in slot 0', () => {
   assert.ok(DEF, 'getCharacter("0002")');
   assert.equal(CHARACTERS.find((c) => c.id === '0002'), DEF, 'the definition itself, not a copy');
   assert.equal(DEF.displayName, '#0002');
@@ -194,22 +73,24 @@ test('#0002 is a real CHARACTERS entry: available, in roster slot 1 (the second)
   assert.equal(DEF.rosterSlot, 1);
   assert.equal(DEF_0001.rosterSlot, 0);
   assert.equal(DEF_0001.available, true);
-  // The roster is CHARACTERS by slot: #0001 then #0002, every other slot free.
+  // The roster is CHARACTERS by slot: #0001, #0002 and #0003 (see
+  // fighter-0003.test.mjs), every other slot free.
   const available = CHARACTERS.filter((c) => c.available).sort((a, b) => a.rosterSlot - b.rosterSlot);
-  assert.deepEqual(available.map((c) => c.id), ['0001', '0002']);
-  assert.deepEqual(CHARACTERS.map((c) => c.id), ['0001', '0002']);
-  assert.equal(getCharacter('0003'), null, 'no #0003: the new art is #0002');
+  assert.deepEqual(available.map((c) => c.id), ['0001', '0002', '0003']);
+  assert.deepEqual(CHARACTERS.map((c) => c.id), ['0001', '0002', '0003']);
   assert.equal(new Set(CHARACTERS.map((c) => c.rosterSlot)).size, CHARACTERS.length, 'one fighter per slot');
   assert.ok(CHARACTERS.every((c) => c.rosterSlot < CONFIG.roster.totalSlots));
 });
 
 // ---- Assets -----------------------------------------------------------------------
 
-test('its folder holds exactly the seventeen supplied files; nothing is left at the root or under 0003', () => {
+test('its folder holds exactly the seventeen supplied files; nothing is left at the root', () => {
   assert.deepEqual(readdirSync(`${ROOT}${DIR}`).sort(), SUPPLIED);
   assert.deepEqual(readdirSync(ROOT).filter((n) => /\.png$/i.test(n) && /^000\d/.test(n)), [], 'no fighter art at the root');
   const all = walk();
-  assert.deepEqual(all.filter((p) => /(^|\/)0003_|characters\/0003\//.test(p)), [], 'no 0003 file anywhere');
+  // Its art was uploaded partly as 0003_*.png; the only 0003 files now are
+  // #0003's own, in #0003's folder.
+  assert.deepEqual(all.filter((p) => /(^|\/)0003_/.test(p) && !p.startsWith('assets/characters/0003/')), [], 'no stray 0003 file');
   assert.deepEqual(all.filter((p) => RETIRED.some((n) => p.endsWith(`/${n}`))), [], 'no retired file anywhere');
   // Idle's fifth frame is a copy of its first: the loop's middle.
   assert.equal(sha256(`${DIR}0002_idle_5.png`), sha256(`${DIR}0002_idle_1.png`));
@@ -251,7 +132,7 @@ test('no code, page or style asks for a retired file or names the old fighter', 
   for (const path of sources) {
     const source = readFileSync(`${ROOT}${path}`, 'utf8');
     assert.doesNotMatch(source, retired, path);
-    assert.doesNotMatch(source, /slender|0003_/i, path);
+    assert.doesNotMatch(source, /slender/i, path);
   }
 });
 
@@ -646,46 +527,6 @@ test('the CPU reads its moveset from its data: no melee, ranged, charged move, S
   assert.equal(ms.dash, null);
   assert.equal(ms.shield, false);
 });
-
-// Two CPUs (CombatAIController) in a real fight on a flat stage, stepped in
-// Battle.update's order. Returns every step's inputs and states, keyed by fighter.
-function cpuFight(defA, defB, { seconds = 30, seed = 3, difficulty = 'brutal' } = {}) {
-  const stage = new StageCollision(stageMap());
-  const make = (def, x, facing, slot, n) => new Fighter({
-    def, sprites: fakeSpritesOf(def), stage, slot, label: `CPU ${n}`, spawn: { x, facing },
-    controller: new CombatAIController({ difficulty, rng: mulberry32(seed + n) }),
-  });
-  const a = make(defA, 900, 1, 'p1', 1);
-  const b = make(defB, 1100, -1, 'p2', 2);
-  a.opponent = b;
-  b.opponent = a;
-  const world = { stage, projectiles: [], clones: [], combat: new CombatSystem(), score: { p1: 0, p2: 0 }, timeLeft: 99, fighters: [a, b] };
-  const ctx = { stage, gravity: CONFIG.sim.gravity, battle: world };
-  const log = new Map([[a, []], [b, []]]);
-  const events = [];
-  for (let n = 0; n < seconds / DT; n++) {
-    for (const f of world.fighters) {
-      if (f.lostToVoid) continue;
-      f.update(DT, ctx);
-      log.get(f).push({
-        ...f.controller.out, attack: f.combat.attack?.def.id ?? null, shielding: f.combat.shielding,
-        state: f.state, grounded: f.grounded, frame: frameName(f),
-      });
-      // Back on stage at once if the Void takes one: the fight goes on.
-      if (f.body.y > 1600 || Math.abs(f.body.x - 1000) > 1800) f.respawn(stage);
-    }
-    separateFighters(a, b, stage);
-    for (const f of world.fighters) resolveSolidOverlap(f.body, stage);
-    spawnProjectiles(world.fighters, world.projectiles);
-    for (const p of world.projectiles) p.update(DT, stage);
-    updateClones(world.clones, DT);
-    spawnClones(world.fighters, world.clones, stage);
-    events.push(...world.combat.update(world.fighters, world.projectiles, world.clones));
-    removeDeadProjectiles(world.projectiles);
-    removeDeadClones(world.clones);
-  }
-  return { a, b, log, events, world };
-}
 
 test('#0001 vs #0002, #0002 vs #0001 and #0002 vs #0002 CPU fights run; #0002 never uses a move, is hit and shows its hurt art', () => {
   for (const [defA, defB] of [[DEF_0001, DEF], [DEF, DEF_0001], [DEF, DEF]]) {

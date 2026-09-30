@@ -163,6 +163,7 @@ globalThis.document = {
 const { CONFIG } = await import('../js/config.js');
 const { CHARACTERS, getCharacter } = await import('../js/data/characters.js');
 const DEF_0002 = getCharacter('0002');
+const DEF_0003 = getCharacter('0003');
 const { DIFFICULTIES, DIFFICULTY_IDS, DEFAULT_DIFFICULTY, getDifficultyProfile } = await import('../js/data/difficulty.js');
 const { MAPS, getMap } = await import('../js/data/maps.js');
 const { ICONS } = await import('../js/ui/icons.js');
@@ -184,8 +185,8 @@ const { Battle, BATTLE_MODES } = await import('../js/game/battle.js');
 const { CombatAIController } = await import('../js/game/combat-ai.js');
 const { PlayerController } = await import('../js/game/fighter-controller.js');
 
-// A third available fighter (#0001's art under another id, after the real
-// #0001 and #0002), so CPU 1 and CPU 2 can differ while sharing art.
+// A fourth available fighter (#0001's art under another id, after the real
+// #0001, #0002 and #0003), so CPU 1 and CPU 2 can differ while sharing art.
 const DEF_9999 = { ...DEF_0001, id: '9999', displayName: '#9999', rosterSlot: 5, available: true };
 CHARACTERS.push(DEF_9999);
 
@@ -216,7 +217,9 @@ function fakeInput() {
 // so screens swap without timers: Home, Quick Battle's setup, Watch Mode's
 // setup and the real Battle screen. Fighters load from `sets` (one fake
 // sprite set per fighter); `loads` lists every load in order.
-function boot({ sets = { '0001': fakeSprites(), '0002': fakeSpritesOf(DEF_0002), '9999': fakeSprites() } } = {}) {
+function boot({
+  sets = { '0001': fakeSprites(), '0002': fakeSpritesOf(DEF_0002), '0003': fakeSpritesOf(DEF_0003), '9999': fakeSprites() },
+} = {}) {
   const loads = [];
   const loading = {
     labels: [], progress: [], error: null,
@@ -627,7 +630,7 @@ test('locked roster slots stay locked on both Watch rosters, exactly as on Selec
       assert.equal(slot.hasAttribute('data-nav'), false, 'out of keyboard / gamepad navigation');
       assert.match(slot.getAttribute('aria-label'), /^Slot \d\d, locked$/);
     }
-    assert.deepEqual(screen.roster.slots.filter((s) => s._def?.available).map((s) => s._def.id), ['0001', '0002', '9999']);
+    assert.deepEqual(screen.roster.slots.filter((s) => s._def?.available).map((s) => s._def.id), ['0001', '0002', '0003', '9999']);
   }
 });
 
@@ -915,6 +918,78 @@ test('Watch Mode with #0002: #0001 vs #0002, #0002 vs #0001 and #0002 vs #0002 l
     }
     screens.battle.exit();
   }
+});
+
+test('Watch Mode with #0003: against #0001 and #0002 either way round, and mirrored, it loads, fights and draws on its own art', async () => {
+  const pairs = [[DEF_0001, DEF_0003], [DEF_0003, DEF_0001], [DEF_0002, DEF_0003], [DEF_0003, DEF_0002], [DEF_0003, DEF_0003]];
+  for (const [cpu1, cpu2] of pairs) {
+    const booted = boot();
+    const { app, screens } = booted;
+    // Chosen on the real CPU 1 and CPU 2 rosters, where #0003 is slot 03.
+    screens.home.actions.watch.click();
+    cardOf(screens.watchDifficulty, 'brutal').click();
+    for (const [screen, def] of [[screens.watchCpu1, cpu1], [screens.watchCpu2, cpu2]]) {
+      assert.equal(slotOf(screen, '0003')._index, 2, 'slot 03');
+      slotOf(screen, def.id).click(0);
+    }
+    mapCard(screens.watchMap, 'desert').click();
+    app.loads.length = 0;
+    screens.watchMap.start();
+    await settle();
+    const battle = screens.battle.battle;
+    const ids = [cpu1.id, cpu2.id];
+    const label = ids.join(' vs ');
+    assert.deepEqual(app.loads, [...new Set(ids)], `${label}: each fighter loaded once`);
+    assert.deepEqual([battle.p1.def.id, battle.p2.def.id], ids, label);
+    assert.deepEqual([battle.p1.sprites, battle.p2.sprites], [app.sets[cpu1.id], app.sets[cpu2.id]], label);
+    screens.battle.hud.update(battle);
+    assert.deepEqual([screens.battle.hud.left.name.textContent, screens.battle.hud.right.name.textContent], ids.map((id) => `#${id}`));
+    // Twenty seconds of the real Battle, both CPUs thinking.
+    const attacks = new Set();
+    trace(battle, 1);
+    for (let n = 0; n < 1200; n++) {
+      battle.update(DT);
+      for (const f of battle.fighters) {
+        if (f.def !== DEF_0003) continue;
+        assert.ok(f.animator.frame.url.startsWith('./assets/characters/0003/0003_'), `${label}: only its own art`);
+        if (f.combat.attack) attacks.add(f.combat.attack.def.id);
+      }
+    }
+    // Its CPU fights with its own moves: its attacks, never a charged action.
+    assert.ok(attacks.size > 0, `${label}: #0003 attacks`);
+    for (const id of attacks) assert.ok(Object.hasOwn(DEF_0003.attacks, id), `${label}: ${id} is its own`);
+    for (const f of battle.fighters) {
+      assert.ok(Number.isFinite(f.x) && Number.isFinite(f.y), `${label}: ${f.def.id} in the world`);
+      if (f.def === DEF_0003) assert.equal(f.combat.chargedCooldowns.size, 0, `${label}: no charged action`);
+    }
+    screens.battle.exit();
+  }
+});
+
+test('Quick Battle with #0003: picked from slot 03, the CPU plays it too, with its own touch buttons', async () => {
+  const booted = boot();
+  const { app, screens } = booted;
+  assert.equal(slotOf(screens.character, '0003')._index, 2, 'Select Fighter: slot 03');
+  const battle = await startQuickBattle(booted, { fighter: DEF_0003 });
+  assert.equal(app.selection.characterId, '0003');
+  assert.deepEqual(app.loads, ['0003'], 'one fighter loaded');
+  assert.deepEqual(app.loading.labels.at(-1), 'Loading #0003');
+  assert.deepEqual([battle.p1.def.id, battle.p2.def.id], ['0003', '0003'], 'the CPU plays Player 1\'s fighter');
+  const touch = screens.battle.touch;
+  const abilities = ['uniqueba', 'transform', 'ba1', 'ba2'];
+  assert.deepEqual(abilities.map((a) => [touch.buttons.get(a).hidden ?? false, touch.buttons.get(a).getAttribute('aria-label')]), [
+    [false, 'Palm Strike'], [true, null], [false, 'Punch'], [false, 'Kick'],
+  ]);
+  trace(battle, 300);
+  for (const f of battle.fighters) assert.ok(f.animator.frame.url.startsWith('./assets/characters/0003/0003_'), 'only its own art');
+  screens.battle.exit();
+  // Back to #0001: Shuriken, Transform, Punch and Kick.
+  app.screens.go('home', {}, { reset: true });
+  await startQuickBattle(booted, { fighter: DEF_0001 });
+  assert.deepEqual(abilities.map((a) => [touch.buttons.get(a).hidden ?? false, touch.buttons.get(a).getAttribute('aria-label')]), [
+    [false, 'Shuriken'], [false, 'Transform'], [false, 'Punch'], [false, 'Kick'],
+  ]);
+  screens.battle.exit();
 });
 
 test('a failed load of either CPU uses the loading error; Retry reloads that fighter and Back returns to the stage', async () => {

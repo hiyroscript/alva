@@ -10,6 +10,8 @@ import { spawnProjectiles, removeDeadProjectiles } from '../js/game/projectile.j
 import { spawnClones, updateClones, removeDeadClones } from '../js/game/clone.js';
 import { StageCollision, resolveSolidOverlap } from '../js/game/physics.js';
 import { SpriteSet } from '../js/game/sprite-normalizer.js';
+import { CombatAIController } from '../js/game/combat-ai.js';
+import { mulberry32 } from '../js/core/utils.js';
 import { CONFIG } from '../js/config.js';
 
 export const def = getCharacter('0001');
@@ -168,4 +170,44 @@ export function duel({
     assert.ok(pred(), 'condition never reached');
   };
   return { attacker: a.fighter, target: b.fighter, tick, until, events, projectiles, clones };
+}
+
+// Two CPUs (CombatAIController) in a real fight on a flat stage, stepped in
+// Battle.update's order. Returns every step's inputs and states, keyed by fighter.
+export function cpuFight(defA, defB, { seconds = 30, seed = 3, difficulty = 'brutal' } = {}) {
+  const stage = new StageCollision(stageMap());
+  const make = (def, x, facing, slot, n) => new Fighter({
+    def, sprites: fakeSpritesOf(def), stage, slot, label: `CPU ${n}`, spawn: { x, facing },
+    controller: new CombatAIController({ difficulty, rng: mulberry32(seed + n) }),
+  });
+  const a = make(defA, 900, 1, 'p1', 1);
+  const b = make(defB, 1100, -1, 'p2', 2);
+  a.opponent = b;
+  b.opponent = a;
+  const world = { stage, projectiles: [], clones: [], combat: new CombatSystem(), score: { p1: 0, p2: 0 }, timeLeft: 99, fighters: [a, b] };
+  const ctx = { stage, gravity: CONFIG.sim.gravity, battle: world };
+  const log = new Map([[a, []], [b, []]]);
+  const events = [];
+  for (let n = 0; n < seconds / DT; n++) {
+    for (const f of world.fighters) {
+      if (f.lostToVoid) continue;
+      f.update(DT, ctx);
+      log.get(f).push({
+        ...f.controller.out, attack: f.combat.attack?.def.id ?? null, shielding: f.combat.shielding,
+        state: f.state, grounded: f.grounded, frame: frameName(f),
+      });
+      // Back on stage at once if the Void takes one: the fight goes on.
+      if (f.body.y > 1600 || Math.abs(f.body.x - 1000) > 1800) f.respawn(stage);
+    }
+    separateFighters(a, b, stage);
+    for (const f of world.fighters) resolveSolidOverlap(f.body, stage);
+    spawnProjectiles(world.fighters, world.projectiles);
+    for (const p of world.projectiles) p.update(DT, stage);
+    updateClones(world.clones, DT);
+    spawnClones(world.fighters, world.clones, stage);
+    events.push(...world.combat.update(world.fighters, world.projectiles, world.clones));
+    removeDeadProjectiles(world.projectiles);
+    removeDeadClones(world.clones);
+  }
+  return { a, b, log, events, world };
 }

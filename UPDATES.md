@@ -410,6 +410,58 @@ and Quick Battle in `tests/practice-ground.test.mjs` and
 `tests/watch-mode.test.mjs`; pending attacks, which no fighter uses now, in
 `tests/basic-attack.test.mjs`.
 
+## #0003 added
+
+Not a named update (it can become one if the owner names it). Asked for as:
+add the supplied sprite sheet as character #0003, with frames for idle,
+jumping, fall, land, hurt, mid-air hurt, charge, mouvement (the Dash), run
+and attacks, properly cropped out.
+
+**What it added**
+
+- **Frames:** 51 PNGs in `assets/characters/0003/`, cut from the sheet: each
+  cropped tight to its art, the sheet's flat background (RGB 128, 128, 255)
+  made transparent and nothing else changed (1x, 8-bit RGBA). Idle 4, run 4,
+  Dash 2, jump 1, fall 2, land 2, hurt 1, mid-air hurt 1, Charge 4 + 2, and
+  the attacks: BA1 5 (straight punch), mid-air BA1 5 (somersault kick), BA2 6
+  (spinning kick), mid-air BA2 5 (dive) and the Palm Strike 7 (Unique Basic
+  Attack). Named by #0001's rules (`0003_1ba1.png` is BA1, frame 1).
+- **#0003** in `CHARACTERS`, roster slot 03: every clip anchored on the
+  sheet's own origin (`anchorX`), each attack timed to whole frames of its
+  clip with a hitbox measured from its strike and combat values following
+  #0001's move in the same role, a Dash, Charge art, its own body. No
+  Transform (left out of `actions`: no button), no Shield, no charged
+  action, projectile or effect. #0001 and #0002 are unchanged.
+- **Touch buttons:** Palm Strike (a new `palm` icon), Punch and Kick, with
+  French names.
+- **Credits:** a **#0003 sprite source** group: The Spriters Resource, sheet
+  ripped by Dazz & Fret (what the sheet credits; it names no game).
+- **Tests:** the real-art helpers (`tests/real-art.mjs`) and the CPU-fight
+  helper (`cpuFight` in `tests/fighter-harness.mjs`) moved out of
+  `tests/fighter-0002.test.mjs` so both fighter tests share them.
+
+**Where to tune it** (`js/data/characters.js`, #0003)
+
+- `FPS_0003`: the attacks', Charge's and the Dash's playback rates (each
+  attack's phases are whole frames at its rate); idle, run, jump, fall,
+  land and the hurt poses have their own `fps`.
+- Each attack in `attacks`: `damage`, `baseLaunch`, `directionalLaunch`,
+  `hitbox`, `hitstun`, `blockstun`, `hitstop`, `cooldown`, the momentum
+  fields and `hitCancel`.
+- `movement` (the Dash's `dashSpeed` and `dashTapWindow` included),
+  `powers`, `launchReaction` and `energy`: #0001's numbers, copied.
+- `collider`, `pushbox`, `hurtboxes`; `visual.height`
+  (`IDLE_ART_0003 * WORLD_PER_ART_0001`, about 83) and `visual.portrait`.
+- Each clip's `anchorX` and `heightRatio`.
+
+**Tests:** `tests/fighter-0003.test.mjs` (registration, the real PNGs and
+their crop, scale, anchors, body, portrait, every clip at runtime, each
+attack's frames, hitbox and launch, the Dash, Charge, CPU fights); its touch
+buttons in `tests/controls-ui.test.mjs`; the credits in
+`tests/settings.test.mjs` and `tests/i18n.test.mjs`; Practice, Watch Mode
+and Quick Battle in `tests/practice-ground.test.mjs` and
+`tests/watch-mode.test.mjs`.
+
 ## Control and move codenames
 
 Not a named update, and it changes no behaviour or tuning: later work

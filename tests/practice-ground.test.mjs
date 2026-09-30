@@ -194,9 +194,9 @@ const { HomeScreen } = await import('../js/screens/home-screen.js');
 const { CharacterSelectScreen } = await import('../js/screens/character-select-screen.js');
 const { PracticeGroundScreen, PRACTICE_DEFAULT_FIGHTER } = await import('../js/screens/practice-screen.js');
 
-// A third available fighter (same art as #0001, after the real #0001 and
-// #0002) so a swap between two fighters of the same art can be checked
-// too. Registered before any roster is built.
+// A fourth available fighter (same art as #0001, after the real #0001,
+// #0002 and #0003) so a swap between two fighters of the same art can be
+// checked too. Registered before any roster is built.
 const DEF_9999 = { ...DEF_0001, id: '9999', displayName: '#9999', rosterSlot: 5, available: true };
 CHARACTERS.push(DEF_9999);
 
@@ -239,7 +239,7 @@ function fakeApp() {
   const sprites = new Map();
   // Each fighter's own clips (#9999's are #0001's, which it copies).
   const spritesFor = (id) => {
-    if (!sprites.has(id)) sprites.set(id, id === '0002' ? fakeSpritesOf(getCharacter('0002')) : fakeSprites());
+    if (!sprites.has(id)) sprites.set(id, ['0002', '0003'].includes(id) ? fakeSpritesOf(getCharacter(id)) : fakeSprites());
     return sprites.get(id);
   };
   const app = {
@@ -1002,8 +1002,8 @@ test('the dialog shows the full configured roster; locked slots stay non-interac
   assert.equal(grid.children.length, CONFIG.roster.totalSlots);
   const available = slots.filter((s) => s._def?.available);
   const locked = slots.filter((s) => !s._def?.available);
-  assert.deepEqual(available.map((s) => s._def.id), ['0001', '0002', '9999']);
-  assert.equal(locked.length, CONFIG.roster.totalSlots - 3);
+  assert.deepEqual(available.map((s) => s._def.id), ['0001', '0002', '0003', '9999']);
+  assert.equal(locked.length, CONFIG.roster.totalSlots - 4);
   for (const s of locked) {
     assert.equal(s.tagName, 'DIV');
     assert.equal(s.hasAttribute('data-nav'), false);
@@ -1251,6 +1251,52 @@ test('#0002 can be the practice CPU, and #0001 can practise against it', async (
   assert.equal(screen.touch.buttons.get('uniqueba').getAttribute('aria-label'), 'Shuriken', 'Player 1\'s controls, not the CPU\'s');
   assert.equal(screen.hud.cpuPanel.name.textContent, '#0002');
   assert.ok(cpu.animator.frame.url.includes('/0002/'));
+});
+
+test('Change Fighter into and out of #0003: its own art and buttons, and its moves play in practice', async () => {
+  const { app, screen, loads } = await enterPractice();
+  const touch = screen.touch;
+  const buttons = new Map(touch.buttons);
+  const input = app.input;
+  for (const id of ['0003', '0001', '0002', '0003']) {
+    screen.openMenu();
+    screen.openRoster();
+    assert.equal(slotFor(screen, '0003')._index, 2, 'slot 03');
+    slotFor(screen, id).click(0);
+    await flush();
+    const p = screen.session.player;
+    assert.equal(loads.at(-1), id);
+    assert.equal(p.def.id, id);
+    assert.equal(p.sprites, app.getSprites(id), 'its own sprite set');
+    assert.ok(p.animator.frame.url.includes(`/${id}/`), 'its own art from the first frame');
+    assert.equal(screen.hud.panel.name.textContent, `#${id}`);
+    assert.equal(p.combat.launchPoint, 0);
+    assert.equal(screen.session.cpu.def.id, '0001', 'the CPU stays');
+    for (const [action, b] of buttons) assert.equal(touch.buttons.get(action), b, action);
+  }
+  // #0003's own buttons: Palm Strike, Punch and Kick, and no Transform.
+  const names = ['uniqueba', 'transform', 'ba1', 'ba2'].map((a) => touch.buttons.get(a).getAttribute('aria-label'));
+  assert.deepEqual(names, ['Palm Strike', null, 'Punch', 'Kick']);
+  assert.equal(touch.buttons.get('transform').hidden, true);
+  // Playing it: BA1 punches on its own art, and Transform does nothing.
+  const p = screen.session.player;
+  input.script.push({ transform: true, transformPressed: true });
+  screen.session.update(DT);
+  assert.equal(p.combat.attack, null, 'no Transform');
+  input.script.push({ ba1: true, ba1Pressed: true });
+  screen.session.update(DT);
+  assert.equal(p.combat.attack?.def.id, 'ba1');
+  assert.ok(p.animator.frame.url.endsWith('/0003/0003_1ba1.png'));
+});
+
+test('#0003 can be the practice CPU, and #0001 can practise against it', async () => {
+  const { screen } = await enterPractice();
+  const cpu = await enableCpu(screen, '0003');
+  assert.equal(cpu.def.id, '0003');
+  assert.equal(screen.session.player.def.id, '0001');
+  assert.equal(screen.touch.buttons.get('uniqueba').getAttribute('aria-label'), 'Shuriken', 'Player 1\'s controls, not the CPU\'s');
+  assert.equal(screen.hud.cpuPanel.name.textContent, '#0003');
+  assert.ok(cpu.animator.frame.url.includes('/0003/'));
 });
 
 // ---- Practice CPU ---------------------------------------------------------------
