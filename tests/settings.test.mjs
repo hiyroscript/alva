@@ -59,6 +59,10 @@ class Element extends Node {
     return this.attrs.has(name) ? this.attrs.get(name) : null;
   }
   hasAttribute(name) { return this.getAttribute(name) !== null; }
+  removeAttribute(name) {
+    if (BOOLEAN_ATTRS.includes(name)) this[name] = false;
+    else this.attrs.delete(name);
+  }
   set textContent(v) { this.replaceChildren(new Text(String(v))); }
   get textContent() { return this.children.map((c) => c.textContent).join(''); }
   set innerHTML(v) { this.replaceChildren(); this.html = v; }
@@ -381,10 +385,10 @@ test('custom layouts are checked: malformed objects, unknown ids, non-finite coo
         stick: { x: 0.2, y: 0.8, scale: 1.25 },
         jump: { x: 1.7, y: -3, scale: 9 }, // pulled onto the edges and the largest size
         shield: { x: 0.5, y: 0.5, scale: 0.1 }, // the smallest size
-        ba1: { x: Infinity, y: 0.5, scale: 1 }, // dropped
-        ba2: { x: 0.5, y: Number.NaN, scale: 1 }, // (NaN is null in JSON) dropped
+        attack1: { x: Infinity, y: 0.5, scale: 1 }, // dropped
+        attack2: { x: 0.5, y: Number.NaN, scale: 1 }, // (NaN is null in JSON) dropped
         transform: { x: '0.5', y: 0.5, scale: 1 }, // dropped
-        uniqueba: { x: 0.5, y: 0.5 }, // no scale: dropped
+        extra_attack: { x: 0.5, y: 0.5 }, // no scale: dropped
         runLeft: { x: 0.5, y: 0.5, scale: 1 }, // not a joystick control: dropped
         __proto__: { x: 0.5, y: 0.5, scale: 1 },
         charge: [0.5, 0.5, 1], // dropped

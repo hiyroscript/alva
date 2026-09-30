@@ -12,27 +12,25 @@ import { createProjectileDefinition } from './projectile.js';
 import { createSummonDefinition, summonProblem } from './clone.js';
 import { ChargedTechnique, createTechniqueDefinition, techniqueProblem } from './charged-technique.js';
 import { getJumpVelocity, getMaxSpeed } from '../data/powers.js';
+import { chargeReplacement } from '../data/loadout.js';
+import { COMBAT_BUTTONS } from '../config.js';
+import { blankInput } from './fighter-controller.js';
 import { approach, clamp, sign } from '../core/utils.js';
 
-// The combat buttons, by control codename: each maps to an attack through
-// the character's `actions`, and ba1 / ba2 to a charged action (cba1 / cba2)
-// through its `chargedActions`. shield, jump and charge are held-state
-// controls, read separately.
-export const COMBAT_ACTIONS = ['uniqueba', 'transform', 'ba1', 'ba2'];
+// The combat buttons, by control codename (COMBAT_BUTTONS in js/config.js):
+// extra_attack, transform and attack1 to attack5. Each maps to an attack
+// through the character's `actions`; a fighter acts only on the ones it
+// has there. attack1 and attack2 may also have a Charge replacement
+// (attack3, attack4) in its `chargeReplacements` (see js/data/loadout.js).
+// shield, jump and charge are held-state controls, read separately.
+export const COMBAT_ACTIONS = COMBAT_BUTTONS;
 
 // stateTime is a sum of fixed steps, which drifts just below whole-step
 // boundaries (12 steps of 1/60 s sum to 0.19999...), so timed clip phases
 // compare with a little slack and last exactly their whole number of steps.
 const TIME_EPSILON = 1e-6;
 
-const NEUTRAL_INPUT = Object.freeze({
-  runLeft: false, runRight: false, charge: false, jump: false, shield: false,
-  uniqueba: false, transform: false, ba1: false, ba2: false,
-  runLeftPressed: false, runRightPressed: false, mouvementLeftPressed: false, mouvementRightPressed: false,
-  jumpPressed: false, chargePressed: false, shieldPressed: false,
-  uniquebaPressed: false, transformPressed: false, ba1Pressed: false, ba2Pressed: false,
-  dropPressed: false,
-});
+const NEUTRAL_INPUT = Object.freeze(blankInput());
 
 // Keeps two fighters' pushboxes apart (see separate in js/game/physics.js),
 // as every fixed step does after the fighters move. A fighter flying off a
@@ -54,13 +52,15 @@ export class Fighter {
     this.animator = new SpriteAnimator(sprites);
     // One pass of the touchdown clip; 0 skips the land state entirely.
     this.landDuration = sprites.duration('land');
-    // One pass of the Charge startup clip; the loop clip follows it.
-    this.chargeStartDuration = sprites.duration('chargeStart');
-    // One Charge frame-time of the release pose; 0 skips it entirely.
-    this.chargeReleaseDuration = sprites.duration('chargeRelease');
-    // One pass of the dash clip: how long a Dash lasts (0 without its art,
-    // and then no Dash starts; see tryDash).
-    this.dashDuration = sprites.duration('dash');
+    // One pass of the Charge startup clip (`charge`); the loop clip
+    // (`charge_loop`) follows it.
+    this.chargeStartDuration = sprites.duration('charge');
+    // One Charge frame-time of the release pose (`charge_release`); 0 skips
+    // it entirely.
+    this.chargeReleaseDuration = sprites.duration('charge_release');
+    // One pass of the mouvment clip: how long a Dash lasts (0 without its
+    // art, and then no Dash starts; see tryDash).
+    this.dashDuration = sprites.duration('mouvment');
     // A pending attack (art only, see js/game/combat.js) lasts one pass of
     // its own clip.
     this.attacks = Object.fromEntries(
@@ -179,9 +179,9 @@ export class Fighter {
     // buffered attack's.
     this.steps = 0;
     this.jumpPressedAt = -1;
-    // The latest uniqueba / ba1 / ba2 press the fighter could not act on yet
-    // ({ action, age, at }), tried again every step for
-    // movement.attackBuffer seconds (see bufferAttack), or null.
+    // The latest combat button press (extra_attack, attack1 to attack5) the
+    // fighter could not act on yet ({ action, age, at }), tried again every
+    // step for movement.attackBuffer seconds (see bufferAttack), or null.
     this.bufferedAttack = null;
     // Down (the Charge input) is held in the air: the fast fall's (see
     // update). Such a hold does not become a Charge on landing; it must be
@@ -333,10 +333,12 @@ export class Fighter {
     const held = (input.runRight ? 1 : 0) - (input.runLeft ? 1 : 0);
 
     // ---- Combat intents --------------------------------------------------
-    // Actions mapped to null are wired but reserved (see tryAction). A press
+    // Actions mapped to null are wired but reserved, and a button the
+    // character has no action for does nothing (see tryAction). A press
     // while already Charging (since an earlier step) with Charge still held
-    // is a charged action first (see tryChargedAction): one that starts, or
-    // one still cooling down, consumes the press; otherwise the normal
+    // is the button's Charge replacement first (see tryChargeReplacement):
+    // one that starts, or one still cooling down, consumes the press;
+    // otherwise (none on that button, or it cannot happen) the normal
     // attack gets it. Letting go of Charge on the press step, or pressing it
     // with a fresh Charge, is a normal attack.
     //
@@ -345,7 +347,7 @@ export class Fighter {
     // (see bufferAttack) and tried again every later step until it starts
     // or expires, so an attack pressed slightly early comes out on the
     // first step it can. A newer press replaces it. Only ever an ordinary
-    // attack: a charged action needs its own press, while Charging.
+    // attack: a Charge replacement needs its own press, while Charging.
     //
     // Buffered presses keep their order: a jump pressed before the attack
     // (both waiting on the same recovery) goes first, and the attack comes
@@ -362,7 +364,7 @@ export class Fighter {
         this.bufferAttack(action);
         continue;
       }
-      if (charged && this.tryChargedAction(action)) {
+      if (charged && this.tryChargeReplacement(action)) {
         this.bufferedAttack = null;
         started = true;
         continue;
@@ -876,9 +878,9 @@ export class Fighter {
     if (!speed || !direction) return false;
     if (!this.canFollowUp() || !this.body.grounded || this.charging || input.charge) return false;
     if (this.combat.shielding || (input.shield && this.shieldAllowed())) return false;
-    // Never a fast run passed off as a Dash: require real dash frames.
-    if (!this.dashDuration || !this.sprites.has('dash')) {
-      console.warn('[Alva] Dash has no animation frames; ignoring.');
+    // Never a fast run passed off as a Dash: require real mouvment frames.
+    if (!this.dashDuration || !this.sprites.has('mouvment')) {
+      console.warn('[Alva] Dash has no mouvment animation frames; ignoring.');
       return false;
     }
     const cutting = !!this.combat.attack;
@@ -889,7 +891,7 @@ export class Fighter {
     this.body.vx = direction * speed;
     // Every Dash plays its clip from the first frame, even straight after
     // another one.
-    this.animator.play('dash', { restart: true });
+    this.animator.play('mouvment', { restart: true });
     return true;
   }
 
@@ -899,19 +901,21 @@ export class Fighter {
     this.dash = null;
   }
 
-  // The charged action for `action`, dispatched on its type: a `summon`
-  // (#0001's cba1, the Clone Attack, see trySummon) or a `technique`
-  // (#0001's cba2, the Sphere Rush, see tryTechnique). True when it
-  // consumed the press: it happened, or it is still cooling down (then
-  // nothing happens at all: no normal attack instead, and the cooldown is
-  // left as it is). False leaves the press to the normal attack.
-  tryChargedAction(action) {
-    const charged = this.def.chargedActions?.[action];
-    if (!charged) return false;
-    if (this.combat.chargedCooldowns.active(charged.id)) return true;
-    if (charged.type === 'summon') return this.trySummon(action, charged.id);
-    if (charged.type === 'technique') return this.tryTechnique(action, charged.id);
-    console.warn(`[Alva] Charged ${action} has an unknown type "${charged.type}"; ignoring.`);
+  // `action`'s Charge replacement (see js/data/loadout.js), dispatched on
+  // its type: a `summon` (#0001's attack3, the Clone Attack, from attack1;
+  // see trySummon) or a `technique` (#0001's attack4, the Sphere Rush, from
+  // attack2; see tryTechnique). True when it consumed the press: it
+  // happened, or it is still cooling down (then nothing happens at all: no
+  // normal attack instead, and the cooldown is left as it is). False (none
+  // on this button, or it cannot happen) leaves the press to the normal
+  // attack.
+  tryChargeReplacement(action) {
+    const replacement = chargeReplacement(this.def, action);
+    if (!replacement) return false;
+    if (this.combat.chargedCooldowns.active(replacement.id)) return true;
+    if (replacement.type === 'summon') return this.trySummon(action, replacement.id);
+    if (replacement.type === 'technique') return this.tryTechnique(action, replacement.id);
+    console.warn(`[Alva] Charge replacement on ${action} has an unknown type "${replacement.type}"; ignoring.`);
     return false;
   }
 
@@ -1016,8 +1020,8 @@ export class Fighter {
   // once the fighter is free (the combat input buffer keeps only those): it
   // maps to an attack for where the fighter is, and that attack could start
   // here at all (on the ground if ground-only, with its art). Never a
-  // reserved button (transform), an air uniqueba or an attack without
-  // frames.
+  // reserved button (transform), a button the character does not have, an
+  // air extra_attack that is ground-only or an attack without frames.
   attackMayStart(action) {
     const attackId = this.attackFor(action);
     const atk = attackId ? this.attacks[attackId] : null;
@@ -1027,7 +1031,8 @@ export class Fighter {
 
   // Attack id for a controller action. The character's `actions` entry is a
   // string (one attack), { ground, air } (chosen by whether the fighter is
-  // grounded as the button is pressed) or null (reserved).
+  // grounded as the button is pressed: attackN / midair_attackN), null
+  // (reserved) or missing (no such button).
   attackFor(action) {
     const mapping = this.def.actions?.[action];
     if (!mapping || typeof mapping === 'string') return mapping || null;
@@ -1102,13 +1107,14 @@ export class Fighter {
   // Animation key for a visual state. An attack plays its own clip for its
   // whole length, even if the fighter lands or leaves the ground meanwhile.
   // Hitstun, and being bound by a charged technique, show `hurt` on the
-  // ground and `midairHurt` in the air. A charged technique plays the clip
-  // of its current phase. Charge plays `chargeStart` once, then `chargeLoop`
-  // for the rest of the hold; a new Charge resets stateTime, so it starts
-  // from the first frame. The Shield shows its held pose where the fighter
-  // is (`airAnimation` in the air), opening with `groundStartAnimation` for
-  // one frame when it goes up on the ground; `shieldRelease` is
-  // `groundReleaseAnimation`.
+  // ground and `midair_hurt` in the air. A charged technique plays the clip
+  // of its current phase. Charge plays its startup (`charge`) once, then
+  // `charge_loop` for the rest of the hold; a new Charge resets stateTime,
+  // so it starts from the first frame. Its release pose is
+  // `charge_release`, and a Dash plays `mouvment`. The Shield shows its
+  // held pose where the fighter is (`airAnimation` in the air), opening
+  // with `groundStartAnimation` for one frame when it goes up on the
+  // ground; the shieldRelease state is `groundReleaseAnimation`.
   animationFor(state) {
     if (state === 'attack') return this.combat.attack.def.animation;
     if (state === 'shield') {
@@ -1119,11 +1125,13 @@ export class Fighter {
     }
     if (state === 'shieldRelease') return this.defense.groundReleaseAnimation;
     if (state === 'technique') return this.technique.animation;
-    if (state === 'hitstun' || state === 'bound') return this.body.grounded ? 'hurt' : 'midairHurt';
-    if (state === 'tumble') return 'midairHurt';
+    if (state === 'hitstun' || state === 'bound') return this.body.grounded ? 'hurt' : 'midair_hurt';
+    if (state === 'tumble') return 'midair_hurt';
     if (state === 'charge') {
-      return this.stateTime < this.chargeStartDuration - TIME_EPSILON ? 'chargeStart' : 'chargeLoop';
+      return this.stateTime < this.chargeStartDuration - TIME_EPSILON ? 'charge' : 'charge_loop';
     }
+    if (state === 'chargeRelease') return 'charge_release';
+    if (state === 'dash') return 'mouvment';
     return state;
   }
 
@@ -1147,7 +1155,7 @@ export class Fighter {
 
   // A voluntary Charge release starts the chargeRelease state; it then lasts
   // one Charge frame-time while nothing of higher priority takes over. A new
-  // Charge outranks it and starts again from charge1.
+  // Charge outranks it and starts again from charge_1.
   isReleasingCharge(dt) {
     if (!this.chargeReleaseDuration) return false;
     if (this.chargeReleased) return true;

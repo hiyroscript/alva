@@ -555,22 +555,22 @@ test('Speed Power leaves every other velocity alone: launches received, the shur
     const thrower = makeFighter({ character });
     const projectiles = [];
     for (let i = 0; i < 30 && !projectiles.length; i++) {
-      thrower.step(i === 0 ? { uniqueba: true, uniquebaPressed: true } : {});
+      thrower.step(i === 0 ? { extra_attack: true, extra_attackPressed: true } : {});
       spawnProjectiles([thrower.fighter], projectiles);
     }
     assert.equal(projectiles.length, 1);
-    assert.equal(projectiles[0].vx, def.projectiles.shuriken.speed, label);
-    assert.equal(def.projectiles.shuriken.speed, 700);
+    assert.equal(projectiles[0].vx, def.projectiles.extra_attack_object.speed, label);
+    assert.equal(def.projectiles.extra_attack_object.speed, 700);
 
     // The Sphere Rush dashes at its own 1050.
     const rusher = makeFighter({ character });
     rusher.step({ charge: true });
-    rusher.step({ charge: true, ba2: true, ba2Pressed: true });
+    rusher.step({ charge: true, attack2: true, attack2Pressed: true });
     const technique = rusher.fighter.technique;
     assert.ok(technique, `${label}: the Sphere Rush started`);
     stepUntil(rusher.step, () => technique.phase === 'dash');
-    assert.equal(rusher.fighter.body.vx, def.chargedTechniques.cba2.dashSpeed, label);
-    assert.equal(def.chargedTechniques.cba2.dashSpeed, 1050);
+    assert.equal(rusher.fighter.body.vx, def.chargedTechniques.attack4.dashSpeed, label);
+    assert.equal(def.chargedTechniques.attack4.dashSpeed, 1050);
 
     // A Shield held from standing still adds no movement, however fast the
     // fighter could run.

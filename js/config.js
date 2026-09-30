@@ -73,16 +73,24 @@ export const CONFIG = Object.freeze({
   // below.
   // `shield` is the shared Shield button; each character's `defense` entry
   // decides what it does (#0001 holds it to Shield).
+  // The numbered attack buttons sit on the right hand: attack1 to attack3
+  // along the row above J K L (U I O), attack4 and attack5 on the row below
+  // it (M ,). A fighter only acts on the ones it has a button for (see
+  // js/data/loadout.js): #0001 uses U and I, and reaches its attack3 and
+  // attack4 through Charge (S / ↓) with them.
   bindings: {
     runLeft: ['KeyA', 'ArrowLeft'],
     runRight: ['KeyD', 'ArrowRight'],
     charge: ['KeyS', 'ArrowDown'],
     jump: ['KeyW', 'Space', 'ArrowUp'],
-    uniqueba: ['KeyJ'],
+    extra_attack: ['KeyJ'],
     transform: ['KeyK'],
     shield: ['KeyL'],
-    ba1: ['KeyU'],
-    ba2: ['KeyI'],
+    attack1: ['KeyU'],
+    attack2: ['KeyI'],
+    attack3: ['KeyO'],
+    attack4: ['KeyM'],
+    attack5: ['Comma'],
     pause: ['Escape', 'KeyP'],
   },
 
@@ -101,10 +109,20 @@ export const CONFIG = Object.freeze({
   },
 });
 
+// The numbered attacks, in order: every character has attack1 and attack2
+// and at most these five (see js/data/loadout.js for which of them have a
+// button of their own and which Charge reaches instead).
+export const NUMBERED_ATTACKS = Object.freeze(['attack1', 'attack2', 'attack3', 'attack4', 'attack5']);
+
+// The combat buttons: one per numbered attack, the optional extra_attack
+// and the reserved transform. Each maps to a move through the character's
+// `actions`; shield, jump and charge are held-state controls, read apart.
+export const COMBAT_BUTTONS = Object.freeze(['extra_attack', 'transform', ...NUMBERED_ATTACKS]);
+
 // The control codenames: universal, the same for every character.
 export const ACTIONS = Object.freeze([
   'runLeft', 'runRight', 'charge', 'jump',
-  'uniqueba', 'transform', 'shield', 'ba1', 'ba2',
+  'extra_attack', 'transform', 'shield', ...NUMBERED_ATTACKS,
   'pause',
 ]);
 
@@ -116,29 +134,37 @@ export const ACTION_LABELS = Object.freeze({
   runRight: 'Move right',
   charge: 'Charge',
   jump: 'Jump',
-  uniqueba: 'Unique Basic Attack',
+  extra_attack: 'Extra Attack',
   transform: 'Transform',
   shield: 'Shield',
-  ba1: 'Basic Attack 1',
-  ba2: 'Basic Attack 2',
+  attack1: 'Attack 1',
+  attack2: 'Attack 2',
+  attack3: 'Attack 3',
+  attack4: 'Attack 4',
+  attack5: 'Attack 5',
   pause: 'Pause',
 });
 
 // The move codenames: universal, the same for every character. A
 // character's moves are keyed by these (in its `attacks`, `summons` and
 // `chargedTechniques`) whatever it calls them in game; its own ability
-// names are per character. Each move belongs to the button that makes it:
-// `ground` and `air` are picked by where the fighter is as the button is
-// pressed (its `actions`), `charged` needs Charge held (its
-// `chargedActions`), and a move with no variant is the button's one move.
-// `label` is the neutral name, for a character with no name of its own.
+// names are per character. `number` is a numbered attack's (its
+// `midair_` version shares it, `air` marking it), and `label` the neutral
+// name, for a character with no name of its own. Nothing here says what a
+// move does for a character: whether attack3 is a third button or what
+// Charge + attack1 makes is the character's loadout (see
+// js/data/loadout.js).
 export const MOVES = Object.freeze({
-  ba1: Object.freeze({ button: 'ba1', variant: 'ground', label: 'Basic Attack 1' }),
-  maba1: Object.freeze({ button: 'ba1', variant: 'air', label: 'Mid-air Basic Attack 1' }),
-  cba1: Object.freeze({ button: 'ba1', variant: 'charged', label: 'Charged Basic Attack 1' }),
-  ba2: Object.freeze({ button: 'ba2', variant: 'ground', label: 'Basic Attack 2' }),
-  maba2: Object.freeze({ button: 'ba2', variant: 'air', label: 'Mid-air Basic Attack 2' }),
-  cba2: Object.freeze({ button: 'ba2', variant: 'charged', label: 'Charged Basic Attack 2' }),
-  uniqueba: Object.freeze({ button: 'uniqueba', variant: null, label: 'Unique Basic Attack' }),
-  transform: Object.freeze({ button: 'transform', variant: null, label: 'Transform' }),
+  attack1: Object.freeze({ number: 1, air: false, label: 'Attack 1' }),
+  midair_attack1: Object.freeze({ number: 1, air: true, label: 'Mid-air Attack 1' }),
+  attack2: Object.freeze({ number: 2, air: false, label: 'Attack 2' }),
+  midair_attack2: Object.freeze({ number: 2, air: true, label: 'Mid-air Attack 2' }),
+  attack3: Object.freeze({ number: 3, air: false, label: 'Attack 3' }),
+  midair_attack3: Object.freeze({ number: 3, air: true, label: 'Mid-air Attack 3' }),
+  attack4: Object.freeze({ number: 4, air: false, label: 'Attack 4' }),
+  midair_attack4: Object.freeze({ number: 4, air: true, label: 'Mid-air Attack 4' }),
+  attack5: Object.freeze({ number: 5, air: false, label: 'Attack 5' }),
+  midair_attack5: Object.freeze({ number: 5, air: true, label: 'Mid-air Attack 5' }),
+  extra_attack: Object.freeze({ number: null, air: false, label: 'Extra Attack' }),
+  transform: Object.freeze({ number: null, air: false, label: 'Transform' }),
 });

@@ -5,26 +5,33 @@
 // js/data/characters.js and read only here: UI data, never combat data.
 // Which abilities a fighter has comes from its `actions`, the same data
 // combat and the CPU go by, so the buttons can never offer a move the
-// fighter does not have. The buttons keep sending the uniqueba / transform
-// / ba1 / ba2 control codenames, so the internal input names are the same
-// whatever a button looks like.
+// fighter does not have: a numbered attack only Charge reaches (#0001's
+// attack3 and attack4, see js/data/loadout.js) has no button, and the
+// button it replaces makes it while Charging. The buttons keep sending the
+// extra_attack / transform / attack1 ... attack5 control codenames, so the
+// internal input names are the same whatever a button looks like.
 //
 // Names are shown in the interface language (js/core/i18n.js): a fighter's
 // own name for a button where the translations have it, the neutral control
 // name where the fighter has none, and otherwise the authored name as it is.
 
 import { t, hasTranslation } from '../core/i18n.js';
+import { COMBAT_BUTTONS } from '../config.js';
 import { ICONS } from './icons.js';
 
-// The touch buttons whose look belongs to the fighter. The rest (shield,
-// jump, charge, runLeft, runRight and the mouvement buttons) are universal,
-// the same for everyone.
-export const ABILITY_ACTIONS = Object.freeze(['uniqueba', 'transform', 'ba1', 'ba2']);
+// The touch buttons whose look belongs to the fighter: every combat button
+// (COMBAT_BUTTONS in js/config.js). The rest (shield, jump, charge,
+// runLeft, runRight and the mouvement buttons) are universal, the same for
+// everyone.
+export const ABILITY_ACTIONS = COMBAT_BUTTONS;
 
 // A fighter with no entry for one of them (a future, unfinished fighter)
 // still gets a usable button: the generic action name and a neutral glyph
-// that tells them apart.
-const FALLBACK_ICONS = Object.freeze({ uniqueba: 'ring', transform: 'transform', ba1: 'pip1', ba2: 'pip2' });
+// that tells them apart (one pip per attack number).
+const FALLBACK_ICONS = Object.freeze({
+  extra_attack: 'ring', transform: 'transform',
+  attack1: 'pip1', attack2: 'pip2', attack3: 'pip3', attack4: 'pip4', attack5: 'pip5',
+});
 
 // Buttons shown as reserved (a dashed outline) while the fighter has no
 // entry of its own for them: a fighter with a Transform presents it in its
@@ -37,9 +44,11 @@ const RESERVED = new Set(['transform']);
 //   'reserved'     mapped to null, or Transform with nothing of the
 //                  fighter's own to present: wired, a move still to come,
 //                  shown dashed
-//   'absent'       left out of its `actions`: a move the fighter does not
-//                  possess at all (e.g. a fighter whose moves are not
-//                  authored yet), so it has no button
+//   'absent'       left out of its `actions`: a button the fighter does not
+//                  have at all (attack3 to attack5 for a fighter with fewer
+//                  numbered attacks, or with the ones it has reached
+//                  through Charge; an extra_attack it has none of), so it
+//                  shows no button
 //
 // With no `actions` to go by (no fighter named yet) every button stays,
 // Transform reserved. A fighter that presents its own Transform (in

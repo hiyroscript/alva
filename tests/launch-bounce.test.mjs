@@ -332,7 +332,7 @@ test('a strong downward launch rebounds off the floor, and is not a landing', ()
   assert.deepEqual([fighter.bounce.normalX, fighter.bounce.normalY], [0, -1]);
   assert.notEqual(fighter.state, 'land', 'no Land pose');
   assert.equal(fighter.state, 'hitstun');
-  assert.equal(frameName(fighter), '0001_midairhurt.png');
+  assert.equal(frameName(fighter), '0001_midair_hurt_1.png');
   assert.equal(fighter.airJumps, 0, 'no landing gives the air jump back');
   assert.equal(fighter.canAct(), false, 'not grounded neutral');
   assert.equal(log.every((s) => s.y <= FLOOR), true);
@@ -460,9 +460,9 @@ test('Launch Point decides it: the same punch into the same wall stops a fresh t
   for (const lp of [0, 20, 40, 60, 100, 160]) {
     const d = wallDuel();
     d.target.combat.launchPoint = lp;
-    d.tick(P('ba1'));
+    d.tick(P('attack1'));
     const b = tickForBounce(d);
-    assert.equal(d.events[0].move, 'ba1');
+    assert.equal(d.events[0].move, 'attack1');
     results.push({ lp, bounced: !!b, speed: b?.speed ?? 0 });
   }
   assert.deepEqual(results.map((r) => r.bounced), [false, false, false, true, true, true]);
@@ -473,7 +473,7 @@ test('a Shield blocks the launch, so nothing rebounds, however high the Launch P
   const d = wallDuel();
   d.target.combat.launchPoint = 300;
   d.tick({}, { shield: true });
-  d.tick(P('ba1'), { shield: true });
+  d.tick(P('attack1'), { shield: true });
   const b = tickForBounce(d, 60, {}, { shield: true });
   assert.equal(d.events[0].type, 'block');
   assert.equal(b, null);
@@ -513,13 +513,13 @@ test('a rebound keeps the fighter stunned while it flies off the surface, then c
   // then: it never fires.)
   const steps = Math.round(B.stun / DT) - 1;
   for (let i = 0; i < steps; i++) {
-    step({ runLeft: true, ...(i === 0 ? P('ba1') : {}) });
+    step({ runLeft: true, ...(i === 0 ? P('attack1') : {}) });
     assert.equal(fighter.combat.attack, null, 'cannot attack while it flies off');
   }
   // Grounded and free: the launch is over, and normal movement resumes.
   run(step, (f) => f.canAct() && f.launch === null, {}, 60);
-  step({ ...P('ba1') });
-  assert.equal(fighter.combat.attack?.def.id, 'ba1');
+  step({ ...P('attack1') });
+  assert.equal(fighter.combat.attack?.def.id, 'attack1');
 });
 
 test('acting again ends the launch: a fighter that has recovered stops against a wall like anyone', () => {
@@ -617,7 +617,7 @@ test('no wall loop: punching a battered opponent into a wall over and over ends 
     let best = 0;
     let free = false;
     for (let t = 0; t < 60 * 6; t++) {
-      const held = t % 2 === 0 ? P('ba1') : {};
+      const held = t % 2 === 0 ? P('attack1') : {};
       if (chase && d.target.body.x > d.attacker.body.x + 30) held.runRight = true;
       const before = d.events.length;
       d.tick(held);
@@ -646,9 +646,9 @@ test('projectiles: the shuriken never launches, so it never makes anyone rebound
   const stage = stageWith({ solids: [wallAt('wall', x + 200 + HALF + 10)] });
   const d = duel({ gap: 200, stage, x });
   d.target.combat.launchPoint = 400;
-  d.tick(P('uniqueba'));
+  d.tick(P('extra_attack'));
   const b = tickForBounce(d, 90);
-  assert.equal(d.events[0].move, 'shuriken');
+  assert.equal(d.events[0].move, 'extra_attack_object');
   assert.equal(b, null);
   assert.equal(d.target.launch, null);
 });
@@ -661,7 +661,7 @@ test('a clone\'s punch launches through the same system: a battered target rebou
   const d = duel({ gap: 420, stage, x });
   d.target.combat.launchPoint = 100;
   d.tick({ charge: true });
-  d.tick({ charge: true, ...P('ba1') });
+  d.tick({ charge: true, ...P('attack1') });
   assert.equal(d.clones.length, 1, 'a clone');
   const b = tickForBounce(d, 120, { charge: true });
   assert.ok(d.events.some((e) => e.summon && e.type === 'hit'), 'the clone hit');
@@ -676,7 +676,7 @@ test('the Sphere Rush explosion launches through the same system: into a nearby 
   const d = duel({ gap: 140, stage, x, pushboxes: true });
   d.target.combat.launchPoint = 60;
   d.tick({ charge: true });
-  d.tick({ charge: true, ...P('ba2') });
+  d.tick({ charge: true, ...P('attack2') });
   const t = d.attacker.technique;
   assert.ok(t, 'the Sphere Rush started');
   let b = null;
@@ -727,7 +727,7 @@ test('Desert: a hard punch drives the opponent into a rock outcrop and it reboun
   p1.body.x = p1.body.prevX = p2.body.x - 40;
   p1.facing = 1;
   p2.combat.launchPoint = 140;
-  script.once = P('ba1');
+  script.once = P('attack1');
   let b = null;
   for (let i = 0; i < 60 && !b; i++) {
     battle.update(DT);

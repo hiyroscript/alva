@@ -275,6 +275,17 @@ test('Home → Discover opens on Power; Back returns Home', () => withTestFighte
 }));
 
 test('with no playable fighter Discover still opens from Home, and Back returns to it', () => {
+  // #0001 disabled for this test only: nothing is playable.
+  const only = CHARACTERS.find((c) => c.id === '0001');
+  only.available = false;
+  try {
+    noFighters();
+  } finally {
+    only.available = true;
+  }
+});
+
+function noFighters() {
   const { app, home, discover } = boot();
   const { play, watch, practice } = home.actions;
   assert.deepEqual([play, watch, practice].map((b) => b.disabled), [true, true, true], 'only the match actions close');
@@ -285,7 +296,7 @@ test('with no playable fighter Discover still opens from Home, and Back returns 
   discover.el.querySelector('.btn-back').click();
   assert.equal(app.screens.current, home);
   assert.equal(document.activeElement, home.actions.discover);
-});
+}
 
 test('Esc, Backspace and gamepad Back leave Discover for Home', () => {
   for (const code of ['Escape', 'Backspace', 'KeyK']) {
@@ -561,7 +572,7 @@ test('the Launch page shows no tuning numbers, no fighter or attack, and nothing
   const page = launch.panel;
   // The only numbers are the Base Launch values themselves.
   assert.doesNotMatch(text(page), /[4-9]|\d{2,}/, 'no velocities or other tuning values');
-  assert.doesNotMatch(everything(page), /#0001|\bBA\d|Basic Attack|mid-?air|Throw|shuriken|Sphere|Rush|clone/i, 'no fighter or attack is named');
+  assert.doesNotMatch(everything(page), /#0001|\battack\s?\d|extra.attack|mid-?air|Throw|shuriken|Sphere|Rush|clone/i, 'no fighter or attack is named');
   assert.deepEqual(page.querySelectorAll('button').concat(page.querySelectorAll('[data-nav]')), []);
 });
 
@@ -609,7 +620,7 @@ test('the Power and Launch pages stay the same as the roster grows', () => {
   const before = render();
   const extra = {
     ...CHARACTERS[0], id: '9998', displayName: '#9998', rosterSlot: 7, available: true, powers: { jump: 3, speed: 1 },
-    attacks: { ...CHARACTERS[0].attacks, ba1: { ...CHARACTERS[0].attacks.ba1, baseLaunch: 3, directionalLaunch: 'vertical' } },
+    attacks: { ...CHARACTERS[0].attacks, attack1: { ...CHARACTERS[0].attacks.attack1, baseLaunch: 3, directionalLaunch: 'vertical' } },
   };
   CHARACTERS.push(extra);
   try {

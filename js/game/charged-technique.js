@@ -1,23 +1,26 @@
 // Charged techniques: moves the fighter itself performs from Charge.
 //
-// A charged action (see `chargedActions` in js/data/characters.js) is either
-// a summon, a detached temporary entity (js/game/clone.js), or a technique:
+// A Charge replacement (see `chargeReplacements` in js/data/characters.js
+// and js/data/loadout.js) is either a summon, a detached temporary entity
+// (js/game/clone.js), or a technique:
 // a multi-phase move the real fighter performs, driven by this runtime. The
 // Fighter starts one (Fighter.tryTechnique), advances it every fixed step,
 // moves its body and ends it; the CombatSystem resolves its hits. It is
 // not an attack (no combat.attack), a projectile or a summon. Behaviour is
-// data on the character (`chargedTechniques`), e.g. #0001's Sphere Rush
-// (cba2):
+// data on the character (`chargedTechniques`, keyed by the attack it is),
+// e.g. #0001's Sphere Rush (attack4, Charge + attack2). Its fighter clips
+// are named after it (attack4_...) and so is its sphere's art
+// (attack4_object_...):
 //
 //   chargedTechniques: {
-//     cba2: {
-//       formAnimation: 'rasenForm', dashAnimation: 'rasenDash', confirmAnimation: 'rasenConfirm',
-//       explosionAnimation: 'rasenExplosion', releaseAnimation: 'rasenRelease',
-//       whiffReleaseAnimation: 'rasenWhiffRelease',
-//       sphereBuild: 'rasenSphereBuild', sphereImpact: 'rasenSphereImpact',
-//       sphereExplosion: 'rasenSphereExplosion',
+//     attack4: {
+//       formAnimation: 'attack4_form', dashAnimation: 'attack4_dash', confirmAnimation: 'attack4_confirm',
+//       explosionAnimation: 'attack4_explosion', releaseAnimation: 'attack4_release',
+//       whiffReleaseAnimation: 'attack4_whiff_release',
+//       sphereBuild: 'attack4_object_build', sphereImpact: 'attack4_object_impact',
+//       sphereExplosion: 'attack4_object_explosion',
 //       cooldown: 5, dashSpeed: 1050,
-//       handOffsets: { rasenForm: [{ x, y }, ...], rasenDash: [...] },
+//       handOffsets: { attack4_form: [{ x, y }, ...], attack4_dash: [...] },
 //       sphereHitbox: { x: -24, y: -24, w: 48, h: 48 }, targetOffset: { x: 0, y: -48 },
 //       explosionDelay: 2.0, sphereGrowth: { startScale: 1, endScale: 1.4 },
 //       firstHit: { damage: 0, ... }, tickInterval: 0.5, tickHit: { damage: 1, ... },
@@ -152,18 +155,21 @@ export function createTechniqueDefinition(spec) {
   return Object.freeze(def);
 }
 
+// The fields naming a technique's fighter clips (fighter animations) and
+// its sphere's clips (effect animations).
+export const TECHNIQUE_CLIPS = Object.freeze([
+  'formAnimation', 'dashAnimation', 'confirmAnimation', 'explosionAnimation', 'releaseAnimation', 'whiffReleaseAnimation',
+]);
+export const TECHNIQUE_EFFECTS = Object.freeze(['sphereBuild', 'sphereImpact', 'sphereExplosion']);
+
 // Why `owner` cannot start `def` right now, or null when it can. Checked
 // before anything happens: never a blue sphere around the wrong pose, nor
 // an invisible sphere, bind or delayed hit.
 export function techniqueProblem(owner, def) {
-  const clips = [
-    def.formAnimation, def.dashAnimation, def.confirmAnimation,
-    def.explosionAnimation, def.releaseAnimation, def.whiffReleaseAnimation,
-  ];
-  for (const key of clips) {
+  for (const key of TECHNIQUE_CLIPS.map((field) => def[field])) {
     if (!key || !owner.sprites.has(key)) return `its fighter clip "${key}" has no animation frames`;
   }
-  for (const key of [def.sphereBuild, def.sphereImpact, def.sphereExplosion]) {
+  for (const key of TECHNIQUE_EFFECTS.map((field) => def[field])) {
     if (!owner.sprites.effect(key)?.frames.length) return `its sphere effect "${key}" has no animation frames`;
   }
   if (!(def.dashSpeed > 0)) return 'its dashSpeed is not a positive speed';
@@ -443,7 +449,7 @@ export class ChargedTechnique {
     // Both fighters chose this step's poses before hits resolved, so show
     // the catch now, on the hit step itself: the first confirm frame, the
     // sphere already on the target, and the target already in its hurt pose
-    // (`hurt`, or `midairHurt` in the air; see Fighter.animationFor).
+    // (`hurt`, or `midair_hurt` in the air; see Fighter.animationFor).
     this.owner.updateState(0);
     target.updateState?.(0);
     return null;

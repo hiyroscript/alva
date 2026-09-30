@@ -3,23 +3,28 @@
 // Attacks are pure data on the character definition; Fighter turns each entry
 // into a frozen definition with createAttackDefinition(). Every character
 // keys its attacks by the universal move codenames (MOVES in js/config.js),
-// whatever it calls them in game: Basic Attack 1 is `ba1` on the ground and
-// `maba1` in the air (both on the ba1 button), Basic Attack 2 `ba2` /
-// `maba2` (the ba2 button), the unique basic attack `uniqueba`. #0001's
-// (its punch, kunai slash, kick, air kick and Throw) are the real attacks so
-// far; see js/data/characters.js. The general shape:
+// whatever it calls them in game: a numbered attack is `attackN` on the
+// ground and `midair_attackN` in the air (both on the attackN button), the
+// extra attack `extra_attack`. Which numbered attacks have a button and
+// which Charge reaches is the character's loadout (js/data/loadout.js).
+// #0001's (its punch, kunai slash, kick, air kick and Throw) are the real
+// attacks so far; see js/data/characters.js. The general shape:
 //
 //   attacks: {
-//     ba1: {
-//       animation: 'ba1', startup: 0.07, active: 0.05, recovery: 0.16,
+//     attack1: {
+//       animation: 'attack1', startup: 0.07, active: 0.05, recovery: 0.16,
 //       damage: 6, hitbox: { x: 18, y: -62, w: 34, h: 18 },
 //       baseLaunch: 1, directionalLaunch: 'horizontal', hitstun: 0.22, blockstun: 0.14, cooldown: 0.1,
 //     },
-//     ba2: { ..., baseLaunch: 2, directionalLaunch: 'vertical' },
-//     maba2: { animation: 'maba2', ..., baseLaunch: 2, directionalLaunch: 'reverseVertical' },
+//     attack2: { ..., baseLaunch: 2, directionalLaunch: 'vertical' },
+//     midair_attack2: { animation: 'midair_attack2', ..., baseLaunch: 2, directionalLaunch: 'reverseVertical' },
 //   },
 //   // One attack per control codename, or { ground, air } chosen by grounded state.
-//   actions: { uniqueba: 'uniqueba', ba1: { ground: 'ba1', air: 'maba1' }, ba2: { ground: 'ba2', air: 'maba2' } }
+//   actions: {
+//     extra_attack: 'extra_attack',
+//     attack1: { ground: 'attack1', air: 'midair_attack1' },
+//     attack2: { ground: 'attack2', air: 'midair_attack2' },
+//   }
 //
 // Every hit (an attack's, a projectile's, a charged technique's) declares
 // its Base Launch (`baseLaunch`: 0, 1, 2 or 3, a multiplier, never a
@@ -46,9 +51,9 @@
 // only). The defaults are a planted attack: all the speed kept, no steering,
 // normal friction.
 //
-//   ba2: { ..., momentum: 0.5, friction: 0.5, step: { at: 0, speed: 280 } },
-//   maba1: { ..., airMomentum: 1, airControl: 0.6 },
-//   uniqueba: { ..., momentum: 0.5, control: 0.3, friction: 0.6 },
+//   attack2: { ..., momentum: 0.5, friction: 0.5, step: { at: 0, speed: 280 } },
+//   midair_attack1: { ..., airMomentum: 1, airControl: 0.6 },
+//   extra_attack: { ..., momentum: 0.5, control: 0.3, friction: 0.6 },
 //
 // `hitCancel` (seconds into the attack, or null for never) is how a
 // connected attack makes room for a follow-up: once it has hit (a Shield's
@@ -61,12 +66,13 @@
 //
 // A projectile attack has `hitbox: null` (no melee strike) and a `projectile`
 // event instead: once its time crosses `spawnAt` it releases that projectile,
-// exactly once, from `offset` (facing right from the origin, mirrored).
+// exactly once, from `offset` (facing right from the origin, mirrored). The
+// projectile is named after the attack that throws it (`<attack>_object`).
 // See js/game/projectile.js.
 //
-//   uniqueba: {
-//     animation: 'uniqueba', startup: 1 / 12, active: 1 / 12, recovery: 1 / 12,
-//     hitbox: null, projectile: { id: 'shuriken', spawnAt: 1 / 12, offset: { x: 16, y: -38 } },
+//   extra_attack: {
+//     animation: 'extra_attack', startup: 1 / 12, active: 1 / 12, recovery: 1 / 12,
+//     hitbox: null, projectile: { id: 'extra_attack_object', spawnAt: 1 / 12, offset: { x: 16, y: -38 } },
 //     cooldown: 0.25, groundOnly: true,
 //   },
 //
@@ -81,7 +87,7 @@
 // defaults below). Nothing about it names a fighter: any fighter whose art
 // arrives before its attributes can use it.
 //
-//   ba1: { animation: 'ba1', pending: true },
+//   attack1: { animation: 'attack1', pending: true },
 //
 // `shield` is the shared player input; each character's `defense` entry says
 // what it does, that is how the character defends (see
@@ -90,9 +96,9 @@
 //
 //   defense: {
 //     type: 'shield',
-//     groundAnimation: 'shield', airAnimation: 'midairShield',
+//     groundAnimation: 'shielding', airAnimation: 'midair_shielding',
 //     // Optional one-frame poses around the grounded hold:
-//     groundStartAnimation: 'shieldStart', groundReleaseAnimation: 'shieldRelease',
+//     groundStartAnimation: 'prepshield', groundReleaseAnimation: 'releaseshield',
 //     // Optional slow fall while it is up in the air:
 //     slowFallSpeed: 200, slowFallBrake: 6000,
 //   }
@@ -124,8 +130,9 @@
 // it, separate from hitstun, that only the technique which placed it
 // releases.
 //
-// Charged actions (a summon or a technique) are not paid for: each has its
-// own cooldown (CombatState.chargedCooldowns, see CooldownTimers), started
+// Charge replacements (a summon or a technique, see js/data/loadout.js) are
+// not paid for: each has its own cooldown (CombatState.chargedCooldowns, see
+// CooldownTimers), keyed by the attack it is (attack3, attack4), started
 // when it is used and apart from the short recovery cooldowns of ordinary
 // attacks (CombatState.cooldowns).
 //
@@ -136,7 +143,7 @@
 // with less left than it costs, but then takes all of it. It refills by
 // itself, faster while the fighter is in its Charge stance. Emptied, it
 // exhausts the fighter: no Dash or Shield until it is full again. Nothing
-// else (movement, jumps, attacks, charged actions) ever touches it.
+// else (movement, jumps, attacks, Charge replacements) ever touches it.
 
 import { resolveHitLaunch, resolveLaunchStrength, resolveDirectionalLaunch } from '../data/launch.js';
 
@@ -267,7 +274,7 @@ export function resolveEnergy(spec) {
 
 // Named cooldowns that each remember their full length, so progress can be
 // read back (1 - remaining / duration) without knowing where they came from.
-// Used for charged actions' cooldowns (CombatState.chargedCooldowns).
+// Used for Charge replacements' cooldowns (CombatState.chargedCooldowns).
 export class CooldownTimers {
   constructor() {
     this.entries = new Map(); // id -> { remaining, duration } in seconds
@@ -351,8 +358,8 @@ export class CombatState {
     this.release = null;    // the attack's projectile, released this step (see Fighter.update)
     // Ordinary attacks' short recovery cooldowns: attack id -> seconds left.
     this.cooldowns = new Map();
-    // Charged actions' own cooldowns (#0001's cba1 and cba2), by summon or
-    // technique id; the Fighter starts and recovers them.
+    // Charge replacements' own cooldowns (#0001's attack3 and attack4), by
+    // the attack each one is; the Fighter starts and recovers them.
     this.chargedCooldowns = new CooldownTimers();
     this.lastIntent = null; // last combat button pressed (see Fighter.tryAction)
     // Whatever holds this fighter in place (a charged technique that caught

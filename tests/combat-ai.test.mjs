@@ -22,8 +22,8 @@ import { TrainingAIController } from '../js/game/fighter-controller.js';
 import { DIFFICULTY_IDS, getDifficultyProfile } from '../js/data/difficulty.js';
 import { mulberry32 } from '../js/core/utils.js';
 
-const BUTTONS = ['runLeft', 'runRight', 'charge', 'jump', 'shield', 'uniqueba', 'transform', 'ba1', 'ba2'];
-const COMBAT = ['uniqueba', 'transform', 'ba1', 'ba2'];
+const BUTTONS = ['runLeft', 'runRight', 'charge', 'jump', 'shield', 'extra_attack', 'transform', 'attack1', 'attack2'];
+const COMBAT = ['extra_attack', 'transform', 'attack1', 'attack2'];
 
 // A flat main floor from x 0 to 2000 (top 800), and one with a platform a
 // jump above the floor.
@@ -138,11 +138,11 @@ test('while its own attack plays it never turns away from its opponent (a held d
 test('it never presses a reserved button, and never drops through a platform', () => {
   assert.equal(def.actions.transform, null, '#0001\'s transform is reserved');
   const moves = readMoveset(new Fighter({ def, sprites: fakeSprites(), stage: FLAT, spawn: { x: 100 } }));
-  // Read from the fighter's own data: Throw, BA1 and BA2 on the ground and
-  // in the air as mapped, both charged actions, the Shield and the Dash.
-  assert.deepEqual(moves.melee.map((m) => m.id).sort(), ['ba1', 'ba2', 'maba1', 'maba2']);
-  assert.deepEqual(moves.ranged.map((m) => [m.id, m.air]), [['uniqueba', false]], 'Throw is ground only');
-  assert.deepEqual(moves.charged.map((c) => [c.action, c.type]), [['ba1', 'summon'], ['ba2', 'technique']]);
+  // Read from the fighter's own data: Throw, attack1 and attack2 on the ground and
+  // in the air as mapped, both Charge replacements, the Shield and the Dash.
+  assert.deepEqual(moves.melee.map((m) => m.id).sort(), ['attack1', 'attack2', 'midair_attack1', 'midair_attack2']);
+  assert.deepEqual(moves.ranged.map((m) => [m.id, m.air]), [['extra_attack', false]], 'Throw is ground only');
+  assert.deepEqual(moves.charged.map((c) => [c.action, c.type]), [['attack1', 'summon'], ['attack2', 'technique']]);
   assert.equal(moves.shield, true);
   assert.ok(moves.dash.distance > 0);
   assert.ok([...moves.melee, ...moves.ranged, ...moves.charged].every((m) => m.action !== 'transform'));
@@ -160,8 +160,8 @@ test('press edges last exactly one step, and every press is of a held button', (
     const script = (n, self) => ({
       runLeft: n % 240 < 120, runRight: n % 240 >= 120,
       jump: n % 97 === 0, jumpPressed: n % 97 === 0,
-      ba1: n % 53 === 0, ba1Pressed: n % 53 === 0,
-      uniqueba: n % 71 === 0, uniquebaPressed: n % 71 === 0,
+      attack1: n % 53 === 0, attack1Pressed: n % 53 === 0,
+      extra_attack: n % 71 === 0, extra_attackPressed: n % 71 === 0,
     });
     const r = ring({ difficulty, seed: 5, cpuX: 700, foeX: 1100, script });
     r.run(seconds(20));
@@ -181,14 +181,14 @@ test('press edges last exactly one step, and every press is of a held button', (
 
 // ---- Shield and reaction ---------------------------------------------------------
 
-// The opponent, 50 units away and facing the CPU, starts Basic Attack 2 on
+// The opponent, 50 units away and facing the CPU, starts Attack 2 on
 // step 30 (0.25 s of startup before its kick can land). The CPU's own
 // neutral thinking is paused, so only its reaction to the attack acts: how
 // soon it answers (Shield held, a jump, or a step away) and whether the
 // kick lands.
 function reactionTrial(difficulty, seed) {
   const START = 30;
-  const script = (n) => (n === START ? { ba2: true, ba2Pressed: true } : {});
+  const script = (n) => (n === START ? { attack2: true, attack2Pressed: true } : {});
   const r = ring({ difficulty, seed, cpuX: 1000, foeX: 1050, script });
   r.hush();
   r.run(START - 1 + seconds(0.8));
@@ -205,11 +205,11 @@ function reactionTrial(difficulty, seed) {
 test('it answers a telegraphed attack (Shield, a jump or a step away), and the kick misses or is blocked', () => {
   const trials = Array.from({ length: 12 }, (_, i) => reactionTrial('brutal', 100 + i));
   const safe = trials.filter((t) => !t.hit).length;
-  assert.ok(safe >= 10, `Brutal answers BA2 in time (${safe}/12)`);
+  assert.ok(safe >= 10, `Brutal answers attack2 in time (${safe}/12)`);
   // With its back to the ledge there is nowhere to step: it Shields.
   let shielded = 0;
   for (let seed = 0; seed < 8; seed++) {
-    const script = (n) => (n === 30 ? { ba2: true, ba2Pressed: true } : {});
+    const script = (n) => (n === 30 ? { attack2: true, attack2Pressed: true } : {});
     const r = ring({ difficulty: 'hard', seed: 150 + seed, cpuX: 1975, foeX: 1925, script });
     r.hush();
     r.run(29 + seconds(0.8));
@@ -247,7 +247,7 @@ test('harder levels answer an incoming shuriken more often', () => {
     caught[difficulty] = 0;
     for (let seed = 0; seed < 12; seed++) {
       // Thrown from 420 units: about half a second of flight.
-      const script = (n) => (n === 20 ? { uniqueba: true, uniquebaPressed: true } : {});
+      const script = (n) => (n === 20 ? { extra_attack: true, extra_attackPressed: true } : {});
       const r = ring({ difficulty, seed: 300 + seed, cpuX: 1000, foeX: 1420, script });
       r.hush();
       r.run(seconds(1.2));
@@ -328,13 +328,13 @@ test('a walk toward the ledge stops at it', () => {
   assert.ok(r.log.slice(-10).every((o) => !o.runRight), 'no longer holding toward it');
 });
 
-// ---- Charge, charged actions, Dash --------------------------------------------------
+// ---- Charge, Charge replacements, Dash --------------------------------------------------
 
-test('it holds Charge over several steps, then presses the charged action with Charge still held', () => {
+test('it holds Charge over several steps, then presses the Charge replacement with Charge still held', () => {
   const r = ring({ difficulty: 'hard', seed: 17, cpuX: 600, foeX: 1300 });
   r.hush();
   const summon = readMoveset(r.cpu).charged.find((c) => c.type === 'summon');
-  assert.ok(summon, '#0001\'s Charged BA1 is a summon');
+  assert.ok(summon, '#0001\'s attack3 is a summon');
   // It plans to look again a moment in: Charge has to be kept up until then.
   r.ai.setIntent({ kind: 'charge', then: summon, face: 0, danger: 0, checkAt: r.ai.clock + 0.2, until: Infinity });
   r.ai.intent.keepUntil = Infinity;
@@ -352,7 +352,7 @@ test('it holds Charge over several steps, then presses the charged action with C
   assert.ok(r.cpu.combat.chargedCooldowns.active(summon.id));
 });
 
-test('left to itself, a high level uses Charge and charged actions', () => {
+test('left to itself, a high level uses Charge and Charge replacements', () => {
   let charged = 0;
   let clones = 0;
   let rushes = 0;
@@ -367,10 +367,10 @@ test('left to itself, a high level uses Charge and charged actions', () => {
       tech = r.cpu.technique;
     }
     clones += new Set(r.events.filter((e) => e.summon && e.attacker === r.cpu).map((e) => e.summon)).size +
-      (r.cpu.combat.chargedCooldowns.active('cba1') ? 1 : 0);
+      (r.cpu.combat.chargedCooldowns.active('attack3') ? 1 : 0);
   }
   assert.ok(charged > 60, `it charges (${charged} steps)`);
-  assert.ok(clones + rushes > 0, `and uses a charged action (${clones} clones, ${rushes} rushes)`);
+  assert.ok(clones + rushes > 0, `and uses a Charge replacement (${clones} clones, ${rushes} rushes)`);
 });
 
 test('Dash is a double tap of a direction on the levels that use it, and never an accident', () => {
@@ -439,7 +439,7 @@ const statsOf = (f) => JSON.stringify({
 test('difficulty never changes the fighter: identical stats on every level, before and after a fight', () => {
   const before = {};
   for (const difficulty of DIFFICULTY_IDS) {
-    const r = ring({ difficulty, seed: 31, cpuX: 900, foeX: 1100, script: (n) => ({ ba1: n % 40 === 0, ba1Pressed: n % 40 === 0 }) });
+    const r = ring({ difficulty, seed: 31, cpuX: 900, foeX: 1100, script: (n) => ({ attack1: n % 40 === 0, attack1Pressed: n % 40 === 0 }) });
     before[difficulty] = statsOf(r.cpu);
     r.run(seconds(8));
     assert.equal(statsOf(r.cpu), before[difficulty], `${difficulty}: nothing about the fighter changed`);
@@ -454,7 +454,7 @@ test('the controller only reads the game: no writes to fighters, no raw input, n
   const writes = src.match(/(^|[\s;(,{])(self|foe|fighter|target|f)\.[\w.]+\s*(=(?!=)|\+=|-=|\+\+|--)/gm) ?? [];
   assert.deepEqual(writes, []);
   // No calls that act on a fighter instead of pressing its buttons.
-  for (const call of ['tryAction', 'tryDash', 'tryChargedAction', 'trySummon', 'tryTechnique', 'applyHit', 'spendEnergy', 'dropThrough', 'endTechnique', 'reset(']) {
+  for (const call of ['tryAction', 'tryDash', 'tryChargeReplacement', 'trySummon', 'tryTechnique', 'applyHit', 'spendEnergy', 'dropThrough', 'endTechnique', 'reset(']) {
     assert.ok(!new RegExp(`(self|foe)\\.${call.replace('(', '\\(')}`).test(src), call);
   }
   assert.ok(!/Math\.random\(\)/.test(src.replace('rng = Math.random', '')), 'randomness comes from the injected rng');
@@ -476,7 +476,7 @@ test('the training controller still never presses a combat button, Charge or Shi
     cpu.update(DT, ctx);
     foe.update(DT, ctx);
     const o = trainee.out;
-    for (const k of ['uniqueba', 'transform', 'ba1', 'ba2', 'charge', 'shield']) {
+    for (const k of ['extra_attack', 'transform', 'attack1', 'attack2', 'charge', 'shield']) {
       assert.ok(!o[k] && !o[`${k}Pressed`], `never ${k}`);
     }
   }

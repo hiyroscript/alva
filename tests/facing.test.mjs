@@ -22,10 +22,10 @@ globalThis.Path2D ??= class {
   }
 };
 
-const BA1 = { ba1: true, ba1Pressed: true };
-const BA2 = { ba2: true, ba2Pressed: true };
+const ATTACK1 = { attack1: true, attack1Pressed: true };
+const ATTACK2 = { attack2: true, attack2Pressed: true };
 const CHARGE = { charge: true };
-const THROW = { uniqueba: true, uniquebaPressed: true };
+const THROW = { extra_attack: true, extra_attackPressed: true };
 // Two presses of `dir`, one step apart: a Dash's double tap.
 const doubleTap = (step, dir) => {
   step({ [`${dir}Pressed`]: true, [dir]: true });
@@ -98,15 +98,15 @@ test('a Dash faces its own direction, and the opponent never overrides it afterw
   }
 });
 
-test('attacks use the current facing: BA1 facing right strikes right with the opponent on the left, and nothing but a direction turns it', () => {
+test('attacks use the current facing: attack1 facing right strikes right with the opponent on the left, and nothing but a direction turns it', () => {
   const d = duel({ gap: -44 });
   const { attacker, target } = d;
   assert.ok(target.body.x < attacker.body.x, 'the opponent is on the left');
   assert.equal(attacker.facing, 1);
   for (let i = 0; i < 10; i++) d.tick();
   assert.equal(attacker.facing, 1, 'no turn before the attack');
-  d.tick(BA1);
-  assert.equal(attacker.combat.attack?.def.id, 'ba1');
+  d.tick(ATTACK1);
+  assert.equal(attacker.combat.attack?.def.id, 'attack1');
   let sawActive = false;
   while (attacker.combat.attack) {
     assert.equal(attacker.facing, 1);
@@ -122,12 +122,12 @@ test('attacks use the current facing: BA1 facing right strikes right with the op
   assert.equal(attacker.facing, 1, 'still facing right afterwards');
 });
 
-test('a direction held mid-attack turns it at once: BA1 started facing away lands on the opponent behind', () => {
+test('a direction held mid-attack turns it at once: attack1 started facing away lands on the opponent behind', () => {
   for (const facing of [1, -1]) {
     const d = duel({ gap: -44, attackerFacing: facing, targetFacing: facing });
     const { attacker, target } = d;
     assert.equal(Math.sign(target.body.x - attacker.body.x), -facing, 'the opponent is behind');
-    d.tick(BA1);
+    d.tick(ATTACK1);
     assert.equal(attacker.combat.phase, 'startup');
     assert.equal(attacker.facing, facing);
     const back = facing > 0 ? { runLeft: true } : { runRight: true };
@@ -135,7 +135,7 @@ test('a direction held mid-attack turns it at once: BA1 started facing away land
     assert.equal(attacker.facing, -facing, 'turned during the wind-up');
     d.until(() => d.events.length > 0 || !attacker.combat.attack, 30);
     assert.equal(d.events[0]?.target, target, 'the strike lands behind');
-    assert.equal(d.events[0].move, 'ba1');
+    assert.equal(d.events[0].move, 'attack1');
   }
 });
 
@@ -148,7 +148,7 @@ test('turning while in Charge: the Sphere Rush goes the way the fighter faces as
   assert.equal(fighter.facing, -1, 'turned without leaving Charge');
   assert.equal(fighter.state, 'charge');
   assert.equal(fighter.body.vx, 0, 'no walking');
-  step({ ...CHARGE, ...BA2 });
+  step({ ...CHARGE, ...ATTACK2 });
   assert.ok(fighter.technique, 'the Sphere Rush started');
   assert.equal(fighter.technique.facing, -1);
   const x = fighter.body.x;

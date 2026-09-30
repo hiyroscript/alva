@@ -85,7 +85,7 @@ test('it refills by itself at 12 per second: standing, running, in the air, atta
   near(c.energy, 34, 'half a second jumping');
   while (!fighter.grounded) step();
   const before = c.energy;
-  step({ ba1: true, ba1Pressed: true });
+  step({ attack1: true, attack1Pressed: true });
   assert.equal(fighter.state, 'attack');
   for (let i = 0; i < 5; i++) step();
   near(c.energy, before + 6 * 0.2, 'attacking');
@@ -97,7 +97,7 @@ test('it refills by itself at 12 per second: standing, running, in the air, atta
   // Stunned (and frozen by the hit): the refill never stops.
   const d = duel();
   d.target.combat.setEnergy(50);
-  d.tick({ ba1: true, ba1Pressed: true });
+  d.tick({ attack1: true, attack1Pressed: true });
   d.until(() => d.target.combat.stun > 0);
   const hit = d.target.combat.energy;
   for (let i = 0; i < 12; i++) d.tick();
@@ -137,7 +137,7 @@ test('a charged technique is not ordinary charging: Sphere Rush refills at the n
   const { fighter, step } = makeFighter();
   const c = fighter.combat;
   for (let i = 0; i < 10; i++) step(CHARGE);
-  step({ ...CHARGE, ba2: true, ba2Pressed: true });
+  step({ ...CHARGE, attack2: true, attack2Pressed: true });
   assert.ok(fighter.technique, 'the Sphere Rush started');
   c.setEnergy(40);
   for (let i = 0; i < 20; i++) step(CHARGE);
@@ -178,7 +178,7 @@ test('the Shield costs 25 per blocked hit and nothing else: not raising it, hold
   const d = duel();
   // Up well before the hit: an ordinary block, never a perfect one.
   for (let i = 0; i < 9; i++) d.tick({}, HOLD);
-  d.tick({ ba1: true, ba1Pressed: true }, HOLD);
+  d.tick({ attack1: true, attack1Pressed: true }, HOLD);
   for (let i = 0; i < 30 && !d.events.length; i++) d.tick({}, HOLD);
   assert.equal(d.events[0].type, 'block');
   assert.equal(d.events[0].energyCost, 25);
@@ -240,7 +240,7 @@ test('too little left still pays: a Dash or a block with less than it costs take
   d.target.combat.setEnergy(20);
   // Up well before the hit: an ordinary block, never a perfect one.
   for (let i = 0; i < 9; i++) d.tick({}, HOLD);
-  d.tick({ ba1: true, ba1Pressed: true }, HOLD);
+  d.tick({ attack1: true, attack1Pressed: true }, HOLD);
   for (let i = 0; i < 30 && !d.events.length; i++) d.tick({}, HOLD);
   assert.equal(d.events[0].type, 'block', 'the block stands');
   assert.ok(d.events[0].energyCost > 20 && d.events[0].energyCost < 25, `all it had (${d.events[0].energyCost})`);
@@ -263,7 +263,7 @@ test('too little left still pays: a Dash or a block with less than it costs take
   assert.equal(s.spendEnergy(1), false, 'exhausted: refused, nothing taken');
 });
 
-test('exhausted, a fighter still moves, jumps, attacks, charges and uses its charged actions', () => {
+test('exhausted, a fighter still moves, jumps, attacks, charges and uses its Charge replacements', () => {
   const { fighter, step } = makeFighter();
   const c = fighter.combat;
   c.setEnergy(0);
@@ -275,18 +275,18 @@ test('exhausted, a fighter still moves, jumps, attacks, charges and uses its cha
   assert.equal(fighter.grounded, false, 'jumps');
   while (!fighter.grounded) step();
   for (let i = 0; i < 20; i++) step();
-  step({ ba1: true, ba1Pressed: true, ...HOLD });
+  step({ attack1: true, attack1Pressed: true, ...HOLD });
   assert.equal(fighter.state, 'attack', 'attacks, even holding Shield: no Shield to take the step');
   while (fighter.combat.attack) step();
   for (let i = 0; i < 10; i++) step();
   for (let i = 0; i < 5; i++) step(CHARGE);
   assert.equal(fighter.state, 'charge', 'charges: Energy never gates Charge');
   assert.equal(c.energyExhausted, true);
-  step({ ...CHARGE, ba2: true, ba2Pressed: true });
-  assert.ok(fighter.technique, 'Charged BA2 (CBA2): its own cooldown, no Energy');
+  step({ ...CHARGE, attack2: true, attack2Pressed: true });
+  assert.ok(fighter.technique, 'attack4 (A4): its own cooldown, no Energy');
 });
 
-test('nothing but Dash and blocked hits ever spends it: runs, jumps, attacks, shurikens and charged actions are free', () => {
+test('nothing but Dash and blocked hits ever spends it: runs, jumps, attacks, shurikens and Charge replacements are free', () => {
   const d = duel();
   const { attacker, tick } = d;
   const spent = () => {
@@ -303,15 +303,15 @@ test('nothing but Dash and blocked hits ever spends it: runs, jumps, attacks, sh
   for (let i = 0; i < 20; i++) t({ runRight: true });
   t({ jump: true, jumpPressed: true });
   for (let i = 0; i < steps(1); i++) t();
-  t({ ba1: true, ba1Pressed: true });
+  t({ attack1: true, attack1Pressed: true });
   for (let i = 0; i < 30; i++) t();
-  t({ ba2: true, ba2Pressed: true });
+  t({ attack2: true, attack2Pressed: true });
   for (let i = 0; i < 30; i++) t();
-  t({ uniqueba: true, uniquebaPressed: true });
+  t({ extra_attack: true, extra_attackPressed: true });
   for (let i = 0; i < 30; i++) t();
   for (let i = 0; i < 10; i++) t(CHARGE);
-  t({ ...CHARGE, ba1: true, ba1Pressed: true });
-  assert.equal(d.clones.length, 1, 'CBA1 summoned its clone');
+  t({ ...CHARGE, attack1: true, attack1Pressed: true });
+  assert.equal(d.clones.length, 1, 'A3 summoned its clone');
   for (let i = 0; i < 60; i++) t(CHARGE);
 });
 

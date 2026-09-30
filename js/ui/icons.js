@@ -43,10 +43,14 @@ export const ICONS = {
     { fill: true },
   ),
   // Neutral stand-ins for a fighter that authors no mobileAbilities: a ring
-  // for the large top button, one and two pips for the two basic attacks.
+  // for the large extra_attack button, and one to five pips for the numbered
+  // attack buttons, attack1 to attack5.
   ring: svg('<circle cx="12" cy="12" r="6.5"/>'),
   pip1: svg('<circle cx="12" cy="12" r="3.6"/>', { fill: true }),
   pip2: svg('<circle cx="7.4" cy="12" r="3.3"/><circle cx="16.6" cy="12" r="3.3"/>', { fill: true }),
+  pip3: svg('<circle cx="12" cy="6.8" r="3"/><circle cx="7" cy="15.4" r="3"/><circle cx="17" cy="15.4" r="3"/>', { fill: true }),
+  pip4: svg('<circle cx="7.4" cy="7.4" r="2.9"/><circle cx="16.6" cy="7.4" r="2.9"/><circle cx="7.4" cy="16.6" r="2.9"/><circle cx="16.6" cy="16.6" r="2.9"/>', { fill: true }),
+  pip5: svg('<circle cx="6.4" cy="6.4" r="2.6"/><circle cx="17.6" cy="6.4" r="2.6"/><circle cx="12" cy="12" r="2.6"/><circle cx="6.4" cy="17.6" r="2.6"/><circle cx="17.6" cy="17.6" r="2.6"/>', { fill: true }),
   pause: svg('<path d="M9 5.5v13M15 5.5v13"/>'),
   // Three dots: Practice Ground's More button.
   more: svg('<circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/>', { fill: true }),

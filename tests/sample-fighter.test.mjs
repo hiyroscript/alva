@@ -1,9 +1,11 @@
 // Run with node --test tests/sample-fighter.test.mjs (no dependencies).
 // A second fighter that is not #0001 (tests/sample-fighter.mjs, tests only):
-// the same universal codenames, different moves on them. Its buttons make
-// its own moves on the ground and in the air, its charged move is a summon
-// on ba2, it has no Defense, it fights #0001 through the same combat, the
-// CPU plays it from its own data, and its ability names are its own. Its
+// the same universal codenames and loadout rules, different moves on them.
+// Its buttons make its own moves on the ground and in the air, it has three
+// numbered attacks with Charge (attack3, a summon, is Charge + attack1, and
+// Charge + attack2 stays attack2), it has no Defense, it fights #0001
+// through the same combat, the CPU plays it from its own data, and its
+// ability names are its own. Its
 // touch buttons are checked in controls-ui.test.mjs, and the universal
 // contract covers it in codenames.test.mjs.
 import test from 'node:test';
@@ -17,7 +19,7 @@ import { spawnProjectiles, removeDeadProjectiles } from '../js/game/projectile.j
 import { spawnClones, updateClones, removeDeadClones } from '../js/game/clone.js';
 import { resolveSolidOverlap } from '../js/game/physics.js';
 import { CombatAIController, readMoveset } from '../js/game/combat-ai.js';
-import { cbaIndicators } from '../js/game/fighter-status.js';
+import { cooldownIndicators } from '../js/game/fighter-status.js';
 import { abilityName } from '../js/data/abilities.js';
 import { mulberry32 } from '../js/core/utils.js';
 
@@ -29,12 +31,12 @@ const CHARGE = { charge: true };
 const SHIELD = { shield: true, shieldPressed: true };
 
 test('each button makes the sample fighter\'s own move, on the ground and in the air', () => {
-  const ground = { uniqueba: 'uniqueba', transform: 'transform', ba1: 'ba1', ba2: 'ba2' };
-  const air = { uniqueba: 'uniqueba', transform: 'transform', ba1: null, ba2: 'maba2' };
+  const ground = { extra_attack: 'extra_attack', transform: 'transform', attack1: 'attack1', attack2: 'attack2', attack3: null };
+  const air = { extra_attack: 'extra_attack', transform: 'transform', attack1: 'midair_attack1', attack2: 'midair_attack2', attack3: null };
   for (const [button, move] of Object.entries(ground)) {
     const { fighter, step } = sample();
     step(P(button));
-    assert.equal(fighter.combat.attack?.def.id, move, `${button} on the ground`);
+    assert.equal(fighter.combat.attack?.def.id ?? null, move, `${button} on the ground`);
     assert.equal(fighter.combat.lastIntent, button);
   }
   for (const [button, move] of Object.entries(air)) {
@@ -47,25 +49,30 @@ test('each button makes the sample fighter\'s own move, on the ground and in the
   }
 });
 
-test('Charge + ba2 summons its cba2 clone, shown as CBA2; Charge + ba1 is a plain ba1', () => {
+test('Charge + attack1 summons its attack3 clone, shown as A3; with no attack4, Charge + attack2 is a plain attack2', () => {
   const d = duel({ attackerCharacter: SAMPLE_FIGHTER, attackerSprites: SPRITES, gap: 120 });
   d.tick(CHARGE);
   d.tick(CHARGE);
-  d.tick({ ...CHARGE, ...P('ba2') });
-  assert.equal(d.attacker.combat.attack, null, 'the charged press, not its ba2');
-  assert.ok(d.attacker.combat.chargedCooldowns.active('cba2'));
-  assert.deepEqual(cbaIndicators(d.attacker).map((c) => [c.id, c.action, c.label]), [['cba2', 'ba2', 'CBA2']]);
+  d.tick({ ...CHARGE, ...P('attack1') });
+  assert.equal(d.attacker.combat.attack, null, 'the Charge replacement, not its attack1');
+  assert.ok(d.attacker.combat.chargedCooldowns.active('attack3'));
+  assert.deepEqual(cooldownIndicators(d.attacker).map((c) => [c.id, c.action, c.label]), [['attack3', 'attack1', 'A3']]);
   d.until(() => d.clones.length === 1);
-  assert.equal(d.clones[0].attackDef.id, 'ba2', 'the clone performs its own ba2');
+  assert.equal(d.clones[0].attackDef.id, 'attack2', 'the clone performs its own attack2');
   d.until(() => d.target.combat.launchPoint > 0);
-  assert.equal(d.target.combat.launchPoint, SAMPLE_FIGHTER.attacks.ba2.damage);
+  assert.equal(d.target.combat.launchPoint, SAMPLE_FIGHTER.attacks.attack2.damage);
 
   const { fighter, step } = sample();
   step(CHARGE);
   step(CHARGE);
-  step({ ...CHARGE, ...P('ba1') });
-  assert.equal(fighter.combat.attack?.def.id, 'ba1', 'nothing charged on ba1: its normal attack');
+  step({ ...CHARGE, ...P('attack2') });
+  assert.equal(fighter.combat.attack?.def.id, 'attack2', 'no Charge replacement on attack2: its normal attack');
   assert.equal(fighter.combat.chargedCooldowns.size, 0);
+  // Its attack3 has no button of its own: pressing attack3 does nothing.
+  const direct = sample();
+  direct.step(P('attack3'));
+  assert.equal(direct.fighter.combat.attack, null);
+  assert.equal(direct.fighter.summons.length, 0);
 });
 
 test('with no Defense the shield button does nothing: no Shield, and a hit lands in full', () => {
@@ -76,40 +83,40 @@ test('with no Defense the shield button does nothing: no Shield, and a hit lands
   assert.equal(fighter.combat.shielding, false);
   assert.notEqual(fighter.state, 'shield');
   // Holding it rules nothing out either.
-  step({ shield: true, ...P('ba1') });
-  assert.equal(fighter.combat.attack?.def.id, 'ba1');
+  step({ shield: true, ...P('attack1') });
+  assert.equal(fighter.combat.attack?.def.id, 'attack1');
 
   const d = duel({ targetCharacter: SAMPLE_FIGHTER, targetSprites: SPRITES });
-  d.tick(P('ba1'), SHIELD);
+  d.tick(P('attack1'), SHIELD);
   d.until(() => d.events.length > 0);
   assert.equal(d.events[0].type, 'hit');
-  assert.equal(d.target.combat.launchPoint, def.attacks.ba1.damage);
+  assert.equal(d.target.combat.launchPoint, def.attacks.attack1.damage);
 });
 
 test('it and #0001 hit each other through the same combat, each with its own move data', () => {
   const mine = duel({ attackerCharacter: SAMPLE_FIGHTER, attackerSprites: SPRITES, targetSprites: fakeSprites() });
-  mine.tick(P('uniqueba'));
+  mine.tick(P('extra_attack'));
   mine.until(() => mine.events.length > 0);
-  assert.deepEqual([mine.events[0].type, mine.events[0].move], ['hit', 'uniqueba']);
-  assert.equal(mine.target.combat.launchPoint, SAMPLE_FIGHTER.attacks.uniqueba.damage);
+  assert.deepEqual([mine.events[0].type, mine.events[0].move], ['hit', 'extra_attack']);
+  assert.equal(mine.target.combat.launchPoint, SAMPLE_FIGHTER.attacks.extra_attack.damage);
 
   const theirs = duel({ targetCharacter: SAMPLE_FIGHTER, targetSprites: SPRITES });
-  theirs.tick(P('ba2'));
+  theirs.tick(P('attack2'));
   theirs.until(() => theirs.events.length > 0);
-  assert.deepEqual([theirs.events[0].type, theirs.events[0].move], ['hit', 'ba2']);
-  assert.equal(theirs.target.combat.launchPoint, def.attacks.ba2.damage);
+  assert.deepEqual([theirs.events[0].type, theirs.events[0].move], ['hit', 'attack2']);
+  assert.equal(theirs.target.combat.launchPoint, def.attacks.attack2.damage);
 });
 
 test('the CPU reads its moveset from its own data', () => {
   const moves = readMoveset(new Fighter({ def: SAMPLE_FIGHTER, sprites: SPRITES, stage: STAGE, spawn: { x: 500 } }));
   assert.deepEqual(moves.melee.map((m) => [m.action, m.id, m.air]).sort(), [
-    ['ba1', 'ba1', false],
-    ['ba2', 'ba2', false], ['ba2', 'maba2', true],
+    ['attack1', 'attack1', false], ['attack1', 'midair_attack1', true],
+    ['attack2', 'attack2', false], ['attack2', 'midair_attack2', true],
+    ['extra_attack', 'extra_attack', false], ['extra_attack', 'extra_attack', true],
     ['transform', 'transform', false], ['transform', 'transform', true],
-    ['uniqueba', 'uniqueba', false], ['uniqueba', 'uniqueba', true],
   ]);
   assert.deepEqual(moves.ranged, [], 'no projectile');
-  assert.deepEqual(moves.charged.map((c) => [c.action, c.id, c.type]), [['ba2', 'cba2', 'summon']]);
+  assert.deepEqual(moves.charged.map((c) => [c.action, c.id, c.type]), [['attack1', 'attack3', 'summon']]);
   assert.equal(moves.shield, false, 'no Shield to raise');
   assert.ok(moves.dash);
 });
@@ -152,13 +159,17 @@ test('a CPU plays it against a #0001 CPU: it attacks with its own moves and neve
 
 test('its ability names are its own; unnamed moves, and moves it does not have, read neutrally', () => {
   assert.deepEqual(Object.fromEntries(Object.keys(MOVES).map((m) => [m, abilityName(SAMPLE_FIGHTER, m)])), {
-    ba1: 'Jab',
-    maba1: 'Mid-air Basic Attack 1',
-    cba1: 'Charged Basic Attack 1',
-    ba2: 'Basic Attack 2',
-    maba2: 'Mid-air Basic Attack 2',
-    cba2: 'Shadow Knee',
-    uniqueba: 'Palm Strike',
+    attack1: 'Jab',
+    midair_attack1: 'Mid-air Attack 1',
+    attack2: 'Attack 2',
+    midair_attack2: 'Mid-air Attack 2',
+    attack3: 'Shadow Knee',
+    midair_attack3: 'Mid-air Attack 3',
+    attack4: 'Attack 4',
+    midair_attack4: 'Mid-air Attack 4',
+    attack5: 'Attack 5',
+    midair_attack5: 'Mid-air Attack 5',
+    extra_attack: 'Palm Strike',
     transform: 'Awakening',
   });
 });

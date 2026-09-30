@@ -2,21 +2,24 @@
 // never in CHARACTERS as it is; test-fighters.mjs registers a playable
 // copy for the screen tests that need a fighter with different moves). It
 // checks that the game works for a character that is not #0001: it goes by
-// the same universal control and move codenames but makes different moves
-// on them and names them its own way.
+// the same universal control and move codenames and the same loadout rules
+// (js/data/loadout.js), but makes different moves on them and names them
+// its own way.
 //
-// Against #0001 it has:
-//   uniqueba   a melee palm strike, usable in the air too (#0001's is a
-//              ground-only projectile Throw)
-//   transform  a real move (#0001's is reserved), presented on its own
-//              touch button
-//   ba1        ground only: nothing in the air (no maba1)
-//   ba2 / maba2  on the ground and in the air
-//   cba2       Charge + ba2, a clone summon (#0001's summon is cba1, and its
-//              cba2 a technique); nothing charged on ba1
+// Against #0001 (four numbered attacks and Charge) it has:
+//   extra_attack  a melee palm strike, usable in the air too (#0001's is a
+//                 ground-only projectile Throw)
+//   transform     a real move (#0001's is reserved), presented on its own
+//                 touch button
+//   attack1 / midair_attack1, attack2 / midair_attack2
+//                 on the ground and in the air, its own timings
+//   attack3       Charge + attack1, a clone summon that performs attack2
+//                 (#0001's attack3 performs attack1); three numbered attacks
+//                 in all, so there is no attack4: attack2 pressed while
+//                 Charging is still attack2
 //   no Defense: the shield button does nothing
-//   its own touch labels and icons (ba2 left neutral) and ability names
-//   (ba2 and maba2 left unnamed)
+//   its own touch labels and icons (attack2 left neutral) and ability names
+//   (attack2 and both mid-air attacks left unnamed)
 //
 // Its body, physics, Powers, Energy and art are #0001's, borrowed: they are
 // not what it tests. Its clips reuse #0001's frame lists under its own keys,
@@ -36,55 +39,56 @@ export const SAMPLE_FIGHTER = Object.freeze({
 
   animations: {
     idle: A.idle, run: A.run, jump: A.jump, fall: A.fall, land: A.land,
-    hurt: A.hurt, midairHurt: A.midairHurt, dash: A.dash,
-    chargeStart: A.chargeStart, chargeLoop: A.chargeLoop, chargeRelease: A.chargeRelease,
-    uniqueba: A.ba2,     // 7 frames
-    transform: A.maba1,  // 3 frames
-    ba1: A.ba1,          // 4 frames
-    ba2: A.uniqueba,     // 3 frames
-    maba2: A.maba2,      // 5 frames
+    hurt: A.hurt, midair_hurt: A.midair_hurt, mouvment: A.mouvment,
+    charge: A.charge, charge_loop: A.charge_loop, charge_release: A.charge_release,
+    extra_attack: A.attack2,              // 7 frames
+    transform: A.midair_attack1,          // 3 frames
+    attack1: A.attack1,                   // 4 frames
+    midair_attack1: A.midair_attack1,     // 3 frames
+    attack2: A.extra_attack,              // 3 frames
+    midair_attack2: A.midair_attack2,     // 5 frames
   },
   projectileAnimations: {},
   projectiles: {},
-  effectAnimations: { cloneCloud: BASE.effectAnimations.cloneCloud },
+  effectAnimations: { attack3_object: BASE.effectAnimations.attack3_object },
   defense: null,
 
   actions: {
-    uniqueba: 'uniqueba',
+    extra_attack: 'extra_attack',
     transform: 'transform',
-    ba1: { ground: 'ba1' },
-    ba2: { ground: 'ba2', air: 'maba2' },
+    attack1: { ground: 'attack1', air: 'midair_attack1' },
+    attack2: { ground: 'attack2', air: 'midair_attack2' },
   },
-  chargedActions: {
-    ba2: { type: 'summon', id: 'cba2' },
+  chargeReplacements: {
+    attack1: { type: 'summon', id: 'attack3' },
   },
   summons: {
-    cba2: {
-      attack: 'ba2',
-      cloud: 'cloneCloud',
+    attack3: {
+      attack: 'attack2',
+      cloud: 'attack3_object',
       cooldown: 3,
       behindDistance: 40,
       effectOffset: { x: 0, y: -44 },
-      noGround: { attack: 'maba2', offset: { x: 0, y: -36 } },
+      noGround: { attack: 'midair_attack2', offset: { x: 0, y: -36 } },
     },
   },
   chargedTechniques: {},
 
   mobileAbilities: {
-    uniqueba: { label: 'Palm Strike', icon: 'arrow' },
+    extra_attack: { label: 'Palm Strike', icon: 'arrow' },
     transform: { label: 'Awakening', icon: 'up' },
-    ba1: { label: 'Jab', icon: 'punch' },
+    attack1: { label: 'Jab', icon: 'punch' },
   },
   abilityNames: {
-    uniqueba: 'Palm Strike',
+    extra_attack: 'Palm Strike',
     transform: 'Awakening',
-    ba1: 'Jab',
-    cba2: 'Shadow Knee',
+    attack1: 'Jab',
+    attack3: 'Shadow Knee',
   },
 
   attacks: {
-    uniqueba: {
-      animation: 'uniqueba', startup: 3 / FPS, active: 2 / FPS, recovery: 2 / FPS,
+    extra_attack: {
+      animation: 'extra_attack', startup: 3 / FPS, active: 2 / FPS, recovery: 2 / FPS,
       damage: 4, baseLaunch: 1, directionalLaunch: 'horizontal',
       hitbox: { x: 10, y: -70, w: 30, h: 30 },
       hitstun: 0.25, blockstun: 0.12, hitstop: 0.06, cooldown: 0.2,
@@ -96,13 +100,14 @@ export const SAMPLE_FIGHTER = Object.freeze({
       hitbox: { x: 8, y: -90, w: 26, h: 70 },
       hitstun: 0.3, blockstun: 0.15, hitstop: 0.05, cooldown: 0.3,
     },
-    ba1: { ...BASE.attacks.ba1 },
-    ba2: {
-      animation: 'ba2', startup: 1 / FPS, active: 1 / FPS, recovery: 1 / FPS,
+    attack1: { ...BASE.attacks.attack1 },
+    midair_attack1: { ...BASE.attacks.midair_attack1 },
+    attack2: {
+      animation: 'attack2', startup: 1 / FPS, active: 1 / FPS, recovery: 1 / FPS,
       damage: 6, baseLaunch: 2, directionalLaunch: 'vertical',
       hitbox: { x: 10, y: -80, w: 26, h: 50 },
       hitstun: 0.28, blockstun: 0.15, hitstop: 0.08, cooldown: 0.15, groundOnly: true,
     },
-    maba2: { ...BASE.attacks.maba2 },
+    midair_attack2: { ...BASE.attacks.midair_attack2 },
   },
 });

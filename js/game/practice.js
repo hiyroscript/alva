@@ -18,10 +18,10 @@
 // added over its head (damageNumbers, "+5").
 //
 // With no CPU, moves aimed at an opponent fall back or miss on their own: a
-// Charged BA1 clone has nobody to appear behind, so the press is an ordinary
-// BA1 and its cooldown does not start (Fighter.trySummon); the Sphere Rush
-// finds no one to catch and ends as a miss (its cooldown still spent);
-// attacks and shurikens strike nothing.
+// summon (#0001's attack3 clone) has nobody to appear behind, so the press is
+// an ordinary attack1 and its cooldown does not start (Fighter.trySummon);
+// the Sphere Rush (attack4) finds no one to catch and ends as a miss (its
+// cooldown still spent); attacks and projectiles strike nothing.
 //
 // The Void never ends practice and scores nothing: a fighter that falls into
 // it is out of play for CONFIG.battle.respawnSeconds, then back at its own

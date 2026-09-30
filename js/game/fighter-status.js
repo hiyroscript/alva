@@ -4,15 +4,18 @@
 //   [ Energy bar   ]    only while below full; bright purple, gray while exhausted
 //   [ P1 / CPU tag ]    (Arena.drawMarkers)
 //   [ fighter      ]
-//   [ CBA1   CBA2  ]    only the charged actions cooling down, under the feet
+//   [  A3     A4   ]    only the Charge replacements cooling down, under the feet
 //
-// Both are temporary: full Energy and a ready charged action draw nothing,
-// so a fighter with full Energy and nothing cooling down carries only its
-// tag. The state helpers (energyBarState, cbaIndicators) are pure, so what
-// is drawn can be checked without a canvas; the draw functions only paint
-// it. Nothing
-// here is character-specific: the rings come from the character's own
-// `chargedActions`, the bar from its Energy.
+// Both are temporary: full Energy and a ready Charge replacement draw
+// nothing, so a fighter with full Energy and nothing cooling down carries
+// only its tag. The state helpers (energyBarState, cooldownIndicators) are
+// pure, so what is drawn can be checked without a canvas; the draw
+// functions only paint it. Nothing here is character-specific: the rings
+// come from the character's own `chargeReplacements` (js/data/loadout.js),
+// each named after the attack it is (A3 for attack3), the bar from its
+// Energy.
+
+import { MOVES } from '../config.js';
 
 // Energy bar: one thin, bright purple fill on a dark track with a black
 // outline; the fill turns gray once the fighter is exhausted and stays gray
@@ -24,19 +27,22 @@ export const ENERGY_STYLE = Object.freeze({
   outline: '#000000',
 });
 
-// CBA rings: white ring, number and label, each with a black outline so
-// they read on any stage (Desert's sand, City's night, Practice's pale
+// Cooldown rings: white ring, number and label, each with a black outline
+// so they read on any stage (Desert's sand, City's night, Practice's pale
 // grid) and against the black Void.
-export const CBA_STYLE = Object.freeze({
+export const COOLDOWN_STYLE = Object.freeze({
   fill: '#ffffff',
   track: 'rgba(255, 255, 255, 0.3)',
   outline: '#000000',
 });
 
-// Player-facing names of charged actions, by the button they are charged
-// from: Charged BA1 (cba1, charged from ba1) is CBA1, Charged BA2 (cba2,
-// charged from ba2) is CBA2.
-export const CHARGED_LABELS = Object.freeze({ ba1: 'CBA1', ba2: 'CBA2' });
+// The compact name of a move's cooldown ring: A and its number for a
+// numbered attack (A3 for attack3, A4 for attack4), the codename in capitals
+// for anything else.
+export function cooldownLabel(move) {
+  const number = MOVES[move]?.number;
+  return number ? `A${number}` : String(move).toUpperCase();
+}
 
 // Seconds left on a cooldown as shown in its ring, one decimal, rounded up
 // so it never reads 0.0 while still cooling ("4.3", "0.1").
@@ -63,22 +69,23 @@ export function energyBarState(fighter) {
   };
 }
 
-// One entry per charged action of `fighter`'s character that is cooling
-// down right now (chargedCooldowns.active), in its `chargedActions` order:
-// { id, action, label, progress, text }. A ready one has no entry, so
-// nothing is drawn for it. progress = 1 - remaining / duration, read
-// straight from the fighter's cooldowns, so a Charge that speeds recovery
-// speeds the ring too.
-export function cbaIndicators(fighter) {
+// One entry per Charge replacement of `fighter`'s character that is cooling
+// down right now (chargedCooldowns.active, keyed by the attack it is), in
+// its `chargeReplacements` order: { id, action, label, progress, text },
+// `id` the attack (attack3) and `action` the button Charge makes it from
+// (attack1). A ready one has no entry, so nothing is drawn for it. progress
+// = 1 - remaining / duration, read straight from the fighter's cooldowns,
+// so a Charge that speeds recovery speeds the ring too.
+export function cooldownIndicators(fighter) {
   const cooldowns = fighter.combat.chargedCooldowns;
-  return Object.entries(fighter.def.chargedActions ?? {})
-    .filter(([, charged]) => cooldowns.active(charged.id))
-    .map(([action, charged]) => ({
-      id: charged.id,
+  return Object.entries(fighter.def.chargeReplacements ?? {})
+    .filter(([, replacement]) => cooldowns.active(replacement.id))
+    .map(([action, replacement]) => ({
+      id: replacement.id,
       action,
-      label: CHARGED_LABELS[action] ?? action.toUpperCase(),
-      progress: cooldowns.progress(charged.id),
-      text: formatCooldown(cooldowns.remaining(charged.id)),
+      label: cooldownLabel(replacement.id),
+      progress: cooldowns.progress(replacement.id),
+      text: formatCooldown(cooldowns.remaining(replacement.id)),
     }));
 }
 
@@ -113,17 +120,17 @@ export function drawEnergyBar(ctx, fighter, rect, dpr = 1) {
 
 const MONO = 'ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace';
 
-// One ring per charged action cooling down, in a row centred under the feet
-// at (x, footY), device pixels: no slot is kept for a ready one, so a lone
-// ring sits straight under the fighter and nothing at all is drawn while
-// both are ready. The ring completes clockwise from the top as the ability
-// recovers, the seconds left inside it, its CBA name beneath. White,
+// One ring per Charge replacement cooling down, in a row centred under the
+// feet at (x, footY), device pixels: no slot is kept for a ready one, so a
+// lone ring sits straight under the fighter and nothing at all is drawn
+// while both are ready. The ring completes clockwise from the top as the
+// ability recovers, the seconds left inside it, its name (A3) beneath. White,
 // outlined in black. Sized with the world (`scale`, device pixels per world
 // unit) but never below a readable size in CSS pixels (`dpr`, device pixels
 // per CSS pixel), the number always inside its ring. Returns how many rings
 // it drew.
-export function drawCbaIndicators(ctx, fighter, x, footY, scale, dpr = 1) {
-  const list = cbaIndicators(fighter);
+export function drawCooldownIndicators(ctx, fighter, x, footY, scale, dpr = 1) {
+  const list = cooldownIndicators(fighter);
   if (!list.length) return 0;
   const r = Math.round(Math.max(10 * dpr, 9.5 * scale));
   const ring = Math.max(2, Math.round(r * 0.2));
@@ -144,20 +151,20 @@ export function drawCbaIndicators(ctx, fighter, x, footY, scale, dpr = 1) {
     ctx.beginPath();
     ctx.arc(cx, cy, r, 0, Math.PI * 2);
     ctx.lineWidth = ring + o * 2;
-    ctx.strokeStyle = CBA_STYLE.outline;
+    ctx.strokeStyle = COOLDOWN_STYLE.outline;
     ctx.stroke();
     ctx.lineWidth = ring;
-    ctx.strokeStyle = CBA_STYLE.track;
+    ctx.strokeStyle = COOLDOWN_STYLE.track;
     ctx.stroke();
     if (c.progress > 0) {
       ctx.beginPath();
       ctx.arc(cx, cy, r, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * c.progress);
-      ctx.strokeStyle = CBA_STYLE.fill;
+      ctx.strokeStyle = COOLDOWN_STYLE.fill;
       ctx.stroke();
     }
     ctx.lineWidth = Math.max(2, o * 2.5);
-    ctx.strokeStyle = CBA_STYLE.outline;
-    ctx.fillStyle = CBA_STYLE.fill;
+    ctx.strokeStyle = COOLDOWN_STYLE.outline;
+    ctx.fillStyle = COOLDOWN_STYLE.fill;
     ctx.font = `800 ${valueFont}px ${MONO}`;
     ctx.textBaseline = 'middle';
     ctx.strokeText(c.text, cx, cy + 1);

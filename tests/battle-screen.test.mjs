@@ -14,7 +14,7 @@ import { CombatState } from '../js/game/combat.js';
 import { formatLaunchPoint, describeEnergy } from '../js/game/hud.js';
 import { CONFIG } from '../js/config.js';
 import { duel, def as DEF_0001 } from './fighter-harness.mjs';
-import { TEST_A, REMOVED_IDS, withTestFighters } from './test-fighters.mjs';
+import { TEST_A, TEST_DISABLED, REMOVED_IDS, withTestFighters } from './test-fighters.mjs';
 
 class Node {
   parentNode = null;
@@ -160,7 +160,7 @@ function fakeBattle({ p1 = 0, p2 = 0, score = { p1: 0, p2: 0 } } = {}) {
   const fighter = (launchPoint) => {
     const combat = new CombatState();
     combat.launchPoint = launchPoint;
-    return { def: { displayName: '#0001', chargedActions: DEF_0001.chargedActions }, combat };
+    return { def: { displayName: '#0001', chargeReplacements: DEF_0001.chargeReplacements }, combat };
   };
   const battle = {
     p1: fighter(p1), p2: fighter(p2), phase: 'fight', phaseTime: 1, timeLeft: 0.2, round: 1, restarts: 0,
@@ -324,14 +324,14 @@ test('HUD: one glass card per fighter, portrait | divider | name over Launch Poi
     assert.equal(tagRow.querySelector('.hud-name').textContent, '#0001', 'the character\'s displayName');
     assert.equal(launchPoint, side.launchPoint, 'Launch Point under the name');
     assert.equal(side.root.querySelector('.hud-sub'), null);
-    // No CBA cooldowns in the card any more: they are drawn under the
-    // fighter itself (see fighter-status.test.mjs).
+    // No Charge replacement cooldowns (A3, A4) in the card: they are drawn
+    // under the fighter itself (see fighter-status.test.mjs).
     for (const cls of ['.hud-cooldowns', '.hud-cd', '.hud-cd-ring', '.hud-cd-name']) {
       assert.deepEqual(side.wrap.querySelectorAll(cls), [], `no ${cls}`);
     }
     assert.equal('cooldowns' in side, false);
     assert.equal('cooldownRow' in side, false);
-    assert.doesNotMatch(side.wrap.textContent, /CBA|BA1|BA2/);
+    assert.doesNotMatch(side.wrap.textContent, /\bA[34]\b|attack[1-5]/);
     // The card, then exactly three score dots under it, all empty at first.
     assert.equal(side.wrap.children.length, 2);
     assert.equal(side.wrap.children[0], side.root);
@@ -537,7 +537,7 @@ test('HUD: the portrait is the character\'s own crop from its sprites, with noth
   screen.hud.bind(battle.p1, battle.p2);
   assert.equal(made, 1);
   const code = readFileSync(new URL('../js/game/hud.js', import.meta.url), 'utf8').replace(/^\s*\/\/.*$/gm, '');
-  assert.doesNotMatch(code, /assets\/|0001|cba1|cba2/, 'data-driven: no character paths or ids');
+  assert.doesNotMatch(code, /assets\/|0001|attack3|attack4/, 'data-driven: no character paths or ids');
   const source = code;
   assert.match(source, /paintPortrait/, 'the shared portrait painter, as the roster uses');
 });
@@ -549,7 +549,7 @@ test('HUD: a real hit raises the Launch Point shown on the target\'s card only',
   const { hud } = screen;
   hud.bind(battle.p1, battle.p2);
   hud.update(battle);
-  d.tick({ ba1: true, ba1Pressed: true });
+  d.tick({ attack1: true, attack1Pressed: true });
   d.until(() => d.events.length > 0);
   hud.update(battle);
   assert.equal(hud.right.launchPointValue.textContent, '3');
@@ -761,7 +761,7 @@ test('entering Quick Battle shows Player 1\'s fighter on the touch ability butto
   const { MAPS } = await import('../js/data/maps.js');
   const touch = screen.touch;
   // Neutral until a fighter is named.
-  assert.equal(touch.buttons.get('uniqueba').getAttribute('aria-label'), 'Unique Basic Attack');
+  assert.equal(touch.buttons.get('extra_attack').getAttribute('aria-label'), 'Extra Attack');
   const calls = [];
   const set = touch.setCharacter.bind(touch);
   touch.setCharacter = (def) => { calls.push(def?.id); set(def); };
@@ -776,14 +776,14 @@ test('entering Quick Battle shows Player 1\'s fighter on the touch ability butto
   await screen.enter();
   assert.deepEqual(loadsBefore, [TEST_A.id], 'configured as soon as the fighter is known, before gameplay');
   assert.deepEqual(calls, [TEST_A.id]);
-  const shown = ['uniqueba', 'shield', 'ba1', 'ba2'].map((a) => [
+  const shown = ['extra_attack', 'shield', 'attack1', 'attack2'].map((a) => [
     touch.buttons.get(a).getAttribute('aria-label'), touch.buttons.get(a).html, touch.buttons.get(a).getAttribute('data-action'),
   ]);
   assert.deepEqual(shown, [
-    ['Shuriken', ICONS.shuriken, 'uniqueba'],
+    ['Shuriken', ICONS.shuriken, 'extra_attack'],
     ['Shield', ICONS.shield, 'shield'],
-    ['Punch', ICONS.punch, 'ba1'],
-    ['Kick', ICONS.kick, 'ba2'],
+    ['Punch', ICONS.punch, 'attack1'],
+    ['Kick', ICONS.kick, 'attack2'],
   ]);
   assert.equal(touch.enabled, false, 'no play without sprites');
 }));
@@ -816,7 +816,7 @@ test('Quick Battle uses the Mobile Controls setting: Joystick by default, Classi
   assert.equal(touch.scheme, 'joystick');
   // The fighter's combat buttons were never rebuilt along the way.
   for (const [action, b] of elements) assert.equal(touch.actionButtons.get(action), b, action);
-  assert.equal(touch.buttons.get('ba1').getAttribute('aria-label'), 'Punch');
+  assert.equal(touch.buttons.get('attack1').getAttribute('aria-label'), 'Punch');
 }));
 
 test('Quick Battle places the touch controls by the saved custom layout of the scheme in use, read on every entry; Watch Mode still has none', () => withTestFighters([TEST_A], async () => {
@@ -895,12 +895,12 @@ async function enterRefused({ params, selection }) {
   return { app, screen, loads, errors, went, named };
 }
 
-test('Battle never starts a fighter that is not playable: disabled #0001, a removed one, null, missing or unknown, in Quick Battle and Watch Mode', async () => {
+test('Battle never starts a fighter that is not playable: a disabled one, a removed one, null, missing or unknown, in Quick Battle and Watch Mode', () => withTestFighters([TEST_DISABLED], async () => {
   const quick = (id) => ({ selection: { characterId: id } });
   const quickDirect = (id) => ({ params: { characterId: id } });
   const watch = (id) => ({ params: { mode: 'watch' }, selection: { watch: { difficulty: 'hard', cpu1CharacterId: id, cpu2CharacterId: id } } });
   const watchDirect = (id) => ({ params: { mode: 'watch', cpu1CharacterId: id, cpu2CharacterId: id } });
-  for (const id of ['0001', ...REMOVED_IDS, null, undefined, '', 'no-such-fighter']) {
+  for (const id of [TEST_DISABLED.id, ...REMOVED_IDS, null, undefined, '', 'no-such-fighter']) {
     for (const [route, opts] of Object.entries({ quick, quickDirect, watch, watchDirect })) {
       const label = `${route}: ${id}`;
       const { screen, loads, errors, went, named, app } = await enterRefused(opts(id));
@@ -918,19 +918,27 @@ test('Battle never starts a fighter that is not playable: disabled #0001, a remo
       assert.equal(screen.isRunning, false);
     }
   }
-});
+  // Playable #0001 gets past the check to its load, on every route.
+  const watchOn = (id) => ({ params: { mode: 'watch' }, selection: { watch: { difficulty: 'hard', cpu1CharacterId: id, cpu2CharacterId: id, mapId: 'desert' } } });
+  for (const opts of [quick('0001'), quickDirect('0001'), watchOn('0001'), watchDirect('0001')]) {
+    const { loads, errors } = await enterRefused(opts);
+    assert.deepEqual(loads.slice(0, 2), ['show: Loading #0001', '0001']);
+    assert.doesNotMatch(errors[0]?.message ?? '', /not available/);
+  }
+}));
 
-test('Watch Mode refuses a pair with one fighter that cannot play, and Quick Battle a disabled one given directly, while others are playable', () => withTestFighters([TEST_A], async () => {
+test('Watch Mode refuses a pair with one fighter that cannot play, and Quick Battle a disabled one given directly, while others are playable', () => withTestFighters([TEST_A, TEST_DISABLED], async () => {
   const [removed1, removed2] = REMOVED_IDS;
-  for (const [cpu1, cpu2] of [[TEST_A.id, '0001'], ['0001', TEST_A.id], [TEST_A.id, removed2], [removed1, TEST_A.id]]) {
+  const off = TEST_DISABLED.id;
+  for (const [cpu1, cpu2] of [[TEST_A.id, off], [off, TEST_A.id], [TEST_A.id, removed2], [removed1, TEST_A.id]]) {
     const { screen, loads, errors } = await enterRefused({ params: { mode: 'watch', cpu1CharacterId: cpu1, cpu2CharacterId: cpu2 } });
     assert.equal(screen.battle, null, `${cpu1} vs ${cpu2}`);
     assert.deepEqual(loads, [], 'not even the playable one is loaded');
     assert.equal(errors.length, 1);
   }
-  // A stale selection naming disabled #0001 is refused even with a
+  // A stale selection naming a disabled fighter is refused even with a
   // playable fighter to hand: nothing falls back to it silently.
-  const { screen, loads, errors } = await enterRefused({ selection: { characterId: '0001' } });
+  const { screen, loads, errors } = await enterRefused({ selection: { characterId: off } });
   assert.equal(screen.battle, null);
   assert.deepEqual(loads, []);
   assert.equal(errors.length, 1);

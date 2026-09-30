@@ -108,7 +108,7 @@ export function stepUntil(step, pred, held, limit = 600) {
   throw new Error('condition never reached');
 }
 
-// ---- Attack helpers (Basic Attack 1 and 2 tests) --------------------------
+// ---- Attack helpers (Attack 1 and 2 tests) --------------------------
 
 export const steps = (seconds) => Math.round(seconds / DT);
 export const frameNo = (name) => Number(name.match(/(\d+)\.png$/)[1]);
@@ -173,15 +173,18 @@ export function duel({
 }
 
 // Two CPUs (CombatAIController) in a real fight on a flat stage, stepped in
-// Battle.update's order. Returns every step's inputs and states, keyed by fighter.
-export function cpuFight(defA, defB, { seconds = 30, seed = 3, difficulty = 'brutal' } = {}) {
+// Battle.update's order. Returns every step's inputs and states, keyed by
+// fighter; `charged` lists the Charge replacements cooling down after the
+// step. `spritesA` / `spritesB` swap in other art (by default each
+// fighter's every clip).
+export function cpuFight(defA, defB, { seconds = 30, seed = 3, difficulty = 'brutal', spritesA, spritesB } = {}) {
   const stage = new StageCollision(stageMap());
-  const make = (def, x, facing, slot, n) => new Fighter({
-    def, sprites: fakeSpritesOf(def), stage, slot, label: `CPU ${n}`, spawn: { x, facing },
+  const make = (def, sprites, x, facing, slot, n) => new Fighter({
+    def, sprites: sprites ?? fakeSpritesOf(def), stage, slot, label: `CPU ${n}`, spawn: { x, facing },
     controller: new CombatAIController({ difficulty, rng: mulberry32(seed + n) }),
   });
-  const a = make(defA, 900, 1, 'p1', 1);
-  const b = make(defB, 1100, -1, 'p2', 2);
+  const a = make(defA, spritesA, 900, 1, 'p1', 1);
+  const b = make(defB, spritesB, 1100, -1, 'p2', 2);
   a.opponent = b;
   b.opponent = a;
   const world = { stage, projectiles: [], clones: [], combat: new CombatSystem(), score: { p1: 0, p2: 0 }, timeLeft: 99, fighters: [a, b] };
@@ -194,7 +197,7 @@ export function cpuFight(defA, defB, { seconds = 30, seed = 3, difficulty = 'bru
       f.update(DT, ctx);
       log.get(f).push({
         ...f.controller.out, attack: f.combat.attack?.def.id ?? null, shielding: f.combat.shielding,
-        state: f.state, grounded: f.grounded, frame: frameName(f),
+        state: f.state, grounded: f.grounded, frame: frameName(f), charged: [...f.combat.chargedCooldowns.entries.keys()],
       });
       // Back on stage at once if the Void takes one: the fight goes on.
       if (f.body.y > 1600 || Math.abs(f.body.x - 1000) > 1800) f.respawn(stage);

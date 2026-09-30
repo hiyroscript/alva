@@ -54,6 +54,10 @@ class Element extends Node {
     return this.attrs.has(name) ? this.attrs.get(name) : null;
   }
   hasAttribute(name) { return this.getAttribute(name) !== null; }
+  removeAttribute(name) {
+    if (BOOLEAN_ATTRS.includes(name)) this[name] = false;
+    else this.attrs.delete(name);
+  }
   set textContent(v) { this.replaceChildren(new Text(String(v))); }
   get textContent() { return this.children.map((c) => c.textContent).join(''); }
   set innerHTML(v) { this.replaceChildren(); this.html = v; }
@@ -185,7 +189,7 @@ test('French is really French: only proper names, codes and shared words read th
     .filter((k) => typeof STRINGS.en[k] === 'string' && STRINGS.en[k] === STRINGS.fr[k])
     .sort();
   assert.deepEqual(same, [
-    'ability.0001.uniqueba', // Shuriken
+    'ability.0001.extra_attack', // Shuriken
     'brand.title', // ALVA
     'control.charge', // Charge
     'control.pause', // Pause
@@ -267,7 +271,7 @@ test('t fills placeholders, reads nested keys, falls back to English, and shows 
   }
   assert.equal(warnings.length, 1, 'logged once');
   assert.equal(hasTranslation('home.play'), true);
-  assert.equal(hasTranslation('ability.9999.ba1'), false);
+  assert.equal(hasTranslation('ability.9999.attack1'), false);
   inFrench(() => {
     assert.equal(t('home.play'), 'Jouer');
     assert.equal(t('setup.steps', { name: { t: 'setup.watch' } }), 'Étapes : Mode Spectateur');
@@ -431,7 +435,7 @@ test('changing the language re-reads the whole interface at once: menus, setup s
     // Touch-control names, the fighter's own included; the codenames never.
     assert.deepEqual(touch.dpad.children.map((b) => b.getAttribute('aria-label')), ['Aller à gauche', 'Charge', 'Aller à droite']);
     assert.equal(touch.dpad.getAttribute('aria-label'), 'Déplacement et Charge');
-    assert.equal(touch.buttons.get('ba2').getAttribute('aria-label'), 'Coup de pied');
+    assert.equal(touch.buttons.get('attack2').getAttribute('aria-label'), 'Coup de pied');
     assert.equal(touch.buttons.get('shield').getAttribute('aria-label'), 'Bouclier');
     assert.deepEqual(touch.dpad.children.map((b) => b.getAttribute('data-action')), ['runLeft', 'charge', 'runRight']);
     // Keyboard hints, keycaps too.
@@ -448,7 +452,7 @@ test('changing the language re-reads the whole interface at once: menus, setup s
   // And back.
   localizeTree(body);
   assert.equal(mode.el.querySelector('.screen-title').textContent, 'Select Mode');
-  assert.equal(touch.buttons.get('ba2').getAttribute('aria-label'), 'Kick');
+  assert.equal(touch.buttons.get('attack2').getAttribute('aria-label'), 'Kick');
   assert.equal(describeEnergy({ maxEnergy: 100, energy: 75, energyExhausted: false }), 'Energy 75 of 100');
 });
 
@@ -474,13 +478,13 @@ test('index.html\'s own labels are marked with the keys that translate them', ()
 test('internal identifiers never change with the language', () => {
   inFrench(() => {
     const touch = new TouchControls(new Element('div'), { setTouch: noop, queueTouchMouvement: noop });
-    assert.deepEqual([...touch.buttons.keys()].sort(), ['ba1', 'ba2', 'charge', 'jump', 'shield', 'transform', 'uniqueba']);
+    assert.deepEqual([...touch.buttons.keys()].sort(), ['attack1', 'attack2', 'attack3', 'attack4', 'attack5', 'charge', 'extra_attack', 'jump', 'shield', 'transform']);
     assert.deepEqual([...touch.mouvementButtons.keys()], ['mouvementLeft', 'mouvementRight']);
     assert.equal(touch.scheme, 'joystick');
     const app = fakeApp();
     const difficulty = new DifficultySelectScreen(app);
     assert.deepEqual(difficulty.cards.map((c) => c.getAttribute('data-difficulty')), ['easy', 'medium', 'hard', 'brutal']);
-    assert.equal(CONFIG.bindings.ba1[0], 'KeyU', 'bindings untouched');
+    assert.equal(CONFIG.bindings.attack1[0], 'KeyU', 'bindings untouched');
   });
 });
 
@@ -500,7 +504,7 @@ test('every fighter-specific string belongs to a fighter that exists, in either 
     assert.doesNotMatch(text, /slender|Knudsen|Victor Surge|XmayGrrr|DeviantArt|renatoooferreiraaa/i, `${language}: nothing of an older fighter`);
   }
   // #0001's own strings stay: its ability names and its sprite credits.
-  assert.equal(STRINGS.fr['ability.0001.ba1'], 'Coup de poing');
+  assert.equal(STRINGS.fr['ability.0001.attack1'], 'Coup de poing');
   assert.equal(STRINGS.en['credits.sprites.title'], '#0001 sprite source');
 });
 

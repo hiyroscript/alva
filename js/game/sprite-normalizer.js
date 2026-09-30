@@ -184,7 +184,7 @@ export class SpriteSet {
     this.def = def;
     this.animations = {};
     this.projectiles = {}; // projectile animations, keyed like projectileAnimations
-    this.effects = {}; // effect animations (e.g. the clone cloud), keyed like effectAnimations
+    this.effects = {}; // effect animations (e.g. attack3_object, the clone cloud), keyed like effectAnimations
     this.worldPerArt = 1;
     this.refArtHeight = 1;
     this.missing = [];

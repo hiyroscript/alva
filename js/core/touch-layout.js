@@ -15,19 +15,23 @@
 // puts it, at its own size: the empty layout is Alva's original one.
 
 import { clamp } from './utils.js';
+import { NUMBERED_ATTACKS } from '../config.js';
 
 // Every control each scheme shows, in reading order: the lower-left cluster
-// first, then the six actions. `stick` is the joystick itself; `charge` is
-// each scheme's own Charge (C in Classic Buttons, the down arrow beside the
-// joystick).
+// first, then the lower-right actions, all five numbered attack buttons
+// included (a fighter shows only the ones it has; the layout is every
+// fighter's). `stick` is the joystick itself; `charge` is each scheme's own
+// Charge (C in Classic Buttons, the down arrow beside the joystick). A
+// control id is its codename, never a translated label: a stored layout
+// with any other id simply leaves that out.
 export const TOUCH_CONTROL_IDS = Object.freeze({
   joystick: Object.freeze([
     'charge', 'mouvementLeft', 'stick', 'mouvementRight',
-    'uniqueba', 'transform', 'shield', 'ba1', 'ba2', 'jump',
+    'extra_attack', 'transform', 'shield', ...NUMBERED_ATTACKS, 'jump',
   ]),
   classic: Object.freeze([
     'runLeft', 'charge', 'runRight',
-    'uniqueba', 'transform', 'shield', 'ba1', 'ba2', 'jump',
+    'extra_attack', 'transform', 'shield', ...NUMBERED_ATTACKS, 'jump',
   ]),
 });
 

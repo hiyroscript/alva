@@ -1,11 +1,11 @@
-// Test-only playable fighters (imported by the *.test.mjs files; not a test
-// file itself, and never in the game). The production roster has no
-// playable fighter (#0001 is kept but disabled), so a screen test that needs
-// one to pick, preview, practise with or watch registers these for its own
-// run: #0001's definition and art (borrowed: they are not what those tests
-// check) under neutral ids, marked available, in roster slots of their own
-// (slot 01 stays #0001's, locked). Every one registered is taken out again,
-// so the exported CHARACTERS array ends each run as it started.
+// Test-only fighters (imported by the *.test.mjs files; not a test file
+// itself, and never in the game). The production roster has one playable
+// fighter, #0001, so a screen test that needs more to pick, preview,
+// practise with or watch registers these for its own run: #0001's
+// definition and art (borrowed: they are not what those tests check) under
+// neutral ids, marked available (all but TEST_DISABLED), in roster slots of
+// their own (slot 01 stays #0001's). Every one registered is taken out
+// again, so the exported CHARACTERS array ends each run as it started.
 import { after } from 'node:test';
 import { CHARACTERS, getCharacter } from '../js/data/characters.js';
 import { SAMPLE_FIGHTER } from './sample-fighter.mjs';
@@ -23,16 +23,24 @@ export const TEST_A = testFighter('test-a', 'Test A', 1);
 export const TEST_B = testFighter('test-b', 'Test B', 2);
 
 // A fighter with no moves at all (slot 04): every combat button left out of
-// its `actions`, so no touch button, attack, charged action, projectile or
-// Shield. It still moves, jumps, falls and is hit like any fighter.
+// its `actions`, so no touch button, attack, Charge replacement, projectile
+// or Shield. It still moves, jumps, falls and is hit like any fighter. On
+// purpose it breaks the loadout rules (no attack1 or attack2; see
+// js/data/loadout.js, which the game's own definitions must pass): a
+// robustness fixture, proving the screens, the touch controls and the CPU
+// survive a fighter with nothing to press.
 export const TEST_MOVELESS = testFighter('test-moveless', 'Moveless', 3, {
-  actions: {}, attacks: {}, chargedActions: {}, summons: {}, chargedTechniques: {},
+  actions: {}, attacks: {}, chargeReplacements: {}, summons: {}, chargedTechniques: {},
   projectiles: {}, projectileAnimations: {}, effectAnimations: {}, mobileAbilities: {}, abilityNames: {}, defense: null,
 });
 
 // The sample fighter's different moves and names (see sample-fighter.mjs),
 // playable, in slot 05.
 export const TEST_SAMPLE = { ...SAMPLE_FIGHTER, id: 'test-sample', displayName: 'Sample', rosterSlot: 4, available: true };
+
+// A fighter that exists but is disabled (`available: false`, slot 07): the
+// definition no route may start, and the roster shows locked.
+export const TEST_DISABLED = testFighter('test-disabled', 'Disabled', 6, { available: false });
 
 // The ids of the fighters removed from the roster (slots 02 and 03). Only
 // ever checked for absence: no definition, art, string or credit of theirs

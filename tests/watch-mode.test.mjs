@@ -5,10 +5,10 @@
 // Quick Battle's, the real Battle with a combat AI on each side, and the
 // Battle screen running it (loading, spectating, pause, restart, rematch,
 // results, Change Stage) before a Quick Battle that behaves as before.
-// No production fighter is playable, so the fighters picked on its screens
-// are test-only (see test-fighters.mjs); the Battle-only checks build #0001
-// straight from its definition, as the engine allows. On a minimal fake
-// DOM; layout and paint still need real-browser checks.
+// The fighters picked on its screens are mostly test-only (see
+// test-fighters.mjs), beside #0001 in slot 01; the Battle-only checks build
+// #0001 straight from its definition. On a minimal fake DOM; layout and
+// paint still need real-browser checks.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -187,11 +187,11 @@ const { Battle, BATTLE_MODES } = await import('../js/game/battle.js');
 const { CombatAIController } = await import('../js/game/combat-ai.js');
 const { PlayerController } = await import('../js/game/fighter-controller.js');
 
-// The playable fighters, all test-only, registered before any roster is
-// built and taken out after the last test: Test A (slot 02) and #9999
-// (slot 06), #0001's art under two ids so CPU 1 and CPU 2 can differ while
-// sharing art, plus a fighter with no moves (slot 04) and the sample
-// fighter's different ones (slot 05).
+// The test-only playable fighters beside #0001 (slot 01), registered before
+// any roster is built and taken out after the last test: Test A (slot 02)
+// and #9999 (slot 06), #0001's art under two ids so CPU 1 and CPU 2 can
+// differ while sharing art, plus a fighter with no moves (slot 04) and the
+// sample fighter's different ones (slot 05).
 const DEF_9999 = testFighter('9999', '#9999', 5);
 useTestFighters(TEST_A, DEF_9999, TEST_MOVELESS, TEST_SAMPLE);
 
@@ -635,7 +635,7 @@ test('locked roster slots stay locked on both Watch rosters, exactly as on Selec
       assert.equal(slot.hasAttribute('data-nav'), false, 'out of keyboard / gamepad navigation');
       assert.match(slot.getAttribute('aria-label'), /^Slot \d\d, locked$/);
     }
-    assert.deepEqual(screen.roster.slots.filter((s) => s._def?.available).map((s) => s._def.id), ['test-a', 'test-moveless', 'test-sample', '9999']);
+    assert.deepEqual(screen.roster.slots.filter((s) => s._def?.available).map((s) => s._def.id), ['0001', 'test-a', 'test-moveless', 'test-sample', '9999']);
   }
 });
 
@@ -681,12 +681,12 @@ test('stale Watch values fall back as Quick Battle\'s do: Medium, the first avai
   assert.equal(document.activeElement, cardOf(screens.watchDifficulty, 'medium'));
   cardOf(screens.watchDifficulty, 'medium').click();
   assert.equal(app.selection.watch.difficulty, 'medium');
-  assert.equal(document.activeElement, slotOf(screens.watchCpu1, 'test-a'));
+  assert.equal(document.activeElement, slotOf(screens.watchCpu1, '0001'), '#0001, slot 01');
   screens.watchCpu1.roster.confirm();
-  assert.equal(app.selection.watch.cpu1CharacterId, 'test-a');
-  assert.equal(document.activeElement, slotOf(screens.watchCpu2, 'test-a'));
+  assert.equal(app.selection.watch.cpu1CharacterId, '0001');
+  assert.equal(document.activeElement, slotOf(screens.watchCpu2, '0001'));
   screens.watchCpu2.roster.confirm();
-  assert.equal(app.selection.watch.cpu2CharacterId, 'test-a');
+  assert.equal(app.selection.watch.cpu2CharacterId, '0001');
   assert.equal(app.selection.watch.mapId, MAPS[0].id, 'an unknown stage is the first one');
   assert.equal(document.activeElement, mapCard(screens.watchMap, MAPS[0].id));
 });
@@ -786,7 +786,7 @@ test('in a seeded mirror match the two CPUs decide for themselves', () => {
     battle.update(DT);
     for (const side of ['p1', 'p2']) {
       const out = battle[side].controller.out;
-      samples[side].push([out.runLeft, out.runRight, out.jump, out.uniqueba, out.ba1, out.ba2, out.shield, out.charge].join());
+      samples[side].push([out.runLeft, out.runRight, out.jump, out.extra_attack, out.attack1, out.attack2, out.shield, out.charge].join());
     }
   }
   // Were they one stream, the same position mirrored would bring the same
@@ -821,7 +821,7 @@ test('spectating: nothing reads gameplay input, and held buttons change nothing 
   // fight would change.
   const all = fakeInput();
   const everything = {};
-  for (const k of ['runLeft', 'runRight', 'charge', 'jump', 'shield', 'uniqueba', 'transform', 'ba1', 'ba2']) {
+  for (const k of ['runLeft', 'runRight', 'charge', 'jump', 'shield', 'extra_attack', 'transform', 'attack1', 'attack2']) {
     everything[k] = true;
     everything[`${k}Pressed`] = true;
   }
@@ -921,7 +921,7 @@ test('Watch Mode with a fighter with no moves: either way round and mirrored, it
     for (const f of battle.fighters) {
       assert.ok(Number.isFinite(f.x) && Number.isFinite(f.y), `${label}: ${f.def.id} in the world`);
       if (f.def === TEST_MOVELESS) {
-        assert.equal(f.combat.chargedCooldowns.size, 0, `${label}: no charged action`);
+        assert.equal(f.combat.chargedCooldowns.size, 0, `${label}: no Charge replacement`);
         assert.ok(battle.projectiles.every((p) => p.owner !== f), `${label}: no projectile of its own`);
       }
     }
@@ -978,9 +978,9 @@ test('Quick Battle with a fighter with different moves: picked from slot 05, the
   assert.deepEqual(app.loading.labels.at(-1), 'Loading Sample');
   assert.deepEqual([battle.p1.def.id, battle.p2.def.id], ['test-sample', 'test-sample'], 'the CPU plays Player 1\'s fighter');
   const touch = screens.battle.touch;
-  const abilities = ['uniqueba', 'transform', 'ba1', 'ba2'];
+  const abilities = ['extra_attack', 'transform', 'attack1', 'attack2'];
   assert.deepEqual(abilities.map((a) => [touch.buttons.get(a).hidden ?? false, touch.buttons.get(a).getAttribute('aria-label')]), [
-    [false, 'Palm Strike'], [false, 'Awakening'], [false, 'Jab'], [false, 'Basic Attack 2'],
+    [false, 'Palm Strike'], [false, 'Awakening'], [false, 'Jab'], [false, 'Attack 2'],
   ]);
   trace(battle, 300);
   for (const f of battle.fighters) assert.ok(Number.isFinite(f.x) && Number.isFinite(f.y));
@@ -1061,8 +1061,8 @@ test('spectating: no touch controls and no gameplay input, through pause, resume
   assert.equal(screen.isRunning, true, 'the match runs');
   assert.ok(screen.el.classList.contains('is-watch'));
   // No fighter's own ability icons.
-  assert.equal(screen.touch.buttons.get('uniqueba').getAttribute('aria-label'), 'Unique Basic Attack');
-  assert.equal(screen.touch.buttons.get('ba1').getAttribute('aria-label'), 'Basic Attack 1');
+  assert.equal(screen.touch.buttons.get('extra_attack').getAttribute('aria-label'), 'Extra Attack');
+  assert.equal(screen.touch.buttons.get('attack1').getAttribute('aria-label'), 'Attack 1');
   screen.pause();
   off();
   screen.resume();
@@ -1109,7 +1109,7 @@ test('spectating: no touch controls and no gameplay input, through pause, resume
   assert.equal(screen.touch.enabled, true);
   assert.equal(screen.touchRoot.hidden, false);
   assert.ok(!screen.el.classList.contains('is-watch'));
-  assert.equal(screen.touch.buttons.get('uniqueba').getAttribute('aria-label'), 'Shuriken', 'Player 1\'s fighter again');
+  assert.equal(screen.touch.buttons.get('extra_attack').getAttribute('aria-label'), 'Shuriken', 'Player 1\'s fighter again');
   screen.exit();
 });
 
@@ -1282,7 +1282,7 @@ test('Quick Battle with a fighter with no moves: picked from slot 04, the CPU pl
   assert.deepEqual([battle.p1.def.id, battle.p2.def.id], ['test-moveless', 'test-moveless'], 'the CPU plays Player 1\'s fighter');
   assert.equal(battle.p1.sprites, battle.p2.sprites);
   const touch = screens.battle.touch;
-  const abilities = ['uniqueba', 'transform', 'ba1', 'ba2'];
+  const abilities = ['extra_attack', 'transform', 'attack1', 'attack2'];
   for (const action of abilities) {
     assert.equal(touch.buttons.get(action).hidden, true, action);
     assert.equal(touch.buttons.get(action).getAttribute('aria-label'), null, action);

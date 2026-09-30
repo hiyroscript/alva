@@ -2,7 +2,7 @@
 // The touch controls on a minimal fake DOM, in both Mobile Controls schemes:
 // the icon-based combat buttons (#0001's Shuriken, Punch and Kick from its
 // mobileAbilities, the universal Shield), their character-aware refresh, the
-// control codenames behind them (uniqueba, shield, ba1, ba2), Classic
+// control codenames behind them (extra_attack, shield, attack1, attack2), Classic
 // Buttons' Left / C / Right cluster (runLeft / charge / runRight) exactly as
 // before,
 // the Joystick scheme's stick (a plain base and knob: deadzone, release,
@@ -87,6 +87,8 @@ const { getCharacter } = await import('../js/data/characters.js');
 const { setLanguage, localizeTree } = await import('../js/core/i18n.js');
 const { SAMPLE_FIGHTER } = await import('./sample-fighter.mjs');
 const { TEST_MOVELESS } = await import('./test-fighters.mjs');
+const { LOADOUT_CASES, WITH_EXTRA } = await import('./loadout-fighters.mjs');
+const { attackSlots } = await import('../js/game/touch-controls.js');
 
 const ROOT = new URL('../', import.meta.url);
 const read = (path) => readFileSync(new URL(path, ROOT), 'utf8');
@@ -97,15 +99,16 @@ const CSS = read('styles.css');
 // Transform (left out of its actions).
 const DEF_0001 = getCharacter('0001');
 const MOVELESS = TEST_MOVELESS;
+const NUMBERED = ['attack1', 'attack2', 'attack3', 'attack4', 'attack5'];
 const NO_TRANSFORM = {
   ...DEF_0001,
   id: 'test-no-transform',
   displayName: 'No Transform',
-  actions: { uniqueba: 'uniqueba', ba1: DEF_0001.actions.ba1, ba2: DEF_0001.actions.ba2 },
+  actions: { extra_attack: 'extra_attack', attack1: DEF_0001.actions.attack1, attack2: DEF_0001.actions.attack2 },
   mobileAbilities: {
-    uniqueba: { label: 'Palm Strike', icon: 'arrow' },
-    ba1: { label: 'Punch', icon: 'punch' },
-    ba2: { label: 'Kick', icon: 'kick' },
+    extra_attack: { label: 'Palm Strike', icon: 'arrow' },
+    attack1: { label: 'Punch', icon: 'punch' },
+    attack2: { label: 'Kick', icon: 'kick' },
   },
 };
 
@@ -131,7 +134,7 @@ const lift = (b, pointerId) => b.dispatch('pointerup', { pointerId });
 // Everything a player could read on a touch button: its text, and any text
 // inside its markup (an <svg> has none).
 const visibleText = (b) => b.textContent + b.innerHTML.replace(/<[^>]*>/g, '');
-const CODE_LABELS = /\b(T|D|BA1|BA2|A1|A2)\b/;
+const CODE_LABELS = /\b(T|D|attack1|attack2|A1|A2)\b/;
 
 // ---- Ability icons ----------------------------------------------------------
 
@@ -170,16 +173,18 @@ test('no image assets for the ability glyphs: the controls never load a PNG', ()
 
 test('#0001 authors its mobile abilities as small, declarative UI data', () => {
   assert.deepEqual(DEF_0001.mobileAbilities, {
-    uniqueba: { label: 'Shuriken', icon: 'shuriken' },
-    ba1: { label: 'Punch', icon: 'punch' },
-    ba2: { label: 'Kick', icon: 'kick' },
+    extra_attack: { label: 'Shuriken', icon: 'shuriken' },
+    attack1: { label: 'Punch', icon: 'punch' },
+    attack2: { label: 'Kick', icon: 'kick' },
   });
   // Every icon it names exists; the Shield is universal, not #0001's.
   for (const { icon } of Object.values(DEF_0001.mobileAbilities)) assert.ok(ICONS[icon], icon);
   assert.equal(DEF_0001.mobileAbilities.shield, undefined);
   // No Transform of its own yet: its Transform button stays reserved.
   assert.equal(DEF_0001.mobileAbilities.transform, undefined);
-  assert.deepEqual([...ABILITY_ACTIONS], ['uniqueba', 'transform', 'ba1', 'ba2']);
+  assert.deepEqual([...ABILITY_ACTIONS], ['extra_attack', 'transform', 'attack1', 'attack2', 'attack3', 'attack4', 'attack5']);
+  // No attack3 or attack4 button: those two are its Charge replacements.
+  for (const button of ['attack3', 'attack4', 'attack5']) assert.equal(DEF_0001.mobileAbilities[button], undefined, button);
   // UI only: no combat module reads it, and the controls never guess an
   // icon from attack data or animation names.
   const code = (file) => read(file).replace(/\/\/.*$/gm, '');
@@ -188,7 +193,7 @@ test('#0001 authors its mobile abilities as small, declarative UI data', () => {
     assert.doesNotMatch(code(`js/game/${file}`), /mobileAbilities|mobile-abilities/, `${file} never reads mobileAbilities`);
   }
   for (const file of ['js/game/touch-controls.js', 'js/ui/mobile-abilities.js']) {
-    assert.doesNotMatch(code(file), /\.(attacks|animations?|chargedActions|projectiles)\b|'000\d'|displayName/, `${file}: no inference, no fighter special case`);
+    assert.doesNotMatch(code(file), /\.(attacks|animations?|chargeReplacements|projectiles)\b|'000\d'|displayName/, `${file}: no inference, no fighter special case`);
   }
   // Whether a button exists at all comes from the fighter's `actions` (the
   // data combat and the CPU go by), read in one place, abilityPresence:
@@ -201,25 +206,28 @@ test('#0001 authors its mobile abilities as small, declarative UI data', () => {
 });
 
 test('mobileAbility falls back safely: generic names and neutral glyphs, never a crash', () => {
-  assert.deepEqual(mobileAbility(DEF_0001, 'uniqueba'), { label: 'Shuriken', icon: ICONS.shuriken, pending: false });
-  assert.deepEqual(mobileAbility(DEF_0001, 'ba1'), { label: 'Punch', icon: ICONS.punch, pending: false });
-  assert.deepEqual(mobileAbility(DEF_0001, 'ba2'), { label: 'Kick', icon: ICONS.kick, pending: false });
+  assert.deepEqual(mobileAbility(DEF_0001, 'extra_attack'), { label: 'Shuriken', icon: ICONS.shuriken, pending: false });
+  assert.deepEqual(mobileAbility(DEF_0001, 'attack1'), { label: 'Punch', icon: ICONS.punch, pending: false });
+  assert.deepEqual(mobileAbility(DEF_0001, 'attack2'), { label: 'Kick', icon: ICONS.kick, pending: false });
   assert.deepEqual(mobileAbility(DEF_0001, 'transform'), { label: 'Transform', icon: ICONS.transform, pending: true });
   for (const def of [null, undefined, {}, { mobileAbilities: {} }]) {
-    assert.deepEqual(mobileAbility(def, 'uniqueba'), { label: ACTION_LABELS.uniqueba, icon: ICONS.ring, pending: false });
-    assert.deepEqual(mobileAbility(def, 'ba1'), { label: ACTION_LABELS.ba1, icon: ICONS.pip1, pending: false });
-    assert.deepEqual(mobileAbility(def, 'ba2'), { label: ACTION_LABELS.ba2, icon: ICONS.pip2, pending: false });
+    assert.deepEqual(mobileAbility(def, 'extra_attack'), { label: ACTION_LABELS.extra_attack, icon: ICONS.ring, pending: false });
+    assert.deepEqual(mobileAbility(def, 'attack1'), { label: ACTION_LABELS.attack1, icon: ICONS.pip1, pending: false });
+    assert.deepEqual(mobileAbility(def, 'attack2'), { label: ACTION_LABELS.attack2, icon: ICONS.pip2, pending: false });
     assert.deepEqual(mobileAbility(def, 'transform'), { label: 'Transform', icon: ICONS.transform, pending: true }, 'reserved until a fighter presents one');
   }
   // Half-authored: whatever is missing or unknown falls back on its own.
-  const partial = { mobileAbilities: { uniqueba: { label: 'Kunai' }, ba1: { icon: 'nope', label: 'Jab' }, transform: { label: 'Awaken' } } };
-  assert.deepEqual(mobileAbility(partial, 'uniqueba'), { label: 'Kunai', icon: ICONS.ring, pending: false });
-  assert.deepEqual(mobileAbility(partial, 'ba1'), { label: 'Jab', icon: ICONS.pip1, pending: false });
-  assert.deepEqual(mobileAbility(partial, 'ba2'), { label: 'Basic Attack 2', icon: ICONS.pip2, pending: false });
+  const partial = { mobileAbilities: { extra_attack: { label: 'Kunai' }, attack1: { icon: 'nope', label: 'Jab' }, transform: { label: 'Awaken' } } };
+  assert.deepEqual(mobileAbility(partial, 'extra_attack'), { label: 'Kunai', icon: ICONS.ring, pending: false });
+  assert.deepEqual(mobileAbility(partial, 'attack1'), { label: 'Jab', icon: ICONS.pip1, pending: false });
+  assert.deepEqual(mobileAbility(partial, 'attack2'), { label: 'Attack 2', icon: ICONS.pip2, pending: false });
   assert.deepEqual(mobileAbility(partial, 'transform'), { label: 'Awaken', icon: ICONS.transform, pending: false }, 'its own Transform: no longer reserved');
-  // The three fallbacks tell the buttons apart and never borrow #0001's look.
-  const glyphs = ['ring', 'pip1', 'pip2'].map((n) => ICONS[n]);
-  assert.equal(new Set(glyphs).size, 3);
+  for (const n of [3, 4, 5]) {
+    assert.deepEqual(mobileAbility(null, `attack${n}`), { label: `Attack ${n}`, icon: ICONS[`pip${n}`], pending: false });
+  }
+  // The fallbacks tell the buttons apart and never borrow #0001's look.
+  const glyphs = ['ring', 'pip1', 'pip2', 'pip3', 'pip4', 'pip5'].map((n) => ICONS[n]);
+  assert.equal(new Set(glyphs).size, 6);
   for (const g of glyphs) assert.ok(![ICONS.shuriken, ICONS.punch, ICONS.kick].includes(g));
 });
 
@@ -229,11 +237,11 @@ test('another fighter presents its own buttons: its Transform is a real button, 
   for (const scheme of ['joystick', 'classic']) {
     const { tc, calls } = touchControls(SAMPLE_FIGHTER, { scheme });
     const b = (a) => tc.buttons.get(a);
-    assert.deepEqual(['uniqueba', 'transform', 'ba1', 'ba2'].map((a) => [a, b(a).getAttribute('aria-label'), b(a).innerHTML]), [
-      ['uniqueba', 'Palm Strike', ICONS.arrow],
+    assert.deepEqual(['extra_attack', 'transform', 'attack1', 'attack2'].map((a) => [a, b(a).getAttribute('aria-label'), b(a).innerHTML]), [
+      ['extra_attack', 'Palm Strike', ICONS.arrow],
       ['transform', 'Awakening', ICONS.up],
-      ['ba1', 'Jab', ICONS.punch],
-      ['ba2', ACTION_LABELS.ba2, ICONS.pip2],
+      ['attack1', 'Jab', ICONS.punch],
+      ['attack2', ACTION_LABELS.attack2, ICONS.pip2],
     ], scheme);
     assert.equal(b('transform').classList.contains('is-pending'), false, `${scheme}: its own Transform, not reserved`);
     assert.deepEqual([...tc.buttons].filter(([, el]) => el.classList.contains('is-pending')), [], `${scheme}: nothing reserved`);
@@ -246,31 +254,38 @@ test('another fighter presents its own buttons: its Transform is a real button, 
     assert.equal(b('transform').getAttribute('aria-label'), 'Transform');
     assert.equal(b('transform').innerHTML, ICONS.transform);
     assert.ok(b('transform').classList.contains('is-pending'), `${scheme}: reserved for #0001`);
-    assert.equal(b('uniqueba').getAttribute('aria-label'), 'Shuriken');
+    assert.equal(b('extra_attack').getAttribute('aria-label'), 'Shuriken');
   }
 });
 
 // ---- Touch buttons: a fighter with no moves ----------------------------------------
 
 test('abilityPresence reads the fighter\'s actions: implemented, reserved (null) or absent (left out)', () => {
-  assert.deepEqual(ABILITY_ACTIONS.map((a) => abilityPresence(DEF_0001, a)), ['implemented', 'reserved', 'implemented', 'implemented']);
+  // #0001: attack3 and attack4 come from Charge, so they (and attack5) have no button.
+  assert.deepEqual(ABILITY_ACTIONS.map((a) => abilityPresence(DEF_0001, a)), [
+    'implemented', 'reserved', 'implemented', 'implemented', 'absent', 'absent', 'absent',
+  ]);
   // A fighter with no moves: every one is left out of its (empty) actions.
   assert.deepEqual(MOVELESS.actions, {});
-  assert.deepEqual(ABILITY_ACTIONS.map((a) => abilityPresence(MOVELESS, a)), ['absent', 'absent', 'absent', 'absent']);
-  assert.deepEqual(ABILITY_ACTIONS.map((a) => abilityPresence(SAMPLE_FIGHTER, a)), ['implemented', 'implemented', 'implemented', 'implemented']);
+  assert.deepEqual(ABILITY_ACTIONS.map((a) => abilityPresence(MOVELESS, a)), ABILITY_ACTIONS.map(() => 'absent'));
+  assert.deepEqual(ABILITY_ACTIONS.map((a) => abilityPresence(SAMPLE_FIGHTER, a)), [
+    'implemented', 'implemented', 'implemented', 'implemented', 'absent', 'absent', 'absent',
+  ]);
   // Nothing to go by: every button stays, Transform reserved.
   for (const def of [null, undefined, {}, { mobileAbilities: {} }]) {
-    assert.deepEqual(ABILITY_ACTIONS.map((a) => abilityPresence(def, a)), ['implemented', 'reserved', 'implemented', 'implemented']);
+    assert.deepEqual(ABILITY_ACTIONS.map((a) => abilityPresence(def, a)), [
+      'implemented', 'reserved', 'implemented', 'implemented', 'implemented', 'implemented', 'implemented',
+    ]);
   }
   // A move mapped to null is reserved, whichever button it is.
-  assert.equal(abilityPresence({ actions: { uniqueba: null } }, 'uniqueba'), 'reserved');
-  assert.equal(abilityPresence({ actions: { uniqueba: null } }, 'ba1'), 'absent');
+  assert.equal(abilityPresence({ actions: { extra_attack: null } }, 'extra_attack'), 'reserved');
+  assert.equal(abilityPresence({ actions: { extra_attack: null } }, 'attack1'), 'absent');
   // An absent ability has nothing to present, not even a neutral glyph or a
   // reserved star.
   for (const action of ABILITY_ACTIONS) assert.equal(mobileAbility(MOVELESS, action), null, action);
 });
 
-test('a fighter with no moves has no ability buttons: all four hidden, unnamed, blank, never dashed; Shield, Charge and Jump stay', () => {
+test('a fighter with no moves has no ability buttons: all seven hidden, unnamed, blank, never dashed; Shield, Charge and Jump stay', () => {
   for (const scheme of ['joystick', 'classic']) {
     const { tc } = touchControls(MOVELESS, { scheme });
     const b = (a) => tc.buttons.get(a);
@@ -282,11 +297,11 @@ test('a fighter with no moves has no ability buttons: all four hidden, unnamed, 
       assert.equal(btn.innerHTML, '', `${action}: no glyph, neutral or not`);
       assert.equal(btn.classList.contains('is-pending'), false, `${action}: not a dashed "coming soon" button`);
       assert.equal(btn.getAttribute('tabindex'), '-1', `${action}: never in the Tab order`);
-      // Still the same element in the same place, codename unchanged.
+      // Still the same element, codename unchanged.
       assert.equal(btn.getAttribute('data-action'), action);
       assert.ok(btn.classList.contains(`tc-${action}`));
     }
-    assert.equal(tc.actions.children[0], b('uniqueba'));
+    assert.equal(tc.actions.children[0], b('extra_attack'));
     // The universal controls stay, named, whatever the fighter has.
     assert.deepEqual(['shield', 'charge', 'jump'].map((a) => [a, b(a).hidden ?? false, b(a).getAttribute('aria-label')]), [
       ['shield', false, 'Shield'],
@@ -315,7 +330,7 @@ test('the hidden ability buttons dispatch nothing: no press, no assistive click'
   assert.deepEqual(calls, [['jump', true], ['jump', false]]);
 });
 
-test('switching #0001 -> no moves -> #0001 hides and restores the very same four buttons; a held one is let go', () => {
+test('switching #0001 -> no moves -> #0001 hides and restores the very same buttons; a held one is let go', () => {
   for (const scheme of ['joystick', 'classic']) {
     const { tc, calls } = touchControls(DEF_0001, { scheme });
     const els = ABILITY_ACTIONS.map((a) => tc.buttons.get(a));
@@ -325,20 +340,24 @@ test('switching #0001 -> no moves -> #0001 hides and restores the very same four
       [false, 'Transform', ICONS.transform, true],
       [false, 'Punch', ICONS.punch, false],
       [false, 'Kick', ICONS.kick, false],
+      // attack3 to attack5: none of #0001's own.
+      [true, null, '', false],
+      [true, null, '', false],
+      [true, null, '', false],
     ];
     assert.deepEqual(looks(), own);
     press(els[0], 7);
     press(els[2], 8);
-    assert.deepEqual(calls, [['uniqueba', true], ['ba1', true]]);
+    assert.deepEqual(calls, [['extra_attack', true], ['attack1', true]]);
     tc.setCharacter(MOVELESS);
-    assert.deepEqual(calls.slice(2).sort(), [['ba1', false], ['uniqueba', false]], 'both holds end as they go');
+    assert.deepEqual(calls.slice(2).sort(), [['attack1', false], ['extra_attack', false]], 'both holds end as they go');
     assert.deepEqual(looks(), ABILITY_ACTIONS.map(() => [true, null, '', false]));
     tc.setCharacter(DEF_0001);
     assert.deepEqual(ABILITY_ACTIONS.map((a) => tc.buttons.get(a)), els, 'the same elements');
     assert.deepEqual(looks(), own);
-    assert.equal(els[0].getAttribute('data-i18n-aria-label'), 'ability.0001.uniqueba');
+    assert.equal(els[0].getAttribute('data-i18n-aria-label'), 'ability.0001.extra_attack');
     press(els[3], 9);
-    assert.deepEqual(calls.at(-1), ['ba2', true], 'and they work again');
+    assert.deepEqual(calls.at(-1), ['attack2', true], 'and they work again');
     lift(els[3], 9);
     tc.setCharacter(MOVELESS);
     assert.ok(els.every((btn) => btn.hidden), `${scheme}: hidden again`);
@@ -349,45 +368,50 @@ test('switching #0001 -> no moves -> #0001 hides and restores the very same four
 // ---- Touch buttons: its own three and no Transform ---------------------------------
 
 test('a fighter that leaves Transform out presents its own three buttons, and its Transform has none', () => {
-  assert.deepEqual(ABILITY_ACTIONS.map((a) => abilityPresence(NO_TRANSFORM, a)), ['implemented', 'absent', 'implemented', 'implemented']);
+  assert.deepEqual(ABILITY_ACTIONS.map((a) => abilityPresence(NO_TRANSFORM, a)), [
+    'implemented', 'absent', 'implemented', 'implemented', 'absent', 'absent', 'absent',
+  ]);
   assert.equal(mobileAbility(NO_TRANSFORM, 'transform'), null);
   for (const scheme of ['joystick', 'classic']) {
     const { tc, calls } = touchControls(NO_TRANSFORM, { scheme });
     const b = (a) => tc.buttons.get(a);
     assert.deepEqual(ABILITY_ACTIONS.map((a) => [a, b(a).hidden ?? false, b(a).getAttribute('aria-label'), b(a).innerHTML]), [
-      ['uniqueba', false, 'Palm Strike', ICONS.arrow],
+      ['extra_attack', false, 'Palm Strike', ICONS.arrow],
       ['transform', true, null, ''],
-      ['ba1', false, 'Punch', ICONS.punch],
-      ['ba2', false, 'Kick', ICONS.kick],
+      ['attack1', false, 'Punch', ICONS.punch],
+      ['attack2', false, 'Kick', ICONS.kick],
+      ['attack3', true, null, ''],
+      ['attack4', true, null, ''],
+      ['attack5', true, null, ''],
     ], scheme);
     assert.deepEqual([...tc.buttons].filter(([, el]) => el.classList.contains('is-pending')), [], `${scheme}: nothing dashed`);
     // A name only the fighter's data has: shown as authored, marked plain
     // (no key to translate it by).
-    assert.equal(b('uniqueba').getAttribute('data-i18n-aria-label'), '');
+    assert.equal(b('extra_attack').getAttribute('data-i18n-aria-label'), '');
     // The buttons send the universal codenames; the hidden one sends nothing.
     for (const [i, action] of ABILITY_ACTIONS.entries()) {
       press(b(action), i + 1);
       lift(b(action), i + 1);
     }
-    assert.deepEqual(calls, [['uniqueba', true], ['uniqueba', false], ['ba1', true], ['ba1', false], ['ba2', true], ['ba2', false]]);
+    assert.deepEqual(calls, [['extra_attack', true], ['extra_attack', false], ['attack1', true], ['attack1', false], ['attack2', true], ['attack2', false]]);
     // #0001 -> this one -> no moves -> this one: the same elements, each fighter's own look.
     tc.setCharacter(DEF_0001);
-    assert.deepEqual([b('uniqueba').getAttribute('aria-label'), b('transform').hidden ?? false], ['Shuriken', false]);
+    assert.deepEqual([b('extra_attack').getAttribute('aria-label'), b('transform').hidden ?? false], ['Shuriken', false]);
     tc.setCharacter(NO_TRANSFORM);
-    assert.equal(b('uniqueba').innerHTML, ICONS.arrow);
+    assert.equal(b('extra_attack').innerHTML, ICONS.arrow);
     assert.equal(b('transform').hidden, true);
     tc.setCharacter(MOVELESS);
     assert.ok(ABILITY_ACTIONS.every((a) => b(a).hidden));
     tc.setCharacter(NO_TRANSFORM);
-    assert.deepEqual(ABILITY_ACTIONS.map((a) => b(a).hidden ?? false), [false, true, false, false], scheme);
-    assert.equal(b('ba2').getAttribute('aria-label'), 'Kick');
+    assert.deepEqual(ABILITY_ACTIONS.map((a) => b(a).hidden ?? false), [false, true, false, false, true, true, true], scheme);
+    assert.equal(b('attack2').getAttribute('aria-label'), 'Kick');
   }
   // In French: names the translations do not know stay as authored.
   const { tc } = touchControls(NO_TRANSFORM);
   setLanguage('fr');
   try {
     localizeTree(tc.root);
-    assert.deepEqual(['uniqueba', 'ba1', 'ba2'].map((a) => tc.buttons.get(a).getAttribute('aria-label')), ['Palm Strike', 'Punch', 'Kick']);
+    assert.deepEqual(['extra_attack', 'attack1', 'attack2'].map((a) => tc.buttons.get(a).getAttribute('aria-label')), ['Palm Strike', 'Punch', 'Kick']);
     assert.equal(tc.buttons.get('transform').getAttribute('aria-label'), null);
   } finally {
     setLanguage('en');
@@ -401,8 +425,8 @@ test('a language change never names the hidden buttons again', () => {
     localizeTree(tc.root);
     for (const action of ABILITY_ACTIONS) assert.equal(tc.buttons.get(action).getAttribute('aria-label'), null, action);
     tc.setCharacter(DEF_0001);
-    assert.equal(tc.buttons.get('uniqueba').getAttribute('aria-label'), 'Shuriken');
-    assert.equal(tc.buttons.get('ba1').getAttribute('aria-label'), 'Coup de poing');
+    assert.equal(tc.buttons.get('extra_attack').getAttribute('aria-label'), 'Shuriken');
+    assert.equal(tc.buttons.get('attack1').getAttribute('aria-label'), 'Coup de poing');
   } finally {
     setLanguage('en');
   }
@@ -413,78 +437,83 @@ test('the touch layout editor keeps absent buttons on show, neutral, so every fi
   tc.setCharacter(MOVELESS);
   const b = (a) => tc.buttons.get(a);
   assert.deepEqual(ABILITY_ACTIONS.map((a) => [a, b(a).hidden, b(a).getAttribute('aria-label'), b(a).innerHTML]), [
-    ['uniqueba', false, ACTION_LABELS.uniqueba, ICONS.ring],
+    ['extra_attack', false, ACTION_LABELS.extra_attack, ICONS.ring],
     ['transform', false, 'Transform', ICONS.transform],
-    ['ba1', false, ACTION_LABELS.ba1, ICONS.pip1],
-    ['ba2', false, ACTION_LABELS.ba2, ICONS.pip2],
+    ['attack1', false, ACTION_LABELS.attack1, ICONS.pip1],
+    ['attack2', false, ACTION_LABELS.attack2, ICONS.pip2],
+    ['attack3', false, ACTION_LABELS.attack3, ICONS.pip3],
+    ['attack4', false, ACTION_LABELS.attack4, ICONS.pip4],
+    ['attack5', false, ACTION_LABELS.attack5, ICONS.pip5],
   ]);
+  // Every numbered attack button in its own slot, so each can be placed.
+  assert.deepEqual(NUMBERED.map((a) => b(a).getAttribute('data-slot')), ['1', '2', '3', '4', '5']);
   assert.match(read('js/ui/touch-layout-editor.js'), /this\.touch = new TouchControls\(.*\{ showAbsent: true \}\);/);
 });
 
 // ---- Touch buttons: #0001 -----------------------------------------------------
 
-test('#0001\'s Throw button shows the shuriken icon, labelled Shuriken, and still dispatches uniqueba', () => {
+test('#0001\'s Throw button shows the shuriken icon, labelled Shuriken, and still dispatches extra_attack', () => {
   const { tc, calls } = touchControls();
-  const b = tc.buttons.get('uniqueba');
+  const b = tc.buttons.get('extra_attack');
   assert.equal(b.innerHTML, ICONS.shuriken);
   assert.match(b.innerHTML, /^<svg/);
   assert.equal(b.querySelector('.tc-text'), null);
   assert.doesNotMatch(visibleText(b), CODE_LABELS, 'no visible T');
   assert.doesNotMatch(visibleText(b), /\S/, 'icon only, no text beside it');
   assert.equal(b.getAttribute('aria-label'), 'Shuriken');
-  assert.equal(b.getAttribute('data-action'), 'uniqueba');
-  assert.ok(b.classList.contains('tc-uniqueba'), 'the same large upper-right slot');
+  assert.equal(b.getAttribute('data-action'), 'extra_attack');
+  assert.ok(b.classList.contains('tc-extra_attack'), 'the same large upper-right slot');
   assert.ok(b.classList.contains('tc-ability'));
   assert.equal(b.classList.contains('is-pending'), false, 'solid, not reserved');
   assert.equal(tc.actions.children[0], b, 'still first in the cluster');
   press(b, 3);
-  assert.deepEqual(calls, [['uniqueba', true]]);
+  assert.deepEqual(calls, [['extra_attack', true]]);
   assert.ok(b.classList.contains('is-pressed'), 'immediate press feedback');
   lift(b, 3);
-  assert.deepEqual(calls, [['uniqueba', true], ['uniqueba', false]]);
+  assert.deepEqual(calls, [['extra_attack', true], ['extra_attack', false]]);
   assert.equal(b.classList.contains('is-pressed'), false);
   // Alongside a held direction, too.
   tc.assign(1, 'runRight');
   press(b, 2);
-  assert.deepEqual(calls.slice(2), [['runRight', true], ['uniqueba', true]]);
+  assert.deepEqual(calls.slice(2), [['runRight', true], ['extra_attack', true]]);
   tc.releaseAll();
-  assert.deepEqual(calls.slice(4).sort(), [['runRight', false], ['uniqueba', false]]);
+  assert.deepEqual(calls.slice(4).sort(), [['extra_attack', false], ['runRight', false]]);
 });
 
-test('#0001\'s BA1 button shows the punch icon, labelled Punch, and still dispatches ba1', () => {
+test('#0001\'s attack1 button shows the punch icon, labelled Punch, and still dispatches attack1', () => {
   const { tc, calls } = touchControls();
-  const b = tc.buttons.get('ba1');
+  const b = tc.buttons.get('attack1');
   assert.equal(b.innerHTML, ICONS.punch);
-  assert.doesNotMatch(visibleText(b), CODE_LABELS, 'no BA1 text');
+  assert.doesNotMatch(visibleText(b), CODE_LABELS, 'no attack1 text');
   assert.doesNotMatch(visibleText(b), /\S/);
   assert.equal(b.getAttribute('aria-label'), 'Punch');
-  assert.equal(b.getAttribute('data-action'), 'ba1');
-  assert.ok(b.classList.contains('tc-ba1'));
+  assert.equal(b.getAttribute('data-action'), 'attack1');
+  assert.ok(b.classList.contains('tc-attack1'));
   assert.equal(b.classList.contains('is-pending'), false);
   press(b, 7);
-  assert.deepEqual(calls, [['ba1', true]]);
+  assert.deepEqual(calls, [['attack1', true]]);
   assert.ok(b.classList.contains('is-pressed'));
   lift(b, 7);
-  assert.deepEqual(calls, [['ba1', true], ['ba1', false]]);
+  assert.deepEqual(calls, [['attack1', true], ['attack1', false]]);
   assert.equal(b.classList.contains('is-pressed'), false);
 });
 
-test('#0001\'s BA2 button shows the kick icon, labelled Kick, and still dispatches ba2', () => {
+test('#0001\'s attack2 button shows the kick icon, labelled Kick, and still dispatches attack2', () => {
   const { tc, calls } = touchControls();
-  const b = tc.buttons.get('ba2');
+  const b = tc.buttons.get('attack2');
   assert.equal(b.innerHTML, ICONS.kick);
-  assert.notEqual(b.innerHTML, tc.buttons.get('ba1').innerHTML, 'the kick is not the fist');
-  assert.doesNotMatch(visibleText(b), CODE_LABELS, 'no BA2 text');
+  assert.notEqual(b.innerHTML, tc.buttons.get('attack1').innerHTML, 'the kick is not the fist');
+  assert.doesNotMatch(visibleText(b), CODE_LABELS, 'no attack2 text');
   assert.doesNotMatch(visibleText(b), /\S/);
   assert.equal(b.getAttribute('aria-label'), 'Kick');
-  assert.equal(b.getAttribute('data-action'), 'ba2');
-  assert.ok(b.classList.contains('tc-ba2'));
+  assert.equal(b.getAttribute('data-action'), 'attack2');
+  assert.ok(b.classList.contains('tc-attack2'));
   assert.equal(b.classList.contains('is-pending'), false);
   press(b, 9);
-  assert.deepEqual(calls, [['ba2', true]]);
+  assert.deepEqual(calls, [['attack2', true]]);
   assert.ok(b.classList.contains('is-pressed'));
   lift(b, 9);
-  assert.deepEqual(calls, [['ba2', true], ['ba2', false]]);
+  assert.deepEqual(calls, [['attack2', true], ['attack2', false]]);
   assert.equal(b.classList.contains('is-pressed'), false);
 });
 
@@ -516,14 +545,14 @@ test('holding Shield dispatches shield for exactly the pointer\'s lifetime, alon
   assert.deepEqual(calls, [['shield', true]]);
   assert.ok(b.classList.contains('is-pressed'));
   // Another finger elsewhere does not lower it.
-  press(tc.buttons.get('ba1'), 8);
-  lift(tc.buttons.get('ba1'), 8);
-  assert.deepEqual(calls.slice(1), [['ba1', true], ['ba1', false]]);
+  press(tc.buttons.get('attack1'), 8);
+  lift(tc.buttons.get('attack1'), 8);
+  assert.deepEqual(calls.slice(1), [['attack1', true], ['attack1', false]]);
   assert.ok(b.classList.contains('is-pressed'), 'still held');
   lift(b, 6);
   assert.deepEqual(calls.at(-1), ['shield', false]);
   assert.equal(b.classList.contains('is-pressed'), false);
-  assert.ok(calls.every(([action]) => ['shield', 'ba1'].includes(action)), 'no shield, block or dodge input');
+  assert.ok(calls.every(([action]) => ['shield', 'attack1'].includes(action)), 'no shield, block or dodge input');
   // A cancelled pointer lowers it too: never stuck up.
   press(b, 4);
   b.dispatch('pointercancel', { pointerId: 4 });
@@ -539,9 +568,14 @@ test('holding Shield dispatches shield for exactly the pointer\'s lifetime, alon
 test('the lower-right cluster keeps its order and slots; only Transform is reserved; no letters remain', () => {
   const { tc } = touchControls();
   assert.deepEqual(tc.actions.children.map((c) => c.getAttribute('data-action')),
-    ['uniqueba', 'transform', 'shield', 'ba1', 'ba2', 'jump']);
-  assert.deepEqual(tc.actions.children.map((c) => [...c.classNames].find((n) => /^tc-(uniqueba|transform|shield|ba1|ba2|jump)$/.test(n))),
-    ['tc-uniqueba', 'tc-transform', 'tc-shield', 'tc-ba1', 'tc-ba2', 'tc-jump']);
+    ['extra_attack', 'transform', 'shield', 'attack1', 'attack2', 'attack3', 'attack4', 'attack5', 'jump']);
+  assert.deepEqual(tc.actions.children.map((c) => [...c.classNames].find((n) => /^tc-(extra_attack|transform|shield|attack\d|jump)$/.test(n))),
+    ['tc-extra_attack', 'tc-transform', 'tc-shield', 'tc-attack1', 'tc-attack2', 'tc-attack3', 'tc-attack4', 'tc-attack5', 'tc-jump']);
+  // #0001 shows attack1 and attack2 in slots 1 and 2; its attack3 and
+  // attack4 come from Charge, so their buttons (and attack5's) stay hidden.
+  assert.deepEqual(NUMBERED.map((a) => [a, tc.buttons.get(a).hidden, tc.buttons.get(a).getAttribute('data-slot')]), [
+    ['attack1', false, '1'], ['attack2', false, '2'], ['attack3', true, null], ['attack4', true, null], ['attack5', true, null],
+  ]);
   const pending = [...tc.buttons].filter(([, b]) => b.classList.contains('is-pending')).map(([action]) => action);
   assert.deepEqual(pending, ['transform']);
   assert.equal(tc.buttons.get('transform').innerHTML, ICONS.transform, 'Transform keeps its star');
@@ -550,37 +584,38 @@ test('the lower-right cluster keeps its order and slots; only Transform is reser
   assert.equal(tc.buttons.get('jump').getAttribute('aria-label'), 'Jump');
   // The combat glyphs share one larger-icon class; Transform and Jump do not.
   assert.deepEqual(tc.actions.children.filter((c) => c.classList.contains('tc-ability')).map((c) => c.getAttribute('data-action')),
-    ['uniqueba', 'shield', 'ba1', 'ba2']);
+    ['extra_attack', 'shield', 'attack1', 'attack2', 'attack3', 'attack4', 'attack5']);
   // The only text left on any touch button is Charge's C.
   assert.deepEqual(tc.root.querySelectorAll('.tc-text').map((t) => t.textContent), ['C']);
   for (const b of tc.actions.children) assert.doesNotMatch(visibleText(b), CODE_LABELS, b.getAttribute('data-action'));
-  // No new controller inputs: the buttons send the same nine actions as
-  // before, by their codenames.
-  assert.deepEqual([...tc.buttons.keys()].sort(),
-    ['ba1', 'ba2', 'charge', 'jump', 'runLeft', 'runRight', 'shield', 'transform', 'uniqueba']);
+  // The buttons send the controls' own codenames: every held control but
+  // the mouvement requests.
+  assert.deepEqual([...tc.buttons.keys()].sort(), [
+    'attack1', 'attack2', 'attack3', 'attack4', 'attack5', 'charge', 'extra_attack', 'jump', 'runLeft', 'runRight', 'shield', 'transform',
+  ]);
 });
 
 test('Punch and Kick work alongside a held direction and each other (multi-touch), and rapid taps each register', () => {
   const { tc, calls } = touchControls();
   tc.assign(1, 'runLeft');
-  press(tc.buttons.get('ba2'), 2);
-  assert.deepEqual(calls, [['runLeft', true], ['ba2', true]]);
-  press(tc.buttons.get('ba1'), 3);
-  assert.deepEqual(calls.at(-1), ['ba1', true]);
-  lift(tc.buttons.get('ba2'), 2);
-  assert.deepEqual(calls.at(-1), ['ba2', false]);
+  press(tc.buttons.get('attack2'), 2);
+  assert.deepEqual(calls, [['runLeft', true], ['attack2', true]]);
+  press(tc.buttons.get('attack1'), 3);
+  assert.deepEqual(calls.at(-1), ['attack1', true]);
+  lift(tc.buttons.get('attack2'), 2);
+  assert.deepEqual(calls.at(-1), ['attack2', false]);
   assert.ok(tc.buttons.get('runLeft').classList.contains('is-pressed'), 'the direction is still held');
   tc.releaseAll();
-  assert.deepEqual(calls.slice(4).sort(), [['ba1', false], ['runLeft', false]]);
+  assert.deepEqual(calls.slice(4).sort(), [['attack1', false], ['runLeft', false]]);
   // Hold Right and tap Punch ten times fast: ten presses, Right never let go.
   const { tc: tc2, calls: log } = touchControls();
   tc2.assign(1, 'runRight');
   for (let i = 0; i < 10; i++) {
-    press(tc2.buttons.get('ba1'), 10 + i);
-    lift(tc2.buttons.get('ba1'), 10 + i);
+    press(tc2.buttons.get('attack1'), 10 + i);
+    lift(tc2.buttons.get('attack1'), 10 + i);
   }
-  assert.equal(log.filter(([a, held]) => a === 'ba1' && held).length, 10);
-  assert.equal(log.filter(([a, held]) => a === 'ba1' && !held).length, 10);
+  assert.equal(log.filter(([a, held]) => a === 'attack1' && held).length, 10);
+  assert.equal(log.filter(([a, held]) => a === 'attack1' && !held).length, 10);
   assert.ok(!log.some(([a, held]) => a === 'runRight' && !held), 'Right stays held');
   assert.ok(tc2.buttons.get('runRight').classList.contains('is-pressed'));
 });
@@ -593,16 +628,16 @@ test('setCharacter swaps the fighter\'s icons and names in place, without rebuil
   const other = {
     id: '9998',
     mobileAbilities: {
-      uniqueba: { label: 'Kunai', icon: 'arrow' },
-      ba1: { label: 'Palm Strike', icon: 'up' },
-      ba2: { label: 'Sweep', icon: 'down' },
+      extra_attack: { label: 'Kunai', icon: 'arrow' },
+      attack1: { label: 'Palm Strike', icon: 'up' },
+      attack2: { label: 'Sweep', icon: 'down' },
     },
   };
   tc.setCharacter(other);
   const b = (a) => tc.buttons.get(a);
-  assert.deepEqual([b('uniqueba').innerHTML, b('ba1').innerHTML, b('ba2').innerHTML], [ICONS.arrow, ICONS.up, ICONS.down]);
-  assert.deepEqual(['uniqueba', 'ba1', 'ba2'].map((a) => b(a).getAttribute('aria-label')), ['Kunai', 'Palm Strike', 'Sweep']);
-  for (const a of ['uniqueba', 'ba1', 'ba2']) {
+  assert.deepEqual([b('extra_attack').innerHTML, b('attack1').innerHTML, b('attack2').innerHTML], [ICONS.arrow, ICONS.up, ICONS.down]);
+  assert.deepEqual(['extra_attack', 'attack1', 'attack2'].map((a) => b(a).getAttribute('aria-label')), ['Kunai', 'Palm Strike', 'Sweep']);
+  for (const a of ['extra_attack', 'attack1', 'attack2']) {
     assert.doesNotMatch(b(a).innerHTML, new RegExp([ICONS.shuriken, ICONS.punch, ICONS.kick].map((i) => i.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')), `${a}: nothing of #0001 left`);
   }
   // Universal buttons untouched.
@@ -619,31 +654,31 @@ test('setCharacter swaps the fighter\'s icons and names in place, without rebuil
   assert.equal(tc.dpad, before.dpad);
   assert.equal(tc.input, input);
   // Input still flows through the same internal actions.
-  press(b('ba1'), 5);
-  lift(b('ba1'), 5);
-  press(b('uniqueba'), 6);
-  assert.deepEqual(calls, [['ba1', true], ['ba1', false], ['uniqueba', true]]);
+  press(b('attack1'), 5);
+  lift(b('attack1'), 5);
+  press(b('extra_attack'), 6);
+  assert.deepEqual(calls, [['attack1', true], ['attack1', false], ['extra_attack', true]]);
   // A fighter that authors nothing: neutral, never #0001's leftovers.
   tc.setCharacter({ id: '9997' });
-  assert.deepEqual(['uniqueba', 'ba1', 'ba2'].map((a) => [b(a).innerHTML, b(a).getAttribute('aria-label')]),
-    [[ICONS.ring, 'Unique Basic Attack'], [ICONS.pip1, 'Basic Attack 1'], [ICONS.pip2, 'Basic Attack 2']]);
+  assert.deepEqual(['extra_attack', 'attack1', 'attack2'].map((a) => [b(a).innerHTML, b(a).getAttribute('aria-label')]),
+    [[ICONS.ring, 'Extra Attack'], [ICONS.pip1, 'Attack 1'], [ICONS.pip2, 'Attack 2']]);
   // And back.
   tc.setCharacter(DEF_0001);
-  assert.deepEqual(['uniqueba', 'ba1', 'ba2'].map((a) => b(a).getAttribute('aria-label')), ['Shuriken', 'Punch', 'Kick']);
+  assert.deepEqual(['extra_attack', 'attack1', 'attack2'].map((a) => b(a).getAttribute('aria-label')), ['Shuriken', 'Punch', 'Kick']);
 });
 
 test('before any fighter is named the controls are usable and neutral; a held button survives a swap', () => {
   const { tc, calls } = touchControls(null);
-  assert.deepEqual(['uniqueba', 'ba1', 'ba2'].map((a) => tc.buttons.get(a).getAttribute('aria-label')),
-    ['Unique Basic Attack', 'Basic Attack 1', 'Basic Attack 2']);
-  const b = tc.buttons.get('ba1');
+  assert.deepEqual(['extra_attack', 'attack1', 'attack2'].map((a) => tc.buttons.get(a).getAttribute('aria-label')),
+    ['Extra Attack', 'Attack 1', 'Attack 2']);
+  const b = tc.buttons.get('attack1');
   assert.equal(b.innerHTML, ICONS.pip1);
   press(b, 4);
   tc.setCharacter(DEF_0001);
   assert.ok(b.classList.contains('is-pressed'), 'still pressed after the icon changed');
   assert.equal(b.innerHTML, ICONS.punch);
   lift(b, 4);
-  assert.deepEqual(calls, [['ba1', true], ['ba1', false]]);
+  assert.deepEqual(calls, [['attack1', true], ['attack1', false]]);
 });
 
 // ---- Desktop controls ---------------------------------------------------------
@@ -654,16 +689,20 @@ test('keyboard bindings are unchanged by the touch layouts, keyed by control cod
     runRight: ['KeyD', 'ArrowRight'],
     charge: ['KeyS', 'ArrowDown'],
     jump: ['KeyW', 'Space', 'ArrowUp'],
-    uniqueba: ['KeyJ'],
+    extra_attack: ['KeyJ'],
     transform: ['KeyK'],
     shield: ['KeyL'],
-    ba1: ['KeyU'],
-    ba2: ['KeyI'],
+    attack1: ['KeyU'],
+    attack2: ['KeyI'],
+    attack3: ['KeyO'],
+    attack4: ['KeyM'],
+    attack5: ['Comma'],
     pause: ['Escape', 'KeyP'],
   });
   assert.deepEqual({ ...ACTION_LABELS }, {
-    runLeft: 'Move left', runRight: 'Move right', charge: 'Charge', jump: 'Jump', uniqueba: 'Unique Basic Attack', transform: 'Transform',
-    shield: 'Shield', ba1: 'Basic Attack 1', ba2: 'Basic Attack 2', pause: 'Pause',
+    runLeft: 'Move left', runRight: 'Move right', charge: 'Charge', jump: 'Jump', extra_attack: 'Extra Attack', transform: 'Transform',
+    shield: 'Shield', attack1: 'Attack 1', attack2: 'Attack 2', attack3: 'Attack 3', attack4: 'Attack 4', attack5: 'Attack 5',
+    pause: 'Pause',
   });
   // No Down, Block or dash key: Dash stays a double tap on the keyboard, and
   // the mouvement buttons are touch-only. No retired name survives as an alias.
@@ -767,7 +806,7 @@ test('a cancelled or lost Charge pointer, or releaseAll(), never leaves Charge s
 });
 
 test('Charge works alongside Punch, Kick, Shield and Jump (multi-touch)', () => {
-  for (const other of ['ba1', 'ba2', 'shield', 'jump']) {
+  for (const other of ['attack1', 'attack2', 'shield', 'jump']) {
     const { tc, calls } = touchControls();
     const at = layoutDpad(tc);
     tc.dpad.dispatch('pointerdown', { pointerId: 1, ...at('charge'), preventDefault() {} });
@@ -806,13 +845,13 @@ test('Joystick is the default scheme; setScheme switches layouts and anything un
   assert.equal(new TouchControls(new Element('div'), input, { scheme: 'classic' }).scheme, 'classic');
 });
 
-test('Classic Buttons is the original layout exactly: Left / C / Right at the lower left, the six actions at the lower right', () => {
+test('Classic Buttons is the original layout exactly: Left / C / Right at the lower left, the actions at the lower right', () => {
   const { tc } = touchControls(DEF_0001, { scheme: 'classic' });
   assert.deepEqual(tc.root.children, [tc.dpad, tc.actions]);
   assert.deepEqual(actionsOf(tc.dpad), ['runLeft', 'charge', 'runRight']);
   assert.deepEqual(tc.dpad.children.map((b) => b.getAttribute('aria-label')), ['Move left', 'Charge', 'Move right']);
   assert.equal(tc.dpad.getAttribute('aria-label'), 'Movement and Charge');
-  assert.deepEqual(actionsOf(tc.actions), ['uniqueba', 'transform', 'shield', 'ba1', 'ba2', 'jump']);
+  assert.deepEqual(actionsOf(tc.actions), ['extra_attack', 'transform', 'shield', 'attack1', 'attack2', 'attack3', 'attack4', 'attack5', 'jump']);
   assert.equal(tc.buttons.get('charge').textContent, 'C');
   // Nothing of the Joystick scheme is on screen.
   assert.equal(tc.root.querySelectorAll('.tc-stick').length, 0);
@@ -863,7 +902,7 @@ test('the Joystick scheme: Charge (a down arrow), then a movement joystick betwe
   assert.deepEqual(tc.root.querySelectorAll('.tc-text'), [], 'no C anywhere');
   // Charge sits to the left of the stick, not under Jump: the down arrow,
   // announced as Charge, sending the same held charge.
-  assert.deepEqual(actionsOf(tc.actions), ['uniqueba', 'transform', 'shield', 'ba1', 'ba2', 'jump'], 'nothing under Jump');
+  assert.deepEqual(actionsOf(tc.actions), ['extra_attack', 'transform', 'shield', 'attack1', 'attack2', 'attack3', 'attack4', 'attack5', 'jump'], 'nothing under Jump');
   assert.equal(charge, tc.buttons.get('charge'));
   assert.equal(charge.getAttribute('data-action'), 'charge');
   assert.ok(charge.classList.contains('tc-btn'));
@@ -872,7 +911,7 @@ test('the Joystick scheme: Charge (a down arrow), then a movement joystick betwe
   assert.ok(charge.classList.contains('tc-charge-down'));
   assert.equal(charge.tagName, 'BUTTON');
   // The same seven held inputs, no left / right buttons: the stick holds those.
-  assert.deepEqual([...tc.buttons.keys()].sort(), ['ba1', 'ba2', 'charge', 'jump', 'shield', 'transform', 'uniqueba']);
+  assert.deepEqual([...tc.buttons.keys()].sort(), ['attack1', 'attack2', 'attack3', 'attack4', 'attack5', 'charge', 'extra_attack', 'jump', 'shield', 'transform']);
 });
 
 // ---- Joystick: steering --------------------------------------------------------
@@ -1005,7 +1044,7 @@ test('one thumb steers: a second pointer on the stick is ignored, and another po
 });
 
 test('the joystick works alongside Jump, Punch, Kick, Shield, Shuriken, Transform and Charge (multi-touch)', () => {
-  for (const other of ['jump', 'ba1', 'ba2', 'shield', 'uniqueba', 'transform', 'charge']) {
+  for (const other of ['jump', 'attack1', 'attack2', 'shield', 'extra_attack', 'transform', 'charge']) {
     const { tc, calls, down, end } = joystickControls();
     down(70);
     const b = tc.buttons.get(other);
@@ -1023,15 +1062,15 @@ test('the joystick works alongside Jump, Punch, Kick, Shield, Shuriken, Transfor
   const { tc, calls, down, end } = joystickControls();
   down(-70);
   press(tc.buttons.get('charge'), 2);
-  press(tc.buttons.get('ba1'), 3);
+  press(tc.buttons.get('attack1'), 3);
   press(tc.buttons.get('jump'), 4);
   end();
   lift(tc.buttons.get('jump'), 4);
-  lift(tc.buttons.get('ba1'), 3);
+  lift(tc.buttons.get('attack1'), 3);
   lift(tc.buttons.get('charge'), 2);
   assert.deepEqual(calls, [
-    ['runLeft', true], ['charge', true], ['ba1', true], ['jump', true],
-    ['runLeft', false], ['jump', false], ['ba1', false], ['charge', false],
+    ['runLeft', true], ['charge', true], ['attack1', true], ['jump', true],
+    ['runLeft', false], ['jump', false], ['attack1', false], ['charge', false],
   ]);
 });
 
@@ -1093,8 +1132,8 @@ test('the down-arrow Charge is held for exactly the pointer\'s lifetime and neve
   press(charge, 1);
   assert.deepEqual(calls, [['charge', true]]);
   assert.ok(charge.classList.contains('is-pressed'));
-  press(tc.buttons.get('ba2'), 2); // Charge + Kick
-  lift(tc.buttons.get('ba2'), 2);
+  press(tc.buttons.get('attack2'), 2); // Charge + Kick
+  lift(tc.buttons.get('attack2'), 2);
   assert.ok(charge.classList.contains('is-pressed'), 'still held after Kick');
   assert.equal(tc.counts.get('charge'), 1);
   lift(charge, 1);
@@ -1139,9 +1178,9 @@ test('switching schemes lets go of everything first: no direction, Charge, Jump 
   assert.deepEqual(calls.slice(-2).sort(), [['charge', false], ['runLeft', false]]);
   assert.equal(tc.padButtons.get('runLeft').classList.contains('is-pressed'), false);
   // Even re-applying the same scheme releases.
-  press(tc.buttons.get('ba1'), 8);
+  press(tc.buttons.get('attack1'), 8);
   tc.setScheme('joystick');
-  assert.deepEqual(calls.at(-1), ['ba1', false]);
+  assert.deepEqual(calls.at(-1), ['attack1', false]);
 });
 
 test('a scheme switch keeps the fighter\'s combat buttons: the same elements, icons and names', () => {
@@ -1150,18 +1189,18 @@ test('a scheme switch keeps the fighter\'s combat buttons: the same elements, ic
   for (const scheme of ['classic', 'joystick', 'classic']) {
     tc.setScheme(scheme);
     for (const [action, b] of before) assert.equal(tc.buttons.get(action), b, `${scheme}: ${action}`);
-    assert.deepEqual(['uniqueba', 'ba1', 'ba2'].map((a) => [tc.buttons.get(a).getAttribute('aria-label'), tc.buttons.get(a).innerHTML]),
+    assert.deepEqual(['extra_attack', 'attack1', 'attack2'].map((a) => [tc.buttons.get(a).getAttribute('aria-label'), tc.buttons.get(a).innerHTML]),
       [['Shuriken', ICONS.shuriken], ['Punch', ICONS.punch], ['Kick', ICONS.kick]]);
-    assert.equal(tc.actions.children[0], before.get('uniqueba'));
+    assert.equal(tc.actions.children[0], before.get('extra_attack'));
   }
   // setCharacter still works in either layout, and never moves a button.
   tc.setScheme('joystick');
   tc.setCharacter(null);
-  assert.equal(tc.buttons.get('uniqueba').getAttribute('aria-label'), 'Unique Basic Attack');
+  assert.equal(tc.buttons.get('extra_attack').getAttribute('aria-label'), 'Extra Attack');
   assert.equal(tc.joystick.children[0], tc.buttons.get('charge'));
   assert.deepEqual(actionsOf(tc.actions).at(-1), 'jump');
-  press(tc.buttons.get('uniqueba'), 1);
-  assert.deepEqual(calls, [['uniqueba', true]]);
+  press(tc.buttons.get('extra_attack'), 1);
+  assert.deepEqual(calls, [['extra_attack', true]]);
 });
 
 test('the Joystick layout\'s geometry: Charge in the old lower-left corner, the stick one gap to its right with Dash buttons above its top corners', () => {
@@ -1204,8 +1243,8 @@ test('the Joystick layout\'s geometry: Charge in the old lower-left corner, the 
   // Buttons has it, untouched.
   assert.doesNotMatch(CSS, /\.is-joystick \.tc-actions/);
   assert.match(CSS, /\.tc-jump \{ right: 0; bottom: 0; \}/);
-  assert.match(CSS, /\.tc-ba2 \{ right: var\(--tc-pitch\); bottom: 0; \}/);
-  assert.match(CSS, /\.tc-ba1 \{ right: calc\(var\(--tc-pitch\) \* 2\); bottom: 0; \}/);
+  assert.match(CSS, /\.tc-attack\[data-slot="2"\] \{ right: var\(--tc-pitch\); bottom: 0; \}/);
+  assert.match(CSS, /\.tc-attack\[data-slot="1"\] \{ right: calc\(var\(--tc-pitch\) \* 2\); bottom: 0; \}/);
   assert.match(CSS, /\.tc-transform \{ right: calc\(var\(--tc-pitch\) \* 1\.5\); bottom: calc\(var\(--tc-pitch\) \* 0\.87\); \}/);
 });
 
@@ -1217,7 +1256,7 @@ test('the Shield touch button keeps the old Defense / Block coordinates', () => 
 });
 
 test('the Shuriken touch button keeps the old Throw / Primary coordinates and size', () => {
-  assert.match(CSS, /\.tc-uniqueba \{\n  right: calc\(var\(--tc-pitch\) \* 0\.02\);\n  bottom: calc\(var\(--tc-pitch\) \* 1\.74\);\n  width: calc\(var\(--tc\) \* 1\.12\);\n  height: calc\(var\(--tc\) \* 1\.12\);/);
+  assert.match(CSS, /\.tc-extra_attack \{\n  right: calc\(var\(--tc-pitch\) \* 0\.02\);\n  bottom: calc\(var\(--tc-pitch\) \* 1\.74\);\n  width: calc\(var\(--tc\) \* 1\.12\);\n  height: calc\(var\(--tc\) \* 1\.12\);/);
   assert.doesNotMatch(CSS, /\.tc-(primary|throw|special|a1|a2)\b/);
 });
 
@@ -1275,4 +1314,107 @@ test('zoom prevention is declarative: no Touch Events, double-tap timers or blan
   const touch = read('js/game/touch-controls.js');
   assert.match(touch, /'pointerdown'/);
   assert.match(touch, /setPointerCapture/);
+});
+
+// ---- Numbered attack buttons: the loadout matrix ---------------------------------------
+
+test('each fighter shows exactly its own numbered attack buttons, in deterministic slots: Cases A to F', () => {
+  for (const c of LOADOUT_CASES) {
+    for (const scheme of ['joystick', 'classic']) {
+      const { tc, calls } = touchControls(c.def, { scheme });
+      const shown = NUMBERED.filter((a) => !tc.buttons.get(a).hidden);
+      assert.deepEqual(shown, c.buttons, `Case ${c.name} (${scheme}): its buttons`);
+      // Slots 1, 2, then 3, 4, 5 for the rest in order: attack5 of Case F
+      // takes slot 3.
+      assert.deepEqual(shown.map((a) => tc.buttons.get(a).getAttribute('data-slot')), shown.map((_, i) => String(i + 1)), `Case ${c.name}`);
+      for (const a of c.chargeOnly) {
+        assert.equal(tc.buttons.get(a).getAttribute('data-slot'), null, `Case ${c.name}: ${a} has no slot`);
+        assert.equal(tc.buttons.get(a).getAttribute('aria-label'), null, `Case ${c.name}: ${a} has no name`);
+      }
+      assert.equal(tc.root.dataset.attackButtons, String(c.buttons.length));
+      // Named and glyphed neutrally (it authors no mobileAbilities), and
+      // each sends its own codename.
+      for (const [i, a] of shown.entries()) {
+        const b = tc.buttons.get(a);
+        assert.equal(b.getAttribute('aria-label'), ACTION_LABELS[a], a);
+        assert.equal(b.innerHTML, ICONS[`pip${a.slice(6)}`], a);
+        press(b, 20 + i);
+        lift(b, 20 + i);
+      }
+      assert.deepEqual(calls, shown.flatMap((a) => [[a, true], [a, false]]), `Case ${c.name}: only its buttons send anything`);
+    }
+  }
+  assert.deepEqual([...attackSlots((a) => ['attack5'].includes(a))], [['attack1', 1], ['attack2', 2], ['attack5', 3]]);
+  assert.deepEqual([...attackSlots(() => true)].map(([, slot]) => slot), [1, 2, 3, 4, 5]);
+});
+
+test('Charge replacements have no button: Charge + attack1 is the same attack1 button, never another element', () => {
+  const E = LOADOUT_CASES.find((c) => c.name === 'E').def;
+  const { tc, calls } = touchControls(E);
+  const punch = tc.buttons.get('attack1');
+  const kids = tc.actions.children.slice();
+  // Charge held (C), then the same attack1 button: the input sends charge and
+  // attack1, which the fighter turns into attack3 (see loadout.test.mjs).
+  tc.assign(1, 'charge');
+  press(punch, 2);
+  assert.deepEqual(calls, [['charge', true], ['attack1', true]]);
+  assert.deepEqual(tc.actions.children, kids, 'no element swapped in or out');
+  assert.equal(tc.buttons.get('attack1'), punch);
+  assert.equal(tc.buttons.get('attack3').hidden, true);
+  tc.releaseAll();
+});
+
+test('five attack buttons and the extra attack work together, multi-touch included, beside Shield, Jump and Charge', () => {
+  const { tc, calls } = touchControls(WITH_EXTRA, { scheme: 'joystick' });
+  const all = ['extra_attack', ...NUMBERED, 'shield', 'jump', 'charge'];
+  for (const a of all) assert.equal(tc.buttons.get(a).hidden ?? false, false, `${a} on show`);
+  assert.equal(tc.buttons.get('extra_attack').getAttribute('aria-label'), ACTION_LABELS.extra_attack);
+  assert.deepEqual(NUMBERED.map((a) => tc.buttons.get(a).getAttribute('data-slot')), ['1', '2', '3', '4', '5']);
+  // Every one held at once, each by its own pointer, then let go one by one.
+  all.forEach((a, i) => press(tc.buttons.get(a), 40 + i));
+  assert.deepEqual(calls.map(([a]) => a), all);
+  assert.ok(all.every((a) => tc.buttons.get(a).classList.contains('is-pressed')));
+  all.forEach((a, i) => lift(tc.buttons.get(a), 40 + i));
+  assert.deepEqual(calls.slice(all.length), all.map((a) => [a, false]));
+  // Switching to #0001 hides attack3 to attack5 and lets go of none it keeps.
+  tc.setCharacter(DEF_0001);
+  assert.deepEqual(NUMBERED.map((a) => tc.buttons.get(a).hidden ?? false), [false, false, true, true, true]);
+  assert.equal(tc.root.dataset.attackButtons, '2');
+});
+
+test('the numbered attack slots are a honeycomb round Transform and Shield: no two buttons of the cluster overlap', () => {
+  // Centres and radii, in units of --tc (a button is 1 across, the extra
+  // attack 1.12, and a pitch is 1.17: --tc plus a 0.17 gap), from the
+  // stylesheet's own rules.
+  const PITCH = 1.17;
+  const place = (selector) => {
+    const rule = CSS.match(new RegExp(`${selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} \\{([^}]*)\\}`))?.[1] ?? '';
+    const k = (side) => {
+      const v = rule.match(new RegExp(`${side}: ([^;]+);`))?.[1];
+      assert.ok(v, `${selector} ${side}`);
+      if (v === '0') return 0;
+      if (v === 'var(--tc-pitch)') return PITCH;
+      return Number(v.match(/var\(--tc-pitch\) \* ([\d.]+)/)[1]) * PITCH;
+    };
+    return { right: k('right'), bottom: k('bottom') };
+  };
+  const buttons = {
+    jump: { ...place('.tc-jump'), size: 1 },
+    shield: { ...place('.tc-shield'), size: 1 },
+    transform: { ...place('.tc-transform'), size: 1 },
+    extra_attack: { ...place('.tc-extra_attack'), size: 1.12 },
+  };
+  for (const n of [1, 2, 3, 4, 5]) buttons[`slot${n}`] = { ...place(`.tc-attack[data-slot="${n}"]`), size: 1 };
+  const entries = Object.entries(buttons).map(([name, b]) => [name, { x: -(b.right + b.size / 2), y: -(b.bottom + b.size / 2), r: b.size / 2 }]);
+  for (const [i, [a, p]] of entries.entries()) {
+    for (const [b, q] of entries.slice(i + 1)) {
+      const gap = Math.hypot(p.x - q.x, p.y - q.y) - p.r - q.r;
+      assert.ok(gap > 0.05, `${a} and ${b} are ${gap.toFixed(3)} --tc apart`);
+    }
+  }
+  // Slots 1 and 2 are where attack1 and attack2 have always been.
+  assert.deepEqual(place('.tc-attack[data-slot="1"]'), { right: 2 * PITCH, bottom: 0 });
+  assert.deepEqual(place('.tc-attack[data-slot="2"]'), { right: PITCH, bottom: 0 });
+  // The cluster widens for a third button, never past half a pitch.
+  assert.match(CSS, /\.touch-controls\[data-attack-buttons="3"\] \.tc-actions,/);
 });
