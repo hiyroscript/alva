@@ -1,0 +1,717 @@
+You are modifying the GitHub repository hiyroscript/alva, branch main.
+
+Objective
+
+Completely remove the Charge mechanic from Alva — not just its visible button.
+
+There must no longer be a Charge stance, Charge input, Charge animation, Charge release, Charge-specific attack routing, Charge-specific cooldown recovery, Charge-specific Energy regeneration, Charge AI behavior, Charge UI, Charge CSS, Charge translations, Charge documentation, Charge tests, Charge assets, or internal identifiers built around “charge” / “charged”.
+
+The two attacks that #0001 currently accesses through Charge must become normal, dedicated attack buttons:
+
+* Attack 3 → Clone Attack
+* Attack 4 → Sphere Rush
+
+They must be directly usable from their own attack inputs and appear as additional attack buttons on screen alongside Attack 1 and Attack 2.
+
+The finished #0001 combat layout should conceptually be:
+
+* Attack 1 → Punch / existing midair Attack 1
+* Attack 2 → Kick / existing midair Attack 2
+* Attack 3 → Clone Attack
+* Attack 4 → Sphere Rush
+* Extra Attack → Shuriken
+* Transform → still reserved
+* Shield → unchanged
+* Jump → unchanged
+
+Do not redesign Clone Attack or Sphere Rush. Preserve their existing combat behavior, tuning, cooldowns, effects, animation timing, hit behavior, launch behavior, targeting, and special runtime logic. Only change how they are activated and how the surrounding systems describe them.
+
+⸻
+
+1. Remove Charge as a gameplay concept
+
+Currently js/config.js includes charge as a gameplay action, with:
+
+* S
+* ArrowDown
+* gamepad D-pad down
+* gamepad left-stick down
+* touch Charge/C controls
+
+Remove charge from the gameplay action vocabulary entirely.
+
+Do not leave a hidden charge input behind simply because Down is still needed for movement mechanics.
+
+Introduce a neutral directional gameplay input named something like:
+
+down
+
+Use it only for mechanics that are genuinely directional rather than Charge mechanics.
+
+Preserve these existing non-Charge behaviors:
+
+* holding Down while falling can still fast-fall;
+* holding Down when being launched can still steer the launch downward;
+* menu Down navigation still works exactly as before.
+
+After the change:
+
+* S / ArrowDown in gameplay should produce down;
+* gamepad D-pad down and stick-down should produce down;
+* menus should continue reading their own Down navigation independently;
+* holding Down on the ground must not start any special state;
+* holding Down must not stop normal movement;
+* holding Down must not prevent Dash;
+* holding Down must not increase Energy regeneration;
+* holding Down must not accelerate any ability cooldown;
+* holding Down + another attack must not modify which attack is performed.
+
+There should be no Charge state whatsoever.
+
+⸻
+
+2. Completely remove Charge state handling from Fighter
+
+js/game/character.js currently contains substantial Charge-specific state and routing. Remove it instead of leaving dormant branches.
+
+Remove concepts including, but not limited to:
+
+* charging
+* canCharge
+* chargeReleased
+* chargeHeld
+* chargeHeldOver
+* chargeFromAir where it exists solely to distinguish Charge from fast-fall
+* chargeStartDuration
+* chargeReleaseDuration
+* Charge startup/sustain/release state logic
+* charge
+* chargeRelease
+* charge_loop
+* isReleasingCharge
+* recoverChargedCooldowns
+* tryChargeReplacement
+* any “wasCharging” branching
+* Charge movement locking
+* Charge-specific Dash restrictions
+* Charge-specific state priority
+* Charge-specific animation selection
+
+Rewrite the fast-fall path to use input.down.
+
+Rewrite vertical launch steering to use input.down.
+
+Do not preserve legacy Charge state variables under different names unless they serve a real remaining mechanic.
+
+Fighter state transitions should now move directly among the actual remaining states such as idle, run, jump, fall, land, attack, technique, shield, shieldRelease, dash, hitstun, tumble, etc.
+
+⸻
+
+3. Turn Attack 3 and Attack 4 into actual direct actions
+
+For fighter 0001, the current data routes:
+
+* Charge + attack1 → attack3 Clone Attack
+* Charge + attack2 → attack4 Sphere Rush
+
+Delete that routing.
+
+0001 must expose its four numbered attacks directly through its actions / loadout data.
+
+Attack 1 and Attack 2 stay normal ground/air attack pairs.
+
+Attack 3 and Attack 4 are special direct numbered attacks:
+
+* attack3 directly triggers the existing summon behavior.
+* attack4 directly triggers the existing Sphere Rush technique behavior.
+
+Use a clean generic action representation for this.
+
+For example, it is acceptable to extend the action schema so an action may resolve to:
+
+* an ordinary attack;
+* a summon;
+* a technique.
+
+Do not force Clone Attack or Sphere Rush into ordinary attacks definitions merely to make the schema uniform. Their specialized runtime behavior already exists and should remain specialized.
+
+Do not recreate a replacement/routing layer under a new name. A press of attack3 should simply mean Attack 3.
+
+Likewise, a press of attack4 should simply mean Attack 4.
+
+The loadout must have one authoritative source of truth.
+
+⸻
+
+4. Clone Attack — preserve behavior, change activation
+
+attack3 is currently represented in summons.attack3.
+
+Keep its existing summon implementation and all existing behavior:
+
+* Clone Attack remains a detached clone/summon.
+* Keep the existing attack3_object cloud effect.
+* Keep appearance/disappearance behavior.
+* Keep reversed disappearance playback.
+* Keep its reuse of the owner’s existing attack data/art.
+* Preserve the normal-ground placement behavior.
+* Preserve the no-ground fallback using the existing airborne attack.
+* Preserve target selection and positioning.
+* Preserve all hit/launch values.
+* Preserve the existing 5 second cooldown.
+* It still costs no Energy.
+
+The difference is activation:
+
+Before: Charge + Attack 1
+After: press Attack 3.
+
+Because Charge previously guaranteed that the owner was grounded, explicitly preserve that gameplay requirement. Attack 3 should be a grounded-only direct special unless existing design data deliberately says otherwise.
+
+If Attack 3 cannot happen — for example, there is no valid opponent — the direct Attack 3 press should simply fail cleanly.
+
+It must not fall back to Attack 1. That fallback only existed because Attack 3 used to replace the Attack 1 button during Charge.
+
+Do not invent a fake Charge pose or reuse the deleted Charge art when activating Clone Attack. The summon itself already provides its visual effect. If the owner has no dedicated Attack 3 activation pose, it does not need one.
+
+A press while Attack 3’s long cooldown is active must not queue the move until five seconds later.
+
+⸻
+
+5. Sphere Rush — preserve behavior, change activation
+
+attack4 currently lives in chargedTechniques.attack4 and is executed by js/game/charged-technique.js.
+
+Preserve the Sphere Rush exactly as a specialized technique:
+
+* form phase;
+* sphere build;
+* dash;
+* hand offsets;
+* hit/contact detection;
+* target binding;
+* confirm phase;
+* periodic tick damage / Launch Point;
+* sphere growth;
+* explosion timing;
+* explosion damage and launch;
+* release;
+* whiff release;
+* wall handling;
+* ground requirements;
+* Shield interaction;
+* interruption behavior;
+* all existing Attack 4 fighter poses;
+* all existing Attack 4 object/effect frames;
+* current dash speed and timing;
+* existing 5 second cooldown;
+* no Energy cost.
+
+The difference is activation:
+
+Before: Charge + Attack 2
+After: press Attack 4.
+
+Attack 4 remains grounded-only.
+
+Do not require a preceding state or setup input.
+
+⸻
+
+6. Rename the “charged technique” architecture
+
+The Sphere Rush runtime is useful and should remain, but “charged” is now incorrect terminology.
+
+Rename:
+
+* js/game/charged-technique.js → a neutral name such as js/game/technique.js
+* ChargedTechnique → Technique
+* character data chargedTechniques → techniques
+* helper functions/imports/comments/tests accordingly
+
+Use neutral terminology throughout the project.
+
+This runtime means “a multi-phase fighter-performed special technique”, not “something reached through Charge”.
+
+Do the same for other internal names that only exist because these moves used to be Charge actions.
+
+For example:
+
+* chargedCooldowns → something neutral such as abilityCooldowns or specialCooldowns
+* AI charged move collections → specials, techniques, or another accurate neutral term
+* chargedValue → a non-Charge name
+* Charge-replacement comments and helper names → remove them entirely
+
+Do not blindly rename chargedCooldownRate; that behavior should be deleted because the mechanic itself is going away.
+
+⸻
+
+7. Keep Attack 3 / Attack 4 cooldowns, but remove Charge acceleration
+
+Attack 3 and Attack 4 should still have their independent 5-second cooldowns.
+
+The generic CooldownTimers utility can remain.
+
+However, remove the Charge-specific recovery system:
+
+* remove stats.chargedCooldownRate;
+* remove recoverChargedCooldowns;
+* remove 2× recovery while holding Charge;
+* cooldowns now recover at their normal real-time rate only.
+
+The cooldown timer should belong to the special/direct ability, not to a “charged action”.
+
+Preserve the existing A3 / A4 cooldown indicators beneath the fighter if possible, because they still communicate useful gameplay state.
+
+Refactor js/game/fighter-status.js so those indicators are derived from the direct Attack 3 / Attack 4 special definitions and the renamed generic cooldown store.
+
+They must no longer depend on chargeReplacements.
+
+⸻
+
+8. Remove Charge from Energy
+
+js/game/combat.js currently supports:
+
+* passive regen;
+* faster chargeRegen while in Charge.
+
+Remove chargeRegen completely.
+
+Energy should now refill using the normal passive regeneration rate only.
+
+For #0001, preserve its existing regular regeneration value unless another test proves it should change.
+
+Remove:
+
+* energy.chargeRegen
+* the default chargeRegen
+* updateEnergy(dt, charging)
+* all Charge-specific Energy comments and tests
+
+Replace it with simple passive regeneration, e.g. conceptually:
+
+updateEnergy(dt)
+
+Energy remains used for the existing mechanics such as Dash and Shield exactly as before.
+
+Attack 3 and Attack 4 remain free.
+
+⸻
+
+9. Simplify the loadout system
+
+js/data/loadout.js currently contains the entire Charge replacement model.
+
+Remove:
+
+* CHARGE_REPLACES
+* REPLACEMENT_TYPES if it only describes Charge replacements
+* chargeReplacement
+* hasChargeReplacements
+* chargeOnlyAttacks
+* the chargeReplacements validation path
+* optional character charge capability validation
+* all rules saying Attack 3 / Attack 4 may be reached through another button
+* all loadout tables describing “while Charging”
+* all Charge-specific examples
+
+The fundamental loadout rule should become simple:
+
+A numbered attack the fighter has is a numbered combat button the player can press directly.
+
+The validator must still enforce coherent numbered attack data, but it must understand that a numbered button may be a specialized ground-only summon/technique rather than a standard attack with a mandatory midair counterpart.
+
+For #0001:
+
+* Attack 1: ordinary ground + midair mapping.
+* Attack 2: ordinary ground + midair mapping.
+* Attack 3: direct summon action.
+* Attack 4: direct technique action.
+* Attack 5: absent.
+
+numberedAttacks(def) and attackButtons(def) should now describe the actual direct buttons.
+
+describeLoadout() should not contain a charge property.
+
+Keep the schema straightforward enough that future characters can define Attack 3–5 as ordinary attacks, summons, techniques, or other supported direct action types without needing a modifier system.
+
+⸻
+
+10. Add Attack 3 and Attack 4 to #0001’s mobile controls
+
+The touch-control UI already has physical slots for Attack 1 through Attack 5.
+
+Use them.
+
+Currently js/ui/mobile-abilities.js hides Attack 3 and Attack 4 because they are absent from #0001’s direct actions.
+
+Once the actions are direct, #0001 must show:
+
+* Attack 1
+* Attack 2
+* Attack 3
+* Attack 4
+
+Attack 3 must be presented as Clone Attack.
+
+Attack 4 must be presented as Sphere Rush.
+
+Add mobileAbilities entries for Attack 3 and Attack 4 as appropriate.
+
+Existing neutral pip3 / pip4 icons are acceptable if no bespoke icon is needed. Do not hold up the refactor by inventing unnecessary artwork.
+
+The current slot system should naturally result in:
+
+* Attack 1 → slot 1
+* Attack 2 → slot 2
+* Attack 3 → slot 3
+* Attack 4 → slot 4
+
+Keep Extra Attack, Transform, Shield, and Jump where the current layout system expects them.
+
+Update comments and accessibility labels so the UI describes the direct buttons, not Charge combinations.
+
+⸻
+
+11. Remove the Charge touch control
+
+js/game/touch-controls.js, js/core/touch-layout.js, styles.css, and Settings currently have dedicated Charge UI.
+
+Remove all Charge semantics and naming.
+
+The lower-left control still needs to support Down where necessary for fast-fall / launch steering.
+
+Use down, not charge.
+
+For Classic controls, the center control can become a normal Down directional button with the existing down-arrow icon instead of “C”.
+
+For the Joystick scheme, either:
+
+* retain the separate down-arrow control but make it a plain down directional input; or
+* cleanly map downward joystick intent to down if that integrates better with the existing touch architecture.
+
+Whichever implementation is chosen:
+
+* it must not be named Charge;
+* it must not display “C”;
+* it must not enter a stance;
+* it must not alter attacks;
+* it must not improve regeneration;
+* it must not lock movement;
+* it must behave only as a directional Down input.
+
+Rename/remove Charge-oriented CSS such as:
+
+* --tc-charge
+* .tc-charge-down
+* .sp-charge
+
+Use neutral Down names if equivalent styles remain.
+
+Update custom touch-layout IDs from charge to down.
+
+Old unknown stored layout keys can be discarded through the existing sanitizer rather than keeping permanent legacy Charge code in the game.
+
+⸻
+
+12. Keyboard and gamepad controls
+
+Keep the existing direct attack bindings already present in js/config.js:
+
+* Attack 3 → O
+* Attack 4 → M
+
+Once #0001 has direct Attack 3 / Attack 4 actions, those keys should immediately activate Clone Attack and Sphere Rush.
+
+Preserve the existing gamepad direct numbered-attack bindings:
+
+* Attack 3 → LT
+* Attack 4 → L3
+* Attack 5 → R3
+
+Change gameplay Down mapping from charge to down.
+
+Menu navigation must remain unaffected.
+
+Update control labels and keyboard hint UI accordingly.
+
+⸻
+
+13. Refactor Combat AI to use Attack 3 / Attack 4 directly
+
+js/game/combat-ai.js currently:
+
+* builds a separate collection of Charge replacement moves;
+* decides when to enter Charge;
+* values Charge for Energy/cooldown recovery;
+* has Charge intents;
+* watches whether the opponent is Charging;
+* holds Charge before pressing Attack 1 / Attack 2 to access the specials.
+
+Delete this behavior.
+
+The AI should instead recognize Attack 3 and Attack 4 as direct available actions in #0001’s moveset.
+
+Preserve the useful tactical logic:
+
+* Clone Attack can still be preferred when a target is likely to remain where the summon will strike.
+* Sphere Rush can still evaluate range, level alignment, grounding, target movement, Shield state, expected damage, etc.
+* The AI must respect each move’s cooldown.
+
+But when it chooses one:
+
+* Clone Attack emits Attack 3.
+* Sphere Rush emits Attack 4.
+
+There should be no intermediate Charge intent.
+
+Remove opponent-Charging detection and punishment logic because the state no longer exists.
+
+Remove AI profile/settings fields whose only meaning is Charge willingness, or rename/restructure them only if they genuinely represent generic special-move decision making.
+
+The CPU must never output a charge control after this refactor.
+
+It may use down where actual directional gameplay such as fast-fall requires it.
+
+⸻
+
+14. Delete Charge artwork
+
+Delete these #0001 asset files:
+
+* assets/characters/0001/0001_charge_1.png
+* assets/characters/0001/0001_charge_2.png
+* assets/characters/0001/0001_charge_a.png
+* assets/characters/0001/0001_charge_b.png
+
+Do not delete any Attack 3 or Attack 4 artwork.
+
+Keep:
+
+* attack3_object_*
+* attack4_*
+* attack4_object_*
+
+Remove the corresponding Charge animation definitions from js/data/characters.js.
+
+Remove CHARGE_FPS if nothing else uses it.
+
+Update frame-path validation/tests accordingly.
+
+Do not bring back removed fighter 0002 or alter roster-removal rules unrelated to this task.
+
+⸻
+
+15. Remove Charge from i18n and Settings
+
+Update js/core/i18n.js.
+
+Remove keys such as:
+
+* control.charge
+
+Replace them with control.down if a gameplay Down label is needed.
+
+Update English and French text.
+
+Remove wording such as:
+
+* “Movement and Charge”
+* “hold C to Charge”
+* “Charge to the left of the joystick”
+
+The control-scheme descriptions must accurately describe the new Down directional control and the direct attack buttons.
+
+Update Settings previews in js/ui/settings-dialog.js and their CSS so no preview contains a Charge/C control.
+
+⸻
+
+16. Remove Charge wording from documentation and source comments
+
+This request is intentionally a complete removal.
+
+Update all current tracked documentation and code comments that describe the retired mechanic, including at minimum:
+
+* README.md
+* ALVA_SPEC.md
+* codename_rule
+* UPDATES.md where necessary
+* CLAUDE.md only if required by resulting documentation conventions
+* JavaScript comments
+* test comments
+
+The repository should now describe the actual design:
+
+* numbered attacks are direct buttons;
+* Attack 3 is Clone Attack;
+* Attack 4 is Sphere Rush;
+* Down is directional input only;
+* special attacks can retain independent cooldowns;
+* Sphere Rush is a technique, not a “charged technique”.
+
+Do not leave old Charge documentation around as guidance for future development.
+
+⸻
+
+17. Tests
+
+Do not merely make existing Charge tests pass by weakening assertions.
+
+Delete or replace tests that exist only to validate the removed mechanic.
+
+tests/charge.test.mjs should no longer exist under that name.
+
+Rewrite affected tests throughout the suite so they verify the new architecture.
+
+At minimum, add/retain coverage proving:
+
+1. #0001 directly exposes Attack 1 through Attack 4.
+2. Attack 3 and Attack 4 appear as touch attack buttons.
+3. Attack 3’s accessible name is Clone Attack.
+4. Attack 4’s accessible name is Sphere Rush.
+5. Pressing Attack 3 directly creates the existing clone.
+6. Pressing Attack 4 directly starts the existing Sphere Rush.
+7. No Down/Charge modifier is required for either.
+8. Attack 3 remains ground-only.
+9. Attack 4 remains ground-only.
+10. Clone Attack still uses its current target/ground/no-ground logic.
+11. Clone Attack retains its 5-second cooldown.
+12. Sphere Rush retains its 5-second cooldown.
+13. Pressing a special during its own long cooldown does not defer it until later.
+14. Clone Attack does not fall back to Punch when unavailable.
+15. Sphere Rush retains all existing phase/tick/explosion/launch behavior.
+16. The cooldown rings still correctly display A3/A4 while those abilities recover.
+17. Cooldowns recover at one normal real-time rate; there is no accelerated Charge recovery.
+18. Energy regenerates only through the ordinary passive rate.
+19. down still performs fast-fall.
+20. down still provides downward launch steering.
+21. Holding Down on the ground does not enter a state or stop movement.
+22. Holding Down does not block Dash.
+23. Keyboard O activates Attack 3 directly.
+24. Keyboard M activates Attack 4 directly.
+25. Gamepad Attack 3 / Attack 4 bindings work directly.
+26. CPU fighters can choose and perform Attack 3 and Attack 4 directly.
+27. CPU output contains no Charge action.
+28. Reset/respawn correctly clears special ability cooldowns and active techniques as before.
+29. Practice Ground still handles the clone and Sphere Rush correctly.
+30. Watch Mode / Quick Battle / Practice Ground still load and run.
+31. Mobile custom-control layouts continue to sanitize and apply correctly.
+32. The removed Charge sprite files are no longer expected by sprite validation.
+33. No regression occurs to Punch, Kick, Shuriken, Shield, Dash, Jump, movement, launch, bounce, or Energy exhaustion.
+
+Run the entire test suite, not only the files touched by the refactor.
+
+⸻
+
+18. Search the entire repository for leftovers
+
+At the end, perform a repository-wide audit.
+
+There should be no retired Charge architecture left in:
+
+* file names;
+* source identifiers;
+* data properties;
+* CSS selectors;
+* translation keys;
+* tests;
+* documentation;
+* sprite paths;
+* comments.
+
+Specifically inspect for terms beginning with or representing the retired mechanic, such as:
+
+* charge
+* charging
+* charged
+* chargeReplacements
+* chargedTechniques
+* chargedCooldowns
+* chargedCooldownRate
+* chargeRegen
+* charge_loop
+* charge_release
+
+Also check tracked paths for filenames containing charge.
+
+A word like “recharge” in unrelated natural-language prose is not itself the old mechanic, but no gameplay identifier or description may refer to Charge.
+
+⸻
+
+19. Important non-goals / regression constraints
+
+Do not:
+
+* remove Clone Attack;
+* remove Sphere Rush;
+* simplify Sphere Rush’s phases;
+* convert Sphere Rush into a normal melee attack;
+* convert Clone Attack into a projectile;
+* delete Attack 3/Attack 4 effect art;
+* change their authored damage/launch values just because input changed;
+* make them cost Energy unless existing data already does;
+* resurrect removed roster characters;
+* alter menu Down navigation;
+* remove fast-fall merely because it shared the old input;
+* remove downward launch steering merely because it shared the old input;
+* leave a hidden modifier system behind under another name;
+* create a generic “special modifier” replacement for Charge.
+
+This is a control/loadout architecture change, not a combat rebalance.
+
+⸻
+
+20. Definition of done
+
+The refactor is complete only when all of the following are true:
+
+Gameplay
+
+* There is no Charge stance.
+* Attack 3 directly summons Clone Attack.
+* Attack 4 directly performs Sphere Rush.
+* Both have dedicated visible attack buttons.
+* Their existing cooldowns and gameplay behavior remain intact.
+* Down remains only a directional gameplay input.
+
+Code
+
+* No Charge replacement routing remains.
+* No Charge state logic remains.
+* charged-technique.js and corresponding “charged” APIs have neutral names.
+* Energy has no Charge regeneration mode.
+* special cooldowns have no Charge recovery multiplier.
+* AI uses the special attacks directly.
+
+UI
+
+* No Charge/C button or label exists.
+* Attack 3 and Attack 4 are visible for #0001.
+* Settings, touch customization, accessibility labels, and translations reflect the new controls.
+
+Assets
+
+* All four 0001_charge_* PNGs are deleted.
+* Attack 3 / Attack 4 assets remain.
+
+Documentation
+
+* Current documentation describes only the new direct-attack design.
+
+Verification
+
+* Full automated test suite passes.
+* Repository-wide search confirms there are no retired Charge identifiers, file names, asset references, CSS names, translations, or gameplay documentation left.
+
+When finished, give a concise implementation summary containing:
+
+1. the architectural changes made;
+2. files deleted/renamed;
+3. how Attack 3 and Attack 4 are now routed;
+4. how Down was separated from the removed mechanic;
+5. AI/UI/data changes;
+6. tests run and their result;
+7. the final repository-wide leftover search result.
+
+Do not stop after hiding Charge from the UI. Follow the mechanic all the way through data, simulation, AI, Energy, cooldowns, controls, assets, docs, and tests.
