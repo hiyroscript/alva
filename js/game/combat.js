@@ -76,6 +76,86 @@
 //     cooldown: 0.25, groundOnly: true,
 //   },
 //
+// A multi-hit attack lists its strikes in `hits` instead of one hitbox:
+// each strikes at most once, while its own window is open (`at` to `at +
+// active`, seconds into the attack), on the first opponent its box meets,
+// and resolves with its own `damage`, `baseLaunch` and `directionalLaunch`
+// (0 and none unless it declares them). A strike's `hitbox`, `hitstun`,
+// `blockstun`, `hitstop` and `carry` default to the attack's own. The
+// attack's startup and active phase follow from its strikes (startup to the
+// first one's window, active until the last one's closes; declaring either
+// is refused), and so do the fields a reader of the whole attack goes by:
+// `hitbox` is the box round every strike's, `damage` their sum, and
+// `baseLaunch` / `directionalLaunch` the last strike's (the finisher). A
+// Shield that blocks a strike stops the string there: the later strikes
+// strike nothing (so a flurry can never empty a Shield on its own).
+//
+//   attack2: {
+//     animation: 'attack2', recovery: 1 / 20, hitbox: { x: 14, y: -70, w: 72, h: 70 }, hitstun: 0.25,
+//     hits: [
+//       { at: 2 / 20, active: 1 / 20, damage: 1 },
+//       { at: 3 / 20, active: 1 / 20, damage: 3, baseLaunch: 2, directionalLaunch: 'horizontal' },
+//     ],
+//   },
+//
+// `carry` (a strike's, a projectile's or an attack's own) drags what it hits
+// along: a real hit that launches nothing takes the velocity of whatever
+// struck (the attacker's body, or the projectile), less `lift` upward, so a
+// rising strike carries its target up with it and a travelling one along.
+//
+//   carry: { lift: 0 },
+//
+// `motion` is movement the attack makes itself, owning the fighter's
+// velocity while it lasts (gravity included, where it says so). Four kinds:
+//
+//   homing  the lock-on dash. Through the startup the fighter hangs in the
+//           air (no gravity, its drift braking). As the active phase opens
+//           it locks on to its opponent if it is in play, within `range` of
+//           the fighter's middle (middle to middle) and not behind it, and
+//           dashes at `speed`, re-aimed at the target's middle every step,
+//           until the active phase is over; with nobody to lock on to it
+//           dashes straight ahead instead. Contact (a hit or a block) ends
+//           the dash: the fighter springs off the target, `rebound` upward
+//           and `recoil` back. A dash that ends without contact keeps
+//           `exit` of its velocity; one that reaches the ground stops there.
+//   bounce  the plunge. The startup hangs, then the fighter drops at a fixed
+//           `fallSpeed` (no gravity; air steering as its `airControl`
+//           allows) until it meets the ground or an opponent: either sends
+//           it back up at `rebound` and ends the attack at once, so it can
+//           bounce again. Meeting the ground this way is no landing.
+//   rise    the lift. The startup hangs, then the fighter rises at `speed`
+//           (no gravity; air steering as its `airControl` allows) for the
+//           active phase, and carries on up from there under gravity.
+//   roll    the ground roll. Through the startup the fighter curls up,
+//           sliding on as a planted attack does; then it rolls the way it
+//           faces at `speed` plus `keep` x the running speed it had as the
+//           attack started (never more than `maxSpeed`), losing `friction`
+//           units/s every second on the ground and nothing in the air (off
+//           a ledge it flies on), for the rest of the attack; a wall stops
+//           it. No steering. A Shield that blocks it stops it dead, sending
+//           it back at `recoil`.
+//
+// A motion attack never turns while it plays (a homing dash faces the way
+// it flies), and never starts while its fighter is still flying from a
+// launch (see Fighter.launch): a hang, a dash, a plunge or a lift would wipe
+// out the launch that carries it away, so it has to recover first (an air
+// jump, a fast fall, or landing).
+//
+//   midair_attack1: { ..., motion: { type: 'homing', range: 240, speed: 1000, rebound: 760, recoil: 140, exit: 0.2 } },
+//   midair_attack2: { ..., motion: { type: 'bounce', fallSpeed: 1300, rebound: 900 } },
+//   midair_attack3: { ..., motion: { type: 'rise', speed: 460 } },
+//   attack3: { ..., motion: { type: 'roll', speed: 400, keep: 0.8, maxSpeed: 820, friction: 420, recoil: 260 } },
+//
+// Four more fields shape an attack's body. `airUses` (a count) is how many
+// times it may start in the air before the fighter lands again or is hit (0,
+// the default, is no limit). `freeFall: true` spends the rest of the
+// airtime: started in the air, it leaves the fighter in free fall, with no
+// attack or air jump left until it lands or is hit (a recovery move's
+// price). `passThrough: true` lets the fighter pass
+// through other fighters while it plays (no pushbox). `hurtboxes` replaces
+// the fighter's own hurtboxes while it plays (a roll tucked into a ball is
+// a smaller target).
+//
 // A pending attack (`pending: true`) is one whose art is in but whose
 // combat attributes are not authored yet: it plays its clip once, first
 // frame to last, and strikes nothing. It has no hitbox, projectile, damage
@@ -173,7 +253,116 @@ const ATTACK_DEFAULTS = {
   directionalLaunch: null,
   projectile: null, // { id, spawnAt, offset } for a projectile attack
   pending: false,   // art only, its attributes not authored yet (see above)
+  hits: null,        // a multi-hit attack's strikes (see above)
+  carry: null,       // { lift }: a real hit drags its target along (see above)
+  motion: null,      // movement the attack makes itself (see above)
+  airUses: 0,        // starts allowed per airtime; 0 is no limit
+  freeFall: false,   // started in the air, it leaves the fighter in free fall (see above)
+  passThrough: false, // passes through other fighters while it plays
+  hurtboxes: null,   // the fighter's hurtboxes while it plays; null keeps its own
 };
+
+// Every kind of attack motion (see above), with its fields' defaults. The
+// ones a kind cannot do without are listed in MOTION_REQUIRED.
+const MOTION_DEFAULTS = Object.freeze({
+  homing: Object.freeze({ range: 0, speed: 0, rebound: 0, recoil: 0, exit: 0 }),
+  bounce: Object.freeze({ fallSpeed: 0, rebound: 0 }),
+  rise: Object.freeze({ speed: 0 }),
+  roll: Object.freeze({ speed: 0, keep: 0, maxSpeed: Infinity, friction: 0, recoil: 0 }),
+});
+const MOTION_REQUIRED = Object.freeze({
+  homing: ['range', 'speed'], bounce: ['fallSpeed'], rise: ['speed'], roll: ['speed'],
+});
+
+export const MOTION_TYPES = Object.freeze(Object.keys(MOTION_DEFAULTS));
+
+// The frozen motion of attack `owner` from its `motion` entry, or null. An
+// unknown kind, or one missing a speed it cannot do without, is refused.
+function resolveMotion(spec, owner) {
+  if (!spec) return null;
+  const defaults = MOTION_DEFAULTS[spec.type];
+  if (!defaults) throw new Error(`[Alva] ${owner} has motion type "${spec.type}" (${MOTION_TYPES.join(', ')})`);
+  const motion = { ...defaults, ...spec };
+  for (const field of MOTION_REQUIRED[spec.type]) {
+    if (!(motion[field] > 0)) throw new Error(`[Alva] ${owner}'s ${spec.type} motion needs a positive ${field}`);
+  }
+  return Object.freeze(motion);
+}
+
+// The fields a strike of a multi-hit attack takes from the attack when it
+// does not declare its own, and the ones only the strikes may declare.
+const STRIKE_INHERITS = Object.freeze(['hitbox', 'hitstun', 'blockstun', 'hitstop', 'carry']);
+const STRIKE_ONLY = Object.freeze(['startup', 'active', 'damage', 'baseLaunch', 'directionalLaunch']);
+
+// A multi-hit attack's strikes, frozen and validated, and what they make of
+// the whole attack (see `hits` above): its startup and active phase, the box
+// round every strike's, its damage and its finisher's launch.
+function resolveStrikes(spec, base) {
+  const owner = `Attack "${spec.id}"`;
+  if (!Array.isArray(spec.hits) || !spec.hits.length) throw new Error(`[Alva] ${owner}'s hits must be a list of strikes`);
+  const declared = STRIKE_ONLY.filter((field) => spec[field] !== undefined);
+  if (declared.length) throw new Error(`[Alva] ${owner} lists hits but declares ${declared.join(', ')}: each strike declares its own`);
+  let last = -Infinity;
+  const hits = spec.hits.map((h, index) => {
+    const who = `${owner} hit ${index + 1}`;
+    if (!(h.at >= 0) || !(h.active > 0)) throw new Error(`[Alva] ${who} needs an \`at\` from 0 and a positive \`active\``);
+    if (h.at < last) throw new Error(`[Alva] ${who} starts before the strike listed ahead of it`);
+    last = h.at;
+    const strike = { id: spec.id, index, at: h.at, active: h.active, damage: h.damage ?? 0 };
+    // The attack's own fields, or the defaults, except the box: a strike
+    // with none of its own and none on the attack is refused, never given a
+    // default box nobody drew.
+    for (const field of STRIKE_INHERITS) strike[field] = h[field] !== undefined ? h[field] : base[field];
+    strike.hitbox = h.hitbox ?? spec.hitbox ?? null;
+    if (!strike.hitbox) throw new Error(`[Alva] ${who} has no hitbox (its own or the attack's)`);
+    return Object.freeze({ ...strike, ...resolveHitLaunch(h, who) });
+  });
+  const startup = hits[0].at;
+  const end = Math.max(...hits.map((h) => h.at + h.active));
+  const x0 = Math.min(...hits.map((h) => h.hitbox.x));
+  const y0 = Math.min(...hits.map((h) => h.hitbox.y));
+  const x1 = Math.max(...hits.map((h) => h.hitbox.x + h.hitbox.w));
+  const y1 = Math.max(...hits.map((h) => h.hitbox.y + h.hitbox.h));
+  const finisher = hits[hits.length - 1];
+  return {
+    hits: Object.freeze(hits),
+    startup,
+    active: end - startup,
+    hitbox: Object.freeze({ x: x0, y: y0, w: x1 - x0, h: y1 - y0 }),
+    damage: hits.reduce((sum, h) => sum + h.damage, 0),
+    baseLaunch: finisher.baseLaunch,
+    directionalLaunch: finisher.directionalLaunch,
+  };
+}
+
+// Where attack `def`'s strikes can land over its whole active phase, facing
+// right from the fighter's origin (the hitbox itself, for an attack that
+// makes no motion of its own): a roll's box swept along its path from a
+// standstill, a plunge's down and a lift's up, and a homing dash's lock-on
+// range round the box's middle, ahead of it. For readers that plan or fear
+// an attack (the combat AI), never for resolving one. Null without a
+// hitbox.
+export function attackReach(def) {
+  const hb = def?.hitbox;
+  if (!hb) return null;
+  const m = def.motion;
+  if (!m) return hb;
+  const t = def.active;
+  if (m.type === 'roll') {
+    const brake = m.friction > 0 ? Math.min(t, m.speed / m.friction) : t;
+    const reach = m.speed * brake - 0.5 * m.friction * brake * brake;
+    return { x: hb.x, y: hb.y, w: hb.w + reach, h: hb.h };
+  }
+  if (m.type === 'bounce') return { x: hb.x, y: hb.y, w: hb.w, h: hb.h + m.fallSpeed * t };
+  if (m.type === 'rise') return { x: hb.x, y: hb.y - m.speed * t, w: hb.w, h: hb.h + m.speed * t };
+  const cy = hb.y + hb.h / 2;
+  return { x: hb.x, y: cy - m.range - hb.h / 2, w: m.range + hb.w, h: 2 * m.range + hb.h };
+}
+
+// Whether multi-hit strike `hit` is live `time` seconds into its attack.
+export function strikeLive(hit, time) {
+  return time >= hit.at - PHASE_EPSILON && time < hit.at + hit.active - PHASE_EPSILON;
+}
 
 // Attack time is a sum of fixed steps, so compare phase boundaries with a
 // little slack: a phase that is a whole number of steps long (e.g. 1 / 12 s at
@@ -192,7 +381,7 @@ export function attackPhase(def, time) {
 // or time a strike.
 const PENDING_REFUSED = Object.freeze([
   'startup', 'active', 'recovery', 'damage', 'hitbox', 'projectile', 'baseLaunch', 'directionalLaunch',
-  'hitstun', 'blockstun', 'hitstop', 'cooldown', 'hitCancel',
+  'hitstun', 'blockstun', 'hitstop', 'cooldown', 'hitCancel', 'hits', 'carry', 'motion',
 ]);
 
 // Frozen attack definition from a character's attack entry (plus its `id`).
@@ -214,7 +403,11 @@ export function createAttackDefinition(spec, { clipDuration = 0 } = {}) {
     def.total = def.recovery;
     return Object.freeze(def);
   }
-  const def = { ...ATTACK_DEFAULTS, ...spec, ...resolveHitLaunch(spec, `Attack "${spec.id}"`) };
+  const def = spec.hits
+    ? { ...ATTACK_DEFAULTS, ...spec }
+    : { ...ATTACK_DEFAULTS, ...spec, ...resolveHitLaunch(spec, `Attack "${spec.id}"`) };
+  if (spec.hits) Object.assign(def, resolveStrikes(spec, def));
+  def.motion = resolveMotion(spec.motion, `Attack "${spec.id}"`);
   def.total = def.startup + def.active + def.recovery;
   return Object.freeze(def);
 }
@@ -351,9 +544,12 @@ export class CombatState {
     this.shieldStun = 0;    // blockstun remaining, held in the Shield
     this.hitstop = 0;       // freeze frames on impact
     // { def, time, hasHit, confirmed, confirmedAt, projectileSpawned,
-    // stepped }: hasHit once its hitbox has struck anyone, confirmed (at its
-    // time confirmedAt) only for a hit a Shield did not block, stepped once
-    // its `step` has moved the fighter.
+    // stepped, struck, blocked, motion }: hasHit once its hitbox (any of its
+    // strikes) has struck anyone, confirmed (at its time confirmedAt) only
+    // for a hit a Shield did not block, stepped once its `step` has moved
+    // the fighter. A multi-hit attack also keeps the strikes it has dealt
+    // (`struck`, by index) and whether a Shield stopped it (`blocked`); a
+    // motion attack its motion's progress (`motion`, see Fighter).
     this.attack = null;
     this.release = null;    // the attack's projectile, released this step (see Fighter.update)
     // Ordinary attacks' short recovery cooldowns: attack id -> seconds left.
@@ -588,7 +784,7 @@ const intersects = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b
 // with the first one it touches ({ x, y }, world units), or null when it
 // touches none. The point only places the hit's effects.
 function strikePoint(hit, target) {
-  for (const hb of target.def.hurtboxes) {
+  for (const hb of target.hurtboxes ?? target.def.hurtboxes) {
     const box = worldBox(target, hb, scratchHurt);
     if (!intersects(hit, box)) continue;
     const x0 = Math.max(hit.x, box.x);
@@ -602,6 +798,9 @@ function strikePoint(hit, target) {
 
 // The middle of `target`'s body, where a hit with no box of its own lands.
 const bodyPoint = (target) => ({ x: target.body.x, y: target.body.y - target.body.height / 2 });
+
+// What a fighter's strike carries its target along at (see `carry`).
+const bodyVelocity = (f) => ({ x: f.body.vx, y: f.body.vy });
 
 const scratchHit = {};
 const scratchHurt = {};
@@ -640,8 +839,13 @@ export class CombatSystem {
     this.events.length = 0;
     for (const attacker of fighters) {
       const atk = attacker.combat.attack;
+      if (!atk || attacker.combat.phase !== 'active') continue;
+      if (atk.def.hits) {
+        this.strike(attacker, atk, fighters);
+        continue;
+      }
       // A projectile attack has no melee hitbox: its damage is the projectile's.
-      if (!atk || !atk.def.hitbox || atk.hasHit || attacker.combat.phase !== 'active') continue;
+      if (!atk.def.hitbox || atk.hasHit) continue;
       const hit = worldBox(attacker, atk.def.hitbox, scratchHit);
       for (const target of fighters) {
         if (target === attacker) continue;
@@ -650,8 +854,10 @@ export class CombatSystem {
         // One hit per attack, blocked or not; only a real hit (never a
         // block) opens its hitCancel.
         atk.hasHit = true;
-        atk.confirmed = this.applyHit(attacker, target, atk.def, { point }).type === 'hit';
+        const event = this.applyHit(attacker, target, atk.def, { point, velocity: bodyVelocity(attacker) });
+        atk.confirmed = event.type === 'hit';
         atk.confirmedAt = atk.time;
+        attacker.attackContact?.(atk, event);
         break;
       }
     }
@@ -659,11 +865,16 @@ export class CombatSystem {
       if (!p.alive) continue;
       const hit = p.hitbox(scratchHit);
       for (const target of fighters) {
-        if (target === p.owner) continue;
+        if (target === p.owner || !p.ready) continue;
         if (!strikePoint(hit, target)) continue;
-        // One hit, then it is gone (a Shielded projectile included).
-        p.alive = false;
-        this.applyHit(p.owner, target, p.def, { facing: p.direction, projectile: p, point: { x: p.x, y: p.y } });
+        // One hit, then it is gone (a Shielded projectile included); a
+        // piercing one strikes again every so often until its last strike,
+        // its finisher (see js/game/projectile.js).
+        const def = p.nextHit;
+        const event = this.applyHit(p.owner, target, def, {
+          facing: p.direction, projectile: p, point: { x: p.x, y: p.y }, velocity: { x: p.vx, y: 0 },
+        });
+        p.struck(event.type === 'block');
         break;
       }
     }
@@ -717,6 +928,34 @@ export class CombatSystem {
     return this.events;
   }
 
+  // A multi-hit attack's strikes (see `hits` above) this step: each one
+  // live in its own window, at most once, on the first opponent its box
+  // meets. Any real hit confirms the attack (its hitCancel counts from the
+  // first); a blocked strike ends the string, so no later one strikes.
+  strike(attacker, atk, fighters) {
+    atk.struck ??= new Set();
+    for (const h of atk.def.hits) {
+      if (atk.blocked) return;
+      if (atk.struck.has(h.index) || !strikeLive(h, atk.time)) continue;
+      const box = worldBox(attacker, h.hitbox, scratchHit);
+      for (const target of fighters) {
+        if (target === attacker) continue;
+        const point = strikePoint(box, target);
+        if (!point) continue;
+        atk.struck.add(h.index);
+        atk.hasHit = true;
+        const event = this.applyHit(attacker, target, h, { point, velocity: bodyVelocity(attacker) });
+        if (event.type === 'block') atk.blocked = true;
+        else if (!atk.confirmed) {
+          atk.confirmed = true;
+          atk.confirmedAt = atk.time;
+        }
+        attacker.attackContact?.(atk, event);
+        break;
+      }
+    }
+  }
+
   // Every tick `t` has due this step, each one tickHit on its target.
   applyTicks(owner, t) {
     for (let target = t.takeTick(); target; target = t.takeTick()) {
@@ -746,9 +985,13 @@ export class CombatSystem {
   // point (see js/data/launch.js). A hit that does not launch (Base Launch
   // 0 or no direction) leaves the target's velocity as it is. Returns the
   // event it recorded.
+  //
+  // A hit with `carry` (see above) that lands and launches nothing gives the
+  // target `velocity`, what struck it (the attacker's body, a projectile),
+  // less its `lift` upward: it is dragged along.
   applyHit(attacker, target, def, {
     facing = attacker.facing, projectile = null, summon = null, technique = null,
-    detached = !!(projectile || summon || technique), point = bodyPoint(target),
+    detached = !!(projectile || summon || technique), point = bodyPoint(target), velocity = null,
   } = {}) {
     const tc = target.combat;
     const blocked = tc.shielding;
@@ -798,6 +1041,13 @@ export class CombatSystem {
       if (finalLaunch.y) {
         target.body.vy = finalLaunch.y;
         target.body.grounded = false;
+      }
+    } else if (!blocked && def.carry && velocity) {
+      target.body.vx = velocity.x;
+      target.body.vy = velocity.y - (def.carry.lift ?? 0);
+      if (target.body.vy < 0) {
+        target.body.grounded = false;
+        target.body.ground = null;
       }
     }
     const event = {

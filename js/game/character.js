@@ -6,7 +6,7 @@ import { SpriteAnimator } from './sprite-animator.js';
 import { createBody, stepBody, dropThrough, separate } from './physics.js';
 import { startLaunch, bounceLaunch, resolveLaunchBounce } from './launch-bounce.js';
 import {
-  CombatState, createAttackDefinition, createDefenseDefinition, resolveEnergy, resolveLaunchReaction,
+  CombatState, attackPhase, createAttackDefinition, createDefenseDefinition, resolveEnergy, resolveLaunchReaction,
 } from './combat.js';
 import { createProjectileDefinition } from './projectile.js';
 import { createSummonDefinition, summonProblem } from './clone.js';
@@ -32,13 +32,19 @@ const TIME_EPSILON = 1e-6;
 
 const NEUTRAL_INPUT = Object.freeze(blankInput());
 
+// World units behind the fighter's middle an opponent may be and still be
+// locked on to by a homing dash (see Fighter.lockOn): one straight above
+// or below counts as ahead, one behind it does not.
+const HOMING_BEHIND = 8;
+
 // Keeps two fighters' pushboxes apart (see separate in js/game/physics.js),
 // as every fixed step does after the fighters move. A fighter flying off a
 // rebound (see Fighter.ricocheting) passes the other instead: a ricochet is
 // never pinned against a body in its way, so it cannot be held in front of
-// an attacker at a wall.
+// an attacker at a wall. So does one in an attack that passes through (see
+// Fighter.passingThrough: #0002's Spin Attack rolls on through its target).
 export function separateFighters(a, b, stage) {
-  if (a.ricocheting || b.ricocheting) return;
+  if (a.ricocheting || b.ricocheting || a.passingThrough || b.passingThrough) return;
   separate(a.body, b.body, a.def.pushbox.width / 2, b.def.pushbox.width / 2, stage);
 }
 
@@ -96,6 +102,11 @@ export class Fighter {
     // Seconds of charged-action cooldown recovered per second while in
     // Charge (see recoverChargedCooldowns); 1 per second otherwise.
     this.chargedCooldownRate = def.stats?.chargedCooldownRate ?? 1;
+    // Whether it has a Charge stance at all: `charge: false` (#0002) has
+    // none, so the Charge input (Down) never holds it in place on the ground
+    // and only ever fast-falls in the air. Nothing to replace, either (see
+    // js/data/loadout.js).
+    this.canCharge = def.charge !== false;
     // Energy settings (js/game/combat.js resolveEnergy): the maximum, both
     // refill rates, what a Dash costs and what each blocked hit costs.
     this.energyDef = resolveEnergy(def.energy);
@@ -183,6 +194,13 @@ export class Fighter {
     // fighter could not act on yet ({ action, age, at }), tried again every
     // step for movement.attackBuffer seconds (see bufferAttack), or null.
     this.bufferedAttack = null;
+    // How many times each attack with `airUses` has started since the
+    // fighter was last on the ground or hit: attack id -> count.
+    this.airAttacks = new Map();
+    // In free fall (see `freeFall` in js/game/combat.js): an attack that
+    // spends the airtime was started in the air, and until the fighter lands
+    // or is hit it has no attack or air jump left.
+    this.freeFall = false;
     // Down (the Charge input) is held in the air: the fast fall's (see
     // update). Such a hold does not become a Charge on landing; it must be
     // let go and held again.
@@ -354,7 +372,7 @@ export class Fighter {
     // out on a later step, in the air. Pressed on the same step, the attack
     // goes first, on the ground.
     const charged = wasCharging && !!input.charge;
-    const canJump = this.coyote > 0 || (!body.grounded && this.airJumps > 0);
+    const canJump = this.coyote > 0 || (!body.grounded && this.airJumps > 0 && !this.freeFall);
     const jumpFirst = (at) =>
       this.jumpBuffer > 0 && canJump && this.jumpPressedAt < at && this.canFollowUp() && !shieldHeld;
     let started = false;
@@ -441,11 +459,12 @@ export class Fighter {
     else this.shieldDownTime += dt;
 
     // ---- Charge: grounded, and only while held ---------------------------
-    // The held value alone decides it: no toggle or buffer, so the step that
+    // Only a fighter with a Charge stance (see canCharge) ever charges. The
+    // held value alone decides it: no toggle or buffer, so the step that
     // sees Charge released ends it. A held Shield outranks it. After a
     // charged technique, a Charge held since before it must be let go and
     // held again, and so must one held down from the air (the fast fall).
-    this.charging =
+    this.charging = this.canCharge &&
       canAct && body.grounded && !!input.charge && !combat.shielding && !this.chargeHeldOver && !this.chargeFromAir;
 
     // ---- Platform drop (training CPU only) -------------------------------
@@ -456,8 +475,11 @@ export class Fighter {
     }
 
     // ---- Horizontal movement ---------------------------------------------
-    // See moveHorizontal, and moveAttack while an attack plays.
+    // See moveHorizontal, and moveAttack while an attack plays (moveMotion
+    // while an attack's own motion owns the body, and then the share of
+    // gravity it falls under this step).
     const atk = combat.attack;
+    let gravityShare = 1;
     let dir = held;
     if (combat.shielding || this.charging || combat.stun > 0 || combat.immobilized || this.technique || this.dash) dir = 0;
     // Normal locomotion only: an attack steers with its own share of it.
@@ -479,6 +501,8 @@ export class Fighter {
       // no steering in the air; the current speed runs down under the normal
       // deceleration (the gentle air drag in the air, so momentum carries on).
       this.moveHorizontal(0, 0, 1, dt);
+    } else if (atk?.motion && !atk.motion.done) {
+      gravityShare = this.moveMotion(atk, dir, dt);
     } else if (atk?.def.lockMovement) {
       this.moveAttack(atk, dir, dt);
     } else {
@@ -509,7 +533,7 @@ export class Fighter {
       this.jumpBuffer = 0;
       this.charging = false;
       jumped = true;
-    } else if (this.jumpBuffer > 0 && !body.grounded && this.coyote <= 0 && this.airJumps > 0 && free && !this.technique) {
+    } else if (this.jumpBuffer > 0 && !body.grounded && this.coyote <= 0 && this.airJumps > 0 && free && !this.technique && !this.freeFall) {
       // ---- Air jump -------------------------------------------------------
       // Jump pressed in the air (past coyote time), with one left: a fresh
       // jump from wherever the fighter is, at airJumpRatio x the normal
@@ -554,7 +578,7 @@ export class Fighter {
     // a stun, a bind or an air Shield may not.
     if (
       !body.grounded && input.charge && body.vy > 0 && mv.fastFallSpeed > 0 &&
-      combat.stun <= 0 && !combat.immobilized && !combat.shielding && !this.technique
+      combat.stun <= 0 && !combat.immobilized && !combat.shielding && !this.technique && !this.inMotion
     ) {
       this.fastFalling = true;
       if (body.vy < mv.fastFallSpeed) body.vy = Math.min(mv.fastFallSpeed, body.vy + mv.fastFallAcceleration * dt);
@@ -579,8 +603,11 @@ export class Fighter {
     }
 
     // ---- Integrate -------------------------------------------------------
-    // A higher jump's rise falls under its lighter share of gravity.
-    stepBody(body, dt, ctx.stage, ctx.gravity * (this.highJump?.lift ?? 1), maxFall);
+    // A higher jump's rise falls under its lighter share of gravity, and an
+    // attack's motion under its own (none while it holds the fighter up).
+    stepBody(body, dt, ctx.stage, ctx.gravity * (this.highJump?.lift ?? 1) * gravityShare, maxFall);
+    // What meeting the ground or a wall does to an attack's motion.
+    if (atk && atk === combat.attack) this.motionContact(atk);
 
     // ---- Launch bounce -----------------------------------------------------
     // Physics stopped the body at whatever it met. If a launch drove it
@@ -600,6 +627,8 @@ export class Fighter {
     if (body.grounded) {
       this.lastGroundY = body.y;
       this.airJumps = mv.airJumps ?? 0;
+      this.airAttacks.clear();
+      this.freeFall = false;
       this.highJump = null;
       this.tumbling = false;
     }
@@ -733,7 +762,8 @@ export class Fighter {
 
   // A hit (never a block) just landed on this fighter (see
   // CombatSystem.applyHit): it gets its air jump back, so a launch never
-  // strands it without one, and a higher jump (deciding or rising) is over.
+  // strands it without one, and its once-per-airtime attacks (`airUses`)
+  // too, and a higher jump (deciding or rising) is over.
   //
   // A launch at launchReaction.tumbleSpeed or faster sets it tumbling; a
   // slower one ends a tumble, and a hit that launches nothing leaves it.
@@ -745,6 +775,8 @@ export class Fighter {
   // leaves the sequence it is flying in as it is.
   takeHit(event) {
     this.airJumps = this.def.movement.airJumps ?? 0;
+    this.airAttacks.clear();
+    this.freeFall = false;
     this.highJump = null;
     if (event.launchSpeed > 0) {
       this.tumbling = event.launchSpeed >= this.launchReaction.tumbleSpeed;
@@ -814,7 +846,10 @@ export class Fighter {
     const spec = this.defense;
     if (spec?.type !== 'shield' || !this.combat.canShield()) return false;
     const key = this.body.grounded ? spec.groundAnimation : spec.airAnimation;
-    if (key && this.sprites.has(key)) return true;
+    // None authored for where it is (#0002's Shield is ground-only): no
+    // Shield there, and nothing missing to report.
+    if (!key) return false;
+    if (this.sprites.has(key)) return true;
     if (!this.missingShieldArt.has(key)) {
       this.missingShieldArt.add(key);
       console.warn(`[Alva] Shield "${key}" has no animation frames; ignoring.`);
@@ -865,7 +900,8 @@ export class Fighter {
   // to act (no attack, stun, bind, charged technique or Dash already
   // running) or in an attack that hit and may be cut short (see
   // CombatState.cancellable: a Dash chases what it sent flying), grounded,
-  // not in or holding Charge, not shielding or holding `shield` for a
+  // not in or holding Charge (holding Down, for a fighter with a Charge
+  // stance), not shielding or holding `shield` for a
   // Shield it may raise, and not exhausted, paying dashCost, or
   // dashCancelCost for one that cuts an attack short (all that is left,
   // emptying the bar, when that is less): the extra is what keeps a
@@ -876,7 +912,7 @@ export class Fighter {
   tryDash(direction, input = NEUTRAL_INPUT) {
     const speed = this.def.movement.dashSpeed;
     if (!speed || !direction) return false;
-    if (!this.canFollowUp() || !this.body.grounded || this.charging || input.charge) return false;
+    if (!this.canFollowUp() || !this.body.grounded || this.charging || (this.canCharge && input.charge)) return false;
     if (this.combat.shielding || (input.shield && this.shieldAllowed())) return false;
     // Never a fast run passed off as a Dash: require real mouvment frames.
     if (!this.dashDuration || !this.sprites.has('mouvment')) {
@@ -996,6 +1032,7 @@ export class Fighter {
     // when it became cancellable.
     if (combat.attack?.def.id === attackId && combat.cancellableFor < atk.cooldown - TIME_EPSILON) return false;
     if (atk.groundOnly && !this.body.grounded) return false;
+    if (this.airStartBlocked(atk)) return false;
     // Never fake an attack pose: require real frames for the attack.
     if (!atk.animation || !this.sprites.has(atk.animation)) {
       console.warn(`[Alva] Attack "${attackId}" has no animation frames; ignoring.`);
@@ -1011,21 +1048,213 @@ export class Fighter {
     }
     this.cutAttack();
     if (dir) this.facing = dir;
+    const runningSpeed = this.body.vx;
     this.body.vx = this.attackStartSpeed(atk, this.body.vx, this.body.grounded);
-    combat.attack = { def: atk, time: 0, hasHit: false, confirmed: false, projectileSpawned: false, stepped: false };
+    combat.attack = {
+      def: atk, time: 0, hasHit: false, confirmed: false, projectileSpawned: false, stepped: false,
+      struck: null, blocked: false, motion: null,
+    };
+    if (atk.airUses > 0 && !this.body.grounded) this.airAttacks.set(atk.id, (this.airAttacks.get(atk.id) ?? 0) + 1);
+    if (atk.freeFall && !this.body.grounded) this.freeFall = true;
+    if (atk.motion) this.startMotion(combat.attack, runningSpeed);
     return true;
+  }
+
+  // Whether `atk` may not start in the air right now: the fighter is in free
+  // fall (see `freeFall`), `atk` has used up its starts for this airtime
+  // (`airUses`: it may start again once the fighter is back on the ground,
+  // or has been hit), or it has a motion of its own and the fighter is still
+  // flying from a launch (a motion would cancel the launch: see `motion` in
+  // js/game/combat.js).
+  airStartBlocked(atk) {
+    if (this.body.grounded) return false;
+    if (this.freeFall) return true;
+    if (atk.motion && this.launch) return true;
+    return atk.airUses > 0 && (this.airAttacks.get(atk.id) ?? 0) >= atk.airUses;
+  }
+
+  // ---- Attack motion (see `motion` in js/game/combat.js) -----------------
+
+  // Sets attack `record`'s motion going as it starts: a roll decides its
+  // speed now (its own, plus its `keep` share of `runningSpeed`, the speed
+  // the fighter had the way it now faces, up to its `maxSpeed`) and takes it
+  // as its strike goes live; anything else hangs in the air from this very
+  // step.
+  startMotion(record, runningSpeed) {
+    const spec = record.def.motion;
+    const m = {
+      done: false, aimed: false, target: null, dirX: this.facing, dirY: 0, dir: this.facing, speed: 0, rolling: false,
+    };
+    record.motion = m;
+    if (spec.type === 'roll') m.speed = Math.min(spec.maxSpeed, spec.speed + spec.keep * Math.max(0, runningSpeed * this.facing));
+    else this.body.vy = 0;
+  }
+
+  // Whether an attack's motion owns the fighter's body right now.
+  get inMotion() {
+    const m = this.combat.attack?.motion;
+    return !!m && !m.done;
+  }
+
+  // One step of attack `atk`'s motion: the velocity it owns, set here. Returns
+  // the share of gravity the body falls under this step: none while the
+  // motion holds it (a hang, a dash, a plunge or a lift), all of it
+  // otherwise. `dir` is the direction held, for the air steering a plunge
+  // or a lift allows (its attack's airControl).
+  moveMotion(atk, dir, dt) {
+    const { body } = this;
+    const spec = atk.def.motion;
+    const m = atk.motion;
+    const phase = attackPhase(atk.def, atk.time);
+    if (spec.type === 'roll') {
+      // The curl (the startup) slides on like any planted attack; the roll
+      // itself starts as the strike goes live.
+      if (phase === 'startup' && !m.rolling) {
+        this.moveAttack(atk, dir, dt);
+        return 1;
+      }
+      if (body.wall === m.dir) m.speed = 0;
+      if (m.rolling && body.grounded) m.speed = Math.max(0, m.speed - spec.friction * dt);
+      m.rolling = true;
+      body.vx = m.dir * m.speed;
+      return 1;
+    }
+    if (phase === 'recovery') {
+      // Over without contact: a dash keeps `exit` of its velocity, anything
+      // else just carries on under gravity.
+      m.done = true;
+      if (spec.type === 'homing') {
+        body.vx *= spec.exit;
+        body.vy *= spec.exit;
+      }
+      if (atk.def.lockMovement) this.moveAttack(atk, dir, dt);
+      return 1;
+    }
+    if (spec.type === 'homing') {
+      if (phase === 'startup') {
+        // Hanging, the drift braking: the lock-on.
+        this.moveHorizontal(0, 0, 1, dt);
+        body.vy = 0;
+        return 0;
+      }
+      if (!m.aimed) this.lockOn(m, spec);
+      this.aimAt(m);
+      body.vx = m.dirX * spec.speed;
+      body.vy = m.dirY * spec.speed;
+      if (Math.abs(m.dirX) > 1e-6) this.facing = Math.sign(m.dirX);
+      return 0;
+    }
+    this.moveAttack(atk, dir, dt);
+    if (phase === 'startup') body.vy = 0;
+    else body.vy = spec.type === 'bounce' ? spec.fallSpeed : -spec.speed;
+    return 0;
+  }
+
+  // A homing dash locking on as it starts: its opponent, if in play, within
+  // `range` of the fighter's middle and not behind it, is its target, and
+  // the dash heads for it; with none it heads straight ahead. Decided once.
+  lockOn(m, spec) {
+    m.aimed = true;
+    m.target = null;
+    m.dirX = this.facing;
+    m.dirY = 0;
+    const foe = this.opponent;
+    if (!foe || foe.lostToVoid) return;
+    const [dx, dy] = this.toMiddleOf(foe);
+    const dist = Math.hypot(dx, dy);
+    if (dist > 0 && dist <= spec.range && dx * this.facing >= -HOMING_BEHIND) m.target = foe;
+  }
+
+  // Re-aims a homing dash at its target's middle, while the target is still
+  // in play and not already reached; otherwise it keeps its heading.
+  aimAt(m) {
+    const foe = m.target;
+    if (!foe || foe.lostToVoid) return;
+    const [dx, dy] = this.toMiddleOf(foe);
+    const dist = Math.hypot(dx, dy);
+    if (dist < 1) return;
+    m.dirX = dx / dist;
+    m.dirY = dy / dist;
+  }
+
+  // From this fighter's middle to `other`'s ([dx, dy], world units).
+  toMiddleOf(other) {
+    const a = this.body;
+    const b = other.body;
+    return [b.x - a.x, (b.y - b.height / 2) - (a.y - a.height / 2)];
+  }
+
+  // After the body moved: a homing dash that reached the ground stops there;
+  // a plunge that reached it bounces back up (no landing) and its attack is
+  // over, so it can bounce again.
+  motionContact(atk) {
+    const m = atk.motion;
+    if (!m || m.done || !this.body.grounded) return;
+    const spec = atk.def.motion;
+    if (spec.type === 'homing' && attackPhase(atk.def, atk.time) === 'active') {
+      m.done = true;
+    } else if (spec.type === 'bounce' && attackPhase(atk.def, atk.time) === 'active') {
+      m.done = true;
+      this.springUp(spec.rebound);
+      this.combat.endAttack();
+    }
+  }
+
+  // Attack `atk` met an opponent (see CombatSystem.update): `event` is the
+  // hit or the block. A homing dash springs off it, `rebound` up and
+  // `recoil` back, its air jump given back by a real hit; a plunge bounces
+  // off it and its attack is over; a roll a Shield blocks stops dead and
+  // rolls back at `recoil` (one that hits rolls on through).
+  attackContact(atk, event) {
+    const m = atk.motion;
+    if (!m || m.done) return;
+    const spec = atk.def.motion;
+    if (spec.type === 'homing') {
+      m.done = true;
+      this.body.vx = -this.facing * spec.recoil;
+      this.springUp(spec.rebound);
+      if (event.type === 'hit') this.airJumps = this.def.movement.airJumps ?? 0;
+    } else if (spec.type === 'bounce') {
+      m.done = true;
+      this.springUp(spec.rebound);
+      if (this.combat.attack === atk) this.combat.endAttack();
+    } else if (spec.type === 'roll' && event.type === 'block') {
+      m.done = true;
+      this.body.vx = -m.dir * spec.recoil;
+    }
+  }
+
+  // Sent upward at `speed`, off whatever it stood on.
+  springUp(speed) {
+    this.body.vy = -speed;
+    this.body.grounded = false;
+    this.body.ground = null;
+  }
+
+  // The hurtboxes that count right now: its attack's own while one says so
+  // (a roll's ball), else its own.
+  get hurtboxes() {
+    return this.combat.attack?.def.hurtboxes ?? this.def.hurtboxes;
+  }
+
+  // Passing through other fighters: in an attack that does (see
+  // separateFighters).
+  get passingThrough() {
+    return !!this.combat.attack?.def.passThrough;
   }
 
   // Whether a press of `action` that could not start now may still start
   // once the fighter is free (the combat input buffer keeps only those): it
   // maps to an attack for where the fighter is, and that attack could start
-  // here at all (on the ground if ground-only, with its art). Never a
-  // reserved button (transform), a button the character does not have, an
-  // air extra_attack that is ground-only or an attack without frames.
+  // here at all (on the ground if ground-only, with its art, and with a
+  // start left for this airtime if it has `airUses`). Never a reserved
+  // button (transform), a button the character does not have, an air
+  // extra_attack that is ground-only, an attack without frames or one used
+  // up until the fighter lands.
   attackMayStart(action) {
     const attackId = this.attackFor(action);
     const atk = attackId ? this.attacks[attackId] : null;
-    if (!atk || (atk.groundOnly && !this.body.grounded)) return false;
+    if (!atk || (atk.groundOnly && !this.body.grounded) || this.airStartBlocked(atk)) return false;
     return !!atk.animation && this.sprites.has(atk.animation);
   }
 
@@ -1051,10 +1280,14 @@ export class Fighter {
   // Otherwise it keeps its last facing: it never turns toward its opponent
   // by itself, standing still included, so an opponent crossing behind it
   // stays behind it. Locked while a stun, bind, charged technique or Dash
-  // plays: none of those is the fighter's to steer.
+  // plays: none of those is the fighter's to steer; nor is an attack with a
+  // motion of its own (a roll, a homing dash, a plunge, a lift).
   updateFacing(dir, held) {
     const { body, combat } = this;
     if (combat.stun > 0 || combat.immobilized || this.technique || this.dash) return;
+    // An attack with a motion of its own never turns (a homing dash faces
+    // the way it flies: see moveMotion).
+    if (combat.attack?.def.motion) return;
     if (combat.attack || combat.shielding || this.charging) {
       if (held) this.facing = held;
       return;

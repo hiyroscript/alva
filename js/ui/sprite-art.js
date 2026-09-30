@@ -51,14 +51,17 @@ export function fitCanvas(canvas, dprCap = 2) {
   return { w, h, dpr, changed, cssW: r.width, cssH: r.height };
 }
 
-// Draw a frame bottom-centre anchored at (x, y) with an integer scale.
+// Draw a frame at its anchor (bottom-centre, or where its clip puts the
+// feet: see anchorY in js/game/sprite-normalizer.js) at (x, y) with an
+// integer scale.
 export function drawFrameAt(ctx, frame, x, y, scale, flip = false) {
   const w = frame.artW * scale;
   const h = frame.artH * scale;
   const ax = Math.round(frame.anchorArtX * scale);
+  const ay = Math.round((frame.anchorArtY ?? frame.artH) * scale);
   ctx.save();
   ctx.translate(Math.round(x), Math.round(y));
   if (flip) ctx.scale(-1, 1);
-  ctx.drawImage(frame.canvas, -ax, -Math.round(h), Math.round(w), Math.round(h));
+  ctx.drawImage(frame.canvas, -ax, -ay, Math.round(w), Math.round(h));
   ctx.restore();
 }

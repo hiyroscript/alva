@@ -23,8 +23,24 @@
 // like an attack's. A horizontal launch travels along the projectile's own
 // direction. A projectile with Base Launch 0 or no direction never launches.
 //
+// A piercing projectile (`pierce: { hits, interval }`) strikes up to `hits`
+// times instead, at least `interval` seconds apart, staying in play between
+// them; its last strike resolves as its `finisher` (a hit of its own: its
+// `damage`, `baseLaunch` and `directionalLaunch`, its stuns and freeze
+// defaulting to the projectile's). With `carry` (see js/game/combat.js) each
+// strike that launches nothing drags the target along with it, `lift`
+// upward: #0002's whirlwind takes its target up and away with it, then flings
+// it on its finisher. A Shield that blocks any strike stops it there.
+//
+//   extra_attack_object: {
+//     ..., damage: 1, hitstun: 0.24, carry: { lift: 360 },
+//     pierce: { hits: 5, interval: 0.14 },
+//     finisher: { damage: 3, baseLaunch: 2, directionalLaunch: 'vertical', hitstun: 0.4 },
+//   },
+//
 // A projectile flies straight in the direction it was released, hits at most
-// once and then disappears. It also disappears when its lifetime runs out,
+// once (a piercing one, its `hits`) and then disappears. It also disappears
+// when its lifetime runs out,
 // when it flies into the Void (the stage's kill boundary; the open air past
 // the ledges does not stop it) or when it meets a solid block, the main
 // floor's body included; one-way platforms never stop it. Its hitbox is
@@ -43,7 +59,13 @@ const PROJECTILE_DEFAULTS = {
   hitstun: 0.2,
   blockstun: 0.12,
   hitstop: 0.06,
+  carry: null,    // { lift }: a strike that launches nothing drags its target along
+  pierce: null,   // { hits, interval }: strikes more than once (see above)
+  finisher: null, // a piercing projectile's last strike
 };
+
+// What a finisher takes from its projectile when it does not say.
+const FINISHER_INHERITS = Object.freeze(['hitstun', 'blockstun', 'hitstop']);
 
 // Age is a sum of fixed steps; compare against boundaries with a little slack
 // (see PHASE_EPSILON in combat.js).
@@ -52,6 +74,23 @@ const TIME_EPSILON = 1e-6;
 export function createProjectileDefinition(spec) {
   if (!spec?.id) throw new Error('[Alva] Projectile definitions need an id');
   const def = { ...PROJECTILE_DEFAULTS, ...spec, ...resolveHitLaunch(spec, `Projectile "${spec.id}"`) };
+  if (def.pierce) {
+    const { hits, interval } = def.pierce;
+    if (!(Number.isInteger(hits) && hits >= 2) || !(interval > 0)) {
+      throw new Error(`[Alva] Projectile "${spec.id}"'s pierce needs 2 or more hits and a positive interval`);
+    }
+    def.pierce = Object.freeze({ hits, interval });
+    if (def.finisher) {
+      const f = def.finisher;
+      const inherited = Object.fromEntries(FINISHER_INHERITS.map((field) => [field, f[field] ?? def[field]]));
+      def.finisher = Object.freeze({
+        id: spec.id, damage: f.damage ?? 0, ...inherited, carry: null,
+        ...resolveHitLaunch(f, `Projectile "${spec.id}" finisher`),
+      });
+    }
+  } else if (def.finisher) {
+    throw new Error(`[Alva] Projectile "${spec.id}" has a finisher but no pierce`);
+  }
   return Object.freeze(def);
 }
 
@@ -76,6 +115,34 @@ export class Projectile {
     this.renderY = y;
     this.age = 0; // seconds alive; also the animation clock
     this.alive = true;
+    // Strikes dealt so far, and its age at the latest (a piercing one's
+    // next waits for its interval).
+    this.hits = 0;
+    this.lastStrike = -Infinity;
+  }
+
+  // Whether it may strike on this step: always, until it has struck; a
+  // piercing one again once its interval has passed since its last strike.
+  get ready() {
+    const pierce = this.def.pierce;
+    if (!pierce || this.hits === 0) return true;
+    return this.age - this.lastStrike >= pierce.interval - TIME_EPSILON;
+  }
+
+  // The hit its next strike deals: its own, and a piercing one's finisher
+  // on its last.
+  get nextHit() {
+    const { pierce, finisher } = this.def;
+    return pierce && finisher && this.hits === pierce.hits - 1 ? finisher : this.def;
+  }
+
+  // It struck (see CombatSystem.update): counted, and gone after its only
+  // strike, its last or any a Shield blocked.
+  struck(blocked) {
+    this.hits++;
+    this.lastStrike = this.age;
+    const pierce = this.def.pierce;
+    if (!pierce || blocked || this.hits >= pierce.hits) this.alive = false;
   }
 
   // Builds the projectile an owner released, or null if it has no such
