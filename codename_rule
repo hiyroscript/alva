@@ -1,0 +1,152 @@
+# Alva codename rules and implementation prompt
+
+Status: target specification; the gameplay migration has not yet been implemented.
+Inspected baseline: hiyroscript/alva main at 4dce378874eebc6112dfe1ab16f7f20659d3bce4.
+This file is intentionally named codename_rule, without an extension.
+
+## Naming contract
+
+Character IDs are four-digit strings, including leading zeroes. 0001 is an example, not a global constant. Animation assets remain under assets/characters/<character_id>/ and retain their actual file extension.
+
+The final numeric suffix is the animation frame number, starting at 1. The number inside attack1 through attack5 identifies the move, not the frame. For example, 0001_attack2_7.png is character 0001, attack 2, frame 7.
+
+| Purpose | Codename / filename stem |
+| --- | --- |
+| Idle sequence | 0001_idle_1 |
+| Run sequence | 0001_run_1 |
+| Jump, fall, land | 0001_jump, 0001_fall, 0001_land |
+| Ground / airborne hurt | 0001_hurt, 0001_midair_hurt |
+| Ground shield preparation, hold, release | 0001_prepshield, 0001_shielding, 0001_releaseshield |
+| Numbered attack N (N = 1–5) | 0001_attackN_1 |
+| Its airborne variant | 0001_midair_attackN_1 |
+| Extra attack | 0001_extra_attack_1 |
+| Charge startup | 0001_charge_1 |
+| Charge sustained loop | 0001_charge_a, 0001_charge_b |
+| Special movement / current dash art | 0001_mouvment_1 |
+| Object produced by attack N | 0001_attackN_object_1 |
+| Object produced by an airborne attack | 0001_midair_attackN_object_1 |
+| Object produced by the extra attack | 0001_extra_attack_object_1 |
+
+Single-pose jump/fall/land/hurt/shield assets may use the exact unsuffixed stems above. A multi-frame version uses _1, _2, etc. Preserve existing frames: 0001 currently has two frames each for jump, fall and land, so these become 0001_jump_1.png and 0001_jump_2.png, and likewise for fall and land. Do not collapse or discard them to match a single-pose example.
+
+Charge always plays its numbered startup once, then alternates charge_a and charge_b while held. Charge release may reuse charge_1, as the current character does; do not create a redundant copy.
+
+Use mouvment exactly as specified for the canonical animation name. Run remains run; special movement does not replace ordinary run. Existing directional input names mouvementLeft/mouvementRight describe controls, not filenames; if normalized to mouvmentLeft/mouvmentRight, migrate every consumer and saved layout key together.
+
+Preserve existing airborne shielding as midair_shielding. For existing dodge sequences use dodge_<frame> and midair_dodge_<frame>; do not merge distinct clips into mouvment or delete unused source artwork.
+
+Runtime move IDs omit the character prefix and frame suffix: attack1, midair_attack1, attack2, midair_attack2, attack3, midair_attack3, attack4, midair_attack4, attack5, midair_attack5, extra_attack. Animation keys use the same vocabulary. Phase subclips can have descriptive keys such as attack4_form, attack4_dash and attack4_release, referencing slices of the canonical attack4 frame series.
+
+## Legacy mapping
+
+| Existing identifier or file series | Replacement |
+| --- | --- |
+| ba1 / 1ba<frame> | attack1 / attack1_<frame> |
+| ba2 / 2ba<frame> | attack2 / attack2_<frame> |
+| maba1 / midair1ba<frame> | midair_attack1 / midair_attack1_<frame> |
+| maba2 / midair2ba<frame> | midair_attack2 / midair_attack2_<frame> |
+| cba1 | attack3 |
+| cba2 | attack4 |
+| uniqueba / throw<frame> | extra_attack / extra_attack_<frame> |
+| idle<frame>, run<frame> | idle_<frame>, run_<frame> |
+| jump<frame>, fall<frame>, land<frame> | jump_<frame>, fall_<frame>, land_<frame> |
+| midairhurt | midair_hurt |
+| releaseblock | releaseshield |
+| midairshielding | midair_shielding |
+| charge1, charge2 | charge_1, charge_2 |
+| chargea, chargeb | charge_a, charge_b |
+| dash<frame> | mouvment_<frame> |
+| shuriken<frame> | extra_attack_object_<frame> |
+| rasen<frame> | attack4_<frame> |
+| prasen<frame> | attack4_object_<frame> |
+| cloneav<frame> | attack3_object_<frame> |
+
+These are semantic mappings, not unrestricted string replacements. charge is still the charging action and state; only the old charged move IDs cba1/cba2 become attack3/attack4. Human-facing character ability names such as Shuriken, Clone Attack and Sphere Rush can remain.
+
+## Numbered attacks and buttons
+
+Interpretation: the 2–5 limit counts numbered attack families. Airborne variants do not increase the count. extra_attack remains a separate optional action, matching the current uniqueba slot. Transform, shield, jump, movement and charge are not numbered attacks. Do not silently fold extra_attack into attack5.
+
+A complete playable character has 2–5 consecutively numbered attacks. Charge support is explicit per character. A character without charge must not acquire it merely because the engine has a charge input.
+
+| Numbered attacks | Charge | Dedicated numbered buttons | Charged replacements | Required airborne variants |
+| --- | --- | --- | --- | --- |
+| 2 | No | attack1, attack2 | None | 1, 2 |
+| 3 | No | attack1, attack2, attack3 | None | 1, 2, 3 |
+| 4 | No | attack1, attack2, attack3, attack4 | None | 1, 2, 3, 4 |
+| 5 | No | attack1, attack2, attack3, attack4, attack5 | None | 1, 2, 3, 4, 5 |
+| 2 | Yes | attack1, attack2 | None | 1, 2 |
+| 3 | Yes | attack1, attack2 | attack1 becomes attack3 | 1, 2 |
+| 4 | Yes | attack1, attack2 | attack1 becomes attack3; attack2 becomes attack4 | 1, 2 |
+| 5 | Yes | attack1, attack2, attack5 | attack1 becomes attack3; attack2 becomes attack4 | 1, 2, 5 |
+
+The two-attacks-with-charge row permits charge as a recovery mechanic without inventing attacks 3 or 4. Existing per-character energy/cooldown rules determine its effect.
+
+Every independently selectable numbered attack requires an explicitly authored, usable midair_attackN. Charge-only attacks do not require an airborne variant. Do not silently substitute a grounded animation or hitbox for a missing aerial attack. Incomplete characters may remain unavailable/pending with validation diagnostics; enforce the complete contract before they become playable.
+
+The third numbered button for a five-attack charged character sends attack5, not attack3. Button position and move number are different concepts. While charging, attack1 and attack2 controls resolve to the configured replacements; their presentation should identify the resolved attacks. Charge-only attacks must not also get direct buttons or bypass inputs.
+
+## Attack objects
+
+All attack-created projectiles, clones, deployables, summons and attached attack objects use the originating move's object namespace. The canonical asset name ends with the frame number, not a projectile instance count.
+
+Keep entity behavior typed: generic object naming does not mean deleting the projectile, summon or technique systems. Runtime instance IDs remain separate from asset IDs. An object spawned by another object keeps its originating attack provenance.
+
+For multiple distinct object clips, use named runtime clip keys and explicit frame slices over an attack-owned object frame series. Do not overwrite one object with another or reuse the same destination path for different source bytes. If future authoring needs an additional object discriminator, define and document that extension before using it; do not quietly invent inconsistent filenames.
+
+For 0001:
+- The extra attack throws extra_attack_object (the current shuriken).
+- attack3 creates an attack3_object (the current clone). Its appearance/disappearance cloud uses the renamed cloneav frames, played forward/reverse as before.
+- The clone currently reuses the owner's attack1 or midair_attack2 poses and combat data. Preserve this sharing through explicit object animation references with attack3 provenance; do not relabel the owner's own attack1 files as attack3 files or duplicate them unnecessarily.
+- attack4 uses attack4_1 through attack4_12 for the fighter and attack4_object_1 through attack4_object_11 for the sphere. Preserve all phase slices, including the shared final whiff/release frame.
+
+## Full implementation prompt
+
+Implement this specification throughout hiyroscript/alva. This is a complete move/input/animation/asset migration plus support for data-driven 2–5 attack characters, not a cosmetic relabeling.
+
+1. Inspect the current branch and repository instructions before editing. Reconcile changes since the baseline above. Inventory all character definitions, fixtures, runtime IDs, animation keys, generated asset paths, static filenames, translation keys, persisted touch-layout keys, documentation and tests. Build an explicit collision-checked old-to-new asset mapping before moving files. Include unused source art in the naming inventory.
+
+2. Keep Alva's existing architecture: plain JavaScript ES modules, HTML/CSS and Canvas 2D, with no framework or build step. Preserve character 0001's available:false status and the empty production roster. Use existing test-only playable fighter registration for integration tests. Do not enable a character just to make a smoke test pass.
+
+3. Replace the old identifiers consistently across js/config.js, js/data/characters.js and js/data/abilities.js. Extend the move/action vocabulary through attack5 and midair_attack5. Separate universal move identity from per-character button routing: the current MOVES registry hardcodes cba1/cba2 to ba1/ba2, but attack3/attack4 now have different access rules depending on the character. Introduce one validated per-character attack/charge contract and shared routing helpers consumed by gameplay, AI and UI. Avoid independently reconstructing the rules in each layer.
+
+4. Migrate character 0001 as a four-numbered-attack character with charge, plus its existing optional extra_attack:
+   - attack1 and midair_attack1 retain the current punch/slash.
+   - attack2 and midair_attack2 retain the current kick/aerial kick.
+   - charge + attack1 starts attack3, the current clone summon.
+   - charge + attack2 starts attack4, the current Sphere Rush technique.
+   - extra_attack retains the current ground-only shuriken throw.
+   - Preserve the reserved transform behavior.
+   Preserve all numeric tuning, frame timing, hitboxes, launch behavior, cooldowns, combo windows, energy use, projectile spawning and technique interruption rules.
+
+5. Rename the actual PNG files and every reference to them. Update the frame helper to generate underscore-delimited frame suffixes, preserve extensions and case, and retain leading-zero character IDs. Rename animation lookup keys and all phase consumers, fallback mappings, hand-offset maps, normalization references and portraits. The current rasen phase keys become attack4_* keys; sphere phase keys become attack4_object_* keys. Preserve sprite dimensions, anchors, height ratios, sourceFacing, mirroring and normalization categories. Keep frame order numeric, especially frames 10–12. Do not merge projectile/effect normalization into fighter-pose normalization.
+
+6. Update js/game/character.js, combat.js, fighter-controller.js, charged-technique.js, clone.js, projectile.js and all dependent callers. Expand input snapshots, neutral input, pressed-edge processing, buffering and attack dispatch to every supported direct attack. Keep the current charge-state timing: a fresh simultaneous charge/attack press uses the normal attack; an established charge can select its replacement. Preserve existing cooldown consumption and documented failure/fallback semantics. Expose optional charge capability explicitly and consistently; a no-charge character cannot enter charge or gain its recovery benefits.
+
+7. Update js/core/input-manager.js and config bindings for keyboard, touch and gamepad. Provide usable, documented bindings for all five direct attacks without conflicting with existing actions. Preserve established bindings for renamed controls where possible. A direct input for attack3/attack4 must be rejected for a character where those are charge-only. Avoid regressions in held input, short taps, blur clearing and menu navigation. Charge currently also supplies down/fast-fall intent: separate that directional behavior from charge capability so removing charge from a character does not accidentally remove fast fall or other existing downward movement.
+
+8. Make touch controls character-driven in js/game/touch-controls.js, js/ui/mobile-abilities.js, js/core/touch-layout.js, js/ui/touch-layout-editor.js and styles.css. Both joystick and classic layouts must accommodate 2–5 numbered buttons. Hide charge when unsupported and never show separate buttons for charge-only attacks. Retain optional extra_attack and other non-numbered controls independently of numbered-button counts. Update labels/icons/accessibility text to the resolved charged move while charging. Handle character changes, orientation changes and removed controls without stuck held input. Preserve usable touch target sizes and prevent default-layout overlap.
+
+9. Migrate saved settings deliberately in js/core/settings.js. Current settings version 2 stores touch-layout geometry under old action IDs. Version the migration, translate ba1/ba2/uniqueba keys to attack1/attack2/extra_attack before sanitization, and preserve position/scale, language and layout choice. Include movement-key migration if those input IDs change. Prefer an existing canonical key on collision. Keep legacy recognition confined to the one-time migration and its tests, not gameplay aliases.
+
+10. Update js/game/combat-ai.js so readMoveset and decision/input generation discover all available direct and aerial attacks, and only valid charged replacements. The AI must obey the same capability, art, cooldown, state and input rules as a player. Update fighter-status.js, arena.js, HUD and charged cooldown labels to identify attack3/attack4 rather than CBA1/CBA2. Update battle, practice, Watch Mode, Discover, settings/help screens, mobile labels, js/core/i18n.js and both English/French translation tables. Preserve character-specific display names independently from internal IDs.
+
+11. Update README.md and ALVA_SPEC.md to describe the new contract and link to this root codename_rule document. Update current source comments and tests so old names are not presented as canonical. Historical UPDATES.md records and explicit migration documentation may retain legacy names with context. Rename obsolete test filenames where appropriate. Legacy identifiers should otherwise disappear from active runtime code and asset paths.
+
+12. Add behavior-focused validation/tests for every row of the attack/button table. Use complete synthetic test fighters rather than adding invented production characters or artwork. Verify:
+   - 2–5 numbered family limits, contiguous numbering and required aerial variants.
+   - No-charge attack3/4/5 are direct attacks and select their matching aerial variants.
+   - Charged 3/4/5-attack characters get exactly the specified replacements and button counts.
+   - A charged five-attack character's third button is attack5 and works in the air.
+   - Unsupported charge and direct access to charge-only moves are rejected.
+   - Established-charge timing, cooldowns, failure fallbacks and attack buffering remain correct.
+   - Charge startup transitions into exactly the a/b loop and restarts correctly.
+   - Asset destinations are unique, all referenced files exist, original image bytes are preserved, and no legacy runtime asset URL remains.
+   - Attack objects retain origin, behavior, clipping, mirroring and correct animation phase/frame order.
+   - Touch-layout migration preserves old user geometry and resolves duplicate keys deterministically.
+   - AI, keyboard, gamepad, both touch layouts and practice controls all use the same routing.
+   - Existing movement, defense, combo, summon, Sphere Rush, hit effects and empty-roster regressions still pass.
+
+13. Run the repository's full Node test suite (inspect its existing invocation; for this ES-module repository use node --experimental-default-type=module --test tests/*.test.mjs if required by the installed Node version). Serve locally for browser checks using the existing static-server workflow. Exercise gameplay through test-only fixtures while leaving production availability unchanged. Verify no missing-image requests or console exceptions and inspect both mobile layouts with the largest button set. Report what actually ran and any limitations; never claim browser verification from source inspection alone.
+
+Complete the implementation, then report changed files, final character routing, asset rename totals/collisions, settings migration behavior, tests and browser checks, and any unresolved missing art. Do not leave a halfway migration with old runtime aliases or silently weaken the required aerial-attack rule to keep old fixtures passing.
