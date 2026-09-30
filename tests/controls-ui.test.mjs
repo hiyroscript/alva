@@ -92,6 +92,7 @@ const read = (path) => readFileSync(new URL(path, ROOT), 'utf8');
 const CSS = read('styles.css');
 const DEF_0001 = getCharacter('0001');
 const DEF_0002 = getCharacter('0002');
+const DEF_0003 = getCharacter('0003');
 
 // Touch controls wired to a recording input; `def` is the fighter they
 // present (#0001 unless given; null leaves them neutral) and `scheme` their
@@ -327,6 +328,62 @@ test('switching #0001 -> #0002 -> #0001 hides and restores the very same four bu
     tc.setCharacter(DEF_0002);
     assert.ok(els.every((btn) => btn.hidden), `${scheme}: hidden again`);
     assert.ok(els.every((btn) => btn.getAttribute('aria-label') === null), 'no stale Shuriken, Punch or Kick');
+  }
+});
+
+// ---- Touch buttons: #0003, its own three and no Transform ------------------------
+
+test('#0003 presents its own Palm Strike, Punch and Kick; its Transform, left out, has no button', () => {
+  assert.deepEqual(ABILITY_ACTIONS.map((a) => abilityPresence(DEF_0003, a)), ['implemented', 'absent', 'implemented', 'implemented']);
+  assert.deepEqual(DEF_0003.mobileAbilities, {
+    uniqueba: { label: 'Palm Strike', icon: 'palm' },
+    ba1: { label: 'Punch', icon: 'punch' },
+    ba2: { label: 'Kick', icon: 'kick' },
+  });
+  // Its palm is a glyph of its own, told apart from every other one.
+  assert.ok(ICONS.palm);
+  for (const [name, icon] of Object.entries(ICONS)) if (name !== 'palm') assert.notEqual(icon, ICONS.palm, name);
+  assert.equal(mobileAbility(DEF_0003, 'transform'), null);
+  for (const scheme of ['joystick', 'classic']) {
+    const { tc, calls } = touchControls(DEF_0003, { scheme });
+    const b = (a) => tc.buttons.get(a);
+    assert.deepEqual(ABILITY_ACTIONS.map((a) => [a, b(a).hidden ?? false, b(a).getAttribute('aria-label'), b(a).innerHTML]), [
+      ['uniqueba', false, 'Palm Strike', ICONS.palm],
+      ['transform', true, null, ''],
+      ['ba1', false, 'Punch', ICONS.punch],
+      ['ba2', false, 'Kick', ICONS.kick],
+    ], scheme);
+    assert.deepEqual([...tc.buttons].filter(([, el]) => el.classList.contains('is-pending')), [], `${scheme}: nothing dashed`);
+    assert.equal(b('uniqueba').getAttribute('data-i18n-aria-label'), 'ability.0003.uniqueba');
+    // The buttons send the universal codenames; the hidden one sends nothing.
+    for (const [i, action] of ABILITY_ACTIONS.entries()) {
+      press(b(action), i + 1);
+      lift(b(action), i + 1);
+    }
+    assert.deepEqual(calls, [['uniqueba', true], ['uniqueba', false], ['ba1', true], ['ba1', false], ['ba2', true], ['ba2', false]]);
+    // #0001 -> #0003 -> #0002 -> #0003: the same elements, each fighter's own look.
+    tc.setCharacter(DEF_0001);
+    assert.deepEqual([b('uniqueba').getAttribute('aria-label'), b('transform').hidden ?? false], ['Shuriken', false]);
+    tc.setCharacter(DEF_0003);
+    assert.equal(b('uniqueba').innerHTML, ICONS.palm);
+    assert.equal(b('transform').hidden, true);
+    tc.setCharacter(DEF_0002);
+    assert.ok(ABILITY_ACTIONS.every((a) => b(a).hidden));
+    tc.setCharacter(DEF_0003);
+    assert.deepEqual(ABILITY_ACTIONS.map((a) => b(a).hidden ?? false), [false, true, false, false], scheme);
+    assert.equal(b('ba2').getAttribute('aria-label'), 'Kick');
+  }
+  // In French: its own names, translated.
+  const { tc } = touchControls(DEF_0003);
+  setLanguage('fr');
+  try {
+    localizeTree(tc.root);
+    assert.deepEqual(['uniqueba', 'ba1', 'ba2'].map((a) => tc.buttons.get(a).getAttribute('aria-label')), [
+      'Frappe de paume', 'Coup de poing', 'Coup de pied',
+    ]);
+    assert.equal(tc.buttons.get('transform').getAttribute('aria-label'), null);
+  } finally {
+    setLanguage('en');
   }
 });
 

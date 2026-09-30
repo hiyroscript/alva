@@ -189,7 +189,7 @@ test('French is really French: only proper names, codes and shared words read th
     'brand.title', // ALVA
     'control.charge', // Charge
     'control.pause', // Pause
-    'credits.sprites.site', // The Spriters Resource
+    'credits.sprites.site', 'credits.sprites0003.site', // The Spriters Resource
     'difficulty.brutal.name', // Brutal
     'hud.pause', // Pause
     'hud.round', // ROUND n

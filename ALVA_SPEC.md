@@ -126,6 +126,25 @@ behave, and how it must look. The README covers running and deploying it.
   frame. It has no attack, Shield, Charge, Dash, Throw, projectile,
   Transform or effect art yet. Idle is 39 art pixels tall; every clip shares
   that art-pixel scale, drawn facing right (`sourceFacing: 1`).
+- `#0003` frames live in `assets/characters/0003/`: 51 frames cut from the
+  one sprite sheet supplied for it, each cropped tight to its visible art,
+  the sheet's flat background (RGB 128, 128, 255) made fully transparent
+  and nothing else changed (8-bit RGBA, every pixel fully opaque or fully
+  clear). Idle `0003_idle1`–`4` (`idle3` is the same drawing as `idle1`),
+  run `0003_run1`–`4`, Dash `0003_dash1`–`2`, single `0003_jump`, fall
+  `0003_fall1`–`2`, land `0003_land1`–`2`, single `0003_hurt` and
+  `0003_midairhurt`, Charge `0003_charge1`–`4` (startup, `charge4` reused
+  for the release) and `0003_chargea` / `0003_chargeb` (the loop), and the
+  attacks: `0003_1ba1`–`5` (BA1), `0003_midair1ba1`–`5` (mid-air BA1),
+  `0003_2ba1`–`6` (BA2), `0003_midair2ba1`–`5` (mid-air BA2) and
+  `0003_palm1`–`7` (the Palm Strike, its Unique Basic Attack), named by
+  #0001's rules below. All are 1× (one file pixel per art pixel, no
+  detectable grid), so each clip's `heightRatio` (its tallest frame over
+  idle's 49) sizes it at exactly one art pixel per file pixel. The sheet
+  sets every frame in a 93-pixel cell around one fixed origin; each frame's
+  `anchorX` is that origin, so the body stays where the original animation
+  puts it. All drawn facing right (`sourceFacing: 1`). No Shield,
+  Transform, projectile or effect art.
 - Source orientation: #0001's art faces right (`sourceFacing: 1` on the
   character), every registered clip included. An animation may override
   the character's orientation with its own `sourceFacing` (none of #0001's
@@ -159,8 +178,8 @@ behave, and how it must look. The README covers running and deploying it.
   switching animations.
 - Sprites render with `imageSmoothingEnabled = false` and, where the size
   allows, whole device pixels per art pixel.
-- **Never redraw, recolour, replace or AI-generate the #0001 or #0002
-  artwork.** Do not
+- **Never redraw, recolour, replace or AI-generate the #0001, #0002 or
+  #0003 artwork.** Do not
   download third-party art. Stage art is original and procedural.
 - `alvafav.PNG` is the site favicon source.
 
@@ -439,8 +458,8 @@ no header, build label, eyebrow or keyboard hint bar.
 ### 6.4 Select Fighter
 
 - Deliberately large roster: 48 slots in a responsive, scrollable grid.
-- `#0001` (slot 01) and `#0002` (slot 02), always shown with the `#`, are
-  selectable; other slots are quiet locked placeholders (silhouette + lock).
+- `#0001` (slot 01), `#0002` (slot 02) and `#0003` (slot 03), always shown
+  with the `#`, are selectable; other slots are quiet locked placeholders (silhouette + lock).
   No invented names or power ratings. The roster is `CHARACTERS`, placed by
   each fighter's `rosterSlot`.
 - Locked slots are non-interactive: hover, Tab and keyboard/gamepad navigation
@@ -527,6 +546,9 @@ Select CPU 2 → Select Stage → CPU vs CPU Battle.
   - **#0001 sprite source** — original sprite material from *Jump Ultimate
     Stars*; The Spriters Resource; source sheet uploaded by
     Dazz; contributor FRET.
+  - **#0003 sprite source** — The Spriters Resource; source sheet ripped
+    by Dazz & Fret (what its sheet itself credits; it names no game, so
+    none is named).
   - **Rights** — hiyroscript did not create or claim ownership of the original
     third-party character/game artwork. Original characters, games, and related
     properties belong to their respective rights holders.
@@ -537,8 +559,8 @@ Select CPU 2 → Select Stage → CPU vs CPU Battle.
   in `js/ui/credits.js`): a new tab, the address never translated, the roll
   holding still while the link has keyboard focus, and its hidden second
   copy never focusable.
-- The UI does not name the character behind #0001 or #0002: each stays
-  `#0001` / `#0002` in game. Never imply ownership of
+- The UI does not name the character behind #0001, #0002 or #0003: each
+  stays `#0001` / `#0002` / `#0003` in game. Never imply ownership of
   original third-party characters, games, artwork, or related properties;
   these belong to their respective rights holders.
 
@@ -985,9 +1007,9 @@ French, concise game terms).
   stage, the air around it and a strip past the Void's edge). A fighter of the reference height
   (`CONFIG.render.fighterHeight`, #0001's 88 units) occupies ≈ 10 % of
   viewport height (8.8–11.5 %), whoever is picked, each fighter drawn at
-  its own art scale; #0002 is drawn at #0001's size per art pixel, so it
-  stands 66 units tall (three quarters of #0001) with pixels the same size
-  on screen. A 16:9 view shows the whole main stage with air past both
+  its own art scale; #0002 and #0003 are drawn at #0001's size per art
+  pixel, so #0002 stands 66 units tall (three quarters of #0001) and #0003
+  about 83, with pixels the same size on screen. A 16:9 view shows the whole main stage with air past both
   ledges, and narrower screens zoom out further for it.
 
 ### 7.2 Fighters, physics and combat
@@ -1011,6 +1033,29 @@ French, concise game terms).
   Its idle, land, jump and mid-air hurt frames anchor on the head they
   share (`anchorX`), and its run frames on their leaning body, so neither
   wobbles from frame to frame.
+- `#0003` has Idle (4 frames, 7 fps), Run (4 frames, 10 fps, slower with
+  its speed down to 0.7), Dash (2 frames, 10 fps: a Dash lasts 0.2 s), Jump
+  (one frame held for the rise), Fall (the tuck, then the legs reaching
+  down, held), Land (2 frames, 2/12 s), Hurt and Mid-air Hurt, Charge
+  (startup 4 frames once, loop 2 frames, the release pose), and five
+  attacks, each one pass of its own clip with its phases on whole frames
+  and its hitbox measured from the frames its strike is drawn on: the Palm
+  Strike (`uniqueba`, ground only, 12 fps: startup 3, active 2, recovery 2;
+  6 damage, Base Launch 2 horizontal, no hit-cancel), BA1 (the straight
+  punch, 15 fps: 1, 2, 2; 3, Base Launch 1 horizontal), mid-air BA1 (the
+  somersault kick, 12 fps: 1, 2, 2; 3, Base Launch 2 vertical), BA2 (the
+  spinning kick, 12 fps: 3, 2, 1, stepping in; 5, Base Launch 2 vertical)
+  and mid-air BA2 (the dive, 12 fps: 2, 2, 1; 5, Base Launch 2 reverse
+  vertical). Their stun, freeze, cooldown, momentum and hit-cancel follow
+  #0001's move in the same role. Transform is left out of its `actions`
+  (no button, the input does nothing); no `defense` (the Shield input does
+  nothing), no charged actions (a combat button pressed in Charge does its
+  normal attack, and no CBA ring shows), no projectile or effect. Its
+  Powers (Jump 2, Speed 2), movement (the Dash's 900 units/s and 0.22 s tap
+  window included), launch reaction and Energy (Dash 15, Dash cancel 40)
+  are #0001's numbers copied into its own definition. Its body is measured
+  from its idle: collider 32 × 76, pushbox 34, a head-and-torso and a legs
+  hurtbox covering about 88 % of the idle art.
 - `#0001` has Idle, Run, Jump, Fall, Land, Hurt, Mid-air Hurt, Basic Attack 1,
   Mid-air Basic Attack 1, Basic Attack 2, Mid-air Basic Attack 2, Charge,
   Shield (raise, held and lower poses), Mid-air Shield (held only), Dash,
@@ -2405,7 +2450,8 @@ French, concise game terms).
   take their icon and name from the character's `mobileAbilities` (UI
   data, never read by combat): for #0001
   **Shuriken** (a four-bladed throwing star), **Punch** (a fist) and
-  **Kick** (a leg and foot). `TouchControls.setCharacter(def)` applies them
+  **Kick** (a leg and foot); for #0003 **Palm Strike** (an open hand),
+  **Punch** and **Kick**. `TouchControls.setCharacter(def)` applies them
   without rebuilding anything; Quick Battle calls it with Player 1's
   fighter as it enters (Watch Mode, where nobody plays, hides the touch
   controls instead), Practice Ground as it enters and on every
@@ -2430,7 +2476,8 @@ French, concise game terms).
   A reserved button (only Transform, and only while the fighter has none)
   uses a dashed outline and never shows nagging alerts; Shuriken, Shield,
   Punch and Kick are solid. A button for a move the fighter does not have
-  at all (left out of its `actions`, as all four of #0002's are:
+  at all (left out of its `actions`, as all four of #0002's are, and
+  #0003's Transform:
   `abilityPresence` in `js/ui/mobile-abilities.js`) is hidden: not drawn,
   not named, never focused and never pressed, its place left empty so no
   other button moves; the same element returns for a fighter that has it.

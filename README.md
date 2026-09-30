@@ -6,8 +6,9 @@ JavaScript with Canvas 2D: no frameworks, no build step, no WebGL or 3D engine
 desktop and on phones and tablets in landscape.
 
 This is the first playable foundation: full menu flow, a 48-slot roster with
-two fighters (#0001, and #0002, whose movement and hurt art is in and whose
-moves are still to come), two compact platform-fighter stages with open ledges and a Void kill boundary, a
+three fighters (#0001; #0002, whose movement and hurt art is in and whose
+moves are still to come; and #0003, cut from one sprite sheet with its
+movement, Charge, Dash and five attacks), two compact platform-fighter stages with open ledges and a Void kill boundary, a
 Watch Mode for CPU-vs-CPU matches, a
 Practice Ground training room, a Discover reference screen, a Settings
 dialog, the whole interface in English or French, movement and platform
@@ -109,6 +110,12 @@ Basic Attack, Transform, BA1 and BA2 are all left out of its `actions`, so
 do nothing for it, and its touch controls have none of those four buttons.
 Without a `defense` the Shield does nothing for it either, and Charge is only
 the stance (it has no charged action).
+
+#0003 has every attack but Transform: Transform is left out of its
+`actions`, so `K` does nothing for it and its touch controls have no
+Transform button (its Palm Strike, Punch and Kick are its own). It has no
+Shield, and no charged action: Charge + `ba1` or `ba2` is simply its normal
+attack.
 
 ### Language
 
@@ -488,15 +495,16 @@ Touch controls show on touch-first devices (coarse pointer, or a touch actually 
 
 ## Current content
 
-- **Characters:** #0001, and #0002 in roster slot 02. #0002's supplied movement and hurt art is registered and plays in game; it has no moves yet (see [#0002](#0002) below)
+- **Characters:** #0001, #0002 in roster slot 02 and #0003 in roster slot 03. #0002's supplied movement and hurt art is registered and plays in game; it has no moves yet (see [#0002](#0002) below). #0003 has its movement, Charge, Dash and five attacks (see [#0003](#0003) below)
 - **Maps:** Desert (a sandstone mesa with 2 rock outcrops, 1360 units wide) and City (a rooftop with 7 one-way platforms and a stair bulkhead, 1440 wide) for Quick Battle and Watch Mode; the Practice Ground training room (one flat training block, 1280 wide) for practice. Each is a compact main stage with open air past both ledges and the Void a short way beyond (see [Stages and the Void](#stages-and-the-void))
 - **Animations:** Idle, Run, Jump, Fall, Land (jump/fall play while airborne; land plays once on touchdown), Hurt and Mid-air Hurt (shown during hitstun on the ground / in the air), Basic Attack 1 (4 frames), Mid-air Basic Attack 1 (the kunai slash, 3 frames: `0001_midair1ba1`–`3`), Basic Attack 2 (7 frames) and Mid-air Basic Attack 2 (the airborne kick, 5 frames: `0001_midair2ba1`–`5`), each played once at 12 fps, Shield (`0001_prepshield` to raise it, `0001_shielding` held, `0001_releaseblock` to lower it) and Mid-air Shield (`0001_midairshielding`, the held pose only), single frames drawn at 1×, Dash (`0001_dash1`–`2`, drawn at 1×, played once at 10 fps), Charge (charge1 → charge2 once, then chargea ↔ chargeb while held, at 10 fps, with charge1 shown briefly on release), Throw (3 fighter frames, played once at 12 fps), Shuriken (3 looping projectile frames at 18 fps, normalized and drawn separately from the fighter poses), the clone appear / vanish cloud (`0001_cloneav1`–`0001_cloneav10`, an effect at 20 fps: forwards as a clone appears, the same frames in reverse as it vanishes), the Sphere Rush poses (`0001_rasen1`–`0001_rasen12` as one-shot fighter clips at 12 fps: formation 1–3, rush 4–6, contact 7–8 with 8 held, explosion 9, recovery 10–12, and 12 alone as the whiff release) and its blue sphere (`0001_prasen1`–`0001_prasen11` as three effects at 12 fps: formation 1–6 once, spinning on the opponent 7–9 looped while it is drawn ever larger, explosion 10–11 once)
 - **#0002's animations:** Idle (`0002_idle_1`–`8`, two slow breaths a loop at 8 fps), Run (`0002_run_1`–`4`, the legs a spinning blur: 12 fps at top speed, slower as it slows, down to 0.6 of that), Jump, Fall and Land (single frames; the land frame shows for 1/12 s), Hurt and Mid-air Hurt (single frames held through the stun). No attack, Shield, Charge, Dash, projectile or effect art yet: its Charge stance holds its first idle frame
-- **Attacks:** Basic Attack 1 and Basic Attack 2, each on the ground and in the air, a ground Throw that releases one shuriken, the Charged BA1 Clone Attack and the Charged BA2 Sphere Rush (ground only), each on its own 5-second cooldown. #0001's damage: BA1 3, mid-air BA1 3, BA2 5, mid-air BA2 5, shuriken 1, Sphere Rush 1 as it catches the opponent and every 0.5 s after while it holds it (4 in all), then 10 on the explosion. Transform is reserved.
-- **Shield:** #0001 shields, on the ground and in the air: held, full circle, free to hold, 25 Energy for each hit it blocks. #0002 has no Shield yet (no Shield art): the Shield button does nothing for it.
+- **#0003's animations:** Idle (`0003_idle1`–`4`, a breath at 7 fps), Run (`0003_run1`–`4`, a low forward sprint at 10 fps, slower as it slows, down to 0.7 of that), Dash (`0003_dash1`–`2`, the flying burst, once at 10 fps), Jump (`0003_jump`, held while rising), Fall (`0003_fall1`–`2`, the tuck then the legs reaching down), Land (`0003_land1`–`2`, 2/12 s), Hurt and Mid-air Hurt (single frames held through the stun), Charge (`0003_charge1`–`4` once, then `0003_chargea` ↔ `0003_chargeb` while held, at 10 fps, `0003_charge4` again on release), BA1 (`0003_1ba1`–`5`, the straight punch, 15 fps), mid-air BA1 (`0003_midair1ba1`–`5`, the somersault kick, 12 fps), BA2 (`0003_2ba1`–`6`, the spinning kick, 12 fps), mid-air BA2 (`0003_midair2ba1`–`5`, the dive, 12 fps) and the Palm Strike (`0003_palm1`–`7`, its Unique Basic Attack, 12 fps), each attack played once
+- **Attacks:** Basic Attack 1 and Basic Attack 2, each on the ground and in the air, a ground Throw that releases one shuriken, the Charged BA1 Clone Attack and the Charged BA2 Sphere Rush (ground only), each on its own 5-second cooldown. #0001's damage: BA1 3, mid-air BA1 3, BA2 5, mid-air BA2 5, shuriken 1, Sphere Rush 1 as it catches the opponent and every 0.5 s after while it holds it (4 in all), then 10 on the explosion. Transform is reserved. #0003's: the Palm Strike 6, BA1 3, mid-air BA1 3, BA2 5, mid-air BA2 5; no Transform and no charged action.
+- **Shield:** #0001 shields, on the ground and in the air: held, full circle, free to hold, 25 Energy for each hit it blocks. #0002 and #0003 have no Shield (no Shield art): the Shield button does nothing for them.
 - **Movement:** running, jumping (the normal jump on a tap, a higher jump held a little longer, one air jump), air steering, the fast fall, the air Shield's slow fall and a grounded Dash on a double tap (15 Energy); attacks keep and add their own momentum, turn with the direction held, early presses are buffered, and a hit opens a follow-up, a Dash cancel included (see Controls above).
-- **Powers:** Jump Power and Speed Power, each in three tiers. #0001 has Jump Power 2 and Speed Power 2 (its original jump and speed). #0002 declares the same tiers only as placeholders (each Power's default), until its own are authored.
-- **Launch:** every hit's damage adds to the target's Launch Point, then the hit launches at its Base Launch (0, 1, 2 or 3) × that new Launch Point, in its Directional Launch. #0001's BA1 is Base Launch 1 horizontal, its BA2 and mid-air BA1 Base Launch 2 vertical, its mid-air BA2 Base Launch 2 reverse vertical (downward), the Sphere Rush blast Base Launch 3 horizontal, and the shuriken and Sphere Rush ticks Base Launch 0 with no direction (they never launch).
+- **Powers:** Jump Power and Speed Power, each in three tiers. #0001 has Jump Power 2 and Speed Power 2 (its original jump and speed). #0002 declares the same tiers only as placeholders (each Power's default), until its own are authored. #0003 has Jump Power 2 and Speed Power 2 too, with #0001's movement numbers copied as its own starting point.
+- **Launch:** every hit's damage adds to the target's Launch Point, then the hit launches at its Base Launch (0, 1, 2 or 3) × that new Launch Point, in its Directional Launch. #0001's BA1 is Base Launch 1 horizontal, its BA2 and mid-air BA1 Base Launch 2 vertical, its mid-air BA2 Base Launch 2 reverse vertical (downward), the Sphere Rush blast Base Launch 3 horizontal, and the shuriken and Sphere Rush ticks Base Launch 0 with no direction (they never launch). #0003's BA1 is Base Launch 1 horizontal, its BA2 and mid-air BA1 Base Launch 2 vertical, its mid-air BA2 Base Launch 2 reverse vertical and its Palm Strike Base Launch 2 horizontal.
 - **HUD:** each fighter has one compact, semi-transparent glass card, pulled in close on either side of the timer: its portrait (the character's own `visual.portrait` crop, turned to face the timer whichever way its art is drawn), one thin divider, and its name with its Launch Point beneath it, under its tag: **P1** and **CPU** in Quick Battle, **CPU 1** and **CPU 2** in Watch Mode. The right-hand card mirrors the left-hand one. In a battle three small dots under each card fill as that fighter scores its points (○ ○ ○, then ● ○ ○ ...). Over each fighter itself, following it: its bright purple Energy bar above its name tag while below full, and its CBA1 / CBA2 cooldown rings under its feet while cooling down.
 - **Modes:** Quick Battle (Splash → Home → Select Mode → Select Difficulty → Select Fighter → Select Stage → Battle): 5 minutes against a CPU that fights with the whole moveset at the difficulty you choose (Easy, Medium, Hard or Brutal; see [Quick Battle difficulty](#quick-battle-difficulty)), first to 3 points. Each time a fighter falls into the Void its opponent scores a point at once; the one that fell is out of play for 2 seconds, then back at its spawn with 0 Launch Point, full Energy and both charged abilities ready, while the fight and the timer carry on. The third point wins the match (a short **K.O.** beat, then the result; the loser does not come back). If both fall together, or one falls while the other is still waiting to come back, that fall scores nothing. If time runs out first, more points wins, then lower Launch Point; equal on both is a draw. Watch Mode (Home → Watch Mode → Select Difficulty → Select CPU 1 → Select CPU 2 → Select Stage → CPU vs CPU Battle): the same battle with the combat AI on both sides, for watching only (see [Watch Mode](#watch-mode)). Practice Ground: training on its own stage with a stand-still, non-attacking CPU dummy from the start (which you can change or disable; difficulty never applies to it), no timer, rounds or points; the Void takes a fighter out for 2 seconds, then puts it back at its spawn (below).
 
@@ -581,6 +589,7 @@ CLAUDE.md             notes for Claude sessions working on the repo
 alvafav.PNG           site favicon
 assets/characters/0001/   #0001 sprite frames (unchanged originals)
 assets/characters/0002/   #0002 sprite frames (the 17 supplied files)
+assets/characters/0003/   #0003 sprite frames (51 frames cut from its supplied sheet)
 js/
   main.js, config.js  boot + global config (bindings, render, timing)
   core/               app controller, screen manager, menu navigation,
@@ -611,7 +620,7 @@ js/
                       layout editor
 ```
 
-- **Sprite normalization.** The idle, jump, fall, land and hurt frames are pixel art at roughly 16× scale, the mid-air hurt, Basic Attack 1 and 2 and Charge frames at 8×, and the run frames at 4×; the Dash and Shield frames are drawn at 1× (one file pixel per art pixel), so each clip's `heightRatio` sizes it against idle's 52 art pixels at that same scale. When a frame loads, the game reads its alpha channel once and finds the visible bounds. It then detects the pixel grid from every colour transition and resamples the frame to 1 pixel per art pixel. Every frame is drawn at the same world scale, anchored bottom-centre at the upper-body centroid, so the fighter keeps the same size and position when switching between animations. When the size stays close to the target, each art pixel maps to a whole number of device pixels. The Sphere Rush poses are fighter poses at 2×, normalized like the rest. #0002's frames are all 2× pixel art on one scale (idle is 39 art pixels tall). Its idle, land, jump and mid-air hurt frames draw the same head, so they place their own anchors (`anchorX`, per frame) to keep that head perfectly still, where the upper-body centroid would shift it by a fraction of an art pixel as the arms swing; its run frames are anchored the same way on their leaning body. Each fighter is drawn at its own art scale (`Arena.pxPerArtOf`), and the view is sized for a fighter of the reference height (`CONFIG.render.fighterHeight`, #0001's 88 units) whoever is picked. #0002 is drawn at #0001's size per art pixel, so both fighters' pixels are the same size on screen and #0002 stands 66 units tall, three quarters of #0001's height. Projectile and effect art (the shuriken at 8×, the clone cloud and the Sphere Rush sphere at 2×) goes through the same grid detection but keeps its own art size, centre-anchored at the fighter's art-pixel scale, and is never fitted to the fighter's height.
+- **Sprite normalization.** The idle, jump, fall, land and hurt frames are pixel art at roughly 16× scale, the mid-air hurt, Basic Attack 1 and 2 and Charge frames at 8×, and the run frames at 4×; the Dash and Shield frames are drawn at 1× (one file pixel per art pixel), so each clip's `heightRatio` sizes it against idle's 52 art pixels at that same scale. When a frame loads, the game reads its alpha channel once and finds the visible bounds. It then detects the pixel grid from every colour transition and resamples the frame to 1 pixel per art pixel. Every frame is drawn at the same world scale, anchored bottom-centre at the upper-body centroid, so the fighter keeps the same size and position when switching between animations. When the size stays close to the target, each art pixel maps to a whole number of device pixels. The Sphere Rush poses are fighter poses at 2×, normalized like the rest. #0002's frames are all 2× pixel art on one scale (idle is 39 art pixels tall). Its idle, land, jump and mid-air hurt frames draw the same head, so they place their own anchors (`anchorX`, per frame) to keep that head perfectly still, where the upper-body centroid would shift it by a fraction of an art pixel as the arms swing; its run frames are anchored the same way on their leaning body. Each fighter is drawn at its own art scale (`Arena.pxPerArtOf`), and the view is sized for a fighter of the reference height (`CONFIG.render.fighterHeight`, #0001's 88 units) whoever is picked. #0002 is drawn at #0001's size per art pixel, so both fighters' pixels are the same size on screen and #0002 stands 66 units tall, three quarters of #0001's height. #0003's frames are all 1× (one file pixel per art pixel, so no grid is found and each clip's `heightRatio`, its tallest frame over idle's 49 art pixels, sizes it at that scale); it is drawn at #0001's size per art pixel too, about 83 units tall. Its sheet set every frame around one origin, so each frame is anchored on that same point (`anchorX`): the body stays where the original animation puts it, where the upper-body centroid would drag it towards a punch's arm or a kick's swoosh. Projectile and effect art (the shuriken at 8×, the clone cloud and the Sphere Rush sphere at 2×) goes through the same grid detection but keeps its own art size, centre-anchored at the fighter's art-pixel scale, and is never fitted to the fighter's height.
 - **Simulation.** Fixed 60 Hz steps with interpolated rendering, so movement is the same at 30, 60 and 120 Hz. Colliders, hurtboxes and pushboxes are set in data and don't depend on PNG size.
 - **Stages.** Flat parallax layers (sky, far, mid, near, atmosphere) are generated once from a seeded RNG into cached `Path2D` geometry; the playable geometry (main stage, platforms, solids) is drawn in one shared one-point perspective (`js/stages/perspective.js`) so it has depth. Collision comes only from `js/data/maps.js`, so any layer can later be swapped for image art.
 
@@ -905,9 +914,51 @@ with, its CPU only closes in and moves about (in a #0002 mirror match the
 two close in on each other and push). No source has been supplied for its
 art, so the credits name none yet.
 
+### #0003
+
+#0003 is the third fighter (roster slot 03). Its 51 frames were cut from one
+supplied sprite sheet into `assets/characters/0003/`, each cropped tight to
+its art with the sheet's background made transparent, and every one is
+registered (see [Current content](#current-content)). `0003_idle3.png` is
+the same drawing as `0003_idle1.png` (the middle of the breath), and the
+Charge release reuses `0003_charge4.png`.
+
+- **Moves.** Unique Basic Attack is the Palm Strike (both palms thrust out
+  after a three-frame wind-up: 6 damage, Base Launch 2 horizontal, ground
+  only, no hit-cancel). BA1 is the straight punch on the ground (3, Base
+  Launch 1 horizontal) and the somersault kick in the air (3, Base Launch 2
+  vertical); BA2 is the spinning kick on the ground (5, Base Launch 2
+  vertical) and the dive in the air (5, Base Launch 2 reverse vertical).
+  Each hitbox is measured from the frames its strike is drawn on, and each
+  attack's stun, freeze, cooldown, momentum and hit-cancel follow #0001's
+  move in the same role. Transform is left out of its `actions`: no button,
+  and `K` does nothing for it.
+- **Dash** on a double tap or a touch mouvement button: 0.2 s at 900
+  units/s, 15 Energy (40 when it cuts short an attack that hit), as
+  #0001's. **Charge** has its own art; with no charged action, a combat
+  button pressed in it does its normal attack. **No Shield**: the Shield
+  button does nothing for it.
+- **Movement, Powers, launch reaction and Energy** are #0001's numbers,
+  copied into its own definition as a starting point (tuning either never
+  moves the other).
+- **Body**, measured from its idle: a collider 32 wide and 76 tall (to the
+  top of the head, the hair spikes over it left out), a pushbox 34 wide, a
+  head-and-torso hurtbox (`x -18, y -76, w 40, h 36`) and a legs hurtbox
+  (`x -30, y -40, w 62, h 40`) covering about 88 % of what the idle frames
+  draw.
+- **Size:** drawn at #0001's size per art pixel, it stands about 83 units
+  tall.
+
+It works everywhere a fighter can be picked: Select Fighter, Quick Battle
+(its CPU plays it too), Practice Ground's Change Fighter and CPU, and Watch
+Mode's CPU 1 and CPU 2, mirror matches included; its CPU fights with its
+attacks and the Dash. The sheet credits its rippers, Dazz &
+Fret, and The Spriters Resource, and the credits name them; it does not say
+which game the sprites come from, so none is named.
+
 ### Adding a fighter
 
-1. Put the frames in `assets/characters/<id>/` (the next is `0003`).
+1. Put the frames in `assets/characters/<id>/` (the next is `0004`).
 2. Add a definition to `CHARACTERS` in `js/data/characters.js`, its moves keyed by the universal move codenames (see [Controls](#controls)) whatever it calls them in game (animations, movement, Power tiers such as `powers: { jump: 2, speed: 2 }`, collider, hurtboxes, stats). Movement is ground `acceleration` / `deceleration` / `turnBoost` / `overspeedDeceleration`, air `airAcceleration` / `airDeceleration` / `airTurnBoost`, `gravityScale`, `maxFallSpeed`, `fastFallAcceleration` / `fastFallSpeed`, `coyoteTime`, `jumpBuffer`, `highJumpWindow` / `highJumpHeight`, `airJumps` / `airJumpRatio`, `attackBuffer`, `hitstunFriction` / `hitstunAirDrag` and the Dash's two; the newer fields are optional (see `Fighter.moveHorizontal`). How it responds to launches is `launchReaction` (`stunPerThousand`, `maxStun`, `tumbleSpeed`, `steerAngle`; see `resolveLaunchReaction` in `js/game/combat.js`), and a Shield's `perfectWindow` / `perfectRearm` set its perfect block and `slowFallSpeed` / `slowFallBrake` its slow fall in the air.
 3. Give it a free `rosterSlot`.
 4. Optionally, name its moves in `abilityNames`, keyed by move codename (e.g. `cba2: 'Sphere Rush'`); a move it leaves out keeps its neutral name.
@@ -966,6 +1017,9 @@ stage artwork by hiyroscript.
 
 - *Jump Ultimate Stars*
 - The Spriters Resource. Source sheet uploaded by Dazz, contributor FRET.
+
+**#0003 sprite source.** The Spriters Resource. Source sheet ripped by Dazz &
+Fret.
 
 **Rights.** hiyroscript did not create or claim ownership of the original
 third-party character/game artwork. Original characters, games, and related

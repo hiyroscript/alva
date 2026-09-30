@@ -946,7 +946,9 @@ test('Help is removed from the game: no Help screen, module, section or registra
 
 test('the Home credits still roll: both copies, the second hidden, every credit unchanged in English', () => {
   const credits = creditsText();
-  assert.deepEqual(credits.map((g) => g.title), [CONFIG.title, 'Original work', '#0001 sprite source', 'Rights', 'Project']);
+  assert.deepEqual(credits.map((g) => g.title), [
+    CONFIG.title, 'Original work', '#0001 sprite source', '#0003 sprite source', 'Rights', 'Project',
+  ]);
   assert.equal(credits[0].lead, `Created by ${CONFIG.developer}`);
   assert.deepEqual(credits[2].lines, [
     'Original sprite material from Jump Ultimate Stars',
@@ -954,6 +956,7 @@ test('the Home credits still roll: both copies, the second hidden, every credit 
     'Source sheet uploaded by Dazz',
     'Contributor: FRET',
   ]);
+  assert.deepEqual(credits[3].lines, ['The Spriters Resource', 'Source sheet ripped by Dazz & Fret']);
   assert.equal(CREDITS.length, credits.length);
   assert.match(read('js/screens/home-screen.js'), /import \{ CREDITS, creditLabel, creditLink \} from '\.\.\/ui\/credits\.js';/);
 
@@ -989,6 +992,9 @@ test('in French the credits translate but proper names stay', () => {
     assert.equal(credits[2].lines[1], 'The Spriters Resource');
     assert.ok(credits[2].lines[2].includes('Dazz'));
     assert.ok(credits[2].lines[3].includes('FRET'));
+    assert.equal(credits[3].title, 'Source des sprites de #0003');
+    assert.equal(credits[3].lines[0], 'The Spriters Resource');
+    assert.ok(credits[3].lines[1].includes('Dazz & Fret'));
     assert.equal(getLanguage(), 'fr');
   } finally {
     setLanguage('en');
@@ -1027,7 +1033,27 @@ test('the credits name no source for #0002: no group of its own, nothing of the 
   assert.deepEqual(credits[at].lines, [
     'Original sprite material from Jump Ultimate Stars', 'The Spriters Resource', 'Source sheet uploaded by Dazz', 'Contributor: FRET',
   ]);
-  assert.deepEqual(credits.slice(at + 1).map((g) => g.title), ['Rights', 'Project']);
+  assert.deepEqual(credits.slice(at + 1).map((g) => g.title), ['#0003 sprite source', 'Rights', 'Project']);
+});
+
+test('#0003\'s credits name only what its sheet does: the site and who ripped it, no game and no character', () => {
+  for (const language of ['en', 'fr']) {
+    setLanguage(language);
+    try {
+      const credits = creditsText();
+      const own = credits.filter((g) => /#0003/.test(g.title));
+      assert.equal(own.length, 1, `${language}: one #0003 group`);
+      assert.equal(own[0].lines.length, 2);
+      assert.equal(own[0].lines[0], 'The Spriters Resource');
+      assert.ok(own[0].lines[1].includes('Dazz & Fret'));
+      // Its sheet does not say which game it comes from, so none is named.
+      assert.ok(!own[0].lines.some((line) => /Jump Ultimate Stars/.test(line)), `${language}: no game named`);
+      // Right after #0001's source, before the rights notices.
+      assert.deepEqual(credits.slice(-3).map((g) => g.title), [own[0].title, t('credits.rights.title'), t('credits.project.title')]);
+    } finally {
+      setLanguage('en');
+    }
+  }
 });
 
 test('a credit line may still link to its source, accessibly, from the Home roll', () => {
