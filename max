@@ -2,437 +2,669 @@ Work directly in the hiyroscript/alva repository.
 
 Objective
 
-Completely remove the existing fighter currently known as #0002 from the game, including its Slender Man-specific implementation and assets.
+Make one deliberate roster reset:
 
-Then promote the new fighter whose files currently use the 0003 prefix into the freed #0002 slot.
+1. Completely remove #0002 from the current repository state.
+2. Completely remove #0003 from the current repository state.
+3. Keep #0001 and all of its implementation/assets intact, but disable it for now so it cannot be selected, instantiated, or played through normal game flows.
+4. After the change, there must be zero available/playable fighters until a future fighter is enabled.
 
-There must be no playable #0003 after this change. The new fighter is #0002 everywhere: runtime ID, display name, asset directory, filenames, tests, references, and documentation where those references describe the active fighter.
+This is a cleanup/reset task, not a renumbering or replacement task.
 
-Do not alter #0001 except where a generic comment/test/docs sentence must be updated because the roster no longer contains the old #0002.
+Do not turn #0003 into #0002.
+Do not reuse either fighter’s assets.
+Do not create a replacement fighter.
+Do not delete #0001.
+Do not strip #0001’s attacks, animations, moves, tests, or assets.
+Do not rewrite Git history. “Completely remove” means from the current checked-in tree and runtime, not from historical commits.
 
-Important current repository state
+⸻
 
-The existing old #0002 is a fully implemented Slender Man fighter.
+Required final state
 
-Its current implementation includes:
+When finished:
 
-* id: '0002'
-* display name #0002
-* character definition in js/data/characters.js
-* sprite assets in assets/characters/0002/
-* Slender Man credits and source attribution
-* i18n strings
-* tests such as tests/fighter-0002.test.mjs
-* references throughout controls, practice, watch mode, docs, comments, etc.
-* old #0002-specific animations, attacks, shields, effects, baseline values and related constants/helpers
+* getCharacter('0002') returns null.
+* getCharacter('0003') returns null.
+* There are no #0002 or #0003 production character definitions.
+* assets/characters/0002/ does not exist.
+* assets/characters/0003/ does not exist.
+* No current source, test, documentation, credits, comments, migration notes, or miscellaneous checked-in file refers to these fighters as existing content.
+* #0001 remains registered as id: '0001', with its existing data and assets, but has available: false.
+* No normal UI/game route can start a battle, Practice Ground session, or Watch Mode session using #0001 while it is disabled.
+* The application handles a roster with zero available fighters without throwing, producing broken navigation, silently falling back to a disabled fighter, or loading disabled fighter assets as if they were playable.
+* The full test suite passes after tests are rewritten for the new zero-available-fighter state.
 
-The new fighter is not yet registered.
+⸻
 
-Its loose root files are currently:
+Current repository state to account for
 
-* 0002_idle_1.png
-* 0003_idle_2.png
-* 0003_idle_3.png
-* 0003_idle_4.png
-* 0003_idle_5.png
-* 0003_idle_6.png
-* 0003_idle_7.png
-* 0003_idle_8.png
-* 0003_run_1.png
-* 0003_run_2.png
-* 0003_run_3.png
-* 0003_run_4.png
-* 0003_jump.png
-* 0003_fall.png
-* 0003_land.png
-* 0003_hurt.png
-* 0003_midairhurt.png
+The current js/data/characters.js contains, in order:
 
-Treat 0002_idle_1.png as frame 1 of this same new fighter’s idle animation. It is not part of the old Slender Man implementation.
+* #0001, available: true, rosterSlot: 0
+* #0002, available: true, rosterSlot: 1
+* #0003, available: true, rosterSlot: 2
 
-The new fighter therefore currently has these animation families:
+#0002 currently consists of movement/hurt art and a temporary baseline.
 
-* Idle: 8 frames
-* Run: 4 frames
-* Jump: 1 frame
-* Fall: 1 frame
-* Land: 1 frame
-* Hurt: 1 frame
-* Mid-air Hurt: 1 frame
+#0003 currently has movement, Charge, Dash, BA1, aerial BA1, BA2, aerial BA2, Palm Strike, ability names/icons, combat values, and its own credits.
 
-No attack, shield, charge, projectile, transformation, unique attack, dash, or other fighter-specific art has been supplied for the new fighter yet.
+Both are real production fighters today. Remove them rather than merely hiding them.
 
-Phase 1 — remove the old #0002 completely
+⸻
 
-Delete the old Slender Man fighter implementation.
+Phase 1 — delete all #0002 assets
 
-This means removing all old assets currently inside:
+Delete the entire directory:
 
 assets/characters/0002/
 
-Do not preserve any of the old Slender Man PNG files simply because the replacement fighter will reuse the 0002 directory name. The contents must be replaced by the new art only.
+It currently contains 17 PNG files:
 
-Remove all old #0002-specific code that exists solely to support that fighter, including as applicable:
+* 8 idle frames
+* 4 run frames
+* jump
+* fall
+* land
+* hurt
+* mid-air hurt
 
-* old BASE_0002 assumptions
-* old FPS_0002
-* old Slender Man-specific animation registration
-* old attack definitions
-* old charged/basic attack definitions
-* old shield setup
-* old effect animation registration
-* old move names
-* old mobile ability presentation data
-* old source-facing/anchor overrides that only belonged to Slender Man
-* old Slender Man-specific collider/hurtbox/visual tuning where it is no longer appropriate
-* old source-credit constants such as SOURCE_0002
-* Slender Man credit groups
-* Slender Man i18n strings
-* Slender Man-specific comments
-* Slender Man-specific tests
+Do not retain the directory as an empty placeholder.
 
-Do not blindly delete generic engine infrastructure that was originally added while implementing #0002 if that infrastructure is also used by #0001 or is a legitimate generic feature of the engine.
+Do not move these files elsewhere.
 
-The distinction is:
+Do not preserve them under another fighter ID.
 
-* delete fighter-specific data and assumptions;
-* retain reusable game-engine capabilities.
+⸻
 
-For example, generic support for per-character animations, pending actions, sprite anchoring, UI fighter selection, etc. should remain if they are part of the architecture rather than Slender Man-only behavior.
+Phase 2 — delete all #0003 assets
 
-Phase 2 — rename the new #0003 art to #0002
+Delete the entire directory:
 
-Move the loose replacement PNG files into:
+assets/characters/0003/
 
-assets/characters/0002/
+It currently contains 51 PNG files covering:
 
-Rename every 0003_ filename to 0002_.
-
-Final replacement asset names should be exactly:
-
-* assets/characters/0002/0002_idle_1.png
-* assets/characters/0002/0002_idle_2.png
-* assets/characters/0002/0002_idle_3.png
-* assets/characters/0002/0002_idle_4.png
-* assets/characters/0002/0002_idle_5.png
-* assets/characters/0002/0002_idle_6.png
-* assets/characters/0002/0002_idle_7.png
-* assets/characters/0002/0002_idle_8.png
-* assets/characters/0002/0002_run_1.png
-* assets/characters/0002/0002_run_2.png
-* assets/characters/0002/0002_run_3.png
-* assets/characters/0002/0002_run_4.png
-* assets/characters/0002/0002_jump.png
-* assets/characters/0002/0002_fall.png
-* assets/characters/0002/0002_land.png
-* assets/characters/0002/0002_hurt.png
-* assets/characters/0002/0002_midairhurt.png
-
-There must be no replacement-character PNG left at repository root after the migration.
-
-There must be no remaining 0003_*.png files.
-
-There must be no old Slender Man PNG left in assets/characters/0002/.
-
-Phase 3 — make the new fighter the actual #0002
-
-Update js/data/characters.js so the replacement fighter is registered as:
-
-* id: '0002'
-* displayName: '#0002'
-* available in the same roster position formerly occupied by #0002
-
-Use the new sprite filenames above.
-
-Register only animations for which art actually exists.
-
-Required animations:
-
-Idle
-
-Frames:
-
-0002_idle_1.png through 0002_idle_8.png
-
-Loop continuously.
-
-Choose a sensible idle FPS after inspecting the frames. Do not inherit Slender Man’s old FPS automatically.
-
-Run
-
-Frames:
-
-0002_run_1.png through 0002_run_4.png
-
-Loop continuously.
-
-Use sensible run timing after inspecting the art. The animation should respond naturally to fighter movement if the existing engine supports speed-scaled run playback.
-
-Jump
-
-Single frame:
-
-0002_jump.png
-
-Use while ascending.
-
-Fall
-
-Single frame:
-
-0002_fall.png
-
-Use while descending.
-
-Land
-
-Single frame:
-
-0002_land.png
-
-Use for the normal touchdown/landing state.
-
-Keep the land state short so a single-frame landing pose does not make movement feel unresponsive.
-
-Hurt
-
-Single frame:
-
-0002_hurt.png
-
-Use for grounded hitstun.
-
-Mid-air Hurt
-
-Single frame:
-
-0002_midairhurt.png
-
-Use during airborne hitstun.
-
-Unsupported animations/actions
-
-Do not point unsupported states at nonexistent files.
-
-Do not invent asset filenames.
-
-Do not reuse old Slender Man attacks or old Slender Man art.
-
-The replacement fighter currently does not have supplied art for:
-
-* BA1
-* mid-air BA1
-* charged BA1
-* BA2
-* mid-air BA2
-* charged BA2
-* Unique Basic Attack
-* Transform
-* Shield
-* mid-air shield
-* Charge
+* Idle
+* Run
+* Jump/Fall/Land
+* Hurt/Mid-air Hurt
 * Dash
-* projectiles
-* fighter-specific effects
+* Charge
+* BA1
+* Mid-air BA1
+* BA2
+* Mid-air BA2
+* Palm Strike
 
-Handle these cleanly according to the current character architecture.
+Do not retain, rename, archive, or migrate any of this art elsewhere in the repository.
 
-If an action can legitimately be omitted from the character’s actions map so the corresponding UI control becomes unavailable, omit it.
+⸻
 
-Do not expose controls that trigger missing animations or stale Slender Man behavior.
+Phase 3 — remove #0002 and #0003 from js/data/characters.js
 
-Do not silently inherit #0001 attacks.
+Remove both fighter objects from CHARACTERS.
 
-Do not leave the replacement fighter capable of executing old #0002 attacks.
+After this change, the production CHARACTERS array should contain #0001 only unless there are unrelated existing entries discovered during implementation.
 
-The fighter should be playable for movement/jumping and able to enter hurt states even while its combat moves are not authored.
+For #0002, remove all code/data that becomes unused, including the current fighter-specific pieces such as:
 
-If the engine requires baseline movement/collider/power fields to construct a fighter, provide only the minimal temporary baseline necessary, clearly marked as temporary for the new #0002.
+* BASE_0002
+* IDLE_ART_0002
+* the underscore-numbered frame helper if it is no longer used anywhere
+* the #0002 object
+* its animations and fallbacks
+* temporary visual sizing
+* collider/pushbox/hurtboxes
+* empty action/attack setup
+* all TODO #0002 comments
+* all explanatory comments that describe the deleted fighter
 
-Do not keep Slender Man-specific proportions or tuning just because they previously lived under TEMPORARY_BASELINE.
+The current TEMPORARY_BASELINE exists specifically to support the unfinished #0002. If it has no remaining legitimate consumer after #0002/#0003 are gone, remove the export completely rather than leaving dead fighter scaffolding behind.
 
-Inspect the new sprites and derive sensible visual sizing, collider, pushbox, and hurtboxes so the replacement’s physical body roughly matches the visible art.
+For #0003, remove all fighter-specific pieces including:
 
-Sprite sizing and anchoring
+* BASE_0003
+* IDLE_ART_0003
+* FPS_0003
+* its full character object
+* animation registrations
+* movement/power copy
+* energy
+* launch reaction
+* Dash configuration
+* Palm Strike
+* BA1 / aerial BA1
+* BA2 / aerial BA2
+* mobile ability metadata
+* ability names
+* attack definitions
+* all fighter-specific comments
 
-Inspect all replacement PNG dimensions and visible sprite bounds.
+WORLD_PER_ART_0001 is currently used to size #0002/#0003 relative to #0001. If deleting those fighters leaves that constant unused, remove it too.
 
-Ensure:
+Do not retain dead constants “for later.”
 
-* all frames render at a consistent perceived character scale;
-* feet stay planted consistently between idle/run/land;
-* jumping and falling do not visibly jump horizontally because of differing transparent padding;
-* the sprite’s horizontal facing behaves consistently;
-* collider/hurtbox placement matches the character body rather than transparent margins.
+Run an unused-code cleanup after deleting the definitions.
 
-Use the engine’s generic sprite normalization and per-animation heightRatio/anchor capabilities where needed.
+⸻
 
-Do not add bespoke renderer hacks for #0002 unless absolutely necessary.
+Phase 4 — disable #0001 without deleting it
 
-Character selection and game modes
+#0001 is temporary-disabled, not removed.
 
-Verify the replacement #0002 works everywhere a fighter can be selected or instantiated:
+In js/data/characters.js change its production availability to:
 
-* fighter select
-* normal battle
-* #0001 vs #0002
-* #0002 vs #0001
-* #0002 vs #0002 if mirror matches are supported
+available: false
+
+Preserve:
+
+* id: '0001'
+* displayName: '#0001'
+* its roster slot unless there is a compelling architectural reason to change it
+* every sprite asset under assets/characters/0001/
+* all animations
+* attacks
+* charged actions
+* Clone Attack
+* Sphere Rush
+* projectile/effect art
+* Shield
+* Dash
+* abilities
+* tuning
+* collider/hurtboxes
+* source credits
+* localization
+* engine tests covering its combat mechanics
+
+Do not gut #0001 just because it is unavailable.
+
+The intention is that re-enabling it later should be essentially a deliberate availability change, not a restoration project.
+
+⸻
+
+Phase 5 — correctly support ZERO available fighters
+
+This is critical.
+
+Simply setting #0001.available = false is not enough because several current flows assume a fighter can always be instantiated.
+
+Audit every route that selects, defaults, loads, or starts a fighter.
+
+js/core/app.js
+
+The app already calculates:
+
+CHARACTERS.find((c) => c.available)?.id ?? null
+
+With every fighter disabled/removed, the initial Quick Battle and Watch selections should therefore be null.
+
+Preserve that null-safe behavior.
+
+Also preserve the rule that only available fighters are preloaded. With zero available fighters, startup must not preload #0001 as playable content.
+
+Do not replace null with '0001'.
+
+Do not introduce a fallback that selects the first definition regardless of available.
+
+js/screens/battle-screen.js
+
+The current battle setup obtains definitions through getCharacter(...) and then assumes they are valid.
+
+Add or strengthen validation so a battle cannot start with:
+
+* a missing fighter ID
+* null
+* a stale deleted ID
+* a fighter whose definition exists but has available: false
+
+This applies to:
+
+* Quick Battle Player 1
+* Quick Battle CPU
+* Watch CPU 1
+* Watch CPU 2
+* any test/direct parameters that reach the normal production entry path
+
+A disabled #0001 must never become playable merely because its ID was supplied directly.
+
+Do not dereference p1Def.displayName, p2Def.displayName, etc. before validating them.
+
+Use the app’s normal navigation/error UI pattern to abort gracefully rather than throwing.
+
+js/screens/practice-screen.js
+
+Practice currently hard-codes:
+
+PRACTICE_DEFAULT_FIGHTER = '0001'
+
+and fresh Practice visits instantiate that fighter directly.
+
+That behavior must change.
+
+While #0001 is disabled:
+
+* Practice must not start a #0001 session.
+* It must not call loadCharacter('0001') as the session fighter.
+* It must not bypass availability because getCharacter('0001') still returns a definition.
+
+Refactor the default to be based on an available fighter, or otherwise represent “no practice fighter” explicitly.
+
+The screen must handle no available fighters cleanly.
+
+Do not solve this by deleting Practice Ground or its generic implementation.
+
+Fighter selection / roster
+
+Audit:
+
+* js/ui/fighter-roster.js
+* js/screens/character-select-screen.js
+* Watch Mode’s fighter selection screens
+
+The roster should still render its locked placeholders.
+
+Slot 01 may remain occupied by the disabled #0001 definition, but it must behave like a locked/unavailable slot:
+
+* not focusable as a fighter
+* not selectable
+* not confirmable
+* no playable preview loading
+* no keyboard/gamepad activation
+* no pointer activation
+
+The current roster logic has fallbacks such as this.slots[0] when no available slot exists. Make sure those fallbacks do not result in invalid .focus() assumptions or accidentally promote a locked slot into a selection.
+
+selectedId should remain null when nothing is available.
+
+The Confirm button must remain disabled.
+
+Keyboard, gamepad, pointer, and screen-reader behavior must remain sane with no selectable fighter buttons.
+
+Home/game-mode entry points
+
+With no available fighters, Play, Watch Mode, and Practice Ground must not lead to a playable session.
+
+Prefer a clean centralized availability check.
+
+A good UX is to disable those game-start actions while there are no available fighters and expose a localized explanation such as “No fighters available” using the project’s existing accessibility/i18n conventions.
+
+Do not leave clickable actions that simply crash deeper in setup.
+
+Keep unrelated Home features available, such as Settings and any non-match informational screens.
+
+Even if Home prevents normal access, retain lower-level guards in Battle and Practice so direct routing/stale state cannot bypass the restriction.
+
+⸻
+
+Phase 6 — remove #0003 UI/localization/credit residue
+
+#0003 currently introduced production data outside characters.js.
+
+Remove it.
+
+js/core/i18n.js
+
+Delete #0003-specific translation entries, including the current keys for:
+
+* credits.sprites0003.*
+* ability.0003.uniqueba
+* ability.0003.ba1
+* ability.0003.ba2
+
+Remove both English and French entries.
+
+Also rewrite generic comments/examples that currently mention #0002 or #0003, such as examples of possessive fighter lists.
+
+Do not remove #0001 ability translations or #0001 credit translations.
+
+Add any generic localized “no fighters available” text needed for the zero-roster UX.
+
+js/ui/credits.js
+
+Remove the entire #0003 sprite-credit group.
+
+Keep:
+
+* project credits
+* original-work credits
+* #0001 sprite/source credits because that art still exists
+* rights/project sections
+
+js/ui/icons.js
+
+palm currently exists for #0003’s Palm Strike.
+
+After deleting #0003, verify whether any production or test fixture legitimately uses ICONS.palm.
+
+If it is orphaned, remove it.
+
+Do not remove generic icons merely because a deleted fighter happened to use them.
+
+⸻
+
+Phase 7 — remove stale comments/references in shared engine files
+
+Repository-wide search currently finds 0002/0003 references in shared files such as:
+
+* js/config.js
+* js/core/i18n.js
+* js/data/characters.js
+* js/game/sprite-normalizer.js
+* js/game/touch-controls.js
+* js/screens/battle-screen.js
+* js/ui/mobile-abilities.js
+* js/ui/credits.js
+* js/ui/icons.js
+
+Most of these are comments/examples rather than fighter-specific architecture.
+
+Rewrite them generically or use #0001 where an example genuinely needs a concrete surviving definition.
+
+Do not remove generic engine systems such as:
+
+* character-specific action maps
+* sprite normalization
+* mobile ability presence
+* per-character icons/names
+* roster infrastructure
+* Watch Mode
 * Practice Ground
-* Watch Mode / CPU-controlled matches
-* mobile/touch UI
-* keyboard/gamepad selection flows
+* combat AI
+* charged-technique support
 
-Selecting #0002 must load the new sprites, never an old Slender Man image.
+The rule is:
 
-UI and controls
+remove deleted-fighter data and assumptions; preserve reusable engine architecture.
 
-Remove any old #0002-specific ability names or icons.
+⸻
 
-Because the replacement currently has no authored attacks, the UI should follow the existing generic “ability absent” behavior rather than displaying Slender Man’s old abilities.
+Phase 8 — delete obsolete max file
 
-Make sure touch controls do not leave clickable attack buttons wired to stale actions.
+The repository root currently contains a file named:
 
-Do not affect #0001’s buttons, names, attacks, or icons.
+max
 
-Credits and attribution
+It is an obsolete implementation prompt about removing an older #0002, promoting #0003, renaming assets, and keeping both IDs in the development process.
 
-Remove the existing Slender Man-specific credit section and its source URL/constants unless those credits are independently required elsewhere.
+It is now directly contrary to this task and contains a large number of 0002/0003 references.
 
-Remove strings such as:
+Delete max entirely.
 
-* #0002 / Slender Man
-* Slender Man creator attribution
-* XmayGrrr sprite attribution
-* the old DeviantArt source URL
+Do not rewrite it into a new prompt.
 
-Do not invent replacement credits unless replacement attribution already exists elsewhere in the repository or is explicitly encoded in the supplied files/context.
+⸻
 
-If no replacement source information exists, simply remove the obsolete fighter-specific source section rather than making one up.
+Phase 9 — tests
 
-Retain the project’s general credits and #0001 credits.
+Delete fighter-specific tests
 
-Documentation
+Delete:
 
-Update documentation to reflect the actual roster after the migration.
+* tests/fighter-0002.test.mjs
+* tests/fighter-0003.test.mjs
+
+These test production content that must no longer exist.
+
+tests/real-art.mjs currently exists to support those two fighter-art tests. After deleting them, verify its import graph. If nothing else uses it, delete it as dead test infrastructure.
+
+Rewrite shared tests
 
 Audit at minimum:
+
+* tests/controls-ui.test.mjs
+* tests/i18n.test.mjs
+* tests/practice-ground.test.mjs
+* tests/settings.test.mjs
+* tests/watch-mode.test.mjs
+* tests/discover.test.mjs
+* tests/difficulty.test.mjs
+* tests/battle-screen.test.mjs
+* any other test that assumes CHARACTERS.filter(c => c.available) contains #0001, #0002, or #0003
+
+Remove expectations about deleted fighters.
+
+Do not keep fake production #0002/#0003 definitions just so old tests continue to work.
+
+For tests that need two or more available fighters to exercise generic Watch/Practice/roster behavior, create test-only synthetic fighters with neutral IDs such as test-a, test-b, 9998, 9999, etc.
+
+It is acceptable for test fixtures to clone #0001’s definition/art and explicitly set available: true for the duration of the test.
+
+That is preferable to retaining deleted production IDs.
+
+Be careful to clean up mutations to the exported CHARACTERS array after tests so tests remain isolated.
+
+New/updated tests required
+
+Add coverage proving at least:
+
+1. getCharacter('0001') still returns its definition.
+2. getCharacter('0001').available === false.
+3. getCharacter('0002') === null.
+4. getCharacter('0003') === null.
+5. The production CHARACTERS array contains no 0002 or 0003.
+6. CHARACTERS.filter(c => c.available) is empty in production.
+7. assets/characters/0002/ does not exist.
+8. assets/characters/0003/ does not exist.
+9. Startup selection initializes fighter IDs to null when no fighters are available.
+10. Startup does not preload disabled #0001.
+11. The fighter roster renders without throwing with no available fighter.
+12. No fighter is selected by the roster.
+13. Confirm remains disabled.
+14. A locked/disabled #0001 slot cannot be confirmed.
+15. Quick Battle cannot instantiate disabled #0001 from stale/direct selection data.
+16. Watch Mode cannot instantiate disabled #0001.
+17. Practice Ground cannot instantiate disabled #0001.
+18. A deleted/stale 0002 or 0003 selection fails gracefully.
+19. Home game-start actions are unavailable or otherwise safely blocked with no fighters.
+20. Synthetic test-only available fighters still prove generic fighter selection, Practice swapping, Watch Mode, and battle infrastructure work.
+21. #0001 combat/unit tests continue to pass despite its production availability being false.
+22. Credits no longer contain a #0003 section.
+23. i18n contains no deleted fighter-specific keys.
+
+Do not weaken unrelated combat, movement, physics, input, accessibility, or UI tests.
+
+Availability is a roster/runtime concern. Existing low-level #0001 tests should still be allowed to construct the definition directly when they are testing engine mechanics.
+
+⸻
+
+Phase 10 — documentation cleanup
+
+Because the instruction is to remove #0002 and #0003 completely from the current files, this task is stricter than merely updating “current roster” paragraphs.
+
+Audit and remove/rewrite their references in:
 
 * README.md
 * ALVA_SPEC.md
 * UPDATES.md
-* CLAUDE.md only if its instructions now contain inaccurate fighter-specific wording
-* inline comments in source files
+* inline source comments
+* test comments
+* any other checked-in text
 
-Remove or rewrite statements describing #0002 as Slender Man or describing old #0002 attacks/animation families.
+Do not leave old #0002/#0003 implementation sections as historical prose in these files.
 
-Update any “next fighter is #0003” wording as appropriate. After this change the active roster is still #0001 and #0002; #0003 remains the next unused fighter ID.
+For this task, the current repository should not continue carrying those fighter IDs in historical update text.
 
-Do not rewrite historical changelog material unnecessarily if it is clearly describing an old historical state, but make sure current-state documentation is not misleading. If a historical entry would now cause confusion because it claims files still exist, clearly mark it as historical rather than silently describing it as current behavior.
+Update the current-state documentation to say, in substance:
 
-Tests
+* #0001 remains implemented but is temporarily unavailable/disabled.
+* There are currently no selectable fighters.
+* New fighters can still be added through the generic character architecture.
 
-The existing tests/fighter-0002.test.mjs is strongly coupled to the old Slender Man asset list and attacks. Replace or substantially rewrite it for the new fighter.
+Keep useful generic documentation about how to add fighters, but remove deleted-fighter-specific examples.
 
-Tests should verify at least:
+If an example currently says things such as “#0002 leaves out all four actions,” replace it with a neutral hypothetical example rather than retaining the deleted ID.
 
-1. getCharacter('0002') returns the new fighter definition.
-2. display name is #0002.
-3. roster slot remains the second fighter slot.
-4. idle contains exactly 8 replacement frames.
-5. run contains exactly 4 replacement frames.
-6. jump/fall/land/hurt/midairHurt point to the expected 0002_*.png files.
-7. every referenced replacement asset exists.
-8. the old Slender Man filenames are no longer referenced.
-9. unsupported attack actions are absent rather than pointing at old moves.
-10. selecting or instantiating #0002 succeeds.
-11. #0001 vs #0002 works.
-12. #0002 vs #0002 works if mirror matches are supported.
-13. Practice Ground can switch to #0002.
-14. Watch Mode can instantiate #0002.
-15. touch controls do not expose stale #0002 attacks.
-16. credits no longer identify #0002 as Slender Man.
-17. i18n tests no longer expect the old Slender Man strings.
+Do not claim the “next fighter” is any particular numbered ID unless that convention is actually required by the project.
 
-Update related tests including, where applicable:
+⸻
 
-* tests/watch-mode.test.mjs
-* tests/practice-ground.test.mjs
-* tests/controls-ui.test.mjs
-* tests/settings.test.mjs
-* tests/i18n.test.mjs
+Phase 11 — repository-wide stale-reference audit
 
-Do not weaken unrelated tests just to make the suite pass.
+Before finishing, search the entire checked-in tree.
 
-Repository-wide stale-reference audit
+There should be no live/current-tree references to deleted fighter identifiers.
 
-Before finishing, search the full repository for all of these:
+Search for at least:
 
-* 0003
+* #0002
 * #0003
+* '0002'
+* "0002"
+* '0003'
+* "0003"
+* 0002_
 * 0003_
-* Slender
-* Slenderman
-* SOURCE_0002
-* old #0002 asset names such as 0002_ba1_, 0002_maba, 0002_cba, 0002_shield, 0002_charge
-* old #0002-specific move names/source references
+* BASE_0002
+* BASE_0003
+* IDLE_ART_0002
+* IDLE_ART_0003
+* FPS_0003
+* ability.0003
+* sprites0003
+* fighter-0002
+* fighter-0003
+* assets/characters/0002
+* assets/characters/0003
 
-Evaluate every hit.
+Use identifier-aware searches so unrelated decimal values such as 0.0002 would not be mistaken for fighter references if any exist.
 
-Expected result:
+Any remaining hit must be investigated.
 
-* no 0003 references that refer to the replacement fighter;
-* generic documentation may still say the next unused fighter ID is 0003;
-* no active Slender Man implementation or current-state docs remain;
-* no old Slender Man PNGs remain;
-* no code path references files that were deleted.
+For this task, “it’s only a comment/changelog/test” is not sufficient justification for keeping a deleted fighter reference.
 
-Also inspect the repository root and ensure all replacement PNGs have been moved into the character directory.
+The expected result is effectively zero fighter-ID residue for 0002 and 0003 in the current tree.
 
-Preserve architecture
+⸻
 
-Do not solve this by hardcoding if (id === '0002') behavior into generic systems.
+#0001-specific stale-state audit
 
-The repository deliberately keeps fighter-specific information in js/data/characters.js.
+Because #0001 still exists, do not globally remove 0001.
 
-Continue following that design.
+Instead verify all production assumptions about its availability.
 
-Prefer data changes over engine changes unless the engine genuinely cannot represent this incomplete fighter cleanly.
+Search for:
 
-Validation
+* hard-coded '0001' defaults
+* comments saying Practice “starts with #0001”
+* PRACTICE_DEFAULT_FIGHTER
+* tests assuming #0001.available === true
+* tests assuming it is in the list of available fighters
+* direct screen/session constructors that instantiate it without checking available
 
-Run the complete test suite.
+Rewrite only the availability assumptions.
 
-Also run any repository lint/static checks if configured.
+Keep legitimate #0001 implementation references.
 
-Resolve all failures caused by the migration.
+⸻
 
-Manually verify, insofar as the repository’s test/runtime setup allows:
+Behavioral acceptance criteria
 
-* #0001 still renders and behaves exactly as before.
-* #0002 visibly uses the new art.
-* idle animates through all 8 frames.
-* run animates through all 4 frames.
-* jump uses jump art while rising.
-* fall uses fall art while descending.
-* land flashes the land pose on touchdown.
-* grounded damage shows hurt.
-* airborne damage shows midairhurt.
-* no missing-image requests occur.
-* no old Slender Man sprites appear anywhere.
-* no attack input triggers old #0002 logic.
+The finished application should behave like this:
 
-Final response
+Startup
 
-When complete, report:
+The app boots normally.
 
-1. every important file changed;
-2. all old #0002 files deleted;
-3. all 0003 files renamed/moved;
-4. the exact final replacement asset list;
-5. what temporary fighter properties were chosen for movement/collider/hurtboxes;
-6. which unsupported abilities are intentionally absent;
-7. tests/checks run and their results;
-8. any remaining generic 0003 references and why they are correct.
+No fighter sprites are preloaded as available roster content.
 
-Do not leave a half-migrated state where the old #0002 implementation and the new #0002 art coexist.
+There are no console exceptions caused by a missing default fighter.
+
+Home
+
+Settings and unrelated UI remain usable.
+
+Play/Watch/Practice cannot begin a match while no fighters are available.
+
+The disabled state is understandable and accessible.
+
+Fighter roster
+
+The roster can render all locked slots.
+
+The former #0002/#0003 production entries do not exist.
+
+#0001 is unavailable/locked.
+
+There is no selected fighter and no enabled Confirm action.
+
+Direct/stale state
+
+If local state, tests, or a direct route supplies:
+
+* 0001
+* 0002
+* 0003
+* null
+* an unknown fighter ID
+
+the production battle/practice entry code must validate it rather than blindly constructing a fighter.
+
+Disabled #0001 must not be treated as valid merely because getCharacter('0001') returns a definition.
+
+Future re-enable
+
+The generic engine should remain ready for future fighters.
+
+Re-enabling or adding a fighter later should not require undoing hacks introduced by this cleanup.
+
+⸻
+
+Implementation quality constraints
+
+* Prefer a small reusable helper for determining playability if several systems need the same check.
+* Keep getCharacter(id) as an identity lookup unless changing it is clearly justified. A useful distinction is:
+    * “definition exists”
+    * “definition is available/playable”
+* Do not redefine getCharacter() so disabled #0001 disappears from low-level engine/tests unless that is necessary. Existing engine tests need access to the definition.
+* Do not use a hidden fallback fighter.
+* Do not substitute placeholder art.
+* Do not add dummy production fighters.
+* Do not leave commented-out #0002/#0003 definitions.
+* Do not leave dead assets.
+* Do not leave dead translation keys.
+* Do not leave obsolete credit groups.
+* Do not weaken error handling.
+* Preserve accessibility/navigation behavior.
+* Preserve generic engine capability.
+
+⸻
+
+Final verification
+
+Run the entire existing test suite after the rewrite.
+
+Also perform explicit filesystem/repository checks confirming:
+
+* assets/characters/0002 absent
+* assets/characters/0003 absent
+* tests/fighter-0002.test.mjs absent
+* tests/fighter-0003.test.mjs absent
+* tests/real-art.mjs absent if orphaned
+* root max absent
+* no production 0002 definition
+* no production 0003 definition
+* #0001.available === false
+* zero available production fighters
+* no stale deleted-ID references remain
+
+If deleting fighter-specific implementation exposes genuinely generic bugs around an empty roster, fix those bugs rather than introducing a fighter fallback.
+
+⸻
+
+Final response after implementation
+
+Report:
+
+1. Files/directories deleted.
+2. Main source files changed.
+3. How #0001 was disabled.
+4. How the zero-available-fighter state is handled.
+5. Shared tests converted to synthetic fighter fixtures.
+6. Documentation/i18n/credits cleanup.
+7. Results of the stale-reference audit.
+8. Exact tests/checks run and whether they passed.
+9. Any remaining caveats.
+
+Do not stop after changing characters.js. This task is complete only when the assets, code, UI behavior, tests, credits, documentation, obsolete prompt file, and repository-wide references all agree with the new state.
