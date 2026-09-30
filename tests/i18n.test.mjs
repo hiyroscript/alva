@@ -189,7 +189,7 @@ test('French is really French: only proper names, codes and shared words read th
     'brand.title', // ALVA
     'control.charge', // Charge
     'control.pause', // Pause
-    'credits.sprites.site', 'credits.sprites0003.site', // The Spriters Resource
+    'credits.sprites.site', // The Spriters Resource
     'difficulty.brutal.name', // Brutal
     'hud.pause', // Pause
     'hud.round', // ROUND n
@@ -271,7 +271,7 @@ test('t fills placeholders, reads nested keys, falls back to English, and shows 
   inFrench(() => {
     assert.equal(t('home.play'), 'Jouer');
     assert.equal(t('setup.steps', { name: { t: 'setup.watch' } }), 'Étapes : Mode Spectateur');
-    assert.equal(t('common.loadingName', { name: joinList(['#0001', '#0002']) }), 'Chargement de #0001 et #0002');
+    assert.equal(t('common.loadingName', { name: joinList(['#0001', '#9999']) }), 'Chargement de #0001 et #9999');
     assert.equal(t('common.spritesFailed', { names: ['#0001'], where: 'assets/characters/0001/' }),
       'Les sprites de #0001 n’ont pas pu être chargés. Vérifiez votre connexion et la présence des fichiers dans assets/characters/0001/.');
   });
@@ -484,11 +484,31 @@ test('internal identifiers never change with the language', () => {
   });
 });
 
-test('no string is left for the fighter that held slot 02 before the current #0002, in either language', () => {
+test('every fighter-specific string belongs to a fighter that exists, in either language: none is left for a removed one', () => {
+  const ids = new Set(CHARACTERS.map((c) => c.id));
+  const names = new Set(CHARACTERS.map((c) => c.displayName));
   for (const language of ['en', 'fr']) {
     const table = STRINGS[language];
-    assert.deepEqual(Object.keys(table).filter((k) => k.startsWith('credits.0002')), [], language);
+    for (const key of Object.keys(table)) {
+      const owner = key.match(/^ability\.([^.]+)\./)?.[1];
+      if (owner) assert.ok(ids.has(owner), `${language}: ${key} names no fighter that exists`);
+      // #0001's sprite source is the one sprite credit group.
+      assert.doesNotMatch(key, /^credits\.sprites[^.]|^credits\.\d/, `${language}: ${key}`);
+    }
     const text = Object.values(table).filter((v) => typeof v === 'string').join('\n');
-    assert.doesNotMatch(text, /slender|Knudsen|Victor Surge|XmayGrrr|DeviantArt|renatoooferreiraaa/i, language);
+    for (const name of text.match(/#\d{4}\b/g) ?? []) assert.ok(names.has(name), `${language}: ${name} is no fighter`);
+    assert.doesNotMatch(text, /slender|Knudsen|Victor Surge|XmayGrrr|DeviantArt|renatoooferreiraaa/i, `${language}: nothing of an older fighter`);
   }
+  // #0001's own strings stay: its ability names and its sprite credits.
+  assert.equal(STRINGS.fr['ability.0001.ba1'], 'Coup de poing');
+  assert.equal(STRINGS.en['credits.sprites.title'], '#0001 sprite source');
+});
+
+test('the empty-roster strings read in both languages', () => {
+  assert.equal(STRINGS.en['common.noFighters'], 'No fighters available');
+  assert.equal(STRINGS.fr['common.noFighters'], 'Aucun combattant disponible');
+  assert.equal(STRINGS.en['common.fighterUnavailable'], 'Fighter unavailable');
+  assert.equal(STRINGS.fr['common.fighterUnavailable'], 'Combattant indisponible');
+  assert.match(STRINGS.en['common.fighterUnavailableMessage'], /cannot start/);
+  assert.match(STRINGS.fr['common.fighterUnavailableMessage'], /ne peut pas commencer/);
 });

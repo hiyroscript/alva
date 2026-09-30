@@ -1,6 +1,11 @@
 // HOME: editorial wordmark and navigation beside a glass strip carrying a
 // looping credits roll, with a compact Settings (gear) button in the top
 // right corner that opens the Settings dialog over Home.
+//
+// Play, Watch Mode and Practice Ground each start a match, so they are
+// open only while a fighter is playable: with none, they are disabled and
+// described by a "No fighters available" note under the menu. Discover,
+// Settings and the credits stay open whatever the roster holds.
 
 import { Screen } from '../core/screen-manager.js';
 import { CONFIG } from '../config.js';
@@ -9,6 +14,16 @@ import { tx, tattr, iconLabel } from '../core/i18n.js';
 import { logoSVG } from '../ui/logo.js';
 import { ICONS } from '../ui/icons.js';
 import { CREDITS, creditLabel, creditLink } from '../ui/credits.js';
+import { playableCharacters } from '../data/characters.js';
+
+// The Home actions that start a match, and so need a playable fighter, and
+// the id of the note that says why they are closed.
+export const MATCH_ACTIONS = Object.freeze(['play', 'watch', 'practice']);
+const NO_FIGHTERS_NOTE = 'home-no-fighters';
+
+// Whether any fighter can be played: the one check behind every match
+// action.
+export const hasPlayableFighters = () => playableCharacters().length > 0;
 
 const CREDITS_RESUME_DELAY = 2000;
 const ROLL_SPEED = 22; // credits roll, CSS px per second
@@ -58,12 +73,21 @@ export class HomeScreen extends Screen {
     const watch = secondary('watch', 'home.watch');
     const practice = secondary('practice', 'home.practice');
     const discover = secondary('discover', 'home.discover');
-    play.addEventListener('click', () => app.screens.go('mode'));
-    watch.addEventListener('click', () => app.screens.go('watch-difficulty'));
-    practice.addEventListener('click', () => app.screens.go('practice'));
+    // A match action goes nowhere while no fighter is playable, even if a
+    // stale click gets past its disabled state.
+    const startMatch = (id) => () => {
+      if (hasPlayableFighters()) app.screens.go(id);
+    };
+    play.addEventListener('click', startMatch('mode'));
+    watch.addEventListener('click', startMatch('watch-difficulty'));
+    practice.addEventListener('click', startMatch('practice'));
     discover.addEventListener('click', () => app.screens.go('discover'));
     // By name, in menu order.
     this.actions = { play, watch, practice, discover };
+    // Shown, and describing the match actions, only while none can start.
+    this.noFightersNote = el('p', {
+      class: 'home-note', id: NO_FIGHTERS_NOTE, role: 'status', hidden: true, ...tx('common.noFighters'),
+    });
 
     // Settings: Home chrome, not a menu action. The gear in the top right
     // corner opens the Settings dialog over Home (js/ui/settings-dialog.js)
@@ -152,6 +176,7 @@ export class HomeScreen extends Screen {
           el('h1', { class: 'home-title', id: 'home-title', html: logoSVG({ className: 'logo logo--display' }) }),
           el('p', { class: 'home-lede', ...tx('home.lede') }),
           el('nav', { class: 'home-actions', ...tattr('aria-label', 'home.menu') }, Object.values(this.actions)),
+          this.noFightersNote,
         ]),
       ]),
       this.settingsButton,
@@ -160,6 +185,29 @@ export class HomeScreen extends Screen {
       ]),
     );
     this.el.setAttribute('aria-labelledby', 'home-title');
+    this.syncMatchActions();
+  }
+
+  // Opens or closes the match actions to follow the roster: with no
+  // playable fighter they are disabled (out of Tab, hover and spatial
+  // navigation) and point at the note that says why.
+  syncMatchActions() {
+    const open = hasPlayableFighters();
+    for (const id of MATCH_ACTIONS) {
+      const button = this.actions[id];
+      button.disabled = !open;
+      if (!open) button.setAttribute('aria-describedby', NO_FIGHTERS_NOTE);
+      else if (button.hasAttribute('aria-describedby')) button.removeAttribute('aria-describedby');
+    }
+    this.noFightersNote.hidden = open;
+    this.el.querySelector('.home-intro')?.classList.toggle('has-note', !open);
+  }
+
+  // The first action that is open (Play whenever a fighter is playable),
+  // else the Settings button.
+  focusDefault() {
+    const target = Object.values(this.actions).find((b) => !b.disabled) ?? this.settingsButton;
+    target.focus({ preventScroll: true });
   }
 
   endDrag() {
@@ -172,6 +220,7 @@ export class HomeScreen extends Screen {
 
   enter() {
     this.lastInteraction = -Infinity;
+    this.syncMatchActions();
   }
 
   exit() {

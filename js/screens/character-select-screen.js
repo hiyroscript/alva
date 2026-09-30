@@ -14,6 +14,7 @@ import { Screen } from '../core/screen-manager.js';
 import { el } from '../core/utils.js';
 import { screenHeader, QUICK_BATTLE_SETUP } from '../ui/components.js';
 import { FighterRoster } from '../ui/fighter-roster.js';
+import { isPlayable } from '../data/characters.js';
 
 export class CharacterSelectScreen extends Screen {
   constructor(app, {
@@ -36,18 +37,22 @@ export class CharacterSelectScreen extends Screen {
     );
   }
 
-  // The fighter this screen last confirmed (unknown or stale: the roster
-  // falls back to the first available one).
+  // The fighter this screen last confirmed (unknown, stale or disabled: the
+  // roster falls back to the first playable one, else selects nothing).
   get chosenId() {
     return this.selection()[this.key];
   }
 
+  // Null while no fighter is playable.
   get defaultSlot() {
     return this.roster.slotFor(this.chosenId);
   }
 
+  // The chosen fighter's slot, else (no playable fighter) the header's Back.
   focusDefault() {
-    this.defaultSlot.focus({ preventScroll: true });
+    const slot = this.defaultSlot;
+    if (slot) slot.focus({ preventScroll: true });
+    else super.focusDefault();
   }
 
   enter() {
@@ -55,6 +60,7 @@ export class CharacterSelectScreen extends Screen {
   }
 
   confirm(def) {
+    if (!isPlayable(def)) return;
     this.selection()[this.key] = def.id;
     this.app.screens.go(this.next);
   }

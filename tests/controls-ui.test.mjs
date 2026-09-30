@@ -86,13 +86,28 @@ const { ABILITY_ACTIONS, abilityPresence, mobileAbility } = await import('../js/
 const { getCharacter } = await import('../js/data/characters.js');
 const { setLanguage, localizeTree } = await import('../js/core/i18n.js');
 const { SAMPLE_FIGHTER } = await import('./sample-fighter.mjs');
+const { TEST_MOVELESS } = await import('./test-fighters.mjs');
 
 const ROOT = new URL('../', import.meta.url);
 const read = (path) => readFileSync(new URL(path, ROOT), 'utf8');
 const CSS = read('styles.css');
+// #0001's definition (disabled in the roster, but the touch controls present
+// any definition they are given), and two test-only fighters built from it:
+// one with no moves at all, and one with its own three buttons and no
+// Transform (left out of its actions).
 const DEF_0001 = getCharacter('0001');
-const DEF_0002 = getCharacter('0002');
-const DEF_0003 = getCharacter('0003');
+const MOVELESS = TEST_MOVELESS;
+const NO_TRANSFORM = {
+  ...DEF_0001,
+  id: 'test-no-transform',
+  displayName: 'No Transform',
+  actions: { uniqueba: 'uniqueba', ba1: DEF_0001.actions.ba1, ba2: DEF_0001.actions.ba2 },
+  mobileAbilities: {
+    uniqueba: { label: 'Palm Strike', icon: 'arrow' },
+    ba1: { label: 'Punch', icon: 'punch' },
+    ba2: { label: 'Kick', icon: 'kick' },
+  },
+};
 
 // Touch controls wired to a recording input; `def` is the fighter they
 // present (#0001 unless given; null leaves them neutral) and `scheme` their
@@ -235,13 +250,13 @@ test('another fighter presents its own buttons: its Transform is a real button, 
   }
 });
 
-// ---- Touch buttons: #0002, a fighter missing its abilities ------------------------
+// ---- Touch buttons: a fighter with no moves ----------------------------------------
 
 test('abilityPresence reads the fighter\'s actions: implemented, reserved (null) or absent (left out)', () => {
   assert.deepEqual(ABILITY_ACTIONS.map((a) => abilityPresence(DEF_0001, a)), ['implemented', 'reserved', 'implemented', 'implemented']);
-  // #0002 has no move yet: every one is left out of its (empty) actions.
-  assert.deepEqual(DEF_0002.actions, {});
-  assert.deepEqual(ABILITY_ACTIONS.map((a) => abilityPresence(DEF_0002, a)), ['absent', 'absent', 'absent', 'absent']);
+  // A fighter with no moves: every one is left out of its (empty) actions.
+  assert.deepEqual(MOVELESS.actions, {});
+  assert.deepEqual(ABILITY_ACTIONS.map((a) => abilityPresence(MOVELESS, a)), ['absent', 'absent', 'absent', 'absent']);
   assert.deepEqual(ABILITY_ACTIONS.map((a) => abilityPresence(SAMPLE_FIGHTER, a)), ['implemented', 'implemented', 'implemented', 'implemented']);
   // Nothing to go by: every button stays, Transform reserved.
   for (const def of [null, undefined, {}, { mobileAbilities: {} }]) {
@@ -252,12 +267,12 @@ test('abilityPresence reads the fighter\'s actions: implemented, reserved (null)
   assert.equal(abilityPresence({ actions: { uniqueba: null } }, 'ba1'), 'absent');
   // An absent ability has nothing to present, not even a neutral glyph or a
   // reserved star.
-  for (const action of ABILITY_ACTIONS) assert.equal(mobileAbility(DEF_0002, action), null, action);
+  for (const action of ABILITY_ACTIONS) assert.equal(mobileAbility(MOVELESS, action), null, action);
 });
 
-test('#0002 has no ability buttons: all four hidden, unnamed, blank, never dashed; Shield, Charge and Jump stay', () => {
+test('a fighter with no moves has no ability buttons: all four hidden, unnamed, blank, never dashed; Shield, Charge and Jump stay', () => {
   for (const scheme of ['joystick', 'classic']) {
-    const { tc } = touchControls(DEF_0002, { scheme });
+    const { tc } = touchControls(MOVELESS, { scheme });
     const b = (a) => tc.buttons.get(a);
     for (const action of ABILITY_ACTIONS) {
       const btn = b(action);
@@ -284,7 +299,7 @@ test('#0002 has no ability buttons: all four hidden, unnamed, blank, never dashe
 });
 
 test('the hidden ability buttons dispatch nothing: no press, no assistive click', async () => {
-  const { tc, calls } = touchControls(DEF_0002);
+  const { tc, calls } = touchControls(MOVELESS);
   for (const [i, action] of ABILITY_ACTIONS.entries()) {
     const btn = tc.buttons.get(action);
     press(btn, i + 1);
@@ -300,7 +315,7 @@ test('the hidden ability buttons dispatch nothing: no press, no assistive click'
   assert.deepEqual(calls, [['jump', true], ['jump', false]]);
 });
 
-test('switching #0001 -> #0002 -> #0001 hides and restores the very same four buttons; a held one is let go', () => {
+test('switching #0001 -> no moves -> #0001 hides and restores the very same four buttons; a held one is let go', () => {
   for (const scheme of ['joystick', 'classic']) {
     const { tc, calls } = touchControls(DEF_0001, { scheme });
     const els = ABILITY_ACTIONS.map((a) => tc.buttons.get(a));
@@ -315,7 +330,7 @@ test('switching #0001 -> #0002 -> #0001 hides and restores the very same four bu
     press(els[0], 7);
     press(els[2], 8);
     assert.deepEqual(calls, [['uniqueba', true], ['ba1', true]]);
-    tc.setCharacter(DEF_0002);
+    tc.setCharacter(MOVELESS);
     assert.deepEqual(calls.slice(2).sort(), [['ba1', false], ['uniqueba', false]], 'both holds end as they go');
     assert.deepEqual(looks(), ABILITY_ACTIONS.map(() => [true, null, '', false]));
     tc.setCharacter(DEF_0001);
@@ -325,62 +340,54 @@ test('switching #0001 -> #0002 -> #0001 hides and restores the very same four bu
     press(els[3], 9);
     assert.deepEqual(calls.at(-1), ['ba2', true], 'and they work again');
     lift(els[3], 9);
-    tc.setCharacter(DEF_0002);
+    tc.setCharacter(MOVELESS);
     assert.ok(els.every((btn) => btn.hidden), `${scheme}: hidden again`);
     assert.ok(els.every((btn) => btn.getAttribute('aria-label') === null), 'no stale Shuriken, Punch or Kick');
   }
 });
 
-// ---- Touch buttons: #0003, its own three and no Transform ------------------------
+// ---- Touch buttons: its own three and no Transform ---------------------------------
 
-test('#0003 presents its own Palm Strike, Punch and Kick; its Transform, left out, has no button', () => {
-  assert.deepEqual(ABILITY_ACTIONS.map((a) => abilityPresence(DEF_0003, a)), ['implemented', 'absent', 'implemented', 'implemented']);
-  assert.deepEqual(DEF_0003.mobileAbilities, {
-    uniqueba: { label: 'Palm Strike', icon: 'palm' },
-    ba1: { label: 'Punch', icon: 'punch' },
-    ba2: { label: 'Kick', icon: 'kick' },
-  });
-  // Its palm is a glyph of its own, told apart from every other one.
-  assert.ok(ICONS.palm);
-  for (const [name, icon] of Object.entries(ICONS)) if (name !== 'palm') assert.notEqual(icon, ICONS.palm, name);
-  assert.equal(mobileAbility(DEF_0003, 'transform'), null);
+test('a fighter that leaves Transform out presents its own three buttons, and its Transform has none', () => {
+  assert.deepEqual(ABILITY_ACTIONS.map((a) => abilityPresence(NO_TRANSFORM, a)), ['implemented', 'absent', 'implemented', 'implemented']);
+  assert.equal(mobileAbility(NO_TRANSFORM, 'transform'), null);
   for (const scheme of ['joystick', 'classic']) {
-    const { tc, calls } = touchControls(DEF_0003, { scheme });
+    const { tc, calls } = touchControls(NO_TRANSFORM, { scheme });
     const b = (a) => tc.buttons.get(a);
     assert.deepEqual(ABILITY_ACTIONS.map((a) => [a, b(a).hidden ?? false, b(a).getAttribute('aria-label'), b(a).innerHTML]), [
-      ['uniqueba', false, 'Palm Strike', ICONS.palm],
+      ['uniqueba', false, 'Palm Strike', ICONS.arrow],
       ['transform', true, null, ''],
       ['ba1', false, 'Punch', ICONS.punch],
       ['ba2', false, 'Kick', ICONS.kick],
     ], scheme);
     assert.deepEqual([...tc.buttons].filter(([, el]) => el.classList.contains('is-pending')), [], `${scheme}: nothing dashed`);
-    assert.equal(b('uniqueba').getAttribute('data-i18n-aria-label'), 'ability.0003.uniqueba');
+    // A name only the fighter's data has: shown as authored, marked plain
+    // (no key to translate it by).
+    assert.equal(b('uniqueba').getAttribute('data-i18n-aria-label'), '');
     // The buttons send the universal codenames; the hidden one sends nothing.
     for (const [i, action] of ABILITY_ACTIONS.entries()) {
       press(b(action), i + 1);
       lift(b(action), i + 1);
     }
     assert.deepEqual(calls, [['uniqueba', true], ['uniqueba', false], ['ba1', true], ['ba1', false], ['ba2', true], ['ba2', false]]);
-    // #0001 -> #0003 -> #0002 -> #0003: the same elements, each fighter's own look.
+    // #0001 -> this one -> no moves -> this one: the same elements, each fighter's own look.
     tc.setCharacter(DEF_0001);
     assert.deepEqual([b('uniqueba').getAttribute('aria-label'), b('transform').hidden ?? false], ['Shuriken', false]);
-    tc.setCharacter(DEF_0003);
-    assert.equal(b('uniqueba').innerHTML, ICONS.palm);
+    tc.setCharacter(NO_TRANSFORM);
+    assert.equal(b('uniqueba').innerHTML, ICONS.arrow);
     assert.equal(b('transform').hidden, true);
-    tc.setCharacter(DEF_0002);
+    tc.setCharacter(MOVELESS);
     assert.ok(ABILITY_ACTIONS.every((a) => b(a).hidden));
-    tc.setCharacter(DEF_0003);
+    tc.setCharacter(NO_TRANSFORM);
     assert.deepEqual(ABILITY_ACTIONS.map((a) => b(a).hidden ?? false), [false, true, false, false], scheme);
     assert.equal(b('ba2').getAttribute('aria-label'), 'Kick');
   }
-  // In French: its own names, translated.
-  const { tc } = touchControls(DEF_0003);
+  // In French: names the translations do not know stay as authored.
+  const { tc } = touchControls(NO_TRANSFORM);
   setLanguage('fr');
   try {
     localizeTree(tc.root);
-    assert.deepEqual(['uniqueba', 'ba1', 'ba2'].map((a) => tc.buttons.get(a).getAttribute('aria-label')), [
-      'Frappe de paume', 'Coup de poing', 'Coup de pied',
-    ]);
+    assert.deepEqual(['uniqueba', 'ba1', 'ba2'].map((a) => tc.buttons.get(a).getAttribute('aria-label')), ['Palm Strike', 'Punch', 'Kick']);
     assert.equal(tc.buttons.get('transform').getAttribute('aria-label'), null);
   } finally {
     setLanguage('en');
@@ -388,7 +395,7 @@ test('#0003 presents its own Palm Strike, Punch and Kick; its Transform, left ou
 });
 
 test('a language change never names the hidden buttons again', () => {
-  const { tc } = touchControls(DEF_0002);
+  const { tc } = touchControls(MOVELESS);
   setLanguage('fr');
   try {
     localizeTree(tc.root);
@@ -403,7 +410,7 @@ test('a language change never names the hidden buttons again', () => {
 
 test('the touch layout editor keeps absent buttons on show, neutral, so every fighter\'s layout can place them', () => {
   const tc = new TouchControls(new Element('div'), { setTouch() {}, queueTouchMouvement() {} }, { scheme: 'joystick', showAbsent: true });
-  tc.setCharacter(DEF_0002);
+  tc.setCharacter(MOVELESS);
   const b = (a) => tc.buttons.get(a);
   assert.deepEqual(ABILITY_ACTIONS.map((a) => [a, b(a).hidden, b(a).getAttribute('aria-label'), b(a).innerHTML]), [
     ['uniqueba', false, ACTION_LABELS.uniqueba, ICONS.ring],

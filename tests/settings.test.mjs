@@ -150,6 +150,8 @@ const { ICONS } = await import('../js/ui/icons.js');
 const creditsModule = await import('../js/ui/credits.js');
 const { CREDITS, creditsText } = creditsModule;
 const { CONFIG } = await import('../js/config.js');
+const { CHARACTERS } = await import('../js/data/characters.js');
+const { TEST_A, withTestFighters } = await import('./test-fighters.mjs');
 
 const ROOT = new URL('../', import.meta.url);
 const read = (path) => readFileSync(new URL(path, ROOT), 'utf8');
@@ -207,7 +209,7 @@ function boot(storage = memoryStorage()) {
     device: { reducedMotion: true },
     audio: { play: noop },
     settings: new Settings(storage),
-    selection: { characterId: '0001' },
+    selection: { characterId: null },
   };
   app.screens = new ScreenManager(app);
   app.nav = new MenuNavigator(app);
@@ -675,7 +677,9 @@ test('Home has four menu actions and a separate Settings gear in the top right c
   }
 });
 
-test('keyboard and gamepad reach the gear from Home\'s menu', () => {
+// Play is Home's default only while a fighter is playable: a test-only one
+// (see test-fighters.mjs) here.
+test('keyboard and gamepad reach the gear from Home\'s menu', () => withTestFighters([TEST_A], () => {
   const { app, home, done } = boot();
   try {
     Object.values(home.actions).forEach((b, i) => place(b, 80, 300 + i * 50, 320, 44));
@@ -691,7 +695,7 @@ test('keyboard and gamepad reach the gear from Home\'s menu', () => {
   } finally {
     done();
   }
-});
+}));
 
 // ---- The Settings dialog ----------------------------------------------------------------
 
@@ -947,7 +951,7 @@ test('Help is removed from the game: no Help screen, module, section or registra
 test('the Home credits still roll: both copies, the second hidden, every credit unchanged in English', () => {
   const credits = creditsText();
   assert.deepEqual(credits.map((g) => g.title), [
-    CONFIG.title, 'Original work', '#0001 sprite source', '#0003 sprite source', 'Rights', 'Project',
+    CONFIG.title, 'Original work', '#0001 sprite source', 'Rights', 'Project',
   ]);
   assert.equal(credits[0].lead, `Created by ${CONFIG.developer}`);
   assert.deepEqual(credits[2].lines, [
@@ -956,7 +960,6 @@ test('the Home credits still roll: both copies, the second hidden, every credit 
     'Source sheet uploaded by Dazz',
     'Contributor: FRET',
   ]);
-  assert.deepEqual(credits[3].lines, ['The Spriters Resource', 'Source sheet ripped by Dazz & Fret']);
   assert.equal(CREDITS.length, credits.length);
   assert.match(read('js/screens/home-screen.js'), /import \{ CREDITS, creditLabel, creditLink \} from '\.\.\/ui\/credits\.js';/);
 
@@ -992,9 +995,7 @@ test('in French the credits translate but proper names stay', () => {
     assert.equal(credits[2].lines[1], 'The Spriters Resource');
     assert.ok(credits[2].lines[2].includes('Dazz'));
     assert.ok(credits[2].lines[3].includes('FRET'));
-    assert.equal(credits[3].title, 'Source des sprites de #0003');
-    assert.equal(credits[3].lines[0], 'The Spriters Resource');
-    assert.ok(credits[3].lines[1].includes('Dazz & Fret'));
+    assert.equal(credits[3].title, 'Droits');
     assert.equal(getLanguage(), 'fr');
   } finally {
     setLanguage('en');
@@ -1002,58 +1003,42 @@ test('in French the credits translate but proper names stay', () => {
   assert.equal(t('credits.rights.title'), 'Rights');
 });
 
-// Every name the fighter that held slot 02 before the current #0002 was
-// credited with, and where its sheet came from: none of it applies now.
+// Every name a removed fighter's art was credited with, and where its sheet
+// came from: none of it applies now.
 const RETIRED_CREDITS = [
   'Slender', 'Eric Knudsen', 'Victor Surge', 'Something Awful', 'XmayGrrr', 'Jus Sheet', 'DeviantArt', 'renatoooferreiraaa',
+  'Dazz & Fret',
 ];
 
-test('the credits name no source for #0002: no group of its own, nothing of the old fighter\'s; #0001\'s unchanged', () => {
+test('the credits name only fighters that exist: #0001\'s sprite source is the one sprite group, unchanged, and nothing of a removed fighter is left', () => {
+  const names = new Set(CHARACTERS.map((c) => c.displayName));
   for (const language of ['en', 'fr']) {
     setLanguage(language);
     try {
       const credits = creditsText();
-      assert.ok(!credits.some((g) => /0002/.test(g.title)), `${language}: no #0002 group`);
       const text = credits.flatMap((g) => [g.title, g.lead ?? '', ...g.lines]).join('\n');
+      for (const name of text.match(/#\d{4}\b/g) ?? []) assert.ok(names.has(name), `${language}: ${name} is no fighter`);
+      assert.equal(credits.filter((g) => /#\d{4}/.test(g.title)).length, 1, `${language}: one sprite source group`);
       for (const name of RETIRED_CREDITS) assert.ok(!text.includes(name), `${language}: ${name}`);
       assert.doesNotMatch(text, /2009/);
     } finally {
       setLanguage('en');
     }
   }
-  // Gone from the data, its source address and its translations too.
-  assert.equal('SOURCE_0002' in creditsModule, false);
-  assert.ok(!CREDITS.some((g) => g.title === 'credits.0002.title'));
+  // Gone from the data and its translations too.
+  assert.deepEqual(CREDITS.map((g) => g.title), [
+    'brand.title', 'credits.original.title', 'credits.sprites.title', 'credits.rights.title', 'credits.project.title',
+  ]);
   assert.ok(!CREDITS.flatMap((g) => g.lines || []).some((line) => line?.href), 'no linked line left');
-  assert.doesNotMatch(read('js/ui/credits.js'), /deviantart|slender|0002/i);
-  assert.doesNotMatch(read('js/core/i18n.js'), /credits\.0002|slender|deviantart|XmayGrrr/i);
+  assert.doesNotMatch(read('js/ui/credits.js'), /deviantart|slender|sprites\d|Dazz & Fret/i);
+  assert.doesNotMatch(read('js/core/i18n.js'), /credits\.\d|credits\.sprites\d|slender|deviantart|XmayGrrr/i);
   // #0001's attribution is all still there, unchanged, and the notices after it.
   const credits = creditsText();
   const at = credits.findIndex((g) => g.title === '#0001 sprite source');
   assert.deepEqual(credits[at].lines, [
     'Original sprite material from Jump Ultimate Stars', 'The Spriters Resource', 'Source sheet uploaded by Dazz', 'Contributor: FRET',
   ]);
-  assert.deepEqual(credits.slice(at + 1).map((g) => g.title), ['#0003 sprite source', 'Rights', 'Project']);
-});
-
-test('#0003\'s credits name only what its sheet does: the site and who ripped it, no game and no character', () => {
-  for (const language of ['en', 'fr']) {
-    setLanguage(language);
-    try {
-      const credits = creditsText();
-      const own = credits.filter((g) => /#0003/.test(g.title));
-      assert.equal(own.length, 1, `${language}: one #0003 group`);
-      assert.equal(own[0].lines.length, 2);
-      assert.equal(own[0].lines[0], 'The Spriters Resource');
-      assert.ok(own[0].lines[1].includes('Dazz & Fret'));
-      // Its sheet does not say which game it comes from, so none is named.
-      assert.ok(!own[0].lines.some((line) => /Jump Ultimate Stars/.test(line)), `${language}: no game named`);
-      // Right after #0001's source, before the rights notices.
-      assert.deepEqual(credits.slice(-3).map((g) => g.title), [own[0].title, t('credits.rights.title'), t('credits.project.title')]);
-    } finally {
-      setLanguage('en');
-    }
-  }
+  assert.deepEqual(credits.slice(at + 1).map((g) => g.title), ['Rights', 'Project']);
 });
 
 test('a credit line may still link to its source, accessibly, from the Home roll', () => {

@@ -19,7 +19,7 @@ import { LoadingOverlay, ConfirmDialog } from '../ui/overlays.js';
 import { LanguageDialog } from '../ui/language-dialog.js';
 import { SettingsDialog } from '../ui/settings-dialog.js';
 import { TouchLayoutEditor } from '../ui/touch-layout-editor.js';
-import { CHARACTERS, getCharacter, characterFramePaths } from '../data/characters.js';
+import { getCharacter, getPlayableCharacter, playableCharacters, characterFramePaths } from '../data/characters.js';
 import { MAPS } from '../data/maps.js';
 import { DEFAULT_DIFFICULTY } from '../data/difficulty.js';
 import { SpriteSet } from '../game/sprite-normalizer.js';
@@ -34,6 +34,27 @@ import { WatchDifficultyScreen, WatchFighterScreen, WatchMapScreen } from '../sc
 import { BattleScreen } from '../screens/battle-screen.js';
 import { PracticeGroundScreen } from '../screens/practice-screen.js';
 import { DiscoverScreen } from '../screens/discover-screen.js';
+
+// Quick Battle's choices, and Watch Mode's apart from them (one difficulty
+// for both CPUs, a fighter each), as they start. Practice Ground keeps its
+// own fighter, and its training-dummy CPU never reads the difficulty. Every
+// fighter is the first playable one, or null while there is none: never a
+// disabled one.
+export function initialSelection() {
+  const firstFighter = playableCharacters()[0]?.id ?? null;
+  return {
+    mode: 'quick-battle',
+    difficulty: DEFAULT_DIFFICULTY,
+    characterId: firstFighter,
+    mapId: MAPS[0].id,
+    watch: {
+      difficulty: DEFAULT_DIFFICULTY,
+      cpu1CharacterId: firstFighter,
+      cpu2CharacterId: firstFighter,
+      mapId: MAPS[0].id,
+    },
+  };
+}
 
 export class App {
   constructor() {
@@ -58,22 +79,7 @@ export class App {
     this.settingsDialog = new SettingsDialog(document.getElementById('settings-dialog'), this);
     this.touchEditor = new TouchLayoutEditor(document.getElementById('touch-editor'), this);
 
-    // Quick Battle's choices, and Watch Mode's apart from them (one
-    // difficulty for both CPUs, a fighter each). Practice Ground keeps its
-    // own fighter, and its training-dummy CPU never reads the difficulty.
-    const firstFighter = CHARACTERS.find((c) => c.available)?.id ?? null;
-    this.selection = {
-      mode: 'quick-battle',
-      difficulty: DEFAULT_DIFFICULTY,
-      characterId: firstFighter,
-      mapId: MAPS[0].id,
-      watch: {
-        difficulty: DEFAULT_DIFFICULTY,
-        cpu1CharacterId: firstFighter,
-        cpu2CharacterId: firstFighter,
-        mapId: MAPS[0].id,
-      },
-    };
+    this.selection = initialSelection();
 
     this.spriteSets = new Map();   // characterId -> SpriteSet
     this.spritePromises = new Map();
@@ -101,8 +107,7 @@ export class App {
     // The page's own static labels (index.html) in the language in use.
     localizeTree(document.body);
 
-    // Preload every available fighter while the splash plays.
-    for (const def of CHARACTERS) if (def.available) this.loadCharacter(def.id);
+    this.preloadFighters();
 
     this.device.addEventListener('change', () => {
       this.screens.current?.onDeviceChange?.();
@@ -127,9 +132,17 @@ export class App {
     for (const screen of this.screens.screens.values()) screen.localize?.();
   }
 
+  // Preloads every playable fighter (while the splash plays): none while
+  // none is available, and never a disabled one.
+  preloadFighters() {
+    for (const def of playableCharacters()) this.loadCharacter(def.id);
+  }
+
   // Loads + normalizes a fighter's frames once. Resolves to a SpriteSet
-  // (possibly unusable if every frame failed).
+  // (possibly unusable if every frame failed), or to null without loading
+  // anything for an id that is not playable (unknown or disabled).
   loadCharacter(id, onProgress) {
+    if (!getPlayableCharacter(id)) return Promise.resolve(null);
     if (this.spriteSets.has(id)) {
       onProgress?.(1, 1);
       return Promise.resolve(this.spriteSets.get(id));

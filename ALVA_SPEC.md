@@ -115,36 +115,9 @@ behave, and how it must look. The README covers running and deploying it.
   (`sourceFacing: 0`): the round orb is never mirrored, only its position
   offset follows facing. It is not a projectile. None of the 23 files is
   duplicated, and none remains at the repository root.
-- `#0002` frames live in `assets/characters/0002/`: the 17 files supplied
-  for it, all kept. Eight idle frames `0002_idle_1`–`8` (56–60 × 76–78 px),
-  four run frames `0002_run_1`–`4` (74–78 × 72 px), and single `0002_jump`
-  (70 × 90), `0002_fall` (68 × 96), `0002_land` (56 × 76), `0002_hurt`
-  (68 × 84) and `0002_midairhurt` (70 × 72), every one 2× pixel art with no
-  transparent margin. File names put an underscore before the frame number
-  (`0002_idle_3` is idle, frame 3). `0002_idle_5` is byte-identical to
-  `0002_idle_1` (the middle of the idle loop) and still plays as its own
-  frame. It has no attack, Shield, Charge, Dash, Throw, projectile,
-  Transform or effect art yet. Idle is 39 art pixels tall; every clip shares
-  that art-pixel scale, drawn facing right (`sourceFacing: 1`).
-- `#0003` frames live in `assets/characters/0003/`: 51 frames cut from the
-  one sprite sheet supplied for it, each cropped tight to its visible art,
-  the sheet's flat background (RGB 128, 128, 255) made fully transparent
-  and nothing else changed (8-bit RGBA, every pixel fully opaque or fully
-  clear). Idle `0003_idle1`–`4` (`idle3` is the same drawing as `idle1`),
-  run `0003_run1`–`4`, Dash `0003_dash1`–`2`, single `0003_jump`, fall
-  `0003_fall1`–`2`, land `0003_land1`–`2`, single `0003_hurt` and
-  `0003_midairhurt`, Charge `0003_charge1`–`4` (startup, `charge4` reused
-  for the release) and `0003_chargea` / `0003_chargeb` (the loop), and the
-  attacks: `0003_1ba1`–`5` (BA1), `0003_midair1ba1`–`5` (mid-air BA1),
-  `0003_2ba1`–`6` (BA2), `0003_midair2ba1`–`5` (mid-air BA2) and
-  `0003_palm1`–`7` (the Palm Strike, its Unique Basic Attack), named by
-  #0001's rules below. All are 1× (one file pixel per art pixel, no
-  detectable grid), so each clip's `heightRatio` (its tallest frame over
-  idle's 49) sizes it at exactly one art pixel per file pixel. The sheet
-  sets every frame in a 93-pixel cell around one fixed origin; each frame's
-  `anchorX` is that origin, so the body stays where the original animation
-  puts it. All drawn facing right (`sourceFacing: 1`). No Shield,
-  Transform, projectile or effect art.
+- `assets/characters/0001/` is the only fighter art in the repository. #0001
+  is temporarily disabled (7.2), but every one of its files stays, and any
+  future fighter's frames go in a folder of its own id.
 - Source orientation: #0001's art faces right (`sourceFacing: 1` on the
   character), every registered clip included. An animation may override
   the character's orientation with its own `sourceFacing` (none of #0001's
@@ -178,8 +151,8 @@ behave, and how it must look. The README covers running and deploying it.
   switching animations.
 - Sprites render with `imageSmoothingEnabled = false` and, where the size
   allows, whole device pixels per art pixel.
-- **Never redraw, recolour, replace or AI-generate the #0001, #0002 or
-  #0003 artwork.** Do not
+- **Never redraw, recolour, replace or AI-generate the #0001 artwork** (or
+  any fighter art supplied later). Do not
   download third-party art. Stage art is original and procedural.
 - `alvafav.PNG` is the site favicon source.
 
@@ -306,8 +279,9 @@ fit the palette.
 First launch (no language chosen yet) → Splash → Home + Language chooser (6.11)
 Splash → Home → Select Mode → Select Difficulty → Select Fighter → Select Stage → Battle
 Home → Watch Mode → Select Difficulty → Select CPU 1 → Select CPU 2 → Select Stage → CPU vs CPU Battle (6.5a)
-Home → Practice Ground (starts at once with #0001 and a #0001 practice CPU)
+Home → Practice Ground (starts at once with the first playable fighter and a practice CPU of it)
 Home → Discover (Power / Launch / Passives reference; Back returns Home)
+Home (no playable fighter) → Play, Watch Mode and Practice Ground disabled, "No fighters available"; Discover and Settings open
 Home → Settings gear → Settings dialog over Home (Language / Controls; Esc, Back or close returns to Home) → Customize touch controls → layout editor (Done or Back returns to Settings)
 Practice Ground → More → Change Fighter (roster dialog) / Change CPU, or Enable CPU once disabled (CPU roster dialog → Disable CPU) / Return (Home)
 Battle → Pause → Resume / Restart Battle / Return to Home (confirmed)
@@ -373,6 +347,16 @@ no header, build label, eyebrow or keyboard hint bar.
   Practice Ground) last opens the Discover reference (6.9). All four are in
   keyboard / gamepad menu navigation, in that order, which the DOM order
   matches whatever the layout. Home buttons have a small 3 px radius.
+- **No playable fighter:** Play, Watch Mode and Practice Ground each start a
+  match, so they are open only while some fighter is playable (7.2). With
+  none, as today, they are disabled (quieter outline, muted label, no hover
+  or press response), out of Tab and menu navigation, and a press goes
+  nowhere; each is described (`aria-describedby`) by a small muted note under
+  the menu, "No fighters available" ("Aucun combattant disponible"), a
+  `role="status"` line shown only then, which the wordmark's height allowance
+  makes room for. Focus starts on Discover. Discover, the Settings gear and
+  the credits stay open. Home re-reads the roster on every visit, so the
+  first playable fighter reopens them with nothing else to change.
 - **Settings gear:** Settings is Home chrome, not a menu action: a compact
   square button with an original inline SVG gear (`ICONS.settings`,
   `currentColor`), named "Settings" / "Paramètres", in the top right corner
@@ -458,10 +442,17 @@ no header, build label, eyebrow or keyboard hint bar.
 ### 6.4 Select Fighter
 
 - Deliberately large roster: 48 slots in a responsive, scrollable grid.
-- `#0001` (slot 01), `#0002` (slot 02) and `#0003` (slot 03), always shown
-  with the `#`, are selectable; other slots are quiet locked placeholders (silhouette + lock).
-  No invented names or power ratings. The roster is `CHARACTERS`, placed by
-  each fighter's `rosterSlot`.
+- The roster is `CHARACTERS`, placed by each fighter's `rosterSlot`; a
+  fighter is always shown with the `#`. Only a playable fighter (`available`,
+  7.2) is a selectable slot; every other slot is a quiet locked placeholder
+  (silhouette + lock). No invented names or power ratings.
+- **Today no slot is selectable.** `#0001` holds slot 01 but is temporarily
+  disabled, so its slot is locked like the rest ("Slot 01, locked"): never
+  focused, selected, confirmed or previewed, and no portrait loads for it.
+  Nothing is selected, the preview shows slot 01 locked, and Confirm stays
+  disabled, labelled "No fighters available"; a stale or direct choice of a
+  fighter that is not playable never selects its slot. The screen's default
+  focus is its Back button.
 - Locked slots are non-interactive: hover, Tab and keyboard/gamepad navigation
   skip them, and they show no hover border or focus ring. Any fighter marked
   available becomes a normal selectable slot.
@@ -509,10 +500,12 @@ Select CPU 2 → Select Stage → CPU vs CPU Battle.
 - **Any two fighters.** CPU 1 and CPU 2 may be different fighters or the
   same one; mirror matches are allowed.
 - **Its own selection.** `app.selection.watch` (`difficulty`,
-  `cpu1CharacterId`, `cpu2CharacterId`, `mapId`; Medium, the first available
-  fighter for both and the first stage on a fresh start) is apart from Quick
-  Battle's, so neither setup changes the other's. Stale values fall back as
-  Quick Battle's do (Medium, the first available fighter, the first stage).
+  `cpu1CharacterId`, `cpu2CharacterId`, `mapId`; Medium, the first playable
+  fighter for both, or none while none is playable, and the first stage on a
+  fresh start) is apart from Quick Battle's, so neither setup changes the
+  other's. Stale values fall back as Quick Battle's do (Medium, the first
+  playable fighter, the first stage), and a side that is not playable is
+  never started (6.7).
 - **The battle.** Starting hands the Battle screen `mode: 'watch'`, the
   stage, both fighters and the level. It is the real `Battle` (7.2) with a
   `CombatAIController` on each side and no `PlayerController`; everything
@@ -546,21 +539,18 @@ Select CPU 2 → Select Stage → CPU vs CPU Battle.
   - **#0001 sprite source** — original sprite material from *Jump Ultimate
     Stars*; The Spriters Resource; source sheet uploaded by
     Dazz; contributor FRET.
-  - **#0003 sprite source** — The Spriters Resource; source sheet ripped
-    by Dazz & Fret (what its sheet itself credits; it names no game, so
-    none is named).
   - **Rights** — hiyroscript did not create or claim ownership of the original
     third-party character/game artwork. Original characters, games, and related
     properties belong to their respective rights holders.
   - **Project** — unofficial fan project. No affiliation or endorsement is
     implied.
-- No source has been supplied for #0002's art, so the credits name none;
-  none is invented. A credit line may link to its source (`{ label, href }`
+- A credit is never invented: a fighter's sprite source is named only as
+  it was supplied. A credit line may link to its source (`{ label, href }`
   in `js/ui/credits.js`): a new tab, the address never translated, the roll
   holding still while the link has keyboard focus, and its hidden second
   copy never focusable.
-- The UI does not name the character behind #0001, #0002 or #0003: each
-  stays `#0001` / `#0002` / `#0003` in game. Never imply ownership of
+- The UI does not name the character behind #0001 (or any fighter): it
+  stays `#0001` in game. Never imply ownership of
   original third-party characters, games, artwork, or related properties;
   these belong to their respective rights holders.
 
@@ -571,6 +561,13 @@ Select CPU 2 → Select Stage → CPU vs CPU Battle.
   short delay so instant loads don't flash.
 - Error state: readable message, green **Retry** and outlined **Back**.
   Battle never starts before its sprites are ready.
+- Fighter unavailable: a Battle (Quick Battle, or either side of Watch Mode)
+  or a Practice Ground session asked to start with a fighter that is not
+  playable (disabled like #0001, removed, missing or unknown, from a stale
+  selection or the route itself) loads nothing and shows the same overlay
+  headed "Fighter unavailable", "This session cannot start: a fighter it
+  needs is not available.", with only **Back** (focused; to Home): there is
+  nothing to retry.
 - Confirmation dialog (`alertdialog`, modal): battle glass panel (7.3) with the
   dimmed battle visible behind it, off-white title, gray message, outlined
   cancel (**Keep Playing**, focused) and green confirm (**Return Home**).
@@ -584,13 +581,14 @@ Select CPU 2 → Select Stage → CPU vs CPU Battle.
 
 A training room, entered straight from Home.
 
-- **Start:** every fresh entry loads #0001 (character `0001`) through the usual
+- **Start:** every fresh entry loads the default fighter, the first playable
+  one (`practiceDefaultFighter`; never a fixed id), through the usual
   loading overlay and gives control at once: no fighter select, countdown,
   round banner, timer, points or result. It runs until the player returns
   Home. Practice keeps its own fighter and CPU choices; it never reads or
   changes Quick Battle's selection. Every fresh entry starts with a fresh
   fighter at 0 Launch Point and the practice CPU already enabled: the same
-  default fighter (#0001), sharing its one loaded sprite set (one load for
+  default fighter, sharing its one loaded sprite set (one load for
   both), paired with Player 1, framed by the camera and shown on its own HUD
   card. A CPU disabled (or changed) on an earlier visit is never
   remembered.
@@ -1007,55 +1005,24 @@ French, concise game terms).
   stage, the air around it and a strip past the Void's edge). A fighter of the reference height
   (`CONFIG.render.fighterHeight`, #0001's 88 units) occupies ≈ 10 % of
   viewport height (8.8–11.5 %), whoever is picked, each fighter drawn at
-  its own art scale; #0002 and #0003 are drawn at #0001's size per art
-  pixel, so #0002 stands 66 units tall (three quarters of #0001) and #0003
-  about 83, with pixels the same size on screen. A 16:9 view shows the whole main stage with air past both
+  its own art scale, so a shorter or taller fighter simply stands shorter
+  or taller on the same stage. A 16:9 view shows the whole main stage with air past both
   ledges, and narrower screens zoom out further for it.
 
 ### 7.2 Fighters, physics and combat
 
-- `#0002` has Idle (8 frames, looped at 8 fps), Run (4 frames, looped at
-  12 fps, slower with the fighter's speed down to 0.6 of that), Jump and
-  Fall (single frames held for the rise and the descent), Land (one frame,
-  1/12 s on touchdown, never holding movement up), Hurt and Mid-air Hurt
-  (single frames held through the stun, on the ground / in the air), all
-  its own art. It has no move yet, and none is guessed or borrowed: Unique
-  Basic Attack, Transform, BA1 and BA2 are all left out of its `actions`
-  (their inputs do nothing for it, the CPU never presses them, no touch
-  buttons) and its `attacks` are empty; no `defense` (the Shield input does
-  nothing), no Dash, no charged actions (no CBA ring), no projectile or
-  effect. Charge is only the universal stance, holding its first idle
-  frame. Its Powers and movement are `TEMPORARY_BASELINE` placeholders
-  (`TODO #0002`: each Power's default tier and #0001's neutral movement,
-  copied, without the attack buffer or the Dash), never its designed stats;
-  its body (`TODO #0002` too) is measured from its idle: collider 28 × 64,
-  pushbox 30, a head and a body hurtbox covering 85–90 % of the idle art.
-  Its idle, land, jump and mid-air hurt frames anchor on the head they
-  share (`anchorX`), and its run frames on their leaning body, so neither
-  wobbles from frame to frame.
-- `#0003` has Idle (4 frames, 7 fps), Run (4 frames, 10 fps, slower with
-  its speed down to 0.7), Dash (2 frames, 10 fps: a Dash lasts 0.2 s), Jump
-  (one frame held for the rise), Fall (the tuck, then the legs reaching
-  down, held), Land (2 frames, 2/12 s), Hurt and Mid-air Hurt, Charge
-  (startup 4 frames once, loop 2 frames, the release pose), and five
-  attacks, each one pass of its own clip with its phases on whole frames
-  and its hitbox measured from the frames its strike is drawn on: the Palm
-  Strike (`uniqueba`, ground only, 12 fps: startup 3, active 2, recovery 2;
-  6 damage, Base Launch 2 horizontal, no hit-cancel), BA1 (the straight
-  punch, 15 fps: 1, 2, 2; 3, Base Launch 1 horizontal), mid-air BA1 (the
-  somersault kick, 12 fps: 1, 2, 2; 3, Base Launch 2 vertical), BA2 (the
-  spinning kick, 12 fps: 3, 2, 1, stepping in; 5, Base Launch 2 vertical)
-  and mid-air BA2 (the dive, 12 fps: 2, 2, 1; 5, Base Launch 2 reverse
-  vertical). Their stun, freeze, cooldown, momentum and hit-cancel follow
-  #0001's move in the same role. Transform is left out of its `actions`
-  (no button, the input does nothing); no `defense` (the Shield input does
-  nothing), no charged actions (a combat button pressed in Charge does its
-  normal attack, and no CBA ring shows), no projectile or effect. Its
-  Powers (Jump 2, Speed 2), movement (the Dash's 900 units/s and 0.22 s tap
-  window included), launch reaction and Energy (Dash 15, Dash cancel 40)
-  are #0001's numbers copied into its own definition. Its body is measured
-  from its idle: collider 32 × 76, pushbox 34, a head-and-torso and a legs
-  hurtbox covering about 88 % of the idle art.
+- **Roster and availability.** `CHARACTERS` (`js/data/characters.js`)
+  holds one definition today, `#0001`, in roster slot 01, fully
+  implemented (everything below) but temporarily disabled: `available:
+  false`. So no fighter is playable. A definition existing (`getCharacter`,
+  which the engine and its tests still build #0001 from) is not the same as
+  it being playable (`isPlayable`, `getPlayableCharacter`,
+  `playableCharacters`): only a playable fighter is preloaded at startup,
+  offered by a roster, the initial Quick Battle / Watch Mode choice or the
+  Practice default, or started in a Battle or Practice Ground; nothing ever
+  falls back to a disabled or missing one (6.2, 6.4, 6.7, 6.8). Re-enabling
+  #0001 is setting `available: true` again, and a new fighter is a new
+  definition with its own art folder, `rosterSlot` and `available: true`.
 - `#0001` has Idle, Run, Jump, Fall, Land, Hurt, Mid-air Hurt, Basic Attack 1,
   Mid-air Basic Attack 1, Basic Attack 2, Mid-air Basic Attack 2, Charge,
   Shield (raise, held and lower poses), Mid-air Shield (held only), Dash,
@@ -2450,8 +2417,7 @@ French, concise game terms).
   take their icon and name from the character's `mobileAbilities` (UI
   data, never read by combat): for #0001
   **Shuriken** (a four-bladed throwing star), **Punch** (a fist) and
-  **Kick** (a leg and foot); for #0003 **Palm Strike** (an open hand),
-  **Punch** and **Kick**. `TouchControls.setCharacter(def)` applies them
+  **Kick** (a leg and foot). `TouchControls.setCharacter(def)` applies them
   without rebuilding anything; Quick Battle calls it with Player 1's
   fighter as it enters (Watch Mode, where nobody plays, hides the touch
   controls instead), Practice Ground as it enters and on every
@@ -2476,8 +2442,7 @@ French, concise game terms).
   A reserved button (only Transform, and only while the fighter has none)
   uses a dashed outline and never shows nagging alerts; Shuriken, Shield,
   Punch and Kick are solid. A button for a move the fighter does not have
-  at all (left out of its `actions`, as all four of #0002's are, and
-  #0003's Transform:
+  at all (left out of its `actions`:
   `abilityPresence` in `js/ui/mobile-abilities.js`) is hidden: not drawn,
   not named, never focused and never pressed, its place left empty so no
   other button moves; the same element returns for a fighter that has it.

@@ -16,7 +16,7 @@ import { CONFIG } from '../config.js';
 import { el } from '../core/utils.js';
 import { t, tx, tattr, setText, joinList } from '../core/i18n.js';
 import { menuButton } from '../ui/components.js';
-import { getCharacter } from '../data/characters.js';
+import { getPlayableCharacter } from '../data/characters.js';
 import { getMap } from '../data/maps.js';
 import { Battle } from '../game/battle.js';
 import { HUD } from '../game/hud.js';
@@ -47,7 +47,7 @@ const MODE_TEXT = {
   watch: { kicker: 'setup.watch', sides: 'side.watch' },
 };
 
-// "#0001", or "#0001 and #0002", in the interface language.
+// One fighter's name, or two joined ("A and B"), in the interface language.
 const fighterNames = (defs) => joinList(defs.map((d) => d.displayName));
 
 export class BattleScreen extends Screen {
@@ -148,9 +148,15 @@ export class BattleScreen extends Screen {
     const watch = mode === 'watch';
     const selection = watch ? app.selection.watch : app.selection;
     const pick = (key) => params?.[key] || selection[key];
-    const p1Def = getCharacter(pick(watch ? 'cpu1CharacterId' : 'characterId'));
+    // Only a playable fighter can take a side: a missing, unknown, deleted
+    // or disabled id (from a stale selection or a direct route) is null.
+    const p1Def = getPlayableCharacter(pick(watch ? 'cpu1CharacterId' : 'characterId'));
     // Quick Battle's CPU plays Player 1's fighter.
-    const p2Def = watch ? getCharacter(pick('cpu2CharacterId')) : p1Def;
+    const p2Def = watch ? getPlayableCharacter(pick('cpu2CharacterId')) : p1Def;
+    if (!p1Def || !p2Def) {
+      this.refuse();
+      return;
+    }
     const map = getMap(pick('mapId'));
     // The CPUs' level: the setup's selection, checked by Battle (an unknown
     // value is Medium).
@@ -225,6 +231,18 @@ export class BattleScreen extends Screen {
     this.el.classList.add('is-live');
 
     if (app.device.blockedPortrait) this.pause();
+  }
+
+  // A battle whose fighters are not all playable never starts: nothing is
+  // loaded or built, and the loading overlay says so with a way Home.
+  refuse() {
+    const app = this.app;
+    this.token = null;
+    app.loading.showError(t('common.fighterUnavailableMessage'), {
+      nav: app.nav,
+      title: 'common.fighterUnavailable',
+      onBack: () => app.screens.go('home', {}, { reset: true }),
+    });
   }
 
   // Loads each of `defs` through the app's cache, reporting their combined

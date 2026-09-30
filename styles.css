@@ -441,14 +441,20 @@ html[data-screen="splash"] .overlay { display: none; }
 }
 .home-intro {
   --lede-size: clamp(13px, 2.1vh, 17px);
+  --home-note-gap: 10px;
+  --home-note-size: 13px;
+  /* The note's share of the height, only while it shows. */
+  --home-note-room: 0px;
   /* Everything that shares the screen's height with the wordmark: the
-     padding round the intro, the footer, the tagline and the four actions
-     (the same values as their own rules below, plus a little slack). The
+     padding round the intro, the footer, the tagline, the four actions and,
+     while it shows, the no-fighters note (the same values as their own
+     rules below, plus a little slack). The
      wordmark keeps its size wherever that leaves room, and shrinks only as
      much as a short screen needs, so the menu is never pushed off it. */
   --below-logo: calc(max(var(--safe-t), 24px) + 24px + clamp(34px, 8vh, 64px) + var(--safe-b)
     + clamp(14px, 3vh, 28px) + var(--lede-size) * 1.45
-    + clamp(18px, 5vh, 48px) + 4 * clamp(42px, 7.4vh, 58px) + 3 * 8px + 8px);
+    + clamp(18px, 5vh, 48px) + 4 * clamp(42px, 7.4vh, 58px) + 3 * 8px + 8px
+    + var(--home-note-room));
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -456,6 +462,7 @@ html[data-screen="splash"] .overlay { display: none; }
   min-width: 0;
   pointer-events: auto;
 }
+.home-intro.has-note { --home-note-room: calc(var(--home-note-gap) + var(--home-note-size) * 1.4); }
 .home-title { width: 100%; line-height: 0; }
 /* Width drives height, so the SVG box keeps the wordmark's own aspect ratio
    and the A starts on the box edge instead of being centred in a wider box.
@@ -506,11 +513,19 @@ html[data-screen="splash"] .overlay { display: none; }
 .home-action--primary { background: var(--action); border-color: var(--action); color: var(--white); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12); }
 .home-action--primary:hover { background: var(--action-hover); border-color: var(--action-hover); color: var(--white); }
 .home-action--primary:active { background: var(--action-pressed); border-color: var(--action-pressed); }
-/* A disabled Home action (none today): quieter outline, readable muted label,
-   no hover or press response. Kept after the interactive states so it
-   overrides them. */
+/* A disabled Home action (the match actions while no fighter is playable):
+   quieter outline, readable muted label, no hover or press response. Kept
+   after the interactive states so it overrides them. */
 .home-action:disabled { background: transparent; border-color: var(--border); color: var(--text-muted); cursor: not-allowed; transform: none; }
 .home-action:disabled .icon { color: var(--text-faint); transform: none; }
+/* Why the match actions are disabled; only shown while they are. */
+.home-note {
+  margin-top: var(--home-note-gap);
+  font-size: var(--home-note-size);
+  line-height: 1.4;
+  color: var(--text-muted);
+}
+.home-note[hidden] { display: none; }
 
 /* Settings: a compact gear in the top right corner, clear of the notch and
    the rounded corner, above the credits column. Home chrome, not a menu
@@ -664,7 +679,10 @@ html[data-screen="splash"] .overlay { display: none; }
   .home-intro {
     --lede-size: 13px;
     --below-logo: calc(max(var(--safe-t), 12px) + 12px + 32px + var(--safe-b)
-      + 10px + var(--lede-size) * 1.45 + 12px + 4 * 36px + 3 * 5px + 6px);
+      + 10px + var(--lede-size) * 1.45 + 12px + 4 * 36px + 3 * 5px + 6px
+      + var(--home-note-room));
+    --home-note-gap: 6px;
+    --home-note-size: 12px;
   }
   .logo--display {
     width: min(100%, 69vh, max(96px, (100vh - var(--below-logo)) * 3));
@@ -683,7 +701,10 @@ html[data-screen="splash"] .overlay { display: none; }
 @media (max-height: 360px) {
   .home-intro {
     --below-logo: calc(max(var(--safe-t), 12px) + 12px + 32px + var(--safe-b)
-      + 8px + var(--lede-size) * 1.45 + 8px + 4 * clamp(30px, 10vh, 36px) + 3 * 4px + 6px);
+      + 8px + var(--lede-size) * 1.45 + 8px + 4 * clamp(30px, 10vh, 36px) + 3 * 4px + 6px
+      + var(--home-note-room));
+    --home-note-gap: 4px;
+    --home-note-size: 11px;
   }
   .logo--display {
     width: min(100%, 63vh, max(96px, (100vh - var(--below-logo)) * 3));

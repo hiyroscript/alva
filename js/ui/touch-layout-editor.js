@@ -29,7 +29,7 @@ import {
   TOUCH_CONTROL_IDS, TOUCH_SCALE, TOUCH_NUDGE, clampScale, normalizePoint, placeControl,
 } from '../core/touch-layout.js';
 import { TouchControls } from '../game/touch-controls.js';
-import { getCharacter } from '../data/characters.js';
+import { getPlayableCharacter } from '../data/characters.js';
 import { ICONS } from './icons.js';
 
 // Arrow command -> unit step.
@@ -191,8 +191,9 @@ export class TouchLayoutEditor {
     this.onClose = onClose;
     this.layout = this.app.settings.touchLayout(this.scheme);
     this.root.hidden = false;
-    // The fighter the player last picked, so the combat buttons look as they will.
-    this.touch.setCharacter(getCharacter(this.app.selection?.characterId) ?? null);
+    // The fighter the player last picked, so the combat buttons look as they
+    // will; the neutral look while none is playable.
+    this.touch.setCharacter(getPlayableCharacter(this.app.selection?.characterId));
     this.touch.setScheme(this.scheme);
     this.touch.setLayout(this.layout);
     setText(this.schemeLabel, 'editor.layout', { scheme: { t: `settings.scheme.${this.scheme}` } });

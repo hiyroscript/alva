@@ -79,7 +79,7 @@ function registryStrings() {
   return out;
 }
 
-// "#0001's", or "#0001's and #0002's".
+// Each name made possessive, joined by "and": "#0001's", or "A's and B's".
 const possessives = (names) => names.map((n) => `${n}'s`).join(' and ');
 
 const EN = {
@@ -97,6 +97,9 @@ const EN = {
     `${possessives(names)} sprite frames could not be loaded. Check your connection and that the files in ${where} exist.`,
   'common.confirm': 'Confirm',
   'common.cancel': 'Cancel',
+  'common.noFighters': 'No fighters available',
+  'common.fighterUnavailable': 'Fighter unavailable',
+  'common.fighterUnavailableMessage': 'This session cannot start: a fighter it needs is not available.',
 
   'hint.navigate': 'Navigate',
   'hint.select': 'Select',
@@ -141,9 +144,6 @@ const EN = {
   'credits.sprites.site': 'The Spriters Resource',
   'credits.sprites.uploader': 'Source sheet uploaded by Dazz',
   'credits.sprites.contributor': 'Contributor: FRET',
-  'credits.sprites0003.title': '#0003 sprite source',
-  'credits.sprites0003.site': 'The Spriters Resource',
-  'credits.sprites0003.rippers': 'Source sheet ripped by Dazz & Fret',
   'credits.rights.title': 'Rights',
   'credits.rights.ownership': '{developer} did not create or claim ownership of the original third-party character/game artwork.',
   'credits.rights.holders': 'Original characters, games, and related properties belong to their respective rights holders.',
@@ -327,9 +327,6 @@ const FR = {
   'ability.0001.uniqueba': 'Shuriken',
   'ability.0001.ba1': 'Coup de poing',
   'ability.0001.ba2': 'Coup de pied',
-  'ability.0003.uniqueba': 'Frappe de paume',
-  'ability.0003.ba1': 'Coup de poing',
-  'ability.0003.ba2': 'Coup de pied',
 
   'power.jump.name': 'Puissance de saut',
   'power.jump.summary': 'Détermine la hauteur d’un saut normal. Plus le niveau est élevé, plus le saut est haut.',
@@ -396,6 +393,9 @@ const FR = {
     `Les sprites de ${joinList(names, 'fr')} n’ont pas pu être chargés. Vérifiez votre connexion et la présence des fichiers dans ${where}.`,
   'common.confirm': 'Confirmer',
   'common.cancel': 'Annuler',
+  'common.noFighters': 'Aucun combattant disponible',
+  'common.fighterUnavailable': 'Combattant indisponible',
+  'common.fighterUnavailableMessage': 'Cette session ne peut pas commencer : un combattant nécessaire n’est pas disponible.',
 
   'hint.navigate': 'Naviguer',
   'hint.select': 'Sélectionner',
@@ -440,9 +440,6 @@ const FR = {
   'credits.sprites.site': 'The Spriters Resource',
   'credits.sprites.uploader': 'Planche source publiée par Dazz',
   'credits.sprites.contributor': 'Contribution : FRET',
-  'credits.sprites0003.title': 'Source des sprites de #0003',
-  'credits.sprites0003.site': 'The Spriters Resource',
-  'credits.sprites0003.rippers': 'Planche source extraite par Dazz & Fret',
   'credits.rights.title': 'Droits',
   'credits.rights.ownership': '{developer} n’a pas créé les illustrations originales de personnages et de jeux de tiers, et n’en revendique pas la propriété.',
   'credits.rights.holders': 'Les personnages, les jeux et les propriétés d’origine appartiennent à leurs ayants droit respectifs.',

@@ -11,6 +11,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { TEST_A, withTestFighters } from './test-fighters.mjs';
 
 // ---- Fake DOM ------------------------------------------------------------------
 
@@ -61,6 +62,10 @@ class Element extends Node {
     return this.attrs.has(name) ? this.attrs.get(name) : null;
   }
   hasAttribute(name) { return this.getAttribute(name) !== null; }
+  removeAttribute(name) {
+    if (BOOLEAN_ATTRS.includes(name)) this[name] = false;
+    else this.attrs.delete(name);
+  }
   get id() { return this.getAttribute('id'); }
   set textContent(v) { this.replaceChildren(new Text(String(v))); }
   get textContent() { return this.children.map((c) => c.textContent).join(''); }
@@ -244,7 +249,9 @@ test('Discover is a registered screen with its own labelled section', () => {
 
 // ---- Home ⇄ Discover ------------------------------------------------------------
 
-test('Home → Discover opens on Power; Back returns Home', () => {
+// Discover needs no fighter, but Home only offers Play (its default) while
+// one is playable: a test-only one (see test-fighters.mjs) where it matters.
+test('Home → Discover opens on Power; Back returns Home', () => withTestFighters([TEST_A], () => {
   const { app, home, discover } = boot();
   const button = home.actions.discover;
   assert.ok(button.html.includes('<span>Discover</span>'));
@@ -265,6 +272,19 @@ test('Home → Discover opens on Power; Back returns Home', () => {
   assert.equal(discover.el.hidden, true);
   assert.equal(discover.el.inert, true);
   assert.ok(document.activeElement.html.includes('<span>Play</span>'), 'Home focuses Play (its default) again');
+}));
+
+test('with no playable fighter Discover still opens from Home, and Back returns to it', () => {
+  const { app, home, discover } = boot();
+  const { play, watch, practice } = home.actions;
+  assert.deepEqual([play, watch, practice].map((b) => b.disabled), [true, true, true], 'only the match actions close');
+  assert.equal(home.actions.discover.disabled, false);
+  assert.equal(document.activeElement, home.actions.discover, 'the first open action is the default');
+  app.input.key('KeyJ');
+  assert.equal(app.screens.current, discover);
+  discover.el.querySelector('.btn-back').click();
+  assert.equal(app.screens.current, home);
+  assert.equal(document.activeElement, home.actions.discover);
 });
 
 test('Esc, Backspace and gamepad Back leave Discover for Home', () => {
@@ -548,7 +568,8 @@ test('the Launch page shows no tuning numbers, no fighter or attack, and nothing
 test('Discover names no fighter: no roster, ownership or character data anywhere', () => {
   const { home, discover } = boot();
   home.actions.discover.click();
-  const names = CHARACTERS.filter((c) => c.available).map((c) => c.displayName);
+  // Every definition's name, playable or not.
+  const names = CHARACTERS.map((c) => c.displayName);
   assert.ok(names.includes('#0001'));
   for (const section of discover.sections) {
     section.tab.click();
@@ -618,7 +639,7 @@ test('Passives is intentionally empty: no cards, placeholder or invented copy', 
 
 // ---- Keyboard / gamepad navigation --------------------------------------------
 
-test('keyboard and gamepad reach Discover from Home and every control on it (wide layout)', () => {
+test('keyboard and gamepad reach Discover from Home and every control on it (wide layout)', () => withTestFighters([TEST_A], () => {
   const { app, home, discover, plays } = boot();
   layOutHome(home);
   layOutWide(discover);
@@ -679,7 +700,7 @@ test('keyboard and gamepad reach Discover from Home and every control on it (wid
   app.input.key('ArrowUp');
   app.input.key('KeyJ');
   assert.equal(app.screens.current, home);
-});
+}));
 
 test('↑ / ↓ scroll a long page while it can scroll, then move on', () => {
   const { app, home, discover } = boot();

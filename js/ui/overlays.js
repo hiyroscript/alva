@@ -48,21 +48,28 @@ export class LoadingOverlay {
     this.bar.setAttribute('aria-valuenow', String(pct));
   }
 
-  showError(message, { onRetry, onBack, nav }) {
+  // An error in place of the progress bar: `message` (already translated)
+  // under the heading `title` (a translation key), with Retry and Back, or
+  // Back alone when there is nothing to retry (no `onRetry`).
+  showError(message, { onRetry, onBack, nav, title = 'common.assetsUnavailable' }) {
     clearTimeout(this.showTimer);
     this.root.hidden = false;
     this.root.classList.add('is-visible');
-    setText(this.label, 'common.assetsUnavailable');
+    setText(this.label, title);
     this.bar.hidden = true;
-    const retry = el('button', { class: 'btn btn--primary', 'data-nav': true, 'data-nav-default': true, type: 'button', ...tx('common.retry') });
-    const back = el('button', { class: 'btn', 'data-nav': true, type: 'button', ...tx('common.back') });
+    const retry = onRetry
+      ? el('button', { class: 'btn btn--primary', 'data-nav': true, 'data-nav-default': true, type: 'button', ...tx('common.retry') })
+      : null;
+    const back = el('button', {
+      class: retry ? 'btn' : 'btn btn--primary', 'data-nav': true, 'data-nav-default': !retry, type: 'button', ...tx('common.back'),
+    });
     const done = (fn) => () => {
       this.hide();
       if (this.scope) nav.popScope(this.scope);
       this.scope = null;
       fn?.();
     };
-    retry.addEventListener('click', done(onRetry));
+    retry?.addEventListener('click', done(onRetry));
     back.addEventListener('click', done(onBack));
     this.error.replaceChildren(
       el('p', { class: 'loading-message', text: message }),
@@ -71,7 +78,7 @@ export class LoadingOverlay {
     this.error.hidden = false;
     this.scope = { el: this.root, onBack: done(onBack) };
     nav.pushScope(this.scope);
-    retry.focus();
+    (retry ?? back).focus();
   }
 
   hide() {

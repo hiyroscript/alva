@@ -42,9 +42,6 @@ export const ICONS = {
       'C12.4 21.1 10.9 22.3 9.1 21.6Z"/>',
     { fill: true },
   ),
-  // An open hand pushing forward: palm, three fingers and the thumb out to
-  // the right. #0003's palm strike.
-  palm: svg('<rect x="5.5" y="11" width="11" height="9.5" rx="3"/><path d="M7.8 11V6.2M11 11V4.5M14.2 11V5.8M16.5 15.5l3.6-3.6"/>'),
   // Neutral stand-ins for a fighter that authors no mobileAbilities: a ring
   // for the large top button, one and two pips for the two basic attacks.
   ring: svg('<circle cx="12" cy="12" r="6.5"/>'),

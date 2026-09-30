@@ -14,6 +14,7 @@ import { CombatState } from '../js/game/combat.js';
 import { formatLaunchPoint, describeEnergy } from '../js/game/hud.js';
 import { CONFIG } from '../js/config.js';
 import { duel, def as DEF_0001 } from './fighter-harness.mjs';
+import { TEST_A, REMOVED_IDS, withTestFighters } from './test-fighters.mjs';
 
 class Node {
   parentNode = null;
@@ -753,7 +754,8 @@ test('Keep Playing is outline-only for Return to Home? alone', async () => {
   assert.equal(await pending, false);
 });
 
-test('entering Quick Battle shows Player 1\'s fighter on the touch ability buttons before play', async () => {
+test('entering Quick Battle shows Player 1\'s fighter on the touch ability buttons before play', () => withTestFighters([TEST_A], async () => {
+  // A playable test-only fighter: no production one is.
   const { app, screen } = setup();
   const { ICONS } = await import('../js/ui/icons.js');
   const { MAPS } = await import('../js/data/maps.js');
@@ -763,7 +765,7 @@ test('entering Quick Battle shows Player 1\'s fighter on the touch ability butto
   const calls = [];
   const set = touch.setCharacter.bind(touch);
   touch.setCharacter = (def) => { calls.push(def?.id); set(def); };
-  app.selection = { characterId: '0001', mapId: MAPS[0].id };
+  app.selection = { characterId: TEST_A.id, mapId: MAPS[0].id };
   // Stop at the load (no real sprites here): the icons are already set by then.
   let loadsBefore = null;
   app.loadCharacter = () => {
@@ -772,8 +774,8 @@ test('entering Quick Battle shows Player 1\'s fighter on the touch ability butto
   };
   app.loading = { show() {}, hide() {}, setProgress() {}, showError() {} };
   await screen.enter();
-  assert.deepEqual(loadsBefore, ['0001'], 'configured as soon as the fighter is known, before gameplay');
-  assert.deepEqual(calls, ['0001']);
+  assert.deepEqual(loadsBefore, [TEST_A.id], 'configured as soon as the fighter is known, before gameplay');
+  assert.deepEqual(calls, [TEST_A.id]);
   const shown = ['uniqueba', 'shield', 'ba1', 'ba2'].map((a) => [
     touch.buttons.get(a).getAttribute('aria-label'), touch.buttons.get(a).html, touch.buttons.get(a).getAttribute('data-action'),
   ]);
@@ -784,12 +786,13 @@ test('entering Quick Battle shows Player 1\'s fighter on the touch ability butto
     ['Kick', ICONS.kick, 'ba2'],
   ]);
   assert.equal(touch.enabled, false, 'no play without sprites');
-});
+}));
 
-test('Quick Battle uses the Mobile Controls setting: Joystick by default, Classic Buttons once chosen, read on every entry', async () => {
+test('Quick Battle uses the Mobile Controls setting: Joystick by default, Classic Buttons once chosen, read on every entry', () => withTestFighters([TEST_A], async () => {
+  // A playable test-only fighter: no production one is.
   const { app, screen } = setup();
   const { MAPS } = await import('../js/data/maps.js');
-  app.selection = { characterId: '0001', mapId: MAPS[0].id };
+  app.selection = { characterId: TEST_A.id, mapId: MAPS[0].id };
   app.loadCharacter = () => Promise.resolve({ usable: false });
   app.loading = { show() {}, hide() {}, setProgress() {}, showError() {} };
   const touch = screen.touch;
@@ -814,14 +817,15 @@ test('Quick Battle uses the Mobile Controls setting: Joystick by default, Classi
   // The fighter's combat buttons were never rebuilt along the way.
   for (const [action, b] of elements) assert.equal(touch.actionButtons.get(action), b, action);
   assert.equal(touch.buttons.get('ba1').getAttribute('aria-label'), 'Punch');
-});
+}));
 
-test('Quick Battle places the touch controls by the saved custom layout of the scheme in use, read on every entry; Watch Mode still has none', async () => {
+test('Quick Battle places the touch controls by the saved custom layout of the scheme in use, read on every entry; Watch Mode still has none', () => withTestFighters([TEST_A], async () => {
+  // A playable test-only fighter: no production one is.
   const { app, screen } = setup();
   const { MAPS } = await import('../js/data/maps.js');
   app.selection = {
-    characterId: '0001', mapId: MAPS[0].id,
-    watch: { difficulty: 'medium', cpu1CharacterId: '0001', cpu2CharacterId: '0001', mapId: MAPS[0].id },
+    characterId: TEST_A.id, mapId: MAPS[0].id,
+    watch: { difficulty: 'medium', cpu1CharacterId: TEST_A.id, cpu2CharacterId: TEST_A.id, mapId: MAPS[0].id },
   };
   app.loadCharacter = () => Promise.resolve({ usable: false });
   app.loading = { show() {}, hide() {}, setProgress() {}, showError() {} };
@@ -859,4 +863,101 @@ test('Quick Battle places the touch controls by the saved custom layout of the s
   await screen.enter({ mode: 'watch' });
   assert.equal(screen.touchRoot.hidden, true);
   assert.equal(touch.enabled, false);
+}));
+
+// ---- Fighters that cannot play ----------------------------------------------
+
+// Enters the Battle screen with `params` (and `selection`) and records what
+// it does instead of playing: its loads, the error it shows and where Back
+// goes.
+async function enterRefused({ params, selection }) {
+  const { app, screen } = setup();
+  const { MAPS } = await import('../js/data/maps.js');
+  const loads = [];
+  const errors = [];
+  const went = [];
+  const named = [];
+  app.selection = {
+    characterId: null, mapId: MAPS[0].id,
+    watch: { difficulty: 'medium', cpu1CharacterId: null, cpu2CharacterId: null, mapId: MAPS[0].id },
+    ...selection,
+  };
+  // No real sprites here: a fighter that gets as far as its load fails it.
+  app.loadCharacter = (id) => { loads.push(id); return Promise.resolve({ usable: false }); };
+  app.loading = {
+    show(label) { loads.push(`show: ${label}`); }, hide() {}, setProgress() {},
+    showError(message, opts) { errors.push({ message, opts }); },
+  };
+  app.screens.go = (...args) => went.push(args);
+  const set = screen.touch.setCharacter.bind(screen.touch);
+  screen.touch.setCharacter = (def) => { named.push(def?.id ?? null); set(def); };
+  await screen.enter(params);
+  return { app, screen, loads, errors, went, named };
+}
+
+test('Battle never starts a fighter that is not playable: disabled #0001, a removed one, null, missing or unknown, in Quick Battle and Watch Mode', async () => {
+  const quick = (id) => ({ selection: { characterId: id } });
+  const quickDirect = (id) => ({ params: { characterId: id } });
+  const watch = (id) => ({ params: { mode: 'watch' }, selection: { watch: { difficulty: 'hard', cpu1CharacterId: id, cpu2CharacterId: id } } });
+  const watchDirect = (id) => ({ params: { mode: 'watch', cpu1CharacterId: id, cpu2CharacterId: id } });
+  for (const id of ['0001', ...REMOVED_IDS, null, undefined, '', 'no-such-fighter']) {
+    for (const [route, opts] of Object.entries({ quick, quickDirect, watch, watchDirect })) {
+      const label = `${route}: ${id}`;
+      const { screen, loads, errors, went, named, app } = await enterRefused(opts(id));
+      assert.equal(screen.battle, null, `${label}: no Battle`);
+      assert.deepEqual(loads, [], `${label}: nothing loaded, not even a loading label`);
+      assert.deepEqual(named, [], `${label}: no fighter on the touch controls`);
+      assert.equal(errors.length, 1, `${label}: the loading overlay's error`);
+      const [{ message, opts: shown }] = errors;
+      assert.equal(message, 'This session cannot start: a fighter it needs is not available.');
+      assert.equal(shown.title, 'common.fighterUnavailable');
+      assert.equal(shown.onRetry, undefined, `${label}: nothing to retry`);
+      assert.equal(shown.nav, app.nav);
+      shown.onBack();
+      assert.deepEqual(went, [['home', {}, { reset: true }]], `${label}: Back goes Home`);
+      assert.equal(screen.isRunning, false);
+    }
+  }
+});
+
+test('Watch Mode refuses a pair with one fighter that cannot play, and Quick Battle a disabled one given directly, while others are playable', () => withTestFighters([TEST_A], async () => {
+  const [removed1, removed2] = REMOVED_IDS;
+  for (const [cpu1, cpu2] of [[TEST_A.id, '0001'], ['0001', TEST_A.id], [TEST_A.id, removed2], [removed1, TEST_A.id]]) {
+    const { screen, loads, errors } = await enterRefused({ params: { mode: 'watch', cpu1CharacterId: cpu1, cpu2CharacterId: cpu2 } });
+    assert.equal(screen.battle, null, `${cpu1} vs ${cpu2}`);
+    assert.deepEqual(loads, [], 'not even the playable one is loaded');
+    assert.equal(errors.length, 1);
+  }
+  // A stale selection naming disabled #0001 is refused even with a
+  // playable fighter to hand: nothing falls back to it silently.
+  const { screen, loads, errors } = await enterRefused({ selection: { characterId: '0001' } });
+  assert.equal(screen.battle, null);
+  assert.deepEqual(loads, []);
+  assert.equal(errors.length, 1);
+  // A playable one gets past the check to its load (which fails here, with
+  // the usual sprites error and its Retry).
+  const ok = await enterRefused({ params: { characterId: TEST_A.id } });
+  assert.deepEqual(ok.loads, ['show: Loading Test A', TEST_A.id]);
+  assert.match(ok.errors[0].message, /^Test A's sprite frames could not be loaded/);
+  assert.equal(typeof ok.errors[0].opts.onRetry, 'function');
+}));
+
+test('the loading error keeps Retry for a failed load but offers only Back when there is nothing to retry', async () => {
+  const { LoadingOverlay } = await import('../js/ui/overlays.js');
+  const { app } = setup();
+  const overlay = new LoadingOverlay(new Element('div'));
+  const buttons = () => overlay.error.querySelectorAll('button').map((b) => b.textContent);
+  overlay.showError('failed', { nav: app.nav, onRetry() {}, onBack() {} });
+  assert.deepEqual(buttons(), ['Retry', 'Back']);
+  assert.equal(overlay.label.textContent, 'Assets unavailable');
+  let back = 0;
+  overlay.showError('none', { nav: app.nav, title: 'common.fighterUnavailable', onBack: () => back++ });
+  assert.deepEqual(buttons(), ['Back']);
+  assert.equal(overlay.label.textContent, 'Fighter unavailable');
+  const only = overlay.error.querySelector('button');
+  assert.equal(document.activeElement, only, 'focus on Back');
+  assert.ok(only.hasAttribute('data-nav-default'));
+  only.click();
+  assert.equal(back, 1);
+  assert.equal(overlay.root.hidden, true);
 });
