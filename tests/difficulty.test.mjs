@@ -11,8 +11,8 @@ import { readFileSync } from 'node:fs';
 import { fakeSprites, def as DEF_0001, DT } from './fighter-harness.mjs';
 import { TEST_A, useTestFighters } from './test-fighters.mjs';
 
-// No production fighter is playable: the setup screens and the Battle screen
-// pick a test-only one (see test-fighters.mjs), registered for this file.
+// The setup screens and the Battle screen pick a test-only fighter (see
+// test-fighters.mjs), registered for this file beside #0001.
 useTestFighters(TEST_A);
 
 // ---- Fake DOM ------------------------------------------------------------------

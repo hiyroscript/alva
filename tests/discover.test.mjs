@@ -275,6 +275,17 @@ test('Home → Discover opens on Power; Back returns Home', () => withTestFighte
 }));
 
 test('with no playable fighter Discover still opens from Home, and Back returns to it', () => {
+  // #0001 disabled for this test only: nothing is playable.
+  const only = CHARACTERS.find((c) => c.id === '0001');
+  only.available = false;
+  try {
+    noFighters();
+  } finally {
+    only.available = true;
+  }
+});
+
+function noFighters() {
   const { app, home, discover } = boot();
   const { play, watch, practice } = home.actions;
   assert.deepEqual([play, watch, practice].map((b) => b.disabled), [true, true, true], 'only the match actions close');
@@ -285,7 +296,7 @@ test('with no playable fighter Discover still opens from Home, and Back returns 
   discover.el.querySelector('.btn-back').click();
   assert.equal(app.screens.current, home);
   assert.equal(document.activeElement, home.actions.discover);
-});
+}
 
 test('Esc, Backspace and gamepad Back leave Discover for Home', () => {
   for (const code of ['Escape', 'Backspace', 'KeyK']) {

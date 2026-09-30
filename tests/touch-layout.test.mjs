@@ -13,7 +13,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { TEST_A, withTestFighters } from './test-fighters.mjs';
+import { TEST_A, TEST_DISABLED, withTestFighters } from './test-fighters.mjs';
 
 const noop = () => {};
 
@@ -615,9 +615,9 @@ function editorApp() {
 
 const saved = (storage) => JSON.parse(storage.map.get(SETTINGS_KEY) ?? 'null');
 
-test('the editor opens on the scheme in use, as a modal with its own scope, the real controls focusable only here', () => withTestFighters([TEST_A], () => {
+test('the editor opens on the scheme in use, as a modal with its own scope, the real controls focusable only here', () => withTestFighters([TEST_A, TEST_DISABLED], () => {
   const { app, editor, root, back } = editorApp();
-  // Quick Battle's last pick, playable (test-only: no production fighter is).
+  // Quick Battle's last pick, playable.
   app.selection.characterId = TEST_A.id;
   app.settings.set('mobileControls', 'classic');
   let closed = 0;
@@ -644,7 +644,7 @@ test('the editor opens on the scheme in use, as a modal with its own scope, the 
   assert.equal(editor.touch.stick.getAttribute('role'), 'button', 'the joystick, pressed like a button here');
   assert.equal(document.activeElement, editor.touch.padButtons.get('runLeft'), 'focus on the first control');
   // No control ids on show anywhere.
-  assert.doesNotMatch(root.textContent, /runLeft|mouvement[LR]|extra_attack|\bba[12]\b/);
+  assert.doesNotMatch(root.textContent, /runLeft|mouvement[LR]|extra_attack|attack\d/);
   // Nothing selected yet: the size controls wait.
   assert.equal(editor.nameEl.textContent, 'No control selected');
   assert.equal(editor.slider.disabled, true);
@@ -655,9 +655,9 @@ test('the editor opens on the scheme in use, as a modal with its own scope, the 
   assert.equal(app.nav.scopes.includes(editor.scope), false);
   assert.equal(closed, 1);
   assert.equal(document.activeElement, back, 'focus back where it came from');
-  // A pick that cannot be played (disabled #0001, none at all) shows the
-  // neutral look instead of a fighter's own.
-  for (const id of ['0001', null]) {
+  // A pick that cannot be played (a disabled fighter, none at all) shows
+  // the neutral look instead of a fighter's own.
+  for (const id of [TEST_DISABLED.id, null]) {
     app.selection.characterId = id;
     editor.open({ scheme: 'classic', returnFocus: back });
     assert.equal(editor.touch.buttons.get('attack1').getAttribute('aria-label'), 'Attack 1', `${id}: neutral`);

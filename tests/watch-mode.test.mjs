@@ -5,10 +5,10 @@
 // Quick Battle's, the real Battle with a combat AI on each side, and the
 // Battle screen running it (loading, spectating, pause, restart, rematch,
 // results, Change Stage) before a Quick Battle that behaves as before.
-// No production fighter is playable, so the fighters picked on its screens
-// are test-only (see test-fighters.mjs); the Battle-only checks build #0001
-// straight from its definition, as the engine allows. On a minimal fake
-// DOM; layout and paint still need real-browser checks.
+// The fighters picked on its screens are mostly test-only (see
+// test-fighters.mjs), beside #0001 in slot 01; the Battle-only checks build
+// #0001 straight from its definition. On a minimal fake DOM; layout and
+// paint still need real-browser checks.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -187,11 +187,11 @@ const { Battle, BATTLE_MODES } = await import('../js/game/battle.js');
 const { CombatAIController } = await import('../js/game/combat-ai.js');
 const { PlayerController } = await import('../js/game/fighter-controller.js');
 
-// The playable fighters, all test-only, registered before any roster is
-// built and taken out after the last test: Test A (slot 02) and #9999
-// (slot 06), #0001's art under two ids so CPU 1 and CPU 2 can differ while
-// sharing art, plus a fighter with no moves (slot 04) and the sample
-// fighter's different ones (slot 05).
+// The test-only playable fighters beside #0001 (slot 01), registered before
+// any roster is built and taken out after the last test: Test A (slot 02)
+// and #9999 (slot 06), #0001's art under two ids so CPU 1 and CPU 2 can
+// differ while sharing art, plus a fighter with no moves (slot 04) and the
+// sample fighter's different ones (slot 05).
 const DEF_9999 = testFighter('9999', '#9999', 5);
 useTestFighters(TEST_A, DEF_9999, TEST_MOVELESS, TEST_SAMPLE);
 
@@ -635,7 +635,7 @@ test('locked roster slots stay locked on both Watch rosters, exactly as on Selec
       assert.equal(slot.hasAttribute('data-nav'), false, 'out of keyboard / gamepad navigation');
       assert.match(slot.getAttribute('aria-label'), /^Slot \d\d, locked$/);
     }
-    assert.deepEqual(screen.roster.slots.filter((s) => s._def?.available).map((s) => s._def.id), ['test-a', 'test-moveless', 'test-sample', '9999']);
+    assert.deepEqual(screen.roster.slots.filter((s) => s._def?.available).map((s) => s._def.id), ['0001', 'test-a', 'test-moveless', 'test-sample', '9999']);
   }
 });
 
@@ -681,12 +681,12 @@ test('stale Watch values fall back as Quick Battle\'s do: Medium, the first avai
   assert.equal(document.activeElement, cardOf(screens.watchDifficulty, 'medium'));
   cardOf(screens.watchDifficulty, 'medium').click();
   assert.equal(app.selection.watch.difficulty, 'medium');
-  assert.equal(document.activeElement, slotOf(screens.watchCpu1, 'test-a'));
+  assert.equal(document.activeElement, slotOf(screens.watchCpu1, '0001'), '#0001, slot 01');
   screens.watchCpu1.roster.confirm();
-  assert.equal(app.selection.watch.cpu1CharacterId, 'test-a');
-  assert.equal(document.activeElement, slotOf(screens.watchCpu2, 'test-a'));
+  assert.equal(app.selection.watch.cpu1CharacterId, '0001');
+  assert.equal(document.activeElement, slotOf(screens.watchCpu2, '0001'));
   screens.watchCpu2.roster.confirm();
-  assert.equal(app.selection.watch.cpu2CharacterId, 'test-a');
+  assert.equal(app.selection.watch.cpu2CharacterId, '0001');
   assert.equal(app.selection.watch.mapId, MAPS[0].id, 'an unknown stage is the first one');
   assert.equal(document.activeElement, mapCard(screens.watchMap, MAPS[0].id));
 });

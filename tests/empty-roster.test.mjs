@@ -1,13 +1,15 @@
 // Run with node --test tests/empty-roster.test.mjs (no dependencies).
-// The roster as it ships: #0001 kept whole but disabled, and no other
-// fighter, so nothing is playable. The two fighters that held slots 02 and
-// 03 are gone (definitions, art, tests, translations, credits), and every
-// route that would start a match refuses rather than falling back to a
-// disabled or missing fighter: startup, the roster, Select Fighter and
-// Watch Mode's CPU screens, Practice Ground and Home (the Battle screen's
-// own refusals are in battle-screen.test.mjs). Nothing here registers a
-// test fighter except to show that one becoming playable reopens Home. On
-// a minimal fake DOM; layout and paint still need real-browser checks.
+// The roster as it ships: #0001 alone, whole and playable again. The two
+// fighters that held slots 02 and 03 are gone (definitions, art, tests,
+// translations, credits). And the empty roster, which the game still
+// handles for the day no fighter is playable: with #0001 disabled for the
+// length of a test (`withoutFighters`), every route that would start a
+// match refuses rather than falling back to a disabled or missing fighter:
+// startup, the roster, Select Fighter and Watch Mode's CPU screens,
+// Practice Ground and Home (the Battle screen's own refusals are in
+// battle-screen.test.mjs). Nothing here registers a test fighter except to
+// show that one becoming playable reopens Home. On a minimal fake DOM;
+// layout and paint still need real-browser checks.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
@@ -197,6 +199,19 @@ const exists = (path) => existsSync(new URL(path, ROOT));
 const read = (path) => readFileSync(new URL(path, ROOT), 'utf8');
 const DEF_0001 = getCharacter('0001');
 
+// Runs `fn` (sync or async) with #0001 disabled, so nothing is playable,
+// and enables it again afterwards whatever happens.
+function withoutFighters(fn) {
+  return async (...args) => {
+    DEF_0001.available = false;
+    try {
+      return await fn(...args);
+    } finally {
+      DEF_0001.available = true;
+    }
+  };
+}
+
 // The app as the screens see it: loads and sprite reads are recorded (none
 // may happen), and so is every navigation and loading overlay call.
 function fakeApp() {
@@ -232,17 +247,16 @@ function fakeApp() {
 
 // ---- The data -------------------------------------------------------------------
 
-test('the roster ships #0001 alone, kept whole but disabled: no fighter is playable', () => {
+test('the roster ships #0001 alone, whole and playable', () => {
   assert.deepEqual(CHARACTERS.map((c) => c.id), ['0001']);
   assert.equal(DEF_0001.id, '0001');
   assert.equal(DEF_0001.displayName, '#0001');
-  assert.equal(DEF_0001.rosterSlot, 0, 'still slot 01');
-  assert.equal(DEF_0001.available, false);
-  assert.equal(isPlayable(DEF_0001), false);
-  assert.equal(getPlayableCharacter('0001'), null, 'the definition exists, but it is not playable');
-  assert.deepEqual(playableCharacters(), []);
-  assert.deepEqual(CHARACTERS.filter((c) => c.available), []);
-  // Nothing of it was stripped: re-enabling it is only `available: true`.
+  assert.equal(DEF_0001.rosterSlot, 0, 'slot 01');
+  assert.equal(DEF_0001.available, true);
+  assert.equal(isPlayable(DEF_0001), true);
+  assert.equal(getPlayableCharacter('0001'), DEF_0001);
+  assert.deepEqual(playableCharacters(), [DEF_0001]);
+  // Nothing of it was stripped while it was disabled.
   assert.deepEqual(Object.keys(DEF_0001.attacks).sort(), ['attack1', 'attack2', 'extra_attack', 'midair_attack1', 'midair_attack2']);
   assert.deepEqual(DEF_0001.chargeReplacements, { attack1: { type: 'summon', id: 'attack3' }, attack2: { type: 'technique', id: 'attack4' } });
   assert.ok(DEF_0001.summons.attack3 && DEF_0001.chargedTechniques.attack4, 'Clone Attack and Sphere Rush');
@@ -261,12 +275,38 @@ test('the roster ships #0001 alone, kept whole but disabled: no fighter is playa
   assert.equal(STRINGS.en['credits.sprites.title'], '#0001 sprite source');
 });
 
-test('the engine and its tests still build #0001 from its definition, disabled or not', () => {
-  assert.equal(HARNESS_DEF, DEF_0001, 'the combat tests\' fighter is the real, disabled #0001');
+test('#0001 is every default: Quick Battle, both Watch Mode CPUs, Practice Ground, and the one fighter preloaded', async () => {
+  const selection = initialSelection();
+  assert.equal(selection.characterId, '0001');
+  assert.equal(selection.watch.cpu1CharacterId, '0001');
+  assert.equal(selection.watch.cpu2CharacterId, '0001');
+  assert.equal(practiceDefaultFighter(), DEF_0001);
+  const asked = [];
+  App.prototype.preloadFighters.call({ loadCharacter: (id) => asked.push(id) });
+  assert.deepEqual(asked, ['0001']);
+  // Home opens every match action, with no note.
+  const { app } = fakeApp();
+  const home = new HomeScreen(app);
+  home.enter();
+  for (const id of MATCH_ACTIONS) assert.equal(home.actions[id].disabled, false, id);
+  assert.equal(home.el.querySelector('.home-note').hidden, true);
+  // The roster offers slot 01 and selects it.
+  const roster = new FighterRoster(app, { host: new Element('section'), onConfirm: noop });
+  assert.equal(roster.slots[0]._def, DEF_0001);
+  assert.ok(!roster.slots[0].classList.contains('is-locked'), 'slot 01 is open');
+  assert.equal(roster.slots[0].hasAttribute('data-nav'), true);
+  assert.ok(roster.slots.slice(1).every((slot) => slot.classList.contains('is-locked')), 'the rest are locked');
+  roster.show('0001');
+  assert.equal(roster.selectedId, '0001');
+  assert.equal(roster.confirmBtn.disabled, false);
+});
+
+test('the engine and its tests build #0001 from its definition, disabled or not', withoutFighters(() => {
+  assert.equal(HARNESS_DEF, DEF_0001, 'the combat tests\' fighter is the real #0001, even disabled');
   const { fighter } = makeFighter();
   assert.equal(fighter.def, DEF_0001);
   assert.equal(fighter.combat.launchPoint, 0);
-});
+}));
 
 test('the removed fighters are gone: no definition, art, tests, helpers, icon or prompt file', () => {
   for (const id of REMOVED) {
@@ -308,7 +348,7 @@ test('no translation or credit is left for the removed fighters, in either langu
 
 // ---- Startup -----------------------------------------------------------------------
 
-test('startup names no fighter for Quick Battle or Watch Mode, and preloads none', async () => {
+test('with nothing playable, startup names no fighter for Quick Battle or Watch Mode, and preloads none', withoutFighters(async () => {
   const selection = initialSelection();
   assert.equal(selection.characterId, null);
   assert.equal(selection.watch.cpu1CharacterId, null);
@@ -331,11 +371,11 @@ test('startup names no fighter for Quick Battle or Watch Mode, and preloads none
   }
   assert.deepEqual(loaded, [], 'no frame requested');
   assert.equal(app.spriteSets.size + app.spritePromises.size, 0);
-});
+}));
 
 // ---- The roster ----------------------------------------------------------------------
 
-test('the roster renders every slot locked, #0001\'s included, selects nothing and never loads a preview', () => {
+test('with nothing playable, the roster renders every slot locked, disabled #0001\'s included, selects nothing and never loads a preview', withoutFighters(() => {
   const { app, loads, reads } = fakeApp();
   const host = new Element('section');
   const confirmed = [];
@@ -376,9 +416,9 @@ test('the roster renders every slot locked, #0001\'s included, selects nothing a
   // Keyboard, gamepad and pointer find nothing to move to in the grid.
   assert.deepEqual(app.nav.candidates(roster.rosterPanel), []);
   assert.deepEqual(app.nav.candidates(roster.previewPanel), [], 'the disabled Confirm neither');
-});
+}));
 
-test('Select Fighter and Watch Mode\'s CPU screens open on the locked roster: focus on Back, nothing to confirm', () => {
+test('Select Fighter and Watch Mode\'s CPU screens open on the locked roster: focus on Back, nothing to confirm', withoutFighters(() => {
   for (const make of [(app) => new CharacterSelectScreen(app), (app) => new WatchFighterScreen(app, 1), (app) => new WatchFighterScreen(app, 2)]) {
     const { app, loads } = fakeApp();
     // A stale pick of disabled #0001 changes nothing.
@@ -396,11 +436,11 @@ test('Select Fighter and Watch Mode\'s CPU screens open on the locked roster: fo
     assert.equal(screen.chosenId, screen.key === 'characterId' ? '0001' : app.selection.watch[screen.key], 'the stale pick is left alone, never used');
     assert.deepEqual(loads, []);
   }
-});
+}));
 
 // ---- Practice Ground -------------------------------------------------------------------
 
-test('Practice Ground never starts disabled #0001: no default fighter, no load, the unavailable error and Back Home', async () => {
+test('Practice Ground never starts disabled #0001: no default fighter, no load, the unavailable error and Back Home', withoutFighters(async () => {
   assert.equal(practiceDefaultFighter(), null);
   assert.doesNotMatch(read('js/screens/practice-screen.js'), /'0001'|PRACTICE_DEFAULT_FIGHTER/);
   const { app, loads } = fakeApp();
@@ -429,11 +469,11 @@ test('Practice Ground never starts disabled #0001: no default fighter, no load, 
   }
   assert.deepEqual(loads, []);
   screen.exit();
-});
+}));
 
 // ---- Home ------------------------------------------------------------------------------
 
-test('Home closes Play, Watch Mode and Practice Ground and says why; Discover, Settings and the credits stay open', () => {
+test('with nothing playable, Home closes Play, Watch Mode and Practice Ground and says why; Discover, Settings and the credits stay open', withoutFighters(() => {
   const { app } = fakeApp();
   const home = new HomeScreen(app);
   app.screens.current = home;
@@ -480,9 +520,9 @@ test('Home closes Play, Watch Mode and Practice Ground and says why; Discover, S
   }
   assert.match(read('styles.css'), /\.home-action:disabled \{/);
   assert.match(read('styles.css'), /\.home-note\[hidden\] \{ display: none; \}/);
-});
+}));
 
-test('a fighter becoming playable reopens Home\'s match actions, and losing it closes them again: no hack to undo', async () => {
+test('with nothing playable, a fighter becoming playable reopens Home\'s match actions, and losing it closes them again: no hack to undo', withoutFighters(async () => {
   const { app } = fakeApp();
   const home = new HomeScreen(app);
   await withTestFighters([TEST_A], () => {
@@ -503,4 +543,4 @@ test('a fighter becoming playable reopens Home\'s match actions, and losing it c
   assert.ok(MATCH_ACTIONS.every((id) => home.actions[id].disabled));
   assert.equal(home.el.querySelector('.home-note').hidden, false);
   assert.deepEqual(CHARACTERS.map((c) => c.id), ['0001'], 'the test fighter is gone again');
-});
+}));

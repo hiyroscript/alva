@@ -362,6 +362,26 @@ refusals in `tests/battle-screen.test.mjs`. The screen tests that need a
 fighter to pick register test-only ones from `tests/test-fighters.mjs`
 (#0001's definition under neutral ids, taken out again after each run).
 
+### Later: #0001 re-enabled
+
+#0001 is playable again: `available: true` in `js/data/characters.js`, the
+one change "Where to change it" above names, and nothing else in the game
+changed. With it, slot 01 is open on every roster and #0001 is what startup
+preloads, Quick Battle's initial pick, both Watch Mode CPUs and the
+Practice Ground default (all by being the first playable fighter, never a
+fixed id). Home's match actions are open and its "No fighters available"
+note hidden. Every zero-fighter path stays in the code and is still
+tested.
+
+**Tests:** `tests/empty-roster.test.mjs` checks the shipped state (#0001
+alone playable and every default) and disables #0001 for its own run to
+keep the zero-fighter checks; `tests/discover.test.mjs` does the same for
+Discover. Where a screen test needs a fighter that exists but is not
+playable, it registers `TEST_DISABLED` (`tests/test-fighters.mjs`, slot 07)
+instead of #0001 (`tests/battle-screen.test.mjs`,
+`tests/touch-layout.test.mjs`). The Watch Mode and Practice Ground tests
+expect #0001 as the first playable fighter.
+
 ## Control and move codenames
 
 History: this section records an earlier rename, and several of the names

@@ -14,7 +14,7 @@ import { CombatState } from '../js/game/combat.js';
 import { formatLaunchPoint, describeEnergy } from '../js/game/hud.js';
 import { CONFIG } from '../js/config.js';
 import { duel, def as DEF_0001 } from './fighter-harness.mjs';
-import { TEST_A, REMOVED_IDS, withTestFighters } from './test-fighters.mjs';
+import { TEST_A, TEST_DISABLED, REMOVED_IDS, withTestFighters } from './test-fighters.mjs';
 
 class Node {
   parentNode = null;
@@ -895,12 +895,12 @@ async function enterRefused({ params, selection }) {
   return { app, screen, loads, errors, went, named };
 }
 
-test('Battle never starts a fighter that is not playable: disabled #0001, a removed one, null, missing or unknown, in Quick Battle and Watch Mode', async () => {
+test('Battle never starts a fighter that is not playable: a disabled one, a removed one, null, missing or unknown, in Quick Battle and Watch Mode', () => withTestFighters([TEST_DISABLED], async () => {
   const quick = (id) => ({ selection: { characterId: id } });
   const quickDirect = (id) => ({ params: { characterId: id } });
   const watch = (id) => ({ params: { mode: 'watch' }, selection: { watch: { difficulty: 'hard', cpu1CharacterId: id, cpu2CharacterId: id } } });
   const watchDirect = (id) => ({ params: { mode: 'watch', cpu1CharacterId: id, cpu2CharacterId: id } });
-  for (const id of ['0001', ...REMOVED_IDS, null, undefined, '', 'no-such-fighter']) {
+  for (const id of [TEST_DISABLED.id, ...REMOVED_IDS, null, undefined, '', 'no-such-fighter']) {
     for (const [route, opts] of Object.entries({ quick, quickDirect, watch, watchDirect })) {
       const label = `${route}: ${id}`;
       const { screen, loads, errors, went, named, app } = await enterRefused(opts(id));
@@ -918,19 +918,27 @@ test('Battle never starts a fighter that is not playable: disabled #0001, a remo
       assert.equal(screen.isRunning, false);
     }
   }
-});
+  // Playable #0001 gets past the check to its load, on every route.
+  const watchOn = (id) => ({ params: { mode: 'watch' }, selection: { watch: { difficulty: 'hard', cpu1CharacterId: id, cpu2CharacterId: id, mapId: 'desert' } } });
+  for (const opts of [quick('0001'), quickDirect('0001'), watchOn('0001'), watchDirect('0001')]) {
+    const { loads, errors } = await enterRefused(opts);
+    assert.deepEqual(loads.slice(0, 2), ['show: Loading #0001', '0001']);
+    assert.doesNotMatch(errors[0]?.message ?? '', /not available/);
+  }
+}));
 
-test('Watch Mode refuses a pair with one fighter that cannot play, and Quick Battle a disabled one given directly, while others are playable', () => withTestFighters([TEST_A], async () => {
+test('Watch Mode refuses a pair with one fighter that cannot play, and Quick Battle a disabled one given directly, while others are playable', () => withTestFighters([TEST_A, TEST_DISABLED], async () => {
   const [removed1, removed2] = REMOVED_IDS;
-  for (const [cpu1, cpu2] of [[TEST_A.id, '0001'], ['0001', TEST_A.id], [TEST_A.id, removed2], [removed1, TEST_A.id]]) {
+  const off = TEST_DISABLED.id;
+  for (const [cpu1, cpu2] of [[TEST_A.id, off], [off, TEST_A.id], [TEST_A.id, removed2], [removed1, TEST_A.id]]) {
     const { screen, loads, errors } = await enterRefused({ params: { mode: 'watch', cpu1CharacterId: cpu1, cpu2CharacterId: cpu2 } });
     assert.equal(screen.battle, null, `${cpu1} vs ${cpu2}`);
     assert.deepEqual(loads, [], 'not even the playable one is loaded');
     assert.equal(errors.length, 1);
   }
-  // A stale selection naming disabled #0001 is refused even with a
+  // A stale selection naming a disabled fighter is refused even with a
   // playable fighter to hand: nothing falls back to it silently.
-  const { screen, loads, errors } = await enterRefused({ selection: { characterId: '0001' } });
+  const { screen, loads, errors } = await enterRefused({ selection: { characterId: off } });
   assert.equal(screen.battle, null);
   assert.deepEqual(loads, []);
   assert.equal(errors.length, 1);

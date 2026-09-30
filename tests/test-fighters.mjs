@@ -1,11 +1,11 @@
-// Test-only playable fighters (imported by the *.test.mjs files; not a test
-// file itself, and never in the game). The production roster has no
-// playable fighter (#0001 is kept but disabled), so a screen test that needs
-// one to pick, preview, practise with or watch registers these for its own
-// run: #0001's definition and art (borrowed: they are not what those tests
-// check) under neutral ids, marked available, in roster slots of their own
-// (slot 01 stays #0001's, locked). Every one registered is taken out again,
-// so the exported CHARACTERS array ends each run as it started.
+// Test-only fighters (imported by the *.test.mjs files; not a test file
+// itself, and never in the game). The production roster has one playable
+// fighter, #0001, so a screen test that needs more to pick, preview,
+// practise with or watch registers these for its own run: #0001's
+// definition and art (borrowed: they are not what those tests check) under
+// neutral ids, marked available (all but TEST_DISABLED), in roster slots of
+// their own (slot 01 stays #0001's). Every one registered is taken out
+// again, so the exported CHARACTERS array ends each run as it started.
 import { after } from 'node:test';
 import { CHARACTERS, getCharacter } from '../js/data/characters.js';
 import { SAMPLE_FIGHTER } from './sample-fighter.mjs';
@@ -37,6 +37,10 @@ export const TEST_MOVELESS = testFighter('test-moveless', 'Moveless', 3, {
 // The sample fighter's different moves and names (see sample-fighter.mjs),
 // playable, in slot 05.
 export const TEST_SAMPLE = { ...SAMPLE_FIGHTER, id: 'test-sample', displayName: 'Sample', rosterSlot: 4, available: true };
+
+// A fighter that exists but is disabled (`available: false`, slot 07): the
+// definition no route may start, and the roster shows locked.
+export const TEST_DISABLED = testFighter('test-disabled', 'Disabled', 6, { available: false });
 
 // The ids of the fighters removed from the roster (slots 02 and 03). Only
 // ever checked for absence: no definition, art, string or credit of theirs

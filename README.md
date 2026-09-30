@@ -6,8 +6,7 @@ JavaScript with Canvas 2D: no frameworks, no build step, no WebGL or 3D engine
 desktop and on phones and tablets in landscape.
 
 This is the first playable foundation: full menu flow, a 48-slot roster
-(currently with **no selectable fighter**: #0001 is fully implemented but
-temporarily disabled, see [Roster status](#roster-status)), two compact platform-fighter stages with open ledges and a Void kill boundary, a
+(with one selectable fighter today, #0001, see [Roster status](#roster-status)), two compact platform-fighter stages with open ledges and a Void kill boundary, a
 Watch Mode for CPU-vs-CPU matches, a
 Practice Ground training room, a Discover reference screen, a Settings
 dialog, the whole interface in English or French, movement and platform
@@ -574,7 +573,7 @@ Touch controls show on touch-first devices (coarse pointer, or a touch actually 
 
 ## Current content
 
-- **Characters:** none selectable. #0001 (roster slot 01) is fully implemented, its art, moves, tuning and tests all kept, but temporarily disabled (`available: false`), so the roster shows every slot locked and no match can start (see [Roster status](#roster-status)). Everything below about #0001 describes it as it will play once it is enabled again
+- **Characters:** #0001 (roster slot 01), the one playable fighter (`available: true`; see [Roster status](#roster-status)). The other 47 slots are locked
 - **Maps:** Desert (a sandstone mesa with 2 rock outcrops, 1360 units wide) and City (a rooftop with 7 one-way platforms and a stair bulkhead, 1440 wide) for Quick Battle and Watch Mode; the Practice Ground training room (one flat training block, 1280 wide) for practice. Each is a compact main stage with open air past both ledges and the Void a short way beyond (see [Stages and the Void](#stages-and-the-void))
 - **Animations:** Idle, Run, Jump, Fall, Land (jump/fall play while airborne; land plays once on touchdown), Hurt and Mid-air Hurt (shown during hitstun on the ground / in the air), attack1 (4 frames), midair_attack1 (the kunai slash, 3 frames: `0001_midair_attack1_1`–`3`), attack2 (7 frames) and midair_attack2 (the airborne kick, 5 frames: `0001_midair_attack2_1`–`5`), each played once at 12 fps, Shield (`0001_prepshield_1` to raise it, `0001_shielding_1` held, `0001_releaseshield_1` to lower it) and Mid-air Shield (`0001_midair_shielding_1`, the held pose only), single frames drawn at 1×, Dash (`0001_mouvment_1`–`2`, drawn at 1×, played once at 10 fps), Charge (charge_1 → charge_2 once, then charge_a ↔ charge_b while held, at 10 fps, with charge_1 shown briefly on release), Throw (3 fighter frames, played once at 12 fps), Shuriken (3 looping projectile frames at 18 fps, normalized and drawn separately from the fighter poses), the clone appear / vanish cloud (`0001_attack3_object_1`–`0001_attack3_object_10`, an effect at 20 fps: forwards as a clone appears, the same frames in reverse as it vanishes), the Sphere Rush poses (`0001_attack4_1`–`0001_attack4_12` as one-shot fighter clips at 12 fps: formation 1–3, rush 4–6, contact 7–8 with 8 held, explosion 9, recovery 10–12, and 12 alone as the whiff release) and its blue sphere (`0001_attack4_object_1`–`0001_attack4_object_11` as three effects at 12 fps: formation 1–6 once, spinning on the opponent 7–9 looped while it is drawn ever larger, explosion 10–11 once)
 - **Attacks:** attack1 and attack2, each on the ground and in the air, a ground Throw that releases one shuriken, the attack3 Clone Attack and the attack4 Sphere Rush (ground only), each on its own 5-second cooldown. #0001's damage: attack1 3, midair_attack1 3, attack2 5, midair_attack2 5, shuriken 1, Sphere Rush 1 as it catches the opponent and every 0.5 s after while it holds it (4 in all), then 10 on the explosion. Transform is reserved.
@@ -612,7 +611,7 @@ ring with dark separation keep states identifiable beyond colour.
   Select Mode), **Practice Ground** opens the training room directly, and
   **Discover** opens the in-game reference. Play, Watch Mode and Practice
   Ground each start a match, so they are open only while a fighter is
-  playable: with none (as now), they are disabled, out of Tab and arrow
+  playable (#0001 is): with none, they are disabled, out of Tab and arrow
   navigation, and described by a "No fighters available" note under the
   menu, and focus starts on Discover. A compact gear button in the top
   right corner (inside the safe area, reached with → or ↑ from the menu)
@@ -842,7 +841,7 @@ first playable one, `practiceDefaultFighter` in
 `js/screens/practice-screen.js`) and a practice CPU of the same fighter,
 sharing its one loaded sprite set, on the training stage: no fighter or
 stage select, countdown, timer, points or result. It runs until you choose
-Return. With no playable fighter (as now) Home keeps it closed, and reached
+Return. With no playable fighter Home keeps it closed, and reached
 any other way it starts nothing: it loads no fighter and says a fighter is
 unavailable, with Back to Home.
 
@@ -964,39 +963,45 @@ A launch that drives its fighter hard into stage geometry **rebounds** off it in
 
 ### Roster status
 
-There is currently **no selectable fighter**. #0001 is fully implemented
-(every sprite in `assets/characters/0001/`, its animations, attacks, Shield,
-Dash, Charge replacements, projectile and effect art, tuning, body, ability
-names, credits and the engine tests of its combat) but temporarily disabled:
-its definition says `available: false`. Re-enabling it is only setting that
-back to `true`.
+There is **one selectable fighter**, #0001, in roster slot 01: fully
+implemented (every sprite in `assets/characters/0001/`, its animations,
+attacks, Shield, Dash, Charge replacements, projectile and effect art,
+tuning, body, ability names, credits and the engine tests of its combat)
+and playable, its definition saying `available: true`. So it is the fighter
+preloaded at startup, Quick Battle's initial pick, both Watch Mode CPUs and
+the Practice Ground default. Disabling it again is only setting that to
+`false`: every file of it stays.
 
 A definition existing is not the same as it being playable.
-`getCharacter(id)` finds any definition, so the engine and its tests still
-build #0001 directly; `isPlayable(def)`, `getPlayableCharacter(id)` and
+`getCharacter(id)` finds any definition, so the engine and its tests build
+fighters from it directly; `isPlayable(def)`, `getPlayableCharacter(id)` and
 `playableCharacters()` (all in `js/data/characters.js`) answer whether one may
 be picked or started, and every route that selects, preloads or starts a
 fighter goes through them:
 
-- **Startup** names no fighter for Quick Battle or Watch Mode (their
-  selections start as `null`) and preloads none (`initialSelection` and
+- **Startup** names the first playable fighter for Quick Battle and both
+  Watch Mode CPUs, and preloads only playable ones (`initialSelection` and
   `App.preloadFighters` in `js/core/app.js`); `App.loadCharacter` loads
-  nothing for a fighter that is not playable.
-- **Home** disables Play, Watch Mode and Practice Ground (see Home above).
-- **The roster** shows every slot locked, slot 01 (#0001's) included: not
-  focusable, selectable or confirmable, and no portrait or preview loads.
-  Nothing is selected and Confirm stays disabled, labelled "No fighters
-  available". Select Fighter and Watch Mode's CPU screens focus Back.
+  nothing for a fighter that is not playable. With none playable, the
+  selections start as `null` and nothing is preloaded.
+- **Home** disables Play, Watch Mode and Practice Ground while no fighter
+  is playable (see Home above).
+- **The roster** shows a fighter that is not playable locked, like an empty
+  slot: not focusable, selectable or confirmable, and no portrait or preview
+  loads. With no playable fighter at all nothing is selected, Confirm stays
+  disabled, labelled "No fighters available", and Select Fighter and Watch
+  Mode's CPU screens focus Back.
 - **Battle** refuses to start with a fighter that is not playable, whether
   it comes from a stale selection or straight from the route's parameters
-  (disabled #0001, a removed fighter's id, `null` or an unknown id), in
+  (a disabled fighter, a removed fighter's id, `null` or an unknown id), in
   Quick Battle and on either side of Watch Mode: it loads nothing and shows
   the loading overlay's "Fighter unavailable" error, with Back to Home.
 - **Practice Ground** does the same with no playable fighter, and never
   swaps a fighter or CPU that is not playable.
 
-New fighters are added through the same generic definitions (see below);
-the first one made available reopens every route with no other change.
+New fighters are added through the same generic definitions (see below).
+`tests/empty-roster.test.mjs` disables #0001 for its own run to check that
+every route stays closed with no playable fighter, and reopens with one.
 
 ### Adding a fighter
 
@@ -1008,7 +1013,7 @@ the first one made available reopens every route with no other change.
 
 A fighter whose art arrives before its attributes can still be added: give an attack whose art is in `pending: true` (art only: one pass of the clip, no hit; declaring combat fields on one is refused), leave out of `actions` any button it does not have (its touch button is hidden and the CPU never presses it), and keep `null` for a `transform` still to come (reserved, dashed). Its `attack1` and `attack2` (each with its mid-air version) are always required. Its `powers` and `movement`, which the engine cannot build a fighter without, are still its own. A clip whose art misleads the automatic anchor (effects drawn beside the body, or swinging limbs that nudge it from frame to frame) can place each frame's anchor itself with `anchorX`, and `visual.portrait.centerX` centres a portrait crop by hand.
 
-The tests already run a second, made-up fighter (`tests/sample-fighter.mjs`, never in the game) with different moves on the same codenames: a melee `extra_attack` usable in the air, a real `transform`, three numbered attacks with Charge (`attack3` a summon from Charge + `attack1`, so Charge + `attack2` stays `attack2`), no Shield. The loadout matrix (`tests/loadout-fighters.mjs`, `tests/loadout.test.mjs`) builds one fighter for each row of the [attack loadouts](#attack-loadouts) table and checks its buttons, mid-air versions, Charge routing, input buffer, touch slots and CPU, plus every rule broken on purpose. It goes through combat, the CPU, the touch buttons and the codename checks (`tests/sample-fighter.test.mjs`), so anything that only works for #0001 shows up there first. A new character is checked against the same codename rules automatically. The screen tests that need a fighter to pick (the roster, Quick Battle, Watch Mode, Practice Ground) register test-only playable ones from `tests/test-fighters.mjs` (#0001's definition under neutral ids, taken out again after each run), since no production fighter is playable.
+The tests already run a second, made-up fighter (`tests/sample-fighter.mjs`, never in the game) with different moves on the same codenames: a melee `extra_attack` usable in the air, a real `transform`, three numbered attacks with Charge (`attack3` a summon from Charge + `attack1`, so Charge + `attack2` stays `attack2`), no Shield. The loadout matrix (`tests/loadout-fighters.mjs`, `tests/loadout.test.mjs`) builds one fighter for each row of the [attack loadouts](#attack-loadouts) table and checks its buttons, mid-air versions, Charge routing, input buffer, touch slots and CPU, plus every rule broken on purpose. It goes through combat, the CPU, the touch buttons and the codename checks (`tests/sample-fighter.test.mjs`), so anything that only works for #0001 shows up there first. A new character is checked against the same codename rules automatically. The screen tests that need more than one fighter to pick (the roster, Quick Battle, Watch Mode, Practice Ground) register test-only ones from `tests/test-fighters.mjs` beside #0001 (#0001's definition under neutral ids, and a disabled one, taken out again after each run).
 
 To add attacks, create animations with real frames, define them in `attacks` under their universal codenames (`attack1` … `attack5`, `midair_attack1` … `midair_attack5`, `extra_attack`; see the schema in `js/game/combat.js`), give each its `damage`, `baseLaunch` and `directionalLaunch`, optionally how it moves (`momentum` / `airMomentum`, `control` / `airControl`, `friction`, a `step`) and when a hit opens a follow-up (`hitCancel`), and map them in `actions`: every numbered button is `{ ground: 'attackN', air: 'midair_attackN' }`, picked by whether the fighter is grounded (as #0001's `attack1: { ground: 'attack1', air: 'midair_attack1' }` and `attack2: { ground: 'attack2', air: 'midair_attack2' }`), `extra_attack: 'extra_attack'` is one attack, and `transform: null` is reserved. A projectile an attack throws is named after it (`projectiles.extra_attack_object`, thrown by `extra_attack`), and so is its art. Time `startup` / `active` / `recovery` to whole frames of the clip so the hitbox is live only while the strike is on screen. An attack without frames is refused rather than faked. Base Launch and Directional Launch are declared separately from damage (see [Launch](#launch)):
 

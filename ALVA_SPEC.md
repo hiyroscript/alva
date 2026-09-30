@@ -143,9 +143,8 @@ behave, and how it must look. The README covers running and deploying it.
   (`sourceFacing: 0`): the round orb is never mirrored, only its position
   offset follows facing. It is not a projectile. None of the 23 files is
   duplicated, and none remains at the repository root.
-- `assets/characters/0001/` is the only fighter art in the repository. #0001
-  is temporarily disabled (7.2), but every one of its files stays, and any
-  future fighter's frames go in a folder of its own id.
+- `assets/characters/0001/` is the only fighter art in the repository, and
+  any future fighter's frames go in a folder of its own id.
 - Source orientation: #0001's art faces right (`sourceFacing: 1` on the
   character), every registered clip included. An animation may override
   the character's orientation with its own `sourceFacing` (none of #0001's
@@ -367,8 +366,8 @@ no header, build label, eyebrow or keyboard hint bar.
   keyboard / gamepad menu navigation, in that order, which the DOM order
   matches whatever the layout. Home buttons have a small 3 px radius.
 - **No playable fighter:** Play, Watch Mode and Practice Ground each start a
-  match, so they are open only while some fighter is playable (7.2). With
-  none, as today, they are disabled (quieter outline, muted label, no hover
+  match, so they are open only while some fighter is playable (7.2; #0001
+  is, today). With none, they are disabled (quieter outline, muted label, no hover
   or press response), out of Tab and menu navigation, and a press goes
   nowhere; each is described (`aria-describedby`) by a small muted note under
   the menu, "No fighters available" ("Aucun combattant disponible"), a
@@ -465,13 +464,15 @@ no header, build label, eyebrow or keyboard hint bar.
   fighter is always shown with the `#`. Only a playable fighter (`available`,
   7.2) is a selectable slot; every other slot is a quiet locked placeholder
   (silhouette + lock). No invented names or power ratings.
-- **Today no slot is selectable.** `#0001` holds slot 01 but is temporarily
-  disabled, so its slot is locked like the rest ("Slot 01, locked"): never
-  focused, selected, confirmed or previewed, and no portrait loads for it.
-  Nothing is selected, the preview shows slot 01 locked, and Confirm stays
-  disabled, labelled "No fighters available"; a stale or direct choice of a
-  fighter that is not playable never selects its slot. The screen's default
-  focus is its Back button.
+- **Today one slot is selectable:** `#0001` in slot 01, selected and
+  focused by default; the other 47 are locked. A fighter that is not
+  playable (disabled, with `available: false`) keeps its slot but shows it
+  locked like the rest ("Slot 01, locked"): never focused, selected,
+  confirmed or previewed, and no portrait loads for it. With no playable
+  fighter at all nothing is selected, the preview shows slot 01 locked,
+  and Confirm stays disabled, labelled "No fighters available", the
+  screen's default focus its Back button; a stale or direct choice of a
+  fighter that is not playable never selects its slot.
 - Locked slots are non-interactive: hover, Tab and keyboard/gamepad navigation
   skip them, and they show no hover border or focus ring. Any fighter marked
   available becomes a normal selectable slot.
@@ -582,7 +583,7 @@ Select CPU 2 → Select Stage → CPU vs CPU Battle.
   Battle never starts before its sprites are ready.
 - Fighter unavailable: a Battle (Quick Battle, or either side of Watch Mode)
   or a Practice Ground session asked to start with a fighter that is not
-  playable (disabled like #0001, removed, missing or unknown, from a stale
+  playable (disabled, removed, missing or unknown, from a stale
   selection or the route itself) loads nothing and shows the same overlay
   headed "Fighter unavailable", "This session cannot start: a fighter it
   needs is not available.", with only **Back** (focused; to Home): there is
@@ -1032,16 +1033,18 @@ French, concise game terms).
 
 - **Roster and availability.** `CHARACTERS` (`js/data/characters.js`)
   holds one definition today, `#0001`, in roster slot 01, fully
-  implemented (everything below) but temporarily disabled: `available:
-  false`. So no fighter is playable. A definition existing (`getCharacter`,
-  which the engine and its tests still build #0001 from) is not the same as
-  it being playable (`isPlayable`, `getPlayableCharacter`,
+  implemented (everything below) and playable: `available: true`. So it is
+  the one fighter preloaded at startup, the initial Quick Battle choice,
+  both Watch Mode CPUs and the Practice default. A definition existing
+  (`getCharacter`, which the engine and its tests build fighters from) is
+  not the same as it being playable (`isPlayable`, `getPlayableCharacter`,
   `playableCharacters`): only a playable fighter is preloaded at startup,
   offered by a roster, the initial Quick Battle / Watch Mode choice or the
   Practice default, or started in a Battle or Practice Ground; nothing ever
-  falls back to a disabled or missing one (6.2, 6.4, 6.7, 6.8). Re-enabling
-  #0001 is setting `available: true` again, and a new fighter is a new
-  definition with its own art folder, `rosterSlot` and `available: true`.
+  falls back to a disabled or missing one (6.2, 6.4, 6.7, 6.8). Disabling a
+  fighter is setting its `available: false` (every file of it kept, its
+  roster slot then locked), and a new fighter is a new definition with its
+  own art folder, `rosterSlot` and `available: true`.
 - **Attack loadout** (`js/data/loadout.js`). A fighter's attacks go by
   universal codenames, the same for every character: the numbered attacks
   `attack1` to `attack5`, each one's mid-air version `midair_attack1` to

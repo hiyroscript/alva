@@ -95,9 +95,7 @@ export const CHARACTERS = [
   {
     id: '0001',
     displayName: '#0001',
-    // Temporarily disabled: its definition, art and tuning are kept whole,
-    // but no roster, menu or match offers it until this is true again.
-    available: false,
+    available: true,
     rosterSlot: 0,
 
     // The source art faces right. A clip drawn the other way would override
