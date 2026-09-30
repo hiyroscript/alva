@@ -208,8 +208,8 @@ export class SpriteSet {
         // pixels from the left of the frame's visible art) where the art
         // misleads visual.anchor: large effects drawn beside the body pull
         // its centroid off the body, and swinging limbs nudge it by a
-        // fraction of an art pixel from frame to frame (see #0002's clips,
-        // anchored on the head their frames share).
+        // fraction of an art pixel from frame to frame (a clip can anchor
+        // instead on a head its frames all share).
         frame.authoredAnchor = anim.anchorX?.[i] ?? null;
         frames.push(frame);
       }

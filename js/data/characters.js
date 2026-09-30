@@ -1,6 +1,6 @@
 // Character database.
 //
-// Adding a fighter (the next is #0004) should only require:
+// Adding a fighter should only require:
 //   1. dropping frames into ./assets/characters/<id>/
 //   2. adding a definition to CHARACTERS below, its moves keyed by the
 //      universal move codenames (MOVES in js/config.js: ba1, maba1, cba1,
@@ -12,15 +12,23 @@
 //      'reverseVertical'), e.g. `damage: 10, baseLaunch: 2,
 //      directionalLaunch: 'vertical'` (see js/data/launch.js)
 //   3. giving it a rosterSlot
-//   4. optionally, naming its moves in `abilityNames` (keyed by move
+//   4. setting `available: true` once it is ready to be played
+//   5. optionally, naming its moves in `abilityNames` (keyed by move
 //      codename; see js/data/abilities.js)
 //
-// A fighter whose art comes before its combat attributes (as #0002's does)
-// can still be added: an attack whose art is in is `pending` (art only, see
-// js/game/combat.js), a move it does not have at all is left out of its
-// `actions` (its touch button is hidden; #0002, with only movement and hurt
-// art so far, leaves out every one), and whatever the engine cannot build a
-// fighter without comes from TEMPORARY_BASELINE below until it is authored.
+// A fighter whose art comes before its combat attributes can still be
+// added: an attack whose art is in is `pending` (art only, see
+// js/game/combat.js), and a move it does not have at all is left out of its
+// `actions` (its touch button is hidden and the CPU never presses it). What
+// the engine cannot build a fighter without, its `powers` and `movement`,
+// is still its own.
+//
+// A definition existing is not the same as it being playable. getCharacter
+// finds any definition (the engine and its tests build fighters from it);
+// only an `available` one is playable (isPlayable, getPlayableCharacter,
+// playableCharacters below): only those are preloaded, offered by a roster
+// or started in a Battle, Watch Mode or Practice Ground. With none
+// available, every game-start route stays closed.
 //
 // Every field the engine reads lives here; nothing about any one fighter is
 // hard-coded in the game systems.
@@ -63,91 +71,13 @@ const RASEN_FPS = 12;
 // pass of rasenSphereBuild (6 frames = 0.5 s) before it dashes.
 const PRASEN_FPS = 12;
 
-const BASE_0002 = './assets/characters/0002/0002_';
-
-// `${base}${name}_1.png` ... `${base}${name}_<count>.png`: #0002's frames
-// put an underscore before the frame number (0002_idle_3.png is idle,
-// frame 3).
-const numbered = (base, name, count) =>
-  Array.from({ length: count }, (_, i) => `${base}${name}_${i + 1}.png`);
-
-// Height in art pixels of #0002's idle (the reference clip): every
-// heightRatio below is a clip's tallest frame over it.
-const IDLE_ART_0002 = 39;
-
-// World units per art pixel for #0001's art (visual.height 88 over its
-// 52-pixel idle). #0002 and #0003 are drawn at the same size per art pixel,
-// so every fighter's pixels are the same size on screen and the view's
-// whole-pixel snap (sized from Player 1's art, see computeWorldScale in
-// js/game/arena.js) keeps each one crisp, whoever is Player 1.
-const WORLD_PER_ART_0001 = 88 / 52;
-
-const BASE_0003 = './assets/characters/0003/0003_';
-
-// Height in art pixels of #0003's idle (the reference clip). Its art is 1x
-// (one file pixel per art pixel), so no pixel grid is ever detected in it:
-// each clip's heightRatio, its tallest frame over this, is what sizes it,
-// at exactly one art pixel per file pixel.
-const IDLE_ART_0003 = 49;
-
-// Playback rates of #0003's clips. Each attack's phases below are whole
-// frames at its rate, and a Dash lasts one pass of the dash clip, so tuning
-// a rate keeps the timing on the art.
-const FPS_0003 = Object.freeze({
-  ba1: 15,
-  ba2: 12,
-  maba1: 12,
-  maba2: 12,
-  uniqueba: 12,
-  charge: 10,
-  dash: 10,
-});
-
-// TODO #0002: replace temporary baseline when authored attributes are supplied.
-//
-// What a Fighter cannot be built without, for a fighter whose own values
-// are not authored yet: its Power tiers and its neutral movement.
-// Placeholder plumbing so it can load, move, jump, fall, land, be hit and
-// respawn like any fighter: none of it is anyone's designed stats. The
-// Powers are each Power's own default tier (defaultTier in
-// js/data/powers.js); the movement is #0001's neutral movement as it
-// stands, copied rather than shared so tuning #0001 never moves it, and
-// only what the engine reads for a fighter with no attacks and no Dash (no
-// attackBuffer, dashSpeed or dashTapWindow). Everything else a fighter may
-// declare (energy, launchReaction, launchBounce, stats) is left to the
-// engine's neutral defaults by leaving it out. The body is not here: it is
-// measured from each fighter's own art.
-export const TEMPORARY_BASELINE = Object.freeze({
-  powers: Object.freeze({ jump: 2, speed: 2 }),
-  movement: Object.freeze({
-    acceleration: 4200,
-    deceleration: 4200,
-    turnBoost: 2.6,
-    overspeedDeceleration: 6000,
-    airAcceleration: 3000,
-    airDeceleration: 380,
-    airTurnBoost: 2.0,
-    gravityScale: 1,
-    maxFallSpeed: 1500,
-    fastFallAcceleration: 12000,
-    fastFallSpeed: 1400,
-    coyoteTime: 0.1,
-    jumpBuffer: 0.12,
-    highJumpWindow: 0.15,
-    highJumpHeight: 1.4,
-    airJumps: 1,
-    airJumpRatio: 0.9,
-    hitstunFriction: 1600,
-    hitstunAirDrag: 210,
-    dropThroughTime: 0.28,
-  }),
-});
-
 export const CHARACTERS = [
   {
     id: '0001',
     displayName: '#0001',
-    available: true,
+    // Temporarily disabled: its definition, art and tuning are kept whole,
+    // but no roster, menu or match offers it until this is true again.
+    available: false,
     rosterSlot: 0,
 
     // The source art faces right. A clip drawn the other way would override
@@ -943,572 +873,28 @@ export const CHARACTERS = [
       },
     },
   },
-
-  // #0002: only its movement and hurt art is in so far (idle, run, jump,
-  // fall, land, hurt and mid-air hurt). No move of its own is authored or
-  // guessed here: it has no attacks, Unique Basic Attack, Transform, Shield,
-  // Dash, charged action, projectile or effect, and its movement is
-  // TEMPORARY_BASELINE's placeholder. It moves, jumps, falls, lands and is
-  // hit like any fighter.
-  {
-    id: '0002',
-    displayName: '#0002',
-    available: true,
-    rosterSlot: 1,
-
-    // Every #0002 clip is drawn facing right: the face, the leading glove
-    // and the run's lean all point that way, the quills trail left.
-    sourceFacing: 1,
-
-    // All its art is 2x pixel art on one art-pixel scale (the grid is
-    // detected in every frame, so heightRatio, the clip's tallest frame
-    // over idle's 39, only sizes a frame whose grid cannot be found).
-    //
-    // Anchors (`anchorX`, art pixels from the left of each frame's visible
-    // art): the idle, land, jump and mid-air hurt frames draw the very same
-    // head, the idle and land frames at the same place in every file, the
-    // jump's 2 art pixels further right and the mid-air hurt's where idle's
-    // is. Each is anchored so that head never moves: the idle breathes, a
-    // touchdown bends the legs under a still body and a takeoff leaves the
-    // head where it was. The automatic torso anchor (visual.anchor) would
-    // follow the swinging arms instead, shifting the head by a fraction of
-    // an art pixel from frame to frame. The run frames draw one leaning
-    // body (run_3 two art pixels further left in its file), anchored the
-    // same way where the torso anchor puts it on average. Fall and hurt,
-    // single frames with a head of their own, keep the torso anchor.
-    animations: {
-      // Two slow breaths a loop: frames 1-4 and 5-8 (0002_idle_5.png is a
-      // copy of 0002_idle_1.png, the loop's middle), each dipping one art
-      // pixel on its third frame. 8 fps: one breath every half second.
-      idle: {
-        frames: numbered(BASE_0002, 'idle', 8),
-        fps: 8,
-        loop: true,
-        heightRatio: 1,
-        anchorX: [14, 14, 14, 14, 14, 14, 14, 14],
-      },
-      // The legs a spinning blur under the leaning body: 12 fps at top
-      // speed (three turns a second), slower as the fighter slows, down to
-      // 0.6 of that (minSpeedScale).
-      run: {
-        frames: numbered(BASE_0002, 'run', 4),
-        fps: 12,
-        loop: true,
-        heightRatio: 36 / IDLE_ART_0002,
-        minSpeedScale: 0.6,
-        anchorX: [23, 23, 21, 23],
-      },
-      // Single frames, held for the rest of the ascent / descent.
-      jump: {
-        frames: [`${BASE_0002}jump.png`],
-        fps: 10,
-        loop: false,
-        heightRatio: 45 / IDLE_ART_0002,
-        anchorX: [16],
-      },
-      fall: {
-        frames: [`${BASE_0002}fall.png`],
-        fps: 10,
-        loop: false,
-        heightRatio: 48 / IDLE_ART_0002,
-      },
-      // One frame on touchdown, and the land state lasts exactly one pass
-      // of it: 1/12 s (5 steps), so a single pose never holds movement up.
-      land: {
-        frames: [`${BASE_0002}land.png`],
-        fps: 12,
-        loop: false,
-        heightRatio: 38 / IDLE_ART_0002,
-        anchorX: [14],
-      },
-      // Hitstun poses: `hurt` while grounded, `midairHurt` while airborne
-      // (and tumbling). Single frames, held for as long as the stun lasts.
-      hurt: {
-        frames: [`${BASE_0002}hurt.png`],
-        fps: 12,
-        loop: false,
-        heightRatio: 42 / IDLE_ART_0002,
-      },
-      midairHurt: {
-        frames: [`${BASE_0002}midairhurt.png`],
-        fps: 12,
-        loop: false,
-        heightRatio: 36 / IDLE_ART_0002,
-        anchorX: [14],
-      },
-    },
-
-    // A still idle frame for any clip whose frames fail to load, as for
-    // #0001. It has no Charge art: the Charge stance (the universal
-    // `charge` input held on the ground) shows its first idle frame, held.
-    animationFallbacks: {
-      jump: { animation: 'idle', frame: 0 },
-      fall: { animation: 'idle', frame: 0 },
-      land: { animation: 'idle', frame: 0 },
-      hurt: { animation: 'idle', frame: 0 },
-      midairHurt: { animation: 'idle', frame: 0 },
-      chargeStart: { animation: 'idle', frame: 0 },
-      chargeLoop: { animation: 'idle', frame: 0 },
-    },
-
-    visual: {
-      // Its 39-pixel idle at #0001's size per art pixel: 66 units, three
-      // quarters of #0001's 88. The view is sized for the reference height
-      // whoever is picked (computeWorldScale in js/game/arena.js), so it
-      // simply stands shorter on the same stage.
-      height: IDLE_ART_0002 * WORLD_PER_ART_0001,
-      referenceAnimation: 'idle',
-      anchor: 'torso',
-      pixelSize: 'auto',
-      // The whole head, quills and face, over the top of the torso.
-      portrait: { animation: 'idle', frame: 0, centerY: 0.24, size: 0.64 },
-    },
-
-    // TODO #0002: replace temporary baseline when authored attributes are supplied.
-    powers: TEMPORARY_BASELINE.powers,
-    movement: TEMPORARY_BASELINE.movement,
-
-    // TODO #0002: temporary body, measured from its idle (anchor at art x
-    // 14, WORLD_PER_ART_0001 units an art pixel), until one is authored.
-    // Collision is independent from sprite/PNG dimensions: the collider is
-    // the torso and legs, up to the top of the head (the thin crest over
-    // it left out), the pushbox a little wider. The head box spans the
-    // quills behind to the face in front, the body box the gloves and
-    // shoes (the front toe and glove tips left out); both face right and
-    // mirror with the fighter.
-    collider: { width: 28, height: 64 },
-    pushbox: { width: 30 },
-    hurtboxes: [
-      { x: -18, y: -64, w: 35, h: 30 }, // head
-      { x: -14, y: -34, w: 30, h: 34 }, // body
-    ],
-
-    // No `defense`: the shared `shield` input does nothing for it (no
-    // Shield art). No movement.dashSpeed: no Dash (no Dash art).
-    //
-    // Control codenames -> move codenames, as for #0001, but every move is
-    // left out: #0002 has none yet, not even a reserved one, so its
-    // Unique Basic Attack, Transform, BA1 and BA2 inputs do nothing for
-    // it, the CPU never presses them and its touch controls have no button
-    // for them (see abilityPresence in js/ui/mobile-abilities.js). Each
-    // comes back here, with its art and its `attacks` entry, once
-    // authored.
-    actions: {},
-
-    // No attack of its own yet: none to start, none borrowed.
-    attacks: {},
-
-    // No `chargedActions`, `summons`, `chargedTechniques`, `projectiles`,
-    // `projectileAnimations` or `effectAnimations`: nothing to charge,
-    // summon or throw, and no CBA cooldown ever shows under it. No
-    // mobileAbilities or abilityNames either.
-  },
-
-  // #0003: cut from one supplied sprite sheet (see assets/characters/0003/).
-  // Idle, Run, Jump, Fall, Land, Hurt, Mid-air Hurt, Charge, the Dash and
-  // five attacks (BA1, mid-air BA1, BA2, mid-air BA2 and a melee Unique
-  // Basic Attack). No Shield, Transform, charged action, projectile or
-  // effect: the sheet has no art for them.
-  {
-    id: '0003',
-    displayName: '#0003',
-    available: true,
-    rosterSlot: 2,
-
-    // Every clip is drawn facing right.
-    sourceFacing: 1,
-
-    // Anchors (`anchorX`, art pixels from the left of each frame's visible
-    // art): the sheet sets every frame in a 93-pixel cell around one fixed
-    // origin, the cell's centre (where the square-on Charge stance stands
-    // centred), and each frame here is anchored on that same point. So the
-    // body stays exactly where the original animation puts it: the feet
-    // stay planted through the idle, a punch lunges off the back foot and a
-    // trail or swoosh never drags the fighter towards it, which the
-    // automatic torso anchor would (the punch's frames by about 16 art
-    // pixels against the idle's).
-    animations: {
-      // A breath: 1 -> 2 -> 3 -> 4, where 3 is the same drawing as 1.
-      idle: {
-        frames: frames(BASE_0003, 'idle', 4),
-        fps: 7,
-        loop: true,
-        heightRatio: 1,
-        anchorX: [24.5, 24.5, 24.5, 24.5],
-      },
-      // The low forward sprint, legs trailing. Its rate follows the speed,
-      // down to 0.7 of it.
-      run: {
-        frames: frames(BASE_0003, 'run', 4),
-        fps: 10,
-        loop: true,
-        heightRatio: 39 / IDLE_ART_0003,
-        minSpeedScale: 0.7,
-        anchorX: [30.5, 30.5, 30.5, 30.5],
-      },
-      // The Dash (the mouvement buttons, or a double tap): the flying burst,
-      // flame trailing behind. Played once per Dash, which lasts exactly
-      // one pass of it (2 frames = 0.2 s at 10 fps).
-      dash: {
-        frames: frames(BASE_0003, 'dash', 2),
-        fps: FPS_0003.dash,
-        loop: false,
-        heightRatio: 38 / IDLE_ART_0003,
-        anchorX: [38.5, 38.5],
-      },
-      // Rising: one stretched frame, held for the ascent (the air jump too).
-      jump: {
-        frames: [`${BASE_0003}jump.png`],
-        fps: 10,
-        loop: false,
-        heightRatio: 57 / IDLE_ART_0003,
-        anchorX: [21.5],
-      },
-      // Descending: the tuck at the top, then the legs reach down for the
-      // ground; held on the second.
-      fall: {
-        frames: frames(BASE_0003, 'fall', 2),
-        fps: 10,
-        loop: false,
-        heightRatio: 62 / IDLE_ART_0003,
-        anchorX: [16.5, 21.5],
-      },
-      // Touchdown: the knees give, then the deep crouch; the land state lasts
-      // one pass (2 / 12 s) and a jump, attack or hit cuts it short.
-      land: {
-        frames: frames(BASE_0003, 'land', 2),
-        fps: 12,
-        loop: false,
-        heightRatio: 41 / IDLE_ART_0003,
-        anchorX: [23.5, 23.5],
-      },
-      // Hitstun poses: `hurt` while grounded (doubled over), `midairHurt`
-      // while airborne and tumbling (knocked flat). Held through the stun.
-      hurt: {
-        frames: [`${BASE_0003}hurt.png`],
-        fps: 12,
-        loop: false,
-        heightRatio: 51 / IDLE_ART_0003,
-        anchorX: [23.5],
-      },
-      midairHurt: {
-        frames: [`${BASE_0003}midairhurt.png`],
-        fps: 12,
-        loop: false,
-        heightRatio: 45 / IDLE_ART_0003,
-        anchorX: [36.5],
-      },
-      // Charge: charge1-4 drop into a crouch and turn square-on, fists
-      // clenched (once); chargea / chargeb, the square-on power-up, then
-      // alternate while Charge is held. Letting go shows charge4 again (the
-      // same file) on the way back to the stance.
-      chargeStart: {
-        frames: frames(BASE_0003, 'charge', 4),
-        fps: FPS_0003.charge,
-        loop: false,
-        heightRatio: 48 / IDLE_ART_0003,
-        anchorX: [23.5, 24.5, 24.5, 22.5],
-      },
-      chargeLoop: {
-        frames: [`${BASE_0003}chargea.png`, `${BASE_0003}chargeb.png`],
-        fps: FPS_0003.charge,
-        loop: true,
-        heightRatio: 46 / IDLE_ART_0003,
-        anchorX: [17.5, 19.5],
-      },
-      chargeRelease: {
-        frames: [`${BASE_0003}charge4.png`],
-        fps: FPS_0003.charge,
-        loop: false,
-        heightRatio: 48 / IDLE_ART_0003,
-        anchorX: [22.5],
-      },
-      // Basic Attack 1: the straight punch. 1 the fist already flying, 2-3
-      // the arm locked out, 4-5 back to the guard.
-      ba1: {
-        frames: frames(BASE_0003, '1ba', 5),
-        fps: FPS_0003.ba1,
-        loop: false,
-        heightRatio: 50 / IDLE_ART_0003,
-        anchorX: [19.5, 16.5, 16.5, 20.5, 23.5],
-      },
-      // Mid-air Basic Attack 1: the somersault kick. 1 the knee drawn up, 2
-      // the kick rising with its swoosh, 3 over the top, 4-5 the rest of the
-      // flip.
-      maba1: {
-        frames: frames(BASE_0003, 'midair1ba', 5),
-        fps: FPS_0003.maba1,
-        loop: false,
-        heightRatio: 67 / IDLE_ART_0003,
-        anchorX: [21.5, 14.5, 26.5, 29.5, 24.5],
-      },
-      // Basic Attack 2: the spinning kick. 1-2 the turn, back to the
-      // opponent, 3 the leg sweeping round behind, 4 the kick out in front
-      // with its swoosh, 5-6 the trail settling on the ground.
-      ba2: {
-        frames: frames(BASE_0003, '2ba', 6),
-        fps: FPS_0003.ba2,
-        loop: false,
-        heightRatio: 57 / IDLE_ART_0003,
-        anchorX: [15.5, 33.5, 38.5, 17.5, 12.5, 39.5],
-      },
-      // Mid-air Basic Attack 2: the dive. 1 the tuck, 2-5 head first and
-      // fists down, flames flickering at the feet on 3 and 5.
-      maba2: {
-        frames: frames(BASE_0003, 'midair2ba', 5),
-        fps: FPS_0003.maba2,
-        loop: false,
-        heightRatio: 58 / IDLE_ART_0003,
-        anchorX: [12.5, 15.5, 18.5, 15.5, 18.5],
-      },
-      // Unique Basic Attack: the palm strike. 1-3 both hands drawn back to
-      // the hip, 4-5 thrust out with a burst of flame behind, 6 held out, 7
-      // pulled back.
-      uniqueba: {
-        frames: frames(BASE_0003, 'palm', 7),
-        fps: FPS_0003.uniqueba,
-        loop: false,
-        heightRatio: 52 / IDLE_ART_0003,
-        anchorX: [23.5, 23.5, 23.5, 19.5, 19.5, 21.5, 23.5],
-      },
-    },
-
-    // A still idle frame for the airborne, landing, hurt and charge clips if
-    // their frames fail to load, as for #0001.
-    animationFallbacks: {
-      jump: { animation: 'idle', frame: 0 },
-      fall: { animation: 'idle', frame: 0 },
-      land: { animation: 'idle', frame: 0 },
-      hurt: { animation: 'idle', frame: 0 },
-      midairHurt: { animation: 'idle', frame: 0 },
-      chargeStart: { animation: 'idle', frame: 0 },
-      chargeLoop: { animation: 'idle', frame: 0 },
-    },
-
-    visual: {
-      // Its 49-pixel idle at #0001's size per art pixel: about 83 units,
-      // a little shorter than #0001's 88.
-      height: IDLE_ART_0003 * WORLD_PER_ART_0001,
-      referenceAnimation: 'idle',
-      anchor: 'torso',
-      pixelSize: 'auto',
-      // The face under the hair: centred low enough that the roster card's
-      // name bar, over the bottom of the crop, leaves the face showing.
-      portrait: { animation: 'idle', frame: 0, centerY: 0.3, size: 0.5 },
-    },
-
-    // #0001's Powers and movement, copied as #0003's own starting point
-    // (never shared, so tuning either leaves the other alone), the attack
-    // buffer and the Dash included. See #0001's for what each field does.
-    powers: {
-      jump: 2,
-      speed: 2,
-    },
-    movement: {
-      acceleration: 4200,
-      deceleration: 4200,
-      turnBoost: 2.6,
-      overspeedDeceleration: 6000,
-      airAcceleration: 3000,
-      airDeceleration: 380,
-      airTurnBoost: 2.0,
-      gravityScale: 1,
-      maxFallSpeed: 1500,
-      fastFallAcceleration: 12000,
-      fastFallSpeed: 1400,
-      coyoteTime: 0.1,
-      jumpBuffer: 0.12,
-      highJumpWindow: 0.15,
-      highJumpHeight: 1.4,
-      airJumps: 1,
-      airJumpRatio: 0.9,
-      attackBuffer: 0.15,
-      hitstunFriction: 1600,
-      hitstunAirDrag: 210,
-      dropThroughTime: 0.28,
-      dashSpeed: 900,
-      dashTapWindow: 0.22,
-    },
-
-    // Its body, measured from its idle (anchor as above, WORLD_PER_ART_0001
-    // units an art pixel). Collision is independent from sprite/PNG
-    // dimensions: the collider is the torso, up to the top of the head (the
-    // hair spikes over it left out), the pushbox a little wider. The upper
-    // box is the head and torso, the lower one the wide-legged stance.
-    collider: { width: 32, height: 76 },
-    pushbox: { width: 34 },
-    hurtboxes: [
-      { x: -18, y: -76, w: 40, h: 36 }, // head and torso
-      { x: -30, y: -40, w: 62, h: 40 }, // legs
-    ],
-
-    // #0001's launch reaction: a harder launch stuns longer, a fast one
-    // tumbles (in its mid-air hurt pose), and a held direction bends it.
-    launchReaction: {
-      stunPerThousand: 0.2,
-      maxStun: 0.7,
-      tumbleSpeed: 1100,
-      steerAngle: 15,
-    },
-
-    // Energy, spent only by the Dash (it has no Shield): 15 a Dash, 40 for
-    // one that cuts short an attack that hit, as #0001's, so a hit-cancel
-    // Dash chase ends after a few.
-    energy: {
-      max: 100,
-      regen: 12,
-      chargeRegen: 30,
-      dashCost: 15,
-      dashCancelCost: 40,
-    },
-
-    // No `defense`: the shared `shield` input does nothing for it (no
-    // Shield art).
-    //
-    // Control codenames -> move codenames, as for #0001. It has no
-    // Transform art, so `transform` is left out: no button, and the input
-    // does nothing.
-    actions: {
-      uniqueba: 'uniqueba', // unique basic attack: the palm strike
-      ba1: { ground: 'ba1', air: 'maba1' }, // punch / mid-air somersault kick
-      ba2: { ground: 'ba2', air: 'maba2' }, // spinning kick / mid-air dive
-    },
-
-    // How its touch buttons look (UI only, see js/ui/mobile-abilities.js).
-    mobileAbilities: {
-      uniqueba: { label: 'Palm Strike', icon: 'palm' },
-      ba1: { label: 'Punch', icon: 'punch' },
-      ba2: { label: 'Kick', icon: 'kick' },
-    },
-
-    // In-game ability names (js/data/abilities.js); maba1 and maba2 keep
-    // their neutral names.
-    abilityNames: {
-      uniqueba: 'Palm Strike',
-      ba1: 'Punch',
-      ba2: 'Kick',
-    },
-
-    // Attack definitions (schema: createAttackDefinition in
-    // js/game/combat.js). Phases are whole frames of each clip, so a hitbox
-    // is live only while its strike is drawn, and each hitbox is measured
-    // from that strike's frames (facing right from the origin, mirrored with
-    // facing). The combat values follow #0001's roles: ba1 the quick
-    // sideways jab, ba2 the upward launcher, maba1 the upward pursuit, maba2
-    // the downward spike; the palm strike (uniqueba) is the slow, heavy
-    // sideways launch, with no hit-cancel.
-    attacks: {
-      // Frame 1 the fist flying, 2-3 the arm locked out (the hit, reaching
-      // the length of the lunge), 4-5 recovery.
-      ba1: {
-        animation: 'ba1',
-        startup: 1 / FPS_0003.ba1,
-        active: 2 / FPS_0003.ba1,
-        recovery: 2 / FPS_0003.ba1,
-        damage: 3,
-        baseLaunch: 1,
-        directionalLaunch: 'horizontal',
-        hitbox: { x: 16, y: -58, w: 62, h: 18 },
-        hitstun: 0.32,
-        blockstun: 0.14,
-        hitstop: 0.05,
-        cooldown: 0.15,
-        groundOnly: true,
-        momentum: 0.75,
-        friction: 0.4,
-        hitCancel: 1 / FPS_0003.ba1,
-      },
-      // Frame 1 the knee drawn up, 2-3 the kick rising and going over the
-      // top (the hit: the swoosh's reach, in front and above), 4-5 the rest
-      // of the flip. Chosen only by ba1's `air` branch.
-      maba1: {
-        animation: 'maba1',
-        startup: 1 / FPS_0003.maba1,
-        active: 2 / FPS_0003.maba1,
-        recovery: 2 / FPS_0003.maba1,
-        damage: 3,
-        baseLaunch: 2,
-        directionalLaunch: 'vertical',
-        hitbox: { x: 8, y: -104, w: 50, h: 80 },
-        hitstun: 0.32,
-        blockstun: 0.15,
-        hitstop: 0.05,
-        cooldown: 0.16,
-        airMomentum: 1,
-        airControl: 0.85,
-        hitCancel: 1 / FPS_0003.maba1,
-      },
-      // Frames 1-3 the spin, 4-5 the kick and its trail in front (the hit),
-      // 6 recovery. Steps in on frame 1.
-      ba2: {
-        animation: 'ba2',
-        startup: 3 / FPS_0003.ba2,
-        active: 2 / FPS_0003.ba2,
-        recovery: 1 / FPS_0003.ba2,
-        damage: 5,
-        baseLaunch: 2,
-        directionalLaunch: 'vertical',
-        hitbox: { x: 10, y: -54, w: 66, h: 50 },
-        hitstun: 0.28,
-        blockstun: 0.15,
-        hitstop: 0.09,
-        cooldown: 0.15,
-        groundOnly: true,
-        momentum: 0.5,
-        friction: 0.5,
-        step: { at: 0, speed: 280 },
-        hitCancel: 3 / FPS_0003.ba2,
-      },
-      // Frames 1-2 the tuck and the dive starting, 3-4 head first, fists
-      // down (the hit, low in front), 5 recovery. Drives the target
-      // downward. Chosen only by ba2's `air` branch.
-      maba2: {
-        animation: 'maba2',
-        startup: 2 / FPS_0003.maba2,
-        active: 2 / FPS_0003.maba2,
-        recovery: 1 / FPS_0003.maba2,
-        damage: 5,
-        baseLaunch: 2,
-        directionalLaunch: 'reverseVertical',
-        hitbox: { x: 6, y: -44, w: 46, h: 44 },
-        hitstun: 0.28,
-        blockstun: 0.14,
-        hitstop: 0.08,
-        cooldown: 0.1,
-        airMomentum: 1,
-        airControl: 0.7,
-        hitCancel: 2 / FPS_0003.maba2,
-      },
-      // The palm strike. Frames 1-3 wind-up, 4-5 both palms thrust out (the
-      // hit, at chest height), 6-7 recovery. Ground only.
-      uniqueba: {
-        animation: 'uniqueba',
-        startup: 3 / FPS_0003.uniqueba,
-        active: 2 / FPS_0003.uniqueba,
-        recovery: 2 / FPS_0003.uniqueba,
-        damage: 6,
-        baseLaunch: 2,
-        directionalLaunch: 'horizontal',
-        hitbox: { x: 16, y: -66, w: 50, h: 24 },
-        hitstun: 0.35,
-        blockstun: 0.2,
-        hitstop: 0.1,
-        cooldown: 0.4,
-        groundOnly: true,
-        momentum: 0.5,
-        friction: 0.6,
-      },
-    },
-
-    // No `chargedActions`, `summons`, `chargedTechniques`, `projectiles`,
-    // `projectileAnimations` or `effectAnimations`: Charge is the stance
-    // alone (a combat button pressed in it does its normal attack) and no
-    // CBA cooldown ever shows under it.
-  },
 ];
 
+// Any definition by id, available or not; null for an unknown id.
 export function getCharacter(id) {
   return CHARACTERS.find((c) => c.id === id) || null;
+}
+
+// Whether `def` may be selected, preloaded or played.
+export function isPlayable(def) {
+  return !!def?.available;
+}
+
+// `id`'s definition only if it is playable: null for an unknown, missing or
+// disabled fighter, so no game-start route can instantiate one.
+export function getPlayableCharacter(id) {
+  const def = getCharacter(id);
+  return isPlayable(def) ? def : null;
+}
+
+// Every playable definition, in CHARACTERS order (empty while none is).
+export function playableCharacters() {
+  return CHARACTERS.filter(isPlayable);
 }
 
 // Every frame a character needs before battle: fighter poses, projectiles

@@ -38,8 +38,8 @@ const RESERVED = new Set(['transform']);
 //                  fighter's own to present: wired, a move still to come,
 //                  shown dashed
 //   'absent'       left out of its `actions`: a move the fighter does not
-//                  possess at all (every move of #0002's, none authored
-//                  yet), so it has no button
+//                  possess at all (e.g. a fighter whose moves are not
+//                  authored yet), so it has no button
 //
 // With no `actions` to go by (no fighter named yet) every button stays,
 // Transform reserved. A fighter that presents its own Transform (in

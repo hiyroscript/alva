@@ -59,10 +59,6 @@ further; the list below is the update as it stands now.
   `airControl`, `friction`, `step`, `hitCancel`, plus `hitstun`,
   `hitstop` and `cooldown`, which set the combo routes.
 
-#0002's placeholder movement (`TEMPORARY_BASELINE` in the same file) is a
-copy of #0001's neutral `movement` numbers, without the attack buffer or the
-Dash. Tuning #0001 never moves it; see [#0002 replaced](#0002-replaced).
-
 **Code:** `Fighter.moveHorizontal`, `moveAttack`, `attackStartSpeed`,
 `tryDash` and `dashAsked` in `js/game/character.js`; `CombatState` and
 `resolveEnergy` in `js/game/combat.js`. The combat AI
@@ -303,164 +299,68 @@ Settings became a dialog).
   guard in `tests/combat-ai.test.mjs`
 - the Joystick layout in `tests/controls-ui.test.mjs`
 
-## The first #0002 (Slender Man, removed)
+## Roster reset
 
-> **Historical.** This entry describes the first #0002, which has since been
-> removed: none of its files, definition, tuning (`FPS_0002`, its anchors,
-> its 110-unit height), credits or tests remain, and the current #0002 is
-> other art (see [#0002 replaced](#0002-replaced)). The generic pieces it
-> added are still in the engine: pending attacks, absent abilities,
-> `anchorX`, `visual.portrait.centerX`, each fighter drawn at its own art
-> scale, and credit links.
-
-Not a named update (it can become one if the owner names it). Asked for as:
-add the second fighter, #0002 (Slender Man), from the supplied `0002_*`
-art, register every animation, invent none of his combat attributes, give
-him no Unique Basic Attack and no Charged BA2, show only the controls he
-has, and credit the character and sprite sources. Later: make him a bit
-taller than #0001.
-
-**What it added**
-
-- **#0002** in `CHARACTERS` (roster slot 02), every supplied file moved to
-  `assets/characters/0002/` and every animation family registered, the
-  Charged BA1 art as an effect. #0001 is unchanged.
-- **Pending attacks** (`pending: true`): art only, one pass of the clip,
-  no hit. #0002's four Basic Attacks are these until his attributes exist.
-- **Absent abilities**: a move left out of a fighter's `actions` has no
-  touch button (hidden, unnamed, untouchable, its place kept); `null`
-  still means reserved (dashed). #0002 has no `uniqueba`.
-- **Temporary baseline** (`TEMPORARY_BASELINE`, marked `TODO #0002`) for
-  his body, movement and Powers: #0001's neutral values, no Dash.
-- **Authored anchors** (`anchorX` per clip) keep his feet planted under
-  the tendrils; `visual.portrait.centerX` centres his portrait.
-- **Rendering**: each fighter is drawn at its own art scale, and the view
-  is sized for a reference fighter height, so #0002 (110 units) stands a
-  quarter taller than #0001 (88) on the same stage, whoever is picked.
-- **Credits**: a **#0002 / Slender Man** group (Eric Knudsen as Victor
-  Surge, Something Awful, 2009; sprites by XmayGrrr, *Upgrade Slenderman
-  Sprites Jus Sheet*; DeviantArt / renatoooferreiraaa, linked).
-
-**Where to tune it** (`js/data/characters.js`, #0002)
-
-- `FPS_0002`: his clips' playback rates.
-- `visual.height` (110): how tall he is drawn; `visual.portrait`.
-- Each clip's `anchorX`: where each frame stands.
-- `TEMPORARY_BASELINE`: his placeholder body and movement, to be replaced
-  by his own when they are authored, as are his `pending` attacks.
-- `CONFIG.render.fighterHeight` (88, `js/config.js`): the height the view
-  is sized for.
-
-**Code:** `createAttackDefinition` (pending attacks, `js/game/combat.js`);
-the Fighter's clip timing for them (`js/game/character.js`);
-`abilityPresence` and `mobileAbility` (`js/ui/mobile-abilities.js`) and
-`TouchControls.setCharacter` (`js/game/touch-controls.js`, with
-`showAbsent` for the touch layout editor); `anchorX` and `centerX` in
-`SpriteSet` (`js/game/sprite-normalizer.js`); `Arena.pxPerArtOf` and
-`computeWorldScale` (`js/game/arena.js`); the credits' links
-(`js/ui/credits.js`, `js/screens/home-screen.js`).
-
-**Tests:** `tests/fighter-0002.test.mjs` (registration, assets read from
-the real PNGs, missing moves, pending attacks, animation, anchors, the
-view, CPU fights); his touch buttons in `tests/controls-ui.test.mjs`; his
-credits in `tests/settings.test.mjs`; Practice, Watch Mode and Quick Battle
-in `tests/practice-ground.test.mjs` and `tests/watch-mode.test.mjs`.
-
-## #0002 replaced
-
-Not a named update (it can become one if the owner names it). Asked for as:
-remove the #0002 above completely, then make the newly supplied art
-(uploaded as `0002_idle_1.png` and `0003_*.png`) the new #0002, with no
-#0003 left anywhere.
+Not a named update (it can become one if the owner names it). Asked for
+as: remove the fighters in roster slots 02 and 03 completely, keep #0001
+whole but disable it for now, and leave zero playable fighters until a
+future one is enabled. It deleted content and closed routes; no tuning of
+#0001 or of any shared system changed.
 
 **What it changed**
 
-- **Removed:** the first #0002's 38 PNGs, its definition, playback rates,
-  anchors, pending Basic Attacks, Shield, Charge pose, Charged BA1 effect and
-  110-unit height; its credits group, source link (`SOURCE_0002`) and
-  English and French strings; and its tests.
-- **#0002** is now the new art, in the same roster slot 02: 17 files in
-  `assets/characters/0002/` (`0002_idle_1`–`8`, `0002_run_1`–`4`,
-  `0002_jump`, `0002_fall`, `0002_land`, `0002_hurt`,
-  `0002_midairhurt`), registered as idle, run, jump, fall, land, hurt and
-  mid-air hurt. It has no move of its own: `actions: {}` and `attacks: {}`,
-  no `defense`, Dash, charged action, projectile or effect, so its four
-  fighter touch buttons are hidden. #0001 is unchanged.
-- **Temporary baseline** (`TEMPORARY_BASELINE`, `TODO #0002`) now holds only
-  the Powers' default tiers and #0001's neutral movement, without the attack
-  buffer or the Dash. The body is #0002's own, measured from its idle and
-  also marked `TODO #0002`.
-- **Size:** drawn at #0001's size per art pixel, 66 units tall.
-- **Credits:** no #0002 group: no source was supplied for the new art.
+- **Removed:** both fighters' definitions in `js/data/characters.js` and
+  every constant that only served them (their frame bases, art heights,
+  playback rates, the underscore frame helper, the temporary movement
+  baseline and the shared world-per-art-pixel size), their art folders
+  under `assets/characters/`, their tests and the real-art helpers only
+  those tests used, their translations (ability names and sprite credits,
+  in English and French), their sprite credit group, the palm glyph only
+  one of them used, and the obsolete `max` prompt file. Every comment,
+  test and document that described them was rewritten generically. Git
+  history still holds them; the current tree does not.
+- **#0001 disabled, not removed:** `available: false`, in slot 01, with its
+  art, animations, attacks, charged actions, Shield, Dash, abilities,
+  tuning, body, credits, translations and engine tests all kept.
+- **Playability:** `isPlayable`, `getPlayableCharacter` and
+  `playableCharacters` (`js/data/characters.js`) tell a playable fighter
+  from a definition that merely exists (`getCharacter`, still an identity
+  lookup the engine and its tests build #0001 from).
+- **Zero playable fighters handled everywhere:** startup names no fighter
+  and preloads none (`initialSelection`, `App.preloadFighters`), and
+  `App.loadCharacter` loads nothing for a fighter that is not playable;
+  Home disables Play, Watch Mode and Practice Ground under a "No fighters
+  available" note, focus on Discover; the roster locks every slot (#0001's
+  too), selects nothing and keeps Confirm disabled; Select Fighter and
+  Watch Mode's CPU screens focus Back; the Battle screen refuses a side
+  that is not playable (disabled, removed, missing or unknown, from a stale
+  selection or the route itself) before loading anything, with a
+  "Fighter unavailable" error that offers only Back to Home; Practice
+  Ground's default fighter is the first playable one
+  (`practiceDefaultFighter`, never a fixed id), and with none it starts
+  nothing and shows the same error.
 
-**Where to tune it** (`js/data/characters.js`, #0002)
+**Where to change it**
 
-- Each clip's `fps` (idle 8; run 12, with `minSpeedScale` 0.6; land 12,
-  which is also how long the land state lasts), `heightRatio` and `anchorX`.
-- `visual.height` (`IDLE_ART_0002 * WORLD_PER_ART_0001`, 66) and
-  `visual.portrait`.
-- `collider`, `pushbox`, `hurtboxes` and `TEMPORARY_BASELINE`: placeholders
-  until its own are authored.
+- `available` on a definition in `js/data/characters.js`: `true` makes it
+  playable again. Nothing else needs undoing.
 
-**Tests:** `tests/fighter-0002.test.mjs` (registration, the real PNGs, the
-missing moves, animation at runtime, anchors, body, the view, CPU fights);
-its touch buttons in `tests/controls-ui.test.mjs`; the credits in
-`tests/settings.test.mjs` and `tests/i18n.test.mjs`; Practice, Watch Mode
-and Quick Battle in `tests/practice-ground.test.mjs` and
-`tests/watch-mode.test.mjs`; pending attacks, which no fighter uses now, in
-`tests/basic-attack.test.mjs`.
+**Code:** `js/data/characters.js`; `initialSelection`, `preloadFighters` and
+`loadCharacter` in `js/core/app.js`; `HomeScreen.syncMatchActions` in
+`js/screens/home-screen.js` (with `.home-note` in `styles.css`);
+`FighterRoster` in `js/ui/fighter-roster.js`; `CharacterSelectScreen` in
+`js/screens/character-select-screen.js`; `BattleScreen.enter` / `refuse`
+in `js/screens/battle-screen.js`; `practiceDefaultFighter` and `enter` in
+`js/screens/practice-screen.js`; the Back-only error in
+`LoadingOverlay.showError` (`js/ui/overlays.js`); the new strings in
+`js/core/i18n.js`.
 
-## #0003 added
-
-Not a named update (it can become one if the owner names it). Asked for as:
-add the supplied sprite sheet as character #0003, with frames for idle,
-jumping, fall, land, hurt, mid-air hurt, charge, mouvement (the Dash), run
-and attacks, properly cropped out.
-
-**What it added**
-
-- **Frames:** 51 PNGs in `assets/characters/0003/`, cut from the sheet: each
-  cropped tight to its art, the sheet's flat background (RGB 128, 128, 255)
-  made transparent and nothing else changed (1x, 8-bit RGBA). Idle 4, run 4,
-  Dash 2, jump 1, fall 2, land 2, hurt 1, mid-air hurt 1, Charge 4 + 2, and
-  the attacks: BA1 5 (straight punch), mid-air BA1 5 (somersault kick), BA2 6
-  (spinning kick), mid-air BA2 5 (dive) and the Palm Strike 7 (Unique Basic
-  Attack). Named by #0001's rules (`0003_1ba1.png` is BA1, frame 1).
-- **#0003** in `CHARACTERS`, roster slot 03: every clip anchored on the
-  sheet's own origin (`anchorX`), each attack timed to whole frames of its
-  clip with a hitbox measured from its strike and combat values following
-  #0001's move in the same role, a Dash, Charge art, its own body. No
-  Transform (left out of `actions`: no button), no Shield, no charged
-  action, projectile or effect. #0001 and #0002 are unchanged.
-- **Touch buttons:** Palm Strike (a new `palm` icon), Punch and Kick, with
-  French names.
-- **Credits:** a **#0003 sprite source** group: The Spriters Resource, sheet
-  ripped by Dazz & Fret (what the sheet credits; it names no game).
-- **Tests:** the real-art helpers (`tests/real-art.mjs`) and the CPU-fight
-  helper (`cpuFight` in `tests/fighter-harness.mjs`) moved out of
-  `tests/fighter-0002.test.mjs` so both fighter tests share them.
-
-**Where to tune it** (`js/data/characters.js`, #0003)
-
-- `FPS_0003`: the attacks', Charge's and the Dash's playback rates (each
-  attack's phases are whole frames at its rate); idle, run, jump, fall,
-  land and the hurt poses have their own `fps`.
-- Each attack in `attacks`: `damage`, `baseLaunch`, `directionalLaunch`,
-  `hitbox`, `hitstun`, `blockstun`, `hitstop`, `cooldown`, the momentum
-  fields and `hitCancel`.
-- `movement` (the Dash's `dashSpeed` and `dashTapWindow` included),
-  `powers`, `launchReaction` and `energy`: #0001's numbers, copied.
-- `collider`, `pushbox`, `hurtboxes`; `visual.height`
-  (`IDLE_ART_0003 * WORLD_PER_ART_0001`, about 83) and `visual.portrait`.
-- Each clip's `anchorX` and `heightRatio`.
-
-**Tests:** `tests/fighter-0003.test.mjs` (registration, the real PNGs and
-their crop, scale, anchors, body, portrait, every clip at runtime, each
-attack's frames, hitbox and launch, the Dash, Charge, CPU fights); its touch
-buttons in `tests/controls-ui.test.mjs`; the credits in
-`tests/settings.test.mjs` and `tests/i18n.test.mjs`; Practice, Watch Mode
-and Quick Battle in `tests/practice-ground.test.mjs` and
-`tests/watch-mode.test.mjs`.
+**Tests:** the shipped state in `tests/empty-roster.test.mjs` (the data,
+the removed fighters' absence, startup, the roster, Select Fighter and
+Watch Mode's CPU screens, Practice Ground and Home); the Battle screen's
+refusals in `tests/battle-screen.test.mjs`. The screen tests that need a
+fighter to pick register test-only ones from `tests/test-fighters.mjs`
+(#0001's definition under neutral ids, taken out again after each run).
 
 ## Control and move codenames
 

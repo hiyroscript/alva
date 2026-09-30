@@ -1,8 +1,8 @@
 // The credits, shown by the Home credits roll. Each group is a title, an
 // optional lead line and plain lines, every one a translation key (or
 // [key, params]; see js/core/i18n.js), so the roll follows the language.
-// Proper names (Jump Ultimate Stars, The Spriters Resource, Dazz, FRET,
-// Dazz & Fret) stay as they are in every language. A line may also link to its source:
+// Proper names (Jump Ultimate Stars, The Spriters Resource, Dazz, FRET)
+// stay as they are in every language. A line may also link to its source:
 // { label: key or [key, params], href }, the label still translated and
 // the address never.
 
@@ -25,11 +25,6 @@ export const CREDITS = [
       'credits.sprites.uploader',
       'credits.sprites.contributor',
     ],
-  },
-  // #0003's sheet names only the site and who ripped it, not its game.
-  {
-    title: 'credits.sprites0003.title',
-    lines: ['credits.sprites0003.site', 'credits.sprites0003.rippers'],
   },
   {
     title: 'credits.rights.title',

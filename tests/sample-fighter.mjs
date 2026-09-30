@@ -1,8 +1,9 @@
 // A sample second fighter for the tests only (not a test file itself, and
-// never in CHARACTERS: no screen, roster or match shows it). It checks that
-// the game works for a character that is not #0001: it goes by the same
-// universal control and move codenames but makes different moves on them
-// and names them its own way.
+// never in CHARACTERS as it is; test-fighters.mjs registers a playable
+// copy for the screen tests that need a fighter with different moves). It
+// checks that the game works for a character that is not #0001: it goes by
+// the same universal control and move codenames but makes different moves
+// on them and names them its own way.
 //
 // Against #0001 it has:
 //   uniqueba   a melee palm strike, usable in the air too (#0001's is a

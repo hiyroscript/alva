@@ -13,6 +13,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { TEST_A, withTestFighters } from './test-fighters.mjs';
 
 const noop = () => {};
 
@@ -590,8 +591,10 @@ function editorApp() {
 
 const saved = (storage) => JSON.parse(storage.map.get(SETTINGS_KEY) ?? 'null');
 
-test('the editor opens on the scheme in use, as a modal with its own scope, the real controls focusable only here', () => {
+test('the editor opens on the scheme in use, as a modal with its own scope, the real controls focusable only here', () => withTestFighters([TEST_A], () => {
   const { app, editor, root, back } = editorApp();
+  // Quick Battle's last pick, playable (test-only: no production fighter is).
+  app.selection.characterId = TEST_A.id;
   app.settings.set('mobileControls', 'classic');
   let closed = 0;
   back.focus();
@@ -628,7 +631,15 @@ test('the editor opens on the scheme in use, as a modal with its own scope, the 
   assert.equal(app.nav.scopes.includes(editor.scope), false);
   assert.equal(closed, 1);
   assert.equal(document.activeElement, back, 'focus back where it came from');
-});
+  // A pick that cannot be played (disabled #0001, none at all) shows the
+  // neutral look instead of a fighter's own.
+  for (const id of ['0001', null]) {
+    app.selection.characterId = id;
+    editor.open({ scheme: 'classic', returnFocus: back });
+    assert.equal(editor.touch.buttons.get('ba1').getAttribute('aria-label'), 'Basic Attack 1', `${id}: neutral`);
+    editor.doneButton.click();
+  }
+}));
 
 test('dragging a control moves it on screen and saves once, as fractions, when the drag ends; a tap only selects', () => {
   const { app, editor, storage } = editorApp();

@@ -1,6 +1,8 @@
-// PRACTICE GROUND screen: a training room. It starts at once with #0001 and
-// a training-dummy CPU (#0001 too) on the training stage, with no intro,
-// timer, points or result, and runs until the player returns Home. The
+// PRACTICE GROUND screen: a training room. It starts at once with the
+// default fighter (the first playable one) and a training-dummy CPU of the
+// same fighter on the training stage, with no intro, timer, points or
+// result, and runs until the player returns Home. With no playable fighter
+// there is no session at all: the screen says so and offers the way Home. The
 // three-dots More button (top centre, or Esc / P / Start) freezes it under a
 // light Practice menu: Change Fighter opens the full roster in a large glass
 // dialog over the paused stage and swaps the fighter in place; Change CPU
@@ -22,15 +24,19 @@ import { t, tx, tattr, iconLabel, setText } from '../core/i18n.js';
 import { ICONS } from '../ui/icons.js';
 import { menuButton } from '../ui/components.js';
 import { FighterRoster } from '../ui/fighter-roster.js';
-import { getCharacter } from '../data/characters.js';
+import { isPlayable, playableCharacters } from '../data/characters.js';
 import { PRACTICE_MAP } from '../data/practice-map.js';
 import { PracticeSession } from '../game/practice.js';
 import { PracticeHUD } from '../game/hud.js';
 import { TouchControls } from '../game/touch-controls.js';
 
 // Every fresh visit from Home starts with this fighter, and a practice CPU
-// of the same fighter, sharing its one loaded sprite set.
-export const PRACTICE_DEFAULT_FIGHTER = '0001';
+// of the same fighter, sharing its one loaded sprite set: the first
+// playable one, read on every visit, or null while none is (no fighter is
+// ever named here, so a disabled one can never be started).
+export function practiceDefaultFighter() {
+  return playableCharacters()[0] ?? null;
+}
 
 // The error shown when `def`'s frames cannot be loaded.
 const spritesFailed = (def) => t('common.spritesFailed', { names: [def.displayName], where: `assets/characters/${def.id}/` });
@@ -55,7 +61,8 @@ export class PracticeGroundScreen extends Screen {
     );
 
     this.session = null;
-    this.characterId = PRACTICE_DEFAULT_FIGHTER;
+    // The practice fighter's id: null until a session starts with one.
+    this.characterId = null;
     this.menuOpen = false;
     // Change Fighter's dialog and the CPU dialog each have their own open and
     // loading state; at most one of them is open at a time.
@@ -149,6 +156,7 @@ export class PracticeGroundScreen extends Screen {
     this.rosterOverlay = dialog.overlay;
     this.rosterDialog = dialog.dialog;
     this.roster = dialog.roster;
+    this.rosterBack = dialog.back;
     this.rosterScope = dialog.scope;
   }
 
@@ -185,9 +193,18 @@ export class PracticeGroundScreen extends Screen {
     const app = this.app;
     // A fresh visit always starts from the default fighter and the default
     // CPU, whatever Quick Battle or an earlier visit used (a CPU disabled
-    // then included).
-    this.characterId = PRACTICE_DEFAULT_FIGHTER;
-    const def = getCharacter(this.characterId);
+    // then included). With no playable fighter nothing starts or loads.
+    const def = practiceDefaultFighter();
+    this.characterId = def?.id ?? null;
+    if (!def) {
+      this.token = null;
+      app.loading.showError(t('common.fighterUnavailableMessage'), {
+        nav: app.nav,
+        title: 'common.fighterUnavailable',
+        onBack: () => app.screens.go('home', {}, { reset: true }),
+      });
+      return;
+    }
     // The touch layout the player chose (Home › Settings › Controls), with
     // its custom placement and sizes.
     this.touch.setScheme(app.settings.mobileControls);
@@ -390,7 +407,8 @@ export class PracticeGroundScreen extends Screen {
     this.rosterOverlay.hidden = false;
     this.roster.show(this.characterId);
     this.app.nav.pushScope(this.rosterScope);
-    this.roster.focusSelected();
+    // No playable slot to focus: Back instead.
+    if (!this.roster.focusSelected()) this.rosterBack.focus({ preventScroll: true });
   }
 
   // Closes only the dialog: the fighter is unchanged and focus returns to
@@ -412,7 +430,7 @@ export class PracticeGroundScreen extends Screen {
   // the dialog and the menu and resumes. A failed load keeps the current
   // fighter (and its touch icons) and the dialog open.
   async changeFighter(def) {
-    if (this.swapping || !this.session) return;
+    if (this.swapping || !this.session || !isPlayable(def)) return;
     const app = this.app;
     const token = this.token;
     this.swapping = true;
@@ -463,7 +481,7 @@ export class PracticeGroundScreen extends Screen {
     this.cpuRosterOverlay.hidden = false;
     this.cpuRoster.show(cpu?.def.id ?? this.characterId);
     this.app.nav.pushScope(this.cpuRosterScope);
-    this.cpuRoster.focusSelected();
+    if (!this.cpuRoster.focusSelected()) this.cpuRosterBack.focus({ preventScroll: true });
   }
 
   // Closes only the CPU dialog, back to the menu with focus on the CPU
@@ -484,7 +502,7 @@ export class PracticeGroundScreen extends Screen {
   // the dialog and the menu and resumes. The player's fighter is untouched.
   // A failed load keeps the current CPU (or none) and the dialog open.
   async selectCpu(def) {
-    if (this.cpuSwapping || !this.session) return;
+    if (this.cpuSwapping || !this.session || !isPlayable(def)) return;
     const app = this.app;
     const token = this.token;
     this.cpuSwapping = true;

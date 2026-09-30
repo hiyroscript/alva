@@ -1,8 +1,10 @@
 // Fighter roster: the large roster grid (CONFIG.roster.totalSlots slots) and
 // its animated preview panel, shared by the Select Fighter screen and
-// Practice Ground's Change Fighter and CPU dialogs. Available fighters are
-// selectable buttons; other slots are non-interactive locked placeholders
-// that stay out of hover, Tab and spatial navigation.
+// Practice Ground's Change Fighter and CPU dialogs. Playable (available)
+// fighters are selectable buttons; every other slot, a disabled fighter's
+// included, is a non-interactive locked placeholder that stays out of
+// hover, Tab and spatial navigation and never loads a preview. With no
+// playable fighter nothing is selected and Confirm stays disabled.
 //
 // The host places `rosterPanel` and `previewPanel`, calls show() when they
 // appear, drives update(dt) while they are visible and decides what
@@ -13,7 +15,7 @@ import { CONFIG } from '../config.js';
 import { el } from '../core/utils.js';
 import { tx, tattr, setText } from '../core/i18n.js';
 import { ICONS } from './icons.js';
-import { CHARACTERS, getCharacter } from '../data/characters.js';
+import { CHARACTERS, isPlayable, getPlayableCharacter } from '../data/characters.js';
 import { fitCanvas, drawFrameAt, paintPortrait } from './sprite-art.js';
 
 export class FighterRoster {
@@ -37,7 +39,7 @@ export class FighterRoster {
       const def = bySlot.get(i) || null;
       const num = String(i + 1).padStart(2, '0');
       let slot;
-      if (def && def.available) {
+      if (isPlayable(def)) {
         const portrait = el('canvas', { class: 'slot-portrait', width: 1, height: 1, 'aria-hidden': 'true' });
         slot = el('button', {
           class: 'slot is-available', type: 'button', 'data-nav': true, 'data-char': def.id,
@@ -88,21 +90,26 @@ export class FighterRoster {
     ]);
   }
 
-  // The slot of fighter `id`, else the first available one.
+  // The slot of playable fighter `id`, else the first playable one's, else
+  // null: a locked slot (a disabled fighter's too) is never chosen.
   slotFor(id) {
-    return this.slots.find((s) => s._def?.id === id) || this.slots.find((s) => s._def?.available) || this.slots[0];
+    return this.slots.find((s) => isPlayable(s._def) && s._def.id === id) ||
+      this.slots.find((s) => isPlayable(s._def)) || null;
   }
 
   // Selects and previews `id`'s slot (see slotFor), scrolls the roster back
-  // to the top and draws the available fighters' portraits as they load.
-  // Returns that slot, for the host to focus.
+  // to the top and draws the playable fighters' portraits as they load.
+  // Returns that slot, for the host to focus, or null when no fighter is
+  // playable: then nothing is selected and the first slot's locked preview
+  // shows.
   show(id) {
     const slot = this.slotFor(id);
-    this.select(slot);
-    this.preview(slot);
+    if (slot) this.select(slot);
+    else this.clearSelection();
+    this.preview(slot ?? this.slots[0]);
     this.scroller.scrollTop = 0;
     for (const s of this.slots) {
-      if (!s._def?.available) continue;
+      if (!isPlayable(s._def)) continue;
       this.app.loadCharacter(s._def.id).then((set) => {
         if (!set?.usable) return;
         this.drawPortrait(s, set);
@@ -113,10 +120,14 @@ export class FighterRoster {
   }
 
   // Focuses the selected fighter's slot (e.g. when returning to the roster).
+  // False when there is no playable slot to focus: the host focuses its own
+  // control instead.
   focusSelected() {
     const slot = this.slotFor(this.selectedId);
+    if (!slot) return false;
     slot.focus({ preventScroll: true });
     slot.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
+    return true;
   }
 
   drawPortrait(slot, set) {
@@ -124,16 +135,27 @@ export class FighterRoster {
   }
 
   select(slot) {
-    if (!slot._def?.available) return;
+    if (!isPlayable(slot?._def)) return;
     this.selectedId = slot._def.id;
     for (const s of this.slots) {
       const on = s === slot;
       s.classList.toggle('is-selected', on);
-      if (s._def?.available) s.setAttribute('aria-pressed', on ? 'true' : 'false');
+      if (isPlayable(s._def)) s.setAttribute('aria-pressed', on ? 'true' : 'false');
     }
   }
 
+  // No fighter selected: nothing marked, Confirm disabled.
+  clearSelection() {
+    this.selectedId = null;
+    for (const s of this.slots) {
+      s.classList.toggle('is-selected', false);
+      if (isPlayable(s._def)) s.setAttribute('aria-pressed', 'false');
+    }
+    this.updateConfirm();
+  }
+
   activate(slot, e) {
+    if (!isPlayable(slot._def)) return;
     // Keyboard/gamepad activation confirms immediately; pointer selects first
     // and confirms on a second press.
     const wasSelected = this.selectedId === slot._def.id;
@@ -146,7 +168,7 @@ export class FighterRoster {
     this.focusedSlot = slot;
     const def = slot._def;
     const num = String(slot._index + 1).padStart(2, '0');
-    if (!def || !def.available) {
+    if (!isPlayable(def)) {
       this.host?.classList.add('is-locked-preview');
       setText(this.status, 'roster.statusLocked');
       this.status.className = 'status-badge is-locked';
@@ -169,15 +191,17 @@ export class FighterRoster {
     if (!this.previewSprites) this.clearPreview();
   }
 
+  // Confirm is enabled only for a playable selection; with no playable
+  // fighter at all it says so.
   updateConfirm() {
-    const def = getCharacter(this.selectedId);
+    const def = getPlayableCharacter(this.selectedId);
     this.confirmBtn.disabled = !def;
-    setText(this.confirmBtn, def ? 'roster.confirm' : 'roster.none');
+    setText(this.confirmBtn, def ? 'roster.confirm' : this.slotFor(null) ? 'roster.none' : 'common.noFighters');
   }
 
   confirm() {
-    const def = getCharacter(this.selectedId);
-    if (!def?.available) return;
+    const def = getPlayableCharacter(this.selectedId);
+    if (!def) return;
     this.onConfirm(def);
   }
 

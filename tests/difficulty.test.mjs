@@ -9,6 +9,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fakeSprites, def as DEF_0001, DT } from './fighter-harness.mjs';
+import { TEST_A, useTestFighters } from './test-fighters.mjs';
+
+// No production fighter is playable: the setup screens and the Battle screen
+// pick a test-only one (see test-fighters.mjs), registered for this file.
+useTestFighters(TEST_A);
 
 // ---- Fake DOM ------------------------------------------------------------------
 
@@ -208,7 +213,7 @@ class BattleStub extends Screen {
 
 function boot() {
   const app = {
-    selection: { mode: 'quick-battle', difficulty: DEFAULT_DIFFICULTY, characterId: '0001', mapId: MAPS[0].id },
+    selection: { mode: 'quick-battle', difficulty: DEFAULT_DIFFICULTY, characterId: TEST_A.id, mapId: MAPS[0].id },
     input: fakeInput(),
     device: { reducedMotion: true, blockedPortrait: false },
     audio: { play: noop },
@@ -329,14 +334,14 @@ test('Select Mode → Select Difficulty → Select Fighter → Select Stage → 
   // Forward again to the end.
   screens.mode.el.querySelector('.mode-card').click();
   cardOf(screens.difficulty, 'brutal').click();
-  screens.character.confirm(DEF_0001);
+  screens.character.confirm(TEST_A);
   assert.equal(current(app), 'map');
   screens.map.onBack();
   assert.equal(current(app), 'character', 'Back from Stage is still Fighter');
-  screens.character.confirm(DEF_0001);
+  screens.character.confirm(TEST_A);
   screens.map.start();
   assert.equal(current(app), 'battle');
-  assert.deepEqual(screens.battle.started, [{ mapId: MAPS[0].id, characterId: '0001', difficulty: 'brutal' }]);
+  assert.deepEqual(screens.battle.started, [{ mapId: MAPS[0].id, characterId: TEST_A.id, difficulty: 'brutal' }]);
   // The header's Back and Esc are the same navigation.
   const { app: app2, screens: s2 } = boot();
   s2.mode.el.querySelector('.mode-card').click();
@@ -507,7 +512,7 @@ test('the Battle\'s CPU plays the chosen level, and keeps it through restarts, r
 test('the Battle screen hands the selected level to its Battle, and a rematch or restart keeps it', async () => {
   const input = fakeInput();
   const app = {
-    selection: { mode: 'quick-battle', difficulty: 'brutal', characterId: '0001', mapId: MAPS[0].id },
+    selection: { mode: 'quick-battle', difficulty: 'brutal', characterId: TEST_A.id, mapId: MAPS[0].id },
     input,
     settings: new Settings(null),
     device: { reducedMotion: true, blockedPortrait: false },
@@ -520,7 +525,7 @@ test('the Battle screen hands the selected level to its Battle, and a rematch or
   app.nav = new MenuNavigator(app);
   const screen = new BattleScreen(app);
   app.screens.current = screen;
-  await screen.enter({ mapId: MAPS[0].id, characterId: '0001', difficulty: 'brutal' });
+  await screen.enter({ mapId: MAPS[0].id, characterId: TEST_A.id, difficulty: 'brutal' });
   const battle = screen.battle;
   assert.equal(battle.difficulty, 'brutal');
   assert.equal(battle.p2.controller.difficulty, 'brutal');
