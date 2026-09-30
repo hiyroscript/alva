@@ -1,0 +1,185 @@
+The game now uses a standardized codename system for every character, attack, animation, and attack-created object. The goal is to make character files easier to understand, remove character-specific or inconsistent internal names, and allow the combat system to support different numbers of attacks without needing special-case code.
+
+Each character is identified by a four-digit character ID. Character 0001, for example, uses filenames beginning with 0001_. The final number in an animation filename always represents the animation frame.
+
+The standard animation format is:
+
+characterID_animationName_frame
+
+Examples:
+
+0001_idle_1
+0001_idle_2
+0001_run_1
+0001_jump_1
+0001_fall_1
+0001_land_1
+0001_hurt_1
+0001_midair_hurt_1
+
+Shield animations use:
+
+0001_prepshield_1
+0001_shielding_1
+0001_releaseshield_1
+
+Movement or dash animations use the standardized mouvment codename:
+
+0001_mouvment_1
+
+The old attack names such as ba1, ba2, maba1, maba2, cba1, cba2, and uniqueba are removed. Attacks are now numbered directly.
+
+The new attack names are:
+
+attack1
+attack2
+attack3
+attack4
+attack5
+
+Their animation files follow the same naming format:
+
+0001_attack1_1
+0001_attack1_2
+0001_attack2_1
+0001_attack3_1
+
+Normal attacks that can be performed in the air use a separate midair_attack codename:
+
+0001_midair_attack1_1
+0001_midair_attack2_1
+0001_midair_attack3_1
+
+Every normal numbered attack should have an obvious midair version. The exception is an attack that only exists as a Charge replacement, because that attack is not part of the character’s normal independent attack set.
+
+Characters may have a minimum of 2 and a maximum of 5 numbered attacks. Attack numbers must remain sequential. A character cannot have attack1, attack2, and attack4 while skipping attack3.
+
+The extra_attack is separate from the numbered attack count. It replaces the old uniqueba system and is used for an additional character-specific action such as a projectile, throw, special utility move, or other unique attack.
+
+Its animation is named:
+
+0001_extra_attack_1
+
+A character may therefore have five numbered attacks and still have an extra_attack.
+
+Charge is now treated as an attack-routing system rather than as a separate family of cba attacks. A character may use Charge to temporarily replace normal attack buttons with stronger attacks.
+
+The charge animation begins with numbered startup frames:
+
+0001_charge_1
+0001_charge_2
+
+Once the startup finishes, Charge continuously loops between:
+
+0001_charge_a
+0001_charge_b
+
+The a and b frames are specifically the looping Charge state and are not regular numbered animation frames.
+
+When a character has Charge, later-numbered attacks can replace earlier attack buttons while Charge is held. For example, a four-attack character can use:
+
+attack1 = first normal attack
+attack2 = second normal attack
+attack3 = charged replacement for attack1
+attack4 = charged replacement for attack2
+
+Normally pressing the attack1 button performs attack1. While Charge is active, pressing that same button performs attack3.
+
+Likewise:
+
+Normal: attack2 button → attack2
+Charging: attack2 button → attack4
+
+The exact button system depends on the character’s attack count.
+
+A character with 2 attacks has two normal attack buttons.
+
+A character with 3 attacks and no Charge has three independent attack buttons: attack1, attack2, and attack3.
+
+A character with 3 attacks and Charge normally has two attack buttons. Attack1 and attack2 are available normally, while attack3 replaces attack1 when Charge is active.
+
+A character with 4 attacks and no Charge has four independent attack buttons.
+
+A character with 4 attacks and Charge normally has two attack buttons. Attack3 replaces attack1 during Charge, and attack4 replaces attack2.
+
+A character with 5 attacks and no Charge has five independent attack buttons.
+
+A character with 5 attacks and Charge has three independently accessible normal buttons: attack1, attack2, and attack5. While Charge is active, attack3 replaces attack1 and attack4 replaces attack2. Attack5 remains its own normal attack.
+
+In simplified form:
+
+attack1 → attack3 while charging
+attack2 → attack4 while charging
+attack5 → remains independent
+
+This rule continues consistently instead of creating separate charged attack categories. Whether attack3 or attack4 is a normal button or a Charge replacement is determined by the character’s loadout, not by the attack name itself.
+
+For example, a character with no Charge may use attack3 as a completely normal third attack with its own midair version:
+
+0001_attack3_1
+0001_midair_attack3_1
+
+Another character may instead use attack3 only as the charged replacement for attack1. In that case, attack3 does not need to appear as an independent button and does not automatically require a midair version.
+
+Objects created by attacks also use the attack that created them as their codename. This applies to projectiles, clones, summons, deployables, effects, and similar attack-owned objects.
+
+The standard format is:
+
+characterID_attackName_object_frame
+
+Examples:
+
+0001_attack1_object_1
+0001_attack3_object_1
+0001_attack3_object_2
+0001_extra_attack_object_1
+
+This means an object should no longer be given an unrelated character-specific filename such as the name of a projectile, clone, technique, or fictional ability. The filename describes which gameplay attack owns the object.
+
+For character 0001, the old attack system converts as follows:
+
+ba1 → attack1
+maba1 → midair_attack1
+ba2 → attack2
+maba2 → midair_attack2
+cba1 → attack3
+cba2 → attack4
+uniqueba → extra_attack
+
+Character 0001 therefore has four numbered attacks and Charge. Attack1 and attack2 are the normal attacks. Attack3 and attack4 are their charged replacements and do not need separate normal buttons. The character’s previous unique attack becomes extra_attack.
+
+Its basic routing is:
+
+Normal attack1 button → attack1
+Charge + attack1 button → attack3
+
+Normal attack2 button → attack2
+Charge + attack2 button → attack4
+
+Extra-attack button → extra_attack
+
+Any projectile produced by the extra attack uses names such as:
+
+0001_extra_attack_object_1
+
+Any object created by attack3 uses:
+
+0001_attack3_object_1
+
+Any object created by attack4 uses:
+
+0001_attack4_object_1
+
+The important rule is that these names are now gameplay codenames, not move names. Display names such as “Punch,” “Kick,” “Clone Attack,” or other character-specific names may still be shown to players in menus and UI, but they must not replace the standardized internal identifiers.
+
+This creates one consistent system across every character:
+
+attack1 through attack5 describe numbered attacks.
+midair_attack1 through midair_attack5 describe their normal airborne versions.
+extra_attack describes the separate character-specific extra move.
+charge modifies which numbered attack is triggered from an existing attack button.
+attackX_object describes anything created by that attack.
+The character ID identifies who owns the animation.
+The final number identifies the frame.
+
+As a result, character code, animation data, PNG filenames, controls, AI, mobile buttons, cooldowns, and attack-created objects can all refer to the same predictable naming system without relying on legacy terms such as BA, MABA, CBA, or Unique BA.
