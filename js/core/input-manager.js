@@ -13,22 +13,28 @@
 // press edge, that Fighter hands to the same Dash as a double tap.
 
 import { ACTIONS } from '../config.js';
+import { HELD_CONTROLS, blankInput } from '../game/fighter-controller.js';
 
 const PAD_DEADZONE = 0.45;
 
-// Standard Gamepad mapping -> gameplay actions.
+// Standard Gamepad mapping -> gameplay actions. attack3 to attack5 are for
+// fighters with those buttons (a fighter only acts on the ones it has; see
+// js/data/loadout.js).
 const PAD_BUTTONS = {
-  0: 'jump',       // A / Cross
-  2: 'uniqueba',   // X / Square (Throw)
-  3: 'transform',  // Y / Triangle
-  1: 'ba1',        // B / Circle
-  4: 'ba2',        // LB
-  5: 'shield',     // RB
-  7: 'shield',     // RT
-  12: 'jump',      // D-pad up
-  13: 'charge',    // D-pad down (menus still read it as Down; see _padMenu)
-  14: 'runLeft',   // D-pad left (menus still read it as Left)
-  15: 'runRight',  // D-pad right (menus still read it as Right)
+  0: 'jump',          // A / Cross
+  2: 'extra_attack',  // X / Square (#0001's Throw)
+  3: 'transform',     // Y / Triangle
+  1: 'attack1',       // B / Circle
+  4: 'attack2',       // LB
+  6: 'attack3',       // LT
+  10: 'attack4',      // L3 (left stick pressed)
+  11: 'attack5',      // R3 (right stick pressed)
+  5: 'shield',        // RB
+  7: 'shield',        // RT
+  12: 'jump',         // D-pad up
+  13: 'charge',       // D-pad down (menus still read it as Down; see _padMenu)
+  14: 'runLeft',      // D-pad left (menus still read it as Left)
+  15: 'runRight',     // D-pad right (menus still read it as Right)
 };
 
 export class InputManager {
@@ -58,15 +64,12 @@ export class InputManager {
     this.padMenuState = { dir: null, nextRepeat: 0, buttons: new Set() };
     this.padConnected = false;
 
-    // Reused per-step snapshot to avoid allocations in the sim loop.
-    this.frame = {
-      runLeft: false, runRight: false, charge: false, jump: false, shield: false,
-      uniqueba: false, transform: false, ba1: false, ba2: false,
-      runLeftPressed: false, runRightPressed: false, mouvementLeftPressed: false, mouvementRightPressed: false,
-      jumpPressed: false, chargePressed: false, uniquebaPressed: false,
-      transformPressed: false, ba1Pressed: false, ba2Pressed: false,
-      shieldPressed: false,
-    };
+    // Reused per-step snapshot to avoid allocations in the sim loop: every
+    // held control and its press edge, and the touch mouvement requests
+    // (see blankInput). Never `dropPressed`: only the training CPU drops
+    // through platforms.
+    const { dropPressed, ...frame } = blankInput();
+    this.frame = frame;
 
     this._onKeyDown = this._onKeyDown.bind(this);
     this._onKeyUp = this._onKeyUp.bind(this);
@@ -179,30 +182,18 @@ export class InputManager {
     this.touchMouvement = 0;
   }
 
-  // Build the per-simulation-step input snapshot for Player 1.
+  // Build the per-simulation-step input snapshot for Player 1: every held
+  // control (runLeft ... attack5) and its press edge, and the Dash a touch
+  // mouvement button asked for.
   sample() {
     const f = this.frame;
-    f.runLeft = this.isHeld('runLeft');
-    f.runRight = this.isHeld('runRight');
-    f.charge = this.isHeld('charge');
-    f.jump = this.isHeld('jump');
-    f.shield = this.isHeld('shield');
-    f.uniqueba = this.isHeld('uniqueba');
-    f.transform = this.isHeld('transform');
-    f.ba1 = this.isHeld('ba1');
-    f.ba2 = this.isHeld('ba2');
-    f.runLeftPressed = this.consume('runLeft');
-    f.runRightPressed = this.consume('runRight');
+    for (const control of HELD_CONTROLS) {
+      f[control] = this.isHeld(control);
+      f[`${control}Pressed`] = this.consume(control);
+    }
     f.mouvementLeftPressed = this.touchMouvement === -1;
     f.mouvementRightPressed = this.touchMouvement === 1;
     this.touchMouvement = 0;
-    f.jumpPressed = this.consume('jump');
-    f.chargePressed = this.consume('charge');
-    f.shieldPressed = this.consume('shield');
-    f.uniquebaPressed = this.consume('uniqueba');
-    f.transformPressed = this.consume('transform');
-    f.ba1Pressed = this.consume('ba1');
-    f.ba2Pressed = this.consume('ba2');
     return f;
   }
 

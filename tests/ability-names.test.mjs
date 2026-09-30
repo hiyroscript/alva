@@ -15,32 +15,40 @@ const DEF_0001 = getCharacter('0001');
 
 test('#0001 names the moves it has names for; the rest keep their neutral names', () => {
   assert.deepEqual(DEF_0001.abilityNames, {
-    uniqueba: 'Shuriken',
-    ba1: 'Punch',
-    ba2: 'Kick',
-    cba1: 'Clone Attack',
-    cba2: 'Sphere Rush',
+    extra_attack: 'Shuriken',
+    attack1: 'Punch',
+    attack2: 'Kick',
+    attack3: 'Clone Attack',
+    attack4: 'Sphere Rush',
   });
   assert.deepEqual(Object.fromEntries(Object.keys(MOVES).map((m) => [m, abilityName(DEF_0001, m)])), {
-    ba1: 'Punch',
-    maba1: 'Mid-air Basic Attack 1',
-    cba1: 'Clone Attack',
-    ba2: 'Kick',
-    maba2: 'Mid-air Basic Attack 2',
-    cba2: 'Sphere Rush',
-    uniqueba: 'Shuriken',
+    attack1: 'Punch',
+    midair_attack1: 'Mid-air Attack 1',
+    attack2: 'Kick',
+    midair_attack2: 'Mid-air Attack 2',
+    attack3: 'Clone Attack',
+    midair_attack3: 'Mid-air Attack 3',
+    attack4: 'Sphere Rush',
+    midair_attack4: 'Mid-air Attack 4',
+    attack5: 'Attack 5',
+    midair_attack5: 'Mid-air Attack 5',
+    extra_attack: 'Shuriken',
     transform: 'Transform',
   });
 });
 
 test('a character with no names of its own, or none at all, gets the neutral name of every move', () => {
-  for (const def of [null, undefined, { id: 'x' }, { id: 'y', abilityNames: {} }, { id: 'z', abilityNames: { ba1: '' } }]) {
+  for (const def of [null, undefined, { id: 'x' }, { id: 'y', abilityNames: {} }, { id: 'z', abilityNames: { attack1: '' } }]) {
     for (const [move, { label }] of Object.entries(MOVES)) assert.equal(abilityName(def, move), label, `${def?.id}: ${move}`);
   }
 });
 
-test('only move codenames have ability names: never a control, a retired name or anything else', () => {
-  for (const name of ['shield', 'jump', 'charge', 'runLeft', 'mouvementLeft', 'throw', 'primary', 'action1', 'midairBa1', 'rasenRush', 'toString', '__proto__', '', undefined]) {
+test('only move codenames have ability names: never a control, an object or anything else', () => {
+  // (The retired names are checked in codenames.test.mjs.)
+  for (const name of [
+    'shield', 'jump', 'charge', 'runLeft', 'mouvementLeft', 'attack6', 'midair_extra_attack', 'extra_attack_object',
+    'attack3_object', 'toString', '__proto__', '', undefined,
+  ]) {
     assert.equal(abilityName(DEF_0001, name), null, String(name));
   }
 });

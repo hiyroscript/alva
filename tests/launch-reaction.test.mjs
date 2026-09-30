@@ -27,28 +27,28 @@ test('a harder launch stuns longer, up to a cap; a hit that launches nothing kee
   assert.ok(close(resolveLaunchStun(1000, R), 0.2));
   assert.ok(close(resolveLaunchStun(2000, R), 0.4));
   assert.equal(resolveLaunchStun(10000, R), R.maxStun, 'capped');
-  // Through the real CombatSystem: BA2 on a target at 55 launches at 1200.
+  // Through the real CombatSystem: attack2 on a target at 55 launches at 1200.
   const d = duel({ gap: 40 });
   d.target.combat.launchPoint = 55;
-  d.tick(P('ba2'));
+  d.tick(P('attack2'));
   d.until(() => d.events.length > 0, 30);
   const [e] = d.events;
   assert.equal(e.launchSpeed, 120 * U);
-  assert.ok(close(e.hitstun, def.attacks.ba2.hitstun + 0.24));
+  assert.ok(close(e.hitstun, def.attacks.attack2.hitstun + 0.24));
   assert.equal(d.target.combat.stun, e.hitstun);
   // The shuriken never launches: its stun is its own.
   const s = duel({ gap: 200 });
   s.target.combat.launchPoint = 300;
-  s.tick(P('uniqueba'));
+  s.tick(P('extra_attack'));
   s.until(() => s.events.length > 0, 60);
   assert.equal(s.events[0].launchSpeed, 0);
-  assert.equal(s.events[0].hitstun, def.projectiles.shuriken.hitstun);
+  assert.equal(s.events[0].hitstun, def.projectiles.extra_attack_object.hitstun);
 });
 
 test('launched hard, a fighter tumbles in its mid-air hurt pose past the stun, until it acts or lands', () => {
   const d = duel({ gap: 40 });
   d.target.combat.launchPoint = 80;
-  d.tick(P('ba2'));
+  d.tick(P('attack2'));
   d.until(() => d.events.length > 0, 30);
   assert.ok(d.events[0].launchSpeed >= R.tumbleSpeed);
   assert.equal(d.target.tumbling, true);
@@ -56,7 +56,7 @@ test('launched hard, a fighter tumbles in its mid-air hurt pose past the stun, u
   d.tick();
   assert.equal(d.target.grounded, false);
   assert.equal(d.target.state, 'tumble', 'free, but still tumbling');
-  assert.equal(frameName(d.target), '0001_midairhurt.png');
+  assert.equal(frameName(d.target), '0001_midair_hurt_1.png');
   // Steering alone does not end it...
   d.tick({}, { runLeft: true });
   assert.equal(d.target.state, 'tumble');
@@ -68,12 +68,12 @@ test('launched hard, a fighter tumbles in its mid-air hurt pose past the stun, u
   // A slower launch never tumbles; landing ends one.
   const slow = duel({ gap: 40 });
   slow.target.combat.launchPoint = 20;
-  slow.tick(P('ba2'));
+  slow.tick(P('attack2'));
   slow.until(() => slow.events.length > 0, 30);
   assert.equal(slow.target.tumbling, false);
   const land = duel({ gap: 40 });
   land.target.combat.launchPoint = 80;
-  land.tick(P('ba2'));
+  land.tick(P('attack2'));
   land.until(() => land.target.grounded && land.events.length > 0, 240);
   assert.equal(land.target.tumbling, false);
 });
@@ -101,7 +101,7 @@ test('in play, the target\'s held direction steers the launch; with nothing held
   const launched = (held) => {
     const d = duel({ gap: 40 });
     d.target.combat.launchPoint = 65;
-    d.tick(P('ba2'));
+    d.tick(P('attack2'));
     // Held on the step the kick lands (walking away any sooner would dodge it).
     const landing = () => d.attacker.combat.attack.time + DT >= d.attacker.combat.attack.def.startup - 1e-6;
     for (let i = 0; i < 30 && !d.events.length; i++) d.tick({}, landing() ? held : {});
@@ -118,7 +118,7 @@ test('in play, the target\'s held direction steers the launch; with nothing held
   // Standing, Down bends nothing into the floor.
   const d = duel({ gap: 40 });
   d.target.combat.launchPoint = 60;
-  d.tick(P('ba1'), { charge: true });
+  d.tick(P('attack1'), { charge: true });
   d.until(() => d.events.length > 0, 30);
   assert.equal(d.events[0].finalLaunch.y, 0);
 });
@@ -128,6 +128,6 @@ test('a hit gives back the air jump, so a launched fighter can steer and jump it
   fighter.airJumps = 0;
   const system = new CombatSystem();
   const attacker = makeFighter({ x: 460 }).fighter;
-  system.applyHit(attacker, fighter, { ...fighter.attacks.ba2, id: 'ba2' });
+  system.applyHit(attacker, fighter, { ...fighter.attacks.attack2, id: 'attack2' });
   assert.equal(fighter.airJumps, def.movement.airJumps);
 });

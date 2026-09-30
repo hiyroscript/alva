@@ -243,21 +243,21 @@ test('the roster ships #0001 alone, kept whole but disabled: no fighter is playa
   assert.deepEqual(playableCharacters(), []);
   assert.deepEqual(CHARACTERS.filter((c) => c.available), []);
   // Nothing of it was stripped: re-enabling it is only `available: true`.
-  assert.deepEqual(Object.keys(DEF_0001.attacks).sort(), ['ba1', 'ba2', 'maba1', 'maba2', 'uniqueba']);
-  assert.deepEqual(DEF_0001.chargedActions, { ba1: { type: 'summon', id: 'cba1' }, ba2: { type: 'technique', id: 'cba2' } });
-  assert.ok(DEF_0001.summons.cba1 && DEF_0001.chargedTechniques.cba2, 'Clone Attack and Sphere Rush');
-  assert.ok(DEF_0001.projectiles.shuriken && DEF_0001.effectAnimations.cloneCloud && DEF_0001.effectAnimations.rasenSphereBuild);
+  assert.deepEqual(Object.keys(DEF_0001.attacks).sort(), ['attack1', 'attack2', 'extra_attack', 'midair_attack1', 'midair_attack2']);
+  assert.deepEqual(DEF_0001.chargeReplacements, { attack1: { type: 'summon', id: 'attack3' }, attack2: { type: 'technique', id: 'attack4' } });
+  assert.ok(DEF_0001.summons.attack3 && DEF_0001.chargedTechniques.attack4, 'Clone Attack and Sphere Rush');
+  assert.ok(DEF_0001.projectiles.extra_attack_object && DEF_0001.effectAnimations.attack3_object && DEF_0001.effectAnimations.attack4_object_build);
   assert.equal(DEF_0001.defense.type, 'shield');
   assert.ok(DEF_0001.movement.dashSpeed > 0, 'its Dash');
-  assert.deepEqual(DEF_0001.abilityNames, { uniqueba: 'Shuriken', ba1: 'Punch', ba2: 'Kick', cba1: 'Clone Attack', cba2: 'Sphere Rush' });
-  assert.deepEqual(Object.keys(DEF_0001.mobileAbilities), ['uniqueba', 'ba1', 'ba2']);
+  assert.deepEqual(DEF_0001.abilityNames, { extra_attack: 'Shuriken', attack1: 'Punch', attack2: 'Kick', attack3: 'Clone Attack', attack4: 'Sphere Rush' });
+  assert.deepEqual(Object.keys(DEF_0001.mobileAbilities), ['extra_attack', 'attack1', 'attack2']);
   assert.ok(DEF_0001.hurtboxes.length > 0 && DEF_0001.collider && DEF_0001.energy && DEF_0001.launchReaction);
   // Every frame it names is still on disk.
   const paths = characterFramePaths(DEF_0001);
   assert.ok(paths.length > 80);
   for (const path of paths) assert.ok(exists(path.replace('./', '')), path);
   // Its French ability names and its sprite credits stay too.
-  assert.equal(STRINGS.fr['ability.0001.ba1'], 'Coup de poing');
+  assert.equal(STRINGS.fr['ability.0001.attack1'], 'Coup de poing');
   assert.equal(STRINGS.en['credits.sprites.title'], '#0001 sprite source');
 });
 

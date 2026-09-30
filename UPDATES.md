@@ -30,22 +30,22 @@ further; the list below is the update as it stands now.
 - **Fast fall:** Down (the Charge input) held in the air while falling. A
   Charge held from the air no longer starts charging on landing.
 - **Dash handoff:** a Dash eases into the run instead of sliding on.
-- **Attack momentum:** a running BA1 slides on, BA2 steps in, aerials keep
+- **Attack momentum:** a running attack1 slides on, attack2 steps in, aerials keep
   their drift and follow the stick almost fully, and the Throw can back
   off. An attack faces the direction held as it starts.
-- **Combat input buffer:** a Throw, BA1 or BA2 press that comes too early is
+- **Combat input buffer:** a Throw, attack1 or attack2 press that comes too early is
   kept for 0.15 s and fires on the first step it can.
 - **Hit-cancel:** a hit that connects (not a block or a whiff) can be cut
   short into another attack, a jump or, on the ground, a Dash.
 - **Dash cancel:** the Dash out of a hit costs 40 Energy instead of 15, so
   a full bar allows two and a third empties it (the Shield goes with it).
-  That is what keeps BA1 → Dash → BA1 from looping. A Dash asked for during
+  That is what keeps attack1 → Dash → attack1 from looping. A Dash asked for during
   the hit's freeze comes out the step it ends.
 - A hit now interrupts the target's own attack.
-- **Combo routes:** at low Launch Point, BA1 → BA2, BA1 → BA1,
-  BA2 → jump → mid-air BA1 and mid-air BA2 → land → BA1 all connect;
-  BA1 → Dash → BA1 chases BA1's push up to about 85 Launch Point, and
-  BA2 → jump → mid-air BA1 carries on into a third aerial (through the air
+- **Combo routes:** at low Launch Point, attack1 → attack2, attack1 → attack1,
+  attack2 → jump → midair_attack1 and midair_attack2 → land → attack1 all connect;
+  attack1 → Dash → attack1 chases attack1's push up to about 85 Launch Point, and
+  attack2 → jump → midair_attack1 carries on into a third aerial (through the air
   jump up to about 40). They break naturally as Launch Point grows.
 
 **Where to tune it** (`js/data/characters.js`, #0001)
@@ -82,14 +82,14 @@ Values it changed, old → new, for undoing any one of them:
 | `movement` | `airTurnBoost` | 1.8 | 2.0 |
 | `movement` | `fastFallAcceleration` | 7500 | 12000 |
 | `movement` | `attackBuffer` | 0.12 | 0.15 |
-| `attacks.maba1` | `airControl` | 0.6 | 0.85 |
-| `attacks.maba1` | `hitstun` | 0.28 | 0.32 |
-| `attacks.maba1` | `cooldown` | 0.18 | 0.16 |
-| `attacks.maba2` | `airControl` | 0.4 | 0.7 |
+| `attacks.midair_attack1` | `airControl` | 0.6 | 0.85 |
+| `attacks.midair_attack1` | `hitstun` | 0.28 | 0.32 |
+| `attacks.midair_attack1` | `cooldown` | 0.18 | 0.16 |
+| `attacks.midair_attack2` | `airControl` | 0.4 | 0.7 |
 | `energy` | `dashCancelCost` | (none) | 40 |
 
 The mid-air attacks were named `midairBa1` and `midairBa2` when this pass
-was made; they are `maba1` and `maba2` now (see
+was made; they are `midair_attack1` and `midair_attack2` now (see
 [Control and move codenames](#control-and-move-codenames)).
 
 It also added the Dash cancel itself (`Fighter.tryDash` accepts an attack
@@ -106,20 +106,20 @@ or two hits to a four-hit Dash chase.
 ### Later: #0001's damage cut
 
 Not part of the update, but it moves the numbers above. #0001's damage was
-lowered afterwards: BA1 and mid-air BA1 5 → 3, BA2 and mid-air BA2 10 → 5,
+lowered afterwards: attack1 and midair_attack1 5 → 3, attack2 and midair_attack2 10 → 5,
 the Sphere Rush blast 15 → 10 (`damage` in `js/data/characters.js`). Each
 hit now pushes and launches a little less, so:
 
-- From 0 Launch Point, BA1 → BA1 strings up to 6 hits (was 4) and the
-  BA1 → Dash → BA1 chase up to 7 (was 5): the same three Dashes empty the
+- From 0 Launch Point, attack1 → attack1 strings up to 6 hits (was 4) and the
+  attack1 → Dash → attack1 chase up to 7 (was 5): the same three Dashes empty the
   bar, then plain BA1s carry on until the push ends it. Neither loops;
   `tests/combo.test.mjs` allows 6 and 7.
-- Each route's Launch Point limit moved up, by about 2 for the BA1 routes
-  and about 5 for the BA2 routes: BA2 → jump → mid-air BA1 now reaches
+- Each route's Launch Point limit moved up, by about 2 for the attack1 routes
+  and about 5 for the attack2 routes: attack2 → jump → midair_attack1 now reaches
   about 65, and the third aerial through the air jump about 45.
 - The combat AI weighs a hit's damage at `damage / 6` instead of `/ 10`
   (`hitValue` in `js/game/combat-ai.js`), so it values its hits, and so its
-  charged actions, as it did before the cut.
+  Charge replacements, as it did before the cut.
 
 ### Later: turning during actions
 
@@ -233,8 +233,8 @@ ceiling and landing are unchanged.
   (`impactVx` / `impactVy`).
 - `js/game/character.js` applies the rebound's stun and freeze.
 
-**Tests:** `tests/launch-bounce.test.mjs`, plus the BA2 spike tests in
-`tests/basic-attack-2.test.mjs`.
+**Tests:** `tests/launch-bounce.test.mjs`, plus the attack2 spike tests in
+`tests/attack2.test.mjs`.
 
 ## Jump, Shield, turning and joystick changes
 
@@ -294,8 +294,8 @@ Settings became a dialog).
 **Tests:**
 - the higher jump and the CPUs' jumps in `tests/movement.test.mjs`
 - the slow fall in `tests/defense.test.mjs`
-- turning in `tests/facing.test.mjs`, `tests/basic-attack.test.mjs`,
-  `tests/basic-attack-2.test.mjs`, `tests/throw.test.mjs`, and the CPU's
+- turning in `tests/facing.test.mjs`, `tests/attack1.test.mjs`,
+  `tests/attack2.test.mjs`, `tests/extra-attack.test.mjs`, and the CPU's
   guard in `tests/combat-ai.test.mjs`
 - the Joystick layout in `tests/controls-ui.test.mjs`
 
@@ -320,7 +320,7 @@ future one is enabled. It deleted content and closed routes; no tuning of
   test and document that described them was rewritten generically. Git
   history still holds them; the current tree does not.
 - **#0001 disabled, not removed:** `available: false`, in slot 01, with its
-  art, animations, attacks, charged actions, Shield, Dash, abilities,
+  art, animations, attacks, Charge replacements, Shield, Dash, abilities,
   tuning, body, credits, translations and engine tests all kept.
 - **Playability:** `isPlayable`, `getPlayableCharacter` and
   `playableCharacters` (`js/data/characters.js`) tell a playable fighter
@@ -364,11 +364,17 @@ fighter to pick register test-only ones from `tests/test-fighters.mjs`
 
 ## Control and move codenames
 
+History: this section records an earlier rename, and several of the names
+it introduced (`uniqueba`, `ba1`, `ba2`, `maba1`, `maba2`, `cba1`, `cba2`,
+CBA1 / CBA2) were themselves retired by the
+[attack codename migration](#attack-codenames-and-loadouts) below. None of
+them is current.
+
 Not a named update, and it changes no behaviour or tuning: later work
 renamed the gameplay controls and the moves to one canonical codename each.
 The codenames are universal, the same for every character (`ACTIONS` and
-`MOVES` in `js/config.js`); a character's own ability names are separate. Where an entry above names a field, it names where that field lives
-now. Old → new:
+`MOVES` in `js/config.js`); a character's own ability names are separate.
+Old → new, as it was then:
 
 | Old | New |
 | --- | --- |
@@ -386,10 +392,120 @@ now. Old → new:
 | CAB1 / CAB2 (cooldown labels) | CBA1 / CBA2 |
 
 A character's `defense` entry (what the `shield` button does, with the
-perfect Shield's `perfectWindow` and `perfectRearm`) keeps its name, as
-`movement` does, and so do the art files (`throw1`–`3`,
-`midair1ba1`–`3`, `midair2ba1`–`5`). The regression checks are in
-`tests/codenames.test.mjs`.
+perfect Shield's `perfectWindow` and `perfectRearm`) kept its name, as
+`movement` did; the art files kept theirs until the migration below. The
+regression checks are in `tests/codenames.test.mjs`.
+
+## Attack codenames and loadouts
+
+Not a named update (it can become one if the owner names it), and it
+changes no behaviour or tuning of #0001: the same inputs play the same
+fight, step for step. Asked for (the `max` prompt and `codename_rule`) as a
+real, repository-wide migration of the attack codenames, the art's file
+names, the input fields, the character schema, the Charge mappings, the
+spawned objects' names, the touch controls, the combat AI, the docs and the
+tests, with no alias left for any old name. Where an entry above names a
+field, it names where that field lives now.
+
+**What it changed**
+
+- **Attack codenames.** Every character's numbered attacks are `attack1`
+  to `attack5`, each with its mid-air version `midair_attack1` to
+  `midair_attack5`; the one optional special attack is `extra_attack`;
+  `transform` stays reserved. `MOVES` gives each a neutral label ("Attack
+  3", "Mid-air Attack 3", "Extra Attack") and nothing about its role.
+- **Loadouts** (`js/data/loadout.js`): 2 to 5 numbered attacks, `attack1`
+  and `attack2` always, contiguous; every numbered attack with a button has
+  its mid-air version; with Charge replacements (`chargeReplacements`,
+  replacing `chargedActions`) `attack3` is always Charge + `attack1` and
+  `attack4` Charge + `attack2`, with no button of their own, and a fifth
+  attack is a third button. `js/data/characters.js` refuses a definition
+  that breaks a rule (`assertLoadout`, every problem named).
+- **Controls.** The combat buttons are `extra_attack`, `transform` and
+  `attack1` to `attack5` (`COMBAT_BUTTONS`), with `extra_attackPressed`,
+  `attack1Pressed` … `attack5Pressed`; J, U and I keep their jobs, and O, M
+  and `,` (gamepad LT, L3, R3) are `attack3` to `attack5`. A fighter only
+  acts on the buttons its `actions` has; the input buffer covers all of
+  them.
+- **Touch controls.** Up to five numbered attack buttons in fixed slots (a
+  honeycomb round Transform and Shield), as many as the fighter has
+  buttons for; #0001 shows two. Custom layouts store `attack1` …
+  `attack5` and `extra_attack` by id (a saved layout's old ids are simply
+  left out: those controls go back to their default place).
+- **Cooldowns** are keyed by the attack itself (`attack3`, `attack4`) and
+  labelled **A3** / **A4** under the fighter.
+- **Animation keys** follow the file codenames: `mouvment` (the Dash
+  clip), `midair_hurt`, `charge` / `charge_loop` / `charge_release`,
+  `prepshield` / `shielding` / `releaseshield` / `midair_shielding`,
+  `attack4_form` … `attack4_whiff_release`, and for spawned objects
+  `extra_attack_object` (projectile and art), `attack3_object` (the clone
+  cloud), `attack4_object_build` / `_impact` / `_explosion` (the sphere).
+- **Art.** Every file of #0001 renamed byte for byte to
+  `<id>_<codename>_<frame>.png`, the unused Dodge frames included; the
+  `frames(id, codename, count, from)` / `framePath` helpers build every
+  path from the character's id.
+- **Tests.** `basic-attack`, `basic-attack-2`, `charged-ba2` and `throw`
+  became `attack1`, `attack2`, `attack4-sphere-rush` and `extra-attack`
+  (`.test.mjs`); the loadout matrix is new (`tests/loadout-fighters.mjs`,
+  `tests/loadout.test.mjs`); the sample fighter is now three attacks with
+  Charge.
+
+Old → new, for #0001 (the old names survive nowhere else):
+
+| Old | New |
+| --- | --- |
+| `ba1` / `maba1` (button, moves, clips) | `attack1` / `midair_attack1` |
+| `ba2` / `maba2` | `attack2` / `midair_attack2` |
+| `cba1` (Charge + `ba1`, the Clone Attack summon) | `attack3` (Charge + `attack1`) |
+| `cba2` (Charge + `ba2`, the Sphere Rush technique) | `attack4` (Charge + `attack2`) |
+| `uniqueba` (button, move, clip) | `extra_attack` |
+| `chargedActions` | `chargeReplacements` |
+| `shuriken` (projectile and art) | `extra_attack_object` |
+| `cloneCloud` | `attack3_object` |
+| `rasenForm` … `rasenWhiffRelease` | `attack4_form` … `attack4_whiff_release` |
+| `rasenSphereBuild` / `Impact` / `Explosion` | `attack4_object_build` / `_impact` / `_explosion` |
+| `dash`, `midairHurt` (clips) | `mouvment`, `midair_hurt` |
+| `chargeStart`, `chargeLoop`, `chargeRelease` (clips) | `charge`, `charge_loop`, `charge_release` |
+| `shieldStart`, `shield`, `shieldRelease`, `midairShield` (clips) | `prepshield`, `shielding`, `releaseshield`, `midair_shielding` |
+| CBA1 / CBA2 (cooldown labels) | A3 / A4 |
+| `0001_1ba1.png`, `0001_midair1ba1.png`, `0001_throw1.png`, `0001_shuriken1.png` | `0001_attack1_1.png`, `0001_midair_attack1_1.png`, `0001_extra_attack_1.png`, `0001_extra_attack_object_1.png` |
+| `0001_cloneav1.png`, `0001_rasen1.png`, `0001_prasen1.png` | `0001_attack3_object_1.png`, `0001_attack4_1.png`, `0001_attack4_object_1.png` |
+| `0001_charge1.png`, `0001_chargea.png`, `0001_dash1.png` | `0001_charge_1.png`, `0001_charge_a.png`, `0001_mouvment_1.png` |
+| `0001_hurt.png`, `0001_midairhurt.png`, `0001_releaseblock.png` | `0001_hurt_1.png`, `0001_midair_hurt_1.png`, `0001_releaseshield_1.png` |
+
+Kept on purpose: the fighter states (`dash`, `shield`, `shieldRelease`,
+`chargeRelease`), the Dash's tuning (`dashSpeed`, `dashTapWindow`,
+`dashCost`, `dashCancelCost`), the generic engine concepts (`summons`,
+`chargedTechniques`, `chargedCooldowns`, `chargedCooldownRate`, the Clone
+class) and the `mouvementLeft` / `mouvementRight` touch controls, whose
+spelling differs from the art's requested `mouvment` stem.
+
+**Where to change it**
+
+- The rules: `js/data/loadout.js` (`CHARGE_REPLACES`,
+  `MIN_NUMBERED_ATTACKS`, `loadoutProblems`); the codenames:
+  `NUMBERED_ATTACKS`, `COMBAT_BUTTONS`, `ACTIONS`, `MOVES` and
+  `CONFIG.bindings` in `js/config.js`.
+- The touch slots: `.tc-attack[data-slot]` in `styles.css` and
+  `attackSlots` in `js/game/touch-controls.js`.
+
+**Code:** `js/data/loadout.js`, `js/data/characters.js`, `js/config.js`,
+`js/game/character.js` (`COMBAT_ACTIONS`, `tryChargeReplacement`, the clip
+keys), `js/game/fighter-controller.js` (`HELD_CONTROLS`, `blankInput`),
+`js/core/input-manager.js`, `js/game/combat-ai.js`,
+`js/game/fighter-status.js` (`cooldownIndicators`, `cooldownLabel`),
+`js/ui/mobile-abilities.js`, `js/game/touch-controls.js`,
+`js/core/touch-layout.js`, `js/core/i18n.js`, `js/ui/icons.js` (`pip3` to
+`pip5`).
+
+**Tests:** `tests/loadout.test.mjs` (the matrix, the Charge routing, the
+buffer, the keys, the CPU and every rule broken on purpose),
+`tests/codenames.test.mjs` (the vocabulary, the files and a scan for every
+retired name), the touch matrix and slot geometry in
+`tests/controls-ui.test.mjs`, and the byte-for-byte checks of the renamed
+art in `tests/charge.test.mjs`, `tests/defense.test.mjs`,
+`tests/extra-attack.test.mjs`, `tests/clone.test.mjs` and
+`tests/attack4-sphere-rush.test.mjs`.
 
 ## Adding a named update
 

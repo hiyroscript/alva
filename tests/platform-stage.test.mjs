@@ -347,13 +347,13 @@ test('Quick Battle: the CPU in the Void scores Player 1 a point; a technique hol
   p2.body.x = p1.body.x + 120;
   script.held = { charge: true };
   for (let i = 0; i < 10; i++) battle.update(DT);
-  script.held = { charge: true, ba2: true, ba2Pressed: true };
+  script.held = { charge: true, attack2: true, attack2Pressed: true };
   battle.update(DT);
   script.held = {};
   const rush = p1.technique;
   for (let i = 0; i < 120 && !rush.hitConfirmed; i++) battle.update(DT);
   assert.ok(p2.combat.immobilized);
-  p1.summons.push({ id: 'cba1', target: p2 });
+  p1.summons.push({ id: 'attack3', target: p2 });
   Object.assign(p2.body, { x: battle.stage.void.right + 50, grounded: false, ground: null });
   battle.update(DT);
   assert.equal(p2.lostToVoid, true);

@@ -13,9 +13,12 @@
 //                     [TRANSFORM] [SHIELD]
 //                    [PUNCH] [KICK] [JUMP]
 //
+//   (#0001: two numbered attack buttons. A fighter with more numbered
+//   attack buttons, up to five, fills the slots round them; see below.)
+//
 // Classic Buttons (the original layout):
 //   lower-left : [LEFT] [C] [RIGHT]  — thumb can slide between them
-//   lower-right: the same six buttons
+//   lower-right: the same buttons
 //
 // Both schemes drive the same internal inputs. The joystick holds `runLeft`
 // or `runRight` exactly as the Left / Right buttons do (a digital hold: how
@@ -26,18 +29,36 @@
 // nothing.
 //
 // C is Charge (the `charge` input, held for as long as the pointer stays on
-// it). The large top slot is the `uniqueba` input, the middle row's first
-// button `transform` and the lower row's first two `ba1` and `ba2`: their
-// look is the fighter's own (#0001's Shuriken, Punch and Kick; see
-// setCharacter and js/ui/mobile-abilities.js), Transform shows as reserved
-// (dashed) while the fighter presents none, and a button for an ability the
-// fighter does not have at all (left out of its `actions`) is hidden, its
-// place left empty. Shield is the universal `shield` input, held for
-// as long as the pointer stays on it.
-// Only the icons and accessible names are player-facing: the input
-// codenames never change with them, so Charge + Punch is Charge + ba1 (cba1,
-// the Clone Attack), and Charge + Kick is Charge + ba2 (cba2, the Sphere
-// Rush).
+// it). The large top slot is the `extra_attack` input, the middle row's
+// first button `transform`, and the numbered attack buttons (`attack1` to
+// `attack5`) sit in numbered slots: their look is the fighter's own
+// (#0001's Shuriken, Punch and Kick; see setCharacter and
+// js/ui/mobile-abilities.js), Transform shows as reserved (dashed) while the
+// fighter presents none, and a button for an ability the fighter does not
+// have at all (left out of its `actions`) is hidden. Shield is the
+// universal `shield` input, held for as long as the pointer stays on it.
+//
+// Numbered attack slots, a honeycomb round Transform and Shield, filled in
+// order by the numbered attacks the fighter has a button for (see
+// js/data/loadout.js): attack1 always in slot 1 and attack2 in slot 2 (the
+// lower row), then its other buttons in slots 3, 4 and 5:
+//
+//                  [4]  [5]  [EXTRA]
+//               [3]  [TRANSFORM] [SHIELD]
+//                  [1]  [2]  [JUMP]
+//
+//   2 attacks              slots 1 2
+//   3 attacks, no Charge   slots 1 2 3 (attack3 in 3)
+//   4 attacks, no Charge   slots 1 2 3 4
+//   5 attacks, no Charge   slots 1 2 3 4 5
+//   3 or 4 with Charge     slots 1 2 (attack3 and attack4 come from Charge)
+//   5 with Charge          slots 1 2 3 (attack5 in 3)
+//
+// A numbered attack only Charge reaches has no button: Charge + attack1 is
+// the very same attack1 button pressed while Charging. Only the icons and
+// accessible names are player-facing: the input codenames never change with
+// them, so Charge + Punch is Charge + attack1 (attack3, the Clone Attack),
+// and Charge + Kick is Charge + attack2 (attack4, the Sphere Rush).
 //
 // Every pointer is tracked by pointerId, so the joystick (or Left / Right)
 // and Jump, or any other combination, work simultaneously. State is pushed
@@ -60,6 +81,7 @@
 import { el } from '../core/utils.js';
 import { tattr, setAttr, setPlainAttr } from '../core/i18n.js';
 import { ICONS } from '../ui/icons.js';
+import { NUMBERED_ATTACKS } from '../config.js';
 import { ABILITY_ACTIONS, abilityPresence, mobileAbility, mobileAbilityLabelKey } from '../ui/mobile-abilities.js';
 import { DEFAULT_MOBILE_CONTROLS, resolveSetting } from '../core/settings.js';
 import {
@@ -76,17 +98,29 @@ const DPAD = [
 
 // Lower-right cluster, in on-screen order. `ability` marks the combat
 // ability glyphs (drawn a little larger); the fighter-specific ones
-// (uniqueba, transform, ba1, ba2) carry no icon or label here: setCharacter
-// fills them in, and marks a reserved one. `pos` is the button's slot in the
-// cluster (its tc-<pos> class).
+// (extra_attack, transform, attack1 to attack5) carry no icon or label
+// here: setCharacter fills them in, and marks a reserved one. `pos` is the
+// button's place in the cluster (its tc-<pos> class); a numbered attack
+// button (`attack`) is also placed by the slot setCharacter gives it
+// (data-slot, see above).
 const ACTION_BUTTONS = [
-  { action: 'uniqueba', pos: 'uniqueba', ability: true },
+  { action: 'extra_attack', pos: 'extra_attack', ability: true },
   { action: 'transform', pos: 'transform' },
   { action: 'shield', label: 'control.shield', icon: ICONS.shield, pos: 'shield', ability: true },
-  { action: 'ba1', pos: 'ba1', ability: true },
-  { action: 'ba2', pos: 'ba2', ability: true },
+  ...NUMBERED_ATTACKS.map((action) => ({ action, pos: action, attack: true, ability: true })),
   { action: 'jump', label: 'control.jump', icon: ICONS.jump, pos: 'jump' },
 ];
+
+// The slot of each numbered attack button a fighter shows (see above):
+// attack1 and attack2 keep slots 1 and 2 whatever else is shown (a hidden
+// one keeps its place empty), and the fighter's other numbered buttons fill
+// slots 3 to 5 in order. `shown(action)` says whether a button is on show.
+export function attackSlots(shown) {
+  const slots = new Map([['attack1', 1], ['attack2', 2]]);
+  let next = 3;
+  for (const action of NUMBERED_ATTACKS.slice(2)) if (shown(action)) slots.set(action, next++);
+  return slots;
+}
 
 // The Joystick scheme's Charge: the same held `charge`, as a down arrow in
 // the lower-left cluster, to the left of the stick.
@@ -125,7 +159,7 @@ function makeButton(spec, cls) {
   const content = spec.icon || (spec.text && el('span', { class: 'tc-text', text: spec.text }));
   const btn = el('button', {
     type: 'button',
-    class: `tc-btn ${cls}${spec.ability ? ' tc-ability' : ''}`,
+    class: `tc-btn ${cls}${spec.ability ? ' tc-ability' : ''}${spec.attack ? ' tc-attack' : ''}`,
     ...(spec.label ? tattr('aria-label', spec.label) : {}),
     'data-action': spec.action,
     tabindex: '-1',
@@ -223,8 +257,8 @@ export class TouchControls {
       });
     }
 
-    // Held buttons (the six actions and the down-arrow Charge): each button
-    // owns its pointers.
+    // Held buttons (the lower-right actions and the down-arrow Charge):
+    // each button owns its pointers.
     for (const b of [...this.actionButtons.values(), this.chargeDown]) {
       const action = b.getAttribute('data-action');
       b.addEventListener('pointerdown', (e) => {
@@ -530,11 +564,17 @@ export class TouchControls {
   //
   // A button whose ability the fighter does not have at all (see
   // abilityPresence: left out of its `actions`) is hidden: not drawn, not
-  // named, never focused and never pressed, and whatever held it is let go. Its place stays empty, so no
-  // other button moves. The next fighter that has the ability shows the
-  // very same element again. `showAbsent` keeps such a button on show in
-  // its neutral look instead (the touch layout editor, whose layout every
-  // fighter shares).
+  // named, never focused and never pressed, and whatever held it is let go.
+  // The next fighter that has the ability shows the very same element
+  // again. `showAbsent` keeps such a button on show in its neutral look
+  // instead (the touch layout editor, whose layout every fighter shares).
+  //
+  // The numbered attack buttons on show then take their slots (see
+  // attackSlots): as many as the fighter has buttons for, so a fighter with
+  // attack3 to attack5 as buttons of their own shows five, and one whose
+  // attack3 and attack4 come from Charge shows only attack1 and attack2
+  // (and attack5 in slot 3, if it has one). attack1's and attack2's places
+  // stay empty when hidden, so no other button moves for them.
   setCharacter(def) {
     let shown = false;
     for (const action of ABILITY_ACTIONS) {
@@ -560,8 +600,21 @@ export class TouchControls {
       b.innerHTML = ability.icon;
       b.classList.toggle('is-pending', ability.pending);
     }
-    // A button back on show: place it again, as its layout says.
-    if (shown) this.applyLayout();
+    const slots = attackSlots((action) => !this.actionButtons.get(action).hidden);
+    let moved = false;
+    for (const action of NUMBERED_ATTACKS) {
+      const b = this.actionButtons.get(action);
+      const slot = slots.has(action) ? String(slots.get(action)) : null;
+      if ((b.getAttribute('data-slot') ?? null) === slot) continue;
+      moved = true;
+      if (slot) b.setAttribute('data-slot', slot);
+      else b.removeAttribute('data-slot');
+    }
+    // How many numbered attack buttons are on show (the cluster's width).
+    this.root.dataset.attackButtons = String(NUMBERED_ATTACKS.filter((action) => !this.actionButtons.get(action).hidden).length);
+    // A button back on show, or one in a new slot: place them again, as the
+    // layout says.
+    if (shown || moved) this.applyLayout();
   }
 
   // Lets go of every pointer holding `action`'s button.

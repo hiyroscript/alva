@@ -61,6 +61,10 @@ class Element extends Node {
     return this.attrs.has(name) ? this.attrs.get(name) : null;
   }
   hasAttribute(name) { return this.getAttribute(name) !== null; }
+  removeAttribute(name) {
+    if (BOOLEAN_ATTRS.includes(name)) this[name] = false;
+    else this.attrs.delete(name);
+  }
   get id() { return this.getAttribute('id'); }
   set textContent(v) { this.replaceChildren(new Text(String(v))); }
   get textContent() { return this.children.map((c) => c.textContent).join(''); }
@@ -286,7 +290,7 @@ test('profiles are ordered: no trait is ever better on a lower level', () => {
   const brutal = getDifficultyProfile('brutal');
   assert.ok(brutal.react[0] >= 3 * CONFIG.sim.step, 'even Brutal needs a few frames to react');
   assert.ok(brutal.lapse > 0 && brutal.noise > 0, 'even Brutal is not perfect');
-  assert.ok(getDifficultyProfile('easy').react[0] > 0.25, 'Easy is usually too late even for BA2\'s startup');
+  assert.ok(getDifficultyProfile('easy').react[0] > 0.25, 'Easy is usually too late even for attack2\'s startup');
 });
 
 test('a profile holds perception and judgement only: nothing a fighter is made of', () => {

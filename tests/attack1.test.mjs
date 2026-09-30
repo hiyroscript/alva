@@ -1,11 +1,12 @@
-// Run with node --test tests/basic-attack.test.mjs (no dependencies).
-// #0001 Basic Attack 1 (BA1) on ba1: ground/air selection, clip playback,
-// phase timing, hit resolution (ground BA1's Base Launch 1 horizontal push;
-// mid-air BA1, the three-frame kunai slash, launching the target upward at
-// Base Launch 2 vertical) and the other combat inputs (Throw on uniqueba,
+// Run with node --test tests/attack1.test.mjs (no dependencies).
+// #0001's attack1 button (attack1, the Punch, and midair_attack1): ground/air
+// selection, clip playback,
+// phase timing, hit resolution (ground attack1's Base Launch 1 horizontal push;
+// midair_attack1, the three-frame kunai slash, launching the target upward at
+// Base Launch 2 vertical) and the other combat inputs (Throw on extra_attack,
 // transform still reserved). Uses the real Fighter, CombatSystem and
-// physics (see fighter-harness.mjs). Basic Attack 2 (BA2, ba2) has its
-// own file, basic-attack-2.test.mjs.
+// physics (see fighter-harness.mjs). The attack2 button has its own file,
+// attack2.test.mjs.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { COMBAT_ACTIONS } from '../js/game/character.js';
@@ -19,34 +20,34 @@ import {
 } from './fighter-harness.mjs';
 import { resolveLaunchStun } from '../js/game/combat.js';
 
-const BA1 = { ba1: true, ba1Pressed: true };
-const BA2 = { ba2: true, ba2Pressed: true };
+const ATTACK1 = { attack1: true, attack1Pressed: true };
+const ATTACK2 = { attack2: true, attack2Pressed: true };
 
 const JUMP = { jump: true, jumpPressed: true };
 
-// Each BA1's Base Launch and Directional Launch: ground BA1 pushes sideways
-// at 1; mid-air BA1 launches the target upward at 2 and pushes it nowhere.
+// Each attack1's Base Launch and Directional Launch: ground attack1 pushes sideways
+// at 1; midair_attack1 launches the target upward at 2 and pushes it nowhere.
 const BA1_LAUNCH = {
-  ba1: { baseLaunch: 1, directionalLaunch: 'horizontal' },
-  maba1: { baseLaunch: 2, directionalLaunch: 'vertical' },
+  attack1: { baseLaunch: 1, directionalLaunch: 'horizontal' },
+  midair_attack1: { baseLaunch: 2, directionalLaunch: 'vertical' },
 };
 
-// Each BA1's whole data entry. Ground BA1 is the four-frame punch; mid-air
-// BA1 is the three-frame kunai slash (midair1ba1-3), with the slash's own
+// Each attack1's whole data entry. Ground attack1 is the four-frame punch; mid-air
+// attack1 is the three-frame kunai slash (midair_attack1_1-3), with the slash's own
 // timing, hitbox and combat values, and each its own movement: the punch
 // keeps some of a run's speed and slides on it, the slash keeps all of its
 // drift and most of the air steering. Both open a follow-up once they hit
 // (hitCancel, from their strike).
 const BA1_ENTRIES = {
-  ba1: {
-    animation: 'ba1', startup: 1 / 12, active: 1 / 12, recovery: 2 / 12, damage: 3,
-    hitbox: { x: 12, y: -64, w: 28, h: 16 }, ...BA1_LAUNCH.ba1,
+  attack1: {
+    animation: 'attack1', startup: 1 / 12, active: 1 / 12, recovery: 2 / 12, damage: 3,
+    hitbox: { x: 12, y: -64, w: 28, h: 16 }, ...BA1_LAUNCH.attack1,
     hitstun: 0.32, blockstun: 0.14, hitstop: 0.05, cooldown: 0.15, groundOnly: true,
     momentum: 0.75, friction: 0.4, hitCancel: 1 / 12,
   },
-  maba1: {
-    animation: 'maba1', startup: 2 / 12, active: 1 / 12, recovery: 0, damage: 3,
-    hitbox: { x: 14, y: -100, w: 22, h: 80 }, ...BA1_LAUNCH.maba1,
+  midair_attack1: {
+    animation: 'midair_attack1', startup: 2 / 12, active: 1 / 12, recovery: 0, damage: 3,
+    hitbox: { x: 14, y: -100, w: 22, h: 80 }, ...BA1_LAUNCH.midair_attack1,
     hitstun: 0.32, blockstun: 0.15, hitstop: 0.05, cooldown: 0.16,
     airMomentum: 1, airControl: 0.85, hitCancel: 2 / 12,
   },
@@ -55,22 +56,23 @@ const BA1_ENTRIES = {
 // Zero either way: +0 or -0 (both === 0).
 const isZero = (v) => v === 0;
 
-test('ba1 is Basic Attack 1: ground ba1, air maba1; ba2 is BA2; uniqueba is Throw; transform stays reserved', () => {
+test('the attack1 button: ground attack1, air midair_attack1; attack2 on its own button, extra_attack the Throw, transform reserved, no attack3 to attack5 button', () => {
   assert.deepEqual(def.actions, {
-    uniqueba: 'uniqueba',
+    extra_attack: 'extra_attack',
     transform: null,
-    ba1: { ground: 'ba1', air: 'maba1' },
-    ba2: { ground: 'ba2', air: 'maba2' },
+    attack1: { ground: 'attack1', air: 'midair_attack1' },
+    attack2: { ground: 'attack2', air: 'midair_attack2' },
   });
-  assert.deepEqual(COMBAT_ACTIONS, ['uniqueba', 'transform', 'ba1', 'ba2']);
-  assert.deepEqual(CONFIG.bindings.ba1, ['KeyU']);
-  assert.deepEqual(CONFIG.bindings.ba2, ['KeyI']);
-  assert.deepEqual(CONFIG.bindings.uniqueba, ['KeyJ']);
+  assert.deepEqual(COMBAT_ACTIONS, ['extra_attack', 'transform', 'attack1', 'attack2', 'attack3', 'attack4', 'attack5']);
+  for (const button of ['attack3', 'attack4', 'attack5']) assert.equal(def.actions[button], undefined, `no ${button} button`);
+  assert.deepEqual(CONFIG.bindings.attack1, ['KeyU']);
+  assert.deepEqual(CONFIG.bindings.attack2, ['KeyI']);
+  assert.deepEqual(CONFIG.bindings.extra_attack, ['KeyJ']);
 });
 
-test('BA1 attack definitions match their clips: the ground punch and the mid-air kunai slash', () => {
+test('attack1 attack definitions match their clips: the ground punch and the mid-air kunai slash', () => {
   const { fighter } = makeFighter();
-  for (const id of ['ba1', 'maba1']) {
+  for (const id of ['attack1', 'midair_attack1']) {
     const atk = fighter.attacks[id];
     const clip = def.animations[id];
     assert.deepEqual({ ...def.attacks[id] }, BA1_ENTRIES[id], `${id}: its whole entry`);
@@ -87,43 +89,43 @@ test('BA1 attack definitions match their clips: the ground punch and the mid-air
     assert.ok(atk.hitbox.x > 0, `${id} hitbox is in front`);
     assert.ok(atk.hitbox.y < 0 && atk.hitbox.y + atk.hitbox.h <= 0, `${id} hitbox is above the feet`);
   }
-  // Ground BA1: frame 1 wind-up, frame 2 punch, frames 3-4 recovery; a
+  // Ground attack1: frame 1 wind-up, frame 2 punch, frames 3-4 recovery; a
   // short jab, no bigger than the fighter's own body.
-  const g = fighter.attacks.ba1;
-  assert.equal(def.animations.ba1.frames.length, 4);
+  const g = fighter.attacks.attack1;
+  assert.equal(def.animations.attack1.frames.length, 4);
   assert.deepEqual([g.startup, g.active, g.recovery], [1 / 12, 1 / 12, 2 / 12]);
   assert.equal(g.groundOnly, true);
   assert.equal(g.damage, 3, 'adds 3 Launch Point');
   assert.deepEqual([g.hitstun, g.blockstun, g.hitstop, g.cooldown], [0.32, 0.14, 0.05, 0.15]);
   // A combo starter: once it hits it may be cut short from its strike, and
-  // its stun outlasts that (with room for BA2's wind-up); its freeze is
+  // its stun outlasts that (with room for attack2's wind-up); its freeze is
   // short, so repeated jabs stay crisp.
   assert.equal(g.hitCancel, g.startup);
-  assert.ok(g.hitstun > fighter.attacks.ba2.startup, 'the stun covers BA2\'s wind-up');
-  assert.ok(g.hitstop < fighter.attacks.ba2.hitstop, 'a lighter freeze than BA2');
-  assert.ok(g.hitbox.x + g.hitbox.w <= 60, 'ba1 hitbox is within reach');
-  assert.ok(g.hitbox.w <= def.collider.width + 10 && g.hitbox.h <= def.collider.height / 2, 'ba1 hitbox is not oversized');
-  // Mid-air BA1: frames 1-2 wind-up, frame 3 the slash, and no recovery
+  assert.ok(g.hitstun > fighter.attacks.attack2.startup, 'the stun covers attack2\'s wind-up');
+  assert.ok(g.hitstop < fighter.attacks.attack2.hitstop, 'a lighter freeze than attack2');
+  assert.ok(g.hitbox.x + g.hitbox.w <= 60, 'attack1 hitbox is within reach');
+  assert.ok(g.hitbox.w <= def.collider.width + 10 && g.hitbox.h <= def.collider.height / 2, 'attack1 hitbox is not oversized');
+  // midair_attack1: frames 1-2 wind-up, frame 3 the slash, and no recovery
   // frame (the clip ends on the slash; the longer cooldown makes up for it).
   // The hitbox covers the slash arc: in front, within a limb's reach and
   // narrower than the fighter.
-  const a = fighter.attacks.maba1;
-  assert.equal(def.animations.maba1.frames.length, 3);
+  const a = fighter.attacks.midair_attack1;
+  assert.equal(def.animations.midair_attack1.frames.length, 3);
   assert.deepEqual([a.startup, a.active, a.recovery], [2 / 12, 1 / 12, 0]);
   assert.equal(a.groundOnly, false);
   assert.equal(a.damage, 3, 'adds 3 Launch Point');
   assert.deepEqual([a.hitstun, a.blockstun, a.hitstop, a.cooldown], [0.32, 0.15, 0.05, 0.16]);
   assert.equal(a.hitCancel, a.startup, 'a follow-up from its slash on');
-  assert.ok(a.hitbox.x + a.hitbox.w > def.collider.width / 2 && a.hitbox.x + a.hitbox.w <= 40, 'maba1 hitbox reach');
-  assert.ok(a.hitbox.w < def.collider.width, 'maba1 hitbox is narrower than the fighter');
+  assert.ok(a.hitbox.x + a.hitbox.w > def.collider.width / 2 && a.hitbox.x + a.hitbox.w <= 40, 'midair_attack1 hitbox reach');
+  assert.ok(a.hitbox.w < def.collider.width, 'midair_attack1 hitbox is narrower than the fighter');
   assert.ok(a.cooldown > g.cooldown);
 });
 
-test('BA1\'s launch is exactly its declared Base Launch and Directional Launch, never derived from its damage', () => {
+test('attack1\'s launch is exactly its declared Base Launch and Directional Launch, never derived from its damage', () => {
   const { fighter } = makeFighter();
-  assert.deepEqual([fighter.attacks.ba1.baseLaunch, fighter.attacks.ba1.directionalLaunch], [1, 'horizontal']);
-  assert.deepEqual([fighter.attacks.maba1.baseLaunch, fighter.attacks.maba1.directionalLaunch], [2, 'vertical']);
-  for (const id of ['ba1', 'maba1']) {
+  assert.deepEqual([fighter.attacks.attack1.baseLaunch, fighter.attacks.attack1.directionalLaunch], [1, 'horizontal']);
+  assert.deepEqual([fighter.attacks.midair_attack1.baseLaunch, fighter.attacks.midair_attack1.directionalLaunch], [2, 'vertical']);
+  for (const id of ['attack1', 'midair_attack1']) {
     const source = def.attacks[id];
     assert.equal('powers' in source, false, `${id} declares no Powers`);
     // The same entry with any other legal Base Launch keeps that one: it is
@@ -134,21 +136,21 @@ test('BA1\'s launch is exactly its declared Base Launch and Directional Launch, 
       assert.equal(atk.damage, 3);
       assert.equal(atk.directionalLaunch, source.directionalLaunch);
     }
-    // Everything about BA1 is its entry's own.
+    // Everything about attack1 is its entry's own.
     const atk = fighter.attacks[id];
     for (const [key, value] of Object.entries(source)) assert.deepEqual(atk[key], value, `${id}.${key}`);
   }
 });
-test('grounded ba1 plays the four-frame ground BA1 once, then returns to idle', () => {
+test('grounded attack1 plays the four-frame ground attack1 once, then returns to idle', () => {
   const { fighter, step } = makeFighter();
-  step(BA1);
+  step(ATTACK1);
   assert.equal(fighter.state, 'attack');
-  assert.equal(fighter.combat.attack.def.id, 'ba1');
-  assert.equal(fighter.animator.anim.key, 'ba1');
-  assert.equal(frameName(fighter), '0001_1ba1.png');
+  assert.equal(fighter.combat.attack.def.id, 'attack1');
+  assert.equal(fighter.animator.anim.key, 'attack1');
+  assert.equal(frameName(fighter), '0001_attack1_1.png');
 
   const log = [{ frame: frameName(fighter), phase: fighter.combat.phase }, ...recordAttack(step)];
-  assert.deepEqual(sequence(log), ['0001_1ba1.png', '0001_1ba2.png', '0001_1ba3.png', '0001_1ba4.png']);
+  assert.deepEqual(sequence(log), ['0001_attack1_1.png', '0001_attack1_2.png', '0001_attack1_3.png', '0001_attack1_4.png']);
   assert.equal(log.length, steps(4 / 12), 'one pass of the clip');
   // Never loops back to an earlier frame.
   for (let i = 1; i < log.length; i++) assert.ok(frameNo(log[i].frame) >= frameNo(log[i - 1].frame));
@@ -157,18 +159,18 @@ test('grounded ba1 plays the four-frame ground BA1 once, then returns to idle', 
   // Clean exit: no attack, idle art, free to act again after the cooldown.
   assert.equal(fighter.state, 'idle');
   assert.equal(fighter.combat.attack, null);
-  assert.equal(frameName(fighter), '0001_idle1.png');
-  assert.ok(fighter.combat.cooldowns.has('ba1'));
-  stepUntil(step, (f) => !f.combat.cooldowns.has('ba1'), {}, steps(0.2));
-  step(BA1);
-  assert.equal(fighter.combat.attack?.def.id, 'ba1');
+  assert.equal(frameName(fighter), '0001_idle_1.png');
+  assert.ok(fighter.combat.cooldowns.has('attack1'));
+  stepUntil(step, (f) => !f.combat.cooldowns.has('attack1'), {}, steps(0.2));
+  step(ATTACK1);
+  assert.equal(fighter.combat.attack?.def.id, 'attack1');
 });
 
 test('the hitbox is live only around the contact frame', () => {
   const cases = {
-    ba1: { contact: '0001_1ba2.png', setup: () => makeFighter() },
-    maba1: {
-      contact: '0001_midair1ba3.png',
+    attack1: { contact: '0001_attack1_2.png', setup: () => makeFighter() },
+    midair_attack1: {
+      contact: '0001_midair_attack1_3.png',
       setup: () => {
         const r = makeFighter();
         r.step({ jump: true, jumpPressed: true });
@@ -178,7 +180,7 @@ test('the hitbox is live only around the contact frame', () => {
   };
   for (const [id, { contact, setup }] of Object.entries(cases)) {
     const { step } = setup();
-    const log = recordAttack(step, BA1);
+    const log = recordAttack(step, ATTACK1);
     assert.equal(log[0].id, id);
     const active = log.filter((s) => s.phase === 'active');
     assert.equal(active.length, steps(1 / 12), `${id}: active for exactly one frame of art`);
@@ -193,7 +195,7 @@ test('the hitbox is live only around the contact frame', () => {
   }
 });
 
-test('airborne ba1 plays the three-frame mid-air BA1 (the kunai slash) during the ascent, under normal gravity', () => {
+test('airborne attack1 plays the three-frame midair_attack1 (the kunai slash) during the ascent, under normal gravity', () => {
   const { fighter, step } = makeFighter();
   // The same jump without an attack, for comparison.
   const plain = makeFighter();
@@ -202,11 +204,11 @@ test('airborne ba1 plays the three-frame mid-air BA1 (the kunai slash) during th
   step();
   plain.step();
   assert.ok(fighter.body.vy < 0, 'rising');
-  step(BA1);
+  step(ATTACK1);
   plain.step();
-  assert.equal(fighter.combat.attack.def.id, 'maba1');
-  assert.equal(fighter.animator.anim.key, 'maba1');
-  assert.equal(frameName(fighter), '0001_midair1ba1.png');
+  assert.equal(fighter.combat.attack.def.id, 'midair_attack1');
+  assert.equal(fighter.animator.anim.key, 'midair_attack1');
+  assert.equal(frameName(fighter), '0001_midair_attack1_1.png');
   const log = [{ frame: frameName(fighter) }];
   while (fighter.state === 'attack') {
     step();
@@ -215,34 +217,34 @@ test('airborne ba1 plays the three-frame mid-air BA1 (the kunai slash) during th
     for (const k of ['x', 'y', 'vx', 'vy']) assert.equal(fighter.body[k], plain.fighter.body[k], `body.${k}`);
     if (fighter.state === 'attack') log.push({ frame: frameName(fighter) });
   }
-  assert.deepEqual(sequence(log), ['0001_midair1ba1.png', '0001_midair1ba2.png', '0001_midair1ba3.png']);
+  assert.deepEqual(sequence(log), ['0001_midair_attack1_1.png', '0001_midair_attack1_2.png', '0001_midair_attack1_3.png']);
   assert.equal(log.length, steps(3 / 12), 'one pass of the clip');
   assert.equal(fighter.grounded, false);
   assert.ok(['jump', 'fall'].includes(fighter.state));
 });
 
-test('airborne ba1 also triggers mid-air BA1 during the descent', () => {
+test('airborne attack1 also triggers midair_attack1 during the descent', () => {
   const { fighter, step } = makeFighter();
   step(JUMP);
   stepUntil(step, (f) => f.body.vy > 0); // a tap: the normal jump
   assert.equal(fighter.state, 'fall');
-  step(BA1);
+  step(ATTACK1);
   assert.equal(fighter.state, 'attack');
-  assert.equal(fighter.combat.attack.def.id, 'maba1');
-  assert.equal(frameName(fighter), '0001_midair1ba1.png');
+  assert.equal(fighter.combat.attack.def.id, 'midair_attack1');
+  assert.equal(frameName(fighter), '0001_midair_attack1_1.png');
   const log = recordAttack(step);
-  assert.equal(sequence(log).at(-1), '0001_midair1ba3.png');
-  assert.ok(log.every((s) => s.id === 'maba1' && !s.grounded));
+  assert.equal(sequence(log).at(-1), '0001_midair_attack1_3.png');
+  assert.ok(log.every((s) => s.id === 'midair_attack1' && !s.grounded));
 });
 
-test('landing during mid-air BA1 finishes the mid-air clip instead of switching to ground BA1 or land', () => {
+test('landing during midair_attack1 finishes the mid-air clip instead of switching to ground attack1 or land', () => {
   const { fighter, step } = makeFighter();
   step(JUMP);
   // Late in the descent, so the fighter lands partway through the attack.
   stepUntil(step, (f) => f.body.vy > 0 && f.body.y > 740);
   const states = [];
   const log = [];
-  let f = step(BA1);
+  let f = step(ATTACK1);
   while (f.state === 'attack') {
     log.push({ id: f.combat.attack.def.id, frame: frameName(f), anim: f.animator.anim.key, grounded: f.grounded });
     states.push(f.state);
@@ -251,63 +253,63 @@ test('landing during mid-air BA1 finishes the mid-air clip instead of switching 
   assert.equal(log[0].grounded, false);
   assert.ok(log.some((s) => s.grounded), 'landed during the attack');
   for (const s of log) {
-    assert.equal(s.id, 'maba1');
-    assert.equal(s.anim, 'maba1');
-    assert.match(s.frame, /^0001_midair1ba\d\.png$/);
+    assert.equal(s.id, 'midair_attack1');
+    assert.equal(s.anim, 'midair_attack1');
+    assert.match(s.frame, /^0001_midair_attack1_\d\.png$/);
   }
   assert.ok(!states.includes('land'));
-  assert.deepEqual(sequence(log), ['0001_midair1ba1.png', '0001_midair1ba2.png', '0001_midair1ba3.png']);
+  assert.deepEqual(sequence(log), ['0001_midair_attack1_1.png', '0001_midair_attack1_2.png', '0001_midair_attack1_3.png']);
   assert.equal(log.length, steps(3 / 12), 'the attack runs its full length');
   // Touchdown happened mid-attack, so there is no late land clip afterwards.
   assert.equal(fighter.grounded, true);
   assert.equal(fighter.state, 'idle');
-  assert.equal(frameName(fighter), '0001_idle1.png');
+  assert.equal(frameName(fighter), '0001_idle_1.png');
 });
 
-test('BA1 on the same step as a jump punches on the ground; the jump is dropped', () => {
+test('attack1 on the same step as a jump punches on the ground; the jump is dropped', () => {
   const { fighter, step } = makeFighter();
-  step({ jump: true, jumpPressed: true, ...BA1 });
-  assert.equal(fighter.combat.attack.def.id, 'ba1');
+  step({ jump: true, jumpPressed: true, ...ATTACK1 });
+  assert.equal(fighter.combat.attack.def.id, 'attack1');
   assert.equal(fighter.grounded, true);
   const log = recordAttack(step);
-  assert.ok(log.every((s) => s.grounded && s.id === 'ba1'));
+  assert.ok(log.every((s) => s.grounded && s.id === 'attack1'));
   assert.equal(fighter.grounded, true);
 });
 
 test('the ground/air choice follows grounded state; a mapping without `air` is inactive in the air', () => {
   const { fighter, step } = makeFighter();
-  assert.equal(fighter.attackFor('ba1'), 'ba1');
-  assert.equal(fighter.attackFor('ba2'), 'ba2');
+  assert.equal(fighter.attackFor('attack1'), 'attack1');
+  assert.equal(fighter.attackFor('attack2'), 'attack2');
   step({ jump: true, jumpPressed: true });
-  assert.equal(fighter.attackFor('ba1'), 'maba1');
-  assert.equal(fighter.attackFor('ba2'), 'maba2');
+  assert.equal(fighter.attackFor('attack1'), 'midair_attack1');
+  assert.equal(fighter.attackFor('attack2'), 'midair_attack2');
   assert.equal(fighter.attackFor('transform'), null);
   // Throw is a plain string mapping: the same id in the air, refused there
-  // because it is ground-only (see throw.test.mjs).
-  assert.equal(fighter.attackFor('uniqueba'), 'uniqueba');
-  assert.equal(fighter.tryAction('uniqueba'), false);
+  // because it is ground-only (see extra-attack.test.mjs).
+  assert.equal(fighter.attackFor('extra_attack'), 'extra_attack');
+  assert.equal(fighter.tryAction('extra_attack'), false);
 
-  const character = { ...def, actions: { ...def.actions, ba1: { ground: 'ba1' } } };
+  const character = { ...def, actions: { ...def.actions, attack1: { ground: 'attack1' } } };
   const groundOnly = makeFighter({ character });
   groundOnly.step({ jump: true, jumpPressed: true });
-  assert.equal(groundOnly.fighter.tryAction('ba1'), false);
+  assert.equal(groundOnly.fighter.tryAction('attack1'), false);
   assert.equal(groundOnly.fighter.combat.attack, null);
 });
 
 test('a plain string mapping still means one attack', () => {
-  const character = { ...def, actions: { ...def.actions, uniqueba: 'ba1' } };
+  const character = { ...def, actions: { ...def.actions, extra_attack: 'attack1' } };
   const { fighter, step } = makeFighter({ character });
-  step({ uniqueba: true, uniquebaPressed: true });
-  assert.equal(fighter.combat.attack.def.id, 'ba1');
-  assert.equal(frameName(fighter), '0001_1ba1.png');
+  step({ extra_attack: true, extra_attackPressed: true });
+  assert.equal(fighter.combat.attack.def.id, 'attack1');
+  assert.equal(frameName(fighter), '0001_attack1_1.png');
   // groundOnly still applies to string mappings.
   const air = makeFighter({ character });
   air.step({ jump: true, jumpPressed: true });
-  air.step({ uniqueba: true, uniquebaPressed: true });
+  air.step({ extra_attack: true, extra_attackPressed: true });
   assert.equal(air.fighter.combat.attack, null);
 });
 
-test('transform stays inactive for #0001; Throw (uniqueba), BA1 and BA2 work', () => {
+test('transform stays inactive for #0001; Throw (extra_attack), attack1 and attack2 work', () => {
   const { fighter, step } = makeFighter();
   assert.equal(fighter.tryAction('transform'), false);
   step({ transform: true, transformPressed: true });
@@ -318,14 +320,14 @@ test('transform stays inactive for #0001; Throw (uniqueba), BA1 and BA2 work', (
   step({ transform: true, transformPressed: true });
   assert.equal(fighter.combat.attack, null, 'transform in the air');
 
-  // Throw, the uniqueba action, on the ground (it has no mid-air version).
+  // Throw, the extra_attack action, on the ground (it has no mid-air version).
   const thrower = makeFighter();
-  thrower.step({ uniqueba: true, uniquebaPressed: true });
-  assert.equal(thrower.fighter.combat.attack?.def.id, 'uniqueba');
-  assert.equal(thrower.fighter.combat.lastIntent, 'uniqueba');
+  thrower.step({ extra_attack: true, extra_attackPressed: true });
+  assert.equal(thrower.fighter.combat.attack?.def.id, 'extra_attack');
+  assert.equal(thrower.fighter.combat.lastIntent, 'extra_attack');
 
   // The two basic attacks, on the ground and in the air.
-  for (const [held, ground, air] of [[BA1, 'ba1', 'maba1'], [BA2, 'ba2', 'maba2']]) {
+  for (const [held, ground, air] of [[ATTACK1, 'attack1', 'midair_attack1'], [ATTACK2, 'attack2', 'midair_attack2']]) {
     const g = makeFighter();
     g.step(held);
     assert.equal(g.fighter.combat.attack?.def.id, ground);
@@ -338,22 +340,22 @@ test('transform stays inactive for #0001; Throw (uniqueba), BA1 and BA2 work', (
 
 test('an attack whose frames failed to load is refused, not faked', (t) => {
   const warn = t.mock.method(console, 'warn', () => {});
-  const keys = Object.keys(def.animations).filter((k) => k !== 'ba1' && k !== 'maba1');
+  const keys = Object.keys(def.animations).filter((k) => k !== 'attack1' && k !== 'midair_attack1');
   const { fighter, step } = makeFighter({ sprites: fakeSprites(keys) });
-  step(BA1);
+  step(ATTACK1);
   assert.equal(fighter.combat.attack, null);
   assert.equal(fighter.state, 'idle');
   step({ jump: true, jumpPressed: true });
-  step(BA1);
+  step(ATTACK1);
   assert.equal(fighter.combat.attack, null);
   assert.ok(['jump', 'fall'].includes(fighter.state));
   assert.equal(warn.mock.callCount(), 2);
 });
 
-test('BA1 locks movement while it plays; the direction held turns it at once', () => {
+test('attack1 locks movement while it plays; the direction held turns it at once', () => {
   const { fighter, step } = makeFighter();
   stepUntil(step, (f) => f.state === 'run', { runRight: true });
-  step({ runRight: true, ...BA1 });
+  step({ runRight: true, ...ATTACK1 });
   assert.equal(fighter.facing, 1);
   const log = [];
   while (fighter.state === 'attack') {
@@ -365,17 +367,17 @@ test('BA1 locks movement while it plays; the direction held turns it at once', (
   assert.ok(log.every((vx) => vx >= 0), 'turning never walks it: the run\'s slide just runs down');
   // Back and forth, as often as the player likes.
   for (let i = 0; i < 30; i++) step();
-  step(BA1);
+  step(ATTACK1);
   for (const [held, facing] of [[{ runRight: true }, 1], [{ runLeft: true }, -1], [{}, -1], [{ runRight: true }, 1]]) {
     step(held);
-    assert.equal(fighter.combat.attack?.def.id, 'ba1');
+    assert.equal(fighter.combat.attack?.def.id, 'attack1');
     assert.equal(fighter.facing, facing);
   }
 });
 
-test('ground BA1 hits an opponent in front during the active phase only', () => {
+test('ground attack1 hits an opponent in front during the active phase only', () => {
   const { attacker, target, tick, events } = duel();
-  tick(BA1);
+  tick(ATTACK1);
   let hitPhase = null;
   while (attacker.combat.attack) {
     const before = events.length;
@@ -391,18 +393,18 @@ test('ground BA1 hits an opponent in front during the active phase only', () => 
   assert.equal(hitPhase, 'active');
 });
 
-test('a ground BA1 hit adds its 3 first, then pushes the target sideways at 1 x its new Launch Point: 117 + 3 = 120, a strength of 120, with no launch', () => {
+test('a ground attack1 hit adds its 3 first, then pushes the target sideways at 1 x its new Launch Point: 117 + 3 = 120, a strength of 120, with no launch', () => {
   for (const facing of [1, -1]) {
     const { attacker, target, tick, events } = duel({ attackerFacing: facing });
     target.combat.launchPoint = 117;
-    tick(BA1);
+    tick(ATTACK1);
     while (!events.length) tick();
     // At impact, before the target's next step: CombatSystem.applyHit set it.
     assert.equal(target.combat.launchPoint, 120);
     assert.equal(events[0].launchStrength, 120, '1 x 120, not 1 x 117');
     assert.equal(target.body.vx, 120 * U * facing, 'away from the attacker, at the strength\'s speed');
     assert.equal(target.body.vy, 0);
-    assert.equal(target.grounded, true, 'BA1 never launches upward');
+    assert.equal(target.grounded, true, 'attack1 never launches upward');
     assert.equal(attacker.facing, facing);
   }
 });
@@ -410,16 +412,16 @@ test('a ground BA1 hit adds its 3 first, then pushes the target sideways at 1 x 
 test('a hit shows the target in its hurt pose through the impact freeze', () => {
   const { attacker, target, tick, until, events } = duel();
   target.combat.launchPoint = 115;
-  tick(BA1);
+  tick(ATTACK1);
   until(() => events.length > 0, 60);
-  // BA1's own 0.32 s, plus what the launch adds (see resolveLaunchStun).
+  // attack1's own 0.32 s, plus what the launch adds (see resolveLaunchStun).
   assert.equal(target.combat.stun, 0.32 + resolveLaunchStun(events[0].launchSpeed, target.launchReaction));
   assert.ok(events[0].launchSpeed > 0 && target.combat.stun > 0.32, 'a hard push stuns longer');
   assert.ok(target.combat.hitstop > 0);
   const frozenAt = { x: target.body.x, attackerFrame: frameName(attacker) };
   tick(); // hitstop: nothing moves, but the pose updates
   assert.equal(target.state, 'hitstun');
-  assert.equal(frameName(target), '0001_hurt.png');
+  assert.equal(frameName(target), '0001_hurt_1.png');
   assert.equal(target.body.x, frozenAt.x);
   assert.equal(frameName(attacker), frozenAt.attackerFrame);
   while (target.combat.hitstop > 0) tick();
@@ -428,15 +430,15 @@ test('a hit shows the target in its hurt pose through the impact freeze', () => 
   assert.ok(target.body.x > frozenAt.x);
   assert.equal(target.body.vy, 0, 'no vertical launch');
   while (target.state === 'hitstun') {
-    assert.equal(frameName(target), '0001_hurt.png');
+    assert.equal(frameName(target), '0001_hurt_1.png');
     tick();
   }
   assert.equal(target.grounded, true);
   assert.ok(['idle', 'run'].includes(target.state));
 });
 
-test('BA1 hitboxes mirror with facing', () => {
-  for (const id of ['ba1', 'maba1']) {
+test('attack1 hitboxes mirror with facing', () => {
+  for (const id of ['attack1', 'midair_attack1']) {
     const hb = def.attacks[id].hitbox;
     const right = worldBox(makeFighter({ facing: 1 }).fighter, hb);
     const left = worldBox(makeFighter({ facing: -1 }).fighter, hb);
@@ -449,35 +451,35 @@ test('BA1 hitboxes mirror with facing', () => {
   assert.equal(attacker.facing, -1);
   target.combat.launchPoint = 115;
   const startX = target.body.x;
-  tick(BA1);
+  tick(ATTACK1);
   while (attacker.combat.attack) tick();
   assert.equal(events.length, 1, 'hits the opponent on the left');
   assert.ok(target.body.x < startX, 'launched to the left');
 });
 
-test('BA1 misses an opponent out of reach or behind the attacker', () => {
+test('attack1 misses an opponent out of reach or behind the attacker', () => {
   for (const gap of [70, -44]) {
     const { attacker, target, tick, events } = duel({ gap });
     attacker.facing = 1;
-    tick(BA1);
+    tick(ATTACK1);
     while (attacker.combat.attack) tick();
     assert.equal(events.length, 0, `gap ${gap}`);
     assert.equal(target.combat.launchPoint, 0);
   }
 });
 
-// A duel with #0001 in the air, descending, about to press BA1: mid-air BA1.
+// A duel with #0001 in the air, descending, about to press attack1: midair_attack1.
 function maba1Duel({ attackerFacing = 1, gap = 44 } = {}) {
   const d = duel({ gap, attackerFacing });
   d.tick(JUMP);
   // Early in the descent, so the slash connects before touchdown.
   d.until(() => d.attacker.body.vy > 0 && d.attacker.body.y > 650);
-  d.tick(BA1);
-  assert.equal(d.attacker.combat.attack.def.id, 'maba1');
+  d.tick(ATTACK1);
+  assert.equal(d.attacker.combat.attack.def.id, 'midair_attack1');
   return d;
 }
 
-test('mid-air BA1 hits a grounded opponent below and in front while still airborne, on the slash frame', () => {
+test('midair_attack1 hits a grounded opponent below and in front while still airborne, on the slash frame', () => {
   const { attacker, target, tick, events } = maba1Duel();
   let airborneAtHit = null;
   while (attacker.combat.attack) {
@@ -485,7 +487,7 @@ test('mid-air BA1 hits a grounded opponent below and in front while still airbor
     if (events.length && airborneAtHit === null) {
       airborneAtHit = !attacker.grounded;
       assert.equal(attacker.combat.phase, 'active');
-      assert.equal(frameName(attacker), '0001_midair1ba3.png');
+      assert.equal(frameName(attacker), '0001_midair_attack1_3.png');
       // The slash's own stun and freeze, on both fighters.
       assert.equal(target.combat.stun, 0.32 + resolveLaunchStun(events[0].launchSpeed, target.launchReaction));
       assert.equal(target.combat.hitstop, 0.05);
@@ -498,7 +500,7 @@ test('mid-air BA1 hits a grounded opponent below and in front while still airbor
   assert.equal(target.combat.launchPoint, 3);
 });
 
-test('a mid-air BA1 hit adds its 3 first, then launches a grounded target straight up at 2 x its new Launch Point: 117 + 3 = 120, a strength of 240', () => {
+test('a midair_attack1 hit adds its 3 first, then launches a grounded target straight up at 2 x its new Launch Point: 117 + 3 = 120, a strength of 240', () => {
   for (const facing of [1, -1]) {
     const { attacker, target, tick, until, events } = maba1Duel({ attackerFacing: facing });
     target.combat.launchPoint = 117;
@@ -526,12 +528,12 @@ test('a mid-air BA1 hit adds its 3 first, then launches a grounded target straig
   }
 });
 
-test('from the same Launch Point, mid-air BA1 launches less high than ground BA2: both Base Launch 2 upward, BA1 adds 3 and BA2 adds 5', () => {
+test('from the same Launch Point, midair_attack1 launches less high than ground attack2: both Base Launch 2 upward, attack1 adds 3 and attack2 adds 5', () => {
   // Highest point a grounded target at 110 reaches after the hit.
   const peak = (air) => {
     const d = air ? maba1Duel() : duel();
     d.target.combat.launchPoint = 110;
-    if (!air) d.tick(BA2);
+    if (!air) d.tick(ATTACK2);
     while (!d.events.length) d.tick();
     assert.equal(d.events[0].launchStrength, air ? 2 * 113 : 2 * 115);
     const floor = d.target.body.y;
@@ -544,16 +546,16 @@ test('from the same Launch Point, mid-air BA1 launches less high than ground BA2
   };
   const slash = peak(true);
   const ground = peak(false);
-  assert.ok(slash > 0, 'mid-air BA1 lifts the target');
-  assert.ok(slash < ground, `a lower launch than ground BA2 (${slash.toFixed(1)} < ${ground.toFixed(1)})`);
+  assert.ok(slash > 0, 'midair_attack1 lifts the target');
+  assert.ok(slash < ground, `a lower launch than ground attack2 (${slash.toFixed(1)} < ${ground.toFixed(1)})`);
 });
 
-test('a Shielded mid-air BA1 is neither launched nor pushed, and adds no Launch Point', () => {
+test('a Shielded midair_attack1 is neither launched nor pushed, and adds no Launch Point', () => {
   const d = duel();
   d.tick(JUMP, { shield: true });
   d.until(() => d.attacker.body.vy > 0 && d.attacker.body.y > 650);
-  d.tick(BA1, { shield: true });
-  assert.equal(d.attacker.combat.attack.def.id, 'maba1');
+  d.tick(ATTACK1, { shield: true });
+  assert.equal(d.attacker.combat.attack.def.id, 'midair_attack1');
   while (!d.events.length && d.attacker.combat.attack) d.tick({}, { shield: true });
   assert.equal(d.events.length, 1);
   assert.equal(d.events[0].type, 'block');
@@ -598,9 +600,9 @@ function mulberry(seed) {
 
 // Any fighter whose art arrives before its combat attributes can give an
 // attack `pending: true` (see js/game/combat.js). No fighter uses one now;
-// here, #0001's own BA1 clip stands in for such art.
+// here, #0001's own attack1 clip stands in for such art.
 test('a pending attack plays one pass of its clip and strikes nothing; combat fields are refused', () => {
-  const atk = createAttackDefinition({ id: 'ba1', animation: 'ba1', pending: true }, { clipDuration: 0.4 });
+  const atk = createAttackDefinition({ id: 'attack1', animation: 'attack1', pending: true }, { clipDuration: 0.4 });
   assert.equal(atk.pending, true);
   assert.equal(atk.total, 0.4);
   assert.deepEqual([atk.startup, atk.active, atk.recovery], [0, 0, 0.4]);
@@ -610,18 +612,18 @@ test('a pending attack plays one pass of its clip and strikes nothing; combat fi
     const value = field === 'hitbox' ? { x: 0, y: 0, w: 1, h: 1 } : field === 'directionalLaunch' ? 'vertical' : 1;
     assert.throws(() => createAttackDefinition({ id: 'x', animation: 'x', pending: true, [field]: value }), new RegExp(field), field);
   }
-  // In a fight: a fighter whose BA1 is pending plays that clip once, every
+  // In a fight: a fighter whose attack1 is pending plays that clip once, every
   // frame in order, and hits nothing it overlaps.
-  const artOnly = { ...def, attacks: { ...def.attacks, ba1: { animation: 'ba1', pending: true } } };
+  const artOnly = { ...def, attacks: { ...def.attacks, attack1: { animation: 'attack1', pending: true } } };
   const d = duel({ attackerCharacter: artOnly, gap: 30 });
   const log = recordAttack((held) => {
     d.tick(held);
     return d.attacker;
-  }, BA1);
-  const clip = def.animations.ba1;
+  }, ATTACK1);
+  const clip = def.animations.attack1;
   assert.equal(log.length, Math.round(clip.frames.length / clip.fps / DT), 'one pass of the clip');
   assert.deepEqual(sequence(log), clip.frames.map((u) => u.split('/').pop()));
-  assert.ok(log.every((s) => s.id === 'ba1' && s.phase === 'recovery'));
+  assert.ok(log.every((s) => s.id === 'attack1' && s.phase === 'recovery'));
   assert.deepEqual(d.events, []);
   assert.equal(d.target.combat.launchPoint, 0);
   assert.equal(d.target.combat.stun, 0);

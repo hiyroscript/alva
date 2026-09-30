@@ -3,8 +3,9 @@
 //
 // A controller like PlayerController: Fighter.update asks it for one
 // FighterInput snapshot per fixed step, and that is all it ever produces.
-// Every attack, Throw, Shield, Charge, charged action, jump and Dash happens
-// because it pressed or held the same inputs a player would, and the fighter
+// Every attack, Throw, Shield, Charge, Charge replacement, jump and Dash
+// happens because it pressed or held the same inputs a player would, and the
+// fighter
 // and combat engine decide what those inputs do, exactly as for Player 1. It
 // never moves, hurts, spawns, cancels or refreshes anything itself, and it
 // never writes to a fighter.
@@ -19,13 +20,16 @@
 //             player's raw input: an attack is seen once the fighter starts
 //             it, not when a key goes down.
 //   evaluate  score the options that fit the moment (answer a threat, strike,
-//             Throw, approach, space, Dash, jump in, Charge for a charged
-//             action, make for the centre, wait), each option built from the
+//             Throw, approach, space, Dash, jump in, Charge for a Charge
+//             replacement, make for the centre, wait), each option built from the
 //             fighter's own move data, and take the best one after the
 //             level's noise.
 //   act       turn the chosen intent into held buttons and one-step presses,
 //             over as many steps as it needs (turn, then strike; hold Charge,
-//             then press the charged action; tap, release, tap for a Dash).
+//             then press the button it replaces, e.g. attack1 for #0001's
+//             attack3; tap, release, tap for a Dash). It never presses a
+//             button the fighter has no action for: a Charge-only attack is
+//             only ever reached through Charge.
 //
 // Reaction: something new the opponent does (an attack's startup, a
 // projectile, a clone's cloud, a charged technique, a whiff, a Charge) is an
@@ -42,16 +46,19 @@
 
 import { range, clamp } from '../core/utils.js';
 import { COMBAT_ACTIONS } from './character.js';
+import { HELD_CONTROLS } from './fighter-controller.js';
 import { worldBox } from './combat.js';
 import { summonProblem } from './clone.js';
 import { techniqueProblem } from './charged-technique.js';
 import { blankInput, jumpTapHold } from './fighter-controller.js';
 import { DEFAULT_DIFFICULTY, getDifficultyProfile, resolveDifficulty } from '../data/difficulty.js';
 
-// The buttons a controller holds, by control codename; each has a matching
-// `…Pressed` edge. The mouvement buttons are touch-only: it Dashes by
-// double-tapping runLeft / runRight, as a keyboard or gamepad player does.
-const BUTTONS = ['runLeft', 'runRight', 'charge', 'jump', 'shield', 'uniqueba', 'transform', 'ba1', 'ba2'];
+// The buttons a controller holds, by control codename (every held control:
+// the directions, Charge, Jump, Shield and every combat button up to
+// attack5); each has a matching `…Pressed` edge. The mouvement buttons are
+// touch-only: it Dashes by double-tapping runLeft / runRight, as a keyboard
+// or gamepad player does.
+const BUTTONS = HELD_CONTROLS;
 const DIR_KEY = { [-1]: 'runLeft', 1: 'runRight' };
 
 // Threats further off than this (seconds to contact) wait for a later look.
@@ -119,7 +126,9 @@ const MOVESETS = new WeakMap();
 
 // Read once per fighter (and again if its definition or art changes): every
 // attack a button starts, on the ground and in the air, split into melee and
-// ranged; its charged actions; whether it has a Shield and a Dash. An action
+// ranged (only the buttons in its `actions`, attack3 to attack5 included
+// where it has them); its Charge replacements, each with the button that
+// makes it (`action`); whether it has a Shield and a Dash. An action
 // mapped to null (a reserved button, like #0001's transform) is left out, as is
 // anything the fighter would refuse for missing art, so the AI never presses
 // a button that cannot do anything.
@@ -146,8 +155,7 @@ export function readMoveset(f) {
     }
   }
   const charged = [];
-  for (const action of COMBAT_ACTIONS) {
-    const spec = def.chargedActions?.[action];
+  for (const [action, spec] of Object.entries(def.chargeReplacements ?? {})) {
     if (spec?.type === 'summon') {
       const summon = f.summonDefs[spec.id];
       if (!summon || summonProblem(f, summon)) continue;
@@ -182,7 +190,7 @@ export function readMoveset(f) {
   const moveset = {
     def, sprites, melee, ranged, charged,
     shield: f.defense?.type === 'shield',
-    dash: dashDistance > 0 && sprites.has('dash') ? { distance: dashDistance, cost: f.energyDef.dashCost } : null,
+    dash: dashDistance > 0 && sprites.has('mouvment') ? { distance: dashDistance, cost: f.energyDef.dashCost } : null,
     hurt: hurtExtent(def),
   };
   MOVESETS.set(f, moveset);
@@ -837,8 +845,8 @@ export class CombatAIController {
       });
     }
 
-    // Charge: Energy and charged cooldowns come back faster, and it leads
-    // into a charged action.
+    // Charge: Energy and Charge replacement cooldowns come back faster, and
+    // it leads into a Charge replacement.
     const charge = this.chargeOption(s);
     if (charge) out.push(charge);
 
@@ -877,9 +885,10 @@ export class CombatAIController {
     return score;
   }
 
-  // Charge, planning a charged action when one fits (a Clone Attack at an
-  // opponent likely to stay put, a Sphere Rush it is in line for) or just to
-  // recover Energy and cooldowns at a safe distance.
+  // Charge, planning a Charge replacement when one fits (a summon like
+  // #0001's Clone Attack at an opponent likely to stay put, a technique like
+  // its Sphere Rush it is in line for) or just to recover Energy and
+  // cooldowns at a safe distance.
   chargeOption(s) {
     const { self, p } = s;
     if (!s.canAct || !s.sameLevel) return null;
@@ -900,7 +909,7 @@ export class CombatAIController {
       }
     }
     // Charging with nothing to gain (full Energy, every cooldown ready, no
-    // charged action to set up) is only standing still.
+    // Charge replacement to set up) is only standing still.
     const gain = 0.6 * energyNeed + 0.25 * cooling + thenValue;
     if (gain <= 0.05) return null;
     const far = clamp((s.liveDist - 320) / 300, 0, 1);
@@ -916,7 +925,7 @@ export class CombatAIController {
     };
   }
 
-  // How good charged action `c` looks right now (0 when it does not fit):
+  // How good Charge replacement `c` looks right now (0 when it does not fit):
   // how likely the opponent is to still be where it lands, times what it is
   // worth, judged by the level.
   chargedValue(c, s) {
@@ -1119,8 +1128,9 @@ export class CombatAIController {
     }
     const c = it.then;
     if (c && !it.used && !self.combat.chargedCooldowns.active(c.id) && this.chargedValue(c, s) > 0.12) {
-      // Charge is still held on this step, and was on the last: the press is
-      // the charged action.
+      // Charge is still held on this step, and was on the last: the press of
+      // the button it replaces (attack1 for attack3, attack2 for attack4)
+      // is the Charge replacement.
       held[c.action] = true;
       it.used = true;
       if (c.type === 'technique') it.done = true;

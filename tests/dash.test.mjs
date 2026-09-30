@@ -1,5 +1,5 @@
 // Run with node --test tests/dash.test.mjs (no dependencies).
-// Dash: #0001's dash frames and their registration, the horizontal press
+// Dash: #0001's mouvment frames (its Dash art) and their registration, the horizontal press
 // edges InputManager exposes (keyboard, touch, D-pad and stick alike), the
 // double tap, what a Dash needs to start, what it costs, how it moves (and
 // stops), its priority against attacks, Shield and Charge, and that it is
@@ -23,7 +23,7 @@ import {
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
 const RIGHT = { runRight: true, runRightPressed: true };
 const LEFT = { runLeft: true, runLeftPressed: true };
-const DASH_STEPS = Math.round((def.animations.dash.frames.length / def.animations.dash.fps) / DT);
+const DASH_STEPS = Math.round((def.animations.mouvment.frames.length / def.animations.mouvment.fps) / DT);
 const near = (a, b, msg) => assert.ok(Math.abs(a - b) < 1e-6, `${msg ?? ''} ${a} vs ${b}`);
 
 // A tap: pressed on one step, released on the next.
@@ -46,12 +46,13 @@ function pngSize(path) {
 
 // ---- The art ------------------------------------------------------------------------
 
-test('the two dash frames live in #0001\'s folder, are registered as a one-shot dash clip and preload with #0001', () => {
+test('the two mouvment frames live in #0001\'s folder, are registered as a one-shot mouvment clip and preload with #0001', () => {
   const dir = readdirSync(ROOT + 'assets/characters/0001/');
-  assert.deepEqual(dir.filter((n) => /^0001_dash\d\.png$/.test(n)).sort(), ['0001_dash1.png', '0001_dash2.png']);
-  assert.deepEqual(readdirSync(ROOT).filter((n) => /dash/i.test(n)), [], 'none left at the repository root');
-  const clip = def.animations.dash;
-  assert.deepEqual(clip.frames, [`${BASE}dash1.png`, `${BASE}dash2.png`]);
+  assert.deepEqual(dir.filter((n) => /^0001_mouvment_\d\.png$/.test(n)).sort(), ['0001_mouvment_1.png', '0001_mouvment_2.png']);
+  assert.deepEqual(readdirSync(ROOT).filter((n) => /dash|mouvment/i.test(n)), [], 'none left at the repository root');
+  assert.equal(def.animations.dash, undefined, 'the clip is mouvment, never dash');
+  const clip = def.animations.mouvment;
+  assert.deepEqual(clip.frames, [`${BASE}mouvment_1.png`, `${BASE}mouvment_2.png`]);
   assert.equal(clip.loop, false, 'plays once');
   assert.equal(clip.fps, 10, 'its own rate');
   assert.equal(clip.sourceFacing, undefined, 'faces right, like the rest of #0001');
@@ -66,7 +67,7 @@ test('the two dash frames live in #0001\'s folder, are registered as a one-shot 
   assert.equal(idleArtH, 52);
   near(clip.heightRatio * idleArtH, Math.max(...dash.map((s) => s.h)), 'one art pixel per file pixel');
   const source = readFileSync(ROOT + 'js/data/characters.js', 'utf8');
-  assert.match(source, /const DASH_FPS = 10;/);
+  assert.match(source, /const MOUVMENT_FPS = 10;/);
 });
 
 test('movement data: dashSpeed 900 (about 2.7x the top speed) for about 180 units, a 0.22 s double-tap window; the top speed itself untouched', () => {
@@ -81,8 +82,8 @@ test('movement data: dashSpeed 900 (about 2.7x the top speed) for about 180 unit
   assert.equal(DASH_STEPS, 12);
   const reach = def.movement.dashSpeed * fighter.dashDuration;
   assert.ok(reach >= 170 && reach <= 180, `about 180 units, half as far again as the old 120: ${reach}`);
-  assert.notEqual(def.movement.dashSpeed, def.chargedTechniques.cba2.dashSpeed, 'the Sphere Rush has its own');
-  assert.equal(def.chargedTechniques.cba2.dashSpeed, 1050);
+  assert.notEqual(def.movement.dashSpeed, def.chargedTechniques.attack4.dashSpeed, 'the Sphere Rush has its own');
+  assert.equal(def.chargedTechniques.attack4.dashSpeed, 1050);
 });
 
 // ---- Input ---------------------------------------------------------------------------
@@ -244,20 +245,20 @@ test('opposite directions never make a double tap: left then right, right then l
   assert.equal(both.fighter.dash, null);
 });
 
-test('a Dash plays the real dash clip once, dash1 then dash2, then the fighter runs or stands', () => {
+test('a Dash plays the real mouvment clip once, mouvment_1 then mouvment_2, then the fighter runs or stands', () => {
   const { fighter, step } = makeFighter();
   tap(step, RIGHT);
   step(RIGHT);
   const frames = [];
   let f = fighter;
   while (f.state === 'dash') {
-    assert.equal(f.animator.anim.key, 'dash');
+    assert.equal(f.animator.anim.key, 'mouvment');
     frames.push(frameName(f));
     f = step({ runRight: true });
   }
   assert.equal(frames.length, DASH_STEPS, 'exactly one pass of the clip');
-  assert.deepEqual([...new Set(frames)], ['0001_dash1.png', '0001_dash2.png']);
-  assert.equal(frames.filter((n) => n === '0001_dash1.png').length, DASH_STEPS / 2);
+  assert.deepEqual([...new Set(frames)], ['0001_mouvment_1.png', '0001_mouvment_2.png']);
+  assert.equal(frames.filter((n) => n === '0001_mouvment_1.png').length, DASH_STEPS / 2);
   assert.equal(fighter.state, 'run', 'still holding right: running on');
   // Never a fast run: no run frame while dashing.
   assert.ok(frames.every((n) => !/run/.test(n)));
@@ -282,7 +283,7 @@ test('a Dash is movement only: no hitbox, damage, launch or invulnerability, eve
   const hit = duel({ gap: 40, attackerFacing: -1, x: 540, pushboxes: true });
   hit.tick({}, RIGHT);
   hit.tick({}, {});
-  hit.tick({ ba1: true, ba1Pressed: true }, RIGHT);
+  hit.tick({ attack1: true, attack1Pressed: true }, RIGHT);
   assert.ok(hit.target.dash, 'the target dashes');
   hit.until(() => hit.events.length > 0);
   assert.equal(hit.events[0].type, 'hit');
@@ -293,7 +294,7 @@ test('a Dash is movement only: no hitbox, damage, launch or invulnerability, eve
 
 // ---- Gating ------------------------------------------------------------------------------
 
-test('no Dash (and nothing spent) while airborne, attacking, stunned, bound, charging, shielding, already dashing, exhausted or without dash art', () => {
+test('no Dash (and nothing spent) while airborne, attacking, stunned, bound, charging, shielding, already dashing, exhausted or without mouvment art', () => {
   const refused = (label, setup) => {
     const f = makeFighter(setup.options);
     setup.before?.(f);
@@ -308,7 +309,7 @@ test('no Dash (and nothing spent) while airborne, attacking, stunned, bound, cha
     press: (f) => f.step(RIGHT),
   });
   refused('attacking', {
-    before: (f) => { f.step(RIGHT); f.step({ ba1: true, ba1Pressed: true }); },
+    before: (f) => { f.step(RIGHT); f.step({ attack1: true, attack1Pressed: true }); },
     press: (f) => f.step(RIGHT),
   });
   refused('stunned', {
@@ -343,15 +344,15 @@ test('no Dash (and nothing spent) while airborne, attacking, stunned, bound, cha
   const warn = console.warn;
   console.warn = (msg) => warnings.push(msg);
   try {
-    refused('no dash art', {
-      options: { sprites: fakeSprites(Object.keys(def.animations).filter((k) => k !== 'dash')) },
+    refused('no mouvment art', {
+      options: { sprites: fakeSprites(Object.keys(def.animations).filter((k) => k !== 'mouvment')) },
       before: (f) => f.step(RIGHT),
       press: (f) => f.step(RIGHT),
     });
   } finally {
     console.warn = warn;
   }
-  assert.ok(warnings.some((w) => /Dash has no animation frames/.test(w)), 'logged clearly');
+  assert.ok(warnings.some((w) => /Dash has no mouvment animation frames/.test(w)), 'logged clearly');
 });
 
 test('short of Energy a Dash still happens, but takes all that is left: the bar is empty, gray, and locks the next one until full', () => {
@@ -385,7 +386,7 @@ test('short of Energy a Dash still happens, but takes all that is left: the bar 
 
 test('a double tap that cannot Dash is used up, never queued for later', () => {
   const { fighter, step } = makeFighter();
-  step({ ba1: true, ba1Pressed: true });
+  step({ attack1: true, attack1Pressed: true });
   step(RIGHT);
   step({});
   step(RIGHT); // the double tap, mid-attack: refused
@@ -471,9 +472,9 @@ test('Shield wins over a Dash on the same step; so does an attack; so does Charg
   // An attack and the second tap together: the attack.
   const attack = makeFighter();
   tap(attack.step, RIGHT);
-  attack.step({ ...RIGHT, ba2: true, ba2Pressed: true });
+  attack.step({ ...RIGHT, attack2: true, attack2Pressed: true });
   assert.equal(attack.fighter.state, 'attack');
-  assert.equal(attack.fighter.combat.attack.def.id, 'ba2');
+  assert.equal(attack.fighter.combat.attack.def.id, 'attack2');
   assert.equal(attack.fighter.dash, null);
   assert.equal(attack.fighter.combat.energy, 100);
   // Charge pressed with the second tap: Charge, no Dash.
@@ -486,7 +487,7 @@ test('Shield wins over a Dash on the same step; so does an attack; so does Charg
   const busy = makeFighter();
   tap(busy.step, RIGHT);
   busy.step(RIGHT);
-  busy.step({ ba1: true, ba1Pressed: true, shield: true, shieldPressed: true, jump: true, charge: true });
+  busy.step({ attack1: true, attack1Pressed: true, shield: true, shieldPressed: true, jump: true, charge: true });
   assert.equal(busy.fighter.state, 'dash');
   assert.equal(busy.fighter.combat.attack, null);
   assert.equal(busy.fighter.combat.shielding, false);
@@ -581,8 +582,8 @@ test('one request Dashes at once through tryDash: no double tap, no held directi
     assert.equal(fighter.dash.direction, direction);
     assert.equal(fighter.facing, direction, 'faces the Dash at once');
     assert.equal(fighter.state, 'dash');
-    assert.equal(fighter.animator.anim.key, 'dash');
-    assert.equal(frameName(fighter), '0001_dash1.png', 'the clip from its first frame');
+    assert.equal(fighter.animator.anim.key, 'mouvment');
+    assert.equal(frameName(fighter), '0001_mouvment_1.png', 'the clip from its first frame');
     assert.equal(fighter.body.vx, direction * def.movement.dashSpeed);
     assert.equal(fighter.combat.energy, 100 - def.energy.dashCost, 'exactly the Dash cost');
     // It runs its one pass of the clip, then the fighter stands.
@@ -640,7 +641,7 @@ test('a request obeys every Dash rule: no Dash (and nothing spent) airborne, att
     press: (f) => f.step(MOUVEMENT_RIGHT),
   });
   refused('attacking', {
-    before: (f) => f.step({ ba1: true, ba1Pressed: true }),
+    before: (f) => f.step({ attack1: true, attack1Pressed: true }),
     press: (f) => f.step(MOUVEMENT_RIGHT),
   });
   refused('stunned', {
@@ -681,17 +682,17 @@ test('a request obeys every Dash rule: no Dash (and nothing spent) airborne, att
   const warn = console.warn;
   console.warn = (msg) => warnings.push(msg);
   try {
-    refused('no dash art', {
-      options: { sprites: fakeSprites(Object.keys(def.animations).filter((k) => k !== 'dash')) },
+    refused('no mouvment art', {
+      options: { sprites: fakeSprites(Object.keys(def.animations).filter((k) => k !== 'mouvment')) },
       press: (f) => f.step(MOUVEMENT_RIGHT),
     });
   } finally {
     console.warn = warn;
   }
-  assert.ok(warnings.some((w) => /Dash has no animation frames/.test(w)));
+  assert.ok(warnings.some((w) => /Dash has no mouvment animation frames/.test(w)));
   // A refused request is used up, never queued for later.
   const { fighter, step } = makeFighter();
-  step({ ba1: true, ba1Pressed: true });
+  step({ attack1: true, attack1Pressed: true });
   step(MOUVEMENT_RIGHT);
   while (fighter.combat.attack) step({});
   for (let i = 0; i < 20; i++) step({});
@@ -720,7 +721,7 @@ test('a request short of Energy empties the bar like any Dash; walls and ledges 
   assert.equal(edge.fighter.dash, null);
 
   const attack = makeFighter();
-  attack.step({ ...MOUVEMENT_RIGHT, ba2: true, ba2Pressed: true });
+  attack.step({ ...MOUVEMENT_RIGHT, attack2: true, attack2Pressed: true });
   assert.equal(attack.fighter.state, 'attack');
   assert.equal(attack.fighter.dash, null);
   const shield = makeFighter();

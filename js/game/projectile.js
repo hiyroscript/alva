@@ -6,11 +6,13 @@
 // then turns it into a live Projectile, owns it, moves it every fixed step,
 // resolves its hits through CombatSystem and removes it once it is spent.
 // Behaviour is data on the character (`projectiles`), and so is the art
-// (`projectileAnimations`, normalized separately from fighter poses):
+// (`projectileAnimations`, normalized separately from fighter poses), both
+// named after the attack that throws it (`<attack>_object`), e.g. #0001's
+// shuriken, thrown by its extra_attack:
 //
 //   projectiles: {
-//     shuriken: {
-//       animation: 'shuriken', speed: 700, lifetime: 1.5,
+//     extra_attack_object: {
+//       animation: 'extra_attack_object', speed: 700, lifetime: 1.5,
 //       hitbox: { x: -5, y: -5, w: 10, h: 10 },
 //       damage: 1, baseLaunch: 0, directionalLaunch: null, hitstun: 0.16, blockstun: 0.1, hitstop: 0.04,
 //     },

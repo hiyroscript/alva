@@ -63,7 +63,7 @@ test('ground: reversing brakes hard, then accelerates the other way: a quick tur
   assert.equal(fighter.facing, -1, 'facing the new way');
 });
 
-test('microspacing: taps move a little; run, let go and BA1 lands right beside the opponent', () => {
+test('microspacing: taps move a little; run, let go and attack1 lands right beside the opponent', () => {
   const tap = (n) => {
     const { fighter, step } = makeFighter();
     const x = fighter.body.x;
@@ -75,16 +75,16 @@ test('microspacing: taps move a little; run, let go and BA1 lands right beside t
   assert.ok(tap(2) < tap(4) && tap(4) < 20, 'longer taps, a little further');
 
   // Run at an opponent from well away, let go in time, then punch: the
-  // stop leaves it inside BA1's reach and short of the pushboxes.
+  // stop leaves it inside attack1's reach and short of the pushboxes.
   const d = duel({ gap: 260 });
   let n = 0;
   while (d.target.body.x - d.attacker.body.x > 58 && n++ < 120) d.tick(RIGHT);
   while (d.attacker.body.vx > 0) d.tick();
   const gap = d.target.body.x - d.attacker.body.x;
   assert.ok(gap >= 36 && gap < 57, `stopped at ${gap.toFixed(1)}: no overshoot`);
-  d.tick(P('ba1'));
+  d.tick(P('attack1'));
   d.until(() => d.events.length > 0, 20);
-  assert.equal(d.events[0].move, 'ba1');
+  assert.equal(d.events[0].move, 'attack1');
 });
 
 // ---- Air and jump -----------------------------------------------------------------
@@ -235,8 +235,8 @@ test('fast fall only while free to fall: never on the ground, in hitstun or behi
   assert.equal(shielded.fighter.fastFalling, false);
 
   const aerial = falling();
-  aerial.step({ ...DOWN, ...P('ba2') });
-  assert.equal(aerial.fighter.combat.attack?.def.id, 'maba2');
+  aerial.step({ ...DOWN, ...P('attack2') });
+  assert.equal(aerial.fighter.combat.attack?.def.id, 'midair_attack2');
   aerial.step(DOWN);
   assert.equal(aerial.fighter.fastFalling, true, 'return to the ground after an aerial');
 });
@@ -293,7 +293,7 @@ test('an attack pressed late in a Dash comes out as it ends, keeping a share of 
   step({});
   step({ ...RIGHT, runRightPressed: true });
   while (fighter.dash.time < fighter.dash.duration - 4 * DT) step({});
-  step(P('ba1'));
+  step(P('attack1'));
   assert.equal(fighter.combat.attack, null, 'never during the Dash');
   let n = 0;
   while (fighter.dash) {
@@ -301,19 +301,19 @@ test('an attack pressed late in a Dash comes out as it ends, keeping a share of 
     n++;
   }
   assert.ok(n <= 4);
-  assert.equal(fighter.combat.attack?.def.id, 'ba1', 'on the step the Dash ends');
-  const ba1 = fighter.attacks.ba1;
-  assert.ok(fighter.body.vx <= fighter.maxSpeed * ba1.momentum, `${fighter.body.vx}`);
+  assert.equal(fighter.combat.attack?.def.id, 'attack1', 'on the step the Dash ends');
+  const attack1 = fighter.attacks.attack1;
+  assert.ok(fighter.body.vx <= fighter.maxSpeed * attack1.momentum, `${fighter.body.vx}`);
 });
 
 // ---- Attacks and momentum ---------------------------------------------------------
 
-test('running into BA1 keeps its momentum share and slides on it under its own friction: no invisible wall', () => {
-  const ba1 = def.attacks.ba1;
+test('running into attack1 keeps its momentum share and slides on it under its own friction: no invisible wall', () => {
+  const attack1 = def.attacks.attack1;
   const { fighter, step } = running();
-  step({ ...RIGHT, ...P('ba1') });
-  assert.equal(fighter.combat.attack.def.id, 'ba1');
-  assert.ok(close(fighter.body.vx, fighter.maxSpeed * ba1.momentum - mv.deceleration * ba1.friction * DT), 'kept, then its friction');
+  step({ ...RIGHT, ...P('attack1') });
+  assert.equal(fighter.combat.attack.def.id, 'attack1');
+  assert.ok(close(fighter.body.vx, fighter.maxSpeed * attack1.momentum - mv.deceleration * attack1.friction * DT), 'kept, then its friction');
   const x = fighter.body.x;
   const log = [];
   for (step(RIGHT); fighter.state === 'attack'; step(RIGHT)) log.push(fighter.body.vx);
@@ -322,28 +322,28 @@ test('running into BA1 keeps its momentum share and slides on it under its own f
   // Standing still, it never moves, whatever is held.
   const still = makeFighter();
   const x0 = still.fighter.body.x;
-  for (still.step(P('ba1')); still.fighter.state === 'attack'; still.step(RIGHT)) {
+  for (still.step(P('attack1')); still.fighter.state === 'attack'; still.step(RIGHT)) {
     assert.equal(still.fighter.body.x, x0);
   }
 });
 
-test('BA2 steps in on its first frame; the Throw keeps half a run and may be steered, turning the way it is steered', () => {
-  const ba2 = def.attacks.ba2;
+test('attack2 steps in on its first frame; the Throw keeps half a run and may be steered, turning the way it is steered', () => {
+  const attack2 = def.attacks.attack2;
   const { fighter, step } = makeFighter();
-  step(P('ba2'));
-  assert.ok(close(fighter.body.vx, ba2.step.speed - mv.deceleration * ba2.friction * DT), 'its step-in');
+  step(P('attack2'));
+  assert.ok(close(fighter.body.vx, attack2.step.speed - mv.deceleration * attack2.friction * DT), 'its step-in');
   const x = fighter.body.x;
   while (fighter.state === 'attack') step({});
   assert.ok(fighter.body.x - x > 10 && fighter.body.x - x < 30, 'a subtle step forward');
   // Facing left, it steps left.
   const left = makeFighter({ facing: -1 });
-  left.step(P('ba2'));
+  left.step(P('attack2'));
   assert.ok(left.fighter.body.vx < 0);
 
-  const thr = def.attacks.uniqueba;
+  const thr = def.attacks.extra_attack;
   const t = running();
-  t.step({ ...RIGHT, ...P('uniqueba') });
-  assert.equal(t.fighter.combat.attack.def.id, 'uniqueba');
+  t.step({ ...RIGHT, ...P('extra_attack') });
+  assert.equal(t.fighter.combat.attack.def.id, 'extra_attack');
   const kept = t.fighter.body.vx;
   assert.ok(kept > 0 && kept < t.fighter.maxSpeed * thr.momentum);
   let reversed = false;
@@ -357,23 +357,23 @@ test('BA2 steps in on its first frame; the Throw keeps half a run and may be ste
 test('aerials keep their drift and steer with their airControl; landing keeps only what is left of them', () => {
   const { fighter, step } = running();
   step({ ...RIGHT, ...JUMP });
-  step({ ...RIGHT, ...P('ba1') });
+  step({ ...RIGHT, ...P('attack1') });
   const atk = fighter.combat.attack;
-  assert.equal(atk.def.id, 'maba1');
+  assert.equal(atk.def.id, 'midair_attack1');
   // Its whole drift (airMomentum 1), above its own steering cap: only the
   // air drag eases it, holding on or not.
   assert.ok(close(fighter.body.vx, fighter.maxSpeed - mv.airDeceleration * DT), 'its whole drift');
   // Steering with 60% of the air control: capped at that share of top speed.
   for (let i = 0; i < 4; i++) step(LEFT);
   assert.ok(fighter.body.vx < fighter.maxSpeed - 4 * mv.airDeceleration * DT, 'steered');
-  // A mid-air BA2 started just before touchdown keeps its own clip after
+  // A midair_attack2 started just before touchdown keeps its own clip after
   // landing, then the fighter acts at once: no extra lock.
   const low = makeFighter();
   low.step(JUMP);
   while (low.fighter.body.vy < 0 || low.fighter.body.y < 790) low.step();
-  low.step(P('ba2'));
+  low.step(P('attack2'));
   const kick = low.fighter.combat.attack;
-  assert.equal(kick.def.id, 'maba2');
+  assert.equal(kick.def.id, 'midair_attack2');
   let steps = 0;
   let landed = false;
   while (low.fighter.combat.attack === kick) {
@@ -383,26 +383,26 @@ test('aerials keep their drift and steer with their airControl; landing keeps on
   }
   assert.ok(landed, 'landed during it');
   assert.equal(steps, Math.round(kick.def.total / DT), 'its own length, not restarted');
-  low.step(P('ba1'));
-  assert.equal(low.fighter.combat.attack?.def.id, 'ba1', 'free on the very next step');
+  low.step(P('attack1'));
+  assert.equal(low.fighter.combat.attack?.def.id, 'attack1', 'free on the very next step');
 });
 
 test('attack movement is data with defaults: an attack that declares none is planted; lockMovement false keeps locomotion', () => {
-  const plain = { animation: 'ba1', startup: 1 / 12, active: 1 / 12, recovery: 2 / 12, damage: 1, hitbox: def.attacks.ba1.hitbox };
+  const plain = { animation: 'attack1', startup: 1 / 12, active: 1 / 12, recovery: 2 / 12, damage: 1, hitbox: def.attacks.attack1.hitbox };
   const character = {
     ...def,
     attacks: { ...def.attacks, plain, free: { ...plain, lockMovement: false } },
-    actions: { ...def.actions, ba1: 'plain', ba2: 'free' },
+    actions: { ...def.actions, attack1: 'plain', attack2: 'free' },
   };
   const a = running({ character });
-  a.step({ ...RIGHT, ...P('ba1') });
+  a.step({ ...RIGHT, ...P('attack1') });
   assert.equal(a.fighter.combat.attack.def.id, 'plain');
   assert.ok(close(a.fighter.body.vx, a.fighter.maxSpeed - mv.deceleration * DT), 'all its speed, normal friction');
   a.step(LEFT);
   assert.ok(close(a.fighter.body.vx, a.fighter.maxSpeed - 2 * mv.deceleration * DT), 'no steering');
 
   const b = running({ character });
-  b.step({ ...RIGHT, ...P('ba2') });
+  b.step({ ...RIGHT, ...P('attack2') });
   assert.equal(b.fighter.combat.attack.def.id, 'free');
   assert.equal(b.fighter.body.vx, b.fighter.maxSpeed, 'still running');
   assert.equal(b.fighter.moveDir, 1);
@@ -410,30 +410,30 @@ test('attack movement is data with defaults: an attack that declares none is pla
 
 // ---- Facing -----------------------------------------------------------------------
 
-test('an attack faces the direction held as it starts: run left, reverse and BA1 on one step strikes right, and holding on keeps it there', () => {
+test('an attack faces the direction held as it starts: run left, reverse and attack1 on one step strikes right, and holding on keeps it there', () => {
   const { fighter, step } = makeFighter();
   for (let i = 0; i < 20; i++) step(LEFT);
   assert.equal(fighter.facing, -1);
-  step({ ...RIGHT, ...P('ba1') });
-  assert.equal(fighter.combat.attack.def.id, 'ba1');
+  step({ ...RIGHT, ...P('attack1') });
+  assert.equal(fighter.combat.attack.def.id, 'attack1');
   assert.equal(fighter.facing, 1, 'the way the player turned');
   for (step(RIGHT); fighter.state === 'attack'; step(RIGHT)) assert.equal(fighter.facing, 1, 'held on: it stays that way');
   // Let go, it keeps the facing it has; nothing turns it but a direction.
   for (let i = 0; i < 30; i++) step();
-  step(P('ba1'));
+  step(P('attack1'));
   for (step(); fighter.state === 'attack'; step()) assert.equal(fighter.facing, 1, 'no direction held: unchanged');
   // With no direction held, the attack keeps the fighter's facing.
   const idle = makeFighter({ facing: -1 });
-  idle.step(P('ba2'));
+  idle.step(P('attack2'));
   assert.equal(idle.fighter.facing, -1);
   // The strike lands on the side it faces.
   const d = duel({ gap: 44 });
   for (let i = 0; i < 10; i++) d.tick(LEFT);
   d.attacker.body.x = d.target.body.x - 44;
   d.attacker.body.vx = -60;
-  d.tick({ ...RIGHT, ...P('ba1') });
+  d.tick({ ...RIGHT, ...P('attack1') });
   d.until(() => d.events.length > 0, 20);
-  assert.equal(d.events[0].move, 'ba1');
+  assert.equal(d.events[0].move, 'attack1');
 });
 
 // ---- Determinism ------------------------------------------------------------------
@@ -445,9 +445,9 @@ test('fixed-step determinism: the same inputs give the same fight, step for step
       runRight: k < 30 || (k > 60 && k < 70), runLeft: k > 40 && k < 50,
       jump: k === 33, jumpPressed: k === 33,
       charge: k > 34 && k < 45,
-      ba1: k === 20 || k === 36, ba1Pressed: k === 20 || k === 36,
-      ba2: k === 26 || k === 52, ba2Pressed: k === 26 || k === 52,
-      uniqueba: k === 80, uniquebaPressed: k === 80,
+      attack1: k === 20 || k === 36, attack1Pressed: k === 20 || k === 36,
+      attack2: k === 26 || k === 52, attack2Pressed: k === 26 || k === 52,
+      extra_attack: k === 80, extra_attackPressed: k === 80,
       runRightPressed: k === 0 || k === 61 || k === 63,
     };
   };
@@ -488,7 +488,7 @@ test('frame rate never changes the simulation: 30, 60 and 120 Hz frames give the
         const i = Math.round(t / DT);
         t += DT;
         const k = i % 60;
-        return { runRight: k < 25, runLeft: k > 40, jump: k === 30, jumpPressed: k === 30, ba1: k === 10, ba1Pressed: k === 10 };
+        return { runRight: k < 25, runLeft: k > 40, jump: k === 30, jumpPressed: k === 30, attack1: k === 10, attack1Pressed: k === 10 };
       },
     };
     const battle = new Battle({ canvas: { getContext: () => ({}) }, map: getMap('desert'), p1Def: def, p2Def: def, p1Sprites: sprites, p2Sprites: sprites, input });
@@ -526,11 +526,11 @@ test('a stunned fighter\'s push or launch runs down at its own hitstun rates, ap
 test('the Sphere Rush still owns its own movement: its authored rush speed, whatever the new locomotion', () => {
   const d = duel({ gap: 600 });
   d.tick({ charge: true });
-  d.tick({ charge: true, ...P('ba2') });
+  d.tick({ charge: true, ...P('attack2') });
   assert.ok(d.attacker.technique);
   d.until(() => d.attacker.technique?.phase === 'dash', 60);
   d.tick({ runLeft: true });
-  assert.equal(d.attacker.body.vx, def.chargedTechniques.cba2.dashSpeed, 'held input ignored');
+  assert.equal(d.attacker.body.vx, def.chargedTechniques.attack4.dashSpeed, 'held input ignored');
 });
 
 test('a fresh Fighter with a character that declares no new movement stats still moves (the old fields suffice)', () => {
@@ -715,7 +715,7 @@ test('a hit gives the air jump back; a stun, an air Shield or an attack in progr
   d.attacker.body.y = 700;
   d.attacker.body.grounded = false;
   d.attacker.body.ground = null;
-  d.tick(P('ba1'));
+  d.tick(P('attack1'));
   d.until(() => d.events.length > 0, 30);
   assert.equal(d.events[0].type, 'hit');
   assert.equal(d.target.airJumps, def.movement.airJumps, 'given back');

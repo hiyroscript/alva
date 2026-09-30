@@ -5,22 +5,28 @@
 // training opponent, kept as a standalone controller.
 
 import { range } from '../core/utils.js';
+import { ACTIONS } from '../config.js';
 
 // How far past its own collider the training CPU looks for a ledge ahead
 // (world units): about two steps at its top speed.
 const LEDGE_LOOKAHEAD = 12;
 
+// The controls a fighter holds, by control codename (every gameplay control
+// but pause): each one's held state and its `…Pressed` edge.
+export const HELD_CONTROLS = Object.freeze(ACTIONS.filter((action) => action !== 'pause'));
+
 // Every field Fighter.update reads, all false: a complete, neutral snapshot,
-// keyed by control codename.
+// keyed by control codename. Besides each held control and its press edge,
+// the touch mouvement buttons' one-step Dash requests and the training
+// CPU's platform drop.
 export function blankInput() {
-  return {
-    runLeft: false, runRight: false, charge: false, jump: false, shield: false,
-    uniqueba: false, transform: false, ba1: false, ba2: false,
-    runLeftPressed: false, runRightPressed: false, mouvementLeftPressed: false, mouvementRightPressed: false,
-    jumpPressed: false, chargePressed: false, shieldPressed: false,
-    uniquebaPressed: false, transformPressed: false, ba1Pressed: false, ba2Pressed: false,
-    dropPressed: false,
-  };
+  const input = {};
+  for (const control of HELD_CONTROLS) input[control] = false;
+  for (const control of HELD_CONTROLS) input[`${control}Pressed`] = false;
+  input.mouvementLeftPressed = false;
+  input.mouvementRightPressed = false;
+  input.dropPressed = false;
+  return input;
 }
 
 // Seconds a CPU holds Jump after pressing it: a step and a half short of the
@@ -44,9 +50,9 @@ export class PlayerController {
 
 // Non-attacking training opponent: keeps a readable distance, follows the
 // player across platforms and occasionally repositions. It never presses
-// combat buttons (uniqueba, ba1 and ba2 included, so it never throws a
-// shuriken), Charge or Shield (so it never shields), so the player can
-// practise on it.
+// combat buttons (extra_attack and attack1 to attack5 included, so it never
+// throws a shuriken), Charge or Shield (so it never shields), so the player
+// can practise on it.
 // It drops through one-way platforms with `dropPressed`, an intent no player
 // control produces. It never walks off the main floor's edges into open air
 // on its own (see atLedge): it only leaves the stage when knocked off.

@@ -786,7 +786,7 @@ test('in a seeded mirror match the two CPUs decide for themselves', () => {
     battle.update(DT);
     for (const side of ['p1', 'p2']) {
       const out = battle[side].controller.out;
-      samples[side].push([out.runLeft, out.runRight, out.jump, out.uniqueba, out.ba1, out.ba2, out.shield, out.charge].join());
+      samples[side].push([out.runLeft, out.runRight, out.jump, out.extra_attack, out.attack1, out.attack2, out.shield, out.charge].join());
     }
   }
   // Were they one stream, the same position mirrored would bring the same
@@ -821,7 +821,7 @@ test('spectating: nothing reads gameplay input, and held buttons change nothing 
   // fight would change.
   const all = fakeInput();
   const everything = {};
-  for (const k of ['runLeft', 'runRight', 'charge', 'jump', 'shield', 'uniqueba', 'transform', 'ba1', 'ba2']) {
+  for (const k of ['runLeft', 'runRight', 'charge', 'jump', 'shield', 'extra_attack', 'transform', 'attack1', 'attack2']) {
     everything[k] = true;
     everything[`${k}Pressed`] = true;
   }
@@ -921,7 +921,7 @@ test('Watch Mode with a fighter with no moves: either way round and mirrored, it
     for (const f of battle.fighters) {
       assert.ok(Number.isFinite(f.x) && Number.isFinite(f.y), `${label}: ${f.def.id} in the world`);
       if (f.def === TEST_MOVELESS) {
-        assert.equal(f.combat.chargedCooldowns.size, 0, `${label}: no charged action`);
+        assert.equal(f.combat.chargedCooldowns.size, 0, `${label}: no Charge replacement`);
         assert.ok(battle.projectiles.every((p) => p.owner !== f), `${label}: no projectile of its own`);
       }
     }
@@ -978,9 +978,9 @@ test('Quick Battle with a fighter with different moves: picked from slot 05, the
   assert.deepEqual(app.loading.labels.at(-1), 'Loading Sample');
   assert.deepEqual([battle.p1.def.id, battle.p2.def.id], ['test-sample', 'test-sample'], 'the CPU plays Player 1\'s fighter');
   const touch = screens.battle.touch;
-  const abilities = ['uniqueba', 'transform', 'ba1', 'ba2'];
+  const abilities = ['extra_attack', 'transform', 'attack1', 'attack2'];
   assert.deepEqual(abilities.map((a) => [touch.buttons.get(a).hidden ?? false, touch.buttons.get(a).getAttribute('aria-label')]), [
-    [false, 'Palm Strike'], [false, 'Awakening'], [false, 'Jab'], [false, 'Basic Attack 2'],
+    [false, 'Palm Strike'], [false, 'Awakening'], [false, 'Jab'], [false, 'Attack 2'],
   ]);
   trace(battle, 300);
   for (const f of battle.fighters) assert.ok(Number.isFinite(f.x) && Number.isFinite(f.y));
@@ -1061,8 +1061,8 @@ test('spectating: no touch controls and no gameplay input, through pause, resume
   assert.equal(screen.isRunning, true, 'the match runs');
   assert.ok(screen.el.classList.contains('is-watch'));
   // No fighter's own ability icons.
-  assert.equal(screen.touch.buttons.get('uniqueba').getAttribute('aria-label'), 'Unique Basic Attack');
-  assert.equal(screen.touch.buttons.get('ba1').getAttribute('aria-label'), 'Basic Attack 1');
+  assert.equal(screen.touch.buttons.get('extra_attack').getAttribute('aria-label'), 'Extra Attack');
+  assert.equal(screen.touch.buttons.get('attack1').getAttribute('aria-label'), 'Attack 1');
   screen.pause();
   off();
   screen.resume();
@@ -1109,7 +1109,7 @@ test('spectating: no touch controls and no gameplay input, through pause, resume
   assert.equal(screen.touch.enabled, true);
   assert.equal(screen.touchRoot.hidden, false);
   assert.ok(!screen.el.classList.contains('is-watch'));
-  assert.equal(screen.touch.buttons.get('uniqueba').getAttribute('aria-label'), 'Shuriken', 'Player 1\'s fighter again');
+  assert.equal(screen.touch.buttons.get('extra_attack').getAttribute('aria-label'), 'Shuriken', 'Player 1\'s fighter again');
   screen.exit();
 });
 
@@ -1282,7 +1282,7 @@ test('Quick Battle with a fighter with no moves: picked from slot 04, the CPU pl
   assert.deepEqual([battle.p1.def.id, battle.p2.def.id], ['test-moveless', 'test-moveless'], 'the CPU plays Player 1\'s fighter');
   assert.equal(battle.p1.sprites, battle.p2.sprites);
   const touch = screens.battle.touch;
-  const abilities = ['uniqueba', 'transform', 'ba1', 'ba2'];
+  const abilities = ['extra_attack', 'transform', 'attack1', 'attack2'];
   for (const action of abilities) {
     assert.equal(touch.buttons.get(action).hidden, true, action);
     assert.equal(touch.buttons.get(action).getAttribute('aria-label'), null, action);

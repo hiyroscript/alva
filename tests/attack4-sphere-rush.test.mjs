@@ -1,9 +1,9 @@
-// Run with node --test tests/charged-ba2.test.mjs (no dependencies).
-// #0001's Charged BA2, the Sphere Rush: the rasen / prasen artwork and its
-// registration, typed charged actions, the Charge-then-BA2 trigger and its
+// Run with node --test tests/attack4-sphere-rush.test.mjs (no dependencies).
+// #0001's attack4, the Sphere Rush: the attack4 / attack4_object artwork and its
+// registration, typed Charge replacements, the Charge-then-attack2 trigger and its
 // fallbacks, the form -> dash -> confirm -> wait -> explode -> release
-// sequence (rasen7-8, rasen8 held, rasen9 for the blast, rasen10-12 after
-// it), the rasen12 whiff release, the target's hurt pose on the contact
+// sequence (attack4_7-8, attack4_8 held, attack4_9 for the blast, attack4_10-12 after
+// it), the attack4_12 whiff release, the target's hurt pose on the contact
 // step, the sphere spinning and growing on the target, its hits (a contact
 // that only binds, 1 Launch Point at once on the contact step and then every
 // 0.5 s while bound, with no launch, then the 10-damage blast at Base Launch
@@ -33,22 +33,22 @@ import { resolveLaunchStun } from '../js/game/combat.js';
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
 const CHARGE = { charge: true };
-const BA1 = { ba1: true, ba1Pressed: true };
-const BA2 = { ba2: true, ba2Pressed: true };
-const THROW = { uniqueba: true, uniquebaPressed: true };
+const ATTACK1 = { attack1: true, attack1Pressed: true };
+const ATTACK2 = { attack2: true, attack2Pressed: true };
+const THROW = { extra_attack: true, extra_attackPressed: true };
 const JUMP = { jump: true, jumpPressed: true };
 const SHIELD = { shield: true, shieldPressed: true };
-const CHARGED_BA1 = { ...CHARGE, ...BA1 };
-const CHARGED_BA2 = { ...CHARGE, ...BA2 };
+const CHARGE_ATTACK1 = { ...CHARGE, ...ATTACK1 };
+const CHARGE_ATTACK2 = { ...CHARGE, ...ATTACK2 };
 
-const TECH = def.chargedTechniques.cba2;
-const RASEN = Array.from({ length: 12 }, (_, i) => `0001_rasen${i + 1}.png`);
-const PRASEN = Array.from({ length: 11 }, (_, i) => `0001_prasen${i + 1}.png`);
-const NEW_FILES = [...RASEN, ...PRASEN];
+const TECH = def.chargedTechniques.attack4;
+const POSES = Array.from({ length: 12 }, (_, i) => `0001_attack4_${i + 1}.png`);
+const SPHERE = Array.from({ length: 11 }, (_, i) => `0001_attack4_object_${i + 1}.png`);
+const NEW_FILES = [...POSES, ...SPHERE];
 // Fixed steps: the form phase (the 6-frame sphere build at 12 fps), the dash
-// (the 3 rasenDash frames at 12 fps), the whiff release (rasen12's one frame
-// at 12 fps), the confirm (rasen7-8 at 12 fps), the release after the blast
-// (rasen10-12 at 12 fps), one sphere frame (12 fps) and the delay from hit
+// (the 3 attack4_dash frames at 12 fps), the whiff release (attack4_12's one frame
+// at 12 fps), the confirm (attack4_7-8 at 12 fps), the release after the blast
+// (attack4_10-12 at 12 fps), one sphere frame (12 fps) and the delay from hit
 // to explosion.
 const FORM_STEPS = steps(6 / 12);
 const DASH_STEPS = steps(3 / 12);
@@ -63,37 +63,37 @@ const TICK_STEPS = steps(TECH.tickInterval);
 // ticks at 0 (the contact's own step), 0.5, 1.0 and 1.5 s, then the blast.
 const FULL_RUSH = [['hit', 0], ['hit', 1], ['hit', 1], ['hit', 1], ['hit', 1], ['hit', 10]];
 // The poses with a role of their own: held while the sphere grows, the
-// blast, and the whiff release (rasen12 alone).
-const HOLD_POSE = '0001_rasen8.png';
-const EXPLOSION_POSE = '0001_rasen9.png';
-const WHIFF_POSE = '0001_rasen12.png';
-const RASEN_CLIPS = ['rasenForm', 'rasenDash', 'rasenConfirm', 'rasenExplosion', 'rasenRelease', 'rasenWhiffRelease'];
+// blast, and the whiff release (attack4_12 alone).
+const HOLD_POSE = '0001_attack4_8.png';
+const EXPLOSION_POSE = '0001_attack4_9.png';
+const WHIFF_POSE = '0001_attack4_12.png';
+const POSE_CLIPS = ['attack4_form', 'attack4_dash', 'attack4_confirm', 'attack4_explosion', 'attack4_release', 'attack4_whiff_release'];
 
 // The uploaded PNGs, byte for byte.
 const SHA256 = {
-  '0001_rasen1.png': '02fd3e02b89d3aa5770c5a4da092879cfe86557e55ca228aff96b1442605ad86',
-  '0001_rasen2.png': 'bbf73065624d62456fc7f4b24564ac597e9461df9c4516c6e28130ce2116a231',
-  '0001_rasen3.png': 'f7087a7baf7cbb764362c3a272ea0907fe38fea697db305109d4c0175b6a869d',
-  '0001_rasen4.png': '217e109fce593ce929bd78b9969598c0944c584a29536234e297979f87b99597',
-  '0001_rasen5.png': '5767f1bb9635353558b0aa8578a746ad751727aee8c90502f4204a257c79c8e3',
-  '0001_rasen6.png': 'cb1e299484a8bb282980fb7a03b14a0e6e3a48d93a4ae10b260cfa3ea767ea38',
-  '0001_rasen7.png': '7e40c73d98ab47d1a903087c747cdb9a39c1a78c2ba3bd7e19ff8f27a179e277',
-  '0001_rasen8.png': '3177859faadb7404c081a0c9794b681fc0b5e53666592a88d432d1668bb4292d',
-  '0001_rasen9.png': 'a763576c3917cd327235a6edf2c573b27fcfc7de15bd63df6d19e2c69787755d',
-  '0001_rasen10.png': 'eed685e6d3b2852d37e3880af8a3e701da6fc784aeb6e8101caa329b2e38790b',
-  '0001_rasen11.png': 'aa2dad10f908c3d747456ee481d581a1d643a945a78f939030cbb671c121ac17',
-  '0001_rasen12.png': '3da52cfbe31807c1212e5b0d3f0edff441b847c8a85470ffe78eb06a042fb9dd',
-  '0001_prasen1.png': '2fd1f0df389fec58ae473f6d94e841d66acbe886126174062bb7c7c2da91620d',
-  '0001_prasen2.png': '4b349f627d0021a6e83501c69f8a240d1e70823ad43c412cce75b2923475261b',
-  '0001_prasen3.png': 'cbf9e6571a8e432e966ab0276ccdcda97bee1819cd8e5f66ec3e8d6d616f6a16',
-  '0001_prasen4.png': '68e05ef55ff2aab85ddaa663547493bb1ad192405ed062fd7948be5df2c406f9',
-  '0001_prasen5.png': '854716f15b93938b7d0bd6b6a517ed83588f7a95b1e2d32f474b852d6dba9c75',
-  '0001_prasen6.png': 'aa1ef656e958ccc328f461bca4d35b512a666bc070f9f7b7f24f5c36a86a4b81',
-  '0001_prasen7.png': '3a6497f5ed16cc5c442ea42d11e381af9de2d91f439ccb07c0add2f30b773b71',
-  '0001_prasen8.png': 'aa06ea1d54f50b6959f42e16f043951f92bc1d370d1e3070530e998e9ac439b4',
-  '0001_prasen9.png': '38b417dd6c9b3b46079f1c823911f6d0767c548f5eee9cc96ecf87ff24bce07d',
-  '0001_prasen10.png': 'dd86e89d11e447e842a2fd964b2804ac5a7c97d2e0c104361ebfd81f2286259e',
-  '0001_prasen11.png': '125e44712106e29110493677ff694191ffb4dcbfd0e667f6c393f520c231b174',
+  '0001_attack4_1.png': '02fd3e02b89d3aa5770c5a4da092879cfe86557e55ca228aff96b1442605ad86',
+  '0001_attack4_2.png': 'bbf73065624d62456fc7f4b24564ac597e9461df9c4516c6e28130ce2116a231',
+  '0001_attack4_3.png': 'f7087a7baf7cbb764362c3a272ea0907fe38fea697db305109d4c0175b6a869d',
+  '0001_attack4_4.png': '217e109fce593ce929bd78b9969598c0944c584a29536234e297979f87b99597',
+  '0001_attack4_5.png': '5767f1bb9635353558b0aa8578a746ad751727aee8c90502f4204a257c79c8e3',
+  '0001_attack4_6.png': 'cb1e299484a8bb282980fb7a03b14a0e6e3a48d93a4ae10b260cfa3ea767ea38',
+  '0001_attack4_7.png': '7e40c73d98ab47d1a903087c747cdb9a39c1a78c2ba3bd7e19ff8f27a179e277',
+  '0001_attack4_8.png': '3177859faadb7404c081a0c9794b681fc0b5e53666592a88d432d1668bb4292d',
+  '0001_attack4_9.png': 'a763576c3917cd327235a6edf2c573b27fcfc7de15bd63df6d19e2c69787755d',
+  '0001_attack4_10.png': 'eed685e6d3b2852d37e3880af8a3e701da6fc784aeb6e8101caa329b2e38790b',
+  '0001_attack4_11.png': 'aa2dad10f908c3d747456ee481d581a1d643a945a78f939030cbb671c121ac17',
+  '0001_attack4_12.png': '3da52cfbe31807c1212e5b0d3f0edff441b847c8a85470ffe78eb06a042fb9dd',
+  '0001_attack4_object_1.png': '2fd1f0df389fec58ae473f6d94e841d66acbe886126174062bb7c7c2da91620d',
+  '0001_attack4_object_2.png': '4b349f627d0021a6e83501c69f8a240d1e70823ad43c412cce75b2923475261b',
+  '0001_attack4_object_3.png': 'cbf9e6571a8e432e966ab0276ccdcda97bee1819cd8e5f66ec3e8d6d616f6a16',
+  '0001_attack4_object_4.png': '68e05ef55ff2aab85ddaa663547493bb1ad192405ed062fd7948be5df2c406f9',
+  '0001_attack4_object_5.png': '854716f15b93938b7d0bd6b6a517ed83588f7a95b1e2d32f474b852d6dba9c75',
+  '0001_attack4_object_6.png': 'aa1ef656e958ccc328f461bca4d35b512a666bc070f9f7b7f24f5c36a86a4b81',
+  '0001_attack4_object_7.png': '3a6497f5ed16cc5c442ea42d11e381af9de2d91f439ccb07c0add2f30b773b71',
+  '0001_attack4_object_8.png': 'aa06ea1d54f50b6959f42e16f043951f92bc1d370d1e3070530e998e9ac439b4',
+  '0001_attack4_object_9.png': '38b417dd6c9b3b46079f1c823911f6d0767c548f5eee9cc96ecf87ff24bce07d',
+  '0001_attack4_object_10.png': 'dd86e89d11e447e842a2fd964b2804ac5a7c97d2e0c104361ebfd81f2286259e',
+  '0001_attack4_object_11.png': '125e44712106e29110493677ff694191ffb4dcbfd0e667f6c393f520c231b174',
 };
 
 const name = (frame) => frame?.url.split('/').pop() ?? null;
@@ -133,12 +133,12 @@ function snap(f) {
   };
 }
 
-// Enters Charge, then (already charging, Charge still held) presses BA2.
+// Enters Charge, then (already charging, Charge still held) presses attack2.
 // Returns the technique started that step.
 function start(d, targetHeld = {}) {
   d.tick(CHARGE, targetHeld);
   assert.equal(d.attacker.state, 'charge');
-  d.tick(CHARGED_BA2, targetHeld);
+  d.tick(CHARGE_ATTACK2, targetHeld);
   assert.ok(d.attacker.technique, 'the Sphere Rush started');
   return d.attacker.technique;
 }
@@ -180,7 +180,7 @@ function standOn(fighter, stage, id) {
 
 // ---- Artwork ----------------------------------------------------------------------
 
-test('the twelve rasen and eleven prasen frames live only in the canonical #0001 folder, unchanged, and preload with #0001', () => {
+test('the twelve attack4 and eleven attack4_object frames live only in the canonical #0001 folder, unchanged, and preload with #0001', () => {
   const paths = characterFramePaths(def);
   for (const file of NEW_FILES) {
     const url = `./assets/characters/0001/${file}`;
@@ -191,25 +191,25 @@ test('the twelve rasen and eleven prasen frames live only in the canonical #0001
     assert.ok(paths.includes(url), `${url} is preloaded`);
   }
   // Preloaded in frame order, once each, with the rest of the character.
-  assert.deepEqual(paths.filter((u) => /\/0001_rasen/.test(u)), RASEN.map((f) => `./assets/characters/0001/${f}`));
-  assert.deepEqual(paths.filter((u) => /\/0001_prasen/.test(u)), PRASEN.map((f) => `./assets/characters/0001/${f}`));
+  assert.deepEqual(paths.filter((u) => /\/0001_attack4_\d+\.png$/.test(u)), POSES.map((f) => `./assets/characters/0001/${f}`));
+  assert.deepEqual(paths.filter((u) => /\/0001_attack4_object_/.test(u)), SPHERE.map((f) => `./assets/characters/0001/${f}`));
   const dir = readdirSync(`${ROOT}assets/characters/0001/`);
-  assert.deepEqual(dir.filter((n) => /rasen/.test(n)).sort(), [...NEW_FILES].sort(), 'exactly the 23, no duplicates');
-  assert.deepEqual(readdirSync(ROOT).filter((n) => /rasen/i.test(n)), [], 'none left at the repository root');
+  assert.deepEqual(dir.filter((n) => /attack4/.test(n)).sort(), [...NEW_FILES].sort(), 'exactly the 23, no duplicates');
+  assert.deepEqual(readdirSync(ROOT).filter((n) => /attack4/i.test(n)), [], 'none left at the repository root');
 });
 
-test('rasen1-12 are one-shot fighter clips: form 1-3, dash 4-6, confirm 7-8, explosion 9, release 10-12; the whiff release is rasen12 alone', () => {
+test('attack4_1-12 are one-shot fighter clips: form 1-3, dash 4-6, confirm 7-8, explosion 9, release 10-12; the whiff release is attack4_12 alone', () => {
   const clip = (key) => def.animations[key].frames.map((u) => u.split('/').pop());
-  assert.deepEqual(clip('rasenForm'), RASEN.slice(0, 3));
-  assert.deepEqual(clip('rasenDash'), RASEN.slice(3, 6));
-  assert.deepEqual(clip('rasenConfirm'), RASEN.slice(6, 8), 'the contact: rasen7, then rasen8 (held)');
-  assert.deepEqual(clip('rasenExplosion'), [EXPLOSION_POSE], 'the pose of the blast itself');
-  assert.deepEqual(clip('rasenRelease'), RASEN.slice(9, 12), 'the recovery after the blast');
-  assert.deepEqual(clip('rasenWhiffRelease'), [WHIFF_POSE], 'a rush that caught nobody');
-  // No late pose before the blast: rasen9-12 are never part of the contact.
-  assert.ok(!clip('rasenConfirm').some((f) => RASEN.slice(8).includes(f)));
-  assert.ok(close(def.animations.rasenWhiffRelease.frames.length / def.animations.rasenWhiffRelease.fps, 1 / 12));
-  for (const key of RASEN_CLIPS) {
+  assert.deepEqual(clip('attack4_form'), POSES.slice(0, 3));
+  assert.deepEqual(clip('attack4_dash'), POSES.slice(3, 6));
+  assert.deepEqual(clip('attack4_confirm'), POSES.slice(6, 8), 'the contact: attack4_7, then attack4_8 (held)');
+  assert.deepEqual(clip('attack4_explosion'), [EXPLOSION_POSE], 'the pose of the blast itself');
+  assert.deepEqual(clip('attack4_release'), POSES.slice(9, 12), 'the recovery after the blast');
+  assert.deepEqual(clip('attack4_whiff_release'), [WHIFF_POSE], 'a rush that caught nobody');
+  // No late pose before the blast: attack4_9-12 are never part of the contact.
+  assert.ok(!clip('attack4_confirm').some((f) => POSES.slice(8).includes(f)));
+  assert.ok(close(def.animations.attack4_whiff_release.frames.length / def.animations.attack4_whiff_release.fps, 1 / 12));
+  for (const key of POSE_CLIPS) {
     const anim = def.animations[key];
     assert.equal(anim.loop, false, `${key} plays once`);
     assert.equal(anim.fps, 12);
@@ -220,33 +220,33 @@ test('rasen1-12 are one-shot fighter clips: form 1-3, dash 4-6, confirm 7-8, exp
     assert.equal(def.projectileAnimations[key], undefined);
     assert.equal(def.animationFallbacks[key], undefined, 'no fallback fakes them');
   }
-  // Every pose in exactly one clip, except rasen12: the last recovery pose
+  // Every pose in exactly one clip, except attack4_12: the last recovery pose
   // and, alone, the whiff release. One file on disk for both (see the
   // artwork test); the same URL, never a copy.
   const uses = new Map();
   for (const [key, anim] of Object.entries(def.animations)) {
-    for (const url of anim.frames.filter((u) => /rasen/.test(u))) uses.set(url, [...(uses.get(url) ?? []), key]);
+    for (const url of anim.frames.filter((u) => /attack4/.test(u))) uses.set(url, [...(uses.get(url) ?? []), key]);
   }
   assert.equal(uses.size, 12);
-  for (const file of RASEN) {
+  for (const file of POSES) {
     const url = `${BASE}${file.slice(5)}`;
-    assert.deepEqual(uses.get(url), file === WHIFF_POSE ? ['rasenRelease', 'rasenWhiffRelease'] : [RASEN_CLIPS.find((k) => clip(k).includes(file))], file);
+    assert.deepEqual(uses.get(url), file === WHIFF_POSE ? ['attack4_release', 'attack4_whiff_release'] : [POSE_CLIPS.find((k) => clip(k).includes(file))], file);
   }
-  assert.deepEqual(Object.keys(def.animations).filter((k) => def.animations[k].frames.some((u) => /rasen/.test(u))), RASEN_CLIPS);
+  assert.deepEqual(Object.keys(def.animations).filter((k) => def.animations[k].frames.some((u) => /attack4/.test(u))), POSE_CLIPS);
 });
 
-test('prasen1-11 are three direction-neutral sphere effects: build 1-6 once, impact 7-9 looped, explosion 10-11 once', () => {
+test('attack4_object_1-11 are three direction-neutral sphere effects: build 1-6 once, impact 7-9 looped, explosion 10-11 once', () => {
   const clip = (key) => def.effectAnimations[key].frames.map((u) => u.split('/').pop());
-  assert.deepEqual(clip('rasenSphereBuild'), PRASEN.slice(0, 6));
-  assert.deepEqual(clip('rasenSphereImpact'), PRASEN.slice(6, 9));
-  assert.deepEqual(clip('rasenSphereExplosion'), PRASEN.slice(9, 11));
+  assert.deepEqual(clip('attack4_object_build'), SPHERE.slice(0, 6));
+  assert.deepEqual(clip('attack4_object_impact'), SPHERE.slice(6, 9));
+  assert.deepEqual(clip('attack4_object_explosion'), SPHERE.slice(9, 11));
   // The sphere spins on the caught opponent: the impact clip loops. The
   // lighter blast frames are never part of that loop.
-  assert.equal(def.effectAnimations.rasenSphereImpact.loop, true, 'the attached sphere keeps spinning');
-  assert.ok(!clip('rasenSphereImpact').some((f) => clip('rasenSphereExplosion').includes(f)));
-  for (const key of ['rasenSphereBuild', 'rasenSphereImpact', 'rasenSphereExplosion']) {
+  assert.equal(def.effectAnimations.attack4_object_impact.loop, true, 'the attached sphere keeps spinning');
+  assert.ok(!clip('attack4_object_impact').some((f) => clip('attack4_object_explosion').includes(f)));
+  for (const key of ['attack4_object_build', 'attack4_object_impact', 'attack4_object_explosion']) {
     const anim = def.effectAnimations[key];
-    if (key !== 'rasenSphereImpact') assert.equal(anim.loop, false, `${key} plays once`);
+    if (key !== 'attack4_object_impact') assert.equal(anim.loop, false, `${key} plays once`);
     assert.equal(anim.fps, 12);
     assert.equal(anim.sourceFacing, 0, 'a round effect: never mirrored');
     assert.equal(anim.heightRatio, undefined, 'never fitted to the fighter height');
@@ -255,11 +255,11 @@ test('prasen1-11 are three direction-neutral sphere effects: build 1-6 once, imp
   }
   // Formation 0.5 s, one turn of the impact 0.25 s, explosion about 0.167 s.
   const pass = (key) => def.effectAnimations[key].frames.length / def.effectAnimations[key].fps;
-  assert.ok(close(pass('rasenSphereBuild'), 0.5));
-  assert.ok(close(pass('rasenSphereImpact'), 0.25));
-  assert.ok(close(pass('rasenSphereExplosion'), 1 / 6));
-  assert.equal(def.projectiles.cba2, undefined);
-  assert.equal(def.summons.cba2, undefined);
+  assert.ok(close(pass('attack4_object_build'), 0.5));
+  assert.ok(close(pass('attack4_object_impact'), 0.25));
+  assert.ok(close(pass('attack4_object_explosion'), 1 / 6));
+  assert.equal(def.projectiles.attack4, undefined);
+  assert.equal(def.summons.attack4, undefined);
 });
 
 // A decoded-image stand-in: `artW` x `artH` art pixels, each a `px` x `px`
@@ -299,15 +299,15 @@ function withFakeCanvas(fn) {
   }
 }
 
-test('SpriteSet normalizes rasen as fighter poses and prasen as effects at their own art size', () => {
+test('SpriteSet normalizes attack4 as fighter poses and attack4_object as effects at their own art size', () => {
   // The real frame sizes, read from the PNG headers; in the browser every
-  // rasen and prasen frame detects as 2 source pixels per art pixel.
+  // attack4 and attack4_object frame detects as 2 source pixels per art pixel.
   const size = (file) => {
     const png = readFileSync(`${ROOT}assets/characters/0001/${file}`);
     return [png.readUInt32BE(16), png.readUInt32BE(20)];
   };
   const set = withFakeCanvas(() => {
-    const images = new Map([[`${BASE}idle1.png`, blockImage(35, 52, 16)]]);
+    const images = new Map([[`${BASE}idle_1.png`, blockImage(35, 52, 16)]]);
     for (const file of NEW_FILES) {
       const [w, h] = size(file);
       images.set(`${BASE}${file.slice(5)}`, blockImage(w / 2, h / 2, 2));
@@ -316,16 +316,16 @@ test('SpriteSet normalizes rasen as fighter poses and prasen as effects at their
     const character = {
       ...def,
       animations: {
-        idle: { frames: [`${BASE}idle1.png`], fps: 7, loop: true },
-        ...pick(def.animations, RASEN_CLIPS),
+        idle: { frames: [`${BASE}idle_1.png`], fps: 7, loop: true },
+        ...pick(def.animations, POSE_CLIPS),
       },
       projectileAnimations: {},
-      effectAnimations: pick(def.effectAnimations, ['rasenSphereBuild', 'rasenSphereImpact', 'rasenSphereExplosion']),
+      effectAnimations: pick(def.effectAnimations, ['attack4_object_build', 'attack4_object_impact', 'attack4_object_explosion']),
     };
     return SpriteSet.build(character, (url) => images.get(url));
   });
   assert.deepEqual(set.missing, []);
-  for (const key of RASEN_CLIPS) {
+  for (const key of POSE_CLIPS) {
     const anim = set.animations[key];
     assert.ok(set.has(key), `${key} is a fighter animation`);
     assert.equal(anim.sourceFacing, 1);
@@ -337,7 +337,7 @@ test('SpriteSet normalizes rasen as fighter poses and prasen as effects at their
       assert.equal(f.anchorArtY, undefined, 'bottom-anchored, not centred');
     }
   }
-  for (const key of ['rasenSphereBuild', 'rasenSphereImpact', 'rasenSphereExplosion']) {
+  for (const key of ['attack4_object_build', 'attack4_object_impact', 'attack4_object_explosion']) {
     const anim = set.effect(key);
     assert.ok(anim, `${key} is an effect`);
     assert.equal(set.has(key), false);
@@ -351,49 +351,49 @@ test('SpriteSet normalizes rasen as fighter poses and prasen as effects at their
   }
   // Only the attached sphere loops.
   assert.deepEqual(
-    ['rasenSphereBuild', 'rasenSphereImpact', 'rasenSphereExplosion'].map((k) => set.effect(k).loop),
+    ['attack4_object_build', 'attack4_object_impact', 'attack4_object_explosion'].map((k) => set.effect(k).loop),
     [false, true, false],
   );
-  for (const key of RASEN_CLIPS) assert.equal(set.animations[key].loop, false);
-  // The complete sphere (prasen6) is 38 x 41 art pixels: about 64 x 69
+  for (const key of POSE_CLIPS) assert.equal(set.animations[key].loop, false);
+  // The complete sphere (attack4_object_6) is 38 x 41 art pixels: about 64 x 69
   // world units at #0001's scale, whatever the fighter's height.
-  const full = set.effect('rasenSphereBuild').frames[5];
+  const full = set.effect('attack4_object_build').frames[5];
   assert.deepEqual([full.artW, full.artH], [38, 41]);
   assert.ok(Math.abs(full.artW * set.worldPerArt - 64.3) < 0.1);
 });
 
 // ---- Data -------------------------------------------------------------------------
 
-test('charged actions are typed: Charged BA1 is the Clone summon, Charged BA2 the Sphere Rush technique', () => {
-  assert.deepEqual(def.chargedActions, {
-    ba1: { type: 'summon', id: 'cba1' },
-    ba2: { type: 'technique', id: 'cba2' },
+test('Charge replacements are typed: attack3 is the Clone summon, attack4 the Sphere Rush technique', () => {
+  assert.deepEqual(def.chargeReplacements, {
+    attack1: { type: 'summon', id: 'attack3' },
+    attack2: { type: 'technique', id: 'attack4' },
   });
   // The normal buttons are untouched.
-  assert.deepEqual(def.actions.ba2, { ground: 'ba2', air: 'maba2' });
-  assert.deepEqual(def.actions.ba1, { ground: 'ba1', air: 'maba1' });
+  assert.deepEqual(def.actions.attack2, { ground: 'attack2', air: 'midair_attack2' });
+  assert.deepEqual(def.actions.attack1, { ground: 'attack1', air: 'midair_attack1' });
   // The Sphere Rush is its own data: not an attack, summon or projectile.
-  assert.equal(def.attacks.cba2, undefined);
-  assert.equal(def.summons.cba2, undefined);
-  assert.equal(def.projectiles.cba2, undefined);
+  assert.equal(def.attacks.attack4, undefined);
+  assert.equal(def.summons.attack4, undefined);
+  assert.equal(def.projectiles.attack4, undefined);
   const { fighter } = makeFighter();
-  assert.ok(fighter.techniqueDefs.cba2);
-  assert.ok(Object.isFrozen(fighter.techniqueDefs.cba2));
-  assert.deepEqual(Object.keys(fighter.summonDefs), ['cba1']);
+  assert.ok(fighter.techniqueDefs.attack4);
+  assert.ok(Object.isFrozen(fighter.techniqueDefs.attack4));
+  assert.deepEqual(Object.keys(fighter.summonDefs), ['attack3']);
 });
 
-test('the Sphere Rush data: 1050 dash, a contact that only binds, +1 every 0.5 s, a 10 blast, 2.0 s delay, a 5 s cooldown, and normal BA2 is unchanged', () => {
-  assert.equal(TECH.formAnimation, 'rasenForm');
-  assert.equal(TECH.dashAnimation, 'rasenDash');
-  assert.equal(TECH.confirmAnimation, 'rasenConfirm');
-  assert.equal(TECH.explosionAnimation, 'rasenExplosion');
-  assert.equal(TECH.releaseAnimation, 'rasenRelease');
-  assert.equal(TECH.whiffReleaseAnimation, 'rasenWhiffRelease');
+test('the Sphere Rush data: 1050 dash, a contact that only binds, +1 every 0.5 s, a 10 blast, 2.0 s delay, a 5 s cooldown, and normal attack2 is unchanged', () => {
+  assert.equal(TECH.formAnimation, 'attack4_form');
+  assert.equal(TECH.dashAnimation, 'attack4_dash');
+  assert.equal(TECH.confirmAnimation, 'attack4_confirm');
+  assert.equal(TECH.explosionAnimation, 'attack4_explosion');
+  assert.equal(TECH.releaseAnimation, 'attack4_release');
+  assert.equal(TECH.whiffReleaseAnimation, 'attack4_whiff_release');
   // The sphere on the target grows: visibly, never absurdly, never shrinking.
   assert.deepEqual(TECH.sphereGrowth, { startScale: 1, endScale: 1.4 });
-  assert.equal(TECH.sphereBuild, 'rasenSphereBuild');
-  assert.equal(TECH.sphereImpact, 'rasenSphereImpact');
-  assert.equal(TECH.sphereExplosion, 'rasenSphereExplosion');
+  assert.equal(TECH.sphereBuild, 'attack4_object_build');
+  assert.equal(TECH.sphereImpact, 'attack4_object_impact');
+  assert.equal(TECH.sphereExplosion, 'attack4_object_explosion');
   assert.equal(TECH.dashSpeed, 1050);
   assert.equal(TECH.explosionDelay, 2.0);
   assert.equal(TECH.cooldown, 5);
@@ -416,18 +416,18 @@ test('the Sphere Rush data: 1050 dash, a contact that only binds, +1 every 0.5 s
   assert.ok(TECH.explosionHit.hitstop > TECH.firstHit.hitstop);
   // A hand offset for every frame the sphere is held through, and a box
   // centred on the sphere.
-  assert.equal(TECH.handOffsets.rasenForm.length, 3);
-  assert.equal(TECH.handOffsets.rasenDash.length, 3);
+  assert.equal(TECH.handOffsets.attack4_form.length, 3);
+  assert.equal(TECH.handOffsets.attack4_dash.length, 3);
   const box = TECH.sphereHitbox;
   assert.equal(box.x, -box.w / 2);
   assert.equal(box.y, -box.h / 2);
   assert.deepEqual(TECH.targetOffset, { x: 0, y: -48 });
-  // Normal BA2 keeps its own data (its own Base Launch 2 upward, not the
+  // Normal attack2 keeps its own data (its own Base Launch 2 upward, not the
   // explosion's launch).
   assert.deepEqual(
-    { ...def.attacks.ba2 },
+    { ...def.attacks.attack2 },
     {
-      animation: 'ba2', startup: 3 / 12, active: 2 / 12, recovery: 2 / 12, damage: 5,
+      animation: 'attack2', startup: 3 / 12, active: 2 / 12, recovery: 2 / 12, damage: 5,
       hitbox: { x: 10, y: -88, w: 24, h: 78 }, baseLaunch: 2, directionalLaunch: 'vertical',
       hitstun: 0.28, blockstun: 0.15, hitstop: 0.09, cooldown: 0.15, groundOnly: true,
       momentum: 0.5, friction: 0.5, step: { at: 0, speed: 280 }, hitCancel: 3 / 12,
@@ -442,59 +442,59 @@ test('the Sphere Rush data: 1050 dash, a contact that only binds, +1 every 0.5 s
 
 // ---- Trigger ----------------------------------------------------------------------
 
-test('Charge, then BA2 while still charging: the Sphere Rush starts on rasen1 and prasen1, out of Charge, its 5.0 s cooldown started', () => {
+test('Charge, then attack2 while still charging: the Sphere Rush starts on attack4_1 and attack4_object_1, out of Charge, its 5.0 s cooldown started', () => {
   const d = duel({ gap: 600 });
   d.tick(CHARGE);
   assert.equal(d.attacker.state, 'charge');
-  d.tick(CHARGED_BA2);
+  d.tick(CHARGE_ATTACK2);
   const t = d.attacker.technique;
   assert.ok(t instanceof ChargedTechnique);
-  assert.equal(t.def.id, 'cba2');
+  assert.equal(t.def.id, 'attack4');
   assert.equal(t.phase, 'form');
   assert.equal(d.attacker.state, 'technique');
   assert.equal(d.attacker.charging, false, 'left Charge');
-  assert.equal(d.attacker.combat.attack, null, 'not an attack: no ordinary BA2');
+  assert.equal(d.attacker.combat.attack, null, 'not an attack: no ordinary attack2');
   assert.equal(d.attacker.combat.cooldowns.size, 0);
-  assert.equal(d.attacker.animator.anim.key, 'rasenForm');
-  assert.equal(frameName(d.attacker), '0001_rasen1.png');
-  assert.equal(name(t.sphereFrame), '0001_prasen1.png');
+  assert.equal(d.attacker.animator.anim.key, 'attack4_form');
+  assert.equal(frameName(d.attacker), '0001_attack4_1.png');
+  assert.equal(name(t.sphereFrame), '0001_attack4_object_1.png');
   assert.equal(t.sphereOwner, 'fighter');
   const cd = d.attacker.combat.chargedCooldowns;
-  assert.deepEqual([cd.remaining('cba2'), cd.duration('cba2')], [5, 5]);
-  assert.equal(cd.active('cba1'), false, 'Charged BA1 stays ready');
-  assert.equal(d.attacker.combat.lastIntent, 'ba2');
+  assert.deepEqual([cd.remaining('attack4'), cd.duration('attack4')], [5, 5]);
+  assert.equal(cd.active('attack3'), false, 'attack3 stays ready');
+  assert.equal(d.attacker.combat.lastIntent, 'attack2');
   assert.deepEqual(d.clones, []);
   assert.deepEqual(d.projectiles, []);
   assert.deepEqual(d.events, []);
   assert.equal(d.attacker.canAct(), false, 'the technique owns the fighter');
 
-  // Holding BA2 (no new press) never restarts it.
-  d.tick({ ...CHARGE, ba2: true });
+  // Holding attack2 (no new press) never restarts it.
+  d.tick({ ...CHARGE, attack2: true });
   assert.equal(d.attacker.technique, t);
-  assert.equal(frameName(d.attacker), '0001_rasen1.png');
+  assert.equal(frameName(d.attacker), '0001_attack4_1.png');
 });
 
-test('Charge and BA2 pressed together from idle is an ordinary BA2', () => {
+test('Charge and attack2 pressed together from idle is an ordinary attack2', () => {
   const d = duel();
-  d.tick({ ...CHARGE, chargePressed: true, ...BA2 });
+  d.tick({ ...CHARGE, chargePressed: true, ...ATTACK2 });
   assert.equal(d.attacker.technique, null);
   assert.equal(d.attacker.state, 'attack');
-  assert.equal(d.attacker.combat.attack.def.id, 'ba2');
-  assert.equal(frameName(d.attacker), '0001_2ba1.png');
+  assert.equal(d.attacker.combat.attack.def.id, 'attack2');
+  assert.equal(frameName(d.attacker), '0001_attack2_1.png');
   d.until(() => d.events.length > 0);
   assert.equal(d.events[0].damage, 5);
   assert.equal(d.events[0].technique, null);
   assert.equal(d.attacker.combat.chargedCooldowns.size, 0);
 });
 
-test('letting go of Charge on the BA2 step is an ordinary BA2: no technique, no release pose, no cooldown', () => {
+test('letting go of Charge on the attack2 step is an ordinary attack2: no technique, no release pose, no cooldown', () => {
   const d = duel();
   for (let i = 0; i < 20; i++) d.tick(CHARGE);
-  assert.equal(d.attacker.animator.anim.key, 'chargeLoop');
-  d.tick(BA2); // charge: false with ba2Pressed: true
+  assert.equal(d.attacker.animator.anim.key, 'charge_loop');
+  d.tick(ATTACK2); // charge: false with attack2Pressed: true
   assert.equal(d.attacker.technique, null);
-  assert.equal(d.attacker.combat.attack.def.id, 'ba2');
-  assert.equal(frameName(d.attacker), '0001_2ba1.png', 'straight into BA2');
+  assert.equal(d.attacker.combat.attack.def.id, 'attack2');
+  assert.equal(frameName(d.attacker), '0001_attack2_1.png', 'straight into attack2');
   const states = [];
   while (d.attacker.state === 'attack') {
     d.tick();
@@ -507,7 +507,7 @@ test('letting go of Charge on the BA2 step is an ordinary BA2: no technique, no 
 
 // ---- Formation --------------------------------------------------------------------
 
-test('the sphere forms prasen1 -> prasen6 in the hand while #0001 stands on rasen1 -> rasen3; only then does he dash', () => {
+test('the sphere forms attack4_object_1 -> attack4_object_6 in the hand while #0001 stands on attack4_1 -> attack4_3; only then does he dash', () => {
   const d = duel({ gap: 900 });
   const t = start(d);
   const log = [snap(d.attacker)];
@@ -516,13 +516,13 @@ test('the sphere forms prasen1 -> prasen6 in the hand while #0001 stands on rase
   const form = log.filter((s) => s.phase === 'form');
   const first = log.find((s) => s.phase === 'dash');
   assert.equal(form.length, FORM_STEPS, 'formation lasts one pass of the build (0.5 s)');
-  assert.deepEqual(order(form.map((s) => s.sphere)), PRASEN.slice(0, 6), 'the build plays once, in order');
-  assert.deepEqual(order(form.map((s) => s.frame)), RASEN.slice(0, 3), 'the poses play once, in order');
-  // rasen3 is held (never looped back) until the sphere is complete, and the
-  // complete prasen6 is on screen before the dash.
-  assert.deepEqual(runs(form.map((s) => s.frame)).map(([f]) => f), RASEN.slice(0, 3));
-  assert.equal(form.at(-1).sphere, '0001_prasen6.png');
-  assert.equal(form.at(-1).frame, '0001_rasen3.png');
+  assert.deepEqual(order(form.map((s) => s.sphere)), SPHERE.slice(0, 6), 'the build plays once, in order');
+  assert.deepEqual(order(form.map((s) => s.frame)), POSES.slice(0, 3), 'the poses play once, in order');
+  // attack4_3 is held (never looped back) until the sphere is complete, and the
+  // complete attack4_object_6 is on screen before the dash.
+  assert.deepEqual(runs(form.map((s) => s.frame)).map(([f]) => f), POSES.slice(0, 3));
+  assert.equal(form.at(-1).sphere, '0001_attack4_object_6.png');
+  assert.equal(form.at(-1).frame, '0001_attack4_3.png');
   // Poses and sphere change on the same steps.
   const frameSteps = steps(1 / 12);
   assert.deepEqual(runs(form.map((s) => s.sphere)).map(([, n]) => n), [frameSteps - 1, 5, 5, 5, 5, frameSteps + 1]);
@@ -531,8 +531,8 @@ test('the sphere forms prasen1 -> prasen6 in the hand while #0001 stands on rase
   assert.ok(form.every((s) => s.x === 500 && s.vx === 0 && s.grounded && s.facing === 1));
   assert.ok(form.every((s) => s.state === 'technique' && s.sphereOwner === 'fighter'));
   // The dash starts on the next step, sphere still complete.
-  assert.equal(first.frame, '0001_rasen4.png');
-  assert.equal(first.sphere, '0001_prasen6.png');
+  assert.equal(first.frame, '0001_attack4_4.png');
+  assert.equal(first.sphere, '0001_attack4_object_6.png');
   assert.ok(first.x > 500);
 });
 
@@ -559,33 +559,33 @@ test('the sphere sits in the hand: its centre follows the hand offset of the pos
     assert.equal(u.phase, 'whiffRelease');
     assert.equal(u.sphereCenter(), null);
     assert.equal(t.endReason, 'miss');
-    assert.deepEqual([...seen].sort(), ['rasenDash:0', 'rasenDash:1', 'rasenDash:2', 'rasenForm:0', 'rasenForm:1', 'rasenForm:2']);
+    assert.deepEqual([...seen].sort(), ['attack4_dash:0', 'attack4_dash:1', 'attack4_dash:2', 'attack4_form:0', 'attack4_form:1', 'attack4_form:2']);
   }
   // Held in the rear palm while forming and dashing, then swung in front on
-  // rasen6; always at hand height, never at the feet.
+  // attack4_6; always at hand height, never at the feet.
   for (const [clip, list] of Object.entries(TECH.handOffsets)) {
     list.forEach((o, i) => {
       assert.ok(o.y < -35 && o.y > -60, `${clip}[${i}] at hand height`);
       assert.ok(Math.abs(o.x) > 10 && Math.abs(o.x) < 45, `${clip}[${i}] at arm's length`);
     });
   }
-  assert.ok(TECH.handOffsets.rasenDash[2].x > 0, 'swung forward on rasen6');
+  assert.ok(TECH.handOffsets.attack4_dash[2].x > 0, 'swung forward on attack4_6');
 });
 
 // ---- Dash -------------------------------------------------------------------------
 
-test('the dash: rasen4 -> rasen6 at a fixed 1050 in the locked facing, the complete sphere in hand, whatever is pressed', () => {
+test('the dash: attack4_4 -> attack4_6 at a fixed 1050 in the locked facing, the complete sphere in hand, whatever is pressed', () => {
   for (const facing of [1, -1]) {
     const d = duel({ gap: 900, attackerFacing: facing });
     const t = start(d);
     runUntil(d, () => t.phase === 'dash');
     const log = [snap(d.attacker)];
-    const noise = [{ runLeft: true }, { runRight: true }, JUMP, SHIELD, BA1, THROW, CHARGED_BA1, { runRight: true, runLeft: false }];
+    const noise = [{ runLeft: true }, { runRight: true }, JUMP, SHIELD, ATTACK1, THROW, CHARGE_ATTACK1, { runRight: true, runLeft: false }];
     log.push(...runUntil(d, () => !d.attacker.technique, (i) => noise[i % noise.length]));
     const dash = log.filter((s) => s.phase === 'dash');
-    assert.equal(dash.length, DASH_STEPS, 'one pass of rasenDash (0.25 s)');
-    assert.deepEqual(order(dash.map((s) => s.frame)), RASEN.slice(3, 6));
-    assert.ok(dash.every((s) => s.sphere === '0001_prasen6.png'), 'the complete sphere, never rebuilt');
+    assert.equal(dash.length, DASH_STEPS, 'one pass of attack4_dash (0.25 s)');
+    assert.deepEqual(order(dash.map((s) => s.frame)), POSES.slice(3, 6));
+    assert.ok(dash.every((s) => s.sphere === '0001_attack4_object_6.png'), 'the complete sphere, never rebuilt');
     assert.ok(dash.every((s) => s.vx === 1050 * facing && s.facing === facing && s.grounded));
     for (let i = 1; i < dash.length; i++) assert.ok(close(dash[i].x - dash[i - 1].x, 1050 * facing * DT));
     // About 262 world units: a committed rush, stepped, never a teleport.
@@ -599,8 +599,8 @@ test('the dash: rasen4 -> rasen6 at a fixed 1050 in the locked facing, the compl
 
 // ---- Miss -------------------------------------------------------------------------
 
-test('a clean miss: the rush stops, #0001 lets go on rasen12 alone for one frame, then is free; no hit, bind, impact or blast', () => {
-  const noise = [{ runRight: true }, { runLeft: true }, JUMP, BA1, BA2, CHARGED_BA2, THROW, SHIELD];
+test('a clean miss: the rush stops, #0001 lets go on attack4_12 alone for one frame, then is free; no hit, bind, impact or blast', () => {
+  const noise = [{ runRight: true }, { runLeft: true }, JUMP, ATTACK1, ATTACK2, CHARGE_ATTACK2, THROW, SHIELD];
   for (const facing of [1, -1]) {
     // `mash`: buttons pressed on every step of the release.
     const rush = (mash) => {
@@ -616,14 +616,14 @@ test('a clean miss: the rush stops, #0001 lets go on rasen12 alone for one frame
     const dash = log.filter((s) => s.phase === 'dash');
     const release = log.filter((s) => s.phase === 'whiffRelease');
     assert.equal(dash.length, DASH_STEPS);
-    assert.equal(release.length, WHIFF_STEPS, 'rasen12 for one frame-time at 12 fps (1 / 12 s)');
+    assert.equal(release.length, WHIFF_STEPS, 'attack4_12 for one frame-time at 12 fps (1 / 12 s)');
     assert.equal(log.length, FORM_STEPS + DASH_STEPS + WHIFF_STEPS + 1, 'form, dash, whiff release, then over on the next step');
-    // Form and dash poses, then the whiff release pose (rasen12 alone), and
+    // Form and dash poses, then the whiff release pose (attack4_12 alone), and
     // only then neutral: never a contact, blast or recovery pose, never idle
     // on the step the dash ends.
     const during = log.slice(0, -1);
-    assert.deepEqual(order(during.map((s) => s.frame)), [...RASEN.slice(0, 6), WHIFF_POSE]);
-    assert.equal(during.at(-1).frame, WHIFF_POSE, 'the last pose before neutral is rasen12');
+    assert.deepEqual(order(during.map((s) => s.frame)), [...POSES.slice(0, 6), WHIFF_POSE]);
+    assert.equal(during.at(-1).frame, WHIFF_POSE, 'the last pose before neutral is attack4_12');
     assert.ok(release.every((s) => s.frame === WHIFF_POSE && s.state === 'technique' && !s.canAct), 'locked while releasing');
     assert.equal(log.at(-1).state, 'idle');
     assert.equal(log.at(-1).phase, null);
@@ -631,8 +631,8 @@ test('a clean miss: the rush stops, #0001 lets go on rasen12 alone for one frame
     assert.ok(release.every((s) => s.x === dash.at(-1).x && s.vx === 0 && s.grounded && s.facing === facing));
     // The sphere is let go: no impact, no explosion, no more contact search.
     assert.ok(release.every((s) => s.sphere === null && s.sphereOwner === null && !s.searching));
-    assert.ok(!log.some((s) => PRASEN.slice(6).includes(s.sphere)), 'no impact or explosion frames');
-    assert.ok(!log.some((s) => RASEN.slice(6, 11).includes(s.frame)), 'no contact, blast or recovery poses');
+    assert.ok(!log.some((s) => SPHERE.slice(6).includes(s.sphere)), 'no impact or explosion frames');
+    assert.ok(!log.some((s) => POSES.slice(6, 11).includes(s.frame)), 'no contact, blast or recovery poses');
     assert.deepEqual(d.events, [], 'no contact, tick or explosion');
     assert.equal(d.target.combat.launchPoint, 0);
     assert.equal(d.target.combat.immobilized, false);
@@ -650,7 +650,7 @@ test('a clean miss: the rush stops, #0001 lets go on rasen12 alone for one frame
     assert.equal(d.attacker.body.x, x);
     d.tick({ runRight: true });
     assert.ok(d.attacker.body.vx > 0, 'free to move again');
-    assert.ok(d.attacker.combat.chargedCooldowns.active('cba2'), 'the whiff still spent the cooldown');
+    assert.ok(d.attacker.combat.chargedCooldowns.active('attack4'), 'the whiff still spent the cooldown');
   }
 });
 
@@ -663,7 +663,7 @@ test('a hit: exactly one contact that adds nothing, its first tick on the same s
   const [event, tick] = d.events;
   assert.equal(event.type, 'hit');
   assert.equal(event.damage, 0, 'no large contact hit');
-  assert.equal(event.move, 'cba2.firstHit');
+  assert.equal(event.move, 'attack4.firstHit');
   assert.equal(event.attacker, d.attacker);
   assert.equal(event.target, d.target);
   assert.equal(event.technique, t);
@@ -671,7 +671,7 @@ test('a hit: exactly one contact that adds nothing, its first tick on the same s
   assert.equal(event.projectile, null);
   assert.deepEqual([event.launchPointBefore, event.launchPointAfter], [0, 0]);
   // The first tick lands on the contact's own step, straight after it.
-  assert.equal(tick.move, 'cba2.tickHit');
+  assert.equal(tick.move, 'attack4.tickHit');
   assert.equal(tick.damage, 1);
   assert.equal(tick.technique, t);
   assert.deepEqual([tick.launchPointBefore, tick.launchPointAfter], [0, 1]);
@@ -689,10 +689,10 @@ test('a hit: exactly one contact that adds nothing, its first tick on the same s
   assert.equal(d.attacker.combat.hitstop, 0, 'the technique\'s hits freeze only the target');
   // The confirm sequence starts on the hit step, sphere on the target.
   assert.equal(t.phase, 'confirm');
-  assert.equal(frameName(d.attacker), '0001_rasen7.png');
-  assert.equal(frameName(d.target), '0001_hurt.png');
+  assert.equal(frameName(d.attacker), '0001_attack4_7.png');
+  assert.equal(frameName(d.target), '0001_hurt_1.png');
   assert.equal(t.sphereOwner, 'target');
-  assert.equal(name(t.sphereFrame), '0001_prasen7.png');
+  assert.equal(name(t.sphereFrame), '0001_attack4_object_7.png');
   assert.deepEqual(t.sphereCenter(), [d.target.body.x, d.target.body.y - 48]);
   // No more contact checks, no slide through the target.
   const x = d.attacker.body.x;
@@ -706,29 +706,29 @@ test('on the very step the sphere first hits, the target already shows Hurt, bou
   const d = hitDuel();
   const t = start(d);
   const before = frameName(d.target);
-  assert.match(before, /0001_idle\d\.png/);
+  assert.match(before, /0001_idle_\d\.png/);
   for (let i = 0; !d.events.length; i++) {
     assert.ok(i < 100, 'the rush connects');
-    assert.notEqual(frameName(d.target), '0001_hurt.png', `step ${i}: not hurt before the contact`);
+    assert.notEqual(frameName(d.target), '0001_hurt_1.png', `step ${i}: not hurt before the contact`);
     d.tick();
   }
   // The contact step itself, with its own tick: the target on screen is
   // already the caught one.
   assert.equal(d.target.combat.launchPoint, 1);
-  assert.deepEqual(d.events.map((e) => e.move), ['cba2.firstHit', 'cba2.tickHit']);
+  assert.deepEqual(d.events.map((e) => e.move), ['attack4.firstHit', 'attack4.tickHit']);
   assert.equal(t.phase, 'confirm');
   assert.equal(d.target.combat.isBoundBy(t), true);
   assert.equal(d.target.state, 'hitstun');
   assert.equal(d.target.animator.anim.key, 'hurt');
-  assert.equal(frameName(d.target), '0001_hurt.png', 'no one-step visual delay');
+  assert.equal(frameName(d.target), '0001_hurt_1.png', 'no one-step visual delay');
   assert.deepEqual(t.sphereCenter(), [d.target.body.x, d.target.body.y - 48], 'the sphere is already on it');
-  assert.equal(name(t.sphereFrame), '0001_prasen7.png');
-  assert.equal(frameName(d.attacker), '0001_rasen7.png');
+  assert.equal(name(t.sphereFrame), '0001_attack4_object_7.png');
+  assert.equal(frameName(d.attacker), '0001_attack4_7.png');
   // It stays in the hurt pose while caught (hitstun, then the bind).
   for (let i = 0; t.phase !== 'explode'; i++) {
     d.tick();
     if (t.phase === 'explode') break;
-    assert.equal(frameName(d.target), '0001_hurt.png', `step ${i}`);
+    assert.equal(frameName(d.target), '0001_hurt_1.png', `step ${i}`);
   }
 
   // Caught in the air: the mid-air hurt pose, on the contact step too.
@@ -740,10 +740,10 @@ test('on the very step the sphere first hits, the target already shows Hurt, bou
   assert.equal(a.target.grounded, false);
   assert.equal(a.target.combat.isBoundBy(u), true);
   assert.equal(a.target.state, 'hitstun');
-  assert.equal(frameName(a.target), '0001_midairhurt.png');
+  assert.equal(frameName(a.target), '0001_midair_hurt_1.png');
 });
 
-test('after the hit #0001 plays rasen7 -> rasen8 and holds rasen8 until the blast, never rasen9-12 early, while the sphere spins prasen7 -> 8 -> 9 on the target', () => {
+test('after the hit #0001 plays attack4_7 -> attack4_8 and holds attack4_8 until the blast, never attack4_9-12 early, while the sphere spins attack4_object_7 -> 8 -> 9 on the target', () => {
   const d = hitDuel();
   const t = hitConfirm(d);
   const log = [snap(d.attacker)];
@@ -759,31 +759,31 @@ test('after the hit #0001 plays rasen7 -> rasen8 and holds rasen8 until the blas
   const before = log.slice(0, -1);
   assert.equal(before.length, DELAY_STEPS, 'every step from the hit to the explosion');
   assert.deepEqual([...new Set(before.map((s) => s.phase))], ['confirm', 'wait']);
-  assert.equal(before.filter((s) => s.phase === 'confirm').length, CONFIRM_STEPS, 'one pass of rasenConfirm');
-  // #0001: rasen7 for one frame-time from the contact step, then rasen8 held
+  assert.equal(before.filter((s) => s.phase === 'confirm').length, CONFIRM_STEPS, 'one pass of attack4_confirm');
+  // #0001: attack4_7 for one frame-time from the contact step, then attack4_8 held
   // for the whole rest of the delay.
   assert.deepEqual(runs(before.map((s) => s.frame)), [
-    ['0001_rasen7.png', SPHERE_FRAME_STEPS], [HOLD_POSE, DELAY_STEPS - SPHERE_FRAME_STEPS],
+    ['0001_attack4_7.png', SPHERE_FRAME_STEPS], [HOLD_POSE, DELAY_STEPS - SPHERE_FRAME_STEPS],
   ]);
-  assert.ok(!before.some((s) => RASEN.slice(8).includes(s.frame)), 'no rasen9-12 before the blast');
+  assert.ok(!before.some((s) => POSES.slice(8).includes(s.frame)), 'no attack4_9-12 before the blast');
   assert.ok(before.every((s) => s.state === 'technique' && !s.canAct && s.vx === 0), 'locked and still');
-  // The sphere: prasen7 -> 8 -> 9 over and over, one frame per 1 / 12 s,
+  // The sphere: attack4_object_7 -> 8 -> 9 over and over, one frame per 1 / 12 s,
   // from the hit step to the explosion; never frozen, never the blast.
   const spins = runs(before.map((s) => s.sphere));
   const turns = DELAY_STEPS / (3 * SPHERE_FRAME_STEPS);
   assert.ok(turns >= 2, 'at least two whole turns');
-  assert.deepEqual(spins, Array.from({ length: 3 * turns }, (_, i) => [PRASEN[6 + (i % 3)], SPHERE_FRAME_STEPS]));
-  assert.ok(!before.some((s) => PRASEN.slice(9).includes(s.sphere)), 'no blast frame while it spins');
+  assert.deepEqual(spins, Array.from({ length: 3 * turns }, (_, i) => [SPHERE[6 + (i % 3)], SPHERE_FRAME_STEPS]));
+  assert.ok(!before.some((s) => SPHERE.slice(9).includes(s.sphere)), 'no blast frame while it spins');
   assert.ok(before.every((s) => s.sphereOwner === 'target'));
   // Centred on the caught opponent the whole time.
   assert.deepEqual(centres.slice(0, -1), targets.slice(0, -1));
-  // The explosion step: rasen9 and the first blast frame together.
+  // The explosion step: attack4_9 and the first blast frame together.
   assert.equal(log.at(-1).phase, 'explode');
-  assert.equal(log.at(-1).sphere, '0001_prasen10.png');
-  assert.equal(log.at(-1).frame, EXPLOSION_POSE, 'the blast belongs with rasen9');
+  assert.equal(log.at(-1).sphere, '0001_attack4_object_10.png');
+  assert.equal(log.at(-1).frame, EXPLOSION_POSE, 'the blast belongs with attack4_9');
 });
 
-test('the sphere on the target grows steadily through the rasen8 hold, from startScale to endScale at the blast, centred on the target', () => {
+test('the sphere on the target grows steadily through the attack4_8 hold, from startScale to endScale at the blast, centred on the target', () => {
   const { startScale, endScale } = TECH.sphereGrowth;
   const d = hitDuel();
   const t = hitConfirm(d);
@@ -803,7 +803,7 @@ test('the sphere on the target grows steadily through the rasen8 hold, from star
   const before = log.slice(0, -1);
   const confirm = before.filter((s) => s.phase === 'confirm');
   const hold = before.filter((s) => s.phase === 'wait');
-  // Its own size through the contact poses; the growth is the rasen8 hold.
+  // Its own size through the contact poses; the growth is the attack4_8 hold.
   assert.ok(confirm.every((s) => s.scale === startScale));
   assert.ok(hold.every((s) => s.frame === HOLD_POSE));
   const early = hold[0].scale;
@@ -851,7 +851,7 @@ test('the attached sphere frame is a pure function of the time since the hit (de
   assert.deepEqual(run(), first, 'the same every time');
 });
 
-test('the explosion comes exactly 2.0 s after the hit step on rasen9: prasen10 -> prasen11, +10, target released then launched sideways at 3 x 14; only then rasen10-12', () => {
+test('the explosion comes exactly 2.0 s after the hit step on attack4_9: attack4_object_10 -> attack4_object_11, +10, target released then launched sideways at 3 x 14; only then attack4_10-12', () => {
   const d = hitDuel();
   const t = hitConfirm(d);
   // Never early: still bound, and only the ticks so far, on every step
@@ -865,12 +865,12 @@ test('the explosion comes exactly 2.0 s after the hit step on rasen9: prasen10 -
   assert.equal(d.target.combat.launchPoint, 4);
   d.tick();
   assert.equal(t.phase, 'explode', 'exactly 2.0 s of fixed steps after the hit step');
-  assert.equal(name(t.sphereFrame), '0001_prasen10.png', 'the blast lands on the first explosion frame');
+  assert.equal(name(t.sphereFrame), '0001_attack4_object_10.png', 'the blast lands on the first explosion frame');
   assert.equal(d.events.length, 6);
   const blast = d.events.at(-1);
   assert.equal(blast.type, 'hit');
   assert.equal(blast.damage, 10);
-  assert.equal(blast.move, 'cba2.explosionHit');
+  assert.equal(blast.move, 'attack4.explosionHit');
   assert.equal(blast.technique, t);
   assert.equal(d.target.combat.launchPoint, 14, '4 ticks, then 10');
   // Released before the launch, so it is intact: 4 + 10 = 14 first, then
@@ -891,32 +891,32 @@ test('the explosion comes exactly 2.0 s after the hit step on rasen9: prasen10 -
   assert.ok(d.target.combat.hitstop > TECH.firstHit.hitstop);
   const launchX = d.target.body.x;
   // #0001 is on the explosion pose as it blows.
-  assert.equal(d.attacker.animator.anim.key, 'rasenExplosion');
+  assert.equal(d.attacker.animator.anim.key, 'attack4_explosion');
   assert.equal(frameName(d.attacker), EXPLOSION_POSE);
   const log = [snap(d.attacker), ...runUntil(d, () => !d.attacker.technique)];
   const blasting = log.filter((s) => s.phase === 'explode');
   const release = log.filter((s) => s.phase === 'release');
   assert.deepEqual(order(log.map((s) => s.phase)), ['explode', 'release'], 'the recovery only once the blast is over');
   assert.equal(log.at(-1).phase, null);
-  // The blast: prasen10 -> prasen11 once (never looped), rasen9 held all
+  // The blast: attack4_object_10 -> attack4_object_11 once (never looped), attack4_9 held all
   // through it.
-  assert.deepEqual(order(blasting.map((s) => s.sphere)), ['0001_prasen10.png', '0001_prasen11.png']);
-  assert.equal(runs(blasting.map((s) => s.sphere))[0][1], SPHERE_FRAME_STEPS, 'prasen10 for a whole frame');
-  assert.deepEqual([blasting[SPHERE_FRAME_STEPS].frame, blasting[SPHERE_FRAME_STEPS].sphere], [EXPLOSION_POSE, '0001_prasen11.png']);
+  assert.deepEqual(order(blasting.map((s) => s.sphere)), ['0001_attack4_object_10.png', '0001_attack4_object_11.png']);
+  assert.equal(runs(blasting.map((s) => s.sphere))[0][1], SPHERE_FRAME_STEPS, 'attack4_object_10 for a whole frame');
+  assert.deepEqual([blasting[SPHERE_FRAME_STEPS].frame, blasting[SPHERE_FRAME_STEPS].sphere], [EXPLOSION_POSE, '0001_attack4_object_11.png']);
   assert.ok(blasting.every((s) => s.frame === EXPLOSION_POSE));
-  // Then the sphere is gone and #0001 recovers rasen10 -> rasen11 -> rasen12
+  // Then the sphere is gone and #0001 recovers attack4_10 -> attack4_11 -> attack4_12
   // once, still locked and still: no damage, bind or search.
   assert.equal(release.length, RELEASE_STEPS);
-  assert.deepEqual(order(release.map((s) => s.frame)), RASEN.slice(9, 12));
+  assert.deepEqual(order(release.map((s) => s.frame)), POSES.slice(9, 12));
   assert.ok(release.every((s) => s.sphere === null && s.sphereOwner === null && !s.searching));
   assert.ok(release.every((s) => s.state === 'technique' && !s.canAct && s.vx === 0 && s.grounded));
-  assert.equal(release.at(-1).frame, '0001_rasen12.png', 'the last pose before neutral');
+  assert.equal(release.at(-1).frame, '0001_attack4_12.png', 'the last pose before neutral');
   assert.equal(d.events.length, 6, 'no more damage');
   assert.equal(d.target.combat.immobilized, false);
   assert.equal(t.endReason, 'done');
   assert.equal(t.sphereFrame, null);
   assert.equal(d.attacker.state, 'idle');
-  assert.equal(log.at(-1).canAct, true, 'free again once rasen12 is over');
+  assert.equal(log.at(-1).canAct, true, 'free again once attack4_12 is over');
   // The target slides away after its freeze.
   d.until(() => d.target.grounded);
   assert.ok(d.target.body.x > launchX, 'launched away');
@@ -932,8 +932,8 @@ test('a full Sphere Rush from 0: nothing from the contact itself, +1 on its step
   for (let i = 0; i < steps(1); i++) d.tick();
   assert.deepEqual(d.events.map((e) => [e.type, e.damage]), FULL_RUSH);
   assert.deepEqual(d.events.map((e) => e.move), [
-    'cba2.firstHit', 'cba2.tickHit', 'cba2.tickHit', 'cba2.tickHit', 'cba2.tickHit',
-    'cba2.explosionHit',
+    'attack4.firstHit', 'attack4.tickHit', 'attack4.tickHit', 'attack4.tickHit', 'attack4.tickHit',
+    'attack4.explosionHit',
   ]);
   assert.ok(d.events.every((e) => e.technique && e.attacker === d.attacker && e.target === d.target));
   assert.equal(d.target.combat.launchPoint, 14);
@@ -954,8 +954,8 @@ function tickSteps(d, t, held = () => ({})) {
     const before = d.events.length;
     d.tick(held(i));
     for (const e of d.events.slice(before)) {
-      if (e.move === 'cba2.tickHit') out.ticks.push(i);
-      if (e.move === 'cba2.explosionHit') out.explosions.push(i);
+      if (e.move === 'attack4.tickHit') out.ticks.push(i);
+      if (e.move === 'attack4.explosionHit') out.explosions.push(i);
     }
   }
   return out;
@@ -965,7 +965,7 @@ test('while bound: one 1-damage tick on the contact step itself, then one every 
   const d = hitDuel();
   const t = hitConfirm(d);
   // The contact step: the setup hit (0), then exactly one tick (1), no more.
-  assert.deepEqual(d.events.map((e) => [e.move, e.damage]), [['cba2.firstHit', 0], ['cba2.tickHit', 1]]);
+  assert.deepEqual(d.events.map((e) => [e.move, e.damage]), [['attack4.firstHit', 0], ['attack4.tickHit', 1]]);
   assert.equal(d.target.combat.launchPoint, 1);
   assert.equal(d.target.combat.isBoundBy(t), true);
   assert.equal(t.ticks, 1);
@@ -1005,7 +1005,7 @@ test('a tick adds 1 Launch Point and nothing else: no launch, no stun or freeze,
   const { x, y } = d.target.body;
   d.tick();
   const tick = d.events.at(-1);
-  assert.equal(tick.move, 'cba2.tickHit');
+  assert.equal(tick.move, 'attack4.tickHit');
   assert.deepEqual([tick.damage, tick.launchPointBefore, tick.launchPointAfter], [1, 1, 2]);
   assert.deepEqual([tick.baseLaunch, tick.directionalLaunch, tick.launchStrength], [0, null, 0]);
   assert.deepEqual(tick.finalLaunch, { x: 0, y: 0 });
@@ -1041,7 +1041,7 @@ test('the blast adds its 10 first, then launches at exactly 3 x the new Launch P
     const t = hitConfirm(d);
     while (t.phase !== 'explode') d.tick();
     const blast = d.events.at(-1);
-    assert.equal(blast.move, 'cba2.explosionHit');
+    assert.equal(blast.move, 'attack4.explosionHit');
     return { blast, vx: d.target.body.vx, vy: d.target.body.vy, k: d.target.combat.launchPoint };
   };
   for (const facing of [1, -1]) {
@@ -1067,7 +1067,7 @@ test('an interruption stops the ticks: a hit on #0001 after the 0.5 s tick leave
   const t = hitConfirm(d);
   for (let i = 0; i < TICK_STEPS + 5; i++) d.tick();
   assert.equal(d.target.combat.launchPoint, 2);
-  new CombatSystem().applyHit(d.target, d.attacker, d.target.attacks.ba1);
+  new CombatSystem().applyHit(d.target, d.attacker, d.target.attacks.attack1);
   assert.equal(t.endReason, 'hit');
   for (let i = 0; i < DELAY_STEPS + 30; i++) d.tick();
   assert.equal(d.target.combat.launchPoint, 2, 'no tick after the interruption, no blast');
@@ -1115,14 +1115,14 @@ test('the Void stops the ticks: a caught target lost to it takes nothing more', 
 
 // ---- Cooldown ---------------------------------------------------------------------------
 
-test('Charged BA2 is ready at first; starting it spends 5.0 s whatever happens next: a hit, a miss, a wall or an interruption', () => {
+test('attack4 is ready at first; starting it spends 5.0 s whatever happens next: a hit, a miss, a wall or an interruption', () => {
   const fresh = duel();
-  assert.equal(fresh.attacker.combat.chargedCooldowns.active('cba2'), false, 'initially ready');
-  const spent = (d) => d.attacker.combat.chargedCooldowns.active('cba2');
+  assert.equal(fresh.attacker.combat.chargedCooldowns.active('attack4'), false, 'initially ready');
+  const spent = (d) => d.attacker.combat.chargedCooldowns.active('attack4');
   // A hit, run to the end.
   const hit = hitDuel();
   start(hit);
-  assert.equal(hit.attacker.combat.chargedCooldowns.remaining('cba2'), 5);
+  assert.equal(hit.attacker.combat.chargedCooldowns.remaining('attack4'), 5);
   hit.until(() => !hit.attacker.technique);
   assert.ok(spent(hit), 'a hit');
   // A whiff.
@@ -1140,38 +1140,38 @@ test('Charged BA2 is ready at first; starting it spends 5.0 s whatever happens n
   const cut = hitDuel();
   const tc = start(cut);
   cut.tick();
-  new CombatSystem().applyHit(cut.target, cut.attacker, cut.target.attacks.ba1);
+  new CombatSystem().applyHit(cut.target, cut.attacker, cut.target.attacks.attack1);
   assert.equal(tc.endReason, 'hit');
   assert.ok(spent(cut), 'interrupted');
   // Each spends its own cooldown only.
-  for (const d of [hit, miss, shielded, cut]) assert.equal(d.attacker.combat.chargedCooldowns.active('cba1'), false);
+  for (const d of [hit, miss, shielded, cut]) assert.equal(d.attacker.combat.chargedCooldowns.active('attack3'), false);
 });
 
-test('Charged BA2 cannot restart while cooling down: the press does nothing, and it is ready again after 5 s', () => {
+test('attack4 cannot restart while cooling down: the press does nothing, and it is ready again after 5 s', () => {
   const d = duel({ gap: 800 });
   start(d);
   d.until(() => !d.attacker.technique);
   const cd = d.attacker.combat.chargedCooldowns;
-  // Charge again and press: nothing at all, not even a BA2.
+  // Charge again and press: nothing at all, not even an attack2.
   d.tick();
   d.tick(CHARGE);
   d.tick(CHARGE);
-  const before = cd.remaining('cba2');
-  d.tick(CHARGED_BA2);
+  const before = cd.remaining('attack4');
+  d.tick(CHARGE_ATTACK2);
   assert.equal(d.attacker.technique, null);
-  assert.equal(d.attacker.combat.attack, null, 'no ordinary BA2 in its place');
+  assert.equal(d.attacker.combat.attack, null, 'no ordinary attack2 in its place');
   assert.equal(d.attacker.state, 'charge');
-  assert.ok(cd.remaining('cba2') < before, 'the cooldown runs on, never restarted');
+  assert.ok(cd.remaining('attack4') < before, 'the cooldown runs on, never restarted');
   // Let go: at the normal rate it is ready exactly 5 s after the start.
-  const used = 5 - cd.remaining('cba2');
+  const used = 5 - cd.remaining('attack4');
   let n = 0;
-  while (cd.active('cba2')) {
+  while (cd.active('attack4')) {
     d.tick();
     n++;
   }
   assert.ok(Math.abs(used + n * DT - 5) <= 2 * DT + 1e-9, `${used} + ${n} steps`);
   d.tick(CHARGE);
-  d.tick(CHARGED_BA2);
+  d.tick(CHARGE_ATTACK2);
   assert.ok(d.attacker.technique, 'ready: it starts again');
 });
 
@@ -1184,8 +1184,8 @@ test('a bound target can neither move, jump, charge, throw, attack, shield nor t
   const x = target.body.x;
   const facing = target.facing;
   const presses = [
-    { runLeft: true }, { runRight: true }, JUMP, CHARGE, BA1, BA2, THROW, SHIELD,
-    { ...CHARGE, runLeft: true }, CHARGED_BA1, CHARGED_BA2, { ...SHIELD, runRight: true }, { dropPressed: true },
+    { runLeft: true }, { runRight: true }, JUMP, CHARGE, ATTACK1, ATTACK2, THROW, SHIELD,
+    { ...CHARGE, runLeft: true }, CHARGE_ATTACK1, CHARGE_ATTACK2, { ...SHIELD, runRight: true }, { dropPressed: true },
   ];
   for (let i = 0; t.phase !== 'explode'; i++) {
     d.tick({}, presses[i % presses.length]);
@@ -1201,7 +1201,7 @@ test('a bound target can neither move, jump, charge, throw, attack, shield nor t
     assert.equal(target.grounded, true);
     assert.equal(target.facing, facing);
     assert.ok(['hitstun', 'bound'].includes(target.state), target.state);
-    assert.equal(frameName(target), '0001_hurt.png', 'caught: the hurt pose');
+    assert.equal(frameName(target), '0001_hurt_1.png', 'caught: the hurt pose');
   }
   assert.equal(target.combat.immobilized, false);
   assert.deepEqual(d.clones, []);
@@ -1243,7 +1243,7 @@ test('#0001 stays committed through the wait: no run, attack, clone, Shield, Thr
   const t = hitConfirm(d);
   const x = d.attacker.body.x;
   const presses = [
-    { runRight: true }, { runLeft: true }, JUMP, BA1, BA2, CHARGED_BA1, CHARGED_BA2, THROW, SHIELD, CHARGE, { ...CHARGE, runLeft: true },
+    { runRight: true }, { runLeft: true }, JUMP, ATTACK1, ATTACK2, CHARGE_ATTACK1, CHARGE_ATTACK2, THROW, SHIELD, CHARGE, { ...CHARGE, runLeft: true },
   ];
   for (let i = 0; t.phase !== 'explode'; i++) {
     d.tick(presses[i % presses.length]);
@@ -1257,7 +1257,7 @@ test('#0001 stays committed through the wait: no run, attack, clone, Shield, Thr
   }
   assert.deepEqual(d.clones, []);
   assert.deepEqual(d.projectiles, []);
-  assert.equal(d.attacker.combat.chargedCooldowns.active('cba1'), false, 'no clone either');
+  assert.equal(d.attacker.combat.chargedCooldowns.active('attack3'), false, 'no clone either');
 });
 
 test('once it is over, a Charge still held does not charge again until it is let go and held anew', () => {
@@ -1277,7 +1277,7 @@ test('once it is over, a Charge still held does not charge again until it is let
   e.tick();
   e.tick(CHARGE);
   assert.equal(e.attacker.state, 'charge', 'a fresh Charge through the normal state machine');
-  assert.equal(frameName(e.attacker), '0001_charge1.png');
+  assert.equal(frameName(e.attacker), '0001_charge_1.png');
   // Let go during the technique, a Charge pressed right as it ends charges.
   const f = duel({ gap: 900 });
   start(f);
@@ -1319,12 +1319,12 @@ test('ground lost during formation cancels it: no sphere, no hit, and #0001 fall
   assert.equal(t.sphereFrame, null);
   assert.equal(d.attacker.grounded, false);
   assert.equal(d.attacker.state, 'fall');
-  assert.equal(frameName(d.attacker), '0001_fall1.png');
+  assert.equal(frameName(d.attacker), '0001_fall_1.png');
   d.until(() => d.attacker.grounded);
   assert.equal(d.attacker.body.y, 800, 'down to the floor, no invisible platform');
   assert.deepEqual(d.events, []);
   assert.equal(d.target.combat.launchPoint, 0);
-  assert.ok(d.attacker.combat.chargedCooldowns.active('cba2'), 'the cooldown is spent all the same');
+  assert.ok(d.attacker.combat.chargedCooldowns.active('attack4'), 'the cooldown is spent all the same');
 });
 
 test('dashing off a ledge ends the rush on that step: the sphere is gone and #0001 falls from where he is', () => {
@@ -1418,8 +1418,8 @@ test('a hit on #0001 cancels the technique in formation, dash, wait, a miss\'s r
     assert.equal(t.phase, when);
     const bound = d.target.combat.immobilized;
     assert.equal(bound, when === 'wait');
-    // A real BA1 from the opponent, through the real CombatSystem.
-    const event = system.applyHit(d.target, d.attacker, d.target.attacks.ba1);
+    // A real attack1 from the opponent, through the real CombatSystem.
+    const event = system.applyHit(d.target, d.attacker, d.target.attacks.attack1);
     assert.equal(event.type, 'hit');
     assert.equal(d.attacker.technique, null, `${when}: cancelled by the hit itself`);
     assert.equal(t.endReason, 'hit');
@@ -1429,7 +1429,7 @@ test('a hit on #0001 cancels the technique in formation, dash, wait, a miss\'s r
     assert.ok(Math.abs(d.attacker.body.vx) > 0, 'the full launch');
     d.tick();
     assert.equal(d.attacker.state, 'hitstun');
-    assert.equal(frameName(d.attacker), '0001_hurt.png');
+    assert.equal(frameName(d.attacker), '0001_hurt_1.png');
     const hits = d.events.length;
     for (let i = 0; i < DELAY_STEPS + 20; i++) d.tick();
     assert.equal(d.events.length, hits, `${when}: nothing more from the cancelled technique`);
@@ -1438,7 +1438,7 @@ test('a hit on #0001 cancels the technique in formation, dash, wait, a miss\'s r
   // A punch that really lands during formation does the same.
   const d = duel({ gap: 44 });
   const t = start(d);
-  d.tick({}, BA1);
+  d.tick({}, ATTACK1);
   d.until(() => d.events.length > 0);
   assert.equal(d.events[0].attacker, d.target);
   assert.equal(d.attacker.technique, null);
@@ -1449,8 +1449,8 @@ test('a hit on #0001 cancels the technique in formation, dash, wait, a miss\'s r
 
 // ---- Shield ------------------------------------------------------------------------
 
-// Step (from the BA2 press) on which the rush first touches an opponent 250
-// in front: on rasen6, one step after the swing begins.
+// Step (from the attack2 press) on which the rush first touches an opponent 250
+// in front: on attack4_6, one step after the swing begins.
 function contactStep(extra = {}) {
   const d = duel({ gap: 250, pushboxes: true, ...extra });
   start(d);
@@ -1471,7 +1471,7 @@ test('a Shield blocks the contact: 25 Energy, no Launch Point, no bind, no tick,
   assert.equal(d.events.length, 1, 'the contact only: no tick on its step');
   const [event] = d.events;
   assert.equal(event.type, 'block');
-  assert.equal(event.move, 'cba2.firstHit');
+  assert.equal(event.move, 'attack4.firstHit');
   assert.equal(event.technique, t);
   assert.equal(event.damage, 0);
   assert.equal(event.energyCost, 25);
@@ -1481,8 +1481,8 @@ test('a Shield blocks the contact: 25 Energy, no Launch Point, no bind, no tick,
   assert.equal(d.target.combat.shielding, true, 'still up: it had Energy to spare');
   assert.deepEqual([t.hitConfirmed, t.ticks, t.ticksDue, t.explosionDue, t.explosionDone], [false, 0, 0, false, false]);
   assert.equal(t.sphereFrame, null, 'no sphere left on anyone');
-  assert.ok(!log.some((s) => PRASEN.slice(6).includes(s.sphere)), 'no impact or explosion frames');
-  assert.ok(!log.some((s) => RASEN.slice(6).includes(s.frame)), 'no contact, blast or release poses');
+  assert.ok(!log.some((s) => SPHERE.slice(6).includes(s.sphere)), 'no impact or explosion frames');
+  assert.ok(!log.some((s) => POSES.slice(6).includes(s.frame)), 'no contact, blast or release poses');
   // #0001 is free again at once, never stuck in the confirm or the hold.
   assert.equal(d.attacker.technique, null);
   assert.equal(d.attacker.state, 'idle');
@@ -1503,7 +1503,7 @@ test('the Shield blocks the rush from behind, when raised just before it lands, 
   assert.equal(behind.events[0].type, 'block');
   // Raised on the step before the contact.
   const C = contactStep();
-  assert.equal(C, FORM_STEPS + 11, 'contact on the second rasen6 step');
+  assert.equal(C, FORM_STEPS + 11, 'contact on the second attack4_6 step');
   const late = duel({ gap: 250, pushboxes: true });
   const u = start(late);
   runUntil(late, () => !late.attacker.technique, () => ({}), (i) => (i + 2 >= C - 1 ? { shield: true } : {}));
@@ -1549,13 +1549,13 @@ test('a target caught in the air stays locked but keeps falling under gravity, t
     assert.equal(cx, d.target.body.x);
     assert.equal(cy, d.target.body.y - 48, 'the sphere follows its body');
     assert.equal(d.target.body.vx, 0);
-    if (!d.target.grounded && d.target.combat.hitstop <= 0) assert.equal(frameName(d.target), '0001_midairhurt.png');
+    if (!d.target.grounded && d.target.combat.hitstop <= 0) assert.equal(frameName(d.target), '0001_midair_hurt_1.png');
     assert.ok(ys.length < 120, 'never hovers');
   }
   assert.ok(ys.some((y, i) => i > 0 && y > ys[i - 1]), 'it came down');
   assert.equal(d.target.body.y, 800);
   assert.equal(d.target.combat.immobilized, true, 'still caught on landing');
-  assert.equal(frameName(d.target), '0001_hurt.png');
+  assert.equal(frameName(d.target), '0001_hurt_1.png');
   d.until(() => !d.attacker.technique);
   assert.deepEqual(d.events.map((e) => [e.type, e.damage]), FULL_RUSH);
 });
@@ -1604,7 +1604,7 @@ test('a solid wall stops the rush: no pass-through, no hit behind it, and #0001 
   assert.equal(log.at(-2).frame, WHIFF_POSE);
   assert.deepEqual(d.events, []);
   assert.equal(d.target.combat.launchPoint, 0);
-  assert.ok(d.attacker.combat.chargedCooldowns.active('cba2'), 'a wall still spends the cooldown');
+  assert.ok(d.attacker.combat.chargedCooldowns.active('attack4'), 'a wall still spends the cooldown');
   assert.equal(d.attacker.state, 'idle');
   assert.equal(t.sphereFrame, null);
   // The main floor's edge is no wall: the rush carries #0001 off it, which
@@ -1622,10 +1622,10 @@ test('a solid wall stops the rush: no pass-through, no hit behind it, and #0001 
 
 // ---- Missing art -------------------------------------------------------------------
 
-test('each missing fighter clip or sphere effect refuses the Sphere Rush: normal BA2, a warning, nothing invisible', () => {
+test('each missing fighter clip or sphere effect refuses the Sphere Rush: normal attack2, a warning, nothing invisible', () => {
   const missing = [
-    ...RASEN_CLIPS.map((key) => [key, 'fighter']),
-    ['rasenSphereBuild', 'effect'], ['rasenSphereImpact', 'effect'], ['rasenSphereExplosion', 'effect'],
+    ...POSE_CLIPS.map((key) => [key, 'fighter']),
+    ['attack4_object_build', 'effect'], ['attack4_object_impact', 'effect'], ['attack4_object_explosion', 'effect'],
   ];
   for (const [key, kind] of missing) {
     const sprites = kind === 'fighter'
@@ -1634,94 +1634,94 @@ test('each missing fighter clip or sphere effect refuses the Sphere Rush: normal
     const d = duel({ attackerSprites: sprites });
     const warnings = captureWarnings(() => {
       d.tick(CHARGE);
-      d.tick(CHARGED_BA2);
+      d.tick(CHARGE_ATTACK2);
     });
     assert.equal(d.attacker.technique, null, key);
-    assert.equal(d.attacker.combat.attack?.def.id, 'ba2', `${key}: the same press is a normal BA2`);
-    assert.equal(frameName(d.attacker), '0001_2ba1.png');
+    assert.equal(d.attacker.combat.attack?.def.id, 'attack2', `${key}: the same press is a normal attack2`);
+    assert.equal(frameName(d.attacker), '0001_attack2_1.png');
     assert.equal(warnings.length, 1, key);
-    assert.match(warnings[0], new RegExp(`cba2.*"${key}" has no animation frames`));
+    assert.match(warnings[0], new RegExp(`attack4.*"${key}" has no animation frames`));
     d.until(() => !d.attacker.combat.attack);
-    assert.ok(d.events.every((e) => e.technique === null && e.damage === 5), `${key}: only BA2's own hit`);
+    assert.ok(d.events.every((e) => e.technique === null && e.damage === 5), `${key}: only attack2's own hit`);
     assert.equal(d.target.combat.immobilized, false);
-    assert.equal(d.attacker.combat.chargedCooldowns.active('cba2'), false, `${key}: no cooldown for a technique that never started`);
+    assert.equal(d.attacker.combat.chargedCooldowns.active('attack4'), false, `${key}: no cooldown for a technique that never started`);
   }
   // Bad data is refused the same way.
-  const bad = { ...def, chargedTechniques: { cba2: { ...TECH, dashSpeed: 0 } } };
+  const bad = { ...def, chargedTechniques: { attack4: { ...TECH, dashSpeed: 0 } } };
   const d = duel();
-  d.attacker.techniqueDefs.cba2 = makeFighter({ character: bad }).fighter.techniqueDefs.cba2;
+  d.attacker.techniqueDefs.attack4 = makeFighter({ character: bad }).fighter.techniqueDefs.attack4;
   const warnings = captureWarnings(() => {
     d.tick(CHARGE);
-    d.tick(CHARGED_BA2);
+    d.tick(CHARGE_ATTACK2);
   });
   assert.equal(d.attacker.technique, null);
-  assert.equal(d.attacker.combat.attack?.def.id, 'ba2');
-  assert.match(warnings[0], /cba2.*dashSpeed/);
+  assert.equal(d.attacker.combat.attack?.def.id, 'attack2');
+  assert.match(warnings[0], /attack4.*dashSpeed/);
   // So is a sphere that would shrink.
-  const shrinking = { ...def, chargedTechniques: { cba2: { ...TECH, sphereGrowth: { startScale: 1.2, endScale: 1 } } } };
+  const shrinking = { ...def, chargedTechniques: { attack4: { ...TECH, sphereGrowth: { startScale: 1.2, endScale: 1 } } } };
   const e = duel();
-  e.attacker.techniqueDefs.cba2 = makeFighter({ character: shrinking }).fighter.techniqueDefs.cba2;
+  e.attacker.techniqueDefs.attack4 = makeFighter({ character: shrinking }).fighter.techniqueDefs.attack4;
   const shrinkWarnings = captureWarnings(() => {
     e.tick(CHARGE);
-    e.tick(CHARGED_BA2);
+    e.tick(CHARGE_ATTACK2);
   });
   assert.equal(e.attacker.technique, null);
-  assert.equal(e.attacker.combat.attack?.def.id, 'ba2');
-  assert.match(shrinkWarnings[0], /cba2.*sphereGrowth/);
+  assert.equal(e.attacker.combat.attack?.def.id, 'attack2');
+  assert.match(shrinkWarnings[0], /attack4.*sphereGrowth/);
 });
 
 // ---- Regressions -------------------------------------------------------------------
 
-test('Charged BA1 is still the Clone Attack and keeps #0001 charging; it starts no technique, and each uses its own cooldown', () => {
+test('attack3 is still the Clone Attack and keeps #0001 charging; it starts no technique, and each uses its own cooldown', () => {
   const d = duel();
   d.tick(CHARGE);
-  d.tick(CHARGED_BA1);
+  d.tick(CHARGE_ATTACK1);
   assert.equal(d.clones.length, 1);
-  assert.ok(d.attacker.combat.chargedCooldowns.active('cba1'));
-  assert.equal(d.attacker.combat.chargedCooldowns.active('cba2'), false, 'Charged BA1 never cools Charged BA2');
+  assert.ok(d.attacker.combat.chargedCooldowns.active('attack3'));
+  assert.equal(d.attacker.combat.chargedCooldowns.active('attack4'), false, 'attack3 never cools attack4');
   assert.equal(d.attacker.state, 'charge');
   assert.equal(d.attacker.technique, null);
   // Clone first, then the Sphere Rush from the same Charge.
   d.tick(CHARGE);
-  d.tick(CHARGED_BA2);
-  assert.ok(d.attacker.technique, 'Charged BA2 is ready though Charged BA1 is cooling down');
+  d.tick(CHARGE_ATTACK2);
+  assert.ok(d.attacker.technique, 'attack4 is ready though attack3 is cooling down');
   assert.equal(d.clones.length, 1, 'the Sphere Rush summons nothing');
-  assert.ok(d.attacker.combat.chargedCooldowns.active('cba2'));
+  assert.ok(d.attacker.combat.chargedCooldowns.active('attack4'));
 });
 
-test('normal BA2 is unchanged outside Charge: 2ba1-2ba7 for 5 on the ground, midair2ba1-5 in the air, no sphere', () => {
+test('normal attack2 is unchanged outside Charge: attack2_1-attack2_7 for 5 on the ground, midair_attack2_1-5 in the air, no sphere', () => {
   const ground = duel();
-  ground.tick(BA2);
+  ground.tick(ATTACK2);
   const frames = [];
   while (ground.attacker.combat.attack) {
     frames.push(frameName(ground.attacker));
     ground.tick();
   }
-  assert.deepEqual(order(frames), Array.from({ length: 7 }, (_, i) => `0001_2ba${i + 1}.png`));
+  assert.deepEqual(order(frames), Array.from({ length: 7 }, (_, i) => `0001_attack2_${i + 1}.png`));
   assert.deepEqual(ground.events.map((e) => [e.type, e.damage, e.technique]), [['hit', 5, null]]);
   assert.equal(ground.attacker.technique, null);
 
   const air = duel({ gap: 300 });
   air.tick(JUMP);
   for (let i = 0; i < 6; i++) air.tick({ ...CHARGE, jump: true });
-  air.tick(CHARGED_BA2); // Charge is ground-only, so this is mid-air BA2
-  assert.equal(air.attacker.combat.attack?.def.id, 'maba2');
+  air.tick(CHARGE_ATTACK2); // Charge is ground-only, so this is midair_attack2
+  assert.equal(air.attacker.combat.attack?.def.id, 'midair_attack2');
   const airFrames = [];
   while (air.attacker.combat.attack) {
     airFrames.push(frameName(air.attacker));
     air.tick();
   }
-  assert.deepEqual(order(airFrames), Array.from({ length: 5 }, (_, i) => `0001_midair2ba${i + 1}.png`));
+  assert.deepEqual(order(airFrames), Array.from({ length: 5 }, (_, i) => `0001_midair_attack2_${i + 1}.png`));
   assert.equal(air.attacker.technique, null);
 });
 
-test('the training CPU never charges or presses BA2, and its neutral input is simply ignored while bound', () => {
+test('the training CPU never charges or presses attack2, and its neutral input is simply ignored while bound', () => {
   const cpu = new TrainingAIController({ rng: () => 0.3 });
   const d = hitDuel();
   start(d, cpu.getInput(d.target, DT, SIM_CTX));
   for (let i = 0; d.attacker.technique && i < 400; i++) {
     const out = cpu.getInput(d.target, DT, SIM_CTX);
-    for (const k of ['charge', 'chargePressed', 'ba1Pressed', 'ba2Pressed', 'uniquebaPressed', 'shieldPressed']) {
+    for (const k of ['charge', 'chargePressed', 'attack1Pressed', 'attack2Pressed', 'extra_attackPressed', 'shieldPressed']) {
       assert.equal(out[k], false, k);
     }
     d.tick({}, out);
@@ -1767,7 +1767,7 @@ function battleHit(battle, script) {
   script.held = CHARGE;
   battle.update(DT);
   script.held = {};
-  script.once = CHARGED_BA2;
+  script.once = CHARGE_ATTACK2;
   battle.update(DT);
   const t = battle.p1.technique;
   assert.ok(t);
@@ -1870,45 +1870,45 @@ test('Battle draws the sphere over both fighters, in the hand then on the target
   script.held = CHARGE;
   battle.update(DT);
   script.held = {};
-  script.once = CHARGED_BA2;
+  script.once = CHARGE_ATTACK2;
   battle.update(DT);
   const t = battle.p1.technique;
-  assert.deepEqual(draws(), ['0001_idle1.png', '0001_rasen1.png', '0001_prasen1.png'], 'P2, P1, then the sphere on top');
-  assert.equal(mirrored('0001_rasen1.png'), true);
-  assert.equal(mirrored('0001_prasen1.png'), false, 'a round effect is never mirrored');
+  assert.deepEqual(draws(), ['0001_idle_1.png', '0001_attack4_1.png', '0001_attack4_object_1.png'], 'P2, P1, then the sphere on top');
+  assert.equal(mirrored('0001_attack4_1.png'), true);
+  assert.equal(mirrored('0001_attack4_object_1.png'), false, 'a round effect is never mirrored');
   const [hx, hy] = t.sphereCenter(true);
-  assert.deepEqual(translateBefore('0001_prasen1.png'), [Math.round(hx - 1000), Math.round(hy - 400)]);
-  assert.equal(hx, battle.p1.body.x - TECH.handOffsets.rasenForm[0].x, 'the hand offset mirrors with facing');
+  assert.deepEqual(translateBefore('0001_attack4_object_1.png'), [Math.round(hx - 1000), Math.round(hy - 400)]);
+  assert.equal(hx, battle.p1.body.x - TECH.handOffsets.attack4_form[0].x, 'the hand offset mirrors with facing');
 
   // Debug: the rushing sphere's box is dashed and labelled while it searches.
   battle.debug = true;
   while (t.phase !== 'dash') battle.update(DT);
   let labels = render().filter((c) => c[0] === 'fillText').map((c) => c[1]);
-  assert.ok(labels.includes('charged ba2 dash'), labels.join());
+  assert.ok(labels.includes('attack4 from attack2 dash'), labels.join());
   assert.ok(calls.some((c) => c[0] === 'setLineDash' && c[1].length), 'dashed, unlike melee and projectile boxes');
   while (t.phase === 'dash') battle.update(DT);
   assert.equal(t.phase, 'confirm');
   labels = render().filter((c) => c[0] === 'fillText').map((c) => c[1]);
-  assert.ok(labels.includes('charged ba2 confirm'), 'the attached sphere\'s centre is marked');
+  assert.ok(labels.includes('attack4 from attack2 confirm'), 'the attached sphere\'s centre is marked');
   assert.ok(labels.includes('bound'), 'the caught opponent is labelled');
   assert.ok(labels.some((l) => /cpu .*\(bound\)/.test(l)));
   battle.debug = false;
   labels = render().filter((c) => c[0] === 'fillText').map((c) => c[1]);
-  assert.ok(!labels.some((l) => /charged|bound/.test(l)), 'nothing of it in normal play');
+  assert.ok(!labels.some((l) => /attack4 from|bound/.test(l)), 'nothing of it in normal play');
 
   // On the target now, still drawn last, centred on it; the caught CPU is
   // drawn in its hurt pose in this very frame.
   const drawn = draws();
-  assert.deepEqual(drawn, ['0001_hurt.png', '0001_rasen7.png', '0001_prasen7.png']);
+  assert.deepEqual(drawn, ['0001_hurt_1.png', '0001_attack4_7.png', '0001_attack4_object_7.png']);
   const [cx, cy] = t.sphereCenter(true);
   assert.deepEqual([cx, cy], [battle.p2.renderX, battle.p2.renderY - 48]);
-  assert.deepEqual(translateBefore('0001_prasen7.png'), [Math.round(cx - 1000), Math.round(cy - 400)]);
-  // #0001 settles on rasen8 and holds it while the sphere on the target
+  assert.deepEqual(translateBefore('0001_attack4_object_7.png'), [Math.round(cx - 1000), Math.round(cy - 400)]);
+  // #0001 settles on attack4_8 and holds it while the sphere on the target
   // keeps spinning 7 -> 8 -> 9 -> 7 ..., never mirrored, drawn ever larger
   // about the same centre, until it blows.
   const at = (id) => calls.find((c) => c[0] === 'drawImage' && c[1].id === id);
-  const base = at('0001_prasen7.png')[4]; // drawn width on the contact step
-  const centre = translateBefore('0001_prasen7.png');
+  const base = at('0001_attack4_object_7.png')[4]; // drawn width on the contact step
+  const centre = translateBefore('0001_attack4_object_7.png');
   const spheres = [];
   const poses = [];
   const widths = [];
@@ -1925,32 +1925,32 @@ test('Battle draws the sphere over both fighters, in the hand then on the target
     assert.deepEqual(translateBefore(sphere), centre, 'the centre never drifts as it grows');
     assert.ok(Math.abs(dx + w / 2) <= 1 && Math.abs(dy + h / 2) <= 1, 'drawn about that centre');
   }
-  assert.deepEqual(order(poses), ['0001_rasen7.png', HOLD_POSE], 'rasen7, then rasen8 held: no rasen9-12 before the blast');
+  assert.deepEqual(order(poses), ['0001_attack4_7.png', HOLD_POSE], 'attack4_7, then attack4_8 held: no attack4_9-12 before the blast');
   assert.deepEqual(order(spheres).slice(0, 7), [
-    '0001_prasen7.png', '0001_prasen8.png', '0001_prasen9.png', '0001_prasen7.png',
-    '0001_prasen8.png', '0001_prasen9.png', '0001_prasen7.png',
+    '0001_attack4_object_7.png', '0001_attack4_object_8.png', '0001_attack4_object_9.png', '0001_attack4_object_7.png',
+    '0001_attack4_object_8.png', '0001_attack4_object_9.png', '0001_attack4_object_7.png',
   ]);
   assert.ok(widths.every((w, i) => i === 0 || w >= widths[i - 1]), 'never shrinks');
   assert.ok(widths.at(-1) > base * 1.3, `grown: ${base} -> ${widths.at(-1)} px`);
-  // The blast: rasen9 with the lighter prasen10, at the grown size, then
-  // prasen11 still on rasen9.
-  assert.deepEqual(draws().slice(1), [EXPLOSION_POSE, '0001_prasen10.png']);
-  assert.equal(at('0001_prasen10.png')[4], Math.round(base * TECH.sphereGrowth.endScale));
+  // The blast: attack4_9 with the lighter attack4_object_10, at the grown size, then
+  // attack4_object_11 still on attack4_9.
+  assert.deepEqual(draws().slice(1), [EXPLOSION_POSE, '0001_attack4_object_10.png']);
+  assert.equal(at('0001_attack4_object_10.png')[4], Math.round(base * TECH.sphereGrowth.endScale));
   const blast = [];
   for (battle.update(DT); t.phase === 'explode'; battle.update(DT)) blast.push(draws().slice(1).join());
-  assert.deepEqual(order(blast), [`${EXPLOSION_POSE},0001_prasen10.png`, `${EXPLOSION_POSE},0001_prasen11.png`]);
-  // Only then, no sphere at all while #0001 recovers rasen10 -> rasen12.
+  assert.deepEqual(order(blast), [`${EXPLOSION_POSE},0001_attack4_object_10.png`, `${EXPLOSION_POSE},0001_attack4_object_11.png`]);
+  // Only then, no sphere at all while #0001 recovers attack4_10 -> attack4_12.
   const recovery = [];
   while (battle.p1.technique) {
     recovery.push(draws().slice(1));
     battle.update(DT);
   }
   assert.ok(recovery.every((f) => f.length === 1), 'no sphere drawn during the recovery');
-  assert.deepEqual(order(recovery.map((f) => f[0])), RASEN.slice(9, 12));
-  assert.deepEqual(draws().filter((id) => /prasen/.test(id)), [], 'gone once it is over');
+  assert.deepEqual(order(recovery.map((f) => f[0])), POSES.slice(9, 12));
+  assert.deepEqual(draws().filter((id) => /attack4_object/.test(id)), [], 'gone once it is over');
 });
 
-test('Battle draws a miss in either direction: the rush, then rasen12 with no sphere at all, then idle', async () => {
+test('Battle draws a miss in either direction: the rush, then attack4_12 with no sphere at all, then idle', async () => {
   for (const facing of [1, -1]) {
     const { battle, script, sprites } = await realBattle();
     for (const anim of [...Object.values(sprites.animations), ...Object.values(sprites.effects)]) {
@@ -1985,7 +1985,7 @@ test('Battle draws a miss in either direction: the rush, then rasen12 with no sp
     script.held = CHARGE;
     battle.update(DT);
     script.held = {};
-    script.once = CHARGED_BA2;
+    script.once = CHARGE_ATTACK2;
     battle.update(DT);
     const t = battle.p1.technique;
     assert.ok(t);
@@ -1997,11 +1997,11 @@ test('Battle draws a miss in either direction: the rush, then rasen12 with no sp
     frames.push(draws().slice(1));
     assert.equal(t.endReason, 'miss');
     const poses = order(frames.map((f) => f[0]));
-    assert.deepEqual(poses.slice(-3), ['0001_rasen6.png', WHIFF_POSE, '0001_idle1.png'], `${facing}: the whiff release, then idle`);
+    assert.deepEqual(poses.slice(-3), ['0001_attack4_6.png', WHIFF_POSE, '0001_idle_1.png'], `${facing}: the whiff release, then idle`);
     const released = frames.filter((f) => f[0] === WHIFF_POSE);
     assert.equal(released.length, WHIFF_STEPS);
     assert.ok(released.every((f) => f.length === 1), 'no sphere drawn with the release');
-    assert.ok(!frames.flat().some((id) => PRASEN.slice(6).includes(id)), 'no impact or explosion drawn');
+    assert.ok(!frames.flat().some((id) => SPHERE.slice(6).includes(id)), 'no impact or explosion drawn');
     assert.equal(battle.p2.combat.launchPoint, 0);
   }
 });

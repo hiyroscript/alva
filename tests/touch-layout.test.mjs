@@ -59,6 +59,10 @@ class Element extends Node {
     return this.attrs.has(name) ? this.attrs.get(name) : null;
   }
   hasAttribute(name) { return this.getAttribute(name) !== null; }
+  removeAttribute(name) {
+    if (BOOLEAN_ATTRS.includes(name)) this[name] = false;
+    else this.attrs.delete(name);
+  }
   set textContent(v) { this.replaceChildren(new Text(String(v))); }
   get textContent() { return this.children.map((c) => c.textContent).join(''); }
   set innerHTML(v) { this.replaceChildren(); this.html = v; }
@@ -177,11 +181,14 @@ function layOut(tc, scheme = tc.scheme) {
     mouvementRight: [170, 330, 40, 40],
     runLeft: [30, 420, 60, 60],
     runRight: [190, 420, 60, 60],
-    uniqueba: [900, 250, 68, 68],
+    extra_attack: [900, 250, 68, 68],
     transform: [800, 330, 60, 60],
     shield: [880, 330, 60, 60],
-    ba1: [760, 420, 60, 60],
-    ba2: [840, 420, 60, 60],
+    attack1: [760, 420, 60, 60],
+    attack2: [840, 420, 60, 60],
+    attack3: [720, 330, 60, 60],
+    attack4: [760, 250, 60, 60],
+    attack5: [840, 250, 60, 60],
     jump: [920, 420, 60, 60],
   };
   for (const [id, node] of tc.getControlElements(scheme)) {
@@ -199,10 +206,12 @@ const centre = (node) => ({ clientX: node.rect.left + node.rect.width / 2, clien
 
 test('every control of both schemes has a stable id, independent of its label', () => {
   assert.deepEqual([...TOUCH_CONTROL_IDS.joystick], [
-    'charge', 'mouvementLeft', 'stick', 'mouvementRight', 'uniqueba', 'transform', 'shield', 'ba1', 'ba2', 'jump',
+    'charge', 'mouvementLeft', 'stick', 'mouvementRight', 'extra_attack', 'transform', 'shield',
+    'attack1', 'attack2', 'attack3', 'attack4', 'attack5', 'jump',
   ]);
   assert.deepEqual([...TOUCH_CONTROL_IDS.classic], [
-    'runLeft', 'charge', 'runRight', 'uniqueba', 'transform', 'shield', 'ba1', 'ba2', 'jump',
+    'runLeft', 'charge', 'runRight', 'extra_attack', 'transform', 'shield',
+    'attack1', 'attack2', 'attack3', 'attack4', 'attack5', 'jump',
   ]);
   assert.deepEqual(Object.keys(TOUCH_CONTROL_IDS), [...MOBILE_CONTROLS], 'one list per Mobile Controls scheme');
   assert.ok(Object.isFrozen(TOUCH_CONTROL_IDS.joystick) && Object.isFrozen(TOUCH_CONTROL_IDS.classic));
@@ -215,7 +224,7 @@ test('every control of both schemes has a stable id, independent of its label', 
   assert.equal(joystick.get('mouvementRight'), tc.mouvementButtons.get('mouvementRight'));
   const classic = tc.getControlElements('classic');
   for (const id of ['runLeft', 'charge', 'runRight']) assert.equal(classic.get(id), tc.padButtons.get(id), id);
-  for (const id of ['uniqueba', 'transform', 'shield', 'ba1', 'ba2', 'jump']) {
+  for (const id of ['extra_attack', 'transform', 'shield', 'attack1', 'attack2', 'attack3', 'attack4', 'attack5', 'jump']) {
     assert.equal(joystick.get(id), tc.actionButtons.get(id), `${id}: joystick`);
     assert.equal(classic.get(id), tc.actionButtons.get(id), `${id}: classic, the same element`);
   }
@@ -232,14 +241,14 @@ test('every control of both schemes has a stable id, independent of its label', 
     localizeTree(tc.root);
     assert.equal(tc.chargeDown.getAttribute('aria-label'), 'Charge');
     assert.equal(tc.mouvementButtons.get('mouvementLeft').getAttribute('aria-label'), 'Mouvement à gauche');
-    assert.equal(tc.actionButtons.get('ba1').getAttribute('aria-label'), 'Coup de poing');
+    assert.equal(tc.actionButtons.get('attack1').getAttribute('aria-label'), 'Coup de poing');
     assert.equal(tc.getControlElements().get('mouvementLeft'), tc.mouvementButtons.get('mouvementLeft'));
     assert.deepEqual([...tc.getControlElements().keys()], [...TOUCH_CONTROL_IDS.joystick]);
   } finally {
     setLanguage('en');
     localizeTree(tc.root);
   }
-  assert.equal(tc.actionButtons.get('ba1').getAttribute('aria-label'), 'Punch');
+  assert.equal(tc.actionButtons.get('attack1').getAttribute('aria-label'), 'Punch');
 });
 
 // ---- Geometry ----------------------------------------------------------------------
@@ -272,6 +281,21 @@ test('positions are fractions of the touch-control area, sizes are scales, and a
   assert.deepEqual(placeControl(large, entry, { width: 50, height: 50 }), { x: 480, y: 810 });
   // Sanitised values never hold pixels or extremes.
   assert.deepEqual(sanitizeTouchLayout('joystick', { stick: { x: 640, y: -2, scale: 0.01 } }), { stick: { x: 1, y: 0, scale: 0.7 } });
+});
+
+test('a stored layout keeps every numbered attack button by its codename, in the scheme\'s order, and drops any other id', () => {
+  const at = (x) => ({ x, y: 0.5, scale: 1 });
+  const stored = {
+    attack5: at(0.5), jump: at(0.9), attack3: at(0.3), attack1: at(0.1), extra_attack: at(0.8), attack4: at(0.4), attack2: at(0.2),
+    attack6: at(0.6), punch: at(0.7), Kick: at(0.1),
+  };
+  for (const scheme of MOBILE_CONTROLS) {
+    const layout = sanitizeTouchLayout(scheme, stored);
+    assert.deepEqual(Object.keys(layout), ['extra_attack', 'attack1', 'attack2', 'attack3', 'attack4', 'attack5', 'jump'], scheme);
+    assert.deepEqual(layout.attack5, at(0.5));
+    // Round trip: what is saved is read back exactly.
+    assert.deepEqual(sanitizeTouchLayout(scheme, JSON.parse(JSON.stringify(layout))), layout);
+  }
 });
 
 // ---- Applying a layout ------------------------------------------------------------------
@@ -319,7 +343,7 @@ test('a custom layout moves and sizes each control by id, kept on screen, and a 
   assert.equal(dashLeft.style.translate, '-10.0px -250.0px');
   assert.equal(dashLeft.style.scale ?? '', '');
   // Everything else is left alone.
-  for (const id of ['charge', 'mouvementRight', 'uniqueba', 'transform', 'shield', 'ba1', 'ba2']) {
+  for (const id of ['charge', 'mouvementRight', 'extra_attack', 'transform', 'shield', 'attack1', 'attack2']) {
     assert.equal(tc.controlElement(id).style.translate, '', id);
   }
   // A new window size or orientation: the same fractions on the new screen.
@@ -398,7 +422,7 @@ test('a custom layout never changes what a button sends: every held action, both
     const { tc, calls } = touchControls(scheme);
     layOut(tc);
     scatter(tc);
-    const held = ['uniqueba', 'transform', 'shield', 'ba1', 'ba2', 'jump', ...(scheme === 'joystick' ? ['charge'] : [])];
+    const held = ['extra_attack', 'transform', 'shield', 'attack1', 'attack2', 'jump', ...(scheme === 'joystick' ? ['charge'] : [])];
     held.forEach((action, i) => {
       const b = tc.buttons.get(action);
       assert.equal(b.getAttribute('data-action'), action, `${scheme}: ${action} keeps its codename`);
@@ -508,31 +532,31 @@ test('multi-touch still works with a custom layout: joystick, Charge, Punch and 
   tc.stick.rect = { left: place.center.x - w / 2, top: place.center.y - w / 2, width: w, height: w };
   tc.stick.dispatch('pointerdown', { pointerId: 1, clientX: place.center.x - w * 0.4, clientY: place.center.y });
   press(tc.buttons.get('charge'), 2);
-  press(tc.buttons.get('ba1'), 3);
+  press(tc.buttons.get('attack1'), 3);
   press(tc.buttons.get('jump'), 4);
   lift(tc.buttons.get('jump'), 4);
   tc.stick.dispatch('pointerup', { pointerId: 1 });
-  lift(tc.buttons.get('ba1'), 3);
+  lift(tc.buttons.get('attack1'), 3);
   lift(tc.buttons.get('charge'), 2);
   assert.deepEqual(calls, [
-    ['runLeft', true], ['charge', true], ['ba1', true], ['jump', true],
-    ['jump', false], ['runLeft', false], ['ba1', false], ['charge', false],
+    ['runLeft', true], ['charge', true], ['attack1', true], ['jump', true],
+    ['jump', false], ['runLeft', false], ['attack1', false], ['charge', false],
   ]);
 });
 
 test('setCharacter still swaps the fighter\'s icons and names in place, and never moves a button', () => {
   const { tc, calls } = touchControls('joystick', null);
   layOut(tc);
-  tc.setLayout({ ba1: { x: 0.5, y: 0.3, scale: 1.3 } });
-  const ba1 = tc.buttons.get('ba1');
-  const before = [ba1.style.translate, ba1.style.scale];
-  assert.equal(ba1.getAttribute('aria-label'), 'Basic Attack 1');
+  tc.setLayout({ attack1: { x: 0.5, y: 0.3, scale: 1.3 } });
+  const attack1 = tc.buttons.get('attack1');
+  const before = [attack1.style.translate, attack1.style.scale];
+  assert.equal(attack1.getAttribute('aria-label'), 'Attack 1');
   tc.setCharacter(DEF_0001);
-  assert.equal(ba1.getAttribute('aria-label'), 'Punch');
-  assert.equal(ba1.innerHTML, ICONS.punch);
-  assert.deepEqual([ba1.style.translate, ba1.style.scale], before, 'still where the player put it');
-  press(ba1, 1);
-  assert.deepEqual(calls, [['ba1', true]], 'still ba1 (Charge + ba1 is still cba1)');
+  assert.equal(attack1.getAttribute('aria-label'), 'Punch');
+  assert.equal(attack1.innerHTML, ICONS.punch);
+  assert.deepEqual([attack1.style.translate, attack1.style.scale], before, 'still where the player put it');
+  press(attack1, 1);
+  assert.deepEqual(calls, [['attack1', true]], 'still attack1 (Charge + attack1 is still attack3)');
 });
 
 test('gameplay touch buttons stay out of keyboard focus in battle; only the editor\'s copy is focusable', () => {
@@ -611,7 +635,7 @@ test('the editor opens on the scheme in use, as a modal with its own scope, the 
   assert.equal(editor.touch.scheme, 'classic');
   assert.equal(editor.touch.enabled, false, 'nothing it does reaches gameplay');
   assert.ok(editor.touchRoot.classList.contains('touch-controls'));
-  assert.equal(editor.touch.buttons.get('ba1').getAttribute('aria-label'), 'Punch', 'the fighter\'s own look');
+  assert.equal(editor.touch.buttons.get('attack1').getAttribute('aria-label'), 'Punch', 'the fighter\'s own look');
   for (const [id, node] of editor.touch.getControlElements('classic')) {
     assert.equal(node.hasAttribute('data-nav'), true, id);
     assert.equal(node.getAttribute('tabindex'), '0', id);
@@ -620,7 +644,7 @@ test('the editor opens on the scheme in use, as a modal with its own scope, the 
   assert.equal(editor.touch.stick.getAttribute('role'), 'button', 'the joystick, pressed like a button here');
   assert.equal(document.activeElement, editor.touch.padButtons.get('runLeft'), 'focus on the first control');
   // No control ids on show anywhere.
-  assert.doesNotMatch(root.textContent, /runLeft|mouvement[LR]|uniqueba|\bba[12]\b/);
+  assert.doesNotMatch(root.textContent, /runLeft|mouvement[LR]|extra_attack|\bba[12]\b/);
   // Nothing selected yet: the size controls wait.
   assert.equal(editor.nameEl.textContent, 'No control selected');
   assert.equal(editor.slider.disabled, true);
@@ -636,7 +660,7 @@ test('the editor opens on the scheme in use, as a modal with its own scope, the 
   for (const id of ['0001', null]) {
     app.selection.characterId = id;
     editor.open({ scheme: 'classic', returnFocus: back });
-    assert.equal(editor.touch.buttons.get('ba1').getAttribute('aria-label'), 'Basic Attack 1', `${id}: neutral`);
+    assert.equal(editor.touch.buttons.get('attack1').getAttribute('aria-label'), 'Attack 1', `${id}: neutral`);
     editor.doneButton.click();
   }
 }));
@@ -763,7 +787,7 @@ test('size: Smaller / Larger and the slider resize the selected control within t
 test('Reset to defaults puts only this scheme back on Alva\'s own layout, saved', () => {
   const { app, editor, storage } = editorApp();
   app.settings.setTouchLayout('joystick', { jump: { x: 0.4, y: 0.4, scale: 1.3 } });
-  app.settings.setTouchLayout('classic', { runLeft: { x: 0.6, y: 0.4, scale: 1.2 }, ba2: { x: 0.2, y: 0.2, scale: 0.9 } });
+  app.settings.setTouchLayout('classic', { runLeft: { x: 0.6, y: 0.4, scale: 1.2 }, attack2: { x: 0.2, y: 0.2, scale: 0.9 } });
   editor.open({ scheme: 'classic' });
   const runLeft = editor.touch.padButtons.get('runLeft');
   assert.notEqual(runLeft.style.translate, '', 'opened on the saved layout');
@@ -789,17 +813,17 @@ test('the editor saves as each change lands, through Settings only, and never st
   assert.match(code, /this\.app\.settings\.resetTouchLayout\(this\.scheme\)/);
   const { editor, storage } = editorApp();
   editor.open({ scheme: 'joystick' });
-  const ba2 = editor.touch.actionButtons.get('ba2');
-  ba2.dispatch('pointerdown', { pointerId: 1, button: 0, ...centre(ba2) });
-  ba2.dispatch('pointermove', { pointerId: 1, clientX: 123, clientY: 77 });
-  ba2.dispatch('pointerup', { pointerId: 1 });
-  const entry = saved(storage).touchLayouts.joystick.ba2;
+  const attack2 = editor.touch.actionButtons.get('attack2');
+  attack2.dispatch('pointerdown', { pointerId: 1, button: 0, ...centre(attack2) });
+  attack2.dispatch('pointermove', { pointerId: 1, clientX: 123, clientY: 77 });
+  attack2.dispatch('pointerup', { pointerId: 1 });
+  const entry = saved(storage).touchLayouts.joystick.attack2;
   assert.deepEqual(Object.keys(entry), ['x', 'y', 'scale']);
   assert.ok(entry.x >= 0 && entry.x <= 1 && entry.y >= 0 && entry.y <= 1, 'fractions, not pixels');
   // A different screen: the same fractions land in the same relative place.
   editor.touchRoot.rect = { left: 0, top: 0, width: 2000, height: 1000 };
   editor.refresh();
-  const { center } = editor.touch.placements.get('ba2');
+  const { center } = editor.touch.placements.get('attack2');
   assert.ok(Math.abs(center.x / 2000 - entry.x) < 0.001 && Math.abs(center.y / 1000 - entry.y) < 0.001);
 });
 
