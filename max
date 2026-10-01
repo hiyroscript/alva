@@ -1,0 +1,598 @@
+ALVA — CPU Facing, Dynamic Attack Icons, Jump Button, and Touch-Control Cleanup
+
+Objective
+
+Implement four improvements directly in the existing hiyroscript/alva repository:
+
+1. CPU-controlled fighters must face their opponent throughout their attacks.
+2. The Jump button must always display an upward arrow icon.
+3. Completely remove the Down arrow button from the mobile control interfaces and eliminate its obsolete UI code and assets.
+4. Attack button icons must automatically reflect their actual ground or mid-air abilities. Specifically, character #0002’s Extra Attack button must display a tornado.
+
+These are production changes, not mockups. Inspect the existing architecture before editing and preserve functional gameplay, combat balance, animations, and responsive controls.
+
+Do not rewrite the game, introduce unnecessary dependencies, or create a second control system.
+
+⸻
+
+1. CPU must face its opponent while attacking
+
+Current architecture
+
+The CPU operates through CombatAIController in js/game/combat-ai.js, which generates ordinary fighter input snapshots.
+
+js/game/character.js owns the fighter’s facing direction, attack execution, and updateFacing() behavior.
+
+Currently, the AI attempts to turn before attacking, and its guard logic prevents some unwanted mid-attack turns. However, these mechanisms do not guarantee that a CPU remains oriented toward its opponent throughout the entire attack.
+
+Required behavior
+
+Whenever a CPU performs an attack, it should face the enemy.
+
+This applies to:
+
+* Grounded attacks.
+* Mid-air attacks.
+* Attack startup, active frames, and recovery.
+* Characters #0001 and #0002, plus future characters.
+* CPU-controlled fighters in Quick Battle and Watch Mode.
+* Situations where the opponent crosses behind the CPU during an attack.
+
+Implementation requirements
+
+Target tracking
+
+Determine the desired facing direction using the fighters’ horizontal positions:
+
+* Opponent to the left: face left.
+* Opponent to the right: face right.
+* Identical horizontal positions: retain the last valid facing direction to prevent rapid flipping.
+
+Update the desired orientation on each relevant simulation step instead of relying exclusively on intermittent AI decisions.
+
+Attack initiation
+
+Make sure the CPU is facing the opponent when an attack begins.
+
+Inspect actAttack(), attackIntent(), guard(), and the input-processing path in Fighter.update() and tryAction().
+
+Avoid cases where the CPU starts an attack while facing away because its orientation was calculated using outdated enemy coordinates.
+
+Attacking while the enemy changes sides
+
+During an ordinary attack that supports turning, allow the CPU to reorient toward the opponent when the opponent crosses behind it.
+
+Do not require the CPU to finish the entire animation before visually correcting its orientation.
+
+Movement-locked attacks
+
+Some attacks have directional movement that is intentionally committed at activation, such as rolls, homing attacks, plunges, lifts, and other motion-based moves.
+
+Do not reverse the physical trajectory of these moves in the middle of an animation merely to change sprite orientation.
+
+Where needed, separate visual-facing information from the locked attack direction:
+
+* Keep movement and projectile trajectories physically consistent.
+* Keep collision boxes, hitboxes, and damage behavior coherent.
+* Allow the CPU’s visible attack animation to face the opponent without corrupting attack physics.
+* Never redirect an already spawned projectile just because the opponent moved behind its owner.
+
+Use the smallest maintainable change that satisfies these requirements.
+
+Preserve manual facing
+
+Player-controlled fighters must retain their existing directional behavior. Do not introduce automatic facing for human-controlled fighters.
+
+Also preserve the current distinction between the attacking combat AI and the non-attacking training opponent.
+
+Important safeguards
+
+* Do not create unintended Dashes when the CPU changes direction.
+* Do not accidentally cause horizontal movement simply to flip a sprite.
+* Do not modify attack damage, cooldowns, or recovery durations.
+* Do not introduce flickering when fighters overlap.
+* Do not allow a destroyed or unavailable opponent to trigger invalid targeting.
+* Preserve deterministic CPU behavior and difficulty settings.
+
+Expected result
+
+During combat, the CPU visibly targets its opponent throughout an attack, even if the opponent jumps across or passes behind it, while direction-locked movement and projectiles continue behaving correctly.
+
+⸻
+
+2. Jump button must ALWAYS use an upward arrow
+
+Current issue
+
+The current mobile presentation system includes Jump among the buttons that display frames of the selected fighter’s animations.
+
+Relevant code:
+
+* js/ui/mobile-abilities.js
+* js/game/touch-controls.js
+* js/ui/icons.js
+* js/data/characters.js
+
+SPRITE_BUTTONS includes jump, and jumpArt() can return a character-specific sprite.
+
+Consequently, the Jump button changes appearance depending on the selected fighter.
+
+Required change
+
+Jump must always display one universal, recognizable upward arrow.
+
+Use the existing ICONS.jump arrow design as the starting point, or refine its SVG for clarity.
+
+The icon must:
+
+* Clearly point upward.
+* Remain identical for every fighter.
+* Remain identical when grounded, jumping, falling, or attacking.
+* Work in both Joystick and Classic mobile layouts.
+* Remain readable at every supported control size.
+* Preserve its accessible label, Jump.
+
+Technical requirements
+
+1. Remove jump from the fighter-specific sprite-preview workflow.
+2. Adjust jumpArt() or replace that presentation path so it always returns the universal SVG without a fighter sprite.
+3. Update TouchControls.setCharacter() so selecting a fighter cannot replace the arrow.
+4. Remove obsolete mobileAbilities.jump.preview entries from character definitions if they are no longer used.
+5. Preserve data-action="jump" and all existing jump input behavior.
+
+Do not change jump physics, variable jump height, air jumps, cooldowns, or any other gameplay behavior.
+
+Expected result
+
+Selecting #0001, #0002, or another fighter never changes the Jump icon. An upward arrow remains visible at all times.
+
+⸻
+
+3. Completely remove the mobile Down arrow button
+
+Current issue
+
+Both mobile control schemes currently expose a Down button.
+
+In js/game/touch-controls.js:
+
+* Classic uses a DPAD entry with action: 'down'.
+* Joystick creates STICK_DOWN, an additional Down button beside the stick.
+
+The control also appears in customization data, CSS, tests, and comments.
+
+Required change
+
+Remove the Down arrow button completely from both mobile layouts and their supporting UI definitions.
+
+It must not remain hidden, transparent, or merely disabled. The unused button element and all button-specific code must be removed.
+
+A. Classic Buttons
+
+Change the directional cluster from:
+
+[LEFT] [DOWN] [RIGHT]
+
+To:
+
+[LEFT] [RIGHT]
+
+Adjust spacing and pointer hit-testing to make the two remaining buttons work correctly.
+
+Dragging a finger from Left to Right and back should continue to update directional input normally.
+
+B. Joystick
+
+Remove the Down button positioned beside the joystick.
+
+Keep the joystick and its Left mouvement and Right mouvement Dash buttons.
+
+Recenter or adjust the joystick cluster as necessary to eliminate the unused space.
+
+Keep the joystick’s original horizontal movement behavior.
+
+C. Remove obsolete code
+
+Inspect and clean up:
+
+* DPAD
+* STICK_DOWN
+* this.stickDown
+* Down-related button creation and event listeners
+* Down button references in allButtons
+* Scheme switching and control-element lookup
+* Joystick positioning calculations
+* Down-specific touch-control CSS
+* Down button entries in TOUCH_CONTROL_IDS
+* Touch layout editor registration and selection
+* Tests that expect the old button
+* Comments or documentation describing the removed button
+
+In styles.css, review definitions such as:
+
+* --tc-down
+* --tc-stick-left
+* .tc-stick-down
+
+Remove or simplify styling that exists exclusively for the deleted button.
+
+Remove ICONS.down only if it has no remaining legitimate consumers.
+
+D. Existing saved layouts
+
+The touch layout system stores customized positions and scales using stable control IDs.
+
+Old saved layouts may contain down.
+
+Update layout sanitization so obsolete down entries are discarded gracefully.
+
+Preserve every other valid customized control position and size.
+
+Previously saved settings must load without errors, invisible hit targets, or shifted controls.
+
+E. Preserve legitimate Down functionality
+
+This request removes the mobile Down arrow button, not every internal use of the word down.
+
+Preserve gameplay mechanics that still legitimately use the Down input through keyboard, gamepad, or CPU behavior, including fast-fall or launch steering.
+
+Also preserve downward navigation in menus and the layout editor.
+
+Do not blindly delete down from CONFIG.ACTIONS, input snapshots, keyboard bindings, or menu navigation if doing so would break existing gameplay.
+
+Remove the obsolete touch-control UI functionality thoroughly without deleting unrelated mechanics.
+
+Expected result
+
+Neither mobile control scheme nor the customization editor contains a Down arrow button or an interactive region for one. The remaining controls are positioned correctly and behave normally.
+
+⸻
+
+4. Dynamic ground and mid-air attack icons
+
+Current issue
+
+js/ui/mobile-abilities.js currently selects one authored preview per action, rather than always reflecting the move associated with the fighter’s current grounded or airborne state.
+
+However, Alva already defines distinct ground and air moves through character actions.
+
+For example, character #0002 uses:
+
+Button	Ground action	Mid-air action
+Attack 1	One-Two	Homing Attack
+Attack 2	Rapid Kicks	Bounce Attack
+Attack 3	Spin Attack	Blue Tornado
+
+These are different abilities and must be visually distinguishable on their corresponding buttons.
+
+Required behavior
+
+Every attack button must display an icon representing the action it will perform in the fighter’s current state.
+
+When grounded, show the corresponding ground move.
+
+When airborne, show the corresponding mid-air move.
+
+When the fighter lands, immediately restore the ground icon.
+
+Implementation design
+
+Use the existing character definitions as the authoritative source of move mappings.
+
+The implementation must not hardcode character-specific ground/air mappings inside the touch renderer.
+
+Extend mobileAbilities to support appropriate previews for both contexts, such as:
+
+attack1: {
+  label: 'Punch',
+  previews: {
+    ground: {
+      animation: 'attack1',
+      frame: 3
+    },
+    air: {
+      animation: 'midair_attack1',
+      frame: 2
+    }
+  }
+}
+
+The example frame indices are illustrative. Inspect the actual sprite files and animation definitions before choosing previews.
+
+Prefer extending the current schema compatibly, rather than introducing duplicate move metadata or hardcoded asset URLs.
+
+Preview selection
+
+The icon-selection process should:
+
+1. Determine whether the player-controlled fighter is grounded or airborne.
+2. Resolve the move mapped to the button in that state.
+3. Select the authored preview corresponding to that move.
+4. Display an appropriate animation frame.
+5. Update only when the selected visual representation changes.
+
+If a fighter lacks an air version of an ability, do not invent an animation or imply an unavailable move can execute. Preserve the correct button visibility and availability behavior, using a clear inactive presentation when appropriate.
+
+Live updates
+
+Currently, screens call TouchControls.setCharacter() when assigning the selected fighter.
+
+That is insufficient for icons that must react to jumping and landing.
+
+Add a lightweight method such as:
+
+touch.setAirborne(isAirborne);
+
+This is a suggested interface, not a mandatory implementation name.
+
+Use the actual player fighter’s state rather than the CPU’s.
+
+Integrate the state synchronization into:
+
+* js/screens/battle-screen.js
+* js/screens/practice-screen.js
+
+Perform updates after the relevant simulation frame so the icons reflect current gameplay state.
+
+Only update DOM content when needed. Do not recreate control buttons, listeners, or image elements every frame.
+
+Maintain reliable visuals through character changes, respawns, rematches, and entering or leaving gameplay screens.
+
+Icon presentation rules
+
+* Ground attacks show recognizable ground attack artwork.
+* Mid-air attacks show recognizable mid-air attack artwork.
+* Different animations should use genuinely appropriate frames.
+* Existing character artwork should take priority over unrelated generic symbols.
+* Preserve icon colors and transparency.
+* Preserve the current button dimensions and styling.
+* Avoid image stretching, clipping, or excessive enlargement.
+* Maintain a fallback when a preview is missing or fails to load.
+* Preserve multilingual accessible labels and update move-specific labels when appropriate.
+* Do not change which gameplay input the button sends.
+
+Character-specific requirements
+
+#0001
+
+Review every numbered attack that has a different air behavior.
+
+Give each supported ground/air variation its corresponding preview rather than reusing the ground preview indiscriminately.
+
+Keep Clone Attack, Sphere Rush, Shuriken, and other existing ability mappings intact.
+
+#0002
+
+Use the actual move definitions:
+
+* Attack 1: One-Two on the ground; Homing Attack in the air.
+* Attack 2: Rapid Kicks on the ground; Bounce Attack in the air.
+* Attack 3: Spin Attack on the ground; Blue Tornado in the air.
+
+Attack 3 must visibly change from rolling-ball artwork to tornado artwork when #0002 becomes airborne.
+
+On landing, it must change back.
+
+Jump is an exception: Its upward arrow must never change, regardless of ground/air status.
+
+⸻
+
+5. Character #0002 — Extra Attack must show the tornado
+
+Current issue
+
+In js/data/characters.js, #0002’s Extra Attack is Whirlwind.
+
+Its existing mobile preview uses:
+
+extra_attack: {
+  label: 'Whirlwind',
+  preview: {
+    animation: 'extra_attack',
+    frame: 5
+  }
+}
+
+That represents a frame of the character’s attack animation.
+
+The actual Whirlwind projectile is a tornado, defined separately as extra_attack_object.
+
+Required change
+
+The Extra Attack button for #0002 must display the tornado itself.
+
+Use the existing tornado artwork:
+
+assets/characters/0002/
+  0002_extra_attack_object_1.png
+  0002_extra_attack_object_2.png
+  0002_extra_attack_object_3.png
+  0002_extra_attack_object_4.png
+
+These files belong to the existing projectileAnimations.extra_attack_object definition.
+
+Choose a frame that clearly displays the full tornado silhouette.
+
+Technical implementation
+
+The current previewFrame() resolver reads def.animations.
+
+Since the tornado effect lives in def.projectileAnimations, extend the presentation resolver to support an explicitly authored projectile animation preview.
+
+For example, allow a preview descriptor to declare its animation collection, or another clear equivalent.
+
+Keep the resolution centralized.
+
+Do not duplicate asset paths across UI files or hardcode a special rendering branch based solely on id === '0002'.
+
+A data-driven preview configuration should identify the tornado sprite directly from the existing character definition.
+
+Retain the accessible ability name Whirlwind, since the move itself is still Whirlwind.
+
+Ground and air consistency
+
+Whirlwind is currently ground-only.
+
+Its icon should still identify the ability as a tornado. However, the button must not imply the ground-only move can be activated in mid-air.
+
+Preserve the ability’s actual restrictions and cooldown.
+
+Fallback
+
+If the tornado preview fails to load, provide a recognizable tornado-themed fallback rather than displaying artwork from an unrelated attack.
+
+A small original tornado SVG in js/ui/icons.js is acceptable if necessary. Keep it stylistically consistent with Alva’s existing SVGs.
+
+Do not add external image or icon dependencies.
+
+Expected result
+
+Whenever #0002 is selected, its Extra Attack button visually represents a tornado, not a generic ring or an unclear character pose.
+
+⸻
+
+6. Maintain architecture and performance
+
+Follow existing project conventions.
+
+The combat engine determines what abilities do. The UI only describes them.
+
+Keep this separation intact.
+
+* js/data/characters.js: character-specific icon metadata.
+* js/ui/mobile-abilities.js: icon and preview resolution.
+* js/game/touch-controls.js: display and touch handling.
+* Battle and Practice screens: current player-state synchronization.
+* js/game/combat-ai.js: CPU decision and targeting behavior.
+* js/game/character.js: fighter state, facing, combat physics.
+* js/core/touch-layout.js: available controls and saved layout validation.
+* styles.css: presentation.
+
+Optimize icon updates by caching the last displayed grounded/airborne state and preview.
+
+Preserve the existing sprite-image reuse behavior wherever possible.
+
+Do not replace entire button trees unnecessarily, because doing so could interfere with held inputs or multi-touch pointer ownership.
+
+Do not introduce new render loops, unnecessary DOM allocations, or redundant image loading.
+
+⸻
+
+7. Update automated tests
+
+The repository already contains a substantial Node-based test suite.
+
+Update relevant tests and add regression coverage.
+
+At minimum, review:
+
+* tests/combat-ai.test.mjs
+* tests/facing.test.mjs
+* tests/controls-ui.test.mjs
+* tests/touch-layout.test.mjs
+* tests/fighter-0002.test.mjs
+* tests/down.test.mjs
+* tests/battle-screen.test.mjs
+* tests/practice-ground.test.mjs
+
+Existing tests that intentionally assert the previous mobile UI or preview behavior must be revised to match the new requirements.
+
+Do not weaken unrelated assertions simply to make tests pass.
+
+Required test scenarios
+
+CPU facing
+
+* CPU begins an attack facing its opponent.
+* CPU remains visually oriented toward the opponent through the attack.
+* Opponent crosses behind the CPU during startup.
+* Opponent crosses behind the CPU during active attack frames.
+* CPU attacks in the air.
+* CPU performs an attack with locked movement.
+* CPU handles overlapping fighter coordinates without flickering.
+* Manual player facing behavior is unchanged.
+* Projectiles preserve their launched direction.
+
+Jump icon
+
+* #0001 always displays the arrow.
+* #0002 always displays the same arrow.
+* The arrow remains unchanged on the ground and in mid-air.
+* Character switching does not introduce a Jump sprite.
+* Jump remains functional.
+
+Down arrow removal
+
+* Neither mobile layout creates a Down button.
+* The layout editor does not expose Down.
+* Old saved layouts containing Down are sanitized correctly.
+* Left and Right buttons remain functional.
+* Joystick and Dash controls work normally.
+* Existing keyboard/gamepad Down mechanics remain functional.
+
+Dynamic attack icons
+
+* Every supported ground-to-air transition changes the correct icon.
+* Landing restores the ground icon.
+* #0002 Attack 3 switches from Spin Attack to Blue Tornado.
+* Icon transitions never alter the underlying input mapping.
+* Image-load failure uses the expected fallback.
+* Held and simultaneous touch inputs continue working.
+
+#0002 tornado
+
+* Extra Attack resolves to projectileAnimations.extra_attack_object.
+* The actual tornado sprite appears.
+* The accessible name remains Whirlwind.
+* Ground-only execution rules remain unchanged.
+
+Validation
+
+Run the full test suite with the repository’s existing Node test workflow, including:
+
+node --test tests/*.test.mjs
+
+Fix regressions caused by these changes.
+
+Also perform browser-based visual checks where the environment permits, preferably in a mobile landscape viewport with both control schemes.
+
+⸻
+
+8. Final acceptance criteria
+
+The implementation is complete only when all of the following are true:
+
+* [ ]	CPU attacks visibly face the opponent, including after a side switch.
+* [ ]	Direction-locked attacks and projectiles retain correct physics.
+* [ ]	Player-controlled fighter facing remains manual.
+* [ ]	Jump always displays the same upward arrow.
+* [ ]	No Down arrow button exists in Joystick controls.
+* [ ]	No Down arrow button exists in Classic controls.
+* [ ]	No Down button exists in touch layout customization.
+* [ ]	Obsolete Down button UI code and styling are removed.
+* [ ]	Existing saved custom layouts remain usable.
+* [ ]	Ground attack icons reflect ground attacks.
+* [ ]	Air attack icons reflect air attacks.
+* [ ]	Attack icons refresh on jumping and landing.
+* [ ]	#0002’s airborne Attack 3 displays Blue Tornado artwork.
+* [ ]	#0002’s Extra Attack displays an actual tornado.
+* [ ]	Ability restrictions, cooldowns, and combat balance are unchanged.
+* [ ]	No multi-touch or control-layout regressions.
+* [ ]	Relevant automated tests pass.
+
+9. Delivery expectations
+
+Implement the changes in the existing repository, not merely as a proposal.
+
+Keep the changes focused and consistent with the existing JavaScript architecture.
+
+After implementation, provide:
+
+1. A summary of changes, grouped by CPU behavior, mobile controls, and attack icons.
+2. The exact files modified or deleted.
+3. Confirmation of how ground/air icons are selected.
+4. Confirmation that #0002’s tornado image comes from its existing projectile animation.
+5. Automated test results, including any failures.
+6. Any remaining limitations or manual checks that could not be completed.
+
+Priority: Correctness, consistency, clean removal of obsolete UI code, and preservation of established gameplay behavior. Do not treat merely changing button labels or hiding controls as completing these requirements.
