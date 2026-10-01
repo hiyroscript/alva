@@ -1,336 +1,113 @@
-The game now uses a standardized codename system for every character, attack, animation, and attack-created object. The goal is to make character files easier to understand, remove character-specific or inconsistent internal names, and allow the combat system to support different numbers of attacks without needing special-case code.
+# Codename and attack rules
 
-Each character is identified by a four-digit character ID. Character 0001, for example, uses filenames beginning with 0001_. The final number in an animation filename always represents the animation frame.
+These rules apply to every character. Codenames identify animations, attacks and attack-created objects consistently across character definitions, assets, combat, controls, AI and UI metadata. A character's mechanics and player-facing move names remain character-specific; the internal naming system is shared.
 
-The standard animation format is:
+## Character IDs and animation filenames
 
-characterID_animationName_frame
+Each character has a four-digit ID, stored as a string with leading zeroes. Use the character's own ID wherever <id> appears below.
 
-Examples:
-
-0001_idle_1
-0001_idle_2
-0001_run_1
-0001_jump_1
-0001_fall_1
-0001_land_1
-0001_hurt_1
-0001_midair_hurt_1
-
-Shield animations use:
-
-0001_prepshield_1
-0001_shielding_1
-0001_releaseshield_1
-
-Movement or dash animations use the standardized mouvment codename:
-
-0001_mouvment_1
-
-The old attack names such as ba1, ba2, maba1, maba2, cba1, cba2, and uniqueba are removed. Attacks are now numbered directly.
-
-The new attack names are:
-
-attack1
-attack2
-attack3
-attack4
-attack5
-
-Their animation files follow the same naming format:
-
-0001_attack1_1
-0001_attack1_2
-0001_attack2_1
-0001_attack3_1
-
-Normal attacks that can be performed in the air use a separate midair_attack codename:
-
-0001_midair_attack1_1
-0001_midair_attack2_1
-0001_midair_attack3_1
-
-Every normal numbered attack should have an obvious midair version. The exception is an attack that only exists as a Charge replacement, because that attack is not part of the character’s normal independent attack set.
-
-Characters may have a minimum of 2 and a maximum of 5 numbered attacks. Attack numbers must remain sequential. A character cannot have attack1, attack2, and attack4 while skipping attack3.
-
-The extra_attack is separate from the numbered attack count. It replaces the old uniqueba system and is used for an additional character-specific action such as a projectile, throw, special utility move, or other unique attack.
-
-Its animation is named:
-
-0001_extra_attack_1
-
-A character may therefore have five numbered attacks and still have an extra_attack.
-
-Charge is now treated as an attack-routing system rather than as a separate family of cba attacks. A character may use Charge to temporarily replace normal attack buttons with stronger attacks.
-
-The charge animation begins with numbered startup frames:
-
-0001_charge_1
-0001_charge_2
-
-Once the startup finishes, Charge continuously loops between:
-
-0001_charge_a
-0001_charge_b
-
-The a and b frames are specifically the looping Charge state and are not regular numbered animation frames.
-
-When a character has Charge, later-numbered attacks can replace earlier attack buttons while Charge is held. For example, a four-attack character can use:
-
-attack1 = first normal attack
-attack2 = second normal attack
-attack3 = charged replacement for attack1
-attack4 = charged replacement for attack2
-
-Normally pressing the attack1 button performs attack1. While Charge is active, pressing that same button performs attack3.
-
-Likewise:
-
-Normal: attack2 button → attack2
-Charging: attack2 button → attack4
-
-The exact button system depends on the character’s attack count.
-
-A character with 2 attacks has two normal attack buttons.
-
-A character with 3 attacks and no Charge has three independent attack buttons: attack1, attack2, and attack3.
-
-A character with 3 attacks and Charge normally has two attack buttons. Attack1 and attack2 are available normally, while attack3 replaces attack1 when Charge is active.
-
-A character with 4 attacks and no Charge has four independent attack buttons.
-
-A character with 4 attacks and Charge normally has two attack buttons. Attack3 replaces attack1 during Charge, and attack4 replaces attack2.
-
-A character with 5 attacks and no Charge has five independent attack buttons.
-
-A character with 5 attacks and Charge has three independently accessible normal buttons: attack1, attack2, and attack5. While Charge is active, attack3 replaces attack1 and attack4 replaces attack2. Attack5 remains its own normal attack.
-
-In simplified form:
-
-attack1 → attack3 while charging
-attack2 → attack4 while charging
-attack5 → remains independent
-
-This rule continues consistently instead of creating separate charged attack categories. Whether attack3 or attack4 is a normal button or a Charge replacement is determined by the character’s loadout, not by the attack name itself.
-
-For example, a character with no Charge may use attack3 as a completely normal third attack with its own midair version:
-
-0001_attack3_1
-0001_midair_attack3_1
-
-Another character may instead use attack3 only as the charged replacement for attack1. In that case, attack3 does not need to appear as an independent button and does not automatically require a midair version.
-
-Objects created by attacks also use the attack that created them as their codename. This applies to projectiles, clones, summons, deployables, effects, and similar attack-owned objects.
-
-The standard format is:
-
-characterID_attackName_object_frame
-
-Examples:
-
-0001_attack1_object_1
-0001_attack3_object_1
-0001_attack3_object_2
-0001_extra_attack_object_1
-
-This means an object should no longer be given an unrelated character-specific filename such as the name of a projectile, clone, technique, or fictional ability. The filename describes which gameplay attack owns the object.
-
-For character 0001, the old attack system converts as follows:
-
-ba1 → attack1
-maba1 → midair_attack1
-ba2 → attack2
-maba2 → midair_attack2
-cba1 → attack3
-cba2 → attack4
-uniqueba → extra_attack
-
-Character 0001 therefore has four numbered attacks and Charge. Attack1 and attack2 are the normal attacks. Attack3 and attack4 are their charged replacements and do not need separate normal buttons. The character’s previous unique attack becomes extra_attack.
-
-Its basic routing is:
-
-Normal attack1 button → attack1
-Charge + attack1 button → attack3
-
-Normal attack2 button → attack2
-Charge + attack2 button → attack4
-
-Extra-attack button → extra_attack
-
-Any projectile produced by the extra attack uses names such as:
-
-0001_extra_attack_object_1
-
-Any object created by attack3 uses:
-
-0001_attack3_object_1
-
-Any object created by attack4 uses:
-
-0001_attack4_object_1
-
-The important rule is that these names are now gameplay codenames, not move names. Display names such as “Punch,” “Kick,” “Clone Attack,” or other character-specific names may still be shown to players in menus and UI, but they must not replace the standardized internal identifiers.
-
-This creates one consistent system across every character:
-
-attack1 through attack5 describe numbered attacks.
-midair_attack1 through midair_attack5 describe their normal airborne versions.
-extra_attack describes the separate character-specific extra move.
-charge modifies which numbered attack is triggered from an existing attack button.
-attackX_object describes anything created by that attack.
-The character ID identifies who owns the animation.
-The final number identifies the frame.
-
-As a result, character code, animation data, PNG filenames, controls, AI, mobile buttons, cooldowns, and attack-created objects can all refer to the same predictable naming system without relying on legacy terms such as BA, MABA, CBA, or Unique BA.
-
-
----
-
-# Repository-specific implementation and verification prompt
-
-Copy the following prompt into the coding agent working on Alva.
-
-## Task and starting point
-
-Complete and verify Alva's universal codename, animation, object and attack-loadout migration across the whole repository. Implement any remaining gaps; do not stop at a plan or a filename-only replacement.
-
-Start from the latest branch, read applicable repository instructions, and inspect the current code before editing. This prompt was prepared against main at f3f2fffdaa672520d0141157174589ef91609161. PR #73 has already merged the main attack-codename migration, and this root document already exists. Preserve completed work and apply this prompt idempotently: an already-correct mapping must stay correct.
-
-Alva is a browser platform fighter using native JavaScript ES modules and Canvas 2D, without a framework or build step. It has keyboard, gamepad and two touch layouts, Quick Battle, Watch Mode, Practice Ground, English/French UI, Launch Point combat, energy, cooldowns and data-driven characters. Character 0001 is currently playable. Preserve its availability and unrelated mechanics.
-
-## Canonical names
-
-Use these names consistently in definitions, action IDs, animation keys, filenames, generated paths, input snapshots, AI, cooldowns, UI metadata, tests and current documentation:
-
-| Legacy move ID | Canonical move ID |
-| --- | --- |
-| ba1 | attack1 |
-| ba2 | attack2 |
-| maba1 | midair_attack1 |
-| maba2 | midair_attack2 |
-| cba1 | attack3 |
-| cba2 | attack4 |
-| uniqueba / unique attack | extra_attack |
-
-Charge itself remains charge. It is the held stance and routing condition; attack3 and attack4 are the attacks reached through it. Do not globally replace the word charge with an attack number.
-
-Display names such as Punch, Kick, Clone Attack, Sphere Rush and Shuriken may remain player-facing names. Canonical IDs must not depend on those display names.
-
-## Animation and asset grammar
-
-Character IDs are four digits with leading zeroes, stored as strings. Paths are relative and remain valid under a GitHub Pages subpath:
+The standard asset path is:
 
 assets/characters/<id>/<id>_<animation>_<frame>.png
 
-Frames start at 1. The final number is the frame index, never an attack number or an object-instance ID. Order numerically, so frame 10 follows frame 9 rather than frame 1. Use lowercase and underscores.
+Use lowercase codenames and underscores. Numbered frames start at 1 and play in numeric order. The final number identifies the animation frame, never the attack number or an object instance. A single-frame animation still ends in _1.
 
-| Animation family | Example asset |
+| Animation | Filename pattern |
 | --- | --- |
-| Idle | 0001_idle_1.png |
-| Run | 0001_run_1.png |
-| Jump / fall / land | 0001_jump_1.png / 0001_fall_1.png / 0001_land_1.png |
-| Hurt / airborne hurt | 0001_hurt_1.png / 0001_midair_hurt_1.png |
-| Shield preparation / hold / release | 0001_prepshield_1.png / 0001_shielding_1.png / 0001_releaseshield_1.png |
-| Airborne shield | 0001_midair_shielding_1.png |
-| Numbered attack N | 0001_attack1_1.png through 0001_attack5_1.png |
-| Airborne numbered attack N | 0001_midair_attack1_1.png through 0001_midair_attack5_1.png |
-| Extra attack | 0001_extra_attack_1.png |
-| Charge startup | 0001_charge_1.png, 0001_charge_2.png, etc. |
-| Charge sustained loop | 0001_charge_a.png, 0001_charge_b.png |
-| Special movement / dash | 0001_mouvment_1.png |
-| Attack-created object | 0001_attack1_object_1.png |
-| Extra-attack-created object | 0001_extra_attack_object_1.png |
+| Idle | <id>_idle_<frame>.png |
+| Run | <id>_run_<frame>.png |
+| Jump | <id>_jump_<frame>.png |
+| Fall | <id>_fall_<frame>.png |
+| Land | <id>_land_<frame>.png |
+| Hurt | <id>_hurt_<frame>.png |
+| Mid-air hurt | <id>_midair_hurt_<frame>.png |
+| Shield preparation | <id>_prepshield_<frame>.png |
+| Shield hold | <id>_shielding_<frame>.png |
+| Shield release | <id>_releaseshield_<frame>.png |
+| Mid-air shield | <id>_midair_shielding_<frame>.png |
+| Movement / dash | <id>_mouvment_<frame>.png |
+| Mid-air movement | <id>_midair_mouvment_<frame>.png |
+| Numbered attack | <id>_attackN_<frame>.png |
+| Mid-air numbered attack | <id>_midair_attackN_<frame>.png |
+| Extra attack | <id>_extra_attack_<frame>.png |
+| Charge startup | <id>_charge_<frame>.png |
+| Charge loop | <id>_charge_a.png and <id>_charge_b.png |
 
-The request's short forms such as 0001_jump and 0001_hurt denote animation families; keep the repository's consistent numbered filenames, including _1 for a single-frame pose. Preserve the exact authored asset/animation spelling mouvment. Ordinary movement physics may retain descriptive terms such as movement and dash; they are not alternate asset codenames. Existing directional input IDs must be migrated explicitly if changed, not by indiscriminate text replacement.
+Replace N with the attack number, from 1 through 5. Preserve the codename spelling mouvment for animation keys and assets, including midair_mouvment.
 
-Charge startup plays once in order, then alternates a, b, a, b while held. Preserve existing release timing and deliberate reuse of the first startup frame. Animation phase keys may have descriptive suffixes, such as attack4_form, while referencing slices of the one attack4 frame sequence.
+Charge startup frames play once in order. After startup, charge_a and charge_b loop while Charge is held. These lettered frames are the explicit exception to numbered animation frames.
 
-Inventory every character asset, including unused dodge and midair_dodge art. Rename existing PNGs and every reference together without changing image pixels, frame counts, playback rates, anchors, facing, height ratios, hitbox timing or art normalization.
+## Numbered attacks and airborne versions
 
-Historical asset mappings for 0001:
+A character has at least 2 and at most 5 numbered attack families: attack1 through attack5. Numbers must be sequential, with no gaps. Ground and mid-air versions belong to the same attack family, and Charge replacements count toward the numbered total.
 
-| Old asset suffix | Canonical suffix |
-| --- | --- |
-| 1baN | attack1_N |
-| 2baN | attack2_N |
-| midair1baN | midair_attack1_N |
-| midair2baN | midair_attack2_N |
-| throwN | extra_attack_N |
-| shurikenN | extra_attack_object_N |
-| cloneavN | attack3_object_N |
-| rasenN | attack4_N |
-| prasenN | attack4_object_N |
-| chargeN / chargea / chargeb | charge_N / charge_a / charge_b |
-| dashN | mouvment_N |
-| midairhurt | midair_hurt_1 |
-| releaseblock | releaseshield_1 |
+Every independently accessible numbered attack must have a functional midair_attackN definition and animation. An attack that exists only as a Charge replacement is exempt from this requirement. An independent attack5 always requires midair_attack5.
 
-## Attack count, charge and button routing
+Attack numbers identify moves; they do not prescribe damage, effects or mechanics. A numbered attack may be a direct strike, projectile, summon, deployable or another character-specific ability.
 
-Support 2–5 sequential numbered attack families. Ground and air versions are one family. Charge replacements count toward this total. Preserve this document's existing decision that extra_attack is separate from the numbered limit; shield, movement, jump, charge and transform are also not numbered attacks.
+extra_attack is a separate, additional character-specific action. It may be a projectile, throw, utility move or other unique attack. It does not count toward the 2–5 numbered attack limit, so a character may have five numbered attacks plus extra_attack. Its airborne availability is defined by the character's loadout.
 
-Every independently accessible numbered attack must have an explicit, functional midair_attackN definition and animation. Only charge-exclusive attacks are exempt. An independent attack5 always needs midair_attack5. Do not satisfy validation with an idle pose, a missing clip or a silent ground-only fallback. Keep extra_attack's existing character-specific air/ground restrictions unless separately redesigned.
+Shield, movement, jump, Charge and transform are not numbered attacks.
 
-All currently shipped characters should retain Charge. Also support a genuinely charge-disabled character, as required by the no-charge examples. Model charge availability separately from whether chargeReplacements is empty: a charge-capable two-attack character can have no replacements. Add an explicit per-character capability if the current schema cannot express that distinction, and route controls, AI and state transitions through it.
+## Charge and attack-button routing
 
-| Numbered attacks | Charge routing enabled | Independent numbered buttons | Charge substitutions |
+charge identifies the held stance that changes which attack an existing button triggers. It is not a separate family of charged attack names.
+
+Charge availability is a character capability. A character may have Charge without having any replacement attacks. Characters without Charge use their numbered attacks as independent buttons.
+
+| Numbered attack count | Charge available | Independent numbered buttons | Replacements while charging |
 | --- | --- | --- | --- |
 | 2 | No | attack1, attack2 | None |
 | 3 | No | attack1, attack2, attack3 | None |
 | 4 | No | attack1, attack2, attack3, attack4 | None |
 | 5 | No | attack1, attack2, attack3, attack4, attack5 | None |
 | 2 | Yes | attack1, attack2 | None |
-| 3 | Yes | attack1, attack2 | attack1 -> attack3 |
-| 4 | Yes | attack1, attack2 | attack1 -> attack3; attack2 -> attack4 |
-| 5 | Yes | attack1, attack2, attack5 | attack1 -> attack3; attack2 -> attack4 |
+| 3 | Yes | attack1, attack2 | attack1 → attack3 |
+| 4 | Yes | attack1, attack2 | attack1 → attack3; attack2 → attack4 |
+| 5 | Yes | attack1, attack2, attack5 | attack1 → attack3; attack2 → attack4 |
 
-For the five-attack charged loadout, the third numbered button still sends attack5, not attack3. Substitutions change the move selected by an existing button; they must not create duplicate buttons or renumber the move IDs.
+For a charged five-attack loadout, attack5 remains independent while charging. Its button always identifies attack5.
 
-A charge-disabled fighter must not enter the charge stance, receive charge-only regeneration bonuses, expose an unusable Charge action, or have AI attempt it. Preserve separate downward-input uses such as fast fall, platform interactions and launch steering when disabling the charge ability.
+Charge-exclusive replacements use the existing base attack buttons and do not get duplicate independent buttons. Whether attack3 or attack4 is an independent move or a Charge replacement depends on the loadout, not its codename.
 
-Use a shared, data-driven loadout resolver for combat, controllers, AI, button visibility and labels. Validate unknown IDs, gaps, more than five families, missing required air variants, missing objects and illegal or duplicate routes. Charge-exclusive attacks must not also be reachable through their own keyboard/gamepad/touch button.
+For example, attack3 on a character without Charge is an independent third attack with midair_attack3. On a charged loadout, attack3 can instead replace attack1 and need no independent button or mid-air version.
 
-Keep the existing charge input timing, buffering, cooldown consumption, release/repress requirement, cancellation and interruption semantics. Verify that a cooldown cannot be bypassed by sending a different button or changing state. A replacement on cooldown must not accidentally execute its base attack; preserve separately documented fallback behavior for unavailable targets or art.
+Controls, AI, UI labels, cooldowns and combat must agree on the same loadout and routing. A character without Charge must not expose an unusable Charge action or enter the Charge stance.
 
-## Attack-created objects and existing mechanics
+## Mid-air shield and dodge fallback
 
-Every projectile, clone, summon, deployable or attack-owned effect uses its owning attack's object namespace. Air-specific objects use midair_attackN_object when owned by that air move. Runtime instance IDs may distinguish concurrent entities; they must not alter the asset frame suffix.
+Characters with mid-air shield frames use midair_shielding for their airborne shield.
 
-Preserve specialized projectile, summon and technique behavior classes. The naming requirement does not require deleting those abstractions or turning every entity into a generic projectile. If an attack creates several visually distinct objects, define collision-free child keys beneath its object namespace and document that extension; never reuse the final frame number as an object-type discriminator.
+Characters with no mid-air shield frames use their midair_mouvment animation frames to dodge in mid-air instead of performing a mid-air shield. This fallback is a dodge action, not a shield displayed with different art.
 
-For character 0001, preserve:
+Each mid-air dodge costs 25 energy. The character must have at least 25 energy to begin the dodge, and the cost is deducted once when the dodge starts.
 
-- attack1 and midair_attack1: the existing punch and airborne slash.
-- attack2 and midair_attack2: the existing kick/launcher and airborne downward attack.
-- attack3: the clone summon reached through Charge + attack1. Its appearance/disappearance cloud uses attack3_object. Preserve reversed disappearance playback and the clone's explicit reuse of the owner's attack1 or midair_attack2 clips and hit data.
-- attack4: the Sphere Rush reached through Charge + attack2. Preserve all form, rush, confirm, explosion, recovery and whiff phases; the 12 pose frames and 11 object frames; hand offsets; target binding; tick damage; explosion timing; interrupts and cooldown.
-- extra_attack: the shuriken throw, with its object release timing, flight, hitbox, lifetime and animation.
+## Attack-created objects
 
-A summon that reuses owner poses need not duplicate the PNGs to rename their pixels. Keep that reuse explicit in its definition while naming summon-owned objects and effects after attack3.
+Projectiles, clones, summons, deployables and attack-owned effects use the codename of the attack that creates them.
 
-## Repository files to inspect and update
+The standard object filename is:
 
-- js/config.js: NUMBERED_ATTACKS, COMBAT_BUTTONS, ACTIONS, MOVES, labels and bindings.
-- js/data/loadout.js: current attackButtons, numberedAttacks, chargeReplacement, describeLoadout and loadoutProblems helpers. Extend these rather than introducing another conflicting rule source.
-- js/data/characters.js and js/data/abilities.js: all character definitions, frame construction, actions, chargeReplacements, summons, chargedTechniques, projectiles, object art, ability names and fallback references.
-- js/game/character.js, combat.js, charged-technique.js, clone.js and projectile.js: action resolution, buffers, cooldown IDs, object creation and animation references.
-- js/core/input-manager.js and js/game/fighter-controller.js: held states and press edges for every supported attack, keyboard/gamepad mappings and all controller types.
-- js/game/combat-ai.js: moveset discovery for independent attack3/4/5, air variants and charged routing. Preserve difficulty behavior.
-- js/game/touch-controls.js, js/ui/mobile-abilities.js, js/core/touch-layout.js, js/ui/touch-layout-editor.js and styles.css: both touch layouts, layout editing, safe areas, hit targets and dynamic button counts.
-- js/core/settings.js: migrate existing saved touch layouts before sanitization. Convert legacy ba1, ba2 and uniqueba entries to canonical keys, preserving position and scale; prefer valid canonical entries when both exist. Preserve unrelated settings. Restrict old identifiers to an isolated read-only migration boundary and its tests; write only canonical IDs.
-- js/game/fighter-status.js, hud.js, screens, UI and js/core/i18n.js: labels, indicators, move references, accessibility names and both languages.
-- js/core/asset-loader.js, js/game/sprite-normalizer.js, sprite-animator.js and js/ui/sprite-art.js: loading, caching, fallback lookup, portraits and animation resolution.
-- assets/characters, test fixtures, tests, README.md, ALVA_SPEC.md and this root codename_rule: keep all live contracts consistent. Retain old names only where explicitly explaining migration or historical work.
+<id>_<attackCodename>_object_<frame>.png
 
-Inspect the latest files for the above gaps rather than assuming they remain. In the reviewed snapshot, loadout.js treats Charge as universal and accepts summon/technique replacements; settings sanitization drops unrecognized legacy layout IDs. Specifically verify genuine no-charge capability and saved-layout migration. If ordinary direct attacks are to serve as replacements, add and test their dispatch explicitly instead of disguising them as summons.
+| Owning attack | Object filename pattern |
+| --- | --- |
+| attackN | <id>_attackN_object_<frame>.png |
+| midair_attackN | <id>_midair_attackN_object_<frame>.png |
+| extra_attack | <id>_extra_attack_object_<frame>.png |
 
-## Validation and completion
+The object codename records gameplay ownership rather than a fictional technique or display name. Runtime instance IDs may distinguish concurrent objects, but must not change the asset frame suffix.
 
-Run the repository's dependency-free Node tests using node --test tests/*.test.mjs. Add behavior-focused coverage for all eight routing rows, missing required air variants, attack limits, charge-disabled state, and runtime controls on all input devices. Update codenames.test.mjs and loadout.test.mjs, their fixtures, and affected charge, clone, technique, controls, AI, settings and animation tests.
+If an attack creates multiple visually distinct object types, use documented child keys beneath its object namespace, such as attackN_object_<type>_<frame>. Do not use frame numbers to distinguish object types.
 
-Verify every referenced asset exists with exact case. Check that frame sequences and phase slices retain their order, that there are no rename collisions, and that old filenames are absent. Scope legacy-identifier scans so intentional migration readers and historical documentation are distinguishable from live aliases.
+A summon may explicitly reuse its owner's animation clips and hit data. Shared art does not need duplicate PNGs; summon-owned art and effects still follow the creating attack's object namespace.
 
-Serve the game over HTTP with python3 -m http.server 8000 and smoke-test Quick Battle, Practice Ground and Watch Mode. Check normal and airborne attacks, charge startup/loop/release, both replacements, clone fallback, Sphere Rush hit/whiff/interruption, extra-attack projectile, shield phases and movement. Exercise keyboard, gamepad and both touch layouts, including five independent attacks and the three-button charged five-attack layout using test fixtures where needed. Confirm no overlapping/unreachable controls, asset 404s or console errors. If browser validation is unavailable, report it explicitly rather than claiming it passed.
+## Internal codenames and display names
 
-Keep codename_rule at the repository root with this grammar, routing table, object ownership rules and examples. Finish with the changed files, completed rename mappings, test results, visual checks actually performed and any remaining art or design blockers. Do not report a completed migration until references, runtime behavior, assets, documentation and tests agree.
+Use attack1 through attack5, midair_attack1 through midair_attack5, extra_attack and charge as the shared internal vocabulary. Do not introduce alternate internal move names based on a character, technique or player-facing label.
+
+Legacy terms such as ba, maba, cba and uniqueba are not live attack IDs. They may appear only when documenting history or reading older saved data for migration.
+
+Player-facing names such as “Punch,” “Kick” or other character-specific move names may appear in menus and descriptions. They do not replace canonical IDs in character definitions, animation keys, filenames, controls, AI, cooldowns or object references.
+
+When adding or updating a character, keep its attack count, Charge routing, airborne variants, object ownership and animation assets consistent with these shared rules.
