@@ -7,8 +7,9 @@ export const ICONS = {
   left: svg('<path d="M15 4.5 7.5 12 15 19.5"/>'),
   right: svg('<path d="M9 4.5 16.5 12 9 19.5"/>'),
   arrow: svg('<path d="M4.5 12h15"/><path d="M13.5 6l6 6-6 6"/>'),
-  down: svg('<path d="M4.5 9 12 16.5 19.5 9"/>'),
   up: svg('<path d="M4.5 15 12 7.5 19.5 15"/>'),
+  // The universal Jump button's: an arrow rising off the ground, the same
+  // for every fighter (see js/game/touch-controls.js).
   jump: svg('<path d="M12 17.5V5.5"/><path d="M6.5 11 12 5.5l5.5 5.5"/><path d="M5 20.5h14"/>'),
   transform: svg('<path d="M12 2.5l2.3 7.2 7.2 2.3-7.2 2.3-2.3 7.2-2.3-7.2-7.2-2.3 7.2-2.3z"/>', { fill: true }),
   // The universal Shield button's glyph (see js/game/touch-controls.js). A
@@ -26,6 +27,10 @@ export const ICONS = {
   pip3: svg('<circle cx="12" cy="6.8" r="3"/><circle cx="7" cy="15.4" r="3"/><circle cx="17" cy="15.4" r="3"/>', { fill: true }),
   pip4: svg('<circle cx="7.4" cy="7.4" r="2.9"/><circle cx="16.6" cy="7.4" r="2.9"/><circle cx="7.4" cy="16.6" r="2.9"/><circle cx="16.6" cy="16.6" r="2.9"/>', { fill: true }),
   pip5: svg('<circle cx="6.4" cy="6.4" r="2.6"/><circle cx="17.6" cy="6.4" r="2.6"/><circle cx="12" cy="12" r="2.6"/><circle cx="6.4" cy="17.6" r="2.6"/><circle cx="17.6" cy="17.6" r="2.6"/>', { fill: true }),
+  // A funnel of gusts narrowing to the ground: the glyph a tornado's preview
+  // names to show should its frame fail to load (#0002's Whirlwind and
+  // Blue Tornado), never another attack's art.
+  tornado: svg('<path d="M3 5h18M5 9h13.5M7.5 13h9M9.5 17h5.5M11 20.5h2.5"/>'),
   pause: svg('<path d="M9 5.5v13M15 5.5v13"/>'),
   // Three dots: Practice Ground's More button.
   more: svg('<circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/>', { fill: true }),

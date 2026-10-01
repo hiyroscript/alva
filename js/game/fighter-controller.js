@@ -15,10 +15,12 @@ const LEDGE_LOOKAHEAD = 12;
 // but pause): each one's held state and its `…Pressed` edge.
 export const HELD_CONTROLS = Object.freeze(ACTIONS.filter((action) => action !== 'pause'));
 
-// Every field Fighter.update reads, all false: a complete, neutral snapshot,
+// Every field Fighter.update reads, all off: a complete, neutral snapshot,
 // keyed by control codename. Besides each held control and its press edge,
-// the touch mouvement buttons' one-step Dash requests and the training
-// CPU's platform drop.
+// the touch mouvement buttons' one-step Dash requests, the training CPU's
+// platform drop and the combat AI's `face` (1 right, -1 left, 0 none: the
+// way its attacks face, toward its opponent; see Fighter.updateFacing).
+// No player control produces either of the last two.
 export function blankInput() {
   const input = {};
   for (const control of HELD_CONTROLS) input[control] = false;
@@ -26,6 +28,7 @@ export function blankInput() {
   input.mouvementLeftPressed = false;
   input.mouvementRightPressed = false;
   input.dropPressed = false;
+  input.face = 0;
   return input;
 }
 

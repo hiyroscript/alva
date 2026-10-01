@@ -210,6 +210,7 @@ export class PracticeGroundScreen extends Screen {
     this.touch.setScheme(app.settings.mobileControls);
     this.touch.setLayout(app.settings.touchLayout(this.touch.scheme));
     this.touch.setCharacter(def);
+    this.syncTouch();
     this.token = {};
     const token = this.token;
 
@@ -244,6 +245,7 @@ export class PracticeGroundScreen extends Screen {
     this.session.setCPU(def, sprites);
     this.hud.bind(this.session.player, this.session.cpu);
     this.hud.update(this.session);
+    this.syncTouch();
     this.syncMenu();
     this.needsResize = true;
     this.resizeObserver.observe(this.el);
@@ -301,6 +303,16 @@ export class PracticeGroundScreen extends Screen {
     if (!this.isRunning || this.app.device.blockedPortrait) return;
     session.frame(dt);
     this.hud.update(session);
+    this.syncTouch();
+  }
+
+  // The touch buttons show the moves the player's own fighter makes where
+  // it is (its mid-air ones while it is off the ground; see
+  // TouchControls.setAirborne), never the CPU's. Out of play, or before a
+  // session exists, they show its ground moves, as it will respawn.
+  syncTouch() {
+    const player = this.session?.player;
+    this.touch.setAirborne(!!player && !player.lostToVoid && !player.grounded);
   }
 
   onDeviceChange() {
@@ -454,8 +466,10 @@ export class PracticeGroundScreen extends Screen {
 
     this.characterId = def.id;
     this.session.setFighter(def, sprites);
-    // The player's touch buttons show the new fighter's art at once, Jump's too.
+    // The player's touch buttons show the new fighter's art at once, for
+    // where it now stands.
     this.touch.setCharacter(def);
+    this.syncTouch();
     this.hud.bind(this.session.player, this.session.cpu);
     this.hud.update(this.session);
     this.closeRoster({ silent: true });

@@ -5,10 +5,9 @@
 //   lower-left : a circular joystick for runLeft / runRight (a plain base
 //                and knob, no arrows in it), with two small Dash buttons,
 //                Left mouvement and Right mouvement (mouvementLeft /
-//                mouvementRight), just above its top-left and top-right,
-//                and Down (a down arrow) to its left:
-//                      [◀]     [▶]
-//                  [▼] (   ●   )
+//                mouvementRight), just above its top-left and top-right:
+//                   [◀]     [▶]
+//                   (   ●   )
 //   lower-right:        [SPHERE]        [SHURIKEN]
 //                 [CLONE]   [TRANSFORM] [SHIELD]
 //                     [PUNCH] [KICK] [JUMP]
@@ -16,31 +15,31 @@
 //   (#0001: four numbered attack buttons, in slots 1 to 4; see below.)
 //
 // Classic Buttons (the original layout):
-//   lower-left : [LEFT] [▼] [RIGHT]  — thumb can slide between them
+//   lower-left : [LEFT] [RIGHT]  — thumb can slide between them
 //   lower-right: the same buttons
 //
 // Both schemes drive the same internal inputs. The joystick holds `runLeft`
 // or `runRight` exactly as the Left / Right buttons do (a digital hold: how
-// far it is pushed never changes the speed), and either down arrow is the
-// same held `down`. The mouvement buttons are the only thing new: a single
-// tap asks InputManager for one Dash (queueTouchMouvement), which
-// Fighter.tryDash accepts or refuses under the usual rules. They hold
-// nothing.
+// far it is pushed never changes the speed). The mouvement buttons are the
+// only thing new: a single tap asks InputManager for one Dash
+// (queueTouchMouvement), which Fighter.tryDash accepts or refuses under the
+// usual rules. They hold nothing. Neither scheme has a Down button: `down`
+// (the fast fall, steering a launch downward) is the keyboard's and the
+// gamepad's.
 //
-// The down arrow is Down (the `down` input, held for as long as the pointer
-// stays on it): a direction only, for the fast fall and for steering a
-// launch downward. The large top slot is the `extra_attack` input, the
-// middle row's first button `transform`, and the numbered attack buttons
-// (`attack1` to `attack5`) sit in numbered slots: each shows a frame of the
-// fighter's own art for its move, in the art's own colours (#0001's
-// shuriken throw, punch, kick, Clone Attack hand seal and Sphere Rush; see
-// setCharacter and js/ui/mobile-abilities.js), and so does Jump, with the
-// fighter's own jump. Transform keeps its star, shown as reserved (dashed)
-// while the fighter presents none, and a button for an ability the fighter
-// does not have at all (left out of its `actions`) is hidden. Shield is the
-// universal `shield` input, held for as long as the pointer stays on it, and
-// keeps its shield glyph, as Down, the joystick and the Left / Right and
-// mouvement buttons keep their arrows.
+// The large top slot is the `extra_attack` input, the middle row's first
+// button `transform`, and the numbered attack buttons (`attack1` to
+// `attack5`) sit in numbered slots: each shows a frame of the fighter's own
+// art for the move it makes where the fighter is, in the art's own colours
+// (#0001's shuriken throw, punch, kick, Clone Attack hand seal and Sphere
+// Rush on the ground, its kunai slash and airborne kick in the air; see
+// setCharacter, setAirborne and js/ui/mobile-abilities.js). Transform keeps
+// its star, shown as reserved (dashed) while the fighter presents none, and
+// a button for an ability the fighter does not have at all (left out of its
+// `actions`) is hidden. Shield is the universal `shield` input, held for as
+// long as the pointer stays on it, and keeps its shield glyph, as Jump keeps
+// its up arrow (the same for every fighter, on the ground or in the air) and
+// the joystick and the Left / Right and mouvement buttons their arrows.
 //
 // Numbered attack slots, a honeycomb round Transform and Shield, filled in
 // order by the numbered attacks the fighter has (every one a button of its
@@ -74,8 +73,8 @@
 // it (the CSS `translate` property, from where the stylesheet puts it) and
 // sizes it (`scale`, which grows its hit area with it), so the default
 // layout is the stylesheet's own, untouched, and holding, sliding and
-// multi-touch work exactly as before. Classic Buttons' Left / Down / Right
-// still slide into one another wherever they are: their cluster captures the
+// multi-touch work exactly as before. Classic Buttons' Left and Right still
+// slide into one another wherever they are: their cluster captures the
 // pointer and hit-tests the buttons where they are drawn.
 //
 // Accessible names are translation keys (js/core/i18n.js), marked so they
@@ -85,7 +84,7 @@ import { el } from '../core/utils.js';
 import { tattr, setAttr, setPlainAttr } from '../core/i18n.js';
 import { ICONS } from '../ui/icons.js';
 import { NUMBERED_ATTACKS } from '../config.js';
-import { ABILITY_ACTIONS, abilityPresence, jumpArt, mobileAbility, mobileAbilityLabelKey } from '../ui/mobile-abilities.js';
+import { ABILITY_ACTIONS, abilityPresence, mobileAbility, mobileAbilityLabelKey } from '../ui/mobile-abilities.js';
 import { DEFAULT_MOBILE_CONTROLS, resolveSetting } from '../core/settings.js';
 import {
   TOUCH_CONTROL_IDS, sanitizeTouchLayout, sanitizeTouchLayouts, layoutArea, placeControl,
@@ -95,16 +94,14 @@ import {
 // accessible name's translation key.
 const DPAD = [
   { action: 'runLeft', label: 'control.runLeft', icon: ICONS.left },
-  { action: 'down', label: 'control.down', icon: ICONS.down },
   { action: 'runRight', label: 'control.runRight', icon: ICONS.right },
 ];
 
 // Lower-right cluster, in on-screen order. `ability` marks the combat
 // buttons (their glyphs drawn a little larger); the fighter-specific ones
 // (extra_attack, transform, attack1 to attack5) carry no icon or label
-// here: setCharacter fills them in, and marks a reserved one. Jump's arrow
-// is only its look until a fighter is named: then it shows that fighter's
-// jump (setCharacter), under its universal name. `pos` is the
+// here: setCharacter fills them in, and marks a reserved one. Jump keeps
+// its up arrow and universal name whatever the fighter. `pos` is the
 // button's place in the cluster (its tc-<pos> class); a numbered attack
 // button (`attack`) is also placed by the slot setCharacter gives it
 // (data-slot, see above).
@@ -127,10 +124,6 @@ export function attackSlots(shown) {
   return slots;
 }
 
-// The Joystick scheme's Down: the same held `down`, as a down arrow in the
-// lower-left cluster, to the left of the stick.
-const STICK_DOWN = { action: 'down', label: 'control.down', icon: ICONS.down, pos: 'stick-down' };
-
 // The Joystick scheme's single-tap Dash buttons, mouvementLeft and
 // mouvementRight. Their codenames and English names are exactly these,
 // spelling included (Left mouvement, Right mouvement).
@@ -144,8 +137,8 @@ const MOUVEMENT_BUTTONS = [
 // the two keeps a thumb resting near the edge from flickering the direction
 // (every flicker would be a fresh press, and two quick presses a Dash). Only
 // the sideways part counts: pushing up or down moves the knob, never Jump or
-// Down (the down arrow beside it holds Down). The knob follows the thumb and
-// stops `travel` from the centre, so it stays inside the base.
+// Down. The knob follows the thumb and stops `travel` from the centre, so it
+// stays inside the base.
 export const JOYSTICK = Object.freeze({ deadzone: 0.24, engage: 0.34, travel: 0.56 });
 
 // The direction a joystick at sideways offset `x` (a fraction of its radius,
@@ -197,6 +190,10 @@ export class TouchControls {
     this.area = null;
     // Sprite files that failed to load: their buttons show glyphs instead.
     this.failedArt = new Set();
+    // The fighter presented (setCharacter) and whether it is in the air
+    // (setAirborne): which of its moves the buttons show.
+    this.def = null;
+    this.airborne = false;
     this.build();
     this.setScheme(scheme);
   }
@@ -211,12 +208,10 @@ export class TouchControls {
       dpad.append(b);
     }
 
-    // The Joystick scheme's lower-left cluster: Down (the down arrow), then
-    // the stick between its two mouvement buttons. The stick is a plain base
-    // and knob: no arrows in it.
+    // The Joystick scheme's lower-left cluster: the stick between its two
+    // mouvement buttons. The stick is a plain base and knob: no arrows in it.
     this.knob = el('div', { class: 'tc-stick-knob' });
     this.stick = el('div', { class: 'tc-stick', role: 'group', ...tattr('aria-label', 'touch.joystick') }, [this.knob]);
-    this.stickDown = makeButton(STICK_DOWN, `tc-${STICK_DOWN.pos}`);
     this.mouvementButtons = new Map(); // 'mouvementLeft' / 'mouvementRight' -> button
     for (const spec of MOUVEMENT_BUTTONS) {
       const b = el('button', {
@@ -227,7 +222,7 @@ export class TouchControls {
       this.mouvementButtons.set(spec.control, b);
     }
     const joystick = el('div', { class: 'tc-cluster tc-joystick' }, [
-      this.stickDown, this.mouvementButtons.get('mouvementLeft'), this.stick, this.mouvementButtons.get('mouvementRight'),
+      this.mouvementButtons.get('mouvementLeft'), this.stick, this.mouvementButtons.get('mouvementRight'),
     ]);
 
     // Lower-right cluster, shared by both schemes.
@@ -243,12 +238,12 @@ export class TouchControls {
     this.joystick = joystick;
     this.actions = actions;
     // Every button either scheme shows, for clearing their pressed looks.
-    this.allButtons = [...this.padButtons.values(), ...this.actionButtons.values(), this.stickDown, ...this.mouvementButtons.values()];
+    this.allButtons = [...this.padButtons.values(), ...this.actionButtons.values(), ...this.mouvementButtons.values()];
     // Neutral until a screen names the fighter.
     this.setCharacter(null);
 
     // Classic lower-left cluster: it captures the pointer so a thumb can
-    // slide between LEFT / DOWN / RIGHT without lifting.
+    // slide between LEFT and RIGHT without lifting.
     dpad.addEventListener('pointerdown', (e) => this.onDpadDown(e));
     dpad.addEventListener('pointermove', (e) => this.onDpadMove(e));
     for (const type of END_EVENTS) dpad.addEventListener(type, (e) => this.onPointerEnd(e));
@@ -262,9 +257,8 @@ export class TouchControls {
       });
     }
 
-    // Held buttons (the lower-right actions and the Joystick scheme's Down):
-    // each button owns its pointers.
-    for (const b of [...this.actionButtons.values(), this.stickDown]) {
+    // Held buttons (the lower-right actions): each button owns its pointers.
+    for (const b of this.actionButtons.values()) {
       const action = b.getAttribute('data-action');
       b.addEventListener('pointerdown', (e) => {
         // A hidden button (an ability the fighter does not have) takes nothing.
@@ -308,19 +302,15 @@ export class TouchControls {
   // Shows the 'joystick' or 'classic' layout (anything else is the
   // default, Joystick), with that scheme's own custom layout. Everything held
   // is let go first, so a switch never leaves a direction or any other
-  // button down. The fighter's own art and names are untouched: the
-  // combat buttons and Jump are the same elements in both.
+    // button down. The fighter's own art and names are untouched: the
+    // combat buttons and Jump are the same elements in both.
   setScheme(scheme) {
     const next = resolveSetting('mobileControls', scheme);
     this.releaseAll();
     if (next === this.scheme) return;
     this.scheme = next;
     const joystick = next === 'joystick';
-    this.buttons = new Map([
-      ...(joystick ? [] : this.padButtons),
-      ...this.actionButtons,
-      ...(joystick ? [['down', this.stickDown]] : []),
-    ]);
+    this.buttons = new Map([...(joystick ? [] : this.padButtons), ...this.actionButtons]);
     this.root.replaceChildren(joystick ? this.joystick : this.dpad, this.actions);
     this.root.classList.toggle('is-joystick', joystick);
     this.root.classList.toggle('is-classic', !joystick);
@@ -337,7 +327,6 @@ export class TouchControls {
     if (scheme === 'classic' && this.padButtons.has(id)) return this.padButtons.get(id);
     if (scheme === 'joystick') {
       if (id === 'stick') return this.stick;
-      if (id === 'down') return this.stickDown;
       if (this.mouvementButtons.has(id)) return this.mouvementButtons.get(id);
     }
     return this.actionButtons.get(id) ?? null;
@@ -560,14 +549,14 @@ export class TouchControls {
   }
 
   // Shows `def`'s own abilities (its mobileAbilities) on the fighter-specific
-  // buttons: each one's art (a frame of the fighter's own animation, or
-  // Transform's star) and accessible name, and whether it shows as
-  // reserved, nothing else; and its own jump on Jump. The buttons stay the
-  // same elements with the same data-action and pointer handling, so input,
-  // held state and multi-touch carry on untouched: only what they show is
-  // swapped, in place (see showArt). Null (or a fighter that authors none)
-  // gives the neutral glyphs, with Transform reserved. A translated name is
-  // marked to follow the language.
+  // buttons, for where it is (see setAirborne): each one's art (a frame of
+  // the fighter's own art, or Transform's star) and accessible name, and
+  // whether it shows as reserved or out of reach, nothing else. Jump keeps
+  // its arrow. The buttons stay the same elements with the same data-action
+  // and pointer handling, so input, held state and multi-touch carry on
+  // untouched: only what they show is swapped, in place (see showArt). Null
+  // (or a fighter that authors none) gives the neutral glyphs, with
+  // Transform reserved. A translated name is marked to follow the language.
   //
   // A button whose ability the fighter does not have at all (see
   // abilityPresence: left out of its `actions`) is hidden: not drawn, not
@@ -582,33 +571,23 @@ export class TouchControls {
   // with attack1 to attack5 shows five. attack1's and attack2's places stay
   // empty when hidden, so no other button moves for them.
   setCharacter(def) {
+    this.def = def;
     let shown = false;
     for (const action of ABILITY_ACTIONS) {
       const b = this.actionButtons.get(action);
-      // An ability the fighter lacks, kept on show: in its neutral look.
-      const from = this.showAbsent && abilityPresence(def, action) === 'absent' ? null : def;
-      const ability = mobileAbility(from, action);
-      const absent = !ability;
+      const absent = !mobileAbility(this.presented(action), action);
       if (b.hidden && !absent) shown = true;
       b.hidden = absent;
-      if (absent) {
-        this.releaseAction(action);
-        b.removeAttribute('aria-label');
-        b.removeAttribute('data-i18n-aria-label');
-        b.removeAttribute('data-i18n-aria-label-params');
-        this.showArt(b, { sprite: null, icon: '' });
-        b.classList.remove('is-pending');
-        continue;
-      }
-      const key = mobileAbilityLabelKey(from, action);
-      if (key) setAttr(b, 'aria-label', key);
-      else setPlainAttr(b, 'aria-label', ability.label);
-      this.showArt(b, ability);
-      b.classList.toggle('is-pending', ability.pending);
+      if (!absent) continue;
+      this.releaseAction(action);
+      b.removeAttribute('aria-label');
+      b.removeAttribute('data-i18n-aria-label');
+      b.removeAttribute('data-i18n-aria-label-params');
+      this.showArt(b, { sprite: null, icon: '' });
+      b.classList.remove('is-pending', 'is-unavailable');
+      b._look = null;
     }
-    // Jump: always on show, always named Jump, drawn with the fighter's own
-    // jump.
-    this.showArt(this.actionButtons.get('jump'), jumpArt(def));
+    this.showAbilities();
     const slots = attackSlots((action) => !this.actionButtons.get(action).hidden);
     let moved = false;
     for (const action of NUMBERED_ATTACKS) {
@@ -624,6 +603,47 @@ export class TouchControls {
     // A button back on show, or one in a new slot: place them again, as the
     // layout says.
     if (shown || moved) this.applyLayout();
+  }
+
+  // Whether the presented fighter is in the air: its buttons then show the
+  // moves they make there (its mid-air attacks), and the ones whose move is
+  // ground-only show out of reach; back on the ground, its ground moves
+  // again. The screens call it after every simulation frame with Player 1's
+  // own fighter; only a change redraws anything, and only the buttons whose
+  // look changes. What each button sends never changes.
+  setAirborne(airborne) {
+    const next = !!airborne;
+    if (next === this.airborne) return;
+    this.airborne = next;
+    this.showAbilities();
+  }
+
+  // The fighter `action`'s button presents: the one named, or none (the
+  // neutral look) for an ability it lacks that `showAbsent` keeps on show.
+  presented(action) {
+    return this.showAbsent && abilityPresence(this.def, action) === 'absent' ? null : this.def;
+  }
+
+  // Draws every fighter-specific button on show as the presented fighter
+  // has it where it is: its name, art and reserved or out-of-reach look. A
+  // button whose look is the same as last time is left alone.
+  showAbilities() {
+    for (const action of ABILITY_ACTIONS) {
+      const b = this.actionButtons.get(action);
+      if (b.hidden) continue;
+      const from = this.presented(action);
+      const ability = mobileAbility(from, action, this.airborne);
+      const key = mobileAbilityLabelKey(from, action, this.airborne);
+      const { sprite } = ability;
+      const look = [key, ability.label, sprite?.url, sprite?.mirrored, ability.icon, ability.pending, ability.unavailable].join('|');
+      if (b._look === look) continue;
+      b._look = look;
+      if (key) setAttr(b, 'aria-label', key);
+      else setPlainAttr(b, 'aria-label', ability.label);
+      this.showArt(b, ability);
+      b.classList.toggle('is-pending', ability.pending);
+      b.classList.toggle('is-unavailable', ability.unavailable);
+    }
   }
 
   // Lets go of every pointer holding `action`'s button.

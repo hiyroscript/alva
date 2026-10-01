@@ -178,6 +178,7 @@ export class BattleScreen extends Screen {
     this.touch.setScheme(app.settings.mobileControls);
     this.touch.setLayout(app.settings.touchLayout(this.touch.scheme));
     this.touch.setCharacter(watch ? null : p1Def);
+    this.syncTouch();
     this.touchRoot.hidden = watch;
     this.el.classList.toggle('is-watch', watch);
     this.el.dataset.map = map.id;
@@ -219,6 +220,7 @@ export class BattleScreen extends Screen {
       difficulty,
     });
     this.hud.bind(this.battle.p1, this.battle.p2);
+    this.syncTouch();
     this.needsResize = true;
     this.paused = false;
     this.hidePause();
@@ -295,6 +297,15 @@ export class BattleScreen extends Screen {
     return !!this.battle && !this.paused && this.battle.phase !== 'result';
   }
 
+  // The touch buttons show the moves Player 1's own fighter makes where it
+  // is (its mid-air ones while it is off the ground; see
+  // TouchControls.setAirborne), never the CPU's. Out of play, or before a
+  // battle exists, they show its ground moves, as it will respawn.
+  syncTouch() {
+    const p1 = this.mode === 'watch' ? null : this.battle?.p1;
+    this.touch.setAirborne(!!p1 && !p1.lostToVoid && !p1.grounded);
+  }
+
   update(dt) {
     const battle = this.battle;
     if (!battle) return;
@@ -307,6 +318,7 @@ export class BattleScreen extends Screen {
     if (!this.isRunning || this.app.device.blockedPortrait) return;
     battle.frame(dt);
     this.hud.update(battle);
+    this.syncTouch();
     // Handled after the frame rather than from inside the simulation step, so
     // a draw can restart the battle safely.
     if (battle.phase === 'result') {
@@ -404,6 +416,7 @@ export class BattleScreen extends Screen {
     if (!this.battle) return;
     this.battle.restart();
     this.hud.update(this.battle);
+    this.syncTouch();
     this.setBanner(null);
     this.hideResult();
     this.paused = true; // resume() clears it
@@ -461,6 +474,7 @@ export class BattleScreen extends Screen {
     this.hideResult();
     this.battle.restart();
     this.hud.update(this.battle);
+    this.syncTouch();
     this.paused = false;
     this.setPlayActive(true);
     document.activeElement?.blur?.();

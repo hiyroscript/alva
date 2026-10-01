@@ -25,10 +25,14 @@
 //             fighter's own move data, and take the best one after the
 //             level's noise.
 //   act       turn the chosen intent into held buttons and one-step presses,
-//             over as many steps as it needs (turn, then strike, or turn,
-//             then press attack4 for #0001's Sphere Rush; tap, release, tap
-//             for a Dash). It never presses a button the fighter has no
-//             action for.
+//             over as many steps as it needs (one press to strike, or to
+//             set off #0001's Sphere Rush; tap, release, tap for a Dash).
+//             It never presses a button the fighter has no action for.
+//   track     every step, the way its attacks should face: toward the
+//             opponent where it is now (`face`, the one input of its own;
+//             see track). Its fighter starts every attack facing that way
+//             and keeps facing the opponent through it, without a step or
+//             a held direction spent turning.
 //
 // Reaction: something new the opponent does (an attack's startup, a
 // projectile, a clone's cloud, a technique, a whiff) is an event. Each is noticed once, after a delay sampled from the level's
@@ -70,6 +74,10 @@ const LEDGE_MARGIN = 10;
 // A neutral press of a direction waits this long after the last press of the
 // same direction, so walking never double-taps into a Dash by accident.
 const TAP_SLACK = 1 / 60;
+// World units the opponent must be off to one side before its attacks face
+// that way: level with it (overlapping, or rolled through) it keeps the last
+// way, so the two never flick it back and forth.
+const FACE_DEADZONE = 2;
 
 const passOf = (anim) => (anim ? anim.frames.length / anim.fps : 0);
 const overlap = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
@@ -232,7 +240,9 @@ export class CombatAIController {
     // When it last pressed an attack or landed a hit: the longer neutral
     // drags on, the more it wants to commit (see urge).
     this.lastOffence = 0;
-    this.turning = false;
+    // The way its attacks face (see track): 1 or -1, 0 until it first looks.
+    this.aim = 0;
+    this.face = 0;
     // A jump's button stays held until this clock time, then is let go in
     // time for the normal jump (see holdJump).
     this.jumpHoldUntil = -Infinity;
@@ -248,7 +258,7 @@ export class CombatAIController {
     this.clock += dt;
     this.tap.age += dt;
     this.gravity = ctx.gravity ?? 2500;
-    this.turning = false;
+    this.face = 0;
     const held = this.held;
     for (const k of BUTTONS) held[k] = false;
 
@@ -270,6 +280,7 @@ export class CombatAIController {
       return this.emit();
     }
 
+    this.face = this.track(self, foe);
     this.perceive(self, foe, ctx);
     this.thinkTimer -= dt;
     const urgent = this.eventDue();
@@ -289,8 +300,19 @@ export class CombatAIController {
     if (this.clock <= this.jumpHoldUntil) held.jump = true;
   }
 
-  // The snapshot for this step: what is held, and a press edge for each
-  // button that went down this step (and only this step).
+  // The way its attacks face this step (see Fighter.updateFacing): toward
+  // the opponent where it is now, read on every step rather than when it
+  // decides, so no attack starts or plays facing where the opponent was.
+  // Level with it, the last way (the way it faces, before it has one).
+  track(self, foe) {
+    const dx = foe.body.x - self.body.x;
+    if (Math.abs(dx) > FACE_DEADZONE || !this.aim) this.aim = Math.sign(dx) || self.facing;
+    return this.aim;
+  }
+
+  // The snapshot for this step: what is held, a press edge for each button
+  // that went down this step (and only this step), and the way its attacks
+  // face (none while there is nobody in play to face).
   emit() {
     const { out, held, prev } = this;
     for (const k of BUTTONS) {
@@ -298,6 +320,7 @@ export class CombatAIController {
       out[`${k}Pressed`] = held[k] && !prev[k];
       prev[k] = held[k];
     }
+    out.face = this.face;
     // Only the training CPU drops through platforms; no player control can,
     // so neither does this one (it walks off an edge instead).
     out.dropPressed = false;
@@ -752,7 +775,9 @@ export class CombatAIController {
   // keeps and its step-in), against where the opponent's motion takes it by
   // then, as far as the level projects. An attack with a motion of its own
   // is judged by where that motion takes its strikes instead (see
-  // motionFits). Never one used up until the fighter lands again.
+  // motionFits), the way it sets off: toward the opponent where it is now
+  // (see track), committed from its first step. Never one used up until the
+  // fighter lands again.
   meleeOptions(s, air = !s.grounded) {
     const { self, foe, p } = s;
     const out = [];
@@ -766,7 +791,7 @@ export class CombatAIController {
       const fx = fb.x + fb.vx * lt;
       const fy = fb.grounded ? fb.y : fb.y + fb.vy * lt + 0.5 * s.g * lt * lt;
       if (m.motion) {
-        const face = Math.sign(fx - s.x) || s.facing;
+        const face = this.face || s.facing;
         if (this.motionFits(m, s, fx, fy, face)) out.push({ ...m, face, value: this.hitValue(atk, s, face) });
         continue;
       }
@@ -820,7 +845,7 @@ export class CombatAIController {
   }
 
   attackIntent(m) {
-    return { kind: 'attack', action: m.action, face: m.face, until: this.clock + 0.3 };
+    return { kind: 'attack', action: m.action, until: this.clock + 0.3 };
   }
 
   // The neutral options that fit this moment, each scored.
@@ -851,14 +876,13 @@ export class CombatAIController {
       let score = s.aggro * (0.7 + m.value) + exposedBonus;
       if (s.foeShielding) score *= 0.3 + (s.foeEnergy <= self.energyDef.shieldHitCost * 2 ? 0.5 * p.punish : 0);
       if (busyFor(m.atk.startup + 1 / 30)) score += p.punish * 1.4 + m.value * 0.5;
-      if (m.face !== s.facing) score *= 0.92;
       out.push({ score, intent: this.attackIntent(m) });
     }
 
     // Throw (a ranged attack): chips from a distance.
     for (const r of s.ms.ranged) {
       const score = this.rangedScore(r, s);
-      if (score > 0) out.push({ score, intent: { kind: 'attack', action: r.action, face: s.dir, until: this.clock + 0.3, ranged: true } });
+      if (score > 0) out.push({ score, intent: { kind: 'attack', action: r.action, until: this.clock + 0.3, ranged: true } });
     }
 
     if (s.sameLevel) {
@@ -947,7 +971,8 @@ export class CombatAIController {
   // each one ready and on the ground pressed on its own button when it
   // fits: a summon like the Clone Attack at an opponent likely to stay put,
   // a technique like the Sphere Rush it is in line for. A technique goes the
-  // way the fighter faces, so it turns first. Worth its long cooldown only
+  // way the fighter faces as it starts: toward the opponent (see track).
+  // Worth its long cooldown only
   // when it is likely to land, as the level judges it. A summon holds the
   // fighter only for its short startup (if it has one: #0001's summoning
   // pose), as it would a player, and its lead counts it; a technique holds
@@ -965,10 +990,9 @@ export class CombatAIController {
       if (v <= 0.12) continue;
       const exposed = c.type === 'technique' && !(s.openings.length && s.foeBusy > c.lead);
       const risk = exposed ? 0.2 + 0.8 * safety : 1;
-      const face = c.type === 'technique' ? s.dir : 0;
       out.push({
         score: p.specials * (0.3 + 2 * v) * risk + s.urge * 0.2,
-        intent: { kind: 'attack', action: c.action, face, until: this.clock + 0.3 },
+        intent: { kind: 'attack', action: c.action, until: this.clock + 0.3 },
       });
     }
     return out;
@@ -1057,8 +1081,9 @@ export class CombatAIController {
     }
   }
 
-  // Turn to face the target if needed (one step of the direction), then one
-  // press of the button. Done once the attack has run (or was refused).
+  // One press of the button: the attack starts facing the opponent (see
+  // track), with no step or direction spent turning first. Done once the
+  // attack has run (or was refused).
   actAttack(self, it, held) {
     if (it.pressed) {
       if (self.canAct() || this.clock - it.pressedAt > 2) it.done = true;
@@ -1066,11 +1091,6 @@ export class CombatAIController {
     }
     if (this.clock > it.until || !self.canAct()) {
       it.done = true;
-      return;
-    }
-    if (it.face && self.facing !== it.face) {
-      held[DIR_KEY[it.face]] = true;
-      this.turning = true;
       return;
     }
     held[it.action] = true;
@@ -1113,14 +1133,11 @@ export class CombatAIController {
     } else if (it.dir) {
       held[DIR_KEY[it.dir]] = true;
     }
-    // An air attack once the opponent comes into its reach on the way:
-    // steer to face it first (in the air that turns at once), then press.
+    // An air attack once the opponent comes into its reach on the way,
+    // facing it as it starts (see track).
     if (it.air && !it.struck && self.canAct()) {
       const m = this.meleeOptions(this.sense(self, foe, ctx), true)[0];
-      if (m && m.face !== self.facing) {
-        held[DIR_KEY[-m.face]] = false;
-        held[DIR_KEY[m.face]] = true;
-      } else if (m) {
+      if (m) {
         held[m.action] = true;
         it.struck = true;
       }
@@ -1252,7 +1269,7 @@ export class CombatAIController {
     return !!stage.surfaceBelow(x - b.halfW, x + b.halfW, b.y).ref;
   }
 
-  // Last checks on what the intent holds: never turn its own attack away
+  // Last checks on what the intent holds: never steer its own attack away
   // from the opponent, never walk off the main floor into open air, hop a
   // solid block in the way, and never double-tap into a Dash by accident.
   guard(self, ctx, held) {
@@ -1260,9 +1277,9 @@ export class CombatAIController {
     const dir = held.runRight === held.runLeft ? 0 : held.runRight ? 1 : -1;
     if (!dir) return;
     const key = DIR_KEY[dir];
-    // A direction held while its attack plays turns it (see
-    // Fighter.updateFacing): steering back to brake an aerial would swing
-    // the strike away. Only ever toward the opponent, then.
+    // Its attack faces the opponent whatever is held (see track), but
+    // steering back to brake an aerial would carry the strike off it. Only
+    // ever toward the opponent, then.
     const foe = self.opponent;
     if (self.combat.attack && dir !== self.facing && foe && Math.sign(foe.body.x - b.x) !== dir) {
       held[key] = false;
@@ -1272,9 +1289,8 @@ export class CombatAIController {
     if (b.grounded && !this.intent?.jumped) {
       const decel = self.def.movement.deceleration;
       const stop = Math.sign(b.vx) === dir ? (b.vx * b.vx) / (2 * decel) : 0;
-      // A Dash's taps look a whole Dash ahead; a one-step turn barely moves.
-      const margin = dashing ? (readMoveset(self).dash?.distance ?? 0) + LEDGE_MARGIN
-        : this.turning ? 2 : LEDGE_MARGIN + stop;
+      // A Dash's taps look a whole Dash ahead.
+      const margin = dashing ? (readMoveset(self).dash?.distance ?? 0) + LEDGE_MARGIN : LEDGE_MARGIN + stop;
       if (!this.groundAhead(self, ctx.stage, dir, margin)) {
         held[key] = false;
         if (this.intent && this.intent.kind !== 'attack') this.intent.done = true;

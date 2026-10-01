@@ -66,9 +66,10 @@ export class InputManager {
 
     // Reused per-step snapshot to avoid allocations in the sim loop: every
     // held control and its press edge, and the touch mouvement requests
-    // (see blankInput). Never `dropPressed`: only the training CPU drops
-    // through platforms.
-    const { dropPressed, ...frame } = blankInput();
+    // (see blankInput). Never `dropPressed` or `face`: only the training CPU
+    // drops through platforms, and only the combat AI's attacks turn toward
+    // their opponent by themselves.
+    const { dropPressed, face, ...frame } = blankInput();
     this.frame = frame;
 
     this._onKeyDown = this._onKeyDown.bind(this);

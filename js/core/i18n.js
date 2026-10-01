@@ -49,6 +49,9 @@ function registryStrings() {
   for (const def of CHARACTERS) {
     for (const [action, own] of Object.entries(def.mobileAbilities ?? {})) {
       if (own?.label) out[`ability.${def.id}.${action}`] = own.label;
+      for (const [state, preview] of Object.entries(own?.previews ?? {})) {
+        if (preview?.label) out[`ability.${def.id}.${action}.${state}`] = preview.label;
+      }
     }
   }
   for (const power of POWERS) {
@@ -290,8 +293,8 @@ const EN = {
   'settings.controlsNote': 'The touch layout for Quick Battle and Practice Ground. Keyboard and gamepad controls stay the same.',
   'settings.scheme.joystick': 'Joystick',
   'settings.scheme.classic': 'Classic Buttons',
-  'settings.scheme.joystickDesc': 'A round joystick to move, one-tap Left and Right mouvement buttons to Dash, and Down to the left of the joystick to fast-fall.',
-  'settings.scheme.classicDesc': 'The original Left, Down and Right buttons. Tap a direction twice to Dash; hold Down in the air to fast-fall.',
+  'settings.scheme.joystickDesc': 'A round joystick to move, with one-tap Left and Right mouvement buttons to Dash.',
+  'settings.scheme.classicDesc': 'The original Left and Right buttons. Tap a direction twice to Dash.',
   'settings.customize': 'Customize touch controls',
   'settings.customizeNote': 'Move and resize every control of the {scheme} layout.',
   'settings.customized': 'Custom layout',
@@ -338,6 +341,9 @@ const FR = {
   'ability.0002.attack1': 'Coup de poing',
   'ability.0002.attack2': 'Coup de pied',
   'ability.0002.attack3': 'Vrille',
+  'ability.0002.attack1.air': 'Attaque téléguidée',
+  'ability.0002.attack2.air': 'Attaque rebond',
+  'ability.0002.attack3.air': 'Tornade bleue',
 
   'power.jump.name': 'Puissance de saut',
   'power.jump.summary': 'Détermine la hauteur d’un saut normal. Plus le niveau est élevé, plus le saut est haut.',
@@ -597,8 +603,8 @@ const FR = {
   'settings.controlsNote': 'La disposition tactile du Combat rapide et du Terrain d’entraînement. Les commandes au clavier et à la manette ne changent pas.',
   'settings.scheme.joystick': 'Joystick',
   'settings.scheme.classic': 'Boutons classiques',
-  'settings.scheme.joystickDesc': 'Un joystick rond pour se déplacer, des boutons de mouvement gauche et droit pour sprinter d’une seule touche, et Bas à gauche du joystick pour tomber plus vite.',
-  'settings.scheme.classicDesc': 'Les boutons Gauche, Bas et Droite d’origine. Touchez deux fois une direction pour sprinter; maintenez Bas en l’air pour tomber plus vite.',
+  'settings.scheme.joystickDesc': 'Un joystick rond pour se déplacer, avec des boutons de mouvement gauche et droit pour sprinter d’une seule touche.',
+  'settings.scheme.classicDesc': 'Les boutons Gauche et Droite d’origine. Touchez deux fois une direction pour sprinter.',
   'settings.customize': 'Personnaliser les commandes tactiles',
   'settings.customizeNote': 'Déplacez et redimensionnez chaque commande de la disposition {scheme}.',
   'settings.customized': 'Disposition personnalisée',

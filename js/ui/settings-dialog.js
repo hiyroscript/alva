@@ -27,14 +27,12 @@ import { ICONS } from './icons.js';
 // only (the card's name and line say the same).
 const PREVIEW = Object.freeze({
   joystick: () => el('span', { class: 'settings-preview settings-preview--joystick', 'aria-hidden': 'true' }, [
-    el('i', { class: 'sp-down', html: ICONS.down }),
     el('i', { class: 'sp-dash sp-dash--left' }),
     el('i', { class: 'sp-stick' }, [el('i', { class: 'sp-knob' })]),
     el('i', { class: 'sp-dash sp-dash--right' }),
   ]),
   classic: () => el('span', { class: 'settings-preview settings-preview--classic', 'aria-hidden': 'true' }, [
     el('i', { class: 'sp-pad', html: ICONS.left }),
-    el('i', { class: 'sp-pad', html: ICONS.down }),
     el('i', { class: 'sp-pad', html: ICONS.right }),
   ]),
 });

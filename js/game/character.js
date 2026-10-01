@@ -136,6 +136,9 @@ export class Fighter {
     this.lostToVoid = false;
     this.respawnTimer = null;
     this.facing = spawn.facing || 1;
+    // The way the sprite looks while a committed move holds `facing` (see
+    // updateFacing): 1 or -1, or 0 to look the way it faces.
+    this.lookFacing = 0;
     this.state = 'idle';
     this.stateTime = 0;
     this.moveDir = 0;
@@ -328,6 +331,11 @@ export class Fighter {
     // The held direction: what steering, a turning attack and a cut-short
     // attack all read.
     const held = (input.runRight ? 1 : 0) - (input.runLeft ? 1 : 0);
+    // The way the combat AI wants its attacks to face (`face`: toward its
+    // opponent, see CombatAIController.track), or 0. No player control
+    // produces it, so a player's attacks turn only the way it holds.
+    const face = Math.sign(input.face || 0);
+    const turn = face || held;
 
     // ---- Combat intents --------------------------------------------------
     // Each press is its button's own move (see tryAction): an attack, or a
@@ -358,7 +366,7 @@ export class Fighter {
         this.bufferAttack(action);
         continue;
       }
-      if (this.tryAction(action, held)) {
+      if (this.tryAction(action, turn)) {
         this.bufferedAttack = null;
         started = true;
       } else if (!started) {
@@ -369,7 +377,7 @@ export class Fighter {
     const waiting = this.bufferedAttack;
     if (!started && waiting && waiting.at < this.steps && !shieldHeld && !jumpFirst(waiting.at)) {
       const { action } = waiting;
-      if (this.tryAction(action, held)) this.bufferedAttack = null;
+      if (this.tryAction(action, turn)) this.bufferedAttack = null;
       else if (!this.attackMayStart(action)) this.bufferedAttack = null;
     }
 
@@ -644,7 +652,7 @@ export class Fighter {
       if (this.bufferedAttack.age > (mv.attackBuffer ?? 0) + TIME_EPSILON) this.bufferedAttack = null;
     }
 
-    this.updateFacing(dir, held);
+    this.updateFacing(dir, held, face);
     this.updateState(dt);
   }
 
@@ -896,8 +904,8 @@ export class Fighter {
   // Only on the ground, only while free to act (never cutting an attack
   // short) and never while its own cooldown runs: a press then does nothing
   // at all, no other attack instead and nothing kept for later. `dir` is
-  // the direction held on this step: a technique faces it as it starts, as
-  // an attack does. True when it started.
+  // the way to turn on this step (see tryAction): a technique faces it as
+  // it starts, as an attack does. True when it started.
   trySpecial(action, special, dir = 0) {
     if (!this.body.grounded || !this.canAct() || this.combat.abilityCooldowns.active(special.id)) return false;
     if (special.type === 'summon') return this.trySummon(special.id);
@@ -996,10 +1004,11 @@ export class Fighter {
   }
 
   // Starts the move mapped to `action`, if it can start now: its summon or
-  // technique (see trySpecial), or else its attack. `dir` is the direction
-  // held on this step: an attack faces it as it starts (so a turn made on
-  // the press step is never stale), and otherwise keeps the fighter's
-  // facing, fixed from then until it ends. Starting it cuts short an attack
+  // technique (see trySpecial), or else its attack. `dir` is the way to
+  // turn on this step (a CPU's opponent, else the direction held): an
+  // attack faces it as it starts (so a turn made on the press step is never
+  // stale), and otherwise keeps the fighter's facing, fixed from then until
+  // it ends unless turned (see updateFacing). Starting it cuts short an attack
   // that may be (its hit confirmed; see CombatState.cancellable), though
   // never into itself while its own cooldown would still run.
   tryAction(action, dir = 0) {
@@ -1265,14 +1274,30 @@ export class Fighter {
   // technique, summon's startup or Dash plays: none of those is the
   // fighter's to steer; nor is an attack with a motion of its own (a roll, a
   // homing dash, a plunge, a lift).
-  updateFacing(dir, held) {
+  //
+  // A CPU's attacks face its opponent (`face`, the combat AI's own input;
+  // never a player's): it starts each attack that way (tryAction) and an
+  // attack that may turn follows the opponent across, step by step, whatever
+  // direction is held. A move committed to its direction (an attack with a
+  // motion of its own, or a summon's startup) keeps `facing`, and with it
+  // its path, its boxes and anything it throws; only its sprite turns to the
+  // opponent (`lookFacing`), and the fighter turns that way for real once
+  // the move is over.
+  updateFacing(dir, held, face = 0) {
     const { body, combat } = this;
-    if (combat.stun > 0 || combat.immobilized || this.technique || this.pendingSummon || this.dash) return;
-    // An attack with a motion of its own never turns (a homing dash faces
-    // the way it flies: see moveMotion).
-    if (combat.attack?.def.motion) return;
+    const look = this.lookFacing;
+    this.lookFacing = 0;
+    if (combat.stun > 0 || combat.immobilized || this.technique || this.dash) return;
+    // A committed move never turns (a homing dash faces the way it flies:
+    // see moveMotion).
+    if (this.pendingSummon || combat.attack?.def.motion) {
+      this.lookFacing = face;
+      return;
+    }
+    if (look) this.facing = look;
     if (combat.attack || combat.shielding) {
-      if (held) this.facing = held;
+      const turn = (combat.attack && face) || held;
+      if (turn) this.facing = turn;
       return;
     }
     if (dir !== 0 && (Math.abs(body.vx) > 20 || !body.grounded)) this.facing = dir;
@@ -1366,11 +1391,12 @@ export class Fighter {
   // Whether the current frame is drawn mirrored. Each clip knows which way its
   // own artwork faces (`sourceFacing`, per animation, else the character's),
   // so a clip drawn facing left is mirrored when the fighter faces right.
-  // Rendering only: `facing`, movement and every hurtbox / hitbox are
-  // unaffected.
+  // It looks the way it faces, or where a committed move has it look (see
+  // updateFacing). Rendering only: `facing`, movement and every hurtbox /
+  // hitbox are unaffected.
   get spriteFlip() {
     const sourceFacing = this.animator.anim?.sourceFacing ?? this.def.sourceFacing ?? 1;
-    return this.facing !== sourceFacing;
+    return (this.lookFacing || this.facing) !== sourceFacing;
   }
 
   // Interpolated position for rendering between fixed steps.
