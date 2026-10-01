@@ -184,6 +184,9 @@ export class Arena {
       for (let j = i + 1; j < fighters.length; j++) separateFighters(fighters[i], fighters[j], this.stage);
     }
     for (const f of fighters) resolveSolidOverlap(f.body, this.stage);
+    // Both fighters have moved: catch a side switch by the fighter updated
+    // second as well, before melee hitboxes are resolved (Watch Mode too).
+    for (const f of fighters) f.updateAttackFacing();
     spawnProjectiles(fighters, this.projectiles);
     for (const p of this.projectiles) p.update(dt, this.stage);
     updateClones(this.clones, dt);

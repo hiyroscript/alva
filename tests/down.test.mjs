@@ -1,6 +1,6 @@
 // Run with node --test tests/down.test.mjs (no dependencies).
 // Down: a plain directional gameplay input (`down`), on S / ↓, D-pad down
-// and the left stick held down, and the touch down arrows. It does exactly
+// and the left stick held down (no mobile Down button). It does exactly
 // two things, both in the air or as a hit lands: the fast fall, and
 // steering a launch downward. On the ground it is nothing: no state, no
 // pose, no lock on movement or the Dash, no faster Energy or cooldowns, and

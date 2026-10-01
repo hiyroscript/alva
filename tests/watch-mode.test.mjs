@@ -1084,7 +1084,7 @@ test('spectating: no touch controls and no gameplay input, through pause, resume
   const tryEverything = () => {
     const down = { pointerId: 1, clientX: 500, clientY: 0, preventDefault: noop };
     screen.touch.buttons.get('jump').dispatch('pointerdown', down);
-    screen.touch.buttons.get('down').dispatch('pointerdown', { ...down, pointerId: 2 });
+    screen.touch.buttons.get('shield').dispatch('pointerdown', { ...down, pointerId: 2 });
     screen.touch.stick.dispatch('pointerdown', { ...down, pointerId: 3 });
     for (const b of screen.touch.mouvementButtons.values()) b.dispatch('pointerdown', { ...down, pointerId: 4 });
   };

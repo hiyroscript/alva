@@ -272,9 +272,8 @@ test('the roster ships #0001 and #0002, both whole and playable', () => {
   assert.equal(DEF_0001.defense.type, 'shield');
   assert.ok(DEF_0001.movement.dashSpeed > 0, 'its Dash');
   assert.deepEqual(DEF_0001.abilityNames, { extra_attack: 'Shuriken', attack1: 'Punch', attack2: 'Kick', attack3: 'Clone Attack', attack4: 'Sphere Rush' });
-  // Its touch buttons: a name and a frame of its own art for each, Jump's
-  // frame too.
-  assert.deepEqual(Object.keys(DEF_0001.mobileAbilities), ['extra_attack', 'attack1', 'attack2', 'attack3', 'attack4', 'jump']);
+  // Its attack buttons: a name and artwork for each; Jump is universal.
+  assert.deepEqual(Object.keys(DEF_0001.mobileAbilities), ['extra_attack', 'attack1', 'attack2', 'attack3', 'attack4']);
   for (const own of Object.values(DEF_0001.mobileAbilities)) assert.ok(DEF_0001.animations[own.preview.animation].frames[own.preview.frame]);
   assert.equal(DEF_0001.summons.attack3.startupAnimation, 'attack3_summon', 'the Clone Attack\'s summoning startup');
   assert.ok(DEF_0001.hurtboxes.length > 0 && DEF_0001.collider && DEF_0001.energy && DEF_0001.launchReaction);
@@ -325,7 +324,7 @@ test('the engine and its tests build #0001 from its definition, disabled or not'
   assert.equal(fighter.combat.launchPoint, 0);
 }));
 
-test('the removed fighters are gone: no definition, art, tests, helpers, icon or prompt file', () => {
+test('the removed fighters are gone: no definition, art, tests, helpers, or icon', () => {
   // Slot 02's first fighter left none of its files behind: the new #0002's
   // folder holds only codename files, none under the old one's names.
   for (const name of ['0002_fall.png', '0002_hurt.png', '0002_jump.png', '0002_land.png', '0002_midairhurt.png']) {
@@ -339,7 +338,6 @@ test('the removed fighters are gone: no definition, art, tests, helpers, icon or
     assert.equal(exists(`tests/fighter-${id}.test.mjs`), false, `tests/fighter-${id}.test.mjs`);
   }
   assert.equal(exists('tests/real-art.mjs'), false, 'their art helpers, with nothing left to use them');
-  assert.equal(exists('max'), false, 'the obsolete prompt file');
   // Their scaffolding, not kept for later.
   for (const name of ['TEMPORARY_BASELINE', 'WORLD_PER_ART_0001']) assert.equal(name in charactersModule, false, name);
   const scaffolding = new RegExp(`${REMOVED.map((id) => `BASE_${id}|FPS_${id}`).join('|')}|IDLE_ART_|TEMPORARY_BASELINE|WORLD_PER_ART|const numbered`);

@@ -136,6 +136,7 @@ export class Fighter {
     this.lostToVoid = false;
     this.respawnTimer = null;
     this.facing = spawn.facing || 1;
+    this.attackVisualFacing = null;
     this.state = 'idle';
     this.stateTime = 0;
     this.moveDir = 0;
@@ -255,6 +256,7 @@ export class Fighter {
     this.bounce = null;
     this.steerHeld.x = (input.runRight ? 1 : 0) - (input.runLeft ? 1 : 0);
     this.steerHeld.y = (input.down ? 1 : 0) - (input.jump ? 1 : 0);
+    this.updateAttackFacing();
 
     // Every cooldown recovers by this step first (the summon's and the
     // technique's too, in real time), so one started below ends the step at
@@ -927,6 +929,7 @@ export class Fighter {
     // completes and whether or not the clone hits.
     this.combat.abilityCooldowns.start(id, summon.cooldown);
     const target = this.opponent;
+    this.faceAttackTarget();
     if (!summon.startupAnimation) {
       this.summons.push({ id, target });
       return true;
@@ -974,7 +977,7 @@ export class Fighter {
     // Started: its cooldown runs from now, whether it hits, misses, meets a
     // wall or is interrupted.
     this.combat.abilityCooldowns.start(id, def.cooldown);
-    if (dir) this.facing = dir;
+    this.faceAttackTarget(dir);
     this.body.vx = 0;
     this.technique = new Technique({ owner: this, def, action });
     return true;
@@ -999,7 +1002,8 @@ export class Fighter {
   // technique (see trySpecial), or else its attack. `dir` is the direction
   // held on this step: an attack faces it as it starts (so a turn made on
   // the press step is never stale), and otherwise keeps the fighter's
-  // facing, fixed from then until it ends. Starting it cuts short an attack
+  // facing. Combat AI uses the current target instead (faceAttackTarget).
+  // Starting it cuts short an attack
   // that may be (its hit confirmed; see CombatState.cancellable), though
   // never into itself while its own cooldown would still run.
   tryAction(action, dir = 0) {
@@ -1030,7 +1034,7 @@ export class Fighter {
       }
     }
     this.cutAttack();
-    if (dir) this.facing = dir;
+    this.faceAttackTarget(dir);
     const runningSpeed = this.body.vx;
     this.body.vx = this.attackStartSpeed(atk, this.body.vx, this.body.grounded);
     combat.attack = {
@@ -1251,7 +1255,7 @@ export class Fighter {
     return (this.body.grounded ? mapping.ground : mapping.air) || null;
   }
 
-  // Facing follows only the fighter's own input: the way it is running
+  // Manual facing follows the fighter's own input: the way it is running
   // (once past a small speed on the ground, so a turn does not flicker) or
   // steering in the air (`dir`). In an action of its own (an attack or the
   // Shield) the direction held (`held`) turns it at once, left to right or
@@ -1264,9 +1268,11 @@ export class Fighter {
   // opponent crossing behind it stays behind it. Locked while a stun, bind,
   // technique, summon's startup or Dash plays: none of those is the
   // fighter's to steer; nor is an attack with a motion of its own (a roll, a
-  // homing dash, a plunge, a lift).
+  // homing dash, a plunge, a lift). Combat AI opts into attack targeting
+  // first; updateAttackFacing separates visual turns from locked motion.
   updateFacing(dir, held) {
     const { body, combat } = this;
+    if (this.updateAttackFacing()) return;
     if (combat.stun > 0 || combat.immobilized || this.technique || this.pendingSummon || this.dash) return;
     // An attack with a motion of its own never turns (a homing dash faces
     // the way it flies: see moveMotion).
@@ -1276,6 +1282,30 @@ export class Fighter {
       return;
     }
     if (dir !== 0 && (Math.abs(body.vx) > 20 || !body.grounded)) this.facing = dir;
+  }
+
+  // Only the attacking combat controller supplies this orientation. Human
+  // and training controllers retain their manual facing rules.
+  faceAttackTarget(dir = 0) {
+    const target = this.controller?.attackFacing?.(this);
+    if (target != null) this.attackVisualFacing = target;
+    if (target || dir) this.facing = target || dir;
+  }
+
+  // Ordinary attacks turn their hitboxes and unreleased projectiles with
+  // the sprite. Motion attacks and techniques keep their physical facing;
+  // only their artwork turns, leaving their committed motion/hits intact.
+  updateAttackFacing() {
+    const { combat } = this;
+    if ((!combat.attack && !this.technique && !this.pendingSummon) || combat.stun > 0 || combat.immobilized) {
+      this.attackVisualFacing = null;
+      return false;
+    }
+    const target = this.controller?.attackFacing?.(this);
+    if (target == null) return false;
+    this.attackVisualFacing = target;
+    if (!combat.attack?.def.motion && !this.technique) this.facing = target;
+    return true;
   }
 
   // Visual state only: nothing here feeds back into movement or collision.
@@ -1370,7 +1400,8 @@ export class Fighter {
   // unaffected.
   get spriteFlip() {
     const sourceFacing = this.animator.anim?.sourceFacing ?? this.def.sourceFacing ?? 1;
-    return this.facing !== sourceFacing;
+    const attacking = this.combat.attack || this.technique || this.pendingSummon;
+    return (attacking ? this.attackVisualFacing ?? this.facing : this.facing) !== sourceFacing;
   }
 
   // Interpolated position for rendering between fixed steps.

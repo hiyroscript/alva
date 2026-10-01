@@ -306,6 +306,7 @@ export class BattleScreen extends Screen {
     }
     if (!this.isRunning || this.app.device.blockedPortrait) return;
     battle.frame(dt);
+    this.touch.setAirborne(!!battle.primary && !battle.primary.grounded);
     this.hud.update(battle);
     // Handled after the frame rather than from inside the simulation step, so
     // a draw can restart the battle safely.
@@ -403,6 +404,7 @@ export class BattleScreen extends Screen {
   restart() {
     if (!this.battle) return;
     this.battle.restart();
+    this.touch.setAirborne(!!this.battle.primary && !this.battle.primary.grounded);
     this.hud.update(this.battle);
     this.setBanner(null);
     this.hideResult();
@@ -460,6 +462,7 @@ export class BattleScreen extends Screen {
   rematch() {
     this.hideResult();
     this.battle.restart();
+    this.touch.setAirborne(!!this.battle.primary && !this.battle.primary.grounded);
     this.hud.update(this.battle);
     this.paused = false;
     this.setPlayActive(true);

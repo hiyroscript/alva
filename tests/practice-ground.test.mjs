@@ -394,7 +394,7 @@ test('Practice Ground uses the Mobile Controls setting on every entry, and a sch
   await screen.enter();
   assert.equal(screen.touch.scheme, 'classic');
   assert.equal(screen.touch.root.children[0], screen.touch.dpad);
-  assert.deepEqual(screen.touch.dpad.children.map((b) => b.getAttribute('aria-label')), ['Move left', 'Down', 'Move right']);
+  assert.deepEqual(screen.touch.dpad.children.map((b) => b.getAttribute('aria-label')), ['Move left', 'Move right']);
   assert.equal(screen.touch.enabled, true);
   for (const [action, b] of elements) assert.equal(screen.touch.actionButtons.get(action), b, action);
   assert.equal(screen.touch.buttons.get('extra_attack').getAttribute('aria-label'), 'Shuriken', 'the fighter\'s own, whatever the layout');
@@ -1148,7 +1148,7 @@ test('a failed fighter load keeps the current fighter and the dialog', async () 
   assert.equal(document.activeElement, slotFor(screen, '9999'), 'back to choosing');
 });
 
-test('the touch buttons\' art follows Player 1\'s fighter, Jump included: set on entry, refreshed in place by Change Fighter, never by the CPU', async () => {
+test('the touch buttons\' art follows Player 1\'s fighter, with a universal Jump arrow: set on entry, refreshed in place by Change Fighter, never by the CPU', async () => {
   // #9999 authors its own mobile presentation for this test only (the rest
   // of the file sees #0001's, which it copies, as Test A does): frames of
   // its own clips (#0001's art, under its own picks), and its own jump
@@ -1170,7 +1170,7 @@ test('the touch buttons\' art follows Player 1\'s fighter, Jump included: set on
     };
     const shown = () => ['extra_attack', 'attack1', 'attack2', 'jump'].map((a) => [touch.buttons.get(a).getAttribute('aria-label'), look(a)]);
     const OWN_A = [
-      ['Shuriken', '0001_extra_attack_2.png'], ['Punch', '0001_attack1_2.png'], ['Kick', '0001_attack2_5.png'], ['Jump', '0001_jump_2.png'],
+      ['Shuriken', '0001_extra_attack_2.png'], ['Punch', '0001_attack1_2.png'], ['Kick', '0001_attack2_5.png'], ['Jump', ICONS.jump],
     ];
     assert.deepEqual(shown(), OWN_A, 'the default fighter\'s art from the start, Jump\'s too');
     const sprite = touch.buttons.get('attack1').querySelector('.tc-sprite-icon');
@@ -1207,7 +1207,7 @@ test('the touch buttons\' art follows Player 1\'s fighter, Jump included: set on
     assert.equal(screen.session.player.def.id, '9999');
     assert.deepEqual(calls, ['9999'], 'refreshed with the new fighter, exactly once');
     assert.deepEqual(shown(), [
-      ['Kunai', '0001_attack2_3.png'], ['Palm Strike', '0001_idle_1.png'], ['Attack 2', ICONS.pip2], ['Jump', '0001_fall_2.png'],
+      ['Kunai', '0001_attack2_3.png'], ['Palm Strike', '0001_idle_1.png'], ['Attack 2', ICONS.pip2], ['Jump', ICONS.jump],
     ]);
     assert.equal(touch.buttons.get('attack1').querySelector('.tc-sprite-icon'), sprite, 'the same image, its source swapped in place');
     assert.equal(touch.buttons.get('shield').innerHTML, ICONS.shield, 'Shield is universal');
@@ -1223,7 +1223,7 @@ test('the touch buttons\' art follows Player 1\'s fighter, Jump included: set on
     assert.equal(screen.session.cpu.def.id, '0001');
     assert.deepEqual(calls, ['9999']);
     assert.equal(touch.buttons.get('extra_attack').getAttribute('aria-label'), 'Kunai');
-    assert.equal(look('jump'), '0001_fall_2.png', 'nor its jump');
+    assert.equal(look('jump'), ICONS.jump, 'nor its jump');
 
     // Back to #0001: its Shuriken, Punch, Kick and jump again.
     screen.openMenu();
@@ -2287,4 +2287,26 @@ test('Select Fighter still builds the full roster from the shared component and 
   assert.equal(new Set(ids).size, ids.length, `duplicate ids: ${ids}`);
   for (const id of ['preview-name', 'practice-preview-name', 'practice-cpu-preview-name']) assert.ok(ids.includes(id), id);
   assert.equal(getCharacter('9999').displayName, '#9999');
+});
+
+test('Practice synchronizes air icons after the player frame and restores ground art after respawn', async () => {
+  const { screen } = await enterPractice();
+  const { session, touch } = screen;
+  screen.needsResize = false;
+  const image = touch.buttons.get('attack1')._sprite;
+  const ground = image.getAttribute('src');
+  // The CPU being airborne alone must never change player controls.
+  session.cpu.body.grounded = false;
+  session.frame = () => {};
+  screen.update(1 / 60);
+  assert.equal(image.getAttribute('src'), ground);
+  session.frame = () => { session.player.body.grounded = false; session.cpu.body.grounded = true; };
+  screen.update(1 / 60);
+  assert.equal(image.getAttribute('src'), DEF_0001.animations.midair_attack1.frames[2]);
+  assert.equal(touch.buttons.get('jump').innerHTML, ICONS.jump);
+  session.frame = () => session.player.respawn(session.stage);
+  screen.update(1 / 60);
+  assert.equal(touch.airborne, false);
+  assert.equal(image.getAttribute('src'), ground);
+  screen.exit();
 });

@@ -236,3 +236,128 @@ test('a respawn takes the spawn\'s facing, and the opponent\'s side does not fli
   }
   assert.equal(p2.facing, spawn2.facing, 'the CPU never turned either');
 });
+
+// Combat AI opts into per-step attack targeting; use scripted input to
+// isolate facing from tactical decisions and difficulty randomness.
+const { CombatAIController } = await import('../js/game/combat-ai.js');
+const { getCharacter } = await import('../js/data/characters.js');
+const { fakeSpritesOf } = await import('./fighter-harness.mjs');
+const { spawnProjectiles } = await import('../js/game/projectile.js');
+const { attackPhase } = await import('../js/game/combat.js');
+function aimedFighter(character = def, airborne = false) {
+  const me = makeFighter({ character, sprites: fakeSpritesOf(character), x: 500, facing: -1 });
+  const foe = makeFighter({ x: 750 }).fighter;
+  me.fighter.opponent = foe;
+  me.fighter.controller.attackFacing = CombatAIController.prototype.attackFacing;
+  if (airborne) Object.assign(me.fighter.body, { y: -1000, prevY: -1000, grounded: false, ground: null });
+  return { ...me, foe };
+}
+
+test('combat CPU aims on the press and follows side switches in startup, active frames and recovery, ground and air', () => {
+  for (const character of [def, getCharacter('0002')]) {
+    for (const airborne of [false, true]) {
+      const { fighter: f, foe, step } = aimedFighter(character, airborne);
+      step(ATTACK1);
+      assert.ok(f.combat.attack, `${character.id}, airborne=${airborne}`);
+      assert.equal(f.facing, 1, 'aims before starting, with no held direction');
+      assert.equal(f.dash, null);
+      assert.equal(f.dashTap, null, 'no synthetic directional press');
+      const recovery = f.combat.attack.def.recovery;
+      const phases = new Set();
+      for (let n = 0; f.combat.attack && n < 200; n++) {
+        const side = n % 2 ? 1 : -1;
+        place(foe, f.x + side * 300);
+        step();
+        if (!f.combat.attack) break;
+        phases.add(attackPhase(f.combat.attack.def, f.combat.attack.time));
+        assert.equal(f.attackVisualFacing, Math.sign(foe.x - f.x));
+        assert.equal(f.spriteFlip, f.attackVisualFacing !== (f.animator.anim.sourceFacing ?? 1));
+        if (!f.combat.attack.def.motion) assert.equal(f.facing, f.attackVisualFacing, 'ordinary hitbox follows artwork');
+        assert.equal(f.dash, null);
+      }
+      assert.deepEqual([...phases].sort(), recovery > 0 ? ['active', 'recovery', 'startup'] : ['active', 'startup'], `${character.id} airborne=${airborne}`);
+    }
+  }
+});
+
+test('target overlap retains the last attack orientation, even in hitstop; absent and invalid targets are ignored', () => {
+  const { fighter: f, foe, step } = aimedFighter();
+  step(ATTACK1);
+  place(foe, f.x - 200);
+  step();
+  f.combat.hitstop = 1;
+  place(foe, f.x);
+  for (let i = 0; i < 8; i++) {
+    step();
+    assert.equal(f.attackVisualFacing, -1);
+    assert.equal(f.facing, -1);
+  }
+  for (const target of [null, { lostToVoid: true, body: { x: 2000 } }, { body: {} }, { body: { x: NaN } }]) {
+    f.opponent = target;
+    assert.doesNotThrow(() => step());
+    assert.equal(f.facing, -1);
+    assert.equal(f.attackVisualFacing, -1);
+  }
+});
+
+test('CPU motion attacks turn only artwork: roll, homing, bounce and lift match manual trajectories and hitboxes', () => {
+  const character = getCharacter('0002');
+  for (const [action, airborne] of [['attack3', false], ['attack1', true], ['attack2', true], ['attack3', true]]) {
+    const cpu = aimedFighter(character, airborne);
+    const manual = aimedFighter(character, airborne);
+    delete manual.fighter.controller.attackFacing;
+    manual.fighter.facing = 1;
+    for (const rig of [cpu, manual]) rig.step({ [action]: true, [`${action}Pressed`]: true });
+    for (let n = 0; cpu.fighter.combat.attack && n < 100; n++) {
+      for (const rig of [cpu, manual]) place(rig.foe, rig.fighter.x - 300);
+      cpu.step(); manual.step();
+      const f = cpu.fighter, m = manual.fighter;
+      assert.deepEqual([f.x, f.y, f.body.vx, f.body.vy, f.facing], [m.x, m.y, m.body.vx, m.body.vy, m.facing], action);
+      if (f.combat.attack) {
+        assert.equal(f.attackVisualFacing, -1);
+        assert.deepEqual(worldBox(f, f.combat.attack.def.hitbox), worldBox(m, m.combat.attack.def.hitbox), 'physical hitboxes stay with motion');
+      }
+    }
+  }
+});
+
+test('CPU summon startup and Sphere Rush visually track, while the rush keeps its committed direction', () => {
+  for (const action of ['attack3', 'attack4']) {
+    const { fighter: f, foe, step } = aimedFighter();
+    step({ [action]: true, [`${action}Pressed`]: true });
+    assert.equal(f.facing, 1);
+    assert.ok(f.pendingSummon || f.technique);
+    for (let i = 0; i < 8; i++) {
+      place(foe, f.x - 300);
+      step();
+      assert.equal(f.attackVisualFacing, -1);
+      if (f.technique) {
+        assert.equal(f.technique.facing, 1);
+        assert.ok(f.body.vx >= 0);
+      }
+    }
+  }
+});
+
+test('CPU throw aims before release but never redirects a spawned projectile', () => {
+  for (const character of [def, getCharacter('0002')]) {
+    const { fighter: f, foe, step } = aimedFighter(character);
+    step(THROW);
+    place(foe, f.x - 300);
+    const shots = [];
+    for (let n = 0; !shots.length && n < 100; n++) {
+      step();
+      spawnProjectiles([f], shots);
+    }
+    assert.equal(shots.length, 1);
+    const shot = shots[0];
+    const heading = shot.direction;
+    assert.equal(heading, -1);
+    const vx = shot.vx;
+    place(foe, f.x + 300);
+    step();
+    assert.equal(f.attackVisualFacing, 1);
+    assert.equal(shot.direction, heading);
+    assert.equal(shot.vx, vx);
+  }
+});

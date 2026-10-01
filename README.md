@@ -70,8 +70,8 @@ in the code depends on the repository name, so no file changes are needed.
 | --- | --- | --- | --- |
 | Move left / right | `runLeft` / `runRight` | `A` `D` or `←` `→` | **Joystick:** push the joystick left / right · **Classic:** lower-left ◀ ▶ |
 | Dash | double tap of `runLeft` / `runRight`; `mouvementLeft` / `mouvementRight` on touch | Double-tap `A` / `D` or `←` / `→` | **Joystick:** one tap of **Left mouvement** / **Right mouvement** (the small ◀ ▶ above the joystick) · **Classic:** double-tap ◀ or ▶ |
-| Down (in the air: fast fall; as a hit lands: steer the launch down) | `down` | `S` or `↓` | **Joystick:** hold the down arrow left of the joystick · **Classic:** hold the lower-left down arrow |
-| Jump (tap: the normal jump; held a little longer: a higher jump; again in the air: air jump) | `jump` | `W`, `Space` or `↑` | Lower-right, bottom corner (the fighter's own jump) |
+| Down (in the air: fast fall; as a hit lands: steer the launch down) | `down` | `S` or `↓` | Not exposed on touch |
+| Jump (tap: the normal jump; held a little longer: a higher jump; again in the air: air jump) | `jump` | `W`, `Space` or `↑` | Lower-right, bottom corner (universal upward arrow) |
 | Extra attack (#0001: the Throw; #0002: the Whirlwind) | `extra_attack` | `J` | **Shuriken** / **Whirlwind**, lower-right, top |
 | Transform* | `transform` | `K` | Lower-right, middle row |
 | Shield | `shield` | `L` | **Shield**, lower-right, middle row |
@@ -94,7 +94,7 @@ Punch, Kick, Clone Attack, Sphere Rush; #0002's One-Two, Homing Attack,
 Rapid Kicks, Bounce Attack, Spin Attack, Blue Tornado, Whirlwind) differ. Those live in the
 character's `abilityNames`, keyed by move codename; `abilityName(def,
 move)` (`js/data/abilities.js`) gives a move left unnamed its neutral name,
-e.g. "Mid-air Attack 1". No screen shows them yet. A control's codename is
+e.g. "Mid-air Attack 1". Airborne touch labels use the mapped move names. A control's codename is
 its one internal name: the key in `CONFIG.bindings`, the field in every
 input snapshot (with a matching `…Pressed` edge, e.g. `attack1Pressed`)
 and, for the combat buttons (`COMBAT_BUTTONS` in `js/config.js`:
@@ -126,14 +126,11 @@ direction.
 Transform move (neither #0001 nor #0002 has one yet). Its touch button has a
 dashed outline.
 
-On touch, the extra attack, every numbered attack and Jump show a frame of
-the fighter's own art for that move, in its own colours: #0001's shuriken
-throw, punch, high kick, the hand seal it summons its clone with, its
-rush and its jump; #0002's Whirlwind, One-Two, Rapid Kicks, Spin Attack
-ball and spin jump. The Left / Right / Down arrows, the joystick and its
-Dash buttons, Shield and Transform keep their glyphs. The picture is only
-presentation: each button still sends its own codename (see
-[Mobile Controls](#mobile-controls)).
+On touch, the extra attack and numbered attacks show their own ground or
+mid-air artwork. Jump always shows the same upward arrow. Left / Right,
+the joystick and its Dash buttons, Shield and Transform keep their glyphs.
+There is no mobile Down button. Artwork is presentation only: every button
+continues sending its existing control codename.
 
 A fighter may also lack a move altogether. A button left out of its
 `actions` (`attack3` to `attack5` for a fighter with fewer numbered
@@ -244,21 +241,18 @@ the same whichever layout is chosen.
   same `runLeft` / `runRight` as the keys, so how far you push never changes the
   speed. A small deadzone round the centre keeps a resting thumb from
   drifting, crossing the centre switches direction cleanly, and letting go
-  recentres it. Pushing it up or down only moves the knob: Jump and Down
-  keep their own buttons. The stick is a plain base and knob, with no
+  recentres it. Pushing it up or down only moves the knob; Jump has its
+  own arrow button. The stick is a plain base and knob, with no
   arrows drawn in it. Above the joystick's top corners sit two small
   Dash buttons, **Left mouvement** and **Right mouvement**: one tap is one
   Dash that way. They hold nothing and need no second tap, and the Dash
   itself is the usual one (grounded only, 15 Energy, its animation, and
-  refused while attacking, shielding, exhausted and so on). **Down** is a
-  down-arrow button to the left of the joystick, level with its centre:
-  hold it in the air to fast-fall, or as a hit lands to steer the launch
-  downward; on the ground it does nothing. The lower-right buttons sit
-  exactly where Classic Buttons has them. The
+  refused while attacking, shielding, exhausted and so on). The lower-right
+  buttons sit exactly where Classic Buttons has them. The
   joystick works with any other button at once (hold it right and press
   Jump, Punch, Kick, Shield, Shuriken or Transform with another finger).
-- **Classic Buttons**: the original layout: Left, **Down** (the down
-  arrow) and Right at the lower left, with thumb sliding between them;
+- **Classic Buttons**: Left and Right at the lower left, with thumb sliding
+  between them;
   tap Left or Right twice quickly to Dash.
 
 Both layouts share the lower-right cluster. Its numbered attack buttons
@@ -308,7 +302,7 @@ and a resize or rotation re-places everything. A control that has not been
 moved stays exactly where the stylesheet puts it. Moving or resizing never
 changes what a control does: the same codenames, held buttons, joystick
 deadzone, one-tap Dash buttons and multi-touch, and Classic Buttons' Left /
-C / Right still slide into one another wherever they sit. The HUD's pause
+Right still slide into one another wherever they sit. The HUD's pause
 and More buttons always stay on top of the controls, so no arrangement can
 cover them.
 
@@ -316,7 +310,7 @@ cover them.
   speed in about 0.08 s, a short stop, a full turn in about 0.12 s) and
   steers well in the air, where steering bends the drift rather than
   replacing it. A running jump carries its speed. Holding Down (`S` /
-  `↓`, the touch down arrow) in the air while falling is a **fast fall**. Attacks keep
+  `↓`) in the air while falling is a **fast fall**. Attacks keep
   some of the speed you carry into them: a running punch slides on, the
   kick steps in, aerials keep their drift and follow the stick almost
   fully, and the Throw can be steered as it throws. Press your next attack
@@ -471,9 +465,7 @@ cover them.
   until Energy is completely full again (a partial refill does not unlock
   them); the bar disappears at 100. Exhausted, a fighter still moves, jumps,
   attacks and uses A3 / A4: nothing else ever costs Energy.
-- **Down:** hold `S` / `↓` (on touch the down arrow, left of the joystick or
-  between Left and Right in Classic Buttons; D-pad down or left stick down on
-  a gamepad). It is a direction only: in the air while falling it is the
+- **Down:** hold `S` / `↓`, D-pad down or left stick down on a gamepad. It is a direction only: in the air while falling it is the
   **fast fall**, and held as a hit lands it bends the launch downward (see
   Launch steering). On the ground it does nothing at all: no pose, no
   stance, no change to movement, the Dash, Energy, cooldowns or what any
@@ -583,7 +575,10 @@ cover them.
   second per second, whatever #0001 does. A restart or rematch, a new fighter in Practice Ground and every
   respawn after the Void clear them. They cost no Energy.
 - **Menus:** arrow keys or WASD to move, `Enter` to select, `Esc` to go back. Mouse and touch work too.
-- **Touch:** two layouts, Joystick (the default) and Classic Buttons (see [Mobile Controls](#mobile-controls)). Several fingers work at once (hold the joystick or Right and press Jump, or hold Down and press Punch). The fighter's own buttons show no letters and no white glyphs but a frame of its own animation for the move, in the art's own colours and transparency: for #0001, **Shuriken** (Throw: the shuriken leaving the hand), **Punch** (attack1: the punch), **Kick** (attack2: the high kick), **Clone Attack** (attack3: the hand seal of its summoning pose) and **Sphere Rush** (attack4: the rush), and **Jump** (its own jump), beside **Shield** (held), whose shield glyph is the same for everyone, and Transform (the dashed star: #0001 has none yet). Each frame is fitted whole inside its round button, aspect kept and crisp (`.tc-sprite-icon`), an image with an empty alt hidden from assistive technology: the button's own translated name is what is announced. Which buttons a fighter has comes from its `actions` (`abilityPresence` in `js/ui/mobile-abilities.js`), so a move it does not have (left out of `actions`) has its button hidden, unnamed and untouchable, its place left empty, while one mapped to `null` stays reserved (dashed). The touch layout editor still shows every control, so a layout can place a button for the fighters that have it (in a neutral pip where the picked fighter lacks the move). Each button's name and frame come from the fighter's `mobileAbilities` in `js/data/characters.js` (`label`, and `preview: { animation, frame }`: a clip of its own and a frame of it, counted from 0) and follow Player 1's fighter, in Practice Ground too when you change fighter (never the CPU's); the image is updated in place. A button with no frame to show (no fighter yet, a preview naming no frame, a file that fails to load) shows a neutral glyph instead, its name and input unchanged. A fighter with no `transform` entry keeps the dashed, reserved Transform star. Shield, Down, the joystick and the Left / Right and Dash arrows are the same for everyone. Only the presentation is per fighter: the buttons always send the same control codenames (`extra_attack`, `transform`, `shield`, `jump`, `attack1` … `attack5`), and nothing a button shows decides what it does. A fighter with more numbered attack buttons shows up to five, in fixed slots round Transform and Shield (see [Mobile Controls](#mobile-controls)); #0001 shows four, Punch, Kick, Clone Attack and Sphere Rush in slots 1 to 4; #0002 shows three, **Punch**, **Kick** and **Spin** (its One-Two / Homing Attack, Rapid Kicks / Bounce Attack and Spin Attack / Blue Tornado, showing the One-Two's straight, the flurry of kicks and the rolled-up ball), with **Whirlwind** on top and its spin jump on Jump. The combat buttons are the same elements in both layouts, in the same places: switching (`TouchControls.setScheme`) only swaps the lower-left corner (Left / Down / Right, or Down and the joystick with its Dash buttons), after letting go of everything held. Each layout can also be rearranged and resized by the player (see [Mobile Controls](#mobile-controls)); the buttons keep what they do wherever they sit. The viewport disables page zoom (`maximum-scale=1, user-scalable=no`) and the play surfaces, joystick and buttons set `touch-action: none`, so rapid taps never zoom or scroll the page.
+- **Touch:** Joystick (the default) has a horizontal stick and two Dash buttons; Classic Buttons has Left / Right with sliding input. Neither layout nor its editor contains Down. Jump always uses the same upward arrow. Multiple fingers can hold movement, Jump and attacks simultaneously. Attack buttons reuse their images in place as the player jumps and lands, without changing their input mappings, size or pointer ownership. Ground-only abilities remain recognizable but dimmed with `aria-disabled` in mid-air. Saved layouts discard obsolete `down` entries while preserving all other positions and scales.
+- **Attack artwork:** `mobileAbilities.preview` (or `previews.ground`) supplies ground/shared art; `previews.air` supplies the distinct airborne move selected by `actions`. Descriptors select a zero-based frame by animation codename, optionally from `collection: 'projectileAnimations'`. #0001's two ordinary attacks have air previews; Clone Attack and Sphere Rush remain ground-only. #0002 shows One-Two / Homing Attack, Rapid Kicks / Bounce Attack and Spin Attack / Blue Tornado. Whirlwind uses its existing `extra_attack_object` frame 2 (file `0002_extra_attack_object_3.png`) and a tornado SVG fallback. Jump and Shield use universal glyphs. Accessible names follow English/French, and absent abilities remain hidden; the editor retains neutral placeholders for other fighters' abilities.
+- **CPU attack facing:** the combat AI aims at the live opponent when an attack starts and on each simulation step through startup, active frames and recovery. Ordinary attacks turn their hitboxes with the sprite. Rolls, homing attacks, plunges, lifts and techniques only turn their artwork: physical direction remains under the existing move mechanics. Spawned projectiles retain their direction. Equal horizontal coordinates retain the last valid direction. Manual players and the non-attacking training controller keep their existing facing rules.
+
 - **Gamepad (standard layout):** D-pad or left stick left / right to move (twice in a row to Dash) and down for Down in battle (they still navigate menus), A to jump, X / Square for the extra attack (#0001's Throw), B / Circle for `attack1`, LB for `attack2`, LT, L3 and R3 for `attack3` to `attack5` (#0001's Clone Attack and Sphere Rush on LT and L3), Y / Triangle for the reserved Transform, RB or RT for Shield, Start to pause.
 - **Debug:** `` ` `` toggles the collider, hurtbox and attack-hitbox overlay in battle (a hitbox shows only while it can connect; hurtboxes look the same with the Shield up, and a shielding fighter is labelled `shield`; a flying shuriken's hitbox is outlined in magenta and labelled; a clone's attack hitbox shows in the attack colour, labelled `clone attack1` (or `clone midair_attack2` overhead), only on its active frame; the Sphere Rush's sphere hitbox is a dashed cyan box labelled `attack4 dash` while it can connect, then a dashed cyan cross marks the sphere on the caught opponent, which is labelled `bound`; solids, the main floor's block among them, are outlined in red and the Void's fixed kill line is dashed violet).
 
@@ -1071,12 +1066,12 @@ every route stays closed with no playable fighter, and reopens with one.
 3. Give it a free `rosterSlot`.
 4. Set `available: true` once it is ready to be played (see [Roster status](#roster-status)).
 5. Optionally, name its moves in `abilityNames`, keyed by move codename (e.g. `attack4: 'Sphere Rush'`); a move it leaves out keeps its neutral name.
-6. Give its touch buttons their names and pictures in `mobileAbilities`, keyed by control codename: `label` (the button's accessible name, translated in `js/core/i18n.js` as `ability.<id>.<button>`) and `preview: { animation, frame }`, a frame of one of its own clips (counted from 0) that reads as the move (e.g. `attack1: { label: 'Punch', preview: { animation: 'attack1', frame: 1 } }`), for `extra_attack`, `attack1` … `attack5` and `jump` (no label: Jump keeps its name). Pick the frame by the move's own timing (its strike, its release), not blindly its first. A button left without one shows a neutral glyph.
+6. Give its touch buttons their names and pictures in `mobileAbilities`, keyed by control codename: `label` (the button's accessible name, translated in `js/core/i18n.js` as `ability.<id>.<button>`) and `preview: { animation, frame }`, a frame of one of its own clips (counted from 0) that reads as the move (e.g. `attack1: { label: 'Punch', preview: { animation: 'attack1', frame: 1 } }`), for `extra_attack`, `attack1` … `attack5` (Jump always uses its universal arrow). Pick the frame by the move's own timing (its strike, its release), not blindly its first. Use `previews.air` for a distinct airborne move and optionally `previews.ground` instead of `preview`; descriptors can select `projectileAnimations` with `collection`. A button left without artwork shows a fallback glyph.
 
 A move can be more than a timed hitbox; each of these is data on the attack (see the schema in `js/game/combat.js`), and #0002 uses them all:
 
 - **`hits`**: a multi-hit attack lists its strikes, each live in its own window (`at`, `active`) with its own damage and launch, its box and stuns defaulting to the attack's. The attack's startup, active phase, overall box, damage and finisher follow from them. A Shield that blocks a strike stops the string.
-- **`motion`**: movement the attack makes itself: `homing` (a lock-on dash that springs off what it meets), `bounce` (a plunge that rebounds off the ground or an opponent, ending the attack), `rise` (a lift) or `roll` (a ground roll that carries the running speed). A motion attack never turns, and never starts while its fighter is still flying from a launch.
+- **`motion`**: movement the attack makes itself: `homing` (a lock-on dash that springs off what it meets), `bounce` (a plunge that rebounds off the ground or an opponent, ending the attack), `rise` (a lift) or `roll` (a ground roll that carries the running speed). A motion attack keeps its physical facing (combat CPU artwork may turn), and never starts while its fighter is still flying from a launch.
 - **`carry: { lift }`**: a hit that lands and launches nothing gives its target the velocity of what struck it, less `lift` upward.
 - **`airUses`**: how many times it may start per airtime (landing or being hit gives them back); **`freeFall: true`**: started in the air, it leaves the fighter in free fall until it lands or is hit.
 - **`passThrough: true`**: no pushbox while it plays; **`hurtboxes`**: the fighter's own replaced while it plays.

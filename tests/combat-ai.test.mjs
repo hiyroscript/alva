@@ -505,3 +505,32 @@ test('the training controller still never presses a combat button, Down or Shiel
   assert.equal(cpu.combat.launchPoint, 0);
   assert.equal(foe.combat.launchPoint, 0, 'it never hit anyone');
 });
+
+test('an attack intent with a stale side presses immediately, and Fighter aims at the current target without a turn tap', () => {
+  const r = ring({ cpuFacing: -1 });
+  r.hush();
+  const held = {};
+  const intent = { action: 'attack1', face: -1, until: r.ai.clock + 1 };
+  r.ai.actAttack(r.cpu, intent, held);
+  assert.equal(held.attack1, true);
+  assert.equal(held.runLeft, undefined);
+  assert.equal(held.runRight, undefined);
+  r.cpu.tryAction('attack1', -1);
+  assert.equal(r.cpu.facing, 1, 'live target wins over stale planned direction');
+  assert.ok(r.cpu.combat.attack);
+});
+
+test('an aerial attack presses without adding a direction just to turn its sprite', () => {
+  const r = ring({ cpuFacing: -1 });
+  r.hush();
+  r.cpu.body.grounded = false;
+  r.foe.body.x = r.cpu.body.x + 25;
+  r.ai.meleeOptions = () => [{ action: 'attack1', face: 1 }];
+  const held = {};
+  const intent = { jumped: true, air: true, dir: 1 };
+  r.ai.actJump(r.cpu, r.foe, r.ctx, intent, held);
+  assert.equal(held.attack1, true);
+  assert.equal(held.runLeft, undefined);
+  assert.equal(held.runRight, undefined);
+  assert.equal(intent.struck, true);
+});
