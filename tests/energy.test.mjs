@@ -12,7 +12,7 @@ import { fileURLToPath } from 'node:url';
 import { CombatState, resolveEnergy } from '../js/game/combat.js';
 import * as status from '../js/game/fighter-status.js';
 import { energyBarState, ENERGY_STYLE } from '../js/game/fighter-status.js';
-import { def, DT, makeFighter, duel, steps } from './fighter-harness.mjs';
+import { def, DT, makeFighter, duel, steps, startupSteps } from './fighter-harness.mjs';
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
 const HOLD = { shield: true };
@@ -272,6 +272,8 @@ test('exhausted, a fighter still moves, jumps, attacks, and uses its Clone Attac
   const d = duel({ gap: 200 });
   d.attacker.combat.setEnergy(0);
   d.tick({ attack3: true, attack3Pressed: true });
+  assert.equal(d.attacker.state, 'summon', 'attack3 (A3): its summoning startup, on no Energy');
+  for (let i = 0; i < startupSteps(def, 'attack3'); i++) d.tick();
   assert.equal(d.clones.length, 1, 'attack3 (A3): its own cooldown, no Energy');
   assert.equal(d.attacker.combat.energyExhausted, true);
 });
@@ -301,7 +303,8 @@ test('nothing but Dash and blocked hits ever spends it: runs, jumps, attacks, sh
   for (let i = 0; i < 30; i++) t();
   for (let i = 0; i < 10; i++) t(DOWN);
   t({ attack3: true, attack3Pressed: true });
-  assert.equal(d.clones.length, 1, 'A3 summoned its clone');
+  for (let i = 0; i < startupSteps(def, 'attack3'); i++) t(DOWN);
+  assert.equal(d.clones.length, 1, 'A3 summoned its clone, its startup spending nothing either');
   for (let i = 0; i < 60; i++) t(DOWN);
   t({ attack4: true, attack4Pressed: true });
   assert.ok(attacker.technique, 'A4 started its rush');

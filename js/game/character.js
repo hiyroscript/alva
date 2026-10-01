@@ -209,6 +209,10 @@ export class Fighter {
     // Summons paid for this step, waiting for the battle to spawn them (see
     // spawnClones in js/game/clone.js): { id, target }.
     this.summons = [];
+    // A summon accepted but not yet sent out: its owner is performing its
+    // startup ({ id, target, animation, duration, time }; see trySummon), or
+    // null.
+    this.pendingSummon = null;
     // The technique this fighter is performing (see js/game/technique.js),
     // or null.
     this.technique = null;
@@ -222,8 +226,8 @@ export class Fighter {
   // Energy full and not exhausted, and every cooldown (the summon's and the
   // technique's included) ready; everything transient goes with the old
   // body: velocity, attack, Shield, Dash, stun, freeze, binds, its
-  // technique and any queued projectile or summon. It is in play again at
-  // once.
+  // technique, a summon's startup and any queued projectile or summon. It
+  // is in play again at once.
   respawn(stage) {
     this.reset(stage);
   }
@@ -256,9 +260,11 @@ export class Fighter {
     // technique's too, in real time), so one started below ends the step at
     // its full length.
     combat.update(dt);
-    // Hitstun always wins over a technique (CombatSystem.applyHit normally
-    // ends it on the hit itself), and over a Dash, as does a bind.
+    // Hitstun always wins over a technique and a summon's startup
+    // (CombatSystem.applyHit normally ends them on the hit itself), and over
+    // a Dash, as does a bind.
     if (this.technique && combat.stun > 0) this.endTechnique('hit');
+    if (this.pendingSummon && (combat.stun > 0 || combat.immobilized)) this.cancelSummon();
     if (this.dash && (combat.stun > 0 || combat.immobilized)) this.endDash();
     // A hit (or a bind) takes the fighter out of its own attack: nothing of
     // it is left to strike, release a projectile or recover from. Checked
@@ -303,6 +309,15 @@ export class Fighter {
       if (this.dash.time >= this.dash.duration - TIME_EPSILON) this.endDash();
     }
 
+    // ---- Summon startup ----------------------------------------------------
+    // Likewise a summon's startup ends after one pass of its clip, counted
+    // from the press step: the clone is queued (see finishSummon) and the
+    // fighter is free again from the step it ends.
+    if (this.pendingSummon) {
+      this.pendingSummon.time += dt;
+      if (this.pendingSummon.time >= this.pendingSummon.duration - TIME_EPSILON) this.finishSummon();
+    }
+
     // ---- Shield: held shield ---------------------------------------------
     // Decided first: `shield` held with a Shield the fighter may raise (its
     // `defense` is a Shield, it is not exhausted, the art for where it is)
@@ -321,7 +336,8 @@ export class Fighter {
     // for does nothing.
     //
     // A press the fighter cannot act on yet (an attack or its recovery, a
-    // stun, a Dash, a cooldown, the Shield button held) is buffered
+    // stun, a Dash, a summon's startup, a cooldown, the Shield button held)
+    // is buffered
     // (see bufferAttack) and tried again every later step until it starts
     // or expires, so an attack pressed slightly early comes out on the
     // first step it can. A newer press replaces it. Only ever an ordinary
@@ -387,11 +403,13 @@ export class Fighter {
       if (ended) this.endTechnique(ended);
     }
 
-    // After the intents, so an attack or technique started this step also
-    // rules out a Shield, jump or platform drop on the same step.
+    // After the intents, so an attack, technique or summon's startup started
+    // this step also rules out a Shield, jump or platform drop on the same
+    // step.
     const canAct = this.canAct();
     // The Shield is up while `shield` is held and the fighter is free to act
-    // (it never cuts an attack, Dash, technique, stun or bind short).
+    // (it never cuts an attack, Dash, technique, summon's startup, stun or
+    // bind short).
     // A blocked hit's blockstun holds it up until the stun is over, held or
     // not. Either way only while shieldAllowed: the block that empties the
     // bar (or having no art for where the fighter is) drops it.
@@ -422,16 +440,19 @@ export class Fighter {
     // ---- Horizontal movement ---------------------------------------------
     // See moveHorizontal, and moveAttack while an attack plays (moveMotion
     // while an attack's own motion owns the body, and then the share of
-    // gravity it falls under this step).
+    // gravity it falls under this step). A summon's startup holds the
+    // fighter still where it stands, as a technique's form does.
     const atk = combat.attack;
     let gravityShare = 1;
     let dir = held;
-    if (combat.shielding || combat.stun > 0 || combat.immobilized || this.technique || this.dash) dir = 0;
+    if (combat.shielding || combat.stun > 0 || combat.immobilized || this.technique || this.dash || this.pendingSummon) dir = 0;
     // Normal locomotion only: an attack steers with its own share of it.
     this.moveDir = atk?.def.lockMovement ? 0 : dir;
 
     if (this.technique) {
       body.vx = this.technique.velocityX;
+    } else if (this.pendingSummon) {
+      body.vx = 0;
     } else if (combat.immobilized) {
       body.vx = 0;
     } else if (combat.stun > 0) {
@@ -599,6 +620,11 @@ export class Fighter {
       else if (technique.phase === 'dash' && body.wall === technique.facing) technique.whiff('wall', dt);
     }
 
+    // ---- Summon startup: ground --------------------------------------------
+    // A summon is ground-only to its very cue: ground lost during its
+    // startup cancels it (no clone) and the fighter falls from where it is.
+    if (this.pendingSummon && !body.grounded) this.cancelSummon();
+
     // ---- Dash: ground and walls ----------------------------------------------
     // Grounded only: leaving the ground (a ledge, the main floor's edge)
     // ends it and the fighter falls from where it is, keeping its speed. It
@@ -748,11 +774,11 @@ export class Fighter {
   }
 
   // Free to start something new: the combat state allows it (no attack,
-  // stun, blockstun or bind), no technique owns the fighter and it is not
-  // dashing. Its Launch Point, however high, and the Energy it has
-  // left never matter.
+  // stun, blockstun or bind), no technique or summon's startup owns the
+  // fighter and it is not dashing. Its Launch Point, however high, and the
+  // Energy it has left never matter.
   canAct() {
-    return this.combat.canAct() && !this.technique && !this.dash;
+    return this.combat.canAct() && !this.technique && !this.dash && !this.pendingSummon;
   }
 
   // A hit landing now would meet a perfect Shield: one raised no more than
@@ -880,11 +906,15 @@ export class Fighter {
     return false;
   }
 
-  // Summon `id`: starts its cooldown and queues one summon at the opponent
-  // for the battle to spawn. The fighter itself performs nothing and is
-  // free at once. False, with no cooldown started, if there is no such
+  // Summon `id` at the opponent: starts its cooldown, then either queues the
+  // summon for the battle to spawn at once (no startupAnimation: the
+  // fighter performs nothing and is free at once) or starts its startup
+  // (see pendingSummon): from this very step the fighter plays
+  // startupAnimation once, standing still in the facing it has now, free to
+  // do nothing else, and the summon is queued as it ends (finishSummon).
+  // False, with no cooldown started and nothing played, if there is no such
   // summon, there is no opponent in play (none at all, or one lost to the
-  // Void and waiting to respawn) or the art is missing (logged).
+  // Void and waiting to respawn) or any of its art is missing (logged).
   trySummon(id) {
     const summon = this.summonDefs[id];
     if (!summon || !this.opponent || this.opponent.lostToVoid) return false;
@@ -893,10 +923,40 @@ export class Fighter {
       console.warn(`[Alva] Summon "${id}" is unavailable: ${problem}; ignoring.`);
       return false;
     }
-    // Accepted: its cooldown runs from now, whether or not the clone hits.
+    // Accepted: its cooldown runs from now, whether or not the startup
+    // completes and whether or not the clone hits.
     this.combat.abilityCooldowns.start(id, summon.cooldown);
-    this.summons.push({ id, target: this.opponent });
+    const target = this.opponent;
+    if (!summon.startupAnimation) {
+      this.summons.push({ id, target });
+      return true;
+    }
+    this.body.vx = 0;
+    this.pendingSummon = {
+      id, target, animation: summon.startupAnimation, duration: this.sprites.duration(summon.startupAnimation), time: 0,
+    };
     return true;
+  }
+
+  // The summon's startup is over: its summon is queued for the battle to
+  // spawn, at the target it was accepted at, and the fighter is free. If
+  // that target is no longer its opponent in play (lost to the Void, taken
+  // out of Practice Ground), nothing is: no clone, no other attack in its
+  // place and never another target. The cooldown runs on either way.
+  finishSummon() {
+    const { id, target } = this.pendingSummon;
+    this.pendingSummon = null;
+    if (target === this.opponent && !target.lostToVoid) this.summons.push({ id, target });
+  }
+
+  // Cuts a summon's startup short, if one is under way: a hit, ground lost,
+  // its target gone, the Void, a reset or the arena going. No clone comes
+  // of it, and its cooldown, started on acceptance, runs on. The fighter's
+  // state follows at once (its hurt pose on the hit's own step).
+  cancelSummon() {
+    if (!this.pendingSummon) return;
+    this.pendingSummon = null;
+    this.updateState(0);
   }
 
   // Start technique `id` from `action`, facing `dir` if one is held: the
@@ -1202,12 +1262,12 @@ export class Fighter {
   // respawn takes the spawn's. Otherwise it keeps its last facing: it never
   // turns toward its opponent by itself, standing still included, so an
   // opponent crossing behind it stays behind it. Locked while a stun, bind,
-  // technique or Dash plays: none of those is the fighter's to steer; nor
-  // is an attack with a motion of its own (a roll, a homing dash, a plunge,
-  // a lift).
+  // technique, summon's startup or Dash plays: none of those is the
+  // fighter's to steer; nor is an attack with a motion of its own (a roll, a
+  // homing dash, a plunge, a lift).
   updateFacing(dir, held) {
     const { body, combat } = this;
-    if (combat.stun > 0 || combat.immobilized || this.technique || this.dash) return;
+    if (combat.stun > 0 || combat.immobilized || this.technique || this.pendingSummon || this.dash) return;
     // An attack with a motion of its own never turns (a homing dash faces
     // the way it flies: see moveMotion).
     if (combat.attack?.def.motion) return;
@@ -1225,6 +1285,7 @@ export class Fighter {
     if (combat.stun > 0) next = 'hitstun';
     else if (this.technique) next = 'technique';
     else if (combat.immobilized) next = 'bound';
+    else if (this.pendingSummon) next = 'summon';
     else if (combat.attack) next = 'attack';
     else if (this.dash) next = 'dash';
     else if (combat.shielding) next = 'shield';
@@ -1262,7 +1323,8 @@ export class Fighter {
   // whole length, even if the fighter lands or leaves the ground meanwhile.
   // Hitstun, and being bound by a technique, show `hurt` on the ground and
   // `midair_hurt` in the air. A technique plays the clip of its current
-  // phase, and a Dash plays `mouvment`. The Shield shows its
+  // phase, a summon's startup its summon's own startupAnimation, and a Dash
+  // plays `mouvment`. The Shield shows its
   // held pose where the fighter is (`airAnimation` in the air), opening
   // with `groundStartAnimation` for one frame when it goes up on the
   // ground; the shieldRelease state is `groundReleaseAnimation`.
@@ -1276,6 +1338,7 @@ export class Fighter {
     }
     if (state === 'shieldRelease') return this.defense.groundReleaseAnimation;
     if (state === 'technique') return this.technique.animation;
+    if (state === 'summon') return this.pendingSummon.animation;
     if (state === 'hitstun' || state === 'bound') return this.body.grounded ? 'hurt' : 'midair_hurt';
     if (state === 'tumble') return 'midair_hurt';
     if (state === 'dash') return 'mouvment';

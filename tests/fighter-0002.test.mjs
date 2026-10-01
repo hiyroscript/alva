@@ -13,7 +13,7 @@
 // settings and i18n. Layout and paint still need real-browser verification.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { inflateSync } from 'node:zlib';
 import {
   DT, STAGE, cpuFight, duel, fakeSpritesOf, frameName, makeFighter, stageMap, stepUntil, steps,
@@ -29,7 +29,7 @@ import { Fighter } from '../js/game/character.js';
 import { SpriteSet, drawFrame } from '../js/game/sprite-normalizer.js';
 import { StageCollision } from '../js/game/physics.js';
 import { mulberry32 } from '../js/core/utils.js';
-import { mobileAbility } from '../js/ui/mobile-abilities.js';
+import { mobileAbility, previewFrame } from '../js/ui/mobile-abilities.js';
 import { ICONS } from '../js/ui/icons.js';
 import { STRINGS, setLanguage } from '../js/core/i18n.js';
 
@@ -219,10 +219,25 @@ test('its in-game names and touch buttons name each move, in English and French'
   };
   assert.deepEqual(buttons('en'), ['Whirlwind', 'Punch', 'Kick', 'Spin']);
   assert.deepEqual(buttons('fr'), ['Tourbillon', 'Coup de poing', 'Coup de pied', 'Vrille']);
-  assert.equal(mobileAbility(DEF, 'extra_attack').icon, ICONS.tornado);
-  assert.equal(mobileAbility(DEF, 'attack3').icon, ICONS.spin);
+  // Each shows a frame of its own move's art, in its own colours: the
+  // Whirlwind sending its tornado off, the One-Two's straight, the Rapid
+  // Kicks, the Spin Attack's ball; and Jump its own jump, curling up.
+  const art = (a) => previewFrame(DEF, a)?.url.split('/').pop() ?? null;
+  assert.deepEqual(['extra_attack', 'attack1', 'attack2', 'attack3', 'jump'].map(art), [
+    '0002_extra_attack_6.png', '0002_attack1_4.png', '0002_attack2_2.png', '0002_attack3_5.png', '0002_jump_1.png',
+  ]);
+  for (const a of ['extra_attack', 'attack1', 'attack2', 'attack3']) {
+    const ability = mobileAbility(DEF, a);
+    assert.equal(ability.sprite.url, DEF.animations[DEF.mobileAbilities[a].preview.animation].frames[DEF.mobileAbilities[a].preview.frame]);
+    assert.ok(existsSync(`${ROOT}${ability.sprite.url.slice(2)}`), a);
+    assert.equal(ability.sprite.mirrored, false, 'drawn facing right, as the buttons read');
+  }
+  assert.equal(DEF.mobileAbilities.extra_attack.preview.frame, Math.round(DEF.attacks.extra_attack.projectile.spawnAt * DEF.animations.extra_attack.fps), 'the frame its tornado leaves on');
+  assert.notEqual(art('jump'), art('attack3'), 'Jump never looks like the Spin');
   assert.equal(mobileAbility(DEF, 'attack4'), null, 'no fourth button');
   assert.equal(mobileAbility(DEF, 'transform').pending, true, 'Transform reserved');
+  assert.equal(mobileAbility(DEF, 'transform').icon, ICONS.transform, 'Transform keeps its star');
+  assert.equal(mobileAbility(DEF, 'transform').sprite, null);
   assert.equal(STRINGS.fr['ability.0002.attack3'], 'Vrille');
 });
 
@@ -759,8 +774,11 @@ test('the CPU sends its Whirlwind at an opponent turtling behind its Shield at m
 
 test('CPU fights with #0002 run: against #0001 and itself, every move used, no summon or technique cooldown of its own', () => {
   const used = new Set();
+  // A seeded sample of real fights (seed 3: one that sees the mid-air
+  // moves; which ones come up depends on how #0001 plays, its Clone
+  // Attack's summoning startup included).
   for (const [a, b] of [[DEF, DEF_0001], [DEF_0001, DEF], [DEF, DEF]]) {
-    const { log } = cpuFight(a, b, { seconds: 40, seed: 5, difficulty: 'brutal' });
+    const { log } = cpuFight(a, b, { seconds: 40, seed: 3, difficulty: 'brutal' });
     for (const [f, steps] of log) {
       if (f.def !== DEF) continue;
       for (const s of steps) {

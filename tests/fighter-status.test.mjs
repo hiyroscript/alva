@@ -105,9 +105,11 @@ test('real attack3 then attack4: A3 appears at once, A4 joins it, A3 goes first,
   const cd = f.combat.abilityCooldowns;
   d.tick({});
   assert.deepEqual(labels(f), []);
-  // A3 used: its ring on the very step, A4 still absent.
+  // A3 used: its ring on the very step, as #0001's summoning startup
+  // begins (the clone follows it), A4 still absent.
   d.tick({ attack3: true, attack3Pressed: true });
-  assert.equal(d.clones.length, 1);
+  assert.equal(f.state, 'summon');
+  assert.equal(d.clones.length, 0);
   let [attack3, attack4] = cooldownIndicators(f);
   assert.deepEqual([attack3.label, attack3.text, attack3.progress], ['A3', '5.0', 0]);
   assert.equal(attack4, undefined);
@@ -115,6 +117,7 @@ test('real attack3 then attack4: A3 appears at once, A4 joins it, A3 goes first,
   // In real time, whatever is held: half a second, Down held or not, takes
   // half a second off.
   for (let i = 0; i < 30; i++) d.tick(i % 2 ? { down: true } : {});
+  assert.equal(d.clones.length, 1, 'the clone is out by now');
   [attack3] = cooldownIndicators(f);
   assert.equal(attack3.text, '4.5');
   assert.ok(Math.abs(attack3.progress - 0.1) < 1e-9);

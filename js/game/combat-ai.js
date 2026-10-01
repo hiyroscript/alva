@@ -163,8 +163,9 @@ export function readMoveset(f) {
       const summon = f.summonDefs[spec.id];
       if (!summon || summonProblem(f, summon)) continue;
       const attack = f.attacks[summon.attack];
-      // From the press to its strike: one pass of the cloud, then the attack's startup.
-      const lead = passOf(sprites.effect(summon.cloud)) + (attack?.startup ?? 0);
+      // From the press to its strike: the owner's startup (if any), one pass
+      // of the cloud, then the attack's startup.
+      const lead = sprites.duration(summon.startupAnimation) + passOf(sprites.effect(summon.cloud)) + (attack?.startup ?? 0);
       specials.push({ action, type: 'summon', id: spec.id, lead, hit: attack });
     } else if (spec?.type === 'technique') {
       const t = f.techniqueDefs[spec.id];
@@ -947,10 +948,11 @@ export class CombatAIController {
   // fits: a summon like the Clone Attack at an opponent likely to stay put,
   // a technique like the Sphere Rush it is in line for. A technique goes the
   // way the fighter faces, so it turns first. Worth its long cooldown only
-  // when it is likely to land, as the level judges it. A summon leaves the
-  // fighter free at once; a technique holds it in place while it forms, so
-  // it is worth less the closer the opponent could strike first, unless the
-  // opponent is busy for longer than that.
+  // when it is likely to land, as the level judges it. A summon holds the
+  // fighter only for its short startup (if it has one: #0001's summoning
+  // pose), as it would a player, and its lead counts it; a technique holds
+  // it in place while it forms, so it is worth less the closer the opponent
+  // could strike first, unless the opponent is busy for longer than that.
   specialOptions(s) {
     const { self, p } = s;
     if (!s.canAct || !s.grounded) return [];

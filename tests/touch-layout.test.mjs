@@ -68,7 +68,7 @@ class Element extends Node {
   set innerHTML(v) { this.replaceChildren(); this.html = v; }
   get innerHTML() { return this.html; }
   append(...nodes) { for (const n of nodes) { n.parentNode = this; this.children.push(n); } }
-  replaceChildren(...nodes) { this.children = []; this.append(...nodes); }
+  replaceChildren(...nodes) { this.children = []; this.html = ''; this.append(...nodes); }
   addEventListener(type, fn) {
     if (!this.listeners.has(type)) this.listeners.set(type, []);
     this.listeners.get(type).push(fn);
@@ -544,30 +544,50 @@ test('multi-touch still works with a custom layout: joystick, Down, Punch and Ju
   ]);
 });
 
-test('setCharacter still swaps the fighter\'s icons and names in place, and never moves a button', () => {
+test('setCharacter still swaps the fighter\'s art and names in place, and never moves or resizes a button', () => {
   const { tc, calls } = touchControls('joystick', null);
   layOut(tc);
-  tc.setLayout({ attack1: { x: 0.5, y: 0.3, scale: 1.3 } });
+  tc.setLayout({ attack1: { x: 0.5, y: 0.3, scale: 1.3 }, jump: { x: 0.9, y: 0.4, scale: 0.8 }, attack3: { x: 0.2, y: 0.2, scale: 1.5 } });
   const attack1 = tc.buttons.get('attack1');
-  const before = [attack1.style.translate, attack1.style.scale];
+  const placed = () => ['attack1', 'jump', 'attack3'].map((id) => {
+    const b = tc.buttons.get(id);
+    return [b.style.translate, b.style.scale];
+  });
+  const before = placed();
+  // What a button shows: the file of its sprite, or its glyph's markup.
+  const look = (b) => b.querySelector('.tc-sprite-icon')?.getAttribute('src').split('/').pop() ?? b.innerHTML;
   assert.equal(attack1.getAttribute('aria-label'), 'Attack 1');
+  assert.equal(look(attack1), ICONS.pip1, 'neutral before a fighter is named');
   tc.setCharacter(DEF_0001);
   assert.equal(attack1.getAttribute('aria-label'), 'Punch');
-  assert.equal(attack1.innerHTML, ICONS.punch);
-  assert.deepEqual([attack1.style.translate, attack1.style.scale], before, 'still where the player put it');
+  assert.equal(look(attack1), '0001_attack1_2.png', 'a frame of #0001\'s own punch');
+  assert.equal(look(tc.buttons.get('jump')), '0001_jump_2.png');
+  assert.deepEqual(placed(), before, 'still where the player put them, at their sizes');
   press(attack1, 1);
   assert.deepEqual(calls, [['attack1', true]], 'still attack1');
   // And Attack 3 and Attack 4 are buttons of their own, named for the
-  // Clone Attack and the Sphere Rush, in slots 3 and 4.
-  for (const [id, label, slot] of [['attack3', 'Clone Attack', '3'], ['attack4', 'Sphere Rush', '4']]) {
+  // Clone Attack and the Sphere Rush, in slots 3 and 4, showing #0001's
+  // summoning hand seal and its rush.
+  for (const [id, label, slot, art] of [['attack3', 'Clone Attack', '3', '0001_attack3_summon_3.png'], ['attack4', 'Sphere Rush', '4', '0001_attack4_5.png']]) {
     const b = tc.buttons.get(id);
     assert.equal(b.hidden, false, id);
     assert.equal(b.getAttribute('aria-label'), label);
     assert.equal(b.getAttribute('data-slot'), slot);
+    assert.equal(look(b), art);
   }
   press(tc.buttons.get('attack3'), 2);
   press(tc.buttons.get('attack4'), 3);
   assert.deepEqual(calls.slice(1), [['attack3', true], ['attack4', true]], 'each its own input');
+  // #0002 (three numbered attacks, no Attack 4): its own art and jump, the
+  // custom places and sizes kept.
+  tc.releaseAll();
+  tc.setCharacter(getCharacter('0002'));
+  assert.deepEqual(['attack1', 'attack3', 'jump'].map((id) => look(tc.buttons.get(id))), ['0002_attack1_4.png', '0002_attack3_5.png', '0002_jump_1.png']);
+  assert.equal(tc.buttons.get('attack4').hidden, true);
+  assert.deepEqual(placed(), before, 'a fighter change never moves or resizes a custom layout');
+  assert.deepEqual(tc.getLayout(), {
+    attack1: { x: 0.5, y: 0.3, scale: 1.3 }, jump: { x: 0.9, y: 0.4, scale: 0.8 }, attack3: { x: 0.2, y: 0.2, scale: 1.5 },
+  });
 });
 
 test('gameplay touch buttons stay out of keyboard focus in battle; only the editor\'s copy is focusable', () => {

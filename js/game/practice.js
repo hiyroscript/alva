@@ -64,12 +64,13 @@ export class PracticeSession extends Arena {
   // Puts `def` on the training floor as the practice fighter, replacing the
   // current one: a fresh Fighter at the stage's spawn with 0 Launch Point and
   // no cooldowns, driven by Player 1 at once. Nothing of the previous fighter
-  // stays: its technique ends and its projectiles and clones go. A
-  // CPU stays as it is.
+  // stays: its technique ends, its summon's startup is cut short and its
+  // projectiles and clones go. A CPU stays as it is.
   setFighter(def, sprites) {
     const old = this.player;
     if (old) {
       old.endTechnique('destroy');
+      old.cancelSummon();
       old.opponent = null;
     }
     this.player = new Fighter({
@@ -102,15 +103,18 @@ export class PracticeSession extends Arena {
   }
 
   // Takes the CPU out of the session, if there is one, with every reference
-  // to it: a technique of the player's holding it ends, clones summoned at
-  // it go, and so do its numbers. Practice is then solo again.
+  // to it: a technique of the player's holding it ends, a summon's startup
+  // cast at it is cut short (its cooldown runs on), clones summoned at it
+  // go, and so do its numbers. Practice is then solo again.
   removeCPU() {
     const cpu = this.cpu;
     if (!cpu) return;
     const player = this.player;
     if (player.technique?.target === cpu) player.endTechnique('released');
+    if (player.pendingSummon?.target === cpu) player.cancelSummon();
     player.summons = player.summons.filter((s) => s.target !== cpu);
     cpu.endTechnique('destroy');
+    cpu.cancelSummon();
     // Anything left in the arrays belongs to the player; a clone aimed at
     // the CPU has nothing left to strike.
     const keep = (e) => e.owner !== cpu && e.target !== cpu;

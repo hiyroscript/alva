@@ -14,7 +14,7 @@ import { COMBAT_ACTIONS } from '../js/game/character.js';
 import { CombatSystem } from '../js/game/combat.js';
 import { HELD_CONTROLS, blankInput } from '../js/game/fighter-controller.js';
 import {
-  def, DT, SIM_CTX, makeFighter, frameName, stepUntil, steps, duel,
+  def, DT, SIM_CTX, makeFighter, frameName, stepUntil, steps, duel, startupSteps,
 } from './fighter-harness.mjs';
 
 const DOWN = { down: true };
@@ -204,20 +204,25 @@ test('holding Down never speeds up a cooldown: Attack 3 and Attack 4 recover in 
 });
 
 test('Down with any button changes nothing about what that button does', () => {
+  // What the press started, and the clones out once a summon's startup
+  // (#0001's, from the same press) has run its course.
   const press = (button, held) => {
     const d = duel({ gap: 150 });
     for (let i = 0; i < 10; i++) d.tick(held);
     d.tick({ ...held, ...P(button) });
     const f = d.attacker;
-    return [f.combat.attack?.def.id ?? null, f.technique?.def.id ?? null, d.clones.length, f.combat.shielding, f.state];
+    const started = [f.combat.attack?.def.id ?? null, f.technique?.def.id ?? null, f.combat.shielding, f.state];
+    for (let i = 0; i < startupSteps(def, 'attack3'); i++) d.tick(held);
+    return [...started, d.clones.length];
   };
   for (const button of [...COMBAT_BUTTONS, 'shield']) {
     assert.deepEqual(press(button, DOWN), press(button, {}), button);
   }
-  // The direct numbered attacks need nothing held: attack3 summons and
-  // attack4 rushes either way.
-  assert.deepEqual(press('attack3', {}).slice(0, 3), [null, null, 1]);
-  assert.deepEqual(press('attack4', {}).slice(0, 3), [null, 'attack4', 0]);
+  // The direct numbered attacks need nothing held: attack3 summons (its
+  // startup first, then the clone) and attack4 rushes either way.
+  assert.deepEqual(press('attack3', {}), [null, null, false, 'summon', 1]);
+  assert.deepEqual(press('attack4', {}).slice(0, 2), [null, 'attack4']);
+  assert.equal(press('attack4', {}).at(-1), 0);
 });
 
 test('the fighter has no state or pose of Down\'s own: only its directional effects read it', () => {

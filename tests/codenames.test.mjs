@@ -14,7 +14,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
-import { def, fakeSprites, makeFighter, STAGE } from './fighter-harness.mjs';
+import { def, fakeSprites, makeFighter, startupSteps, STAGE } from './fighter-harness.mjs';
 import { ACTIONS, ACTION_LABELS, COMBAT_BUTTONS, CONFIG, MOVES, NUMBERED_ATTACKS } from '../js/config.js';
 import { CHARACTERS, characterFramePaths, framePath, frames } from '../js/data/characters.js';
 import { actionType, loadoutProblems, specialAction } from '../js/data/loadout.js';
@@ -205,9 +205,13 @@ test('#0001\'s moves, clips and objects go by the codenames: attack1, midair_att
   assert.deepEqual(Object.keys(def.animations), [
     'idle', 'run', 'jump', 'fall', 'mouvment', 'land', 'hurt', 'midair_hurt',
     'attack1', 'midair_attack1', 'attack2', 'midair_attack2',
-    'prepshield', 'shielding', 'releaseshield', 'midair_shielding', 'extra_attack',
+    'prepshield', 'shielding', 'releaseshield', 'midair_shielding', 'extra_attack', 'attack3_summon',
     'attack4_form', 'attack4_dash', 'attack4_confirm', 'attack4_explosion', 'attack4_release', 'attack4_whiff_release',
   ]);
+  // attack3's own pose (the summoning startup) is a fighter clip under
+  // attack3's name; the clone's smoke is attack3's object.
+  assert.equal(def.summons.attack3.startupAnimation, 'attack3_summon');
+  assert.equal(def.summons.attack3.cloud, 'attack3_object');
   assert.deepEqual(Object.keys(def.projectileAnimations), ['extra_attack_object']);
   assert.deepEqual(Object.keys(def.projectiles), ['extra_attack_object']);
   assert.equal(def.attacks.extra_attack.projectile.id, 'extra_attack_object');
@@ -251,6 +255,8 @@ test('pressing attack3 and attack4 starts their cooldowns, keyed by those moves 
   summoner.fighter.opponent = foe.fighter;
   summoner.step({ attack3: true, attack3Pressed: true });
   assert.ok(summoner.fighter.combat.abilityCooldowns.active('attack3'));
+  assert.equal(summoner.fighter.pendingSummon.id, 'attack3', 'its startup, keyed by attack3');
+  for (let i = 0; i < startupSteps(def, 'attack3'); i++) summoner.step({});
   assert.deepEqual(summoner.fighter.summons.map((s) => s.id), ['attack3']);
   summoner.step({});
   summoner.step({ attack4: true, attack4Pressed: true });
@@ -304,7 +310,9 @@ test('every fighter frame is <id>_<codename>_<frame>.png in its own folder, and 
 
 test('#0001\'s folder holds only codename files, none under a retired stem', () => {
   const files = readdirSync(new URL('assets/characters/0001/', ROOT));
-  assert.equal(files.length, 88);
+  assert.equal(files.length, 92);
+  // The summoning startup's four frames are attack3's.
+  assert.deepEqual(files.filter((n) => n.startsWith('0001_attack3_summon_')).sort(), [1, 2, 3, 4].map((n) => `0001_attack3_summon_${n}.png`));
   for (const name of files) {
     assert.match(name, /^0001_[a-z][a-z0-9_]*_\d+\.png$/, name);
     assert.doesNotMatch(name, new RegExp(`^0001_(${RETIRED_STEMS.join('|')})\\d*\\.png$`), name);
@@ -378,4 +386,25 @@ test('the retired stance mechanic is gone for good: no file name, identifier, st
     assert.doesNotMatch(JSON.stringify(c), RETIRED_MECHANIC, `#${c.id}`);
     for (const url of characterFramePaths(c)) assert.doesNotMatch(url, RETIRED_MECHANIC, url);
   }
+});
+
+test('the guard still catches the retired mechanic coming back, under any of its old names', () => {
+  // Its stem, put together here so this file never spells it.
+  const stem = ['c', 'h', 'a', 'r', 'g', 'e'].join('');
+  const Stem = stem[0].toUpperCase() + stem.slice(1);
+  for (const attempt of [
+    stem, Stem, `${stem}Pressed`, `${stem}d`, `${stem}_loop`, `${Stem}Stance`,
+    `0001_${stem}_1.png`, `0001_${stem}_a.png`, `assets/characters/0001/0001_${stem}_b.png`,
+    `tests/${stem}.test.mjs`, `.tc-${stem}`, `control.${stem}`, `${stem.toUpperCase()}_FPS`,
+    JSON.stringify({ ...def, animations: { ...def.animations, [stem]: def.animations.attack3_summon } }),
+    JSON.stringify({ ...def, actions: { ...def.actions, [stem]: 'attack1' } }),
+  ]) {
+    assert.match(attempt, RETIRED_MECHANIC, `caught: ${attempt.slice(0, 40)}`);
+  }
+  // The restored art itself carries none of them: it is attack3's, by name
+  // and by clip.
+  for (const url of def.animations.attack3_summon.frames) assert.doesNotMatch(url, RETIRED_MECHANIC, url);
+  assert.ok(def.animations.attack3_summon.frames.every((url) => /\/0001_attack3_summon_\d\.png$/.test(url)));
+  // Words that only share its letters are not it.
+  for (const fine of ['re' + stem, 'Re' + stem, `${Stem.slice(0, 5)}ement`, `${stem.slice(0, 5)}és`]) assert.doesNotMatch(fine, RETIRED_MECHANIC, fine);
 });

@@ -13,7 +13,7 @@ import { HitEffects, HIT_FX, launchIsLethal } from '../js/game/hit-fx.js';
 import { LAUNCH_UNIT_SPEED } from '../js/data/launch.js';
 import { getMap } from '../js/data/maps.js';
 import { CONFIG } from '../js/config.js';
-import { def, DT, makeFighter, duel, stageMap, fakeSprites, frameName } from './fighter-harness.mjs';
+import { def, DT, makeFighter, duel, stageMap, fakeSprites, frameName, startupSteps } from './fighter-harness.mjs';
 
 const G = CONFIG.sim.gravity;
 const B = LAUNCH_BOUNCE;
@@ -661,6 +661,8 @@ test('a clone\'s punch launches through the same system: a battered target rebou
   const d = duel({ gap: 420, stage, x });
   d.target.combat.launchPoint = 100;
   d.tick(P('attack3'));
+  // #0001's summoning startup, then the clone.
+  for (let i = 0; i < startupSteps(def, 'attack3'); i++) d.tick();
   assert.equal(d.clones.length, 1, 'a clone');
   const b = tickForBounce(d, 120, {});
   assert.ok(d.events.some((e) => e.summon && e.type === 'hit'), 'the clone hit');

@@ -20,7 +20,7 @@ import {
 import * as loadoutModule from '../js/data/loadout.js';
 import { COMBAT_ACTIONS } from '../js/game/character.js';
 import { readMoveset } from '../js/game/combat-ai.js';
-import { DT, cpuFight, duel, fakeSpritesOf, makeFighter } from './fighter-harness.mjs';
+import { DT, cpuFight, duel, fakeSpritesOf, makeFighter, startupSteps } from './fighter-harness.mjs';
 import { LOADOUT_CASES, WITH_EXTRA, loadoutFighter } from './loadout-fighters.mjs';
 import { SAMPLE_FIGHTER } from './sample-fighter.mjs';
 
@@ -93,6 +93,11 @@ for (const c of LOADOUT_CASES) {
       } else if (type === 'summon') {
         assert.equal(f.combat.attack, null, `${button}: no attack of the fighter's own`);
         assert.ok(f.combat.abilityCooldowns.active(button), `${button}, the summon, with its cooldown`);
+        // Its owner's summoning startup first (#0001's, borrowed), then the
+        // clone, from the same press.
+        assert.equal(f.state, 'summon', `${button}: the startup, from the press`);
+        assert.equal(ground.clones.length, 0, 'no clone before the startup ends');
+        for (let i = 0; i < startupSteps(c.def, button); i++) ground.tick();
         assert.equal(ground.clones.length, 1, 'its clone');
         assert.equal(ground.clones[0].attackDef.id, 'attack1');
       } else if (type === 'technique') {
@@ -341,12 +346,14 @@ test('what kind of move attack3 to attack5 are is data: the same button is an or
   const summoned = structuredClone({ ...B, animations: B.animations, attacks: B.attacks });
   summoned.actions.attack3 = { type: 'summon', id: 'attack3' };
   summoned.summons = { attack3: { ...DEF_0001.summons.attack3 } };
+  summoned.animations.attack3_summon = DEF_0001.animations.attack3_summon;
   summoned.effectAnimations = { attack3_object: DEF_0001.effectAnimations.attack3_object };
   delete summoned.attacks.attack3;
   delete summoned.attacks.midair_attack3;
   assert.deepEqual(loadoutProblems(summoned), []);
   const d = duel({ attackerCharacter: summoned, attackerSprites: fakeSpritesOf(summoned), gap: 150 });
   d.tick(P('attack3'));
+  for (let i = 0; i < startupSteps(summoned, 'attack3'); i++) d.tick();
   assert.equal(d.clones.length, 1, 'the same button, now a summon');
   assert.equal(actionType(summoned, 'attack1'), 'attack');
   assert.equal(actionType(summoned, 'attack5'), null, 'no such button');

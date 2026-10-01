@@ -1031,8 +1031,11 @@ export class CombatSystem {
     if (def.hitstop > 0) tc.hitstop = def.hitstop;
     if (!detached) attacker.combat.hitstop = def.hitstop;
     // ...and a technique: no armour. It ends at once, releasing
-    // whatever it held, before the launch below moves the fighter.
+    // whatever it held, before the launch below moves the fighter. So does
+    // a summon's startup: the hurt pose shows on this very step, and no
+    // clone comes of it.
     target.endTechnique?.('hit');
+    target.cancelSummon?.();
     if (finalLaunch.x || finalLaunch.y) {
       // A launch replaces the target's sideways speed (a vertical one sends
       // it straight up or down) and, when it has one, its vertical speed.

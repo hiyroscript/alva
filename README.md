@@ -71,7 +71,7 @@ in the code depends on the repository name, so no file changes are needed.
 | Move left / right | `runLeft` / `runRight` | `A` `D` or `←` `→` | **Joystick:** push the joystick left / right · **Classic:** lower-left ◀ ▶ |
 | Dash | double tap of `runLeft` / `runRight`; `mouvementLeft` / `mouvementRight` on touch | Double-tap `A` / `D` or `←` / `→` | **Joystick:** one tap of **Left mouvement** / **Right mouvement** (the small ◀ ▶ above the joystick) · **Classic:** double-tap ◀ or ▶ |
 | Down (in the air: fast fall; as a hit lands: steer the launch down) | `down` | `S` or `↓` | **Joystick:** hold the down arrow left of the joystick · **Classic:** hold the lower-left down arrow |
-| Jump (tap: the normal jump; held a little longer: a higher jump; again in the air: air jump) | `jump` | `W`, `Space` or `↑` | Lower-right, bottom corner |
+| Jump (tap: the normal jump; held a little longer: a higher jump; again in the air: air jump) | `jump` | `W`, `Space` or `↑` | Lower-right, bottom corner (the fighter's own jump) |
 | Extra attack (#0001: the Throw; #0002: the Whirlwind) | `extra_attack` | `J` | **Shuriken** / **Whirlwind**, lower-right, top |
 | Transform* | `transform` | `K` | Lower-right, middle row |
 | Shield | `shield` | `L` | **Shield**, lower-right, middle row |
@@ -125,6 +125,15 @@ direction.
 \* Reserved: wired into input and combat, but inactive until a fighter has a
 Transform move (neither #0001 nor #0002 has one yet). Its touch button has a
 dashed outline.
+
+On touch, the extra attack, every numbered attack and Jump show a frame of
+the fighter's own art for that move, in its own colours: #0001's shuriken
+throw, punch, high kick, the hand seal it summons its clone with, its
+rush and its jump; #0002's Whirlwind, One-Two, Rapid Kicks, Spin Attack
+ball and spin jump. The Left / Right / Down arrows, the joystick and its
+Dash buttons, Shield and Transform keep their glyphs. The picture is only
+presentation: each button still sends its own codename (see
+[Mobile Controls](#mobile-controls)).
 
 A fighter may also lack a move altogether. A button left out of its
 `actions` (`attack3` to `attack5` for a fighter with fewer numbered
@@ -471,21 +480,31 @@ cover them.
   button does. There is no drop-through control: walk off an edge to come
   down. Menus read their own Down.
 - **Clone Attack (attack3):** press Attack 3 (`O`, LT on a gamepad, the
-  **Clone Attack** touch button) on the ground. A clone appears behind the
-  opponent in a smoke cloud (`attack3_object_1 → … → attack3_object_10`, 20
-  fps), performs #0001's normal attack1, then vanishes through the cloud
-  animation in reverse (`attack3_object_10 → … → attack3_object_1`). #0001
-  itself performs nothing and is free at once: it can run, jump, attack or
-  Dash while its clone plays. attack3 then cools down for 5 s (below), hit
-  or miss. Pressed while it is still cooling down, in the air, or with no
-  opponent to appear behind, it does nothing at all: no attack1 in its
-  place, no cooldown spent, and nothing kept for later.
+  **Clone Attack** touch button) on the ground. #0001 first summons the
+  clone himself: from the press he stands still in his summoning poses
+  (`attack3_summon_1 → … → attack3_summon_4`, once, 10 fps: 0.4 s), facing
+  the way he faced, and can do nothing else meanwhile (no attack, Throw,
+  Sphere Rush, Dash, jump or Shield). As the last pose ends the clone
+  appears behind the opponent in a smoke cloud
+  (`attack3_object_1 → … → attack3_object_10`, 20 fps), performs #0001's
+  normal attack1, then vanishes through the cloud animation in reverse
+  (`attack3_object_10 → … → attack3_object_1`), and #0001 is free again:
+  he can run, jump, attack or Dash while his clone plays. The summoning
+  poses are his; the smoke is the clone's. attack3 cools down for 5 s
+  (below) from the press, hit or miss. A hit on #0001 during his summoning
+  stops it at once (his hurt pose on that very step), as does losing the
+  ground under him, the Void, or the opponent leaving play: then no clone
+  appears at all, and the cooldown already started runs on. Pressed while
+  it is still cooling down, in the air, or with no opponent to appear
+  behind, it does nothing at all: no pose, no attack1 in its place, no
+  cooldown spent, and nothing kept for later. (The summoning poses are four
+  frames that once belonged to the retired held Down stance, recovered and
+  renamed for Attack 3; the stance itself has not come back.)
   The clone appears on the opponent's back side, facing it, at the spot where
-  the opponent stood when you pressed Attack 3; it never follows, so an opponent
-  who moves away makes it miss. Its punch is attack1's (3 damage, same hitbox
-  and hitstun, Base Launch 1 horizontal, pushing the opponent away from the
-  clone), hits
-  once, and a Shield blocks it like any attack. If
+  the opponent stands as #0001's summoning ends; it never follows, so an
+  opponent who moves away makes it miss. Its punch is attack1's (3 damage,
+  same hitbox and hitstun, Base Launch 1 horizontal, pushing the opponent
+  away from the clone), hits once, and a Shield blocks it like any attack. If
   there is no ground behind the opponent at its foot height (it stands at a
   platform's edge or a ledge with its back to the drop, or it is in the
   air), the clone
@@ -553,9 +572,9 @@ cover them.
 - **Attack 3 and Attack 4 cooldowns (A3, A4):** the Clone Attack (`attack3`,
   shown as **A3**) and the Sphere Rush (`attack4`, **A4**) each have their
   own 5-second cooldown, keyed by the attack itself, started the moment the
-  move is used (the clone summoned, the rush started), whether it hits or
-  not. A press while it is cooling down does nothing, and is never kept
-  for later. While it
+  move is accepted (the summoning begun, the rush started), whether it hits
+  or not, and even if a hit cuts it short. A press while it is cooling down
+  does nothing, and is never kept for later. While it
   cools down it shows as a small white ring, outlined in black, under the
   fighter's feet, labelled A3 or A4: it fills clockwise as the ability
   recovers, with the seconds left inside, and disappears the moment it is
@@ -564,7 +583,7 @@ cover them.
   second per second, whatever #0001 does. A restart or rematch, a new fighter in Practice Ground and every
   respawn after the Void clear them. They cost no Energy.
 - **Menus:** arrow keys or WASD to move, `Enter` to select, `Esc` to go back. Mouse and touch work too.
-- **Touch:** two layouts, Joystick (the default) and Classic Buttons (see [Mobile Controls](#mobile-controls)). Several fingers work at once (hold the joystick or Right and press Jump, or hold Down and press Punch). The combat buttons show icons, not letters: for #0001, **Shuriken** (Throw), **Shield** (held), **Punch** (attack1), **Kick** (attack2), **Clone Attack** (attack3) and **Sphere Rush** (attack4), beside Transform (dashed: #0001 has none yet) and Jump. Which buttons a fighter has comes from its `actions` (`abilityPresence` in `js/ui/mobile-abilities.js`), so a move it does not have (left out of `actions`) has its button hidden, unnamed and untouchable, its place left empty, while one mapped to `null` stays reserved (dashed). The touch layout editor still shows every control, so a layout can place a button for the fighters that have it. The icons of the fighter's own buttons (Shuriken, Punch, Kick, the numbered glyphs of the Clone Attack and the Sphere Rush, and Transform once a fighter has one) come from its `mobileAbilities` in `js/data/characters.js` and follow Player 1's fighter, in Practice Ground too when you change fighter; a fighter with no `transform` entry keeps the dashed, reserved Transform star. Shield, Jump and Down are the same for everyone. Only the presentation is per fighter: the buttons always send the same control codenames (`extra_attack`, `transform`, `shield`, `attack1` … `attack5`). A fighter with more numbered attack buttons shows up to five, in fixed slots round Transform and Shield (see [Mobile Controls](#mobile-controls)); #0001 shows four, Punch, Kick, Clone Attack and Sphere Rush in slots 1 to 4; #0002 shows three, **Punch**, **Kick** and **Spin** (its One-Two / Homing Attack, Rapid Kicks / Bounce Attack and Spin Attack / Blue Tornado), with **Whirlwind** on top. The combat buttons are the same elements in both layouts, in the same places: switching (`TouchControls.setScheme`) only swaps the lower-left corner (Left / Down / Right, or Down and the joystick with its Dash buttons), after letting go of everything held. Each layout can also be rearranged and resized by the player (see [Mobile Controls](#mobile-controls)); the buttons keep what they do wherever they sit. The viewport disables page zoom (`maximum-scale=1, user-scalable=no`) and the play surfaces, joystick and buttons set `touch-action: none`, so rapid taps never zoom or scroll the page.
+- **Touch:** two layouts, Joystick (the default) and Classic Buttons (see [Mobile Controls](#mobile-controls)). Several fingers work at once (hold the joystick or Right and press Jump, or hold Down and press Punch). The fighter's own buttons show no letters and no white glyphs but a frame of its own animation for the move, in the art's own colours and transparency: for #0001, **Shuriken** (Throw: the shuriken leaving the hand), **Punch** (attack1: the punch), **Kick** (attack2: the high kick), **Clone Attack** (attack3: the hand seal of its summoning pose) and **Sphere Rush** (attack4: the rush), and **Jump** (its own jump), beside **Shield** (held), whose shield glyph is the same for everyone, and Transform (the dashed star: #0001 has none yet). Each frame is fitted whole inside its round button, aspect kept and crisp (`.tc-sprite-icon`), an image with an empty alt hidden from assistive technology: the button's own translated name is what is announced. Which buttons a fighter has comes from its `actions` (`abilityPresence` in `js/ui/mobile-abilities.js`), so a move it does not have (left out of `actions`) has its button hidden, unnamed and untouchable, its place left empty, while one mapped to `null` stays reserved (dashed). The touch layout editor still shows every control, so a layout can place a button for the fighters that have it (in a neutral pip where the picked fighter lacks the move). Each button's name and frame come from the fighter's `mobileAbilities` in `js/data/characters.js` (`label`, and `preview: { animation, frame }`: a clip of its own and a frame of it, counted from 0) and follow Player 1's fighter, in Practice Ground too when you change fighter (never the CPU's); the image is updated in place. A button with no frame to show (no fighter yet, a preview naming no frame, a file that fails to load) shows a neutral glyph instead, its name and input unchanged. A fighter with no `transform` entry keeps the dashed, reserved Transform star. Shield, Down, the joystick and the Left / Right and Dash arrows are the same for everyone. Only the presentation is per fighter: the buttons always send the same control codenames (`extra_attack`, `transform`, `shield`, `jump`, `attack1` … `attack5`), and nothing a button shows decides what it does. A fighter with more numbered attack buttons shows up to five, in fixed slots round Transform and Shield (see [Mobile Controls](#mobile-controls)); #0001 shows four, Punch, Kick, Clone Attack and Sphere Rush in slots 1 to 4; #0002 shows three, **Punch**, **Kick** and **Spin** (its One-Two / Homing Attack, Rapid Kicks / Bounce Attack and Spin Attack / Blue Tornado, showing the One-Two's straight, the flurry of kicks and the rolled-up ball), with **Whirlwind** on top and its spin jump on Jump. The combat buttons are the same elements in both layouts, in the same places: switching (`TouchControls.setScheme`) only swaps the lower-left corner (Left / Down / Right, or Down and the joystick with its Dash buttons), after letting go of everything held. Each layout can also be rearranged and resized by the player (see [Mobile Controls](#mobile-controls)); the buttons keep what they do wherever they sit. The viewport disables page zoom (`maximum-scale=1, user-scalable=no`) and the play surfaces, joystick and buttons set `touch-action: none`, so rapid taps never zoom or scroll the page.
 - **Gamepad (standard layout):** D-pad or left stick left / right to move (twice in a row to Dash) and down for Down in battle (they still navigate menus), A to jump, X / Square for the extra attack (#0001's Throw), B / Circle for `attack1`, LB for `attack2`, LT, L3 and R3 for `attack3` to `attack5` (#0001's Clone Attack and Sphere Rush on LT and L3), Y / Triangle for the reserved Transform, RB or RT for Shield, Start to pause.
 - **Debug:** `` ` `` toggles the collider, hurtbox and attack-hitbox overlay in battle (a hitbox shows only while it can connect; hurtboxes look the same with the Shield up, and a shielding fighter is labelled `shield`; a flying shuriken's hitbox is outlined in magenta and labelled; a clone's attack hitbox shows in the attack colour, labelled `clone attack1` (or `clone midair_attack2` overhead), only on its active frame; the Sphere Rush's sphere hitbox is a dashed cyan box labelled `attack4 dash` while it can connect, then a dashed cyan cross marks the sphere on the caught opponent, which is labelled `bound`; solids, the main floor's block among them, are outlined in red and the Void's fixed kill line is dashed violet).
 
@@ -693,7 +712,7 @@ js/
   data/               characters.js, maps.js, practice-map.js, powers.js,
                       launch.js, difficulty.js
   ui/                 wordmark, icons, overlays, credits, stage preview,
-                      fighter roster, mobile ability icons, the first-launch
+                      fighter roster, touch-button names and art, the first-launch
                       language dialog, the Settings dialog and the touch
                       layout editor
 ```
@@ -1052,6 +1071,7 @@ every route stays closed with no playable fighter, and reopens with one.
 3. Give it a free `rosterSlot`.
 4. Set `available: true` once it is ready to be played (see [Roster status](#roster-status)).
 5. Optionally, name its moves in `abilityNames`, keyed by move codename (e.g. `attack4: 'Sphere Rush'`); a move it leaves out keeps its neutral name.
+6. Give its touch buttons their names and pictures in `mobileAbilities`, keyed by control codename: `label` (the button's accessible name, translated in `js/core/i18n.js` as `ability.<id>.<button>`) and `preview: { animation, frame }`, a frame of one of its own clips (counted from 0) that reads as the move (e.g. `attack1: { label: 'Punch', preview: { animation: 'attack1', frame: 1 } }`), for `extra_attack`, `attack1` … `attack5` and `jump` (no label: Jump keeps its name). Pick the frame by the move's own timing (its strike, its release), not blindly its first. A button left without one shows a neutral glyph.
 
 A move can be more than a timed hitbox; each of these is data on the attack (see the schema in `js/game/combat.js`), and #0002 uses them all:
 
@@ -1065,7 +1085,7 @@ A projectile may pierce (`pierce: { hits, interval }`), striking again every `in
 
 A fighter whose art arrives before its attributes can still be added: give an attack whose art is in `pending: true` (art only: one pass of the clip, no hit; declaring combat fields on one is refused), leave out of `actions` any button it does not have (its touch button is hidden and the CPU never presses it), and keep `null` for a `transform` still to come (reserved, dashed). Its `attack1` and `attack2` (each with its mid-air version) are always required. Its `powers` and `movement`, which the engine cannot build a fighter without, are still its own. A clip whose art misleads the automatic anchor (effects drawn beside the body, or swinging limbs that nudge it from frame to frame) can place each frame's anchor itself with `anchorX`, and `visual.portrait.centerX` centres a portrait crop by hand.
 
-The tests already run a second, made-up fighter (`tests/sample-fighter.mjs`, never in the game) with different moves on the same codenames: a melee `extra_attack` usable in the air, a real `transform`, three numbered attacks (`attack3` a summon on its own button, performing its `attack2`), no Shield. The loadout matrix (`tests/loadout-fighters.mjs`, `tests/loadout.test.mjs`) builds one fighter for each row of the [attack loadouts](#attack-loadouts) table and checks its buttons, each button's move, mid-air versions, input buffer, touch slots and CPU, plus every rule broken on purpose. It goes through combat, the CPU, the touch buttons and the codename checks (`tests/sample-fighter.test.mjs`), so anything that only works for #0001 shows up there first. A new character is checked against the same codename rules automatically. The screen tests that need more than one fighter to pick (the roster, Quick Battle, Watch Mode, Practice Ground) register test-only ones from `tests/test-fighters.mjs` beside #0001 (#0001's definition under neutral ids, and a disabled one, taken out again after each run).
+The tests already run a second, made-up fighter (`tests/sample-fighter.mjs`, never in the game) with different moves on the same codenames: a melee `extra_attack` usable in the air, a real `transform`, three numbered attacks (`attack3` a summon on its own button, performing its `attack2`, with no startup: its clone appears on the press), no Shield, and frames of its own clips on its touch buttons (its Transform with a glyph of its own, Jump with the arrow). The loadout matrix (`tests/loadout-fighters.mjs`, `tests/loadout.test.mjs`) builds one fighter for each row of the [attack loadouts](#attack-loadouts) table and checks its buttons, each button's move, mid-air versions, input buffer, touch slots and CPU, plus every rule broken on purpose. It goes through combat, the CPU, the touch buttons and the codename checks (`tests/sample-fighter.test.mjs`), so anything that only works for #0001 shows up there first. A new character is checked against the same codename rules automatically. The screen tests that need more than one fighter to pick (the roster, Quick Battle, Watch Mode, Practice Ground) register test-only ones from `tests/test-fighters.mjs` beside #0001 (#0001's definition under neutral ids, and a disabled one, taken out again after each run).
 
 To add attacks, create animations with real frames, define them in `attacks` under their universal codenames (`attack1` … `attack5`, `midair_attack1` … `midair_attack5`, `extra_attack`; see the schema in `js/game/combat.js`), give each its `damage`, `baseLaunch` and `directionalLaunch`, optionally how it moves (`momentum` / `airMomentum`, `control` / `airControl`, `friction`, a `step`) and when a hit opens a follow-up (`hitCancel`), and map them in `actions`: every numbered button is `{ ground: 'attackN', air: 'midair_attackN' }`, picked by whether the fighter is grounded (as #0001's `attack1: { ground: 'attack1', air: 'midair_attack1' }` and `attack2: { ground: 'attack2', air: 'midair_attack2' }`), `extra_attack: 'extra_attack'` is one attack, and `transform: null` is reserved. A projectile an attack throws is named after it (`projectiles.extra_attack_object`, thrown by `extra_attack`), and so is its art. Time `startup` / `active` / `recovery` to whole frames of the clip so the hitbox is live only while the strike is on screen. An attack without frames is refused rather than faked. Base Launch and Directional Launch are declared separately from damage (see [Launch](#launch)):
 
@@ -1093,7 +1113,7 @@ attacks: {
 
 To make one of `attack3` to `attack5` a summon or a technique, give its button a typed descriptor keyed by that same attack (`{ type, id }` with `id` the button itself) instead of `{ ground, air }`; `Fighter.tryAction` sees the type and hands the press to `Fighter.trySpecial`:
 
-- `{ type: 'summon', id }` names an entry in `summons` (see the schema in `js/game/clone.js`), as #0001's `attack3: { type: 'summon', id: 'attack3' }` (the Clone Attack) does. It starts the summon's `cooldown` and spawns a detached clone that performs one of the fighter's own `attacks` through an `effectAnimations` cloud named after it (`attack3_object`); the fighter itself is free at once. An optional `noGround: { attack, offset }` names another of its attacks, and where to appear relative to the opponent, for when there is no ground behind the opponent at its foot height.
+- `{ type: 'summon', id }` names an entry in `summons` (see the schema in `js/game/clone.js`), as #0001's `attack3: { type: 'summon', id: 'attack3' }` (the Clone Attack) does. It starts the summon's `cooldown` and spawns a detached clone that performs one of the fighter's own `attacks` through an `effectAnimations` cloud named after it (`attack3_object`). An optional `startupAnimation` (#0001's `attack3_summon`, its `<id>_attackN_summon_<frame>.png` frames) is the fighter's own summoning pose: played once from the press, the fighter standing still and committed to it, and the clone sent out as it ends; a hit, lost ground or a target out of play first means no clone (the cooldown runs on). Without one the clone is sent out on the press and the fighter is free at once. An optional `noGround: { attack, offset }` names another of its attacks, and where to appear relative to the opponent, for when there is no ground behind the opponent at its foot height.
 - `{ type: 'technique', id }` names an entry in `techniques` (see the schema and phases in `js/game/technique.js`), as #0001's `attack4: { type: 'technique', id: 'attack4' }` (the Sphere Rush) does. The fighter itself performs it, facing the direction held as it is pressed: fighter clips from `animations` for its form / dash / confirm / explosion / release phases and its whiff release (`attack4_form` … `attack4_whiff_release`), an effect from `effectAnimations` for each stage of the sphere (`attack4_object_build`, `_impact`, `_explosion`), a dash speed, hand offsets per frame, a sphere hitbox, a delay, the sphere's growth on the target and the data for its hits (the contact, an optional `tickHit` every `tickInterval` while the target is held, and the explosion). Its `cooldown` starts when it starts.
 
 Either is ground-only, starts only while the fighter is free to act, costs no Energy and needs no mid-air version. While it is cooling down, in the air, or when it cannot happen (no opponent for a summon, missing art or invalid data, logged), the press does nothing at all: no other attack in its place, no cooldown started, nothing kept for later. The cooldown is keyed by the attack itself (`attack3`, `attack4`), recovers in real time and shows under the fighter as **A3** / **A4**.

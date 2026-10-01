@@ -230,7 +230,13 @@ test('English game copy is the registries\' own, never retyped', () => {
   assert.equal(STRINGS.en['launch.formula'], launch.LAUNCH_FORMULA);
   for (const d of launch.DIRECTIONAL_LAUNCHES) assert.equal(STRINGS.en[`launch.direction.${d.id ?? 'none'}.name`], d.name);
   for (const def of CHARACTERS) {
-    for (const [action, own] of Object.entries(def.mobileAbilities ?? {})) assert.equal(STRINGS.en[`ability.${def.id}.${action}`], own.label);
+    // A name of its own (Jump has none: it keeps the universal one) has its
+    // key; a button with only art has none.
+    for (const [action, own] of Object.entries(def.mobileAbilities ?? {})) {
+      assert.equal(STRINGS.en[`ability.${def.id}.${action}`], own.label, `${def.id} ${action}`);
+    }
+    assert.equal(def.mobileAbilities.jump?.label, undefined, `#${def.id}: Jump keeps its name`);
+    assert.equal(STRINGS.en[`ability.${def.id}.jump`], undefined);
   }
   // The game data itself stays in English: its tests and gameplay are untouched.
   assert.equal(POWERS[0].name, 'Jump Power');

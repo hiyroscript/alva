@@ -90,6 +90,16 @@ behave, and how it must look. The README covers running and deploying it.
   plain rename: no image was re-encoded, and the tests check each file's
   SHA-256 against the original upload). No file under an older name
   remains, and no code or data refers to one.
+- The four Clone Attack startup poses, `0001_attack3_summon_1`–`_4`
+  (288 / 288 / 280 / 272 × 416 px, 8× pixel art like #0001's other poses),
+  are one one-shot fighter clip, `attack3_summon` (10 fps, never looped):
+  #0001 squaring up, bringing his fists in, then holding the hand seal that
+  summons the clone. They are the four poses of the retired held Down
+  stance, recovered byte for byte from the repository's history (commit
+  538d73a, the tests check each file's SHA-256 and git blob id) and
+  renamed for Attack 3: its two startup poses became `_1` and `_2`, its two
+  held poses `_3` and `_4`, and they now play once, in that order. The
+  stance itself is gone for good; only its art was reused.
 - The twelve Sphere Rush poses are fighter poses, registered as logical
   one-shot clips in `animations` rather than one blind animation, each with
   one role: `attack4_form` (`attack4_1`–`attack4_3`, formation: the rear palm opens
@@ -1605,15 +1615,17 @@ French, concise game terms).
   kept per ability in `CombatState.abilityCooldowns` (a `CooldownTimers`:
   `{ remaining, duration }` per id, apart from ordinary attacks' short
   recovery cooldowns in `CombatState.cooldowns`), started the moment the
-  move happens and recovering at 1 s per second, whatever the fighter does
-  (impact freezes included), never below 0. Neither spends Energy. The Clone
+  move is accepted (a summon's startup included) and recovering at 1 s per
+  second, whatever the fighter does (impact freezes included), never below
+  0. Neither spends Energy. The Clone
   Attack never depends on technique code, nor the technique on the summon
   system.
 - attack3 Clone Attack (#0001). Trigger: a new press of `attack3` (O,
   gamepad LT, touch slot 3, the **Clone Attack** button) on the ground,
   under the shared rule above. It is data on the character: `actions`
   maps `attack3` to the `attack3` summon, which names the attack (`attack1`),
-  the cloud effect (`attack3_object`), `cooldown` 5, `behindDistance` 48 world
+  the cloud effect (`attack3_object`), the owner's startup
+  (`startupAnimation: 'attack3_summon'`, below), `cooldown` 5, `behindDistance` 48 world
   units, the cloud's `effectOffset` (centred 44 units above the clone's feet,
   half the fighter's height) and a `noGround` fallback (the
   attack `midair_attack2` at `offset` `{ x: 0, y: -36 }` from the opponent's
@@ -1623,8 +1635,8 @@ French, concise game terms).
   same summon, never a second cooldown. While it cools, an attack3 press
   does nothing. With no opponent no clone is summoned, no cooldown starts
   and the press does nothing. Before
-  starting its cooldown, the summon checks that the cloud has
-  real frames, that both of its attacks (attack1 and the no-ground midair_attack2)
+  starting its cooldown, the summon checks that its startup pose and the
+  cloud have real frames, that both of its attacks (attack1 and the no-ground midair_attack2)
   are defined with a hitbox and real frames, and that there is an opponent,
   wherever the opponent stands, so whether it works never depends on where
   the clone would appear; missing art or data logs a warning, starts no
@@ -1632,9 +1644,39 @@ French, concise game terms).
   exactly one clone; holding attack3 does not repeat it. The cooldown (5 s)
   outlasts a clone's life (≈1.3 s), so clones never overlap; each runs its
   own independent lifecycle.
-  The owner does not perform attack1: no `0001_attack1_1*` art, no attack,
-  no attack1 cooldown and no summon pose; it is free on the very step it
-  summons, idling, running or doing whatever it was. Once summoned, the
+  Startup: the accepted press puts #0001 into his summoning startup
+  (`Fighter.pendingSummon`: the summon's id, its target, the startup clip
+  and its clock; visual state `summon`, between `bound` and `attack` in
+  priority: hitstun, technique, bound, summon, attack, dash, shield, …).
+  On the press step itself he shows `attack3_summon_1` (no idle frame
+  first), then plays `attack3_summon_1 → 2 → 3 → 4` once at 10 fps, each
+  pose 0.1 s (6 fixed steps), 0.4 s in all, never looped. The four files
+  are the poses of the retired held Down stance, recovered byte for byte
+  from the repository's history and renamed for Attack 3: its two startup
+  poses as `attack3_summon_1` and `_2`, its two held poses as `_3` and
+  `_4` (the hand seal). For the startup he is committed: standing still
+  (his speed set to 0 on the press, so a run never slides under the pose),
+  facing as he did when it was accepted (a held direction never turns
+  him, and nothing turns him toward the opponent), and unable to attack,
+  Throw, start a summon or technique, Dash, jump, raise the Shield or drop
+  through a platform (`canAct` is false; a press of an ordinary attack in
+  its last 0.15 s is kept by the combat input buffer, as after any action).
+  The step after its last pose (one pass of the clip, counted from the
+  press step) the summon request is queued at the opponent it was cast at
+  and #0001 is free again on that very step; the Battle spawns the clone
+  the same step, on cloud frame 1. The startup is cut short, with no clone
+  and the cooldown already started left to run, by a hit (any hit,
+  `CombatSystem.applyHit`, which shows the hurt pose on the hit's own
+  step), by losing the ground under him (he falls from where he is), by
+  the Void taking him or his target, by a reset, a respawn, a Practice
+  Ground fighter or CPU change, or the arena going. A target no longer his
+  opponent, or out of play, when the pose ends gets no clone, and no other
+  fighter is targeted instead. With no `startupAnimation` a summon is sent
+  out on the press itself and its owner is free at once (the schema's
+  default). The startup is the owner's pose; the smoke cloud
+  (`attack3_object`) is the clone's own effect, played where it appears.
+  The owner does not perform attack1: no `0001_attack1_1*` art, no attack
+  and no attack1 cooldown. Once summoned, the
   clone is independent: the owner may move, jump, throw, attack, shield or
   be hit and launched, and the clone still finishes appearing, attacking and
   vanishing, with no cooldown refund. It never retargets or summons again.
@@ -1644,8 +1686,8 @@ French, concise game terms).
   part in fighter separation or solid collision (the opponent can move
   through it), is ignored by the camera (framing still uses P1 and the CPU)
   and has no marker, name, ring, shadow or HUD card. Its position
-  facing and attack are snapshotted once, on the summon step, facing the way
-  the opponent faced. Normally it stands on the opponent's back side
+  facing and attack are snapshotted once, on the step it is sent out (as
+  the owner's startup ends), facing the way the opponent faces then. Normally it stands on the opponent's back side
   (`x = target.x − target.facing × 48`, never clamped: there are no side
   walls), at the opponent's foot height, and performs attack1. That
   spot counts as ground only if something the clone's collider (#0001's, 34
@@ -2151,14 +2193,15 @@ French, concise game terms).
   the Shield button's `defense` (typed, the Shield so far), Energy, launches,
   stun and blockstun, hitstop, cooldowns, summon and technique cooldowns, binds, typed
   numbered buttons, summons and techniques) is data-driven. numbered attacks 1 and 2,
-  Throw (with its shuriken projectile), the attack3 Clone Attack (a
-  summoned clone performing attack1, or midair_attack2 over an opponent with no
-  ground behind it) and the attack4 Sphere Rush (a
+  Throw (with its shuriken projectile), the attack3 Clone Attack (#0001's
+  own summoning pose, then a summoned clone performing attack1, or
+  midair_attack2 over an opponent with no ground behind it) and the attack4 Sphere Rush (a
   technique) are implemented through it with real artwork; Transform stays reserved
   (mapped to no attack) until real sprites exist, and no attack, projectile,
   clone or frame is ever fabricated. An attack whose frames fail to load is
   refused (no substitute pose, no invisible hitbox), and so is a Shield, and so
-  is a clone summon whose cloud or attack art is missing (no cooldown starts),
+  is a clone summon whose startup pose, cloud or attack art is missing (no
+  pose, no cooldown starts),
   and so is a technique with any of its clips missing.
 - Quick Battle: 5 minutes (`CONFIG.battle.roundSeconds`, 300 seconds),
   first to `CONFIG.battle.pointsToWin` (3) points, against a CPU that uses the same fighter definition and fights with
@@ -2594,36 +2637,63 @@ French, concise game terms).
   codename, so a placed `attack5` stays where the player put it whichever
   slot a fighter would give it.
 
-  Every combat button shows an original monochrome SVG icon
-  (`currentColor`, from `js/ui/icons.js`) and no text: no **T**, **D** or
-  attack number. Its accessible name says what it is. The fighter's own
-  buttons, the large top one (`extra_attack`), the first of the middle row
-  (`transform`) and the numbered attack buttons, take their icon and name
-  from the character's `mobileAbilities` (UI data, never read by combat):
-  for #0001
-  **Shuriken** (a four-bladed throwing star), **Punch** (a fist),
-  **Kick** (a leg and foot), **Clone Attack** (three pips) and **Sphere
-  Rush** (four pips). `TouchControls.setCharacter(def)` applies them
-  without rebuilding anything; Quick Battle calls it with Player 1's
-  fighter as it enters (Watch Mode, where nobody plays, hides the touch
-  controls instead), Practice Ground as it enters and on every
-  successful Change Fighter (a CPU change never touches them). A fighter
-  with no `mobileAbilities` gets the generic names ("Extra Attack",
-  "Attack 1" to "Attack 5") and neutral glyphs (a ring, then one to five
-  pips). Transform is reserved until a fighter presents its own: with no
-  `transform` entry (#0001 has none) it is the neutral star, labelled
-  "Transform", with a dashed outline. The universal buttons belong to the
-  controls: **Shield** (the shield outline, labelled "Shield"; held for as
-  long as the pointer stays on it) in the old Block slot, and Jump.
-  Only the presentation is per fighter: each button's `data-action` is its
-  control codename (`extra_attack`, `transform`, `shield`, `attack1` to
-  `attack5`, `jump`, `down`, `runLeft`, `runRight`), whatever it looks
-  like, so #0001's Clone Attack is `attack3` and its Sphere Rush
-  `attack4`. The combat glyphs
-  are drawn slightly larger (`.tc-ability .icon`) and share the pressed
-  state of every button.
+  No touch button shows text: no **T**, **D** or attack number. Its
+  accessible name says what it is. The fighter's own buttons, the large
+  top one (`extra_attack`) and the numbered attack buttons, and Jump show a
+  frame of the fighter's own animation for that move, in the art's own
+  colours and transparency (never tinted white or in `currentColor`): one
+  image element per button (`.tc-sprite-icon`, empty `alt`,
+  `aria-hidden="true"`, no pointer events), centred and fitted whole, its
+  aspect kept (`object-fit: contain`, crisp pixels), inside the square
+  inscribed in the round button (70% of it), so no sprite is clipped by
+  the circle or stretched; the button's size, hit area, shell, press
+  feedback and pending style are its own. Each button's name and frame come
+  from the character's `mobileAbilities` (UI data, never read by combat,
+  and never deciding what a button does): `label`, and `preview:
+  { animation, frame }`, a clip of the fighter's own `animations` and a
+  frame of it counted from 0 (as `visual.portrait.frame` is), resolved by
+  `previewFrame` in `js/ui/mobile-abilities.js` to that clip's own file (no
+  path is written twice; a clip drawn facing left is mirrored to face
+  right). Each frame is chosen to read as the move. For #0001:
+  **Shuriken** `extra_attack` frame 1 (`extra_attack_2`, the shuriken
+  leaving the hand), **Punch** `attack1` frame 1 (`attack1_2`, the punch),
+  **Kick** `attack2` frame 4 (`attack2_5`, the high kick), **Clone Attack**
+  `attack3_summon` frame 2 (`attack3_summon_3`, the hand seal of the
+  summoning pose it then performs), **Sphere Rush** `attack4_dash` frame 1
+  (`attack4_5`, the rush) and Jump `jump` frame 1 (`jump_2`). For #0002:
+  **Whirlwind** `extra_attack_6` (the tornado sent off), **Punch**
+  `attack1_4` (the One-Two's straight), **Kick** `attack2_2` (the flurry),
+  **Spin** `attack3_5` (the rolled-up ball) and Jump `jump_1` (curling up,
+  face showing, so it never looks like the Spin). Jump keeps its universal
+  name ("Jump", "Saut"): its entry has no `label`.
+  `TouchControls.setCharacter(def)` applies them in place, without
+  rebuilding anything: the same buttons, and the same image in each, only
+  its source changed (`TouchControls.showArt`). Quick Battle calls it with
+  Player 1's fighter as it enters (Watch Mode, where nobody plays, hides
+  the touch controls instead), Practice Ground as it enters and on every
+  successful Change Fighter (a CPU change never touches them). A button
+  with no frame to show (no fighter named yet, a fighter with no
+  `mobileAbilities`, a preview naming no clip or frame, reported once, or
+  a file that fails to load, reported once and not tried again) shows its
+  neutral glyph instead (a ring, one to five pips, the jump arrow), its
+  name and input unchanged; with no `mobileAbilities` the names are the
+  generic ones ("Extra Attack", "Attack 1" to "Attack 5"). Valid fighters
+  never fall back in play. Transform keeps its glyph: it is reserved until
+  a fighter presents its own (with its own `icon`, a key of `ICONS`); with
+  no `transform` entry (#0001 and #0002 have none) it is the neutral star,
+  labelled "Transform", with a dashed outline. The universal buttons belong
+  to the controls and keep their original monochrome SVG glyphs
+  (`currentColor`, from `js/ui/icons.js`): **Shield** (the shield outline,
+  labelled "Shield"; held for as long as the pointer stays on it) in the
+  old Block slot, the Left / Right / Down arrows, the joystick and the
+  Dash buttons. Only the presentation is per fighter: each button's
+  `data-action` is its control codename (`extra_attack`, `transform`,
+  `shield`, `attack1` to `attack5`, `jump`, `down`, `runLeft`, `runRight`),
+  whatever it looks like, so #0001's Clone Attack is `attack3` and its
+  Sphere Rush `attack4`. The combat glyphs are drawn slightly larger
+  (`.tc-ability .icon`); every button shares the pressed state.
   Tapping the timer or the pause section beneath it (top centre, 7.3) pauses.
-  Original circular icons, translucent dark fill, white outlines; pressed
+  Original circular buttons, translucent dark fill, white outlines; pressed
   buttons scale down and brighten to white — no hue.
   A reserved button (only Transform, and only while the fighter has none)
   uses a dashed outline and never shows nagging alerts; Shuriken, Shield,

@@ -428,7 +428,7 @@ export class PracticeGroundScreen extends Screen {
   // on the spawn (0 Launch Point, no cooldowns; a CPU stays as it is),
   // shows its abilities on the touch controls, rebinds the HUD, then closes
   // the dialog and the menu and resumes. A failed load keeps the current
-  // fighter (and its touch icons) and the dialog open.
+  // fighter (and its touch buttons' art) and the dialog open.
   async changeFighter(def) {
     if (this.swapping || !this.session || !isPlayable(def)) return;
     const app = this.app;
@@ -454,7 +454,7 @@ export class PracticeGroundScreen extends Screen {
 
     this.characterId = def.id;
     this.session.setFighter(def, sprites);
-    // The player's touch ability icons follow the new fighter at once.
+    // The player's touch buttons show the new fighter's art at once, Jump's too.
     this.touch.setCharacter(def);
     this.hud.bind(this.session.player, this.session.cpu);
     this.hud.update(this.session);
