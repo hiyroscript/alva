@@ -230,14 +230,19 @@ test('English game copy is the registries\' own, never retyped', () => {
   assert.equal(STRINGS.en['launch.formula'], launch.LAUNCH_FORMULA);
   for (const d of launch.DIRECTIONAL_LAUNCHES) assert.equal(STRINGS.en[`launch.direction.${d.id ?? 'none'}.name`], d.name);
   for (const def of CHARACTERS) {
-    // A name of its own (Jump has none: it keeps the universal one) has its
-    // key; a button with only art has none.
+    // A name of its own has its key, and so has a name of its own for the
+    // ground or the air (#0002's mid-air moves); a button with only art has
+    // none. Jump is no fighter's button: it keeps the universal name.
     for (const [action, own] of Object.entries(def.mobileAbilities ?? {})) {
       assert.equal(STRINGS.en[`ability.${def.id}.${action}`], own.label, `${def.id} ${action}`);
+      for (const state of ['ground', 'air']) {
+        assert.equal(STRINGS.en[`ability.${def.id}.${action}.${state}`], own.previews?.[state]?.label, `${def.id} ${action} ${state}`);
+      }
     }
-    assert.equal(def.mobileAbilities.jump?.label, undefined, `#${def.id}: Jump keeps its name`);
+    assert.equal(def.mobileAbilities.jump, undefined, `#${def.id}: Jump keeps its name and arrow`);
     assert.equal(STRINGS.en[`ability.${def.id}.jump`], undefined);
   }
+  assert.deepEqual(['attack1', 'attack2', 'attack3'].map((a) => STRINGS.en[`ability.0002.${a}.air`]), ['Homing Attack', 'Bounce Attack', 'Blue Tornado']);
   // The game data itself stays in English: its tests and gameplay are untouched.
   assert.equal(POWERS[0].name, 'Jump Power');
   assert.equal(DIFFICULTIES[0].name, 'Easy');
@@ -438,13 +443,13 @@ test('changing the language re-reads the whole interface at once: menus, setup s
     assert.equal(hud.timeButton.getAttribute('aria-label'), 'Mettre en pause');
     assert.equal(hudRoot.querySelector('.hud-launch-point').getAttribute('aria-label'), 'Point d’éjection');
     // Touch-control names, the fighter's own included; the codenames never.
-    assert.deepEqual(touch.dpad.children.map((b) => b.getAttribute('aria-label')), ['Aller à gauche', 'Bas', 'Aller à droite']);
+    assert.deepEqual(touch.dpad.children.map((b) => b.getAttribute('aria-label')), ['Aller à gauche', 'Aller à droite']);
     assert.equal(touch.dpad.getAttribute('aria-label'), 'Déplacement');
     assert.equal(touch.buttons.get('attack2').getAttribute('aria-label'), 'Coup de pied');
     assert.equal(touch.buttons.get('attack3').getAttribute('aria-label'), 'Attaque du clone');
     assert.equal(touch.buttons.get('attack4').getAttribute('aria-label'), 'Ruée sphérique');
     assert.equal(touch.buttons.get('shield').getAttribute('aria-label'), 'Bouclier');
-    assert.deepEqual(touch.dpad.children.map((b) => b.getAttribute('data-action')), ['runLeft', 'down', 'runRight']);
+    assert.deepEqual(touch.dpad.children.map((b) => b.getAttribute('data-action')), ['runLeft', 'runRight']);
     // Keyboard hints, keycaps too.
     assert.deepEqual(hints.querySelectorAll('.hint-label').map((l) => l.textContent), ['Naviguer', 'Sélectionner', 'Retour']);
     assert.deepEqual(hints.querySelectorAll('kbd').slice(-2).map((k) => k.textContent), ['Entrée', 'Échap']);
@@ -487,7 +492,7 @@ test('index.html\'s own labels are marked with the keys that translate them', ()
 test('internal identifiers never change with the language', () => {
   inFrench(() => {
     const touch = new TouchControls(new Element('div'), { setTouch: noop, queueTouchMouvement: noop });
-    assert.deepEqual([...touch.buttons.keys()].sort(), ['attack1', 'attack2', 'attack3', 'attack4', 'attack5', 'down', 'extra_attack', 'jump', 'shield', 'transform']);
+    assert.deepEqual([...touch.buttons.keys()].sort(), ['attack1', 'attack2', 'attack3', 'attack4', 'attack5', 'extra_attack', 'jump', 'shield', 'transform']);
     assert.deepEqual([...touch.mouvementButtons.keys()], ['mouvementLeft', 'mouvementRight']);
     assert.equal(touch.scheme, 'joystick');
     const app = fakeApp();

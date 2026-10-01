@@ -219,21 +219,45 @@ test('its in-game names and touch buttons name each move, in English and French'
   };
   assert.deepEqual(buttons('en'), ['Whirlwind', 'Punch', 'Kick', 'Spin']);
   assert.deepEqual(buttons('fr'), ['Tourbillon', 'Coup de poing', 'Coup de pied', 'Vrille']);
+  // In the air its numbered buttons are named for the move they make there;
+  // the Whirlwind keeps its name.
+  const airButtons = (language) => {
+    setLanguage(language);
+    try {
+      return ['extra_attack', 'attack1', 'attack2', 'attack3'].map((a) => mobileAbility(DEF, a, true).label);
+    } finally {
+      setLanguage('en');
+    }
+  };
+  assert.deepEqual(airButtons('en'), ['Whirlwind', 'Homing Attack', 'Bounce Attack', 'Blue Tornado']);
+  assert.deepEqual(airButtons('fr'), ['Tourbillon', 'Attaque téléguidée', 'Attaque rebond', 'Tornade bleue']);
+  assert.deepEqual(['attack1', 'attack2', 'attack3'].map((a) => DEF.mobileAbilities[a].previews.air.label), ['attack1', 'attack2', 'attack3'].map((a) => abilityName(DEF, `midair_${a}`)), 'the names it gives the moves');
   // Each shows a frame of its own move's art, in its own colours: the
-  // Whirlwind sending its tornado off, the One-Two's straight, the Rapid
-  // Kicks, the Spin Attack's ball; and Jump its own jump, curling up.
-  const art = (a) => previewFrame(DEF, a)?.url.split('/').pop() ?? null;
-  assert.deepEqual(['extra_attack', 'attack1', 'attack2', 'attack3', 'jump'].map(art), [
-    '0002_extra_attack_6.png', '0002_attack1_4.png', '0002_attack2_2.png', '0002_attack3_5.png', '0002_jump_1.png',
+  // tornado the Whirlwind sends off, the One-Two's straight, the Rapid
+  // Kicks and the Spin Attack's ball; in the air, the Homing Attack's ball,
+  // the Bounce Attack's and the Blue Tornado.
+  const art = (a, airborne = false) => previewFrame(DEF, a, airborne)?.url.split('/').pop() ?? null;
+  assert.deepEqual(['extra_attack', 'attack1', 'attack2', 'attack3'].map((a) => art(a)), [
+    '0002_extra_attack_object_1.png', '0002_attack1_4.png', '0002_attack2_2.png', '0002_attack3_5.png',
+  ]);
+  assert.deepEqual(['extra_attack', 'attack1', 'attack2', 'attack3'].map((a) => art(a, true)), [
+    '0002_extra_attack_object_1.png', '0002_midair_attack1_1.png', '0002_midair_attack2_3.png', '0002_midair_attack3_3.png',
   ]);
   for (const a of ['extra_attack', 'attack1', 'attack2', 'attack3']) {
-    const ability = mobileAbility(DEF, a);
-    assert.equal(ability.sprite.url, DEF.animations[DEF.mobileAbilities[a].preview.animation].frames[DEF.mobileAbilities[a].preview.frame]);
-    assert.ok(existsSync(`${ROOT}${ability.sprite.url.slice(2)}`), a);
-    assert.equal(ability.sprite.mirrored, false, 'drawn facing right, as the buttons read');
+    for (const airborne of [false, true]) {
+      const ability = mobileAbility(DEF, a, airborne);
+      assert.ok(existsSync(`${ROOT}${ability.sprite.url.slice(2)}`), a);
+      assert.equal(ability.sprite.mirrored, false, 'drawn facing right, as the buttons read');
+      // Each the clip its move plays (the Whirlwind's: the tornado it throws).
+      const move = DEF.attacks[airborne && a !== 'extra_attack' ? DEF.actions[a].air : DEF.actions[a].ground ?? DEF.actions[a]];
+      const clip = a === 'extra_attack' ? DEF.projectileAnimations[DEF.projectiles[move.projectile.id].animation] : DEF.animations[move.animation];
+      assert.ok(clip.frames.includes(ability.sprite.url), `${a}${airborne ? ' in the air' : ''}: its own move's art`);
+    }
   }
-  assert.equal(DEF.mobileAbilities.extra_attack.preview.frame, Math.round(DEF.attacks.extra_attack.projectile.spawnAt * DEF.animations.extra_attack.fps), 'the frame its tornado leaves on');
-  assert.notEqual(art('jump'), art('attack3'), 'Jump never looks like the Spin');
+  // Only the Whirlwind is out of reach in the air: it is ground-only.
+  assert.deepEqual(['extra_attack', 'attack1', 'attack2', 'attack3'].map((a) => mobileAbility(DEF, a, true).unavailable), [true, false, false, false]);
+  assert.equal(DEF.attacks.extra_attack.groundOnly, true);
+  assert.equal(DEF.mobileAbilities.jump, undefined, 'Jump keeps the universal arrow');
   assert.equal(mobileAbility(DEF, 'attack4'), null, 'no fourth button');
   assert.equal(mobileAbility(DEF, 'transform').pending, true, 'Transform reserved');
   assert.equal(mobileAbility(DEF, 'transform').icon, ICONS.transform, 'Transform keeps its star');

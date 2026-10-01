@@ -30,12 +30,15 @@ const read = (path) => readFileSync(new URL(path, ROOT), 'utf8');
 
 const HELD = ['runLeft', 'runRight', 'down', 'jump', 'extra_attack', 'transform', 'shield', 'attack1', 'attack2', 'attack3', 'attack4', 'attack5'];
 
-// The normalized fighter input snapshot, field for field.
+// The normalized fighter input snapshot, field for field: every held
+// control and its press edge, the touch Dash requests, and the two intents
+// only a CPU has (the training CPU's platform drop, the combat AI's `face`).
 const SNAPSHOT = [
   ...HELD,
   ...HELD.map((control) => `${control}Pressed`),
-  'mouvementLeftPressed', 'mouvementRightPressed', 'dropPressed',
+  'mouvementLeftPressed', 'mouvementRightPressed', 'dropPressed', 'face',
 ];
+const CPU_ONLY = ['dropPressed', 'face'];
 
 // Every name the codename migrations retired, none of which may come back:
 // the attack codenames before attack1 to attack5 / extra_attack, the control
@@ -167,13 +170,14 @@ test('every character (and the tests\' sample fighter) keys its moves by the uni
 
 test('every controller builds the same canonical input snapshot, every combat button up to attack5 included', async () => {
   assert.deepEqual(Object.keys(blankInput()), SNAPSHOT);
-  for (const [key, value] of Object.entries(blankInput())) assert.equal(value, false, key);
+  for (const [key, value] of Object.entries(blankInput())) assert.equal(value, key === 'face' ? 0 : false, key);
   globalThis.window = { addEventListener() {} };
   globalThis.document = { addEventListener() {}, hidden: false };
   const { InputManager } = await import('../js/core/input-manager.js');
   const input = new InputManager(CONFIG.bindings);
-  // Player 1's snapshot: everything but the training CPU's drop intent.
-  assert.deepEqual(Object.keys(input.sample()).sort(), SNAPSHOT.filter((k) => k !== 'dropPressed').sort());
+  // Player 1's snapshot: everything but the CPUs' own intents, so a
+  // player's attacks never turn toward the opponent by themselves.
+  assert.deepEqual(Object.keys(input.sample()).sort(), SNAPSHOT.filter((k) => !CPU_ONLY.includes(k)).sort());
   assert.equal(typeof input.queueTouchMouvement, 'function');
   assert.equal(input.touchMouvement, 0);
   for (const gone of ['queueTouchDash', 'touchDash']) assert.equal(input[gone], undefined, gone);

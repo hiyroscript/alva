@@ -626,9 +626,9 @@ export const CHARACTERS = [
     // reads best as the move: the shuriken leaving the hand
     // (extra_attack_2), the punch landing (attack1_2) and the kunai's slash
     // in the air (midair_attack1_3), the high kick (attack2_5) and the
-    // swung airborne kick (midair_attack2_2), the hand seal that summons the
-    // clone (attack3_summon_3) and the rush (attack4_5, attack4_dash's
-    // second). The Throw, the Clone Attack and the Sphere Rush are
+    // airborne kick's forward-low arc (midair_attack2_3), the hand seal
+    // that summons the clone (attack3_summon_3) and the rush (attack4_5,
+    // attack4_dash's second). The Throw, the Clone Attack and the Sphere Rush are
     // ground-only: in the air their buttons fade. With no `transform` entry
     // (no Transform yet) its Transform button stays reserved (the dashed
     // star); the Shield, Jump and movement buttons are universal glyphs.
@@ -645,7 +645,7 @@ export const CHARACTERS = [
         label: 'Kick',
         previews: {
           ground: { animation: 'attack2', frame: 4 },
-          air: { animation: 'midair_attack2', frame: 1 },
+          air: { animation: 'midair_attack2', frame: 2 },
         },
       },
       attack3: { label: 'Clone Attack', preview: { animation: 'attack3_summon', frame: 2 } },

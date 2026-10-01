@@ -1,20 +1,25 @@
 // Run with node --test tests/facing.test.mjs (no dependencies).
-// Facing is manual: a fighter never turns toward its opponent by itself.
-// Only its own input turns it: its movement, a Dash, a direction held as an
-// attack or a technique starts, and a direction held during an attack or
-// the Shield (at once, either way); standing still it keeps its last
-// facing, attacks and shurikens go the way it faces, and a respawn takes
-// the spawn's facing. A stun, a bind, a Dash and a technique hold it. The HUD portraits facing the timer are a
-// separate, fixed rule (see battle-screen.test.mjs). Uses the real Fighter,
-// CombatSystem, Battle and physics (see fighter-harness.mjs).
+// Facing is manual for a player: a fighter never turns toward its opponent
+// by itself. Only its own input turns it: its movement, a Dash, a direction
+// held as an attack or a technique starts, and a direction held during an
+// attack or the Shield (at once, either way); standing still it keeps its
+// last facing, attacks and shurikens go the way it faces, and a respawn
+// takes the spawn's facing. A stun, a bind, a Dash and a technique hold it.
+// A CPU's attacks also face its opponent (`face`, an input only the combat
+// AI produces): turned on the press, kept on the opponent through every
+// phase, a committed move's path kept while only its sprite looks. The HUD
+// portraits facing the timer are a separate, fixed rule (see
+// battle-screen.test.mjs). Uses the real Fighter, CombatSystem, Battle and
+// physics (see fighter-harness.mjs).
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Battle } from '../js/game/battle.js';
 import { getMap } from '../js/data/maps.js';
+import { getCharacter } from '../js/data/characters.js';
 import { worldBox } from '../js/game/combat.js';
 import { TrainingAIController } from '../js/game/fighter-controller.js';
 import { CONFIG } from '../js/config.js';
-import { def, DT, fakeSprites, makeFighter, duel } from './fighter-harness.mjs';
+import { def, DT, fakeSprites, fakeSpritesOf, makeFighter, duel, startupSteps } from './fighter-harness.mjs';
 
 globalThis.Path2D ??= class {
   constructor() {
@@ -235,4 +240,200 @@ test('a respawn takes the spawn\'s facing, and the opponent\'s side does not fli
     assert.equal(p1.facing, spawn1.facing, 'never turned toward the CPU behind it');
   }
   assert.equal(p2.facing, spawn2.facing, 'the CPU never turned either');
+});
+
+// ---- A CPU's attacks face its opponent ----------------------------------------------
+// `face` is the combat AI's own input (see CombatAIController.track): no
+// player control produces it.
+
+const DEF_0002 = getCharacter('0002');
+const ATTACK2_STARTUP = Math.round(def.attacks.attack2.startup / DT);
+
+test('a CPU\'s attack starts facing its opponent: turned on the press, with no step, speed, Dash or held direction spent', () => {
+  for (const facing of [1, -1]) {
+    // The opponent right behind it.
+    const d = duel({ gap: -44, attackerFacing: facing, targetFacing: facing });
+    const { attacker, target } = d;
+    const toward = Math.sign(target.body.x - attacker.body.x);
+    assert.equal(toward, -facing);
+    const x = attacker.body.x;
+    d.tick({ ...ATTACK1, face: toward });
+    assert.equal(attacker.combat.attack?.def.id, 'attack1');
+    assert.equal(attacker.facing, toward, 'turned on the press step itself');
+    assert.equal(attacker.body.vx, 0, 'not a walk');
+    assert.equal(attacker.dash, null, 'not a Dash');
+    // Kept on the opponent through every phase, even with the other way held.
+    const away = toward > 0 ? { runLeft: true } : { runRight: true };
+    const phases = new Set();
+    while (attacker.combat.attack) {
+      phases.add(attacker.combat.phase);
+      assert.equal(attacker.facing, toward, `${attacker.combat.phase}: facing the opponent`);
+      assert.equal(attacker.body.x, x, `${attacker.combat.phase}: turning moved it nowhere`);
+      d.tick({ face: toward, ...(attacker.combat.phase === 'recovery' ? {} : away) });
+    }
+    assert.deepEqual([...phases].sort(), ['active', 'recovery', 'startup']);
+    assert.equal(d.events[0]?.target, target, 'the strike lands on it');
+  }
+});
+
+test('the opponent crossing behind a CPU during the startup or the active frames: the attack turns after it, step by step', () => {
+  for (const when of ['startup', 'active']) {
+    // In front of it as it presses (out of reach, for the active case).
+    const d = duel({ gap: when === 'startup' ? 44 : 140 });
+    const { attacker, target } = d;
+    d.tick({ ...ATTACK2, face: 1 });
+    assert.equal(attacker.combat.attack?.def.id, 'attack2');
+    while (attacker.combat.phase !== when) d.tick({ face: 1 });
+    // Over to its left, out of the kick's reach on the right (and where the
+    // kick's step-in leaves it in reach on the left).
+    place(target, attacker.body.x - (when === 'startup' ? 4 : 24));
+    if (when === 'active') assert.equal(d.events.length, 0, 'nothing hit before it crossed');
+    d.tick({ face: -1 });
+    assert.equal(attacker.facing, -1, `${when}: turned to it at once`);
+    while (attacker.combat.attack && !d.events.length) {
+      if (attacker.combat.phase === 'active') {
+        const box = worldBox(attacker, attacker.combat.attack.def.hitbox);
+        assert.ok(box.x + box.w <= attacker.body.x + 1, `${when}: the hitbox is on its left`);
+      }
+      d.tick({ face: -1 });
+    }
+    assert.equal(d.events[0]?.target, target, `${when}: the kick lands behind`);
+    assert.equal(d.events[0].move, 'attack2');
+  }
+  // Startup as long as the art says: the turn takes nothing from it.
+  assert.ok(ATTACK2_STARTUP > 3);
+});
+
+test('a CPU turns its air attacks after its opponent too, without drifting toward it', () => {
+  const { fighter, step } = makeFighter({ x: 1000, facing: 1 });
+  Object.assign(fighter.body, { y: 600, prevY: 600, grounded: false, ground: null, vx: 0, vy: 0 });
+  step({ ...ATTACK1, face: -1 });
+  assert.equal(fighter.combat.attack?.def.id, 'midair_attack1', 'its mid-air version');
+  assert.equal(fighter.facing, -1);
+  for (const face of [-1, 1, 1, -1]) {
+    step({ face });
+    if (!fighter.combat.attack) break;
+    assert.equal(fighter.facing, face);
+    assert.equal(fighter.body.vx, 0, 'a turn is no steering');
+  }
+});
+
+test('a committed move keeps its path, boxes and facing when the opponent crosses: only its sprite looks at it, and it turns for real once over', () => {
+  const { fighter, step } = makeFighter({ character: DEF_0002, sprites: fakeSpritesOf(DEF_0002), x: 600, facing: 1 });
+  step({ attack3: true, attack3Pressed: true, face: 1 });
+  assert.equal(fighter.combat.attack?.def.id, 'attack3', 'the Spin Attack: a roll');
+  assert.equal(fighter.combat.attack.motion.dir, 1);
+  // The opponent now on its left (it rolled through, or jumped over).
+  let rolled = false;
+  let last = fighter.body.x;
+  while (fighter.combat.attack) {
+    step({ face: -1 });
+    if (!fighter.combat.attack) break;
+    assert.equal(fighter.facing, 1, 'its facing, and so its hitbox and hurtbox, kept');
+    assert.equal(fighter.combat.attack.motion.dir, 1, 'its path kept');
+    assert.ok(fighter.body.x >= last, 'never reversed');
+    rolled ||= fighter.body.x > last;
+    last = fighter.body.x;
+    const box = worldBox(fighter, fighter.combat.attack.def.hitbox);
+    assert.equal(box.x, fighter.body.x + fighter.combat.attack.def.hitbox.x, 'the ball\'s box where the facing puts it');
+    assert.equal(fighter.lookFacing, -1);
+    assert.equal(fighter.spriteFlip, true, 'drawn looking left at it');
+  }
+  assert.ok(rolled, 'it rolled on');
+  assert.equal(fighter.facing, -1, 'over: it faces the opponent');
+  assert.equal(fighter.lookFacing, 0);
+  assert.equal(fighter.spriteFlip, true);
+  // A player's roll (no face) looks the way it rolls, as ever.
+  const p = makeFighter({ character: DEF_0002, sprites: fakeSpritesOf(DEF_0002), x: 600, facing: 1 });
+  p.step({ attack3: true, attack3Pressed: true });
+  while (p.fighter.combat.attack) {
+    assert.equal(p.fighter.spriteFlip, false);
+    assert.equal(p.fighter.facing, 1);
+    p.step({ runLeft: true });
+  }
+});
+
+test('a CPU\'s homing dash and plunge keep their own heading; only the sprite looks at the opponent', () => {
+  for (const [action, move] of [['attack1', 'midair_attack1'], ['attack2', 'midair_attack2']]) {
+    const { fighter, step } = makeFighter({ character: DEF_0002, sprites: fakeSpritesOf(DEF_0002), x: 600, facing: 1 });
+    Object.assign(fighter.body, { y: 500, prevY: 500, grounded: false, ground: null, vx: 0, vy: 0 });
+    step({ [action]: true, [`${action}Pressed`]: true, face: 1 });
+    assert.equal(fighter.combat.attack?.def.id, move);
+    while (fighter.combat.attack?.def.id === move) {
+      step({ face: -1 });
+      if (!fighter.combat.attack) break;
+      assert.equal(fighter.facing, 1, `${move}: its heading kept`);
+      assert.ok(fighter.body.vx >= 0, `${move}: never sent back toward the opponent`);
+      assert.equal(fighter.spriteFlip, true, `${move}: looking at it`);
+    }
+  }
+});
+
+test('a projectile keeps the direction it was thrown in, whichever way its CPU turns after', () => {
+  const d = duel({ gap: 200 });
+  const { attacker, target } = d;
+  d.tick({ ...THROW, face: 1 });
+  while (!d.projectiles.length) d.tick({ face: 1 });
+  const [p] = d.projectiles;
+  assert.equal(p.direction, 1);
+  place(target, attacker.body.x - 150);
+  const x = p.x;
+  for (let i = 0; i < 10; i++) d.tick({ face: -1 });
+  assert.equal(p.direction, 1, 'never redirected');
+  assert.ok(p.x > x, 'still flying right');
+  // One thrown after the turn goes the new way.
+  const late = duel({ gap: 200 });
+  late.tick({ ...THROW, face: 1 });
+  late.tick({ face: -1 });
+  while (!late.projectiles.length) late.tick({ face: -1 });
+  assert.equal(late.projectiles[0].direction, -1, 'not thrown yet when it turned');
+});
+
+test('a CPU\'s summon startup keeps its facing while its sprite looks at the opponent; a technique keeps its rush and its look', () => {
+  // The Clone Attack: the summoning pose looks at the opponent across.
+  const cpu = makeFighter({ x: 1000, facing: 1 });
+  const foe = makeFighter({ x: 1200, facing: -1 });
+  cpu.fighter.opponent = foe.fighter;
+  foe.fighter.opponent = cpu.fighter;
+  cpu.step({ attack3: true, attack3Pressed: true, face: 1 });
+  assert.ok(cpu.fighter.pendingSummon, 'its startup');
+  for (let i = 1; i < startupSteps(def, 'attack3'); i++) {
+    cpu.step({ face: -1 });
+    assert.equal(cpu.fighter.facing, 1, 'its facing kept');
+    assert.equal(cpu.fighter.body.vx, 0, 'standing still');
+    assert.equal(cpu.fighter.spriteFlip, true, 'looking at the opponent');
+  }
+  cpu.step({ face: -1 });
+  assert.equal(cpu.fighter.pendingSummon, null);
+  assert.equal(cpu.fighter.summons.length, 1, 'its clone, as ever');
+  assert.equal(cpu.fighter.facing, -1, 'and then it faces the opponent');
+  // The Sphere Rush: set off toward the opponent, then committed, sprite and all.
+  const rush = makeFighter({ x: 1000, facing: 1 });
+  rush.step({ attack4: true, attack4Pressed: true, face: -1 });
+  assert.ok(rush.fighter.technique);
+  assert.equal(rush.fighter.technique.facing, -1, 'it rushes at the opponent');
+  for (let i = 0; i < 20 && rush.fighter.technique; i++) {
+    rush.step({ face: 1 });
+    assert.equal(rush.fighter.facing, -1);
+    assert.equal(rush.fighter.spriteFlip, true, 'the sphere and the pose stay one');
+  }
+});
+
+test('face does nothing outside an attack: no turn standing, walking or shielding, and none for a player at all', () => {
+  const { fighter, step } = makeFighter({ x: 1000, facing: 1 });
+  for (let i = 0; i < 30; i++) step({ face: -1 });
+  assert.equal(fighter.facing, 1, 'standing');
+  for (let i = 0; i < 20; i++) step({ runRight: true, face: -1 });
+  assert.equal(fighter.facing, 1, 'walking: its movement turns it');
+  for (let i = 0; i < 10; i++) step({ shield: true, face: -1 });
+  assert.equal(fighter.combat.shielding, true);
+  assert.equal(fighter.facing, 1, 'shielding');
+  assert.equal(fighter.lookFacing, 0);
+  // Without it (every player), an attack keeps the facing it started with.
+  const d = duel({ gap: -44 });
+  d.tick(ATTACK1);
+  while (d.attacker.combat.attack) {
+    assert.equal(d.attacker.facing, 1);
+    d.tick();
+  }
 });

@@ -576,9 +576,11 @@ export class TouchControls {
     for (const action of ABILITY_ACTIONS) {
       const b = this.actionButtons.get(action);
       const absent = !mobileAbility(this.presented(action), action);
-      if (b.hidden && !absent) shown = true;
+      const wasHidden = !!b.hidden;
+      if (wasHidden && !absent) shown = true;
       b.hidden = absent;
-      if (!absent) continue;
+      // Hidden already: nothing on it to clear.
+      if (!absent || wasHidden) continue;
       this.releaseAction(action);
       b.removeAttribute('aria-label');
       b.removeAttribute('data-i18n-aria-label');

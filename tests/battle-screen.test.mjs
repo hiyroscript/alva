@@ -13,6 +13,7 @@ import { Battle } from '../js/game/battle.js';
 import { CombatState } from '../js/game/combat.js';
 import { formatLaunchPoint, describeEnergy } from '../js/game/hud.js';
 import { CONFIG } from '../js/config.js';
+import { ICONS } from '../js/ui/icons.js';
 import { duel, def as DEF_0001 } from './fighter-harness.mjs';
 import { TEST_A, TEST_DISABLED, REMOVED_IDS, withTestFighters } from './test-fighters.mjs';
 
@@ -757,7 +758,6 @@ test('Keep Playing is outline-only for Return to Home? alone', async () => {
 test('entering Quick Battle shows Player 1\'s fighter\'s own art on the touch buttons before play', () => withTestFighters([TEST_A], async () => {
   // A playable test-only fighter: no production one is.
   const { app, screen } = setup();
-  const { ICONS } = await import('../js/ui/icons.js');
   const { MAPS } = await import('../js/data/maps.js');
   const touch = screen.touch;
   // Neutral until a fighter is named.
@@ -791,11 +791,58 @@ test('entering Quick Battle shows Player 1\'s fighter\'s own art on the touch bu
     ['Kick', '0001_attack2_5.png', 'attack2'],
     ['Clone Attack', '0001_attack3_summon_3.png', 'attack3'],
     ['Sphere Rush', '0001_attack4_5.png', 'attack4'],
-    ['Jump', '0001_jump_2.png', 'jump'],
+    ['Jump', ICONS.jump, 'jump'],
   ]);
   assert.ok(touch.buttons.get('transform').classList.contains('is-pending'), 'Transform reserved, dashed');
+  assert.equal(touch.airborne, false, 'its ground moves, before any battle');
   assert.equal(touch.enabled, false, 'no play without sprites');
 }));
+
+test('the touch buttons follow Player 1\'s own fighter into the air and back, never the CPU\'s, through restart, rematch and the Void', () => {
+  const { screen } = setup();
+  const battle = startBattle(screen);
+  const touch = screen.touch;
+  touch.setCharacter(DEF_0001);
+  const look = (b) => b.querySelector('.tc-sprite-icon')?.getAttribute('src').split('/').pop() ?? b.html;
+  const punch = touch.buttons.get('attack1');
+  const jump = touch.buttons.get('jump');
+  Object.assign(battle.p1, { grounded: true, lostToVoid: false });
+  Object.assign(battle.p2, { grounded: false, lostToVoid: false });
+  screen.update(1 / 60);
+  assert.equal(look(punch), '0001_attack1_2.png', 'the CPU in the air changes nothing');
+  // Synced after each frame, from the state the frame left.
+  battle.frame = () => { battle.p1.grounded = false; };
+  screen.update(1 / 60);
+  assert.equal(touch.airborne, true);
+  assert.equal(look(punch), '0001_midair_attack1_3.png', 'the kunai slash in the air');
+  assert.equal(jump.html, ICONS.jump, 'Jump keeps its arrow');
+  battle.frame = () => { battle.p1.grounded = true; };
+  screen.update(1 / 60);
+  assert.equal(look(punch), '0001_attack1_2.png', 'landed: the punch again');
+  // A restart or a rematch puts both back at their spawns: the ground moves at once.
+  const restart = battle.restart.bind(battle);
+  battle.restart = () => { restart(); battle.p1.grounded = true; };
+  for (const again of [() => screen.restart(), () => { screen.showResult(); screen.rematch(); }]) {
+    battle.frame = () => { battle.p1.grounded = false; };
+    screen.update(1 / 60);
+    assert.equal(touch.airborne, true);
+    battle.phase = 'fight';
+    battle.frame = () => {};
+    again();
+    assert.equal(touch.airborne, false);
+    assert.equal(look(punch), '0001_attack1_2.png');
+  }
+  // Out of play, waiting to respawn: its ground moves, as it will come back.
+  battle.phase = 'fight';
+  Object.assign(battle.p1, { grounded: false, lostToVoid: true });
+  screen.update(1 / 60);
+  assert.equal(touch.airborne, false);
+  // A spectator follows nobody.
+  battle.p1.lostToVoid = false;
+  screen.mode = 'watch';
+  screen.update(1 / 60);
+  assert.equal(touch.airborne, false);
+});
 
 test('Quick Battle uses the Mobile Controls setting: Joystick by default, Classic Buttons once chosen, read on every entry', () => withTestFighters([TEST_A], async () => {
   // A playable test-only fighter: no production one is.
@@ -812,13 +859,15 @@ test('Quick Battle uses the Mobile Controls setting: Joystick by default, Classi
   assert.equal(app.settings.mobileControls, 'joystick', 'nothing stored: the default');
   assert.equal(touch.scheme, 'joystick');
   assert.equal(lowerLeft(), touch.joystick);
-  assert.equal(touch.buttons.get('down'), touch.stickDown);
+  assert.deepEqual(lowerLeft().children, [touch.mouvementButtons.get('mouvementLeft'), touch.stick, touch.mouvementButtons.get('mouvementRight')]);
+  assert.equal(touch.buttons.has('down'), false, 'no Down button');
 
   app.settings.set('mobileControls', 'classic');
   await screen.enter();
   assert.equal(touch.scheme, 'classic');
   assert.equal(lowerLeft(), touch.dpad);
-  assert.equal(touch.buttons.get('down'), touch.padButtons.get('down'));
+  assert.deepEqual(lowerLeft().children.map((b) => b.getAttribute('data-action')), ['runLeft', 'runRight']);
+  assert.equal(touch.buttons.has('down'), false, 'no Down button');
 
   app.settings.set('mobileControls', 'joystick');
   await screen.enter();

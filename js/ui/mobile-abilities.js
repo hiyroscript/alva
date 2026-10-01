@@ -112,14 +112,13 @@ export function buttonMove(def, action, airborne = false) {
 // Which of its states `action`'s button presents on `def` (`state`:
 // 'ground' or 'air') and whether its move is out of reach where the
 // fighter is (`unavailable`). On the ground, the ground. In the air, the
-// air if the button has a move there; if not, the ground, out of reach. A
-// button with no fighter's move to go by (none named, or reserved) is
-// always shown as on the ground.
+// air if the button has a move there; if it only has one on the ground,
+// the ground, out of reach. A button with no move of the fighter's to go
+// by (none named, or reserved) is always shown as on the ground.
 function presentation(def, action, airborne) {
-  if (!airborne || !def?.actions || abilityPresence(def, action) !== 'implemented') {
-    return { state: 'ground', unavailable: false };
-  }
-  return buttonMove(def, action, true) ? { state: 'air', unavailable: false } : { state: 'ground', unavailable: true };
+  if (!airborne || abilityPresence(def, action) !== 'implemented') return { state: 'ground', unavailable: false };
+  if (buttonMove(def, action, true)) return { state: 'air', unavailable: false };
+  return { state: 'ground', unavailable: !!buttonMove(def, action, false) };
 }
 
 // `own`'s preview for `state`: its `previews[state]` (none if it authors

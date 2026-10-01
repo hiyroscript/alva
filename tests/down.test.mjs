@@ -1,11 +1,11 @@
 // Run with node --test tests/down.test.mjs (no dependencies).
 // Down: a plain directional gameplay input (`down`), on S / ↓, D-pad down
-// and the left stick held down, and the touch down arrows. It does exactly
-// two things, both in the air or as a hit lands: the fast fall, and
-// steering a launch downward. On the ground it is nothing: no state, no
-// pose, no lock on movement or the Dash, no faster Energy or cooldowns, and
-// no change to what any button does. Menus keep their own Down. Uses the
-// real Fighter, CombatSystem, physics and InputManager (see
+// and the left stick held down; the touch controls have no Down button. It
+// does exactly two things, both in the air or as a hit lands: the fast
+// fall, and steering a launch downward. On the ground it is nothing: no
+// state, no pose, no lock on movement or the Dash, no faster Energy or
+// cooldowns, and no change to what any button does. Menus keep their own
+// Down. Uses the real Fighter, CombatSystem, physics and InputManager (see
 // fighter-harness.mjs).
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -67,6 +67,7 @@ test('InputManager samples a held down from S, ↓, D-pad down and the left stic
   const frame = input.sample();
   assert.ok('down' in frame && 'downPressed' in frame);
   assert.ok(!('dropPressed' in frame), 'no platform drop in the player sample');
+  assert.ok(!('face' in frame), 'and no turn toward the opponent: only the combat AI\'s');
 
   for (const code of ['KeyS', 'ArrowDown']) {
     key('keydown', code);

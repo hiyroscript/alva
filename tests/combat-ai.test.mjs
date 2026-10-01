@@ -11,7 +11,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { def, DT, fakeSprites, stageMap } from './fighter-harness.mjs';
+import { def, DT, fakeSprites, fakeSpritesOf, stageMap } from './fighter-harness.mjs';
+import { getCharacter } from '../js/data/characters.js';
 import { CONFIG } from '../js/config.js';
 import { Fighter, separateFighters } from '../js/game/character.js';
 import { CombatSystem } from '../js/game/combat.js';
@@ -39,16 +40,15 @@ const RAISED = new StageCollision(stageMap({ platforms: [{ id: 'deck', x: 1300, 
 // logged every step.
 function ring({
   difficulty = 'medium', seed = 1, stage = FLAT, cpuX = 1000, foeX = 1200, foeY, script = () => ({}),
-  cpuFacing = Math.sign(foeX - cpuX) || 1, foeFacing = -cpuFacing,
+  cpuFacing = Math.sign(foeX - cpuX) || 1, foeFacing = -cpuFacing, cpuDef = def, foeDef = def,
 } = {}) {
-  const sprites = fakeSprites();
   const ai = new CombatAIController({ difficulty, rng: mulberry32(seed) });
   let n = 0;
   const foe = new Fighter({
-    def, sprites, stage, slot: 'p1', label: 'P1', spawn: { x: foeX, y: foeY, facing: foeFacing },
+    def: foeDef, sprites: fakeSpritesOf(foeDef), stage, slot: 'p1', label: 'P1', spawn: { x: foeX, y: foeY, facing: foeFacing },
     controller: { getInput: (self) => ({ ...script(n, self) }) },
   });
-  const cpu = new Fighter({ def, sprites, stage, slot: 'p2', label: 'CPU', spawn: { x: cpuX, facing: cpuFacing }, controller: ai });
+  const cpu = new Fighter({ def: cpuDef, sprites: fakeSpritesOf(cpuDef), stage, slot: 'p2', label: 'CPU', spawn: { x: cpuX, facing: cpuFacing }, controller: ai });
   foe.opponent = cpu;
   cpu.opponent = foe;
   const world = {
@@ -382,14 +382,15 @@ test('left to itself, a high level uses the Clone Attack and the Sphere Rush, ea
   assert.ok(rushes > 0, `it rushes (${rushes} rushes)`);
 });
 
-test('its output is only the player\'s own controls: never a control the fighter does not read', () => {
+test('its output is only the player\'s own controls, and the way its attacks face: never a control the fighter does not read', () => {
   const allowed = Object.keys(blankInput()).sort();
   for (const difficulty of DIFFICULTY_IDS) {
     const r = ring({ difficulty, seed: 9, cpuX: 700, foeX: 1100, script: (n) => (n % 120 < 30 ? { runLeft: true } : {}) });
     r.run(seconds(8));
     for (const out of r.log) {
       const { step, intent, ...controls } = out;
-      assert.deepEqual(Object.keys(controls).sort(), allowed, `${difficulty}: the same controls a player has`);
+      assert.deepEqual(Object.keys(controls).sort(), allowed, `${difficulty}: the same controls a player has, and face`);
+      assert.ok([-1, 0, 1].includes(controls.face), `${difficulty}: face is a direction`);
     }
     assert.ok(r.log.every((o) => o.intent === null || typeof o.intent === 'string'));
   }
@@ -501,7 +502,195 @@ test('the training controller still never presses a combat button, Down or Shiel
     for (const k of ['extra_attack', 'transform', 'attack1', 'attack2', 'attack3', 'attack4', 'attack5', 'down', 'shield']) {
       assert.ok(!o[k] && !o[`${k}Pressed`], `never ${k}`);
     }
+    assert.equal(o.face, 0, 'and it never faces anything for an attack');
   }
   assert.equal(cpu.combat.launchPoint, 0);
   assert.equal(foe.combat.launchPoint, 0, 'it never hit anyone');
+});
+
+// ---- Facing its opponent ------------------------------------------------------------
+
+const DEF_0002 = getCharacter('0002');
+// The way a fighter is drawn looking: a committed move's look, else its facing.
+const looking = (f) => f.lookFacing || f.facing;
+
+test('every attack it makes faces its opponent, from the step it starts to the step it ends, crossing over included: #0001 and #0002, every level', () => {
+  const stats = { attacks: 0, crossed: 0, committed: 0 };
+  for (const [cpuDef, foeDef] of [[def, def], [DEF_0002, def], [DEF_0002, DEF_0002]]) {
+    for (const difficulty of DIFFICULTY_IDS) {
+      for (const seed of [1, 2, 3]) {
+        // Against another CPU, so both close in, cross over and strike. The
+        // opponent's side as each controller decides (the step's own facing
+        // input), and each attack's side as it started.
+        const side = new Map();
+        const decide = (controller) => (self, dt, ctx) => {
+          side.set(self, self.opponent.body.x - self.body.x);
+          return controller.getInput(self, dt, ctx);
+        };
+        const other = decide(new CombatAIController({ difficulty, rng: mulberry32(seed + 100) }));
+        const r = ring({ difficulty, seed, cpuX: 900, foeX: 1100, cpuDef, foeDef, script: (n, self) => other(self, DT, r.ctx) });
+        r.cpu.controller = { getInput: decide(r.ai) };
+        const started = new Map();
+        for (let i = 0; i < seconds(20); i++) {
+          const frozen = new Map([r.cpu, r.foe].map((f) => [f, f.combat.hitstop > 0]));
+          r.step();
+          for (const f of [r.cpu, r.foe]) {
+            const atk = f.combat.attack;
+            if (!atk) continue;
+            const dx = side.get(f);
+            if (!started.has(atk)) {
+              started.set(atk, Math.sign(dx));
+              stats.attacks++;
+              if (atk.def.motion) stats.committed++;
+            }
+            if (frozen.get(f) || Math.abs(dx) <= 2) continue;
+            if (Math.sign(dx) !== started.get(atk)) stats.crossed++;
+            assert.equal(looking(f), Math.sign(dx), `${cpuDef.id} vs ${foeDef.id}, ${difficulty} seed ${seed}: ${f.label}'s ${atk.def.id} looks away at step ${r.n}`);
+            // A committed move keeps its own heading meanwhile.
+            if (atk.def.motion?.type === 'roll') assert.equal(f.facing, atk.motion.dir, 'a roll keeps its path');
+          }
+          if (r.cpu.body.y > 2000 || r.foe.body.y > 2000) break; // one fell into the Void
+        }
+      }
+    }
+  }
+  assert.ok(stats.attacks > 400, `plenty of attacks (${stats.attacks})`);
+  assert.ok(stats.crossed > 10, `the opponent crossed during some (${stats.crossed})`);
+  assert.ok(stats.committed > 10, `committed moves among them (${stats.committed})`);
+});
+
+test('it strikes without first turning: the press is the button alone, the attack faces the opponent on that step, nothing walks or Dashes', () => {
+  for (const action of ['attack1', 'attack2', 'extra_attack']) {
+    // Facing away from an opponent right behind it (clear of its pushbox).
+    const r = ring({ difficulty: 'hard', seed: 41, cpuX: 1000, foeX: 940, cpuFacing: 1, foeFacing: 1 });
+    r.hush();
+    const x = r.cpu.body.x;
+    r.ai.setIntent({ kind: 'attack', action, until: r.ai.clock + 0.3 });
+    r.step();
+    const press = r.log.at(-1);
+    assert.equal(press[`${action}Pressed`], true, `${action}: pressed on its first step, no turn step before it`);
+    assert.equal(press.runLeft || press.runRight, false, `${action}: no direction held with it`);
+    assert.equal(press.face, -1, `${action}: facing where the opponent is now`);
+    assert.equal(r.cpu.combat.attack?.def.id, action);
+    assert.equal(r.cpu.facing, -1, `${action}: it starts facing the opponent`);
+    // Only the attack's own step-in (attack2's) moves it, and toward the opponent.
+    if (def.attacks[action].step) assert.ok(r.cpu.body.x < x, `${action}: its step-in, at the opponent`);
+    else assert.equal(r.cpu.body.x, x, `${action}: no walk to turn`);
+    assert.equal(r.cpu.dash, null);
+    const taps = r.log.filter((o) => o.runLeftPressed || o.runRightPressed);
+    assert.deepEqual(taps, [], `${action}: no tap that could become a Dash`);
+  }
+});
+
+test('the opponent crossing behind it during its startup or its strike: its attack turns after it and still lands', () => {
+  for (const when of ['startup', 'active']) {
+    // In front, out of the kick's reach until it crosses.
+    const r = ring({ difficulty: 'hard', seed: 43, cpuX: 1000, foeX: when === 'startup' ? 1044 : 1140 });
+    r.hush();
+    r.ai.setIntent({ kind: 'attack', action: 'attack2', until: r.ai.clock + 0.3 });
+    r.step();
+    assert.equal(r.cpu.combat.attack?.def.id, 'attack2');
+    assert.equal(r.cpu.facing, 1);
+    while (r.cpu.combat.phase !== when) r.step();
+    Object.assign(r.foe.body, { x: r.cpu.body.x - (when === 'startup' ? 4 : 24), prevX: r.cpu.body.x - 24 });
+    r.step();
+    assert.equal(r.cpu.facing, -1, `${when}: turned to it on the next step`);
+    while (r.cpu.combat.attack && !hitsOn(r.events, r.foe).length) r.step();
+    assert.equal(hitsOn(r.events, r.foe)[0]?.move, 'attack2', `${when}: the kick lands behind`);
+  }
+});
+
+test('in the air too: its aerial faces the opponent as it starts and turns when the opponent crosses under it', () => {
+  const r = ring({ difficulty: 'hard', seed: 47, cpuX: 1000, foeX: 960 });
+  r.hush();
+  Object.assign(r.cpu.body, { y: 640, prevY: 640, grounded: false, ground: null, vx: 0, vy: 0 });
+  Object.assign(r.foe.body, { y: 660, prevY: 660, grounded: false, ground: null, vx: 0, vy: 0, gravityScale: 0 });
+  r.ai.setIntent({ kind: 'attack', action: 'attack1', until: r.ai.clock + 0.3 });
+  r.step();
+  assert.equal(r.cpu.combat.attack?.def.id, 'midair_attack1');
+  assert.equal(r.cpu.facing, -1);
+  Object.assign(r.foe.body, { x: 1040, prevX: 1040 });
+  r.step();
+  if (r.cpu.combat.attack) assert.equal(r.cpu.facing, 1, 'turned under it');
+  assert.equal(r.cpu.body.vx, 0, 'no drift spent turning');
+});
+
+test('a committed move: #0002\'s Spin Attack rolls on under its opponent, its path and boxes kept, looking back at it, then faces it', () => {
+  // The opponent hangs just over the ball's path, as if it had jumped it.
+  const r = ring({ difficulty: 'hard', seed: 53, cpuDef: DEF_0002, cpuX: 1000, foeX: 1120 });
+  Object.assign(r.foe.body, { y: 690, prevY: 690, grounded: false, ground: null, gravityScale: 0, vy: 0 });
+  r.hush();
+  r.ai.setIntent({ kind: 'attack', action: 'attack3', until: r.ai.clock + 0.3 });
+  r.step();
+  const atk = r.cpu.combat.attack;
+  assert.equal(atk?.def.id, 'attack3');
+  assert.equal(atk.motion.dir, 1, 'rolling at the opponent');
+  let behind = 0;
+  let last = r.cpu.body.x;
+  // Behind it as the step began: what that step's look goes by.
+  let wasBehind = false;
+  while (r.cpu.combat.attack === atk) {
+    r.step();
+    if (r.cpu.combat.attack !== atk) break;
+    assert.equal(r.cpu.facing, 1, 'its facing, path and boxes kept');
+    assert.ok(r.cpu.body.x >= last - 1e-9, 'never rolled back to flip its sprite');
+    last = r.cpu.body.x;
+    if (wasBehind) {
+      behind++;
+      assert.equal(r.cpu.spriteFlip, true, 'drawn looking back at the opponent');
+    }
+    wasBehind = r.foe.body.x < r.cpu.body.x - 2;
+  }
+  assert.ok(behind > 0, `it rolled through (${behind} steps past)`);
+  assert.equal(r.cpu.facing, -1, 'over: facing the opponent behind it');
+});
+
+test('level with its opponent it keeps the way it faces: an overlap never flicks it back and forth', () => {
+  const r = ring({ difficulty: 'hard', seed: 59, cpuX: 1000, foeX: 1100 });
+  r.hush();
+  r.step();
+  assert.equal(r.log.at(-1).face, 1);
+  // On the very same spot, and wobbling a unit or so either side.
+  for (let i = 0; i < 90; i++) {
+    const x = r.cpu.body.x + [0, 1.5, -1.5, 0.5, -2][i % 5];
+    Object.assign(r.foe.body, { x, prevX: x, vx: 0 });
+    if (i === 30) r.ai.setIntent({ kind: 'attack', action: 'attack1', until: r.ai.clock + 0.3 });
+    r.step();
+    assert.equal(r.log.at(-1).face, 1, `step ${i}: the last way it had`);
+    if (r.cpu.combat.attack) assert.equal(r.cpu.facing, 1);
+  }
+  // Clearly to the other side: it faces that way, once.
+  Object.assign(r.foe.body, { x: r.cpu.body.x - 30, prevX: r.cpu.body.x - 30 });
+  r.step();
+  assert.equal(r.log.at(-1).face, -1);
+});
+
+test('with nobody in play it faces nothing: an opponent lost to the Void (or none) never steers its attacks', () => {
+  const r = ring({ difficulty: 'hard', seed: 61, cpuX: 1000, foeX: 900 });
+  r.run(10);
+  assert.equal(r.log.at(-1).face, -1);
+  r.foe.lostToVoid = true;
+  r.run(30);
+  assert.ok(r.log.slice(-30).every((o) => o.face === 0), 'out of play: nothing to face');
+  r.cpu.opponent = null;
+  r.run(10);
+  assert.ok(r.log.slice(-10).every((o) => o.face === 0), 'no opponent at all');
+  r.cpu.opponent = r.foe;
+  r.foe.lostToVoid = false;
+  r.run(2);
+  assert.equal(r.log.at(-1).face, -1, 'back in play: facing it again');
+  // Locked input (intro, time-up, K.O.): nothing either.
+  r.cpu.inputLocked = true;
+  r.run(3);
+  assert.ok(r.log.slice(-3).every((o) => o.face === 0));
+});
+
+test('facing is as deterministic as the rest: the same seed, the same fight, step for step', () => {
+  const run = () => {
+    const other = new CombatAIController({ difficulty: 'brutal', rng: mulberry32(7) });
+    const r = ring({ difficulty: 'brutal', seed: 6, cpuX: 900, foeX: 1100, script: (n, self) => other.getInput(self, DT, r.ctx) });
+    r.run(seconds(8));
+    return JSON.stringify(r.log.map((o) => [o.face, o.attack1Pressed, o.attack2Pressed, o.runLeft, o.runRight])) + r.cpu.body.x + r.foe.body.x;
+  };
+  assert.equal(run(), run());
 });
