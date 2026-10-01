@@ -11,7 +11,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { fakeSprites, fakeSpritesOf, def as DEF_0001, DT } from './fighter-harness.mjs';
+import { fakeSprites, fakeSpritesOf, def as DEF_0001, DT, startupSteps } from './fighter-harness.mjs';
 import { TEST_A, TEST_MOVELESS, TEST_SAMPLE, testFighter, useTestFighters } from './test-fighters.mjs';
 
 // ---- Fake DOM + Canvas -------------------------------------------------------
@@ -72,7 +72,7 @@ class Element extends Node {
   set innerHTML(v) { this.replaceChildren(); this.html = v; }
   get innerHTML() { return this.html; }
   append(...nodes) { for (const n of nodes) { n.parentNode = this; this.children.push(n); } }
-  replaceChildren(...nodes) { this.children = []; this.append(...nodes); }
+  replaceChildren(...nodes) { this.children = []; this.html = ''; this.append(...nodes); }
   addEventListener(type, fn) {
     if (!this.listeners.has(type)) this.listeners.set(type, []);
     this.listeners.get(type).push(fn);
@@ -558,11 +558,13 @@ test('moves that aim at an opponent fall back or miss with nobody there, without
   };
 
   // attack3: no one to appear behind, so nothing at all (never a Punch in
-  // its place), and free.
+  // its place, nor a summoning startup for nobody), and free.
   run({}, 10);
   assert.equal(p.state, 'idle');
   run({ attack3: true, attack3Pressed: true });
   assert.equal(p.combat.attack, null);
+  assert.equal(p.pendingSummon, null, 'no startup');
+  assert.equal(p.state, 'idle');
   assert.equal(session.clones.length, 0);
   assert.equal(p.combat.abilityCooldowns.active('attack3'), false, 'no cooldown spent on a clone that cannot appear');
   idle();
@@ -1146,33 +1148,43 @@ test('a failed fighter load keeps the current fighter and the dialog', async () 
   assert.equal(document.activeElement, slotFor(screen, '9999'), 'back to choosing');
 });
 
-test('the touch ability icons follow Player 1\'s fighter: set on entry, refreshed by Change Fighter, never by the CPU', async () => {
+test('the touch buttons\' art follows Player 1\'s fighter, Jump included: set on entry, refreshed in place by Change Fighter, never by the CPU', async () => {
   // #9999 authors its own mobile presentation for this test only (the rest
-  // of the file sees #0001's, which it copies, as Test A does). The default
-  // fighter, and CPU, is #0001.
+  // of the file sees #0001's, which it copies, as Test A does): frames of
+  // its own clips (#0001's art, under its own picks), and its own jump
+  // frame. The default fighter, and CPU, is #0001.
   const saved = DEF_9999.mobileAbilities;
   DEF_9999.mobileAbilities = {
-    extra_attack: { label: 'Kunai', icon: 'arrow' },
-    attack1: { label: 'Palm Strike', icon: 'up' },
+    extra_attack: { label: 'Kunai', preview: { animation: 'attack2', frame: 2 } },
+    attack1: { label: 'Palm Strike', preview: { animation: 'idle', frame: 0 } },
+    jump: { preview: { animation: 'fall', frame: 1 } },
   };
   try {
     const { app, screen } = await enterPractice();
     const touch = screen.touch;
     const buttons = new Map(touch.buttons);
-    const shown = () => ['extra_attack', 'attack1', 'attack2'].map((a) => [touch.buttons.get(a).getAttribute('aria-label'), touch.buttons.get(a).innerHTML]);
-    const OWN_A = [['Shuriken', ICONS.shuriken], ['Punch', ICONS.punch], ['Kick', ICONS.kick]];
-    assert.deepEqual(shown(), OWN_A, 'the default fighter\'s icons from the start');
+    // What a button shows: the file of its sprite, or its glyph's markup.
+    const look = (a) => {
+      const img = touch.buttons.get(a).querySelector('.tc-sprite-icon');
+      return img ? img.getAttribute('src').split('/').pop() : touch.buttons.get(a).innerHTML;
+    };
+    const shown = () => ['extra_attack', 'attack1', 'attack2', 'jump'].map((a) => [touch.buttons.get(a).getAttribute('aria-label'), look(a)]);
+    const OWN_A = [
+      ['Shuriken', '0001_extra_attack_2.png'], ['Punch', '0001_attack1_2.png'], ['Kick', '0001_attack2_5.png'], ['Jump', '0001_jump_2.png'],
+    ];
+    assert.deepEqual(shown(), OWN_A, 'the default fighter\'s art from the start, Jump\'s too');
+    const sprite = touch.buttons.get('attack1').querySelector('.tc-sprite-icon');
     const calls = [];
     const set = touch.setCharacter.bind(touch);
     touch.setCharacter = (def) => { calls.push(def?.id ?? null); set(def); };
 
-    // A new CPU, even #9999, leaves Player 1's icons alone.
+    // A new CPU, even #9999, leaves Player 1's art alone.
     await enableCpu(screen, '9999');
     assert.equal(screen.session.cpu.def.id, '9999');
     assert.deepEqual(calls, []);
     assert.deepEqual(shown(), OWN_A);
 
-    // A failed fighter load keeps them too.
+    // A failed fighter load keeps it too.
     const load = app.loadCharacter;
     app.loadCharacter = () => Promise.resolve({ usable: false });
     screen.openMenu();
@@ -1187,27 +1199,33 @@ test('the touch ability icons follow Player 1\'s fighter: set on entry, refreshe
     screen.closeRoster();
     screen.resume();
 
-    // Change Fighter to #9999: its own look, the rest neutral, at once.
+    // Change Fighter to #9999: its own art and jump, the rest neutral, at once.
     screen.openMenu();
     screen.openRoster();
     slotFor(screen, '9999').click(0);
     await flush();
     assert.equal(screen.session.player.def.id, '9999');
     assert.deepEqual(calls, ['9999'], 'refreshed with the new fighter, exactly once');
-    assert.deepEqual(shown(), [['Kunai', ICONS.arrow], ['Palm Strike', ICONS.up], ['Attack 2', ICONS.pip2]]);
+    assert.deepEqual(shown(), [
+      ['Kunai', '0001_attack2_3.png'], ['Palm Strike', '0001_idle_1.png'], ['Attack 2', ICONS.pip2], ['Jump', '0001_fall_2.png'],
+    ]);
+    assert.equal(touch.buttons.get('attack1').querySelector('.tc-sprite-icon'), sprite, 'the same image, its source swapped in place');
     assert.equal(touch.buttons.get('shield').innerHTML, ICONS.shield, 'Shield is universal');
+    assert.equal(touch.buttons.get('transform').innerHTML, ICONS.transform, 'Transform keeps its star');
     assert.equal(touch.enabled, true, 'playing again');
     // The same controls, refreshed in place, still sending the same inputs.
     for (const [action, b] of buttons) assert.equal(touch.buttons.get(action), b, action);
     assert.equal(touch.buttons.get('attack1').getAttribute('data-action'), 'attack1');
+    assert.equal(touch.buttons.get('jump').getAttribute('data-action'), 'jump');
 
-    // Changing the CPU back to #0001 does not bring #0001's icons back.
+    // Changing the CPU back to #0001 does not bring #0001's art back.
     await enableCpu(screen, '0001');
     assert.equal(screen.session.cpu.def.id, '0001');
     assert.deepEqual(calls, ['9999']);
     assert.equal(touch.buttons.get('extra_attack').getAttribute('aria-label'), 'Kunai');
+    assert.equal(look('jump'), '0001_fall_2.png', 'nor its jump');
 
-    // Back to #0001: Shuriken, Punch and Kick again.
+    // Back to #0001: its Shuriken, Punch, Kick and jump again.
     screen.openMenu();
     screen.openRoster();
     slotFor(screen, '0001').click(0);
@@ -1587,13 +1605,16 @@ test('shuriken, clone and Sphere Rush hits on the CPU each float their own resol
     assert.equal(hit.damage, hit.projectile.def.damage);
     assert.deepEqual(numbers.map((d) => [d.damage, d.text]), [[1, '+1']]);
   }
-  // attack3: the clone appears behind the CPU (its cooldown started as
-  // usual) and strikes it.
+  // attack3: #0001 summons (its cooldown started as usual), then the clone
+  // appears behind the CPU and strikes it.
   {
     const { session, run, until, events, numbers } = practiceSession();
     const { player, cpu } = session;
     run({}, 10);
     run({ attack3: true, attack3Pressed: true });
+    assert.equal(player.state, 'summon');
+    assert.equal(session.clones.length, 0);
+    run({}, startupSteps(DEF_0001, 'attack3'));
     assert.equal(session.clones.length, 1);
     assert.equal(session.clones[0].target, cpu);
     assert.ok(player.combat.abilityCooldowns.active('attack3'), 'its cooldown started');
@@ -2021,13 +2042,33 @@ test('changing Player 1\'s fighter keeps the CPU, rewired to the new fighter', a
 
 // ---- Attack 3 / Attack 4 cooldowns and the Void ------------------------------
 
+test('the CPU taken out or changed during #0001\'s summoning startup: no clone, never at the new CPU, and the Attack 3 cooldown runs on', () => {
+  for (const change of ['remove', 'replace']) {
+    const { session, run } = practiceSession();
+    const { player } = session;
+    run({}, 10);
+    run({ attack3: true, attack3Pressed: true });
+    const old = session.cpu;
+    assert.equal(player.pendingSummon?.target, old, 'cast at the CPU');
+    run({}, 5);
+    if (change === 'remove') session.removeCPU();
+    else session.setCPU(DEF_9999, fakeSprites());
+    assert.equal(player.pendingSummon, null, `${change}: the startup is cut short`);
+    assert.equal(player.state, 'idle', `${change}: free at once`);
+    run({}, startupSteps(DEF_0001, 'attack3') + 60);
+    assert.deepEqual(session.clones, [], `${change}: no clone, at the old CPU or the new one`);
+    assert.deepEqual(player.summons, []);
+    assert.ok(player.combat.abilityCooldowns.active('attack3'), `${change}: the accepted use keeps its cooldown`);
+  }
+});
+
 test('a Practice Void respawn is a fresh training state: 0 Launch Point, full Energy and Attack 3 and Attack 4 ready again', () => {
   const { session, run, until } = practiceSession();
   const { player } = session;
   // Use both for real.
   run({}, 10);
   run({ attack3: true, attack3Pressed: true });
-  run({}, 2);
+  run({}, startupSteps(DEF_0001, 'attack3') + 2);
   run({ attack4: true, attack4Pressed: true });
   const cd = player.combat.abilityCooldowns;
   assert.ok(cd.active('attack3') && cd.active('attack4'));

@@ -2,7 +2,8 @@
 // #0001's attack3 Clone Attack: the clone-cloud artwork and its effect
 // registration, its own Attack 3 button (ground-only, no modifier), its
 // 5-second cooldown and its refusals, the clone's appear -> attack1 -> vanish
-// lifecycle, its placement
+// lifecycle once #0001's summoning startup has played (the startup itself:
+// summon-startup.test.mjs), its placement
 // behind the opponent, the overhead midair_attack2 it performs instead where
 // there is no ground behind (platform edges, airborne opponents), detached
 // hits (the Shield, hitstop, attribution), independence from its owner,
@@ -25,7 +26,7 @@ import { StageCollision, createBody, stepBody } from '../js/game/physics.js';
 import { SpriteSet } from '../js/game/sprite-normalizer.js';
 import { TrainingAIController } from '../js/game/fighter-controller.js';
 import {
-  def, DT, BASE, STAGE, SIM_CTX, fakeSprites, makeFighter, frameName, stepUntil, steps, duel, stageMap,
+  def, DT, BASE, STAGE, SIM_CTX, fakeSprites, makeFighter, frameName, stepUntil, steps, duel, stageMap, startupSteps,
 } from './fighter-harness.mjs';
 import { resolveLaunchStun } from '../js/game/combat.js';
 
@@ -47,6 +48,9 @@ const CLOUD_STEPS = steps(CLOUD.length / def.effectAnimations.attack3_object.fps
 const BA1_STEPS = steps(ATTACK.startup + ATTACK.active + ATTACK.recovery);
 // Steps from the spawn step to the first active attack1 step of the clone.
 const TO_ACTIVE = CLOUD_STEPS + steps(ATTACK.startup);
+// Steps of #0001's summoning startup: the clone is sent out this many steps
+// after the Attack 3 press (see summon below).
+const STARTUP_STEPS = startupSteps(def, 'attack3');
 
 // The uploaded PNGs, byte for byte.
 const SHA256 = {
@@ -75,12 +79,20 @@ function runs(list) {
   return out;
 }
 
-// Presses Attack 3, the owner standing free on the ground. Returns the clone
-// spawned that step.
+// Presses Attack 3, the owner standing free on the ground, and plays out
+// #0001's summoning startup (the press step and STARTUP_STEPS - 1 more, the
+// owner posing, no clone yet). Returns the clone spawned on the next step,
+// as the startup ends.
 function summon(d, targetHeld = {}) {
   const before = d.clones.length;
   d.tick(ATTACK3, targetHeld);
-  assert.equal(d.clones.length, before + 1, 'one clone per attack3');
+  assert.equal(d.attacker.state, 'summon', 'the startup, from the press step');
+  for (let i = 1; i < STARTUP_STEPS; i++) {
+    d.tick({}, targetHeld);
+    assert.equal(d.clones.length, before, 'no clone during the startup');
+  }
+  d.tick({}, targetHeld);
+  assert.equal(d.clones.length, before + 1, 'one clone per attack3, as its startup ends');
   return d.clones.at(-1);
 }
 
@@ -128,7 +140,9 @@ test('the ten clone-cloud frames live only in the canonical #0001 folder, unchan
   }
   // Preloaded in frame order, with the rest of the character.
   assert.deepEqual(paths.filter((u) => /attack3_object/.test(u)), CLOUD.map((f) => `./assets/characters/0001/${f}`));
-  assert.deepEqual(dir.filter((n) => /attack3/i.test(n)).sort(), [...CLOUD].sort(), 'exactly the ten, no reversed copies');
+  assert.deepEqual(dir.filter((n) => /attack3_object/i.test(n)).sort(), [...CLOUD].sort(), 'exactly the ten, no reversed copies');
+  // attack3's other files are #0001's own summoning poses, never cloud frames.
+  assert.deepEqual(dir.filter((n) => /attack3/i.test(n) && !CLOUD.includes(n)).sort(), [1, 2, 3, 4].map((n) => `0001_attack3_summon_${n}.png`));
   assert.deepEqual(readdirSync(ROOT).filter((n) => /attack3|clone/i.test(n)), [], 'none left at the repository root');
   // An early upload's name had a space in it; no file name does now.
   for (const where of ['', 'assets/characters/0001/']) {
@@ -328,9 +342,17 @@ test('CooldownTimers: start, remaining, duration and progress; recovery in real 
 
 // ---- Trigger --------------------------------------------------------------------
 
-test('Attack 3 pressed: one clone, a 5.0 s cooldown, and the owner is free at once', () => {
+test('Attack 3 pressed: #0001 summons, then one clone; the 5.0 s cooldown runs from the press, and the owner is free as the clone appears', () => {
   const d = duel();
   d.tick(ATTACK3);
+  // Accepted: the cooldown at once, the owner's startup, no clone yet.
+  const cd = d.attacker.combat.abilityCooldowns;
+  assert.deepEqual([cd.remaining('attack3'), cd.duration('attack3')], [5, 5], 'attack3\'s 5.0 s cooldown starts on the press');
+  assert.equal(cd.active('attack4'), false, 'attack4 stays ready');
+  assert.equal(d.attacker.state, 'summon');
+  assert.equal(d.clones.length, 0);
+  assert.deepEqual(d.attacker.summons, []);
+  d.until(() => d.clones.length > 0);
   assert.equal(d.clones.length, 1);
   const [clone] = d.clones;
   assert.ok(clone instanceof Clone);
@@ -339,12 +361,10 @@ test('Attack 3 pressed: one clone, a 5.0 s cooldown, and the owner is free at on
   assert.equal(clone.phase, 'appear');
   assert.equal(name(clone.cloudFrame), CLOUD[0], 'the cloud starts on frame 1');
   assert.equal(clone.frame, null, 'no clone body yet');
-  const cd = d.attacker.combat.abilityCooldowns;
-  assert.deepEqual([cd.remaining('attack3'), cd.duration('attack3')], [5, 5], 'attack3\'s 5.0 s cooldown starts');
-  assert.equal(cd.active('attack4'), false, 'attack4 stays ready');
+  assert.ok(Math.abs(cd.remaining('attack3') - (5 - STARTUP_STEPS * DT)) < 1e-9, 'counting since the press');
   assert.equal(d.attacker.summons.length, 0, 'the request was consumed');
-  // The owner performs nothing: no attack, no pose of its own, no attack
-  // cooldown, and nothing holds it.
+  // Its startup over, the owner performs nothing more: no attack, no pose of
+  // its own, no attack cooldown, and nothing holds it.
   assert.equal(d.attacker.state, 'idle');
   assert.equal(d.attacker.combat.attack, null);
   assert.notEqual(d.attacker.animator.anim.key, 'attack1');
@@ -371,6 +391,8 @@ test('Attack 3 needs no setup or modifier: pressed standing, running or with Dow
     const d = duel({ gap: 200 });
     for (const held of before) d.tick(held);
     d.tick(press);
+    assert.equal(d.attacker.state, 'summon', `${label}: the same startup`);
+    for (let i = 0; i < STARTUP_STEPS; i++) d.tick(before.at(-1) ?? {});
     assert.equal(d.clones.length, 1, label);
     assert.equal(d.clones[0].attackDef.id, 'attack1', `${label}: the same clone`);
     assert.ok(d.attacker.combat.abilityCooldowns.active('attack3'), label);
@@ -408,8 +430,7 @@ test('attack3 is ground-only: pressed in the air nothing happens, no cooldown is
   for (let i = 0; i < 20; i++) d.tick();
   assert.equal(d.clones.length, 0, 'nothing on landing either');
   // Back on the ground, a fresh press summons.
-  d.tick(ATTACK3);
-  assert.equal(d.clones.length, 1);
+  summon(d);
 });
 
 test('attack3 cannot be reused while cooling down: the press does nothing at all, is never kept for later, and the cooldown runs on', () => {
@@ -442,27 +463,28 @@ test('attack3 cannot be reused while cooling down: the press does nothing at all
   assert.equal(cd.active('attack3'), false);
 });
 
-test('attack3 is ready again 5 s after its use in real time, whether or not the clone hit', () => {
+test('attack3 is ready again 5 s after its press in real time, whether or not the clone hit', () => {
   for (const hit of [true, false]) {
     const d = duel();
-    const clone = summon(d);
+    d.tick(ATTACK3);
     // Without a hit, the target walks away before the punch.
     const used = d.attacker.combat.abilityCooldowns;
-    let n = 0;
+    let n = 1;
     while (used.active('attack3')) {
-      d.tick({}, !hit && n < steps(0.5) ? { runRight: true } : {});
+      d.tick({}, !hit && n > STARTUP_STEPS && n < STARTUP_STEPS + steps(0.5) ? { runRight: true } : {});
       n++;
       assert.ok(n < steps(6));
     }
-    assert.equal(clone.alive, false);
-    assert.equal(d.events.some((e) => e.summon === clone), hit, hit ? 'the clone hit' : 'the clone missed');
-    // Summoned on the press step, 5 s after it.
+    const [clone] = d.events.length ? [d.events[0].summon] : [null];
+    assert.equal(d.clones.length, 0);
+    assert.equal(d.events.some((e) => e.summon), hit, hit ? 'the clone hit' : 'the clone missed');
+    if (clone) assert.equal(clone.alive, false);
+    // From the press step, 5 s: the startup counts.
     assert.ok(Math.abs(n * DT - 5) <= DT, `${n} steps`);
-    // Ready: the next attack3 summons again.
+    // Ready: the next attack3 summons again, its cooldown full from the press.
     d.tick(ATTACK3);
-    assert.equal(d.clones.length, 1);
-    assert.notEqual(d.clones[0], clone);
     assert.equal(used.remaining('attack3'), 5);
+    assert.equal(d.attacker.state, 'summon');
   }
 });
 
@@ -470,19 +492,19 @@ test('the cooldown runs at the same real-time rate whatever the owner does: stan
   const lengths = [];
   for (const held of [{}, { runLeft: true }, { down: true }, { shield: true }]) {
     const d = duel({ gap: 200 });
-    summon(d);
-    let n = 0;
+    d.tick(ATTACK3);
+    let n = 1;
     while (d.attacker.combat.abilityCooldowns.active('attack3')) {
       d.tick(held);
       n++;
     }
     lengths.push(n);
   }
-  // Hit meanwhile: stunned and frozen part of the time.
+  // Hit meanwhile, once the clone is out: stunned and frozen part of the time.
   const hit = duel();
   summon(hit);
   hit.tick({}, ATTACK1);
-  let n = 1;
+  let n = STARTUP_STEPS + 2;
   while (hit.attacker.combat.abilityCooldowns.active('attack3')) {
     hit.tick();
     n++;
@@ -493,10 +515,12 @@ test('the cooldown runs at the same real-time rate whatever the owner does: stan
   assert.ok(Math.abs(lengths[0] * DT - 5) <= DT);
 });
 
-test('missing cloud art: no clone, no cooldown started, a warning, and nothing in its place', () => {
+test('missing cloud, attack or startup art: no clone, no startup, no cooldown started, a warning, and nothing in its place', () => {
   const d = duel({ attackerSprites: fakeSprites(undefined, undefined, []) });
   let warnings = captureWarnings(() => d.tick(ATTACK3));
   assert.equal(d.clones.length, 0);
+  assert.equal(d.attacker.pendingSummon, null, 'no summoning pose for a clone that cannot appear');
+  assert.equal(d.attacker.state, 'idle');
   assert.equal(d.attacker.combat.abilityCooldowns.active('attack3'), false);
   assert.equal(d.attacker.combat.attack, null, 'never the Punch instead');
   assert.equal(warnings.length, 1);
@@ -506,15 +530,34 @@ test('missing cloud art: no clone, no cooldown started, a warning, and nothing i
   const noBa1 = duel({ attackerSprites: fakeSprites(Object.keys(def.animations).filter((k) => k !== 'attack1')) });
   warnings = captureWarnings(() => noBa1.tick(ATTACK3));
   assert.equal(noBa1.clones.length, 0);
+  assert.equal(noBa1.attacker.pendingSummon, null);
   assert.equal(noBa1.attacker.combat.abilityCooldowns.active('attack3'), false);
   assert.equal(noBa1.attacker.combat.attack, null);
   assert.equal(noBa1.attacker.state, 'idle');
   assert.ok(warnings.some((w) => /attack3.*"attack1" has no animation frames/.test(w)), warnings.join('\n'));
 
-  // No opponent to appear behind: nothing to summon, no cooldown, no Punch.
+  // Missing summoning startup art: refused the same way, never a clone out
+  // of nowhere with the owner standing idle.
+  const noStartup = duel({ attackerSprites: fakeSprites(Object.keys(def.animations).filter((k) => k !== 'attack3_summon')) });
+  warnings = captureWarnings(() => {
+    noStartup.tick(ATTACK3);
+    for (let i = 0; i < STARTUP_STEPS + 5; i++) noStartup.tick();
+  });
+  assert.equal(noStartup.clones.length, 0);
+  assert.deepEqual(noStartup.attacker.summons, []);
+  assert.equal(noStartup.attacker.pendingSummon, null);
+  assert.equal(noStartup.attacker.combat.abilityCooldowns.active('attack3'), false);
+  assert.equal(noStartup.attacker.combat.attack, null);
+  assert.equal(warnings.length, 1);
+  assert.match(warnings[0], /Summon "attack3" is unavailable: its startup animation "attack3_summon" has no animation frames/);
+
+  // No opponent to appear behind: nothing to summon, no startup, no
+  // cooldown, no Punch.
   const alone = makeFighter();
   alone.step(ATTACK3);
   assert.equal(alone.fighter.summons.length, 0);
+  assert.equal(alone.fighter.pendingSummon, null);
+  assert.equal(alone.fighter.state, 'idle');
   assert.equal(alone.fighter.combat.abilityCooldowns.active('attack3'), false);
   assert.equal(alone.fighter.combat.attack, null, 'it fails cleanly: no fallback to attack1');
   assert.equal(alone.fighter.bufferedAttack, null);
@@ -879,9 +922,10 @@ test('an airborne target gets the overhead midair_attack2, snapshotted where it 
     for (let i = 0; i < 8; i++) d.tick({}, { jump: true });
     assert.equal(d.attacker.grounded, true, 'the owner stays on the ground');
     assert.equal(d.target.grounded, false);
-    d.tick(ATTACK3, { jump: true });
-    assert.equal(d.clones.length, 1);
-    const [clone] = d.clones;
+    // Still in the air as #0001's startup ends and the clone is sent out:
+    // the spot is the target's at that moment.
+    const clone = summon(d, { jump: true });
+    assert.equal(d.target.grounded, false);
     assert.ok(d.target.body.y < 800 - 36, 'well off the floor');
     assert.equal(clone.attackDef.id, 'midair_attack2');
     assert.equal(clone.x, d.target.body.x);
@@ -1216,17 +1260,27 @@ test('the clone attack1 hits once with attack1\'s damage, stun and launch from t
   assert.equal(d.target.combat.launchPoint, 120);
 });
 
-test('a clone hit freezes the target and the clone, never the owner, whose idle keeps animating', () => {
+// The same duel twice, the same Attack 3 in each: in `ref` the clone is
+// taken away as it appears, so whatever it does in `d` is all that differs.
+function twinSummons() {
   const d = duel();
-  const solo = makeFighter();
+  const ref = duel();
   const clone = summon(d);
-  solo.step({});
+  summon(ref);
+  ref.clones.length = 0;
+  return { d, ref, clone };
+}
+
+test('a clone hit freezes the target and the clone, never the owner, whose idle keeps animating', () => {
+  const { d, ref, clone } = twinSummons();
+  const solo = { step: () => ref.tick(), fighter: ref.attacker };
   const compare = () => {
     assert.equal(d.attacker.state, solo.fighter.state);
     assert.equal(d.attacker.stateTime, solo.fighter.stateTime);
     assert.equal(frameName(d.attacker), frameName(solo.fighter));
     assert.equal(d.attacker.combat.hitstop, 0);
   };
+  compare();
   while (!d.events.length) {
     d.tick();
     solo.step({});
@@ -1287,11 +1341,10 @@ test('a Shield blocks the clone attack1 from behind as from the front: 25 Energy
 // ---- Independence ---------------------------------------------------------------
 
 test('the owner stays free and unfrozen for the clone\'s whole life, in its own idle, and never plays attack1', () => {
-  // The owner against a fighter that only ever stands.
-  const d = duel();
-  const solo = makeFighter();
-  const clone = summon(d);
-  solo.step({});
+  // The owner against a fighter that only ever stands, beside the same
+  // owner whose clone was taken away.
+  const { d, ref, clone } = twinSummons();
+  const solo = { step: () => ref.tick(), fighter: ref.attacker };
   const anims = new Set();
   const shown = [];
   while (d.clones.includes(clone)) {
@@ -1306,7 +1359,7 @@ test('the owner stays free and unfrozen for the clone\'s whole life, in its own 
     assert.equal(d.attacker.combat.attack, null);
     assert.equal(d.attacker.canAct(), true);
   }
-  assert.deepEqual([...anims], ['idle'], 'its own idle art only: no activation pose, never attack1');
+  assert.deepEqual([...anims], ['idle'], 'its own idle art only once the clone is out: no pose for it, never attack1');
   assert.ok(shown.every((n) => /^0001_idle_\d\.png$/.test(n)));
   assert.equal(d.events.length, 1, 'the clone hit meanwhile');
 });
@@ -1384,6 +1437,7 @@ test('clones from successive attack3s never overlap: each waits out the 5 s cool
   tick({});
   for (let i = 0; i < 3; i++) {
     tick(ATTACK3);
+    for (let j = 0; j < STARTUP_STEPS; j++) tick({});
     assert.equal(d.clones.length, 1, `clone ${i + 1}`);
     // The cooldown runs well after the clone is gone.
     while (d.attacker.combat.abilityCooldowns.active('attack3')) {
@@ -1476,18 +1530,32 @@ test('Battle summons, owns and drops clones; restart and rematch clear them and 
   battle.update(DT);
   script.once = ATTACK3;
   battle.update(DT);
+  assert.equal(battle.p1.combat.abilityCooldowns.remaining('attack3'), 5, 'its cooldown from the press');
+  assert.equal(battle.p1.state, 'summon');
+  assert.equal(battle.clones.length, 0, 'not before the summoning startup is over');
+  for (let i = 1; i < STARTUP_STEPS; i++) battle.update(DT);
+  assert.equal(battle.clones.length, 0);
+  battle.update(DT);
   assert.equal(battle.clones.length, 1);
-  assert.equal(name(battle.clones[0].cloudFrame), CLOUD[0], 'spawned on cloud frame 1 in the same step');
-  assert.equal(battle.p1.combat.abilityCooldowns.remaining('attack3'), 5);
+  assert.equal(name(battle.clones[0].cloudFrame), CLOUD[0], 'spawned on cloud frame 1 in the step the startup ends');
   assert.equal(battle.p1.state, 'idle');
   assert.deepEqual(battle.fighters, [battle.p1, battle.p2], 'never a fighter');
   battle.update(DT);
   script.once = ATTACK3;
   battle.update(DT);
+  assert.equal(battle.p1.state, 'idle', 'still cooling down: no second startup');
+  for (let i = 0; i < STARTUP_STEPS; i++) battle.update(DT);
   assert.equal(battle.clones.length, 1, 'still cooling down: no second clone');
   assert.equal(battle.p2.combat.abilityCooldowns.size, 0);
 
+  // A rematch called mid-startup: nothing of it survives either.
+  while (battle.p1.combat.abilityCooldowns.active('attack3')) battle.update(DT);
+  script.once = ATTACK3;
+  battle.update(DT);
+  assert.ok(battle.p1.pendingSummon);
   battle.restart();
+  assert.equal(battle.p1.pendingSummon, null, 'no startup survives a rematch');
+  assert.equal(battle.p1.state, 'idle');
   assert.equal(battle.clones.length, 0, 'no clone survives a rematch');
   assert.equal(battle.p1.combat.abilityCooldowns.size, 0, 'a rematch starts with every cooldown ready');
   assert.equal(battle.p2.combat.abilityCooldowns.size, 0);
@@ -1500,6 +1568,7 @@ test('Battle summons, owns and drops clones; restart and rematch clear them and 
   battle.update(DT);
   script.once = ATTACK3;
   battle.update(DT);
+  for (let i = 0; i < STARTUP_STEPS; i++) battle.update(DT);
   const [clone] = battle.clones;
   let n = 0;
   while (battle.clones.length && n++ < 600) battle.update(DT);
@@ -1515,8 +1584,17 @@ test('Battle summons, owns and drops clones; restart and rematch clear them and 
   while (battle.p1.combat.abilityCooldowns.active('attack3')) battle.update(DT);
   script.once = ATTACK3;
   battle.update(DT);
+  for (let i = 0; i < STARTUP_STEPS; i++) battle.update(DT);
   assert.equal(battle.clones.length, 1);
+  // And a battle torn down mid-startup leaves none behind.
+  while (battle.p1.combat.abilityCooldowns.active('attack3')) battle.update(DT);
+  script.once = ATTACK3;
+  battle.update(DT);
+  const p1 = battle.p1;
+  assert.ok(p1.pendingSummon);
   battle.destroy();
+  assert.equal(p1.pendingSummon, null, 'its startup is cut short');
+  assert.deepEqual(p1.summons, []);
   assert.deepEqual(battle.clones, []);
   assert.deepEqual(battle.fighters, []);
 });
@@ -1549,12 +1627,23 @@ test('Battle draws clones behind both fighters, with no shadow, ring or name tag
   script.once = ATTACK3;
   battle.update(DT);
   battle.p2.controller = null;
-  const clone = battle.clones[0];
   const draws = () => {
     calls.length = 0;
     battle.render();
     return calls.filter((c) => c[0] === 'drawImage').map((c) => c[1].id);
   };
+  // The summoning startup: P1 drawn in its own summoning poses, in order,
+  // with no clone or cloud anywhere yet.
+  const poses = [];
+  for (let i = 0; i < STARTUP_STEPS; i++) {
+    const drawnNow = draws();
+    assert.equal(drawnNow.length, 2, 'the two fighters only');
+    poses.push(drawnNow.find((id) => /attack3_summon/.test(id)));
+    battle.update(DT);
+  }
+  assert.deepEqual(order(poses), [1, 2, 3, 4].map((n) => `0001_attack3_summon_${n}.png`));
+  const clone = battle.clones[0];
+  assert.ok(clone, 'the clone, as the startup ends');
   // Whether the drawImage of `id` sits inside a save() ... scale(-1, 1).
   const mirrored = (id) => {
     const at = calls.findIndex((c) => c[0] === 'drawImage' && c[1].id === id);

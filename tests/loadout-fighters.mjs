@@ -19,8 +19,10 @@
 //                                attack4 a technique (#0001's shape)
 //   F  5 attacks with specials   as E, and attack5 ordinary
 //
-// The summon is #0001's clone (performing attack1) and the technique its
-// Sphere Rush (its clips and sphere art borrowed under attack4's own names).
+// The summon is #0001's clone (performing attack1, after #0001's own
+// summoning startup, its attack3_summon clip borrowed with it) and the
+// technique its Sphere Rush (its clips and sphere art borrowed under
+// attack4's own names).
 import { getCharacter } from '../js/data/characters.js';
 import { NUMBERED_ATTACKS } from '../js/config.js';
 
@@ -70,6 +72,7 @@ export function loadoutFighter({ id, count, specials = false, extra = false }) {
   if (special.includes('attack3')) {
     actions.attack3 = { type: 'summon', id: 'attack3' };
     def.summons.attack3 = { ...BASE.summons.attack3 };
+    animations.attack3_summon = A.attack3_summon;
     def.effectAnimations.attack3_object = BASE.effectAnimations.attack3_object;
   }
   if (special.includes('attack4')) {

@@ -31,13 +31,16 @@
 // stays on it): a direction only, for the fast fall and for steering a
 // launch downward. The large top slot is the `extra_attack` input, the
 // middle row's first button `transform`, and the numbered attack buttons
-// (`attack1` to `attack5`) sit in numbered slots: their look is the
-// fighter's own (#0001's Shuriken, Punch, Kick, Clone Attack and Sphere
-// Rush; see setCharacter and js/ui/mobile-abilities.js), Transform shows as
-// reserved (dashed) while the fighter presents none, and a button for an
-// ability the fighter does not have at all (left out of its `actions`) is
-// hidden. Shield is the universal `shield` input, held for as long as the
-// pointer stays on it.
+// (`attack1` to `attack5`) sit in numbered slots: each shows a frame of the
+// fighter's own art for its move, in the art's own colours (#0001's
+// shuriken throw, punch, kick, Clone Attack hand seal and Sphere Rush; see
+// setCharacter and js/ui/mobile-abilities.js), and so does Jump, with the
+// fighter's own jump. Transform keeps its star, shown as reserved (dashed)
+// while the fighter presents none, and a button for an ability the fighter
+// does not have at all (left out of its `actions`) is hidden. Shield is the
+// universal `shield` input, held for as long as the pointer stays on it, and
+// keeps its shield glyph, as Down, the joystick and the Left / Right and
+// mouvement buttons keep their arrows.
 //
 // Numbered attack slots, a honeycomb round Transform and Shield, filled in
 // order by the numbered attacks the fighter has (every one a button of its
@@ -55,9 +58,10 @@
 //   5 attacks   slots 1 2 3 4 5
 //
 // Whatever kind of move a numbered button is (an ordinary attack, a summon,
-// a technique), it is pressed the same way. Only the icons and accessible
+// a technique), it is pressed the same way. Only the art and accessible
 // names are player-facing: the input codenames never change with them, so
-// Clone Attack is attack3 and Sphere Rush is attack4.
+// Clone Attack is attack3 and Sphere Rush is attack4, and nothing a button
+// shows decides what it does.
 //
 // Every pointer is tracked by pointerId, so the joystick (or Left / Right)
 // and Jump, or any other combination, work simultaneously. State is pushed
@@ -81,7 +85,7 @@ import { el } from '../core/utils.js';
 import { tattr, setAttr, setPlainAttr } from '../core/i18n.js';
 import { ICONS } from '../ui/icons.js';
 import { NUMBERED_ATTACKS } from '../config.js';
-import { ABILITY_ACTIONS, abilityPresence, mobileAbility, mobileAbilityLabelKey } from '../ui/mobile-abilities.js';
+import { ABILITY_ACTIONS, abilityPresence, jumpArt, mobileAbility, mobileAbilityLabelKey } from '../ui/mobile-abilities.js';
 import { DEFAULT_MOBILE_CONTROLS, resolveSetting } from '../core/settings.js';
 import {
   TOUCH_CONTROL_IDS, sanitizeTouchLayout, sanitizeTouchLayouts, layoutArea, placeControl,
@@ -96,9 +100,11 @@ const DPAD = [
 ];
 
 // Lower-right cluster, in on-screen order. `ability` marks the combat
-// ability glyphs (drawn a little larger); the fighter-specific ones
+// buttons (their glyphs drawn a little larger); the fighter-specific ones
 // (extra_attack, transform, attack1 to attack5) carry no icon or label
-// here: setCharacter fills them in, and marks a reserved one. `pos` is the
+// here: setCharacter fills them in, and marks a reserved one. Jump's arrow
+// is only its look until a fighter is named: then it shows that fighter's
+// jump (setCharacter), under its universal name. `pos` is the
 // button's place in the cluster (its tc-<pos> class); a numbered attack
 // button (`attack`) is also placed by the slot setCharacter gives it
 // (data-slot, see above).
@@ -189,6 +195,8 @@ export class TouchControls {
     this.layouts = sanitizeTouchLayouts(null);
     this.placements = new Map();
     this.area = null;
+    // Sprite files that failed to load: their buttons show glyphs instead.
+    this.failedArt = new Set();
     this.build();
     this.setScheme(scheme);
   }
@@ -300,8 +308,8 @@ export class TouchControls {
   // Shows the 'joystick' or 'classic' layout (anything else is the
   // default, Joystick), with that scheme's own custom layout. Everything held
   // is let go first, so a switch never leaves a direction or any other
-  // button down. The fighter's own icons are untouched: the combat
-  // buttons are the same elements in both.
+  // button down. The fighter's own art and names are untouched: the
+  // combat buttons and Jump are the same elements in both.
   setScheme(scheme) {
     const next = resolveSetting('mobileControls', scheme);
     this.releaseAll();
@@ -552,12 +560,14 @@ export class TouchControls {
   }
 
   // Shows `def`'s own abilities (its mobileAbilities) on the fighter-specific
-  // buttons: each one's icon and accessible name, and whether it shows as
-  // reserved, nothing else. The buttons stay the same elements with the same
-  // data-action and pointer handling, so input, held state and multi-touch
-  // carry on untouched. Null (or a fighter that authors none) gives the
-  // neutral fallback, with Transform reserved. A translated name is marked
-  // to follow the language.
+  // buttons: each one's art (a frame of the fighter's own animation, or
+  // Transform's star) and accessible name, and whether it shows as
+  // reserved, nothing else; and its own jump on Jump. The buttons stay the
+  // same elements with the same data-action and pointer handling, so input,
+  // held state and multi-touch carry on untouched: only what they show is
+  // swapped, in place (see showArt). Null (or a fighter that authors none)
+  // gives the neutral glyphs, with Transform reserved. A translated name is
+  // marked to follow the language.
   //
   // A button whose ability the fighter does not have at all (see
   // abilityPresence: left out of its `actions`) is hidden: not drawn, not
@@ -586,16 +596,19 @@ export class TouchControls {
         b.removeAttribute('aria-label');
         b.removeAttribute('data-i18n-aria-label');
         b.removeAttribute('data-i18n-aria-label-params');
-        b.innerHTML = '';
+        this.showArt(b, { sprite: null, icon: '' });
         b.classList.remove('is-pending');
         continue;
       }
       const key = mobileAbilityLabelKey(from, action);
       if (key) setAttr(b, 'aria-label', key);
       else setPlainAttr(b, 'aria-label', ability.label);
-      b.innerHTML = ability.icon;
+      this.showArt(b, ability);
       b.classList.toggle('is-pending', ability.pending);
     }
+    // Jump: always on show, always named Jump, drawn with the fighter's own
+    // jump.
+    this.showArt(this.actionButtons.get('jump'), jumpArt(def));
     const slots = attackSlots((action) => !this.actionButtons.get(action).hidden);
     let moved = false;
     for (const action of NUMBERED_ATTACKS) {
@@ -616,5 +629,51 @@ export class TouchControls {
   // Lets go of every pointer holding `action`'s button.
   releaseAction(action) {
     for (const [id, held] of [...this.pointers]) if (held === action) this.assign(id, null);
+  }
+
+  // Draws `art` ({ sprite, icon }, see js/ui/mobile-abilities.js) on button
+  // `b`, in place. A sprite is the button's one decorative image element
+  // (empty alt, hidden from assistive technology: the button's own
+  // aria-label names it), in the art's own colours and transparency, fitted
+  // whole inside the button (.tc-sprite-icon in styles.css); the same
+  // element is kept and only its source changes from fighter to fighter.
+  // Without a sprite, or once its file has failed to load, the button shows
+  // `icon`, the glyph. Never the button itself, its name, classes or
+  // handlers.
+  showArt(b, { sprite, icon }) {
+    if (!sprite || this.failedArt.has(sprite.url)) {
+      b.innerHTML = icon;
+      b.classList.remove('has-sprite');
+      b._fallback = null;
+      return;
+    }
+    let img = b._sprite;
+    if (!img) {
+      img = el('img', { class: 'tc-sprite-icon', alt: '', 'aria-hidden': 'true', draggable: 'false', decoding: 'async' });
+      img.addEventListener('error', () => this.spriteFailed(b, img));
+      b._sprite = img;
+    }
+    if (img.getAttribute('src') !== sprite.url) img.setAttribute('src', sprite.url);
+    img.classList.toggle('is-mirrored', sprite.mirrored);
+    b._fallback = icon;
+    if (!b.classList.contains('has-sprite')) {
+      b.replaceChildren(img);
+      b.classList.add('has-sprite');
+    }
+  }
+
+  // Button `b`'s sprite `img` failed to load (a missing or broken frame):
+  // it shows its glyph instead, keeping its name and input, and that file is
+  // not tried again. Reported once per file. An error from a source already
+  // replaced (the new one still loading) is not this one's.
+  spriteFailed(b, img) {
+    const url = img.getAttribute('src');
+    if (b._sprite !== img || !b.classList.contains('has-sprite') || !url || img.complete === false) return;
+    if (!this.failedArt.has(url)) {
+      this.failedArt.add(url);
+      console.warn(`[Alva] Touch button art "${url}" failed to load; showing its glyph.`);
+    }
+    b.innerHTML = b._fallback ?? '';
+    b.classList.remove('has-sprite');
   }
 }

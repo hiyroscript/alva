@@ -111,6 +111,15 @@ export function stepUntil(step, pred, held, limit = 600) {
 // ---- Attack helpers (Attack 1 and 2 tests) --------------------------
 
 export const steps = (seconds) => Math.round(seconds / DT);
+
+// Fixed steps a summon's startup lasts: one pass of `character`'s summon
+// `id`'s startupAnimation (0 for a summon without one). Its clone is queued
+// this many steps after the press step: the press step and the steps after
+// it show the startup, and the next one sends the clone out.
+export function startupSteps(character, id) {
+  const clip = character.animations?.[character.summons?.[id]?.startupAnimation];
+  return clip ? steps(clip.frames.length / clip.fps) : 0;
+}
 export const frameNo = (name) => Number(name.match(/(\d+)\.png$/)[1]);
 
 // Records every step of an attack until the fighter leaves the attack state.

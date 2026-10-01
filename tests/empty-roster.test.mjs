@@ -75,7 +75,7 @@ class Element extends Node {
   set innerHTML(v) { this.replaceChildren(); this.html = v; }
   get innerHTML() { return this.html; }
   append(...nodes) { for (const n of nodes) { n.parentNode = this; this.children.push(n); } }
-  replaceChildren(...nodes) { this.children = []; this.append(...nodes); }
+  replaceChildren(...nodes) { this.children = []; this.html = ''; this.append(...nodes); }
   addEventListener(type, fn) {
     if (!this.listeners.has(type)) this.listeners.set(type, []);
     this.listeners.get(type).push(fn);
@@ -272,7 +272,11 @@ test('the roster ships #0001 and #0002, both whole and playable', () => {
   assert.equal(DEF_0001.defense.type, 'shield');
   assert.ok(DEF_0001.movement.dashSpeed > 0, 'its Dash');
   assert.deepEqual(DEF_0001.abilityNames, { extra_attack: 'Shuriken', attack1: 'Punch', attack2: 'Kick', attack3: 'Clone Attack', attack4: 'Sphere Rush' });
-  assert.deepEqual(Object.keys(DEF_0001.mobileAbilities), ['extra_attack', 'attack1', 'attack2', 'attack3', 'attack4']);
+  // Its touch buttons: a name and a frame of its own art for each, Jump's
+  // frame too.
+  assert.deepEqual(Object.keys(DEF_0001.mobileAbilities), ['extra_attack', 'attack1', 'attack2', 'attack3', 'attack4', 'jump']);
+  for (const own of Object.values(DEF_0001.mobileAbilities)) assert.ok(DEF_0001.animations[own.preview.animation].frames[own.preview.frame]);
+  assert.equal(DEF_0001.summons.attack3.startupAnimation, 'attack3_summon', 'the Clone Attack\'s summoning startup');
   assert.ok(DEF_0001.hurtboxes.length > 0 && DEF_0001.collider && DEF_0001.energy && DEF_0001.launchReaction);
   // Every frame it names is still on disk.
   const paths = characterFramePaths(DEF_0001);

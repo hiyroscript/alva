@@ -235,13 +235,17 @@ export class Arena {
   }
 
   // Nothing else may keep hold of or aim at `f` once the Void takes it: a
-  // technique holding it ends, and pending summons, clones and projectiles
-  // aimed at it or released by it go. Its own technique ends with `reason`.
+  // technique holding it ends, a summon's startup cast at it is cut short,
+  // and pending summons, clones and projectiles aimed at it or released by
+  // it go. Its own technique ends with `reason`, and its own summon's
+  // startup is cut short.
   detachFromPlay(f, reason) {
     f.endTechnique(reason);
+    f.cancelSummon();
     for (const other of this.fighters) {
       if (other === f) continue;
       if (other.technique?.target === f) other.endTechnique('released');
+      if (other.pendingSummon?.target === f) other.cancelSummon();
       other.summons = other.summons.filter((s) => s.target !== f);
     }
     const keep = (e) => e.owner !== f && e.target !== f;
@@ -655,7 +659,9 @@ export class Arena {
     const p = this.primary;
     const action = p.technique
       ? ` ${p.technique.def.id} ${p.technique.phase}`
-      : p.combat.attack
+      : p.pendingSummon
+        ? ` ${p.pendingSummon.id} startup`
+        : p.combat.attack
         ? ` ${p.combat.attack.def.id} ${p.combat.phase}`
         : p.combat.shielding ? ` shield ${Math.round(p.combat.energy)}` : '';
     // The other fighter's state under its own label (the CPU's, in Quick
@@ -678,8 +684,12 @@ export class Arena {
   }
 
   destroy() {
-    // No technique may keep its owner, target or bind past the arena.
-    for (const f of this.fighters) f.endTechnique('destroy');
+    // No technique may keep its owner, target or bind past the arena, nor a
+    // summon's startup its target.
+    for (const f of this.fighters) {
+      f.endTechnique('destroy');
+      f.cancelSummon();
+    }
     this.fighters = [];
     this.projectiles = [];
     this.clones = [];

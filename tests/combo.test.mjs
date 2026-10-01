@@ -6,7 +6,7 @@
 // physics.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { def, DT, makeFighter, duel } from './fighter-harness.mjs';
+import { def, DT, makeFighter, duel, startupSteps } from './fighter-harness.mjs';
 
 const mv = def.movement;
 const P = (k) => ({ [k]: true, [`${k}Pressed`]: true });
@@ -115,13 +115,14 @@ test('only presses that could start are kept: never transform, an air Throw or a
   air.step(ATTACK2);
   air.step(THROW);
   assert.equal(air.fighter.bufferedAttack?.action, 'attack2', 'an air Throw never replaces it');
-  // An attack3 press on its cooldown is used up, never kept for later.
+  // An attack3 press on its cooldown (here during its own summoning
+  // startup) is used up, never kept for later.
   const d = duel({ gap: 600 });
   d.tick(P('attack3'));
   assert.ok(d.attacker.combat.abilityCooldowns.active('attack3'));
   d.tick(P('attack3'));
   assert.equal(d.attacker.bufferedAttack, null);
-  for (let i = 0; i < 20; i++) d.tick({});
+  for (let i = 0; i < startupSteps(def, 'attack3') + 20; i++) d.tick({});
   assert.equal(d.attacker.combat.attack, null, 'no attack1 later either');
   assert.equal(d.clones.length, 1, 'and no second clone');
   // Nor is one pressed during an attack: it happens on its own press or

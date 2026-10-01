@@ -29,6 +29,7 @@ Use lowercase codenames and underscores. Numbered frames start at 1 and play in 
 | Mid-air movement | <id>_midair_mouvment_<frame>.png |
 | Mid-air dodge | <id>_dodge_<frame>.png |
 | Numbered attack | <id>_attackN_<frame>.png |
+| Summon startup (the owner's own pose before its summon appears) | <id>_attackN_summon_<frame>.png |
 | Mid-air numbered attack | <id>_midair_attackN_<frame>.png |
 | Extra attack | <id>_extra_attack_<frame>.png |
 
@@ -71,6 +72,8 @@ For example, attack3 may be an ordinary third attack with midair_attack3 on one 
 
 A summon or technique starts only on its own button's press, on the ground, with the fighter free to act and its cooldown over. Otherwise the press does nothing: no other attack in its place and nothing kept for later.
 
+A summon may have a startup: the owner's own summoning pose, its attackN_summon animation, named in the summon as startupAnimation. It plays once from the accepted press, the owner committed to it (standing still, facing kept, no other action), and the summon appears as it ends. A hit, lost ground or a target gone from play cuts it short with no summon. The cooldown starts on the press either way. Character 0001's attack3 has one: 0001_attack3_summon_1 through 0001_attack3_summon_4, then its clone.
+
 down is a directional input only: the fast fall and launch steering. It never changes what a button does. Menus keep their own Down navigation.
 
 Controls, AI, UI labels, cooldowns and combat must agree on the same loadout and routing.
@@ -103,7 +106,7 @@ The object codename records gameplay ownership rather than a fictional technique
 
 If an attack creates multiple visually distinct object types, use documented child keys beneath its object namespace, such as attackN_object_<type>_<frame>. Do not use frame numbers to distinguish object types.
 
-A summon may explicitly reuse its owner's animation clips and hit data. Shared art does not need duplicate PNGs; summon-owned art and effects still follow the creating attack's object namespace.
+A summon may explicitly reuse its owner's animation clips and hit data. Shared art does not need duplicate PNGs; summon-owned art and effects still follow the creating attack's object namespace. The owner's summoning pose is the owner's art, not the summon's: it is attackN_summon, while the summoned entity's effects are attackN_object.
 
 ## Internal codenames and display names
 
@@ -112,5 +115,7 @@ Use attack1 through attack5, midair_attack1 through midair_attack5 and extra_att
 Legacy terms such as ba, maba, cba and uniqueba are not live attack IDs. They may appear only when documenting history or reading older saved data for migration.
 
 Player-facing names such as “Punch,” “Kick” or other character-specific move names may appear in menus and descriptions. They do not replace canonical IDs in character definitions, animation keys, filenames, controls, AI, cooldowns or object references.
+
+Touch buttons show a frame of the character's own art for their move, chosen in its UI data by animation codename and frame (counted from 0), never by a file name of their own. The picture is presentation only: each button still sends its control codename.
 
 When adding or updating a character, keep its attack count, button routing, airborne variants, object ownership and animation assets consistent with these shared rules.

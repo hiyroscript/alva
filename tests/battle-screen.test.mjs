@@ -65,7 +65,7 @@ class Element extends Node {
   get textContent() { return this.children.map(c => c.textContent).join(''); }
   set innerHTML(v) { this.replaceChildren(); this.html = v; }
   append(...nodes) { for (const n of nodes) { n.parentNode = this; this.children.push(n); } }
-  replaceChildren(...nodes) { this.children = []; this.append(...nodes); }
+  replaceChildren(...nodes) { this.children = []; this.html = ''; this.append(...nodes); }
   addEventListener(type, fn) {
     if (!this.listeners.has(type)) this.listeners.set(type, []);
     this.listeners.get(type).push(fn);
@@ -754,7 +754,7 @@ test('Keep Playing is outline-only for Return to Home? alone', async () => {
   assert.equal(await pending, false);
 });
 
-test('entering Quick Battle shows Player 1\'s fighter on the touch ability buttons before play', () => withTestFighters([TEST_A], async () => {
+test('entering Quick Battle shows Player 1\'s fighter\'s own art on the touch buttons before play', () => withTestFighters([TEST_A], async () => {
   // A playable test-only fighter: no production one is.
   const { app, screen } = setup();
   const { ICONS } = await import('../js/ui/icons.js');
@@ -766,7 +766,8 @@ test('entering Quick Battle shows Player 1\'s fighter on the touch ability butto
   const set = touch.setCharacter.bind(touch);
   touch.setCharacter = (def) => { calls.push(def?.id); set(def); };
   app.selection = { characterId: TEST_A.id, mapId: MAPS[0].id };
-  // Stop at the load (no real sprites here): the icons are already set by then.
+  // Stop at the load (no real sprites here): the buttons' art is already set
+  // by then.
   let loadsBefore = null;
   app.loadCharacter = () => {
     loadsBefore = [...calls];
@@ -776,15 +777,23 @@ test('entering Quick Battle shows Player 1\'s fighter on the touch ability butto
   await screen.enter();
   assert.deepEqual(loadsBefore, [TEST_A.id], 'configured as soon as the fighter is known, before gameplay');
   assert.deepEqual(calls, [TEST_A.id]);
-  const shown = ['extra_attack', 'shield', 'attack1', 'attack2'].map((a) => [
-    touch.buttons.get(a).getAttribute('aria-label'), touch.buttons.get(a).html, touch.buttons.get(a).getAttribute('data-action'),
+  // What a button shows: the file of its sprite (the fighter's own art), or
+  // its glyph's markup.
+  const look = (b) => b.querySelector('.tc-sprite-icon')?.getAttribute('src').split('/').pop() ?? b.html;
+  const shown = ['extra_attack', 'shield', 'transform', 'attack1', 'attack2', 'attack3', 'attack4', 'jump'].map((a) => [
+    touch.buttons.get(a).getAttribute('aria-label'), look(touch.buttons.get(a)), touch.buttons.get(a).getAttribute('data-action'),
   ]);
   assert.deepEqual(shown, [
-    ['Shuriken', ICONS.shuriken, 'extra_attack'],
+    ['Shuriken', '0001_extra_attack_2.png', 'extra_attack'],
     ['Shield', ICONS.shield, 'shield'],
-    ['Punch', ICONS.punch, 'attack1'],
-    ['Kick', ICONS.kick, 'attack2'],
+    ['Transform', ICONS.transform, 'transform'],
+    ['Punch', '0001_attack1_2.png', 'attack1'],
+    ['Kick', '0001_attack2_5.png', 'attack2'],
+    ['Clone Attack', '0001_attack3_summon_3.png', 'attack3'],
+    ['Sphere Rush', '0001_attack4_5.png', 'attack4'],
+    ['Jump', '0001_jump_2.png', 'jump'],
   ]);
+  assert.ok(touch.buttons.get('transform').classList.contains('is-pending'), 'Transform reserved, dashed');
   assert.equal(touch.enabled, false, 'no play without sprites');
 }));
 

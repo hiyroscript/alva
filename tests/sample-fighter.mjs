@@ -19,8 +19,10 @@
 //                 in all, so there is no attack4 (no technique) and its
 //                 attack3 button keeps its neutral look
 //   no Defense: the shield button does nothing
-//   its own touch labels and icons (attack2 left neutral) and ability names
-//   (attack2 and both mid-air attacks left unnamed)
+//   its own touch labels, frames of its own clips on its touch buttons
+//   (attack2 left neutral, and no jump frame of its own, so Jump keeps its
+//   arrow) and its own glyph on its Transform, and ability names (attack2
+//   and both mid-air attacks left unnamed)
 //
 // Its body, physics, Powers, Energy and art are #0001's, borrowed: they are
 // not what it tests. Its clips reuse #0001's frame lists under its own keys,
@@ -73,9 +75,9 @@ export const SAMPLE_FIGHTER = Object.freeze({
   techniques: {},
 
   mobileAbilities: {
-    extra_attack: { label: 'Palm Strike', icon: 'arrow' },
+    extra_attack: { label: 'Palm Strike', preview: { animation: 'extra_attack', frame: 3 } },
     transform: { label: 'Awakening', icon: 'up' },
-    attack1: { label: 'Jab', icon: 'punch' },
+    attack1: { label: 'Jab', preview: { animation: 'attack1', frame: 1 } },
   },
   abilityNames: {
     extra_attack: 'Palm Strike',

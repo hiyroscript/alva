@@ -172,8 +172,9 @@ export class BattleScreen extends Screen {
       : t('battle.canvas'));
     this.canvas.setAttribute('data-i18n-aria-label', '');
     // The touch layout the player chose (Home › Settings › Controls), its
-    // custom placement and sizes, and Player 1's fighter for the ability
-    // icons, never the CPU's. A spectator has no touch controls at all.
+    // custom placement and sizes, and Player 1's fighter for the buttons'
+    // art and names, never the CPU's. A spectator has no touch controls at
+    // all.
     this.touch.setScheme(app.settings.mobileControls);
     this.touch.setLayout(app.settings.touchLayout(this.touch.scheme));
     this.touch.setCharacter(watch ? null : p1Def);

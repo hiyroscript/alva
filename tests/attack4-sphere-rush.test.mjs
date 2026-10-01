@@ -1678,13 +1678,20 @@ test('each missing fighter clip or sphere effect refuses the Sphere Rush: nothin
 
 // ---- Regressions -------------------------------------------------------------------
 
-test('attack3 is the Clone Attack on its own button and leaves #0001 free; it starts no technique, and each uses its own cooldown', () => {
+test('attack3 is the Clone Attack on its own button: its short summoning startup, then #0001 is free; it starts no technique, and each uses its own cooldown', () => {
   const d = duel();
   d.tick(ATTACK3);
-  assert.equal(d.clones.length, 1);
+  assert.equal(d.attacker.state, 'summon', 'its summoning startup, not the technique');
   assert.ok(d.attacker.combat.abilityCooldowns.active('attack3'));
   assert.equal(d.attacker.combat.abilityCooldowns.active('attack4'), false, 'attack3 never cools attack4');
-  assert.equal(d.attacker.state, 'idle');
+  assert.equal(d.attacker.technique, null);
+  // Pressed during the startup, attack4 does nothing at all: not started,
+  // not cooled, not kept for later.
+  d.tick(ATTACK4);
+  assert.equal(d.attacker.technique, null, 'no Sphere Rush cuts the startup short');
+  assert.equal(d.attacker.combat.abilityCooldowns.active('attack4'), false);
+  d.until(() => d.clones.length === 1);
+  assert.equal(d.attacker.state, 'idle', 'free again as the clone appears');
   assert.equal(d.attacker.technique, null);
   // Clone first, then the Sphere Rush on the next step.
   d.tick(ATTACK4);

@@ -687,6 +687,97 @@ Attack 4 became buttons of their own; neither move changed.
 `tests/controls-ui.test.mjs`, and the repository-wide scan for the
 retired mechanic in `tests/codenames.test.mjs`.
 
+### Later: the Clone Attack's summoning startup
+
+Not part of this change, but it alters one line of it: the summon no
+longer leaves #0001 free at once. He first performs a short summoning
+startup, and the touch buttons no longer show glyphs for Attack 3 and
+Attack 4. See [Sprite buttons and the summoning
+startup](#sprite-buttons-and-the-summoning-startup). The stance stays
+removed: only four of its poses came back, renamed for Attack 3.
+
+## Sprite buttons and the summoning startup
+
+Not a named update (it can become one if the owner names it). Asked for
+(the `max` prompt) as: the fighters' touch action buttons show frames of
+their own animations instead of white glyphs (Run / movement, Shield and
+Transform keep theirs), and #0001's old held Down stance art is recovered
+from history and repurposed as a visible startup for Attack 3, so #0001
+summons the clone before it appears. The stance itself stays removed.
+
+**What it changed**
+
+- **Touch art.** The extra attack, attack1 to attack5 and Jump show one
+  frame of the fighter's own art, in its own colours: an image element
+  (`.tc-sprite-icon`, empty alt, hidden from assistive technology, no
+  pointer events) fitted whole inside the round button (70%, aspect kept,
+  crisp pixels). Each fighter picks its frames in `mobileAbilities` as
+  `preview: { animation, frame }` (a clip of its own, a frame counted from
+  0); Jump has an entry with no label, so it keeps its name. #0001:
+  `extra_attack_2` (the release), `attack1_2`, `attack2_5`,
+  `attack3_summon_3` (the hand seal), `attack4_5` (the rush), `jump_2`.
+  #0002: `extra_attack_6` (the tornado sent off), `attack1_4`, `attack2_2`,
+  `attack3_5`, `jump_1`. The art follows Player 1's fighter and is swapped
+  in place (`TouchControls.showArt`): the same buttons and images, the same
+  `data-action`, slots, custom layouts, held state and names. A button
+  with nothing to show (no fighter yet, a preview naming no frame, a file
+  that fails to load) falls back to its neutral glyph (ring, pips, jump
+  arrow) and keeps its name and input. Left / Right / Down, the joystick,
+  the Dash buttons, Shield and the reserved Transform star are unchanged.
+  The fighter glyphs that became unused (`shuriken`, `punch`, `kick`,
+  `spin`, `tornado`) are gone from `js/ui/icons.js`.
+- **The summoning startup.** A summon may name `startupAnimation`, an
+  owner clip played once from the accepted press before the summon is
+  sent out (`Fighter.pendingSummon`, visual state `summon`, between
+  `bound` and `attack`). The fighter stands still (speed 0), keeps its
+  facing and can do nothing else; the cooldown runs from the press. A hit
+  (on its own step, straight to the hurt pose), lost ground, the Void, a
+  reset or respawn, a Practice Ground fighter or CPU change, the arena
+  going, or a target no longer in play cut it short: no clone, never
+  another target, the cooldown spent. Without `startupAnimation` a summon
+  is sent out on the press, as before.
+- **#0001's Clone Attack** names `startupAnimation: 'attack3_summon'`:
+  `0001_attack3_summon_1` to `_4` at 10 fps, 0.4 s (24 steps), the clone
+  queued on the step after the last pose. The four files are the stance's
+  old poses, byte for byte from commit `538d73a`: its two startup poses
+  as `_1` and `_2`, its two held poses as `_3` and `_4`. The clone's own
+  smoke (`attack3_object`), placement, attack, timing and its 5 s cooldown
+  are unchanged.
+- **The CPU** still presses Attack 3 directly; the startup holds it as it
+  holds a player, and its lead for the summon counts the startup
+  (`readMoveset`). Nothing else in its play changed.
+
+**Where to tune it** (`js/data/characters.js`)
+
+- The summoning pose: `ATTACK3_SUMMON_FPS` (10) and
+  `summons.attack3.startupAnimation` (remove it for the old immediate
+  summon).
+- Each button's picture: `mobileAbilities.<button>.preview` per fighter
+  (`animation`, `frame` from 0).
+- The picture's size in its button: `.tc-sprite-icon` in `styles.css`.
+
+**Code:** `trySummon`, `finishSummon`, `cancelSummon`, `canAct`,
+`updateFacing`, `updateState` and `animationFor` in
+`js/game/character.js`; `startupAnimation` and `summonProblem` in
+`js/game/clone.js`; the hit in `CombatSystem.applyHit`
+(`js/game/combat.js`); `detachFromPlay` and `destroy` in
+`js/game/arena.js`; `setFighter` and `removeCPU` in `js/game/practice.js`;
+`readMoveset` in `js/game/combat-ai.js`; `previewFrame`, `mobileAbility`,
+`jumpArt` and `SPRITE_BUTTONS` in `js/ui/mobile-abilities.js`;
+`setCharacter`, `showArt` and `spriteFailed` in
+`js/game/touch-controls.js`; `js/ui/icons.js`; `styles.css`.
+
+**Tests:** `tests/summon-startup.test.mjs` (the restored bytes, the clip,
+the press, the poses in order, the commitment, every interruption, the
+refusals, a summon with no startup, the CPU); `tests/clone.test.mjs` (the
+clone after the startup); `tests/controls-ui.test.mjs` (the art, Jump,
+fallbacks, the glyphs that stay, names in English and French, both
+fighters, multi-touch, the editor); `tests/touch-layout.test.mjs`,
+`tests/practice-ground.test.mjs` and `tests/battle-screen.test.mjs` (art
+following Player 1, never the CPU, layouts kept);
+`tests/codenames.test.mjs` (the new files and clip, and a check that the
+retired mechanic's names are still caught).
+
 ## Adding a named update
 
 When a new piece of work gets a name, add a row to the table and a section in

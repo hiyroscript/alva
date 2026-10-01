@@ -74,6 +74,10 @@ const EXTRA_ATTACK_FPS = 12;
 // Playback rate of the extra_attack_object spin (the thrown shuriken). Art
 // only: it never changes how fast the projectile travels.
 const EXTRA_ATTACK_OBJECT_FPS = 18;
+// Playback rate of attack3_summon, #0001's own pose as it summons the
+// Clone Attack. The clone is queued as one pass of it ends (4 frames = 0.4 s
+// at 10 fps), so tuning it keeps the clone on the art.
+const ATTACK3_SUMMON_FPS = 10;
 // Playback rate of attack3_object, the Clone Attack's cloud. The same rate
 // plays it forwards as the clone appears and backwards as it vanishes, so
 // both take one pass of the clip (10 frames = 0.5 s at 20 fps).
@@ -280,6 +284,19 @@ export const CHARACTERS = [
         fps: EXTRA_ATTACK_FPS,
         loop: false,
         heightRatio: 0.9,
+      },
+      // attack3_summon, the Clone Attack's startup: #0001 summoning the
+      // clone. attack3_summon_1 squares up, attack3_summon_2 brings the
+      // fists in, attack3_summon_3 and attack3_summon_4 hold the hand seal.
+      // Played once (never looped) between the Attack 3 press and the
+      // clone's appearance; see summons.attack3.startupAnimation. Faces right
+      // like the rest of #0001. The clone's own smoke is attack3_object,
+      // below: a separate effect, played where the clone appears.
+      attack3_summon: {
+        frames: frames('0001', 'attack3_summon', 4),
+        fps: ATTACK3_SUMMON_FPS,
+        loop: false,
+        heightRatio: 1,
       },
       // attack4, the Sphere Rush: one set of twelve poses (attack4_1-12)
       // split into logical clips, each played once by its own technique
@@ -595,22 +612,29 @@ export const CHARACTERS = [
       attack4: { type: 'technique', id: 'attack4' }, // the Sphere Rush
     },
 
-    // How the touch controls present this fighter's own buttons: an icon
-    // (a key of ICONS in js/ui/icons.js) and an accessible name for each.
-    // UI only (see js/ui/mobile-abilities.js): the buttons still send
-    // extra_attack, transform and attack1 to attack4, and nothing here
-    // reaches combat. Each names the button's ability family, not every move
-    // it makes: Punch is also midair_attack1 (the mid-air kunai slash).
-    // Attack 3 and Attack 4 show the neutral numbered glyphs under their
-    // own names. With no `transform` entry (no Transform yet) its Transform
-    // button stays reserved (dashed). The Shield, Jump and movement buttons
-    // are universal.
+    // How the touch controls present this fighter's own buttons: an
+    // accessible name (`label`) for each, and the frame of its own art the
+    // button shows (`preview`: `frame` of the clip `animation` above,
+    // counted from 0 like visual.portrait's, so frame 1 is a clip's second
+    // frame). UI only (see js/ui/mobile-abilities.js): the buttons still send
+    // extra_attack, jump and attack1 to attack4, and nothing here reaches
+    // combat. Each names the button's ability family, not every move it
+    // makes: Punch is also midair_attack1 (the mid-air kunai slash). Each
+    // frame is the one that reads best as the move: the shuriken leaving
+    // the hand (extra_attack_2), the punch landing (attack1_2), the high
+    // kick (attack2_5), the hand seal that summons the clone
+    // (attack3_summon_3), the rush (attack4_5, attack4_dash's second) and
+    // the rising jump (jump_2). Jump keeps its own name, so it has no label
+    // here. With no `transform` entry (no Transform yet) its Transform
+    // button stays reserved (the dashed star); the Shield and movement
+    // buttons are universal glyphs.
     mobileAbilities: {
-      extra_attack: { label: 'Shuriken', icon: 'shuriken' },
-      attack1: { label: 'Punch', icon: 'punch' },
-      attack2: { label: 'Kick', icon: 'kick' },
-      attack3: { label: 'Clone Attack', icon: 'pip3' },
-      attack4: { label: 'Sphere Rush', icon: 'pip4' },
+      extra_attack: { label: 'Shuriken', preview: { animation: 'extra_attack', frame: 1 } },
+      attack1: { label: 'Punch', preview: { animation: 'attack1', frame: 1 } },
+      attack2: { label: 'Kick', preview: { animation: 'attack2', frame: 4 } },
+      attack3: { label: 'Clone Attack', preview: { animation: 'attack3_summon', frame: 2 } },
+      attack4: { label: 'Sphere Rush', preview: { animation: 'attack4_dash', frame: 1 } },
+      jump: { preview: { animation: 'jump', frame: 1 } },
     },
 
     // #0001's in-game ability names, keyed by the universal move codenames
@@ -628,16 +652,19 @@ export const CHARACTERS = [
 
     // Summons, keyed by the attack they are: attack3's button (see
     // `actions`) sends this one out, on the ground only. It costs no
-    // Energy: its own cooldown (`cooldown`) starts when it is used, hit or
-    // miss, and a press while it is still cooling down, or when it cannot
+    // Energy: its own cooldown (`cooldown`) starts when it is accepted, hit
+    // or miss, and a press while it is still cooling down, or when it cannot
     // happen at all (no opponent in play, missing art), does nothing: no
     // other attack instead, and nothing kept for later. The cooldown shows
     // under the fighter as A3. See js/game/clone.js for the schema
-    // (createSummonDefinition). A clone is a temporary attack entity,
-    // not a fighter: it appears through the `cloud` effect, performs one of
-    // the owner's attacks once with that attack's own art and combat data,
-    // then vanishes through the same cloud played in reverse. Normally it
-    // appears behind the opponent and performs `attack`; with nothing to
+    // (createSummonDefinition). Accepted, #0001 first performs the summon
+    // himself: `startupAnimation` plays once while he stands committed to
+    // it, and the clone is queued as it ends (a hit, lost ground or a
+    // vanished target first: no clone). A clone is a temporary attack
+    // entity, not a fighter: it appears through the `cloud` effect, performs
+    // one of the owner's attacks once with that attack's own art and combat
+    // data, then vanishes through the same cloud played in reverse. Normally
+    // it appears behind the opponent and performs `attack`; with nothing to
     // stand on there at the opponent's foot height, the optional `noGround`
     // fallback places it and picks its attack instead.
     summons: {
@@ -645,9 +672,13 @@ export const CHARACTERS = [
       attack3: {
         attack: 'attack1',
         cloud: 'attack3_object',
+        // #0001's own summoning pose before the clone appears: one pass of
+        // attack3_summon (0.4 s), facing as he did when it was accepted.
+        startupAnimation: 'attack3_summon',
         // Seconds before attack3 can be used again, from the moment the
-        // summon is accepted, whichever way it appears and whether or not it
-        // hits. Its hit is the attack's own: 3 as attack1, 5 as
+        // summon is accepted (as the startup begins), whichever way it
+        // appears, whether or not it hits, and even when the startup is cut
+        // short. Its hit is the attack's own: 3 as attack1, 5 as
         // midair_attack2.
         cooldown: 5,
         // World units behind the opponent (on its back side) at the summon;
@@ -1181,13 +1212,19 @@ export const CHARACTERS = [
       attack3: { ground: 'attack3', air: 'midair_attack3' }, // the Spin Attack / the Blue Tornado
     },
 
-    // Its touch buttons (UI only, see js/ui/mobile-abilities.js), each named
-    // for its ground move's family.
+    // Its touch buttons (UI only, see js/ui/mobile-abilities.js and #0001's),
+    // each named for its ground move's family and showing a frame of that
+    // move (counted from 0): the Whirlwind as it sends the tornado off
+    // (extra_attack_6), the One-Two's straight (attack1_4), the Rapid Kicks'
+    // flurry (attack2_2), the Spin Attack's tight ball (attack3_5) and the
+    // jump as it curls up (jump_1, face still showing, so Jump never looks
+    // like the Spin).
     mobileAbilities: {
-      extra_attack: { label: 'Whirlwind', icon: 'tornado' },
-      attack1: { label: 'Punch', icon: 'punch' },
-      attack2: { label: 'Kick', icon: 'kick' },
-      attack3: { label: 'Spin', icon: 'spin' },
+      extra_attack: { label: 'Whirlwind', preview: { animation: 'extra_attack', frame: 5 } },
+      attack1: { label: 'Punch', preview: { animation: 'attack1', frame: 3 } },
+      attack2: { label: 'Kick', preview: { animation: 'attack2', frame: 1 } },
+      attack3: { label: 'Spin', preview: { animation: 'attack3', frame: 4 } },
+      jump: { preview: { animation: 'jump', frame: 0 } },
     },
 
     // In-game ability names (js/data/abilities.js).

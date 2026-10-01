@@ -12,11 +12,21 @@
 //
 //   summons: {
 //     attack3: {
-//       attack: 'attack1', cloud: 'attack3_object', cooldown: 5,
-//       behindDistance: 48, effectOffset: { x: 0, y: -44 },
+//       attack: 'attack1', cloud: 'attack3_object', startupAnimation: 'attack3_summon',
+//       cooldown: 5, behindDistance: 48, effectOffset: { x: 0, y: -44 },
 //       noGround: { attack: 'midair_attack2', offset: { x: 0, y: -36 } },
 //     },
 //   },
+//
+// The optional `startupAnimation` is the owner's own summoning pose: a
+// fighter clip played once between the accepted press and the request
+// (see Fighter.trySummon and finishSummon). For its length the owner is
+// committed to it: it stands still, keeps its facing and can do nothing
+// else, and a hit, lost ground or a target gone from play cancels it with
+// no clone at all. The cooldown already runs from the press. Without one
+// the request is queued on the press itself and the owner is free at once.
+// The startup is the owner's; the `cloud` is the clone's, played where the
+// clone appears.
 //
 // A clone normally appears on the target's back side, at its foot height,
 // and performs `attack`. The optional `noGround` fallback covers a spot with
@@ -53,6 +63,7 @@ import { attackPhase } from './combat.js';
 const SUMMON_DEFAULTS = {
   attack: null,       // owner attack id the clone performs
   cloud: null,        // owner effect animation it appears / vanishes through
+  startupAnimation: null, // owner fighter clip played once before the request (none: at once)
   cooldown: 0,        // seconds before the owner can summon it again
   behindDistance: 48, // world units behind the target
   effectOffset: { x: 0, y: 0 }, // cloud centre from the clone origin, facing right
@@ -85,10 +96,14 @@ function attackProblem(owner, id, label) {
 }
 
 // Why `owner` cannot summon `def` right now, or null when it can. Checked
-// before its cooldown starts: never spend it on an invisible clone or punch.
-// The no-ground attack is checked too, wherever the target stands, so
-// whether a summon works never depends on where the clone would appear.
+// before its cooldown starts: never spend it on an invisible clone or punch,
+// nor on a startup with no pose to show. The no-ground attack is checked
+// too, wherever the target stands, so whether a summon works never depends
+// on where the clone would appear.
 export function summonProblem(owner, def) {
+  if (def.startupAnimation && !owner.sprites.has(def.startupAnimation)) {
+    return `its startup animation "${def.startupAnimation}" has no animation frames`;
+  }
   const cloud = owner.sprites.effect(def.cloud);
   if (!cloud?.frames.length) return `its cloud effect "${def.cloud}" has no animation frames`;
   return attackProblem(owner, def.attack, 'attack') ??
