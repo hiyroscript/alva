@@ -80,7 +80,7 @@ Characters with mid-air shield frames use midair_shielding for their airborne sh
 
 Characters with no mid-air shield frames use their midair_mouvment animation frames to dodge in mid-air instead of performing a mid-air shield. This fallback is a dodge action, not a shield displayed with different art.
 
-Each mid-air dodge costs 25 energy. The character must have at least 25 energy to begin the dodge, and the cost is deducted once when the dodge starts.
+Each mid-air dodge costs 25 energy, but the character only needs energy greater than 0 to begin the dodge; they do not need the full 25 energy. Deduct the cost once when the dodge starts, clamping remaining energy to 0. A character with 0 energy cannot begin a dodge.
 
 ## Attack-created objects
 
