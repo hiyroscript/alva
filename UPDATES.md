@@ -300,6 +300,15 @@ Settings became a dialog).
   guard in `tests/combat-ai.test.mjs`
 - the Joystick layout in `tests/controls-ui.test.mjs`
 
+### Later: the touch Down buttons are gone
+
+The down arrow this moved beside the joystick, and Classic Buttons' middle
+one, were later removed altogether, with `--tc-stick-left`, `--tc-down` and
+`.tc-stick-down`; the stick now sits at the cluster's left edge. The CPU's
+attacks now also face their opponent by themselves. See [CPU facing, the
+Jump arrow, no touch Down, ground and air
+icons](#cpu-facing-the-jump-arrow-no-touch-down-ground-and-air-icons).
+
 ## Roster reset
 
 Not a named update (it can become one if the owner names it). Asked for
@@ -641,7 +650,7 @@ Attack 4 became buttons of their own; neither move changed.
   later. A Sphere Rush faces the direction held as it is pressed. The
   summon leaves #0001 free at once, in its own idle.
 - **Down** is the plain `down` control (S / ↓, D-pad down, left stick
-  down, the touch down arrows): the fast fall and downward launch steering
+  down, and then the touch down arrows, since removed): the fast fall and downward launch steering
   only. On the ground it is nothing: no state, no pose, no lock on
   movement or the Dash, no change to any button. Menus keep their own Down.
 - **Energy** refills at its one passive `regen` rate; **cooldowns** recover
@@ -777,6 +786,107 @@ fighters, multi-touch, the editor); `tests/touch-layout.test.mjs`,
 following Player 1, never the CPU, layouts kept);
 `tests/codenames.test.mjs` (the new files and clip, and a check that the
 retired mechanic's names are still caught).
+
+### Later: Jump's arrow, and art for the air
+
+Jump no longer shows a fighter's jump: it is always the up arrow, and the
+`jump` entries and `jumpArt` are gone. The buttons now also show each
+fighter's mid-air moves while it is in the air, and #0002's Whirlwind
+shows its tornado (the `tornado` glyph is back, as its fallback). See [CPU
+facing, the Jump arrow, no touch Down, ground and air
+icons](#cpu-facing-the-jump-arrow-no-touch-down-ground-and-air-icons).
+
+## CPU facing, the Jump arrow, no touch Down, ground and air icons
+
+Not a named update (it can become one if the owner names it). Asked for
+(the `max` prompt) as: CPU-controlled fighters face their opponent
+throughout their attacks (only the bots: real players' facing is
+unchanged); the Jump button always shows an upward arrow; the mobile Down
+button is removed from both layouts with its code and styles; and the
+attack buttons show the move they make on the ground or in the air, with
+#0002's Extra Attack showing the tornado.
+
+**What it changed**
+
+- **CPU facing.** The combat AI sends `face` with its buttons
+  (`CombatAIController.track`): toward its opponent's current position,
+  read every step, unchanged within 2 units of level (no flicker on an
+  overlap), 0 with nobody in play. It is in `blankInput` (0) and never in
+  Player 1's sample. `Fighter.tryAction` starts an attack or technique
+  facing it on the press step, and `updateFacing` keeps an ordinary
+  attack, on the ground or in the air, turned to it in every phase,
+  whatever is held. A move committed to its direction (an attack with a
+  `motion`, a summon's startup) keeps `facing`, its path, boxes and
+  projectiles; only the sprite looks (`Fighter.lookFacing`, read by
+  `spriteFlip`), and the fighter turns that way once it is over. A
+  technique stays committed. A projectile keeps its release direction.
+  The AI no longer turns before a strike (one step of a held direction,
+  which walked and could tap toward a Dash): `actAttack` and the jump-in
+  press at once, intents carry no `face`, the turn penalty in `options`
+  and `this.turning` are gone, a roll's fit is judged the way it will set
+  off, and `guard` still keeps it from steering an attack away.
+- **Jump** is always `ICONS.jump`, for every fighter, on the ground and
+  in the air: no longer in `SPRITE_BUTTONS`, no `jump` preview in any
+  `mobileAbilities`, no `jumpArt`.
+- **No touch Down.** `DPAD` is Left and Right (a slightly wider gap,
+  inside the hit radius), `STICK_DOWN` / `stickDown` and its listeners
+  are gone, the stick sits at the Joystick cluster's left edge, `down` is
+  out of `TOUCH_CONTROL_IDS` (the editor cannot place it, and a saved
+  layout's `down` entry is dropped as it loads), the Settings previews and
+  scheme descriptions lose it, and so do `ICONS.down`, `--tc-down`,
+  `--tc-stick-left`, `.tc-stick-down` and `.sp-down`. The `down` input
+  itself, its keys, the gamepad's down and menu Down are unchanged.
+- **Ground and air icons.** `buttonMove` reads the move each button makes
+  on the ground and in the air from `actions`; `mobileAbilities` entries
+  may give `previews: { ground, air }` (each with an optional `label`,
+  translated as `ability.<id>.<button>.<state>`, and `icon`), and a
+  preview may name its `collection`. In the air a ground-only move keeps
+  its ground picture, faded (`.is-unavailable`), and still sends its
+  input. `TouchControls.setAirborne`, called by the Battle and Practice
+  screens after every frame (and on a restart, rematch or fighter change)
+  from Player 1's own fighter, redraws only buttons whose look changed.
+  #0001: the kunai slash (`midair_attack1_3`) and the airborne kick
+  (`midair_attack2_3`) in the air; Throw, Clone Attack and Sphere Rush
+  fade. #0002: Homing Attack (`midair_attack1_1`), Bounce Attack
+  (`midair_attack2_3`) and Blue Tornado (`midair_attack3_3`), named so in
+  English and French; the Whirlwind fades.
+- **#0002's Extra Attack** shows its tornado,
+  `projectileAnimations.extra_attack_object` frame 0, with the `tornado`
+  glyph (back in `js/ui/icons.js`) as its fallback, still named Whirlwind,
+  still ground-only.
+
+**Where to tune it**
+
+- The overlap deadzone: `FACE_DEADZONE` (2) in `js/game/combat-ai.js`.
+- Each button's pictures and air names: `mobileAbilities` per fighter in
+  `js/data/characters.js`; the French names in `js/core/i18n.js`.
+- The out-of-reach look: `.tc-btn.is-unavailable` in `styles.css`; the
+  Classic gap: `.tc-dpad`.
+
+**Code:** `updateFacing`, `tryAction`, `lookFacing` and `spriteFlip` in
+`js/game/character.js`; `blankInput` in `js/game/fighter-controller.js`;
+the player sample in `js/core/input-manager.js`; `track`, `emit`,
+`actAttack`, `actJump`, `meleeOptions`, `options` and `guard` in
+`js/game/combat-ai.js`; `buttonMove`, `previewFrame`, `mobileAbility`,
+`mobileAbilityLabelKey` and `PREVIEW_COLLECTIONS` in
+`js/ui/mobile-abilities.js`; `setCharacter`, `setAirborne`,
+`showAbilities` and the clusters in `js/game/touch-controls.js`;
+`TOUCH_CONTROL_IDS` in `js/core/touch-layout.js`; `syncTouch` in
+`js/screens/battle-screen.js` and `js/screens/practice-screen.js`;
+`js/ui/settings-dialog.js`; `js/ui/icons.js`; `styles.css`.
+
+**Tests:** `tests/facing.test.mjs` (the press turn, crossing in startup
+and active frames, the air, rolls, homing dashes and plunges, projectiles,
+the summon startup and the Sphere Rush, nothing for players);
+`tests/combat-ai.test.mjs` (every #0001 and #0002 CPU attack looking at
+its opponent through 20 s fights on every level, no turn step, crossing,
+the roll, overlap, nobody in play, determinism);
+`tests/controls-ui.test.mjs` and `tests/touch-layout.test.mjs` (no Down
+anywhere, old layouts, Jump's arrow, ground and air art and names,
+redraws only on change, the tornado and its fallback);
+`tests/battle-screen.test.mjs` and `tests/practice-ground.test.mjs` (the
+airborne sync); `tests/fighter-0002.test.mjs`, `tests/i18n.test.mjs`,
+`tests/codenames.test.mjs` and `tests/down.test.mjs`.
 
 ## Adding a named update
 

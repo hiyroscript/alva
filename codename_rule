@@ -116,6 +116,6 @@ Legacy terms such as ba, maba, cba and uniqueba are not live attack IDs. They ma
 
 Player-facing names such as “Punch,” “Kick” or other character-specific move names may appear in menus and descriptions. They do not replace canonical IDs in character definitions, animation keys, filenames, controls, AI, cooldowns or object references.
 
-Touch buttons show a frame of the character's own art for their move, chosen in its UI data by animation codename and frame (counted from 0), never by a file name of their own. The picture is presentation only: each button still sends its control codename.
+Touch buttons show a frame of the character's own art for the move they make where the character is, chosen in its UI data by animation codename and frame (counted from 0), never by a file name of their own: one picture, or one for the ground and one for the air when the button's move has a mid-air version. A picture may come from the art the move creates (its attackN_object or extra_attack_object clip). In the air, a button whose move is ground-only keeps its ground picture, shown out of reach. Jump is always the same up arrow, and neither touch layout has a Down button. The picture is presentation only: each button still sends its control codename.
 
 When adding or updating a character, keep its attack count, button routing, airborne variants, object ownership and animation assets consistent with these shared rules.
