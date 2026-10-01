@@ -27,6 +27,7 @@ Use lowercase codenames and underscores. Numbered frames start at 1 and play in 
 | Mid-air shield | <id>_midair_shielding_<frame>.png |
 | Movement / dash | <id>_mouvment_<frame>.png |
 | Mid-air movement | <id>_midair_mouvment_<frame>.png |
+| Mid-air dodge | <id>_dodge_<frame>.png |
 | Numbered attack | <id>_attackN_<frame>.png |
 | Mid-air numbered attack | <id>_midair_attackN_<frame>.png |
 | Extra attack | <id>_extra_attack_<frame>.png |
@@ -78,7 +79,9 @@ Controls, AI, UI labels, cooldowns and combat must agree on the same loadout and
 
 Characters with mid-air shield frames use midair_shielding for their airborne shield.
 
-Characters with no mid-air shield frames use their midair_mouvment animation frames to dodge in mid-air instead of performing a mid-air shield. This fallback is a dodge action, not a shield displayed with different art.
+Characters with no mid-air shield frames dodge in mid-air instead of performing a mid-air shield. Mid-air dodging uses the dodge animation sequence: <id>_dodge_1.png through <id>_dodge_<lastFrame>.png (000#_dodge_1 through 000#_dodge_# in shorthand). Use the character's own four-digit ID and play the frames in numeric order.
+
+A mid-air dodge gives a base horizontal launch of 1 in the direction the character is facing when the dodge begins: +1 when facing right and -1 when facing left.
 
 Each mid-air dodge costs 25 energy, but the character only needs energy greater than 0 to begin the dodge; they do not need the full 25 energy. Deduct the cost once when the dodge starts, clamping remaining energy to 0. A character with 0 energy cannot begin a dodge.
 
