@@ -791,7 +791,7 @@ test('entering Quick Battle shows Player 1\'s fighter\'s own art on the touch bu
     ['Kick', '0001_attack2_5.png', 'attack2'],
     ['Clone Attack', '0001_attack3_summon_3.png', 'attack3'],
     ['Sphere Rush', '0001_attack4_5.png', 'attack4'],
-    ['Jump', '0001_jump_2.png', 'jump'],
+    ['Jump', ICONS.jump, 'jump'],
   ]);
   assert.ok(touch.buttons.get('transform').classList.contains('is-pending'), 'Transform reserved, dashed');
   assert.equal(touch.enabled, false, 'no play without sprites');
@@ -977,4 +977,26 @@ test('the loading error keeps Retry for a failed load but offers only Back when 
   only.click();
   assert.equal(back, 1);
   assert.equal(overlay.root.hidden, true);
+});
+
+test('Battle updates touch context after the player simulation, never from the opponent, and resets on rematch', () => {
+  const { screen } = setup();
+  const battle = startBattle(screen);
+  battle.primary = battle.p1;
+  battle.p1.grounded = true;
+  battle.p2.grounded = false;
+  screen.touch.setCharacter(DEF_0001);
+  const image = screen.touch.buttons.get('attack1')._sprite;
+  const ground = image.getAttribute('src');
+  battle.frame = () => { battle.p1.grounded = false; battle.p2.grounded = true; };
+  screen.update(1 / 60);
+  assert.equal(image.getAttribute('src'), DEF_0001.animations.midair_attack1.frames[2]);
+  assert.equal(screen.touch.airborne, true);
+  battle.frame = () => { battle.p1.grounded = true; battle.p2.grounded = false; };
+  screen.update(1 / 60);
+  assert.equal(image.getAttribute('src'), ground);
+  screen.touch.setAirborne(true);
+  screen.rematch();
+  assert.equal(screen.touch.airborne, false);
+  assert.equal(screen.touch.buttons.get('attack1')._sprite, image);
 });

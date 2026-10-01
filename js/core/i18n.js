@@ -31,6 +31,7 @@ import {
 } from '../data/launch.js';
 import { DIFFICULTIES } from '../data/difficulty.js';
 import { MAPS } from '../data/maps.js';
+import { abilityName } from '../data/abilities.js';
 import { CHARACTERS } from '../data/characters.js';
 
 export { LANGUAGES, DEFAULT_LANGUAGE };
@@ -47,6 +48,9 @@ function registryStrings() {
   const out = {};
   for (const [action, label] of Object.entries(ACTION_LABELS)) out[`control.${action}`] = label;
   for (const def of CHARACTERS) {
+    for (const mapping of Object.values(def.actions ?? {})) {
+      if (mapping?.air) out[`ability.${def.id}.${mapping.air}`] = abilityName(def, mapping.air);
+    }
     for (const [action, own] of Object.entries(def.mobileAbilities ?? {})) {
       if (own?.label) out[`ability.${def.id}.${action}`] = own.label;
     }
@@ -290,8 +294,8 @@ const EN = {
   'settings.controlsNote': 'The touch layout for Quick Battle and Practice Ground. Keyboard and gamepad controls stay the same.',
   'settings.scheme.joystick': 'Joystick',
   'settings.scheme.classic': 'Classic Buttons',
-  'settings.scheme.joystickDesc': 'A round joystick to move, one-tap Left and Right mouvement buttons to Dash, and Down to the left of the joystick to fast-fall.',
-  'settings.scheme.classicDesc': 'The original Left, Down and Right buttons. Tap a direction twice to Dash; hold Down in the air to fast-fall.',
+  'settings.scheme.joystickDesc': 'A round joystick to move, with one-tap Left and Right mouvement buttons to Dash.',
+  'settings.scheme.classicDesc': 'Left and Right buttons. Tap a direction twice to Dash.',
   'settings.customize': 'Customize touch controls',
   'settings.customizeNote': 'Move and resize every control of the {scheme} layout.',
   'settings.customized': 'Custom layout',
@@ -334,10 +338,15 @@ const FR = {
   'ability.0001.attack2': 'Coup de pied',
   'ability.0001.attack3': 'Attaque du clone',
   'ability.0001.attack4': 'Ruée sphérique',
+  'ability.0001.midair_attack1': 'Attaque aérienne 1',
+  'ability.0001.midair_attack2': 'Attaque aérienne 2',
+  'ability.0002.midair_attack1': 'Attaque à tête chercheuse',
+  'ability.0002.midair_attack2': 'Attaque rebondissante',
+  'ability.0002.midair_attack3': 'Tornade bleue',
   'ability.0002.extra_attack': 'Tourbillon',
-  'ability.0002.attack1': 'Coup de poing',
-  'ability.0002.attack2': 'Coup de pied',
-  'ability.0002.attack3': 'Vrille',
+  'ability.0002.attack1': 'Un-deux',
+  'ability.0002.attack2': 'Coups de pied rapides',
+  'ability.0002.attack3': 'Attaque tournoyante',
 
   'power.jump.name': 'Puissance de saut',
   'power.jump.summary': 'Détermine la hauteur d’un saut normal. Plus le niveau est élevé, plus le saut est haut.',
@@ -597,8 +606,8 @@ const FR = {
   'settings.controlsNote': 'La disposition tactile du Combat rapide et du Terrain d’entraînement. Les commandes au clavier et à la manette ne changent pas.',
   'settings.scheme.joystick': 'Joystick',
   'settings.scheme.classic': 'Boutons classiques',
-  'settings.scheme.joystickDesc': 'Un joystick rond pour se déplacer, des boutons de mouvement gauche et droit pour sprinter d’une seule touche, et Bas à gauche du joystick pour tomber plus vite.',
-  'settings.scheme.classicDesc': 'Les boutons Gauche, Bas et Droite d’origine. Touchez deux fois une direction pour sprinter; maintenez Bas en l’air pour tomber plus vite.',
+  'settings.scheme.joystickDesc': 'Un joystick rond pour se déplacer, avec des boutons de mouvement gauche et droit pour sprinter d’une seule touche.',
+  'settings.scheme.classicDesc': 'Les boutons Gauche et Droite. Touchez deux fois une direction pour sprinter.',
   'settings.customize': 'Personnaliser les commandes tactiles',
   'settings.customizeNote': 'Déplacez et redimensionnez chaque commande de la disposition {scheme}.',
   'settings.customized': 'Disposition personnalisée',

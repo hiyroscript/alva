@@ -214,6 +214,15 @@ export class CombatAIController {
     this.reset();
   }
 
+  // Attack orientation is sampled by Fighter on each simulation step, not
+  // on the AI's slower decision clock. It is not a movement input or tap.
+  attackFacing(self) {
+    const foe = self.opponent;
+    if (self.inputLocked || self.lostToVoid || !foe || foe.lostToVoid ||
+        !Number.isFinite(foe.body?.x) || !Number.isFinite(self.body?.x)) return null;
+    return Math.sign(foe.body.x - self.body.x) || self.attackVisualFacing || self.facing;
+  }
+
   // Forget everything: the fighter was reset (a restart or rematch) or
   // respawned, so the fight starts over from neutral with nothing held.
   reset() {
@@ -232,7 +241,6 @@ export class CombatAIController {
     // When it last pressed an attack or landed a hit: the longer neutral
     // drags on, the more it wants to commit (see urge).
     this.lastOffence = 0;
-    this.turning = false;
     // A jump's button stays held until this clock time, then is let go in
     // time for the normal jump (see holdJump).
     this.jumpHoldUntil = -Infinity;
@@ -248,7 +256,6 @@ export class CombatAIController {
     this.clock += dt;
     this.tap.age += dt;
     this.gravity = ctx.gravity ?? 2500;
-    this.turning = false;
     const held = this.held;
     for (const k of BUTTONS) held[k] = false;
 
@@ -1057,8 +1064,8 @@ export class CombatAIController {
     }
   }
 
-  // Turn to face the target if needed (one step of the direction), then one
-  // press of the button. Done once the attack has run (or was refused).
+  // Fighter aims at the current opponent when accepting the press. No
+  // directional tap is needed just to turn (and no stale intent.face).
   actAttack(self, it, held) {
     if (it.pressed) {
       if (self.canAct() || this.clock - it.pressedAt > 2) it.done = true;
@@ -1066,11 +1073,6 @@ export class CombatAIController {
     }
     if (this.clock > it.until || !self.canAct()) {
       it.done = true;
-      return;
-    }
-    if (it.face && self.facing !== it.face) {
-      held[DIR_KEY[it.face]] = true;
-      this.turning = true;
       return;
     }
     held[it.action] = true;
@@ -1114,13 +1116,10 @@ export class CombatAIController {
       held[DIR_KEY[it.dir]] = true;
     }
     // An air attack once the opponent comes into its reach on the way:
-    // steer to face it first (in the air that turns at once), then press.
+    // press directly. Fighter aims without changing the navigation drift.
     if (it.air && !it.struck && self.canAct()) {
       const m = this.meleeOptions(this.sense(self, foe, ctx), true)[0];
-      if (m && m.face !== self.facing) {
-        held[DIR_KEY[-m.face]] = false;
-        held[DIR_KEY[m.face]] = true;
-      } else if (m) {
+      if (m) {
         held[m.action] = true;
         it.struck = true;
       }
@@ -1272,9 +1271,9 @@ export class CombatAIController {
     if (b.grounded && !this.intent?.jumped) {
       const decel = self.def.movement.deceleration;
       const stop = Math.sign(b.vx) === dir ? (b.vx * b.vx) / (2 * decel) : 0;
-      // A Dash's taps look a whole Dash ahead; a one-step turn barely moves.
+      // A Dash's taps look a whole Dash ahead; running leaves braking room.
       const margin = dashing ? (readMoveset(self).dash?.distance ?? 0) + LEDGE_MARGIN
-        : this.turning ? 2 : LEDGE_MARGIN + stop;
+        : LEDGE_MARGIN + stop;
       if (!this.groundAhead(self, ctx.stage, dir, margin)) {
         held[key] = false;
         if (this.intent && this.intent.kind !== 'attack') this.intent.done = true;

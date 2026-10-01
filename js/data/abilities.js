@@ -2,8 +2,8 @@
 // themselves go by the universal move codenames (MOVES in js/config.js),
 // the same for every character; a character names them in its own
 // `abilityNames` (js/data/characters.js), and a move it leaves out keeps
-// the neutral name. Names only: nothing here reaches combat, and no screen
-// shows them yet.
+// the neutral name. The touch resolver uses them for airborne move labels;
+// nothing here reaches combat.
 
 import { MOVES } from '../config.js';
 

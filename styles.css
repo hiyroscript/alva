@@ -1432,14 +1432,12 @@ html:not(.is-pointer-input) .settings-option:focus { box-shadow: var(--focus-rin
 .settings-preview .icon { font-size: calc(var(--sp) * 0.5); stroke-width: 2.8; }
 .settings-preview--classic { gap: calc(var(--sp) * 0.18); }
 .sp-pad { width: var(--sp); height: var(--sp); }
-.settings-preview--joystick { width: calc(var(--sp) * 2.65); }
-.sp-stick { position: absolute; left: calc(var(--sp) * 0.8); bottom: 0; width: calc(var(--sp) * 1.5); height: calc(var(--sp) * 1.5); }
+.settings-preview--joystick { width: calc(var(--sp) * 1.9); }
+.sp-stick { position: absolute; left: calc(var(--sp) * 0.2); bottom: 0; width: calc(var(--sp) * 1.5); height: calc(var(--sp) * 1.5); }
 .settings-preview .sp-knob { width: calc(var(--sp) * 0.66); height: calc(var(--sp) * 0.66); border-color: var(--text-secondary); }
 .sp-dash { position: absolute; top: 0; width: calc(var(--sp) * 0.5); height: calc(var(--sp) * 0.5); }
-.sp-dash--left { left: calc(var(--sp) * 0.63); }
-.sp-dash--right { right: calc(var(--sp) * 0.18); }
-.sp-down { position: absolute; left: 0; bottom: calc(var(--sp) * 0.45); width: calc(var(--sp) * 0.6); height: calc(var(--sp) * 0.6); }
-.settings-preview .sp-down .icon { font-size: calc(var(--sp) * 0.36); }
+.sp-dash--left { left: 0; }
+.sp-dash--right { right: 0; }
 .settings-option.is-current .settings-preview i { border-color: rgba(47, 191, 99, 0.6); }
 
 /* Customize touch controls, with the scheme it edits beside it. */
@@ -1808,14 +1806,10 @@ html:not(.is-pointer-input) .touch-editor .is-editor-selected:focus { outline-co
   --tc-gap: calc(var(--tc) * 0.17);
   --tc-pitch: calc(var(--tc) + var(--tc-gap));
   --tc-bottom: calc(max(var(--safe-b), 10px) + 1.6vh);
-  /* Joystick scheme: the stick's base, its knob, its two Dash buttons and
-     the down-arrow Down button to its left; the stick starts one gap past
-     it. */
+  /* Joystick scheme: the stick's base, its knob and two Dash buttons. */
   --tc-stick: calc(var(--tc) * 1.92);
   --tc-knob: calc(var(--tc) * 0.84);
   --tc-dash: calc(var(--tc) * 0.62);
-  --tc-down: calc(var(--tc) * 0.8);
-  --tc-stick-left: calc(var(--tc-down) + var(--tc-gap));
   display: none;
   position: absolute;
   inset: 0;
@@ -1869,7 +1863,7 @@ html.is-touch .touch-controls[hidden] { display: none; }
    buttons. */
 .tc-ability .icon { font-size: 1.14em; }
 /* A frame of the fighter's own art on its button (TouchControls.showArt):
-   the extra attack, the numbered attacks and Jump. Its own colours and
+   the extra attack and the numbered attacks. Its own colours and
    transparency, never tinted; centred and fitted whole, aspect kept, inside
    the square inscribed in the round button (70% of it), so no sprite is
    clipped by the circle or stretched, whatever its shape. Crisp pixels, as
@@ -1907,6 +1901,7 @@ html.is-touch .touch-controls[hidden] { display: none; }
 }
 .tc-btn.is-pressed .icon, .tc-btn.is-pressed .tc-sprite-icon { opacity: 1; }
 .tc-act { position: absolute; }
+.tc-btn.is-unavailable { opacity: 0.4; border-style: dashed; }
 .tc-jump { right: 0; bottom: 0; }
 .tc-shield { right: calc(var(--tc-pitch) * 0.5); bottom: calc(var(--tc-pitch) * 0.87); }
 .tc-transform { right: calc(var(--tc-pitch) * 1.5); bottom: calc(var(--tc-pitch) * 0.87); }
@@ -1933,22 +1928,22 @@ html.is-touch .touch-controls[hidden] { display: none; }
   border-color: rgba(255, 255, 255, 0.6);
   background: rgba(255, 255, 255, 0.1);
 }
+.tc-btn.is-unavailable { opacity: 0.4; border-style: dashed; }
 .tc-jump { background: rgba(255, 255, 255, 0.1); border-color: rgba(255, 255, 255, 0.5); }
 
 /* Joystick scheme (the Mobile Controls setting's default). The lower-left
    cluster is one round stick in the same translucent style as the buttons
    (a plain base and knob, no arrows in it), with a small Dash button just
    above each of its top corners (their centres sit 120deg and 60deg round
-   from the stick's, clear of its rim) and the down-arrow Down button to
-   its left, level with its centre. */
+   from the stick's, clear of its rim). */
 .tc-joystick {
   left: calc(max(var(--safe-l), 12px) + 1.4vw);
-  width: calc(var(--tc-stick-left) + var(--tc-stick));
+  width: var(--tc-stick);
   height: calc(var(--tc) * 2.44);
 }
 .tc-stick {
   position: absolute;
-  left: var(--tc-stick-left);
+  left: 0;
   bottom: 0;
   width: var(--tc-stick);
   height: var(--tc-stick);
@@ -1989,15 +1984,9 @@ html.is-touch .touch-controls[hidden] { display: none; }
   height: var(--tc-dash);
   font-size: calc(var(--tc-dash) * 0.46);
 }
-.tc-dash-left { left: calc(var(--tc-stick-left) - var(--tc) * 0.03); }
+.tc-dash-left { left: calc(var(--tc) * -0.03); }
 .tc-dash-right { right: calc(var(--tc) * -0.03); }
-.tc-stick-down {
-  position: absolute;
-  left: 0;
-  bottom: calc((var(--tc-stick) - var(--tc-down)) / 2);
-  width: var(--tc-down);
-  height: var(--tc-down);
-}
+
 
 /* Banner ---------------------------------------------------------------- */
 

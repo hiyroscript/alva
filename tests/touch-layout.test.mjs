@@ -175,7 +175,6 @@ function touchControls(scheme = 'joystick', def = DEF_0001) {
 // right. Returns the boxes it gave.
 function layOut(tc, scheme = tc.scheme) {
   const boxes = {
-    down: scheme === 'joystick' ? [20, 400, 50, 50] : [110, 420, 60, 60],
     mouvementLeft: [90, 330, 40, 40],
     stick: [80, 360, 120, 120],
     mouvementRight: [170, 330, 40, 40],
@@ -206,11 +205,11 @@ const centre = (node) => ({ clientX: node.rect.left + node.rect.width / 2, clien
 
 test('every control of both schemes has a stable id, independent of its label', () => {
   assert.deepEqual([...TOUCH_CONTROL_IDS.joystick], [
-    'down', 'mouvementLeft', 'stick', 'mouvementRight', 'extra_attack', 'transform', 'shield',
+    'mouvementLeft', 'stick', 'mouvementRight', 'extra_attack', 'transform', 'shield',
     'attack1', 'attack2', 'attack3', 'attack4', 'attack5', 'jump',
   ]);
   assert.deepEqual([...TOUCH_CONTROL_IDS.classic], [
-    'runLeft', 'down', 'runRight', 'extra_attack', 'transform', 'shield',
+    'runLeft', 'runRight', 'extra_attack', 'transform', 'shield',
     'attack1', 'attack2', 'attack3', 'attack4', 'attack5', 'jump',
   ]);
   assert.deepEqual(Object.keys(TOUCH_CONTROL_IDS), [...MOBILE_CONTROLS], 'one list per Mobile Controls scheme');
@@ -219,11 +218,11 @@ test('every control of both schemes has a stable id, independent of its label', 
   // Each id is exactly the element on screen for it.
   const joystick = tc.getControlElements('joystick');
   assert.equal(joystick.get('stick'), tc.stick, 'the joystick itself, though it is no button');
-  assert.equal(joystick.get('down'), tc.stickDown);
+  assert.equal(tc.controlElement('down'), null);
   assert.equal(joystick.get('mouvementLeft'), tc.mouvementButtons.get('mouvementLeft'));
   assert.equal(joystick.get('mouvementRight'), tc.mouvementButtons.get('mouvementRight'));
   const classic = tc.getControlElements('classic');
-  for (const id of ['runLeft', 'down', 'runRight']) assert.equal(classic.get(id), tc.padButtons.get(id), id);
+  for (const id of ['runLeft', 'runRight']) assert.equal(classic.get(id), tc.padButtons.get(id), id);
   for (const id of ['extra_attack', 'transform', 'shield', 'attack1', 'attack2', 'attack3', 'attack4', 'attack5', 'jump']) {
     assert.equal(joystick.get(id), tc.actionButtons.get(id), `${id}: joystick`);
     assert.equal(classic.get(id), tc.actionButtons.get(id), `${id}: classic, the same element`);
@@ -239,7 +238,6 @@ test('every control of both schemes has a stable id, independent of its label', 
   setLanguage('fr');
   try {
     localizeTree(tc.root);
-    assert.equal(tc.stickDown.getAttribute('aria-label'), 'Bas');
     assert.equal(tc.mouvementButtons.get('mouvementLeft').getAttribute('aria-label'), 'Mouvement à gauche');
     assert.equal(tc.actionButtons.get('attack1').getAttribute('aria-label'), 'Coup de poing');
     assert.equal(tc.getControlElements().get('mouvementLeft'), tc.mouvementButtons.get('mouvementLeft'));
@@ -343,7 +341,7 @@ test('a custom layout moves and sizes each control by id, kept on screen, and a 
   assert.equal(dashLeft.style.translate, '-10.0px -250.0px');
   assert.equal(dashLeft.style.scale ?? '', '');
   // Everything else is left alone.
-  for (const id of ['down', 'mouvementRight', 'extra_attack', 'transform', 'shield', 'attack1', 'attack2']) {
+  for (const id of ['mouvementRight', 'extra_attack', 'transform', 'shield', 'attack1', 'attack2']) {
     assert.equal(tc.controlElement(id).style.translate, '', id);
   }
   // A new window size or orientation: the same fractions on the new screen.
@@ -422,7 +420,7 @@ test('a custom layout never changes what a button sends: every held action, both
     const { tc, calls } = touchControls(scheme);
     layOut(tc);
     scatter(tc);
-    const held = ['extra_attack', 'transform', 'shield', 'attack1', 'attack2', 'jump', ...(scheme === 'joystick' ? ['down'] : [])];
+    const held = ['extra_attack', 'transform', 'shield', 'attack1', 'attack2', 'jump'];
     held.forEach((action, i) => {
       const b = tc.buttons.get(action);
       assert.equal(b.getAttribute('data-action'), action, `${scheme}: ${action} keeps its codename`);
@@ -482,13 +480,13 @@ test('the Dash buttons still ask for exactly one Dash per tap wherever they are'
   assert.equal(tc.pointers.size, 0, 'no held direction');
 });
 
-test('Classic Left / C / Right still slide into one another wherever they are placed', () => {
+test('Classic Left / Right still slide into one another wherever they are placed', () => {
   const { tc, calls } = touchControls('classic');
   layOut(tc);
   // Rearranged and spread out: Right at the far left, C in the middle of
   // the screen, Left over on the right (their drawn boxes).
-  tc.setLayout({ runRight: { x: 0.05, y: 0.8, scale: 1 }, down: { x: 0.4, y: 0.8, scale: 1.3 }, runLeft: { x: 0.7, y: 0.8, scale: 1 } });
-  for (const id of ['runLeft', 'down', 'runRight']) {
+  tc.setLayout({ runRight: { x: 0.05, y: 0.8, scale: 1.3 }, runLeft: { x: 0.7, y: 0.8, scale: 1 } });
+  for (const id of ['runLeft', 'runRight']) {
     const { center, size, scale } = tc.placements.get(id);
     const w = size.width * scale;
     tc.padButtons.get(id).rect = { left: center.x - w / 2, top: center.y - w / 2, width: w, height: w };
@@ -501,11 +499,9 @@ test('Classic Left / C / Right still slide into one another wherever they are pl
   // Across empty screen: the hold stays until the thumb reaches another.
   tc.dpad.dispatch('pointermove', { pointerId: 1, clientX: 560, clientY: at('runLeft').clientY });
   assert.deepEqual(calls, [['runLeft', true]], 'no button there: Left stays held');
-  tc.dpad.dispatch('pointermove', { pointerId: 1, ...at('down') });
-  assert.deepEqual(calls, [['runLeft', true], ['runLeft', false], ['down', true]]);
-  assert.ok(tc.buttons.get('down').classList.contains('is-pressed'));
   tc.dpad.dispatch('pointermove', { pointerId: 1, ...at('runRight') });
-  assert.deepEqual(calls.slice(3), [['down', false], ['runRight', true]]);
+  assert.deepEqual(calls, [['runLeft', true], ['runLeft', false], ['runRight', true]]);
+  assert.ok(tc.buttons.get('runRight').classList.contains('is-pressed'));
   tc.dpad.dispatch('pointerup', { pointerId: 1 });
   assert.deepEqual(calls.at(-1), ['runRight', false]);
   assert.equal(tc.pointers.size, 0);
@@ -518,12 +514,12 @@ test('Classic Left / C / Right still slide into one another wherever they are pl
   assert.deepEqual(calls, [['runRight', true], ['runRight', false], ['runRight', true], ['runRight', false]]);
   // A bigger C is hit wherever its bigger box reaches.
   calls.length = 0;
-  const c = tc.padButtons.get('down').rect;
+  const c = tc.padButtons.get('runRight').rect;
   tc.dpad.dispatch('pointerdown', { pointerId: 4, clientX: c.left + c.width * 0.95, clientY: c.top + c.height / 2 });
-  assert.deepEqual(calls, [['down', true]]);
+  assert.deepEqual(calls, [['runRight', true]]);
 });
 
-test('multi-touch still works with a custom layout: joystick, Down, Punch and Jump at once', () => {
+test('multi-touch still works with a custom layout: joystick, Shield, Punch and Jump at once', () => {
   const { tc, calls } = touchControls('joystick');
   layOut(tc);
   scatter(tc);
@@ -531,16 +527,16 @@ test('multi-touch still works with a custom layout: joystick, Down, Punch and Ju
   const w = place.size.width * place.scale;
   tc.stick.rect = { left: place.center.x - w / 2, top: place.center.y - w / 2, width: w, height: w };
   tc.stick.dispatch('pointerdown', { pointerId: 1, clientX: place.center.x - w * 0.4, clientY: place.center.y });
-  press(tc.buttons.get('down'), 2);
+  press(tc.buttons.get('shield'), 2);
   press(tc.buttons.get('attack1'), 3);
   press(tc.buttons.get('jump'), 4);
   lift(tc.buttons.get('jump'), 4);
   tc.stick.dispatch('pointerup', { pointerId: 1 });
   lift(tc.buttons.get('attack1'), 3);
-  lift(tc.buttons.get('down'), 2);
+  lift(tc.buttons.get('shield'), 2);
   assert.deepEqual(calls, [
-    ['runLeft', true], ['down', true], ['attack1', true], ['jump', true],
-    ['jump', false], ['runLeft', false], ['attack1', false], ['down', false],
+    ['runLeft', true], ['shield', true], ['attack1', true], ['jump', true],
+    ['jump', false], ['runLeft', false], ['attack1', false], ['shield', false],
   ]);
 });
 
@@ -561,7 +557,7 @@ test('setCharacter still swaps the fighter\'s art and names in place, and never 
   tc.setCharacter(DEF_0001);
   assert.equal(attack1.getAttribute('aria-label'), 'Punch');
   assert.equal(look(attack1), '0001_attack1_2.png', 'a frame of #0001\'s own punch');
-  assert.equal(look(tc.buttons.get('jump')), '0001_jump_2.png');
+  assert.equal(look(tc.buttons.get('jump')), ICONS.jump);
   assert.deepEqual(placed(), before, 'still where the player put them, at their sizes');
   press(attack1, 1);
   assert.deepEqual(calls, [['attack1', true]], 'still attack1');
@@ -582,7 +578,7 @@ test('setCharacter still swaps the fighter\'s art and names in place, and never 
   // custom places and sizes kept.
   tc.releaseAll();
   tc.setCharacter(getCharacter('0002'));
-  assert.deepEqual(['attack1', 'attack3', 'jump'].map((id) => look(tc.buttons.get(id))), ['0002_attack1_4.png', '0002_attack3_5.png', '0002_jump_1.png']);
+  assert.deepEqual(['attack1', 'attack3', 'jump'].map((id) => look(tc.buttons.get(id))), ['0002_attack1_4.png', '0002_attack3_5.png', ICONS.jump]);
   assert.equal(tc.buttons.get('attack4').hidden, true);
   assert.deepEqual(placed(), before, 'a fighter change never moves or resizes a custom layout');
   assert.deepEqual(tc.getLayout(), {
@@ -784,32 +780,32 @@ test('keyboard and gamepad: Enter / A moves a control with the arrows in small s
 test('size: Smaller / Larger and the slider resize the selected control within the limits, its centre kept, saved each step', () => {
   const { editor, storage } = editorApp();
   editor.open({ scheme: 'classic' });
-  const down = editor.touch.padButtons.get('down');
-  down.dispatch('pointerdown', { pointerId: 1, button: 0, ...centre(down) });
-  down.dispatch('pointerup', { pointerId: 1 });
-  const home = { ...editor.touch.placements.get('down').center };
+  const runRight = editor.touch.padButtons.get('runRight');
+  runRight.dispatch('pointerdown', { pointerId: 1, button: 0, ...centre(runRight) });
+  runRight.dispatch('pointerup', { pointerId: 1 });
+  const home = { ...editor.touch.placements.get('runRight').center };
   editor.larger.click();
-  assert.equal(down.style.scale, '1.1');
-  assert.deepEqual(saved(storage).touchLayouts.classic.down.scale, 1.1);
+  assert.equal(runRight.style.scale, '1.1');
+  assert.deepEqual(saved(storage).touchLayouts.classic.runRight.scale, 1.1);
   assert.equal(editor.sizeValue.textContent, '110%');
   assert.equal(editor.slider.getAttribute('aria-valuetext'), '110%');
   assert.equal(editor.slider.value, '110');
-  assert.deepEqual(editor.touch.placements.get('down').center, home, 'grows round its centre');
+  assert.deepEqual(editor.touch.placements.get('runRight').center, home, 'grows round its centre');
   editor.slider.value = '150';
   editor.slider.dispatch('input');
-  assert.equal(saved(storage).touchLayouts.classic.down.scale, 1.5);
+  assert.equal(saved(storage).touchLayouts.classic.runRight.scale, 1.5);
   editor.slider.value = '900';
   editor.slider.dispatch('input');
-  assert.equal(saved(storage).touchLayouts.classic.down.scale, 1.8, 'never past the largest size');
+  assert.equal(saved(storage).touchLayouts.classic.runRight.scale, 1.8, 'never past the largest size');
   for (let i = 0; i < 20; i++) editor.smaller.click();
-  assert.equal(saved(storage).touchLayouts.classic.down.scale, 0.7, 'never below the smallest size');
+  assert.equal(saved(storage).touchLayouts.classic.runRight.scale, 0.7, 'never below the smallest size');
   assert.equal(editor.smaller.disabled, false, 'at the limit it just holds (focus never falls off it)');
   // ← / → on the focused slider resize it too.
   editor.slider.focus();
   editor.app.nav.command('right', null);
-  assert.equal(saved(storage).touchLayouts.classic.down.scale, 0.8);
+  assert.equal(saved(storage).touchLayouts.classic.runRight.scale, 0.8);
   editor.app.nav.command('left', null);
-  assert.equal(saved(storage).touchLayouts.classic.down.scale, 0.7);
+  assert.equal(saved(storage).touchLayouts.classic.runRight.scale, 0.7);
   // The slider's range is the scale's.
   assert.deepEqual([editor.slider.getAttribute('min'), editor.slider.getAttribute('max'), editor.slider.getAttribute('step')], ['70', '180', '10']);
   assert.equal(editor.slider.getAttribute('aria-labelledby'), 'touch-editor-size-label touch-editor-name');
@@ -870,4 +866,21 @@ test('editor and dialog styles: the real controls always shown here, a selection
   assert.match(rule('.touch-controls'), /z-index: 3;/);
   // Reduced motion: the global rule still ends every animation and transition.
   assert.match(css, /@media \(prefers-reduced-motion: reduce\) \{\n  \*, \*::before, \*::after \{\n    animation-duration: 0\.001ms !important;/);
+});
+
+test('legacy layouts discard Down alone and keep all other positions and scales, including in the editor', () => {
+  for (const scheme of MOBILE_CONTROLS) {
+    const kept = Object.fromEntries(TOUCH_CONTROL_IDS[scheme].map((id, i) => [id, { x: Math.round((0.1 + i * 0.02) * 100) / 100, y: 0.6, scale: 1.2 }]));
+    const legacy = { ...kept, down: { x: 0.3, y: 0.4, scale: 1.7 } };
+    assert.deepEqual(sanitizeTouchLayout(scheme, legacy), kept);
+    const { tc } = touchControls(scheme);
+    tc.setLayout(legacy);
+    assert.deepEqual(tc.getLayout(), kept);
+    assert.equal(tc.getControlElements().has('down'), false);
+    assert.equal(tc.controlElement('down'), null);
+    const { editor } = editorApp();
+    editor.open({ scheme });
+    assert.equal(editor.touch.getControlElements().has('down'), false);
+    editor.close();
+  }
 });

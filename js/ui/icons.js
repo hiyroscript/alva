@@ -7,7 +7,6 @@ export const ICONS = {
   left: svg('<path d="M15 4.5 7.5 12 15 19.5"/>'),
   right: svg('<path d="M9 4.5 16.5 12 9 19.5"/>'),
   arrow: svg('<path d="M4.5 12h15"/><path d="M13.5 6l6 6-6 6"/>'),
-  down: svg('<path d="M4.5 9 12 16.5 19.5 9"/>'),
   up: svg('<path d="M4.5 15 12 7.5 19.5 15"/>'),
   jump: svg('<path d="M12 17.5V5.5"/><path d="M6.5 11 12 5.5l5.5 5.5"/><path d="M5 20.5h14"/>'),
   transform: svg('<path d="M12 2.5l2.3 7.2 7.2 2.3-7.2 2.3-2.3 7.2-2.3-7.2-7.2-2.3 7.2-2.3z"/>', { fill: true }),
@@ -20,6 +19,7 @@ export const ICONS = {
   // fighter that lacks it, a frame that fails to load): a ring for the large
   // extra_attack button, and one to five pips for the numbered attack
   // buttons, attack1 to attack5.
+  tornado: svg('<path d="M3 5c4-2 14-2 18 0M4 8c4 2 12 2 16 0M6 12c3 2 9 2 12 0M8 16c2 1 6 1 8 0M11 20h2"/>'),
   ring: svg('<circle cx="12" cy="12" r="6.5"/>'),
   pip1: svg('<circle cx="12" cy="12" r="3.6"/>', { fill: true }),
   pip2: svg('<circle cx="7.4" cy="12" r="3.3"/><circle cx="16.6" cy="12" r="3.3"/>', { fill: true }),

@@ -612,36 +612,23 @@ export const CHARACTERS = [
       attack4: { type: 'technique', id: 'attack4' }, // the Sphere Rush
     },
 
-    // How the touch controls present this fighter's own buttons: an
-    // accessible name (`label`) for each, and the frame of its own art the
-    // button shows (`preview`: `frame` of the clip `animation` above,
-    // counted from 0 like visual.portrait's, so frame 1 is a clip's second
-    // frame). UI only (see js/ui/mobile-abilities.js): the buttons still send
-    // extra_attack, jump and attack1 to attack4, and nothing here reaches
-    // combat. Each names the button's ability family, not every move it
-    // makes: Punch is also midair_attack1 (the mid-air kunai slash). Each
-    // frame is the one that reads best as the move: the shuriken leaving
-    // the hand (extra_attack_2), the punch landing (attack1_2), the high
-    // kick (attack2_5), the hand seal that summons the clone
-    // (attack3_summon_3), the rush (attack4_5, attack4_dash's second) and
-    // the rising jump (jump_2). Jump keeps its own name, so it has no label
-    // here. With no `transform` entry (no Transform yet) its Transform
-    // button stays reserved (the dashed star); the Shield and movement
-    // buttons are universal glyphs.
+    // UI only: preview is the ground (or shared) artwork; previews.air
+    // supplies the distinct airborne move from actions. Frame indices start
+    // at zero. The resolver also accepts previews.ground. Jump, Shield and
+    // movement always use universal glyphs; Transform stays reserved.
     mobileAbilities: {
       extra_attack: { label: 'Shuriken', preview: { animation: 'extra_attack', frame: 1 } },
-      attack1: { label: 'Punch', preview: { animation: 'attack1', frame: 1 } },
-      attack2: { label: 'Kick', preview: { animation: 'attack2', frame: 4 } },
+      attack1: { label: 'Punch', preview: { animation: 'attack1', frame: 1 }, previews: { air: { animation: 'midair_attack1', frame: 2 } } },
+      attack2: { label: 'Kick', preview: { animation: 'attack2', frame: 4 }, previews: { air: { animation: 'midair_attack2', frame: 1 } } },
       attack3: { label: 'Clone Attack', preview: { animation: 'attack3_summon', frame: 2 } },
       attack4: { label: 'Sphere Rush', preview: { animation: 'attack4_dash', frame: 1 } },
-      jump: { preview: { animation: 'jump', frame: 1 } },
     },
 
     // #0001's in-game ability names, keyed by the universal move codenames
     // (MOVES in js/config.js). Read through abilityName (js/data/abilities.js),
     // which gives a move left out here its neutral name: midair_attack1 and
-    // midair_attack2 are still unnamed. Names only: no screen shows them
-    // yet, and nothing here reaches combat.
+    // midair_attack2 are still unnamed. Touch labels use these names for
+    // the selected airborne move; nothing here reaches combat.
     abilityNames: {
       extra_attack: 'Shuriken',
       attack1: 'Punch',
@@ -1212,19 +1199,14 @@ export const CHARACTERS = [
       attack3: { ground: 'attack3', air: 'midair_attack3' }, // the Spin Attack / the Blue Tornado
     },
 
-    // Its touch buttons (UI only, see js/ui/mobile-abilities.js and #0001's),
-    // each named for its ground move's family and showing a frame of that
-    // move (counted from 0): the Whirlwind as it sends the tornado off
-    // (extra_attack_6), the One-Two's straight (attack1_4), the Rapid Kicks'
-    // flurry (attack2_2), the Spin Attack's tight ball (attack3_5) and the
-    // jump as it curls up (jump_1, face still showing, so Jump never looks
-    // like the Spin).
+    // UI only: grounded poses and the matching airborne ball/tornado
+    // frames. Whirlwind shows its projectile's full tornado silhouette,
+    // with a tornado glyph if that image cannot load.
     mobileAbilities: {
-      extra_attack: { label: 'Whirlwind', preview: { animation: 'extra_attack', frame: 5 } },
-      attack1: { label: 'Punch', preview: { animation: 'attack1', frame: 3 } },
-      attack2: { label: 'Kick', preview: { animation: 'attack2', frame: 1 } },
-      attack3: { label: 'Spin', preview: { animation: 'attack3', frame: 4 } },
-      jump: { preview: { animation: 'jump', frame: 0 } },
+      extra_attack: { label: 'Whirlwind', fallbackIcon: 'tornado', preview: { collection: 'projectileAnimations', animation: 'extra_attack_object', frame: 2 } },
+      attack1: { label: 'One-Two', preview: { animation: 'attack1', frame: 3 }, previews: { air: { animation: 'midair_attack1', frame: 0 } } },
+      attack2: { label: 'Rapid Kicks', preview: { animation: 'attack2', frame: 1 }, previews: { air: { animation: 'midair_attack2', frame: 4 } } },
+      attack3: { label: 'Spin Attack', preview: { animation: 'attack3', frame: 4 }, previews: { air: { animation: 'midair_attack3', frame: 2 } } },
     },
 
     // In-game ability names (js/data/abilities.js).

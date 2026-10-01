@@ -217,28 +217,28 @@ test('its in-game names and touch buttons name each move, in English and French'
       setLanguage('en');
     }
   };
-  assert.deepEqual(buttons('en'), ['Whirlwind', 'Punch', 'Kick', 'Spin']);
-  assert.deepEqual(buttons('fr'), ['Tourbillon', 'Coup de poing', 'Coup de pied', 'Vrille']);
+  assert.deepEqual(buttons('en'), ['Whirlwind', 'One-Two', 'Rapid Kicks', 'Spin Attack']);
+  assert.deepEqual(buttons('fr'), ['Tourbillon', 'Un-deux', 'Coups de pied rapides', 'Attaque tournoyante']);
   // Each shows a frame of its own move's art, in its own colours: the
   // Whirlwind sending its tornado off, the One-Two's straight, the Rapid
   // Kicks, the Spin Attack's ball; and Jump its own jump, curling up.
   const art = (a) => previewFrame(DEF, a)?.url.split('/').pop() ?? null;
   assert.deepEqual(['extra_attack', 'attack1', 'attack2', 'attack3', 'jump'].map(art), [
-    '0002_extra_attack_6.png', '0002_attack1_4.png', '0002_attack2_2.png', '0002_attack3_5.png', '0002_jump_1.png',
+    '0002_extra_attack_object_3.png', '0002_attack1_4.png', '0002_attack2_2.png', '0002_attack3_5.png', null,
   ]);
   for (const a of ['extra_attack', 'attack1', 'attack2', 'attack3']) {
     const ability = mobileAbility(DEF, a);
-    assert.equal(ability.sprite.url, DEF.animations[DEF.mobileAbilities[a].preview.animation].frames[DEF.mobileAbilities[a].preview.frame]);
+    assert.equal(ability.sprite.url, DEF[DEF.mobileAbilities[a].preview.collection ?? 'animations'][DEF.mobileAbilities[a].preview.animation].frames[DEF.mobileAbilities[a].preview.frame]);
     assert.ok(existsSync(`${ROOT}${ability.sprite.url.slice(2)}`), a);
     assert.equal(ability.sprite.mirrored, false, 'drawn facing right, as the buttons read');
   }
-  assert.equal(DEF.mobileAbilities.extra_attack.preview.frame, Math.round(DEF.attacks.extra_attack.projectile.spawnAt * DEF.animations.extra_attack.fps), 'the frame its tornado leaves on');
+  assert.equal(previewFrame(DEF, 'extra_attack').url, DEF.projectileAnimations.extra_attack_object.frames[2], 'the existing tornado projectile');
   assert.notEqual(art('jump'), art('attack3'), 'Jump never looks like the Spin');
   assert.equal(mobileAbility(DEF, 'attack4'), null, 'no fourth button');
   assert.equal(mobileAbility(DEF, 'transform').pending, true, 'Transform reserved');
   assert.equal(mobileAbility(DEF, 'transform').icon, ICONS.transform, 'Transform keeps its star');
   assert.equal(mobileAbility(DEF, 'transform').sprite, null);
-  assert.equal(STRINGS.fr['ability.0002.attack3'], 'Vrille');
+  assert.equal(STRINGS.fr['ability.0002.attack3'], 'Attaque tournoyante');
 });
 
 // ---- Art --------------------------------------------------------------------------
