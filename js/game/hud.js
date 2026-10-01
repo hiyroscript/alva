@@ -17,9 +17,10 @@
 // P1 and CPU in Quick Battle, CPU 1 and CPU 2 in Watch Mode. Under it, in a
 // Battle only, one dot per point the match is played to
 // (CONFIG.battle.pointsToWin), filled for each point the fighter has scored.
-// The right-hand card mirrors the left-hand one. Energy and the Charge
-// replacement cooldowns are drawn over the fighter itself (js/game/fighter-status.js);
-// the card only describes Energy to screen readers.
+// The right-hand card mirrors the left-hand one. Energy and the summon and
+// technique cooldowns are drawn over the fighter itself
+// (js/game/fighter-status.js); the card only describes Energy to screen
+// readers.
 //
 // Every label and spoken description is translated (js/core/i18n.js): the
 // slot tags too (P1 reads J1 in French), while the tag the fighter carries

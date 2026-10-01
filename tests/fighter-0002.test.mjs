@@ -1,8 +1,8 @@
 // Run with node --test tests/fighter-0002.test.mjs (no dependencies).
 // #0002, the speedster: registered from CHARACTERS alone in roster slot 02,
 // its clips cut from one sprite sheet into its own folder and read from the
-// real PNGs (tight, 1x, one art-pixel scale, anchored on the body), no
-// Charge at all, and every move a mechanic of its own: the One-Two's two
+// real PNGs (tight, 1x, one art-pixel scale, anchored on the body), three
+// ordinary numbered buttons, and every move a mechanic of its own: the One-Two's two
 // strikes, the lock-on Homing Attack, the Rapid Kicks' held flurry, the
 // Bounce Attack's plunge and rebound, the Spin Attack's roll, the Blue
 // Tornado's carrying lift and free fall, and the Whirlwind's travelling,
@@ -21,7 +21,7 @@ import {
 import { CONFIG, NUMBERED_ATTACKS } from '../js/config.js';
 import { CHARACTERS, characterFramePaths, getCharacter, playableCharacters } from '../js/data/characters.js';
 import { abilityName } from '../js/data/abilities.js';
-import { describeLoadout, loadoutProblems } from '../js/data/loadout.js';
+import { describeLoadout, loadoutProblems, specialAttacks } from '../js/data/loadout.js';
 import { attackReach, createAttackDefinition, strikeLive } from '../js/game/combat.js';
 import { createProjectileDefinition } from '../js/game/projectile.js';
 import { CombatAIController, readMoveset } from '../js/game/combat-ai.js';
@@ -168,11 +168,10 @@ test('#0002 is a real CHARACTERS entry: available, in roster slot 02, after #000
   assert.equal(new Set(CHARACTERS.map((c) => c.rosterSlot)).size, CHARACTERS.length, 'one fighter per slot');
 });
 
-test('no Charge at all: charge: false, no Charge replacement, summon, technique or Charge clip', () => {
-  assert.equal(DEF.charge, false);
-  for (const field of ['chargeReplacements', 'summons', 'chargedTechniques', 'stats']) assert.equal(DEF[field], undefined, field);
-  for (const key of Object.keys(DEF.animations)) assert.doesNotMatch(key, /charge/, key);
-  assert.equal('chargeRegen' in DEF.energy, false, 'no faster refill to earn');
+test('no summon or technique: every numbered button an ordinary attack, and Energy with its one refill rate', () => {
+  for (const field of ['summons', 'techniques', 'stats']) assert.equal(DEF[field], undefined, field);
+  assert.deepEqual(specialAttacks(DEF), []);
+  assert.deepEqual(Object.keys(DEF.energy).sort(), ['dashCancelCost', 'dashCost', 'max', 'regen', 'shieldHitCost']);
 });
 
 test('three numbered attacks, each a button of its own with its mid-air version, plus the extra_attack; Transform reserved', () => {
@@ -188,7 +187,7 @@ test('three numbered attacks, each a button of its own with its mid-air version,
     numbered: ['attack1', 'attack2', 'attack3'],
     buttons: ['attack1', 'attack2', 'attack3'],
     air: { attack1: 'midair_attack1', attack2: 'midair_attack2', attack3: 'midair_attack3' },
-    charge: {},
+    types: { attack1: 'attack', attack2: 'attack', attack3: 'attack' },
     extra: true,
   });
   assert.deepEqual(Object.keys(DEF.attacks).sort(), [
@@ -199,11 +198,9 @@ test('three numbered attacks, each a button of its own with its mid-air version,
   assert.equal(DEF.attacks.extra_attack.projectile.id, 'extra_attack_object');
 });
 
-test('the loadout refuses Charge replacements on a fighter with no Charge, and a charge that is not a yes or no', () => {
-  const withCharge = { ...DEF, chargeReplacements: { attack1: { type: 'summon', id: 'attack3' } } };
-  assert.ok(loadoutProblems(withCharge).some((p) => /no Charge \(charge: false\)/.test(p)));
-  assert.ok(loadoutProblems({ ...DEF, charge: 'yes' }).some((p) => /^charge is "yes"/.test(p)));
-  assert.deepEqual(loadoutProblems({ ...DEF, charge: true }), [], 'true (or left out) is a Charge stance');
+test('its attack3 is an ordinary attack by its data alone: made a summon with no summon behind it, the loadout refuses it', () => {
+  const summoned = { ...DEF, actions: { ...DEF.actions, attack3: { type: 'summon', id: 'attack3' } } };
+  assert.ok(loadoutProblems(summoned).some((p) => /summons attack3, which is not in `summons`/.test(p)));
 });
 
 test('its in-game names and touch buttons name each move, in English and French', () => {
@@ -311,23 +308,22 @@ test('the roster portrait is its face', () => {
   assert.equal(portrait.width, Math.round(39 * 0.62));
 });
 
-// ---- No Charge ------------------------------------------------------------------------
+// ---- Down ------------------------------------------------------------------------------
 
-test('Down on the ground never charges: no stance, no faster refill, and a Dash still starts while it is held', () => {
+test('Down on the ground is nothing: no state, no faster refill, and a Dash still starts while it is held', () => {
   const { fighter, step } = solo();
   fighter.combat.setEnergy(50);
-  for (let i = 0; i < 30; i++) step({ charge: true });
-  assert.equal(fighter.charging, false);
-  assert.notEqual(fighter.state, 'charge');
+  for (let i = 0; i < 30; i++) step({ down: true });
+  assert.equal(fighter.state, 'idle');
   assert.ok(Math.abs(fighter.combat.energy - (50 + 30 * DT * DEF.energy.regen)) < 1e-6, 'the normal refill only');
   // Walking still works with Down held: nothing locks the fighter in place.
-  for (let i = 0; i < 10; i++) step({ charge: true, runRight: true });
+  for (let i = 0; i < 10; i++) step({ down: true, runRight: true });
   assert.ok(fighter.body.vx > 100);
-  step({ charge: true });
-  for (let i = 0; i < 12; i++) step({ charge: true });
-  step({ charge: true, runRight: true, runRightPressed: true });
-  step({ charge: true });
-  step({ charge: true, runRight: true, runRightPressed: true });
+  step({ down: true });
+  for (let i = 0; i < 12; i++) step({ down: true });
+  step({ down: true, runRight: true, runRightPressed: true });
+  step({ down: true });
+  step({ down: true, runRight: true, runRightPressed: true });
   assert.ok(fighter.dash, 'a double tap Dashes, Down held or not');
 });
 
@@ -335,19 +331,18 @@ test('in the air Down still fast-falls', () => {
   const { fighter, step } = solo();
   step(P('jump'));
   stepUntil(step, (f) => f.body.vy > 0, {});
-  step({ charge: true });
+  step({ down: true });
   assert.equal(fighter.fastFalling, true);
 });
 
-test('the CPU never plans a Charge with it', () => {
+test('the CPU plans no summon or technique with it: it has none', () => {
   const s = makeFighter({ character: DEF, sprites: SPRITES });
   const foe = makeFighter({ x: 1200, facing: -1 });
   s.fighter.opponent = foe.fighter;
   foe.fighter.opponent = s.fighter;
-  s.fighter.combat.setEnergy(10);
   const ai = new CombatAIController({ difficulty: 'brutal', rng: mulberry32(1) });
-  assert.equal(ai.chargeOption({ self: s.fighter, p: ai.profile, canAct: true, sameLevel: true }), null);
-  assert.deepEqual(readMoveset(s.fighter).charged, []);
+  assert.deepEqual(readMoveset(s.fighter).specials, []);
+  assert.deepEqual(ai.specialOptions({ self: s.fighter, p: ai.profile, canAct: true, grounded: true, ms: readMoveset(s.fighter) }), []);
 });
 
 // ---- attack1: the One-Two ----------------------------------------------------------------
@@ -709,7 +704,7 @@ test('a motion attack never turns while it plays', () => {
 
 // ---- The CPU ------------------------------------------------------------------------------------
 
-test('the CPU reads every move from the data: its motions, and no Charge', () => {
+test('the CPU reads every move from the data: its motions, and no summon or technique', () => {
   const f = new Fighter({ def: DEF, sprites: SPRITES, stage: STAGE, spawn: { x: 500 } });
   const moves = readMoveset(f);
   assert.deepEqual(moves.melee.map((m) => [m.action, m.id, m.air, m.motion]).sort(), [
@@ -718,7 +713,7 @@ test('the CPU reads every move from the data: its motions, and no Charge', () =>
     ['attack3', 'attack3', false, 'roll'], ['attack3', 'midair_attack3', true, 'rise'],
   ]);
   assert.deepEqual(moves.ranged.map((r) => r.id), ['extra_attack']);
-  assert.deepEqual(moves.charged, []);
+  assert.deepEqual(moves.specials, []);
   assert.equal(moves.shield, true);
 });
 
@@ -740,29 +735,29 @@ test('knocked off the stage with its air jump spent, the CPU rises back on its B
   assert.ok(used, 'the Blue Tornado');
 });
 
-test('the CPU sends its Whirlwind at an opponent sitting in a Charge at mid range', () => {
+test('the CPU sends its Whirlwind at an opponent turtling behind its Shield at mid range', () => {
   for (const gap of [200, 340]) {
     const stage = new StageCollision(stageMap());
     const ai = new CombatAIController({ difficulty: 'hard', rng: mulberry32(3) });
     const me = new Fighter({ def: DEF, sprites: SPRITES, stage, slot: 'p1', label: 'CPU', spawn: { x: 900, facing: 1 }, controller: ai });
     const foe = new Fighter({
       def: DEF_0001, sprites: fakeSpritesOf(DEF_0001), stage, slot: 'p2', label: 'P', spawn: { x: 900 + gap, facing: -1 },
-      controller: { getInput: () => ({ charge: true }) },
+      controller: { getInput: () => ({ shield: true }) },
     });
     me.opponent = foe;
     foe.opponent = me;
     const ctx = { stage, gravity: CONFIG.sim.gravity, battle: { projectiles: [], clones: [], combat: { events: [] } } };
-    let used = null;
-    for (let i = 0; i < 120 && !used; i++) {
+    let thrown = false;
+    for (let i = 0; i < 360 && !thrown; i++) {
       me.update(DT, ctx);
       foe.update(DT, ctx);
-      used = me.combat.attack?.def.id ?? null;
+      thrown = me.combat.attack?.def.id === 'extra_attack';
     }
-    assert.equal(used, 'extra_attack', `${gap} units away`);
+    assert.ok(thrown, `${gap} units away`);
   }
 });
 
-test('CPU fights with #0002 run: against #0001 and itself, every move used, nothing ever charged', () => {
+test('CPU fights with #0002 run: against #0001 and itself, every move used, no summon or technique cooldown of its own', () => {
   const used = new Set();
   for (const [a, b] of [[DEF, DEF_0001], [DEF_0001, DEF], [DEF, DEF]]) {
     const { log } = cpuFight(a, b, { seconds: 40, seed: 5, difficulty: 'brutal' });
@@ -770,8 +765,7 @@ test('CPU fights with #0002 run: against #0001 and itself, every move used, noth
       if (f.def !== DEF) continue;
       for (const s of steps) {
         if (s.attack) used.add(s.attack);
-        assert.notEqual(s.state, 'charge');
-        assert.deepEqual(s.charged, []);
+        assert.deepEqual(s.cooling, []);
       }
     }
   }

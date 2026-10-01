@@ -2,8 +2,8 @@
 // Dash: #0001's mouvment frames (its Dash art) and their registration, the horizontal press
 // edges InputManager exposes (keyboard, touch, D-pad and stick alike), the
 // double tap, what a Dash needs to start, what it costs, how it moves (and
-// stops), its priority against attacks, Shield and Charge, and that it is
-// movement only. Also the one-tap request of the Joystick touch layout's
+// stops), its priority against attacks and the Shield (Down held never
+// stops one), and that it is movement only. Also the one-tap request of the Joystick touch layout's
 // Dash buttons (InputManager.queueTouchMouvement → mouvementLeftPressed /
 // mouvementRightPressed), which goes through the same tryDash and its rules.
 // Uses the real Fighter, InputManager and physics (see fighter-harness.mjs).
@@ -82,8 +82,8 @@ test('movement data: dashSpeed 900 (about 2.7x the top speed) for about 180 unit
   assert.equal(DASH_STEPS, 12);
   const reach = def.movement.dashSpeed * fighter.dashDuration;
   assert.ok(reach >= 170 && reach <= 180, `about 180 units, half as far again as the old 120: ${reach}`);
-  assert.notEqual(def.movement.dashSpeed, def.chargedTechniques.attack4.dashSpeed, 'the Sphere Rush has its own');
-  assert.equal(def.chargedTechniques.attack4.dashSpeed, 1050);
+  assert.notEqual(def.movement.dashSpeed, def.techniques.attack4.dashSpeed, 'the Sphere Rush has its own');
+  assert.equal(def.techniques.attack4.dashSpeed, 1050);
 });
 
 // ---- Input ---------------------------------------------------------------------------
@@ -294,7 +294,7 @@ test('a Dash is movement only: no hitbox, damage, launch or invulnerability, eve
 
 // ---- Gating ------------------------------------------------------------------------------
 
-test('no Dash (and nothing spent) while airborne, attacking, stunned, bound, charging, shielding, already dashing, exhausted or without mouvment art', () => {
+test('no Dash (and nothing spent) while airborne, attacking, stunned, bound, shielding, already dashing, exhausted or without mouvment art', () => {
   const refused = (label, setup) => {
     const f = makeFighter(setup.options);
     setup.before?.(f);
@@ -319,10 +319,6 @@ test('no Dash (and nothing spent) while airborne, attacking, stunned, bound, cha
   refused('bound', {
     before: (f) => { f.step(RIGHT); f.fighter.combat.bind('rush'); },
     press: (f) => f.step(RIGHT),
-  });
-  refused('charging', {
-    before: (f) => { for (let i = 0; i < 5; i++) f.step({ charge: true }); f.step({ charge: true, ...RIGHT }); },
-    press: (f) => f.step({ charge: true, ...RIGHT }),
   });
   refused('shielding', {
     before: (f) => { f.step({ shield: true, shieldPressed: true }); f.step({ shield: true, ...RIGHT }); },
@@ -460,7 +456,7 @@ test('a solid stops a Dash where it stands; walking off a ledge ends it, and the
 
 // ---- Priority -------------------------------------------------------------------------------
 
-test('Shield wins over a Dash on the same step; so does an attack; so does Charge', () => {
+test('Shield wins over a Dash on the same step; so does an attack; Down held never does', () => {
   // Shield and the second tap together: the Shield, and nothing spent.
   const shield = makeFighter();
   tap(shield.step, RIGHT);
@@ -477,22 +473,25 @@ test('Shield wins over a Dash on the same step; so does an attack; so does Charg
   assert.equal(attack.fighter.combat.attack.def.id, 'attack2');
   assert.equal(attack.fighter.dash, null);
   assert.equal(attack.fighter.combat.energy, 100);
-  // Charge pressed with the second tap: Charge, no Dash.
-  const charge = makeFighter();
-  tap(charge.step, RIGHT);
-  charge.step({ ...RIGHT, charge: true, chargePressed: true });
-  assert.equal(charge.fighter.dash, null);
-  assert.equal(charge.fighter.state, 'charge');
-  // And a Dash in progress rules out attacks, the Shield, jumps and Charge.
+  // Down pressed and held through the double tap: only a direction, so
+  // the Dash comes out all the same, and costs what it always does.
+  const down = makeFighter();
+  down.step({ ...RIGHT, down: true, downPressed: true });
+  down.step({ down: true });
+  down.step({ ...RIGHT, down: true });
+  assert.ok(down.fighter.dash, 'a Dash with Down held');
+  assert.equal(down.fighter.state, 'dash');
+  assert.equal(down.fighter.combat.energy, 100 - def.energy.dashCost);
+  // And a Dash in progress rules out attacks, the Shield and jumps; Down
+  // does nothing to it.
   const busy = makeFighter();
   tap(busy.step, RIGHT);
   busy.step(RIGHT);
-  busy.step({ attack1: true, attack1Pressed: true, shield: true, shieldPressed: true, jump: true, charge: true });
+  busy.step({ attack1: true, attack1Pressed: true, shield: true, shieldPressed: true, jump: true, down: true });
   assert.equal(busy.fighter.state, 'dash');
   assert.equal(busy.fighter.combat.attack, null);
   assert.equal(busy.fighter.combat.shielding, false);
   assert.equal(busy.fighter.grounded, true);
-  assert.equal(busy.fighter.charging, false);
 });
 
 // ---- A Dash asked for in one tap (the Joystick layout's Dash buttons) ------------
@@ -626,7 +625,7 @@ test('a request is not a direction press: it never pairs with a tap before it or
   assert.ok(keys.fighter.dash);
 });
 
-test('a request obeys every Dash rule: no Dash (and nothing spent) airborne, attacking, stunned, bound, charging, shielding, dashing, exhausted or without art', () => {
+test('a request obeys every Dash rule: no Dash (and nothing spent) airborne, attacking, stunned, bound, shielding, dashing, exhausted or without art', () => {
   const refused = (label, setup) => {
     const f = makeFighter(setup.options);
     setup.before?.(f);
@@ -651,13 +650,6 @@ test('a request obeys every Dash rule: no Dash (and nothing spent) airborne, att
   refused('bound', {
     before: (f) => f.fighter.combat.bind('rush'),
     press: (f) => f.step(MOUVEMENT_RIGHT),
-  });
-  refused('charging', {
-    before: (f) => { for (let i = 0; i < 5; i++) f.step({ charge: true }); },
-    press: (f) => f.step({ charge: true, ...MOUVEMENT_RIGHT }),
-  });
-  refused('holding Charge on the request', {
-    press: (f) => f.step({ charge: true, chargePressed: true, ...MOUVEMENT_RIGHT }),
   });
   refused('shielding', {
     before: (f) => f.step({ shield: true, shieldPressed: true }),
@@ -699,7 +691,7 @@ test('a request obeys every Dash rule: no Dash (and nothing spent) airborne, att
   assert.equal(fighter.dash, null);
 });
 
-test('a request short of Energy empties the bar like any Dash; walls and ledges end it; attacks, Shield and Charge win the step', () => {
+test('a request short of Energy empties the bar like any Dash; walls and ledges end it; attacks and the Shield win the step, Down never does', () => {
   const low = makeFighter();
   low.fighter.combat.setEnergy(10);
   low.step(MOUVEMENT_RIGHT);
@@ -728,10 +720,12 @@ test('a request short of Energy empties the bar like any Dash; walls and ledges 
   shield.step({ ...MOUVEMENT_RIGHT, shield: true, shieldPressed: true });
   assert.equal(shield.fighter.combat.shielding, true);
   assert.equal(shield.fighter.dash, null);
-  const charge = makeFighter();
-  charge.step({ ...MOUVEMENT_RIGHT, charge: true, chargePressed: true });
-  assert.equal(charge.fighter.state, 'charge');
-  assert.equal(charge.fighter.dash, null);
+  for (const held of [{ down: true, downPressed: true }, { down: true }]) {
+    const down = makeFighter();
+    for (let i = 0; i < 5; i++) down.step({ down: true });
+    down.step({ ...MOUVEMENT_RIGHT, ...held });
+    assert.ok(down.fighter.dash, 'Down pressed or held: the Dash all the same');
+  }
 });
 
 test('end to end: a Right mouvement tap through the real InputManager and PlayerController Dashes once', async () => {

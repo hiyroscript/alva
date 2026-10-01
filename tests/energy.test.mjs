@@ -1,7 +1,7 @@
 // Run with node --test tests/energy.test.mjs (no dependencies).
 // Energy: the one resource, spent only by Dash (as it starts) and by the
-// Shield (for each hit it blocks). Its defaults, clamping, passive and
-// Charge refill, what each action costs, spending more than is left (it
+// Shield (for each hit it blocks). Its defaults, clamping, its one passive
+// refill rate, what each action costs, spending more than is left (it
 // still happens, and empties the bar), the exhaustion lockout that only a
 // full refill clears, and the one bright purple bar. Uses the real Fighter,
 // CombatState and physics (see fighter-harness.mjs).
@@ -16,7 +16,7 @@ import { def, DT, makeFighter, duel, steps } from './fighter-harness.mjs';
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
 const HOLD = { shield: true };
-const CHARGE = { charge: true };
+const DOWN = { down: true };
 const near = (a, b, msg) => assert.ok(Math.abs(a - b) < 1e-6, `${msg ?? ''} ${a} vs ${b}`);
 // Two presses of `dir`, one step apart: a Dash's double tap.
 const dash = (step, dir = 'runRight') => {
@@ -25,8 +25,8 @@ const dash = (step, dir = 'runRight') => {
   return step({ [`${dir}Pressed`]: true, [dir]: true });
 };
 
-test('#0001 declares its Energy: 100 max, 12 / s, 30 / s in Charge, 15 per Dash, 40 per Dash cancel, 25 per blocked hit', () => {
-  assert.deepEqual(def.energy, { max: 100, regen: 12, chargeRegen: 30, dashCost: 15, dashCancelCost: 40, shieldHitCost: 25 });
+test('#0001 declares its Energy: 100 max, 12 / s, 15 per Dash, 40 per Dash cancel, 25 per blocked hit', () => {
+  assert.deepEqual(def.energy, { max: 100, regen: 12, dashCost: 15, dashCancelCost: 40, shieldHitCost: 25 });
   assert.equal(def.stamina, undefined, 'the old name is gone');
   // Defaults for a future fighter that declares none (or only some): a Dash
   // cancel costs what its Dash does unless it says otherwise.
@@ -108,42 +108,28 @@ test('it refills by itself at 12 per second: standing, running, in the air, atta
   assert.ok(c.energy < 100);
 });
 
-test('Charge refills it faster, at 30 per second, only in the real Charge stance', () => {
-  const { fighter, step } = makeFighter();
-  const c = fighter.combat;
-  c.setEnergy(20);
-  for (let i = 0; i < 60; i++) step(CHARGE);
-  assert.equal(fighter.state, 'charge');
-  near(c.energy, 50, 'a second of Charge: +30');
-  // Letting go: the release pose is not Charge.
-  step();
-  assert.equal(fighter.state, 'chargeRelease');
-  near(c.energy, 50.2, 'the release step refills at the normal rate');
-  // Charge held in the air is not the stance either.
-  step({ jump: true, jumpPressed: true });
-  const up = c.energy;
-  for (let i = 0; i < 10; i++) step(CHARGE);
-  assert.equal(fighter.charging, false);
-  near(c.energy, up + 10 * 0.2);
-  // Nor is Charge held under a Shield: the Shield outranks it.
-  const both = makeFighter();
-  both.fighter.combat.setEnergy(60);
-  for (let i = 0; i < 30; i++) both.step({ ...CHARGE, ...HOLD });
-  assert.equal(both.fighter.charging, false);
-  near(both.fighter.combat.energy, 66, 'normal rate');
-});
-
-test('a charged technique is not ordinary charging: Sphere Rush refills at the normal rate while Charge is held', () => {
-  const { fighter, step } = makeFighter();
-  const c = fighter.combat;
-  for (let i = 0; i < 10; i++) step(CHARGE);
-  step({ ...CHARGE, attack2: true, attack2Pressed: true });
-  assert.ok(fighter.technique, 'the Sphere Rush started');
-  c.setEnergy(40);
-  for (let i = 0; i < 20; i++) step(CHARGE);
-  assert.ok(fighter.technique);
-  assert.equal(fighter.charging, false);
-  near(c.energy, 44, 'normal rate');
+test('it refills at one passive rate only: 12 per second whatever is held, standing, holding Down, shielding or in the Sphere Rush', () => {
+  const refill = (before, held, count = 60) => {
+    const { fighter, step } = makeFighter();
+    for (const h of before) step(h);
+    fighter.combat.setEnergy(20);
+    for (let i = 0; i < count; i++) step(held);
+    return fighter;
+  };
+  near(refill([], {}).combat.energy, 32, 'a second standing: +12');
+  near(refill([], DOWN).combat.energy, 32, 'a second holding Down: the same');
+  near(refill([], HOLD).combat.energy, 32, 'a second behind a held Shield: the same');
+  near(refill([], { ...DOWN, runRight: true }).combat.energy, 32, 'running with Down held: the same');
+  // The Sphere Rush (A4): a technique, never a reason to refill faster.
+  const rush = refill([{ attack4: true, attack4Pressed: true }], DOWN, 30);
+  assert.ok(rush.technique, 'still rushing');
+  near(rush.combat.energy, 26, 'half a second of the Sphere Rush: +6, the same rate');
+  // There is one rate to set, and nothing else.
+  assert.deepEqual(Object.keys(resolveEnergy()).sort(), ['dashCancelCost', 'dashCost', 'max', 'regen', 'shieldHitCost']);
+  const c = new CombatState();
+  c.setEnergy(0);
+  c.updateEnergy(0.5, true);
+  near(c.energy, 6, 'updateEnergy(dt) takes nothing else into account');
 });
 
 test('a Dash spends exactly 15 as it starts, and only then; spending the last of it exhausts', () => {
@@ -263,7 +249,7 @@ test('too little left still pays: a Dash or a block with less than it costs take
   assert.equal(s.spendEnergy(1), false, 'exhausted: refused, nothing taken');
 });
 
-test('exhausted, a fighter still moves, jumps, attacks, charges and uses its Charge replacements', () => {
+test('exhausted, a fighter still moves, jumps, attacks, and uses its Clone Attack and Sphere Rush', () => {
   const { fighter, step } = makeFighter();
   const c = fighter.combat;
   c.setEnergy(0);
@@ -279,14 +265,18 @@ test('exhausted, a fighter still moves, jumps, attacks, charges and uses its Cha
   assert.equal(fighter.state, 'attack', 'attacks, even holding Shield: no Shield to take the step');
   while (fighter.combat.attack) step();
   for (let i = 0; i < 10; i++) step();
-  for (let i = 0; i < 5; i++) step(CHARGE);
-  assert.equal(fighter.state, 'charge', 'charges: Energy never gates Charge');
   assert.equal(c.energyExhausted, true);
-  step({ ...CHARGE, attack2: true, attack2Pressed: true });
+  step({ attack4: true, attack4Pressed: true });
   assert.ok(fighter.technique, 'attack4 (A4): its own cooldown, no Energy');
+  // And A3 too, against an opponent.
+  const d = duel({ gap: 200 });
+  d.attacker.combat.setEnergy(0);
+  d.tick({ attack3: true, attack3Pressed: true });
+  assert.equal(d.clones.length, 1, 'attack3 (A3): its own cooldown, no Energy');
+  assert.equal(d.attacker.combat.energyExhausted, true);
 });
 
-test('nothing but Dash and blocked hits ever spends it: runs, jumps, attacks, shurikens and Charge replacements are free', () => {
+test('nothing but Dash and blocked hits ever spends it: runs, jumps, attacks, shurikens, the Clone Attack and the Sphere Rush are free', () => {
   const d = duel();
   const { attacker, tick } = d;
   const spent = () => {
@@ -309,10 +299,13 @@ test('nothing but Dash and blocked hits ever spends it: runs, jumps, attacks, sh
   for (let i = 0; i < 30; i++) t();
   t({ extra_attack: true, extra_attackPressed: true });
   for (let i = 0; i < 30; i++) t();
-  for (let i = 0; i < 10; i++) t(CHARGE);
-  t({ ...CHARGE, attack1: true, attack1Pressed: true });
+  for (let i = 0; i < 10; i++) t(DOWN);
+  t({ attack3: true, attack3Pressed: true });
   assert.equal(d.clones.length, 1, 'A3 summoned its clone');
-  for (let i = 0; i < 60; i++) t(CHARGE);
+  for (let i = 0; i < 60; i++) t(DOWN);
+  t({ attack4: true, attack4Pressed: true });
+  assert.ok(attacker.technique, 'A4 started its rush');
+  while (attacker.technique) t();
 });
 
 // ---- The bar ------------------------------------------------------------------------

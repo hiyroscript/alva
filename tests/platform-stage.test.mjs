@@ -345,9 +345,8 @@ test('Quick Battle: the CPU in the Void scores Player 1 a point; a technique hol
   const { p1, p2 } = battle;
   // Catch the CPU in the Sphere Rush.
   p2.body.x = p1.body.x + 120;
-  script.held = { charge: true };
   for (let i = 0; i < 10; i++) battle.update(DT);
-  script.held = { charge: true, attack2: true, attack2Pressed: true };
+  script.held = { attack4: true, attack4Pressed: true };
   battle.update(DT);
   script.held = {};
   const rush = p1.technique;

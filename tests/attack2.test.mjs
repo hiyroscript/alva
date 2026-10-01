@@ -700,7 +700,7 @@ test('#0001 Shielding attack2 pays 25 Energy and takes its blockstun and hitstop
     assert.equal(target.state, 'shield', 'never a hurt pose');
   }
   assert.equal(events.length, 1);
-  assert.equal(def.stats.blockDamageScale, undefined, '#0001 has no chip-damage stat');
+  assert.equal(def.stats?.blockDamageScale, undefined, '#0001 has no chip-damage stat');
 });
 
 test('midair_attack2 hits a grounded opponent in front while still airborne', () => {

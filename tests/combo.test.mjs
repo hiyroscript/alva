@@ -103,7 +103,7 @@ test('a press during a cooldown comes out as the cooldown ends; the latest press
   assert.equal(latest.fighter.combat.attack?.def.id, 'extra_attack');
 });
 
-test('only presses that could start are kept: never transform, an air Throw or an attack without art; charged presses never', () => {
+test('only presses that could start are kept: never transform, an air Throw or an attack without art; a summon or technique press never', () => {
   const { fighter, step } = makeFighter();
   step(ATTACK1);
   step(P('transform'));
@@ -115,15 +115,25 @@ test('only presses that could start are kept: never transform, an air Throw or a
   air.step(ATTACK2);
   air.step(THROW);
   assert.equal(air.fighter.bufferedAttack?.action, 'attack2', 'an air Throw never replaces it');
-  // A attack3 press on its cooldown is used up, never kept for later.
+  // An attack3 press on its cooldown is used up, never kept for later.
   const d = duel({ gap: 600 });
-  d.tick({ charge: true });
-  d.tick({ charge: true, ...ATTACK1 });
-  assert.ok(d.attacker.combat.chargedCooldowns.active('attack3'));
-  d.tick({ charge: true, ...ATTACK1 });
+  d.tick(P('attack3'));
+  assert.ok(d.attacker.combat.abilityCooldowns.active('attack3'));
+  d.tick(P('attack3'));
   assert.equal(d.attacker.bufferedAttack, null);
   for (let i = 0; i < 20; i++) d.tick({});
   assert.equal(d.attacker.combat.attack, null, 'no attack1 later either');
+  assert.equal(d.clones.length, 1, 'and no second clone');
+  // Nor is one pressed during an attack: it happens on its own press or
+  // not at all.
+  const busy = duel({ gap: 600 });
+  busy.tick(ATTACK1);
+  busy.tick(P('attack4'));
+  assert.equal(busy.attacker.bufferedAttack, null);
+  busy.until(() => !busy.attacker.combat.attack);
+  for (let i = 0; i < 20; i++) busy.tick({});
+  assert.equal(busy.attacker.technique, null, 'no Sphere Rush after the punch');
+  assert.equal(busy.attacker.combat.abilityCooldowns.size, 0);
 });
 
 test('presses made during an impact freeze are kept, and do not age through it', () => {
@@ -194,7 +204,7 @@ test('a whiffed or blocked attack keeps its whole recovery: no cut short', () =>
   }
 });
 
-test('a jump or a Dash cuts a connected attack2 short; walking, the Shield and Charge never do', () => {
+test('a jump or a Dash cuts a connected attack2 short; walking, the Shield and Down never do', () => {
   const hitBa2 = () => {
     const d = combo({ gap: 40 });
     d.run((i) => (i === 0 ? ATTACK2 : {}), 16);
@@ -208,7 +218,7 @@ test('a jump or a Dash cuts a connected attack2 short; walking, the Shield and C
   assert.equal(j.attacker.combat.attack, null);
   assert.equal(j.attacker.grounded, false, 'jumping after the launched target');
 
-  for (const held of [{ runRight: true }, { shield: true }, { charge: true }]) {
+  for (const held of [{ runRight: true }, { shield: true }, { down: true }]) {
     const d = hitBa2();
     const atk = d.attacker.combat.attack;
     d.run(() => held, 3);
@@ -403,7 +413,7 @@ test('midair_attack2 drives a grounded target into the ground; landing (fast) le
   for (const lp of [0, 40, 100]) {
     const d = combo({ gap: 20, lp });
     Object.assign(d.attacker.body, { y: 800 - 130, vy: 0, grounded: false, ground: null });
-    d.run((i) => ({ charge: true, ...(i === 0 ? ATTACK2 : {}) }), 16);
+    d.run((i) => ({ down: true, ...(i === 0 ? ATTACK2 : {}) }), 16);
     assert.deepEqual(d.hits.map((h) => h.move), ['midair_attack2'], `LP ${lp}: the spike`);
     d.run(() => ATTACK1, 1);
     d.run(() => ({}), 30);

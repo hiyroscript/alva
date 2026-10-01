@@ -68,20 +68,21 @@ export const CONFIG = Object.freeze({
   },
 
   // Player 1 keyboard bindings (KeyboardEvent.code), the single source of
-  // truth for gameplay keys, keyed by control codename. S / ↓ are Charge in
-  // battle; menus read their own Down (and Left / Right) from menuBindings
-  // below.
+  // truth for gameplay keys, keyed by control codename. S / ↓ are the plain
+  // `down` direction in battle (the fast fall, and steering a launch
+  // downward); menus read their own Down (and Left / Right) from
+  // menuBindings below.
   // `shield` is the shared Shield button; each character's `defense` entry
   // decides what it does (#0001 holds it to Shield).
   // The numbered attack buttons sit on the right hand: attack1 to attack3
   // along the row above J K L (U I O), attack4 and attack5 on the row below
   // it (M ,). A fighter only acts on the ones it has a button for (see
-  // js/data/loadout.js): #0001 uses U and I, and reaches its attack3 and
-  // attack4 through Charge (S / ↓) with them.
+  // js/data/loadout.js): #0001 uses U, I, O and M (Punch, Kick, Clone Attack
+  // and Sphere Rush).
   bindings: {
     runLeft: ['KeyA', 'ArrowLeft'],
     runRight: ['KeyD', 'ArrowRight'],
-    charge: ['KeyS', 'ArrowDown'],
+    down: ['KeyS', 'ArrowDown'],
     jump: ['KeyW', 'Space', 'ArrowUp'],
     extra_attack: ['KeyJ'],
     transform: ['KeyK'],
@@ -110,18 +111,19 @@ export const CONFIG = Object.freeze({
 });
 
 // The numbered attacks, in order: every character has attack1 and attack2
-// and at most these five (see js/data/loadout.js for which of them have a
-// button of their own and which Charge reaches instead).
+// and at most these five, each one a button of its own (see
+// js/data/loadout.js).
 export const NUMBERED_ATTACKS = Object.freeze(['attack1', 'attack2', 'attack3', 'attack4', 'attack5']);
 
 // The combat buttons: one per numbered attack, the optional extra_attack
 // and the reserved transform. Each maps to a move through the character's
-// `actions`; shield, jump and charge are held-state controls, read apart.
+// `actions`; shield, jump and the directions (down included) are held-state
+// controls, read apart.
 export const COMBAT_BUTTONS = Object.freeze(['extra_attack', 'transform', ...NUMBERED_ATTACKS]);
 
 // The control codenames: universal, the same for every character.
 export const ACTIONS = Object.freeze([
-  'runLeft', 'runRight', 'charge', 'jump',
+  'runLeft', 'runRight', 'down', 'jump',
   'extra_attack', 'transform', 'shield', ...NUMBERED_ATTACKS,
   'pause',
 ]);
@@ -132,7 +134,7 @@ export const ACTIONS = Object.freeze([
 export const ACTION_LABELS = Object.freeze({
   runLeft: 'Move left',
   runRight: 'Move right',
-  charge: 'Charge',
+  down: 'Down',
   jump: 'Jump',
   extra_attack: 'Extra Attack',
   transform: 'Transform',
@@ -147,13 +149,12 @@ export const ACTION_LABELS = Object.freeze({
 
 // The move codenames: universal, the same for every character. A
 // character's moves are keyed by these (in its `attacks`, `summons` and
-// `chargedTechniques`) whatever it calls them in game; its own ability
-// names are per character. `number` is a numbered attack's (its
-// `midair_` version shares it, `air` marking it), and `label` the neutral
-// name, for a character with no name of its own. Nothing here says what a
-// move does for a character: whether attack3 is a third button or what
-// Charge + attack1 makes is the character's loadout (see
-// js/data/loadout.js).
+// `techniques`) whatever it calls them in game; its own ability names are
+// per character. `number` is a numbered attack's (its `midair_` version
+// shares it, `air` marking it), and `label` the neutral name, for a
+// character with no name of its own. Nothing here says what a move does
+// for a character: whether attack3 is an ordinary attack, a summon or a
+// technique is the character's loadout (see js/data/loadout.js).
 export const MOVES = Object.freeze({
   attack1: Object.freeze({ number: 1, air: false, label: 'Attack 1' }),
   midair_attack1: Object.freeze({ number: 1, air: true, label: 'Mid-air Attack 1' }),

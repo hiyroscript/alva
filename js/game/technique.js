@@ -1,18 +1,18 @@
-// Charged techniques: moves the fighter itself performs from Charge.
+// Techniques: multi-phase special moves the fighter itself performs.
 //
-// A Charge replacement (see `chargeReplacements` in js/data/characters.js
-// and js/data/loadout.js) is either a summon, a detached temporary entity
-// (js/game/clone.js), or a technique:
-// a multi-phase move the real fighter performs, driven by this runtime. The
+// A numbered button may be a technique (`{ type: 'technique', id }` in the
+// character's `actions`; see js/data/loadout.js), as it may be a summon, a
+// detached temporary entity (js/game/clone.js). A technique is a
+// multi-phase move the real fighter performs, driven by this runtime. The
 // Fighter starts one (Fighter.tryTechnique), advances it every fixed step,
 // moves its body and ends it; the CombatSystem resolves its hits. It is
 // not an attack (no combat.attack), a projectile or a summon. Behaviour is
-// data on the character (`chargedTechniques`, keyed by the attack it is),
-// e.g. #0001's Sphere Rush (attack4, Charge + attack2). Its fighter clips
-// are named after it (attack4_...) and so is its sphere's art
+// data on the character (`techniques`, keyed by the attack it is), e.g.
+// #0001's Sphere Rush (attack4, its Attack 4 button). Its fighter clips are
+// named after it (attack4_...) and so is its sphere's art
 // (attack4_object_...):
 //
-//   chargedTechniques: {
+//   techniques: {
 //     attack4: {
 //       formAnimation: 'attack4_form', dashAnimation: 'attack4_dash', confirmAnimation: 'attack4_confirm',
 //       explosionAnimation: 'attack4_explosion', releaseAnimation: 'attack4_release',
@@ -146,7 +146,7 @@ function createHit(id, spec) {
 }
 
 export function createTechniqueDefinition(spec) {
-  if (!spec?.id) throw new Error('[Alva] Charged technique definitions need an id');
+  if (!spec?.id) throw new Error('[Alva] Technique definitions need an id');
   const def = { ...TECHNIQUE_DEFAULTS, ...spec };
   def.sphereGrowth = Object.freeze({ ...TECHNIQUE_DEFAULTS.sphereGrowth, ...spec.sphereGrowth });
   def.firstHit = createHit(`${spec.id}.firstHit`, spec.firstHit);
@@ -191,13 +191,13 @@ function frameAt(anim, time) {
   return anim.loop ? index % anim.frames.length : Math.min(index, anim.frames.length - 1);
 }
 
-export class ChargedTechnique {
+export class Technique {
   // `owner` is the Fighter performing it. Facing is snapshotted here, once:
   // the technique never turns, and the rush travels this way.
   constructor({ owner, def, action = null }) {
     this.owner = owner;
     this.def = def;
-    this.action = action; // the button it was charged from (debug label)
+    this.action = action; // the button that started it (debug label)
     this.facing = owner.facing;
     this.target = null;
     this.phase = 'form';

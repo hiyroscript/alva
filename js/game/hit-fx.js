@@ -134,7 +134,7 @@ export class HitEffects {
         this.addSpark(e.perfect ? 'perfect' : 'block', e);
         continue;
       }
-      // A charged technique's ticks deal no stun and no freeze: they only
+      // A technique's ticks deal no stun and no freeze: they only
       // count, so they show nothing.
       if (!(e.hitstun > 0) && !(e.launchSpeed > 0)) continue;
       const s = HIT_FX.shake;

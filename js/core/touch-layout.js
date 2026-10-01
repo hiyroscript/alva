@@ -20,17 +20,18 @@ import { NUMBERED_ATTACKS } from '../config.js';
 // Every control each scheme shows, in reading order: the lower-left cluster
 // first, then the lower-right actions, all five numbered attack buttons
 // included (a fighter shows only the ones it has; the layout is every
-// fighter's). `stick` is the joystick itself; `charge` is each scheme's own
-// Charge (C in Classic Buttons, the down arrow beside the joystick). A
-// control id is its codename, never a translated label: a stored layout
-// with any other id simply leaves that out.
+// fighter's). `stick` is the joystick itself; `down` is each scheme's own
+// Down button (the down arrow between Left and Right in Classic Buttons,
+// beside the joystick in Joystick). A control id is its codename, never a
+// translated label: a stored layout with any other id simply leaves that
+// out.
 export const TOUCH_CONTROL_IDS = Object.freeze({
   joystick: Object.freeze([
-    'charge', 'mouvementLeft', 'stick', 'mouvementRight',
+    'down', 'mouvementLeft', 'stick', 'mouvementRight',
     'extra_attack', 'transform', 'shield', ...NUMBERED_ATTACKS, 'jump',
   ]),
   classic: Object.freeze([
-    'runLeft', 'charge', 'runRight',
+    'runLeft', 'down', 'runRight',
     'extra_attack', 'transform', 'shield', ...NUMBERED_ATTACKS, 'jump',
   ]),
 });

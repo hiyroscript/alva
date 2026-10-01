@@ -1,13 +1,14 @@
 // Summoned clones: temporary attack entities, not fighters.
 //
-// A summon-type Charge replacement (`{ type: 'summon', id }` in
-// `chargeReplacements`, js/data/characters.js; see js/data/loadout.js) makes
-// the Fighter start the summon's cooldown and queue one summon request. The Battle then turns each request into a live Clone,
+// A numbered button that is a summon (`{ type: 'summon', id }` in the
+// character's `actions`, js/data/characters.js; see js/data/loadout.js)
+// makes the Fighter start the summon's cooldown and queue one summon
+// request. The Battle then turns each request into a live Clone,
 // owns it, updates it every fixed step, resolves its hit through
 // CombatSystem and removes it once it is done. Behaviour is data on the
 // character (`summons`, keyed by the attack it is; its cloud is that
-// attack's object art), e.g. #0001's Clone Attack (attack3, Charge +
-// attack1):
+// attack's object art), e.g. #0001's Clone Attack (attack3, its Attack 3
+// button):
 //
 //   summons: {
 //     attack3: {

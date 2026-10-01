@@ -38,12 +38,12 @@ test('every new fighter starts at 0 Launch Point with every cooldown ready, and 
       const fighter = build(character, facing);
       assert.equal(fighter.combat.launchPoint, 0, `${character.displayName} starts at 0`);
       assert.equal(fighter.combat.cooldowns.size, 0);
-      assert.equal(fighter.combat.chargedCooldowns.size, 0);
+      assert.equal(fighter.combat.abilityCooldowns.size, 0);
       fighter.combat.launchPoint = 87;
-      fighter.combat.chargedCooldowns.start('attack3', 5);
+      fighter.combat.abilityCooldowns.start('attack3', 5);
       fighter.reset(STAGE);
       assert.equal(fighter.combat.launchPoint, 0, `${character.displayName} after a reset`);
-      assert.equal(fighter.combat.chargedCooldowns.size, 0);
+      assert.equal(fighter.combat.abilityCooldowns.size, 0);
     }
   }
   assert.equal(new CombatState().launchPoint, 0);
@@ -60,7 +60,7 @@ test('Launch Point has no maximum: hits keep adding to it far past 100', () => {
   assert.equal(target.combat.launchPoint, 1e6 + 40);
 });
 
-test('a high Launch Point alone never stops a fighter acting: it runs, jumps, attacks, shields and charges at 100, 200 and 500', () => {
+test('a high Launch Point alone never stops a fighter acting: it runs, jumps, attacks, shields and rushes at 100, 200 and 500', () => {
   for (const value of [100, 200, 500]) {
     const { fighter, step } = makeFighter();
     fighter.combat.launchPoint = value;
@@ -75,8 +75,9 @@ test('a high Launch Point alone never stops a fighter acting: it runs, jumps, at
     step({ shield: true, shieldPressed: true });
     assert.equal(fighter.state, 'shield', `shields at ${value}`);
     for (let i = 0; i < 60; i++) step();
-    step({ charge: true, chargePressed: true });
-    assert.equal(fighter.charging, true, `charges at ${value}`);
+    step({ attack4: true, attack4Pressed: true });
+    assert.ok(fighter.technique, `rushes at ${value}`);
+    while (fighter.technique) step();
     for (let i = 0; i < 10; i++) step();
     step({ jump: true, jumpPressed: true });
     assert.equal(fighter.grounded, false, `jumps at ${value}`);

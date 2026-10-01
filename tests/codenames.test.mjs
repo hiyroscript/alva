@@ -2,13 +2,14 @@
 // The canonical control, move, animation and file codenames, in one place.
 // They are universal, the same for every character (a character's own
 // ability names are per character): every gameplay control (runLeft,
-// runRight, mouvementLeft, mouvementRight, jump, charge, shield,
+// runRight, mouvementLeft, mouvementRight, down, jump, shield,
 // extra_attack, transform, attack1 to attack5, pause), every move (attack1
 // to attack5, midair_attack1 to midair_attack5, extra_attack, transform) and
 // every file (<id>_<codename>_<frame>.png) goes by exactly one name, from
 // the bindings and input snapshots through every character's data, its
-// Charge replacements, their cooldowns, the combat AI and the art on disk.
-// The retired names survive nowhere, not even as an alias. The loadout
+// summons and techniques, their cooldowns, the combat AI and the art on
+// disk. The retired names, and the retired mechanic's every word, survive
+// nowhere, not even as an alias. The loadout
 // rules themselves are in loadout.test.mjs; behaviour in the other files.
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -16,7 +17,7 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { def, fakeSprites, makeFighter, STAGE } from './fighter-harness.mjs';
 import { ACTIONS, ACTION_LABELS, COMBAT_BUTTONS, CONFIG, MOVES, NUMBERED_ATTACKS } from '../js/config.js';
 import { CHARACTERS, characterFramePaths, framePath, frames } from '../js/data/characters.js';
-import { loadoutProblems } from '../js/data/loadout.js';
+import { actionType, loadoutProblems, specialAction } from '../js/data/loadout.js';
 import { SAMPLE_FIGHTER } from './sample-fighter.mjs';
 import { COMBAT_ACTIONS, Fighter } from '../js/game/character.js';
 import { blankInput } from '../js/game/fighter-controller.js';
@@ -27,7 +28,7 @@ import { ABILITY_ACTIONS } from '../js/ui/mobile-abilities.js';
 const ROOT = new URL('../', import.meta.url);
 const read = (path) => readFileSync(new URL(path, ROOT), 'utf8');
 
-const HELD = ['runLeft', 'runRight', 'charge', 'jump', 'extra_attack', 'transform', 'shield', 'attack1', 'attack2', 'attack3', 'attack4', 'attack5'];
+const HELD = ['runLeft', 'runRight', 'down', 'jump', 'extra_attack', 'transform', 'shield', 'attack1', 'attack2', 'attack3', 'attack4', 'attack5'];
 
 // The normalized fighter input snapshot, field for field.
 const SNAPSHOT = [
@@ -38,15 +39,15 @@ const SNAPSHOT = [
 
 // Every name the codename migrations retired, none of which may come back:
 // the attack codenames before attack1 to attack5 / extra_attack, the control
-// names before those, the charged-action vocabulary, and the old art stems
-// and animation keys.
+// names before those, and the old art stems and animation keys. (The
+// retired mechanic's vocabulary is guarded as a whole, below.)
 const RETIRED_ATTACKS = ['ba1', 'ba2', 'maba1', 'maba2', 'cba1', 'cba2', 'uniqueba'];
 const RETIRED_CONTROLS = [
   'left', 'right', 'primary', 'special', 'defense', 'action1', 'action2', 'dashLeft', 'dashRight',
 ];
 const RETIRED_MOVES = ['midairBa1', 'midairBa2', 'throw', 'ba1Clone', 'rasenRush', 'shuriken'];
 const RETIRED_ANIMATIONS = [
-  'dash', 'midairHurt', 'chargeStart', 'chargeLoop', 'chargeRelease', 'shield', 'shieldStart', 'shieldRelease',
+  'dash', 'midairHurt', 'shield', 'shieldStart', 'shieldRelease',
   'midairShield', 'cloneCloud', 'rasenForm', 'rasenDash', 'rasenConfirm', 'rasenExplosion', 'rasenRelease',
   'rasenWhiffRelease', 'rasenSphereBuild', 'rasenSphereImpact', 'rasenSphereExplosion',
 ];
@@ -55,28 +56,28 @@ const RETIRED_STEMS = ['1ba', '2ba', 'midair1ba', 'midair2ba', 'throw', 'shurike
 // built on them): gone from the code, the tests and the documentation.
 const RETIRED_NOW = new RegExp([
   `\\b(${RETIRED_ATTACKS.join('|')})(Pressed)?\\b`,
-  '\\b(chargedActions|tryChargedAction|CHARGED_LABELS|cbaIndicators|drawCbaIndicators|CBA_STYLE|CBA[12]?)\\b',
-  '\\b(Basic Attack|Unique Basic|Charged BA|BA[12])\\b',
-  '\\b(midairHurt|chargeStart|chargeLoop|midairShield|shieldStart|cloneCloud|rasen[A-Z]\\w*)\\b',
+  '\\b(cbaIndicators|drawCbaIndicators|CBA_STYLE|CBA[12]?)\\b',
+  '\\b(Basic Attack|Unique Basic|BA[12])\\b',
+  '\\b(midairHurt|midairShield|shieldStart|cloneCloud|rasen[A-Z]\\w*)\\b',
   `0001_(${RETIRED_STEMS.join('|')})`,
 ].join('|'));
 // ...and, in the game code, every older retired name too (the tests keep
 // their own checks that those stay gone).
 const RETIRED_CODE = new RegExp([
   `\\b(${RETIRED_ATTACKS.join('|')})(Pressed)?\\b`,
-  '\\b(chargedActions|tryChargedAction|CHARGED_LABELS|cbaIndicators|drawCbaIndicators|CBA_STYLE|CBA[12]?)\\b',
+  '\\b(cbaIndicators|drawCbaIndicators|CBA_STYLE|CBA[12]?)\\b',
   '\\b(action1|action2|midairBa1|midairBa2|ba1Clone|rasenRush)\\b',
   '\\b(dashLeftPressed|dashRightPressed|leftPressed|rightPressed|queueTouchDash|touchDash)\\b',
   '\\b(primaryPressed|specialPressed|defensePressed|cabIndicators|drawCabIndicators|CAB_STYLE)\\b',
   '\\bCAB[12]?\\b',
-  '\\b(Basic Attack|Unique Basic|Charged BA|BA[12])\\b',
-  '\\b(midairHurt|chargeStart|chargeLoop|midairShield|shieldStart|cloneCloud|rasen[A-Z]\\w*)\\b',
+  '\\b(Basic Attack|Unique Basic|BA[12])\\b',
+  '\\b(midairHurt|midairShield|shieldStart|cloneCloud|rasen[A-Z]\\w*)\\b',
   `0001_(${RETIRED_STEMS.join('|')})`,
 ].join('|'));
 
 test('the gameplay controls are the canonical codenames; existing keys unchanged, attack3 to attack5 on free keys', () => {
   assert.deepEqual([...ACTIONS], [
-    'runLeft', 'runRight', 'charge', 'jump', 'extra_attack', 'transform', 'shield',
+    'runLeft', 'runRight', 'down', 'jump', 'extra_attack', 'transform', 'shield',
     'attack1', 'attack2', 'attack3', 'attack4', 'attack5', 'pause',
   ]);
   assert.deepEqual([...NUMBERED_ATTACKS], ['attack1', 'attack2', 'attack3', 'attack4', 'attack5']);
@@ -84,7 +85,7 @@ test('the gameplay controls are the canonical codenames; existing keys unchanged
   assert.deepEqual(Object.keys(ACTION_LABELS), [...ACTIONS]);
   assert.deepEqual(CONFIG.bindings.runLeft, ['KeyA', 'ArrowLeft']);
   assert.deepEqual(CONFIG.bindings.runRight, ['KeyD', 'ArrowRight']);
-  assert.deepEqual(CONFIG.bindings.charge, ['KeyS', 'ArrowDown']);
+  assert.deepEqual(CONFIG.bindings.down, ['KeyS', 'ArrowDown']);
   assert.deepEqual(CONFIG.bindings.jump, ['KeyW', 'Space', 'ArrowUp']);
   // The migrated controls keep their keys.
   assert.deepEqual(CONFIG.bindings.extra_attack, ['KeyJ']);
@@ -114,10 +115,10 @@ test('the gameplay controls are the canonical codenames; existing keys unchanged
   }
 });
 
-test('the combat buttons are extra_attack, transform and attack1 to attack5; shield, jump and charge stay held-state controls', () => {
+test('the combat buttons are extra_attack, transform and attack1 to attack5; shield, jump and down stay held-state controls', () => {
   assert.deepEqual([...COMBAT_BUTTONS], ['extra_attack', 'transform', 'attack1', 'attack2', 'attack3', 'attack4', 'attack5']);
   assert.equal(COMBAT_ACTIONS, COMBAT_BUTTONS, 'the Fighter reads the same list');
-  for (const held of ['shield', 'jump', 'charge']) assert.ok(!COMBAT_ACTIONS.includes(held), held);
+  for (const held of ['shield', 'jump', 'down']) assert.ok(!COMBAT_ACTIONS.includes(held), held);
   assert.deepEqual([...ABILITY_ACTIONS], [...COMBAT_BUTTONS], 'the touch buttons a fighter presents');
 });
 
@@ -132,14 +133,14 @@ test('the move codenames are universal and neutral: numbered attacks, their mid-
   }
   assert.deepEqual({ ...MOVES.extra_attack }, { number: null, air: false, label: 'Extra Attack' });
   assert.deepEqual({ ...MOVES.transform }, { number: null, air: false, label: 'Transform' });
-  // Nothing global says what attack3 or attack4 is for: whether it is a
-  // button or reached through Charge is each character's loadout.
+  // Nothing global says what attack3 or attack4 is for: whether it is an
+  // ordinary attack, a summon or a technique is each character's loadout.
   for (const m of Object.values(MOVES)) {
     assert.deepEqual(Object.keys(m).sort(), ['air', 'label', 'number'], 'no button, variant or role');
   }
   // Neutral names, never one character's: its own ability names go on top.
   for (const label of [...Object.values(ACTION_LABELS), ...Object.values(MOVES).map((m) => m.label)]) {
-    assert.doesNotMatch(label, /Throw|Shuriken|Punch|Kick|Clone|Sphere|#0001|Basic|BA\d|Charged/, `${label}: neutral`);
+    assert.doesNotMatch(label, /Throw|Shuriken|Punch|Kick|Clone|Sphere|#0001|Basic|BA\d/, `${label}: neutral`);
   }
   for (const name of [...RETIRED_ATTACKS, ...RETIRED_MOVES]) assert.equal(MOVES[name], undefined, `no ${name} move`);
 });
@@ -149,8 +150,11 @@ test('every character (and the tests\' sample fighter) keys its moves by the uni
     const who = `#${c.id}`;
     assert.deepEqual(loadoutProblems(c), [], `${who} keeps the loadout rules`);
     for (const id of Object.keys(c.attacks ?? {})) assert.ok(Object.hasOwn(MOVES, id), `${who}: attack ${id} is a move codename`);
-    for (const id of [...Object.keys(c.summons ?? {}), ...Object.keys(c.chargedTechniques ?? {})]) {
-      assert.ok(NUMBERED_ATTACKS.includes(id), `${who}: ${id} is a numbered attack`);
+    for (const [type, table] of [['summon', c.summons], ['technique', c.techniques]]) {
+      for (const id of Object.keys(table ?? {})) {
+        assert.ok(NUMBERED_ATTACKS.includes(id), `${who}: ${id} is a numbered attack`);
+        assert.equal(actionType(c, id), type, `${who}: ${id} is its own ${type} button`);
+      }
     }
     for (const button of Object.keys(c.mobileAbilities ?? {})) {
       assert.ok(ACTIONS.includes(button), `${who}: mobileAbilities.${button} names a control`);
@@ -158,7 +162,6 @@ test('every character (and the tests\' sample fighter) keys its moves by the uni
     for (const move of Object.keys(c.abilityNames ?? {})) {
       assert.ok(Object.hasOwn(MOVES, move), `${who}: abilityNames.${move} names a universal move`);
     }
-    assert.equal('chargedActions' in c, false, `${who}: its Charge replacements go by chargeReplacements`);
   }
 });
 
@@ -180,13 +183,16 @@ test('every controller builds the same canonical input snapshot, every combat bu
   }
 });
 
-test('#0001\'s actions resolve to the canonical move ids, on the ground and in the air; it has no attack3 to attack5 button', () => {
+test('#0001\'s actions resolve to the canonical move ids: attacks on the ground and in the air, attack3 its summon, attack4 its technique, no attack5', () => {
   assert.deepEqual(def.actions, {
     extra_attack: 'extra_attack',
     transform: null,
     attack1: { ground: 'attack1', air: 'midair_attack1' },
     attack2: { ground: 'attack2', air: 'midair_attack2' },
+    attack3: { type: 'summon', id: 'attack3' },
+    attack4: { type: 'technique', id: 'attack4' },
   });
+  assert.deepEqual(COMBAT_ACTIONS.map((a) => specialAction(def, a)?.id ?? null), [null, null, null, null, 'attack3', 'attack4', null]);
   const { fighter, step } = makeFighter();
   assert.deepEqual(COMBAT_ACTIONS.map((a) => fighter.attackFor(a)), ['extra_attack', null, 'attack1', 'attack2', null, null, null]);
   step({ jump: true, jumpPressed: true });
@@ -198,7 +204,7 @@ test('#0001\'s moves, clips and objects go by the codenames: attack1, midair_att
   for (const [id, atk] of Object.entries(def.attacks)) assert.equal(atk.animation, id, `${id} plays its own clip`);
   assert.deepEqual(Object.keys(def.animations), [
     'idle', 'run', 'jump', 'fall', 'mouvment', 'land', 'hurt', 'midair_hurt',
-    'attack1', 'midair_attack1', 'attack2', 'midair_attack2', 'charge', 'charge_loop', 'charge_release',
+    'attack1', 'midair_attack1', 'attack2', 'midair_attack2',
     'prepshield', 'shielding', 'releaseshield', 'midair_shielding', 'extra_attack',
     'attack4_form', 'attack4_dash', 'attack4_confirm', 'attack4_explosion', 'attack4_release', 'attack4_whiff_release',
   ]);
@@ -209,34 +215,29 @@ test('#0001\'s moves, clips and objects go by the codenames: attack1, midair_att
     'attack3_object', 'attack4_object_build', 'attack4_object_impact', 'attack4_object_explosion',
   ]);
   for (const name of [...RETIRED_ATTACKS, ...RETIRED_MOVES, ...RETIRED_ANIMATIONS]) {
-    for (const table of ['attacks', 'animations', 'projectileAnimations', 'effectAnimations', 'projectiles', 'summons', 'chargedTechniques', 'abilityNames']) {
+    for (const table of ['attacks', 'animations', 'projectileAnimations', 'effectAnimations', 'projectiles', 'summons', 'techniques', 'abilityNames']) {
       assert.equal(def[table][name], undefined, `no ${table}.${name}`);
     }
   }
   for (const name of [...RETIRED_CONTROLS, ...RETIRED_ATTACKS]) {
     assert.equal(def.actions[name], undefined, `no ${name} action`);
     assert.equal(def.mobileAbilities[name], undefined, `no ${name} mobile ability`);
-    assert.equal(def.chargeReplacements[name], undefined, `no ${name} Charge replacement`);
   }
 });
 
-test('Charge replacements: Charge + attack1 is attack3 (the Clone Attack), Charge + attack2 is attack4 (the Sphere Rush)', () => {
-  assert.deepEqual(def.chargeReplacements, {
-    attack1: { type: 'summon', id: 'attack3' },
-    attack2: { type: 'technique', id: 'attack4' },
-  });
+test('attack3 is the Clone Attack\'s summon and attack4 the Sphere Rush\'s technique, each keyed by its own button', () => {
   assert.deepEqual(Object.keys(def.summons), ['attack3']);
   assert.equal(def.summons.attack3.attack, 'attack1');
   assert.equal(def.summons.attack3.noGround.attack, 'midair_attack2');
   assert.equal(def.summons.attack3.cloud, 'attack3_object');
-  assert.deepEqual(Object.keys(def.chargedTechniques), ['attack4']);
+  assert.deepEqual(Object.keys(def.techniques), ['attack4']);
   assert.deepEqual(
     ['formAnimation', 'dashAnimation', 'confirmAnimation', 'explosionAnimation', 'releaseAnimation', 'whiffReleaseAnimation',
-      'sphereBuild', 'sphereImpact', 'sphereExplosion'].map((field) => def.chargedTechniques.attack4[field]),
+      'sphereBuild', 'sphereImpact', 'sphereExplosion'].map((field) => def.techniques.attack4[field]),
     ['attack4_form', 'attack4_dash', 'attack4_confirm', 'attack4_explosion', 'attack4_release', 'attack4_whiff_release',
       'attack4_object_build', 'attack4_object_impact', 'attack4_object_explosion'],
   );
-  assert.deepEqual(Object.keys(def.chargedTechniques.attack4.handOffsets), ['attack4_form', 'attack4_dash']);
+  assert.deepEqual(Object.keys(def.techniques.attack4.handOffsets), ['attack4_form', 'attack4_dash']);
   assert.deepEqual(def.abilityNames, {
     extra_attack: 'Shuriken', attack1: 'Punch', attack2: 'Kick', attack3: 'Clone Attack', attack4: 'Sphere Rush',
   });
@@ -244,42 +245,37 @@ test('Charge replacements: Charge + attack1 is attack3 (the Clone Attack), Charg
   assert.equal(cooldownLabel('attack4'), 'A4');
 });
 
-test('real Charge replacements start the attack3 and attack4 cooldowns, keyed by those moves and shown as A3 and A4', () => {
+test('pressing attack3 and attack4 starts their cooldowns, keyed by those moves and shown as A3 and A4', () => {
   const summoner = makeFighter();
   const foe = makeFighter({ x: 900, facing: -1 });
   summoner.fighter.opponent = foe.fighter;
-  summoner.step({ charge: true });
-  summoner.step({ charge: true, attack1: true, attack1Pressed: true });
-  assert.ok(summoner.fighter.combat.chargedCooldowns.active('attack3'));
+  summoner.step({ attack3: true, attack3Pressed: true });
+  assert.ok(summoner.fighter.combat.abilityCooldowns.active('attack3'));
   assert.deepEqual(summoner.fighter.summons.map((s) => s.id), ['attack3']);
   summoner.step({});
-  summoner.step({ charge: true });
-  summoner.step({ charge: true, attack2: true, attack2Pressed: true });
+  summoner.step({ attack4: true, attack4Pressed: true });
   assert.equal(summoner.fighter.technique?.def.id, 'attack4');
-  assert.equal(summoner.fighter.technique.action, 'attack2');
-  assert.deepEqual([...summoner.fighter.combat.chargedCooldowns.entries.keys()], ['attack3', 'attack4']);
-  assert.deepEqual(cooldownIndicators(summoner.fighter).map((c) => [c.id, c.action, c.label]), [
-    ['attack3', 'attack1', 'A3'],
-    ['attack4', 'attack2', 'A4'],
-  ]);
+  assert.equal(summoner.fighter.technique.action, 'attack4');
+  assert.deepEqual([...summoner.fighter.combat.abilityCooldowns.entries.keys()], ['attack3', 'attack4']);
+  assert.deepEqual(cooldownIndicators(summoner.fighter).map((c) => [c.id, c.label]), [['attack3', 'A3'], ['attack4', 'A4']]);
 });
 
-test('the combat AI discovers the moveset by its canonical names, and reaches attack3 and attack4 only through their buttons', () => {
+test('the combat AI discovers the moveset by its canonical names, and reaches attack3 and attack4 through their own buttons', () => {
   const moves = readMoveset(new Fighter({ def, sprites: fakeSprites(), stage: STAGE, spawn: { x: 500 } }));
   assert.deepEqual(moves.melee.map((m) => [m.action, m.id, m.air]).sort(), [
     ['attack1', 'attack1', false], ['attack1', 'midair_attack1', true], ['attack2', 'attack2', false], ['attack2', 'midair_attack2', true],
   ]);
   assert.deepEqual(moves.ranged.map((m) => [m.action, m.id, m.air]), [['extra_attack', 'extra_attack', false]]);
-  assert.deepEqual(moves.charged.map((c) => [c.action, c.id]), [['attack1', 'attack3'], ['attack2', 'attack4']]);
-  assert.ok([...moves.melee, ...moves.ranged, ...moves.charged].every((m) => m.action !== 'transform'), 'transform is reserved');
-  assert.ok([...moves.melee, ...moves.ranged].every((m) => !['attack3', 'attack4', 'attack5'].includes(m.action)), 'no attack3 to attack5 button');
+  assert.deepEqual(moves.specials.map((c) => [c.action, c.id]), [['attack3', 'attack3'], ['attack4', 'attack4']]);
+  assert.ok([...moves.melee, ...moves.ranged, ...moves.specials].every((m) => m.action !== 'transform'), 'transform is reserved');
+  assert.ok([...moves.melee, ...moves.ranged].every((m) => !['attack3', 'attack4', 'attack5'].includes(m.action)), 'attack3 and attack4 are no melee or ranged attacks');
 });
 
 // ---- Files ------------------------------------------------------------------
 
 test('every fighter frame is <id>_<codename>_<frame>.png in its own folder, and the frame helpers build exactly that', () => {
   assert.equal(framePath('0027', 'attack2', 3), './assets/characters/0027/0027_attack2_3.png');
-  assert.equal(framePath('0027', 'charge', 'a'), './assets/characters/0027/0027_charge_a.png');
+  assert.equal(framePath('0027', 'idle', 1), './assets/characters/0027/0027_idle_1.png');
   assert.deepEqual(frames('0027', 'midair_attack2', 2), [
     './assets/characters/0027/0027_midair_attack2_1.png', './assets/characters/0027/0027_midair_attack2_2.png',
   ]);
@@ -288,19 +284,17 @@ test('every fighter frame is <id>_<codename>_<frame>.png in its own folder, and 
   ]);
   for (const c of [...CHARACTERS, SAMPLE_FIGHTER]) {
     const id = c.id === 'sample' ? '0001' : c.id;
-    const pattern = new RegExp(`^\\./assets/characters/${id}/${id}_([a-z0-9_]+)_(\\d+|[ab])\\.png$`);
+    const pattern = new RegExp(`^\\./assets/characters/${id}/${id}_([a-z0-9_]+)_(\\d+)\\.png$`);
     for (const [table, clips] of [['animations', c.animations], ['projectileAnimations', c.projectileAnimations], ['effectAnimations', c.effectAnimations]]) {
       for (const [key, clip] of Object.entries(clips ?? {})) {
         for (const url of clip.frames) {
           const m = pattern.exec(url);
           assert.ok(m, `${table}.${key}: ${url} follows <id>_<codename>_<frame>.png`);
           // The frame's codename is its clip's own, or the one its clip is a
-          // part of (attack4_form plays attack4_*, charge_loop charge_*).
+          // part of (attack4_form plays attack4_*); every frame is numbered.
           const codename = m[1];
           if (c === SAMPLE_FIGHTER) continue;
           assert.ok(key === codename || key.startsWith(`${codename}_`), `${table}.${key} plays ${codename} frames`);
-          // Lettered frames are Charge's loop, and nothing else.
-          if (/[ab]$/.test(m[2])) assert.equal(`${codename}_${key}`, 'charge_charge_loop', url);
         }
       }
     }
@@ -310,9 +304,9 @@ test('every fighter frame is <id>_<codename>_<frame>.png in its own folder, and 
 
 test('#0001\'s folder holds only codename files, none under a retired stem', () => {
   const files = readdirSync(new URL('assets/characters/0001/', ROOT));
-  assert.equal(files.length, 92);
+  assert.equal(files.length, 88);
   for (const name of files) {
-    assert.match(name, /^0001_[a-z][a-z0-9_]*_(\d+|[ab])\.png$/, name);
+    assert.match(name, /^0001_[a-z][a-z0-9_]*_\d+\.png$/, name);
     assert.doesNotMatch(name, new RegExp(`^0001_(${RETIRED_STEMS.join('|')})\\d*\\.png$`), name);
   }
   const used = new Set(characterFramePaths(def).map((url) => url.split('/').pop()));
@@ -348,7 +342,40 @@ test('no retired name is left in the tests or the current documentation either',
     assert.equal(hit, -1, `${file}:${hit + 1} still uses a retired name: ${lines[hit]}`);
   }
   // Test files are named by the new codenames too.
-  for (const gone of ['basic-attack', 'basic-attack-2', 'charged-ba2', 'throw']) {
+  for (const gone of ['basic-attack', 'basic-attack-2', 'throw']) {
     assert.equal(existsSync(new URL(`tests/${gone}.test.mjs`, ROOT)), false, `tests/${gone}.test.mjs`);
+  }
+});
+
+// The retired stance mechanic, as a whole: none of its words is left in any
+// file name, path, line of code, style, test or document of the repository.
+// Its stem is written with a character class so this file never matches
+// itself; French words that only share its letters (Chargement, chargés,
+// en recharge: loading, and Energy refilling) are not it.
+const RETIRED_MECHANIC = /(?<!re)c[h]arg(?!ement|és)/i;
+const BINARY = /\.(png|jpe?g|gif|webp|ico)$/i;
+
+// Every file and folder of the repository but its git store, as paths.
+function repositoryPaths(dir = '') {
+  return readdirSync(new URL(dir || './', ROOT), { withFileTypes: true }).flatMap((e) => {
+    if (e.name === '.git' || e.name === 'node_modules') return [];
+    const path = `${dir}${e.name}`;
+    return e.isDirectory() ? [`${path}/`, ...repositoryPaths(`${path}/`)] : [path];
+  });
+}
+
+test('the retired stance mechanic is gone for good: no file name, identifier, style, translation, test or document of it', () => {
+  const paths = repositoryPaths();
+  assert.ok(paths.includes('js/game/technique.js') && paths.includes('README.md'), 'the walk sees the repository');
+  for (const path of paths) assert.doesNotMatch(path, RETIRED_MECHANIC, `${path}: its name`);
+  for (const path of paths.filter((p) => !p.endsWith('/') && !BINARY.test(p))) {
+    const lines = read(path).split('\n');
+    const hit = lines.findIndex((line) => RETIRED_MECHANIC.test(line));
+    assert.equal(hit, -1, `${path}:${hit + 1}: ${lines[hit]}`);
+  }
+  // Nor in any definition's data, the art each one loads, or a translation key.
+  for (const c of [...CHARACTERS, SAMPLE_FIGHTER]) {
+    assert.doesNotMatch(JSON.stringify(c), RETIRED_MECHANIC, `#${c.id}`);
+    for (const url of characterFramePaths(c)) assert.doesNotMatch(url, RETIRED_MECHANIC, url);
   }
 });

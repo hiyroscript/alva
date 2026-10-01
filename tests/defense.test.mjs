@@ -37,7 +37,7 @@ const SHIELD_FPS = 12;
 const POSE = steps(1 / SHIELD_FPS); // simulation steps the raise / lower pose shows
 const COST = 25;
 // #0001 with no Energy refill, so a run of blocks lands on exact values.
-const NO_REGEN = { ...def, energy: { ...def.energy, regen: 0, chargeRegen: 0 } };
+const NO_REGEN = { ...def, energy: { ...def.energy, regen: 0 } };
 
 // The uploaded PNGs, byte for byte, and their one-frame roles, each clip
 // keyed by its codename (prepshield, shielding, releaseshield,
@@ -153,7 +153,7 @@ test('#0001 defends with a Shield: typed data, no Dodge fields, no chip-damage s
   const { fighter } = makeFighter();
   assert.equal(fighter.defense.type, 'shield');
   assert.ok(Object.isFrozen(fighter.defense));
-  assert.equal(def.stats.blockDamageScale, undefined);
+  assert.equal(def.stats?.blockDamageScale, undefined);
   assert.equal(def.energy.shieldHitCost, COST);
   assert.equal('blockDrain' in def.energy, false, 'no drain while held');
   assert.equal('dodgeCost' in def.energy, false);
@@ -180,7 +180,7 @@ test('the Shield is a held-state control (its `defense`), never an attack or com
   for (let i = 0; i < 20; i++) step(HOLD);
   assert.equal(fighter.combat.attack, null, 'no attack, hitbox or hasHit');
   assert.equal(fighter.combat.cooldowns.size, 0, 'no cooldown entry');
-  assert.equal(fighter.combat.chargedCooldowns.size, 0);
+  assert.equal(fighter.combat.abilityCooldowns.size, 0);
 });
 
 // ---- Input ---------------------------------------------------------------------
@@ -192,7 +192,7 @@ test('the shared input is shield on L; no block, dodge or defense action', () =>
   assert.equal(CONFIG.bindings.defense, undefined, 'no alias for the retired name');
   assert.equal(ACTION_LABELS.shield, 'Shield');
   assert.deepEqual(ACTIONS, [
-    'runLeft', 'runRight', 'charge', 'jump', 'extra_attack', 'transform', 'shield',
+    'runLeft', 'runRight', 'down', 'jump', 'extra_attack', 'transform', 'shield',
     'attack1', 'attack2', 'attack3', 'attack4', 'attack5', 'pause',
   ]);
 });
@@ -234,7 +234,7 @@ test('InputManager exposes shield / shieldPressed from L, RB and RT; other pad b
     button(i, false);
     assert.equal(input.sample().shield, false);
   }
-  for (const [i, action] of [[0, 'jump'], [1, 'attack1'], [4, 'attack2'], [13, 'charge'], [2, 'extra_attack'], [3, 'transform']]) {
+  for (const [i, action] of [[0, 'jump'], [1, 'attack1'], [4, 'attack2'], [13, 'down'], [2, 'extra_attack'], [3, 'transform']]) {
     button(i, true);
     f = input.sample();
     assert.equal(f[action], true, `button ${i} -> ${action}`);
@@ -402,11 +402,11 @@ test('a mid-air Shield slows the fall: it brakes toward slowFallSpeed and falls 
   // at slowFallSpeed. Down held too: the Shield rules the fast fall out.
   const fast = aloft(def.movement.fastFallSpeed);
   const vys = [fast.fighter.body.vy];
-  fast.step({ ...SHIELD, charge: true });
+  fast.step({ ...SHIELD, down: true });
   assert.equal(fast.fighter.state, 'shield');
   vys.push(fast.fighter.body.vy);
   for (let i = 0; i < 20; i++) {
-    fast.step({ ...HOLD, charge: true });
+    fast.step({ ...HOLD, down: true });
     vys.push(fast.fighter.body.vy);
   }
   for (let i = 1; i < vys.length; i++) assert.ok(near(vys[i], Math.max(slow, vys[i - 1] - brake * DT)), `step ${i}: ${vys[i]}`);
@@ -508,7 +508,7 @@ test('Shield held wins over a new attack; an attack already playing is never cut
   assert.equal(fighter.combat.shielding, true, 'up the step the attack ends');
 });
 
-test('no Shield while stunned, bound or performing a charged technique', () => {
+test('no Shield while stunned, bound or performing a technique', () => {
   const stunned = makeFighter();
   stunned.fighter.combat.stun = 0.2;
   stunned.step(SHIELD);
@@ -528,8 +528,8 @@ test('no Shield while stunned, bound or performing a charged technique', () => {
   assert.equal(bound.fighter.combat.shielding, true);
 
   const rush = makeFighter();
-  for (let i = 0; i < 10; i++) rush.step({ charge: true });
-  rush.step({ charge: true, ...ATTACK2 });
+  for (let i = 0; i < 10; i++) rush.step({});
+  rush.step({ attack4: true, attack4Pressed: true });
   assert.ok(rush.fighter.technique);
   rush.step(HOLD);
   assert.equal(rush.fighter.combat.shielding, false);
@@ -993,7 +993,7 @@ test('no gameplay code reads the Shield\'s look: only the Arena\'s renderer impo
   const arena = readFileSync(`${ROOT}js/game/arena.js`, 'utf8');
   assert.match(arena, /import \{ drawShield \} from '\.\/shield-fx\.js';/);
   for (const name of ['shieldRadius', 'shieldOutline', 'SHIELD_SHAPE']) {
-    for (const f of ['combat.js', 'physics.js', 'character.js', 'charged-technique.js', 'projectile.js', 'clone.js']) {
+    for (const f of ['combat.js', 'physics.js', 'character.js', 'technique.js', 'projectile.js', 'clone.js']) {
       assert.doesNotMatch(readFileSync(`${ROOT}js/game/${f}`, 'utf8'), new RegExp(name), `${f} never uses ${name}`);
     }
   }

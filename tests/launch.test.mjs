@@ -7,7 +7,7 @@
 // (LAUNCH_UNIT_SPEED, 10 world units per second per point) turns it into a
 // speed. Covers the registry and
 // its validation, the shared resolvers, the real CombatSystem.applyHit path
-// (melee, projectiles, clones and charged techniques alike), the Shield's
+// (melee, projectiles, clones and techniques alike), the Shield's
 // blocked hits (no Launch Point, no launch), #0001's authored hits, Void respawns and a guard against the old
 // Knockback architecture coming back. Runs the real Fighter, physics and
 // combat (see fighter-harness.mjs).
@@ -23,7 +23,7 @@ import { CHARACTERS } from '../js/data/characters.js';
 import * as combatModule from '../js/game/combat.js';
 import { CombatState, CombatSystem, createAttackDefinition } from '../js/game/combat.js';
 import { createProjectileDefinition } from '../js/game/projectile.js';
-import { createTechniqueDefinition } from '../js/game/charged-technique.js';
+import { createTechniqueDefinition } from '../js/game/technique.js';
 import { Battle } from '../js/game/battle.js';
 import { getMap } from '../js/data/maps.js';
 import { CONFIG } from '../js/config.js';
@@ -345,7 +345,7 @@ test('a hit event describes the new system and nothing of the old one', () => {
 // ---- #0001 ------------------------------------------------------------------------
 
 test('#0001\'s authored hits: damage, Base Launch and Directional Launch, exactly', () => {
-  const rush = def.chargedTechniques.attack4;
+  const rush = def.techniques.attack4;
   const authored = {
     attack1: def.attacks.attack1,
     attack2: def.attacks.attack2,
@@ -495,7 +495,7 @@ test('the launch path is shared and generic: no fighter, attack or technique sin
   assert.doesNotMatch(combat, /(?:\.id|attack|attackId|fighter\.id|technique\.id)\s*===?\s*['"]/);
   assert.doesNotMatch(combat, /'0001'|'(midair_)?attack\d'|'extra_attack(_object)?'|'attack\d_object\w*'/);
   // Projectiles, clones and techniques never compute a launch of their own.
-  for (const file of ['js/game/projectile.js', 'js/game/clone.js', 'js/game/charged-technique.js']) {
+  for (const file of ['js/game/projectile.js', 'js/game/clone.js', 'js/game/technique.js']) {
     const code = read(file).replace(/^\s*\/\/.*$/gm, '');
     assert.doesNotMatch(code, /resolveLaunchStrength|resolveDirectionalLaunch\(|launchPoint\s*\*/, `${file} has no launch math`);
   }

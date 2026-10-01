@@ -79,7 +79,7 @@ export class Battle extends Arena {
   }
 
   restart() {
-    // Resetting a fighter ends its charged technique and releases whatever
+    // Resetting a fighter ends its technique and releases whatever
     // it held, and cancels any respawn wait; the fresh combat state carries
     // no bind, timer or sphere, 0 Launch Point, full Energy and no cooldowns.
     // Both back to 0 points. Every CPU's controller starts over too (nothing

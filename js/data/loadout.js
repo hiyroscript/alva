@@ -1,5 +1,5 @@
-// Attack loadouts: which numbered attacks a character has, which of them
-// have a button of their own, and which Charge reaches instead.
+// Attack loadouts: which numbered attacks a character has and what each of
+// their buttons does.
 //
 // Every character's moves go by the same universal codenames (MOVES in
 // js/config.js), whatever it calls them in game:
@@ -7,56 +7,39 @@
 //   attack1 ... attack5     the numbered attacks: attack1 and attack2
 //                           always, at most five, and contiguous from
 //                           attack1 to the highest one
-//   midair_attack1 ... 5    each numbered attack's mid-air version
+//   midair_attack1 ... 5    an ordinary numbered attack's mid-air version
 //   extra_attack            one optional special attack of the character's
 //                           own (a throw, a projectile, a utility move),
 //                           never counted among the numbered ones
 //   transform               reserved
 //
-// Whether attack3 or attack4 is a button of its own or what Charge makes of
-// attack1 or attack2 depends on the character, never on its number. A
-// character with no Charge replacements gives every numbered attack its own
-// button, and every one of those its mid-air version:
+// The one rule: a numbered attack the fighter has is a numbered combat
+// button the player presses directly. Nothing else reaches one: no held
+// stance, modifier or other button. Its `actions` entry says which kind of
+// move the button is (ACTION_TYPES):
+//
+//   an ordinary attack   { ground: 'attackN', air: 'midair_attackN' }:
+//                        attackN on the ground, its mid-air version in the
+//                        air (both in `attacks`)
+//   a summon             { type: 'summon', id: 'attackN' }: sends out the
+//                        detached entity `summons.attackN` (js/game/clone.js)
+//   a technique          { type: 'technique', id: 'attackN' }: the fighter
+//                        itself performs the multi-phase move
+//                        `techniques.attackN` (js/game/technique.js)
+//
+// A summon or a technique is ground-only and has no mid-air version; each
+// has its own cooldown. attack1 and attack2 are always ordinary attacks;
+// attack3 to attack5 may be any of the three. #0001, for example:
 //
 //   actions: {
 //     attack1: { ground: 'attack1', air: 'midair_attack1' },
 //     attack2: { ground: 'attack2', air: 'midair_attack2' },
-//     attack3: { ground: 'attack3', air: 'midair_attack3' },
+//     attack3: { type: 'summon', id: 'attack3' },
+//     attack4: { type: 'technique', id: 'attack4' },
 //   }
 //
-// A character with Charge replacements spends attack3 and attack4 on them:
-// while it is Charging, its attack1 button makes attack3 and its attack2
-// button attack4. They have no button of their own and need no mid-air
-// version (Charge is grounded). A fifth attack is an ordinary third button:
-//
-//   actions: {
-//     attack1: { ground: 'attack1', air: 'midair_attack1' },
-//     attack2: { ground: 'attack2', air: 'midair_attack2' },
-//     attack5: { ground: 'attack5', air: 'midair_attack5' },
-//   },
-//   chargeReplacements: {
-//     attack1: { type: 'summon', id: 'attack3' },
-//     attack2: { type: 'technique', id: 'attack4' },
-//   },
-//
-// So, by numbered attacks and Charge replacements:
-//
-//   attacks  Charge  buttons                    while Charging
-//   2        -       attack1 attack2
-//   3        -       attack1 attack2 attack3
-//   4        -       attack1 ... attack4
-//   5        -       attack1 ... attack5
-//   3        yes     attack1 attack2            attack1 -> attack3
-//   4        yes     attack1 attack2            attack1 -> attack3, attack2 -> attack4
-//   5        yes     attack1 attack2 attack5    attack1 -> attack3, attack2 -> attack4
-//
-// With a replacement on attack1 only, attack2 pressed while Charging is
-// still attack2. A replacement is typed: a `summon` (js/game/clone.js) or a
-// `technique` (js/game/charged-technique.js), keyed by the attack it is.
-// Charge itself is a grounded stance every fighter has, unless its
-// definition says `charge: false` (#0002): then the Charge input never holds
-// it in a stance (Down only fast-falls, in the air), and it can have no
-// Charge replacements. Only what Charge replaces is the character's.
+// So a fighter with N numbered attacks has exactly N numbered buttons,
+// attack1 to attackN, whatever kind each one is.
 //
 // Anything an attack creates is named after it with `object`: a projectile
 // `<attack>_object`, and the art of a summon or a technique
@@ -67,7 +50,7 @@
 // js/data/characters.js refuses to load one that breaks any.
 
 import { COMBAT_BUTTONS, MOVES, NUMBERED_ATTACKS } from '../config.js';
-import { TECHNIQUE_CLIPS, TECHNIQUE_EFFECTS } from '../game/charged-technique.js';
+import { TECHNIQUE_CLIPS, TECHNIQUE_EFFECTS } from '../game/technique.js';
 
 export { NUMBERED_ATTACKS };
 
@@ -78,12 +61,11 @@ export const MIN_NUMBERED_ATTACKS = 2;
 // The one special attack outside the numbered ones.
 export const EXTRA_ATTACK = 'extra_attack';
 
-// Each button a Charge replacement may sit on, and the numbered attack it
-// always is.
-export const CHARGE_REPLACES = Object.freeze({ attack1: 'attack3', attack2: 'attack4' });
+// The kinds of move a numbered button may be (see above).
+export const ACTION_TYPES = Object.freeze(['attack', 'summon', 'technique']);
 
-// What a Charge replacement may be.
-export const REPLACEMENT_TYPES = Object.freeze(['summon', 'technique']);
+// The numbered buttons that are always ordinary attacks.
+const ORDINARY_ONLY = Object.freeze(['attack1', 'attack2']);
 
 // The mid-air version of numbered attack `attack` (midair_attack3 for attack3).
 export const midairAttack = (attack) => `midair_${attack}`;
@@ -91,69 +73,66 @@ export const midairAttack = (attack) => `midair_${attack}`;
 // Whether `id` is one of the numbered attacks.
 export const isNumberedAttack = (id) => NUMBERED_ATTACKS.includes(id);
 
-// The number in a numbered attack's codename (3 for attack3 or even
-// attack7), Infinity for anything else: orders them.
-const numberOf = (id) => Number(/^attack(\d+)$/.exec(id)?.[1] ?? Infinity);
-
 // The codename an attack's own objects start with (see above).
 export const objectOf = (attack) => `${attack}_object`;
 
+const isObject = (value) => !!value && typeof value === 'object' && !Array.isArray(value);
+
+// Which kind of move `def`'s `action` button is (ACTION_TYPES): 'summon' or
+// 'technique' for a typed entry, 'attack' for any other mapped button, null
+// for one it does not have or that is reserved (null).
+export function actionType(def, action) {
+  const mapping = def?.actions?.[action];
+  if (!mapping) return null;
+  return isObject(mapping) && Object.hasOwn(mapping, 'type') ? mapping.type : 'attack';
+}
+
+// `def`'s summon or technique on `action`'s button ({ type, id }), or null
+// for any other button.
+export function specialAction(def, action) {
+  const type = actionType(def, action);
+  return type === 'summon' || type === 'technique' ? def.actions[action] : null;
+}
+
 // The numbered attacks `def` gives a button of its own, in order: the ones
-// in its `actions`.
+// in its `actions`. Every numbered attack it has is one of them.
 export function attackButtons(def) {
   const actions = def?.actions ?? {};
   return NUMBERED_ATTACKS.filter((id) => Object.hasOwn(actions, id));
 }
 
-// `def`'s Charge replacement on `button` ({ type, id }), or null.
-export function chargeReplacement(def, button) {
-  return def?.chargeReplacements?.[button] ?? null;
-}
-
-// Whether `def` has any Charge replacement.
-export function hasChargeReplacements(def) {
-  return Object.keys(def?.chargeReplacements ?? {}).length > 0;
-}
-
-// Every numbered attack `def` has, in order: the ones with a button and the
-// ones Charge reaches (whatever ids those name, so a wrong one shows).
+// Every numbered attack `def` has, in order: exactly its numbered buttons.
 export function numberedAttacks(def) {
-  const ids = new Set(attackButtons(def));
-  for (const spec of Object.values(def?.chargeReplacements ?? {})) if (spec?.id) ids.add(spec.id);
-  return [...ids].sort((a, b) => numberOf(a) - numberOf(b));
+  return attackButtons(def);
 }
 
-// The numbered attacks only Charge reaches: no button of their own.
-export function chargeOnlyAttacks(def) {
-  const buttons = attackButtons(def);
-  return numberedAttacks(def).filter((id) => !buttons.includes(id));
+// The numbered buttons that are a summon or a technique, in order.
+export function specialAttacks(def) {
+  return attackButtons(def).filter((id) => specialAction(def, id));
 }
 
-// What `def`'s loadout comes to: its numbered attacks, the ones with a
-// button (each with its mid-air version), what Charge makes of each button
-// it replaces, and whether it has an extra_attack.
+// What `def`'s loadout comes to: its numbered attacks (every one a button),
+// the ordinary ones' mid-air versions, the kind of move each button is, and
+// whether it has an extra_attack.
 export function describeLoadout(def) {
   const buttons = attackButtons(def);
   return {
     numbered: numberedAttacks(def),
     buttons,
-    air: Object.fromEntries(buttons.map((id) => [id, midairAttack(id)])),
-    charge: Object.fromEntries(Object.entries(def?.chargeReplacements ?? {}).map(([button, spec]) => [button, spec?.id ?? null])),
+    air: Object.fromEntries(buttons.filter((id) => actionType(def, id) === 'attack').map((id) => [id, midairAttack(id)])),
+    types: Object.fromEntries(buttons.map((id) => [id, actionType(def, id)])),
     extra: !!def?.actions?.[EXTRA_ATTACK],
   };
 }
 
-const isObject = (value) => !!value && typeof value === 'object' && !Array.isArray(value);
-
 // Every way `def` breaks the loadout rules above, one sentence each; empty
-// when it keeps them all. Checks its buttons, its Charge replacements, the
-// numbered attacks they come to, that every move they name exists with the
-// art it plays, and that everything an attack creates is named after it.
+// when it keeps them all. Checks its buttons, the numbered attacks they
+// come to, that every move they name exists with the art it plays, and that
+// everything an attack creates is named after it.
 export function loadoutProblems(def) {
   const problems = [];
   const say = (text) => problems.push(text);
   const actions = isObject(def?.actions) ? def.actions : {};
-  const replacements = isObject(def?.chargeReplacements) ? def.chargeReplacements : {};
   const attacks = def?.attacks ?? {};
   const animations = def?.animations ?? {};
   const effects = def?.effectAnimations ?? {};
@@ -166,18 +145,63 @@ export function loadoutProblems(def) {
     if (!attacks[id]) say(`${where} names attack "${id}", which is not in \`attacks\``);
   };
 
+  // A summon's data and art, for button `id`.
+  const checkSummon = (id) => {
+    const summon = def?.summons?.[id];
+    if (!summon) {
+      say(`actions.${id} summons ${id}, which is not in \`summons\``);
+      return;
+    }
+    needAttack(summon.attack, `summon ${id}`);
+    if (summon.noGround) needAttack(summon.noGround.attack, `summon ${id}'s noGround`);
+    if (!effects[summon.cloud]) say(`summon ${id}'s cloud "${summon.cloud}" is not in \`effectAnimations\``);
+    else if (!summon.cloud.startsWith(objectOf(id))) say(`summon ${id}'s cloud "${summon.cloud}" is not named ${objectOf(id)}`);
+  };
+
+  // A technique's data and art, for button `id`.
+  const checkTechnique = (id) => {
+    const technique = def?.techniques?.[id];
+    if (!technique) {
+      say(`actions.${id} performs ${id}, which is not in \`techniques\``);
+      return;
+    }
+    for (const field of TECHNIQUE_CLIPS) {
+      const key = technique[field];
+      if (!animations[key]) say(`technique ${id}'s ${field} "${key}" is not in \`animations\``);
+      else if (!key.startsWith(`${id}_`)) say(`technique ${id}'s ${field} "${key}" is not named ${id}_...`);
+    }
+    for (const field of TECHNIQUE_EFFECTS) {
+      const key = technique[field];
+      if (!effects[key]) say(`technique ${id}'s ${field} "${key}" is not in \`effectAnimations\``);
+      else if (!key.startsWith(objectOf(id))) say(`technique ${id}'s ${field} "${key}" is not named ${objectOf(id)}...`);
+    }
+  };
+
   // ---- Buttons ----------------------------------------------------------------
   for (const [button, mapping] of Object.entries(actions)) {
     if (!COMBAT_BUTTONS.includes(button)) {
       say(`actions.${button} is not a combat button (${COMBAT_BUTTONS.join(', ')})`);
     } else if (isNumberedAttack(button)) {
-      // A numbered attack with a button always has its mid-air version.
       const air = midairAttack(button);
-      if (!isObject(mapping) || mapping.ground !== button || mapping.air !== air) {
-        say(`actions.${button} must be { ground: '${button}', air: '${air}' }`);
+      const type = actionType(def, button);
+      if (type === 'attack') {
+        // An ordinary numbered attack always has its mid-air version.
+        if (!isObject(mapping) || mapping.ground !== button || mapping.air !== air) {
+          say(`actions.${button} must be { ground: '${button}', air: '${air}' }, a summon or a technique`);
+        } else {
+          needAttack(button, `actions.${button}`);
+          needAttack(air, `actions.${button}`);
+        }
+      } else if (ORDINARY_ONLY.includes(button)) {
+        say(`actions.${button} must be an ordinary attack ({ ground: '${button}', air: '${air}' })`);
+      } else if (type !== 'summon' && type !== 'technique') {
+        say(`actions.${button} has type ${JSON.stringify(mapping?.type)} (summon or technique)`);
+      } else if (mapping.id !== button || Object.keys(mapping).some((key) => key !== 'type' && key !== 'id')) {
+        say(`actions.${button} must be { type: '${type}', id: '${button}' }: a ${type} is keyed by the button it is`);
+      } else if (type === 'summon') {
+        checkSummon(button);
       } else {
-        needAttack(button, `actions.${button}`);
-        needAttack(air, `actions.${button}`);
+        checkTechnique(button);
       }
     } else if (mapping !== null) {
       // extra_attack and transform: their own move, or null (reserved).
@@ -185,53 +209,8 @@ export function loadoutProblems(def) {
       else needAttack(button, `actions.${button}`);
     }
   }
-  for (const id of ['attack1', 'attack2']) {
+  for (const id of ORDINARY_ONLY) {
     if (!Object.hasOwn(actions, id)) say(`${id} needs a button of its own (actions.${id})`);
-  }
-
-  // ---- Charge replacements ----------------------------------------------------------
-  if (def && Object.hasOwn(def, 'charge') && typeof def.charge !== 'boolean') {
-    say(`charge is ${JSON.stringify(def.charge)}: true, false or left out`);
-  }
-  if (def?.charge === false && Object.keys(replacements).length) {
-    say('it has no Charge (charge: false), so it can have no Charge replacements');
-  }
-  for (const [button, spec] of Object.entries(replacements)) {
-    const target = CHARGE_REPLACES[button];
-    if (!target) {
-      say(`chargeReplacements.${button}: only attack1 (-> attack3) and attack2 (-> attack4) have Charge replacements`);
-      continue;
-    }
-    if (spec?.id !== target) say(`chargeReplacements.${button} is ${target}, not "${spec?.id}"`);
-    if (spec?.type === 'summon') {
-      const summon = def?.summons?.[target];
-      if (!summon) {
-        say(`chargeReplacements.${button} summons ${target}, which is not in \`summons\``);
-      } else {
-        needAttack(summon.attack, `summon ${target}`);
-        if (summon.noGround) needAttack(summon.noGround.attack, `summon ${target}'s noGround`);
-        if (!effects[summon.cloud]) say(`summon ${target}'s cloud "${summon.cloud}" is not in \`effectAnimations\``);
-        else if (!summon.cloud.startsWith(objectOf(target))) say(`summon ${target}'s cloud "${summon.cloud}" is not named ${objectOf(target)}`);
-      }
-    } else if (spec?.type === 'technique') {
-      const technique = def?.chargedTechniques?.[target];
-      if (!technique) {
-        say(`chargeReplacements.${button} performs ${target}, which is not in \`chargedTechniques\``);
-      } else {
-        for (const field of TECHNIQUE_CLIPS) {
-          const key = technique[field];
-          if (!animations[key]) say(`technique ${target}'s ${field} "${key}" is not in \`animations\``);
-          else if (!key.startsWith(`${target}_`)) say(`technique ${target}'s ${field} "${key}" is not named ${target}_...`);
-        }
-        for (const field of TECHNIQUE_EFFECTS) {
-          const key = technique[field];
-          if (!effects[key]) say(`technique ${target}'s ${field} "${key}" is not in \`effectAnimations\``);
-          else if (!key.startsWith(objectOf(target))) say(`technique ${target}'s ${field} "${key}" is not named ${objectOf(target)}...`);
-        }
-      }
-    } else {
-      say(`chargeReplacements.${button} has type "${spec?.type}" (${REPLACEMENT_TYPES.join(' or ')})`);
-    }
   }
 
   // ---- The numbered attacks they come to --------------------------------------------
@@ -242,14 +221,6 @@ export function loadoutProblems(def) {
   }
   if (numbered.some((id, i) => id !== NUMBERED_ATTACKS[i])) {
     say(`its numbered attacks (${numbered.join(', ')}) are not attack1 to attack${numbered.length} in a row`);
-  }
-  if (hasChargeReplacements(def)) {
-    // With Charge, attack3 is always attack1's replacement, and attack4
-    // attack2's once there is one: never a button in their place.
-    if (!replacements.attack1) say('with Charge replacements, attack3 is Charge + attack1: chargeReplacements.attack1 is missing');
-    if (numbered.includes('attack4') && !replacements.attack2) {
-      say('with Charge replacements, attack4 is Charge + attack2: chargeReplacements.attack2 is missing');
-    }
   }
 
   // ---- Moves, and what they create ----------------------------------------------------
@@ -266,9 +237,10 @@ export function loadoutProblems(def) {
     if (!projectile) say(`attack "${id}" throws "${shot.id}", which is not in \`projectiles\``);
     else if (!projectileArt[projectile.animation]) say(`projectile "${shot.id}" plays "${projectile.animation}", which is not in \`projectileAnimations\``);
   }
-  for (const [kind, table] of [['summons', def?.summons], ['chargedTechniques', def?.chargedTechniques]]) {
+  // Every summon and technique is some button's: none is left unreachable.
+  for (const [kind, type, table] of [['summons', 'summon', def?.summons], ['techniques', 'technique', def?.techniques]]) {
     for (const id of Object.keys(table ?? {})) {
-      if (!Object.values(replacements).some((spec) => spec?.id === id)) say(`${kind}.${id} is no Charge replacement's`);
+      if (actionType(def, id) !== type) say(`${kind}.${id} is no button's: actions.${id} is not { type: '${type}', id: '${id}' }`);
     }
   }
   const owned = (key) => Object.keys(MOVES).some((move) => key.startsWith(objectOf(move)));

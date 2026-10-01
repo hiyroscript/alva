@@ -19,7 +19,7 @@ const PAD_DEADZONE = 0.45;
 
 // Standard Gamepad mapping -> gameplay actions. attack3 to attack5 are for
 // fighters with those buttons (a fighter only acts on the ones it has; see
-// js/data/loadout.js).
+// js/data/loadout.js): #0001's Clone Attack on LT and Sphere Rush on L3.
 const PAD_BUTTONS = {
   0: 'jump',          // A / Cross
   2: 'extra_attack',  // X / Square (#0001's Throw)
@@ -32,7 +32,7 @@ const PAD_BUTTONS = {
   5: 'shield',        // RB
   7: 'shield',        // RT
   12: 'jump',         // D-pad up
-  13: 'charge',       // D-pad down (menus still read it as Down; see _padMenu)
+  13: 'down',         // D-pad down (menus still read it as Down; see _padMenu)
   14: 'runLeft',      // D-pad left (menus still read it as Left)
   15: 'runRight',     // D-pad right (menus still read it as Right)
 };
@@ -212,7 +212,7 @@ export class InputManager {
     const ay = pad.axes[1] || 0;
     if (ax < -PAD_DEADZONE) next.add('runLeft');
     if (ax > PAD_DEADZONE) next.add('runRight');
-    if (ay > PAD_DEADZONE) next.add('charge');
+    if (ay > PAD_DEADZONE) next.add('down');
 
     let changed = false;
     for (const a of next) if (!this.pad.has(a)) changed = true;

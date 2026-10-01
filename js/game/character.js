@@ -10,19 +10,19 @@ import {
 } from './combat.js';
 import { createProjectileDefinition } from './projectile.js';
 import { createSummonDefinition, summonProblem } from './clone.js';
-import { ChargedTechnique, createTechniqueDefinition, techniqueProblem } from './charged-technique.js';
+import { Technique, createTechniqueDefinition, techniqueProblem } from './technique.js';
 import { getJumpVelocity, getMaxSpeed } from '../data/powers.js';
-import { chargeReplacement } from '../data/loadout.js';
+import { specialAction } from '../data/loadout.js';
 import { COMBAT_BUTTONS } from '../config.js';
 import { blankInput } from './fighter-controller.js';
 import { approach, clamp, sign } from '../core/utils.js';
 
 // The combat buttons, by control codename (COMBAT_BUTTONS in js/config.js):
-// extra_attack, transform and attack1 to attack5. Each maps to an attack
-// through the character's `actions`; a fighter acts only on the ones it
-// has there. attack1 and attack2 may also have a Charge replacement
-// (attack3, attack4) in its `chargeReplacements` (see js/data/loadout.js).
-// shield, jump and charge are held-state controls, read separately.
+// extra_attack, transform and attack1 to attack5. Each maps to a move
+// through the character's `actions` (an attack, or for attack3 to attack5
+// also a summon or a technique; see js/data/loadout.js); a fighter acts
+// only on the ones it has there. shield, jump and the directions (down
+// included) are held-state controls, read separately.
 export const COMBAT_ACTIONS = COMBAT_BUTTONS;
 
 // stateTime is a sum of fixed steps, which drifts just below whole-step
@@ -58,12 +58,6 @@ export class Fighter {
     this.animator = new SpriteAnimator(sprites);
     // One pass of the touchdown clip; 0 skips the land state entirely.
     this.landDuration = sprites.duration('land');
-    // One pass of the Charge startup clip (`charge`); the loop clip
-    // (`charge_loop`) follows it.
-    this.chargeStartDuration = sprites.duration('charge');
-    // One Charge frame-time of the release pose (`charge_release`); 0 skips
-    // it entirely.
-    this.chargeReleaseDuration = sprites.duration('charge_release');
     // One pass of the mouvment clip: how long a Dash lasts (0 without its
     // art, and then no Dash starts; see tryDash).
     this.dashDuration = sprites.duration('mouvment');
@@ -81,7 +75,7 @@ export class Fighter {
       Object.entries(def.summons || {}).map(([id, spec]) => [id, createSummonDefinition({ id, ...spec })]),
     );
     this.techniqueDefs = Object.fromEntries(
-      Object.entries(def.chargedTechniques || {}).map(([id, spec]) => [id, createTechniqueDefinition({ id, ...spec })]),
+      Object.entries(def.techniques || {}).map(([id, spec]) => [id, createTechniqueDefinition({ id, ...spec })]),
     );
     // What the shared `shield` input does for this character (its `defense`
     // entry; null: nothing).
@@ -99,16 +93,8 @@ export class Fighter {
     // air, from its Speed Power tier. Nothing else (acceleration, launches,
     // projectiles, techniques) uses it.
     this.maxSpeed = getMaxSpeed(def);
-    // Seconds of charged-action cooldown recovered per second while in
-    // Charge (see recoverChargedCooldowns); 1 per second otherwise.
-    this.chargedCooldownRate = def.stats?.chargedCooldownRate ?? 1;
-    // Whether it has a Charge stance at all: `charge: false` (#0002) has
-    // none, so the Charge input (Down) never holds it in place on the ground
-    // and only ever fast-falls in the air. Nothing to replace, either (see
-    // js/data/loadout.js).
-    this.canCharge = def.charge !== false;
-    // Energy settings (js/game/combat.js resolveEnergy): the maximum, both
-    // refill rates, what a Dash costs and what each blocked hit costs.
+    // Energy settings (js/game/combat.js resolveEnergy): the maximum, the
+    // refill rate, what a Dash costs and what each blocked hit costs.
     this.energyDef = resolveEnergy(def.energy);
     // How it responds to being launched (resolveLaunchReaction in
     // js/game/combat.js): longer stun for
@@ -124,8 +110,8 @@ export class Fighter {
   }
 
   reset(stage) {
-    // A charged technique in progress ends first, releasing any opponent it
-    // holds: nothing of it survives a rematch.
+    // A technique in progress ends first, releasing any opponent it holds:
+    // nothing of it survives a rematch.
     if (this.technique) this.endTechnique('reset');
     const { def, spawn } = this;
     const half = def.collider.width / 2;
@@ -153,13 +139,6 @@ export class Fighter {
     this.state = 'idle';
     this.stateTime = 0;
     this.moveDir = 0;
-    this.charging = false;
-    this.chargeReleased = false;
-    // Whether Charge was held on the latest step, and whether it was held as
-    // a charged technique ended: such a Charge does not charge again until
-    // it is let go (see update).
-    this.chargeHeld = false;
-    this.chargeHeldOver = false;
     this.coyote = 0;
     this.jumpBuffer = 0;
     // Jumps left in the air before landing again (movement.airJumps),
@@ -168,7 +147,7 @@ export class Fighter {
     // Jumped in the air this step (the jump clip starts over).
     this.airJumped = false;
     // The direction held this step ({ x, y }, y -1 up with Jump, 1 down with
-    // Charge), read by a hit landing on it to steer its launch.
+    // Down), read by a hit landing on it to steer its launch.
     this.steerHeld = { x: 0, y: 0 };
     // Launched hard (launchReaction.tumbleSpeed or faster): it tumbles in its
     // mid-air hurt pose, stunned or not, until it acts or lands.
@@ -201,10 +180,6 @@ export class Fighter {
     // spends the airtime was started in the air, and until the fighter lands
     // or is hit it has no attack or air jump left.
     this.freeFall = false;
-    // Down (the Charge input) is held in the air: the fast fall's (see
-    // update). Such a hold does not become a Charge on landing; it must be
-    // let go and held again.
-    this.chargeFromAir = false;
     // Fast-falling this step: Down held in the air while descending.
     this.fastFalling = false;
     this.lastGroundY = this.body.y;
@@ -234,8 +209,8 @@ export class Fighter {
     // Summons paid for this step, waiting for the battle to spawn them (see
     // spawnClones in js/game/clone.js): { id, target }.
     this.summons = [];
-    // The charged technique this fighter is performing (see
-    // js/game/charged-technique.js), or null.
+    // The technique this fighter is performing (see js/game/technique.js),
+    // or null.
     this.technique = null;
     this.renderX = this.body.x;
     this.renderY = this.body.y;
@@ -244,10 +219,11 @@ export class Fighter {
 
   // Back at its own spawn after the Void's wait (see Arena.updateRespawns):
   // a clean, neutral state, exactly a reset. Launch Point is back to 0,
-  // Energy full and not exhausted, and every cooldown (charged ones
-  // included) ready; everything transient goes with the old body: velocity,
-  // attack, Shield, Dash, stun, freeze, binds, its charged technique and any
-  // queued projectile or summon. It is in play again at once.
+  // Energy full and not exhausted, and every cooldown (the summon's and the
+  // technique's included) ready; everything transient goes with the old
+  // body: velocity, attack, Shield, Dash, stun, freeze, binds, its
+  // technique and any queued projectile or summon. It is in play again at
+  // once.
   respawn(stage) {
     this.reset(stage);
   }
@@ -269,30 +245,19 @@ export class Fighter {
 
     const raw = this.controller ? this.controller.getInput(this, dt, ctx) : NEUTRAL_INPUT;
     const input = this.inputLocked ? NEUTRAL_INPUT : raw;
-    const wasCharging = this.charging;
     this.steps++;
-    this.chargeReleased = false;
-    this.chargeHeld = !!input.charge;
-    if (!this.chargeHeld) this.chargeHeldOver = false;
-    // Down held in the air is the fast fall's, never a Charge waiting for
-    // the ground: it has to be let go and held again there.
-    if (!this.chargeHeld) this.chargeFromAir = false;
-    else if (!body.grounded) this.chargeFromAir = true;
     this.fastFalling = false;
     this.airJumped = false;
     this.bounce = null;
     this.steerHeld.x = (input.runRight ? 1 : 0) - (input.runLeft ? 1 : 0);
-    this.steerHeld.y = (input.charge ? 1 : 0) - (input.jump ? 1 : 0);
+    this.steerHeld.y = (input.down ? 1 : 0) - (input.jump ? 1 : 0);
 
+    // Every cooldown recovers by this step first (the summon's and the
+    // technique's too, in real time), so one started below ends the step at
+    // its full length.
     combat.update(dt);
-    // Charged cooldowns recover by this step first, so one started below
-    // ends the step at its full length. Faster only while a Charge held
-    // since an earlier step is still held and nothing has interrupted it.
-    this.recoverChargedCooldowns(
-      dt, wasCharging && !!input.charge && combat.stun <= 0 && combat.hitstop <= 0 && !combat.immobilized,
-    );
-    // Hitstun always wins over a charged technique (CombatSystem.applyHit
-    // normally ends it on the hit itself), and over a Dash, as does a bind.
+    // Hitstun always wins over a technique (CombatSystem.applyHit normally
+    // ends it on the hit itself), and over a Dash, as does a bind.
     if (this.technique && combat.stun > 0) this.endTechnique('hit');
     if (this.dash && (combat.stun > 0 || combat.immobilized)) this.endDash();
     // A hit (or a bind) takes the fighter out of its own attack: nothing of
@@ -315,8 +280,7 @@ export class Fighter {
     if (combat.hitstop > 0) {
       // Impact freeze: nothing moves or advances, but a fresh hit still
       // switches to the hurt pose so the freeze holds the reaction (and a
-      // blocked one keeps the Shield up). Energy keeps refilling, at the
-      // normal rate (a frozen fighter is not in its Charge stance). Presses
+      // blocked one keeps the Shield up). Energy keeps refilling. Presses
       // made during it are kept, not lost, and do not age: the attack
       // pressed through the impact comes out as soon as it can, and so
       // does a Dash asked for (a Dash cancel out of the hit). The body is
@@ -326,7 +290,7 @@ export class Fighter {
       body.prevY = body.y;
       for (const action of COMBAT_ACTIONS) if (input[`${action}Pressed`]) this.bufferAttack(action);
       this.frozenDash = this.dashAsked(input, 0) || this.frozenDash;
-      combat.updateEnergy(dt, false);
+      combat.updateEnergy(dt);
       this.updateState(0);
       return;
     }
@@ -342,7 +306,7 @@ export class Fighter {
     // ---- Shield: held shield ---------------------------------------------
     // Decided first: `shield` held with a Shield the fighter may raise (its
     // `defense` is a Shield, it is not exhausted, the art for where it is)
-    // takes the step, so no attack, Throw, charged action or Dash starts
+    // takes the step, so no attack, Throw, summon, technique or Dash starts
     // while it is held. Let go of the Shield button to do any of them.
     const shieldHeld = !!input.shield && this.shieldAllowed();
 
@@ -351,27 +315,23 @@ export class Fighter {
     const held = (input.runRight ? 1 : 0) - (input.runLeft ? 1 : 0);
 
     // ---- Combat intents --------------------------------------------------
-    // Actions mapped to null are wired but reserved, and a button the
-    // character has no action for does nothing (see tryAction). A press
-    // while already Charging (since an earlier step) with Charge still held
-    // is the button's Charge replacement first (see tryChargeReplacement):
-    // one that starts, or one still cooling down, consumes the press;
-    // otherwise (none on that button, or it cannot happen) the normal
-    // attack gets it. Letting go of Charge on the press step, or pressing it
-    // with a fresh Charge, is a normal attack.
+    // Each press is its button's own move (see tryAction): an attack, or a
+    // summon or technique (#0001's Attack 3 and Attack 4). Actions mapped to
+    // null are wired but reserved, and a button the character has no action
+    // for does nothing.
     //
     // A press the fighter cannot act on yet (an attack or its recovery, a
     // stun, a Dash, a cooldown, the Shield button held) is buffered
     // (see bufferAttack) and tried again every later step until it starts
     // or expires, so an attack pressed slightly early comes out on the
     // first step it can. A newer press replaces it. Only ever an ordinary
-    // attack: a Charge replacement needs its own press, while Charging.
+    // attack: a summon or a technique happens on its own press or not at
+    // all, so one pressed while it cools down never comes out later.
     //
     // Buffered presses keep their order: a jump pressed before the attack
     // (both waiting on the same recovery) goes first, and the attack comes
     // out on a later step, in the air. Pressed on the same step, the attack
     // goes first, on the ground.
-    const charged = wasCharging && !!input.charge;
     const canJump = this.coyote > 0 || (!body.grounded && this.airJumps > 0 && !this.freeFall);
     const jumpFirst = (at) =>
       this.jumpBuffer > 0 && canJump && this.jumpPressedAt < at && this.canFollowUp() && !shieldHeld;
@@ -380,11 +340,6 @@ export class Fighter {
       if (!input[`${action}Pressed`]) continue;
       if (shieldHeld || jumpFirst(this.steps)) {
         this.bufferAttack(action);
-        continue;
-      }
-      if (charged && this.tryChargeReplacement(action)) {
-        this.bufferedAttack = null;
-        started = true;
         continue;
       }
       if (this.tryAction(action, held)) {
@@ -423,21 +378,20 @@ export class Fighter {
     this.frozenDash = 0;
     if (dashDirection && this.tryDash(dashDirection, input)) spent = true;
 
-    // ---- Charged technique -------------------------------------------------
+    // ---- Technique ---------------------------------------------------------
     // While one runs it owns the fighter: its phases advance on their own
     // clock (the release after a whiff or a finished explosion ends it here),
-    // whether or not Charge is still held.
+    // whatever is held.
     if (this.technique) {
       const ended = this.technique.update(dt);
       if (ended) this.endTechnique(ended);
     }
 
-    // After the intents, so an attack or charged technique started this step
-    // also rules out a Shield, jump, charge or platform drop on the same
-    // step.
+    // After the intents, so an attack or technique started this step also
+    // rules out a Shield, jump or platform drop on the same step.
     const canAct = this.canAct();
     // The Shield is up while `shield` is held and the fighter is free to act
-    // (it never cuts an attack, Dash, charged technique, stun or bind short).
+    // (it never cuts an attack, Dash, technique, stun or bind short).
     // A blocked hit's blockstun holds it up until the stun is over, held or
     // not. Either way only while shieldAllowed: the block that empties the
     // bar (or having no art for where the fighter is) drops it.
@@ -458,15 +412,6 @@ export class Fighter {
     if (combat.shielding) this.shieldDownTime = 0;
     else this.shieldDownTime += dt;
 
-    // ---- Charge: grounded, and only while held ---------------------------
-    // Only a fighter with a Charge stance (see canCharge) ever charges. The
-    // held value alone decides it: no toggle or buffer, so the step that
-    // sees Charge released ends it. A held Shield outranks it. After a
-    // charged technique, a Charge held since before it must be let go and
-    // held again, and so must one held down from the air (the fast fall).
-    this.charging = this.canCharge &&
-      canAct && body.grounded && !!input.charge && !combat.shielding && !this.chargeHeldOver && !this.chargeFromAir;
-
     // ---- Platform drop (training CPU only) -------------------------------
     // No player key, button or touch control produces `dropPressed`; the
     // training CPU uses it to follow the player down through one-way platforms.
@@ -481,7 +426,7 @@ export class Fighter {
     const atk = combat.attack;
     let gravityShare = 1;
     let dir = held;
-    if (combat.shielding || this.charging || combat.stun > 0 || combat.immobilized || this.technique || this.dash) dir = 0;
+    if (combat.shielding || combat.stun > 0 || combat.immobilized || this.technique || this.dash) dir = 0;
     // Normal locomotion only: an attack steers with its own share of it.
     this.moveDir = atk?.def.lockMovement ? 0 : dir;
 
@@ -496,9 +441,9 @@ export class Fighter {
       body.vx = approach(body.vx, 0, drag * dt);
     } else if (this.dash) {
       body.vx = this.dash.direction * mv.dashSpeed;
-    } else if (combat.shielding || this.charging) {
-      // A Shield or Charge locks it: no walking or running on the ground,
-      // no steering in the air; the current speed runs down under the normal
+    } else if (combat.shielding) {
+      // A Shield locks it: no walking or running on the ground, no steering
+      // in the air; the current speed runs down under the normal
       // deceleration (the gentle air drag in the air, so momentum carries on).
       this.moveHorizontal(0, 0, 1, dt);
     } else if (atk?.motion && !atk.motion.done) {
@@ -531,7 +476,6 @@ export class Fighter {
       body.ground = null;
       this.coyote = 0;
       this.jumpBuffer = 0;
-      this.charging = false;
       jumped = true;
     } else if (this.jumpBuffer > 0 && !body.grounded && this.coyote <= 0 && this.airJumps > 0 && free && !this.technique && !this.freeFall) {
       // ---- Air jump -------------------------------------------------------
@@ -571,25 +515,18 @@ export class Fighter {
     }
 
     // ---- Fast fall ---------------------------------------------------------
-    // Down (the Charge input) held in the air while already descending
-    // speeds the fall up toward movement.fastFallSpeed at
+    // Down held in the air while already descending speeds the fall up
+    // toward movement.fastFallSpeed at
     // fastFallAcceleration: never while rising, never a jump in speed, and
     // never slower than the fall already is. Aerial attacks may fast-fall;
     // a stun, a bind or an air Shield may not.
     if (
-      !body.grounded && input.charge && body.vy > 0 && mv.fastFallSpeed > 0 &&
+      !body.grounded && input.down && body.vy > 0 && mv.fastFallSpeed > 0 &&
       combat.stun <= 0 && !combat.immobilized && !combat.shielding && !this.technique && !this.inMotion
     ) {
       this.fastFalling = true;
       if (body.vy < mv.fastFallSpeed) body.vy = Math.min(mv.fastFallSpeed, body.vy + mv.fastFallAcceleration * dt);
     }
-
-    // ---- Voluntary Charge release ----------------------------------------
-    // Charging last step, Charge let go this step, and nothing else took over
-    // (a hit, attack, Shield or jump all rule it out through canAct,
-    // shielding or grounded). Only then does the brief release pose play.
-    this.chargeReleased =
-      wasCharging && !input.charge && canAct && body.grounded && !combat.shielding;
 
     // ---- Slow fall ---------------------------------------------------------
     // The Shield up in the air (held, or kept up by blockstun) slows the
@@ -649,13 +586,13 @@ export class Fighter {
       this.launch = null;
     }
 
-    // ---- Charged technique: ground and walls ------------------------------
+    // ---- Technique: ground and walls --------------------------------------
     // It needs real ground under the fighter from its first frame to its
     // last: ground lost (a ledge, the main floor's edge, a vanished
     // platform) ends it at once and the fighter falls from where it is. A
     // wall (a solid's side; the stage has no side walls) stops the rush as
     // a whiff: the fighter stays against it and releases, this step counting
-    // as the release's first (see ChargedTechnique.whiff).
+    // as the release's first (see Technique.whiff).
     const technique = this.technique;
     if (technique) {
       if (!body.grounded) this.endTechnique('ground');
@@ -670,10 +607,9 @@ export class Fighter {
     if (this.dash && (!body.grounded || body.wall === this.dash.direction)) this.endDash();
 
     // ---- Energy refill -----------------------------------------------------
-    // Every step no Dash was paid for, a held Shield included: faster while
-    // in the Charge stance (this.charging: never the release pose, a
-    // charged technique or a Charge held through one).
-    if (!spent) combat.updateEnergy(dt, this.charging);
+    // Every step no Dash was paid for, a held Shield included, at the one
+    // passive rate: nothing held ever makes it faster.
+    if (!spent) combat.updateEnergy(dt);
 
     // A buffered press ages only on steps the fighter lives through (never
     // in a freeze) and is gone once it is older than the buffer.
@@ -812,19 +748,11 @@ export class Fighter {
   }
 
   // Free to start something new: the combat state allows it (no attack,
-  // stun, blockstun or bind), no charged technique owns the fighter and it
-  // is not dashing. Its Launch Point, however high, and the Energy it has
+  // stun, blockstun or bind), no technique owns the fighter and it is not
+  // dashing. Its Launch Point, however high, and the Energy it has
   // left never matter.
   canAct() {
     return this.combat.canAct() && !this.technique && !this.dash;
-  }
-
-  // One fixed step of recovery for every charged-action cooldown: at
-  // chargedCooldownRate while `charging` (the fighter is really in its
-  // Charge stance), at 1 otherwise (running, jumping, attacking, stunned,
-  // shielding, frozen, bound or performing a charged technique).
-  recoverChargedCooldowns(dt, charging) {
-    this.combat.chargedCooldowns.update(dt, charging ? this.chargedCooldownRate : 1);
   }
 
   // A hit landing now would meet a perfect Shield: one raised no more than
@@ -897,22 +825,21 @@ export class Fighter {
   // Starts one Dash toward `direction` (1 right, -1 left): a short grounded
   // burst at movement.dashSpeed for one pass of the dash clip. Movement
   // only: no hitbox, damage, launch or invulnerability. Only while free
-  // to act (no attack, stun, bind, charged technique or Dash already
-  // running) or in an attack that hit and may be cut short (see
+  // to act (no attack, stun, bind, technique or Dash already running) or
+  // in an attack that hit and may be cut short (see
   // CombatState.cancellable: a Dash chases what it sent flying), grounded,
-  // not in or holding Charge (holding Down, for a fighter with a Charge
-  // stance), not shielding or holding `shield` for a
-  // Shield it may raise, and not exhausted, paying dashCost, or
-  // dashCancelCost for one that cuts an attack short (all that is left,
-  // emptying the bar, when that is less): the extra is what keeps a
-  // hit-Dash-hit chase from looping. The fighter faces the Dash at once.
-  // False, with nothing spent and the attack left as it is, if it cannot
-  // start (a missing dash clip is logged). `input` is this step's (Charge or
-  // Shield held rules it out); any caller (a future AI too) may use it.
+  // not shielding or holding `shield` for a Shield it may raise, and not
+  // exhausted, paying dashCost, or dashCancelCost for one that cuts an
+  // attack short (all that is left, emptying the bar, when that is less):
+  // the extra is what keeps a hit-Dash-hit chase from looping. Down held
+  // never matters. The fighter faces the Dash at once. False, with nothing
+  // spent and the attack left as it is, if it cannot start (a missing dash
+  // clip is logged). `input` is this step's (Shield held rules it out);
+  // any caller (a future AI too) may use it.
   tryDash(direction, input = NEUTRAL_INPUT) {
     const speed = this.def.movement.dashSpeed;
     if (!speed || !direction) return false;
-    if (!this.canFollowUp() || !this.body.grounded || this.charging || (this.canCharge && input.charge)) return false;
+    if (!this.canFollowUp() || !this.body.grounded) return false;
     if (this.combat.shielding || (input.shield && this.shieldAllowed())) return false;
     // Never a fast run passed off as a Dash: require real mouvment frames.
     if (!this.dashDuration || !this.sprites.has('mouvment')) {
@@ -937,93 +864,89 @@ export class Fighter {
     this.dash = null;
   }
 
-  // `action`'s Charge replacement (see js/data/loadout.js), dispatched on
-  // its type: a `summon` (#0001's attack3, the Clone Attack, from attack1;
-  // see trySummon) or a `technique` (#0001's attack4, the Sphere Rush, from
-  // attack2; see tryTechnique). True when it consumed the press: it
-  // happened, or it is still cooling down (then nothing happens at all: no
-  // normal attack instead, and the cooldown is left as it is). False (none
-  // on this button, or it cannot happen) leaves the press to the normal
-  // attack.
-  tryChargeReplacement(action) {
-    const replacement = chargeReplacement(this.def, action);
-    if (!replacement) return false;
-    if (this.combat.chargedCooldowns.active(replacement.id)) return true;
-    if (replacement.type === 'summon') return this.trySummon(action, replacement.id);
-    if (replacement.type === 'technique') return this.tryTechnique(action, replacement.id);
-    console.warn(`[Alva] Charge replacement on ${action} has an unknown type "${replacement.type}"; ignoring.`);
+  // Starts `action`'s summon or technique (`special`, its { type, id } in
+  // `actions`; see js/data/loadout.js): #0001's attack3, the Clone Attack
+  // (see trySummon), or its attack4, the Sphere Rush (see tryTechnique).
+  // Only on the ground, only while free to act (never cutting an attack
+  // short) and never while its own cooldown runs: a press then does nothing
+  // at all, no other attack instead and nothing kept for later. `dir` is
+  // the direction held on this step: a technique faces it as it starts, as
+  // an attack does. True when it started.
+  trySpecial(action, special, dir = 0) {
+    if (!this.body.grounded || !this.canAct() || this.combat.abilityCooldowns.active(special.id)) return false;
+    if (special.type === 'summon') return this.trySummon(special.id);
+    if (special.type === 'technique') return this.tryTechnique(action, special.id, dir);
+    console.warn(`[Alva] ${action} has an unknown action type "${special.type}"; ignoring.`);
     return false;
   }
 
-  // Summon `id` from `action`: starts its cooldown and queues one summon at
-  // the opponent for the battle to spawn. The fighter itself performs
-  // nothing and keeps charging. False, with no cooldown started, if there is
-  // no such summon, the fighter cannot act, there is no opponent in play
-  // (none at all, or one lost to the Void and waiting to respawn) or the art
-  // is missing (logged).
-  trySummon(action, id) {
+  // Summon `id`: starts its cooldown and queues one summon at the opponent
+  // for the battle to spawn. The fighter itself performs nothing and is
+  // free at once. False, with no cooldown started, if there is no such
+  // summon, there is no opponent in play (none at all, or one lost to the
+  // Void and waiting to respawn) or the art is missing (logged).
+  trySummon(id) {
     const summon = this.summonDefs[id];
-    if (!summon || !this.opponent || this.opponent.lostToVoid || !this.canAct()) return false;
+    if (!summon || !this.opponent || this.opponent.lostToVoid) return false;
     const problem = summonProblem(this, summon);
     if (problem) {
       console.warn(`[Alva] Summon "${id}" is unavailable: ${problem}; ignoring.`);
       return false;
     }
     // Accepted: its cooldown runs from now, whether or not the clone hits.
-    this.combat.chargedCooldowns.start(id, summon.cooldown);
-    this.combat.lastIntent = action;
+    this.combat.abilityCooldowns.start(id, summon.cooldown);
     this.summons.push({ id, target: this.opponent });
     return true;
   }
 
-  // Start technique `id` from `action`: the fighter leaves Charge (no
-  // release pose) and the technique owns it from this step (see
-  // js/game/charged-technique.js). Grounded only. False, with no cooldown
-  // started, if there is no such technique, the fighter cannot act or is
-  // airborne, or its art or data is missing (logged).
-  tryTechnique(action, id) {
+  // Start technique `id` from `action`, facing `dir` if one is held: the
+  // technique owns the fighter from this step (see js/game/technique.js).
+  // False, with no cooldown started, if there is no such technique or its
+  // art or data is missing (logged).
+  tryTechnique(action, id, dir = 0) {
     const def = this.techniqueDefs[id];
-    if (!def || !this.canAct() || !this.body.grounded) return false;
+    if (!def) return false;
     const problem = techniqueProblem(this, def);
     if (problem) {
-      console.warn(`[Alva] Charged technique "${id}" is unavailable: ${problem}; ignoring.`);
+      console.warn(`[Alva] Technique "${id}" is unavailable: ${problem}; ignoring.`);
       return false;
     }
     // Started: its cooldown runs from now, whether it hits, misses, meets a
     // wall or is interrupted.
-    this.combat.chargedCooldowns.start(id, def.cooldown);
-    this.combat.lastIntent = action;
-    this.charging = false;
+    this.combat.abilityCooldowns.start(id, def.cooldown);
+    if (dir) this.facing = dir;
     this.body.vx = 0;
-    this.technique = new ChargedTechnique({ owner: this, def, action });
+    this.technique = new Technique({ owner: this, def, action });
     return true;
   }
 
-  // Ends the charged technique in progress, if any, for `reason`: 'miss' or
-  // 'wall' (once its release pose has shown), 'blocked', 'done', 'ground',
-  // 'hit', 'released', 'void', 'reset' or 'destroy'. The sphere is removed
-  // and any opponent it holds released; Launch Point already added stays, and
-  // no further tick or explosion follows. The rush never carries on as a
-  // slide, and a Charge still held from before it does not resume by itself.
+  // Ends the technique in progress, if any, for `reason`: 'miss' or 'wall'
+  // (once its release pose has shown), 'blocked', 'done', 'ground', 'hit',
+  // 'released', 'void', 'reset' or 'destroy'. The sphere is removed and any
+  // opponent it holds released; Launch Point already added stays, and no
+  // further tick or explosion follows. The rush never carries on as a
+  // slide.
   endTechnique(reason) {
     const t = this.technique;
     if (!t) return;
     t.end(reason);
     this.technique = null;
-    this.chargeHeldOver = this.chargeHeld;
     this.body.vx = 0;
     this.updateState(0);
   }
 
-  // Starts the attack mapped to `action`, if it can start now. `dir` is the
-  // direction held on this step: an attack faces it as it starts (so a
-  // turn made on the press step is never stale), and otherwise keeps the
-  // fighter's facing, fixed from then until it ends. Starting it cuts short
-  // an attack that may be (its hit confirmed; see CombatState.cancellable),
-  // though never into itself while its own cooldown would still run.
+  // Starts the move mapped to `action`, if it can start now: its summon or
+  // technique (see trySpecial), or else its attack. `dir` is the direction
+  // held on this step: an attack faces it as it starts (so a turn made on
+  // the press step is never stale), and otherwise keeps the fighter's
+  // facing, fixed from then until it ends. Starting it cuts short an attack
+  // that may be (its hit confirmed; see CombatState.cancellable), though
+  // never into itself while its own cooldown would still run.
   tryAction(action, dir = 0) {
     const combat = this.combat;
     combat.lastIntent = action;
+    const special = specialAction(this.def, action);
+    if (special) return this.trySpecial(action, special, dir);
     const attackId = this.attackFor(action);
     if (!attackId) return false; // reserved: wired, but no attack mapped
     const atk = this.attacks[attackId];
@@ -1270,25 +1193,25 @@ export class Fighter {
 
   // Facing follows only the fighter's own input: the way it is running
   // (once past a small speed on the ground, so a turn does not flicker) or
-  // steering in the air (`dir`). In an action of its own (an attack, the
-  // Shield or Charge) the direction held (`held`) turns it at once, left to
-  // right or right to left, as often as it likes: whatever the action does
-  // from then goes the new way (the hitbox, the attack's step-in, a
-  // shuriken not yet thrown, a Sphere Rush started from the Charge). A Dash
-  // sets it as it starts (tryDash), and so does an attack started with a
-  // direction held (tryAction); a spawn or respawn takes the spawn's.
-  // Otherwise it keeps its last facing: it never turns toward its opponent
-  // by itself, standing still included, so an opponent crossing behind it
-  // stays behind it. Locked while a stun, bind, charged technique or Dash
-  // plays: none of those is the fighter's to steer; nor is an attack with a
-  // motion of its own (a roll, a homing dash, a plunge, a lift).
+  // steering in the air (`dir`). In an action of its own (an attack or the
+  // Shield) the direction held (`held`) turns it at once, left to right or
+  // right to left, as often as it likes: whatever the action does from then
+  // goes the new way (the hitbox, the attack's step-in, a shuriken not yet
+  // thrown). A Dash sets it as it starts (tryDash), and so does an attack or
+  // a technique started with a direction held (tryAction); a spawn or
+  // respawn takes the spawn's. Otherwise it keeps its last facing: it never
+  // turns toward its opponent by itself, standing still included, so an
+  // opponent crossing behind it stays behind it. Locked while a stun, bind,
+  // technique or Dash plays: none of those is the fighter's to steer; nor
+  // is an attack with a motion of its own (a roll, a homing dash, a plunge,
+  // a lift).
   updateFacing(dir, held) {
     const { body, combat } = this;
     if (combat.stun > 0 || combat.immobilized || this.technique || this.dash) return;
     // An attack with a motion of its own never turns (a homing dash faces
     // the way it flies: see moveMotion).
     if (combat.attack?.def.motion) return;
-    if (combat.attack || combat.shielding || this.charging) {
+    if (combat.attack || combat.shielding) {
       if (held) this.facing = held;
       return;
     }
@@ -1308,9 +1231,7 @@ export class Fighter {
     else if (this.tumbling && !body.grounded) next = 'tumble';
     else if (!body.grounded) next = body.vy < 0 ? 'jump' : 'fall';
     else if (this.isLanding(dt)) next = 'land';
-    else if (this.charging) next = 'charge';
     else if (this.isReleasingShield(dt)) next = 'shieldRelease';
-    else if (this.isReleasingCharge(dt)) next = 'chargeRelease';
     else if ((this.moveDir !== 0 && Math.abs(body.vx) > 20) || Math.abs(body.vx) > 140) next = 'run';
     else next = 'idle';
 
@@ -1339,12 +1260,9 @@ export class Fighter {
 
   // Animation key for a visual state. An attack plays its own clip for its
   // whole length, even if the fighter lands or leaves the ground meanwhile.
-  // Hitstun, and being bound by a charged technique, show `hurt` on the
-  // ground and `midair_hurt` in the air. A charged technique plays the clip
-  // of its current phase. Charge plays its startup (`charge`) once, then
-  // `charge_loop` for the rest of the hold; a new Charge resets stateTime,
-  // so it starts from the first frame. Its release pose is
-  // `charge_release`, and a Dash plays `mouvment`. The Shield shows its
+  // Hitstun, and being bound by a technique, show `hurt` on the ground and
+  // `midair_hurt` in the air. A technique plays the clip of its current
+  // phase, and a Dash plays `mouvment`. The Shield shows its
   // held pose where the fighter is (`airAnimation` in the air), opening
   // with `groundStartAnimation` for one frame when it goes up on the
   // ground; the shieldRelease state is `groundReleaseAnimation`.
@@ -1360,10 +1278,6 @@ export class Fighter {
     if (state === 'technique') return this.technique.animation;
     if (state === 'hitstun' || state === 'bound') return this.body.grounded ? 'hurt' : 'midair_hurt';
     if (state === 'tumble') return 'midair_hurt';
-    if (state === 'charge') {
-      return this.stateTime < this.chargeStartDuration - TIME_EPSILON ? 'charge' : 'charge_loop';
-    }
-    if (state === 'chargeRelease') return 'charge_release';
     if (state === 'dash') return 'mouvment';
     return state;
   }
@@ -1384,15 +1298,6 @@ export class Fighter {
     if (!this.shieldReleaseDuration) return false;
     if (this.state === 'shield') return this.body.grounded;
     return this.state === 'shieldRelease' && this.stateTime + dt < this.shieldReleaseDuration - TIME_EPSILON;
-  }
-
-  // A voluntary Charge release starts the chargeRelease state; it then lasts
-  // one Charge frame-time while nothing of higher priority takes over. A new
-  // Charge outranks it and starts again from charge_1.
-  isReleasingCharge(dt) {
-    if (!this.chargeReleaseDuration) return false;
-    if (this.chargeReleased) return true;
-    return this.state === 'chargeRelease' && this.stateTime + dt < this.chargeReleaseDuration - TIME_EPSILON;
   }
 
   // Whether the current frame is drawn mirrored. Each clip knows which way its

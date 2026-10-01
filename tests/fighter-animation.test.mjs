@@ -365,21 +365,18 @@ test('missing hurt art holds a still idle frame instead of crashing', () => {
   assert.equal(air.fighter.animator.hold, 0);
 });
 
-test('Charge on a platform charges in place: the old Down drop-through is gone', () => {
+test('Down on a platform stands in place: no drop-through and no pose, only the training CPU drops', () => {
   const { fighter, step } = makeFighter({ x: 1000, y: 600 });
   assert.equal(fighter.body.ground.id, 'ledge');
-  step({ charge: true, chargePressed: true });
+  step({ down: true, downPressed: true });
   assert.equal(fighter.grounded, true);
   assert.equal(fighter.body.ground.id, 'ledge');
   assert.equal(fighter.body.dropId, null);
-  assert.equal(fighter.state, 'charge');
-  assert.equal(frameName(fighter), '0001_charge_1.png');
-  for (let i = 0; i < 60; i++) step({ charge: true });
+  assert.equal(fighter.state, 'idle');
+  assert.match(frameName(fighter), /^0001_idle_\d\.png$/);
+  for (let i = 0; i < 60; i++) step({ down: true });
   assert.equal(fighter.body.ground.id, 'ledge');
-  assert.equal(fighter.state, 'charge');
-  // The removed gameplay action does nothing if something still sends it.
-  step({ down: true, downPressed: true });
-  assert.equal(fighter.body.ground.id, 'ledge');
+  assert.equal(fighter.state, 'idle');
 });
 
 test('the training CPU\'s platform drop still uses fall, then lands', () => {

@@ -160,7 +160,7 @@ function fakeBattle({ p1 = 0, p2 = 0, score = { p1: 0, p2: 0 } } = {}) {
   const fighter = (launchPoint) => {
     const combat = new CombatState();
     combat.launchPoint = launchPoint;
-    return { def: { displayName: '#0001', chargeReplacements: DEF_0001.chargeReplacements }, combat };
+    return { def: { displayName: '#0001', actions: DEF_0001.actions }, combat };
   };
   const battle = {
     p1: fighter(p1), p2: fighter(p2), phase: 'fight', phaseTime: 1, timeLeft: 0.2, round: 1, restarts: 0,
@@ -172,7 +172,7 @@ function fakeBattle({ p1 = 0, p2 = 0, score = { p1: 0, p2: 0 } } = {}) {
       this.restarts++;
       for (const f of [this.p1, this.p2]) {
         f.combat.launchPoint = 0;
-        f.combat.chargedCooldowns.clear();
+        f.combat.abilityCooldowns.clear();
       }
       this.score.p1 = 0;
       this.score.p2 = 0;
@@ -241,7 +241,7 @@ test('Help is gone from the pause overlay: no button, view, scroll area, state o
   assert.doesNotMatch(source, /help/i, 'no Help code left in the Battle screen');
 });
 
-test('S and ↓ still move down through menus; gameplay Charge leaves menu Down alone', () => {
+test('S and ↓ still move down through menus; gameplay Down leaves menu Down alone', () => {
   const { app, screen } = setup();
   startBattle(screen);
   screen.pause();
@@ -324,7 +324,7 @@ test('HUD: one glass card per fighter, portrait | divider | name over Launch Poi
     assert.equal(tagRow.querySelector('.hud-name').textContent, '#0001', 'the character\'s displayName');
     assert.equal(launchPoint, side.launchPoint, 'Launch Point under the name');
     assert.equal(side.root.querySelector('.hud-sub'), null);
-    // No Charge replacement cooldowns (A3, A4) in the card: they are drawn
+    // No Attack 3 or Attack 4 cooldowns (A3, A4) in the card: they are drawn
     // under the fighter itself (see fighter-status.test.mjs).
     for (const cls of ['.hud-cooldowns', '.hud-cd', '.hud-cd-ring', '.hud-cd-name']) {
       assert.deepEqual(side.wrap.querySelectorAll(cls), [], `no ${cls}`);
@@ -803,13 +803,13 @@ test('Quick Battle uses the Mobile Controls setting: Joystick by default, Classi
   assert.equal(app.settings.mobileControls, 'joystick', 'nothing stored: the default');
   assert.equal(touch.scheme, 'joystick');
   assert.equal(lowerLeft(), touch.joystick);
-  assert.equal(touch.buttons.get('charge'), touch.chargeDown);
+  assert.equal(touch.buttons.get('down'), touch.stickDown);
 
   app.settings.set('mobileControls', 'classic');
   await screen.enter();
   assert.equal(touch.scheme, 'classic');
   assert.equal(lowerLeft(), touch.dpad);
-  assert.equal(touch.buttons.get('charge').textContent, 'C');
+  assert.equal(touch.buttons.get('down'), touch.padButtons.get('down'));
 
   app.settings.set('mobileControls', 'joystick');
   await screen.enter();

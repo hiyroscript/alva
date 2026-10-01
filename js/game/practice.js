@@ -8,7 +8,7 @@
 // Ground screen.
 //
 // The practice CPU is a training dummy: it has no controller, so it never
-// moves, jumps, attacks, charges or shields of its own accord (Fighter falls
+// moves, jumps, attacks or shields of its own accord (Fighter falls
 // back to neutral input), and keeps its spawn's facing: like every fighter
 // it never turns toward its opponent by itself. It is otherwise a normal
 // fighter: it takes real hits, hitstun, launches and binds, collides, and
@@ -64,7 +64,7 @@ export class PracticeSession extends Arena {
   // Puts `def` on the training floor as the practice fighter, replacing the
   // current one: a fresh Fighter at the stage's spawn with 0 Launch Point and
   // no cooldowns, driven by Player 1 at once. Nothing of the previous fighter
-  // stays: its charged technique ends and its projectiles and clones go. A
+  // stays: its technique ends and its projectiles and clones go. A
   // CPU stays as it is.
   setFighter(def, sprites) {
     const old = this.player;
@@ -138,8 +138,8 @@ export class PracticeSession extends Arena {
   // play): nothing may keep hold of or aim at it (a technique holding it
   // ends; clones and projectiles aimed at it or its own go, and so do its
   // damage numbers). After its respawn wait it is back at its own spawn,
-  // still, in a fresh training state: 0 Launch Point, full Energy and its
-  // charged cooldowns ready (Fighter.respawn). No point is scored and
+  // still, in a fresh training state: 0 Launch Point, full Energy and every
+  // cooldown ready (Fighter.respawn). No point is scored and
   // practice simply carries on.
   onVoid(f) {
     this.detachFromPlay(f, 'void');

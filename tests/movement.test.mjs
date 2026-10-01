@@ -17,7 +17,7 @@ const mv = def.movement;
 const P = (k) => ({ [k]: true, [`${k}Pressed`]: true });
 const RIGHT = { runRight: true };
 const LEFT = { runLeft: true };
-const DOWN = { charge: true };
+const DOWN = { down: true };
 const JUMP = P('jump');
 const close = (a, b, eps = 1e-9) => Math.abs(a - b) < eps;
 
@@ -444,7 +444,7 @@ test('fixed-step determinism: the same inputs give the same fight, step for step
     return {
       runRight: k < 30 || (k > 60 && k < 70), runLeft: k > 40 && k < 50,
       jump: k === 33, jumpPressed: k === 33,
-      charge: k > 34 && k < 45,
+      down: k > 34 && k < 45,
       attack1: k === 20 || k === 36, attack1Pressed: k === 20 || k === 36,
       attack2: k === 26 || k === 52, attack2Pressed: k === 26 || k === 52,
       extra_attack: k === 80, extra_attackPressed: k === 80,
@@ -525,12 +525,11 @@ test('a stunned fighter\'s push or launch runs down at its own hitstun rates, ap
 
 test('the Sphere Rush still owns its own movement: its authored rush speed, whatever the new locomotion', () => {
   const d = duel({ gap: 600 });
-  d.tick({ charge: true });
-  d.tick({ charge: true, ...P('attack2') });
+  d.tick(P('attack4'));
   assert.ok(d.attacker.technique);
   d.until(() => d.attacker.technique?.phase === 'dash', 60);
   d.tick({ runLeft: true });
-  assert.equal(d.attacker.body.vx, def.chargedTechniques.attack4.dashSpeed, 'held input ignored');
+  assert.equal(d.attacker.body.vx, def.techniques.attack4.dashSpeed, 'held input ignored');
 });
 
 test('a fresh Fighter with a character that declares no new movement stats still moves (the old fields suffice)', () => {

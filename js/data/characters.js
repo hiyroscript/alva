@@ -10,10 +10,9 @@
 //      universal move codenames (MOVES in js/config.js: attack1 to attack5,
 //      midair_attack1 to midair_attack5, extra_attack, transform) whatever
 //      it calls them in game, and its loadout following js/data/loadout.js:
-//      attack1 and attack2 at least, attack5 at most, each numbered attack
-//      with a button of its own also in the air (midair_attackN), and with
-//      Charge replacements attack3 and attack4 made by Charge + attack1 and
-//      Charge + attack2 instead of buttons of their own. Also its Power
+//      attack1 and attack2 at least, attack5 at most, every numbered attack
+//      a button of its own: an ordinary attack (also in the air,
+//      midair_attackN), a summon or a technique. Also its Power
 //      tiers (`powers`, see js/data/powers.js) and each hit's `damage`, Base
 //      Launch (`baseLaunch`: 0, 1, 2 or 3) and Directional Launch
 //      (`directionalLaunch`: null, 'horizontal', 'vertical' or
@@ -48,8 +47,7 @@ import { assertLoadout } from './loadout.js';
 // ./assets/characters/<id>/<id>_<codename>_<frame>.png. The codename is the
 // universal one (idle, run, attack2, midair_attack2, extra_attack,
 // attack4_object...), never the move's name in game, and the last part is
-// always the frame: 0001_attack1_3.png is attack1, frame 3. Charge's
-// sustained loop is the one lettered pair, charge_a and charge_b.
+// always the frame: 0001_attack1_3.png is attack1, frame 3.
 export const framePath = (id, codename, frame) => `./assets/characters/${id}/${id}_${codename}_${frame}.png`;
 
 // Frames `from` to `from + count - 1` of `codename`, in order.
@@ -63,8 +61,6 @@ const ATTACK1_FPS = 12;
 // Same for attack2 (attack2, midair_attack2): its phases are whole frames
 // at this rate.
 const ATTACK2_FPS = 12;
-// Playback rate of the Charge clips (startup, sustained loop and release).
-const CHARGE_FPS = 10;
 // Playback rate of the Shield clips: the raise and lower poses around the
 // grounded hold each show for one frame at this rate.
 const SHIELD_FPS = 12;
@@ -242,32 +238,6 @@ export const CHARACTERS = [
         loop: false,
         heightRatio: 1.08,
       },
-      // Charge: one logical fighter state drawn as two clips. The startup
-      // (charge_1, charge_2) plays once when Charge begins; the sustained
-      // loop (charge_a, charge_b) then alternates for as long as Charge is
-      // held. The loop frames are lettered, not numbered: they are the loop,
-      // never frames 3 and 4.
-      charge: {
-        frames: frames('0001', 'charge', 2),
-        fps: CHARGE_FPS,
-        loop: false,
-        heightRatio: 1,
-      },
-      charge_loop: {
-        frames: [framePath('0001', 'charge', 'a'), framePath('0001', 'charge', 'b')],
-        fps: CHARGE_FPS,
-        loop: true,
-        heightRatio: 1,
-      },
-      // Letting go of Charge shows charge_1 again for one Charge frame-time
-      // before the normal state resumes. The same file as the startup's
-      // first frame, on purpose, never a copy.
-      charge_release: {
-        frames: frames('0001', 'charge', 1),
-        fps: CHARGE_FPS,
-        loop: false,
-        heightRatio: 1,
-      },
       // Shield, what #0001's `shield` button does (see `defense` below): four
       // single frames, each drawn at 1x like the mouvment clip, so
       // heightRatio sizes each by its own height against idle's 52 art pixels
@@ -313,7 +283,7 @@ export const CHARACTERS = [
       },
       // attack4, the Sphere Rush: one set of twelve poses (attack4_1-12)
       // split into logical clips, each played once by its own technique
-      // phase (see chargedTechniques.attack4). attack4_form (1-3): the rear
+      // phase (see techniques.attack4). attack4_form (1-3): the rear
       // palm opens for the sphere to form in. attack4_dash (4-6): the rush,
       // sphere carried behind, swung forward on attack4_6. The rest only a
       // hit shows: attack4_confirm (7-8), the palm driven into the opponent,
@@ -443,8 +413,8 @@ export const CHARACTERS = [
       },
     },
 
-    // A still idle frame for the airborne, landing, hurt and charge clips if
-    // their frames fail to load. `frame` holds a single frame instead of
+    // A still idle frame for the airborne, landing and hurt clips if their
+    // frames fail to load. `frame` holds a single frame instead of
     // looping, so the fighter never stretches or rotates to fake a pose.
     // Attacks, the Shield and the Dash never fall back: one whose frames are
     // missing is refused (see Fighter.tryAction, shieldAllowed and tryDash).
@@ -454,8 +424,6 @@ export const CHARACTERS = [
       land: { animation: 'idle', frame: 0 },
       hurt: { animation: 'idle', frame: 0 },
       midair_hurt: { animation: 'idle', frame: 0 },
-      charge: { animation: 'idle', frame: 0 },
-      charge_loop: { animation: 'idle', frame: 0 },
     },
 
     visual: {
@@ -505,9 +473,8 @@ export const CHARACTERS = [
       airTurnBoost: 2.0,
       gravityScale: 1,
       maxFallSpeed: 1500,
-      // Fast fall: Down (the Charge input) held in the air while already
-      // descending speeds the fall up toward fastFallSpeed, reaching it in
-      // about 0.1 s.
+      // Fast fall: Down held in the air while already descending speeds the
+      // fall up toward fastFallSpeed, reaching it in about 0.1 s.
       fastFallAcceleration: 12000,
       fastFallSpeed: 1400,
       coyoteTime: 0.1,
@@ -548,20 +515,13 @@ export const CHARACTERS = [
       { x: -17, y: -46, w: 34, h: 46 }, // lower body
     ],
 
-    stats: {
-      // Charge replacements' cooldowns (attack3's summon, attack4's
-      // technique) recover this many seconds per second while the fighter is
-      // actually in Charge; 1 per second otherwise.
-      chargedCooldownRate: 2,
-    },
-
     // How #0001 responds to being launched (see resolveLaunchReaction in
     // js/game/combat.js). A harder launch stuns longer: 0.2 s more per 1000
     // units/s, 0.7 s more at most, so a big hit is a clear moment to chase
     // (and the air jump can extend a juggle at middling Launch Point, never
     // past three hits). Launched at 1100 units/s or faster it tumbles
     // (its mid-air hurt pose) until it acts or lands. Left / Right, Jump and
-    // Charge held as a hit lands bend its launch by up to 15 degrees toward
+    // Down held as a hit lands bend its launch by up to 15 degrees toward
     // them (never its strength): a skill for surviving, and for slipping a
     // follow-up.
     launchReaction: {
@@ -578,13 +538,12 @@ export const CHARACTERS = [
     // empties it) and Shield (shieldHitCost, for each hit it blocks;
     // holding it is free). Either still works with
     // less left than it costs, but then takes all of it. It refills by
-    // itself at `regen` per second, at `chargeRegen` while in Charge (apart
-    // from, and on top of, Charge's faster charged cooldowns). Emptied, it
-    // turns gray: no Dash or Shield until it is full again.
+    // itself at `regen` per second, whatever the fighter is doing. Emptied,
+    // it turns gray: no Dash or Shield until it is full again. The Clone
+    // Attack and the Sphere Rush cost none of it.
     energy: {
       max: 100,
       regen: 12,
-      chargeRegen: 30,
       dashCost: 15,
       dashCancelCost: 40,
       shieldHitCost: 25,
@@ -618,33 +577,40 @@ export const CHARACTERS = [
     },
 
     // Control codenames -> move codenames (both universal, see js/config.js),
-    // following the loadout rules (js/data/loadout.js). A numbered attack's
-    // button is { ground, air }, picked by whether the fighter is grounded
-    // when it is pressed; the extra_attack's is one attack; null means the
-    // button is wired but reserved: no artwork, no attack. #0001 has four
-    // numbered attacks and Charge: attack1 and attack2 have buttons of their
-    // own, attack3 and attack4 come from Charge (chargeReplacements below),
-    // so there is no attack3, attack4 or attack5 button.
+    // following the loadout rules (js/data/loadout.js). An ordinary
+    // numbered attack's button is { ground, air }, picked by whether the
+    // fighter is grounded when it is pressed; a summon's or a technique's
+    // is { type, id }, keyed by the attack it is; the extra_attack's is one
+    // attack; null means the button is wired but reserved: no artwork, no
+    // attack. #0001 has four numbered attacks, each a button of its own:
+    // attack1 and attack2 ordinary attacks, attack3 the Clone Attack (a
+    // summon, see `summons`) and attack4 the Sphere Rush (a technique, see
+    // `techniques`). There is no attack5 button.
     actions: {
       extra_attack: 'extra_attack', // the Throw: #0001's shuriken
       transform: null, // reserved: no Transform move yet
       attack1: { ground: 'attack1', air: 'midair_attack1' }, // the Punch / the kunai slash
       attack2: { ground: 'attack2', air: 'midair_attack2' }, // the Kick / the airborne kick
+      attack3: { type: 'summon', id: 'attack3' }, // the Clone Attack
+      attack4: { type: 'technique', id: 'attack4' }, // the Sphere Rush
     },
 
     // How the touch controls present this fighter's own buttons: an icon
     // (a key of ICONS in js/ui/icons.js) and an accessible name for each.
     // UI only (see js/ui/mobile-abilities.js): the buttons still send
-    // extra_attack, transform, attack1 and attack2, and nothing here reaches
-    // combat. Each names the button's ability family, not every move it
-    // makes: Punch is also midair_attack1 (the mid-air kunai slash), and
-    // with Charge held attack3 (the Clone Attack). With no `transform` entry
-    // (no Transform yet) its Transform button stays reserved (dashed). The
-    // Shield, Jump and movement buttons are universal.
+    // extra_attack, transform and attack1 to attack4, and nothing here
+    // reaches combat. Each names the button's ability family, not every move
+    // it makes: Punch is also midair_attack1 (the mid-air kunai slash).
+    // Attack 3 and Attack 4 show the neutral numbered glyphs under their
+    // own names. With no `transform` entry (no Transform yet) its Transform
+    // button stays reserved (dashed). The Shield, Jump and movement buttons
+    // are universal.
     mobileAbilities: {
       extra_attack: { label: 'Shuriken', icon: 'shuriken' },
       attack1: { label: 'Punch', icon: 'punch' },
       attack2: { label: 'Kick', icon: 'kick' },
+      attack3: { label: 'Clone Attack', icon: 'pip3' },
+      attack4: { label: 'Sphere Rush', icon: 'pip4' },
     },
 
     // #0001's in-game ability names, keyed by the universal move codenames
@@ -660,26 +626,14 @@ export const CHARACTERS = [
       attack4: 'Sphere Rush',
     },
 
-    // Charge replacements (see js/data/loadout.js): what a numbered attack
-    // button does when pressed while the fighter is already Charging (since
-    // an earlier step) and still holding Charge, instead of its normal
-    // attack. attack1's is attack3 and attack2's attack4, the attacks
-    // themselves: they have no button of their own. Each is typed: a
-    // `summon` (see `summons`) sends out a detached entity while the fighter
-    // keeps charging; a `technique` (see `chargedTechniques`) is performed
-    // by the fighter itself. Each has its own cooldown (the summon's or
-    // technique's `cooldown`), started when it is used, hit or miss; a press
-    // while it is still cooling down does nothing at all. If it cannot
-    // happen for another reason (no opponent, missing art), the press falls
-    // through to the button's normal attack. Their cooldowns show under the
-    // fighter as A3 and A4.
-    chargeReplacements: {
-      attack1: { type: 'summon', id: 'attack3' }, // the Clone Attack
-      attack2: { type: 'technique', id: 'attack4' }, // the Sphere Rush
-    },
-
-    // Summons, keyed by the attack they are. See js/game/clone.js for the
-    // schema (createSummonDefinition). A clone is a temporary attack entity,
+    // Summons, keyed by the attack they are: attack3's button (see
+    // `actions`) sends this one out, on the ground only. It costs no
+    // Energy: its own cooldown (`cooldown`) starts when it is used, hit or
+    // miss, and a press while it is still cooling down, or when it cannot
+    // happen at all (no opponent in play, missing art), does nothing: no
+    // other attack instead, and nothing kept for later. The cooldown shows
+    // under the fighter as A3. See js/game/clone.js for the schema
+    // (createSummonDefinition). A clone is a temporary attack entity,
     // not a fighter: it appears through the `cloud` effect, performs one of
     // the owner's attacks once with that attack's own art and combat data,
     // then vanishes through the same cloud played in reverse. Normally it
@@ -715,11 +669,13 @@ export const CHARACTERS = [
       },
     },
 
-    // Charged techniques, keyed by the attack they are. See
-    // js/game/charged-technique.js for the schema (createTechniqueDefinition)
-    // and the phases. Not an attack, a projectile or a summon: #0001
-    // performs it himself.
-    chargedTechniques: {
+    // Techniques, keyed by the attack they are: attack4's button (see
+    // `actions`) starts this one, on the ground only, and like the summon it
+    // costs no Energy and has its own cooldown (shown as A4), a press while
+    // it cools down doing nothing. See js/game/technique.js for the schema
+    // (createTechniqueDefinition) and the phases. Not an attack, a
+    // projectile or a summon: #0001 performs it himself.
+    techniques: {
       // attack4, the Sphere Rush. The sphere forms in #0001's rear palm
       // (attack4_form + attack4_object_build, 0.5 s), then he rushes forward
       // for one pass of attack4_dash (0.25 s, about 262 world units)
@@ -949,9 +905,9 @@ export const CHARACTERS = [
   },
 
   // #0002: the speedster, cut from one supplied sprite sheet (see
-  // assets/characters/0002/). No Charge at all (`charge: false`): three
-  // numbered attacks, each with a button of its own and a mid-air version,
-  // and an extra_attack. Its moves are its own mechanics, not just poses
+  // assets/characters/0002/). Three numbered attacks, each an ordinary
+  // attack with a button of its own and a mid-air version, and an
+  // extra_attack. Its moves are its own mechanics, not just poses
   // and damage: a two-punch string, a lock-on Homing Attack that springs off
   // what it hits, a kick flurry that holds its target then flings it, a
   // Bounce Attack that plunges, spikes and rebounds, a Spin Attack that
@@ -966,11 +922,6 @@ export const CHARACTERS = [
 
     // Every clip is drawn facing right.
     sourceFacing: 1,
-
-    // No Charge stance: Down never holds it in place on the ground (it only
-    // fast-falls in the air), and nothing replaces its buttons (see
-    // js/data/loadout.js).
-    charge: false,
 
     // Anchors: the idle, run, Dash, fall, hurt and guard poses use the
     // automatic torso anchor. Where the art would drag it (a ball or a
@@ -1127,8 +1078,8 @@ export const CHARACTERS = [
     },
 
     // A still idle frame for the airborne and hurt clips if their frames
-    // fail to load, as for #0001. It has no land or Charge clips at all:
-    // it lands straight into its stance.
+    // fail to load, as for #0001. It has no land clip at all: it lands
+    // straight into its stance.
     animationFallbacks: {
       jump: { animation: 'idle', frame: 0 },
       fall: { animation: 'idle', frame: 0 },
@@ -1200,8 +1151,7 @@ export const CHARACTERS = [
       steerAngle: 15,
     },
 
-    // Energy, spent by the Dash and the Shield as #0001's is. With no Charge
-    // stance there is no faster refill.
+    // Energy, spent by the Dash and the Shield and refilled as #0001's is.
     energy: {
       max: 100,
       regen: 12,
@@ -1220,7 +1170,7 @@ export const CHARACTERS = [
       perfectRearm: 0.25,
     },
 
-    // Three numbered attacks with no Charge: three buttons, each with its
+    // Three numbered attacks, all ordinary: three buttons, each with its
     // mid-air version (see js/data/loadout.js). The sheet's transformation
     // art has no move yet: Transform is reserved.
     actions: {
@@ -1462,8 +1412,7 @@ export function playableCharacters() {
 
 // Every frame a character needs before battle: fighter poses, projectiles
 // and effects, each file once (two clips may share one, e.g. #0001's
-// attack4_12 in attack4_release and attack4_whiff_release, or charge_1 in
-// charge and charge_release).
+// attack4_12 in attack4_release and attack4_whiff_release).
 export function characterFramePaths(def) {
   const out = [];
   for (const anim of Object.values(def.animations)) out.push(...anim.frames);

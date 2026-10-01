@@ -11,7 +11,7 @@ import { MOVES } from '../config.js';
 // ("Mid-air Attack 1"). Null for anything that is not a move codename. It
 // names the move whether or not the character has it (a reserved transform
 // included), and whatever role it plays for that character (attack3 is
-// "Clone Attack" for #0001, reached through Charge, and "Attack 3" for a
+// "Clone Attack" for #0001, a summon, and "Attack 3" for a
 // character with no name of its own for it): what a character can do is
 // its loadout's business, not its names'.
 export function abilityName(def, move) {
