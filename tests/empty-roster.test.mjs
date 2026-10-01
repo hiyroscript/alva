@@ -265,13 +265,14 @@ test('the roster ships #0001 and #0002, both whole and playable', () => {
   assert.deepEqual(playableCharacters(), [DEF_0001, DEF_0002]);
   // Nothing of it was stripped while it was disabled.
   assert.deepEqual(Object.keys(DEF_0001.attacks).sort(), ['attack1', 'attack2', 'extra_attack', 'midair_attack1', 'midair_attack2']);
-  assert.deepEqual(DEF_0001.chargeReplacements, { attack1: { type: 'summon', id: 'attack3' }, attack2: { type: 'technique', id: 'attack4' } });
-  assert.ok(DEF_0001.summons.attack3 && DEF_0001.chargedTechniques.attack4, 'Clone Attack and Sphere Rush');
+  assert.deepEqual(DEF_0001.actions.attack3, { type: 'summon', id: 'attack3' });
+  assert.deepEqual(DEF_0001.actions.attack4, { type: 'technique', id: 'attack4' });
+  assert.ok(DEF_0001.summons.attack3 && DEF_0001.techniques.attack4, 'Clone Attack and Sphere Rush');
   assert.ok(DEF_0001.projectiles.extra_attack_object && DEF_0001.effectAnimations.attack3_object && DEF_0001.effectAnimations.attack4_object_build);
   assert.equal(DEF_0001.defense.type, 'shield');
   assert.ok(DEF_0001.movement.dashSpeed > 0, 'its Dash');
   assert.deepEqual(DEF_0001.abilityNames, { extra_attack: 'Shuriken', attack1: 'Punch', attack2: 'Kick', attack3: 'Clone Attack', attack4: 'Sphere Rush' });
-  assert.deepEqual(Object.keys(DEF_0001.mobileAbilities), ['extra_attack', 'attack1', 'attack2']);
+  assert.deepEqual(Object.keys(DEF_0001.mobileAbilities), ['extra_attack', 'attack1', 'attack2', 'attack3', 'attack4']);
   assert.ok(DEF_0001.hurtboxes.length > 0 && DEF_0001.collider && DEF_0001.energy && DEF_0001.launchReaction);
   // Every frame it names is still on disk.
   const paths = characterFramePaths(DEF_0001);
@@ -279,6 +280,8 @@ test('the roster ships #0001 and #0002, both whole and playable', () => {
   for (const path of paths) assert.ok(exists(path.replace('./', '')), path);
   // Its French ability names and its sprite credits stay too.
   assert.equal(STRINGS.fr['ability.0001.attack1'], 'Coup de poing');
+  assert.equal(STRINGS.fr['ability.0001.attack3'], 'Attaque du clone');
+  assert.equal(STRINGS.fr['ability.0001.attack4'], 'Ruée sphérique');
   assert.equal(STRINGS.en['credits.sprites.title'], '#0001 sprite source');
 });
 

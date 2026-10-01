@@ -56,15 +56,17 @@ const BA1_ENTRIES = {
 // Zero either way: +0 or -0 (both === 0).
 const isZero = (v) => v === 0;
 
-test('the attack1 button: ground attack1, air midair_attack1; attack2 on its own button, extra_attack the Throw, transform reserved, no attack3 to attack5 button', () => {
+test('the attack1 button: ground attack1, air midair_attack1; attack2 to attack4 on their own buttons, extra_attack the Throw, transform reserved, no attack5 button', () => {
   assert.deepEqual(def.actions, {
     extra_attack: 'extra_attack',
     transform: null,
     attack1: { ground: 'attack1', air: 'midair_attack1' },
     attack2: { ground: 'attack2', air: 'midair_attack2' },
+    attack3: { type: 'summon', id: 'attack3' },
+    attack4: { type: 'technique', id: 'attack4' },
   });
   assert.deepEqual(COMBAT_ACTIONS, ['extra_attack', 'transform', 'attack1', 'attack2', 'attack3', 'attack4', 'attack5']);
-  for (const button of ['attack3', 'attack4', 'attack5']) assert.equal(def.actions[button], undefined, `no ${button} button`);
+  assert.equal(def.actions.attack5, undefined, 'no attack5 button');
   assert.deepEqual(CONFIG.bindings.attack1, ['KeyU']);
   assert.deepEqual(CONFIG.bindings.attack2, ['KeyI']);
   assert.deepEqual(CONFIG.bindings.extra_attack, ['KeyJ']);

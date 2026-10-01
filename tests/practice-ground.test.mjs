@@ -394,7 +394,7 @@ test('Practice Ground uses the Mobile Controls setting on every entry, and a sch
   await screen.enter();
   assert.equal(screen.touch.scheme, 'classic');
   assert.equal(screen.touch.root.children[0], screen.touch.dpad);
-  assert.deepEqual(screen.touch.dpad.children.map((b) => b.getAttribute('aria-label')), ['Move left', 'Charge', 'Move right']);
+  assert.deepEqual(screen.touch.dpad.children.map((b) => b.getAttribute('aria-label')), ['Move left', 'Down', 'Move right']);
   assert.equal(screen.touch.enabled, true);
   for (const [action, b] of elements) assert.equal(screen.touch.actionButtons.get(action), b, action);
   assert.equal(screen.touch.buttons.get('extra_attack').getAttribute('aria-label'), 'Shuriken', 'the fighter\'s own, whatever the layout');
@@ -557,18 +557,19 @@ test('moves that aim at an opponent fall back or miss with nobody there, without
     assert.equal(p.state, 'idle');
   };
 
-  // attack3: no one to appear behind, so it is an ordinary attack1, free.
-  run({ charge: true }, 10);
-  assert.equal(p.state, 'charge');
-  run({ charge: true, attack1: true, attack1Pressed: true });
-  assert.equal(p.combat.attack?.def.id, 'attack1');
+  // attack3: no one to appear behind, so nothing at all (never a Punch in
+  // its place), and free.
+  run({}, 10);
+  assert.equal(p.state, 'idle');
+  run({ attack3: true, attack3Pressed: true });
+  assert.equal(p.combat.attack, null);
   assert.equal(session.clones.length, 0);
-  assert.equal(p.combat.chargedCooldowns.active('attack3'), false, 'no cooldown spent on a clone that cannot appear');
+  assert.equal(p.combat.abilityCooldowns.active('attack3'), false, 'no cooldown spent on a clone that cannot appear');
   idle();
 
   // attack4: the Sphere Rush forms, dashes, finds nobody and misses.
-  run({ charge: true }, 10);
-  run({ charge: true, attack2: true, attack2Pressed: true });
+  run({}, 10);
+  run({ attack4: true, attack4Pressed: true });
   const rush = p.technique;
   assert.ok(rush, 'the Sphere Rush starts');
   idle();
@@ -647,8 +648,8 @@ test('the Void never ends practice: a fighter in it is out for 2 s, then back at
   // Player 1, a shuriken of its in flight, is carried just past the Void's
   // fixed line: its next step takes it out of play, its own shuriken gone.
   player.combat.launchPoint = 70;
-  player.combat.chargedCooldowns.start('attack4', 5);
-  player.combat.chargedCooldowns.start('attack3', 2);
+  player.combat.abilityCooldowns.start('attack4', 5);
+  player.combat.abilityCooldowns.start('attack3', 2);
   run({ extra_attack: true, extra_attackPressed: true });
   until(() => session.projectiles.length === 1);
   Object.assign(player.body, { x: v.left - 2, y: 1200, vx: -300, vy: 900, grounded: false, ground: null });
@@ -671,7 +672,7 @@ test('the Void never ends practice: a fighter in it is out for 2 s, then back at
   );
   assert.equal(player.combat.attack, null, 'no attack survives it');
   assert.equal(player.combat.launchPoint, 0, 'a fresh 0');
-  assert.equal(player.combat.chargedCooldowns.size, 0, 'Charge replacement cooldowns cleared: ready again');
+  assert.equal(player.combat.abilityCooldowns.size, 0, 'Attack 3 and Attack 4 cooldowns cleared: ready again');
   assert.equal(player.combat.energy, player.combat.maxEnergy, 'full Energy');
   assert.equal(player.combat.stun, 0);
   assert.equal(player.combat.hitstop, 0);
@@ -682,8 +683,8 @@ test('the Void never ends practice: a fighter in it is out for 2 s, then back at
   // bound: the rush holding it ends, its damage numbers go, and 2 s later
   // it is back at its own spawn, free.
   run({}, 60);
-  run({ charge: true }, 10);
-  run({ charge: true, attack2: true, attack2Pressed: true });
+  run({}, 10);
+  run({ attack4: true, attack4Pressed: true });
   const rush = player.technique;
   until(() => rush.hitConfirmed, 120);
   run({}, 30); // the first tick: +1 over it
@@ -1075,15 +1076,15 @@ test('confirming a fighter swaps it in place and resumes practice', async () => 
   const old = session.player;
   // Leave something of the old fighter behind: a Sphere Rush in progress,
   // a shuriken and a clone.
-  for (let i = 0; i < 10; i++) { input.script.push({ charge: true }); session.update(DT); }
-  input.script.push({ charge: true, attack2: true, attack2Pressed: true });
+  for (let i = 0; i < 10; i++) { input.script.push({}); session.update(DT); }
+  input.script.push({ attack4: true, attack4Pressed: true });
   session.update(DT);
   const rush = old.technique;
   assert.ok(rush);
   session.projectiles.push({ alive: true });
   session.clones.push({ alive: true });
   old.combat.launchPoint = 30;
-  assert.ok(old.combat.chargedCooldowns.active('attack4'));
+  assert.ok(old.combat.abilityCooldowns.active('attack4'));
 
   screen.openMenu();
   screen.openRoster();
@@ -1101,7 +1102,7 @@ test('confirming a fighter swaps it in place and resumes practice', async () => 
   assert.equal(p.body.x, PRACTICE_MAP.spawnPoints[0].x);
   assert.equal(p.body.y, PRACTICE_MAP.mainStage.top);
   assert.equal(p.combat.launchPoint, 0, 'a fresh 0');
-  assert.equal(p.combat.chargedCooldowns.size, 0, 'no Charge replacement cooldowns');
+  assert.equal(p.combat.abilityCooldowns.size, 0, 'no summon or technique cooldowns');
   assert.equal(p.technique, null);
   assert.equal(rush.phase, 'done', 'the old technique ended');
   assert.equal(rush.endReason, 'destroy');
@@ -1235,7 +1236,7 @@ test('Change Fighter into and out of a fighter with no moves, again and again: i
     assert.equal(p.def.id, id);
     assert.equal(p.sprites, app.getSprites(id), 'its own sprite set');
     assert.equal(screen.hud.panel.name.textContent, def.displayName);
-    assert.equal(p.combat.chargedCooldowns.size, 0, 'no cooldown carried over');
+    assert.equal(p.combat.abilityCooldowns.size, 0, 'no cooldown carried over');
     assert.equal(p.combat.launchPoint, 0);
     assert.equal(screen.session.cpu.def.id, '0001', 'the CPU stays');
     // The same controls, refreshed: no ability button for the fighter with
@@ -1457,7 +1458,7 @@ test('selecting a CPU loads it and puts it on the stage as a p2 / CPU training d
   session.frame(DT);
 });
 
-test('the practice CPU never acts on its own: no movement, jump, attack, charge, Shield or AI, however long it stands', async () => {
+test('the practice CPU never acts on its own: no movement, jump, attack, summon, rush, Shield or AI, however long it stands', async () => {
   const { app, screen } = await enterPractice();
   const cpu = await enableCpu(screen, 'test-a');
   const { session } = screen;
@@ -1469,13 +1470,13 @@ test('the practice CPU never acts on its own: no movement, jump, attack, charge,
     states.add(cpu.state);
     const c = cpu.combat;
     if (cpu.body.x !== spawnX || cpu.body.y !== PRACTICE_MAP.mainStage.top || !cpu.body.grounded || cpu.moveDir !== 0 ||
-        c.attack || c.shielding || cpu.charging || cpu.technique || cpu.releases.length || cpu.summons.length) {
+        c.attack || c.shielding || cpu.technique || cpu.releases.length || cpu.summons.length) {
       assert.fail(`the CPU acted on step ${i}: ${cpu.state}`);
     }
   }
   assert.deepEqual([...states], ['idle']);
   assert.equal(cpu.combat.lastIntent, null, 'no combat button was ever pressed');
-  assert.equal(cpu.combat.chargedCooldowns.size, 0);
+  assert.equal(cpu.combat.abilityCooldowns.size, 0);
   assert.equal(cpu.combat.cooldowns.size, 0);
   assert.deepEqual(session.projectiles, []);
   assert.deepEqual(session.clones, []);
@@ -1591,11 +1592,11 @@ test('shuriken, clone and Sphere Rush hits on the CPU each float their own resol
   {
     const { session, run, until, events, numbers } = practiceSession();
     const { player, cpu } = session;
-    run({ charge: true }, 10);
-    run({ charge: true, attack1: true, attack1Pressed: true });
+    run({}, 10);
+    run({ attack3: true, attack3Pressed: true });
     assert.equal(session.clones.length, 1);
     assert.equal(session.clones[0].target, cpu);
-    assert.ok(player.combat.chargedCooldowns.active('attack3'), 'its cooldown started');
+    assert.ok(player.combat.abilityCooldowns.active('attack3'), 'its cooldown started');
     until(() => events.length > 0, 180);
     const [hit] = events;
     assert.equal(hit.summon, session.clones[0] ?? hit.summon);
@@ -1609,8 +1610,8 @@ test('shuriken, clone and Sphere Rush hits on the CPU each float their own resol
   {
     const { session, run, until, events, numbers } = practiceSession();
     const { player, cpu } = session;
-    run({ charge: true }, 10);
-    run({ charge: true, attack2: true, attack2Pressed: true });
+    run({}, 10);
+    run({ attack4: true, attack4Pressed: true });
     const rush = player.technique;
     assert.ok(rush);
     until(() => rush.hitConfirmed, 120);
@@ -1780,8 +1781,8 @@ test('Disable CPU removes the CPU and every reference to it, then waits, frozen,
   const player = session.player;
   // Catch the CPU in a Sphere Rush (bound, the sphere on it, a number over
   // it), with a clone summoned at it and a shuriken of Player 1's in flight.
-  for (let i = 0; i < 10; i++) { input.script.push({ charge: true }); session.update(DT); }
-  input.script.push({ charge: true, attack2: true, attack2Pressed: true });
+  for (let i = 0; i < 10; i++) { input.script.push({}); session.update(DT); }
+  input.script.push({ attack4: true, attack4Pressed: true });
   session.update(DT);
   const rush = player.technique;
   for (let i = 0; i < 120 && !rush.hitConfirmed; i++) session.update(DT);
@@ -1848,18 +1849,18 @@ test('Disable CPU removes the CPU and every reference to it, then waits, frozen,
   assert.equal(screen.cpuRosterOpen, true, 'a hidden, disabled button does nothing');
   screen.cpuRosterBack.click();
 
-  // Solo practice again: an attack3 is an ordinary attack1, for free, and the
-  // camera follows Player 1 alone.
+  // Solo practice again: an attack3 does nothing (nobody to appear behind),
+  // for free, and the camera follows Player 1 alone.
   session.frame = Object.getPrototypeOf(session).frame.bind(session);
   screen.resume();
   assert.equal(screen.isRunning, true);
   for (let i = 0; i < 90 && (player.state !== 'idle' || player.technique); i++) session.update(DT);
-  for (let i = 0; i < 10; i++) { input.script.push({ charge: true }); session.update(DT); }
-  input.script.push({ charge: true, attack1: true, attack1Pressed: true });
+  for (let i = 0; i < 10; i++) { input.script.push({}); session.update(DT); }
+  input.script.push({ attack3: true, attack3Pressed: true });
   session.update(DT);
-  assert.equal(player.combat.attack?.def.id, 'attack1');
+  assert.equal(player.combat.attack, null);
   assert.deepEqual(session.clones, []);
-  assert.equal(player.combat.chargedCooldowns.active('attack3'), false);
+  assert.equal(player.combat.abilityCooldowns.active('attack3'), false);
   const calls = [];
   const { follow } = session.camera;
   session.camera.follow = (...args) => { calls.push(args); return follow.apply(session.camera, args); };
@@ -1988,8 +1989,8 @@ test('changing Player 1\'s fighter keeps the CPU, rewired to the new fighter', a
   const cpu = await enableCpu(screen, '9999');
   const old = session.player;
   // The old fighter's Sphere Rush holds the CPU.
-  for (let i = 0; i < 10; i++) { input.script.push({ charge: true }); session.update(DT); }
-  input.script.push({ charge: true, attack2: true, attack2Pressed: true });
+  for (let i = 0; i < 10; i++) { input.script.push({}); session.update(DT); }
+  input.script.push({ attack4: true, attack4Pressed: true });
   session.update(DT);
   const rush = old.technique;
   for (let i = 0; i < 120 && !rush.hitConfirmed; i++) session.update(DT);
@@ -2018,17 +2019,17 @@ test('changing Player 1\'s fighter keeps the CPU, rewired to the new fighter', a
   assert.equal(app.selection.characterId, 'test-a');
 });
 
-// ---- Charged cooldowns and the Void ------------------------------------------
+// ---- Attack 3 / Attack 4 cooldowns and the Void ------------------------------
 
-test('a Practice Void respawn is a fresh training state: 0 Launch Point, full Energy and both charged abilities ready again', () => {
+test('a Practice Void respawn is a fresh training state: 0 Launch Point, full Energy and Attack 3 and Attack 4 ready again', () => {
   const { session, run, until } = practiceSession();
   const { player } = session;
-  // Use both charged abilities for real.
-  run({ charge: true }, 10);
-  run({ charge: true, attack1: true, attack1Pressed: true });
-  run({ charge: true }, 2);
-  run({ charge: true, attack2: true, attack2Pressed: true });
-  const cd = player.combat.chargedCooldowns;
+  // Use both for real.
+  run({}, 10);
+  run({ attack3: true, attack3Pressed: true });
+  run({}, 2);
+  run({ attack4: true, attack4Pressed: true });
+  const cd = player.combat.abilityCooldowns;
   assert.ok(cd.active('attack3') && cd.active('attack4'));
   until(() => !player.technique, 400);
   player.combat.launchPoint = 88;
@@ -2043,12 +2044,12 @@ test('a Practice Void respawn is a fresh training state: 0 Launch Point, full En
   assert.equal(player.combat.launchPoint, 0);
   assert.equal(player.combat.energy, player.combat.maxEnergy, 'Energy full');
   assert.equal(player.combat.energyExhausted, false, 'and no longer exhausted');
-  assert.equal(cd === player.combat.chargedCooldowns ? cd.size : player.combat.chargedCooldowns.size, 0);
-  assert.equal(player.combat.chargedCooldowns.active('attack3'), false);
-  assert.equal(player.combat.chargedCooldowns.active('attack4'), false);
+  assert.equal(cd === player.combat.abilityCooldowns ? cd.size : player.combat.abilityCooldowns.size, 0);
+  assert.equal(player.combat.abilityCooldowns.active('attack3'), false);
+  assert.equal(player.combat.abilityCooldowns.active('attack4'), false);
   // Ready at once: the next attack4 starts.
-  run({ charge: true }, 10);
-  run({ charge: true, attack2: true, attack2Pressed: true });
+  run({}, 10);
+  run({ attack4: true, attack4Pressed: true });
   assert.ok(player.technique, 'attack4 is ready again');
 });
 
@@ -2058,7 +2059,7 @@ test('a fresh visit starts with the default CPU again and a fresh fighter at 0 L
   const { app, screen, loads } = await enterPractice();
   await enableCpu(screen, '9999');
   screen.session.player.combat.launchPoint = 42;
-  screen.session.player.combat.chargedCooldowns.start('attack3', 5);
+  screen.session.player.combat.abilityCooldowns.start('attack3', 5);
   // The last visit ends with the CPU disabled: that is never remembered.
   screen.openMenu();
   screen.cpuBtn.click();
@@ -2073,7 +2074,7 @@ test('a fresh visit starts with the default CPU again and a fresh fighter at 0 L
   assert.ok(session.cpu, 'the CPU is back');
   assert.equal(session.cpu.def.id, '0001');
   assert.equal(session.player.combat.launchPoint, 0);
-  assert.equal(session.player.combat.chargedCooldowns.size, 0);
+  assert.equal(session.player.combat.abilityCooldowns.size, 0);
   assert.deepEqual(session.fighters, [session.player, session.cpu]);
   assert.equal(session.player.def.id, '0001');
   assert.equal(session.secondary, session.cpu);

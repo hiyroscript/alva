@@ -4,18 +4,19 @@
 //   [ Energy bar   ]    only while below full; bright purple, gray while exhausted
 //   [ P1 / CPU tag ]    (Arena.drawMarkers)
 //   [ fighter      ]
-//   [  A3     A4   ]    only the Charge replacements cooling down, under the feet
+//   [  A3     A4   ]    only the summons and techniques cooling down, under the feet
 //
-// Both are temporary: full Energy and a ready Charge replacement draw
+// Both are temporary: full Energy and a ready summon or technique draw
 // nothing, so a fighter with full Energy and nothing cooling down carries
 // only its tag. The state helpers (energyBarState, cooldownIndicators) are
 // pure, so what is drawn can be checked without a canvas; the draw
 // functions only paint it. Nothing here is character-specific: the rings
-// come from the character's own `chargeReplacements` (js/data/loadout.js),
-// each named after the attack it is (A3 for attack3), the bar from its
-// Energy.
+// come from the character's own numbered buttons that are a summon or a
+// technique (specialAttacks, js/data/loadout.js), each named after the
+// attack it is (A3 for attack3), the bar from its Energy.
 
 import { MOVES } from '../config.js';
+import { specialAttacks } from '../data/loadout.js';
 
 // Energy bar: one thin, bright purple fill on a dark track with a black
 // outline; the fill turns gray once the fighter is exhausted and stays gray
@@ -69,23 +70,20 @@ export function energyBarState(fighter) {
   };
 }
 
-// One entry per Charge replacement of `fighter`'s character that is cooling
-// down right now (chargedCooldowns.active, keyed by the attack it is), in
-// its `chargeReplacements` order: { id, action, label, progress, text },
-// `id` the attack (attack3) and `action` the button Charge makes it from
-// (attack1). A ready one has no entry, so nothing is drawn for it. progress
-// = 1 - remaining / duration, read straight from the fighter's cooldowns,
-// so a Charge that speeds recovery speeds the ring too.
+// One entry per summon or technique button of `fighter`'s character that
+// is cooling down right now (abilityCooldowns.active, keyed by the attack it
+// is), in button order: { id, label, progress, text }, `id` the attack
+// (attack3). A ready one has no entry, so nothing is drawn for it. progress
+// = 1 - remaining / duration, read straight from the fighter's cooldowns.
 export function cooldownIndicators(fighter) {
-  const cooldowns = fighter.combat.chargedCooldowns;
-  return Object.entries(fighter.def.chargeReplacements ?? {})
-    .filter(([, replacement]) => cooldowns.active(replacement.id))
-    .map(([action, replacement]) => ({
-      id: replacement.id,
-      action,
-      label: cooldownLabel(replacement.id),
-      progress: cooldowns.progress(replacement.id),
-      text: formatCooldown(cooldowns.remaining(replacement.id)),
+  const cooldowns = fighter.combat.abilityCooldowns;
+  return specialAttacks(fighter.def)
+    .filter((id) => cooldowns.active(id))
+    .map((id) => ({
+      id,
+      label: cooldownLabel(id),
+      progress: cooldowns.progress(id),
+      text: formatCooldown(cooldowns.remaining(id)),
     }));
 }
 
@@ -120,7 +118,7 @@ export function drawEnergyBar(ctx, fighter, rect, dpr = 1) {
 
 const MONO = 'ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace';
 
-// One ring per Charge replacement cooling down, in a row centred under the
+// One ring per summon or technique cooling down, in a row centred under the
 // feet at (x, footY), device pixels: no slot is kept for a ready one, so a
 // lone ring sits straight under the fighter and nothing at all is drawn
 // while both are ready. The ring completes clockwise from the top as the

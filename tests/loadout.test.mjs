@@ -1,21 +1,23 @@
 // Run with node --test tests/loadout.test.mjs (no dependencies).
 // The attack loadout rules (js/data/loadout.js), data-driven over the
 // matrix of tests/loadout-fighters.mjs: which numbered attacks each fighter
-// has, which have a button of their own and a mid-air version, and which
-// Charge reaches from which button; then the same fighters through the real
-// Fighter (ground, air, Charge, the combat input buffer), the keyboard and
-// gamepad, and the combat AI; and every rule the validator enforces, each
-// broken on purpose. #0001's own loadout is one case among them, never a
-// special one. Its touch buttons are in controls-ui.test.mjs.
+// has (every one a button of its own), which kind of move each button is
+// (an ordinary attack with its mid-air version, a summon or a technique);
+// then the same fighters through the real Fighter (ground, air, the combat
+// input buffer), the keyboard and gamepad, and the combat AI; and every
+// rule the validator enforces, each broken on purpose. #0001's own loadout
+// is one case among them, never a special one. Its touch buttons are in
+// controls-ui.test.mjs.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { CONFIG, NUMBERED_ATTACKS } from '../js/config.js';
 import { CHARACTERS, getCharacter } from '../js/data/characters.js';
 import {
-  CHARGE_REPLACES, MIN_NUMBERED_ATTACKS, assertLoadout, attackButtons, chargeOnlyAttacks, chargeReplacement,
-  describeLoadout, hasChargeReplacements, loadoutProblems, midairAttack, numberedAttacks,
+  ACTION_TYPES, MIN_NUMBERED_ATTACKS, actionType, assertLoadout, attackButtons, describeLoadout, loadoutProblems,
+  midairAttack, numberedAttacks, specialAction, specialAttacks,
 } from '../js/data/loadout.js';
+import * as loadoutModule from '../js/data/loadout.js';
 import { COMBAT_ACTIONS } from '../js/game/character.js';
 import { readMoveset } from '../js/game/combat-ai.js';
 import { DT, cpuFight, duel, fakeSpritesOf, makeFighter } from './fighter-harness.mjs';
@@ -24,7 +26,6 @@ import { SAMPLE_FIGHTER } from './sample-fighter.mjs';
 
 const DEF_0001 = getCharacter('0001');
 const P = (k) => ({ [k]: true, [`${k}Pressed`]: true });
-const CHARGE = { charge: true };
 const JUMP = { jump: true, jumpPressed: true };
 const fighterOf = (def, opts = {}) => makeFighter({ character: def, sprites: fakeSpritesOf(def), ...opts });
 
@@ -37,102 +38,95 @@ function airborne(def) {
   return f;
 }
 
-// Holds Charge for a few steps (a Charge since an earlier step), then
-// presses `button` with Charge still held; returns the fighter.
-function chargedPress(d, button) {
-  for (let i = 0; i < 5; i++) d.tick(CHARGE);
-  assert.equal(d.attacker.charging, true, 'in Charge');
-  d.tick({ ...CHARGE, ...P(button) });
-  return d.attacker;
-}
-
 // ---- The matrix ------------------------------------------------------------------
 
 for (const c of LOADOUT_CASES) {
-  const label = `Case ${c.name}: ${c.count} attacks${c.charge ? ' + Charge' : ', no Charge'}`;
+  const kinds = c.buttons.map((b) => (c.types[b] === 'attack' ? b : `${b} (${c.types[b]})`));
+  const label = `Case ${c.name}: ${c.count} attacks${c.specials ? ' with a summon and a technique' : ''}`;
 
-  test(`${label}: buttons ${c.buttons.join(', ')}${c.chargeOnly.length ? `; Charge reaches ${c.chargeOnly.join(', ')}` : ''}`, () => {
+  test(`${label}: buttons ${kinds.join(', ')}, every numbered attack a button of its own`, () => {
     const def = c.def;
     assert.deepEqual(loadoutProblems(def), [], 'it keeps every rule');
     assert.deepEqual(numberedAttacks(def), NUMBERED_ATTACKS.slice(0, c.count), 'attack1 to its highest, in a row');
     assert.deepEqual(attackButtons(def), c.buttons, 'the buttons of its own');
-    assert.deepEqual(chargeOnlyAttacks(def), c.chargeOnly);
-    assert.equal(hasChargeReplacements(def), c.charge);
+    assert.deepEqual(attackButtons(def), numberedAttacks(def), 'one button per numbered attack: nothing reached another way');
+    const ordinary = c.buttons.filter((b) => c.types[b] === 'attack');
     assert.deepEqual(describeLoadout(def), {
       numbered: NUMBERED_ATTACKS.slice(0, c.count),
       buttons: c.buttons,
-      air: Object.fromEntries(c.buttons.map((b) => [b, `midair_${b}`])),
-      charge: c.charged,
+      air: Object.fromEntries(ordinary.map((b) => [b, `midair_${b}`])),
+      types: c.types,
       extra: false,
     });
-    // Every button is { ground: attackN, air: midair_attackN }; a numbered
-    // attack only Charge reaches has no button and needs no mid-air version.
+    assert.deepEqual(specialAttacks(def), c.buttons.filter((b) => c.types[b] !== 'attack'));
     for (const button of c.buttons) {
-      assert.deepEqual(def.actions[button], { ground: button, air: midairAttack(button) }, button);
-      assert.ok(def.attacks[midairAttack(button)], `${button} has its mid-air version`);
-    }
-    for (const id of c.chargeOnly) {
-      assert.equal(def.actions[id], undefined, `${id}: no button`);
-      assert.equal(def.attacks[midairAttack(id)], undefined, `${id}: no mid-air version needed`);
-      assert.equal(def.animations[midairAttack(id)], undefined);
-    }
-    for (const [button, id] of Object.entries(c.charged)) {
-      assert.equal(chargeReplacement(def, button).id, id, `Charge + ${button} -> ${id}`);
-      assert.equal(CHARGE_REPLACES[button], id, 'the one rule for every character');
+      assert.equal(actionType(def, button), c.types[button], button);
+      if (c.types[button] === 'attack') {
+        // An ordinary button is { ground: attackN, air: midair_attackN }.
+        assert.deepEqual(def.actions[button], { ground: button, air: midairAttack(button) }, button);
+        assert.ok(def.attacks[midairAttack(button)], `${button} has its mid-air version`);
+        assert.equal(specialAction(def, button), null);
+      } else {
+        // A summon or a technique is { type, id }, keyed by the button it
+        // is, and needs no mid-air version.
+        assert.deepEqual(def.actions[button], { type: c.types[button], id: button }, button);
+        assert.deepEqual(specialAction(def, button), { type: c.types[button], id: button });
+        assert.equal(def.attacks[midairAttack(button)], undefined, `${button}: no mid-air version needed`);
+        assert.equal(def.animations[midairAttack(button)], undefined);
+      }
     }
   });
 
-  test(`${label}: each button makes its own attack on the ground and its mid-air one in the air; nothing else presses`, () => {
+  test(`${label}: each button makes its own move, on the ground, and in the air where it has one; nothing else presses`, () => {
     for (const button of COMBAT_ACTIONS) {
-      const ground = fighterOf(c.def);
-      ground.step(P(button));
+      const ground = duel({ attackerCharacter: c.def, attackerSprites: fakeSpritesOf(c.def), gap: 150 });
+      ground.tick(P(button));
       const air = airborne(c.def);
       air.step(P(button));
-      if (c.buttons.includes(button)) {
-        assert.equal(ground.fighter.combat.attack?.def.id, button, `${button} on the ground`);
+      const type = c.buttons.includes(button) ? c.types[button] : null;
+      const f = ground.attacker;
+      if (type === 'attack') {
+        assert.equal(f.combat.attack?.def.id, button, `${button} on the ground`);
         assert.equal(air.fighter.combat.attack?.def.id, midairAttack(button), `${button} in the air`);
-        assert.equal(ground.fighter.combat.attack.def.damage, Number(button.slice(6)), 'its own data');
+        assert.equal(f.combat.attack.def.damage, Number(button.slice(6)), 'its own data');
+        assert.equal(f.combat.abilityCooldowns.size, 0);
+      } else if (type === 'summon') {
+        assert.equal(f.combat.attack, null, `${button}: no attack of the fighter's own`);
+        assert.ok(f.combat.abilityCooldowns.active(button), `${button}, the summon, with its cooldown`);
+        assert.equal(ground.clones.length, 1, 'its clone');
+        assert.equal(ground.clones[0].attackDef.id, 'attack1');
+      } else if (type === 'technique') {
+        assert.equal(f.technique?.def.id, button, `${button}, the technique`);
+        assert.ok(f.combat.abilityCooldowns.active(button));
       } else {
-        // A button it does not have (a charge-only attack3 or attack4,
-        // attack5 of a smaller fighter, its reserved or missing extras).
-        assert.equal(ground.fighter.combat.attack, null, `${button}: nothing on the ground`);
+        // A button it does not have (attack5 of a smaller fighter, its
+        // reserved or missing extras).
+        assert.equal(f.combat.attack, null, `${button}: nothing on the ground`);
+        assert.equal(f.summons.length + ground.clones.length + (f.technique ? 1 : 0), 0, `${button}: no summon or technique either`);
+      }
+      if (type !== 'attack') {
+        // A summon or a technique is ground-only: nothing in the air.
         assert.equal(air.fighter.combat.attack, null, `${button}: nothing in the air`);
-        assert.equal(ground.fighter.summons.length + (ground.fighter.technique ? 1 : 0), 0, `${button}: no Charge replacement either`);
+        assert.equal(air.fighter.summons.length + (air.fighter.technique ? 1 : 0), 0, `${button}: no summon or technique in the air`);
+        assert.equal(air.fighter.combat.abilityCooldowns.size, 0, `${button}: no cooldown spent in the air`);
       }
     }
   });
 
-  test(`${label}: while Charging, each button makes its Charge replacement, or its own attack where it has none`, () => {
+  test(`${label}: Down held changes nothing about what a button makes`, () => {
     for (const button of c.buttons) {
-      const d = duel({ attackerCharacter: c.def, attackerSprites: fakeSpritesOf(c.def), gap: 150 });
-      const f = chargedPress(d, button);
-      const id = c.charged[button];
-      if (id === 'attack3') {
-        assert.equal(f.combat.attack, null, 'no normal attack');
-        assert.ok(f.combat.chargedCooldowns.active('attack3'), 'attack3, the summon, with its cooldown');
-        assert.equal(d.clones.length, 1, 'its clone');
-        assert.equal(d.clones[0].attackDef.id, 'attack1');
-      } else if (id === 'attack4') {
-        assert.equal(f.technique?.def.id, 'attack4', 'attack4, the technique');
-        assert.ok(f.combat.chargedCooldowns.active('attack4'));
-      } else {
-        assert.equal(f.combat.attack?.def.id, button, `no Charge replacement on ${button}: ${button} itself`);
-        assert.equal(f.combat.chargedCooldowns.size, 0);
-      }
-    }
-    // Pressing a charge-only attack's own codename while Charging does
-    // nothing: it is reached through its button only.
-    for (const id of c.chargeOnly) {
-      const d = duel({ attackerCharacter: c.def, attackerSprites: fakeSpritesOf(c.def), gap: 150 });
-      const f = chargedPress(d, id);
-      assert.equal(f.combat.attack, null, id);
-      assert.equal(f.combat.chargedCooldowns.size, 0, id);
-      assert.equal(f.charging, true, `${id}: still charging, nothing happened`);
+      const plain = duel({ attackerCharacter: c.def, attackerSprites: fakeSpritesOf(c.def), gap: 150 });
+      plain.tick(P(button));
+      const down = duel({ attackerCharacter: c.def, attackerSprites: fakeSpritesOf(c.def), gap: 150 });
+      for (let i = 0; i < 5; i++) down.tick({ down: true });
+      down.tick({ down: true, ...P(button) });
+      const what = (d) => [d.attacker.combat.attack?.def.id ?? null, d.attacker.technique?.def.id ?? null, d.clones.length];
+      assert.deepEqual(what(down), what(plain), button);
     }
   });
 }
 
-test('Case F: attack5 is an ordinary third button beside the Charge replacements, midair_attack5 in the air, and it hits', () => {
+test('Case F: attack5 is an ordinary button beside the summon and the technique, midair_attack5 in the air, and it hits', () => {
   const F = LOADOUT_CASES.find((c) => c.name === 'F').def;
   const air = airborne(F);
   air.step(P('attack5'));
@@ -141,19 +135,20 @@ test('Case F: attack5 is an ordinary third button beside the Charge replacements
   d.tick(P('attack5'));
   d.until(() => d.events.length > 0);
   assert.deepEqual([d.events[0].type, d.events[0].move, d.events[0].damage], ['hit', 'attack5', 5]);
-  // Charging does not change what attack5 does: it has no replacement.
-  const charged = duel({ attackerCharacter: F, attackerSprites: fakeSpritesOf(F), gap: 150 });
-  assert.equal(chargedPress(charged, 'attack5').combat.attack?.def.id, 'attack5');
 });
 
-test('#0001 is Case E with an extra attack: four numbered attacks and Charge, attack1 and attack2 its only numbered buttons', () => {
+test('#0001 is Case E with an extra attack: four numbered buttons, attack3 a summon and attack4 a technique', () => {
   const E = LOADOUT_CASES.find((c) => c.name === 'E');
   const own = describeLoadout(DEF_0001);
   assert.deepEqual({ ...own, extra: false }, describeLoadout(E.def));
   assert.equal(own.extra, true);
-  assert.deepEqual(own.charge, { attack1: 'attack3', attack2: 'attack4' });
-  assert.deepEqual(chargeOnlyAttacks(DEF_0001), ['attack3', 'attack4']);
-  assert.deepEqual(attackButtons(DEF_0001), ['attack1', 'attack2'], 'no attack3 or attack4 button');
+  assert.deepEqual(own.types, { attack1: 'attack', attack2: 'attack', attack3: 'summon', attack4: 'technique' });
+  assert.deepEqual(attackButtons(DEF_0001), ['attack1', 'attack2', 'attack3', 'attack4'], 'Attack 1 to Attack 4');
+  assert.equal(Object.hasOwn(DEF_0001.actions, 'attack5'), false, 'no Attack 5');
+  assert.deepEqual(DEF_0001.actions.attack3, { type: 'summon', id: 'attack3' });
+  assert.deepEqual(DEF_0001.actions.attack4, { type: 'technique', id: 'attack4' });
+  assert.deepEqual(Object.keys(own), ['numbered', 'buttons', 'air', 'types', 'extra'], 'nothing reached through another button');
+  assert.deepEqual(ACTION_TYPES, ['attack', 'summon', 'technique']);
 });
 
 test('an extra_attack sits beside five numbered attacks, outside their count, on its own button', () => {
@@ -223,14 +218,18 @@ test('keyboard O, M and , and gamepad LT, L3 and R3 press attack3, attack4 and a
 
 // ---- The combat AI -------------------------------------------------------------------------
 
-test('the CPU knows each fighter\'s buttons and Charge replacements from its loadout, never a charge-only attack as a button', () => {
+test('the CPU knows each fighter\'s buttons from its loadout: its attacks, and its summons and techniques on their own buttons', () => {
   for (const c of LOADOUT_CASES) {
     const { fighter } = fighterOf(c.def);
     const moves = readMoveset(fighter);
     const pressed = new Set([...moves.melee, ...moves.ranged].map((m) => m.action));
-    assert.deepEqual([...pressed].sort(), [...c.buttons].sort(), `Case ${c.name}: its buttons`);
-    assert.deepEqual(moves.charged.map((m) => [m.action, m.id]), Object.entries(c.charged), `Case ${c.name}: Charge + button`);
-    for (const id of c.chargeOnly) assert.ok(!pressed.has(id), `Case ${c.name}: never presses ${id} itself`);
+    const ordinary = c.buttons.filter((b) => c.types[b] === 'attack');
+    assert.deepEqual([...pressed].sort(), [...ordinary].sort(), `Case ${c.name}: its attacks`);
+    assert.deepEqual(
+      moves.specials.map((m) => [m.action, m.id, m.type]),
+      c.buttons.filter((b) => c.types[b] !== 'attack').map((b) => [b, b, c.types[b]]),
+      `Case ${c.name}: each summon and technique on its own button`,
+    );
   }
 });
 
@@ -250,25 +249,24 @@ test('a CPU presses whichever of attack3 to attack5 it has a button for, and the
   }
 });
 
-test('a Case F CPU presses attack5 but never attack3 or attack4: it reaches them only as Charge + attack1 / attack2', () => {
+test('a Case F CPU presses attack3, attack4 and attack5 directly: each summon or technique starts on its own button', () => {
   const F = LOADOUT_CASES.find((c) => c.name === 'F').def;
-  let replacements = 0;
+  let specials = 0;
   for (const seed of [1, 2, 3, 4, 5]) {
     const { a, log } = cpuFight(F, DEF_0001, { seconds: 40, seed });
     const mine = log.get(a);
     assert.ok(mine.some((s) => s.attack5Pressed), `seed ${seed}: attack5 has a button`);
-    assert.ok(!mine.some((s) => s.attack3Pressed || s.attack4Pressed), `seed ${seed}: no attack3 or attack4 button is ever pressed`);
-    // Each Charge replacement starts on a step where Charge is held (and
-    // was on the step before) and its button is pressed.
+    // Each summon or technique starts on a step where its own button is
+    // pressed, and no other numbered button with it.
     mine.forEach((s, i) => {
-      for (const id of s.charged.filter((c) => !(mine[i - 1]?.charged ?? []).includes(c))) {
-        replacements++;
-        const button = id === 'attack3' ? 'attack1' : 'attack2';
-        assert.ok(s.charge && mine[i - 1]?.charge && s[`${button}Pressed`], `seed ${seed}: ${id} from Charge + ${button}`);
+      for (const id of s.cooling.filter((c) => !(mine[i - 1]?.cooling ?? []).includes(c))) {
+        specials++;
+        assert.ok(s[`${id}Pressed`], `seed ${seed}: ${id} from its own button`);
+        for (const other of ['attack1', 'attack2']) assert.ok(!s[`${other}Pressed`], `seed ${seed}: ${id} never from ${other}`);
       }
     });
   }
-  assert.ok(replacements > 0, 'it did use its Charge replacements');
+  assert.ok(specials > 0, 'it did use its summon and technique');
 });
 
 // ---- The rules, each broken ------------------------------------------------------------------
@@ -291,19 +289,19 @@ test('a character has 2 to 5 numbered attacks, attack1 and attack2 always, and n
   breaks((d) => { delete d.actions.attack1; }, /attack1 needs a button/);
   breaks((d) => { delete d.actions.attack2; }, /attack2 needs a button/);
   breaks((d) => { d.actions.attack6 = { ground: 'attack6', air: 'midair_attack6' }; }, /actions\.attack6 is not a combat button/);
+  breaks((d) => { d.actions.attack6 = { type: 'summon', id: 'attack6' }; }, /actions\.attack6 is not a combat button/);
   breaks((d) => { d.attacks.attack6 = { ...d.attacks.attack5, animation: 'attack5' }; }, /attacks\.attack6 is not a move codename/);
-  breaks((d) => { d.chargeReplacements = { attack5: { type: 'summon', id: 'attack6' } }; }, /only attack1 \(-> attack3\) and attack2 \(-> attack4\)/);
 });
 
-test('the numbered attacks are contiguous, normal buttons and Charge replacements together', () => {
+test('the numbered attacks are contiguous, whatever kind of move each button is', () => {
   // attack1, attack2, attack4: attack3 skipped.
   breaks((d) => { delete d.actions.attack3; delete d.actions.attack5; }, /are not attack1 to attack3 in a row/);
-  // attack3 only from Charge, attack5 a button, attack4 nowhere.
+  // attack3 a summon, attack5 a button, attack4 nowhere.
   const D = LOADOUT_CASES.find((c) => c.name === 'D').def;
   breaks((d) => { d.actions.attack5 = { ground: 'attack5', air: 'midair_attack5' }; }, /not attack1 to attack4 in a row/, D);
 });
 
-test('every normal numbered button has its mid-air version, named midair_attackN, and both exist', () => {
+test('every ordinary numbered button has its mid-air version, named midair_attackN, and both exist', () => {
   breaks((d) => { d.actions.attack3 = { ground: 'attack3' }; }, /actions\.attack3 must be \{ ground: 'attack3', air: 'midair_attack3' \}/);
   breaks((d) => { d.actions.attack3 = 'attack3'; }, /actions\.attack3 must be/);
   breaks((d) => { d.actions.attack3 = { ground: 'attack3', air: 'midair_attack1' }; }, /actions\.attack3 must be/);
@@ -312,46 +310,47 @@ test('every normal numbered button has its mid-air version, named midair_attackN
   breaks((d) => { delete d.animations.midair_attack2; }, /attack "midair_attack2" plays "midair_attack2", which is not in `animations`/);
 });
 
-test('Charge replacements are attack3 from attack1 and attack4 from attack2, each a real summon or technique', () => {
+test('a summon or technique button is { type, id }, keyed by the button it is, a real summon or technique, and never attack1 or attack2', () => {
   const E = LOADOUT_CASES.find((c) => c.name === 'E').def;
-  breaks((d) => { d.chargeReplacements.attack1.id = 'attack4'; }, /chargeReplacements\.attack1 is attack3, not "attack4"/, E);
-  breaks((d) => { d.chargeReplacements.attack2.type = 'projectile'; }, /has type "projectile"/, E);
+  breaks((d) => { d.actions.attack3.id = 'attack4'; }, /actions\.attack3 must be \{ type: 'summon', id: 'attack3' \}/, E);
+  breaks((d) => { d.actions.attack3.air = 'midair_attack3'; }, /actions\.attack3 must be \{ type: 'summon', id: 'attack3' \}/, E);
+  breaks((d) => { d.actions.attack4.type = 'projectile'; }, /actions\.attack4 has type "projectile" \(summon or technique\)/, E);
   breaks((d) => { delete d.summons.attack3; }, /summons attack3, which is not in `summons`/, E);
-  breaks((d) => { delete d.chargedTechniques.attack4; }, /performs attack4, which is not in `chargedTechniques`/, E);
+  breaks((d) => { delete d.techniques.attack4; }, /performs attack4, which is not in `techniques`/, E);
   breaks((d) => { d.summons.attack3.attack = 'attack9'; }, /summon attack3 names attack "attack9"/, E);
   breaks((d) => { delete d.effectAnimations.attack3_object; }, /cloud "attack3_object" is not in `effectAnimations`/, E);
   breaks((d) => { delete d.animations.attack4_dash; }, /dashAnimation "attack4_dash" is not in `animations`/, E);
-  // With Charge, attack3 is always attack1's replacement...
-  breaks((d) => { d.chargeReplacements = { attack2: { type: 'technique', id: 'attack4' } }; }, /attack3 is Charge \+ attack1/, E);
-  // ...and attack4 attack2's: never a button in its place.
-  const D = LOADOUT_CASES.find((c) => c.name === 'D').def;
-  breaks((d) => {
-    d.actions.attack4 = { ground: 'attack4', air: 'midair_attack4' };
-    d.attacks.attack4 = d.attacks.attack1;
-    d.attacks.midair_attack4 = d.attacks.midair_attack1;
-  }, /attack4 is Charge \+ attack2/, D);
-  // A summon or technique no replacement names is refused too.
-  breaks((d) => { d.summons.attack5 = d.summons.attack3; }, /summons\.attack5 is no Charge replacement's/, E);
+  // attack1 and attack2 are always ordinary attacks.
+  breaks((d) => { d.actions.attack1 = { type: 'summon', id: 'attack1' }; }, /actions\.attack1 must be an ordinary attack/, E);
+  breaks((d) => { d.actions.attack2 = { type: 'technique', id: 'attack2' }; }, /actions\.attack2 must be an ordinary attack/, E);
+  // A summon or technique no button is gets refused: nothing is left to be
+  // reached some other way.
+  breaks((d) => { d.summons.attack5 = d.summons.attack3; }, /summons\.attack5 is no button's/, E);
+  breaks((d) => { d.techniques.attack3 = d.techniques.attack4; }, /techniques\.attack3 is no button's/, E);
+  breaks((d) => { d.actions.attack3 = { ground: 'attack3', air: 'midair_attack3' }; }, /summons\.attack3 is no button's|names attack "attack3"/, E);
 });
 
-test('attack3 and attack4 are ordinary buttons without Charge and Charge replacements with it; a charge-only attack gets a button only when authored as one', () => {
+test('what kind of move attack3 to attack5 are is data: the same button is an ordinary attack, a summon or a technique as authored', () => {
   const B = LOADOUT_CASES.find((c) => c.name === 'B').def;
   const D = LOADOUT_CASES.find((c) => c.name === 'D').def;
-  assert.deepEqual(attackButtons(B), ['attack1', 'attack2', 'attack3']);
-  assert.deepEqual(attackButtons(D), ['attack1', 'attack2']);
-  // attack3 authored as a button as well as Charge + attack1: both, and the
-  // button then needs its mid-air version like any other.
-  const both = structuredClone({ ...D, animations: D.animations, attacks: D.attacks });
-  both.actions.attack3 = { ground: 'attack3', air: 'midair_attack3' };
-  both.attacks.attack3 = { ...both.attacks.attack1, animation: 'attack3' };
-  both.animations.attack3 = D.animations.attack1;
-  assert.ok(loadoutProblems(both).some((p) => /midair_attack3/.test(p)), 'its mid-air version is missing');
-  both.attacks.midair_attack3 = { ...both.attacks.midair_attack1, animation: 'midair_attack3' };
-  both.animations.midair_attack3 = D.animations.midair_attack1;
-  assert.deepEqual(loadoutProblems(both), []);
-  assert.deepEqual(attackButtons(both), ['attack1', 'attack2', 'attack3']);
-  assert.deepEqual(chargeOnlyAttacks(both), []);
-  assert.equal(chargeReplacement(both, 'attack1').id, 'attack3');
+  assert.equal(actionType(B, 'attack3'), 'attack');
+  assert.equal(actionType(D, 'attack3'), 'summon');
+  assert.deepEqual(attackButtons(B), attackButtons(D), 'a button either way');
+  // B's attack3 turned into D's summon by data alone: it keeps the rules
+  // and needs no mid-air version.
+  const summoned = structuredClone({ ...B, animations: B.animations, attacks: B.attacks });
+  summoned.actions.attack3 = { type: 'summon', id: 'attack3' };
+  summoned.summons = { attack3: { ...DEF_0001.summons.attack3 } };
+  summoned.effectAnimations = { attack3_object: DEF_0001.effectAnimations.attack3_object };
+  delete summoned.attacks.attack3;
+  delete summoned.attacks.midair_attack3;
+  assert.deepEqual(loadoutProblems(summoned), []);
+  const d = duel({ attackerCharacter: summoned, attackerSprites: fakeSpritesOf(summoned), gap: 150 });
+  d.tick(P('attack3'));
+  assert.equal(d.clones.length, 1, 'the same button, now a summon');
+  assert.equal(actionType(summoned, 'attack1'), 'attack');
+  assert.equal(actionType(summoned, 'attack5'), null, 'no such button');
+  assert.equal(actionType({ actions: { transform: null } }, 'transform'), null, 'reserved');
 });
 
 test('whatever an attack creates is named after it: <attack>_object', () => {
@@ -386,6 +385,13 @@ test('every definition the game loads keeps the rules, and a broken one is refus
   // The rules are generic: nothing in them names a character.
   const rules = readFileSync(new URL('../js/data/loadout.js', import.meta.url), 'utf8').replace(/^\s*\/\/.*$/gm, '');
   assert.doesNotMatch(rules, /'000\d'|#000\d|displayName|Punch|Kick|Shuriken|Clone|Sphere/);
+  // And they describe direct buttons only: no modifier, stance or
+  // replacement layer.
+  assert.deepEqual(Object.keys(loadoutModule).sort(), [
+    'ACTION_TYPES', 'EXTRA_ATTACK', 'MIN_NUMBERED_ATTACKS', 'NUMBERED_ATTACKS', 'actionType', 'assertLoadout', 'attackButtons',
+    'describeLoadout', 'isNumberedAttack', 'loadoutProblems', 'midairAttack', 'numberedAttacks', 'objectOf', 'specialAction',
+    'specialAttacks',
+  ]);
 });
 
 test('the engine goes by the loadout, never by an attack\'s number: no character or attack special-cased', () => {

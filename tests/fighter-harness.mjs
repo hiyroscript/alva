@@ -174,8 +174,8 @@ export function duel({
 
 // Two CPUs (CombatAIController) in a real fight on a flat stage, stepped in
 // Battle.update's order. Returns every step's inputs and states, keyed by
-// fighter; `charged` lists the Charge replacements cooling down after the
-// step. `spritesA` / `spritesB` swap in other art (by default each
+// fighter; `cooling` lists the summons and techniques cooling down after
+// the step. `spritesA` / `spritesB` swap in other art (by default each
 // fighter's every clip).
 export function cpuFight(defA, defB, { seconds = 30, seed = 3, difficulty = 'brutal', spritesA, spritesB } = {}) {
   const stage = new StageCollision(stageMap());
@@ -197,7 +197,7 @@ export function cpuFight(defA, defB, { seconds = 30, seed = 3, difficulty = 'bru
       f.update(DT, ctx);
       log.get(f).push({
         ...f.controller.out, attack: f.combat.attack?.def.id ?? null, shielding: f.combat.shielding,
-        state: f.state, grounded: f.grounded, frame: frameName(f), charged: [...f.combat.chargedCooldowns.entries.keys()],
+        state: f.state, grounded: f.grounded, frame: frameName(f), cooling: [...f.combat.abilityCooldowns.entries.keys()],
       });
       // Back on stage at once if the Void takes one: the fight goes on.
       if (f.body.y > 1600 || Math.abs(f.body.x - 1000) > 1800) f.respawn(stage);

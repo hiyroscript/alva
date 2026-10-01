@@ -391,7 +391,7 @@ test('custom layouts are checked: malformed objects, unknown ids, non-finite coo
         extra_attack: { x: 0.5, y: 0.5 }, // no scale: dropped
         runLeft: { x: 0.5, y: 0.5, scale: 1 }, // not a joystick control: dropped
         __proto__: { x: 0.5, y: 0.5, scale: 1 },
-        charge: [0.5, 0.5, 1], // dropped
+        down: [0.5, 0.5, 1], // not { x, y, scale }: dropped
         mouvementLeft: null, // dropped
       },
       classic: 'not a layout',

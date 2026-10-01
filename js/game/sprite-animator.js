@@ -1,5 +1,5 @@
 // Plays normalized animations for one fighter. Logical states whose art is
-// missing (jump, hurt, charge, ...) resolve through the character's fallback
+// missing (jump, hurt, land, ...) resolve through the character's fallback
 // table.
 
 export class SpriteAnimator {

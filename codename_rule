@@ -31,49 +31,49 @@ Use lowercase codenames and underscores. Numbered frames start at 1 and play in 
 | Numbered attack | <id>_attackN_<frame>.png |
 | Mid-air numbered attack | <id>_midair_attackN_<frame>.png |
 | Extra attack | <id>_extra_attack_<frame>.png |
-| Charge startup | <id>_charge_<frame>.png |
-| Charge loop | <id>_charge_a.png and <id>_charge_b.png |
 
 Replace N with the attack number, from 1 through 5. Preserve the codename spelling mouvment for animation keys and assets, including midair_mouvment.
 
-Charge startup frames play once in order. After startup, charge_a and charge_b loop while Charge is held. These lettered frames are the explicit exception to numbered animation frames.
-
 ## Numbered attacks and airborne versions
 
-A character has at least 2 and at most 5 numbered attack families: attack1 through attack5. Numbers must be sequential, with no gaps. Ground and mid-air versions belong to the same attack family, and Charge replacements count toward the numbered total.
+A character has at least 2 and at most 5 numbered attack families: attack1 through attack5. Numbers must be sequential, with no gaps. Ground and mid-air versions belong to the same attack family, and summons and techniques count toward the numbered total.
 
-Every independently accessible numbered attack must have a functional midair_attackN definition and animation. An attack that exists only as a Charge replacement is exempt from this requirement. An independent attack5 always requires midair_attack5.
+Every ordinary numbered attack must have a functional midair_attackN definition and animation. A summon or technique, which is ground-only, is exempt from this requirement. An ordinary attack5 always requires midair_attack5.
 
 Attack numbers identify moves; they do not prescribe damage, effects or mechanics. A numbered attack may be a direct strike, projectile, summon, deployable or another character-specific ability.
 
 extra_attack is a separate, additional character-specific action. It may be a projectile, throw, utility move or other unique attack. It does not count toward the 2–5 numbered attack limit, so a character may have five numbered attacks plus extra_attack. Its airborne availability is defined by the character's loadout.
 
-Shield, movement, jump, Charge and transform are not numbered attacks.
+Shield, movement, jump, down and transform are not numbered attacks.
 
-## Charge and attack-button routing
+## Attack-button routing
 
-charge identifies the held stance that changes which attack an existing button triggers. It is not a separate family of charged attack names.
+Every numbered attack a character has is a numbered button of its own, pressed directly on keyboard, gamepad and touch. No held stance, modifier or other button reaches a numbered attack or changes which attack a button triggers.
 
-Charge availability is a character capability. A character may have Charge without having any replacement attacks. Characters without Charge use their numbered attacks as independent buttons.
+| Numbered attack count | Numbered buttons |
+| --- | --- |
+| 2 | attack1, attack2 |
+| 3 | attack1, attack2, attack3 |
+| 4 | attack1, attack2, attack3, attack4 |
+| 5 | attack1, attack2, attack3, attack4, attack5 |
 
-| Numbered attack count | Charge available | Independent numbered buttons | Replacements while charging |
-| --- | --- | --- | --- |
-| 2 | No | attack1, attack2 | None |
-| 3 | No | attack1, attack2, attack3 | None |
-| 4 | No | attack1, attack2, attack3, attack4 | None |
-| 5 | No | attack1, attack2, attack3, attack4, attack5 | None |
-| 2 | Yes | attack1, attack2 | None |
-| 3 | Yes | attack1, attack2 | attack1 → attack3 |
-| 4 | Yes | attack1, attack2 | attack1 → attack3; attack2 → attack4 |
-| 5 | Yes | attack1, attack2, attack5 | attack1 → attack3; attack2 → attack4 |
+Each numbered button is one of three kinds of move, set by the character's loadout:
 
-For a charged five-attack loadout, attack5 remains independent while charging. Its button always identifies attack5.
+| Kind | Loadout entry | Mid-air version |
+| --- | --- | --- |
+| Ordinary attack | { ground: 'attackN', air: 'midair_attackN' } | Required |
+| Summon | { type: 'summon', id: 'attackN' } | None (ground-only) |
+| Technique | { type: 'technique', id: 'attackN' } | None (ground-only) |
 
-Charge-exclusive replacements use the existing base attack buttons and do not get duplicate independent buttons. Whether attack3 or attack4 is an independent move or a Charge replacement depends on the loadout, not its codename.
+attack1 and attack2 are always ordinary attacks. attack3, attack4 and attack5 may each be any of the three. A summon or technique is keyed by the button it is and has its own cooldown. Whether attack3 or attack4 is an ordinary attack, a summon or a technique depends on the loadout, not its codename.
 
-For example, attack3 on a character without Charge is an independent third attack with midair_attack3. On a charged loadout, attack3 can instead replace attack1 and need no independent button or mid-air version.
+For example, attack3 may be an ordinary third attack with midair_attack3 on one character, and a summon on its own Attack 3 button with no mid-air version on another. Character 0001 has four buttons: attack1 and attack2 are ordinary attacks, attack3 is the clone summon and attack4 the Sphere Rush technique.
 
-Controls, AI, UI labels, cooldowns and combat must agree on the same loadout and routing. A character without Charge must not expose an unusable Charge action or enter the Charge stance.
+A summon or technique starts only on its own button's press, on the ground, with the fighter free to act and its cooldown over. Otherwise the press does nothing: no other attack in its place and nothing kept for later.
+
+down is a directional input only: the fast fall and launch steering. It never changes what a button does. Menus keep their own Down navigation.
+
+Controls, AI, UI labels, cooldowns and combat must agree on the same loadout and routing.
 
 ## Mid-air shield and dodge fallback
 
@@ -107,10 +107,10 @@ A summon may explicitly reuse its owner's animation clips and hit data. Shared a
 
 ## Internal codenames and display names
 
-Use attack1 through attack5, midair_attack1 through midair_attack5, extra_attack and charge as the shared internal vocabulary. Do not introduce alternate internal move names based on a character, technique or player-facing label.
+Use attack1 through attack5, midair_attack1 through midair_attack5 and extra_attack as the shared internal vocabulary. Do not introduce alternate internal move names based on a character, technique or player-facing label.
 
 Legacy terms such as ba, maba, cba and uniqueba are not live attack IDs. They may appear only when documenting history or reading older saved data for migration.
 
 Player-facing names such as “Punch,” “Kick” or other character-specific move names may appear in menus and descriptions. They do not replace canonical IDs in character definitions, animation keys, filenames, controls, AI, cooldowns or object references.
 
-When adding or updating a character, keep its attack count, Charge routing, airborne variants, object ownership and animation assets consistent with these shared rules.
+When adding or updating a character, keep its attack count, button routing, airborne variants, object ownership and animation assets consistent with these shared rules.

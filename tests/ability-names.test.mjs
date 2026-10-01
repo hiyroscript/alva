@@ -46,7 +46,7 @@ test('a character with no names of its own, or none at all, gets the neutral nam
 test('only move codenames have ability names: never a control, an object or anything else', () => {
   // (The retired names are checked in codenames.test.mjs.)
   for (const name of [
-    'shield', 'jump', 'charge', 'runLeft', 'mouvementLeft', 'attack6', 'midair_extra_attack', 'extra_attack_object',
+    'shield', 'jump', 'down', 'runLeft', 'mouvementLeft', 'attack6', 'midair_extra_attack', 'extra_attack_object',
     'attack3_object', 'toString', '__proto__', '', undefined,
   ]) {
     assert.equal(abilityName(DEF_0001, name), null, String(name));
@@ -64,7 +64,7 @@ test('every character\'s ability names are non-empty names of universal moves', 
 });
 
 test('names only: no combat code reads them', () => {
-  for (const file of ['character.js', 'combat.js', 'combat-ai.js', 'clone.js', 'charged-technique.js', 'projectile.js']) {
+  for (const file of ['character.js', 'combat.js', 'combat-ai.js', 'clone.js', 'technique.js', 'projectile.js']) {
     const code = readFileSync(new URL(`../js/game/${file}`, import.meta.url), 'utf8');
     assert.doesNotMatch(code, /abilityNames?\b/, file);
   }

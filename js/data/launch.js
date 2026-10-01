@@ -28,7 +28,7 @@
 // Launch Point and launches nothing at all (see CombatSystem.applyHit in
 // js/game/combat.js).
 //
-// Every hit (a fighter's attack, a projectile's, a charged technique's)
+// Every hit (a fighter's attack, a projectile's, a technique's)
 // declares both fields in js/data/characters.js, independently:
 //
 //   damage: 10, baseLaunch: 2, directionalLaunch: 'vertical'

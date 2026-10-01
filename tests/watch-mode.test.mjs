@@ -786,7 +786,9 @@ test('in a seeded mirror match the two CPUs decide for themselves', () => {
     battle.update(DT);
     for (const side of ['p1', 'p2']) {
       const out = battle[side].controller.out;
-      samples[side].push([out.runLeft, out.runRight, out.jump, out.extra_attack, out.attack1, out.attack2, out.shield, out.charge].join());
+      samples[side].push([
+        out.runLeft, out.runRight, out.jump, out.extra_attack, out.attack1, out.attack2, out.attack3, out.attack4, out.shield, out.down,
+      ].join());
     }
   }
   // Were they one stream, the same position mirrored would bring the same
@@ -821,7 +823,7 @@ test('spectating: nothing reads gameplay input, and held buttons change nothing 
   // fight would change.
   const all = fakeInput();
   const everything = {};
-  for (const k of ['runLeft', 'runRight', 'charge', 'jump', 'shield', 'extra_attack', 'transform', 'attack1', 'attack2']) {
+  for (const k of ['runLeft', 'runRight', 'down', 'jump', 'shield', 'extra_attack', 'transform', 'attack1', 'attack2', 'attack3', 'attack4', 'attack5']) {
     everything[k] = true;
     everything[`${k}Pressed`] = true;
   }
@@ -921,7 +923,7 @@ test('Watch Mode with a fighter with no moves: either way round and mirrored, it
     for (const f of battle.fighters) {
       assert.ok(Number.isFinite(f.x) && Number.isFinite(f.y), `${label}: ${f.def.id} in the world`);
       if (f.def === TEST_MOVELESS) {
-        assert.equal(f.combat.chargedCooldowns.size, 0, `${label}: no Charge replacement`);
+        assert.equal(f.combat.abilityCooldowns.size, 0, `${label}: no summon or technique`);
         assert.ok(battle.projectiles.every((p) => p.owner !== f), `${label}: no projectile of its own`);
       }
     }
@@ -1082,7 +1084,7 @@ test('spectating: no touch controls and no gameplay input, through pause, resume
   const tryEverything = () => {
     const down = { pointerId: 1, clientX: 500, clientY: 0, preventDefault: noop };
     screen.touch.buttons.get('jump').dispatch('pointerdown', down);
-    screen.touch.buttons.get('charge').dispatch('pointerdown', { ...down, pointerId: 2 });
+    screen.touch.buttons.get('down').dispatch('pointerdown', { ...down, pointerId: 2 });
     screen.touch.stick.dispatch('pointerdown', { ...down, pointerId: 3 });
     for (const b of screen.touch.mouvementButtons.values()) b.dispatch('pointerdown', { ...down, pointerId: 4 });
   };

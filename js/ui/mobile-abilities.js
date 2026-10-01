@@ -1,15 +1,15 @@
 // Mobile presentation of a fighter's own abilities: the icon and accessible
-// name each fighter-specific touch button shows (Shuriken, Punch and Kick
-// for #0001), whether it shows as reserved, and whether the fighter has
-// the ability at all. Authored per fighter as `mobileAbilities` in
-// js/data/characters.js and read only here: UI data, never combat data.
-// Which abilities a fighter has comes from its `actions`, the same data
-// combat and the CPU go by, so the buttons can never offer a move the
-// fighter does not have: a numbered attack only Charge reaches (#0001's
-// attack3 and attack4, see js/data/loadout.js) has no button, and the
-// button it replaces makes it while Charging. The buttons keep sending the
-// extra_attack / transform / attack1 ... attack5 control codenames, so the
-// internal input names are the same whatever a button looks like.
+// name each fighter-specific touch button shows (Shuriken, Punch, Kick,
+// Clone Attack and Sphere Rush for #0001), whether it shows as reserved,
+// and whether the fighter has the ability at all. Authored per fighter as
+// `mobileAbilities` in js/data/characters.js and read only here: UI data,
+// never combat data. Which abilities a fighter has comes from its
+// `actions`, the same data combat and the CPU go by, so the buttons can
+// never offer a move the fighter does not have, and every numbered attack
+// it has is a button (see js/data/loadout.js), whatever kind of move it is.
+// The buttons keep sending the extra_attack / transform / attack1 ...
+// attack5 control codenames, so the internal input names are the same
+// whatever a button looks like.
 //
 // Names are shown in the interface language (js/core/i18n.js): a fighter's
 // own name for a button where the translations have it, the neutral control
@@ -20,7 +20,7 @@ import { COMBAT_BUTTONS } from '../config.js';
 import { ICONS } from './icons.js';
 
 // The touch buttons whose look belongs to the fighter: every combat button
-// (COMBAT_BUTTONS in js/config.js). The rest (shield, jump, charge,
+// (COMBAT_BUTTONS in js/config.js). The rest (shield, jump, down,
 // runLeft, runRight and the mouvement buttons) are universal, the same for
 // everyone.
 export const ABILITY_ACTIONS = COMBAT_BUTTONS;
@@ -46,8 +46,7 @@ const RESERVED = new Set(['transform']);
 //                  shown dashed
 //   'absent'       left out of its `actions`: a button the fighter does not
 //                  have at all (attack3 to attack5 for a fighter with fewer
-//                  numbered attacks, or with the ones it has reached
-//                  through Charge; an extra_attack it has none of), so it
+//                  numbered attacks; an extra_attack it has none of), so it
 //                  shows no button
 //
 // With no `actions` to go by (no fighter named yet) every button stays,

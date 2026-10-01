@@ -91,7 +91,7 @@ test('launch steering bends a launch toward the held direction by up to 15 degre
   // A diagonal counts only its part across.
   const diag = steerLaunch(up, { x: 1, y: -1 }, R.steerAngle);
   assert.ok(close(deg(diag) - deg(up), R.steerAngle * Math.SQRT1_2));
-  // A sideways launch bends up with Jump held, down with Charge.
+  // A sideways launch bends up with Jump held, down with Down.
   const side = { x: 1000, y: 0 };
   assert.ok(steerLaunch(side, { x: 0, y: -1 }, R.steerAngle).y < 0);
   assert.ok(steerLaunch(side, { x: 0, y: 1 }, R.steerAngle).y > 0);
@@ -118,7 +118,7 @@ test('in play, the target\'s held direction steers the launch; with nothing held
   // Standing, Down bends nothing into the floor.
   const d = duel({ gap: 40 });
   d.target.combat.launchPoint = 60;
-  d.tick(P('attack1'), { charge: true });
+  d.tick(P('attack1'), { down: true });
   d.until(() => d.events.length > 0, 30);
   assert.equal(d.events[0].finalLaunch.y, 0);
 });

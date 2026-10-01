@@ -2,11 +2,11 @@
 // The status drawn with each fighter on the Arena canvas: the bright purple
 // Energy bar over its name tag, only while below full (gray
 // through an exhaustion's whole refill), and the A3 / A4 cooldown rings of
-// #0001's Charge replacements (attack3, attack4) under its feet, only while
-// cooling down. The state helpers are checked directly;
-// the drawing through a
-// canvas context that records what it is asked to paint (layout and paint
-// themselves still need a real browser).
+// #0001's direct Attack 3 and Attack 4 (the Clone Attack's summon and the
+// Sphere Rush technique) under its feet, only while cooling down. The state
+// helpers are checked directly; the drawing through a canvas context that
+// records what it is asked to paint (layout and paint themselves still
+// need a real browser).
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -16,6 +16,7 @@ import {
   cooldownIndicators, energyBarState, formatCooldown, drawCooldownIndicators, drawEnergyBar, statusOnScreen,
   COOLDOWN_STYLE, ENERGY_STYLE, cooldownLabel,
 } from '../js/game/fighter-status.js';
+import { specialAttacks } from '../js/data/loadout.js';
 import { def, DT, fakeSprites, makeFighter, duel } from './fighter-harness.mjs';
 
 globalThis.Path2D ??= class {
@@ -57,27 +58,28 @@ const drawnRings = (fighter) => {
 
 // ---- A3 / A4: only while cooling down ------------------------------------
 
-test('A3 and A4 are named after the attacks they are (attack3, attack4), never after the buttons Charge makes them from; ready, neither has any indicator at all', () => {
+test('A3 and A4 are named after the attacks they are (attack3, attack4), each its own button; ready, neither has any indicator at all', () => {
   assert.deepEqual(['attack1', 'attack2', 'attack3', 'attack4', 'attack5'].map(cooldownLabel), ['A1', 'A2', 'A3', 'A4', 'A5']);
   assert.equal(cooldownLabel('midair_attack3'), 'A3');
   assert.equal(cooldownLabel('extra_attack'), 'EXTRA_ATTACK');
   const { fighter } = makeFighter();
-  assert.deepEqual(Object.values(def.chargeReplacements).map((c) => c.id), ['attack3', 'attack4']);
+  assert.deepEqual(specialAttacks(def), ['attack3', 'attack4'], 'its summon and its technique, each on its own button');
   assert.deepEqual(cooldownIndicators(fighter), [], 'both ready: no entries, not ready ones made invisible');
   const { rings, calls } = drawnRings(fighter);
   assert.deepEqual(rings, []);
   assert.deepEqual(calls, [], 'nothing under the fighter: no ring, label, number or empty slot');
   // Each one is its own: A4 alone, then A3 alone.
-  fighter.combat.chargedCooldowns.start('attack4', 5);
-  assert.deepEqual(cooldownIndicators(fighter).map((c) => [c.label, c.id, c.action]), [['A4', 'attack4', 'attack2']]);
-  fighter.combat.chargedCooldowns.clear();
-  fighter.combat.chargedCooldowns.start('attack3', 5);
-  assert.deepEqual(cooldownIndicators(fighter).map((c) => [c.label, c.id, c.action]), [['A3', 'attack3', 'attack1']]);
+  fighter.combat.abilityCooldowns.start('attack4', 5);
+  assert.deepEqual(cooldownIndicators(fighter).map((c) => [c.label, c.id]), [['A4', 'attack4']]);
+  fighter.combat.abilityCooldowns.clear();
+  fighter.combat.abilityCooldowns.start('attack3', 5);
+  assert.deepEqual(cooldownIndicators(fighter).map((c) => [c.label, c.id]), [['A3', 'attack3']]);
+  assert.deepEqual(Object.keys(cooldownIndicators(fighter)[0]).sort(), ['id', 'label', 'progress', 'text']);
 });
 
 test('the rings read the real cooldowns: empty as one starts, half way at half, the seconds left counting down, gone when ready', () => {
   const { fighter } = makeFighter();
-  const cd = fighter.combat.chargedCooldowns;
+  const cd = fighter.combat.abilityCooldowns;
   cd.start('attack3', 5);
   let [attack3, attack4] = cooldownIndicators(fighter);
   assert.deepEqual([attack3.label, attack3.progress, attack3.text], ['A3', 0, '5.0']);
@@ -100,23 +102,24 @@ test('the rings read the real cooldowns: empty as one starts, half way at half, 
 test('real attack3 then attack4: A3 appears at once, A4 joins it, A3 goes first, the last one leaves nothing', () => {
   const d = duel({ gap: 200 });
   const f = d.attacker;
-  const cd = f.combat.chargedCooldowns;
-  d.tick({ charge: true });
+  const cd = f.combat.abilityCooldowns;
+  d.tick({});
   assert.deepEqual(labels(f), []);
   // A3 used: its ring on the very step, A4 still absent.
-  d.tick({ charge: true, attack1: true, attack1Pressed: true });
+  d.tick({ attack3: true, attack3Pressed: true });
   assert.equal(d.clones.length, 1);
   let [attack3, attack4] = cooldownIndicators(f);
   assert.deepEqual([attack3.label, attack3.text, attack3.progress], ['A3', '5.0', 0]);
   assert.equal(attack4, undefined);
   assert.deepEqual(labels(d.target), [], 'the other fighter shows nothing');
-  // Charge fills it faster: half a second of Charge takes a whole second off.
-  for (let i = 0; i < 30; i++) d.tick({ charge: true });
+  // In real time, whatever is held: half a second, Down held or not, takes
+  // half a second off.
+  for (let i = 0; i < 30; i++) d.tick(i % 2 ? { down: true } : {});
   [attack3] = cooldownIndicators(f);
-  assert.equal(attack3.text, '4.0');
-  assert.ok(Math.abs(attack3.progress - 0.2) < 1e-9);
+  assert.equal(attack3.text, '4.5');
+  assert.ok(Math.abs(attack3.progress - 0.1) < 1e-9);
   // A4 used while A3 cools: both, side by side, A3 on the left.
-  d.tick({ charge: true, attack2: true, attack2Pressed: true });
+  d.tick({ attack4: true, attack4Pressed: true });
   assert.ok(f.technique, 'the Sphere Rush started');
   assert.deepEqual(labels(f), ['A3', 'A4']);
   const both = drawnRings(f).rings;
@@ -146,8 +149,8 @@ test('cooldown rings are white with a black outline: ring, number and label; nev
   assert.equal(COOLDOWN_STYLE.fill, '#ffffff');
   assert.equal(COOLDOWN_STYLE.outline, '#000000');
   const { fighter } = makeFighter();
-  fighter.combat.chargedCooldowns.start('attack4', 5);
-  fighter.combat.chargedCooldowns.update(2.5);
+  fighter.combat.abilityCooldowns.start('attack4', 5);
+  fighter.combat.abilityCooldowns.update(2.5);
   let { rings, calls } = drawnRings(fighter);
   assert.deepEqual(texts(calls), ['2.5', 'A4'], 'A4 cooling (2.5 left), nothing for the ready A3');
   assert.deepEqual(rings, [{ label: 'A4', x: 400 }], 'alone: straight under the fighter, no slot kept for A3');
@@ -171,7 +174,7 @@ test('cooldown rings are white with a black outline: ring, number and label; nev
   const used = new Set(calls.filter((c) => ['stroke', 'fillText', 'strokeText'].includes(c.fn)).map((c) => (c.fn === 'fillText' ? c.fill : c.stroke)));
   assert.deepEqual([...used].sort(), [COOLDOWN_STYLE.outline, COOLDOWN_STYLE.fill, COOLDOWN_STYLE.track].sort());
   // Both cooling: one row, A3 left of A4, under the feet (y below 300).
-  fighter.combat.chargedCooldowns.start('attack3', 5);
+  fighter.combat.abilityCooldowns.start('attack3', 5);
   ({ calls } = drawnRings(fighter));
   assert.deepEqual(texts(calls), ['5.0', 'A3', '2.5', 'A4']);
   const [l1, l2] = calls.filter((c) => c.fn === 'fillText' && /^A\d$/.test(c.args[0]));
@@ -277,15 +280,15 @@ test('a fresh fighter shows no bar; a real Dash or blocked hit brings it up at o
   }
 });
 
-test('Charge only fills the bar faster: it still shows until full, and hides at full', () => {
+test('the bar refills at one rate, Down held or not: it shows until full, and hides at full', () => {
   const normal = makeFighter();
   normal.fighter.combat.setEnergy(40);
-  const slow = refillUntilHidden(normal.fighter, normal.step).steps;
-  const charging = makeFighter();
-  charging.fighter.combat.setEnergy(40);
-  const fast = refillUntilHidden(charging.fighter, charging.step, { charge: true });
-  assert.ok(fast.steps < slow * 0.5, `faster in Charge (${fast.steps} vs ${slow} steps)`);
-  assert.deepEqual([...fast.colors], [ENERGY_STYLE.fill]);
+  const plain = refillUntilHidden(normal.fighter, normal.step);
+  const down = makeFighter();
+  down.fighter.combat.setEnergy(40);
+  const held = refillUntilHidden(down.fighter, down.step, { down: true });
+  assert.equal(held.steps, plain.steps, `the same refill (${held.steps} vs ${plain.steps} steps)`);
+  assert.deepEqual([...held.colors], [ENERGY_STYLE.fill]);
 });
 
 test('the gray exhaustion cycle: a Dash with too little left empties it, gray through 25, 75 and 99, gone only when full', () => {
@@ -344,7 +347,7 @@ function renderedBattle() {
   return { battle, render };
 }
 
-test('in play: nothing over or under a fighter with full Energy and both Charge replacements ready; its bar over its tag and rings under its feet once they show, drawn after the Void', () => {
+test('in play: nothing over or under a fighter with full Energy and Attack 3 and Attack 4 ready; its bar over its tag and rings under its feet once they show, drawn after the Void', () => {
   const { battle, render } = renderedBattle();
   const { p1, p2 } = battle;
   // A fighter's bar: its black outline fillRect (the cooldown rings are strokes
@@ -360,7 +363,7 @@ test('in play: nothing over or under a fighter with full Energy and both Charge 
   // P1 spends Energy and uses A3: its bar and A3, nothing more; the
   // CPU still shows neither.
   p1.combat.setEnergy(75);
-  p1.combat.chargedCooldowns.start('attack3', 5);
+  p1.combat.abilityCooldowns.start('attack3', 5);
   calls = render();
   const at = (pred) => calls.findIndex(pred);
   const voidAt = at((c) => c.fn === 'void');
@@ -399,7 +402,7 @@ test('no bar, rings or tag for a fighter out of play (waiting to respawn); back,
   const barsDrawn = (calls) => calls.filter((c) => c.fn === 'fillRect' && c.fill === ENERGY_STYLE.outline);
   const spend = (f) => {
     f.combat.setEnergy(50);
-    f.combat.chargedCooldowns.start('attack3', 5);
+    f.combat.abilityCooldowns.start('attack3', 5);
   };
   spend(p1);
   spend(p2);
@@ -439,7 +442,7 @@ test('no bar, rings or tag for a fighter out of play (waiting to respawn); back,
 
 test('the rings and bar are canvas-drawn, never DOM in a HUD card', () => {
   const hud = readFileSync(new URL('../js/game/hud.js', import.meta.url), 'utf8').replace(/^\s*\/\/.*$/gm, '');
-  assert.doesNotMatch(hud, /cooldown|chargedCooldowns/i, 'the HUD knows nothing of them');
+  assert.doesNotMatch(hud, /cooldown|abilityCooldowns/i, 'the HUD knows nothing of them');
   const status = readFileSync(new URL('../js/game/fighter-status.js', import.meta.url), 'utf8');
   assert.doesNotMatch(status, /document\.|createElement/, 'no DOM');
   assert.doesNotMatch(status, /stamina/i, 'Energy, never the old Stamina');

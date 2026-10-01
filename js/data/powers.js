@@ -28,7 +28,7 @@ export const JUMP_POWER_TIERS = Object.freeze([
 // right movement, on the ground and in the air alike. Tier 2 is the normal
 // speed and tier 3 only a little faster. Acceleration, deceleration, the turn
 // boost and air control are movement stats; launches, projectiles, Dashes
-// and charged techniques have speeds of their own.
+// and techniques have speeds of their own.
 export const SPEED_POWER_TIERS = Object.freeze([
   Object.freeze({ tier: 1, name: 'Speed Power 1', description: 'Slow.', maxSpeed: 270 }),
   Object.freeze({ tier: 2, name: 'Speed Power 2', description: 'Normal speed.', maxSpeed: 330 }),

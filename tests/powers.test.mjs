@@ -564,13 +564,13 @@ test('Speed Power leaves every other velocity alone: launches received, the shur
 
     // The Sphere Rush dashes at its own 1050.
     const rusher = makeFighter({ character });
-    rusher.step({ charge: true });
-    rusher.step({ charge: true, attack2: true, attack2Pressed: true });
+    rusher.step({});
+    rusher.step({ attack4: true, attack4Pressed: true });
     const technique = rusher.fighter.technique;
     assert.ok(technique, `${label}: the Sphere Rush started`);
     stepUntil(rusher.step, () => technique.phase === 'dash');
-    assert.equal(rusher.fighter.body.vx, def.chargedTechniques.attack4.dashSpeed, label);
-    assert.equal(def.chargedTechniques.attack4.dashSpeed, 1050);
+    assert.equal(rusher.fighter.body.vx, def.techniques.attack4.dashSpeed, label);
+    assert.equal(def.techniques.attack4.dashSpeed, 1050);
 
     // A Shield held from standing still adds no movement, however fast the
     // fighter could run.

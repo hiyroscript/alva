@@ -3,8 +3,8 @@
 // projectile: artwork, registration, one-pass playback, one release per press
 // on the release frame, independent flight, spin animation, hits through the real
 // CombatSystem (no launch either way, the Shield), cleanup, missing-art
-// safety, the ground-only rule, Charge / Shield priority, input and the
-// training CPU. The shuriken is Base Launch 0 with no Directional Launch: a
+// safety, the ground-only rule, Shield priority (Down held changes nothing),
+// input and the training CPU. The shuriken is Base Launch 0 with no Directional Launch: a
 // hit adds 1 to the target's Launch Point and stuns it, but never pushes or
 // launches it, however high its Launch Point. Uses the real Fighter, CombatSystem,
 // projectiles, physics and InputManager (see fighter-harness.mjs).
@@ -681,34 +681,27 @@ test('Throw in the air does nothing: no ground art in the air, no shuriken, Jump
 
 // ---- Priority -------------------------------------------------------------------
 
-test('Throw cuts straight out of Charge (no release pose); a held Charge restarts from charge_1 after', () => {
-  const d = range();
-  const CHARGE = { charge: true };
-  for (let i = 0; i < 30; i++) d.tick(CHARGE);
-  assert.equal(d.attacker.state, 'charge');
-  d.tick({ ...CHARGE, ...THROW });
-  assert.equal(d.attacker.state, 'attack');
-  assert.equal(frameName(d.attacker), '0001_extra_attack_1.png');
-  const states = [];
-  while (d.attacker.combat.attack) {
-    d.tick(CHARGE);
-    states.push(d.attacker.state);
-  }
-  assert.ok(!states.includes('chargeRelease'));
-  assert.equal(d.attacker.state, 'charge');
-  assert.equal(frameName(d.attacker), '0001_charge_1.png');
-  // Letting go of Charge during the Throw: no release pose afterwards either.
-  const e = range();
-  for (let i = 0; i < 30; i++) e.tick(CHARGE);
-  e.tick(THROW);
-  const after = [];
-  while (e.attacker.combat.attack) e.tick();
-  for (let i = 0; i < 10; i++) {
-    e.tick();
-    after.push(e.attacker.state);
-  }
-  assert.ok(!after.includes('chargeRelease'), after.join());
-  assert.equal(e.projectiles.length, 1);
+test('Down held changes nothing about a Throw: it comes out, throws and recovers exactly the same, and leaves no pose behind', () => {
+  const throwWith = (held) => {
+    const d = range();
+    for (let i = 0; i < 30; i++) d.tick(held);
+    d.tick({ ...held, ...THROW });
+    const log = [];
+    while (d.attacker.combat.attack) {
+      log.push([d.attacker.state, frameName(d.attacker)]);
+      d.tick(held);
+    }
+    for (let i = 0; i < 10; i++) {
+      d.tick(held);
+      log.push([d.attacker.state, frameName(d.attacker)]);
+    }
+    return { log, shots: d.projectiles.length };
+  };
+  const plain = throwWith({});
+  assert.deepEqual(throwWith({ down: true }), plain);
+  assert.equal(plain.log[0][1], '0001_extra_attack_1.png');
+  assert.deepEqual(plain.log.slice(-10).map(([state]) => state), Array(10).fill('idle'));
+  assert.equal(plain.shots, 1);
 });
 
 test('Shield held wins over a Throw pressed with it; a Throw already playing is never cut short by the Shield', () => {
@@ -761,12 +754,12 @@ test('a shuriken adds exactly 1 Launch Point and never launches, even a target a
   }
 });
 
-test('Throw and its shuriken start no charged-action cooldown on either side', () => {
+test('Throw and its shuriken start no summon or technique cooldown on either side', () => {
   const d = duel({ gap: 200 });
   d.tick(THROW);
   d.until(() => d.events.length > 0);
   for (let i = 0; i < 30; i++) d.tick();
-  for (const f of [d.attacker, d.target]) assert.equal(f.combat.chargedCooldowns.size, 0);
+  for (const f of [d.attacker, d.target]) assert.equal(f.combat.abilityCooldowns.size, 0);
 });
 
 // ---- Input and CPU ----------------------------------------------------------------

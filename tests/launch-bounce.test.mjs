@@ -660,10 +660,9 @@ test('a clone\'s punch launches through the same system: a battered target rebou
   const stage = stageWith({ solids: [wallAt('wall', 600, 40)] });
   const d = duel({ gap: 420, stage, x });
   d.target.combat.launchPoint = 100;
-  d.tick({ charge: true });
-  d.tick({ charge: true, ...P('attack1') });
+  d.tick(P('attack3'));
   assert.equal(d.clones.length, 1, 'a clone');
-  const b = tickForBounce(d, 120, { charge: true });
+  const b = tickForBounce(d, 120, {});
   assert.ok(d.events.some((e) => e.summon && e.type === 'hit'), 'the clone hit');
   assert.ok(b, 'rebounded');
   assert.equal(b.normalX, 1, 'off the wall\'s far face');
@@ -675,8 +674,7 @@ test('the Sphere Rush explosion launches through the same system: into a nearby 
   const stage = stageWith({ solids: [wallAt('wall', 800)] });
   const d = duel({ gap: 140, stage, x, pushboxes: true });
   d.target.combat.launchPoint = 60;
-  d.tick({ charge: true });
-  d.tick({ charge: true, ...P('attack2') });
+  d.tick(P('attack4'));
   const t = d.attacker.technique;
   assert.ok(t, 'the Sphere Rush started');
   let b = null;

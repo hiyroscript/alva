@@ -6,17 +6,18 @@
 // (js/data/loadout.js), but makes different moves on them and names them
 // its own way.
 //
-// Against #0001 (four numbered attacks and Charge) it has:
+// Against #0001 (four numbered attacks: two ordinary, a summon and a
+// technique) it has:
 //   extra_attack  a melee palm strike, usable in the air too (#0001's is a
 //                 ground-only projectile Throw)
 //   transform     a real move (#0001's is reserved), presented on its own
 //                 touch button
 //   attack1 / midair_attack1, attack2 / midair_attack2
 //                 on the ground and in the air, its own timings
-//   attack3       Charge + attack1, a clone summon that performs attack2
+//   attack3       its own button, a clone summon that performs attack2
 //                 (#0001's attack3 performs attack1); three numbered attacks
-//                 in all, so there is no attack4: attack2 pressed while
-//                 Charging is still attack2
+//                 in all, so there is no attack4 (no technique) and its
+//                 attack3 button keeps its neutral look
 //   no Defense: the shield button does nothing
 //   its own touch labels and icons (attack2 left neutral) and ability names
 //   (attack2 and both mid-air attacks left unnamed)
@@ -40,7 +41,6 @@ export const SAMPLE_FIGHTER = Object.freeze({
   animations: {
     idle: A.idle, run: A.run, jump: A.jump, fall: A.fall, land: A.land,
     hurt: A.hurt, midair_hurt: A.midair_hurt, mouvment: A.mouvment,
-    charge: A.charge, charge_loop: A.charge_loop, charge_release: A.charge_release,
     extra_attack: A.attack2,              // 7 frames
     transform: A.midair_attack1,          // 3 frames
     attack1: A.attack1,                   // 4 frames
@@ -58,9 +58,7 @@ export const SAMPLE_FIGHTER = Object.freeze({
     transform: 'transform',
     attack1: { ground: 'attack1', air: 'midair_attack1' },
     attack2: { ground: 'attack2', air: 'midair_attack2' },
-  },
-  chargeReplacements: {
-    attack1: { type: 'summon', id: 'attack3' },
+    attack3: { type: 'summon', id: 'attack3' },
   },
   summons: {
     attack3: {
@@ -72,7 +70,7 @@ export const SAMPLE_FIGHTER = Object.freeze({
       noGround: { attack: 'midair_attack2', offset: { x: 0, y: -36 } },
     },
   },
-  chargedTechniques: {},
+  techniques: {},
 
   mobileAbilities: {
     extra_attack: { label: 'Palm Strike', icon: 'arrow' },

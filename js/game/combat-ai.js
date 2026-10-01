@@ -3,10 +3,10 @@
 //
 // A controller like PlayerController: Fighter.update asks it for one
 // FighterInput snapshot per fixed step, and that is all it ever produces.
-// Every attack, Throw, Shield, Charge, Charge replacement, jump and Dash
-// happens because it pressed or held the same inputs a player would, and the
-// fighter
-// and combat engine decide what those inputs do, exactly as for Player 1. It
+// Every attack, Throw, summon, technique, Shield, jump, fast fall and Dash
+// happens because it pressed or held the same inputs a player would, and
+// the fighter and combat engine decide what those inputs do, exactly as for
+// Player 1. It
 // never moves, hurts, spawns, cancels or refreshes anything itself, and it
 // never writes to a fighter.
 //
@@ -15,25 +15,23 @@
 //
 //   sense     one honest picture of the fight from what is on screen: both
 //             fighters' positions, motion, attacks and their phases, Shield,
-//             Charge, Energy, Launch Point and cooldowns, the projectiles and
+//             techniques, Energy, Launch Point and cooldowns, the projectiles and
 //             clones in play, the stage, the score and the clock. Never the
 //             player's raw input: an attack is seen once the fighter starts
 //             it, not when a key goes down.
 //   evaluate  score the options that fit the moment (answer a threat, strike,
-//             Throw, approach, space, Dash, jump in, Charge for a Charge
-//             replacement, make for the centre, wait), each option built from the
+//             Throw, a summon or technique, approach, space, Dash, jump in,
+//             make for the centre, wait), each option built from the
 //             fighter's own move data, and take the best one after the
 //             level's noise.
 //   act       turn the chosen intent into held buttons and one-step presses,
-//             over as many steps as it needs (turn, then strike; hold Charge,
-//             then press the button it replaces, e.g. attack1 for #0001's
-//             attack3; tap, release, tap for a Dash). It never presses a
-//             button the fighter has no action for: a Charge-only attack is
-//             only ever reached through Charge.
+//             over as many steps as it needs (turn, then strike, or turn,
+//             then press attack4 for #0001's Sphere Rush; tap, release, tap
+//             for a Dash). It never presses a button the fighter has no
+//             action for.
 //
 // Reaction: something new the opponent does (an attack's startup, a
-// projectile, a clone's cloud, a charged technique, a whiff, a Charge) is an
-// event. Each is noticed once, after a delay sampled from the level's
+// projectile, a clone's cloud, a technique, a whiff) is an event. Each is noticed once, after a delay sampled from the level's
 // reaction window, or not at all (its lapse chance); only then can it be
 // answered. Nothing is answered on the step it appears, on any level.
 // Neutral decisions happen on the level's own reassessment cadence, and a
@@ -42,19 +40,20 @@
 //
 // Prediction is limited to motion: the opponent's position a short horizon
 // ahead (the level's lookahead) from its current velocity, and the path of a
-// projectile or a charged rush already under way. Never future inputs.
+// projectile or a rush already under way. Never future inputs.
 
 import { range, clamp } from '../core/utils.js';
 import { COMBAT_ACTIONS } from './character.js';
 import { HELD_CONTROLS } from './fighter-controller.js';
 import { attackReach, worldBox } from './combat.js';
 import { summonProblem } from './clone.js';
-import { techniqueProblem } from './charged-technique.js';
+import { techniqueProblem } from './technique.js';
+import { specialAction } from '../data/loadout.js';
 import { blankInput, jumpTapHold } from './fighter-controller.js';
 import { DEFAULT_DIFFICULTY, getDifficultyProfile, resolveDifficulty } from '../data/difficulty.js';
 
 // The buttons a controller holds, by control codename (every held control:
-// the directions, Charge, Jump, Shield and every combat button up to
+// the directions, Down included, Jump, Shield and every combat button up to
 // attack5); each has a matching `…Pressed` edge. The mouvement buttons are
 // touch-only: it Dashes by double-tapping runLeft / runRight, as a keyboard
 // or gamepad player does.
@@ -130,11 +129,11 @@ const MOVESETS = new WeakMap();
 // where it has them), each melee one with where its strikes can reach over
 // its own motion (`reach`, see attackReach in js/game/combat.js) and that
 // motion's kind (`motion`: a roll, a homing dash, a plunge, a lift, or
-// null); its Charge replacements, each with the button that
-// makes it (`action`); whether it has a Shield and a Dash. An action
-// mapped to null (a reserved button, like #0001's transform) is left out, as is
-// anything the fighter would refuse for missing art, so the AI never presses
-// a button that cannot do anything.
+// null); its summons and techniques (`specials`, #0001's attack3 and
+// attack4), each with its own button (`action`); whether it has a Shield
+// and a Dash. An action mapped to null (a reserved button, like #0001's
+// transform) is left out, as is anything the fighter would refuse for
+// missing art, so the AI never presses a button that cannot do anything.
 export function readMoveset(f) {
   const cached = MOVESETS.get(f);
   if (cached && cached.def === f.def && cached.sprites === f.sprites) return cached;
@@ -143,7 +142,7 @@ export function readMoveset(f) {
   const ranged = [];
   for (const action of COMBAT_ACTIONS) {
     const mapping = def.actions?.[action];
-    if (!mapping) continue;
+    if (!mapping || specialAction(def, action)) continue;
     const pairs = typeof mapping === 'string' ? [[mapping, false], [mapping, true]] : [[mapping.ground, false], [mapping.air, true]];
     for (const [id, air] of pairs) {
       const atk = id ? f.attacks[id] : null;
@@ -157,15 +156,16 @@ export function readMoveset(f) {
       }
     }
   }
-  const charged = [];
-  for (const [action, spec] of Object.entries(def.chargeReplacements ?? {})) {
+  const specials = [];
+  for (const action of COMBAT_ACTIONS) {
+    const spec = specialAction(def, action);
     if (spec?.type === 'summon') {
       const summon = f.summonDefs[spec.id];
       if (!summon || summonProblem(f, summon)) continue;
       const attack = f.attacks[summon.attack];
       // From the press to its strike: one pass of the cloud, then the attack's startup.
       const lead = passOf(sprites.effect(summon.cloud)) + (attack?.startup ?? 0);
-      charged.push({ action, type: 'summon', id: spec.id, lead, hit: attack });
+      specials.push({ action, type: 'summon', id: spec.id, lead, hit: attack });
     } else if (spec?.type === 'technique') {
       const t = f.techniqueDefs[spec.id];
       if (!t || techniqueProblem(f, t)) continue;
@@ -182,7 +182,7 @@ export function readMoveset(f) {
       const y1 = Math.max(...hands.map((h) => h.y)) + hb.y + hb.h;
       const ticks = t.tickHit ? Math.floor(t.explosionDelay / t.tickInterval) : 0;
       const damage = (t.firstHit?.damage ?? 0) + ticks * (t.tickHit?.damage ?? 0) + (t.explosionHit?.damage ?? 0);
-      charged.push({
+      specials.push({
         action, type: 'technique', id: spec.id, lead: form, form, rush,
         box: { x: x0, y: y0, w: x1 - x0, h: y1 - y0 },
         hit: { ...t.explosionHit, damage },
@@ -191,7 +191,7 @@ export function readMoveset(f) {
   }
   const dashDistance = (def.movement?.dashSpeed ?? 0) * f.dashDuration;
   const moveset = {
-    def, sprites, melee, ranged, charged,
+    def, sprites, melee, ranged, specials,
     shield: f.defense?.type === 'shield',
     dash: dashDistance > 0 && sprites.has('mouvment') ? { distance: dashDistance, cost: f.energyDef.dashCost } : null,
     hurt: hurtExtent(def),
@@ -224,7 +224,7 @@ export class CombatAIController {
     this.events = [];
     this.seen = new WeakSet();
     this.openSeen = new WeakSet();
-    this.foeWas = { charging: false, stunned: false, exhausted: false };
+    this.foeWas = { stunned: false, exhausted: false };
     // The last horizontal press and how long ago it was (see emit).
     this.tap = { dir: 0, age: Infinity };
     this.lastThrow = -Infinity;
@@ -344,14 +344,12 @@ export class CombatAIController {
       this.seen.add(c);
       this.notice('clone', c, () => c.alive);
     }
-    // States that come and go: a Charge (it stands still, and a projectile
-    // interrupts it), hitstun (a follow-up), an exhausted bar (no Shield).
+    // States that come and go: hitstun (a follow-up), an exhausted bar (no
+    // Shield).
     const now = {
-      charging: foe.charging,
       stunned: fc.stun > 0,
       exhausted: fc.energyExhausted,
     };
-    if (now.charging && !this.foeWas.charging) this.notice('opening', null, () => foe.charging, 'charge');
     if (now.stunned && !this.foeWas.stunned) this.notice('opening', null, () => foe.combat.stun > 0, 'stun');
     if (now.exhausted && !this.foeWas.exhausted) this.notice('opening', null, () => foe.combat.energyExhausted, 'exhausted');
     this.foeWas = now;
@@ -431,12 +429,12 @@ export class CombatAIController {
       self, foe, stage, world, g, p, ms, fms,
       me: ms.hurt, fe: fms.hurt,
       x: b.x, y: b.y, vx: b.vx, vy: b.vy, grounded: b.grounded, facing: self.facing,
-      canAct: self.canAct(), charging: self.charging,
+      canAct: self.canAct(),
       energy: self.combat.energy, exhausted: self.combat.energyExhausted,
       fx, fy, dx, dist: Math.abs(dx), dir, dy: fy - b.y,
       liveDist: Math.abs(fb.x - b.x),
       foeGrounded: fb.grounded, foeCanAct: foe.canAct(), foeBusy,
-      foeCharging: foe.charging, foeShielding: fc.shielding, foeExhausted: fc.energyExhausted,
+      foeShielding: fc.shielding, foeExhausted: fc.energyExhausted,
       foeEnergy: fc.energy, myLP: self.combat.launchPoint, foeLP: fc.launchPoint,
       sameLevel: Math.abs(foeLevel - b.y) < 40 || (!fb.grounded && fb.y > b.y - 120 && fb.y < b.y + 40),
       foeLevel,
@@ -627,11 +625,11 @@ export class CombatAIController {
     if (s.offStage) return this.setIntent({ kind: 'recover' });
     const defense = this.chooseDefense(s);
     if (defense) return this.setIntent(defense);
-    // A plan in progress is kept for the level's planning time (a Charge for
-    // as long as its own checks allow) unless something new calls for a look.
+    // A plan in progress is kept for the level's planning time unless
+    // something new calls for a look.
     const it = this.intent;
-    if (it && !it.done && !urgent && (it.keepUntil > this.clock || it.kind === 'charge')) return undefined;
-    // Mid-move (an attack, stun, a Dash, a charged technique): nothing new
+    if (it && !it.done && !urgent && it.keepUntil > this.clock) return undefined;
+    // Mid-move (an attack, stun, a Dash, a technique): nothing new
     // to start until it is over; the next look decides what comes next.
     if (!s.canAct) return this.setIntent({ kind: 'idle', until: this.clock + 0.05 });
     if (rng() < p.hesitation * (s.openings.length ? 0.4 : 1)) {
@@ -681,7 +679,7 @@ export class CombatAIController {
       return null;
     }
     const weight = p.guard * (0.6 + Math.min(threat.severity, 30) / 12);
-    const ready = s.canAct || s.charging;
+    const ready = s.canAct;
     const options = [{ score: (1 - p.guard) * 0.8 + (threat.severity < 3 ? 0.6 : 0), intent: { kind: 'take' } }];
 
     // Shield: up the step `shield` is held, from either side; costs Energy
@@ -737,7 +735,7 @@ export class CombatAIController {
     }
 
     // Strike first: a hit stops a Throw before it lets go, and ends a
-    // charged technique still forming.
+    // technique still forming.
     if ((threat.kind === 'throw' || threat.kind === 'technique') && s.canAct) {
       const strike = this.meleeOptions(s, false).find((m) => m.atk.startup < threat.contactIn - 1 / 60);
       if (strike) options.push({ score: weight * 1.1 * (0.4 + p.punish), intent: this.attackIntent(strike) });
@@ -856,7 +854,7 @@ export class CombatAIController {
       out.push({ score, intent: this.attackIntent(m) });
     }
 
-    // Throw (a ranged attack): chips from a distance, stops a Charge.
+    // Throw (a ranged attack): chips from a distance.
     for (const r of s.ms.ranged) {
       const score = this.rangedScore(r, s);
       if (score > 0) out.push({ score, intent: { kind: 'attack', action: r.action, face: s.dir, until: this.clock + 0.3, ranged: true } });
@@ -867,8 +865,7 @@ export class CombatAIController {
       if (s.dist > s.myReach * 0.9) {
         const far = clamp((s.dist - 100) / 400, 0, 1);
         const reachable = busyFor((s.dist - s.myReach) / self.maxSpeed + 0.1);
-        const score = s.aggro * (0.55 + far * 0.5) + s.urge * 0.55 + (reachable ? p.punish * 1.1 : 0) + exposedBonus +
-          (s.foeCharging ? 0.25 * p.punish : 0);
+        const score = s.aggro * (0.55 + far * 0.5) + s.urge * 0.55 + (reachable ? p.punish * 1.1 : 0) + exposedBonus;
         const range = Math.max(s.myReach - 10, 24);
         out.push({ score, intent: { kind: 'approach', range, then: p.plan > 0, until: this.clock + 1.2 } });
         // ...or cover the gap with a Dash.
@@ -907,10 +904,9 @@ export class CombatAIController {
       });
     }
 
-    // Charge: Energy and Charge replacement cooldowns come back faster, and
-    // it leads into a Charge replacement.
-    const charge = this.chargeOption(s);
-    if (charge) out.push(charge);
+    // A summon or a technique (#0001's Attack 3 and Attack 4), pressed
+    // directly when one fits.
+    out.push(...this.specialOptions(s));
 
     out.push({ score: 0.18 + (1 - s.aggro) * 0.2, intent: { kind: 'idle', until: this.clock + range(this.rng, 0.1, 0.3) } });
     return out;
@@ -938,7 +934,6 @@ export class CombatAIController {
     // Best from mid range out, where no strike reaches.
     const far = clamp((s.dist - s.myReach * 1.4) / 260, 0, 1);
     let score = s.aggro * (0.2 + 0.55 * far) + s.urge * 0.25 * far;
-    if (s.foeCharging) score += 0.9 * (0.3 + p.punish);
     if (s.openings.length && s.foeBusy > t) score += 0.6 * p.punish;
     if (s.foeShielding) score += 0.25 * p.punish;
     // Not the same trick over and over.
@@ -947,57 +942,46 @@ export class CombatAIController {
     return score;
   }
 
-  // Charge, planning a Charge replacement when one fits (a summon like
-  // #0001's Clone Attack at an opponent likely to stay put, a technique like
-  // its Sphere Rush it is in line for) or just to recover Energy and
-  // cooldowns at a safe distance.
-  chargeOption(s) {
+  // The fighter's summons and techniques (#0001's Attack 3 and Attack 4),
+  // each one ready and on the ground pressed on its own button when it
+  // fits: a summon like the Clone Attack at an opponent likely to stay put,
+  // a technique like the Sphere Rush it is in line for. A technique goes the
+  // way the fighter faces, so it turns first. Worth its long cooldown only
+  // when it is likely to land, as the level judges it. A summon leaves the
+  // fighter free at once; a technique holds it in place while it forms, so
+  // it is worth less the closer the opponent could strike first, unless the
+  // opponent is busy for longer than that.
+  specialOptions(s) {
     const { self, p } = s;
-    if (!self.canCharge || !s.canAct || !s.sameLevel) return null;
-    const cooling = s.ms.charged.filter((c) => self.combat.chargedCooldowns.active(c.id)).length;
-    const energyNeed = 1 - s.energy / self.combat.maxEnergy;
-    if (!s.ms.charged.length && energyNeed <= 0) return null;
-    // Room to charge: how long the opponent would need to get here.
+    if (!s.canAct || !s.grounded) return [];
+    const out = [];
     const danger = s.foeReach + 60 + self.maxSpeed * 0.2;
     const safety = clamp((s.liveDist - danger) / 200, 0, 1);
-    let then = null;
-    let thenValue = 0;
-    for (const c of s.ms.charged) {
-      if (self.combat.chargedCooldowns.active(c.id)) continue;
-      const v = this.chargedValue(c, s);
-      if (v > thenValue) {
-        thenValue = v;
-        then = c;
-      }
+    for (const c of s.ms.specials) {
+      if (self.combat.abilityCooldowns.active(c.id)) continue;
+      const v = this.specialValue(c, s);
+      if (v <= 0.12) continue;
+      const exposed = c.type === 'technique' && !(s.openings.length && s.foeBusy > c.lead);
+      const risk = exposed ? 0.2 + 0.8 * safety : 1;
+      const face = c.type === 'technique' ? s.dir : 0;
+      out.push({
+        score: p.specials * (0.3 + 2 * v) * risk + s.urge * 0.2,
+        intent: { kind: 'attack', action: c.action, face, until: this.clock + 0.3 },
+      });
     }
-    // Charging with nothing to gain (full Energy, every cooldown ready, no
-    // Charge replacement to set up) is only standing still.
-    const gain = 0.6 * energyNeed + 0.25 * cooling + thenValue;
-    if (gain <= 0.05) return null;
-    const far = clamp((s.liveDist - 320) / 300, 0, 1);
-    const score = p.charged * (0.1 + gain + 0.35 * far) * (0.2 + 0.8 * safety) - s.urge * 0.3;
-    if (score <= 0) return null;
-    const face = then?.type === 'technique' ? s.dir : 0;
-    return {
-      score,
-      intent: {
-        kind: 'charge', then, face, danger, checkAt: 0,
-        until: this.clock + (then ? 1.4 : range(this.rng, 0.4, 0.4 + gain * 1.2)),
-      },
-    };
+    return out;
   }
 
-  // How good Charge replacement `c` looks right now (0 when it does not fit):
-  // how likely the opponent is to still be where it lands, times what it is
-  // worth, judged by the level.
-  chargedValue(c, s) {
+  // How good summon or technique `c` looks right now (0 when it does not
+  // fit): how likely the opponent is to still be where it lands, times what
+  // it is worth, judged by the level.
+  specialValue(c, s) {
     const { foe, p } = s;
-    const judged = 0.3 + 0.7 * p.charged;
+    const judged = 0.3 + 0.7 * p.specials;
     if (s.foeShielding) return c.type === 'summon' ? 0.1 * judged : 0;
     const still = Math.abs(foe.body.vx) < 30 && s.foeGrounded;
     let stay = 0.15;
-    if (s.foeCharging) stay = 0.85;
-    else if (s.openings.length && s.foeBusy > c.lead) stay = 0.9;
+    if (s.openings.length && s.foeBusy > c.lead) stay = 0.9;
     else if (still) stay = 0.35;
     // A clone makes the opponent answer it wherever it is, and lands on one
     // that stays put; it pushes the way the opponent faces.
@@ -1063,9 +1047,6 @@ export class CombatAIController {
       case 'dash':
         this.actDash(self, foe, ctx, it, held);
         break;
-      case 'charge':
-        this.actCharge(self, foe, ctx, it, held);
-        break;
       case 'navigate':
         this.actNavigate(self, foe, ctx, it, held);
         break;
@@ -1107,7 +1088,7 @@ export class CombatAIController {
   actJump(self, foe, ctx, it, held) {
     const b = self.body;
     if (!it.jumped) {
-      if (!b.grounded || !(self.canAct() || self.charging)) {
+      if (!b.grounded || !self.canAct()) {
         it.done = true;
         return;
       }
@@ -1148,8 +1129,14 @@ export class CombatAIController {
   // double-taps; the fighter decides whether it can Dash.
   actDash(self, foe, ctx, it, held) {
     const key = DIR_KEY[it.dir];
+    // Already holding that way (running there): let go for a step first, so
+    // the first tap is a fresh press.
+    if (it.step === undefined && this.prev[key] && !it.released) {
+      it.released = true;
+      return;
+    }
     const step = (it.step = (it.step ?? -1) + 1);
-    if (step === 0 && !(self.body.grounded && self.canAct() && !self.charging)) {
+    if (step === 0 && !(self.body.grounded && self.canAct())) {
       it.done = true;
       return;
     }
@@ -1161,46 +1148,6 @@ export class CombatAIController {
         if (it.then) this.followUp(self, foe, ctx);
       }
     }
-  }
-
-  actCharge(self, foe, ctx, it, held) {
-    const p = this.profile;
-    const b = self.body;
-    if (!b.grounded || this.clock > it.until || self.technique || self.combat.stun > 0 || (!self.charging && !self.canAct())) {
-      it.done = true;
-      return;
-    }
-    // A Sphere Rush goes the way the fighter faces: turn before charging.
-    if (it.face && self.facing !== it.face && !self.charging) {
-      held[DIR_KEY[it.face]] = true;
-      this.turning = true;
-      return;
-    }
-    held.charge = true;
-    if (!self.charging || this.clock < it.checkAt) return;
-    // Looked at again at the level's reaction pace, not every frame.
-    it.checkAt = this.clock + range(this.rng, p.react[0], p.react[1]);
-    const s = this.sense(self, foe, ctx);
-    const close = s.liveDist < it.danger || s.threats.some((t) => t.contactIn < 0.5);
-    const rushReady = it.then?.type === 'technique' && !it.used && !self.combat.chargedCooldowns.active(it.then.id);
-    if (close && !(rushReady && this.chargedValue(it.then, s) > 0.3)) {
-      held.charge = false;
-      it.done = true;
-      return;
-    }
-    const c = it.then;
-    if (c && !it.used && !self.combat.chargedCooldowns.active(c.id) && this.chargedValue(c, s) > 0.12) {
-      // Charge is still held on this step, and was on the last: the press of
-      // the button it replaces (attack1 for attack3, attack2 for attack4)
-      // is the Charge replacement.
-      held[c.action] = true;
-      it.used = true;
-      if (c.type === 'technique') it.done = true;
-      else it.until = Math.min(it.until, this.clock + range(this.rng, 0.3, 0.9));
-      return;
-    }
-    const cooling = s.ms.charged.some((x) => self.combat.chargedCooldowns.active(x.id));
-    if (!c && !cooling && s.energy >= self.combat.maxEnergy) it.done = true;
   }
 
   // Following the opponent to another level: up by a reachable platform,
@@ -1290,7 +1237,7 @@ export class CombatAIController {
     // until it recovers), with the lift otherwise left: a fast fall ends
     // the launch, and the lift comes on the next look.
     const spent = self.freeFall || (lift.atk.airUses > 0 && (self.airAttacks.get(lift.id) ?? 0) >= lift.atk.airUses);
-    if (self.launch && !spent) held.charge = true;
+    if (self.launch && !spent) held.down = true;
   }
 
   // ---- Safety on every level --------------------------------------------------------
@@ -1328,7 +1275,7 @@ export class CombatAIController {
         : this.turning ? 2 : LEDGE_MARGIN + stop;
       if (!this.groundAhead(self, ctx.stage, dir, margin)) {
         held[key] = false;
-        if (this.intent && this.intent.kind !== 'attack' && this.intent.kind !== 'charge') this.intent.done = true;
+        if (this.intent && this.intent.kind !== 'attack') this.intent.done = true;
         return;
       }
       if (b.wall === dir && self.canAct() && !this.prev.jump) held.jump = true;

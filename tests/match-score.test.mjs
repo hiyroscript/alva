@@ -87,13 +87,13 @@ test('a fall takes the fighter out of play at once; it is back exactly 2 s later
   const { battle, run, script, input } = match();
   const { p1, p2 } = battle;
   const [spawn] = battle.map.spawnPoints;
-  // Make a mess to clear: Launch Point, empty Energy, a raised Shield, both
-  // Charge replacement cooldowns, a stun and a speed.
+  // Make a mess to clear: Launch Point, empty Energy, a raised Shield, the
+  // Clone Attack's and the Sphere Rush's cooldowns, a stun and a speed.
   p1.combat.launchPoint = 64;
   p1.combat.setEnergy(0);
   p1.combat.shielding = true;
-  p1.combat.chargedCooldowns.start('attack3', 5);
-  p1.combat.chargedCooldowns.start('attack4', 5);
+  p1.combat.abilityCooldowns.start('attack3', 5);
+  p1.combat.abilityCooldowns.start('attack4', 5);
   intoVoid(battle, p1);
   p1.body.vx = 400;
   run();
@@ -121,7 +121,7 @@ test('a fall takes the fighter out of play at once; it is back exactly 2 s later
   assert.equal(p1.combat.launchPoint, 0);
   assert.deepEqual([p1.combat.energy, p1.combat.energyExhausted], [100, false], 'Energy full, not exhausted');
   assert.deepEqual([p1.combat.shielding, p1.combat.shieldStun], [false, 0], 'the Shield down');
-  assert.equal(p1.combat.chargedCooldowns.size, 0, 'A3 and A4 ready');
+  assert.equal(p1.combat.abilityCooldowns.size, 0, 'A3 and A4 ready');
   assert.deepEqual([p1.combat.stun, p1.combat.hitstop, p1.combat.attack, p1.technique, p1.dash], [0, 0, null, null, null]);
   assert.equal(p1.state, 'idle');
   assert.deepEqual(battle.inPlay, [p1, p2]);
@@ -135,9 +135,8 @@ test('whatever held or aimed at a fallen fighter lets go: a Sphere Rush bind, cl
   const { battle, run, script } = match();
   const { p1, p2 } = battle;
   p2.body.x = p1.body.x + 120;
-  script.held = { charge: true };
   run(10);
-  script.held = { charge: true, attack2: true, attack2Pressed: true };
+  script.held = { attack4: true, attack4Pressed: true };
   run();
   script.held = {};
   const rush = p1.technique;
@@ -156,16 +155,14 @@ test('whatever held or aimed at a fallen fighter lets go: a Sphere Rush bind, cl
   assert.deepEqual(p1.summons, []);
   assert.ok(battle.clones.every((c) => c.target !== p2 && c.owner !== p2));
   assert.ok(battle.projectiles.every((p) => p.owner !== p2), 'its own shuriken went too');
-  // While it is out, an attack3 has nobody to appear behind: an ordinary
-  // attack1, and A3's cooldown is not spent.
-  run(60);
-  script.held = { charge: true };
-  run(10);
-  script.held = { charge: true, attack1: true, attack1Pressed: true };
+  // While it is out, an attack3 has nobody to appear behind: nothing at
+  // all (never a Punch in its place), and A3's cooldown is not spent.
+  run(70);
+  script.held = { attack3: true, attack3Pressed: true };
   run();
   script.held = {};
-  assert.equal(p1.combat.attack?.def.id, 'attack1');
-  assert.equal(p1.combat.chargedCooldowns.active('attack3'), false);
+  assert.equal(p1.combat.attack, null);
+  assert.equal(p1.combat.abilityCooldowns.active('attack3'), false);
   assert.deepEqual(battle.clones, []);
 });
 

@@ -5,8 +5,8 @@
 // keys its attacks by the universal move codenames (MOVES in js/config.js),
 // whatever it calls them in game: a numbered attack is `attackN` on the
 // ground and `midair_attackN` in the air (both on the attackN button), the
-// extra attack `extra_attack`. Which numbered attacks have a button and
-// which Charge reaches is the character's loadout (js/data/loadout.js).
+// extra attack `extra_attack`. Which numbered attacks a character has, each
+// a button of its own, is its loadout (js/data/loadout.js).
 // #0001's (its punch, kunai slash, kick, air kick and Throw) are the real
 // attacks so far; see js/data/characters.js. The general shape:
 //
@@ -26,7 +26,7 @@
 //     attack2: { ground: 'attack2', air: 'midair_attack2' },
 //   }
 //
-// Every hit (an attack's, a projectile's, a charged technique's) declares
+// Every hit (an attack's, a projectile's, a technique's) declares
 // its Base Launch (`baseLaunch`: 0, 1, 2 or 3, a multiplier, never a
 // velocity) and its Directional Launch (`directionalLaunch`: null,
 // 'horizontal', 'vertical' or 'reverseVertical'), independently of each
@@ -60,7 +60,7 @@
 // block does not count) and its time has reached hitCancel, another attack,
 // a jump or a Dash may cut the rest of it short (see
 // CombatState.cancellable), its cooldown starting as if it had finished.
-// Nothing else does: walking, the Shield and Charge still wait for its end.
+// Nothing else does: walking and the Shield still wait for its end.
 // Left alone, it plays out in full, and a whiffed or blocked attack keeps
 // its whole recovery.
 //
@@ -202,28 +202,28 @@
 // Its hits resolve through the same applyHit and credit the owner, but, like
 // a projectile's, they never freeze the owner.
 //
-// A charged technique (see js/game/charged-technique.js) is performed by the
-// fighter itself but is not an attack either: its sphere's contact, the
+// A technique (see js/game/technique.js) is performed by the fighter itself
+// but is not an attack either: its sphere's contact, the
 // ticks while it holds the target and its delayed explosion are its hits,
 // resolved here through applyHit with their own data. They freeze only the
 // target. A confirmed contact binds the target (CombatState.bind): a hold on
 // it, separate from hitstun, that only the technique which placed it
 // releases.
 //
-// Charge replacements (a summon or a technique, see js/data/loadout.js) are
-// not paid for: each has its own cooldown (CombatState.chargedCooldowns, see
+// A summon or a technique on a numbered button (see js/data/loadout.js) is
+// not paid for: each has its own cooldown (CombatState.abilityCooldowns, see
 // CooldownTimers), keyed by the attack it is (attack3, attack4), started
 // when it is used and apart from the short recovery cooldowns of ordinary
-// attacks (CombatState.cooldowns).
+// attacks (CombatState.cooldowns). Both run down in real time.
 //
 // Energy (CombatState.energy, see resolveEnergy) is the one resource a
 // fighter spends, and only on Dash and Shield: a Dash pays dashCost as it
 // starts (dashCancelCost when it cuts short an attack that hit), and every
 // hit the Shield blocks costs shieldHitCost. Either works
 // with less left than it costs, but then takes all of it. It refills by
-// itself, faster while the fighter is in its Charge stance. Emptied, it
-// exhausts the fighter: no Dash or Shield until it is full again. Nothing
-// else (movement, jumps, attacks, Charge replacements) ever touches it.
+// itself at one passive rate. Emptied, it exhausts the fighter: no Dash or
+// Shield until it is full again. Nothing else (movement, jumps, attacks,
+// summons, techniques) ever touches it.
 
 import { resolveHitLaunch, resolveLaunchStrength, resolveDirectionalLaunch } from '../data/launch.js';
 
@@ -445,7 +445,6 @@ export function createDefenseDefinition(spec) {
 //   energy: {
 //     max: 100,           // full, and where every fighter starts
 //     regen: 12,          // per second, whatever the fighter is doing
-//     chargeRegen: 30,    // per second instead, while in the Charge stance
 //     dashCost: 15,       // spent once as a Dash starts
 //     dashCancelCost: 40, // ...instead, by a Dash that cuts short an attack that hit
 //     shieldHitCost: 25,  // spent once for every hit the Shield blocks
@@ -455,7 +454,7 @@ export function createDefenseDefinition(spec) {
 // empties the bar and exhausts the fighter (see CombatState.spendEnergy).
 // Left out, dashCancelCost is the fighter's dashCost.
 const ENERGY_DEFAULTS = Object.freeze({
-  max: 100, regen: 12, chargeRegen: 30, dashCost: 15, shieldHitCost: 25,
+  max: 100, regen: 12, dashCost: 15, shieldHitCost: 25,
 });
 
 // Frozen Energy settings: the character's entry over the defaults.
@@ -467,7 +466,8 @@ export function resolveEnergy(spec) {
 
 // Named cooldowns that each remember their full length, so progress can be
 // read back (1 - remaining / duration) without knowing where they came from.
-// Used for Charge replacements' cooldowns (CombatState.chargedCooldowns).
+// Used for the summons' and techniques' cooldowns
+// (CombatState.abilityCooldowns).
 export class CooldownTimers {
   constructor() {
     this.entries = new Map(); // id -> { remaining, duration } in seconds
@@ -501,14 +501,12 @@ export class CooldownTimers {
     return Math.min(1, Math.max(0, 1 - e.remaining / e.duration));
   }
 
-  // Every cooldown recovers `dt * rate` seconds; one that reaches 0 (to
-  // within a little slack, as the steps are sums of floats) is over. Never
-  // negative.
-  update(dt, rate = 1) {
-    const amount = dt * rate;
+  // Every cooldown recovers `dt` seconds; one that reaches 0 (to within a
+  // little slack, as the steps are sums of floats) is over. Never negative.
+  update(dt) {
     for (const [id, e] of this.entries) {
-      if (e.remaining - amount <= PHASE_EPSILON) this.entries.delete(id);
-      else e.remaining -= amount;
+      if (e.remaining - dt <= PHASE_EPSILON) this.entries.delete(id);
+      else e.remaining -= dt;
     }
   }
 
@@ -554,11 +552,12 @@ export class CombatState {
     this.release = null;    // the attack's projectile, released this step (see Fighter.update)
     // Ordinary attacks' short recovery cooldowns: attack id -> seconds left.
     this.cooldowns = new Map();
-    // Charge replacements' own cooldowns (#0001's attack3 and attack4), by
-    // the attack each one is; the Fighter starts and recovers them.
-    this.chargedCooldowns = new CooldownTimers();
+    // The summons' and techniques' own cooldowns (#0001's attack3 and
+    // attack4), by the attack each one is: the Fighter starts them, and
+    // they recover in real time (see update).
+    this.abilityCooldowns = new CooldownTimers();
     this.lastIntent = null; // last combat button pressed (see Fighter.tryAction)
-    // Whatever holds this fighter in place (a charged technique that caught
+    // Whatever holds this fighter in place (a technique that caught
     // it), each by its own token so a source only ever releases its own hold.
     this.binds = new Set();
   }
@@ -608,7 +607,7 @@ export class CombatState {
     return a ? attackPhase(a.def, a.time) : null;
   }
 
-  // Bound: caught and held by a charged technique (see bind). Unlike
+  // Bound: caught and held by a technique (see bind). Unlike
   // hitstun it has no timer: it lasts until its source releases it.
   get immobilized() {
     return this.binds.size > 0;
@@ -662,11 +661,9 @@ export class CombatState {
     this.setEnergy(this.energy + amount);
   }
 
-  // One step of recovery: chargeRegen per second while `charging` (the
-  // fighter is really in its Charge stance), regen per second otherwise.
-  updateEnergy(dt, charging) {
-    const spec = this.energySpec;
-    this.regenEnergy(dt * (charging ? spec.chargeRegen : spec.regen));
+  // One step of passive recovery: regen per second.
+  updateEnergy(dt) {
+    this.regenEnergy(dt * this.energySpec.regen);
   }
 
   // Full again, not exhausted (a fresh fighter, a respawn).
@@ -700,6 +697,8 @@ export class CombatState {
       if (t - dt <= 0) this.cooldowns.delete(id);
       else this.cooldowns.set(id, t - dt);
     }
+    // Every step, frozen or not, whatever the fighter holds or does.
+    this.abilityCooldowns.update(dt);
     if (this.hitstop > 0) {
       // To within a little slack, so a freeze a whole number of steps long
       // (0.05 s) lasts exactly that many.
@@ -807,10 +806,10 @@ const scratchHurt = {};
 
 // Resolves hits each simulation step: fighters' melee hitboxes, then live
 // projectiles (see js/game/projectile.js), then summoned clones (see
-// js/game/clone.js), then charged techniques (see
-// js/game/charged-technique.js). A shielding target is struck exactly like
-// any other (its own hurtboxes, never a bigger circle): applyHit decides the
-// hit is blocked, and the hitbox is used up either way.
+// js/game/clone.js), then techniques (see js/game/technique.js). A
+// shielding target is struck exactly like any other (its own hurtboxes,
+// never a bigger circle): applyHit decides the hit is blocked, and the
+// hitbox is used up either way.
 export class CombatSystem {
   constructor() {
     // { type: 'hit' | 'block', attacker, target, move, damage, energyCost,
@@ -899,7 +898,7 @@ export class CombatSystem {
       if (!t) continue;
       // The ticks while it holds its target, one hit each: Launch Point
       // only, no launch. Never on the explosion's step (see
-      // ChargedTechnique.update).
+      // Technique.update).
       this.applyTicks(owner, t);
       // The delayed explosion, on the step its first frame shows: the target
       // is released first, then takes the big hit and its launch.
@@ -963,7 +962,7 @@ export class CombatSystem {
     }
   }
 
-  // Shared by melee, projectiles, clones and charged techniques. `facing` is
+  // Shared by melee, projectiles, clones and techniques. `facing` is
   // the direction the hit travels: the attacker's facing for melee, the
   // projectile's own direction (fixed when thrown), the clone's facing
   // (fixed when summoned) or the technique's (fixed when it started). A
@@ -1021,7 +1020,7 @@ export class CombatSystem {
     );
     const launchSpeed = Math.hypot(finalLaunch.x, finalLaunch.y);
     const hitstun = def.hitstun > 0 ? def.hitstun + resolveLaunchStun(launchSpeed, reaction) : 0;
-    // A hit with no stun or freeze of its own (a charged technique's tick)
+    // A hit with no stun or freeze of its own (a technique's tick)
     // leaves any already running as it is. A block's stun holds the Shield
     // only while it is still up.
     if (blocked) {
@@ -1031,7 +1030,7 @@ export class CombatSystem {
     }
     if (def.hitstop > 0) tc.hitstop = def.hitstop;
     if (!detached) attacker.combat.hitstop = def.hitstop;
-    // ...and a charged technique: no armour. It ends at once, releasing
+    // ...and a technique: no armour. It ends at once, releasing
     // whatever it held, before the launch below moves the fighter.
     target.endTechnique?.('hit');
     if (finalLaunch.x || finalLaunch.y) {

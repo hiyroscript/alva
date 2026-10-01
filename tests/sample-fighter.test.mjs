@@ -2,8 +2,8 @@
 // A second fighter that is not #0001 (tests/sample-fighter.mjs, tests only):
 // the same universal codenames and loadout rules, different moves on them.
 // Its buttons make its own moves on the ground and in the air, it has three
-// numbered attacks with Charge (attack3, a summon, is Charge + attack1, and
-// Charge + attack2 stays attack2), it has no Defense, it fights #0001
+// numbered attacks (attack3 a summon on its own button, which performs its
+// attack2), it has no Defense, it fights #0001
 // through the same combat, the CPU plays it from its own data, and its
 // ability names are its own. Its
 // touch buttons are checked in controls-ui.test.mjs, and the universal
@@ -27,10 +27,10 @@ const SPRITES = fakeSpritesOf(SAMPLE_FIGHTER);
 const sample = (opts = {}) => makeFighter({ character: SAMPLE_FIGHTER, sprites: SPRITES, ...opts });
 const P = (k) => ({ [k]: true, [`${k}Pressed`]: true });
 const JUMP = { jump: true, jumpPressed: true };
-const CHARGE = { charge: true };
 const SHIELD = { shield: true, shieldPressed: true };
 
 test('each button makes the sample fighter\'s own move, on the ground and in the air', () => {
+  // attack3 is a summon: no attack of the fighter's own (see below).
   const ground = { extra_attack: 'extra_attack', transform: 'transform', attack1: 'attack1', attack2: 'attack2', attack3: null };
   const air = { extra_attack: 'extra_attack', transform: 'transform', attack1: 'midair_attack1', attack2: 'midair_attack2', attack3: null };
   for (const [button, move] of Object.entries(ground)) {
@@ -49,30 +49,32 @@ test('each button makes the sample fighter\'s own move, on the ground and in the
   }
 });
 
-test('Charge + attack1 summons its attack3 clone, shown as A3; with no attack4, Charge + attack2 is a plain attack2', () => {
+test('its Attack 3 button summons its attack3 clone, shown as A3; attack1 and attack2 stay its own attacks', () => {
   const d = duel({ attackerCharacter: SAMPLE_FIGHTER, attackerSprites: SPRITES, gap: 120 });
-  d.tick(CHARGE);
-  d.tick(CHARGE);
-  d.tick({ ...CHARGE, ...P('attack1') });
-  assert.equal(d.attacker.combat.attack, null, 'the Charge replacement, not its attack1');
-  assert.ok(d.attacker.combat.chargedCooldowns.active('attack3'));
-  assert.deepEqual(cooldownIndicators(d.attacker).map((c) => [c.id, c.action, c.label]), [['attack3', 'attack1', 'A3']]);
+  d.tick(P('attack3'));
+  assert.equal(d.attacker.combat.attack, null, 'the summon, not an attack of its own');
+  assert.ok(d.attacker.combat.abilityCooldowns.active('attack3'));
+  assert.equal(d.attacker.combat.abilityCooldowns.duration('attack3'), 3, 'its own 3 s cooldown');
+  assert.deepEqual(cooldownIndicators(d.attacker).map((c) => [c.id, c.label]), [['attack3', 'A3']]);
   d.until(() => d.clones.length === 1);
   assert.equal(d.clones[0].attackDef.id, 'attack2', 'the clone performs its own attack2');
   d.until(() => d.target.combat.launchPoint > 0);
   assert.equal(d.target.combat.launchPoint, SAMPLE_FIGHTER.attacks.attack2.damage);
 
-  const { fighter, step } = sample();
-  step(CHARGE);
-  step(CHARGE);
-  step({ ...CHARGE, ...P('attack2') });
-  assert.equal(fighter.combat.attack?.def.id, 'attack2', 'no Charge replacement on attack2: its normal attack');
-  assert.equal(fighter.combat.chargedCooldowns.size, 0);
-  // Its attack3 has no button of its own: pressing attack3 does nothing.
-  const direct = sample();
-  direct.step(P('attack3'));
-  assert.equal(direct.fighter.combat.attack, null);
-  assert.equal(direct.fighter.summons.length, 0);
+  for (const button of ['attack1', 'attack2']) {
+    const { fighter, step } = sample();
+    step({ down: true });
+    step({ down: true, ...P(button) });
+    assert.equal(fighter.combat.attack?.def.id, button, `${button}: its normal attack, Down held or not`);
+    assert.equal(fighter.combat.abilityCooldowns.size, 0);
+  }
+  // With no opponent to appear behind, Attack 3 does nothing at all: no
+  // attack in its place and no cooldown spent.
+  const alone = sample();
+  alone.step(P('attack3'));
+  assert.equal(alone.fighter.combat.attack, null);
+  assert.equal(alone.fighter.summons.length, 0);
+  assert.equal(alone.fighter.combat.abilityCooldowns.size, 0);
 });
 
 test('with no Defense the shield button does nothing: no Shield, and a hit lands in full', () => {
@@ -116,7 +118,7 @@ test('the CPU reads its moveset from its own data', () => {
     ['transform', 'transform', false], ['transform', 'transform', true],
   ]);
   assert.deepEqual(moves.ranged, [], 'no projectile');
-  assert.deepEqual(moves.charged.map((c) => [c.action, c.id, c.type]), [['attack1', 'attack3', 'summon']]);
+  assert.deepEqual(moves.specials.map((c) => [c.action, c.id, c.type]), [['attack3', 'attack3', 'summon']]);
   assert.equal(moves.shield, false, 'no Shield to raise');
   assert.ok(moves.dash);
 });
