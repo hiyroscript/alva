@@ -47,6 +47,18 @@ extra_attack is a separate, additional character-specific action. It may be a pr
 
 Shield, movement, jump, down and transform are not numbered attacks.
 
+## Attack launch levels
+
+Use the following launch levels according to the attack's impact:
+
+| Launch level | Attack impact |
+| --- | --- |
+| 1 | Light attacks |
+| 2 | Medium attacks |
+| 3 | Big-impact attacks |
+
+Launch levels describe attack impact independently of numbered attack codenames.
+
 ## Attack-button routing
 
 Every numbered attack a character has is a numbered button of its own, pressed directly on keyboard, gamepad and touch. No held stance, modifier or other button reaches a numbered attack or changes which attack a button triggers.
