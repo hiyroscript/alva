@@ -14,14 +14,14 @@
 // preview. The open page is itself a stop in menu navigation so a gamepad can
 // scroll it: ↑ / ↓ scroll it, and leave it once it can scroll no further.
 //
-// The copy is read through the translations (js/core/i18n.js), keyed by the
+// The copy is read through the translations (js/localization/i18n.js), keyed by the
 // registries' own ids: English is the registries' copy itself, French its
 // translation, and the pages follow the interface language.
 
 import { Screen } from '../core/screen-manager.js';
 import { findNeighbor } from '../core/menu-navigator.js';
 import { el } from '../core/utils.js';
-import { tx, tattr } from '../core/i18n.js';
+import { tx, tattr } from '../localization/i18n.js';
 import { screenHeader } from '../ui/components.js';
 import { POWERS } from '../data/powers.js';
 import { BASE_LAUNCH_VALUES, DIRECTIONAL_LAUNCHES } from '../data/launch.js';

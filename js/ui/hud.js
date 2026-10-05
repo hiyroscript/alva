@@ -22,13 +22,13 @@
 // (js/game/rendering/fighter-status.js); the card only describes Energy to screen
 // readers.
 //
-// Every label and spoken description is translated (js/core/i18n.js): the
+// Every label and spoken description is translated (js/localization/i18n.js): the
 // slot tags too (P1 reads J1 in French), while the tag the fighter carries
 // stays the same internally.
 
 import { CONFIG } from '../config.js';
 import { el } from '../core/utils.js';
-import { t, tattr, plural, slotLabel } from '../core/i18n.js';
+import { t, tattr, plural, slotLabel } from '../localization/i18n.js';
 import { ICONS } from './icons.js';
 import { paintPortrait, portraitSourceFacing } from './sprite-art.js';
 

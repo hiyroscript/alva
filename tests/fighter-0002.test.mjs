@@ -32,7 +32,7 @@ import { StageCollision } from '../js/game/physics.js';
 import { mulberry32 } from '../js/core/utils.js';
 import { mobileAbility, previewFrame } from '../js/ui/mobile-abilities.js';
 import { ICONS } from '../js/ui/icons.js';
-import { STRINGS, setLanguage } from '../js/core/i18n.js';
+import { STRINGS, setLanguage } from '../js/localization/i18n.js';
 
 const ROOT = new URL('../', import.meta.url).pathname;
 const DIR = 'assets/characters/0002/';

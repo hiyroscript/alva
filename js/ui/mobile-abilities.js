@@ -8,7 +8,7 @@
 // Missing/failed art uses a glyph (fallbackIcon may override the neutral
 // one). Labels follow the interface language. Jump is always universal.
 
-import { t, hasTranslation } from '../core/i18n.js';
+import { t, hasTranslation } from '../localization/i18n.js';
 import { COMBAT_BUTTONS, NUMBERED_ATTACKS } from '../config.js';
 import { ICONS } from './icons.js';
 import { abilityName } from '../data/abilities.js';

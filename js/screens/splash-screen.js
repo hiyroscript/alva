@@ -2,7 +2,7 @@
 import { Screen } from '../core/screen-manager.js';
 import { CONFIG } from '../config.js';
 import { el } from '../core/utils.js';
-import { tx } from '../core/i18n.js';
+import { tx } from '../localization/i18n.js';
 
 const ARTWORK = [
   { url: './hs.jpg', name: 'hs', alt: 'hiyroscript', credit: true },

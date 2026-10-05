@@ -42,11 +42,11 @@
 // still slide into one another wherever they are: their cluster captures the
 // pointer and hit-tests the buttons where they are drawn.
 //
-// Accessible names are translation keys (js/core/i18n.js), marked so they
+// Accessible names are translation keys (js/localization/i18n.js), marked so they
 // follow the interface language.
 
 import { el } from '../core/utils.js';
-import { tattr, setAttr, setPlainAttr } from '../core/i18n.js';
+import { tattr, setAttr, setPlainAttr } from '../localization/i18n.js';
 import { ICONS } from './icons.js';
 import { NUMBERED_ATTACKS } from '../config.js';
 import { ABILITY_ACTIONS, abilityPresence, abilityAvailable, jumpArt, mobileAbility, mobileAbilityLabelKey } from './mobile-abilities.js';

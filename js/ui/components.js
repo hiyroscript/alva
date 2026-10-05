@@ -1,8 +1,8 @@
 // Shared UI building blocks for menu screens. Every label is a translation
-// key (js/core/i18n.js), marked so it follows the language.
+// key (js/localization/i18n.js), marked so it follows the language.
 
 import { el } from '../core/utils.js';
-import { tx, tattr, iconLabel } from '../core/i18n.js';
+import { tx, tattr, iconLabel } from '../localization/i18n.js';
 import { ICONS } from './icons.js';
 
 // The setups that end in a Battle, each with its steps in order, as

@@ -19,7 +19,7 @@ import { drawEnergyBar, drawCooldownIndicators, energyBarState, statusOnScreen }
 import { drawShield } from './rendering/shield-fx.js';
 import { HIT_FX, HitEffects, whiteFrame } from './rendering/hit-fx.js';
 import { createTheme } from '../stages/index.js';
-import { slotLabel } from '../core/i18n.js';
+import { slotLabel } from '../localization/i18n.js';
 
 // Ground ring + name tag tones: the player is white, the CPU a mid gray.
 const MARKER = { p1: '#ffffff', p2: '#a3a3a3' };

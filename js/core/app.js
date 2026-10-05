@@ -14,7 +14,7 @@ import { Device } from './device.js';
 import { ScreenManager } from './screen-manager.js';
 import { MenuNavigator } from './menu-navigator.js';
 import { Settings } from './settings.js';
-import { i18n, followSettings, onLanguageChange, localizeTree } from './i18n.js';
+import { i18n, followSettings, onLanguageChange, localizeTree } from '../localization/i18n.js';
 import { LoadingOverlay, ConfirmDialog } from '../ui/overlays.js';
 import { LanguageDialog } from '../ui/language-dialog.js';
 import { SettingsDialog } from '../ui/settings-dialog.js';
@@ -126,7 +126,7 @@ export class App {
   }
 
   // Re-reads every string on the page in the new language: each marked one
-  // (js/core/i18n.js), then the few a screen composes itself.
+  // (js/localization/i18n.js), then the few a screen composes itself.
   localize() {
     localizeTree(document.body);
     for (const screen of this.screens.screens.values()) screen.localize?.();

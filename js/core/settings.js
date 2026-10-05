@@ -27,7 +27,7 @@
 
 import { TOUCH_CONTROL_IDS, sanitizeTouchLayout, sanitizeTouchLayouts } from './touch-layout.js';
 
-// The interface languages (see js/core/i18n.js). English is the language in
+// The interface languages (see js/localization/i18n.js). English is the language in
 // use until the player picks one.
 export const LANGUAGES = Object.freeze(['en', 'fr']);
 export const DEFAULT_LANGUAGE = 'en';

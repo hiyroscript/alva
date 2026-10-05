@@ -4,7 +4,7 @@
 
 import { Screen } from '../core/screen-manager.js';
 import { el } from '../core/utils.js';
-import { tx, tattr, iconLabel } from '../core/i18n.js';
+import { tx, tattr, iconLabel } from '../localization/i18n.js';
 import { ICONS } from '../ui/icons.js';
 import { screenHeader } from '../ui/components.js';
 

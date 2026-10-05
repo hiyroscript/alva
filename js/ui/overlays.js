@@ -1,9 +1,9 @@
 // Global overlays: loading screen and confirmation dialog. Their own labels
-// are translation keys (js/core/i18n.js); a caller's loading label, error
+// are translation keys (js/localization/i18n.js); a caller's loading label, error
 // message and dialog copy arrive already translated.
 
 import { el } from '../core/utils.js';
-import { t, tx, setText } from '../core/i18n.js';
+import { t, tx, setText } from '../localization/i18n.js';
 import { logoSVG } from './logo.js';
 
 export class LoadingOverlay {

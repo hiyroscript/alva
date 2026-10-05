@@ -145,7 +145,7 @@ const { TouchControls } = await import('../js/ui/touch-controls.js');
 const { TouchLayoutEditor } = await import('../js/ui/touch-layout-editor.js');
 const { Settings, SETTINGS_KEY, MOBILE_CONTROLS } = await import('../js/core/settings.js');
 const { MenuNavigator } = await import('../js/core/menu-navigator.js');
-const { setLanguage, localizeTree } = await import('../js/core/i18n.js');
+const { setLanguage, localizeTree } = await import('../js/localization/i18n.js');
 const { getCharacter } = await import('../js/data/characters.js');
 const { ICONS } = await import('../js/ui/icons.js');
 

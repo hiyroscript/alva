@@ -142,7 +142,7 @@ const {
   Settings, SETTINGS_KEY, SETTINGS_VERSION, DEFAULT_SETTINGS, LANGUAGES, DEFAULT_LANGUAGE, MOBILE_CONTROLS, DEFAULT_MOBILE_CONTROLS,
   readSettings,
 } = await import('../js/core/settings.js');
-const { t, followSettings, onLanguageChange, localizeTree, getLanguage, setLanguage } = await import('../js/core/i18n.js');
+const { t, followSettings, onLanguageChange, localizeTree, getLanguage, setLanguage } = await import('../js/localization/i18n.js');
 const { ScreenManager, Screen } = await import('../js/core/screen-manager.js');
 const { App } = await import('../js/core/app.js');
 const { MenuNavigator } = await import('../js/core/menu-navigator.js');
@@ -1043,7 +1043,9 @@ test('the credits name only fighters that exist: a sprite group for each, #0001\
   assert.equal(links.length, 1);
   assert.match(links[0].href, /^https:\/\/www\.deviantart\.com\/thespriteanimations\/art\/[\w-]*1350194762$/);
   assert.doesNotMatch(read('js/ui/credits.js'), /slender|sprites000[13]|Dazz & Fret/i);
-  assert.doesNotMatch(read('js/core/i18n.js'), /credits\.\d|credits\.sprites000[13]|slender|XmayGrrr/i);
+  for (const file of ['js/localization/i18n.js', 'js/localization/strings/en.js', 'js/localization/strings/fr.js']) {
+    assert.doesNotMatch(read(file), /credits\.\d|credits\.sprites000[13]|slender|XmayGrrr/i, file);
+  }
   // #0001's attribution is all still there, unchanged, and the notices after it.
   const credits = creditsText();
   const at = credits.findIndex((g) => g.title === '#0001 sprite source');

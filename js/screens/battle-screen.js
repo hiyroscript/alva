@@ -7,14 +7,14 @@
 // watching only: no gameplay input and no touch controls, while pause,
 // restart, rematch and Return to Home work as in Quick Battle.
 //
-// Every string is a translation key (js/core/i18n.js); the touch controls
+// Every string is a translation key (js/localization/i18n.js); the touch controls
 // use the player's saved scheme and custom layout (Home › Settings ›
 // Controls), read afresh as each battle is entered.
 
 import { Screen } from '../core/screen-manager.js';
 import { CONFIG } from '../config.js';
 import { el } from '../core/utils.js';
-import { t, tx, tattr, setText, joinList } from '../core/i18n.js';
+import { t, tx, tattr, setText, joinList } from '../localization/i18n.js';
 import { menuButton } from '../ui/components.js';
 import { getPlayableCharacter } from '../data/characters.js';
 import { getMap } from '../data/maps.js';

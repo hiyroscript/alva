@@ -10,7 +10,7 @@
 import { Screen } from '../core/screen-manager.js';
 import { CONFIG } from '../config.js';
 import { el } from '../core/utils.js';
-import { tx, tattr, iconLabel } from '../core/i18n.js';
+import { tx, tattr, iconLabel } from '../localization/i18n.js';
 import { logoSVG } from '../ui/logo.js';
 import { ICONS } from '../ui/icons.js';
 import { CREDITS, creditLabel, creditLink } from '../ui/credits.js';

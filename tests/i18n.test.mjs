@@ -125,7 +125,7 @@ globalThis.document = {
 const {
   STRINGS, LANGUAGES, LANGUAGE_NAMES, t, plural, joinList, bilingual, hasTranslation, setLanguage, getLanguage, onLanguageChange,
   localizeTree, tx, tattr, iconLabel, setText, setAttr, followSettings, slotLabel, i18n,
-} = await import('../js/core/i18n.js');
+} = await import('../js/localization/i18n.js');
 const { Settings } = await import('../js/core/settings.js');
 const { CONFIG, ACTION_LABELS } = await import('../js/config.js');
 const { POWERS } = await import('../js/data/powers.js');
@@ -245,7 +245,8 @@ test('English game copy is the registries\' own, never retyped', () => {
 
 test('no module scatters language checks or reads a language by hand: every string goes through a key', () => {
   for (const file of sourceFiles()) {
-    if (file === 'js/core/i18n.js') continue;
+    // The translator and its formatter are where languages are told apart.
+    if (file === 'js/localization/i18n.js' || file === 'js/localization/format.js') continue;
     const code = read(file).replace(/^\s*\/\/.*$/gm, '');
     assert.doesNotMatch(code, /===?\s*['"](en|fr)['"]|['"](en|fr)['"]\s*===?/, `${file}: no language === 'fr' checks`);
     assert.doesNotMatch(code, /navigator\.language/, file === 'js/ui/language-dialog.js' ? `${file}` : file);
