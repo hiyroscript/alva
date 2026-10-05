@@ -388,7 +388,7 @@ test('every definition the game loads keeps the rules, and a broken one is refus
     assert.doesNotThrow(() => assertLoadout(def));
   }
   const source = readFileSync(new URL('../js/data/characters.js', import.meta.url), 'utf8');
-  assert.match(source, /for \(const def of CHARACTERS\) assertLoadout\(def\);/);
+  assert.match(source, /for \(const def of CHARACTERS\) assertLoadout\(def\);/, 'the registry validates every definition it loads');
   // The rules are generic: nothing in them names a character.
   const rules = readFileSync(new URL('../js/data/loadout.js', import.meta.url), 'utf8').replace(/^\s*\/\/.*$/gm, '');
   assert.doesNotMatch(rules, /'000\d'|#000\d|displayName|Punch|Kick|Shuriken|Clone|Sphere/);

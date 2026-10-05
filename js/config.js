@@ -11,10 +11,12 @@ export const CONFIG = Object.freeze({
   render: {
     // Backing-buffer devicePixelRatio cap (performance on high-DPI phones).
     dprCap: 2,
-    // World height (units) of the fighter the ratios below are about:
-    // #0001's visual.height. The view is sized for a fighter this tall
-    // whoever is picked, so the stage frames the same for every fighter and
-    // a taller or shorter one simply stands taller or shorter on it.
+    // Reference fighter height (world units) the ratios below are about: a
+    // fixed camera convention, not a requirement on any fighter. The view is
+    // sized for a fighter this tall whoever is picked, so the stage frames
+    // the same for every fighter and a taller or shorter one simply stands
+    // taller or shorter on it. (88 was #0001's visual.height when it was the
+    // only fighter; no fighter's own height is read here.)
     fighterHeight: 88,
     // Target on-screen fighter height as a fraction of the viewport height:
     // a platform-fighter view, far enough out for the whole main stage, the
@@ -73,12 +75,13 @@ export const CONFIG = Object.freeze({
   // downward); menus read their own Down (and Left / Right) from
   // menuBindings below.
   // `shield` is the shared Shield button; each character's `defense` entry
-  // decides what it does (#0001 holds it to Shield).
+  // decides what it does (e.g. #0001 holds it to Shield; a fighter with no
+  // `defense` does nothing on it).
   // The numbered attack buttons sit on the right hand: attack1 to attack3
   // along the row above J K L (U I O), attack4 and attack5 on the row below
   // it (M ,). A fighter only acts on the ones it has a button for (see
-  // js/data/loadout.js): #0001 uses U, I, O and M (Punch, Kick, Clone Attack
-  // and Sphere Rush).
+  // js/data/loadout.js): e.g. #0001 uses U, I, O and M (Punch, Kick, Clone
+  // Attack and Sphere Rush), #0002 U, I and O.
   bindings: {
     runLeft: ['KeyA', 'ArrowLeft'],
     runRight: ['KeyD', 'ArrowRight'],

@@ -13,7 +13,7 @@
 // layout and paint still need real-browser checks.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { def as HARNESS_DEF, makeFighter } from './fighter-harness.mjs';
 import { TEST_A, REMOVED_IDS as REMOVED, withTestFighters } from './test-fighters.mjs';
 
@@ -341,7 +341,8 @@ test('the removed fighters are gone: no definition, art, tests, helpers, or icon
   // Their scaffolding, not kept for later.
   for (const name of ['TEMPORARY_BASELINE', 'WORLD_PER_ART_0001']) assert.equal(name in charactersModule, false, name);
   const scaffolding = new RegExp(`${REMOVED.map((id) => `BASE_${id}|FPS_${id}`).join('|')}|IDLE_ART_|TEMPORARY_BASELINE|WORLD_PER_ART|const numbered`);
-  assert.doesNotMatch(read('js/data/characters.js'), scaffolding);
+  const definitions = ['js/data/characters.js', ...readdirSync(new URL('js/data/characters/', ROOT)).map((f) => `js/data/characters/${f}`)];
+  for (const file of definitions) assert.doesNotMatch(read(file), scaffolding, file);
   assert.equal('palm' in ICONS, false, 'the palm glyph only they used');
 });
 

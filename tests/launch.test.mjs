@@ -470,7 +470,7 @@ test('the old Knockback engine is gone: no knockback.js, and nothing the game sh
   assert.equal(existsSync(new URL('js/data/knockback.js', ROOT)), false);
   assert.ok(existsSync(new URL('js/data/launch.js', ROOT)));
   const files = shippedFiles();
-  assert.ok(files.includes('js/game/combat.js') && files.includes('js/data/characters.js'));
+  assert.ok(files.includes('js/game/combat.js') && files.includes('js/data/characters.js') && files.includes('js/data/characters/0001.js'));
   for (const file of files) {
     const source = read(file);
     assert.doesNotMatch(source, /knockback/i, `${file} still mentions Knockback`);

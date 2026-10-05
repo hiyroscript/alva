@@ -122,8 +122,9 @@ export class Clone {
     this.x = x;
     this.y = y;
     this.facing = facing;
-    // The owner's own sprites: the clone is drawn with #0001's real art. The
-    // clip is cued on its first frame now and only advances while attacking.
+    // The owner's own sprites: the clone is drawn with its owner's real art.
+    // The clip is cued on its first frame now and only advances while
+    // attacking.
     this.animator = new SpriteAnimator(owner.sprites);
     this.animator.play(attackDef.animation, { restart: true });
     this.phase = 'appear';

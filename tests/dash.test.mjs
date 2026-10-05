@@ -66,7 +66,7 @@ test('the two mouvment frames live in #0001\'s folder, are registered as a one-s
   const idleArtH = Math.max(...idle.map((s) => s.h / 16));
   assert.equal(idleArtH, 52);
   near(clip.heightRatio * idleArtH, Math.max(...dash.map((s) => s.h)), 'one art pixel per file pixel');
-  const source = readFileSync(ROOT + 'js/data/characters.js', 'utf8');
+  const source = readFileSync(ROOT + 'js/data/characters/0001.js', 'utf8');
   assert.match(source, /const MOUVMENT_FPS = 10;/);
 });
 

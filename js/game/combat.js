@@ -6,9 +6,9 @@
 // whatever it calls them in game: a numbered attack is `attackN` on the
 // ground and `midair_attackN` in the air (both on the attackN button), the
 // extra attack `extra_attack`. Which numbered attacks a character has, each
-// a button of its own, is its loadout (js/data/loadout.js).
-// #0001's (its punch, kunai slash, kick, air kick and Throw) are the real
-// attacks so far; see js/data/characters.js. The general shape:
+// a button of its own, is its loadout (js/data/loadout.js). Each fighter's
+// own attacks are in its definition (js/data/characters/<id>.js). The
+// general shape, with example values:
 //
 //   attacks: {
 //     attack1: {
