@@ -17,8 +17,8 @@
 // Important constraints:
 //   - CHARACTERS is a plain, mutable array and stays the same instance for
 //     the whole run: tests register temporary fighters by pushing onto it
-//     and splice them out again (tests/helpers/test-fighters.mjs). Never
-//     freeze it or replace it.
+//     and splice them out again (tests/fighters/fixtures/test-fighters.mjs).
+//     Never freeze it or replace it.
 //   - Every definition passes assertLoadout (js/data/loadout.js) as this
 //     module loads, every problem named; one that breaks the loadout rules
 //     never loads.

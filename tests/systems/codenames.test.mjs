@@ -346,8 +346,9 @@ test('no retired attack, control, animation or file name is left in the game cod
 test('no retired name is left in the tests or the current documentation either', () => {
   const tests = readdirSync(new URL('tests/', ROOT), { recursive: true })
     .filter((f) => f.endsWith('.mjs') && !f.endsWith('codenames.test.mjs')).map((f) => `tests/${f}`);
-  assert.ok(tests.length > 40);
-  for (const file of [...tests, 'README.md', 'ALVA_SPEC.md', 'CLAUDE.md']) {
+  const docs = readdirSync(new URL('docs/', ROOT), { recursive: true }).filter((f) => f.endsWith('.md')).map((f) => `docs/${f}`);
+  assert.ok(tests.length > 40 && docs.length > 0);
+  for (const file of [...tests, 'README.md', 'ALVA_SPEC.md', 'CLAUDE.md', ...docs]) {
     const lines = read(file).split('\n');
     const hit = lines.findIndex((line) => RETIRED_NOW.test(line));
     assert.equal(hit, -1, `${file}:${hit + 1} still uses a retired name: ${lines[hit]}`);

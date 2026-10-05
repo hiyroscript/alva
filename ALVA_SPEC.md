@@ -1,8 +1,28 @@
 # Alva — Product Specification
 
 Alva is a browser-based 2D sprite fighting game by **hiyroscript**. This
-document is the single specification for the product: what it is, how it must
-behave, and how it must look. The README covers running and deploying it.
+document is the product specification: what the game is, how it must
+behave, and how it must look.
+
+**How it is organized.**
+
+- This document holds the product requirements and every shared rule:
+  platform, assets, architecture, brand, screens and flow, battle, input,
+  accessibility and performance. Its rules apply to every fighter alike;
+  where it gives a fighter's value, that is an example and says whose.
+- Each fighter's own specification (its art, body, movement profile,
+  Powers and moves, with their exact values) is a document of its own and
+  part of this specification: [7.2.9](#729-character-specifications)
+  lists them ([`docs/characters/`](docs/characters/)).
+- The guides in [`docs/`](docs/README.md) explain how the code carries
+  these rules out: which modules own what, which data fields a system
+  reads, how to extend it and which tests cover it. They describe; this
+  document decides. A guide that disagrees with it is the one to correct.
+- History (what changed when, and why) lives in
+  [`UPDATES.md`](UPDATES.md), not here: this document describes the game
+  as it is now. The [README](README.md) covers running and deploying it.
+- Nothing here is a future plan. The one capability wired before any
+  fighter uses it, Transform, is marked reserved where it appears.
 
 ---
 
@@ -59,191 +79,92 @@ behave, and how it must look. The README covers running and deploying it.
     `<attack>_object`, e.g. `extra_attack_object`, `attack3_object`,
     `attack4_object`.
   The code builds every path with
-  one helper (`frames` / `framePath` in `js/data/characters.js`), from the
+  one helper (`frames` / `framePath` in `js/data/characters/helpers.js`), from the
   character's id.
-- `#0001` frames live in `assets/characters/0001/`: four idle frames
-  `0001_idle_1`–`4` (≈560–592 × 800–832 px), six run frames `0001_run_1`–`6`
-  (≈128–160 × 184–188 px), two each of jump (624 × 816 px), fall
-  (544 × 832 px) and land (≈528–544 × 560–688 px), one hurt frame
-  `0001_hurt_1` (608 × 752 px), one mid-air hurt frame
-  `0001_midair_hurt_1` (424 × 272 px), four attack1 frames (the punch)
-  `0001_attack1_1`–`0001_attack1_4` (≈264–376 × 392–432 px), three
-  midair_attack1 frames (the kunai slash)
-  `0001_midair_attack1_1`–`0001_midair_attack1_3` (≈216–352 × 424–536 px),
-  seven attack2 frames (the kick) `0001_attack2_1`–`0001_attack2_7`
-  (≈224–336 × 384–424 px), five midair_attack2 frames (the airborne kick)
-  `0001_midair_attack2_1`–`0001_midair_attack2_5` (≈248–424 × 344–448 px),
-  three extra_attack frames (the
-  Throw) `0001_extra_attack_1`–`0001_extra_attack_3` (≈280–312 × 360–376 px),
-  twelve attack4 (Sphere Rush) poses `0001_attack4_1`–`0001_attack4_12`
-  (≈64–110 × 80–104 px, ≈2× pixel art), two mouvment (Dash) frames
-  `0001_mouvment_1` (47 × 41 px) and `0001_mouvment_2` (48 × 40 px) and
-  four single Shield frames, all drawn at 1× (one file pixel per art
-  pixel): `0001_prepshield_1` (35 × 51 px, the guard being raised),
-  `0001_shielding_1` (36 × 47 px, the held guard), `0001_releaseshield_1`
-  (39 × 45 px, the guard lowered) and `0001_midair_shielding_1`
-  (26 × 49 px, the held guard in the air, its only mid-air Shield frame).
-  All four face right. The old Dodge frames (`0001_dodge_1`–`3`,
-  `0001_midair_dodge_1`–`3`) are still in the folder, named by the same
-  rule, but are no longer registered or loaded: Dodge was removed.
-- Every one of #0001's files was renamed to this rule byte for byte (a
-  plain rename: no image was re-encoded, and the tests check each file's
-  SHA-256 against the original upload). No file under an older name
-  remains, and no code or data refers to one.
-- The four Clone Attack startup poses, `0001_attack3_summon_1`–`_4`
-  (288 / 288 / 280 / 272 × 416 px, 8× pixel art like #0001's other poses),
-  are one one-shot fighter clip, `attack3_summon` (10 fps, never looped):
-  #0001 squaring up, bringing his fists in, then holding the hand seal that
-  summons the clone. They are the four poses of the retired held Down
-  stance, recovered byte for byte from the repository's history (commit
-  538d73a, the tests check each file's SHA-256 and git blob id) and
-  renamed for Attack 3: its two startup poses became `_1` and `_2`, its two
-  held poses `_3` and `_4`, and they now play once, in that order. The
-  stance itself is gone for good; only its art was reused.
-- The twelve Sphere Rush poses are fighter poses, registered as logical
-  one-shot clips in `animations` rather than one blind animation, each with
-  one role: `attack4_form` (`attack4_1`–`attack4_3`, formation: the rear palm opens
-  for the sphere), `attack4_dash` (`attack4_4`–`attack4_6`, the rush: the sphere
-  carried behind, swung forward on `attack4_6`), `attack4_confirm`
-  (`attack4_7`–`attack4_8`, the successful contact and stop; `attack4_8` is held
-  while the sphere on the opponent spins and grows), `attack4_explosion`
-  (`attack4_9` alone, the pose of the blast itself) and `attack4_release`
-  (`attack4_10`–`attack4_12`, the release / recovery after the blast). A rush
-  that catches nobody has its own one-frame `attack4_whiff_release`: `attack4_12`
-  alone. That clip and `attack4_release` share the one `0001_attack4_12.png` (the
-  same URL, preloaded once, never a copy on disk). They use the normal
-  fighter normalization (bottom-centre anchor, fighter height, per-clip
-  source facing, pixel-grid detection) and inherit the character's
-  `sourceFacing: 1`.
-- The same folder holds #0001's projectile art: three shuriken frames
-  `0001_extra_attack_object_1`–`0001_extra_attack_object_3` (48–64 px square). They are the in-flight
-  spin of one shuriken, not fighter poses and not three shurikens. They are
-  registered apart from the fighter animations (`projectileAnimations`),
-  preloaded with the character, and normalized and drawn separately: same
-  grid detection, a centre anchor instead of bottom-centre, and the
-  fighter's world-per-art-pixel scale, never fitted to the fighter's height.
-- The same folder holds #0001's effect art: the clone appear / vanish cloud,
-  ten frames `0001_attack3_object_1`–`0001_attack3_object_10` (≈38–210 × 36–132 px, ≈2×
-  pixel art), a smoke puff that grows, fills out and then breaks into
-  scattered wisps. Appearance plays them in forward order (`attack3_object_1 → … →
-  attack3_object_10`); disappearance plays the same ten files in reverse order
-  (`attack3_object_10 → … → attack3_object_1`), reversed at runtime, never duplicated or
-  reversed on disk. They are registered apart from the fighter and projectile
-  animations (`effectAnimations.attack3_object`), preloaded with the character,
-  and normalized like projectile art (own art size, centre anchor, the
-  fighter's world-per-art-pixel scale, never fitted to the fighter's height).
-  The cloud is direction-neutral (`sourceFacing: 0`) and never mirrored. No
-  file name has a space in it (an early upload's did; it was replaced).
-- The same folder holds the Sphere Rush's blue sphere, eleven effect frames
-  `0001_attack4_object_1`–`0001_attack4_object_11` (≈36–116 × 34–118 px, ≈2× pixel art),
-  registered as three `effectAnimations` at 12 fps:
-  `attack4_object_build` (`attack4_object_1`–`attack4_object_6`, energy gathering into the
-  complete orb, once, 0.5 s), `attack4_object_impact` (`attack4_object_7`–`attack4_object_9`, the
-  authored rotation of the orb spinning on the caught opponent, looped
-  `7 → 8 → 9 → 7 → …`, 0.25 s a turn, `loop: true`; the technique draws it
-  ever larger through the hold, since the frames' own sizes do not grow) and
-  `attack4_object_explosion` (`attack4_object_10`–`attack4_object_11`, the lighter, brighter
-  blast, once, ≈0.167 s; never part of the spin). Normalized like the clone
-  cloud (own art size, centre anchor, the fighter's world-per-art-pixel
-  scale, never fitted to the fighter's height): the complete `attack4_object_6` orb
-  is 38 × 41 art pixels, ≈64 × 69 world units. Direction-neutral
-  (`sourceFacing: 0`): the round orb is never mirrored, only its position
-  offset follows facing. It is not a projectile. None of the 23 files is
-  duplicated, and none remains at the repository root.
-- `#0002` frames live in `assets/characters/0002/`: 85 frames cut from
-  one supplied sprite sheet, each cropped tight to its art with the sheet's
-  flat green background (0, 90, 20) made transparent and nothing else
-  changed (1×, 8-bit RGBA, one file pixel per art pixel; the visual
-  config forces `pixelSize: 1`, so no grid is looked for). Eight idle
-  frames (the fighting stance, 29–30 × 38–39 px, the reference: 39 art
-  pixels), twelve run frames (≤ 38 × 40), eight jump frames (the spin
-  ball, 30 × 28–30, looped), one fall frame (arms spread, 35 × 48), four
-  mouvment (Dash) frames (the figure-eight blur, 37–39 × 36), one hurt
-  (34 × 42) and one mid-air hurt (38 × 32), one `shielding` guard (29 × 39),
-  four attack1 frames (the One-Two), four attack2 frames (the Rapid Kicks,
-  74–94 × 71–80 px: the kick trails reach far in front and below the
-  standing foot), the eight ball frames again for each of midair_attack1
-  (the Homing Attack), midair_attack2 (the Bounce Attack) and attack3 (the
-  Spin Attack), four midair_attack3 frames (the Blue Tornado, 34–35 ×
-  45–46), nine extra_attack frames (the Whirlwind, 29–56 × 37–39) and four
-  extra_attack_object frames (the tornado it sends, the same drawing as
-  the Blue Tornado's, as a projectile). Every clip is its own files, named
-  for it, so the ball and the tornado are copies on disk under their own
-  codenames. Everything faces right. No Land or mid-air Shield art.
-  Each clip's `heightRatio` is its tallest frame over 39, so every frame
-  normalizes at exactly one art pixel per file pixel, and `visual.height`
-  (66 world units) puts #0002's art pixels at #0001's size (88 / 52 units
-  each).
+- Each fighter's art lives in `assets/characters/<id>/` and nowhere else
+  (none at the repository root): `assets/characters/0001/` and
+  `assets/characters/0002/` are the only fighter art in the repository
+  today, and any future fighter's frames go in a folder of its own id.
+  Every file, its size and the clips it makes are listed in the fighter's
+  character specification (7.2.9).
+- Supplied art may come at very different raw scales (#0001's poses alone
+  range from 1× to about 16× pixel art). A normalization system must, once
+  per frame: read the alpha channel, find the visible bounds, detect the
+  pixel-art grid (or, where none can be detected, size the clip by its
+  `heightRatio`, or by the character's fixed `visual.pixelSize`), resample
+  to one pixel per art pixel, and anchor bottom-centre so the fighter
+  never grows, shrinks, jumps or slides when switching animations. By
+  convention every fighter's art pixel is the same world size, 88 / 52
+  units (the scale #0001's art is drawn at): a fighter's `visual.height`
+  is its reference clip's art height × 88 / 52, so fighters stand at their
+  own true heights side by side.
 - Where automatic anchoring would drag the body, a clip authors its own
-  anchors: `anchorX` (art pixels from the left of each frame's visible art)
-  on #0002's ball and tornado (their own middle), Whirlwind (the body
-  inside the wind) and One-Two (its planted feet), and `anchorY` (art pixels
-  down from the top of each frame's art to the feet) on its Rapid Kicks,
-  whose trails sweep below the standing foot: without it the bottom-anchored
-  frame would lift the whole body off the ground by the trail's depth. A
-  frame with no `anchorY` stands on the bottom of its art, as every other
-  does (`drawFrame` draws it at `-anchorArtY`).
-- `assets/characters/0001/` and `assets/characters/0002/` are the only
-  fighter art in the repository, and any future fighter's frames go in a
-  folder of its own id.
-- Source orientation: #0001's art faces right (`sourceFacing: 1` on the
-  character), every registered clip included. An animation may override
-  the character's orientation with its own `sourceFacing` (none of #0001's
-  does now); the normalized clip keeps it, and
-  the renderer mirrors a frame only when the fighter's facing differs from
-  its clip's `sourceFacing`. It is rendering metadata only: the fighter's
-  facing, movement, hurtboxes and hitboxes never change with it. The Throw
-  frames face right like the rest. The shuriken art is a four-point star
-  spinning clockwise; it is mirrored when thrown left so it always rolls
-  forward.
-- The idle, jump, fall, land and hurt frames (≈16× pixel art), the mid-air
-  hurt, attack1, attack2, extra_attack and extra_attack_object frames (≈8×),
-  the run frames (≈4×), the clone cloud, Sphere Rush pose and sphere
-  frames (≈2×) and the mouvment (Dash) and Shield frames (1×, whose grid cannot be
-  detected, so each clip's `heightRatio` (the Dash's 41 / 52, the Shield's
-  51 / 52, 47 / 52, 45 / 52 and 49 / 52) fits its tallest frame at exactly
-  one art pixel per file pixel against idle's 52 art pixels)
-  are at very different raw scales. A normalization
-  system must, once per frame: read the alpha channel, find the visible bounds,
-  detect the pixel-art grid, resample to one pixel per art pixel, and anchor
-  bottom-centre so the fighter never grows, shrinks, jumps or slides when
-  switching animations.
+  anchors: `anchorX` (art pixels from the left of each frame's visible
+  art) and `anchorY` (art pixels down from the top of each frame's art to
+  the feet), for art that reaches below the feet; without it a
+  bottom-anchored frame would lift the whole body off the ground. A frame
+  with no `anchorY` stands on the bottom of its art (`drawFrame` draws it
+  at `-anchorArtY`).
+- Source orientation: a character's art declares the way it faces
+  (`sourceFacing` on the character, 1 for right), and an animation may
+  override it with its own `sourceFacing`; the normalized clip keeps it,
+  and the renderer mirrors a frame only when the fighter's facing differs
+  from its clip's `sourceFacing`. It is rendering metadata only: the
+  fighter's facing, movement, hurtboxes and hitboxes never change with it.
+  Projectile art travels its own `sourceFacing` way and is mirrored when
+  thrown the other way; `sourceFacing: 0` marks direction-neutral art,
+  never mirrored. (All of #0001's and #0002's art faces right.)
+- Projectile and effect art (a character's `projectileAnimations` and
+  `effectAnimations`) is normalized apart from the fighter's poses: the
+  same grid detection, a centre anchor instead of bottom-centre, and the
+  fighter's world-per-art-pixel scale, never fitted to the fighter's
+  height. A clip reused by two others shares the same file (the same URL,
+  preloaded once), never a copy on disk.
 - Sprites render with `imageSmoothingEnabled = false` and, where the size
   allows, whole device pixels per art pixel.
-- **Never redraw, recolour, replace or AI-generate the #0001 artwork** (or
-  any fighter art supplied later). Do not
-  download third-party art. Stage art is original and procedural.
+- **Never redraw, recolour, replace or AI-generate a fighter's supplied
+  artwork** (#0001's, #0002's or any later fighter's). Do not download
+  third-party art. Stage art is original and procedural.
 - `alvafav.PNG` is the site favicon source.
 
 ## 4. Architecture
 
-- One application controller (`App`) owns the managers, the
-  `requestAnimationFrame` loop and cross-screen selection state.
+- One application controller (`App`, `js/core/app.js`) owns the managers,
+  the `requestAnimationFrame` loop and cross-screen selection state.
 - A screen manager swaps `<section>` screens with short CSS transitions (no page
   reloads); inactive screens are `hidden` and `inert`.
-- Systems: asset loader, input (keyboard, touch, gamepad), menu navigator,
-  device detection, audio stub, sprite normalizer/animator, fighter state
-  machine, controllers (player / combat AI for Quick Battle and Watch Mode /
-  training AI),
-  physics, camera, combat, launch bounce,
-  projectiles, summoned clones, techniques, HUD, touch controls
-  (two layouts, each rearrangeable, 7.4), stage themes, fighter roster, the
-  player's settings (`js/core/settings.js`, 6.10) and the interface
-  language (`js/core/i18n.js`, 6.11), which `App` owns and applies to the
-  whole page.
+- Systems, by folder (each module's responsibility and dependencies:
+  [`docs/architecture/module-responsibilities.md`](docs/architecture/module-responsibilities.md)):
+  `js/core/` (asset loader, input for keyboard, touch and gamepad, menu
+  navigator, device detection, audio stub, the player's settings
+  `js/core/settings.js` (6.10), touch-layout geometry, utilities);
+  `js/localization/` (the interface language, 6.11, which `App` owns and
+  applies to the whole page, with one string table per language);
+  `js/data/` (the registries: characters and each fighter's definition,
+  loadout rules, maps, Powers, Launch, difficulty, ability names);
+  `js/game/` (the arena, battle and practice modes and physics, with
+  `fighters/` for the fighter state machine, its movement rules and
+  controllers, `combat/` for attacks, defense, combat state, hit
+  resolution, projectiles, summons, techniques and launch bounce, `ai/`
+  for the combat AI and its moveset reader, and `rendering/` for the
+  camera, sprite normalizer and animator, hit and Shield effects and the
+  fighter status); `js/stages/` (stage themes); `js/screens/`;
+  `js/ui/` (components, the HUD, touch controls in two layouts, each
+  rearrangeable (7.4), the fighter roster, dialogs).
 - One arena (`js/game/arena.js`) owns the fixed-step world and its Canvas
   rendering. `Battle` adds the combat-AI CPU at the chosen difficulty (in
   Watch Mode one on each side), phases and round timer; Practice Ground (`PracticeSession`)
   runs Player 1, and an optional training-dummy CPU, with none of them.
-- Data-driven content: `js/data/characters.js`, `js/data/maps.js` (the Quick
-  Battle stages), `js/data/practice-map.js` (the training stage) and
-  `js/data/powers.js` (the Power tier tables, 7.2) and `js/data/launch.js`
-  (the Base Launch values and Directional Launches, 7.2) and
-  `js/data/difficulty.js` (the four CPU levels, 6.3a, used by Quick Battle
-  and Watch Mode). Adding a fighter
-  means adding frames, a definition (including its Power tiers and each
-  hit's damage, Base Launch and Directional Launch) and a roster slot —
-  never editing engine code.
+- Data-driven content: `js/data/characters.js` (the registry) with one
+  definition module per fighter in `js/data/characters/`,
+  `js/data/maps.js` (the Quick Battle stages), `js/data/practice-map.js`
+  (the training stage), `js/data/powers.js` (the Power tier tables, 7.2),
+  `js/data/launch.js` (the Base Launch values and Directional Launches,
+  7.2) and `js/data/difficulty.js` (the four CPU levels, 6.3a, used by
+  Quick Battle and Watch Mode). Adding a fighter means adding frames, a
+  definition module (including its Power tiers, movement profile and each
+  hit's damage, Base Launch and Directional Launch), its registration and
+  a roster slot — never editing engine code.
 - Simulation uses fixed 60 Hz steps with interpolated rendering and a clamped
   frame delta, so behaviour is identical at 30, 60 and 120 Hz.
 
@@ -505,8 +426,9 @@ no header, build label, eyebrow or keyboard hint bar.
   fighter is always shown with the `#`. Only a playable fighter (`available`,
   7.2) is a selectable slot; every other slot is a quiet locked placeholder
   (silhouette + lock). No invented names or power ratings.
-- **Today one slot is selectable:** `#0001` in slot 01, selected and
-  focused by default; the other 47 are locked. A fighter that is not
+- **Today two slots are selectable:** `#0001` in slot 01 (selected and
+  focused by default, as the first playable fighter) and `#0002` in slot
+  02; the other 46 are locked. A fighter that is not
   playable (disabled, with `available: false`) keeps its slot but shows it
   locked like the rest ("Slot 01, locked"): never focused, selected,
   confirmed or previewed, and no portrait loads for it. With no playable
@@ -900,8 +822,9 @@ itself included:
 - **Joystick:** Left mouvement, the joystick, Right mouvement, and
   the actions (Shuriken / `extra_attack`, Transform, Shield, Punch / `attack1`,
   Kick / `attack2`, Clone Attack / `attack3`, Sphere Rush / `attack4`,
-  Jump; a numbered button the fighter does not have, such as `attack5`
-  for #0001, stays hidden).
+  Jump; for #0001's names: every fighter shares the layout, so all five
+  numbered buttons show, one the fighter does not have, such as `attack5`
+  for #0001, in its neutral look).
 - **Classic Buttons:** Left, Right, and the same actions.
 
 Each control has a stable control id, independent of its translated name
@@ -967,7 +890,9 @@ French, concise game terms).
   from splash to Home in their saved language (`LanguageDialog.ensureChosen()`
   resolves at once). Failed splash loads use the same continuation.
 - **One source of strings.** Every player-facing and screen-reader string
-  lives in `js/core/i18n.js` (`STRINGS.en`, `STRINGS.fr`), looked up by
+  lives in one table per language (`js/localization/strings/en.js` and
+  `fr.js`, exposed as `STRINGS.en` and `STRINGS.fr` by
+  `js/localization/i18n.js`), looked up by
   stable key with `t(key, params)` (`{name}` placeholders; a placeholder may
   hold another key as `{ t: key }`; `plural(key, n)` follows each language's
   rules). Keys name what a string is for, never what it says, and a
@@ -1071,7 +996,9 @@ French, concise game terms).
   the main stage's centre while it
   does, interpolates smoothly and never shows outside its camera bounds (the
   stage, the air around it and a strip past the Void's edge). A fighter of the reference height
-  (`CONFIG.render.fighterHeight`, #0001's 88 units) occupies ≈ 10 % of
+  (`CONFIG.render.fighterHeight`, 88 world units: a fixed camera convention,
+  taken from #0001's height when it was the only fighter, never a
+  requirement on any fighter) occupies ≈ 10 % of
   viewport height (8.8–11.5 %), whoever is picked, each fighter drawn at
   its own art scale, so a shorter or taller fighter simply stands shorter
   or taller on the same stage. A 16:9 view shows the whole main stage with air past both
@@ -1079,9 +1006,17 @@ French, concise game terms).
 
 ### 7.2 Fighters, physics and combat
 
-- **Roster and availability.** `CHARACTERS` (`js/data/characters.js`)
-  holds two definitions today, `#0001` in roster slot 01 and `#0002` in
-  slot 02, each fully implemented (everything below) and playable:
+The rules in 7.2.1 to 7.2.8 are shared: every fighter follows them, and a
+fighter's own numbers, art and moves come from its definition. A value
+given here is the engine's default, or a named fighter's as an example;
+each fighter's own values are in its character specification (7.2.9).
+
+#### 7.2.1 Roster and the character system
+
+- **Roster and availability.** `CHARACTERS` (the registry,
+  `js/data/characters.js`) holds two definitions today, each in a module of
+  its own (`js/data/characters/0001.js`, `0002.js`): `#0001` in roster slot
+  01 and `#0002` in slot 02, each fully implemented (7.2.9) and playable:
   `available: true`. Both are preloaded at startup, and #0001, the first
   playable one, is the initial Quick Battle choice, both Watch Mode CPUs
   and the Practice default. A definition existing
@@ -1093,7 +1028,18 @@ French, concise game terms).
   falls back to a disabled or missing one (6.2, 6.4, 6.7, 6.8). Disabling a
   fighter is setting its `available: false` (every file of it kept, its
   roster slot then locked), and a new fighter is a new definition with its
-  own art folder, `rosterSlot` and `available: true`.
+  own art folder, definition module, `rosterSlot` and `available: true`
+  (docs/characters/adding-characters.md).
+- **Shared systems, per-fighter values.** Everything in 7.2.2 to 7.2.8 is
+  one rule for every fighter. A fighter supplies only data: its art and
+  clips, body, movement profile, Powers, Energy, `defense`,
+  `launchReaction` (and optionally `launchBounce`), attacks, projectiles,
+  summons, techniques, button map (`actions`), touch buttons
+  (`mobileAbilities`) and ability names (`abilityNames`). No shared system
+  reads a fighter's id or treats one fighter as the reference: where a
+  value below is a fighter's, it is named as an example. A capability a
+  fighter leaves out (a `defense`, a Dash, a projectile, a summon, a
+  technique, an extra attack, a button) is simply absent for it.
 - **Attack loadout** (`js/data/loadout.js`). A fighter's attacks go by
   universal codenames, the same for every character: the numbered attacks
   `attack1` to `attack5`, each one's mid-air version `midair_attack1` to
@@ -1131,7 +1077,7 @@ French, concise game terms).
     summon's cloud and a technique's sphere `<attack>_object...` effect
     clips, a technique's own poses `<attack>_...` (#0001's `attack4_form`
     to `attack4_whiff_release`), and the files follow (3).
-  #0001 has four numbered attacks, all four its buttons: `attack1` (the
+  For example, #0001 has four numbered attacks, all four its buttons: `attack1` (the
   Punch; `midair_attack1`, the kunai slash) and `attack2` (the Kick;
   `midair_attack2`, the airborne kick) are ordinary attacks, `attack3` (the
   Clone Attack) a summon and `attack4` (the Sphere Rush) a technique, and
@@ -1141,19 +1087,24 @@ French, concise game terms).
   `midair_attack2`, the Bounce Attack) and `attack3` (the Spin Attack;
   `midair_attack3`, the Blue Tornado) are its buttons, and `extra_attack` is
   its Whirlwind. It has no `attack4` or `attack5` button.
-- `#0001` has Idle, Run, Jump, Fall, Land, Hurt, Mid-air Hurt, attack1,
-  midair_attack1, attack2, midair_attack2,
-  Shield (raise, held and lower poses), Mid-air Shield (held only), Dash (`mouvment`),
-  Throw and the Sphere Rush (six clips), plus the
-  Shuriken projectile animation and the clone-cloud and sphere effects.
-  No invented frames. Rising uses Jump and
-  descending (walking off a ledge included) uses Fall; each plays once at 10 fps
-  and holds its last frame. Land plays once at 12 fps on touchdown, for
-  exactly the clip's length, then returns to idle or run. Land is a visual
-  state only: it never changes movement or collision, and a new jump, attack
-  or hitstun cuts it short. If those frames fail to load, the fighter holds an
-  idle frame without stretching or rotating. Facing flips the sprite (per
-  clip, against that clip's source orientation; see 3). For players it is manual: only
+
+#### 7.2.2 States, animation and facing
+
+- **Clips and states.** Every fighter's clips are its own: Idle and Run;
+  Jump while rising and Fall while descending (walking off a ledge
+  included), each looped or held on its last frame as its clip says; an
+  optional Land, played once on touchdown for exactly the clip's length
+  and then back to idle or run (a fighter with no land clip lands straight
+  into its stance; Land is a visual state only and never changes movement
+  or collision, and a new jump, attack or hitstun cuts it short); Hurt and
+  Mid-air Hurt for hitstun; its attacks', Shield's and Dash's clips; and
+  its projectile and effect art. No invented frames. If the airborne,
+  landing or hurt frames fail to load, the fighter holds the frame its
+  `animationFallbacks` names (e.g. #0001's and #0002's first idle frame)
+  without stretching or rotating; attacks, the Shield and the Dash never
+  fall back (7.2.4, 7.2.5). Facing flips the sprite (per clip, against
+  that clip's source orientation; see 3).
+- **Facing.** For players it is manual: only
   the fighter's own movement (running past a small speed on the ground,
   steering in the air), a Dash and an attack started with a direction held
   turn it (the attack faces that direction as it starts, so a turn made on
@@ -1161,10 +1112,10 @@ French, concise game terms).
   never the stale way). **During an action of its own** (an attack or the
   Shield) the direction held turns it at once, left to right or right to
   left, as often as the player likes (`Fighter.updateFacing`): the hitbox,
-  a step-in still to come and a shuriken not yet released all go the new
-  way. Turning never walks or runs. A technique faces the direction held
-  on the step it starts (so the Sphere Rush pressed with Left held rushes
-  left); from then on a stun, a bind, a Dash and a technique hold the
+  a step-in still to come and a projectile not yet released (e.g. #0001's
+  shuriken) all go the new way. Turning never walks or runs. A technique faces the direction held
+  on the step it starts (so #0001's Sphere Rush pressed with Left held
+  rushes left); from then on a stun, a bind, a Dash and a technique hold the
   facing. A spawn or respawn takes the spawn's `facing`, and otherwise it
   keeps its last facing. Manual players and the non-attacking training
   controller never auto-face. The combat CPU aims at its live opponent on
@@ -1181,21 +1132,650 @@ French, concise game terms).
   idle), and normal states resume when it ends. The pose is visual only (no
   collider changes), but being hit is not: a hit (never a block) or a bind
   takes the fighter out of its own attack on its next step, so nothing of
-  that attack is left to strike, release a shuriken or recover from (no
+  that attack is left to strike, release a projectile or recover from (no
   cooldown either). Checked on the fighter's next step, two attacks that
   connect on the same step still trade. A stunned fighter's push or
-  launch runs down at its own `movement.hitstunFriction` (1600) on the
-  ground and `hitstunAirDrag` (210) in the air, whatever is held: the rates
-  Launch Point was tuned against, apart from the movement rework. Missing
-  hurt art holds an idle frame.
+  launch runs down at its own `movement.hitstunFriction` on the ground and
+  `hitstunAirDrag` in the air (half its deceleration and air drag when it
+  declares none), whatever is held. Missing hurt art holds its fallback
+  frame.
+- `down` (S / ↓, D-pad or left stick down) is a
+  direction only, never a stance, state or modifier: it has no animation,
+  locks no movement, refills nothing and changes no attack. It does two
+  things, both in the air: held while falling it is the fast fall, and held
+  as a hit lands it steers the launch downward (see the fast fall, 7.2.3,
+  and launch steering, 7.2.7). On the ground it does nothing at all: the fighter
+  idles, runs, attacks, jumps and shields exactly as with nothing held, and
+  every numbered button does the same thing whether or not Down is held. On
+  a one-way platform it never drops through (the player has no
+  drop-through control; see the stages above). Menus read Down from their
+  own bindings, the same keys and pad directions as ever (7.4). State
+  priority is
+  hitstun > technique > bound > attack > Dash > Shield > tumble > jump /
+  fall > land > Shield lower pose > run > idle: a hit shows Hurt at once.
+
+#### 7.2.3 Physics, movement and Powers
+
+- Physics: acceleration, deceleration, turn braking, max speed (from the
+  fighter's Speed Power, below), air steering and drag, gravity, jump
+  impulse (from its Jump Power, below), the fast fall,
+  ground/platform/solid collision on a finite main floor (no side walls:
+  a fighter can leave the stage and fall), landing detection; collision boxes
+  independent of PNG size; bottom-centre origin; no sinking, floating or
+  jitter. A collision stops the body on that axis and reports the speed it
+  stopped; only a launch turns that into a rebound (Launch bounce). Pushboxes
+  split an overlap evenly, so a fighter at a ledge can be shoved off it; a
+  fighter flying off a rebound passes through them.
+- **Movement and game feel.** Movement is immediate, smooth and precise;
+  fast to respond, never simply fast. The rules are the same for every
+  fighter (`js/game/fighters/movement.js`, docs/systems/movement.md); each
+  fighter's `movement` profile and Powers supply the numbers, so two
+  fighters move differently under the same rules. #0001's and #0002's
+  values, and how they play, are in their character specifications
+  (7.2.9).
+  - *Ground.* From rest to top speed at `acceleration`; letting go stops
+    the fighter at `deceleration` (a short, natural stop, never an
+    instant one); pressing against the way it moves brakes at
+    `acceleration` × `turnBoost` (never softer than letting go) until
+    that way is spent, the rest of that step accelerating the new way, so
+    a turn is quick but never a one-step flip. Above top speed (after a
+    Dash) the excess bleeds off at `overspeedDeceleration`, whatever is
+    held.
+  - *Air.* The same shape with `airAcceleration`, `airTurnBoost` (its
+    `turnBoost` when it declares none) and a light `airDeceleration`
+    drag: steering bends the drift instead of replacing it, and a running
+    jump carries its speed. Above top speed (a launch, a jump out of a
+    Dash), holding the way it already moves never slows the fighter
+    beyond the drag; pressing against it brakes.
+  - *Jump.* Its strength is its Jump Power; it is buffered (`jumpBuffer`)
+    and has coyote time (`coyoteTime`), both of which must be positive for
+    the fighter to jump at all. Takeoff is on the press step, and the jump
+    only sets the upward speed: the run carries straight into the air (no
+    horizontal reset), so run → jump → drift is one continuous motion.
+  - *Higher jump.* A tap is the normal jump. Jump still held
+    `highJumpWindow` after takeoff (held from the takeoff step on: a press
+    a little longer than a tap) makes it the higher jump: from that step to
+    its apex it rises under a lighter share of gravity, set once so it tops
+    out at `highJumpHeight` × the normal height (`Fighter.highJump`,
+    `highJumpLift`). No kick in speed: the arc stretches. Decided once and
+    kept whether Jump stays held or not; the apex, a hit, the air jump or
+    the ground ends it. Ground jumps only (coyote time included); the air
+    jump is never a higher one. A fighter with no `highJumpWindow` never
+    makes one. Both CPUs let go of Jump inside the window (`jumpTapHold`):
+    their jumps are normal ones.
+  - *Air jump.* `airJumps` more jumps in the air (none when it declares
+    none), past coyote time, at `airJumpRatio` (1 when it declares none) ×
+    the normal jump's speed, always full height, the jump clip from its
+    first frame. A direction held sets off that way at least at top speed
+    (a change of course); with none held the drift carries on. Landing
+    gives them back, and so does a hit. Not while stunned, bound, shielding
+    or in a technique, nor in free fall; a jump pressed in the air with none
+    left waits (the jump buffer) for the ground. It may cut short an attack
+    that hit, like a ground jump. Quick Battle's CPU uses it to get back to
+    the stage. A jump and an air jump from a stage's highest footing stay
+    well clear of the upper Void.
+  - *Fast fall.* Down (the `down` input: S / ↓, D-pad or stick down,
+    with no mobile Down button) held in the air while already descending
+    speeds the fall up toward `fastFallSpeed` at `fastFallAcceleration` on
+    top of gravity: never while rising, never a jump in speed and never
+    slower than the fall already is; it lands on platforms like any fall.
+    A fighter whose `fastFallSpeed` is not positive has none. Aerial attacks
+    may fast-fall (back to the ground after an aerial); a stun, a bind, an
+    air Shield, a technique or an attack's own motion may not.
+    `Fighter.fastFalling` is true on the steps it applies.
+  Attack movement, the combat input buffer, hit-cancels and hitstop are
+  combat rules (7.2.4).
+- **Dash** (movement, not an attack): two press edges of the same
+  horizontal direction (`runLeftPressed` / `runRightPressed`, 7.4), the second
+  within `movement.dashTapWindow` (e.g. #0001's 0.22 s) of the first, start a Dash that
+  way (`Fighter.trackDashTaps`, `tryDash`); the other direction replaces the
+  waiting tap, both at once cancel it, and a double tap that cannot Dash is
+  used up, never queued. A one-step request (`mouvementLeftPressed` /
+  `mouvementRightPressed`, 7.4: one tap of the Joystick touch layout's Left
+  mouvement / Right mouvement, `mouvementLeft` / `mouvementRight`) goes straight to the same `tryDash`, so every
+  rule, cost and effect below applies unchanged; it is not a direction
+  press (it never pairs with one), it forgets any first tap waiting, it is
+  used up whether or not it Dashes, and both at once ask for nothing. A Dash needs the fighter free to act (no attack,
+  stun, bind, technique or Dash running) or in an attack that hit
+  and may be cut short (a **Dash cancel**, see Hit-cancels, 7.2.4), grounded,
+  not shielding nor holding `shield` for a Shield
+  that can go up, not exhausted (it pays `energy.dashCost` once as it
+  starts, `dashCancelCost` for a Dash cancel, or all that is left when that
+  is less, emptying the bar), a positive `movement.dashSpeed` and its real
+  `mouvment` clip (played once; without it the Dash is refused and logged,
+  never faked with the run). A held Shield and attacks are resolved before it on
+  the same step, so either wins over it. The fighter faces the Dash at once and
+  moves at `movement.dashSpeed` (the top speed itself never changes) for
+  one pass of its own `mouvment` clip, ignoring input (e.g. #0001: 900
+  units/s for 0.2 s, about 180 units; #0002: 1100 units/s for 0.2 s,
+  about 220); afterwards the normal movement takes over from that speed,
+  its excess over top speed bleeding off at
+  `movement.overspeedDeceleration` whatever is held, so holding on eases
+  into the run and letting go slides to a stop. No speed spike, no dead
+  stop. It obeys collision: a solid stops it (the Dash ends against
+  it), and leaving the ground ends it (the fighter falls on with its speed).
+  Hitstun or a bind end it at once. While it runs the fighter cannot attack,
+  shield, jump, summon, start a technique or Dash again (an attack or a jump pressed late in
+  it is kept by the input buffers and comes out the step it ends: a Dash
+  into a punch, keeping at most the punch's share of top speed, never a
+  lunge; there is no attack-cancel out of a Dash). A Dash asked for during
+  an impact freeze (a double tap or a one-step request) is kept and tried
+  on the step the freeze ends, like the attack presses made then. It has no hitbox,
+  damage, launch or invulnerability. The training CPU never dashes (its
+  input never has press edges); Quick Battle's combat AI dashes only
+  through the same double tap a player uses (a press, a release and a
+  press within the window), and guards against double-tapping by accident.
+- **Powers** (`js/data/powers.js`): fighter abilities owned at one of three
+  tiers, Jump Power and Speed Power. Each Power is a frozen tier table in
+  the one `POWERS` registry, the single source of its names, descriptions,
+  tier numbers and tuning values: gameplay reads the values, the Discover
+  reference (6.9) the names and descriptions. A fighter's definition
+  declares one tier of each (`powers: { jump: 2, speed: 2 }`); `Fighter`
+  resolves them once, at construction (`getJumpVelocity`, `getMaxSpeed`).
+
+  Tier values (world units per second, at the global gravity of 2500):
+
+  | Power | Tier 1 | Tier 2 | Tier 3 | Becomes |
+  | --- | --- | --- | --- | --- |
+  | Jump Power | 650 | 920 | 1000 | initial upward speed of the normal jump |
+  | Speed Power | 270 | 330 | 360 | top speed of normal movement |
+
+  Each fighter's tiers are in its character specification (7.2.9): #0001
+  has Jump Power 2 and Speed Power 2 (exactly its original 920 jump and 330
+  top speed), #0002 Jump Power 2 and Speed Power 3. The tiers are the only
+  sources: movement has no raw `jumpVelocity` or `maxSpeed`.
+  Speed Power feeds the same normal left / right target speed on the ground
+  and in the air (and the run clip's playback rate, relative to the
+  fighter's own top speed; an attack's steering and the speed it may keep on
+  the ground are shares of that top speed); acceleration, deceleration, the
+  turn boosts, the overspeed bleed, air control and drag, gravity, fall
+  speed, the fast fall, coyote time, the jump and attack buffers, hitstun
+  friction, launches, projectiles, the Shield and techniques (e.g. the
+  Sphere Rush's own 1050 dash) never depend on it, just as none of them depend
+  on Jump Power. The shared
+  Fighter applies both for Player 1, the CPU and Practice Ground alike. A
+  declared tier the table lacks (or a fighter missing a Power) is logged and
+  gets tier 2.
+
+#### 7.2.4 Combat
+
+- **Attacks** are data on the character (`attacks`, keyed by move
+  codename; the schema is `createAttackDefinition` in
+  `js/game/combat/attacks.js`), turned once into frozen definitions: an
+  `animation` (real frames are required: an attack without them is refused,
+  never faked), phases (`startup`, `active`, `recovery`, timed to whole
+  frames of the clip so the hitbox is live only while the strike is on
+  screen), a `hitbox` facing right from the fighter's origin (bottom-centre,
+  mirrored with facing, live only in the active phase, at most one hit per
+  attack), its `damage`, `baseLaunch` and `directionalLaunch` (7.2.7),
+  `hitstun`, `blockstun`, `hitstop` and a short `cooldown`, `groundOnly`,
+  and how it moves and combos (below). An airborne version that lands
+  finishes what is left of its own clip (never restarted) instead of
+  switching to the ground version or Land. A projectile attack has
+  `hitbox: null` and a `projectile` release instead (below). A *pending*
+  attack (`pending: true`) is art only: one pass of its clip, no hit, and
+  declaring combat fields on one is refused.
+  - *Attack movement.* Normal locomotion is off while an attack plays, but
+    that is not the same as standing still: an attack keeps a share of the
+    horizontal speed it started with (`momentum` on the ground, never more
+    than that share of top speed; `airMomentum` in the air), may be
+    steered with a share of the normal acceleration and top speed
+    (`control`, `airControl`), lets the rest of its speed run down under
+    `friction` × the ground deceleration (the air drag in the air), and may
+    move by itself (`step: { at, speed }`: forward speed raised to at
+    least `speed` as its time crosses `at`, on the ground). Defaults
+    (`momentum` 1, `control` 0, `friction` 1, no step) are a planted
+    attack; `lockMovement: false` keeps full locomotion. A technique owns
+    its own movement instead and a clone never moves: neither reads these.
+  - *Combat input buffer.* An ordinary attack press the fighter cannot act
+    on yet (an attack or its recovery, a stun, a Dash, a cooldown, `shield`
+    held for its Shield) is kept for `movement.attackBuffer` and comes out
+    on the first step it can, if it still maps to an attack that can start
+    there (on the ground or in the air as the fighter is then). The latest
+    such press wins; one older than the buffer never fires. Presses made
+    during an impact freeze are kept and do not age through it. Only
+    ordinary attacks: a summon or technique happens on its own press or not
+    at all (one pressed while it cools down, in the air or while the
+    fighter is busy is simply gone), and a reserved button, a ground-only
+    attack pressed in the air or an attack without art is never kept. Kept
+    presses keep their order with a buffered jump: a jump pressed before
+    the attack goes first and the attack comes out next step, in the air;
+    pressed on the same step, the ground attack goes first. A fighter with
+    no positive `attackBuffer` keeps nothing.
+  - *Hit-cancels.* An attack that hits (a Shield's block does not count)
+    may be cut short once its time reaches its `hitCancel` (seconds in, or
+    null for never; the step its freeze ends at the earliest), by another
+    attack, a jump or, on the ground, a Dash (a **Dash cancel**, for
+    `energy.dashCancelCost`): walking, the Shield, summons and techniques
+    still wait for its end, and left alone it plays out in full. A Dash
+    asked for during the hit's freeze comes out the step it ends. It cuts
+    into itself only once its own cooldown has run since it became
+    cancellable. The cut attack's cooldown starts as it is cut. A whiff or
+    a block keeps the whole recovery (and never Dash-cancels), so
+    commitment is unchanged where it matters. Which attacks open a
+    follow-up, and the combo routes they make, are each fighter's own
+    (7.2.9). No route loops: every hit adds to the Launch Point that sends
+    the next one further, a Dash chase spends the Energy the Shield needs,
+    and a wall's rebounds are capped until the target recovers (7.2.7).
+  - *Hitstop.* Per hit, its own `hitstop`; a hard rebound off the stage
+    freezes its fighter alone for `LAUNCH_BOUNCE.hitstop`. It freezes the
+    fighters, never the controls: presses made during it are kept, and a
+    frozen fighter is drawn still where it stopped. A detached hit (a
+    projectile's, a clone's, a technique's) freezes only its target.
+- **Projectiles** (`projectiles` on the character, `<attack>_object`,
+  named after the attack that throws it; runtime in
+  `js/game/combat/projectile.js`) are independent battle entities, not a
+  fighter hitbox: each has its own position (interpolated between fixed
+  steps like the fighters), velocity, animation clock, hitbox, combat data
+  and lifetime, all from character data. The attack releases exactly one,
+  once, as its time crosses the release's `spawnAt`, from its `offset`
+  (facing right, mirrored), aimed where the fighter faces then; a hit
+  before that point throws nothing, and its direction never changes
+  afterwards, whoever turns, jumps, shields or is hit. Its speed never
+  depends on its art. It hits through the same `CombatSystem.applyHit` as
+  melee, with its own direction in place of the attacker's facing, credits
+  its thrower and freezes only its target; it never hits its thrower. By
+  default it strikes once and is gone (a Shield blocks it and it is used
+  up), and it also disappears at the end of its `lifetime`, in the Void or
+  against a solid block (the main stage's own cliff face included);
+  one-way platforms and the open air past a ledge do not stop it. A
+  piercing one strikes again (below). The Battle owns live projectiles:
+  each fixed step it updates the fighters, spawns released projectiles
+  (once each), moves them, resolves hits, then removes spent ones. They are
+  drawn on the battle canvas over the fighters, centred on their position
+  with image smoothing off, and cleared on restart. Missing projectile art
+  refuses the attack that throws it (logged): never an invisible
+  projectile.
+- **Attack mechanics beyond a timed hitbox** (`js/game/combat/attacks.js`,
+  `js/game/combat/combat.js`, `js/game/fighters/fighter.js`,
+  `js/game/combat/projectile.js`). Each is data on an attack (or a
+  projectile), generic, and validated as its definition is built; any
+  fighter may use them (#0002 uses them all today):
+  - **Strikes** (`hits`): a multi-hit attack lists its strikes, each live
+    in its own window (`at` to `at + active`) and striking at most once,
+    with its own `damage`, `baseLaunch` and `directionalLaunch`; its
+    `hitbox`, `hitstun`, `blockstun`, `hitstop` and `carry` default to the
+    attack's. The attack's startup and active phase follow from them
+    (declaring either, or an attack-level damage or launch, is refused), and
+    so do its overall box (round every strike's), damage (their sum) and
+    launch (the last strike's), for readers such as the CPU. Any real hit
+    confirms it (its hit-cancel counts from the first); a Shield that blocks
+    a strike stops the string there, so a flurry never empties a Shield.
+  - **Carry** (`carry: { lift }`, on an attack, a strike or a projectile): a
+    real hit that launches nothing gives its target the velocity of what
+    struck it (the attacker's body, or the projectile), less `lift` upward.
+  - **Motion** (`motion`, one of four kinds; a motion attack never changes physical facing for a visual turn
+    while it plays): `homing` hangs through its startup (no gravity), then
+    locks on to its opponent if in play, within `range` of its middle and
+    not behind it, and dashes at `speed`, re-aimed at the target's middle
+    every step, until its active phase ends (straight ahead with no target);
+    contact (hit or block) springs it off the target, `rebound` up and
+    `recoil` back; a dash that ends without contact keeps `exit` of its
+    velocity, and one that reaches the ground stops. `bounce` hangs, then
+    plunges at a fixed `fallSpeed`; meeting the ground or an opponent sends
+    it back up at `rebound` and ends the attack (a ground bounce is no
+    landing). `rise` hangs, then rises at `speed` for its active phase and
+    carries on up under gravity. `roll` curls through its startup (sliding
+    on), then rolls the way it faces at `speed` plus `keep` × the running
+    speed it had, up to `maxSpeed`, losing `friction` per second on the
+    ground (none in the air); a wall stops it, and a Shield that blocks it
+    stops it dead and sends it back at `recoil`. No motion attack starts
+    while its fighter is still flying from a launch (`Fighter.launch`): a
+    hang, dash, plunge or lift would cancel the launch, so it must recover
+    first (an air jump, a fast fall or landing).
+  - **Per airtime** (`airUses`): how many times the attack may start before
+    the fighter lands or is hit. **Free fall** (`freeFall: true`): started
+    in the air, it leaves the fighter with no attack and no air jump until
+    it lands or is hit.
+  - **Body** (`passThrough: true`): no pushbox against other fighters while
+    it plays. (`hurtboxes`): the fighter's own replaced while it plays.
+  - **Piercing projectiles** (`pierce: { hits, interval }`): strike up to
+    `hits` times, at least `interval` seconds apart, staying in play between
+    them; the last resolves as the projectile's `finisher` (its own damage
+    and launch, its stuns defaulting to the projectile's). A block stops it.
+  - The CPU reads all of it from the data: each attack's reach swept along
+    its motion (`attackReach`: a roll's path, a plunge's depth, a lift's
+    height, a homing dash's lock-on range) for choosing and fearing it, the
+    travel time before a moving strike can arrive, per-airtime starts and
+    free fall; it uses a lift (a `rise` air attack) to recover when its air
+    jump is spent, fast-falling first to end a launch, and never plans a
+    summon or technique for a fighter with none.
+- **Combat architecture** (Launch Point, Base Launch, Directional Launch,
+  damage, hitboxes, hurtboxes, attack definitions, the Shield button's
+  `defense` (typed, the Shield so far), Energy, launches, stun and
+  blockstun, hitstop, cooldowns, summon and technique cooldowns, binds,
+  typed numbered buttons, summons and techniques) is data-driven: every
+  fighter's moves are implemented through it with real artwork (7.2.9),
+  Transform stays reserved (mapped to no attack) until real sprites exist,
+  and no attack, projectile, clone or frame is ever fabricated. An attack
+  whose frames fail to load is refused (no substitute pose, no invisible
+  hitbox), and so is a Shield, a summon whose startup pose, cloud or
+  attack art is missing (no pose, no cooldown starts), and a technique
+  with any of its clips missing.
+
+#### 7.2.5 Defense and Energy
+
+- `shield` is the shared player action, the Shield button (keyboard L,
+  gamepad RB / RT, the touch **Shield** button). What it does, how a
+  fighter defends, is character data (`defense` in
+  each character's definition, frozen by `createDefenseDefinition` in
+  `js/game/combat/defense.js`), not part of
+  the input system. The one defense type is the Shield, `{ type: 'shield',
+  groundAnimation, airAnimation, groundStartAnimation,
+  groundReleaseAnimation }`; the type is checked, so a future fighter can
+  defend another way, and an unknown type is an error. A fighter with no
+  `defense` does nothing on the button. #0001 and #0002 both use the
+  Shield (#0002's on the ground only). There is no
+  Dodge (no invulnerability, evasive frames or one-press defensive move)
+  and no chip-damage Block anywhere in the engine.
+- The **Shield** is a held state, `CombatState.shielding`: up while
+  `shield` is held and the Shield is allowed, down the step it is let go.
+  Allowed means: the fighter is free to act (no attack, stun, bind,
+  technique or Dash; the Shield never cuts one short, and comes up the step
+  it ends if `shield` is still held), it is not exhausted
+  (`CombatState.canShield`: any Energy left is enough) and the held art
+  for where it is. It is decided before the
+  combat intents: while `shield` is held with a Shield that can go up, no
+  attack, Throw, summon, technique, Dash or jump starts (let go of `shield`
+  first: an attack or a jump pressed meanwhile is buffered and comes out
+  the step the Shield is let go, if that is soon enough; a summon or
+  technique pressed meanwhile is not kept). On the ground it shows its
+  optional `groundStartAnimation` (#0001's `prepshield`) for one pass as it
+  goes up, then `groundAnimation` (#0001's `shielding`) for as long as it
+  is held; lowered on the ground, the optional `groundReleaseAnimation`
+  (#0001's `releaseshield`) shows for one pass (the `shieldRelease` state)
+  while nothing of higher priority takes over (visual only: movement
+  resumes at once). In the air there is only `airAnimation` (#0001's
+  `midair_shielding`), the held pose: no raise or lower pose, and a Shield
+  lowered in the air goes straight back to Jump / Fall; a Shield with no
+  `airAnimation` (#0002's) simply cannot go up in the air. Landing with it up keeps the held pose (no raise
+  pose, no Land). While it is up horizontal input moves nothing (on the
+  ground no walking, running or Dash, the current velocity slowing under
+  the normal deceleration; in the air momentum carries on under the normal
+  air drag with no steering), though the direction held turns the fighter.
+  In the air it **slows the fall**: a faster fall (a fast fall included)
+  brakes toward `defense.slowFallSpeed` (#0001: 200 units / s) at
+  `slowFallBrake` (#0001: 6000 / s², so 0.2 s from its fast fall's 1400), and
+  gravity never takes it past that while the Shield stays up; a rise is
+  untouched (`stepBody`'s fall cap, from `Fighter.update`). A Shield without
+  `slowFallSpeed` (0) falls as ever. A
+  missing held clip refuses the Shield (logged once per clip); missing
+  raise or lower poses are simply skipped.
+- **Blocking.** The Shield is a full circle: while it is up, any hit that
+  reaches the fighter's own hurtboxes (the same `CombatSystem` overlap as
+  any hit, never a bigger circle) is blocked, whichever side it comes from:
+  melee, projectiles, clone attacks and the Sphere Rush's contact alike. A
+  blocked hit adds no Launch Point and launches nothing (launch strength 0,
+  final launch zero, whatever its Base Launch and direction), shows no
+  hurt pose and deals no hitstun; the hitbox is used up exactly as by a
+  hit (an attack's `hasHit`, a projectile gone, a clone's `hasHit`, the
+  technique's contact). The fighter pays `energy.shieldHitCost` (25 by default) for
+  it, once, in `CombatSystem.applyHit`, or all it has left when that is
+  less, and the event is a `'block'` with that `energyCost`. The hit's hitstop still freezes both sides as usual, and
+  its `blockstun` becomes `CombatState.shieldStun`: the Shield is held up
+  through it even if `shield` is let go, and the fighter cannot act until it
+  is over. A block that empties the bar (with `shieldHitCost` or less left) exhausts the
+  fighter and drops the Shield at once, clearing the blockstun. That block
+  itself stands, never turned into a hit
+  after the fact, but any later hit, even on the same step, lands in full.
+  Holding the Shield costs nothing, and a miss costs nothing: only a
+  confirmed block is paid for.
+- **Perfect Shield.** A hit that lands within `defense.perfectWindow`
+  (#0001's and #0002's: 0.1 s) of the Shield going up is a perfect block (`Fighter.perfectShield`,
+  the event's `perfect`): it costs no Energy and deals no blockstun, so the
+  fighter can let go and answer at once, while the attacker, whose attack
+  was blocked, still has its whole recovery (no hit-cancel). The hit's
+  hitstop still freezes both. Only a raise after the Shield has been down
+  for `perfectRearm` (#0001's and #0002's: 0.25 s) has that window, so tapping `shield` over and
+  over never keeps one open; held up longer, or raised again too soon, a
+  block is an ordinary one. It is drawn as a white ring bursting from the
+  block (see Hit effects, 7.3). Quick Battle's CPU pulls one off only as
+  often as its level earns it: a raise that close to contact succeeds with
+  a chance of its `guard` trait to the fourth power (Brutal often, Easy almost never),
+  and otherwise it takes the hit.
+- The Shield's look (`js/game/rendering/shield-fx.js`): a wavy circle round the
+  fighter, drawn procedurally on the battle canvas (no PNG), kin to the
+  Void: a barely-there black interior (`rgba(0, 0, 0, 0.16)`) drawn behind
+  the fighter's sprite, then in front of it a black wavy rim (3.5 CSS px)
+  with a thin red line (`#d21f2b`, 1.25 CSS px) on its outer side, both on
+  the same waves: the red is traced (1.125 CSS px) further out than the
+  black, so it covers the black's outermost 1.25 px, flush with its outer
+  edge. From the fighter outward it reads interior, black boundary, red
+  edge; there is never a red ring inside the black. Its centre is the
+  fighter's body middle (half the character's `visual.height` over the
+  interpolated feet) and its mean
+  radius 0.62 × that height (≈55 units for #0001), so it surrounds head and
+  feet whatever frame is on screen. The perimeter leans in and out by at
+  most 10 % of the radius (`SHIELD_SHAPE.amp` 0.1), a sum of two
+  whole-number sine waves round the circle (so it always closes and its
+  mean radius never changes: it wavers like the Void's edge, never pulses)
+  drifting slowly on the Arena's effects clock, traced at 96 points so the
+  curve stays smooth; with reduced motion it holds a still, wavy shape. It is drawn only while the Shield is up, under
+  the Void, name tags and status, and never used by collision. The debug
+  overlay labels a shielding fighter `shield`; its hurtboxes are drawn as
+  usual.
+- **Energy** (`CombatState.energy`, `maxEnergy`, `energyExhausted`;
+  settings from the character's `energy` entry through `resolveEnergy`
+  in `js/game/combat/combat-state.js`, every field optional: `max` 100,
+  `regen` 12 / s, `dashCost` 15, `shieldHitCost` 25, and `dashCancelCost`
+  the fighter's own `dashCost` when it declares none; #0001 and #0002
+  declare 40) is the one resource a fighter spends, and only on a Dash (as it
+  starts: `dashCost`, or `dashCancelCost` for a Dash that cuts short an
+  attack that hit, which is the fighter's `dashCost` when it declares none)
+  and on the Shield (for each hit it blocks). Either works whenever the fighter is not
+  exhausted, however little is left: a cost larger than what remains is
+  paid by taking all of it (`CombatState.spendEnergy`), never going below
+  0. Every fighter starts full, and every
+  change goes through `setEnergy`, clamped to [0, max]. It refills by
+  itself at `regen` on every step no Dash was paid for (idle, moving,
+  airborne, attacking, shielding, stunned or frozen; `updateEnergy`), at
+  that one rate whatever is held. Reaching 0 (a Dash or a block alike, an overspend included)
+  exhausts the fighter: Dash and Shield stay unavailable however much has
+  refilled (1, 25, 50, 75, 99) until Energy is back at exactly max, which
+  clears it. Energy never gates movement,
+  jumps, attacks, Throw, summons or techniques, and none of them spend it. A respawn and a restart start it full.
+
+#### 7.2.6 Summons and techniques
+
+- **Summons and techniques** are numbered buttons of their own (see the
+  attack loadout above), dispatched by type, not a summon shortcut. A
+  button whose `actions` entry is `{ type: 'summon', id }` sends out the
+  entry `id` in `summons` (a detached temporary entity), and one whose entry
+  is `{ type: 'technique', id }` starts the entry `id` in `techniques` (a
+  sequence the fighter performs itself). For example, #0001 has
+  `attack3: { type: 'summon', id: 'attack3' }` (the Clone Attack) and
+  `attack4: { type: 'technique', id: 'attack4' }` (the Sphere Rush).
+  `Fighter.tryAction` sends either to `Fighter.trySpecial`, which dispatches
+  on the type (`trySummon` / `tryTechnique`). The rule is shared: the
+  button's own new press, on the ground, with the fighter free to act (no
+  attack, stun, bind, technique, Dash or held Shield; one never cuts an
+  attack short) and its cooldown over. Anything else, an airborne press, a
+  busy fighter, a cooldown still running, no opponent for a summon, missing
+  art or invalid data, makes the press do nothing at all: never Punch or
+  Kick (or any other attack) in its place, never kept for later (the combat
+  input buffer below keeps ordinary attacks only), never an invisible move.
+  Holding the button does not repeat it, and neither Down nor any other
+  input changes what it does. Each has its own cooldown instead of any
+  cost: the summon's or technique's `cooldown` (e.g. 5 s for both of #0001's),
+  kept per ability in `CombatState.abilityCooldowns` (a `CooldownTimers`:
+  `{ remaining, duration }` per id, apart from ordinary attacks' short
+  recovery cooldowns in `CombatState.cooldowns`), started the moment the
+  move is accepted (a summon's startup included) and recovering at 1 s per
+  second, whatever the fighter does (impact freezes included), never below
+  0. Neither spends Energy. The summon system never depends on technique
+  code, nor the technique runtime on the summon system.
+- **Summons** (`summons` on the character; runtime in
+  `js/game/combat/summon.js`). The one kind of summon so far is a clone of
+  its owner: a temporary attack entity, not a fighter, drawn with the
+  owner's real art and performing one of the owner's own `attacks` once,
+  with that attack's own resolved definition. A summon names that
+  `attack`, the `cloud` effect it appears and vanishes through (an
+  `effectAnimations` entry named after it, `<attack>_object`), its
+  `cooldown`, how far behind the target it appears (`behindDistance`), the
+  cloud's `effectOffset`, an optional `noGround: { attack, offset }`
+  fallback and an optional `startupAnimation`.
+  - *Startup.* With a `startupAnimation`, the accepted press puts the
+    owner into its own summoning pose (`Fighter.pendingSummon`, visual
+    state `summon`, between `bound` and `attack` in priority): it plays
+    once from the press step, the owner standing still (speed 0), keeping
+    its facing and unable to do anything else; the summon is queued the
+    step after its last frame, and the owner is free on that step. A hit
+    (its hurt pose on the hit's own step), lost ground, the Void taking it
+    or its target, a reset or respawn, a Practice Ground fighter or CPU
+    change or the arena going cut it short: no clone, never another target,
+    the cooldown (started on acceptance) running on. Without one the
+    summon is sent out on the press and the owner is free at once.
+  - *Placement.* The clone appears on the target's back side
+    (`x = target.x − target.facing × behindDistance`, never clamped: there
+    are no side walls), at the target's foot height, if something the
+    clone's collider (its owner's) would stand on lies there; otherwise,
+    with a `noGround` fallback, at that `offset` from the target's origin
+    (mirrored with facing) performing the fallback's attack; without one it
+    always appears behind. It faces the way the target faced at the summon.
+    Position, facing and attack are chosen once, and it never moves, turns,
+    falls, retargets or re-checks the ground after that, so a target who
+    moves away makes it whiff.
+  - *Lifecycle.* APPEAR plays the cloud forwards once (no hitbox), the
+    clone's first attack frame showing beneath its last frame; ATTACK plays
+    the attack once from frame 1 with the owner's sprites and the attack's
+    own phases, its hitbox live only in the active phase, hitting at most
+    once; VANISH removes the body and plays the same cloud backwards once;
+    then it is removed. Its hit resolves from its own position and facing
+    through the shared `CombatSystem.applyHit`, credits the owner (the
+    event names the clone as its `summon`), inherits the attack's damage,
+    Base Launch and Directional Launch (a horizontal launch travels along
+    the clone's facing), and freezes the target and the clone, never the
+    owner. A Shield blocks it like any hit. Once sent out it finishes
+    whatever its owner does next.
+  - *Not a fighter.* No Launch Point, controller, pushbox, hurtboxes,
+    physics or gravity, camera or HUD presence: it cannot be hit and
+    nothing collides with it. Clones are drawn behind both fighters; the
+    Battle owns them (each fixed step it advances live clones, spawns the
+    ones summoned that step on cloud frame 1, resolves their hits and drops
+    finished ones), and restart, rematch and leaving the battle clear them.
+  - Before the cooldown starts the summon checks that its startup pose and
+    cloud have real frames, that its attacks are defined with a hitbox and
+    real frames, and that there is an opponent in play: anything missing
+    logs a warning, starts no cooldown and summons nothing. #0001's Clone
+    Attack is the one summon today (docs/characters/0001.md).
+- **Techniques** (`techniques` on the character; runtime in
+  `js/game/combat/technique.js`) are multi-phase moves the fighter itself
+  performs: not an attack (no `combat.attack`), a projectile or a summon.
+  The runtime implements one form of technique so far, an object formed in
+  the fighter's hand and carried on a grounded rush: explicit phases (form,
+  dash, then a whiff release after a miss, or confirm, wait, explode and
+  release after a contact, then done), never inferred from animation
+  frames, each phase playing the technique's own fighter clip
+  (`formAnimation` … `whiffReleaseAnimation`) while its object plays its
+  own effect clips (`sphereBuild`, `sphereImpact`, `sphereExplosion`). The
+  rush moves at its own `dashSpeed` in the facing snapshotted at the start
+  (the direction held on the press step, if any); its object's hitbox,
+  carried at per-frame `handOffsets`, is the only contact search. A
+  contact binds the target (`CombatState.bind`, a hold separate from
+  hitstun that only the technique which placed it releases), deals its
+  `firstHit`, an optional `tickHit` every `tickInterval` while it holds the
+  target (never on the explosion's step) and, `explosionDelay` after the
+  contact, releases the target and deals its `explosionHit`; all through
+  the shared `CombatSystem.applyHit`, freezing only the target. The
+  technique needs real ground from its first frame to its last (ground
+  lost ends it at once and the fighter falls), a wall stops the rush as a
+  miss, a hit on the fighter cancels it (no armour), and a Shield that
+  blocks the contact ends it with no bind, tick or explosion. Every clip
+  and effect it names (and valid data) is required before it starts:
+  anything missing logs a warning and the press does nothing. Its field
+  names come from the first technique built on it, #0001's Sphere Rush
+  (docs/characters/0001.md); a technique of another shape would be a new
+  form in the runtime, not a new reading of these fields.
+
+#### 7.2.7 Launch
+
+- Every fighter's central combat number is its **Launch Point**
+  (`CombatState.launchPoint`): it starts at 0 (a new fighter, a Quick
+  Battle restart / rematch, a new Practice fighter and every respawn after
+  the Void all start from 0), grows by exactly the damage received, never
+  goes below 0, has no maximum and is shown as a bare number (no % sign). A
+  hit's `damage` is how much it adds (a hit a Shield blocks adds nothing);
+  each fighter's hits are listed in its character specification (7.2.9).
+  Every fighter has a Launch Point that starts at 0 and increases by damage
+  received. Every hit declares a Base Launch of 0, 1, 2 or 3 and a
+  Directional Launch. After a hit's damage is added, its launch strength is:
+  Base Launch × the target's new Launch Point. Base Launch 0 therefore never
+  launches, while 1 uses normal Launch Point strength, 2 doubles it, and 3
+  triples it.
+
+  | Concept | Belongs to | Meaning |
+  | --- | --- | --- |
+  | Damage | the hit | how much it adds to the target's Launch Point |
+  | Launch Point | the fighter | the damage it has taken this life, a plain number |
+  | Base Launch | the hit | 0, 1, 2 or 3: how many times the new Launch Point the launch strength is |
+  | Directional Launch | the hit | `null`, `'horizontal'`, `'vertical'` or `'reverseVertical'`: where that strength goes |
+  | Launch strength | the hit's result | Base Launch × Launch Point (after this hit's damage) |
+
+  Damage, Base Launch and Directional Launch are authored separately on
+  every hit, and none is derived from another. The shared
+  `CombatSystem.applyHit` adds the damage first, then computes the strength
+  (`resolveLaunchStrength`) and turns it into a velocity
+  (`resolveDirectionalLaunch`, `js/data/launch.js`) at `LAUNCH_UNIT_SPEED`,
+  10 world units per second per point: horizontal along the hit's travel
+  (`vx = strength × 10 × facing`), vertical upward (`vy = −strength × 10`,
+  as world y grows downward), reverse vertical downward (`vy = +strength ×
+  10`), `null` nothing at all. That multiplication is the whole strength:
+  no base velocity is added, and horizontal and vertical launches use the
+  same number. The one conversion factor is the same for every hit and
+  direction, so it only puts the strength in the world's units (gravity
+  2500, a jump 920) and never changes its proportions. At 120 Launch Point,
+  Base Launch 0, 1, 2 and 3 give strengths of 0, 120, 240 and 360 (speeds
+  0, 1200, 2400 and 3600); at 37, 0, 37, 74 and 111. A hit a Shield
+  blocks is the one exception: it adds no Launch Point and launches
+  nothing at all (launch strength 0), whatever its Base Launch and
+  direction; there is no chip damage and no partial launch. A hit that
+  launches replaces the target's sideways speed (a
+  vertical one sends it straight up or down) and, when it has one, its
+  vertical speed; a hit that does not launch (Base Launch 0, no direction,
+  or blocked) leaves the target's velocity alone. The target may bend a
+  launch's direction by up to its `steerAngle` with the direction it holds
+  (launch steering, see Launch reaction below), never its speed. Its
+  event carries `damage`, `launchPointBefore`, `launchPointAfter`,
+  `baseLaunch` (the integer), `directionalLaunch`, `launchStrength`,
+  `finalLaunch` (the world-space `{ x, y }` velocity given, steered),
+  `launchSpeed` (its length), `hitstun` (the stun dealt, launch stun
+  included), `perfect` (a perfect block), `point` (where the hit landed,
+  for its effects) and `energyCost` (the Shield's cost on a block, 0 on a
+  hit or a perfect block). Launch Point
+  never disables a fighter (`canAct()` never reads it) and never takes one
+  out: only the Void does. On time-up in Quick Battle, level on points, the
+  fighter with the lower Launch Point wins (a fighter still waiting to
+  respawn counts the Launch Point it fell with); equal is a draw.
+- **Launch** (`js/data/launch.js`): how a hit sends its target flying. It is
+  not a Power: every hit (an attack's, a projectile's, a
+  technique's) declares its own `baseLaunch` and `directionalLaunch` beside
+  its `damage`, independently of each other:
+  `damage: 3, baseLaunch: 1, directionalLaunch: 'horizontal'`,
+  `damage: 5, baseLaunch: 2, directionalLaunch: 'vertical'`, or
+  `damage: 5, baseLaunch: 2, directionalLaunch: 'reverseVertical'` to drive
+  the target downward. `BASE_LAUNCH_VALUES` (`[0, 1, 2, 3]`) holds the only
+  legal Base Launch values: literal multipliers, not tiers, levels or
+  velocities. `DIRECTIONAL_LAUNCHES` holds the only legal directions:
+  `null` (None), `'horizontal'`, `'vertical'` and `'reverseVertical'`
+  (Reverse vertical). `resolveHitLaunch` validates both fields once, when a
+  hit's definition is built (`createAttackDefinition`,
+  `createProjectileDefinition`, `createTechniqueDefinition`): a hit that
+  declares neither has Base Launch 0 and no direction; any other Base
+  Launch (0.5, 4, 10, −1 ...) is logged and becomes 0, an unknown direction
+  is logged and becomes `null`, and a nonzero Base Launch with no direction
+  is logged and never launches, so bad data never launches anyone with a
+  strength nobody chose. Neither field is inferred from damage, the hitbox
+  or the other field. Each fighter's hits (damage, Base Launch and
+  Directional Launch) are tabled in its character specification (7.2.9).
+  Launch never depends on either fighter's Jump or Speed Power.
 - **Launch reaction** (the character's `launchReaction`, resolved by
-  `resolveLaunchReaction` in `js/game/combat.js`; every field optional,
-  the defaults change nothing). None of it changes a launch's strength.
+  `resolveLaunchReaction` in `js/game/combat/combat.js`; every field optional,
+  the defaults change nothing; the values below are #0001's and #0002's). None of it changes a launch's strength.
   - *Launch stun.* A launching hit stuns for its own `hitstun` plus
     `stunPerThousand` (0.2 s for #0001) per 1000 units / s of launch
     speed, never more than `maxStun` (0.7 s) extra: a big hit at a high
-    Launch Point is a clear moment to chase. attack2 at 50 Launch Point (1200
-    units / s) stuns 0.28 + 0.24 s. The event's `hitstun` is the total.
+    Launch Point is a clear moment to chase. (#0001's attack2 at 50 Launch
+    Point, 1200 units / s, stuns 0.28 + 0.24 s.) The event's `hitstun` is the total.
   - *Tumble.* Launched at `tumbleSpeed` (1100 units / s) or faster, the
     fighter tumbles (`Fighter.tumbling`, the `tumble` state, drawn with
     `midair_hurt`): through the stun and on past it, until it acts (an
@@ -1213,9 +1793,9 @@ French, concise game terms).
     formula exactly.
   - A hit (never a block) also gives the target its air jump back, so a
     launch never strands it without one.
-- **Launch bounce** (`js/game/launch-bounce.js`: every fighter's
+- **Launch bounce** (`js/game/combat/launch-bounce.js`: every fighter's
   `LAUNCH_BOUNCE` settings, which a character may override with its own
-  `launchBounce`, `enabled: false` included; #0001 overrides none). A launch
+  `launchBounce`, `enabled: false` included; #0001 and #0002 override none). A launch
   that drives its fighter hard into stage geometry rebounds off it instead
   of stopping dead, and may ricochet on to the next surface. It is not part
   of a launch's strength: Launch Point, Base Launch and Directional Launch
@@ -1246,8 +1826,9 @@ French, concise game terms).
     surface is at least `minImpactSpeed` (500 units / s). Only what crosses
     the surface counts, so a glancing contact never rebounds hard. Slower, it
     is an ordinary stop, and that surface spends the launch on that axis.
-    Ground attack1 rebounds its target off a wall right behind it from about 50
-    Launch Point, midair_attack2 off the floor from about 25; the body's
+    For example, #0001's ground attack1 rebounds its target off a wall right
+    behind it from about 50 Launch Point, its midair_attack2 off the floor
+    from about 25; the body's
     `maxFallSpeed` (1500) still caps a downward launch.
   - *Rebound.* The stopped speed comes back reversed and scaled by the
     surface's restitution: a solid's side (`wallRestitution` 0.72), a floor
@@ -1286,926 +1867,17 @@ French, concise game terms).
     again...): punching a battered opponent into a wall over and over ends
     within about six hits.
   - A Shield's block launches nothing, so it never rebounds, and neither
-    does the shuriken's hit. A clone's hit and the Sphere Rush explosion
-    launch through the same `CombatSystem.applyHit` and rebound like any
-    launch (the blast into a rock outcrop ricochets back across the mesa).
-- attack1 is #0001's first attack, on the `attack1` button. On the
-  ground it is a punch (`attack1`, 4 frames); in the air a kunai slash
-  (`midair_attack1`, midair_attack1, 3 frames: `midair_attack1_1`–`midair_attack1_3`); the character data
-  maps `attack1: { ground: 'attack1', air: 'midair_attack1' }` and the fighter picks by grounded state
-  when the button is pressed. Both play once at 12 fps, and the phases are
-  whole frames: ground attack1 is frame 1 startup, frame 2 active, frames 3–4
-  recovery; midair_attack1 is frames 1–2 startup (kunai drawn back, then
-  overhead) and frame 3 active (the slash arc), with no recovery frame, so
-  the attack ends with its clip. Ground attack1 hits once for 3 damage, 0.32 s
-  hitstun, 0.14 s blockstun, 0.05 s hitstop and a 0.15 s cooldown, and
-  declares `baseLaunch: 1, directionalLaunch: 'horizontal'`: an unblocked
-  hit adds its 3 to the opponent's Launch Point, then pushes it away at 1 ×
-  that new Launch Point (from 117: 120, at impact vx 1200 × facing) with no
-  vertical launch. midair_attack1 hits once for 3 damage, 0.32 s hitstun,
-  0.15 s blockstun, 0.05 s hitstop and a 0.16 s cooldown (longer, making up
-  for the missing recovery), and declares `baseLaunch: 2,
-  directionalLaunch: 'vertical'`: an unblocked hit launches the opponent
-  upward at 2 × its new Launch Point with no sideways push (from 117: at
-  impact vx 0, vy −2400), less high than ground attack2's launch from the same
-  Launch Point, as attack2 adds more damage first. A Shielded midair_attack1 is
-  neither pushed nor launched. Hitboxes match the
-  strike in the contact frame (the punch; the slash arc in front of the
-  fighter) and mirror with facing. A direction held while an attack plays
-  turns it (see the facing rule in 4); movement follows the attack's own data (see Attack movement below):
-  ground attack1 keeps 0.75 of the speed it started with (never more than that
-  share of top speed) and slides on it under 0.4 of the ground
-  deceleration, with no steering, so a running punch carries on about 20
-  units instead of stopping dead; midair_attack1 keeps all of its drift and
-  0.85 of the air steering, for chasing airborne opponents. Gravity still
-  applies, and a midair_attack1 that lands finishes its own clip (only what
-  is left of it: never restarted) instead of switching to ground attack1 or
-  Land. Both are combo starters: once they hit, the rest may be cut short
-  from their strike on (`hitCancel` 1/12 s, 2/12 s; see Hit-cancels
-  below). Ground attack1 is ground-only.
-- attack2 is #0001's secondary basic attack, on the `attack2`
-  button, selected the same way (`attack2: { ground: 'attack2', air: 'midair_attack2' }`). On the ground it
-  is a spinning high kick (`attack2`, 7 real frames); in the air an airborne kick
-  (`midair_attack2`, midair_attack2, 5 real frames: `midair_attack2_1`–`midair_attack2_5`). Both play once at
-  12 fps, and the phases are the frames that visibly strike: ground attack2 is
-  frames 1–3 startup (step in, lead jab, spin), frames 4–5 active (the kick,
-  drawn with motion trails), frames 6–7 recovery; midair_attack2 is frames 1–2
-  startup, frame 3 active (the kick's forward-low arc) and frames 4–5
-  recovery. Ground attack2 is slower, more committed and heavier than ground
-  attack1: it hits once for 5 damage, 0.28 s hitstun, 0.15 s blockstun and
-  0.09 s hitstop, with a 0.15 s cooldown, and declares `baseLaunch: 2, directionalLaunch:
-  'vertical'`: an unblocked hit adds its 5, then launches the opponent
-  upward at 2 × its new Launch Point (from 115: 120, at impact vx 0,
-  vy −2400, airborne, before normal gravity brings it down). midair_attack2 hits
-  once for 5 damage, 0.28 s hitstun, 0.14 s blockstun and 0.08 s hitstop,
-  with a 0.1 s cooldown, and declares `baseLaunch: 2, directionalLaunch:
-  'reverseVertical'`: an unblocked hit drives the opponent downward just as
-  hard (from 115: at impact vx 0, vy +2400). A grounded opponent is knocked
-  straight back onto the ground it stands on; an airborne one is sent down
-  toward it. Driven into the ground hard enough (500 units / s, from about
-  25 Launch Point), either rebounds off it once (see Launch bounce). Neither
-  has a horizontal launch. Both come from the shared
-  launch path, not special attack2 code. A Shielded attack2 adds no Launch Point
-  and launches nothing (the Shield pays 25 Energy and takes its blockstun
-  and hitstop). Hitboxes cover the ground kick's arc and the airborne
-  kick's forward-low arc in front of the fighter and mirror with facing.
-  The same turning applies. Ground attack2 keeps half the speed it started
-  with, slides under half the ground deceleration and, on its first frame
-  (the step in), raises its forward speed to 280, a subtle step of about 20
-  units that shoves an opponent standing close along through the
-  pushboxes; midair_attack2 keeps all of its drift and 0.7 of the air
-  steering, never frozen sideways. Gravity keeps working, and a mid-air
-  attack2 that lands finishes what is left of its own clip instead of
-  switching to ground attack2 or Land. Both are launchers: once they hit, the
-  rest may be cut short from their kick on (`hitCancel` 3/12 s, 2/12 s).
-  Ground attack2 is ground-only; pressing attack2 and Jump on the same step attacks
-  on the ground.
-- The two mid-air numbered attacks swapped moves: midair_attack1 is the
-  three-frame kunai slash that used to be midair_attack2, and midair_attack2 the
-  five-frame airborne kick that used to be midair_attack1. Each move took its
-  whole package with it (art, timing, hitbox, damage, stun, hitstop and
-  cooldown); only its launch changed, to the values above. The frame
-  files were renamed to match: `midair_attack1_1`–`3` is the slash and
-  `midair_attack2_1`–`5` the kick.
-- Throw is #0001's projectile attack and its extra attack, on the
-  `extra_attack` button (player-facing name Throw; keyboard J, gamepad X /
-  Square, the touch **Shuriken** button).
-  The character data maps `extra_attack: 'extra_attack'`: the button and the move
-  share one codename. It is ground-only: there is no
-  mid-air Throw art, so pressing it in the air does nothing (no pose, no
-  shuriken, Jump / Fall continue). One press plays the 3-frame `extra_attack` clip (the `extra_attack_1`–`extra_attack_3` files)
-  once at 12 fps (`extra_attack_1` raises the shuriken by the face, `extra_attack_2` whips the
-  arm across and lets go, `extra_attack_3` follows through) and releases exactly one
-  shuriken; holding the button neither loops the clip nor throws again. Its
-  phases are whole frames: frame 1 startup, frame 2 active (the release),
-  frame 3 recovery. The attack has no melee hitbox (`hitbox: null`); instead
-  a one-shot projectile event releases the shuriken once, on the step the
-  attack's time reaches `extra_attack_2` (`spawnAt` 1/12 s; like other phases it may
-  trail the art by one simulation step, never before the release pose and
-  never after the Throw ends), at the throwing hand (16 units in front of
-  the origin, 38 up, mirrored with facing). A Throw hit before its release
-  throws nothing. A direction held turns it like other attacks (before
-  the release, the shuriken goes the new way); it keeps half the speed it
-  started with, slides under 0.6 of the ground deceleration and keeps 0.3
-  of the steering, so the thrower is never rooted to the spot. Gravity keeps working, and there is a 0.25 s
-  cooldown after it. It is a spacing and interruption tool, never a combo
-  starter: no hit-cancel, and the shuriken's short stun leaves no
-  follow-up. Like attack1 / attack2, Throw never starts while Shield is held with
-  a Shield that can go up (the Shield takes the step; let go of Shield to
-  throw, and a Throw pressed meanwhile comes out as it is let go, see the
-  combat input buffer below). If
-  the Throw frames or the shuriken frames are missing, Throw is refused
-  (logged): never a faked pose or an invisible projectile.
-- The shuriken is an independent battle entity (`js/game/projectile.js`), not
-  a fighter hitbox: it has its own position (interpolated between fixed
-  steps like the fighters), velocity, animation clock, hitbox, combat data
-  and lifetime, all from character data (`projectiles.shuriken`). Its
-  direction is #0001's facing at the release and never changes afterwards,
-  even if #0001 turns, jumps, shields or is hit. It flies straight at
-  700 units/s, looping `extra_attack_object_1 → extra_attack_object_2 → extra_attack_object_3` at 18 fps (art
-  only; speed never depends on it). Its hitbox is 10 × 10 units, centred.
-  It hits at most once: 1 damage (+1 Launch Point), 0.16 s hitstun, 0.10 s
-  blockstun, 0.04 s hitstop on the target only (the thrower does not freeze)
-  and `baseLaunch: 0, directionalLaunch: null`: 0 × any Launch Point is no
-  launch, so it neither pushes nor launches, however high the target's
-  Launch Point (from 500 the target is at 501 and still not launched), then
-  it disappears. Hits resolve through the same `CombatSystem.applyHit` as melee,
-  with the shuriken's direction in place of the attacker's facing, and credit
-  #0001 as the attacker. It never hits its thrower. A raised Shield blocks
-  it from either side: it is used up and gone, and the target pays 25
-  Energy and takes no Launch Point, stun or launch (only the Shield's
-  blockstun and the hitstop). A missed
-  shuriken disappears after 1.5 s, once it has flown into the Void, or when it
-  meets a solid block (the main stage's own cliff face included); one-way
-  platforms and the open air past a ledge do not stop it. No multi-hit,
-  homing, bouncing, piercing, explosion or clash. The Battle owns live
-  projectiles: each fixed step it updates the fighters, spawns released
-  projectiles (once each), moves them, resolves melee and projectile hits,
-  then removes spent ones. They are drawn on the battle canvas over the
-  fighters, centred on their position with image smoothing off, and cleared
-  on restart.
-- `down` (S / ↓, D-pad or left stick down) is a
-  direction only, never a stance, state or modifier: it has no animation,
-  locks no movement, refills nothing and changes no attack. It does two
-  things, both in the air: held while falling it is the fast fall, and held
-  as a hit lands it steers the launch downward (see Movement and game feel
-  and Launch steering). On the ground it does nothing at all: the fighter
-  idles, runs, attacks, jumps and shields exactly as with nothing held, and
-  every numbered button does the same thing whether or not Down is held. On
-  a one-way platform it never drops through (the player has no
-  drop-through control; see the stages above). Menus read Down from their
-  own bindings, the same keys and pad directions as ever (7.4). State
-  priority is
-  hitstun > technique > bound > attack > Dash > Shield > tumble > jump /
-  fall > land > Shield lower pose > run > idle: a hit shows Hurt at once.
-- `shield` is the shared player action, the Shield button (keyboard L,
-  gamepad RB / RT, the touch **Shield** button). What it does, how a
-  fighter defends, is character data (`defense` in
-  `js/data/characters.js`, frozen by `createDefenseDefinition`), not part of
-  the input system. The one defense type is the Shield, `{ type: 'shield',
-  groundAnimation, airAnimation, groundStartAnimation,
-  groundReleaseAnimation }`; the type is checked, so a future fighter can
-  defend another way, and an unknown type is an error. #0001 uses it:
-  `shielding`, `midair_shielding`, `prepshield` and `releaseshield`. There is no
-  Dodge (no invulnerability, evasive frames or one-press defensive move)
-  and no chip-damage Block anywhere in the engine.
-- #0001's **Shield** is a held state, `CombatState.shielding`: up while
-  `shield` is held and the Shield is allowed, down the step it is let go.
-  Allowed means: the fighter is free to act (no attack, stun, bind,
-  technique or Dash; the Shield never cuts one short, and comes up the step
-  it ends if `shield` is still held), it is not exhausted
-  (`CombatState.canShield`: any Energy left is enough) and the held art
-  for where it is. It is decided before the
-  combat intents: while `shield` is held with a Shield that can go up, no
-  attack, Throw, summon, technique, Dash or jump starts (let go of `shield`
-  first: an attack or a jump pressed meanwhile is buffered and comes out
-  the step the Shield is let go, if that is soon enough; a summon or
-  technique pressed meanwhile is not kept). On the ground it shows `prepshield` (`0001_prepshield_1`) for
-  one Shield frame (12 fps, 1/12 s) as it goes up, then `shielding`
-  (`0001_shielding_1`) for as long as it is held; lowered on the ground,
-  `releaseshield` (`0001_releaseshield_1`) shows for one frame (the
-  `shieldRelease` state) while nothing of higher priority takes over
-  (visual only: movement resumes at once). In the air there is only
-  `midair_shielding` (`0001_midair_shielding_1`), the held pose:
-  no raise or lower pose, and a Shield lowered in the air goes straight
-  back to Jump / Fall. Landing with it up keeps the held pose (no raise
-  pose, no Land). While it is up horizontal input moves nothing (on the
-  ground no walking, running or Dash, the current velocity slowing under
-  the normal deceleration; in the air momentum carries on under the normal
-  air drag with no steering), though the direction held turns the fighter.
-  In the air it **slows the fall**: a faster fall (a fast fall included)
-  brakes toward `defense.slowFallSpeed` (#0001: 200 units / s) at
-  `slowFallBrake` (6000 / s², so 0.2 s from the fast fall's 1400), and
-  gravity never takes it past that while the Shield stays up; a rise is
-  untouched (`stepBody`'s fall cap, from `Fighter.update`). A Shield without
-  `slowFallSpeed` (0) falls as ever. A
-  missing held clip refuses the Shield (logged once per clip); missing
-  raise or lower poses are simply skipped.
-- **Blocking.** The Shield is a full circle: while it is up, any hit that
-  reaches the fighter's own hurtboxes (the same `CombatSystem` overlap as
-  any hit, never a bigger circle) is blocked, whichever side it comes from:
-  melee, projectiles, clone attacks and the Sphere Rush's contact alike. A
-  blocked hit adds no Launch Point and launches nothing (launch strength 0,
-  final launch zero, whatever its Base Launch and direction), shows no
-  hurt pose and deals no hitstun; the hitbox is used up exactly as by a
-  hit (an attack's `hasHit`, a projectile gone, a clone's `hasHit`, the
-  technique's contact). The fighter pays `energy.shieldHitCost` (25) for
-  it, once, in `CombatSystem.applyHit`, or all it has left when that is
-  less, and the event is a `'block'` with that `energyCost`. The hit's hitstop still freezes both sides as usual, and
-  its `blockstun` becomes `CombatState.shieldStun`: the Shield is held up
-  through it even if `shield` is let go, and the fighter cannot act until it
-  is over. A block that empties the bar (with 25 or less left) exhausts the
-  fighter and drops the Shield at once, clearing the blockstun. That block
-  itself stands, never turned into a hit
-  after the fact, but any later hit, even on the same step, lands in full.
-  Holding the Shield costs nothing, and a miss costs nothing: only a
-  confirmed block is paid for.
-- **Perfect Shield.** A hit that lands within `defense.perfectWindow`
-  (0.1 s) of the Shield going up is a perfect block (`Fighter.perfectShield`,
-  the event's `perfect`): it costs no Energy and deals no blockstun, so the
-  fighter can let go and answer at once, while the attacker, whose attack
-  was blocked, still has its whole recovery (no hit-cancel). The hit's
-  hitstop still freezes both. Only a raise after the Shield has been down
-  for `perfectRearm` (0.25 s) has that window, so tapping `shield` over and
-  over never keeps one open; held up longer, or raised again too soon, a
-  block is an ordinary one. It is drawn as a white ring bursting from the
-  block (see Hit effects, 7.3). Quick Battle's CPU pulls one off only as
-  often as its level earns it: a raise that close to contact succeeds with
-  a chance of its `guard` trait to the fourth power (Brutal often, Easy almost never),
-  and otherwise it takes the hit.
-- The Shield's look (`js/game/shield-fx.js`): a wavy circle round the
-  fighter, drawn procedurally on the battle canvas (no PNG), kin to the
-  Void: a barely-there black interior (`rgba(0, 0, 0, 0.16)`) drawn behind
-  the fighter's sprite, then in front of it a black wavy rim (3.5 CSS px)
-  with a thin red line (`#d21f2b`, 1.25 CSS px) on its outer side, both on
-  the same waves: the red is traced (1.125 CSS px) further out than the
-  black, so it covers the black's outermost 1.25 px, flush with its outer
-  edge. From the fighter outward it reads interior, black boundary, red
-  edge; there is never a red ring inside the black. Its centre is the
-  fighter's body middle (half the character's `visual.height` over the
-  interpolated feet) and its mean
-  radius 0.62 × that height (≈55 units for #0001), so it surrounds head and
-  feet whatever frame is on screen. The perimeter leans in and out by at
-  most 10 % of the radius (`SHIELD_SHAPE.amp` 0.1), a sum of two
-  whole-number sine waves round the circle (so it always closes and its
-  mean radius never changes: it wavers like the Void's edge, never pulses)
-  drifting slowly on the Arena's effects clock, traced at 96 points so the
-  curve stays smooth; with reduced motion it holds a still, wavy shape. It is drawn only while the Shield is up, under
-  the Void, name tags and status, and never used by collision. The debug
-  overlay labels a shielding fighter `shield`; its hurtboxes are drawn as
-  usual.
-- **Energy** (`CombatState.energy`, `maxEnergy`, `energyExhausted`;
-  settings from the character's `energy` entry through `resolveEnergy`
-  in `js/game/combat.js`, every field optional: `max` 100, `regen` 12 / s,
-  `dashCost` 15, `dashCancelCost` 40, `shieldHitCost` 25) is the one resource a fighter spends, and only on a Dash (as it
-  starts: `dashCost`, or `dashCancelCost` for a Dash that cuts short an
-  attack that hit, which is the fighter's `dashCost` when it declares none)
-  and on the Shield (for each hit it blocks). Either works whenever the fighter is not
-  exhausted, however little is left: a cost larger than what remains is
-  paid by taking all of it (`CombatState.spendEnergy`), never going below
-  0. Every fighter starts full, and every
-  change goes through `setEnergy`, clamped to [0, max]. It refills by
-  itself at `regen` on every step no Dash was paid for (idle, moving,
-  airborne, attacking, shielding, stunned or frozen; `updateEnergy`), at
-  that one rate whatever is held. Reaching 0 (a Dash or a block alike, an overspend included)
-  exhausts the fighter: Dash and Shield stay unavailable however much has
-  refilled (1, 25, 50, 75, 99) until Energy is back at exactly max, which
-  clears it. Energy never gates movement,
-  jumps, attacks, Throw, summons or techniques, and none of them spend it. A respawn and a restart start it full.
-- **Dash** (movement, not an attack): two press edges of the same
-  horizontal direction (`runLeftPressed` / `runRightPressed`, 7.4), the second
-  within `movement.dashTapWindow` (0.22 s) of the first, start a Dash that
-  way (`Fighter.trackDashTaps`, `tryDash`); the other direction replaces the
-  waiting tap, both at once cancel it, and a double tap that cannot Dash is
-  used up, never queued. A one-step request (`mouvementLeftPressed` /
-  `mouvementRightPressed`, 7.4: one tap of the Joystick touch layout's Left
-  mouvement / Right mouvement, `mouvementLeft` / `mouvementRight`) goes straight to the same `tryDash`, so every
-  rule, cost and effect below applies unchanged; it is not a direction
-  press (it never pairs with one), it forgets any first tap waiting, it is
-  used up whether or not it Dashes, and both at once ask for nothing. A Dash needs the fighter free to act (no attack,
-  stun, bind, technique or Dash running) or in an attack that hit
-  and may be cut short (a **Dash cancel**, see Hit-cancels), grounded,
-  not shielding nor holding `shield` for a Shield
-  that can go up, not exhausted (it pays `dashCost` 15 once as it starts,
-  `dashCancelCost` 40 for a Dash cancel, or all that is left when that is
-  less, emptying the bar) and its real `mouvment` clip (`mouvment_1 → mouvment_2`,
-  once at `MOUVMENT_FPS` 10; without it the Dash is refused and logged, never
-  faked with the run). A held Shield and attacks are resolved before it on
-  the same step, so either wins over it. The fighter faces the Dash at once and
-  moves at `movement.dashSpeed` (900, about 2.7× Speed Power 2's 330; the
-  top speed itself never changes) for one pass of the clip (0.2 s, ≈180
-  units on open ground), ignoring input; afterwards the normal movement
-  takes over from that speed, its excess over top speed bleeding off at
-  `movement.overspeedDeceleration` (6000) whatever is held: holding on it
-  eases into the run at top speed within about four steps, letting go
-  slides about 50 units to a stop, and pressing back brakes harder still.
-  No speed spike, no dead stop. It obeys collision: a solid stops it (the Dash ends against
-  it), and leaving the ground ends it (the fighter falls on with its speed).
-  Hitstun or a bind end it at once. While it runs the fighter cannot attack,
-  shield, jump, summon, start a technique or Dash again (an attack or a jump pressed late in
-  it is kept by the input buffers and comes out the step it ends: a Dash
-  into a punch, keeping at most the punch's share of top speed, never a
-  lunge; there is no attack-cancel out of a Dash). A Dash asked for during
-  an impact freeze (a double tap or a one-step request) is kept and tried
-  on the step the freeze ends, like the attack presses made then. It has no hitbox,
-  damage, launch or invulnerability. The training CPU never dashes (its
-  input never has press edges); Quick Battle's combat AI dashes only
-  through the same double tap a player uses (a press, a release and a
-  press within the window), and guards against double-tapping by accident.
-- **Summons and techniques** are numbered buttons of their own (see the
-  attack loadout above), dispatched by type, not a summon shortcut. A
-  button whose `actions` entry is `{ type: 'summon', id }` sends out the
-  entry `id` in `summons` (a detached temporary entity), and one whose entry
-  is `{ type: 'technique', id }` starts the entry `id` in `techniques` (a
-  sequence the fighter performs itself). #0001 has
-  `attack3: { type: 'summon', id: 'attack3' }` (the Clone Attack) and
-  `attack4: { type: 'technique', id: 'attack4' }` (the Sphere Rush).
-  `Fighter.tryAction` sends either to `Fighter.trySpecial`, which dispatches
-  on the type (`trySummon` / `tryTechnique`). The rule is shared: the
-  button's own new press, on the ground, with the fighter free to act (no
-  attack, stun, bind, technique, Dash or held Shield; one never cuts an
-  attack short) and its cooldown over. Anything else, an airborne press, a
-  busy fighter, a cooldown still running, no opponent for a summon, missing
-  art or invalid data, makes the press do nothing at all: never Punch or
-  Kick (or any other attack) in its place, never kept for later (the combat
-  input buffer below keeps ordinary attacks only), never an invisible move.
-  Holding the button does not repeat it, and neither Down nor any other
-  input changes what it does. Each has its own cooldown instead of any
-  cost: the summon's or technique's `cooldown` (5 s for both of #0001's),
-  kept per ability in `CombatState.abilityCooldowns` (a `CooldownTimers`:
-  `{ remaining, duration }` per id, apart from ordinary attacks' short
-  recovery cooldowns in `CombatState.cooldowns`), started the moment the
-  move is accepted (a summon's startup included) and recovering at 1 s per
-  second, whatever the fighter does (impact freezes included), never below
-  0. Neither spends Energy. The Clone
-  Attack never depends on technique code, nor the technique on the summon
-  system.
-- attack3 Clone Attack (#0001). Trigger: a new press of `attack3` (O,
-  gamepad LT, touch slot 3, the **Clone Attack** button) on the ground,
-  under the shared rule above. It is data on the character: `actions`
-  maps `attack3` to the `attack3` summon, which names the attack (`attack1`),
-  the cloud effect (`attack3_object`), the owner's startup
-  (`startupAnimation: 'attack3_summon'`, below), `cooldown` 5, `behindDistance` 48 world
-  units, the cloud's `effectOffset` (centred 44 units above the clone's feet,
-  half the fighter's height) and a `noGround` fallback (the
-  attack `midair_attack2` at `offset` `{ x: 0, y: -36 }` from the opponent's
-  origin) for when there is no ground behind the opponent (below). A
-  successful summon starts attack3's 5-second cooldown once, when it is
-  accepted, whether or not the clone then hits; the overhead fallback is the
-  same summon, never a second cooldown. While it cools, an attack3 press
-  does nothing. With no opponent no clone is summoned, no cooldown starts
-  and the press does nothing. Before
-  starting its cooldown, the summon checks that its startup pose and the
-  cloud have real frames, that both of its attacks (attack1 and the no-ground midair_attack2)
-  are defined with a hitbox and real frames, and that there is an opponent,
-  wherever the opponent stands, so whether it works never depends on where
-  the clone would appear; missing art or data logs a warning, starts no
-  cooldown, summons nothing and does nothing else. One press summons
-  exactly one clone; holding attack3 does not repeat it. The cooldown (5 s)
-  outlasts a clone's life (≈1.3 s), so clones never overlap; each runs its
-  own independent lifecycle.
-  Startup: the accepted press puts #0001 into his summoning startup
-  (`Fighter.pendingSummon`: the summon's id, its target, the startup clip
-  and its clock; visual state `summon`, between `bound` and `attack` in
-  priority: hitstun, technique, bound, summon, attack, dash, shield, …).
-  On the press step itself he shows `attack3_summon_1` (no idle frame
-  first), then plays `attack3_summon_1 → 2 → 3 → 4` once at 10 fps, each
-  pose 0.1 s (6 fixed steps), 0.4 s in all, never looped. The four files
-  are the poses of the retired held Down stance, recovered byte for byte
-  from the repository's history and renamed for Attack 3: its two startup
-  poses as `attack3_summon_1` and `_2`, its two held poses as `_3` and
-  `_4` (the hand seal). For the startup he is committed: standing still
-  (his speed set to 0 on the press, so a run never slides under the pose),
-  facing as he did when it was accepted (a held direction never turns
-  him, and nothing turns him toward the opponent), and unable to attack,
-  Throw, start a summon or technique, Dash, jump, raise the Shield or drop
-  through a platform (`canAct` is false; a press of an ordinary attack in
-  its last 0.15 s is kept by the combat input buffer, as after any action).
-  The step after its last pose (one pass of the clip, counted from the
-  press step) the summon request is queued at the opponent it was cast at
-  and #0001 is free again on that very step; the Battle spawns the clone
-  the same step, on cloud frame 1. The startup is cut short, with no clone
-  and the cooldown already started left to run, by a hit (any hit,
-  `CombatSystem.applyHit`, which shows the hurt pose on the hit's own
-  step), by losing the ground under him (he falls from where he is), by
-  the Void taking him or his target, by a reset, a respawn, a Practice
-  Ground fighter or CPU change, or the arena going. A target no longer his
-  opponent, or out of play, when the pose ends gets no clone, and no other
-  fighter is targeted instead. With no `startupAnimation` a summon is sent
-  out on the press itself and its owner is free at once (the schema's
-  default). The startup is the owner's pose; the smoke cloud
-  (`attack3_object`) is the clone's own effect, played where it appears.
-  The owner does not perform attack1: no `0001_attack1_1*` art, no attack
-  and no attack1 cooldown. Once summoned, the
-  clone is independent: the owner may move, jump, throw, attack, shield or
-  be hit and launched, and the clone still finishes appearing, attacking and
-  vanishing, with no cooldown refund. It never retargets or summons again.
-  The clone is not a Fighter (`js/game/clone.js`): it has no Launch Point,
-  controller, pushbox, hurtboxes, defence, jump or coyote logic, physics or
-  gravity, and it is not in `battle.fighters`. It is untargetable, takes no
-  part in fighter separation or solid collision (the opponent can move
-  through it), is ignored by the camera (framing still uses P1 and the CPU)
-  and has no marker, name, ring, shadow or HUD card. Its position
-  facing and attack are snapshotted once, on the step it is sent out (as
-  the owner's startup ends), facing the way the opponent faces then. Normally it stands on the opponent's back side
-  (`x = target.x − target.facing × 48`, never clamped: there are no side
-  walls), at the opponent's foot height, and performs attack1. That
-  spot counts as ground only if something the clone's collider (#0001's, 34
-  wide) would stand on lies at the opponent's current foot height (within
-  the physics' 0.5-unit tolerance, with the same horizontal overlap a
-  landing body needs), judged at the spot where the clone would really
-  appear. A lower platform or the floor further down does not count, and
-  neither does the opponent itself being grounded. With no such ground (an
-  opponent at a platform's edge or a ledge with its back to the drop, or an
-  airborne opponent), the clone appears over the opponent instead, at
-  `x = target.x`, `y = target.y − 36` (feet level with its upper body; a
-  sideways `offset.x` would mirror with facing, unclamped as well),
-  and performs #0001's existing midair_attack2 kick. Either way it never moves,
-  turns, chases, falls, lands or teleports after that, and never re-checks
-  the ground or switches attack, so an opponent who moves away before the
-  strike makes it whiff. Lifecycle, all on fixed steps: APPEAR plays
-  `attack3_object_1 → … → attack3_object_10` once at 20 fps (0.5 s), with no hitbox; the
-  clone's first attack frame (`attack1_1`, or `midair_attack2_1` overhead) shows
-  beneath the last cloud frame as the smoke clears. ATTACK plays one
-  ordinary grounded attack1 from frame 1 with the owner's
-  real sprites (`0001_attack1_1 → attack1_2 → attack1_3 → attack1_4` at 12 fps, the same
-  per-clip `sourceFacing` mirroring, no tint, transparency, outline or
-  silhouette) and attack1's own resolved attack definition (`attacks.attack1`: frame 1
-  startup, frame 2 active, frames 3–4 recovery, 3 damage, 0.32 s hitstun,
-  0.14 s blockstun, 0.05 s hitstop; the clone never moves or follows up, so
-  it reads none of the attack's movement or hit-cancel data), so its hitbox exists only on the active
-  frame and hits at most once. It performs the owner's normalized attack1, so it
-  inherits attack1's Base Launch 1 and horizontal Directional Launch (along the
-  clone's facing, away from the clone) automatically through the shared
-  `CombatSystem.applyHit`; the summon has no launch data of its own and
-  never computes a launch itself. The overhead clone instead plays
-  midair_attack2 from frame 1 (`0001_midair_attack2_1 → … → midair_attack2_5` at 12 fps)
-  with its own resolved definition (`attacks.midair_attack2`: frames 1–2
-  startup, frame 3 active, frames 4–5 recovery, 5 damage, 0.28 s hitstun,
-  0.14 s blockstun, 0.08 s hitstop), whose hitbox, from the overhead spot,
-  lands on a stationary opponent's hurtboxes, and whose Base Launch 2
-  reverse vertical launch drives the opponent downward (from 115: `vy =
-  +2400`, no sideways push; none on a block, like any vertical launch). VANISH removes the
-  body and plays
-  the same cloud backwards, `attack3_object_10 → … → attack3_object_1`, at the same 20 fps
-  (0.5 s), with no hitbox; the clone is then removed. The clone's hitbox is
-  resolved from the clone's own position and facing, never the owner's. A hit
-  credits the owner as the attacker (the combat event also names the clone as
-  its `summon`) and pushes the target along the clone's facing, away from the
-  clone. It is a detached hit: the target gets the attack's hitstop and the
-  clone pauses its own attack clock for the same 0.05 s (as many steps as
-  the target's freeze), but the owner is never
-  frozen (like a projectile's thrower). A raised Shield blocks it from
-  either side, a clone at its back included: the attack is used up, the
-  target pays 25 Energy and takes no Launch Point or launch (the overhead
-  kick's spike included), and the clone still pauses for the hitstop.
-  Clones are drawn behind both fighters (terrain, shadows, clones, CPU, P1,
-  projectiles, foreground), with the cloud centred at the effect offset at
-  the fighters' art-pixel scale. The Battle owns live clones: each fixed step
-  it updates the fighters, spawns projectiles and moves them, advances live
-  clones, spawns the clones summoned that step (each on cloud frame 1),
-  resolves melee, projectile and clone hits, then drops spent projectiles and
-  finished clones. Restart / rematch and leaving the battle clear every clone.
-  The debug overlay draws a clone's hitbox in the attack colour, labelled
-  with its attack (`clone attack1`, or `clone midair_attack2` overhead), only on its
-  active frame; a clone has no hurtboxes to draw.
-- attack4 Sphere Rush (#0001, `techniques.attack4`, runtime in
-  `js/game/technique.js`). Not a summon, a projectile, ordinary attack2
-  or a big melee hitbox: #0001 himself changes animation, holds the sphere,
-  dashes and makes contact, driven by a dedicated technique runtime with
-  explicit phases (`form`, `dash`, then `whiffRelease` after a miss, or
-  `confirm`, `wait`, `explode`, `release` after a hit, and `done`), never
-  inferred from animation frames. It sets no `combat.attack`. Trigger:
-  a new press of `attack4` (M, gamepad L3, touch slot 4, the **Sphere
-  Rush** button) on the ground, under the shared rule for summons and
-  techniques above; attack2 (5 damage, `attack2_1`–`attack2_7`;
-  midair_attack2 `midair_attack2_1`–`5`) is untouched and never becomes
-  it. Grounded only. Once started it owns the fighter (nothing needs to stay
-  held); it ends only by a miss, a wall, ground loss, a
-  hit on #0001, a contact blocked by a Shield, a lost bind (the Void
-  included), completion or a reset. Starting it (the attack4 press step) starts
-  attack4's 5-second cooldown, spent whatever follows: a hit, a miss, a
-  block, a wall, ground loss or an interruption. Sprite
-  partitioning:
+    does any hit with Base Launch 0 (such as #0001's shuriken). A clone's
+    hit, a projectile's and a technique's launch through the same
+    `CombatSystem.applyHit` and rebound like any launch (#0001's Sphere
+    Rush blast into a rock outcrop ricochets back across the mesa).
 
-  | Frames | Clip | Role |
-  | --- | --- | --- |
-  | `attack4_1`–`3` | `attack4_form` | formation |
-  | `attack4_4`–`6` | `attack4_dash` | rush / contact search |
-  | `attack4_7`–`8` | `attack4_confirm` | successful contact and stop; `attack4_8` held while the sphere grows |
-  | `attack4_9` | `attack4_explosion` | the explosion pose |
-  | `attack4_10`–`12` | `attack4_release` | release / recovery after the explosion |
-  | `attack4_12` | `attack4_whiff_release` | release after a rush that caught nobody |
-  | `attack4_object_1`–`6` | `attack4_object_build` | sphere formation (once) |
-  | `attack4_object_7`–`9` | `attack4_object_impact` | sphere spinning on the target (looped), drawn larger over the hold |
-  | `attack4_object_10`–`11` | `attack4_object_explosion` | explosion (once) |
+#### 7.2.8 Matches and the combat AI
 
-  Deterministic sequence, in 60 Hz fixed steps (all clips at 12 fps; the
-  technique's clock follows the sprite animator, so a clip's first frame
-  shows 4 steps, later frames 5):
-  1. FORM (activation step + 29 more, 0.5 s): on the attack4 press #0001
-     stops, horizontal speed 0, controls and facing locked (the facing is
-     snapshotted here: the direction held on the press step if any, else
-     the way it faced). `attack4_1 → attack4_2 → attack4_3`
-     play once, `attack4_3` held, while `attack4_object_1 → … → attack4_object_6` form in his
-     rear palm; poses and sphere frames change on the same steps. It lasts
-     the longer of the two clips, so the rush never starts before `attack4_object_6`
-     has completed its frame time. No movement, no hitbox.
-  2. DASH (15 steps, 0.25 s): `attack4_4 → attack4_5 → attack4_6` once, at a fixed
-     1050 world units / s in the snapshotted facing, through normal
-     fixed-step physics (≈262 units at most; solids and ground respected, and
-     running off a ledge is ground lost; player left / right ignored). The complete `attack4_object_6` stays
-     in the hand, never rebuilt. This is the only contact search: each step
-     the sphere's hitbox (48 × 48 units, centred on the sphere) is tested
-     against the opponent's hurtboxes, from the sphere's actual world
-     position. Hand offsets (sphere centre from #0001's origin, facing
-     right, x mirrored with facing, one per pose shown): `attack4_1` (−15, −47)
-     the fist, `attack4_2` / `attack4_3` (−25, −42) the open palm, `attack4_4`
-     (−32, −51) and `attack4_5` (−34, −51) trailing behind him, `attack4_6`
-     (32, −47) swung in front. So contact is made on the forward swing
-     (`attack4_6`), after the rush has closed in; pushboxes keep #0001 from
-     running through the opponent meanwhile. No contact by the end of
-     `attack4_6`, or a solid wall reached first (no pass-through), is a miss:
-     WHIFF RELEASE below.
-  3. WHIFF RELEASE (a miss only; 5 steps, one `attack4_12` frame at 12 fps,
-     1/12 s, the `attack4_whiff_release` clip):
-     from the step after the dash's last (or the very step a wall stops it)
-     the rush stops dead where it is (`vx` 0, no slide) and the contact
-     search ends. The sphere is let go: it simply vanishes, with no impact
-     or explosion frames (`attack4_object_7`–`11`), no hit, damage or bind, and none
-     of the successful-hit poses (`attack4_7`–`11`, nor the full
-     `attack4_10`–`12` recovery). #0001 shows `attack4_12` alone, still committed
-     (controls and facing locked, buttons ignored), and is back in Idle /
-     normal control only on the step after that frame: the last pose of a
-     clean miss is always `attack4_12`, never a jump straight from `attack4_6` to
-     Idle. The technique then ends as a `miss` (or `wall`).
-  4. CONFIRM (from the contact step): the rush stops at once (`vx` 0, no
-     sliding through). The contact, applied exactly once through
-     `CombatSystem.applyHit`: no damage (no large initial hit), Base Launch 0
-     and no Directional Launch (no launch), 0.2 s hitstun, 0.15 s blockstun, 0.06 s hitstop on the
-     target only. It is only the setup: the first tick (below) is its own
-     `tickHit`, dealt straight after it on the same step.
-     The target is then bound (below) with its horizontal speed zeroed and,
-     on that same contact step (hits resolve after both fighters have picked
-     their poses, so the technique re-picks the target's), is already shown
-     in its Hurt pose (`hurt`, or `midair_hurt` if caught airborne): no
-     one-step delay. The sphere moves from the hand onto it (centre at the
-     target's origin + (0, −48), over its body, following it every step) and
-     spins there: `attack4_object_7 → attack4_object_8 → attack4_object_9 → attack4_object_7 → …`, one frame
-     every 1/12 s counted from the contact step, for as long as it holds
-     the target (eight turns in the 2 s delay). #0001 plays
-     `attack4_7 → attack4_8` once from the same step (`attack4_7` 5 steps, then
-     `attack4_8`; 10 steps in all).
-  5. WAIT: #0001 holds `attack4_8` (never `attack4_9`–`12` before the blast),
-     committed (no movement, attack, summon, Shield, Throw or jump),
-     and the bound target holds in its Hurt pose with the sphere still
-     spinning on it and growing: `sphereGrowth` draws it from `startScale`
-     (1, its own art size) at the start of the hold, by the same amount
-     every step, to `endScale` (1.4) as it explodes. The growth is explicit
-     because the spin frames' own sizes shrink slightly (`attack4_object_7`–`9` are
-     ≈116, 106 and 100 px wide); it never shrinks or pulses, and it is
-     visual only: the sphere stays centred on the target (the drawn frame
-     grows about its centre), and no hitbox, hurtbox, collision or hit ever
-     reads it (the rush's hitbox is gone since the contact).
-     TICKS: the contact queues exactly one `tickHit` at once, dealt on the
-     contact step itself right after the contact; then, through CONFIRM
-     and WAIT, while the target is still bound by the technique, every
-     whole `tickInterval` (0.5 s) since the contact step is one more. Each
-     goes through `CombatSystem.applyHit`: 1 damage (+1 Launch Point), Base
-     Launch 0 and no Directional Launch (no launch), no stun or hitstop, so
-     the hold never stutters. They fall on the contact step and 0.5, 1.0 and
-     1.5 s after it (steps 0, 30, 60 and 90), counted on the fixed-step
-     clock by threshold crossings (the contact's own tick counts as the
-     first, so the contact step can never deal two), never from animation
-     frames; none before the contact, none after the technique ends or the
-     bind is lost, and none on the explosion's step (the explosion is never
-     also a tick). Each is one combat event (`move` `attack4.tickHit`).
-  6. EXPLODE: exactly 2.0 s (`explosionDelay`, 120 steps) after the
-     contact step, counted from the hit, never from formation: #0001
-     switches to `attack4_9`, the explosion pose, and the sphere stops spinning
-     and growing and plays `attack4_object_10 → attack4_object_11` once at the grown size. On
-     the step `attack4_object_10` first shows the target is released from the bind
-     and then takes the explosion, exactly once: 10 damage (14 in all with
-     the four ticks) with `baseLaunch: 3, directionalLaunch: 'horizontal'`:
-     the 10 is added first, then the target's new Launch Point is tripled
-     and sent sideways along the rush, through the same shared launch as
-     every other hit (from 110 before the blast: 120, a strength of 360,
-     launched at 3600 units/s; a fresh target, 14 after the ticks and the
-     blast, at 3 × 14 = 42, so 420 units/s). It is the
-     technique's only launching hit. 0.55 s hitstun, 0.12 s hitstop
-     (twice the contact's), 0.3 s blockstun. Releasing first keeps the bind
-     from cancelling the launch. `attack4_9` is held for the whole blast (it lasts
-     the longer of the blast and the explosion pose).
-  7. RELEASE: only once the blast is over, the sphere is gone and #0001
-     recovers through `attack4_10 → attack4_11 → attack4_12` once (15 steps, 0.25 s),
-     still committed: no sphere, hit, bind or contact search.
-  8. DONE: after `attack4_12` the technique is cleared and #0001 returns to
-     Idle / normal control. A full sequence is exactly six hit events: the
-     contact (0), four ticks (1 each, the first on the contact step) and the
-     explosion (10): 14 in all.
-  The bind is a combat status separate from hitstun (`CombatState.bind` /
-  `unbind`, keyed by the technique as a token so it only ever releases its
-  own hold). While bound a fighter can't act (`canAct()` is false): no walk,
-  run, jump, Throw, attack, summon, technique, Shield or turning; its horizontal
-  speed is held at 0, gravity and vertical collision still apply (an
-  airborne catch falls and lands, the sphere following it), and it shows
-  Hurt / Mid-air Hurt. It lasts until the explosion, or until the technique
-  is cancelled. Ground dependency: from the first `attack4_1` frame to the end,
-  #0001 must be supported by real ground, checked every step
-  (`body.grounded`, not remembered from the start). Losing it in formation,
-  mid-dash (running off a ledge; no hover over the gap, no snap back),
-  during a miss's whiff release or after the hit (the recovery included)
-  cancels the technique on that step: sphere removed, any bind
-  released at once (ticks already dealt stay; no further tick or
-  explosion) and #0001
-  enters Fall, straight down. A hit on #0001 in any phase cancels it the same
-  way and shows the normal Hurt (no armour, no invulnerability). A raised
-  Shield blocks the contact from either side: the target pays 25 Energy
-  and takes no Launch Point; there is no bind, no tick (not even the
-  contact's), no sphere left on it and no explosion, and the technique ends
-  at once (`blocked`), #0001 free on the next step. The target losing its bind meanwhile
-  (a reset, or the Void taking it) ends it too. No Launch Point ends
-  the hold: there is no knockout. Before starting, the technique requires all six fighter clips
-  and all three sphere effects (and valid data); anything missing logs a
-  warning and the press does nothing (no attack2 or other attack in its
-  place): never a sphere around the wrong pose, an invisible sphere, bind
-  or delayed hit, and no cooldown starts. The
-  sphere is drawn over both fighters (terrain, shadows, clones, CPU, P1,
-  sphere, projectiles, foreground), centred at the fighters' art-pixel
-  scale with image smoothing off, never mirrored. Restart / rematch
-  (`Fighter.reset`) and leaving the battle end any technique, its sphere,
-  bind and pending explosion, and drop its owner and target references. The
-  debug overlay draws the rushing sphere's hitbox as a dashed cyan box
-  labelled `attack4 dash`, then a dashed cyan cross on the attached
-  sphere's centre, and labels a bound fighter `bound`.
-- Every fighter's central combat number is its **Launch Point**
-  (`CombatState.launchPoint`): it starts at 0 (a new fighter, a Quick
-  Battle restart / rematch, a new Practice fighter and every respawn after
-  the Void all start from 0), grows by exactly the damage received, never
-  goes below 0, has no maximum and is shown as a bare number (no % sign). A
-  hit's `damage` is how much it adds: #0001's attack1 3, midair_attack1 3, attack2 5,
-  midair_attack2 5, shuriken 1, the clone's attack1 3 or overhead midair_attack2 5,
-  the Sphere Rush 0 on contact, 1 per tick and 10 on the explosion (a hit a
-  Shield blocks adds nothing).
-  Every fighter has a Launch Point that starts at 0 and increases by damage
-  received. Every hit declares a Base Launch of 0, 1, 2 or 3 and a
-  Directional Launch. After a hit's damage is added, its launch strength is:
-  Base Launch × the target's new Launch Point. Base Launch 0 therefore never
-  launches, while 1 uses normal Launch Point strength, 2 doubles it, and 3
-  triples it.
-
-  | Concept | Belongs to | Meaning |
-  | --- | --- | --- |
-  | Damage | the hit | how much it adds to the target's Launch Point |
-  | Launch Point | the fighter | the damage it has taken this life, a plain number |
-  | Base Launch | the hit | 0, 1, 2 or 3: how many times the new Launch Point the launch strength is |
-  | Directional Launch | the hit | `null`, `'horizontal'`, `'vertical'` or `'reverseVertical'`: where that strength goes |
-  | Launch strength | the hit's result | Base Launch × Launch Point (after this hit's damage) |
-
-  Damage, Base Launch and Directional Launch are authored separately on
-  every hit, and none is derived from another. The shared
-  `CombatSystem.applyHit` adds the damage first, then computes the strength
-  (`resolveLaunchStrength`) and turns it into a velocity
-  (`resolveDirectionalLaunch`, `js/data/launch.js`) at `LAUNCH_UNIT_SPEED`,
-  10 world units per second per point: horizontal along the hit's travel
-  (`vx = strength × 10 × facing`), vertical upward (`vy = −strength × 10`,
-  as world y grows downward), reverse vertical downward (`vy = +strength ×
-  10`), `null` nothing at all. That multiplication is the whole strength:
-  no base velocity is added, and horizontal and vertical launches use the
-  same number. The one conversion factor is the same for every hit and
-  direction, so it only puts the strength in the world's units (gravity
-  2500, a jump 920) and never changes its proportions. At 120 Launch Point,
-  Base Launch 0, 1, 2 and 3 give strengths of 0, 120, 240 and 360 (speeds
-  0, 1200, 2400 and 3600); at 37, 0, 37, 74 and 111. A hit a Shield
-  blocks is the one exception: it adds no Launch Point and launches
-  nothing at all (launch strength 0), whatever its Base Launch and
-  direction; there is no chip damage and no partial launch. A hit that
-  launches replaces the target's sideways speed (a
-  vertical one sends it straight up or down) and, when it has one, its
-  vertical speed; a hit that does not launch (Base Launch 0, no direction,
-  or blocked) leaves the target's velocity alone. The target may bend a
-  launch's direction by up to 15 degrees with the direction it holds
-  (launch steering, see Launch reaction above), never its speed. Its
-  event carries `damage`, `launchPointBefore`, `launchPointAfter`,
-  `baseLaunch` (the integer), `directionalLaunch`, `launchStrength`,
-  `finalLaunch` (the world-space `{ x, y }` velocity given, steered),
-  `launchSpeed` (its length), `hitstun` (the stun dealt, launch stun
-  included), `perfect` (a perfect block), `point` (where the hit landed,
-  for its effects) and `energyCost` (25 on a block, 0 on a hit or a
-  perfect block). Launch Point
-  never disables a fighter (`canAct()` never reads it) and never takes one
-  out: only the Void does. On time-up in Quick Battle, level on points, the
-  fighter with the lower Launch Point wins (a fighter still waiting to
-  respawn counts the Launch Point it fell with); equal is a draw.
-- Physics: acceleration, deceleration, turn braking, max speed (from the
-  fighter's Speed Power, below), air steering and drag, gravity, jump
-  impulse (from its Jump Power, below), the fast fall,
-  ground/platform/solid collision on a finite main floor (no side walls:
-  a fighter can leave the stage and fall), landing detection; collision boxes
-  independent of PNG size; bottom-centre origin; no sinking, floating or
-  jitter. A collision stops the body on that axis and reports the speed it
-  stopped; only a launch turns that into a rebound (Launch bounce). Pushboxes
-  split an overlap evenly, so a fighter at a ledge can be shoved off it; a
-  fighter flying off a rebound passes through them.
-- **Movement and game feel.** Movement is immediate, smooth and precise;
-  fast to respond, never simply fast. Everything below is data on the
-  character (`movement`, and each attack's movement fields), read by
-  `Fighter.moveHorizontal` / `moveAttack`, with defaults so a fighter that
-  declares none of the new fields still moves. #0001's values:
-  - *Ground.* `acceleration` 4200 (rest to top speed in 5 steps, about
-    0.08 s), `deceleration` 4200 (letting go stops a run in 5 steps, about
-    10 units of slide: a short, natural stop, never an instant one, so it
-    can stop right beside an opponent), `turnBoost` 2.6 (pressing against
-    the way it moves brakes at acceleration × 2.6 until that way is spent;
-    the rest of that step accelerates the new way: a full turn in about 7
-    steps, never a one-step flip). Above top speed (after a Dash) the
-    excess bleeds off at `overspeedDeceleration` (6000).
-  - *Air.* `airAcceleration` 3000, `airTurnBoost` 2.0 and a light
-    `airDeceleration` drag of 380: steering bends the drift instead of
-    replacing it, a running jump carries its speed, a standing jump can be
-    steered to full speed in 7 steps, and a full reversal takes about 10
-    steps of a 44-step jump (the ground's takes 7: not the same). Above
-    top speed (a launch, a jump out of a Dash), holding the way it already
-    moves never slows the fighter beyond the drag; pressing against it
-    brakes.
-  - *Jump.* Unchanged in strength (Jump Power) and still buffered
-    (`jumpBuffer` 0.12 s) with coyote time (`coyoteTime` 0.1 s). Takeoff
-    is on the press step, and the jump only sets the upward speed: the run
-    carries straight into the air (no horizontal reset), so run → jump →
-    drift is one continuous motion.
-  - *Higher jump.* A tap is the normal jump (Jump Power 2: 169 units),
-    exactly its old arc. Jump still held `highJumpWindow` (0.15 s) after
-    takeoff (held from the takeoff step on: a press a little longer than a
-    tap) makes it the higher jump: from that step to its apex it rises
-    under a lighter share of gravity, set once so it tops out at
-    `highJumpHeight` (1.4) × the normal height, about 237 units
-    (`Fighter.highJump`, `highJumpLift`). No kick in speed: the arc
-    stretches. Decided once and kept whether Jump stays held or not; the
-    apex, a hit, the air jump or the ground ends it. Ground jumps only
-    (coyote time included); the air jump is never a higher one. Both CPUs
-    let go of Jump inside the window (`jumpTapHold`): their jumps are
-    normal ones.
-  - *Air jump.* `airJumps` (1) more jump in the air, past coyote time, at
-    `airJumpRatio` (0.9) × the normal jump's speed (about 137 units of
-    rise), always full height, the jump clip from its first frame. A
-    direction held sets off that way at least at top speed (a change of
-    course); with none held the drift carries on. Landing gives it back,
-    and so does a hit. Not while stunned, bound, shielding or in a
-    technique; a jump pressed in the air with none left waits (the jump
-    buffer) for the ground. It may cut short an attack that hit, like a
-    ground jump. Quick Battle's CPU uses it to get back to the stage. A
-    jump and an air jump from a stage's highest footing still stay well
-    clear of the upper Void.
-  - *Fast fall.* Down (the `down` input: S / ↓, D-pad or stick down,
-    with no mobile Down button) held in the air while
-    already descending speeds the fall up toward
-    `fastFallSpeed` (1400) at `fastFallAcceleration` (12000) on top of
-    gravity: never while rising, never a jump in speed and never slower
-    than the fall already is; it lands on platforms like any fall. Aerial
-    attacks may fast-fall (back to the ground after an aerial); a stun, a
-    bind or an air Shield may not. A descent from a jump's apex takes
-    about 9 steps instead of 21. `Fighter.fastFalling` is true on the
-    steps it applies.
-  - *Attack movement.* Normal locomotion is off while an attack plays, but
-    that is not the same as standing still: an attack keeps a share of the
-    horizontal speed it started with (`momentum` on the ground, never more
-    than that share of top speed; `airMomentum` in the air), may be
-    steered with a share of the normal acceleration and top speed
-    (`control`, `airControl`), lets the rest of its speed run down under
-    `friction` × the ground deceleration (the air drag in the air), and may
-    move by itself (`step: { at, speed }`: forward speed raised to at
-    least `speed` as its time crosses `at`, on the ground). Defaults
-    (`momentum` 1, `control` 0, `friction` 1, no step) are a planted
-    attack; `lockMovement: false` keeps full locomotion. #0001: attack1 0.75 /
-    0 / 0.4 (a running punch slides on, no creep), attack2 0.5 / 0 / 0.5 with
-    its step-in, Throw 0.5 / 0.3 / 0.6, midair_attack1 all its drift and 0.85
-    steering, midair_attack2 all its drift and 0.7: aerials follow the stick,
-    so a juggle can be steered after. A technique owns
-    its own movement instead (the Sphere Rush's 1050 rush) and a clone
-    never moves: neither reads these.
-  - *Combat input buffer.* A Throw / attack1 / attack2 press the fighter cannot act
-    on yet (an attack or its recovery, a stun, a Dash, a cooldown, `shield`
-    held for its Shield) is kept for `movement.attackBuffer` (0.15 s) and
-    comes out on the first step it can, if it still maps to an attack that
-    can start there (on the ground or in the air as the fighter is then).
-    The latest such press wins; one older than the buffer never fires.
-    Presses made during an impact freeze are kept and do not age through
-    it. Only ordinary attacks: a summon or technique happens on its own
-    press or not at all (one pressed while it cools down, in the air or
-    while the fighter is busy is simply gone), and a reserved
-    button, an air Throw or an attack without art is never kept. Kept
-    presses keep their order with a buffered jump: a jump pressed before
-    the attack goes first and the attack comes out next step, in the air;
-    pressed on the same step, the ground attack goes first. So attack2 pressed
-    shortly before attack1 ends starts on attack1's last step, and Shield → release
-    → attack has no gap.
-  - *Hit-cancels.* An attack that hits (a Shield's block does not count)
-    may be cut short once its time reaches its `hitCancel` (seconds in, or
-    null for never; the step its freeze ends at the earliest), by another
-    attack, a jump or, on the ground, a Dash (a **Dash cancel**, for
-    `energy.dashCancelCost`, 40 for #0001 against a plain Dash's 15: two
-    from a full bar, and a third empties it, Shield included): walking, the
-    Shield, summons and techniques still wait for its end, and left alone it plays out in
-    full. A Dash asked for during the hit's freeze comes out the step it
-    ends. It cuts into itself only once its own cooldown has run since it
-    became cancellable. The cut attack's cooldown starts as it is cut. A
-    whiff or a block keeps the whole recovery (and never Dash-cancels), so
-    commitment is unchanged where it matters. #0001's attack1, attack2, midair_attack1
-    and midair_attack2 open theirs from their strike; the Throw has none.
-  - *Combo routes.* Movement, recovery and the buffer do most of the work;
-    hitstun is only long enough for the intended follow-up to arrive.
-    attack1 (0.32 s) is the starter, attack2 (0.28 s, a stronger freeze) the
-    launcher, midair_attack1 the pursuit tool, midair_attack2 the spike, the
-    shuriken spacing only. At low Launch Point these are true combos (the
-    target never gets to act between the hits): attack1 → attack2 (attack2 pressed
-    anywhere in about 0.2 s after attack1), attack1 → attack1 at close range (a string
-    of two to six that attack1's own push ends), attack2 → attack1 while the launch is
-    still a hop, attack2 → jump → midair_attack1 once it launches properly (Launch
-    Point about 25–65), and midair_attack2 → land (fast) → attack1 on a grounded
-    target. attack1 → Dash → attack1 chases attack1's push from 0 to about 85 Launch
-    Point, so the starter has a follow-up where attack1 → attack2 no longer
-    reaches. Launch Point breaks them by itself, with no combo counter: attack1's
-    push carries the target out of attack2's reach past about 25, out of a Dash's
-    past about 85, and attack2's launch out of a jump's reach past about 65, so
-    at high Launch Point combat turns into pursuit and ring-outs. None loops:
-    every hit adds to the Launch Point that sends the next one further, and
-    a Dash chase spends the Energy the Shield needs, ending within seven
-    hits. Stage geometry bends
-    that into new routes (a rebound off a wall or a spiked floor is a moment
-    to chase), never a loop: a wall's rebounds are capped until the target
-    recovers, and a rebound flies past the attacker (Launch bounce).
-  - *Hitstop.* Per hit, by strength: 0.05 s for attack1 and midair_attack1 (a
-    crisp tap, never sticky on repeated jabs), 0.08–0.09 s for the kicks,
-    0.12 s for the Sphere Rush blast, still the strongest; a hard rebound
-    off the stage freezes its fighter alone for 0.05 s. It freezes the
-    fighters, never the controls: presses made during it are kept, and a
-    frozen fighter is drawn still where it stopped.
-  - *Air combos.* With the air jump, the launch stun and aerials that
-    steer, attack2 → jump → midair_attack1 leads on to a third hit: straight into
-    another midair_attack1 or a midair_attack2 spike below about 20 Launch Point,
-    and through the air jump into a midair_attack2 up to about 40 or a mid-air
-    attack1 up to about 45. Gone by about 65, when attack2 launches past any jump.
-- **Powers** (`js/data/powers.js`): fighter abilities owned at one of three
-  tiers, Jump Power and Speed Power. Each Power is a frozen tier table in
-  the one `POWERS` registry, the single source of its names, descriptions,
-  tier numbers and tuning values: gameplay reads the values, the Discover
-  reference (6.9) the names and descriptions. A fighter's definition
-  declares one tier of each (`powers: { jump: 2, speed: 2 }`); `Fighter`
-  resolves them once, at construction (`getJumpVelocity`, `getMaxSpeed`).
-
-  Tier values (world units per second, at the global gravity of 2500):
-
-  | Power | Tier 1 | Tier 2 | Tier 3 | Becomes |
-  | --- | --- | --- | --- | --- |
-  | Jump Power | 650 | 920 | 1000 | initial upward speed of the normal jump |
-  | Speed Power | 270 | 330 | 360 | top speed of normal movement |
-
-  #0001 has **Jump Power 2** and **Speed Power 2**, exactly its original 920
-  jump and 330 top speed, so its jump and movement are unchanged. The tiers
-  are the only sources: movement has no raw `jumpVelocity` or `maxSpeed`.
-  Speed Power feeds the same normal left / right target speed on the ground
-  and in the air (and the run clip's playback rate, relative to the
-  fighter's own top speed; an attack's steering and the speed it may keep on
-  the ground are shares of that top speed); acceleration, deceleration, the
-  turn boosts, the overspeed bleed, air control and drag, gravity, fall
-  speed, the fast fall, coyote time, the jump and attack buffers, hitstun
-  friction, launches, projectiles, the Shield and techniques (the
-  Sphere Rush's 1050 dash) never depend on it, just as none of them depend
-  on Jump Power. The shared
-  Fighter applies both for Player 1, the CPU and Practice Ground alike. A
-  declared tier the table lacks (or a fighter missing a Power) is logged and
-  gets tier 2.
-- **Launch** (`js/data/launch.js`): how a hit sends its target flying. It is
-  not a Power: every hit (an attack's, a projectile's, a
-  technique's) declares its own `baseLaunch` and `directionalLaunch` beside
-  its `damage`, independently of each other:
-  `damage: 3, baseLaunch: 1, directionalLaunch: 'horizontal'`,
-  `damage: 5, baseLaunch: 2, directionalLaunch: 'vertical'`, or
-  `damage: 5, baseLaunch: 2, directionalLaunch: 'reverseVertical'` to drive
-  the target downward. `BASE_LAUNCH_VALUES` (`[0, 1, 2, 3]`) holds the only
-  legal Base Launch values: literal multipliers, not tiers, levels or
-  velocities. `DIRECTIONAL_LAUNCHES` holds the only legal directions:
-  `null` (None), `'horizontal'`, `'vertical'` and `'reverseVertical'`
-  (Reverse vertical). `resolveHitLaunch` validates both fields once, when a
-  hit's definition is built (`createAttackDefinition`,
-  `createProjectileDefinition`, `createTechniqueDefinition`): a hit that
-  declares neither has Base Launch 0 and no direction; any other Base
-  Launch (0.5, 4, 10, −1 ...) is logged and becomes 0, an unknown direction
-  is logged and becomes `null`, and a nonzero Base Launch with no direction
-  is logged and never launches, so bad data never launches anyone with a
-  strength nobody chose. Neither field is inferred from damage, the hitbox
-  or the other field. #0001's hits:
-
-  | Hit | Damage | Base Launch | Directional Launch |
-  | --- | --- | --- | --- |
-  | Ground attack1 | 3 | 1 | horizontal |
-  | Ground attack2 | 5 | 2 | vertical |
-  | midair_attack1 | 3 | 2 | vertical |
-  | midair_attack2 | 5 | 2 | reverse vertical |
-  | Shuriken | 1 | 0 | none |
-  | Sphere Rush contact | 0 | 0 | none |
-  | Sphere Rush tick (on the contact step, then every 0.5 s while held) | 1 | 0 | none |
-  | Sphere Rush explosion | 10 | 3 | horizontal |
-
-  Launch never depends on either fighter's Jump or Speed Power.
-- Combat architecture (Launch Point, Base Launch, Directional Launch, damage, hitboxes, hurtboxes, attack definitions,
-  the Shield button's `defense` (typed, the Shield so far), Energy, launches,
-  stun and blockstun, hitstop, cooldowns, summon and technique cooldowns, binds, typed
-  numbered buttons, summons and techniques) is data-driven. numbered attacks 1 and 2,
-  Throw (with its shuriken projectile), the attack3 Clone Attack (#0001's
-  own summoning pose, then a summoned clone performing attack1, or
-  midair_attack2 over an opponent with no ground behind it) and the attack4 Sphere Rush (a
-  technique) are implemented through it with real artwork; Transform stays reserved
-  (mapped to no attack) until real sprites exist, and no attack, projectile,
-  clone or frame is ever fabricated. An attack whose frames fail to load is
-  refused (no substitute pose, no invisible hitbox), and so is a Shield, and so
-  is a clone summon whose startup pose, cloud or attack art is missing (no
-  pose, no cooldown starts),
-  and so is a technique with any of its clips missing.
 - Quick Battle: 5 minutes (`CONFIG.battle.roundSeconds`, 300 seconds),
   first to `CONFIG.battle.pointsToWin` (3) points, against a CPU that uses the same fighter definition and fights with
   it at the difficulty chosen on Select Difficulty (6.3a): Quick Battle's
-  combat AI, `CombatAIController` (`js/game/combat-ai.js`). `BattleScreen`
+  combat AI, `CombatAIController` (`js/game/ai/combat-ai.js`). `BattleScreen`
   passes `app.selection.difficulty` to `Battle`, which validates it once
   (`resolveDifficulty`: anything unknown is Medium), keeps it for the whole
   battle (restart, rematch and every respawn keep it; a restart also clears
@@ -2264,7 +1936,17 @@ French, concise game terms).
   Practice Ground's CPU is a different thing: a controller-less training
   dummy that never moves or attacks, whatever the Quick Battle difficulty.
   The older non-attacking `TrainingAIController` remains in
-  `js/game/fighter-controller.js`, unused by every mode.
+  `js/game/fighters/fighter-controller.js`, unused by every mode.
+  - **Attack orientation.** The combat controller supplies a live
+    horizontal target direction for attack initiation and each simulation
+    step, including after both fighters move. Equal coordinates retain the
+    last valid direction; missing or out-of-play targets are ignored.
+    Ordinary attacks turn their hitboxes and pending projectile release
+    with their artwork. Motion attacks and techniques use separate visual
+    facing so their existing trajectory, collision and hit directions
+    remain intact. Spawned projectiles never turn with their owner. This
+    does not synthesize movement or Dash input and does not change manual
+    or training facing.
 - Match score (`Battle.score`, `{ p1, p2 }`, the match's own: never on a
   fighter or its character, and not `round`): both start at 0. A fall into
   the Void scores exactly one point for the opponent, at once, if the
@@ -2273,111 +1955,38 @@ French, concise game terms).
   the other still waits to respawn) that fall scores nothing, so a double
   K.O. never moves both toward the win. The global phase stays `fight`
   while a fighter waits to respawn: the timer runs on and the survivor
-  plays on (an attack3 then has nobody to appear behind and falls back to
-  attack1; nothing can hit, hold or aim at the absent fighter). The point that
+  plays on (a summon then has nobody to appear behind and its press does
+  nothing at all; nothing can hit, hold or aim at the absent fighter). The point that
   reaches 3 ends the match: no respawn for the loser, the `ko` phase (the
   K.O. beat) and then the result. Once time is up or the match is won, a
   fall scores nothing and nobody respawns. The result: 3 points wins
   (`reason: 'void'`); on time, more points wins (`'points'`), then the lower
   Launch Point (`'time'`), else a draw. Restart and rematch reset both scores
   to 0 and cancel any respawn wait.
-- **Attack mechanics beyond a timed hitbox** (`js/game/combat.js`,
-  `js/game/character.js`, `js/game/projectile.js`). Each is data on an
-  attack (or a projectile), generic, and validated as its definition is
-  built; #0002 is the fighter that uses them:
-  - **Strikes** (`hits`): a multi-hit attack lists its strikes, each live
-    in its own window (`at` to `at + active`) and striking at most once,
-    with its own `damage`, `baseLaunch` and `directionalLaunch`; its
-    `hitbox`, `hitstun`, `blockstun`, `hitstop` and `carry` default to the
-    attack's. The attack's startup and active phase follow from them
-    (declaring either, or an attack-level damage or launch, is refused), and
-    so do its overall box (round every strike's), damage (their sum) and
-    launch (the last strike's), for readers such as the CPU. Any real hit
-    confirms it (its hit-cancel counts from the first); a Shield that blocks
-    a strike stops the string there, so a flurry never empties a Shield.
-  - **Carry** (`carry: { lift }`, on an attack, a strike or a projectile): a
-    real hit that launches nothing gives its target the velocity of what
-    struck it (the attacker's body, or the projectile), less `lift` upward.
-  - **Motion** (`motion`, one of four kinds; a motion attack never changes physical facing for a visual turn
-    while it plays): `homing` hangs through its startup (no gravity), then
-    locks on to its opponent if in play, within `range` of its middle and
-    not behind it, and dashes at `speed`, re-aimed at the target's middle
-    every step, until its active phase ends (straight ahead with no target);
-    contact (hit or block) springs it off the target, `rebound` up and
-    `recoil` back; a dash that ends without contact keeps `exit` of its
-    velocity, and one that reaches the ground stops. `bounce` hangs, then
-    plunges at a fixed `fallSpeed`; meeting the ground or an opponent sends
-    it back up at `rebound` and ends the attack (a ground bounce is no
-    landing). `rise` hangs, then rises at `speed` for its active phase and
-    carries on up under gravity. `roll` curls through its startup (sliding
-    on), then rolls the way it faces at `speed` plus `keep` × the running
-    speed it had, up to `maxSpeed`, losing `friction` per second on the
-    ground (none in the air); a wall stops it, and a Shield that blocks it
-    stops it dead and sends it back at `recoil`. No motion attack starts
-    while its fighter is still flying from a launch (`Fighter.launch`): a
-    hang, dash, plunge or lift would cancel the launch, so it must recover
-    first (an air jump, a fast fall or landing).
-  - **Per airtime** (`airUses`): how many times the attack may start before
-    the fighter lands or is hit. **Free fall** (`freeFall: true`): started
-    in the air, it leaves the fighter with no attack and no air jump until
-    it lands or is hit.
-  - **Body** (`passThrough: true`): no pushbox against other fighters while
-    it plays. (`hurtboxes`): the fighter's own replaced while it plays.
-  - **Piercing projectiles** (`pierce: { hits, interval }`): strike up to
-    `hits` times, at least `interval` seconds apart, staying in play between
-    them; the last resolves as the projectile's `finisher` (its own damage
-    and launch, its stuns defaulting to the projectile's). A block stops it.
-  - The CPU reads all of it from the data: each attack's reach swept along
-    its motion (`attackReach`: a roll's path, a plunge's depth, a lift's
-    height, a homing dash's lock-on range) for choosing and fearing it, the
-    travel time before a moving strike can arrive, per-airtime starts and
-    free fall; it uses a lift (a `rise` air attack) to recover when its air
-    jump is spent, fast-falling first to end a launch, and never plans a
-    summon or technique for a fighter with none.
-- **#0002, the speedster.** Speed Power 3, Jump Power 2, a quicker start
-  (acceleration 4800, air 3200) and a longer, faster Dash (1100 units/s for
-  one pass of its four-frame clip, ≈220 units). No summon or technique. Its Shield is a
-  ground guard only (`airAnimation: null`: in the air the Shield input does
-  nothing, quietly). Its body: collider 26 × 62, pushbox 30, hurtboxes
-  `{ -18, -64, 34, 32 }` (head and torso) and `{ -14, -32, 34, 32 }` (legs).
-  Its moves:
-  - **One-Two** (`attack1`, 4 frames at 15 fps): two strikes, the jab
-    (frame 2: 1, no launch, holding the target) and the straight (frame 4:
-    2, Base Launch 1 sideways); hit-cancel once the straight is out.
-  - **Homing Attack** (`midair_attack1`, the ball): `homing`, range 240,
-    speed 1000 for up to 0.22 s after a 0.15 s hang; 2, Base Launch 1
-    upward; springs off at 760 up and 140 back, its air jump given back by a
-    hit; a miss keeps a fifth of its speed. Once per airtime.
-  - **Rapid Kicks** (`attack2`, 4 frames at 20 fps played twice): a 0.2 s
-    wind-up, three kicks (1 each, no launch, each stun outlasting the gap to
-    the next), then the finisher (3, Base Launch 2 sideways); no hit-cancel,
-    a 1.2 s cooldown.
-  - **Bounce Attack** (`midair_attack2`, the ball): `bounce`, a 0.1 s hang,
-    then 1300 units/s down, rebounding at 900; 2, Base Launch 2 downward.
-    Twice per airtime.
-  - **Spin Attack** (`attack3`, the ball): `roll`, 400 + 0.8 × the run (up
-    to 820), friction 420, after a 0.17 s curl; `passThrough`, the ball's
-    hurtbox; 2, Base Launch 1 sideways; recoil 260 off a Shield; 1.6 s
-    cooldown.
-  - **Blue Tornado** (`midair_attack3`, 4 frames looped): `rise` at 460
-    (≈175 units in all), three strikes that carry the target up (1 each),
-    then the finisher (2, Base Launch 2 upward); once per airtime, and free
-    fall after.
-  - **Whirlwind** (`extra_attack`, 9 frames at 18 fps): sends its tornado
-    (`extra_attack_object`) on frame 6: 260 units/s for 1.6 s, piercing
-    five strikes 0.14 s apart, four of 1 that carry the target along and
-    lift it 300 units/s, then the finisher (2, Base Launch 2 upward); a
-    1.4 s cooldown.
-  Its tuning comes from seeded CPU-vs-CPU fights against #0001 (120
-  one-minute fights per level on Desert): at Hard and Brutal both fall
-  into the Void about as often; at Easy and Medium #0002's CPU still wins
-  more.
+
+#### 7.2.9 Character specifications
+
+Each playable fighter has a character specification of its own, part of
+this specification: its art, clips, body, movement profile and Powers, its
+moves with their exact values, its defense, Energy and launch reaction,
+its touch buttons and its combo routes. The rules above are not repeated
+there, and nothing in one is a rule for another fighter.
+
+- **#0001**: [docs/characters/0001.md](docs/characters/0001.md) (attack1
+  the Punch, attack2 the Kick, the Throw, the attack3 Clone Attack, the
+  attack4 Sphere Rush, a held Shield with a slow fall).
+- **#0002**: [docs/characters/0002.md](docs/characters/0002.md) (the
+  speedster: the One-Two, Homing Attack, Rapid Kicks, Bounce Attack, Spin
+  Attack, Blue Tornado and Whirlwind, a ground guard).
+
+Adding one is described in
+[docs/characters/adding-characters.md](docs/characters/adding-characters.md).
 
 ### 7.3 Battle chrome
 
 - The battle keeps deliberate dark chrome over the stage for legibility, using
   the same neutral hierarchy: white labels, gray secondary text.
-- **Battle glass** (`.glass` in `styles.css`): semi-transparent charcoal with a
+- **Battle glass** (`.glass` in `css/battle.css`): semi-transparent charcoal with a
   faint top sheen, a light translucent hairline and a soft shadow; darker than
   the Home strip so type stays readable over bright and dark stage art. HUD
   pieces float over a canvas that repaints every frame, so they skip backdrop
@@ -2408,7 +2017,7 @@ French, concise game terms).
   scored, in order, the moment it is scored (the third fills as the K.O.
   beat starts). They survive respawns and reset only on a new match, a
   restart or a rematch. Practice Ground shows none.
-- Fighter status (Canvas, `js/game/fighter-status.js`, drawn by the Arena
+- Fighter status (Canvas, `js/game/rendering/fighter-status.js`, drawn by the Arena
   over everything, the Void included, for each fighter in play whose body
   is on screen, at its interpolated position). Both parts are temporary:
   a thin **Energy bar** just above the name tag, only while Energy is
@@ -2447,7 +2056,7 @@ French, concise game terms).
   inverts or flashes.
 - Player markers above fighters (under their Energy bars) and ground
   rings: P1 white, CPU gray.
-- **Hit effects** (`js/game/hit-fx.js`, owned by the Arena, so Quick Battle
+- **Hit effects** (`js/game/rendering/hit-fx.js`, owned by the Arena, so Quick Battle
   and Practice Ground alike): presentation only, fed each step's combat
   events. They never change a simulation step; a test steps the same fight
   with and without them and compares every step.
@@ -2503,7 +2112,7 @@ French, concise game terms).
 
 - Keyboard (simultaneous keys, held-state tracking, no reliance on key
   repeat): A/D or ←/→ move (`runLeft` / `runRight`; twice in a row to Dash), S/↓ Down (`down`; held; a direction only: in the air while falling, the fast fall, and as a hit lands, steering the launch downward), W/Space/↑ jump (`jump`; tapped, the normal jump; held a little longer, the higher jump; again in the air, the air jump), J the
-  extra attack (`extra_attack`, #0001's Throw), K Transform (`transform`, reserved), L Shield (`shield`), U
+  extra attack (`extra_attack`, e.g. #0001's Throw), K Transform (`transform`, reserved), L Shield (`shield`), U
   `attack1`, I `attack2`, O `attack3`, M `attack4`, `,` `attack5` (the
   numbered buttons along the row above J K L, then the row below it; a
   fighter acts only on the ones it has a button for, 7.2), Esc/P pause
@@ -2601,7 +2210,7 @@ French, concise game terms).
   discarded during sanitization; all other positions and scales survive.
 
   Both layouts share the lower-right staggered cluster, in the same place
-  in both. For #0001 (four numbered buttons) it is —
+  in both. For example, for #0001 (four numbered buttons) it is —
 
   ```
               [SPHERE]        [SHURIKEN]
@@ -2647,17 +2256,9 @@ French, concise game terms).
   frame of it counted from 0 (as `visual.portrait.frame` is), resolved by
   `previewFrame` in `js/ui/mobile-abilities.js` to that clip's own file (no
   path is written twice; a clip drawn facing left is mirrored to face
-  right). Each frame is chosen to read as the move. For #0001:
-  **Shuriken** `extra_attack` frame 1 (`extra_attack_2`, the shuriken
-  leaving the hand), **Punch** `attack1` frame 1 (`attack1_2`, the punch),
-  **Kick** `attack2` frame 4 (`attack2_5`, the high kick), **Clone Attack**
-  `attack3_summon` frame 2 (`attack3_summon_3`, the hand seal of the
-  summoning pose it then performs), **Sphere Rush** `attack4_dash` frame 1
-  (`attack4_5`, the rush). #0001's air previews are `midair_attack1_3`
-  and `midair_attack2_2`. #0002 uses `attack1_4` / `midair_attack1_1`,
-  `attack2_2` / `midair_attack2_5`, and `attack3_5` / `midair_attack3_3`.
-  Whirlwind uses `projectileAnimations.extra_attack_object`, frame 2
-  (`0002_extra_attack_object_3.png`), with a tornado SVG fallback.
+  right). Each frame is chosen to read as the move; each fighter's choices
+  are in its character specification (7.2.9). A button may name a
+  `fallbackIcon` (a key of `ICONS`) to show if its image cannot load.
   `previews.air` describes the distinct airborne move selected by `actions`;
   `preview` or `previews.ground` describes ground/shared artwork. A preview
   may explicitly select `collection: 'projectileAnimations'`. Jump always
@@ -2750,19 +2351,11 @@ French, concise game terms).
 
 ## 10. Repository
 
-- Entry point `index.html`; styles in `styles.css` (design tokens at the top);
-  modules under `js/`; `.nojekyll` at the root.
-- The repository is intended to be named `alva` (GitHub Pages path `/alva/`).
-  If it still carries an older name, the site simply serves from that path —
-  no code references the repository name.
-
-### Combat CPU attack orientation
-
-The combat controller supplies a live horizontal target direction for attack
-initiation and each simulation step, including after both fighters move. Equal
-coordinates retain the last valid direction; missing/out-of-play targets are
-ignored. Ordinary attacks turn their hitboxes and pending projectile release
-with their artwork. Motion attacks and techniques use separate visual facing
-so their existing trajectory, collision and hit directions remain intact.
-Spawned projectiles never turn with their owner. This does not synthesize
-movement or Dash input and does not change manual or training facing.
+- Entry point `index.html` at the root (for GitHub Pages); styles in
+  `css/`, one stylesheet part per area linked from `index.html` in cascade
+  order (design tokens first, in `css/base.css`; responsive overrides
+  last); modules under `js/`; documentation under `docs/`; tests under
+  `tests/`; `.nojekyll` at the root. Every path is relative.
+- The repository is `hiyroscript/alva` (GitHub Pages path `/alva/`). No
+  code references the repository name, so the site works under any
+  sub-path.

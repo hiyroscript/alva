@@ -1,0 +1,118 @@
+# Module responsibilities
+
+Every module under `js/`, what it owns, and which modules use it. "Used
+by" is the module's importers in the source (tests aside), so a change to
+a module's exports reaches exactly those. The folders' roles:
+
+| Folder | Role | May import |
+| --- | --- | --- |
+| `js/core/` | Application shell: the app controller, screens, input devices, settings, assets, device and utilities. | config, data, localization, game, screens, ui (only `app.js` wires everything together) |
+| `js/data/` | Registries and pure data: fighters, loadout rules, Powers, Launch, difficulty, maps, ability names. No DOM, no simulation state. | config, other data (and `loadout.js` reads the technique clip-field names from `game/combat/technique.js`) |
+| `js/game/` | The simulation (fighters, combat, AI, physics, modes) and its canvas rendering. No DOM except the canvas it is given. | config, core/utils, data, stages, localization (the arena's canvas label only) |
+| `js/stages/` | Stage themes: procedural Canvas art, perspective, the Void's look. | core |
+| `js/localization/` | The interface languages. | config, core/settings, data (for registry-owned English copy) |
+| `js/screens/` | One module per screen: navigation and the screen's lifecycle. | everything below them |
+| `js/ui/` | Reusable interface pieces (DOM), the HUD and touch controls included. | config, core, data, localization, game (rendering helpers), stages |
+
+There are no import cycles (checked over every module).
+
+## Entry
+
+| Module | Owns | Used by |
+| --- | --- | --- |
+| `js/main.js` | Boot: creates the `App`, shows the boot error if it fails. | `index.html` |
+| `js/config.js` | Global data-only configuration: render, simulation step and gravity, battle timing and scoring, roster size, keyboard and menu bindings, the control and move codenames (`ACTIONS`, `COMBAT_BUTTONS`, `NUMBERED_ATTACKS`, `MOVES`, `ACTION_LABELS`). | almost everything |
+
+## `js/core/`
+
+| Module | Owns | Used by |
+| --- | --- | --- |
+| `app.js` | `App`: the managers, the frame loop, cross-screen selection state (Quick Battle's and Watch Mode's), preloading and loading fighters, the language and settings wiring. | `main.js` |
+| `screen-manager.js` | Screen registration and transitions (`hidden` / `inert`). | `app.js`, every screen |
+| `menu-navigator.js` | Menu navigation scopes for keyboard, pointer and gamepad. | `app.js`, `screens/discover-screen.js` |
+| `input-manager.js` | `InputManager`: keyboard, gamepad and touch merged into one snapshot per step with press edges. | `app.js` |
+| `settings.js` | The versioned settings store (the only module touching storage): language, Mobile Controls, custom touch layouts. | `app.js`, `localization/i18n.js`, `ui/settings-dialog.js`, `ui/touch-controls.js`, `ui/touch-layout-editor.js` |
+| `touch-layout.js` | Touch control ids, layout geometry and sanitizing. | `settings.js`, `ui/touch-controls.js`, `ui/touch-layout-editor.js` |
+| `asset-loader.js` | Image loading and decoding. | `app.js` |
+| `device.js` | Touch-first detection, orientation, reduced motion. | `app.js` |
+| `audio-manager.js` | The audio stub (the game ships with no audio). | `app.js` |
+| `organic-edge.js` | The wavering-edge geometry the Void and the Shield share. | `game/rendering/shield-fx.js`, `stages/stage-theme.js` |
+| `utils.js` | Small helpers (`clamp`, `approach`, `el`, seeded RNG `mulberry32`, `deriveSeed`...). | most modules |
+
+## `js/data/`
+
+| Module | Owns | Used by |
+| --- | --- | --- |
+| `characters.js` | The fighter registry: `CHARACTERS`, `getCharacter`, `isPlayable`, `getPlayableCharacter`, `playableCharacters`, `characterFramePaths`; re-exports `framePath` / `frames`. Validates every definition (`assertLoadout`). | `core/app.js`, `localization/strings/en.js`, the battle, practice, home and character-select screens, `ui/fighter-roster.js`, `ui/touch-layout-editor.js` |
+| `characters/0001.js`, `characters/0002.js` | One fighter's whole definition each (`CHARACTER_0001`, `CHARACTER_0002`) and its own constants. | `characters.js` |
+| `characters/helpers.js` | `framePath`, `frames`: the asset-path convention. | `characters.js` and each definition |
+| `loadout.js` | The attack loadout rules and `actions` readers. | `characters.js`, `game/fighters/fighter.js`, `game/ai/moveset.js`, `game/rendering/fighter-status.js`, `ui/mobile-abilities.js` |
+| `powers.js` | The Power tier tables and resolvers. | `game/fighters/fighter.js`, `localization/strings/en.js`, `screens/discover-screen.js` |
+| `launch.js` | Launch Point, Base Launch, Directional Launch: registry, formula and validation. | `game/combat/attacks.js`, `combat.js`, `projectile.js`, `technique.js`, `localization/strings/en.js`, `screens/discover-screen.js` |
+| `difficulty.js` | The four CPU levels and their profiles. | `core/app.js`, `game/battle.js`, `game/ai/combat-ai.js`, `localization/strings/en.js`, `screens/difficulty-select-screen.js` |
+| `abilities.js` | `abilityName`: a fighter's name for a move, or its neutral name. | `localization/strings/en.js`, `ui/mobile-abilities.js` |
+| `maps.js`, `practice-map.js` | The Quick Battle stages; the training stage (kept out of `MAPS`). | `core/app.js`, the battle, map-select and practice screens, `localization/strings/en.js` |
+
+## `js/game/`
+
+| Module | Owns | Used by |
+| --- | --- | --- |
+| `arena.js` | `Arena`: the fixed-step world (fighters, projectiles, clones, combat, hit effects, the Void and respawns), the camera and all canvas drawing. | `battle.js`, `practice.js` |
+| `battle.js` | `Battle` (Quick Battle and Watch Mode): phases, timer, score, K.O., each side's controller. | `screens/battle-screen.js` |
+| `practice.js` | `PracticeSession`: Player 1 and the optional training dummy, damage numbers. | `screens/practice-screen.js` |
+| `physics.js` | Bodies, integration, stage collision (`StageCollision`, `stepBody`, `separate`, `dropThrough`). | `arena.js`, `fighters/fighter.js`, `rendering/hit-fx.js` |
+| `fighters/fighter.js` | `Fighter`: the per-fighter state machine and step order; `separateFighters`; `COMBAT_ACTIONS`. | `arena.js`, `battle.js`, `practice.js`, `ai/moveset.js` |
+| `fighters/movement.js` | The shared movement rules over a movement profile. | `fighters/fighter.js` |
+| `fighters/fighter-controller.js` | `PlayerController`, `TrainingAIController`, `blankInput`, `jumpTapHold`, `HELD_CONTROLS`. | `fighters/fighter.js`, `ai/combat-ai.js`, `battle.js`, `practice.js`, `core/input-manager.js` |
+| `combat/attacks.js` | The attack schema and phases. | `combat/combat.js`, `combat/combat-state.js`, `combat/summon.js`, `fighters/fighter.js`, `ai/combat-ai.js`, `ai/moveset.js` |
+| `combat/defense.js` | The defense schema. | `fighters/fighter.js` |
+| `combat/combat-state.js` | `CombatState`, `CooldownTimers`, `resolveEnergy`. | `fighters/fighter.js` |
+| `combat/combat.js` | `CombatSystem` (hit resolution), launch reaction, `worldBox`. | `arena.js`, `fighters/fighter.js`, `ai/combat-ai.js` |
+| `combat/projectile.js` | Projectiles. | `arena.js`, `fighters/fighter.js` |
+| `combat/summon.js` | The summon system and its clones. | `arena.js`, `fighters/fighter.js`, `ai/moveset.js` |
+| `combat/technique.js` | The technique runtime. | `fighters/fighter.js`, `ai/moveset.js`, `data/loadout.js` |
+| `combat/launch-bounce.js` | Launch rebounds and their settings. | `fighters/fighter.js`, `rendering/hit-fx.js` |
+| `ai/combat-ai.js` | `CombatAIController`. | `battle.js` |
+| `ai/moveset.js` | `readMoveset`, `hurtExtent`. | `ai/combat-ai.js` |
+| `rendering/sprite-normalizer.js` | `SpriteSet`, sprite normalization and drawing. | `arena.js`, `core/app.js`, `ui/stage-preview.js` |
+| `rendering/sprite-animator.js` | `SpriteAnimator`. | `fighters/fighter.js`, `combat/summon.js` |
+| `rendering/camera.js` | The camera. | `arena.js` |
+| `rendering/hit-fx.js` | Hit effects. | `arena.js` |
+| `rendering/shield-fx.js` | The Shield's look. | `arena.js` (only) |
+| `rendering/fighter-status.js` | The Energy bar and cooldown rings. | `arena.js` |
+
+## `js/localization/`
+
+| Module | Owns | Used by |
+| --- | --- | --- |
+| `i18n.js` | The translator and marked strings. | `core/app.js`, every screen, most of `ui/`, `game/arena.js` |
+| `strings/en.js`, `strings/fr.js` | The string tables. | `i18n.js` |
+| `format.js` | `formatList`. | `i18n.js`, `strings/fr.js` |
+
+## `js/screens/` and `js/ui/`
+
+Each screen (`splash`, `home`, `mode-select`, `difficulty-select`,
+`character-select`, `map-select`, `watch-screens` (Watch Mode's setup,
+built from the setup screens), `battle`, `practice`, `discover`) is
+registered by `core/app.js` and owns its own section of `index.html`.
+
+| `js/ui/` module | Owns | Used by |
+| --- | --- | --- |
+| `components.js` | Shared menu pieces (headers, buttons, hint bars). | the setup screens, battle, practice, discover |
+| `hud.js` | The battle and practice HUD (DOM). | `screens/battle-screen.js`, `screens/practice-screen.js` |
+| `touch-controls.js` | `TouchControls`: both touch layouts. | `screens/battle-screen.js`, `screens/practice-screen.js`, `touch-layout-editor.js` |
+| `mobile-abilities.js` | Which touch buttons a fighter has, their names and art. | `touch-controls.js` |
+| `touch-layout-editor.js` | The layout editor. | `core/app.js` |
+| `fighter-roster.js` | The 48-slot roster (Select Fighter, Watch Mode's CPU screens, Practice Ground's dialogs). | `screens/character-select-screen.js`, `screens/practice-screen.js` |
+| `sprite-art.js` | Portrait and preview painting. | `fighter-roster.js`, `hud.js`, `stage-preview.js` |
+| `stage-preview.js` | Select Stage's live preview. | `screens/map-select-screen.js` |
+| `overlays.js` | The loading overlay and the confirm dialog. | `core/app.js` |
+| `settings-dialog.js`, `language-dialog.js` | Settings; the first-launch language chooser. | `core/app.js` |
+| `credits.js`, `logo.js`, `icons.js` | The credits list, the wordmark, inline SVG glyphs. | Home, overlays, the HUD and touch controls |
+
+## `js/stages/`
+
+`index.js` registers the themes (`desert-theme.js`, `city-theme.js`,
+`practice-theme.js`, each built on `stage-theme.js`) for the arena and the
+stage preview; `perspective.js` is the one-point perspective every stage
+shares.

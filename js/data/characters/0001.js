@@ -4,7 +4,7 @@
 //
 // Four numbered attacks: attack1 (the Punch) and attack2 (the Kick), each
 // an ordinary attack with a mid-air version; attack3, the Clone Attack (a
-// summon, `summons.attack3`, run by js/game/combat/summons.js); and
+// summon, `summons.attack3`, run by js/game/combat/summon.js); and
 // attack4, the Sphere Rush (a technique, `techniques.attack4`, run by
 // js/game/combat/technique.js). Plus its extra_attack, the Throw (a
 // shuriken projectile), a held ground and mid-air Shield, and the Dash on
