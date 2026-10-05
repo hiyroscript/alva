@@ -1,0 +1,141 @@
+/* Global overlays (loading, the confirm dialog, the rotate prompt), and
+   the shared surface finish that gives menu, battle, practice and dialog
+   surfaces the Home Play look; it overrides the screens above, so it must
+   stay after them. One part of the stylesheet index.html loads in order
+   (css/base.css first; see docs/development/conventions.md). */
+
+/* ---------------------------------------------------------------------
+   Global overlays: loading, confirm dialog, rotate
+   --------------------------------------------------------------------- */
+
+.loading-overlay {
+  position: fixed;
+  z-index: 50;
+  background: var(--bg);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+.loading-overlay.is-visible { opacity: 1; }
+.loading-inner { display: grid; justify-items: center; gap: 16px; width: min(360px, 84vw); text-align: center; }
+.logo--small { width: auto; height: 18px; margin-bottom: 8px; }
+.loading-label { font-size: 14px; font-weight: 600; color: var(--text); }
+.loading-bar { width: 100%; height: 4px; border-radius: 2px; background: var(--surface-muted); overflow: hidden; }
+.loading-bar[hidden] { display: none; }
+.loading-fill { height: 100%; background: var(--accent); transform-origin: left center; transform: scaleX(0); transition: transform 0.2s ease; }
+.loading-error { display: grid; gap: 16px; }
+.loading-error[hidden] { display: none; }
+.loading-message { color: var(--text-secondary); font-size: 14px; line-height: 1.5; }
+.loading-actions { display: flex; gap: 10px; justify-content: center; }
+
+.dialog-overlay { position: fixed; z-index: 60; background: rgba(0, 0, 0, 0.4); animation: dim-in 0.15s ease both; }
+.dialog-overlay > .dialog-panel { animation: fade-in 0.15s ease both; }
+.dialog-panel {
+  width: min(480px, 100%);
+  display: grid;
+  gap: 10px;
+  padding: clamp(16px, 3.4vh, 26px) clamp(16px, 2.4vw, 26px);
+  color: var(--text);
+  color-scheme: dark;
+  border-radius: var(--radius-lg);
+}
+.dialog-title { font-weight: 700; font-size: clamp(18px, 3.6vh, 24px); letter-spacing: -0.01em; color: var(--text-strong); }
+.dialog-message { color: var(--text-secondary); font-size: 14px; line-height: 1.5; }
+.dialog-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 8px; flex-wrap: wrap; }
+.dialog-actions .btn { flex: 1 1 180px; padding: 0 16px; }
+
+/* Match Home Play on the requested surfaces only. Keep shared radius
+   tokens, intentional pills, and result-dialog styling unchanged. */
+.screen--mode .btn-back,
+.screen--difficulty .btn-back,
+.screen--character .btn-back,
+.screen--map .btn-back,
+.screen--discover .btn-back,
+.mode-card,
+.mode-info,
+.mode-cta,
+.difficulty-card,
+.roster-panel,
+.slot,
+.char-preview,
+.btn--confirm,
+.map-hero,
+.map-card,
+.btn--start,
+.hud-side,
+.hud-center,
+.pause-overlay .pause-panel,
+.pause-overlay .pause-btn-item,
+.practice-more,
+.practice-menu-overlay .pause-panel,
+.practice-menu-overlay .pause-btn-item,
+.practice-roster-dialog,
+.practice-roster-dialog .btn-back,
+.dialog-overlay .dialog-panel,
+.dialog-overlay .dialog-actions .btn {
+  border-radius: 3px;
+}
+
+/* Square meeting corners inside the single bordered timer/pause holder. */
+.hud-time { border-radius: 2px 2px 0 0; }
+.hud-pause { border-radius: 0 0 2px 2px; }
+
+/* Preserve hover/pressed feedback and distinguish enabled secondary actions. */
+.pause-overlay .pause-btn-item:not(.is-primary):enabled,
+.practice-menu-overlay .pause-btn-item:not(.is-primary):enabled,
+.dialog-overlay .dialog-actions .btn:not(.btn--primary):enabled {
+  color: var(--text);
+}
+.pause-overlay .pause-btn-item:not(.is-primary):enabled:not(:hover):not(:active),
+.practice-menu-overlay .pause-btn-item:not(.is-primary):enabled:not(:hover):not(:active),
+.dialog-overlay .dialog-actions .btn:not(.btn--primary):enabled:not(:hover):not(:active) {
+  background: transparent;
+}
+/* Outline-only actions (pause Restart Battle / Return to Home, Practice
+   Return, and Keep Playing in Return to Home?): no fill in any state. The
+   focus ring and press scale come from the base rules and are left alone. */
+.pause-overlay .pause-btn-item.is-outline-only,
+.pause-overlay .pause-btn-item.is-outline-only:hover,
+.pause-overlay .pause-btn-item.is-outline-only:focus,
+.pause-overlay .pause-btn-item.is-outline-only:active,
+.practice-menu-overlay .pause-btn-item.is-outline-only,
+.practice-menu-overlay .pause-btn-item.is-outline-only:hover,
+.practice-menu-overlay .pause-btn-item.is-outline-only:focus,
+.practice-menu-overlay .pause-btn-item.is-outline-only:active,
+.dialog-overlay .dialog-actions .btn.is-outline-only,
+.dialog-overlay .dialog-actions .btn.is-outline-only:hover,
+.dialog-overlay .dialog-actions .btn.is-outline-only:focus,
+.dialog-overlay .dialog-actions .btn.is-outline-only:active {
+  background: transparent;
+}
+
+.rotate-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: none;
+  place-items: center;
+  background: var(--bg);
+  padding: 24px;
+  text-align: center;
+}
+html.is-portrait-blocked .rotate-overlay { display: grid; }
+.rotate-inner { display: grid; justify-items: center; gap: 12px; }
+.rotate-icon { width: 96px; height: 96px; fill: none; stroke: var(--border-hover); stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.rotate-phone--land, .rotate-arrow { stroke: var(--text); }
+.rotate-icon .rotate-phone:not(.rotate-phone--land) { animation: rotate-hint 2.4s var(--ease) infinite; transform-origin: 32px 26px; }
+@keyframes rotate-hint { 0%, 30% { transform: none; } 55%, 85% { transform: rotate(-90deg); } 100% { transform: none; } }
+.rotate-title { font-weight: 700; font-size: 20px; color: var(--text-strong); }
+.rotate-text { color: var(--text-secondary); font-size: 14px; }
+
+.boot-error {
+  position: fixed;
+  inset: auto 0 0 0;
+  padding: 16px;
+  text-align: center;
+  color: var(--text);
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  z-index: 200;
+}
+.boot-error[hidden] { display: none; }
+

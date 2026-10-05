@@ -14,20 +14,20 @@
 // preview. The open page is itself a stop in menu navigation so a gamepad can
 // scroll it: ↑ / ↓ scroll it, and leave it once it can scroll no further.
 //
-// The copy is read through the translations (js/core/i18n.js), keyed by the
+// The copy is read through the translations (js/localization/i18n.js), keyed by the
 // registries' own ids: English is the registries' copy itself, French its
 // translation, and the pages follow the interface language.
 
 import { Screen } from '../core/screen-manager.js';
 import { findNeighbor } from '../core/menu-navigator.js';
 import { el } from '../core/utils.js';
-import { tx, tattr } from '../core/i18n.js';
+import { tx, tattr } from '../localization/i18n.js';
 import { screenHeader } from '../ui/components.js';
 import { POWERS } from '../data/powers.js';
 import { BASE_LAUNCH_VALUES, DIRECTIONAL_LAUNCHES } from '../data/launch.js';
 
 // Where the rail turns horizontal: narrow windows, but never short landscape
-// ones. Keep in step with the matching rule in styles.css (Discover, narrow).
+// ones. Keep in step with the matching rule in css/discover.css (narrow windows).
 const NARROW_QUERY = '(max-width: 600px) and (min-height: 441px), (max-aspect-ratio: 1/1) and (min-height: 600px)';
 
 const DIRECTIONS = ['up', 'down', 'left', 'right'];

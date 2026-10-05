@@ -1,7 +1,7 @@
 // Custom touch-control layouts: which controls a player may move and resize
 // in each Mobile Controls scheme, how a layout is stored, and the geometry
 // that turns a stored layout into places on the screen. Pure data and
-// math: TouchControls (js/game/touch-controls.js) applies a layout, the
+// math: TouchControls (js/ui/touch-controls.js) applies a layout, the
 // layout editor (js/ui/touch-layout-editor.js) makes one and Settings
 // (js/core/settings.js) keeps one per scheme.
 //
@@ -9,7 +9,7 @@
 // (never a translated label): { [id]: { x, y, scale } }. `x` and `y` are the
 // control's centre as fractions (0 to 1) of the touch-control area, the
 // screen inside its safe-area insets and a small margin (the padding of
-// .touch-controls in styles.css), so a layout made on one landscape screen
+// .touch-controls in css/touch-controls.css), so a layout made on one landscape screen
 // fits another. `scale` multiplies the control's own size, and its hit area
 // with it. A control a layout leaves out stays exactly where the stylesheet
 // puts it, at its own size: the empty layout is Alva's original one.

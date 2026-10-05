@@ -13,7 +13,7 @@
 // press edge, that Fighter hands to the same Dash as a double tap.
 
 import { ACTIONS } from '../config.js';
-import { HELD_CONTROLS, blankInput } from '../game/fighter-controller.js';
+import { HELD_CONTROLS, blankInput } from '../game/fighters/fighter-controller.js';
 
 const PAD_DEADZONE = 0.45;
 

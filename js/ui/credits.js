@@ -1,6 +1,6 @@
 // The credits, shown by the Home credits roll. Each group is a title, an
 // optional lead line and plain lines, every one a translation key (or
-// [key, params]; see js/core/i18n.js), so the roll follows the language.
+// [key, params]; see js/localization/i18n.js), so the roll follows the language.
 // Proper names (Jump Ultimate Stars, The Spriters Resource, Dazz, FRET,
 // thespriteanimations, DeviantArt) stay as they are in every language. A
 // line may also link to its source:
@@ -8,7 +8,7 @@
 // the address never.
 
 import { CONFIG } from '../config.js';
-import { t } from '../core/i18n.js';
+import { t } from '../localization/i18n.js';
 
 const developer = CONFIG.developer;
 

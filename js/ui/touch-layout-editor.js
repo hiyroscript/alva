@@ -23,12 +23,12 @@
 // follows the screen it is played on.
 
 import { el } from '../core/utils.js';
-import { t, tx, tattr, iconLabel, setText } from '../core/i18n.js';
+import { t, tx, tattr, iconLabel, setText } from '../localization/i18n.js';
 import { resolveSetting } from '../core/settings.js';
 import {
   TOUCH_CONTROL_IDS, TOUCH_SCALE, TOUCH_NUDGE, clampScale, normalizePoint, placeControl,
 } from '../core/touch-layout.js';
-import { TouchControls } from '../game/touch-controls.js';
+import { TouchControls } from './touch-controls.js';
 import { getPlayableCharacter } from '../data/characters.js';
 import { ICONS } from './icons.js';
 

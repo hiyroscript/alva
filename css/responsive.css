@@ -1,0 +1,69 @@
+/* Responsive adjustments: compact landscape (phones), tall windows and
+   wide desktops. Last, so it overrides everything above. One part of the
+   stylesheet index.html loads in order (css/base.css first; see
+   docs/development/conventions.md). */
+
+/* ---------------------------------------------------------------------
+   Responsive: compact landscape (phones), tall windows, wide desktops
+   --------------------------------------------------------------------- */
+
+@media (max-height: 560px) {
+  .screen--menu { gap: 8px; }
+  .screen-header { padding-bottom: 8px; }
+  .steps li { padding: 5px 8px 6px; }
+  .step-name { display: none; }
+  .hint-bar { display: none; }
+  .preview-info { gap: 7px; }
+}
+
+/* Four setup steps: between the full header and the phone layout (where
+   the steps hide), only the current step keeps its name. */
+@media (max-width: 1100px) {
+  .steps li:not(.is-current) .step-name { display: none; }
+}
+
+@media (max-height: 560px) {
+  .difficulty-card { min-height: 0; --bar-h: clamp(30px, 11vh, 52px); gap: 8px; }
+}
+
+@media (max-width: 720px) {
+  .difficulty-scale { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .difficulty-card { min-height: 0; }
+}
+
+@media (max-height: 420px) {
+  .screen-heading .kicker { display: none; }
+  .mode-desc { display: none; }
+  .difficulty-card { padding: 10px 12px; gap: 6px; --bar-h: 30px; }
+  .difficulty-index { font-size: 22px; }
+  .difficulty-name { font-size: 17px; }
+  .difficulty-desc { min-height: 2.6em; font-size: 11.5px; line-height: 1.3; }
+  .map-card-tag { display: none; }
+  .hud-side { padding: 3px 8px 3px 3px; }
+  .hud-p2 { padding: 3px 3px 3px 8px; }
+  .hud-time { padding: 2px 6px 3px; }
+}
+
+@media (max-width: 760px) {
+  .steps { display: none; }
+}
+
+/* Tall / narrow desktop windows: stack panels instead of squeezing them. */
+@media (max-aspect-ratio: 1/1) and (min-height: 600px) {
+  .char-layout, .map-layout { grid-template-columns: 1fr; grid-template-rows: minmax(0, 1.4fr) minmax(0, 1fr); }
+  .mode-layout { grid-template-columns: 1fr; grid-template-rows: auto minmax(0, 1fr); }
+  .difficulty-scale { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (min-width: 1700px) and (min-height: 900px) {
+  .roster-grid { --slot: 118px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}

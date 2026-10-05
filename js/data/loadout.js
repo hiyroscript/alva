@@ -22,10 +22,10 @@
 //                        attackN on the ground, its mid-air version in the
 //                        air (both in `attacks`)
 //   a summon             { type: 'summon', id: 'attackN' }: sends out the
-//                        detached entity `summons.attackN` (js/game/clone.js)
+//                        detached entity `summons.attackN` (js/game/combat/summon.js)
 //   a technique          { type: 'technique', id: 'attackN' }: the fighter
 //                        itself performs the multi-phase move
-//                        `techniques.attackN` (js/game/technique.js)
+//                        `techniques.attackN` (js/game/combat/technique.js)
 //
 // A summon or a technique is ground-only and has no mid-air version; each
 // has its own cooldown. attack1 and attack2 are always ordinary attacks;
@@ -50,7 +50,7 @@
 // js/data/characters.js refuses to load one that breaks any.
 
 import { COMBAT_BUTTONS, MOVES, NUMBERED_ATTACKS } from '../config.js';
-import { TECHNIQUE_CLIPS, TECHNIQUE_EFFECTS } from '../game/technique.js';
+import { TECHNIQUE_CLIPS, TECHNIQUE_EFFECTS } from '../game/combat/technique.js';
 
 export { NUMBERED_ATTACKS };
 

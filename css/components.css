@@ -1,0 +1,184 @@
+/* Shared controls (buttons, cards, focus rings), the menu screen frame
+   and the shared panel surface. One part of the stylesheet index.html
+   loads in order (css/base.css first; see
+   docs/development/conventions.md). */
+
+/* ---------------------------------------------------------------------
+   Shared controls
+   --------------------------------------------------------------------- */
+
+.kicker {
+  font-family: var(--font-mono);
+  font-size: clamp(10px, 1.55vh, 12px);
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: clamp(42px, 7vh, 52px);
+  padding: 0 20px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+  font-weight: 600;
+  font-size: clamp(13px, 2vh, 15px);
+  transition: background-color var(--dur-fast) ease, border-color var(--dur-fast) ease, box-shadow var(--dur-fast) ease, transform 80ms ease;
+}
+.btn .icon { font-size: 1.15em; }
+.btn:hover { background: var(--surface-subtle); border-color: var(--border-hover); }
+.btn:focus { box-shadow: var(--focus-ring); }
+.btn:active { transform: scale(0.985); background: var(--surface-muted); }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+.btn--primary { background: var(--action); border-color: var(--action); color: var(--white); }
+.btn--primary:hover { background: var(--action-hover); border-color: var(--action-hover); }
+.btn--primary:active { background: var(--action-pressed); border-color: var(--action-pressed); }
+
+.btn-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: clamp(36px, 6vh, 44px);
+  padding: 0 14px 0 10px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-weight: 600;
+  font-size: 14px;
+  flex: none;
+  transition: background-color var(--dur-fast) ease, border-color var(--dur-fast) ease, box-shadow var(--dur-fast) ease, transform 80ms ease;
+}
+.btn-back .icon { font-size: 18px; }
+.btn-back:hover { background: var(--surface-subtle); border-color: var(--border-strong); }
+.btn-back:focus { box-shadow: var(--focus-ring); }
+.btn-back:active { transform: scale(0.97); }
+
+kbd {
+  display: inline-grid;
+  place-items: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 5px;
+  border: 1px solid var(--border-strong);
+  border-bottom-width: 2px;
+  background: var(--surface);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.hint-bar {
+  flex: none;
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 6px 20px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.hint { display: inline-flex; align-items: center; gap: 4px; }
+.hint-label { margin-left: 4px; }
+html.is-touch .hint-bar { display: none; }
+
+.panel-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: clamp(6px, 1.4vh, 12px);
+}
+.panel-title {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+.panel-meta { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted); }
+.panel-meta b { color: var(--text-strong); font-weight: 700; }
+.panel-note { color: var(--text-secondary); font-size: 13px; line-height: 1.5; }
+
+/* ---------------------------------------------------------------------
+   Menu screen frame
+   --------------------------------------------------------------------- */
+
+.screen--menu {
+  gap: clamp(10px, 2.4vh, 24px);
+  padding:
+    max(var(--safe-t), var(--pad-y))
+    max(var(--safe-r), var(--pad))
+    max(var(--safe-b), clamp(10px, 2.2vh, 24px))
+    max(var(--safe-l), var(--pad));
+}
+
+.screen-header {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: clamp(12px, 2vw, 24px);
+  padding-bottom: clamp(10px, 2.2vh, 20px);
+  border-bottom: 1px solid var(--border);
+}
+.screen-heading { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.screen-title {
+  font-weight: 700;
+  font-size: clamp(20px, 4.4vh, 32px);
+  line-height: 1.1;
+  letter-spacing: -0.015em;
+  color: var(--text-strong);
+  white-space: nowrap;
+}
+
+.steps {
+  margin: 0 0 0 auto;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  gap: 4px;
+}
+.steps li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px 9px;
+  border-bottom: 2px solid var(--border);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+.step-num {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1px solid currentColor;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+}
+.steps li:not(.is-done):not(.is-current) .step-num { border-color: var(--border-strong); }
+.step-num .icon { font-size: 12px; stroke-width: 3; }
+.steps li.is-done { color: var(--text-secondary); border-bottom-color: var(--border-strong); }
+.steps li.is-current { color: var(--text-strong); font-weight: 600; border-bottom-color: var(--accent); }
+.steps li.is-current .step-num { background: var(--accent); border-color: var(--accent); color: var(--black); }
+
+.screen-body { flex: 1; min-height: 0; display: grid; gap: clamp(10px, 1.8vw, 22px); }
+
+/* Shared panel surface */
+.mode-info, .roster-panel, .char-preview {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+

@@ -13,7 +13,7 @@
 
 import { CONFIG } from '../config.js';
 import { el } from '../core/utils.js';
-import { tx, tattr, setText } from '../core/i18n.js';
+import { tx, tattr, setText } from '../localization/i18n.js';
 import { ICONS } from './icons.js';
 import { CHARACTERS, isPlayable, getPlayableCharacter } from '../data/characters.js';
 import { fitCanvas, drawFrameAt, paintPortrait } from './sprite-art.js';

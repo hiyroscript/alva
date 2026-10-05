@@ -9,7 +9,7 @@
 
 import { Screen } from '../core/screen-manager.js';
 import { el } from '../core/utils.js';
-import { tx, tattr, iconLabel, setAttr, plural } from '../core/i18n.js';
+import { tx, tattr, iconLabel, setAttr, plural } from '../localization/i18n.js';
 import { ICONS } from '../ui/icons.js';
 import { screenHeader, QUICK_BATTLE_SETUP } from '../ui/components.js';
 import { MAPS, getMap } from '../data/maps.js';

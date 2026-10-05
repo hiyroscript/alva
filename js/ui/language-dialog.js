@@ -13,7 +13,7 @@
 // only way on, so Back does nothing here.
 
 import { el } from '../core/utils.js';
-import { LANGUAGES, LANGUAGE_NAMES, bilingual } from '../core/i18n.js';
+import { LANGUAGES, LANGUAGE_NAMES, bilingual } from '../localization/i18n.js';
 
 // The language the browser prefers, if it is one of ours, else English:
 // the option focused first, never chosen for the player.

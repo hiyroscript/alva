@@ -5,9 +5,16 @@ Some larger pieces of work have a name, so they can be referred to later
 update"). Each entry says what the update added, where its tuning lives, and
 which tests cover it. Anything not listed under an update is unchanged by it.
 
+This file is the project's history. The pull requests, commits, values and
+descriptions below record what each change was when it was made; the
+file paths in "Where to tune it", "Code" and "Tests" point at where those
+things live now (see [Repository reorganization](#repository-reorganization)
+for where they moved). The game as it is now is specified in
+[`ALVA_SPEC.md`](./ALVA_SPEC.md) and explained in [`docs/`](./docs/README.md).
+
 | Name | Pull request | Commit | In one line |
 | --- | --- | --- | --- |
-| **Movement update** | [#49](https://github.com/hiyroscript/alva/pull/49), then [#57](https://github.com/hiyroscript/alva/pull/57) ([second pass](#second-pass)) | `a34fbdd`, then `e75dbb6` | Movement feel, attack momentum and combo flow for #0001 |
+| **Movement update** | [#49](https://github.com/hiyroscript/alva/pull/49), then [#57](https://github.com/hiyroscript/alva/pull/57) ([second pass](#second-pass)) | `a34fbdd`, then `e75dbb6` | The shared movement feel, attack momentum and combo flow, first tuned on #0001 |
 | **Effect update** | [#50](https://github.com/hiyroscript/alva/pull/50) | `487b9af` | Short hop, air jump, launch reaction, perfect Shield and hit effects |
 | **Bounce update** | [#51](https://github.com/hiyroscript/alva/pull/51) | `f7c1e28` | Hard launches rebound off walls, floors and ceilings |
 
@@ -16,63 +23,112 @@ assumes the movement update, and the bounce update assumes both.
 
 ## Movement update
 
-Makes #0001's movement quicker and its attacks flow into each other.
-MultiVersus was the reference for the feel only; every ALVA mechanic is kept.
-A [second pass](#second-pass) later made it snappier and opened the combos
-further; the list below is the update as it stands now.
+The movement update reworked how fighters move and how attacks flow into
+each other. MultiVersus was the reference for the feel only; every ALVA
+mechanic is kept. It has three layers: the shared mechanics it built into
+the Fighter, the per-fighter values those mechanics read, and the tuning
+it gave #0001, the only fighter at the time. A [second pass](#second-pass)
+later made it snappier and opened the combos further; the lists below are
+the update as it stands now.
 
-**What it added**
+### The shared mechanics
 
-- **Ground movement:** top speed in about 0.08 s, a short natural stop, and
-  turns that brake hard before accelerating.
-- **Air steering:** bends the drift instead of replacing it, so a running
-  jump carries its speed.
-- **Fast fall:** Down held in the air while falling. (Down is now a
-  direction only; see [Attack 3 and Attack 4 on their own
-  buttons](#attack-3-and-attack-4-on-their-own-buttons).)
-- **Dash handoff:** a Dash eases into the run instead of sliding on.
-- **Attack momentum:** a running attack1 slides on, attack2 steps in, aerials keep
-  their drift and follow the stick almost fully, and the Throw can back
-  off. An attack faces the direction held as it starts.
-- **Combat input buffer:** a Throw, attack1 or attack2 press that comes too early is
-  kept for 0.15 s and fires on the first step it can.
-- **Hit-cancel:** a hit that connects (not a block or a whiff) can be cut
-  short into another attack, a jump or, on the ground, a Dash.
-- **Dash cancel:** the Dash out of a hit costs 40 Energy instead of 15, so
-  a full bar allows two and a third empties it (the Shield goes with it).
-  That is what keeps attack1 → Dash → attack1 from looping. A Dash asked for during
-  the hit's freeze comes out the step it ends.
-- A hit now interrupts the target's own attack.
-- **Combo routes:** at low Launch Point, attack1 → attack2, attack1 → attack1,
-  attack2 → jump → midair_attack1 and midair_attack2 → land → attack1 all connect;
-  attack1 → Dash → attack1 chases attack1's push up to about 85 Launch Point, and
-  attack2 → jump → midair_attack1 carries on into a third aerial (through the air
-  jump up to about 40). They break naturally as Launch Point grows.
+What the update added to the movement and combat systems. They are the
+Fighter's, for every fighter that has the data they read (today
+[`js/game/fighters/movement.js`](./js/game/fighters/movement.js) and
+[`js/game/fighters/fighter.js`](./js/game/fighters/fighter.js);
+explained in [docs/systems/movement.md](./docs/systems/movement.md)):
 
-**Where to tune it** (`js/data/characters.js`, #0001)
+- **Ground responsiveness:** acceleration to top speed, a natural stop
+  under deceleration, and turns that brake hard (acceleration × the turn
+  boost, never softer than letting go) before accelerating the other way.
+- **Air steering:** steering bends the drift instead of replacing it, so
+  a running jump carries its speed.
+- **Fast fall:** Down held in the air while falling speeds the fall up to
+  a set speed. (Down is now a direction only; see [Attack 3 and Attack 4
+  on their own buttons](#attack-3-and-attack-4-on-their-own-buttons).)
+- **Dash handoff:** after a Dash, the excess over top speed bleeds off
+  (overspeed deceleration), so the Dash eases into the run instead of
+  sliding on.
+- **Attack momentum:** an attack keeps a share of the speed it started
+  with (`momentum`, `airMomentum`; on the ground never more than that
+  share of top speed), may be steered with a share of normal control
+  (`control`, `airControl`), runs the rest down under its `friction`, and
+  may step in by itself (`step`). An attack faces the direction held as it
+  starts.
+- **Combat input buffer:** an attack press that comes too early is kept
+  for the fighter's `attackBuffer` and fires on the first step it can.
+- **Hit-cancel:** an attack that connects (not a block or a whiff) can be
+  cut short from its `hitCancel` time into another attack, a jump or, on
+  the ground, a Dash.
+- **Dash cancel:** that Dash costs `energy.dashCancelCost` instead of the
+  plain `dashCost`, which is what keeps a hit → Dash → hit chase from
+  looping. A Dash asked for during the hit's freeze comes out the step it
+  ends.
+- **Combat interruption:** a hit now interrupts the target's own attack.
+
+### The per-fighter values
+
+Each fighter supplies the numbers those mechanics read, in its own
+definition (today `js/data/characters/<id>.js`; every field, its unit and
+default in [docs/systems/movement.md](./docs/systems/movement.md#2-the-movement-profile)):
 
 - `movement`: `acceleration`, `deceleration`, `turnBoost`,
   `overspeedDeceleration`, `airAcceleration`, `airDeceleration`,
   `airTurnBoost`, `fastFallAcceleration`, `fastFallSpeed`, `attackBuffer`,
   `hitstunFriction`, `hitstunAirDrag`.
-- `energy.dashCancelCost`: what a Dash cancel costs.
+- `energy.dashCancelCost`: what a Dash cancel costs (the fighter's
+  `dashCost` when it declares none).
 - Each attack in `attacks`: `momentum` / `airMomentum`, `control` /
   `airControl`, `friction`, `step`, `hitCancel`, plus `hitstun`,
-  `hitstop` and `cooldown`, which set the combo routes.
+  `hitstop` and `cooldown`, which set its combo routes.
 
-**Code:** `Fighter.moveHorizontal`, `moveAttack`, `attackStartSpeed`,
-`tryDash` and `dashAsked` in `js/game/character.js`; `CombatState` and
-`resolveEnergy` in `js/game/combat.js`. The combat AI
-(`js/game/combat-ai.js`) predicts attack drift from the same data.
+### #0001's tuning
 
-**Tests:** `tests/movement.test.mjs`, `tests/combo.test.mjs` (the Dash
-cancel included), and the Dash cancel's cost in `tests/energy.test.mjs`.
+The update was tuned on #0001, and these values and routes are #0001's
+own (in [`js/data/characters/0001.js`](./js/data/characters/0001.js);
+specified in [docs/characters/0001.md](./docs/characters/0001.md)). They
+are not requirements for any other fighter: #0002, added later, has its
+own profile and routes.
+
+- **Movement:** top speed in about 0.08 s, a short natural stop, a full
+  turn in about 0.12 s; aerials keep their drift and follow the stick
+  almost fully.
+- **Attacks:** a running attack1 slides on, attack2 steps in, and the
+  Throw can back off. The buffer covers its Throw, attack1 and attack2
+  presses, for 0.15 s.
+- **Dash cancel:** 40 Energy instead of 15, so a full bar allows two and a
+  third empties it (the Shield goes with it). That is what keeps its
+  attack1 → Dash → attack1 from looping.
+- **Combo routes:** at low Launch Point, attack1 → attack2, attack1 →
+  attack1, attack2 → jump → midair_attack1 and midair_attack2 → land →
+  attack1 all connect; attack1 → Dash → attack1 chases attack1's push up to
+  about 85 Launch Point, and attack2 → jump → midair_attack1 carries on
+  into a third aerial (through the air jump up to about 40). They break
+  naturally as Launch Point grows.
+
+**Where to tune it:** each fighter's `movement`, `energy` and `attacks`
+(above); #0001's in `js/data/characters/0001.js`.
+
+**Code:** `steer`, `steerAttack` and `attackStartSpeed` in
+`js/game/fighters/movement.js` (they were `Fighter.moveHorizontal`,
+`moveAttack` and `attackStartSpeed`, which now call them); `tryDash` and
+`dashAsked` in `js/game/fighters/fighter.js`; `CombatState` and
+`resolveEnergy` in `js/game/combat/combat-state.js`. The combat AI
+(`js/game/ai/combat-ai.js`) predicts attack drift from the same data.
+
+**Tests:** `tests/systems/movement.test.mjs`, `tests/systems/combo.test.mjs`
+(the Dash cancel included), and the Dash cancel's cost in
+`tests/systems/energy.test.mjs`, all with #0001's values;
+`tests/systems/movement-profile.test.mjs` for the shared rules with any
+values and every playable fighter.
 
 ### Second pass
 
 Pull request [#57](https://github.com/hiyroscript/alva/pull/57), commit `e75dbb6`. Asked for as "the
 movement update needs to feel better and combos to be even more open".
-Values it changed, old → new, for undoing any one of them:
+Values it changed in #0001's definition (the only fighter then), old →
+new, for undoing any one of them:
 
 | Where | Field | Before | After |
 | --- | --- | --- | --- |
@@ -93,13 +149,13 @@ The mid-air attacks were named `midairBa1` and `midairBa2` when this pass
 was made; they are `midair_attack1` and `midair_attack2` now (see
 [Control and move codenames](#control-and-move-codenames)).
 
-It also added the Dash cancel itself (`Fighter.tryDash` accepts an attack
+It also added the Dash cancel itself, a shared rule (`Fighter.tryDash` accepts an attack
 that may be cut short), and kept a Dash asked for during a hit's freeze
 (`Fighter.dashAsked`, `frozenDash`). Setting `dashCancelCost` does not turn
 Dash cancels off. To take them out, put back `canAct()` in place of
 `canFollowUp()` in `tryDash`.
 
-Measured, in steps of 1/60 s: top speed 6 → 5, a full turn 8 → 7, a full
+Measured on #0001, in steps of 1/60 s: top speed 6 → 5, a full turn 8 → 7, a full
 air reversal 13 → 10, a fast fall from a jump's apex 11 → 9. The longest
 true combo from 0 Launch Point is still 9 hits. At 40–60 it went from one
 or two hits to a four-hit Dash chase.
@@ -108,18 +164,18 @@ or two hits to a four-hit Dash chase.
 
 Not part of the update, but it moves the numbers above. #0001's damage was
 lowered afterwards: attack1 and midair_attack1 5 → 3, attack2 and midair_attack2 10 → 5,
-the Sphere Rush blast 15 → 10 (`damage` in `js/data/characters.js`). Each
+the Sphere Rush blast 15 → 10 (`damage` in `js/data/characters/0001.js`). Each
 hit now pushes and launches a little less, so:
 
 - From 0 Launch Point, attack1 → attack1 strings up to 6 hits (was 4) and the
   attack1 → Dash → attack1 chase up to 7 (was 5): the same three Dashes empty the
   bar, then plain BA1s carry on until the push ends it. Neither loops;
-  `tests/combo.test.mjs` allows 6 and 7.
+  `tests/systems/combo.test.mjs` allows 6 and 7.
 - Each route's Launch Point limit moved up, by about 2 for the attack1 routes
   and about 5 for the attack2 routes: attack2 → jump → midair_attack1 now reaches
   about 65, and the third aerial through the air jump about 45.
 - The combat AI weighs a hit's damage at `damage / 6` instead of `/ 10`
-  (`hitValue` in `js/game/combat-ai.js`), so it values its hits, and so its
+  (`hitValue` in `js/game/ai/combat-ai.js`), so it values its hits, and so its
   Clone Attack and Sphere Rush, as it did before the cut.
 
 ### Later: turning during actions
@@ -167,25 +223,25 @@ launch steering or perfect Shield is about this update.
 
 **Where to tune it**
 
-- `js/data/characters.js`, #0001:
+- Each fighter's definition (#0001's then; `js/data/characters/0001.js`):
   - `movement`: `airJumps`, `airJumpRatio` (`shortHopWindow` and
     `shortHopHeight` are gone, see below);
   - `launchReaction`: `stunPerThousand`, `maxStun`, `tumbleSpeed`,
     `steerAngle`;
   - `defense`: `perfectWindow`, `perfectRearm`.
-- `js/game/hit-fx.js`: `HIT_FX` (`shake`, `flash`, `sparks`, `trail`,
+- `js/game/rendering/hit-fx.js`: `HIT_FX` (`shake`, `flash`, `sparks`, `trail`,
   `lethal`).
 
-**Code:** the jump and Shield timing in `js/game/character.js`;
+**Code:** the jump and Shield timing in `js/game/fighters/fighter.js`;
 `resolveLaunchReaction`, `resolveLaunchStun`, `steerLaunch` and the perfect
-Shield in `CombatSystem.applyHit` (`js/game/combat.js`); `HitEffects` and
-`launchIsLethal` in `js/game/hit-fx.js`, drawn by `js/game/arena.js`.
+Shield in `CombatSystem.applyHit` (`js/game/combat/combat.js`); `HitEffects` and
+`launchIsLethal` in `js/game/rendering/hit-fx.js`, drawn by `js/game/arena.js`.
 
 **Tests:**
-- `tests/hit-fx.test.mjs`
-- `tests/launch-reaction.test.mjs`
-- the air jump in `tests/movement.test.mjs`
-- perfect Shield in `tests/defense.test.mjs`
+- `tests/systems/hit-fx.test.mjs`
+- `tests/systems/launch-reaction.test.mjs`
+- the air jump in `tests/systems/movement.test.mjs`
+- perfect Shield in `tests/systems/defense.test.mjs`
 
 ### Later: the short hop is gone
 
@@ -221,21 +277,21 @@ ceiling and landing are unchanged.
 
 **Where to tune it**
 
-- `js/game/launch-bounce.js`: `LAUNCH_BOUNCE` (`enabled`,
+- `js/game/combat/launch-bounce.js`: `LAUNCH_BOUNCE` (`enabled`,
   `minImpactSpeed`, `wallRestitution`, `floorRestitution`,
   `ceilingRestitution`, `maxBounces`, `stun`, `hitstop`, `hitstopSpeed`).
 - A character can override any of these with its own `launchBounce` entry
-  in `js/data/characters.js`; `enabled: false` turns bouncing off.
-- `js/game/hit-fx.js`: `HIT_FX.bounce` for the rebound sparks and shake.
+  (`js/data/characters/<id>.js`); `enabled: false` turns bouncing off.
+- `js/game/rendering/hit-fx.js`: `HIT_FX.bounce` for the rebound sparks and shake.
 
 **Code:**
-- `js/game/launch-bounce.js` decides the rebounds.
+- `js/game/combat/launch-bounce.js` decides the rebounds.
 - `stepBody` in `js/game/physics.js` reports the speed it stopped
   (`impactVx` / `impactVy`).
-- `js/game/character.js` applies the rebound's stun and freeze.
+- `js/game/fighters/fighter.js` applies the rebound's stun and freeze.
 
-**Tests:** `tests/launch-bounce.test.mjs`, plus the attack2 spike tests in
-`tests/attack2.test.mjs`.
+**Tests:** `tests/systems/launch-bounce.test.mjs`, plus the attack2 spike tests in
+`tests/fighters/0001/attack2.test.mjs`.
 
 ## Jump, Shield, turning and joystick changes
 
@@ -275,30 +331,31 @@ joystick).
   attack away from its opponent.
 - The air jump and the fast fall are unchanged.
 
-**Where to tune it** (`js/data/characters.js`, #0001)
+**Where to tune it** (each fighter's definition; the values are #0001's,
+in `js/data/characters/0001.js`)
 
 - `movement`: `highJumpWindow` (0.15), `highJumpHeight` (1.4).
 - `defense`: `slowFallSpeed` (200), `slowFallBrake` (6000). Left out (or
-  0), a Shield falls as ever (`SHIELD_DEFAULTS` in `js/game/combat.js`).
+  0), a Shield falls as ever (`SHIELD_DEFAULTS` in `js/game/combat/defense.js`).
 - The Joystick layout's geometry: `--tc-stick-left`, `.tc-stick-down`,
-  `.tc-dash-left` and `.tc-joystick` in `styles.css`.
+  `.tc-dash-left` and `.tc-joystick` in `css/touch-controls.css`.
 
 **Code:** the higher jump (`Fighter.highJump`, `highJumpLift`), the slow
-fall and `updateFacing` in `js/game/character.js`; the fall cap in
+fall and `updateFacing` in `js/game/fighters/fighter.js`; the fall cap in
 `stepBody` (`js/game/physics.js`); `jumpTapHold` in
-`js/game/fighter-controller.js` and the mid-attack guard in
-`CombatAIController.guard` (`js/game/combat-ai.js`); the layout in
-`js/game/touch-controls.js`, `styles.css` and the Settings card, now in
+`js/game/fighters/fighter-controller.js` and the mid-attack guard in
+`CombatAIController.guard` (`js/game/ai/combat-ai.js`); the layout in
+`js/ui/touch-controls.js`, `css/touch-controls.css` and the Settings card, now in
 `js/ui/settings-dialog.js` (it was `js/screens/settings-screen.js` before
 Settings became a dialog).
 
 **Tests:**
-- the higher jump and the CPUs' jumps in `tests/movement.test.mjs`
-- the slow fall in `tests/defense.test.mjs`
-- turning in `tests/facing.test.mjs`, `tests/attack1.test.mjs`,
-  `tests/attack2.test.mjs`, `tests/extra-attack.test.mjs`, and the CPU's
-  guard in `tests/combat-ai.test.mjs`
-- the Joystick layout in `tests/controls-ui.test.mjs`
+- the higher jump and the CPUs' jumps in `tests/systems/movement.test.mjs`
+- the slow fall in `tests/systems/defense.test.mjs`
+- turning in `tests/systems/facing.test.mjs`, `tests/fighters/0001/attack1.test.mjs`,
+  `tests/fighters/0001/attack2.test.mjs`, `tests/fighters/0001/extra-attack.test.mjs`, and the CPU's
+  guard in `tests/systems/combat-ai.test.mjs`
+- the Joystick layout in `tests/interface/controls-ui.test.mjs`
 
 ## Roster reset
 
@@ -343,29 +400,29 @@ future one is enabled. It deleted content and closed routes; no tuning of
 
 **Where to change it**
 
-- `available` on a definition in `js/data/characters.js`: `true` makes it
-  playable again. Nothing else needs undoing.
+- `available` on a definition (`js/data/characters/<id>.js` today):
+  `true` makes it playable again. Nothing else needs undoing.
 
 **Code:** `js/data/characters.js`; `initialSelection`, `preloadFighters` and
 `loadCharacter` in `js/core/app.js`; `HomeScreen.syncMatchActions` in
-`js/screens/home-screen.js` (with `.home-note` in `styles.css`);
+`js/screens/home-screen.js` (with `.home-note` in `css/home.css`);
 `FighterRoster` in `js/ui/fighter-roster.js`; `CharacterSelectScreen` in
 `js/screens/character-select-screen.js`; `BattleScreen.enter` / `refuse`
 in `js/screens/battle-screen.js`; `practiceDefaultFighter` and `enter` in
 `js/screens/practice-screen.js`; the Back-only error in
 `LoadingOverlay.showError` (`js/ui/overlays.js`); the new strings in
-`js/core/i18n.js`.
+`js/localization/`.
 
-**Tests:** the shipped state in `tests/empty-roster.test.mjs` (the data,
+**Tests:** the shipped state in `tests/integration/empty-roster.test.mjs` (the data,
 the removed fighters' absence, startup, the roster, Select Fighter and
 Watch Mode's CPU screens, Practice Ground and Home); the Battle screen's
-refusals in `tests/battle-screen.test.mjs`. The screen tests that need a
-fighter to pick register test-only ones from `tests/test-fighters.mjs`
+refusals in `tests/interface/battle-screen.test.mjs`. The screen tests that need a
+fighter to pick register test-only ones from `tests/fighters/fixtures/test-fighters.mjs`
 (#0001's definition under neutral ids, taken out again after each run).
 
 ### Later: #0001 re-enabled
 
-#0001 is playable again: `available: true` in `js/data/characters.js`, the
+#0001 is playable again: `available: true` in its definition (`js/data/characters/0001.js` today), the
 one change "Where to change it" above names, and nothing else in the game
 changed. With it, slot 01 is open on every roster and #0001 is what startup
 preloads, Quick Battle's initial pick, both Watch Mode CPUs and the
@@ -374,13 +431,13 @@ fixed id). Home's match actions are open and its "No fighters available"
 note hidden. Every zero-fighter path stays in the code and is still
 tested.
 
-**Tests:** `tests/empty-roster.test.mjs` checks the shipped state (#0001
+**Tests:** `tests/integration/empty-roster.test.mjs` checks the shipped state (#0001
 alone playable and every default) and disables #0001 for its own run to
-keep the zero-fighter checks; `tests/discover.test.mjs` does the same for
+keep the zero-fighter checks; `tests/interface/discover.test.mjs` does the same for
 Discover. Where a screen test needs a fighter that exists but is not
-playable, it registers `TEST_DISABLED` (`tests/test-fighters.mjs`, slot 07)
-instead of #0001 (`tests/battle-screen.test.mjs`,
-`tests/touch-layout.test.mjs`). The Watch Mode and Practice Ground tests
+playable, it registers `TEST_DISABLED` (`tests/fighters/fixtures/test-fighters.mjs`, slot 07)
+instead of #0001 (`tests/interface/battle-screen.test.mjs`,
+`tests/interface/touch-layout.test.mjs`). The Watch Mode and Practice Ground tests
 expect #0001 as the first playable fighter.
 
 ## Control and move codenames
@@ -415,7 +472,7 @@ Old → new, as it was then:
 A character's `defense` entry (what the `shield` button does, with the
 perfect Shield's `perfectWindow` and `perfectRearm`) kept its name, as
 `movement` did; the art files kept theirs until the migration below. The
-regression checks are in `tests/codenames.test.mjs`.
+regression checks are in `tests/systems/codenames.test.mjs`.
 
 ## Attack codenames and loadouts
 
@@ -468,7 +525,7 @@ on their own buttons](#attack-3-and-attack-4-on-their-own-buttons).)
   path from the character's id.
 - **Tests.** The old attack test files became `attack1`, `attack2`,
   `attack4-sphere-rush` and `extra-attack` (`.test.mjs`); the loadout
-  matrix is new (`tests/loadout-fighters.mjs`, `tests/loadout.test.mjs`);
+  matrix is new (`tests/fighters/fixtures/loadout-fighters.mjs`, `tests/systems/loadout.test.mjs`);
   the sample fighter has three numbered attacks.
 
 Old → new, for #0001 (the old names survive nowhere else):
@@ -505,25 +562,25 @@ requested `mouvment` stem.
   `loadoutProblems`); the codenames:
   `NUMBERED_ATTACKS`, `COMBAT_BUTTONS`, `ACTIONS`, `MOVES` and
   `CONFIG.bindings` in `js/config.js`.
-- The touch slots: `.tc-attack[data-slot]` in `styles.css` and
-  `attackSlots` in `js/game/touch-controls.js`.
+- The touch slots: `.tc-attack[data-slot]` in `css/touch-controls.css` and
+  `attackSlots` in `js/ui/touch-controls.js`.
 
 **Code:** `js/data/loadout.js`, `js/data/characters.js`, `js/config.js`,
-`js/game/character.js` (`COMBAT_ACTIONS`, `tryAction`, the clip keys), `js/game/fighter-controller.js` (`HELD_CONTROLS`, `blankInput`),
-`js/core/input-manager.js`, `js/game/combat-ai.js`,
-`js/game/fighter-status.js` (`cooldownIndicators`, `cooldownLabel`),
-`js/ui/mobile-abilities.js`, `js/game/touch-controls.js`,
-`js/core/touch-layout.js`, `js/core/i18n.js`, `js/ui/icons.js` (`pip3` to
+`js/game/fighters/fighter.js` (`COMBAT_ACTIONS`, `tryAction`, the clip keys), `js/game/fighters/fighter-controller.js` (`HELD_CONTROLS`, `blankInput`),
+`js/core/input-manager.js`, `js/game/ai/combat-ai.js`,
+`js/game/rendering/fighter-status.js` (`cooldownIndicators`, `cooldownLabel`),
+`js/ui/mobile-abilities.js`, `js/ui/touch-controls.js`,
+`js/core/touch-layout.js`, `js/localization/`, `js/ui/icons.js` (`pip3` to
 `pip5`).
 
-**Tests:** `tests/loadout.test.mjs` (the matrix, each button's move, the
+**Tests:** `tests/systems/loadout.test.mjs` (the matrix, each button's move, the
 buffer, the keys, the CPU and every rule broken on purpose),
-`tests/codenames.test.mjs` (the vocabulary, the files and a scan for every
+`tests/systems/codenames.test.mjs` (the vocabulary, the files and a scan for every
 retired name), the touch matrix and slot geometry in
-`tests/controls-ui.test.mjs`, and the byte-for-byte checks of the renamed
-art in `tests/defense.test.mjs`,
-`tests/extra-attack.test.mjs`, `tests/clone.test.mjs` and
-`tests/attack4-sphere-rush.test.mjs`.
+`tests/interface/controls-ui.test.mjs`, and the byte-for-byte checks of the renamed
+art in `tests/systems/defense.test.mjs`,
+`tests/fighters/0001/extra-attack.test.mjs`, `tests/fighters/0001/clone.test.mjs` and
+`tests/fighters/0001/attack4-sphere-rush.test.mjs`.
 
 ## #0002, the speedster
 
@@ -586,31 +643,31 @@ Launch 1). The #0002 mirror still scores fewer Void falls than #0001's.
 
 **Where to tune it**
 
-- `js/data/characters.js`, #0002: each attack's damage, launch, timing,
+- `js/data/characters/0002.js`: each attack's damage, launch, timing,
   `hits`, `motion` fields (`range`, `speed`, `rebound`, `recoil`, `exit`,
   `fallSpeed`, `keep`, `maxSpeed`, `friction`), `airUses`, `freeFall` and
   `cooldown`; the tornado's `speed`, `lifetime`, `carry.lift`, `pierce` and
   `finisher`; `powers`, `movement` and the body.
-- The motion kinds' defaults: `MOTION_DEFAULTS` in `js/game/combat.js`;
+- The motion kinds' defaults: `MOTION_DEFAULTS` in `js/game/combat/attacks.js`;
   the homing lock-on's allowance behind: `HOMING_BEHIND` in
-  `js/game/character.js`.
+  `js/game/fighters/fighter.js`.
 
 **Code:** `createAttackDefinition` (`resolveStrikes`, `resolveMotion`),
 `attackReach`, `strikeLive`, `CombatSystem.strike` and `carry` in
-`applyHit` (`js/game/combat.js`); `startMotion`, `moveMotion`, `lockOn`,
+`applyHit` (`js/game/combat/attacks.js`, `js/game/combat/combat.js`); `startMotion`, `moveMotion`, `lockOn`,
 `aimAt`, `motionContact`, `attackContact`, `airStartBlocked`,
-`freeFall`, `hurtboxes` and `passingThrough` in `js/game/character.js`;
-`pierce` / `finisher` in `js/game/projectile.js`; `anchorY` in
-`js/game/sprite-normalizer.js` and `js/ui/sprite-art.js`; `motionFits`,
-`travelTime` and `steerHome` in `js/game/combat-ai.js`;
-`js/ui/credits.js`, `js/ui/icons.js`, `js/core/i18n.js`.
+`freeFall`, `hurtboxes` and `passingThrough` in `js/game/fighters/fighter.js`;
+`pierce` / `finisher` in `js/game/combat/projectile.js`; `anchorY` in
+`js/game/rendering/sprite-normalizer.js` and `js/ui/sprite-art.js`; `motionFits`,
+`travelTime` and `steerHome` in `js/game/ai/combat-ai.js`;
+`js/ui/credits.js`, `js/ui/icons.js`, `js/localization/`.
 
-**Tests:** `tests/fighter-0002.test.mjs` (the real PNGs, crops, scale and
+**Tests:** `tests/fighters/0002/fighter-0002.test.mjs` (the real PNGs, crops, scale and
 anchors, its ordinary buttons, every move's mechanics, the engine rules and their
 validation, the CPU); the roster, credits and translations in
-`tests/empty-roster.test.mjs`, `tests/settings.test.mjs` and
-`tests/i18n.test.mjs`; the roster screens in
-`tests/practice-ground.test.mjs` and `tests/watch-mode.test.mjs`.
+`tests/integration/empty-roster.test.mjs`, `tests/interface/settings.test.mjs` and
+`tests/interface/i18n.test.mjs`; the roster screens in
+`tests/integration/practice-ground.test.mjs` and `tests/integration/watch-mode.test.mjs`.
 
 ## Attack 3 and Attack 4 on their own buttons
 
@@ -647,7 +704,7 @@ Attack 4 became buttons of their own; neither move changed.
 - **Energy** refills at its one passive `regen` rate; **cooldowns** recover
   in real time (`CombatState.abilityCooldowns`, updated with the rest of
   the combat state every step).
-- **Renamed:** `js/game/technique.js` (the `Technique` class) and the
+- **Renamed:** `js/game/combat/technique.js` (the `Technique` class) and the
   characters' `techniques`; `CombatState.abilityCooldowns`; the CPU's
   `specials`; the difficulty trait `specials`; the touch control `down`
   (`.tc-stick-down`, `--tc-down`, `.sp-down`). A saved touch layout's old
@@ -663,7 +720,7 @@ Attack 4 became buttons of their own; neither move changed.
   of a direction it was already running in before its first tap, so a
   Dash out of a run registers.
 
-**Where to tune it** (`js/data/characters.js`, #0001)
+**Where to tune it** (`js/data/characters/0001.js`)
 
 - `summons.attack3` and `techniques.attack4`: unchanged, `cooldown`
   included.
@@ -672,20 +729,20 @@ Attack 4 became buttons of their own; neither move changed.
   `js/data/difficulty.js`.
 
 **Code:** `js/data/loadout.js`; `Fighter.tryAction`, `trySpecial`,
-`trySummon`, `tryTechnique` and the fast fall in `js/game/character.js`;
-`js/game/technique.js`; `CombatState.update` and `updateEnergy` in
-`js/game/combat.js`; `cooldownIndicators` in `js/game/fighter-status.js`;
+`trySummon`, `tryTechnique` and the fast fall in `js/game/fighters/fighter.js`;
+`js/game/combat/technique.js`; `CombatState.update` and `updateEnergy` in
+`js/game/combat/combat-state.js`; `cooldownIndicators` in `js/game/rendering/fighter-status.js`;
 `readMoveset`, `specialOptions`, `specialValue` and `actDash` in
-`js/game/combat-ai.js`; `js/game/touch-controls.js`,
+`js/game/ai/combat-ai.js`; `js/ui/touch-controls.js`,
 `js/core/touch-layout.js`, `js/core/input-manager.js`, `js/config.js`,
-`js/core/i18n.js`, `js/ui/settings-dialog.js` and `styles.css`.
+`js/localization/`, `js/ui/settings-dialog.js` and the `css/` parts.
 
-**Tests:** `tests/down.test.mjs` (Down as a direction only),
-`tests/loadout.test.mjs`, `tests/clone.test.mjs`,
-`tests/attack4-sphere-rush.test.mjs`, `tests/fighter-status.test.mjs`,
-`tests/energy.test.mjs`, `tests/combat-ai.test.mjs`,
-`tests/controls-ui.test.mjs`, and the repository-wide scan for the
-retired mechanic in `tests/codenames.test.mjs`.
+**Tests:** `tests/systems/down.test.mjs` (Down as a direction only),
+`tests/systems/loadout.test.mjs`, `tests/fighters/0001/clone.test.mjs`,
+`tests/fighters/0001/attack4-sphere-rush.test.mjs`, `tests/systems/fighter-status.test.mjs`,
+`tests/systems/energy.test.mjs`, `tests/systems/combat-ai.test.mjs`,
+`tests/interface/controls-ui.test.mjs`, and the repository-wide scan for the
+retired mechanic in `tests/systems/codenames.test.mjs`.
 
 ### Later: the Clone Attack's summoning startup
 
@@ -747,36 +804,114 @@ summons the clone before it appears. The stance itself stays removed.
   holds a player, and its lead for the summon counts the startup
   (`readMoveset`). Nothing else in its play changed.
 
-**Where to tune it** (`js/data/characters.js`)
+**Where to tune it** (`js/data/characters/0001.js`)
 
 - The summoning pose: `ATTACK3_SUMMON_FPS` (10) and
   `summons.attack3.startupAnimation` (remove it for the old immediate
   summon).
 - Each button's picture: `mobileAbilities.<button>.preview` per fighter
   (`animation`, `frame` from 0).
-- The picture's size in its button: `.tc-sprite-icon` in `styles.css`.
+- The picture's size in its button: `.tc-sprite-icon` in `css/touch-controls.css`.
 
 **Code:** `trySummon`, `finishSummon`, `cancelSummon`, `canAct`,
 `updateFacing`, `updateState` and `animationFor` in
-`js/game/character.js`; `startupAnimation` and `summonProblem` in
-`js/game/clone.js`; the hit in `CombatSystem.applyHit`
-(`js/game/combat.js`); `detachFromPlay` and `destroy` in
+`js/game/fighters/fighter.js`; `startupAnimation` and `summonProblem` in
+`js/game/combat/summon.js`; the hit in `CombatSystem.applyHit`
+(`js/game/combat/combat.js`); `detachFromPlay` and `destroy` in
 `js/game/arena.js`; `setFighter` and `removeCPU` in `js/game/practice.js`;
-`readMoveset` in `js/game/combat-ai.js`; `previewFrame`, `mobileAbility`,
+`readMoveset` in `js/game/ai/combat-ai.js`; `previewFrame`, `mobileAbility`,
 `jumpArt` and `SPRITE_BUTTONS` in `js/ui/mobile-abilities.js`;
 `setCharacter`, `showArt` and `spriteFailed` in
-`js/game/touch-controls.js`; `js/ui/icons.js`; `styles.css`.
+`js/ui/touch-controls.js`; `js/ui/icons.js`; `css/touch-controls.css`.
 
-**Tests:** `tests/summon-startup.test.mjs` (the restored bytes, the clip,
+**Tests:** `tests/fighters/0001/summon-startup.test.mjs` (the restored bytes, the clip,
 the press, the poses in order, the commitment, every interruption, the
-refusals, a summon with no startup, the CPU); `tests/clone.test.mjs` (the
-clone after the startup); `tests/controls-ui.test.mjs` (the art, Jump,
+refusals, a summon with no startup, the CPU); `tests/fighters/0001/clone.test.mjs` (the
+clone after the startup); `tests/interface/controls-ui.test.mjs` (the art, Jump,
 fallbacks, the glyphs that stay, names in English and French, both
-fighters, multi-touch, the editor); `tests/touch-layout.test.mjs`,
-`tests/practice-ground.test.mjs` and `tests/battle-screen.test.mjs` (art
+fighters, multi-touch, the editor); `tests/interface/touch-layout.test.mjs`,
+`tests/integration/practice-ground.test.mjs` and `tests/interface/battle-screen.test.mjs` (art
 following Player 1, never the CPU, layouts kept);
-`tests/codenames.test.mjs` (the new files and clip, and a check that the
+`tests/systems/codenames.test.mjs` (the new files and clip, and a check that the
 retired mechanic's names are still caught).
+
+## Repository reorganization
+
+Not a named update (it can become one if the owner names it), and it
+changes no behaviour or tuning: the same inputs play the same fight, step
+for step. Asked for (the `max` prompt) as a reorganization of the code,
+documentation, styles and tests around a universal character system, so
+that shared mechanics no longer read as #0001's and each fighter's own
+data and documentation stand on their own. `character_rule` was not
+touched.
+
+**What it changed**
+
+- **Fighter definitions:** each fighter's definition moved out of
+  `js/data/characters.js` into a module of its own
+  (`js/data/characters/0001.js`, `0002.js`, with their own constants;
+  `framePath` / `frames` in `js/data/characters/helpers.js`).
+  `js/data/characters.js` is the registry: the same `CHARACTERS` array
+  (mutable, one instance), `getCharacter`, `isPlayable`,
+  `getPlayableCharacter`, `playableCharacters`, `characterFramePaths`,
+  and `framePath` / `frames` re-exported.
+- **`js/game/` by responsibility:** `fighters/`, `combat/`, `ai/` and
+  `rendering/`. `combat.js` was split into `combat/attacks.js` (attack
+  schema), `combat/defense.js`, `combat/combat-state.js` (`CombatState`,
+  `CooldownTimers`, `resolveEnergy`) and `combat/combat.js`
+  (`CombatSystem`, launch reaction, `worldBox`). The movement arithmetic
+  moved from the Fighter into `fighters/movement.js` (the Fighter keeps
+  its state and step order and calls it). `readMoveset` moved into
+  `ai/moveset.js`. The DOM HUD and touch controls moved to `js/ui/`.
+- **Localization:** `js/core/i18n.js` became `js/localization/i18n.js`,
+  with one string table per language in `js/localization/strings/`.
+- **Styles:** `styles.css` became the ordered parts in `css/`, linked
+  from `index.html`; concatenated, they are byte for byte the old file.
+- **Tests:** grouped into `tests/systems/`, `tests/fighters/<id>/`,
+  `tests/fighters/fixtures/`, `tests/interface/`, `tests/integration/`
+  and `tests/helpers/`; the harness names its default fighter
+  (`DEFAULT_CHARACTER`) and adds `harnessFor(character)`. New:
+  `tests/systems/movement-profile.test.mjs`,
+  `tests/integration/roster-matrix.test.mjs`,
+  `tests/interface/stylesheets.test.mjs`.
+- **Documentation:** a slimmer README; `docs/` (architecture, systems,
+  characters, gameplay, development); the product specification's
+  fighter-specific sections moved into `docs/characters/0001.md` and
+  `0002.md`, which it names as part of itself; the movement update above
+  rewritten into its shared mechanics, the per-fighter values and #0001's
+  tuning. Stale statements corrected along the way: two selectable roster
+  slots (not one), a summon with nobody to appear behind does nothing (it
+  does not fall back to attack1), the touch layout editor shows every
+  numbered button, `dashCancelCost` defaults to the fighter's `dashCost`,
+  and the repository's name.
+- **`codename_rule`:** the mid-air dodge it described for fighters with
+  no mid-air Shield frames (its `<id>_dodge_<frame>` art, 25 Energy, a
+  horizontal launch of 1) was removed at the owner's request. The game
+  never implemented it, so nothing plays differently: a fighter with no
+  mid-air Shield frames has no Shield in the air, and the button does
+  nothing there.
+
+Where things moved:
+
+| Before | Now |
+| --- | --- |
+| `js/data/characters.js` (definitions) | `js/data/characters/0001.js`, `0002.js`, `helpers.js` |
+| `js/game/character.js` | `js/game/fighters/fighter.js` (+ `fighters/movement.js`) |
+| `js/game/fighter-controller.js` | `js/game/fighters/fighter-controller.js` |
+| `js/game/combat.js` | `js/game/combat/attacks.js`, `defense.js`, `combat-state.js`, `combat.js` |
+| `js/game/projectile.js`, `technique.js`, `launch-bounce.js` | `js/game/combat/` |
+| `js/game/clone.js` | `js/game/combat/summon.js` |
+| `js/game/combat-ai.js` | `js/game/ai/combat-ai.js` (+ `ai/moveset.js`) |
+| `js/game/camera.js`, `sprite-animator.js`, `sprite-normalizer.js`, `hit-fx.js`, `shield-fx.js`, `fighter-status.js` | `js/game/rendering/` |
+| `js/game/hud.js`, `js/game/touch-controls.js` | `js/ui/` |
+| `js/core/i18n.js` | `js/localization/i18n.js`, `strings/en.js`, `strings/fr.js`, `format.js` |
+| `styles.css` | `css/*.css` |
+| `tests/*.test.mjs`, `tests/*.mjs` | `tests/<group>/...` |
+
+**Tests:** the whole suite, unchanged in what it checks (its source scans
+widened to the new files), plus the new tests above; seeded CPU-vs-CPU
+traces for every pairing compared byte for byte against the code before
+the move.
 
 ## Adding a named update
 

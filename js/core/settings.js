@@ -27,13 +27,13 @@
 
 import { TOUCH_CONTROL_IDS, sanitizeTouchLayout, sanitizeTouchLayouts } from './touch-layout.js';
 
-// The interface languages (see js/core/i18n.js). English is the language in
+// The interface languages (see js/localization/i18n.js). English is the language in
 // use until the player picks one.
 export const LANGUAGES = Object.freeze(['en', 'fr']);
 export const DEFAULT_LANGUAGE = 'en';
 
 // The touch layouts Quick Battle and Practice Ground can use (see
-// js/game/touch-controls.js). Joystick is the default for a player who has
+// js/ui/touch-controls.js). Joystick is the default for a player who has
 // never chosen; Classic Buttons is the original Left / C / Right layout.
 export const MOBILE_CONTROLS = Object.freeze(['joystick', 'classic']);
 export const DEFAULT_MOBILE_CONTROLS = 'joystick';

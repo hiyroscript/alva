@@ -52,7 +52,7 @@ export function fitCanvas(canvas, dprCap = 2) {
 }
 
 // Draw a frame at its anchor (bottom-centre, or where its clip puts the
-// feet: see anchorY in js/game/sprite-normalizer.js) at (x, y) with an
+// feet: see anchorY in js/game/rendering/sprite-normalizer.js) at (x, y) with an
 // integer scale.
 export function drawFrameAt(ctx, frame, x, y, scale, flip = false) {
   const w = frame.artW * scale;

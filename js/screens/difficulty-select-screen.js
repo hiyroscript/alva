@@ -11,7 +11,7 @@
 
 import { Screen } from '../core/screen-manager.js';
 import { el } from '../core/utils.js';
-import { tx, tattr, iconLabel } from '../core/i18n.js';
+import { tx, tattr, iconLabel } from '../localization/i18n.js';
 import { ICONS } from '../ui/icons.js';
 import { screenHeader, QUICK_BATTLE_SETUP } from '../ui/components.js';
 import { DIFFICULTIES, resolveDifficulty } from '../data/difficulty.js';

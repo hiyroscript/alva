@@ -14,21 +14,21 @@
 // starts over (default fighter, default CPU): a disabled CPU is never
 // remembered, and it never reads or writes Quick Battle's app.selection.
 //
-// Every string is a translation key (js/core/i18n.js); the touch controls
+// Every string is a translation key (js/localization/i18n.js); the touch controls
 // use the player's saved scheme and custom layout, read on every entry.
 
 import { Screen } from '../core/screen-manager.js';
 import { CONFIG } from '../config.js';
 import { el } from '../core/utils.js';
-import { t, tx, tattr, iconLabel, setText } from '../core/i18n.js';
+import { t, tx, tattr, iconLabel, setText } from '../localization/i18n.js';
 import { ICONS } from '../ui/icons.js';
 import { menuButton } from '../ui/components.js';
 import { FighterRoster } from '../ui/fighter-roster.js';
 import { isPlayable, playableCharacters } from '../data/characters.js';
 import { PRACTICE_MAP } from '../data/practice-map.js';
 import { PracticeSession } from '../game/practice.js';
-import { PracticeHUD } from '../game/hud.js';
-import { TouchControls } from '../game/touch-controls.js';
+import { PracticeHUD } from '../ui/hud.js';
+import { TouchControls } from '../ui/touch-controls.js';
 
 // Every fresh visit from Home starts with this fighter, and a practice CPU
 // of the same fighter, sharing its one loaded sprite set: the first

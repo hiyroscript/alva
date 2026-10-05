@@ -6,7 +6,7 @@
 // far-off Void.
 
 import { createTheme } from '../stages/index.js';
-import { drawFrame } from '../game/sprite-normalizer.js';
+import { drawFrame } from '../game/rendering/sprite-normalizer.js';
 import { fitCanvas } from './sprite-art.js';
 
 // View width as a multiple of the main stage's width.

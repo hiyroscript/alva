@@ -16,7 +16,7 @@
 // reports what each contact stopped instead (impactVx / impactVy, with the
 // contact's side in wall / landed / bonked), so a caller that knows why the
 // body was moving can turn it into a rebound (a hard combat launch, see
-// js/game/launch-bounce.js). Physics itself never knows why.
+// js/game/combat/launch-bounce.js). Physics itself never knows why.
 
 const EPS = 0.5;
 

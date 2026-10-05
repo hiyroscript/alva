@@ -19,7 +19,7 @@
 // does.
 
 import { el } from '../core/utils.js';
-import { tx, tattr, iconLabel, setText, LANGUAGES, LANGUAGE_NAMES } from '../core/i18n.js';
+import { tx, tattr, iconLabel, setText, LANGUAGES, LANGUAGE_NAMES } from '../localization/i18n.js';
 import { MOBILE_CONTROLS, DEFAULT_MOBILE_CONTROLS } from '../core/settings.js';
 import { ICONS } from './icons.js';
 
