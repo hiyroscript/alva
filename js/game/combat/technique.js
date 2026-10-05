@@ -1,8 +1,17 @@
 // Techniques: multi-phase special moves the fighter itself performs.
 //
+// The runtime below implements one form of technique so far: an object
+// formed in the fighter's hand, carried on a grounded rush, binding what it
+// meets, ticking while it holds it and exploding. Its field names
+// (sphereBuild, sphereHitbox, ...) come from the first technique built on
+// it, #0001's Sphere Rush, but nothing in it reads a fighter or a button:
+// any fighter may give a technique of this form its own clips, speeds and
+// hits. A technique of a different shape would be a new form here, not a
+// new reading of these fields.
+//
 // A numbered button may be a technique (`{ type: 'technique', id }` in the
 // character's `actions`; see js/data/loadout.js), as it may be a summon, a
-// detached temporary entity (js/game/clone.js). A technique is a
+// detached temporary entity (js/game/combat/summon.js). A technique is a
 // multi-phase move the real fighter performs, driven by this runtime. The
 // Fighter starts one (Fighter.tryTechnique), advances it every fixed step,
 // moves its body and ends it; the CombatSystem resolves its hits. It is
@@ -89,7 +98,7 @@
 // hit with Base Launch 0 or no direction (a contact that only binds, a
 // tick) never launches.
 
-import { resolveHitLaunch } from '../data/launch.js';
+import { resolveHitLaunch } from '../../data/launch.js';
 
 const HIT_DEFAULTS = {
   damage: 0,
@@ -134,7 +143,7 @@ const TECHNIQUE_DEFAULTS = {
 };
 
 // Clocks are sums of fixed steps; compare against boundaries with a little
-// slack (see PHASE_EPSILON in combat.js).
+// slack (see PHASE_EPSILON in attacks.js).
 const TIME_EPSILON = 1e-6;
 
 const ORIGIN = Object.freeze({ x: 0, y: 0 });

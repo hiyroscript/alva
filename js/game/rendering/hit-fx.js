@@ -19,14 +19,14 @@
 // - A short slow-motion zoom on a launch that will carry its fighter into
 //   the Void if it does nothing (see launchIsLethal).
 // - A launch's rebound off a wall, floor or ceiling (see
-//   js/game/launch-bounce.js): sparks thrown off the surface it struck and,
+//   js/game/combat/launch-bounce.js): sparks thrown off the surface it struck and,
 //   for a hard one, a small shake. The rebound itself says the rest.
 //
 // With reduced motion there is no shake and no zoom; the rest stays.
 
-import { stepBody } from './physics.js';
-import { bounceLaunch } from './launch-bounce.js';
-import { approach } from '../core/utils.js';
+import { stepBody } from '../physics.js';
+import { bounceLaunch } from '../combat/launch-bounce.js';
+import { approach } from '../../core/utils.js';
 
 // All tuning in one place. Times are real seconds; sizes are CSS pixels
 // unless noted (scaled by the view's device-pixel ratio when drawn).
@@ -84,7 +84,7 @@ function seeded(seed) {
 // physics, its speed running down at its hitstun rates for the stun, then
 // at its normal ones for `grace` seconds more, with no steering, jump or
 // fast fall. Its launch rebounds off whatever it meets on the way, exactly
-// as the fighter's would (see js/game/launch-bounce.js), each rebound
+// as the fighter's would (see js/game/combat/launch-bounce.js), each rebound
 // keeping it stunned at least as long as the fighter's. Only then is the
 // finishing blow shown in slow motion.
 export function launchIsLethal(event, stage, gravity, dt, grace = HIT_FX.lethal.grace) {

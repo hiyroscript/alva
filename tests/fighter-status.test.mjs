@@ -15,7 +15,7 @@ import { getMap } from '../js/data/maps.js';
 import {
   cooldownIndicators, energyBarState, formatCooldown, drawCooldownIndicators, drawEnergyBar, statusOnScreen,
   COOLDOWN_STYLE, ENERGY_STYLE, cooldownLabel,
-} from '../js/game/fighter-status.js';
+} from '../js/game/rendering/fighter-status.js';
 import { specialAttacks } from '../js/data/loadout.js';
 import { def, DT, fakeSprites, makeFighter, duel } from './fighter-harness.mjs';
 
@@ -444,9 +444,9 @@ test('no bar, rings or tag for a fighter out of play (waiting to respawn); back,
 });
 
 test('the rings and bar are canvas-drawn, never DOM in a HUD card', () => {
-  const hud = readFileSync(new URL('../js/game/hud.js', import.meta.url), 'utf8').replace(/^\s*\/\/.*$/gm, '');
+  const hud = readFileSync(new URL('../js/ui/hud.js', import.meta.url), 'utf8').replace(/^\s*\/\/.*$/gm, '');
   assert.doesNotMatch(hud, /cooldown|abilityCooldowns/i, 'the HUD knows nothing of them');
-  const status = readFileSync(new URL('../js/game/fighter-status.js', import.meta.url), 'utf8');
+  const status = readFileSync(new URL('../js/game/rendering/fighter-status.js', import.meta.url), 'utf8');
   assert.doesNotMatch(status, /document\.|createElement/, 'no DOM');
   assert.doesNotMatch(status, /stamina/i, 'Energy, never the old Stamina');
   const arena = readFileSync(new URL('../js/game/arena.js', import.meta.url), 'utf8');

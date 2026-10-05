@@ -326,7 +326,7 @@ export const CHARACTER_0001 = {
   },
 
   // Projectile behaviour, keyed by id: `<attack>_object`, the attack that
-  // throws it. See js/game/projectile.js for the schema
+  // throws it. See js/game/combat/projectile.js for the schema
   // (createProjectileDefinition). The hitbox is centred on the
   // projectile and mirrors with its direction; the combat fields resolve
   // exactly like an attack's (CombatSystem.applyHit). One hit at most.
@@ -385,9 +385,10 @@ export const CHARACTER_0001 = {
     speed: 2,
   },
 
-  // Every other movement stat (see Fighter.moveHorizontal). The top speed
-  // is Speed Power's; a Dash never changes it, it owns the horizontal
-  // speed for its own length.
+  // #0001's movement profile: its values for the shared movement rules
+  // (js/game/fighters/movement.js, which lists every field). The top speed
+  // is Speed Power's; a Dash never changes it, it owns the horizontal speed
+  // for its own length.
   movement: {
     // Ground: from rest to top speed in about 0.08 s; letting go stops a
     // run in about 0.08 s (about 10 units of slide), so it can stop right
@@ -451,7 +452,7 @@ export const CHARACTER_0001 = {
   ],
 
   // How #0001 responds to being launched (see resolveLaunchReaction in
-  // js/game/combat.js). A harder launch stuns longer: 0.2 s more per 1000
+  // js/game/combat/combat.js). A harder launch stuns longer: 0.2 s more per 1000
   // units/s, 0.7 s more at most, so a big hit is a clear moment to chase
   // (and the air jump can extend a juggle at middling Launch Point, never
   // past three hits). Launched at 1100 units/s or faster it tumbles
@@ -466,7 +467,7 @@ export const CHARACTER_0001 = {
     steerAngle: 15,
   },
 
-  // Energy (see resolveEnergy in js/game/combat.js): 100 at most, shown
+  // Energy (see resolveEnergy in js/game/combat/combat-state.js): 100 at most, shown
   // over the fighter's head as a bright purple bar while below full,
   // spent only by Dash (dashCost, as it starts; dashCancelCost for one
   // that cuts short an attack that hit: two from a full bar, and a third
@@ -490,8 +491,8 @@ export const CHARACTER_0001 = {
   // `groundStartAnimation`, lowered by `groundReleaseAnimation`) and
   // `airAnimation` in the air, where he falls slowly. Every hit it
   // blocks costs energy.shieldHitCost and deals nothing else: no Launch
-  // Point, no launch (see createDefenseDefinition and
-  // CombatSystem.applyHit in js/game/combat.js).
+  // Point, no launch (see createDefenseDefinition in
+  // js/game/combat/defense.js and CombatSystem.applyHit in js/game/combat/combat.js).
   defense: {
     type: 'shield',
     groundAnimation: 'shielding',
@@ -561,7 +562,7 @@ export const CHARACTER_0001 = {
   // or miss, and a press while it is still cooling down, or when it cannot
   // happen at all (no opponent in play, missing art), does nothing: no
   // other attack instead, and nothing kept for later. The cooldown shows
-  // under the fighter as A3. See js/game/clone.js for the schema
+  // under the fighter as A3. See js/game/combat/summon.js for the schema
   // (createSummonDefinition). Accepted, #0001 first performs the summon
   // himself: `startupAnimation` plays once while he stands committed to
   // it, and the clone is queued as it ends (a hit, lost ground or a
@@ -608,7 +609,7 @@ export const CHARACTER_0001 = {
   // Techniques, keyed by the attack they are: attack4's button (see
   // `actions`) starts this one, on the ground only, and like the summon it
   // costs no Energy and has its own cooldown (shown as A4), a press while
-  // it cools down doing nothing. See js/game/technique.js for the schema
+  // it cools down doing nothing. See js/game/combat/technique.js for the schema
   // (createTechniqueDefinition) and the phases. Not an attack, a
   // projectile or a summon: #0001 performs it himself.
   techniques: {
@@ -704,7 +705,7 @@ export const CHARACTER_0001 = {
     },
   },
 
-  // Attack definitions, keyed by id. See js/game/combat.js for the schema
+  // Attack definitions, keyed by id. See js/game/combat/attacks.js for the schema
   // (createAttackDefinition). Phases are whole frames of the attack's clip,
   // so the hitbox is live only while the strike is on screen. Hitboxes face
   // right from the fighter's origin (bottom-centre) and mirror with facing.

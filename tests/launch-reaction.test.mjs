@@ -1,10 +1,10 @@
 // How a launched fighter responds (the character's `launchReaction`, see
-// resolveLaunchReaction in js/game/combat.js): a harder launch stuns longer,
+// resolveLaunchReaction in js/game/combat/combat.js): a harder launch stuns longer,
 // a hard one tumbles, and the direction held as a hit lands bends the launch
 // a little. None of it changes a launch's strength.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { resolveLaunchReaction, resolveLaunchStun, steerLaunch, CombatSystem } from '../js/game/combat.js';
+import { resolveLaunchReaction, resolveLaunchStun, steerLaunch, CombatSystem } from '../js/game/combat/combat.js';
 import { resolveDirectionalLaunch, LAUNCH_UNIT_SPEED as U } from '../js/data/launch.js';
 import { def, DT, makeFighter, duel, frameName } from './fighter-harness.mjs';
 

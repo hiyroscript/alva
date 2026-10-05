@@ -10,7 +10,7 @@ export const ICONS = {
   up: svg('<path d="M4.5 15 12 7.5 19.5 15"/>'),
   jump: svg('<path d="M12 17.5V5.5"/><path d="M6.5 11 12 5.5l5.5 5.5"/><path d="M5 20.5h14"/>'),
   transform: svg('<path d="M12 2.5l2.3 7.2 7.2 2.3-7.2 2.3-2.3 7.2-2.3-7.2-7.2-2.3 7.2-2.3z"/>', { fill: true }),
-  // The universal Shield button's glyph (see js/game/touch-controls.js). A
+  // The universal Shield button's glyph (see js/ui/touch-controls.js). A
   // fighter's own combat buttons show frames of its own art instead (see
   // js/ui/mobile-abilities.js).
   shield: svg('<path d="M12 3C10 4.4 7.6 5.2 5.2 5.5Q4.4 5.6 4.4 6.4V10C4.4 15.2 7.6 18.8 12 21C16.4 18.8 19.6 15.2 19.6 10V6.4Q19.6 5.6 18.8 5.5C16.4 5.2 14 4.4 12 3Z"/>'),

@@ -11,8 +11,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Battle } from '../js/game/battle.js';
 import { getMap } from '../js/data/maps.js';
-import { worldBox } from '../js/game/combat.js';
-import { TrainingAIController } from '../js/game/fighter-controller.js';
+import { worldBox } from '../js/game/combat/combat.js';
+import { TrainingAIController } from '../js/game/fighters/fighter-controller.js';
 import { CONFIG } from '../js/config.js';
 import { def, DT, fakeSprites, makeFighter, duel } from './fighter-harness.mjs';
 
@@ -239,11 +239,11 @@ test('a respawn takes the spawn\'s facing, and the opponent\'s side does not fli
 
 // Combat AI opts into per-step attack targeting; use scripted input to
 // isolate facing from tactical decisions and difficulty randomness.
-const { CombatAIController } = await import('../js/game/combat-ai.js');
+const { CombatAIController } = await import('../js/game/ai/combat-ai.js');
 const { getCharacter } = await import('../js/data/characters.js');
 const { fakeSpritesOf } = await import('./fighter-harness.mjs');
-const { spawnProjectiles } = await import('../js/game/projectile.js');
-const { attackPhase } = await import('../js/game/combat.js');
+const { spawnProjectiles } = await import('../js/game/combat/projectile.js');
+const { attackPhase } = await import('../js/game/combat/attacks.js');
 function aimedFighter(character = def, airborne = false) {
   const me = makeFighter({ character, sprites: fakeSpritesOf(character), x: 500, facing: -1 });
   const foe = makeFighter({ x: 750 }).fighter;

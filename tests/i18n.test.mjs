@@ -137,8 +137,8 @@ const { MenuNavigator } = await import('../js/core/menu-navigator.js');
 const { ModeSelectScreen } = await import('../js/screens/mode-select-screen.js');
 const { DifficultySelectScreen } = await import('../js/screens/difficulty-select-screen.js');
 const { DiscoverScreen } = await import('../js/screens/discover-screen.js');
-const { HUD, describeEnergy } = await import('../js/game/hud.js');
-const { TouchControls } = await import('../js/game/touch-controls.js');
+const { HUD, describeEnergy } = await import('../js/ui/hud.js');
+const { TouchControls } = await import('../js/ui/touch-controls.js');
 const { hintBar, MENU_HINTS } = await import('../js/ui/components.js');
 
 const ROOT = new URL('../', import.meta.url);

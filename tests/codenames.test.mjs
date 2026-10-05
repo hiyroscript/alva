@@ -19,10 +19,10 @@ import { ACTIONS, ACTION_LABELS, COMBAT_BUTTONS, CONFIG, MOVES, NUMBERED_ATTACKS
 import { CHARACTERS, characterFramePaths, framePath, frames } from '../js/data/characters.js';
 import { actionType, loadoutProblems, specialAction } from '../js/data/loadout.js';
 import { SAMPLE_FIGHTER } from './sample-fighter.mjs';
-import { COMBAT_ACTIONS, Fighter } from '../js/game/character.js';
-import { blankInput } from '../js/game/fighter-controller.js';
-import { readMoveset } from '../js/game/combat-ai.js';
-import { cooldownIndicators, cooldownLabel } from '../js/game/fighter-status.js';
+import { COMBAT_ACTIONS, Fighter } from '../js/game/fighters/fighter.js';
+import { blankInput } from '../js/game/fighters/fighter-controller.js';
+import { readMoveset } from '../js/game/ai/moveset.js';
+import { cooldownIndicators, cooldownLabel } from '../js/game/rendering/fighter-status.js';
 import { ABILITY_ACTIONS } from '../js/ui/mobile-abilities.js';
 
 const ROOT = new URL('../', import.meta.url);
@@ -374,7 +374,7 @@ function repositoryPaths(dir = '') {
 
 test('the retired stance mechanic is gone for good: no file name, identifier, style, translation, test or document of it', () => {
   const paths = repositoryPaths();
-  assert.ok(paths.includes('js/game/technique.js') && paths.includes('README.md'), 'the walk sees the repository');
+  assert.ok(paths.includes('js/game/combat/technique.js') && paths.includes('README.md'), 'the walk sees the repository');
   for (const path of paths) assert.doesNotMatch(path, RETIRED_MECHANIC, `${path}: its name`);
   for (const path of paths.filter((p) => !p.endsWith('/') && !BINARY.test(p))) {
     const lines = read(path).split('\n');

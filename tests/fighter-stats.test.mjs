@@ -7,9 +7,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { CHARACTERS } from '../js/data/characters.js';
-import { Fighter } from '../js/game/character.js';
-import { CombatState, CombatSystem } from '../js/game/combat.js';
-import { SpriteSet } from '../js/game/sprite-normalizer.js';
+import { Fighter } from '../js/game/fighters/fighter.js';
+import { CombatState } from '../js/game/combat/combat-state.js';
+import { CombatSystem } from '../js/game/combat/combat.js';
+import { SpriteSet } from '../js/game/rendering/sprite-normalizer.js';
 import { STAGE, makeFighter, duel } from './fighter-harness.mjs';
 
 // A real Fighter for `character`, with its own (art-less) sprite set.

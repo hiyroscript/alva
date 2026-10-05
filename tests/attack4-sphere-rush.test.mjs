@@ -20,16 +20,16 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { characterFramePaths } from '../js/data/characters.js';
 import { getMap } from '../js/data/maps.js';
-import { CombatSystem } from '../js/game/combat.js';
+import { CombatSystem } from '../js/game/combat/combat.js';
 import { LAUNCH_UNIT_SPEED as U } from '../js/data/launch.js';
-import { Technique } from '../js/game/technique.js';
+import { Technique } from '../js/game/combat/technique.js';
 import { StageCollision } from '../js/game/physics.js';
-import { SpriteSet } from '../js/game/sprite-normalizer.js';
-import { TrainingAIController } from '../js/game/fighter-controller.js';
+import { SpriteSet } from '../js/game/rendering/sprite-normalizer.js';
+import { TrainingAIController } from '../js/game/fighters/fighter-controller.js';
 import {
   def, DT, BASE, SIM_CTX, fakeSprites, makeFighter, frameName, steps, duel, stageMap,
 } from './fighter-harness.mjs';
-import { resolveLaunchStun } from '../js/game/combat.js';
+import { resolveLaunchStun } from '../js/game/combat/combat.js';
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
 const DOWN = { down: true };
@@ -1310,7 +1310,7 @@ test('no Launch Point ends the hold: a target at 999 is caught, ticked and blown
   assert.equal(d.target.combat.launchPoint, 999 + 14);
   assert.equal(d.target.combat.immobilized, false);
   // Only its own hold ending (its bind lost, the technique over) releases it.
-  const code = readFileSync(ROOT + 'js/game/technique.js', 'utf8').replace(/^\s*\/\/.*$/gm, '');
+  const code = readFileSync(ROOT + 'js/game/combat/technique.js', 'utf8').replace(/^\s*\/\/.*$/gm, '');
   assert.doesNotMatch(code, /health|knockback|launchPoint\s*[<>]/i, 'no Health, and no Launch Point threshold');
 });
 

@@ -10,8 +10,8 @@ import { ConfirmDialog } from '../js/ui/overlays.js';
 import { Settings } from '../js/core/settings.js';
 import { readFileSync } from 'node:fs';
 import { Battle } from '../js/game/battle.js';
-import { CombatState } from '../js/game/combat.js';
-import { formatLaunchPoint, describeEnergy } from '../js/game/hud.js';
+import { CombatState } from '../js/game/combat/combat-state.js';
+import { formatLaunchPoint, describeEnergy } from '../js/ui/hud.js';
 import { CONFIG } from '../js/config.js';
 import { duel, def as DEF_0001 } from './fighter-harness.mjs';
 import { TEST_A, TEST_DISABLED, REMOVED_IDS, withTestFighters } from './test-fighters.mjs';
@@ -536,7 +536,7 @@ test('HUD: the portrait is the character\'s own crop from its sprites, with noth
   // Rebinding the same art does not redraw it.
   screen.hud.bind(battle.p1, battle.p2);
   assert.equal(made, 1);
-  const code = readFileSync(new URL('../js/game/hud.js', import.meta.url), 'utf8').replace(/^\s*\/\/.*$/gm, '');
+  const code = readFileSync(new URL('../js/ui/hud.js', import.meta.url), 'utf8').replace(/^\s*\/\/.*$/gm, '');
   assert.doesNotMatch(code, /assets\/|0001|attack3|attack4/, 'data-driven: no character paths or ids');
   const source = code;
   assert.match(source, /paintPortrait/, 'the shared portrait painter, as the roster uses');

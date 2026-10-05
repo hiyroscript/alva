@@ -16,10 +16,10 @@ import {
 } from '../js/data/powers.js';
 import * as powersModule from '../js/data/powers.js';
 import { CHARACTERS } from '../js/data/characters.js';
-import { Fighter } from '../js/game/character.js';
-import { CombatSystem } from '../js/game/combat.js';
-import { spawnProjectiles } from '../js/game/projectile.js';
-import { PlayerController, TrainingAIController } from '../js/game/fighter-controller.js';
+import { Fighter } from '../js/game/fighters/fighter.js';
+import { CombatSystem } from '../js/game/combat/combat.js';
+import { spawnProjectiles } from '../js/game/combat/projectile.js';
+import { PlayerController, TrainingAIController } from '../js/game/fighters/fighter-controller.js';
 import { CONFIG } from '../js/config.js';
 import { def, DT, STAGE, SIM_CTX, fakeSprites, makeFighter, stepUntil } from './fighter-harness.mjs';
 

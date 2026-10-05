@@ -1,5 +1,10 @@
 // Summoned clones: temporary attack entities, not fighters.
 //
+// The summon system (this module) is shared by every fighter; the one kind
+// of summon so far is a clone of its owner, drawn with the owner's art and
+// performing one of the owner's own attacks. A fighter's `summons` entry
+// decides which attack, where it appears and its cooldown.
+//
 // A numbered button that is a summon (`{ type: 'summon', id }` in the
 // character's `actions`, js/data/characters.js; see js/data/loadout.js)
 // makes the Fighter start the summon's cooldown and queue one summon
@@ -57,8 +62,8 @@
 // launch travels along the clone's facing); the hit credits the owner
 // but freezes only the target and the clone itself, never the owner.
 
-import { SpriteAnimator } from './sprite-animator.js';
-import { attackPhase } from './combat.js';
+import { SpriteAnimator } from '../rendering/sprite-animator.js';
+import { attackPhase } from './attacks.js';
 
 const SUMMON_DEFAULTS = {
   attack: null,       // owner attack id the clone performs
@@ -76,7 +81,7 @@ const NO_GROUND_DEFAULTS = {
 };
 
 // Clocks are sums of fixed steps; compare against boundaries with a little
-// slack (see PHASE_EPSILON in combat.js).
+// slack (see PHASE_EPSILON in attacks.js).
 const TIME_EPSILON = 1e-6;
 
 export function createSummonDefinition(spec) {

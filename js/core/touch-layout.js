@@ -1,7 +1,7 @@
 // Custom touch-control layouts: which controls a player may move and resize
 // in each Mobile Controls scheme, how a layout is stored, and the geometry
 // that turns a stored layout into places on the screen. Pure data and
-// math: TouchControls (js/game/touch-controls.js) applies a layout, the
+// math: TouchControls (js/ui/touch-controls.js) applies a layout, the
 // layout editor (js/ui/touch-layout-editor.js) makes one and Settings
 // (js/core/settings.js) keeps one per scheme.
 //

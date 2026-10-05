@@ -19,7 +19,7 @@
 // (CONFIG.battle.pointsToWin), filled for each point the fighter has scored.
 // The right-hand card mirrors the left-hand one. Energy and the summon and
 // technique cooldowns are drawn over the fighter itself
-// (js/game/fighter-status.js); the card only describes Energy to screen
+// (js/game/rendering/fighter-status.js); the card only describes Energy to screen
 // readers.
 //
 // Every label and spoken description is translated (js/core/i18n.js): the
@@ -29,8 +29,8 @@
 import { CONFIG } from '../config.js';
 import { el } from '../core/utils.js';
 import { t, tattr, plural, slotLabel } from '../core/i18n.js';
-import { ICONS } from '../ui/icons.js';
-import { paintPortrait, portraitSourceFacing } from '../ui/sprite-art.js';
+import { ICONS } from './icons.js';
+import { paintPortrait, portraitSourceFacing } from './sprite-art.js';
 
 // Spoken names of the slot tags, for the score dots' labels: Player 1 in
 // full, the others as shown.

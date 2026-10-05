@@ -29,8 +29,8 @@
 // every cooldown ready. Player 1 and the CPU each wait on their own.
 
 import { Arena } from './arena.js';
-import { Fighter } from './character.js';
-import { PlayerController } from './fighter-controller.js';
+import { Fighter } from './fighters/fighter.js';
+import { PlayerController } from './fighters/fighter-controller.js';
 
 // Floating damage numbers over the CPU: how long each lasts (seconds), how
 // far it rises meanwhile (world units) and when it starts to fade (fraction

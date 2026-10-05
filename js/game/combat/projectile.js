@@ -1,7 +1,7 @@
 // Projectiles: independent battle entities thrown by an attack.
 //
 // An attack with a `projectile` entry (see createAttackDefinition in
-// js/game/combat.js) releases one projectile when its time crosses `spawnAt`.
+// js/game/combat/attacks.js) releases one projectile when its time crosses `spawnAt`.
 // The Fighter queues the release with its facing at that moment; the Battle
 // then turns it into a live Projectile, owns it, moves it every fixed step,
 // resolves its hits through CombatSystem and removes it once it is spent.
@@ -27,7 +27,7 @@
 // times instead, at least `interval` seconds apart, staying in play between
 // them; its last strike resolves as its `finisher` (a hit of its own: its
 // `damage`, `baseLaunch` and `directionalLaunch`, its stuns and freeze
-// defaulting to the projectile's). With `carry` (see js/game/combat.js) each
+// defaulting to the projectile's). With `carry` (see js/game/combat/attacks.js) each
 // strike that launches nothing drags the target along with it, `lift`
 // upward: #0002's whirlwind takes its target up and away with it, then flings
 // it on its finisher. A Shield that blocks any strike stops it there.
@@ -46,7 +46,7 @@
 // floor's body included; one-way platforms never stop it. Its hitbox is
 // centred on its position and mirrors with its direction.
 
-import { resolveHitLaunch } from '../data/launch.js';
+import { resolveHitLaunch } from '../../data/launch.js';
 
 const PROJECTILE_DEFAULTS = {
   animation: null,
@@ -68,7 +68,7 @@ const PROJECTILE_DEFAULTS = {
 const FINISHER_INHERITS = Object.freeze(['hitstun', 'blockstun', 'hitstop']);
 
 // Age is a sum of fixed steps; compare against boundaries with a little slack
-// (see PHASE_EPSILON in combat.js).
+// (see PHASE_EPSILON in attacks.js).
 const TIME_EPSILON = 1e-6;
 
 export function createProjectileDefinition(spec) {

@@ -1,5 +1,6 @@
-// Movement and game feel (see Fighter.moveHorizontal / moveAttack and the
-// movement entry in js/data/characters.js): ground acceleration, stopping
+// Movement and game feel (the shared rules in js/game/fighters/movement.js,
+// run here with #0001's movement profile, js/data/characters/0001.js):
+// ground acceleration, stopping
 // and turning, air steering, jumps that carry their speed, the fast fall,
 // the Dash's handoff back into running, how attacks keep, spend and add
 // momentum, the facing an attack takes, landing out of an aerial, and
@@ -7,7 +8,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { StageCollision } from '../js/game/physics.js';
-import { Fighter } from '../js/game/character.js';
+import { Fighter } from '../js/game/fighters/fighter.js';
 import { CONFIG } from '../js/config.js';
 import {
   def, DT, makeFighter, fakeSprites, stageMap, stepUntil, duel, STAGE,
@@ -731,8 +732,8 @@ test('a hit gives the air jump back; a stun, an air Shield or an attack in progr
 });
 
 test('the CPUs let go of Jump inside the higher-jump window: their jumps are normal ones', async () => {
-  const { CombatAIController } = await import('../js/game/combat-ai.js');
-  const { TrainingAIController } = await import('../js/game/fighter-controller.js');
+  const { CombatAIController } = await import('../js/game/ai/combat-ai.js');
+  const { TrainingAIController } = await import('../js/game/fighters/fighter-controller.js');
   const normal = (920 * 920) / (2 * CONFIG.sim.gravity);
   const apexWith = (controller, prepare) => {
     const d = duel({ gap: 600 });

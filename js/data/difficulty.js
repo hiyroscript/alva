@@ -1,13 +1,13 @@
 // Quick Battle difficulty: how well the CPU thinks, never what its fighter
 // is allowed to do.
 //
-// Each level is a profile read by the combat AI (js/game/combat-ai.js). The
+// Each level is a profile read by the combat AI (js/game/ai/combat-ai.js). The
 // profile tunes the controller's perception and judgement only: how soon it
 // notices what the opponent does, how often it reassesses, how noisy and how
 // careful its choices are and how far ahead it projects movement. Nothing here
 // reaches the fighter: damage, launch, speed, jumps, Dash, Shield, Energy,
 // cooldowns, hitboxes and every other mechanic are the character's own and
-// identical on every level (see Fighter in js/game/character.js).
+// identical on every level (see Fighter in js/game/fighters/fighter.js).
 //
 // Profile traits (seconds and world units are simulation time and space):
 //

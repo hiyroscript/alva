@@ -22,11 +22,12 @@ import { CONFIG, NUMBERED_ATTACKS } from '../js/config.js';
 import { CHARACTERS, characterFramePaths, getCharacter, playableCharacters } from '../js/data/characters.js';
 import { abilityName } from '../js/data/abilities.js';
 import { describeLoadout, loadoutProblems, specialAttacks } from '../js/data/loadout.js';
-import { attackReach, createAttackDefinition, strikeLive } from '../js/game/combat.js';
-import { createProjectileDefinition } from '../js/game/projectile.js';
-import { CombatAIController, readMoveset } from '../js/game/combat-ai.js';
-import { Fighter } from '../js/game/character.js';
-import { SpriteSet, drawFrame } from '../js/game/sprite-normalizer.js';
+import { attackReach, createAttackDefinition, strikeLive } from '../js/game/combat/attacks.js';
+import { createProjectileDefinition } from '../js/game/combat/projectile.js';
+import { CombatAIController } from '../js/game/ai/combat-ai.js';
+import { readMoveset } from '../js/game/ai/moveset.js';
+import { Fighter } from '../js/game/fighters/fighter.js';
+import { SpriteSet, drawFrame } from '../js/game/rendering/sprite-normalizer.js';
 import { StageCollision } from '../js/game/physics.js';
 import { mulberry32 } from '../js/core/utils.js';
 import { mobileAbility, previewFrame } from '../js/ui/mobile-abilities.js';
@@ -794,7 +795,7 @@ test('CPU fights with #0002 run: against #0001 and itself, every move used, no s
 // ---- On screen ----------------------------------------------------------------------------------
 
 test('its touch controls show three numbered buttons, in slots 1 to 3, the Whirlwind on top', async () => {
-  const { attackSlots } = await import('../js/game/touch-controls.js');
+  const { attackSlots } = await import('../js/ui/touch-controls.js');
   const shown = (action) => mobileAbility(DEF, action) !== null;
   assert.deepEqual([...attackSlots(shown)], [['attack1', 1], ['attack2', 2], ['attack3', 3]]);
   assert.equal(shown('extra_attack'), true);

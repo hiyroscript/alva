@@ -9,9 +9,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { CombatState, resolveEnergy } from '../js/game/combat.js';
-import * as status from '../js/game/fighter-status.js';
-import { energyBarState, ENERGY_STYLE } from '../js/game/fighter-status.js';
+import { CombatState, resolveEnergy } from '../js/game/combat/combat-state.js';
+import * as status from '../js/game/rendering/fighter-status.js';
+import { energyBarState, ENERGY_STYLE } from '../js/game/rendering/fighter-status.js';
 import { def, DT, makeFighter, duel, steps, startupSteps } from './fighter-harness.mjs';
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));

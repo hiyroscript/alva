@@ -4,29 +4,41 @@
 // and paint still need real-browser verification.
 import assert from 'node:assert/strict';
 import { getCharacter } from '../js/data/characters.js';
-import { Fighter, separateFighters } from '../js/game/character.js';
-import { CombatSystem } from '../js/game/combat.js';
-import { spawnProjectiles, removeDeadProjectiles } from '../js/game/projectile.js';
-import { spawnClones, updateClones, removeDeadClones } from '../js/game/clone.js';
+import { Fighter, separateFighters } from '../js/game/fighters/fighter.js';
+import { CombatSystem } from '../js/game/combat/combat.js';
+import { spawnProjectiles, removeDeadProjectiles } from '../js/game/combat/projectile.js';
+import { spawnClones, updateClones, removeDeadClones } from '../js/game/combat/summon.js';
 import { StageCollision, resolveSolidOverlap } from '../js/game/physics.js';
-import { SpriteSet } from '../js/game/sprite-normalizer.js';
-import { CombatAIController } from '../js/game/combat-ai.js';
+import { SpriteSet } from '../js/game/rendering/sprite-normalizer.js';
+import { CombatAIController } from '../js/game/ai/combat-ai.js';
 import { mulberry32 } from '../js/core/utils.js';
 import { CONFIG } from '../js/config.js';
 
-export const def = getCharacter('0001');
+// The fighter the harness builds when a test names none. It is #0001 only
+// because the first tests were written against it: a compatibility default,
+// not a reference fighter. Tests of #0001's own moves rely on it on purpose;
+// a test of a shared mechanic should say which fighter it runs (pass
+// `character` to makeFighter / duel, or use harnessFor below), so it never
+// passes only because one fighter happens to have particular values.
+export const DEFAULT_CHARACTER = getCharacter('0001');
+// The default's definition, under the name the older tests import it by.
+export const def = DEFAULT_CHARACTER;
 export const DT = CONFIG.sim.step;
-export const BASE = './assets/characters/0001/0001_';
 
-// SpriteSet with #0001's clip metadata in place of decoded frames.
-// `projectileKeys` and `effectKeys` pick which projectile and effect
-// animations have art.
+// The start of every art path of fighter `id`: `${assetBase(id)}idle_1.png`.
+export const assetBase = (id) => `./assets/characters/${id}/${id}_`;
+// The default fighter's (#0001's) art path start.
+export const BASE = assetBase(DEFAULT_CHARACTER.id);
+
+// SpriteSet with the default fighter's (#0001's) clip metadata in place of
+// decoded frames. `projectileKeys` and `effectKeys` pick which projectile
+// and effect animations have art.
 export function fakeSprites(
-  keys = Object.keys(def.animations),
-  projectileKeys = Object.keys(def.projectileAnimations),
-  effectKeys = Object.keys(def.effectAnimations),
+  keys = Object.keys(DEFAULT_CHARACTER.animations),
+  projectileKeys = Object.keys(DEFAULT_CHARACTER.projectileAnimations ?? {}),
+  effectKeys = Object.keys(DEFAULT_CHARACTER.effectAnimations ?? {}),
 ) {
-  return fakeSpritesOf(def, keys, projectileKeys, effectKeys);
+  return fakeSpritesOf(DEFAULT_CHARACTER, keys, projectileKeys, effectKeys);
 }
 
 // The same for any character: every clip, projectile and effect it
@@ -82,8 +94,11 @@ export const STAGE = new StageCollision(stageMap({
 
 export const SIM_CTX = { stage: STAGE, gravity: CONFIG.sim.gravity };
 
-// `stage` swaps in another StageCollision (ledges, walls).
-export function makeFighter({ sprites = fakeSprites(), x = 500, y, facing = 1, character = def, stage = STAGE } = {}) {
+// One fighter on its own, stepped by hand. `character` is the definition it
+// is built from (the default fighter when left out) and `sprites` its art
+// (by default every clip `character` declares). `stage` swaps in another
+// StageCollision (ledges, walls).
+export function makeFighter({ character = DEFAULT_CHARACTER, sprites = fakeSpritesOf(character), x = 500, y, facing = 1, stage = STAGE } = {}) {
   const input = {};
   const controller = { getInput: () => ({ ...input }) };
   const fighter = new Fighter({
@@ -139,7 +154,8 @@ export const sequence = (log) => log.map((s) => s.frame).filter((n, i, a) => n !
 // Two fighters, their projectiles and clones and the real CombatSystem,
 // stepped in Battle.update()'s order. `attackerCharacter` and
 // `targetCharacter` swap in other definitions (e.g. one with no Energy
-// refill); `targetFacing` overrides the
+// refill, or another fighter altogether; each gets its own art unless
+// `attackerSprites` / `targetSprites` say otherwise); `targetFacing` overrides the
 // target's starting facing (by default it faces the attacker). `stage`
 // and `x` (the attacker's spawn) place them; `pushboxes` also keeps the two
 // bodies apart and out of solids, as Battle.update() does.
@@ -222,4 +238,21 @@ export function cpuFight(defA, defB, { seconds = 30, seed = 3, difficulty = 'bru
     removeDeadClones(world.clones);
   }
   return { a, b, log, events, world };
+}
+
+// The harness bound to one fighter: the same helpers, built from
+// `character` (its own definition and art) instead of the default. For
+// tests that run a shared mechanic over several fighters:
+//
+//   for (const c of playableCharacters()) {
+//     const { makeFighter } = harnessFor(c);
+//     ...
+//   }
+export function harnessFor(character) {
+  return {
+    def: character,
+    fakeSprites: (...keys) => fakeSpritesOf(character, ...keys),
+    makeFighter: (opts = {}) => makeFighter({ character, ...opts }),
+    duel: (opts = {}) => duel({ attackerCharacter: character, targetCharacter: character, ...opts }),
+  };
 }

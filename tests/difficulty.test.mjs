@@ -176,7 +176,7 @@ const { MapSelectScreen } = await import('../js/screens/map-select-screen.js');
 const { BattleScreen } = await import('../js/screens/battle-screen.js');
 const { Settings } = await import('../js/core/settings.js');
 const { Battle } = await import('../js/game/battle.js');
-const { CombatAIController } = await import('../js/game/combat-ai.js');
+const { CombatAIController } = await import('../js/game/ai/combat-ai.js');
 const { mulberry32 } = await import('../js/core/utils.js');
 
 // Keyboard input (key() runs a keydown through every listener, menus first,
@@ -300,8 +300,8 @@ test('a profile holds perception and judgement only: nothing a fighter is made o
     assert.deepEqual(Object.keys(d.profile).sort(), Object.keys(CAPABILITY).sort(), `${d.id}: only AI traits`);
     for (const k of Object.keys(d.profile)) assert.ok(!fighterStats.includes(k), k);
   }
-  const src = readFileSync(new URL('../js/game/character.js', import.meta.url), 'utf8') +
-    readFileSync(new URL('../js/game/combat.js', import.meta.url), 'utf8');
+  const src = ['fighters/fighter', 'fighters/movement', 'combat/combat', 'combat/attacks', 'combat/combat-state', 'combat/defense']
+    .map((name) => readFileSync(new URL(`../js/game/${name}.js`, import.meta.url), 'utf8')).join('\n');
   assert.ok(!/difficulty/i.test(src), 'Fighter and combat never read a difficulty');
 });
 

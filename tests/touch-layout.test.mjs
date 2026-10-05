@@ -141,7 +141,7 @@ globalThis.document = {
 const {
   TOUCH_CONTROL_IDS, TOUCH_SCALE, TOUCH_NUDGE, sanitizeTouchLayout, placeControl, normalizePoint, layoutArea, clampScale,
 } = await import('../js/core/touch-layout.js');
-const { TouchControls } = await import('../js/game/touch-controls.js');
+const { TouchControls } = await import('../js/ui/touch-controls.js');
 const { TouchLayoutEditor } = await import('../js/ui/touch-layout-editor.js');
 const { Settings, SETTINGS_KEY, MOBILE_CONTROLS } = await import('../js/core/settings.js');
 const { MenuNavigator } = await import('../js/core/menu-navigator.js');

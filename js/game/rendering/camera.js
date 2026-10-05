@@ -5,7 +5,7 @@
 // and a fighter off a ledge still sees the way back; always clamped to its
 // camera bounds (the stage, the air around it and the Void's edge).
 
-import { clamp, damp } from '../core/utils.js';
+import { clamp, damp } from '../../core/utils.js';
 
 // How far the framing leans toward the main stage's centre (0 none, 1 all
 // the way), as long as every framed fighter stays inside the margin.

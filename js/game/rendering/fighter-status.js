@@ -15,8 +15,8 @@
 // technique (specialAttacks, js/data/loadout.js), each named after the
 // attack it is (A3 for attack3), the bar from its Energy.
 
-import { MOVES } from '../config.js';
-import { specialAttacks } from '../data/loadout.js';
+import { MOVES } from '../../config.js';
+import { specialAttacks } from '../../data/loadout.js';
 
 // Energy bar: one thin, bright purple fill on a dark track with a black
 // outline; the fill turns gray once the fighter is exhausted and stays gray

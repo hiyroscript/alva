@@ -80,7 +80,7 @@ globalThis.document = {
   createTextNode: (text) => new Text(text),
 };
 
-const { TouchControls, JOYSTICK, joystickDirection } = await import('../js/game/touch-controls.js');
+const { TouchControls, JOYSTICK, joystickDirection } = await import('../js/ui/touch-controls.js');
 const { ACTION_LABELS, CONFIG } = await import('../js/config.js');
 const { ICONS } = await import('../js/ui/icons.js');
 const { ABILITY_ACTIONS, SPRITE_BUTTONS, abilityPresence, jumpArt, mobileAbility, previewFrame } = await import('../js/ui/mobile-abilities.js');
@@ -89,7 +89,7 @@ const { setLanguage, localizeTree } = await import('../js/core/i18n.js');
 const { SAMPLE_FIGHTER } = await import('./sample-fighter.mjs');
 const { TEST_MOVELESS } = await import('./test-fighters.mjs');
 const { LOADOUT_CASES, WITH_EXTRA } = await import('./loadout-fighters.mjs');
-const { attackSlots } = await import('../js/game/touch-controls.js');
+const { attackSlots } = await import('../js/ui/touch-controls.js');
 
 const ROOT = new URL('../', import.meta.url);
 const read = (path) => readFileSync(new URL(path, ROOT), 'utf8');
@@ -196,12 +196,12 @@ test('the glyphs that stay are inline SVG in currentColor, hidden from assistive
 });
 
 test('fighter art is one real image element per button, never image markup or an asset path written in the UI', () => {
-  for (const file of ['js/game/touch-controls.js', 'js/ui/mobile-abilities.js', 'js/ui/icons.js']) {
+  for (const file of ['js/ui/touch-controls.js', 'js/ui/mobile-abilities.js', 'js/ui/icons.js']) {
     const code = read(file);
     assert.doesNotMatch(code, /\.png|\.jpg|\.svg['"]|new Image|<img/i, `${file}: no path, no markup`);
   }
   // The <img> is built as an element, its source set as an attribute.
-  assert.match(read('js/game/touch-controls.js'), /el\('img', \{ class: 'tc-sprite-icon', alt: '', 'aria-hidden': 'true'/);
+  assert.match(read('js/ui/touch-controls.js'), /el\('img', \{ class: 'tc-sprite-icon', alt: '', 'aria-hidden': 'true'/);
   // In the stylesheet: its own colours (no tint, no currentColor), fitted
   // whole inside the round button, aspect kept, crisp, and never in the way
   // of the button's own pointer handling or size.
@@ -259,14 +259,14 @@ test('#0001 authors its touch buttons as small, declarative UI data: a name and 
   // UI only: no combat module reads it, and the controls never guess art
   // from attack data or file names.
   const code = (file) => read(file).replace(/\/\/.*$/gm, '');
-  for (const file of readdirSync(new URL('js/game/', ROOT))) {
-    if (file === 'touch-controls.js') continue; // the UI that presents it
+  // (The touch controls that present it are UI: js/ui/touch-controls.js.)
+  for (const file of readdirSync(new URL('js/game/', ROOT), { recursive: true }).filter((f) => f.endsWith('.js'))) {
     assert.doesNotMatch(code(`js/game/${file}`), /mobileAbilities|mobile-abilities|preview/, `${file} never reads mobileAbilities`);
   }
-  for (const file of ['js/game/touch-controls.js', 'js/ui/mobile-abilities.js']) {
+  for (const file of ['js/ui/touch-controls.js', 'js/ui/mobile-abilities.js']) {
     assert.doesNotMatch(code(file), /\.(summons|techniques|projectiles)\b|'000\d'|#000\d|displayName/, `${file}: no inference, no fighter special case`);
   }
-  assert.doesNotMatch(code('js/game/touch-controls.js'), /\.animations?\b|\.preview\b/, 'the controls draw what they are given');
+  assert.doesNotMatch(code('js/ui/touch-controls.js'), /\.animations?\b|\.preview\b/, 'the controls draw what they are given');
   // Whether a button exists at all comes from the fighter's `actions` (the
   // data combat and the CPU go by), read in one place, abilityPresence; the
   // frame a button shows from its own clip, read in one place, previewFrame:
@@ -278,7 +278,7 @@ test('#0001 authors its touch buttons as small, declarative UI data: a name and 
   assert.match(abilities, /export function abilityMove/, 'loadout resolution is centralized alongside presence');
   assert.match(preview, /def\[collection\]/);
   assert.doesNotMatch(abilities.replace(preview, ''), /\.animations\b/, 'animations: read in previewFrame only');
-  assert.doesNotMatch(code('js/game/touch-controls.js'), /\bdef\??\.actions\b/);
+  assert.doesNotMatch(code('js/ui/touch-controls.js'), /\bdef\??\.actions\b/);
 });
 
 test('mobileAbility gives each button its name, its frame of fighter art and a neutral glyph to fall back on, never a crash', () => {
@@ -1610,7 +1610,7 @@ test('zoom prevention is declarative: no Touch Events, double-tap timers or blan
     assert.doesNotMatch(code, /['"](touchstart|touchend|touchmove|gesturestart|gesturechange|dblclick)['"]/, `${file}: no Touch / gesture events`);
   }
   // The touch controls stay on Pointer Events.
-  const touch = read('js/game/touch-controls.js');
+  const touch = read('js/ui/touch-controls.js');
   assert.match(touch, /'pointerdown'/);
   assert.match(touch, /setPointerCapture/);
 });

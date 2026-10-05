@@ -19,8 +19,8 @@ import { menuButton } from '../ui/components.js';
 import { getPlayableCharacter } from '../data/characters.js';
 import { getMap } from '../data/maps.js';
 import { Battle } from '../game/battle.js';
-import { HUD } from '../game/hud.js';
-import { TouchControls } from '../game/touch-controls.js';
+import { HUD } from '../ui/hud.js';
+import { TouchControls } from '../ui/touch-controls.js';
 
 // Banner lines by state, as translation keys (with params).
 const BANNERS = {

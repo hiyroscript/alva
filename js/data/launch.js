@@ -26,7 +26,7 @@
 // the game's numbers into the physics' units and never changes their
 // proportions. A Shield is the only exception: a hit it blocks adds no
 // Launch Point and launches nothing at all (see CombatSystem.applyHit in
-// js/game/combat.js).
+// js/game/combat/combat.js).
 //
 // Every hit (a fighter's attack, a projectile's, a technique's)
 // declares both fields in js/data/characters.js, independently:

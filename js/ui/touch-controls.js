@@ -47,9 +47,9 @@
 
 import { el } from '../core/utils.js';
 import { tattr, setAttr, setPlainAttr } from '../core/i18n.js';
-import { ICONS } from '../ui/icons.js';
+import { ICONS } from './icons.js';
 import { NUMBERED_ATTACKS } from '../config.js';
-import { ABILITY_ACTIONS, abilityPresence, abilityAvailable, jumpArt, mobileAbility, mobileAbilityLabelKey } from '../ui/mobile-abilities.js';
+import { ABILITY_ACTIONS, abilityPresence, abilityAvailable, jumpArt, mobileAbility, mobileAbilityLabelKey } from './mobile-abilities.js';
 import { DEFAULT_MOBILE_CONTROLS, resolveSetting } from '../core/settings.js';
 import {
   TOUCH_CONTROL_IDS, sanitizeTouchLayout, sanitizeTouchLayouts, layoutArea, placeControl,

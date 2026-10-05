@@ -11,15 +11,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { COMBAT_ACTIONS } from '../js/game/character.js';
-import { worldBox, CombatSystem, createAttackDefinition } from '../js/game/combat.js';
+import { COMBAT_ACTIONS } from '../js/game/fighters/fighter.js';
+import { createAttackDefinition } from '../js/game/combat/attacks.js';
+import { worldBox, CombatSystem } from '../js/game/combat/combat.js';
 import { ACTIONS, CONFIG } from '../js/config.js';
 import { LAUNCH_UNIT_SPEED } from '../js/data/launch.js';
 import {
   def, DT, SIM_CTX, fakeSprites, makeFighter, frameName, stepUntil,
   steps, frameNo, recordAttack, sequence, duel,
 } from './fighter-harness.mjs';
-import { resolveLaunchStun } from '../js/game/combat.js';
+import { resolveLaunchStun } from '../js/game/combat/combat.js';
 
 const ATTACK1 = { attack1: true, attack1Pressed: true };
 const ATTACK2 = { attack2: true, attack2Pressed: true };
@@ -211,7 +212,9 @@ test('attack2\'s launch is exactly its declared Base Launch and Directional Laun
   // The launch is the shared launch path's: nothing in combat singles out
   // an attack or a fighter.
   // Its code, that is: the schema comments show example move codenames.
-  const combat = readFileSync(new URL('../js/game/combat.js', import.meta.url), 'utf8').replace(/^\s*\/\/.*$/gm, '');
+  const combat = ['combat', 'attacks', 'combat-state', 'defense']
+    .map((name) => readFileSync(new URL(`../js/game/combat/${name}.js`, import.meta.url), 'utf8')).join('\n')
+    .replace(/^\s*\/\/.*$/gm, '');
   assert.doesNotMatch(combat, /(?:\.id|attack|attackId)\s*===?\s*['"]/);
   assert.doesNotMatch(combat, /'0001'|'attack2'|'midair_attack2'/);
 });
@@ -831,7 +834,7 @@ test('only the missing half of attack2 is refused', (t) => {
 });
 
 test('the training CPU stays non-attacking with attack2 mapped', async () => {
-  const { TrainingAIController } = await import('../js/game/fighter-controller.js');
+  const { TrainingAIController } = await import('../js/game/fighters/fighter-controller.js');
   const cpu = new TrainingAIController({ rng: () => 0.3 });
   const player = makeFighter({ x: 700 });
   const bot = makeFighter({ x: 900, facing: -1 });
@@ -855,7 +858,7 @@ test('Quick Battle: an attack2 hit launches the training CPU straight up through
   };
   const { Battle } = await import('../js/game/battle.js');
   const { getMap } = await import('../js/data/maps.js');
-  const { TrainingAIController } = await import('../js/game/fighter-controller.js');
+  const { TrainingAIController } = await import('../js/game/fighters/fighter-controller.js');
   const sprites = fakeSprites();
   let once = {};
   const input = {

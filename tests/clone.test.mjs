@@ -18,17 +18,17 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { characterFramePaths } from '../js/data/characters.js';
 import { getMap } from '../js/data/maps.js';
-import { Fighter } from '../js/game/character.js';
+import { Fighter } from '../js/game/fighters/fighter.js';
 import { LAUNCH_UNIT_SPEED as U } from '../js/data/launch.js';
-import { CombatState, CooldownTimers } from '../js/game/combat.js';
-import { Clone } from '../js/game/clone.js';
+import { CombatState, CooldownTimers } from '../js/game/combat/combat-state.js';
+import { Clone } from '../js/game/combat/summon.js';
 import { StageCollision, createBody, stepBody } from '../js/game/physics.js';
-import { SpriteSet } from '../js/game/sprite-normalizer.js';
-import { TrainingAIController } from '../js/game/fighter-controller.js';
+import { SpriteSet } from '../js/game/rendering/sprite-normalizer.js';
+import { TrainingAIController } from '../js/game/fighters/fighter-controller.js';
 import {
   def, DT, BASE, STAGE, SIM_CTX, fakeSprites, makeFighter, frameName, stepUntil, steps, duel, stageMap, startupSteps,
 } from './fighter-harness.mjs';
-import { resolveLaunchStun } from '../js/game/combat.js';
+import { resolveLaunchStun } from '../js/game/combat/combat.js';
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
 const ATTACK1 = { attack1: true, attack1Pressed: true };
@@ -197,7 +197,7 @@ test('the Clone Attack is data: an attack3 summon on a 5-second cooldown, reusin
     },
   );
   for (const key of ['baseLaunch', 'directionalLaunch', 'launchPoint', 'powers']) assert.equal(key in SUMMON, false, `no summon ${key}`);
-  assert.doesNotMatch(readFileSync(ROOT + 'js/game/clone.js', 'utf8'), /knockback|launch\.js|resolveHitLaunch|resolveLaunchStrength|resolveDirectionalLaunch|powers\.js/i,
+  assert.doesNotMatch(readFileSync(ROOT + 'js/game/combat/summon.js', 'utf8'), /knockback|launch\.js|resolveHitLaunch|resolveLaunchStrength|resolveDirectionalLaunch|powers\.js/i,
     'the clone performs the owner\'s resolved attack; it never resolves a launch itself');
   assert.deepEqual(def.actions.attack1, { ground: 'attack1', air: 'midair_attack1' });
   // The Attack 3 button is the summon itself: no attack or mid-air version
@@ -794,7 +794,7 @@ test('the no-ground fallback is data: the summon reuses midair_attack2 over the 
   );
   assert.equal(def.attacks.attack3, undefined);
   // The clone engine never names a fighter, a summon or an attack.
-  const src = readFileSync(ROOT + 'js/game/clone.js', 'utf8').replace(/^\s*\/\/.*$/gm, '');
+  const src = readFileSync(ROOT + 'js/game/combat/summon.js', 'utf8').replace(/^\s*\/\/.*$/gm, '');
   assert.doesNotMatch(src, /0001|attack3|midair_attack2|'attack1'/);
   const f = makeFighter().fighter;
   assert.deepEqual(f.summonDefs.attack3.noGround, SUMMON.noGround);

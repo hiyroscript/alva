@@ -33,7 +33,7 @@ export const LANGUAGES = Object.freeze(['en', 'fr']);
 export const DEFAULT_LANGUAGE = 'en';
 
 // The touch layouts Quick Battle and Practice Ground can use (see
-// js/game/touch-controls.js). Joystick is the default for a player who has
+// js/ui/touch-controls.js). Joystick is the default for a player who has
 // never chosen; Classic Buttons is the original Left / C / Right layout.
 export const MOBILE_CONTROLS = Object.freeze(['joystick', 'classic']);
 export const DEFAULT_MOBILE_CONTROLS = 'joystick';

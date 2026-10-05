@@ -1,4 +1,4 @@
-// Launch bounce (js/game/launch-bounce.js): a hard combat launch that drives
+// Launch bounce (js/game/combat/launch-bounce.js): a hard combat launch that drives
 // its fighter into stage geometry rebounds off it, and may ricochet on,
 // while ordinary movement still stops dead against the same surfaces.
 // Uses the real Fighter, physics, CombatSystem and hit effects (see
@@ -7,9 +7,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { StageCollision, createBody, stepBody } from '../js/game/physics.js';
-import { CombatSystem, createAttackDefinition } from '../js/game/combat.js';
-import { LAUNCH_BOUNCE, resolveLaunchBounce, startLaunch, bounceLaunch } from '../js/game/launch-bounce.js';
-import { HitEffects, HIT_FX, launchIsLethal } from '../js/game/hit-fx.js';
+import { createAttackDefinition } from '../js/game/combat/attacks.js';
+import { CombatSystem } from '../js/game/combat/combat.js';
+import { LAUNCH_BOUNCE, resolveLaunchBounce, startLaunch, bounceLaunch } from '../js/game/combat/launch-bounce.js';
+import { HitEffects, HIT_FX, launchIsLethal } from '../js/game/rendering/hit-fx.js';
 import { LAUNCH_UNIT_SPEED } from '../js/data/launch.js';
 import { getMap } from '../js/data/maps.js';
 import { CONFIG } from '../js/config.js';

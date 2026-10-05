@@ -27,8 +27,8 @@ import { FighterRoster } from '../ui/fighter-roster.js';
 import { isPlayable, playableCharacters } from '../data/characters.js';
 import { PRACTICE_MAP } from '../data/practice-map.js';
 import { PracticeSession } from '../game/practice.js';
-import { PracticeHUD } from '../game/hud.js';
-import { TouchControls } from '../game/touch-controls.js';
+import { PracticeHUD } from '../ui/hud.js';
+import { TouchControls } from '../ui/touch-controls.js';
 
 // Every fresh visit from Home starts with this fighter, and a practice CPU
 // of the same fighter, sharing its one loaded sprite set: the first

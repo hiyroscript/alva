@@ -9,16 +9,17 @@
 // attack2.test.mjs.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { COMBAT_ACTIONS } from '../js/game/character.js';
-import { worldBox, createAttackDefinition } from '../js/game/combat.js';
-import { TrainingAIController } from '../js/game/fighter-controller.js';
+import { COMBAT_ACTIONS } from '../js/game/fighters/fighter.js';
+import { createAttackDefinition } from '../js/game/combat/attacks.js';
+import { worldBox } from '../js/game/combat/combat.js';
+import { TrainingAIController } from '../js/game/fighters/fighter-controller.js';
 import { LAUNCH_UNIT_SPEED as U } from '../js/data/launch.js';
 import { CONFIG } from '../js/config.js';
 import {
   def, DT, SIM_CTX, fakeSprites, makeFighter, frameName, stepUntil,
   steps, frameNo, recordAttack, sequence, duel,
 } from './fighter-harness.mjs';
-import { resolveLaunchStun } from '../js/game/combat.js';
+import { resolveLaunchStun } from '../js/game/combat/combat.js';
 
 const ATTACK1 = { attack1: true, attack1Pressed: true };
 const ATTACK2 = { attack2: true, attack2Pressed: true };
@@ -601,7 +602,7 @@ function mulberry(seed) {
 // ---- Pending (art-only) attacks --------------------------------------------------
 
 // Any fighter whose art arrives before its combat attributes can give an
-// attack `pending: true` (see js/game/combat.js). No fighter uses one now;
+// attack `pending: true` (see js/game/combat/attacks.js). No fighter uses one now;
 // here, #0001's own attack1 clip stands in for such art.
 test('a pending attack plays one pass of its clip and strikes nothing; combat fields are refused', () => {
   const atk = createAttackDefinition({ id: 'attack1', animation: 'attack1', pending: true }, { clipDuration: 0.4 });

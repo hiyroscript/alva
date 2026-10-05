@@ -22,7 +22,7 @@ import { TouchLayoutEditor } from '../ui/touch-layout-editor.js';
 import { getCharacter, getPlayableCharacter, playableCharacters, characterFramePaths } from '../data/characters.js';
 import { MAPS } from '../data/maps.js';
 import { DEFAULT_DIFFICULTY } from '../data/difficulty.js';
-import { SpriteSet } from '../game/sprite-normalizer.js';
+import { SpriteSet } from '../game/rendering/sprite-normalizer.js';
 
 import { SplashScreen } from '../screens/splash-screen.js';
 import { HomeScreen } from '../screens/home-screen.js';

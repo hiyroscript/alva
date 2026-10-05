@@ -1,5 +1,5 @@
 // Run with node --test tests/combat-ai.test.mjs (no dependencies).
-// Quick Battle's combat AI (js/game/combat-ai.js): it fights through the
+// Quick Battle's combat AI (js/game/ai/combat-ai.js): it fights through the
 // same inputs a player has (attacks, Throw, the Clone Attack and Sphere
 // Rush on their own buttons, Shield, Dash, jumps, the fast fall), reacts
 // late on low levels and early (never
@@ -13,16 +13,17 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { def, DT, fakeSprites, stageMap } from './fighter-harness.mjs';
 import { CONFIG } from '../js/config.js';
-import { Fighter, separateFighters } from '../js/game/character.js';
-import { CombatSystem } from '../js/game/combat.js';
-import { spawnProjectiles, removeDeadProjectiles } from '../js/game/projectile.js';
-import { spawnClones, updateClones, removeDeadClones } from '../js/game/clone.js';
+import { Fighter, separateFighters } from '../js/game/fighters/fighter.js';
+import { CombatSystem } from '../js/game/combat/combat.js';
+import { spawnProjectiles, removeDeadProjectiles } from '../js/game/combat/projectile.js';
+import { spawnClones, updateClones, removeDeadClones } from '../js/game/combat/summon.js';
 import { StageCollision, resolveSolidOverlap } from '../js/game/physics.js';
-import { CombatAIController, readMoveset } from '../js/game/combat-ai.js';
-import { TrainingAIController } from '../js/game/fighter-controller.js';
+import { CombatAIController } from '../js/game/ai/combat-ai.js';
+import { readMoveset } from '../js/game/ai/moveset.js';
+import { TrainingAIController } from '../js/game/fighters/fighter-controller.js';
 import { DIFFICULTY_IDS, getDifficultyProfile } from '../js/data/difficulty.js';
 import { mulberry32 } from '../js/core/utils.js';
-import { blankInput } from '../js/game/fighter-controller.js';
+import { blankInput } from '../js/game/fighters/fighter-controller.js';
 
 const BUTTONS = ['runLeft', 'runRight', 'down', 'jump', 'shield', 'extra_attack', 'transform', 'attack1', 'attack2', 'attack3', 'attack4'];
 const COMBAT = ['extra_attack', 'transform', 'attack1', 'attack2'];
@@ -470,8 +471,8 @@ test('difficulty never changes the fighter: identical stats on every level, befo
 });
 
 test('the controller only reads the game: no writes to fighters, no raw input, no unseeded randomness', () => {
-  const src = readFileSync(new URL('../js/game/combat-ai.js', import.meta.url), 'utf8')
-    .replace(/\/\/.*$/gm, '');
+  const src = ['combat-ai', 'moveset'].map((name) => readFileSync(new URL(`../js/game/ai/${name}.js`, import.meta.url), 'utf8'))
+    .join('\n').replace(/\/\/.*$/gm, '');
   // Assignments to anything reached through a fighter.
   const writes = src.match(/(^|[\s;(,{])(self|foe|fighter|target|f)\.[\w.]+\s*(=(?!=)|\+=|-=|\+\+|--)/gm) ?? [];
   assert.deepEqual(writes, []);

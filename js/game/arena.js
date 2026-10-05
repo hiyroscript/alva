@@ -9,15 +9,15 @@
 
 import { CONFIG } from '../config.js';
 import { StageCollision, resolveSolidOverlap } from './physics.js';
-import { separateFighters } from './character.js';
-import { CombatSystem, worldBox } from './combat.js';
-import { spawnProjectiles, removeDeadProjectiles } from './projectile.js';
-import { spawnClones, updateClones, removeDeadClones } from './clone.js';
-import { Camera } from './camera.js';
-import { drawFrame, drawCenteredFrame } from './sprite-normalizer.js';
-import { drawEnergyBar, drawCooldownIndicators, energyBarState, statusOnScreen } from './fighter-status.js';
-import { drawShield } from './shield-fx.js';
-import { HIT_FX, HitEffects, whiteFrame } from './hit-fx.js';
+import { separateFighters } from './fighters/fighter.js';
+import { CombatSystem, worldBox } from './combat/combat.js';
+import { spawnProjectiles, removeDeadProjectiles } from './combat/projectile.js';
+import { spawnClones, updateClones, removeDeadClones } from './combat/summon.js';
+import { Camera } from './rendering/camera.js';
+import { drawFrame, drawCenteredFrame } from './rendering/sprite-normalizer.js';
+import { drawEnergyBar, drawCooldownIndicators, energyBarState, statusOnScreen } from './rendering/fighter-status.js';
+import { drawShield } from './rendering/shield-fx.js';
+import { HIT_FX, HitEffects, whiteFrame } from './rendering/hit-fx.js';
 import { createTheme } from '../stages/index.js';
 import { slotLabel } from '../core/i18n.js';
 
@@ -43,7 +43,7 @@ export class Arena {
     this.camera.setBounds(map.cameraBounds);
     this.camera.setAnchor(this.stage.centerX);
     this.combat = new CombatSystem();
-    // Hit effects (js/game/hit-fx.js): screen shake, hit flashes, sparks,
+    // Hit effects (js/game/rendering/hit-fx.js): screen shake, hit flashes, sparks,
     // speed trails and a lethal launch's slow motion. Presentation only:
     // they slow the clock the fixed steps are fed from, never a step.
     this.fx = new HitEffects({ reducedMotion });
@@ -58,12 +58,12 @@ export class Arena {
     this.simCtx = { stage: this.stage, gravity: this.gravity, battle: this };
     // Fighters in play, Player 1 first; each mode fills it.
     this.fighters = [];
-    // Live projectiles (js/game/projectile.js), in spawn order.
+    // Live projectiles (js/game/combat/projectile.js), in spawn order.
     this.projectiles = [];
-    // Live summoned clones (js/game/clone.js), in spawn order. Never
+    // Live summoned clones (js/game/combat/summon.js), in spawn order. Never
     // fighters: no pushbox, camera, HUD, marker or result role.
     this.clones = [];
-    // A technique (js/game/technique.js) lives on the
+    // A technique (js/game/combat/technique.js) lives on the
     // fighter performing it (`fighter.technique`), not here: that fighter
     // updates, moves and ends it, and a reset ends it.
   }
@@ -499,7 +499,7 @@ export class Arena {
   // Energy bars and the summon and technique cooldowns, for the fighters
   // whose body is on screen: an off-screen fighter only gets its edge
   // pointer. Each draws only while it has something to show (see
-  // js/game/fighter-status.js).
+  // js/game/rendering/fighter-status.js).
   drawStatus(fighters = this.inPlay) {
     const { ctx, view } = this;
     for (const f of fighters) {

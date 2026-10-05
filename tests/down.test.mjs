@@ -10,9 +10,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { ACTIONS, ACTION_LABELS, COMBAT_BUTTONS, CONFIG } from '../js/config.js';
-import { COMBAT_ACTIONS } from '../js/game/character.js';
-import { CombatSystem } from '../js/game/combat.js';
-import { HELD_CONTROLS, blankInput } from '../js/game/fighter-controller.js';
+import { COMBAT_ACTIONS } from '../js/game/fighters/fighter.js';
+import { CombatSystem } from '../js/game/combat/combat.js';
+import { HELD_CONTROLS, blankInput } from '../js/game/fighters/fighter-controller.js';
 import {
   def, DT, SIM_CTX, makeFighter, frameName, stepUntil, steps, duel, startupSteps,
 } from './fighter-harness.mjs';
@@ -303,7 +303,7 @@ test('Down held as a hit lands in the air bends the launch downward; on the grou
 // ---- Controllers ----------------------------------------------------------------------
 
 test('the training CPU never holds Down or presses a combat button, and still drops through platforms to follow', async () => {
-  const { TrainingAIController } = await import('../js/game/fighter-controller.js');
+  const { TrainingAIController } = await import('../js/game/fighters/fighter-controller.js');
   const cpu = new TrainingAIController({ rng: () => 0.3 });
   const player = makeFighter({ x: 700 });
   const bot = makeFighter({ x: 900, facing: -1 });

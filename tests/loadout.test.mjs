@@ -18,8 +18,8 @@ import {
   midairAttack, numberedAttacks, specialAction, specialAttacks,
 } from '../js/data/loadout.js';
 import * as loadoutModule from '../js/data/loadout.js';
-import { COMBAT_ACTIONS } from '../js/game/character.js';
-import { readMoveset } from '../js/game/combat-ai.js';
+import { COMBAT_ACTIONS } from '../js/game/fighters/fighter.js';
+import { readMoveset } from '../js/game/ai/moveset.js';
 import { DT, cpuFight, duel, fakeSpritesOf, makeFighter, startupSteps } from './fighter-harness.mjs';
 import { LOADOUT_CASES, WITH_EXTRA, loadoutFighter } from './loadout-fighters.mjs';
 import { SAMPLE_FIGHTER } from './sample-fighter.mjs';
@@ -402,7 +402,10 @@ test('every definition the game loads keeps the rules, and a broken one is refus
 });
 
 test('the engine goes by the loadout, never by an attack\'s number: no character or attack special-cased', () => {
-  for (const file of ['js/game/character.js', 'js/game/combat-ai.js', 'js/game/touch-controls.js', 'js/ui/mobile-abilities.js', 'js/game/fighter-status.js']) {
+  for (const file of [
+    'js/game/fighters/fighter.js', 'js/game/fighters/movement.js', 'js/game/ai/combat-ai.js', 'js/game/ai/moveset.js',
+    'js/ui/touch-controls.js', 'js/ui/mobile-abilities.js', 'js/game/rendering/fighter-status.js',
+  ]) {
     const code = readFileSync(new URL(`../${file}`, import.meta.url), 'utf8').replace(/^\s*\/\/.*$/gm, '');
     assert.doesNotMatch(code, /'000\d'/, `${file}: no fighter id`);
     assert.doesNotMatch(code, /===?\s*'attack[3-5]'|'attack[3-5]'\s*===?/, `${file}: no attack3 to attack5 special case`);

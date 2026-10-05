@@ -20,10 +20,15 @@ import {
 } from '../js/data/launch.js';
 import * as launchModule from '../js/data/launch.js';
 import { CHARACTERS } from '../js/data/characters.js';
-import * as combatModule from '../js/game/combat.js';
-import { CombatState, CombatSystem, createAttackDefinition } from '../js/game/combat.js';
-import { createProjectileDefinition } from '../js/game/projectile.js';
-import { createTechniqueDefinition } from '../js/game/technique.js';
+import * as combatModule from '../js/game/combat/combat.js';
+import * as attacksModule from '../js/game/combat/attacks.js';
+import * as combatStateModule from '../js/game/combat/combat-state.js';
+import * as defenseModule from '../js/game/combat/defense.js';
+import { createAttackDefinition } from '../js/game/combat/attacks.js';
+import { CombatState } from '../js/game/combat/combat-state.js';
+import { CombatSystem } from '../js/game/combat/combat.js';
+import { createProjectileDefinition } from '../js/game/combat/projectile.js';
+import { createTechniqueDefinition } from '../js/game/combat/technique.js';
 import { Battle } from '../js/game/battle.js';
 import { getMap } from '../js/data/maps.js';
 import { CONFIG } from '../js/config.js';
@@ -318,7 +323,9 @@ test('a Shielded hit adds no Launch Point and launches nothing, whatever its Bas
     }
   }
   // The old Block modifiers (chip damage, a halved sideways launch) are gone.
-  for (const key of ['blockLaunch', 'BLOCKED_HORIZONTAL_LAUNCH_SCALE']) assert.equal(key in combatModule, false, key);
+  for (const key of ['blockLaunch', 'BLOCKED_HORIZONTAL_LAUNCH_SCALE']) {
+    for (const mod of [combatModule, attacksModule, combatStateModule, defenseModule]) assert.equal(key in mod, false, key);
+  }
   assert.equal('chipDamage' in createAttackDefinition({ id: 'x' }), false);
 });
 
@@ -470,7 +477,7 @@ test('the old Knockback engine is gone: no knockback.js, and nothing the game sh
   assert.equal(existsSync(new URL('js/data/knockback.js', ROOT)), false);
   assert.ok(existsSync(new URL('js/data/launch.js', ROOT)));
   const files = shippedFiles();
-  assert.ok(files.includes('js/game/combat.js') && files.includes('js/data/characters.js') && files.includes('js/data/characters/0001.js'));
+  assert.ok(files.includes('js/game/combat/combat.js') && files.includes('js/data/characters.js') && files.includes('js/data/characters/0001.js'));
   for (const file of files) {
     const source = read(file);
     assert.doesNotMatch(source, /knockback/i, `${file} still mentions Knockback`);
@@ -491,11 +498,12 @@ test('the documentation describes only the new system: no obsolete engine names 
 });
 
 test('the launch path is shared and generic: no fighter, attack or technique singled out anywhere in combat', () => {
-  const combat = read('js/game/combat.js').replace(/^\s*\/\/.*$/gm, '');
+  const combat = ['combat', 'attacks', 'combat-state', 'defense']
+    .map((name) => read(`js/game/combat/${name}.js`)).join('\n').replace(/^\s*\/\/.*$/gm, '');
   assert.doesNotMatch(combat, /(?:\.id|attack|attackId|fighter\.id|technique\.id)\s*===?\s*['"]/);
   assert.doesNotMatch(combat, /'0001'|'(midair_)?attack\d'|'extra_attack(_object)?'|'attack\d_object\w*'/);
   // Projectiles, clones and techniques never compute a launch of their own.
-  for (const file of ['js/game/projectile.js', 'js/game/clone.js', 'js/game/technique.js']) {
+  for (const file of ['js/game/combat/projectile.js', 'js/game/combat/summon.js', 'js/game/combat/technique.js']) {
     const code = read(file).replace(/^\s*\/\/.*$/gm, '');
     assert.doesNotMatch(code, /resolveLaunchStrength|resolveDirectionalLaunch\(|launchPoint\s*\*/, `${file} has no launch math`);
   }

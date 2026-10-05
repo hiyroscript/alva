@@ -220,8 +220,8 @@ export const CHARACTER_0002 = {
   },
 
   // A still idle frame for the airborne and hurt clips if their frames
-  // fail to load, as for #0001. It has no land clip at all: it lands
-  // straight into its stance.
+  // fail to load. It has no land clip at all: it lands straight into its
+  // stance.
   animationFallbacks: {
     jump: { animation: 'idle', frame: 0 },
     fall: { animation: 'idle', frame: 0 },
@@ -230,9 +230,10 @@ export const CHARACTER_0002 = {
   },
 
   visual: {
-    // Its 39-pixel idle at #0001's size per art pixel (88 units over 52
-    // pixels): 66 units, a head shorter than #0001, so every fighter's
-    // pixels are the same size on screen.
+    // Its 39-pixel idle at the roster's common art-pixel size, 88/52 world
+    // units per art pixel (the scale #0001's art is drawn at, so every
+    // fighter's pixels are the same size on screen): 66 units, a head
+    // shorter than #0001.
     height: ART_0002 * (88 / 52),
     referenceAnimation: 'idle',
     anchor: 'torso',
@@ -246,9 +247,9 @@ export const CHARACTER_0002 = {
     speed: 3,
   },
 
-  // #0001's movement as its starting point (see #0001's for what each
-  // field does), quicker off the mark and with a longer, faster Dash
-  // (about 220 units in its 0.2 s).
+  // #0002's movement profile (js/game/fighters/movement.js lists what each
+  // field does). Tuned from #0001's values: quicker off the mark, and a
+  // longer, faster Dash (about 220 units in its 0.2 s).
   movement: {
     acceleration: 4800,
     deceleration: 4200,
@@ -285,7 +286,8 @@ export const CHARACTER_0002 = {
     { x: -14, y: -32, w: 34, h: 32 }, // legs
   ],
 
-  // #0001's launch reaction.
+  // How #0002 responds to being launched (see resolveLaunchReaction in
+  // js/game/combat/combat.js); these happen to be #0001's values too.
   launchReaction: {
     stunPerThousand: 0.2,
     maxStun: 0.7,
@@ -293,7 +295,8 @@ export const CHARACTER_0002 = {
     steerAngle: 15,
   },
 
-  // Energy, spent by the Dash and the Shield and refilled as #0001's is.
+  // Energy (see resolveEnergy in js/game/combat/combat-state.js), spent by
+  // the Dash and the Shield; the same values as #0001's.
   energy: {
     max: 100,
     regen: 12,
@@ -303,7 +306,8 @@ export const CHARACTER_0002 = {
   },
 
   // The guard, on the ground only: there is no art for one in the air,
-  // where the `shield` input does nothing. Perfect Shield as #0001's.
+  // where the `shield` input does nothing. Its perfect Shield opens for
+  // 0.1 s after 0.25 s down, as #0001's does.
   defense: {
     type: 'shield',
     groundAnimation: 'shielding',
@@ -345,7 +349,7 @@ export const CHARACTER_0002 = {
   },
 
   // Attack definitions (schema: createAttackDefinition in
-  // js/game/combat.js). Phases and strikes are whole frames of each clip,
+  // js/game/combat/attacks.js). Phases and strikes are whole frames of each clip,
   // and every hitbox is measured from its art (facing right from the
   // origin, mirrored with facing).
   attacks: {

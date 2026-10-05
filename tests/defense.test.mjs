@@ -13,14 +13,16 @@ import { createHash } from 'node:crypto';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { characterFramePaths } from '../js/data/characters.js';
-import { COMBAT_ACTIONS } from '../js/game/character.js';
-import { CombatState, CombatSystem, createDefenseDefinition, resolveEnergy } from '../js/game/combat.js';
-import { SpriteSet } from '../js/game/sprite-normalizer.js';
+import { COMBAT_ACTIONS } from '../js/game/fighters/fighter.js';
+import { createDefenseDefinition } from '../js/game/combat/defense.js';
+import { CombatState, resolveEnergy } from '../js/game/combat/combat-state.js';
+import { CombatSystem } from '../js/game/combat/combat.js';
+import { SpriteSet } from '../js/game/rendering/sprite-normalizer.js';
 import {
   SHIELD_SHAPE, SHIELD_STYLE, drawShield, shieldCenter, shieldOutline, shieldRadius,
-} from '../js/game/shield-fx.js';
+} from '../js/game/rendering/shield-fx.js';
 import { EDGE_RED } from '../js/core/organic-edge.js';
-import { energyBarState, ENERGY_STYLE } from '../js/game/fighter-status.js';
+import { energyBarState, ENERGY_STYLE } from '../js/game/rendering/fighter-status.js';
 import { ACTIONS, ACTION_LABELS, CONFIG } from '../js/config.js';
 import {
   def, DT, BASE, SIM_CTX, fakeSprites, makeFighter, frameName, stepUntil, steps, duel,
@@ -991,9 +993,13 @@ test('no gameplay code reads the Shield\'s look: only the Arena\'s renderer impo
   assert.deepEqual(importers, ['js/game/arena.js']);
   // And the Arena only draws it.
   const arena = readFileSync(`${ROOT}js/game/arena.js`, 'utf8');
-  assert.match(arena, /import \{ drawShield \} from '\.\/shield-fx\.js';/);
+  assert.match(arena, /import \{ drawShield \} from '\.\/rendering\/shield-fx\.js';/);
+  const simulation = [
+    'combat/combat.js', 'combat/attacks.js', 'combat/combat-state.js', 'combat/defense.js', 'physics.js',
+    'fighters/fighter.js', 'fighters/movement.js', 'combat/technique.js', 'combat/projectile.js', 'combat/summon.js',
+  ];
   for (const name of ['shieldRadius', 'shieldOutline', 'SHIELD_SHAPE']) {
-    for (const f of ['combat.js', 'physics.js', 'character.js', 'technique.js', 'projectile.js', 'clone.js']) {
+    for (const f of simulation) {
       assert.doesNotMatch(readFileSync(`${ROOT}js/game/${f}`, 'utf8'), new RegExp(name), `${f} never uses ${name}`);
     }
   }
@@ -1053,7 +1059,7 @@ test('in a real render the Shield wraps its fighter: interior behind the sprite,
 // ---- Training CPU -----------------------------------------------------------------
 
 test('the training CPU never presses Shield and never shields', async () => {
-  const { TrainingAIController } = await import('../js/game/fighter-controller.js');
+  const { TrainingAIController } = await import('../js/game/fighters/fighter-controller.js');
   const cpu = new TrainingAIController({ rng: () => 0.3 });
   const player = makeFighter({ x: 700 });
   const bot = makeFighter({ x: 900, facing: -1 });

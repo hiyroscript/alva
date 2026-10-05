@@ -1,6 +1,6 @@
 // The living edge the Void and the Shield share: black, a thin red rim, and
 // a perimeter that wavers by a few slow sine waves (see drawVoid in
-// js/stages/stage-theme.js and js/game/shield-fx.js). Art only: no gameplay
+// js/stages/stage-theme.js and js/game/rendering/shield-fx.js). Art only: no gameplay
 // boundary or collision ever reads it.
 
 // The red of both rims.

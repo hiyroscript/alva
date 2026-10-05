@@ -1,6 +1,6 @@
 // Battle: one match on the shared Arena (js/game/arena.js), with the intro /
 // fight / time-up / KO / result phases and the round timer. In Quick Battle
-// it is Player 1 against the combat AI (js/game/combat-ai.js) at the chosen
+// it is Player 1 against the combat AI (js/game/ai/combat-ai.js) at the chosen
 // difficulty; in Watch Mode both fighters are the combat AI, each with its
 // own controller, at the one chosen difficulty (see BATTLE_MODES). Every
 // rule below is the same in both. The Arena owns the fixed-timestep world
@@ -17,9 +17,9 @@
 
 import { CONFIG } from '../config.js';
 import { Arena } from './arena.js';
-import { Fighter } from './character.js';
-import { PlayerController } from './fighter-controller.js';
-import { CombatAIController } from './combat-ai.js';
+import { Fighter } from './fighters/fighter.js';
+import { PlayerController } from './fighters/fighter-controller.js';
+import { CombatAIController } from './ai/combat-ai.js';
 import { resolveDifficulty } from '../data/difficulty.js';
 import { mulberry32, deriveSeed } from '../core/utils.js';
 

@@ -16,7 +16,7 @@
 // The geometry helpers are pure, so what is drawn can be checked without a
 // canvas.
 
-import { EDGE_RED, waveOffset } from '../core/organic-edge.js';
+import { EDGE_RED, waveOffset } from '../../core/organic-edge.js';
 
 export const SHIELD_STYLE = Object.freeze({
   interior: 'rgba(0, 0, 0, 0.16)',

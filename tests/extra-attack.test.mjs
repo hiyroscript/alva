@@ -14,11 +14,11 @@ import { createHash } from 'node:crypto';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { characterFramePaths } from '../js/data/characters.js';
-import { COMBAT_ACTIONS } from '../js/game/character.js';
-import { CombatSystem } from '../js/game/combat.js';
-import { Projectile, spawnProjectiles, removeDeadProjectiles, createProjectileDefinition } from '../js/game/projectile.js';
+import { COMBAT_ACTIONS } from '../js/game/fighters/fighter.js';
+import { CombatSystem } from '../js/game/combat/combat.js';
+import { Projectile, spawnProjectiles, removeDeadProjectiles, createProjectileDefinition } from '../js/game/combat/projectile.js';
 import { StageCollision } from '../js/game/physics.js';
-import { SpriteSet } from '../js/game/sprite-normalizer.js';
+import { SpriteSet } from '../js/game/rendering/sprite-normalizer.js';
 import { ACTION_LABELS, CONFIG } from '../js/config.js';
 import {
   def, DT, BASE, STAGE, SIM_CTX, fakeSprites, makeFighter, frameName, stepUntil,
@@ -794,7 +794,7 @@ test('J and gamepad X / Square still press the extra_attack action, labelled ext
 });
 
 test('the training CPU never throws', async () => {
-  const { TrainingAIController } = await import('../js/game/fighter-controller.js');
+  const { TrainingAIController } = await import('../js/game/fighters/fighter-controller.js');
   const cpu = new TrainingAIController({ rng: () => 0.42 });
   const d = duel({ gap: 300 });
   for (let i = 0; i < 1500; i++) {

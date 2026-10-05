@@ -1,21 +1,42 @@
 // Fighter entity: physics body + state machine + combat state + animator.
 // Behaviour is driven entirely by the character definition and whatever
 // controller (player / AI) feeds it input.
+//
+// Purpose: the one runtime fighter every mode uses, for every character.
+// It owns the fighter's state (its body, Dash, jumps, Shield, attack in
+// progress, summon startup, technique, launch sequence) and the order in
+// which each fixed step updates it (Fighter.update).
+// Inputs: a character definition (js/data/characters/<id>.js), its loaded
+// SpriteSet (clip lengths time the Dash, the land pose, pending attacks and
+// summon startups), a spawn, the stage, and a controller
+// (js/game/fighters/fighter-controller.js or js/game/ai/combat-ai.js).
+// Outputs: Fighter, separateFighters and COMBAT_ACTIONS.
+// Important constraints: the rules are shared and the numbers are the
+// character's. Movement math lives in js/game/fighters/movement.js, attack
+// / defense / Energy schemas in js/game/combat/, and nothing here names a
+// fighter or a button's role: a summon or technique is whatever the
+// character's `actions` say it is. The simulation is fixed-step and
+// deterministic; rendering reads it (interpolate, spriteFlip) and never
+// feeds back.
 
-import { SpriteAnimator } from './sprite-animator.js';
-import { createBody, stepBody, dropThrough, separate } from './physics.js';
-import { startLaunch, bounceLaunch, resolveLaunchBounce } from './launch-bounce.js';
-import {
-  CombatState, attackPhase, createAttackDefinition, createDefenseDefinition, resolveEnergy, resolveLaunchReaction,
-} from './combat.js';
-import { createProjectileDefinition } from './projectile.js';
-import { createSummonDefinition, summonProblem } from './clone.js';
-import { Technique, createTechniqueDefinition, techniqueProblem } from './technique.js';
-import { getJumpVelocity, getMaxSpeed } from '../data/powers.js';
-import { specialAction } from '../data/loadout.js';
-import { COMBAT_BUTTONS } from '../config.js';
+import { SpriteAnimator } from '../rendering/sprite-animator.js';
+import { createBody, stepBody, dropThrough, separate } from '../physics.js';
+import { startLaunch, bounceLaunch, resolveLaunchBounce } from '../combat/launch-bounce.js';
+import { attackPhase, createAttackDefinition } from '../combat/attacks.js';
+import { createDefenseDefinition } from '../combat/defense.js';
+import { CombatState, resolveEnergy } from '../combat/combat-state.js';
+import { resolveLaunchReaction } from '../combat/combat.js';
+import { createProjectileDefinition } from '../combat/projectile.js';
+import { createSummonDefinition, summonProblem } from '../combat/summon.js';
+import { Technique, createTechniqueDefinition, techniqueProblem } from '../combat/technique.js';
+import { getJumpVelocity, getMaxSpeed } from '../../data/powers.js';
+import { specialAction } from '../../data/loadout.js';
+import { COMBAT_BUTTONS } from '../../config.js';
 import { blankInput } from './fighter-controller.js';
-import { approach, clamp, sign } from '../core/utils.js';
+import { approach, clamp } from '../../core/utils.js';
+import {
+  steer, steerAttack, attackStartSpeed, hitstunDrag, fastFallVelocity, airJump, highJumpLift, readDashTap,
+} from './movement.js';
 
 // The combat buttons, by control codename (COMBAT_BUTTONS in js/config.js):
 // extra_attack, transform and attack1 to attack5. Each maps to a move
@@ -61,7 +82,7 @@ export class Fighter {
     // One pass of the mouvment clip: how long a Dash lasts (0 without its
     // art, and then no Dash starts; see tryDash).
     this.dashDuration = sprites.duration('mouvment');
-    // A pending attack (art only, see js/game/combat.js) lasts one pass of
+    // A pending attack (art only, see js/game/combat/attacks.js) lasts one pass of
     // its own clip.
     this.attacks = Object.fromEntries(
       Object.entries(def.attacks || {}).map(([id, spec]) => [
@@ -93,15 +114,15 @@ export class Fighter {
     // air, from its Speed Power tier. Nothing else (acceleration, launches,
     // projectiles, techniques) uses it.
     this.maxSpeed = getMaxSpeed(def);
-    // Energy settings (js/game/combat.js resolveEnergy): the maximum, the
+    // Energy settings (js/game/combat/combat-state.js resolveEnergy): the maximum, the
     // refill rate, what a Dash costs and what each blocked hit costs.
     this.energyDef = resolveEnergy(def.energy);
     // How it responds to being launched (resolveLaunchReaction in
-    // js/game/combat.js): longer stun for
+    // js/game/combat/combat.js): longer stun for
     // a harder launch, tumbling past a speed, and how far it may steer one.
     this.launchReaction = resolveLaunchReaction(def.launchReaction);
     // How a launch that drives it into a wall, floor or ceiling rebounds
-    // (js/game/launch-bounce.js: LAUNCH_BOUNCE, under the character's own
+    // (js/game/combat/launch-bounce.js: LAUNCH_BOUNCE, under the character's own
     // `launchBounce`).
     this.launchBounce = resolveLaunchBounce(def.launchBounce, `Character "${def.id}"`);
     this.opponent = null;
@@ -153,7 +174,7 @@ export class Fighter {
     // Launched hard (launchReaction.tumbleSpeed or faster): it tumbles in its
     // mid-air hurt pose, stunned or not, until it acts or lands.
     this.tumbling = false;
-    // The launch sequence it is flying in (see js/game/launch-bounce.js),
+    // The launch sequence it is flying in (see js/game/combat/launch-bounce.js),
     // from the launching hit until it is back in ordinary play; null
     // otherwise. And this step's rebound off stage geometry, if any.
     this.launch = null;
@@ -177,7 +198,7 @@ export class Fighter {
     // How many times each attack with `airUses` has started since the
     // fighter was last on the ground or hit: attack id -> count.
     this.airAttacks = new Map();
-    // In free fall (see `freeFall` in js/game/combat.js): an attack that
+    // In free fall (see `freeFall` in js/game/combat/attacks.js): an attack that
     // spends the airtime was started in the air, and until the fighter lands
     // or is hit it has no attack or air jump left.
     this.freeFall = false;
@@ -205,16 +226,16 @@ export class Fighter {
     // every cooldown ready.
     this.combat = new CombatState(this.energyDef);
     // Projectiles released this step, waiting for the battle to spawn them
-    // (see spawnProjectiles in js/game/projectile.js).
+    // (see spawnProjectiles in js/game/combat/projectile.js).
     this.releases = [];
     // Summons paid for this step, waiting for the battle to spawn them (see
-    // spawnClones in js/game/clone.js): { id, target }.
+    // spawnClones in js/game/combat/summon.js): { id, target }.
     this.summons = [];
     // A summon accepted but not yet sent out: its owner is performing its
     // startup ({ id, target, animation, duration, time }; see trySummon), or
     // null.
     this.pendingSummon = null;
-    // The technique this fighter is performing (see js/game/technique.js),
+    // The technique this fighter is performing (see js/game/combat/technique.js),
     // or null.
     this.technique = null;
     this.renderX = this.body.x;
@@ -234,7 +255,7 @@ export class Fighter {
   }
 
   // Flying off a rebound: its launch has ricocheted off the stage at least
-  // once and is not over yet (see js/game/launch-bounce.js). Such a fighter
+  // once and is not over yet (see js/game/combat/launch-bounce.js). Such a fighter
   // passes other fighters' pushboxes (see separateFighters).
   get ricocheting() {
     return !!this.launch && this.launch.bounces > 0;
@@ -460,8 +481,7 @@ export class Fighter {
     } else if (combat.stun > 0) {
       // Launched or pushed: the speed runs down at the fighter's own hitstun
       // rates, whatever is held.
-      const drag = body.grounded ? mv.hitstunFriction ?? mv.deceleration * 0.5 : mv.hitstunAirDrag ?? mv.airDeceleration * 0.5;
-      body.vx = approach(body.vx, 0, drag * dt);
+      body.vx = approach(body.vx, 0, hitstunDrag(mv, body.grounded) * dt);
     } else if (this.dash) {
       body.vx = this.dash.direction * mv.dashSpeed;
     } else if (combat.shielding) {
@@ -509,8 +529,7 @@ export class Fighter {
       // with none held the drift carries on. Always the same height, held
       // or tapped: never a higher jump.
       this.cutAttack();
-      body.vy = -this.jumpVelocity * (mv.airJumpRatio ?? 1);
-      if (held) body.vx = held * Math.max(held * body.vx, this.maxSpeed);
+      airJump(body, mv, this.jumpVelocity, this.maxSpeed, held);
       this.airJumps--;
       this.jumpBuffer = 0;
       this.highJump = null;
@@ -548,7 +567,7 @@ export class Fighter {
       combat.stun <= 0 && !combat.immobilized && !combat.shielding && !this.technique && !this.inMotion
     ) {
       this.fastFalling = true;
-      if (body.vy < mv.fastFallSpeed) body.vy = Math.min(mv.fastFallSpeed, body.vy + mv.fastFallAcceleration * dt);
+      body.vy = fastFallVelocity(body.vy, mv, dt);
     }
 
     // ---- Slow fall ---------------------------------------------------------
@@ -572,7 +591,7 @@ export class Fighter {
     // ---- Launch bounce -----------------------------------------------------
     // Physics stopped the body at whatever it met. If a launch drove it
     // into that wall, floor or ceiling hard enough, it rebounds instead (see
-    // js/game/launch-bounce.js): a floor it rebounds from is no landing. A
+    // js/game/combat/launch-bounce.js): a floor it rebounds from is no landing. A
     // rebound never hands control back mid-flight (at least
     // launchBounce.stun of hitstun), and a hard one freezes the fighter at
     // the surface for a moment first.
@@ -650,69 +669,26 @@ export class Fighter {
     this.updateState(dt);
   }
 
-  // One step of horizontal steering on whatever the fighter stands on (or
-  // in the air), with `control` (0-1) of its normal steering: that share of
-  // its acceleration and top speed. `friction` scales the ground
-  // deceleration that slows it while it is not steering.
-  //
-  // Ground: from rest to top speed at `acceleration`; letting go stops it at
-  // `deceleration`; pressing against the way it moves brakes at
-  // acceleration x `turnBoost` until that way is spent, then accelerates the
-  // new way, so a turn is quick but never a jump from one full speed to the
-  // other. Faster than top speed (a Dash's burst, run down after it ends)
-  // the excess bleeds off at `overspeedDeceleration`, whatever is held.
-  // Air: the same shape with `airAcceleration`, `airTurnBoost` and the
-  // gentle `airDeceleration` drag, so steering bends the drift instead of
-  // replacing it. Holding the way it already moves never slows the fighter
-  // beyond the drag, however fast it goes.
+  // One step of horizontal steering, with `control` (0-1) of the fighter's
+  // normal steering and `friction` x its ground deceleration while it is
+  // not steering: the shared rule (steer in js/game/fighters/movement.js)
+  // with this fighter's movement profile and top speed.
   moveHorizontal(dir, control, friction, dt) {
-    const { body } = this;
-    const mv = this.def.movement;
-    const grounded = body.grounded;
-    const v = body.vx;
-    const top = this.maxSpeed * control;
-    const accel = (grounded ? mv.acceleration : mv.airAcceleration) * control;
-    const boost = grounded ? mv.turnBoost : mv.airTurnBoost ?? mv.turnBoost;
-    let drag = grounded ? mv.deceleration * friction : mv.airDeceleration;
-    if (grounded && Math.abs(v) > this.maxSpeed + TIME_EPSILON) drag = Math.max(drag, mv.overspeedDeceleration ?? 0);
-    if (!dir || control <= 0) {
-      body.vx = approach(v, 0, drag * dt);
-    } else if (v !== 0 && sign(v) !== dir) {
-      // Reversing: brake hard (never softer than letting go), then whatever
-      // is left of this step accelerates the new way.
-      const brake = Math.max(accel * boost, drag) * dt;
-      body.vx = brake <= Math.abs(v) ? v + dir * brake : dir * Math.min(top, Math.min(brake - Math.abs(v), accel * dt));
-    } else if (Math.abs(v) > top) {
-      body.vx = approach(v, dir * top, drag * dt);
-    } else {
-      body.vx = approach(v, dir * top, accel * dt);
-    }
+    steer(this.body, this.def.movement, this.maxSpeed, dir, control, friction, dt);
   }
 
-  // One step of an attack's own movement (see the attack fields in
-  // js/game/combat.js): its step-in once its time reaches it, then steering
-  // with the attack's share of control (none by default) over the speed it
-  // started with, the rest running down under its friction.
+  // One step of an attack's own movement: its step-in, then steering with
+  // the attack's share of control (steerAttack in
+  // js/game/fighters/movement.js).
   moveAttack(atk, dir, dt) {
-    const { body } = this;
-    const def = atk.def;
-    const step = def.step;
-    if (step && !atk.stepped && atk.time >= step.at - TIME_EPSILON) {
-      atk.stepped = true;
-      if (body.grounded && body.vx * this.facing < step.speed) body.vx = this.facing * step.speed;
-    }
-    const grounded = body.grounded;
-    this.moveHorizontal(dir, grounded ? def.control : def.airControl, grounded ? def.friction : 1, dt);
+    steerAttack(this.body, this.def.movement, this.maxSpeed, this.facing, atk, dir, dt);
   }
 
-  // The horizontal speed an attack starting now keeps of `vx`: its momentum
-  // share (airMomentum in the air), and on the ground never more than the
-  // fighter's top speed, so a Dash's burst never becomes a lunge.
+  // The horizontal speed an attack starting now keeps of `vx` (see
+  // attackStartSpeed in js/game/fighters/movement.js), against this
+  // fighter's own top speed.
   attackStartSpeed(atk, vx, grounded) {
-    if (!atk.lockMovement) return vx;
-    if (!grounded) return vx * atk.airMomentum;
-    const kept = vx * atk.momentum;
-    return clamp(kept, -this.maxSpeed * atk.momentum, this.maxSpeed * atk.momentum);
+    return attackStartSpeed(atk, vx, grounded, this.maxSpeed);
   }
 
   // Remembers `action`'s press for the combat input buffer: the latest
@@ -732,7 +708,7 @@ export class Fighter {
   // A launch at launchReaction.tumbleSpeed or faster sets it tumbling; a
   // slower one ends a tumble, and a hit that launches nothing leaves it.
   //
-  // A launch also starts a new launch sequence (see js/game/launch-bounce.js):
+  // A launch also starts a new launch sequence (see js/game/combat/launch-bounce.js):
   // the new launch replaced its velocity, so the sequence takes its heading.
   // Rebounds already made count on until the fighter recovers (startLaunch),
   // so a wall can never keep a combo going. A hit that launches nothing
@@ -750,17 +726,9 @@ export class Fighter {
 
   // The share of gravity (0-1) under which the higher jump rises from here
   // to top out at movement.highJumpHeight x the normal jump's height above
-  // its takeoff: its upward speed now, spent over the height left. Never
-  // more than full gravity, so it only ever goes higher than the normal
-  // jump would from here.
+  // its takeoff (see highJumpLift in js/game/fighters/movement.js).
   highJumpLift(gravity) {
-    const { body, highJump } = this;
-    const g = gravity * body.gravityScale;
-    if (!(g > 0)) return 1;
-    const normal = (this.jumpVelocity * this.jumpVelocity) / (2 * g);
-    const left = normal * (this.def.movement.highJumpHeight ?? 1) - (highJump.fromY - body.y);
-    if (!(left > 0)) return 1;
-    return Math.min(1, (body.vy * body.vy) / (2 * g * left));
+    return highJumpLift(this.body, this.def.movement, this.jumpVelocity, this.highJump.fromY, gravity);
   }
 
   // Cuts the attack in progress short, if it may be (see
@@ -826,28 +794,15 @@ export class Fighter {
     return this.trackDashTaps(input, dt);
   }
 
-  // Double-tap detection on the run press edges (runLeftPressed /
-  // runRightPressed, from any device). A press of the same direction as the
-  // one waiting, within movement.dashTapWindow seconds of it, is a double
-  // tap: returns its direction (1 right, -1 left) and starts over. Any
-  // other press (the other direction, or one too late) becomes the new
-  // first tap; both directions on one step cancel it. 0 otherwise.
+  // Double-tap detection on the run press edges (see readDashTap in
+  // js/game/fighters/movement.js): a press of the same direction as the one
+  // waiting, within movement.dashTapWindow seconds of it, returns its
+  // direction (1 right, -1 left); 0 otherwise. The press still waiting is
+  // the fighter's own (`dashTap`).
   trackDashTaps(input, dt) {
-    const tap = this.dashTap;
-    if (tap) tap.age += dt;
-    if (!input.runLeftPressed && !input.runRightPressed) return 0;
-    if (input.runLeftPressed && input.runRightPressed) {
-      this.dashTap = null;
-      return 0;
-    }
-    const direction = input.runRightPressed ? 1 : -1;
-    const window = this.def.movement.dashTapWindow ?? 0;
-    if (tap && tap.direction === direction && tap.age <= window + TIME_EPSILON) {
-      this.dashTap = null;
-      return direction;
-    }
-    this.dashTap = { direction, age: 0 };
-    return 0;
+    const { direction, tap } = readDashTap(this.dashTap, input, this.def.movement, dt);
+    this.dashTap = tap;
+    return direction;
   }
 
   // Starts one Dash toward `direction` (1 right, -1 left): a short grounded
@@ -963,7 +918,7 @@ export class Fighter {
   }
 
   // Start technique `id` from `action`, facing `dir` if one is held: the
-  // technique owns the fighter from this step (see js/game/technique.js).
+  // technique owns the fighter from this step (see js/game/combat/technique.js).
   // False, with no cooldown started, if there is no such technique or its
   // art or data is missing (logged).
   tryTechnique(action, id, dir = 0) {
@@ -1052,7 +1007,7 @@ export class Fighter {
   // (`airUses`: it may start again once the fighter is back on the ground,
   // or has been hit), or it has a motion of its own and the fighter is still
   // flying from a launch (a motion would cancel the launch: see `motion` in
-  // js/game/combat.js).
+  // js/game/combat/attacks.js).
   airStartBlocked(atk) {
     if (this.body.grounded) return false;
     if (this.freeFall) return true;
@@ -1060,7 +1015,7 @@ export class Fighter {
     return atk.airUses > 0 && (this.airAttacks.get(atk.id) ?? 0) >= atk.airUses;
   }
 
-  // ---- Attack motion (see `motion` in js/game/combat.js) -----------------
+  // ---- Attack motion (see `motion` in js/game/combat/attacks.js) ----------
 
   // Sets attack `record`'s motion going as it starts: a roll decides its
   // speed now (its own, plus its `keep` share of `runningSpeed`, the speed

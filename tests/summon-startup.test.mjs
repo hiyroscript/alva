@@ -1,5 +1,5 @@
 // Run with node --test tests/summon-startup.test.mjs (no dependencies).
-// A summon's startup (its `startupAnimation`, js/game/clone.js): the owner's
+// A summon's startup (its `startupAnimation`, js/game/combat/summon.js): the owner's
 // own summoning pose, played once between the accepted press and the summon
 // request. #0001's Clone Attack: its four attack3_summon frames (restored
 // byte for byte from the repository's history, the poses of the retired
@@ -18,9 +18,9 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { characterFramePaths } from '../js/data/characters.js';
 import { getMap } from '../js/data/maps.js';
-import { Fighter } from '../js/game/character.js';
-import { Clone, createSummonDefinition } from '../js/game/clone.js';
-import { readMoveset } from '../js/game/combat-ai.js';
+import { Fighter } from '../js/game/fighters/fighter.js';
+import { Clone, createSummonDefinition } from '../js/game/combat/summon.js';
+import { readMoveset } from '../js/game/ai/moveset.js';
 import {
   def, DT, BASE, STAGE, cpuFight, duel, fakeSprites, fakeSpritesOf, frameName, makeFighter, startupSteps, steps,
 } from './fighter-harness.mjs';
@@ -102,7 +102,10 @@ test('the startup is summon data, generic: startupAnimation names the owner\'s c
   assert.equal(def.summons.attack3.startupAnimation, 'attack3_summon');
   assert.equal(createSummonDefinition({ id: 'x' }).startupAnimation, null, 'optional: none by default');
   assert.equal(createSummonDefinition({ id: 'x', startupAnimation: 'pose' }).startupAnimation, 'pose');
-  for (const file of ['js/game/character.js', 'js/game/clone.js', 'js/game/combat.js', 'js/game/arena.js', 'js/game/practice.js']) {
+  for (const file of [
+    'js/game/fighters/fighter.js', 'js/game/combat/summon.js', 'js/game/combat/combat.js', 'js/game/combat/attacks.js',
+    'js/game/combat/combat-state.js', 'js/game/arena.js', 'js/game/practice.js',
+  ]) {
     const code = readFileSync(`${ROOT}${file}`, 'utf8').replace(/^\s*\/\/.*$/gm, '');
     assert.doesNotMatch(code, /'000\d'|#000\d|attack3_summon|attack3_object|'attack3'/, `${file}: nothing about one fighter or button`);
     assert.doesNotMatch(code, /mobileAbilities|preview/, `${file}: never the touch art`);

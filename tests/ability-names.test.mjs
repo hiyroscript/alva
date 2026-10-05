@@ -5,7 +5,7 @@
 // leaves out. Names only: they reach no combat code.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { MOVES } from '../js/config.js';
 import { CHARACTERS, getCharacter } from '../js/data/characters.js';
 import { abilityName } from '../js/data/abilities.js';
@@ -64,8 +64,12 @@ test('every character\'s ability names are non-empty names of universal moves', 
 });
 
 test('names only: no combat code reads them', () => {
-  for (const file of ['character.js', 'combat.js', 'combat-ai.js', 'clone.js', 'technique.js', 'projectile.js']) {
-    const code = readFileSync(new URL(`../js/game/${file}`, import.meta.url), 'utf8');
+  // Every simulation, combat, AI and rendering module under js/game/.
+  const game = new URL('../js/game/', import.meta.url);
+  const files = readdirSync(game, { recursive: true }).filter((f) => f.endsWith('.js'));
+  assert.ok(files.includes('fighters/fighter.js') && files.includes('ai/combat-ai.js'));
+  for (const file of files) {
+    const code = readFileSync(new URL(file, game), 'utf8');
     assert.doesNotMatch(code, /abilityNames?\b/, file);
   }
 });

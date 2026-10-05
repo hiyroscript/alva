@@ -10,7 +10,7 @@ import assert from 'node:assert/strict';
 import { MAPS, getMap, voidAround, cameraAround } from '../js/data/maps.js';
 import { PRACTICE_MAP } from '../js/data/practice-map.js';
 import { StageCollision, createBody, stepBody, separate, resolveSolidOverlap } from '../js/game/physics.js';
-import { Camera } from '../js/game/camera.js';
+import { Camera } from '../js/game/rendering/camera.js';
 import { getJumpVelocity } from '../js/data/powers.js';
 import { CONFIG } from '../js/config.js';
 import { def, DT, STAGE, SIM_CTX, fakeSprites, makeFighter, stageMap } from './fighter-harness.mjs';
@@ -387,7 +387,7 @@ test('Quick Battle: after time runs out, a fall scores nothing and nobody respaw
 });
 
 test('the training CPU never walks off a ledge on its own', async () => {
-  const { TrainingAIController } = await import('../js/game/fighter-controller.js');
+  const { TrainingAIController } = await import('../js/game/fighters/fighter-controller.js');
   const sprites = fakeSprites();
   const input = { flush() {}, sample: () => ({}) };
   const battle = new Battle({

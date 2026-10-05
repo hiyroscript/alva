@@ -184,8 +184,8 @@ const { MapSelectScreen } = await import('../js/screens/map-select-screen.js');
 const { WatchDifficultyScreen, WatchFighterScreen, WatchMapScreen } = await import('../js/screens/watch-screens.js');
 const { BattleScreen } = await import('../js/screens/battle-screen.js');
 const { Battle, BATTLE_MODES } = await import('../js/game/battle.js');
-const { CombatAIController } = await import('../js/game/combat-ai.js');
-const { PlayerController } = await import('../js/game/fighter-controller.js');
+const { CombatAIController } = await import('../js/game/ai/combat-ai.js');
+const { PlayerController } = await import('../js/game/fighters/fighter-controller.js');
 
 // The test-only playable fighters beside #0001 (slot 01), registered before
 // any roster is built and taken out after the last test: Test A (slot 09)

@@ -1,10 +1,10 @@
-// Hit effects (js/game/hit-fx.js): screen shake, the white hit flash,
+// Hit effects (js/game/rendering/hit-fx.js): screen shake, the white hit flash,
 // sparks, speed trails and a lethal launch's slow-motion zoom. Presentation
 // only: these check what each hit asks for, and that none of it ever changes
 // a simulation step.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { HitEffects, HIT_FX, launchIsLethal, whiteFrame } from '../js/game/hit-fx.js';
+import { HitEffects, HIT_FX, launchIsLethal, whiteFrame } from '../js/game/rendering/hit-fx.js';
 import { StageCollision } from '../js/game/physics.js';
 import { CONFIG } from '../js/config.js';
 import { def, DT, duel, stageMap, fakeSprites } from './fighter-harness.mjs';

@@ -35,7 +35,7 @@
 // Nothing here draws or freezes: the fighter applies the stun and impact
 // freeze a rebound earns (see Fighter.update), a fighter flying off a
 // rebound passes other fighters' pushboxes (see separateFighters in
-// js/game/character.js), and the effects are js/game/hit-fx.js's.
+// js/game/fighters/fighter.js), and the effects are js/game/rendering/hit-fx.js's.
 //
 // None of it is part of a launch's strength: Launch Point, Base Launch and
 // Directional Launch resolve exactly as js/data/launch.js says, and only the

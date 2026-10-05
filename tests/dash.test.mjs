@@ -13,7 +13,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { characterFramePaths } from '../js/data/characters.js';
 import { StageCollision } from '../js/game/physics.js';
-import { TrainingAIController } from '../js/game/fighter-controller.js';
+import { TrainingAIController } from '../js/game/fighters/fighter-controller.js';
 import { getMaxSpeed } from '../js/data/powers.js';
 import { CONFIG } from '../js/config.js';
 import {
@@ -549,7 +549,7 @@ test('InputManager.queueTouchMouvement is a one-sample request: never a held dir
 });
 
 test('every controller\'s input carries the request fields, false unless asked', async () => {
-  const { blankInput } = await import('../js/game/fighter-controller.js');
+  const { blankInput } = await import('../js/game/fighters/fighter-controller.js');
   const blank = blankInput();
   assert.equal(blank.mouvementLeftPressed, false);
   assert.equal(blank.mouvementRightPressed, false);
@@ -565,7 +565,7 @@ test('every controller\'s input carries the request fields, false unless asked',
     assert.equal(out.mouvementRightPressed, false);
     bot.step(out);
   }
-  const source = readFileSync(ROOT + 'js/game/combat-ai.js', 'utf8');
+  const source = readFileSync(ROOT + 'js/game/ai/combat-ai.js', 'utf8');
   assert.doesNotMatch(source, /dash(Left|Right)Pressed|queueTouchMouvement/, 'the combat AI still dashes by double tap only');
 });
 
@@ -732,8 +732,8 @@ test('end to end: a Right mouvement tap through the real InputManager and Player
   globalThis.window = { addEventListener() {} };
   globalThis.document = { addEventListener() {}, hidden: false };
   const { InputManager } = await import('../js/core/input-manager.js');
-  const { PlayerController } = await import('../js/game/fighter-controller.js');
-  const { Fighter } = await import('../js/game/character.js');
+  const { PlayerController } = await import('../js/game/fighters/fighter-controller.js');
+  const { Fighter } = await import('../js/game/fighters/fighter.js');
   const { STAGE } = await import('./fighter-harness.mjs');
   const input = new InputManager(CONFIG.bindings);
   const fighter = new Fighter({
