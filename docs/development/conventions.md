@@ -88,12 +88,3 @@ checks that every part is linked once, base first and responsive last.
   [`character_rule`](../../character_rule) and the credits rules in
   [`ALVA_SPEC.md`](../../ALVA_SPEC.md) §6.6). `character_rule` itself is
   protected: never edit, move or rename it.
-
-## Known gaps between the rules files and the game
-
-`codename_rule` also describes a mid-air dodge for fighters with no
-mid-air Shield frames (25 Energy, a horizontal launch of 1). The game does
-not implement it: the product specification says there is no Dodge, and a
-fighter with no `airAnimation` simply cannot Shield in the air (#0002).
-The rule is kept as written; implementing it would be a gameplay change,
-not a cleanup.

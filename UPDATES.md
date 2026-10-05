@@ -884,6 +884,12 @@ touched.
   does not fall back to attack1), the touch layout editor shows every
   numbered button, `dashCancelCost` defaults to the fighter's `dashCost`,
   and the repository's name.
+- **`codename_rule`:** the mid-air dodge it described for fighters with
+  no mid-air Shield frames (its `<id>_dodge_<frame>` art, 25 Energy, a
+  horizontal launch of 1) was removed at the owner's request. The game
+  never implemented it, so nothing plays differently: a fighter with no
+  mid-air Shield frames has no Shield in the air, and the button does
+  nothing there.
 
 Where things moved:
 
