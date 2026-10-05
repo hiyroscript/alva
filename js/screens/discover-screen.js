@@ -27,7 +27,7 @@ import { POWERS } from '../data/powers.js';
 import { BASE_LAUNCH_VALUES, DIRECTIONAL_LAUNCHES } from '../data/launch.js';
 
 // Where the rail turns horizontal: narrow windows, but never short landscape
-// ones. Keep in step with the matching rule in styles.css (Discover, narrow).
+// ones. Keep in step with the matching rule in css/discover.css (narrow windows).
 const NARROW_QUERY = '(max-width: 600px) and (min-height: 441px), (max-aspect-ratio: 1/1) and (min-height: 600px)';
 
 const DIRECTIONS = ['up', 'down', 'left', 'right'];

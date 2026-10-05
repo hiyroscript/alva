@@ -33,6 +33,7 @@ import { Battle } from '../js/game/battle.js';
 import { getMap } from '../js/data/maps.js';
 import { CONFIG } from '../js/config.js';
 import { def, DT, fakeSprites, makeFighter, duel } from './fighter-harness.mjs';
+import { stylesheetFiles } from './stylesheet.mjs';
 
 const ROOT = new URL('../', import.meta.url);
 // World units per second per point of launch strength.
@@ -456,7 +457,7 @@ test('a fighter with Launch Point that falls into the Void is eliminated, scores
 
 // Every source file the game ships: scripts, styles and markup.
 function shippedFiles() {
-  const out = ['index.html', 'styles.css'];
+  const out = ['index.html', ...stylesheetFiles()];
   const walk = (dir) => {
     for (const entry of readdirSync(new URL(dir, ROOT), { withFileTypes: true })) {
       if (entry.isDirectory()) walk(`${dir}${entry.name}/`);

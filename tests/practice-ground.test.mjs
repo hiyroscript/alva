@@ -13,6 +13,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fakeSprites, fakeSpritesOf, def as DEF_0001, DT, startupSteps } from './fighter-harness.mjs';
 import { TEST_A, TEST_MOVELESS, TEST_SAMPLE, testFighter, useTestFighters } from './test-fighters.mjs';
+import { stylesheet } from './stylesheet.mjs';
 
 // ---- Fake DOM + Canvas -------------------------------------------------------
 
@@ -847,7 +848,7 @@ test('the More button is a compact three-dots glass button labelled Practice men
 
 test('layout: More sits in the HUD\'s centre column, a little below Quick Battle\'s timer, and the menu opens under it', () => {
   // Layout itself needs a real browser; this pins down the rules behind it.
-  const css = readFileSync(new URL('../styles.css', import.meta.url), 'utf8');
+  const css = stylesheet();
   const rule = (selector) => {
     const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     return css.match(new RegExp(`(?:^|\\n)${escaped}\\s*\\{([^}]*)\\}`))?.[1] ?? null;

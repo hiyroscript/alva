@@ -317,7 +317,7 @@ export class TouchControls {
   }
 
   // The touch-control area in screen px: the root's box inside its padding
-  // (the safe-area insets and margin, see .touch-controls in styles.css).
+  // (the safe-area insets and margin, see .touch-controls in css/touch-controls.css).
   measureArea() {
     const rect = this.root.getBoundingClientRect();
     const style = globalThis.getComputedStyle?.(this.root);
@@ -608,7 +608,7 @@ export class TouchControls {
   // `b`, in place. A sprite is the button's one decorative image element
   // (empty alt, hidden from assistive technology: the button's own
   // aria-label names it), in the art's own colours and transparency, fitted
-  // whole inside the button (.tc-sprite-icon in styles.css); the same
+  // whole inside the button (.tc-sprite-icon in css/touch-controls.css); the same
   // element is kept and only its source changes from fighter to fighter.
   // Without a sprite, or once its file has failed to load, the button shows
   // `icon`, the glyph. Never the button itself, its name, classes or

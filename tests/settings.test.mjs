@@ -10,6 +10,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
+import { stylesheet } from './stylesheet.mjs';
 
 // ---- Fake DOM ------------------------------------------------------------------
 
@@ -671,7 +672,7 @@ test('Home has four menu actions and a separate Settings gear in the top right c
     assert.match(ICONS.settings, /^<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" class="icon">/);
     assert.doesNotMatch(ICONS.settings, /#[0-9a-f]{3,8}\b|rgba?\(|\b(fill|stroke)="|<(image|text|use)\b|href=/i);
     // Placed by CSS in the top right, inside the safe area.
-    const css = read('styles.css');
+    const css = stylesheet();
     const rule = css.match(/\n\.home-settings \{([^}]*)\}/)?.[1] ?? '';
     assert.match(rule, /position: absolute;/);
     assert.match(rule, /top: max\(var\(--safe-t\), /);
@@ -725,7 +726,7 @@ test('the gear opens the Settings dialog over Home: no screen change, a modal wi
     assert.equal(document.activeElement, languageNamed(dialog, 'en'), 'focus lands on the language in use');
     // The panel is translucent glass over a dim, not an opaque screen.
     assert.ok(dialog.panel.classList.contains('glass') && dialog.panel.classList.contains('glass--panel'));
-    const css = read('styles.css');
+    const css = stylesheet();
     assert.match(css.match(/\n\.settings-overlay \{([^}]*)\}/)?.[1] ?? '', /background: rgba\(0, 0, 0, 0\.\d+\);/);
     assert.match(css.match(/\n\.settings-body \{([^}]*)\}/)?.[1] ?? '', /overflow-y: auto;[\s\S]*touch-action: pan-y;/, 'it scrolls on its own');
   } finally {
@@ -933,7 +934,7 @@ test('Settings is no longer a screen: no module, section, registration, navigati
   for (const file of sourceFiles()) {
     assert.doesNotMatch(read(file), /screens\.go\('settings'\)|SettingsScreen|settings-screen/, file);
   }
-  const css = read('styles.css');
+  const css = stylesheet();
   assert.doesNotMatch(css, /\.settings-layout|\.screen--settings|\.settings-group \{/);
 });
 
@@ -948,7 +949,7 @@ test('Help is removed from the game: no Help screen, module, section or registra
     assert.doesNotMatch(code, /help-content|help-credits|buildHelp|buildCredits|helpOpen|openHelp|closeHelp|pauseHelp/, file);
   }
   // Its styles went with it.
-  const css = read('styles.css');
+  const css = stylesheet();
   assert.doesNotMatch(css, /\.help-layout|\.tab-panel|\.info-card|\.controls-table|\.mobile-diagram|\.md-[a-z]|pause-help|\.is-help|screen--help/);
 });
 

@@ -15,6 +15,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
+import { stylesheet } from './stylesheet.mjs';
 
 class Node {
   parentNode = null;
@@ -93,7 +94,7 @@ const { attackSlots } = await import('../js/ui/touch-controls.js');
 
 const ROOT = new URL('../', import.meta.url);
 const read = (path) => readFileSync(new URL(path, ROOT), 'utf8');
-const CSS = read('styles.css');
+const CSS = stylesheet();
 // #0001's definition (disabled in the roster, but the touch controls present
 // any definition they are given), and two test-only fighters built from it:
 // one with no moves at all, and one with its own three buttons and no

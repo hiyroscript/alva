@@ -1,0 +1,179 @@
+/* =====================================================================
+   ALVA — interface styles
+   Near-black and charcoal surfaces, off-white type, restrained green accents.
+   Seren-inspired visual discipline applies only to interface chrome;
+   character sprites and stage artwork keep their original colours.
+   ===================================================================== */
+
+:root {
+  /* Surfaces */
+  --bg: #050506;
+  --surface: #0a0b0c;
+  --surface-subtle: #141518;
+  --surface-muted: #1c1f24;
+  --surface-sunken: #08090a;
+
+  /* Type */
+  --text: #f4f5f6;
+  --text-strong: #ffffff;
+  --text-secondary: #a7acb3;
+  --text-muted: #8c929a;
+  --text-faint: #4c5158;
+
+  /* Lines */
+  --border: rgba(255, 255, 255, 0.09);
+  --border-strong: rgba(255, 255, 255, 0.16);
+  --border-hover: rgba(255, 255, 255, 0.28);
+
+  /* Solids */
+  --black: #050506;
+  --white: #ffffff;
+  --accent: #2fbf63;
+  --accent-hi: #7cf7a6;
+  --accent-lo: #1f8f4a;
+  --accent-wash: rgba(47, 191, 99, 0.14);
+  /* Deeper green fills keep white action labels above 4.5:1 contrast. */
+  --action: #197a3d;
+  --action-hover: #1b8141;
+  --action-pressed: #146332;
+  --surface-overlay: rgba(10, 11, 12, 0.94);
+
+  /* Battle chrome (dark, over stage art) */
+  --scrim-text-muted: #ababab;
+  /* Battle glass: translucent charcoal with a faint top sheen and a light
+     hairline. Darker than the Home strip so white type stays readable over
+     bright and dark stage art. */
+  --glass-fill: rgba(10, 11, 13, 0.64);
+  --glass-fill-panel: rgba(10, 11, 13, 0.86);
+  --glass-fill-blur: rgba(10, 11, 13, 0.7);
+  --glass-edge: rgba(255, 255, 255, 0.14);
+  --glass-seam: rgba(255, 255, 255, 0.1);
+  --glass-sheen: linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.02) 45%, rgba(255, 255, 255, 0) 75%);
+  --glass-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 4px 16px rgba(0, 0, 0, 0.22);
+
+  --radius-xs: 6px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+  --radius-pill: 999px;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 1px 2px rgba(0, 0, 0, 0.04), 0 10px 30px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 2px 8px rgba(0, 0, 0, 0.06), 0 28px 70px rgba(0, 0, 0, 0.18);
+
+  --font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SFMono-Regular", "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+
+  --safe-t: env(safe-area-inset-top, 0px);
+  --safe-r: env(safe-area-inset-right, 0px);
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  --safe-l: env(safe-area-inset-left, 0px);
+  --pad: clamp(14px, 3vw, 44px);
+  --pad-y: clamp(10px, 2.8vh, 30px);
+  --shell: 1160px;
+
+  --ease: cubic-bezier(0.2, 0.75, 0.2, 1);
+  --dur-fast: 140ms;
+  --dur: 200ms;
+  --focus-ring: 0 0 0 2px var(--black), 0 0 0 4px var(--white);
+  --focus-ring-inset: inset 0 0 0 2px var(--white);
+
+  color-scheme: dark;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html {
+  background: var(--bg);
+}
+/* Before boot and during the splash the page is black, so nothing flashes
+   white ahead of the intro. */
+html:not([data-screen]), html[data-screen="splash"] { background: #000; }
+
+html, body {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+  color: var(--text);
+}
+
+body {
+  font-family: var(--font);
+  font-size: 15px;
+  line-height: 1.4;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+button:focus { outline: none; }
+button:focus-visible { outline: none; }
+
+h1, h2, h3, p, dl, dd, figure { margin: 0; }
+
+.icon {
+  width: 1em;
+  height: 1em;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  flex: none;
+}
+.icon--fill { fill: currentColor; stroke: none; }
+
+.logo { display: block; height: auto; color: var(--text-strong); }
+
+.app {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+}
+
+/* ---------------------------------------------------------------------
+   Screens + transitions
+   --------------------------------------------------------------------- */
+
+.screen {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--bg);
+}
+.screen[hidden] { display: none; }
+.screen.is-active { z-index: 2; }
+.screen.is-leaving { z-index: 1; pointer-events: none; animation: screen-out 0.24s ease both; }
+.screen.is-entering { animation: screen-in 0.32s var(--ease) both; }
+.screen.is-back.is-entering { animation-name: screen-in-back; }
+.screen--battle.is-entering { animation-name: fade-in; animation-duration: 0.4s; }
+
+@keyframes screen-in { from { opacity: 0; transform: translateX(12px); } to { opacity: 1; transform: none; } }
+@keyframes screen-in-back { from { opacity: 0; transform: translateX(-12px); } to { opacity: 1; transform: none; } }
+@keyframes screen-out { to { opacity: 0; } }
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes dim-in { from { background-color: transparent; } }
+@keyframes rise-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+

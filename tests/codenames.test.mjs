@@ -24,6 +24,7 @@ import { blankInput } from '../js/game/fighters/fighter-controller.js';
 import { readMoveset } from '../js/game/ai/moveset.js';
 import { cooldownIndicators, cooldownLabel } from '../js/game/rendering/fighter-status.js';
 import { ABILITY_ACTIONS } from '../js/ui/mobile-abilities.js';
+import { stylesheetFiles } from './stylesheet.mjs';
 
 const ROOT = new URL('../', import.meta.url);
 const read = (path) => readFileSync(new URL(path, ROOT), 'utf8');
@@ -330,7 +331,7 @@ test('#0001\'s folder holds only codename files, none under a retired stem', () 
 
 test('no retired attack, control, animation or file name is left in the game code, the stylesheet or the page', () => {
   const files = readdirSync(new URL('js/', ROOT), { recursive: true }).filter((f) => f.endsWith('.js')).map((f) => `js/${f}`);
-  for (const file of [...files, 'styles.css', 'index.html']) {
+  for (const file of [...files, ...stylesheetFiles(), 'index.html']) {
     const lines = read(file).split('\n');
     const hit = lines.findIndex((line) => RETIRED_CODE.test(line));
     assert.equal(hit, -1, `${file}:${hit + 1} still uses a retired name: ${lines[hit]}`);

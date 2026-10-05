@@ -10,6 +10,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fakeSprites, def as DEF_0001, DT } from './fighter-harness.mjs';
 import { TEST_A, useTestFighters } from './test-fighters.mjs';
+import { stylesheet } from './stylesheet.mjs';
 
 // The setup screens and the Battle screen pick a test-only fighter (see
 // test-fighters.mjs), registered for this file beside #0001.
@@ -453,7 +454,7 @@ test('each card: its index, a four-bar scale with one to four lit, its name and 
     assert.equal(card.getAttribute('aria-describedby'), desc.id);
     assert.equal(card.querySelector('.difficulty-current').innerHTML, `${ICONS.check}<span>Current</span>`, 'the current level is labelled, not just tinted');
   }
-  const css = readFileSync(new URL('../styles.css', import.meta.url), 'utf8');
+  const css = stylesheet();
   assert.match(css, /\.difficulty-bars i\.is-on \{ background: var\(--accent\)/, 'lit bars in Alva\'s accent');
   assert.match(css, /\.screen--difficulty \.btn-back,/, 'Back shaped like the other setup screens');
   assert.match(css, /grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/, 'a 2 x 2 grid on narrow screens');

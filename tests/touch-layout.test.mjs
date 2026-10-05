@@ -14,6 +14,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { TEST_A, TEST_DISABLED, withTestFighters } from './test-fighters.mjs';
+import { stylesheet } from './stylesheet.mjs';
 
 const noop = () => {};
 
@@ -312,7 +313,7 @@ test('with no custom layout nothing is moved or sized: the stylesheet\'s own lay
     }
   }
   // Nothing in the stylesheet's control geometry was touched for this.
-  const css = read('styles.css');
+  const css = stylesheet();
   assert.match(css, /\.tc-jump \{ right: 0; bottom: 0; \}/);
   assert.match(css, /--tc-stick: calc\(var\(--tc\) \* 1\.92\);/);
   assert.match(css.match(/\n\.touch-controls \{([^}]*)\}/)[1], /padding: max\(var\(--safe-t\), 6px\) max\(var\(--safe-r\), 6px\) max\(var\(--safe-b\), 6px\) max\(var\(--safe-l\), 6px\);/,
@@ -855,7 +856,7 @@ test('the editor saves as each change lands, through Settings only, and never st
 });
 
 test('editor and dialog styles: the real controls always shown here, a selection ring, reduced motion respected', () => {
-  const css = read('styles.css');
+  const css = stylesheet();
   const rule = (selector) => css.match(new RegExp(`\\n${selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} \\{([^}]*)\\}`))?.[1] ?? '';
   assert.match(rule('.touch-editor'), /position: fixed;/);
   assert.match(rule('.touch-editor'), /touch-action: none;/);

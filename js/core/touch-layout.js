@@ -9,7 +9,7 @@
 // (never a translated label): { [id]: { x, y, scale } }. `x` and `y` are the
 // control's centre as fractions (0 to 1) of the touch-control area, the
 // screen inside its safe-area insets and a small margin (the padding of
-// .touch-controls in styles.css), so a layout made on one landscape screen
+// .touch-controls in css/touch-controls.css), so a layout made on one landscape screen
 // fits another. `scale` multiplies the control's own size, and its hit area
 // with it. A control a layout leaves out stays exactly where the stylesheet
 // puts it, at its own size: the empty layout is Alva's original one.

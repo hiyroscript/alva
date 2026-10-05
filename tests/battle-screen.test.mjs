@@ -15,6 +15,7 @@ import { formatLaunchPoint, describeEnergy } from '../js/ui/hud.js';
 import { CONFIG } from '../js/config.js';
 import { duel, def as DEF_0001 } from './fighter-harness.mjs';
 import { TEST_A, TEST_DISABLED, REMOVED_IDS, withTestFighters } from './test-fighters.mjs';
+import { stylesheet } from './stylesheet.mjs';
 
 class Node {
   parentNode = null;
@@ -343,7 +344,7 @@ test('HUD: one glass card per fighter, portrait | divider | name over Launch Poi
   }
   assert.deepEqual([hud.left.tag.textContent, hud.right.tag.textContent], ['P1', 'CPU']);
   assert.equal(hud.left.root.classList.contains('hud-p1'), true);
-  assert.equal(hud.right.root.classList.contains('hud-p2'), true, 'the CPU card mirrors (see styles.css)');
+  assert.equal(hud.right.root.classList.contains('hud-p2'), true, 'the CPU card mirrors (see css/battle.css)');
   assert.equal(hud.left.launchPointValue.textContent, '0');
   assert.equal(hud.right.launchPointValue.textContent, '40');
   assert.equal(hud.timeButton.parentNode.classList.contains('glass'), true);
@@ -398,7 +399,7 @@ test('HUD: the cards sit in the inner columns, either side of the timer, their p
   assert.equal(hud.right.portrait.classList.contains('is-mirrored'), false);
   assert.deepEqual([hud.left.portrait.dataset.facing, hud.right.portrait.dataset.facing], ['right', 'left']);
   // The rules behind the layout (a real browser still has to show it).
-  const css = readFileSync(new URL('../styles.css', import.meta.url), 'utf8');
+  const css = stylesheet();
   const rule = (selector) => {
     const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     return css.match(new RegExp(`(?:^|\\n)${escaped}\\s*\\{([^}]*)\\}`))?.[1] ?? null;
@@ -463,7 +464,7 @@ test('HUD: no Health anywhere, and no Energy meter on the card: no bar, fill, la
     assert.equal(side.launchPointValue.textContent, '0', 'starts at 0');
     assert.doesNotMatch(side.root.textContent, /%|HP|\/100/);
   }
-  const css = readFileSync(new URL('../styles.css', import.meta.url), 'utf8');
+  const css = stylesheet();
   assert.doesNotMatch(css, /hud-bar|hud-energy|low-hp|--energy/, 'no Health / Energy styles left');
 });
 

@@ -12,6 +12,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { TEST_A, withTestFighters } from './test-fighters.mjs';
+import { stylesheet } from './stylesheet.mjs';
 
 // ---- Fake DOM ------------------------------------------------------------------
 
@@ -606,7 +607,7 @@ test('Discover names no fighter: no roster, ownership or character data anywhere
   assert.match(source, /import \{ POWERS \} from '\.\.\/data\/powers\.js';/);
   assert.match(source, /\bBASE_LAUNCH_VALUES\b[^;]*\bDIRECTIONAL_LAUNCHES\b[^;]*\} from '\.\.\/data\/launch\.js';/);
   // And the ownership styles are gone with it.
-  const css = readFileSync(new URL('../styles.css', import.meta.url), 'utf8');
+  const css = stylesheet();
   assert.doesNotMatch(css, /\.discover-(owners|tier-users|tier-check|label)\b|\.discover-tier\.is-used/);
 });
 

@@ -1,0 +1,105 @@
+/* Battle overlays: the round banner and the pause and result panels. One
+   part of the stylesheet index.html loads in order (css/base.css first;
+   see docs/development/conventions.md). */
+
+/* Banner ---------------------------------------------------------------- */
+
+.battle-banner {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 36%;
+  z-index: 3;
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  padding: clamp(8px, 2vh, 18px) 0;
+  pointer-events: none;
+  opacity: 0;
+}
+.battle-banner::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(8, 8, 8, 0.7) 25%, rgba(8, 8, 8, 0.7) 75%, transparent);
+  z-index: -1;
+}
+.battle-banner.is-shown { animation: banner-in 0.45s var(--ease) both; }
+@keyframes banner-in {
+  from { opacity: 0; transform: scaleY(0.7); }
+  to { opacity: 1; transform: none; }
+}
+.banner-sub { font-family: var(--font-mono); font-size: clamp(10px, 1.8vh, 13px); font-weight: 600; letter-spacing: 0.4em; padding-left: 0.4em; color: var(--scrim-text-muted); }
+.banner-sub:empty { display: none; }
+.banner-main {
+  font-weight: 800;
+  font-size: clamp(36px, 11vh, 108px);
+  line-height: 1;
+  letter-spacing: 0.08em;
+  padding-left: 0.08em;
+  color: var(--white);
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.6);
+}
+
+/* Pause + result overlays: glass panels over a dimmed battle ----------- */
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: max(var(--safe-t), 12px) max(var(--safe-r), 12px) max(var(--safe-b), 12px) max(var(--safe-l), 12px);
+}
+.overlay[hidden] { display: none; }
+.pause-overlay, .result-overlay {
+  z-index: 6;
+  background: rgba(0, 0, 0, 0.5);
+  animation: dim-in 0.18s ease both;
+}
+/* Glass overlays fade their dim and their panel separately: fading the whole
+   overlay's opacity would cut the panel's blur off from the battle behind. */
+.pause-overlay > .pause-panel, .result-overlay > .pause-panel { animation: fade-in 0.18s ease both; }
+.pause-panel {
+  width: min(400px, 100%);
+  max-height: 100%;
+  display: grid;
+  color: var(--text);
+  color-scheme: dark;
+  border-radius: var(--radius-lg);
+  padding: clamp(14px, 3.2vh, 26px) clamp(16px, 2.4vw, 26px);
+  overflow: hidden;
+}
+.pause-view { display: grid; gap: clamp(8px, 1.8vh, 14px); min-height: 0; }
+.pause-title, .result-title {
+  font-weight: 700;
+  font-size: clamp(22px, 5vh, 34px);
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  color: var(--text-strong);
+}
+.pause-menu { display: grid; gap: clamp(6px, 1.2vh, 10px); margin-top: 4px; }
+.pause-btn-item {
+  display: flex;
+  align-items: center;
+  height: clamp(40px, 7.2vh, 52px);
+  padding: 0 18px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  font-weight: 600;
+  font-size: clamp(13px, 2vh, 15px);
+  text-align: left;
+  transition: background-color var(--dur-fast) ease, border-color var(--dur-fast) ease, box-shadow var(--dur-fast) ease, transform 80ms ease;
+}
+.pause-btn-item:hover { background: var(--surface-subtle); border-color: var(--border-hover); }
+.pause-btn-item:focus { box-shadow: var(--focus-ring); }
+.pause-btn-item:active { transform: scale(0.99); background: var(--surface-muted); }
+.pause-btn-item.is-primary { background: var(--action); border-color: var(--action); color: var(--white); }
+.pause-btn-item.is-primary:hover { background: var(--action-hover); border-color: var(--action-hover); }
+.pause-btn-item.is-primary:active { background: var(--action-pressed); }
+/* A disabled item (menuButton's `disabled`; none today): quieter outline,
+   muted label, no hover or press response. Kept after the interactive
+   states so it overrides them. */
+.pause-btn-item:disabled { background: transparent; border-color: var(--border); color: var(--text-muted); cursor: not-allowed; transform: none; }
+.result-sub { color: var(--text-secondary); font-size: 14px; }
+

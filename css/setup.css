@@ -1,0 +1,334 @@
+/* The setup screens: Select Mode, Select Difficulty, Select Fighter (the
+   roster) and Select Stage, for Quick Battle and Watch Mode alike. One
+   part of the stylesheet index.html loads in order (css/base.css first;
+   see docs/development/conventions.md). */
+
+/* ---------------------------------------------------------------------
+   Mode select
+   --------------------------------------------------------------------- */
+
+/* A compact Quick Battle card at the top; Mode details keeps its full height. */
+.mode-layout { grid-template-columns: minmax(0, 1.75fr) minmax(220px, 1fr); }
+.mode-rail { display: flex; align-self: start; }
+/* Hover is a neutral preview. The focus ring is for keyboard/gamepad focus,
+   so it stays off while the last menu input was a pointer. */
+.mode-card {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-areas: "index cta" "name cta" "desc cta";
+  gap: 4px 18px;
+  align-items: center;
+  padding: clamp(12px, 2.6vh, 24px) clamp(16px, 2vw, 28px);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  text-align: left;
+  transition: background-color var(--dur-fast) ease, border-color var(--dur-fast) ease, box-shadow var(--dur) ease, transform var(--dur) var(--ease);
+}
+.mode-card:hover { background: var(--surface-subtle); border-color: var(--border-hover); box-shadow: var(--shadow-md); }
+html:not(.is-pointer-input) .mode-card:focus { box-shadow: var(--focus-ring), var(--shadow-md); }
+.mode-card:active { transform: scale(0.997); }
+.mode-index { grid-area: index; font-family: var(--font-mono); font-size: 11px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-muted); }
+.mode-name {
+  grid-area: name;
+  font-weight: 700;
+  font-size: clamp(22px, 5vh, 40px);
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  color: var(--text-strong);
+}
+.mode-desc { grid-area: desc; color: var(--text-secondary); font-size: clamp(13px, 2vh, 16px); }
+.mode-cta {
+  grid-area: cta;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 16px 11px 18px;
+  border-radius: var(--radius-md);
+  background: var(--action);
+  color: var(--white);
+  font-weight: 600;
+  font-size: 14px;
+}
+.mode-card:hover .mode-cta { background: var(--action-hover); }
+
+/* Same vertical padding as the card so both mono labels share a top line. */
+.mode-info { padding: clamp(12px, 2.6vh, 24px) clamp(14px, 1.8vw, 24px); }
+.mode-info .panel-title { padding-bottom: clamp(8px, 1.6vh, 12px); border-bottom: 1px solid var(--border); }
+
+/* ---------------------------------------------------------------------
+   Difficulty select
+   --------------------------------------------------------------------- */
+
+/* Four ascending levels in one row, a 2 x 2 grid on narrow screens. The
+   area scrolls on its own if a very short window cannot fit the cards, so
+   the header's Back stays put. */
+.difficulty-layout { grid-template-rows: minmax(0, 1fr); align-items: center; overflow-y: auto; }
+.difficulty-scale {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: clamp(8px, 1.4vw, 16px);
+  padding: 4px; /* room for the focus ring inside the scroll area */
+}
+.difficulty-card {
+  --bar-h: clamp(44px, 12vh, 104px);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: clamp(10px, 2.4vh, 22px);
+  min-height: clamp(190px, 46vh, 380px);
+  padding: clamp(12px, 2.4vh, 22px) clamp(14px, 1.6vw, 22px);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  text-align: left;
+  transition: background-color var(--dur-fast) ease, border-color var(--dur-fast) ease, box-shadow var(--dur) ease, transform var(--dur) var(--ease);
+}
+.difficulty-card:hover { background: var(--surface-subtle); border-color: var(--border-hover); box-shadow: var(--shadow-md); }
+html:not(.is-pointer-input) .difficulty-card:focus { box-shadow: var(--focus-ring), var(--shadow-md); }
+.difficulty-card:active { transform: scale(0.99); }
+.difficulty-card.is-current { border-color: rgba(47, 191, 99, 0.5); }
+.difficulty-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.difficulty-index {
+  font-family: var(--font-mono);
+  font-size: clamp(26px, 6.2vh, 54px);
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: -0.05em;
+  color: var(--text-faint);
+  transition: color var(--dur-fast) ease;
+}
+.difficulty-card:hover .difficulty-index,
+.difficulty-card:focus .difficulty-index,
+.difficulty-card.is-current .difficulty-index { color: var(--text-muted); }
+/* Same pill as the selected stage card, so the current level reads by its
+   label too, not by its tint. */
+.difficulty-current {
+  display: none;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px 4px 7px;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+  color: var(--black);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.difficulty-current .icon { stroke-width: 3.2; }
+.difficulty-card.is-current .difficulty-current { display: inline-flex; }
+/* The ascending scale: lit bars solid in the accent, the rest hollow. */
+.difficulty-bars { display: flex; align-items: flex-end; gap: clamp(5px, 0.6vw, 7px); height: var(--bar-h); margin-top: auto; }
+.difficulty-bars i { width: clamp(9px, 1vw, 13px); border: 1px solid var(--border-strong); border-radius: 1px; }
+.difficulty-bars i:nth-child(1) { height: 25%; }
+.difficulty-bars i:nth-child(2) { height: 50%; }
+.difficulty-bars i:nth-child(3) { height: 75%; }
+.difficulty-bars i:nth-child(4) { height: 100%; }
+.difficulty-bars i.is-on { background: var(--accent); border-color: var(--accent); }
+/* Brutal's top bar a step brighter: the same accent family, no new colour. */
+.difficulty-card[data-level="4"] .difficulty-bars i:last-child { background: var(--accent-hi); border-color: var(--accent-hi); box-shadow: 0 0 14px rgba(47, 191, 99, 0.35); }
+.difficulty-text { display: grid; gap: 4px; }
+.difficulty-name { font-weight: 700; font-size: clamp(19px, 4.2vh, 30px); line-height: 1.1; letter-spacing: -0.02em; color: var(--text-strong); }
+/* Two lines' room for every line, so the names sit level across the row. */
+.difficulty-desc { min-height: 2.8em; color: var(--text-secondary); font-size: clamp(12px, 1.9vh, 15px); line-height: 1.4; }
+
+/* ---------------------------------------------------------------------
+   Character select
+   --------------------------------------------------------------------- */
+
+.char-layout { grid-template-columns: minmax(0, 1.6fr) minmax(230px, 1fr); }
+.roster-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: clamp(10px, 2vh, 18px) clamp(10px, 1.4vw, 18px);
+}
+.roster-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 5px;
+  margin: -5px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+  touch-action: pan-y;
+}
+.roster-grid {
+  --slot: clamp(54px, calc(5.2vw + 3.2vh), 112px);
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--slot), 1fr));
+  gap: clamp(5px, 0.7vw, 9px);
+}
+.slot-cell { aspect-ratio: 1; min-width: 0; }
+.slot {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  overflow: hidden;
+  transition: border-color 120ms ease, box-shadow 120ms ease, transform 120ms var(--ease), background-color 120ms ease;
+}
+.slot:focus { box-shadow: var(--focus-ring); }
+.slot.is-locked { background: var(--surface-subtle); cursor: default; }
+.slot.is-locked .slot-art { position: absolute; inset: 22% 18% 0; display: grid; }
+.slot.is-locked .slot-art .icon { width: 100%; height: 100%; fill: var(--surface-sunken); }
+.slot-num {
+  position: absolute;
+  top: 4px;
+  left: 6px;
+  font-family: var(--font-mono);
+  font-size: clamp(8px, 1.3vh, 10px);
+  font-weight: 600;
+  color: var(--text-faint);
+  z-index: 1;
+}
+.slot-lock { position: absolute; top: 5px; right: 5px; display: grid; font-size: clamp(9px, 1.5vh, 12px); color: var(--text-faint); }
+
+.slot.is-available { background: var(--surface-muted); border-color: var(--border-strong); }
+.slot.is-available .slot-num { color: var(--text-secondary); }
+.slot-art { display: block; }
+.slot.is-available .slot-art { position: absolute; inset: 0; }
+.slot-portrait { display: block; width: 100%; height: 100%; image-rendering: pixelated; }
+.slot-name {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 3px 6px 4px;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  font-weight: 600;
+  font-size: clamp(10px, 1.7vh, 13px);
+  text-align: left;
+  color: var(--text);
+}
+.slot-check {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: none;
+  place-items: center;
+  width: clamp(14px, 2.4vh, 20px);
+  height: clamp(14px, 2.4vh, 20px);
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--black);
+  font-size: clamp(9px, 1.5vh, 12px);
+}
+.slot-check .icon { stroke-width: 3.4; }
+.slot.is-selected .slot-check { display: grid; }
+.slot.is-available:hover { border-color: var(--border-hover); }
+
+.char-preview {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  min-height: 0;
+  overflow: hidden;
+}
+.preview-stage { position: relative; min-height: 0; background: var(--surface-subtle); }
+.preview-canvas { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; }
+
+.preview-info {
+  display: grid;
+  gap: clamp(8px, 1.2vh, 12px);
+  padding: clamp(10px, 2vh, 18px) clamp(12px, 1.6vw, 20px) clamp(12px, 2.2vh, 20px);
+  border-top: 1px solid var(--border);
+}
+.preview-head { display: grid; gap: 4px; justify-items: start; }
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 9px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-strong);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.status-badge::before { content: ""; width: 6px; height: 6px; border-radius: 50%; border: 1.5px solid currentColor; }
+.status-badge.is-available { color: var(--text-strong); }
+.status-badge.is-available::before { background: currentColor; }
+.status-badge.is-locked { color: var(--text-muted); }
+.preview-name {
+  font-weight: 700;
+  font-size: clamp(22px, 5.4vh, 42px);
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  color: var(--text-strong);
+}
+.label { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-muted); }
+.btn--confirm { width: 100%; }
+
+/* ---------------------------------------------------------------------
+   Map select
+   --------------------------------------------------------------------- */
+
+.map-layout { grid-template-columns: minmax(0, 1.7fr) minmax(230px, 1fr); }
+.map-hero {
+  position: relative;
+  min-height: 0;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  overflow: hidden;
+  background: var(--surface-muted);
+}
+.map-hero-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+
+.map-side { display: flex; flex-direction: column; min-height: 0; }
+.map-cards { flex: 1; min-height: 0; display: grid; grid-template-rows: 1fr 1fr; gap: clamp(8px, 1.6vh, 14px); margin-bottom: clamp(8px, 1.6vh, 14px); }
+.map-card {
+  position: relative;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  min-height: 0;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  overflow: hidden;
+  text-align: left;
+  transition: border-color var(--dur-fast) ease, box-shadow var(--dur-fast) ease, transform var(--dur-fast) var(--ease);
+}
+.map-card:hover { border-color: var(--border-hover); }
+.map-card:focus { box-shadow: var(--focus-ring); }
+.map-card:active { transform: scale(0.99); }
+.map-thumb-wrap { position: relative; min-height: 0; display: block; }
+.map-thumb { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.map-card-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1px;
+  padding: clamp(6px, 1.3vh, 12px) 12px clamp(7px, 1.4vh, 12px);
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+}
+.map-card-name { font-weight: 700; font-size: clamp(15px, 2.8vh, 22px); letter-spacing: -0.01em; color: var(--text-strong); }
+.map-card-tag { color: var(--text-secondary); font-size: clamp(11px, 1.7vh, 13px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.map-card-selected {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: none;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px 4px 7px;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+  color: var(--black);
+  font-size: 11px;
+  font-weight: 600;
+  box-shadow: var(--shadow-sm);
+}
+.map-card-selected .icon { stroke-width: 3.2; }
+.map-card.is-selected .map-card-selected { display: inline-flex; }
+.btn--start { width: 100%; flex: none; padding-block: 6px; text-align: center; }
+/* The fixed label wraps on compact landscape columns; balance the two lines. */
+.btn--start span { text-wrap: balance; }
+

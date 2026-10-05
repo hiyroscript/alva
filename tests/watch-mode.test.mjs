@@ -14,6 +14,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fakeSprites, fakeSpritesOf, def as DEF_0001, DT } from './fighter-harness.mjs';
 import { TEST_A, TEST_MOVELESS, TEST_SAMPLE, testFighter, useTestFighters } from './test-fighters.mjs';
+import { stylesheet } from './stylesheet.mjs';
 
 // ---- Fake DOM ------------------------------------------------------------------
 
@@ -1058,7 +1059,7 @@ test('spectating: no touch controls and no gameplay input, through pause, resume
   };
   off();
   // Hidden outranks the touch layout's display: block on touch devices.
-  const css = readFileSync(new URL('../styles.css', import.meta.url), 'utf8');
+  const css = stylesheet();
   assert.match(css, /\nhtml\.is-touch \.touch-controls \{ display: block; \}\n(?:.*\n)*?html\.is-touch \.touch-controls\[hidden\] \{ display: none; \}/);
   assert.equal(screen.isRunning, true, 'the match runs');
   assert.ok(screen.el.classList.contains('is-watch'));

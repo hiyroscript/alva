@@ -16,6 +16,7 @@ import assert from 'node:assert/strict';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { def as HARNESS_DEF, makeFighter } from './fighter-harness.mjs';
 import { TEST_A, REMOVED_IDS as REMOVED, withTestFighters } from './test-fighters.mjs';
+import { stylesheet } from './stylesheet.mjs';
 
 // ---- Fake DOM + Canvas -------------------------------------------------------
 
@@ -540,8 +541,8 @@ test('with nothing playable, Home closes Play, Watch Mode and Practice Ground an
   } finally {
     setLanguage('en');
   }
-  assert.match(read('styles.css'), /\.home-action:disabled \{/);
-  assert.match(read('styles.css'), /\.home-note\[hidden\] \{ display: none; \}/);
+  assert.match(stylesheet(), /\.home-action:disabled \{/);
+  assert.match(stylesheet(), /\.home-note\[hidden\] \{ display: none; \}/);
 }));
 
 test('with nothing playable, a fighter becoming playable reopens Home\'s match actions, and losing it closes them again: no hack to undo', withoutFighters(async () => {
