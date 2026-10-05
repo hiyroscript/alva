@@ -1,670 +1,1503 @@
-ALVA — COMPLETE CHARACTER #0001 REWORK
+ALVA — Comprehensive Repository Organization and Structural Refinement
 
-Objective
+Mission
 
-You are working inside the GitHub repository hiyroscript/alva.
+Work directly in the GitHub repository:
 
-Your task is to completely rebuild character #0001 using the character sprite sheet attached to this conversation.
+Repository: hiyroscript/alva
+Branch: Create a dedicated refactoring branch rather than modifying main directly.
 
-This is a full character redevelopment, not a cosmetic update, a simple sprite replacement, or a minor balance patch.
+Your task is to carefully reorganize and refine the existing Alva project so that its architecture, codebase, documentation, assets, and tests are more structured, consistent, maintainable, specific, and understandable.
 
-Rework #0001’s animations, abilities, attack mechanics, movement characteristics, effects, collision accuracy, presentation, AI integration, and overall gameplay identity.
+This is an organizational and architectural refinement, NOT a complete rewrite of the game.
 
-The finished character must feel distinctive, responsive, polished, faithful to its source material, and fully integrated into Alva.
+The existing implementation contains substantial work that must be preserved. Improve how that work is organized and explained rather than unnecessarily replacing it.
 
-Do the implementation. Do not stop after producing a design document or describing how it could be implemented.
+The primary objective is to make Alva a game built around a universal, extensible character system, not a project whose architecture or general documentation revolves around its first character, #0001.
 
-1. Read and understand the repository
+I want meaningful, deliberate improvements rather than superficial folder creation, excessive abstraction, or renaming things merely to make the repository look different.
 
-Before modifying anything, inspect the relevant project files.
+Important: You are expected to implement the reorganization, not simply recommend it.
 
-Mandatory reading:
+⸻
 
-* character_rule — highest priority for character design.
-* codename_rule — mandatory conventions for asset naming, attack routing, and abilities.
-* ALVA_SPEC.md — technical and gameplay specifications.
-* README.md — current features, controls, and mechanics.
-* js/data/characters.js — character definitions and existing #0001 implementation.
-* js/data/loadout.js — attack structure and validation.
-* js/game/character.js — fighter movement and behavior.
-* js/game/combat.js — attack resolution, collision, damage, and launch.
-* js/game/clone.js — summon handling.
-* js/game/technique.js — multi-phase special attacks.
-* js/game/projectile.js — projectile behavior.
-* js/game/sprite-normalizer.js and sprite-animator.js.
-* js/game/combat-ai.js — computer opponent behavior.
-* js/ui/mobile-abilities.js — ability icons.
-* js/core/i18n.js and js/ui/credits.js.
-* Relevant character and combat tests.
+1. ABSOLUTE RULE: DO NOT MODIFY character_rule
 
-Also examine #0002 as an example of how Alva implements attacks with actual mechanics, including aerial abilities, multi-hit attacks, movement-driven attacks, and stage interactions.
+The file located at:
 
-Do not simply copy #0002’s abilities.
+character_rule
 
-Understand Alva’s existing architecture before designing any replacement systems.
+is strictly protected.
 
-Critical character_rule requirement
+You must NOT:
 
-The game’s character design philosophy explicitly rejects bland attacks that consist only of an animation followed by damage.
+* Edit its contents.
+* Correct its spelling or grammar.
+* Reformat it.
+* Rename it.
+* Move it into another directory.
+* Delete or regenerate it.
+* Change its encoding, line endings, or permissions.
+* Replace it with a differently formatted equivalent.
 
-Build abilities with distinctive gameplay mechanics inspired by the reference character’s established fighting style.
+The file must remain at its existing root-level path, completely unchanged.
 
-Not every attack needs an elaborate mechanic. Basic attacks are useful. However, the overall moveset must feature meaningful differences in how abilities behave and affect combat.
+You may read it for contextual understanding, but nothing about the reorganization authorizes modifying it.
 
-Examples include:
+Before starting, record its existing Git blob SHA. After completing all changes, verify that the file remains at exactly the same path and has exactly the same contents.
 
-* Clones that independently influence positioning or combat.
-* Attacks that change the fighter’s movement.
-* Abilities that respond differently to successful hits and misses.
-* Aerial attacks with distinct movement or landing consequences.
-* Defensive abilities involving deception or repositioning.
-* Multi-phase attacks with genuinely different gameplay states.
-* Combos and follow-ups earned through accurate timing.
-* Techniques interacting with opponents, shields, stage geometry, or launch trajectories.
+If a proposed change conflicts with this restriction, do not make that change.
 
-Creativity must affect gameplay, not merely visual effects.
+This requirement overrides all other organizational preferences in this prompt.
 
-2. Analyze the supplied sprite sheet first
+⸻
 
-The attached sprite is the primary visual source.
+2. UNDERSTAND ALVA BEFORE EDITING
 
-Before writing character code, carefully inspect the entire image at its native resolution.
+Alva is a browser-based 2D sprite fighting game implemented using:
 
-Identify and catalog every usable animation, including:
+* Vanilla JavaScript ES modules.
+* HTML and CSS.
+* Canvas 2D rendering.
+* Character-specific sprite assets.
+* A fixed-timestep gameplay simulation.
+* Data-driven fighter definitions.
 
-* Idle and breathing animations.
-* Walking and running.
-* Dash or sprint.
-* Jumping, airborne movement, and falling.
-* Landing and recovery.
-* Defensive poses.
-* Grounded attacks.
-* Airborne attacks.
-* Clone creation or summoning poses.
-* Special techniques.
-* Transformation-related sprites, if present.
-* Impact and ability effects.
-* Projectiles and attack-created objects.
-* Hurt and knockback poses.
-* Transitional animation frames.
+It is intentionally lightweight, with no framework, build pipeline, or required runtime dependencies.
 
-Do not assume the image includes every animation listed above.
+Preserve those architectural constraints.
 
-Sprite processing
+The current game supports several important systems:
 
-For every extracted animation:
-
-1. Preserve the original pixel artwork.
-2. Remove only the sprite sheet’s surrounding background where necessary.
-3. Preserve transparency and intentional internal details.
-4. Extract frames without merging neighboring sprites.
-5. Keep each animation’s frame order consistent with its intended action.
-6. Avoid interpolation, blurring, or smoothing.
-7. Preserve the proportions and silhouette of the original artwork.
-8. Maintain consistent perceived character size.
-9. Align frames using stable character anchors.
-10. Ensure animation transitions do not cause visible position jumps.
-
-Do not AI-generate replacement character artwork, invent missing poses, or redraw source sprites.
-
-Do not artificially rotate, stretch, or recolor character poses to manufacture unavailable animations.
-
-Use the game’s existing sprite normalization and rendering facilities.
-
-Important existing specification
-
-ALVA_SPEC.md contains an older restriction against replacing #0001’s supplied artwork.
-
-The present task explicitly authorizes replacing #0001’s existing art with the newly attached sheet. Treat that as the narrow exception to the old restriction.
-
-Continue respecting the other art-preservation requirements, especially the prohibition on inventing or redrawing frames.
-
-Animation inventory
-
-Create an internal mapping that records:
-
-* The action represented.
-* Source frame locations.
-* Extracted frame count.
-* Sprite orientation.
-* Playback speed.
-* Looping behavior.
-* Source pixel scale.
-* Horizontal and vertical anchors.
-* Associated gameplay mechanic.
-* Whether additional effect frames are available.
-
-Only finalize the moveset after this inventory is complete.
-
-3. Preserve Alva’s character architecture
-
-Keep the character ID 0001, its roster slot, and its compatibility with existing game modes.
-
-Store the replacement sprites under:
-
-assets/characters/0001/
-
-Follow codename_rule exactly.
-
-Examples:
-
-* 0001_idle_1.png
-* 0001_run_1.png
-* 0001_jump_1.png
-* 0001_fall_1.png
-* 0001_mouvment_1.png
-* 0001_attack1_1.png
-* 0001_midair_attack1_1.png
-* 0001_attack2_1.png
-* 0001_midair_attack2_1.png
-* 0001_attack3_summon_1.png
-* 0001_attack3_object_1.png
-* 0001_attack4_1.png
-* 0001_attack4_object_1.png
-
-Preserve the intentional spelling mouvment. Do not silently change it to movement.
-
-Object sprites must use the codename of the attack that creates them.
-
-Loadout rules
-
-Respect the existing requirements:
-
-* Every character has between two and five consecutively numbered attacks.
-* attack1 and attack2 must be ordinary attacks.
-* Ordinary numbered attacks must have functional mid-air counterparts.
-* attack3, attack4, and attack5 may represent ordinary attacks, summons, or techniques.
-* extra_attack remains a separate optional action.
-* Each numbered attack uses its own existing button.
-* Summons and techniques are ground-only and use independent cooldowns.
-* Internal attack names must remain consistent across the game.
-
-Do not introduce conflicting input mappings or character-specific keyboard bindings.
-
-You may redesign #0001’s attack count if the sheet supports it, but explain and validate the chosen loadout. Retaining four numbered attacks is a reasonable starting point, not an absolute requirement.
-
-4. Completely redesign the moveset
-
-The replacement character should have a clear mechanical identity:
-
-An agile close-range fighter specializing in deceptive movement, clones, coordinated combos, and powerful chakra-based finishing techniques.
-
-Research the reference character’s established abilities to guide the mechanical design, while keeping the in-game fighter identified as #0001.
-
-The moveset should be recognizable through its behavior, even without reading move names.
-
-The following is a proposed design direction. Adapt the exact techniques, phases, and animations to the attached sheet rather than forcing incompatible sprites.
-
-Attack 1 — Close-range combination
-
-Design a responsive close-range attack that rewards timing and positioning.
-
-Potential mechanics:
-
-* A quick first strike.
-* A short follow-up combination if the opening attack connects.
-* Distinct startup, contact, and recovery timing.
-* Modest forward momentum.
-* Hit-confirm-based combo opportunities.
-* A clear interruption window.
-* Short-range horizontal launch.
-
-Do not make every visual strike hit automatically.
-
-If the sprite contains several connected fighting poses, use them to create a coherent combination.
-
-Its airborne counterpart should be a genuine aerial attack with its own timing and purpose rather than the grounded attack played in mid-air.
-
-Attack 2 — Launcher and aerial pressure
-
-Give the second attack a different strategic purpose from Attack 1.
-
-Suggested behavior:
-
-* A committed strike with greater startup.
-* Stronger vertical launch on clean contact.
-* Distinct recovery that creates a punishable opening.
-* Follow-up opportunities when timed correctly.
-
-For its mid-air counterpart, consider a descending strike that alters vertical momentum and can rebound after connecting.
-
-A successful contact, missed contact, and shielded contact should produce appropriately different results.
-
-Do not create infinite aerial loops or unavoidable repeated hits.
-
-Attack 3 — Shadow Clone Mechanic
-
-Make clone-based fighting one of #0001’s defining features.
-
-The current game already has a clone system, but simply retaining an identical clone that appears and attacks once is not enough for this rework.
-
-Develop a more expressive mechanic, grounded in what the supplied sprite sheet supports.
-
-Possible behaviors include:
-
-* A clone appearing on a strategically selected side of an opponent.
-* A coordinated delayed strike.
-* A clone that creates pressure while the player moves independently.
-* A clone assisting a legitimate combo.
-* A clone functioning as a temporary decoy.
-* Different clone placement when an opponent is airborne or near a ledge.
-
-Not all these behaviors must be combined. Select a coherent set that creates interesting decisions.
-
-Requirements:
-
-* The clone must have a clearly defined lifecycle.
-* Clone placement must respect stage geometry.
-* Clone attacks must have proper hit detection.
-* Ownership and scoring must belong to #0001.
-* A clone must not become a permanent independent fighter.
-* Summon cooldowns must be enforced.
-* Clones must be removed on the appropriate lifecycle events.
-* The opponent must have legitimate defensive options.
-* The mechanic must not produce unavoidable damage.
-
-If the chosen design requires clones to become targetable or movable, extend the relevant engine systems carefully rather than pretending the existing clone implementation already supports those features.
-
-Make the clone useful because of its positioning, timing, or tactical utility—not simply because it adds another damage instance.
-
-Attack 4 — Rasengan / Spiral Impact
-
-Design a powerful signature technique featuring meaningful buildup, directional movement, contact confirmation, and a distinct finishing result.
-
-Alva already supports a multi-phase rush technique, but this rework should re-evaluate its timing, interactions, presentation, and game balance.
-
-Possible phases:
-
-Preparation: The fighter visibly forms and concentrates the technique.
-
-Approach: The fighter performs a committed forward movement or short rush.
-
-Contact: Collision is tested through a proper active hitbox.
-
-Confirmation: On a successful unblocked hit, transition into a distinct impact state.
-
-Finisher: Apply the appropriate launch or pushback.
-
-Recovery: Restore player control after the finishing animation.
-
-Provide separate outcomes for:
-
-* A successful hit.
-* A missed attack.
-* A shielded attack.
-* An interrupted preparation.
-* An obstacle or stage boundary.
-* A target that becomes unavailable.
-
-The attack should be satisfying without becoming an automatic knockout or an unavoidable grab.
-
-Use actual source effect sprites when available, and keep effect animations aligned with the fighter’s hands, contact location, and target.
-
-Avoid excessively long periods where the opponent cannot interact.
-
-Extra Attack — Ranged pressure or utility
-
-Evaluate the sprite sheet for an appropriate projectile or secondary technique.
-
-If compatible artwork exists, create a ranged attack with a distinct role in controlling space and setting up approaches.
-
-It should have:
-
-* An appropriate release animation.
-* Correct spawn position.
-* Predictable directional behavior.
-* A clear collision model.
-* Limited active lifetime.
-* Appropriate cooldown and recovery.
-* A defensible counterplay option.
-
-It should not simply replace the purpose of a close-range attack.
-
-If the sprite does not support the existing ranged action, redesign or remove that action cleanly rather than showing unrelated frames.
-
-Defense — Deception and evasive movement
-
-Investigate whether the supplied artwork supports a substitution-style defensive behavior.
-
-If it does, consider a tightly constrained mechanic that rewards defensive timing, such as a brief decoy effect followed by a small repositioning movement.
-
-Any such mechanic must have:
-
-* A precise activation condition.
-* Appropriate Energy or cooldown costs.
-* Clearly limited displacement.
-* Defined invulnerability or vulnerability timing.
-* Collision-safe placement.
-* No ability to bypass the stage’s normal boundaries.
-* Tests against exploitative repeated activation.
-
-Do not turn an ordinary Shield into unlimited teleportation.
-
-If the art does not support this mechanic, retain a polished, correctly animated defense consistent with the existing game rules.
-
-Transformation
-
-The transform action is currently reserved in Alva.
-
-Do not activate it merely because the button exists.
-
-Only introduce a transformation if the supplied artwork genuinely includes enough material for a visually and mechanically coherent alternate state.
-
-Otherwise, preserve transform: null.
-
-5. Movement and character feel
-
-Reevaluate #0001’s movement as part of the rebuild.
-
-The fighter should feel agile and capable of quickly transitioning between movement and deliberate attacks.
-
-Review:
-
-* Ground acceleration.
-* Braking and deceleration.
-* Direction changes.
-* Air control.
-* Jump height.
-* Double-jump behavior.
-* Dash distance.
-* Landing recovery.
-* Momentum retention during attacks.
-* Collision dimensions.
-
-Do not simply maximize movement statistics.
-
-Movement should interact naturally with the chosen abilities.
-
-A successful aerial action might preserve momentum, while a committed finishing attack might temporarily restrict steering.
-
-Tune using Alva’s existing Jump Power, Speed Power, Energy, and physics systems.
-
-Respect the current 60 Hz fixed-step simulation.
-
-Movement must remain deterministic and usable with keyboard, gamepad, and touch controls.
-
-6. Combat balance and hit detection
-
-Maintain Alva’s Launch Point combat model.
-
-Attack damage, Base Launch, and Directional Launch must remain separate gameplay parameters.
-
-Apply launch levels based on actual impact, not the attack number.
-
-Use:
-
-* Level 1 for light attacks.
-* Level 2 for moderate attacks.
-* Level 3 for major impacts.
-
-Use Base Launch 0 when the mechanic should add Launch Point without immediately launching its target.
-
-For every attack, define and verify:
-
-* Startup frames.
-* Active frames.
-* Recovery frames.
-* Hitbox position and size.
-* Contact timing.
-* Hitstun and blockstun.
-* Hitstop.
-* Damage and launch.
-* Cooldown.
-* Movement behavior.
-* Interruptibility.
-* Valid hit targets.
-* Maximum contacts per activation.
-
-Align hitboxes to the actual active animation frames.
-
-Avoid visually disconnected hits, repeated unintended contacts, infinite combos, and oversized invisible hitboxes.
-
-The character must remain balanced against #0002 without copying that fighter’s mechanics.
-
-7. Animation polish and responsiveness
-
-Animation quality is a central requirement.
-
-Ensure:
-
-* Idle loops are seamless.
-* Run cycles align with movement speed.
-* Jump and fall transitions feel coherent.
-* Dash visuals match dash movement.
-* Attacks visibly connect when their hitboxes become active.
-* Finishing animations have meaningful recovery.
-* Hurt animations take priority when interrupted.
-* Clones and attack objects have properly synchronized lifetimes.
-* Visual effects do not obscure important combat information.
-
-Respect the original pixel-art scale and use nearest-neighbor rendering.
-
-Do not add excessive screen shake or large effects that interfere with readability.
-
-The character should be legible on desktop and smaller landscape mobile screens.
-
-8. Modify the necessary game systems
-
-Do not restrict changes to js/data/characters.js if the design requires additional mechanics.
-
-Inspect and update relevant existing modules where necessary.
-
-Likely integration points include:
-
-* Character definitions and loadout validation.
-* Fighter state transitions.
-* Combat hit resolution.
-* Summon lifecycle.
-* Multi-phase techniques.
-* Projectiles.
-* Sprite loading and animation.
-* AI decision-making.
-* Touch ability previews.
-* Localized labels.
-* Practice Ground behavior.
-* Battle rendering.
-
-Prefer existing data-driven abstractions.
-
-If a new reusable mechanic is required, implement it cleanly without hardcoding a character ID into a shared engine system.
-
-Preserve compatibility with other characters.
-
-Do not break #0002 or introduce unnecessary dependencies, frameworks, or a build system.
-
-Keep the browser-based HTML/CSS/JavaScript architecture intact.
-
-9. Integrate every ability into the game’s interfaces
-
-The rebuild must work beyond the combat screen.
-
-Update #0001’s:
-
-* Roster portrait.
-* Character selection preview.
-* Ground attack button artwork.
-* Airborne attack button artwork.
-* Ability names.
-* Cooldown indicators.
-* Relevant descriptions.
-* Practice Ground presentation.
-* Any Discover-screen references.
-* English and French localized strings.
-
-Touch previews must point to actual extracted frames.
-
-Do not use missing sprite references or arbitrary frames that fail to represent their attacks.
-
-Missing actions must remain correctly hidden or disabled.
-
-Keep universal controls and control codenames unchanged.
-
-10. Update computer opponent behavior
-
-The CPU must understand the newly redesigned #0001.
-
-Review js/game/combat-ai.js and the character-specific data it consumes.
-
-The CPU should recognize:
-
-* Effective attack ranges.
-* Proper aerial and grounded opportunities.
-* The purpose of clone pressure.
-* Special-attack cooldowns.
-* Projectile travel and threat distance.
-* Technique commitment and recovery.
-* Defensive opportunities.
-* Platform and ledge hazards.
-
-It must obey the same gameplay rules as the player.
-
-Do not give the CPU artificial damage, faster cooldowns, forbidden abilities, or information about player inputs it could not legitimately observe.
-
-Keep the existing difficulty system intact.
-
-Test CPU-controlled #0001 against both available fighters.
-
-11. Credits and attribution
-
-Update the game’s existing credits system using js/ui/credits.js and the corresponding translations in js/core/i18n.js.
-
-Use the following requested source credit exactly:
-
-Naruto Uzumaki - Jump Ultimate Stars - DS / DSi - The Spriters Resource
-
-The reference sprite listing is:
-
-https://www.spriters-resource.com/ds_dsi/jus/asset/20887/
-
-Preserve verified uploader or contributor attribution where applicable, including Dazz and FRET for that source.
-
-The repository’s character_rule also contains a separate DeviantArt source reference. Check whether the supplied sheet actually derives from that reference before deciding whether an additional credit is warranted. Do not conflate unrelated sprite sheets.
-
-Respect the rule against exposing the reference character’s personal name as the playable character’s identity. Keep all gameplay identifiers, roster names, character-facing descriptions, and system references centered on #0001.
-
-The exact source-credit line above is the explicitly requested attribution exception.
-
-Preserve the existing acknowledgement that original third-party artwork and intellectual property belong to their respective rights holders. Attribution does not itself grant redistribution rights, so flag any relevant permission concerns.
-
-12. Testing and verification
-
-After implementing the replacement, run the existing Node test suite and add targeted regression tests.
-
-At minimum, verify:
-
-Assets
-
-* Every referenced sprite file exists.
-* Frames load successfully.
-* Transparency is correct.
-* Frame indexing is valid.
-* Animation transitions preserve alignment.
-* Mirroring works.
-* Source pixel proportions are preserved.
-
-Character definitions
-
-* loadoutProblems reports no issues.
-* Attack IDs follow codename_rule.
-* Each ordinary numbered attack has its air counterpart.
-* Summons and techniques have valid definitions.
-* Object filenames identify their owning attacks.
-* The character remains playable in its original roster slot.
-
-Combat
-
-* Every move activates through the correct button.
-* Ground and air actions are correctly distinguished.
-* Hits register only when appropriate.
-* Shield interactions work.
-* Cooldowns are respected.
-* Clone ownership and despawning work.
-* Interrupted abilities clean up correctly.
-* Launch directions and impact levels are correct.
-* No ability unintentionally hits the same target without limit.
-
-Stability
-
-* No uncaught JavaScript errors.
-* No missing assets.
-* No permanently stuck fighter states.
-* No persistent orphaned combat entities.
-* No excessive slowdown from spawning effects.
-* No regression in #0002.
-* No regression in score or respawn behavior.
-
-Manual gameplay
-
-Test:
+Gameplay
 
 * Quick Battle.
 * Watch Mode.
 * Practice Ground.
-* Desktop keyboard.
-* Gamepad input.
-* Mobile landscape controls.
-* Both supported touch-control layouts.
-* English and French interfaces.
+* Character selection.
+* Stage selection.
+* Difficulty selection.
+* AI-controlled opponents.
+* Multiple playable character definitions.
+* Launch Point and directional launching.
+* Launch rebounds.
+* Energy management.
+* Movement, jumping, dashing, shielding, and dodging.
+* Character-specific attacks, projectiles, summons, and techniques.
+* Combat visual effects.
 
-Include tests for combat near open ledges, interrupted attacks, respawns, shielded techniques, and ability cancellation.
+Interface
 
-13. Remove obsolete implementation details
+* Desktop keyboard controls.
+* Gamepad support.
+* Mobile touch controls.
+* Joystick and Classic Buttons layouts.
+* Customizable touch-control positions and sizes.
+* English and French localization.
+* Settings.
+* Discover reference screens.
+* Responsive landscape layouts.
 
-Once the new character works, identify unused #0001 assets and outdated definitions.
+Content
 
-Remove obsolete references carefully.
+The repository currently includes two playable fighters:
 
-Do not delete source material that the new implementation still depends upon.
+* 0001
+* 0002
 
-Remove stale comments and documentation that describe mechanics #0001 no longer possesses.
+Their implementations are different.
 
-Update relevant README or specification sections to reflect the actual completed implementation.
+For example, 0001 uses a clone summon and Sphere Rush technique, while 0002 has its own movement characteristics and moves such as Spin Attack, Blue Tornado, and Whirlwind.
 
-Document any intentional deviations from previous #0001 behavior.
+These differences belong to character-specific definitions.
 
-Do not rewrite unrelated systems for cosmetic reasons.
+Do not lose these mechanics, merge the characters’ behavior, or force one character to follow another’s unique implementation.
 
-14. Deliverables
+Before editing, trace the complete flow from:
 
-At completion, provide:
+index.html → js/main.js → App → screens → Battle/Practice → Arena → Fighter → combat and physics
 
-1. A summary of the new character’s gameplay identity.
-2. A complete move list, including ground and airborne differences.
-3. An explanation of each major mechanic and its counterplay.
-4. A list of extracted animation groups and their frame counts.
-5. The primary source files changed.
-6. Any new shared engine mechanics.
-7. Relevant balance values.
-8. Test results, including failures or limitations.
-9. Confirmation that the required credit appears in the actual game.
+Also examine character registration, animation loading, AI decisions, touch-button generation, and tests.
 
-Do not claim a feature works unless it has been implemented and verified.
+Create a dependency map identifying which modules own each responsibility and which modules depend on them.
 
-Do not present planned features as completed features.
+Use that map to guide the reorganization.
 
-Final acceptance criteria
+⸻
 
-The rework is complete only when:
+3. PRIMARY ARCHITECTURAL PRINCIPLE: ALVA IS CHARACTER-AGNOSTIC
 
-* #0001 consistently uses the supplied character artwork.
-* Its animations are clean, accurately aligned, and responsive.
-* Its moveset reflects the source character’s abilities.
-* Multiple abilities have meaningful mechanics beyond animation and damage.
-* Its clones and special techniques work reliably.
-* Grounded and aerial combat both feel intentional.
-* The fighter can be controlled by keyboard, gamepad, and touch.
-* CPU players can use its abilities appropriately.
-* The character works across Alva’s existing game modes.
-* #0002 and shared combat systems remain functional.
-* The new credits are visible.
-* Existing and new relevant tests pass.
+This is the most important conceptual requirement.
 
-Most important instruction:
+Alva’s shared systems must be about all characters, while individual character definitions own individual characteristics.
 
-Do not produce a superficial reskin.
+Currently, some documentation and comments describe universal mechanics as improvements made specifically for #0001.
 
-Use the sprite sheet as the foundation for a mechanically distinctive fighter. The animations, movement, attack behavior, clone mechanics, and special techniques must work together to create a cohesive character.
+For example, UPDATES.md describes the Movement Update with wording similar to:
 
-Prioritize gameplay depth, faithful animation use, satisfying controls, and integration with Alva’s existing architecture.
+“Makes #0001’s movement quicker and its attacks flow into each other.”
 
-Begin by inspecting the attached sprite sheet and character_rule, then implement the complete rework. If the sprite attachment is not available, request it before attempting asset extraction or finalizing the animation-dependent moveset.
+This language is unsuitable as the primary explanation of the current shared movement architecture.
+
+The movement implementation must support every fighter. Each fighter can then specify its own speed, acceleration, movement responsiveness, animation timing, and other values.
+
+The documentation should clearly explain that distinction.
+
+Correct conceptual model
+
+Shared system:
+
+The movement engine supports configurable ground acceleration, deceleration, directional changes, air control, fast falling, jumping, dashing, attack momentum, and input buffering.
+
+Character configuration:
+
+Each fighter specifies values determining how those shared mechanics behave for that fighter.
+
+Character-specific behavior:
+
+A fighter may have a unique ability, movement technique, animation, or other specialized interaction implemented through an explicit capability or data-driven definition.
+
+Follow this conceptual separation throughout the repository.
+
+Rules
+
+1. Shared combat, movement, physics, AI, rendering, input, and stage systems must not assume that 0001 is the primary character.
+2. Do not use 0001 as the implicit source of gameplay defaults merely because it was implemented first.
+3. Move genuine character-specific configuration into the appropriate character definition whenever reasonable.
+4. Shared modules may contain examples referencing characters, but those examples must be clearly identified as examples rather than universal requirements.
+5. Existing numerical tuning must not be changed simply to make two fighters more alike.
+6. Never replace meaningful character distinctions with generic behavior.
+7. Avoid adding character-ID checks to shared systems when the same functionality could be represented using existing definitions or a small, explicit capability interface.
+8. Keep universal mechanics reusable for future fighters whose abilities may differ substantially from the current roster.
+
+Important distinction
+
+It is perfectly acceptable for character-specific documentation to mention 0001 extensively.
+
+For example:
+
+* 0001’s attack timings.
+* 0001’s animation frames.
+* 0001’s summon.
+* 0001’s technique.
+* 0001’s movement values.
+* 0001’s unique gameplay interactions.
+
+What is not acceptable is presenting a general mechanic as though its purpose, availability, or implementation belongs exclusively to 0001.
+
+Apply the same reasoning to 0002.
+
+⸻
+
+4. REORGANIZE THE PROJECT INTO CLEAR RESPONSIBILITIES
+
+The existing repository already has a useful organizational foundation:
+
+* js/core/
+* js/data/
+* js/game/
+* js/screens/
+* js/stages/
+* js/ui/
+* assets/
+* tests/
+
+Do not discard this structure.
+
+Instead, improve it where individual files have become too large or where unrelated responsibilities are mixed together.
+
+Use the following proposed architecture as a direction, not an instruction to create every directory regardless of need.
+
+Proposed repository structure
+
+alva/
+│
+├── index.html
+├── styles.css
+├── .nojekyll
+│
+├── character_rule
+├── codename_rule
+├── CLAUDE.md
+├── README.md
+├── ALVA_SPEC.md
+├── UPDATES.md
+│
+├── assets/
+│   ├── characters/
+│   │   ├── 0001/
+│   │   └── 0002/
+│   └── ...
+│
+├── js/
+│   ├── main.js
+│   ├── config.js
+│   │
+│   ├── core/
+│   │   ├── app.js
+│   │   ├── asset-loader.js
+│   │   ├── audio-manager.js
+│   │   ├── device.js
+│   │   ├── input-manager.js
+│   │   ├── menu-navigator.js
+│   │   ├── screen-manager.js
+│   │   ├── settings.js
+│   │   ├── touch-layout.js
+│   │   └── utils.js
+│   │
+│   ├── data/
+│   │   ├── characters.js
+│   │   ├── characters/
+│   │   │   ├── 0001.js
+│   │   │   ├── 0002.js
+│   │   │   └── helpers.js
+│   │   ├── abilities.js
+│   │   ├── difficulty.js
+│   │   ├── launch.js
+│   │   ├── loadout.js
+│   │   ├── maps.js
+│   │   ├── powers.js
+│   │   └── practice-map.js
+│   │
+│   ├── game/
+│   │   ├── arena.js
+│   │   ├── battle.js
+│   │   ├── practice.js
+│   │   │
+│   │   ├── fighters/
+│   │   │   ├── fighter.js
+│   │   │   ├── movement.js
+│   │   │   ├── state.js
+│   │   │   └── controller.js
+│   │   │
+│   │   ├── combat/
+│   │   │   ├── combat.js
+│   │   │   ├── attacks.js
+│   │   │   ├── defense.js
+│   │   │   ├── projectiles.js
+│   │   │   ├── summons.js
+│   │   │   ├── techniques.js
+│   │   │   └── launch-bounce.js
+│   │   │
+│   │   ├── ai/
+│   │   │   ├── combat-ai.js
+│   │   │   └── ...
+│   │   │
+│   │   ├── rendering/
+│   │   │   ├── camera.js
+│   │   │   ├── sprite-animator.js
+│   │   │   ├── sprite-normalizer.js
+│   │   │   ├── hit-fx.js
+│   │   │   └── shield-fx.js
+│   │   │
+│   │   ├── physics.js
+│   │   └── ...
+│   │
+│   ├── localization/
+│   │   ├── i18n.js
+│   │   └── strings/
+│   │       ├── en.js
+│   │       └── fr.js
+│   │
+│   ├── screens/
+│   ├── stages/
+│   └── ui/
+│
+├── docs/
+│   ├── architecture/
+│   ├── systems/
+│   ├── characters/
+│   ├── gameplay/
+│   ├── development/
+│   └── history/
+│
+├── tests/
+│   ├── helpers/
+│   ├── systems/
+│   ├── fighters/
+│   ├── integration/
+│   └── ...
+│
+└── ...
+
+This is an illustrative target.
+
+Use actual existing modules and their responsibilities to determine final filenames.
+
+For instance, do not introduce both fighter.js and character.js as duplicate implementations of the same entity. Choose one authoritative implementation and update its imports.
+
+Do not create a folder containing a single trivial wrapper unless that folder has a clear architectural purpose.
+
+Do not leave duplicate old and new implementations operating in parallel.
+
+Do not add an abstraction if keeping the existing module is simpler and equally maintainable.
+
+⸻
+
+5. REORGANIZE CHARACTER DEFINITIONS
+
+Existing issue
+
+js/data/characters.js currently contains both fighter definitions along with their animation metadata, tuning, moves, and supporting helpers.
+
+The file is over 60 KB and will continue growing as characters are introduced.
+
+The project is intended to support many more than two characters, so this arrangement does not scale well.
+
+Required improvement
+
+Separate character-specific definitions into individual modules.
+
+Suggested layout:
+
+js/data/
+├── characters.js
+└── characters/
+    ├── 0001.js
+    ├── 0002.js
+    └── helpers.js
+
+Each character module should own that fighter’s specific information:
+
+* Identifier and roster position.
+* Availability.
+* Display name.
+* Animation definitions.
+* Sprite metadata.
+* Rendering proportions and anchors.
+* Powers.
+* Movement characteristics.
+* Hitboxes and hurtboxes.
+* Energy configuration.
+* Defensive behavior.
+* Attack definitions.
+* Projectile definitions.
+* Summon definitions.
+* Techniques.
+* Ability names.
+* Mobile button artwork and metadata.
+
+A fighter’s character-specific constants should generally live beside its own definition.
+
+For example, constants for 0001’s attack animation rates do not belong in a global module unless they are genuinely shared configuration.
+
+The same applies to 0002’s animation measurements, spinning-ball hitbox, and attack timing.
+
+Keep character access stable
+
+Preserve the existing public interface of js/data/characters.js where possible:
+
+* CHARACTERS
+* getCharacter
+* isPlayable
+* getPlayableCharacter
+* playableCharacters
+* characterFramePaths
+* framePath
+* frames
+
+The existing module can become a small registry and compatibility entry point that imports individual character definitions.
+
+This is particularly important because current tests register temporary fighters by modifying the exported CHARACTERS array.
+
+Do not accidentally break that workflow by freezing the array, replacing it with a different instance, or changing its mutability.
+
+Keep validation through assertLoadout.
+
+Character asset organization
+
+Preserve the established path convention:
+
+assets/characters/<id>/<id>_<codename>_<frame>.png
+
+Do not rename the current sprite assets for organizational aesthetics.
+
+Importantly, preserve the established animation codename mouvment, including its spelling.
+
+Although the word is unconventional, it is part of the existing canonical asset and animation naming contract in codename_rule.
+
+Do not silently change it to movement.
+
+The character definition’s movement configuration and the animation codename mouvment are separate concepts.
+
+⸻
+
+6. IMPROVE SHARED MOVEMENT ARCHITECTURE
+
+Examine:
+
+* js/game/character.js
+* js/game/physics.js
+* js/game/fighter-controller.js
+* js/data/powers.js
+* js/config.js
+* tests/movement.test.mjs
+* tests/dash.test.mjs
+* tests/facing.test.mjs
+
+Currently, the Fighter implementation contains substantial movement and gameplay-state behavior.
+
+Some of these responsibilities are candidates for extraction into focused modules.
+
+For example:
+
+* Ground acceleration and braking.
+* Air movement.
+* Direction changes.
+* Jump handling.
+* Higher-jump behavior.
+* Air jumps.
+* Fast falling.
+* Dash activation.
+* Dash cancellation.
+* Attack-related movement.
+* Hitstun movement.
+* Collision reactions.
+
+If extraction genuinely improves clarity, move cohesive operations into an appropriately named movement module.
+
+However, preserve the existing Fighter state ownership and simulation ordering.
+
+Do not create a second movement engine.
+
+Maintain a clear distinction between mechanics and configuration
+
+Universal movement logic:
+
+How acceleration, jump buffering, directional control, momentum retention, and dashing operate.
+
+Per-character configuration:
+
+Values such as:
+
+* acceleration
+* deceleration
+* turnBoost
+* airAcceleration
+* airDeceleration
+* airTurnBoost
+* fastFallAcceleration
+* fastFallSpeed
+* highJumpWindow
+* highJumpHeight
+* airJumps
+* airJumpRatio
+* attackBuffer
+* dashSpeed
+* dashTapWindow
+
+The shared code must interpret these values without special treatment for 0001 or 0002.
+
+Do not automatically standardize the numbers across fighters.
+
+Rendering configuration
+
+Review CONFIG.render.fighterHeight.
+
+Its existing comment references 0001’s visual height as the scale reference.
+
+Determine whether this is a deliberate fixed world-space rendering reference or an accidental character dependency.
+
+If it is intentionally a fixed reference, clarify that it is a camera/rendering convention, not a requirement that all fighters match 0001.
+
+Do not change camera scale, character proportions, or sprite resolution during a documentation cleanup.
+
+Movement acceptance criteria
+
+The reorganization must preserve:
+
+* Fixed-step determinism.
+* Ground acceleration.
+* Air steering.
+* Dash distance and timing.
+* Jump behavior.
+* Attack momentum.
+* Input buffering.
+* Hit-cancel behavior.
+* Existing per-fighter movement differences.
+* Existing animation synchronization.
+
+⸻
+
+7. REORGANIZE COMBAT WITHOUT REDESIGNING IT
+
+Review these modules:
+
+* js/game/combat.js
+* js/game/character.js
+* js/game/projectile.js
+* js/game/clone.js
+* js/game/technique.js
+* js/game/launch-bounce.js
+* js/game/fighter-status.js
+* js/data/launch.js
+* js/data/loadout.js
+
+The combat system already has meaningful distinctions among attacks, projectiles, summons, and techniques.
+
+Preserve those concepts.
+
+Potentially separate cohesive responsibilities such as:
+
+* Attack schema construction and validation.
+* Attack startup, active frames, and recovery.
+* Hitbox evaluation.
+* Damage application.
+* Hitstun and blockstun.
+* Launch calculations.
+* Defensive actions.
+* Attack cancellation.
+* Projectile processing.
+* Summon processing.
+* Technique processing.
+* Energy management.
+
+Do not split every function into a separate file.
+
+Prefer modules that represent complete responsibilities.
+
+Preserve existing contracts
+
+The following concepts must remain intact:
+
+Launch Point: The accumulation model already implemented by Alva.
+
+Base Launch: The established launch multiplier values.
+
+Directional Launch: The existing directional definitions.
+
+Loadouts: A fighter has two to five sequential numbered attack families under the existing rules.
+
+Attack routing: Ground and airborne forms use their established move codenames.
+
+Special mechanics: Summons and techniques retain their current semantics and cooldown behavior.
+
+Defense: A character’s definition determines what its defensive action does.
+
+Do not replace Alva’s combat architecture with another fighting-game system.
+
+Distinguish universal combat capabilities from unique moves
+
+For example:
+
+A reusable summon system is universal infrastructure.
+
+0001’s Clone Attack is a specific use of that infrastructure.
+
+A reusable technique system is universal infrastructure.
+
+0001’s Sphere Rush is a specific technique.
+
+A reusable projectile system is universal infrastructure.
+
+The current characters’ individual projectiles have character-specific art and behavior.
+
+This distinction should be obvious in code ownership, documentation, and comments.
+
+⸻
+
+8. REORGANIZE THE COMBAT AI
+
+js/game/combat-ai.js is another large module.
+
+Inspect its internal sections and identify meaningful boundaries.
+
+Possible responsibilities include:
+
+* Perception.
+* Target tracking.
+* Movement decisions.
+* Defensive decisions.
+* Attack evaluation.
+* Move availability.
+* Tactical scoring.
+* Difficulty adjustments.
+* Decision execution.
+
+Extract cohesive responsibilities when doing so reduces complexity and preserves the controller interface.
+
+The AI must continue using each fighter’s actual data and available loadout.
+
+It must not assume all fighters possess 0001’s attacks, summons, or techniques.
+
+Retain support for:
+
+* Quick Battle CPU opponents.
+* Watch Mode CPU-versus-CPU matches.
+* Mirror matches.
+* Different fighters on each side.
+* Deterministic seeded simulations.
+* Different difficulty settings.
+* Character-specific movement and attack behavior.
+
+Preserve the current CPU facing and attack-orientation behavior, including the distinction between ordinary attacks and movement-owning techniques.
+
+Do not change combat difficulty, attack selection weights, or tactical behavior merely to simplify the source structure.
+
+⸻
+
+9. IMPROVE LOCALIZATION AND UI ORGANIZATION
+
+Localization
+
+Review js/core/i18n.js.
+
+It currently combines localization logic, language dictionaries, and dynamic text obtained from game registries.
+
+Consider moving language-specific dictionaries into dedicated modules:
+
+js/localization/
+├── i18n.js
+└── strings/
+    ├── en.js
+    └── fr.js
+
+Keep existing translation keys and fallback behavior intact.
+
+Maintain dynamic string generation from the registries for controls, characters, stages, Powers, and Launch.
+
+Do not replace registry-owned gameplay terminology with independently maintained copies.
+
+Preserve:
+
+* English and French.
+* Existing translated strings.
+* Language selection and persistence.
+* Reactive language changes.
+* Accessibility labels.
+* Missing-translation fallback behavior.
+
+If relocating the current localization API, use a lightweight compatibility export only when necessary.
+
+Interface
+
+Review the existing separation among js/screens/, js/ui/, and js/game/touch-controls.js.
+
+Use this ownership model:
+
+* Screens: navigation and screen lifecycle.
+* UI components: reusable interface presentation.
+* Input systems: device and control input.
+* Touch controls: translating mobile interactions into existing inputs.
+* Game simulation: gameplay behavior, independent of interface rendering.
+
+Avoid creating separate implementations of the same interaction for desktop, gamepad, and mobile when they can share the established action mapping.
+
+⸻
+
+10. IMPROVE CSS ORGANIZATION
+
+styles.css is approximately 94 KB.
+
+Its size makes it difficult to locate styles for a particular screen or component.
+
+Investigate whether splitting it into smaller stylesheets would materially improve maintenance.
+
+Potential categories:
+
+* Base variables and reset.
+* Typography.
+* Shared components.
+* Menus and navigation.
+* Screen-specific styling.
+* Battle interface.
+* Practice interface.
+* Touch controls.
+* Settings and touch editor.
+* Responsive adjustments.
+
+This is optional if the split would introduce substantial regression risk without enough benefit.
+
+If splitting:
+
+1. Preserve the exact effective cascade and override precedence.
+2. Preserve selectors and layout geometry.
+3. Preserve responsive breakpoints and safe-area handling.
+4. Keep all stylesheet URLs relative.
+5. Update index.html appropriately.
+6. Check desktop, mobile, and landscape layouts.
+7. Avoid introducing CSS dependencies or a preprocessing pipeline.
+
+Do not visually redesign Alva.
+
+Keep its existing visual identity, typography, colors, spacing philosophy, and interface behavior.
+
+⸻
+
+11. REORGANIZE DOCUMENTATION — HIGH PRIORITY
+
+Documentation is one of the most important parts of this task.
+
+The existing repository contains three particularly large documents:
+
+* README.md
+* ALVA_SPEC.md
+* UPDATES.md
+
+They contain valuable information but are difficult to navigate as the project expands.
+
+I want more precise documentation, with clearly defined subjects, ownership, navigation, and terminology.
+
+Proposed documentation structure
+
+docs/
+├── README.md
+│
+├── architecture/
+│   ├── overview.md
+│   ├── module-responsibilities.md
+│   ├── data-flow.md
+│   └── character-system.md
+│
+├── systems/
+│   ├── movement.md
+│   ├── combat.md
+│   ├── launch.md
+│   ├── defense.md
+│   ├── energy.md
+│   ├── ai.md
+│   ├── input.md
+│   ├── rendering.md
+│   └── localization.md
+│
+├── characters/
+│   ├── README.md
+│   ├── adding-characters.md
+│   ├── 0001.md
+│   └── 0002.md
+│
+├── gameplay/
+│   ├── battle.md
+│   ├── watch-mode.md
+│   ├── practice.md
+│   └── stages.md
+│
+├── development/
+│   ├── setup.md
+│   ├── testing.md
+│   ├── conventions.md
+│   └── architecture-decisions.md
+│
+└── history/
+    └── named-updates.md
+
+Create only documents that contain useful, nonredundant material.
+
+README.md
+
+The root README should primarily answer:
+
+1. What is Alva?
+2. What kind of game is it?
+3. What features are currently implemented?
+4. How do you run it?
+5. How do you deploy it?
+6. How is the repository organized?
+7. Where is the detailed documentation?
+8. How do developers add fighters, maps, or mechanics?
+
+Move extensive technical explanations into focused documents.
+
+A new developer should be able to understand the project’s structure without navigating a massive README.
+
+ALVA_SPEC.md
+
+Treat this as Alva’s canonical product specification.
+
+It may remain at the root as an authoritative specification with clear links to detailed supporting documents.
+
+Alternatively, carefully reorganize its sections while keeping its root path as the stable specification entry point.
+
+Do not create multiple documents that contradict one another about what the game is supposed to do.
+
+Distinguish:
+
+* Product requirements.
+* Current implementation.
+* Character-specific behavior.
+* Historical decisions.
+* Future design possibilities.
+
+Keep existing specifications accurate.
+
+UPDATES.md
+
+Preserve its role as the index of named updates.
+
+Keep the established names:
+
+* Movement Update.
+* Effect Update.
+* Bounce Update.
+
+Preserve references to their original pull requests and commits.
+
+These are historical facts, not names to arbitrarily change.
+
+You may reorganize detailed material into docs/history/named-updates.md or topic-specific documents, provided UPDATES.md remains a clear, accurate entry point.
+
+Do not erase history.
+
+Important: Historical descriptions and current architectural descriptions serve different purposes.
+
+A historical update may genuinely have been developed and tuned initially using 0001.
+
+That fact can remain.
+
+However, the current explanation of movement must describe the reusable movement system and then distinguish its original 0001 tuning.
+
+⸻
+
+12. SPECIFIC DOCUMENTATION CORRECTION: THE MOVEMENT UPDATE
+
+This is a mandatory example of the broader cleanup.
+
+Inspect the Movement Update section in UPDATES.md, along with the corresponding README and specification sections.
+
+The update currently begins by emphasizing improvements to 0001.
+
+Rework the presentation so it identifies three layers:
+
+A. Universal implementation
+
+Explain the actual reusable mechanics introduced or adjusted:
+
+* Ground responsiveness.
+* Acceleration and braking.
+* Air steering.
+* Fast falling.
+* Dash transitions.
+* Attack momentum.
+* Input buffering.
+* Hit cancellation.
+* Dash cancellation.
+* Combat interruption behavior.
+
+Make clear that the underlying implementation is used by the Fighter system for whichever characters support the relevant behavior.
+
+B. Per-character tuning
+
+Explain that individual fighters use values in their own definitions to control movement characteristics.
+
+Document relevant fields and their units, defaults, valid ranges where enforced, and gameplay effects.
+
+Do not invent validation rules that the implementation does not enforce.
+
+C. Historical character-specific adjustments
+
+Document that the original update included particular tuning and combo-route changes for 0001.
+
+Preserve accurate historical values and their previous/current relationships.
+
+Keep 0001’s combo examples in a character-specific section.
+
+Do not imply that those routes, animation timings, or exact Energy costs necessarily apply to all fighters.
+
+Desired result
+
+A reader should leave with the understanding that:
+
+“Alva has a universal configurable movement system, and each fighter has its own movement profile.”
+
+Not:
+
+“Alva’s movement system exists to make character 0001 faster.”
+
+Apply this same approach to other affected documentation.
+
+⸻
+
+13. DISTINGUISH CHARACTER-SPECIFIC AND UNIVERSAL DOCUMENTATION
+
+Provide a clear documentation hierarchy.
+
+Shared systems documentation
+
+Describe:
+
+* How the system works.
+* Which modules implement it.
+* What configuration it reads.
+* Which character capabilities it supports.
+* Which rules are universal.
+* Which aspects are configurable.
+* How the system behaves with unsupported or absent optional capabilities.
+* Relevant tests.
+
+Use neutral wording whenever possible:
+
+* “The fighter”
+* “The active character”
+* “The attacker”
+* “The defender”
+* “The character definition”
+* “The selected move”
+
+Character-specific documentation
+
+Describe each fighter independently.
+
+For 0001, document its actual:
+
+* Movement profile.
+* Attacks and aerial variants.
+* Projectile.
+* Clone summon.
+* Sphere Rush technique.
+* Defense configuration.
+* Animation relationships.
+* Unique gameplay interactions.
+
+For 0002, document its actual:
+
+* Movement profile and Speed Power.
+* Ordinary and airborne attacks.
+* Homing and Bounce Attacks.
+* Spin Attack.
+* Blue Tornado.
+* Whirlwind.
+* Defensive capabilities and limitations.
+* Sprite scaling and animation characteristics.
+
+Use accurate implemented behavior rather than inventing additional abilities.
+
+Document real differences, not comparisons that suggest one fighter is the template every other fighter should follow.
+
+Adding future characters
+
+Write a detailed guide covering:
+
+* Four-digit character identifiers.
+* Registration.
+* Availability.
+* Roster slots.
+* Asset naming.
+* Animation metadata.
+* Required movement and combat data.
+* Powers.
+* Attack loadouts.
+* Defensive capabilities.
+* Projectiles, summons, and techniques.
+* Touch previews and ability names.
+* Localization.
+* Validation.
+* Testing.
+
+A future contributor should be able to follow the guide without cloning 0001 and manually discovering which assumptions need replacing.
+
+⸻
+
+14. PRESERVE CODENAME CONVENTIONS
+
+Treat codename_rule as an existing authoritative source for internal naming contracts.
+
+Do not invent new internal attack naming schemes.
+
+Preserve established names such as:
+
+* attack1 through attack5
+* midair_attack1 through midair_attack5
+* extra_attack
+* transform
+* shield
+* mouvment
+* midair_mouvment
+* attackN_summon
+* attackN_object
+
+Retain the distinction between internal codenames and player-facing ability names.
+
+Do not rename internal concepts after one fighter’s ability.
+
+For example, a generic Attack 3 handler should not be called a Clone Attack handler just because 0001 uses Attack 3 for a clone.
+
+Similarly, a generic technique controller must not assume every technique operates like Sphere Rush.
+
+Preserve the existing loadout restrictions and validation rules.
+
+The goal is clearer organization, not an incompatible naming migration.
+
+⸻
+
+15. REORGANIZE TESTS
+
+The repository already contains extensive tests covering movement, combat, AI, touch controls, stages, launch behavior, characters, and screen functionality.
+
+Preserve their coverage.
+
+The root tests/ directory has grown large enough that grouping tests by responsibility may improve navigation.
+
+Suggested categories:
+
+tests/
+├── helpers/
+├── systems/
+│   ├── movement/
+│   ├── combat/
+│   ├── defense/
+│   ├── physics/
+│   └── input/
+├── fighters/
+│   ├── 0001/
+│   ├── 0002/
+│   └── fixtures/
+├── integration/
+└── ...
+
+Do not force every test into a new location if the grouping makes navigation worse.
+
+Separate two kinds of tests
+
+Universal mechanic tests
+
+These validate systems independently of any single production fighter’s identity.
+
+Where practical, use explicit fixtures or parameterized character configurations.
+
+For example:
+
+* Ground acceleration behaves according to the supplied movement values.
+* Attack routing follows a fighter’s own loadout.
+* Launch calculations follow the same system for every fighter.
+* The AI respects the active fighter’s available moves.
+* Input controls do not assume a particular ability.
+
+Character-specific tests
+
+These validate exact attributes, attacks, animations, and interactions belonging to a particular character.
+
+For example:
+
+* 0001’s clone summon sequence.
+* 0001’s Sphere Rush behavior.
+* 0002’s Homing Attack.
+* 0002’s Blue Tornado.
+* Their individual movement numbers and clip timing.
+
+Do not incorrectly convert a specific test into a universal requirement.
+
+Existing harness concern
+
+tests/fighter-harness.mjs currently uses 0001 as its default fighter definition.
+
+This is understandable historically, but it can unintentionally encourage tests to rely on that fighter as the universal reference.
+
+Improve the harness so a fighter definition can be supplied explicitly without breaking existing test behavior.
+
+Make any compatibility defaults clear.
+
+Use the existing tests/sample-fighter.mjs and tests/test-fighters.mjs to validate data-driven behavior.
+
+Preserve temporary fighter registration and cleanup.
+
+Required test scenarios
+
+Validate:
+
+1. 0001 versus 0002.
+2. 0002 versus 0001.
+3. Mirror matches.
+4. Different attack loadouts.
+5. Ground and airborne attacks.
+6. Characters with and without optional capabilities.
+7. Character-specific movement values.
+8. Projectile, summon, and technique behavior.
+9. Disabled or unavailable fighters.
+10. An empty playable roster.
+11. Selection, Battle, Watch Mode, and Practice Ground behavior.
+12. Touch controls and ability previews.
+13. AI behavior with different fighters.
+14. Fixed-timestep consistency.
+
+Avoid creating brittle tests that only pass because one fighter happens to have particular values.
+
+⸻
+
+16. VERIFY DOCUMENTATION AGAINST THE ACTUAL CODE
+
+Do not assume that every existing paragraph is still accurate.
+
+Historical changes have left some documentation describing earlier states of the game.
+
+For example:
+
+* The original Effect Update included a short-hop mechanic, but later changes replaced it with the current higher-jump behavior.
+* Some historical roster sections describe times when fighters were disabled or removed.
+* Some descriptions focus on when 0001 was the primary or only playable fighter.
+
+Preserve these details when explicitly discussing history.
+
+However, clearly distinguish them from the current state.
+
+Current gameplay documentation must match what the repository implements now.
+
+When reorganizing:
+
+* Inspect the code before rewriting technical statements.
+* Verify current defaults.
+* Verify what is genuinely configurable.
+* Verify which features are universal.
+* Verify character availability.
+* Verify current control mappings.
+* Verify existing move codenames.
+* Verify stage and camera behavior.
+* Verify actual tests.
+
+Do not fabricate missing functionality.
+
+If documentation contradicts implementation, correct the documentation when the implementation is clearly authoritative, or record the discrepancy when product intent is uncertain.
+
+Do not silently alter gameplay to make old prose true.
+
+⸻
+
+17. MAKE CODE MORE SPECIFIC WITHOUT MAKING IT VERBOSE
+
+Improve code comments where they help maintainability.
+
+Good comments should explain:
+
+* Why something exists.
+* Which responsibility it owns.
+* Important constraints.
+* Non-obvious state transitions.
+* Relationships between configuration and runtime behavior.
+* Reasons for unusual implementation decisions.
+
+Avoid comments that simply repeat the next line of code.
+
+Use consistent module introductions where valuable:
+
+Purpose: What the module owns.
+
+Inputs: Relevant dependencies or data.
+
+Outputs: What it exposes.
+
+Important constraints: Invariants that maintain gameplay compatibility.
+
+Separate major sections in larger modules.
+
+Use consistent naming for equivalent concepts.
+
+Avoid ambiguous abbreviations unless they are established project conventions.
+
+Do not rename public APIs casually.
+
+Prefer meaningful function boundaries over giant functions, but avoid turning straightforward logic into a chain of unnecessary wrappers.
+
+The resulting code should be easier to follow, not more elaborate merely for the sake of elaboration.
+
+⸻
+
+18. PROTECT GAMEPLAY AND DEPLOYMENT
+
+This reorganization must preserve the current game.
+
+Do not intentionally change:
+
+* Character balance.
+* Damage values.
+* Movement speed.
+* Collision dimensions.
+* Hitbox timing.
+* Launch calculations.
+* Energy costs.
+* AI difficulty.
+* Match scoring.
+* Round timing.
+* Respawn behavior.
+* Animation timing.
+* Attack availability.
+* User input mappings.
+* Touch control geometry.
+* Settings behavior.
+* Visual effects.
+* Existing art.
+* Audio assets.
+* Localization.
+* The visual design.
+
+Preserve relative asset and module paths.
+
+The site must continue running under GitHub Pages, including when deployed under a repository subdirectory.
+
+Keep index.html at the root.
+
+Keep the project dependency-free unless an existing dependency is specifically required, which should not be necessary for this task.
+
+Do not introduce:
+
+* React.
+* Vue.
+* A bundler.
+* TypeScript migration.
+* CSS frameworks.
+* New runtime services.
+* A replacement renderer.
+* A different physics engine.
+
+The project must remain recognizable as the existing Alva game.
+
+⸻
+
+19. IMPLEMENT THE REORGANIZATION IN PHASES
+
+Work in a controlled order.
+
+Phase 1 — Audit
+
+Inspect the entire repository.
+
+Produce an internal inventory of:
+
+* Existing directories.
+* Large files.
+* Module dependencies.
+* Duplicated responsibilities.
+* Character-specific logic.
+* Universal systems.
+* Documentation duplication.
+* Hard-coded character references.
+* Existing tests and entry points.
+
+Record a baseline of relevant file hashes, including character_rule.
+
+Identify genuine organizational problems before editing.
+
+Phase 2 — Character architecture
+
+Separate character definitions into individual modules.
+
+Preserve exports, runtime behavior, registration semantics, and validations.
+
+Make ownership of character-specific data explicit.
+
+Run relevant tests.
+
+Phase 3 — Shared systems
+
+Improve the internal boundaries of movement, combat, AI, and rendering where the existing complexity justifies doing so.
+
+Use small, reviewable changes.
+
+Update imports and associated tests immediately.
+
+Avoid combining unrelated behavioral changes with file relocation.
+
+Phase 4 — Documentation
+
+Organize product, technical, historical, and character-specific information.
+
+Make the shared systems character-neutral.
+
+Correct misleading 0001-centric descriptions.
+
+Preserve historically accurate character-specific records.
+
+Fix internal links.
+
+Phase 5 — Interface and styling
+
+Clean up localization, interface responsibilities, or stylesheets only where there is a clear maintainability gain.
+
+Preserve the player-facing experience.
+
+Phase 6 — Testing and review
+
+Run the entire applicable test suite.
+
+For example, from the repository root:
+
+node --test
+
+Also run appropriate targeted tests after each significant change.
+
+Verify module import paths, sprite references, and documentation links.
+
+Perform browser smoke testing where possible.
+
+Check at least:
+
+* Desktop gameplay.
+* Mobile landscape gameplay.
+* Character selection.
+* Both playable characters.
+* Quick Battle.
+* Watch Mode.
+* Practice Ground.
+* Settings.
+* Touch controls.
+* Language switching.
+* Asset loading.
+
+A successful Node test run does not replace browser checks for rendering and layout.
+
+If browser verification is unavailable, explicitly record what remains unverified.
+
+⸻
+
+20. IMPORTANT STRUCTURAL SAFEGUARDS
+
+Follow these throughout the task.
+
+Avoid unnecessary compatibility layers
+
+A small re-export entry point can be useful to preserve the public character registry.
+
+However, do not leave multiple complete implementations after relocating code.
+
+Avoid circular dependencies.
+
+Preserve runtime references
+
+Update every affected import, exported symbol, animation reference, asset path, and test reference.
+
+Avoid accidental behavioral changes
+
+Distinguish pure relocation from logic modification.
+
+When necessary, compare execution results before and after the change.
+
+Preserve historical resources
+
+Review files such as max, CLAUDE.md, and codename_rule before moving or editing them.
+
+Do not automatically treat historical prompts as current design requirements.
+
+If a historical file is moved, preserve its content and update discoverability and references.
+
+No speculative mechanics
+
+Do not introduce a new move, defensive feature, passive, transformation, or animation merely because the reorganized structure has a place for one.
+
+Keep future extensibility architectural rather than speculative.
+
+Keep the repository clean
+
+Do not add meaningless placeholder modules.
+
+Do not commit generated temporary files.
+
+Do not retain unused imports or abandoned implementations.
+
+Do not introduce duplicated documentation that will drift over time.
+
+⸻
+
+21. DEFINITION OF DONE
+
+The task is complete only when the following conditions are satisfied.
+
+Repository organization
+
+* Files have clearer ownership.
+* Large modules have been examined and sensibly organized.
+* Character definitions are independently maintainable.
+* Module paths and imports work.
+* There are no unnecessary parallel implementations.
+
+Architecture
+
+* Universal systems do not depend on 0001 as a special default.
+* Character-specific data is isolated appropriately.
+* Existing mechanics remain data-driven.
+* Adding another fighter does not require copying or modifying an existing fighter’s unique behavior.
+* Existing simulation and combat semantics are preserved.
+
+Documentation
+
+* README provides an approachable introduction.
+* The specification remains authoritative and navigable.
+* Named updates remain traceable.
+* Universal mechanics are documented independently.
+* Character-specific mechanics have dedicated explanations.
+* Misleading 0001-centric descriptions have been corrected.
+* Historical facts have not been rewritten.
+* Internal links work.
+* Documentation agrees with the current implementation.
+
+Tests
+
+* Existing tests pass, or any remaining failures are explicitly documented.
+* Character-specific tests remain character-specific.
+* Shared behavior has meaningful character-neutral coverage.
+* Existing test fixtures continue working.
+* No behavior-changing adjustments are disguised as organizational changes.
+
+Protected file
+
+* character_rule has not been modified, moved, renamed, or deleted.
+* Its path and original blob SHA remain unchanged.
+
+⸻
+
+22. FINAL DELIVERABLES
+
+Implement the changes on a dedicated branch and prepare a pull request for review.
+
+In the pull request description, include:
+
+A. Reorganization summary
+
+Explain the overall changes and why they improve maintainability.
+
+B. Before-and-after structure
+
+Show a concise directory comparison identifying significant file moves and splits.
+
+C. Character-system improvements
+
+Explain how the architecture now distinguishes shared gameplay mechanics from per-character definitions.
+
+D. Documentation changes
+
+Identify which documents were reorganized and which misleading descriptions were corrected, especially the Movement Update.
+
+E. Compatibility notes
+
+Identify preserved public interfaces, any compatibility re-exports, and relevant import-path migrations.
+
+F. Testing results
+
+Report tests executed and their actual results, with any limitations or unverified browser behaviors.
+
+G. Protected file confirmation
+
+Explicitly confirm that character_rule remains byte-for-byte unchanged at its original path.
+
+H. Remaining opportunities
+
+List any useful future organizational improvements deliberately excluded from this refactoring.
+
+Do not claim that tests passed unless they were actually executed.
+
+Do not merge the pull request automatically.
+
+⸻
+
+FINAL DIRECTION
+
+The purpose of this task is to make Alva easier to understand, maintain, expand, and develop without sacrificing the game’s identity or existing functionality.
+
+I am not asking for a completely different codebase.
+
+I want the current codebase to become a more organized, deliberate version of itself.
+
+Prioritize:
+
+1. Clarity over complexity.
+2. Preservation over unnecessary rewriting.
+3. Universal game systems over character-specific architectural assumptions.
+4. Character-specific definitions for genuinely unique behavior.
+5. Detailed, accurate documentation over broad or vague explanations.
+6. Extensibility without premature abstraction.
+7. Verified functionality over cosmetic restructuring.
+
+Do not make Alva revolve around 0001 simply because it was the first character.
+
+Treat 0001 and 0002 as members of a growing roster using shared game systems, while keeping their unique attributes, animations, attacks, and mechanics intact.
+
+The result should feel like a carefully maintained and thoughtfully structured game project—not a rewritten prototype.
+
+And under no circumstances modify character_rule.
