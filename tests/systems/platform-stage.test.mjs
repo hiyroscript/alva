@@ -470,6 +470,37 @@ test('the camera leans toward the stage while framing, never past a framed fight
   assert.ok(cam.x + cam.w <= battle.map.cameraBounds.right + 1e-6);
 });
 
+test('the camera keeps up with the universal speed: Dashes and their run-on stay inside the view, the lead capped', () => {
+  const { battle } = realBattle('desert');
+  const cam = battle.camera;
+  cam.setView(1560, 880, 1);
+  battle.p2.lostToVoid = true;
+  const p1 = battle.p1;
+  const { left, right } = battle.map.mainStage;
+  p1.body.x = p1.body.prevX = left + 120;
+  battle.snapCamera();
+  // Dash after Dash along the whole stage, holding on between them.
+  let worst = Infinity;
+  for (let i = 0; i < 160 && p1.body.x < right - 140; i++) {
+    const tap = i % 24 === 0 || i % 24 === 2;
+    p1.controller = { getInput: () => ({ runRight: true, runRightPressed: tap }) };
+    p1.update(DT, { stage: battle.stage, gravity: CONFIG.sim.gravity });
+    p1.interpolate(1);
+    cam.follow(p1, null, DT);
+    worst = Math.min(worst, cam.x + cam.w - p1.renderX, p1.renderX - cam.x);
+  }
+  assert.ok(worst > cam.w * 0.12, `always well inside the view (closest ${worst.toFixed(0)} of ${cam.w})`);
+  // The lead counts a Dash's speed only up to its cap: the target moves no
+  // further ahead for a burst than for a fast run.
+  const still = (vx) => {
+    cam.computeTarget({ renderX: 1800, renderY: 860, lastGroundY: 860, body: { vx, y: 860, grounded: true, height: 80 } }, null);
+    return cam.tx;
+  };
+  const lead = still(1250) - still(0);
+  assert.ok(lead > 0 && lead <= 0.12 * 700 + 1e-6, `a capped lead (${lead.toFixed(1)})`);
+  assert.equal(still(1250), still(900));
+});
+
 // ---- Void art -------------------------------------------------------------------------
 
 // A context that records every path point, for comparing edges between

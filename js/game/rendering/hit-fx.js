@@ -15,7 +15,8 @@
 //   launch for a hit, a red ring for a block, a bright white ring for a
 //   perfect block.
 // - Speed trails: fading afterimages behind a fighter launched hard enough
-//   to tumble, while it flies fast.
+//   to tumble, while it flies fast, and fainter ones behind a Dash or an air
+//   dash while it lasts.
 // - A short slow-motion zoom on a launch that will carry its fighter into
 //   the Void if it does nothing (see launchIsLethal).
 // - A launch's rebound off a wall, floor or ceiling (see
@@ -50,6 +51,7 @@ export const HIT_FX = Object.freeze({
     count: 6,
     life: 0.16, // seconds each afterimage takes to fade
     alpha: 0.42,
+    dashAlpha: 0.26, // a Dash's (or air dash's) afterimages: fainter
   },
   bounce: {
     shakeSpeed: 900, // world units/s into the surface: slower rebounds do not shake
@@ -251,11 +253,14 @@ export class HitEffects {
     return this.flashes.has(f);
   }
 
-  // Records `f`'s afterimage while it tumbles fast (called once per frame
-  // with its current frame and interpolated position); old ones fade.
+  // Records `f`'s afterimage while it tumbles fast or Dashes (called once
+  // per frame with its current frame and interpolated position); old ones
+  // fade.
   sampleTrail(f, dt) {
     let trail = this.trails.get(f);
-    const fast = f.tumbling && Math.hypot(f.body.vx, f.body.vy) >= HIT_FX.trail.speed && !f.lostToVoid;
+    const tumbling = f.tumbling && Math.hypot(f.body.vx, f.body.vy) >= HIT_FX.trail.speed;
+    const dashing = !!f.dash;
+    const fast = (tumbling || dashing) && !f.lostToVoid;
     if (!trail) {
       if (!fast) return;
       trail = { ghosts: [], since: Infinity };
@@ -267,7 +272,7 @@ export class HitEffects {
     const frame = f.animator.frame;
     if (fast && frame && trail.since >= HIT_FX.trail.every) {
       trail.since = 0;
-      trail.ghosts.push({ x: f.renderX, y: f.renderY, frame, flip: f.spriteFlip, age: 0 });
+      trail.ghosts.push({ x: f.renderX, y: f.renderY, frame, flip: f.spriteFlip, age: 0, dash: !tumbling });
       if (trail.ghosts.length > HIT_FX.trail.count) trail.ghosts.shift();
     }
     if (!fast && !trail.ghosts.length) this.trails.delete(f);
@@ -277,8 +282,8 @@ export class HitEffects {
   ghosts(f) {
     const trail = this.trails.get(f);
     if (!trail) return [];
-    const { life, alpha } = HIT_FX.trail;
-    return trail.ghosts.map((g) => ({ ...g, alpha: alpha * (1 - g.age / life) }));
+    const { life, alpha, dashAlpha } = HIT_FX.trail;
+    return trail.ghosts.map((g) => ({ ...g, alpha: (g.dash ? dashAlpha : alpha) * (1 - g.age / life) }));
   }
 
   // Draws every live spark. `toScreen(x, y)` maps world to device pixels and

@@ -11,6 +11,18 @@ import { clamp, damp } from '../../core/utils.js';
 // the way), as long as every framed fighter stays inside the margin.
 const STAGE_LEAN = 0.35;
 
+// Player 1 is framed a little ahead of where it is going: LEAD seconds of
+// its sideways speed, that speed counted up to LEAD_SPEED (world units / s)
+// at most, so a Dash's burst never swings the view.
+const LEAD = 0.12;
+const LEAD_SPEED = 700;
+
+// How quickly the view closes on its target, sideways and up or down (per
+// second; see damp in js/core/utils.js): quick enough sideways that a
+// fighter at a Dash's speed stays well inside the margin.
+const FOLLOW_X = 7;
+const FOLLOW_Y = 4;
+
 export class Camera {
   constructor() {
     this.x = 0;
@@ -54,7 +66,7 @@ export class Camera {
   computeTarget(primary, secondary) {
     const w = this.w;
     const margin = w * 0.2;
-    const px = primary.renderX + primary.body.vx * 0.12;
+    const px = primary.renderX + clamp(primary.body.vx, -LEAD_SPEED, LEAD_SPEED) * LEAD;
     const maxSpan = w - margin * 2;
     let fx = px;
     let fy = Camera.trackY(primary);
@@ -92,8 +104,8 @@ export class Camera {
 
   follow(primary, secondary, dt) {
     this.computeTarget(primary, secondary);
-    this.x += (this.tx - this.x) * damp(5.5, dt);
-    this.y += (this.ty - this.y) * damp(3.6, dt);
+    this.x += (this.tx - this.x) * damp(FOLLOW_X, dt);
+    this.y += (this.ty - this.y) * damp(FOLLOW_Y, dt);
     this.clampToBounds();
   }
 

@@ -65,7 +65,7 @@ const FPS_0001 = Object.freeze({
   attack4_release: 3,
   attack5_cast: 6,
   attack5_release: 3,
-  extra_attack: 15,
+  extra_attack: 12,
 });
 
 // How fast #0001's orbs spin as they fly, in degrees per second: six whole
@@ -547,16 +547,17 @@ export const CHARACTER_0001 = {
     },
     // The High Kick: frame 1, the leap in on frame 2 (forward speed raised
     // to at least 300 on the ground), 3 the leg rising, 4 the kick (out to
-    // about 58 units, chest to head height), 5 the knee drawn back, held two
-    // frames more. #0001's launcher, telegraphed (a fifth of a second before
-    // it lands) and punishable: 4, Base Launch 2 upward. It keeps the speed
-    // it is thrown at. In the air it stands on the air while it kicks, once
-    // per airtime.
+    // about 58 units, chest to head height), 5 the knee drawn back, held a
+    // frame more. #0001's launcher, and so still telegraphed (a quarter of a
+    // second before it lands, its old rate: any quicker and the Jab strings
+    // into it far longer) and punishable: 4, Base Launch 2 upward. It keeps
+    // the speed it is thrown at. In the air it stands on the air while it
+    // kicks, once per airtime.
     extra_attack: {
       animation: 'extra_attack',
       startup: 3 / FPS_0001.extra_attack,
       active: 1 / FPS_0001.extra_attack,
-      recovery: 3 / FPS_0001.extra_attack,
+      recovery: 2 / FPS_0001.extra_attack,
       damage: 4,
       baseLaunch: 2,
       directionalLaunch: 'vertical',
