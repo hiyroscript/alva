@@ -130,9 +130,8 @@ declaring any of them. Do not give it a `movement` profile, `powers`
 (Jump Power and Speed Power are retired) or any movement field: the
 registry refuses the definition. A fighter that looks heavy is no slower,
 and one that is fast in its canon is no faster: put that speed in its
-moves (a `motion` such as `homing`, `roll`, `bounce` or `rise`, a
-`step`). Every attack keeps all of the speed it is thrown at (no attack
-can declare `momentum`, `airMomentum` or `friction`).
+moves (a `motion` such as `homing`, `roll`, `bounce` or `rise`, a `step`,
+its attacks' `momentum`).
 
 What it does bring is art: a `mouvment` clip for the Dash and a
 `midair_mouvment` clip for the air dash (each is played once across the
@@ -174,7 +173,7 @@ its `damage` (added to the target's Launch Point), its `baseLaunch` (0 to
 3: by `codename_rule`'s launch levels, 1 for light, 2 for medium, 3 for
 big-impact attacks) and its `directionalLaunch` (`null`, `'horizontal'`,
 `'vertical'` or `'reverseVertical'`), each authored separately. Add how
-it moves beyond keeping its speed (`control`, `airControl`, `step`) and whether a hit
+it moves (`momentum`, `control`, `friction`, `step`) and whether a hit
 opens a follow-up (`hitCancel`). For more than a timed hitbox, use the
 attack mechanics: strikes (`hits`), `carry`, `motion` (`hover`, `homing`,
 `bounce`, `rise`, `roll`), `pull`, `airUses`, `freeFall`, `passThrough`,

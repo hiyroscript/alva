@@ -27,9 +27,8 @@
 // The optional `startupAnimation` is the owner's own summoning pose: a
 // fighter clip played once between the accepted press and the request
 // (see Fighter.trySummon and finishSummon). For its length the owner is
-// committed to it: it is carried on at the speed it had (never stopped),
-// keeps its facing and can do nothing else, and a hit, lost ground or a
-// target gone from play cancels it with
+// committed to it: it stands still, keeps its facing and can do nothing
+// else, and a hit, lost ground or a target gone from play cancels it with
 // no clone at all. The cooldown already runs from the press. Without one
 // the request is queued on the press itself and the owner is free at once.
 // The startup is the owner's; the `cloud` is the clone's, played where the

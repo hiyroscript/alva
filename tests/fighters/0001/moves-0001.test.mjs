@@ -74,20 +74,16 @@ test('a Jab that hits can be cut short into another Jab or a High Kick; one that
   assert.equal(whiff.fighter.combat.attack?.def.id, 'attack1', 'still in its own recovery');
 });
 
-test('a running Jab carries the run on through it, never braked, never steered', () => {
+test('a running Jab slides on with the run, never steered', () => {
   const { fighter, step } = solo({ x: 300 });
   for (let i = 0; i < 40; i++) step({ runRight: true });
   const speed = fighter.body.vx;
-  assert.equal(speed, MOVEMENT.maxSpeed, 'a full run');
   step({ runRight: true, ...P('attack1') });
-  assert.equal(fighter.combat.attack?.def.id, 'attack1');
-  assert.equal(fighter.body.vx, speed, 'all of the run carried in');
+  assert.equal(A.attack1.momentum, 1, 'all of it');
+  const kept = speed * A.attack1.momentum - MOVEMENT.deceleration * A.attack1.friction * DT;
+  assert.ok(Math.abs(fighter.body.vx - kept) < 1e-9, `the run carried in (${fighter.body.vx})`);
   step({ runLeft: true });
-  assert.equal(fighter.body.vx, speed, 'held back the other way: no steering, no braking');
-  while (fighter.combat.attack) {
-    step({});
-    if (fighter.combat.attack) assert.equal(fighter.body.vx, speed, 'carried on to its last frame');
-  }
+  assert.ok(fighter.body.vx > 0, 'held back the other way: no steering');
 });
 
 // ---- Standing on the air -------------------------------------------------------------
@@ -127,9 +123,8 @@ test('the High Kick: a leap in, then 4 and Base Launch 2 straight up; in the air
     d.tick();
     leap = Math.max(leap, d.attacker.body.vx);
   }
-  // Raised to the step's speed on frame 2, its lunge fading from there.
-  const fade = MOVEMENT.overspeedHoldDeceleration * DT;
-  assert.ok(leap >= A.extra_attack.step.speed - fade - 1e-9 && leap <= A.extra_attack.step.speed, `the leap in on frame 2 (${leap})`);
+  // Raised to the step's speed on frame 2, braking from there.
+  assert.ok(leap > A.extra_attack.step.speed * 0.8 && leap <= A.extra_attack.step.speed, `the leap in on frame 2 (${leap})`);
   const [e] = d.events;
   assert.equal(e.damage, 4);
   assert.deepEqual({ ...e.finalLaunch }, { x: 0, y: -58 * U });
@@ -167,14 +162,6 @@ test('Red pushes its target away: 2 and Base Launch 1 along its flight', () => {
   assert.equal(e.move, 'attack2_object');
   assert.equal(e.damage, 2);
   assert.deepEqual({ ...e.finalLaunch }, { x: 48 * U, y: 0 });
-  // Thrown on the run, the orb still pushes by its own launch alone: a
-  // projectile passes on no run (only a fighter's own strike does).
-  const run = versus({ gap: 260 });
-  run.attacker.body.vx = MOVEMENT.maxSpeed;
-  run.tick(P('attack2'));
-  tickUntil(run, () => run.events.length > 0, {}, {}, 60);
-  assert.equal(run.events[0].move, 'attack2_object');
-  assert.equal(run.events[0].carried, 0);
 });
 
 test('a Shield that blocks Red is shoved back 520 units/s, and pays for it', () => {
@@ -345,10 +332,8 @@ test('a paralyzed opponent can be hit freely; the first hit that launches it set
   d.tick(P('attack4'));
   tickUntil(d, () => d.target.combat.immobilized, {}, {}, 60);
   tickUntil(d, () => !d.attacker.technique, {}, {}, 60);
-  // Walk in and stop (a kick keeps a run's speed: it would carry #0001
-  // past), then kick.
+  // Walk in and Jab: still held after a hit that only stuns...
   for (let i = 0; i < 20 && d.target.body.x - d.attacker.body.x > 45; i++) d.tick({ runRight: true });
-  tickUntil(d, () => d.attacker.body.vx === 0, {}, {}, 20);
   d.target.combat.launchPoint = 0;
   const before = d.events.length;
   d.tick(P('extra_attack'));

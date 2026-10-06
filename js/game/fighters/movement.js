@@ -3,8 +3,8 @@
 // fighter.
 //
 // Purpose: how ground acceleration and braking, turning, air steering,
-// overspeed, the carry through an attack, the hitstun drift, the fast fall,
-// the air jump, the higher jump and the double tap (the Dash's and the air
+// overspeed, an attack's momentum, the hitstun drift, the fast fall, the
+// air jump, the higher jump and the double tap (the Dash's and the air
 // dash's) work. No fighter changes these rules or their numbers.
 //
 // Inputs: the movement values (`mv`: BASE_FIGHTER_MOVEMENT in
@@ -23,9 +23,8 @@
 // Momentum is state worth keeping: nothing here zeroes, clamps or replaces
 // a velocity because the fighter changed what it is doing. Speed above top
 // speed bleeds off at a rate (overspeed), never at once; a jump, an air
-// jump, a landing and every move a fighter makes (an attack, a technique,
-// a summon's startup) keep the sideways speed they find, all of it, and
-// never brake it: see carry.
+// jump, an attack's start (all of its speed, unless the attack's own data
+// keeps less) and a landing keep the sideways speed they find.
 
 import { approach, sign } from '../../core/utils.js';
 
@@ -36,10 +35,11 @@ const EPSILON = 1e-6;
 
 // One step of horizontal steering on whatever `body` stands on (or in the
 // air), with `control` (0-1) of the normal steering: that share of the
-// acceleration and of top speed. `mv` is the movement values and `dir` the
-// direction held (-1, 0 or 1). `burst`: the speed above top speed is the
-// fighter's own (a Dash's, an air dash's or a homing dash's; see
-// Fighter.burst), so it bleeds off in the air too.
+// acceleration and of top speed. `friction` scales the ground deceleration
+// that slows it while it is not steering. `mv` is the movement values and
+// `dir` the direction held (-1, 0 or 1). `burst`: the speed above top speed
+// is the fighter's own (a Dash's or an air dash's; see Fighter.burst), so
+// it bleeds off in the air too.
 //
 // Ground: from rest to top speed at `acceleration`; letting go stops it at
 // `deceleration`; pressing against the way it moves brakes at
@@ -53,14 +53,14 @@ const EPSILON = 1e-6;
 // `airDeceleration` drag, so steering bends the drift instead of replacing
 // it; a burst above top speed bleeds off at `airOverspeedDeceleration`, and
 // any other speed (a launch's) only under the drag.
-export function steer(body, mv, dir, control, dt, burst = false) {
+export function steer(body, mv, dir, control, friction, dt, burst = false) {
   const grounded = body.grounded;
   const v = body.vx;
   const top = mv.maxSpeed * control;
   const accel = (grounded ? mv.acceleration : mv.airAcceleration) * control;
   const boost = grounded ? mv.turnBoost : mv.airTurnBoost;
   const ahead = dir !== 0 && control > 0 && v !== 0 && sign(v) === dir;
-  let drag = grounded ? mv.deceleration : mv.airDeceleration;
+  let drag = grounded ? mv.deceleration * friction : mv.airDeceleration;
   if (Math.abs(v) > mv.maxSpeed + EPSILON) {
     if (grounded) drag = ahead ? mv.overspeedHoldDeceleration : Math.max(drag, mv.overspeedDeceleration);
     else if (burst) drag = Math.max(drag, mv.airOverspeedDeceleration);
@@ -79,54 +79,31 @@ export function steer(body, mv, dir, control, dt, burst = false) {
   }
 }
 
-// One step of a fighter carried on by a move it makes (an attack that
-// governs its movement, a technique, a summon's startup): the speed it has
-// is kept, never braked. Up to top speed it is held exactly, on the ground
-// as in the air: no ground deceleration, no air drag. Above it, the excess
-// bleeds off as it does for a fighter holding the way it moves (see steer):
-// `overspeedHoldDeceleration` on the ground; in the air
-// `airOverspeedDeceleration` for a `burst`, the air drag for anything else
-// (a launch's speed).
-export function carry(body, mv, dt, burst = false) {
-  if (Math.abs(body.vx) > mv.maxSpeed + EPSILON) steer(body, mv, sign(body.vx), 1, dt, burst);
-}
-
 // One step of attack record `atk`'s own movement (see the attack fields in
-// js/game/combat/attacks.js) for a fighter facing `facing`, `dir` held.
-// Its step-in, once its time reaches it: on the ground, a fighter standing
-// or going forward slower than the step lunges forward at its speed; one
-// going the other way does not step (its momentum is never turned round).
-// Then the carry (see carry): the attack keeps every bit of the speed it
-// found. Only the step's own lunge fades, as speed above top speed does for
-// a fighter holding the way it goes (`overspeedHoldDeceleration`), back
-// down to the speed the fighter brought into it and never below. Where the
-// attack lends steering (`control` on the ground, `airControl` in the air:
-// none by default), holding a direction steers with that share of the
-// normal steering, but only to build speed toward that share of top speed
-// or to turn: steering never pulls a faster fighter back down to it.
-// `burst` as for steer.
+// js/game/combat/attacks.js) for a fighter facing `facing`: its step-in once
+// its time reaches it (on the ground only: never slower than the fighter
+// already goes that way), then steering with the attack's share of control
+// (none by default) over the speed it started with, the rest running down
+// under its friction. `burst` as for steer.
 export function steerAttack(body, mv, facing, atk, dir, dt, burst = false) {
   const def = atk.def;
   const step = def.step;
   if (step && !atk.stepped && atk.time >= step.at - EPSILON) {
     atk.stepped = true;
-    const ahead = body.vx * facing;
-    if (body.grounded && ahead >= 0 && ahead < step.speed) {
-      atk.lunge = { dir: facing, from: ahead };
-      body.vx = facing * step.speed;
-    }
+    if (body.grounded && body.vx * facing < step.speed) body.vx = facing * step.speed;
   }
-  const control = body.grounded ? def.control : def.airControl;
-  const v = body.vx;
-  const lunge = atk.lunge;
-  if (dir !== 0 && control > 0 && (sign(v) !== dir || Math.abs(v) < mv.maxSpeed * control - EPSILON)) {
-    steer(body, mv, dir, control, dt, burst);
-  } else if (lunge && body.grounded && v * lunge.dir > lunge.from) {
-    const forward = Math.max(lunge.from, v * lunge.dir - mv.overspeedHoldDeceleration * dt);
-    body.vx = forward > 0 ? lunge.dir * forward : 0;
-  } else {
-    carry(body, mv, dt, burst);
-  }
+  const grounded = body.grounded;
+  steer(body, mv, dir, grounded ? def.control : def.airControl, grounded ? def.friction : 1, dt, burst);
+}
+
+// The horizontal speed an attack definition `atk` starting now keeps of
+// `vx`: its momentum share (airMomentum in the air), which is all of it
+// unless the attack says otherwise. Never capped at top speed: a Dash's
+// burst carries on into the attack and bleeds off as overspeed does. An
+// attack that leaves normal locomotion on keeps all of it.
+export function attackStartSpeed(atk, vx, grounded) {
+  if (!atk.lockMovement) return vx;
+  return vx * (grounded ? atk.momentum : atk.airMomentum);
 }
 
 // How fast a stunned fighter's speed runs down (per second), whatever is
