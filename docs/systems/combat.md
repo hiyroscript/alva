@@ -5,15 +5,16 @@ are found and resolved: one system for every fighter. A fighter's moves
 are data in its definition; the shared code turns that data into attacks,
 projectiles, summons and techniques and resolves every hit the same way.
 
-The product rules are [`ALVA_SPEC.md`](../../ALVA_SPEC.md) §7.2.4 (combat)
-and §7.2.6 (summons and techniques); Launch is its own guide
+The product rules are [`ALVA_SPEC.md`](../../ALVA_SPEC.md) §7.2.4 (combat),
+§7.2.4a (Combat Assist) and §7.2.6 (summons and techniques); Launch is its own guide
 ([launch](launch.md)), and so are the Shield and the Deflect
 ([defense](defense.md)) and Energy ([energy](energy.md)).
 
 | Module | Owns |
 | --- | --- |
 | [`js/data/loadout.js`](../../js/data/loadout.js) | The loadout rules and the readers of a fighter's `actions` (`loadoutProblems`, `assertLoadout`, `actionType`, `specialAction`, `specialAttacks`, `describeLoadout`). |
-| [`js/game/combat/attacks.js`](../../js/game/combat/attacks.js) | The attack schema: `createAttackDefinition`, attack phases (`attackPhase`, `strikeLive`), motions, strikes, `attackReach` (for readers such as the CPU). |
+| [`js/game/combat/attacks.js`](../../js/game/combat/attacks.js) | The attack schema: `createAttackDefinition`, attack phases (`attackPhase`, `strikeLive`), motions, strikes, `attackReach` (for readers such as the CPU), and what kind of strike an attack is (`isMeleeAttack`, `isRangedAttack`: one reading for Combat Assist and the CPU's moveset). |
+| [`js/game/combat/combat-assist.js`](../../js/game/combat/combat-assist.js) | Combat Assist's measurements: `meleeGap` (an attack's box against a target's hurtboxes), `approachDistance`, `approachClear`, `assistRange` (one Dash's travel), `ASSIST_MARGIN`. |
 | [`js/game/combat/combat-state.js`](../../js/game/combat/combat-state.js) | `CombatState`, one per fighter: Launch Point, Energy, the attack in progress and its clock, stun, blockstun, hitstop, paralysis, cooldowns (`CooldownTimers` for summons and techniques). |
 | [`js/game/combat/combat.js`](../../js/game/combat/combat.js) | `CombatSystem`: turns back the projectiles a live `deflectProjectiles` box meets (`deflectProjectiles`), then finds every hit each fixed step and resolves it through one `applyHit`; launch reaction (`resolveLaunchReaction`, `resolveLaunchStun`, `steerLaunch`); `worldBox`. |
 | [`js/game/combat/deflect.js`](../../js/game/combat/deflect.js) | The Deflect's schema (`createDeflectDefinition`): an attack definition with the fixed strike every Deflect has ([defense](defense.md#the-deflect)). |
@@ -22,7 +23,7 @@ and §7.2.6 (summons and techniques); Launch is its own guide
 | [`js/game/combat/projectile.js`](../../js/game/combat/projectile.js) | Projectiles: `createProjectileDefinition`, `Projectile` (with `turnBack`, shared by repel and the Deflect), `clashProjectiles` (repel and erase), `projectileAngle` (the art's spin), spawning and cleanup. |
 | [`js/game/combat/summon.js`](../../js/game/combat/summon.js) | Summons: `createSummonDefinition`, `summonProblem`, the `Clone` entity, spawning and cleanup. |
 | [`js/game/combat/technique.js`](../../js/game/combat/technique.js) | Techniques: `createTechniqueDefinition`, `techniqueProblem`, the `Technique` runtime and its phases. |
-| [`js/game/fighters/fighter.js`](../../js/game/fighters/fighter.js) | Turning presses into moves (`tryAction`, `tryDeflect`, `startAttack`, `trySpecial`, `trySummon`, `tryTechnique`), the combat input buffer, hit-cancels, attack motion, summon startups. |
+| [`js/game/fighters/fighter.js`](../../js/game/fighters/fighter.js) | Turning presses into moves (`tryAction`, `tryDeflect`, `startAttack`, `trySpecial`, `trySummon`, `tryTechnique`), the combat input buffer, hit-cancels, attack motion, summon startups, Combat Assist's approach (`tryCombatAssist`, `assistIntents`, `stepCombatAssist`, `finishCombatAssist`, `cancelCombatAssist`). |
 
 ## Loadouts
 
@@ -120,7 +121,9 @@ attack buttons are tried on that step; it is never buffered
 
 A hit (never a block) or a paralysis takes the target out of its own
 attack on its next step. The Shield, a stun, a Dash before its cancel
-time, a technique or a summon's startup rules a new attack out.
+time, a technique, a summon's startup or Combat Assist's approach rules a
+new attack out (the approach takes this step's presses itself: see
+below).
 
 **Pace.** Every ordinary attack's phases are whole frames of its clip,
 and every attack clip plays at a rate that is a whole number of 60 Hz
@@ -322,6 +325,55 @@ the fighter does, and drawn under the fighter as rings labelled by the
 button (A4, A5) while they run
 ([rendering](rendering.md#fighter-status)). None of them costs Energy.
 
+## Combat Assist
+
+The human player's option (Home › Settings › Combat, on by default; the
+store is [`js/core/settings.js`](../../js/core/settings.js)): a melee
+press made just out of reach closes the gap first, with the Dash's
+`mouvment` clip, then starts the very attack asked for. The rules are
+[`ALVA_SPEC.md`](../../ALVA_SPEC.md) §7.2.4a; here is how the code does it.
+
+- **Who.** `Fighter.combatAssistOn`: the fighter's controller is a
+  player's (`kind === 'player'`) with `combatAssist === true`. The
+  screens read the setting as a session starts and pass it to `Battle` /
+  `PracticeSession` (`combatAssist`), which give it to the
+  `PlayerController` alone. A CPU's controller (`CombatAIController`,
+  `TrainingAIController`) or none (the practice dummy) never has it, so
+  the exclusion is structural: no slot, label or fighter id is read, and
+  [`js/game/ai/combat-ai.js`](../../js/game/ai/combat-ai.js) has no
+  Combat Assist code.
+- **Start.** `tryAction` has checked the press may start its attack now;
+  before `startAttack`, `tryCombatAssist` may start the approach instead:
+  a melee attack (`isMeleeAttack`), on the ground, the fighter free to act
+  (`canAct`: never out of a hit-cancel or a Dash), its opponent in play,
+  `mouvment` art and a Dash duration, and `approachDistance` finite and
+  above 0 (out of reach by at most `assistRange`, one Dash's travel, on
+  the box's level and short of the pushboxes meeting), with
+  `approachClear` (no solid's side on the way, footing where it stops).
+  Then it pays `dashCost` (`spendEnergy`: never while exhausted) and sets
+  `fighter.combatAssist`. Otherwise the attack starts where the fighter
+  stands, as ever.
+- **Each step.** While `fighter.combatAssist` is set, `Fighter.update`
+  hands the step's presses to `assistIntents` instead of the ordinary
+  loop: a jump, a Dash request (read before the intents now, by
+  `dashAsked`), a Shield press or hold cancels it and the move goes on
+  through its own section of the step; else the first combat button
+  decides (a melee attack replaces the attack served, anything else cancels
+  and is tried by `tryAction` at once, a reserved button does nothing).
+  Then `stepCombatAssist` checks it may go on, measures again and either
+  finishes (`finishCombatAssist`: stop, then `tryAction(action, held,
+  false)`, never another approach) or plans this step's move (`need`),
+  which the horizontal movement turns into `dashSpeed` or less. After the
+  body moves, leaving the ground or a wall cancels it; a hit cancels it in
+  `takeHit`, a stun or paralysis on the next step, and the arena and
+  Practice Ground cancel it when its target or its fighter goes. It is
+  never in the combat buffer, so a replaced or cancelled attack never
+  comes out later.
+- **State and art.** `canAct()` is false while it runs; the visual state
+  is `assist`, playing `mouvment` at the Dash's rate; facing is locked
+  toward the target; the speed trail draws as a Dash's. `reset` and
+  `respawn` clear it.
+
 ## What a fighter may leave out
 
 | Left out | Result |
@@ -345,6 +397,10 @@ button (A4, A5) while they run
   [`sample-fighter.test.mjs`](../../tests/systems/sample-fighter.test.mjs)
   (a fighter that is not #0001, with different moves on the same
   codenames).
+- [`tests/systems/combat-assist.test.mjs`](../../tests/systems/combat-assist.test.mjs):
+  Combat Assist for every fighter's melee buttons, its Energy, the newest
+  press winning, every cancellation, the stage, and that no CPU ever has
+  it.
 - The shared capabilities on bespoke data:
   [`deflect.test.mjs`](../../tests/systems/deflect.test.mjs),
   [`projectile-spin.test.mjs`](../../tests/systems/projectile-spin.test.mjs),

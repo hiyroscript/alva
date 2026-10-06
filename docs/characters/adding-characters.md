@@ -136,9 +136,13 @@ its attacks' `momentum`).
 What it does bring is art: a `mouvment` clip for the Dash and a
 `midair_mouvment` clip for the air dash (each is played once across the
 universal Dash, whatever its frame count). Every playable fighter needs
-both, so every playable fighter has the same capabilities.
+both, so every playable fighter has the same capabilities. The `mouvment`
+clip is also what the human player's Combat Assist plays as it closes in
+before a melee attack ([combat](../systems/combat.md#combat-assist)): that
+needs nothing else from a fighter, as an attack's own `hitbox` (and no
+`projectile`) is what makes it melee.
 
-Optionally `energy` (Dash, air dash and Shield costs; defaults in
+Optionally `energy` (Dash, air dash, Combat Assist and Shield costs; defaults in
 [Energy](../systems/energy.md)), `launchReaction` (extra stun, tumble,
 steering; [launch](../systems/launch.md#launch-reaction-per-fighter)) and
 `launchBounce` (overrides of the shared rebound settings).

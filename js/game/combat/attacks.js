@@ -8,6 +8,7 @@
 // Launch validation from js/data/launch.js, and the hit effects
 // (unblockable, paralyze, blockPush) from js/game/combat/hit-effects.js.
 // Outputs: createAttackDefinition, attackPhase, strikeLive, attackReach,
+// isMeleeAttack / isRangedAttack (what kind of strike an attack is),
 // MOTION_TYPES and PHASE_EPSILON (the slack every phase boundary compares
 // with).
 // Important constraints: definitions are frozen and validated once; a
@@ -361,6 +362,19 @@ export function attackReach(def) {
   if (m.type === 'rise') return { x: hb.x, y: hb.y - m.speed * t, w: hb.w, h: hb.h + m.speed * t };
   const cy = hb.y + hb.h / 2;
   return { x: hb.x, y: cy - m.range - hb.h / 2, w: m.range + hb.w, h: 2 * m.range + hb.h };
+}
+
+// What kind of strike attack definition `def` is, for every reader that
+// sorts attacks (the Fighter's Combat Assist, the combat AI's moveset in
+// js/game/ai/moveset.js), so the two can never disagree: a projectile
+// attack is ranged; an attack with a hitbox of its own and no projectile is
+// melee. A pending attack has neither, so it is neither.
+export function isRangedAttack(def) {
+  return !!def?.projectile;
+}
+
+export function isMeleeAttack(def) {
+  return !!def?.hitbox && !def.projectile;
 }
 
 // An attack's box widened to take in its pull (see `pull` above): an

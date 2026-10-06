@@ -9,12 +9,12 @@ rules are [`ALVA_SPEC.md`](../../ALVA_SPEC.md) §7.4 (input), §6.10
 | --- | --- |
 | [`js/config.js`](../../js/config.js) | The codenames (`ACTIONS`, `COMBAT_BUTTONS`, `NUMBERED_ATTACKS`, `MOVES`), their neutral names (`ACTION_LABELS`), keyboard `bindings` and `menuBindings`. |
 | [`js/core/input-manager.js`](../../js/core/input-manager.js) | `InputManager`: keyboard, gamepad and touch state merged into one snapshot per step (`sample()`), with one-step `…Pressed` edges (never key auto-repeat) and one-tap Dash requests (`queueTouchMouvement`). |
-| [`js/game/fighters/fighter-controller.js`](../../js/game/fighters/fighter-controller.js) | `PlayerController` (Player 1 reads the snapshot), `blankInput`, `HELD_CONTROLS`. |
+| [`js/game/fighters/fighter-controller.js`](../../js/game/fighters/fighter-controller.js) | `PlayerController` (Player 1 reads the snapshot; it alone carries the player's Combat Assist setting, see [combat](combat.md#combat-assist)), `blankInput`, `HELD_CONTROLS`. |
 | [`js/ui/touch-controls.js`](../../js/ui/touch-controls.js) | `TouchControls`: the two touch layouts, multi-touch, the fighter's art on its buttons (`setCharacter`, `showArt`), airborne art (`setAirborne`) and custom placement (`applyLayout`). |
 | [`js/ui/mobile-abilities.js`](../../js/ui/mobile-abilities.js) | Which buttons a fighter has (`abilityPresence`, from its `actions`), and each button's name and frame (`previewFrame`, from its `mobileAbilities`). |
 | [`js/core/touch-layout.js`](../../js/core/touch-layout.js) | Stable control ids, layout geometry and sanitizing. |
 | [`js/ui/touch-layout-editor.js`](../../js/ui/touch-layout-editor.js) | The layout editor. |
-| [`js/core/settings.js`](../../js/core/settings.js) | The saved Mobile Controls choice and each layout's custom placement (the only module touching storage). |
+| [`js/core/settings.js`](../../js/core/settings.js) | The saved Mobile Controls choice and each layout's custom placement, and Combat Assist on or off (the only module touching storage). |
 | [`js/core/menu-navigator.js`](../../js/core/menu-navigator.js) | Menu navigation with one shared highlight for keyboard, mouse, touch and gamepad; menus read their own bindings, never gameplay edges. |
 
 ## Controls
@@ -84,6 +84,12 @@ numbered buttons show (in their neutral look where a fighter has none)
 because the layout is every fighter's. Positions are stored as fractions
 of the safe touch area and sizes as scales, keyed by control id, never by
 label or slot; each layout keeps its own arrangement.
+
+**Combat Assist** (Settings → Combat) is not part of the input system: no
+binding, device or `InputManager` code knows it. Keyboard, gamepad and
+touch presses reach the fighter in the same snapshot as ever, and the
+Fighter decides what a melee press does while the player's controller
+carries the setting ([combat](combat.md#combat-assist)).
 
 ## Tests
 

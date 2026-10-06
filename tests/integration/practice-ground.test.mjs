@@ -509,6 +509,40 @@ test('Practice Ground starts with Player 1 and the default CPU: two fighters, pa
   }
 });
 
+test('Practice Ground gives Player 1 the saved Combat Assist on every entry, and Change Fighter keeps it; the CPU never has it', async () => {
+  const { app } = fakeApp();
+  const screen = new PracticeGroundScreen(app);
+  app.screens.current = screen;
+  assert.equal(app.settings.combatAssist, true, 'nothing stored: on');
+  await screen.enter();
+  assert.equal(screen.session.player.controller.combatAssist, true);
+  assert.equal(screen.session.player.combatAssistOn, true);
+  assert.equal(screen.session.cpu.combatAssistOn, false, 'the training dummy never');
+  screen.exit();
+  app.settings.set('combatAssist', false);
+  await screen.enter();
+  assert.equal(screen.session.player.combatAssistOn, false, 'read afresh on entry');
+  // Change Fighter and Change CPU: the player keeps the setting, the CPU never has it.
+  screen.openMenu();
+  screen.openRoster();
+  slotFor(screen, '9999').click(0);
+  await flush();
+  assert.equal(screen.session.player.def.id, '9999');
+  assert.equal(screen.session.player.combatAssistOn, false);
+  screen.exit();
+  app.settings.set('combatAssist', true);
+  await screen.enter();
+  screen.openMenu();
+  screen.openRoster();
+  slotFor(screen, '9999').click(0);
+  await flush();
+  assert.equal(screen.session.player.combatAssistOn, true);
+  const cpu = await enableCpu(screen);
+  assert.equal(cpu.combatAssistOn, false);
+  assert.equal(cpu.controller, null);
+  screen.exit();
+});
+
 test('the session has no countdown, round, timer or result, and runs indefinitely', async () => {
   const { screen } = await enterPractice();
   const { session } = screen;

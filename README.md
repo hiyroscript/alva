@@ -57,6 +57,9 @@ use.
 - **Every input**: keyboard, gamepad, and touch in two layouts (a joystick
   or classic buttons) that players can rearrange and resize, with each
   fighter's own art on its touch buttons.
+- **Combat Assist** for the human player (on by default, in Settings): a
+  melee attack pressed just out of reach closes the short gap first, for
+  Energy. Never for ranged attacks, never for a CPU.
 - **The whole interface in English and French**, Settings, and a
   **Discover** reference that explains universal movement and Launch.
 

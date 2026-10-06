@@ -1,5 +1,5 @@
 // SETTINGS: a translucent glass dialog over Home, opened by Home's gear
-// (top right). Exactly two sections:
+// (top right). Exactly three sections:
 //
 //   Language  English / Français, a single choice (radio buttons). Picking
 //             one saves it and the whole interface switches at once, this
@@ -9,6 +9,12 @@
 //             cards, and Customize touch controls, which opens the touch
 //             layout editor (js/ui/touch-layout-editor.js) for the scheme in
 //             use. Keyboard and gamepad controls never change.
+//   Combat    Combat Assist, On (the default) or Off, a single choice
+//             (radio buttons, in the Language section's style) with the
+//             line that says what it does: the player's melee attacks close
+//             a short gap first, for Energy, never a ranged one (see
+//             Fighter.tryCombatAssist). Read as each Quick Battle or
+//             Practice Ground session starts; no CPU ever has it.
 //
 // Every choice saves on this device at once through app.settings
 // (js/core/settings.js). The dialog is modal: role="dialog" with
@@ -20,7 +26,7 @@
 
 import { el } from '../core/utils.js';
 import { tx, tattr, iconLabel, setText, LANGUAGES, LANGUAGE_NAMES } from '../localization/i18n.js';
-import { MOBILE_CONTROLS, DEFAULT_MOBILE_CONTROLS } from '../core/settings.js';
+import { MOBILE_CONTROLS, DEFAULT_MOBILE_CONTROLS, DEFAULT_COMBAT_ASSIST } from '../core/settings.js';
 import { ICONS } from './icons.js';
 
 // A small picture of each layout's lower-left corner, for sighted players
@@ -118,6 +124,32 @@ export class SettingsDialog {
       el('p', { class: 'settings-customize-text' }, [this.customizeNote, this.customTag]),
     ]);
 
+    // ---- Combat --------------------------------------------------------------
+    // Combat Assist's two choices, On first, each named and ticked when it
+    // is the saved one; the default says so, as Joystick's card does.
+    this.assistOptions = [true, false].map((on) => {
+      const option = el('button', {
+        class: 'settings-choice', type: 'button', role: 'radio', 'aria-checked': 'false',
+        'data-nav': true, 'data-combat-assist': on ? 'on' : 'off',
+      }, [
+        el('span', { class: 'settings-choice-name' }, [
+          el('span', tx(on ? 'settings.combatAssistOn' : 'settings.combatAssistOff')),
+          on === DEFAULT_COMBAT_ASSIST ? el('span', { class: 'settings-option-tag', ...tx('common.default') }) : null,
+        ]),
+        el('span', { class: 'settings-language-check', 'aria-hidden': 'true', html: ICONS.check }),
+      ]);
+      option.addEventListener('click', () => this.chooseCombatAssist(on));
+      return option;
+    });
+    const assistGroup = el('div', { class: 'settings-subgroup' }, [
+      el('h4', { class: 'settings-subtitle', id: 'settings-assist-title', ...tx('settings.combatAssist') }),
+      el('p', { class: 'settings-group-note', id: 'settings-assist-desc', ...tx('settings.combatAssistDesc') }),
+      el('div', {
+        class: 'settings-choices', role: 'radiogroup',
+        'aria-labelledby': 'settings-assist-title', 'aria-describedby': 'settings-assist-desc',
+      }, this.assistOptions),
+    ]);
+
     // ---- Panel ---------------------------------------------------------------
     this.closeButton = el('button', {
       class: 'settings-close', type: 'button', 'data-nav': true, ...tattr('aria-label', 'settings.close'), html: ICONS.close,
@@ -127,6 +159,7 @@ export class SettingsDialog {
     this.sections = {
       language: section('language', 'settings.language', 'settings.languageNote', [languageGroup]),
       controls: section('controls', 'settings.controls', 'settings.controlsNote', [schemeGroup, customize]),
+      combat: section('combat', 'settings.combat', null, [assistGroup]),
     };
     this.body = el('div', { class: 'settings-body' }, Object.values(this.sections));
     this.panel = el('div', { class: 'settings-panel glass glass--panel' }, [
@@ -164,6 +197,10 @@ export class SettingsDialog {
     return this.schemeOptions.find((o) => o.getAttribute('data-mobile-controls') === scheme);
   }
 
+  assistFor(on) {
+    return this.assistOptions.find((o) => o.getAttribute('data-combat-assist') === (on ? 'on' : 'off'));
+  }
+
   // Opens over the current screen (Home), which goes inert beneath it, and
   // focuses the language in use. `returnFocus` gets focus back on close.
   open({ returnFocus = document.activeElement } = {}) {
@@ -198,7 +235,7 @@ export class SettingsDialog {
   // Shows the saved choices checked, and the Customize line for the scheme
   // in use (with a Custom layout tag once that scheme has one).
   markCurrent() {
-    const { language, mobileControls } = this.app.settings;
+    const { language, mobileControls, combatAssist } = this.app.settings;
     for (const option of this.languageOptions) {
       const on = option.getAttribute('data-language') === language;
       option.classList.toggle('is-current', on);
@@ -206,6 +243,11 @@ export class SettingsDialog {
     }
     for (const option of this.schemeOptions) {
       const on = option.getAttribute('data-mobile-controls') === mobileControls;
+      option.classList.toggle('is-current', on);
+      option.setAttribute('aria-checked', on ? 'true' : 'false');
+    }
+    for (const option of this.assistOptions) {
+      const on = option === this.assistFor(combatAssist);
       option.classList.toggle('is-current', on);
       option.setAttribute('aria-checked', on ? 'true' : 'false');
     }
@@ -222,6 +264,13 @@ export class SettingsDialog {
   // Saves `scheme` as the Mobile Controls layout; the dialog stays.
   chooseScheme(scheme) {
     this.app.settings.set('mobileControls', scheme);
+    this.markCurrent();
+  }
+
+  // Saves Combat Assist on (`on` true) or off; the dialog stays. The next
+  // Quick Battle or Practice Ground session uses it.
+  chooseCombatAssist(on) {
+    this.app.settings.set('combatAssist', on);
     this.markCurrent();
   }
 

@@ -2,7 +2,9 @@
 // are completely separate: Quick Battle's CPU is the combat AI
 // (CombatAIController, js/game/ai/combat-ai.js), which plugs in here without
 // touching Fighter. TrainingAIController below is the older non-attacking
-// training opponent, kept as a standalone controller.
+// training opponent, kept as a standalone controller. Only the player's
+// controller carries the player's Combat Assist preference; no CPU's ever
+// does.
 
 import { range } from '../../core/utils.js';
 import { ACTIONS } from '../../config.js';
@@ -36,10 +38,15 @@ export function jumpTapHold(self) {
   return Math.max(0, self.movement.highJumpWindow - 1.5 / 60);
 }
 
+// The human player's controller: the one kind ('player') that may have
+// Combat Assist (see Fighter.tryCombatAssist), and only while
+// `combatAssist`, the player's setting (Home › Settings › Combat, read as
+// the mode starts), is on. It is on by default, as the setting is.
 export class PlayerController {
-  constructor(input) {
+  constructor(input, { combatAssist = true } = {}) {
     this.input = input;
     this.kind = 'player';
+    this.combatAssist = combatAssist === true;
   }
 
   getInput() {

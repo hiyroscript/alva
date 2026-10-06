@@ -2,28 +2,33 @@
 //
 // One small versioned object under one localStorage key, read once at start
 // and written whole on every change, so nothing else in the game touches
-// storage. Presentation and input configuration only: no setting changes a
-// fighter, a stage or the rules of a fight.
+// storage. Presentation, input configuration and the human player's own
+// Combat Assist only: no setting changes a fighter, a stage, a CPU or the
+// rules of a fight.
 //
 // Stored as
 //
-//   { version: 2,
+//   { version: 3,
 //     language: 'en' | 'fr' | null,
 //     mobileControls: 'joystick' | 'classic',
-//     touchLayouts: { joystick: { ... }, classic: { ... } } }
+//     touchLayouts: { joystick: { ... }, classic: { ... } },
+//     combatAssist: true | false }
 //
 // `language` stays null until the player picks one: the game then speaks
 // English, but the first-launch chooser still asks (languageChosen), so a
 // default is never mistaken for a choice. Each scheme keeps its own custom
 // touch layout (see js/core/touch-layout.js); an empty one is Alva's
-// original layout.
+// original layout. `combatAssist` is whether the human player's melee
+// presses close a short gap first (see Fighter.tryCombatAssist in
+// js/game/fighters/fighter.js): on unless the player turns it off.
 //
-// A version 1 object ({ version: 1, mobileControls }) is migrated: its
-// Mobile Controls choice is kept, with no language chosen yet and no custom
-// layout. Missing, blocked or unreadable storage, a stored object of any
-// other version, and every value that is not one of its setting's choices
-// fall back to the defaults, value by value, so the game always starts with
-// a valid set.
+// Older objects are migrated: version 1 ({ version: 1, mobileControls })
+// keeps its Mobile Controls choice, with no language chosen yet and no
+// custom layout; version 2 keeps its language, Mobile Controls and both
+// custom layouts. Either gets Combat Assist on. Missing, blocked or
+// unreadable storage, a stored object of any other version, and every value
+// that is not one of its setting's choices fall back to the defaults, value
+// by value, so the game always starts with a valid set.
 
 import { TOUCH_CONTROL_IDS, sanitizeTouchLayout, sanitizeTouchLayouts } from './touch-layout.js';
 
@@ -38,21 +43,35 @@ export const DEFAULT_LANGUAGE = 'en';
 export const MOBILE_CONTROLS = Object.freeze(['joystick', 'classic']);
 export const DEFAULT_MOBILE_CONTROLS = 'joystick';
 
+// Combat Assist (Home › Settings › Combat) is on for a player who has never
+// turned it off.
+export const DEFAULT_COMBAT_ASSIST = true;
+
 export const SETTINGS_KEY = 'alva.settings';
-export const SETTINGS_VERSION = 2;
+export const SETTINGS_VERSION = 3;
 
 export const DEFAULT_SETTINGS = Object.freeze({
   language: null,
   mobileControls: DEFAULT_MOBILE_CONTROLS,
   touchLayouts: Object.freeze(Object.fromEntries(MOBILE_CONTROLS.map((scheme) => [scheme, Object.freeze({})]))),
+  combatAssist: DEFAULT_COMBAT_ASSIST,
 });
 
 // The settings that are one choice from a list, and their allowed values.
 const CHOICES = Object.freeze({ language: LANGUAGES, mobileControls: MOBILE_CONTROLS });
+// The settings that are on or off: a real boolean, nothing else.
+const TOGGLES = Object.freeze(['combatAssist']);
 
-// `value` if it is one of `name`'s choices, else that setting's default.
+// Whether `value` is one `name` may take: one of a choice's values, or a
+// boolean for a toggle.
+function allowed(name, value) {
+  if (TOGGLES.includes(name)) return typeof value === 'boolean';
+  return !!CHOICES[name]?.includes(value);
+}
+
+// `value` if `name` may take it, else that setting's default.
 export function resolveSetting(name, value) {
-  return CHOICES[name]?.includes(value) ? value : DEFAULT_SETTINGS[name];
+  return allowed(name, value) ? value : DEFAULT_SETTINGS[name];
 }
 
 // Every setting from a stored object of the current version, each checked.
@@ -61,6 +80,7 @@ function readCurrent(stored) {
     language: resolveSetting('language', stored.language),
     mobileControls: resolveSetting('mobileControls', stored.mobileControls),
     touchLayouts: sanitizeTouchLayouts(stored.touchLayouts),
+    combatAssist: resolveSetting('combatAssist', stored.combatAssist),
   };
 }
 
@@ -69,6 +89,11 @@ const MIGRATIONS = Object.freeze({
   // Version 1 held Mobile Controls only: kept, and the language still to be
   // chosen, so the chooser shows once after the update.
   1: (stored) => readCurrent({ mobileControls: stored.mobileControls }),
+  // Version 2 had everything but Combat Assist: all of it kept, and Combat
+  // Assist on, whatever the object may hold under that name.
+  2: (stored) => readCurrent({
+    language: stored.language, mobileControls: stored.mobileControls, touchLayouts: stored.touchLayouts,
+  }),
 });
 
 // The settings a stored value holds: checked if it is the current version,
@@ -130,11 +155,11 @@ export class Settings {
     return this.values[name];
   }
 
-  // Sets choice `name` (language or mobileControls) to `value` and saves; an
-  // unknown setting or value is refused (false). Listeners hear about real
-  // changes only.
+  // Sets choice `name` (language or mobileControls) or toggle
+  // (combatAssist) to `value` and saves; an unknown setting or value is
+  // refused (false). Listeners hear about real changes only.
   set(name, value) {
-    if (!Object.hasOwn(CHOICES, name) || !CHOICES[name].includes(value)) return false;
+    if (!allowed(name, value)) return false;
     if (this.values[name] === value) return true;
     this.values[name] = value;
     this.save();
@@ -170,6 +195,16 @@ export class Settings {
 
   set mobileControls(value) {
     this.set('mobileControls', value);
+  }
+
+  // Whether the human player's Combat Assist is on (see the top of this
+  // file). Only a boolean is taken.
+  get combatAssist() {
+    return this.values.combatAssist;
+  }
+
+  set combatAssist(value) {
+    this.set('combatAssist', value);
   }
 
   // A copy of `scheme`'s custom touch layout ({} for the original one).

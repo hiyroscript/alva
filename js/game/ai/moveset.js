@@ -15,7 +15,7 @@
 // button that cannot do anything.
 
 import { COMBAT_ACTIONS } from '../fighters/fighter.js';
-import { attackReach } from '../combat/attacks.js';
+import { attackReach, isMeleeAttack, isRangedAttack } from '../combat/attacks.js';
 import { summonProblem } from '../combat/summon.js';
 import { techniqueProblem } from '../combat/technique.js';
 import { specialAction } from '../../data/loadout.js';
@@ -77,11 +77,11 @@ export function readMoveset(f) {
     for (const [id, air] of pairs) {
       const atk = id ? f.attacks[id] : null;
       if (!atk || (air && atk.groundOnly) || !atk.animation || !sprites.has(atk.animation)) continue;
-      if (atk.projectile) {
+      if (isRangedAttack(atk)) {
         const proj = f.projectileDefs[atk.projectile.id];
         if (!proj?.animation || !sprites.projectile(proj.animation) || !(proj.speed > 0)) continue;
         ranged.push({ action, air, id, atk, proj });
-      } else if (atk.hitbox) {
+      } else if (isMeleeAttack(atk)) {
         melee.push({ action, air, id, atk, reach: attackReach(atk), motion: atk.motion?.type ?? null });
       }
     }

@@ -51,9 +51,13 @@ export function formatDamage(damage) {
 }
 
 export class PracticeSession extends Arena {
-  constructor({ canvas, map, def, sprites, input, reducedMotion = false }) {
+  // `combatAssist` is the player's Combat Assist setting (on unless given
+  // false), for Player 1's controller only: the practice CPU has no
+  // controller, so it never has it.
+  constructor({ canvas, map, def, sprites, input, reducedMotion = false, combatAssist = true }) {
     super({ canvas, map, input, reducedMotion });
     this.reducedMotion = reducedMotion;
+    this.combatAssist = combatAssist === true;
     this.player = null;
     this.cpu = null;
     // Live damage numbers over the CPU, oldest first:
@@ -64,19 +68,21 @@ export class PracticeSession extends Arena {
 
   // Puts `def` on the training floor as the practice fighter, replacing the
   // current one: a fresh Fighter at the stage's spawn with 0 Launch Point and
-  // no cooldowns, driven by Player 1 at once. Nothing of the previous fighter
-  // stays: its technique ends, its summon's startup is cut short and its
-  // projectiles and clones go. A CPU stays as it is.
+  // no cooldowns, driven by Player 1 at once (with the session's Combat
+  // Assist setting). Nothing of the previous fighter stays: its technique
+  // ends, its summon's startup and Combat Assist's approach are cut short
+  // and its projectiles and clones go. A CPU stays as it is.
   setFighter(def, sprites) {
     const old = this.player;
     if (old) {
       old.endTechnique('destroy');
       old.cancelSummon();
+      old.cancelCombatAssist();
       old.opponent = null;
     }
     this.player = new Fighter({
       def, sprites, spawn: this.map.spawnPoints[0], stage: this.stage,
-      slot: 'p1', label: 'P1', controller: new PlayerController(this.input),
+      slot: 'p1', label: 'P1', controller: new PlayerController(this.input, { combatAssist: this.combatAssist }),
     });
     this.pairFighters();
     this.projectiles.length = 0;
@@ -105,13 +111,15 @@ export class PracticeSession extends Arena {
 
   // Takes the CPU out of the session, if there is one, with every reference
   // to it: a summon's startup cast at it is cut short (its cooldown runs
-  // on), clones summoned at it go, and so do its numbers. Practice is then
+  // on), Combat Assist's approach toward it ends (its attack never comes),
+  // clones summoned at it go, and so do its numbers. Practice is then
   // solo again.
   removeCPU() {
     const cpu = this.cpu;
     if (!cpu) return;
     const player = this.player;
     if (player.pendingSummon?.target === cpu) player.cancelSummon();
+    if (player.combatAssist?.target === cpu) player.cancelCombatAssist();
     player.summons = player.summons.filter((s) => s.target !== cpu);
     cpu.endTechnique('destroy');
     cpu.cancelSummon();
