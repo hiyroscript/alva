@@ -123,7 +123,7 @@ const file = (url) => url.split('/').pop();
 const look = (b) => (spriteOf(b) ? file(spriteOf(b).getAttribute('src')) : b.innerHTML);
 // #0001's and #0002's button art, frame by frame.
 const ART_0001 = {
-  extra_attack: '0001_extra_attack_3.png', attack1: '0001_attack1_4.png', attack2: '0001_attack2_object_1.png',
+  extra_attack: '0001_extra_attack_4.png', attack1: '0001_attack1_4.png', attack2: '0001_attack2_object_1.png',
   attack3: '0001_attack3_object_1.png', attack4: '0001_attack4_6.png', attack5: '0001_attack5_object_1.png', jump: ICONS.jump,
 };
 const ART_0002 = {
@@ -223,7 +223,7 @@ test('fighter art is one real image element per button, never image markup or an
 
 test('#0001 authors its touch buttons as small, declarative UI data: a name and a frame of its own art each', () => {
   assert.deepEqual(DEF_0001.mobileAbilities, {
-    extra_attack: { label: 'High Kick', preview: { animation: 'extra_attack', frame: 2 } },
+    extra_attack: { label: 'High Kick', preview: { animation: 'extra_attack', frame: 3 } },
     attack1: { label: 'Jab', preview: { animation: 'attack1', frame: 3 }, previews: { air: { animation: 'midair_attack1', frame: 3 } } },
     attack2: {
       label: 'Red',
@@ -786,7 +786,7 @@ test('#0001\'s extra attack button shows its High Kick, labelled High Kick, and 
   const { tc, calls } = touchControls();
   const b = tc.buttons.get('extra_attack');
   assertArt(b, DEF_0001, 'extra_attack', 'High Kick');
-  assert.equal(look(b), '0001_extra_attack_3.png', 'the kick at full height');
+  assert.equal(look(b), '0001_extra_attack_4.png', 'the kick at full height');
   assert.equal(b.querySelector('.tc-text'), null);
   assert.doesNotMatch(visibleText(b), CODE_LABELS, 'no visible T');
   assert.ok(b.classList.contains('tc-extra_attack'), 'the same large upper-right slot');

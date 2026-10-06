@@ -248,8 +248,8 @@ export const CHARACTER_0002 = {
   },
 
   // #0002's movement profile (js/game/fighters/movement.js lists what each
-  // field does). Tuned from #0001's values: quicker off the mark, and a
-  // longer, faster Dash (about 220 units in its 0.2 s).
+  // field does): quicker off the mark than #0001, and a longer, faster Dash
+  // (about 220 units in its 0.2 s).
   movement: {
     acceleration: 4800,
     deceleration: 4200,
@@ -287,7 +287,9 @@ export const CHARACTER_0002 = {
   ],
 
   // How #0002 responds to being launched (see resolveLaunchReaction in
-  // js/game/combat/combat.js); these happen to be #0001's values too.
+  // js/game/combat/combat.js): 0.2 s more stun per 1000 units/s, 0.7 s more
+  // at most, tumbling from 1100 units/s, and a held direction bends a
+  // launch by up to 15 degrees.
   launchReaction: {
     stunPerThousand: 0.2,
     maxStun: 0.7,
@@ -296,7 +298,7 @@ export const CHARACTER_0002 = {
   },
 
   // Energy (see resolveEnergy in js/game/combat/combat-state.js), spent by
-  // the Dash and the Shield; the same values as #0001's.
+  // the Dash and the Shield (#0001's goes a little further).
   energy: {
     max: 100,
     regen: 12,

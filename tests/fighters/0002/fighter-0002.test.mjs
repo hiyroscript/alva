@@ -695,9 +695,10 @@ test('a piercing projectile needs 2 or more hits and an interval; a finisher nee
 test('no motion attack starts while it is still flying from a launch: it recovers first', () => {
   const d = versus({ gap: 40 });
   const { attacker: me } = d;
-  // The target's attack2 launches #0002 upward, hard (from 80 Launch Point).
+  // The target's High Kick launches #0002 upward, hard (from 80 Launch
+  // Point).
   me.combat.launchPoint = 80;
-  d.tick({}, P('attack2'));
+  d.tick({}, P('extra_attack'));
   d.until(() => me.launch && me.combat.stun <= 0 && !me.grounded, 200);
   d.tick(P('attack1'));
   assert.equal(me.combat.attack, null, 'no Homing Attack out of the launch');

@@ -141,7 +141,7 @@ test('its in-game names and touch buttons name each move, in English and French'
   // the universal arrow.
   const art = (a) => previewFrame(DEF, a)?.url.split('/').pop() ?? null;
   assert.deepEqual(['extra_attack', 'attack1', 'attack2', 'attack3', 'attack4', 'attack5', 'jump'].map(art), [
-    '0001_extra_attack_3.png', '0001_attack1_4.png', '0001_attack2_object_1.png', '0001_attack3_object_1.png',
+    '0001_extra_attack_4.png', '0001_attack1_4.png', '0001_attack2_object_1.png', '0001_attack3_object_1.png',
     '0001_attack4_6.png', '0001_attack5_object_1.png', null,
   ]);
   for (const a of ['extra_attack', 'attack1', 'attack2', 'attack3', 'attack4', 'attack5']) {

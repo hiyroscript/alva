@@ -793,7 +793,7 @@ test('HUD: the CPU card follows real hits, rebinds when the CPU changes and goes
   const { app, screen } = await enterPractice();
   const { hud, session } = screen;
   const cpuPanel = hud.cpuPanel;
-  // Walk up to the CPU and hit it with attack1: its card reads 3.
+  // Walk up to the CPU and hit it with attack1: its card reads 2.
   const step = (held = {}) => {
     app.input.script.push(held);
     session.update(DT);
@@ -803,9 +803,9 @@ test('HUD: the CPU card follows real hits, rebinds when the CPU changes and goes
   for (let i = 0; i < 30; i++) step();
   step({ attack1: true, attack1Pressed: true });
   for (let i = 0; i < 30; i++) step();
-  assert.equal(session.cpu.combat.launchPoint, 3);
-  assert.equal(cpuPanel.launchPointValue.textContent, '3');
-  assert.ok(session.damageNumbers.some((d) => d.text === '+3'), 'the floating number too');
+  assert.equal(session.cpu.combat.launchPoint, 2);
+  assert.equal(cpuPanel.launchPointValue.textContent, '2');
+  assert.ok(session.damageNumbers.some((d) => d.text === '+2'), 'the floating number too');
 
   // Change CPU: the card is the new fighter's.
   const cpu = await enableCpu(screen, '9999');
@@ -1168,7 +1168,7 @@ test('the touch buttons\' art follows Player 1\'s fighter, with a universal Jump
     };
     const shown = () => ['extra_attack', 'attack1', 'attack2', 'jump'].map((a) => [touch.buttons.get(a).getAttribute('aria-label'), look(a)]);
     const OWN_A = [
-      ['High Kick', '0001_extra_attack_3.png'], ['Jab', '0001_attack1_4.png'], ['Red', '0001_attack2_object_1.png'], ['Jump', ICONS.jump],
+      ['High Kick', '0001_extra_attack_4.png'], ['Jab', '0001_attack1_4.png'], ['Red', '0001_attack2_object_1.png'], ['Jump', ICONS.jump],
     ];
     assert.deepEqual(shown(), OWN_A, 'the default fighter\'s art from the start, Jump\'s too');
     const sprite = touch.buttons.get('attack1').querySelector('.tc-sprite-icon');
@@ -1521,8 +1521,8 @@ test('Player 1\'s attacks hit the CPU through the real CombatSystem, and it reac
   assert.equal(cpu.facing, -1);
 
   assert.equal(cpu.combat.launchPoint, 0);
-  // From 97, attack1's 3 makes 100: a push of 1 x 100, well short of the ledge.
-  cpu.combat.launchPoint = 97;
+  // From 98, attack1's 2 makes 100: a push of 1 x 100, well short of the ledge.
+  cpu.combat.launchPoint = 98;
   run({ attack1: true, attack1Pressed: true });
   until(() => events.length > 0, 30);
   const [hit] = events;
@@ -1531,7 +1531,7 @@ test('Player 1\'s attacks hit the CPU through the real CombatSystem, and it reac
   assert.equal(hit.target, cpu);
   assert.equal(hit.damage, player.attacks.attack1.damage);
   assert.deepEqual([hit.projectile, hit.summon, hit.technique], [null, null, null]);
-  assert.equal(cpu.combat.launchPoint, 97 + hit.damage, 'its Launch Point builds up');
+  assert.equal(cpu.combat.launchPoint, 98 + hit.damage, 'its Launch Point builds up');
   assert.equal(hit.launchStrength, 100);
   assert.ok(cpu.combat.stun > 0, 'hitstun');
   run(); // the reaction shows from the CPU's next update
@@ -1539,7 +1539,7 @@ test('Player 1\'s attacks hit the CPU through the real CombatSystem, and it reac
   assert.equal(cpu.animator.anim.key, 'hurt');
   // Its number, straight from the resolved event.
   assert.deepEqual(numbers.map((d) => [d.target, d.damage, d.text]), [[cpu, hit.damage, `+${hit.damage}`]]);
-  assert.equal(numbers[0].text, '+3');
+  assert.equal(numbers[0].text, '+2');
   // Launched away, then idle again, never hitting back.
   const x = cpu.body.x;
   run({}, 40);
@@ -1557,7 +1557,7 @@ test('Player 1\'s High Kick launches the CPU straight up (Base Launch 2, vertica
   const groundY = cpu.body.y;
   const startX = cpu.body.x;
   assert.equal(cpu.grounded, true);
-  cpu.combat.launchPoint = 25;
+  cpu.combat.launchPoint = 26;
 
   run({ extra_attack: true, extra_attackPressed: true });
   until(() => events.length > 0, 30);
@@ -1565,9 +1565,9 @@ test('Player 1\'s High Kick launches the CPU straight up (Base Launch 2, vertica
   assert.equal(hit.type, 'hit');
   assert.equal(hit.target, cpu);
   assert.equal(hit.damage, player.attacks.extra_attack.damage);
-  assert.equal(numbers[0].text, '+5');
+  assert.equal(numbers[0].text, '+4');
   // At impact: launched upward, not pushed sideways, at the High Kick's
-  // Base Launch 2 x the CPU's new Launch Point: 25 + 5 = 30, a strength of
+  // Base Launch 2 x the CPU's new Launch Point: 26 + 4 = 30, a strength of
   // 60, so 600. (Measured from where the kick struck: its step-in may have
   // shoved it along a little through the pushboxes first.)
   const hitX = cpu.body.x;
@@ -1597,7 +1597,7 @@ test('Red, Maximum Blue, Unlimited Void and Hollow Purple hits on the CPU each f
   // Red, Maximum Blue and Hollow Purple fly from Player 1's spawn into the
   // CPU: Red strikes once, Maximum Blue grinds it (its pull keeping it in)
   // and ends on its finisher, Hollow Purple strikes once, hard.
-  for (const [button, texts] of [['attack2', ['+4']], ['attack3', ['+1', '+1', '+1', '+2']], ['attack5', ['+12']]]) {
+  for (const [button, texts] of [['attack2', ['+2']], ['attack3', ['+1', '+1', '+2']], ['attack5', ['+12']]]) {
     const { session, run, until, events, numbers } = practiceSession();
     run({}, 10);
     run({ [button]: true, [`${button}Pressed`]: true });
@@ -1674,7 +1674,7 @@ test('damage numbers: positive "+N" red text over the CPU\'s head that follows i
   const draw = () => {
     drawn.length = 0;
     session.render();
-    return drawn.find((d) => d.text === '+4');
+    return drawn.find((d) => d.text === '+2');
   };
   const first = draw();
   assert.ok(first, 'drawn');
@@ -1695,7 +1695,7 @@ test('damage numbers: positive "+N" red text over the CPU\'s head that follows i
   let steps = 0;
   while (session.damageNumbers.length && steps < 120) { run(); steps++; }
   assert.ok(steps >= 0.6 * 60 && steps <= 1.0 * 60, `lasts ${steps} steps`);
-  session.damageNumbers.push({ target: cpu, damage: 4, text: '+4', age: 0.7, stack: 0 });
+  session.damageNumbers.push({ target: cpu, damage: 2, text: '+2', age: 0.7, stack: 0 });
   const late = draw();
   assert.ok(late.y < first.y, 'drifted up');
   assert.ok(late.alpha < 1, 'fading');

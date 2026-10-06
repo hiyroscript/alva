@@ -921,8 +921,8 @@ export class Fighter {
       console.warn(`[Alva] Technique "${id}" is unavailable: ${problem}; ignoring.`);
       return false;
     }
-    // Started: its cooldown runs from now, whether it hits, misses, meets a
-    // wall or is interrupted.
+    // Started: its cooldown runs from now, whether it lands, misses or is
+    // interrupted.
     this.combat.abilityCooldowns.start(id, def.cooldown);
     this.faceAttackTarget(dir);
     this.body.vx = 0;
@@ -1212,7 +1212,7 @@ export class Fighter {
   // steering in the air (`dir`). In an action of its own (an attack or the
   // Shield) the direction held (`held`) turns it at once, left to right or
   // right to left, as often as it likes: whatever the action does from then
-  // goes the new way (the hitbox, the attack's step-in, a shuriken not yet
+  // goes the new way (the hitbox, the attack's step-in, a projectile not yet
   // thrown). A Dash sets it as it starts (tryDash), and so does an attack or
   // a technique started with a direction held (tryAction); a spawn or
   // respawn takes the spawn's. Otherwise it keeps its last facing: it never
@@ -1303,7 +1303,7 @@ export class Fighter {
 
   // Animation key for a visual state. An attack plays its own clip for its
   // whole length, even if the fighter lands or leaves the ground meanwhile.
-  // Hitstun, and being held by a paralysis (the bound state), show `hurt` on the ground and
+  // Hitstun, and being held by a paralysis (the `bound` state), show `hurt` on the ground and
   // `midair_hurt` in the air. A technique plays the clip of its current
   // phase, a summon's startup its summon's own startupAnimation, and a Dash
   // plays `mouvment`. The Shield shows its

@@ -24,8 +24,8 @@
 //
 // For example:
 //
-//   explosionHit: { damage: 3, unblockable: true, paralyze: 1.8, hitstun: 0.3 },
-//   attack2: { ..., blockPush: 520 },
+//   burst: { hitbox: { ... }, hit: { damage: 3, unblockable: true, paralyze: 1.8 } },
+//   attack2_object: { ..., blockPush: 520 },
 
 // The fields a hit may declare here, with the value that changes nothing.
 const DEFAULTS = Object.freeze({ unblockable: false, paralyze: 0, blockPush: 0 });

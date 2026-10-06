@@ -161,7 +161,7 @@ test('#0001 defends with a Shield: typed data, no Dodge fields, no chip-damage s
     slowFallBrake: 6000,
     perfectWindow: 0.1,
     perfectRearm: 0.25,
-    stall: 0.3,
+    stall: 0.25,
   });
   const { fighter } = makeFighter();
   assert.equal(fighter.defense.type, 'shield');
@@ -790,7 +790,7 @@ test('missing Shield art refuses the Shield (warned once), and the attack lands 
     assert.equal(target.state, 'idle', 'no idle-as-shield');
     for (let i = 0; i < 30 && !events.length; i++) tick({}, HOLD);
     assert.equal(events[0].type, 'hit');
-    assert.equal(target.combat.launchPoint, 3);
+    assert.equal(target.combat.launchPoint, def.attacks.attack1.damage);
     while (attacker.combat.attack) tick({}, HOLD);
     assert.equal(warnings.filter((w) => /Shield "shielding" has no animation frames/.test(w)).length, 1, 'once');
 

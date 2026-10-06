@@ -551,8 +551,8 @@ test('Speed Power leaves every other velocity alone: launches received, Red, Hol
     const character = withSpeed(tier);
     const label = `Speed Power ${tier}`;
 
-    // Red flies at its own 900, and Hollow Purple at its own 640.
-    for (const [button, id, speed] of [['attack2', 'attack2_object', 900], ['attack5', 'attack5_object', 640]]) {
+    // Red flies at its own 600, and Hollow Purple at its own 640.
+    for (const [button, id, speed] of [['attack2', 'attack2_object', 600], ['attack5', 'attack5_object', 640]]) {
       const thrower = makeFighter({ character });
       const projectiles = [];
       for (let i = 0; i < 120 && !projectiles.length; i++) {

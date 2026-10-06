@@ -1,7 +1,7 @@
 // Sprite normalization.
 //
-// Source frames for a character can come in wildly different sizes (e.g. #0001's
-// idle frames are ~16x upscaled pixel art, its run frames ~4x). Drawing them at
+// Source frames for a character can come in wildly different sizes (e.g. one
+// sheet's idle frames upscaled 16x and its run frames 4x). Drawing them at
 // raw scale would make the fighter grow/shrink between animations, so each
 // frame is analysed ONCE when loaded:
 //

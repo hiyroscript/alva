@@ -12,8 +12,9 @@
 // owns it, updates it every fixed step, resolves its hit through
 // CombatSystem and removes it once it is done. Behaviour is data on the
 // character (`summons`, keyed by the attack it is; its cloud is that
-// attack's object art), e.g. #0001's Clone Attack (attack3, its Attack 3
-// button):
+// attack's object art), e.g. a clone on a fighter's Attack 3 button that
+// strikes with its attack1 (no fighter in the roster summons today; the
+// loadout tests' Case D does):
 //
 //   summons: {
 //     attack3: {

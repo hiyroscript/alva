@@ -20,11 +20,11 @@
 //   techniques: {
 //     attack5: {
 //       castAnimation: 'attack5_cast', releaseAnimation: 'attack5_release', cooldown: 12,
-//       projectile: { id: 'attack5_object', offset: { x: 60, y: -52 } },
+//       projectile: { id: 'attack5_object', offset: { x: 95, y: -60 } },
 //     },
 //     attack4: {
 //       castAnimation: 'attack4_cast', releaseAnimation: 'attack4_release', cooldown: 14,
-//       burst: { hitbox: { x: -260, y: -230, w: 520, h: 250 }, hit: { damage: 3, unblockable: true, paralyze: 1.8 } },
+//       burst: { hitbox: { x: -250, y: -210, w: 500, h: 230 }, hit: { damage: 3, unblockable: true, paralyze: 1.8 } },
 //     },
 //   },
 //

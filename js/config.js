@@ -15,8 +15,8 @@ export const CONFIG = Object.freeze({
     // fixed camera convention, not a requirement on any fighter. The view is
     // sized for a fighter this tall whoever is picked, so the stage frames
     // the same for every fighter and a taller or shorter one simply stands
-    // taller or shorter on it. (88 was #0001's visual.height when it was the
-    // only fighter; no fighter's own height is read here.)
+    // taller or shorter on it. (88 is what 52 art pixels make at the
+    // roster's common art-pixel size; no fighter's own height is read here.)
     fighterHeight: 88,
     // Target on-screen fighter height as a fraction of the viewport height:
     // a platform-fighter view, far enough out for the whole main stage, the
@@ -80,8 +80,9 @@ export const CONFIG = Object.freeze({
   // The numbered attack buttons sit on the right hand: attack1 to attack3
   // along the row above J K L (U I O), attack4 and attack5 on the row below
   // it (M ,). A fighter only acts on the ones it has a button for (see
-  // js/data/loadout.js): e.g. #0001 uses U, I, O and M (Punch, Kick, Clone
-  // Attack and Sphere Rush), #0002 U, I and O.
+  // js/data/loadout.js): e.g. #0001 uses all five (U, I and O for the Jab,
+  // Red and Maximum Blue, M and , for Unlimited Void and Hollow Purple),
+  // #0002 U, I and O.
   bindings: {
     runLeft: ['KeyA', 'ArrowLeft'],
     runRight: ['KeyD', 'ArrowRight'],
@@ -133,7 +134,7 @@ export const ACTIONS = Object.freeze([
 
 // Neutral names of the controls, the same for every character. A
 // character's own names for its buttons (its `mobileAbilities`, e.g.
-// #0001's Shuriken, Punch and Kick) take their place where it has them.
+// #0001's High Kick, Jab and Red) take their place where it has them.
 export const ACTION_LABELS = Object.freeze({
   runLeft: 'Move left',
   runRight: 'Move right',

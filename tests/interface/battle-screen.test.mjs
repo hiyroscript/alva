@@ -553,7 +553,7 @@ test('HUD: a real hit raises the Launch Point shown on the target\'s card only',
   d.tick({ attack1: true, attack1Pressed: true });
   d.until(() => d.events.length > 0);
   hud.update(battle);
-  assert.equal(hud.right.launchPointValue.textContent, '3');
+  assert.equal(hud.right.launchPointValue.textContent, String(DEF_0001.attacks.attack1.damage));
   assert.equal(hud.left.launchPointValue.textContent, '0');
 });
 
@@ -785,7 +785,7 @@ test('entering Quick Battle shows Player 1\'s fighter\'s own art on the touch bu
     touch.buttons.get(a).getAttribute('aria-label'), look(touch.buttons.get(a)), touch.buttons.get(a).getAttribute('data-action'),
   ]);
   assert.deepEqual(shown, [
-    ['High Kick', '0001_extra_attack_3.png', 'extra_attack'],
+    ['High Kick', '0001_extra_attack_4.png', 'extra_attack'],
     ['Shield', ICONS.shield, 'shield'],
     ['Transform', ICONS.transform, 'transform'],
     ['Jab', '0001_attack1_4.png', 'attack1'],

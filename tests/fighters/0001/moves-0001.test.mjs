@@ -42,7 +42,7 @@ const tickUntil = (d, pred, held = {}, targetHeld = {}, limit = 240) => {
 
 // ---- The Jab ------------------------------------------------------------------------
 
-test('the Jab lands on its third frame for 3, pushing the target away (Base Launch 1 sideways)', () => {
+test('the Jab lands on its third frame for 2, pushing the target away (Base Launch 1 sideways)', () => {
   const d = versus({ gap: 40 });
   d.target.combat.launchPoint = 30;
   d.tick(P('attack1'));
@@ -51,8 +51,8 @@ test('the Jab lands on its third frame for 3, pushing the target away (Base Laun
   assert.equal(n, steps(A.attack1.startup) + 1, 'out after its two wind-up frames');
   const [e] = d.events;
   assert.equal(e.move, 'attack1');
-  assert.equal(e.damage, 3);
-  assert.deepEqual({ ...e.finalLaunch }, { x: 33 * U, y: 0 });
+  assert.equal(e.damage, 2);
+  assert.deepEqual({ ...e.finalLaunch }, { x: 32 * U, y: 0 });
 });
 
 test('a Jab that hits can be cut short into another Jab or a High Kick; one that whiffs cannot', () => {
@@ -112,7 +112,7 @@ test('the Floating Straight stands on the air while it strikes: no fall, twice p
   assert.equal(fighter.combat.attack?.def.id, 'midair_attack1', 'landing gives them back');
 });
 
-test('the High Kick: a leap in, then 5 and Base Launch 2 straight up; in the air it stands on the air, once', () => {
+test('the High Kick: a leap in, then 4 and Base Launch 2 straight up; in the air it stands on the air, once', () => {
   const d = versus({ gap: 50 });
   d.target.combat.launchPoint = 25;
   d.tick(P('extra_attack'));
@@ -124,8 +124,8 @@ test('the High Kick: a leap in, then 5 and Base Launch 2 straight up; in the air
   // Raised to the step's speed on frame 2, braking from there.
   assert.ok(leap > A.extra_attack.step.speed * 0.8 && leap <= A.extra_attack.step.speed, `the leap in on frame 2 (${leap})`);
   const [e] = d.events;
-  assert.equal(e.damage, 5);
-  assert.deepEqual({ ...e.finalLaunch }, { x: 0, y: -60 * U });
+  assert.equal(e.damage, 4);
+  assert.deepEqual({ ...e.finalLaunch }, { x: 0, y: -58 * U });
   const { fighter, step } = solo();
   airborne(step);
   step(P('extra_attack'));
@@ -139,7 +139,7 @@ test('the High Kick: a leap in, then 5 and Base Launch 2 straight up; in the air
 
 // ---- Red ------------------------------------------------------------------------------
 
-test('Red leaves the palms on frame 4 and flies 900 units/s for about 306 units', () => {
+test('Red leaves the palms on frame 4 and flies 600 units/s for about 300 units', () => {
   const { fighter, step } = solo();
   step(P('attack2'));
   let n = 1;
@@ -147,18 +147,19 @@ test('Red leaves the palms on frame 4 and flies 900 units/s for about 306 units'
   assert.equal(n, steps(A.attack2.projectile.spawnAt) + 1, 'on the step its time crosses spawnAt (the press step counted)');
   assert.deepEqual(fighter.releases[0], { id: 'attack2_object', offset: { x: 44, y: -70 }, direction: 1 });
   const orb = DEF.projectiles.attack2_object;
-  assert.ok(Math.abs(orb.speed * orb.lifetime - 306) < 1);
+  assert.equal(orb.speed, 600);
+  assert.ok(Math.abs(orb.speed * orb.lifetime - 300) < 1);
 });
 
-test('Red blasts its target away: 4 and Base Launch 2 along its flight', () => {
+test('Red pushes its target away: 2 and Base Launch 1 along its flight', () => {
   const d = versus({ gap: 200 });
   d.target.combat.launchPoint = 46;
   d.tick(P('attack2'));
   tickUntil(d, () => d.events.length > 0, {}, {}, 60);
   const [e] = d.events;
   assert.equal(e.move, 'attack2_object');
-  assert.equal(e.damage, 4);
-  assert.deepEqual({ ...e.finalLaunch }, { x: 100 * U, y: 0 });
+  assert.equal(e.damage, 2);
+  assert.deepEqual({ ...e.finalLaunch }, { x: 48 * U, y: 0 });
 });
 
 test('a Shield that blocks Red is shoved back 520 units/s, and pays for it', () => {
@@ -209,7 +210,7 @@ test('the Red Kick hangs for its lock-on, flies at its opponent re-aimed every s
   tickUntil(d, () => d.events.length > 0, {}, {}, 30);
   const [e] = d.events;
   assert.equal(e.move, 'midair_attack2');
-  assert.equal(e.damage, 4);
+  assert.equal(e.damage, 3);
   assert.ok(e.finalLaunch.x > 0, 'blasted away');
   d.tick();
   assert.ok(d.attacker.body.vy < 0, 'springs up off it');
@@ -218,7 +219,7 @@ test('the Red Kick hangs for its lock-on, flies at its opponent re-aimed every s
 
 // ---- Maximum Blue ------------------------------------------------------------------------
 
-test('Maximum Blue drags a target into itself and grinds it: four strikes 0.25 s apart, the last its collapse upward', () => {
+test('Maximum Blue drags a target into itself and grinds it: three strikes 0.25 s apart, the last its collapse upward', () => {
   const d = versus({ gap: 300 });
   d.target.combat.launchPoint = 20;
   d.tick(P('attack3'));
@@ -230,16 +231,16 @@ test('Maximum Blue drags a target into itself and grinds it: four strikes 0.25 s
   assert.equal(d.events.length, 0, 'drawn toward the orb before it arrives');
   // Each strike, and the step it landed on.
   const at = [];
-  for (let n = 0; n < steps(1.5) && at.length < 4; n++) {
+  for (let n = 0; n < steps(1.5) && at.length < 3; n++) {
     const before = d.events.length;
     d.tick();
     if (d.events.length > before) at.push(n);
   }
   const hits = d.events.filter((e) => e.projectile === orb);
-  assert.deepEqual(hits.map((e) => e.damage), [1, 1, 1, 2]);
-  assert.deepEqual(at.slice(1).map((n, i) => n - at[i]), [15, 15, 15], '0.25 s apart');
-  assert.ok(hits.slice(0, 3).every((e) => e.launchSpeed === 0), 'the grinding launches nothing');
-  assert.ok(hits[3].finalLaunch.y < 0 && hits[3].finalLaunch.x === 0, 'the collapse pops it upward');
+  assert.deepEqual(hits.map((e) => e.damage), [1, 1, 2]);
+  assert.deepEqual(at.slice(1).map((n, i) => n - at[i]), [15, 15], '0.25 s apart');
+  assert.ok(hits.slice(0, 2).every((e) => e.launchSpeed === 0), 'the grinding launches nothing');
+  assert.ok(hits[2].finalLaunch.y < 0 && hits[2].finalLaunch.x === 0, 'the collapse pops it upward');
   assert.equal(orb.alive, false, 'spent');
 });
 
@@ -270,7 +271,7 @@ test('Blue yanks an opponent in to its palm and strikes it upward, standing on t
   tickUntil(d, () => d.events.length > 0, {}, {}, 20);
   const [e] = d.events;
   assert.equal(e.move, 'midair_attack3');
-  assert.equal(e.damage, 3);
+  assert.equal(e.damage, 2);
   assert.ok(e.finalLaunch.y < 0 && e.finalLaunch.x === 0, 'up');
   // Out of the pull's reach: nothing.
   const far = versus({ gap: 320 });
@@ -389,15 +390,15 @@ test('Hollow Purple erases the projectiles it meets; a hit during the chant brea
 
 // ---- Infinity -------------------------------------------------------------------------------
 
-test('Infinity stalls the blow it blocks: the attacker freezes 0.3 s, long enough for a Jab back', () => {
+test('Infinity stalls the blow it blocks: the attacker freezes 0.25 s, long enough for a Jab back', () => {
   // #0001 shields; its opponent (the attacker here) Jabs into it.
   const d = duel({ gap: 40 });
   raise(d);
   d.tick(P('attack1'), HOLD);
   tickUntil(d, () => d.events.length > 0, {}, HOLD, 20);
   assert.equal(d.events[0].type, 'block');
-  assert.equal(d.events[0].stall, 0.3);
-  assert.ok(Math.abs(d.attacker.combat.hitstop - 0.3) < 1e-9);
+  assert.equal(d.events[0].stall, 0.25);
+  assert.ok(Math.abs(d.attacker.combat.hitstop - 0.25) < 1e-9);
   // Let go and Jab back: it lands while the attacker is still frozen or
   // recovering.
   d.tick({}, {});

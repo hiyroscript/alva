@@ -224,7 +224,7 @@ test('a whiffed or blocked attack keeps its whole recovery: no cut short', () =>
 test('a jump or a Dash cuts a connected High Kick short; walking, the Shield and Down never do', () => {
   const hitBa2 = () => {
     const d = combo({ gap: 40 });
-    d.run((i) => (i === 0 ? KICK : {}), 12);
+    d.run((i) => (i === 0 ? KICK : {}), 20);
     assert.equal(d.hits.length, 1);
     while (d.attacker.combat.hitstop > 0) d.run(() => ({}), 1);
     assert.ok(d.attacker.combat.cancellable);

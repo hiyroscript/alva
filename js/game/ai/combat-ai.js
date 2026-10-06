@@ -896,7 +896,10 @@ export class CombatAIController {
       const v = this.specialValue(c, s);
       if (v <= 0.12) continue;
       const exposed = c.type === 'technique' && !(s.openings.length && s.foeBusy > c.lead);
-      const risk = exposed ? 0.2 + 0.8 * safety : 1;
+      let risk = exposed ? 0.2 + 0.8 * safety : 1;
+      // A raised Shield has to come down before it can strike back: against
+      // one, a technique no Shield stops is a smaller risk.
+      if (exposed && s.foeShielding && c.hit?.unblockable) risk = Math.max(risk, 0.6);
       const face = c.type === 'technique' ? s.dir : 0;
       out.push({
         score: p.specials * (0.3 + 2 * v) * risk + s.urge * 0.2,

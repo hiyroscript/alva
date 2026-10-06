@@ -16,9 +16,9 @@
 //
 //   projectiles: {
 //     attack2_object: {
-//       animation: 'attack2_object', speed: 900, lifetime: 0.32,
-//       hitbox: { x: -14, y: -14, w: 28, h: 28 },
-//       damage: 4, baseLaunch: 2, directionalLaunch: 'horizontal', hitstun: 0.35, blockstun: 0.14, hitstop: 0.08,
+//       animation: 'attack2_object', speed: 900, lifetime: 0.34,
+//       hitbox: { x: -16, y: -16, w: 32, h: 32 },
+//       damage: 4, baseLaunch: 2, directionalLaunch: 'horizontal', hitstun: 0.36, blockstun: 0.16, hitstop: 0.08,
 //       blockPush: 520, repel: true,
 //     },
 //   },

@@ -19,10 +19,11 @@ const PAD_DEADZONE = 0.45;
 
 // Standard Gamepad mapping -> gameplay actions. attack3 to attack5 are for
 // fighters with those buttons (a fighter only acts on the ones it has; see
-// js/data/loadout.js): #0001's Clone Attack on LT and Sphere Rush on L3.
+// js/data/loadout.js): #0001's Maximum Blue on LT, Unlimited Void on L3 and
+// Hollow Purple on R3.
 const PAD_BUTTONS = {
   0: 'jump',          // A / Cross
-  2: 'extra_attack',  // X / Square (#0001's Throw)
+  2: 'extra_attack',  // X / Square (#0001's High Kick)
   3: 'transform',     // Y / Triangle
   1: 'attack1',       // B / Circle
   4: 'attack2',       // LB
