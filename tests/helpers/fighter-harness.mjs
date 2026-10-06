@@ -14,6 +14,7 @@ import { SpriteSet } from '../../js/game/rendering/sprite-normalizer.js';
 import { CombatAIController } from '../../js/game/ai/combat-ai.js';
 import { mulberry32 } from '../../js/core/utils.js';
 import { CONFIG } from '../../js/config.js';
+import { BASE_FIGHTER_MOVEMENT } from '../../js/data/movement.js';
 
 // The fighter the harness builds when a test names none: #0001, the first
 // in the roster. A convenience default, not a reference fighter. Tests of
@@ -25,6 +26,8 @@ export const DEFAULT_CHARACTER = getCharacter('0001');
 // The default's definition, under the name the older tests import it by.
 export const def = DEFAULT_CHARACTER;
 export const DT = CONFIG.sim.step;
+// The universal movement values every fighter runs on (js/data/movement.js).
+export const MOVEMENT = BASE_FIGHTER_MOVEMENT;
 
 // The start of every art path of fighter `id`: `${assetBase(id)}idle_1.png`.
 export const assetBase = (id) => `./assets/characters/${id}/${id}_`;

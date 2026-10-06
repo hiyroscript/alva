@@ -30,11 +30,10 @@ export function blankInput() {
 }
 
 // Seconds a CPU holds Jump after pressing it: a step and a half short of the
-// fighter's higher-jump window (movement.highJumpWindow; see
-// Fighter.update), so its jump is always the normal one. The press alone
-// for a fighter without that window.
+// higher-jump window (movement.highJumpWindow, the universal one; see
+// Fighter.update), so its jump is always the normal one.
 export function jumpTapHold(self) {
-  return Math.max(0, (self.def.movement.highJumpWindow ?? 0) - 1.5 / 60);
+  return Math.max(0, self.movement.highJumpWindow - 1.5 / 60);
 }
 
 export class PlayerController {

@@ -14,16 +14,15 @@ import { fileURLToPath } from 'node:url';
 import { characterFramePaths } from '../../js/data/characters.js';
 import { StageCollision } from '../../js/game/physics.js';
 import { TrainingAIController } from '../../js/game/fighters/fighter-controller.js';
-import { getMaxSpeed } from '../../js/data/powers.js';
 import { CONFIG } from '../../js/config.js';
 import {
-  def, DT, BASE, SIM_CTX, fakeSprites, makeFighter, frameName, stageMap, duel,
+  def, DT, BASE, MOVEMENT, SIM_CTX, fakeSprites, makeFighter, frameName, stageMap, duel,
 } from '../helpers/fighter-harness.mjs';
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const RIGHT = { runRight: true, runRightPressed: true };
 const LEFT = { runLeft: true, runLeftPressed: true };
-const DASH_STEPS = Math.round((def.animations.mouvment.frames.length / def.animations.mouvment.fps) / DT);
+const DASH_STEPS = Math.round(MOVEMENT.dashDuration / DT);
 const near = (a, b, msg) => assert.ok(Math.abs(a - b) < 1e-6, `${msg ?? ''} ${a} vs ${b}`);
 
 // A tap: pressed on one step, released on the next.
@@ -54,7 +53,7 @@ test('the one mouvment frame lives in #0001\'s folder, is registered as a one-sh
   const clip = def.animations.mouvment;
   assert.deepEqual(clip.frames, [`${BASE}mouvment_1.png`]);
   assert.equal(clip.loop, false, 'plays once');
-  assert.equal(clip.fps, 5, 'its own rate: one frame held 0.2 s');
+  assert.equal(clip.fps, 6, 'its own rate: one frame held across the whole Dash');
   assert.equal(clip.sourceFacing, undefined, 'faces right, like the rest of #0001');
   const paths = characterFramePaths(def);
   for (const url of clip.frames) assert.ok(paths.includes(url), `${url} preloads`);
@@ -68,17 +67,20 @@ test('the one mouvment frame lives in #0001\'s folder, is registered as a one-sh
   near(clip.heightRatio * idleArtH, Math.max(...dash.map((s) => s.h)), 'one art pixel per file pixel');
 });
 
-test('movement data: dashSpeed 950 (about 2.9x the top speed) for about 190 units, a 0.22 s double-tap window; the top speed itself untouched', () => {
-  assert.equal(def.movement.dashTapWindow, 0.22);
-  assert.equal(def.movement.dashSpeed, 950);
-  const ratio = def.movement.dashSpeed / getMaxSpeed(def);
-  assert.ok(ratio >= 2.8 && ratio <= 3, `${ratio}`);
+test('movement data: the universal Dash, 1250 (about 3x the top speed) for a sixth of a second, about 208 units, a 0.22 s double-tap window', () => {
+  assert.equal(MOVEMENT.dashTapWindow, 0.22);
+  assert.equal(MOVEMENT.dashSpeed, 1250);
+  const ratio = MOVEMENT.dashSpeed / MOVEMENT.maxSpeed;
+  assert.ok(ratio >= 2.8 && ratio <= 3.1, `${ratio}`);
   const { fighter } = makeFighter();
-  assert.equal(fighter.maxSpeed, getMaxSpeed(def));
-  near(fighter.dashDuration, 0.2, 'one pass of the clip');
-  assert.equal(DASH_STEPS, 12);
-  const reach = def.movement.dashSpeed * fighter.dashDuration;
-  near(reach, 190, 'about 190 units');
+  assert.equal(fighter.maxSpeed, MOVEMENT.maxSpeed);
+  near(fighter.dashDuration, 1 / 6, 'the universal length, whatever the clip');
+  assert.equal(DASH_STEPS, 10);
+  // One pass of the clip across it: the clip's own pass matches.
+  const clip = def.animations.mouvment;
+  near(clip.frames.length / clip.fps, fighter.dashDuration);
+  const reach = MOVEMENT.dashSpeed * fighter.dashDuration;
+  assert.ok(Math.abs(reach - 208) < 1, 'about 208 units');
 });
 
 // ---- Input ---------------------------------------------------------------------------
@@ -207,7 +209,7 @@ test('one press never dashes; two presses of the same direction inside the windo
 });
 
 test('the window: the second press up to 0.22 s after the first dashes, any later does not', () => {
-  const window = Math.floor(def.movement.dashTapWindow / DT + 1e-9); // 13 steps
+  const window = Math.floor(MOVEMENT.dashTapWindow / DT + 1e-9); // 13 steps
   const inside = makeFighter();
   doubleTap(inside.step, RIGHT, window);
   assert.ok(inside.fighter.dash, `${window} steps apart`);
@@ -307,7 +309,7 @@ test('no Dash (and nothing spent) while attacking, stunned, paralyzed, shielding
   aloft.step(RIGHT);
   assert.equal(aloft.fighter.dash?.air, true, 'airborne: the air dash');
   assert.equal(aloft.fighter.dash.animation, 'midair_mouvment');
-  assert.equal(aloft.fighter.dash.speed, def.movement.airDashSpeed);
+  assert.equal(aloft.fighter.dash.speed, MOVEMENT.airDashSpeed);
   assert.equal(aloft.fighter.tryDash(1), false, 'tryDash itself is the ground\'s');
   refused('attacking', {
     before: (f) => { f.step(RIGHT); f.step({ attack1: true, attack1Pressed: true }); },
@@ -359,7 +361,7 @@ test('short of Energy a Dash still happens, but takes all that is left: the bar 
   c.setEnergy(10);
   step(RIGHT);
   assert.ok(fighter.dash, 'a Dash on 10 Energy');
-  assert.equal(fighter.body.vx, def.movement.dashSpeed, 'the full burst, not a weaker one');
+  assert.equal(fighter.body.vx, MOVEMENT.dashSpeed, 'the full burst, not a weaker one');
   assert.deepEqual([c.energy, c.energyExhausted], [0, true]);
   while (fighter.dash) step({});
   for (let i = 0; i < 10; i++) step({});
@@ -407,7 +409,7 @@ test('a Dash spends its cost (12) exactly once as it starts, and bursts at dashS
   step(RIGHT);
   assert.equal(def.energy.dashCost, 12);
   assert.equal(fighter.combat.energy, 88, 'exactly 12, no refill on that step');
-  assert.equal(fighter.body.vx, def.movement.dashSpeed, 'dash speed from the first step');
+  assert.equal(fighter.body.vx, MOVEMENT.dashSpeed, 'dash speed from the first step');
   const x0 = fighter.body.prevX;
   let n = 1;
   let x1 = fighter.body.x;
@@ -416,18 +418,19 @@ test('a Dash spends its cost (12) exactly once as it starts, and bursts at dashS
     step({});
     assert.ok(fighter.combat.energy > before, 'refilling, never draining, while it dashes');
     if (fighter.dash) {
-      assert.equal(fighter.body.vx, def.movement.dashSpeed, 'the speed is the Dash\'s, input or not');
+      assert.equal(fighter.body.vx, MOVEMENT.dashSpeed, 'the speed is the Dash\'s, input or not');
       x1 = fighter.body.x;
     }
     n++;
   }
   assert.equal(n, DASH_STEPS + 1, 'over after one pass of the clip');
-  near(x1 - x0, def.movement.dashSpeed * DT * DASH_STEPS, 'straight along the ground');
-  near(x1 - x0, 190, 'about 190 units in all');
-  assert.ok(fighter.body.vx < def.movement.dashSpeed, 'then the normal movement slows it');
+  near(x1 - x0, MOVEMENT.dashSpeed * DT * DASH_STEPS, 'straight along the ground');
+  assert.ok(Math.abs(x1 - x0 - 208) < 1, 'about 208 units in all');
+  assert.ok(fighter.body.vx < MOVEMENT.dashSpeed, 'then the normal movement slows it');
+  assert.ok(fighter.body.vx > MOVEMENT.maxSpeed, 'carrying its burst on, never reset');
   assert.equal(fighter.grounded, true);
   // No top speed was changed on the way.
-  assert.equal(fighter.maxSpeed, getMaxSpeed(def));
+  assert.equal(fighter.maxSpeed, MOVEMENT.maxSpeed);
   for (let i = 0; i < 60; i++) step({ runRight: true });
   near(fighter.body.vx, fighter.maxSpeed, 'running settles back at the normal top speed');
 });
@@ -584,7 +587,7 @@ test('one request Dashes at once through tryDash: no double tap, no held directi
     assert.equal(fighter.state, 'dash');
     assert.equal(fighter.animator.anim.key, 'mouvment');
     assert.equal(frameName(fighter), '0001_mouvment_1.png', 'the clip from its first frame');
-    assert.equal(fighter.body.vx, direction * def.movement.dashSpeed);
+    assert.equal(fighter.body.vx, direction * MOVEMENT.dashSpeed);
     assert.equal(fighter.combat.energy, 100 - def.energy.dashCost, 'exactly the Dash cost');
     // It runs its one pass of the clip, then the fighter stands.
     let n = 1;

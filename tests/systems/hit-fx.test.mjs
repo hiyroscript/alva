@@ -151,14 +151,21 @@ test('effects never change a step: the same fight, stepped with and without them
   const sprites = fakeSprites();
   const run = (withFx) => {
     let i = 0;
+    let battle = null;
+    // Running at the opponent wherever it is (the same in both runs, unless
+    // the effects changed something), then a Jab, a jump and Red.
     const input = {
       flush() {},
       sample() {
         const k = i++ % 50;
-        return { runRight: k < 20, attack1: k === 22, attack1Pressed: k === 22, attack2: k === 40, attack2Pressed: k === 40, jump: k === 30, jumpPressed: k === 30 };
+        const dx = battle.p2.body.x - battle.p1.body.x;
+        return {
+          runRight: k < 20 && dx > 40, runLeft: k < 20 && dx < -40,
+          attack1: k === 22, attack1Pressed: k === 22, attack2: k === 40, attack2Pressed: k === 40, jump: k === 30, jumpPressed: k === 30,
+        };
       },
     };
-    const battle = new Battle({ canvas: { getContext: () => ({}) }, map: getMap('city'), p1Def: def, p2Def: def, p1Sprites: sprites, p2Sprites: sprites, input });
+    battle = new Battle({ canvas: { getContext: () => ({}) }, map: getMap('desert'), p1Def: def, p2Def: def, p1Sprites: sprites, p2Sprites: sprites, input });
     battle.p2.controller = null;
     battle.p2.combat.launchPoint = 40;
     if (!withFx) battle.fx = { take() {}, takeBounce() {}, reset() {}, timeScale: 1 };

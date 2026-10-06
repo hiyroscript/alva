@@ -273,7 +273,8 @@ test('the roster ships #0001 and #0002, both whole and playable', () => {
   assert.ok(DEF_0001.techniques.attack4.burst && DEF_0001.techniques.attack5.projectile, 'Unlimited Void and Hollow Purple');
   assert.deepEqual(Object.keys(DEF_0001.projectiles).sort(), ['attack2_object', 'attack3_object', 'attack5_object']);
   assert.equal(DEF_0001.defense.type, 'shield');
-  assert.ok(DEF_0001.movement.dashSpeed > 0, 'its Dash');
+  assert.ok(DEF_0001.animations.mouvment && DEF_0001.animations.midair_mouvment, 'its Dash and air dash (their art: the movement itself is universal)');
+  assert.equal(DEF_0001.movement, undefined, 'no movement of its own');
   assert.deepEqual(DEF_0001.abilityNames, {
     extra_attack: 'High Kick', attack1: 'Jab', midair_attack1: 'Floating Straight', attack2: 'Red', midair_attack2: 'Red Kick',
     attack3: 'Maximum Blue', midair_attack3: 'Blue', attack4: 'Unlimited Void', attack5: 'Hollow Purple',

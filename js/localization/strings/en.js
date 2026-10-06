@@ -4,12 +4,12 @@
 // one.
 //
 // The English copy of game data (control names, each fighter's own button
-// and ability names, Powers, Launch, difficulty levels, stages) is not
+// and ability names, universal movement, Launch, difficulty levels, stages) is not
 // written here: registryStrings reads it from the registries that own it,
 // so it cannot drift from them. Only interface copy is authored below.
 
 import { CONFIG, ACTION_LABELS } from '../../config.js';
-import { POWERS } from '../../data/powers.js';
+import { MOVEMENT_SUMMARY, MOVEMENT_GUIDE } from '../../data/movement.js';
 import {
   LAUNCH_POINT_SUMMARY, LAUNCH_FORMULA, BASE_LAUNCH_SUMMARY, BASE_LAUNCH_DESCRIPTIONS, DIRECTIONAL_LAUNCH_SUMMARY,
   DIRECTIONAL_LAUNCHES,
@@ -34,13 +34,10 @@ function registryStrings() {
       if (own?.label) out[`ability.${def.id}.${action}`] = own.label;
     }
   }
-  for (const power of POWERS) {
-    out[`power.${power.id}.name`] = power.name;
-    out[`power.${power.id}.summary`] = power.summary;
-    for (const tier of power.tiers) {
-      out[`power.${power.id}.tier.${tier.tier}.name`] = tier.name;
-      out[`power.${power.id}.tier.${tier.tier}.description`] = tier.description;
-    }
+  out['movement.summary'] = MOVEMENT_SUMMARY;
+  for (const move of MOVEMENT_GUIDE) {
+    out[`movement.${move.id}.name`] = move.name;
+    out[`movement.${move.id}.description`] = move.description;
   }
   out['launch.pointSummary'] = LAUNCH_POINT_SUMMARY;
   out['launch.formula'] = LAUNCH_FORMULA;
@@ -241,10 +238,11 @@ export const EN = {
 
   'discover.title': 'Discover',
   'discover.sections': 'Discover sections',
-  'discover.power': 'Power',
+  'discover.movement': 'Movement',
   'discover.launch': 'Launch',
   'discover.passives': 'Passives',
-  'discover.tiers': '{name} tiers',
+  'discover.movementTitle': 'Universal movement',
+  'discover.movementList': 'Universal movement',
   'discover.launchPointTitle': 'Launch Point',
   'discover.baseLaunchTitle': 'Base Launch',
   'discover.baseLaunchValue': 'Base Launch {value}',

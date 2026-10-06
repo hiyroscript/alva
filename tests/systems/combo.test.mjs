@@ -9,9 +9,9 @@
 // tests/fighters/0001/combos.test.mjs.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { def, DT, makeFighter, duel, startupSteps } from '../helpers/fighter-harness.mjs';
+import { def, DT, MOVEMENT, makeFighter, duel, startupSteps } from '../helpers/fighter-harness.mjs';
 
-const mv = def.movement;
+const mv = MOVEMENT;
 const P = (k) => ({ [k]: true, [`${k}Pressed`]: true });
 const ATTACK1 = P('attack1');
 const ATTACK2 = P('attack2');
@@ -107,13 +107,15 @@ test('a press during a cooldown comes out as the cooldown ends; the latest press
   assert.equal(latest.fighter.combat.attack?.def.id, 'extra_attack');
 });
 
-test('only presses that could start are kept: never transform, an air press of a ground-only attack or one without art; a technique press never', () => {
+test('only presses that could start are kept: never transform or one without art; a ground-only one in the air waits for the ground; a technique press never', () => {
   const { fighter, step } = makeFighter();
   step(ATTACK1);
   step(P('transform'));
   assert.equal(fighter.bufferedAttack, null, 'reserved');
   // A fighter whose High Kick is ground-only: pressed in the air it is
-  // never kept, so it never replaces a press that is.
+  // kept all the same (it could start once the fighter lands), so pressed
+  // just before touchdown it comes out on the ground; pressed long before,
+  // it is gone by then.
   const groundKick = { ...def, attacks: { ...def.attacks, extra_attack: { ...def.attacks.extra_attack, groundOnly: true, motion: undefined } } };
   const air = makeFighter({ character: groundKick });
   air.step(JUMP);
@@ -121,7 +123,23 @@ test('only presses that could start are kept: never transform, an air press of a
   assert.equal(air.fighter.combat.attack?.def.id, 'midair_attack1');
   air.step(ATTACK2);
   air.step(KICK);
-  assert.equal(air.fighter.bufferedAttack?.action, 'attack2', 'an air press of a ground-only kick never replaces it');
+  assert.equal(air.fighter.bufferedAttack?.action, 'extra_attack', 'the newest press that could start, on the ground');
+  while (air.fighter.combat.attack) air.step({});
+  assert.equal(air.fighter.combat.attack, null, 'never in the air');
+  const early = makeFighter({ character: groundKick });
+  early.step(JUMP);
+  while (early.fighter.body.vy < 0) early.step({});
+  early.step(KICK);
+  let kicked = false;
+  for (let i = 0; i < 120 && !kicked; i++) kicked = early.step({}).combat.attack?.def.id === 'extra_attack';
+  assert.equal(kicked, false, 'pressed at the apex: long expired by touchdown');
+  const late = makeFighter({ character: groundKick });
+  late.step(JUMP);
+  while (late.fighter.body.vy < 0 || late.fighter.body.y < 780) late.step({});
+  late.step(KICK);
+  while (!late.fighter.grounded) late.step({});
+  late.step({});
+  assert.equal(late.fighter.combat.attack?.def.id, 'extra_attack', 'pressed just before touchdown: out on the ground');
   // A technique press while it cools down (here during its own cast) is
   // used up, never kept for later.
   const d = duel({ gap: 600 });

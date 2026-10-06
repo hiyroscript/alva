@@ -11,9 +11,8 @@ import { MAPS, getMap, voidAround, cameraAround } from '../../js/data/maps.js';
 import { PRACTICE_MAP } from '../../js/data/practice-map.js';
 import { StageCollision, createBody, stepBody, separate, resolveSolidOverlap } from '../../js/game/physics.js';
 import { Camera } from '../../js/game/rendering/camera.js';
-import { getJumpVelocity } from '../../js/data/powers.js';
 import { CONFIG } from '../../js/config.js';
-import { def, DT, STAGE, SIM_CTX, fakeSprites, makeFighter, stageMap } from '../helpers/fighter-harness.mjs';
+import { def, DT, MOVEMENT, STAGE, SIM_CTX, fakeSprites, makeFighter, stageMap } from '../helpers/fighter-harness.mjs';
 
 // Stage themes build Path2D art, which Node lacks: a do-nothing stand-in.
 globalThis.Path2D ??= class {
@@ -103,11 +102,12 @@ test('the Void is much closer than before on every stage: at least 30% nearer on
 });
 
 test('ordinary jumps never reach the upper Void, even from each stage\'s highest footing', () => {
-  const g = CONFIG.sim.gravity * def.movement.gravityScale;
-  // Tier 3 is the highest normal jump any fighter can own, and its air jump
-  // (taken at the apex, the highest it can start) adds its own rise.
-  const rise = (1000 ** 2 + (1000 * def.movement.airJumpRatio) ** 2 * def.movement.airJumps) / (2 * g);
-  assert.ok(getJumpVelocity(def) <= 1000);
+  const g = CONFIG.sim.gravity * MOVEMENT.gravityScale;
+  // The universal jump, then both air jumps of the triple jump, each taken
+  // at the apex of the one before (the highest each can start).
+  const v = MOVEMENT.jumpVelocity;
+  const rise = (v ** 2 + (v * MOVEMENT.airJumpRatio) ** 2 * MOVEMENT.airJumps) / (2 * g);
+  assert.equal(MOVEMENT.airJumps, 2, 'the triple jump');
   for (const m of ALL_MAPS) {
     const footing = Math.min(m.mainStage.top, ...m.platforms.map((p) => p.y), ...m.solids.map((s) => s.y));
     // The body's centre at the top of the jump (see StageCollision.inVoid).

@@ -26,20 +26,24 @@ import { frames } from './helpers.js';
 const ART_0002 = 39;
 
 // Playback rates of #0002's clips. Each attack's phases and strikes below
-// are whole frames of its clip at its rate, and a Dash lasts one pass of
-// the mouvment clip, so tuning a rate keeps the timing on the art.
+// are whole frames of its clip at its rate, so tuning a rate keeps the
+// timing on the art; every attack's rate is a whole number of 60 Hz steps
+// per frame, so each frame lasts exactly as long as its gameplay does. (The
+// Dash and the air dash last the universal Dash's length, whatever these
+// say: their clips are shown once across it, which 24 fps for the Dash's
+// four frames and 6 for the air dash's one match.)
 const FPS_0002 = Object.freeze({
-  idle: 8,
-  run: 20,
-  mouvment: 20,
-  midair_mouvment: 5,
+  idle: 10,
+  run: 24,
+  mouvment: 24,
+  midair_mouvment: 6,
   deflect: 20,
-  jump: 24,
+  jump: 30,
   ball: 30,
-  attack1: 15,
+  attack1: 20,
   attack2: 20,
-  tornado: 20,
-  extra_attack: 18,
+  tornado: 30,
+  extra_attack: 20,
   extra_attack_object: 16,
 });
 
@@ -88,7 +92,7 @@ export const CHARACTER_0002 = {
       heightRatio: 1,
     },
     // The run: a twelve-frame stride. Its rate follows the speed, down to
-    // 0.6 of it.
+    // 0.6 of it (and up past it on a Dash's run-on).
     run: {
       frames: frames('0002', 'run', 12),
       fps: FPS_0002.run,
@@ -112,9 +116,8 @@ export const CHARACTER_0002 = {
       loop: false,
       heightRatio: 48 / ART_0002,
     },
-    // mouvment, the Dash: the legs a blur of a figure-eight at full tilt.
-    // Played once per Dash, which lasts exactly one pass of it (4 frames =
-    // 0.2 s at 20 fps).
+    // mouvment, the Dash: the legs a blur of a figure-eight at full tilt,
+    // played once across the whole Dash.
     mouvment: {
       frames: frames('0002', 'mouvment', 4),
       fps: FPS_0002.mouvment,
@@ -122,8 +125,7 @@ export const CHARACTER_0002 = {
       heightRatio: 36 / ART_0002,
     },
     // midair_mouvment, the air dash: stretched out flat, arms swept back,
-    // one foot leading. Played once per air dash, which lasts exactly one
-    // pass of it (1 frame = 0.2 s at 5 fps).
+    // one foot leading, shown for the whole air dash.
     midair_mouvment: {
       frames: frames('0002', 'midair_mouvment', 1),
       fps: FPS_0002.midair_mouvment,
@@ -266,44 +268,6 @@ export const CHARACTER_0002 = {
     portrait: { animation: 'idle', frame: 0, centerY: 0.3, size: 0.62 },
   },
 
-  // Fast: Speed Power 3, the top speed; a normal jump.
-  powers: {
-    jump: 2,
-    speed: 3,
-  },
-
-  // #0002's movement profile (js/game/fighters/movement.js lists what each
-  // field does): quicker off the mark than #0001, a longer, faster Dash
-  // (about 220 units in its 0.2 s), and one air dash per airtime as fast
-  // and as long, flat across the air.
-  movement: {
-    acceleration: 4800,
-    deceleration: 4200,
-    turnBoost: 2.6,
-    overspeedDeceleration: 6000,
-    airAcceleration: 3200,
-    airDeceleration: 380,
-    airTurnBoost: 2.0,
-    gravityScale: 1,
-    maxFallSpeed: 1500,
-    fastFallAcceleration: 12000,
-    fastFallSpeed: 1400,
-    coyoteTime: 0.1,
-    jumpBuffer: 0.12,
-    highJumpWindow: 0.15,
-    highJumpHeight: 1.4,
-    airJumps: 1,
-    airJumpRatio: 0.9,
-    attackBuffer: 0.15,
-    hitstunFriction: 1600,
-    hitstunAirDrag: 210,
-    dropThroughTime: 0.28,
-    dashSpeed: 1100,
-    dashTapWindow: 0.22,
-    airDashSpeed: 1100,
-    airDashUses: 1,
-  },
-
   // Its body, measured from its idle: the head and torso (the quills'
   // tips left out), then the wide stance. Collision is independent of
   // the art.
@@ -351,7 +315,7 @@ export const CHARACTER_0002 = {
   // two frames more. Every Deflect's 3, Base Launch 2, here sideways, the way
   // the hand swats; while the swat is live it knocks the other fighter's
   // projectiles back at their thrower, now #0002's. A quarter of a second
-  // in all, falling as it swats.
+  // in all, falling as it swats and carrying the whole of its drift.
   deflect: {
     animation: 'deflect',
     startup: 1 / FPS_0002.deflect,
@@ -363,7 +327,7 @@ export const CHARACTER_0002 = {
     blockstun: 0.12,
     hitstop: 0.05,
     cooldown: 0.3,
-    airMomentum: 0.8,
+    airMomentum: 1,
     airControl: 0.4,
     deflectProjectiles: true,
   },
@@ -403,43 +367,46 @@ export const CHARACTER_0002 = {
   // Attack definitions (schema: createAttackDefinition in
   // js/game/combat/attacks.js). Phases and strikes are whole frames of each clip,
   // and every hitbox is measured from its art (facing right from the
-  // origin, mirrored with facing).
+  // origin, mirrored with facing). Its speed is in its moves' own motion
+  // (the homing dash, the plunge, the roll, the lift), never in how it runs.
   attacks: {
-    // The One-Two: two strikes in one press, light and quick. The jab
-    // (frame 2, 1) holds the target for the straight (frame 4, 2), which
-    // pushes it away. Frame 4 is held one more frame to recover. A hit
-    // opens a follow-up once the straight is out.
+    // The One-Two: two strikes in one press, light and quick (a quarter of
+    // a second in all). The jab (frame 2, 1) holds the target for the
+    // straight (frame 4, 2), which pushes it away. Frame 4 is held one more
+    // frame to recover. A hit opens a follow-up once the straight is out.
+    // It keeps all the speed it is thrown at, sliding on under half the
+    // ground deceleration.
     attack1: {
       animation: 'attack1',
       recovery: 1 / FPS_0002.attack1,
       hitbox: { x: 8, y: -50, w: 26, h: 18 },
       hitstun: 0.3,
       blockstun: 0.12,
-      hitstop: 0.04,
+      hitstop: 1 / 30,
       hits: [
         { at: 1 / FPS_0002.attack1, active: 1 / FPS_0002.attack1, damage: 1 },
         {
           at: 3 / FPS_0002.attack1, active: 1 / FPS_0002.attack1, hitbox: { x: 8, y: -50, w: 28, h: 18 },
-          damage: 2, baseLaunch: 1, directionalLaunch: 'horizontal', hitstop: 0.06,
+          damage: 2, baseLaunch: 1, directionalLaunch: 'horizontal', hitstop: 0.05,
         },
       ],
-      cooldown: 0.12,
+      cooldown: 0.1,
       groundOnly: true,
-      momentum: 0.6,
+      momentum: 1,
       friction: 0.5,
       hitCancel: 4 / FPS_0002.attack1,
     },
     // The Homing Attack. Curled up, it hangs for a moment (the lock-on,
-    // 0.15 s), then dashes at 1000 units/s for up to 0.22 s at its
+    // 7/60 s), then dashes at 1100 units/s for up to 0.22 s at its
     // opponent, if it is within 240 units and not behind it, re-aimed
     // every step; with nobody there it dashes straight ahead (a short air
-    // dash that keeps a fifth of its speed as it ends). The hit pops the
+    // dash that keeps a quarter of its speed as it ends). The hit pops the
     // target up (2, Base Launch 1 upward) and #0002 springs off it (760
-    // up, 140 back) with its air jump back: the chain canon is famous for.
-    // Once per airtime (landing or being hit gives it back).
+    // up, 140 back) with both its air jumps back: the chain canon is
+    // famous for. Once per airtime (landing or being hit gives it back).
     midair_attack1: {
       animation: 'midair_attack1',
-      startup: 9 / 60,
+      startup: 7 / 60,
       active: 0.22,
       recovery: 0.1,
       damage: 2,
@@ -448,53 +415,55 @@ export const CHARACTER_0002 = {
       hitbox: BALL_HITBOX_0002,
       hitstun: 0.4,
       blockstun: 0.15,
-      hitstop: 0.06,
+      hitstop: 0.05,
       cooldown: 0.1,
       airUses: 1,
-      motion: { type: 'homing', range: 240, speed: 1000, rebound: 760, recoil: 140, exit: 0.2 },
-      airMomentum: 0.3,
-      hitCancel: 9 / 60,
+      motion: { type: 'homing', range: 240, speed: 1100, rebound: 760, recoil: 140, exit: 0.25 },
+      airMomentum: 0.6,
+      hitCancel: 7 / 60,
     },
-    // The Rapid Kicks: a committed flurry. After a wind-up of four
-    // frames (0.2 s: time to see it coming), three kicks, 1 Launch Point
-    // each and no launch, hold the target in place (each one's stun
-    // outlasts the next), then the fourth flings it away (3, Base Launch 2
-    // sideways, too short a stun to chase with the Spin Attack): 6 in all,
-    // and #0002's surest way to send someone off the stage.
+    // The Rapid Kicks: a committed flurry, its heaviest launcher. After a
+    // wind-up of four frames (0.2 s: time to see it coming), three kicks, 1
+    // Launch Point each and no launch, hold the target in place (each
+    // one's stun outlasts the next), then the fourth flings it away (3,
+    // Base Launch 2 sideways, too short a stun to chase with the Spin
+    // Attack): 6 in all, and #0002's surest way to send someone off the
+    // stage. Once the finisher has landed, a jump or a Dash may chase it.
     // The hitbox is the thick of the flurry just in front, where the feet
-    // land, not the trails' tips. No hit-cancel and a long cooldown: the
-    // target is free again well before another flurry could start, so it
-    // never loops. A Shield stops the flurry at the kick it blocks.
+    // land, not the trails' tips. A long cooldown: the target is free again
+    // well before another flurry could start, so it never loops. A Shield
+    // stops the flurry at the kick it blocks. It keeps most of a run.
     attack2: {
       animation: 'attack2',
       recovery: 2 / FPS_0002.attack2,
       hitbox: { x: 12, y: -70, w: 36, h: 62 },
       hitstun: 0.26,
       blockstun: 0.12,
-      hitstop: 0.03,
+      hitstop: 1 / 30,
       hits: [
         { at: 4 / FPS_0002.attack2, active: 1 / FPS_0002.attack2, damage: 1 },
         { at: 5 / FPS_0002.attack2, active: 1 / FPS_0002.attack2, damage: 1 },
         { at: 6 / FPS_0002.attack2, active: 1 / FPS_0002.attack2, damage: 1 },
         {
           at: 7 / FPS_0002.attack2, active: 1 / FPS_0002.attack2,
-          damage: 3, baseLaunch: 2, directionalLaunch: 'horizontal', hitstun: 0.3, hitstop: 0.09,
+          damage: 3, baseLaunch: 2, directionalLaunch: 'horizontal', hitstun: 0.3, hitstop: 0.08,
         },
       ],
       cooldown: 1.2,
       groundOnly: true,
-      momentum: 0.4,
-      friction: 0.6,
+      momentum: 0.8,
+      friction: 0.8,
+      hitCancel: 8 / FPS_0002.attack2,
     },
-    // The Bounce Attack. Curled up, it hangs for a moment (0.1 s), then
-    // plunges at 1300 units/s (steering half as well as it drifts) until
+    // The Bounce Attack. Curled up, it hangs for a moment (5/60 s), then
+    // plunges at 1400 units/s (steering half as well as it drifts) until
     // it meets the ground or an opponent, and bounces back up off either
     // at 900 (about a jump's height): the attack is over, so it can bounce
     // again, twice per airtime. A hit spikes the target (2, Base Launch 2
     // downward).
     midair_attack2: {
       animation: 'midair_attack2',
-      startup: 6 / 60,
+      startup: 5 / 60,
       active: 0.8,
       recovery: 0.1,
       damage: 2,
@@ -503,37 +472,38 @@ export const CHARACTER_0002 = {
       hitbox: { x: -20, y: -44, w: 40, h: 50 },
       hitstun: 0.3,
       blockstun: 0.14,
-      hitstop: 0.06,
+      hitstop: 0.05,
       cooldown: 0.05,
       airUses: 2,
-      motion: { type: 'bounce', fallSpeed: 1300, rebound: 900 },
-      airMomentum: 0.5,
+      motion: { type: 'bounce', fallSpeed: 1400, rebound: 900 },
+      airMomentum: 0.8,
       airControl: 0.5,
     },
-    // The Spin Attack. It curls into a ball (0.17 s, sliding on: time to
+    // The Spin Attack. It curls into a ball (8/60 s, sliding on: time to
     // see it coming), then rolls the way it faces at 400 units/s plus 0.8
-    // of the running speed it had as it curled (up to 820), slowing by 420
-    // every second on the ground, for 0.6 s: about 165 units from a
-    // standstill, 335 from a full run. As a ball it is a smaller target
-    // (its hurtbox is the ball) and it rolls on through the
-    // opponent it bowls over (2, Base Launch 1 sideways, too short a stun
-    // to chase); a Shield stops it dead instead, bouncing it back. Off a
-    // ledge it flies on. A long cooldown: an opener, not a string.
+    // of the running speed it had as it curled (up to 1000: a Dash's burst
+    // makes it a cannonball), slowing by 420 every second on the ground,
+    // for 0.55 s: about 150 units from a standstill, 340 from a full run.
+    // As a ball it is a smaller target (its hurtbox is the ball) and it
+    // rolls on through the opponent it bowls over (2, Base Launch 1
+    // sideways, too short a stun to chase); a Shield stops it dead instead,
+    // bouncing it back. Off a ledge it flies on. A long cooldown: an
+    // opener, not a string.
     attack3: {
       animation: 'attack3',
-      startup: 10 / 60,
+      startup: 8 / 60,
       active: 0.4,
-      recovery: 0.2,
+      recovery: 0.15,
       damage: 2,
       baseLaunch: 1,
       directionalLaunch: 'horizontal',
       hitbox: BALL_HITBOX_0002,
       hitstun: 0.24,
       blockstun: 0.15,
-      hitstop: 0.07,
+      hitstop: 0.06,
       cooldown: 1.6,
       groundOnly: true,
-      motion: { type: 'roll', speed: 400, keep: 0.8, maxSpeed: 820, friction: 420, recoil: 260 },
+      motion: { type: 'roll', speed: 400, keep: 0.8, maxSpeed: 1000, friction: 420, recoil: 260 },
       passThrough: true,
       hurtboxes: [{ x: -20, y: -50, w: 40, h: 50 }],
     },
@@ -546,7 +516,7 @@ export const CHARACTER_0002 = {
     // (free fall).
     midair_attack3: {
       animation: 'midair_attack3',
-      recovery: 0.2,
+      recovery: 0.15,
       hitbox: { x: -28, y: -80, w: 56, h: 84 },
       hitstun: 0.24,
       blockstun: 0.1,
@@ -565,13 +535,14 @@ export const CHARACTER_0002 = {
       airUses: 1,
       freeFall: true,
       motion: { type: 'rise', speed: 460 },
-      airMomentum: 0.4,
+      airMomentum: 0.6,
       airControl: 0.5,
     },
     // The Whirlwind (extra_attack). It turns and spins up a whirlwind
     // (frames 1-5), sends it off as a tornado (extra_attack_object) as
     // frame 6 shows, and spins down (7-9). No melee hitbox: the tornado
-    // is the attack. A long cooldown: a trap to set, not to spam.
+    // is the attack. A long cooldown: a trap to set, not to spam. A cast,
+    // planted on purpose.
     extra_attack: {
       animation: 'extra_attack',
       startup: 5 / FPS_0002.extra_attack,
@@ -581,7 +552,8 @@ export const CHARACTER_0002 = {
       projectile: { id: 'extra_attack_object', spawnAt: 5 / FPS_0002.extra_attack, offset: { x: 44, y: -39 } },
       cooldown: 1.4,
       groundOnly: true,
-      momentum: 0.3,
+      momentum: 0.4,
+      friction: 0.8,
     },
   },
 };

@@ -46,7 +46,9 @@
 // projectile already under way or a technique still casting. Never future inputs.
 
 import { range, clamp } from '../../core/utils.js';
+import { CONFIG } from '../../config.js';
 import { HELD_CONTROLS, blankInput, jumpTapHold } from '../fighters/fighter-controller.js';
+import { steerAttack } from '../fighters/movement.js';
 import { attackReach } from '../combat/attacks.js';
 import { worldBox } from '../combat/combat.js';
 import { DEFAULT_DIFFICULTY, getDifficultyProfile, resolveDifficulty } from '../../data/difficulty.js';
@@ -74,24 +76,25 @@ const TAP_SLACK = 1 / 60;
 const overlap = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
 // Height above take-off `t` seconds into a jump at `v` under gravity `g`.
 const jumpHeight = (v, g, t) => v * t - 0.5 * g * t * t;
-// How far a body sliding at `vx` travels in `t` seconds while braking at `decel`.
-const slide = (vx, decel, t) => Math.sign(vx) * Math.min(Math.abs(vx) * t, (vx * vx) / (2 * decel));
+const STEP = CONFIG.sim.step;
 
 // How far an attack `self` starts now at speed `vx` carries it in `t`
-// seconds (see steerAttack in js/game/fighters/movement.js), toward `face` for its step-in: the share
-// of that speed it keeps, then its step-in once its time reaches it, all
-// running down under the attack's friction (the air drag in the air). Its
-// steering is left out: the CPU does not steer through its attacks.
+// seconds, toward `face` for its step-in: the very rules the Fighter runs
+// (attackStartSpeed, then steerAttack in js/game/fighters/movement.js step
+// by step: the share of that speed it keeps, a burst's overspeed bleeding
+// off, its friction, its step-in once its time reaches it), on a scratch
+// body that never touches the stage. Its steering is left out: the CPU
+// does not steer through its attacks.
 function attackDrift(self, atk, vx, t, air, face) {
-  const mv = self.def.movement;
-  const drag = air ? mv.airDeceleration : mv.deceleration * atk.friction;
-  const v = self.attackStartSpeed(atk, vx, !air);
-  const step = air ? null : atk.step;
-  if (!step || step.at > t) return slide(v, drag, t);
-  const before = slide(v, drag, step.at);
-  const left = Math.sign(v) * Math.max(0, Math.abs(v) - drag * step.at);
-  const stepped = face * Math.max(left * face, step.speed);
-  return before + slide(stepped, drag, t - step.at);
+  const body = { vx: self.attackStartSpeed(atk, vx, !air), grounded: !air };
+  const record = { def: atk, time: 0, stepped: false };
+  let x = 0;
+  for (let i = Math.round(t / STEP); i > 0; i--) {
+    steerAttack(body, self.movement, face, record, 0, STEP, self.burst);
+    x += body.vx * STEP;
+    record.time += STEP;
+  }
+  return x;
 }
 
 // Where hitbox `hb` (facing right from its owner's origin) meets a target
@@ -578,9 +581,15 @@ export class CombatAIController {
     // something new calls for a look.
     const it = this.intent;
     if (it && !it.done && !urgent && it.keepUntil > this.clock) return undefined;
-    // Mid-move (an attack, stun, a Dash, a technique): nothing new
-    // to start until it is over; the next look decides what comes next.
-    if (!s.canAct) return this.setIntent({ kind: 'idle', until: this.clock + 0.05 });
+    // Mid-move (an attack, stun, a Dash, a technique): nothing new to start
+    // until it is over, unless its own attack hit and may be cut short (a
+    // hit-cancel): then a strike that connects now, or a Dash after what it
+    // sent flying, as readily as the level presses an advantage. The next
+    // look decides what comes next.
+    if (!s.canAct) {
+      const chase = self.combat.cancellable ? this.chase(s) : null;
+      return this.setIntent(chase ?? { kind: 'idle', until: this.clock + 0.05 });
+    }
     if (rng() < p.hesitation * (s.openings.length ? 0.4 : 1)) {
       return this.setIntent({ kind: 'idle', until: this.clock + range(rng, 0.15, 0.45) });
     }
@@ -609,6 +618,26 @@ export class CombatAIController {
     const gap = b.x < floor.x ? floor.x - b.x : b.x - (floor.x + floor.w);
     if (gap < 100 || b.y > stage.groundY + 60) return null;
     return { kind: 'dash', dir: Math.sign(stage.centerX - b.x) || 1, air: true, recover: true };
+  }
+
+  // A follow-up out of an attack that hit and may be cut short (see
+  // CombatState.cancellable), as often as the level punishes: a strike that
+  // connects now (never the same attack again: it may not cut into itself
+  // yet), else, on the ground, a Dash after an opponent sent out of reach
+  // (a level that Dashes at all, with the Energy a Dash cancel costs). Null
+  // to let the attack play out.
+  chase(s) {
+    const { self, p } = s;
+    if (this.rng() >= p.punish) return null;
+    const current = self.combat.attack?.def.id;
+    const strike = this.meleeOptions(s).find((m) => m.id !== current);
+    if (strike) return this.attackIntent(strike);
+    const dash = s.ms.dash;
+    if (dash && p.dash > 0 && s.grounded && s.sameLevel && s.dist > s.myReach + 40 && s.dist < dash.reach + s.myReach &&
+        s.energy >= dash.cancelCost + p.energyCare * 25 && this.groundAhead(self, s.stage, s.dir, dash.reach)) {
+      return { kind: 'dash', dir: s.dir, then: p.plan > 0 };
+    }
+    return null;
   }
 
   // The highest option after the level's decision noise.
@@ -675,7 +704,7 @@ export class CombatAIController {
     if (threat.box && s.grounded && ready) {
       const away = threat.from > 0 ? -1 : 1;
       const need = away < 0 ? s.x + s.me.hw - threat.box.x + 2 : threat.box.x + threat.box.w - (s.x - s.me.hw) + 2;
-      const mv = self.def.movement;
+      const mv = self.movement;
       const t = Math.max(0, threat.contactIn - 1 / 60);
       const ta = self.maxSpeed / mv.acceleration;
       const walk = t < ta ? 0.5 * mv.acceleration * t * t : 0.5 * mv.acceleration * ta * ta + self.maxSpeed * (t - ta);
@@ -874,11 +903,13 @@ export class CombatAIController {
         const score = s.aggro * (0.55 + far * 0.5) + s.urge * 0.55 + (reachable ? p.punish * 1.1 : 0) + exposedBonus;
         const range = Math.max(s.myReach - 10, 24);
         out.push({ score, intent: { kind: 'approach', range, then: p.plan > 0, until: this.clock + 1.2 } });
-        // ...or cover the gap with a Dash.
+        // ...or cover the gap with a Dash: from a little more than its own
+        // length out to where a Dash, its run-on and a strike out of it
+        // reach (a strike may cut it short: see actDash).
         const dash = s.ms.dash;
-        if (dash && p.dash > 0 && s.dist > 170 && s.dist < 460 && !s.exhausted &&
-            s.energy >= dash.cost + p.energyCare * 35 && this.groundAhead(self, s.stage, s.dir, dash.distance + 20)) {
-          out.push({ score: score * (0.45 + p.dash * 0.8), intent: { kind: 'dash', dir: s.dir, then: p.plan > 0 } });
+        if (dash && p.dash > 0 && s.dist > dash.distance * 0.8 && s.dist < dash.reach + s.myReach + 120 && !s.exhausted &&
+            s.energy >= dash.cost + p.energyCare * 35 && this.groundAhead(self, s.stage, s.dir, dash.reach + 20)) {
+          out.push({ score: score * (0.5 + p.dash * 0.9), intent: { kind: 'dash', dir: s.dir, then: p.plan > 0 } });
         }
       }
 
@@ -1076,16 +1107,18 @@ export class CombatAIController {
   }
 
   // Fighter aims at the current opponent when accepting the press. No
-  // directional tap is needed just to turn (and no stale intent.face). A
-  // Deflect (`deflect`) is the air's: landed before the press, it is dropped
-  // rather than pressed into a Shield, and it needs `shield` up first to be
-  // a press at all.
+  // directional tap is needed just to turn (and no stale intent.face). It
+  // presses whenever the fighter may follow up: free, or in an attack that
+  // hit or a Dash past its cancel time (see Fighter.canFollowUp). A Deflect
+  // (`deflect`) is the air's: landed before the press, it is dropped rather
+  // than pressed into a Shield, and it needs `shield` up first to be a press
+  // at all.
   actAttack(self, it, held) {
     if (it.pressed) {
       if (self.canAct() || this.clock - it.pressedAt > 2) it.done = true;
       return;
     }
-    if (this.clock > it.until || !self.canAct() || (it.deflect && self.body.grounded)) {
+    if (this.clock > it.until || !self.canFollowUp() || (it.deflect && self.body.grounded)) {
       it.done = true;
       return;
     }
@@ -1097,11 +1130,13 @@ export class CombatAIController {
     if (it.ranged) this.lastThrow = this.clock;
   }
 
-  // A planned follow-up: whatever strike connects now, if any.
+  // A planned follow-up: whatever strike connects now, if any. True when
+  // there was one.
   followUp(self, foe, ctx) {
     const s = this.sense(self, foe, ctx);
     const m = this.meleeOptions(s)[0];
     if (m) this.setIntent(this.attackIntent(m));
+    return !!m;
   }
 
   actJump(self, foe, ctx, it, held) {
@@ -1142,9 +1177,11 @@ export class CombatAIController {
   }
 
   // Dash: a tap, a release and a tap of the same direction, as a player
-  // double-taps; the fighter decides whether it can Dash. The same taps in
-  // the air (`air`) are its air dash; one made to get back to the stage
-  // (`recover`) goes back to recovering once it is over.
+  // double-taps; the fighter decides whether it can Dash (out of an attack
+  // that hit too: a Dash cancel). The same taps in the air (`air`) are its
+  // air dash; one made to get back to the stage (`recover`) goes back to
+  // recovering once it is over. A planned follow-up (`then`) strikes out of
+  // the Dash as soon as one connects, cutting it short.
   actDash(self, foe, ctx, it, held) {
     const key = DIR_KEY[it.dir];
     // Already holding that way (running there): let go for a step first, so
@@ -1154,14 +1191,16 @@ export class CombatAIController {
       return;
     }
     const step = (it.step = (it.step ?? -1) + 1);
-    if (step === 0 && !(self.body.grounded === !it.air && self.canAct())) {
+    if (step === 0 && !(self.body.grounded === !it.air && self.canFollowUp())) {
       it.done = true;
       return;
     }
     if (step === 0 || step === 2) held[key] = true;
     else if (step > 2) {
-      if (self.dash) held[key] = true;
-      else {
+      if (self.dash) {
+        held[key] = true;
+        if (it.then && self.dashCancellable && this.followUp(self, foe, ctx)) it.done = true;
+      } else {
         it.done = true;
         if (it.then) this.followUp(self, foe, ctx);
         else if (it.recover && this.offStage(self, ctx.stage)) this.setIntent({ kind: 'recover' });
@@ -1287,7 +1326,7 @@ export class CombatAIController {
     }
     const dashing = this.intent?.kind === 'dash' && !this.intent.done;
     if (b.grounded && !this.intent?.jumped) {
-      const decel = self.def.movement.deceleration;
+      const decel = self.movement.deceleration;
       const stop = Math.sign(b.vx) === dir ? (b.vx * b.vx) / (2 * decel) : 0;
       // A Dash's taps look a whole Dash ahead; running leaves braking room.
       const margin = dashing ? (readMoveset(self).dash?.distance ?? 0) + LEDGE_MARGIN
@@ -1299,7 +1338,7 @@ export class CombatAIController {
       }
       if (b.wall === dir && self.canAct() && !this.prev.jump) held.jump = true;
     }
-    if (!dashing && !this.prev[key] && this.tap.dir === dir && this.tap.age <= (self.def.movement.dashTapWindow ?? 0) + TAP_SLACK) {
+    if (!dashing && !this.prev[key] && this.tap.dir === dir && this.tap.age <= self.movement.dashTapWindow + TAP_SLACK) {
       held[key] = false;
     }
   }

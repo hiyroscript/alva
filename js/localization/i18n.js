@@ -8,10 +8,11 @@
 // Keys name what a string is for, never what it says, and internal
 // identifiers (control and move codenames, character, map and scheme ids,
 // CSS classes, data keys) are never translated. The English copy of game
-// data (Powers, Launch, difficulty levels, stages, control names and each
-// fighter's own touch-button names) is read from the registries that own it,
-// so it cannot drift from them; STRINGS.fr translates every key, and a key
-// missing from a language falls back to English.
+// data (universal movement, Launch, difficulty levels, stages, control
+// names and each fighter's own touch-button names) is read from the
+// registries that own it, so it cannot drift from them; STRINGS.fr
+// translates every key, and a key missing from a language falls back to
+// English.
 //
 // The string tables live beside this module, one per language
 // (js/localization/strings/en.js and fr.js); this module is the translator

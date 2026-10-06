@@ -8,12 +8,16 @@
 // launch sequence) and the order in which each fixed step updates it
 // (Fighter.update).
 // Inputs: a character definition (js/data/characters/<id>.js), its loaded
-// SpriteSet (clip lengths time the Dash and the air dash, the land pose,
-// pending attacks and summon startups), a spawn, the stage, and a controller
-// (js/game/fighters/fighter-controller.js or js/game/ai/combat-ai.js).
+// SpriteSet (clip lengths time the land pose, pending attacks and summon
+// startups; the Dash and the air dash need their art), the universal
+// movement values (BASE_FIGHTER_MOVEMENT, js/data/movement.js), a spawn,
+// the stage, and a controller (js/game/fighters/fighter-controller.js or
+// js/game/ai/combat-ai.js).
 // Outputs: Fighter, separateFighters and COMBAT_ACTIONS.
-// Important constraints: the rules are shared and the numbers are the
-// character's. Movement math lives in js/game/fighters/movement.js, attack
+// Important constraints: the rules are shared; movement's numbers are
+// universal (no fighter has its own run, jump or Dash) and every other
+// number is the character's. Movement math lives in
+// js/game/fighters/movement.js, attack
 // / defense / Energy schemas in js/game/combat/, and nothing here names a
 // fighter or a button's role: a summon or technique is whatever the
 // character's `actions` say it is. The simulation is fixed-step and
@@ -31,7 +35,7 @@ import { resolveLaunchReaction } from '../combat/combat.js';
 import { createProjectileDefinition } from '../combat/projectile.js';
 import { createSummonDefinition, summonProblem } from '../combat/summon.js';
 import { Technique, createTechniqueDefinition, techniqueProblem } from '../combat/technique.js';
-import { getJumpVelocity, getMaxSpeed } from '../../data/powers.js';
+import { BASE_FIGHTER_MOVEMENT } from '../../data/movement.js';
 import { specialAction } from '../../data/loadout.js';
 import { COMBAT_BUTTONS } from '../../config.js';
 import { blankInput } from './fighter-controller.js';
@@ -54,6 +58,11 @@ export const COMBAT_ACTIONS = COMBAT_BUTTONS;
 const TIME_EPSILON = 1e-6;
 
 const NEUTRAL_INPUT = Object.freeze(blankInput());
+
+// The fastest the run clip plays (x its own rate) by default, above top
+// speed: a burst's run-on looks as fast as it goes (a clip may say
+// otherwise with its own maxSpeedScale). Art only.
+const RUN_MAX_SPEED_SCALE = 1.6;
 
 // World units behind the fighter's middle an opponent may be and still be
 // locked on to by a homing dash (see Fighter.lockOn): one straight above
@@ -79,13 +88,18 @@ export class Fighter {
     this.label = label;
     this.controller = controller;
     this.animator = new SpriteAnimator(sprites);
-    // One pass of the touchdown clip; 0 skips the land state entirely.
+    // The universal movement values (js/data/movement.js): the same object
+    // for every fighter, whatever its definition says. Nothing about how a
+    // fighter runs, jumps or Dashes is its own.
+    this.movement = BASE_FIGHTER_MOVEMENT;
+    // One pass of the touchdown clip; 0 skips the land pose entirely. A
+    // pose only: it never holds the fighter (see updateState).
     this.landDuration = sprites.duration('land');
-    // One pass of the mouvment clip: how long a Dash lasts (0 without its
-    // art, and then no Dash starts; see tryDash). Likewise one pass of the
-    // midair_mouvment clip is how long an air dash lasts (see tryAirDash).
-    this.dashDuration = sprites.duration('mouvment');
-    this.airDashDuration = sprites.duration('midair_mouvment');
+    // How long a Dash and an air dash last: the universal durations, with
+    // their clip played once across each (see updateState); 0 without the
+    // art, and then none starts (see tryDash and tryAirDash).
+    this.dashDuration = sprites.duration('mouvment') > 0 ? this.movement.dashDuration : 0;
+    this.airDashDuration = sprites.duration('midair_mouvment') > 0 ? this.movement.airDashDuration : 0;
     // A pending attack (art only, see js/game/combat/attacks.js) lasts one pass of
     // its own clip.
     this.attacks = Object.fromEntries(
@@ -114,14 +128,6 @@ export class Fighter {
     this.shieldReleaseDuration = sprites.duration(this.defense?.groundReleaseAnimation);
     // Shield clips already reported missing, so a held Shield warns once.
     this.missingShieldArt = new Set();
-    // The character's Powers (js/data/powers.js), resolved once.
-    // Upward speed of the normal jump, from its Jump Power tier. Nothing else
-    // (launches, techniques) uses it.
-    this.jumpVelocity = getJumpVelocity(def);
-    // Top speed of normal left / right movement, on the ground and in the
-    // air, from its Speed Power tier. Nothing else (acceleration, launches,
-    // projectiles, techniques) uses it.
-    this.maxSpeed = getMaxSpeed(def);
     // Energy settings (js/game/combat/combat-state.js resolveEnergy): the maximum, the
     // refill rate, what a Dash costs and what each blocked hit costs.
     this.energyDef = resolveEnergy(def.energy);
@@ -152,8 +158,8 @@ export class Fighter {
       y: ground.ref ? ground.y : from,
       width: def.collider.width,
       height: def.collider.height,
-      gravityScale: def.movement.gravityScale,
-      maxFall: def.movement.maxFallSpeed,
+      gravityScale: this.movement.gravityScale,
+      maxFall: this.movement.maxFallSpeed,
     });
     this.body.grounded = !!ground.ref;
     this.body.ground = ground.ref;
@@ -170,11 +176,18 @@ export class Fighter {
     this.moveDir = 0;
     this.coyote = 0;
     this.jumpBuffer = 0;
-    // Jumps left in the air before landing again (movement.airJumps),
-    // refreshed on the ground and by a hit (see takeHit); and air dashes
-    // likewise (see airDashUses).
-    this.airJumps = def.movement.airJumps ?? 0;
+    // Jumps left in the air before landing again (movement.airJumps: two,
+    // the triple jump), refreshed on the ground and by a hit (see takeHit);
+    // and air dashes likewise (see airDashUses).
+    this.airJumps = this.movement.airJumps;
     this.airDashes = this.airDashUses;
+    // Carrying a burst of its own: the speed above top speed came from its
+    // Dash or air dash, so in the air it bleeds off at
+    // movement.airOverspeedDeceleration (see steer in
+    // js/game/fighters/movement.js). Set as either starts; over once the
+    // speed is back to top speed or less, or a hit lands. A launch's speed is
+    // never a burst: it flies on under the air drag.
+    this.burst = false;
     // Jumped in the air this step (the jump clip starts over).
     this.airJumped = false;
     // The direction held this step ({ x, y }, y -1 up with Jump, 1 down with
@@ -204,6 +217,10 @@ export class Fighter {
     // fighter could not act on yet ({ action, age, at }), tried again every
     // step for movement.attackBuffer seconds (see bufferAttack), or null.
     this.bufferedAttack = null;
+    // Likewise the latest Dash (or air dash) asked for that could not start
+    // yet ({ direction, age }), tried again every step for the same
+    // movement.attackBuffer (see the Dash in update), or null.
+    this.bufferedDash = null;
     // How many times each attack with `airUses` has started since the
     // fighter was last on the ground or hit: attack id -> count.
     this.airAttacks = new Map();
@@ -221,9 +238,6 @@ export class Fighter {
     // trackDashTaps): { direction, age }, or null.
     this.dash = null;
     this.dashTap = null;
-    // A Dash asked for during an impact freeze (1 right, -1 left, 0 none),
-    // tried on the step the freeze ends (see dashAsked).
-    this.frozenDash = 0;
     // Seconds the Shield has been up (from the step it went up) and down;
     // and whether this raise may block perfectly (see perfectShield).
     this.shieldUpTime = 0;
@@ -272,9 +286,15 @@ export class Fighter {
   get y() { return this.body.y; }
   get grounded() { return this.body.grounded; }
 
+  // Top speed of normal left / right movement (on the ground and in the
+  // air) and the normal jump's upward speed: the universal values, the same
+  // for every fighter.
+  get maxSpeed() { return this.movement.maxSpeed; }
+  get jumpVelocity() { return this.movement.jumpVelocity; }
+
   update(dt, ctx) {
     const { body, combat } = this;
-    const mv = this.def.movement;
+    const mv = this.movement;
 
     const raw = this.controller ? this.controller.getInput(this, dt, ctx) : NEUTRAL_INPUT;
     const input = this.inputLocked ? NEUTRAL_INPUT : raw;
@@ -316,28 +336,31 @@ export class Fighter {
     if (combat.hitstop > 0) {
       // Impact freeze: nothing moves or advances, but a fresh hit still
       // switches to the hurt pose so the freeze holds the reaction (and a
-      // blocked one keeps the Shield up). Energy keeps refilling. Presses
-      // made during it are kept, not lost, and do not age: the attack
-      // pressed through the impact comes out as soon as it can, and so
-      // does a Dash asked for (a Dash cancel out of the hit). A Shield press
-      // is not: a Deflect starts on its own press or not at all. The body is
-      // drawn where it stopped, not between its last two steps (a rebound
-      // freezes it at the surface it struck).
+      // blocked one keeps the Shield up). The velocity is frozen, never
+      // lost: the body picks up exactly where it stopped. Energy keeps
+      // refilling. Presses made during it are kept, not lost, and do not
+      // age: the attack pressed through the impact comes out as soon as it
+      // can, and so does a Dash asked for (a Dash cancel out of the hit). A
+      // Shield press is not: a Deflect starts on its own press or not at
+      // all. The body is drawn where it stopped, not between its last two
+      // steps (a rebound freezes it at the surface it struck).
       body.prevX = body.x;
       body.prevY = body.y;
       for (const action of COMBAT_ACTIONS) if (input[`${action}Pressed`]) this.bufferAttack(action);
-      this.frozenDash = this.dashAsked(input, 0) || this.frozenDash;
+      const frozenDash = this.dashAsked(input, 0);
+      if (frozenDash) this.bufferedDash = { direction: frozenDash, age: 0 };
       combat.updateEnergy(dt);
       this.updateState(0);
       return;
     }
 
     // ---- Dash -------------------------------------------------------------
-    // A Dash or an air dash ends by itself after one pass of its clip: the
-    // fighter is free again from the step it ends.
+    // A Dash or an air dash ends by itself after its duration (its clip
+    // played once across it): the fighter is free again from the step it
+    // ends, carrying on at the speed it had.
     if (this.dash) {
       this.dash.time += dt;
-      if (this.dash.time >= this.dash.duration - TIME_EPSILON) this.endDash(true);
+      if (this.dash.time >= this.dash.duration - TIME_EPSILON) this.endDash();
     }
 
     // ---- Summon startup ----------------------------------------------------
@@ -368,8 +391,8 @@ export class Fighter {
     // for does nothing.
     //
     // A press the fighter cannot act on yet (an attack or its recovery, a
-    // stun, a Dash, a summon's startup, a cooldown, the Shield button held)
-    // is buffered
+    // stun, a Dash before its cancel time, a summon's startup, a cooldown,
+    // the Shield button held) is buffered
     // (see bufferAttack) and tried again every later step until it starts
     // or expires, so an attack pressed slightly early comes out on the
     // first step it can. A newer press replaces it. Only ever an ordinary
@@ -416,23 +439,41 @@ export class Fighter {
     // The Dash on the ground, the air dash in the air (see tryMouvment).
     // After the attacks (a Deflect included), so one started this step wins
     // over a Dash on the same step (canFollowUp). A Dash may cut short an
-    // attack that hit, as a jump may. A double tap that cannot Dash right
-    // now is used up all the same: nothing is queued for later. Energy
+    // attack that hit, as a jump may. Asked for while the fighter is busy
+    // (an attack or its recovery, a stun, another Dash, an impact freeze),
+    // the request is buffered like an attack press: tried again every step
+    // until it starts, for movement.attackBuffer seconds (a newer request
+    // replaces it), so a Dash pressed slightly early comes out on the first
+    // step it can; so is one in the air that no air dash answers, which is
+    // the Dash if the fighter lands in time. One refused on the ground for
+    // any other reason (no Energy, the Shield held, no art) is used up:
+    // nothing is kept. Energy
     // spent this step means no refill this step (see the end of update).
     //
     // mouvementLeftPressed / mouvementRightPressed ask for one Dash outright
     // (the Joystick touch layout's single-tap mouvement buttons, see
     // InputManager.queueTouchMouvement). The request goes through the very same
     // tryMouvment, so every rule and cost of a double-tap Dash applies, and it
-    // is used up the same way. It is not a tap: it forgets any first tap
-    // waiting, so it never pairs with one, and this step's own direction
-    // press (if any) is not counted as one either. Both at once ask for
-    // nothing. A Dash asked for during an impact freeze is tried here, on
-    // the step it ends, unless this step asks for one itself.
+    // is buffered or used up the same way. It is not a tap: it forgets any
+    // first tap waiting, so it never pairs with one, and this step's own
+    // direction press (if any) is not counted as one either. Both at once
+    // ask for nothing.
     let spent = false;
-    const dashDirection = this.dashAsked(input, dt) || this.frozenDash;
-    this.frozenDash = 0;
-    if (dashDirection && this.tryMouvment(dashDirection, input)) spent = true;
+    const dashDirection = this.dashAsked(input, dt);
+    if (dashDirection) this.bufferedDash = { direction: dashDirection, age: 0 };
+    const wantedDash = this.bufferedDash;
+    if (wantedDash) {
+      // Busy (or dashing still): wait for the first step it can start. In
+      // the air one no air dash answers waits too: on touchdown it is the
+      // Dash.
+      const busy = !this.canFollowUp() || !!this.dash || (!body.grounded && this.dashDuration > 0);
+      if (this.tryMouvment(wantedDash.direction, input)) {
+        spent = true;
+        this.bufferedDash = null;
+      } else if (!busy) {
+        this.bufferedDash = null;
+      }
+    }
 
     // ---- Technique ---------------------------------------------------------
     // While one runs it owns the fighter: its phases advance on their own
@@ -489,6 +530,8 @@ export class Fighter {
     if (combat.shielding || combat.stun > 0 || combat.immobilized || this.technique || this.dash || this.pendingSummon) dir = 0;
     // Normal locomotion only: an attack steers with its own share of it.
     this.moveDir = atk?.def.lockMovement ? 0 : dir;
+    // A Dash or an air dash is a burst at its own speed: the body goes the
+    // Dash's way at it, an air dash flat across with no fall.
 
     if (this.technique || this.pendingSummon) {
       body.vx = 0;
@@ -524,14 +567,18 @@ export class Fighter {
     else this.coyote = Math.max(0, this.coyote - dt);
 
     // A held Shield outranks a jump: let go of the Shield to jump. A jump may
-    // also cut short an attack that hit (see CombatState.cancellable). It
+    // also cut short an attack that hit (see CombatState.cancellable) and a
+    // Dash or an air dash past its cancel time (see dashCancellable). It
     // only sets the upward speed: whatever horizontal speed the fighter has
-    // carries straight into the air. A tap is the normal jump; Jump held a
+    // (a Dash's whole burst included) carries straight into the air, under
+    // full gravity from this step. A tap is the normal jump; Jump held a
     // little longer makes it the higher jump (see below).
-    const free = (canAct || combat.cancellable) && !combat.shielding;
+    const free = (canAct || combat.cancellable || this.dashCancellable) && !combat.shielding;
     let jumped = false;
     if (this.jumpBuffer > 0 && this.coyote > 0 && free) {
       this.cutAttack();
+      if (this.dash) this.endDash();
+      gravityShare = 1;
       this.highJump = { time: 0, fromY: body.y, lift: null };
       body.vy = -this.jumpVelocity;
       body.grounded = false;
@@ -541,14 +588,16 @@ export class Fighter {
       jumped = true;
     } else if (this.jumpBuffer > 0 && !body.grounded && this.coyote <= 0 && this.airJumps > 0 && free && !this.technique && !this.freeFall) {
       // ---- Air jump -------------------------------------------------------
-      // Jump pressed in the air (past coyote time), with one left: a fresh
-      // jump from wherever the fighter is, at airJumpRatio x the normal
-      // jump's speed, the jump clip from its first frame. A held direction
-      // sets off that way at least at top speed, so it can change course;
-      // with none held the drift carries on. Always the same height, held
-      // or tapped: never a higher jump.
+      // Jump pressed in the air (past coyote time), with one left (two per
+      // airtime: the triple jump): a fresh jump from wherever the fighter
+      // is, at airJumpRatio x the normal jump's speed, the jump clip from its
+      // first frame. Vertical only: the sideways speed carries straight
+      // through it, and steering the other way bends it round as the air
+      // allows. Always the same height, held or tapped: never a higher jump.
       this.cutAttack();
-      airJump(body, mv, this.jumpVelocity, this.maxSpeed, held);
+      if (this.dash) this.endDash();
+      gravityShare = 1;
+      airJump(body, mv);
       this.airJumps--;
       this.jumpBuffer = 0;
       this.highJump = null;
@@ -614,12 +663,18 @@ export class Fighter {
 
     if (body.grounded) {
       this.lastGroundY = body.y;
-      this.airJumps = mv.airJumps ?? 0;
+      this.airJumps = mv.airJumps;
       this.airDashes = this.airDashUses;
       this.airAttacks.clear();
       this.freeFall = false;
       this.highJump = null;
       this.tumbling = false;
+      // Landing cancel: an attack started in the air whose recovery runs
+      // on the ground is over (its cooldown starting as if it had
+      // finished), so the fighter acts on touchdown. Its startup and strike
+      // play on as ever; its sideways speed carries on as the ground allows.
+      const a = combat.attack;
+      if (a?.airborne && combat.phase === 'recovery' && !this.inMotion) combat.endAttack();
     }
     // A tumble lasts past the stun until the fighter does something: an
     // attack, a jump, the Shield or a fast fall. Steering alone does not end
@@ -663,37 +718,43 @@ export class Fighter {
     // passive rate: nothing held ever makes it faster.
     if (!spent) combat.updateEnergy(dt);
 
+    // A burst is over once the speed is back to top speed or less.
+    if (this.burst && !this.dash && Math.abs(body.vx) <= mv.maxSpeed + TIME_EPSILON) this.burst = false;
+
     // A buffered press ages only on steps the fighter lives through (never
     // in a freeze) and is gone once it is older than the buffer.
     if (this.bufferedAttack) {
       this.bufferedAttack.age += dt;
-      if (this.bufferedAttack.age > (mv.attackBuffer ?? 0) + TIME_EPSILON) this.bufferedAttack = null;
+      if (this.bufferedAttack.age > mv.attackBuffer + TIME_EPSILON) this.bufferedAttack = null;
+    }
+    if (this.bufferedDash) {
+      this.bufferedDash.age += dt;
+      if (this.bufferedDash.age > mv.attackBuffer + TIME_EPSILON) this.bufferedDash = null;
     }
 
     this.updateFacing(dir, held);
     this.updateState(dt);
   }
 
-  // One step of horizontal steering, with `control` (0-1) of the fighter's
-  // normal steering and `friction` x its ground deceleration while it is
-  // not steering: the shared rule (steer in js/game/fighters/movement.js)
-  // with this fighter's movement profile and top speed.
+  // One step of horizontal steering, with `control` (0-1) of the normal
+  // steering and `friction` x the ground deceleration while it is not
+  // steering: the shared rule (steer in js/game/fighters/movement.js) with
+  // the universal movement values and this fighter's burst.
   moveHorizontal(dir, control, friction, dt) {
-    steer(this.body, this.def.movement, this.maxSpeed, dir, control, friction, dt);
+    steer(this.body, this.movement, dir, control, friction, dt, this.burst);
   }
 
   // One step of an attack's own movement: its step-in, then steering with
   // the attack's share of control (steerAttack in
   // js/game/fighters/movement.js).
   moveAttack(atk, dir, dt) {
-    steerAttack(this.body, this.def.movement, this.maxSpeed, this.facing, atk, dir, dt);
+    steerAttack(this.body, this.movement, this.facing, atk, dir, dt, this.burst);
   }
 
   // The horizontal speed an attack starting now keeps of `vx` (see
-  // attackStartSpeed in js/game/fighters/movement.js), against this
-  // fighter's own top speed.
+  // attackStartSpeed in js/game/fighters/movement.js).
   attackStartSpeed(atk, vx, grounded) {
-    return attackStartSpeed(atk, vx, grounded, this.maxSpeed);
+    return attackStartSpeed(atk, vx, grounded);
   }
 
   // Remembers `action`'s press for the combat input buffer: the latest
@@ -701,14 +762,15 @@ export class Fighter {
   // movement.attackBuffer seconds. Any other press leaves the buffer as it
   // is.
   bufferAttack(action) {
-    if (!(this.def.movement.attackBuffer > 0) || !this.attackMayStart(action)) return;
+    if (!(this.movement.attackBuffer > 0) || !this.attackMayStart(action)) return;
     this.bufferedAttack = { action, age: 0, at: this.steps };
   }
 
   // A hit (never a block) just landed on this fighter (see
-  // CombatSystem.applyHit): it gets its air jump back, so a launch never
-  // strands it without one, and its air dashes and once-per-airtime attacks
-  // (`airUses`) too, and a higher jump (deciding or rising) is over.
+  // CombatSystem.applyHit): it gets both its air jumps back, so a launch
+  // never strands it without them, and its air dashes and once-per-airtime
+  // attacks (`airUses`) too; a higher jump (deciding or rising) is over, and
+  // so is any burst of its own (whatever speed it has now is the hit's).
   //
   // A launch at launchReaction.tumbleSpeed or faster sets it tumbling; a
   // slower one ends a tumble, and a hit that launches nothing leaves it.
@@ -719,8 +781,9 @@ export class Fighter {
   // so a wall can never keep a combo going. A hit that launches nothing
   // leaves the sequence it is flying in as it is.
   takeHit(event) {
-    this.airJumps = this.def.movement.airJumps ?? 0;
+    this.airJumps = this.movement.airJumps;
     this.airDashes = this.airDashUses;
+    this.burst = false;
     this.airAttacks.clear();
     this.freeFall = false;
     this.highJump = null;
@@ -734,7 +797,7 @@ export class Fighter {
   // to top out at movement.highJumpHeight x the normal jump's height above
   // its takeoff (see highJumpLift in js/game/fighters/movement.js).
   highJumpLift(gravity) {
-    return highJumpLift(this.body, this.def.movement, this.jumpVelocity, this.highJump.fromY, gravity);
+    return highJumpLift(this.body, this.movement, this.highJump.fromY, gravity);
   }
 
   // Cuts the attack in progress short, if it may be (see
@@ -744,10 +807,21 @@ export class Fighter {
   }
 
   // Free to start an attack (a Deflect included), a jump, a Dash or an air
-  // dash: free to act, or in an attack that hit and may now be cut short
-  // (see CombatState.cancellable).
+  // dash: free to act, in an attack that hit and may now be cut short (see
+  // CombatState.cancellable), or in a Dash or air dash past its cancel time
+  // (see dashCancellable; a new Dash still waits for it to end).
   canFollowUp() {
-    return this.canAct() || (this.combat.cancellable && !this.technique && !this.dash);
+    return this.canAct() || (this.combat.cancellable && !this.technique && !this.dash) || this.dashCancellable;
+  }
+
+  // A Dash or an air dash may be cut short: movement.dashCancelTime into
+  // it, by an attack, a Deflect or a jump (an air jump in the air), which
+  // carries on from the Dash's speed. Never before: a Dash commits to a
+  // moment of itself first.
+  get dashCancellable() {
+    const d = this.dash;
+    return !!d && d.time >= this.movement.dashCancelTime - TIME_EPSILON && this.combat.canAct() &&
+      !this.technique && !this.pendingSummon;
   }
 
   // Free to start something new: the combat state allows it (no attack,
@@ -807,7 +881,7 @@ export class Fighter {
   // direction (1 right, -1 left); 0 otherwise. The press still waiting is
   // the fighter's own (`dashTap`).
   trackDashTaps(input, dt) {
-    const { direction, tap } = readDashTap(this.dashTap, input, this.def.movement, dt);
+    const { direction, tap } = readDashTap(this.dashTap, input, this.movement, dt);
     this.dashTap = tap;
     return direction;
   }
@@ -820,31 +894,38 @@ export class Fighter {
     return this.body.grounded ? this.tryDash(direction, input) : this.tryAirDash(direction);
   }
 
-  // Air dashes the fighter may make per airtime (movement.airDashUses, 1
-  // when left out), given back on landing and by a hit as its air jumps
-  // are; none at all without a positive movement.airDashSpeed.
+  // Air dashes the fighter may make per airtime (movement.airDashUses),
+  // given back on landing and by a hit as its air jumps are.
   get airDashUses() {
-    const mv = this.def.movement;
-    return mv.airDashSpeed > 0 ? mv.airDashUses ?? 1 : 0;
+    return this.movement.airDashUses;
+  }
+
+  // The speed a Dash or air dash toward `direction` goes at: `speed`, or
+  // the fighter's own speed that way if it is already faster. A Dash never
+  // slows anyone down.
+  dashSpeedToward(direction, speed) {
+    return Math.max(speed, this.body.vx * direction);
   }
 
   // Starts one Dash toward `direction` (1 right, -1 left): a short grounded
-  // burst at movement.dashSpeed for one pass of the dash clip. Movement
-  // only: no hitbox, damage, launch or invulnerability. Only while free
-  // to act (no attack, stun, paralysis, technique or Dash already running) or
-  // in an attack that hit and may be cut short (see
+  // burst at movement.dashSpeed (or faster: see dashSpeedToward) for
+  // movement.dashDuration, its mouvment clip played once across it.
+  // Movement only: no hitbox, damage, launch or invulnerability. Only while
+  // free to act (no attack, stun, paralysis, technique or Dash already
+  // running) or in an attack that hit and may be cut short (see
   // CombatState.cancellable: a Dash chases what it sent flying), grounded,
   // not shielding or holding `shield` for a Shield it may raise, and not
   // exhausted, paying dashCost, or dashCancelCost for one that cuts an
   // attack short (all that is left, emptying the bar, when that is less):
   // the extra is what keeps a hit-Dash-hit chase from looping. Down held
-  // never matters. The fighter faces the Dash at once. False, with nothing
-  // spent and the attack left as it is, if it cannot start (a missing dash
-  // clip is logged). `input` is this step's (Shield held rules it out);
-  // any caller (a future AI too) may use it.
+  // never matters. The fighter faces the Dash at once, and carries a burst
+  // (see `burst`) from it. False, with nothing spent and the attack left as
+  // it is, if it cannot start (a missing dash clip is logged). `input` is
+  // this step's (Shield held rules it out); any caller (a future AI too)
+  // may use it.
   tryDash(direction, input = NEUTRAL_INPUT) {
-    const speed = this.def.movement.dashSpeed;
-    if (!speed || !direction) return false;
+    const speed = this.movement.dashSpeed;
+    if (!speed || !direction || this.dash) return false;
     if (!this.canFollowUp() || !this.body.grounded) return false;
     if (this.combat.shielding || (input.shield && this.shieldAllowed())) return false;
     // Never a fast run passed off as a Dash: require real mouvment frames.
@@ -855,9 +936,11 @@ export class Fighter {
     const cutting = !!this.combat.attack;
     if (!this.combat.spendEnergy(cutting ? this.energyDef.dashCancelCost : this.energyDef.dashCost)) return false;
     this.cutAttack();
-    this.dash = { direction, time: 0, duration: this.dashDuration, speed, air: false, animation: 'mouvment' };
+    const burst = this.dashSpeedToward(direction, speed);
+    this.dash = { direction, time: 0, duration: this.dashDuration, speed: burst, air: false, animation: 'mouvment' };
     this.facing = direction;
-    this.body.vx = direction * speed;
+    this.burst = true;
+    this.body.vx = direction * burst;
     // Every Dash plays its clip from the first frame, even straight after
     // another one.
     this.animator.play('mouvment', { restart: true });
@@ -865,10 +948,11 @@ export class Fighter {
   }
 
   // Starts one air dash toward `direction` (1 right, -1 left): the
-  // fighter's own mid-air mouvment, apart from its Dash. Straight across at
-  // movement.airDashSpeed, no fall (its vertical speed zeroed as it starts,
-  // gravity held off throughout), for one pass of its midair_mouvment clip,
-  // facing that way at once. Movement only: no hitbox, damage, launch,
+  // fighter's mid-air mouvment, apart from its Dash. Straight across at
+  // movement.airDashSpeed (or faster: see dashSpeedToward), no fall (its
+  // vertical speed zeroed as it starts, gravity held off throughout), for
+  // movement.airDashDuration, its midair_mouvment clip played once across
+  // it, facing that way at once. Movement only: no hitbox, damage, launch,
   // invulnerability, Shield or Deflect. airDashUses per airtime (see
   // airDashUses), never chained further. The same rules as a Dash
   // otherwise: free to act or in an attack that may be cut short, not
@@ -879,8 +963,8 @@ export class Fighter {
   // cannot start (missing midair_mouvment art is logged, never faked with
   // another clip).
   tryAirDash(direction) {
-    const speed = this.def.movement.airDashSpeed;
-    if (!(speed > 0) || !direction || this.body.grounded) return false;
+    const speed = this.movement.airDashSpeed;
+    if (!(speed > 0) || !direction || this.body.grounded || this.dash) return false;
     if (!this.canFollowUp() || this.airDashes <= 0 || this.freeFall || this.launch) return false;
     if (!this.airDashDuration || !this.sprites.has('midair_mouvment')) {
       console.warn('[Alva] Air dash has no midair_mouvment animation frames; ignoring.');
@@ -890,25 +974,24 @@ export class Fighter {
     if (!this.combat.spendEnergy(cutting ? this.energyDef.dashCancelCost : this.energyDef.dashCost)) return false;
     this.cutAttack();
     this.airDashes--;
-    this.dash = { direction, time: 0, duration: this.airDashDuration, speed, air: true, animation: 'midair_mouvment' };
+    const burst = this.dashSpeedToward(direction, speed);
+    this.dash = { direction, time: 0, duration: this.airDashDuration, speed: burst, air: true, animation: 'midair_mouvment' };
     this.facing = direction;
     this.highJump = null;
-    this.body.vx = direction * speed;
+    this.burst = true;
+    this.body.vx = direction * burst;
     this.body.vy = 0;
     this.animator.play('midair_mouvment', { restart: true });
     return true;
   }
 
-  // Ends the Dash or air dash in progress, if any. The fighter keeps
-  // whatever speed it has, and the normal movement slows it from there;
-  // except that an air dash run to its end (`finished`) comes out of it at
-  // no more than the fighter's top speed, so the air drag never has a
-  // whole dash's speed to carry it on with. Cut short (a hit, a wall, the
-  // ground) it leaves the speed as it is.
-  endDash(finished = false) {
-    const d = this.dash;
+  // Ends the Dash or air dash in progress, if any: run to its end, cut short
+  // by an attack, a Deflect or a jump, or stopped by a hit, a wall or the
+  // ground (lost, for a Dash). The fighter keeps whatever speed it has:
+  // the normal movement takes over from there, the burst bleeding off as
+  // overspeed does (see steer in js/game/fighters/movement.js).
+  endDash() {
     this.dash = null;
-    if (finished && d?.air) this.body.vx = d.direction * Math.min(Math.abs(this.body.vx), this.maxSpeed);
   }
 
   // Starts the fighter's Deflect (its `deflect` entry, see
@@ -1081,19 +1164,22 @@ export class Fighter {
   }
 
   // Starts attack `atk` now (it may: see tryAction and tryDeflect), turned
-  // to `dir` if one is held: it cuts short an attack that may be, keeps its
-  // share of the speed the fighter had (see attackStartSpeed), counts
-  // against its starts for this airtime, may spend the airtime, and sets its
-  // motion going.
+  // to `dir` if one is held: it cuts short an attack that may be (or a Dash
+  // past its cancel time), keeps its share of the speed the fighter had
+  // (see attackStartSpeed: all of it unless the attack says otherwise, a
+  // Dash's burst included), counts against its starts for this airtime, may
+  // spend the airtime, and sets its motion going. `airborne` remembers
+  // where it started, for the landing cancel (see update).
   startAttack(atk, dir = 0) {
     const combat = this.combat;
     this.cutAttack();
+    if (this.dash) this.endDash();
     this.faceAttackTarget(dir);
     const runningSpeed = this.body.vx;
     this.body.vx = this.attackStartSpeed(atk, this.body.vx, this.body.grounded);
     combat.attack = {
       def: atk, time: 0, hasHit: false, confirmed: false, projectileSpawned: false, stepped: false,
-      struck: null, blocked: false, motion: null,
+      struck: null, blocked: false, motion: null, airborne: !this.body.grounded,
     };
     if (atk.airUses > 0 && !this.body.grounded) this.airAttacks.set(atk.id, (this.airAttacks.get(atk.id) ?? 0) + 1);
     if (atk.freeFall && !this.body.grounded) this.freeFall = true;
@@ -1249,7 +1335,7 @@ export class Fighter {
 
   // Attack `atk` met an opponent (see CombatSystem.update): `event` is the
   // hit or the block. A homing dash springs off it, `rebound` up and
-  // `recoil` back, its air jump given back by a real hit; a plunge bounces
+  // `recoil` back, its air jumps given back by a real hit; a plunge bounces
   // off it and its attack is over; a roll a Shield blocks stops dead and
   // rolls back at `recoil` (one that hits rolls on through).
   attackContact(atk, event) {
@@ -1260,7 +1346,7 @@ export class Fighter {
       m.done = true;
       this.body.vx = -this.facing * spec.recoil;
       this.springUp(spec.rebound);
-      if (event.type === 'hit') this.airJumps = this.def.movement.airJumps ?? 0;
+      if (event.type === 'hit') this.airJumps = this.movement.airJumps;
     } else if (spec.type === 'bounce') {
       m.done = true;
       this.springUp(spec.rebound);
@@ -1294,14 +1380,24 @@ export class Fighter {
   // once the fighter is free (the combat input buffer keeps only those): it
   // maps to an attack for where the fighter is, and that attack could start
   // here at all (on the ground if ground-only, with its art, and with a
-  // start left for this airtime if it has `airUses`). Never a reserved
-  // button (transform), a button the character does not have, an air
-  // extra_attack that is ground-only, an attack without frames or one used
-  // up until the fighter lands.
+  // start left for this airtime if it has `airUses`). In the air, a press
+  // whose ground attack could start once it lands is kept too, so it comes
+  // out on touchdown if that is soon enough (a ground-only extra_attack
+  // pressed just before landing). Never a reserved button (transform), a
+  // button the character does not have, an attack without frames or one
+  // used up until the fighter lands.
   attackMayStart(action) {
-    const attackId = this.attackFor(action);
+    if (this.attackStartsWhere(action, this.body.grounded)) return true;
+    return !this.body.grounded && this.attackStartsWhere(action, true);
+  }
+
+  // Whether `action`'s attack for the ground (`grounded`) or the air could
+  // start there at all (see attackMayStart).
+  attackStartsWhere(action, grounded) {
+    const attackId = this.attackFor(action, grounded);
     const atk = attackId ? this.attacks[attackId] : null;
-    if (!atk || (atk.groundOnly && !this.body.grounded) || this.airStartBlocked(atk)) return false;
+    if (!atk || (atk.groundOnly && !grounded)) return false;
+    if (!grounded && this.airStartBlocked(atk)) return false;
     return !!atk.animation && this.sprites.has(atk.animation);
   }
 
@@ -1309,10 +1405,10 @@ export class Fighter {
   // string (one attack), { ground, air } (chosen by whether the fighter is
   // grounded as the button is pressed: attackN / midair_attackN), null
   // (reserved) or missing (no such button).
-  attackFor(action) {
+  attackFor(action, grounded = this.body.grounded) {
     const mapping = this.def.actions?.[action];
     if (!mapping || typeof mapping === 'string') return mapping || null;
-    return (this.body.grounded ? mapping.ground : mapping.air) || null;
+    return (grounded ? mapping.ground : mapping.air) || null;
   }
 
   // Manual facing follows the fighter's own input: the way it is running
@@ -1369,8 +1465,12 @@ export class Fighter {
   }
 
   // Visual state only: nothing here feeds back into movement or collision.
+  // The land and Shield-release poses never hold anyone: running (a
+  // direction held, or sliding fast) goes straight past them, and anything
+  // of higher priority (a jump, an attack, a Dash, the Shield) ends them.
   updateState(dt) {
     const { body, combat } = this;
+    const running = (this.moveDir !== 0 && Math.abs(body.vx) > 20) || Math.abs(body.vx) > 140;
     let next;
     if (combat.stun > 0) next = 'hitstun';
     else if (this.technique) next = 'technique';
@@ -1381,9 +1481,9 @@ export class Fighter {
     else if (combat.shielding) next = 'shield';
     else if (this.tumbling && !body.grounded) next = 'tumble';
     else if (!body.grounded) next = body.vy < 0 ? 'jump' : 'fall';
+    else if (running) next = 'run';
     else if (this.isLanding(dt)) next = 'land';
     else if (this.isReleasingShield(dt)) next = 'shieldRelease';
-    else if ((this.moveDir !== 0 && Math.abs(body.vx) > 20) || Math.abs(body.vx) > 140) next = 'run';
     else next = 'idle';
 
     // An air jump starts the jump clip over, even straight out of another
@@ -1398,10 +1498,17 @@ export class Fighter {
 
     this.animator.play(this.animationFor(next), { restart });
     if (next === 'run') {
-      // The clip's own rate at the fighter's own top speed, whatever its tier.
+      // The clip's own rate at top speed, following the speed: down to its
+      // minSpeedScale, and faster still above top speed (a Dash's burst run
+      // on), up to its maxSpeedScale, so the stride keeps up with the body.
       const anim = this.animator.anim;
       const ratio = Math.abs(body.vx) / this.maxSpeed;
-      this.animator.setSpeed(clamp(ratio, anim?.minSpeedScale ?? 1, 1));
+      this.animator.setSpeed(clamp(ratio, anim?.minSpeedScale ?? 1, anim?.maxSpeedScale ?? RUN_MAX_SPEED_SCALE));
+    } else if (next === 'dash') {
+      // One pass of the Dash's (or air dash's) clip across the whole Dash,
+      // whatever its frame count and rate.
+      const pass = this.sprites.duration(this.dash.animation);
+      this.animator.setSpeed(pass > 0 && this.dash.duration > 0 ? pass / this.dash.duration : 1);
     } else {
       this.animator.setSpeed(1);
     }
@@ -1433,8 +1540,9 @@ export class Fighter {
     return state;
   }
 
-  // Touchdown starts the land state; it then lasts one pass of the land clip
-  // while grounded. Anything with higher priority (a new jump included) ends it.
+  // Touchdown starts the land state (a pose only); it then lasts one pass of
+  // the land clip while grounded and still. Anything with higher priority (a
+  // run, a new jump included) ends it.
   isLanding(dt) {
     if (!this.landDuration) return false;
     if (this.body.landed) return true;

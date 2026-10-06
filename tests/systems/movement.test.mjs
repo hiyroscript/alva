@@ -1,20 +1,20 @@
-// Movement and game feel (the shared rules in js/game/fighters/movement.js,
-// run here with #0001's movement profile, js/data/characters/0001.js):
-// ground acceleration, stopping
-// and turning, air steering, jumps that carry their speed, the fast fall,
-// the Dash's handoff back into running, how attacks keep, spend and add
-// momentum, the facing an attack takes, landing out of an aerial, and
-// fixed-step determinism.
+// Movement and game feel (the shared rules in js/game/fighters/movement.js
+// with the universal values, js/data/movement.js, run here on #0001):
+// ground acceleration, stopping and turning, air steering, jumps that carry
+// their speed, the fast fall, the Dash's run-on, how attacks keep, spend and
+// add momentum, the facing an attack takes, landing out of an aerial, and
+// fixed-step determinism. (The same for every fighter: see
+// tests/systems/universal-movement.test.mjs and momentum.test.mjs.)
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { StageCollision } from '../../js/game/physics.js';
 import { Fighter } from '../../js/game/fighters/fighter.js';
 import { CONFIG } from '../../js/config.js';
 import {
-  def, DT, makeFighter, fakeSprites, stageMap, stepUntil, duel, STAGE,
+  def, DT, MOVEMENT, makeFighter, fakeSprites, stageMap, stepUntil, duel, STAGE,
 } from '../helpers/fighter-harness.mjs';
 
-const mv = def.movement;
+const mv = MOVEMENT;
 const P = (k) => ({ [k]: true, [`${k}Pressed`]: true });
 const RIGHT = { runRight: true };
 const LEFT = { runLeft: true };
@@ -72,8 +72,8 @@ test('microspacing: taps move a little; run, let go and attack1 lands right besi
     for (let i = 0; i < 20; i++) step({});
     return fighter.body.x - x;
   };
-  assert.ok(tap(1) < 2, 'a one-step tap barely moves');
-  assert.ok(tap(2) < tap(4) && tap(4) < 20, 'longer taps, a little further');
+  assert.ok(tap(1) < 3, 'a one-step tap barely moves');
+  assert.ok(tap(2) < tap(4) && tap(4) < 40, 'longer taps, a little further');
 
   // Run at an opponent from well away, let go in time, then punch: the
   // stop leaves it inside attack1's reach and short of the pushboxes.
@@ -125,7 +125,7 @@ test('air steering bends the drift: a standing jump can be steered, and reversin
   assert.ok(mv.airAcceleration < mv.acceleration && mv.airDeceleration < mv.deceleration);
 });
 
-test('air: faster than top speed (a launch, a jump out of a Dash), holding on never slows the fighter beyond the drag', () => {
+test('air: faster than top speed from a launch, holding on never slows the fighter beyond the drag', () => {
   const { fighter, step } = makeFighter();
   step(JUMP);
   fighter.body.vx = 800;
@@ -283,7 +283,7 @@ test('a fast fall lands on a one-way platform like any fall, never through it', 
 
 // ---- Dash -------------------------------------------------------------------------
 
-test('after a Dash its burst eases back into the run within a few steps, or into a short slide; never a spike or a dead stop', () => {
+test('after a Dash its burst runs on: held on, it eases back into the run; let go, into a slide; never a spike or a dead stop', () => {
   for (const hold of [true, false]) {
     const { fighter, step } = makeFighter();
     step({ ...RIGHT, runRightPressed: true });
@@ -293,41 +293,53 @@ test('after a Dash its burst eases back into the run within a few steps, or into
     const energy = fighter.combat.energy;
     assert.equal(energy, 100 - def.energy.dashCost, 'its Energy, once');
     while (fighter.dash) step(hold ? RIGHT : {});
+    // The step it ends on already runs on from the Dash's own speed: nothing
+    // reset.
+    const rate = hold ? mv.overspeedHoldDeceleration : mv.overspeedDeceleration;
+    assert.ok(close(fighter.body.vx, mv.dashSpeed - rate * DT), `${fighter.body.vx}`);
     const log = [fighter.body.vx];
     const x = fighter.body.x;
-    for (let i = 0; i < 20; i++) log.push(step(hold ? RIGHT : {}).body.vx);
+    for (let i = 0; i < 40; i++) log.push(step(hold ? RIGHT : {}).body.vx);
     for (let i = 1; i < log.length; i++) {
       const d = log[i - 1] - log[i];
-      assert.ok(d >= 0 && d <= mv.overspeedDeceleration * DT + 1e-9, `step ${i}: eases by ${d}`);
+      assert.ok(d >= 0 && d <= Math.max(rate, mv.deceleration) * DT + 1e-9, `step ${i}: eases by ${d}`);
+      if (log[i] > mv.maxSpeed) assert.ok(Math.abs(d - rate * DT) < 1e-9, `step ${i}: at its overspeed rate`);
     }
     if (hold) {
       const settle = log.findIndex((v) => v === fighter.maxSpeed);
-      assert.ok(settle > 0 && settle <= 7, `running at top speed ${settle} steps after the Dash`);
+      assert.equal(settle, Math.ceil((mv.dashSpeed - mv.maxSpeed) / (mv.overspeedHoldDeceleration * DT) - 1e-9) - 1, 'back to a run');
       assert.ok(log.slice(settle).every((v) => v === fighter.maxSpeed));
     } else {
       assert.equal(log.at(-1), 0);
-      assert.ok(fighter.body.x - x < 70, `a short slide (${(fighter.body.x - x).toFixed(1)})`);
+      assert.ok(fighter.body.x - x < 180, `a slide (${(fighter.body.x - x).toFixed(1)})`);
     }
   }
 });
 
-test('an attack pressed late in a Dash comes out as it ends, keeping a share of top speed at most: never a lunge', () => {
+test('an attack pressed during a Dash comes out once its cancel time is reached, keeping the Dash\'s speed: a Dash attack', () => {
   const { fighter, step } = makeFighter();
   step({ ...RIGHT, runRightPressed: true });
   step({});
   step({ ...RIGHT, runRightPressed: true });
-  while (fighter.dash.time < fighter.dash.duration - 4 * DT) step({});
   step(P('attack1'));
-  assert.equal(fighter.combat.attack, null, 'never during the Dash');
-  let n = 0;
-  while (fighter.dash) {
+  assert.equal(fighter.combat.attack, null, 'never in the Dash\'s first moment');
+  let n = 1;
+  while (!fighter.combat.attack) {
     step({});
     n++;
   }
-  assert.ok(n <= 4);
-  assert.equal(fighter.combat.attack?.def.id, 'attack1', 'on the step the Dash ends');
+  assert.equal(n, Math.ceil(mv.dashCancelTime / DT - 1e-9), 'on the first step the Dash may be cut short');
+  assert.equal(fighter.dash, null, 'the attack cut it short');
   const attack1 = fighter.attacks.attack1;
-  assert.ok(fighter.body.vx <= fighter.maxSpeed * attack1.momentum, `${fighter.body.vx}`);
+  assert.ok(fighter.body.vx > mv.dashSpeed * attack1.momentum - mv.overspeedDeceleration * DT - 1e-9, `${fighter.body.vx}`);
+  // Late in a Dash, at once.
+  const late = makeFighter();
+  late.step({ ...RIGHT, runRightPressed: true });
+  late.step({});
+  late.step({ ...RIGHT, runRightPressed: true });
+  while (late.fighter.dash.time < late.fighter.dash.duration - 3 * DT) late.step({});
+  late.step(P('attack1'));
+  assert.equal(late.fighter.combat.attack?.def.id, 'attack1');
 });
 
 // ---- Attacks and momentum ---------------------------------------------------------
@@ -360,7 +372,7 @@ test('the High Kick steps in on its leap frame; an attack with control keeps a s
   assert.ok(close(fighter.body.vx, kick.step.speed - mv.deceleration * kick.friction * DT), 'its step-in, as the leap frame shows');
   const x = fighter.body.x;
   while (fighter.state === 'attack') step({});
-  assert.ok(fighter.body.x - x > 10 && fighter.body.x - x < 30, 'a subtle step forward');
+  assert.ok(fighter.body.x - x > 6 && fighter.body.x - x < 30, `a subtle step forward (${(fighter.body.x - x).toFixed(1)})`);
   // Facing left, it steps left.
   const left = makeFighter({ facing: -1 });
   left.step(P('extra_attack'));
@@ -383,20 +395,22 @@ test('the High Kick steps in on its leap frame; an attack with control keeps a s
   assert.ok(reversed, 'steered the other way while it releases');
 });
 
-test('aerials keep their share of the drift and steer with their airControl; landing keeps only what is left of them', () => {
+test('aerials keep their share of the drift and steer with their airControl; landing cuts only their recovery', () => {
   const { fighter, step } = running();
   step({ ...RIGHT, ...JUMP });
   step({ ...RIGHT, ...P('attack1') });
   const atk = fighter.combat.attack;
   assert.equal(atk.def.id, 'midair_attack1');
-  // Half its drift (airMomentum 0.5), above its own steering cap (0.4 of
-  // top speed): only the air drag eases it, holding on or not.
+  // Its share of the drift (airMomentum), above its own steering cap
+  // (airControl of top speed): only the air drag eases it, holding on or
+  // not.
   const drift = fighter.maxSpeed * atk.def.airMomentum;
   assert.ok(close(fighter.body.vx, drift - mv.airDeceleration * DT), 'its share of the drift');
   for (let i = 0; i < 4; i++) step(LEFT);
   assert.ok(fighter.body.vx < drift - 4 * mv.airDeceleration * DT, 'steered');
-  // A plain aerial started just before touchdown keeps its own clip after
-  // landing, then the fighter acts at once: no extra lock.
+  // A plain aerial started just before touchdown plays its startup and
+  // strike on after landing; its recovery is cut by the ground (the landing
+  // cancel), and the fighter acts at once.
   const plainAir = { ...def, attacks: { ...def.attacks, midair_attack1: { ...def.attacks.midair_attack1, motion: undefined } } };
   const low = makeFighter({ character: plainAir });
   low.step(JUMP);
@@ -412,7 +426,7 @@ test('aerials keep their share of the drift and steer with their airControl; lan
     landed ||= low.fighter.grounded;
   }
   assert.ok(landed, 'landed during it');
-  assert.equal(steps, Math.round(punch.def.total / DT), 'its own length, not restarted');
+  assert.equal(steps, Math.round((punch.def.startup + punch.def.active) / DT), 'its startup and strike, never its recovery');
   for (let i = 0; i < 10 && low.fighter.combat.cooldowns.size; i++) low.step();
   low.step(P('attack1'));
   assert.equal(low.fighter.combat.attack?.def.id, 'attack1', 'free on the ground again');
@@ -583,20 +597,6 @@ test('a technique holds its fighter still: Unlimited Void\'s cast never moves, w
   assert.ok(Math.abs(d.attacker.body.prevX - x) < 1e-9, 'not a unit until it is over');
 });
 
-test('a fresh Fighter with a character that declares no new movement stats still moves (the old fields suffice)', () => {
-  const { overspeedDeceleration, airTurnBoost, fastFallAcceleration, fastFallSpeed, attackBuffer, hitstunFriction, hitstunAirDrag, ...old } = def.movement;
-  const character = { ...def, movement: old };
-  const stage = new StageCollision(stageMap());
-  const fighter = new Fighter({
-    def: character, sprites: fakeSprites(), stage, slot: 0, label: 'P1', controller: null, spawn: { x: 500, facing: 1 },
-  });
-  const ctx = { stage, gravity: CONFIG.sim.gravity };
-  fighter.body.vx = 900;
-  fighter.update(DT, ctx);
-  assert.ok(fighter.body.vx < 900 && fighter.body.vx > 0, 'slows under the deceleration');
-  assert.equal(fighter.bufferedAttack, null);
-});
-
 // ---- Higher jump and air jump --------------------------------------------------------
 
 // Apex height of a ground jump whose Jump is held for `hold` steps (the
@@ -714,26 +714,28 @@ test('the higher jump is decided once: an air jump, a hit or landing ends it, an
   assert.equal(land.fighter.highJump, null);
 });
 
-test('one air jump: past coyote time, from anywhere in the air, the jump clip from its first frame', () => {
+test('two air jumps: past coyote time, from anywhere in the air, each the jump clip from its first frame', () => {
   const { fighter, step } = makeFighter();
   step(JUMP);
   stepUntil(step, (f) => f.body.vy > 0, { jump: true });
   assert.equal(fighter.state, 'fall');
-  assert.equal(fighter.airJumps, 1);
-  step(JUMP);
-  assert.ok(close(fighter.body.vy, -920 * mv.airJumpRatio + CONFIG.sim.gravity * DT), 'a fresh jump');
-  assert.equal(fighter.airJumps, 0);
-  assert.equal(fighter.state, 'jump');
-  assert.equal(fighter.animator.anim.key, 'jump');
-  assert.equal(fighter.animator.index, 0, 'from its first frame');
-  // No second one.
-  stepUntil(step, (f) => f.body.vy > 0);
+  assert.equal(fighter.airJumps, 2);
+  for (const left of [1, 0]) {
+    step(JUMP);
+    assert.ok(close(fighter.body.vy, -920 * mv.airJumpRatio + CONFIG.sim.gravity * DT), 'a fresh jump');
+    assert.equal(fighter.airJumps, left);
+    assert.equal(fighter.state, 'jump');
+    assert.equal(fighter.animator.anim.key, 'jump');
+    assert.equal(fighter.animator.index, 0, 'from its first frame');
+    stepUntil(step, (f) => f.body.vy > 0);
+  }
+  // No third one.
   const vy = fighter.body.vy;
   step(JUMP);
   assert.ok(fighter.body.vy > vy, 'spent: nothing');
-  // Landing gives it back.
+  // Landing gives both back.
   stepUntil(step, (f) => f.grounded);
-  assert.equal(fighter.airJumps, 1);
+  assert.equal(fighter.airJumps, 2);
   // Mid-rise, the air jump starts over too (the clip included).
   step(JUMP);
   for (let i = 0; i < 12; i++) step({ jump: true });
@@ -742,12 +744,13 @@ test('one air jump: past coyote time, from anywhere in the air, the jump clip fr
   assert.equal(fighter.animator.index, 0);
 });
 
-test('an air jump with a direction held sets off that way at least at top speed; with none, the drift carries on', () => {
+test('an air jump never sets the sideways speed: the drift carries on, and a held direction steers it as the air does', () => {
   const turn = running();
   turn.step({ ...RIGHT, ...JUMP });
   for (let i = 0; i < 10; i++) turn.step({ ...RIGHT, jump: true });
+  const before = turn.fighter.body.vx;
   turn.step({ ...LEFT, ...JUMP });
-  assert.ok(turn.fighter.body.vx <= -turn.fighter.maxSpeed + 1e-9, 'a change of course');
+  assert.ok(close(turn.fighter.body.vx, before - mv.airAcceleration * mv.airTurnBoost * DT), 'one step of the air\'s turn, no flip');
   const on = running();
   on.step({ ...RIGHT, ...JUMP });
   for (let i = 0; i < 10; i++) on.step({ jump: true });
@@ -756,7 +759,7 @@ test('an air jump with a direction held sets off that way at least at top speed;
   assert.ok(close(on.fighter.body.vx, vx - mv.airDeceleration * DT), 'no direction: the drift, under the drag');
 });
 
-test('a hit gives the air jump back; a stun or an attack in progress (a Deflect too) holds it for later', () => {
+test('a hit gives the air jumps back; a stun or an attack in progress (a Deflect too) holds them for later', () => {
   const d = duel({ gap: 44 });
   d.target.body.y = 700;
   d.target.body.grounded = false;
@@ -768,18 +771,18 @@ test('a hit gives the air jump back; a stun or an attack in progress (a Deflect 
   d.tick(P('attack1'));
   d.until(() => d.events.length > 0, 30);
   assert.equal(d.events[0].type, 'hit');
-  assert.equal(d.target.airJumps, def.movement.airJumps, 'given back');
+  assert.equal(d.target.airJumps, mv.airJumps, 'given back');
   // Stunned, the press waits (it may expire); it never fires mid-stun.
   d.tick({}, JUMP);
   assert.ok(d.target.combat.stun > 0);
-  assert.equal(d.target.airJumps, def.movement.airJumps);
+  assert.equal(d.target.airJumps, mv.airJumps);
   const deflect = makeFighter();
   deflect.step(JUMP);
   stepUntil(deflect.step, (f) => f.body.vy > 0, { jump: true });
   deflect.step({ shield: true, shieldPressed: true });
   assert.equal(deflect.fighter.combat.attack?.def.id, 'deflect');
   deflect.step({ shield: true, ...JUMP });
-  assert.equal(deflect.fighter.airJumps, 1, 'the Deflect plays on: the jump waits');
+  assert.equal(deflect.fighter.airJumps, mv.airJumps, 'the Deflect plays on: the jump waits');
 });
 
 test('the CPUs let go of Jump inside the higher-jump window: their jumps are normal ones', async () => {

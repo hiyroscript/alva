@@ -3,8 +3,9 @@
 //
 // Purpose: each fighter's definition lives in a module of its own under
 // js/data/characters/ (0001.js, 0002.js, ...): its animations, body,
-// movement profile, Powers, Energy, defense, attacks, projectiles,
-// summons, techniques, touch buttons and ability names. This module only
+// Energy, defense, attacks, projectiles, summons, techniques, touch buttons
+// and ability names. Never its movement: run, jump, the triple jump, the
+// Dash and the air dash are universal (js/data/movement.js). This module only
 // collects them, validates each one and answers "which fighters exist" and
 // "which may be played". It holds no fighter's data itself.
 //
@@ -19,9 +20,10 @@
 //     the whole run: tests register temporary fighters by pushing onto it
 //     and splice them out again (tests/fighters/fixtures/test-fighters.mjs).
 //     Never freeze it or replace it.
-//   - Every definition passes assertLoadout (js/data/loadout.js) as this
-//     module loads, every problem named; one that breaks the loadout rules
-//     never loads.
+//   - Every definition passes assertLoadout (js/data/loadout.js) and
+//     assertUniversalMovement (js/data/movement.js) as this module loads,
+//     every problem named; one that breaks the loadout rules or declares
+//     movement of its own (a `movement` profile, `powers`) never loads.
 //   - A definition existing is not the same as it being playable.
 //     getCharacter finds any definition (the engine and its tests build
 //     fighters from it); only an `available` one is playable (isPlayable,
@@ -40,19 +42,20 @@
 //      (codename_rule), never the move's name in game;
 //   2. write js/data/characters/<id>.js exporting its definition, its moves
 //      keyed by the universal move codenames (MOVES in js/config.js) and
-//      its loadout following js/data/loadout.js, with its own Power tiers
-//      (js/data/powers.js), movement profile and each hit's `damage`,
-//      `baseLaunch` and `directionalLaunch` (js/data/launch.js);
+//      its loadout following js/data/loadout.js, with each hit's `damage`,
+//      `baseLaunch` and `directionalLaunch` (js/data/launch.js). No
+//      movement numbers: it runs, jumps and Dashes exactly as every other
+//      fighter does;
 //   3. import it below and add it to CHARACTERS, with a rosterSlot of its
 //      own;
 //   4. set `available: true` once it is ready to be played.
 //
 // A fighter whose art comes before its combat attributes can still be
 // added: an attack whose art is in is `pending` (art only, see
-// js/game/combat/attacks.js). What the engine cannot build a fighter
-// without, its `powers` and `movement`, is still its own.
+// js/game/combat/attacks.js).
 
 import { assertLoadout } from './loadout.js';
+import { assertUniversalMovement } from './movement.js';
 import { CHARACTER_0001 } from './characters/0001.js';
 import { CHARACTER_0002 } from './characters/0002.js';
 
@@ -98,5 +101,9 @@ export function characterFramePaths(def) {
   return [...new Set(out)];
 }
 
-// No definition that breaks the attack loadout rules is ever loaded.
-for (const def of CHARACTERS) assertLoadout(def);
+// No definition that breaks the attack loadout rules, or that declares
+// movement of its own, is ever loaded.
+for (const def of CHARACTERS) {
+  assertLoadout(def);
+  assertUniversalMovement(def);
+}

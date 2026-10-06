@@ -27,6 +27,7 @@
 import { stepBody } from '../physics.js';
 import { bounceLaunch } from '../combat/launch-bounce.js';
 import { approach } from '../../core/utils.js';
+import { BASE_FIGHTER_MOVEMENT } from '../../data/movement.js';
 
 // All tuning in one place. Times are real seconds; sizes are CSS pixels
 // unless noted (scaled by the view's device-pixel ratio when drawn).
@@ -90,7 +91,7 @@ function seeded(seed) {
 export function launchIsLethal(event, stage, gravity, dt, grace = HIT_FX.lethal.grace) {
   const target = event.target;
   if (!target?.body || !(event.launchSpeed > 0) || !stage?.inVoid) return false;
-  const mv = target.def.movement;
+  const mv = target.movement ?? BASE_FIGHTER_MOVEMENT;
   const body = { ...target.body };
   const bounce = target.launchBounce;
   const launch = target.launch ? { ...target.launch } : null;
@@ -98,8 +99,8 @@ export function launchIsLethal(event, stage, gravity, dt, grace = HIT_FX.lethal.
   for (let t = 0; t < stun + grace; t += dt) {
     const stunned = t < stun;
     const drag = body.grounded
-      ? (stunned ? mv.hitstunFriction ?? mv.deceleration * 0.5 : mv.deceleration)
-      : (stunned ? mv.hitstunAirDrag ?? mv.airDeceleration * 0.5 : mv.airDeceleration);
+      ? (stunned ? mv.hitstunFriction : mv.deceleration)
+      : (stunned ? mv.hitstunAirDrag : mv.airDeceleration);
     body.vx = approach(body.vx, 0, drag * dt);
     stepBody(body, dt, stage, gravity);
     if (launch && bounceLaunch(body, launch, bounce)) stun = Math.max(stun, t + dt + bounce.stun);

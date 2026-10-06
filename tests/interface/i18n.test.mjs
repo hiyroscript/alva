@@ -128,7 +128,7 @@ const {
 } = await import('../../js/localization/i18n.js');
 const { Settings } = await import('../../js/core/settings.js');
 const { CONFIG, ACTION_LABELS } = await import('../../js/config.js');
-const { POWERS } = await import('../../js/data/powers.js');
+const { MOVEMENT_SUMMARY, MOVEMENT_GUIDE } = await import('../../js/data/movement.js');
 const { DIFFICULTIES } = await import('../../js/data/difficulty.js');
 const { MAPS } = await import('../../js/data/maps.js');
 const launch = await import('../../js/data/launch.js');
@@ -208,13 +208,10 @@ test('French is really French: only proper names, codes and shared words read th
 
 test('English game copy is the registries\' own, never retyped', () => {
   for (const [action, label] of Object.entries(ACTION_LABELS)) assert.equal(STRINGS.en[`control.${action}`], label, action);
-  for (const power of POWERS) {
-    assert.equal(STRINGS.en[`power.${power.id}.name`], power.name);
-    assert.equal(STRINGS.en[`power.${power.id}.summary`], power.summary);
-    for (const tier of power.tiers) {
-      assert.equal(STRINGS.en[`power.${power.id}.tier.${tier.tier}.name`], tier.name);
-      assert.equal(STRINGS.en[`power.${power.id}.tier.${tier.tier}.description`], tier.description);
-    }
+  assert.equal(STRINGS.en['movement.summary'], MOVEMENT_SUMMARY);
+  for (const move of MOVEMENT_GUIDE) {
+    assert.equal(STRINGS.en[`movement.${move.id}.name`], move.name);
+    assert.equal(STRINGS.en[`movement.${move.id}.description`], move.description);
   }
   for (const d of DIFFICULTIES) {
     assert.equal(STRINGS.en[`difficulty.${d.id}.name`], d.name);
@@ -237,7 +234,7 @@ test('English game copy is the registries\' own, never retyped', () => {
     assert.equal(STRINGS.en[`ability.${def.id}.jump`], undefined);
   }
   // The game data itself stays in English: its tests and gameplay are untouched.
-  assert.equal(POWERS[0].name, 'Jump Power');
+  assert.equal(MOVEMENT_GUIDE[0].name, 'Run');
   assert.equal(DIFFICULTIES[0].name, 'Easy');
 });
 
@@ -426,10 +423,10 @@ test('changing the language re-reads the whole interface at once: menus, setup s
     assert.equal(difficulty.cards[0].getAttribute('aria-label'), 'Facile, niveau 1 sur 4');
     assert.equal(difficulty.cards[2].querySelector('.difficulty-desc').textContent, 'Réactions rapides. Se défend et punit.');
     // Discover: tabs and the pages built from the registries.
-    assert.deepEqual(discover.tabs.map((tab) => tab.textContent), ['Puissance', 'Éjection', 'Passifs']);
+    assert.deepEqual(discover.tabs.map((tab) => tab.textContent), ['Déplacement', 'Éjection', 'Passifs']);
     assert.equal(discover.el.querySelector('.screen-title').textContent, 'Découvrir');
     const tierNames = discover.el.querySelectorAll('.discover-tier-name').map((n) => n.textContent);
-    assert.ok(tierNames.includes('Puissance de saut 1'));
+    assert.ok(tierNames.includes('Triple saut'));
     assert.ok(tierNames.includes('Éjection de base 2'));
     assert.ok(discover.el.querySelectorAll('.discover-formula')[0].textContent.startsWith('Force d’éjection'));
     // The HUD's spoken labels.

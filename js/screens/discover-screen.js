@@ -1,13 +1,13 @@
-// DISCOVER: the in-game reference. An index rail of sections (Power, Launch,
-// Passives) beside one scrollable page; on narrow windows the rail runs
-// across the top instead. Each page is built from the registry the game
+// DISCOVER: the in-game reference. An index rail of sections (Movement,
+// Launch, Passives) beside one scrollable page; on narrow windows the rail
+// runs across the top instead. Each page is built from the registry the game
 // plays by, never the tuning values, so the reference cannot drift from
-// gameplay: Power from POWERS in js/data/powers.js (names, descriptions and
-// tier numbers), Launch from js/data/launch.js (Launch Point, the Base Launch
-// values and the formula they follow, and every Directional Launch). It
-// explains mechanics only: it never says which fighter or attack uses which
-// Power, tier, Base Launch or direction, so it stays the same as the roster
-// grows.
+// gameplay: Movement from MOVEMENT_GUIDE in js/data/movement.js (the
+// universal run, jumps and Dash every fighter shares), Launch from
+// js/data/launch.js (Launch Point, the Base Launch values and the formula
+// they follow, and every Directional Launch). It explains mechanics only:
+// it never says which fighter or attack uses which Base Launch or
+// direction, so it stays the same as the roster grows.
 //
 // The rail is a tablist with automatic activation: keyboard or gamepad focus
 // on a section shows it, a click or tap selects it, and mouse hover is only a
@@ -23,7 +23,7 @@ import { findNeighbor } from '../core/menu-navigator.js';
 import { el } from '../core/utils.js';
 import { tx, tattr } from '../localization/i18n.js';
 import { screenHeader } from '../ui/components.js';
-import { POWERS } from '../data/powers.js';
+import { MOVEMENT_GUIDE } from '../data/movement.js';
 import { BASE_LAUNCH_VALUES, DIRECTIONAL_LAUNCHES } from '../data/launch.js';
 
 // Where the rail turns horizontal: narrow windows, but never short landscape
@@ -31,17 +31,6 @@ import { BASE_LAUNCH_VALUES, DIRECTIONAL_LAUNCHES } from '../data/launch.js';
 const NARROW_QUERY = '(max-width: 600px) and (min-height: 441px), (max-aspect-ratio: 1/1) and (min-height: 600px)';
 
 const DIRECTIONS = ['up', 'down', 'left', 'right'];
-
-// Tier i of n as n rising bars, the first i filled. Decorative: the name
-// beside it says which it is.
-function tierMeter(tier, count) {
-  return el('span', { class: 'discover-meter', 'aria-hidden': 'true' },
-    Array.from({ length: count }, (_, i) => el('i', {
-      class: i < tier ? 'is-on' : null,
-      style: `height: ${Math.round(((i + 1) / count) * 100)}%`,
-    })),
-  );
-}
 
 // An arrow pointing right, turned by CSS to show a Directional Launch, and
 // a dash for none. Decorative: the direction's name says which it is.
@@ -78,19 +67,16 @@ function row(dataset, marker, name, description) {
   ]);
 }
 
-// One Power: what it does, beside its tiers. Names and descriptions only.
-function powerEntry(power) {
-  const count = power.tiers.length;
-  const key = `power.${power.id}`;
-  return entry(`power-${power.id}`, `${key}.name`, `${key}.summary`,
-    el('ol', { class: 'discover-tiers', ...tattr('aria-label', 'discover.tiers', { name: { t: `${key}.name` } }) }, power.tiers.map((tier) =>
-      row({ tier: String(tier.tier) }, tierMeter(tier.tier, count), `${key}.tier.${tier.tier}.name`, `${key}.tier.${tier.tier}.description`))));
-}
-
-function buildPowerPage() {
+// Movement: the one entry every fighter shares (it says so), beside the
+// universal run, jumps and Dash, each marked with a plain bullet. Names
+// and descriptions only: no tuning numbers.
+function buildMovementPage() {
   return el('div', { class: 'discover-page' }, [
-    el('h2', { class: 'discover-page-title', ...tx('discover.power') }),
-    ...POWERS.map(powerEntry),
+    el('h2', { class: 'discover-page-title', ...tx('discover.movement') }),
+    entry('movement', 'discover.movementTitle', 'movement.summary',
+      el('ul', { class: 'discover-tiers', ...tattr('aria-label', 'discover.movementList') }, MOVEMENT_GUIDE.map((move) =>
+        row({ move: move.id }, el('span', { class: 'discover-mark', 'aria-hidden': 'true' }),
+          `movement.${move.id}.name`, `movement.${move.id}.description`)))),
   ]);
 }
 
@@ -121,7 +107,7 @@ function buildLaunchPage() {
 // future passives registry, so its page stays empty rather than faked.
 // `label` is the tab's translation key.
 const SECTIONS = [
-  { id: 'power', label: 'discover.power', build: buildPowerPage },
+  { id: 'movement', label: 'discover.movement', build: buildMovementPage },
   { id: 'launch', label: 'discover.launch', build: buildLaunchPage },
   { id: 'passives', label: 'discover.passives', build: () => null },
 ];
@@ -162,7 +148,7 @@ export class DiscoverScreen extends Screen {
     this.active = null;
   }
 
-  // Every visit opens on Power, the first section.
+  // Every visit opens on Movement, the first section.
   enter() {
     this.active = null;
     this.show(SECTIONS[0].id);
