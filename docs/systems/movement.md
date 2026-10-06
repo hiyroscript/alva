@@ -206,6 +206,21 @@ one in the air that no air dash answers, which is the Dash if the fighter
 lands in time. One refused on the ground for any other reason (no
 Energy, the Shield held, no art) is used up.
 
+**Combat Assist's approach.** The human player's melee press made just out
+of reach may close the gap first ([combat](combat.md#combat-assist)), on
+the Dash's own numbers: at most one Dash's travel (`dashSpeed` ×
+`dashDuration`, `assistRange` in
+[`js/game/combat/combat-assist.js`](../../js/game/combat/combat-assist.js)),
+at up to `dashSpeed`, its `mouvment` clip played at the Dash's rate, for
+the Dash's `dashCost`, grounded only. It is not a Dash
+(`fighter.combatAssist`, never `fighter.dash`): it covers only the
+distance the attack needs, ends by starting that attack (stopped where it
+reached), and a jump, a Dash request (which then Dashes as above), the
+Shield or another move cancels it at any time, with no `dashCancelTime`
+to wait out. It never leaves its ground: an approach that would end past
+a ledge does not start, and one whose target moves out over a gap stops
+at the edge rather than flying off.
+
 ## 7. Landing
 
 Landing never holds a fighter. On the touchdown step it is free to run,

@@ -31,7 +31,7 @@ There are no import cycles (checked over every module).
 | `screen-manager.js` | Screen registration and transitions (`hidden` / `inert`). | `app.js`, every screen |
 | `menu-navigator.js` | Menu navigation scopes for keyboard, pointer and gamepad. | `app.js`, `screens/discover-screen.js` |
 | `input-manager.js` | `InputManager`: keyboard, gamepad and touch merged into one snapshot per step with press edges. | `app.js` |
-| `settings.js` | The versioned settings store (the only module touching storage): language, Mobile Controls, custom touch layouts. | `app.js`, `localization/i18n.js`, `ui/settings-dialog.js`, `ui/touch-controls.js`, `ui/touch-layout-editor.js` |
+| `settings.js` | The versioned settings store (the only module touching storage): language, Mobile Controls, custom touch layouts, Combat Assist. | `app.js`, `localization/i18n.js`, `ui/settings-dialog.js`, `ui/touch-controls.js`, `ui/touch-layout-editor.js` |
 | `touch-layout.js` | Touch control ids, layout geometry and sanitizing. | `settings.js`, `ui/touch-controls.js`, `ui/touch-layout-editor.js` |
 | `asset-loader.js` | Image loading and decoding. | `app.js` |
 | `device.js` | Touch-first detection, orientation, reduced motion. | `app.js` |
@@ -58,19 +58,20 @@ There are no import cycles (checked over every module).
 | Module | Owns | Used by |
 | --- | --- | --- |
 | `arena.js` | `Arena`: the fixed-step world (fighters, projectiles, clones, combat, hit effects, the Void and respawns), the camera and all canvas drawing. | `battle.js`, `practice.js` |
-| `battle.js` | `Battle` (Quick Battle and Watch Mode): phases, timer, score, K.O., each side's controller. | `screens/battle-screen.js` |
-| `practice.js` | `PracticeSession`: Player 1 and the optional training dummy, damage numbers. | `screens/practice-screen.js` |
-| `physics.js` | Bodies, integration, stage collision (`StageCollision`, `stepBody`, `separate`, `dropThrough`). | `arena.js`, `fighters/fighter.js`, `rendering/hit-fx.js` |
-| `fighters/fighter.js` | `Fighter`: the per-fighter state machine and step order; `separateFighters`; `COMBAT_ACTIONS`. | `arena.js`, `battle.js`, `practice.js`, `ai/moveset.js` |
+| `battle.js` | `Battle` (Quick Battle and Watch Mode): phases, timer, score, K.O., each side's controller (the player's Combat Assist setting to the player's alone). | `screens/battle-screen.js` |
+| `practice.js` | `PracticeSession`: Player 1 (with the player's Combat Assist setting) and the optional training dummy, damage numbers. | `screens/practice-screen.js` |
+| `physics.js` | Bodies, integration, stage collision (`StageCollision`, with the queries `surfaceBelow`, `supportsAt`, `solidAcross` and `inVoid`; `stepBody`, `separate`, `dropThrough`). | `arena.js`, `fighters/fighter.js`, `rendering/hit-fx.js` |
+| `fighters/fighter.js` | `Fighter`: the per-fighter state machine and step order (Combat Assist's approach included: who has it, its presses, its cancellations); `separateFighters`; `COMBAT_ACTIONS`. | `arena.js`, `battle.js`, `practice.js`, `ai/moveset.js` |
 | `fighters/movement.js` | The shared movement rules over the movement values. | `fighters/fighter.js`, `ai/combat-ai.js` |
-| `fighters/fighter-controller.js` | `PlayerController`, `TrainingAIController`, `blankInput`, `jumpTapHold`, `HELD_CONTROLS`. | `fighters/fighter.js`, `ai/combat-ai.js`, `battle.js`, `practice.js`, `core/input-manager.js` |
-| `combat/attacks.js` | The attack schema and phases, motions, pulls' validation (`resolvePull`), the `deflectProjectiles` capability's validation. | `combat/combat.js`, `combat/combat-state.js`, `combat/summon.js`, `combat/projectile.js`, `combat/deflect.js`, `fighters/fighter.js`, `ai/combat-ai.js`, `ai/moveset.js` |
+| `fighters/fighter-controller.js` | `PlayerController` (the one kind that may carry Combat Assist), `TrainingAIController`, `blankInput`, `jumpTapHold`, `HELD_CONTROLS`. | `fighters/fighter.js`, `ai/combat-ai.js`, `battle.js`, `practice.js`, `core/input-manager.js` |
+| `combat/attacks.js` | The attack schema and phases, motions, pulls' validation (`resolvePull`), the `deflectProjectiles` capability's validation, melee or ranged (`isMeleeAttack`, `isRangedAttack`). | `combat/combat.js`, `combat/combat-state.js`, `combat/summon.js`, `combat/projectile.js`, `combat/deflect.js`, `fighters/fighter.js`, `ai/combat-ai.js`, `ai/moveset.js` |
+| `combat/combat-assist.js` | Combat Assist's measurements: `meleeGap`, `approachDistance`, `approachClear`, `assistRange`, `ASSIST_MARGIN`. | `fighters/fighter.js` |
 | `combat/hit-effects.js` | The shared hit effects (`unblockable`, `paralyze`, `blockPush`) and their validation. | `combat/attacks.js`, `combat/projectile.js`, `combat/technique.js` |
 | `combat/pull.js` | Pulls: attacks and projectiles drawing opponents in, each step. | `arena.js` |
 | `combat/defense.js` | The defense schema (the Shield, on the ground; air Shield fields refused). | `fighters/fighter.js` |
 | `combat/deflect.js` | The Deflect schema: an attack definition with every Deflect's fixed strike (`DEFLECT_DAMAGE`, `DEFLECT_BASE_LAUNCH`). | `fighters/fighter.js` |
 | `combat/combat-state.js` | `CombatState`, `CooldownTimers`, `resolveEnergy`. | `fighters/fighter.js` |
-| `combat/combat.js` | `CombatSystem` (projectiles a live Deflect turns back, then hit resolution), launch reaction, `worldBox`. | `arena.js`, `fighters/fighter.js`, `ai/combat-ai.js` |
+| `combat/combat.js` | `CombatSystem` (projectiles a live Deflect turns back, then hit resolution), launch reaction, `worldBox`. | `arena.js`, `combat/combat-assist.js`, `fighters/fighter.js`, `ai/combat-ai.js` |
 | `combat/projectile.js` | Projectiles, and what they do to each other (`clashProjectiles`: repel, erase); `turnBack` (shared by repel and the Deflect); the art's spin (`projectileAngle`). | `arena.js`, `fighters/fighter.js` |
 | `combat/summon.js` | The summon system and its clones. | `arena.js`, `fighters/fighter.js`, `ai/moveset.js` |
 | `combat/technique.js` | The technique runtime. | `fighters/fighter.js`, `ai/moveset.js`, `data/loadout.js` |

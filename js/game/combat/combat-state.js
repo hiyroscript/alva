@@ -19,13 +19,16 @@
 // attacks (CombatState.cooldowns). Both run down in real time.
 //
 // Energy (CombatState.energy, see resolveEnergy) is the one resource a
-// fighter spends, and only on Dash and Shield: a Dash pays dashCost as it
-// starts (dashCancelCost when it cuts short an attack that hit), and every
-// hit the Shield blocks costs shieldHitCost. Either works
-// with less left than it costs, but then takes all of it. It refills by
-// itself at one passive rate. Emptied, it exhausts the fighter: no Dash or
-// Shield until it is full again. Nothing else (movement, jumps, attacks,
-// summons, techniques) ever touches it.
+// fighter spends (there is no Shield meter apart from it), and only on the
+// Dash, Combat Assist's approach and the Shield: a Dash (or an air dash)
+// pays dashCost as it starts (dashCancelCost when it cuts short an attack
+// that hit), the human player's Combat Assist approach pays dashCost once
+// as it starts (see Fighter.tryCombatAssist), and every hit the Shield
+// blocks costs shieldHitCost. Each works with less left than it costs, but
+// then takes all of it. It refills by itself at one passive rate. Emptied,
+// it exhausts the fighter: no Dash, approach or Shield until it is full
+// again. Nothing else (movement, jumps, attacks, summons, techniques) ever
+// touches it.
 
 import { PHASE_EPSILON, attackPhase } from './attacks.js';
 
@@ -34,7 +37,7 @@ import { PHASE_EPSILON, attackPhase } from './attacks.js';
 //   energy: {
 //     max: 100,           // full, and where every fighter starts
 //     regen: 12,          // per second, whatever the fighter is doing
-//     dashCost: 15,       // spent once as a Dash starts
+//     dashCost: 15,       // spent once as a Dash (or Combat Assist's approach) starts
 //     dashCancelCost: 40, // ...instead, by a Dash that cuts short an attack that hit
 //     shieldHitCost: 25,  // spent once for every hit the Shield blocks
 //   }
@@ -116,10 +119,10 @@ export class CombatState {
     // negative, no maximum, and it never stops the fighter acting; a
     // launching hit multiplies it by its Base Launch.
     this.launchPoint = 0;
-    // Energy for Dash and Shield (see resolveEnergy): full at the start,
-    // never below 0 or above maxEnergy. Emptying it (however it happens)
-    // exhausts the fighter, and only a full refill clears that (see
-    // setEnergy).
+    // Energy for the Dash, Combat Assist and the Shield (see
+    // resolveEnergy): full at the start, never below 0 or above
+    // maxEnergy. Emptying it (however it happens) exhausts the fighter,
+    // and only a full refill clears that (see setEnergy).
     this.energySpec = energy;
     this.maxEnergy = energy.max;
     this.energy = energy.max;

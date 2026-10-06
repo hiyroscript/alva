@@ -147,7 +147,8 @@ behave, and how it must look.
   `js/game/` (the arena, battle and practice modes and physics, with
   `fighters/` for the fighter state machine, its movement rules and
   controllers, `combat/` for attacks, defense, combat state, hit
-  resolution, projectiles, summons, techniques and launch bounce, `ai/`
+  resolution, projectiles, summons, techniques, launch bounce and Combat
+  Assist's measurements, `ai/`
   for the combat AI and its moveset reader, and `rendering/` for the
   camera, sprite normalizer and animator, hit and Shield effects and the
   fighter status); `js/stages/` (stage themes); `js/screens/`;
@@ -752,7 +753,7 @@ Home's Settings gear. Home stays visible behind a light dim, blurred where
 backdrop blur is supported, in the same glass as the pause and Practice
 panels (`.glass--panel`); the header holds the kicker "ALVA", the title
 "Settings" and a labelled close button. It holds the player's settings,
-saved on this device, in exactly two sections:
+saved on this device, in exactly three sections, in this order:
 
 - **Language** — **English** and **Français**, each named in its own
   language and marked with its own `lang`, as a `radiogroup` of two `radio`
@@ -774,6 +775,15 @@ saved on this device, in exactly two sections:
   or practice uses it. Beneath them, **Customize touch controls** opens the
   touch layout editor (6.10a) for the layout in use, beside a line naming
   that layout and a "Custom layout" tag once it has one.
+- **Combat** — **Combat Assist** (7.2.4a), under the line "Automatically
+  closes a short gap before a melee attack. Uses Energy and never affects
+  ranged attacks.", with exactly two choices in the Language section's
+  style: **On** (marked "Default") and **Off**, a `radiogroup` (labelled by
+  the setting's name, described by its line) of two `radio` buttons; the
+  one saved is ticked and outlined in green. Choosing one saves it at once
+  and the dialog stays open; each Quick Battle or Practice Ground session
+  reads it as it starts, for Player 1 only. French: **Combat**,
+  **Assistance au combat**, **Activée** / **Désactivée**.
 - **Modal behaviour.** `role="dialog"`, `aria-modal="true"`, labelled by its
   title. Opening it pushes its own navigation scope (arrows, D-pad, Enter,
   A move and choose inside it only; nothing behind it can be reached) and
@@ -784,10 +794,12 @@ saved on this device, in exactly two sections:
 - **Responsive.** Up to 760 px wide; on short landscape screens the body
   scrolls on its own (`overscroll-behavior: contain`, `touch-action: pan-y`)
   while Home never scrolls, and the cards drop their lines below 460 px of
-  height. Narrow windows stack the cards.
-- Presentation and input configuration only: keyboard bindings, gamepad
-  mappings, fighters and rules never change, and Watch Mode stays free of
-  player controls whichever layout is chosen.
+  height (Combat Assist's line always shows: it says what the setting
+  costs). Narrow windows stack the cards.
+- Presentation, input configuration and the human player's own Combat
+  Assist only: keyboard bindings, gamepad mappings, fighters, the CPU and
+  the rules of a fight never change, and Watch Mode stays free of player
+  controls (and of Combat Assist) whichever choices are saved.
 - **Storage.** `js/core/settings.js` is the only module that touches
   storage (no other module reads or writes `localStorage` or
   `sessionStorage`): one versioned object under the `localStorage` key
@@ -795,21 +807,25 @@ saved on this device, in exactly two sections:
   each change —
 
   ```
-  { "version": 2,
+  { "version": 3,
     "language": "en" | "fr" | null,
     "mobileControls": "joystick" | "classic",
-    "touchLayouts": { "joystick": { … }, "classic": { … } } }
+    "touchLayouts": { "joystick": { … }, "classic": { … } },
+    "combatAssist": true | false }
   ```
 
   `language` is null until the player picks one (English is used meanwhile,
   but the first-launch chooser still asks: a default is never mistaken for a
-  choice). A version 1 object (`{ "version": 1, "mobileControls": … }`) is
-  migrated: its Joystick / Classic choice is kept, no language is chosen yet
-  (so the chooser shows once) and both layouts are empty. Every value is
-  checked on load, one by one: nothing stored, corrupt JSON, any other
-  version, an unknown language or scheme, or a malformed layout entry (see
-  6.10a) falls back to its own default without disturbing valid
-  neighbours. Storage that is missing or throws keeps every choice for the
+  choice). `combatAssist` is a real boolean, `true` unless the player turned
+  it off. Older objects are migrated: a version 1 object (`{ "version": 1,
+  "mobileControls": … }`) keeps its Joystick / Classic choice, with no
+  language chosen yet (so the chooser shows once) and both layouts empty;
+  a version 2 object keeps its language, Mobile Controls and both custom
+  layouts. Either gets Combat Assist on. Every value is checked on load,
+  one by one: nothing stored, corrupt JSON, any other version, an unknown
+  language or scheme, a malformed layout entry (see 6.10a) or a Combat
+  Assist that is not a boolean falls back to its own default without
+  disturbing valid neighbours. Storage that is missing or throws keeps every choice for the
   visit only.
 
 ### 6.10a Touch layout editor
@@ -1110,7 +1126,9 @@ each fighter's own values are in its character specification (7.2.9).
   into its stance; Land is a visual state only and never changes movement
   or collision, and a new jump, attack or hitstun cuts it short); Hurt and
   Mid-air Hurt for hitstun; its attacks', Shield's, Deflect's, Dash's and
-  air dash's clips; and its projectile and effect art. No invented frames.
+  air dash's clips (the Dash's `mouvment` also plays through Combat
+  Assist's approach, 7.2.4a); and its projectile and effect art. No
+  invented frames.
   If the airborne, landing or hurt frames fail to load, the fighter holds
   the frame its `animationFallbacks` names (e.g. #0001's and #0002's first
   idle frame) without stretching or rotating; attacks, the Shield, the
@@ -1118,7 +1136,8 @@ each fighter's own values are in its character specification (7.2.9).
   that clip's source orientation; see 3).
 - **Facing.** For players it is manual: only
   the fighter's own movement (running past a small speed on the ground,
-  steering in the air), a Dash, an air dash and an attack started with a
+  steering in the air), a Dash, an air dash, Combat Assist's approach
+  (toward its target, 7.2.4a) and an attack started with a
   direction held turn it (the attack faces that direction as it starts, so a turn made on
   the press step, run left → press right and attack1 together, strikes right,
   never the stale way). **During an action of its own** (an attack or the
@@ -1127,8 +1146,8 @@ each fighter's own values are in its character specification (7.2.9).
   a step-in still to come and a projectile not yet released (e.g. #0001's
   Red) all go the new way. Turning never walks or runs. A technique faces the direction held
   on the step it starts (so #0001's Hollow Purple pressed with Left held
-  sends its sphere left); from then on a stun, a paralysis, a Dash and a
-  technique hold the facing. A spawn or respawn takes the spawn's `facing`, and otherwise it
+  sends its sphere left); from then on a stun, a paralysis, a Dash, Combat
+  Assist's approach and a technique hold the facing. A spawn or respawn takes the spawn's `facing`, and otherwise it
   keeps its last facing. Manual players and the non-attacking training
   controller never auto-face. The combat CPU aims at its live opponent on
   attack initiation and each simulation step, including side switches during
@@ -1140,8 +1159,9 @@ each fighter's own values are in its character specification (7.2.9).
 - Hitstun shows Hurt while grounded and Mid-air Hurt while airborne, switching
   to Hurt if the fighter lands still stunned; the pose also holds through the
   impact freeze. Hitstun outranks every other state (technique, bound (a
-  paralysis), attack, Dash, Shield, tumble, jump, fall, land, Shield lower
-  pose, run and idle), and normal states resume when it ends. The pose is
+  paralysis), attack, Dash, Combat Assist's approach (`assist`), Shield,
+  tumble, jump, fall, land, Shield lower pose, run and idle), and normal
+  states resume when it ends. The pose is
   visual only (no collider changes), but being hit is not: a hit (never a
   block) or a paralysis takes the fighter out of its own attack on its next step, so nothing of
   that attack is left to strike, release a projectile or recover from (no
@@ -1571,6 +1591,89 @@ each fighter's own values are in its character specification (7.2.9).
   attack art is missing (no pose, no cooldown starts), and a technique
   with any of its clips missing.
 
+#### 7.2.4a Combat Assist
+
+Combat Assist (Home › Settings › Combat, 6.10; on by default) makes close
+fighting more forgiving for the human player: a melee press made just out
+of reach closes the gap first, then the very attack asked for comes out.
+It is a short movement phase before the attack, never a change to the
+attack: no hitbox is extended, no damage, phase or motion changed, and
+nobody is teleported. The rules are shared (`Fighter.tryCombatAssist` and
+its neighbours in `js/game/fighters/fighter.js`, the measurements in
+`js/game/combat/combat-assist.js`); nothing in them names a fighter, an
+attack or a button.
+
+- **Whose.** The human player's only, by its controller: a
+  `PlayerController` (kind `player`) given the setting on. Quick Battle's
+  Player 1 and Practice Ground's player get the saved setting as each
+  session starts (`Battle` and `PracticeSession` take `combatAssist` and
+  hand it to that controller alone). The combat AI (Quick Battle's CPU,
+  Watch Mode's CPU 1 and CPU 2), the practice dummy (no controller) and
+  any other kind never have it; a slot, a label ("P1") or a fighter never
+  decides it, and the combat AI has no Combat Assist logic.
+- **Which presses.** A fresh combat-button press (or one the combat input
+  buffer retries) that resolves to a **melee** attack: one with a hitbox of
+  its own and no projectile (`isMeleeAttack` in
+  `js/game/combat/attacks.js`, the very reading the combat AI's moveset
+  sorts melee and ranged by). Never a projectile attack, a pending
+  (art-only) attack, a summon, a technique, a reserved or unmapped button,
+  the Shield or the Deflect (which is an attack, but on `shield`, and only
+  in the air). Only on the ground, for the ground attack, with the fighter
+  free to act (never cutting an attack, a hit-cancel or a Dash short), its
+  opponent in play (not lost to the Void), Energy usable (not exhausted)
+  and its `mouvment` art present; an aerial attack never starts one.
+- **When.** The attack's own hitbox, facing the opponent, is measured
+  against the opponent's hurtboxes where they are (`meleeGap`): only
+  hurtboxes at the box's height count, so a target on another level, in
+  the air above it or behind it is out of reach. Already in reach: the
+  attack starts at once, as ever, nothing paid. Out of reach by no more
+  than **one grounded Dash's travel** (`movement.dashSpeed` × its
+  duration, 208⅓ units: `assistRange`), with ground under the whole way, no
+  solid's side across it, and short of the two pushboxes meeting: the
+  approach starts. Anything else (further, another level, a wall or a gap
+  in the way, a box that could only reach through the target): the attack
+  starts where the fighter stands and may whiff, nothing paid. An attack's
+  own motion (a roll, a step-in, a homing dash) is never counted, so no
+  attack's assist reaches further for one.
+- **The approach** (`fighter.combatAssist`: the press it serves, its
+  attack, its target, its direction, what is left to go, what it has
+  covered and for how long; its own state, never `fighter.dash`). It pays
+  `energy.dashCost` once as it starts, as a Dash does (that step has no
+  refill), faces the opponent and plays the fighter's `mouvment` clip from
+  its first frame, at the Dash's rate. It runs straight at the target at
+  `dashSpeed`, covering only what is left (its last step exactly that,
+  `ASSIST_MARGIN`, 1 unit, past the edge of reach) under ordinary physics:
+  no hitbox, damage or invulnerability, never through a wall or its target.
+  It is measured afresh every step (the target may move). Once the
+  attack's box reaches, it stops where it is and the attack starts there by
+  the ordinary rules (`tryAction`): its own phases, hitbox, motion and held
+  direction, exactly the attack thrown in reach from that spot. Once it can
+  get no closer (a Dash's travel or duration spent, the target off its
+  level or behind it), it stops and the attack starts where it is.
+- **The newest melee press wins.** While it runs, a fresh melee press
+  replaces the attack it ends in (no new cost) and the approach is measured
+  for that attack's own reach; one already in reach starts at once. There
+  is only ever one: a replaced attack never comes out, and nothing of the
+  approach ever goes into the combat buffer. A replacement that cannot
+  start (its cooldown, no art) ends the approach with nothing, never the
+  older attack.
+- **Cancelled**, with its attack never coming and its Energy never given
+  back, by: a jump (the jump takes over on that step), a Dash (a double tap
+  or a mouvement button: the ordinary Dash, paying its own cost), the
+  Shield (pressed, or held where it may go up: the Shield goes up) or a
+  Deflect (in the air, should something lift the fighter), any combat
+  button whose move is not melee (a projectile attack, a pending attack, a
+  summon or a technique: it is tried at once as a press of its own), a hit
+  or a paralysis, leaving the ground, a wall or a ledge in the way (it
+  stops there), its target lost to the Void, taken out or replaced
+  (Practice Ground), its own fighter lost to the Void, input locked (time
+  up), a reset, a rematch, a respawn, a replaced fighter or the arena
+  going. A combat button pressed together with a jump, Dash or Shield that
+  cancels it is dropped; a reserved button does nothing, as ever. While it
+  runs, held directions do not steer or turn the fighter.
+- **Off**, every press behaves exactly as it did before Combat Assist
+  existed: movement, attacks, Energy, input and the CPU are untouched.
+
 #### 7.2.5 Defense and Energy
 
 - `shield` is the shared player action, the Shield button (keyboard L,
@@ -1717,18 +1820,22 @@ each fighter's own values are in its character specification (7.2.9).
   #0002 40) is the one resource a fighter spends, and only on a Dash or an
   air dash (as it starts: `dashCost`, or `dashCancelCost` for one that cuts
   short an attack that hit, which is the fighter's `dashCost` when it
-  declares none; the air dash has no cost of its own) and on the Shield
-  (for each hit it blocks). A Deflect, which is no Shield, costs nothing. Either works whenever the fighter is not
+  declares none; the air dash has no cost of its own), on Combat Assist's
+  approach (`dashCost`, once, as it starts: 7.2.4a) and on the Shield (for
+  each hit it blocks). There is no Shield meter: this is it. A Deflect,
+  which is no Shield, costs nothing. Each works whenever the fighter is not
   exhausted, however little is left: a cost larger than what remains is
   paid by taking all of it (`CombatState.spendEnergy`), never going below
   0. Every fighter starts full, and every
   change goes through `setEnergy`, clamped to [0, max]. It refills by
-  itself at `regen` on every step no Dash or air dash was paid for (idle, moving,
+  itself at `regen` on every step no Dash, air dash or Combat Assist
+  approach was paid for (idle, moving,
   airborne, attacking, shielding, stunned or frozen; `updateEnergy`), at
-  that one rate whatever is held. Reaching 0 (a Dash or a block alike, an overspend included)
-  exhausts the fighter: Dash, air dash and Shield stay unavailable however much has
+  that one rate whatever is held. Reaching 0 (a Dash, an approach or a block alike, an overspend included)
+  exhausts the fighter: Dash, air dash, Combat Assist's approach and Shield stay unavailable however much has
   refilled (1, 25, 50, 75, 99) until Energy is back at exactly max, which
-  clears it. Energy never gates movement,
+  clears it (an exhausted player's melee press simply starts its attack
+  where it stands). Energy never gates movement,
   jumps, attacks, projectiles, summons or techniques, and none of them spend it. A respawn and a restart start it full.
 
 #### 7.2.6 Summons and techniques
@@ -2067,7 +2174,9 @@ each fighter's own values are in its character specification (7.2.9).
     double tap) all go through the fighter
     exactly as a player's do. It never writes to a fighter, never spawns or
     moves anything, never reads the player's raw input, and never uses the
-    training CPU's platform drop: it walks off platform edges instead.
+    training CPU's platform drop: it walks off platform edges instead. It
+    never has Combat Assist (7.2.4a): its melee presses start their attacks
+    where it stands, whatever the player's setting, which never reaches it.
   - **Sense → evaluate → act.** It senses what the simulation shows (both
     fighters' positions, motion, attacks and their phases, Shield,
     Energy, Launch Point, cooldowns, techniques, projectiles, clones, the

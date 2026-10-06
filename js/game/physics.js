@@ -70,6 +70,14 @@ export class StageCollision {
     return Math.abs(this.surfaceBelow(x0, x1, y).y - y) <= EPS;
   }
 
+  // Whether a solid's side stands anywhere across span [x0, x1] at the
+  // height of a body with its feet at `y`, `height` tall: one stepBody would
+  // stop that body at, moving across the span. A solid it stands on top of
+  // (the main floor included) never counts.
+  solidAcross(x0, x1, y, height) {
+    return this.solids.some((s) => y > s.y + EPS && y - height < s.y + s.h && x1 > s.x && x0 < s.x + s.w);
+  }
+
   // Whether a body has crossed into the Void: its centre (half its height
   // above its feet) is outside voidBounds. A fixed, mathematical boundary:
   // the wavering edge the themes draw is art only and never moves it.

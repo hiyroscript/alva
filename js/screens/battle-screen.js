@@ -9,7 +9,9 @@
 //
 // Every string is a translation key (js/localization/i18n.js); the touch controls
 // use the player's saved scheme and custom layout (Home › Settings ›
-// Controls), read afresh as each battle is entered.
+// Controls), read afresh as each battle is entered, as is the player's
+// Combat Assist (Home › Settings › Combat), which only Player 1's
+// controller is given: Watch Mode has no player, so no fighter has it.
 
 import { Screen } from '../core/screen-manager.js';
 import { CONFIG } from '../config.js';
@@ -217,6 +219,7 @@ export class BattleScreen extends Screen {
       input: app.input,
       reducedMotion: app.device.reducedMotion,
       difficulty,
+      combatAssist: app.settings.combatAssist,
     });
     this.hud.bind(this.battle.p1, this.battle.p2);
     this.needsResize = true;

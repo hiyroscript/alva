@@ -196,6 +196,7 @@ test('French is really French: only proper names, codes and shared words read th
     'hud.round', // ROUND n
     'map.card', // {name}. {tagline}
     'mode.index', // Mode 01
+    'settings.combat', // Combat
     'settings.scheme.joystick', // Joystick
     'slot.cpu', 'slot.cpu1', 'slot.cpu2', // CPU
     'banner.round', // ROUND n

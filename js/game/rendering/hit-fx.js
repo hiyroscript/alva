@@ -253,13 +253,13 @@ export class HitEffects {
     return this.flashes.has(f);
   }
 
-  // Records `f`'s afterimage while it tumbles fast or Dashes (called once
-  // per frame with its current frame and interpolated position); old ones
-  // fade.
+  // Records `f`'s afterimage while it tumbles fast or Dashes (Combat
+  // Assist's approach, a Dash's clip and speed, included), called once per
+  // frame with its current frame and interpolated position; old ones fade.
   sampleTrail(f, dt) {
     let trail = this.trails.get(f);
     const tumbling = f.tumbling && Math.hypot(f.body.vx, f.body.vy) >= HIT_FX.trail.speed;
-    const dashing = !!f.dash;
+    const dashing = !!f.dash || !!f.combatAssist;
     const fast = (tumbling || dashing) && !f.lostToVoid;
     if (!trail) {
       if (!fast) return;

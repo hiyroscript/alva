@@ -3,7 +3,8 @@
    order (css/base.css first; see docs/development/conventions.md). */
 
 /* ---------------------------------------------------------------------
-   Settings — a translucent glass dialog over Home: Language and Controls
+   Settings — a translucent glass dialog over Home: Language, Controls
+   and Combat
    --------------------------------------------------------------------- */
 
 /* Home stays visible under a light dim; the glass panel blurs it where
@@ -82,9 +83,10 @@
 .settings-subgroup { display: grid; gap: 8px; }
 .settings-subtitle { margin: 0; font-size: 13px; font-weight: 600; color: var(--text); }
 
-/* Language: two self-named choices, the chosen one ticked and outlined. */
-.settings-languages { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: clamp(8px, 1.4vw, 16px); }
-.settings-language {
+/* Language, and Combat Assist's On / Off: two self-named choices, the
+   chosen one ticked and outlined. */
+.settings-languages, .settings-choices { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: clamp(8px, 1.4vw, 16px); }
+.settings-language, .settings-choice {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -100,9 +102,9 @@
   text-align: left;
   transition: background-color var(--dur-fast) ease, border-color var(--dur-fast) ease, box-shadow var(--dur-fast) ease, transform 80ms ease;
 }
-.settings-language:hover { background: var(--surface-subtle); border-color: var(--border-hover); }
-.settings-language:focus { box-shadow: var(--focus-ring); }
-.settings-language:active { transform: scale(0.99); }
+.settings-language:hover, .settings-choice:hover { background: var(--surface-subtle); border-color: var(--border-hover); }
+.settings-language:focus, .settings-choice:focus { box-shadow: var(--focus-ring); }
+.settings-language:active, .settings-choice:active { transform: scale(0.99); }
 .settings-language-check {
   display: none;
   place-items: center;
@@ -113,8 +115,10 @@
   color: var(--black);
 }
 .settings-language-check .icon { font-size: 14px; stroke-width: 3.2; }
-.settings-language.is-current { border-color: rgba(47, 191, 99, 0.6); background: rgba(47, 191, 99, 0.08); }
-.settings-language.is-current .settings-language-check { display: grid; }
+.settings-language.is-current, .settings-choice.is-current { border-color: rgba(47, 191, 99, 0.6); background: rgba(47, 191, 99, 0.08); }
+.settings-language.is-current .settings-language-check, .settings-choice.is-current .settings-language-check { display: grid; }
+/* A choice's name, with the Default tag beside it. */
+.settings-choice-name { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 10px; }
 
 .settings-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: clamp(8px, 1.4vw, 16px); }
 /* Like the difficulty cards: hover is a preview, the ring is for keys and

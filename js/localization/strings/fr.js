@@ -300,6 +300,11 @@ export const FR = {
   'settings.customize': 'Personnaliser les commandes tactiles',
   'settings.customizeNote': 'Déplacez et redimensionnez chaque commande de la disposition {scheme}.',
   'settings.customized': 'Disposition personnalisée',
+  'settings.combat': 'Combat',
+  'settings.combatAssist': 'Assistance au combat',
+  'settings.combatAssistDesc': 'Comble automatiquement un court écart avant une attaque au corps à corps. Consomme de l’Énergie et n’agit jamais sur les attaques à distance.',
+  'settings.combatAssistOn': 'Activée',
+  'settings.combatAssistOff': 'Désactivée',
 
   'editor.label': 'Éditeur des commandes tactiles',
   'editor.layout': 'Disposition {scheme}',

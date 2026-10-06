@@ -283,8 +283,8 @@ export const CHARACTER_0001 = {
   },
 
   // Energy (see resolveEnergy in js/game/combat/combat-state.js), spent by
-  // the Dash, the air dash and the Shield: it goes further than most,
-  // refilling faster and paying less for each.
+  // the Dash, the air dash, Combat Assist's approach and the Shield: it
+  // goes further than most, refilling faster and paying less for each.
   energy: {
     max: 100,
     regen: 14,

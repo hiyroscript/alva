@@ -243,15 +243,18 @@ export class Arena {
   }
 
   // Nothing else may aim at `f` once the Void takes it: a summon's startup
-  // cast at it is cut short, and pending summons, clones and projectiles
-  // aimed at it or released by it go. Its own technique ends with
-  // `reason`, and its own summon's startup is cut short.
+  // cast at it is cut short, so is Combat Assist's approach toward it, and
+  // pending summons, clones and projectiles aimed at it or released by it
+  // go. Its own technique ends with `reason`, and its own summon's startup
+  // and approach are cut short.
   detachFromPlay(f, reason) {
     f.endTechnique(reason);
     f.cancelSummon();
+    f.cancelCombatAssist();
     for (const other of this.fighters) {
       if (other === f) continue;
       if (other.pendingSummon?.target === f) other.cancelSummon();
+      if (other.combatAssist?.target === f) other.cancelCombatAssist();
       other.summons = other.summons.filter((s) => s.target !== f);
     }
     const keep = (e) => e.owner !== f && e.target !== f;
@@ -664,6 +667,7 @@ export class Arena {
     for (const f of this.fighters) {
       f.endTechnique('destroy');
       f.cancelSummon();
+      f.cancelCombatAssist();
     }
     this.fighters = [];
     this.projectiles = [];

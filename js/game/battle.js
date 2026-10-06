@@ -45,8 +45,14 @@ export class Battle extends Arena {
   // (js/data/difficulty.js); anything missing or unknown is Medium. It shapes
   // only the CPUs' controllers: both fighters are built from their
   // definitions alone. `seed` fixes the CPUs' randomness (tests); by default
-  // every battle differs.
-  constructor({ canvas, map, p1Def, p2Def, p1Sprites, p2Sprites, input, reducedMotion = false, onPhase, difficulty, seed, mode }) {
+  // every battle differs. `combatAssist` is the human player's Combat
+  // Assist setting (on unless given false): it goes to the player's
+  // controller only, so a CPU (Quick Battle's, or either of Watch Mode's)
+  // never has it.
+  constructor({
+    canvas, map, p1Def, p2Def, p1Sprites, p2Sprites, input, reducedMotion = false, onPhase, difficulty, seed, mode,
+    combatAssist = true,
+  }) {
     super({ canvas, map, input, reducedMotion });
     this.onPhase = onPhase || (() => {});
     // Kept for the whole battle: restarts, rematches and respawns keep them.
@@ -57,7 +63,7 @@ export class Battle extends Arena {
     const sides = BATTLE_MODES[this.mode];
     const controllerFor = (side) => (side.cpu
       ? new CombatAIController({ difficulty: this.difficulty, rng: mulberry32(deriveSeed(this.seed, side.stream)) })
-      : new PlayerController(input));
+      : new PlayerController(input, { combatAssist }));
     const [s1, s2] = map.spawnPoints;
     this.p1 = new Fighter({
       def: p1Def, sprites: p1Sprites, spawn: s1, stage: this.stage,

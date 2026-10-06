@@ -1002,3 +1002,50 @@ test('Battle updates touch context after the player simulation, never from the o
   assert.equal(screen.touch.airborne, false);
   assert.equal(screen.touch.buttons.get('attack1')._sprite, image);
 });
+
+// ---- Combat Assist ------------------------------------------------------------------
+
+test('Quick Battle gives Player 1 the saved Combat Assist, read on every entry; its CPU and Watch Mode\'s never have it', () => withTestFighters([TEST_A], async () => {
+  globalThis.Path2D ??= class {
+    constructor() {
+      return new Proxy(this, { get: (t, k) => (k in t ? t[k] : () => {}) });
+    }
+  };
+  const { fakeSpritesOf } = await import('../helpers/fighter-harness.mjs');
+  const { MAPS } = await import('../../js/data/maps.js');
+  const { CombatAIController } = await import('../../js/game/ai/combat-ai.js');
+  const { app, screen } = setup();
+  app.selection = {
+    characterId: TEST_A.id, mapId: MAPS[0].id,
+    watch: { cpu1CharacterId: TEST_A.id, cpu2CharacterId: TEST_A.id, mapId: MAPS[0].id },
+  };
+  const sprites = fakeSpritesOf(TEST_A);
+  app.loadCharacter = () => Promise.resolve(sprites);
+  app.resetCharacter = () => {};
+  app.loading = { show() {}, hide() {}, setProgress() {}, showError() {} };
+  app.input.onKey = () => () => {};
+  const enter = async (params) => {
+    screen.exit?.();
+    await screen.enter(params);
+    assert.ok(screen.battle, 'a Battle was built');
+    return screen.battle;
+  };
+  assert.equal(app.settings.combatAssist, true, 'nothing stored: on');
+  let battle = await enter();
+  assert.equal(battle.p1.controller.kind, 'player');
+  assert.equal(battle.p1.combatAssistOn, true);
+  assert.ok(battle.p2.controller instanceof CombatAIController);
+  assert.equal(battle.p2.combatAssistOn, false, 'never the CPU');
+  app.settings.set('combatAssist', false);
+  battle = await enter();
+  assert.equal(battle.p1.combatAssistOn, false, 'read afresh on entry');
+  app.settings.set('combatAssist', true);
+  battle = await enter();
+  assert.equal(battle.p1.combatAssistOn, true);
+  // Watch Mode: no player, so nobody has it, whatever is saved.
+  battle = await enter({ mode: 'watch' });
+  assert.equal(battle.p1.combatAssistOn, false, 'CPU 1');
+  assert.equal(battle.p2.combatAssistOn, false, 'CPU 2');
+  assert.ok(battle.p1.controller instanceof CombatAIController && battle.p2.controller instanceof CombatAIController);
+  screen.exit?.();
+}));
