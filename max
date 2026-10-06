@@ -1,1503 +1,874 @@
-ALVA — Comprehensive Repository Organization and Structural Refinement
+You are modifying the Alva game repository. Implement this feature completely, including gameplay, sprite integration, AI awareness where appropriate, tests, documentation, and removal/update of stale behavior.
 
-Mission
+Before changing code, inspect the repository architecture and conventions, especially:
 
-Work directly in the GitHub repository:
+* ALVA_SPEC.md
+* codename_rule
+* max
+* docs/architecture/character-system.md
+* docs/development/conventions.md
+* docs/systems/defense.md
+* docs/systems/movement.md
+* docs/systems/combat.md
+* js/game/fighters/fighter.js
+* js/game/fighters/movement.js
+* js/game/combat/attacks.js
+* js/game/combat/combat.js
+* js/game/combat/defense.js
+* js/game/combat/projectile.js
+* js/game/arena.js
+* js/game/rendering/sprite-normalizer.js
+* js/game/ai/moveset.js
+* js/game/ai/combat-ai.js
+* js/data/characters/0001.js
+* js/data/characters/0002.js
+* the corresponding tests under tests/systems/, tests/fighters/0001/, and tests/fighters/0002/
 
-Repository: hiyroscript/alva
-Branch: Create a dedicated refactoring branch rather than modifying main directly.
+Architectural rule
 
-Your task is to carefully reorganize and refine the existing Alva project so that its architecture, codebase, documentation, assets, and tests are more structured, consistent, maintainable, specific, and understandable.
+Do not implement this with checks such as:
 
-This is an organizational and architectural refinement, NOT a complete rewrite of the game.
+if (fighter.def.id === '0001') ...
+if (fighter.def.id === '0002') ...
 
-The existing implementation contains substantial work that must be preserved. Improve how that work is organized and explained rather than unnecessarily replacing it.
+Alva intentionally separates shared systems from fighter configuration. Create generic, optional capabilities which any future fighter could use. 0001 and 0002 should merely opt into those capabilities through their character definitions.
 
-The primary objective is to make Alva a game built around a universal, extensible character system, not a project whose architecture or general documentation revolves around its first character, #0001.
-
-I want meaningful, deliberate improvements rather than superficial folder creation, excessive abstraction, or renaming things merely to make the repository look different.
-
-Important: You are expected to implement the reorganization, not simply recommend it.
-
-⸻
-
-1. ABSOLUTE RULE: DO NOT MODIFY character_rule
-
-The file located at:
-
-character_rule
-
-is strictly protected.
-
-You must NOT:
-
-* Edit its contents.
-* Correct its spelling or grammar.
-* Reformat it.
-* Rename it.
-* Move it into another directory.
-* Delete or regenerate it.
-* Change its encoding, line endings, or permissions.
-* Replace it with a differently formatted equivalent.
-
-The file must remain at its existing root-level path, completely unchanged.
-
-You may read it for contextual understanding, but nothing about the reorganization authorizes modifying it.
-
-Before starting, record its existing Git blob SHA. After completing all changes, verify that the file remains at exactly the same path and has exactly the same contents.
-
-If a proposed change conflicts with this restriction, do not make that change.
-
-This requirement overrides all other organizational preferences in this prompt.
+Preserve fixed-step determinism. Rendering must never alter simulation state.
 
 ⸻
 
-2. UNDERSTAND ALVA BEFORE EDITING
+1. REMOVE MID-AIR SHIELDING AND INTRODUCE DEFLECT
 
-Alva is a browser-based 2D sprite fighting game implemented using:
+The shared Shield input currently behaves differently for the two fighters:
 
-* Vanilla JavaScript ES modules.
-* HTML and CSS.
-* Canvas 2D rendering.
-* Character-specific sprite assets.
-* A fixed-timestep gameplay simulation.
-* Data-driven fighter definitions.
+* 0001 has a real airborne Infinity Shield through defense.airAnimation = 'midair_shielding', including slow-fall behavior.
+* 0002 already has airAnimation: null, so its Shield input does nothing in the air.
 
-It is intentionally lightweight, with no framework, build pipeline, or required runtime dependencies.
+Change the design so neither fighter can Shield while airborne.
 
-Preserve those architectural constraints.
+Grounded Shield behavior must remain intact.
 
-The current game supports several important systems:
+For both fighters:
 
-Gameplay
+* grounded Shield stays a held defensive action;
+* perfect Shield mechanics stay grounded;
+* Shield Energy costs stay grounded;
+* Shield blockstun, stall, and block behavior stay grounded;
+* Shield visual FX stays grounded;
+* airborne Shield slow-fall is removed;
+* pressing the Shield button while airborne now invokes Deflect instead.
 
-* Quick Battle.
-* Watch Mode.
-* Practice Ground.
-* Character selection.
-* Stage selection.
-* Difficulty selection.
-* AI-controlled opponents.
-* Multiple playable character definitions.
-* Launch Point and directional launching.
-* Launch rebounds.
-* Energy management.
-* Movement, jumping, dashing, shielding, and dodging.
-* Character-specific attacks, projectiles, summons, and techniques.
-* Combat visual effects.
+For 0001, remove the functional use of midair_shielding from its defense definition and remove the old slow-fall configuration that existed solely for airborne Infinity.
 
-Interface
+Do not fake an airborne Shield using the old animation.
 
-* Desktop keyboard controls.
-* Gamepad support.
-* Mobile touch controls.
-* Joystick and Classic Buttons layouts.
-* Customizable touch-control positions and sizes.
-* English and French localization.
-* Settings.
-* Discover reference screens.
-* Responsive landscape layouts.
+Deflect input
 
-Content
+Reuse the existing shared shield control.
 
-The repository currently includes two playable fighters:
+On the ground:
 
-* 0001
-* 0002
+hold Shield -> normal grounded Shield
 
-Their implementations are different.
+In the air:
 
-For example, 0001 uses a clone summon and Sphere Rush technique, while 0002 has its own movement characteristics and moves such as Spin Attack, Blue Tornado, and Whirlwind.
+fresh Shield press -> Deflect
 
-These differences belong to character-specific definitions.
+Use shieldPressed, not continuous shield, to trigger Deflect.
 
-Do not lose these mechanics, merge the characters’ behavior, or force one character to follow another’s unique implementation.
+Holding the Shield button must not repeatedly restart Deflect.
 
-Before editing, trace the complete flow from:
+Do not add another keyboard binding.
 
-index.html → js/main.js → App → screens → Battle/Practice → Arena → Fighter → combat and physics
+The existing L key / Shield touch control should therefore be context-sensitive:
 
-Also examine character registration, animation loading, AI decisions, touch-button generation, and tests.
+Grounded: Shield
+Airborne: Deflect
 
-Create a dependency map identifying which modules own each responsibility and which modules depend on them.
-
-Use that map to guide the reorganization.
+Update UI/accessibility/control text where necessary so this is communicated as Shield / Deflect, or dynamically as Deflect while airborne if the current UI architecture supports that cleanly.
 
 ⸻
 
-3. PRIMARY ARCHITECTURAL PRINCIPLE: ALVA IS CHARACTER-AGNOSTIC
+2. DEFLECT MUST BE AN ACTUAL AIRBORNE ATTACK
 
-This is the most important conceptual requirement.
+Deflect is not another Shield state.
 
-Alva’s shared systems must be about all characters, while individual character definitions own individual characteristics.
+Implement it as an attack-like airborne action with:
 
-Currently, some documentation and comments describe universal mechanics as improvements made specifically for #0001.
+* its own animation;
+* startup;
+* active frames;
+* recovery;
+* a melee hitbox;
+* normal fighter-vs-fighter hit resolution;
+* projectile-deflection capability during its active frames.
 
-For example, UPDATES.md describes the Movement Update with wording similar to:
+It should feel like a fast aerial melee swipe/strike rather than a defensive bubble.
 
-“Makes #0001’s movement quicker and its attacks flow into each other.”
+Use the uploaded sprite sheets for 0001 and 0002 as the source of truth for the animations.
 
-This language is unsuitable as the primary explanation of the current shared movement architecture.
+Create a generic character capability, for example conceptually:
 
-The movement implementation must support every fighter. Each fighter can then specify its own speed, acceleration, movement responsiveness, animation timing, and other values.
+deflect: {
+  animation: 'deflect',
+  startup: ...,
+  active: ...,
+  recovery: ...,
+  hitbox: ...,
+  hitstun: ...,
+  hitstop: ...,
+  baseLaunch: ...,
+  directionalLaunch: ...,
+  deflectProjectiles: true,
+}
 
-The documentation should clearly explain that distinction.
+The exact internal schema may differ if another structure fits Alva better, but it must remain generic and data-driven.
 
-Correct conceptual model
+Prefer reusing the existing attack definition / CombatSystem infrastructure rather than creating an unrelated duplicate combat engine.
 
-Shared system:
+Deflect is air-only.
 
-The movement engine supports configurable ground acceleration, deceleration, directional changes, air control, fast falling, jumping, dashing, attack momentum, and input buffering.
+It should not begin when:
 
-Character configuration:
+* grounded;
+* stunned;
+* paralyzed;
+* in a technique;
+* already performing another action that normally prevents a new attack;
+* already performing Deflect.
 
-Each fighter specifies values determining how those shared mechanics behave for that fighter.
+Do not let Deflect silently cut arbitrary attacks short.
 
-Character-specific behavior:
+If an existing generic cancel rule explicitly permits an action to be cancelled, preserve the repository’s established cancel semantics rather than introducing fighter-specific exceptions.
 
-A fighter may have a unique ability, movement technique, animation, or other specialized interaction implemented through an explicit capability or data-driven definition.
+⸻
 
-Follow this conceptual separation throughout the repository.
+3. DEFLECT DAMAGE IS ALWAYS EXACTLY 3
 
-Rules
+This is a hard gameplay invariant:
 
-1. Shared combat, movement, physics, AI, rendering, input, and stage systems must not assume that 0001 is the primary character.
-2. Do not use 0001 as the implicit source of gameplay defaults merely because it was implemented first.
-3. Move genuine character-specific configuration into the appropriate character definition whenever reasonable.
-4. Shared modules may contain examples referencing characters, but those examples must be clearly identified as examples rather than universal requirements.
-5. Existing numerical tuning must not be changed simply to make two fighters more alike.
-6. Never replace meaningful character distinctions with generic behavior.
-7. Avoid adding character-ID checks to shared systems when the same functionality could be represented using existing definitions or a small, explicit capability interface.
-8. Keep universal mechanics reusable for future fighters whose abilities may differ substantially from the current roster.
+A Deflect melee hit always deals exactly 3 damage / Launch Point.
 
-Important distinction
+Do not independently tune 0001 and 0002 to different Deflect damage.
 
-It is perfectly acceptable for character-specific documentation to mention 0001 extensively.
+Prefer enforcing this invariant in the shared Deflect definition rather than merely writing damage: 3 twice and allowing it to drift later.
+
+For example, the shared resolver may inject:
+
+damage: 3
+
+or reject any authored Deflect damage other than 3.
+
+Timing, hitbox dimensions, hitstun and launch characteristics may remain character-specific, but damage must always be 3.
+
+Do not give Deflect unusually huge launch just because its damage is fixed. Keep its launch behavior in line with a relatively light aerial melee attack unless the uploaded animation strongly implies otherwise.
+
+⸻
+
+4. DEFLECT PROJECTILES
+
+During Deflect’s active frames only, its active hitbox can intersect hostile projectiles.
+
+Normal attacks must not automatically gain this property.
+
+Make projectile deflection an explicit capability such as:
+
+deflectProjectiles: true
+
+For this task, only the new Deflect actions for 0001 and 0002 should opt into it unless an existing move already explicitly has equivalent semantics.
+
+When an active Deflect hitbox contacts an enemy projectile:
+
+1. The projectile must not damage the Deflecting fighter on that simulation step.
+2. The projectile changes owner to the Deflecting fighter.
+3. It travels away from the Deflecting fighter.
+4. Its strike history resets in the same way as an already-repelled projectile.
+5. It can then damage its previous owner.
+6. Do not spawn a duplicate projectile.
+7. Do not destroy it merely because it was Deflected.
+
+There is already useful generic behavior in:
+
+Projectile.turnBack(owner, direction)
+
+0001’s Red uses the projectile repel mechanic and ultimately relies on this ownership/direction-reset concept. Reuse/refactor the generic behavior rather than implementing a second incompatible projectile reversal system.
+
+Deflection ordering
+
+This is important.
+
+Current Arena ordering moves projectiles, resolves projectile clashes, then CombatSystem.update() handles melee followed by projectile hits.
+
+Ensure Deflect-vs-projectile interaction occurs before that projectile can hit the fighter during the same fixed step.
 
 For example:
 
-* 0001’s attack timings.
-* 0001’s animation frames.
-* 0001’s summon.
-* 0001’s technique.
-* 0001’s movement values.
-* 0001’s unique gameplay interactions.
+active melee/deflect boxes
+    ↓
+deflect overlapping hostile projectile
+    ↓
+projectile owner/direction changes
+    ↓
+normal projectile-vs-fighter hit resolution
 
-What is not acceptable is presenting a general mechanic as though its purpose, availability, or implementation belongs exclusively to 0001.
+A projectile physically intercepted by an active Deflect should never simultaneously damage the Deflecting fighter because the projectile section happened later.
 
-Apply the same reasoning to 0002.
+Direction
 
-⸻
+A Deflected projectile should leave the fighter rather than somehow being redirected into them.
 
-4. REORGANIZE THE PROJECT INTO CLEAR RESPONSIBILITIES
+For a forward-facing Deflect hitbox, fighter facing is a sensible outgoing direction.
 
-The existing repository already has a useful organizational foundation:
+If the implementation allows all-around Deflect hitboxes, determine the outgoing direction from the projectile’s position relative to the fighter so the projectile is always sent away from the fighter.
 
-* js/core/
-* js/data/
-* js/game/
-* js/screens/
-* js/stages/
-* js/ui/
-* assets/
-* tests/
+Projectile types
 
-Do not discard this structure.
+Deflection should work through the generic projectile system rather than being special-cased to Red, Blue, Whirlwind, etc.
 
-Instead, improve it where individual files have become too large or where unrelated responsibilities are mixed together.
+Do not assume unblockable means undeflectable: blocking and deflecting are different mechanics.
 
-Use the following proposed architecture as a direction, not an instruction to create every directory regardless of need.
+Do not infer immunity simply because a projectile has repel, pierce, or erase.
 
-Proposed repository structure
-
-alva/
-│
-├── index.html
-├── styles.css
-├── .nojekyll
-│
-├── character_rule
-├── codename_rule
-├── CLAUDE.md
-├── README.md
-├── ALVA_SPEC.md
-├── UPDATES.md
-│
-├── assets/
-│   ├── characters/
-│   │   ├── 0001/
-│   │   └── 0002/
-│   └── ...
-│
-├── js/
-│   ├── main.js
-│   ├── config.js
-│   │
-│   ├── core/
-│   │   ├── app.js
-│   │   ├── asset-loader.js
-│   │   ├── audio-manager.js
-│   │   ├── device.js
-│   │   ├── input-manager.js
-│   │   ├── menu-navigator.js
-│   │   ├── screen-manager.js
-│   │   ├── settings.js
-│   │   ├── touch-layout.js
-│   │   └── utils.js
-│   │
-│   ├── data/
-│   │   ├── characters.js
-│   │   ├── characters/
-│   │   │   ├── 0001.js
-│   │   │   ├── 0002.js
-│   │   │   └── helpers.js
-│   │   ├── abilities.js
-│   │   ├── difficulty.js
-│   │   ├── launch.js
-│   │   ├── loadout.js
-│   │   ├── maps.js
-│   │   ├── powers.js
-│   │   └── practice-map.js
-│   │
-│   ├── game/
-│   │   ├── arena.js
-│   │   ├── battle.js
-│   │   ├── practice.js
-│   │   │
-│   │   ├── fighters/
-│   │   │   ├── fighter.js
-│   │   │   ├── movement.js
-│   │   │   ├── state.js
-│   │   │   └── controller.js
-│   │   │
-│   │   ├── combat/
-│   │   │   ├── combat.js
-│   │   │   ├── attacks.js
-│   │   │   ├── defense.js
-│   │   │   ├── projectiles.js
-│   │   │   ├── summons.js
-│   │   │   ├── techniques.js
-│   │   │   └── launch-bounce.js
-│   │   │
-│   │   ├── ai/
-│   │   │   ├── combat-ai.js
-│   │   │   └── ...
-│   │   │
-│   │   ├── rendering/
-│   │   │   ├── camera.js
-│   │   │   ├── sprite-animator.js
-│   │   │   ├── sprite-normalizer.js
-│   │   │   ├── hit-fx.js
-│   │   │   └── shield-fx.js
-│   │   │
-│   │   ├── physics.js
-│   │   └── ...
-│   │
-│   ├── localization/
-│   │   ├── i18n.js
-│   │   └── strings/
-│   │       ├── en.js
-│   │       └── fr.js
-│   │
-│   ├── screens/
-│   ├── stages/
-│   └── ui/
-│
-├── docs/
-│   ├── architecture/
-│   ├── systems/
-│   ├── characters/
-│   ├── gameplay/
-│   ├── development/
-│   └── history/
-│
-├── tests/
-│   ├── helpers/
-│   ├── systems/
-│   ├── fighters/
-│   ├── integration/
-│   └── ...
-│
-└── ...
-
-This is an illustrative target.
-
-Use actual existing modules and their responsibilities to determine final filenames.
-
-For instance, do not introduce both fighter.js and character.js as duplicate implementations of the same entity. Choose one authoritative implementation and update its imports.
-
-Do not create a folder containing a single trivial wrapper unless that folder has a clear architectural purpose.
-
-Do not leave duplicate old and new implementations operating in parallel.
-
-Do not add an abstraction if keeping the existing module is simpler and equally maintainable.
+If a future design needs an explicitly undeflectable projectile, that should be its own explicit data capability; do not silently create that exception as part of this task.
 
 ⸻
 
-5. REORGANIZE CHARACTER DEFINITIONS
+5. DEFLECT MUST NOT BE SHIELDING
 
-Existing issue
+While Deflect is running:
 
-js/data/characters.js currently contains both fighter definitions along with their animation metadata, tuning, moves, and supporting helpers.
+fighter.combat.shielding
 
-The file is over 60 KB and will continue growing as characters are introduced.
+must remain false.
 
-The project is intended to support many more than two characters, so this arrangement does not scale well.
+Deflect must not receive:
 
-Required improvement
+* perfect Shield;
+* Shield Energy payment;
+* Shield blockstun;
+* Shield stall;
+* Shield FX;
+* the old Infinity slow-fall behavior;
+* automatic protection from melee attacks.
 
-Separate character-specific definitions into individual modules.
+If an opponent attacks the Deflecting fighter and the attacks trade, use ordinary combat/trade rules.
 
-Suggested layout:
+Deflect protects against a projectile only when the Deflect hitbox actually catches that projectile during its active window.
 
-js/data/
-├── characters.js
-└── characters/
-    ├── 0001.js
-    ├── 0002.js
-    └── helpers.js
-
-Each character module should own that fighter’s specific information:
-
-* Identifier and roster position.
-* Availability.
-* Display name.
-* Animation definitions.
-* Sprite metadata.
-* Rendering proportions and anchors.
-* Powers.
-* Movement characteristics.
-* Hitboxes and hurtboxes.
-* Energy configuration.
-* Defensive behavior.
-* Attack definitions.
-* Projectile definitions.
-* Summon definitions.
-* Techniques.
-* Ability names.
-* Mobile button artwork and metadata.
-
-A fighter’s character-specific constants should generally live beside its own definition.
-
-For example, constants for 0001’s attack animation rates do not belong in a global module unless they are genuinely shared configuration.
-
-The same applies to 0002’s animation measurements, spinning-ball hitbox, and attack timing.
-
-Keep character access stable
-
-Preserve the existing public interface of js/data/characters.js where possible:
-
-* CHARACTERS
-* getCharacter
-* isPlayable
-* getPlayableCharacter
-* playableCharacters
-* characterFramePaths
-* framePath
-* frames
-
-The existing module can become a small registry and compatibility entry point that imports individual character definitions.
-
-This is particularly important because current tests register temporary fighters by modifying the exported CHARACTERS array.
-
-Do not accidentally break that workflow by freezing the array, replacing it with a different instance, or changing its mutability.
-
-Keep validation through assertLoadout.
-
-Character asset organization
-
-Preserve the established path convention:
-
-assets/characters/<id>/<id>_<codename>_<frame>.png
-
-Do not rename the current sprite assets for organizational aesthetics.
-
-Importantly, preserve the established animation codename mouvment, including its spelling.
-
-Although the word is unconventional, it is part of the existing canonical asset and animation naming contract in codename_rule.
-
-Do not silently change it to movement.
-
-The character definition’s movement configuration and the animation codename mouvment are separate concepts.
+That timing requirement is intentional.
 
 ⸻
 
-6. IMPROVE SHARED MOVEMENT ARCHITECTURE
+6. ADD NEW SPRITES FOR DEFLECT
 
-Examine:
+I will provide updated sprite sheets for both characters in chat.
 
-* js/game/character.js
-* js/game/physics.js
-* js/game/fighter-controller.js
-* js/data/powers.js
-* js/config.js
-* tests/movement.test.mjs
-* tests/dash.test.mjs
-* tests/facing.test.mjs
+Inspect those sheets instead of inventing placeholder art.
 
-Currently, the Fighter implementation contains substantial movement and gameplay-state behavior.
+Extract the appropriate Deflect frames into:
 
-Some of these responsibilities are candidates for extraction into focused modules.
+assets/characters/0001/
+assets/characters/0002/
 
-For example:
+Use a universal codename, preferably:
 
-* Ground acceleration and braking.
-* Air movement.
-* Direction changes.
-* Jump handling.
-* Higher-jump behavior.
-* Air jumps.
-* Fast falling.
-* Dash activation.
-* Dash cancellation.
-* Attack-related movement.
-* Hitstun movement.
-* Collision reactions.
+deflect
 
-If extraction genuinely improves clarity, move cohesive operations into an appropriately named movement module.
+with filenames following the existing character convention:
 
-However, preserve the existing Fighter state ownership and simulation ordering.
+0001_deflect_1.png
+0001_deflect_2.png
+...
+0002_deflect_1.png
+0002_deflect_2.png
+...
 
-Do not create a second movement engine.
+Determine actual frame count, crop boundaries, anchors and FPS from the supplied sheets.
 
-Maintain a clear distinction between mechanics and configuration
+Register the clips in the respective character animation definitions.
 
-Universal movement logic:
+Do not stretch existing Shield art and call it Deflect.
 
-How acceleration, jump buffering, directional control, momentum retention, and dashing operate.
+If obsolete midair_shielding art remains after the change, remove it from the runtime animation definition and from every test/documentation requirement. Delete truly dead generated frame files if appropriate, but do not damage unrelated source artwork.
 
-Per-character configuration:
-
-Values such as:
-
-* acceleration
-* deceleration
-* turnBoost
-* airAcceleration
-* airDeceleration
-* airTurnBoost
-* fastFallAcceleration
-* fastFallSpeed
-* highJumpWindow
-* highJumpHeight
-* airJumps
-* airJumpRatio
-* attackBuffer
-* dashSpeed
-* dashTapWindow
-
-The shared code must interpret these values without special treatment for 0001 or 0002.
-
-Do not automatically standardize the numbers across fighters.
-
-Rendering configuration
-
-Review CONFIG.render.fighterHeight.
-
-Its existing comment references 0001’s visual height as the scale reference.
-
-Determine whether this is a deliberate fixed world-space rendering reference or an accidental character dependency.
-
-If it is intentionally a fixed reference, clarify that it is a camera/rendering convention, not a requirement that all fighters match 0001.
-
-Do not change camera scale, character proportions, or sprite resolution during a documentation cleanup.
-
-Movement acceptance criteria
-
-The reorganization must preserve:
-
-* Fixed-step determinism.
-* Ground acceleration.
-* Air steering.
-* Dash distance and timing.
-* Jump behavior.
-* Attack momentum.
-* Input buffering.
-* Hit-cancel behavior.
-* Existing per-fighter movement differences.
-* Existing animation synchronization.
+Update codename validation/documentation if deflect needs to become an official universal animation codename.
 
 ⸻
 
-7. REORGANIZE COMBAT WITHOUT REDESIGNING IT
+7. ADD CHARACTER-SPECIFIC MID-AIR MOUVMENT
 
-Review these modules:
+The game currently has a grounded Dash driven by:
 
-* js/game/combat.js
-* js/game/character.js
-* js/game/projectile.js
-* js/game/clone.js
-* js/game/technique.js
-* js/game/launch-bounce.js
-* js/game/fighter-status.js
-* js/data/launch.js
-* js/data/loadout.js
+movement.dashSpeed
+movement.dashTapWindow
+animation: mouvment
+Fighter.tryDash()
 
-The combat system already has meaningful distinctions among attacks, projectiles, summons, and techniques.
+Note that mouvment is intentionally spelled that way in this repository.
 
-Preserve those concepts.
+Do not “correct” existing mouvment naming to movement.
 
-Potentially separate cohesive responsibilities such as:
+Add a distinct airborne mobility capability for characters.
 
-* Attack schema construction and validation.
-* Attack startup, active frames, and recovery.
-* Hitbox evaluation.
-* Damage application.
-* Hitstun and blockstun.
-* Launch calculations.
-* Defensive actions.
-* Attack cancellation.
-* Projectile processing.
-* Summon processing.
-* Technique processing.
-* Energy management.
+The new animation codename should preferably be:
 
-Do not split every function into a separate file.
+midair_mouvment
 
-Prefer modules that represent complete responsibilities.
+to remain consistent with the repository’s existing spelling.
 
-Preserve existing contracts
+This must be a separate character capability from the grounded Dash.
 
-The following concepts must remain intact:
+A fighter may have:
 
-Launch Point: The accumulation model already implemented by Alva.
+ground mouvment only
+air mouvment only
+both
+neither
 
-Base Launch: The established launch multiplier values.
+without shared code checking fighter IDs.
 
-Directional Launch: The existing directional definitions.
-
-Loadouts: A fighter has two to five sequential numbered attack families under the existing rules.
-
-Attack routing: Ground and airborne forms use their established move codenames.
-
-Special mechanics: Summons and techniques retain their current semantics and cooldown behavior.
-
-Defense: A character’s definition determines what its defensive action does.
-
-Do not replace Alva’s combat architecture with another fighting-game system.
-
-Distinguish universal combat capabilities from unique moves
-
-For example:
-
-A reusable summon system is universal infrastructure.
-
-0001’s Clone Attack is a specific use of that infrastructure.
-
-A reusable technique system is universal infrastructure.
-
-0001’s Sphere Rush is a specific technique.
-
-A reusable projectile system is universal infrastructure.
-
-The current characters’ individual projectiles have character-specific art and behavior.
-
-This distinction should be obvious in code ownership, documentation, and comments.
+For this task, both 0001 and 0002 get both.
 
 ⸻
 
-8. REORGANIZE THE COMBAT AI
+8. MID-AIR MOUVMENT INPUT
 
-js/game/combat-ai.js is another large module.
+Reuse the existing movement/Dash intents rather than adding another control.
 
-Inspect its internal sections and identify meaningful boundaries.
+The current system already produces:
 
-Possible responsibilities include:
+mouvementLeftPressed
+mouvementRightPressed
 
-* Perception.
-* Target tracking.
-* Movement decisions.
-* Defensive decisions.
-* Attack evaluation.
-* Move availability.
-* Tactical scoring.
-* Difficulty adjustments.
-* Decision execution.
+and directional double-tap Dash requests.
 
-Extract cohesive responsibilities when doing so reduces complexity and preserves the controller interface.
+When grounded, these continue to invoke the normal grounded Dash.
 
-The AI must continue using each fighter’s actual data and available loadout.
+When airborne, the same intent should attempt the character’s new airborne midair_mouvment.
 
-It must not assume all fighters possess 0001’s attacks, summons, or techniques.
+Conceptually:
 
-Retain support for:
+movement request + grounded -> grounded mouvment/Dash
+movement request + airborne -> midair mouvment
 
-* Quick Battle CPU opponents.
-* Watch Mode CPU-versus-CPU matches.
-* Mirror matches.
-* Different fighters on each side.
-* Deterministic seeded simulations.
-* Different difficulty settings.
-* Character-specific movement and attack behavior.
-
-Preserve the current CPU facing and attack-orientation behavior, including the distinction between ordinary attacks and movement-owning techniques.
-
-Do not change combat difficulty, attack selection weights, or tactical behavior merely to simplify the source structure.
+Do not make it require the Shield/Deflect button.
 
 ⸻
 
-9. IMPROVE LOCALIZATION AND UI ORGANIZATION
+9. MID-AIR MOUVMENT BEHAVIOR
 
-Localization
+Implement a generic optional configuration rather than copying grounded Dash logic into 0001 and 0002.
 
-Review js/core/i18n.js.
+A reasonable schema would be something like:
 
-It currently combines localization logic, language dictionaries, and dynamic text obtained from game registries.
+movement: {
+  ...
+  dashSpeed: 950,
+  dashTapWindow: 0.22,
+  airDashSpeed: 950,
+  airDashUses: 1,
+}
 
-Consider moving language-specific dictionaries into dedicated modules:
+The exact field names may differ, but their meaning should be clear and documented.
 
-js/localization/
-├── i18n.js
-└── strings/
-    ├── en.js
-    └── fr.js
+Use:
 
-Keep existing translation keys and fallback behavior intact.
+animations.midair_mouvment
 
-Maintain dynamic string generation from the registries for controls, characters, stages, Powers, and Launch.
+for the animation.
 
-Do not replace registry-owned gameplay terminology with independently maintained copies.
+For both 0001 and 0002, begin with one airborne movement use per airtime.
+
+Restore the use when the fighter:
+
+* lands; or
+* is hit/reset in the same circumstances where Alva restores other airtime resources such as air jumps / limited aerial attacks.
+
+During the aerial movement:
+
+* move in the requested horizontal direction;
+* immediately face that direction;
+* play one pass of midair_mouvment;
+* it is mobility only;
+* no hitbox;
+* no damage;
+* no launch;
+* no invulnerability;
+* no projectile deflection;
+* no Shield state.
+
+Use the sprite animation duration as the ability duration, consistent with grounded mouvment.
+
+Start with an air speed around the corresponding fighter’s existing grounded Dash speed:
+
+0001: ~950 units/s
+0002: ~1100 units/s
+
+but keep the values independently configurable.
+
+For a conventional horizontal air dash, zero vertical velocity when it starts and suppress normal gravity during the short animation, then return to normal airborne physics when it ends.
+
+If the supplied sprite clearly depicts a different trajectory, tune the character data to match the artwork while keeping the shared mechanic generic.
+
+Do not allow infinite chained air movement.
+
+Missing midair_mouvment art must cause the ability to be refused/logged in the same spirit as the current grounded Dash rather than silently substituting another animation.
+
+⸻
+
+10. AIR MOUVMENT AND ACTION PRIORITY
+
+Preserve clear input priority.
+
+A fresh airborne Shield press intended for Deflect should not accidentally become air movement.
+
+A normal numbered attack pressed on the same step should follow the repository’s existing combat-intent priority rules.
+
+Do not introduce surprising implicit buffering.
+
+Air movement should obey the same broad restrictions as grounded Dash:
+
+* no start during stun;
+* no start during paralysis;
+* no start during a technique;
+* no start while another movement ability is already active;
+* no start without the authored animation;
+* respect existing attack-cancel rules rather than bypassing them.
+
+If grounded Dash spends Energy, preserve compatible energy/cancel behavior for aerial movement unless there is a strong architectural reason to expose a separate configurable air-movement cost.
+
+If you expose a separate cost, make it generic and document the fallback/default. Do not hardcode it by fighter ID.
+
+⸻
+
+11. MAKE ALL 0001 PROJECTILES ROTATE EXTREMELY FAST
+
+0001 currently has:
+
+attack2_object — Red
+attack3_object — Maximum Blue
+attack5_object — Hollow Purple
+
+Make all of these projectile sprites spin very rapidly while flying.
+
+This must be a generic projectile rendering capability, not:
+
+if (owner.id === '0001') rotate(...)
+
+Add optional projectile data such as:
+
+rotationSpeed: 2160
+
+where the unit is clearly documented, preferably degrees per second.
+
+Default:
+
+rotationSpeed: 0
+
+so every existing projectile remains visually unchanged unless it opts in.
+
+Set all 0001 projectile definitions to approximately:
+
+2160 degrees/second
+
+which is six full rotations per second and should read as “extremely fast”.
+
+Tune slightly if required by the art, but it must visibly be a very fast spin.
+
+Rotation constraints
+
+Rotation is visual only.
+
+It must not:
+
+* change projectile velocity;
+* rotate the collision hitbox;
+* affect launch direction;
+* affect pulls;
+* affect projectile clash calculations;
+* modify determinism.
+
+Derive rotation from simulation time / projectile age rather than mutating gameplay geometry.
+
+A projectile that is Deflected or repelled should retain continuous rotation; do not reset its visual spin merely because ownership changed.
+
+⸻
+
+12. PROJECTILE RENDERING
+
+At present Arena uses:
+
+drawCenteredFrame(...)
+
+for projectiles without rotation.
+
+Extend rendering cleanly.
+
+Either:
+
+* add an optional rotation argument to the centered-frame renderer; or
+* add a small dedicated rotated-centered-frame helper.
+
+Use canvas transforms in this order conceptually:
+
+save
+translate to projectile centre
+rotate
+apply flip if necessary
+draw around normalized projectile anchor
+restore
+
+Do not break the existing normalized anchor/scale behavior.
+
+Projectiles with rotationSpeed: 0 must render identically to today.
+
+⸻
+
+13. AI / MOVESET INTEGRATION
+
+Alva’s CPU reads capabilities from:
+
+js/game/ai/moveset.js
+js/game/ai/combat-ai.js
+
+Do not leave the new abilities as player-only mechanics if the CPU architecture can represent them generically.
+
+Update the moveset reader so it knows whether the current fighter has:
+
+ground Shield
+Deflect
+ground mouvment
+midair mouvment
+
+Do not represent shield: true as though that automatically means Shield is valid in the air.
+
+At minimum:
+
+* CPUs should stop attempting an airborne Shield that no longer exists;
+* they should be able to recognize Deflect as the aerial response capability;
+* they should recognize mid-air movement as mobility.
+
+A reasonable CPU behavior is:
+
+* if airborne and an incoming hostile projectile is about to intersect within the Deflect timing/reach, Deflect may be considered as a defensive response;
+* otherwise the CPU can use aerial movement for positioning/recovery according to the same difficulty/personality system used by Dash.
+
+Keep all AI capability checks generic.
+
+Do not make an AI branch for 0001 or 0002.
+
+⸻
+
+14. CHARACTER 0001
+
+Update js/data/characters/0001.js.
+
+Required end state:
+
+Ground Shield: yes
+Air Shield: no
+Deflect: yes
+Ground mouvment: yes
+Mid-air mouvment: yes
+Deflect damage: 3
+Fast projectile spin: Red, Maximum Blue, Hollow Purple
+
+Specific cleanup:
+
+* remove defense.airAnimation = 'midair_shielding';
+* remove airborne Shield slow-fall behavior;
+* register the new Deflect animation from the uploaded sheet;
+* register midair_mouvment from the uploaded sheet;
+* author Deflect timings/hitbox based on the sheet;
+* opt Deflect into projectile reflection;
+* add the new aerial movement parameters;
+* add fast rotationSpeed to all three 0001 projectile definitions.
+
+Do not alter Red’s existing repel property merely because Deflect now exists. Red should keep its projectile-vs-projectile repelling behavior.
+
+⸻
+
+15. CHARACTER 0002
+
+Update js/data/characters/0002.js.
+
+Required end state:
+
+Ground Shield: yes
+Air Shield: no
+Deflect: yes
+Ground mouvment: yes
+Mid-air mouvment: yes
+Deflect damage: 3
+
+Its current airAnimation: null behavior is no longer simply “Shield does nothing in the air”; the Shield input should now trigger Deflect.
+
+Use 0002’s uploaded sprite sheet for both:
+
+deflect
+midair_mouvment
+
+Do not repurpose Homing Attack, Bounce Attack or Blue Tornado as Deflect. Deflect is its own shared defensive/offensive aerial action.
+
+⸻
+
+16. SPRITE-SHEET INTEGRATION
+
+Do not guess arbitrary frame rectangles before inspecting the uploaded sprite sheets.
+
+For each sheet:
+
+1. identify the new Deflect sequence;
+2. identify the new mid-air movement sequence;
+3. crop frames cleanly;
+4. preserve transparency;
+5. preserve the character’s established pixel scale;
+6. determine appropriate anchor points so the body does not visibly jump between frames;
+7. register the proper FPS;
+8. add real frame paths through the repository’s existing frame helper;
+9. verify every referenced PNG exists.
+
+Use:
+
+0001_deflect_<frame>.png
+0001_midair_mouvment_<frame>.png
+0002_deflect_<frame>.png
+0002_midair_mouvment_<frame>.png
+
+unless an existing universal codename rule requires another exact form. If so, update the universal codename specification cleanly rather than inventing character-specific names.
+
+⸻
+
+17. TESTS
+
+Do not merely update old snapshots until they pass. Add regression coverage for the actual mechanics.
+
+Update or add tests covering all of the following.
+
+Deflect
+
+Verify that:
+
+0001 cannot Shield in the air.
+0002 cannot Shield in the air.
+Grounded Shield still works for both.
+Holding Shield airborne does not create a held Shield state.
+A fresh Shield press airborne starts Deflect.
+Holding the button does not repeatedly restart Deflect.
+Deflect only exists during its authored attack duration.
+Deflect melee damage is exactly 3 for both fighters.
+Deflect never charges shieldHitCost.
+Deflect is not a perfect Shield.
+Deflect gets no blockstun.
+Deflect does not block ordinary melee attacks.
+Deflect only reflects projectiles during active frames.
+Startup does not reflect.
+Recovery does not reflect.
+A projectile caught by Deflect cannot hit the Deflecting fighter on that same step.
+The Deflected projectile changes owner.
+The Deflected projectile travels away from the Deflecting fighter.
+Its previous hit history is reset.
+The previous owner can be hit by the returned projectile.
+Normal attacks that lack the capability do not Deflect projectiles.
+Existing Red repel behavior still works.
+
+A dedicated file such as:
+
+tests/systems/deflect.test.mjs
+
+is appropriate.
+
+Also update relevant expectations in:
+
+tests/systems/defense.test.mjs
+tests/systems/projectile-clash.test.mjs
+tests/systems/combo.test.mjs
+
+where current behavior assumes the old airborne Shield.
+
+Mid-air mouvment
+
+Verify:
+
+grounded movement request still performs normal mouvment
+airborne movement request performs midair_mouvment
+it uses its own animation
+it uses its own speed/configuration
+it faces the requested direction
+it is movement-only
+it creates no hitbox
+it gives no invulnerability
+it does not Shield
+it does not Deflect
+only the configured number of uses are available per airtime
+landing restores the use
+being reset/hit restores it according to the normal airtime-resource convention
+missing midair_mouvment art refuses the ability instead of faking it
+0001 and 0002 both have the capability
+
+Update:
+
+tests/systems/dash.test.mjs
+tests/systems/movement.test.mjs
+tests/systems/movement-profile.test.mjs
+
+or introduce a focused air-movement test if that keeps responsibilities cleaner.
+
+Projectile spin
+
+Verify:
+
+rotationSpeed defaults to 0
+0001 Red has high rotationSpeed
+0001 Maximum Blue has high rotationSpeed
+0001 Hollow Purple has high rotationSpeed
+other projectile definitions are unchanged unless explicitly configured
+render angle advances deterministically with projectile age
+rotation does not modify the hitbox
+turnBack / Deflect does not reset projectile rotation
+
+Add renderer coverage for canvas rotate() without making the test depend on real-time wall-clock values.
+
+Character sprite tests
+
+Update the existing character tests under:
+
+tests/fighters/0001/
+tests/fighters/0002/
+
+so they validate:
+
+Deflect clip exists
+midair_mouvment clip exists
+all referenced frame PNGs exist
+normalization succeeds on the real uploaded art
+the obsolete airborne Shield clip is no longer required by 0001
+
+Update tests/systems/codenames.test.mjs if adding the new universal animation codenames.
+
+Update AI tests to verify capability-driven behavior and that the CPU no longer treats Shield as an airborne guard.
+
+⸻
+
+18. DOCUMENTATION
+
+Update the documentation so it describes the game that actually exists after this change.
+
+At minimum inspect/update:
+
+docs/systems/defense.md
+docs/systems/movement.md
+docs/systems/combat.md
+docs/systems/rendering.md
+docs/systems/ai.md
+docs/characters/0001.md
+docs/characters/0002.md
+docs/characters/adding-characters.md
+docs/architecture/character-system.md
+ALVA_SPEC.md
+codename_rule
+
+Remove descriptions saying:
+
+0001 can Shield in the air
+0001 Shield causes slow-fall
+0002 Shield input simply does nothing in the air
+
+Replace those with the new Shield/Deflect behavior.
+
+Document:
+
+Deflect
+3-damage invariant
+projectile-deflection capability
+midair_mouvment
+airtime-use reset rules
+projectile rotationSpeed
+
+Keep comments in source synchronized with the implementation.
+
+⸻
+
+19. BACKWARD-COMPATIBILITY / NON-GOALS
+
+Do not redesign unrelated combat.
 
 Preserve:
 
-* English and French.
-* Existing translated strings.
-* Language selection and persistence.
-* Reactive language changes.
-* Accessibility labels.
-* Missing-translation fallback behavior.
+0001 grounded Infinity Shield
+0002 grounded guard
+perfect Shield timing
+Energy regeneration
+ground Dash behavior
+air jumps
+numbered aerial attacks
+Red repel
+Blue pull/pierce
+Hollow Purple erase/unblockable behavior when it actually hits
+0002 Whirlwind behavior
+current launch system
+current fixed-step simulation
+current sprite normalization scale
 
-If relocating the current localization API, use a lightweight compatibility export only when necessary.
+The new Deflect mechanic is not a replacement for the ordinary midair_attackN moves.
 
-Interface
+The new midair_mouvment is not an attack.
 
-Review the existing separation among js/screens/, js/ui/, and js/game/touch-controls.js.
-
-Use this ownership model:
-
-* Screens: navigation and screen lifecycle.
-* UI components: reusable interface presentation.
-* Input systems: device and control input.
-* Touch controls: translating mobile interactions into existing inputs.
-* Game simulation: gameplay behavior, independent of interface rendering.
-
-Avoid creating separate implementations of the same interaction for desktop, gamepad, and mobile when they can share the established action mapping.
+Projectile rotation is not projectile physics.
 
 ⸻
 
-10. IMPROVE CSS ORGANIZATION
+20. IMPLEMENTATION QUALITY
 
-styles.css is approximately 94 KB.
+Keep functions small and responsibilities clear.
 
-Its size makes it difficult to locate styles for a particular screen or component.
+Prefer:
 
-Investigate whether splitting it into smaller stylesheets would materially improve maintenance.
+shared schema/mechanic
++
+character data opting into it
 
-Potential categories:
+over character-specific runtime branches.
 
-* Base variables and reset.
-* Typography.
-* Shared components.
-* Menus and navigation.
-* Screen-specific styling.
-* Battle interface.
-* Practice interface.
-* Touch controls.
-* Settings and touch editor.
-* Responsive adjustments.
+Avoid duplicated collision logic.
 
-This is optional if the split would introduce substantial regression risk without enough benefit.
+Reuse:
 
-If splitting:
+Projectile.turnBack(...)
+worldBox(...)
+existing attack active-window logic
+existing animation timing
+existing movement-resource reset conventions
 
-1. Preserve the exact effective cascade and override precedence.
-2. Preserve selectors and layout geometry.
-3. Preserve responsive breakpoints and safe-area handling.
-4. Keep all stylesheet URLs relative.
-5. Update index.html appropriately.
-6. Check desktop, mobile, and landscape layouts.
-7. Avoid introducing CSS dependencies or a preprocessing pipeline.
+where sensible.
 
-Do not visually redesign Alva.
-
-Keep its existing visual identity, typography, colors, spacing philosophy, and interface behavior.
+Do not leave partially implemented placeholders, TODO mechanics, invisible hitboxes, fallback sprites pretending to be authored moves, or dead references to the removed mid-air Shield.
 
 ⸻
 
-11. REORGANIZE DOCUMENTATION — HIGH PRIORITY
-
-Documentation is one of the most important parts of this task.
-
-The existing repository contains three particularly large documents:
-
-* README.md
-* ALVA_SPEC.md
-* UPDATES.md
-
-They contain valuable information but are difficult to navigate as the project expands.
-
-I want more precise documentation, with clearly defined subjects, ownership, navigation, and terminology.
-
-Proposed documentation structure
-
-docs/
-├── README.md
-│
-├── architecture/
-│   ├── overview.md
-│   ├── module-responsibilities.md
-│   ├── data-flow.md
-│   └── character-system.md
-│
-├── systems/
-│   ├── movement.md
-│   ├── combat.md
-│   ├── launch.md
-│   ├── defense.md
-│   ├── energy.md
-│   ├── ai.md
-│   ├── input.md
-│   ├── rendering.md
-│   └── localization.md
-│
-├── characters/
-│   ├── README.md
-│   ├── adding-characters.md
-│   ├── 0001.md
-│   └── 0002.md
-│
-├── gameplay/
-│   ├── battle.md
-│   ├── watch-mode.md
-│   ├── practice.md
-│   └── stages.md
-│
-├── development/
-│   ├── setup.md
-│   ├── testing.md
-│   ├── conventions.md
-│   └── architecture-decisions.md
-│
-└── history/
-    └── named-updates.md
-
-Create only documents that contain useful, nonredundant material.
-
-README.md
-
-The root README should primarily answer:
-
-1. What is Alva?
-2. What kind of game is it?
-3. What features are currently implemented?
-4. How do you run it?
-5. How do you deploy it?
-6. How is the repository organized?
-7. Where is the detailed documentation?
-8. How do developers add fighters, maps, or mechanics?
-
-Move extensive technical explanations into focused documents.
-
-A new developer should be able to understand the project’s structure without navigating a massive README.
-
-ALVA_SPEC.md
-
-Treat this as Alva’s canonical product specification.
-
-It may remain at the root as an authoritative specification with clear links to detailed supporting documents.
-
-Alternatively, carefully reorganize its sections while keeping its root path as the stable specification entry point.
-
-Do not create multiple documents that contradict one another about what the game is supposed to do.
-
-Distinguish:
-
-* Product requirements.
-* Current implementation.
-* Character-specific behavior.
-* Historical decisions.
-* Future design possibilities.
-
-Keep existing specifications accurate.
-
-UPDATES.md
-
-Preserve its role as the index of named updates.
-
-Keep the established names:
-
-* Movement Update.
-* Effect Update.
-* Bounce Update.
-
-Preserve references to their original pull requests and commits.
-
-These are historical facts, not names to arbitrarily change.
-
-You may reorganize detailed material into docs/history/named-updates.md or topic-specific documents, provided UPDATES.md remains a clear, accurate entry point.
-
-Do not erase history.
-
-Important: Historical descriptions and current architectural descriptions serve different purposes.
-
-A historical update may genuinely have been developed and tuned initially using 0001.
-
-That fact can remain.
-
-However, the current explanation of movement must describe the reusable movement system and then distinguish its original 0001 tuning.
-
-⸻
-
-12. SPECIFIC DOCUMENTATION CORRECTION: THE MOVEMENT UPDATE
-
-This is a mandatory example of the broader cleanup.
-
-Inspect the Movement Update section in UPDATES.md, along with the corresponding README and specification sections.
-
-The update currently begins by emphasizing improvements to 0001.
-
-Rework the presentation so it identifies three layers:
-
-A. Universal implementation
-
-Explain the actual reusable mechanics introduced or adjusted:
-
-* Ground responsiveness.
-* Acceleration and braking.
-* Air steering.
-* Fast falling.
-* Dash transitions.
-* Attack momentum.
-* Input buffering.
-* Hit cancellation.
-* Dash cancellation.
-* Combat interruption behavior.
-
-Make clear that the underlying implementation is used by the Fighter system for whichever characters support the relevant behavior.
-
-B. Per-character tuning
-
-Explain that individual fighters use values in their own definitions to control movement characteristics.
-
-Document relevant fields and their units, defaults, valid ranges where enforced, and gameplay effects.
-
-Do not invent validation rules that the implementation does not enforce.
-
-C. Historical character-specific adjustments
-
-Document that the original update included particular tuning and combo-route changes for 0001.
-
-Preserve accurate historical values and their previous/current relationships.
-
-Keep 0001’s combo examples in a character-specific section.
-
-Do not imply that those routes, animation timings, or exact Energy costs necessarily apply to all fighters.
-
-Desired result
-
-A reader should leave with the understanding that:
-
-“Alva has a universal configurable movement system, and each fighter has its own movement profile.”
-
-Not:
-
-“Alva’s movement system exists to make character 0001 faster.”
-
-Apply this same approach to other affected documentation.
-
-⸻
-
-13. DISTINGUISH CHARACTER-SPECIFIC AND UNIVERSAL DOCUMENTATION
-
-Provide a clear documentation hierarchy.
-
-Shared systems documentation
-
-Describe:
-
-* How the system works.
-* Which modules implement it.
-* What configuration it reads.
-* Which character capabilities it supports.
-* Which rules are universal.
-* Which aspects are configurable.
-* How the system behaves with unsupported or absent optional capabilities.
-* Relevant tests.
-
-Use neutral wording whenever possible:
-
-* “The fighter”
-* “The active character”
-* “The attacker”
-* “The defender”
-* “The character definition”
-* “The selected move”
-
-Character-specific documentation
-
-Describe each fighter independently.
-
-For 0001, document its actual:
-
-* Movement profile.
-* Attacks and aerial variants.
-* Projectile.
-* Clone summon.
-* Sphere Rush technique.
-* Defense configuration.
-* Animation relationships.
-* Unique gameplay interactions.
-
-For 0002, document its actual:
-
-* Movement profile and Speed Power.
-* Ordinary and airborne attacks.
-* Homing and Bounce Attacks.
-* Spin Attack.
-* Blue Tornado.
-* Whirlwind.
-* Defensive capabilities and limitations.
-* Sprite scaling and animation characteristics.
-
-Use accurate implemented behavior rather than inventing additional abilities.
-
-Document real differences, not comparisons that suggest one fighter is the template every other fighter should follow.
-
-Adding future characters
-
-Write a detailed guide covering:
-
-* Four-digit character identifiers.
-* Registration.
-* Availability.
-* Roster slots.
-* Asset naming.
-* Animation metadata.
-* Required movement and combat data.
-* Powers.
-* Attack loadouts.
-* Defensive capabilities.
-* Projectiles, summons, and techniques.
-* Touch previews and ability names.
-* Localization.
-* Validation.
-* Testing.
-
-A future contributor should be able to follow the guide without cloning 0001 and manually discovering which assumptions need replacing.
-
-⸻
-
-14. PRESERVE CODENAME CONVENTIONS
-
-Treat codename_rule as an existing authoritative source for internal naming contracts.
-
-Do not invent new internal attack naming schemes.
-
-Preserve established names such as:
-
-* attack1 through attack5
-* midair_attack1 through midair_attack5
-* extra_attack
-* transform
-* shield
-* mouvment
-* midair_mouvment
-* attackN_summon
-* attackN_object
-
-Retain the distinction between internal codenames and player-facing ability names.
-
-Do not rename internal concepts after one fighter’s ability.
-
-For example, a generic Attack 3 handler should not be called a Clone Attack handler just because 0001 uses Attack 3 for a clone.
-
-Similarly, a generic technique controller must not assume every technique operates like Sphere Rush.
-
-Preserve the existing loadout restrictions and validation rules.
-
-The goal is clearer organization, not an incompatible naming migration.
-
-⸻
-
-15. REORGANIZE TESTS
-
-The repository already contains extensive tests covering movement, combat, AI, touch controls, stages, launch behavior, characters, and screen functionality.
-
-Preserve their coverage.
-
-The root tests/ directory has grown large enough that grouping tests by responsibility may improve navigation.
-
-Suggested categories:
-
-tests/
-├── helpers/
-├── systems/
-│   ├── movement/
-│   ├── combat/
-│   ├── defense/
-│   ├── physics/
-│   └── input/
-├── fighters/
-│   ├── 0001/
-│   ├── 0002/
-│   └── fixtures/
-├── integration/
-└── ...
-
-Do not force every test into a new location if the grouping makes navigation worse.
-
-Separate two kinds of tests
-
-Universal mechanic tests
-
-These validate systems independently of any single production fighter’s identity.
-
-Where practical, use explicit fixtures or parameterized character configurations.
-
-For example:
-
-* Ground acceleration behaves according to the supplied movement values.
-* Attack routing follows a fighter’s own loadout.
-* Launch calculations follow the same system for every fighter.
-* The AI respects the active fighter’s available moves.
-* Input controls do not assume a particular ability.
-
-Character-specific tests
-
-These validate exact attributes, attacks, animations, and interactions belonging to a particular character.
-
-For example:
-
-* 0001’s clone summon sequence.
-* 0001’s Sphere Rush behavior.
-* 0002’s Homing Attack.
-* 0002’s Blue Tornado.
-* Their individual movement numbers and clip timing.
-
-Do not incorrectly convert a specific test into a universal requirement.
-
-Existing harness concern
-
-tests/fighter-harness.mjs currently uses 0001 as its default fighter definition.
-
-This is understandable historically, but it can unintentionally encourage tests to rely on that fighter as the universal reference.
-
-Improve the harness so a fighter definition can be supplied explicitly without breaking existing test behavior.
-
-Make any compatibility defaults clear.
-
-Use the existing tests/sample-fighter.mjs and tests/test-fighters.mjs to validate data-driven behavior.
-
-Preserve temporary fighter registration and cleanup.
-
-Required test scenarios
-
-Validate:
-
-1. 0001 versus 0002.
-2. 0002 versus 0001.
-3. Mirror matches.
-4. Different attack loadouts.
-5. Ground and airborne attacks.
-6. Characters with and without optional capabilities.
-7. Character-specific movement values.
-8. Projectile, summon, and technique behavior.
-9. Disabled or unavailable fighters.
-10. An empty playable roster.
-11. Selection, Battle, Watch Mode, and Practice Ground behavior.
-12. Touch controls and ability previews.
-13. AI behavior with different fighters.
-14. Fixed-timestep consistency.
-
-Avoid creating brittle tests that only pass because one fighter happens to have particular values.
-
-⸻
-
-16. VERIFY DOCUMENTATION AGAINST THE ACTUAL CODE
-
-Do not assume that every existing paragraph is still accurate.
-
-Historical changes have left some documentation describing earlier states of the game.
-
-For example:
-
-* The original Effect Update included a short-hop mechanic, but later changes replaced it with the current higher-jump behavior.
-* Some historical roster sections describe times when fighters were disabled or removed.
-* Some descriptions focus on when 0001 was the primary or only playable fighter.
-
-Preserve these details when explicitly discussing history.
-
-However, clearly distinguish them from the current state.
-
-Current gameplay documentation must match what the repository implements now.
-
-When reorganizing:
-
-* Inspect the code before rewriting technical statements.
-* Verify current defaults.
-* Verify what is genuinely configurable.
-* Verify which features are universal.
-* Verify character availability.
-* Verify current control mappings.
-* Verify existing move codenames.
-* Verify stage and camera behavior.
-* Verify actual tests.
-
-Do not fabricate missing functionality.
-
-If documentation contradicts implementation, correct the documentation when the implementation is clearly authoritative, or record the discrepancy when product intent is uncertain.
-
-Do not silently alter gameplay to make old prose true.
-
-⸻
-
-17. MAKE CODE MORE SPECIFIC WITHOUT MAKING IT VERBOSE
-
-Improve code comments where they help maintainability.
-
-Good comments should explain:
-
-* Why something exists.
-* Which responsibility it owns.
-* Important constraints.
-* Non-obvious state transitions.
-* Relationships between configuration and runtime behavior.
-* Reasons for unusual implementation decisions.
-
-Avoid comments that simply repeat the next line of code.
-
-Use consistent module introductions where valuable:
-
-Purpose: What the module owns.
-
-Inputs: Relevant dependencies or data.
-
-Outputs: What it exposes.
-
-Important constraints: Invariants that maintain gameplay compatibility.
-
-Separate major sections in larger modules.
-
-Use consistent naming for equivalent concepts.
-
-Avoid ambiguous abbreviations unless they are established project conventions.
-
-Do not rename public APIs casually.
-
-Prefer meaningful function boundaries over giant functions, but avoid turning straightforward logic into a chain of unnecessary wrappers.
-
-The resulting code should be easier to follow, not more elaborate merely for the sake of elaboration.
-
-⸻
-
-18. PROTECT GAMEPLAY AND DEPLOYMENT
-
-This reorganization must preserve the current game.
-
-Do not intentionally change:
-
-* Character balance.
-* Damage values.
-* Movement speed.
-* Collision dimensions.
-* Hitbox timing.
-* Launch calculations.
-* Energy costs.
-* AI difficulty.
-* Match scoring.
-* Round timing.
-* Respawn behavior.
-* Animation timing.
-* Attack availability.
-* User input mappings.
-* Touch control geometry.
-* Settings behavior.
-* Visual effects.
-* Existing art.
-* Audio assets.
-* Localization.
-* The visual design.
-
-Preserve relative asset and module paths.
-
-The site must continue running under GitHub Pages, including when deployed under a repository subdirectory.
-
-Keep index.html at the root.
-
-Keep the project dependency-free unless an existing dependency is specifically required, which should not be necessary for this task.
-
-Do not introduce:
-
-* React.
-* Vue.
-* A bundler.
-* TypeScript migration.
-* CSS frameworks.
-* New runtime services.
-* A replacement renderer.
-* A different physics engine.
-
-The project must remain recognizable as the existing Alva game.
-
-⸻
-
-19. IMPLEMENT THE REORGANIZATION IN PHASES
-
-Work in a controlled order.
-
-Phase 1 — Audit
-
-Inspect the entire repository.
-
-Produce an internal inventory of:
-
-* Existing directories.
-* Large files.
-* Module dependencies.
-* Duplicated responsibilities.
-* Character-specific logic.
-* Universal systems.
-* Documentation duplication.
-* Hard-coded character references.
-* Existing tests and entry points.
-
-Record a baseline of relevant file hashes, including character_rule.
-
-Identify genuine organizational problems before editing.
-
-Phase 2 — Character architecture
-
-Separate character definitions into individual modules.
-
-Preserve exports, runtime behavior, registration semantics, and validations.
-
-Make ownership of character-specific data explicit.
-
-Run relevant tests.
-
-Phase 3 — Shared systems
-
-Improve the internal boundaries of movement, combat, AI, and rendering where the existing complexity justifies doing so.
-
-Use small, reviewable changes.
-
-Update imports and associated tests immediately.
-
-Avoid combining unrelated behavioral changes with file relocation.
-
-Phase 4 — Documentation
-
-Organize product, technical, historical, and character-specific information.
-
-Make the shared systems character-neutral.
-
-Correct misleading 0001-centric descriptions.
-
-Preserve historically accurate character-specific records.
-
-Fix internal links.
-
-Phase 5 — Interface and styling
-
-Clean up localization, interface responsibilities, or stylesheets only where there is a clear maintainability gain.
-
-Preserve the player-facing experience.
-
-Phase 6 — Testing and review
-
-Run the entire applicable test suite.
-
-For example, from the repository root:
-
-node --test
-
-Also run appropriate targeted tests after each significant change.
-
-Verify module import paths, sprite references, and documentation links.
-
-Perform browser smoke testing where possible.
-
-Check at least:
-
-* Desktop gameplay.
-* Mobile landscape gameplay.
-* Character selection.
-* Both playable characters.
-* Quick Battle.
-* Watch Mode.
-* Practice Ground.
-* Settings.
-* Touch controls.
-* Language switching.
-* Asset loading.
-
-A successful Node test run does not replace browser checks for rendering and layout.
-
-If browser verification is unavailable, explicitly record what remains unverified.
-
-⸻
-
-20. IMPORTANT STRUCTURAL SAFEGUARDS
-
-Follow these throughout the task.
-
-Avoid unnecessary compatibility layers
-
-A small re-export entry point can be useful to preserve the public character registry.
-
-However, do not leave multiple complete implementations after relocating code.
-
-Avoid circular dependencies.
-
-Preserve runtime references
-
-Update every affected import, exported symbol, animation reference, asset path, and test reference.
-
-Avoid accidental behavioral changes
-
-Distinguish pure relocation from logic modification.
-
-When necessary, compare execution results before and after the change.
-
-Preserve historical resources
-
-Review files such as max, CLAUDE.md, and codename_rule before moving or editing them.
-
-Do not automatically treat historical prompts as current design requirements.
-
-If a historical file is moved, preserve its content and update discoverability and references.
-
-No speculative mechanics
-
-Do not introduce a new move, defensive feature, passive, transformation, or animation merely because the reorganized structure has a place for one.
-
-Keep future extensibility architectural rather than speculative.
-
-Keep the repository clean
-
-Do not add meaningless placeholder modules.
-
-Do not commit generated temporary files.
-
-Do not retain unused imports or abandoned implementations.
-
-Do not introduce duplicated documentation that will drift over time.
-
-⸻
-
-21. DEFINITION OF DONE
-
-The task is complete only when the following conditions are satisfied.
-
-Repository organization
-
-* Files have clearer ownership.
-* Large modules have been examined and sensibly organized.
-* Character definitions are independently maintainable.
-* Module paths and imports work.
-* There are no unnecessary parallel implementations.
-
-Architecture
-
-* Universal systems do not depend on 0001 as a special default.
-* Character-specific data is isolated appropriately.
-* Existing mechanics remain data-driven.
-* Adding another fighter does not require copying or modifying an existing fighter’s unique behavior.
-* Existing simulation and combat semantics are preserved.
-
-Documentation
-
-* README provides an approachable introduction.
-* The specification remains authoritative and navigable.
-* Named updates remain traceable.
-* Universal mechanics are documented independently.
-* Character-specific mechanics have dedicated explanations.
-* Misleading 0001-centric descriptions have been corrected.
-* Historical facts have not been rewritten.
-* Internal links work.
-* Documentation agrees with the current implementation.
-
-Tests
-
-* Existing tests pass, or any remaining failures are explicitly documented.
-* Character-specific tests remain character-specific.
-* Shared behavior has meaningful character-neutral coverage.
-* Existing test fixtures continue working.
-* No behavior-changing adjustments are disguised as organizational changes.
-
-Protected file
-
-* character_rule has not been modified, moved, renamed, or deleted.
-* Its path and original blob SHA remain unchanged.
-
-⸻
-
-22. FINAL DELIVERABLES
-
-Implement the changes on a dedicated branch and prepare a pull request for review.
-
-In the pull request description, include:
-
-A. Reorganization summary
-
-Explain the overall changes and why they improve maintainability.
-
-B. Before-and-after structure
-
-Show a concise directory comparison identifying significant file moves and splits.
-
-C. Character-system improvements
-
-Explain how the architecture now distinguishes shared gameplay mechanics from per-character definitions.
-
-D. Documentation changes
-
-Identify which documents were reorganized and which misleading descriptions were corrected, especially the Movement Update.
-
-E. Compatibility notes
-
-Identify preserved public interfaces, any compatibility re-exports, and relevant import-path migrations.
-
-F. Testing results
-
-Report tests executed and their actual results, with any limitations or unverified browser behaviors.
-
-G. Protected file confirmation
-
-Explicitly confirm that character_rule remains byte-for-byte unchanged at its original path.
-
-H. Remaining opportunities
-
-List any useful future organizational improvements deliberately excluded from this refactoring.
-
-Do not claim that tests passed unless they were actually executed.
-
-Do not merge the pull request automatically.
-
-⸻
-
-FINAL DIRECTION
-
-The purpose of this task is to make Alva easier to understand, maintain, expand, and develop without sacrificing the game’s identity or existing functionality.
-
-I am not asking for a completely different codebase.
-
-I want the current codebase to become a more organized, deliberate version of itself.
-
-Prioritize:
-
-1. Clarity over complexity.
-2. Preservation over unnecessary rewriting.
-3. Universal game systems over character-specific architectural assumptions.
-4. Character-specific definitions for genuinely unique behavior.
-5. Detailed, accurate documentation over broad or vague explanations.
-6. Extensibility without premature abstraction.
-7. Verified functionality over cosmetic restructuring.
-
-Do not make Alva revolve around 0001 simply because it was the first character.
-
-Treat 0001 and 0002 as members of a growing roster using shared game systems, while keeping their unique attributes, animations, attacks, and mechanics intact.
-
-The result should feel like a carefully maintained and thoughtfully structured game project—not a rewritten prototype.
-
-And under no circumstances modify character_rule.
+21. FINAL VALIDATION
+
+After implementation:
+
+1. Run focused tests for Deflect, projectile clashes, defense, movement/Dash, rendering, AI, 0001, and 0002.
+2. Run the full Node test suite.
+3. Search the repository for stale midair_shielding / airborne-Shield assumptions.
+4. Search for hardcoded 0001 / 0002 checks added to shared runtime files and remove them.
+5. Confirm every new sprite path exists.
+6. Confirm both fighters can perform Deflect with the Shield input while airborne.
+7. Confirm both fighters can perform their new mid-air movement with the movement/Dash input.
+8. Confirm grounded Shield and grounded mouvment are unchanged.
+9. Confirm Deflect always deals exactly 3.
+10. Confirm a Deflected projectile can hit its original owner.
+11. Confirm all three 0001 projectile sprites visibly rotate extremely fast.
+12. Confirm projectile rotation does not affect physics or collision.
+
+When finished, provide a concise implementation summary listing:
+
+* shared mechanics added;
+* character-definition changes;
+* sprite frames added;
+* tests added/updated;
+* docs updated;
+* any tuning choices made for Deflect timing/hitbox and mid-air movement;
+* full test-suite result.
