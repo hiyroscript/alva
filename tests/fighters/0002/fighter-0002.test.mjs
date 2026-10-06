@@ -776,8 +776,7 @@ test('the CPU sends its Whirlwind at an opponent turtling behind its Shield at m
 test('CPU fights with #0002 run: against #0001 and itself, every move used, no summon or technique cooldown of its own', () => {
   const used = new Set();
   // A seeded sample of real fights (seed 3: one that sees the mid-air
-  // moves; which ones come up depends on how #0001 plays, its Clone
-  // Attack's summoning startup included).
+  // moves; which ones come up depends on how #0001 plays).
   for (const [a, b] of [[DEF, DEF_0001], [DEF_0001, DEF], [DEF, DEF]]) {
     const { log } = cpuFight(a, b, { seconds: 40, seed: 3, difficulty: 'brutal' });
     for (const [f, steps] of log) {

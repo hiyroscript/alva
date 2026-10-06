@@ -737,6 +737,15 @@ export class CombatAIController {
     return v;
   }
 
+  // What projectile `proj` landing in full is worth (see hitValue): every
+  // strike of a piercing one, its last its finisher.
+  shotValue(proj, s) {
+    const face = s.dir;
+    if (!proj.pierce) return this.hitValue(proj, s, face);
+    const strikes = proj.pierce.hits - (proj.finisher ? 1 : 0);
+    return strikes * this.hitValue(proj, s, face) + (proj.finisher ? this.hitValue(proj.finisher, s, face) : 0);
+  }
+
   attackIntent(m) {
     return { kind: 'attack', action: m.action, face: m.face, until: this.clock + 0.3 };
   }
@@ -836,23 +845,28 @@ export class CombatAIController {
     if (r.air !== !s.grounded || self.combat.cooldowns.has(r.id)) return 0;
     const o = r.atk.projectile.offset ?? { x: 0, y: 0 };
     const hb = r.proj.hitbox;
-    const gap = Math.max(0, s.dist - o.x - s.fe.hw);
+    // A shot that pulls reaches as far again as its pull: whoever is that
+    // close is drawn into it.
+    const pull = r.proj.pull?.radius ?? 0;
+    const gap = Math.max(0, s.dist - o.x - s.fe.hw - pull);
     const t = r.atk.projectile.spawnAt + gap / r.proj.speed;
     if (gap > r.proj.speed * r.proj.lifetime) return 0;
     // Still level with the shot when it arrives, as far as the level projects.
     const lt = Math.min(t, p.lookahead);
     const fb = foe.body;
     const fy = fb.grounded ? fb.y : Math.min(fb.y + fb.vy * lt + 0.5 * s.g * lt * lt, s.foeLevel);
-    const top = s.y + o.y + hb.y;
-    if (!(top < fy + s.fe.bottom && top + hb.h > fy + s.fe.top)) return 0;
+    const top = s.y + o.y + hb.y - pull;
+    if (!(top < fy + s.fe.bottom && top + hb.h + 2 * pull > fy + s.fe.top)) return 0;
     // A solid block in the way stops it.
     const y = s.y + o.y;
     const x0 = Math.min(s.x, fb.x);
     const x1 = Math.max(s.x, fb.x);
     if (s.stage.solids.some((so) => so.y < y && so.y + so.h > y && so.x < x1 && so.x + so.w > x0)) return 0;
-    // Best from mid range out, where no strike reaches.
+    // Best from mid range out, where no strike reaches; and worth what its
+    // hit is (a shot that launches, or strikes again and again, more than
+    // one that chips).
     const far = clamp((s.dist - s.myReach * 1.4) / 260, 0, 1);
-    let score = s.aggro * (0.2 + 0.55 * far) + s.urge * 0.25 * far;
+    let score = s.aggro * (0.2 + 0.55 * far) + s.urge * 0.25 * far + 0.3 * this.shotValue(r.proj, s);
     if (s.openings.length && s.foeBusy > t) score += 0.6 * p.punish;
     if (s.foeShielding) score += 0.25 * p.punish;
     // Not the same trick over and over.

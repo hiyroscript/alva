@@ -158,7 +158,7 @@ export class CombatState {
   // The attack in progress hit (a block does not count) and has reached its
   // hitCancel time: another attack, a jump or a Dash may cut the rest of it
   // short (see Fighter.tryAction, Fighter.tryDash and the jump in
-  // Fighter.update). Never during the hit's freeze, a stun or a bind.
+  // Fighter.update). Never during the hit's freeze, a stun or a paralysis.
   get cancellable() {
     const a = this.attack;
     const at = a?.def.hitCancel;
@@ -185,7 +185,7 @@ export class CombatState {
   }
 
   // Drops the attack in progress with nothing left behind (no cooldown): a
-  // hit or a bind took the fighter out of it (see Fighter.update).
+  // hit or a paralysis took the fighter out of it (see Fighter.update).
   interruptAttack() {
     this.attack = null;
     this.release = null;

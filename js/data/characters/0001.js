@@ -23,8 +23,7 @@
 //   extra_attack  the High Kick, its launcher, floating in the air too
 //
 // Its Shield is Infinity: a hit it blocks stalls in it (`stall`), and in
-// the air it all but stops falling. Its Energy goes far and its perfect
-// Shield opens a little longer than most.
+// the air it all but stops falling. Its Energy goes further than most.
 
 import { frames } from './helpers.js';
 

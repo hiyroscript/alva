@@ -375,14 +375,17 @@ test('it presses Attack 4 and Attack 5 directly: one press on the move\'s own bu
   }
 });
 
-test('left to itself, a high level uses Unlimited Void and Hollow Purple, each from its own button', () => {
+test('left to itself, a high level uses Unlimited Void and Hollow Purple on a turtle, each from its own button', () => {
   const used = { attack4: 0, attack5: 0 };
   for (let seed = 0; seed < 6; seed++) {
-    // An opponent standing still, out of reach.
-    const r = ring({ difficulty: 'brutal', seed: 400 + seed, cpuX: 500, foeX: 1100 });
+    // An opponent a few steps away holding its Shield up, never battered
+    // (its Launch Point held at 0, so it stays on the stage): no Shield
+    // stops either technique.
+    const r = ring({ difficulty: 'brutal', seed: 400 + seed, cpuX: 700, foeX: 900, script: () => ({ shield: true }) });
     let tech = null;
     let cooling = [];
     for (let i = 0; i < seconds(14); i++) {
+      r.foe.combat.launchPoint = 0;
       r.step();
       const out = r.log.at(-1);
       const now = [...r.cpu.combat.abilityCooldowns.entries.keys()];
