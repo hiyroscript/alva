@@ -1,5 +1,8 @@
 You are modifying the Alva game repository. Implement this feature completely, including gameplay, sprite integration, AI awareness where appropriate, tests, documentation, and removal/update of stale behavior.
 
+
+very important: defect should always have a base launch of 2.
+
 Before changing code, inspect the repository architecture and conventions, especially:
 
 * ALVA_SPEC.md
