@@ -3,8 +3,9 @@
 //
 // Purpose: how ground acceleration and braking, turning, air steering, an
 // attack's momentum, the hitstun drift, the fast fall, the air jump, the
-// higher jump and the Dash's double tap work. A fighter never changes these
-// rules; it only supplies the numbers they read.
+// higher jump and the double tap (the Dash's and the air dash's) work. A
+// fighter never changes these rules; it only supplies the numbers they
+// read.
 //
 // Inputs: the fighter's `movement` entry (its definition in
 // js/data/characters/<id>.js), its top speed and jump speed from its Powers
@@ -44,7 +45,11 @@
 //                         (default 1)
 //   dashSpeed             the Dash's speed (0 or missing: no Dash)
 //   dashTapWindow         seconds between the two taps of a double tap
-//                         (default 0)
+//                         (default 0), on the ground and in the air
+//   airDashSpeed          the air dash's speed, flat across the air (0 or
+//                         missing: no air dash; see Fighter.tryAirDash)
+//   airDashUses           air dashes per airtime, given back on landing and
+//                         by a hit (default 1)
 //   attackBuffer          seconds an early attack press is kept (default 0:
 //                         none)
 //   coyoteTime, jumpBuffer, gravityScale, maxFallSpeed, dropThroughTime

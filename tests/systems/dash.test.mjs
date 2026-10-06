@@ -288,7 +288,7 @@ test('a Dash is movement only: no hitbox, damage, launch or invulnerability, eve
 
 // ---- Gating ------------------------------------------------------------------------------
 
-test('no Dash (and nothing spent) while airborne, attacking, stunned, paralyzed, shielding, already dashing, exhausted or without mouvment art', () => {
+test('no Dash (and nothing spent) while attacking, stunned, paralyzed, shielding, already dashing, exhausted or without mouvment art; airborne, the double tap is the air dash', () => {
   const refused = (label, setup) => {
     const f = makeFighter(setup.options);
     setup.before?.(f);
@@ -298,10 +298,17 @@ test('no Dash (and nothing spent) while airborne, attacking, stunned, paralyzed,
     assert.equal(f.fighter.dash, wasDash, `${label}: no new Dash`);
     assert.ok(f.fighter.combat.energy >= before - 1e-9, `${label}: nothing spent`);
   };
-  refused('airborne', {
-    before: (f) => { f.step({ jump: true, jumpPressed: true }); f.step(RIGHT); },
-    press: (f) => f.step(RIGHT),
-  });
+  // Airborne, the same double tap is the fighter's air dash, never a Dash
+  // (see air-mouvment.test.mjs): its own clip and speed.
+  const aloft = makeFighter();
+  aloft.step({ jump: true, jumpPressed: true });
+  aloft.step(RIGHT);
+  aloft.step({});
+  aloft.step(RIGHT);
+  assert.equal(aloft.fighter.dash?.air, true, 'airborne: the air dash');
+  assert.equal(aloft.fighter.dash.animation, 'midair_mouvment');
+  assert.equal(aloft.fighter.dash.speed, def.movement.airDashSpeed);
+  assert.equal(aloft.fighter.tryDash(1), false, 'tryDash itself is the ground\'s');
   refused('attacking', {
     before: (f) => { f.step(RIGHT); f.step({ attack1: true, attack1Pressed: true }); },
     press: (f) => f.step(RIGHT),
@@ -619,7 +626,7 @@ test('a request is not a direction press: it never pairs with a tap before it or
   assert.ok(keys.fighter.dash);
 });
 
-test('a request obeys every Dash rule: no Dash (and nothing spent) airborne, attacking, stunned, paralyzed, shielding, dashing, exhausted or without art', () => {
+test('a request obeys every Dash rule: no Dash (and nothing spent) attacking, stunned, paralyzed, shielding, dashing, exhausted or without art; airborne it is the air dash', () => {
   const refused = (label, setup) => {
     const f = makeFighter(setup.options);
     setup.before?.(f);
@@ -629,10 +636,11 @@ test('a request obeys every Dash rule: no Dash (and nothing spent) airborne, att
     assert.equal(f.fighter.dash, wasDash, `${label}: no new Dash`);
     assert.ok(f.fighter.combat.energy >= before - 1e-9, `${label}: nothing spent`);
   };
-  refused('airborne', {
-    before: (f) => { f.step({ jump: true, jumpPressed: true }); f.step({}); },
-    press: (f) => f.step(MOUVEMENT_RIGHT),
-  });
+  const aloft = makeFighter();
+  aloft.step({ jump: true, jumpPressed: true });
+  aloft.step({});
+  aloft.step(MOUVEMENT_RIGHT);
+  assert.equal(aloft.fighter.dash?.air, true, 'airborne: the air dash');
   refused('attacking', {
     before: (f) => f.step({ attack1: true, attack1Pressed: true }),
     press: (f) => f.step(MOUVEMENT_RIGHT),

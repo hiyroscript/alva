@@ -2,8 +2,8 @@
 
 Alva has one movement system, used by every fighter, and each fighter has
 its own movement profile. The system decides *how* acceleration, braking,
-turning, air steering, jumps, the fast fall, the Dash and attack momentum
-work; a fighter's definition decides *how much*. Two fighters with
+turning, air steering, jumps, the fast fall, the Dash, the air dash and
+attack momentum work; a fighter's definition decides *how much*. Two fighters with
 different profiles move differently under exactly the same rules, and a
 new fighter needs no movement code of its own.
 
@@ -16,25 +16,29 @@ explains how the code carries them out.
 | Module | Owns |
 | --- | --- |
 | [`js/game/fighters/movement.js`](../../js/game/fighters/movement.js) | The rules, as pure functions over a movement profile: `steer` (ground and air acceleration, braking, turning, overspeed), `steerAttack` (an attack's step-in and steering), `attackStartSpeed` (the momentum an attack keeps), `hitstunDrag`, `fastFallVelocity`, `airJump`, `highJumpLift`, `readDashTap` (the double tap). Each reads the values it is given on every call and writes only the body or tap record it is handed. |
-| [`js/game/fighters/fighter.js`](../../js/game/fighters/fighter.js) | All movement *state* (the body, the Dash, the jump buffer, coyote time, the higher jump, air jumps left, the waiting tap) and the order things happen in each fixed step (`Fighter.update`). It decides *when* a rule applies (a stun, a paralysis, a Shield, a technique or a Dash takes the step first) and calls `movement.js` for the arithmetic. |
+| [`js/game/fighters/fighter.js`](../../js/game/fighters/fighter.js) | All movement *state* (the body, the Dash or air dash, the jump buffer, coyote time, the higher jump, air jumps and air dashes left, the waiting tap) and the order things happen in each fixed step (`Fighter.update`). It decides *when* a rule applies (a stun, a paralysis, a Shield, a technique or a Dash takes the step first) and calls `movement.js` for the arithmetic. |
 | [`js/game/physics.js`](../../js/game/physics.js) | Integration and collision (`stepBody`): gravity, the fall cap, landing, solids and one-way platforms. It never knows why a body moves. |
 | [`js/data/powers.js`](../../js/data/powers.js) | Top speed (Speed Power) and jump speed (Jump Power), by tier. |
 
 What happens in one fixed step, in order (`Fighter.update`): the
 controller's input is read; cooldowns recover; a hit or paralysis ends a
 technique, a summon's startup, a Dash or an attack; during an impact
-freeze nothing moves (presses are kept); the Dash and a summon's startup
-advance their clocks; combat presses are tried (or buffered); a Dash is
-tried; a technique advances; the Shield goes up or down; then horizontal
-movement is chosen, in priority: a technique's own velocity, standing
-still (a summon's startup, a technique's cast, a paralysis), the hitstun drift, the Dash's speed, a
-Shield's coast, an attack's own motion, an attack's steering, or normal
-steering. Then the jump (buffered, with coyote time), the air jump, the
-higher jump's lift, the fast fall and the air Shield's slow fall; then the
-body is integrated and collided; then launch rebounds, landing resets
-(air jumps, per-airtime attacks, free fall), the end of a Dash, a
-technique or a summon's startup that lost its ground, Energy refill,
-facing and the visual state.
+freeze nothing moves (presses are kept, a Shield press excepted); the
+Dash (or air dash) and a summon's startup advance their clocks; in the
+air a fresh Shield press tries the Deflect, then combat presses are tried
+(or buffered); a Dash (on the ground) or an air dash (in the air) is
+tried; a technique advances; the Shield goes up or down (on the ground
+only); then horizontal movement is chosen, in priority: a technique's own
+velocity, standing still (a summon's startup, a technique's cast, a
+paralysis), the hitstun drift, the Dash's or the air dash's speed (an air
+dash also holds the fall off), a Shield's stand, an attack's own motion,
+an attack's steering, or normal steering. Then the jump (buffered, with
+coyote time), the air jump, the higher jump's lift and the fast fall;
+then the body is integrated and collided; then launch rebounds, landing
+resets (air jumps, air dashes, per-airtime attacks, free fall), the end of
+a Dash that lost its ground or an air dash that found it, of a technique
+or a summon's startup that lost its ground, Energy refill, facing and the
+visual state.
 
 The simulation is fixed-step (1/60 s) and deterministic: the same inputs
 give the same fight, step for step, at any frame rate
@@ -71,7 +75,9 @@ fighter's movement rather than raising an error.
 | `hitstunFriction` | units/s² | `deceleration` / 2 | Ground drag on a stunned fighter's push or launch, whatever is held. |
 | `hitstunAirDrag` | units/s² | `airDeceleration` / 2 | The same in the air. |
 | `dashSpeed` | units/s | none | The Dash's speed. Not positive: no Dash. |
-| `dashTapWindow` | s | 0 | The most time between the two taps of a double tap. |
+| `dashTapWindow` | s | 0 | The most time between the two taps of a double tap (the Dash's and the air dash's). |
+| `airDashSpeed` | units/s | none | The air dash's speed. Not positive: no air dash. |
+| `airDashUses` | count | 1 | Air dashes per airtime; landing or a hit gives them back. |
 | `dropThroughTime` | s | required for a drop | How long a platform drop ignores the platform (the training CPU's drop only; no player control drops through). |
 
 **Top speed and jump speed are not in the profile.** They come from the
@@ -113,7 +119,8 @@ fighter's own `mouvment` clip (the codename keeps that spelling: see
 double tap of a direction (two `runLeftPressed` / `runRightPressed` edges
 within `dashTapWindow`, from any device) or one tap of a Joystick-layout
 Dash button (`mouvementLeftPressed` / `mouvementRightPressed`), both
-through the same `Fighter.tryDash`. It needs the fighter free to act (or in
+through the same `Fighter.tryDash` (in the air the same requests are the
+air dash, below). It needs the fighter free to act (or in
 an attack that hit and may be cut short: a Dash cancel), grounded, not
 shielding, not exhausted, a positive `dashSpeed` and real `mouvment`
 frames (refused and logged otherwise, never faked with the run). It costs
@@ -123,12 +130,34 @@ invulnerability. Leaving the ground or meeting a solid ends it; the normal
 movement then takes over from its speed, the excess bleeding off at
 `overspeedDeceleration`.
 
+### The air dash
+
+The fighter's own mid-air mouvment, a capability apart from the Dash:
+the same requests (a double tap, a mouvement button) that Dash on the
+ground air dash in the air, both through `Fighter.tryMouvment` (the Dash
+by `tryDash`, the air dash by `tryAirDash`). Straight across the air at
+`movement.airDashSpeed` for exactly one pass of the fighter's own
+`midair_mouvment` clip, facing the way it goes at once: its vertical
+speed is zeroed as it starts and gravity is held off throughout (no fall,
+no fast fall), then normal airborne physics take over, its sideways speed
+capped at the fighter's top speed as it ends. `airDashUses` per airtime
+(1 unless authored), given back on landing and by a hit as the air jumps
+are; an air jump gives none back. The same rules as a Dash otherwise: free
+to act or in an attack that hit and may be cut short (a Dash cancel in the
+air, for `dashCancelCost`), not exhausted, paying `energy.dashCost`; never
+while stunned, paralyzed or already dashing; and, as an attack's own
+motion, never while still flying from a launch or in free fall. Missing
+`midair_mouvment` art refuses it (logged), never faked with the Dash's
+clip or the run. It is movement only: no hitbox, damage, launch,
+invulnerability, Shield or Deflect. Meeting a solid or the ground ends it.
+
 ### Capabilities a fighter may leave out
 
 | Left out | Result |
 | --- | --- |
 | `fastFallSpeed` (or not positive) | no fast fall |
-| `dashSpeed` (or not positive), or the `mouvment` clip | no Dash: a double tap or Dash button does nothing |
+| `dashSpeed` (or not positive), or the `mouvment` clip | no Dash: a double tap or Dash button does nothing on the ground |
+| `airDashSpeed` (or not positive), or the `midair_mouvment` clip | no air dash: a double tap or Dash button does nothing in the air |
 | `airJumps` | no air jump |
 | `highJumpWindow` | every jump is the normal jump |
 | `attackBuffer` | early presses are not kept |
@@ -148,6 +177,7 @@ specification:
 | `airJumps` / `airJumpRatio` | 1 / 0.9 | 1 / 0.9 |
 | `highJumpWindow` / `highJumpHeight` | 0.15 / 1.4 | 0.15 / 1.4 |
 | `dashSpeed` / Dash clip | 950 / 0.2 s (about 190 units) | 1100 / 0.2 s (about 220 units) |
+| `airDashSpeed` / `airDashUses` / air dash clip | 950 / 1 / 0.2 s (about 190 units) | 1100 / 1 / 0.2 s (about 220 units) |
 
 Equal values are a tuning choice, not a shared requirement: each profile
 is its fighter's own.
@@ -169,6 +199,10 @@ always been the Fighter's, for every fighter.
 - [`tests/systems/movement-profile.test.mjs`](../../tests/systems/movement-profile.test.mjs):
   the rules against made-up profiles, then every playable fighter held to
   its own profile and Powers.
+- [`tests/systems/air-mouvment.test.mjs`](../../tests/systems/air-mouvment.test.mjs):
+  the air dash, for both fighters: its request, clip, speed, flat path,
+  uses per airtime and what gives them back, its rules, that it is
+  movement only, and the CPU's air dash home.
 - [`tests/systems/movement.test.mjs`](../../tests/systems/movement.test.mjs),
   [`dash.test.mjs`](../../tests/systems/dash.test.mjs),
   [`down.test.mjs`](../../tests/systems/down.test.mjs),

@@ -30,6 +30,11 @@
 // its hit, resolved here through applyHit with its own data (what it throws
 // is a projectile like any other). It freezes only its targets.
 //
+// A fighter's Deflect (see js/game/combat/deflect.js) is one of its attacks
+// here, struck and blocked like any other; its hitbox's other job, turning
+// projectiles back (`deflectProjectiles`), is settled first every step
+// (deflectProjectiles), before any projectile can strike.
+//
 // Beyond damage and launch, a hit may carry the shared hit effects (see
 // js/game/combat/hit-effects.js): `unblockable` (no Shield stops it),
 // `paralyze` (a timed hold on the target, CombatState.paralyze, that a
@@ -123,9 +128,13 @@ const bodyVelocity = (f) => ({ x: f.body.vx, y: f.body.vy });
 const scratchHit = {};
 const scratchHurt = {};
 const scratchBurst = {};
+const scratchDeflect = {};
+const scratchShot = {};
 
-// Resolves hits each simulation step: fighters' melee hitboxes, then live
-// projectiles (see js/game/combat/projectile.js), then summoned clones (see
+// Resolves hits each simulation step: first the projectiles a live
+// `deflectProjectiles` hitbox turns back (see deflectProjectiles), then
+// fighters' melee hitboxes, then live projectiles (see
+// js/game/combat/projectile.js), then summoned clones (see
 // js/game/combat/summon.js), then techniques' bursts (see
 // js/game/combat/technique.js). A
 // shielding target is struck exactly like any other (its own hurtboxes,
@@ -155,10 +164,18 @@ export class CombatSystem {
     // is the owner for a projectile or clone hit; `projectile`, `summon` and
     // `technique` are null for the fighter's own melee.
     this.events = [];
+    // { fighter, projectile, from, direction }: the projectiles turned back
+    // this step (see deflectProjectiles), `from` the owner each one had.
+    this.deflections = [];
   }
 
   update(fighters, projectiles = [], clones = []) {
     this.events.length = 0;
+    this.deflections.length = 0;
+    // Before anything strikes: a projectile caught by a live Deflect is the
+    // deflecting fighter's own by the time projectiles strike below, so it
+    // never hits the fighter that caught it.
+    this.deflectProjectiles(fighters, projectiles);
     for (const attacker of fighters) {
       const atk = attacker.combat.attack;
       if (!atk || attacker.combat.phase !== 'active') continue;
@@ -230,6 +247,32 @@ export class CombatSystem {
       }
     }
     return this.events;
+  }
+
+  // Every live projectile of another fighter's that meets the live hitbox
+  // of an attack with `deflectProjectiles` (see js/game/combat/attacks.js)
+  // during its active phase is turned back (Projectile.turnBack): from this
+  // step it is that fighter's, flying away from it (to the side of it the
+  // projectile is on, or the way it faces with the projectile level with
+  // it) at its own speed, its strikes starting over, so it can strike its
+  // old owner. The same projectile, never a copy, and never destroyed for
+  // it. It is not a hit: no event, no freeze, nothing used up (the box may
+  // turn back more than one, and still strike a fighter). Startup and
+  // recovery turn nothing back.
+  deflectProjectiles(fighters, projectiles) {
+    if (!projectiles.length) return;
+    for (const f of fighters) {
+      const atk = f.combat.attack;
+      if (!atk?.def.deflectProjectiles || f.combat.phase !== 'active') continue;
+      const box = worldBox(f, atk.def.hitbox, scratchDeflect);
+      for (const p of projectiles) {
+        if (!p.alive || p.owner === f || !intersects(box, p.hitbox(scratchShot))) continue;
+        const from = p.owner;
+        const direction = Math.sign(p.x - f.body.x) || f.facing;
+        p.turnBack(f, direction);
+        this.deflections.push({ fighter: f, projectile: p, from, direction });
+      }
+    }
   }
 
   // A multi-hit attack's strikes (see `hits` above) this step: each one

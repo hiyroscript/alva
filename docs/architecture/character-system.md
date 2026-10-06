@@ -12,7 +12,7 @@ to, and adding a third means writing its definition, not copying either.
 | --- | --- | --- |
 | **Shared systems** | `js/game/`, `js/data/loadout.js`, `js/data/launch.js`, `js/data/powers.js` | The rules: how movement, attacks, hits, launches, the Shield, Energy, summons, techniques, the CPU, input and rendering work. The same for every fighter. |
 | **Fighter configuration** | each fighter's definition, `js/data/characters/<id>.js` | The numbers and choices those rules read: its body, movement profile, Powers, Energy, launch reaction, which buttons it has and what kind of move each is, every attack's timing, hitbox, damage and launch. |
-| **Fighter capabilities** | the same definition | Optional, explicit pieces a fighter may or may not have: a `defense`, a Dash (`dashSpeed` and a `mouvment` clip), projectiles, summons, techniques, an extra attack, attack mechanics such as `motion` or `hits`. A shared system checks for the capability, never for the fighter. |
+| **Fighter capabilities** | the same definition | Optional, explicit pieces a fighter may or may not have: a `defense` (the Shield, on the ground), a `deflect` (the Shield button in the air), a Dash (`dashSpeed` and a `mouvment` clip), an air dash (`airDashSpeed` and a `midair_mouvment` clip), projectiles (spinning ones with a `rotationSpeed`), summons, techniques, an extra attack, attack mechanics such as `motion`, `hits` or `deflectProjectiles`. A shared system checks for the capability, never for the fighter. |
 
 So "#0002 is faster" is configuration (Speed Power 3, a higher
 acceleration, a faster Dash); "#0001's Maximum Blue drags its target in"
@@ -47,7 +47,8 @@ problem named.
 | `powers`, `movement` | Fighter, [movement](../systems/movement.md) | yes |
 | `energy` | [Energy](../systems/energy.md) | no (defaults) |
 | `launchReaction`, `launchBounce` | [launch](../systems/launch.md) | no (defaults) |
-| `defense` | [defense](../systems/defense.md) | no (none: the Shield button does nothing) |
+| `defense` | [defense](../systems/defense.md) | no (none: the Shield button does nothing on the ground) |
+| `deflect` | [defense: the Deflect](../systems/defense.md#the-deflect) | no (none: the Shield button does nothing in the air) |
 | `actions` | Fighter, the AI, touch controls, input | yes (`attack1`, `attack2` at least) |
 | `attacks`, `projectiles`, `summons`, `techniques` | [combat](../systems/combat.md) | `attacks` for every mapped attack |
 | `mobileAbilities` | touch controls ([input](../systems/input.md#touch-controls)) | no (neutral glyphs and names) |
@@ -83,7 +84,9 @@ Unlimited Void and Hollow Purple use ([combat:
 techniques](../systems/combat.md#techniques)). The capabilities its moves
 needed (the `hover` motion, pulls, repelling and erasing projectiles, the
 shared hit effects, a Shield's stall) were added to the shared systems as
-data any fighter may use, never as #0001's own code.
+data any fighter may use, never as #0001's own code; so were the Deflect
+(and its `deflectProjectiles`), the air dash and the projectiles' spin,
+which both fighters opt into through their definitions.
 
 ## Adding a fighter
 

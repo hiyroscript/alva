@@ -1023,6 +1023,122 @@ the shared capabilities on bespoke data in
 interface and integration test that used the first #0001's moves adapted
 to the new ones.
 
+## Deflect and air dash
+
+Not a named update (it can become one if the owner names it). Asked for
+in `max`: no fighter Shields in the air any more, and the Shield button
+in the air is a Deflect, an aerial strike that turns projectiles back; a
+mid-air mouvment of each fighter's own beside its Dash; and #0001's three
+projectiles spinning very fast.
+
+**What it removed.** The air Shield: #0001's held Infinity in the air
+(`midair_shielding`, its one frame `0001_midair_shielding_1.png`, deleted)
+and its slow fall (`slowFallSpeed` 90, `slowFallBrake` 6000), and the
+defense schema's `airAnimation`, `slowFallSpeed` and `slowFallBrake`
+(now refused if declared). #0002's `airAnimation: null` went with it.
+`midair_shielding` is a retired codename.
+
+**What it added**
+
+- **The Deflect** (`js/game/combat/deflect.js`, `Fighter.tryDeflect`):
+  a fresh Shield press in the air starts the fighter's `deflect`, an
+  attack definition like any other (its own clip, phases, hitbox, stuns,
+  cooldown), never a Shield (no block, perfect Shield, Energy, blockstun,
+  stall, Shield look or slow fall). Every Deflect strikes for 3 at Base
+  Launch 2, the shared rule (`DEFLECT_DAMAGE`, `DEFLECT_BASE_LAUNCH`); a
+  fighter cannot author other values. Held, the button starts nothing
+  more; a press it cannot use is not kept. It may cut short an attack that
+  hit, as any attack may, and wins over an attack button pressed with it.
+- **Turning projectiles back** (`deflectProjectiles`, an attack
+  capability, and `CombatSystem.deflectProjectiles`): while a Deflect is
+  live, every other fighter's projectile its box meets is turned back
+  before any projectile strikes on that step, by the repel's own
+  `Projectile.turnBack`: the deflecting fighter's from then on, flying
+  away from it, its strikes starting over (so it can strike its thrower),
+  the rest of its lifetime kept; the same projectile, never destroyed for
+  it, whatever it is.
+- **The air dash** (`movement.airDashSpeed`, `movement.airDashUses`, the
+  `midair_mouvment` clip, `Fighter.tryAirDash` behind `tryMouvment`): the
+  same requests that Dash on the ground air dash in the air, flat across
+  at its own speed for one pass of its clip, no fall, then normal air
+  physics at no more than top speed. One per airtime for both fighters,
+  given back on landing and by a hit. The Dash's costs, cancel and
+  restrictions, and never while flying from a launch or in free fall.
+- **Projectile spin** (`rotationSpeed`, degrees per second, 0 by
+  default; `projectileAngle`, `Projectile.angle` / `renderAngle`,
+  `drawCenteredFrame`'s rotation): art only, from the projectile's own age.
+  #0001's Red, Maximum Blue and Hollow Purple spin at 2160 (six turns a
+  second). A projectile is now drawn at the art scale of the fighter whose
+  art it is, whoever owns it.
+- **The CPU** (`readMoveset`: `groundShield`, `deflect`, `dash`,
+  `airDash`; `deflectCatches`, `airDashHome`): it never holds the Shield in
+  the air, Deflects a shot in the air when its Deflect would be live as the
+  shot arrives (a careful level watching such a shot every step), uses the
+  Deflect as an aerial strike too, air dashes home from off the stage and
+  in the air to close in.
+- **The touch Shield button** is named and drawn **Deflect**
+  (`touch.deflect`, `ICONS.deflect`) while the fighter is in the air.
+- **Art**, cut from the two supplied sheets at 1x with their flat
+  backgrounds made transparent, nothing redrawn. #0001: `deflect` 1-4, the
+  last row's arm across the body, palm out, sweep over the head with its
+  trail and arm raised; `midair_mouvment` 1, the sheet's one flying leap
+  (the Dash's drawing, its own file). #0002: `deflect` 1-3, the sheet's
+  aerial swat (its first frame the same drawing as the fall pose);
+  `midair_mouvment` 1, its stretched-out flying pose.
+
+**Tuning chosen.** #0001's Deflect: 15 fps, startup 1 frame, active 2,
+recovery 2 (1/3 s), a box from the waist to well over the head out to 50
+units (`{ x: 6, y: -118, w: 44, h: 98 }`), upward, hitstun 0.32, a 0.3 s
+cooldown. #0002's: 20 fps, 1 / 2 / 2 frames (1/4 s), from the head to the
+knees out to 38 units (`{ x: 6, y: -64, w: 32, h: 56 }`), sideways,
+hitstun 0.3, a 0.3 s cooldown. Each box covers the front of the body its
+art sweeps, so a Deflect catches a shot before it reaches the body. Air
+dashes: #0001 950 units/s, #0002 1100, each 0.2 s (one 5 fps frame).
+
+**Balance, measured.** Seeded CPU-vs-CPU fights on Desert, up to one
+minute each, 200 per level (100 each way round), Void falls #0001 :
+#0002. Before (the same fights on the code before the change): Easy
+97 : 2, Medium 93 : 58, Hard 49 : 70, Brutal 60 : 94. After: Easy 109 : 1,
+Medium 111 : 60, Hard 81 : 45, Brutal 82 : 93. #0001 falls more often:
+it lost its air Shield, and #0002's Deflect turns its orbs back at it.
+With #0002's projectile catching off, Hard is 65 : 66; with neither
+fighter's Deflect, 72 : 60; with neither air dash, 83 : 50. Counts this
+size vary by up to about twenty between seed ranges (two other ranges:
+Hard 91 : 43 and 88 : 39, Brutal 90 : 90 and 104 : 75). Left as measured:
+the levers are the Deflects' windows and boxes in the definitions and the
+CPU's Deflect choice in `chooseDefense`.
+
+**Where to tune it**
+
+- `js/data/characters/0001.js` and `0002.js`: each `deflect` (phases,
+  `hitbox`, `directionalLaunch`, stuns, `cooldown`, `airMomentum`,
+  `airControl`, `airUses`), `FPS_*.deflect` and `.midair_mouvment`,
+  `movement.airDashSpeed` / `airDashUses`, `ORB_SPIN_0001`.
+- `js/game/combat/deflect.js`: `DEFLECT_DAMAGE`, `DEFLECT_BASE_LAUNCH`.
+- `js/game/ai/combat-ai.js`: the Deflect option's weight in
+  `chooseDefense`, `airDashHome`, the airborne air dash option in
+  `options`.
+
+**Code:** `js/game/combat/deflect.js`; `deflectProjectiles` in
+`js/game/combat/attacks.js` and `CombatSystem.deflectProjectiles` in
+`js/game/combat/combat.js`; `rotationSpeed`, `projectileAngle` and
+`turnBack` in `js/game/combat/projectile.js`; `drawCenteredFrame` in
+`js/game/rendering/sprite-normalizer.js`; `Arena.drawProjectile`; the
+ground-only Shield in `js/game/combat/defense.js`; `tryDeflect`,
+`startAttack`, `tryMouvment`, `tryAirDash`, `airDashUses` and the step in
+`js/game/fighters/fighter.js`; `js/game/ai/moveset.js`,
+`js/game/ai/combat-ai.js`; `js/ui/touch-controls.js`, `js/ui/icons.js`,
+`js/localization/strings/`; both definitions and their new frames.
+
+**Tests:** `tests/systems/deflect.test.mjs`, `air-mouvment.test.mjs`,
+`projectile-spin.test.mjs` (new); `defense.test.mjs` (no Shield in the air
+for either fighter, the refused fields), `dash.test.mjs`, `combo.test.mjs`
+(the air dash cancel), `movement.test.mjs`, `codenames.test.mjs`,
+`combat-ai.test.mjs`, `sample-fighter.test.mjs`,
+`tests/fighters/0001/`, `tests/fighters/0002/`,
+`tests/interface/controls-ui.test.mjs` (the Deflect label) and
+`tests/integration/roster-matrix.test.mjs` updated.
+
 ## Adding a named update
 
 When a new piece of work gets a name, add a row to the table and a section in

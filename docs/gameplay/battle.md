@@ -36,9 +36,10 @@ respawn; Practice Ground never reads it.
 - **Medium:** a balanced opponent: its fighter's attacks and extra attack,
   an occasional Shield, summon or technique; answers slow threats, still
   gets caught.
-- **Hard:** fast reactions; Shields and steps away from real threats,
-  punishes recovery, spaces, jumps in, dashes and uses its summons and
-  techniques deliberately.
+- **Hard:** fast reactions; Shields and steps away from real threats (in
+  the air, Deflects the shots it can catch), punishes recovery, spaces,
+  jumps in, dashes and air dashes, and uses its summons and techniques
+  deliberately.
 - **Brutal:** reacts within a few frames (never instantly), reassesses
   constantly, manages Energy and cooldowns, and uses the full moveset. It
   still waits, spaces and retreats when that is the stronger choice.

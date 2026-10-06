@@ -390,12 +390,16 @@ export function drawFrame(ctx, frame, x, y, pxPerArt, flip) {
 }
 
 // Draws a normalized projectile or effect frame centred on device pixel
-// position (x, y), at the same `pxPerArt` as the fighters.
-export function drawCenteredFrame(ctx, frame, x, y, pxPerArt, flip) {
+// position (x, y), at the same `pxPerArt` as the fighters, turned
+// `rotation` radians clockwise round its centre (a spinning projectile, see
+// Projectile.renderAngle) and then mirrored if `flip`. No rotation, no
+// turn: exactly the unrotated draw.
+export function drawCenteredFrame(ctx, frame, x, y, pxPerArt, flip, rotation = 0) {
   const w = frame.artW * pxPerArt;
   const h = frame.artH * pxPerArt;
   ctx.save();
   ctx.translate(Math.round(x), Math.round(y));
+  if (rotation) ctx.rotate(rotation);
   if (flip) ctx.scale(-1, 1);
   ctx.drawImage(
     frame.canvas,

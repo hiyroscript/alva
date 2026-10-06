@@ -7,21 +7,22 @@ projectiles, summons and techniques and resolves every hit the same way.
 
 The product rules are [`ALVA_SPEC.md`](../../ALVA_SPEC.md) §7.2.4 (combat)
 and §7.2.6 (summons and techniques); Launch is its own guide
-([launch](launch.md)), and so are the Shield ([defense](defense.md)) and
-Energy ([energy](energy.md)).
+([launch](launch.md)), and so are the Shield and the Deflect
+([defense](defense.md)) and Energy ([energy](energy.md)).
 
 | Module | Owns |
 | --- | --- |
 | [`js/data/loadout.js`](../../js/data/loadout.js) | The loadout rules and the readers of a fighter's `actions` (`loadoutProblems`, `assertLoadout`, `actionType`, `specialAction`, `specialAttacks`, `describeLoadout`). |
 | [`js/game/combat/attacks.js`](../../js/game/combat/attacks.js) | The attack schema: `createAttackDefinition`, attack phases (`attackPhase`, `strikeLive`), motions, strikes, `attackReach` (for readers such as the CPU). |
 | [`js/game/combat/combat-state.js`](../../js/game/combat/combat-state.js) | `CombatState`, one per fighter: Launch Point, Energy, the attack in progress and its clock, stun, blockstun, hitstop, paralysis, cooldowns (`CooldownTimers` for summons and techniques). |
-| [`js/game/combat/combat.js`](../../js/game/combat/combat.js) | `CombatSystem`: finds every hit each fixed step and resolves it through one `applyHit`; launch reaction (`resolveLaunchReaction`, `resolveLaunchStun`, `steerLaunch`); `worldBox`. |
+| [`js/game/combat/combat.js`](../../js/game/combat/combat.js) | `CombatSystem`: turns back the projectiles a live `deflectProjectiles` box meets (`deflectProjectiles`), then finds every hit each fixed step and resolves it through one `applyHit`; launch reaction (`resolveLaunchReaction`, `resolveLaunchStun`, `steerLaunch`); `worldBox`. |
+| [`js/game/combat/deflect.js`](../../js/game/combat/deflect.js) | The Deflect's schema (`createDeflectDefinition`): an attack definition with the fixed strike every Deflect has ([defense](defense.md#the-deflect)). |
 | [`js/game/combat/hit-effects.js`](../../js/game/combat/hit-effects.js) | The shared hit effects any hit may carry (`unblockable`, `paralyze`, `blockPush`): `resolveHitEffects`, `HIT_EFFECT_FIELDS`. |
 | [`js/game/combat/pull.js`](../../js/game/combat/pull.js) | Pulls: `applyPulls` (every attack and projectile pull live this step), `pullToward`. |
-| [`js/game/combat/projectile.js`](../../js/game/combat/projectile.js) | Projectiles: `createProjectileDefinition`, `Projectile`, `clashProjectiles` (repel and erase), spawning and cleanup. |
+| [`js/game/combat/projectile.js`](../../js/game/combat/projectile.js) | Projectiles: `createProjectileDefinition`, `Projectile` (with `turnBack`, shared by repel and the Deflect), `clashProjectiles` (repel and erase), `projectileAngle` (the art's spin), spawning and cleanup. |
 | [`js/game/combat/summon.js`](../../js/game/combat/summon.js) | Summons: `createSummonDefinition`, `summonProblem`, the `Clone` entity, spawning and cleanup. |
 | [`js/game/combat/technique.js`](../../js/game/combat/technique.js) | Techniques: `createTechniqueDefinition`, `techniqueProblem`, the `Technique` runtime and its phases. |
-| [`js/game/fighters/fighter.js`](../../js/game/fighters/fighter.js) | Turning presses into moves (`tryAction`, `trySpecial`, `trySummon`, `tryTechnique`), the combat input buffer, hit-cancels, attack motion, summon startups. |
+| [`js/game/fighters/fighter.js`](../../js/game/fighters/fighter.js) | Turning presses into moves (`tryAction`, `tryDeflect`, `startAttack`, `trySpecial`, `trySummon`, `tryTechnique`), the combat input buffer, hit-cancels, attack motion, summon startups. |
 
 ## Loadouts
 
@@ -79,10 +80,10 @@ An attack entry (`attacks.<codename>`) becomes a frozen definition through
 | `cooldown` | 0 | A short recovery cooldown after it ends or is cut short. |
 | `groundOnly` | false | It never starts in the air (and an air press of it is never buffered). |
 | `lockMovement`, `momentum`, `airMomentum`, `control`, `airControl`, `friction`, `step` | true, 1, 1, 0, 0, 1, null | How the fighter moves while it plays ([movement](movement.md#attack-movement)). |
-| `hitCancel` | null | Seconds in: from then on, once it has hit, another attack, a jump or a Dash may cut it short. |
+| `hitCancel` | null | Seconds in: from then on, once it has hit, another attack (the Deflect included), a jump, a Dash or an air dash may cut it short. |
 | `projectile` | null | `{ id, spawnAt, offset }`: releases that projectile once, as its time crosses `spawnAt`. |
 | `pending` | false | Art only: one pass of its clip, no hit (declaring combat fields on one is refused). |
-| `hits`, `carry`, `motion`, `pull`, `airUses`, `freeFall`, `passThrough`, `hurtboxes` | — | See below. |
+| `hits`, `carry`, `motion`, `pull`, `deflectProjectiles`, `airUses`, `freeFall`, `passThrough`, `hurtboxes` | — | See below. |
 | `unblockable` / `paralyze` / `blockPush` | false / 0 / 0 | The shared hit effects (below). |
 
 ### From a press to a move
@@ -98,6 +99,14 @@ there. An attack faces the direction held as it starts (the combat AI
 faces its target instead). A press that cannot start yet is kept by the
 combat input buffer for `movement.attackBuffer` and tried every step;
 summons and techniques are never buffered.
+
+The Shield button's move in the air, the Deflect, is an attack too, from
+the fighter's `deflect` entry (not its `actions`): `Fighter.tryDeflect`
+starts it on a fresh `shield` press in the air, under the same rules
+(free to follow up, its cooldown over, not in free fall), before the
+attack buttons are tried on that step; it is never buffered
+([defense](defense.md#the-deflect)). Both start through the same
+`startAttack`.
 
 A hit (never a block) or a paralysis takes the target out of its own
 attack on its next step. The Shield, a stun, a Dash, a technique or a summon's
@@ -150,6 +159,11 @@ them today):
   hitstun, and any hit that launches the target ends it), `blockPush` (a
   Shield that blocks it is shoved along the hit's direction). Each
   defaults to changing nothing; a value of the wrong kind is refused.
+- **Turning projectiles back** (`deflectProjectiles: true`): while its
+  active phase is open, its hitbox turns back every other fighter's
+  projectile it meets, before any projectile strikes that step
+  (`CombatSystem.deflectProjectiles`). Only every fighter's Deflect has it
+  ([defense](defense.md#the-deflect)); it needs a hitbox.
 - **Per airtime** (`airUses`) and **free fall** (`freeFall: true`).
 - **Body** (`passThrough: true`: no pushbox while it plays; `hurtboxes`:
   the fighter's own replaced while it plays).
@@ -158,9 +172,11 @@ them today):
 
 Each fixed step, after every fighter has moved (see the step order in
 [the architecture overview](../architecture/overview.md#one-fixed-step)),
-`CombatSystem.update` resolves, in order: fighters' melee hitboxes (and
-strikes), live projectiles, summoned clones, then techniques (a burst
-due on its release step). Every hit goes through one
+`CombatSystem.update` resolves, in order: the projectiles a live
+Deflect turns back (`deflectProjectiles`: from then on they are the
+deflecting fighter's, so none of them strikes it this step), fighters'
+melee hitboxes (and strikes), live projectiles, summoned clones, then
+techniques (a burst due on its release step). Every hit goes through one
 `applyHit(attacker, target, def, ...)`, which never checks which fighter,
 attack or technique it is resolving:
 
@@ -200,7 +216,10 @@ entry. Fields (`PROJECTILE_DEFAULTS`): `animation` (a
 `damage`, `baseLaunch`, `directionalLaunch`, `hitstun`, `blockstun`,
 `hitstop`, `carry`, `pierce: { hits, interval }` with an optional
 `finisher` (its last strike), `pull: { radius, speed }`, `repel`, `erase`
-and the hit effects. A projectile flies straight in the direction its
+and the hit effects, and `rotationSpeed` (degrees per second its art
+spins as it flies, clockwise; 0, the default, is none: art only, see
+[rendering](rendering.md#projectile-spin)). A projectile flies straight
+in the direction its
 thrower faced at the release, never turns, hits once by default (a
 piercing one up to its `hits`, an erasing one each fighter once, flying
 on through), and is gone on a block, at the end of its lifetime, in the
@@ -208,7 +227,10 @@ Void or against a solid. Its hits credit its thrower and freeze only its
 target. When two of different owners meet (`clashProjectiles`), erasing
 beats repelling beats neither: a repelling one turns the other back, its
 owner's from then on; an erasing one makes it disappear; two of the same
-rank that act both go; two that do neither pass each other by.
+rank that act both go; two that do neither pass each other by. A live
+Deflect turns one back the same way (`Projectile.turnBack`), whatever it
+is: away from the deflecting fighter, its strikes starting over, the rest
+of its lifetime kept.
 
 ## Summons
 
@@ -291,6 +313,7 @@ button (A4, A5) while they run
 | `attack3` to `attack5` | those buttons do nothing for it |
 | `summons` / `techniques` | no special moves; the CPU never plans one |
 | `projectiles` | no projectile attacks |
+| `deflect` | the Shield button does nothing in the air |
 | `transform` (or `null`) | reserved: the button is wired, does nothing, dashed on touch |
 
 ## Tests
@@ -306,6 +329,8 @@ button (A4, A5) while they run
   (a fighter that is not #0001, with different moves on the same
   codenames).
 - The shared capabilities on bespoke data:
+  [`deflect.test.mjs`](../../tests/systems/deflect.test.mjs),
+  [`projectile-spin.test.mjs`](../../tests/systems/projectile-spin.test.mjs),
   [`hit-effects.test.mjs`](../../tests/systems/hit-effects.test.mjs),
   [`pull.test.mjs`](../../tests/systems/pull.test.mjs),
   [`projectile-clash.test.mjs`](../../tests/systems/projectile-clash.test.mjs),

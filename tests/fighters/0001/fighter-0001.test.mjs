@@ -36,10 +36,11 @@ const CLIPS = {
   fall: named('fall', 2),
   land: named('land', 2),
   mouvment: named('mouvment', 1),
+  midair_mouvment: named('midair_mouvment', 1),
   hurt: named('hurt', 2),
   midair_hurt: named('midair_hurt', 1),
   shielding: named('shielding', 1),
-  midair_shielding: named('midair_shielding', 1),
+  deflect: named('deflect', 4),
   attack1: named('attack1', 6),
   midair_attack1: named('midair_attack1', 5),
   attack2: named('attack2', 5),
@@ -57,7 +58,7 @@ const FILES = [...new Set([...Object.values(CLIPS).flat(), ...Object.values(ORBS
 
 // The tallest frame of each clip, in art pixels (one per file pixel).
 const HEIGHTS = {
-  idle: 63, run: 61, jump: 66, fall: 70, land: 59, mouvment: 40, hurt: 60, midair_hurt: 51, shielding: 55, midair_shielding: 57,
+  idle: 63, run: 61, jump: 66, fall: 70, land: 59, mouvment: 40, midair_mouvment: 40, hurt: 60, midair_hurt: 51, shielding: 55, deflect: 69,
   attack1: 61, midair_attack1: 60, attack2: 61, midair_attack2: 47, attack3: 62, midair_attack3: 62,
   attack4_cast: 62, attack4_release: 55, attack5_cast: 54, attack5_release: 54, extra_attack: 58,
 };
@@ -117,7 +118,11 @@ test('its moves are not just damage: each one names the mechanic it is built on'
   assert.equal(p.attack5_object.unblockable, true);
   assert.equal(t.attack4.burst.hit.unblockable, true, 'Unlimited Void is a sure hit');
   assert.ok(t.attack4.burst.hit.paralyze > 0, 'that paralyzes');
-  assert.ok(defense.stall > 0 && defense.slowFallSpeed > 0, 'Infinity stalls blows and stops the fall');
+  assert.ok(defense.stall > 0, 'Infinity stalls blows');
+  assert.equal(defense.airAnimation, undefined, 'and is the ground\'s only');
+  assert.equal(DEF.deflect.deflectProjectiles, true, 'its Deflect turns projectiles back');
+  assert.ok(DEF.movement.airDashSpeed > 0 && DEF.animations.midair_mouvment, 'it dashes in the air too');
+  for (const id of ['attack2_object', 'attack3_object', 'attack5_object']) assert.ok(p[id].rotationSpeed >= 2000, `${id} spins fast`);
 });
 
 test('its in-game names and touch buttons name each move, in English and French', () => {
@@ -165,7 +170,7 @@ test('its sprite sheet is credited, linked to where it was published, without na
 
 test('its folder holds exactly the frames its clips play: every file named <id>_<codename>_<frame>.png', () => {
   assert.deepEqual(readdirSync(`${ROOT}${DIR}`).sort(), FILES);
-  assert.equal(FILES.length, 74);
+  assert.equal(FILES.length, 78);
   for (const [key, want] of Object.entries(CLIPS)) assert.deepEqual(DEF.animations[key].frames.map(file), want, key);
   for (const [key, want] of Object.entries(ORBS)) assert.deepEqual(DEF.projectileAnimations[key].frames.map(file), want, key);
   assert.deepEqual(Object.keys(DEF.animations).sort(), Object.keys(CLIPS).sort());
@@ -216,7 +221,7 @@ test('the real art normalizes at one art pixel per file pixel, the roster\'s siz
 
 test('anchors keep the body in place: authored on the shirt where an arm or a glow reaches out, the kick on its planted foot', () => {
   for (const key of ['attack1', 'midair_attack1', 'attack2', 'attack3', 'midair_attack3', 'attack4_cast', 'attack4_release',
-    'attack5_cast', 'attack5_release', 'extra_attack', 'hurt']) {
+    'attack5_cast', 'attack5_release', 'extra_attack', 'hurt', 'deflect']) {
     assert.deepEqual(REAL.animations[key].frames.map((f) => f.anchorArtX), DEF.animations[key].anchorX, `${key}: as authored`);
   }
   // A punch reaching out never drags the body forward: the Jab's and the

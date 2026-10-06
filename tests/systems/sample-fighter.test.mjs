@@ -121,8 +121,10 @@ test('the CPU reads its moveset from its own data', () => {
   ]);
   assert.deepEqual(moves.ranged, [], 'no projectile');
   assert.deepEqual(moves.specials.map((c) => [c.action, c.id, c.type]), [['attack3', 'attack3', 'summon']]);
-  assert.equal(moves.shield, false, 'no Shield to raise');
+  assert.equal(moves.groundShield, false, 'no Shield to raise');
+  assert.equal(moves.deflect, null, 'no Deflect');
   assert.ok(moves.dash);
+  assert.equal(moves.airDash, null, 'no air dash: none authored');
 });
 
 test('a CPU plays it against a #0001 CPU: it attacks with its own moves and never shields', () => {

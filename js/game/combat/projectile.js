@@ -67,6 +67,23 @@
 // go), a repelling one turns back one that does neither (two repelling
 // ones, both go), and two that do neither pass each other by.
 //
+// A fighter's attack with `deflectProjectiles` (every fighter's Deflect, see
+// js/game/combat/deflect.js) turns a projectile back the same way, by the
+// same turnBack, whatever the projectile is: being unblockable, repelling,
+// piercing or erasing never keeps one from being turned back.
+//
+// One field is art only:
+//
+//   rotationSpeed: 2160       degrees per second it spins as it flies,
+//                             clockwise on screen (0, the default: never),
+//                             whichever way it travels. The angle is its
+//                             age x this (Projectile.angle), drawn round its
+//                             centre (see drawCenteredFrame in
+//                             js/game/rendering/sprite-normalizer.js). Its
+//                             hitbox, velocity, launches, pulls and clashes
+//                             never turn with it, and being turned back
+//                             never resets it: the spin runs on its age.
+//
 // A projectile flies straight in the direction it was released, hits at most
 // once (a piercing one, its `hits`; an erasing one, each fighter once) and
 // then disappears. It also disappears when its lifetime runs out, when it
@@ -96,6 +113,7 @@ const PROJECTILE_DEFAULTS = {
   pull: null,     // { radius, speed }: draws opponents in while it flies (see above)
   repel: false,   // turns back the projectiles it meets (see above)
   erase: false,   // erases the projectiles it meets and flies on through fighters (see above)
+  rotationSpeed: 0, // degrees per second its art spins (see above): rendering only
 };
 
 // What a finisher takes from its projectile when it does not say.
@@ -112,6 +130,7 @@ export function createProjectileDefinition(spec) {
   def.pull = resolvePull(spec.pull, owner);
   def.repel = !!def.repel;
   def.erase = !!def.erase;
+  if (!Number.isFinite(def.rotationSpeed)) throw new Error(`[Alva] Projectile "${spec.id}"'s rotationSpeed must be a number (degrees per second)`);
   if (def.pierce) {
     const { hits, interval } = def.pierce;
     if (!(Number.isInteger(hits) && hits >= 2) || !(interval > 0)) {
@@ -134,14 +153,24 @@ export function createProjectileDefinition(spec) {
 
 const overlaps = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
 
+// The angle (radians, clockwise on screen) projectile definition `def`'s
+// art is drawn at `age` seconds into its flight: its rotationSpeed (degrees
+// per second) x its age. Rendering only.
+export function projectileAngle(def, age) {
+  return def.rotationSpeed ? (def.rotationSpeed * age * Math.PI) / 180 : 0;
+}
+
 export class Projectile {
-  // `anim` is the normalized projectile animation (SpriteSet.projectile()).
-  // `direction` is fixed here: the projectile never follows its owner's
-  // later facing.
-  constructor({ owner, def, anim, x, y, direction }) {
+  // `anim` is the normalized projectile animation (SpriteSet.projectile())
+  // and `sprites` the set it came from (its owner's at release), whose
+  // art-pixel scale it is drawn at whoever owns it later. `direction` is
+  // fixed here: the projectile never follows its owner's later facing (only
+  // turnBack changes it).
+  constructor({ owner, def, anim, x, y, direction, sprites = owner?.sprites ?? null }) {
     this.owner = owner;
     this.def = def;
     this.anim = anim;
+    this.sprites = sprites;
     this.direction = direction;
     this.speed = def.speed;
     this.vx = def.speed * direction;
@@ -151,7 +180,10 @@ export class Projectile {
     this.prevY = y;
     this.renderX = x;
     this.renderY = y;
-    this.age = 0; // seconds alive; also the animation clock
+    this.age = 0; // seconds alive; also the animation and spin clock
+    // The age drawn between two fixed steps (see interpolate): art only.
+    this.prevAge = 0;
+    this.renderAge = 0;
     this.alive = true;
     // Strikes dealt so far, and its age at the latest (a piercing one's
     // next waits for its interval).
@@ -196,9 +228,13 @@ export class Projectile {
     return this.through.has(target);
   }
 
-  // Turned back by a repelling projectile (see clashProjectiles): it flies
-  // `direction` at its own speed and is `owner`'s from now on, as if thrown
-  // by it, its strikes starting over.
+  // Turned back by a repelling projectile (see clashProjectiles) or a
+  // fighter's Deflect (CombatSystem.deflectProjectiles in
+  // js/game/combat/combat.js): it flies `direction` at its own speed and is
+  // `owner`'s from now on, as if thrown by it, its strikes starting over (so
+  // it may strike whoever threw it). Its age runs on, and with it its clip,
+  // its spin and the rest of its lifetime: a short-lived shot turned back
+  // late may not make it all the way home.
   turnBack(owner, direction) {
     this.owner = owner;
     this.direction = direction;
@@ -229,6 +265,7 @@ export class Projectile {
     if (!this.alive) return;
     this.prevX = this.x;
     this.prevY = this.y;
+    this.prevAge = this.age;
     this.x += this.vx * dt;
     this.age += dt;
     if (this.age >= this.def.lifetime - TIME_EPSILON) {
@@ -271,10 +308,22 @@ export class Projectile {
     return !!source && this.direction !== source;
   }
 
-  // Interpolated position for rendering between fixed steps.
+  // The angle its art is at on this fixed step (see projectileAngle), and
+  // the one drawn between steps (from the interpolated age). Rendering only:
+  // nothing in the simulation reads either.
+  get angle() {
+    return projectileAngle(this.def, this.age);
+  }
+
+  get renderAngle() {
+    return projectileAngle(this.def, this.renderAge);
+  }
+
+  // Interpolated position (and spin) for rendering between fixed steps.
   interpolate(alpha) {
     this.renderX = this.prevX + (this.x - this.prevX) * alpha;
     this.renderY = this.prevY + (this.y - this.prevY) * alpha;
+    this.renderAge = this.prevAge + (this.age - this.prevAge) * alpha;
   }
 }
 

@@ -69,10 +69,13 @@ for (const pair of PAIRS) {
       const own = m.steps.map((s) => s[side]);
       const buttons = new Set(own.flatMap((s) => s.pressed));
       const attacks = new Set(own.map((s) => s.attack).filter(Boolean));
-      // Only buttons the fighter has a move on; only its own attacks,
-      // summons and techniques ever start.
+      // Only buttons the fighter has a move on; only its own attacks (its
+      // Deflect, the Shield button's in the air, among them), summons and
+      // techniques ever start.
       for (const action of buttons) assert.ok(def.actions?.[action], `${def.displayName} pressed ${action}, which it has no move on`);
-      for (const id of attacks) assert.ok(id in def.attacks, `${def.displayName} started ${id}, which is not one of its attacks`);
+      for (const id of attacks) {
+        assert.ok(id in def.attacks || (id === 'deflect' && def.deflect), `${def.displayName} started ${id}, which is not one of its attacks`);
+      }
       for (const s of own) {
         if (s.technique) assert.ok(s.technique in (def.techniques ?? {}), `${def.displayName}: technique ${s.technique}`);
         if (s.summon) assert.ok(s.summon in (def.summons ?? {}), `${def.displayName}: summon ${s.summon}`);

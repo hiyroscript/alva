@@ -23,8 +23,8 @@ export const TEST_A = testFighter('test-a', 'Test A', 8);
 export const TEST_B = testFighter('test-b', 'Test B', 2);
 
 // A fighter with no moves at all (slot 04): every combat button left out of
-// its `actions`, so no touch button, attack, summon, technique, projectile
-// or Shield. It still moves, jumps, falls and is hit like any fighter. On
+// its `actions`, so no touch button, attack, summon, technique, projectile,
+// Shield or Deflect. It still moves, jumps, falls and is hit like any fighter. On
 // purpose it breaks the loadout rules (no attack1 or attack2; see
 // js/data/loadout.js, which the game's own definitions must pass): a
 // robustness fixture, proving the screens, the touch controls and the CPU
@@ -32,6 +32,7 @@ export const TEST_B = testFighter('test-b', 'Test B', 2);
 export const TEST_MOVELESS = testFighter('test-moveless', 'Moveless', 3, {
   actions: {}, attacks: {}, summons: {}, techniques: {},
   projectiles: {}, projectileAnimations: {}, effectAnimations: {}, mobileAbilities: {}, abilityNames: {}, defense: null,
+  deflect: null,
 });
 
 // The sample fighter's different moves and names (see tests/fighters/fixtures/sample-fighter.mjs),

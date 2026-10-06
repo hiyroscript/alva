@@ -22,12 +22,12 @@ rules are [`ALVA_SPEC.md`](../../ALVA_SPEC.md) §7.4 (input), §6.10
 | Action | Codename | Keyboard | Gamepad | Touch |
 | --- | --- | --- | --- | --- |
 | Move left / right | `runLeft` / `runRight` | A D or ← → | D-pad / left stick | Joystick, or Classic ◀ ▶ |
-| Dash | a double tap of `runLeft` / `runRight`; `mouvementLeft` / `mouvementRight` on touch | double-tap A / D or ← / → | double-tap the D-pad or stick | Joystick: one tap of **Left mouvement** / **Right mouvement**; Classic: double-tap ◀ or ▶ |
+| Dash (on the ground) / air dash (in the air) | a double tap of `runLeft` / `runRight`; `mouvementLeft` / `mouvementRight` on touch | double-tap A / D or ← / → | double-tap the D-pad or stick | Joystick: one tap of **Left mouvement** / **Right mouvement**; Classic: double-tap ◀ or ▶ |
 | Down (fast fall in the air; steer a launch down) | `down` | S or ↓ | D-pad down / stick down | none |
 | Jump (tap: normal; held a little longer: higher; again in the air: air jump) | `jump` | W, Space or ↑ | A / Cross | the upward arrow |
 | Extra attack | `extra_attack` | J | X / Square | top of the cluster |
 | Transform (reserved) | `transform` | K | Y / Triangle | dashed button |
-| Shield | `shield` | L | RB / RT | **Shield** |
+| Shield (on the ground, held) / Deflect (in the air, a fresh press) | `shield` | L | RB / RT | **Shield**, named and drawn **Deflect** while airborne |
 | Attack 1 to Attack 5 | `attack1` … `attack5` | U I O M , | B, LB, LT, L3, R3 | slots 1 to 5 |
 | Pause (the Practice menu in Practice Ground) | `pause` | Esc or P | Start | the timer / pause or More button |
 
@@ -70,7 +70,9 @@ fighter's own art, chosen in its `mobileAbilities`
 (`preview: { animation, frame }`, `previews.air` for a distinct airborne
 move, `collection: 'projectileAnimations'` to pick projectile art, an
 optional `fallbackIcon`); Jump, Shield, Transform, the arrows, the joystick
-and the Dash buttons keep their universal glyphs. A button with nothing to
+and the Dash buttons keep their universal glyphs (the Shield button's turns
+to the Deflect's, with the name **Deflect**, while the fighter is in the air
+and has a Deflect: the same button sending `shield`). A button with nothing to
 show falls back to a neutral glyph with its name and input unchanged.
 Presentation never changes a button's codename or what it sends. In the
 air, ground-only abilities stay visible but dimmed (`aria-disabled`).

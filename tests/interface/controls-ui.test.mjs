@@ -1779,6 +1779,32 @@ test('ground/air previews follow each loadout and reuse images, buttons and simu
   }
 });
 
+test('the Shield button says what it does where the fighter is: Shield on the ground, Deflect in the air, the same `shield` input', () => {
+  for (const def of [DEF_0001, DEF_0002]) for (const scheme of ['classic', 'joystick']) {
+    const { tc, calls } = touchControls(def, { scheme });
+    const b = tc.buttons.get('shield');
+    assert.equal(b.getAttribute('aria-label'), 'Shield');
+    assert.equal(look(b), ICONS.shield);
+    tc.setAirborne(true);
+    assert.equal(tc.buttons.get('shield'), b, 'the same button');
+    assert.equal(b.getAttribute('aria-label'), 'Deflect');
+    assert.equal(b.getAttribute('data-i18n-aria-label'), 'touch.deflect');
+    assert.equal(look(b), ICONS.deflect);
+    assert.equal(b.getAttribute('data-action'), 'shield', 'its input never changes');
+    press(b, 1);
+    assert.deepEqual(calls.at(-1), ['shield', true]);
+    tc.setAirborne(false);
+    assert.equal(b.getAttribute('aria-label'), 'Shield');
+    assert.equal(look(b), ICONS.shield);
+    tc.releaseAll();
+  }
+  // A fighter with no Deflect keeps its Shield's name and glyph in the air.
+  const { tc } = touchControls({ ...DEF_0001, id: 'test-no-deflect', deflect: null });
+  tc.setAirborne(true);
+  assert.equal(tc.buttons.get('shield').getAttribute('aria-label'), 'Shield');
+  assert.equal(look(tc.buttons.get('shield')), ICONS.shield);
+});
+
 test('ground-only abilities stay recognizable but inactive in the air, including the Whirlwind tornado', () => {
   for (const [def, actions] of [[DEF_0001, ['attack4', 'attack5']], [DEF_0002, ['extra_attack']]]) {
     const { tc } = touchControls(def);

@@ -139,9 +139,11 @@ const CLIPS = {
   jump: named('jump', 8),
   fall: named('fall', 1),
   mouvment: named('mouvment', 4),
+  midair_mouvment: named('midair_mouvment', 1),
   hurt: named('hurt', 1),
   midair_hurt: named('midair_hurt', 1),
   shielding: named('shielding', 1),
+  deflect: named('deflect', 3),
   attack1: named('attack1', 4),
   midair_attack1: named('midair_attack1', 8),
   attack2: [...named('attack2', 4), ...named('attack2', 4)],
@@ -154,7 +156,7 @@ const FILES = [...new Set([...Object.values(CLIPS).flat(), ...named('extra_attac
 
 // The tallest frame of each clip, in art pixels (one per file pixel).
 const HEIGHTS = {
-  idle: 39, run: 40, jump: 30, fall: 48, mouvment: 36, hurt: 42, midair_hurt: 32, shielding: 39,
+  idle: 39, run: 40, jump: 30, fall: 48, mouvment: 36, midair_mouvment: 33, hurt: 42, midair_hurt: 32, shielding: 39, deflect: 48,
   attack1: 39, midair_attack1: 30, attack2: 80, midair_attack2: 30, attack3: 30, midair_attack3: 46, extra_attack: 39,
 };
 
@@ -246,7 +248,7 @@ test('its in-game names and touch buttons name each move, in English and French'
 
 test('its folder holds exactly the frames its clips play: every file named <id>_<codename>_<frame>.png', () => {
   assert.deepEqual(readdirSync(`${ROOT}${DIR}`).sort(), FILES);
-  assert.equal(FILES.length, 85);
+  assert.equal(FILES.length, 89);
   for (const [key, want] of Object.entries(CLIPS)) assert.deepEqual(DEF.animations[key].frames.map(file), want, key);
   assert.deepEqual(DEF.projectileAnimations.extra_attack_object.frames.map(file), named('extra_attack_object', 4));
   assert.deepEqual(Object.keys(DEF.animations).sort(), Object.keys(CLIPS).sort());
@@ -292,13 +294,15 @@ test('anchors keep the body in place: authored on the ball, the tornado, the whi
   }
   assert.deepEqual(REAL.animations.attack1.frames.map((f) => f.anchorArtX), [14, 13, 13, 13]);
   assert.deepEqual(REAL.animations.extra_attack.frames.map((f) => f.anchorArtX), [16, 23.5, 23.5, 25.5, 25.5, 28, 29, 26, 25]);
+  // The Deflect on its face and chest, never dragged out by the swatting hand.
+  assert.deepEqual(REAL.animations.deflect.frames.map((f) => f.anchorArtX), [19, 14, 14.5]);
   // The Rapid Kicks' feet are above the bottom of the art: its trails
   // sweep below the standing foot, and must not lift the body.
   const kicks = REAL.animations.attack2.frames;
   assert.deepEqual(kicks.map((f) => f.anchorArtY), [59, 57, 59, 61, 59, 57, 59, 61]);
   for (const f of kicks) assert.ok(f.anchorArtY < f.artH, 'the feet above the trails');
   // Everything else stands on the bottom of its art.
-  for (const key of ['idle', 'run', 'fall', 'hurt', 'shielding', 'extra_attack']) {
+  for (const key of ['idle', 'run', 'fall', 'hurt', 'shielding', 'extra_attack', 'deflect', 'midair_mouvment']) {
     for (const f of REAL.animations[key].frames) assert.equal(f.anchorArtY, f.artH, key);
   }
 });
@@ -731,10 +735,13 @@ test('the CPU reads every move from the data: its motions, and no summon or tech
   ]);
   assert.deepEqual(moves.ranged.map((r) => r.id), ['extra_attack']);
   assert.deepEqual(moves.specials, []);
-  assert.equal(moves.shield, true);
+  assert.equal(moves.groundShield, true, 'a Shield on the ground');
+  assert.equal(moves.deflect.id, 'deflect', 'its Deflect in the air, on the Shield button');
+  assert.equal(moves.deflect.action, 'shield');
+  assert.ok(moves.airDash.distance > 0, 'and its air dash');
 });
 
-test('knocked off the stage with its air jump spent, the CPU rises back on its Blue Tornado', () => {
+test('knocked off the stage with its air jump and air dash spent, the CPU rises back on its Blue Tornado', () => {
   const stage = new StageCollision(stageMap({ left: 0, right: 1000 }));
   const ai = new CombatAIController({ difficulty: 'hard', rng: mulberry32(2) });
   const me = new Fighter({ def: DEF, sprites: SPRITES, stage, slot: 'p1', label: 'CPU', spawn: { x: 1100, y: 700 }, controller: ai });
@@ -742,6 +749,7 @@ test('knocked off the stage with its air jump spent, the CPU rises back on its B
   me.opponent = foe;
   foe.opponent = me;
   me.airJumps = 0;
+  me.airDashes = 0;
   me.body.vy = 100;
   const ctx = { stage, gravity: CONFIG.sim.gravity, battle: { projectiles: [], clones: [] } };
   let used = false;

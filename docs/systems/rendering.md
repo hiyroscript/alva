@@ -7,7 +7,7 @@ product rules are [`ALVA_SPEC.md`](../../ALVA_SPEC.md) §3 (assets), §7.1
 
 | Module | Owns |
 | --- | --- |
-| [`js/game/rendering/sprite-normalizer.js`](../../js/game/rendering/sprite-normalizer.js) | `SpriteSet`: each fighter's loaded clips, normalized once per frame (visible bounds, pixel-grid detection, resampling to one pixel per art pixel, anchors), clip durations (which time the Dash, the land pose and summon startups), `drawFrame`. |
+| [`js/game/rendering/sprite-normalizer.js`](../../js/game/rendering/sprite-normalizer.js) | `SpriteSet`: each fighter's loaded clips, normalized once per frame (visible bounds, pixel-grid detection, resampling to one pixel per art pixel, anchors), clip durations (which time the Dash, the air dash, the land pose and summon startups), `drawFrame`, `drawCenteredFrame` (projectiles and effects, optionally turned). |
 | [`js/game/rendering/sprite-animator.js`](../../js/game/rendering/sprite-animator.js) | `SpriteAnimator`: which frame of which clip a fighter shows. |
 | [`js/game/rendering/camera.js`](../../js/game/rendering/camera.js) | Framing the fighters in play inside the camera bounds. |
 | [`js/game/rendering/hit-fx.js`](../../js/game/rendering/hit-fx.js) | Hit effects from each step's combat events: shake, flash, sparks, trails, rebound sparks, the lethal launch's slow motion (`HIT_FX`). |
@@ -47,6 +47,22 @@ technique objects, projectiles, hit sparks, the stage's foreground, the
 Void, then each fighter's markers and status over everything, and the
 debug overlay when it is on (`` ` ``).
 
+## Projectile spin
+
+A projectile whose definition has a `rotationSpeed` (degrees per second,
+clockwise on screen; 0 by default) spins as it flies: #0001's Red, Maximum
+Blue and Hollow Purple at 2160, six whole turns a second. The angle is its
+rotationSpeed × its own age (`projectileAngle`; `Projectile.angle` on the
+fixed step, `renderAngle` from the age interpolated between steps like its
+position), so it is the same at any frame rate and never reads a clock of
+its own. `drawCenteredFrame` translates to the projectile's centre,
+rotates, mirrors if the art travels the other way, and draws round the
+normalized anchor at the usual scale; with no rotation it draws exactly as
+it always has. It is art only: the hitbox, velocity, launches, pulls and
+clashes never turn, and being turned back (a repel or a Deflect) never
+resets it. A projectile is drawn at the art-pixel scale of the fighter
+whose art it is, whoever owns it now.
+
 ## Fighter status
 
 Over each fighter in play whose body is on screen: a thin bright purple
@@ -70,6 +86,9 @@ motion drops the shake and the zoom. Tuning: `HIT_FX` (`shake`, `flash`,
 
 ## Tests
 
+- [`tests/systems/projectile-spin.test.mjs`](../../tests/systems/projectile-spin.test.mjs):
+  the spin (its angle from age, never its box, kept through a turn back)
+  and the rotated draw on a recording canvas.
 - [`tests/systems/hit-fx.test.mjs`](../../tests/systems/hit-fx.test.mjs),
   [`fighter-status.test.mjs`](../../tests/systems/fighter-status.test.mjs),
   [`platform-stage.test.mjs`](../../tests/systems/platform-stage.test.mjs).

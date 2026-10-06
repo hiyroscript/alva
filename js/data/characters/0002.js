@@ -11,7 +11,10 @@
 // Bounce Attack that plunges, spikes and rebounds, a Spin Attack that
 // rolls on its running speed straight through its target as a smaller
 // ball, a rising Blue Tornado that carries its target up with it, and a
-// Whirlwind that sends a travelling tornado to catch, lift and fling.
+// Whirlwind that sends a travelling tornado to catch, lift and fling. In the
+// air the Shield button is its Deflect, a swat of the hand that knocks
+// projectiles back, and it has an air dash of its own (its
+// midair_mouvment), flat out across the air.
 
 import { frames } from './helpers.js';
 
@@ -29,6 +32,8 @@ const FPS_0002 = Object.freeze({
   idle: 8,
   run: 20,
   mouvment: 20,
+  midair_mouvment: 5,
+  deflect: 20,
   jump: 24,
   ball: 30,
   attack1: 15,
@@ -65,12 +70,13 @@ export const CHARACTER_0002 = {
   // Every clip is drawn facing right.
   sourceFacing: 1,
 
-  // Anchors: the idle, run, Dash, fall, hurt and guard poses use the
-  // automatic torso anchor. Where the art would drag it (a ball or a
-  // tornado spinning, a whirlwind or kick trails beside the body) a clip
-  // authors its own (`anchorX`, art pixels from the left of each frame's
-  // visible art): the ball and the tornado on their own middle, the
-  // Whirlwind on the body inside it, the One-Two on its planted feet. The
+  // Anchors: the idle, run, Dash, air dash, fall, hurt and guard poses use
+  // the automatic torso anchor. Where the art would drag it (a ball or a
+  // tornado spinning, a whirlwind or kick trails beside the body, a hand
+  // swatting) a clip authors its own (`anchorX`, art pixels from the left of
+  // each frame's visible art): the ball and the tornado on their own
+  // middle, the Whirlwind on the body inside it, the One-Two on its planted
+  // feet, the Deflect on the face and chest. The
   // Rapid Kicks also say where the feet are (`anchorY`, art pixels down
   // from the top of the art): their trails sweep below the standing foot.
   animations: {
@@ -115,6 +121,15 @@ export const CHARACTER_0002 = {
       loop: false,
       heightRatio: 36 / ART_0002,
     },
+    // midair_mouvment, the air dash: stretched out flat, arms swept back,
+    // one foot leading. Played once per air dash, which lasts exactly one
+    // pass of it (1 frame = 0.2 s at 5 fps).
+    midair_mouvment: {
+      frames: frames('0002', 'midair_mouvment', 1),
+      fps: FPS_0002.midair_mouvment,
+      loop: false,
+      heightRatio: 33 / ART_0002,
+    },
     // Hitstun poses: `hurt` (recoiling) on the ground, `midair_hurt`
     // (knocked back, legs up) in the air. Held through the stun.
     hurt: {
@@ -129,12 +144,21 @@ export const CHARACTER_0002 = {
       loop: false,
       heightRatio: 32 / ART_0002,
     },
-    // The guard, arms crossed: its Shield, on the ground only.
+    // The guard, arms crossed: its Shield, on the ground.
     shielding: {
       frames: frames('0002', 'shielding', 1),
       fps: 12,
       loop: false,
       heightRatio: 1,
+    },
+    // deflect, its Deflect: 1 the arms flung wide, 2 the hand swatting up
+    // and out in front, the legs kicking, 3 the hand carried on through.
+    deflect: {
+      frames: frames('0002', 'deflect', 3),
+      fps: FPS_0002.deflect,
+      loop: false,
+      heightRatio: 48 / ART_0002,
+      anchorX: [19, 14, 14.5],
     },
     // attack1, the One-Two: 1 the jab drawn back, 2 the jab, 3 the other
     // fist drawn back, 4 the straight.
@@ -220,8 +244,9 @@ export const CHARACTER_0002 = {
   },
 
   // A still idle frame for the airborne and hurt clips if their frames
-  // fail to load. It has no land clip at all: it lands straight into its
-  // stance.
+  // fail to load (never for an attack, the Shield, the Deflect, the Dash or
+  // the air dash: missing, each is refused). It has no land clip at all: it
+  // lands straight into its stance.
   animationFallbacks: {
     jump: { animation: 'idle', frame: 0 },
     fall: { animation: 'idle', frame: 0 },
@@ -248,8 +273,9 @@ export const CHARACTER_0002 = {
   },
 
   // #0002's movement profile (js/game/fighters/movement.js lists what each
-  // field does): quicker off the mark than #0001, and a longer, faster Dash
-  // (about 220 units in its 0.2 s).
+  // field does): quicker off the mark than #0001, a longer, faster Dash
+  // (about 220 units in its 0.2 s), and one air dash per airtime as fast
+  // and as long, flat across the air.
   movement: {
     acceleration: 4800,
     deceleration: 4200,
@@ -274,6 +300,8 @@ export const CHARACTER_0002 = {
     dropThroughTime: 0.28,
     dashSpeed: 1100,
     dashTapWindow: 0.22,
+    airDashSpeed: 1100,
+    airDashUses: 1,
   },
 
   // Its body, measured from its idle: the head and torso (the quills'
@@ -298,7 +326,7 @@ export const CHARACTER_0002 = {
   },
 
   // Energy (see resolveEnergy in js/game/combat/combat-state.js), spent by
-  // the Dash and the Shield (#0001's goes a little further).
+  // the Dash, the air dash and the Shield (#0001's goes a little further).
   energy: {
     max: 100,
     regen: 12,
@@ -307,15 +335,37 @@ export const CHARACTER_0002 = {
     shieldHitCost: 25,
   },
 
-  // The guard, on the ground only: there is no art for one in the air,
-  // where the `shield` input does nothing. Its perfect Shield opens for
-  // 0.1 s after 0.25 s down, as #0001's does.
+  // The guard, what the `shield` input does for #0002 on the ground. Its
+  // perfect Shield opens for 0.1 s after 0.25 s down, as #0001's does.
   defense: {
     type: 'shield',
     groundAnimation: 'shielding',
-    airAnimation: null,
     perfectWindow: 0.1,
     perfectRearm: 0.25,
+  },
+
+  // Its Deflect, what the `shield` input does for #0002 in the air (schema:
+  // js/game/combat/deflect.js): quicker than #0001's and shorter in reach.
+  // Frame 1 the arms flung wide, then the swat (frames 2-3, live: a box in
+  // front from the head to the knees, out to 38 units), frame 3 then held
+  // two frames more. Every Deflect's 3, Base Launch 2, here sideways, the way
+  // the hand swats; while the swat is live it knocks the other fighter's
+  // projectiles back at their thrower, now #0002's. A quarter of a second
+  // in all, falling as it swats.
+  deflect: {
+    animation: 'deflect',
+    startup: 1 / FPS_0002.deflect,
+    active: 2 / FPS_0002.deflect,
+    recovery: 2 / FPS_0002.deflect,
+    hitbox: { x: 6, y: -64, w: 32, h: 56 },
+    directionalLaunch: 'horizontal',
+    hitstun: 0.3,
+    blockstun: 0.12,
+    hitstop: 0.05,
+    cooldown: 0.3,
+    airMomentum: 0.8,
+    airControl: 0.4,
+    deflectProjectiles: true,
   },
 
   // Three numbered attacks, all ordinary: three buttons, each with its

@@ -24,9 +24,9 @@ Use lowercase codenames and underscores. Numbered frames start at 1 and play in 
 | Shield preparation | <id>_prepshield_<frame>.png |
 | Shield hold | <id>_shielding_<frame>.png |
 | Shield release | <id>_releaseshield_<frame>.png |
-| Mid-air shield | <id>_midair_shielding_<frame>.png |
+| Deflect (the shield button in mid-air) | <id>_deflect_<frame>.png |
 | Movement / dash | <id>_mouvment_<frame>.png |
-| Mid-air movement | <id>_midair_mouvment_<frame>.png |
+| Mid-air movement / air dash | <id>_midair_mouvment_<frame>.png |
 | Numbered attack | <id>_attackN_<frame>.png |
 | Summon startup (the owner's own pose before its summon appears) | <id>_attackN_summon_<frame>.png |
 | Mid-air numbered attack | <id>_midair_attackN_<frame>.png |
@@ -44,7 +44,7 @@ Attack numbers identify moves; they do not prescribe damage, effects or mechanic
 
 extra_attack is a separate, additional character-specific action. It may be a projectile, throw, utility move or other unique attack. It does not count toward the 2–5 numbered attack limit, so a character may have five numbered attacks plus extra_attack. Its airborne availability is defined by the character's loadout.
 
-Shield, movement, jump, down and transform are not numbered attacks.
+Shield, Deflect, movement, mid-air movement, jump, down and transform are not numbered attacks.
 
 ## Attack launch levels
 
@@ -89,11 +89,15 @@ down is a directional input only: the fast fall and launch steering. It never ch
 
 Controls, AI, UI labels, cooldowns and combat must agree on the same loadout and routing.
 
-## Mid-air shield
+## Shield and Deflect
 
-Characters with mid-air shield frames use midair_shielding for their airborne shield.
+The shield button is the Shield on the ground: prepshield, shielding and releaseshield, held. No character has a mid-air shield, and there is no mid-air dodge.
 
-Characters with no mid-air shield frames have no airborne shield: the shield button does nothing in mid-air. There is no mid-air dodge.
+In mid-air the same shield button is the character's Deflect, codename deflect: a fresh press starts an aerial strike with its own deflect frames, and while its strike is live it turns the other characters' projectiles back. Every Deflect deals 3 damage at launch level 2, whatever the character. A character with no deflect frames has no Deflect: the shield button does nothing in mid-air.
+
+## Mid-air movement
+
+The movement request that dashes on the ground (mouvment) is the character's own air dash in mid-air, codename midair_mouvment, with its own frames. A character may have either, both or neither.
 
 ## Attack-created objects
 

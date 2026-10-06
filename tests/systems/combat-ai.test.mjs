@@ -145,13 +145,17 @@ test('it never presses a reserved button, and never drops through a platform', (
   // Read from the fighter's own data: the High Kick on the ground and in the
   // air, attack1 on both, attack2 and attack3 as close moves in the air and
   // as projectiles (Red, Maximum Blue) on the ground, attack4 and attack5
-  // (its two techniques) on their own buttons, the Shield and the Dash.
+  // (its two techniques) on their own buttons, the Shield on the ground,
+  // the Deflect on the Shield button in the air, the Dash and the air dash.
   assert.deepEqual(moves.melee.map((m) => m.id).sort(),
     ['attack1', 'extra_attack', 'extra_attack', 'midair_attack1', 'midair_attack2', 'midair_attack3']);
   assert.deepEqual(moves.ranged.map((m) => [m.id, m.air]), [['attack2', false], ['attack3', false]], 'the projectiles are ground only');
   assert.deepEqual(moves.specials.map((c) => [c.action, c.id, c.type]), [['attack4', 'attack4', 'technique'], ['attack5', 'attack5', 'technique']]);
-  assert.equal(moves.shield, true);
+  assert.equal(moves.shield, undefined, 'no Shield said to work everywhere');
+  assert.equal(moves.groundShield, true);
+  assert.equal(moves.deflect.action, 'shield');
   assert.ok(moves.dash.distance > 0);
+  assert.ok(moves.airDash.distance > 0);
   assert.ok([...moves.melee, ...moves.ranged, ...moves.specials].every((m) => m.action !== 'transform'));
   for (const difficulty of DIFFICULTY_IDS) {
     const r = ring({ difficulty, seed: 11, stage: RAISED, cpuX: 900, foeX: 1400 });

@@ -64,13 +64,14 @@ There are no import cycles (checked over every module).
 | `fighters/fighter.js` | `Fighter`: the per-fighter state machine and step order; `separateFighters`; `COMBAT_ACTIONS`. | `arena.js`, `battle.js`, `practice.js`, `ai/moveset.js` |
 | `fighters/movement.js` | The shared movement rules over a movement profile. | `fighters/fighter.js` |
 | `fighters/fighter-controller.js` | `PlayerController`, `TrainingAIController`, `blankInput`, `jumpTapHold`, `HELD_CONTROLS`. | `fighters/fighter.js`, `ai/combat-ai.js`, `battle.js`, `practice.js`, `core/input-manager.js` |
-| `combat/attacks.js` | The attack schema and phases, motions, pulls' validation (`resolvePull`). | `combat/combat.js`, `combat/combat-state.js`, `combat/summon.js`, `combat/projectile.js`, `fighters/fighter.js`, `ai/combat-ai.js`, `ai/moveset.js` |
+| `combat/attacks.js` | The attack schema and phases, motions, pulls' validation (`resolvePull`), the `deflectProjectiles` capability's validation. | `combat/combat.js`, `combat/combat-state.js`, `combat/summon.js`, `combat/projectile.js`, `combat/deflect.js`, `fighters/fighter.js`, `ai/combat-ai.js`, `ai/moveset.js` |
 | `combat/hit-effects.js` | The shared hit effects (`unblockable`, `paralyze`, `blockPush`) and their validation. | `combat/attacks.js`, `combat/projectile.js`, `combat/technique.js` |
 | `combat/pull.js` | Pulls: attacks and projectiles drawing opponents in, each step. | `arena.js` |
-| `combat/defense.js` | The defense schema. | `fighters/fighter.js` |
+| `combat/defense.js` | The defense schema (the Shield, on the ground; air Shield fields refused). | `fighters/fighter.js` |
+| `combat/deflect.js` | The Deflect schema: an attack definition with every Deflect's fixed strike (`DEFLECT_DAMAGE`, `DEFLECT_BASE_LAUNCH`). | `fighters/fighter.js` |
 | `combat/combat-state.js` | `CombatState`, `CooldownTimers`, `resolveEnergy`. | `fighters/fighter.js` |
-| `combat/combat.js` | `CombatSystem` (hit resolution), launch reaction, `worldBox`. | `arena.js`, `fighters/fighter.js`, `ai/combat-ai.js` |
-| `combat/projectile.js` | Projectiles, and what they do to each other (`clashProjectiles`: repel, erase). | `arena.js`, `fighters/fighter.js` |
+| `combat/combat.js` | `CombatSystem` (projectiles a live Deflect turns back, then hit resolution), launch reaction, `worldBox`. | `arena.js`, `fighters/fighter.js`, `ai/combat-ai.js` |
+| `combat/projectile.js` | Projectiles, and what they do to each other (`clashProjectiles`: repel, erase); `turnBack` (shared by repel and the Deflect); the art's spin (`projectileAngle`). | `arena.js`, `fighters/fighter.js` |
 | `combat/summon.js` | The summon system and its clones. | `arena.js`, `fighters/fighter.js`, `ai/moveset.js` |
 | `combat/technique.js` | The technique runtime. | `fighters/fighter.js`, `ai/moveset.js`, `data/loadout.js` |
 | `combat/launch-bounce.js` | Launch rebounds and their settings. | `fighters/fighter.js`, `rendering/hit-fx.js` |

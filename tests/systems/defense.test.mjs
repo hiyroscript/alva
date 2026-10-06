@@ -1,7 +1,9 @@
 // Run with node --test tests/systems/defense.test.mjs (no dependencies).
 // `shield`, the shared defensive input (L / RB / RT / the touch Shield
 // button), and #0001's Shield (Infinity), what its `defense` entry makes of
-// it: artwork registration, the held ground and mid-air Shield, its poses
+// it on the ground: artwork registration, the held Shield (never one in the
+// air, for #0001 or #0002: there the button is the Deflect, see
+// deflect.test.mjs), its poses
 // (and a Shield's raise and lower poses, on a test variant that has them),
 // physics, priority, the Energy cost of each blocked hit (and nothing
 // else), full-circle blocking on the fighter's own hurtboxes, the
@@ -14,7 +16,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { characterFramePaths } from '../../js/data/characters.js';
+import { characterFramePaths, getCharacter } from '../../js/data/characters.js';
 import { COMBAT_ACTIONS } from '../../js/game/fighters/fighter.js';
 import { createDefenseDefinition } from '../../js/game/combat/defense.js';
 import { CombatState, resolveEnergy } from '../../js/game/combat/combat-state.js';
@@ -45,12 +47,11 @@ const COST = def.energy.shieldHitCost;
 const REGEN = def.energy.regen;
 // #0001 with no Energy refill, so a run of blocks lands on exact values.
 const NO_REGEN = { ...def, energy: { ...def.energy, regen: 0 } };
-// #0001's Shield frames and their heights in art pixels (its idle is 63):
-// the held guard on the ground and in the air. It has no raise or lower
-// pose.
+// #0001's Shield frame and its height in art pixels (its idle is 63): the
+// held guard, on the ground (there is no Shield in the air). It has no raise
+// or lower pose.
 const SHIELD_FILES = {
   shielding: ['0001_shielding_1.png', 55],
-  midair_shielding: ['0001_midair_shielding_1.png', 57],
 };
 // A test-only variant of #0001 whose Shield also has the optional raise
 // and lower poses on the ground (prepshield, releaseshield), each one frame
@@ -88,7 +89,7 @@ function blockedAttack(d, press = ATTACK1, targetHeld = HOLD, limit = 60) {
 
 // ---- Artwork ------------------------------------------------------------------
 
-test('#0001\'s two Shield frames live in the canonical #0001 folder, and nowhere else', () => {
+test('#0001\'s Shield frame lives in the canonical #0001 folder, and nowhere else; no air Shield art', () => {
   const paths = characterFramePaths(def);
   for (const [key, [name, height]] of Object.entries(SHIELD_FILES)) {
     const url = `./assets/characters/0001/${name}`;
@@ -115,7 +116,8 @@ test('Shield clips are single held frames at 1x, sized against idle\'s 63 art pi
     assert.equal(clip.sourceFacing, undefined, `${key} faces right like the rest of #0001`);
     assert.equal(def.animationFallbacks[key], undefined, `${key} never borrows other art`);
   }
-  // No raise or lower pose, on the ground or in the air: none was supplied.
+  // No raise or lower pose (none was supplied), and nothing for the air,
+  // where there is no Shield.
   for (const key of ['prepshield', 'releaseshield', 'midair_prepshield', 'midair_releaseshield']) {
     assert.equal(def.animations[key], undefined, key);
   }
@@ -143,9 +145,8 @@ test('SpriteSet.build keeps every Shield clip right-facing', (t) => {
   for (const key of Object.keys(SHIELD_FILES)) assert.equal(set.animations[key].sourceFacing, 1, key);
   for (const facing of [1, -1]) {
     const { fighter, step } = makeFighter({ facing });
-    step(JUMP);
     step(SHIELD);
-    assert.equal(fighter.animator.anim.key, 'midair_shielding');
+    assert.equal(fighter.animator.anim.key, 'shielding');
     assert.equal(fighter.spriteFlip, facing === -1, 'mirrored only when facing left, like idle');
   }
 });
@@ -156,9 +157,6 @@ test('#0001 defends with a Shield: typed data, no Dodge fields, no chip-damage s
   assert.deepEqual(def.defense, {
     type: 'shield',
     groundAnimation: 'shielding',
-    airAnimation: 'midair_shielding',
-    slowFallSpeed: 90,
-    slowFallBrake: 6000,
     perfectWindow: 0.1,
     perfectRearm: 0.25,
     stall: 0.25,
@@ -174,8 +172,13 @@ test('#0001 defends with a Shield: typed data, no Dodge fields, no chip-damage s
   // is fine; an unknown type is refused.
   assert.equal(createDefenseDefinition(undefined), null);
   assert.equal(createDefenseDefinition({ type: 'shield' }).groundAnimation, null);
-  assert.equal(createDefenseDefinition({ type: 'shield' }).slowFallSpeed, 0, 'no slow fall unless authored');
   assert.equal(createDefenseDefinition({ type: 'shield' }).stall, 0, 'no stall unless authored');
+  // No Shield in the air: its fields are gone, and naming one is refused.
+  for (const field of ['airAnimation', 'slowFallSpeed', 'slowFallBrake']) {
+    assert.equal(field in createDefenseDefinition({ type: 'shield' }), false, field);
+    assert.throws(() => createDefenseDefinition({ type: 'shield', [field]: null }), /no Shield in the air/, field);
+  }
+  assert.throws(() => createDefenseDefinition({ ...def.defense, airAnimation: 'shielding' }), /airAnimation/);
   assert.throws(() => createDefenseDefinition({ type: 'dodge' }), /Unknown defense type/);
   assert.throws(() => createDefenseDefinition({ type: 'block' }), /Unknown defense type/);
   const none = makeFighter({ character: { ...def, defense: undefined } });
@@ -377,133 +380,53 @@ test('a grounded Shield holds the fighter in place: no walking, Dash or jump, th
   assert.equal(fighter.grounded, false);
 });
 
-// ---- Mid-air Shield --------------------------------------------------------------
+// ---- No Shield in the air --------------------------------------------------------
 
-for (const [when, setup] of [
-  ['rising', (step) => { step(JUMP); step(); }],
-  ['falling', (step) => { step(JUMP); stepUntil(step, (f) => f.body.vy > 0 && f.body.y < 700); }],
-]) {
-  test(`Shield while ${when} holds midair_shielding at once; a rise keeps its exact arc`, () => {
-    const { fighter, step } = makeFighter();
-    const plain = makeFighter();
-    setup(step);
-    setup(plain.step);
-    step(SHIELD);
-    plain.step();
-    assert.equal(fighter.combat.shielding, true);
-    assert.equal(fighter.state, 'shield');
-    assert.equal(fighter.animator.anim.key, 'midair_shielding', 'no raise pose in the air');
-    assert.equal(frameName(fighter), '0001_midair_shielding_1.png');
-    // Rising: the exact trajectory of the same jump with no input, no hover
-    // or lift. Falling: the slow fall (see below), never faster than it.
-    for (let i = 0; i < 12 && !fighter.grounded; i++) {
-      if (when === 'rising') {
-        assert.ok(fighter.body.vy < 0, `step ${i}: still rising`);
+for (const id of ['0001', '0002']) {
+  for (const [when, setup] of [
+    ['rising', (step) => { step(JUMP); step(); }],
+    ['falling', (step) => { step(JUMP); stepUntil(step, (f) => f.body.vy > 0 && f.body.y < 700); }],
+  ]) {
+    test(`#${id}: Shield held while ${when} never goes up; the arc is exactly the plain one (no slow fall)`, () => {
+      const character = getCharacter(id);
+      const { fighter, step } = makeFighter({ character });
+      const plain = makeFighter({ character });
+      setup(step);
+      setup(plain.step);
+      for (let i = 0; i < 20 && !fighter.grounded; i++) {
+        step(HOLD);
+        plain.step();
+        assert.equal(fighter.combat.shielding, false, `step ${i}: no Shield`);
+        assert.equal(fighter.shieldAllowed(), false, `step ${i}: none allowed in the air`);
+        assert.ok(['jump', 'fall'].includes(fighter.state), `step ${i}: ${fighter.state}`);
+        assert.equal(fighter.combat.attack, null, `step ${i}: holding starts nothing`);
         assert.equal(fighter.body.y, plain.fighter.body.y, `step ${i}: y`);
         assert.equal(fighter.body.vy, plain.fighter.body.vy, `step ${i}: vy`);
-      } else {
-        assert.ok(fighter.body.vy > 0 && fighter.body.vy <= def.defense.slowFallSpeed, `step ${i}: falling slowly`);
-        assert.ok(fighter.body.vy <= plain.fighter.body.vy, `step ${i}: never faster than without the Shield`);
       }
-      assert.equal(frameName(fighter), '0001_midair_shielding_1.png');
-      step(HOLD);
-      plain.step();
-    }
-    if (when === 'falling') assert.ok(plain.fighter.body.vy > fighter.body.vy + 100, 'clearly slower by now');
-    // Released in the air: straight back to the airborne clip, no lower pose.
-    step();
-    assert.equal(fighter.combat.shielding, false);
-    assert.ok(['jump', 'fall'].includes(fighter.state), fighter.state);
-    assert.ok(['jump', 'fall'].includes(fighter.animator.anim.key));
-  });
+      assert.equal(fighter.combat.energy, 100, 'nothing paid');
+    });
+  }
 }
 
-test('a mid-air Shield slows the fall: it brakes toward slowFallSpeed and falls no faster while it stays up', () => {
-  const { slowFallSpeed: slow, slowFallBrake: brake } = def.defense;
-  const g = CONFIG.sim.gravity * DT;
-  const near = (a, b) => Math.abs(a - b) < 1e-9;
-  const aloft = (vy) => {
-    const made = makeFighter();
-    Object.assign(made.fighter.body, { y: 200, prevY: 200, vy, grounded: false, ground: null });
-    return made;
-  };
-  // Falling at the fast fall's top speed: braked at slowFallBrake, then held
-  // at slowFallSpeed. Down held too: the Shield rules the fast fall out.
-  const fast = aloft(def.movement.fastFallSpeed);
-  const vys = [fast.fighter.body.vy];
-  fast.step({ ...SHIELD, down: true });
-  assert.equal(fast.fighter.state, 'shield');
-  vys.push(fast.fighter.body.vy);
-  for (let i = 0; i < 20; i++) {
-    fast.step({ ...HOLD, down: true });
-    vys.push(fast.fighter.body.vy);
-  }
-  for (let i = 1; i < vys.length; i++) assert.ok(near(vys[i], Math.max(slow, vys[i - 1] - brake * DT)), `step ${i}: ${vys[i]}`);
-  assert.equal(fast.fighter.body.vy, slow, 'down to the slow fall in 0.2 s');
-  assert.equal(fast.fighter.fastFalling, false);
-  // Let go: the normal fall again, gravity picking up from the slow speed.
-  fast.step();
-  assert.ok(near(fast.fighter.body.vy, slow + g));
-  // Just past the apex: gravity takes it up to slowFallSpeed and no further.
-  const top = aloft(0);
-  top.step(SHIELD);
-  let vy = top.fighter.body.vy;
-  assert.ok(near(vy, g));
-  for (let i = 0; i < 20; i++) {
-    top.step(HOLD);
-    assert.ok(near(top.fighter.body.vy, Math.min(slow, vy + g)), `step ${i}`);
-    vy = top.fighter.body.vy;
-  }
-  // All the way down: it lands with the Shield up.
-  stepUntil(top.step, (f) => f.grounded, HOLD);
-  assert.equal(top.fighter.state, 'shield');
-  // A fighter authoring no slow fall falls as ever with its Shield up.
-  const plainDef = { ...def, defense: { ...def.defense, slowFallSpeed: 0 } };
-  const none = makeFighter({ character: plainDef });
-  Object.assign(none.fighter.body, { y: 200, prevY: 200, vy: 0, grounded: false, ground: null });
-  for (let i = 0; i < 20; i++) none.step(i ? HOLD : SHIELD);
-  assert.ok(near(none.fighter.body.vy, 20 * g), 'full gravity');
-});
-
-test('a mid-air Shield keeps horizontal momentum under the normal air drag, without steering', () => {
-  const { fighter, step } = makeFighter();
-  const plain = makeFighter();
-  for (const r of [step, plain.step]) {
-    stepUntil(r, (f) => f.body.vx >= f.maxSpeed, RIGHT);
-    r({ ...JUMP, ...RIGHT });
-    r(RIGHT);
-  }
-  step({ ...SHIELD, ...RIGHT });
-  plain.step();
-  for (let i = 0; i < 15; i++) {
-    assert.equal(fighter.body.vx, plain.fighter.body.vx, `step ${i}: vx`);
-    assert.equal(fighter.body.x, plain.fighter.body.x, `step ${i}: x`);
-    step({ ...HOLD, ...RIGHT });
-    plain.step();
-  }
-  assert.ok(fighter.body.vx > fighter.maxSpeed / 2, 'momentum carries on');
-  assert.equal(fighter.grounded, false);
-});
-
-test('landing with the Shield up holds the grounded shielding pose: no raise pose, no Land', () => {
+test('Shield held through a landing goes up on the ground, opening on its raise pose', () => {
   const { fighter, step } = raising();
   step(JUMP);
   step();
-  step(SHIELD);
   const states = [];
   const frames = [];
   while (!fighter.grounded) {
     step(HOLD);
     states.push(fighter.state);
-    frames.push(frameName(fighter));
   }
+  assert.ok(!states.includes('shield'), 'never up in the air');
   for (let i = 0; i < 10; i++) {
     step(HOLD);
     states.push(fighter.state);
     frames.push(frameName(fighter));
   }
-  assert.ok(states.every((s) => s === 'shield'), states.join());
-  assert.ok(!frames.includes('test_prepshield_1.png'), 'already up: not raised again');
+  assert.equal(fighter.combat.shielding, true, 'up on the ground');
+  assert.equal(states.at(-1), 'shield');
+  assert.ok(frames.includes('test_prepshield_1.png'), 'raised on the ground: its raise pose');
   assert.equal(frames.at(-1), '0001_shielding_1.png');
 });
 
@@ -644,24 +567,19 @@ test('the Shield blocks from every side: an attack from behind is blocked just t
   assert.equal(d.target.grounded, true);
 });
 
-test('a mid-air Shield blocks too: no launch, and the fighter keeps falling', () => {
-  // Both in the air; #0001's Red Kick locks on to the shielding target and
-  // flies into its Shield.
+test('in the air nothing is blocked: Shield held there, a blow lands in full', () => {
+  // Both in the air; #0001's Red Kick locks on to the target holding
+  // Shield (no fresh press, so no Deflect either) and strikes it.
   const d = duel({ gap: 40 });
   d.tick(JUMP, JUMP);
-  raiseShield(d);
+  for (let i = 0; i < 3; i++) d.tick({}, HOLD);
   assert.equal(d.target.grounded, false);
   const [event] = blockedAttack(d, ATTACK2);
-  assert.equal(event.type, 'block');
+  assert.equal(event.type, 'hit');
   assert.equal(event.move, 'midair_attack2');
-  assert.equal(d.target.combat.launchPoint, 0);
-  assert.equal(d.target.combat.energy, 100 - COST);
-  const vy = d.target.body.vy;
-  while (d.target.combat.hitstop > 0) d.tick({}, HOLD);
-  d.tick({}, HOLD);
-  assert.ok(d.target.body.vy > vy, 'gravity still pulls');
-  assert.equal(d.target.state, 'shield');
-  assert.equal(d.target.animator.anim.key, 'midair_shielding');
+  assert.equal(d.target.combat.launchPoint, def.attacks.midair_attack2.damage);
+  assert.equal(d.target.combat.energy, 100, 'no Shield paid for it');
+  assert.equal(d.target.combat.shielding, false);
 });
 
 test('a missed attack costs nothing: no hit, no block event, no Energy', () => {
@@ -794,15 +712,6 @@ test('missing Shield art refuses the Shield (warned once), and the attack lands 
     while (attacker.combat.attack) tick({}, HOLD);
     assert.equal(warnings.filter((w) => /Shield "shielding" has no animation frames/.test(w)).length, 1, 'once');
 
-    // Only the air clip missing: the ground Shield works, the air one is refused.
-    const noAir = makeFighter({ sprites: fakeSprites(Object.keys(def.animations).filter((k) => k !== 'midair_shielding')) });
-    noAir.step(SHIELD);
-    assert.equal(noAir.fighter.combat.shielding, true);
-    noAir.step();
-    noAir.step(JUMP);
-    noAir.step(HOLD);
-    assert.equal(noAir.fighter.combat.shielding, false);
-    assert.ok(warnings.some((w) => /Shield "midair_shielding" has no animation frames/.test(w)));
     // Without its raise or lower pose the held Shield still works, just
     // without those poses.
     const bare = makeFighter({ sprites: fakeSprites(Object.keys(def.animations).filter((k) => !/^(prep|release)shield$/.test(k))) });

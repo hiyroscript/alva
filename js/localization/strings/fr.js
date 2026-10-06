@@ -280,6 +280,7 @@ export const FR = {
   'touch.dpad': 'Déplacement',
   'touch.joystick': 'Joystick de déplacement',
   'touch.actions': 'Actions',
+  'touch.deflect': 'Renvoi',
   'touch.mouvementLeft': 'Mouvement à gauche',
   'touch.mouvementRight': 'Mouvement à droite',
 
