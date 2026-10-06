@@ -1,877 +1,1171 @@
-You are modifying the Alva game repository. Implement this feature completely, including gameplay, sprite integration, AI awareness where appropriate, tests, documentation, and removal/update of stale behavior.
+You are modifying the Alva game repository.
 
+Implement a complete game-feel overhaul focused on one primary goal:
 
-very important: defect should always have a base launch of 2.
+Alva should feel extremely fast, responsive, fluid and momentum-driven at all times. Combat and movement should flow into each other almost seamlessly.
 
-Before changing code, inspect the repository architecture and conventions, especially:
+This is not a request to simply increase a few speed numbers.
 
+Inspect how Alva currently handles movement state, attack state, animation timing, Dash/air dash duration, attack momentum, hitstop, input buffering, hit-cancels, landing, air jumps, AI prediction and character configuration, then redesign/tune these systems together so the entire game feels substantially faster and smoother.
+
+The final result should feel like a high-mobility platform fighter where the player is encouraged to stay in motion and where transitioning between running, jumping, attacking, dashing, air dashing, landing and attacking again almost never produces an arbitrary loss of momentum.
+
+⸻
+
+0. READ THE REPOSITORY FIRST
+
+Before editing anything, inspect the current implementation and repository conventions, particularly:
+
+* README.md
 * ALVA_SPEC.md
+* UPDATES.md
+* character_rule
 * codename_rule
 * max
 * docs/architecture/character-system.md
-* docs/development/conventions.md
-* docs/systems/defense.md
 * docs/systems/movement.md
 * docs/systems/combat.md
+* docs/systems/rendering.md
+* docs/systems/launch.md
+* docs/systems/energy.md
+* docs/characters/0001.md
+* docs/characters/0002.md
+* js/data/powers.js
+* js/data/characters.js
+* js/data/characters/0001.js
+* js/data/characters/0002.js
 * js/game/fighters/fighter.js
 * js/game/fighters/movement.js
 * js/game/combat/attacks.js
 * js/game/combat/combat.js
-* js/game/combat/defense.js
-* js/game/combat/projectile.js
-* js/game/arena.js
-* js/game/rendering/sprite-normalizer.js
+* js/game/combat/combat-state.js
 * js/game/ai/moveset.js
 * js/game/ai/combat-ai.js
-* js/data/characters/0001.js
-* js/data/characters/0002.js
-* the corresponding tests under tests/systems/, tests/fighters/0001/, and tests/fighters/0002/
+* js/game/rendering/sprite-animator.js
+* js/game/rendering/sprite-normalizer.js
+* the relevant tests under tests/systems/, tests/fighters/0001/, tests/fighters/0002/, and tests/integration/
 
-Architectural rule
+Run the existing test suite before changes so the current state is understood.
 
-Do not implement this with checks such as:
+Alva is deterministic and fixed-step. Preserve that.
+
+Rendering must never modify simulation state.
+
+Do not solve this by applying a global JavaScript time scale or making the whole simulation clock run faster. Make the actual movement/combat mechanics better.
+
+⸻
+
+1. CRITICAL RULE — CHARACTER IDENTITY MUST NOT CHANGE BASELINE MOBILITY
+
+This is an absolute design rule.
+
+Every playable character must have exactly the same baseline movement capabilities.
+
+Character lore, appearance, archetype, name or identity must never secretly alter normal movement statistics.
+
+For example:
+
+#0002 may be described as a “speedster,” but that does NOT mean #0002 runs faster, accelerates faster, jumps higher, Dashes faster or gets superior air mobility.
+
+The word “speedster” can describe the character’s fantasy, animations and unique attacks such as Homing Attack, Spin Attack, Bounce Attack, etc.
+
+It must not grant superior universal locomotion.
+
+Likewise, no future character should become slower because they look heavy or stronger because they look muscular.
+
+Universal baseline
+
+All playable characters must share the same values/rules for normal:
+
+* maximum run speed;
+* ground acceleration;
+* ground deceleration;
+* turn acceleration / turn boost;
+* overspeed handling;
+* air acceleration;
+* air deceleration;
+* air turning;
+* normal jump velocity / jump height;
+* higher-jump behavior;
+* air-jump count;
+* air-jump strength;
+* gravity scale;
+* maximum normal fall speed;
+* fast-fall acceleration;
+* fast-fall speed;
+* coyote time;
+* jump buffer;
+* combat input buffer where it relates to universal responsiveness;
+* Dash speed;
+* Dash input window;
+* air-dash speed;
+* air-dash uses;
+* other generic mobility statistics introduced by this update.
+
+A player selecting another fighter should not need to relearn basic movement.
+
+Current inequality that must be removed
+
+The repository currently intentionally gives the fighters different movement profiles.
+
+Among other differences:
+
+* #0001 uses Speed Power 2.
+* #0002 uses Speed Power 3.
+* #0001 acceleration is approximately 4200.
+* #0002 acceleration is approximately 4800.
+* #0001 Dash / air dash is approximately 950 units/s.
+* #0002 Dash / air dash is approximately 1100 units/s.
+
+That distinction is no longer desired.
+
+Normalize it.
+
+The existing documentation even uses “#0002 is faster” as an example of character configuration. That design philosophy must be updated.
+
+Architecture
+
+Prefer a single shared baseline movement configuration rather than copying identical numbers into every fighter file.
+
+Conceptually, something such as:
+
+export const BASE_FIGHTER_MOVEMENT = Object.freeze({
+  ...
+});
+
+or another clean shared architecture is preferable.
+
+Character definitions may still describe unique move mechanics, but they should not own arbitrary variations in universal locomotion.
+
+A newly-added fighter should automatically inherit the same baseline without its author needing to manually copy 15 movement numbers.
+
+Do not special-case IDs:
 
 if (fighter.def.id === '0001') ...
 if (fighter.def.id === '0002') ...
 
-Alva intentionally separates shared systems from fighter configuration. Create generic, optional capabilities which any future fighter could use. 0001 and 0002 should merely opt into those capabilities through their character definitions.
-
-Preserve fixed-step determinism. Rendering must never alter simulation state.
+is unacceptable.
 
 ⸻
 
-1. REMOVE MID-AIR SHIELDING AND INTRODUCE DEFLECT
+2. SPEED POWER / JUMP POWER MUST NOT BE A BACK DOOR AROUND THIS RULE
 
-The shared Shield input currently behaves differently for the two fighters:
+Currently js/data/powers.js allows different Speed Power tiers and Jump Power tiers to directly change normal top speed and jump velocity.
 
-* 0001 has a real airborne Infinity Shield through defense.airAnimation = 'midair_shielding', including slow-fall behavior.
-* 0002 already has airAnimation: null, so its Shield input does nothing in the air.
+That conflicts with the new universal-baseline rule when those tiers are assigned based on character identity.
 
-Change the design so neither fighter can Shield while airborne.
+Refactor this appropriately.
 
-Grounded Shield behavior must remain intact.
+Do not leave #0002 at Speed Power 3 and #0001 at Speed Power 2 while merely compensating somewhere else.
 
-For both fighters:
+There must be no hidden route by which one fighter gets faster normal locomotion.
 
-* grounded Shield stays a held defensive action;
-* perfect Shield mechanics stay grounded;
-* Shield Energy costs stay grounded;
-* Shield blockstun, stall, and block behavior stay grounded;
-* Shield visual FX stays grounded;
-* airborne Shield slow-fall is removed;
-* pressing the Shield button while airborne now invokes Deflect instead.
+Choose the cleanest architecture after inspecting all consumers.
 
-For 0001, remove the functional use of midair_shielding from its defense definition and remove the old slow-fall configuration that existed solely for airborne Infinity.
+If Speed Power and Jump Power no longer have a meaningful gameplay purpose after baseline normalization, either remove/collapse them cleanly or redesign their role. Do not preserve obsolete complexity solely because it already exists.
 
-Do not fake an airborne Shield using the old animation.
+If they remain visible in Discover/documentation, the UI must not falsely imply that #0002 receives superior base running speed.
 
-Deflect input
-
-Reuse the existing shared shield control.
-
-On the ground:
-
-hold Shield -> normal grounded Shield
-
-In the air:
-
-fresh Shield press -> Deflect
-
-Use shieldPressed, not continuous shield, to trigger Deflect.
-
-Holding the Shield button must not repeatedly restart Deflect.
-
-Do not add another keyboard binding.
-
-The existing L key / Shield touch control should therefore be context-sensitive:
-
-Grounded: Shield
-Airborne: Deflect
-
-Update UI/accessibility/control text where necessary so this is communicated as Shield / Deflect, or dynamically as Deflect while airborne if the current UI architecture supports that cleanly.
+Update all stale tests and documentation.
 
 ⸻
 
-2. DEFLECT MUST BE AN ACTUAL AIRBORNE ATTACK
+3. MAKE NORMAL MOVEMENT NOTICEABLY FASTER
 
-Deflect is not another Shield state.
+The game should immediately feel quicker.
 
-Implement it as an attack-like airborne action with:
+Do not merely equalize #0001 downward to #0002 or #0002 downward to #0001.
 
-* its own animation;
-* startup;
-* active frames;
-* recovery;
-* a melee hitbox;
-* normal fighter-vs-fighter hit resolution;
-* projectile-deflection capability during its active frames.
+Create a new faster universal baseline.
 
-It should feel like a fast aerial melee swipe/strike rather than a defensive bubble.
+Target the feeling of:
 
-Use the uploaded sprite sheets for 0001 and 0002 as the source of truth for the animations.
+* rapid acceleration;
+* high but controllable run speed;
+* very quick direction changes;
+* responsive aerial steering;
+* short downtime between movement states;
+* strong ability to chase an opponent after launching them;
+* movement that supports aggressive combat instead of separating combat from traversal.
 
-Create a generic character capability, for example conceptually:
+A reasonable initial tuning target is approximately:
 
-deflect: {
-  animation: 'deflect',
-  startup: ...,
-  active: ...,
-  recovery: ...,
-  hitbox: ...,
-  hitstun: ...,
-  hitstop: ...,
-  baseLaunch: ...,
-  directionalLaunch: ...,
-  deflectProjectiles: true,
-}
+* normal top speed around the low 400s rather than 330/360;
+* enough acceleration to reach that speed in roughly 60–90 ms;
+* strong but smooth turning;
+* Dash / air dash roughly in the 1200–1300 units/s region;
+* shorter, sharper Dash duration than the current ~0.2 s if that feels better.
 
-The exact internal schema may differ if another structure fits Alva better, but it must remain generic and data-driven.
+These are starting targets, not blind constants.
 
-Prefer reusing the existing attack definition / CombatSystem infrastructure rather than creating an unrelated duplicate combat engine.
+Tune them against Alva’s actual stage dimensions, camera and combat ranges.
 
-Deflect is air-only.
+The final criteria are feel, controllability and consistency.
 
-It should not begin when:
-
-* grounded;
-* stunned;
-* paralyzed;
-* in a technique;
-* already performing another action that normally prevents a new attack;
-* already performing Deflect.
-
-Do not let Deflect silently cut arbitrary attacks short.
-
-If an existing generic cancel rule explicitly permits an action to be cancelled, preserve the repository’s established cancel semantics rather than introducing fighter-specific exceptions.
+Fast must not mean uncontrollable.
 
 ⸻
 
-3. DEFLECT DAMAGE IS ALWAYS EXACTLY 3
+4. ADD A TRUE TRIPLE JUMP
 
-This is a hard gameplay invariant:
+Every character gets a triple jump.
 
-A Deflect melee hit always deals exactly 3 damage / Launch Point.
+In Alva’s current semantics, airJumps counts additional jumps after the initial grounded jump.
 
-Do not independently tune 0001 and 0002 to different Deflect damage.
+Therefore:
 
-Prefer enforcing this invariant in the shared Deflect definition rather than merely writing damage: 3 twice and allowing it to drift later.
+airJumps: 2
 
-For example, the shared resolver may inject:
+means:
 
-damage: 3
+1. ground jump;
+2. first air jump;
+3. second air jump.
 
-or reject any authored Deflect damage other than 3.
+That is the desired behavior.
 
-Timing, hitbox dimensions, hitstun and launch characteristics may remain character-specific, but damage must always be 3.
+The fourth jump attempt must fail until the airtime resource is restored.
 
-Do not give Deflect unusually huge launch just because its damage is fixed. Keep its launch behavior in line with a relatively light aerial melee attack unless the uploaded animation strongly implies otherwise.
+Landing restores both air jumps.
 
-⸻
+Existing hit/reset behavior that restores airtime resources should restore the correct new count.
 
-4. DEFLECT PROJECTILES
+Every fighter gets exactly the same triple-jump capability.
 
-During Deflect’s active frames only, its active hitbox can intersect hostile projectiles.
+No character receives a stronger air jump because of identity.
 
-Normal attacks must not automatically gain this property.
-
-Make projectile deflection an explicit capability such as:
-
-deflectProjectiles: true
-
-For this task, only the new Deflect actions for 0001 and 0002 should opt into it unless an existing move already explicitly has equivalent semantics.
-
-When an active Deflect hitbox contacts an enemy projectile:
-
-1. The projectile must not damage the Deflecting fighter on that simulation step.
-2. The projectile changes owner to the Deflecting fighter.
-3. It travels away from the Deflecting fighter.
-4. Its strike history resets in the same way as an already-repelled projectile.
-5. It can then damage its previous owner.
-6. Do not spawn a duplicate projectile.
-7. Do not destroy it merely because it was Deflected.
-
-There is already useful generic behavior in:
-
-Projectile.turnBack(owner, direction)
-
-0001’s Red uses the projectile repel mechanic and ultimately relies on this ownership/direction-reset concept. Reuse/refactor the generic behavior rather than implementing a second incompatible projectile reversal system.
-
-Deflection ordering
-
-This is important.
-
-Current Arena ordering moves projectiles, resolves projectile clashes, then CombatSystem.update() handles melee followed by projectile hits.
-
-Ensure Deflect-vs-projectile interaction occurs before that projectile can hit the fighter during the same fixed step.
-
-For example:
-
-active melee/deflect boxes
-    ↓
-deflect overlapping hostile projectile
-    ↓
-projectile owner/direction changes
-    ↓
-normal projectile-vs-fighter hit resolution
-
-A projectile physically intercepted by an active Deflect should never simultaneously damage the Deflecting fighter because the projectile section happened later.
-
-Direction
-
-A Deflected projectile should leave the fighter rather than somehow being redirected into them.
-
-For a forward-facing Deflect hitbox, fighter facing is a sensible outgoing direction.
-
-If the implementation allows all-around Deflect hitboxes, determine the outgoing direction from the projectile’s position relative to the fighter so the projectile is always sent away from the fighter.
-
-Projectile types
-
-Deflection should work through the generic projectile system rather than being special-cased to Red, Blue, Whirlwind, etc.
-
-Do not assume unblockable means undeflectable: blocking and deflecting are different mechanics.
-
-Do not infer immunity simply because a projectile has repel, pierce, or erase.
-
-If a future design needs an explicitly undeflectable projectile, that should be its own explicit data capability; do not silently create that exception as part of this task.
+Air-jump height should also be universal.
 
 ⸻
 
-5. DEFLECT MUST NOT BE SHIELDING
+5. AIR JUMPS MUST PRESERVE HORIZONTAL MOMENTUM
 
-While Deflect is running:
+Audit the current airJump() behavior.
 
-fighter.combat.shielding
+An air jump should primarily add/reset vertical jump velocity.
 
-must remain false.
+It should not arbitrarily replace a player’s horizontal velocity simply because Jump was pressed.
 
-Deflect must not receive:
+If the player is moving quickly to the right and air-jumps, they should continue carrying that horizontal momentum.
 
-* perfect Shield;
-* Shield Energy payment;
-* Shield blockstun;
-* Shield stall;
-* Shield FX;
-* the old Infinity slow-fall behavior;
-* automatic protection from melee attacks.
+If they begin steering left, normal air-control rules should bend/reverse the velocity progressively rather than teleporting the velocity from one direction to another.
 
-If an opponent attacks the Deflecting fighter and the attacks trade, use ordinary combat/trade rules.
+The expected flow is:
 
-Deflect protects against a projectile only when the Deflect hitbox actually catches that projectile during its active window.
+fast run
+→ jump
+→ air attack
+→ air jump
+→ air attack
+→ air dash
 
-That timing requirement is intentional.
-
-⸻
-
-6. ADD NEW SPRITES FOR DEFLECT
-
-I will provide updated sprite sheets for both characters in chat.
-
-Inspect those sheets instead of inventing placeholder art.
-
-Extract the appropriate Deflect frames into:
-
-assets/characters/0001/
-assets/characters/0002/
-
-Use a universal codename, preferably:
-
-deflect
-
-with filenames following the existing character convention:
-
-0001_deflect_1.png
-0001_deflect_2.png
-...
-0002_deflect_1.png
-0002_deflect_2.png
-...
-
-Determine actual frame count, crop boundaries, anchors and FPS from the supplied sheets.
-
-Register the clips in the respective character animation definitions.
-
-Do not stretch existing Shield art and call it Deflect.
-
-If obsolete midair_shielding art remains after the change, remove it from the runtime animation definition and from every test/documentation requirement. Delete truly dead generated frame files if appropriate, but do not damage unrelated source artwork.
-
-Update codename validation/documentation if deflect needs to become an official universal animation codename.
+without arbitrary horizontal speed loss at the transitions.
 
 ⸻
 
-7. ADD CHARACTER-SPECIFIC MID-AIR MOUVMENT
+6. MOMENTUM IS A CORE DESIGN PILLAR
 
-The game currently has a grounded Dash driven by:
+This is one of the most important requirements of the update:
 
-movement.dashSpeed
-movement.dashTapWindow
-animation: mouvment
-Fighter.tryDash()
+A legal action transition should almost never destroy existing momentum.
 
-Note that mouvment is intentionally spelled that way in this repository.
+Audit every place where vx or vy is:
 
-Do not “correct” existing mouvment naming to movement.
+* zeroed;
+* replaced;
+* clamped;
+* reduced;
+* reset;
+* normalized to normal top speed;
+* silently discarded by a state transition.
 
-Add a distinct airborne mobility capability for characters.
+Remove arbitrary momentum loss.
 
-The new animation codename should preferably be:
+Current problem: attackStartSpeed
 
-midair_mouvment
+The current shared movement code intentionally clamps a grounded attack’s inherited velocity against normal maxSpeed.
 
-to remain consistent with the repository’s existing spelling.
+That means high Dash momentum can be thrown away when entering an attack.
 
-This must be a separate character capability from the grounded Dash.
+This conflicts directly with the new design.
 
-A fighter may have:
+Refactor attackStartSpeed() and the surrounding attack-movement semantics.
 
-ground mouvment only
-air mouvment only
-both
-neither
+A fighter going:
 
-without shared code checking fighter IDs.
+Dash at 1250
+→ attack
 
-For this task, both 0001 and 0002 get both.
+should not suddenly fall to ordinary running speed just because an attack began.
 
-⸻
+The attack should inherit the incoming momentum unless the attack’s actual mechanical behavior explicitly redirects it.
 
-8. MID-AIR MOUVMENT INPUT
+Momentum through actions
 
-Reuse the existing movement/Dash intents rather than adding another control.
+Preserve horizontal momentum through:
 
-The current system already produces:
+* jump;
+* air jump;
+* attack startup;
+* attack active frames;
+* attack recovery;
+* hit-cancel;
+* Dash cancel;
+* Dash → attack;
+* Dash → jump;
+* air dash → attack;
+* air dash → jump where legal;
+* landing;
+* landing → attack;
+* landing → Dash;
+* transitions between ordinary locomotion animations;
+* Deflect where its mechanics do not explicitly redirect motion.
 
-mouvementLeftPressed
-mouvementRightPressed
+There should be no hidden state transition that simply assigns:
 
-and directional double-tap Dash requests.
+vx = 0;
 
-When grounded, these continue to invoke the normal grounded Dash.
+because entering that state is convenient.
 
-When airborne, the same intent should attempt the character’s new airborne midair_mouvment.
+Dash behavior
+
+Starting a Dash should never make an already-faster fighter slower.
 
 Conceptually:
 
-movement request + grounded -> grounded mouvment/Dash
-movement request + airborne -> midair mouvment
+newSpeed = Math.max(existingForwardSpeed, dashSpeed)
 
-Do not make it require the Shield/Deflect button.
+rather than blindly overwriting a faster existing forward velocity with a lower constant.
 
-⸻
+The exact implementation should respect facing/direction and remain deterministic.
 
-9. MID-AIR MOUVMENT BEHAVIOR
+When a Dash finishes, the fighter should carry its velocity into the next state.
 
-Implement a generic optional configuration rather than copying grounded Dash logic into 0001 and 0002.
+Do not end a Dash by resetting to normal run speed.
 
-A reasonable schema would be something like:
+Overspeed
 
-movement: {
-  ...
-  dashSpeed: 950,
-  dashTapWindow: 0.22,
-  airDashSpeed: 950,
-  airDashUses: 1,
-}
+Normal top speed is the speed locomotion builds toward from rest.
 
-The exact field names may differ, but their meaning should be clear and documented.
+It should not behave as an invisible hard velocity cap on momentum earned from:
 
-Use:
+* Dash;
+* air dash;
+* attack motion;
+* rebounds;
+* another legitimate movement mechanic.
 
-animations.midair_mouvment
+Overspeed may decay smoothly where appropriate, but it must not disappear instantly.
 
-for the animation.
+Holding the current travel direction should preserve momentum especially well.
 
-For both 0001 and 0002, begin with one airborne movement use per airtime.
+Releasing the stick can gradually brake.
 
-Restore the use when the fighter:
+Holding the opposite direction can brake aggressively and reverse.
 
-* lands; or
-* is hit/reset in the same circumstances where Alva restores other airtime resources such as air jumps / limited aerial attacks.
+The difference between those situations should be obvious.
 
-During the aerial movement:
+Legitimate exceptions
 
-* move in the requested horizontal direction;
-* immediately face that direction;
-* play one pass of midair_mouvment;
-* it is mobility only;
-* no hitbox;
-* no damage;
-* no launch;
-* no invulnerability;
-* no projectile deflection;
-* no Shield state.
+Actual outside forces may legitimately change momentum:
 
-Use the sprite animation duration as the ability duration, consistent with grounded mouvment.
+* being hit;
+* a launch;
+* a carry;
+* a pull;
+* a rebound;
+* a wall/terrain collision;
+* a move whose explicit mechanic is to redirect the user’s body;
+* falling into the Void / respawning.
 
-Start with an air speed around the corresponding fighter’s existing grounded Dash speed:
+Those are physical/gameplay events.
 
-0001: ~950 units/s
-0002: ~1100 units/s
-
-but keep the values independently configurable.
-
-For a conventional horizontal air dash, zero vertical velocity when it starts and suppress normal gravity during the short animation, then return to normal airborne physics when it ends.
-
-If the supplied sprite clearly depicts a different trajectory, tune the character data to match the artwork while keeping the shared mechanic generic.
-
-Do not allow infinite chained air movement.
-
-Missing midair_mouvment art must cause the ability to be refused/logged in the same spirit as the current grounded Dash rather than silently substituting another animation.
+A state-machine transition is not.
 
 ⸻
 
-10. AIR MOUVMENT AND ACTION PRIORITY
+7. UNIQUE ATTACK MOTION IS STILL ALLOWED
 
-Preserve clear input priority.
+Universal movement equality does not mean every move travels identically.
 
-A fresh airborne Shield press intended for Deflect should not accidentally become air movement.
+Character identity should come from moves, not invisible baseline stats.
 
-A normal numbered attack pressed on the same step should follow the repository’s existing combat-intent priority rules.
+For example #0002 may still have:
 
-Do not introduce surprising implicit buffering.
+* Homing Attack;
+* Bounce Attack;
+* Spin Attack;
+* Blue Tornado;
+* Whirlwind.
 
-Air movement should obey the same broad restrictions as grounded Dash:
+Those attacks can have unique motion because the movement is part of the ability.
 
-* no start during stun;
-* no start during paralysis;
-* no start during a technique;
-* no start while another movement ability is already active;
-* no start without the authored animation;
-* respect existing attack-cancel rules rather than bypassing them.
+Likewise #0001’s unique attack movement may remain unique.
 
-If grounded Dash spends Energy, preserve compatible energy/cancel behavior for aerial movement unless there is a strong architectural reason to expose a separate configurable air-movement cost.
+The important distinction is:
 
-If you expose a separate cost, make it generic and document the fallback/default. Do not hardcode it by fighter ID.
+NORMAL RUN / JUMP / DASH
+    universal
+ABILITY MECHANICS
+    character-specific
 
-⸻
+Do not flatten the actual movesets.
 
-11. MAKE ALL 0001 PROJECTILES ROTATE EXTREMELY FAST
-
-0001 currently has:
-
-attack2_object — Red
-attack3_object — Maximum Blue
-attack5_object — Hollow Purple
-
-Make all of these projectile sprites spin very rapidly while flying.
-
-This must be a generic projectile rendering capability, not:
-
-if (owner.id === '0001') rotate(...)
-
-Add optional projectile data such as:
-
-rotationSpeed: 2160
-
-where the unit is clearly documented, preferably degrees per second.
-
-Default:
-
-rotationSpeed: 0
-
-so every existing projectile remains visually unchanged unless it opts in.
-
-Set all 0001 projectile definitions to approximately:
-
-2160 degrees/second
-
-which is six full rotations per second and should read as “extremely fast”.
-
-Tune slightly if required by the art, but it must visibly be a very fast spin.
-
-Rotation constraints
-
-Rotation is visual only.
-
-It must not:
-
-* change projectile velocity;
-* rotate the collision hitbox;
-* affect launch direction;
-* affect pulls;
-* affect projectile clash calculations;
-* modify determinism.
-
-Derive rotation from simulation time / projectile age rather than mutating gameplay geometry.
-
-A projectile that is Deflected or repelled should retain continuous rotation; do not reset its visual spin merely because ownership changed.
+Keep the characters mechanically distinct.
 
 ⸻
 
-12. PROJECTILE RENDERING
+8. MAKE ATTACKS FEEL MUCH FASTER
 
-At present Arena uses:
+Audit the full roster’s ordinary attack timing.
 
-drawCenteredFrame(...)
+Alva currently ties most attack phase durations to actual animation frames, which is good. Preserve frame/art synchronization.
 
-for projectiles without rotation.
+However, the overall fighting pace should become substantially snappier.
 
-Extend rendering cleanly.
+For normal attacks:
 
-Either:
+* shorten excessive startup;
+* shorten excessive recovery;
+* make the visible strike occur promptly;
+* remove dead animation frames that serve no gameplay/readability purpose;
+* increase animation FPS where appropriate;
+* keep active frames synchronized to the actual visible strike;
+* preserve enough startup to read attacks;
+* preserve enough recovery that whiffing still has meaning.
 
-* add an optional rotation argument to the centered-frame renderer; or
-* add a small dedicated rotated-centered-frame helper.
+The goal is not “every attack becomes frame 1.”
 
-Use canvas transforms in this order conceptually:
+The goal is:
 
-save
-translate to projectile centre
-rotate
-apply flip if necessary
-draw around normalized projectile anchor
-restore
+No attack should feel like the player pressed a button and then waited for the game to catch up.
 
-Do not break the existing normalized anchor/scale behavior.
+As a starting point, many normal combat clips can probably tolerate roughly 15–30% faster playback/timing, with slower dramatic techniques handled individually.
 
-Projectiles with rotationSpeed: 0 must render identically to today.
+Do not blindly multiply every move by the same scalar.
 
-⸻
-
-13. AI / MOVESET INTEGRATION
-
-Alva’s CPU reads capabilities from:
-
-js/game/ai/moveset.js
-js/game/ai/combat-ai.js
-
-Do not leave the new abilities as player-only mechanics if the CPU architecture can represent them generically.
-
-Update the moveset reader so it knows whether the current fighter has:
-
-ground Shield
-Deflect
-ground mouvment
-midair mouvment
-
-Do not represent shield: true as though that automatically means Shield is valid in the air.
-
-At minimum:
-
-* CPUs should stop attempting an airborne Shield that no longer exists;
-* they should be able to recognize Deflect as the aerial response capability;
-* they should recognize mid-air movement as mobility.
-
-A reasonable CPU behavior is:
-
-* if airborne and an incoming hostile projectile is about to intersect within the Deflect timing/reach, Deflect may be considered as a defensive response;
-* otherwise the CPU can use aerial movement for positioning/recovery according to the same difficulty/personality system used by Dash.
-
-Keep all AI capability checks generic.
-
-Do not make an AI branch for 0001 or 0002.
+Review each attack.
 
 ⸻
 
-14. CHARACTER 0001
+9. FASTER ANIMATIONS
 
-Update js/data/characters/0001.js.
+Increase the perceived speed of the game through animation as well as physics.
 
-Required end state:
+Audit:
 
-Ground Shield: yes
-Air Shield: no
-Deflect: yes
-Ground mouvment: yes
-Mid-air mouvment: yes
-Deflect damage: 3
-Fast projectile spin: Red, Maximum Blue, Hollow Purple
+* idle responsiveness;
+* run FPS;
+* jump animation;
+* fall animation;
+* landing animation;
+* Dash animation;
+* air-dash animation;
+* Deflect;
+* normal attacks;
+* multi-hit attacks;
+* attack recovery;
+* appropriate technique casts.
 
-Specific cleanup:
+Movement animation should visually match the new faster movement.
 
-* remove defense.airAnimation = 'midair_shielding';
-* remove airborne Shield slow-fall behavior;
-* register the new Deflect animation from the uploaded sheet;
-* register midair_mouvment from the uploaded sheet;
-* author Deflect timings/hitbox based on the sheet;
-* opt Deflect into projectile reflection;
-* add the new aerial movement parameters;
-* add fast rotationSpeed to all three 0001 projectile definitions.
+A fighter moving very quickly should not look like they are jogging slowly.
 
-Do not alter Red’s existing repel property merely because Deflect now exists. Red should keep its projectile-vs-projectile repelling behavior.
+Important: animation timing is gameplay timing in Alva
 
-⸻
+Do not forget that Alva uses clip duration for actual mechanics in several places.
 
-15. CHARACTER 0002
+For example:
 
-Update js/data/characters/0002.js.
+Dash duration = one pass of `mouvment`
+air dash duration = one pass of `midair_mouvment`
 
-Required end state:
+Increasing the FPS therefore changes the mechanic.
 
-Ground Shield: yes
-Air Shield: no
-Deflect: yes
-Ground mouvment: yes
-Mid-air mouvment: yes
-Deflect damage: 3
+Whenever animation FPS changes, audit anything derived from that duration:
 
-Its current airAnimation: null behavior is no longer simply “Shield does nothing in the air”; the Shield input should now trigger Deflect.
+* Dash duration;
+* Dash travel distance;
+* air-dash duration;
+* air-dash travel distance;
+* attack startup/active/recovery;
+* hits[].at;
+* hits[].active;
+* projectile spawnAt;
+* motion timing;
+* technique phases;
+* summon startup;
+* hit-cancel timing;
+* AI lead/prediction.
 
-Use 0002’s uploaded sprite sheet for both:
+Keep the visual frame and gameplay event synchronized.
 
-deflect
-midair_mouvment
-
-Do not repurpose Homing Attack, Bounce Attack or Blue Tornado as Deflect. Deflect is its own shared defensive/offensive aerial action.
-
-⸻
-
-16. SPRITE-SHEET INTEGRATION
-
-Do not guess arbitrary frame rectangles before inspecting the uploaded sprite sheets.
-
-For each sheet:
-
-1. identify the new Deflect sequence;
-2. identify the new mid-air movement sequence;
-3. crop frames cleanly;
-4. preserve transparency;
-5. preserve the character’s established pixel scale;
-6. determine appropriate anchor points so the body does not visibly jump between frames;
-7. register the proper FPS;
-8. add real frame paths through the repository’s existing frame helper;
-9. verify every referenced PNG exists.
-
-Use:
-
-0001_deflect_<frame>.png
-0001_midair_mouvment_<frame>.png
-0002_deflect_<frame>.png
-0002_midair_mouvment_<frame>.png
-
-unless an existing universal codename rule requires another exact form. If so, update the universal codename specification cleanly rather than inventing character-specific names.
+Do not make a projectile spawn before the throwing frame merely because the clip was sped up.
 
 ⸻
 
-17. TESTS
+10. LANDING MUST NEVER FEEL STICKY
 
-Do not merely update old snapshots until they pass. Add regression coverage for the actual mechanics.
+Landing should be almost invisible from a control perspective.
 
-Update or add tests covering all of the following.
+If a fighter has a Land animation, it may still play visually, but it must not create unnecessary input latency.
 
-Deflect
+Landing should immediately permit appropriate actions such as:
 
-Verify that:
+* running;
+* turning;
+* jumping again;
+* attacking;
+* Dashing;
+* shielding.
 
-0001 cannot Shield in the air.
-0002 cannot Shield in the air.
-Grounded Shield still works for both.
-Holding Shield airborne does not create a held Shield state.
-A fresh Shield press airborne starts Deflect.
-Holding the button does not repeatedly restart Deflect.
-Deflect only exists during its authored attack duration.
-Deflect melee damage is exactly 3 for both fighters.
-Deflect never charges shieldHitCost.
-Deflect is not a perfect Shield.
-Deflect gets no blockstun.
-Deflect does not block ordinary melee attacks.
-Deflect only reflects projectiles during active frames.
-Startup does not reflect.
-Recovery does not reflect.
-A projectile caught by Deflect cannot hit the Deflecting fighter on that same step.
-The Deflected projectile changes owner.
-The Deflected projectile travels away from the Deflecting fighter.
-Its previous hit history is reset.
-The previous owner can be hit by the returned projectile.
-Normal attacks that lack the capability do not Deflect projectiles.
-Existing Red repel behavior still works.
+A landing pose must be interruptible immediately by meaningful player input.
 
-A dedicated file such as:
+Do not make a character with a Land clip less responsive than a character without one.
 
-tests/systems/deflect.test.mjs
+#0002 currently lacks Land art and returns directly to stance.
 
-is appropriate.
+#0001 has Land art.
 
-Also update relevant expectations in:
-
-tests/systems/defense.test.mjs
-tests/systems/projectile-clash.test.mjs
-tests/systems/combo.test.mjs
-
-where current behavior assumes the old airborne Shield.
-
-Mid-air mouvment
-
-Verify:
-
-grounded movement request still performs normal mouvment
-airborne movement request performs midair_mouvment
-it uses its own animation
-it uses its own speed/configuration
-it faces the requested direction
-it is movement-only
-it creates no hitbox
-it gives no invulnerability
-it does not Shield
-it does not Deflect
-only the configured number of uses are available per airtime
-landing restores the use
-being reset/hit restores it according to the normal airtime-resource convention
-missing midair_mouvment art refuses the ability instead of faking it
-0001 and 0002 both have the capability
-
-Update:
-
-tests/systems/dash.test.mjs
-tests/systems/movement.test.mjs
-tests/systems/movement-profile.test.mjs
-
-or introduce a focused air-movement test if that keeps responsibilities cleaner.
-
-Projectile spin
-
-Verify:
-
-rotationSpeed defaults to 0
-0001 Red has high rotationSpeed
-0001 Maximum Blue has high rotationSpeed
-0001 Hollow Purple has high rotationSpeed
-other projectile definitions are unchanged unless explicitly configured
-render angle advances deterministically with projectile age
-rotation does not modify the hitbox
-turnBack / Deflect does not reset projectile rotation
-
-Add renderer coverage for canvas rotate() without making the test depend on real-time wall-clock values.
-
-Character sprite tests
-
-Update the existing character tests under:
-
-tests/fighters/0001/
-tests/fighters/0002/
-
-so they validate:
-
-Deflect clip exists
-midair_mouvment clip exists
-all referenced frame PNGs exist
-normalization succeeds on the real uploaded art
-the obsolete airborne Shield clip is no longer required by 0001
-
-Update tests/systems/codenames.test.mjs if adding the new universal animation codenames.
-
-Update AI tests to verify capability-driven behavior and that the CPU no longer treats Shield as an airborne guard.
+That art difference must not produce a gameplay responsiveness difference.
 
 ⸻
 
-18. DOCUMENTATION
+11. IMPROVE DASH FLOW
 
-Update the documentation so it describes the game that actually exists after this change.
+The Dash and air dash should become central tools for flowing through combat.
 
-At minimum inspect/update:
+They must feel like mobility tools, not temporary cutscenes.
 
-docs/systems/defense.md
-docs/systems/movement.md
-docs/systems/combat.md
-docs/systems/rendering.md
-docs/systems/ai.md
-docs/characters/0001.md
-docs/characters/0002.md
-docs/characters/adding-characters.md
-docs/architecture/character-system.md
-ALVA_SPEC.md
-codename_rule
+Review:
 
-Remove descriptions saying:
+* double-tap recognition;
+* state entry;
+* duration;
+* cancel rules;
+* Energy interaction;
+* attack transitions;
+* jump transitions;
+* momentum carried after Dash;
+* AI knowledge.
 
-0001 can Shield in the air
-0001 Shield causes slow-fall
-0002 Shield input simply does nothing in the air
+A player should be able to perform fast sequences such as:
 
-Replace those with the new Shield/Deflect behavior.
+run
+→ Dash
+→ attack
 
-Document:
+and:
 
-Deflect
-3-damage invariant
-projectile-deflection capability
-midair_mouvment
-airtime-use reset rules
-projectile rotationSpeed
+jump
+→ air dash
+→ aerial
 
-Keep comments in source synchronized with the implementation.
+without the game feeling like it enters isolated states.
 
-⸻
+Introduce generic cancel windows if necessary.
 
-19. BACKWARD-COMPATIBILITY / NON-GOALS
+Do not make everything freely cancelable from the very first frame with no commitment.
 
-Do not redesign unrelated combat.
+Instead, create deliberate short windows which make actions responsive while preserving meaningful attack commitment.
 
-Preserve:
+For example, allowing a Dash to transition into attack/jump shortly after startup may feel far better than forcing its entire clip to finish.
 
-0001 grounded Infinity Shield
-0002 grounded guard
-perfect Shield timing
-Energy regeneration
-ground Dash behavior
-air jumps
-numbered aerial attacks
-Red repel
-Blue pull/pierce
-Hollow Purple erase/unblockable behavior when it actually hits
-0002 Whirlwind behavior
-current launch system
-current fixed-step simulation
-current sprite normalization scale
-
-The new Deflect mechanic is not a replacement for the ordinary midair_attackN moves.
-
-The new midair_mouvment is not an attack.
-
-Projectile rotation is not projectile physics.
+Keep this system generic and data-driven.
 
 ⸻
 
-20. IMPLEMENTATION QUALITY
+12. SMOOTHER ATTACK CANCELLING
 
-Keep functions small and responsibilities clear.
+Alva already has hit-cancels and Dash cancels.
 
-Prefer:
+Build on the existing system instead of replacing it with unrelated code.
 
-shared schema/mechanic
-+
-character data opting into it
+The combat loop should strongly support:
 
-over character-specific runtime branches.
+movement
+→ attack
+→ hit
+→ chase
+→ attack
+→ air chase
+→ attack
 
-Avoid duplicated collision logic.
+The player should rarely be waiting on a long invisible recovery timer after successfully connecting.
 
-Reuse:
+Audit hitCancel across the roster.
 
-Projectile.turnBack(...)
-worldBox(...)
-existing attack active-window logic
-existing animation timing
-existing movement-resource reset conventions
+Successful hits should generally allow aggressive continuation sooner than whiffs.
 
-where sensible.
+Preserve move-specific balance, but make successful offense feel immediate.
 
-Do not leave partially implemented placeholders, TODO mechanics, invisible hitboxes, fallback sprites pretending to be authored moves, or dead references to the removed mid-air Shield.
+A buffered action should execute on the first legal fixed step.
+
+Do not add avoidable one-frame gaps between one legal action ending and the next beginning.
 
 ⸻
 
-21. FINAL VALIDATION
+13. INPUT BUFFERING
 
-After implementation:
+Alva already has a combat attack buffer.
 
-1. Run focused tests for Deflect, projectile clashes, defense, movement/Dash, rendering, AI, 0001, and 0002.
-2. Run the full Node test suite.
-3. Search the repository for stale midair_shielding / airborne-Shield assumptions.
-4. Search for hardcoded 0001 / 0002 checks added to shared runtime files and remove them.
-5. Confirm every new sprite path exists.
-6. Confirm both fighters can perform Deflect with the Shield input while airborne.
-7. Confirm both fighters can perform their new mid-air movement with the movement/Dash input.
-8. Confirm grounded Shield and grounded mouvment are unchanged.
-9. Confirm Deflect always deals exactly 3.
-10. Confirm a Deflected projectile can hit its original owner.
-11. Confirm all three 0001 projectile sprites visibly rotate extremely fast.
-12. Confirm projectile rotation does not affect physics or collision.
+Preserve it and improve its consistency.
 
-When finished, provide a concise implementation summary listing:
+The player should be able to press the next intended action very slightly before the current state allows it and have the game perform that action immediately when legal.
 
-* shared mechanics added;
-* character-definition changes;
-* sprite frames added;
-* tests added/updated;
-* docs updated;
-* any tuning choices made for Deflect timing/hitbox and mid-air movement;
-* full test-suite result.
+Audit buffering for:
+
+* attack after attack;
+* attack after landing;
+* attack after Dash;
+* jump after attack;
+* Dash after attack;
+* air dash after attack where cancel rules permit it;
+* jump immediately before landing.
+
+Do not create enormous buffers that cause old inputs to execute unexpectedly.
+
+The current ~0.15-second combat buffer is within a useful range; tune globally if necessary rather than giving different characters different forgiveness.
+
+⸻
+
+14. ATTACK MOVEMENT SHOULD FEEL ALIVE
+
+Most normal attacks should not feel as if the fighter’s feet were welded to the floor.
+
+Review existing lockMovement, momentum, airMomentum, control, airControl, friction and step behavior.
+
+Keep these generic systems, but tune ordinary attacks toward better flow.
+
+Where appropriate:
+
+* preserve full incoming momentum;
+* allow a useful amount of steering;
+* let running attacks slide naturally;
+* let aerial attacks retain aerial drift;
+* avoid automatically braking characters merely because an attack is playing.
+
+An attack specifically designed to be planted may still be planted.
+
+But “planted” must be an intentional move property, not the default sensation of the entire combat system.
+
+Unique attack motions such as homing, bounce, rise, roll and hover continue to own movement according to their mechanic.
+
+Even there, consider incoming momentum when entering/exiting the mechanic so transitions do not feel discontinuous.
+
+⸻
+
+15. HITSTOP MUST ADD IMPACT WITHOUT MAKING THE GAME SLUGGISH
+
+Keep hitstop.
+
+The game still needs impact.
+
+But audit every hitstop value.
+
+Light attacks should have short, crisp hitstop.
+
+Heavy attacks can have more.
+
+A dramatic finishing launch may have more presentation.
+
+Avoid excessive freezes on ordinary rapid combat.
+
+Most importantly, hitstop must temporarily freeze motion, not erase it.
+
+When hitstop ends, stored velocities must continue correctly.
+
+A fighter moving quickly before hitstop should not mysteriously resume slowly afterward.
+
+⸻
+
+16. DO NOT USE CHARACTER LORE FOR PHYSICS
+
+Audit comments, documentation and tests for assumptions such as:
+
+* “#0002 is faster because speedster”;
+* faster acceleration because of character identity;
+* faster Dash because of character identity;
+* higher jump because a character can fly/jump in canon;
+* heavier gravity because a character looks heavy.
+
+Remove those assumptions from baseline movement.
+
+Character lore belongs in:
+
+* ability mechanics;
+* animation;
+* visual effects;
+* move names;
+* hitboxes where justified by art;
+* projectiles;
+* techniques;
+* attack motion.
+
+It does not belong in universal movement statistics.
+
+⸻
+
+17. FUTURE FIGHTERS MUST FOLLOW THIS AUTOMATICALLY
+
+Do not implement equality only for the two existing characters.
+
+The architecture should make mobility parity the default for the entire 48-slot roster.
+
+A future 0003.js should not normally specify:
+
+speed: ...
+jump: ...
+acceleration: ...
+dashSpeed: ...
+
+for ordinary movement.
+
+The shared baseline should provide those values.
+
+Only introduce character-authored movement data when it belongs to a specific move mechanic, not basic locomotion.
+
+Add validation if useful so accidental baseline stat divergence is difficult or impossible.
+
+⸻
+
+18. TEST UNIVERSAL MOVEMENT EQUALITY
+
+The current tests include assumptions that fighters may intentionally have different movement profiles.
+
+That requirement is obsolete.
+
+In particular, update/remove tests equivalent to:
+
+“two fighters with different profiles move differently under the same rules”
+
+and replace them with tests enforcing the new invariant.
+
+Add a roster-wide test that instantiates every playable character and proves that they have identical baseline:
+
+* max speed;
+* normal jump velocity;
+* acceleration;
+* deceleration;
+* turn behavior;
+* air control;
+* fast fall;
+* air-jump count;
+* air-jump strength;
+* Dash speed;
+* air-dash speed;
+* Dash uses where relevant;
+* coyote time;
+* jump/input buffers.
+
+Do not merely compare configuration objects if runtime behavior can still differ.
+
+Also run identical input traces against #0001 and #0002 and verify identical baseline trajectories when no character-specific move is used.
+
+⸻
+
+19. ADD MOMENTUM REGRESSION TESTS
+
+Create explicit automated tests for momentum continuity.
+
+Examples:
+
+Run → jump
+
+A fighter running at speed should keep horizontal speed when jumping.
+
+Dash → jump
+
+Jumping out of an allowed Dash transition must retain the Dash’s horizontal velocity rather than snapping to normal top speed.
+
+Dash → attack
+
+If the cancel is legal:
+
+Dash
+→ attack
+
+must retain high horizontal velocity.
+
+Attack → jump
+
+A jump cancel should not zero inherited horizontal momentum.
+
+Attack → Dash
+
+The existing Dash-cancel route should transition cleanly to Dash speed and preserve proper direction.
+
+Air jump
+
+Air jumping while travelling horizontally must preserve horizontal momentum.
+
+Air dash → aerial attack
+
+The attack should inherit the air-dash momentum rather than snapping to normal speed.
+
+Landing
+
+Landing while travelling horizontally should preserve horizontal velocity.
+
+Hitstop
+
+Velocity before and after hitstop should be identical unless another force changed it.
+
+Overspeed
+
+A fighter above normal top speed must not instantly clamp to top speed because their state changed.
+
+⸻
+
+20. TEST THE TRIPLE JUMP
+
+Add explicit tests proving:
+
+ground jump      succeeds
+air jump #1      succeeds
+air jump #2      succeeds
+air jump #3      fails
+
+Then:
+
+land
+
+restores the two air-jump resources.
+
+Also test restoration through any existing hit/reset rule that intentionally replenishes airtime resources.
+
+Run these tests against more than one fighter.
+
+⸻
+
+21. AI MUST UNDERSTAND THE NEW SPEED
+
+The Combat AI already reads movement/attack definitions and predicts attack drift.
+
+Audit it after changing movement.
+
+Do not leave its assumptions tuned around 330/360 running speed or the old Dash distances.
+
+The CPU should understand:
+
+* universal new run speed;
+* triple jump;
+* new Dash distance;
+* new air-dash distance;
+* shortened attack startup;
+* changed attack travel;
+* new cancel possibilities if they affect planning;
+* faster chase potential.
+
+Difficulty must continue to change decision quality, not fighter stats.
+
+Easy and Brutal must control the exact same physical fighter.
+
+Watch Mode must remain deterministic.
+
+⸻
+
+22. CAMERA / PRESENTATION
+
+Higher mobility may expose camera tuning that was acceptable at the old speed.
+
+Playtest the camera.
+
+If the fighters can now outrun the camera or produce uncomfortable lag, adjust camera tracking/smoothing as necessary.
+
+Do not alter gameplay to compensate for a slow camera.
+
+Rendering changes must remain presentation-only.
+
+Maintain reduced-motion behavior.
+
+Speed trails and other existing effects may be retuned to support the new faster movement if appropriate.
+
+Do not clutter the screen excessively.
+
+⸻
+
+23. DO NOT DESTROY CHARACTER MOVE IDENTITY
+
+The goal is not to homogenize the roster.
+
+Keep character-specific:
+
+* attacks;
+* projectiles;
+* techniques;
+* summons;
+* attack motion;
+* defense mechanics;
+* Deflect animation/timing;
+* move names;
+* hitboxes;
+* damage;
+* launch values;
+* cooldowns;
+* unique mechanics.
+
+Normalize basic locomotion, not the whole character.
+
+For example, #0002’s Homing Attack may still travel differently from #0001’s Red Kick because those are two different attacks.
+
+What must not happen is:
+
+#0002 normal run = faster
+
+solely because #0002 is called a speedster.
+
+⸻
+
+24. DO NOT “FIX” COMBAT BY MAKING EVERYTHING BROKEN
+
+Fast and smooth does not mean removing all game rules.
+
+Do not:
+
+* eliminate every startup frame;
+* eliminate every recovery frame;
+* allow every move to cancel into everything on frame one;
+* remove hitstop completely;
+* remove Energy without a reason;
+* make every attack safe on whiff;
+* give permanent invulnerability;
+* increase damage across the board;
+* increase launch merely because animation is faster;
+* change stage boundaries merely to hide movement bugs.
+
+Preserve tactical commitment while removing unnecessary friction.
+
+The ideal feel is:
+
+responsive immediately, committed briefly, moving constantly.
+
+⸻
+
+25. ANIMATION QUALITY
+
+Do not invent fake sprite frames.
+
+Use the existing art.
+
+Changing FPS is allowed and expected.
+
+Do not use interpolation that destroys the pixel-art presentation.
+
+Image smoothing remains off.
+
+When clips have different frame counts, tune playback individually.
+
+A one-frame Dash clip can still play quickly; its gameplay duration need not remain 0.2 seconds simply because it currently uses 5 FPS.
+
+Likewise, a 12-frame run animation should be fast enough to visually sell the new universal speed.
+
+⸻
+
+26. DOCUMENTATION MUST MATCH THE NEW GAME
+
+Update all stale documentation, including where relevant:
+
+* README.md
+* ALVA_SPEC.md
+* UPDATES.md
+* docs/systems/movement.md
+* docs/systems/combat.md
+* docs/architecture/character-system.md
+* docs/characters/0001.md
+* docs/characters/0002.md
+* adding-character documentation
+* Powers documentation if that system changes.
+
+Specifically remove statements claiming that:
+
+* #0002 has superior baseline speed;
+* equal movement values are merely optional tuning;
+* fighter movement profiles are expected to differ in universal stats.
+
+Document the new rule prominently:
+
+All fighters share universal baseline locomotion. Character identity changes the moveset, not run/jump/Dash fundamentals.
+
+Do not rewrite historical UPDATES.md entries as though history never happened; add/update current behavior appropriately while keeping history intelligible.
+
+⸻
+
+27. TESTS THAT CURRENTLY HARD-CODE OLD VALUES
+
+Search the repository for assumptions including:
+
+330
+360
+4200
+4800
+950
+1100
+Speed Power 2
+Speed Power 3
+airJumps: 1
+
+Do not blindly replace every occurrence because some numbers such as 1100 are also legitimately used for launch thresholds, positions, pull speeds, attack speeds, etc.
+
+Update only values referring to baseline movement.
+
+Known relevant areas include:
+
+* movement-profile tests;
+* Dash tests;
+* air-mouvment tests;
+* #0001 fighter tests;
+* #0002 fighter tests;
+* Powers tests;
+* docs;
+* AI/moveset expectations.
+
+Delete stale assertions instead of twisting implementation code to preserve obsolete behavior.
+
+⸻
+
+28. MANUAL GAME-FEEL VALIDATION
+
+After automated tests pass, actually run the game:
+
+python3 -m http.server 8000
+
+Use Quick Battle and Practice Ground if the environment supports browser interaction.
+
+Test at minimum:
+
+run → jump → attack
+run → Dash → attack
+run → Dash → jump
+jump → air jump → air jump
+jump → aerial → air jump → aerial
+jump → air dash → aerial
+attack hit → Dash chase → attack
+aerial → land → grounded attack
+aerial → land → Dash
+high-speed landing → immediate jump
+high-speed landing → immediate attack
+
+Try both #0001 and #0002.
+
+The baseline movement portions should feel identical.
+
+The moves themselves should still make the characters feel different.
+
+⸻
+
+29. FEEL ACCEPTANCE CRITERIA
+
+Do not consider the task finished merely because tests are green.
+
+The final game should satisfy these qualitative requirements:
+
+Movement
+
+The fighter responds immediately.
+
+Running feels genuinely fast.
+
+Reversing direction is sharp but physically continuous.
+
+Jumping does not kill forward movement.
+
+Triple jumping feels natural.
+
+Air control is powerful without looking like teleportation.
+
+Dash is short, fast and useful.
+
+Air dash flows directly into aerial offense.
+
+Landing does not interrupt the player’s rhythm.
+
+Combat
+
+Buttons feel responsive.
+
+Normal attack animations are visibly faster.
+
+Startup is readable but short.
+
+Recovery exists without feeling sluggish.
+
+Hits still feel impactful.
+
+Successful hits naturally lead into chase opportunities.
+
+Moving attacks preserve motion.
+
+Combat and movement feel like one system rather than two separate modes.
+
+Momentum
+
+The player’s speed is treated as valuable state.
+
+A state transition does not casually erase it.
+
+The player should be able to build a fast sequence and visually feel that speed carry through it.
+
+Character parity
+
+If #0001 and #0002 receive the exact same movement-only input sequence from the same starting conditions, they should produce the same baseline movement trajectory.
+
+No exception because one is a “speedster.”
+
+⸻
+
+30. ARCHITECTURAL ACCEPTANCE CRITERIA
+
+The implementation is incomplete unless:
+
+* shared movement remains fighter-ID agnostic;
+* baseline locomotion is universal;
+* unique ability motion remains data-driven;
+* future fighters inherit baseline movement automatically;
+* fixed-step determinism remains intact;
+* AI consumes the same movement rules as players;
+* animation timing stays synchronized with hit/gameplay timing;
+* momentum continuity is covered by tests;
+* triple jump is covered by tests;
+* stale per-character-speed documentation/tests are removed or updated;
+* node --test passes completely.
+
+Do not leave partially migrated systems.
+
+Do not maintain two simultaneous philosophies where some code assumes universal movement and another still expects fighter-specific base speed.
+
+⸻
+
+31. FINAL IMPLEMENTATION REPORT
+
+When finished, provide a concise implementation report containing:
+
+1. the shared movement changes;
+2. the final universal movement values;
+3. how triple jump works;
+4. how momentum preservation works;
+5. changes to attackStartSpeed / attack movement;
+6. Dash and air-dash changes;
+7. combat timing / cancel changes;
+8. animation FPS/timing changes;
+9. what happened to Speed Power / Jump Power;
+10. AI changes;
+11. important tests added/updated;
+12. documentation updated;
+13. the final full test result.
+
+Also explicitly confirm:
+
+#0001 and #0002 now have identical baseline walk/run speed, acceleration, jump height, air jumps, Dash speed and air-dash speed. Character identity does not grant baseline movement advantages.
+
+The priority order for this task is:
+
+1. Extremely smooth combat.
+2. Fast, responsive movement.
+3. Momentum preservation.
+4. Universal character mobility parity.
+5. Triple jump.
+6. Faster, properly synchronized animations.
+7. Preserve each character’s unique moves and mechanics.
+
+Do not stop after simply making the numbers larger. The objective is to make Alva itself feel fundamentally faster and smoother to control.
