@@ -88,8 +88,8 @@ export function playableCharacters() {
 }
 
 // Every frame a character needs before battle: fighter poses, projectiles
-// and effects, each file once (two clips may share one, e.g. #0001's
-// attack4_12 in attack4_release and attack4_whiff_release).
+// and effects, each file once (a clip may play one more than once, e.g.
+// #0002's attack2, and two clips may share one).
 export function characterFramePaths(def) {
   const out = [];
   for (const anim of Object.values(def.animations)) out.push(...anim.frames);

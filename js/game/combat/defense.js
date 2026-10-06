@@ -21,6 +21,8 @@
 //     groundStartAnimation: 'prepshield', groundReleaseAnimation: 'releaseshield',
 //     // Optional slow fall while it is up in the air:
 //     slowFallSpeed: 200, slowFallBrake: 6000,
+//     // Optional: a blow it blocks freezes the attacker this long:
+//     stall: 0.3,
 //   }
 //
 // While it is up (CombatState.shielding, see Fighter.update) any hit that
@@ -48,6 +50,11 @@ const SHIELD_DEFAULTS = Object.freeze({
   // ever.
   slowFallSpeed: 0,
   slowFallBrake: 6000,
+  // A melee blow it blocks stalls in it: the attacker (never a projectile,
+  // a clone or a technique, whose hits are detached) is frozen at least
+  // this many seconds, the hit's own hitstop if that is longer. 0 is none:
+  // the attacker freezes for the hit's hitstop, as ever.
+  stall: 0,
 });
 
 // Frozen form of a character's `defense` entry, or null for a fighter that

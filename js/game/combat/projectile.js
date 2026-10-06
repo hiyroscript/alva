@@ -1,36 +1,44 @@
-// Projectiles: independent battle entities thrown by an attack.
+// Projectiles: independent battle entities thrown by an attack or released
+// by a technique.
 //
 // An attack with a `projectile` entry (see createAttackDefinition in
-// js/game/combat/attacks.js) releases one projectile when its time crosses `spawnAt`.
-// The Fighter queues the release with its facing at that moment; the Battle
-// then turns it into a live Projectile, owns it, moves it every fixed step,
+// js/game/combat/attacks.js) releases one projectile when its time crosses
+// `spawnAt`, and a technique with one releases it as it lets go (see
+// js/game/combat/technique.js). The Fighter queues the release with its
+// facing at that moment; the Battle then turns it into a live Projectile,
+// owns it, moves it every fixed step, lets it meet the other projectiles
+// and pull fighters (see clashProjectiles and js/game/combat/pull.js),
 // resolves its hits through CombatSystem and removes it once it is spent.
 // Behaviour is data on the character (`projectiles`), and so is the art
 // (`projectileAnimations`, normalized separately from fighter poses), both
 // named after the attack that throws it (`<attack>_object`), e.g. #0001's
-// shuriken, thrown by its extra_attack:
+// Red, thrown by its attack2:
 //
 //   projectiles: {
-//     extra_attack_object: {
-//       animation: 'extra_attack_object', speed: 700, lifetime: 1.5,
-//       hitbox: { x: -5, y: -5, w: 10, h: 10 },
-//       damage: 1, baseLaunch: 0, directionalLaunch: null, hitstun: 0.16, blockstun: 0.1, hitstop: 0.04,
+//     attack2_object: {
+//       animation: 'attack2_object', speed: 900, lifetime: 0.34,
+//       hitbox: { x: -16, y: -16, w: 32, h: 32 },
+//       damage: 4, baseLaunch: 2, directionalLaunch: 'horizontal', hitstun: 0.36, blockstun: 0.16, hitstop: 0.08,
+//       blockPush: 520, repel: true,
 //     },
 //   },
 //
 // `baseLaunch` and `directionalLaunch` are the projectile's own Base Launch
 // and Directional Launch (see js/data/launch.js), validated here exactly
-// like an attack's. A horizontal launch travels along the projectile's own
-// direction. A projectile with Base Launch 0 or no direction never launches.
+// like an attack's, and so are the shared hit effects (`unblockable`,
+// `paralyze`, `blockPush`; see js/game/combat/hit-effects.js). A
+// horizontal launch travels along the projectile's own direction. A
+// projectile with Base Launch 0 or no direction never launches.
 //
 // A piercing projectile (`pierce: { hits, interval }`) strikes up to `hits`
 // times instead, at least `interval` seconds apart, staying in play between
 // them; its last strike resolves as its `finisher` (a hit of its own: its
-// `damage`, `baseLaunch` and `directionalLaunch`, its stuns and freeze
-// defaulting to the projectile's). With `carry` (see js/game/combat/attacks.js) each
-// strike that launches nothing drags the target along with it, `lift`
-// upward: #0002's whirlwind takes its target up and away with it, then flings
-// it on its finisher. A Shield that blocks any strike stops it there.
+// `damage`, `baseLaunch` and `directionalLaunch`, its stuns, freeze and hit
+// effects defaulting to the projectile's). With `carry` (see
+// js/game/combat/attacks.js) each strike that launches nothing drags the
+// target along with it, `lift` upward: #0002's whirlwind takes its target
+// up and away with it, then flings it on its finisher. A Shield that blocks
+// any strike stops it there.
 //
 //   extra_attack_object: {
 //     ..., damage: 1, hitstun: 0.24, carry: { lift: 360 },
@@ -38,15 +46,38 @@
 //     finisher: { damage: 3, baseLaunch: 2, directionalLaunch: 'vertical', hitstun: 0.4 },
 //   },
 //
+// Three more fields make a projectile act on what is round it:
+//
+//   pull: { radius, speed }   for as long as it flies it draws opponents in,
+//                             exactly as an attack's pull does (see
+//                             js/game/combat/attacks.js and pull.js), toward
+//                             its own centre (or `offset` from it, mirrored
+//                             with its direction): #0001's Blue drags its
+//                             target into the orb, where its strikes land.
+//   repel: true               another fighter's projectile it meets is
+//                             turned back the way this one travels and is
+//                             this one's owner's from then on, as if thrown
+//                             by it (its strikes start over).
+//   erase: true               another fighter's projectile it meets is gone,
+//                             and it flies on through every fighter it
+//                             strikes (each once) instead of stopping.
+//
+// When two projectiles of different owners meet, erasing beats repelling
+// beats neither: an erasing one erases the other (two erasing ones, both
+// go), a repelling one turns back one that does neither (two repelling
+// ones, both go), and two that do neither pass each other by.
+//
 // A projectile flies straight in the direction it was released, hits at most
-// once (a piercing one, its `hits`) and then disappears. It also disappears
-// when its lifetime runs out,
-// when it flies into the Void (the stage's kill boundary; the open air past
-// the ledges does not stop it) or when it meets a solid block, the main
-// floor's body included; one-way platforms never stop it. Its hitbox is
-// centred on its position and mirrors with its direction.
+// once (a piercing one, its `hits`; an erasing one, each fighter once) and
+// then disappears. It also disappears when its lifetime runs out, when it
+// flies into the Void (the stage's kill boundary; the open air past the
+// ledges does not stop it) or when it meets a solid block, the main floor's
+// body included; one-way platforms never stop it. Its hitbox is centred on
+// its position and mirrors with its direction.
 
 import { resolveHitLaunch } from '../../data/launch.js';
+import { resolvePull } from './attacks.js';
+import { resolveHitEffects } from './hit-effects.js';
 
 const PROJECTILE_DEFAULTS = {
   animation: null,
@@ -62,10 +93,13 @@ const PROJECTILE_DEFAULTS = {
   carry: null,    // { lift }: a strike that launches nothing drags its target along
   pierce: null,   // { hits, interval }: strikes more than once (see above)
   finisher: null, // a piercing projectile's last strike
+  pull: null,     // { radius, speed }: draws opponents in while it flies (see above)
+  repel: false,   // turns back the projectiles it meets (see above)
+  erase: false,   // erases the projectiles it meets and flies on through fighters (see above)
 };
 
 // What a finisher takes from its projectile when it does not say.
-const FINISHER_INHERITS = Object.freeze(['hitstun', 'blockstun', 'hitstop']);
+const FINISHER_INHERITS = Object.freeze(['hitstun', 'blockstun', 'hitstop', 'unblockable', 'paralyze', 'blockPush']);
 
 // Age is a sum of fixed steps; compare against boundaries with a little slack
 // (see PHASE_EPSILON in attacks.js).
@@ -73,7 +107,11 @@ const TIME_EPSILON = 1e-6;
 
 export function createProjectileDefinition(spec) {
   if (!spec?.id) throw new Error('[Alva] Projectile definitions need an id');
-  const def = { ...PROJECTILE_DEFAULTS, ...spec, ...resolveHitLaunch(spec, `Projectile "${spec.id}"`) };
+  const owner = `Projectile "${spec.id}"`;
+  const def = { ...PROJECTILE_DEFAULTS, ...spec, ...resolveHitLaunch(spec, owner), ...resolveHitEffects(spec, owner) };
+  def.pull = resolvePull(spec.pull, owner);
+  def.repel = !!def.repel;
+  def.erase = !!def.erase;
   if (def.pierce) {
     const { hits, interval } = def.pierce;
     if (!(Number.isInteger(hits) && hits >= 2) || !(interval > 0)) {
@@ -85,7 +123,7 @@ export function createProjectileDefinition(spec) {
       const inherited = Object.fromEntries(FINISHER_INHERITS.map((field) => [field, f[field] ?? def[field]]));
       def.finisher = Object.freeze({
         id: spec.id, damage: f.damage ?? 0, ...inherited, carry: null,
-        ...resolveHitLaunch(f, `Projectile "${spec.id}" finisher`),
+        ...resolveHitLaunch(f, `${owner} finisher`), ...resolveHitEffects(inherited, `${owner} finisher`),
       });
     }
   } else if (def.finisher) {
@@ -119,6 +157,8 @@ export class Projectile {
     // next waits for its interval).
     this.hits = 0;
     this.lastStrike = -Infinity;
+    // The fighters an erasing projectile has struck and flown through.
+    this.through = new Set();
   }
 
   // Whether it may strike on this step: always, until it has struck; a
@@ -136,13 +176,36 @@ export class Projectile {
     return pierce && finisher && this.hits === pierce.hits - 1 ? finisher : this.def;
   }
 
-  // It struck (see CombatSystem.update): counted, and gone after its only
-  // strike, its last or any a Shield blocked.
-  struck(blocked) {
+  // It struck `target` (see CombatSystem.update): counted, and gone after
+  // its only strike, its last or any a Shield blocked; an erasing one flies
+  // on through, never to strike that target again.
+  struck(blocked, target = null) {
     this.hits++;
     this.lastStrike = this.age;
+    if (this.def.erase) {
+      this.through.add(target);
+      return;
+    }
     const pierce = this.def.pierce;
     if (!pierce || blocked || this.hits >= pierce.hits) this.alive = false;
+  }
+
+  // Whether it has already flown through `target` (an erasing one strikes
+  // each fighter once).
+  passed(target) {
+    return this.through.has(target);
+  }
+
+  // Turned back by a repelling projectile (see clashProjectiles): it flies
+  // `direction` at its own speed and is `owner`'s from now on, as if thrown
+  // by it, its strikes starting over.
+  turnBack(owner, direction) {
+    this.owner = owner;
+    this.direction = direction;
+    this.vx = this.speed * direction;
+    this.hits = 0;
+    this.lastStrike = -Infinity;
+    this.through.clear();
   }
 
   // Builds the projectile an owner released, or null if it has no such
@@ -216,6 +279,34 @@ export class Projectile {
 }
 
 const scratch = {};
+const scratchOther = {};
+
+// Every pair of live projectiles of different owners that meet this step
+// (their boxes overlap), settled once, in spawn order: erasing beats
+// repelling beats neither (see above). A projectile gone, or turned back
+// to the same owner, meets nothing more this step.
+export function clashProjectiles(list) {
+  for (let i = 0; i < list.length; i++) {
+    const a = list[i];
+    for (let j = i + 1; j < list.length && a.alive; j++) {
+      const b = list[j];
+      if (!b.alive || a.owner === b.owner) continue;
+      if (!overlaps(a.hitbox(scratch), b.hitbox(scratchOther))) continue;
+      const rank = (p) => (p.def.erase ? 2 : p.def.repel ? 1 : 0);
+      const ra = rank(a);
+      const rb = rank(b);
+      if (!ra && !rb) continue;
+      if (ra === rb) {
+        a.alive = false;
+        b.alive = false;
+      } else {
+        const [win, lose] = ra > rb ? [a, b] : [b, a];
+        if (win.def.erase) lose.alive = false;
+        else lose.turnBack(win.owner, win.direction);
+      }
+    }
+  }
+}
 
 // Turns every projectile the fighters released this step into a live
 // Projectile in `list`. Each release is consumed exactly once.

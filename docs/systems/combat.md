@@ -14,9 +14,11 @@ Energy ([energy](energy.md)).
 | --- | --- |
 | [`js/data/loadout.js`](../../js/data/loadout.js) | The loadout rules and the readers of a fighter's `actions` (`loadoutProblems`, `assertLoadout`, `actionType`, `specialAction`, `specialAttacks`, `describeLoadout`). |
 | [`js/game/combat/attacks.js`](../../js/game/combat/attacks.js) | The attack schema: `createAttackDefinition`, attack phases (`attackPhase`, `strikeLive`), motions, strikes, `attackReach` (for readers such as the CPU). |
-| [`js/game/combat/combat-state.js`](../../js/game/combat/combat-state.js) | `CombatState`, one per fighter: Launch Point, Energy, the attack in progress and its clock, stun, blockstun, hitstop, binds, cooldowns (`CooldownTimers` for summons and techniques). |
+| [`js/game/combat/combat-state.js`](../../js/game/combat/combat-state.js) | `CombatState`, one per fighter: Launch Point, Energy, the attack in progress and its clock, stun, blockstun, hitstop, paralysis, cooldowns (`CooldownTimers` for summons and techniques). |
 | [`js/game/combat/combat.js`](../../js/game/combat/combat.js) | `CombatSystem`: finds every hit each fixed step and resolves it through one `applyHit`; launch reaction (`resolveLaunchReaction`, `resolveLaunchStun`, `steerLaunch`); `worldBox`. |
-| [`js/game/combat/projectile.js`](../../js/game/combat/projectile.js) | Projectiles: `createProjectileDefinition`, `Projectile`, spawning and cleanup. |
+| [`js/game/combat/hit-effects.js`](../../js/game/combat/hit-effects.js) | The shared hit effects any hit may carry (`unblockable`, `paralyze`, `blockPush`): `resolveHitEffects`, `HIT_EFFECT_FIELDS`. |
+| [`js/game/combat/pull.js`](../../js/game/combat/pull.js) | Pulls: `applyPulls` (every attack and projectile pull live this step), `pullToward`. |
+| [`js/game/combat/projectile.js`](../../js/game/combat/projectile.js) | Projectiles: `createProjectileDefinition`, `Projectile`, `clashProjectiles` (repel and erase), spawning and cleanup. |
 | [`js/game/combat/summon.js`](../../js/game/combat/summon.js) | Summons: `createSummonDefinition`, `summonProblem`, the `Clone` entity, spawning and cleanup. |
 | [`js/game/combat/technique.js`](../../js/game/combat/technique.js) | Techniques: `createTechniqueDefinition`, `techniqueProblem`, the `Technique` runtime and its phases. |
 | [`js/game/fighters/fighter.js`](../../js/game/fighters/fighter.js) | Turning presses into moves (`tryAction`, `trySpecial`, `trySummon`, `tryTechnique`), the combat input buffer, hit-cancels, attack motion, summon startups. |
@@ -45,7 +47,7 @@ definition that breaks one is refused, every problem named):
   be any kind. A summon or technique is keyed by its own button, is
   ground-only, has no mid-air version and has its own cooldown.
 - Whatever an attack creates is named after it: a projectile
-  `<attack>_object`, a summon's cloud and a technique's object
+  `<attack>_object` (a technique's included), a summon's cloud
   `<attack>_object...`, a technique's own poses `<attack>_...`.
 - `extra_attack: 'extra_attack'` is one attack; `transform: null` is
   wired but reserved; a button left out of `actions` does nothing for that
@@ -58,8 +60,8 @@ definition that breaks one is refused, every problem named):
 | 4 | `attack1` … `attack4` |
 | 5 | `attack1` … `attack5` |
 
-For example, #0001 has four (attack3 a summon, attack4 a technique) and
-#0002 three ordinary ones ([character docs](../characters/README.md)).
+For example, #0001 has five (attack4 and attack5 techniques) and #0002
+three ordinary ones ([character docs](../characters/README.md)).
 
 ## Attacks
 
@@ -80,7 +82,8 @@ An attack entry (`attacks.<codename>`) becomes a frozen definition through
 | `hitCancel` | null | Seconds in: from then on, once it has hit, another attack, a jump or a Dash may cut it short. |
 | `projectile` | null | `{ id, spawnAt, offset }`: releases that projectile once, as its time crosses `spawnAt`. |
 | `pending` | false | Art only: one pass of its clip, no hit (declaring combat fields on one is refused). |
-| `hits`, `carry`, `motion`, `airUses`, `freeFall`, `passThrough`, `hurtboxes` | — | See below. |
+| `hits`, `carry`, `motion`, `pull`, `airUses`, `freeFall`, `passThrough`, `hurtboxes` | — | See below. |
+| `unblockable` / `paralyze` / `blockPush` | false / 0 / 0 | The shared hit effects (below). |
 
 ### From a press to a move
 
@@ -96,19 +99,21 @@ faces its target instead). A press that cannot start yet is kept by the
 combat input buffer for `movement.attackBuffer` and tried every step;
 summons and techniques are never buffered.
 
-A hit (never a block) or a bind takes the target out of its own attack on
-its next step. The Shield, a stun, a Dash, a technique or a summon's
+A hit (never a block) or a paralysis takes the target out of its own
+attack on its next step. The Shield, a stun, a Dash, a technique or a summon's
 startup rules a new attack out.
 
 ### Attack mechanics beyond a timed hitbox
 
 Each is data on an attack (or a projectile), validated as its definition
-is built, and usable by any fighter (#0002 uses them all today):
+is built, and usable by any fighter (#0001 and #0002 use them between
+them today):
 
 - **Strikes** (`hits`): a multi-hit attack lists its strikes, each live in
   its own window (`at` to `at + active`) and striking at most once, with
   its own `damage`, `baseLaunch` and `directionalLaunch`; its `hitbox`,
-  `hitstun`, `blockstun`, `hitstop` and `carry` default to the attack's.
+  `hitstun`, `blockstun`, `hitstop`, `carry` and hit effects default to
+  the attack's.
   The attack's startup, active phase, overall box, damage (their sum) and
   launch (the last strike's) follow from them; declaring those on the
   attack as well is refused. A Shield that blocks a strike stops the
@@ -116,7 +121,10 @@ is built, and usable by any fighter (#0002 uses them all today):
 - **Carry** (`carry: { lift }`): a real hit that launches nothing gives
   its target the velocity of what struck it, less `lift` upward.
 - **Motion** (`motion: { type, ... }`, `MOTION_DEFAULTS`): movement the
-  attack makes itself, owning the body while it lasts. `homing` (`range`,
+  attack makes itself, owning the body while it lasts. `hover` (no
+  fields): the fighter stands on the air for the whole attack, its drift
+  steered as its `airMomentum` and `airControl` allow (#0001's Floating
+  Straight, Blue and air High Kick). `homing` (`range`,
   `speed` required; `rebound`, `recoil`, `exit`): hang, lock on, dash at
   the target, spring off what it meets. `bounce` (`fallSpeed` required;
   `rebound`): hang, plunge, rebound off the ground or an opponent, the
@@ -124,6 +132,24 @@ is built, and usable by any fighter (#0002 uses them all today):
   (`speed` required; `keep`, `maxSpeed`, `friction`, `recoil`): curl, then
   roll on the running speed. A motion attack keeps its physical facing,
   and never starts while its fighter is still flying from a launch.
+- **Pull** (`pull: { radius, speed, offset }`): while the attack is active
+  it draws every opponent whose middle is within `radius` of its point
+  (`offset`, facing right and mirrored) straight toward it at up to
+  `speed`, never past it, a grounded one along the ground, an airborne one
+  on both axes; a raised Shield, a paralysed fighter and one out of play
+  hold their ground. The same rule runs a projectile's pull, toward its
+  centre (`applyPulls` in [`pull.js`](../../js/game/combat/pull.js), each
+  step after everything has moved and before hits resolve, so whoever is
+  drawn into a hitbox is struck that step). `attackReach` widens the box
+  to the pull's circle for the CPU.
+- **Hit effects** (on any hit: an attack, a strike, a projectile, a
+  finisher, a technique's burst; [`hit-effects.js`](../../js/game/combat/hit-effects.js)):
+  `unblockable` (a raised Shield takes it in full and pays nothing),
+  `paralyze` (seconds a real hit holds its target in place: no acting, no
+  sideways speed, its hurt pose; the longer hold wins, it runs down like
+  hitstun, and any hit that launches the target ends it), `blockPush` (a
+  Shield that blocks it is shoved along the hit's direction). Each
+  defaults to changing nothing; a value of the wrong kind is refused.
 - **Per airtime** (`airUses`) and **free fall** (`freeFall: true`).
 - **Body** (`passThrough: true`: no pushbox while it plays; `hurtboxes`:
   the fighter's own replaced while it plays).
@@ -133,14 +159,16 @@ is built, and usable by any fighter (#0002 uses them all today):
 Each fixed step, after every fighter has moved (see the step order in
 [the architecture overview](../architecture/overview.md#one-fixed-step)),
 `CombatSystem.update` resolves, in order: fighters' melee hitboxes (and
-strikes), live projectiles, summoned clones, then techniques (their ticks,
-a due explosion, the rushing object's contact). Every hit goes through one
+strikes), live projectiles, summoned clones, then techniques (a burst
+due on its release step). Every hit goes through one
 `applyHit(attacker, target, def, ...)`, which never checks which fighter,
 attack or technique it is resolving:
 
-1. A target whose Shield is up blocks it (from any side): a perfect
-   Shield blocks for free with no blockstun, otherwise the Shield pays
-   `energy.shieldHitCost` ([defense](defense.md)).
+1. A target whose Shield is up blocks it (from any side) unless the hit is
+   `unblockable`: a perfect Shield blocks for free with no blockstun,
+   otherwise the Shield pays `energy.shieldHitCost`; a hit with
+   `blockPush` shoves it back, and a Shield with a `stall` freezes a melee
+   attacker for that long ([defense](defense.md)).
 2. Otherwise the hit's `damage` is added to the target's Launch Point,
    then its launch strength is `baseLaunch` × that new Launch Point, sent
    along its `directionalLaunch` and bent by the target's launch steering
@@ -150,12 +178,15 @@ attack or technique it is resolving:
    projectile's, a clone's or a technique's).
 4. A hit ends the target's technique and cancels its summon startup (no
    armour).
-5. The launch replaces the target's velocity, or a `carry` drags it.
-6. One event is recorded (`type` hit or block, attacker, target, move,
+5. A launch ends any paralysis; a real hit that `paralyze`s and launches
+   nothing holds the target.
+6. The launch replaces the target's velocity, or a `carry` drags it.
+7. One event is recorded (`type` hit or block, attacker, target, move,
    damage, Launch Point before and after, launch values, stun, `perfect`,
-   the point it landed, and the projectile, summon or technique behind
-   it), and the target's own reaction runs (`Fighter.takeHit`: its air
-   jumps and per-airtime attacks back, a tumble, a launch sequence).
+   the point it landed, the `paralysis` it put on and the `stall` it
+   caused, and the projectile, summon or technique behind it), and the
+   target's own reaction runs (`Fighter.takeHit`: its air jumps and
+   per-airtime attacks back, a tumble, a launch sequence).
 
 The events feed the hit effects and Practice Ground's damage numbers;
 nothing reads them back into the simulation.
@@ -167,12 +198,17 @@ entry. Fields (`PROJECTILE_DEFAULTS`): `animation` (a
 `projectileAnimations` clip; missing art refuses the attack), `speed`,
 `lifetime` (1 s), `hitbox` (centred, mirrored with its direction),
 `damage`, `baseLaunch`, `directionalLaunch`, `hitstun`, `blockstun`,
-`hitstop`, `carry`, and `pierce: { hits, interval }` with an optional
-`finisher` (its last strike). A projectile flies straight in the direction
-its thrower faced at the release, never turns, hits once by default (or
-pierces), and is gone on a block, at the end of its lifetime, in the Void
-or against a solid. Its hits credit its thrower and freeze only its
-target.
+`hitstop`, `carry`, `pierce: { hits, interval }` with an optional
+`finisher` (its last strike), `pull: { radius, speed }`, `repel`, `erase`
+and the hit effects. A projectile flies straight in the direction its
+thrower faced at the release, never turns, hits once by default (a
+piercing one up to its `hits`, an erasing one each fighter once, flying
+on through), and is gone on a block, at the end of its lifetime, in the
+Void or against a solid. Its hits credit its thrower and freeze only its
+target. When two of different owners meet (`clashProjectiles`), erasing
+beats repelling beats neither: a repelling one turns the other back, its
+owner's from then on; an erasing one makes it disappear; two of the same
+rank that act both go; two that do neither pass each other by.
 
 ## Summons
 
@@ -201,8 +237,9 @@ by `applyHit` and credited to the owner. No opponent in play, or missing
 art, and the press does nothing (no cooldown). The exact rules:
 [`ALVA_SPEC.md`](../../ALVA_SPEC.md) §7.2.6.
 
-#0001's Clone Attack (`attack3`) is the one summon today
-([its specification](../characters/0001.md#attack3-the-clone-attack)).
+No fighter in the roster summons today; the loadout matrix's Case D
+([`tests/fighters/fixtures/loadout-fighters.mjs`](../../tests/fighters/fixtures/loadout-fighters.mjs))
+and the sample fighter keep the system tested.
 
 ## Techniques
 
@@ -212,35 +249,38 @@ run by [`js/game/combat/technique.js`](../../js/game/combat/technique.js).
 It is not an attack, a projectile or a summon; while it runs it owns the
 fighter.
 
-**One form so far.** The runtime implements one shape of technique: an
-object formed in the hand, carried on a grounded rush, binding what it
-meets, ticking while it holds it, then exploding. Its phases are
-explicit (form, dash, then whiff release, or confirm, wait, explode,
-release; then done). Its fields name the fighter clips for those phases
-(`formAnimation`, `dashAnimation`, `confirmAnimation`,
-`explosionAnimation`, `releaseAnimation`, `whiffReleaseAnimation`), the
-object's effect clips (`sphereBuild`, `sphereImpact`, `sphereExplosion`),
-`cooldown`, `dashSpeed`, per-frame `handOffsets`, `sphereHitbox`,
-`targetOffset`, `explosionDelay`, `sphereGrowth`, and its hits
-(`firstHit`, `tickHit` every `tickInterval`, `explosionHit`), each
-validated like an attack's. The field names come from the first technique
-built on it, #0001's Sphere Rush
-([its specification](../characters/0001.md#attack4-the-sphere-rush)), but
-nothing in the runtime reads a fighter or a button. A technique of a
-different shape (one that does not rush, hold or explode) would be a new
-form in the runtime with its own fields, not a reinterpretation of these.
+**One form: the cast.** The fighter stands committed to a casting pose,
+then lets go of what it casts all at once. Its phases are explicit:
+*cast* (`castAnimation`, once from the press step: the fighter stands
+still in the facing snapshotted at the start, the direction held on the
+press step if any), *release* (on its first step it releases, exactly
+once, its `projectile: { id, offset }`, thrown the snapshotted way as an
+attack throws one, and its `burst: { hitbox, hit }`, whose hit is dealt
+once to every opponent the box meets, facing right from the fighter and
+mirrored, so a box round the fighter reaches both sides; then
+`releaseAnimation` plays once) and *done*. Fields: `castAnimation`,
+`releaseAnimation`, `cooldown`, `projectile`, `burst`; the burst's hit is
+validated like an attack's (damage, launch, stuns and hit effects). E.g.
+#0001's Unlimited Void (a burst that no Shield stops and that paralyzes)
+and Hollow Purple (a projectile that erases) ([its
+specification](../characters/0001.md#each-move-in-detail)). Nothing in the
+runtime reads a fighter or a button; a technique of a different shape
+would be a new form in the runtime with its own fields, not a
+reinterpretation of these.
 
-Any clip or effect missing, or invalid data, and the press does nothing
-(logged, no cooldown). Losing the ground, a hit on the fighter, a
-blocked contact or a lost bind end it.
+Any clip missing, the projectile's art missing, nothing to release, or
+invalid data, and the press does nothing (logged, no cooldown). Losing
+the ground or a hit on the fighter end it: whatever it had not released
+yet never is, and what it already let go stays.
 
 ## Cooldowns
 
 Ordinary attacks have short recovery cooldowns (`CombatState.cooldowns`).
 Summons and techniques have their own (`CombatState.abilityCooldowns`, a
-`CooldownTimers` keyed by the button: `attack3`, `attack4`), started the
-moment the move is accepted, recovering in real time whatever the fighter
-does, and drawn under the fighter as A3 / A4 rings while they run
+`CooldownTimers` keyed by the button: #0001's `attack4` and `attack5`),
+started the moment the move is accepted, recovering in real time whatever
+the fighter does, and drawn under the fighter as rings labelled by the
+button (A4, A5) while they run
 ([rendering](rendering.md#fighter-status)). None of them costs Energy.
 
 ## What a fighter may leave out
@@ -265,8 +305,13 @@ does, and drawn under the fighter as A3 / A4 rings while they run
   [`sample-fighter.test.mjs`](../../tests/systems/sample-fighter.test.mjs)
   (a fighter that is not #0001, with different moves on the same
   codenames).
+- The shared capabilities on bespoke data:
+  [`hit-effects.test.mjs`](../../tests/systems/hit-effects.test.mjs),
+  [`pull.test.mjs`](../../tests/systems/pull.test.mjs),
+  [`projectile-clash.test.mjs`](../../tests/systems/projectile-clash.test.mjs),
+  [`technique.test.mjs`](../../tests/systems/technique.test.mjs).
 - Each fighter's moves: [`tests/fighters/0001/`](../../tests/fighters/0001/)
-  (attack1, attack2, the Throw, the Clone Attack and its startup, the
-  Sphere Rush), [`tests/fighters/0002/`](../../tests/fighters/0002/).
+  (every move's mechanic, its combos, the CPU playing it),
+  [`tests/fighters/0002/`](../../tests/fighters/0002/).
 - Every pairing of playable fighters in a real battle:
   [`tests/integration/roster-matrix.test.mjs`](../../tests/integration/roster-matrix.test.mjs).

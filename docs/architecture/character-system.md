@@ -15,9 +15,9 @@ to, and adding a third means writing its definition, not copying either.
 | **Fighter capabilities** | the same definition | Optional, explicit pieces a fighter may or may not have: a `defense`, a Dash (`dashSpeed` and a `mouvment` clip), projectiles, summons, techniques, an extra attack, attack mechanics such as `motion` or `hits`. A shared system checks for the capability, never for the fighter. |
 
 So "#0002 is faster" is configuration (Speed Power 3, a higher
-acceleration, a faster Dash); "#0001 has a clone" is a capability (a
-`summons` entry on its `attack3` button) running on the shared summon
-system; and "an attack keeps some of its momentum" is a shared rule every
+acceleration, a faster Dash); "#0001's Maximum Blue drags its target in"
+is a capability (a `pull` on its projectile) running on the shared pull
+rule; and "an attack keeps some of its momentum" is a shared rule every
 fighter's attacks follow with their own `momentum` values.
 
 ## The registry
@@ -59,7 +59,7 @@ hitboxes) live beside the definition in the same module.
 ## What stays shared
 
 Shared code may *mention* a fighter in a comment as an example ("e.g.
-#0001's Sphere Rush"), but never branches on one. The tests enforce it:
+#0001's Hollow Purple"), but never branches on one. The tests enforce it:
 no module of the engine, the AI, the touch controls or the status display
 contains a fighter id or special-cases a numbered attack
 ([`tests/systems/loadout.test.mjs`](../../tests/systems/loadout.test.mjs)),
@@ -70,16 +70,20 @@ Two shared conventions came from the first fighter and are fixed
 references, not requirements on any fighter:
 
 - the camera's reference height, `CONFIG.render.fighterHeight` (88 world
-  units, #0001's `visual.height` when it was the only fighter): the view is
-  sized for a fighter that tall whoever is picked;
+  units, what 52 art pixels make at the common art-pixel size): the view
+  is sized for a fighter that tall whoever is picked;
 - the common art-pixel size, 88 / 52 world units per art pixel: a fighter's
   `visual.height` is its reference clip's art height × 88 / 52, so all
   fighters' pixels are the same size on screen.
 
 One shared runtime has a single form so far: the technique runtime
-implements the one shape of technique the roster uses, a rush carrying an
-object that binds, ticks and explodes, with field names from #0001's
-Sphere Rush ([combat: techniques](../systems/combat.md#techniques)).
+implements one shape of technique, the cast (stand committed, then let go
+of a projectile, a burst round the fighter, or both), which #0001's
+Unlimited Void and Hollow Purple use ([combat:
+techniques](../systems/combat.md#techniques)). The capabilities its moves
+needed (the `hover` motion, pulls, repelling and erasing projectiles, the
+shared hit effects, a Shield's stall) were added to the shared systems as
+data any fighter may use, never as #0001's own code.
 
 ## Adding a fighter
 

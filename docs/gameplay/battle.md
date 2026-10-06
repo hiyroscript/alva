@@ -30,8 +30,9 @@ on a fresh start) and stays through Restart Battle, Rematch and every Void
 respawn; Practice Ground never reads it.
 
 - **Easy:** slower reactions, often too late or not at all; pauses, misjudges
-  spacing, rarely uses its fighter's summons and techniques (#0001's Clone
-  Attack and Sphere Rush, say). Still attacks: inexperienced, not disabled.
+  spacing, rarely uses its fighter's summons and techniques (#0001's
+  Unlimited Void and Hollow Purple, say). Still attacks: inexperienced, not
+  disabled.
 - **Medium:** a balanced opponent: its fighter's attacks and extra attack,
   an occasional Shield, summon or technique; answers slow threats, still
   gets caught.

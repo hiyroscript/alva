@@ -27,7 +27,7 @@
 //   punish      how readily an opening (a whiff, recovery, an exhausted
 //               opponent) is noticed and taken.
 //   specials    judgement with the fighter's summons and techniques (e.g.
-//               #0001's attack3 and attack4): when one is worth its long
+//               #0001's attack4 and attack5): when one is worth its long
 //               cooldown. A fighter with none never uses it.
 //   dash        how much Dash is part of its movement.
 //   plan        seconds a multi-step plan (approach then strike, Dash then
@@ -50,12 +50,12 @@ export const CAPABILITY = Object.freeze({
   lookahead: 1, guard: 1, punish: 1, specials: 1, dash: 1, plan: 1, aggression: 1, stage: 1, energyCare: 1,
 });
 
-// The reaction windows are the same for every fighter. They were set
-// against #0001's startups (attack1 1/12 s, attack2 3/12 s, the Sphere
-// Rush's 0.5 s form, a clone's 0.5 s cloud): against those, Easy is usually
-// too late even for attack2, Medium answers the slow ones, Hard reads
-// attack2 reliably and Brutal sometimes even attack1, but never on the frame
-// it starts. Another fighter's moves are read by the same windows, so a
+// The reaction windows are the same for every fighter. They are set
+// against startups from about 1/12 s (a jab) through a quarter of a second
+// (a telegraphed kick) to half a second or more (a technique's cast, a
+// clone's cloud): against those, Easy is usually too late even for the
+// kick, Medium answers the slow ones, Hard reads the kick reliably and
+// Brutal sometimes even the jab, but never on the frame it starts. Another fighter's moves are read by the same windows, so a
 // faster or slower startup is simply harder or easier to answer.
 const PROFILES = {
   easy: {

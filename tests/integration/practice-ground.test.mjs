@@ -13,6 +13,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fakeSprites, fakeSpritesOf, def as DEF_0001, DT, startupSteps } from '../helpers/fighter-harness.mjs';
 import { TEST_A, TEST_MOVELESS, TEST_SAMPLE, testFighter, useTestFighters } from '../fighters/fixtures/test-fighters.mjs';
+import { LOADOUT_CASES } from '../fighters/fixtures/loadout-fighters.mjs';
 import { stylesheet } from '../helpers/stylesheet.mjs';
 
 // ---- Fake DOM + Canvas -------------------------------------------------------
@@ -312,12 +313,13 @@ async function enableCpu(screen, id = '9999') {
   return screen.session.cpu;
 }
 
-// A practice session on a fake canvas, with a CPU (#9999) by default. `run`
+// A practice session on a fake canvas, Player 1 playing `def` (#0001 by
+// default), with a CPU (#9999) by default. `run`
 // feeds one input snapshot per step; `events` collects every hit the
 // CombatSystem resolved and `numbers` every damage number that appeared.
-function practiceSession({ cpu = true } = {}) {
+function practiceSession({ cpu = true, def = DEF_0001 } = {}) {
   const input = fakeInput();
-  const session = new PracticeSession({ canvas: new Element('canvas'), map: PRACTICE_MAP, def: DEF_0001, sprites: fakeSprites(), input });
+  const session = new PracticeSession({ canvas: new Element('canvas'), map: PRACTICE_MAP, def, sprites: fakeSpritesOf(def), input });
   if (cpu) session.setCPU(DEF_9999, fakeSprites());
   const events = [];
   const numbers = [];
@@ -398,7 +400,7 @@ test('Practice Ground uses the Mobile Controls setting on every entry, and a sch
   assert.deepEqual(screen.touch.dpad.children.map((b) => b.getAttribute('aria-label')), ['Move left', 'Move right']);
   assert.equal(screen.touch.enabled, true);
   for (const [action, b] of elements) assert.equal(screen.touch.actionButtons.get(action), b, action);
-  assert.equal(screen.touch.buttons.get('extra_attack').getAttribute('aria-label'), 'Shuriken', 'the fighter\'s own, whatever the layout');
+  assert.equal(screen.touch.buttons.get('extra_attack').getAttribute('aria-label'), 'High Kick', 'the fighter\'s own, whatever the layout');
   screen.exit();
   assert.equal(screen.touch.enabled, false, 'leaving turns them off');
 });
@@ -558,36 +560,36 @@ test('moves that aim at an opponent fall back or miss with nobody there, without
     assert.equal(p.state, 'idle');
   };
 
-  // attack3: no one to appear behind, so nothing at all (never a Punch in
-  // its place, nor a summoning startup for nobody), and free.
+  // attack4: Unlimited Void casts, releases its burst round nobody, and is
+  // over; nothing was hit.
   run({}, 10);
   assert.equal(p.state, 'idle');
-  run({ attack3: true, attack3Pressed: true });
-  assert.equal(p.combat.attack, null);
-  assert.equal(p.pendingSummon, null, 'no startup');
-  assert.equal(p.state, 'idle');
-  assert.equal(session.clones.length, 0);
-  assert.equal(p.combat.abilityCooldowns.active('attack3'), false, 'no cooldown spent on a clone that cannot appear');
-  idle();
-
-  // attack4: the Sphere Rush forms, dashes, finds nobody and misses.
-  run({}, 10);
   run({ attack4: true, attack4Pressed: true });
-  const rush = p.technique;
-  assert.ok(rush, 'the Sphere Rush starts');
+  const voidCast = p.technique;
+  assert.equal(voidCast?.action, 'attack4', 'Unlimited Void starts');
   idle();
-  assert.equal(rush.endReason, 'miss');
-  assert.equal(rush.target, null);
+  assert.equal(voidCast.released, true);
+  assert.equal(voidCast.endReason, 'done');
 
-  // Throw: the shuriken flies, hits nothing and expires.
-  run({ extra_attack: true, extra_attackPressed: true });
-  let seen = 0;
-  for (let i = 0; i < 180; i++) {
-    run({});
-    seen = Math.max(seen, session.projectiles.length);
+  // Red, Maximum Blue and Hollow Purple: each flies, hits nothing and
+  // expires (Maximum Blue's pull draws nobody in).
+  for (const button of ['attack2', 'attack3', 'attack5']) {
+    run({}, 10);
+    run({ [button]: true, [`${button}Pressed`]: true });
+    let seen = 0;
+    for (let i = 0; i < 240; i++) {
+      run({});
+      seen = Math.max(seen, session.projectiles.length);
+    }
+    assert.equal(seen, 1, button);
+    assert.equal(session.projectiles.length, 0, `${button}: gone`);
+    idle();
   }
-  assert.equal(seen, 1);
-  assert.equal(session.projectiles.length, 0);
+
+  // The High Kick: a kick into the air, nobody there.
+  run({ extra_attack: true, extra_attackPressed: true });
+  assert.equal(p.combat.attack?.def.id, 'extra_attack');
+  idle();
 
   // Movement, jumping, both BAs in the air and the Shield still work alone.
   run({ runRight: true }, 30);
@@ -648,19 +650,19 @@ test('the Void never ends practice: a fighter in it is out for 2 s, then back at
   const v = PRACTICE_MAP.voidBounds;
   const { top } = PRACTICE_MAP.mainStage;
   const [p1Spawn, cpuSpawn] = PRACTICE_MAP.spawnPoints;
-  // Player 1, a shuriken of its in flight, is carried just past the Void's
-  // fixed line: its next step takes it out of play, its own shuriken gone.
+  // Player 1, a Red of its in flight, is carried just past the Void's
+  // fixed line: its next step takes it out of play, its own Red gone.
   player.combat.launchPoint = 70;
   player.combat.abilityCooldowns.start('attack4', 5);
-  player.combat.abilityCooldowns.start('attack3', 2);
-  run({ extra_attack: true, extra_attackPressed: true });
+  player.combat.abilityCooldowns.start('attack5', 2);
+  run({ attack2: true, attack2Pressed: true });
   until(() => session.projectiles.length === 1);
   Object.assign(player.body, { x: v.left - 2, y: 1200, vx: -300, vy: 900, grounded: false, ground: null });
   run();
   assert.equal(player.lostToVoid, true);
   assert.deepEqual(session.inPlay, [cpu], 'out of play: not updated, hit or drawn');
   assert.deepEqual(session.cameraTargets, [cpu, null], 'the camera follows the CPU meanwhile');
-  assert.deepEqual(session.projectiles, [], 'its shuriken went with it');
+  assert.deepEqual(session.projectiles, [], 'its Red went with it');
   assert.equal(player.combat.launchPoint, 70, 'its Launch Point stays until it is back');
   for (const key of ['score', 'points']) assert.equal(key in session, false, `no ${key}: practice scores nothing`);
   // Two seconds later: back, still, in a fresh training state.
@@ -675,32 +677,26 @@ test('the Void never ends practice: a fighter in it is out for 2 s, then back at
   );
   assert.equal(player.combat.attack, null, 'no attack survives it');
   assert.equal(player.combat.launchPoint, 0, 'a fresh 0');
-  assert.equal(player.combat.abilityCooldowns.size, 0, 'Attack 3 and Attack 4 cooldowns cleared: ready again');
+  assert.equal(player.combat.abilityCooldowns.size, 0, 'Attack 4 and Attack 5 cooldowns cleared: ready again');
   assert.equal(player.combat.energy, player.combat.maxEnergy, 'full Energy');
   assert.equal(player.combat.stun, 0);
   assert.equal(player.combat.hitstop, 0);
   assert.deepEqual(session.fighters, [player, cpu]);
   assert.equal(player.opponent, cpu);
 
-  // The CPU, caught in Player 1's Sphere Rush, falls into the Void while
-  // bound: the rush holding it ends, its damage numbers go, and 2 s later
-  // it is back at its own spawn, free.
+  // The CPU, paralysed by Player 1's Unlimited Void, falls into the Void:
+  // its damage numbers go, and 2 s later it is back at its own spawn,
+  // free.
   run({}, 60);
+  Object.assign(player.body, { x: cpu.body.x - 150, prevX: cpu.body.x - 150 });
   run({}, 10);
   run({ attack4: true, attack4Pressed: true });
-  const rush = player.technique;
-  until(() => rush.hitConfirmed, 120);
-  run({}, 30); // the first tick: +1 over it
-  assert.ok(cpu.combat.immobilized);
-  assert.ok(session.damageNumbers.some((d) => d.target === cpu && d.text === '+1'));
+  until(() => cpu.combat.immobilized, 120);
+  assert.ok(session.damageNumbers.some((d) => d.target === cpu && d.text === `+${DEF_0001.techniques.attack4.burst.hit.damage}`));
   cpu.combat.launchPoint += 60;
   Object.assign(cpu.body, { y: v.bottom + cpu.body.height, grounded: false, ground: null });
   run();
   assert.equal(cpu.lostToVoid, true);
-  assert.equal(player.technique, null, 'the rush holding it ended');
-  assert.equal(rush.endReason, 'released');
-  assert.equal(rush.target, null);
-  assert.equal(cpu.combat.immobilized, false);
   assert.ok(!session.damageNumbers.some((d) => d.target === cpu));
   assert.equal(session.secondary, null, 'Player 1 framed alone meanwhile');
   run({}, RESPAWN_STEPS);
@@ -710,7 +706,8 @@ test('the Void never ends practice: a fighter in it is out for 2 s, then back at
   assert.deepEqual(session.fighters, [player, cpu]);
   run({}, 30);
   assert.equal(cpu.body.x, cpuSpawn.x, 'standing still again');
-  // No tick from the ended rush ever reaches it.
+  // Back free: no paralysis carried over the fall.
+  assert.equal(cpu.combat.immobilized, false);
   run({}, 120);
   assert.equal(cpu.combat.launchPoint, 0);
   // Practice simply carries on: Player 1 can fight the CPU again.
@@ -796,7 +793,7 @@ test('HUD: the CPU card follows real hits, rebinds when the CPU changes and goes
   const { app, screen } = await enterPractice();
   const { hud, session } = screen;
   const cpuPanel = hud.cpuPanel;
-  // Walk up to the CPU and hit it with attack1: its card reads 3.
+  // Walk up to the CPU and hit it with attack1: its card reads 2.
   const step = (held = {}) => {
     app.input.script.push(held);
     session.update(DT);
@@ -806,9 +803,9 @@ test('HUD: the CPU card follows real hits, rebinds when the CPU changes and goes
   for (let i = 0; i < 30; i++) step();
   step({ attack1: true, attack1Pressed: true });
   for (let i = 0; i < 30; i++) step();
-  assert.equal(session.cpu.combat.launchPoint, 3);
-  assert.equal(cpuPanel.launchPointValue.textContent, '3');
-  assert.ok(session.damageNumbers.some((d) => d.text === '+3'), 'the floating number too');
+  assert.equal(session.cpu.combat.launchPoint, 2);
+  assert.equal(cpuPanel.launchPointValue.textContent, '2');
+  assert.ok(session.damageNumbers.some((d) => d.text === '+2'), 'the floating number too');
 
   // Change CPU: the card is the new fighter's.
   const cpu = await enableCpu(screen, '9999');
@@ -1077,8 +1074,8 @@ test('confirming a fighter swaps it in place and resumes practice', async () => 
   const { session } = screen;
   const input = app.input;
   const old = session.player;
-  // Leave something of the old fighter behind: a Sphere Rush in progress,
-  // a shuriken and a clone.
+  // Leave something of the old fighter behind: Unlimited Void in progress,
+  // a projectile and a clone.
   for (let i = 0; i < 10; i++) { input.script.push({}); session.update(DT); }
   input.script.push({ attack4: true, attack4Pressed: true });
   session.update(DT);
@@ -1171,7 +1168,7 @@ test('the touch buttons\' art follows Player 1\'s fighter, with a universal Jump
     };
     const shown = () => ['extra_attack', 'attack1', 'attack2', 'jump'].map((a) => [touch.buttons.get(a).getAttribute('aria-label'), look(a)]);
     const OWN_A = [
-      ['Shuriken', '0001_extra_attack_2.png'], ['Punch', '0001_attack1_2.png'], ['Kick', '0001_attack2_5.png'], ['Jump', ICONS.jump],
+      ['High Kick', '0001_extra_attack_4.png'], ['Jab', '0001_attack1_4.png'], ['Red', '0001_attack2_object_1.png'], ['Jump', ICONS.jump],
     ];
     assert.deepEqual(shown(), OWN_A, 'the default fighter\'s art from the start, Jump\'s too');
     const sprite = touch.buttons.get('attack1').querySelector('.tc-sprite-icon');
@@ -1226,7 +1223,7 @@ test('the touch buttons\' art follows Player 1\'s fighter, with a universal Jump
     assert.equal(touch.buttons.get('extra_attack').getAttribute('aria-label'), 'Kunai');
     assert.equal(look('jump'), ICONS.jump, 'nor its jump');
 
-    // Back to #0001: its Shuriken, Punch, Kick and jump again.
+    // Back to #0001: its High Kick, Jab, Red and jump again.
     screen.openMenu();
     screen.openRoster();
     slotFor(screen, '0001').click(0);
@@ -1259,9 +1256,9 @@ test('Change Fighter into and out of a fighter with no moves, again and again: i
     assert.equal(p.combat.launchPoint, 0);
     assert.equal(screen.session.cpu.def.id, '0001', 'the CPU stays');
     // The same controls, refreshed: no ability button for the fighter with
-    // no moves, Test A's Shuriken, Transform, Punch and Kick back for it.
+    // no moves, Test A's High Kick, Transform, Jab and Red back for it.
     for (const [action, b] of buttons) assert.equal(touch.buttons.get(action), b, action);
-    const own = { extra_attack: 'Shuriken', transform: 'Transform', attack1: 'Punch', attack2: 'Kick' };
+    const own = { extra_attack: 'High Kick', transform: 'Transform', attack1: 'Jab', attack2: 'Red' };
     const moveless = id === 'test-moveless';
     for (const [action, name] of Object.entries(own)) {
       const b = touch.buttons.get(action);
@@ -1321,7 +1318,7 @@ test('a fighter with no moves, or with different ones, can be the practice CPU, 
     const cpu = await enableCpu(screen, id);
     assert.equal(cpu.def.id, id);
     assert.equal(screen.session.player.def.id, '0001');
-    assert.equal(screen.touch.buttons.get('extra_attack').getAttribute('aria-label'), 'Shuriken', 'Player 1\'s controls, not the CPU\'s');
+    assert.equal(screen.touch.buttons.get('extra_attack').getAttribute('aria-label'), 'High Kick', 'Player 1\'s controls, not the CPU\'s');
     assert.equal(screen.hud.cpuPanel.name.textContent, getCharacter(id).displayName);
     screen.exit();
   }
@@ -1524,8 +1521,8 @@ test('Player 1\'s attacks hit the CPU through the real CombatSystem, and it reac
   assert.equal(cpu.facing, -1);
 
   assert.equal(cpu.combat.launchPoint, 0);
-  // From 97, attack1's 3 makes 100: a push of 1 x 100, well short of the ledge.
-  cpu.combat.launchPoint = 97;
+  // From 98, attack1's 2 makes 100: a push of 1 x 100, well short of the ledge.
+  cpu.combat.launchPoint = 98;
   run({ attack1: true, attack1Pressed: true });
   until(() => events.length > 0, 30);
   const [hit] = events;
@@ -1534,7 +1531,7 @@ test('Player 1\'s attacks hit the CPU through the real CombatSystem, and it reac
   assert.equal(hit.target, cpu);
   assert.equal(hit.damage, player.attacks.attack1.damage);
   assert.deepEqual([hit.projectile, hit.summon, hit.technique], [null, null, null]);
-  assert.equal(cpu.combat.launchPoint, 97 + hit.damage, 'its Launch Point builds up');
+  assert.equal(cpu.combat.launchPoint, 98 + hit.damage, 'its Launch Point builds up');
   assert.equal(hit.launchStrength, 100);
   assert.ok(cpu.combat.stun > 0, 'hitstun');
   run(); // the reaction shows from the CPU's next update
@@ -1542,7 +1539,7 @@ test('Player 1\'s attacks hit the CPU through the real CombatSystem, and it reac
   assert.equal(cpu.animator.anim.key, 'hurt');
   // Its number, straight from the resolved event.
   assert.deepEqual(numbers.map((d) => [d.target, d.damage, d.text]), [[cpu, hit.damage, `+${hit.damage}`]]);
-  assert.equal(numbers[0].text, '+3');
+  assert.equal(numbers[0].text, '+2');
   // Launched away, then idle again, never hitting back.
   const x = cpu.body.x;
   run({}, 40);
@@ -1552,7 +1549,7 @@ test('Player 1\'s attacks hit the CPU through the real CombatSystem, and it reac
   assert.equal(events.length, 1);
 });
 
-test('Player 1\'s attack2 launches the CPU straight up (Base Launch 2, vertical), then gravity brings it down', () => {
+test('Player 1\'s High Kick launches the CPU straight up (Base Launch 2, vertical), then gravity brings it down', () => {
   const { session, run, until, events, numbers } = practiceSession();
   const { player, cpu } = session;
   for (let i = 0; i < 300 && cpu.body.x - player.body.x > 60; i++) run({ runRight: true });
@@ -1560,19 +1557,19 @@ test('Player 1\'s attack2 launches the CPU straight up (Base Launch 2, vertical)
   const groundY = cpu.body.y;
   const startX = cpu.body.x;
   assert.equal(cpu.grounded, true);
-  cpu.combat.launchPoint = 25;
+  cpu.combat.launchPoint = 26;
 
-  run({ attack2: true, attack2Pressed: true });
+  run({ extra_attack: true, extra_attackPressed: true });
   until(() => events.length > 0, 30);
   const [hit] = events;
   assert.equal(hit.type, 'hit');
   assert.equal(hit.target, cpu);
-  assert.equal(hit.damage, player.attacks.attack2.damage);
-  assert.equal(numbers[0].text, '+5');
-  // At impact: launched upward, not pushed sideways, at attack2's Base Launch 2
-  // x the CPU's new Launch Point: 25 + 5 = 30, a strength of 60, so 600.
-  // (Measured from where the kick struck: attack2's step-in may have shoved it
-  // along a little through the pushboxes first.)
+  assert.equal(hit.damage, player.attacks.extra_attack.damage);
+  assert.equal(numbers[0].text, '+4');
+  // At impact: launched upward, not pushed sideways, at the High Kick's
+  // Base Launch 2 x the CPU's new Launch Point: 26 + 4 = 30, a strength of
+  // 60, so 600. (Measured from where the kick struck: its step-in may have
+  // shoved it along a little through the pushboxes first.)
   const hitX = cpu.body.x;
   assert.ok(cpu.body.vx === 0, 'no sideways push');
   assert.equal(cpu.combat.launchPoint, 30);
@@ -1587,65 +1584,45 @@ test('Player 1\'s attack2 launches the CPU straight up (Base Launch 2, vertical)
   assert.ok(top < groundY, 'it left the ground');
   assert.equal(cpu.grounded, true, 'and came back down');
   assert.equal(cpu.body.y, groundY);
-  assert.equal(cpu.body.x, hitX, 'straight up and down');
+  // (The kick's step-in carries on a moment after it lands, nudging the
+  // rising CPU by a fraction through the pushboxes.)
+  assert.ok(Math.abs(cpu.body.x - hitX) < 1, 'straight up and down');
   assert.ok(Math.abs(cpu.body.x - startX) < 10, 'about where it stood');
   run({}, 40);
   assert.equal(cpu.state, 'idle');
   assert.equal(events.length, 1);
 });
 
-test('shuriken, clone and Sphere Rush hits on the CPU each float their own resolved damage', () => {
-  // Throw: the shuriken flies from Player 1's spawn into the CPU.
-  {
+test('Red, Maximum Blue, Unlimited Void and Hollow Purple hits on the CPU each float their own resolved damage', () => {
+  // Red, Maximum Blue and Hollow Purple fly from Player 1's spawn into the
+  // CPU: Red strikes once, Maximum Blue grinds it (its pull keeping it in)
+  // and ends on its finisher, Hollow Purple strikes once, hard.
+  for (const [button, texts] of [['attack2', ['+2']], ['attack3', ['+1', '+1', '+2']], ['attack5', ['+12']]]) {
     const { session, run, until, events, numbers } = practiceSession();
-    run({ extra_attack: true, extra_attackPressed: true });
-    until(() => events.length > 0, 120);
-    const [hit] = events;
-    assert.ok(hit.projectile, 'a projectile hit');
-    assert.equal(hit.target, session.cpu);
-    assert.equal(hit.damage, hit.projectile.def.damage);
-    assert.deepEqual(numbers.map((d) => [d.damage, d.text]), [[1, '+1']]);
-  }
-  // attack3: #0001 summons (its cooldown started as usual), then the clone
-  // appears behind the CPU and strikes it.
-  {
-    const { session, run, until, events, numbers } = practiceSession();
-    const { player, cpu } = session;
     run({}, 10);
-    run({ attack3: true, attack3Pressed: true });
-    assert.equal(player.state, 'summon');
-    assert.equal(session.clones.length, 0);
-    run({}, startupSteps(DEF_0001, 'attack3'));
-    assert.equal(session.clones.length, 1);
-    assert.equal(session.clones[0].target, cpu);
-    assert.ok(player.combat.abilityCooldowns.active('attack3'), 'its cooldown started');
+    run({ [button]: true, [`${button}Pressed`]: true });
     until(() => events.length > 0, 180);
-    const [hit] = events;
-    assert.equal(hit.summon, session.clones[0] ?? hit.summon);
-    assert.ok(hit.summon);
-    assert.equal(hit.attacker, player);
-    assert.equal(hit.target, cpu);
-    assert.deepEqual(numbers.map((d) => d.text), ['+3']);
+    run({}, 120);
+    assert.ok(events.every((e) => e.projectile && e.target === session.cpu), `${button}: projectile hits on the CPU`);
+    assert.deepEqual(events.map((e) => e.damage), texts.map((t) => Number(t.slice(1))), button);
+    assert.deepEqual(numbers.map((d) => d.text), texts, button);
   }
-  // attack4: the Sphere Rush catches the CPU, ticks +1 four times,
-  // then explodes on it for +10.
+  // attack4: Unlimited Void's burst catches the CPU close by: +3, and it is
+  // paralysed.
   {
     const { session, run, until, events, numbers } = practiceSession();
     const { player, cpu } = session;
+    Object.assign(player.body, { x: cpu.body.x - 150, prevX: cpu.body.x - 150 });
     run({}, 10);
     run({ attack4: true, attack4Pressed: true });
-    const rush = player.technique;
-    assert.ok(rush);
-    until(() => rush.hitConfirmed, 120);
-    assert.equal(rush.target, cpu);
-    assert.ok(cpu.combat.immobilized, 'bound');
-    until(() => !player.technique, 400);
-    assert.ok(events.every((e) => e.technique === rush && e.target === cpu));
-    const damages = events.map((e) => e.damage);
-    assert.deepEqual(damages, [0, 1, 1, 1, 1, 10]);
-    // The contact adds nothing, so it floats nothing; its tick on the same
-    // step floats the first +1.
-    assert.deepEqual(numbers.map((d) => d.text), ['+1', '+1', '+1', '+1', '+10']);
+    const cast = player.technique;
+    assert.equal(cast?.action, 'attack4');
+    until(() => events.length > 0, 120);
+    const [hit] = events;
+    assert.equal(hit.technique, cast);
+    assert.equal(hit.target, cpu);
+    assert.ok(cpu.combat.immobilized, 'paralysed');
+    assert.deepEqual(numbers.map((d) => d.text), ['+3']);
   }
 });
 
@@ -1692,12 +1669,12 @@ test('damage numbers: positive "+N" red text over the CPU\'s head that follows i
   assert.ok(session.view.w > 600 && session.view.w < 1600, `a real view (${session.view.w} units wide)`);
   const drawn = [];
   session.ctx.fillText = (text, x, y) => drawn.push({ text, x, y, fill: session.ctx.fillStyle, alpha: session.ctx.globalAlpha });
-  run({ extra_attack: true, extra_attackPressed: true });
+  run({ attack2: true, attack2Pressed: true });
   until(() => events.length > 0, 120);
   const draw = () => {
     drawn.length = 0;
     session.render();
-    return drawn.find((d) => d.text === '+1');
+    return drawn.find((d) => d.text === '+2');
   };
   const first = draw();
   assert.ok(first, 'drawn');
@@ -1718,28 +1695,33 @@ test('damage numbers: positive "+N" red text over the CPU\'s head that follows i
   let steps = 0;
   while (session.damageNumbers.length && steps < 120) { run(); steps++; }
   assert.ok(steps >= 0.6 * 60 && steps <= 1.0 * 60, `lasts ${steps} steps`);
-  session.damageNumbers.push({ target: cpu, damage: 1, text: '+1', age: 0.7, stack: 0 });
+  session.damageNumbers.push({ target: cpu, damage: 2, text: '+2', age: 0.7, stack: 0 });
   const late = draw();
   assert.ok(late.y < first.y, 'drifted up');
   assert.ok(late.alpha < 1, 'fading');
 });
 
 test('the CPU is never knocked out: at any Launch Point it keeps taking hits, with nothing to revive', () => {
+  // Hits that launch nothing, so it stays on the stage: Unlimited Void's
+  // burst (3), then Maximum Blue's first grinding tick (1).
   const { session, run, until, events, numbers } = practiceSession();
-  const { cpu } = session;
+  const { player, cpu } = session;
+  Object.assign(player.body, { x: cpu.body.x - 150, prevX: cpu.body.x - 150 });
   cpu.combat.launchPoint = 500;
-  run({ extra_attack: true, extra_attackPressed: true });
+  run({}, 10);
+  run({ attack4: true, attack4Pressed: true });
   until(() => events.length > 0, 120);
-  assert.equal(cpu.combat.launchPoint, 501);
-  assert.equal(numbers.at(-1).text, '+1', 'the number is what the hit added');
-  until(() => cpu.combat.stun <= 0 && cpu.combat.hitstop <= 0, 120);
-  assert.equal(cpu.canAct(), true, '500 Launch Point never stops it');
+  assert.equal(cpu.combat.launchPoint, 503);
+  assert.equal(numbers.at(-1).text, '+3', 'the number is what the hit added');
+  until(() => cpu.canAct(), 240);
+  assert.equal(cpu.lostToVoid, false);
+  assert.equal(cpu.combat.immobilized, false, '503 Launch Point never stops it, once the paralysis is over');
   // ...and can be hit again.
   run({}, 30);
-  run({ extra_attack: true, extra_attackPressed: true });
-  until(() => events.length > 1, 120);
+  run({ attack3: true, attack3Pressed: true });
+  until(() => events.length > 1, 180);
   assert.equal(events[1].target, cpu);
-  assert.equal(cpu.combat.launchPoint, 502);
+  assert.equal(cpu.combat.launchPoint, 504);
 });
 
 test('Change CPU replaces the CPU in place and leaves Player 1 alone', async () => {
@@ -1801,21 +1783,19 @@ test('Disable CPU removes the CPU and every reference to it, then waits, frozen,
   const input = app.input;
   const cpu = await enableCpu(screen, '9999');
   const player = session.player;
-  // Catch the CPU in a Sphere Rush (bound, the sphere on it, a number over
-  // it), with a clone summoned at it and a shuriken of Player 1's in flight.
+  // Catch the CPU in Unlimited Void (paralysed, a number over it), with a
+  // clone summoned at it and a projectile of Player 1's in flight.
+  Object.assign(player.body, { x: cpu.body.x - 150, prevX: cpu.body.x - 150 });
   for (let i = 0; i < 10; i++) { input.script.push({}); session.update(DT); }
   input.script.push({ attack4: true, attack4Pressed: true });
   session.update(DT);
-  const rush = player.technique;
-  for (let i = 0; i < 120 && !rush.hitConfirmed; i++) session.update(DT);
-  for (let i = 0; i < 30; i++) session.update(DT); // the 0.5 s tick
-  assert.equal(rush.target, cpu);
-  assert.ok(cpu.combat.isBoundBy(rush));
-  assert.equal(session.damageNumbers.length, 2, 'the contact\'s tick and the 0.5 s one');
+  for (let i = 0; i < 120 && !cpu.combat.immobilized; i++) session.update(DT);
+  assert.ok(cpu.combat.immobilized, 'paralysed');
+  assert.equal(session.damageNumbers.length, 1, 'the burst\'s +3');
   const stray = { alive: true, owner: player, target: cpu };
-  const shuriken = { alive: true, owner: player };
+  const shot = { alive: true, owner: player };
   session.clones.push(stray);
-  session.projectiles.push(shuriken);
+  session.projectiles.push(shot);
 
   screen.openMenu();
   screen.cpuBtn.click();
@@ -1831,15 +1811,11 @@ test('Disable CPU removes the CPU and every reference to it, then waits, frozen,
   assert.equal(session.secondary, null);
   assert.equal(player.opponent, null);
   assert.equal(cpu.opponent, null);
-  assert.equal(player.technique, null, 'the technique holding the CPU ends');
-  assert.equal(rush.endReason, 'released');
-  assert.equal(rush.target, null);
-  assert.equal(cpu.combat.immobilized, false);
   assert.ok(!session.clones.includes(stray), 'the clone aimed at it goes');
-  assert.ok(session.projectiles.includes(shuriken), 'Player 1\'s shuriken flies on');
+  assert.ok(session.projectiles.includes(shot), 'Player 1\'s projectile flies on');
   assert.deepEqual(session.damageNumbers, []);
   const refs = [
-    ...session.fighters.flatMap((f) => [f, f.opponent, f.technique?.target]),
+    ...session.fighters.flatMap((f) => [f, f.opponent]),
     ...session.fighters.flatMap((f) => f.summons.map((s) => s.target)),
     ...session.clones.flatMap((c) => [c.owner, c.target]),
     ...session.projectiles.map((p) => p.owner),
@@ -1871,8 +1847,8 @@ test('Disable CPU removes the CPU and every reference to it, then waits, frozen,
   assert.equal(screen.cpuRosterOpen, true, 'a hidden, disabled button does nothing');
   screen.cpuRosterBack.click();
 
-  // Solo practice again: an attack3 does nothing (nobody to appear behind),
-  // for free, and the camera follows Player 1 alone.
+  // Solo practice again: Maximum Blue flies with nobody to draw in, and
+  // the camera follows Player 1 alone.
   session.frame = Object.getPrototypeOf(session).frame.bind(session);
   screen.resume();
   assert.equal(screen.isRunning, true);
@@ -1880,9 +1856,10 @@ test('Disable CPU removes the CPU and every reference to it, then waits, frozen,
   for (let i = 0; i < 10; i++) { input.script.push({}); session.update(DT); }
   input.script.push({ attack3: true, attack3Pressed: true });
   session.update(DT);
-  assert.equal(player.combat.attack, null);
+  assert.equal(player.combat.attack?.def.id, 'attack3');
+  for (let i = 0; i < 30; i++) session.update(DT);
+  assert.equal(session.projectiles.length, 1, 'out, with nobody to strike');
   assert.deepEqual(session.clones, []);
-  assert.equal(player.combat.abilityCooldowns.active('attack3'), false);
   const calls = [];
   const { follow } = session.camera;
   session.camera.follow = (...args) => { calls.push(args); return follow.apply(session.camera, args); };
@@ -2010,13 +1987,13 @@ test('changing Player 1\'s fighter keeps the CPU, rewired to the new fighter', a
   const input = app.input;
   const cpu = await enableCpu(screen, '9999');
   const old = session.player;
-  // The old fighter's Sphere Rush holds the CPU.
+  // The old fighter is mid-cast: Hollow Purple, not yet released.
   for (let i = 0; i < 10; i++) { input.script.push({}); session.update(DT); }
-  input.script.push({ attack4: true, attack4Pressed: true });
+  input.script.push({ attack5: true, attack5Pressed: true });
   session.update(DT);
-  const rush = old.technique;
-  for (let i = 0; i < 120 && !rush.hitConfirmed; i++) session.update(DT);
-  assert.ok(cpu.combat.isBoundBy(rush));
+  const cast = old.technique;
+  assert.equal(cast?.action, 'attack5');
+  assert.equal(cast.released, false);
 
   screen.openMenu();
   screen.openRoster();
@@ -2032,8 +2009,9 @@ test('changing Player 1\'s fighter keeps the CPU, rewired to the new fighter', a
   assert.equal(cpu.opponent, p);
   assert.equal(old.opponent, null);
   assert.equal(session.secondary, cpu);
-  assert.equal(rush.endReason, 'destroy');
-  assert.equal(cpu.combat.immobilized, false, 'released');
+  assert.equal(cast.endReason, 'destroy');
+  assert.equal(cast.released, false, 'nothing came of it');
+  for (let i = 0; i < 120; i++) session.update(DT);
   assert.deepEqual(session.projectiles, []);
   assert.deepEqual(session.clones, []);
   assert.equal(screen.cpuBtn.textContent, 'Change CPU');
@@ -2041,11 +2019,14 @@ test('changing Player 1\'s fighter keeps the CPU, rewired to the new fighter', a
   assert.equal(app.selection.characterId, 'test-a');
 });
 
-// ---- Attack 3 / Attack 4 cooldowns and the Void ------------------------------
+// ---- Summon and technique cooldowns and the Void ---------------------------
 
-test('the CPU taken out or changed during #0001\'s summoning startup: no clone, never at the new CPU, and the Attack 3 cooldown runs on', () => {
+test('the CPU taken out or changed during a summoning startup: no clone, never at the new CPU, and the Attack 3 cooldown runs on', () => {
+  // A fighter whose Attack 3 summons after a startup of its own (the
+  // loadout matrix's Case D, see tests/fighters/fixtures/loadout-fighters.mjs).
+  const summoner = LOADOUT_CASES.find((c) => c.name === 'D').def;
   for (const change of ['remove', 'replace']) {
-    const { session, run } = practiceSession();
+    const { session, run } = practiceSession({ def: summoner });
     const { player } = session;
     run({}, 10);
     run({ attack3: true, attack3Pressed: true });
@@ -2056,23 +2037,24 @@ test('the CPU taken out or changed during #0001\'s summoning startup: no clone, 
     else session.setCPU(DEF_9999, fakeSprites());
     assert.equal(player.pendingSummon, null, `${change}: the startup is cut short`);
     assert.equal(player.state, 'idle', `${change}: free at once`);
-    run({}, startupSteps(DEF_0001, 'attack3') + 60);
+    run({}, startupSteps(summoner, 'attack3') + 60);
     assert.deepEqual(session.clones, [], `${change}: no clone, at the old CPU or the new one`);
     assert.deepEqual(player.summons, []);
     assert.ok(player.combat.abilityCooldowns.active('attack3'), `${change}: the accepted use keeps its cooldown`);
   }
 });
 
-test('a Practice Void respawn is a fresh training state: 0 Launch Point, full Energy and Attack 3 and Attack 4 ready again', () => {
+test('a Practice Void respawn is a fresh training state: 0 Launch Point, full Energy and Attack 4 and Attack 5 ready again', () => {
   const { session, run, until } = practiceSession();
   const { player } = session;
   // Use both for real.
   run({}, 10);
-  run({ attack3: true, attack3Pressed: true });
-  run({}, startupSteps(DEF_0001, 'attack3') + 2);
   run({ attack4: true, attack4Pressed: true });
+  until(() => !player.technique, 400);
+  run({}, 2);
+  run({ attack5: true, attack5Pressed: true });
   const cd = player.combat.abilityCooldowns;
-  assert.ok(cd.active('attack3') && cd.active('attack4'));
+  assert.ok(cd.active('attack4') && cd.active('attack5'));
   until(() => !player.technique, 400);
   player.combat.launchPoint = 88;
   player.combat.spendEnergy(100);
@@ -2087,8 +2069,8 @@ test('a Practice Void respawn is a fresh training state: 0 Launch Point, full En
   assert.equal(player.combat.energy, player.combat.maxEnergy, 'Energy full');
   assert.equal(player.combat.energyExhausted, false, 'and no longer exhausted');
   assert.equal(cd === player.combat.abilityCooldowns ? cd.size : player.combat.abilityCooldowns.size, 0);
-  assert.equal(player.combat.abilityCooldowns.active('attack3'), false);
   assert.equal(player.combat.abilityCooldowns.active('attack4'), false);
+  assert.equal(player.combat.abilityCooldowns.active('attack5'), false);
   // Ready at once: the next attack4 starts.
   run({}, 10);
   run({ attack4: true, attack4Pressed: true });
@@ -2303,7 +2285,7 @@ test('Practice synchronizes air icons after the player frame and restores ground
   assert.equal(image.getAttribute('src'), ground);
   session.frame = () => { session.player.body.grounded = false; session.cpu.body.grounded = true; };
   screen.update(1 / 60);
-  assert.equal(image.getAttribute('src'), DEF_0001.animations.midair_attack1.frames[2]);
+  assert.equal(image.getAttribute('src'), DEF_0001.animations.midair_attack1.frames[DEF_0001.mobileAbilities.attack1.previews.air.frame]);
   assert.equal(touch.buttons.get('jump').innerHTML, ICONS.jump);
   session.frame = () => session.player.respawn(session.stage);
   screen.update(1 / 60);

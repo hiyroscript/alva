@@ -339,32 +339,33 @@ test('Quick Battle: falling into the Void takes that fighter out of play at once
   assert.equal(battle.result.reason, 'time');
 });
 
-test('Quick Battle: the CPU in the Void scores Player 1 a point; a technique holding it lets go, and whatever aimed at it goes', () => {
+test('Quick Battle: the CPU in the Void scores Player 1 a point; whatever aimed at it goes, and it comes back free of any paralysis', () => {
   const { battle, script } = realBattle('desert');
   battle.setPhase('fight');
   const { p1, p2 } = battle;
-  // Catch the CPU in the Sphere Rush.
+  // Catch the CPU in Unlimited Void: paralysed where it stands.
   p2.body.x = p1.body.x + 120;
   for (let i = 0; i < 10; i++) battle.update(DT);
   script.held = { attack4: true, attack4Pressed: true };
   battle.update(DT);
   script.held = {};
-  const rush = p1.technique;
-  for (let i = 0; i < 120 && !rush.hitConfirmed; i++) battle.update(DT);
-  assert.ok(p2.combat.immobilized);
+  for (let i = 0; i < 120 && !p2.combat.immobilized; i++) battle.update(DT);
+  assert.ok(p2.combat.immobilized, 'paralysed');
   p1.summons.push({ id: 'attack3', target: p2 });
   Object.assign(p2.body, { x: battle.stage.void.right + 50, grounded: false, ground: null });
   battle.update(DT);
   assert.equal(p2.lostToVoid, true);
-  assert.equal(p1.technique, null);
-  assert.equal(rush.endReason, 'released');
-  assert.equal(p2.combat.immobilized, false);
   assert.deepEqual(p1.summons, []);
   assert.ok(battle.clones.every((c) => c.target !== p2));
   assert.deepEqual(battle.score, { p1: 1, p2: 0 });
   assert.equal(battle.phase, 'fight');
   assert.deepEqual(battle.result, { outcome: 'p1', reason: 'points' }, 'ahead on points');
   assert.equal(battle.secondary, null, 'the camera frames Player 1 alone');
+  // Back at its spawn once the wait is over, fresh: no paralysis left.
+  for (let i = 0; i < Math.round(CONFIG.battle.respawnSeconds / DT) + 2; i++) battle.update(DT);
+  assert.equal(p2.lostToVoid, false);
+  assert.equal(p2.combat.immobilized, false);
+  assert.equal(p2.combat.paralysis, 0);
 });
 
 test('Quick Battle: after time runs out, a fall scores nothing and nobody respawns; points, then Launch Point, decide', () => {
@@ -413,13 +414,17 @@ test('the training CPU never walks off a ledge on its own', async () => {
 // ---- Camera -------------------------------------------------------------------------
 
 test('the world scale is a platform-fighter view: fighters about a tenth of the view, the whole main stage across it', () => {
-  const sprites = { refArtHeight: 52, worldPerArt: def.visual.height / 52 };
+  // #0001's art: 63 px tall, each art pixel 88/52 world units like every
+  // fighter's. The scale is set by the reference height
+  // (CONFIG.render.fighterHeight), so a fighter of that height is what
+  // stands at about a tenth of the view.
+  const sprites = { refArtHeight: 63, worldPerArt: def.visual.height / 63 };
   const r = CONFIG.render;
   for (const m of ALL_MAPS) {
     const stageW = m.mainStage.right - m.mainStage.left;
     for (const [w, h] of [[1280, 720], [1920, 1080], [2560, 1440], [1688, 780], [2048, 1536], [800, 600]]) {
       const scale = computeWorldScale(w, h, sprites, m);
-      const ratio = (def.visual.height * scale) / h;
+      const ratio = (r.fighterHeight * scale) / h;
       assert.ok(ratio >= r.fighterScreenRatioMin - 1e-9 && ratio <= r.fighterScreenRatioMax + 1e-9, `${m.id} ${w}x${h}: ${ratio}`);
       const viewW = w / scale;
       // Wide screens show the whole stage and air past both ledges; narrow
@@ -428,9 +433,12 @@ test('the world scale is a platform-fighter view: fighters about a tenth of the 
       else assert.ok(viewW >= stageW || Math.abs(ratio - r.fighterScreenRatioMin) < 1e-6, `${m.id} ${w}x${h}`);
     }
   }
-  // At 16:9 fighters stand at about a tenth of the height.
-  const ratio = (def.visual.height * computeWorldScale(1280, 720, sprites, getMap('desert'))) / 720;
+  // At 16:9 fighters stand at about a tenth of the height; #0001, drawn
+  // taller (63 art pixels to the reference 52), is just that.
+  const scale = computeWorldScale(1280, 720, sprites, getMap('desert'));
+  const ratio = (r.fighterHeight * scale) / 720;
   assert.ok(ratio >= 0.095 && ratio <= 0.105, `${ratio}`);
+  assert.ok(Math.abs((def.visual.height * scale) / 720 - ratio * (63 / 52)) < 1e-9);
 });
 
 test('the camera leans toward the stage while framing, never past a framed fighter\'s margin', () => {

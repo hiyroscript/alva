@@ -32,7 +32,7 @@ never on a lapse), **senses** the fight (both fighters, their attacks and
 phases, Shield, techniques, Energy, Launch Point, cooldowns, projectiles,
 clones, the stage, the score and the clock), **evaluates** options when
 its reassessment timer is due or an event is urgent (answer a threat,
-strike, Throw, a summon or technique, approach, space, Dash, jump in,
+strike, throw a projectile, a summon or technique, approach, space, Dash, jump in,
 make for the centre, wait) and **acts** over as many steps as an option
 needs. A guard keeps it off the main floor's edge, and every jump it
 presses is the normal one (`jumpTapHold`). Prediction is limited to
@@ -43,10 +43,12 @@ projecting current motion over the level's short horizon.
 The options come from `readMoveset(fighter)`, never from a fighter's id:
 
 - every button in its `actions` that starts an attack, on the ground and
-  in the air, split into melee (with its reach swept along its motion:
-  `attackReach`) and ranged (with its projectile's speed);
-- its summons and techniques (each with its own button), only if their
-  art and data are complete;
+  in the air, split into melee (with its reach swept along its motion,
+  or widened to its pull's circle: `attackReach`) and ranged (with its
+  projectile's speed, its pull's reach and what its hit is worth, every
+  strike of a piercing one counted);
+- its summons and techniques (each with its own button, its lead, where
+  it lands and its hit), only if their art and data are complete;
 - whether it has a Shield and a Dash (and the Dash's distance and cost);
 - its hurtboxes' extent.
 
@@ -54,6 +56,14 @@ A reserved button, a button the fighter does not have, or a move it would
 refuse for missing art is never in its moveset, so the CPU never presses a
 button that cannot do anything. A fighter with no summons or techniques
 never plans one; one with no Shield never shields.
+
+How it weighs a hit is generic too: damage and launch (more at a high
+Launch Point and near a ledge it launches toward), a paralysis as the free
+hits it opens, and a paralysed opponent as an opening as long as the hold
+lasts. A technique that holds the fighter in place while it casts counts
+the risk of being struck first, smaller when its opponent hides behind a
+Shield that cannot stop it. And it never raises a Shield against a hit no
+Shield stops: it steps out, jumps, Dashes or strikes first instead.
 
 ## Difficulty
 
@@ -63,7 +73,8 @@ hesitation, spacing error, motion lookahead, and weights for defense
 (`guard`), punishing, summons and techniques (`specials`), Dash, planning,
 aggression, stage sense and Energy care. Every trait is ordered from Easy
 to Brutal; Brutal's reaction is fast but never zero. The reaction windows
-are the same for every fighter (they were set against #0001's startups);
+are the same for every fighter (set against startups from a jab's 1/12 s
+to a technique's half second or more);
 no level changes damage, launch, hitstun, speed, jumps, the Dash, the
 Shield, Energy, cooldowns, hitboxes, scoring or respawns.
 

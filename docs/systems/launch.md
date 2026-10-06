@@ -56,7 +56,13 @@ is optional and the defaults change nothing:
 
 A hit (never a block) also gives the target its air jumps back. #0001's
 and #0002's values are in their character specifications (both use 0.2 s
-per 1000 units/s up to 0.7 s, tumble from 1100 units/s, 15° of steering).
+per 1000 units/s up to 0.7 s and tumble from 1100 units/s; #0001 steers a
+launch up to 18°, #0002 15°).
+
+A launching hit also ends a paralysis on the spot (a hit's `paralyze`,
+see [combat](combat.md#attack-mechanics-beyond-a-timed-hitbox)): a launch
+is never held back, and a paralysed fighter that is launched flies like
+any other.
 
 ## Launch bounce
 

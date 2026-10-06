@@ -6,20 +6,21 @@ import assert from 'node:assert/strict';
 import { getCharacter } from '../../js/data/characters.js';
 import { Fighter, separateFighters } from '../../js/game/fighters/fighter.js';
 import { CombatSystem } from '../../js/game/combat/combat.js';
-import { spawnProjectiles, removeDeadProjectiles } from '../../js/game/combat/projectile.js';
+import { spawnProjectiles, removeDeadProjectiles, clashProjectiles } from '../../js/game/combat/projectile.js';
 import { spawnClones, updateClones, removeDeadClones } from '../../js/game/combat/summon.js';
+import { applyPulls } from '../../js/game/combat/pull.js';
 import { StageCollision, resolveSolidOverlap } from '../../js/game/physics.js';
 import { SpriteSet } from '../../js/game/rendering/sprite-normalizer.js';
 import { CombatAIController } from '../../js/game/ai/combat-ai.js';
 import { mulberry32 } from '../../js/core/utils.js';
 import { CONFIG } from '../../js/config.js';
 
-// The fighter the harness builds when a test names none. It is #0001 only
-// because the first tests were written against it: a compatibility default,
-// not a reference fighter. Tests of #0001's own moves rely on it on purpose;
-// a test of a shared mechanic should say which fighter it runs (pass
-// `character` to makeFighter / duel, or use harnessFor below), so it never
-// passes only because one fighter happens to have particular values.
+// The fighter the harness builds when a test names none: #0001, the first
+// in the roster. A convenience default, not a reference fighter. Tests of
+// #0001's own moves rely on it on purpose; a test of a shared mechanic
+// should say which fighter it runs (pass `character` to makeFighter /
+// duel, or use harnessFor below), so it never passes only because one
+// fighter happens to have particular values.
 export const DEFAULT_CHARACTER = getCharacter('0001');
 // The default's definition, under the name the older tests import it by.
 export const def = DEFAULT_CHARACTER;
@@ -123,7 +124,7 @@ export function stepUntil(step, pred, held, limit = 600) {
   throw new Error('condition never reached');
 }
 
-// ---- Attack helpers (Attack 1 and 2 tests) --------------------------
+// ---- Attack helpers ----------------------------------------------------
 
 export const steps = (seconds) => Math.round(seconds / DT);
 
@@ -183,8 +184,10 @@ export function duel({
     }
     spawnProjectiles(fighters, projectiles);
     for (const p of projectiles) p.update(DT, stage);
+    clashProjectiles(projectiles);
     updateClones(clones, DT);
     spawnClones(fighters, clones, stage);
+    applyPulls(fighters, projectiles, DT);
     events.push(...system.update(fighters, projectiles, clones));
     removeDeadProjectiles(projectiles);
     removeDeadClones(clones);
@@ -231,8 +234,10 @@ export function cpuFight(defA, defB, { seconds = 30, seed = 3, difficulty = 'bru
     for (const f of world.fighters) resolveSolidOverlap(f.body, stage);
     spawnProjectiles(world.fighters, world.projectiles);
     for (const p of world.projectiles) p.update(DT, stage);
+    clashProjectiles(world.projectiles);
     updateClones(world.clones, DT);
     spawnClones(world.fighters, world.clones, stage);
+    applyPulls(world.fighters, world.projectiles, DT);
     events.push(...world.combat.update(world.fighters, world.projectiles, world.clones));
     removeDeadProjectiles(world.projectiles);
     removeDeadClones(world.clones);

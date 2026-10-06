@@ -24,8 +24,10 @@ A fighter's `energy` entry; every field is optional:
 | `dashCancelCost` | the fighter's `dashCost` | Paid instead by a Dash that cuts short an attack that hit. |
 | `shieldHitCost` | 25 | Paid once for every hit the Shield blocks. |
 
-#0001 and #0002 both declare `max` 100, `regen` 12, `dashCost` 15,
-`dashCancelCost` 40 and `shieldHitCost` 25.
+#0001 declares `max` 100, `regen` 14, `dashCost` 12, `dashCancelCost` 35
+and `shieldHitCost` 20 (its Energy goes further than most); #0002 `max`
+100, `regen` 12, `dashCost` 15, `dashCancelCost` 40 and `shieldHitCost`
+25.
 
 ## Rules
 

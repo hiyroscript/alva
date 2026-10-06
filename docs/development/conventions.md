@@ -16,9 +16,8 @@ contract; it applies to every fighter.
   `midair_attack5`, `extra_attack` and the reserved `transform`. A
   number names a move's slot, never its role: whether `attack3` is an
   ordinary attack, a summon or a technique is the fighter's loadout.
-  Never name an internal concept after one fighter's ability (a generic
-  summon is a summon, not a "clone attack"; the technique runtime is not
-  "the Sphere Rush").
+  Never name an internal concept after one fighter's ability (a pull is a
+  pull, not "Blue"; the technique runtime's cast is not "the Void").
 - **Art files** are `assets/characters/<id>/<id>_<codename>_<frame>.png`,
   frames from 1. Whatever an attack creates is `<attack>_object`.
 - **`mouvment`** (the Dash's clip and its art, and `midair_mouvment`) is
@@ -26,7 +25,7 @@ contract; it applies to every fighter.
   controls' `mouvementLeft` / `mouvementRight` keep their own spelling.
   The fighter's `movement` profile is a different thing with an ordinary
   name.
-- **Player-facing names** (Punch, Sphere Rush, Whirlwind) live in a
+- **Player-facing names** (Jab, Hollow Purple, Whirlwind) live in a
   fighter's `abilityNames` and `mobileAbilities` only.
 - Retired names (listed in
   [`tests/systems/codenames.test.mjs`](../../tests/systems/codenames.test.mjs))

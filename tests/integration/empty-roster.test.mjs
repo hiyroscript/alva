@@ -264,29 +264,35 @@ test('the roster ships #0001 and #0002, both whole and playable', () => {
   assert.equal(isPlayable(DEF_0002), true);
   assert.equal(getPlayableCharacter('0002'), DEF_0002);
   assert.deepEqual(playableCharacters(), [DEF_0001, DEF_0002]);
-  // Nothing of it was stripped while it was disabled.
-  assert.deepEqual(Object.keys(DEF_0001.attacks).sort(), ['attack1', 'attack2', 'extra_attack', 'midair_attack1', 'midair_attack2']);
-  assert.deepEqual(DEF_0001.actions.attack3, { type: 'summon', id: 'attack3' });
+  // Whole: five numbered attacks (three ordinary, with their mid-air
+  // versions, and two techniques) and the High Kick.
+  assert.deepEqual(Object.keys(DEF_0001.attacks).sort(),
+    ['attack1', 'attack2', 'attack3', 'extra_attack', 'midair_attack1', 'midair_attack2', 'midair_attack3']);
   assert.deepEqual(DEF_0001.actions.attack4, { type: 'technique', id: 'attack4' });
-  assert.ok(DEF_0001.summons.attack3 && DEF_0001.techniques.attack4, 'Clone Attack and Sphere Rush');
-  assert.ok(DEF_0001.projectiles.extra_attack_object && DEF_0001.effectAnimations.attack3_object && DEF_0001.effectAnimations.attack4_object_build);
+  assert.deepEqual(DEF_0001.actions.attack5, { type: 'technique', id: 'attack5' });
+  assert.ok(DEF_0001.techniques.attack4.burst && DEF_0001.techniques.attack5.projectile, 'Unlimited Void and Hollow Purple');
+  assert.deepEqual(Object.keys(DEF_0001.projectiles).sort(), ['attack2_object', 'attack3_object', 'attack5_object']);
   assert.equal(DEF_0001.defense.type, 'shield');
   assert.ok(DEF_0001.movement.dashSpeed > 0, 'its Dash');
-  assert.deepEqual(DEF_0001.abilityNames, { extra_attack: 'Shuriken', attack1: 'Punch', attack2: 'Kick', attack3: 'Clone Attack', attack4: 'Sphere Rush' });
+  assert.deepEqual(DEF_0001.abilityNames, {
+    extra_attack: 'High Kick', attack1: 'Jab', midair_attack1: 'Floating Straight', attack2: 'Red', midair_attack2: 'Red Kick',
+    attack3: 'Maximum Blue', midair_attack3: 'Blue', attack4: 'Unlimited Void', attack5: 'Hollow Purple',
+  });
   // Its attack buttons: a name and artwork for each; Jump is universal.
-  assert.deepEqual(Object.keys(DEF_0001.mobileAbilities), ['extra_attack', 'attack1', 'attack2', 'attack3', 'attack4']);
-  for (const own of Object.values(DEF_0001.mobileAbilities)) assert.ok(DEF_0001.animations[own.preview.animation].frames[own.preview.frame]);
-  assert.equal(DEF_0001.summons.attack3.startupAnimation, 'attack3_summon', 'the Clone Attack\'s summoning startup');
+  assert.deepEqual(Object.keys(DEF_0001.mobileAbilities), ['extra_attack', 'attack1', 'attack2', 'attack3', 'attack4', 'attack5']);
+  for (const own of Object.values(DEF_0001.mobileAbilities)) {
+    assert.ok(DEF_0001[own.preview.collection ?? 'animations'][own.preview.animation].frames[own.preview.frame]);
+  }
   assert.ok(DEF_0001.hurtboxes.length > 0 && DEF_0001.collider && DEF_0001.energy && DEF_0001.launchReaction);
-  // Every frame it names is still on disk.
+  // Every frame it names is on disk.
   const paths = characterFramePaths(DEF_0001);
-  assert.ok(paths.length > 80);
+  assert.ok(paths.length >= 70);
   for (const path of paths) assert.ok(exists(path.replace('./', '')), path);
-  // Its French ability names and its sprite credits stay too.
-  assert.equal(STRINGS.fr['ability.0001.attack1'], 'Coup de poing');
-  assert.equal(STRINGS.fr['ability.0001.attack3'], 'Attaque du clone');
-  assert.equal(STRINGS.fr['ability.0001.attack4'], 'Ruée sphérique');
-  assert.equal(STRINGS.en['credits.sprites.title'], '#0001 sprite source');
+  // Its French ability names and its sprite credits.
+  assert.equal(STRINGS.fr['ability.0001.attack1'], 'Direct');
+  assert.equal(STRINGS.fr['ability.0001.attack4'], 'Vide infini');
+  assert.equal(STRINGS.fr['ability.0001.attack5'], 'Violet creux');
+  assert.equal(STRINGS.en['credits.sprites0001.title'], '#0001 sprite source');
 });
 
 test('#0001 is every default: Quick Battle, both Watch Mode CPUs and Practice Ground; both fighters are preloaded', async () => {

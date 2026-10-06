@@ -4,10 +4,11 @@
 // numbered attacks, every one a button of its own, ordinary or (with
 // `specials`) a summon and a technique, and optionally an extra_attack.
 // Their body, physics and art are #0001's, borrowed (they are not what
-// these fighters test): every ordinary numbered attack plays #0001's punch
-// frames and every mid-air one its kunai slash, each under its own
-// codename, and each hits for its own number in damage (attack3 deals 3,
-// midair_attack5 5), so a test can tell which one landed.
+// these fighters test): every ordinary numbered attack plays #0001's Jab
+// frames and every mid-air one its Floating Straight (without its hover:
+// a plain aerial), each under its own codename, and each hits for its own
+// number in damage (attack3 deals 3, midair_attack5 5), so a test can tell
+// which one landed.
 //
 // The cases the loadout rules spell out:
 //
@@ -16,13 +17,16 @@
 //   C  5 attacks                 attack1 ... attack5, ordinary
 //   D  3 attacks with specials   attack1 attack2 ordinary, attack3 a summon
 //   E  4 attacks with specials   attack1 attack2 ordinary, attack3 a summon,
-//                                attack4 a technique (#0001's shape)
+//                                attack4 a technique (a cast, #0001's form)
 //   F  5 attacks with specials   as E, and attack5 ordinary
+//   G  5 attacks, two techniques attack1 attack2 attack3 ordinary, attack4
+//                                and attack5 techniques (#0001's shape)
 //
-// The summon is #0001's clone (performing attack1, after #0001's own
-// summoning startup, its attack3_summon clip borrowed with it) and the
-// technique its Sphere Rush (its clips and sphere art borrowed under
-// attack4's own names).
+// The summon is a clone performing attack1 after a summoning startup of
+// its own (#0001's Unlimited Void cast poses, borrowed as attack3_summon),
+// appearing through a cloud (the blue orb's frame); the technique is
+// #0001's Unlimited Void (its clips borrowed under attack4's own names),
+// and in Case G attack5 is #0001's Hollow Purple with its projectile.
 import { getCharacter } from '../../../js/data/characters.js';
 import { NUMBERED_ATTACKS } from '../../../js/config.js';
 
@@ -30,16 +34,16 @@ const BASE = getCharacter('0001');
 const A = BASE.animations;
 
 const UNIVERSAL = [
-  'idle', 'run', 'jump', 'fall', 'mouvment', 'land', 'hurt', 'midair_hurt',
-  'prepshield', 'shielding', 'releaseshield', 'midair_shielding',
+  'idle', 'run', 'jump', 'fall', 'mouvment', 'land', 'hurt', 'midair_hurt', 'shielding', 'midair_shielding',
 ];
 
 // A fighter with `count` numbered attacks (2 to 5, or more to break the
-// rules), attack3 a summon and attack4 a technique when `specials`, and
-// #0001's Throw as its extra_attack when `extra`. `id` names it.
-export function loadoutFighter({ id, count, specials = false, extra = false }) {
+// rules), attack3 a summon and attack4 a technique when `specials`, the
+// buttons in `casts` #0001's own technique on that button, and #0001's
+// High Kick as its extra_attack when `extra`. `id` names it.
+export function loadoutFighter({ id, count, specials = false, casts = [], extra = false }) {
   const numbered = Array.from({ length: count }, (_, i) => `attack${i + 1}`);
-  const special = specials ? numbered.filter((a) => a === 'attack3' || a === 'attack4') : [];
+  const special = specials ? numbered.filter((a) => a === 'attack3' || a === 'attack4') : [...casts];
   const animations = Object.fromEntries(UNIVERSAL.map((key) => [key, A[key]]));
   const attacks = {};
   const actions = {};
@@ -49,7 +53,7 @@ export function loadoutFighter({ id, count, specials = false, extra = false }) {
     animations[button] = A.attack1;
     animations[air] = A.midair_attack1;
     attacks[button] = { ...BASE.attacks.attack1, animation: button, damage: n };
-    attacks[air] = { ...BASE.attacks.midair_attack1, animation: air, damage: n };
+    attacks[air] = { ...BASE.attacks.midair_attack1, animation: air, damage: n, motion: undefined, airUses: 0 };
     actions[button] = { ground: button, air };
   }
   const def = {
@@ -71,24 +75,27 @@ export function loadoutFighter({ id, count, specials = false, extra = false }) {
   };
   if (special.includes('attack3')) {
     actions.attack3 = { type: 'summon', id: 'attack3' };
-    def.summons.attack3 = { ...BASE.summons.attack3 };
-    animations.attack3_summon = A.attack3_summon;
-    def.effectAnimations.attack3_object = BASE.effectAnimations.attack3_object;
+    def.summons.attack3 = {
+      attack: 'attack1', cloud: 'attack3_object', startupAnimation: 'attack3_summon', cooldown: 5,
+      behindDistance: 48, effectOffset: { x: 0, y: -52 }, noGround: { attack: 'midair_attack1', offset: { x: 0, y: -40 } },
+    };
+    animations.attack3_summon = { ...A.attack4_cast, fps: 10 };
+    def.effectAnimations.attack3_object = { ...BASE.projectileAnimations.attack3_object, fps: 2, loop: false };
   }
-  if (special.includes('attack4')) {
-    actions.attack4 = { type: 'technique', id: 'attack4' };
-    def.techniques.attack4 = BASE.techniques.attack4;
-    for (const key of Object.keys(BASE.animations).filter((k) => k.startsWith('attack4_'))) animations[key] = A[key];
-    for (const key of Object.keys(BASE.effectAnimations).filter((k) => k.startsWith('attack4_object'))) {
-      def.effectAnimations[key] = BASE.effectAnimations[key];
+  for (const button of special.filter((b) => b === 'attack4' || b === 'attack5')) {
+    actions[button] = { type: 'technique', id: button };
+    def.techniques[button] = BASE.techniques[button];
+    for (const key of Object.keys(BASE.animations).filter((k) => k.startsWith(`${button}_`))) animations[key] = A[key];
+    const shot = BASE.techniques[button].projectile;
+    if (shot) {
+      def.projectiles[shot.id] = BASE.projectiles[shot.id];
+      def.projectileAnimations[shot.id] = BASE.projectileAnimations[shot.id];
     }
   }
   if (extra) {
     actions.extra_attack = 'extra_attack';
     animations.extra_attack = A.extra_attack;
     attacks.extra_attack = BASE.attacks.extra_attack;
-    def.projectiles.extra_attack_object = BASE.projectiles.extra_attack_object;
-    def.projectileAnimations.extra_attack_object = BASE.projectileAnimations.extra_attack_object;
   }
   return def;
 }
@@ -113,7 +120,14 @@ export const LOADOUT_CASES = Object.freeze([
     name: 'F', count: 5, specials: true, buttons: [...NUMBERED_ATTACKS],
     types: { ...ordinary(['attack1', 'attack2']), attack3: 'summon', attack4: 'technique', attack5: 'attack' },
   },
-].map((c) => Object.freeze({ ...c, def: loadoutFighter({ id: `loadout-${c.name}`, count: c.count, specials: c.specials }) })));
+  {
+    name: 'G', count: 5, specials: false, casts: ['attack4', 'attack5'], buttons: [...NUMBERED_ATTACKS],
+    types: { ...ordinary(['attack1', 'attack2', 'attack3']), attack4: 'technique', attack5: 'technique' },
+  },
+].map((c) => Object.freeze({
+  ...c, def: loadoutFighter({ id: `loadout-${c.name}`, count: c.count, specials: c.specials, casts: c.casts }),
+})));
 
-// Case C with an extra_attack as well: five numbered attacks and the Throw.
+// Case C with an extra_attack as well: five numbered attacks and the High
+// Kick.
 export const WITH_EXTRA = loadoutFighter({ id: 'loadout-extra', count: 5, extra: true });

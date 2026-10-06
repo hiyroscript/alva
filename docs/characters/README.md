@@ -10,7 +10,7 @@ pages are part of the product specification
 
 | Fighter | Slot | Playable | Numbered attacks | Specification |
 | --- | --- | --- | --- | --- |
-| #0001 | 01 | yes | 4: Punch, Kick, Clone Attack (summon), Sphere Rush (technique); extra attack: the Throw | [0001.md](0001.md) |
+| #0001 | 01 | yes | 5: Jab / Floating Straight, Red / Red Kick, Maximum Blue / Blue, Unlimited Void (technique), Hollow Purple (technique); extra attack: the High Kick | [0001.md](0001.md) |
 | #0002 | 02 | yes | 3: One-Two / Homing Attack, Rapid Kicks / Bounce Attack, Spin Attack / Blue Tornado; extra attack: the Whirlwind | [0002.md](0002.md) |
 
 The other 46 of the 48 roster slots are locked placeholders. #0001 is

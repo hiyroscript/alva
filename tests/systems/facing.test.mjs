@@ -138,23 +138,24 @@ test('a direction held mid-attack turns it at once: attack1 started facing away 
   }
 });
 
-test('the Sphere Rush goes the way held as Attack 4 is pressed, from standing still, and holds that facing', () => {
-  const { fighter, step } = makeFighter({ x: 1000, facing: 1 });
-  for (let i = 0; i < 5; i++) step({});
+test('Hollow Purple goes the way held as Attack 5 is pressed, from standing still, and holds that facing', () => {
+  const d = duel({ x: 1000, gap: 400 });
+  const fighter = d.attacker;
+  for (let i = 0; i < 5; i++) d.tick({});
   assert.equal(fighter.state, 'idle');
-  step({ runLeft: true, attack4: true, attack4Pressed: true });
-  assert.ok(fighter.technique, 'the Sphere Rush started');
+  d.tick({ runLeft: true, attack5: true, attack5Pressed: true });
+  assert.ok(fighter.technique, 'Hollow Purple started');
   assert.equal(fighter.facing, -1, 'turned on the press');
   assert.equal(fighter.technique.facing, -1);
   assert.equal(fighter.body.vx, 0, 'no walking');
-  const x = fighter.body.x;
-  while (fighter.technique && fighter.technique.phase !== 'dash') step();
-  for (let i = 0; i < 3 && fighter.technique; i++) step({ runRight: true });
-  assert.ok(fighter.body.x < x, 'rushes left');
+  // Right held all through the chant: it still releases left.
+  while (fighter.technique && !d.projectiles.length) d.tick({ runRight: true });
+  assert.equal(d.projectiles.length, 1);
+  assert.equal(d.projectiles[0].direction, -1, 'the sphere leaves leftward');
   assert.equal(fighter.facing, -1, 'a technique holds its facing');
 });
 
-test('a stun, a Dash or a bind still holds the facing whatever is held', () => {
+test('a stun, a Dash or a paralysis still holds the facing whatever is held', () => {
   const stunned = makeFighter({ facing: 1 });
   stunned.fighter.combat.stun = 0.3;
   for (let i = 0; i < 10; i++) stunned.step({ runLeft: true });
@@ -165,18 +166,18 @@ test('a stun, a Dash or a bind still holds the facing whatever is held', () => {
   dashing.step({ runLeft: true });
   assert.ok(dashing.fighter.dash, 'still dashing');
   assert.equal(dashing.fighter.facing, 1, 'dashing');
-  const bound = makeFighter({ facing: 1 });
-  bound.fighter.combat.bind('a technique');
-  assert.ok(bound.fighter.combat.immobilized);
-  for (let i = 0; i < 5; i++) bound.step({ runLeft: true });
-  assert.equal(bound.fighter.facing, 1, 'bound');
+  const held = makeFighter({ facing: 1 });
+  held.fighter.combat.paralyze(1);
+  assert.ok(held.fighter.combat.immobilized);
+  for (let i = 0; i < 5; i++) held.step({ runLeft: true });
+  assert.equal(held.fighter.facing, 1, 'paralyzed');
 });
 
-test('a shuriken flies the way the thrower faces, with no aim toward an opponent behind it', () => {
+test('Red flies the way its thrower faces, with no aim toward an opponent behind it', () => {
   const d = duel({ gap: -200 });
   const { attacker } = d;
   assert.equal(attacker.facing, 1);
-  d.tick(THROW);
+  d.tick(ATTACK2);
   d.until(() => d.projectiles.length > 0, 60);
   const [p] = d.projectiles;
   assert.equal(p.direction, 1);
@@ -321,28 +322,26 @@ test('CPU motion attacks turn only artwork: roll, homing, bounce and lift match 
   }
 });
 
-test('CPU summon startup and Sphere Rush visually track, while the rush keeps its committed direction', () => {
-  for (const action of ['attack3', 'attack4']) {
+test('CPU techniques visually track while casting, and keep their committed direction', () => {
+  for (const action of ['attack4', 'attack5']) {
     const { fighter: f, foe, step } = aimedFighter();
     step({ [action]: true, [`${action}Pressed`]: true });
     assert.equal(f.facing, 1);
-    assert.ok(f.pendingSummon || f.technique);
+    assert.ok(f.technique);
     for (let i = 0; i < 8; i++) {
       place(foe, f.x - 300);
       step();
       assert.equal(f.attackVisualFacing, -1);
-      if (f.technique) {
-        assert.equal(f.technique.facing, 1);
-        assert.ok(f.body.vx >= 0);
-      }
+      assert.equal(f.technique.facing, 1);
+      assert.equal(f.body.vx, 0);
     }
   }
 });
 
 test('CPU throw aims before release but never redirects a spawned projectile', () => {
-  for (const character of [def, getCharacter('0002')]) {
+  for (const [character, press] of [[def, ATTACK2], [getCharacter('0002'), THROW]]) {
     const { fighter: f, foe, step } = aimedFighter(character);
-    step(THROW);
+    step(press);
     place(foe, f.x - 300);
     const shots = [];
     for (let n = 0; !shots.length && n < 100; n++) {

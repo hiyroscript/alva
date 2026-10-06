@@ -103,11 +103,12 @@ test('it and #0001 hit each other through the same combat, each with its own mov
   assert.deepEqual([mine.events[0].type, mine.events[0].move], ['hit', 'extra_attack']);
   assert.equal(mine.target.combat.launchPoint, SAMPLE_FIGHTER.attacks.extra_attack.damage);
 
+  // #0001's Red: its projectile's hit, credited to #0001.
   const theirs = duel({ targetCharacter: SAMPLE_FIGHTER, targetSprites: SPRITES });
   theirs.tick(P('attack2'));
   theirs.until(() => theirs.events.length > 0);
-  assert.deepEqual([theirs.events[0].type, theirs.events[0].move], ['hit', 'attack2']);
-  assert.equal(theirs.target.combat.launchPoint, def.attacks.attack2.damage);
+  assert.deepEqual([theirs.events[0].type, theirs.events[0].move, theirs.events[0].attacker], ['hit', 'attack2_object', theirs.attacker]);
+  assert.equal(theirs.target.combat.launchPoint, def.projectiles.attack2_object.damage);
 });
 
 test('the CPU reads its moveset from its own data', () => {

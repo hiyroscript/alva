@@ -695,9 +695,10 @@ test('a piercing projectile needs 2 or more hits and an interval; a finisher nee
 test('no motion attack starts while it is still flying from a launch: it recovers first', () => {
   const d = versus({ gap: 40 });
   const { attacker: me } = d;
-  // The target's attack2 launches #0002 upward, hard (from 80 Launch Point).
+  // The target's High Kick launches #0002 upward, hard (from 80 Launch
+  // Point).
   me.combat.launchPoint = 80;
-  d.tick({}, P('attack2'));
+  d.tick({}, P('extra_attack'));
   d.until(() => me.launch && me.combat.stun <= 0 && !me.grounded, 200);
   d.tick(P('attack1'));
   assert.equal(me.combat.attack, null, 'no Homing Attack out of the launch');
@@ -776,8 +777,7 @@ test('the CPU sends its Whirlwind at an opponent turtling behind its Shield at m
 test('CPU fights with #0002 run: against #0001 and itself, every move used, no summon or technique cooldown of its own', () => {
   const used = new Set();
   // A seeded sample of real fights (seed 3: one that sees the mid-air
-  // moves; which ones come up depends on how #0001 plays, its Clone
-  // Attack's summoning startup included).
+  // moves; which ones come up depends on how #0001 plays).
   for (const [a, b] of [[DEF, DEF_0001], [DEF_0001, DEF], [DEF, DEF]]) {
     const { log } = cpuFight(a, b, { seconds: 40, seed: 3, difficulty: 'brutal' });
     for (const [f, steps] of log) {

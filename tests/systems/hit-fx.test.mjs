@@ -37,7 +37,7 @@ test('a hit shakes the screen by its strength, flashes its target white for one 
   fx.update(1 / 60);
   assert.equal(fx.flashing(light.e.target), false);
   // A harder hit shakes harder.
-  const heavy = hitWith({ lp: 80, press: P('attack2') });
+  const heavy = hitWith({ lp: 80, press: P('extra_attack') });
   const fx2 = new HitEffects();
   fx2.take([heavy.e], ARENA(new StageCollision(stageMap())));
   assert.ok(fx2.shake.amp > lightShake);
@@ -115,7 +115,7 @@ test('a lethal launch slows the clock and closes the view in on its fighter, the
 });
 
 test('a fighter tumbling fast leaves a fading trail of its own poses; slower, the trail fades out', () => {
-  const { d } = hitWith({ lp: 90, press: P('attack2') });
+  const { d } = hitWith({ lp: 90, press: P('extra_attack') });
   const f = d.target;
   assert.equal(f.tumbling, true);
   f.renderX = f.body.x;

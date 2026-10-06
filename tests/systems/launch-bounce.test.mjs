@@ -15,6 +15,7 @@ import { LAUNCH_UNIT_SPEED } from '../../js/data/launch.js';
 import { getMap } from '../../js/data/maps.js';
 import { CONFIG } from '../../js/config.js';
 import { def, DT, makeFighter, duel, stageMap, fakeSprites, frameName, startupSteps } from '../helpers/fighter-harness.mjs';
+import { LOADOUT_CASES } from '../fighters/fixtures/loadout-fighters.mjs';
 
 const G = CONFIG.sim.gravity;
 const B = LAUNCH_BOUNCE;
@@ -117,7 +118,7 @@ test('physics stays generic: it stops the body and reports what it stopped, and 
   stepBody(land, DT, stage, G);
   assert.equal(land.impactVy, 0);
   // A ceiling reports the rise it stopped.
-  const up = createBody({ x: 350, y: 600 + HEIGHT + 5, width: 34, height: 80 });
+  const up = createBody({ x: 350, y: 600 + 80 + 5, width: 34, height: 80 });
   up.vy = -900;
   stepBody(up, DT, stage, G);
   assert.equal(up.bonked, true);
@@ -642,28 +643,33 @@ test('no wall loop: punching a battered opponent into a wall over and over ends 
 
 // ---- Every source of launch -------------------------------------------------------
 
-test('projectiles: the shuriken never launches, so it never makes anyone rebound', () => {
+test('projectiles launch through the same system: Red drives a battered target into a wall and it rebounds', () => {
   const x = 500;
   const stage = stageWith({ solids: [wallAt('wall', x + 200 + HALF + 10)] });
   const d = duel({ gap: 200, stage, x });
-  d.target.combat.launchPoint = 400;
-  d.tick(P('extra_attack'));
+  d.target.combat.launchPoint = 60;
+  d.tick(P('attack2'));
   const b = tickForBounce(d, 90);
-  assert.equal(d.events[0].move, 'extra_attack_object');
-  assert.equal(b, null);
-  assert.equal(d.target.launch, null);
+  assert.equal(d.events[0].move, 'attack2_object');
+  assert.ok(d.events[0].projectile, 'the orb hit');
+  assert.ok(b, 'rebounded');
+  assert.equal(b.normalX, -1, 'off the wall\'s near face');
+  assert.ok(d.target.body.vx < 0, 'back toward the thrower');
 });
 
-test('a clone\'s punch launches through the same system: a battered target rebounds off a wall', () => {
-  // The target faces the owner; the clone appears behind it and punches it
-  // forward, into a wall between the two.
+test('a clone\'s strike launches through the same system: a battered target rebounds off a wall', () => {
+  // A fighter whose Attack 3 summons a clone (the loadout matrix's Case D,
+  // see tests/fighters/fixtures/loadout-fighters.mjs). The target faces the
+  // owner; the clone appears behind it and strikes it forward, into a wall
+  // between the two.
+  const summoner = LOADOUT_CASES.find((c) => c.name === 'D').def;
   const x = 300;
   const stage = stageWith({ solids: [wallAt('wall', 600, 40)] });
-  const d = duel({ gap: 420, stage, x });
+  const d = duel({ gap: 420, stage, x, attackerCharacter: summoner });
   d.target.combat.launchPoint = 100;
   d.tick(P('attack3'));
-  // #0001's summoning startup, then the clone.
-  for (let i = 0; i < startupSteps(def, 'attack3'); i++) d.tick();
+  // The summoning startup, then the clone.
+  for (let i = 0; i < startupSteps(summoner, 'attack3'); i++) d.tick();
   assert.equal(d.clones.length, 1, 'a clone');
   const b = tickForBounce(d, 120, {});
   assert.ok(d.events.some((e) => e.summon && e.type === 'hit'), 'the clone hit');
@@ -672,22 +678,21 @@ test('a clone\'s punch launches through the same system: a battered target rebou
   assert.ok(d.target.body.vx > 0, 'back toward the clone');
 });
 
-test('the Sphere Rush explosion launches through the same system: into a nearby wall, it rebounds', () => {
+test('a technique\'s projectile launches through the same system: Hollow Purple into a nearby wall, it rebounds', () => {
   const x = 500;
   const stage = stageWith({ solids: [wallAt('wall', 800)] });
   const d = duel({ gap: 140, stage, x, pushboxes: true });
   d.target.combat.launchPoint = 60;
-  d.tick(P('attack4'));
-  const t = d.attacker.technique;
-  assert.ok(t, 'the Sphere Rush started');
+  d.tick(P('attack5'));
+  assert.equal(d.attacker.technique?.action, 'attack5', 'Hollow Purple started');
   let b = null;
   for (let i = 0; i < 400 && !b; i++) {
     d.tick();
     b = d.target.bounce;
   }
-  const blast = d.events.find((e) => e.move === 'explosionHit' || e.launchSpeed > 0);
-  assert.ok(blast, 'the explosion launched it');
-  assert.ok(blast.finalLaunch.x > 2000, 'sideways, along the rush');
+  const blast = d.events.find((e) => e.move === 'attack5_object');
+  assert.ok(blast?.launchSpeed > 0, 'the sphere launched it');
+  assert.ok(blast.finalLaunch.x > 2000, 'sideways, the way it flies');
   assert.ok(b, 'rebounded');
   assert.equal(b.normalX, -1);
   assert.ok(d.target.body.vx < -1000, 'hard back across the stage');

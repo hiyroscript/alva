@@ -131,8 +131,7 @@ export class Fighter {
   }
 
   reset(stage) {
-    // A technique in progress ends first, releasing any opponent it holds:
-    // nothing of it survives a rematch.
+    // A technique in progress ends first: nothing of it survives a rematch.
     if (this.technique) this.endTechnique('reset');
     const { def, spawn } = this;
     const half = def.collider.width / 2;
@@ -247,7 +246,7 @@ export class Fighter {
   // a clean, neutral state, exactly a reset. Launch Point is back to 0,
   // Energy full and not exhausted, and every cooldown (the summon's and the
   // technique's included) ready; everything transient goes with the old
-  // body: velocity, attack, Shield, Dash, stun, freeze, binds, its
+  // body: velocity, attack, Shield, Dash, stun, freeze, paralysis, its
   // technique, a summon's startup and any queued projectile or summon. It
   // is in play again at once.
   respawn(stage) {
@@ -285,11 +284,11 @@ export class Fighter {
     combat.update(dt);
     // Hitstun always wins over a technique and a summon's startup
     // (CombatSystem.applyHit normally ends them on the hit itself), and over
-    // a Dash, as does a bind.
+    // a Dash, as does a paralysis.
     if (this.technique && combat.stun > 0) this.endTechnique('hit');
     if (this.pendingSummon && (combat.stun > 0 || combat.immobilized)) this.cancelSummon();
     if (this.dash && (combat.stun > 0 || combat.immobilized)) this.endDash();
-    // A hit (or a bind) takes the fighter out of its own attack: nothing of
+    // A hit (or a paralysis) takes the fighter out of its own attack: nothing of
     // it is left to strike, release a projectile or recover from. Checked
     // here, on the fighter's next step, so two attacks that connect on the
     // same step still trade.
@@ -354,7 +353,7 @@ export class Fighter {
 
     // ---- Combat intents --------------------------------------------------
     // Each press is its button's own move (see tryAction): an attack, or a
-    // summon or technique (#0001's Attack 3 and Attack 4). Actions mapped to
+    // summon or technique (e.g. #0001's Attack 4 and Attack 5). Actions mapped to
     // null are wired but reserved, and a button the character has no action
     // for does nothing.
     //
@@ -419,8 +418,8 @@ export class Fighter {
 
     // ---- Technique ---------------------------------------------------------
     // While one runs it owns the fighter: its phases advance on their own
-    // clock (the release after a whiff or a finished explosion ends it here),
-    // whatever is held.
+    // clock (it releases as its cast ends, and is over after its release
+    // pose), whatever is held.
     if (this.technique) {
       const ended = this.technique.update(dt);
       if (ended) this.endTechnique(ended);
@@ -432,7 +431,7 @@ export class Fighter {
     const canAct = this.canAct();
     // The Shield is up while `shield` is held and the fighter is free to act
     // (it never cuts an attack, Dash, technique, summon's startup, stun or
-    // bind short).
+    // paralysis short).
     // A blocked hit's blockstun holds it up until the stun is over, held or
     // not. Either way only while shieldAllowed: the block that empties the
     // bar (or having no art for where the fighter is) drops it.
@@ -464,7 +463,7 @@ export class Fighter {
     // See moveHorizontal, and moveAttack while an attack plays (moveMotion
     // while an attack's own motion owns the body, and then the share of
     // gravity it falls under this step). A summon's startup holds the
-    // fighter still where it stands, as a technique's form does.
+    // fighter still where it stands, as a technique does.
     const atk = combat.attack;
     let gravityShare = 1;
     let dir = held;
@@ -472,9 +471,7 @@ export class Fighter {
     // Normal locomotion only: an attack steers with its own share of it.
     this.moveDir = atk?.def.lockMovement ? 0 : dir;
 
-    if (this.technique) {
-      body.vx = this.technique.velocityX;
-    } else if (this.pendingSummon) {
+    if (this.technique || this.pendingSummon) {
       body.vx = 0;
     } else if (combat.immobilized) {
       body.vx = 0;
@@ -561,7 +558,7 @@ export class Fighter {
     // toward movement.fastFallSpeed at
     // fastFallAcceleration: never while rising, never a jump in speed, and
     // never slower than the fall already is. Aerial attacks may fast-fall;
-    // a stun, a bind or an air Shield may not.
+    // a stun, a paralysis or an air Shield may not.
     if (
       !body.grounded && input.down && body.vy > 0 && mv.fastFallSpeed > 0 &&
       combat.stun <= 0 && !combat.immobilized && !combat.shielding && !this.technique && !this.inMotion
@@ -620,7 +617,7 @@ export class Fighter {
     }
     // A launch sequence ends once the fighter is back in ordinary play: on
     // the ground with its stun over, acting again once free (as a tumble
-    // ends) or held by a bind. Until then a stunned fighter sliding on from
+    // ends) or held by a paralysis. Until then a stunned fighter sliding on from
     // a landing may still rebound off a wall, and a hit that launches it
     // again carries the sequence's rebounds on (see startLaunch): past
     // maxBounces it stops at surfaces like anyone until it has recovered.
@@ -628,18 +625,12 @@ export class Fighter {
       this.launch = null;
     }
 
-    // ---- Technique: ground and walls --------------------------------------
+    // ---- Technique: ground ---------------------------------------------------
     // It needs real ground under the fighter from its first frame to its
     // last: ground lost (a ledge, the main floor's edge, a vanished
-    // platform) ends it at once and the fighter falls from where it is. A
-    // wall (a solid's side; the stage has no side walls) stops the rush as
-    // a whiff: the fighter stays against it and releases, this step counting
-    // as the release's first (see Technique.whiff).
-    const technique = this.technique;
-    if (technique) {
-      if (!body.grounded) this.endTechnique('ground');
-      else if (technique.phase === 'dash' && body.wall === technique.facing) technique.whiff('wall', dt);
-    }
+    // platform, a pull lifting it) ends it at once and the fighter falls
+    // from where it is.
+    if (this.technique && !body.grounded) this.endTechnique('ground');
 
     // ---- Summon startup: ground --------------------------------------------
     // A summon is ground-only to its very cue: ground lost during its
@@ -744,7 +735,7 @@ export class Fighter {
   }
 
   // Free to start something new: the combat state allows it (no attack,
-  // stun, blockstun or bind), no technique or summon's startup owns the
+  // stun, blockstun or paralysis), no technique or summon's startup owns the
   // fighter and it is not dashing. Its Launch Point, however high, and the
   // Energy it has left never matter.
   canAct() {
@@ -808,7 +799,7 @@ export class Fighter {
   // Starts one Dash toward `direction` (1 right, -1 left): a short grounded
   // burst at movement.dashSpeed for one pass of the dash clip. Movement
   // only: no hitbox, damage, launch or invulnerability. Only while free
-  // to act (no attack, stun, bind, technique or Dash already running) or
+  // to act (no attack, stun, paralysis, technique or Dash already running) or
   // in an attack that hit and may be cut short (see
   // CombatState.cancellable: a Dash chases what it sent flying), grounded,
   // not shielding or holding `shield` for a Shield it may raise, and not
@@ -848,8 +839,9 @@ export class Fighter {
   }
 
   // Starts `action`'s summon or technique (`special`, its { type, id } in
-  // `actions`; see js/data/loadout.js): #0001's attack3, the Clone Attack
-  // (see trySummon), or its attack4, the Sphere Rush (see tryTechnique).
+  // `actions`; see js/data/loadout.js): a summon (see trySummon), or a
+  // technique such as #0001's Unlimited Void or Hollow Purple (see
+  // tryTechnique).
   // Only on the ground, only while free to act (never cutting an attack
   // short) and never while its own cooldown runs: a press then does nothing
   // at all, no other attack instead and nothing kept for later. `dir` is
@@ -929,8 +921,8 @@ export class Fighter {
       console.warn(`[Alva] Technique "${id}" is unavailable: ${problem}; ignoring.`);
       return false;
     }
-    // Started: its cooldown runs from now, whether it hits, misses, meets a
-    // wall or is interrupted.
+    // Started: its cooldown runs from now, whether it lands, misses or is
+    // interrupted.
     this.combat.abilityCooldowns.start(id, def.cooldown);
     this.faceAttackTarget(dir);
     this.body.vx = 0;
@@ -938,12 +930,10 @@ export class Fighter {
     return true;
   }
 
-  // Ends the technique in progress, if any, for `reason`: 'miss' or 'wall'
-  // (once its release pose has shown), 'blocked', 'done', 'ground', 'hit',
-  // 'released', 'void', 'reset' or 'destroy'. The sphere is removed and any
-  // opponent it holds released; Launch Point already added stays, and no
-  // further tick or explosion follows. The rush never carries on as a
-  // slide.
+  // Ends the technique in progress, if any, for `reason`: 'done' (once its
+  // release pose has shown), 'ground', 'hit', 'void', 'reset' or 'destroy'.
+  // Whatever it has not released yet never is; what it has (a projectile
+  // in flight, a burst that landed) stays.
   endTechnique(reason) {
     const t = this.technique;
     if (!t) return;
@@ -1040,7 +1030,7 @@ export class Fighter {
 
   // One step of attack `atk`'s motion: the velocity it owns, set here. Returns
   // the share of gravity the body falls under this step: none while the
-  // motion holds it (a hang, a dash, a plunge or a lift), all of it
+  // motion holds it (a hang, a dash, a plunge, a lift or a hover), all of it
   // otherwise. `dir` is the direction held, for the air steering a plunge
   // or a lift allows (its attack's airControl).
   moveMotion(atk, dir, dt) {
@@ -1060,6 +1050,13 @@ export class Fighter {
       m.rolling = true;
       body.vx = m.dir * m.speed;
       return 1;
+    }
+    if (spec.type === 'hover') {
+      // Standing on the air for the whole attack: no fall, the drift
+      // steered as the attack allows (its air momentum and control).
+      this.moveAttack(atk, dir, dt);
+      body.vy = 0;
+      return 0;
     }
     if (phase === 'recovery') {
       // Over without contact: a dash keeps `exit` of its velocity, anything
@@ -1215,12 +1212,12 @@ export class Fighter {
   // steering in the air (`dir`). In an action of its own (an attack or the
   // Shield) the direction held (`held`) turns it at once, left to right or
   // right to left, as often as it likes: whatever the action does from then
-  // goes the new way (the hitbox, the attack's step-in, a shuriken not yet
+  // goes the new way (the hitbox, the attack's step-in, a projectile not yet
   // thrown). A Dash sets it as it starts (tryDash), and so does an attack or
   // a technique started with a direction held (tryAction); a spawn or
   // respawn takes the spawn's. Otherwise it keeps its last facing: it never
   // turns toward its opponent by itself, standing still included, so an
-  // opponent crossing behind it stays behind it. Locked while a stun, bind,
+  // opponent crossing behind it stays behind it. Locked while a stun, paralysis,
   // technique, summon's startup or Dash plays: none of those is the
   // fighter's to steer; nor is an attack with a motion of its own (a roll, a
   // homing dash, a plunge, a lift). Combat AI opts into attack targeting
@@ -1306,7 +1303,7 @@ export class Fighter {
 
   // Animation key for a visual state. An attack plays its own clip for its
   // whole length, even if the fighter lands or leaves the ground meanwhile.
-  // Hitstun, and being bound by a technique, show `hurt` on the ground and
+  // Hitstun, and being held by a paralysis (the `bound` state), show `hurt` on the ground and
   // `midair_hurt` in the air. A technique plays the clip of its current
   // phase, a summon's startup its summon's own startupAnimation, and a Dash
   // plays `mouvment`. The Shield shows its

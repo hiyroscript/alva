@@ -2,56 +2,73 @@
 // nothing any other fighter shares. Registered in js/data/characters.js;
 // see docs/characters/0001.md for what each move does in play.
 //
-// Four numbered attacks: attack1 (the Punch) and attack2 (the Kick), each
-// an ordinary attack with a mid-air version; attack3, the Clone Attack (a
-// summon, `summons.attack3`, run by js/game/combat/summon.js); and
-// attack4, the Sphere Rush (a technique, `techniques.attack4`, run by
-// js/game/combat/technique.js). Plus its extra_attack, the Throw (a
-// shuriken projectile), a held ground and mid-air Shield, and the Dash on
-// its mouvment clip.
+// The limitless sorcerer, cut from one supplied sprite sheet (see
+// assets/characters/0001/). A fighter of space: it pulls, pushes, erases
+// and cannot be touched. Five numbered attacks, each a button of its own,
+// plus its extra_attack:
 //
-// The playback rates below are #0001's own: each clip's phases are whole
-// frames at its rate, so they are kept here, beside the definition that
-// times its attacks on them.
+//   attack1  the Jab, and in the air a Floating Straight: it stands on the
+//            air while it strikes (motion `hover`)
+//   attack2  Red, a repelling orb that pushes its target away, shoves a
+//            Shield back and turns the other fighter's projectiles around
+//            (`repel`, `blockPush`); in the air the Red Kick, a lock-on
+//            flying kick that springs off what it meets
+//   attack3  Maximum Blue, an attracting orb that drags its target into
+//            itself and grinds it (`pull`, `pierce`); in the air Blue, a
+//            palm that yanks the opponent in to it (an attack `pull`)
+//   attack4  Unlimited Void, a technique: a sure hit round itself that no
+//            Shield stops and that paralyzes (`unblockable`, `paralyze`)
+//   attack5  Hollow Purple, a technique: a chanted cast that sends a vast
+//            sphere through everything (`unblockable`, `erase`)
+//   extra_attack  the High Kick, its launcher, floating in the air too
+//
+// Its Shield is Infinity: a hit it blocks stalls in it (`stall`), and in
+// the air it all but stops falling. Its Energy goes further than most.
 
 import { frames } from './helpers.js';
 
-// Playback rate of #0001's attack1 clips (attack1, midair_attack1). Their
-// phases below are whole frames at this rate, so tuning it keeps combat in
-// sync with the art.
-const ATTACK1_FPS = 12;
-// Same for attack2 (attack2, midair_attack2): its phases are whole frames
-// at this rate.
-const ATTACK2_FPS = 12;
-// Playback rate of the Shield clips: the raise and lower poses around the
-// grounded hold each show for one frame at this rate.
-const SHIELD_FPS = 12;
-// Playback rate of the mouvment clip (the Dash). A Dash lasts exactly one
-// pass of it (2 frames = 0.2 s at 10 fps), so tuning it keeps the burst on
-// the art.
-const MOUVMENT_FPS = 10;
-// Playback rate of the extra_attack clip (the Throw). Its phases and the
-// shuriken's release point below are whole frames at this rate.
-const EXTRA_ATTACK_FPS = 12;
-// Playback rate of the extra_attack_object spin (the thrown shuriken). Art
-// only: it never changes how fast the projectile travels.
-const EXTRA_ATTACK_OBJECT_FPS = 18;
-// Playback rate of attack3_summon, #0001's own pose as it summons the
-// Clone Attack. The clone is queued as one pass of it ends (4 frames = 0.4 s
-// at 10 fps), so tuning it keeps the clone on the art.
-const ATTACK3_SUMMON_FPS = 10;
-// Playback rate of attack3_object, the Clone Attack's cloud. The same rate
-// plays it forwards as the clone appears and backwards as it vanishes, so
-// both take one pass of the clip (10 frames = 0.5 s at 20 fps).
-const ATTACK3_OBJECT_FPS = 20;
-// Playback rate of #0001's attack4 poses (the Sphere Rush). The rush lasts
-// exactly one pass of attack4_dash at this rate, so tuning it keeps the
-// rush's contact window on the dash art.
-const ATTACK4_FPS = 12;
-// Playback rate of attack4_object, the Sphere Rush's blue sphere. The rush
-// waits for one full pass of attack4_object_build (6 frames = 0.5 s)
-// before it dashes.
-const ATTACK4_OBJECT_FPS = 12;
+// Height in art pixels of #0001's idle (its reference clip). Its art is 1x
+// (one file pixel per art pixel, cut from one sprite sheet with its flat
+// background made transparent), so no pixel grid is ever looked for in it
+// (`visual.pixelSize: 1`): each clip's heightRatio, its tallest frame over
+// this, is what sizes it, at exactly one art pixel per file pixel.
+const ART_0001 = 63;
+
+// Playback rates of #0001's clips. Each attack's phases below are whole
+// frames of its clip at its rate, a technique's phases are passes of its
+// clips, and a Dash lasts one pass of the mouvment clip, so tuning a rate
+// keeps the timing on the art.
+const FPS_0001 = Object.freeze({
+  idle: 6,
+  run: 12,
+  mouvment: 5,
+  jump: 10,
+  fall: 8,
+  land: 14,
+  hurt: 12,
+  shield: 12,
+  attack1: 15,
+  midair_attack1: 15,
+  attack2: 15,
+  midair_attack2: 20,
+  attack3: 12,
+  midair_attack3: 12,
+  attack4_cast: 10,
+  attack4_release: 2.5,
+  attack5_cast: 5,
+  attack5_release: 3,
+  extra_attack: 12,
+});
+
+// A clip of `count` frames of codename `codename` (from frame `start`),
+// sized by its tallest frame (`height`, art pixels) against the idle.
+const clip = (codename, count, fps, height, extra = {}, start = 1) => ({
+  frames: frames('0001', codename, count, start),
+  fps,
+  loop: false,
+  heightRatio: height / ART_0001,
+  ...extra,
+});
 
 export const CHARACTER_0001 = {
   id: '0001',
@@ -59,300 +76,148 @@ export const CHARACTER_0001 = {
   available: true,
   rosterSlot: 0,
 
-  // The source art faces right. A clip drawn the other way would override
-  // this with its own `sourceFacing`; it only decides whether the sprite
-  // is mirrored, never the fighter's facing or its boxes.
+  // Every clip is drawn facing right.
   sourceFacing: 1,
 
+  // Anchors: the idle, run, jump, fall, land, Shield, Dash and Red Kick
+  // poses use the automatic torso anchor. Where an arm thrust forward, a
+  // glow in the hand or a deep lunge would drag it off the body, a clip
+  // authors its own (`anchorX`, art pixels from the left of each frame's
+  // visible art): on the black shirt, which stays over the hips whatever
+  // the arms do; the High Kick on its planted foot.
   animations: {
-    idle: {
-      frames: frames('0001', 'idle', 4),
-      fps: 7,
-      loop: true,
-      // Only used if the pixel grid of a frame cannot be detected: the
-      // animation is then scaled so its tallest frame is this fraction of
-      // visual.height.
-      heightRatio: 1,
-    },
-    run: {
-      frames: frames('0001', 'run', 6),
-      fps: 11,
-      loop: true,
-      heightRatio: 0.9,
-      // Playback rate follows horizontal speed, clamped to this minimum.
-      minSpeedScale: 0.7,
-    },
-    // Airborne clips play once and hold their last frame for the rest of
-    // the ascent / descent.
-    jump: {
-      frames: frames('0001', 'jump', 2),
-      fps: 10,
-      loop: false,
-      heightRatio: 0.98,
-    },
-    fall: {
-      frames: frames('0001', 'fall', 2),
-      fps: 10,
-      loop: false,
-      heightRatio: 1,
-    },
-    // mouvment, the Dash: mouvment_1 leans into the burst, mouvment_2 is
-    // the low, stretched-out sprint. Played once per Dash, which lasts
-    // exactly one pass of it. Drawn at 1x (one file pixel per art pixel,
-    // unlike the upscaled rest of #0001), so its grid cannot be detected:
-    // heightRatio then sizes it by its tallest frame, mouvment_1's 41 px
-    // against idle's 52, which puts it at exactly one art pixel per file
-    // pixel, the same scale as every other pose.
-    mouvment: {
-      frames: frames('0001', 'mouvment', 2),
-      fps: MOUVMENT_FPS,
-      loop: false,
-      heightRatio: 41 / 52,
-    },
-    // Plays once on touchdown; the fighter holds the land state for exactly
-    // one pass of this clip (frames / fps).
-    land: {
-      frames: frames('0001', 'land', 2),
-      fps: 12,
-      loop: false,
-      heightRatio: 0.83,
-    },
-    // Hitstun poses: `hurt` while grounded, `midair_hurt` while airborne.
-    // Single frames, held for as long as the stun lasts.
-    hurt: {
-      frames: frames('0001', 'hurt', 1),
-      fps: 12,
-      loop: false,
-      heightRatio: 0.9,
-    },
-    midair_hurt: {
-      frames: frames('0001', 'midair_hurt', 1),
-      fps: 12,
-      loop: false,
-      heightRatio: 0.65,
-    },
-    // attack1 (the Punch) and midair_attack1 (the kunai slash). Each plays
-    // once; the attack definitions below time startup / active / recovery
-    // to these frames.
-    attack1: {
-      frames: frames('0001', 'attack1', 4),
-      fps: ATTACK1_FPS,
-      loop: false,
-      heightRatio: 1.04,
-    },
-    midair_attack1: {
-      frames: frames('0001', 'midair_attack1', 3),
-      fps: ATTACK1_FPS,
-      loop: false,
-      heightRatio: 1.29,
-    },
-    // attack2 (the Kick) and midair_attack2 (the airborne kick). Played
-    // once, like attack1.
-    attack2: {
-      frames: frames('0001', 'attack2', 7),
-      fps: ATTACK2_FPS,
-      loop: false,
-      heightRatio: 1.02,
-    },
-    midair_attack2: {
-      frames: frames('0001', 'midair_attack2', 5),
-      fps: ATTACK2_FPS,
-      loop: false,
-      heightRatio: 1.08,
-    },
-    // Shield, what #0001's `shield` button does (see `defense` below): four
-    // single frames, each drawn at 1x like the mouvment clip, so
-    // heightRatio sizes each by its own height against idle's 52 art pixels
-    // (one art pixel per file pixel, the scale of every other pose). On the
-    // ground, prepshield raises the guard for one frame, shielding is the
-    // held guard for as long as `shield` is held, and releaseshield lowers
-    // it for one frame after. In the air there is only the held guard,
-    // midair_shielding: no raise or lower pose. All face right like the
-    // rest of #0001.
-    prepshield: {
-      frames: frames('0001', 'prepshield', 1),
-      fps: SHIELD_FPS,
-      loop: false,
-      heightRatio: 51 / 52,
-    },
-    shielding: {
-      frames: frames('0001', 'shielding', 1),
-      fps: SHIELD_FPS,
-      loop: false,
-      heightRatio: 47 / 52,
-    },
-    releaseshield: {
-      frames: frames('0001', 'releaseshield', 1),
-      fps: SHIELD_FPS,
-      loop: false,
-      heightRatio: 45 / 52,
-    },
-    midair_shielding: {
-      frames: frames('0001', 'midair_shielding', 1),
-      fps: SHIELD_FPS,
-      loop: false,
-      heightRatio: 49 / 52,
-    },
-    // extra_attack, the Throw: extra_attack_1 raises the shuriken by the
-    // face, extra_attack_2 whips the arm across and lets go (the release
-    // frame), extra_attack_3 follows through. Faces right like the rest
-    // of #0001. Ground only: there is no mid-air Throw art.
-    extra_attack: {
-      frames: frames('0001', 'extra_attack', 3),
-      fps: EXTRA_ATTACK_FPS,
-      loop: false,
-      heightRatio: 0.9,
-    },
-    // attack3_summon, the Clone Attack's startup: #0001 summoning the
-    // clone. attack3_summon_1 squares up, attack3_summon_2 brings the
-    // fists in, attack3_summon_3 and attack3_summon_4 hold the hand seal.
-    // Played once (never looped) between the Attack 3 press and the
-    // clone's appearance; see summons.attack3.startupAnimation. Faces right
-    // like the rest of #0001. The clone's own smoke is attack3_object,
-    // below: a separate effect, played where the clone appears.
-    attack3_summon: {
-      frames: frames('0001', 'attack3_summon', 4),
-      fps: ATTACK3_SUMMON_FPS,
-      loop: false,
-      heightRatio: 1,
-    },
-    // attack4, the Sphere Rush: one set of twelve poses (attack4_1-12)
-    // split into logical clips, each played once by its own technique
-    // phase (see techniques.attack4). attack4_form (1-3): the rear
-    // palm opens for the sphere to form in. attack4_dash (4-6): the rush,
-    // sphere carried behind, swung forward on attack4_6. The rest only a
-    // hit shows: attack4_confirm (7-8), the palm driven into the opponent,
-    // attack4_8 held while the sphere on it grows; attack4_explosion (9),
-    // the pose of the blast itself; attack4_release (10-12), the recovery
-    // once the blast is over. attack4_whiff_release reuses attack4_12 (the
-    // same file, never a copy) alone, for one frame after a rush that
-    // caught nobody. Faces right like the rest of #0001.
-    attack4_form: {
-      frames: frames('0001', 'attack4', 3),
-      fps: ATTACK4_FPS,
-      loop: false,
-      heightRatio: 0.94,
-    },
-    attack4_dash: {
-      frames: frames('0001', 'attack4', 3, 4),
-      fps: ATTACK4_FPS,
-      loop: false,
-      heightRatio: 0.88,
-    },
-    attack4_confirm: {
-      frames: frames('0001', 'attack4', 2, 7),
-      fps: ATTACK4_FPS,
-      loop: false,
-      heightRatio: 0.79,
-    },
-    attack4_explosion: {
-      frames: frames('0001', 'attack4', 1, 9),
-      fps: ATTACK4_FPS,
-      loop: false,
-      heightRatio: 0.77,
-    },
-    attack4_release: {
-      frames: frames('0001', 'attack4', 3, 10),
-      fps: ATTACK4_FPS,
-      loop: false,
-      heightRatio: 1,
-    },
-    attack4_whiff_release: {
-      frames: frames('0001', 'attack4', 1, 12),
-      fps: ATTACK4_FPS,
-      loop: false,
-      heightRatio: 1,
-    },
+    // Standing easy, four frames.
+    idle: { ...clip('idle', 4, FPS_0001.idle, 63), loop: true },
+    // The walk: an eight-frame stride at full speed. Its rate follows the
+    // speed, down to 0.6 of it.
+    run: { ...clip('run', 8, FPS_0001.run, 61), loop: true, minSpeedScale: 0.6 },
+    // Takeoff (a knee up), then tucked on the rise; spread at the top, then
+    // straight down, hands on the head. Each holds its last frame.
+    jump: clip('jump', 2, FPS_0001.jump, 66),
+    fall: clip('fall', 2, FPS_0001.fall, 70),
+    // Touchdown: a crouch, then straightening up.
+    land: clip('land', 2, FPS_0001.land, 59),
+    // mouvment, the Dash: one long, low leap. Played once per Dash, which
+    // lasts exactly one pass of it (1 frame = 0.2 s at 5 fps).
+    mouvment: clip('mouvment', 1, FPS_0001.mouvment, 40),
+    // Hitstun: `hurt` flinches, then doubles over (held); `midair_hurt` is
+    // knocked back with the knees up.
+    hurt: clip('hurt', 2, FPS_0001.hurt, 60, { anchorX: [16.5, 16.5] }),
+    midair_hurt: clip('midair_hurt', 1, FPS_0001.hurt, 51),
+    // Infinity, its Shield: the arms crossed, standing on the ground,
+    // a knee up in the air.
+    shielding: clip('shielding', 1, FPS_0001.shield, 55),
+    midair_shielding: clip('midair_shielding', 1, FPS_0001.shield, 57),
+    // attack1, the Jab: 1 the stance, 2 the fist drawn back, 3 the punch
+    // with its trail, 4-5 the arm out, 6 back.
+    attack1: clip('attack1', 6, FPS_0001.attack1, 61, { anchorX: [14.5, 17.5, 16.5, 18, 17, 16.5] }),
+    // midair_attack1, the Floating Straight: 1 the stance, 2 drawn back,
+    // 3 the lunge with its trail, 4-5 the fist out.
+    midair_attack1: clip('midair_attack1', 5, FPS_0001.midair_attack1, 60, { anchorX: [12.5, 17.5, 24.5, 26, 26] }),
+    // attack2, Red: 1 the stance, 2-3 the hand raised to the face and the
+    // finger up, 4 both palms thrust out (the release), 5 the lunge after it.
+    attack2: clip('attack2', 5, FPS_0001.attack2, 61, { anchorX: [14, 12, 13.5, 16, 19.5] }),
+    // midair_attack2, the Red Kick: 1 tucked, 2 rolling, 3 laid out, 4 the
+    // flying kick (held while it flies).
+    midair_attack2: clip('midair_attack2', 4, FPS_0001.midair_attack2, 47),
+    // attack3, Maximum Blue: 1 the stance, 2 the hand raised, 3 Blue
+    // sparking in it, 4 stepping in, pointing, 5 the palm out as the orb
+    // leaves it.
+    attack3: clip('attack3', 5, FPS_0001.attack3, 62, { anchorX: [12, 12, 11.5, 18, 18] }),
+    // midair_attack3, Blue: 1 the stance, 2 the palm thrust with its trail,
+    // 3 pointing, 4 the open palm.
+    midair_attack3: clip('midair_attack3', 4, FPS_0001.midair_attack3, 62, { anchorX: [12, 12.5, 12.5, 12] }),
+    // attack4, Unlimited Void (a technique, see `techniques`): the cast is
+    // gathering itself (1-3, the fists, the arms crossed) and the hand
+    // sign rising (4-6); the release is one step forward, the sign held,
+    // as the domain closes round its target.
+    attack4_cast: clip('attack4', 6, FPS_0001.attack4_cast, 62, { anchorX: [12.5, 17.5, 12.5, 12, 12, 12] }),
+    attack4_release: clip('attack4', 1, FPS_0001.attack4_release, 55, { anchorX: [16.5] }, 7),
+    // attack5, Hollow Purple (a technique): the cast is the chant, five
+    // poses in a deep stance (the hands low, then sweeping up through the
+    // swirl, then raised); the release is both hands thrust forward as the
+    // sphere leaves them.
+    attack5_cast: clip('attack5', 5, FPS_0001.attack5_cast, 54, { anchorX: [21, 23, 19.5, 19.5, 19.5] }),
+    attack5_release: clip('attack5', 1, FPS_0001.attack5_release, 54, { anchorX: [19.5] }, 6),
+    // extra_attack, the High Kick: 1 the stance, 2 the leap in, 3 the leg
+    // rising, 4 the kick, 5 the knee drawn back.
+    extra_attack: clip('extra_attack', 5, FPS_0001.extra_attack, 58, { anchorX: [23.5, 28, 17.5, 17.5, 21.5] }),
   },
 
-  // Projectile art, kept apart from the fighter poses above: it is
-  // normalized at its own size around a centre anchor, never scaled to the
-  // fighter's height (see SpriteSet.build). Frames loop while it flies.
-  // `sourceFacing` is the way the art travels; it is mirrored when thrown
-  // the other way. Left out, the art is treated as direction-neutral.
+  // The orbs: one frame each, glowing. Round, so never mirrored.
   projectileAnimations: {
-    // extra_attack_object, the shuriken extra_attack throws: three
-    // rotations of it, spinning clockwise, rolling forward when thrown
-    // right, so it is mirrored when thrown left.
-    extra_attack_object: {
-      frames: frames('0001', 'extra_attack_object', 3),
-      fps: EXTRA_ATTACK_OBJECT_FPS,
-      loop: true,
-      sourceFacing: 1,
-    },
+    // attack2_object, Red: the red orb.
+    attack2_object: { frames: frames('0001', 'attack2_object', 1), fps: 1, loop: true, sourceFacing: 0 },
+    // attack3_object, Maximum Blue: the blue orb.
+    attack3_object: { frames: frames('0001', 'attack3_object', 1), fps: 1, loop: true, sourceFacing: 0 },
+    // attack5_object, Hollow Purple: the purple sphere.
+    attack5_object: { frames: frames('0001', 'attack5_object', 1), fps: 1, loop: true, sourceFacing: 0 },
   },
 
-  // Effect art: not a fighter pose and not a projectile, and always named
-  // after the attack that creates it (<attack>_object...). Normalized like
-  // projectile art (own size, centre anchor, the fighter's art-pixel
-  // scale, never fitted to the fighter's height) and drawn by whatever
-  // uses it. `sourceFacing: 0` marks direction-neutral art: never mirrored.
-  effectAnimations: {
-    // attack3_object, the smoke cloud attack3's clone appears from and
-    // vanishes into: played 1 -> 10 once as it appears, then the same
-    // frames 10 -> 1 as it vanishes (reversed at runtime, never duplicated
-    // on disk).
-    attack3_object: {
-      frames: frames('0001', 'attack3_object', 10),
-      fps: ATTACK3_OBJECT_FPS,
-      loop: false,
-      sourceFacing: 0,
-    },
-    // attack4_object, the Sphere Rush's blue sphere (attack4_object_1-11),
-    // split into three clips: attack4_object_build forms it in the hand
-    // (1-6, once), attack4_object_impact is the sphere spinning on the
-    // caught opponent (7 -> 8 -> 9, looped until it explodes, drawn ever
-    // larger by the technique's sphereGrowth) and
-    // attack4_object_explosion is the delayed blast (10-11, the lighter,
-    // brighter frames, once). A round effect: never mirrored.
-    attack4_object_build: {
-      frames: frames('0001', 'attack4_object', 6),
-      fps: ATTACK4_OBJECT_FPS,
-      loop: false,
-      sourceFacing: 0,
-    },
-    attack4_object_impact: {
-      frames: frames('0001', 'attack4_object', 3, 7),
-      fps: ATTACK4_OBJECT_FPS,
-      loop: true,
-      sourceFacing: 0,
-    },
-    attack4_object_explosion: {
-      frames: frames('0001', 'attack4_object', 2, 10),
-      fps: ATTACK4_OBJECT_FPS,
-      loop: false,
-      sourceFacing: 0,
-    },
-  },
-
-  // Projectile behaviour, keyed by id: `<attack>_object`, the attack that
-  // throws it. See js/game/combat/projectile.js for the schema
-  // (createProjectileDefinition). The hitbox is centred on the
-  // projectile and mirrors with its direction; the combat fields resolve
-  // exactly like an attack's (CombatSystem.applyHit). One hit at most.
   projectiles: {
-    extra_attack_object: {
-      animation: 'extra_attack_object',
-      speed: 700,
+    // Red: quick and short (600 units/s, about 300 units in its 0.5 s). It
+    // repels: a hit pushes its target away (2, Base Launch 1 sideways), a
+    // Shield that blocks it is shoved back (520 units/s), and the other
+    // fighter's projectiles it meets are turned around, now #0001's.
+    attack2_object: {
+      animation: 'attack2_object',
+      speed: 600,
+      lifetime: 0.5,
+      hitbox: { x: -16, y: -16, w: 32, h: 32 },
+      damage: 2,
+      baseLaunch: 1,
+      directionalLaunch: 'horizontal',
+      hitstun: 0.36,
+      blockstun: 0.16,
+      hitstop: 0.08,
+      blockPush: 520,
+      repel: true,
+    },
+    // Maximum Blue: slow (about 240 units in its 1.5 s). It attracts: an
+    // opponent within 120 units of it is dragged in at up to 360 units/s
+    // and held there, grinding: three strikes 0.25 s apart, 1 Launch Point
+    // each with no launch, the third the collapse, 2 and a Base Launch 1
+    // pop upward. 4 in all. A Shield is not pulled, and blocking a strike
+    // ends it.
+    attack3_object: {
+      animation: 'attack3_object',
+      speed: 160,
       lifetime: 1.5,
-      hitbox: { x: -5, y: -5, w: 10, h: 10 },
-      // Adds 1 to the target's Launch Point. Base Launch 0 and no
-      // direction: never a launching hit. It adds its damage and stun
-      // without pushing or launching the target, at any Launch Point.
+      hitbox: { x: -32, y: -32, w: 64, h: 64 },
       damage: 1,
       baseLaunch: 0,
       directionalLaunch: null,
-      hitstun: 0.16,
-      blockstun: 0.1,
-      hitstop: 0.04,
+      hitstun: 0.3,
+      blockstun: 0.12,
+      hitstop: 0.02,
+      pull: { radius: 120, speed: 360 },
+      pierce: { hits: 3, interval: 0.25 },
+      finisher: { damage: 2, baseLaunch: 1, directionalLaunch: 'vertical', hitstun: 0.4, hitstop: 0.06 },
+    },
+    // Hollow Purple: a vast sphere (116 units across where it strikes)
+    // crossing the stage at 640 units/s for 1.8 s. It erases: no Shield
+    // stops it, it erases the projectiles it meets and it flies on through
+    // whatever it strikes. Its one hit is the heaviest #0001 has: 12, Base
+    // Launch 3 sideways.
+    attack5_object: {
+      animation: 'attack5_object',
+      speed: 640,
+      lifetime: 1.8,
+      hitbox: { x: -58, y: -58, w: 116, h: 116 },
+      damage: 12,
+      baseLaunch: 3,
+      directionalLaunch: 'horizontal',
+      hitstun: 0.55,
+      blockstun: 0.3,
+      hitstop: 0.12,
+      unblockable: true,
+      erase: true,
     },
   },
 
   // A still idle frame for the airborne, landing and hurt clips if their
-  // frames fail to load. `frame` holds a single frame instead of
-  // looping, so the fighter never stretches or rotates to fake a pose.
-  // Attacks, the Shield and the Dash never fall back: one whose frames are
-  // missing is refused (see Fighter.tryAction, shieldAllowed and tryDash).
+  // frames fail to load. Attacks, the Shield and the Dash never fall back:
+  // one whose frames are missing is refused.
   animationFallbacks: {
     jump: { animation: 'idle', frame: 0 },
     fall: { animation: 'idle', frame: 0 },
@@ -362,481 +227,336 @@ export const CHARACTER_0001 = {
   },
 
   visual: {
-    // World-unit height of the tallest frame of the reference animation.
-    height: 88,
+    // Its 63-pixel idle at the roster's common art-pixel size, 88/52 world
+    // units per art pixel (so every fighter's pixels are the same size on
+    // screen): about 107 units, a tall fighter.
+    height: ART_0001 * (88 / 52),
     referenceAnimation: 'idle',
-    // Horizontal anchor: 'torso' uses the opaque-pixel centroid of the upper
-    // body so the character doesn't slide between frames/animations.
-    // 'center' uses the visible bounding box centre.
     anchor: 'torso',
-    // 'auto' detects upscaled pixel-art grids. A number forces a size.
-    pixelSize: 'auto',
-    // Roster portrait crop (fractions of the normalized idle frame).
-    portrait: { animation: 'idle', frame: 0, centerY: 0.24, size: 0.5 },
+    pixelSize: 1,
+    portrait: { animation: 'idle', frame: 0, centerY: 0.2, size: 0.42 },
   },
 
-  // Powers, each owned at one tier. The tier tables in js/data/powers.js
-  // turn these into gameplay values: Jump Power 2 is the normal jump and
-  // Speed Power 2 the normal top speed, the only sources of this fighter's
-  // jump strength and movement speed. (Launch is not a Power: Base Launch
-  // and Directional Launch belong to each hit below.)
+  // A normal jump and a normal top speed: its reach is in its techniques.
   powers: {
     jump: 2,
     speed: 2,
   },
 
-  // #0001's movement profile: its values for the shared movement rules
-  // (js/game/fighters/movement.js, which lists every field). The top speed
-  // is Speed Power's; a Dash never changes it, it owns the horizontal speed
-  // for its own length.
+  // #0001's movement profile (js/game/fighters/movement.js lists what each
+  // field does): quick to start and stop, a light air drag so a running
+  // jump carries, one air jump, a higher jump on a longer press, and a
+  // long, fast Dash (about 190 units in its 0.2 s).
   movement: {
-    // Ground: from rest to top speed in about 0.08 s; letting go stops a
-    // run in about 0.08 s (about 10 units of slide), so it can stop right
-    // beside an opponent; pressing the other way brakes at acceleration x
-    // turnBoost, then accelerates: a full turn in about 0.12 s.
     acceleration: 4200,
     deceleration: 4200,
     turnBoost: 2.6,
-    // Faster than top speed on the ground (the end of a Dash): the excess
-    // bleeds off at this rate, whatever is held.
     overspeedDeceleration: 6000,
-    // Air: steering bends the drift rather than replacing it. Top speed
-    // in about 0.12 s, a turn braking at airAcceleration x airTurnBoost
-    // (a full reversal in about 10 steps, softer than the ground's), and a
-    // light drag so a running jump carries its speed.
     airAcceleration: 3000,
     airDeceleration: 380,
     airTurnBoost: 2.0,
     gravityScale: 1,
     maxFallSpeed: 1500,
-    // Fast fall: Down held in the air while already descending speeds the
-    // fall up toward fastFallSpeed, reaching it in about 0.1 s.
     fastFallAcceleration: 12000,
     fastFallSpeed: 1400,
     coyoteTime: 0.1,
     jumpBuffer: 0.12,
-    // Higher jump: a tap is the normal jump (Jump Power 2's 169 units);
-    // Jump still held highJumpWindow after takeoff (a press a little
-    // longer than a tap) carries it on up to highJumpHeight x that
-    // (about 237 units), rising a little slower from then on.
     highJumpWindow: 0.15,
     highJumpHeight: 1.4,
-    // One more jump in the air before landing again, at airJumpRatio x
-    // the normal jump's speed; landing, or being hit, gives it back.
     airJumps: 1,
     airJumpRatio: 0.9,
-    // Combat input buffer: an extra_attack, attack1 or attack2 press the
-    // fighter cannot act on yet is kept this long and comes out on the
-    // first step it can.
     attackBuffer: 0.15,
-    // How a hit's push or launch runs down while this fighter is stunned
-    // (ground, air): its own, apart from the movement stats above.
     hitstunFriction: 1600,
     hitstunAirDrag: 210,
-    // Used only by the training CPU's platform drop; see Fighter.update.
     dropThroughTime: 0.28,
-    // Dash: two presses of the same direction (left or right), the second
-    // within dashTapWindow seconds of the first, start a grounded burst at
-    // dashSpeed (about 2.7x the top speed) for one pass of the dash clip:
-    // 0.2 s, about 180 units on open ground.
-    dashSpeed: 900,
+    dashSpeed: 950,
     dashTapWindow: 0.22,
   },
 
-  // Collision is independent from sprite/PNG dimensions.
-  collider: { width: 34, height: 80 },
+  // Its body, measured from its idle: the head and shirt, then the legs.
+  // Collision is independent of the art.
+  collider: { width: 32, height: 100 },
   pushbox: { width: 36 },
   hurtboxes: [
-    { x: -15, y: -80, w: 30, h: 34 }, // upper body
-    { x: -17, y: -46, w: 34, h: 46 }, // lower body
+    { x: -17, y: -104, w: 34, h: 52 }, // head and torso
+    { x: -19, y: -52, w: 38, h: 52 }, // legs
   ],
 
   // How #0001 responds to being launched (see resolveLaunchReaction in
-  // js/game/combat/combat.js). A harder launch stuns longer: 0.2 s more per 1000
-  // units/s, 0.7 s more at most, so a big hit is a clear moment to chase
-  // (and the air jump can extend a juggle at middling Launch Point, never
-  // past three hits). Launched at 1100 units/s or faster it tumbles
-  // (its mid-air hurt pose) until it acts or lands. Left / Right, Jump and
-  // Down held as a hit lands bend its launch by up to 15 degrees toward
-  // them (never its strength): a skill for surviving, and for slipping a
-  // follow-up.
+  // js/game/combat/combat.js): 0.2 s more stun per 1000 units/s, 0.7 s more
+  // at most, tumbling from 1100 units/s, and a held direction bends a
+  // launch by up to 18 degrees: it reads a launch a little better than
+  // most.
   launchReaction: {
     stunPerThousand: 0.2,
     maxStun: 0.7,
     tumbleSpeed: 1100,
-    steerAngle: 15,
+    steerAngle: 18,
   },
 
-  // Energy (see resolveEnergy in js/game/combat/combat-state.js): 100 at most, shown
-  // over the fighter's head as a bright purple bar while below full,
-  // spent only by Dash (dashCost, as it starts; dashCancelCost for one
-  // that cuts short an attack that hit: two from a full bar, and a third
-  // empties it) and Shield (shieldHitCost, for each hit it blocks;
-  // holding it is free). Either still works with
-  // less left than it costs, but then takes all of it. It refills by
-  // itself at `regen` per second, whatever the fighter is doing. Emptied,
-  // it turns gray: no Dash or Shield until it is full again. The Clone
-  // Attack and the Sphere Rush cost none of it.
+  // Energy (see resolveEnergy in js/game/combat/combat-state.js), spent by
+  // the Dash and the Shield: it goes further than most, refilling faster
+  // and paying less for each.
   energy: {
     max: 100,
-    regen: 12,
-    dashCost: 15,
-    dashCancelCost: 40,
-    shieldHitCost: 25,
+    regen: 14,
+    dashCost: 12,
+    dashCancelCost: 35,
+    shieldHitCost: 20,
   },
 
-  // What the shared `shield` input (L, RB / RT, the touch Shield button)
-  // does for this fighter. #0001 shields: held `shield` keeps a Shield up
-  // all round him, `groundAnimation` on the ground (raised by
-  // `groundStartAnimation`, lowered by `groundReleaseAnimation`) and
-  // `airAnimation` in the air, where he falls slowly. Every hit it
-  // blocks costs energy.shieldHitCost and deals nothing else: no Launch
-  // Point, no launch (see createDefenseDefinition in
-  // js/game/combat/defense.js and CombatSystem.applyHit in js/game/combat/combat.js).
+  // Infinity, what the `shield` input does for #0001: a Shield all round
+  // it, arms crossed on the ground, a knee up in the air. A melee blow it
+  // blocks stalls in it: the attacker freezes 0.25 s (its own hitstop if
+  // longer), time to punish. Up in the air it all but stops falling (90
+  // units/s at most). Its perfect Shield opens for 0.1 s after 0.25 s
+  // down.
   defense: {
     type: 'shield',
     groundAnimation: 'shielding',
-    groundStartAnimation: 'prepshield',
-    groundReleaseAnimation: 'releaseshield',
     airAnimation: 'midair_shielding',
-    // Slow fall: up in the air, the Shield brakes any faster fall to 200
-    // units/s (from the fast fall's 1400 in 0.2 s) and holds it there,
-    // about a seventh of the normal fall's top speed. Sideways he only
-    // drifts, as with any Shield.
-    slowFallSpeed: 200,
+    slowFallSpeed: 90,
     slowFallBrake: 6000,
-    // Perfect Shield: a hit within 0.1 s of raising it (after at least
-    // 0.25 s down) is blocked for free, with no blockstun: time it and
-    // punish the attacker's recovery.
     perfectWindow: 0.1,
     perfectRearm: 0.25,
+    stall: 0.25,
   },
 
-  // Control codenames -> move codenames (both universal, see js/config.js),
-  // following the loadout rules (js/data/loadout.js). An ordinary
-  // numbered attack's button is { ground, air }, picked by whether the
-  // fighter is grounded when it is pressed; a summon's or a technique's
-  // is { type, id }, keyed by the attack it is; the extra_attack's is one
-  // attack; null means the button is wired but reserved: no artwork, no
-  // attack. #0001 has four numbered attacks, each a button of its own:
-  // attack1 and attack2 ordinary attacks, attack3 the Clone Attack (a
-  // summon, see `summons`) and attack4 the Sphere Rush (a technique, see
-  // `techniques`). There is no attack5 button.
+  // Five numbered attacks, each a button of its own (see
+  // js/data/loadout.js): attack1 to attack3 ordinary attacks with their
+  // mid-air versions, attack4 and attack5 techniques (ground only, each
+  // with its own cooldown). Transform is reserved.
   actions: {
-    extra_attack: 'extra_attack', // the Throw: #0001's shuriken
-    transform: null, // reserved: no Transform move yet
-    attack1: { ground: 'attack1', air: 'midair_attack1' }, // the Punch / the kunai slash
-    attack2: { ground: 'attack2', air: 'midair_attack2' }, // the Kick / the airborne kick
-    attack3: { type: 'summon', id: 'attack3' }, // the Clone Attack
-    attack4: { type: 'technique', id: 'attack4' }, // the Sphere Rush
+    extra_attack: 'extra_attack', // the High Kick
+    transform: null, // reserved
+    attack1: { ground: 'attack1', air: 'midair_attack1' }, // the Jab / the Floating Straight
+    attack2: { ground: 'attack2', air: 'midair_attack2' }, // Red / the Red Kick
+    attack3: { ground: 'attack3', air: 'midair_attack3' }, // Maximum Blue / Blue
+    attack4: { type: 'technique', id: 'attack4' }, // Unlimited Void
+    attack5: { type: 'technique', id: 'attack5' }, // Hollow Purple
   },
 
-  // UI only: preview is the ground (or shared) artwork; previews.air
-  // supplies the distinct airborne move from actions. Frame indices start
-  // at zero. The resolver also accepts previews.ground. Jump, Shield and
-  // movement always use universal glyphs; Transform stays reserved.
+  // UI only: a frame of each move's own art, the orb itself for Red, Blue
+  // and Hollow Purple (zero-based frames).
   mobileAbilities: {
-    extra_attack: { label: 'Shuriken', preview: { animation: 'extra_attack', frame: 1 } },
-    attack1: { label: 'Punch', preview: { animation: 'attack1', frame: 1 }, previews: { air: { animation: 'midair_attack1', frame: 2 } } },
-    attack2: { label: 'Kick', preview: { animation: 'attack2', frame: 4 }, previews: { air: { animation: 'midair_attack2', frame: 1 } } },
-    attack3: { label: 'Clone Attack', preview: { animation: 'attack3_summon', frame: 2 } },
-    attack4: { label: 'Sphere Rush', preview: { animation: 'attack4_dash', frame: 1 } },
-  },
-
-  // #0001's in-game ability names, keyed by the universal move codenames
-  // (MOVES in js/config.js). Read through abilityName (js/data/abilities.js),
-  // which gives a move left out here its neutral name: midair_attack1 and
-  // midair_attack2 are still unnamed. Touch labels use these names for
-  // the selected airborne move; nothing here reaches combat.
-  abilityNames: {
-    extra_attack: 'Shuriken',
-    attack1: 'Punch',
-    attack2: 'Kick',
-    attack3: 'Clone Attack',
-    attack4: 'Sphere Rush',
-  },
-
-  // Summons, keyed by the attack they are: attack3's button (see
-  // `actions`) sends this one out, on the ground only. It costs no
-  // Energy: its own cooldown (`cooldown`) starts when it is accepted, hit
-  // or miss, and a press while it is still cooling down, or when it cannot
-  // happen at all (no opponent in play, missing art), does nothing: no
-  // other attack instead, and nothing kept for later. The cooldown shows
-  // under the fighter as A3. See js/game/combat/summon.js for the schema
-  // (createSummonDefinition). Accepted, #0001 first performs the summon
-  // himself: `startupAnimation` plays once while he stands committed to
-  // it, and the clone is queued as it ends (a hit, lost ground or a
-  // vanished target first: no clone). A clone is a temporary attack
-  // entity, not a fighter: it appears through the `cloud` effect, performs
-  // one of the owner's attacks once with that attack's own art and combat
-  // data, then vanishes through the same cloud played in reverse. Normally
-  // it appears behind the opponent and performs `attack`; with nothing to
-  // stand on there at the opponent's foot height, the optional `noGround`
-  // fallback places it and picks its attack instead.
-  summons: {
-    // attack3, the Clone Attack.
+    extra_attack: { label: 'High Kick', preview: { animation: 'extra_attack', frame: 3 } },
+    attack1: { label: 'Jab', preview: { animation: 'attack1', frame: 3 }, previews: { air: { animation: 'midair_attack1', frame: 3 } } },
+    attack2: {
+      label: 'Red',
+      preview: { collection: 'projectileAnimations', animation: 'attack2_object', frame: 0 },
+      previews: { air: { animation: 'midair_attack2', frame: 3 } },
+    },
     attack3: {
-      attack: 'attack1',
-      cloud: 'attack3_object',
-      // #0001's own summoning pose before the clone appears: one pass of
-      // attack3_summon (0.4 s), facing as he did when it was accepted.
-      startupAnimation: 'attack3_summon',
-      // Seconds before attack3 can be used again, from the moment the
-      // summon is accepted (as the startup begins), whichever way it
-      // appears, whether or not it hits, and even when the startup is cut
-      // short. Its hit is the attack's own: 3 as attack1, 5 as
-      // midair_attack2.
-      cooldown: 5,
-      // World units behind the opponent (on its back side) at the summon;
-      // attack1's punch reaches forward from there into the opponent.
-      behindDistance: 48,
-      // Cloud centre from the clone's origin (bottom-centre), facing right:
-      // half the fighter's visual height, so the smoke wraps the body.
-      effectOffset: { x: 0, y: -44 },
-      // No ground behind the opponent at its foot height (past a platform's
-      // edge, or the opponent is airborne): the clone appears over it
-      // instead and performs the airborne kick (midair_attack2), driving
-      // it downward. `offset` is the clone's origin from the opponent's
-      // (facing right, mirrored): feet at its upper body, where
-      // midair_attack2's own hitbox lands on its hurtboxes.
-      noGround: {
-        attack: 'midair_attack2',
-        offset: { x: 0, y: -36 },
-      },
+      label: 'Maximum Blue',
+      preview: { collection: 'projectileAnimations', animation: 'attack3_object', frame: 0 },
+      previews: { air: { animation: 'midair_attack3', frame: 1 } },
     },
+    attack4: { label: 'Unlimited Void', preview: { animation: 'attack4_cast', frame: 5 } },
+    attack5: { label: 'Hollow Purple', preview: { collection: 'projectileAnimations', animation: 'attack5_object', frame: 0 } },
   },
 
-  // Techniques, keyed by the attack they are: attack4's button (see
-  // `actions`) starts this one, on the ground only, and like the summon it
-  // costs no Energy and has its own cooldown (shown as A4), a press while
-  // it cools down doing nothing. See js/game/combat/technique.js for the schema
-  // (createTechniqueDefinition) and the phases. Not an attack, a
-  // projectile or a summon: #0001 performs it himself.
+  // In-game ability names (js/data/abilities.js).
+  abilityNames: {
+    extra_attack: 'High Kick',
+    attack1: 'Jab',
+    midair_attack1: 'Floating Straight',
+    attack2: 'Red',
+    midair_attack2: 'Red Kick',
+    attack3: 'Maximum Blue',
+    midair_attack3: 'Blue',
+    attack4: 'Unlimited Void',
+    attack5: 'Hollow Purple',
+  },
+
+  // Techniques, keyed by the attack they are (schema and phases:
+  // js/game/combat/technique.js). Each is a cast: #0001 stands committed to
+  // it, then lets go all at once. A hit on #0001 before it lets go breaks
+  // it (nothing released, the cooldown spent), and it needs the ground
+  // throughout.
   techniques: {
-    // attack4, the Sphere Rush. The sphere forms in #0001's rear palm
-    // (attack4_form + attack4_object_build, 0.5 s), then he rushes forward
-    // for one pass of attack4_dash (0.25 s, about 262 world units)
-    // carrying it behind him and swinging it forward on attack4_6. It must
-    // connect during that rush: a miss stops him and he lets the sphere go
-    // on the attack4_whiff_release pose (attack4_12, one frame) before he
-    // is free. A hit binds the opponent (no damage of its own) and the
-    // sphere moves onto it, spinning there (attack4_object_7-9 looped)
-    // while attack4_confirm plays attack4_7 -> attack4_8 and holds
-    // attack4_8 as the sphere grows. While it is held, 1 Launch Point is
-    // added at once on the hit's own step and then every 0.5 s, with no
-    // launch (0, 0.5, 1 and 1.5 s after the hit). 2 s after the hit it
-    // explodes (attack4_object_10-11) while #0001 is on attack4_explosion
-    // (attack4_9): 10 more Launch Point, then Base Launch 3 sideways, which
-    // releases the opponent (14 damage in all: 4 ticks and the blast);
-    // once the blast is over he recovers through attack4_release
-    // (attack4_10-12). The whole technique needs ground under #0001. A
-    // Shield blocks the contact: no bind, tick or explosion, and the rush
-    // ends there.
+    // Unlimited Void: 0.6 s to cast, then the domain closes round #0001 as
+    // it steps forward: every opponent within 250 units either side, from
+    // well over its head to its feet, takes a sure hit no Shield stops (3)
+    // and is paralyzed for 1.8 s, unable to act, until then or until a hit
+    // launches it. #0001 is free again 0.4 s later: 1.4 s of an opponent
+    // that cannot move.
     attack4: {
-      formAnimation: 'attack4_form',
-      dashAnimation: 'attack4_dash',
-      confirmAnimation: 'attack4_confirm',
-      explosionAnimation: 'attack4_explosion',
+      castAnimation: 'attack4_cast',
       releaseAnimation: 'attack4_release',
-      whiffReleaseAnimation: 'attack4_whiff_release',
-      sphereBuild: 'attack4_object_build',
-      sphereImpact: 'attack4_object_impact',
-      sphereExplosion: 'attack4_object_explosion',
-      // Seconds before attack4 can be used again, from the moment the
-      // rush starts forming: spent on a hit, a miss, a wall or an
-      // interruption alike.
-      cooldown: 5,
-      // World units per second, in the facing snapshotted at the start.
-      dashSpeed: 1050,
-      // Sphere centre from #0001's origin (bottom-centre), facing right,
-      // one per frame: the rear palm in attack4_1-5 (the fist in attack4_1,
-      // the open palm in attack4_2-3, trailing behind in attack4_4-5), then
-      // the hand at the end of the forward swing in attack4_6.
-      handOffsets: {
-        attack4_form: [{ x: -15, y: -47 }, { x: -25, y: -42 }, { x: -25, y: -42 }],
-        attack4_dash: [{ x: -32, y: -51 }, { x: -34, y: -51 }, { x: 32, y: -47 }],
+      cooldown: 14,
+      burst: {
+        hitbox: { x: -250, y: -210, w: 500, h: 230 },
+        hit: { damage: 3, unblockable: true, paralyze: 1.8, hitstun: 0.25, blockstun: 0, hitstop: 0.12 },
       },
-      // Around the sphere centre: the visible orb of the complete sphere.
-      sphereHitbox: { x: -24, y: -24, w: 48, h: 48 },
-      // Sphere centre from the opponent's origin once it hits (x along
-      // the rush): over the caught opponent's body.
-      targetOffset: { x: 0, y: -48 },
-      // Seconds from the hit to the explosion.
-      explosionDelay: 2.0,
-      // The sphere on the opponent, drawn at its own art size from the hit,
-      // grows steadily through the attack4_8 hold to this multiple of it as
-      // it explodes; the blast bursts at that size. Visual only.
-      sphereGrowth: { startScale: 1, endScale: 1.4 },
-      // The sphere's contact: the setup, no damage and no launch. The bind
-      // that follows (not this hitstun) is what holds the opponent; its
-      // first tickHit lands on this same step.
-      firstHit: {
-        damage: 0,
-        baseLaunch: 0,
-        directionalLaunch: null,
-        hitstun: 0.2,
-        blockstun: 0.15,
-        hitstop: 0.06,
-      },
-      // While the opponent is held, before the explosion: one tickHit on
-      // the contact's own step, then one every tickInterval seconds since
-      // it. Launch Point only: no launch, stun or freeze, so the hold never
-      // stutters.
-      tickInterval: 0.5,
-      tickHit: {
-        damage: 1,
-        baseLaunch: 0,
-        directionalLaunch: null,
-        hitstun: 0,
-        blockstun: 0,
-        hitstop: 0,
-      },
-      // The explosion: the big one, and the technique's only launching
-      // hit. Its 10 damage is added first, then the target's new Launch
-      // Point is tripled and sent sideways along the technique's facing.
-      explosionHit: {
-        damage: 10,
-        baseLaunch: 3,
-        directionalLaunch: 'horizontal',
-        hitstun: 0.55,
-        blockstun: 0.3,
-        hitstop: 0.12,
-      },
+    },
+    // Hollow Purple: the chant, 1 s; then the sphere leaves both hands (see
+    // projectiles.attack5_object) and #0001 holds the pose for 1/3 s.
+    attack5: {
+      castAnimation: 'attack5_cast',
+      releaseAnimation: 'attack5_release',
+      cooldown: 12,
+      projectile: { id: 'attack5_object', offset: { x: 95, y: -60 } },
     },
   },
 
-  // Attack definitions, keyed by id. See js/game/combat/attacks.js for the schema
-  // (createAttackDefinition). Phases are whole frames of the attack's clip,
-  // so the hitbox is live only while the strike is on screen. Hitboxes face
-  // right from the fighter's origin (bottom-centre) and mirror with facing.
-  // Each also says how #0001 moves through it (momentum, control,
-  // friction, a step-in) and, for the numbered attacks, when a hit opens a
-  // follow-up (hitCancel, from the strike: another attack, a jump or, on
-  // the ground, a Dash). Roles: attack1 the quick combo starter (a long
-  // stun, the lightest freeze), attack2 the committed launcher (a
-  // step-in, a heavier freeze), midair_attack1 the pursuit tool,
-  // midair_attack2 the spike into grounded pressure, extra_attack (the
-  // Throw) spacing only. Each attack's `damage` is added to the target's
-  // Launch Point first; its Base Launch then multiplies that new Launch
-  // Point and its Directional Launch sends the result: attack1 pushes
-  // sideways (1, horizontal), attack2 and midair_attack1 launch upward (2,
-  // vertical) and midair_attack2 drives the target downward (2, reverse
-  // vertical).
-  // Damage and Base Launch are authored separately: neither is derived
-  // from the other.
+  // Attack definitions (schema: createAttackDefinition in
+  // js/game/combat/attacks.js). Phases are whole frames of each clip, and
+  // every hitbox is measured from its art (facing right from the origin,
+  // mirrored with facing).
   attacks: {
-    // Frame 1 wind-up, frame 2 punch, frames 3-4 recovery. Keeps 0.75 of
-    // a run and slides on it (no steering, so a jab string never creeps
-    // after its target); its stun covers attack2's wind-up.
+    // The Jab: frames 1-2 the wind-up, 3-4 the punch (its box out to 40
+    // units, at the shoulders, just short of the fist's tip), 5-6 back.
+    // Light and quick (2), it pushes (Base Launch 1 sideways) and opens a
+    // follow-up once it has hit; its own push ends a string of them within
+    // a few. A running Jab slides on (0.75 of the run, under 0.4 of the
+    // ground deceleration), never steered.
     attack1: {
       animation: 'attack1',
-      startup: 1 / ATTACK1_FPS,
-      active: 1 / ATTACK1_FPS,
-      recovery: 2 / ATTACK1_FPS,
-      damage: 3,
+      startup: 2 / FPS_0001.attack1,
+      active: 2 / FPS_0001.attack1,
+      recovery: 2 / FPS_0001.attack1,
+      damage: 2,
       baseLaunch: 1,
       directionalLaunch: 'horizontal',
-      hitbox: { x: 12, y: -64, w: 28, h: 16 },
-      hitstun: 0.32,
+      hitbox: { x: 12, y: -82, w: 28, h: 26 },
+      hitstun: 0.3,
       blockstun: 0.14,
       hitstop: 0.05,
       cooldown: 0.15,
       groundOnly: true,
       momentum: 0.75,
       friction: 0.4,
-      hitCancel: 1 / ATTACK1_FPS,
+      hitCancel: 2 / FPS_0001.attack1,
     },
-    // Frames 1-2 wind-up (kunai drawn back, then overhead), frame 3 the
-    // downward kunai slash. The clip has no recovery frame, so the attack
-    // ends with it; the longer cooldown makes up for the missing recovery.
-    // The hitbox covers the slash arc in front of the fighter, and it
-    // launches the target upward. Chosen only by attack1's `air` branch.
-    // Keeps all its drift and nearly all the air steering, for pursuit;
-    // its stun holds a juggled target for the next aerial.
+    // The Floating Straight: frames 1-2 the wind-up, 3-4 the lunging
+    // punch (2, Base Launch 1 sideways), 5 recovering, standing on the air
+    // throughout (no fall: motion `hover`), drifting on half its speed with
+    // a little steering. Twice per airtime.
     midair_attack1: {
       animation: 'midair_attack1',
-      startup: 2 / ATTACK1_FPS,
-      active: 1 / ATTACK1_FPS,
-      recovery: 0,
-      damage: 3,
-      baseLaunch: 2,
-      directionalLaunch: 'vertical',
-      hitbox: { x: 14, y: -100, w: 22, h: 80 },
-      hitstun: 0.32,
-      blockstun: 0.15,
+      startup: 2 / FPS_0001.midair_attack1,
+      active: 2 / FPS_0001.midair_attack1,
+      recovery: 1 / FPS_0001.midair_attack1,
+      damage: 2,
+      baseLaunch: 1,
+      directionalLaunch: 'horizontal',
+      hitbox: { x: 12, y: -78, w: 34, h: 28 },
+      hitstun: 0.34,
+      blockstun: 0.14,
       hitstop: 0.05,
-      cooldown: 0.16,
-      airMomentum: 1,
-      airControl: 0.85,
-      hitCancel: 2 / ATTACK1_FPS,
+      cooldown: 0.15,
+      airUses: 2,
+      motion: { type: 'hover' },
+      airMomentum: 0.5,
+      airControl: 0.4,
+      hitCancel: 2 / FPS_0001.midair_attack1,
     },
-    // Frames 1-3 wind-up (step in, lead jab, spin), frames 4-5 the kick
-    // (low sweep rising into a high kick, both drawn with motion trails),
-    // frames 6-7 recovery (kick apex, settle). One hit per attack, so the
-    // lead jab is part of the wind-up. The hitbox spans the kick's arc in
-    // front of the fighter, knee height to overhead. Slower and heavier than
-    // attack1, and it launches the opponent upward instead of pushing it
-    // away. Steps in on frame 1 (forward speed raised to 280: about 20
-    // units) and keeps half a run.
+    // Red: frames 1-3 the hand sign, 4 the palms thrust out (the orb leaves
+    // them, see projectiles.attack2_object), 5 the lunge after, held a
+    // frame longer. No melee hitbox: Red is the attack.
     attack2: {
       animation: 'attack2',
-      startup: 3 / ATTACK2_FPS,
-      active: 2 / ATTACK2_FPS,
-      recovery: 2 / ATTACK2_FPS,
-      damage: 5,
-      baseLaunch: 2,
-      directionalLaunch: 'vertical',
-      hitbox: { x: 10, y: -88, w: 24, h: 78 },
-      hitstun: 0.28,
-      blockstun: 0.15,
-      hitstop: 0.09,
-      cooldown: 0.15,
+      startup: 3 / FPS_0001.attack2,
+      active: 1 / FPS_0001.attack2,
+      recovery: 3 / FPS_0001.attack2,
+      hitbox: null,
+      projectile: { id: 'attack2_object', spawnAt: 3 / FPS_0001.attack2, offset: { x: 44, y: -70 } },
+      cooldown: 1.1,
       groundOnly: true,
-      momentum: 0.5,
-      friction: 0.5,
-      step: { at: 0, speed: 280 },
-      hitCancel: 3 / ATTACK2_FPS,
+      momentum: 0.4,
+      friction: 0.6,
     },
-    // Frames 1-2 wind-up, frame 3 kick (the forward-low arc), frames 4-5
-    // recovery. Drives the target hard downward. Chosen only by attack2's
-    // `air` branch. Keeps its drift and most of the steering: never
-    // frozen sideways.
+    // The Red Kick: tucked, rolling and laid out (frames 1-3, the lock-on:
+    // it hangs 0.15 s), then the flying kick: a dash at 950 units/s for up
+    // to 0.22 s at its opponent, if within 230 units and not behind it,
+    // re-aimed every step. The hit blasts the target away (3, Base Launch 2
+    // sideways), a Shield is shoved back, and #0001 springs off what it
+    // met (620 up, 240 back). Once per airtime.
     midair_attack2: {
       animation: 'midair_attack2',
-      startup: 2 / ATTACK2_FPS,
-      active: 1 / ATTACK2_FPS,
-      recovery: 2 / ATTACK2_FPS,
-      damage: 5,
+      startup: 3 / FPS_0001.midair_attack2,
+      active: 0.22,
+      recovery: 0.12,
+      damage: 3,
       baseLaunch: 2,
-      directionalLaunch: 'reverseVertical',
-      hitbox: { x: 8, y: -44, w: 40, h: 40 },
-      hitstun: 0.28,
-      blockstun: 0.14,
-      hitstop: 0.08,
-      cooldown: 0.1,
-      airMomentum: 1,
-      airControl: 0.7,
-      hitCancel: 2 / ATTACK2_FPS,
+      directionalLaunch: 'horizontal',
+      hitbox: { x: 6, y: -46, w: 44, h: 44 },
+      hitstun: 0.38,
+      blockstun: 0.15,
+      hitstop: 0.07,
+      blockPush: 400,
+      cooldown: 0.2,
+      airUses: 1,
+      motion: { type: 'homing', range: 230, speed: 950, rebound: 620, recoil: 240, exit: 0.25 },
+      airMomentum: 0.3,
+      hitCancel: 3 / FPS_0001.midair_attack2,
     },
-    // The Throw (extra_attack). Frame 1 wind-up, frame 2 release, frame 3
-    // follow-through. No melee hitbox: the damage is the shuriken's
-    // (extra_attack_object, 1), released once, as the attack reaches frame
-    // 2, from the throwing hand (`offset` is from the fighter's origin,
-    // facing right, and mirrors with facing). Keeps half a run and some
-    // steering, so #0001 is never rooted while he throws; no hitCancel: a
-    // spacing tool, not a combo starter.
+    // Maximum Blue: frames 1-4 Blue gathering in the raised hand, 5 the
+    // palm out as the orb leaves it (see projectiles.attack3_object), held
+    // two frames more. A trap to set, not to spam.
+    attack3: {
+      animation: 'attack3',
+      startup: 4 / FPS_0001.attack3,
+      active: 1 / FPS_0001.attack3,
+      recovery: 2 / FPS_0001.attack3,
+      hitbox: null,
+      projectile: { id: 'attack3_object', spawnAt: 4 / FPS_0001.attack3, offset: { x: 78, y: -69 } },
+      cooldown: 3.5,
+      groundOnly: true,
+      momentum: 0.3,
+      friction: 0.6,
+    },
+    // Blue: frame 1, then the palm thrust and the point (2-3): while they
+    // last, an opponent within 170 units of the palm is yanked in to it at
+    // up to 1100 units/s, and the palm strikes whoever it brought (2, Base
+    // Launch 1 upward). Standing on the air throughout. Once per airtime.
+    midair_attack3: {
+      animation: 'midair_attack3',
+      startup: 1 / FPS_0001.midair_attack3,
+      active: 2 / FPS_0001.midair_attack3,
+      recovery: 2 / FPS_0001.midair_attack3,
+      damage: 2,
+      baseLaunch: 1,
+      directionalLaunch: 'vertical',
+      hitbox: { x: 16, y: -96, w: 44, h: 50 },
+      hitstun: 0.36,
+      blockstun: 0.14,
+      hitstop: 0.06,
+      cooldown: 0.4,
+      airUses: 1,
+      pull: { radius: 170, speed: 1100, offset: { x: 50, y: -72 } },
+      motion: { type: 'hover' },
+      airMomentum: 0.4,
+      airControl: 0.3,
+      hitCancel: 1 / FPS_0001.midair_attack3,
+    },
+    // The High Kick: frame 1, the leap in on frame 2 (forward speed raised
+    // to 260 on the ground), 3 the leg rising, 4 the kick (out to about 58
+    // units, chest to head height), 5 the knee drawn back, held two frames
+    // more. #0001's launcher, telegraphed (a quarter of a second before it
+    // lands) and punishable: 4, Base Launch 2 upward. In the air it stands
+    // on the air while it kicks, once per airtime.
     extra_attack: {
       animation: 'extra_attack',
-      startup: 1 / EXTRA_ATTACK_FPS,
-      active: 1 / EXTRA_ATTACK_FPS,
-      recovery: 1 / EXTRA_ATTACK_FPS,
-      hitbox: null,
-      projectile: { id: 'extra_attack_object', spawnAt: 1 / EXTRA_ATTACK_FPS, offset: { x: 16, y: -38 } },
-      cooldown: 0.25,
-      groundOnly: true,
+      startup: 3 / FPS_0001.extra_attack,
+      active: 1 / FPS_0001.extra_attack,
+      recovery: 3 / FPS_0001.extra_attack,
+      damage: 4,
+      baseLaunch: 2,
+      directionalLaunch: 'vertical',
+      hitbox: { x: 12, y: -72, w: 46, h: 34 },
+      hitstun: 0.3,
+      blockstun: 0.15,
+      hitstop: 0.09,
+      cooldown: 0.35,
       momentum: 0.5,
-      control: 0.3,
-      friction: 0.6,
+      friction: 0.5,
+      step: { at: 1 / FPS_0001.extra_attack, speed: 260 },
+      airUses: 1,
+      motion: { type: 'hover' },
+      airMomentum: 0.6,
+      airControl: 0.4,
+      hitCancel: 3 / FPS_0001.extra_attack,
     },
   },
 };

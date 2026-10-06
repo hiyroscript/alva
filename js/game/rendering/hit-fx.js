@@ -134,8 +134,8 @@ export class HitEffects {
         this.addSpark(e.perfect ? 'perfect' : 'block', e);
         continue;
       }
-      // A technique's ticks deal no stun and no freeze: they only
-      // count, so they show nothing.
+      // A hit with no stun and no launch only counts (a Launch Point
+      // tick): it shows nothing.
       if (!(e.hitstun > 0) && !(e.launchSpeed > 0)) continue;
       const s = HIT_FX.shake;
       this.addShake(Math.min(s.max, s.base + e.damage * s.perDamage + e.launchSpeed * s.perSpeed));

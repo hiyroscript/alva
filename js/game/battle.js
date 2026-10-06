@@ -79,9 +79,9 @@ export class Battle extends Arena {
   }
 
   restart() {
-    // Resetting a fighter ends its technique and releases whatever
-    // it held, and cancels any respawn wait; the fresh combat state carries
-    // no bind, timer or sphere, 0 Launch Point, full Energy and no cooldowns.
+    // Resetting a fighter ends its technique and cancels any respawn wait;
+    // the fresh combat state carries no paralysis or timer, 0 Launch Point,
+    // full Energy and no cooldowns.
     // Both back to 0 points. Every CPU's controller starts over too (nothing
     // held or planned), at the same difficulty, and Player 1 stays Player 1.
     for (const f of this.fighters) {

@@ -913,6 +913,116 @@ widened to the new files), plus the new tests above; seeded CPU-vs-CPU
 traces for every pairing compared byte for byte against the code before
 the move.
 
+## #0001 replaced
+
+Not a named update (it can become one if the owner names it). Asked for
+as: read `character_rule` and rework #0001 from scratch, deleting
+everything of the old #0001 (its images included) and replacing it with a
+new character from a supplied sprite sheet: abilities with real mechanics
+based on the character's canon, not animations with plain damage;
+credited to the sheet's DeviantArt page; never naming the character
+anywhere. `character_rule` was not touched.
+
+**What it removed.** The first #0001's 92 frames, its definition (the
+Punch, the kunai slash, the Kick, the airborne kick, the Shuriken, the
+Clone Attack with its summoning startup, the Sphere Rush, a Shield with
+raise and lower poses), its tests (`tests/fighters/0001/`), its touch
+names and French ability names, and its sprite credits (the Jump Ultimate
+Stars material from The Spriters Resource). The technique runtime's rush
+form (form, dash, confirm, wait, explode; binds and ticks) went with the
+only technique built on it. Git history still holds them all.
+
+**What it added**
+
+- **The fighter.** #0001, the limitless sorcerer, in roster slot 01,
+  playable: 74 frames cut from the sheet into `assets/characters/0001/`
+  (tight 1× crops, the flat navy background (33, 31, 63) made transparent,
+  nothing redrawn or recoloured, every file `0001_<codename>_<frame>.png`),
+  drawn at the roster's art-pixel size (a 63-pixel idle, about 107 units
+  tall). Jump Power 2, Speed Power 2, a 950 units/s Dash, one air jump.
+- **Its buttons:** five numbered attacks, each a button of its own (U, I,
+  O, M, `,`; touch slots 1 to 5): three ordinary attacks with mid-air
+  versions and two techniques, plus the extra attack.
+- **Its moves**, each a mechanic: the Jab and the Floating Straight
+  (standing on the air while it strikes), Red (a repelling orb: pushes,
+  shoves a Shield back, turns the other fighter's projectiles around,
+  theirs no longer), the Red Kick (a lock-on flying kick), Maximum Blue (an
+  attracting orb that drags its target in and grinds it), Blue (a palm
+  that yanks an opponent in), Unlimited Void (a technique: a sure hit round
+  #0001 that no Shield stops and that paralyzes for 1.8 s), Hollow Purple
+  (a technique: a chanted sphere that no Shield stops, erasing projectiles
+  and flying through everything), the High Kick (its launcher, hovering in
+  the air), and Infinity (a Shield all round it that stalls the blows it
+  blocks and all but stops its fall).
+- **Engine features they are built on, generic for any fighter:** the
+  `hover` attack motion; pulls on attacks and projectiles
+  (`js/game/combat/pull.js`); projectiles that `repel` or `erase` and
+  `clashProjectiles` to settle two that meet; the shared hit effects
+  `unblockable`, `paralyze` (a timed hold that replaces binds, ended by any
+  launch) and `blockPush` (`js/game/combat/hit-effects.js`); a Shield's
+  `stall`; and the technique runtime's one form is now the cast (stand
+  committed, then release a projectile, a burst round the fighter, or
+  both).
+- **The CPU** plays it from the data: a pulling attack's reach is its
+  box widened to the pull's circle, a projectile is worth what its hit is
+  (every strike of a piercing one) and reaches as far as its pull, a
+  paralysis counts as the free hits it opens (and a paralysed opponent as
+  an opening), an unblockable technique is a smaller risk against a raised
+  Shield, and it never shields against a hit no Shield stops.
+- **UI:** its touch buttons (each move's own frame, the orbs for Red,
+  Maximum Blue and Hollow Purple), French names, and a credit group,
+  "#0001 sprite source", linked to the sheet's DeviantArt page by the
+  deviation's number alone (so the address names nothing), with the
+  credits the sheet itself gives. Its translation keys are
+  `credits.sprites0001.*`, as every other fighter's credit group is named.
+
+**Balance, measured.** Tuned from seeded CPU-vs-CPU fights against #0002
+(200 one-minute fights per level on Desert, Void falls #0001 : #0002).
+The first cut was far too strong (over 40 fights per level: 0 : 49 at
+Medium, 1 : 56 at Hard, 0 : 58 at Brutal; #0002 could not get past Red,
+and the High Kick launched too fast and too hard). Red became a push (2, Base Launch 1, 600 units/s for 0.5 s, a
+1.1 s cooldown), the High Kick a telegraphed launcher (4, landing a
+quarter of a second in, a longer recovery), Maximum Blue a trap (3.5 s
+cooldown, a 120-unit pull, three strikes), the Jab, Floating Straight,
+Red Kick and Blue a point lighter, and Infinity's stall 0.25 s. Now: Easy
+121 : 4, Medium 90 : 60, Hard 63 : 66, Brutal 61 : 82. At Easy #0002's
+Whirlwind carries a slow-reacting #0001 off the stage far more often than
+the other way round.
+
+**Where to tune it**
+
+- `js/data/characters/0001.js`: each attack's damage, launch, timing,
+  hitbox, `pull`, `motion` and `cooldown`; Red's, Maximum Blue's and Hollow
+  Purple's `speed`, `lifetime`, `pull`, `pierce`, `finisher`,
+  `blockPush`, `repel`, `erase` and `unblockable`; Unlimited Void's burst
+  box and hit (its `paralyze`); each technique's cooldown and clip rates
+  (`FPS_0001`); Infinity's `stall` and slow fall; `powers`, `movement`,
+  `energy` and the body.
+- The capabilities' defaults: `MOTION_DEFAULTS` in
+  `js/game/combat/attacks.js`, the hit effects' in
+  `js/game/combat/hit-effects.js`, the Shield's in
+  `js/game/combat/defense.js`.
+
+**Code:** `js/data/characters/0001.js`; `js/game/combat/hit-effects.js`,
+`js/game/combat/pull.js`; `hover` and `resolvePull` in
+`js/game/combat/attacks.js`; `repel`, `erase` and `clashProjectiles` in
+`js/game/combat/projectile.js`; the cast form in
+`js/game/combat/technique.js`; `paralyze` in
+`js/game/combat/combat-state.js`; the hit effects and the stall in
+`CombatSystem.applyHit` (`js/game/combat/combat.js`); `stall` in
+`js/game/combat/defense.js`; the step order (pulls, clashes) in
+`js/game/arena.js`; `shotValue`, `hitValue` and `specialOptions` in
+`js/game/ai/combat-ai.js`; `js/ui/credits.js`, `js/localization/`.
+
+**Tests:** `tests/fighters/0001/` (`fighter-0001`: the real PNGs, crops,
+scale, anchors, data and names; `moves-0001`: every move's mechanic;
+`combos-0001`: its routes; `cpu-0001`: the CPU playing and facing it);
+the shared capabilities on bespoke data in
+`tests/systems/hit-effects.test.mjs`, `pull.test.mjs`,
+`projectile-clash.test.mjs` and `technique.test.mjs`; every system,
+interface and integration test that used the first #0001's moves adapted
+to the new ones.
+
 ## Adding a named update
 
 When a new piece of work gets a name, add a row to the table and a section in

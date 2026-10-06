@@ -16,8 +16,9 @@ unavailable, with Back to Home.
   CPU, paired and framed together from the start. With the CPU disabled,
   moves aimed at an opponent do nothing or miss: a summon has nobody to
   appear behind, so its press does nothing at all (no other attack, no
-  cooldown started); a technique's rush (e.g. #0001's Sphere Rush) finds
-  no one, releases as a miss and ends (its cooldown spent).
+  cooldown started); a technique still casts and releases (e.g. #0001's
+  Unlimited Void, its burst meeting no one; its cooldown spent), a pull
+  draws nobody in and projectiles fly on and expire.
 - **Stage.** `PRACTICE_MAP` (`js/data/practice-map.js`) is deliberately not
   in `MAPS`, which feeds Select Stage. `js/stages/practice-theme.js` draws the
   room as one square grid in one-point perspective: a back wall, and a
@@ -44,11 +45,13 @@ unavailable, with Back to Home.
   fighter and puts it 320 units to your right, facing you, labelled CPU, and
   resumes; the camera frames you both.
   It is a training dummy with no controller: it never moves, jumps, attacks
-  or defends, but it takes real hits, hitstun, launches and binds,
-  so every move lands on it: attacks, projectiles, clones and techniques. Its
+  or defends, but it takes real hits, hitstun, launches, pulls and
+  paralysis, so every move lands on it: attacks, projectiles, clones and
+  techniques. Its
   Launch Point builds up (and launching hits send it further) like anyone's.
-  Each hit floats the Launch Point it added (for #0001: `+3` for a punch,
-  `+1` for each Sphere Rush tick, `+10` for the blast) in red over its head
+  Each hit floats the Launch Point it added (for #0001: `+2` for a Jab,
+  `+1` for each of Maximum Blue's grinding strikes and `+2` for its
+  collapse, `+12` for Hollow Purple) in red over its head
   for under a second, straight from the
   combat system's resolved hit. Change CPU swaps it for
   another fighter; **Disable CPU**, beside Back in that dialog, removes it

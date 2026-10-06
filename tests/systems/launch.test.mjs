@@ -68,19 +68,22 @@ function hitAt(launchPoint, hitDef, { facing = 1, options = {}, targetCharacter,
   return { ...d, event };
 }
 
-// #0001's own resolved hits, as the engine holds them.
+// #0001's own resolved hits, as the engine holds them: its melee attacks,
+// its orbs (Blue's grinding strike and its collapse), and Unlimited Void's
+// burst.
 function realHits() {
   const { fighter } = makeFighter();
-  const rush = fighter.techniqueDefs.attack4;
   return {
     attack1: fighter.attacks.attack1,
-    attack2: fighter.attacks.attack2,
     midair_attack1: fighter.attacks.midair_attack1,
     midair_attack2: fighter.attacks.midair_attack2,
-    extra_attack_object: fighter.projectileDefs.extra_attack_object,
-    firstHit: rush.firstHit,
-    tickHit: rush.tickHit,
-    explosionHit: rush.explosionHit,
+    midair_attack3: fighter.attacks.midair_attack3,
+    extra_attack: fighter.attacks.extra_attack,
+    attack2_object: fighter.projectileDefs.attack2_object,
+    attack3_object: fighter.projectileDefs.attack3_object,
+    attack3_finisher: fighter.projectileDefs.attack3_object.finisher,
+    attack5_object: fighter.projectileDefs.attack5_object,
+    burst: fighter.techniqueDefs.attack4.burst.hit,
   };
 }
 
@@ -155,14 +158,14 @@ test('every hit definition validates the same two fields the same way: attacks, 
   const { value, warnings: w } = warnings(() => [
     createAttackDefinition({ id: 'a', ...bad }),
     createProjectileDefinition({ id: 'p', ...bad }),
-    createTechniqueDefinition({ id: 't', firstHit: bad }).firstHit,
+    createTechniqueDefinition({ id: 't', burst: { hitbox: { x: 0, y: 0, w: 1, h: 1 }, hit: bad } }).burst.hit,
   ]);
   for (const hit of value) {
     assert.deepEqual([hit.baseLaunch, hit.directionalLaunch], [0, null]);
     assert.ok(Object.isFrozen(hit));
   }
   assert.equal(w.length, 6, 'both fields, on all three');
-  assert.ok(w.some((m) => /Attack "a"/.test(m)) && w.some((m) => /Projectile "p"/.test(m)) && w.some((m) => /Hit "t.firstHit"/.test(m)));
+  assert.ok(w.some((m) => /Attack "a"/.test(m)) && w.some((m) => /Projectile "p"/.test(m)) && w.some((m) => /Hit "t.burst"/.test(m)));
   // Declared fields are kept exactly: never inferred from damage or hitbox.
   const atk = createAttackDefinition({ id: 'b', damage: 10, baseLaunch: 1, directionalLaunch: 'reverseVertical', hitbox: { x: 0, y: -90, w: 10, h: 90 } });
   assert.deepEqual([atk.damage, atk.baseLaunch, atk.directionalLaunch], [10, 1, 'reverseVertical']);
@@ -179,17 +182,17 @@ test('Launch Point starts at 0 on every new combat state and every new fighter',
   assert.equal('knockback' in new CombatState(), false, 'the old accumulated Knockback is gone');
 });
 
-test('damage adds exactly the damage received: 0 + 3 = 3, + 5 = 8, + 1 = 9', () => {
-  const { attack1, attack2, extra_attack_object: shuriken } = realHits();
+test('damage adds exactly the damage received: 0 + 2 = 2, + 4 = 6, + 1 = 7', () => {
+  const { attack1, extra_attack: kick, attack3_object: blue } = realHits();
   const d = duel();
   const system = new CombatSystem();
   const seen = [];
-  for (const hit of [attack1, attack2, shuriken]) {
+  for (const hit of [attack1, kick, blue]) {
     const e = system.applyHit(d.attacker, d.target, hit);
     seen.push([e.launchPointBefore, e.damage, e.launchPointAfter]);
   }
-  assert.deepEqual(seen, [[0, 3, 3], [3, 5, 8], [8, 1, 9]]);
-  assert.equal(d.target.combat.launchPoint, 9);
+  assert.deepEqual(seen, [[0, 2, 2], [2, 4, 6], [6, 1, 7]]);
+  assert.equal(d.target.combat.launchPoint, 7);
 });
 
 test('Launch Point never becomes negative', () => {
@@ -305,13 +308,13 @@ test('the facing a hit travels in is its own: a projectile\'s direction, a clone
 
 // ---- Shield -----------------------------------------------------------------------
 
-test('a Shielded hit adds no Launch Point and launches nothing, whatever its Base Launch or direction; the Shield pays 25 Energy instead', () => {
+test('a Shielded hit adds no Launch Point and launches nothing, whatever its Base Launch or direction; the Shield pays its cost instead', () => {
   for (const [baseLaunch, direction] of [[1, 'horizontal'], [2, 'vertical'], [2, 'reverseVertical'], [3, 'horizontal']]) {
     for (const facing of [1, -1]) {
       const { target, event } = hitAt(119, probe(5, baseLaunch, direction), { facing, shielding: true });
       assert.equal(event.type, 'block');
       assert.equal(event.damage, 0, 'no chip damage');
-      assert.equal(event.energyCost, 25);
+      assert.equal(event.energyCost, def.energy.shieldHitCost);
       assert.deepEqual([event.launchPointBefore, event.launchPointAfter], [119, 119]);
       assert.equal(target.combat.launchPoint, 119);
       assert.equal(event.baseLaunch, baseLaunch, 'the hit keeps its own data');
@@ -320,7 +323,7 @@ test('a Shielded hit adds no Launch Point and launches nothing, whatever its Bas
       assert.deepEqual({ ...event.finalLaunch }, { x: 0, y: 0 });
       assert.deepEqual([target.body.vx, target.body.vy], [0, 0]);
       assert.notEqual(target.body.grounded, false, 'not lifted or driven down');
-      assert.equal(target.combat.energy, 75);
+      assert.equal(target.combat.energy, 100 - def.energy.shieldHitCost);
     }
   }
   // The old Block modifiers (chip damage, a halved sideways launch) are gone.
@@ -333,16 +336,17 @@ test('a Shielded hit adds no Launch Point and launches nothing, whatever its Bas
 // ---- Events -----------------------------------------------------------------------
 
 test('a hit event describes the new system and nothing of the old one', () => {
-  const { event, attacker, target } = hitAt(115, realHits().attack2);
+  const { event, attacker, target } = hitAt(116, realHits().extra_attack);
   assert.deepEqual(Object.keys(event).sort(), [
     'attacker', 'baseLaunch', 'damage', 'directionalLaunch', 'energyCost', 'finalLaunch', 'hitstun',
-    'launchPointAfter', 'launchPointBefore', 'launchSpeed', 'launchStrength', 'move', 'perfect', 'point',
-    'projectile', 'summon', 'target', 'technique', 'type',
+    'launchPointAfter', 'launchPointBefore', 'launchSpeed', 'launchStrength', 'move', 'paralysis', 'perfect', 'point',
+    'projectile', 'stall', 'summon', 'target', 'technique', 'type',
   ]);
   assert.equal(event.energyCost, 0, 'a hit costs its target no Energy');
+  assert.deepEqual([event.paralysis, event.stall], [0, 0], 'no hold, no stall');
   assert.deepEqual(
     [event.type, event.attacker, event.target, event.move, event.damage, event.launchPointBefore, event.launchPointAfter],
-    ['hit', attacker, target, 'attack2', 5, 115, 120],
+    ['hit', attacker, target, 'extra_attack', 4, 116, 120],
   );
   assert.equal(event.baseLaunch, 2, 'the integer multiplier, not a vector');
   assert.equal(event.directionalLaunch, 'vertical');
@@ -353,30 +357,35 @@ test('a hit event describes the new system and nothing of the old one', () => {
 // ---- #0001 ------------------------------------------------------------------------
 
 test('#0001\'s authored hits: damage, Base Launch and Directional Launch, exactly', () => {
-  const rush = def.techniques.attack4;
+  const blue = def.projectiles.attack3_object;
   const authored = {
     attack1: def.attacks.attack1,
-    attack2: def.attacks.attack2,
     midair_attack1: def.attacks.midair_attack1,
     midair_attack2: def.attacks.midair_attack2,
-    extra_attack_object: def.projectiles.extra_attack_object,
-    tickHit: rush.tickHit,
-    explosionHit: rush.explosionHit,
+    midair_attack3: def.attacks.midair_attack3,
+    extra_attack: def.attacks.extra_attack,
+    attack2_object: def.projectiles.attack2_object,
+    attack3_object: blue,
+    attack3_finisher: blue.finisher,
+    attack5_object: def.projectiles.attack5_object,
+    burst: def.techniques.attack4.burst.hit,
   };
-  const table = Object.fromEntries(Object.entries(authored).map(([id, h]) => [id, [h.damage, h.baseLaunch, h.directionalLaunch]]));
+  const table = Object.fromEntries(Object.entries(authored).map(([id, h]) => [id, [h.damage, h.baseLaunch ?? 0, h.directionalLaunch ?? null]]));
   assert.deepEqual(table, {
-    attack1: [3, 1, 'horizontal'],
-    attack2: [5, 2, 'vertical'],
-    midair_attack1: [3, 2, 'vertical'],
-    midair_attack2: [5, 2, 'reverseVertical'],
-    extra_attack_object: [1, 0, null],
-    tickHit: [1, 0, null],
-    explosionHit: [10, 3, 'horizontal'],
+    attack1: [2, 1, 'horizontal'],
+    midair_attack1: [2, 1, 'horizontal'],
+    midair_attack2: [3, 2, 'horizontal'],
+    midair_attack3: [2, 1, 'vertical'],
+    extra_attack: [4, 2, 'vertical'],
+    attack2_object: [2, 1, 'horizontal'],
+    attack3_object: [1, 0, null],
+    attack3_finisher: [2, 1, 'vertical'],
+    attack5_object: [12, 3, 'horizontal'],
+    burst: [3, 0, null],
   });
-  assert.equal(rush.tickInterval, 0.5, 'one tick every 0.5 s');
-  // The contact before the hold deals no damage and never launches: the
-  // explosion is the technique's only launching hit.
-  assert.deepEqual([rush.firstHit.damage, rush.firstHit.baseLaunch, rush.firstHit.directionalLaunch], [0, 0, null]);
+  // Red and Maximum Blue have no melee hit of their own: the orb is the attack.
+  assert.equal(def.attacks.attack2.hitbox, null);
+  assert.equal(def.attacks.attack3.hitbox, null);
   // Every resolved definition carries the same values.
   const hits = realHits();
   for (const [id, [damage, baseLaunch, directionalLaunch]] of Object.entries(table)) {
@@ -388,13 +397,16 @@ test('#0001 at work: each hit adds its damage, then launches at Base Launch x th
   const hits = realHits();
   const cases = [
     // [hit, from, to, strength, finalLaunch facing right (strength x 10)]
-    ['attack1', 117, 120, 120, { x: 1200, y: 0 }],
-    ['attack2', 115, 120, 240, { x: 0, y: -2400 }],
-    ['midair_attack1', 117, 120, 240, { x: 0, y: -2400 }],
-    ['midair_attack2', 115, 120, 240, { x: 0, y: 2400 }],
-    ['extra_attack_object', 119, 120, 0, { x: 0, y: 0 }],
-    ['tickHit', 119, 120, 0, { x: 0, y: 0 }],
-    ['explosionHit', 110, 120, 360, { x: 3600, y: 0 }],
+    ['attack1', 118, 120, 120, { x: 1200, y: 0 }],
+    ['midair_attack1', 118, 120, 120, { x: 1200, y: 0 }],
+    ['midair_attack2', 117, 120, 240, { x: 2400, y: 0 }],
+    ['midair_attack3', 118, 120, 120, { x: 0, y: -1200 }],
+    ['extra_attack', 116, 120, 240, { x: 0, y: -2400 }],
+    ['attack2_object', 118, 120, 120, { x: 1200, y: 0 }],
+    ['attack3_object', 119, 120, 0, { x: 0, y: 0 }],
+    ['attack3_finisher', 118, 120, 120, { x: 0, y: -1200 }],
+    ['attack5_object', 108, 120, 360, { x: 3600, y: 0 }],
+    ['burst', 117, 120, 0, { x: 0, y: 0 }],
   ];
   for (const [id, from, to, strength, final] of cases) {
     const { target, event } = hitAt(from, hits[id]);
@@ -409,8 +421,8 @@ test('#0001 at work: each hit adds its damage, then launches at Base Launch x th
     }
   }
   // Facing left, the sideways hits travel left.
-  assert.equal(hitAt(117, hits.attack1, { facing: -1 }).target.body.vx, -1200);
-  assert.equal(hitAt(110, hits.explosionHit, { facing: -1 }).target.body.vx, -3600);
+  assert.equal(hitAt(118, hits.attack1, { facing: -1 }).target.body.vx, -1200);
+  assert.equal(hitAt(108, hits.attack5_object, { facing: -1 }).target.body.vx, -3600);
 });
 
 // ---- Respawn ----------------------------------------------------------------------
@@ -433,7 +445,7 @@ test('a fighter with Launch Point that falls into the Void is eliminated, scores
   assert.deepEqual([p1.combat.launchPoint, p2.combat.launchPoint], [0, 0], 'every fighter starts the round at 0');
   // Launched off with a real, heavy Launch Point.
   const e = new CombatSystem().applyHit(p1, p2, realHits().attack1);
-  assert.equal(e.launchPointAfter, 3);
+  assert.equal(e.launchPointAfter, def.attacks.attack1.damage);
   p2.combat.launchPoint = 240;
   Object.assign(p2.body, { y: battle.stage.void.bottom + 100, vy: 0, grounded: false, ground: null });
   battle.update(DT);

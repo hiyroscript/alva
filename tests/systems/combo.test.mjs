@@ -1,9 +1,12 @@
 // Combat flow: the combat input buffer, hit-cancels (a connected attack's
-// rest cut short by another attack or a jump), the combo routes they open
-// at low Launch Point, how a higher Launch Point breaks them by launching
-// the target further, a hit interrupting the target's own attack, and the
-// Shield's transitions. Frame-exact, on the real Fighter, CombatSystem and
-// physics.
+// rest cut short by another attack or a jump), the Dash cancel and the
+// chase it opens, how a higher Launch Point breaks a follow-up by
+// launching the target further, a hit interrupting the target's own
+// attack, and the Shield's transitions. Frame-exact, on the real Fighter,
+// CombatSystem and physics, with #0001's moves: its Jab (attack1) as the
+// starter, its High Kick (extra_attack) as the follow-up, its Red
+// (attack2) as a ground attack that throws. #0001's own combo routes are in
+// tests/fighters/0001/combos.test.mjs.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { def, DT, makeFighter, duel, startupSteps } from '../helpers/fighter-harness.mjs';
@@ -12,7 +15,8 @@ const mv = def.movement;
 const P = (k) => ({ [k]: true, [`${k}Pressed`]: true });
 const ATTACK1 = P('attack1');
 const ATTACK2 = P('attack2');
-const THROW = P('extra_attack');
+const KICK = P('extra_attack');
+const THROW = KICK;
 const JUMP = P('jump');
 const BUFFER_STEPS = Math.floor(mv.attackBuffer / DT + 1e-6);
 
@@ -103,50 +107,60 @@ test('a press during a cooldown comes out as the cooldown ends; the latest press
   assert.equal(latest.fighter.combat.attack?.def.id, 'extra_attack');
 });
 
-test('only presses that could start are kept: never transform, an air Throw or an attack without art; a summon or technique press never', () => {
+test('only presses that could start are kept: never transform, an air press of a ground-only attack or one without art; a technique press never', () => {
   const { fighter, step } = makeFighter();
   step(ATTACK1);
   step(P('transform'));
   assert.equal(fighter.bufferedAttack, null, 'reserved');
-  const air = makeFighter();
+  // A fighter whose High Kick is ground-only: pressed in the air it is
+  // never kept, so it never replaces a press that is.
+  const groundKick = { ...def, attacks: { ...def.attacks, extra_attack: { ...def.attacks.extra_attack, groundOnly: true, motion: undefined } } };
+  const air = makeFighter({ character: groundKick });
   air.step(JUMP);
   air.step(ATTACK1);
   assert.equal(air.fighter.combat.attack?.def.id, 'midair_attack1');
   air.step(ATTACK2);
-  air.step(THROW);
-  assert.equal(air.fighter.bufferedAttack?.action, 'attack2', 'an air Throw never replaces it');
-  // An attack3 press on its cooldown (here during its own summoning
-  // startup) is used up, never kept for later.
+  air.step(KICK);
+  assert.equal(air.fighter.bufferedAttack?.action, 'attack2', 'an air press of a ground-only kick never replaces it');
+  // A technique press while it cools down (here during its own cast) is
+  // used up, never kept for later.
   const d = duel({ gap: 600 });
-  d.tick(P('attack3'));
-  assert.ok(d.attacker.combat.abilityCooldowns.active('attack3'));
-  d.tick(P('attack3'));
+  d.tick(P('attack4'));
+  assert.ok(d.attacker.combat.abilityCooldowns.active('attack4'));
+  d.tick(P('attack4'));
   assert.equal(d.attacker.bufferedAttack, null);
-  for (let i = 0; i < startupSteps(def, 'attack3') + 20; i++) d.tick({});
-  assert.equal(d.attacker.combat.attack, null, 'no attack1 later either');
-  assert.equal(d.clones.length, 1, 'and no second clone');
+  while (d.attacker.technique) d.tick({});
+  for (let i = 0; i < 20; i++) d.tick({});
+  assert.equal(d.attacker.technique, null, 'no second cast');
+  assert.equal(d.attacker.combat.attack, null, 'and no attack in its place');
   // Nor is one pressed during an attack: it happens on its own press or
   // not at all.
   const busy = duel({ gap: 600 });
   busy.tick(ATTACK1);
-  busy.tick(P('attack4'));
+  busy.tick(P('attack5'));
   assert.equal(busy.attacker.bufferedAttack, null);
   busy.until(() => !busy.attacker.combat.attack);
   for (let i = 0; i < 20; i++) busy.tick({});
-  assert.equal(busy.attacker.technique, null, 'no Sphere Rush after the punch');
+  assert.equal(busy.attacker.technique, null, 'no Hollow Purple after the Jab');
   assert.equal(busy.attacker.combat.abilityCooldowns.size, 0);
 });
 
+// Runs `d` until its first hit has landed (the Jab pressed on step 0).
+function untilHit(d, press = ATTACK1) {
+  d.run(() => press, 1);
+  while (!d.hits.length) d.run(() => ({}), 1);
+}
+
 test('presses made during an impact freeze are kept, and do not age through it', () => {
   const d = combo({ gap: 40 });
-  d.run((i) => (i === 0 ? ATTACK1 : {}), 6);
+  untilHit(d);
   assert.equal(d.hits.length, 1);
   assert.ok(d.attacker.combat.hitstop > 0, 'frozen');
-  d.run(() => ATTACK2, 1);
+  d.run(() => KICK, 1);
   const buffered = d.attacker.bufferedAttack;
-  assert.equal(buffered?.action, 'attack2');
+  assert.equal(buffered?.action, 'extra_attack');
   while (d.attacker.combat.hitstop > 0) d.run(() => ({}), 1);
-  assert.equal(d.attacker.combat.attack?.def.id, 'attack2', 'out as soon as the freeze is over');
+  assert.equal(d.attacker.combat.attack?.def.id, 'extra_attack', 'out as soon as the freeze is over');
 });
 
 test('a press while Shield holds the Shield up comes out the step the Shield is let go', () => {
@@ -183,12 +197,12 @@ test('buffered presses keep their order: jump then attack1 is a jump and an air 
 
 // ---- Hit-cancels ------------------------------------------------------------------
 
-test('an attack1 that hits may be cut short by attack2 the step its freeze ends; its cooldown starts then', () => {
+test('an attack1 that hits may be cut short by another attack the step its freeze ends; its cooldown starts then', () => {
   const d = combo({ gap: 40 });
-  d.run((i) => (i === 0 ? ATTACK1 : i === 2 ? ATTACK2 : {}), 8);
+  d.run((i) => (i === 0 ? ATTACK1 : i === 2 ? KICK : {}), 10);
   assert.equal(d.hits.length, 1);
   while (d.attacker.combat.hitstop > 0) d.run(() => ({}), 1);
-  assert.equal(d.attacker.combat.attack?.def.id, 'attack2', 'cut short into attack2');
+  assert.equal(d.attacker.combat.attack?.def.id, 'extra_attack', 'cut short into the High Kick');
   assert.ok(d.attacker.combat.cooldowns.has('attack1'), 'attack1\'s cooldown from the cut');
 });
 
@@ -198,17 +212,19 @@ test('a whiffed or blocked attack keeps its whole recovery: no cut short', () =>
     d.run((i) => (i === 0 ? ATTACK1 : {}), 1);
     const atk = d.attacker.combat.attack;
     let n = 0;
-    for (; d.attacker.combat.attack === atk; n++) d.run(() => ATTACK2, 1);
-    const freeze = blocked ? Math.round(atk.def.hitstop / DT) : 0;
+    for (; d.attacker.combat.attack === atk; n++) d.run(() => KICK, 1);
+    // A blocked blow freezes its attacker for the hit's hitstop, or the
+    // Shield's stall where that is longer (#0001's Infinity stalls 0.3 s).
+    const freeze = blocked ? Math.round(Math.max(atk.def.hitstop, def.defense.stall) / DT) : 0;
     assert.equal(n, Math.round(atk.def.total / DT) + freeze, blocked ? 'blocked: in full' : 'whiffed: in full');
-    assert.equal(d.attacker.combat.attack?.def.id, 'attack2', 'then the buffered attack2');
+    assert.equal(d.attacker.combat.attack?.def.id, 'extra_attack', 'then the buffered High Kick');
   }
 });
 
-test('a jump or a Dash cuts a connected attack2 short; walking, the Shield and Down never do', () => {
+test('a jump or a Dash cuts a connected High Kick short; walking, the Shield and Down never do', () => {
   const hitBa2 = () => {
     const d = combo({ gap: 40 });
-    d.run((i) => (i === 0 ? ATTACK2 : {}), 16);
+    d.run((i) => (i === 0 ? KICK : {}), 20);
     assert.equal(d.hits.length, 1);
     while (d.attacker.combat.hitstop > 0) d.run(() => ({}), 1);
     assert.ok(d.attacker.combat.cancellable);
@@ -226,10 +242,11 @@ test('a jump or a Dash cuts a connected attack2 short; walking, the Shield and D
     assert.equal(d.attacker.combat.attack, atk, `${Object.keys(held)[0]}: the attack plays on`);
   }
   const dash = hitBa2();
-  dash.run((i) => (i % 2 ? {} : { runRight: true, runRightPressed: true }), 3);
+  let tap = 0;
+  dash.run(() => (tap++ % 2 ? {} : { runRight: true, runRightPressed: true }), 3);
   assert.ok(dash.attacker.dash, 'a double tap Dashes out of it');
   assert.equal(dash.attacker.combat.attack, null);
-  assert.ok(dash.attacker.combat.cooldowns.has('attack2'), 'attack2\'s cooldown from the cut');
+  assert.ok(dash.attacker.combat.cooldowns.has('extra_attack'), 'the kick\'s cooldown from the cut');
 });
 
 // ---- Dash cancel ----------------------------------------------------------------------
@@ -242,7 +259,7 @@ test('a Dash cancel: out of an attack1 that hit, either way, for dashCancelCost 
   assert.ok(energy.dashCancelCost > energy.dashCost);
   for (const [press, direction] of [[MOUVEMENT_RIGHT, 1], [MOUVEMENT_LEFT, -1]]) {
     const d = combo({ gap: 40 });
-    d.run((i) => (i === 0 ? ATTACK1 : {}), 6);
+    untilHit(d);
     assert.ok(d.attacker.combat.hitstop > 0, 'the hit\'s freeze');
     d.run(() => press, 1);
     assert.equal(d.attacker.dash, null, 'never during it...');
@@ -277,10 +294,12 @@ test('no Dash cancel out of a whiff, a block, an aerial or while exhausted: noth
   const block = combo({ gap: 40, targetHeld: () => ({ shield: true }) });
   block.run((i) => (i === 0 ? ATTACK1 : {}), 9);
   assert.equal(block.events[0]?.type, 'block');
+  while (block.attacker.combat.hitstop > 0) block.run(() => ({}), 1);
   tryCancel(block, 'blocked');
   const tired = combo({ gap: 40 });
   tired.attacker.combat.setEnergy(0);
-  tired.run((i) => (i === 0 ? ATTACK1 : {}), 9);
+  untilHit(tired);
+  while (tired.attacker.combat.hitstop > 0) tired.run(() => ({}), 1);
   assert.ok(tired.attacker.combat.cancellable);
   tryCancel(tired, 'exhausted');
   // A midair_attack1 that hits may be cut short by an air jump, never a Dash.
@@ -293,11 +312,11 @@ test('no Dash cancel out of a whiff, a block, an aerial or while exhausted: noth
   tryCancel(air, 'in the air');
 });
 
-test('attack1 -> Dash -> attack1 chases a push attack1 -> attack2 no longer reaches, into high Launch Point', () => {
-  for (const lp of [30, 50, 70]) {
+test('attack1 -> Dash -> attack1 chases a push attack1 -> High Kick no longer reaches, into high Launch Point', () => {
+  for (const lp of [50, 60]) {
     const direct = combo({ gap: 40, lp });
-    direct.run((i) => (i === 0 ? ATTACK1 : i === 6 ? ATTACK2 : {}), 60);
-    assert.ok(direct.hits.length < 2 || !direct.held(0, 1), `LP ${lp}: attack2 alone is out of reach`);
+    direct.run((i) => (i === 0 ? ATTACK1 : i === 6 ? KICK : {}), 60);
+    assert.ok(direct.hits.length < 2 || !direct.held(0, 1), `LP ${lp}: the High Kick alone is out of reach`);
 
     const d = combo({ gap: 40, lp });
     let dashAt = -1;
@@ -315,7 +334,7 @@ test('attack1 -> Dash -> attack1 chases a push attack1 -> attack2 no longer reac
 });
 
 test('attack1 -> Dash -> attack1 never loops: Energy allows two cancels and the third empties the bar, so the chase ends within seven hits', () => {
-  for (const lp of [0, 30]) {
+  for (const lp of [30, 50]) {
     const d = combo({ gap: 40, lp });
     let dashAt = -1;
     let cancels = 0;
@@ -350,7 +369,7 @@ test('left alone, a connected attack plays out its whole clip; into itself only 
   assert.equal(n, Math.round(atk.def.total / DT) + Math.round(atk.def.hitstop / DT), 'its whole clip and the freeze');
 
   const self = combo({ gap: 40 });
-  self.run((i) => (i === 0 ? ATTACK1 : {}), 6);
+  untilHit(self);
   while (self.attacker.combat.hitstop > 0) self.run(() => ({}), 1);
   const first = self.attacker.combat.attack;
   let steps = 0;
@@ -362,100 +381,16 @@ test('left alone, a connected attack plays out its whole clip; into itself only 
   assert.equal(steps, Math.round(first.def.cooldown / DT), 'after its cooldown, counted from the cut\'s opening');
 });
 
-// ---- Routes at low Launch Point -------------------------------------------------------
-
-test('attack1 -> attack2 is a true combo at low Launch Point, with a forgiving window for the second press', () => {
-  for (const lp of [0, 10, 20]) {
-    for (const press of [1, 4, 8, 11]) {
-      const d = combo({ gap: 40, lp });
-      d.run((i) => (i === 0 ? ATTACK1 : i === press ? ATTACK2 : {}), 60);
-      assert.deepEqual(d.hits.map((h) => h.move), ['attack1', 'attack2'], `LP ${lp}, attack2 ${press} steps after attack1`);
-      assert.ok(d.held(0, 1), `LP ${lp}, attack2 at ${press}: the target never got to act`);
-    }
-  }
-});
-
-test('attack1 -> attack1 combos at LP 0 close in; its own pushback ends the string within a few hits', () => {
-  const d = combo({ gap: 38 });
-  d.run((i) => (i % 12 === 0 ? ATTACK1 : {}), 300);
-  assert.ok(d.hits.length >= 2 && d.held(0, 1), 'another light attack');
-  let chain = 1;
-  while (chain < d.hits.length && d.held(chain - 1, chain)) chain++;
-  assert.ok(chain >= 2 && chain <= 6, `a ${chain}-hit string, never a loop`);
-  // Holding forward adds no more: the punch does not creep after its target.
-  const f = combo({ gap: 38 });
-  f.run((i) => ({ runRight: true, ...(i % 12 === 0 ? ATTACK1 : {}) }), 300);
-  let fchain = 1;
-  while (fchain < f.hits.length && f.held(fchain - 1, fchain)) fchain++;
-  assert.ok(fchain <= 6, `still ${fchain}`);
-  // From LP 25, attack1's push already carries the target out of a second one.
-  const mid = combo({ gap: 40, lp: 25 });
-  mid.run((i) => (i % 12 === 0 ? ATTACK1 : {}), 40);
-  assert.ok(mid.hits.length < 2 || !mid.held(0, 1));
-});
-
-test('attack2 -> jump -> air attack1 is a true combo at medium Launch Point; attack2 -> attack1 at low', () => {
-  for (const lp of [30, 40, 50]) {
-    const d = combo({ gap: 40, lp });
-    // A tap: the normal jump after the launch.
-    d.run((i) => (i === 0 ? ATTACK2 : i === 18 ? JUMP : i === 21 ? ATTACK1 : {}), 70);
-    assert.deepEqual(d.hits.map((h) => h.move), ['attack2', 'midair_attack1'], `LP ${lp}`);
-    assert.ok(d.held(0, 1), `LP ${lp}: the launched target never got to act`);
-  }
-  for (const lp of [0, 10]) {
-    const d = combo({ gap: 40, lp });
-    d.run((i) => (i === 0 ? ATTACK2 : i === 18 ? ATTACK1 : {}), 60);
-    assert.deepEqual(d.hits.map((h) => h.move), ['attack2', 'attack1'], `LP ${lp}`);
-    assert.ok(d.held(0, 1));
-  }
-});
-
-test('midair_attack2 drives a grounded target into the ground; landing (fast) leads into a grounded attack1', () => {
-  for (const lp of [0, 40, 100]) {
-    const d = combo({ gap: 20, lp });
-    Object.assign(d.attacker.body, { y: 800 - 130, vy: 0, grounded: false, ground: null });
-    d.run((i) => ({ down: true, ...(i === 0 ? ATTACK2 : {}) }), 16);
-    assert.deepEqual(d.hits.map((h) => h.move), ['midair_attack2'], `LP ${lp}: the spike`);
-    d.run(() => ATTACK1, 1);
-    d.run(() => ({}), 30);
-    assert.deepEqual(d.hits.map((h) => h.move), ['midair_attack2', 'attack1'], `LP ${lp}`);
-    assert.ok(d.held(0, 1), `LP ${lp}: grounded pressure, unbroken`);
-  }
-});
-
-// ---- High Launch Point breaks them ---------------------------------------------------
-
-test('a high Launch Point launches the target too far for the same routes: combat turns to pursuit', () => {
-  // attack1 -> attack2: attack1's push alone carries the target out of reach.
-  for (const lp of [40, 80]) {
-    const d = combo({ gap: 40, lp });
-    d.run((i) => (i === 0 ? ATTACK1 : i === 4 ? ATTACK2 : {}), 60);
-    assert.ok(d.hits.length === 1 || !d.held(0, 1), `LP ${lp}: no attack1 -> attack2`);
-  }
-  // attack2 -> jump -> air attack1: the launch sends the target far above the jump.
-  for (const lp of [90, 120]) {
-    const d = combo({ gap: 40, lp });
-    d.run((i) => (i === 0 ? ATTACK2 : i === 18 ? JUMP : i === 21 ? ATTACK1 : {}), 70);
-    assert.ok(d.hits.length === 1 || !d.held(0, 1), `LP ${lp}: no attack2 -> air attack1`);
-  }
-  // The separation attack1 makes grows with Launch Point.
-  const pushed = (lp) => {
-    const d = combo({ gap: 40, lp });
-    d.run((i) => (i === 0 ? ATTACK1 : {}), 60);
-    return d.target.body.x - d.attacker.body.x;
-  };
-  assert.ok(pushed(0) < pushed(40) && pushed(40) < pushed(100));
-  assert.ok(pushed(100) > 200, 'far out of every reach');
-});
-
 // ---- Interruption --------------------------------------------------------------------
 
 test('a hit interrupts the target\'s own attack; two that connect on one step still trade', () => {
-  // The target winds up attack2 (three frames); an attack1 lands first.
+  // The target winds up Red (three frames before the orb leaves its
+  // hands); a Jab lands first.
   const d = combo({ gap: 40, targetHeld: (i) => (i === 0 ? ATTACK2 : {}) });
   d.run((i) => (i === 1 ? ATTACK1 : {}), 40);
   assert.deepEqual(d.hits.map((h) => h.move), ['attack1']);
-  assert.ok(!d.events.some((e) => e.attacker === d.target), 'its kick never came out');
+  assert.ok(!d.events.some((e) => e.attacker === d.target), 'its Red never came out');
+  assert.deepEqual(d.target.releases, [], 'and nothing is left to release');
 
   const t = duel({ gap: 40 });
   t.tick(ATTACK1, ATTACK1);

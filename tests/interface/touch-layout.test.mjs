@@ -240,14 +240,14 @@ test('every control of both schemes has a stable id, independent of its label', 
   try {
     localizeTree(tc.root);
     assert.equal(tc.mouvementButtons.get('mouvementLeft').getAttribute('aria-label'), 'Mouvement à gauche');
-    assert.equal(tc.actionButtons.get('attack1').getAttribute('aria-label'), 'Coup de poing');
+    assert.equal(tc.actionButtons.get('attack1').getAttribute('aria-label'), 'Direct');
     assert.equal(tc.getControlElements().get('mouvementLeft'), tc.mouvementButtons.get('mouvementLeft'));
     assert.deepEqual([...tc.getControlElements().keys()], [...TOUCH_CONTROL_IDS.joystick]);
   } finally {
     setLanguage('en');
     localizeTree(tc.root);
   }
-  assert.equal(tc.actionButtons.get('attack1').getAttribute('aria-label'), 'Punch');
+  assert.equal(tc.actionButtons.get('attack1').getAttribute('aria-label'), 'Jab');
 });
 
 // ---- Geometry ----------------------------------------------------------------------
@@ -556,25 +556,25 @@ test('setCharacter still swaps the fighter\'s art and names in place, and never 
   assert.equal(attack1.getAttribute('aria-label'), 'Attack 1');
   assert.equal(look(attack1), ICONS.pip1, 'neutral before a fighter is named');
   tc.setCharacter(DEF_0001);
-  assert.equal(attack1.getAttribute('aria-label'), 'Punch');
-  assert.equal(look(attack1), '0001_attack1_2.png', 'a frame of #0001\'s own punch');
+  assert.equal(attack1.getAttribute('aria-label'), 'Jab');
+  assert.equal(look(attack1), '0001_attack1_4.png', 'a frame of #0001\'s own Jab');
   assert.equal(look(tc.buttons.get('jump')), ICONS.jump);
   assert.deepEqual(placed(), before, 'still where the player put them, at their sizes');
   press(attack1, 1);
   assert.deepEqual(calls, [['attack1', true]], 'still attack1');
-  // And Attack 3 and Attack 4 are buttons of their own, named for the
-  // Clone Attack and the Sphere Rush, in slots 3 and 4, showing #0001's
-  // summoning hand seal and its rush.
-  for (const [id, label, slot, art] of [['attack3', 'Clone Attack', '3', '0001_attack3_summon_3.png'], ['attack4', 'Sphere Rush', '4', '0001_attack4_5.png']]) {
+  // And Attack 4 and Attack 5 are buttons of their own, named for
+  // Unlimited Void and Hollow Purple, in slots 4 and 5, showing #0001's
+  // hand sign and the purple sphere.
+  for (const [id, label, slot, art] of [['attack4', 'Unlimited Void', '4', '0001_attack4_6.png'], ['attack5', 'Hollow Purple', '5', '0001_attack5_object_1.png']]) {
     const b = tc.buttons.get(id);
     assert.equal(b.hidden, false, id);
     assert.equal(b.getAttribute('aria-label'), label);
     assert.equal(b.getAttribute('data-slot'), slot);
     assert.equal(look(b), art);
   }
-  press(tc.buttons.get('attack3'), 2);
-  press(tc.buttons.get('attack4'), 3);
-  assert.deepEqual(calls.slice(1), [['attack3', true], ['attack4', true]], 'each its own input');
+  press(tc.buttons.get('attack4'), 2);
+  press(tc.buttons.get('attack5'), 3);
+  assert.deepEqual(calls.slice(1), [['attack4', true], ['attack5', true]], 'each its own input');
   // #0002 (three numbered attacks, no Attack 4): its own art and jump, the
   // custom places and sizes kept.
   tc.releaseAll();
@@ -663,7 +663,7 @@ test('the editor opens on the scheme in use, as a modal with its own scope, the 
   assert.equal(editor.touch.scheme, 'classic');
   assert.equal(editor.touch.enabled, false, 'nothing it does reaches gameplay');
   assert.ok(editor.touchRoot.classList.contains('touch-controls'));
-  assert.equal(editor.touch.buttons.get('attack1').getAttribute('aria-label'), 'Punch', 'the fighter\'s own look');
+  assert.equal(editor.touch.buttons.get('attack1').getAttribute('aria-label'), 'Jab', 'the fighter\'s own look');
   for (const [id, node] of editor.touch.getControlElements('classic')) {
     assert.equal(node.hasAttribute('data-nav'), true, id);
     assert.equal(node.getAttribute('tabindex'), '0', id);

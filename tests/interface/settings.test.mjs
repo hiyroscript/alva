@@ -959,12 +959,7 @@ test('the Home credits still roll: both copies, the second hidden, every credit 
     CONFIG.title, 'Original work', '#0001 sprite source', '#0002 sprite source', 'Rights', 'Project',
   ]);
   assert.equal(credits[0].lead, `Created by ${CONFIG.developer}`);
-  assert.deepEqual(credits[2].lines, [
-    'Original sprite material from Jump Ultimate Stars',
-    'The Spriters Resource',
-    'Source sheet uploaded by Dazz',
-    'Contributor: FRET',
-  ]);
+  assert.deepEqual(credits[2].lines, ['Sprite sheet by Finhj on DeviantArt', 'Sheet credits: ZetrasBlack, R0B4N']);
   assert.deepEqual(credits[3].lines, ['Sprite sheet by thespriteanimations on DeviantArt']);
   assert.equal(CREDITS.length, credits.length);
   assert.match(read('js/screens/home-screen.js'), /import \{ CREDITS, creditLabel, creditLink \} from '\.\.\/ui\/credits\.js';/);
@@ -997,10 +992,9 @@ test('in French the credits translate but proper names stay', () => {
     assert.equal(credits[0].title, CONFIG.title);
     assert.equal(credits[0].lead, `Créé par ${CONFIG.developer}`);
     assert.equal(credits[1].title, 'Création originale');
-    assert.ok(credits[2].lines[0].includes('Jump Ultimate Stars'));
-    assert.equal(credits[2].lines[1], 'The Spriters Resource');
-    assert.ok(credits[2].lines[2].includes('Dazz'));
-    assert.ok(credits[2].lines[3].includes('FRET'));
+    assert.equal(credits[2].title, 'Source des sprites de #0001');
+    assert.ok(credits[2].lines[0].includes('Finhj') && credits[2].lines[0].includes('DeviantArt'));
+    assert.ok(credits[2].lines[1].includes('ZetrasBlack') && credits[2].lines[1].includes('R0B4N'));
     assert.equal(credits[3].title, 'Source des sprites de #0002');
     assert.ok(credits[3].lines[0].includes('thespriteanimations') && credits[3].lines[0].includes('DeviantArt'));
     assert.equal(credits[4].title, 'Droits');
@@ -1011,15 +1005,16 @@ test('in French the credits translate but proper names stay', () => {
   assert.equal(t('credits.rights.title'), 'Rights');
 });
 
-// Every name a removed fighter's art was credited with: none of it applies
-// now. (DeviantArt, where the first #0002's sheet came from, is where the
-// new #0002's sheet was published too: credited again, by its own artist.)
+// Every name a removed or replaced fighter's art was credited with (the
+// first #0001's included): none of it applies now. (DeviantArt, where the
+// first #0002's sheet came from, is where the new #0002's and #0001's
+// sheets were published too: credited again, by their own artists.)
 const RETIRED_CREDITS = [
   'Slender', 'Eric Knudsen', 'Victor Surge', 'Something Awful', 'XmayGrrr', 'Jus Sheet', 'renatoooferreiraaa',
-  'Dazz & Fret',
+  'Dazz', 'FRET', 'Jump Ultimate Stars', 'Spriters Resource',
 ];
 
-test('the credits name only fighters that exist: a sprite group for each, #0001\'s unchanged, and nothing of a removed fighter is left', () => {
+test('the credits name only fighters that exist: a sprite group for each, #0001\'s its own sheet\'s, and nothing of a removed or replaced fighter is left', () => {
   const names = new Set(CHARACTERS.map((c) => c.displayName));
   for (const language of ['en', 'fr']) {
     setLanguage(language);
@@ -1036,23 +1031,24 @@ test('the credits name only fighters that exist: a sprite group for each, #0001\
   }
   // Gone from the data and its translations too.
   assert.deepEqual(CREDITS.map((g) => g.title), [
-    'brand.title', 'credits.original.title', 'credits.sprites.title', 'credits.sprites0002.title', 'credits.rights.title',
+    'brand.title', 'credits.original.title', 'credits.sprites0001.title', 'credits.sprites0002.title', 'credits.rights.title',
     'credits.project.title',
   ]);
-  // One linked line: #0002's sheet, on its DeviantArt page.
+  // Two linked lines: #0001's and #0002's sheets, each on its DeviantArt
+  // page (#0001's by the deviation's number alone, naming nothing).
   const links = CREDITS.flatMap((g) => g.lines || []).filter((line) => line?.href);
-  assert.equal(links.length, 1);
-  assert.match(links[0].href, /^https:\/\/www\.deviantart\.com\/thespriteanimations\/art\/[\w-]*1350194762$/);
-  assert.doesNotMatch(read('js/ui/credits.js'), /slender|sprites000[13]|Dazz & Fret/i);
+  assert.equal(links.length, 2);
+  assert.equal(links[0].href, 'https://www.deviantart.com/finhj/art/1084627848');
+  assert.match(links[1].href, /^https:\/\/www\.deviantart\.com\/thespriteanimations\/art\/[\w-]*1350194762$/);
+  assert.doesNotMatch(read('js/ui/credits.js'), /slender|sprites0003|credits\.sprites\.|Dazz|FRET/i);
   for (const file of ['js/localization/i18n.js', 'js/localization/strings/en.js', 'js/localization/strings/fr.js']) {
-    assert.doesNotMatch(read(file), /credits\.\d|credits\.sprites000[13]|slender|XmayGrrr/i, file);
+    assert.doesNotMatch(read(file), /credits\.\d|credits\.sprites0003|credits\.sprites\.|slender|XmayGrrr/i, file);
   }
-  // #0001's attribution is all still there, unchanged, and the notices after it.
+  // #0001's attribution: its sheet's artist and the credits the sheet
+  // gives, then the notices after it.
   const credits = creditsText();
   const at = credits.findIndex((g) => g.title === '#0001 sprite source');
-  assert.deepEqual(credits[at].lines, [
-    'Original sprite material from Jump Ultimate Stars', 'The Spriters Resource', 'Source sheet uploaded by Dazz', 'Contributor: FRET',
-  ]);
+  assert.deepEqual(credits[at].lines, ['Sprite sheet by Finhj on DeviantArt', 'Sheet credits: ZetrasBlack, R0B4N']);
   assert.deepEqual(credits.slice(at + 1).map((g) => g.title), ['#0002 sprite source', 'Rights', 'Project']);
 });
 
@@ -1060,11 +1056,12 @@ test('a credit line may still link to its source, accessibly, from the Home roll
   // A linked line, added for this check only: the address is data, its
   // label a translation key like any line's.
   const href = 'https://example.com/source-page';
-  const group = { title: 'credits.sprites.title', lines: [{ label: 'credits.sprites.site', href }] };
+  const group = { title: 'credits.sprites0001.title', lines: [{ label: 'credits.sprites0001.sheet', href }] };
   CREDITS.splice(CREDITS.length - 2, 0, group);
   const { home, done } = boot();
   try {
-    // Only the line added here (#0002's own linked credit is left aside).
+    // Only the line added here (#0001's and #0002's own linked credits are
+    // left aside).
     const [first, copy] = home.el.querySelectorAll('.home-credits-seq')
       .map((seq) => seq.querySelectorAll('.home-credit-link').filter((a) => a.getAttribute('href') === href));
     assert.equal(first.length, 1);
@@ -1074,8 +1071,8 @@ test('a credit line may still link to its source, accessibly, from the Home roll
       assert.equal(a.getAttribute('href'), href);
       assert.equal(a.getAttribute('target'), '_blank');
       assert.equal(a.getAttribute('rel'), 'noopener noreferrer');
-      assert.equal(a.textContent, 'The Spriters Resource', 'a descriptive name, not a bare address');
-      assert.equal(a.getAttribute('data-i18n'), 'credits.sprites.site', 'it follows the language');
+      assert.equal(a.textContent, 'Sprite sheet by Finhj on DeviantArt', 'a descriptive name, not a bare address');
+      assert.equal(a.getAttribute('data-i18n'), 'credits.sprites0001.sheet', 'it follows the language');
       assert.ok(a.parentNode.classList.contains('home-credit-line'));
     }
     assert.equal(first[0].getAttribute('tabindex'), null, 'reachable by Tab');
@@ -1102,7 +1099,7 @@ test('English and French credits keep the same structure, and French keeps every
   }
   assert.deepEqual(fr.map((g) => [g.lead === null, g.lines.length]), en.map((g) => [g.lead === null, g.lines.length]));
   const at = en.findIndex((g) => g.title === '#0001 sprite source');
-  for (const name of ['Jump Ultimate Stars', 'The Spriters Resource', 'Dazz', 'FRET']) {
+  for (const name of ['Finhj', 'DeviantArt', 'ZetrasBlack', 'R0B4N']) {
     assert.ok(fr[at].lines.join(' ').includes(name), `fr: ${name}`);
   }
 });

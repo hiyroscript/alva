@@ -16,16 +16,16 @@
 //                  [1]  [2]  [JUMP]
 //
 //   2 attacks   slots 1 2
-//   3 attacks   slots 1 2 3 (attack3 in 3)
-//   4 attacks   slots 1 2 3 4 (#0001: its Clone Attack in 3, its Sphere
-//               Rush in 4)
-//   5 attacks   slots 1 2 3 4 5
+//   3 attacks   slots 1 2 3 (attack3 in 3; #0002)
+//   4 attacks   slots 1 2 3 4
+//   5 attacks   slots 1 2 3 4 5 (#0001: its two techniques, Unlimited
+//               Void and Hollow Purple, in 4 and 5)
 //
 // Whatever kind of move a numbered button is (an ordinary attack, a summon,
 // a technique), it is pressed the same way. Only the art and accessible
 // names are player-facing: the input codenames never change with them, so
-// Clone Attack is attack3 and Sphere Rush is attack4, and nothing a button
-// shows decides what it does.
+// Unlimited Void is attack4 and Hollow Purple is attack5, and nothing a
+// button shows decides what it does.
 //
 // Every pointer is tracked by pointerId, so the joystick (or Left / Right)
 // and Jump, or any other combination, work simultaneously. State is pushed
@@ -531,10 +531,10 @@ export class TouchControls {
   // instead (the touch layout editor, whose layout every fighter shares).
   //
   // The numbered attack buttons on show then take their slots (see
-  // attackSlots): as many as the fighter has numbered attacks, so #0001
-  // shows four (Punch, Kick, Clone Attack and Sphere Rush) and a fighter
-  // with attack1 to attack5 shows five. attack1's and attack2's places stay
-  // empty when hidden, so no other button moves for them.
+  // attackSlots): as many as the fighter has numbered attacks, so #0002
+  // shows three and #0001 (attack1 to attack5) five. attack1's and
+  // attack2's places stay empty when hidden, so no other button moves for
+  // them.
   setCharacter(def) {
     this.character = def;
     this.airborne = false;
