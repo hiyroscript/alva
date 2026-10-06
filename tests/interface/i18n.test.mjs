@@ -189,10 +189,8 @@ test('French is really French: only proper names, codes and shared words read th
     .filter((k) => typeof STRINGS.en[k] === 'string' && STRINGS.en[k] === STRINGS.fr[k])
     .sort();
   assert.deepEqual(same, [
-    'ability.0001.extra_attack', // Shuriken
     'brand.title', // ALVA
     'control.pause', // Pause
-    'credits.sprites.site', // The Spriters Resource
     'difficulty.brutal.name', // Brutal
     'hud.pause', // Pause
     'hud.round', // ROUND n
@@ -441,9 +439,10 @@ test('changing the language re-reads the whole interface at once: menus, setup s
     // Touch-control names, the fighter's own included; the codenames never.
     assert.deepEqual(touch.dpad.children.map((b) => b.getAttribute('aria-label')), ['Aller à gauche', 'Aller à droite']);
     assert.equal(touch.dpad.getAttribute('aria-label'), 'Déplacement');
-    assert.equal(touch.buttons.get('attack2').getAttribute('aria-label'), 'Coup de pied');
-    assert.equal(touch.buttons.get('attack3').getAttribute('aria-label'), 'Attaque du clone');
-    assert.equal(touch.buttons.get('attack4').getAttribute('aria-label'), 'Ruée sphérique');
+    assert.equal(touch.buttons.get('attack2').getAttribute('aria-label'), 'Rouge');
+    assert.equal(touch.buttons.get('attack3').getAttribute('aria-label'), 'Bleu maximal');
+    assert.equal(touch.buttons.get('attack4').getAttribute('aria-label'), 'Vide infini');
+    assert.equal(touch.buttons.get('attack5').getAttribute('aria-label'), 'Violet creux');
     assert.equal(touch.buttons.get('shield').getAttribute('aria-label'), 'Bouclier');
     assert.deepEqual(touch.dpad.children.map((b) => b.getAttribute('data-action')), ['runLeft', 'runRight']);
     // Keyboard hints, keycaps too.
@@ -460,9 +459,10 @@ test('changing the language re-reads the whole interface at once: menus, setup s
   // And back.
   localizeTree(body);
   assert.equal(mode.el.querySelector('.screen-title').textContent, 'Select Mode');
-  assert.equal(touch.buttons.get('attack2').getAttribute('aria-label'), 'Kick');
-  assert.equal(touch.buttons.get('attack3').getAttribute('aria-label'), 'Clone Attack');
-  assert.equal(touch.buttons.get('attack4').getAttribute('aria-label'), 'Sphere Rush');
+  assert.equal(touch.buttons.get('attack2').getAttribute('aria-label'), 'Red');
+  assert.equal(touch.buttons.get('attack3').getAttribute('aria-label'), 'Maximum Blue');
+  assert.equal(touch.buttons.get('attack4').getAttribute('aria-label'), 'Unlimited Void');
+  assert.equal(touch.buttons.get('attack5').getAttribute('aria-label'), 'Hollow Purple');
   assert.equal(describeEnergy({ maxEnergy: 100, energy: 75, energyExhausted: false }), 'Energy 75 of 100');
 });
 
@@ -506,8 +506,8 @@ test('every fighter-specific string belongs to a fighter that exists, in either 
     for (const key of Object.keys(table)) {
       const owner = key.match(/^ability\.([^.]+)\./)?.[1];
       if (owner) assert.ok(ids.has(owner), `${language}: ${key} names no fighter that exists`);
-      // A sprite credit group is #0001's (credits.sprites) or another
-      // existing fighter's (credits.sprites<id>), never a removed one's.
+      // A sprite credit group is an existing fighter's
+      // (credits.sprites<id>), never a removed one's.
       const credited = key.match(/^credits\.sprites(\d{4})\./)?.[1];
       if (credited) assert.ok(ids.has(credited), `${language}: ${key} credits no fighter that exists`);
       assert.doesNotMatch(key, /^credits\.\d/, `${language}: ${key}`);
@@ -518,8 +518,8 @@ test('every fighter-specific string belongs to a fighter that exists, in either 
   }
   // #0001's own strings stay: its ability names and its sprite credits; and
   // #0002's are there.
-  assert.equal(STRINGS.fr['ability.0001.attack1'], 'Coup de poing');
-  assert.equal(STRINGS.en['credits.sprites.title'], '#0001 sprite source');
+  assert.equal(STRINGS.fr['ability.0001.attack1'], 'Direct');
+  assert.equal(STRINGS.en['credits.sprites0001.title'], '#0001 sprite source');
   assert.equal(STRINGS.en['credits.sprites0002.title'], '#0002 sprite source');
   assert.equal(STRINGS.fr['ability.0002.extra_attack'], 'Tourbillon');
 });

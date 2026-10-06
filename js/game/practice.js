@@ -11,17 +11,18 @@
 // moves, jumps, attacks or shields of its own accord (Fighter falls
 // back to neutral input), and keeps its spawn's facing: like every fighter
 // it never turns toward its opponent by itself. It is otherwise a normal
-// fighter: it takes real hits, hitstun, launches and binds, collides, and
+// fighter: it takes real hits, hitstun, launches and paralysis, collides, and
 // the camera frames it as the secondary fighter. Its Launch Point builds up
 // like anyone's (and launching hits send it further as it does), shown on
 // its own HUD card, and every hit it takes also floats the Launch Point it
 // added over its head (damageNumbers, "+5").
 //
-// With no CPU, moves aimed at an opponent fall back or miss on their own: a
-// summon (#0001's attack3 clone) has nobody to appear behind, so the press is
-// an ordinary attack1 and its cooldown does not start (Fighter.trySummon);
-// the Sphere Rush (attack4) finds no one to catch and ends as a miss (its
-// cooldown still spent); attacks and projectiles strike nothing.
+// With no CPU, moves aimed at an opponent find no one on their own: a
+// summon has nobody to appear behind, so the press does nothing and its
+// cooldown does not start (Fighter.trySummon); a technique still casts (its
+// cooldown spent), its burst catching no one and its projectile flying on
+// (e.g. #0001's Unlimited Void and Hollow Purple); attacks, pulls and
+// projectiles strike nothing.
 //
 // The Void never ends practice and scores nothing: a fighter that falls into
 // it is out of play for CONFIG.battle.respawnSeconds, then back at its own
@@ -103,14 +104,13 @@ export class PracticeSession extends Arena {
   }
 
   // Takes the CPU out of the session, if there is one, with every reference
-  // to it: a technique of the player's holding it ends, a summon's startup
-  // cast at it is cut short (its cooldown runs on), clones summoned at it
-  // go, and so do its numbers. Practice is then solo again.
+  // to it: a summon's startup cast at it is cut short (its cooldown runs
+  // on), clones summoned at it go, and so do its numbers. Practice is then
+  // solo again.
   removeCPU() {
     const cpu = this.cpu;
     if (!cpu) return;
     const player = this.player;
-    if (player.technique?.target === cpu) player.endTechnique('released');
     if (player.pendingSummon?.target === cpu) player.cancelSummon();
     player.summons = player.summons.filter((s) => s.target !== cpu);
     cpu.endTechnique('destroy');

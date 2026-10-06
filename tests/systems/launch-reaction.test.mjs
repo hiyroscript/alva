@@ -14,7 +14,7 @@ const close = (a, b, eps = 1e-9) => Math.abs(a - b) < eps;
 const deg = (v) => (Math.atan2(v.y, v.x) * 180) / Math.PI;
 
 test('#0001\'s launch reaction is data, and a fighter without one responds exactly as before', () => {
-  assert.deepEqual(R, { stunPerThousand: 0.2, maxStun: 0.7, tumbleSpeed: 1100, steerAngle: 15 });
+  assert.deepEqual(R, { stunPerThousand: 0.2, maxStun: 0.7, tumbleSpeed: 1100, steerAngle: 18 });
   const none = resolveLaunchReaction(undefined);
   assert.equal(resolveLaunchStun(3000, none), 0);
   assert.equal(none.tumbleSpeed, Infinity);
@@ -27,28 +27,30 @@ test('a harder launch stuns longer, up to a cap; a hit that launches nothing kee
   assert.ok(close(resolveLaunchStun(1000, R), 0.2));
   assert.ok(close(resolveLaunchStun(2000, R), 0.4));
   assert.equal(resolveLaunchStun(10000, R), R.maxStun, 'capped');
-  // Through the real CombatSystem: attack2 on a target at 55 launches at 1200.
+  // Through the real CombatSystem: the High Kick on a target at 55 launches
+  // at 1200.
   const d = duel({ gap: 40 });
   d.target.combat.launchPoint = 55;
-  d.tick(P('attack2'));
+  d.tick(P('extra_attack'));
   d.until(() => d.events.length > 0, 30);
   const [e] = d.events;
   assert.equal(e.launchSpeed, 120 * U);
-  assert.ok(close(e.hitstun, def.attacks.attack2.hitstun + 0.24));
+  assert.ok(close(e.hitstun, def.attacks.extra_attack.hitstun + 0.24));
   assert.equal(d.target.combat.stun, e.hitstun);
-  // The shuriken never launches: its stun is its own.
+  // Maximum Blue's grinding ticks never launch: their stun is their own.
   const s = duel({ gap: 200 });
   s.target.combat.launchPoint = 300;
-  s.tick(P('extra_attack'));
-  s.until(() => s.events.length > 0, 60);
+  s.tick(P('attack3'));
+  s.until(() => s.events.length > 0, 90);
+  assert.equal(s.events[0].move, 'attack3_object');
   assert.equal(s.events[0].launchSpeed, 0);
-  assert.equal(s.events[0].hitstun, def.projectiles.extra_attack_object.hitstun);
+  assert.equal(s.events[0].hitstun, def.projectiles.attack3_object.hitstun);
 });
 
 test('launched hard, a fighter tumbles in its mid-air hurt pose past the stun, until it acts or lands', () => {
   const d = duel({ gap: 40 });
   d.target.combat.launchPoint = 80;
-  d.tick(P('attack2'));
+  d.tick(P('extra_attack'));
   d.until(() => d.events.length > 0, 30);
   assert.ok(d.events[0].launchSpeed >= R.tumbleSpeed);
   assert.equal(d.target.tumbling, true);
@@ -68,17 +70,17 @@ test('launched hard, a fighter tumbles in its mid-air hurt pose past the stun, u
   // A slower launch never tumbles; landing ends one.
   const slow = duel({ gap: 40 });
   slow.target.combat.launchPoint = 20;
-  slow.tick(P('attack2'));
+  slow.tick(P('extra_attack'));
   slow.until(() => slow.events.length > 0, 30);
   assert.equal(slow.target.tumbling, false);
   const land = duel({ gap: 40 });
   land.target.combat.launchPoint = 80;
-  land.tick(P('attack2'));
+  land.tick(P('extra_attack'));
   land.until(() => land.target.grounded && land.events.length > 0, 240);
   assert.equal(land.target.tumbling, false);
 });
 
-test('launch steering bends a launch toward the held direction by up to 15 degrees; its speed never changes', () => {
+test('launch steering bends a launch toward the held direction by up to the steer angle; its speed never changes', () => {
   const up = { x: 0, y: -1000 };
   const right = steerLaunch(up, { x: 1, y: 0 }, R.steerAngle);
   assert.ok(close(Math.hypot(right.x, right.y), 1000), 'same speed');
@@ -101,7 +103,7 @@ test('in play, the target\'s held direction steers the launch; with nothing held
   const launched = (held) => {
     const d = duel({ gap: 40 });
     d.target.combat.launchPoint = 65;
-    d.tick(P('attack2'));
+    d.tick(P('extra_attack'));
     // Held on the step the kick lands (walking away any sooner would dodge it).
     const landing = () => d.attacker.combat.attack.time + DT >= d.attacker.combat.attack.def.startup - 1e-6;
     for (let i = 0; i < 30 && !d.events.length; i++) d.tick({}, landing() ? held : {});
@@ -128,6 +130,6 @@ test('a hit gives back the air jump, so a launched fighter can steer and jump it
   fighter.airJumps = 0;
   const system = new CombatSystem();
   const attacker = makeFighter({ x: 460 }).fighter;
-  system.applyHit(attacker, fighter, { ...fighter.attacks.attack2, id: 'attack2' });
+  system.applyHit(attacker, fighter, { ...fighter.attacks.extra_attack, id: 'extra_attack' });
   assert.equal(fighter.airJumps, def.movement.airJumps);
 });

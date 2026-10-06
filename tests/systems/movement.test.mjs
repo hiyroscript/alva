@@ -235,11 +235,24 @@ test('fast fall only while free to fall: never on the ground, in hitstun or behi
   assert.equal(shielded.fighter.combat.shielding, true);
   assert.equal(shielded.fighter.fastFalling, false);
 
-  const aerial = falling();
-  aerial.step({ ...DOWN, ...P('attack2') });
-  assert.equal(aerial.fighter.combat.attack?.def.id, 'midair_attack2');
-  aerial.step(DOWN);
-  assert.equal(aerial.fighter.fastFalling, true, 'return to the ground after an aerial');
+  // A plain aerial (one with no motion of its own: #0001's Floating
+  // Straight without its hover) may fast-fall.
+  const plainAir = { ...def, attacks: { ...def.attacks, midair_attack1: { ...def.attacks.midair_attack1, motion: undefined } } };
+  const f = makeFighter({ character: plainAir });
+  f.step(JUMP);
+  while (f.fighter.body.vy < 0) f.step();
+  f.step();
+  f.step({ ...DOWN, ...P('attack1') });
+  assert.equal(f.fighter.combat.attack?.def.id, 'midair_attack1');
+  f.step(DOWN);
+  assert.equal(f.fighter.fastFalling, true, 'return to the ground after an aerial');
+  // One that hovers neither falls nor fast-falls while it plays.
+  const hover = falling();
+  hover.step({ ...DOWN, ...P('attack1') });
+  assert.equal(hover.fighter.combat.attack?.def.motion.type, 'hover');
+  hover.step(DOWN);
+  assert.equal(hover.fighter.fastFalling, false);
+  assert.equal(hover.fighter.body.vy, 0, 'standing on the air');
 });
 
 test('a fast fall lands on a one-way platform like any fall, never through it', () => {
@@ -328,64 +341,86 @@ test('running into attack1 keeps its momentum share and slides on it under its o
   }
 });
 
-test('attack2 steps in on its first frame; the Throw keeps half a run and may be steered, turning the way it is steered', () => {
-  const attack2 = def.attacks.attack2;
+test('the High Kick steps in on its leap frame; an attack with control keeps a share of a run and may be steered, turning the way it is steered', () => {
+  const kick = def.attacks.extra_attack;
   const { fighter, step } = makeFighter();
-  step(P('attack2'));
-  assert.ok(close(fighter.body.vx, attack2.step.speed - mv.deceleration * attack2.friction * DT), 'its step-in');
+  step(P('extra_attack'));
+  assert.equal(fighter.body.vx, 0, 'standing: no speed to keep');
+  while (fighter.combat.attack.time < kick.step.at - 1e-9) step({});
+  assert.ok(close(fighter.body.vx, kick.step.speed - mv.deceleration * kick.friction * DT), 'its step-in, as the leap frame shows');
   const x = fighter.body.x;
   while (fighter.state === 'attack') step({});
   assert.ok(fighter.body.x - x > 10 && fighter.body.x - x < 30, 'a subtle step forward');
   // Facing left, it steps left.
   const left = makeFighter({ facing: -1 });
-  left.step(P('attack2'));
+  left.step(P('extra_attack'));
+  while (left.fighter.combat.attack.time < kick.step.at - 1e-9) left.step({});
   assert.ok(left.fighter.body.vx < 0);
 
-  const thr = def.attacks.extra_attack;
-  const t = running();
-  t.step({ ...RIGHT, ...P('extra_attack') });
-  assert.equal(t.fighter.combat.attack.def.id, 'extra_attack');
+  // Steering through an attack (`control`): Red, given a little.
+  const steered = { ...def, attacks: { ...def.attacks, attack2: { ...def.attacks.attack2, control: 0.3 } } };
+  const red = def.attacks.attack2;
+  const t = running({ character: steered });
+  t.step({ ...RIGHT, ...P('attack2') });
+  assert.equal(t.fighter.combat.attack.def.id, 'attack2');
   const kept = t.fighter.body.vx;
-  assert.ok(kept > 0 && kept < t.fighter.maxSpeed * thr.momentum);
+  assert.ok(kept > 0 && kept < t.fighter.maxSpeed * red.momentum);
   let reversed = false;
   for (t.step(LEFT); t.fighter.state === 'attack'; t.step(LEFT)) {
     assert.equal(t.fighter.facing, -1, 'turned by the direction held');
     reversed ||= t.fighter.body.vx < 0;
   }
-  assert.ok(reversed, 'steered the other way while it throws');
+  assert.ok(reversed, 'steered the other way while it releases');
 });
 
-test('aerials keep their drift and steer with their airControl; landing keeps only what is left of them', () => {
+test('aerials keep their share of the drift and steer with their airControl; landing keeps only what is left of them', () => {
   const { fighter, step } = running();
   step({ ...RIGHT, ...JUMP });
   step({ ...RIGHT, ...P('attack1') });
   const atk = fighter.combat.attack;
   assert.equal(atk.def.id, 'midair_attack1');
-  // Its whole drift (airMomentum 1), above its own steering cap: only the
-  // air drag eases it, holding on or not.
-  assert.ok(close(fighter.body.vx, fighter.maxSpeed - mv.airDeceleration * DT), 'its whole drift');
-  // Steering with 60% of the air control: capped at that share of top speed.
+  // Half its drift (airMomentum 0.5), above its own steering cap (0.4 of
+  // top speed): only the air drag eases it, holding on or not.
+  const drift = fighter.maxSpeed * atk.def.airMomentum;
+  assert.ok(close(fighter.body.vx, drift - mv.airDeceleration * DT), 'its share of the drift');
   for (let i = 0; i < 4; i++) step(LEFT);
-  assert.ok(fighter.body.vx < fighter.maxSpeed - 4 * mv.airDeceleration * DT, 'steered');
-  // A midair_attack2 started just before touchdown keeps its own clip after
+  assert.ok(fighter.body.vx < drift - 4 * mv.airDeceleration * DT, 'steered');
+  // A plain aerial started just before touchdown keeps its own clip after
   // landing, then the fighter acts at once: no extra lock.
-  const low = makeFighter();
+  const plainAir = { ...def, attacks: { ...def.attacks, midair_attack1: { ...def.attacks.midair_attack1, motion: undefined } } };
+  const low = makeFighter({ character: plainAir });
   low.step(JUMP);
   while (low.fighter.body.vy < 0 || low.fighter.body.y < 790) low.step();
-  low.step(P('attack2'));
-  const kick = low.fighter.combat.attack;
-  assert.equal(kick.def.id, 'midair_attack2');
+  low.step(P('attack1'));
+  const punch = low.fighter.combat.attack;
+  assert.equal(punch.def.id, 'midair_attack1');
   let steps = 0;
   let landed = false;
-  while (low.fighter.combat.attack === kick) {
+  while (low.fighter.combat.attack === punch) {
     low.step();
     steps++;
     landed ||= low.fighter.grounded;
   }
   assert.ok(landed, 'landed during it');
-  assert.equal(steps, Math.round(kick.def.total / DT), 'its own length, not restarted');
+  assert.equal(steps, Math.round(punch.def.total / DT), 'its own length, not restarted');
+  for (let i = 0; i < 10 && low.fighter.combat.cooldowns.size; i++) low.step();
   low.step(P('attack1'));
-  assert.equal(low.fighter.combat.attack?.def.id, 'attack1', 'free on the very next step');
+  assert.equal(low.fighter.combat.attack?.def.id, 'attack1', 'free on the ground again');
+  // #0001's own hovers instead: started that low, it stays up for the whole
+  // attack and only lands after it.
+  const hover = makeFighter();
+  hover.step(JUMP);
+  while (hover.fighter.body.vy < 0 || hover.fighter.body.y < 790) hover.step();
+  hover.step(P('attack1'));
+  const y = hover.fighter.body.y;
+  const floating = hover.fighter.combat.attack;
+  while (hover.fighter.combat.attack === floating) {
+    assert.equal(hover.fighter.grounded, false);
+    assert.equal(hover.fighter.body.y, y, 'never lower');
+    hover.step();
+  }
+  hover.step();
+  assert.ok(hover.fighter.body.y > y, 'and falls again once it is over');
 });
 
 test('attack movement is data with defaults: an attack that declares none is planted; lockMovement false keeps locomotion', () => {
@@ -524,13 +559,18 @@ test('a stunned fighter\'s push or launch runs down at its own hitstun rates, ap
   assert.deepEqual([mv.hitstunFriction, mv.hitstunAirDrag], [1600, 210]);
 });
 
-test('the Sphere Rush still owns its own movement: its authored rush speed, whatever the new locomotion', () => {
+test('a technique holds its fighter still: Unlimited Void\'s cast never moves, whatever is held', () => {
   const d = duel({ gap: 600 });
+  for (let i = 0; i < 20; i++) d.tick({ runRight: true });
+  assert.ok(d.attacker.body.vx > 0, 'running');
   d.tick(P('attack4'));
   assert.ok(d.attacker.technique);
-  d.until(() => d.attacker.technique?.phase === 'dash', 60);
-  d.tick({ runLeft: true });
-  assert.equal(d.attacker.body.vx, def.techniques.attack4.dashSpeed, 'held input ignored');
+  const x = d.attacker.body.x;
+  while (d.attacker.technique) {
+    assert.equal(d.attacker.body.vx, 0, 'held input ignored');
+    d.tick({ runLeft: true });
+  }
+  assert.ok(Math.abs(d.attacker.body.prevX - x) < 1e-9, 'not a unit until it is over');
 });
 
 test('a fresh Fighter with a character that declares no new movement stats still moves (the old fields suffice)', () => {

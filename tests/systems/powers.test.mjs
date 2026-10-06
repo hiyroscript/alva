@@ -35,7 +35,7 @@ const withSpeed = (tier) => ({ ...def, powers: { ...def.powers, speed: tier } })
 
 const SPEEDS = [[1, 270], [2, 330], [3, 360]];
 
-// Bespoke hits (like the Sphere Rush's explosion) that launch upward and
+// Bespoke hits (no fighter's own moves) that launch upward and
 // push sideways, for checking what a target's Powers do, or don't do, to its
 // flight. On a fresh target (0 Launch Point) the damage is the whole new
 // Launch Point: 3 x 16 = 48 of strength, 480 upward, and 2 x 13 = 26, 260
@@ -525,7 +525,7 @@ function shieldFrom(character) {
   return { poses, moved: fighter.body.x - x };
 }
 
-test('Speed Power leaves every other velocity alone: launches received, the shuriken, the Sphere Rush and the Shield', () => {
+test('Speed Power leaves every other velocity alone: launches received, Red, Hollow Purple and the Shield', () => {
   // Launches received: tier 1 and tier 3 targets fly alike, pushed sideways
   // and launched upward.
   const flights = [1, 3].map((tier) => {
@@ -551,26 +551,18 @@ test('Speed Power leaves every other velocity alone: launches received, the shur
     const character = withSpeed(tier);
     const label = `Speed Power ${tier}`;
 
-    // The shuriken flies at its own 700.
-    const thrower = makeFighter({ character });
-    const projectiles = [];
-    for (let i = 0; i < 30 && !projectiles.length; i++) {
-      thrower.step(i === 0 ? { extra_attack: true, extra_attackPressed: true } : {});
-      spawnProjectiles([thrower.fighter], projectiles);
+    // Red flies at its own 900, and Hollow Purple at its own 640.
+    for (const [button, id, speed] of [['attack2', 'attack2_object', 900], ['attack5', 'attack5_object', 640]]) {
+      const thrower = makeFighter({ character });
+      const projectiles = [];
+      for (let i = 0; i < 120 && !projectiles.length; i++) {
+        thrower.step(i === 0 ? { [button]: true, [`${button}Pressed`]: true } : {});
+        spawnProjectiles([thrower.fighter], projectiles);
+      }
+      assert.equal(projectiles.length, 1, `${label}: ${id}`);
+      assert.equal(projectiles[0].vx, def.projectiles[id].speed, `${label}: ${id}`);
+      assert.equal(def.projectiles[id].speed, speed);
     }
-    assert.equal(projectiles.length, 1);
-    assert.equal(projectiles[0].vx, def.projectiles.extra_attack_object.speed, label);
-    assert.equal(def.projectiles.extra_attack_object.speed, 700);
-
-    // The Sphere Rush dashes at its own 1050.
-    const rusher = makeFighter({ character });
-    rusher.step({});
-    rusher.step({ attack4: true, attack4Pressed: true });
-    const technique = rusher.fighter.technique;
-    assert.ok(technique, `${label}: the Sphere Rush started`);
-    stepUntil(rusher.step, () => technique.phase === 'dash');
-    assert.equal(rusher.fighter.body.vx, def.techniques.attack4.dashSpeed, label);
-    assert.equal(def.techniques.attack4.dashSpeed, 1050);
 
     // A Shield held from standing still adds no movement, however fast the
     // fighter could run.

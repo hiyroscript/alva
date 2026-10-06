@@ -131,39 +131,48 @@ test('a fall takes the fighter out of play at once; it is back exactly 2 s later
   assert.equal('invulnerable' in p1.combat, false);
 });
 
-test('whatever held or aimed at a fallen fighter lets go: a Sphere Rush bind, clones and projectiles', () => {
+test('whatever aimed at a fallen fighter or came from it goes: summons, clones, projectiles, its own technique; it comes back unparalysed', () => {
   const { battle, run, script } = match();
   const { p1, p2 } = battle;
   p2.body.x = p1.body.x + 120;
   run(10);
+  // Unlimited Void paralyses the CPU where it stands.
   script.held = { attack4: true, attack4Pressed: true };
   run();
   script.held = {};
-  const rush = p1.technique;
-  for (let i = 0; i < 120 && !rush.hitConfirmed; i++) run();
-  assert.ok(p2.combat.immobilized);
+  for (let i = 0; i < 120 && !p2.combat.immobilized; i++) run();
+  assert.ok(p2.combat.immobilized, 'paralysed');
   p1.summons.push({ id: 'attack3', target: p2 });
-  // A shuriken of the CPU's own, far off (it strikes nothing).
+  // A projectile of the CPU's own, far off (it strikes nothing).
   const far = { x: -1e5, y: -1e5, w: 1, h: 1 };
-  battle.projectiles.push({ alive: true, owner: p2, update() {}, interpolate() {}, hitbox: (out) => Object.assign(out, far) });
+  battle.projectiles.push({ alive: true, owner: p2, def: {}, update() {}, interpolate() {}, hitbox: (out) => Object.assign(out, far) });
   intoVoid(battle, p2);
   run();
   assert.equal(p2.lostToVoid, true);
-  assert.equal(p1.technique, null);
-  assert.equal(rush.endReason, 'released');
-  assert.equal(p2.combat.immobilized, false);
   assert.deepEqual(p1.summons, []);
   assert.ok(battle.clones.every((c) => c.target !== p2 && c.owner !== p2));
-  assert.ok(battle.projectiles.every((p) => p.owner !== p2), 'its own shuriken went too');
-  // While it is out, an attack3 has nobody to appear behind: nothing at
-  // all (never a Punch in its place), and A3's cooldown is not spent.
-  run(70);
-  script.held = { attack3: true, attack3Pressed: true };
+  assert.ok(battle.projectiles.every((p) => p.owner !== p2), 'its own projectile went too');
+  // Back at its spawn once the wait is over: no paralysis left.
+  run(RESPAWN_STEPS + 1);
+  assert.equal(p2.lostToVoid, false);
+  assert.equal(p2.combat.immobilized, false);
+  assert.equal(p2.combat.paralysis, 0);
+
+  // A technique cast by the one that falls ends there, releasing nothing.
+  run(30);
+  script.cpu = { attack5: true, attack5Pressed: true };
   run();
-  script.held = {};
-  assert.equal(p1.combat.attack, null);
-  assert.equal(p1.combat.abilityCooldowns.active('attack3'), false);
-  assert.deepEqual(battle.clones, []);
+  script.cpu = {};
+  const purple = p2.technique;
+  assert.equal(purple?.action, 'attack5', 'Hollow Purple under way');
+  intoVoid(battle, p2);
+  run();
+  assert.equal(p2.technique, null);
+  // Carried off the ground, it is over before the Void even takes it.
+  assert.ok(['ground', 'void'].includes(purple.endReason), purple.endReason);
+  assert.equal(purple.released, false);
+  run(120);
+  assert.ok(battle.projectiles.every((p) => p.owner !== p2), 'and nothing came out of it');
 });
 
 test('simultaneous falls score nothing: both respawn, and play goes on', () => {

@@ -1,7 +1,7 @@
 // Run with node --test tests/systems/combat-ai.test.mjs (no dependencies).
 // Quick Battle's combat AI (js/game/ai/combat-ai.js): it fights through the
-// same inputs a player has (attacks, Throw, the Clone Attack and Sphere
-// Rush on their own buttons, Shield, Dash, jumps, the fast fall), reacts
+// same inputs a player has (attacks, projectiles, techniques on their own
+// buttons, Shield, Dash, jumps, the fast fall), reacts
 // late on low levels and early (never
 // instantly) on high ones, reassesses faster the higher it goes, keeps off
 // the Void's edge, waits while its opponent is out, and never touches a
@@ -25,8 +25,8 @@ import { DIFFICULTY_IDS, getDifficultyProfile } from '../../js/data/difficulty.j
 import { mulberry32 } from '../../js/core/utils.js';
 import { blankInput } from '../../js/game/fighters/fighter-controller.js';
 
-const BUTTONS = ['runLeft', 'runRight', 'down', 'jump', 'shield', 'extra_attack', 'transform', 'attack1', 'attack2', 'attack3', 'attack4'];
-const COMBAT = ['extra_attack', 'transform', 'attack1', 'attack2'];
+const BUTTONS = ['runLeft', 'runRight', 'down', 'jump', 'shield', 'extra_attack', 'transform', 'attack1', 'attack2', 'attack3', 'attack4', 'attack5'];
+const COMBAT = ['extra_attack', 'transform', 'attack1', 'attack2', 'attack3'];
 
 // A flat main floor from x 0 to 2000 (top 800), and one with a platform a
 // jump above the floor.
@@ -34,19 +34,20 @@ const FLAT = new StageCollision(stageMap());
 const RAISED = new StageCollision(stageMap({ platforms: [{ id: 'deck', x: 1300, y: 670, w: 240, h: 16 }] }));
 
 // Two fighters in play: the CPU (slot p2) driven by the combat AI, and a
-// scripted opponent (p1) whose `script(step, fighter)` returns its input.
+// scripted opponent (p1, #0001 unless `foeDef` says otherwise) whose
+// `script(step, fighter)` returns its input.
 // `world` stands in for the Arena as ctx.battle (projectiles, clones, the
 // combat system's events, the score and the clock). The AI's output is
 // logged every step.
 function ring({
   difficulty = 'medium', seed = 1, stage = FLAT, cpuX = 1000, foeX = 1200, foeY, script = () => ({}),
-  cpuFacing = Math.sign(foeX - cpuX) || 1, foeFacing = -cpuFacing,
+  cpuFacing = Math.sign(foeX - cpuX) || 1, foeFacing = -cpuFacing, foeDef = def,
 } = {}) {
   const sprites = fakeSprites();
   const ai = new CombatAIController({ difficulty, rng: mulberry32(seed) });
   let n = 0;
   const foe = new Fighter({
-    def, sprites, stage, slot: 'p1', label: 'P1', spawn: { x: foeX, y: foeY, facing: foeFacing },
+    def: foeDef, sprites, stage, slot: 'p1', label: 'P1', spawn: { x: foeX, y: foeY, facing: foeFacing },
     controller: { getInput: (self) => ({ ...script(n, self) }) },
   });
   const cpu = new Fighter({ def, sprites, stage, slot: 'p2', label: 'CPU', spawn: { x: cpuX, facing: cpuFacing }, controller: ai });
@@ -141,12 +142,14 @@ test('while its own attack plays it never turns away from its opponent (a held d
 test('it never presses a reserved button, and never drops through a platform', () => {
   assert.equal(def.actions.transform, null, '#0001\'s transform is reserved');
   const moves = readMoveset(new Fighter({ def, sprites: fakeSprites(), stage: FLAT, spawn: { x: 100 } }));
-  // Read from the fighter's own data: Throw, attack1 and attack2 on the ground and
-  // in the air as mapped, attack3 and attack4 (its summon and technique) on
-  // their own buttons, the Shield and the Dash.
-  assert.deepEqual(moves.melee.map((m) => m.id).sort(), ['attack1', 'attack2', 'midair_attack1', 'midair_attack2']);
-  assert.deepEqual(moves.ranged.map((m) => [m.id, m.air]), [['extra_attack', false]], 'Throw is ground only');
-  assert.deepEqual(moves.specials.map((c) => [c.action, c.id, c.type]), [['attack3', 'attack3', 'summon'], ['attack4', 'attack4', 'technique']]);
+  // Read from the fighter's own data: the High Kick on the ground and in the
+  // air, attack1 on both, attack2 and attack3 as close moves in the air and
+  // as projectiles (Red, Maximum Blue) on the ground, attack4 and attack5
+  // (its two techniques) on their own buttons, the Shield and the Dash.
+  assert.deepEqual(moves.melee.map((m) => m.id).sort(),
+    ['attack1', 'extra_attack', 'extra_attack', 'midair_attack1', 'midair_attack2', 'midair_attack3']);
+  assert.deepEqual(moves.ranged.map((m) => [m.id, m.air]), [['attack2', false], ['attack3', false]], 'the projectiles are ground only');
+  assert.deepEqual(moves.specials.map((c) => [c.action, c.id, c.type]), [['attack4', 'attack4', 'technique'], ['attack5', 'attack5', 'technique']]);
   assert.equal(moves.shield, true);
   assert.ok(moves.dash.distance > 0);
   assert.ok([...moves.melee, ...moves.ranged, ...moves.specials].every((m) => m.action !== 'transform'));
@@ -185,15 +188,24 @@ test('press edges last exactly one step, and every press is of a held button', (
 
 // ---- Shield and reaction ---------------------------------------------------------
 
-// The opponent, 50 units away and facing the CPU, starts Attack 2 on
-// step 30 (0.25 s of startup before its kick can land). The CPU's own
-// neutral thinking is paused, so only its reaction to the attack acts: how
-// soon it answers (Shield held, a jump, or a step away) and whether the
-// kick lands.
+// An opponent with a telegraphed kick on Attack 2: #0001's High Kick
+// slowed to 0.25 s of startup (a test fixture: none of the game's fighters
+// is built around a kick this slow).
+const KICKER = {
+  ...def,
+  actions: { ...def.actions, attack2: 'attack2' },
+  attacks: { ...def.attacks, attack2: { ...def.attacks.extra_attack, animation: 'attack2', startup: 0.25, step: undefined } },
+};
+
+// The KICKER, 50 units away and facing the CPU, starts Attack 2 on step
+// 30 (0.25 s of startup before its kick can land). The CPU's own neutral
+// thinking is paused, so only its reaction to the attack acts: how soon it
+// answers (Shield held, a jump, or a step away) and whether the kick
+// lands.
 function reactionTrial(difficulty, seed) {
   const START = 30;
   const script = (n) => (n === START ? { attack2: true, attack2Pressed: true } : {});
-  const r = ring({ difficulty, seed, cpuX: 1000, foeX: 1050, script });
+  const r = ring({ difficulty, seed, cpuX: 1000, foeX: 1050, script, foeDef: KICKER });
   r.hush();
   r.run(START - 1 + seconds(0.8));
   const away = 'runLeft';
@@ -214,7 +226,7 @@ test('it answers a telegraphed attack (Shield, a jump or a step away), and the k
   let shielded = 0;
   for (let seed = 0; seed < 8; seed++) {
     const script = (n) => (n === 30 ? { attack2: true, attack2Pressed: true } : {});
-    const r = ring({ difficulty: 'hard', seed: 150 + seed, cpuX: 1975, foeX: 1925, script });
+    const r = ring({ difficulty: 'hard', seed: 150 + seed, cpuX: 1975, foeX: 1925, script, foeDef: KICKER });
     r.hush();
     r.run(29 + seconds(0.8));
     if (r.events.some((e) => e.target === r.cpu && e.type === 'block')) shielded++;
@@ -245,20 +257,20 @@ test('reactions scale with difficulty: Easy is slower and less reliable than Bru
   assert.ok(brutal.minDelay >= 2 * DT);
 });
 
-test('harder levels answer an incoming shuriken more often', () => {
+test('harder levels answer an incoming Red more often', () => {
   const caught = {};
   for (const difficulty of ['easy', 'brutal']) {
     caught[difficulty] = 0;
     for (let seed = 0; seed < 12; seed++) {
-      // Thrown from 420 units: about half a second of flight.
-      const script = (n) => (n === 20 ? { extra_attack: true, extra_attackPressed: true } : {});
-      const r = ring({ difficulty, seed: 300 + seed, cpuX: 1000, foeX: 1420, script });
+      // Thrown from 300 units: about half a second from the press to contact.
+      const script = (n) => (n === 20 ? { attack2: true, attack2Pressed: true } : {});
+      const r = ring({ difficulty, seed: 300 + seed, cpuX: 1000, foeX: 1300, script });
       r.hush();
       r.run(seconds(1.2));
       if (hitsOn(r.events, r.cpu).some((e) => e.projectile)) caught[difficulty]++;
     }
   }
-  assert.ok(caught.brutal < caught.easy, `Brutal avoids more shurikens (${caught.brutal} vs ${caught.easy} of 12 hit)`);
+  assert.ok(caught.brutal < caught.easy, `Brutal avoids more of them (${caught.brutal} vs ${caught.easy} of 12 hit)`);
 });
 
 // ---- Movement and the stage ----------------------------------------------------
@@ -334,53 +346,57 @@ test('a walk toward the ledge stops at it', () => {
 
 // ---- Attack 3, Attack 4, Dash ---------------------------------------------------------
 
-test('it presses Attack 3 and Attack 4 directly: one press on the move\'s own button, nothing held with it, and never again while it cools down', () => {
-  for (const special of readMoveset(ring().cpu).specials) {
+test('it presses Attack 4 and Attack 5 directly: one press on the move\'s own button, nothing held with it, and never again while it cools down', () => {
+  const specials = readMoveset(ring().cpu).specials;
+  assert.deepEqual(specials.map((c) => c.action), ['attack4', 'attack5']);
+  for (const special of specials) {
     const r = ring({ difficulty: 'hard', seed: 17, cpuX: 900, foeX: 1100 });
     r.hush();
     const face = special.type === 'technique' ? 1 : 0;
     r.ai.setIntent({ kind: 'attack', action: special.action, face, until: r.ai.clock + 0.3 });
-    r.run(seconds(1.5));
+    let cast = null;
+    for (let i = 0; i < seconds(1.5); i++) {
+      r.step();
+      cast ??= r.cpu.technique;
+    }
     const log = r.log.slice(1);
     const presses = log.filter((o) => o[`${special.action}Pressed`]);
     assert.equal(presses.length, 1, `${special.id}: one press`);
     const [press] = presses;
     assert.equal(press.down, false, `${special.id}: no Down held with it`);
-    for (const other of ['attack1', 'attack2', 'extra_attack', 'shield']) assert.equal(press[other], false, `${special.id}: no ${other} with it`);
+    for (const other of ['attack1', 'attack2', 'attack3', 'extra_attack', 'shield']) {
+      if (other !== special.action) assert.equal(press[other], false, `${special.id}: no ${other} with it`);
+    }
     assert.ok(r.cpu.combat.abilityCooldowns.active(special.id), `${special.id}: its cooldown runs`);
-    if (special.type === 'summon') assert.ok(r.world.clones.length === 1 || r.events.some((e) => e.summon), 'the clone came from the fighter\'s own summon');
-    else assert.ok(r.cpu.technique || r.events.some((e) => e.technique), 'the Sphere Rush came from its own button');
+    assert.equal(cast?.action, special.action, `${special.id}: the technique came from its own button`);
     // Its own options never offer it again while it is cooling down.
     const s = r.ai.sense(r.cpu, r.foe, r.ctx);
     assert.ok(!r.ai.specialOptions(s).some((o) => o.intent.action === special.action), `${special.id}: not while cooling down`);
   }
 });
 
-test('left to itself, a high level uses the Clone Attack and the Sphere Rush, each from its own button', () => {
-  let clones = 0;
-  let rushes = 0;
+test('left to itself, a high level uses Unlimited Void and Hollow Purple, each from its own button', () => {
+  const used = { attack4: 0, attack5: 0 };
   for (let seed = 0; seed < 6; seed++) {
-    // A far opponent standing still.
+    // An opponent standing still, out of reach.
     const r = ring({ difficulty: 'brutal', seed: 400 + seed, cpuX: 500, foeX: 1100 });
     let tech = null;
     let cooling = [];
-    for (let i = 0; i < seconds(10); i++) {
+    for (let i = 0; i < seconds(14); i++) {
       r.step();
       const out = r.log.at(-1);
       const now = [...r.cpu.combat.abilityCooldowns.entries.keys()];
       for (const id of now.filter((c) => !cooling.includes(c))) {
         assert.ok(out[`${id}Pressed`], `seed ${seed}: ${id} started on its own button`);
-        assert.ok(!out.attack1Pressed && !out.attack2Pressed, `seed ${seed}: never from attack1 or attack2`);
+        assert.ok(!out.attack1Pressed && !out.attack2Pressed && !out.attack3Pressed, `seed ${seed}: never from another attack`);
       }
       cooling = now;
-      if (r.cpu.technique && r.cpu.technique !== tech) rushes++;
+      if (r.cpu.technique && r.cpu.technique !== tech) used[r.cpu.technique.action]++;
       tech = r.cpu.technique;
     }
-    clones += new Set(r.events.filter((e) => e.summon && e.attacker === r.cpu).map((e) => e.summon)).size +
-      (r.cpu.combat.abilityCooldowns.active('attack3') ? 1 : 0);
   }
-  assert.ok(clones > 0, `it summons (${clones} clones)`);
-  assert.ok(rushes > 0, `it rushes (${rushes} rushes)`);
+  assert.ok(used.attack4 > 0, `it casts Unlimited Void (${used.attack4})`);
+  assert.ok(used.attack5 > 0, `it casts Hollow Purple (${used.attack5})`);
 });
 
 test('its output is only the player\'s own controls: never a control the fighter does not read', () => {

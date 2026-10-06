@@ -11,8 +11,9 @@ import { CONFIG } from '../config.js';
 import { StageCollision, resolveSolidOverlap } from './physics.js';
 import { separateFighters } from './fighters/fighter.js';
 import { CombatSystem, worldBox } from './combat/combat.js';
-import { spawnProjectiles, removeDeadProjectiles } from './combat/projectile.js';
+import { spawnProjectiles, removeDeadProjectiles, clashProjectiles } from './combat/projectile.js';
 import { spawnClones, updateClones, removeDeadClones } from './combat/summon.js';
+import { applyPulls } from './combat/pull.js';
 import { Camera } from './rendering/camera.js';
 import { drawFrame, drawCenteredFrame } from './rendering/sprite-normalizer.js';
 import { drawEnergyBar, drawCooldownIndicators, energyBarState, statusOnScreen } from './rendering/fighter-status.js';
@@ -65,7 +66,8 @@ export class Arena {
     this.clones = [];
     // A technique (js/game/combat/technique.js) lives on the
     // fighter performing it (`fighter.technique`), not here: that fighter
-    // updates, moves and ends it, and a reset ends it.
+    // updates and ends it, and a reset ends it. What it releases is a
+    // projectile here like any other.
   }
 
   // Player 1: the fighter the camera keeps in view and the view is scaled
@@ -166,13 +168,14 @@ export class Arena {
   // timer) run them first and then call this.
   update(dt) {
     // Any fighter whose respawn wait is over comes back first, and plays
-    // this step. Then the fighters (a technique advances and moves
-    // with its fighter); then the projectiles they released this step spawn
-    // (once each) and every projectile moves. Live clones advance, then the
-    // clones summoned this step spawn (once each, on their cloud's first
-    // frame). Melee, projectile, clone and technique hits resolve,
-    // and spent projectiles and finished clones are dropped. Last, any
-    // fighter now in the Void is handed to the mode (checkVoid).
+    // this step. Then the fighters (a technique advances with its
+    // fighter); then the projectiles they released this step spawn (once
+    // each), every projectile moves and those that meet settle it
+    // (clashProjectiles). Live clones advance, then the clones summoned this
+    // step spawn (once each, on their cloud's first frame). Pulls draw
+    // fighters in (applyPulls), then melee, projectile, clone and technique
+    // hits resolve, and spent projectiles and finished clones are dropped.
+    // Last, any fighter now in the Void is handed to the mode (checkVoid).
     this.updateRespawns(dt);
     const fighters = this.inPlay;
     for (const f of fighters) f.update(dt, this.simCtx);
@@ -189,8 +192,10 @@ export class Arena {
     for (const f of fighters) f.updateAttackFacing();
     spawnProjectiles(fighters, this.projectiles);
     for (const p of this.projectiles) p.update(dt, this.stage);
+    clashProjectiles(this.projectiles);
     updateClones(this.clones, dt);
     spawnClones(fighters, this.clones, this.stage);
+    applyPulls(fighters, this.projectiles, dt);
     this.combat.update(fighters, this.projectiles, this.clones);
     this.fx.take(this.combat.events, this);
     removeDeadProjectiles(this.projectiles);
@@ -237,17 +242,15 @@ export class Arena {
     }
   }
 
-  // Nothing else may keep hold of or aim at `f` once the Void takes it: a
-  // technique holding it ends, a summon's startup cast at it is cut short,
-  // and pending summons, clones and projectiles aimed at it or released by
-  // it go. Its own technique ends with `reason`, and its own summon's
-  // startup is cut short.
+  // Nothing else may aim at `f` once the Void takes it: a summon's startup
+  // cast at it is cut short, and pending summons, clones and projectiles
+  // aimed at it or released by it go. Its own technique ends with
+  // `reason`, and its own summon's startup is cut short.
   detachFromPlay(f, reason) {
     f.endTechnique(reason);
     f.cancelSummon();
     for (const other of this.fighters) {
       if (other === f) continue;
-      if (other.technique?.target === f) other.endTechnique('released');
       if (other.pendingSummon?.target === f) other.cancelSummon();
       other.summons = other.summons.filter((s) => s.target !== f);
     }
@@ -322,9 +325,6 @@ export class Arena {
       this.drawFighter(f);
       drawShield(ctx, f, view, 'rim', this.fxTime, this.reducedMotion);
     }
-    // A technique's sphere over the fighters, so the glowing orb is
-    // never hidden behind a body, whether in a hand or on a caught opponent.
-    for (const f of fighters) if (f.technique) this.drawTechnique(f.technique, f);
     // Projectiles over the fighters, so a thrown one stays visible in front.
     for (const p of this.projectiles) this.drawProjectile(p);
     ctx.imageSmoothingEnabled = true;
@@ -434,21 +434,6 @@ export class Arena {
       const [sx, sy] = this.toScreen(...c.cloudCenter());
       drawCenteredFrame(this.ctx, cloud, sx, sy, this.pxPerArtOf(c.owner?.sprites), false);
     }
-  }
-
-  // The technique's sphere frame, centred on the hand or the caught
-  // opponent (interpolated like the fighters), at its owner's art scale
-  // times the technique's own sphereScale (it grows on the target; the
-  // centre stays put), and never mirrored: a round effect only moves its
-  // offset with facing.
-  drawTechnique(t, owner) {
-    const sphere = t.sphere;
-    const center = sphere && t.sphereCenter(true);
-    if (!center) return;
-    const [sx, sy] = this.toScreen(...center);
-    const source = sphere.anim.sourceFacing;
-    const frame = sphere.anim.frames[sphere.index];
-    drawCenteredFrame(this.ctx, frame, sx, sy, this.pxPerArtOf(owner?.sprites) * t.sphereScale, !!source && t.facing !== source);
   }
 
   // Centred on the projectile's position, at its owner's art scale.
@@ -618,37 +603,22 @@ export class Arena {
       ctx.fillStyle = '#ff4dff';
       ctx.fillText(p.def.id, Math.round(lx), Math.round(ly) - 2);
     }
-    // Techniques, dashed cyan: the rushing sphere's hitbox while it
-    // can connect, then a cross on the sphere's centre once it is attached
-    // to the caught opponent, drawn where the sphere is drawn. A bound,
-    // shielding or ricocheting fighter is labelled over its hurtboxes (a
-    // ricochet with its rebound count).
+    // Techniques, dashed cyan: a burst's box through the release it lands
+    // on, labelled by the attack it is and its phase (e.g. "attack4
+    // release" for #0001's Unlimited Void). A paralyzed, shielding or
+    // ricocheting fighter is labelled over its hurtboxes (a paralysis with
+    // its seconds left, a ricochet with its rebound count).
     ctx.setLineDash([4, 3]);
     ctx.fillStyle = TECHNIQUE_DEBUG;
     for (const f of fighters) {
       const t = f.technique;
-      if (!t) continue;
-      // Labelled by the attack it is and its phase (e.g. "attack4 dash"
-      // for #0001's Sphere Rush).
-      const label = `${t.def.id} ${t.phase}`;
-      if (t.sphereHitbox(box, true)) {
-        rect(box.x, box.y, box.w, box.h, TECHNIQUE_DEBUG);
-        const [lx, ly] = this.toScreen(box.x, box.y);
-        ctx.fillText(label, Math.round(lx), Math.round(ly) - 2);
-      } else if (t.sphereOwner === 'target') {
-        const [cx, cy] = this.toScreen(...t.sphereCenter(true));
-        ctx.strokeStyle = TECHNIQUE_DEBUG;
-        ctx.beginPath();
-        ctx.moveTo(Math.round(cx) - 6, Math.round(cy) + 0.5);
-        ctx.lineTo(Math.round(cx) + 7, Math.round(cy) + 0.5);
-        ctx.moveTo(Math.round(cx) + 0.5, Math.round(cy) - 6);
-        ctx.lineTo(Math.round(cx) + 0.5, Math.round(cy) + 7);
-        ctx.stroke();
-        ctx.fillText(label, Math.round(cx) + 8, Math.round(cy) - 8);
-      }
+      if (!t || t.phase !== 'release' || !t.burstBox(box, true)) continue;
+      rect(box.x, box.y, box.w, box.h, TECHNIQUE_DEBUG);
+      const [lx, ly] = this.toScreen(box.x, box.y);
+      ctx.fillText(`${t.def.id} ${t.phase}`, Math.round(lx), Math.round(ly) - 2);
     }
     for (const f of fighters) {
-      const tag = f.combat.immobilized ? 'bound' : f.combat.shielding ? 'shield'
+      const tag = f.combat.immobilized ? `paralyzed ${f.combat.paralysis.toFixed(1)}` : f.combat.shielding ? 'shield'
         : f.ricocheting ? `ricochet ${f.launch.bounces}` : null;
       if (!tag) continue;
       const [lx, ly] = this.toScreen(f.renderX - f.body.halfW, f.renderY - f.body.height);
@@ -670,7 +640,7 @@ export class Arena {
     // The other fighter's state under its own label (the CPU's, in Quick
     // Battle or practice); nothing when Player 1 is alone.
     const other = this.secondary;
-    const rival = other ? `  ${other.label.toLowerCase()} ${other.state}${other.combat.immobilized ? ' (bound)' : ''}` : '';
+    const rival = other ? `  ${other.label.toLowerCase()} ${other.state}${other.combat.immobilized ? ' (paralyzed)' : ''}` : '';
     const lines = [
       `state ${p.state}${action}  grounded ${p.body.grounded}  ground ${p.body.ground?.id ?? '-'}`,
       `pos ${p.body.x.toFixed(1)}, ${p.body.y.toFixed(1)}  vel ${p.body.vx.toFixed(0)}, ${p.body.vy.toFixed(0)}`,
@@ -687,8 +657,8 @@ export class Arena {
   }
 
   destroy() {
-    // No technique may keep its owner, target or bind past the arena, nor a
-    // summon's startup its target.
+    // No technique may keep its owner past the arena, nor a summon's
+    // startup its target.
     for (const f of this.fighters) {
       f.endTechnique('destroy');
       f.cancelSummon();

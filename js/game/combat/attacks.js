@@ -5,7 +5,8 @@
 //
 // Inputs: one attack entry from a character definition
 // (js/data/characters/<id>.js), plus its id; Base Launch / Directional
-// Launch validation from js/data/launch.js.
+// Launch validation from js/data/launch.js, and the hit effects
+// (unblockable, paralyze, blockPush) from js/game/combat/hit-effects.js.
 // Outputs: createAttackDefinition, attackPhase, strikeLive, attackReach,
 // MOTION_TYPES and PHASE_EPSILON (the slack every phase boundary compares
 // with).
@@ -121,7 +122,7 @@
 //   carry: { lift: 0 },
 //
 // `motion` is movement the attack makes itself, owning the fighter's
-// velocity while it lasts (gravity included, where it says so). Four kinds:
+// velocity while it lasts (gravity included, where it says so). Five kinds:
 //
 //   homing  the lock-on dash. Through the startup the fighter hangs in the
 //           air (no gravity, its drift braking). As the active phase opens
@@ -160,6 +161,23 @@
 //   midair_attack2: { ..., motion: { type: 'bounce', fallSpeed: 1300, rebound: 900 } },
 //   midair_attack3: { ..., motion: { type: 'rise', speed: 460 } },
 //   attack3: { ..., motion: { type: 'roll', speed: 400, keep: 0.8, maxSpeed: 820, friction: 420, recoil: 260 } },
+//   midair_attack1: { ..., motion: { type: 'hover' } },
+//
+// `pull` draws opponents in while the attack's active phase is open: every
+// step, an opponent whose middle is within `radius` of the point `offset`
+// (facing right from the fighter's origin, mirrored with its facing) is
+// moved toward that point at up to `speed` world units / s, straight
+// there, never past it. A raised Shield holds its ground (it is not
+// pulled), and so does a fighter held in place (paralyzed) or out of play.
+// The attack's own hitbox then meets whoever was drawn into it. The same
+// rule runs a projectile's `pull` (see js/game/combat/projectile.js).
+//
+//   midair_attack3: { ..., pull: { radius: 150, speed: 900, offset: { x: 44, y: -60 } } },
+//
+// Every hit may also declare the shared hit effects (see
+// js/game/combat/hit-effects.js): `unblockable`, `paralyze` and
+// `blockPush`. A multi-hit attack's strikes take the attack's own unless
+// they declare theirs.
 //
 // Four more fields shape an attack's body. `airUses` (a count) is how many
 // times it may start in the air before the fighter lands again or is hit (0,
@@ -185,6 +203,7 @@
 //   attack1: { animation: 'attack1', pending: true },
 
 import { resolveHitLaunch } from '../../data/launch.js';
+import { resolveHitEffects } from './hit-effects.js';
 
 const ATTACK_DEFAULTS = {
   animation: null,
@@ -219,6 +238,10 @@ const ATTACK_DEFAULTS = {
   freeFall: false,   // started in the air, it leaves the fighter in free fall (see above)
   passThrough: false, // passes through other fighters while it plays
   hurtboxes: null,   // the fighter's hurtboxes while it plays; null keeps its own
+  pull: null,        // { radius, speed, offset }: draws opponents in while it is active (see above)
+  unblockable: false, // the shared hit effects (js/game/combat/hit-effects.js)
+  paralyze: 0,
+  blockPush: 0,
 };
 
 // Every kind of attack motion (see above), with its fields' defaults. The
@@ -228,9 +251,10 @@ const MOTION_DEFAULTS = Object.freeze({
   bounce: Object.freeze({ fallSpeed: 0, rebound: 0 }),
   rise: Object.freeze({ speed: 0 }),
   roll: Object.freeze({ speed: 0, keep: 0, maxSpeed: Infinity, friction: 0, recoil: 0 }),
+  hover: Object.freeze({}),
 });
 const MOTION_REQUIRED = Object.freeze({
-  homing: ['range', 'speed'], bounce: ['fallSpeed'], rise: ['speed'], roll: ['speed'],
+  homing: ['range', 'speed'], bounce: ['fallSpeed'], rise: ['speed'], roll: ['speed'], hover: [],
 });
 
 export const MOTION_TYPES = Object.freeze(Object.keys(MOTION_DEFAULTS));
@@ -248,9 +272,19 @@ function resolveMotion(spec, owner) {
   return Object.freeze(motion);
 }
 
+// The frozen pull (see `pull` above) of `owner` from its `pull` entry, or
+// null. Its radius and speed must be positive; its point defaults to the
+// fighter's origin.
+export function resolvePull(spec, owner) {
+  if (!spec) return null;
+  if (!(spec.radius > 0) || !(spec.speed > 0)) throw new Error(`[Alva] ${owner}'s pull needs a positive radius and speed`);
+  const o = spec.offset ?? {};
+  return Object.freeze({ ...spec, offset: Object.freeze({ x: o.x ?? 0, y: o.y ?? 0 }) });
+}
+
 // The fields a strike of a multi-hit attack takes from the attack when it
 // does not declare its own, and the ones only the strikes may declare.
-const STRIKE_INHERITS = Object.freeze(['hitbox', 'hitstun', 'blockstun', 'hitstop', 'carry']);
+const STRIKE_INHERITS = Object.freeze(['hitbox', 'hitstun', 'blockstun', 'hitstop', 'carry', 'unblockable', 'paralyze', 'blockPush']);
 const STRIKE_ONLY = Object.freeze(['startup', 'active', 'damage', 'baseLaunch', 'directionalLaunch']);
 
 // A multi-hit attack's strikes, frozen and validated, and what they make of
@@ -274,7 +308,7 @@ function resolveStrikes(spec, base) {
     for (const field of STRIKE_INHERITS) strike[field] = h[field] !== undefined ? h[field] : base[field];
     strike.hitbox = h.hitbox ?? spec.hitbox ?? null;
     if (!strike.hitbox) throw new Error(`[Alva] ${who} has no hitbox (its own or the attack's)`);
-    return Object.freeze({ ...strike, ...resolveHitLaunch(h, who) });
+    return Object.freeze({ ...strike, ...resolveHitLaunch(h, who), ...resolveHitEffects(strike, who) });
   });
   const startup = hits[0].at;
   const end = Math.max(...hits.map((h) => h.at + h.active));
@@ -305,7 +339,7 @@ export function attackReach(def) {
   const hb = def?.hitbox;
   if (!hb) return null;
   const m = def.motion;
-  if (!m) return hb;
+  if (!m || m.type === 'hover') return pullReach(def, hb);
   const t = def.active;
   if (m.type === 'roll') {
     const brake = m.friction > 0 ? Math.min(t, m.speed / m.friction) : t;
@@ -316,6 +350,19 @@ export function attackReach(def) {
   if (m.type === 'rise') return { x: hb.x, y: hb.y - m.speed * t, w: hb.w, h: hb.h + m.speed * t };
   const cy = hb.y + hb.h / 2;
   return { x: hb.x, y: cy - m.range - hb.h / 2, w: m.range + hb.w, h: 2 * m.range + hb.h };
+}
+
+// An attack's box widened to take in its pull (see `pull` above): an
+// opponent anywhere in the pull's circle is drawn into the box, so the
+// strike reaches it there.
+function pullReach(def, hb) {
+  const p = def.pull;
+  if (!p) return hb;
+  const x0 = Math.min(hb.x, p.offset.x - p.radius);
+  const y0 = Math.min(hb.y, p.offset.y - p.radius);
+  const x1 = Math.max(hb.x + hb.w, p.offset.x + p.radius);
+  const y1 = Math.max(hb.y + hb.h, p.offset.y + p.radius);
+  return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
 }
 
 // Whether multi-hit strike `hit` is live `time` seconds into its attack.
@@ -340,7 +387,8 @@ export function attackPhase(def, time) {
 // or time a strike.
 const PENDING_REFUSED = Object.freeze([
   'startup', 'active', 'recovery', 'damage', 'hitbox', 'projectile', 'baseLaunch', 'directionalLaunch',
-  'hitstun', 'blockstun', 'hitstop', 'cooldown', 'hitCancel', 'hits', 'carry', 'motion',
+  'hitstun', 'blockstun', 'hitstop', 'cooldown', 'hitCancel', 'hits', 'carry', 'motion', 'pull',
+  'unblockable', 'paralyze', 'blockPush',
 ]);
 
 // Frozen attack definition from a character's attack entry (plus its `id`).
@@ -362,11 +410,14 @@ export function createAttackDefinition(spec, { clipDuration = 0 } = {}) {
     def.total = def.recovery;
     return Object.freeze(def);
   }
+  const owner = `Attack "${spec.id}"`;
   const def = spec.hits
     ? { ...ATTACK_DEFAULTS, ...spec }
-    : { ...ATTACK_DEFAULTS, ...spec, ...resolveHitLaunch(spec, `Attack "${spec.id}"`) };
+    : { ...ATTACK_DEFAULTS, ...spec, ...resolveHitLaunch(spec, owner) };
+  Object.assign(def, resolveHitEffects(spec, owner));
   if (spec.hits) Object.assign(def, resolveStrikes(spec, def));
-  def.motion = resolveMotion(spec.motion, `Attack "${spec.id}"`);
+  def.motion = resolveMotion(spec.motion, owner);
+  def.pull = resolvePull(spec.pull, owner);
   def.total = def.startup + def.active + def.recovery;
   return Object.freeze(def);
 }

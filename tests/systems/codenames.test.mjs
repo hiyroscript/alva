@@ -184,43 +184,43 @@ test('every controller builds the same canonical input snapshot, every combat bu
   }
 });
 
-test('#0001\'s actions resolve to the canonical move ids: attacks on the ground and in the air, attack3 its summon, attack4 its technique, no attack5', () => {
+test('#0001\'s actions resolve to the canonical move ids: attacks on the ground and in the air, attack4 and attack5 its techniques', () => {
   assert.deepEqual(def.actions, {
     extra_attack: 'extra_attack',
     transform: null,
     attack1: { ground: 'attack1', air: 'midair_attack1' },
     attack2: { ground: 'attack2', air: 'midair_attack2' },
-    attack3: { type: 'summon', id: 'attack3' },
+    attack3: { ground: 'attack3', air: 'midair_attack3' },
     attack4: { type: 'technique', id: 'attack4' },
+    attack5: { type: 'technique', id: 'attack5' },
   });
-  assert.deepEqual(COMBAT_ACTIONS.map((a) => specialAction(def, a)?.id ?? null), [null, null, null, null, 'attack3', 'attack4', null]);
+  assert.deepEqual(COMBAT_ACTIONS.map((a) => specialAction(def, a)?.id ?? null), [null, null, null, null, null, 'attack4', 'attack5']);
   const { fighter, step } = makeFighter();
-  assert.deepEqual(COMBAT_ACTIONS.map((a) => fighter.attackFor(a)), ['extra_attack', null, 'attack1', 'attack2', null, null, null]);
+  assert.deepEqual(COMBAT_ACTIONS.map((a) => fighter.attackFor(a)), ['extra_attack', null, 'attack1', 'attack2', 'attack3', null, null]);
   step({ jump: true, jumpPressed: true });
-  assert.deepEqual(COMBAT_ACTIONS.map((a) => fighter.attackFor(a)), ['extra_attack', null, 'midair_attack1', 'midair_attack2', null, null, null]);
+  assert.deepEqual(COMBAT_ACTIONS.map((a) => fighter.attackFor(a)), ['extra_attack', null, 'midair_attack1', 'midair_attack2', 'midair_attack3', null, null]);
 });
 
-test('#0001\'s moves, clips and objects go by the codenames: attack1, midair_attack1, attack2, midair_attack2, extra_attack, attack3 and attack4', () => {
-  assert.deepEqual(Object.keys(def.attacks).sort(), ['attack1', 'attack2', 'extra_attack', 'midair_attack1', 'midair_attack2']);
+test('#0001\'s moves, clips and objects go by the codenames: attack1 to attack3 with their mid-air versions, extra_attack, attack4 and attack5', () => {
+  assert.deepEqual(Object.keys(def.attacks).sort(), [
+    'attack1', 'attack2', 'attack3', 'extra_attack', 'midair_attack1', 'midair_attack2', 'midair_attack3',
+  ]);
   for (const [id, atk] of Object.entries(def.attacks)) assert.equal(atk.animation, id, `${id} plays its own clip`);
   assert.deepEqual(Object.keys(def.animations), [
-    'idle', 'run', 'jump', 'fall', 'mouvment', 'land', 'hurt', 'midair_hurt',
-    'attack1', 'midair_attack1', 'attack2', 'midair_attack2',
-    'prepshield', 'shielding', 'releaseshield', 'midair_shielding', 'extra_attack', 'attack3_summon',
-    'attack4_form', 'attack4_dash', 'attack4_confirm', 'attack4_explosion', 'attack4_release', 'attack4_whiff_release',
+    'idle', 'run', 'jump', 'fall', 'land', 'mouvment', 'hurt', 'midair_hurt', 'shielding', 'midair_shielding',
+    'attack1', 'midair_attack1', 'attack2', 'midair_attack2', 'attack3', 'midair_attack3',
+    'attack4_cast', 'attack4_release', 'attack5_cast', 'attack5_release', 'extra_attack',
   ]);
-  // attack3's own pose (the summoning startup) is a fighter clip under
-  // attack3's name; the clone's smoke is attack3's object.
-  assert.equal(def.summons.attack3.startupAnimation, 'attack3_summon');
-  assert.equal(def.summons.attack3.cloud, 'attack3_object');
-  assert.deepEqual(Object.keys(def.projectileAnimations), ['extra_attack_object']);
-  assert.deepEqual(Object.keys(def.projectiles), ['extra_attack_object']);
-  assert.equal(def.attacks.extra_attack.projectile.id, 'extra_attack_object');
-  assert.deepEqual(Object.keys(def.effectAnimations), [
-    'attack3_object', 'attack4_object_build', 'attack4_object_impact', 'attack4_object_explosion',
-  ]);
+  // Each orb is the projectile of the attack that releases it.
+  assert.deepEqual(Object.keys(def.projectileAnimations), ['attack2_object', 'attack3_object', 'attack5_object']);
+  assert.deepEqual(Object.keys(def.projectiles), ['attack2_object', 'attack3_object', 'attack5_object']);
+  assert.equal(def.attacks.attack2.projectile.id, 'attack2_object');
+  assert.equal(def.attacks.attack3.projectile.id, 'attack3_object');
+  assert.equal(def.techniques.attack5.projectile.id, 'attack5_object');
+  assert.equal(def.effectAnimations, undefined, 'no effect art: everything it creates is a projectile');
+  assert.equal(def.summons, undefined, 'no summon');
   for (const name of [...RETIRED_ATTACKS, ...RETIRED_MOVES, ...RETIRED_ANIMATIONS]) {
-    for (const table of ['attacks', 'animations', 'projectileAnimations', 'effectAnimations', 'projectiles', 'summons', 'techniques', 'abilityNames']) {
+    for (const table of ['attacks', 'animations', 'projectileAnimations', 'projectiles', 'techniques', 'abilityNames']) {
       assert.equal(def[table][name], undefined, `no ${table}.${name}`);
     }
   }
@@ -230,52 +230,48 @@ test('#0001\'s moves, clips and objects go by the codenames: attack1, midair_att
   }
 });
 
-test('attack3 is the Clone Attack\'s summon and attack4 the Sphere Rush\'s technique, each keyed by its own button', () => {
-  assert.deepEqual(Object.keys(def.summons), ['attack3']);
-  assert.equal(def.summons.attack3.attack, 'attack1');
-  assert.equal(def.summons.attack3.noGround.attack, 'midair_attack2');
-  assert.equal(def.summons.attack3.cloud, 'attack3_object');
-  assert.deepEqual(Object.keys(def.techniques), ['attack4']);
-  assert.deepEqual(
-    ['formAnimation', 'dashAnimation', 'confirmAnimation', 'explosionAnimation', 'releaseAnimation', 'whiffReleaseAnimation',
-      'sphereBuild', 'sphereImpact', 'sphereExplosion'].map((field) => def.techniques.attack4[field]),
-    ['attack4_form', 'attack4_dash', 'attack4_confirm', 'attack4_explosion', 'attack4_release', 'attack4_whiff_release',
-      'attack4_object_build', 'attack4_object_impact', 'attack4_object_explosion'],
-  );
-  assert.deepEqual(Object.keys(def.techniques.attack4.handOffsets), ['attack4_form', 'attack4_dash']);
+test('attack4 is Unlimited Void\'s technique and attack5 Hollow Purple\'s, each keyed by its own button and its clips named after it', () => {
+  assert.deepEqual(Object.keys(def.techniques), ['attack4', 'attack5']);
+  for (const id of ['attack4', 'attack5']) {
+    assert.equal(def.techniques[id].castAnimation, `${id}_cast`);
+    assert.equal(def.techniques[id].releaseAnimation, `${id}_release`);
+  }
+  assert.ok(def.techniques.attack4.burst, 'Unlimited Void releases a burst');
+  assert.equal(def.techniques.attack4.projectile, undefined);
+  assert.equal(def.techniques.attack5.burst, undefined);
   assert.deepEqual(def.abilityNames, {
-    extra_attack: 'Shuriken', attack1: 'Punch', attack2: 'Kick', attack3: 'Clone Attack', attack4: 'Sphere Rush',
+    extra_attack: 'High Kick', attack1: 'Jab', midair_attack1: 'Floating Straight', attack2: 'Red', midair_attack2: 'Red Kick',
+    attack3: 'Maximum Blue', midair_attack3: 'Blue', attack4: 'Unlimited Void', attack5: 'Hollow Purple',
   });
-  assert.equal(cooldownLabel('attack3'), 'A3');
   assert.equal(cooldownLabel('attack4'), 'A4');
+  assert.equal(cooldownLabel('attack5'), 'A5');
 });
 
-test('pressing attack3 and attack4 starts their cooldowns, keyed by those moves and shown as A3 and A4', () => {
-  const summoner = makeFighter();
-  const foe = makeFighter({ x: 900, facing: -1 });
-  summoner.fighter.opponent = foe.fighter;
-  summoner.step({ attack3: true, attack3Pressed: true });
-  assert.ok(summoner.fighter.combat.abilityCooldowns.active('attack3'));
-  assert.equal(summoner.fighter.pendingSummon.id, 'attack3', 'its startup, keyed by attack3');
-  for (let i = 0; i < startupSteps(def, 'attack3'); i++) summoner.step({});
-  assert.deepEqual(summoner.fighter.summons.map((s) => s.id), ['attack3']);
-  summoner.step({});
-  summoner.step({ attack4: true, attack4Pressed: true });
-  assert.equal(summoner.fighter.technique?.def.id, 'attack4');
-  assert.equal(summoner.fighter.technique.action, 'attack4');
-  assert.deepEqual([...summoner.fighter.combat.abilityCooldowns.entries.keys()], ['attack3', 'attack4']);
-  assert.deepEqual(cooldownIndicators(summoner.fighter).map((c) => [c.id, c.label]), [['attack3', 'A3'], ['attack4', 'A4']]);
+test('pressing attack4 and attack5 starts their cooldowns, keyed by those moves and shown as A4 and A5', () => {
+  const caster = makeFighter();
+  const foe = makeFighter({ x: 1400, facing: -1 });
+  caster.fighter.opponent = foe.fighter;
+  caster.step({ attack4: true, attack4Pressed: true });
+  assert.equal(caster.fighter.technique?.def.id, 'attack4');
+  assert.equal(caster.fighter.technique.action, 'attack4');
+  while (caster.fighter.technique) caster.step({});
+  caster.step({ attack5: true, attack5Pressed: true });
+  assert.equal(caster.fighter.technique?.def.id, 'attack5');
+  assert.deepEqual([...caster.fighter.combat.abilityCooldowns.entries.keys()], ['attack4', 'attack5']);
+  assert.deepEqual(cooldownIndicators(caster.fighter).map((c) => [c.id, c.label]), [['attack4', 'A4'], ['attack5', 'A5']]);
 });
 
-test('the combat AI discovers the moveset by its canonical names, and reaches attack3 and attack4 through their own buttons', () => {
+test('the combat AI discovers the moveset by its canonical names, and reaches attack4 and attack5 through their own buttons', () => {
   const moves = readMoveset(new Fighter({ def, sprites: fakeSprites(), stage: STAGE, spawn: { x: 500 } }));
   assert.deepEqual(moves.melee.map((m) => [m.action, m.id, m.air]).sort(), [
-    ['attack1', 'attack1', false], ['attack1', 'midair_attack1', true], ['attack2', 'attack2', false], ['attack2', 'midair_attack2', true],
+    ['attack1', 'attack1', false], ['attack1', 'midair_attack1', true],
+    ['attack2', 'midair_attack2', true], ['attack3', 'midair_attack3', true],
+    ['extra_attack', 'extra_attack', false], ['extra_attack', 'extra_attack', true],
   ]);
-  assert.deepEqual(moves.ranged.map((m) => [m.action, m.id, m.air]), [['extra_attack', 'extra_attack', false]]);
-  assert.deepEqual(moves.specials.map((c) => [c.action, c.id]), [['attack3', 'attack3'], ['attack4', 'attack4']]);
+  assert.deepEqual(moves.ranged.map((m) => [m.action, m.id, m.air]), [['attack2', 'attack2', false], ['attack3', 'attack3', false]]);
+  assert.deepEqual(moves.specials.map((c) => [c.action, c.id, c.type]), [['attack4', 'attack4', 'technique'], ['attack5', 'attack5', 'technique']]);
   assert.ok([...moves.melee, ...moves.ranged, ...moves.specials].every((m) => m.action !== 'transform'), 'transform is reserved');
-  assert.ok([...moves.melee, ...moves.ranged].every((m) => !['attack3', 'attack4', 'attack5'].includes(m.action)), 'attack3 and attack4 are no melee or ranged attacks');
+  assert.ok([...moves.melee, ...moves.ranged].every((m) => !['attack4', 'attack5'].includes(m.action)), 'attack4 and attack5 are no melee or ranged attacks');
 });
 
 // ---- Files ------------------------------------------------------------------
@@ -309,22 +305,17 @@ test('every fighter frame is <id>_<codename>_<frame>.png in its own folder, and 
   }
 });
 
-test('#0001\'s folder holds only codename files, none under a retired stem', () => {
+test('#0001\'s folder holds only codename files, none under a retired stem, every one loaded', () => {
   const files = readdirSync(new URL('assets/characters/0001/', ROOT));
-  assert.equal(files.length, 92);
-  // The summoning startup's four frames are attack3's.
-  assert.deepEqual(files.filter((n) => n.startsWith('0001_attack3_summon_')).sort(), [1, 2, 3, 4].map((n) => `0001_attack3_summon_${n}.png`));
+  assert.equal(files.length, 74);
   for (const name of files) {
     assert.match(name, /^0001_[a-z][a-z0-9_]*_\d+\.png$/, name);
     assert.doesNotMatch(name, new RegExp(`^0001_(${RETIRED_STEMS.join('|')})\\d*\\.png$`), name);
   }
+  // Every file is in a clip: nothing on disk that the game never loads.
   const used = new Set(characterFramePaths(def).map((url) => url.split('/').pop()));
-  // Only the retired Dodge frames are not loaded (Dodge was removed; their
-  // names follow the convention all the same).
-  assert.deepEqual(files.filter((n) => !used.has(n)).sort(), [
-    '0001_dodge_1.png', '0001_dodge_2.png', '0001_dodge_3.png',
-    '0001_midair_dodge_1.png', '0001_midair_dodge_2.png', '0001_midair_dodge_3.png',
-  ]);
+  assert.deepEqual(files.filter((n) => !used.has(n)), []);
+  assert.equal(used.size, files.length);
 });
 
 // ---- Retired names ------------------------------------------------------------
@@ -400,15 +391,11 @@ test('the guard still catches the retired mechanic coming back, under any of its
     stem, Stem, `${stem}Pressed`, `${stem}d`, `${stem}_loop`, `${Stem}Stance`,
     `0001_${stem}_1.png`, `0001_${stem}_a.png`, `assets/characters/0001/0001_${stem}_b.png`,
     `tests/${stem}.test.mjs`, `.tc-${stem}`, `control.${stem}`, `${stem.toUpperCase()}_FPS`,
-    JSON.stringify({ ...def, animations: { ...def.animations, [stem]: def.animations.attack3_summon } }),
+    JSON.stringify({ ...def, animations: { ...def.animations, [stem]: def.animations.attack4_cast } }),
     JSON.stringify({ ...def, actions: { ...def.actions, [stem]: 'attack1' } }),
   ]) {
     assert.match(attempt, RETIRED_MECHANIC, `caught: ${attempt.slice(0, 40)}`);
   }
-  // The restored art itself carries none of them: it is attack3's, by name
-  // and by clip.
-  for (const url of def.animations.attack3_summon.frames) assert.doesNotMatch(url, RETIRED_MECHANIC, url);
-  assert.ok(def.animations.attack3_summon.frames.every((url) => /\/0001_attack3_summon_\d\.png$/.test(url)));
   // Words that only share its letters are not it.
   for (const fine of ['re' + stem, 'Re' + stem, `${Stem.slice(0, 5)}ement`, `${stem.slice(0, 5)}és`]) assert.doesNotMatch(fine, RETIRED_MECHANIC, fine);
 });

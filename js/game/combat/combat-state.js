@@ -1,5 +1,5 @@
 // Per-fighter combat state: Launch Point, Energy, the attack in progress
-// and its phase clock, hitstun, blockstun and impact freeze, binds, and
+// and its phase clock, hitstun, blockstun and impact freeze, paralysis, and
 // every cooldown. Universal: one CombatState per fighter, whoever it is.
 //
 // Inputs: the fighter's resolved Energy settings (resolveEnergy, from its
@@ -14,7 +14,7 @@
 //
 // A summon or a technique on a numbered button (see js/data/loadout.js) is
 // not paid for: each has its own cooldown (CombatState.abilityCooldowns, see
-// CooldownTimers), keyed by the attack it is (attack3, attack4), started
+// CooldownTimers), keyed by the attack it is (attack4, attack5), started
 // when it is used and apart from the short recovery cooldowns of ordinary
 // attacks (CombatState.cooldowns). Both run down in real time.
 //
@@ -141,14 +141,14 @@ export class CombatState {
     this.release = null;    // the attack's projectile, released this step (see Fighter.update)
     // Ordinary attacks' short recovery cooldowns: attack id -> seconds left.
     this.cooldowns = new Map();
-    // The summons' and techniques' own cooldowns (#0001's attack3 and
-    // attack4), by the attack each one is: the Fighter starts them, and
+    // The summons' and techniques' own cooldowns (e.g. #0001's attack4 and
+    // attack5), by the attack each one is: the Fighter starts them, and
     // they recover in real time (see update).
     this.abilityCooldowns = new CooldownTimers();
     this.lastIntent = null; // last combat button pressed (see Fighter.tryAction)
-    // Whatever holds this fighter in place (a technique that caught
-    // it), each by its own token so a source only ever releases its own hold.
-    this.binds = new Set();
+    // Seconds this fighter is still held in place by a hit's `paralyze`
+    // (see js/game/combat/hit-effects.js and paralyze below).
+    this.paralysis = 0;
   }
 
   get attacking() {
@@ -196,26 +196,27 @@ export class CombatState {
     return a ? attackPhase(a.def, a.time) : null;
   }
 
-  // Bound: caught and held by a technique (see bind). Unlike
-  // hitstun it has no timer: it lasts until its source releases it.
+  // Held in place (paralyzed, see paralyze): the fighter cannot act, its
+  // sideways speed is held at 0 and it shows its hurt pose (see
+  // Fighter.update). Apart from hitstun: a hit that only stuns never ends
+  // it, and it never ends a stun.
   get immobilized() {
-    return this.binds.size > 0;
+    return this.paralysis > 0;
   }
 
-  bind(source) {
-    this.binds.add(source);
+  // A real hit paralyzed the fighter for `seconds`: the longer of what is
+  // left and the new hold. It runs down like hitstun (never during an
+  // impact freeze), and a launching hit ends it at once (see
+  // releaseParalysis): a launch is never held back.
+  paralyze(seconds) {
+    if (seconds > this.paralysis) this.paralysis = seconds;
   }
 
-  // Releases only `source`'s hold; any other stays.
-  unbind(source) {
-    this.binds.delete(source);
+  releaseParalysis() {
+    this.paralysis = 0;
   }
 
-  isBoundBy(source) {
-    return this.binds.has(source);
-  }
-
-  // Free of any attack, stun (a Shield's blockstun included) or bind.
+  // Free of any attack, stun (a Shield's blockstun included) or paralysis.
   // Launch Point never matters here, however high it is, and neither does
   // Energy. (An attack that hit may still be cut short by another attack or
   // a jump: see cancellable.)
@@ -296,6 +297,9 @@ export class CombatState {
     }
     if (this.stun > 0) this.stun = Math.max(0, this.stun - dt);
     if (this.shieldStun > 0) this.shieldStun = Math.max(0, this.shieldStun - dt);
+    // To within a little slack, like the freeze: a hold a whole number of
+    // steps long lasts exactly that many.
+    if (this.paralysis > 0) this.paralysis = this.paralysis - dt <= PHASE_EPSILON ? 0 : this.paralysis - dt;
     if (this.attack) {
       this.attack.time += dt;
       // One-shot release: the step the attack's time crosses `spawnAt`. A

@@ -988,11 +988,11 @@ test('Quick Battle with a fighter with different moves: picked from slot 05, the
   trace(battle, 300);
   for (const f of battle.fighters) assert.ok(Number.isFinite(f.x) && Number.isFinite(f.y));
   screens.battle.exit();
-  // Back to Test A: Shuriken, Transform, Punch and Kick.
+  // Back to Test A: High Kick, Transform, Jab and Red.
   app.screens.go('home', {}, { reset: true });
   await startQuickBattle(booted, { fighter: TEST_A });
   assert.deepEqual(abilities.map((a) => [touch.buttons.get(a).hidden ?? false, touch.buttons.get(a).getAttribute('aria-label')]), [
-    [false, 'Shuriken'], [false, 'Transform'], [false, 'Punch'], [false, 'Kick'],
+    [false, 'High Kick'], [false, 'Transform'], [false, 'Jab'], [false, 'Red'],
   ]);
   screens.battle.exit();
 });
@@ -1112,7 +1112,7 @@ test('spectating: no touch controls and no gameplay input, through pause, resume
   assert.equal(screen.touch.enabled, true);
   assert.equal(screen.touchRoot.hidden, false);
   assert.ok(!screen.el.classList.contains('is-watch'));
-  assert.equal(screen.touch.buttons.get('extra_attack').getAttribute('aria-label'), 'Shuriken', 'Player 1\'s fighter again');
+  assert.equal(screen.touch.buttons.get('extra_attack').getAttribute('aria-label'), 'High Kick', 'Player 1\'s fighter again');
   screen.exit();
 });
 
@@ -1295,11 +1295,11 @@ test('Quick Battle with a fighter with no moves: picked from slot 04, the CPU pl
   trace(battle, 300);
   for (const f of battle.fighters) assert.ok(Number.isFinite(f.x) && Number.isFinite(f.y));
   screens.battle.exit();
-  // Back to Test A: Shuriken, Transform, Punch and Kick are back.
+  // Back to Test A: High Kick, Transform, Jab and Red are back.
   app.screens.go('home', {}, { reset: true });
   await startQuickBattle(booted, { fighter: TEST_A });
   assert.deepEqual(abilities.map((a) => [touch.buttons.get(a).hidden, touch.buttons.get(a).getAttribute('aria-label')]), [
-    [false, 'Shuriken'], [false, 'Transform'], [false, 'Punch'], [false, 'Kick'],
+    [false, 'High Kick'], [false, 'Transform'], [false, 'Jab'], [false, 'Red'],
   ]);
   screens.battle.exit();
 });

@@ -14,7 +14,7 @@ import { COMBAT_ACTIONS } from '../../js/game/fighters/fighter.js';
 import { CombatSystem } from '../../js/game/combat/combat.js';
 import { HELD_CONTROLS, blankInput } from '../../js/game/fighters/fighter-controller.js';
 import {
-  def, DT, SIM_CTX, makeFighter, frameName, stepUntil, steps, duel, startupSteps,
+  def, DT, SIM_CTX, makeFighter, frameName, stepUntil, steps, duel,
 } from '../helpers/fighter-harness.mjs';
 
 const DOWN = { down: true };
@@ -185,44 +185,52 @@ test('holding Down never refills Energy faster: one passive rate, whatever is he
   assert.ok(Math.abs(plain[steps(1) - 1] - (20 + def.energy.regen)) < 1e-6, 'regen per second, exactly');
 });
 
-test('holding Down never speeds up a cooldown: Attack 3 and Attack 4 recover in real time either way', () => {
-  const recover = (held) => {
-    const d = duel({ gap: 600 });
-    d.tick(P('attack3'));
-    d.until(() => d.attacker.combat.abilityCooldowns.active('attack3'), 1);
-    const cd = d.attacker.combat.abilityCooldowns;
-    const out = [];
-    for (let i = 0; i < steps(1); i++) {
-      d.tick(held);
-      out.push(cd.remaining('attack3'));
-    }
-    return out;
-  };
-  const plain = recover({});
-  assert.deepEqual(recover(DOWN), plain);
-  assert.ok(Math.abs(plain.at(-1) - 4) < 1e-6, '1 s of cooldown per second');
+test('holding Down never speeds up a cooldown: Attack 4 and Attack 5 recover in real time either way', () => {
+  for (const button of ['attack4', 'attack5']) {
+    const recover = (held) => {
+      const d = duel({ gap: 600 });
+      d.tick(P(button));
+      d.until(() => d.attacker.combat.abilityCooldowns.active(button), 1);
+      const cd = d.attacker.combat.abilityCooldowns;
+      const out = [];
+      for (let i = 0; i < steps(1); i++) {
+        d.tick(held);
+        out.push(cd.remaining(button));
+      }
+      return out;
+    };
+    const plain = recover({});
+    assert.deepEqual(recover(DOWN), plain, button);
+    assert.ok(Math.abs(plain.at(-1) - (def.techniques[button].cooldown - 1)) < 1e-6, `${button}: 1 s of cooldown per second`);
+  }
 });
 
 test('Down with any button changes nothing about what that button does', () => {
-  // What the press started, and the clones out once a summon's startup
-  // (#0001's, from the same press) has run its course.
+  // What the press started, and what it has sent out half a second on
+  // (projectiles in flight, clones).
   const press = (button, held) => {
     const d = duel({ gap: 150 });
     for (let i = 0; i < 10; i++) d.tick(held);
     d.tick({ ...held, ...P(button) });
     const f = d.attacker;
     const started = [f.combat.attack?.def.id ?? null, f.technique?.def.id ?? null, f.combat.shielding, f.state];
-    for (let i = 0; i < startupSteps(def, 'attack3'); i++) d.tick(held);
-    return [...started, d.clones.length];
+    const sent = [];
+    for (let i = 0; i < steps(0.5); i++) {
+      d.tick(held);
+      sent.push(d.projectiles.length + d.clones.length);
+    }
+    return [...started, sent];
   };
   for (const button of [...COMBAT_BUTTONS, 'shield']) {
     assert.deepEqual(press(button, DOWN), press(button, {}), button);
   }
-  // The direct numbered attacks need nothing held: attack3 summons (its
-  // startup first, then the clone) and attack4 rushes either way.
-  assert.deepEqual(press('attack3', {}), [null, null, false, 'summon', 1]);
+  // The direct numbered attacks need nothing held: attack3 throws Maximum
+  // Blue, attack4 and attack5 cast their techniques either way.
+  const blue = press('attack3', {});
+  assert.deepEqual(blue.slice(0, 4), ['attack3', null, false, 'attack']);
+  assert.ok(blue[4].includes(1), 'Maximum Blue went out');
   assert.deepEqual(press('attack4', {}).slice(0, 2), [null, 'attack4']);
-  assert.equal(press('attack4', {}).at(-1), 0);
+  assert.deepEqual(press('attack5', {}).slice(0, 2), [null, 'attack5']);
 });
 
 test('the fighter has no state or pose of Down\'s own: only its directional effects read it', () => {

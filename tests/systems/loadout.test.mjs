@@ -42,7 +42,7 @@ function airborne(def) {
 
 for (const c of LOADOUT_CASES) {
   const kinds = c.buttons.map((b) => (c.types[b] === 'attack' ? b : `${b} (${c.types[b]})`));
-  const label = `Case ${c.name}: ${c.count} attacks${c.specials ? ' with a summon and a technique' : ''}`;
+  const label = `Case ${c.name}: ${c.count} attacks${c.specials ? ' with a summon and a technique' : c.casts ? ' with two techniques' : ''}`;
 
   test(`${label}: buttons ${kinds.join(', ')}, every numbered attack a button of its own`, () => {
     const def = c.def;
@@ -142,16 +142,17 @@ test('Case F: attack5 is an ordinary button beside the summon and the technique,
   assert.deepEqual([d.events[0].type, d.events[0].move, d.events[0].damage], ['hit', 'attack5', 5]);
 });
 
-test('#0001 is Case E with an extra attack: four numbered buttons, attack3 a summon and attack4 a technique', () => {
-  const E = LOADOUT_CASES.find((c) => c.name === 'E');
+test('#0001 is Case G with an extra attack: five numbered buttons, attack4 and attack5 techniques', () => {
+  const G = LOADOUT_CASES.find((c) => c.name === 'G');
   const own = describeLoadout(DEF_0001);
-  assert.deepEqual({ ...own, extra: false }, describeLoadout(E.def));
+  assert.deepEqual({ ...own, extra: false }, describeLoadout(G.def));
   assert.equal(own.extra, true);
-  assert.deepEqual(own.types, { attack1: 'attack', attack2: 'attack', attack3: 'summon', attack4: 'technique' });
-  assert.deepEqual(attackButtons(DEF_0001), ['attack1', 'attack2', 'attack3', 'attack4'], 'Attack 1 to Attack 4');
-  assert.equal(Object.hasOwn(DEF_0001.actions, 'attack5'), false, 'no Attack 5');
-  assert.deepEqual(DEF_0001.actions.attack3, { type: 'summon', id: 'attack3' });
+  assert.deepEqual(own.types, { attack1: 'attack', attack2: 'attack', attack3: 'attack', attack4: 'technique', attack5: 'technique' });
+  assert.deepEqual(attackButtons(DEF_0001), [...NUMBERED_ATTACKS], 'Attack 1 to Attack 5');
+  assert.deepEqual(own.air, { attack1: 'midair_attack1', attack2: 'midair_attack2', attack3: 'midair_attack3' });
   assert.deepEqual(DEF_0001.actions.attack4, { type: 'technique', id: 'attack4' });
+  assert.deepEqual(DEF_0001.actions.attack5, { type: 'technique', id: 'attack5' });
+  assert.deepEqual(specialAttacks(DEF_0001), ['attack4', 'attack5']);
   assert.deepEqual(Object.keys(own), ['numbered', 'buttons', 'air', 'types', 'extra'], 'nothing reached through another button');
   assert.deepEqual(ACTION_TYPES, ['attack', 'summon', 'technique']);
 });
@@ -163,8 +164,10 @@ test('an extra_attack sits beside five numbered attacks, outside their count, on
   const ground = fighterOf(WITH_EXTRA);
   ground.step(P('extra_attack'));
   assert.equal(ground.fighter.combat.attack.def.id, 'extra_attack');
-  while (ground.fighter.combat.attack) ground.step({});
-  assert.deepEqual(ground.fighter.releases.map((r) => r.id), ['extra_attack_object'], 'its projectile, named after it');
+  const d = duel({ attackerCharacter: WITH_EXTRA, attackerSprites: fakeSpritesOf(WITH_EXTRA) });
+  d.tick(P('extra_attack'));
+  d.until(() => d.events.length > 0);
+  assert.deepEqual([d.events[0].type, d.events[0].move], ['hit', 'extra_attack'], 'it strikes as itself');
   // Its own button: it needs no midair_extra_attack.
   assert.equal(WITH_EXTRA.attacks.midair_extra_attack, undefined);
   // And it counts toward nothing: one numbered attack and an extra_attack
@@ -324,7 +327,9 @@ test('a summon or technique button is { type, id }, keyed by the button it is, a
   breaks((d) => { delete d.techniques.attack4; }, /performs attack4, which is not in `techniques`/, E);
   breaks((d) => { d.summons.attack3.attack = 'attack9'; }, /summon attack3 names attack "attack9"/, E);
   breaks((d) => { delete d.effectAnimations.attack3_object; }, /cloud "attack3_object" is not in `effectAnimations`/, E);
-  breaks((d) => { delete d.animations.attack4_dash; }, /dashAnimation "attack4_dash" is not in `animations`/, E);
+  breaks((d) => { delete d.animations.attack4_cast; }, /castAnimation "attack4_cast" is not in `animations`/, E);
+  breaks((d) => { d.techniques.attack4 = { ...d.techniques.attack4, burst: null }; }, /technique attack4 releases nothing/, E);
+  breaks((d) => { d.techniques.attack4 = { ...d.techniques.attack4, castAnimation: 'windup' }; }, /castAnimation "windup" is not in `animations`/, E);
   // attack1 and attack2 are always ordinary attacks.
   breaks((d) => { d.actions.attack1 = { type: 'summon', id: 'attack1' }; }, /actions\.attack1 must be an ordinary attack/, E);
   breaks((d) => { d.actions.attack2 = { type: 'technique', id: 'attack2' }; }, /actions\.attack2 must be an ordinary attack/, E);
@@ -345,9 +350,9 @@ test('what kind of move attack3 to attack5 are is data: the same button is an or
   // and needs no mid-air version.
   const summoned = structuredClone({ ...B, animations: B.animations, attacks: B.attacks });
   summoned.actions.attack3 = { type: 'summon', id: 'attack3' };
-  summoned.summons = { attack3: { ...DEF_0001.summons.attack3 } };
-  summoned.animations.attack3_summon = DEF_0001.animations.attack3_summon;
-  summoned.effectAnimations = { attack3_object: DEF_0001.effectAnimations.attack3_object };
+  summoned.summons = { attack3: { ...D.summons.attack3 } };
+  summoned.animations.attack3_summon = D.animations.attack3_summon;
+  summoned.effectAnimations = { attack3_object: D.effectAnimations.attack3_object };
   delete summoned.attacks.attack3;
   delete summoned.attacks.midair_attack3;
   assert.deepEqual(loadoutProblems(summoned), []);
@@ -363,11 +368,16 @@ test('what kind of move attack3 to attack5 are is data: the same button is an or
 test('whatever an attack creates is named after it: <attack>_object', () => {
   breaks((d) => {
     d.actions.extra_attack = 'extra_attack';
-    d.attacks.extra_attack = { ...DEF_0001.attacks.extra_attack, projectile: { ...DEF_0001.attacks.extra_attack.projectile, id: 'star' } };
-    d.animations.extra_attack = DEF_0001.animations.extra_attack;
-    d.projectiles.star = DEF_0001.projectiles.extra_attack_object;
-    d.projectileAnimations.extra_attack_object = DEF_0001.projectileAnimations.extra_attack_object;
+    d.attacks.extra_attack = { ...DEF_0001.attacks.attack2, animation: 'extra_attack', projectile: { ...DEF_0001.attacks.attack2.projectile, id: 'star' } };
+    d.animations.extra_attack = DEF_0001.animations.attack2;
+    d.projectiles.star = DEF_0001.projectiles.attack2_object;
+    d.projectileAnimations.extra_attack_object = DEF_0001.projectileAnimations.attack2_object;
   }, /throws "star": its projectile is extra_attack_object/);
+  // A technique's projectile too.
+  const G = LOADOUT_CASES.find((c) => c.name === 'G').def;
+  breaks((d) => {
+    d.techniques.attack5 = { ...d.techniques.attack5, projectile: { ...d.techniques.attack5.projectile, id: 'orb' } };
+  }, /technique attack5 releases "orb": its projectile is attack5_object/, G);
   const E = LOADOUT_CASES.find((c) => c.name === 'E').def;
   breaks((d) => {
     d.effectAnimations.smoke = d.effectAnimations.attack3_object;

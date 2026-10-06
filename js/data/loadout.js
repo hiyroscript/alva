@@ -34,23 +34,24 @@
 //   actions: {
 //     attack1: { ground: 'attack1', air: 'midair_attack1' },
 //     attack2: { ground: 'attack2', air: 'midair_attack2' },
-//     attack3: { type: 'summon', id: 'attack3' },
+//     attack3: { ground: 'attack3', air: 'midair_attack3' },
 //     attack4: { type: 'technique', id: 'attack4' },
+//     attack5: { type: 'technique', id: 'attack5' },
 //   }
 //
 // So a fighter with N numbered attacks has exactly N numbered buttons,
 // attack1 to attackN, whatever kind each one is.
 //
 // Anything an attack creates is named after it with `object`: a projectile
-// `<attack>_object`, and the art of a summon or a technique
-// `<attack>_object...` (its effect clips), so a fighter's data and files
-// read the same whatever its moves are called.
+// `<attack>_object` (an ordinary attack's or a technique's), and the art of
+// a summon `<attack>_object...` (its effect clips), so a fighter's data and
+// files read the same whatever its moves are called.
 //
 // loadoutProblems checks a definition against every one of these rules;
 // js/data/characters.js refuses to load one that breaks any.
 
 import { COMBAT_BUTTONS, MOVES, NUMBERED_ATTACKS } from '../config.js';
-import { TECHNIQUE_CLIPS, TECHNIQUE_EFFECTS } from '../game/combat/technique.js';
+import { TECHNIQUE_CLIPS } from '../game/combat/technique.js';
 
 export { NUMBERED_ATTACKS };
 
@@ -158,7 +159,8 @@ export function loadoutProblems(def) {
     else if (!summon.cloud.startsWith(objectOf(id))) say(`summon ${id}'s cloud "${summon.cloud}" is not named ${objectOf(id)}`);
   };
 
-  // A technique's data and art, for button `id`.
+  // A technique's data and art, for button `id`: its clips named after it,
+  // something to release, and its projectile named after it with art.
   const checkTechnique = (id) => {
     const technique = def?.techniques?.[id];
     if (!technique) {
@@ -170,11 +172,16 @@ export function loadoutProblems(def) {
       if (!animations[key]) say(`technique ${id}'s ${field} "${key}" is not in \`animations\``);
       else if (!key.startsWith(`${id}_`)) say(`technique ${id}'s ${field} "${key}" is not named ${id}_...`);
     }
-    for (const field of TECHNIQUE_EFFECTS) {
-      const key = technique[field];
-      if (!effects[key]) say(`technique ${id}'s ${field} "${key}" is not in \`effectAnimations\``);
-      else if (!key.startsWith(objectOf(id))) say(`technique ${id}'s ${field} "${key}" is not named ${objectOf(id)}...`);
+    if (!technique.projectile && !technique.burst) say(`technique ${id} releases nothing (no projectile and no burst)`);
+    const shot = technique.projectile;
+    if (shot) {
+      if (shot.id !== objectOf(id)) say(`technique ${id} releases "${shot.id}": its projectile is ${objectOf(id)}`);
+      const projectile = def?.projectiles?.[shot.id];
+      if (!projectile) say(`technique ${id} releases "${shot.id}", which is not in \`projectiles\``);
+      else if (!projectileArt[projectile.animation]) say(`projectile "${shot.id}" plays "${projectile.animation}", which is not in \`projectileAnimations\``);
     }
+    const burst = technique.burst;
+    if (burst && (!burst.hitbox || !burst.hit)) say(`technique ${id}'s burst needs a hitbox and a hit`);
   };
 
   // ---- Buttons ----------------------------------------------------------------

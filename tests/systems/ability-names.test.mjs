@@ -15,24 +15,29 @@ const DEF_0001 = getCharacter('0001');
 
 test('#0001 names the moves it has names for; the rest keep their neutral names', () => {
   assert.deepEqual(DEF_0001.abilityNames, {
-    extra_attack: 'Shuriken',
-    attack1: 'Punch',
-    attack2: 'Kick',
-    attack3: 'Clone Attack',
-    attack4: 'Sphere Rush',
+    extra_attack: 'High Kick',
+    attack1: 'Jab',
+    midair_attack1: 'Floating Straight',
+    attack2: 'Red',
+    midair_attack2: 'Red Kick',
+    attack3: 'Maximum Blue',
+    midair_attack3: 'Blue',
+    attack4: 'Unlimited Void',
+    attack5: 'Hollow Purple',
   });
+  // The techniques have no mid-air versions: those keep their neutral names.
   assert.deepEqual(Object.fromEntries(Object.keys(MOVES).map((m) => [m, abilityName(DEF_0001, m)])), {
-    attack1: 'Punch',
-    midair_attack1: 'Mid-air Attack 1',
-    attack2: 'Kick',
-    midair_attack2: 'Mid-air Attack 2',
-    attack3: 'Clone Attack',
-    midair_attack3: 'Mid-air Attack 3',
-    attack4: 'Sphere Rush',
+    attack1: 'Jab',
+    midair_attack1: 'Floating Straight',
+    attack2: 'Red',
+    midair_attack2: 'Red Kick',
+    attack3: 'Maximum Blue',
+    midair_attack3: 'Blue',
+    attack4: 'Unlimited Void',
     midair_attack4: 'Mid-air Attack 4',
-    attack5: 'Attack 5',
+    attack5: 'Hollow Purple',
     midair_attack5: 'Mid-air Attack 5',
-    extra_attack: 'Shuriken',
+    extra_attack: 'High Kick',
     transform: 'Transform',
   });
 });

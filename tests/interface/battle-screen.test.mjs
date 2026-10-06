@@ -781,17 +781,18 @@ test('entering Quick Battle shows Player 1\'s fighter\'s own art on the touch bu
   // What a button shows: the file of its sprite (the fighter's own art), or
   // its glyph's markup.
   const look = (b) => b.querySelector('.tc-sprite-icon')?.getAttribute('src').split('/').pop() ?? b.html;
-  const shown = ['extra_attack', 'shield', 'transform', 'attack1', 'attack2', 'attack3', 'attack4', 'jump'].map((a) => [
+  const shown = ['extra_attack', 'shield', 'transform', 'attack1', 'attack2', 'attack3', 'attack4', 'attack5', 'jump'].map((a) => [
     touch.buttons.get(a).getAttribute('aria-label'), look(touch.buttons.get(a)), touch.buttons.get(a).getAttribute('data-action'),
   ]);
   assert.deepEqual(shown, [
-    ['Shuriken', '0001_extra_attack_2.png', 'extra_attack'],
+    ['High Kick', '0001_extra_attack_3.png', 'extra_attack'],
     ['Shield', ICONS.shield, 'shield'],
     ['Transform', ICONS.transform, 'transform'],
-    ['Punch', '0001_attack1_2.png', 'attack1'],
-    ['Kick', '0001_attack2_5.png', 'attack2'],
-    ['Clone Attack', '0001_attack3_summon_3.png', 'attack3'],
-    ['Sphere Rush', '0001_attack4_5.png', 'attack4'],
+    ['Jab', '0001_attack1_4.png', 'attack1'],
+    ['Red', '0001_attack2_object_1.png', 'attack2'],
+    ['Maximum Blue', '0001_attack3_object_1.png', 'attack3'],
+    ['Unlimited Void', '0001_attack4_6.png', 'attack4'],
+    ['Hollow Purple', '0001_attack5_object_1.png', 'attack5'],
     ['Jump', ICONS.jump, 'jump'],
   ]);
   assert.ok(touch.buttons.get('transform').classList.contains('is-pending'), 'Transform reserved, dashed');
@@ -826,7 +827,7 @@ test('Quick Battle uses the Mobile Controls setting: Joystick by default, Classi
   assert.equal(touch.scheme, 'joystick');
   // The fighter's combat buttons were never rebuilt along the way.
   for (const [action, b] of elements) assert.equal(touch.actionButtons.get(action), b, action);
-  assert.equal(touch.buttons.get('attack1').getAttribute('aria-label'), 'Punch');
+  assert.equal(touch.buttons.get('attack1').getAttribute('aria-label'), 'Jab');
 }));
 
 test('Quick Battle places the touch controls by the saved custom layout of the scheme in use, read on every entry; Watch Mode still has none', () => withTestFighters([TEST_A], async () => {
@@ -991,7 +992,7 @@ test('Battle updates touch context after the player simulation, never from the o
   const ground = image.getAttribute('src');
   battle.frame = () => { battle.p1.grounded = false; battle.p2.grounded = true; };
   screen.update(1 / 60);
-  assert.equal(image.getAttribute('src'), DEF_0001.animations.midair_attack1.frames[2]);
+  assert.equal(image.getAttribute('src'), DEF_0001.animations.midair_attack1.frames[DEF_0001.mobileAbilities.attack1.previews.air.frame]);
   assert.equal(screen.touch.airborne, true);
   battle.frame = () => { battle.p1.grounded = true; battle.p2.grounded = false; };
   screen.update(1 / 60);

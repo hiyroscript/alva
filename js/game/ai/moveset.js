@@ -22,6 +22,14 @@ import { specialAction } from '../../data/loadout.js';
 
 const passOf = (anim) => (anim ? anim.frames.length / anim.fps : 0);
 
+// The smallest box round both `a` (or nothing) and `b`.
+function union(a, b) {
+  if (!a) return { ...b };
+  const x = Math.min(a.x, b.x);
+  const y = Math.min(a.y, b.y);
+  return { x, y, w: Math.max(a.x + a.w, b.x + b.w) - x, h: Math.max(a.y + a.h, b.y + b.h) - y };
+}
+
 // Horizontal half-width and vertical span of a fighter's hurtboxes (their
 // union, either facing), read from its own data.
 export function hurtExtent(def) {
@@ -43,13 +51,16 @@ const MOVESETS = new WeakMap();
 // attack a button starts, on the ground and in the air, split into melee and
 // ranged (only the buttons in its `actions`, attack3 to attack5 included
 // where it has them), each melee one with where its strikes can reach over
-// its own motion (`reach`, see attackReach in js/game/combat/attacks.js) and that
-// motion's kind (`motion`: a roll, a homing dash, a plunge, a lift, or
-// null); its summons and techniques (`specials`, #0001's attack3 and
-// attack4), each with its own button (`action`); whether it has a Shield
-// and a Dash. An action mapped to null (a reserved button, like #0001's
-// transform) is left out, as is anything the fighter would refuse for
-// missing art, so the AI never presses a button that cannot do anything.
+// its own motion and pull (`reach`, see attackReach in
+// js/game/combat/attacks.js) and that motion's kind (`motion`: a roll, a
+// homing dash, a plunge, a lift, a hover, or null); its summons and
+// techniques (`specials`, e.g. #0001's attack4 and attack5), each with its
+// own button (`action`), what it takes to come out (`lead`) and, for a
+// technique, where it lands (`box`) and with what (`hit`); whether it has a
+// Shield and a Dash. An action mapped to null (a reserved button, like
+// #0001's transform) is left out, as is anything the fighter would refuse
+// for missing art, so the AI never presses a button that cannot do
+// anything.
 export function readMoveset(f) {
   const cached = MOVESETS.get(f);
   if (cached && cached.def === f.def && cached.sprites === f.sprites) return cached;
@@ -86,23 +97,21 @@ export function readMoveset(f) {
     } else if (spec?.type === 'technique') {
       const t = f.techniqueDefs[spec.id];
       if (!t || techniqueProblem(f, t)) continue;
-      const form = Math.max(sprites.duration(t.formAnimation), passOf(sprites.effect(t.sphereBuild)));
-      const rush = sprites.duration(t.dashAnimation);
-      // The span the sphere sweeps over the rush, facing right from the
-      // fighter's origin: its hand positions through the dash clip, carried
-      // forward by the rush.
-      const hands = t.handOffsets?.[t.dashAnimation]?.length ? t.handOffsets[t.dashAnimation] : [{ x: 0, y: 0 }];
-      const hb = t.sphereHitbox;
-      const x0 = Math.min(...hands.map((h) => h.x)) + hb.x;
-      const x1 = Math.max(...hands.map((h) => h.x)) + hb.x + hb.w + t.dashSpeed * rush;
-      const y0 = Math.min(...hands.map((h) => h.y)) + hb.y;
-      const y1 = Math.max(...hands.map((h) => h.y)) + hb.y + hb.h;
-      const ticks = t.tickHit ? Math.floor(t.explosionDelay / t.tickInterval) : 0;
-      const damage = (t.firstHit?.damage ?? 0) + ticks * (t.tickHit?.damage ?? 0) + (t.explosionHit?.damage ?? 0);
+      // From the press to its release: one pass of its cast.
+      const lead = sprites.duration(t.castAnimation);
+      const shot = t.projectile ? f.projectileDefs[t.projectile.id] : null;
+      // Where it can land, facing right from the fighter's origin: its
+      // burst's box round the fighter, and its projectile's path over the
+      // whole of its life.
+      let box = t.burst ? { ...t.burst.hitbox } : null;
+      if (shot) {
+        const o = t.projectile.offset;
+        const hb = shot.hitbox;
+        box = union(box, { x: o.x + hb.x, y: o.y + hb.y, w: hb.w + shot.speed * shot.lifetime, h: hb.h });
+      }
       specials.push({
-        action, type: 'technique', id: spec.id, lead: form, form, rush,
-        box: { x: x0, y: y0, w: x1 - x0, h: y1 - y0 },
-        hit: { ...t.explosionHit, damage },
+        action, type: 'technique', id: spec.id, lead, box,
+        hit: t.burst?.hit ?? shot, projectile: shot ? { def: shot, offset: t.projectile.offset } : null,
       });
     }
   }

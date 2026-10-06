@@ -26,7 +26,7 @@
 //             level's noise.
 //   act       turn the chosen intent into held buttons and one-step presses,
 //             over as many steps as it needs (turn, then strike, or turn,
-//             then press attack4 for #0001's Sphere Rush; tap, release, tap
+//             then press attack5 for #0001's Hollow Purple; tap, release, tap
 //             for a Dash). It never presses a button the fighter has no
 //             action for.
 //
@@ -40,7 +40,7 @@
 //
 // Prediction is limited to motion: the opponent's position a short horizon
 // ahead (the level's lookahead) from its current velocity, and the path of a
-// projectile or a rush already under way. Never future inputs.
+// projectile already under way or a technique still casting. Never future inputs.
 
 import { range, clamp } from '../../core/utils.js';
 import { HELD_CONTROLS, blankInput, jumpTapHold } from '../fighters/fighter-controller.js';
@@ -235,7 +235,9 @@ export class CombatAIController {
       this.seen.add(tech);
       this.notice('technique', tech, () => foe.technique === tech);
     }
-    if (tech && tech.phase === 'whiffRelease' && !this.openSeen.has(tech)) {
+    // A technique that has let go leaves its fighter committed to its
+    // release pose: an opening, for as long as that lasts.
+    if (tech && tech.phase === 'release' && !this.openSeen.has(tech)) {
       this.openSeen.add(tech);
       this.notice('opening', tech, () => foe.technique === tech);
     }
@@ -312,13 +314,8 @@ export class CombatAIController {
     let foeBusy = Math.max(fc.stun + fc.hitstop, fc.shieldStun);
     if (fc.attack) foeBusy = Math.max(foeBusy, fc.attack.def.total - fc.attack.time);
     if (foe.dash) foeBusy = Math.max(foeBusy, foe.dash.duration - foe.dash.time);
-    if (foe.technique) {
-      const t = foe.technique;
-      if (t.phase === 'whiffRelease') foeBusy = Math.max(foeBusy, t.whiffDuration - t.time);
-      else if (t.phase === 'form') foeBusy = Math.max(foeBusy, t.formDuration - t.time + t.dashDuration);
-      else foeBusy = Math.max(foeBusy, 1);
-    }
-    if (fc.immobilized) foeBusy = Math.max(foeBusy, 1);
+    if (foe.technique) foeBusy = Math.max(foeBusy, foe.technique.endIn);
+    if (fc.immobilized) foeBusy = Math.max(foeBusy, fc.paralysis);
 
     const score = world?.score;
     const lead = (score?.[self.slot] ?? 0) - (score?.[foe.slot] ?? 0);
@@ -423,7 +420,7 @@ export class CombatAIController {
       if (!overlap(box, this.myBox(s, s.x, s.y, 3))) return null;
       const from = Math.sign(foe.body.x - b.x) || foe.facing * -1;
       const contactIn = Math.min(endIn, Math.max(0, def.startup - atk.time) + this.travelTime(foe, atk, s));
-      return { kind: 'melee', contactIn, endIn, box, top: box.y, from, severity: this.severity(def, s, from) };
+      return { kind: 'melee', contactIn, endIn, box, top: box.y, from, severity: this.severity(def, s, from), unblockable: def.unblockable };
     }
     if (e.kind === 'projectile') return this.projectileThreat(s, e.ref, 0);
     if (e.kind === 'clone') {
@@ -437,27 +434,37 @@ export class CombatAIController {
       const box = { x: c.facing > 0 ? c.x + hb.x : c.x - hb.x - hb.w, y: c.y + hb.y, w: hb.w, h: hb.h };
       if (!overlap(box, this.myBox(s, s.x, s.y, 3))) return null;
       const from = Math.sign(box.x + box.w / 2 - b.x) || -self.facing;
-      return { kind: 'clone', contactIn: Math.max(0, lead + def.startup), endIn, box, top: box.y, from, severity: this.severity(def, s, from) };
+      return { kind: 'clone', contactIn: Math.max(0, lead + def.startup), endIn, box, top: box.y, from, severity: this.severity(def, s, from), unblockable: def.unblockable };
     }
     if (e.kind === 'technique') {
+      // Still casting: what it will release. Once it has, its projectile is
+      // a projectile like any other and its burst has landed.
       const t = e.ref;
-      if (t.phase !== 'form' && t.phase !== 'dash') return null;
-      const center = t.sphereCenter();
-      if (!center) return null;
-      const speed = t.def.dashSpeed;
-      const startIn = t.phase === 'form' ? Math.max(0, t.formDuration - t.time) : 0;
-      const rushLeft = t.phase === 'form' ? t.dashDuration : Math.max(0, t.dashDuration - t.time);
-      const half = t.def.sphereHitbox.w / 2;
-      // The sphere's sweep from where it is to the end of the rush (the hand
-      // swings forward on the last frame: a generous margin covers it).
-      const reach = speed * rushLeft + 70;
-      const x0 = t.facing > 0 ? center[0] - half : center[0] - reach - half;
-      const box = { x: x0, y: center[1] + t.def.sphereHitbox.y - 8, w: reach + half * 2, h: t.def.sphereHitbox.h + 16 };
-      if (!overlap(box, this.myBox(s))) return null;
-      const ahead = (b.x - center[0]) * t.facing;
-      const contactIn = startIn + Math.max(0, (ahead - s.me.hw - half) / speed);
-      const hit = { ...t.def.explosionHit, damage: (t.def.explosionHit?.damage ?? 0) + 4 };
-      return { kind: 'technique', contactIn, endIn: startIn + rushLeft + 0.05, box, top: box.y, from: -t.facing, severity: this.severity(hit, s, -t.facing) + 6 };
+      if (t.phase !== 'cast') return null;
+      const startIn = t.releaseIn;
+      const burst = t.def.burst;
+      if (burst) {
+        const box = t.burstBox({});
+        if (box && overlap(box, this.myBox(s, s.x, s.y, 3))) {
+          const from = Math.sign(foe.body.x - b.x) || -self.facing;
+          return {
+            kind: 'technique', contactIn: startIn, endIn: startIn + 1 / 30, box, top: box.y, from,
+            severity: this.severity(burst.hit, s, from) + 6, unblockable: burst.hit.unblockable,
+          };
+        }
+      }
+      const shot = t.def.projectile;
+      const proj = shot && foe.projectileDefs[shot.id];
+      if (proj) {
+        const f = t.facing;
+        const ball = { x: foe.body.x + shot.offset.x * f, y: foe.body.y + shot.offset.y, vx: proj.speed * f, def: proj, age: 0 };
+        const threat = this.projectileThreat(s, ball, startIn);
+        if (threat) {
+          threat.kind = 'technique';
+          threat.severity += 6;
+        }
+        return threat;
+      }
     }
     return null;
   }
@@ -465,7 +472,7 @@ export class CombatAIController {
   // How long attack `atk` of the opponent's, once under way, travels before
   // its strike can touch this fighter: a roll or a homing dash covering the
   // gap at its speed, a plunge or a lift the height between. 0 for one that
-  // strikes where it stands.
+  // strikes where it stands (a hover included).
   travelTime(foe, atk, s) {
     const m = atk.def.motion;
     if (!m) return 0;
@@ -479,6 +486,7 @@ export class CombatAIController {
       return Math.max(0, gap) / speed;
     }
     if (m.type === 'bounce') return Math.max(0, s.y + e.top - (fb.y + hb.y + hb.h)) / m.fallSpeed;
+    if (m.type === 'hover') return 0;
     return Math.max(0, fb.y + hb.y - (s.y + e.bottom)) / m.speed;
   }
 
@@ -504,7 +512,7 @@ export class CombatAIController {
     const from = -dirp;
     return {
       kind: 'projectile', contactIn, endIn: contactIn + (e.hw * 2 + hb.w) / speed, box: null, top, from,
-      severity: this.severity(p.def, s, from),
+      severity: this.severity(p.def, s, from), unblockable: p.def.unblockable,
     };
   }
 
@@ -594,8 +602,9 @@ export class CombatAIController {
     // this close to contact it is a perfect Shield (see
     // Fighter.perfectShield), free: a timing the level has to earn, so a
     // lower one mostly fumbles it and takes the hit instead.
+    // Never against a hit no Shield stops.
     const justInTime = !self.combat.shielding && threat.contactIn <= (self.defense?.perfectWindow ?? 0);
-    if (s.ms.shield && self.shieldAllowed() && (!justInTime || this.rng() < p.guard ** 4)) {
+    if (s.ms.shield && !threat.unblockable && self.shieldAllowed() && (!justInTime || this.rng() < p.guard ** 4)) {
       const cost = self.energyDef.shieldHitCost;
       const drain = justInTime ? 0 : cost >= s.energy ? 1.2 : (cost / s.energy) * 0.8;
       const linger = 0.04 + (1 - p.guard) * 0.25;
@@ -642,7 +651,7 @@ export class CombatAIController {
     }
 
     // Strike first: a hit stops a Throw before it lets go, and ends a
-    // technique still forming.
+    // technique still casting.
     if ((threat.kind === 'throw' || threat.kind === 'technique') && s.canAct) {
       const strike = this.meleeOptions(s, false).find((m) => m.atk.startup < threat.contactIn - 1 / 60);
       if (strike) options.push({ score: weight * 1.1 * (0.4 + p.punish), intent: this.attackIntent(strike) });
@@ -689,9 +698,9 @@ export class CombatAIController {
   // Whether motion attack `m` would reach an opponent whose feet will be at
   // (fx, fy), turned to `face`, and is safe to start here: a homing dash
   // when the opponent's middle is well inside its lock-on range; a roll, a
-  // plunge or a lift when its swept reach covers the opponent (with this
-  // level's spacing error), a roll only with ground all along its path and a
-  // plunge only over ground (never into the Void).
+  // plunge, a lift or a hover when its swept reach covers the opponent (with
+  // this level's spacing error), a roll only with ground all along its path
+  // and a plunge only over ground (never into the Void).
   motionFits(m, s, fx, fy, face) {
     const { self, foe, p } = s;
     const spec = m.atk.motion;
@@ -702,7 +711,8 @@ export class CombatAIController {
       return Math.hypot(fx - s.x, foeMid - myMid) + err < spec.range * 0.9;
     }
     const d = (fx - s.x) * face + err;
-    const dy = fy - this.ownY(s, m.atk.startup);
+    // A hover holds the fighter where it is from its first step.
+    const dy = fy - (m.motion === 'hover' ? s.y : this.ownY(s, m.atk.startup));
     if (!within(reachOf(m.reach, s.fe), d, dy)) return false;
     if (m.motion === 'roll') return this.groundAhead(self, s.stage, face, m.reach.w - m.atk.hitbox.w);
     if (m.motion === 'bounce') {
@@ -717,6 +727,8 @@ export class CombatAIController {
   hitValue(hit, s, face) {
     const lp = s.foeLP + (hit.damage ?? 0);
     let v = (hit.damage ?? 0) / 6 + ((hit.baseLaunch ?? 0) * lp) / 60;
+    // A hit that paralyses is worth the free strikes that follow it.
+    v += (hit.paralyze ?? 0) * 0.6;
     if (hit.directionalLaunch === 'horizontal') {
       const f = s.stage.floor;
       const room = face > 0 ? f.x + f.w - s.foe.body.x : s.foe.body.x - f.x;
@@ -811,8 +823,8 @@ export class CombatAIController {
       });
     }
 
-    // A summon or a technique (#0001's Attack 3 and Attack 4), pressed
-    // directly when one fits.
+    // A summon or a technique (e.g. #0001's Attack 4 and Attack 5),
+    // pressed directly when one fits.
     out.push(...this.specialOptions(s));
 
     out.push({ score: 0.18 + (1 - s.aggro) * 0.2, intent: { kind: 'idle', until: this.clock + range(this.rng, 0.1, 0.3) } });
@@ -849,16 +861,16 @@ export class CombatAIController {
     return score;
   }
 
-  // The fighter's summons and techniques (#0001's Attack 3 and Attack 4),
-  // each one ready and on the ground pressed on its own button when it
-  // fits: a summon like the Clone Attack at an opponent likely to stay put,
-  // a technique like the Sphere Rush it is in line for. A technique goes the
-  // way the fighter faces, so it turns first. Worth its long cooldown only
-  // when it is likely to land, as the level judges it. A summon holds the
-  // fighter only for its short startup (if it has one: #0001's summoning
-  // pose), as it would a player, and its lead counts it; a technique holds
-  // it in place while it forms, so it is worth less the closer the opponent
-  // could strike first, unless the opponent is busy for longer than that.
+  // The fighter's summons and techniques (e.g. #0001's Attack 4 and Attack
+  // 5), each one ready and on the ground pressed on its own button when it
+  // fits: a summon at an opponent likely to stay put, a technique whose
+  // burst or projectile it is in line for. A technique goes the way the
+  // fighter faces, so it turns first. Worth its long cooldown only when it
+  // is likely to land, as the level judges it. A summon holds the fighter
+  // only for its startup (if it has one), as it would a player, and its
+  // lead counts it; a technique holds it in place while it casts, so it is
+  // worth less the closer the opponent could strike first, unless the
+  // opponent is busy for longer than that.
   specialOptions(s) {
     const { self, p } = s;
     if (!s.canAct || !s.grounded) return [];
@@ -886,8 +898,11 @@ export class CombatAIController {
   specialValue(c, s) {
     const { foe, p } = s;
     const judged = 0.3 + 0.7 * p.specials;
-    if (s.foeShielding) return c.type === 'summon' ? 0.1 * judged : 0;
-    const still = Math.abs(foe.body.vx) < 30 && s.foeGrounded;
+    // A Shield blocks it, unless nothing can: then a raised one is an
+    // opponent standing still for it.
+    const unblockable = !!c.hit?.unblockable;
+    if (s.foeShielding && !unblockable) return c.type === 'summon' ? 0.1 * judged : 0;
+    const still = (Math.abs(foe.body.vx) < 30 && s.foeGrounded) || s.foeShielding;
     let stay = 0.15;
     if (s.openings.length && s.foeBusy > c.lead) stay = 0.9;
     else if (still) stay = 0.35;
@@ -895,11 +910,11 @@ export class CombatAIController {
     // that stays put; it pushes the way the opponent faces.
     if (c.type === 'summon') return (0.18 + stay * this.hitValue(c.hit, s, foe.facing)) * judged;
     if (c.type === 'technique') {
-      if (!s.sameLevel || !s.foeGrounded) return 0;
+      if (!c.box || !s.sameLevel) return 0;
       const r = reachOf(c.box, s.fe);
       const d = s.dist + (this.rng() * 2 - 1) * p.rangeError;
       if (!within(r, d, s.dy)) return 0;
-      // Walking into the rush counts as staying.
+      // Walking into it counts as staying.
       if (Math.sign(foe.body.vx) === -s.dir && Math.abs(foe.body.vx) > 30) stay = Math.max(stay, 0.35);
     }
     return stay * this.hitValue(c.hit, s, s.dir) * judged;
