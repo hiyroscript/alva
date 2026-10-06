@@ -3,8 +3,9 @@
 //
 // A controller like PlayerController: Fighter.update asks it for one
 // FighterInput snapshot per fixed step, and that is all it ever produces.
-// Every attack, Throw, summon, technique, Shield, jump, fast fall and Dash
-// happens because it pressed or held the same inputs a player would, and
+// Every attack, Throw, summon, technique, Shield, Deflect, jump, fast fall,
+// Dash and air dash happens because it pressed or held the same inputs a
+// player would, and
 // the fighter and combat engine decide what those inputs do, exactly as for
 // Player 1. It
 // never moves, hurts, spawns, cancels or refreshes anything itself, and it
@@ -21,9 +22,11 @@
 //             it, not when a key goes down.
 //   evaluate  score the options that fit the moment (answer a threat, strike,
 //             Throw, a summon or technique, approach, space, Dash, jump in,
-//             make for the centre, wait), each option built from the
-//             fighter's own move data, and take the best one after the
-//             level's noise.
+//             air dash, make for the centre, wait), each option built from
+//             the fighter's own move data, and take the best one after the
+//             level's noise. On the ground a threat may be Shielded; in the
+//             air there is no Shield, and a projectile may be Deflected
+//             instead, if the fighter's Deflect would be live as it arrives.
 //   act       turn the chosen intent into held buttons and one-step presses,
 //             over as many steps as it needs (turn, then strike, or turn,
 //             then press attack5 for #0001's Hollow Purple; tap, release, tap
@@ -52,8 +55,8 @@ import { readMoveset } from './moveset.js';
 // The buttons a controller holds, by control codename (every held control:
 // the directions, Down included, Jump, Shield and every combat button up to
 // attack5); each has a matching `…Pressed` edge. The mouvement buttons are
-// touch-only: it Dashes by double-tapping runLeft / runRight, as a keyboard
-// or gamepad player does.
+// touch-only: it Dashes (and air dashes) by double-tapping runLeft /
+// runRight, as a keyboard or gamepad player does.
 const BUTTONS = HELD_CONTROLS;
 const DIR_KEY = { [-1]: 'runLeft', 1: 'runRight' };
 
@@ -512,8 +515,34 @@ export class CombatAIController {
     const from = -dirp;
     return {
       kind: 'projectile', contactIn, endIn: contactIn + (e.hw * 2 + hb.w) / speed, box: null, top, from,
-      severity: this.severity(p.def, s, from), unblockable: p.def.unblockable,
+      severity: this.severity(p.def, s, from), unblockable: p.def.unblockable, shot: p, delay,
     };
+  }
+
+  // Whether Deflect `d` (see readMoveset), pressed now, would catch the
+  // projectile threatening this fighter (`threat.shot`, `threat.delay`
+  // seconds from release): its box, turned to the opponent as the fighter
+  // turns its attacks, meets the shot's while the Deflect is live, and the
+  // shot does not reach the fighter before. Its own fall carries it, as far
+  // as it knows its body; its drift is left out.
+  deflectCatches(s, d, threat) {
+    const shot = threat.shot;
+    const atk = d.atk;
+    if (!shot || !d.catches || threat.contactIn < atk.startup - 1 / 120) return false;
+    const face = Math.sign(s.foe.body.x - s.x) || s.facing;
+    const hb = atk.hitbox;
+    const ph = shot.def.hitbox;
+    const dirp = Math.sign(shot.vx);
+    for (let t = atk.startup; t < atk.startup + atk.active - 1e-6; t += 1 / 60) {
+      const flown = t - threat.delay;
+      if (flown < 0) continue;
+      const y = this.ownY(s, t);
+      const box = { x: face > 0 ? s.x + hb.x : s.x - hb.x - hb.w, y: y + hb.y, w: hb.w, h: hb.h };
+      const px = shot.x + shot.vx * flown;
+      const pbox = { x: dirp > 0 ? px + ph.x : px - ph.x - ph.w, y: shot.y + ph.y, w: ph.w, h: ph.h };
+      if (overlap(box, pbox)) return true;
+    }
+    return false;
   }
 
   // ---- Evaluate -------------------------------------------------------------------
@@ -536,8 +565,13 @@ export class CombatAIController {
       const soonest = Math.min(...later.map((t) => t.contactIn));
       this.thinkTimer = Math.min(this.thinkTimer, soonest - DEFENSE_HORIZON + 0.02);
     }
+    // In the air with a Deflect, a shot inside the horizon is watched step by
+    // step: the Deflect's live window is only a few steps long.
+    if (s.ms.deflect && !s.grounded && p.guard >= 0.5 && s.threats.some((t) => t.shot && t.contactIn <= DEFENSE_HORIZON)) {
+      this.thinkTimer = Math.min(this.thinkTimer, 1 / 60);
+    }
 
-    if (s.offStage) return this.setIntent({ kind: 'recover' });
+    if (s.offStage) return this.setIntent(this.airDashHome(s) ?? { kind: 'recover' });
     const defense = this.chooseDefense(s);
     if (defense) return this.setIntent(defense);
     // A plan in progress is kept for the level's planning time unless
@@ -552,6 +586,29 @@ export class CombatAIController {
     }
     const best = this.pick(this.options(s));
     return this.setIntent(best ?? { kind: 'idle', until: this.clock + 0.2 });
+  }
+
+  // Whether an air dash could start now, as far as the CPU can tell: one
+  // left this airtime, free to act, not exhausted, not in free fall and not
+  // still flying from a launch (no air dash starts then; see
+  // Fighter.tryAirDash).
+  airDashFree(s) {
+    const { self } = s;
+    return !s.grounded && s.canAct && !s.exhausted && self.airDashes > 0 && !self.freeFall && !self.launch;
+  }
+
+  // Knocked off the stage and still level with its top, but too far out
+  // for drifting back: an air dash home (as often as the level Dashes at
+  // all), the air jump kept for the climb. Null for none.
+  airDashHome(s) {
+    const { self, stage, p } = s;
+    const d = s.ms.airDash;
+    if (!d || !(p.dash > 0) || !this.airDashFree(s) || this.rng() >= p.dash) return null;
+    const b = self.body;
+    const floor = stage.floor;
+    const gap = b.x < floor.x ? floor.x - b.x : b.x - (floor.x + floor.w);
+    if (gap < 100 || b.y > stage.groundY + 60) return null;
+    return { kind: 'dash', dir: Math.sign(stage.centerX - b.x) || 1, air: true, recover: true };
   }
 
   // The highest option after the level's decision noise.
@@ -588,7 +645,7 @@ export class CombatAIController {
       // Taken in too late: the attack is already past, or already landed.
       // A lower level sometimes raises its Shield anyway, a beat behind.
       const late = s.fresh?.some((e) => e.kind === 'attack' && !this.threatOf(e, s)) && s.liveDist < s.foeReach + 40;
-      if (late && s.ms.shield && self.shieldAllowed() && this.rng() < (1 - p.guard) * 0.5) {
+      if (late && s.grounded && s.ms.groundShield && self.shieldAllowed() && this.rng() < (1 - p.guard) * 0.5) {
         return { kind: 'shield', until: this.clock + range(this.rng, 0.2, 0.45) };
       }
       return null;
@@ -597,14 +654,15 @@ export class CombatAIController {
     const ready = s.canAct;
     const options = [{ score: (1 - p.guard) * 0.8 + (threat.severity < 3 ? 0.6 : 0), intent: { kind: 'take' } }];
 
-    // Shield: up the step `shield` is held, from either side; costs Energy
-    // only if it blocks. Held through the threat, never much longer. Raised
-    // this close to contact it is a perfect Shield (see
+    // Shield: on the ground only, up the step `shield` is held, from either
+    // side; costs Energy only if it blocks. Held through the threat, never
+    // much longer. Raised this close to contact it is a perfect Shield (see
     // Fighter.perfectShield), free: a timing the level has to earn, so a
     // lower one mostly fumbles it and takes the hit instead.
     // Never against a hit no Shield stops.
     const justInTime = !self.combat.shielding && threat.contactIn <= (self.defense?.perfectWindow ?? 0);
-    if (s.ms.shield && !threat.unblockable && self.shieldAllowed() && (!justInTime || this.rng() < p.guard ** 4)) {
+    if (s.grounded && s.ms.groundShield && !threat.unblockable && self.shieldAllowed() &&
+        (!justInTime || this.rng() < p.guard ** 4)) {
       const cost = self.energyDef.shieldHitCost;
       const drain = justInTime ? 0 : cost >= s.energy ? 1.2 : (cost / s.energy) * 0.8;
       const linger = 0.04 + (1 - p.guard) * 0.25;
@@ -650,6 +708,17 @@ export class CombatAIController {
       }
     }
 
+    // Deflect it: in the air, a projectile on course that the Deflect's box
+    // would meet while it is live is turned back at its thrower (see
+    // deflectCatches). Pressed on `shield`, now: an answer whose timing the
+    // level's own reaction already has to make. Unblockable shots too (a
+    // Deflect is no Shield).
+    const deflect = s.ms.deflect;
+    if (deflect && !s.grounded && ready && !self.combat.cooldowns.has(deflect.id) && !self.airStartBlocked(deflect.atk) &&
+        this.deflectCatches(s, deflect, threat)) {
+      options.push({ score: weight * 1.2, intent: this.attackIntent({ ...deflect, face: Math.sign(s.foe.body.x - s.x) || s.facing }) });
+    }
+
     // Strike first: a hit stops a Throw before it lets go, and ends a
     // technique still casting.
     if ((threat.kind === 'throw' || threat.kind === 'technique') && s.canAct) {
@@ -667,13 +736,15 @@ export class CombatAIController {
   // keeps and its step-in), against where the opponent's motion takes it by
   // then, as far as the level projects. An attack with a motion of its own
   // is judged by where that motion takes its strikes instead (see
-  // motionFits). Never one used up until the fighter lands again.
+  // motionFits). Never one used up until the fighter lands again. In the
+  // air its Deflect is one of them (an aerial strike on `shield`).
   meleeOptions(s, air = !s.grounded) {
     const { self, foe, p } = s;
     const out = [];
     const fb = foe.body;
     const toward = Math.sign(fb.x - s.x) || s.facing;
-    for (const m of s.ms.melee) {
+    const moves = air && s.ms.deflect ? [...s.ms.melee, s.ms.deflect] : s.ms.melee;
+    for (const m of moves) {
       if (m.air !== air || self.combat.cooldowns.has(m.id) || self.airStartBlocked(m.atk)) continue;
       const atk = m.atk;
       const t = atk.startup;
@@ -747,7 +818,7 @@ export class CombatAIController {
   }
 
   attackIntent(m) {
-    return { kind: 'attack', action: m.action, face: m.face, until: this.clock + 0.3 };
+    return { kind: 'attack', action: m.action, face: m.face, until: this.clock + 0.3, deflect: !!m.deflect };
   }
 
   // The neutral options that fit this moment, each scored.
@@ -758,10 +829,17 @@ export class CombatAIController {
     const busyFor = (t) => punishing && s.foeBusy >= t;
     const exposedBonus = s.openings.some((e) => e.why === 'exhausted') ? 0.4 * p.punish : 0;
 
-    // Airborne and free: strike on the way down, or steer.
+    // Airborne and free: strike on the way down, close in with an air dash,
+    // or steer.
     if (!s.grounded) {
       for (const m of this.meleeOptions(s, true)) {
         out.push({ score: s.aggro * (0.8 + m.value) + (busyFor(m.atk.startup) ? p.punish : 0), intent: this.attackIntent(m) });
+      }
+      const airDash = s.ms.airDash;
+      if (airDash && p.dash > 0 && this.airDashFree(s) && s.sameLevel && s.dist > s.myReach + 60 &&
+          s.dist < airDash.distance + s.myReach + 120 && s.energy >= airDash.cost + p.energyCare * 35 &&
+          this.groundAhead(self, s.stage, s.dir, airDash.distance)) {
+        out.push({ score: s.aggro * (0.35 + p.dash * 0.6) + s.urge * 0.2, intent: { kind: 'dash', dir: s.dir, air: true, then: p.plan > 0 } });
       }
       const home = s.roomAhead < 60 || s.roomBehind < 60 ? Math.sign(s.stage.centerX - s.x) : s.dir;
       out.push({ score: 0.5, intent: { kind: 'move', dir: home, until: this.clock + 0.25, air: true } });
@@ -953,7 +1031,9 @@ export class CombatAIController {
         if (b.grounded) it.done = true;
         break;
       case 'shield':
-        if (clock > it.until) it.done = true;
+        // The Shield is the ground's: leaving the ground ends the plan, so
+        // a held button never becomes a press in the air (a Deflect).
+        if (clock > it.until || !b.grounded) it.done = true;
         else held.shield = true;
         break;
       case 'move':
@@ -996,16 +1076,20 @@ export class CombatAIController {
   }
 
   // Fighter aims at the current opponent when accepting the press. No
-  // directional tap is needed just to turn (and no stale intent.face).
+  // directional tap is needed just to turn (and no stale intent.face). A
+  // Deflect (`deflect`) is the air's: landed before the press, it is dropped
+  // rather than pressed into a Shield, and it needs `shield` up first to be
+  // a press at all.
   actAttack(self, it, held) {
     if (it.pressed) {
       if (self.canAct() || this.clock - it.pressedAt > 2) it.done = true;
       return;
     }
-    if (this.clock > it.until || !self.canAct()) {
+    if (this.clock > it.until || !self.canAct() || (it.deflect && self.body.grounded)) {
       it.done = true;
       return;
     }
+    if (it.deflect && this.prev[it.action]) return;
     held[it.action] = true;
     it.pressed = true;
     it.pressedAt = this.clock;
@@ -1058,7 +1142,9 @@ export class CombatAIController {
   }
 
   // Dash: a tap, a release and a tap of the same direction, as a player
-  // double-taps; the fighter decides whether it can Dash.
+  // double-taps; the fighter decides whether it can Dash. The same taps in
+  // the air (`air`) are its air dash; one made to get back to the stage
+  // (`recover`) goes back to recovering once it is over.
   actDash(self, foe, ctx, it, held) {
     const key = DIR_KEY[it.dir];
     // Already holding that way (running there): let go for a step first, so
@@ -1068,7 +1154,7 @@ export class CombatAIController {
       return;
     }
     const step = (it.step = (it.step ?? -1) + 1);
-    if (step === 0 && !(self.body.grounded && self.canAct())) {
+    if (step === 0 && !(self.body.grounded === !it.air && self.canAct())) {
       it.done = true;
       return;
     }
@@ -1078,6 +1164,7 @@ export class CombatAIController {
       else {
         it.done = true;
         if (it.then) this.followUp(self, foe, ctx);
+        else if (it.recover && this.offStage(self, ctx.stage)) this.setIntent({ kind: 'recover' });
       }
     }
   }

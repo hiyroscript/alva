@@ -436,10 +436,12 @@ export class Arena {
     }
   }
 
-  // Centred on the projectile's position, at its owner's art scale.
+  // Centred on the projectile's position, at the art scale of the fighter
+  // whose art it is (its owner's at release: a projectile turned back keeps
+  // its size), spun to its angle (see Projectile.renderAngle).
   drawProjectile(p) {
     const [sx, sy] = this.toScreen(p.renderX, p.renderY);
-    drawCenteredFrame(this.ctx, p.frame, sx, sy, this.pxPerArtOf(p.owner?.sprites), p.flip);
+    drawCenteredFrame(this.ctx, p.frame, sx, sy, this.pxPerArtOf(p.sprites ?? p.owner?.sprites), p.flip, p.renderAngle);
   }
 
   // Name-tag font size, in device pixels.

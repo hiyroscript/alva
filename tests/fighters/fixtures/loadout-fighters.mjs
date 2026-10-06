@@ -34,7 +34,7 @@ const BASE = getCharacter('0001');
 const A = BASE.animations;
 
 const UNIVERSAL = [
-  'idle', 'run', 'jump', 'fall', 'mouvment', 'land', 'hurt', 'midair_hurt', 'shielding', 'midair_shielding',
+  'idle', 'run', 'jump', 'fall', 'mouvment', 'midair_mouvment', 'land', 'hurt', 'midair_hurt', 'shielding', 'deflect',
 ];
 
 // A fighter with `count` numbered attacks (2 to 5, or more to break the

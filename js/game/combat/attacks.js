@@ -174,6 +174,16 @@
 //
 //   midair_attack3: { ..., pull: { radius: 150, speed: 900, offset: { x: 44, y: -60 } } },
 //
+// `deflectProjectiles: true` turns projectiles back: while the attack's
+// active phase is open, any other fighter's projectile its hitbox meets is
+// turned around and becomes this fighter's (see
+// CombatSystem.deflectProjectiles in js/game/combat/combat.js), before any
+// projectile strikes on that step. Only an attack that says so does it
+// (every fighter's Deflect, see js/game/combat/deflect.js); a hitbox alone
+// never stops a projectile.
+//
+//   deflect: { ..., hitbox: { x: 6, y: -118, w: 44, h: 98 }, deflectProjectiles: true },
+//
 // Every hit may also declare the shared hit effects (see
 // js/game/combat/hit-effects.js): `unblockable`, `paralyze` and
 // `blockPush`. A multi-hit attack's strikes take the attack's own unless
@@ -239,6 +249,7 @@ const ATTACK_DEFAULTS = {
   passThrough: false, // passes through other fighters while it plays
   hurtboxes: null,   // the fighter's hurtboxes while it plays; null keeps its own
   pull: null,        // { radius, speed, offset }: draws opponents in while it is active (see above)
+  deflectProjectiles: false, // its live hitbox turns other fighters' projectiles back (see above)
   unblockable: false, // the shared hit effects (js/game/combat/hit-effects.js)
   paralyze: 0,
   blockPush: 0,
@@ -388,7 +399,7 @@ export function attackPhase(def, time) {
 const PENDING_REFUSED = Object.freeze([
   'startup', 'active', 'recovery', 'damage', 'hitbox', 'projectile', 'baseLaunch', 'directionalLaunch',
   'hitstun', 'blockstun', 'hitstop', 'cooldown', 'hitCancel', 'hits', 'carry', 'motion', 'pull',
-  'unblockable', 'paralyze', 'blockPush',
+  'deflectProjectiles', 'unblockable', 'paralyze', 'blockPush',
 ]);
 
 // Frozen attack definition from a character's attack entry (plus its `id`).
@@ -418,6 +429,8 @@ export function createAttackDefinition(spec, { clipDuration = 0 } = {}) {
   if (spec.hits) Object.assign(def, resolveStrikes(spec, def));
   def.motion = resolveMotion(spec.motion, owner);
   def.pull = resolvePull(spec.pull, owner);
+  def.deflectProjectiles = !!def.deflectProjectiles;
+  if (def.deflectProjectiles && !def.hitbox) throw new Error(`[Alva] ${owner} deflects projectiles but has no hitbox to do it with`);
   def.total = def.startup + def.active + def.recovery;
   return Object.freeze(def);
 }

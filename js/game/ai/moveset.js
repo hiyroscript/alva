@@ -2,10 +2,10 @@
 // definition and art, for any fighter.
 //
 // Purpose: one place that turns a Fighter's resolved data (its `actions`,
-// attacks, projectiles, summons, techniques, defense, Dash and hurtboxes)
-// into the options the CPU weighs (js/game/ai/combat-ai.js). The CPU never
-// assumes a move: whatever a fighter's definition gives it, and nothing
-// else, is in its moveset.
+// attacks, projectiles, summons, techniques, defense, Deflect, Dash, air
+// dash and hurtboxes) into the options the CPU weighs
+// (js/game/ai/combat-ai.js). The CPU never assumes a move: whatever a
+// fighter's definition gives it, and nothing else, is in its moveset.
 //
 // Inputs: a Fighter (js/game/fighters/fighter.js) with its resolved
 // definitions and SpriteSet.
@@ -57,10 +57,12 @@ const MOVESETS = new WeakMap();
 // techniques (`specials`, e.g. #0001's attack4 and attack5), each with its
 // own button (`action`), what it takes to come out (`lead`) and, for a
 // technique, where it lands (`box`) and with what (`hit`); whether it has a
-// Shield and a Dash. An action mapped to null (a reserved button, like
-// #0001's transform) is left out, as is anything the fighter would refuse
-// for missing art, so the AI never presses a button that cannot do
-// anything.
+// Shield on the ground (`groundShield`: there is none in the air), a
+// Deflect in the air (`deflect`, on the `shield` button: its attack and
+// reach, and whether it turns projectiles back), a Dash and an air dash.
+// An action mapped to null (a reserved button, like #0001's transform) is
+// left out, as is anything the fighter would refuse for missing art, so the
+// AI never presses a button that cannot do anything.
 export function readMoveset(f) {
   const cached = MOVESETS.get(f);
   if (cached && cached.def === f.def && cached.sprites === f.sprites) return cached;
@@ -116,10 +118,22 @@ export function readMoveset(f) {
     }
   }
   const dashDistance = (def.movement?.dashSpeed ?? 0) * f.dashDuration;
+  const airDashDistance = (def.movement?.airDashSpeed ?? 0) * f.airDashDuration;
+  const guard = f.defense?.type === 'shield' ? f.defense.groundAnimation : null;
+  const deflect = f.deflect && sprites.has(f.deflect.animation) ? f.deflect : null;
   const moveset = {
     def, sprites, melee, ranged, specials,
-    shield: f.defense?.type === 'shield',
+    groundShield: !!guard && sprites.has(guard),
+    // Pressed on `shield` in the air, an aerial strike like any other, that
+    // may also turn projectiles back while it is live.
+    deflect: deflect ? {
+      action: 'shield', air: true, id: deflect.id, atk: deflect, reach: attackReach(deflect),
+      motion: deflect.motion?.type ?? null, deflect: true, catches: deflect.deflectProjectiles,
+    } : null,
     dash: dashDistance > 0 && sprites.has('mouvment') ? { distance: dashDistance, cost: f.energyDef.dashCost } : null,
+    airDash: airDashDistance > 0 && sprites.has('midair_mouvment')
+      ? { distance: airDashDistance, duration: f.airDashDuration, cost: f.energyDef.dashCost, uses: f.airDashUses }
+      : null,
     hurt: hurtExtent(def),
   };
   MOVESETS.set(f, moveset);

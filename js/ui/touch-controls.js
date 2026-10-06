@@ -2,6 +2,8 @@
 // Joystick: horizontal stick with Left mouvement / Right mouvement Dash
 // buttons above it. Classic: Left / Right, with sliding pointer capture.
 // Both share the same action buttons. Jump always uses the upward arrow;
+// Shield its shield, named and drawn as Deflect while the fighter is in the
+// air (where the same button is its Deflect, for one that has one);
 // attacks use the fighter's authored ground/air previews and translated
 // move names. Ground-only abilities stay visible but marked unavailable in
 // the air. Presentation never changes the input codename or pointer owner.
@@ -580,8 +582,15 @@ export class TouchControls {
       this.showArt(b, ability);
       b.classList.toggle('is-pending', ability.pending);
     }
-    // Jump is always the same universal arrow.
+    // Jump is always the same universal arrow. The Shield button is
+    // universal too, and says what it does where the fighter is: the Shield
+    // on the ground, its Deflect in the air (for a fighter that has one; see
+    // Fighter.tryDeflect). Its input is `shield` either way.
     this.showArt(this.actionButtons.get('jump'), jumpArt());
+    const shield = this.actionButtons.get('shield');
+    const deflecting = this.airborne && !!def?.deflect;
+    setAttr(shield, 'aria-label', deflecting ? 'touch.deflect' : 'control.shield');
+    this.showArt(shield, { sprite: null, icon: deflecting ? ICONS.deflect : ICONS.shield });
     const slots = attackSlots((action) => !this.actionButtons.get(action).hidden);
     let moved = false;
     for (const action of NUMBERED_ATTACKS) {

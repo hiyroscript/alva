@@ -18,7 +18,8 @@ pursuit and ring-outs.
 Every fighter runs on the same shared systems (movement, combat, the
 Shield, Energy, Launch, the CPU, controls) and brings its own moves, art
 and movement profile as data. Moves are mechanics, not just poses with
-damage: summons, techniques, projectiles that pull, repel or erase,
+damage: summons, techniques, projectiles that pull, repel or erase (and
+a Deflect that turns them back),
 paralysis and unblockable hits, homing dashes, hovers, plunges, rolls,
 lifts and multi-hit strings are all part of the shared engine for any
 fighter to use.
@@ -33,7 +34,9 @@ fighter to use.
   blocks) and
   [#0002](docs/characters/0002.md), the speedster (a lock-on Homing
   Attack, a plunging Bounce Attack, a rolling Spin Attack, a rising Blue
-  Tornado and a travelling Whirlwind).
+  Tornado and a travelling Whirlwind). Both Shield on the ground and
+  Deflect in the air (a strike that knocks projectiles back at their
+  thrower), and both Dash on the ground and air dash.
 - **Quick Battle** against a CPU at four difficulties (Easy, Medium, Hard,
   Brutal): difficulty changes how well it thinks, never what its fighter
   can do.
@@ -79,12 +82,12 @@ sub-path; `.nojekyll` keeps Jekyll out. More in
 | Action | Keyboard | Gamepad |
 | --- | --- | --- |
 | Move | A D or ← → | D-pad / left stick |
-| Dash | double-tap a direction | double-tap a direction |
+| Dash (in the air: air dash) | double-tap a direction | double-tap a direction |
 | Jump (hold a little longer: higher; again in the air: air jump) | W, Space or ↑ | A |
 | Down (fast fall; steer a launch down) | S or ↓ | D-pad / stick down |
 | Attack 1 / 2 / 3 / 4 / 5 | U / I / O / M / , | B / LB / LT / L3 / R3 |
 | Extra attack | J | X |
-| Shield (hold) | L | RB / RT |
+| Shield (hold, on the ground) / Deflect (press, in the air) | L | RB / RT |
 | Transform (reserved) | K | Y |
 | Pause | Esc or P | Start |
 

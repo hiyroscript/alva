@@ -409,13 +409,24 @@ test('Infinity stalls the blow it blocks: the attacker freezes 0.25 s, long enou
   assert.equal(d.events[1].type, 'hit');
 });
 
-test('Infinity in the air all but stops the fall: 90 units/s at most', () => {
+test('Infinity is the ground\'s: in the air the Shield button is the Deflect\'s arm sweep, falling as ever', () => {
   const { fighter, step } = solo();
-  step(P('jump'));
-  while (fighter.body.vy < 0) step({});
+  const plain = solo();
+  for (const r of [step, plain.step]) {
+    r(P('jump'));
+    while ((r === step ? fighter : plain.fighter).body.vy < 0) r({});
+  }
   step(SHIELD);
-  for (let i = 0; i < steps(0.4); i++) step(HOLD);
-  assert.equal(fighter.combat.shielding, true);
-  assert.ok(fighter.body.vy <= DEF.defense.slowFallSpeed + 1e-6, `${fighter.body.vy}`);
-  assert.equal(fighter.animator.anim.key, 'midair_shielding');
+  plain.step({});
+  const shown = [];
+  while (fighter.combat.attack) {
+    assert.equal(fighter.combat.shielding, false, 'never Infinity');
+    assert.equal(fighter.combat.attack.def.id, 'deflect');
+    shown.push(fighter.animator.frame.url.split('/').pop());
+    assert.equal(fighter.body.vy, plain.fighter.body.vy, 'falling exactly as a plain fall: no slow fall');
+    step(HOLD);
+    plain.step({});
+  }
+  assert.deepEqual([...new Set(shown)], ['0001_deflect_1.png', '0001_deflect_2.png', '0001_deflect_3.png', '0001_deflect_4.png']);
+  assert.equal(shown.length, steps(DEF.deflect.startup + DEF.deflect.active + DEF.deflect.recovery), 'a third of a second');
 });

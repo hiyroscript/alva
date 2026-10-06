@@ -49,16 +49,18 @@ timer):
 
 1. Respawns whose wait is over come back.
 2. Every fighter in play updates (`Fighter.update`): reads its
-   controller's input, then cooldowns, the impact freeze, the Dash,
-   summon startups, combat presses (or the input buffer), a Dash request,
-   its technique, the Shield, horizontal movement, jumps, the fast fall,
+   controller's input, then cooldowns, the impact freeze, the Dash or air
+   dash, summon startups, a Deflect (a fresh Shield press in the air),
+   combat presses (or the input buffer), a Dash or air dash request,
+   its technique, the Shield (on the ground), horizontal movement, jumps, the fast fall,
    integration and collision, launch rebounds, landing, Energy refill,
    facing and its visual state ([movement](../systems/movement.md#1-the-shared-implementation)).
 3. Rebounds show their impact; pushboxes keep fighters apart and out of
    solids; attack facing is re-sampled for side switches.
 4. Projectiles released this step spawn and every projectile moves;
    live clones advance and the ones summoned this step spawn.
-5. `CombatSystem.update` resolves every hit ([combat](../systems/combat.md#hit-resolution))
+5. `CombatSystem.update` first turns back the projectiles a live Deflect
+   meets, then resolves every hit ([combat](../systems/combat.md#hit-resolution))
    and its events go to the hit effects.
 6. Spent projectiles and finished clones are dropped, and any fighter now
    in the Void is handed to the mode (`onVoid`: a point and a respawn in a

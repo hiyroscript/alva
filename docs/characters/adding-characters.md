@@ -27,8 +27,9 @@ frame). Lowercase with underscores.
 | What | Codename |
 | --- | --- |
 | Idle, run, jump, fall, land, hurt, mid-air hurt | `idle`, `run`, `jump`, `fall`, `land`, `hurt`, `midair_hurt` |
-| The Shield (raise, hold, lower, in the air) | `prepshield`, `shielding`, `releaseshield`, `midair_shielding` |
-| The Dash | `mouvment` (spelled that way on purpose; `midair_mouvment` is reserved for a mid-air version) |
+| The Shield (raise, hold, lower: on the ground) | `prepshield`, `shielding`, `releaseshield` |
+| The Deflect (the Shield button in the air) | `deflect` |
+| The Dash and the air dash | `mouvment`, `midair_mouvment` (spelled that way on purpose) |
 | Numbered attacks and their mid-air versions | `attack1` … `attack5`, `midair_attack1` … `midair_attack5` |
 | The extra attack | `extra_attack` |
 | A summon's startup pose (the owner's own) | `attackN_summon` |
@@ -114,7 +115,8 @@ into its stance). Projectile art goes in `projectileAnimations`, effect art
 (clouds, objects) in `effectAnimations`; both are normalized at their own
 size, never fitted to the fighter's height. `animationFallbacks` names a
 still frame for the airborne, landing and hurt clips if their frames fail
-to load; attacks, the Shield and the Dash never fall back.
+to load; attacks, the Shield, the Deflect, the Dash and the air dash never
+fall back.
 
 ## 4. Give it a movement profile and Powers
 
@@ -126,11 +128,13 @@ lists every field, its unit and default. Required: `acceleration`,
 `coyoteTime` and `jumpBuffer` (both positive, or it cannot jump). Add
 `fastFallAcceleration` / `fastFallSpeed` for a fast fall, `airJumps` /
 `airJumpRatio` for air jumps, `highJumpWindow` / `highJumpHeight` for a
-higher jump, `attackBuffer` for an input buffer, and `dashSpeed` /
-`dashTapWindow` with a `mouvment` clip for a Dash. Tune the numbers for
-this fighter; nothing requires them to match another's.
+higher jump, `attackBuffer` for an input buffer, `dashSpeed` /
+`dashTapWindow` with a `mouvment` clip for a Dash, and `airDashSpeed`
+(with `airDashUses`, 1 unless given) with a `midair_mouvment` clip for an
+air dash: either may be had without the other. Tune the numbers for this
+fighter; nothing requires them to match another's.
 
-Optionally `energy` (Dash and Shield costs; defaults in
+Optionally `energy` (Dash, air dash and Shield costs; defaults in
 [Energy](../systems/energy.md)), `launchReaction` (extra stun, tumble,
 steering; [launch](../systems/launch.md#launch-reaction-per-fighter)) and
 `launchBounce` (overrides of the shared rebound settings).
@@ -207,18 +211,26 @@ the fighter or for its button: never a check for `'0027'` in shared code.
 ## 6. Defense, touch buttons and names
 
 - **Defense:** `defense: { type: 'shield', groundAnimation:
-  'shielding', airAnimation: 'midair_shielding', ... }` for a Shield
-  ([defense](../systems/defense.md)); `airAnimation: null` for a ground
-  guard only; `stall` to freeze the melee attackers it blocks; leave
-  `defense` out for none.
+  'shielding', ... }` for a Shield on the ground
+  ([defense](../systems/defense.md)); `stall` to freeze the melee
+  attackers it blocks; leave `defense` out for none. There is no Shield in
+  the air (an `airAnimation` or slow fall is refused).
+- **Deflect:** `deflect: { animation: 'deflect', startup, active,
+  recovery, hitbox, directionalLaunch, ..., deflectProjectiles: true }`
+  for the Shield button in the air ([the
+  Deflect](../systems/defense.md#the-deflect)): an attack whose strike is
+  always 3 at Base Launch 2 (leave `damage` and `baseLaunch` out). Its box
+  is also what catches projectiles, so cover the front of the body the
+  move sweeps. Leave it out for none (the button then does nothing in the
+  air).
 - **Touch buttons:** `mobileAbilities.<button>` gives each button its
   `label` and a frame of its own art: `preview: { animation, frame }`
   (frame counted from 0), `previews.air` for a distinct airborne move,
   `collection: 'projectileAnimations'` to pick projectile art, and an
   optional `fallbackIcon` ([input](../systems/input.md#touch-controls)).
   Pick the frame that reads as the move (its strike, its release), not
-  blindly the first. Jump, Shield and Transform keep their universal
-  glyphs.
+  blindly the first. Jump, Shield (Deflect in the air) and Transform keep
+  their universal glyphs.
 - **Ability names:** `abilityNames`, keyed by move codename
   (`attack1: 'Uppercut'`); a move left out keeps its neutral name
   ("Attack 1").

@@ -255,6 +255,7 @@ export const EN = {
   'touch.dpad': 'Movement',
   'touch.joystick': 'Movement joystick',
   'touch.actions': 'Actions',
+  'touch.deflect': 'Deflect',
   'touch.mouvementLeft': 'Left mouvement',
   'touch.mouvementRight': 'Right mouvement',
 

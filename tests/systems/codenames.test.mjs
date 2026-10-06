@@ -49,7 +49,7 @@ const RETIRED_CONTROLS = [
 const RETIRED_MOVES = ['midairBa1', 'midairBa2', 'throw', 'ba1Clone', 'rasenRush', 'shuriken'];
 const RETIRED_ANIMATIONS = [
   'dash', 'midairHurt', 'shield', 'shieldStart', 'shieldRelease',
-  'midairShield', 'cloneCloud', 'rasenForm', 'rasenDash', 'rasenConfirm', 'rasenExplosion', 'rasenRelease',
+  'midairShield', 'midair_shielding', 'cloneCloud', 'rasenForm', 'rasenDash', 'rasenConfirm', 'rasenExplosion', 'rasenRelease',
   'rasenWhiffRelease', 'rasenSphereBuild', 'rasenSphereImpact', 'rasenSphereExplosion',
 ];
 const RETIRED_STEMS = ['1ba', '2ba', 'midair1ba', 'midair2ba', 'throw', 'shuriken', 'cloneav', 'rasen', 'prasen', 'releaseblock', 'midairhurt', 'dash'];
@@ -60,6 +60,8 @@ const RETIRED_NOW = new RegExp([
   '\\b(cbaIndicators|drawCbaIndicators|CBA_STYLE|CBA[12]?)\\b',
   '\\b(Basic Attack|Unique Basic|BA[12])\\b',
   '\\b(midairHurt|midairShield|shieldStart|cloneCloud|rasen[A-Z]\\w*)\\b',
+  // The air Shield's clip, gone with the air Shield (the air's is the Deflect).
+  '\\bmidair_shielding\\b',
   `0001_(${RETIRED_STEMS.join('|')})`,
 ].join('|'));
 // ...and, in the game code, every older retired name too (the tests keep
@@ -73,6 +75,7 @@ const RETIRED_CODE = new RegExp([
   '\\bCAB[12]?\\b',
   '\\b(Basic Attack|Unique Basic|BA[12])\\b',
   '\\b(midairHurt|midairShield|shieldStart|cloneCloud|rasen[A-Z]\\w*)\\b',
+  '\\bmidair_shielding\\b',
   `0001_(${RETIRED_STEMS.join('|')})`,
 ].join('|'));
 
@@ -207,7 +210,7 @@ test('#0001\'s moves, clips and objects go by the codenames: attack1 to attack3 
   ]);
   for (const [id, atk] of Object.entries(def.attacks)) assert.equal(atk.animation, id, `${id} plays its own clip`);
   assert.deepEqual(Object.keys(def.animations), [
-    'idle', 'run', 'jump', 'fall', 'land', 'mouvment', 'hurt', 'midair_hurt', 'shielding', 'midair_shielding',
+    'idle', 'run', 'jump', 'fall', 'land', 'mouvment', 'midair_mouvment', 'hurt', 'midair_hurt', 'shielding', 'deflect',
     'attack1', 'midair_attack1', 'attack2', 'midair_attack2', 'attack3', 'midair_attack3',
     'attack4_cast', 'attack4_release', 'attack5_cast', 'attack5_release', 'extra_attack',
   ]);
@@ -272,6 +275,8 @@ test('the combat AI discovers the moveset by its canonical names, and reaches at
   assert.deepEqual(moves.specials.map((c) => [c.action, c.id, c.type]), [['attack4', 'attack4', 'technique'], ['attack5', 'attack5', 'technique']]);
   assert.ok([...moves.melee, ...moves.ranged, ...moves.specials].every((m) => m.action !== 'transform'), 'transform is reserved');
   assert.ok([...moves.melee, ...moves.ranged].every((m) => !['attack4', 'attack5'].includes(m.action)), 'attack4 and attack5 are no melee or ranged attacks');
+  // The Shield button's own move in the air goes by its universal codename.
+  assert.deepEqual([moves.deflect.action, moves.deflect.id, moves.deflect.air], ['shield', 'deflect', true]);
 });
 
 // ---- Files ------------------------------------------------------------------
@@ -307,7 +312,7 @@ test('every fighter frame is <id>_<codename>_<frame>.png in its own folder, and 
 
 test('#0001\'s folder holds only codename files, none under a retired stem, every one loaded', () => {
   const files = readdirSync(new URL('assets/characters/0001/', ROOT));
-  assert.equal(files.length, 74);
+  assert.equal(files.length, 78);
   for (const name of files) {
     assert.match(name, /^0001_[a-z][a-z0-9_]*_\d+\.png$/, name);
     assert.doesNotMatch(name, new RegExp(`^0001_(${RETIRED_STEMS.join('|')})\\d*\\.png$`), name);

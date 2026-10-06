@@ -211,7 +211,7 @@ test('fast fall: Down held while descending speeds the fall up smoothly toward f
   assert.ok(steps < plainSteps * 0.5, `down in ${steps} steps instead of ${plainSteps}`);
 });
 
-test('fast fall only while free to fall: never on the ground, in hitstun or behind an air Shield; an aerial attack may', () => {
+test('fast fall only while free to fall: never on the ground, in hitstun or an air dash; Shield held in the air is no Shield; an aerial attack may', () => {
   const ground = makeFighter();
   ground.step(DOWN);
   assert.equal(ground.fighter.fastFalling, false);
@@ -230,10 +230,20 @@ test('fast fall only while free to fall: never on the ground, in hitstun or behi
   assert.equal(stunned.fighter.fastFalling, false);
   assert.ok(close(stunned.fighter.body.vy, vy + CONFIG.sim.gravity * DT), 'gravity only');
 
+  // There is no Shield in the air: holding the button there rules nothing
+  // out.
   const shielded = falling();
   shielded.step({ ...DOWN, shield: true });
-  assert.equal(shielded.fighter.combat.shielding, true);
-  assert.equal(shielded.fighter.fastFalling, false);
+  assert.equal(shielded.fighter.combat.shielding, false);
+  assert.equal(shielded.fighter.fastFalling, true);
+
+  // An air dash holds the fall off for its whole length: Down too.
+  const dashing = falling();
+  dashing.step({ runRight: true, mouvementRightPressed: true });
+  assert.equal(dashing.fighter.dash?.air, true);
+  dashing.step(DOWN);
+  assert.equal(dashing.fighter.fastFalling, false);
+  assert.equal(dashing.fighter.body.vy, 0, 'flat across the air');
 
   // A plain aerial (one with no motion of its own: #0001's Floating
   // Straight without its hover) may fast-fall.
@@ -746,7 +756,7 @@ test('an air jump with a direction held sets off that way at least at top speed;
   assert.ok(close(on.fighter.body.vx, vx - mv.airDeceleration * DT), 'no direction: the drift, under the drag');
 });
 
-test('a hit gives the air jump back; a stun, an air Shield or an attack in progress holds it for later', () => {
+test('a hit gives the air jump back; a stun or an attack in progress (a Deflect too) holds it for later', () => {
   const d = duel({ gap: 44 });
   d.target.body.y = 700;
   d.target.body.grounded = false;
@@ -763,12 +773,13 @@ test('a hit gives the air jump back; a stun, an air Shield or an attack in progr
   d.tick({}, JUMP);
   assert.ok(d.target.combat.stun > 0);
   assert.equal(d.target.airJumps, def.movement.airJumps);
-  const shield = makeFighter();
-  shield.step(JUMP);
-  stepUntil(shield.step, (f) => f.body.vy > 0, { jump: true });
-  shield.step({ shield: true });
-  shield.step({ shield: true, ...JUMP });
-  assert.equal(shield.fighter.airJumps, 1, 'the Shield outranks it');
+  const deflect = makeFighter();
+  deflect.step(JUMP);
+  stepUntil(deflect.step, (f) => f.body.vy > 0, { jump: true });
+  deflect.step({ shield: true, shieldPressed: true });
+  assert.equal(deflect.fighter.combat.attack?.def.id, 'deflect');
+  deflect.step({ shield: true, ...JUMP });
+  assert.equal(deflect.fighter.airJumps, 1, 'the Deflect plays on: the jump waits');
 });
 
 test('the CPUs let go of Jump inside the higher-jump window: their jumps are normal ones', async () => {

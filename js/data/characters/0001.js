@@ -22,8 +22,11 @@
 //            sphere through everything (`unblockable`, `erase`)
 //   extra_attack  the High Kick, its launcher, floating in the air too
 //
-// Its Shield is Infinity: a hit it blocks stalls in it (`stall`), and in
-// the air it all but stops falling. Its Energy goes further than most.
+// Its Shield is Infinity, on the ground: a hit it blocks stalls in it
+// (`stall`). In the air the Shield button is its Deflect, a sweep of the
+// arm that turns projectiles back at their thrower; and it has an air dash
+// of its own (its midair_mouvment), apart from its Dash. Its orbs spin as
+// they fly. Its Energy goes further than most.
 
 import { frames } from './helpers.js';
 
@@ -42,11 +45,13 @@ const FPS_0001 = Object.freeze({
   idle: 6,
   run: 12,
   mouvment: 5,
+  midair_mouvment: 5,
   jump: 10,
   fall: 8,
   land: 14,
   hurt: 12,
   shield: 12,
+  deflect: 15,
   attack1: 15,
   midair_attack1: 15,
   attack2: 15,
@@ -59,6 +64,11 @@ const FPS_0001 = Object.freeze({
   attack5_release: 3,
   extra_attack: 12,
 });
+
+// How fast #0001's orbs spin as they fly, in degrees per second: six whole
+// turns a second, a blur of a spin (art only; see rotationSpeed in
+// js/game/combat/projectile.js).
+const ORB_SPIN_0001 = 2160;
 
 // A clip of `count` frames of codename `codename` (from frame `start`),
 // sized by its tallest frame (`height`, art pixels) against the idle.
@@ -79,12 +89,12 @@ export const CHARACTER_0001 = {
   // Every clip is drawn facing right.
   sourceFacing: 1,
 
-  // Anchors: the idle, run, jump, fall, land, Shield, Dash and Red Kick
-  // poses use the automatic torso anchor. Where an arm thrust forward, a
-  // glow in the hand or a deep lunge would drag it off the body, a clip
-  // authors its own (`anchorX`, art pixels from the left of each frame's
-  // visible art): on the black shirt, which stays over the hips whatever
-  // the arms do; the High Kick on its planted foot.
+  // Anchors: the idle, run, jump, fall, land, Shield, Dash, air dash and
+  // Red Kick poses use the automatic torso anchor. Where an arm thrust
+  // forward, a glow in the hand, a sweep's trail or a deep lunge would drag
+  // it off the body, a clip authors its own (`anchorX`, art pixels from the
+  // left of each frame's visible art): on the black shirt, which stays over
+  // the hips whatever the arms do; the High Kick on its planted foot.
   animations: {
     // Standing easy, four frames.
     idle: { ...clip('idle', 4, FPS_0001.idle, 63), loop: true },
@@ -100,14 +110,20 @@ export const CHARACTER_0001 = {
     // mouvment, the Dash: one long, low leap. Played once per Dash, which
     // lasts exactly one pass of it (1 frame = 0.2 s at 5 fps).
     mouvment: clip('mouvment', 1, FPS_0001.mouvment, 40),
+    // midair_mouvment, the air dash: the sheet's one flying leap, laid out
+    // flat across the air (the Dash's own drawing, its own file). Played
+    // once per air dash, which lasts exactly one pass of it (0.2 s).
+    midair_mouvment: clip('midair_mouvment', 1, FPS_0001.midair_mouvment, 40),
     // Hitstun: `hurt` flinches, then doubles over (held); `midair_hurt` is
     // knocked back with the knees up.
     hurt: clip('hurt', 2, FPS_0001.hurt, 60, { anchorX: [16.5, 16.5] }),
     midair_hurt: clip('midair_hurt', 1, FPS_0001.hurt, 51),
-    // Infinity, its Shield: the arms crossed, standing on the ground,
-    // a knee up in the air.
+    // Infinity, its Shield: the arms crossed, on the ground.
     shielding: clip('shielding', 1, FPS_0001.shield, 55),
-    midair_shielding: clip('midair_shielding', 1, FPS_0001.shield, 57),
+    // deflect, its Deflect: 1 the arm drawn across the body, 2 the palm
+    // thrust out, 3 the arm swept up over the head with its trail, 4 the
+    // arm raised. The body holds still on the shirt; only the arm moves.
+    deflect: clip('deflect', 4, FPS_0001.deflect, 69, { anchorX: [11, 11, 11, 11] }),
     // attack1, the Jab: 1 the stance, 2 the fist drawn back, 3 the punch
     // with its trail, 4-5 the arm out, 6 back.
     attack1: clip('attack1', 6, FPS_0001.attack1, 61, { anchorX: [14.5, 17.5, 16.5, 18, 17, 16.5] }),
@@ -144,7 +160,8 @@ export const CHARACTER_0001 = {
     extra_attack: clip('extra_attack', 5, FPS_0001.extra_attack, 58, { anchorX: [23.5, 28, 17.5, 17.5, 21.5] }),
   },
 
-  // The orbs: one frame each, glowing. Round, so never mirrored.
+  // The orbs: one frame each, glowing. Round, so never mirrored (each
+  // spins as it flies instead: its projectile's rotationSpeed).
   projectileAnimations: {
     // attack2_object, Red: the red orb.
     attack2_object: { frames: frames('0001', 'attack2_object', 1), fps: 1, loop: true, sourceFacing: 0 },
@@ -154,6 +171,8 @@ export const CHARACTER_0001 = {
     attack5_object: { frames: frames('0001', 'attack5_object', 1), fps: 1, loop: true, sourceFacing: 0 },
   },
 
+  // Every orb spins six whole turns a second as it flies (rotationSpeed:
+  // 2160 degrees per second), art only: its box, path and hits never turn.
   projectiles: {
     // Red: quick and short (600 units/s, about 300 units in its 0.5 s). It
     // repels: a hit pushes its target away (2, Base Launch 1 sideways), a
@@ -172,6 +191,7 @@ export const CHARACTER_0001 = {
       hitstop: 0.08,
       blockPush: 520,
       repel: true,
+      rotationSpeed: ORB_SPIN_0001,
     },
     // Maximum Blue: slow (about 240 units in its 1.5 s). It attracts: an
     // opponent within 120 units of it is dragged in at up to 360 units/s
@@ -193,6 +213,7 @@ export const CHARACTER_0001 = {
       pull: { radius: 120, speed: 360 },
       pierce: { hits: 3, interval: 0.25 },
       finisher: { damage: 2, baseLaunch: 1, directionalLaunch: 'vertical', hitstun: 0.4, hitstop: 0.06 },
+      rotationSpeed: ORB_SPIN_0001,
     },
     // Hollow Purple: a vast sphere (116 units across where it strikes)
     // crossing the stage at 640 units/s for 1.8 s. It erases: no Shield
@@ -212,12 +233,13 @@ export const CHARACTER_0001 = {
       hitstop: 0.12,
       unblockable: true,
       erase: true,
+      rotationSpeed: ORB_SPIN_0001,
     },
   },
 
   // A still idle frame for the airborne, landing and hurt clips if their
-  // frames fail to load. Attacks, the Shield and the Dash never fall back:
-  // one whose frames are missing is refused.
+  // frames fail to load. Attacks, the Shield, the Deflect, the Dash and the
+  // air dash never fall back: one whose frames are missing is refused.
   animationFallbacks: {
     jump: { animation: 'idle', frame: 0 },
     fall: { animation: 'idle', frame: 0 },
@@ -245,8 +267,9 @@ export const CHARACTER_0001 = {
 
   // #0001's movement profile (js/game/fighters/movement.js lists what each
   // field does): quick to start and stop, a light air drag so a running
-  // jump carries, one air jump, a higher jump on a longer press, and a
-  // long, fast Dash (about 190 units in its 0.2 s).
+  // jump carries, one air jump, a higher jump on a longer press, a long,
+  // fast Dash (about 190 units in its 0.2 s) and one air dash per airtime
+  // as fast and as long, flat across the air.
   movement: {
     acceleration: 4200,
     deceleration: 4200,
@@ -271,6 +294,8 @@ export const CHARACTER_0001 = {
     dropThroughTime: 0.28,
     dashSpeed: 950,
     dashTapWindow: 0.22,
+    airDashSpeed: 950,
+    airDashUses: 1,
   },
 
   // Its body, measured from its idle: the head and shirt, then the legs.
@@ -295,8 +320,8 @@ export const CHARACTER_0001 = {
   },
 
   // Energy (see resolveEnergy in js/game/combat/combat-state.js), spent by
-  // the Dash and the Shield: it goes further than most, refilling faster
-  // and paying less for each.
+  // the Dash, the air dash and the Shield: it goes further than most,
+  // refilling faster and paying less for each.
   energy: {
     max: 100,
     regen: 14,
@@ -305,21 +330,40 @@ export const CHARACTER_0001 = {
     shieldHitCost: 20,
   },
 
-  // Infinity, what the `shield` input does for #0001: a Shield all round
-  // it, arms crossed on the ground, a knee up in the air. A melee blow it
-  // blocks stalls in it: the attacker freezes 0.25 s (its own hitstop if
-  // longer), time to punish. Up in the air it all but stops falling (90
-  // units/s at most). Its perfect Shield opens for 0.1 s after 0.25 s
-  // down.
+  // Infinity, what the `shield` input does for #0001 on the ground: a
+  // Shield all round it, arms crossed. A melee blow it blocks stalls in it:
+  // the attacker freezes 0.25 s (its own hitstop if longer), time to
+  // punish. Its perfect Shield opens for 0.1 s after 0.25 s down.
   defense: {
     type: 'shield',
     groundAnimation: 'shielding',
-    airAnimation: 'midair_shielding',
-    slowFallSpeed: 90,
-    slowFallBrake: 6000,
     perfectWindow: 0.1,
     perfectRearm: 0.25,
     stall: 0.25,
+  },
+
+  // Its Deflect, what the `shield` input does for #0001 in the air (schema:
+  // js/game/combat/deflect.js): frame 1 the arm drawn across, then the palm
+  // thrust out and swept up over the head (frames 2-3, live: the whole
+  // front the arm sweeps, from the waist to well over the head, out to 50
+  // units, past the palm), frame 4 the arm raised, held a frame longer. Every Deflect's 3, Base Launch 2,
+  // here upward, the way the arm sweeps; while the sweep is live it turns
+  // the other fighter's projectiles back at their thrower, now #0001's. A
+  // third of a second in all, falling as it sweeps.
+  deflect: {
+    animation: 'deflect',
+    startup: 1 / FPS_0001.deflect,
+    active: 2 / FPS_0001.deflect,
+    recovery: 2 / FPS_0001.deflect,
+    hitbox: { x: 6, y: -118, w: 44, h: 98 },
+    directionalLaunch: 'vertical',
+    hitstun: 0.32,
+    blockstun: 0.14,
+    hitstop: 0.06,
+    cooldown: 0.3,
+    airMomentum: 0.7,
+    airControl: 0.3,
+    deflectProjectiles: true,
   },
 
   // Five numbered attacks, each a button of its own (see

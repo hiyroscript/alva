@@ -14,6 +14,9 @@ export const ICONS = {
   // fighter's own combat buttons show frames of its own art instead (see
   // js/ui/mobile-abilities.js).
   shield: svg('<path d="M12 3C10 4.4 7.6 5.2 5.2 5.5Q4.4 5.6 4.4 6.4V10C4.4 15.2 7.6 18.8 12 21C16.4 18.8 19.6 15.2 19.6 10V6.4Q19.6 5.6 18.8 5.5C16.4 5.2 14 4.4 12 3Z"/>'),
+  // The same button in the air, where it is the fighter's Deflect: a swipe
+  // sweeping up and an arrow sent back the way it came.
+  deflect: svg('<path d="M5 19.5C5 12 9.5 6.5 17 5"/><path d="M13.5 3.5 17 5l-2 3.2"/><path d="M19.5 13.5H11"/><path d="M14 10.5l-3 3 3 3"/>'),
   // Neutral stand-ins for a combat button with no frame of a fighter's art
   // to show (no fighter named yet, a button the layout editor shows for a
   // fighter that lacks it, a frame that fails to load): a ring for the large

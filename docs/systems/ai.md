@@ -19,7 +19,8 @@ it thinks, never what its fighter can do. The product rules are
 `Fighter.update` asks its controller for one input snapshot per fixed
 step; the CPU produces exactly the snapshot a player would (held
 directions, Down, Jump, Shield, the combat buttons and their one-step
-`…Pressed` edges, a Dash by double tap). The fighter and the combat
+`…Pressed` edges, a Dash or an air dash by double tap, a Deflect by a
+fresh Shield press in the air). The fighter and the combat
 system decide what those inputs do, so the CPU cannot attack while
 stunned, skip recovery, bypass a cooldown or spawn anything itself. It
 never writes to a fighter, never reads the player's raw input, and never
@@ -33,7 +34,7 @@ phases, Shield, techniques, Energy, Launch Point, cooldowns, projectiles,
 clones, the stage, the score and the clock), **evaluates** options when
 its reassessment timer is due or an event is urgent (answer a threat,
 strike, throw a projectile, a summon or technique, approach, space, Dash, jump in,
-make for the centre, wait) and **acts** over as many steps as an option
+air dash, make for the centre, wait) and **acts** over as many steps as an option
 needs. A guard keeps it off the main floor's edge, and every jump it
 presses is the normal one (`jumpTapHold`). Prediction is limited to
 projecting current motion over the level's short horizon.
@@ -49,7 +50,11 @@ The options come from `readMoveset(fighter)`, never from a fighter's id:
   strike of a piercing one counted);
 - its summons and techniques (each with its own button, its lead, where
   it lands and its hit), only if their art and data are complete;
-- whether it has a Shield and a Dash (and the Dash's distance and cost);
+- whether it has a Shield on the ground (`groundShield`; there is no
+  Shield in the air, and nothing in the moveset says there is), a Deflect
+  in the air (`deflect`: its attack on the `shield` button, its reach and
+  whether it turns projectiles back), a Dash and an air dash (each with
+  its distance and cost);
 - its hurtboxes' extent.
 
 A reserved button, a button the fighter does not have, or a move it would
@@ -64,6 +69,18 @@ lasts. A technique that holds the fighter in place while it casts counts
 the risk of being struck first, smaller when its opponent hides behind a
 Shield that cannot stop it. And it never raises a Shield against a hit no
 Shield stops: it steps out, jumps, Dashes or strikes first instead.
+
+In the air it never holds the Shield button (a Shield plan ends as it
+leaves the ground). Its answer to a projectile on course for it there is
+its Deflect, considered when the Deflect pressed now would be live as the
+shot meets its box (and before the shot reaches its body); a careful
+level watches such a shot step by step, since the window is a few steps
+long. Unblockable shots too: a Deflect is no Shield. The Deflect is also
+one of its aerial strikes. The air dash is mobility: knocked off the stage
+but level with its top and too far out to drift back, it air dashes home
+(as often as its level Dashes at all), and in the air it may air dash to
+close in, both only when an air dash could start (one left this airtime,
+not exhausted, not in free fall, not flying from a launch).
 
 ## Difficulty
 
@@ -102,6 +119,10 @@ manual facing is unchanged.
   it fights through inputs only, reacts late on low levels and early (never
   instantly) on high ones, keeps off the Void's edge, never touches a
   fighter's stats, and reads every fighter's moveset from its data.
+- [`tests/systems/deflect.test.mjs`](../../tests/systems/deflect.test.mjs)
+  and [`air-mouvment.test.mjs`](../../tests/systems/air-mouvment.test.mjs):
+  the CPU Deflecting a shot in the air, never holding a Shield there, and
+  air dashing home.
 - [`tests/integration/difficulty.test.mjs`](../../tests/integration/difficulty.test.mjs):
   the levels, their ordering and the Select Difficulty screen.
 - [`tests/integration/roster-matrix.test.mjs`](../../tests/integration/roster-matrix.test.mjs):

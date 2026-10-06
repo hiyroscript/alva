@@ -69,10 +69,11 @@ behave, and how it must look.
   always the frame number, counted from 1, even for a single frame
   (`0001_hurt_1.png`). The codenames:
   - fighter states: `idle`, `run`, `jump`, `fall`, `land`, `hurt`,
-    `midair_hurt` and `mouvment` (the Dash; the stem is spelled `mouvment` on
-    purpose);
-  - the Shield: `prepshield` (raised), `shielding` (held), `releaseshield`
-    (lowered) and `midair_shielding` (held in the air);
+    `midair_hurt`, `mouvment` (the Dash) and `midair_mouvment` (the air
+    dash; the stem is spelled `mouvment` on purpose);
+  - the Shield, on the ground: `prepshield` (raised), `shielding` (held)
+    and `releaseshield` (lowered); and the Deflect, the Shield button in
+    the air: `deflect`;
   - attacks: `attack1` to `attack5`, `midair_attack1` to `midair_attack5`
     and `extra_attack`;
   - anything an attack creates (a projectile, a clone's cloud, a sphere):
@@ -1103,17 +1104,17 @@ each fighter's own values are in its character specification (7.2.9).
   and then back to idle or run (a fighter with no land clip lands straight
   into its stance; Land is a visual state only and never changes movement
   or collision, and a new jump, attack or hitstun cuts it short); Hurt and
-  Mid-air Hurt for hitstun; its attacks', Shield's and Dash's clips; and
-  its projectile and effect art. No invented frames. If the airborne,
-  landing or hurt frames fail to load, the fighter holds the frame its
-  `animationFallbacks` names (e.g. #0001's and #0002's first idle frame)
-  without stretching or rotating; attacks, the Shield and the Dash never
-  fall back (7.2.4, 7.2.5). Facing flips the sprite (per clip, against
+  Mid-air Hurt for hitstun; its attacks', Shield's, Deflect's, Dash's and
+  air dash's clips; and its projectile and effect art. No invented frames.
+  If the airborne, landing or hurt frames fail to load, the fighter holds
+  the frame its `animationFallbacks` names (e.g. #0001's and #0002's first
+  idle frame) without stretching or rotating; attacks, the Shield, the
+  Deflect, the Dash and the air dash never fall back (7.2.4, 7.2.5). Facing flips the sprite (per clip, against
   that clip's source orientation; see 3).
 - **Facing.** For players it is manual: only
   the fighter's own movement (running past a small speed on the ground,
-  steering in the air), a Dash and an attack started with a direction held
-  turn it (the attack faces that direction as it starts, so a turn made on
+  steering in the air), a Dash, an air dash and an attack started with a
+  direction held turn it (the attack faces that direction as it starts, so a turn made on
   the press step, run left → press right and attack1 together, strikes right,
   never the stale way). **During an action of its own** (an attack or the
   Shield) the direction held turns it at once, left to right or right to
@@ -1215,7 +1216,8 @@ each fighter's own values are in its character specification (7.2.9).
     first frame. A direction held sets off that way at least at top speed
     (a change of course); with none held the drift carries on. Landing
     gives them back, and so does a hit. Not while stunned, paralysed,
-    shielding or in a technique, nor in free fall; a jump pressed in the air with none
+    in an attack (a Deflect included) or a technique, nor in free fall; a
+    jump pressed in the air with none
     left waits (the jump buffer) for the ground. It may cut short an attack
     that hit, like a ground jump. Quick Battle's CPU uses it to get back to
     the stage. A jump and an air jump from a stage's highest footing stay
@@ -1226,9 +1228,9 @@ each fighter's own values are in its character specification (7.2.9).
     top of gravity: never while rising, never a jump in speed and never
     slower than the fall already is; it lands on platforms like any fall.
     A fighter whose `fastFallSpeed` is not positive has none. Aerial attacks
-    may fast-fall (back to the ground after an aerial); a stun, a
-    paralysis, an air Shield, a technique or an attack's own motion (a
-    hover included) may not.
+    may fast-fall (back to the ground after an aerial), a Deflect
+    included; a stun, a paralysis, an air dash, a technique or an attack's
+    own motion (a hover included) may not.
     `Fighter.fastFalling` is true on the steps it applies.
   Attack movement, the combat input buffer, hit-cancels and hitstop are
   combat rules (7.2.4).
@@ -1272,6 +1274,33 @@ each fighter's own values are in its character specification (7.2.9).
   input never has press edges); Quick Battle's combat AI dashes only
   through the same double tap a player uses (a press, a release and a
   press within the window), and guards against double-tapping by accident.
+- **Air dash** (movement, not an attack): the fighter's own mid-air
+  mouvment, a capability apart from the Dash. The same requests (the
+  double tap, the one-step request) that Dash on the ground air dash in
+  the air (`Fighter.tryMouvment`: `tryDash` on the ground, `tryAirDash` in
+  the air). It needs a positive `movement.airDashSpeed`, its real
+  `midair_mouvment` clip (played once; without it the air dash is refused
+  and logged, never faked with the Dash's clip or the run) and an air dash
+  left this airtime (`movement.airDashUses`, 1 unless authored; landing
+  gives them back, and so does a hit, as for the air jumps; an air jump
+  does not). Otherwise the Dash's rules: free to act or in an attack that
+  hit and may be cut short (a Dash cancel in the air, for
+  `dashCancelCost`), not exhausted, paying `energy.dashCost`; never while
+  stunned, paralyzed or already dashing; and, as an attack's own motion,
+  never while still flying from a launch or in free fall. A Deflect and
+  attacks are resolved before it on the same step. The fighter faces the
+  air dash at once and moves straight across at `movement.airDashSpeed`
+  for one pass of its `midair_mouvment` clip (e.g. #0001: 950 units/s for
+  0.2 s, about 190 units; #0002: 1100 units/s for 0.2 s, about 220), its
+  vertical speed zeroed as it starts and gravity held off throughout (no
+  fall and no fast fall); run to its end, its sideways speed is capped at
+  the fighter's top speed and normal airborne physics take over. A solid
+  or the ground ends it, and so do hitstun and a paralysis. While it runs
+  the fighter cannot attack, Deflect, jump or dash again (an attack or a
+  jump pressed late in it is kept by the input buffers). It has no
+  hitbox, damage, launch, invulnerability, Shield or Deflect. Quick
+  Battle's combat AI air dashes through the same double tap: home when
+  knocked off the stage too far out, and in the air to close in.
 - **Powers** (`js/data/powers.js`): fighter abilities owned at one of three
   tiers, Jump Power and Speed Power. Each Power is a frozen tier table in
   the one `POWERS` registry, the single source of its names, descriptions,
@@ -1389,10 +1418,17 @@ each fighter's own values are in its character specification (7.2.9).
   The Battle owns live projectiles: each fixed step it updates the
   fighters, spawns released projectiles (once each), moves them, lets them
   meet each other (`clashProjectiles`, below), applies the pulls of
-  attacks and projectiles (`applyPulls`), resolves hits, then removes
-  spent ones. They are
+  attacks and projectiles (`applyPulls`), turns back the ones a live
+  Deflect meets (7.2.5), resolves hits, then removes spent ones. They are
   drawn on the battle canvas over the fighters, centred on their position
-  with image smoothing off, and cleared on restart. Missing projectile art
+  with image smoothing off, at the art-pixel scale of the fighter whose
+  art they are, and cleared on restart. A projectile with a
+  `rotationSpeed` (degrees per second, clockwise on screen; 0 by default)
+  spins as it flies: its art turned round its centre by its rotationSpeed
+  × its own age (interpolated between steps like its position), art only:
+  its hitbox, velocity, launches, pulls and clashes never turn, and being
+  turned back never resets it. #0001's Red, Maximum Blue and Hollow Purple
+  spin at 2160, six whole turns a second. Missing projectile art
   refuses the attack that throws it (logged): never an invisible
   projectile.
 - **Attack mechanics beyond a timed hitbox** (`js/game/combat/attacks.js`,
@@ -1474,6 +1510,11 @@ each fighter's own values are in its character specification (7.2.9).
     strikes, each once. When two of different owners meet, erasing beats
     repelling beats neither; two of the same rank that act both go, and two
     that do neither pass each other by.
+  - **Turning projectiles back** (`deflectProjectiles: true`): while the
+    attack is live its hitbox turns back every other fighter's projectile
+    it meets, by the repel's own `turnBack`, before any projectile strikes
+    that step. Every fighter's Deflect has it (7.2.5); no other attack
+    does, and a hitbox alone never stops a projectile.
   - The CPU reads all of it from the data: each attack's reach swept along
     its motion (`attackReach`: a roll's path, a plunge's depth, a lift's
     height, a homing dash's lock-on range) for choosing and fearing it, the
@@ -1483,7 +1524,8 @@ each fighter's own values are in its character specification (7.2.9).
     summon or technique for a fighter with none.
 - **Combat architecture** (Launch Point, Base Launch, Directional Launch,
   damage, hitboxes, hurtboxes, attack definitions, the Shield button's
-  `defense` (typed, the Shield so far), Energy, launches, stun and
+  `defense` (typed, the Shield so far, on the ground) and `deflect` (in the
+  air), Energy, launches, stun and
   blockstun, hitstop, cooldowns, summon and technique cooldowns,
   paralysis, pulls, typed numbered buttons, summons and techniques) is data-driven: every
   fighter's moves are implemented through it with real artwork (7.2.9),
@@ -1497,26 +1539,33 @@ each fighter's own values are in its character specification (7.2.9).
 #### 7.2.5 Defense and Energy
 
 - `shield` is the shared player action, the Shield button (keyboard L,
-  gamepad RB / RT, the touch **Shield** button). What it does, how a
-  fighter defends, is character data (`defense` in
-  each character's definition, frozen by `createDefenseDefinition` in
-  `js/game/combat/defense.js`), not part of
-  the input system. The one defense type is the Shield, `{ type: 'shield',
-  groundAnimation, airAnimation, groundStartAnimation,
-  groundReleaseAnimation }`; the type is checked, so a future fighter can
-  defend another way, and an unknown type is an error. A fighter with no
-  `defense` does nothing on the button. #0001 and #0002 both use the
-  Shield (#0001's, Infinity, stalls the blows it blocks; #0002's is on the
-  ground only). There is no
+  gamepad RB / RT, the touch **Shield** button, named and drawn **Deflect**
+  while the fighter is in the air). On the ground it is the fighter's
+  Shield, held; in the air it is the fighter's Deflect, a fresh press
+  (below). What it does is character data, not part of the input system:
+  on the ground how a fighter defends (`defense` in each character's
+  definition, frozen by `createDefenseDefinition` in
+  `js/game/combat/defense.js`), in the air its `deflect` (frozen by
+  `createDeflectDefinition` in `js/game/combat/deflect.js`). The one
+  defense type is the Shield, `{ type: 'shield', groundAnimation,
+  groundStartAnimation, groundReleaseAnimation }`; the type is checked, so
+  a future fighter can defend another way, and an unknown type is an
+  error. A fighter with no `defense` does nothing on the button on the
+  ground, and one with no `deflect` nothing in the air. #0001 and #0002
+  both use the Shield (#0001's, Infinity, stalls the blows it blocks) and
+  both have a Deflect. No fighter Shields in the air: an air Shield's
+  fields (`airAnimation`, `slowFallSpeed`, `slowFallBrake`) are refused,
+  and nothing slows a fall. There is no
   Dodge (no invulnerability, evasive frames or one-press defensive move)
   and no chip-damage Block anywhere in the engine.
-- The **Shield** is a held state, `CombatState.shielding`: up while
-  `shield` is held and the Shield is allowed, down the step it is let go.
-  Allowed means: the fighter is free to act (no attack, stun, paralysis,
-  technique or Dash; the Shield never cuts one short, and comes up the step
-  it ends if `shield` is still held), it is not exhausted
-  (`CombatState.canShield`: any Energy left is enough) and the held art
-  for where it is. It is decided before the
+- The **Shield** is a held state on the ground, `CombatState.shielding`:
+  up while `shield` is held and the Shield is allowed, down the step it is
+  let go. Allowed means: the fighter is on the ground and free to act (no
+  attack, stun, paralysis, technique or Dash; the Shield never cuts one
+  short, and comes up the step it ends if `shield` is still held, a
+  landing included), it is not exhausted (`CombatState.canShield`: any
+  Energy left is enough) and it has the held art. Leaving the ground
+  drops it (a block's push off a ledge). It is decided before the
   combat intents: while `shield` is held with a Shield that can go up, no
   attack, summon, technique, Dash or jump starts (let go of `shield`
   first: an attack or a jump pressed meanwhile is buffered and comes out
@@ -1527,22 +1576,12 @@ each fighter's own values are in its character specification (7.2.9).
   lowered on the ground, the optional `groundReleaseAnimation` shows for
   one pass (the `shieldRelease` state) while nothing of higher priority
   takes over (visual only: movement resumes at once). Neither #0001 nor
-  #0002 has a raise or lower pose. In the air there is only `airAnimation`
-  (#0001's `midair_shielding`), the held pose: no raise or lower pose, and a Shield
-  lowered in the air goes straight back to Jump / Fall; a Shield with no
-  `airAnimation` (#0002's) simply cannot go up in the air. Landing with it up keeps the held pose (no raise
-  pose, no Land). While it is up horizontal input moves nothing (on the
-  ground no walking, running or Dash, the current velocity slowing under
-  the normal deceleration; in the air momentum carries on under the normal
-  air drag with no steering), though the direction held turns the fighter.
-  In the air it **slows the fall**: a faster fall (a fast fall included)
-  brakes toward `defense.slowFallSpeed` (#0001: 90 units / s) at
-  `slowFallBrake` (#0001: 6000 / s², so about 0.22 s from its fast fall's 1400), and
-  gravity never takes it past that while the Shield stays up; a rise is
-  untouched (`stepBody`'s fall cap, from `Fighter.update`). A Shield without
-  `slowFallSpeed` (0) falls as ever. A
-  missing held clip refuses the Shield (logged once per clip); missing
-  raise or lower poses are simply skipped.
+  #0002 has a raise or lower pose. While it is up horizontal input moves
+  nothing (no walking, running or Dash, the current velocity slowing under
+  the normal deceleration), though the direction held turns the fighter.
+  Held through a jump, nothing is up in the air; it rises as the fighter
+  lands, with its raise pose. A missing held clip refuses the Shield
+  (logged once per clip); missing raise or lower poses are simply skipped.
 - **Blocking.** The Shield is a full circle: while it is up, any hit that
   reaches the fighter's own hurtboxes (the same `CombatSystem` overlap as
   any hit, never a bigger circle) is blocked, whichever side it comes from:
@@ -1570,6 +1609,37 @@ each fighter's own values are in its character specification (7.2.9).
   to let go and punish; the event carries it as `stall`. A detached hit (a
   projectile's, a clone's, a technique's) stalls nothing. 0 (the default)
   is none.
+- **Deflect.** In the air, a fresh `shield` press (`shieldPressed`,
+  never the button held) is the fighter's Deflect: an attack in every
+  way, through `createAttackDefinition` (its own `deflect` clip, startup,
+  active phase, recovery, melee hitbox, stuns, hitstop, cooldown,
+  momentum and steering), resolved by the same `CombatSystem` as any
+  attack, trading, interrupted and punished as one. Its strike is the
+  same for every fighter: **3** Launch Points at **Base Launch 2**
+  (`DEFLECT_DAMAGE`, `DEFLECT_BASE_LAUNCH`; a fighter authors neither, and
+  any other value is refused); its direction, timing, box, stuns and
+  cooldown are the fighter's own. It is one strike in the air (no `hits`,
+  projectile, `pending` or `groundOnly`). It starts only in the air, free
+  to act or in an attack that hit and may be cut short (7.2.4's
+  hit-cancel), never stunned, paralyzed, in a Dash or air dash, in another
+  attack, already Deflecting, during its cooldown, in free fall or out of
+  `airUses`, and only with its art (missing art is refused and logged
+  once). It is tried before the attack buttons on its step (an attack
+  pressed with it loses), never buffered and never restarted by the
+  button held. It is not a Shield: `CombatState.shielding` stays false, so
+  it blocks nothing, is never a perfect Shield, pays no Energy, takes no
+  blockstun, stalls nothing, draws no Shield and slows no fall.
+  **Turning projectiles back** (`deflectProjectiles: true`, an attack
+  capability only the Deflects opt into): on every step, before any
+  projectile strikes, every other fighter's live projectile that meets a
+  live `deflectProjectiles` box is turned back (`Projectile.turnBack`, the
+  repel's own): from that step it is the deflecting fighter's, so it never
+  strikes it on that step, it flies away from the fighter (to the side of
+  it the projectile is on) at its own speed, its strikes start over, so it
+  can strike its old owner, and it keeps the rest of its lifetime. The
+  same projectile, never a copy and never destroyed for it, whatever it is
+  (unblockable, repelling, piercing or erasing alike). Startup and
+  recovery turn nothing back.
 - **Perfect Shield.** A hit that lands within `defense.perfectWindow`
   (#0001's and #0002's: 0.1 s) of the Shield going up is a perfect block (`Fighter.perfectShield`,
   the event's `perfect`): it costs no Energy and deals no blockstun, so the
@@ -1609,18 +1679,19 @@ each fighter's own values are in its character specification (7.2.9).
   in `js/game/combat/combat-state.js`, every field optional: `max` 100,
   `regen` 12 / s, `dashCost` 15, `shieldHitCost` 25, and `dashCancelCost`
   the fighter's own `dashCost` when it declares none; #0001 declares 35,
-  #0002 40) is the one resource a fighter spends, and only on a Dash (as it
-  starts: `dashCost`, or `dashCancelCost` for a Dash that cuts short an
-  attack that hit, which is the fighter's `dashCost` when it declares none)
-  and on the Shield (for each hit it blocks). Either works whenever the fighter is not
+  #0002 40) is the one resource a fighter spends, and only on a Dash or an
+  air dash (as it starts: `dashCost`, or `dashCancelCost` for one that cuts
+  short an attack that hit, which is the fighter's `dashCost` when it
+  declares none; the air dash has no cost of its own) and on the Shield
+  (for each hit it blocks). A Deflect, which is no Shield, costs nothing. Either works whenever the fighter is not
   exhausted, however little is left: a cost larger than what remains is
   paid by taking all of it (`CombatState.spendEnergy`), never going below
   0. Every fighter starts full, and every
   change goes through `setEnergy`, clamped to [0, max]. It refills by
-  itself at `regen` on every step no Dash was paid for (idle, moving,
+  itself at `regen` on every step no Dash or air dash was paid for (idle, moving,
   airborne, attacking, shielding, stunned or frozen; `updateEnergy`), at
   that one rate whatever is held. Reaching 0 (a Dash or a block alike, an overspend included)
-  exhausts the fighter: Dash and Shield stay unavailable however much has
+  exhausts the fighter: Dash, air dash and Shield stay unavailable however much has
   refilled (1, 25, 50, 75, 99) until Energy is back at exactly max, which
   clears it. Energy never gates movement,
   jumps, attacks, projectiles, summons or techniques, and none of them spend it. A respawn and a restart start it full.
@@ -1967,8 +2038,10 @@ each fighter's own values are in its character specification (7.2.9).
     Energy, Launch Point, cooldowns, techniques, projectiles, clones, the
     stage's ledges and platforms, the score and the clock through
     `ctx.stage` / `ctx.battle`), scores the options that fit (answer a threat
-    with Shield / a step / a jump / a Dash / a strike first; strike; throw a projectile;
-    approach; hold a spacing; jump in; Dash in; press a summon or technique
+    with Shield (on the ground) / a step / a jump / a Dash / a strike first,
+    or in the air a shot on course with its Deflect when the Deflect would
+    be live as it arrives; strike; throw a projectile;
+    approach; hold a spacing; jump in; Dash in; air dash in or home; press a summon or technique
     button (a technique it saves for a safe distance or an opening rather
     than casting it point blank, unless no Shield stops it and its
     opponent hides behind one); make for the centre; wait), each built
@@ -2036,11 +2109,11 @@ there, and nothing in one is a rule for another fighter.
 - **#0001**: [docs/characters/0001.md](docs/characters/0001.md) (the
   limitless sorcerer: the Jab and Floating Straight, Red and the Red Kick,
   Maximum Blue and Blue, the High Kick, the Unlimited Void and Hollow
-  Purple techniques, and Infinity, a Shield that stalls the blows it
-  blocks).
+  Purple techniques, Infinity, a Shield that stalls the blows it
+  blocks, and its arm-sweep Deflect).
 - **#0002**: [docs/characters/0002.md](docs/characters/0002.md) (the
   speedster: the One-Two, Homing Attack, Rapid Kicks, Bounce Attack, Spin
-  Attack, Blue Tornado and Whirlwind, a ground guard).
+  Attack, Blue Tornado and Whirlwind, a guard, and its swatting Deflect).
 
 Adding one is described in
 [docs/characters/adding-characters.md](docs/characters/adding-characters.md).
@@ -2176,8 +2249,8 @@ Adding one is described in
 ### 7.4 Input
 
 - Keyboard (simultaneous keys, held-state tracking, no reliance on key
-  repeat): A/D or ←/→ move (`runLeft` / `runRight`; twice in a row to Dash), S/↓ Down (`down`; held; a direction only: in the air while falling, the fast fall, and as a hit lands, steering the launch downward), W/Space/↑ jump (`jump`; tapped, the normal jump; held a little longer, the higher jump; again in the air, the air jump), J the
-  extra attack (`extra_attack`, e.g. #0001's High Kick), K Transform (`transform`, reserved), L Shield (`shield`), U
+  repeat): A/D or ←/→ move (`runLeft` / `runRight`; twice in a row to Dash, or in the air to air dash), S/↓ Down (`down`; held; a direction only: in the air while falling, the fast fall, and as a hit lands, steering the launch downward), W/Space/↑ jump (`jump`; tapped, the normal jump; held a little longer, the higher jump; again in the air, the air jump), J the
+  extra attack (`extra_attack`, e.g. #0001's High Kick), K Transform (`transform`, reserved), L Shield (`shield`; held on the ground; a fresh press in the air is the Deflect), U
   `attack1`, I `attack2`, O `attack3`, M `attack4`, `,` `attack5` (the
   numbered buttons along the row above J K L, then the row below it; a
   fighter acts only on the ones it has a button for, 7.2), Esc/P pause
@@ -2353,7 +2426,9 @@ Adding one is described in
   labelled "Transform", with a dashed outline. The universal buttons belong
   to the controls and keep their original monochrome SVG glyphs
   (`currentColor`, from `js/ui/icons.js`): **Shield** (the shield outline,
-  labelled "Shield"; held for as long as the pointer stays on it) in the
+  labelled "Shield"; held for as long as the pointer stays on it; while the
+  fighter is in the air and has a Deflect, the Deflect's swipe glyph,
+  labelled "Deflect", the same button sending `shield`) in the
   old Block slot, Jump and the Left / Right arrows, the joystick and the
   Dash buttons. Only the presentation is per fighter: each button's
   `data-action` is its control codename (`extra_attack`, `transform`,

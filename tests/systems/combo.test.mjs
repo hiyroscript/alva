@@ -278,7 +278,7 @@ test('a Dash cancel: out of an attack1 that hit, either way, for dashCancelCost 
   assert.equal(fighter.combat.energy, 100 - energy.dashCost);
 });
 
-test('no Dash cancel out of a whiff, a block, an aerial or while exhausted: nothing is spent and the attack plays on', () => {
+test('no Dash cancel out of a whiff, a block or while exhausted: nothing is spent and the attack plays on', () => {
   const tryCancel = (d, what) => {
     const atk = d.attacker.combat.attack;
     assert.ok(atk, `${what}: attacking`);
@@ -302,14 +302,21 @@ test('no Dash cancel out of a whiff, a block, an aerial or while exhausted: noth
   while (tired.attacker.combat.hitstop > 0) tired.run(() => ({}), 1);
   assert.ok(tired.attacker.combat.cancellable);
   tryCancel(tired, 'exhausted');
-  // A midair_attack1 that hits may be cut short by an air jump, never a Dash.
+});
+
+test('in the air the same cancel is the air dash: a midair_attack1 that hit is cut short for dashCancelCost, once per airtime', () => {
   const air = combo({ gap: 40 });
   for (const f of [air.attacker, air.target]) Object.assign(f.body, { y: 700, vy: 0, grounded: false, ground: null });
   air.run((i) => (i === 0 ? ATTACK1 : {}), 1);
   while (!air.hits.length) air.run(() => ({}), 1);
   while (air.attacker.combat.hitstop > 0) air.run(() => ({}), 1);
   assert.ok(air.attacker.combat.cancellable);
-  tryCancel(air, 'in the air');
+  air.run(() => MOUVEMENT_RIGHT, 1);
+  assert.equal(air.attacker.dash?.air, true, 'the air dash, never the ground Dash');
+  assert.equal(air.attacker.combat.attack, null, 'the attack is cut short');
+  assert.ok(air.attacker.combat.cooldowns.has('midair_attack1'), 'its cooldown from the cut');
+  assert.equal(air.attacker.combat.energy, 100 - def.energy.dashCancelCost);
+  assert.equal(air.attacker.airDashes, 0, 'its one air dash this airtime');
 });
 
 test('attack1 -> Dash -> attack1 chases a push attack1 -> High Kick no longer reaches, into high Launch Point', () => {
