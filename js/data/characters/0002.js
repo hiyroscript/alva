@@ -101,7 +101,7 @@ export const CHARACTER_0002 = {
       minSpeedScale: 0.6,
     },
     // The spin jump: curled into the ball, spinning for the whole rise
-    // (the air jump too).
+    // (the air jumps too).
     jump: {
       frames: frames('0002', 'jump', 8),
       fps: FPS_0002.jump,

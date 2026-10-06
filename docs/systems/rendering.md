@@ -7,9 +7,9 @@ product rules are [`ALVA_SPEC.md`](../../ALVA_SPEC.md) §3 (assets), §7.1
 
 | Module | Owns |
 | --- | --- |
-| [`js/game/rendering/sprite-normalizer.js`](../../js/game/rendering/sprite-normalizer.js) | `SpriteSet`: each fighter's loaded clips, normalized once per frame (visible bounds, pixel-grid detection, resampling to one pixel per art pixel, anchors), clip durations (which time the Dash, the air dash, the land pose and summon startups), `drawFrame`, `drawCenteredFrame` (projectiles and effects, optionally turned). |
+| [`js/game/rendering/sprite-normalizer.js`](../../js/game/rendering/sprite-normalizer.js) | `SpriteSet`: each fighter's loaded clips, normalized once per frame (visible bounds, pixel-grid detection, resampling to one pixel per art pixel, anchors), clip durations (which time the land pose, pending attacks and summon startups; the Dash and the air dash last the universal Dash's length, their clips played once across it), `drawFrame`, `drawCenteredFrame` (projectiles and effects, optionally turned). |
 | [`js/game/rendering/sprite-animator.js`](../../js/game/rendering/sprite-animator.js) | `SpriteAnimator`: which frame of which clip a fighter shows. |
-| [`js/game/rendering/camera.js`](../../js/game/rendering/camera.js) | Framing the fighters in play inside the camera bounds. |
+| [`js/game/rendering/camera.js`](../../js/game/rendering/camera.js) | Framing the fighters in play inside the camera bounds: a lead ahead of Player 1 (`LEAD` seconds of its speed, counted to `LEAD_SPEED` at most, so a Dash's burst never swings the view) and a follow quick enough (`FOLLOW_X`, `FOLLOW_Y`) that a fighter at a Dash's speed stays well inside the margin. |
 | [`js/game/rendering/hit-fx.js`](../../js/game/rendering/hit-fx.js) | Hit effects from each step's combat events: shake, flash, sparks, trails, rebound sparks, the lethal launch's slow motion (`HIT_FX`). |
 | [`js/game/rendering/shield-fx.js`](../../js/game/rendering/shield-fx.js) | The Shield's wavy circle. |
 | [`js/game/rendering/fighter-status.js`](../../js/game/rendering/fighter-status.js) | The Energy bar and cooldown rings drawn with each fighter. |
@@ -37,6 +37,14 @@ are drawn with image smoothing off and, where the size allows, whole
 device pixels per art pixel. Each clip says which way its art faces
 (`sourceFacing`); a frame is mirrored only when the fighter faces the
 other way.
+
+Animation keeps up with the speed: the run clip's rate follows the
+fighter's speed against the universal top speed, from its
+`minSpeedScale` up to its `maxSpeedScale` (1.6 unless the clip says
+otherwise) on a Dash's run-on; the Dash's and the air dash's clips are
+played once across the universal Dash, whatever their frame count; the
+land clip is a pose that running goes straight past. No frame is ever
+invented or interpolated: the art's own frames, played faster.
 
 ## Draw order
 
@@ -79,7 +87,8 @@ Presentation only: they never change a simulation step (a test steps the
 same fight with and without them). Screen shake scaled to the hit, a
 one-frame white flash on the fighter hit, sparks where it landed (a red
 ring for a block, white for a perfect Shield), speed trails behind a fast
-tumbling fighter, sparks and a small shake off a rebounding surface, and a
+tumbling fighter and fainter ones behind a Dash or an air dash while it
+lasts (`trail.dashAlpha`), sparks and a small shake off a rebounding surface, and a
 short slow-motion zoom on a launch predicted to reach the Void. Reduced
 motion drops the shake and the zoom. Tuning: `HIT_FX` (`shake`, `flash`,
 `sparks`, `trail`, `lethal`, `bounce`).

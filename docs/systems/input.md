@@ -24,7 +24,7 @@ rules are [`ALVA_SPEC.md`](../../ALVA_SPEC.md) §7.4 (input), §6.10
 | Move left / right | `runLeft` / `runRight` | A D or ← → | D-pad / left stick | Joystick, or Classic ◀ ▶ |
 | Dash (on the ground) / air dash (in the air) | a double tap of `runLeft` / `runRight`; `mouvementLeft` / `mouvementRight` on touch | double-tap A / D or ← / → | double-tap the D-pad or stick | Joystick: one tap of **Left mouvement** / **Right mouvement**; Classic: double-tap ◀ or ▶ |
 | Down (fast fall in the air; steer a launch down) | `down` | S or ↓ | D-pad down / stick down | none |
-| Jump (tap: normal; held a little longer: higher; again in the air: air jump) | `jump` | W, Space or ↑ | A / Cross | the upward arrow |
+| Jump (tap: normal; held a little longer: higher; again in the air: an air jump, twice: the triple jump) | `jump` | W, Space or ↑ | A / Cross | the upward arrow |
 | Extra attack | `extra_attack` | J | X / Square | top of the cluster |
 | Transform (reserved) | `transform` | K | Y / Triangle | dashed button |
 | Shield (on the ground, held) / Deflect (in the air, a fresh press) | `shield` | L | RB / RT | **Shield**, named and drawn **Deflect** while airborne |

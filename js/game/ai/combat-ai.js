@@ -608,7 +608,7 @@ export class CombatAIController {
 
   // Knocked off the stage and still level with its top, but too far out
   // for drifting back: an air dash home (as often as the level Dashes at
-  // all), the air jump kept for the climb. Null for none.
+  // all), the air jumps kept for the climb. Null for none.
   airDashHome(s) {
     const { self, stage, p } = s;
     const d = s.ms.airDash;
@@ -1276,9 +1276,10 @@ export class CombatAIController {
   steerHome(self, stage, held) {
     const dx = stage.centerX - self.body.x;
     if (Math.abs(dx) > 8) held[DIR_KEY[Math.sign(dx)]] = true;
-    // Falling past the stage's top with its air jump left: jump back up.
-    // With it spent, a lift (an air attack that rises, like #0002's Blue
-    // Tornado) still to use this airtime: that instead.
+    // Falling past the stage's top with an air jump left: jump back up (both
+    // of the triple jump's, one after the other). With them spent, a lift
+    // (an air attack that rises, like #0002's Blue Tornado) still to use
+    // this airtime: that instead.
     const b = self.body;
     if (b.grounded || b.vy <= 0 || b.y <= stage.groundY - 40 || self.combat.stun > 0) return;
     if (self.airJumps > 0 && !self.freeFall) {

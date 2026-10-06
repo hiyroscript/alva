@@ -83,8 +83,7 @@ export const CHARACTER_0027 = {
   collider: { width: 32, height: 78 },
   pushbox: { width: 34 },
   hurtboxes: [{ x: -16, y: -78, w: 32, h: 78 }],
-  powers: { jump: 2, speed: 2 },
-  movement: { /* step 4 */ },
+  // No movement and no powers: see step 4.
   actions: { /* step 5 */ },
   attacks: { /* step 5 */ },
 };
@@ -105,10 +104,12 @@ export const CHARACTERS = [
 ```
 
 The registry validates it as the module loads: a definition that breaks
-the loadout rules is refused with every problem named.
+the loadout rules, or that declares movement of its own (step 4), is
+refused with every problem named.
 
 **Clips.** A clip is `{ frames, fps, loop }`, plus optionally
-`heightRatio`, `minSpeedScale` (run), `sourceFacing`, `anchorX` /
+`heightRatio`, `minSpeedScale` / `maxSpeedScale` (run: the slowest and
+fastest it plays, × its rate, following the speed), `sourceFacing`, `anchorX` /
 `anchorY` (per-frame anchors in art pixels, for art the automatic anchor
 gets wrong). `land` is optional (without it the fighter lands straight
 into its stance). Projectile art goes in `projectileAnimations`, effect art
@@ -118,21 +119,24 @@ still frame for the airborne, landing and hurt clips if their frames fail
 to load; attacks, the Shield, the Deflect, the Dash and the air dash never
 fall back.
 
-## 4. Give it a movement profile and Powers
+## 4. Movement: nothing to write
 
-`powers: { jump, speed }` picks a tier of each (1 to 3): Jump Power sets
-the normal jump's speed, Speed Power the top speed. Everything else is the
-`movement` profile; [the field table](../systems/movement.md#2-the-movement-profile)
-lists every field, its unit and default. Required: `acceleration`,
-`deceleration`, `turnBoost`, `airAcceleration`, `airDeceleration`,
-`coyoteTime` and `jumpBuffer` (both positive, or it cannot jump). Add
-`fastFallAcceleration` / `fastFallSpeed` for a fast fall, `airJumps` /
-`airJumpRatio` for air jumps, `highJumpWindow` / `highJumpHeight` for a
-higher jump, `attackBuffer` for an input buffer, `dashSpeed` /
-`dashTapWindow` with a `mouvment` clip for a Dash, and `airDashSpeed`
-(with `airDashUses`, 1 unless given) with a `midair_mouvment` clip for an
-air dash: either may be had without the other. Tune the numbers for this
-fighter; nothing requires them to match another's.
+**All fighters share universal baseline locomotion. Character identity
+changes the moveset, not run/jump/Dash fundamentals.** A new fighter runs,
+turns, jumps, triple-jumps, fast-falls, Dashes and air dashes on the
+universal values ([`js/data/movement.js`](../../js/data/movement.js),
+[movement](../systems/movement.md#2-the-universal-values)) without
+declaring any of them. Do not give it a `movement` profile, `powers`
+(Jump Power and Speed Power are retired) or any movement field: the
+registry refuses the definition. A fighter that looks heavy is no slower,
+and one that is fast in its canon is no faster: put that speed in its
+moves (a `motion` such as `homing`, `roll`, `bounce` or `rise`, a `step`,
+its attacks' `momentum`).
+
+What it does bring is art: a `mouvment` clip for the Dash and a
+`midair_mouvment` clip for the air dash (each is played once across the
+universal Dash, whatever its frame count). Every playable fighter needs
+both, so every playable fighter has the same capabilities.
 
 Optionally `energy` (Dash, air dash and Shield costs; defaults in
 [Energy](../systems/energy.md)), `launchReaction` (extra stun, tumble,
@@ -262,8 +266,10 @@ A new fighter is covered automatically by:
 - the codename and asset checks in
   [`tests/systems/codenames.test.mjs`](../../tests/systems/codenames.test.mjs)
   (every frame path exists);
-- [`tests/systems/movement-profile.test.mjs`](../../tests/systems/movement-profile.test.mjs)
-  (once playable: it runs, stops, jumps and Dashes by its own profile);
+- [`tests/systems/universal-movement.test.mjs`](../../tests/systems/universal-movement.test.mjs)
+  and [`momentum.test.mjs`](../../tests/systems/momentum.test.mjs) (once
+  playable: it moves exactly as every other fighter does, keeps its
+  momentum, triple-jumps, and has the Dash and air dash art);
 - [`tests/integration/roster-matrix.test.mjs`](../../tests/integration/roster-matrix.test.mjs)
   (once playable: every pairing with the other fighters, both ways and
   mirrored, in a real Watch Mode battle);

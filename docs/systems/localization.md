@@ -20,7 +20,7 @@ reload. The product rules are [`ALVA_SPEC.md`](../../ALVA_SPEC.md) §6.11.
   CSS classes, data keys) are never translated, and proper names (ALVA,
   #0001, the credited sources) stay as they are.
 - **Registry-owned copy.** The English names and descriptions of game data
-  (control names, each fighter's button and ability names, Powers, Launch,
+  (control names, each fighter's button and ability names, universal movement, Launch,
   difficulty levels, stages) are not written in the table: `registryStrings`
   reads them from the registries, so they cannot drift. French translates
   every key, those included.

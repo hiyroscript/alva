@@ -26,8 +26,9 @@ Which document answers what, and which one decides.
 Shared by every fighter; each guide lists its modules, the data it
 reads, what a fighter may leave out, and its tests.
 
-- [Movement](systems/movement.md): the movement rules, the movement
-  profile, Powers, the Dash.
+- [Movement](systems/movement.md): universal movement (one set of values
+  for every fighter), momentum, the triple jump, the Dash and the air
+  dash.
 - [Combat](systems/combat.md): loadouts, attacks, hit resolution,
   projectiles, summons, techniques, cooldowns.
 - [Launch](systems/launch.md): Launch Point, Base and Directional Launch,

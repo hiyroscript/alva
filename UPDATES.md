@@ -71,7 +71,9 @@ explained in [docs/systems/movement.md](./docs/systems/movement.md)):
 
 Each fighter supplies the numbers those mechanics read, in its own
 definition (today `js/data/characters/<id>.js`; every field, its unit and
-default in [docs/systems/movement.md](./docs/systems/movement.md#2-the-movement-profile)):
+default in [docs/systems/movement.md](./docs/systems/movement.md); since
+[universal movement](#universal-movement-and-momentum) these are one set of
+values for every fighter):
 
 - `movement`: `acceleration`, `deceleration`, `turnBoost`,
   `overspeedDeceleration`, `airAcceleration`, `airDeceleration`,
@@ -1138,6 +1140,145 @@ for either fighter, the refused fields), `dash.test.mjs`, `combo.test.mjs`
 `tests/fighters/0001/`, `tests/fighters/0002/`,
 `tests/interface/controls-ui.test.mjs` (the Deflect label) and
 `tests/integration/roster-matrix.test.mjs` updated.
+
+## Universal movement and momentum
+
+Not a named update (it can become one if the owner names it). Asked for in
+`max`: make Alva feel fast, fluid and momentum-driven, with combat and
+movement flowing into each other; give every fighter exactly the same
+baseline movement (no fighter faster because of its lore); add a triple
+jump; keep momentum through every legal change of action; make attacks and
+animations faster while keeping the art and the gameplay in step.
+
+**The rule.** All fighters share universal baseline locomotion. Character
+identity changes the moveset, not run/jump/Dash fundamentals.
+
+**What it removed.**
+
+- Each fighter's `movement` profile (`js/data/characters/<id>.js`). #0001
+  had acceleration 4200, air acceleration 3000, a 950 Dash and air dash;
+  #0002, "the speedster", acceleration 4800, air acceleration 3200 and an
+  1100 Dash and air dash. Both had deceleration 4200, turn boost 2.6,
+  overspeed deceleration 6000, air drag 380, air turn boost 2.0, fast fall
+  12000 / 1400, one air jump at 0.9, coyote 0.1, jump buffer 0.12, attack
+  buffer 0.15, the higher jump 0.15 / 1.4, Dashes lasting one pass of their
+  clips (0.2 s).
+- **Jump Power and Speed Power** (`js/data/powers.js`, `POWERS`,
+  `getJumpVelocity`, `getMaxSpeed`, each fighter's `powers`): Jump Power
+  650 / 920 / 1000, Speed Power 270 / 330 / 360. #0001 had Jump Power 2 and
+  Speed Power 2 (920, 330), #0002 Jump Power 2 and Speed Power 3 (920,
+  360). With one movement for everyone a tier had nothing left to choose,
+  so the system went rather than stay as a back door. Discover's **Power**
+  page went with it (its tier meter style too), and
+  `tests/systems/powers.test.mjs` and `movement-profile.test.mjs`.
+- The cap that kept a grounded attack from carrying more than its share of
+  top speed (`attackStartSpeed`'s clamp), the air dash's cut to top speed
+  as it ended, and the air jump's set-off at top speed in a held direction.
+
+**What it added**
+
+- **Universal movement** (`js/data/movement.js`, `BASE_FIGHTER_MOVEMENT`):
+  one frozen set of values every Fighter reads (`fighter.movement`), never
+  a definition's. The registry refuses a definition that declares
+  `movement`, `powers` or any movement field (`assertUniversalMovement`).
+  Faster than before: top speed 420, acceleration 6000 (five steps to top
+  speed), deceleration 4800, turn boost 2.2, air acceleration 4000, air
+  drag 360, fast fall 14000 / 1500, the jump 920, the higher jump unchanged.
+- **The triple jump**: `airJumps: 2` at `airJumpRatio` 0.78 (each air jump
+  about 105 units, kept so no stage's highest footing reaches the upper
+  Void). Landing, a hit and a homing dash's spring off what it hit give
+  both back.
+- **Momentum.** Attacks keep the speed they start with (all of it unless
+  their data says otherwise, never capped at top speed); jumps and air
+  jumps leave the sideways speed alone; a Dash never slows a faster
+  fighter (`dashSpeedToward`) and its speed carries on after it; landing
+  keeps the speed; hitstop holds velocity. Above top speed the excess
+  bleeds off at a rate, never at once: `overspeedHoldDeceleration` 2400
+  while held, `overspeedDeceleration` 5400 let go, the turn pressed back;
+  in the air a **burst** of the fighter's own (`Fighter.burst`, from its
+  Dash or air dash) at `airOverspeedDeceleration` 2600, a launch's speed
+  never, so launches are untouched.
+- **Dash flow.** The Dash and air dash: 1250 units/s for 1/6 s (about 208
+  units), their clips played once across them whatever their frame count.
+  After `dashCancelTime` (0.05 s) an attack, a Deflect or a jump may cut
+  either short, keeping its speed (run → Dash → attack, jump → air dash →
+  aerial). A Dash request is buffered like an attack press (it used to be
+  used up), and one in the air that no air dash answers is the Dash on
+  landing.
+- **Landing.** The landing cancel (an aerial's recovery is over on
+  touchdown), the land pose never holding anyone (running goes straight
+  past it), and a ground attack pressed just before touchdown kept by the
+  buffer (a ground-only one too).
+- **Faster, step-aligned attacks.** Every attack clip plays at a whole
+  number of 60 Hz steps per frame (20, 15, 12, 30 fps), phases still whole
+  frames, hitstop two steps for light strikes. #0001: Jab and Floating
+  Straight 15 → 20 fps (the Jab 0.4 → 0.3 s), Red 15 → 20, Red Kick 20 →
+  30 (homing 950 → 1050), Maximum Blue and Blue 12 → 15 (Blue's pull 1100
+  → 1300 so it reaches as far in its shorter window), Unlimited Void's cast
+  0.6 → 0.5 s (paralysis 1.8 → 1.7 s, so the free time is about the same),
+  Hollow Purple's chant 1 → 5/6 s; the High Kick kept 12 fps with a
+  shorter recovery. #0002: One-Two 15 → 20 fps, Homing Attack 9/60 → 7/60
+  s hang and 1000 → 1100, Bounce Attack 1300 → 1400, Spin Attack curl
+  10/60 → 8/60 s and its roll cap 820 → 1000, the Whirlwind 18 → 20, the
+  Rapid Kicks kept their 0.2 s wind-up and gained a hit-cancel once the
+  finisher is out. Momentum shares raised to carry runs and Dashes
+  (`momentum` 1 for the Jab, the One-Two and the High Kick; casts stay
+  planted on purpose); Deflects keep all their drift (`airMomentum` 1) and
+  their own timing.
+- **Animation.** The run clip follows the speed up to 1.6× its rate on a
+  Dash's run-on (`maxSpeedScale`); both fighters' run, idle, jump and fall
+  clips play faster; a Dash leaves faint afterimages (`HIT_FX.trail.dashAlpha`).
+- **The camera** follows quicker (`FOLLOW_X` 7, `FOLLOW_Y` 4) and caps its
+  lead (`LEAD_SPEED` 700).
+- **The CPU** simulates attack drift with the Fighter's own rules, knows
+  the Dash's run-on (`moveset.dash.reach`), Dashes in from where a Dash and
+  a strike reach, strikes out of a Dash past its cancel time, and follows
+  up out of hit-cancels (`chase`) as readily as its level punishes.
+- **Discover's Movement page** (`MOVEMENT_SUMMARY`, `MOVEMENT_GUIDE`): one
+  entry, Universal movement, with the run, the jump, the triple jump, the
+  fast fall, the Dash and the air dash; no tiers, no numbers.
+
+**Balance, measured.** Seeded CPU-vs-CPU fights on Desert, one minute
+each, 200 per level (100 each way round), Void falls #0001 : #0002. Before
+(the code before the change): Easy 106 : 4, Medium 91 : 58, Hard 78 : 44,
+Brutal 77 : 85. After: Easy 130 : 7, Medium 94 : 111, Hard 103 : 119,
+Brutal 114 : 81; fights are more decisive (about 10% more hits a minute,
+twice the falls on Hard). Universal movement alone (both fighters' old
+moves on the new movement, 120 fights) left Hard at 67 : 39: #0002's lost
+run and Dash advantage changed little. #0001's High Kick at 15 fps like
+its other moves made its Jab strings into it far longer (Hard 50 : 175),
+so it kept its quarter-second startup. With the CPU's hit-cancel chase off,
+Hard is 73 : 101.
+
+**Where to tune it**
+
+- `js/data/movement.js`: every movement value.
+- `js/data/characters/0001.js` and `0002.js`: `FPS_*`, each attack's
+  phases, `momentum`, `friction`, `airMomentum`, `hitstop`, `hitCancel`
+  and motion speeds.
+- `js/game/rendering/camera.js`: `LEAD`, `LEAD_SPEED`, `FOLLOW_X`,
+  `FOLLOW_Y`; `js/game/rendering/hit-fx.js`: `HIT_FX.trail.dashAlpha`;
+  `RUN_MAX_SPEED_SCALE` in `js/game/fighters/fighter.js`.
+- `js/game/ai/combat-ai.js`: `chase`, the Dash option in `options`.
+
+**Code:** `js/data/movement.js` (new); `js/data/powers.js` (deleted);
+`js/game/fighters/movement.js`, `js/game/fighters/fighter.js`,
+`js/game/fighters/fighter-controller.js`, `js/data/characters.js`, both
+definitions, `js/game/ai/combat-ai.js`, `js/game/ai/moveset.js`,
+`js/game/rendering/camera.js`, `js/game/rendering/hit-fx.js`,
+`js/screens/discover-screen.js`, `css/discover.css`,
+`js/localization/strings/`.
+
+**Tests:** `tests/systems/universal-movement.test.mjs` (the values, the
+registry refusing a fighter's own, every playable fighter measured field by
+field, identical traces for #0001 and #0002, the triple jump for each
+fighter), `momentum.test.mjs` and `movement-rules.test.mjs` (new);
+`movement.test.mjs`, `dash.test.mjs`, `air-mouvment.test.mjs`,
+`combo.test.mjs`, `combat-ai.test.mjs` (the CPU's cancels),
+`platform-stage.test.mjs` (the triple jump and the upper Void, the camera
+at speed), `hit-fx.test.mjs` (Dash trails), `tests/interface/discover.test.mjs`,
+`i18n.test.mjs`, `tests/fighters/0001/`, `tests/fighters/0002/` and others
+updated.
 
 ## Adding a named update
 

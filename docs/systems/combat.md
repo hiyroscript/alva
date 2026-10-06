@@ -79,7 +79,7 @@ An attack entry (`attacks.<codename>`) becomes a frozen definition through
 | `hitstun` / `blockstun` / `hitstop` | 0.2 / 0.12 / 0.06 s | |
 | `cooldown` | 0 | A short recovery cooldown after it ends or is cut short. |
 | `groundOnly` | false | It never starts in the air (and an air press of it is never buffered). |
-| `lockMovement`, `momentum`, `airMomentum`, `control`, `airControl`, `friction`, `step` | true, 1, 1, 0, 0, 1, null | How the fighter moves while it plays ([movement](movement.md#attack-movement)). |
+| `lockMovement`, `momentum`, `airMomentum`, `control`, `airControl`, `friction`, `step` | true, 1, 1, 0, 0, 1, null | How the fighter moves while it plays ([movement](movement.md#5-attack-movement)): by default it keeps all the speed it starts with (a Dash's burst included), unsteered, under the normal friction. |
 | `hitCancel` | null | Seconds in: from then on, once it has hit, another attack (the Deflect included), a jump, a Dash or an air dash may cut it short. |
 | `projectile` | null | `{ id, spawnAt, offset }`: releases that projectile once, as its time crosses `spawnAt`. |
 | `pending` | false | Art only: one pass of its clip, no hit (declaring combat fields on one is refused). |
@@ -97,8 +97,18 @@ hit and is past its `hitCancel`), its cooldown is over, it is not
 fighter is not in free fall, and its art (and its projectile's art) is
 there. An attack faces the direction held as it starts (the combat AI
 faces its target instead). A press that cannot start yet is kept by the
-combat input buffer for `movement.attackBuffer` and tried every step;
-summons and techniques are never buffered.
+combat input buffer for the universal `attackBuffer` (0.15 s,
+[movement](movement.md#2-the-universal-values)) and tried every step, so
+it comes out on the first step it can; in the air, a press whose ground
+attack could start once the fighter lands is kept too (pressed just
+before touchdown, it comes out on the ground). Summons and techniques are
+never buffered.
+
+An attack may also cut a Dash or an air dash short once the Dash is past
+its `dashCancelTime` (0.05 s), keeping the Dash's speed: a Dash attack
+([movement](movement.md#6-the-dash-and-the-air-dash)). And an attack
+started in the air whose recovery runs on the ground is over on
+touchdown (the landing cancel, [movement](movement.md#7-landing)).
 
 The Shield button's move in the air, the Deflect, is an attack too, from
 the fighter's `deflect` entry (not its `actions`): `Fighter.tryDeflect`
@@ -109,8 +119,15 @@ attack buttons are tried on that step; it is never buffered
 `startAttack`.
 
 A hit (never a block) or a paralysis takes the target out of its own
-attack on its next step. The Shield, a stun, a Dash, a technique or a summon's
-startup rules a new attack out.
+attack on its next step. The Shield, a stun, a Dash before its cancel
+time, a technique or a summon's startup rules a new attack out.
+
+**Pace.** Every ordinary attack's phases are whole frames of its clip,
+and every attack clip plays at a rate that is a whole number of 60 Hz
+steps per frame (20, 15, 12 or 30 fps), so each frame lasts exactly as
+long as its gameplay does. Light strikes freeze for two steps (1/30 s),
+heavier ones longer; a dramatic finisher (Hollow Purple) longest. The
+freeze holds the body's velocity, never loses it.
 
 ### Attack mechanics beyond a timed hitbox
 

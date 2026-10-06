@@ -417,7 +417,7 @@ export class CombatSystem {
       paralysis: blocked || finalLaunch.x || finalLaunch.y ? 0 : def.paralyze ?? 0, stall,
       projectile, summon, technique,
     };
-    // The target's own reaction to a real hit (its air jump back, see
+    // The target's own reaction to a real hit (its air jumps back, see
     // Fighter.takeHit).
     if (!blocked) target.takeHit?.(event);
     this.events.push(event);

@@ -57,9 +57,20 @@ honest to its art.
 ## Movement rules as pure functions
 
 `js/game/fighters/movement.js` holds the movement arithmetic as pure
-functions over a profile, while the Fighter keeps all state and the step
-order. The profile's every field is documented in one place, and the
-rules can be tested against any values without building a fighter.
+functions over the values they are handed, while the Fighter keeps all
+state and the step order. The rules can be tested against any values
+without building a fighter.
+
+## Universal movement
+
+Every fighter runs on one frozen set of movement values
+(`js/data/movement.js`), and no definition may declare its own: identity
+lives in moves, never in a faster run or a higher jump, so no player has
+to relearn basic movement between fighters, and no route (a profile, a
+Power tier) can give one fighter better locomotion. The registry refuses
+a definition that tries, and the Fighter never reads one. Jump Power and
+Speed Power, tiers that set a fighter's jump and top speed, were retired
+with it.
 
 ## Combat split by responsibility
 

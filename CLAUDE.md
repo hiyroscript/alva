@@ -18,6 +18,8 @@ and add an entry there when the owner names a new one.
   fighter's values and capabilities in `js/data/characters/<id>.js`. Never
   special-case a fighter's id in shared code
   ([the character system](./docs/architecture/character-system.md)).
+  Movement is universal (`js/data/movement.js`): no fighter has its own
+  run, jump or Dash numbers.
 - [`codename_rule`](./codename_rule) is the naming contract for controls,
   moves and art (`mouvment` is spelled that way on purpose).
 - [`character_rule`](./character_rule) is protected: never edit, move,

@@ -10,8 +10,8 @@ behave, and how it must look.
   platform, assets, architecture, brand, screens and flow, battle, input,
   accessibility and performance. Its rules apply to every fighter alike;
   where it gives a fighter's value, that is an example and says whose.
-- Each fighter's own specification (its art, body, movement profile,
-  Powers and moves, with their exact values) is a document of its own and
+- Each fighter's own specification (its art, body and moves, with their
+  exact values; movement is universal, 7.2.3) is a document of its own and
   part of this specification: [7.2.9](#729-character-specifications)
   lists them ([`docs/characters/`](docs/characters/)).
 - The guides in [`docs/`](docs/README.md) explain how the code carries
@@ -143,7 +143,7 @@ behave, and how it must look.
   `js/localization/` (the interface language, 6.11, which `App` owns and
   applies to the whole page, with one string table per language);
   `js/data/` (the registries: characters and each fighter's definition,
-  loadout rules, maps, Powers, Launch, difficulty, ability names);
+  universal movement, loadout rules, maps, Launch, difficulty, ability names);
   `js/game/` (the arena, battle and practice modes and physics, with
   `fighters/` for the fighter state machine, its movement rules and
   controllers, `combat/` for attacks, defense, combat state, hit
@@ -160,13 +160,13 @@ behave, and how it must look.
 - Data-driven content: `js/data/characters.js` (the registry) with one
   definition module per fighter in `js/data/characters/`,
   `js/data/maps.js` (the Quick Battle stages), `js/data/practice-map.js`
-  (the training stage), `js/data/powers.js` (the Power tier tables, 7.2),
-  `js/data/launch.js` (the Base Launch values and Directional Launches,
-  7.2) and `js/data/difficulty.js` (the four CPU levels, 6.3a, used by
-  Quick Battle and Watch Mode). Adding a fighter means adding frames, a
-  definition module (including its Power tiers, movement profile and each
-  hit's damage, Base Launch and Directional Launch), its registration and
-  a roster slot — never editing engine code.
+  (the training stage), `js/data/movement.js` (the universal movement
+  values every fighter runs on, 7.2.3), `js/data/launch.js` (the Base
+  Launch values and Directional Launches, 7.2) and `js/data/difficulty.js`
+  (the four CPU levels, 6.3a, used by Quick Battle and Watch Mode). Adding
+  a fighter means adding frames, a definition module (each hit's damage,
+  Base Launch and Directional Launch, and never any movement), its
+  registration and a roster slot — never editing engine code.
 - Simulation uses fixed 60 Hz steps with interpolated rendering and a clamped
   frame delta, so behaviour is identical at 30, 60 and 120 Hz.
 
@@ -262,7 +262,7 @@ First launch (no language chosen yet) → Splash → Home + Language chooser (6.
 Splash → Home → Select Mode → Select Difficulty → Select Fighter → Select Stage → Battle
 Home → Watch Mode → Select Difficulty → Select CPU 1 → Select CPU 2 → Select Stage → CPU vs CPU Battle (6.5a)
 Home → Practice Ground (starts at once with the first playable fighter and a practice CPU of it)
-Home → Discover (Power / Launch / Passives reference; Back returns Home)
+Home → Discover (Movement / Launch / Passives reference; Back returns Home)
 Home (no playable fighter) → Play, Watch Mode and Practice Ground disabled, "No fighters available"; Discover and Settings open
 Home → Settings gear → Settings dialog over Home (Language / Controls; Esc, Back or close returns to Home) → Customize touch controls → layout editor (Done or Back returns to Settings)
 Practice Ground → More → Change Fighter (roster dialog) / Change CPU, or Enable CPU once disabled (CPU roster dialog → Disable CPU) / Return (Home)
@@ -670,8 +670,8 @@ scrollable page of structured entries) in Alva's own visual language:
 charcoal surfaces, off-white type, thin borders and the green accent.
 Discover is a character-neutral mechanics reference, not a roster or stat
 sheet: it explains how each mechanic works and never says which fighter (or
-which of a fighter's attacks) uses which Power, tier, Base Launch or
-Directional Launch. No
+which of a fighter's attacks) uses which Base Launch or Directional
+Launch. No
 character name or
 ID appears anywhere on it, visibly or in accessible text, and it does not
 read the character database, so it stays the same as fighters are added.
@@ -679,10 +679,10 @@ read the character database, so it stays the same as fighters are added.
 - **Header:** the standard menu header — Back (Alva's back icon, labelled
   "Back") and the title **Discover**. Back, Esc / Backspace and gamepad B
   return Home.
-- **Rail:** exactly three sections, **POWER**, **LAUNCH** then
-  **PASSIVES** (ids `power`, `launch`, `passives`), as a
+- **Rail:** exactly three sections, **MOVEMENT**, **LAUNCH** then
+  **PASSIVES** (ids `movement`, `launch`, `passives`), as a
   `tablist` of real buttons (`tab`, `aria-selected`, `aria-controls`, roving
-  tabindex; each page a focusable `tabpanel`). Every visit opens on Power.
+  tabindex; each page a focusable `tabpanel`). Every visit opens on Movement.
   The open section wears a green bar on its leading edge, a faint green wash
   and bolder, full-strength type, so it never relies on colour alone.
   Keyboard or gamepad focus on a section opens it; a click or tap selects
@@ -696,23 +696,23 @@ read the character database, so it stays the same as fighters are added.
   and leaving it toward the rail lands on the open section's tab. The hidden
   page is `hidden`, so nothing in it can take focus. Focus shows as an inset
   frame, so an empty page shows it too.
-- **Power:** one entry per Power type, in registry order, built only from
-  `POWERS` in `js/data/powers.js` (names, descriptions, tier numbers), so it
-  cannot drift from gameplay. Each entry is the Power's name and summary
-  beside (stacked when there is no room for two columns) its three tiers,
-  each with its name, description and a decorative rising-bar meter; every
-  tier row looks the same, none is singled out. There are two:
-  - **Jump Power**: "Controls how high a normal jump goes. Higher tiers jump
-    higher." — Jump Power 1 "Very low jump.", Jump Power 2 "Normal jump.",
-    Jump Power 3 "Slightly higher jump."
-  - **Speed Power**: "Controls maximum movement speed. Higher tiers move
-    faster." — Speed Power 1 "Slow.", Speed Power 2 "Normal speed.", Speed
-    Power 3 "Slightly faster."
-
-  Launch is not a Power and is not listed here.
+- **Movement:** one entry, **Universal movement**, built only from
+  `MOVEMENT_SUMMARY` and `MOVEMENT_GUIDE` in `js/data/movement.js`, so it
+  cannot drift from gameplay: "Movement is the same for everyone: one run,
+  one set of jumps, one Dash. What sets each apart is their moves." beside
+  (stacked when there is no room for two columns) its rows, each with its
+  name, description and a plain bullet (none is ranked or singled out):
+  Run "Quick to full speed and quick to turn. Speed you build carries on
+  through jumps, attacks and landings.", Jump "A tap is the normal jump;
+  held a little longer, the higher jump.", Triple jump "Two more jumps in
+  mid-air. Landing or being hit gives them back.", Fast fall "Hold Down
+  while falling to drop faster.", Dash "Double-tap a direction for a burst
+  of speed. An attack or a jump can cut in after a moment.", Air dash "The
+  Dash in mid-air, flat across, once per airtime." No tiers and no
+  numbers: there is nothing to compare.
 - **Launch:** built only from the registry and reference copy in
   `js/data/launch.js` (`BASE_LAUNCH_VALUES`, `DIRECTIONAL_LAUNCHES` and their
-  summaries), in the same entry and row language as Power. Three entries:
+  summaries), in the same entry and row language as Movement. Three entries:
   - **Launch Point**: accumulated damage: it starts at 0, all damage taken is
     added to it, the higher it is the harder a hit with a Base Launch above 0
     launches, and it resets to 0 after an elimination, on respawn. Explained,
@@ -742,8 +742,8 @@ read the character database, so it stays the same as fighters are added.
 - **Passives:** intentionally empty — no cards, placeholder or "coming
   soon" copy — until a passives registry exists. The section is fully
   selectable and accessible.
-- A new Power type appears here once it is added to `POWERS`, with no
-  change to the screen.
+- A new universal movement appears here once it is added to
+  `MOVEMENT_GUIDE`, with no change to the screen.
 
 ### 6.10 Settings
 
@@ -900,8 +900,8 @@ French, concise game terms).
   stable key with `t(key, params)` (`{name}` placeholders; a placeholder may
   hold another key as `{ t: key }`; `plural(key, n)` follows each language's
   rules). Keys name what a string is for, never what it says, and a
-  translated string is never an identifier. English game copy (Powers,
-  Launch, difficulty levels, stage names and taglines, neutral control names,
+  translated string is never an identifier. English game copy (universal
+  movement, Launch, difficulty levels, stage names and taglines, neutral control names,
   each fighter's own touch-button names) is read from the registries that
   own it, so it cannot drift; every key exists in both languages, and a key
   missing from French falls back to English. Internal identifiers (control
@@ -945,7 +945,7 @@ French, concise game terms).
   420 and 800 (over its highest deck); Practice Ground 380 (its block is the
   narrowest), 400 and 760. There is room to be knocked off, fight briefly
   and drift back, but a fighter carried on outward is lost soon after; no
-  jump (its air jump included) from any stage's highest footing reaches the upper line. Camera
+  jump (both air jumps of the triple jump included) from any stage's highest footing reaches the upper line. Camera
   bounds are the Void's rectangle plus 140 on every side (`cameraAround`),
   so the neutral view never shows the Void and the camera never wanders deep
   into it.
@@ -1000,7 +1000,11 @@ French, concise game terms).
   Practice Ground's fighter alone while its CPU is disabled), leaning toward
   the main stage's centre while it
   does, interpolates smoothly and never shows outside its camera bounds (the
-  stage, the air around it and a strip past the Void's edge). A fighter of the reference height
+  stage, the air around it and a strip past the Void's edge). It keeps up
+  with the universal speed: Player 1 is framed a little ahead of where it
+  goes (a lead counted up to 700 units / s, so a Dash's burst never swings
+  the view), and a fighter Dashing across the stage stays well inside the
+  view. A fighter of the reference height
   (`CONFIG.render.fighterHeight`, 88 world units: a fixed camera convention,
   what 52 art pixels make at the roster's art-pixel size, never a
   requirement on any fighter) occupies ≈ 10 % of
@@ -1037,10 +1041,11 @@ each fighter's own values are in its character specification (7.2.9).
   (docs/characters/adding-characters.md).
 - **Shared systems, per-fighter values.** Everything in 7.2.2 to 7.2.8 is
   one rule for every fighter. A fighter supplies only data: its art and
-  clips, body, movement profile, Powers, Energy, `defense`,
+  clips, body, Energy, `defense`,
   `launchReaction` (and optionally `launchBounce`), attacks, projectiles,
   summons, techniques, button map (`actions`), touch buttons
-  (`mobileAbilities`) and ability names (`abilityNames`). No shared system
+  (`mobileAbilities`) and ability names (`abilityNames`); never movement,
+  which is universal (7.2.3). No shared system
   reads a fighter's id or treats one fighter as the reference: where a
   value below is a fighter's, it is named as an example. A capability a
   fighter leaves out (a `defense`, a Dash, a projectile, a summon, a
@@ -1161,11 +1166,10 @@ each fighter's own values are in its character specification (7.2.9).
   hitstun > technique > bound > attack > Dash > Shield > tumble > jump /
   fall > land > Shield lower pose > run > idle: a hit shows Hurt at once.
 
-#### 7.2.3 Physics, movement and Powers
+#### 7.2.3 Physics and universal movement
 
-- Physics: acceleration, deceleration, turn braking, max speed (from the
-  fighter's Speed Power, below), air steering and drag, gravity, jump
-  impulse (from its Jump Power, below), the fast fall,
+- Physics: acceleration, deceleration, turn braking, top speed, air
+  steering and drag, gravity, jump impulse, the fast fall,
   ground/platform/solid collision on a finite main floor (no side walls:
   a fighter can leave the stage and fall), landing detection; collision boxes
   independent of PNG size; bottom-centre origin; no sinking, floating or
@@ -1173,164 +1177,177 @@ each fighter's own values are in its character specification (7.2.9).
   stopped; only a launch turns that into a rebound (Launch bounce). Pushboxes
   split an overlap evenly, so a fighter at a ledge can be shoved off it; a
   fighter flying off a rebound passes through them.
-- **Movement and game feel.** Movement is immediate, smooth and precise;
-  fast to respond, never simply fast. The rules are the same for every
-  fighter (`js/game/fighters/movement.js`, docs/systems/movement.md); each
-  fighter's `movement` profile and Powers supply the numbers, so two
-  fighters move differently under the same rules. #0001's and #0002's
-  values, and how they play, are in their character specifications
-  (7.2.9).
-  - *Ground.* From rest to top speed at `acceleration`; letting go stops
-    the fighter at `deceleration` (a short, natural stop, never an
-    instant one); pressing against the way it moves brakes at
-    `acceleration` × `turnBoost` (never softer than letting go) until
-    that way is spent, the rest of that step accelerating the new way, so
-    a turn is quick but never a one-step flip. Above top speed (after a
-    Dash) the excess bleeds off at `overspeedDeceleration`, whatever is
-    held.
-  - *Air.* The same shape with `airAcceleration`, `airTurnBoost` (its
-    `turnBoost` when it declares none) and a light `airDeceleration`
-    drag: steering bends the drift instead of replacing it, and a running
-    jump carries its speed. Above top speed (a launch, a jump out of a
-    Dash), holding the way it already moves never slows the fighter
-    beyond the drag; pressing against it brakes.
-  - *Jump.* Its strength is its Jump Power; it is buffered (`jumpBuffer`)
-    and has coyote time (`coyoteTime`), both of which must be positive for
-    the fighter to jump at all. Takeoff is on the press step, and the jump
-    only sets the upward speed: the run carries straight into the air (no
-    horizontal reset), so run → jump → drift is one continuous motion.
+- **Universal movement. All fighters share universal baseline locomotion.
+  Character identity changes the moveset, not run/jump/Dash
+  fundamentals.** Every playable fighter has exactly the same top speed,
+  ground acceleration and deceleration, turn braking, overspeed handling,
+  air acceleration, drag and turning, jump speed and higher jump, air jumps
+  (count and strength), gravity, fall speed, fast fall, coyote time, jump
+  and combat input buffers, Dash speed, length and input window, and air
+  dash speed, length and uses: one frozen set of values
+  (`BASE_FIGHTER_MOVEMENT`, `js/data/movement.js`; docs/systems/movement.md
+  lists them) that the Fighter reads for everyone. No fighter definition
+  declares movement: a `movement` profile, `powers` or any of those fields
+  is refused as the registry loads (`assertUniversalMovement`), and the
+  Fighter never reads a definition's movement even if one is handed to it,
+  so a new fighter inherits the values without writing any and no route
+  gives one fighter better locomotion. A fighter's lore, archetype or look
+  (a "speedster", a heavy body) never changes them: its identity is its
+  moves, and a move may travel in its own way (a homing dash, a roll, a
+  plunge, a lift, a hover, a step-in) because that motion is the move.
+  Identical movement-only input from the same start gives #0001 and #0002
+  the identical trajectory. Whether a fighter has the Dash and the air dash
+  at all is its art (`mouvment`, `midair_mouvment`); every playable fighter
+  has both.
+- **Movement and game feel.** Movement is immediate, fast, smooth and
+  momentum-driven: a fighter is encouraged to stay in motion, and moving
+  and fighting flow into each other. The rules are the same for every
+  fighter (`js/game/fighters/movement.js`), and so are the numbers.
+  - *Ground.* From rest to top speed (420 units/s) in five steps; letting
+    go stops the fighter in about 90 ms on a short slide (never an instant
+    stop); pressing against the way it moves brakes at `acceleration` ×
+    `turnBoost` (never softer than letting go) until that way is spent,
+    the rest of that step accelerating the new way: a quick turn, never a
+    one-step flip.
+  - *Overspeed.* Top speed is what locomotion builds toward, never a cap.
+    Above it (a Dash's burst) the excess bleeds off at a rate, never at
+    once: gently while the fighter holds the way it moves
+    (`overspeedHoldDeceleration`), harder with nothing held
+    (`overspeedDeceleration`), hardest pressing back. In the air a burst of
+    the fighter's own (a Dash's or an air dash's: `Fighter.burst`) bleeds
+    off at `airOverspeedDeceleration`; a launch's speed never does (it flies
+    on under the drag), so movement rules never weaken a launch.
+  - *Air.* The same shape with `airAcceleration`, `airTurnBoost` and a light
+    `airDeceleration` drag: steering bends the drift instead of replacing
+    it, and a running jump carries its speed.
+  - *Momentum.* A legal change of action never throws speed away: a jump
+    and an air jump keep the sideways speed they find, an attack keeps its
+    `momentum` share of it (all of it unless its data says otherwise, a
+    Dash's burst included), a Dash never slows a faster fighter and its
+    speed carries on after it, landing keeps the speed it lands with, and
+    the impact freeze holds a velocity without losing it. Only real forces
+    change momentum: a hit, a launch, a carry, a pull, a rebound, a wall, a
+    move whose own mechanic redirects the body (a motion, a step-in, a
+    technique's or summon's planted cast, a paralysis), the Void.
+  - *Jump.* Its strength is the universal `jumpVelocity` (920 units/s,
+    about 170 units high); it is buffered (`jumpBuffer`) and has coyote time
+    (`coyoteTime`). Takeoff is on the press step, and the jump only sets
+    the upward speed: the run carries straight into the air (no horizontal
+    reset), so run → jump → drift is one continuous motion.
   - *Higher jump.* A tap is the normal jump. Jump still held
     `highJumpWindow` after takeoff (held from the takeoff step on: a press
     a little longer than a tap) makes it the higher jump: from that step to
     its apex it rises under a lighter share of gravity, set once so it tops
     out at `highJumpHeight` × the normal height (`Fighter.highJump`,
     `highJumpLift`). No kick in speed: the arc stretches. Decided once and
-    kept whether Jump stays held or not; the apex, a hit, the air jump or
-    the ground ends it. Ground jumps only (coyote time included); the air
-    jump is never a higher one. A fighter with no `highJumpWindow` never
-    makes one. Both CPUs let go of Jump inside the window (`jumpTapHold`):
-    their jumps are normal ones.
-  - *Air jump.* `airJumps` more jumps in the air (none when it declares
-    none), past coyote time, at `airJumpRatio` (1 when it declares none) ×
-    the normal jump's speed, always full height, the jump clip from its
-    first frame. A direction held sets off that way at least at top speed
-    (a change of course); with none held the drift carries on. Landing
-    gives them back, and so does a hit. Not while stunned, paralysed,
-    in an attack (a Deflect included) or a technique, nor in free fall; a
-    jump pressed in the air with none
-    left waits (the jump buffer) for the ground. It may cut short an attack
-    that hit, like a ground jump. Quick Battle's CPU uses it to get back to
-    the stage. A jump and an air jump from a stage's highest footing stay
-    well clear of the upper Void.
+    kept whether Jump stays held or not; the apex, a hit, an air jump or
+    the ground ends it. Ground jumps only (coyote time included); an air
+    jump is never a higher one. Both CPUs let go of Jump inside the window
+    (`jumpTapHold`): their jumps are normal ones.
+  - *Triple jump.* Two air jumps (`airJumps: 2`, counting the jumps after
+    the ground jump): ground jump, air jump, air jump; a fourth press does
+    nothing until the airtime resources come back. Each is past coyote
+    time, at `airJumpRatio` (0.78) × the jump's speed, always the same
+    height, the jump clip from its first frame. Vertical only: the sideways
+    speed carries straight through it, and steering the other way bends it
+    round as air control allows, never in one step. Landing gives both
+    back, and so does a hit (and a homing dash's spring off what it hit).
+    Not while stunned, paralysed, in an attack (a Deflect included) or a
+    technique, nor in free fall; a jump pressed in the air with none left
+    waits (the jump buffer) for the ground. It may cut short an attack that
+    hit, like a ground jump, and an air dash past its cancel time. Quick
+    Battle's CPU uses them to get back to the stage. A jump and both air
+    jumps from a stage's highest footing stay well clear of the upper Void.
   - *Fast fall.* Down (the `down` input: S / ↓, D-pad or stick down,
     with no mobile Down button) held in the air while already descending
     speeds the fall up toward `fastFallSpeed` at `fastFallAcceleration` on
     top of gravity: never while rising, never a jump in speed and never
     slower than the fall already is; it lands on platforms like any fall.
-    A fighter whose `fastFallSpeed` is not positive has none. Aerial attacks
-    may fast-fall (back to the ground after an aerial), a Deflect
-    included; a stun, a paralysis, an air dash, a technique or an attack's
-    own motion (a hover included) may not.
-    `Fighter.fastFalling` is true on the steps it applies.
+    Aerial attacks may fast-fall (back to the ground after an aerial), a
+    Deflect included; a stun, a paralysis, an air dash, a technique or an
+    attack's own motion (a hover included) may not. `Fighter.fastFalling`
+    is true on the steps it applies.
+  - *Landing.* Landing never holds a fighter: on touchdown it may run,
+    turn, jump, attack, Dash or Shield at once, and a press made just
+    before (within its buffer) comes out then. An attack started in the
+    air whose recovery runs on the ground is over on touchdown (the
+    landing cancel). The land clip is a pose only: running, or anything of
+    higher priority, goes straight past it, so a fighter with a land clip
+    is never less responsive than one without.
   Attack movement, the combat input buffer, hit-cancels and hitstop are
   combat rules (7.2.4).
 - **Dash** (movement, not an attack): two press edges of the same
   horizontal direction (`runLeftPressed` / `runRightPressed`, 7.4), the second
-  within `movement.dashTapWindow` (e.g. #0001's 0.22 s) of the first, start a Dash that
+  within `dashTapWindow` (0.22 s) of the first, start a Dash that
   way (`Fighter.trackDashTaps`, `tryDash`); the other direction replaces the
-  waiting tap, both at once cancel it, and a double tap that cannot Dash is
-  used up, never queued. A one-step request (`mouvementLeftPressed` /
-  `mouvementRightPressed`, 7.4: one tap of the Joystick touch layout's Left
-  mouvement / Right mouvement, `mouvementLeft` / `mouvementRight`) goes straight to the same `tryDash`, so every
-  rule, cost and effect below applies unchanged; it is not a direction
-  press (it never pairs with one), it forgets any first tap waiting, it is
-  used up whether or not it Dashes, and both at once ask for nothing. A Dash needs the fighter free to act (no attack,
-  stun, paralysis, technique or Dash running) or in an attack that hit
-  and may be cut short (a **Dash cancel**, see Hit-cancels, 7.2.4), grounded,
-  not shielding nor holding `shield` for a Shield
-  that can go up, not exhausted (it pays `energy.dashCost` once as it
-  starts, `dashCancelCost` for a Dash cancel, or all that is left when that
-  is less, emptying the bar), a positive `movement.dashSpeed` and its real
-  `mouvment` clip (played once; without it the Dash is refused and logged,
-  never faked with the run). A held Shield and attacks are resolved before it on
-  the same step, so either wins over it. The fighter faces the Dash at once and
-  moves at `movement.dashSpeed` (the top speed itself never changes) for
-  one pass of its own `mouvment` clip, ignoring input (e.g. #0001: 950
-  units/s for 0.2 s, about 190 units; #0002: 1100 units/s for 0.2 s,
-  about 220); afterwards the normal movement takes over from that speed,
-  its excess over top speed bleeding off at
-  `movement.overspeedDeceleration` whatever is held, so holding on eases
-  into the run and letting go slides to a stop. No speed spike, no dead
-  stop. It obeys collision: a solid stops it (the Dash ends against
-  it), and leaving the ground ends it (the fighter falls on with its speed).
-  Hitstun or a paralysis end it at once. While it runs the fighter cannot attack,
-  shield, jump, summon, start a technique or Dash again (an attack or a jump pressed late in
-  it is kept by the input buffers and comes out the step it ends: a Dash
-  into a Jab, keeping at most the Jab's share of top speed, never a
-  lunge; there is no attack-cancel out of a Dash). A Dash asked for during
-  an impact freeze (a double tap or a one-step request) is kept and tried
-  on the step the freeze ends, like the attack presses made then. It has no hitbox,
-  damage, launch or invulnerability. The training CPU never dashes (its
-  input never has press edges); Quick Battle's combat AI dashes only
-  through the same double tap a player uses (a press, a release and a
-  press within the window), and guards against double-tapping by accident.
-- **Air dash** (movement, not an attack): the fighter's own mid-air
-  mouvment, a capability apart from the Dash. The same requests (the
-  double tap, the one-step request) that Dash on the ground air dash in
-  the air (`Fighter.tryMouvment`: `tryDash` on the ground, `tryAirDash` in
-  the air). It needs a positive `movement.airDashSpeed`, its real
-  `midair_mouvment` clip (played once; without it the air dash is refused
-  and logged, never faked with the Dash's clip or the run) and an air dash
-  left this airtime (`movement.airDashUses`, 1 unless authored; landing
-  gives them back, and so does a hit, as for the air jumps; an air jump
-  does not). Otherwise the Dash's rules: free to act or in an attack that
-  hit and may be cut short (a Dash cancel in the air, for
-  `dashCancelCost`), not exhausted, paying `energy.dashCost`; never while
-  stunned, paralyzed or already dashing; and, as an attack's own motion,
-  never while still flying from a launch or in free fall. A Deflect and
-  attacks are resolved before it on the same step. The fighter faces the
-  air dash at once and moves straight across at `movement.airDashSpeed`
-  for one pass of its `midair_mouvment` clip (e.g. #0001: 950 units/s for
-  0.2 s, about 190 units; #0002: 1100 units/s for 0.2 s, about 220), its
-  vertical speed zeroed as it starts and gravity held off throughout (no
-  fall and no fast fall); run to its end, its sideways speed is capped at
-  the fighter's top speed and normal airborne physics take over. A solid
-  or the ground ends it, and so do hitstun and a paralysis. While it runs
-  the fighter cannot attack, Deflect, jump or dash again (an attack or a
-  jump pressed late in it is kept by the input buffers). It has no
-  hitbox, damage, launch, invulnerability, Shield or Deflect. Quick
-  Battle's combat AI air dashes through the same double tap: home when
-  knocked off the stage too far out, and in the air to close in.
-- **Powers** (`js/data/powers.js`): fighter abilities owned at one of three
-  tiers, Jump Power and Speed Power. Each Power is a frozen tier table in
-  the one `POWERS` registry, the single source of its names, descriptions,
-  tier numbers and tuning values: gameplay reads the values, the Discover
-  reference (6.9) the names and descriptions. A fighter's definition
-  declares one tier of each (`powers: { jump: 2, speed: 2 }`); `Fighter`
-  resolves them once, at construction (`getJumpVelocity`, `getMaxSpeed`).
-
-  Tier values (world units per second, at the global gravity of 2500):
-
-  | Power | Tier 1 | Tier 2 | Tier 3 | Becomes |
-  | --- | --- | --- | --- | --- |
-  | Jump Power | 650 | 920 | 1000 | initial upward speed of the normal jump |
-  | Speed Power | 270 | 330 | 360 | top speed of normal movement |
-
-  Each fighter's tiers are in its character specification (7.2.9): #0001
-  has Jump Power 2 and Speed Power 2, #0002 Jump Power 2 and Speed Power 3. The tiers are the only
-  sources: movement has no raw `jumpVelocity` or `maxSpeed`.
-  Speed Power feeds the same normal left / right target speed on the ground
-  and in the air (and the run clip's playback rate, relative to the
-  fighter's own top speed; an attack's steering and the speed it may keep on
-  the ground are shares of that top speed); acceleration, deceleration, the
-  turn boosts, the overspeed bleed, air control and drag, gravity, fall
-  speed, the fast fall, coyote time, the jump and attack buffers, hitstun
-  friction, launches, projectiles (e.g. #0001's Red at its own 600) and
-  techniques, pulls and the Shield never depend on it, just as none of them depend
-  on Jump Power. The shared
-  Fighter applies both for Player 1, the CPU and Practice Ground alike. A
-  declared tier the table lacks (or a fighter missing a Power) is logged and
-  gets tier 2.
+  waiting tap and both at once cancel it. A one-step request
+  (`mouvementLeftPressed` / `mouvementRightPressed`, 7.4: one tap of the
+  Joystick touch layout's Left mouvement / Right mouvement, `mouvementLeft`
+  / `mouvementRight`) goes straight to the same `tryDash`, so every rule,
+  cost and effect below applies unchanged; it is not a direction press (it
+  never pairs with one), it forgets any first tap waiting, and both at once
+  ask for nothing. A Dash needs the fighter free to act (no attack, stun,
+  paralysis, technique or Dash running) or in an attack that hit and may
+  be cut short (a **Dash cancel**, see Hit-cancels, 7.2.4), grounded, not
+  shielding nor holding `shield` for a Shield that can go up, not exhausted
+  (it pays `energy.dashCost` once as it starts, `dashCancelCost` for a Dash
+  cancel, or all that is left when that is less, emptying the bar) and its
+  real `mouvment` clip (without it the Dash is refused and logged, never
+  faked with the run). A request made while the fighter is busy (an attack
+  or its recovery, a stun, another Dash, an impact freeze) is buffered like
+  an attack press (`attackBuffer`) and comes out on the first step it can;
+  one refused for any other reason is used up. A held Shield and attacks
+  are resolved before it on the same step, so either wins over it. The
+  fighter faces the Dash at once and moves at `dashSpeed` (1250 units/s),
+  or at its own speed that way if that is faster, for `dashDuration` (1/6
+  s, about 208 units), its `mouvment` clip played once across it whatever
+  its frame count, ignoring direction input; afterwards it keeps the speed
+  it has, the excess over top speed bleeding off as overspeed does
+  (holding on keeps it longest). No speed spike, no dead stop. It obeys
+  collision: a solid stops it (the Dash ends against it), and leaving the
+  ground ends it (the fighter falls on with its speed). Hitstun or a
+  paralysis end it at once. For its first `dashCancelTime` (0.05 s) it
+  commits; from then on an attack, a Deflect or a jump may cut it short,
+  carrying on from its speed (a Dash attack, a Dash jump), and an attack or
+  jump pressed earlier in it is kept by the input buffers and comes out the
+  first step it may. It cannot Shield, summon, start a technique or Dash
+  again until it ends. It has no hitbox, damage, launch or invulnerability.
+  The training CPU never dashes (its input never has press edges); Quick
+  Battle's combat AI dashes only through the same double tap a player uses
+  (a press, a release and a press within the window), and guards against
+  double-tapping by accident.
+- **Air dash** (movement, not an attack): the mid-air mouvment, a
+  capability apart from the Dash. The same requests (the double tap, the
+  one-step request) that Dash on the ground air dash in the air
+  (`Fighter.tryMouvment`: `tryDash` on the ground, `tryAirDash` in the
+  air). It needs its real `midair_mouvment` clip (without it the air dash
+  is refused and logged, never faked with the Dash's clip or the run) and
+  an air dash left this airtime (`airDashUses`, 1; landing gives it back,
+  and so does a hit, as for the air jumps; an air jump does not).
+  Otherwise the Dash's rules: free to act or in an attack that hit and may
+  be cut short (a Dash cancel in the air, for `dashCancelCost`), not
+  exhausted, paying `energy.dashCost`; never while stunned, paralyzed or
+  already dashing; and, as an attack's own motion, never while still
+  flying from a launch or in free fall. A request in the air that no air
+  dash answers is kept for the buffer, and is the Dash if the fighter lands
+  in time. A Deflect and attacks are resolved before it on the same step.
+  The fighter faces the air dash at once and moves straight across at
+  `airDashSpeed` (1250 units/s, or faster if it already goes faster that
+  way) for `airDashDuration` (1/6 s, about 208 units), its
+  `midair_mouvment` clip played once across it, its vertical speed zeroed
+  as it starts and gravity held off throughout (no fall and no fast fall);
+  then normal airborne physics take over from the speed it has, its burst
+  bleeding off. A solid or the ground ends it, and so do hitstun and a
+  paralysis. Like the Dash it commits for `dashCancelTime`, then an
+  attack, a Deflect or an air jump may cut it short (an air dash into an
+  aerial keeps its speed). It has no hitbox, damage, launch,
+  invulnerability, Shield or Deflect. Quick Battle's combat AI air dashes
+  through the same double tap: home when knocked off the stage too far
+  out, and in the air to close in.
+- **Powers are retired.** Jump Power and Speed Power, tiers that once set
+  a fighter's jump and top speed (`js/data/powers.js`), are gone with
+  universal movement: a `powers` entry is refused. Their history is in
+  `UPDATES.md`.
 
 #### 7.2.4 Combat
 
@@ -1345,38 +1362,50 @@ each fighter's own values are in its character specification (7.2.9).
   attack), its `damage`, `baseLaunch` and `directionalLaunch` (7.2.7),
   `hitstun`, `blockstun`, `hitstop` and a short `cooldown`, `groundOnly`,
   and how it moves and combos (below). An airborne version that lands
-  finishes what is left of its own clip (never restarted) instead of
-  switching to the ground version or Land. A projectile attack has
+  plays its startup and strike on (never restarted, never switched to the
+  ground version or Land), and its recovery is over on touchdown: the
+  **landing cancel**. Phases are whole frames of clips that play at a whole
+  number of 60 Hz steps per frame, so the strike shows exactly while it
+  is live. The pace is quick: light attacks a third of a second or less,
+  launchers and casts kept long enough to read (#0001's High Kick a
+  quarter of a second before it lands). A projectile attack has
   `hitbox: null` and a `projectile` release instead (below). A *pending*
   attack (`pending: true`) is art only: one pass of its clip, no hit, and
   declaring combat fields on one is refused.
   - *Attack movement.* Normal locomotion is off while an attack plays, but
-    that is not the same as standing still: an attack keeps a share of the
-    horizontal speed it started with (`momentum` on the ground, never more
-    than that share of top speed; `airMomentum` in the air), may be
-    steered with a share of the normal acceleration and top speed
-    (`control`, `airControl`), lets the rest of its speed run down under
-    `friction` × the ground deceleration (the air drag in the air), and may
-    move by itself (`step: { at, speed }`: forward speed raised to at
-    least `speed` as its time crosses `at`, on the ground). Defaults
-    (`momentum` 1, `control` 0, `friction` 1, no step) are a planted
-    attack; `lockMovement: false` keeps full locomotion. A technique holds
-    its fighter still instead and a clone never moves: neither reads these.
+    that is not the same as standing still: an attack keeps its share of
+    the horizontal speed it started with (`momentum` on the ground,
+    `airMomentum` in the air: all of it by default, never capped at top
+    speed, so a Dash's burst carries into a Dash attack), may be steered
+    with a share of the normal acceleration and top speed (`control`,
+    `airControl`), lets the rest of its speed run down under `friction` ×
+    the ground deceleration (above top speed the overspeed brake; the air
+    drag in the air), and may move by itself (`step: { at, speed }`:
+    forward speed raised to at least `speed` as its time crosses `at`, on
+    the ground, never lowered). Defaults (`momentum` 1, `control` 0,
+    `friction` 1, no step) keep the fighter's speed, unsteered; a planted
+    attack is one whose data says so (a low `momentum`, a high `friction`),
+    never the default. `lockMovement: false` keeps full locomotion. A
+    technique holds its fighter still instead and a clone never moves:
+    neither reads these.
   - *Combat input buffer.* An ordinary attack press the fighter cannot act
-    on yet (an attack or its recovery, a stun, a Dash, a cooldown, `shield`
-    held for its Shield) is kept for `movement.attackBuffer` and comes out
-    on the first step it can, if it still maps to an attack that can start
-    there (on the ground or in the air as the fighter is then). The latest
-    such press wins; one older than the buffer never fires. Presses made
-    during an impact freeze are kept and do not age through it. Only
-    ordinary attacks: a summon or technique happens on its own press or not
-    at all (one pressed while it cools down, in the air or while the
-    fighter is busy is simply gone), and a reserved button, a ground-only
-    attack pressed in the air or an attack without art is never kept. Kept
-    presses keep their order with a buffered jump: a jump pressed before
-    the attack goes first and the attack comes out next step, in the air;
-    pressed on the same step, the ground attack goes first. A fighter with
-    no positive `attackBuffer` keeps nothing.
+    on yet (an attack or its recovery, a stun, a Dash before its cancel
+    time, a cooldown, `shield` held for its Shield) is kept for the
+    universal `attackBuffer` (0.15 s, the same for every fighter) and comes
+    out on the first step it can, if it still maps to an attack that can
+    start there (on the ground or in the air as the fighter is then). The
+    latest such press wins; one older than the buffer never fires. Presses
+    made during an impact freeze are kept and do not age through it. In the
+    air, a press whose ground attack could start once the fighter lands is
+    kept too, so one made just before touchdown comes out on the ground.
+    Only ordinary attacks: a summon or technique happens on its own press
+    or not at all (one pressed while it cools down, in the air or while the
+    fighter is busy is simply gone), and a reserved button or an attack
+    without art is never kept. Kept presses keep their order with a
+    buffered jump: a jump pressed before the attack goes first and the
+    attack comes out next step, in the air; pressed on the same step, the
+    ground attack goes first. A Dash request is buffered the same way
+    (7.2.3).
   - *Hit-cancels.* An attack that hits (a Shield's block does not count)
     may be cut short once its time reaches its `hitCancel` (seconds in, or
     null for never; the step its freeze ends at the earliest), by another
@@ -1387,16 +1416,22 @@ each fighter's own values are in its character specification (7.2.9).
     into itself only once its own cooldown has run since it became
     cancellable. The cut attack's cooldown starts as it is cut. A whiff or
     a block keeps the whole recovery (and never Dash-cancels), so
-    commitment is unchanged where it matters. Which attacks open a
+    commitment is unchanged where it matters: a hit opens the chase sooner
+    than a whiff ever could. A cancel keeps momentum: a jump out of an
+    attack keeps its speed, a Dash out of one goes the Dash's way at its
+    speed. Which attacks open a
     follow-up, and the combo routes they make, are each fighter's own
     (7.2.9). No route loops: every hit adds to the Launch Point that sends
     the next one further, a Dash chase spends the Energy the Shield needs,
     and a wall's rebounds are capped until the target recovers (7.2.7).
-  - *Hitstop.* Per hit, its own `hitstop`; a hard rebound off the stage
-    freezes its fighter alone for `LAUNCH_BOUNCE.hitstop`. It freezes the
-    fighters, never the controls: presses made during it are kept, and a
-    frozen fighter is drawn still where it stopped. A detached hit (a
-    projectile's, a clone's, a technique's) freezes only its target.
+  - *Hitstop.* Per hit, its own `hitstop`: crisp for light strikes (two
+    steps), longer for heavy ones and finishers; a hard rebound off the
+    stage freezes its fighter alone for `LAUNCH_BOUNCE.hitstop`. It freezes
+    the fighters, never the controls: presses made during it are kept, and
+    a frozen fighter is drawn still where it stopped. It freezes motion,
+    never erases it: a fighter's velocity is held through it and it
+    carries on at exactly that speed. A detached hit (a projectile's, a
+    clone's, a technique's) freezes only its target.
 - **Projectiles** (`projectiles` on the character, `<attack>_object`,
   named after the attack that throws it; runtime in
   `js/game/combat/projectile.js`) are independent battle entities, not a
@@ -1876,8 +1911,8 @@ each fighter's own values are in its character specification (7.2.9).
   out: only the Void does. On time-up in Quick Battle, level on points, the
   fighter with the lower Launch Point wins (a fighter still waiting to
   respawn counts the Launch Point it fell with); equal is a draw.
-- **Launch** (`js/data/launch.js`): how a hit sends its target flying. It is
-  not a Power: every hit (an attack's, a projectile's, a
+- **Launch** (`js/data/launch.js`): how a hit sends its target flying.
+  Every hit (an attack's, a projectile's, a
   technique's) declares its own `baseLaunch` and `directionalLaunch` beside
   its `damage`, independently of each other:
   `damage: 3, baseLaunch: 1, directionalLaunch: 'horizontal'`,
@@ -1897,7 +1932,7 @@ each fighter's own values are in its character specification (7.2.9).
   strength nobody chose. Neither field is inferred from damage, the hitbox
   or the other field. Each fighter's hits (damage, Base Launch and
   Directional Launch) are tabled in its character specification (7.2.9).
-  Launch never depends on either fighter's Jump or Speed Power.
+  Launch never depends on how a fighter moves.
 - **Launch reaction** (the character's `launchReaction`, resolved by
   `resolveLaunchReaction` in `js/game/combat/combat.js`; every field optional,
   the defaults change nothing; the values below are #0001's and #0002's). None of it changes a launch's strength.
@@ -1921,8 +1956,8 @@ each fighter's own values are in its character specification (7.2.9).
     defender's skill: surviving a launch, or slipping out of a follow-up.
     `finalLaunch` is the steered velocity; with nothing held it is the
     formula exactly.
-  - A hit (never a block) also gives the target its air jump back, so a
-    launch never strands it without one.
+  - A hit (never a block) also gives the target both its air jumps back,
+    so a launch never strands it without them.
 - **Launch bounce** (`js/game/combat/launch-bounce.js`: every fighter's
   `LAUNCH_BOUNCE` settings, which a character may override with its own
   `launchBounce`, `enabled: false` included; #0001 and #0002 override none). A launch
@@ -2101,9 +2136,10 @@ each fighter's own values are in its character specification (7.2.9).
 #### 7.2.9 Character specifications
 
 Each playable fighter has a character specification of its own, part of
-this specification: its art, clips, body, movement profile and Powers, its
-moves with their exact values, its defense, Energy and launch reaction,
-its touch buttons and its combo routes. The rules above are not repeated
+this specification: its art, clips, body, its moves with their exact
+values, its defense, Energy and launch reaction, its touch buttons and its
+combo routes. Never its movement: every fighter's run, jumps and Dash are
+the universal ones (7.2.3). The rules above are not repeated
 there, and nothing in one is a rule for another fighter.
 
 - **#0001**: [docs/characters/0001.md](docs/characters/0001.md) (the
@@ -2112,8 +2148,9 @@ there, and nothing in one is a rule for another fighter.
   Purple techniques, Infinity, a Shield that stalls the blows it
   blocks, and its arm-sweep Deflect).
 - **#0002**: [docs/characters/0002.md](docs/characters/0002.md) (the
-  speedster: the One-Two, Homing Attack, Rapid Kicks, Bounce Attack, Spin
-  Attack, Blue Tornado and Whirlwind, a guard, and its swatting Deflect).
+  speedster, in its moves and never its run: the One-Two, Homing Attack,
+  Rapid Kicks, Bounce Attack, Spin Attack, Blue Tornado and Whirlwind, a
+  guard, and its swatting Deflect).
 
 Adding one is described in
 [docs/characters/adding-characters.md](docs/characters/adding-characters.md).
@@ -2212,7 +2249,8 @@ Adding one is described in
     hit; a red ring for a block; a white ring edged in red for a perfect
     block.
   - *Speed trails:* a tumbling fighter moving at 900 units / s or faster
-    leaves up to six fading afterimages of its own poses behind it.
+    leaves up to six fading afterimages of its own poses behind it; a Dash
+    or an air dash leaves fainter ones while it lasts.
   - *Rebounds:* a launch rebounding off the stage (`Fighter.bounce`, handed
     over by the Arena each step) throws the hit's sparks off the surface
     where it struck, sized by its speed into it, and one at 900 units / s or
@@ -2249,7 +2287,7 @@ Adding one is described in
 ### 7.4 Input
 
 - Keyboard (simultaneous keys, held-state tracking, no reliance on key
-  repeat): A/D or ←/→ move (`runLeft` / `runRight`; twice in a row to Dash, or in the air to air dash), S/↓ Down (`down`; held; a direction only: in the air while falling, the fast fall, and as a hit lands, steering the launch downward), W/Space/↑ jump (`jump`; tapped, the normal jump; held a little longer, the higher jump; again in the air, the air jump), J the
+  repeat): A/D or ←/→ move (`runLeft` / `runRight`; twice in a row to Dash, or in the air to air dash), S/↓ Down (`down`; held; a direction only: in the air while falling, the fast fall, and as a hit lands, steering the launch downward), W/Space/↑ jump (`jump`; tapped, the normal jump; held a little longer, the higher jump; again in the air, an air jump, twice: the triple jump), J the
   extra attack (`extra_attack`, e.g. #0001's High Kick), K Transform (`transform`, reserved), L Shield (`shield`; held on the ground; a fresh press in the air is the Deflect), U
   `attack1`, I `attack2`, O `attack3`, M `attack4`, `,` `attack5` (the
   numbered buttons along the row above J K L, then the row below it; a

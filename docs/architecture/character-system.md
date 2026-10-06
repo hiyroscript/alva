@@ -6,19 +6,31 @@ that makes a fighter itself. #0001 and #0002 are two members of the
 roster, not templates: neither is the default that shared code falls back
 to, and adding a third means writing its definition, not copying either.
 
+**All fighters share universal baseline locomotion. Character identity
+changes the moveset, not run/jump/Dash fundamentals.** Run speed,
+acceleration, turning, air control, the jump and the triple jump, the
+fast fall, the Dash, the air dash, coyote time and the buffers are one
+set of numbers ([`js/data/movement.js`](../../js/data/movement.js),
+[movement](../systems/movement.md)) that no definition may declare or
+change: a fighter's lore, archetype or look never makes it run faster,
+jump higher or fall heavier. What a fighter brings is its moves, their
+motion included.
+
 ## Three layers
 
 | Layer | Where | What it decides |
 | --- | --- | --- |
-| **Shared systems** | `js/game/`, `js/data/loadout.js`, `js/data/launch.js`, `js/data/powers.js` | The rules: how movement, attacks, hits, launches, the Shield, Energy, summons, techniques, the CPU, input and rendering work. The same for every fighter. |
-| **Fighter configuration** | each fighter's definition, `js/data/characters/<id>.js` | The numbers and choices those rules read: its body, movement profile, Powers, Energy, launch reaction, which buttons it has and what kind of move each is, every attack's timing, hitbox, damage and launch. |
-| **Fighter capabilities** | the same definition | Optional, explicit pieces a fighter may or may not have: a `defense` (the Shield, on the ground), a `deflect` (the Shield button in the air), a Dash (`dashSpeed` and a `mouvment` clip), an air dash (`airDashSpeed` and a `midair_mouvment` clip), projectiles (spinning ones with a `rotationSpeed`), summons, techniques, an extra attack, attack mechanics such as `motion`, `hits` or `deflectProjectiles`. A shared system checks for the capability, never for the fighter. |
+| **Shared systems** | `js/game/`, `js/data/movement.js`, `js/data/loadout.js`, `js/data/launch.js` | The rules: how movement, attacks, hits, launches, the Shield, Energy, summons, techniques, the CPU, input and rendering work. The same for every fighter, and so are movement's numbers. |
+| **Fighter configuration** | each fighter's definition, `js/data/characters/<id>.js` | The numbers and choices those rules read: its body, Energy, launch reaction, which buttons it has and what kind of move each is, every attack's timing, hitbox, damage, launch and motion. Never its movement. |
+| **Fighter capabilities** | the same definition | Optional, explicit pieces a fighter may or may not have: a `defense` (the Shield, on the ground), a `deflect` (the Shield button in the air), the art for the universal Dash (a `mouvment` clip) and air dash (a `midair_mouvment` clip), projectiles (spinning ones with a `rotationSpeed`), summons, techniques, an extra attack, attack mechanics such as `motion`, `hits` or `deflectProjectiles`. A shared system checks for the capability, never for the fighter. |
 
-So "#0002 is faster" is configuration (Speed Power 3, a higher
-acceleration, a faster Dash); "#0001's Maximum Blue drags its target in"
-is a capability (a `pull` on its projectile) running on the shared pull
-rule; and "an attack keeps some of its momentum" is a shared rule every
-fighter's attacks follow with their own `momentum` values.
+So "#0001's Maximum Blue drags its target in" is a capability (a `pull`
+on its projectile) running on the shared pull rule; "#0002's Homing
+Attack dashes at its target" is a capability (a `homing` motion on its
+attack) running on the shared motion rules; and "an attack keeps its
+momentum" is a shared rule every fighter's attacks follow with their own
+`momentum` values. "#0002 is faster" is not a thing a definition can say:
+it runs exactly as fast as #0001, and its speed lives in its moves.
 
 ## The registry
 
@@ -33,9 +45,11 @@ definitions (`CHARACTERS`) and the lookups everything else uses:
 | `characterFramePaths(def)` | Every frame a fighter needs before battle, each once. |
 | `framePath`, `frames` | The art path convention (from `js/data/characters/helpers.js`). |
 
-Every definition is validated against the loadout rules as the registry
-loads (`assertLoadout`); one that breaks a rule is refused with every
-problem named.
+Every definition is validated as the registry loads: against the
+loadout rules (`assertLoadout`) and for movement of its own
+(`assertUniversalMovement`: a `movement` profile, `powers` or any
+universal movement field is refused); one that breaks a rule is refused
+with every problem named.
 
 ## What a definition holds
 
@@ -44,7 +58,7 @@ problem named.
 | `id`, `displayName`, `rosterSlot`, `available` | registry, roster, HUD | yes |
 | `sourceFacing`, `animations`, `projectileAnimations`, `effectAnimations`, `animationFallbacks`, `visual` | sprite normalization, Fighter, renderers, roster | `animations` (with the states it needs) and `visual` |
 | `collider`, `pushbox`, `hurtboxes` | physics, combat, the AI | yes |
-| `powers`, `movement` | Fighter, [movement](../systems/movement.md) | yes |
+| `movement`, `powers` | nobody: refused ([movement](../systems/movement.md)) | never (movement is universal) |
 | `energy` | [Energy](../systems/energy.md) | no (defaults) |
 | `launchReaction`, `launchBounce` | [launch](../systems/launch.md) | no (defaults) |
 | `defense` | [defense](../systems/defense.md) | no (none: the Shield button does nothing on the ground) |

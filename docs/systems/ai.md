@@ -54,7 +54,9 @@ The options come from `readMoveset(fighter)`, never from a fighter's id:
   Shield in the air, and nothing in the moveset says there is), a Deflect
   in the air (`deflect`: its attack on the `shield` button, its reach and
   whether it turns projectiles back), a Dash and an air dash (each with
-  its distance and cost);
+  its distance and cost; the Dash also with its `reach`, the distance its
+  burst's run-on adds, and what a Dash cancel costs). The distances come
+  from the universal movement values, the same for every fighter;
 - its hurtboxes' extent.
 
 A reserved button, a button the fighter does not have, or a move it would
@@ -82,6 +84,25 @@ but level with its top and too far out to drift back, it air dashes home
 close in, both only when an air dash could start (one left this airtime,
 not exhausted, not in free fall, not flying from a launch).
 
+It plays the faster game as a player does, through the same rules:
+
+- **Attack drift.** Where an attack carries it before it strikes is
+  computed by stepping the very rules the Fighter runs (`attackStartSpeed`
+  and `steerAttack` from `js/game/fighters/movement.js`) over the attack's
+  startup, so a Dash's burst carried into an attack is a lunge it plans
+  for.
+- **The Dash.** It Dashes in from a little more than a Dash's length out
+  to where a Dash, its run-on and a strike reach; a planned follow-up
+  strikes out of the Dash as soon as one connects, cutting it short past
+  its cancel time, rather than waiting for it to end.
+- **Hit-cancels.** Mid-attack, when its attack hit and may be cut short,
+  it may follow up at once (`chase`), as readily as its level punishes: a
+  strike that connects now (never the same attack again), or on the
+  ground a Dash after an opponent sent out of reach (a level that Dashes,
+  with the Energy a Dash cancel costs).
+- **The triple jump.** Knocked off the stage it jumps back with every air
+  jump it has left (both, after a hit gives them back).
+
 ## Difficulty
 
 `js/data/difficulty.js` holds one profile per level: reaction window
@@ -93,7 +114,8 @@ to Brutal; Brutal's reaction is fast but never zero. The reaction windows
 are the same for every fighter (set against startups from a jab's 1/12 s
 to a technique's half second or more);
 no level changes damage, launch, hitstun, speed, jumps, the Dash, the
-Shield, Energy, cooldowns, hitboxes, scoring or respawns.
+Shield, Energy, cooldowns, hitboxes, scoring or respawns: Easy and Brutal
+control the very same physical fighter.
 
 ## Determinism
 
