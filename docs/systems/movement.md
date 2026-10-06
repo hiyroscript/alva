@@ -16,18 +16,18 @@ explains how the code carries them out.
 | Module | Owns |
 | --- | --- |
 | [`js/game/fighters/movement.js`](../../js/game/fighters/movement.js) | The rules, as pure functions over a movement profile: `steer` (ground and air acceleration, braking, turning, overspeed), `steerAttack` (an attack's step-in and steering), `attackStartSpeed` (the momentum an attack keeps), `hitstunDrag`, `fastFallVelocity`, `airJump`, `highJumpLift`, `readDashTap` (the double tap). Each reads the values it is given on every call and writes only the body or tap record it is handed. |
-| [`js/game/fighters/fighter.js`](../../js/game/fighters/fighter.js) | All movement *state* (the body, the Dash, the jump buffer, coyote time, the higher jump, air jumps left, the waiting tap) and the order things happen in each fixed step (`Fighter.update`). It decides *when* a rule applies (a stun, a bind, a Shield, a technique or a Dash takes the step first) and calls `movement.js` for the arithmetic. |
+| [`js/game/fighters/fighter.js`](../../js/game/fighters/fighter.js) | All movement *state* (the body, the Dash, the jump buffer, coyote time, the higher jump, air jumps left, the waiting tap) and the order things happen in each fixed step (`Fighter.update`). It decides *when* a rule applies (a stun, a paralysis, a Shield, a technique or a Dash takes the step first) and calls `movement.js` for the arithmetic. |
 | [`js/game/physics.js`](../../js/game/physics.js) | Integration and collision (`stepBody`): gravity, the fall cap, landing, solids and one-way platforms. It never knows why a body moves. |
 | [`js/data/powers.js`](../../js/data/powers.js) | Top speed (Speed Power) and jump speed (Jump Power), by tier. |
 
 What happens in one fixed step, in order (`Fighter.update`): the
-controller's input is read; cooldowns recover; a hit or bind ends a
+controller's input is read; cooldowns recover; a hit or paralysis ends a
 technique, a summon's startup, a Dash or an attack; during an impact
 freeze nothing moves (presses are kept); the Dash and a summon's startup
 advance their clocks; combat presses are tried (or buffered); a Dash is
 tried; a technique advances; the Shield goes up or down; then horizontal
 movement is chosen, in priority: a technique's own velocity, standing
-still (a summon's startup, a bind), the hitstun drift, the Dash's speed, a
+still (a summon's startup, a technique's cast, a paralysis), the hitstun drift, the Dash's speed, a
 Shield's coast, an attack's own motion, an attack's steering, or normal
 steering. Then the jump (buffered, with coyote time), the air jump, the
 higher jump's lift, the fast fall and the air Shield's slow fall; then the
@@ -147,21 +147,22 @@ specification:
 | `fastFallAcceleration` / `fastFallSpeed` | 12000 / 1400 | 12000 / 1400 |
 | `airJumps` / `airJumpRatio` | 1 / 0.9 | 1 / 0.9 |
 | `highJumpWindow` / `highJumpHeight` | 0.15 / 1.4 | 0.15 / 1.4 |
-| `dashSpeed` / Dash clip | 900 / 0.2 s (about 180 units) | 1100 / 0.2 s (about 220 units) |
+| `dashSpeed` / Dash clip | 950 / 0.2 s (about 190 units) | 1100 / 0.2 s (about 220 units) |
 
-Equal values are a tuning choice, not a shared requirement: #0002's
-profile was tuned starting from #0001's and changed where #0002 needed to
-differ.
+Equal values are a tuning choice, not a shared requirement: each profile
+is its fighter's own.
 
 ### History: the movement update
 
 The current rules came largely from the [movement
 update](../../UPDATES.md#movement-update) (pull requests #49 and #57),
-whose numbers were first tuned on #0001, the only fighter at the time;
-the [effect update](../../UPDATES.md#effect-update) added the air jump
-and a short hop that was later replaced by the higher jump. Those
-historical values are #0001's and are kept in [`UPDATES.md`](../../UPDATES.md);
-the mechanics themselves have always been the Fighter's, for every fighter.
+whose numbers were first tuned on the first #0001, the only fighter at
+the time (since replaced by the current #0001, which kept that movement
+profile with a faster Dash); the [effect
+update](../../UPDATES.md#effect-update) added the air jump and a short hop
+that was later replaced by the higher jump. Those historical values are
+kept in [`UPDATES.md`](../../UPDATES.md); the mechanics themselves have
+always been the Fighter's, for every fighter.
 
 ## Tests
 
@@ -174,6 +175,7 @@ the mechanics themselves have always been the Fighter's, for every fighter.
   [`facing.test.mjs`](../../tests/systems/facing.test.mjs),
   [`combo.test.mjs`](../../tests/systems/combo.test.mjs),
   [`powers.test.mjs`](../../tests/systems/powers.test.mjs): the same rules,
-  frame-exact, run with #0001's profile (their numbers are #0001's).
+  frame-exact, run with #0001's profile (their numbers are #0001's),
+  including the `hover` motion of its Floating Straight.
 - [`tests/fighters/0002/fighter-0002.test.mjs`](../../tests/fighters/0002/fighter-0002.test.mjs):
   #0002's profile and motion attacks.

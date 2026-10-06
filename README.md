@@ -18,15 +18,19 @@ pursuit and ring-outs.
 Every fighter runs on the same shared systems (movement, combat, the
 Shield, Energy, Launch, the CPU, controls) and brings its own moves, art
 and movement profile as data. Moves are mechanics, not just poses with
-damage: summons, techniques, projectiles, homing dashes, plunges, rolls,
+damage: summons, techniques, projectiles that pull, repel or erase,
+paralysis and unblockable hits, homing dashes, hovers, plunges, rolls,
 lifts and multi-hit strings are all part of the shared engine for any
 fighter to use.
 
 ## What's in it
 
 - **Two playable fighters** on a 48-slot roster:
-  [#0001](docs/characters/0001.md) (the Punch, Kick and Throw, a Clone
-  Attack summon, the Sphere Rush technique, a Shield with a slow fall) and
+  [#0001](docs/characters/0001.md), the limitless sorcerer (Red pushing
+  away and turning projectiles back, Maximum Blue dragging its target in,
+  a paralyzing Unlimited Void no Shield stops, Hollow Purple erasing
+  everything in its path, and Infinity, a Shield that stalls the blows it
+  blocks) and
   [#0002](docs/characters/0002.md), the speedster (a lock-on Homing
   Attack, a plunging Bounce Attack, a rolling Spin Attack, a rising Blue
   Tornado and a travelling Whirlwind).
@@ -147,10 +151,9 @@ max                     the owner's working prompt for the current task (not a s
 **Original work.** Game design, code, interface, ALVA wordmark, and Desert / City
 stage artwork by hiyroscript.
 
-**#0001 sprite source.** Original sprite material from:
-
-- *Jump Ultimate Stars*
-- The Spriters Resource. Source sheet uploaded by Dazz, contributor FRET.
+**#0001 sprite source.** Sprite sheet by Finhj on
+[DeviantArt](https://www.deviantart.com/finhj/art/1084627848). Sheet
+credits: ZetrasBlack, R0B4N.
 
 **#0002 sprite source.** Sprite sheet by thespriteanimations on
 [DeviantArt](https://www.deviantart.com/thespriteanimations/art/Sprite-Sheet-1350194762).

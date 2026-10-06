@@ -46,7 +46,7 @@ The `mouvment` spelling is part of that contract.
 
 A numbered button's entry says what kind of move it is. That keeps the
 loadout rules, the touch controls, the AI and cooldowns generic: none of
-them knows that #0001's `attack3` is a clone.
+them knows that #0001's `attack4` is a technique.
 
 ## Refuse rather than fake
 

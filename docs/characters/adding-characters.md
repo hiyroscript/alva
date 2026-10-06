@@ -167,8 +167,10 @@ big-impact attacks) and its `directionalLaunch` (`null`, `'horizontal'`,
 `'vertical'` or `'reverseVertical'`), each authored separately. Add how
 it moves (`momentum`, `control`, `friction`, `step`) and whether a hit
 opens a follow-up (`hitCancel`). For more than a timed hitbox, use the
-attack mechanics: strikes (`hits`), `carry`, `motion` (`homing`, `bounce`,
-`rise`, `roll`), `airUses`, `freeFall`, `passThrough`, `hurtboxes`
+attack mechanics: strikes (`hits`), `carry`, `motion` (`hover`, `homing`,
+`bounce`, `rise`, `roll`), `pull`, `airUses`, `freeFall`, `passThrough`,
+`hurtboxes`, and on any hit the shared hit effects (`unblockable`,
+`paralyze`, `blockPush`)
 ([combat](../systems/combat.md#attack-mechanics-beyond-a-timed-hitbox)).
 An attack whose art is in but whose attributes are not can be
 `pending: true` for now (art only, no hit).
@@ -176,7 +178,9 @@ An attack whose art is in but whose attributes are not can be
 **A projectile** is an attack with `hitbox: null` and `projectile: { id:
 'extra_attack_object', spawnAt, offset }`, plus an entry in `projectiles`
 and its art in `projectileAnimations`
-([projectiles](../systems/combat.md#projectiles)).
+([projectiles](../systems/combat.md#projectiles)). It may pierce
+(`pierce`, `finisher`), pull (`pull`), turn other fighters' projectiles
+back (`repel`) or erase them and fly through fighters (`erase`).
 
 **A summon** (a clone of the fighter performing one of its own attacks)
 is a `summons.attackN` entry with its `attack`, its `cloud` (an
@@ -185,15 +189,18 @@ optionally `startupAnimation` (`attackN_summon`) and `noGround`
 ([summons](../systems/combat.md#summons)).
 
 **A technique** is a `techniques.attackN` entry. The runtime supports one
-form so far (an object formed in the hand, carried on a grounded rush,
-binding, ticking and exploding); a technique of that form needs all six
-fighter clips, its three object effects and its hits
-([techniques](../systems/combat.md#techniques)). A technique of a
-different shape needs a new form in the runtime first.
+form, the cast: two fighter clips (`castAnimation`, `releaseAnimation`,
+named `attackN_cast` and `attackN_release` by convention), a `cooldown`,
+and what it lets go of as the cast ends, a `projectile` (an entry of
+`projectiles`, `attackN_object`), a `burst` round the fighter (a `hitbox`
+and its `hit`), or both ([techniques](../systems/combat.md#techniques);
+#0001's Unlimited Void and Hollow Purple). A technique of a different
+shape needs a new form in the runtime first.
 
 **Character-specific mechanics** belong in the definition when the
 shared schema can express them (as #0002's homing dash or plunge are
-`motion` data). When it cannot, add the mechanic to the shared system as
+`motion` data, and #0001's Maximum Blue drawing its target in is a
+projectile's `pull`). When it cannot, add the mechanic to the shared system as
 a capability any fighter can opt into, named for what it does, never for
 the fighter or for its button: never a check for `'0027'` in shared code.
 
@@ -202,7 +209,8 @@ the fighter or for its button: never a check for `'0027'` in shared code.
 - **Defense:** `defense: { type: 'shield', groundAnimation:
   'shielding', airAnimation: 'midair_shielding', ... }` for a Shield
   ([defense](../systems/defense.md)); `airAnimation: null` for a ground
-  guard only; leave `defense` out for none.
+  guard only; `stall` to freeze the melee attackers it blocks; leave
+  `defense` out for none.
 - **Touch buttons:** `mobileAbilities.<button>` gives each button its
   `label` and a frame of its own art: `preview: { animation, frame }`
   (frame counted from 0), `previews.air` for a distinct airborne move,
