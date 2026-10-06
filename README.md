@@ -16,13 +16,16 @@ along its **Directional Launch**), so fights build from close combos to
 pursuit and ring-outs.
 
 Every fighter runs on the same shared systems (movement, combat, the
-Shield, Energy, Launch, the CPU, controls) and brings its own moves, art
-and movement profile as data. Moves are mechanics, not just poses with
-damage: summons, techniques, projectiles that pull, repel or erase (and
-a Deflect that turns them back),
-paralysis and unblockable hits, homing dashes, hovers, plunges, rolls,
-lifts and multi-hit strings are all part of the shared engine for any
-fighter to use.
+Shield, Energy, Launch, the CPU, controls) and brings its own moves and
+art as data. **All fighters share universal baseline locomotion.
+Character identity changes the moveset, not run/jump/Dash fundamentals:**
+every fighter runs, jumps, triple-jumps and Dashes exactly alike, and
+speed you build carries on through jumps, attacks and landings. Moves are
+mechanics, not just poses with damage: summons, techniques, projectiles
+that pull, repel or erase (and a Deflect that turns them back), paralysis
+and unblockable hits, homing dashes, hovers, plunges, rolls, lifts and
+multi-hit strings are all part of the shared engine for any fighter to
+use.
 
 ## What's in it
 
@@ -46,15 +49,16 @@ fighter to use.
   numbers and fighter swaps.
 - **Two stages**, Desert and City, plus the training room: open ledges,
   platforms, a Void kill boundary and a platform-fighter camera.
-- **Shared mechanics**: a Dash, a higher jump, air jumps, the fast fall,
-  a held Shield with a perfect Shield, Energy, hit-cancels and an input
-  buffer, launch steering and tumbling, launches that rebound off walls,
-  hit effects, and two Powers (Jump Power and Speed Power) in tiers.
+- **Shared mechanics**: universal, momentum-driven movement (a fast run,
+  a higher jump, the triple jump, the fast fall, a Dash and an air dash
+  that flow straight into attacks and jumps), a held Shield with a perfect
+  Shield, Energy, hit-cancels and an input buffer, launch steering and
+  tumbling, launches that rebound off walls, and hit effects.
 - **Every input**: keyboard, gamepad, and touch in two layouts (a joystick
   or classic buttons) that players can rearrange and resize, with each
   fighter's own art on its touch buttons.
 - **The whole interface in English and French**, Settings, and a
-  **Discover** reference that explains Powers and Launch.
+  **Discover** reference that explains universal movement and Launch.
 
 ## Run it
 
@@ -105,7 +109,8 @@ js/
   main.js, config.js    boot; codenames, bindings, timing and render settings
   core/                 app controller, screens, input, settings, assets, device
   data/                 registries: characters.js and one module per fighter in
-                        characters/, loadout rules, Powers, Launch, difficulty, maps
+                        characters/, universal movement, loadout rules, Launch,
+                        difficulty, maps
   game/                 arena, battle, practice, physics
     fighters/           the Fighter, its movement rules, controllers
     combat/             attacks, defense, combat state, hit resolution,

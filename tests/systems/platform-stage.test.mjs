@@ -11,9 +11,8 @@ import { MAPS, getMap, voidAround, cameraAround } from '../../js/data/maps.js';
 import { PRACTICE_MAP } from '../../js/data/practice-map.js';
 import { StageCollision, createBody, stepBody, separate, resolveSolidOverlap } from '../../js/game/physics.js';
 import { Camera } from '../../js/game/rendering/camera.js';
-import { getJumpVelocity } from '../../js/data/powers.js';
 import { CONFIG } from '../../js/config.js';
-import { def, DT, STAGE, SIM_CTX, fakeSprites, makeFighter, stageMap } from '../helpers/fighter-harness.mjs';
+import { def, DT, MOVEMENT, STAGE, SIM_CTX, fakeSprites, makeFighter, stageMap } from '../helpers/fighter-harness.mjs';
 
 // Stage themes build Path2D art, which Node lacks: a do-nothing stand-in.
 globalThis.Path2D ??= class {
@@ -103,11 +102,12 @@ test('the Void is much closer than before on every stage: at least 30% nearer on
 });
 
 test('ordinary jumps never reach the upper Void, even from each stage\'s highest footing', () => {
-  const g = CONFIG.sim.gravity * def.movement.gravityScale;
-  // Tier 3 is the highest normal jump any fighter can own, and its air jump
-  // (taken at the apex, the highest it can start) adds its own rise.
-  const rise = (1000 ** 2 + (1000 * def.movement.airJumpRatio) ** 2 * def.movement.airJumps) / (2 * g);
-  assert.ok(getJumpVelocity(def) <= 1000);
+  const g = CONFIG.sim.gravity * MOVEMENT.gravityScale;
+  // The universal jump, then both air jumps of the triple jump, each taken
+  // at the apex of the one before (the highest each can start).
+  const v = MOVEMENT.jumpVelocity;
+  const rise = (v ** 2 + (v * MOVEMENT.airJumpRatio) ** 2 * MOVEMENT.airJumps) / (2 * g);
+  assert.equal(MOVEMENT.airJumps, 2, 'the triple jump');
   for (const m of ALL_MAPS) {
     const footing = Math.min(m.mainStage.top, ...m.platforms.map((p) => p.y), ...m.solids.map((s) => s.y));
     // The body's centre at the top of the jump (see StageCollision.inVoid).
@@ -468,6 +468,37 @@ test('the camera leans toward the stage while framing, never past a framed fight
   cam.snap(fighter(far), null);
   assert.ok(cam.x + cam.w > battle.stage.void.right);
   assert.ok(cam.x + cam.w <= battle.map.cameraBounds.right + 1e-6);
+});
+
+test('the camera keeps up with the universal speed: Dashes and their run-on stay inside the view, the lead capped', () => {
+  const { battle } = realBattle('desert');
+  const cam = battle.camera;
+  cam.setView(1560, 880, 1);
+  battle.p2.lostToVoid = true;
+  const p1 = battle.p1;
+  const { left, right } = battle.map.mainStage;
+  p1.body.x = p1.body.prevX = left + 120;
+  battle.snapCamera();
+  // Dash after Dash along the whole stage, holding on between them.
+  let worst = Infinity;
+  for (let i = 0; i < 160 && p1.body.x < right - 140; i++) {
+    const tap = i % 24 === 0 || i % 24 === 2;
+    p1.controller = { getInput: () => ({ runRight: true, runRightPressed: tap }) };
+    p1.update(DT, { stage: battle.stage, gravity: CONFIG.sim.gravity });
+    p1.interpolate(1);
+    cam.follow(p1, null, DT);
+    worst = Math.min(worst, cam.x + cam.w - p1.renderX, p1.renderX - cam.x);
+  }
+  assert.ok(worst > cam.w * 0.12, `always well inside the view (closest ${worst.toFixed(0)} of ${cam.w})`);
+  // The lead counts a Dash's speed only up to its cap: the target moves no
+  // further ahead for a burst than for a fast run.
+  const still = (vx) => {
+    cam.computeTarget({ renderX: 1800, renderY: 860, lastGroundY: 860, body: { vx, y: 860, grounded: true, height: 80 } }, null);
+    return cam.tx;
+  };
+  const lead = still(1250) - still(0);
+  assert.ok(lead > 0 && lead <= 0.12 * 700 + 1e-6, `a capped lead (${lead.toFixed(1)})`);
+  assert.equal(still(1250), still(900));
 });
 
 // ---- Void art -------------------------------------------------------------------------

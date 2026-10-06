@@ -70,10 +70,10 @@ html:not(.is-pointer-input) .discover-panel:focus { box-shadow: var(--focus-ring
   color: var(--text-secondary);
 }
 
-/* One reference entry per Power (or Launch topic), under a hairline:
-   what it does beside its tiers, values or directions, in two columns
-   wherever both fit. Mechanics only: no fighter is ever named or singled out
-   here. */
+/* One reference entry per topic (universal movement, each Launch topic),
+   under a hairline: what it does beside its moves, values or directions,
+   in two columns wherever both fit. Mechanics only: no fighter is ever
+   named or singled out here. */
 .discover-entry {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 190px), 1fr));
@@ -106,9 +106,21 @@ html:not(.is-pointer-input) .discover-panel:focus { box-shadow: var(--focus-ring
   border-radius: 3px;
   background: var(--surface);
 }
-.discover-meter { display: inline-flex; align-items: flex-end; gap: 3px; height: 20px; }
-.discover-meter i { width: 5px; border-radius: 1px; background: var(--border-strong); }
-.discover-meter i.is-on { background: var(--text-secondary); }
+/* A universal movement's marker: a plain bullet, the same for every row
+   (none of them is more or less of anything). */
+.discover-mark {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+}
+.discover-mark::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 1px;
+  background: var(--text-secondary);
+}
 /* A Base Launch value, in the meter's place: the multiplier itself, as a
    small numeric marker. */
 .discover-value {

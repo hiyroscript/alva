@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { HitEffects, HIT_FX, launchIsLethal, whiteFrame } from '../../js/game/rendering/hit-fx.js';
 import { StageCollision } from '../../js/game/physics.js';
 import { CONFIG } from '../../js/config.js';
-import { def, DT, duel, stageMap, fakeSprites } from '../helpers/fighter-harness.mjs';
+import { def, DT, duel, makeFighter, stageMap, fakeSprites } from '../helpers/fighter-harness.mjs';
 
 const P = (k) => ({ [k]: true, [`${k}Pressed`]: true });
 const ARENA = (stage) => ({ stage, gravity: CONFIG.sim.gravity, step: DT });
@@ -135,6 +135,29 @@ test('a fighter tumbling fast leaves a fading trail of its own poses; slower, th
   assert.equal(fx.ghosts(f).length, 0);
 });
 
+test('a Dash or an air dash leaves fainter afterimages while it lasts, then they fade; a run leaves none', () => {
+  const { fighter: f, step } = makeFighter();
+  const fx = new HitEffects();
+  const sample = (held) => {
+    step(held);
+    f.interpolate(1);
+    fx.sampleTrail(f, DT);
+  };
+  for (let i = 0; i < 20; i++) sample({ runRight: true });
+  assert.equal(fx.ghosts(f).length, 0, 'a run, however fast: none');
+  sample({ runRight: true, runRightPressed: true });
+  sample({});
+  sample({ runRight: true, runRightPressed: true });
+  assert.ok(f.dash);
+  while (f.dash) sample({});
+  const ghosts = fx.ghosts(f);
+  assert.ok(ghosts.length >= 2 && ghosts.length <= HIT_FX.trail.count, `${ghosts.length}`);
+  assert.ok(ghosts.every((g) => g.dash && g.alpha > 0 && g.alpha <= HIT_FX.trail.dashAlpha), 'fainter than a launch\'s');
+  assert.ok(HIT_FX.trail.dashAlpha < HIT_FX.trail.alpha);
+  for (let i = 0; i < 30; i++) sample({});
+  assert.equal(fx.ghosts(f).length, 0, 'gone soon after');
+});
+
 test('the white flash is a silhouette of the same frame; with no canvas to draw on, the frame itself', () => {
   const frame = { canvas: { width: 0, height: 0 }, artW: 10, artH: 20, anchorArtX: 5 };
   assert.equal(whiteFrame(frame), frame);
@@ -151,14 +174,21 @@ test('effects never change a step: the same fight, stepped with and without them
   const sprites = fakeSprites();
   const run = (withFx) => {
     let i = 0;
+    let battle = null;
+    // Running at the opponent wherever it is (the same in both runs, unless
+    // the effects changed something), then a Jab, a jump and Red.
     const input = {
       flush() {},
       sample() {
         const k = i++ % 50;
-        return { runRight: k < 20, attack1: k === 22, attack1Pressed: k === 22, attack2: k === 40, attack2Pressed: k === 40, jump: k === 30, jumpPressed: k === 30 };
+        const dx = battle.p2.body.x - battle.p1.body.x;
+        return {
+          runRight: k < 20 && dx > 40, runLeft: k < 20 && dx < -40,
+          attack1: k === 22, attack1Pressed: k === 22, attack2: k === 40, attack2Pressed: k === 40, jump: k === 30, jumpPressed: k === 30,
+        };
       },
     };
-    const battle = new Battle({ canvas: { getContext: () => ({}) }, map: getMap('city'), p1Def: def, p2Def: def, p1Sprites: sprites, p2Sprites: sprites, input });
+    battle = new Battle({ canvas: { getContext: () => ({}) }, map: getMap('desert'), p1Def: def, p2Def: def, p1Sprites: sprites, p2Sprites: sprites, input });
     battle.p2.controller = null;
     battle.p2.combat.launchPoint = 40;
     if (!withFx) battle.fx = { take() {}, takeBounce() {}, reset() {}, timeScale: 1 };

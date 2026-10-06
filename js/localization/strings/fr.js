@@ -1,6 +1,6 @@
 // French: every interface string, by the same stable keys as English
 // (js/localization/strings/en.js), registry-owned game copy included
-// (Powers, Launch, difficulty levels, stages, controls and each fighter's
+// (universal movement, Launch, difficulty levels, stages, controls and each fighter's
 // button names, translated here by key). A key missing here falls back to
 // English; tests/interface/i18n.test.mjs fails if one is.
 
@@ -40,22 +40,19 @@ export const FR = {
   'ability.0002.attack2': 'Coups de pied rapides',
   'ability.0002.attack3': 'Attaque tournoyante',
 
-  'power.jump.name': 'Puissance de saut',
-  'power.jump.summary': 'Détermine la hauteur d’un saut normal. Plus le niveau est élevé, plus le saut est haut.',
-  'power.jump.tier.1.name': 'Puissance de saut 1',
-  'power.jump.tier.1.description': 'Saut très bas.',
-  'power.jump.tier.2.name': 'Puissance de saut 2',
-  'power.jump.tier.2.description': 'Saut normal.',
-  'power.jump.tier.3.name': 'Puissance de saut 3',
-  'power.jump.tier.3.description': 'Saut un peu plus haut.',
-  'power.speed.name': 'Puissance de vitesse',
-  'power.speed.summary': 'Détermine la vitesse de déplacement maximale. Plus le niveau est élevé, plus le déplacement est rapide.',
-  'power.speed.tier.1.name': 'Puissance de vitesse 1',
-  'power.speed.tier.1.description': 'Lent.',
-  'power.speed.tier.2.name': 'Puissance de vitesse 2',
-  'power.speed.tier.2.description': 'Vitesse normale.',
-  'power.speed.tier.3.name': 'Puissance de vitesse 3',
-  'power.speed.tier.3.description': 'Un peu plus rapide.',
+  'movement.summary': 'Le déplacement est le même pour tous : une course, des sauts, un sprint. Ce qui distingue chacun, ce sont ses coups.',
+  'movement.run.name': 'Course',
+  'movement.run.description': 'Pleine vitesse en un instant, demi-tour immédiat. La vitesse acquise se conserve à travers les sauts, les attaques et les atterrissages.',
+  'movement.jump.name': 'Saut',
+  'movement.jump.description': 'Une pression brève donne le saut normal ; maintenue un peu plus longtemps, le saut plus haut.',
+  'movement.airJumps.name': 'Triple saut',
+  'movement.airJumps.description': 'Deux sauts de plus en l’air. Atterrir ou être touché les rend.',
+  'movement.fastFall.name': 'Chute rapide',
+  'movement.fastFall.description': 'Maintenez Bas en tombant pour descendre plus vite.',
+  'movement.dash.name': 'Sprint',
+  'movement.dash.description': 'Touchez deux fois une direction pour un élan de vitesse. Une attaque ou un saut peut l’interrompre après un instant.',
+  'movement.airDash.name': 'Sprint aérien',
+  'movement.airDash.description': 'Le sprint en l’air, à l’horizontale, une fois avant de retoucher le sol.',
 
   'launch.pointSummary':
     'Le Point d’éjection correspond aux dégâts accumulés : il part de 0 et tous les dégâts subis s’y ajoutent. ' +
@@ -266,10 +263,11 @@ export const FR = {
 
   'discover.title': 'Découvrir',
   'discover.sections': 'Sections de Découvrir',
-  'discover.power': 'Puissance',
+  'discover.movement': 'Déplacement',
   'discover.launch': 'Éjection',
   'discover.passives': 'Passifs',
-  'discover.tiers': 'Niveaux – {name}',
+  'discover.movementTitle': 'Déplacement universel',
+  'discover.movementList': 'Déplacement universel',
   'discover.launchPointTitle': 'Point d’éjection',
   'discover.baseLaunchTitle': 'Éjection de base',
   'discover.baseLaunchValue': 'Éjection de base {value}',

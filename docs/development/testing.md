@@ -16,7 +16,7 @@ a real browser.
 
 | Folder | What it covers |
 | --- | --- |
-| [`tests/systems/`](../../tests/systems/) | The shared mechanics, for every fighter: movement and the movement profile, the Dash and the air dash (`air-mouvment`), facing, Down, combos and hit-cancels, Energy, defense, the Deflect (`deflect`), Launch, launch reaction and bounce, loadouts, Powers, codenames, the fighter status, the hit effects on screen (`hit-fx`) and in play (`hit-effects`: unblockable, paralysis, block push, stall), pulls, projectile clashes, the projectiles' spin (`projectile-spin`), the cast form of techniques, stages, the combat AI, ability names, and a fighter that is not #0001. |
+| [`tests/systems/`](../../tests/systems/) | The shared mechanics, for every fighter: movement, universal movement (`universal-movement`: the same values and trajectories for every fighter, the triple jump), momentum (`momentum`), the movement rules (`movement-rules`), the Dash and the air dash (`air-mouvment`), facing, Down, combos and hit-cancels, Energy, defense, the Deflect (`deflect`), Launch, launch reaction and bounce, loadouts, codenames, the fighter status, the hit effects on screen (`hit-fx`) and in play (`hit-effects`: unblockable, paralysis, block push, stall), pulls, projectile clashes, the projectiles' spin (`projectile-spin`), the cast form of techniques, stages, the combat AI, ability names, and a fighter that is not #0001. |
 | [`tests/fighters/0001/`](../../tests/fighters/0001/), [`tests/fighters/0002/`](../../tests/fighters/0002/) | One fighter's own art and moves, with its exact values. #0001's are split by subject: `fighter-0001` (registration, art, data, names), `moves-0001` (every move's mechanic), `combos-0001` (its combo routes) and `cpu-0001` (the CPU playing it and facing it). |
 | [`tests/fighters/fixtures/`](../../tests/fighters/fixtures/) | Test-only fighters (never in the game): `sample-fighter.mjs` (different moves on the same codenames), `loadout-fighters.mjs` (one fighter per loadout shape), `test-fighters.mjs` (fighters the screen tests register for their own run). |
 | [`tests/interface/`](../../tests/interface/) | Screens, the HUD, touch controls and their layouts, Settings, localization, the stylesheet parts, the splash. |
@@ -29,8 +29,8 @@ Keep the two apart:
 
 - **A test of a shared mechanic** should not pass only because one fighter
   happens to have particular values. Drive it from the values it is given
-  (made-up profiles, like
-  [`movement-profile.test.mjs`](../../tests/systems/movement-profile.test.mjs)),
+  (made-up values, like
+  [`movement-rules.test.mjs`](../../tests/systems/movement-rules.test.mjs)),
   from each fighter's own data (loop over `playableCharacters()`, like
   [`roster-matrix.test.mjs`](../../tests/integration/roster-matrix.test.mjs)),
   or from a fixture fighter.

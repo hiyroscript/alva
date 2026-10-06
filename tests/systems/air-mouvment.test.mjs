@@ -1,11 +1,12 @@
 // Run with node --test tests/systems/air-mouvment.test.mjs (no dependencies).
-// The air dash: each fighter's own mid-air mouvment (its movement profile's
-// airDashSpeed and airDashUses, its midair_mouvment clip), a capability
-// apart from its grounded Dash. The same requests (a double tap, a
-// mouvement button) make the Dash on the ground and the air dash in the
-// air. Movement only, a set number per airtime, given back on landing and
-// by a hit. Uses the real Fighter, CombatSystem and combat AI (see
-// tests/helpers/fighter-harness.mjs), against both fighters' own data.
+// The air dash: the universal mid-air mouvment (airDashSpeed,
+// airDashDuration and airDashUses in js/data/movement.js, each fighter's own
+// midair_mouvment clip shown across it), a capability apart from the
+// grounded Dash. The same requests (a double tap, a mouvement button) make
+// the Dash on the ground and the air dash in the air. Movement only, a set
+// number per airtime, given back on landing and by a hit; its speed carries
+// on after it. Uses the real Fighter, CombatSystem and combat AI (see
+// tests/helpers/fighter-harness.mjs), against both fighters.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
@@ -17,7 +18,7 @@ import { CombatAIController } from '../../js/game/ai/combat-ai.js';
 import { readMoveset } from '../../js/game/ai/moveset.js';
 import { StageCollision } from '../../js/game/physics.js';
 import { mulberry32 } from '../../js/core/utils.js';
-import { DT, duel, fakeSpritesOf, makeFighter, stageMap, steps } from '../helpers/fighter-harness.mjs';
+import { DT, MOVEMENT, duel, fakeSpritesOf, makeFighter, stageMap, steps } from '../helpers/fighter-harness.mjs';
 
 const ROOT = new URL('../../', import.meta.url).pathname;
 const DEF_0001 = getCharacter('0001');
@@ -31,15 +32,13 @@ function aloft(f, y = 400, x = f.body.x) {
   Object.assign(f.body, { x, prevX: x, y, prevY: y, vx: 0, vy: 0, grounded: false, ground: null });
 }
 
-// One pass of `def`'s clip `key`, in seconds.
-const pass = (def, key) => def.animations[key].frames.length / def.animations[key].fps;
-
 // ---- Data ------------------------------------------------------------------------------
 
-test('both fighters have an air dash of their own beside their Dash: its own speed, uses and midair_mouvment art', () => {
-  for (const [c, speed] of [[DEF_0001, 950], [DEF_0002, 1100]]) {
-    assert.equal(c.movement.airDashSpeed, speed, `#${c.id}: about its Dash's speed`);
-    assert.equal(c.movement.airDashUses, 1, `#${c.id}: once per airtime`);
+test('both fighters have the universal air dash beside their Dash: the same speed, length and uses, each its own midair_mouvment art', () => {
+  assert.equal(MOVEMENT.airDashSpeed, MOVEMENT.dashSpeed, 'as fast as the Dash');
+  assert.equal(MOVEMENT.airDashUses, 1, 'once per airtime');
+  for (const c of FIGHTERS) {
+    const speed = MOVEMENT.airDashSpeed;
     const clip = c.animations.midair_mouvment;
     assert.ok(clip, `#${c.id}: a midair_mouvment clip`);
     assert.notEqual(clip, c.animations.mouvment, 'not the Dash\'s clip');
@@ -49,7 +48,7 @@ test('both fighters have an air dash of their own beside their Dash: its own spe
       assert.ok(existsSync(ROOT + url.slice(2)), `${url} exists`);
     }
     const { fighter } = makeFighter({ character: c });
-    assert.ok(Math.abs(fighter.airDashDuration - pass(c, 'midair_mouvment')) < 1e-9, 'it lasts one pass of its clip');
+    assert.equal(fighter.airDashDuration, MOVEMENT.airDashDuration, 'the universal length, its clip shown once across it');
     assert.equal(fighter.airDashUses, 1);
     const moves = readMoveset(fighter);
     assert.ok(Math.abs(moves.airDash.distance - speed * fighter.airDashDuration) < 1e-9, 'the CPU knows how far it goes');
@@ -76,7 +75,7 @@ for (const c of FIGHTERS) {
     assert.equal(f.state, 'dash');
     assert.equal(f.animator.anim.key, 'midair_mouvment', 'its own clip');
     assert.equal(f.facing, -1, 'facing the way it dashes at once');
-    assert.equal(f.body.vx, -c.movement.airDashSpeed, 'its own speed');
+    assert.equal(f.body.vx, -MOVEMENT.airDashSpeed, 'the universal speed');
     assert.equal(f.body.vy, 0);
     assert.equal(f.combat.energy, energy - c.energy.dashCost, 'the Dash\'s cost');
     let n = 1;
@@ -87,8 +86,10 @@ for (const c of FIGHTERS) {
       step({ runLeft: true });
       n++;
     }
-    assert.equal(n - 1, steps(pass(c, 'midair_mouvment')), 'one pass of its clip');
-    assert.ok(Math.abs(f.body.vx) <= f.maxSpeed + 1e-9, 'out of it at no more than top speed');
+    assert.equal(n - 1, steps(MOVEMENT.airDashDuration), 'its universal length');
+    assert.ok(Math.abs(f.body.vx) > f.maxSpeed, 'out of it at its own speed, carried on, never cut to top speed');
+    assert.ok(Math.abs(f.body.vx) >= MOVEMENT.airDashSpeed - MOVEMENT.airOverspeedDeceleration * DT - 1e-9, 'one step of its burst bleeding off');
+    assert.equal(f.burst, true, 'a burst of its own');
     step({});
     assert.ok(f.body.vy > 0, 'then it falls as ever');
     assert.ok(['jump', 'fall'].includes(f.state));
@@ -176,7 +177,7 @@ test('one air dash per airtime: a second is refused with nothing spent; landing 
   d.until(() => d.events.length > 0);
   assert.equal(d.events[0].type, 'hit');
   assert.equal(d.target.airDashes, 1, 'given back with the air jump');
-  assert.equal(d.target.airJumps, DEF_0001.movement.airJumps);
+  assert.equal(d.target.airJumps, MOVEMENT.airJumps);
 });
 
 test('the same rules as a Dash: never stunned, paralyzed, mid-attack, mid-dash, exhausted, in free fall or still flying from a launch', () => {
@@ -211,22 +212,28 @@ test('the same rules as a Dash: never stunned, paralyzed, mid-attack, mid-dash, 
   assert.equal(fighter.dash, null);
 });
 
-test('the air dash and the Dash are separate capabilities: either may be had without the other; missing art refuses it, never faked', () => {
-  const noAir = { ...DEF_0001, id: 'test-no-air-dash', movement: { ...DEF_0001.movement, airDashSpeed: 0 } };
-  const ground = makeFighter({ character: noAir });
-  assert.equal(ground.fighter.airDashUses, 0);
-  aloft(ground.fighter, 300);
-  ground.step(RIGHT_REQUEST);
-  assert.equal(ground.fighter.dash, null, 'no air dash without its speed');
-  assert.equal(readMoveset(ground.fighter).airDash, null);
+test('the air dash and the Dash are separate capabilities, each its art\'s: either may be had without the other; missing art refuses it, never faked', () => {
+  const quiet = console.warn;
+  console.warn = () => {};
+  try {
+    const noAir = fakeSpritesOf(DEF_0001, Object.keys(DEF_0001.animations).filter((k) => k !== 'midair_mouvment'));
+    const ground = makeFighter({ sprites: noAir });
+    assert.equal(ground.fighter.airDashDuration, 0);
+    aloft(ground.fighter, 300);
+    ground.step(RIGHT_REQUEST);
+    assert.equal(ground.fighter.dash, null, 'no air dash without its art');
+    assert.equal(readMoveset(ground.fighter).airDash, null);
 
-  const airOnly = { ...DEF_0001, id: 'test-air-only', movement: { ...DEF_0001.movement, dashSpeed: 0 } };
-  const air = makeFighter({ character: airOnly });
-  air.step(RIGHT_REQUEST);
-  assert.equal(air.fighter.dash, null, 'no Dash on the ground');
-  aloft(air.fighter, 300);
-  air.step(RIGHT_REQUEST);
-  assert.equal(air.fighter.dash?.air, true, 'yet its air dash');
+    const airOnly = fakeSpritesOf(DEF_0001, Object.keys(DEF_0001.animations).filter((k) => k !== 'mouvment'));
+    const air = makeFighter({ sprites: airOnly });
+    air.step(RIGHT_REQUEST);
+    assert.equal(air.fighter.dash, null, 'no Dash on the ground');
+    aloft(air.fighter, 300);
+    air.step(RIGHT_REQUEST);
+    assert.equal(air.fighter.dash?.air, true, 'yet its air dash');
+  } finally {
+    console.warn = quiet;
+  }
 
   const warnings = [];
   const warn = console.warn;

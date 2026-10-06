@@ -11,7 +11,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { def, DT, fakeSprites, stageMap } from '../helpers/fighter-harness.mjs';
+import { def, DT, cpuFight, fakeSprites, stageMap } from '../helpers/fighter-harness.mjs';
 import { CONFIG } from '../../js/config.js';
 import { Fighter, separateFighters } from '../../js/game/fighters/fighter.js';
 import { CombatSystem } from '../../js/game/combat/combat.js';
@@ -22,6 +22,7 @@ import { CombatAIController } from '../../js/game/ai/combat-ai.js';
 import { readMoveset } from '../../js/game/ai/moveset.js';
 import { TrainingAIController } from '../../js/game/fighters/fighter-controller.js';
 import { DIFFICULTY_IDS, getDifficultyProfile } from '../../js/data/difficulty.js';
+import { getCharacter } from '../../js/data/characters.js';
 import { mulberry32 } from '../../js/core/utils.js';
 import { blankInput } from '../../js/game/fighters/fighter-controller.js';
 
@@ -557,4 +558,31 @@ test('an aerial attack presses without adding a direction just to turn its sprit
   assert.equal(held.runLeft, undefined);
   assert.equal(held.runRight, undefined);
   assert.equal(intent.struck, true);
+});
+
+test('the CPU uses the new cancels as a player would: strikes out of its Dashes and follows up out of hit-cancels, never on Easy', () => {
+  // A strike started on a step the fighter was still dashing (cut short
+  // past its cancel time), and a new attack straight out of another one
+  // (cut short once it hit).
+  const count = (difficulty) => {
+    let dashStrikes = 0;
+    let followUps = 0;
+    for (const seed of [3, 7, 11]) {
+      const { log } = cpuFight(getCharacter('0001'), getCharacter('0002'), { seconds: 20, seed, difficulty });
+      for (const steps of log.values()) {
+        for (let i = 1; i < steps.length; i++) {
+          const [was, now] = [steps[i - 1], steps[i]];
+          if (was.state === 'dash' && now.state === 'attack') dashStrikes++;
+          if (was.attack && now.attack && now.attack !== was.attack) followUps++;
+        }
+      }
+    }
+    return { dashStrikes, followUps };
+  };
+  const brutal = count('brutal');
+  assert.ok(brutal.dashStrikes > 0, `Brutal strikes out of a Dash (${brutal.dashStrikes})`);
+  assert.ok(brutal.followUps > 0, `Brutal follows up out of a hit-cancel (${brutal.followUps})`);
+  const easy = count('easy');
+  assert.equal(easy.dashStrikes, 0, 'Easy never Dashes at all');
+  assert.ok(easy.followUps < brutal.followUps, `Easy follows up less (${easy.followUps})`);
 });

@@ -125,11 +125,12 @@ test('in play, the target\'s held direction steers the launch; with nothing held
   assert.equal(d.events[0].finalLaunch.y, 0);
 });
 
-test('a hit gives back the air jump, so a launched fighter can steer and jump its way home', () => {
+test('a hit gives back both air jumps, so a launched fighter can steer and jump its way home', () => {
   const { fighter } = makeFighter();
   fighter.airJumps = 0;
   const system = new CombatSystem();
   const attacker = makeFighter({ x: 460 }).fighter;
   system.applyHit(attacker, fighter, { ...fighter.attacks.extra_attack, id: 'extra_attack' });
-  assert.equal(fighter.airJumps, def.movement.airJumps);
+  assert.equal(fighter.airJumps, fighter.movement.airJumps);
+  assert.equal(fighter.airJumps, 2);
 });

@@ -23,8 +23,8 @@ contract; it applies to every fighter.
 - **`mouvment`** (the Dash's clip and its art, and `midair_mouvment`) is
   spelled that way on purpose and is part of the contract; the touch
   controls' `mouvementLeft` / `mouvementRight` keep their own spelling.
-  The fighter's `movement` profile is a different thing with an ordinary
-  name.
+  Universal movement (`js/data/movement.js`, `fighter.movement`) is a
+  different thing with an ordinary name.
 - **Player-facing names** (Jab, Hollow Purple, Whirlwind) live in a
   fighter's `abilityNames` and `mobileAbilities` only.
 - Retired names (listed in

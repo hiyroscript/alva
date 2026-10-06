@@ -59,7 +59,8 @@ const MOVESETS = new WeakMap();
 // technique, where it lands (`box`) and with what (`hit`); whether it has a
 // Shield on the ground (`groundShield`: there is none in the air), a
 // Deflect in the air (`deflect`, on the `shield` button: its attack and
-// reach, and whether it turns projectiles back), a Dash and an air dash.
+// reach, and whether it turns projectiles back), a Dash and an air dash
+// (the universal ones, if it has their art: how far each goes).
 // An action mapped to null (a reserved button, like #0001's transform) is
 // left out, as is anything the fighter would refuse for missing art, so the
 // AI never presses a button that cannot do anything.
@@ -117,8 +118,12 @@ export function readMoveset(f) {
       });
     }
   }
-  const dashDistance = (def.movement?.dashSpeed ?? 0) * f.dashDuration;
-  const airDashDistance = (def.movement?.airDashSpeed ?? 0) * f.airDashDuration;
+  const mv = f.movement;
+  const dashDistance = mv.dashSpeed * f.dashDuration;
+  const airDashDistance = mv.airDashSpeed * f.airDashDuration;
+  // How far a Dash's burst runs on once it is over with nothing held: down
+  // to top speed at the overspeed brake, then to a stop.
+  const runOn = (mv.dashSpeed ** 2 - mv.maxSpeed ** 2) / (2 * mv.overspeedDeceleration) + mv.maxSpeed ** 2 / (2 * mv.deceleration);
   const guard = f.defense?.type === 'shield' ? f.defense.groundAnimation : null;
   const deflect = f.deflect && sprites.has(f.deflect.animation) ? f.deflect : null;
   const moveset = {
@@ -130,7 +135,10 @@ export function readMoveset(f) {
       action: 'shield', air: true, id: deflect.id, atk: deflect, reach: attackReach(deflect),
       motion: deflect.motion?.type ?? null, deflect: true, catches: deflect.deflectProjectiles,
     } : null,
-    dash: dashDistance > 0 && sprites.has('mouvment') ? { distance: dashDistance, cost: f.energyDef.dashCost } : null,
+    // A Dash: how far it goes, and how far with its run-on (`reach`).
+    dash: dashDistance > 0 && sprites.has('mouvment')
+      ? { distance: dashDistance, reach: dashDistance + runOn, cost: f.energyDef.dashCost, cancelCost: f.energyDef.dashCancelCost }
+      : null,
     airDash: airDashDistance > 0 && sprites.has('midair_mouvment')
       ? { distance: airDashDistance, duration: f.airDashDuration, cost: f.energyDef.dashCost, uses: f.airDashUses }
       : null,

@@ -121,7 +121,8 @@ test('its moves are not just damage: each one names the mechanic it is built on'
   assert.ok(defense.stall > 0, 'Infinity stalls blows');
   assert.equal(defense.airAnimation, undefined, 'and is the ground\'s only');
   assert.equal(DEF.deflect.deflectProjectiles, true, 'its Deflect turns projectiles back');
-  assert.ok(DEF.movement.airDashSpeed > 0 && DEF.animations.midair_mouvment, 'it dashes in the air too');
+  assert.ok(DEF.animations.midair_mouvment, 'it dashes in the air too (the universal air dash, with its own art)');
+  assert.equal(DEF.movement, undefined, 'and runs, jumps and Dashes as everyone does');
   for (const id of ['attack2_object', 'attack3_object', 'attack5_object']) assert.ok(p[id].rotationSpeed >= 2000, `${id} spins fast`);
 });
 

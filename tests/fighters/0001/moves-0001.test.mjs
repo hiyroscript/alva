@@ -10,7 +10,7 @@
 // tests/helpers/fighter-harness.mjs).
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { duel, fakeSpritesOf, makeFighter, steps } from '../../helpers/fighter-harness.mjs';
+import { DT, MOVEMENT, duel, fakeSpritesOf, makeFighter, steps } from '../../helpers/fighter-harness.mjs';
 import { getCharacter } from '../../../js/data/characters.js';
 import { LAUNCH_UNIT_SPEED as U } from '../../../js/data/launch.js';
 
@@ -79,7 +79,9 @@ test('a running Jab slides on with the run, never steered', () => {
   for (let i = 0; i < 40; i++) step({ runRight: true });
   const speed = fighter.body.vx;
   step({ runRight: true, ...P('attack1') });
-  assert.ok(Math.abs(fighter.body.vx - speed * A.attack1.momentum) < speed * 0.1, 'the run carried in');
+  assert.equal(A.attack1.momentum, 1, 'all of it');
+  const kept = speed * A.attack1.momentum - MOVEMENT.deceleration * A.attack1.friction * DT;
+  assert.ok(Math.abs(fighter.body.vx - kept) < 1e-9, `the run carried in (${fighter.body.vx})`);
   step({ runLeft: true });
   assert.ok(fighter.body.vx > 0, 'held back the other way: no steering');
 });
@@ -285,22 +287,23 @@ test('Blue yanks an opponent in to its palm and strikes it upward, standing on t
 
 // ---- Unlimited Void -------------------------------------------------------------------------
 
-test('Unlimited Void: 0.6 s of cast, then a sure hit round #0001 that no Shield stops, paralyzing for 1.8 s', () => {
+test('Unlimited Void: half a second of cast, then a sure hit round #0001 that no Shield stops, paralyzing for 1.7 s', () => {
   const d = versus({ gap: 200 });
   raise(d);
   d.tick(P('attack4'), HOLD);
   const t = d.attacker.technique;
   assert.equal(t?.action, 'attack4');
-  assert.equal(t.castDuration, 0.6);
+  assert.equal(t.castDuration, 0.5);
   tickUntil(d, () => d.events.length > 0, {}, HOLD, 60);
   const [e] = d.events;
   assert.equal(e.type, 'hit', 'through the Shield');
   assert.equal(e.technique, t);
   assert.equal(e.damage, 3);
   assert.equal(e.energyCost, 0);
-  assert.equal(e.paralysis, 1.8);
+  assert.equal(e.paralysis, 1.7);
   assert.equal(d.target.combat.immobilized, true);
-  // #0001 is free 0.4 s later; its opponent is held a good while longer.
+  // #0001 is free a third of a second later; its opponent is held a good
+  // while longer.
   tickUntil(d, () => !d.attacker.technique, {}, {}, 60);
   assert.ok(d.target.combat.paralysis > 1.2, `still held (${d.target.combat.paralysis.toFixed(2)} s)`);
   assert.ok(d.attacker.combat.abilityCooldowns.remaining('attack4') > 12, 'a long cooldown');
@@ -343,17 +346,17 @@ test('a paralyzed opponent can be hit freely; the first hit that launches it set
 
 // ---- Hollow Purple ----------------------------------------------------------------------------
 
-test('Hollow Purple: a 1 s chant, then the sphere through any Shield for 12 and Base Launch 3, flying on through', () => {
+test('Hollow Purple: a five-sixths of a second chant, then the sphere through any Shield for 12 and Base Launch 3, flying on through', () => {
   const d = versus({ gap: 400 });
   raise(d);
   d.target.combat.launchPoint = 20;
   d.tick(P('attack5'), HOLD);
   const t = d.attacker.technique;
   assert.equal(t?.action, 'attack5');
-  assert.equal(t.castDuration, 1);
+  assert.ok(Math.abs(t.castDuration - 5 / 6) < 1e-9);
   let castSteps = 1;
   while (d.attacker.technique?.phase === 'cast') { d.tick({}, HOLD); castSteps++; }
-  assert.equal(castSteps, steps(1) + 1);
+  assert.equal(castSteps, steps(5 / 6) + 1);
   tickUntil(d, () => d.events.length > 0, {}, HOLD, 60);
   const [e] = d.events;
   assert.equal(e.type, 'hit', 'no Shield stops it');

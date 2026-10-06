@@ -7,7 +7,7 @@ a module's exports reaches exactly those. The folders' roles:
 | Folder | Role | May import |
 | --- | --- | --- |
 | `js/core/` | Application shell: the app controller, screens, input devices, settings, assets, device and utilities. | config, data, localization, game, screens, ui (only `app.js` wires everything together) |
-| `js/data/` | Registries and pure data: fighters, loadout rules, Powers, Launch, difficulty, maps, ability names. No DOM, no simulation state. | config, other data (and `loadout.js` reads the technique clip-field names from `game/combat/technique.js`) |
+| `js/data/` | Registries and pure data: fighters, universal movement, loadout rules, Launch, difficulty, maps, ability names. No DOM, no simulation state. | config, other data (and `loadout.js` reads the technique clip-field names from `game/combat/technique.js`) |
 | `js/game/` | The simulation (fighters, combat, AI, physics, modes) and its canvas rendering. No DOM except the canvas it is given. | config, core/utils, data, stages, localization (the arena's canvas label only) |
 | `js/stages/` | Stage themes: procedural Canvas art, perspective, the Void's look. | core |
 | `js/localization/` | The interface languages. | config, core/settings, data (for registry-owned English copy) |
@@ -47,7 +47,7 @@ There are no import cycles (checked over every module).
 | `characters/0001.js`, `characters/0002.js` | One fighter's whole definition each (`CHARACTER_0001`, `CHARACTER_0002`) and its own constants. | `characters.js` |
 | `characters/helpers.js` | `framePath`, `frames`: the asset-path convention. | `characters.js` and each definition |
 | `loadout.js` | The attack loadout rules and `actions` readers. | `characters.js`, `game/fighters/fighter.js`, `game/ai/moveset.js`, `game/rendering/fighter-status.js`, `ui/mobile-abilities.js` |
-| `powers.js` | The Power tier tables and resolvers. | `game/fighters/fighter.js`, `localization/strings/en.js`, `screens/discover-screen.js` |
+| `movement.js` | The universal movement values every fighter runs on (`BASE_FIGHTER_MOVEMENT`), the check that refuses a definition's own, and the Discover copy for them. | `data/characters.js`, `game/fighters/fighter.js`, `game/rendering/hit-fx.js`, `localization/strings/en.js`, `screens/discover-screen.js` |
 | `launch.js` | Launch Point, Base Launch, Directional Launch: registry, formula and validation. | `game/combat/attacks.js`, `combat.js`, `projectile.js`, `technique.js`, `localization/strings/en.js`, `screens/discover-screen.js` |
 | `difficulty.js` | The four CPU levels and their profiles. | `core/app.js`, `game/battle.js`, `game/ai/combat-ai.js`, `localization/strings/en.js`, `screens/difficulty-select-screen.js` |
 | `abilities.js` | `abilityName`: a fighter's name for a move, or its neutral name. | `localization/strings/en.js`, `ui/mobile-abilities.js` |
@@ -62,7 +62,7 @@ There are no import cycles (checked over every module).
 | `practice.js` | `PracticeSession`: Player 1 and the optional training dummy, damage numbers. | `screens/practice-screen.js` |
 | `physics.js` | Bodies, integration, stage collision (`StageCollision`, `stepBody`, `separate`, `dropThrough`). | `arena.js`, `fighters/fighter.js`, `rendering/hit-fx.js` |
 | `fighters/fighter.js` | `Fighter`: the per-fighter state machine and step order; `separateFighters`; `COMBAT_ACTIONS`. | `arena.js`, `battle.js`, `practice.js`, `ai/moveset.js` |
-| `fighters/movement.js` | The shared movement rules over a movement profile. | `fighters/fighter.js` |
+| `fighters/movement.js` | The shared movement rules over the movement values. | `fighters/fighter.js`, `ai/combat-ai.js` |
 | `fighters/fighter-controller.js` | `PlayerController`, `TrainingAIController`, `blankInput`, `jumpTapHold`, `HELD_CONTROLS`. | `fighters/fighter.js`, `ai/combat-ai.js`, `battle.js`, `practice.js`, `core/input-manager.js` |
 | `combat/attacks.js` | The attack schema and phases, motions, pulls' validation (`resolvePull`), the `deflectProjectiles` capability's validation. | `combat/combat.js`, `combat/combat-state.js`, `combat/summon.js`, `combat/projectile.js`, `combat/deflect.js`, `fighters/fighter.js`, `ai/combat-ai.js`, `ai/moveset.js` |
 | `combat/hit-effects.js` | The shared hit effects (`unblockable`, `paralyze`, `blockPush`) and their validation. | `combat/attacks.js`, `combat/projectile.js`, `combat/technique.js` |

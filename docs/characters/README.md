@@ -2,8 +2,8 @@
 
 The roster's fighters, each specified on its own. Everything a fighter
 does runs on the shared systems ([`docs/systems/`](../systems/)); a
-fighter's page covers only what is its own: its art, body, movement
-profile and Powers, its moves with their exact values, its defense,
+fighter's page covers only what is its own: its art, body, its moves with
+their exact values (movement is universal, never a fighter's own), its defense,
 Energy and launch reaction, its touch buttons, and how it plays. These
 pages are part of the product specification
 ([`ALVA_SPEC.md`](../../ALVA_SPEC.md) §7.2.9).

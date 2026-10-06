@@ -16,7 +16,7 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { inflateSync } from 'node:zlib';
 import {
-  DT, STAGE, cpuFight, duel, fakeSpritesOf, frameName, makeFighter, stageMap, stepUntil, steps,
+  DT, MOVEMENT, STAGE, cpuFight, duel, fakeSpritesOf, frameName, makeFighter, stageMap, stepUntil, steps,
 } from '../../helpers/fighter-harness.mjs';
 import { CONFIG, NUMBERED_ATTACKS } from '../../../js/config.js';
 import { CHARACTERS, characterFramePaths, getCharacter, playableCharacters } from '../../../js/data/characters.js';
@@ -377,10 +377,10 @@ test('the One-Two strikes twice in one press: the jab on frame 2 holds, the stra
   assert.equal(straight.finalLaunch.x, 30, 'Base Launch 1 x the 3 Launch Point, sideways');
   assert.ok(straight.launchPointBefore === 1, 'the jab\'s Launch Point is there first');
   const def = createAttackDefinition({ id: 'attack1', ...DEF.attacks.attack1 });
-  assert.deepEqual(def.hits.map((h) => h.at * 15), [1, 3], 'frames 2 and 4');
+  assert.deepEqual(def.hits.map((h) => h.at * 20), [1, 3], 'frames 2 and 4');
   assert.equal(def.damage, 3, 'the whole attack: its strikes\' sum');
-  assert.equal(def.startup, 1 / 15);
-  assert.ok(Math.abs(def.total - 5 / 15) < 1e-9);
+  assert.equal(def.startup, 1 / 20);
+  assert.ok(Math.abs(def.total - 5 / 20) < 1e-9, 'a quarter of a second in all');
 });
 
 // ---- attack2: the Rapid Kicks ------------------------------------------------------------
@@ -398,7 +398,7 @@ test('the Rapid Kicks: a 0.2 s wind-up, three kicks that hold the target, then t
   const def = createAttackDefinition({ id: 'attack2', ...DEF.attacks.attack2 });
   for (let i = 0; i < 3; i++) assert.ok(def.hits[i].hitstun > def.hits[i + 1].at - def.hits[i].at + def.hits[i].hitstop);
   assert.equal(def.startup, 4 / 20);
-  assert.equal(def.hitCancel, null, 'no hit-cancel: a committed flurry');
+  assert.ok(def.hitCancel >= def.hits[3].at + def.hits[3].active - 1e-9, 'committed to the whole flurry: a chase only once the finisher is out');
   assert.ok(def.cooldown > def.hits[3].hitstun, 'free again well before another flurry');
 });
 
@@ -421,7 +421,7 @@ test('the Homing Attack hangs for the lock-on, then dashes at its opponent, re-a
   d.tick(P('attack1'));
   assert.equal(me.combat.attack.def.id, 'midair_attack1');
   // The hang: no gravity, no rise.
-  for (let i = 0; i < 7; i++) {
+  for (let i = 0; i < 6; i++) {
     d.tick();
     assert.equal(me.body.vy, 0, 'hanging');
   }
@@ -430,7 +430,7 @@ test('the Homing Attack hangs for the lock-on, then dashes at its opponent, re-a
   const m = me.combat.attack.motion;
   assert.equal(m.target, d.target, 'locked on');
   const speed = Math.hypot(me.body.vx, me.body.vy);
-  assert.ok(Math.abs(speed - 1000) < 1e-6, 'at its dash speed');
+  assert.ok(Math.abs(speed - 1100) < 1e-6, 'at its dash speed');
   assert.ok(me.body.vx > 0 && me.body.vy > 0, 'down and ahead, at the grounded target');
   d.until(() => d.events.length > 0);
   const [hit] = d.events;
@@ -438,10 +438,10 @@ test('the Homing Attack hangs for the lock-on, then dashes at its opponent, re-a
   // It springs off: up, and back.
   assert.equal(me.body.vy, -760);
   assert.equal(me.body.vx, -140);
-  assert.equal(me.airJumps, DEF.movement.airJumps, 'its air jump given back');
+  assert.equal(me.airJumps, MOVEMENT.airJumps, 'both its air jumps given back');
 });
 
-test('with nobody in range it dashes straight ahead, and keeps a fifth of its speed as the dash ends', () => {
+test('with nobody in range it dashes straight ahead, and keeps a quarter of its speed as the dash ends', () => {
   const { fighter, step } = solo();
   const far = makeFighter({ x: 1800, facing: -1 });
   fighter.opponent = far.fighter;
@@ -450,11 +450,11 @@ test('with nobody in range it dashes straight ahead, and keeps a fifth of its sp
   stepUntil(step, (f) => f.combat.phase === 'active', {});
   step({});
   assert.equal(fighter.combat.attack.motion.target, null);
-  assert.equal(fighter.body.vx, 1000);
+  assert.equal(fighter.body.vx, 1100);
   assert.equal(fighter.body.vy, 0);
   stepUntil(step, (f) => f.combat.phase === 'recovery', {});
-  // A fifth of its speed, less one step of the air's drag.
-  assert.ok(Math.abs(fighter.body.vx - (200 - DEF.movement.airDeceleration * DT)) < 1e-6, 'a fifth of its speed');
+  // A quarter of its speed, less one step of the air's drag.
+  assert.ok(Math.abs(fighter.body.vx - (275 - MOVEMENT.airDeceleration * DT)) < 1e-6, 'a quarter of its speed');
 });
 
 test('an opponent behind it is never locked on to', () => {
@@ -475,6 +475,8 @@ test('once per airtime: a second press before landing does nothing; landing give
   step(P('attack1'));
   assert.equal(fighter.combat.attack, null, 'used up until it lands');
   stepUntil(step, (f) => f.grounded, {});
+  // (A press that close to the ground may come out as the One-Two on it.)
+  stepUntil(step, (f) => f.canAct(), {});
   airborne(step, 4);
   step(P('attack1'));
   assert.equal(fighter.combat.attack?.def.id, 'midair_attack1');
@@ -488,7 +490,7 @@ test('the Bounce Attack plunges at a fixed speed and bounces back up off the gro
   step(P('attack2'));
   stepUntil(step, (f) => f.combat.phase === 'active', {});
   step({});
-  assert.equal(fighter.body.vy, 1300);
+  assert.equal(fighter.body.vy, 1400);
   stepUntil(step, (f) => f.body.vy < 0, {});
   assert.equal(fighter.body.vy, -900, 'rebounding');
   assert.equal(fighter.grounded, false, 'no landing');
@@ -530,10 +532,10 @@ test('the Spin Attack curls up, then rolls at its own speed plus 0.8 of the run 
   assert.ok(Math.abs(still.fighter.body.vx - 400) < 1, 'its own speed from a standstill');
   const run = solo();
   for (let i = 0; i < 30; i++) run.step({ runRight: true, runRightPressed: i === 0 });
-  assert.equal(run.fighter.body.vx, 360, 'running at Speed Power 3');
+  assert.equal(run.fighter.body.vx, MOVEMENT.maxSpeed, 'running at the universal top speed');
   run.step(P('attack3'));
   stepUntil(run.step, (f) => f.combat.phase === 'active', {});
-  assert.ok(Math.abs(run.fighter.body.vx - (400 + 0.8 * 360)) < 1, 'plus 0.8 of the run');
+  assert.ok(Math.abs(run.fighter.body.vx - (400 + 0.8 * MOVEMENT.maxSpeed)) < 1, 'plus 0.8 of the run');
   stepUntil(run.step, (f) => !f.combat.attack, {});
   assert.deepEqual(run.fighter.hurtboxes, DEF.hurtboxes, 'its own hurtboxes back');
 });
@@ -586,9 +588,9 @@ test('after the Blue Tornado it is in free fall: no attack and no air jump until
   step(P('attack3'));
   stepUntil(step, (f) => !f.combat.attack, {});
   assert.equal(fighter.freeFall, true);
-  assert.equal(fighter.airJumps, 1, 'its air jump is still counted...');
+  assert.equal(fighter.airJumps, MOVEMENT.airJumps, 'its air jumps are still counted...');
   step(P('jump'));
-  assert.ok(fighter.body.vy > -fighter.jumpVelocity * 0.9 + 1, '...but no air jump comes out');
+  assert.ok(fighter.body.vy > -fighter.jumpVelocity * MOVEMENT.airJumpRatio + 1, '...but no air jump comes out');
   for (const button of ['attack1', 'attack2', 'attack3']) {
     step(P(button));
     assert.equal(fighter.combat.attack, null, `${button}: nothing`);
@@ -809,13 +811,17 @@ test('its touch controls show three numbered buttons, in slots 1 to 3, the Whirl
   assert.equal(shown('extra_attack'), true);
 });
 
-test('a timing sanity check: the Dash lasts one pass of its four frames', () => {
+test('a timing sanity check: the Dash is the universal one, its four frames played once across it', () => {
   const { fighter, step } = solo();
   step({ runRight: true, runRightPressed: true });
   step({});
   step({ runRight: true, runRightPressed: true });
   assert.ok(fighter.dash);
-  assert.equal(fighter.dash.duration, 4 / 20);
-  assert.equal(fighter.body.vx, 1100);
-  assert.equal(steps(fighter.dash.duration), 12);
+  assert.equal(fighter.dash.duration, MOVEMENT.dashDuration);
+  assert.ok(Math.abs(4 / DEF.animations.mouvment.fps - fighter.dash.duration) < 1e-9, 'its clip\'s own pass matches');
+  assert.equal(fighter.body.vx, MOVEMENT.dashSpeed);
+  assert.equal(steps(fighter.dash.duration), 10);
+  const frames = new Set();
+  while (fighter.dash) frames.add(step({}).animator.index);
+  assert.ok(frames.size >= 3, `the four frames shown across it (${[...frames]})`);
 });

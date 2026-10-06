@@ -79,7 +79,7 @@ Content is data, behaviour is shared code:
 | --- | --- |
 | Fighters: `js/data/characters.js` and one module per fighter in `js/data/characters/` | the Fighter, combat, the AI, the touch controls, the roster, localization |
 | Loadout rules: `js/data/loadout.js` | the registry (validation), the Fighter, the AI, the touch controls |
-| Powers, Launch: `js/data/powers.js`, `js/data/launch.js` | the Fighter, combat, Discover, localization |
+| Universal movement, Launch: `js/data/movement.js`, `js/data/launch.js` | the Fighter, combat, Discover, localization |
 | CPU levels: `js/data/difficulty.js` | the Battle and the combat AI |
 | Stages: `js/data/maps.js`, `js/data/practice-map.js` | physics (collision), the stage themes, Select Stage |
 | Codenames, bindings, timing: `js/config.js` | input, combat, the HUD, everything |
