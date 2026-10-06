@@ -1,1171 +1,637 @@
-You are modifying the Alva game repository.
+Implement a new Combat Assist accessibility/ease-of-combat mechanic in the Alva repository.
 
-Implement a complete game-feel overhaul focused on one primary goal:
+Before editing anything, inspect and follow the repository’s existing architecture and rules, especially:
 
-Alva should feel extremely fast, responsive, fluid and momentum-driven at all times. Combat and movement should flow into each other almost seamlessly.
-
-This is not a request to simply increase a few speed numbers.
-
-Inspect how Alva currently handles movement state, attack state, animation timing, Dash/air dash duration, attack momentum, hitstop, input buffering, hit-cancels, landing, air jumps, AI prediction and character configuration, then redesign/tune these systems together so the entire game feels substantially faster and smoother.
-
-The final result should feel like a high-mobility platform fighter where the player is encouraged to stay in motion and where transitioning between running, jumping, attacking, dashing, air dashing, landing and attacking again almost never produces an arbitrary loss of momentum.
-
-⸻
-
-0. READ THE REPOSITORY FIRST
-
-Before editing anything, inspect the current implementation and repository conventions, particularly:
-
-* README.md
+* CLAUDE.md
 * ALVA_SPEC.md
-* UPDATES.md
-* character_rule
 * codename_rule
-* max
-* docs/architecture/character-system.md
-* docs/systems/movement.md
-* docs/systems/combat.md
-* docs/systems/rendering.md
-* docs/systems/launch.md
-* docs/systems/energy.md
-* docs/characters/0001.md
-* docs/characters/0002.md
-* js/data/powers.js
-* js/data/characters.js
-* js/data/characters/0001.js
-* js/data/characters/0002.js
+* character_rule — never edit, move, rename, or reformat this file
+* js/core/settings.js
+* js/ui/settings-dialog.js
+* css/settings.css
 * js/game/fighters/fighter.js
-* js/game/fighters/movement.js
+* js/game/fighters/fighter-controller.js
 * js/game/combat/attacks.js
-* js/game/combat/combat.js
 * js/game/combat/combat-state.js
+* js/game/battle.js
+* js/game/practice.js
 * js/game/ai/moveset.js
 * js/game/ai/combat-ai.js
-* js/game/rendering/sprite-animator.js
-* js/game/rendering/sprite-normalizer.js
-* the relevant tests under tests/systems/, tests/fighters/0001/, tests/fighters/0002/, and tests/integration/
+* js/data/movement.js
+* js/screens/battle-screen.js
+* js/screens/practice-screen.js
+* js/localization/strings/en.js
+* js/localization/strings/fr.js
+* the relevant tests under tests/
 
-Run the existing test suite before changes so the current state is understood.
+Do not special-case fighter IDs. This must be a universal shared system that works from character data for every current and future fighter.
 
-Alva is deterministic and fixed-step. Preserve that.
+Preserve the repository’s intentional spelling of mouvment for the Dash animation/codename.
 
-Rendering must never modify simulation state.
+Goal
 
-Do not solve this by applying a global JavaScript time scale or making the whole simulation clock run faster. Make the actual movement/combat mechanics better.
+Add a new Combat section to Home → Settings.
 
-⸻
+Inside it add a setting named:
 
-1. CRITICAL RULE — CHARACTER IDENTITY MUST NOT CHANGE BASELINE MOBILITY
+Combat Assist
 
-This is an absolute design rule.
+Combat Assist is ON by default.
 
-Every playable character must have exactly the same baseline movement capabilities.
+When enabled, a human player who presses a valid melee attack while close enough to their opponent, but just outside that attack’s normal melee reach, automatically closes the remaining distance using the fighter’s existing mouvment animation, then performs the requested melee attack.
 
-Character lore, appearance, archetype, name or identity must never secretly alter normal movement statistics.
+The intent is to make close-range fighting more forgiving without changing the attacks themselves or giving the CPU the same assistance.
 
-For example:
+Combat Assist must never teleport the fighter, extend a hitbox, modify attack damage, modify attack startup/active/recovery timing, or alter the actual melee attack definition. It is a short automatic movement phase that happens before the real attack begins.
 
-#0002 may be described as a “speedster,” but that does NOT mean #0002 runs faster, accelerates faster, jumps higher, Dashes faster or gets superior air mobility.
+Player-only rule
 
-The word “speedster” can describe the character’s fantasy, animations and unique attacks such as Homing Attack, Spin Attack, Bounce Attack, etc.
+Combat Assist is strictly for the human player.
 
-It must not grant superior universal locomotion.
+It must never be available to:
 
-Likewise, no future character should become slower because they look heavy or stronger because they look muscular.
+* CombatAIController
+* Watch Mode CPU 1
+* Watch Mode CPU 2
+* Practice Ground’s CPU/dummy
+* any future controller whose kind is not player
 
-Universal baseline
+Do not add Combat Assist logic to combat-ai.js.
 
-All playable characters must share the same values/rules for normal:
+The clean integration should preserve the existing controller separation. Pass the saved setting into the human PlayerController/player session and let shared Fighter logic recognize that the current controller is the human player with Combat Assist enabled.
 
-* maximum run speed;
-* ground acceleration;
-* ground deceleration;
-* turn acceleration / turn boost;
-* overspeed handling;
-* air acceleration;
-* air deceleration;
-* air turning;
-* normal jump velocity / jump height;
-* higher-jump behavior;
-* air-jump count;
-* air-jump strength;
-* gravity scale;
-* maximum normal fall speed;
-* fast-fall acceleration;
-* fast-fall speed;
-* coyote time;
-* jump buffer;
-* combat input buffer where it relates to universal responsiveness;
-* Dash speed;
-* Dash input window;
-* air-dash speed;
-* air-dash uses;
-* other generic mobility statistics introduced by this update.
+Quick Battle Player 1 and the Practice Ground player should use the setting.
 
-A player selecting another fighter should not need to relearn basic movement.
+Watch Mode should behave exactly as it does now because neither fighter is human-controlled.
 
-Current inequality that must be removed
+What counts as melee
 
-The repository currently intentionally gives the fighters different movement profiles.
+Use Alva’s existing attack model rather than attack names or fighter IDs.
 
-Among other differences:
+The repository already distinguishes ordinary melee and ranged attacks in js/game/ai/moveset.js:
 
-* #0001 uses Speed Power 2.
-* #0002 uses Speed Power 3.
-* #0001 acceleration is approximately 4200.
-* #0002 acceleration is approximately 4800.
-* #0001 Dash / air dash is approximately 950 units/s.
-* #0002 Dash / air dash is approximately 1100 units/s.
+* a projectile attack is ranged
+* an ordinary attack with a real hitbox and no projectile is melee
 
-That distinction is no longer desired.
+Use the same semantic distinction for Combat Assist.
 
-Normalize it.
+Combat Assist may only be initiated by an ordinary combat-button attack that resolves to a genuine melee attack.
 
-The existing documentation even uses “#0002 is faster” as an example of character configuration. That design philosophy must be updated.
+It must not activate for:
 
-Architecture
+* projectile/ranged attacks
+* summons
+* techniques
+* pending/art-only attacks with no actual melee hitbox
+* reserved/unmapped controls
+* Shield
+* Deflect
 
-Prefer a single shared baseline movement configuration rather than copying identical numbers into every fighter file.
+Deflect is an attack internally, but it is performed through the Shield input and is specifically a cancellation action for Combat Assist, not an assist-triggering melee attack.
 
-Conceptually, something such as:
+Do not duplicate a separate fighter-specific list of which moves are melee.
 
-export const BASE_FIGHTER_MOVEMENT = Object.freeze({
-  ...
-});
+If useful, extract a small shared attack-classification helper into the appropriate combat module so Fighter and AI moveset classification cannot drift apart.
 
-or another clean shared architecture is preferable.
+Grounded behavior
 
-Character definitions may still describe unique move mechanics, but they should not own arbitrary variations in universal locomotion.
+Combat Assist uses the existing grounded mouvment animation.
 
-A newly-added fighter should automatically inherit the same baseline without its author needing to manually copy 15 movement numbers.
+Therefore Combat Assist begins only for a grounded human player performing a grounded melee attack.
 
-Do not special-case IDs:
+Do not invent an aerial Combat Assist and do not substitute midair_mouvment.
 
-if (fighter.def.id === '0001') ...
-if (fighter.def.id === '0002') ...
+Aerial melee attacks continue working normally.
 
-is unacceptable.
+If the player jumps during Combat Assist, the assist is cancelled and the normal jump takes over.
 
-⸻
+When Combat Assist engages
 
-2. SPEED POWER / JUMP POWER MUST NOT BE A BACK DOOR AROUND THIS RULE
+On a fresh melee attack request:
 
-Currently js/data/powers.js allows different Speed Power tiers and Jump Power tiers to directly change normal top speed and jump velocity.
+1. Resolve the exact ground attack that the pressed action would normally start.
+2. Verify that Combat Assist is enabled for this human-controlled fighter.
+3. Verify the fighter has a live opponent.
+4. Verify the opponent is not lost to the Void or otherwise out of play.
+5. Verify the player is grounded and otherwise in a state from which this request can sensibly initiate Combat Assist.
+6. Determine whether the requested move is a genuine melee attack.
+7. Determine the move’s actual normal melee reach using its authored attack/hitbox data.
+8. If the opponent is already within the attack’s ordinary usable reach, start the attack normally. Do not run Combat Assist and do not charge Energy.
+9. If the opponent is too far away for Combat Assist, start the attack normally from the current position. It may whiff normally. Do not charge Energy.
+10. If the opponent is outside ordinary attack reach but within Combat Assist’s acquisition range, begin Combat Assist.
 
-That conflicts with the new universal-baseline rule when those tiers are assigned based on character identity.
+Do not turn every melee press into an automatic movement.
 
-Refactor this appropriately.
+The assist exists only for the small “almost in range” gap.
 
-Do not leave #0002 at Speed Power 3 and #0001 at Speed Power 2 while merely compensating somewhere else.
+Assist range
 
-There must be no hidden route by which one fighter gets faster normal locomotion.
+Do not introduce an arbitrary giant lock-on radius.
 
-Choose the cleanest architecture after inspecting all consumers.
+Derive the maximum distance Combat Assist can close from Alva’s existing universal Dash movement:
 
-If Speed Power and Jump Power no longer have a meaningful gameplay purpose after baseline normalization, either remove/collapse them cleanly or redesign their role. Do not preserve obsolete complexity solely because it already exists.
+dashSpeed × dashDuration
 
-If they remain visible in Discover/documentation, the UI must not falsely imply that #0002 receives superior base running speed.
+This keeps the mechanic grounded in the game’s existing universal movement tuning.
 
-Update all stale tests and documentation.
+The practical activation condition should be:
 
-⸻
+ordinary melee reach + at most one normal grounded Dash’s travel
 
-3. MAKE NORMAL MOVEMENT NOTICEABLY FASTER
+The assist should only cover the amount of distance required to put the requested attack into its ordinary reach. It should not always travel the full Dash distance.
 
-The game should immediately feel quicker.
+Use the attack and opponent geometry rather than only comparing centre-to-centre distance. Account for the opponent’s hurtbox/pushbox extent so the movement stops where the authored melee attack can legitimately reach.
 
-Do not merely equalize #0001 downward to #0002 or #0002 downward to #0001.
+Vertical compatibility matters. Do not activate merely because two fighters are close diagonally when the requested ground melee could not reasonably reach the opponent.
 
-Create a new faster universal baseline.
+Do not use Combat Assist to manufacture impossible hits through floors, walls, or unrelated vertical levels.
 
-Target the feeling of:
+Movement phase
 
-* rapid acceleration;
-* high but controllable run speed;
-* very quick direction changes;
-* responsive aerial steering;
-* short downtime between movement states;
-* strong ability to chase an opponent after launching them;
-* movement that supports aggressive combat instead of separating combat from traversal.
+Create an explicit Combat Assist runtime state rather than pretending the assist is an ordinary Dash.
 
-A reasonable initial tuning target is approximately:
+The mechanic can reuse existing movement values and animation infrastructure, but it has different lifecycle and cancellation rules and should remain distinguishable from fighter.dash.
 
-* normal top speed around the low 400s rather than 330/360;
-* enough acceleration to reach that speed in roughly 60–90 ms;
-* strong but smooth turning;
-* Dash / air dash roughly in the 1200–1300 units/s region;
-* shorter, sharper Dash duration than the current ~0.2 s if that feels better.
+A state similar in spirit to the following is appropriate:
 
-These are starting targets, not blind constants.
+fighter.combatAssist
 
-Tune them against Alva’s actual stage dimensions, camera and combat ranges.
+It should retain enough information to know:
 
-The final criteria are feel, controllability and consistency.
+* the requested action
+* the currently selected melee attack
+* the target fighter
+* movement direction
+* whether the one-time Energy cost has already been paid
 
-Fast must not mean uncontrollable.
+During the assist:
 
-⸻
+* face toward the opponent
+* play the fighter’s existing mouvment animation
+* move horizontally toward the opponent using the existing universal Dash speed
+* use normal stage/body collision
+* do not teleport or snap
+* do not create a hitbox
+* do not deal damage
+* do not grant invulnerability
+* do not pass through walls
+* do not pass through the opponent simply to guarantee the attack
+* do not override normal world collision
+* stop as soon as the currently requested melee attack can legitimately reach the opponent
+* immediately start that real attack once range is reached
 
-4. ADD A TRUE TRIPLE JUMP
+The movement animation should begin from its first frame and visibly cover the closing movement.
 
-Every character gets a triple jump.
+Do not alter the attack’s own authored animation. Once Combat Assist finishes, startAttack should run the real attack exactly as it normally would.
 
-In Alva’s current semantics, airJumps counts additional jumps after the initial grounded jump.
+If the fighter has no usable mouvment art, fail gracefully: skip the assist and perform the attack normally. Never fake the movement with another animation.
 
-Therefore:
+Energy / “Shield” cost
 
-airJumps: 2
+Alva does not have a separate Shield meter. Shield and Dash currently spend the fighter’s existing Energy resource.
 
-means:
+Therefore implement the requested “cost shield” behavior through Energy.
 
-1. ground jump;
-2. first air jump;
-3. second air jump.
+For Combat Assist, use the fighter’s existing:
 
-That is the desired behavior.
+energyDef.dashCost
 
-The fourth jump attempt must fail until the airtime resource is restored.
+Do not create another resource bar.
 
-Landing restores both air jumps.
+Charge this cost exactly once, when Combat Assist actually commits to the automatic movement.
 
-Existing hit/reset behavior that restores airtime resources should restore the correct new count.
+Do not charge anything when:
 
-Every fighter gets exactly the same triple-jump capability.
+* Combat Assist is disabled
+* the attack is ranged/non-melee
+* the opponent is already in normal attack range
+* the opponent is outside assist range
+* the assist cannot begin
+* the attack simply starts normally
 
-No character receives a stronger air jump because of identity.
+Follow the same Energy/exhaustion semantics already used by Dash. If Energy cannot currently authorize the movement because the fighter is exhausted/has no usable Energy, Combat Assist must not engage; the requested melee attack should still execute normally from the player’s current position if it otherwise can.
 
-Air-jump height should also be universal.
+Replacing one melee request with another while already travelling must not charge Energy a second time.
 
-⸻
+Cancelling Combat Assist does not refund Energy already spent.
 
-5. AIR JUMPS MUST PRESERVE HORIZONTAL MOMENTUM
+Ensure Energy does not receive its passive refill on the same simulation step that Combat Assist paid its cost, matching the existing Dash payment behavior.
 
-Audit the current airJump() behavior.
+Update comments/documentation that currently claim Energy is spent only by Dash and Shield.
 
-An air jump should primarily add/reset vertical jump velocity.
+Latest melee request wins
 
-It should not arbitrarily replace a player’s horizontal velocity simply because Jump was pressed.
+This is a required part of the mechanic.
 
-If the player is moving quickly to the right and air-jumps, they should continue carrying that horizontal momentum.
+Suppose Combat Assist begins because the player presses melee Attack A.
 
-If they begin steering left, normal air-control rules should bend/reverse the velocity progressively rather than teleporting the velocity from one direction to another.
+While the fighter is still travelling in the mouvment phase, the player presses melee Attack B.
 
-The expected flow is:
+Do not perform Attack A.
 
-fast run
-→ jump
-→ air attack
-→ air jump
-→ air attack
-→ air dash
+Instead:
 
-without arbitrary horizontal speed loss at the transitions.
+* replace the pending attack with Attack B
+* keep travelling if necessary
+* recalculate the stopping/reach condition for Attack B
+* perform Attack B when its own normal range has been reached
 
-⸻
+If Attack B is already in range at the moment it replaces Attack A, end the assist movement and start Attack B immediately.
 
-6. MOMENTUM IS A CORE DESIGN PILLAR
+If the player presses Attack C afterward, Attack C becomes the new pending attack.
 
-This is one of the most important requirements of the update:
+The most recent valid melee request always wins.
 
-A legal action transition should almost never destroy existing momentum.
+There should only ever be one pending Combat Assist melee request.
 
-Audit every place where vx or vy is:
+A replacement does not restart or duplicate the Energy cost.
 
-* zeroed;
-* replaced;
-* clamped;
-* reduced;
-* reset;
-* normalized to normal top speed;
-* silently discarded by a state transition.
+Do not allow the original attack to leak into the existing general combat buffer and fire later.
 
-Remove arbitrary momentum loss.
+Carefully integrate this with bufferedAttack so a replaced/cancelled Combat Assist request cannot unexpectedly execute after the assist is gone.
 
-Current problem: attackStartSpeed
+If the latest requested melee move becomes invalid before it can execute—cooldown, state change, target gone, required art unavailable, etc.—cancel cleanly. Do not silently fall back to the older attack.
 
-The current shared movement code intentionally clamps a grounded attack’s inherited velocity against normal maxSpeed.
+Required cancellation behavior
 
-That means high Dash momentum can be thrown away when entering an attack.
+While Combat Assist’s movement animation is active, it must be cancellable by all of the following:
 
-This conflicts directly with the new design.
+Jump
 
-Refactor attackStartSpeed() and the surrounding attack-movement semantics.
+A fresh jump request cancels Combat Assist. The jump should then proceed through the existing jump rules on that step where legal.
 
-A fighter going:
+The pending melee attack must not fire later.
 
-Dash at 1250
-→ attack
+Mouvement / Dash
 
-should not suddenly fall to ordinary running speed just because an attack began.
+A normal player Dash request—double-tap movement or the dedicated touch mouvementLeft / mouvementRight request—cancels Combat Assist.
 
-The attack should inherit the incoming momentum unless the attack’s actual mechanical behavior explicitly redirects it.
+After cancelling, process the requested normal Dash according to the ordinary Dash rules.
 
-Momentum through actions
+Combat Assist Energy that was already paid is not refunded, and a subsequent real Dash pays its own normal cost if it starts.
 
-Preserve horizontal momentum through:
+Shield
 
-* jump;
-* air jump;
-* attack startup;
-* attack active frames;
-* attack recovery;
-* hit-cancel;
-* Dash cancel;
-* Dash → attack;
-* Dash → jump;
-* air dash → attack;
-* air dash → jump where legal;
-* landing;
-* landing → attack;
-* landing → Dash;
-* transitions between ordinary locomotion animations;
-* Deflect where its mechanics do not explicitly redirect motion.
+Attempting to Shield cancels Combat Assist.
 
-There should be no hidden state transition that simply assigns:
+After cancellation, allow the existing Shield behavior to proceed normally when Shield is legal.
 
-vx = 0;
+Deflect
 
-because entering that state is convenient.
+A valid Deflect request cancels Combat Assist and should then be processed as a normal Deflect.
 
-Dash behavior
+Combat Assist must never reinterpret Deflect as its replacement melee attack.
 
-Starting a Dash should never make an already-faster fighter slower.
+Any non-melee attack/action
 
-Conceptually:
+If the player requests a ranged attack, projectile attack, summon, technique, or other non-melee combat action during Combat Assist:
 
-newSpeed = Math.max(existingForwardSpeed, dashSpeed)
+* cancel Combat Assist
+* discard its pending melee
+* process the newly requested action normally on that same step where existing rules permit it
 
-rather than blindly overwriting a faster existing forward velocity with a lower constant.
+Do not make the player wait for the discarded assist to finish.
 
-The exact implementation should respect facing/direction and remain deterministic.
+Other forced cancellations
 
-When a Dash finishes, the fighter should carry its velocity into the next state.
+Combat Assist must also terminate safely if gameplay invalidates it, including:
 
-Do not end a Dash by resetting to normal run speed.
+* the player is hit
+* hitstun begins
+* paralysis/immobilization begins
+* the fighter is lost to the Void
+* the opponent is lost to the Void
+* the opponent is removed/replaced in Practice Ground
+* the fighter leaves the ground
+* a wall or other stage collision prevents the closing movement
+* the match/session resets
+* the fighter respawns
+* the fighter is replaced/destroyed
 
-Overspeed
+Do not fire the pending melee afterward.
 
-Normal top speed is the speed locomotion builds toward from rest.
+Input priority
 
-It should not behave as an invisible hard velocity cap on momentum earned from:
+Preserve Alva’s existing responsiveness and input-priority principles.
 
-* Dash;
-* air dash;
-* attack motion;
-* rebounds;
-* another legitimate movement mechanic.
+During Combat Assist, process fresh inputs in a deterministic order that supports the required behavior:
 
-Overspeed may decay smoothly where appropriate, but it must not disappear instantly.
+* explicit cancellation actions must be able to take over immediately
+* a new valid melee press replaces the queued melee
+* a non-melee press cancels and becomes the new requested action
+* stale original presses must not survive cancellation
 
-Holding the current travel direction should preserve momentum especially well.
+Do not break the existing universal attackBuffer, jump buffer, Dash buffer, hit-cancel behavior, Shield priority, or Deflect rules outside Combat Assist.
 
-Releasing the stick can gradually brake.
+Avoid adding hidden special cases to InputManager; this mechanic belongs at the player/Fighter action-resolution layer because keyboard, gamepad, and touch already resolve into the same FighterInput snapshot.
 
-Holding the opposite direction can brake aggressively and reverse.
+Settings storage
 
-The difference between those situations should be obvious.
+Extend js/core/settings.js.
 
-Legitimate exceptions
+The current settings schema is version 2. Bump it to the next schema version and add a persisted boolean:
 
-Actual outside forces may legitimately change momentum:
+combatAssist
 
-* being hit;
-* a launch;
-* a carry;
-* a pull;
-* a rebound;
-* a wall/terrain collision;
-* a move whose explicit mechanic is to redirect the user’s body;
-* falling into the Void / respawning.
+Default:
 
-Those are physical/gameplay events.
+true
 
-A state-machine transition is not.
+A new installation, missing setting, corrupt value, unsupported value, or migrated older settings must all resolve Combat Assist to true.
 
-⸻
+Add migration for the current version 2 schema so existing users preserve:
 
-7. UNIQUE ATTACK MOTION IS STILL ALLOWED
+* language
+* Mobile Controls choice
+* both custom touch layouts
 
-Universal movement equality does not mean every move travels identically.
+and simply receive:
 
-Character identity should come from moves, not invisible baseline stats.
+combatAssist: true
 
-For example #0002 may still have:
+Preserve the existing version 1 migration path as well.
 
-* Homing Attack;
-* Bounce Attack;
-* Spin Attack;
-* Blue Tornado;
-* Whirlwind.
+Do not directly access localStorage anywhere else. js/core/settings.js must remain the only owner of settings persistence.
 
-Those attacks can have unique motion because the movement is part of the ability.
+Expose a clean getter/setter such as:
 
-Likewise #0001’s unique attack movement may remain unique.
+settings.combatAssist
 
-The important distinction is:
+Validate it as a boolean; do not force it awkwardly into the current string-choice array.
 
-NORMAL RUN / JUMP / DASH
-    universal
-ABILITY MECHANICS
-    character-specific
+Saving a changed Combat Assist value should use the same save/emit semantics as the other settings.
 
-Do not flatten the actual movesets.
+Settings UI
 
-Keep the characters mechanically distinct.
+Update js/ui/settings-dialog.js.
 
-⸻
+The dialog currently has exactly Language and Controls. It should now contain exactly:
 
-8. MAKE ATTACKS FEEL MUCH FASTER
+1. Language
+2. Controls
+3. Combat
 
-Audit the full roster’s ordinary attack timing.
+Add the Combat section after Controls.
 
-Alva currently ties most attack phase durations to actual animation frames, which is good. Preserve frame/art synchronization.
+The Combat section should contain the Combat Assist setting with clear On/Off selection.
 
-However, the overall fighting pace should become substantially snappier.
+Use the existing Settings visual language rather than inventing an unrelated control style. An accessible two-choice radio group consistent with the existing Settings cards/buttons is appropriate.
 
-For normal attacks:
+Requirements:
 
-* shorten excessive startup;
-* shorten excessive recovery;
-* make the visible strike occur promptly;
-* remove dead animation frames that serve no gameplay/readability purpose;
-* increase animation FPS where appropriate;
-* keep active frames synchronized to the actual visible strike;
-* preserve enough startup to read attacks;
-* preserve enough recovery that whiffing still has meaning.
+* Combat Assist ON is marked as the default
+* current saved state is visually indicated
+* keyboard navigation works
+* gamepad menu navigation works
+* correct aria-checked/radiogroup semantics
+* changing it saves immediately
+* the dialog remains open after changing it
+* it works in both English and French
+* short landscape screens remain scrollable
+* do not break the touch layout editor or existing focus-return behavior
 
-The goal is not “every attack becomes frame 1.”
+Suggested player-facing English copy:
 
-The goal is:
-
-No attack should feel like the player pressed a button and then waited for the game to catch up.
-
-As a starting point, many normal combat clips can probably tolerate roughly 15–30% faster playback/timing, with slower dramatic techniques handled individually.
-
-Do not blindly multiply every move by the same scalar.
-
-Review each attack.
-
-⸻
-
-9. FASTER ANIMATIONS
-
-Increase the perceived speed of the game through animation as well as physics.
-
-Audit:
-
-* idle responsiveness;
-* run FPS;
-* jump animation;
-* fall animation;
-* landing animation;
-* Dash animation;
-* air-dash animation;
-* Deflect;
-* normal attacks;
-* multi-hit attacks;
-* attack recovery;
-* appropriate technique casts.
-
-Movement animation should visually match the new faster movement.
-
-A fighter moving very quickly should not look like they are jogging slowly.
-
-Important: animation timing is gameplay timing in Alva
-
-Do not forget that Alva uses clip duration for actual mechanics in several places.
-
-For example:
-
-Dash duration = one pass of `mouvment`
-air dash duration = one pass of `midair_mouvment`
-
-Increasing the FPS therefore changes the mechanic.
-
-Whenever animation FPS changes, audit anything derived from that duration:
-
-* Dash duration;
-* Dash travel distance;
-* air-dash duration;
-* air-dash travel distance;
-* attack startup/active/recovery;
-* hits[].at;
-* hits[].active;
-* projectile spawnAt;
-* motion timing;
-* technique phases;
-* summon startup;
-* hit-cancel timing;
-* AI lead/prediction.
-
-Keep the visual frame and gameplay event synchronized.
-
-Do not make a projectile spawn before the throwing frame merely because the clip was sped up.
-
-⸻
-
-10. LANDING MUST NEVER FEEL STICKY
-
-Landing should be almost invisible from a control perspective.
-
-If a fighter has a Land animation, it may still play visually, but it must not create unnecessary input latency.
-
-Landing should immediately permit appropriate actions such as:
-
-* running;
-* turning;
-* jumping again;
-* attacking;
-* Dashing;
-* shielding.
-
-A landing pose must be interruptible immediately by meaningful player input.
-
-Do not make a character with a Land clip less responsive than a character without one.
-
-#0002 currently lacks Land art and returns directly to stance.
-
-#0001 has Land art.
-
-That art difference must not produce a gameplay responsiveness difference.
-
-⸻
-
-11. IMPROVE DASH FLOW
-
-The Dash and air dash should become central tools for flowing through combat.
-
-They must feel like mobility tools, not temporary cutscenes.
-
-Review:
-
-* double-tap recognition;
-* state entry;
-* duration;
-* cancel rules;
-* Energy interaction;
-* attack transitions;
-* jump transitions;
-* momentum carried after Dash;
-* AI knowledge.
-
-A player should be able to perform fast sequences such as:
-
-run
-→ Dash
-→ attack
-
-and:
-
-jump
-→ air dash
-→ aerial
-
-without the game feeling like it enters isolated states.
-
-Introduce generic cancel windows if necessary.
-
-Do not make everything freely cancelable from the very first frame with no commitment.
-
-Instead, create deliberate short windows which make actions responsive while preserving meaningful attack commitment.
-
-For example, allowing a Dash to transition into attack/jump shortly after startup may feel far better than forcing its entire clip to finish.
-
-Keep this system generic and data-driven.
-
-⸻
-
-12. SMOOTHER ATTACK CANCELLING
-
-Alva already has hit-cancels and Dash cancels.
-
-Build on the existing system instead of replacing it with unrelated code.
-
-The combat loop should strongly support:
-
-movement
-→ attack
-→ hit
-→ chase
-→ attack
-→ air chase
-→ attack
-
-The player should rarely be waiting on a long invisible recovery timer after successfully connecting.
-
-Audit hitCancel across the roster.
-
-Successful hits should generally allow aggressive continuation sooner than whiffs.
-
-Preserve move-specific balance, but make successful offense feel immediate.
-
-A buffered action should execute on the first legal fixed step.
-
-Do not add avoidable one-frame gaps between one legal action ending and the next beginning.
-
-⸻
-
-13. INPUT BUFFERING
-
-Alva already has a combat attack buffer.
-
-Preserve it and improve its consistency.
-
-The player should be able to press the next intended action very slightly before the current state allows it and have the game perform that action immediately when legal.
-
-Audit buffering for:
-
-* attack after attack;
-* attack after landing;
-* attack after Dash;
-* jump after attack;
-* Dash after attack;
-* air dash after attack where cancel rules permit it;
-* jump immediately before landing.
-
-Do not create enormous buffers that cause old inputs to execute unexpectedly.
-
-The current ~0.15-second combat buffer is within a useful range; tune globally if necessary rather than giving different characters different forgiveness.
-
-⸻
-
-14. ATTACK MOVEMENT SHOULD FEEL ALIVE
-
-Most normal attacks should not feel as if the fighter’s feet were welded to the floor.
-
-Review existing lockMovement, momentum, airMomentum, control, airControl, friction and step behavior.
-
-Keep these generic systems, but tune ordinary attacks toward better flow.
-
-Where appropriate:
-
-* preserve full incoming momentum;
-* allow a useful amount of steering;
-* let running attacks slide naturally;
-* let aerial attacks retain aerial drift;
-* avoid automatically braking characters merely because an attack is playing.
-
-An attack specifically designed to be planted may still be planted.
-
-But “planted” must be an intentional move property, not the default sensation of the entire combat system.
-
-Unique attack motions such as homing, bounce, rise, roll and hover continue to own movement according to their mechanic.
-
-Even there, consider incoming momentum when entering/exiting the mechanic so transitions do not feel discontinuous.
-
-⸻
-
-15. HITSTOP MUST ADD IMPACT WITHOUT MAKING THE GAME SLUGGISH
-
-Keep hitstop.
-
-The game still needs impact.
-
-But audit every hitstop value.
-
-Light attacks should have short, crisp hitstop.
-
-Heavy attacks can have more.
-
-A dramatic finishing launch may have more presentation.
-
-Avoid excessive freezes on ordinary rapid combat.
-
-Most importantly, hitstop must temporarily freeze motion, not erase it.
-
-When hitstop ends, stored velocities must continue correctly.
-
-A fighter moving quickly before hitstop should not mysteriously resume slowly afterward.
-
-⸻
-
-16. DO NOT USE CHARACTER LORE FOR PHYSICS
-
-Audit comments, documentation and tests for assumptions such as:
-
-* “#0002 is faster because speedster”;
-* faster acceleration because of character identity;
-* faster Dash because of character identity;
-* higher jump because a character can fly/jump in canon;
-* heavier gravity because a character looks heavy.
-
-Remove those assumptions from baseline movement.
-
-Character lore belongs in:
-
-* ability mechanics;
-* animation;
-* visual effects;
-* move names;
-* hitboxes where justified by art;
-* projectiles;
-* techniques;
-* attack motion.
-
-It does not belong in universal movement statistics.
-
-⸻
-
-17. FUTURE FIGHTERS MUST FOLLOW THIS AUTOMATICALLY
-
-Do not implement equality only for the two existing characters.
-
-The architecture should make mobility parity the default for the entire 48-slot roster.
-
-A future 0003.js should not normally specify:
-
-speed: ...
-jump: ...
-acceleration: ...
-dashSpeed: ...
-
-for ordinary movement.
-
-The shared baseline should provide those values.
-
-Only introduce character-authored movement data when it belongs to a specific move mechanic, not basic locomotion.
-
-Add validation if useful so accidental baseline stat divergence is difficult or impossible.
-
-⸻
-
-18. TEST UNIVERSAL MOVEMENT EQUALITY
-
-The current tests include assumptions that fighters may intentionally have different movement profiles.
-
-That requirement is obsolete.
-
-In particular, update/remove tests equivalent to:
-
-“two fighters with different profiles move differently under the same rules”
-
-and replace them with tests enforcing the new invariant.
-
-Add a roster-wide test that instantiates every playable character and proves that they have identical baseline:
-
-* max speed;
-* normal jump velocity;
-* acceleration;
-* deceleration;
-* turn behavior;
-* air control;
-* fast fall;
-* air-jump count;
-* air-jump strength;
-* Dash speed;
-* air-dash speed;
-* Dash uses where relevant;
-* coyote time;
-* jump/input buffers.
-
-Do not merely compare configuration objects if runtime behavior can still differ.
-
-Also run identical input traces against #0001 and #0002 and verify identical baseline trajectories when no character-specific move is used.
-
-⸻
-
-19. ADD MOMENTUM REGRESSION TESTS
-
-Create explicit automated tests for momentum continuity.
-
-Examples:
-
-Run → jump
-
-A fighter running at speed should keep horizontal speed when jumping.
-
-Dash → jump
-
-Jumping out of an allowed Dash transition must retain the Dash’s horizontal velocity rather than snapping to normal top speed.
-
-Dash → attack
-
-If the cancel is legal:
-
-Dash
-→ attack
-
-must retain high horizontal velocity.
-
-Attack → jump
-
-A jump cancel should not zero inherited horizontal momentum.
-
-Attack → Dash
-
-The existing Dash-cancel route should transition cleanly to Dash speed and preserve proper direction.
-
-Air jump
-
-Air jumping while travelling horizontally must preserve horizontal momentum.
-
-Air dash → aerial attack
-
-The attack should inherit the air-dash momentum rather than snapping to normal speed.
-
-Landing
-
-Landing while travelling horizontally should preserve horizontal velocity.
-
-Hitstop
-
-Velocity before and after hitstop should be identical unless another force changed it.
-
-Overspeed
-
-A fighter above normal top speed must not instantly clamp to top speed because their state changed.
-
-⸻
-
-20. TEST THE TRIPLE JUMP
-
-Add explicit tests proving:
-
-ground jump      succeeds
-air jump #1      succeeds
-air jump #2      succeeds
-air jump #3      fails
-
-Then:
-
-land
-
-restores the two air-jump resources.
-
-Also test restoration through any existing hit/reset rule that intentionally replenishes airtime resources.
-
-Run these tests against more than one fighter.
-
-⸻
-
-21. AI MUST UNDERSTAND THE NEW SPEED
-
-The Combat AI already reads movement/attack definitions and predicts attack drift.
-
-Audit it after changing movement.
-
-Do not leave its assumptions tuned around 330/360 running speed or the old Dash distances.
-
-The CPU should understand:
-
-* universal new run speed;
-* triple jump;
-* new Dash distance;
-* new air-dash distance;
-* shortened attack startup;
-* changed attack travel;
-* new cancel possibilities if they affect planning;
-* faster chase potential.
-
-Difficulty must continue to change decision quality, not fighter stats.
-
-Easy and Brutal must control the exact same physical fighter.
-
-Watch Mode must remain deterministic.
-
-⸻
-
-22. CAMERA / PRESENTATION
-
-Higher mobility may expose camera tuning that was acceptable at the old speed.
-
-Playtest the camera.
-
-If the fighters can now outrun the camera or produce uncomfortable lag, adjust camera tracking/smoothing as necessary.
-
-Do not alter gameplay to compensate for a slow camera.
-
-Rendering changes must remain presentation-only.
-
-Maintain reduced-motion behavior.
-
-Speed trails and other existing effects may be retuned to support the new faster movement if appropriate.
-
-Do not clutter the screen excessively.
-
-⸻
-
-23. DO NOT DESTROY CHARACTER MOVE IDENTITY
-
-The goal is not to homogenize the roster.
-
-Keep character-specific:
-
-* attacks;
-* projectiles;
-* techniques;
-* summons;
-* attack motion;
-* defense mechanics;
-* Deflect animation/timing;
-* move names;
-* hitboxes;
-* damage;
-* launch values;
-* cooldowns;
-* unique mechanics.
-
-Normalize basic locomotion, not the whole character.
-
-For example, #0002’s Homing Attack may still travel differently from #0001’s Red Kick because those are two different attacks.
-
-What must not happen is:
-
-#0002 normal run = faster
-
-solely because #0002 is called a speedster.
-
-⸻
-
-24. DO NOT “FIX” COMBAT BY MAKING EVERYTHING BROKEN
-
-Fast and smooth does not mean removing all game rules.
-
-Do not:
-
-* eliminate every startup frame;
-* eliminate every recovery frame;
-* allow every move to cancel into everything on frame one;
-* remove hitstop completely;
-* remove Energy without a reason;
-* make every attack safe on whiff;
-* give permanent invulnerability;
-* increase damage across the board;
-* increase launch merely because animation is faster;
-* change stage boundaries merely to hide movement bugs.
-
-Preserve tactical commitment while removing unnecessary friction.
-
-The ideal feel is:
-
-responsive immediately, committed briefly, moving constantly.
-
-⸻
-
-25. ANIMATION QUALITY
-
-Do not invent fake sprite frames.
-
-Use the existing art.
-
-Changing FPS is allowed and expected.
-
-Do not use interpolation that destroys the pixel-art presentation.
-
-Image smoothing remains off.
-
-When clips have different frame counts, tune playback individually.
-
-A one-frame Dash clip can still play quickly; its gameplay duration need not remain 0.2 seconds simply because it currently uses 5 FPS.
-
-Likewise, a 12-frame run animation should be fast enough to visually sell the new universal speed.
-
-⸻
-
-26. DOCUMENTATION MUST MATCH THE NEW GAME
-
-Update all stale documentation, including where relevant:
-
-* README.md
-* ALVA_SPEC.md
-* UPDATES.md
-* docs/systems/movement.md
-* docs/systems/combat.md
-* docs/architecture/character-system.md
-* docs/characters/0001.md
-* docs/characters/0002.md
-* adding-character documentation
-* Powers documentation if that system changes.
-
-Specifically remove statements claiming that:
-
-* #0002 has superior baseline speed;
-* equal movement values are merely optional tuning;
-* fighter movement profiles are expected to differ in universal stats.
-
-Document the new rule prominently:
-
-All fighters share universal baseline locomotion. Character identity changes the moveset, not run/jump/Dash fundamentals.
-
-Do not rewrite historical UPDATES.md entries as though history never happened; add/update current behavior appropriately while keeping history intelligible.
-
-⸻
-
-27. TESTS THAT CURRENTLY HARD-CODE OLD VALUES
-
-Search the repository for assumptions including:
-
-330
-360
-4200
-4800
-950
-1100
-Speed Power 2
-Speed Power 3
-airJumps: 1
-
-Do not blindly replace every occurrence because some numbers such as 1100 are also legitimately used for launch thresholds, positions, pull speeds, attack speeds, etc.
-
-Update only values referring to baseline movement.
-
-Known relevant areas include:
-
-* movement-profile tests;
-* Dash tests;
-* air-mouvment tests;
-* #0001 fighter tests;
-* #0002 fighter tests;
-* Powers tests;
-* docs;
-* AI/moveset expectations.
-
-Delete stale assertions instead of twisting implementation code to preserve obsolete behavior.
-
-⸻
-
-28. MANUAL GAME-FEEL VALIDATION
-
-After automated tests pass, actually run the game:
-
-python3 -m http.server 8000
-
-Use Quick Battle and Practice Ground if the environment supports browser interaction.
-
-Test at minimum:
-
-run → jump → attack
-run → Dash → attack
-run → Dash → jump
-jump → air jump → air jump
-jump → aerial → air jump → aerial
-jump → air dash → aerial
-attack hit → Dash chase → attack
-aerial → land → grounded attack
-aerial → land → Dash
-high-speed landing → immediate jump
-high-speed landing → immediate attack
-
-Try both #0001 and #0002.
-
-The baseline movement portions should feel identical.
-
-The moves themselves should still make the characters feel different.
-
-⸻
-
-29. FEEL ACCEPTANCE CRITERIA
-
-Do not consider the task finished merely because tests are green.
-
-The final game should satisfy these qualitative requirements:
-
-Movement
-
-The fighter responds immediately.
-
-Running feels genuinely fast.
-
-Reversing direction is sharp but physically continuous.
-
-Jumping does not kill forward movement.
-
-Triple jumping feels natural.
-
-Air control is powerful without looking like teleportation.
-
-Dash is short, fast and useful.
-
-Air dash flows directly into aerial offense.
-
-Landing does not interrupt the player’s rhythm.
-
+Section:
 Combat
 
-Buttons feel responsive.
+Setting:
+Combat Assist
 
-Normal attack animations are visibly faster.
+Description:
+Automatically closes a short gap before a melee attack. Uses Energy and never affects ranged attacks.
 
-Startup is readable but short.
+Choices:
+On
+Off
 
-Recovery exists without feeling sluggish.
+You may polish the wording to match the existing UI voice, but do not obscure that it is melee-only and costs Energy.
 
-Hits still feel impactful.
+Add natural French translations in js/localization/strings/fr.js, not untranslated English placeholders.
 
-Successful hits naturally lead into chase opportunities.
+Reuse existing CSS where possible. Add only the minimum css/settings.css rules necessary.
 
-Moving attacks preserve motion.
+Passing the setting into gameplay
 
-Combat and movement feel like one system rather than two separate modes.
+The setting should be read when a player gameplay session is entered, consistent with how the screens currently read saved touch settings.
 
-Momentum
+Update the relevant construction flow so:
 
-The player’s speed is treated as valuable state.
+BattleScreen
+→ Battle
+→ human PlayerController
+→ Fighter
 
-A state transition does not casually erase it.
+receives the Combat Assist preference.
 
-The player should be able to build a fast sequence and visually feel that speed carry through it.
+Likewise:
 
-Character parity
+PracticeGroundScreen
+→ PracticeSession
+→ human PlayerController
+→ Fighter
 
-If #0001 and #0002 receive the exact same movement-only input sequence from the same starting conditions, they should produce the same baseline movement trajectory.
+must receive it.
 
-No exception because one is a “speedster.”
+Do not give the setting to CombatAIController.
 
-⸻
+A clean design would allow PlayerController to expose something such as:
 
-30. ARCHITECTURAL ACCEPTANCE CRITERIA
+kind = 'player'
+combatAssist = true/false
 
-The implementation is incomplete unless:
+and let the shared Fighter rule require both player control and the enabled flag.
 
-* shared movement remains fighter-ID agnostic;
-* baseline locomotion is universal;
-* unique ability motion remains data-driven;
-* future fighters inherit baseline movement automatically;
-* fixed-step determinism remains intact;
-* AI consumes the same movement rules as players;
-* animation timing stays synchronized with hit/gameplay timing;
-* momentum continuity is covered by tests;
-* triple jump is covered by tests;
-* stale per-character-speed documentation/tests are removed or updated;
-* node --test passes completely.
+The exact API can differ if there is a cleaner architecture, but CPU exclusion must be structural rather than an ad-hoc fighter-slot check such as slot === 'p1'.
 
-Do not leave partially migrated systems.
+Do not infer human control from the label "P1".
 
-Do not maintain two simultaneous philosophies where some code assumes universal movement and another still expects fighter-specific base speed.
+Existing attack motion
 
-⸻
+Some melee attacks have their own authored motion such as roll, homing, bounce, rise, or hover.
 
-31. FINAL IMPLEMENTATION REPORT
+Combat Assist is a pre-attack approach, not a replacement for those authored motions.
 
-When finished, provide a concise implementation report containing:
+Once the assist has put the target into the requested attack’s legitimate starting/reach situation, start the attack normally and let its existing authored motion behave exactly as before.
 
-1. the shared movement changes;
-2. the final universal movement values;
-3. how triple jump works;
-4. how momentum preservation works;
-5. changes to attackStartSpeed / attack movement;
-6. Dash and air-dash changes;
-7. combat timing / cancel changes;
-8. animation FPS/timing changes;
-9. what happened to Speed Power / Jump Power;
-10. AI changes;
-11. important tests added/updated;
-12. documentation updated;
-13. the final full test result.
+Do not remove, rewrite, or double-count its attack motion.
 
-Also explicitly confirm:
+The assist range calculation should be conservative for unusual motion attacks. Do not use a giant motion-expanded threat box as justification for assisting from across the stage.
 
-#0001 and #0002 now have identical baseline walk/run speed, acceleration, jump height, air jumps, Dash speed and air-dash speed. Character identity does not grant baseline movement advantages.
+The assist exists to cover a short proximity gap, capped by one ordinary Dash’s travel.
 
-The priority order for this task is:
+Simulation integrity
 
-1. Extremely smooth combat.
-2. Fast, responsive movement.
-3. Momentum preservation.
-4. Universal character mobility parity.
-5. Triple jump.
-6. Faster, properly synchronized animations.
-7. Preserve each character’s unique moves and mechanics.
+Combat Assist must remain fixed-step and deterministic.
 
-Do not stop after simply making the numbers larger. The objective is to make Alva itself feel fundamentally faster and smoother to control.
+Do not use:
+
+* timers outside the simulation
+* setTimeout
+* render coordinates for gameplay
+* DOM measurements
+* random values
+* interpolation state
+
+Gameplay decisions must use simulation body/attack data only.
+
+Rendering reads the state; it must never control the mechanic.
+
+Documentation
+
+Update the project documentation so it matches the implemented behavior.
+
+At minimum audit and update:
+
+* ALVA_SPEC.md
+* docs/systems/combat.md
+* docs/systems/movement.md if the mouvment/Dash-derived approach range belongs there
+* docs/architecture/module-responsibilities.md
+* Settings/storage documentation and comments
+* Energy documentation/comments that currently say only Dash and Shield spend Energy
+
+Do not create fighter-specific Combat Assist documentation.
+
+Do not edit character_rule.
+
+Do not call this a named historical update in UPDATES.md unless repository convention genuinely requires it; do not invent an update name merely to add an entry.
+
+Tests
+
+Add focused automated coverage, preferably a dedicated system test such as:
+
+tests/systems/combat-assist.test.mjs
+
+Also update the existing Settings/interface tests.
+
+Cover all of the following behavior:
+
+Settings
+
+* settings schema version is bumped correctly
+* fresh/default Combat Assist is true
+* version 2 migrates to Combat Assist ON without losing its existing settings
+* version 1 migration still works
+* persisted false reloads as false
+* persisted true reloads as true
+* invalid/non-boolean values safely resolve to the default
+* change events/save behavior work
+* Settings dialog now has Language, Controls, Combat
+* On is shown as the default
+* the selected state follows the saved preference
+* English and French strings exist
+
+Core assist
+
+* enabled human player just outside melee range enters Combat Assist
+* mouvment is the animation during approach
+* fighter physically closes the gap instead of teleporting
+* requested melee starts once ordinary reach is reached
+* attack’s normal authored timing/hitbox is unchanged
+* already-in-range melee starts immediately with no assist and no Energy charge
+* opponent beyond the assist limit gets a normal attack/whiff with no assist and no charge
+* disabled setting produces completely normal legacy attack behavior
+* ranged/projectile attacks never trigger assist
+* summons and techniques never trigger assist
+* Deflect never triggers assist
+* aerial melee never initiates the grounded assist
+* the feature works from generic attack data and not fighter IDs
+
+Energy
+
+* starting an assist charges exactly one dashCost
+* replacing the melee while travelling does not charge again
+* cancelling does not refund the cost
+* no assist means no assist cost
+* exhausted/no usable Energy prevents the assist but does not swallow an otherwise legal melee attack
+* Energy does not regenerate on the same step the assist cost was paid
+
+Replacement
+
+* Attack A starts the approach
+* Attack B pressed during approach replaces A
+* only B eventually begins
+* multiple replacements always leave the newest valid melee
+* changing to a move with a different reach recalculates when the approach ends
+* the old attack never appears later through bufferedAttack
+
+Cancellation
+
+* jump cancels and jumps
+* ordinary Dash/mouvement cancels and normal Dash behavior takes over
+* Shield cancels and can raise normally
+* Deflect cancels when legal
+* projectile/ranged attack cancels and that attack is processed
+* summon/technique cancels and the requested special is processed
+* hitstun cancels
+* paralysis/immobilization cancels
+* leaving the ground cancels
+* target loss/removal cancels
+* reset/respawn clears the state
+* stale pending melee never fires after any cancellation
+
+CPU isolation
+
+* Quick Battle CPU never receives Combat Assist
+* both Watch Mode CPUs never receive it
+* Practice CPU/dummy never receives it
+* enabling the player setting does not change CombatAIController decisions or movement
+* there is no fighter-ID or p1 slot hack providing the distinction
+
+World interaction
+
+* assist respects walls/solids
+* assist does not teleport through the opponent
+* assist does not produce a hitbox during movement
+* assist does not create damage or invulnerability by itself
+* it stops/cancels safely at a ledge rather than turning into an unintended aerial Dash
+
+Where old tests need to isolate unrelated behavior from the new default-on player feature, explicitly set Combat Assist off in those fixtures rather than weakening their assertions.
+
+Verification
+
+Run the complete suite:
+
+node --test
+
+Do not stop after the new tests pass.
+
+Fix every regression caused by this implementation.
+
+Also inspect the Settings UI manually enough to verify:
+
+* Combat section layout
+* scroll behavior
+* English/French localization
+* keyboard navigation
+* gamepad navigation semantics
+* On/Off selected state
+* no regression to Controls customization
+
+Acceptance criteria
+
+The work is complete only when the following player-visible sequence works:
+
+A human player has Combat Assist ON.
+
+They stand a short distance outside the reach of a melee attack and press it.
+
+Their fighter immediately faces the opponent, spends the existing Energy cost, plays its mouvment animation while physically closing only the required distance, then starts the real melee attack.
+
+While travelling, pressing a different melee attack changes the pending move so the newest melee is the one that comes out.
+
+While travelling, Jump, normal mouvement/Dash, Shield, Deflect, or any non-melee action cancels the assist immediately and takes over according to the normal rules.
+
+If the target is already in melee range, the attack happens normally without assist or Energy cost.
+
+If the target is too far away, the attack happens normally and may whiff; Combat Assist does not pull the player across the stage.
+
+Projectile/ranged attacks never receive assistance.
+
+CPU fighters never receive assistance under any mode.
+
+Turning Combat Assist OFF restores the existing combat behavior without otherwise changing movement, attacks, Energy, CPU behavior, or input.
+
+The setting defaults ON, persists correctly, migrates existing users safely, appears under Settings → Combat in English and French, and the complete node --test suite passes.
+
+Keep the implementation small, shared, deterministic, data-driven, and consistent with Alva’s existing architecture. Do not solve this by adding fighter-specific conditions, cloning attacks, extending hitboxes, teleporting fighters, or teaching the CPU to use the mechanic.
