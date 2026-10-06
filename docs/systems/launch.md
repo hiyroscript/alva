@@ -42,17 +42,6 @@ built: a Base Launch other than 0-3 is logged and becomes 0, an unknown
 direction is logged and becomes `null`, and a nonzero Base Launch with no
 direction is logged and never launches.
 
-The launch replaces the target's velocity, with one addition: a
-fighter's own sideways push (`'horizontal'`, from its body: never a
-projectile, a clone or a technique) adds the speed its fighter goes the
-way it pushes, up to a full run (top speed), on top of the formula
-(`passedOn` in [`js/game/combat/combat.js`](../../js/game/combat/combat.js);
-the hit event's `carried`). Attacks never take a fighter's momentum
-([movement](movement.md#3-momentum)); a push passes it on, so a string
-thrown on the run parts the fighters as one thrown standing does. The
-strength, the stun it deals and the event's `finalLaunch` are the formula
-alone.
-
 ## Launch reaction (per fighter)
 
 A fighter's `launchReaction` entry decides how it responds; every field

@@ -55,24 +55,21 @@
 // (bottom-centre) and mirrored automatically.
 //
 // Every attack also says how the fighter moves while it plays (see
-// steerAttack in js/game/fighters/movement.js). Normal locomotion is off,
-// but that is never standing still: an attack never stops a fighter or
-// takes any of its momentum. It keeps all of the speed the fighter carried
-// into it and carries it on, never braking it (no ground friction, no air
-// drag; only speed above top speed, a Dash's burst, bleeds off as it would
-// for a fighter holding the way it goes). It may lend the fighter a share
-// of its normal steering (`control` on the ground, `airControl` in the air:
-// 0 is none, 1 is all) to build speed up to that share of top speed or to
-// turn, never to slow a faster fighter down. A `step` is movement the
-// attack makes itself: as its time crosses `at`, the fighter's forward
-// speed is raised to at least `speed` (on the ground only). The defaults:
-// all the speed kept, no steering. No attack may keep less of it:
-// `momentum`, `airMomentum` and `friction` (shares of the speed kept, a
-// braking rate) are refused.
+// steer in js/game/fighters/movement.js). Normal locomotion is off, but that is not the
+// same as standing still: the attack keeps a share of the speed the fighter
+// carried into it (`momentum` on the ground, `airMomentum` in the air; on
+// the ground never more than that share of the fighter's top speed), lets the fighter
+// steer with a share of its normal acceleration and top speed (`control`,
+// `airControl`: 0 is none, 1 is all), and lets the rest of that speed run
+// down under `friction` x the ground deceleration (the air drag in the air).
+// A `step` is movement the attack makes itself: as its time crosses `at`,
+// the fighter's forward speed is raised to at least `speed` (on the ground
+// only). The defaults are a planted attack: all the speed kept, no steering,
+// normal friction.
 //
-//   attack2: { ..., step: { at: 0, speed: 280 } },
-//   midair_attack1: { ..., airControl: 0.6 },
-//   extra_attack: { ..., control: 0.3 },
+//   attack2: { ..., momentum: 0.5, friction: 0.5, step: { at: 0, speed: 280 } },
+//   midair_attack1: { ..., airMomentum: 1, airControl: 0.6 },
+//   extra_attack: { ..., momentum: 0.5, control: 0.3, friction: 0.6 },
 //
 // `hitCancel` (seconds into the attack, or null for never) is how a
 // connected attack makes room for a follow-up: once it has hit (a Shield's
@@ -128,17 +125,15 @@
 // velocity while it lasts (gravity included, where it says so). Five kinds:
 //
 //   homing  the lock-on dash. Through the startup the fighter hangs in the
-//           air (no gravity, its sideways drift carried on). As the active
-//           phase opens it locks on to its opponent if it is in play, within
-//           `range` of the fighter's middle (middle to middle) and not
-//           behind it, and dashes at `speed` (or the speed it already goes
-//           that way, if faster), re-aimed at the target's middle every
-//           step, until the active phase is over; with nobody to lock on to
-//           it dashes straight ahead instead. Contact (a hit or a block)
-//           ends the dash: the fighter springs off the target, `rebound`
-//           upward and `recoil` back. A dash that ends without contact, or
-//           reaches the ground, keeps all of its velocity: a burst, which
-//           bleeds off above top speed as an air dash's does.
+//           air (no gravity, its drift braking). As the active phase opens
+//           it locks on to its opponent if it is in play, within `range` of
+//           the fighter's middle (middle to middle) and not behind it, and
+//           dashes at `speed`, re-aimed at the target's middle every step,
+//           until the active phase is over; with nobody to lock on to it
+//           dashes straight ahead instead. Contact (a hit or a block) ends
+//           the dash: the fighter springs off the target, `rebound` upward
+//           and `recoil` back. A dash that ends without contact keeps
+//           `exit` of its velocity; one that reaches the ground stops there.
 //   bounce  the plunge. The startup hangs, then the fighter drops at a fixed
 //           `fallSpeed` (no gravity; air steering as its `airControl`
 //           allows) until it meets the ground or an opponent: either sends
@@ -148,13 +143,13 @@
 //           (no gravity; air steering as its `airControl` allows) for the
 //           active phase, and carries on up from there under gravity.
 //   roll    the ground roll. Through the startup the fighter curls up,
-//           sliding on as any attack does; then it rolls the way it faces
-//           at `speed` plus `keep` x the running speed it had as the attack
-//           started (never more than `maxSpeed`, and never slower than it
-//           goes that way as the roll starts), at that one speed for the
-//           rest of the attack, on the ground and off a ledge alike; a wall
-//           stops it. No steering. A Shield that blocks it stops it dead,
-//           sending it back at `recoil`.
+//           sliding on as a planted attack does; then it rolls the way it
+//           faces at `speed` plus `keep` x the running speed it had as the
+//           attack started (never more than `maxSpeed`), losing `friction`
+//           units/s every second on the ground and nothing in the air (off
+//           a ledge it flies on), for the rest of the attack; a wall stops
+//           it. No steering. A Shield that blocks it stops it dead, sending
+//           it back at `recoil`.
 //
 // A motion attack never turns while it plays (a homing dash faces the way
 // it flies), and never starts while its fighter is still flying from a
@@ -162,10 +157,10 @@
 // out the launch that carries it away, so it has to recover first (an air
 // jump, a fast fall, or landing).
 //
-//   midair_attack1: { ..., motion: { type: 'homing', range: 240, speed: 1000, rebound: 760, recoil: 140 } },
+//   midair_attack1: { ..., motion: { type: 'homing', range: 240, speed: 1000, rebound: 760, recoil: 140, exit: 0.2 } },
 //   midair_attack2: { ..., motion: { type: 'bounce', fallSpeed: 1300, rebound: 900 } },
 //   midair_attack3: { ..., motion: { type: 'rise', speed: 460 } },
-//   attack3: { ..., motion: { type: 'roll', speed: 400, keep: 0.8, maxSpeed: 820, recoil: 260 } },
+//   attack3: { ..., motion: { type: 'roll', speed: 400, keep: 0.8, maxSpeed: 820, friction: 420, recoil: 260 } },
 //   midair_attack1: { ..., motion: { type: 'hover' } },
 //
 // `pull` draws opponents in while the attack's active phase is open: every
@@ -211,8 +206,8 @@
 // them). Its length is one pass of its clip (the fighter's art decides it:
 // see createAttackDefinition's `clipDuration`), all of it recovery, so the
 // fighter is committed and harmless for exactly as long as the art plays.
-// No cooldown or hit-cancel, and it moves like any attack (the defaults
-// below: its speed carried on). Nothing about it names a fighter: any fighter whose art
+// No cooldown or hit-cancel, and it moves like any planted attack (the
+// defaults below). Nothing about it names a fighter: any fighter whose art
 // arrives before its attributes can use it.
 //
 //   attack1: { animation: 'attack1', pending: true },
@@ -235,8 +230,11 @@ const ATTACK_DEFAULTS = {
   // The attack governs the fighter's movement while it plays (see the
   // fields below). False leaves normal locomotion on throughout.
   lockMovement: true,
-  control: 0,        // share (0-1) of normal steering lent on the ground
+  momentum: 1,       // x the horizontal speed kept as it starts on the ground
+  airMomentum: 1,    // the same, starting in the air
+  control: 0,        // share (0-1) of normal steering kept on the ground
   airControl: 0,     // the same in the air
+  friction: 1,       // x the ground deceleration while it is not steered
   step: null,        // { at, speed }: forward speed raised to `speed` as its time crosses `at`
   hitCancel: null,   // seconds in: from then on, once it has hit, an attack, a jump or a Dash may cut it short
   baseLaunch: 0,
@@ -260,19 +258,15 @@ const ATTACK_DEFAULTS = {
 // Every kind of attack motion (see above), with its fields' defaults. The
 // ones a kind cannot do without are listed in MOTION_REQUIRED.
 const MOTION_DEFAULTS = Object.freeze({
-  homing: Object.freeze({ range: 0, speed: 0, rebound: 0, recoil: 0 }),
+  homing: Object.freeze({ range: 0, speed: 0, rebound: 0, recoil: 0, exit: 0 }),
   bounce: Object.freeze({ fallSpeed: 0, rebound: 0 }),
   rise: Object.freeze({ speed: 0 }),
-  roll: Object.freeze({ speed: 0, keep: 0, maxSpeed: Infinity, recoil: 0 }),
+  roll: Object.freeze({ speed: 0, keep: 0, maxSpeed: Infinity, friction: 0, recoil: 0 }),
   hover: Object.freeze({}),
 });
 const MOTION_REQUIRED = Object.freeze({
   homing: ['range', 'speed'], bounce: ['fallSpeed'], rise: ['speed'], roll: ['speed'], hover: [],
 });
-// What would make a motion lose speed it has: a homing dash keeping only a
-// share of its speed as it ends (`exit`), a roll braking (`friction`).
-// Refused: a motion's speed is kept.
-const MOTION_REFUSED = Object.freeze({ homing: ['exit'], roll: ['friction'] });
 
 export const MOTION_TYPES = Object.freeze(Object.keys(MOTION_DEFAULTS));
 
@@ -282,10 +276,6 @@ function resolveMotion(spec, owner) {
   if (!spec) return null;
   const defaults = MOTION_DEFAULTS[spec.type];
   if (!defaults) throw new Error(`[Alva] ${owner} has motion type "${spec.type}" (${MOTION_TYPES.join(', ')})`);
-  const braking = (MOTION_REFUSED[spec.type] ?? []).filter((field) => spec[field] !== undefined);
-  if (braking.length) {
-    throw new Error(`[Alva] ${owner}'s ${spec.type} motion declares ${braking.join(', ')}: a motion keeps its speed`);
-  }
   const motion = { ...defaults, ...spec };
   for (const field of MOTION_REQUIRED[spec.type]) {
     if (!(motion[field] > 0)) throw new Error(`[Alva] ${owner}'s ${spec.type} motion needs a positive ${field}`);
@@ -352,7 +342,7 @@ function resolveStrikes(spec, base) {
 // Where attack `def`'s strikes can land over its whole active phase, facing
 // right from the fighter's origin (the hitbox itself, for an attack that
 // makes no motion of its own): a roll's box swept along its path from a
-// standstill (at its own speed throughout), a plunge's down and a lift's up, and a homing dash's lock-on
+// standstill, a plunge's down and a lift's up, and a homing dash's lock-on
 // range round the box's middle, ahead of it. For readers that plan or fear
 // an attack (the combat AI), never for resolving one. Null without a
 // hitbox.
@@ -362,7 +352,11 @@ export function attackReach(def) {
   const m = def.motion;
   if (!m || m.type === 'hover') return pullReach(def, hb);
   const t = def.active;
-  if (m.type === 'roll') return { x: hb.x, y: hb.y, w: hb.w + m.speed * t, h: hb.h };
+  if (m.type === 'roll') {
+    const brake = m.friction > 0 ? Math.min(t, m.speed / m.friction) : t;
+    const reach = m.speed * brake - 0.5 * m.friction * brake * brake;
+    return { x: hb.x, y: hb.y, w: hb.w + reach, h: hb.h };
+  }
   if (m.type === 'bounce') return { x: hb.x, y: hb.y, w: hb.w, h: hb.h + m.fallSpeed * t };
   if (m.type === 'rise') return { x: hb.x, y: hb.y - m.speed * t, w: hb.w, h: hb.h + m.speed * t };
   const cy = hb.y + hb.h / 2;
@@ -408,23 +402,13 @@ const PENDING_REFUSED = Object.freeze([
   'deflectProjectiles', 'unblockable', 'paralyze', 'blockPush',
 ]);
 
-// What no attack may declare: a share of the speed kept as it starts
-// (`momentum`, `airMomentum`) or a braking rate while it plays (`friction`).
-// An attack keeps all of a fighter's momentum (see above).
-const MOMENTUM_REFUSED = Object.freeze(['momentum', 'airMomentum', 'friction']);
-
 // Frozen attack definition from a character's attack entry (plus its `id`).
 // Its `baseLaunch` and `directionalLaunch` are validated here, once, as
 // declared: neither is inferred from the damage, the hitbox or the other.
 // A pending attack (see above) lasts `clipDuration` seconds, one pass of
-// its clip, and strikes nothing. One that would take away any of a
-// fighter's momentum (MOMENTUM_REFUSED) is refused.
+// its clip, and strikes nothing.
 export function createAttackDefinition(spec, { clipDuration = 0 } = {}) {
   if (!spec?.id) throw new Error('[Alva] Attack definitions need an id');
-  const braking = MOMENTUM_REFUSED.filter((field) => spec[field] !== undefined);
-  if (braking.length) {
-    throw new Error(`[Alva] Attack "${spec.id}" declares ${braking.join(', ')}: an attack keeps all of a fighter's momentum`);
-  }
   if (spec.pending) {
     const declared = PENDING_REFUSED.filter((field) => spec[field] !== undefined);
     if (declared.length) {

@@ -41,7 +41,7 @@ import { COMBAT_BUTTONS } from '../../config.js';
 import { blankInput } from './fighter-controller.js';
 import { approach, clamp } from '../../core/utils.js';
 import {
-  steer, steerAttack, carry, hitstunDrag, fastFallVelocity, airJump, highJumpLift, readDashTap,
+  steer, steerAttack, attackStartSpeed, hitstunDrag, fastFallVelocity, airJump, highJumpLift, readDashTap,
 } from './movement.js';
 
 // The combat buttons, by control codename (COMBAT_BUTTONS in js/config.js):
@@ -182,11 +182,11 @@ export class Fighter {
     this.airJumps = this.movement.airJumps;
     this.airDashes = this.airDashUses;
     // Carrying a burst of its own: the speed above top speed came from its
-    // Dash, air dash or homing dash (see lockOn), so in the air it bleeds
-    // off at movement.airOverspeedDeceleration (see steer in
-    // js/game/fighters/movement.js). Set as any of them starts; over once
-    // the speed is back to top speed or less, or a hit lands. A launch's
-    // speed is never a burst: it flies on under the air drag.
+    // Dash or air dash, so in the air it bleeds off at
+    // movement.airOverspeedDeceleration (see steer in
+    // js/game/fighters/movement.js). Set as either starts; over once the
+    // speed is back to top speed or less, or a hit lands. A launch's speed is
+    // never a burst: it flies on under the air drag.
     this.burst = false;
     // Jumped in the air this step (the jump clip starts over).
     this.airJumped = false;
@@ -521,10 +521,9 @@ export class Fighter {
     // ---- Horizontal movement ---------------------------------------------
     // See moveHorizontal, and moveAttack while an attack plays (moveMotion
     // while an attack's own motion owns the body, and then the share of
-    // gravity it falls under this step). A technique and a summon's startup
-    // carry the fighter on at the speed it had (see carry): no move a
-    // fighter makes brakes it. An air dash owns the body too: straight
-    // across at its speed, no fall.
+    // gravity it falls under this step). A summon's startup holds the
+    // fighter still where it stands, as a technique does. An air dash owns
+    // the body too: straight across at its speed, no fall.
     const atk = combat.attack;
     let gravityShare = 1;
     let dir = held;
@@ -532,7 +531,9 @@ export class Fighter {
     // Normal locomotion only: an attack steers with its own share of it.
     this.moveDir = atk?.def.lockMovement ? 0 : dir;
 
-    if (combat.immobilized) {
+    if (this.technique || this.pendingSummon) {
+      body.vx = 0;
+    } else if (combat.immobilized) {
       body.vx = 0;
     } else if (combat.stun > 0) {
       // Launched or pushed: the speed runs down at the fighter's own hitstun
@@ -549,15 +550,13 @@ export class Fighter {
     } else if (combat.shielding) {
       // A Shield locks it: no walking or running, the current speed running
       // down under the normal deceleration.
-      this.moveHorizontal(0, 1, dt);
-    } else if (this.technique || this.pendingSummon) {
-      carry(body, mv, dt, this.burst);
+      this.moveHorizontal(0, 0, 1, dt);
     } else if (atk?.motion && !atk.motion.done) {
       gravityShare = this.moveMotion(atk, dir, dt);
     } else if (atk?.def.lockMovement) {
       this.moveAttack(atk, dir, dt);
     } else {
-      this.moveHorizontal(dir, 1, dt);
+      this.moveHorizontal(dir, 1, 1, dt);
     }
 
     // ---- Jump (buffered + coyote time) -----------------------------------
@@ -719,9 +718,8 @@ export class Fighter {
     // passive rate: nothing held ever makes it faster.
     if (!spent) combat.updateEnergy(dt);
 
-    // A burst is over once the speed is back to top speed or less (never
-    // while a Dash or an attack's motion still drives the body).
-    if (this.burst && !this.dash && !this.inMotion && Math.abs(body.vx) <= mv.maxSpeed + TIME_EPSILON) this.burst = false;
+    // A burst is over once the speed is back to top speed or less.
+    if (this.burst && !this.dash && Math.abs(body.vx) <= mv.maxSpeed + TIME_EPSILON) this.burst = false;
 
     // A buffered press ages only on steps the fighter lives through (never
     // in a freeze) and is gone once it is older than the buffer.
@@ -739,17 +737,24 @@ export class Fighter {
   }
 
   // One step of horizontal steering, with `control` (0-1) of the normal
+  // steering and `friction` x the ground deceleration while it is not
   // steering: the shared rule (steer in js/game/fighters/movement.js) with
   // the universal movement values and this fighter's burst.
-  moveHorizontal(dir, control, dt) {
-    steer(this.body, this.movement, dir, control, dt, this.burst);
+  moveHorizontal(dir, control, friction, dt) {
+    steer(this.body, this.movement, dir, control, friction, dt, this.burst);
   }
 
-  // One step of an attack's own movement: its step-in, then the carry, its
-  // speed kept, steered only as far as the attack lends steering
-  // (steerAttack in js/game/fighters/movement.js).
+  // One step of an attack's own movement: its step-in, then steering with
+  // the attack's share of control (steerAttack in
+  // js/game/fighters/movement.js).
   moveAttack(atk, dir, dt) {
     steerAttack(this.body, this.movement, this.facing, atk, dir, dt, this.burst);
+  }
+
+  // The horizontal speed an attack starting now keeps of `vx` (see
+  // attackStartSpeed in js/game/fighters/movement.js).
+  attackStartSpeed(atk, vx, grounded) {
+    return attackStartSpeed(atk, vx, grounded);
   }
 
   // Remembers `action`'s press for the combat input buffer: the latest
@@ -1035,9 +1040,8 @@ export class Fighter {
   // summon for the battle to spawn at once (no startupAnimation: the
   // fighter performs nothing and is free at once) or starts its startup
   // (see pendingSummon): from this very step the fighter plays
-  // startupAnimation once in the facing it has now, carried on at the speed
-  // it had (never stopped), free to do nothing else, and the summon is
-  // queued as it ends (finishSummon).
+  // startupAnimation once, standing still in the facing it has now, free to
+  // do nothing else, and the summon is queued as it ends (finishSummon).
   // False, with no cooldown started and nothing played, if there is no such
   // summon, there is no opponent in play (none at all, or one lost to the
   // Void and waiting to respawn) or any of its art is missing (logged).
@@ -1058,6 +1062,7 @@ export class Fighter {
       this.summons.push({ id, target });
       return true;
     }
+    this.body.vx = 0;
     this.pendingSummon = {
       id, target, animation: summon.startupAnimation, duration: this.sprites.duration(summon.startupAnimation), time: 0,
     };
@@ -1086,8 +1091,7 @@ export class Fighter {
   }
 
   // Start technique `id` from `action`, facing `dir` if one is held: the
-  // technique owns the fighter from this step (see js/game/combat/technique.js),
-  // which carries on at the speed it had (see carry: never stopped).
+  // technique owns the fighter from this step (see js/game/combat/technique.js).
   // False, with no cooldown started, if there is no such technique or its
   // art or data is missing (logged).
   tryTechnique(action, id, dir = 0) {
@@ -1102,6 +1106,7 @@ export class Fighter {
     // interrupted.
     this.combat.abilityCooldowns.start(id, def.cooldown);
     this.faceAttackTarget(dir);
+    this.body.vx = 0;
     this.technique = new Technique({ owner: this, def, action });
     return true;
   }
@@ -1115,6 +1120,7 @@ export class Fighter {
     if (!t) return;
     t.end(reason);
     this.technique = null;
+    this.body.vx = 0;
     this.updateState(0);
   }
 
@@ -1159,19 +1165,20 @@ export class Fighter {
 
   // Starts attack `atk` now (it may: see tryAction and tryDeflect), turned
   // to `dir` if one is held: it cuts short an attack that may be (or a Dash
-  // past its cancel time), keeps all of the speed the fighter had (a Dash's
-  // burst included: no attack takes any of it away, see steerAttack),
-  // counts against its starts for this airtime, may spend the airtime, and
-  // sets its motion going. `airborne` remembers where it started, for the
-  // landing cancel (see update).
+  // past its cancel time), keeps its share of the speed the fighter had
+  // (see attackStartSpeed: all of it unless the attack says otherwise, a
+  // Dash's burst included), counts against its starts for this airtime, may
+  // spend the airtime, and sets its motion going. `airborne` remembers
+  // where it started, for the landing cancel (see update).
   startAttack(atk, dir = 0) {
     const combat = this.combat;
     this.cutAttack();
     if (this.dash) this.endDash();
     this.faceAttackTarget(dir);
     const runningSpeed = this.body.vx;
+    this.body.vx = this.attackStartSpeed(atk, this.body.vx, this.body.grounded);
     combat.attack = {
-      def: atk, time: 0, hasHit: false, confirmed: false, projectileSpawned: false, stepped: false, lunge: null,
+      def: atk, time: 0, hasHit: false, confirmed: false, projectileSpawned: false, stepped: false,
       struck: null, blocked: false, motion: null, airborne: !this.body.grounded,
     };
     if (atk.airUses > 0 && !this.body.grounded) this.airAttacks.set(atk.id, (this.airAttacks.get(atk.id) ?? 0) + 1);
@@ -1197,9 +1204,8 @@ export class Fighter {
   // Sets attack `record`'s motion going as it starts: a roll decides its
   // speed now (its own, plus its `keep` share of `runningSpeed`, the speed
   // the fighter had the way it now faces, up to its `maxSpeed`) and takes it
-  // as its strike goes live (never slower than the fighter goes that way by
-  // then); anything else hangs in the air from this very step, its
-  // sideways speed carried on.
+  // as its strike goes live; anything else hangs in the air from this very
+  // step.
   startMotion(record, runningSpeed) {
     const spec = record.def.motion;
     const m = {
@@ -1233,40 +1239,41 @@ export class Fighter {
         this.moveAttack(atk, dir, dt);
         return 1;
       }
-      // It rolls on at one speed, slowing for nothing (a ledge it flies
-      // off included) but a wall, which stops it.
-      if (!m.rolling) m.speed = Math.max(m.speed, body.vx * m.dir);
       if (body.wall === m.dir) m.speed = 0;
+      if (m.rolling && body.grounded) m.speed = Math.max(0, m.speed - spec.friction * dt);
       m.rolling = true;
       body.vx = m.dir * m.speed;
       return 1;
     }
     if (spec.type === 'hover') {
       // Standing on the air for the whole attack: no fall, the drift
-      // carried on (and steered as far as its airControl lends).
+      // steered as the attack allows (its air momentum and control).
       this.moveAttack(atk, dir, dt);
       body.vy = 0;
       return 0;
     }
     if (phase === 'recovery') {
-      // Over without contact: the fighter carries on with all the velocity
-      // it had (a dash's whole speed too, bleeding off as a burst does),
-      // under gravity again.
+      // Over without contact: a dash keeps `exit` of its velocity, anything
+      // else just carries on under gravity.
       m.done = true;
+      if (spec.type === 'homing') {
+        body.vx *= spec.exit;
+        body.vy *= spec.exit;
+      }
       if (atk.def.lockMovement) this.moveAttack(atk, dir, dt);
       return 1;
     }
     if (spec.type === 'homing') {
       if (phase === 'startup') {
-        // Hanging, its sideways drift carried on: the lock-on.
-        this.moveAttack(atk, dir, dt);
+        // Hanging, the drift braking: the lock-on.
+        this.moveHorizontal(0, 0, 1, dt);
         body.vy = 0;
         return 0;
       }
       if (!m.aimed) this.lockOn(m, spec);
       this.aimAt(m);
-      body.vx = m.dirX * m.speed;
-      body.vy = m.dirY * m.speed;
+      body.vx = m.dirX * spec.speed;
+      body.vy = m.dirY * spec.speed;
       if (Math.abs(m.dirX) > 1e-6) this.facing = Math.sign(m.dirX);
       return 0;
     }
@@ -1278,25 +1285,17 @@ export class Fighter {
 
   // A homing dash locking on as it starts: its opponent, if in play, within
   // `range` of the fighter's middle and not behind it, is its target, and
-  // the dash heads for it; with none it heads straight ahead. Decided once,
-  // and so is its speed: its own, or the speed the fighter already goes
-  // that way if that is faster (never slower), a burst like a Dash's above
-  // top speed (see Fighter.burst).
+  // the dash heads for it; with none it heads straight ahead. Decided once.
   lockOn(m, spec) {
     m.aimed = true;
     m.target = null;
     m.dirX = this.facing;
     m.dirY = 0;
     const foe = this.opponent;
-    if (foe && !foe.lostToVoid) {
-      const [dx, dy] = this.toMiddleOf(foe);
-      const dist = Math.hypot(dx, dy);
-      if (dist > 0 && dist <= spec.range && dx * this.facing >= -HOMING_BEHIND) m.target = foe;
-    }
-    this.aimAt(m);
-    const { body } = this;
-    m.speed = Math.max(spec.speed, body.vx * m.dirX + body.vy * m.dirY);
-    if (m.speed > this.movement.maxSpeed) this.burst = true;
+    if (!foe || foe.lostToVoid) return;
+    const [dx, dy] = this.toMiddleOf(foe);
+    const dist = Math.hypot(dx, dy);
+    if (dist > 0 && dist <= spec.range && dx * this.facing >= -HOMING_BEHIND) m.target = foe;
   }
 
   // Re-aims a homing dash at its target's middle, while the target is still

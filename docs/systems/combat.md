@@ -79,7 +79,7 @@ An attack entry (`attacks.<codename>`) becomes a frozen definition through
 | `hitstun` / `blockstun` / `hitstop` | 0.2 / 0.12 / 0.06 s | |
 | `cooldown` | 0 | A short recovery cooldown after it ends or is cut short. |
 | `groundOnly` | false | It never starts in the air (and an air press of it is never buffered). |
-| `lockMovement`, `control`, `airControl`, `step` | true, 0, 0, null | How the fighter moves while it plays ([movement](movement.md#5-attack-movement)): it always keeps all the speed it starts with (a Dash's burst included), carried on and never braked; `control` / `airControl` lend steering, `step` a lunge of its own. `momentum`, `airMomentum` and `friction` are refused: no attack may keep less. |
+| `lockMovement`, `momentum`, `airMomentum`, `control`, `airControl`, `friction`, `step` | true, 1, 1, 0, 0, 1, null | How the fighter moves while it plays ([movement](movement.md#5-attack-movement)): by default it keeps all the speed it starts with (a Dash's burst included), unsteered, under the normal friction. |
 | `hitCancel` | null | Seconds in: from then on, once it has hit, another attack (the Deflect included), a jump, a Dash or an air dash may cut it short. |
 | `projectile` | null | `{ id, spawnAt, offset }`: releases that projectile once, as its time crosses `spawnAt`. |
 | `pending` | false | Art only: one pass of its clip, no hit (declaring combat fields on one is refused). |
@@ -147,19 +147,16 @@ them today):
 - **Carry** (`carry: { lift }`): a real hit that launches nothing gives
   its target the velocity of what struck it, less `lift` upward.
 - **Motion** (`motion: { type, ... }`, `MOTION_DEFAULTS`): movement the
-  attack makes itself, owning the body while it lasts, never slower than
-  the fighter already goes. `hover` (no fields): the fighter stands on the
-  air for the whole attack, its drift carried on and steered as far as its
-  `airControl` lends (#0001's Floating Straight, Blue and air High Kick).
-  `homing` (`range`, `speed` required; `rebound`, `recoil`): hang (its
-  sideways drift carried on), lock on, dash at the target (at its speed or
-  faster, if the fighter already goes faster that way), spring off what
-  it meets; a miss keeps all of its velocity, a burst. `bounce` (`fallSpeed` required;
+  attack makes itself, owning the body while it lasts. `hover` (no
+  fields): the fighter stands on the air for the whole attack, its drift
+  steered as its `airMomentum` and `airControl` allow (#0001's Floating
+  Straight, Blue and air High Kick). `homing` (`range`,
+  `speed` required; `rebound`, `recoil`, `exit`): hang, lock on, dash at
+  the target, spring off what it meets. `bounce` (`fallSpeed` required;
   `rebound`): hang, plunge, rebound off the ground or an opponent, the
   attack over. `rise` (`speed` required): hang, then lift. `roll`
-  (`speed` required; `keep`, `maxSpeed`, `recoil`): curl, then roll on
-  the running speed, at one speed to its end. A homing dash's `exit` and a
-  roll's `friction` (a share kept, a brake) are refused. A motion attack keeps its physical facing,
+  (`speed` required; `keep`, `maxSpeed`, `friction`, `recoil`): curl, then
+  roll on the running speed. A motion attack keeps its physical facing,
   and never starts while its fighter is still flying from a launch.
 - **Pull** (`pull: { radius, speed, offset }`): while the attack is active
   it draws every opponent whose middle is within `radius` of its point
@@ -291,11 +288,11 @@ run by [`js/game/combat/technique.js`](../../js/game/combat/technique.js).
 It is not an attack, a projectile or a summon; while it runs it owns the
 fighter.
 
-**One form: the cast.** The fighter is committed to a casting pose, then
-lets go of what it casts all at once. Its phases are explicit: *cast*
-(`castAnimation`, once from the press step: the fighter is carried on at
-the speed it had, never braked, in the facing snapshotted at the start,
-the direction held on the press step if any), *release* (on its first step it releases, exactly
+**One form: the cast.** The fighter stands committed to a casting pose,
+then lets go of what it casts all at once. Its phases are explicit:
+*cast* (`castAnimation`, once from the press step: the fighter stands
+still in the facing snapshotted at the start, the direction held on the
+press step if any), *release* (on its first step it releases, exactly
 once, its `projectile: { id, offset }`, thrown the snapshotted way as an
 attack throws one, and its `burst: { hitbox, hit }`, whose hit is dealt
 once to every opponent the box meets, facing right from the fighter and

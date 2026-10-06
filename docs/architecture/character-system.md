@@ -28,8 +28,8 @@ So "#0001's Maximum Blue drags its target in" is a capability (a `pull`
 on its projectile) running on the shared pull rule; "#0002's Homing
 Attack dashes at its target" is a capability (a `homing` motion on its
 attack) running on the shared motion rules; and "an attack keeps its
-momentum" is a shared rule every fighter's attacks follow, with no value
-of their own to change it. "#0002 is faster" is not a thing a definition can say:
+momentum" is a shared rule every fighter's attacks follow with their own
+`momentum` values. "#0002 is faster" is not a thing a definition can say:
 it runs exactly as fast as #0001, and its speed lives in its moves.
 
 ## The registry

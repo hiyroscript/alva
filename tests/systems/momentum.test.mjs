@@ -4,10 +4,8 @@
 // attack → jump, attack → Dash, the air jump, air dash → aerial, landing,
 // the impact freeze and overspeed, each checked for every playable fighter
 // on the real Fighter, physics and combat (see
-// tests/helpers/fighter-harness.mjs). No attack ever takes any of it: every
-// one carries the speed it finds, and a sideways push passes the run behind
-// it on to its target. Only real forces change it: a hit, a wall, a move
-// whose own mechanic redirects the body.
+// tests/helpers/fighter-harness.mjs). Only real forces change it: a hit,
+// a wall, a move whose own mechanic redirects the body.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { playableCharacters, getCharacter } from '../../js/data/characters.js';
@@ -78,69 +76,9 @@ for (const c of playableCharacters()) {
     }
   });
 
-  // Every attack on a button, its own motion included (a roll, a homing
-  // dash, a plunge, a lift, a hover), and every cast that throws:
-  // { action, ground, air } (ids, null where there is none).
-  const buttons = () => Object.entries(c.actions).flatMap(([action, m]) => {
-    if (typeof m === 'string') return [{ action, ground: m, air: c.attacks[m].groundOnly ? null : m }];
-    return m?.ground ? [{ action, ground: m.ground, air: m.air ?? null }] : [];
-  });
-
-  test(`${name}: every ground attack carries a full run on to its last frame, never braking it, whatever is held`, () => {
-    assert.ok(buttons().length >= 4, 'every button checked');
-    for (const mapping of buttons()) {
-      for (const held of [{}, LEFT]) {
-        const { fighter, step } = running({ x: 300 });
-        step({ ...RIGHT, ...P(mapping.action) });
-        const atk = fighter.combat.attack;
-        assert.equal(atk?.def.id, mapping.ground, mapping.action);
-        while (fighter.combat.attack === atk) {
-          assert.ok(fighter.body.vx >= mv.maxSpeed - 1e-9, `${mapping.ground}, ${JSON.stringify(held)}: ${fighter.body.vx}`);
-          step(held);
-        }
-      }
-    }
-  });
-
-  test(`${name}: every aerial carries the drift it finds on, never braking it`, () => {
-    for (const mapping of buttons()) {
-      if (!mapping.air) continue;
-      const { fighter, step } = running({ x: 300 });
-      step({ ...RIGHT, ...JUMP });
-      for (let i = 0; i < 4; i++) step(RIGHT);
-      step(P(mapping.action));
-      const atk = fighter.combat.attack;
-      assert.equal(atk?.def.id, mapping.air, mapping.action);
-      while (fighter.combat.attack === atk) {
-        assert.ok(fighter.body.vx >= mv.maxSpeed - 1e-9, `${mapping.air}: ${fighter.body.vx}`);
-        step({});
-      }
-    }
-  });
-
-  test(`${name}: a sideways push passes on the run behind it, up to a full run; standing, it passes nothing`, () => {
-    const push = (vx) => {
-      const d = duel({ gap: 40, x: 500, pushboxes: true });
-      d.attacker.body.vx = vx;
-      if (vx > mv.maxSpeed) d.attacker.burst = true;
-      d.tick(P('attack1'));
-      let e = null;
-      for (let i = 0; i < 60 && !e; i++) {
-        e = d.events.find((ev) => ev.type === 'hit' && ev.directionalLaunch === 'horizontal') ?? null;
-        if (!e) d.tick();
-      }
-      assert.ok(e, `a push at ${vx}`);
-      assert.equal(d.target.body.vx, e.finalLaunch.x + e.carried, 'the target takes the push and the run');
-      return e;
-    };
-    assert.equal(push(0).carried, 0, 'standing: nothing');
-    assert.equal(push(mv.maxSpeed).carried, mv.maxSpeed, 'on the run: all of the run');
-    assert.equal(push(1200).carried, mv.maxSpeed, 'faster: never more than a full run');
-  });
-
   test(`${name}: a Dash commits to a moment of itself, then an attack cuts it short keeping its speed`, () => {
     for (const { action, ground } of ordinary(c, makeFighter().fighter)) {
-      if (!ground) continue;
+      if (!ground || ground.projectile) continue;
       const { fighter, step } = dashing(0);
       step(P(action));
       assert.equal(fighter.combat.attack, null, 'not in the Dash\'s first steps: the press is kept');
@@ -149,14 +87,16 @@ for (const c of playableCharacters()) {
       assert.equal(fighter.combat.attack?.def.id, ground.id, `${action}: out as the cancel window opens`);
       assert.equal(n, COMMIT);
       assert.equal(fighter.dash, null);
-      // All of the Dash's speed, then one step of the carry: the excess
-      // above top speed bleeding at the held rate, far beyond top speed.
-      assert.ok(close(fighter.body.vx, mv.dashSpeed - mv.overspeedHoldDeceleration * DT), `${action}: ${fighter.body.vx}`);
-      assert.ok(fighter.body.vx > 2 * mv.maxSpeed, `${action}: a Dash attack, not a standing one`);
+      // Its momentum share of the Dash's speed, then one step of the
+      // overspeed brake: far beyond top speed.
+      const kept = mv.dashSpeed * ground.momentum;
+      assert.ok(close(fighter.body.vx, kept - Math.max(mv.overspeedDeceleration, mv.deceleration * ground.friction) * DT),
+        `${action}: ${fighter.body.vx} from ${kept}`);
+      if (ground.momentum >= 1) assert.ok(fighter.body.vx > 2 * mv.maxSpeed, `${action}: a Dash attack, not a standing one`);
     }
   });
 
-  test(`${name}: air dash → aerial keeps all of the air dash's speed, never snapped to top speed`, () => {
+  test(`${name}: air dash → aerial keeps the air dash's speed (its airMomentum share), never snapped to top speed`, () => {
     for (const { action, air } of ordinary(c, makeFighter().fighter)) {
       if (!air) continue;
       const { fighter, step } = makeFighter({ x: 300 });
@@ -167,7 +107,7 @@ for (const c of playableCharacters()) {
       for (let i = 0; i < COMMIT; i++) step({});
       step(P(action));
       assert.equal(fighter.combat.attack?.def.id, air.id, action);
-      assert.ok(fighter.body.vx >= mv.airDashSpeed - mv.airOverspeedDeceleration * DT - 1e-9,
+      assert.ok(fighter.body.vx >= mv.airDashSpeed * air.airMomentum - mv.airOverspeedDeceleration * DT - 1e-9,
         `${action}: ${fighter.body.vx}`);
       assert.ok(fighter.body.vx > mv.maxSpeed, `${action}: still faster than a run`);
     }
@@ -222,8 +162,9 @@ for (const c of playableCharacters()) {
         d.tick(JUMP);
         assert.notEqual(d.attacker.combat.attack, atk, 'cut short');
         assert.ok(d.attacker.body.vy < 0);
-        // The attack carried it (nothing lost) and the jump took nothing.
-        assert.equal(d.attacker.body.vx, 300, 'its speed carried into the air');
+        // The step's own ground movement (the attack's friction) ran before
+        // the jump took off; the jump itself takes nothing.
+        assert.ok(close(d.attacker.body.vx, 300 - mv.deceleration * atk.def.friction * DT), `its speed carried into the air (${d.attacker.body.vx})`);
       } else {
         d.tick({ mouvementLeftPressed: true });
         assert.equal(d.attacker.dash?.direction, -1);
@@ -334,9 +275,9 @@ for (const c of playableCharacters()) {
       assert.equal(d.attacker.body.x, x);
     }
     // The step the freeze ends it picks up from exactly that speed: one
-    // step of its attack's own movement (or the run, if it is over),
-    // nothing more.
-    const brake = Math.max(mv.overspeedDeceleration, mv.overspeedHoldDeceleration) * DT;
+    // step of its attack's own movement, nothing more.
+    const atk = d.attacker.combat.attack;
+    const brake = Math.max(mv.overspeedDeceleration, mv.deceleration * (atk?.def.friction ?? 1)) * DT;
     assert.ok(Math.abs(vx - d.attacker.body.vx) <= brake + 1e-9, `resumed at ${d.attacker.body.vx} from ${vx}`);
     assert.ok(frozen >= 0);
   });

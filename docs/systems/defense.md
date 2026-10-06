@@ -76,9 +76,8 @@ or lower poses are skipped. There is no Dodge and no chip-damage Block.
 In the air the same button is the fighter's **Deflect**, its `deflect`
 entry: an attack in every way (it goes through `createAttackDefinition`,
 plays its own `deflect` clip, has a startup, an active phase, a recovery,
-a melee hitbox, its stuns and hitstop, a cooldown, its steering; like
-every attack it keeps all of the fighter's momentum), resolved by the
-same `CombatSystem` as any attack. Its strike
+a melee hitbox, its stuns and hitstop, a cooldown, its momentum and
+steering), resolved by the same `CombatSystem` as any attack. Its strike
 is always **3** Launch Points at **Base Launch 2**, the shared rule
 (`DEFLECT_DAMAGE`, `DEFLECT_BASE_LAUNCH`): a fighter leaves both out, and
 any other value is refused. Its direction is the fighter's own.
@@ -88,7 +87,7 @@ any other value is refused. Its direction is the fighter's own.
 | `animation` | Its clip (`deflect`). Required; missing art refuses it (logged once), never faked. |
 | `startup` / `active` / `recovery` | Its phases, whole frames of its clip. |
 | `hitbox` | Its live box, facing right from the fighter's origin: what its strike meets, and what it catches projectiles with. Required. |
-| `directionalLaunch`, `hitstun`, `blockstun`, `hitstop`, `cooldown`, `airControl`, `airUses`, `hitCancel` | As for any attack ([combat](combat.md#attacks)). |
+| `directionalLaunch`, `hitstun`, `blockstun`, `hitstop`, `cooldown`, `airMomentum`, `airControl`, `airUses`, `hitCancel` | As for any attack ([combat](combat.md#attacks)). |
 | `deflectProjectiles` | `true`: while it is live its box turns projectiles back (below). |
 | `damage` / `baseLaunch` | Never authored: always 3 and 2. |
 

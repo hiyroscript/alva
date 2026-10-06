@@ -48,7 +48,7 @@
 import { range, clamp } from '../../core/utils.js';
 import { CONFIG } from '../../config.js';
 import { HELD_CONTROLS, blankInput, jumpTapHold } from '../fighters/fighter-controller.js';
-import { steerAttack, carry } from '../fighters/movement.js';
+import { steerAttack } from '../fighters/movement.js';
 import { attackReach } from '../combat/attacks.js';
 import { worldBox } from '../combat/combat.js';
 import { DEFAULT_DIFFICULTY, getDifficultyProfile, resolveDifficulty } from '../../data/difficulty.js';
@@ -80,31 +80,19 @@ const STEP = CONFIG.sim.step;
 
 // How far an attack `self` starts now at speed `vx` carries it in `t`
 // seconds, toward `face` for its step-in: the very rules the Fighter runs
-// (steerAttack in js/game/fighters/movement.js, step by step: all of that
-// speed carried on, a burst's overspeed bleeding off, its step-in once its
-// time reaches it), on a scratch body that never touches the stage. Its
-// steering is left out: the CPU does not steer through its attacks.
+// (attackStartSpeed, then steerAttack in js/game/fighters/movement.js step
+// by step: the share of that speed it keeps, a burst's overspeed bleeding
+// off, its friction, its step-in once its time reaches it), on a scratch
+// body that never touches the stage. Its steering is left out: the CPU
+// does not steer through its attacks.
 function attackDrift(self, atk, vx, t, air, face) {
-  const body = { vx, grounded: !air };
-  const record = { def: atk, time: 0, stepped: false, lunge: null };
+  const body = { vx: self.attackStartSpeed(atk, vx, !air), grounded: !air };
+  const record = { def: atk, time: 0, stepped: false };
   let x = 0;
   for (let i = Math.round(t / STEP); i > 0; i--) {
     steerAttack(body, self.movement, face, record, 0, STEP, self.burst);
     x += body.vx * STEP;
     record.time += STEP;
-  }
-  return x;
-}
-
-// How far `self` moving at `vx` is carried in `t` seconds by a move that
-// keeps its speed (a technique, a summon's startup: see carry in
-// js/game/fighters/movement.js), on a scratch body as attackDrift.
-function carryDrift(self, vx, t) {
-  const body = { vx, grounded: true };
-  let x = 0;
-  for (let i = Math.round(t / STEP); i > 0; i--) {
-    carry(body, self.movement, STEP, self.burst);
-    x += body.vx * STEP;
   }
   return x;
 }
@@ -797,7 +785,6 @@ export class CombatAIController {
         if (this.motionFits(m, s, fx, fy, face)) out.push({ ...m, face, value: this.hitValue(atk, s, face) });
         continue;
       }
-      if (!air && !this.keepsFooting(s, atk)) continue;
       const sx = s.x + attackDrift(self, atk, s.vx, t, air, toward);
       const face = Math.sign(fx - sx) || s.facing;
       const d = (fx - sx) * face + (this.rng() * 2 - 1) * p.rangeError;
@@ -806,14 +793,6 @@ export class CombatAIController {
       out.push({ ...m, face, value: this.hitValue(atk, s, face) });
     }
     return out.sort((a, b) => b.value - a.value);
-  }
-
-  // Whether ground attack `atk` started now leaves the fighter on its
-  // footing: an attack carries it on at the speed it has (see attackDrift),
-  // so one that would slide it off a ledge before it is over is left alone.
-  keepsFooting(s, atk) {
-    const slide = attackDrift(s.self, atk, s.vx, atk.total, false, s.dir);
-    return Math.abs(slide) <= 1 || this.groundAhead(s.self, s.stage, Math.sign(slide), Math.abs(slide) + LEDGE_MARGIN);
   }
 
   // Whether motion attack `m` would reach an opponent whose feet will be at
@@ -973,7 +952,6 @@ export class CombatAIController {
   rangedScore(r, s) {
     const { self, foe, p } = s;
     if (r.air !== !s.grounded || self.combat.cooldowns.has(r.id)) return 0;
-    if (s.grounded && !this.keepsFooting(s, r.atk)) return 0;
     const o = r.atk.projectile.offset ?? { x: 0, y: 0 };
     const hb = r.proj.hitbox;
     // A shot that pulls reaches as far again as its pull: whoever is that
@@ -1013,11 +991,9 @@ export class CombatAIController {
   // fighter faces, so it turns first. Worth its long cooldown only when it
   // is likely to land, as the level judges it. A summon holds the fighter
   // only for its startup (if it has one), as it would a player, and its
-  // lead counts it; a technique commits it while it casts, so it is worth
-  // less the closer the opponent could strike first, unless the opponent
-  // is busy for longer than that. Either carries the fighter on at the
-  // speed it has (see carryDrift), so never one that would slide it off its
-  // footing, which would cut it short.
+  // lead counts it; a technique holds it in place while it casts, so it is
+  // worth less the closer the opponent could strike first, unless the
+  // opponent is busy for longer than that.
   specialOptions(s) {
     const { self, p } = s;
     if (!s.canAct || !s.grounded) return [];
@@ -1026,8 +1002,6 @@ export class CombatAIController {
     const safety = clamp((s.liveDist - danger) / 200, 0, 1);
     for (const c of s.ms.specials) {
       if (self.combat.abilityCooldowns.active(c.id)) continue;
-      const slide = carryDrift(self, s.vx, c.hold);
-      if (Math.abs(slide) > 1 && !this.groundAhead(self, s.stage, Math.sign(slide), Math.abs(slide) + LEDGE_MARGIN)) continue;
       const v = this.specialValue(c, s);
       if (v <= 0.12) continue;
       const exposed = c.type === 'technique' && !(s.openings.length && s.foeBusy > c.lead);
@@ -1064,8 +1038,7 @@ export class CombatAIController {
     if (c.type === 'technique') {
       if (!c.box || !s.sameLevel) return 0;
       const r = reachOf(c.box, s.fe);
-      // Where it will be as it lets go: carried on at the speed it has.
-      const d = s.dist - carryDrift(s.self, s.vx, c.lead) * s.dir + (this.rng() * 2 - 1) * p.rangeError;
+      const d = s.dist + (this.rng() * 2 - 1) * p.rangeError;
       if (!within(r, d, s.dy)) return 0;
       // Walking into it counts as staying.
       if (Math.sign(foe.body.vx) === -s.dir && Math.abs(foe.body.vx) > 30) stay = Math.max(stay, 0.35);

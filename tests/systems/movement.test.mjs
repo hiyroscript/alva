@@ -330,7 +330,8 @@ test('an attack pressed during a Dash comes out once its cancel time is reached,
   }
   assert.equal(n, Math.ceil(mv.dashCancelTime / DT - 1e-9), 'on the first step the Dash may be cut short');
   assert.equal(fighter.dash, null, 'the attack cut it short');
-  assert.ok(close(fighter.body.vx, mv.dashSpeed - mv.overspeedHoldDeceleration * DT), `all of the Dash's speed (${fighter.body.vx})`);
+  const attack1 = fighter.attacks.attack1;
+  assert.ok(fighter.body.vx > mv.dashSpeed * attack1.momentum - mv.overspeedDeceleration * DT - 1e-9, `${fighter.body.vx}`);
   // Late in a Dash, at once.
   const late = makeFighter();
   late.step({ ...RIGHT, runRightPressed: true });
@@ -343,19 +344,17 @@ test('an attack pressed during a Dash comes out once its cancel time is reached,
 
 // ---- Attacks and momentum ---------------------------------------------------------
 
-test('running into attack1 carries the whole run on through it, never braked, whatever is held: no invisible wall', () => {
-  for (const held of [RIGHT, {}, LEFT]) {
-    const { fighter, step } = running();
-    step({ ...RIGHT, ...P('attack1') });
-    assert.equal(fighter.combat.attack.def.id, 'attack1');
-    assert.equal(fighter.body.vx, fighter.maxSpeed, 'all of it');
-    const x = fighter.body.x;
-    let n = 0;
-    for (step(held); fighter.combat.attack; step(held)) {
-      assert.equal(fighter.body.vx, fighter.maxSpeed, `${JSON.stringify(held)}: carried on, step ${++n}`);
-    }
-    assert.ok(fighter.body.x - x >= fighter.maxSpeed * n * DT - 1e-9, 'a run\'s distance through the punch');
-  }
+test('running into attack1 keeps its momentum share and slides on it under its own friction: no invisible wall', () => {
+  const attack1 = def.attacks.attack1;
+  const { fighter, step } = running();
+  step({ ...RIGHT, ...P('attack1') });
+  assert.equal(fighter.combat.attack.def.id, 'attack1');
+  assert.ok(close(fighter.body.vx, fighter.maxSpeed * attack1.momentum - mv.deceleration * attack1.friction * DT), 'kept, then its friction');
+  const x = fighter.body.x;
+  const log = [];
+  for (step(RIGHT); fighter.state === 'attack'; step(RIGHT)) log.push(fighter.body.vx);
+  assert.ok(fighter.body.x - x > 12, 'it carries on through the punch');
+  for (let i = 1; i < log.length; i++) assert.ok(log[i] <= log[i - 1], 'never speeding up: no steering');
   // Standing still, it never moves, whatever is held.
   const still = makeFighter();
   const x0 = still.fighter.body.x;
@@ -370,18 +369,10 @@ test('the High Kick steps in on its leap frame; an attack with control keeps a s
   step(P('extra_attack'));
   assert.equal(fighter.body.vx, 0, 'standing: no speed to keep');
   while (fighter.combat.attack.time < kick.step.at - 1e-9) step({});
-  assert.ok(close(fighter.body.vx, kick.step.speed - mv.overspeedHoldDeceleration * DT), 'its step-in, as the leap frame shows');
+  assert.ok(close(fighter.body.vx, kick.step.speed - mv.deceleration * kick.friction * DT), 'its step-in, as the leap frame shows');
   const x = fighter.body.x;
   while (fighter.state === 'attack') step({});
   assert.ok(fighter.body.x - x > 6 && fighter.body.x - x < 30, `a subtle step forward (${(fighter.body.x - x).toFixed(1)})`);
-  assert.equal(fighter.body.vx, 0, 'its own lunge faded: back to the standstill it began from');
-  // Running in, faster than the step: the run carries on through it.
-  const run = running();
-  run.step({ ...RIGHT, ...P('extra_attack') });
-  while (run.fighter.combat.attack) {
-    assert.equal(run.fighter.body.vx, run.fighter.maxSpeed, 'the run, all of it');
-    run.step({});
-  }
   // Facing left, it steps left.
   const left = makeFighter({ facing: -1 });
   left.step(P('extra_attack'));
@@ -390,10 +381,12 @@ test('the High Kick steps in on its leap frame; an attack with control keeps a s
 
   // Steering through an attack (`control`): Red, given a little.
   const steered = { ...def, attacks: { ...def.attacks, attack2: { ...def.attacks.attack2, control: 0.3 } } };
+  const red = def.attacks.attack2;
   const t = running({ character: steered });
   t.step({ ...RIGHT, ...P('attack2') });
   assert.equal(t.fighter.combat.attack.def.id, 'attack2');
-  assert.equal(t.fighter.body.vx, t.fighter.maxSpeed, 'all of the run, held on: never pulled down to its share');
+  const kept = t.fighter.body.vx;
+  assert.ok(kept > 0 && kept < t.fighter.maxSpeed * red.momentum);
   let reversed = false;
   for (t.step(LEFT); t.fighter.state === 'attack'; t.step(LEFT)) {
     assert.equal(t.fighter.facing, -1, 'turned by the direction held');
@@ -402,19 +395,17 @@ test('the High Kick steps in on its leap frame; an attack with control keeps a s
   assert.ok(reversed, 'steered the other way while it releases');
 });
 
-test('aerials keep all of the drift and steer with their airControl; landing cuts only their recovery', () => {
+test('aerials keep their share of the drift and steer with their airControl; landing cuts only their recovery', () => {
   const { fighter, step } = running();
   step({ ...RIGHT, ...JUMP });
   step({ ...RIGHT, ...P('attack1') });
   const atk = fighter.combat.attack;
   assert.equal(atk.def.id, 'midair_attack1');
-  // All of the drift, above its own steering cap (airControl of top
-  // speed): held on, no air drag at all.
-  const drift = fighter.maxSpeed;
-  assert.equal(fighter.body.vx, drift, 'all of the drift');
-  step(RIGHT);
-  step({});
-  assert.equal(fighter.body.vx, drift, 'held on or let go: carried on');
+  // Its share of the drift (airMomentum), above its own steering cap
+  // (airControl of top speed): only the air drag eases it, holding on or
+  // not.
+  const drift = fighter.maxSpeed * atk.def.airMomentum;
+  assert.ok(close(fighter.body.vx, drift - mv.airDeceleration * DT), 'its share of the drift');
   for (let i = 0; i < 4; i++) step(LEFT);
   assert.ok(fighter.body.vx < drift - 4 * mv.airDeceleration * DT, 'steered');
   // A plain aerial started just before touchdown plays its startup and
@@ -456,7 +447,7 @@ test('aerials keep all of the drift and steer with their airControl; landing cut
   assert.ok(hover.fighter.body.y > y, 'and falls again once it is over');
 });
 
-test('attack movement is data with defaults: an attack that declares none carries its speed on; lockMovement false keeps locomotion', () => {
+test('attack movement is data with defaults: an attack that declares none is planted; lockMovement false keeps locomotion', () => {
   const plain = { animation: 'attack1', startup: 1 / 12, active: 1 / 12, recovery: 2 / 12, damage: 1, hitbox: def.attacks.attack1.hitbox };
   const character = {
     ...def,
@@ -466,9 +457,9 @@ test('attack movement is data with defaults: an attack that declares none carrie
   const a = running({ character });
   a.step({ ...RIGHT, ...P('attack1') });
   assert.equal(a.fighter.combat.attack.def.id, 'plain');
-  assert.equal(a.fighter.body.vx, a.fighter.maxSpeed, 'all its speed, never braked');
+  assert.ok(close(a.fighter.body.vx, a.fighter.maxSpeed - mv.deceleration * DT), 'all its speed, normal friction');
   a.step(LEFT);
-  assert.equal(a.fighter.body.vx, a.fighter.maxSpeed, 'no steering, no braking');
+  assert.ok(close(a.fighter.body.vx, a.fighter.maxSpeed - 2 * mv.deceleration * DT), 'no steering');
 
   const b = running({ character });
   b.step({ ...RIGHT, ...P('attack2') });
@@ -592,27 +583,18 @@ test('a stunned fighter\'s push or launch runs down at its own hitstun rates, ap
   assert.deepEqual([mv.hitstunFriction, mv.hitstunAirDrag], [1600, 210]);
 });
 
-test('a technique carries its fighter on at the speed it had: Unlimited Void\'s cast never brakes it, whatever is held', () => {
-  const d = duel({ gap: 900, x: 200 });
+test('a technique holds its fighter still: Unlimited Void\'s cast never moves, whatever is held', () => {
+  const d = duel({ gap: 600 });
   for (let i = 0; i < 20; i++) d.tick({ runRight: true });
-  const speed = d.attacker.body.vx;
-  assert.equal(speed, mv.maxSpeed, 'running');
+  assert.ok(d.attacker.body.vx > 0, 'running');
   d.tick(P('attack4'));
   assert.ok(d.attacker.technique);
-  assert.equal(d.attacker.body.vx, speed, 'the run carried into it');
+  const x = d.attacker.body.x;
   while (d.attacker.technique) {
-    assert.equal(d.attacker.body.vx, speed, 'held input ignored, the speed kept');
-    const x = d.attacker.body.x;
+    assert.equal(d.attacker.body.vx, 0, 'held input ignored');
     d.tick({ runLeft: true });
-    if (d.attacker.technique) assert.ok(close(d.attacker.body.x - x, speed * DT), 'carried on a run\'s step');
   }
-  assert.equal(d.attacker.technique, null);
-  // Standing, it stays where it stands.
-  const still = duel({ gap: 600 });
-  still.tick(P('attack4'));
-  const x0 = still.attacker.body.x;
-  while (still.attacker.technique) still.tick({ runLeft: true });
-  assert.ok(Math.abs(still.attacker.body.prevX - x0) < 1e-9, 'not a unit');
+  assert.ok(Math.abs(d.attacker.body.prevX - x) < 1e-9, 'not a unit until it is over');
 });
 
 // ---- Higher jump and air jump --------------------------------------------------------
