@@ -447,8 +447,8 @@ export class Fighter {
     // step it can; so is one in the air that no air dash answers, which is
     // the Dash if the fighter lands in time. One refused on the ground for
     // any other reason (no Energy, the Shield held, no art) is used up:
-    // nothing is kept. Energy
-    // spent this step means no refill this step (see the end of update).
+    // nothing is kept. Energy spent this step means no refill this step
+    // (see the end of update).
     //
     // mouvementLeftPressed / mouvementRightPressed ask for one Dash outright
     // (the Joystick touch layout's single-tap mouvement buttons, see
@@ -530,8 +530,6 @@ export class Fighter {
     if (combat.shielding || combat.stun > 0 || combat.immobilized || this.technique || this.dash || this.pendingSummon) dir = 0;
     // Normal locomotion only: an attack steers with its own share of it.
     this.moveDir = atk?.def.lockMovement ? 0 : dir;
-    // A Dash or an air dash is a burst at its own speed: the body goes the
-    // Dash's way at it, an air dash flat across with no fall.
 
     if (this.technique || this.pendingSummon) {
       body.vx = 0;
@@ -542,6 +540,8 @@ export class Fighter {
       // rates, whatever is held.
       body.vx = approach(body.vx, 0, hitstunDrag(mv, body.grounded) * dt);
     } else if (this.dash) {
+      // A burst at its own speed (never slower than the fighter came in
+      // at, see dashSpeedToward): the Dash's way, an air dash flat across.
       body.vx = this.dash.direction * this.dash.speed;
       if (this.dash.air) {
         body.vy = 0;
