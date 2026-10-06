@@ -10,12 +10,13 @@
 // or a summon. Behaviour is data on the character (`techniques`, keyed by
 // the attack it is), and so are its clips, named after it (attack5_...).
 //
-// The runtime implements one form of technique: the cast. The fighter
-// stands still, committed to a casting pose, then lets go of what it casts
-// all at once: a projectile, a burst round itself, or both. Nothing in it
-// reads a fighter or a button: any fighter may give a cast its own clips,
-// timing, projectile and burst. E.g. #0001's Hollow Purple (attack5) and
-// Unlimited Void (attack4):
+// The runtime implements one form of technique: the cast. The fighter is
+// committed to a casting pose (carried on at the speed it had, never
+// stopped: see carry in js/game/fighters/movement.js), then lets go of
+// what it casts all at once: a projectile, a burst round itself, or both.
+// Nothing in it reads a fighter or a button: any fighter may give a cast
+// its own clips, timing, projectile and burst. E.g. #0001's Hollow Purple
+// (attack5) and Unlimited Void (attack4):
 //
 //   techniques: {
 //     attack5: {
@@ -31,9 +32,9 @@
 // Phases, always explicit:
 //
 //   cast     castAnimation plays once from the press step. The fighter
-//            stands still in the facing snapshotted at the start (the
-//            direction held on the press step, if any) and can do nothing
-//            else.
+//            is carried on, never braked, in the facing snapshotted at
+//            the start (the direction held on the press step, if any)
+//            and can do nothing else.
 //   release  on its first step the technique releases: its `projectile`
 //            (an entry of the character's `projectiles`, named
 //            <attack>_object, sent the snapshotted way from `offset`, facing

@@ -1254,8 +1254,9 @@ Hard is 73 : 101.
 
 - `js/data/movement.js`: every movement value.
 - `js/data/characters/0001.js` and `0002.js`: `FPS_*`, each attack's
-  phases, `momentum`, `friction`, `airMomentum`, `hitstop`, `hitCancel`
-  and motion speeds.
+  phases, `hitstop`, `hitCancel` and motion speeds (`momentum`,
+  `friction` and `airMomentum` were retired next: see [Attacks never stop
+  momentum](#attacks-never-stop-momentum)).
 - `js/game/rendering/camera.js`: `LEAD`, `LEAD_SPEED`, `FOLLOW_X`,
   `FOLLOW_Y`; `js/game/rendering/hit-fx.js`: `HIT_FX.trail.dashAlpha`;
   `RUN_MAX_SPEED_SCALE` in `js/game/fighters/fighter.js`.
@@ -1279,6 +1280,117 @@ fighter), `momentum.test.mjs` and `movement-rules.test.mjs` (new);
 at speed), `hit-fx.test.mjs` (Dash trails), `tests/interface/discover.test.mjs`,
 `i18n.test.mjs`, `tests/fighters/0001/`, `tests/fighters/0002/` and others
 updated.
+
+## Attacks never stop momentum
+
+Not a named update (it can become one if the owner names it). Asked for
+after [universal movement](#universal-movement-and-momentum): "Attacks are
+stopping fighters and killing momentum, that shouldn't happen momentum
+should never be stopped no matter what."
+
+**The rule.** Nothing a fighter does with its own moves takes its speed
+away. Every attack, technique and summon's startup keeps all of the speed
+it finds and carries it on; no fighter's data can say otherwise.
+
+**What it removed.**
+
+- The attack fields that kept less: `momentum` (the share kept on the
+  ground), `airMomentum` (in the air) and `friction` (× the ground
+  deceleration while an attack played, 1 by default: a run into any
+  attack stopped in about 90 ms). `createAttackDefinition` now refuses
+  all three. `attackStartSpeed` went with them, and `steer` lost its
+  `friction` parameter. Their values were: #0001 Jab `momentum` 1 /
+  `friction` 0.6, Floating Straight `airMomentum` 0.8, Red 0.5 / 0.8, Red
+  Kick `airMomentum` 0.6, Maximum Blue 0.4 / 0.8, Blue `airMomentum` 0.6,
+  High Kick 1 / 0.6 and `airMomentum` 0.8, Deflect `airMomentum` 1; #0002
+  One-Two 1 / 0.5, Homing Attack `airMomentum` 0.6, Rapid Kicks 0.8 /
+  0.8, Bounce Attack `airMomentum` 0.8, Blue Tornado `airMomentum` 0.6,
+  Whirlwind 0.4 / 0.8, Deflect `airMomentum` 1.
+- A homing dash's `exit` (the share of its speed kept after a miss: #0001's
+  Red Kick 0.3, #0002's Homing Attack 0.25) and a roll's `friction` (the
+  Spin Attack lost 420 units/s every second on the ground). Both are
+  refused now.
+- The stop a technique and a summon's startup put on their fighter (speed
+  set to 0 as either started and ended, and every step between).
+- The homing dash's braking hang (its sideways drift braked through the
+  lock-on).
+
+**What it added**
+
+- **The carry** (`carry` in `js/game/fighters/movement.js`): up to top
+  speed the speed is held exactly, on the ground and in the air, whatever
+  is held (no ground friction, no air drag); above it the excess bleeds
+  off as it does for a fighter holding the way it goes
+  (`overspeedHoldDeceleration` on the ground, a burst's
+  `airOverspeedDeceleration` in the air, the drag alone for a launch's
+  speed). `steerAttack` runs it for every attack, the Fighter for a
+  technique and a summon's startup.
+- **Lent steering never brakes.** An attack's `control` / `airControl`
+  builds speed up to its share of top speed or turns the fighter, as the
+  player steers; it no longer pulls a faster fighter down to its share.
+- **The step-in's lunge** (the High Kick's): a fighter standing or going
+  forward slower lunges forward at the step's speed; only that lunge fades
+  again (at `overspeedHoldDeceleration`, about 19 units from a standstill,
+  where it was about 16), never below the speed brought in; a fighter
+  going the other way does not step, so its momentum is never turned
+  round.
+- **Motions keep speed.** A homing dash carries its sideways drift through
+  the hang, dashes at its speed or the speed it already goes that way if
+  faster, and keeps all of its velocity after a miss or on reaching the
+  ground: a burst (`Fighter.burst`), bleeding off as an air dash's does. A
+  roll rolls at one speed to its end (the Spin Attack: about 220 units
+  from a standstill, 400 from a full run, where it was 150 and 340), never
+  slower than it goes as it starts. A hover, a plunge and a lift carry the
+  sideways drift on. Their vertical hangs are unchanged.
+- **Pushes pass the run on** (`passedOn` in `js/game/combat/combat.js`;
+  the hit event's `carried`). A fighter's own strike whose Directional
+  Launch is horizontal adds its forward speed, up to a full run (top
+  speed), to its target's push; a projectile's, a clone's or a technique's
+  adds none. Without it a fighter running on through its own Jabs kept
+  pace with the target it pushed, and a Jab string ran to 16 hits; with it
+  a string thrown on the run parts the fighters as one thrown standing
+  does (the Jab → Dash → Jab chase still ends within seven hits).
+- **The CPU** reads the carry: its attack drift is the full carried speed,
+  it leaves alone a ground attack, a technique or a summon whose slide
+  would take it off its footing (`keepsFooting`, `moveset.specials[].hold`)
+  and judges a technique's reach from where the slide leaves it.
+
+**Unchanged on purpose.** A hit, a launch, a paralysis (held in place), a
+wall, a contact rebound (a homing dash springing off what it met, a roll
+a Shield stops), the vertical hangs of the homing dash, the Bounce
+Attack, the Blue Tornado and the hovers, and the player's own braking
+(letting go, the Shield, pressing back).
+
+**Balance, measured.** The same seeded CPU-vs-CPU fights on Desert, 100
+per level (50 each way round), Void falls #0001 : #0002: Easy 62 : 6,
+Medium 47 : 47, Hard 54 : 50, Brutal 65 : 36 (before, over twice as many
+fights: Easy 130 : 7, Medium 94 : 111, Hard 103 : 119, Brutal 114 : 81);
+hits a minute unchanged (98 to 113).
+
+**Where to tune it**
+
+- `js/data/movement.js`: `overspeedHoldDeceleration` (an attack's bleed
+  above top speed on the ground, and a step-in's fade),
+  `airOverspeedDeceleration`.
+- `js/game/combat/combat.js`: `passedOn` (how much run a push hands on).
+- `js/data/characters/0001.js` and `0002.js`: `control`, `airControl`,
+  `step`, motion speeds.
+
+**Code:** `js/game/fighters/movement.js`, `js/game/fighters/fighter.js`,
+`js/game/combat/attacks.js`, `js/game/combat/combat.js`,
+`js/game/combat/deflect.js`, `js/game/ai/combat-ai.js`,
+`js/game/ai/moveset.js`, both definitions.
+
+**Tests:** `tests/systems/momentum.test.mjs` (every ground attack carries
+a full run to its last frame whatever is held, every aerial its drift, a
+push passes on up to a full run), `movement-rules.test.mjs` (the carry,
+lent steering, the step-in's lunge, the refused fields),
+`movement.test.mjs` (a running Jab, the High Kick's lunge, a technique
+carrying its fighter), `tests/fighters/0001/moves-0001.test.mjs` (a
+projectile passes nothing on), `tests/fighters/0002/fighter-0002.test.mjs`
+(a homing miss keeps its speed, never slower; the roll at one speed, never
+slower; `exit` and roll `friction` refused), `launch.test.mjs`,
+`combo.test.mjs`, `tests/integration/practice-ground.test.mjs`.
 
 ## Adding a named update
 

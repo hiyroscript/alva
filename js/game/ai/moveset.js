@@ -55,8 +55,10 @@ const MOVESETS = new WeakMap();
 // js/game/combat/attacks.js) and that motion's kind (`motion`: a roll, a
 // homing dash, a plunge, a lift, a hover, or null); its summons and
 // techniques (`specials`, e.g. #0001's attack4 and attack5), each with its
-// own button (`action`), what it takes to come out (`lead`) and, for a
-// technique, where it lands (`box`) and with what (`hit`); whether it has a
+// own button (`action`), what it takes to come out (`lead`), how long it
+// carries the fighter on, committed (`hold`: a technique's cast and
+// release, a summon's startup) and, for a technique, where it lands
+// (`box`) and with what (`hit`); whether it has a
 // Shield on the ground (`groundShield`: there is none in the air), a
 // Deflect in the air (`deflect`, on the `shield` button: its attack and
 // reach, and whether it turns projectiles back), a Dash and an air dash
@@ -95,8 +97,9 @@ export function readMoveset(f) {
       const attack = f.attacks[summon.attack];
       // From the press to its strike: the owner's startup (if any), one pass
       // of the cloud, then the attack's startup.
-      const lead = sprites.duration(summon.startupAnimation) + passOf(sprites.effect(summon.cloud)) + (attack?.startup ?? 0);
-      specials.push({ action, type: 'summon', id: spec.id, lead, hit: attack });
+      const hold = sprites.duration(summon.startupAnimation);
+      const lead = hold + passOf(sprites.effect(summon.cloud)) + (attack?.startup ?? 0);
+      specials.push({ action, type: 'summon', id: spec.id, lead, hold, hit: attack });
     } else if (spec?.type === 'technique') {
       const t = f.techniqueDefs[spec.id];
       if (!t || techniqueProblem(f, t)) continue;
@@ -113,7 +116,7 @@ export function readMoveset(f) {
         box = union(box, { x: o.x + hb.x, y: o.y + hb.y, w: hb.w + shot.speed * shot.lifetime, h: hb.h });
       }
       specials.push({
-        action, type: 'technique', id: spec.id, lead, box,
+        action, type: 'technique', id: spec.id, lead, hold: lead + sprites.duration(t.releaseAnimation), box,
         hit: t.burst?.hit ?? shot, projectile: shot ? { def: shot, offset: t.projectile.offset } : null,
       });
     }

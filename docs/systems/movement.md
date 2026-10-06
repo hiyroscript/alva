@@ -20,7 +20,7 @@ explains how the code carries them out.
 | Module | Owns |
 | --- | --- |
 | [`js/data/movement.js`](../../js/data/movement.js) | The numbers: `BASE_FIGHTER_MOVEMENT`, one frozen object every Fighter reads (`MOVEMENT_FIELDS` lists them). `movementProblems` / `assertUniversalMovement`, which the registry uses to refuse a definition that declares movement of its own. And the Discover copy (`MOVEMENT_SUMMARY`, `MOVEMENT_GUIDE`). |
-| [`js/game/fighters/movement.js`](../../js/game/fighters/movement.js) | The rules, as pure functions over those numbers: `steer` (ground and air acceleration, braking, turning, overspeed), `steerAttack` (an attack's step-in and steering), `attackStartSpeed` (the momentum an attack keeps), `hitstunDrag`, `fastFallVelocity`, `airJump`, `highJumpLift`, `readDashTap` (the double tap). Each reads the values it is given on every call and writes only the body or tap record it is handed. |
+| [`js/game/fighters/movement.js`](../../js/game/fighters/movement.js) | The rules, as pure functions over those numbers: `steer` (ground and air acceleration, braking, turning, overspeed), `carry` (a move keeping all the speed it finds: an attack's, a technique's, a summon's startup), `steerAttack` (an attack's step-in, carry and lent steering), `hitstunDrag`, `fastFallVelocity`, `airJump`, `highJumpLift`, `readDashTap` (the double tap). Each reads the values it is given on every call and writes only the body or tap record it is handed. |
 | [`js/game/fighters/fighter.js`](../../js/game/fighters/fighter.js) | All movement *state* (the body, the Dash or air dash, the burst, the jump buffer, coyote time, the higher jump, air jumps and air dashes left, the waiting tap, the buffered Dash) and the order things happen in each fixed step (`Fighter.update`). It decides *when* a rule applies (a stun, a paralysis, a Shield, a technique or a Dash takes the step first) and calls `movement.js` for the arithmetic. `fighter.movement` is always `BASE_FIGHTER_MOVEMENT`. |
 | [`js/game/physics.js`](../../js/game/physics.js) | Integration and collision (`stepBody`): gravity, the fall cap, landing, solids and one-way platforms. It never knows why a body moves. |
 
@@ -43,10 +43,11 @@ startup advance their clocks; in the air a fresh Shield press tries the
 Deflect, then combat presses are tried (or buffered); a Dash (on the
 ground) or an air dash (in the air) is tried, or buffered; a technique
 advances; the Shield goes up or down (on the ground only); then
-horizontal movement is chosen, in priority: standing still (a summon's
-startup, a technique's cast, a paralysis), the hitstun drift, the Dash's
-or the air dash's speed (an air dash also holds the fall off), a Shield's
-stand, an attack's own motion, an attack's steering, or normal steering.
+horizontal movement is chosen, in priority: held in place (a
+paralysis), the hitstun drift, the Dash's or the air dash's speed (an air
+dash also holds the fall off), a Shield's stand, the carry (a technique,
+a summon's startup), an attack's own motion, an attack's carry and
+steering, or normal steering.
 Then the jump (buffered, with coyote time), the air jump, the higher
 jump's lift and the fast fall; then the body is integrated and collided;
 then launch rebounds, landing resets (air jumps, air dashes, per-airtime
@@ -101,19 +102,34 @@ above it.
 
 ## 3. Momentum
 
-Speed is state worth keeping. A legal change of action never throws it
-away:
+Speed is state worth keeping. Momentum is never stopped by anything a
+fighter does:
 
 - **Jumps.** A jump only sets the upward speed: the run's (or the Dash's)
   whole sideways speed carries into the air. An air jump is vertical
   only, a fresh rise at `airJumpRatio` × the jump's speed: the sideways
   speed carries straight through it, and steering the other way bends it
   round as the air allows (`airTurnBoost`), never in one step.
-- **Attacks.** An attack keeps its `momentum` share of the speed it starts
-  with (`airMomentum` in the air), which is all of it unless the attack
-  says otherwise, never capped at top speed: a Dash's burst carries on
-  into the attack. A planted attack is a choice its data makes (a low
-  `momentum`, a high `friction`), never the default.
+- **Attacks, techniques and summons.** Every attack keeps all of the
+  speed it starts with and carries it on (`carry`): up to top speed it is
+  held exactly, on the ground and in the air, whatever is held (no ground
+  friction, no air drag); above it the excess bleeds off as it would for
+  a fighter holding the way it goes (`overspeedHoldDeceleration` on the
+  ground, a burst's `airOverspeedDeceleration` in the air, the drag for a
+  launch's speed), so a Dash's burst carries on into a Dash attack. A
+  technique's cast and a summon's startup carry their fighter on the same
+  way. No fighter's data can keep less: `momentum`, `airMomentum` and
+  `friction` on an attack, `exit` on a homing dash and `friction` on a
+  roll are refused.
+- **Pushes pass it on.** A fighter's own strike whose Directional Launch
+  is horizontal adds the speed its fighter goes the way it pushes, up to a
+  full run (top speed), to its target's push (`passedOn` in
+  [`js/game/combat/combat.js`](../../js/game/combat/combat.js); the hit
+  event's `carried`). A projectile's, a clone's or a technique's adds
+  none. Without it a fighter running on through its own string would keep
+  pace with every target it pushes; with it a string thrown on the run
+  parts the fighters as one thrown standing does, so it still ends within
+  a few.
 - **Dashes.** A Dash or air dash goes at its speed or at the fighter's own
   speed that way if that is faster: it never slows anyone down. When it
   ends (run out, cut short, or stopped by a wall or the ground) the
@@ -127,14 +143,16 @@ away:
   gently while the fighter holds the way it moves
   (`overspeedHoldDeceleration`), harder with nothing held
   (`overspeedDeceleration`), hardest pressing back (the turn). In the air
-  a **burst** (`Fighter.burst`: the speed came from the fighter's own Dash
-  or air dash) bleeds off at `airOverspeedDeceleration`; once the speed is
-  back to top speed, or a hit lands, the burst is over.
+  a **burst** (`Fighter.burst`: the speed came from the fighter's own
+  Dash, air dash or homing dash) bleeds off at `airOverspeedDeceleration`;
+  once the speed is back to top speed (and no Dash or motion still drives
+  it), or a hit lands, the burst is over.
 
 What may change momentum is a real force: a hit, a launch, a carry, a
 pull, a rebound, a wall, a move whose own mechanic redirects the body (a
-homing dash, a roll, a plunge, a lift, a hover, a step-in, a technique's
-or summon's planted cast, a paralysis), the Void. A launch's speed is
+homing dash's hang and aim, a roll, a plunge, a lift, a hover's stand on
+the air, a step-in's lunge, a paralysis), the player's own steering
+(letting go, the Shield, pressing back), the Void. A launch's speed is
 never a burst, so momentum rules never weaken a launch.
 
 ## 4. Jumps
@@ -155,15 +173,19 @@ both. Free fall (after a move that spends the airtime) rules them out.
 
 ## 5. Attack movement
 
-Each attack also says how its fighter moves while it plays
-([combat](combat.md#attacks)): `momentum` / `airMomentum` (the share of
-the speed it started with that it keeps, all of it by default),
-`control` / `airControl` (a share of normal steering), `friction` (× the
-ground deceleration on what is not steered; above top speed the overspeed
-brake applies instead) and `step: { at, speed }` (a step-in that never
-slows a fighter already going faster). `lockMovement: false` keeps normal
-locomotion throughout. An attack with a `motion` of its own (a homing
-dash, a plunge, a lift, a roll, a hover) owns the body instead
+An attack never stops its fighter: it carries on all of the speed it
+started with (`steerAttack`, see [momentum](#3-momentum)). What its data
+may add ([combat](combat.md#attacks)): `control` / `airControl` (a share
+of normal steering it lends, to build speed up to that share of top speed
+or to turn, never to pull a faster fighter down to it) and
+`step: { at, speed }` (a step-in: on the ground, a fighter standing or
+going forward slower lunges forward at `speed`; only that lunge fades
+again, at `overspeedHoldDeceleration`, never below the speed it brought
+in, and a fighter going the other way does not step, its momentum never
+turned round). `lockMovement: false` keeps normal locomotion throughout.
+An attack with a `motion` of its own (a homing dash, a plunge, a lift, a
+roll, a hover) owns the body instead, keeping the sideways speed it finds
+through its hang and never slowing a faster fighter
 ([combat](combat.md#attack-mechanics-beyond-a-timed-hitbox)).
 
 ## 6. The Dash and the air dash
@@ -237,7 +259,12 @@ for its jump, Speed Power for its top speed), and #0002 ran faster than
 #0001. [Universal movement](../../UPDATES.md#universal-movement-and-momentum)
 retired all of that: one set of faster values for everyone, the triple
 jump, momentum kept through every change of action, and Dashes that flow
-into attacks and jumps. The old values are kept in
+into attacks and jumps. [Attacks never stop
+momentum](../../UPDATES.md#attacks-never-stop-momentum) then retired the
+last ways a move could brake its fighter (an attack's `momentum`,
+`airMomentum` and `friction`, a homing dash's `exit`, a roll's
+`friction`, the stop a technique or summon put on its fighter) and made
+pushes pass the run on. The old values are kept in
 [`UPDATES.md`](../../UPDATES.md).
 
 ## Tests
@@ -250,7 +277,8 @@ into attacks and jumps. The old values are kept in
 - [`tests/systems/momentum.test.mjs`](../../tests/systems/momentum.test.mjs):
   momentum through run → jump, Dash → jump, Dash → attack, attack → jump,
   attack → Dash, the air jump, air dash → aerial, landing, the impact
-  freeze and overspeed, for each fighter.
+  freeze and overspeed, every ground attack and aerial carrying its speed
+  to its last frame, and pushes passing the run on, for each fighter.
 - [`tests/systems/movement-rules.test.mjs`](../../tests/systems/movement-rules.test.mjs):
   the rules against made-up values.
 - [`tests/systems/air-mouvment.test.mjs`](../../tests/systems/air-mouvment.test.mjs):

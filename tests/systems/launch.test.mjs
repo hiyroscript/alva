@@ -338,7 +338,7 @@ test('a Shielded hit adds no Launch Point and launches nothing, whatever its Bas
 test('a hit event describes the new system and nothing of the old one', () => {
   const { event, attacker, target } = hitAt(116, realHits().extra_attack);
   assert.deepEqual(Object.keys(event).sort(), [
-    'attacker', 'baseLaunch', 'damage', 'directionalLaunch', 'energyCost', 'finalLaunch', 'hitstun',
+    'attacker', 'baseLaunch', 'carried', 'damage', 'directionalLaunch', 'energyCost', 'finalLaunch', 'hitstun',
     'launchPointAfter', 'launchPointBefore', 'launchSpeed', 'launchStrength', 'move', 'paralysis', 'perfect', 'point',
     'projectile', 'stall', 'summon', 'target', 'technique', 'type',
   ]);
@@ -352,6 +352,7 @@ test('a hit event describes the new system and nothing of the old one', () => {
   assert.equal(event.directionalLaunch, 'vertical');
   assert.equal(event.launchStrength, 240);
   assert.deepEqual(event.finalLaunch, { x: 0, y: -240 * U });
+  assert.equal(event.carried, 0, 'an upward launch passes on no run');
 });
 
 // ---- #0001 ------------------------------------------------------------------------

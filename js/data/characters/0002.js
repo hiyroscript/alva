@@ -327,7 +327,6 @@ export const CHARACTER_0002 = {
     blockstun: 0.12,
     hitstop: 0.05,
     cooldown: 0.3,
-    airMomentum: 1,
     airControl: 0.4,
     deflectProjectiles: true,
   },
@@ -368,14 +367,15 @@ export const CHARACTER_0002 = {
   // js/game/combat/attacks.js). Phases and strikes are whole frames of each clip,
   // and every hitbox is measured from its art (facing right from the
   // origin, mirrored with facing). Its speed is in its moves' own motion
-  // (the homing dash, the plunge, the roll, the lift), never in how it runs.
+  // (the homing dash, the plunge, the roll, the lift), never in how it runs,
+  // and every one keeps all the speed #0002 brings into it, carried on and
+  // never braked (see steerAttack in js/game/fighters/movement.js).
   attacks: {
     // The One-Two: two strikes in one press, light and quick (a quarter of
     // a second in all). The jab (frame 2, 1) holds the target for the
     // straight (frame 4, 2), which pushes it away. Frame 4 is held one more
     // frame to recover. A hit opens a follow-up once the straight is out.
-    // It keeps all the speed it is thrown at, sliding on under half the
-    // ground deceleration.
+    // It keeps all the speed it is thrown at, carried on.
     attack1: {
       animation: 'attack1',
       recovery: 1 / FPS_0002.attack1,
@@ -392,17 +392,16 @@ export const CHARACTER_0002 = {
       ],
       cooldown: 0.1,
       groundOnly: true,
-      momentum: 1,
-      friction: 0.5,
       hitCancel: 4 / FPS_0002.attack1,
     },
     // The Homing Attack. Curled up, it hangs for a moment (the lock-on,
     // 7/60 s), then dashes at 1100 units/s for up to 0.22 s at its
     // opponent, if it is within 240 units and not behind it, re-aimed
-    // every step; with nobody there it dashes straight ahead (a short air
-    // dash that keeps a quarter of its speed as it ends). The hit pops the
-    // target up (2, Base Launch 1 upward) and #0002 springs off it (760
-    // up, 140 back) with both its air jumps back: the chain canon is
+    // every step (faster, if it already flies faster that way); with
+    // nobody there it dashes straight ahead, a short air dash whose speed
+    // carries on as it ends, bleeding off as an air dash's does. The hit
+    // pops the target up (2, Base Launch 1 upward) and #0002 springs off it
+    // (760 up, 140 back) with both its air jumps back: the chain canon is
     // famous for. Once per airtime (landing or being hit gives it back).
     midair_attack1: {
       animation: 'midair_attack1',
@@ -418,8 +417,7 @@ export const CHARACTER_0002 = {
       hitstop: 0.05,
       cooldown: 0.1,
       airUses: 1,
-      motion: { type: 'homing', range: 240, speed: 1100, rebound: 760, recoil: 140, exit: 0.25 },
-      airMomentum: 0.6,
+      motion: { type: 'homing', range: 240, speed: 1100, rebound: 760, recoil: 140 },
       hitCancel: 7 / 60,
     },
     // The Rapid Kicks: a committed flurry, its heaviest launcher. After a
@@ -432,7 +430,7 @@ export const CHARACTER_0002 = {
     // The hitbox is the thick of the flurry just in front, where the feet
     // land, not the trails' tips. A long cooldown: the target is free again
     // well before another flurry could start, so it never loops. A Shield
-    // stops the flurry at the kick it blocks. It keeps most of a run.
+    // stops the flurry at the kick it blocks. A run carries on through it.
     attack2: {
       animation: 'attack2',
       recovery: 2 / FPS_0002.attack2,
@@ -451,8 +449,6 @@ export const CHARACTER_0002 = {
       ],
       cooldown: 1.2,
       groundOnly: true,
-      momentum: 0.8,
-      friction: 0.8,
       hitCancel: 8 / FPS_0002.attack2,
     },
     // The Bounce Attack. Curled up, it hangs for a moment (5/60 s), then
@@ -476,14 +472,14 @@ export const CHARACTER_0002 = {
       cooldown: 0.05,
       airUses: 2,
       motion: { type: 'bounce', fallSpeed: 1400, rebound: 900 },
-      airMomentum: 0.8,
       airControl: 0.5,
     },
     // The Spin Attack. It curls into a ball (8/60 s, sliding on: time to
     // see it coming), then rolls the way it faces at 400 units/s plus 0.8
     // of the running speed it had as it curled (up to 1000: a Dash's burst
-    // makes it a cannonball), slowing by 420 every second on the ground,
-    // for 0.55 s: about 150 units from a standstill, 340 from a full run.
+    // makes it a cannonball, never slower than it already goes), at that
+    // one speed for 0.55 s: about 220 units from a standstill, 400 from a
+    // full run.
     // As a ball it is a smaller target (its hurtbox is the ball) and it
     // rolls on through the opponent it bowls over (2, Base Launch 1
     // sideways, too short a stun to chase); a Shield stops it dead instead,
@@ -503,7 +499,7 @@ export const CHARACTER_0002 = {
       hitstop: 0.06,
       cooldown: 1.6,
       groundOnly: true,
-      motion: { type: 'roll', speed: 400, keep: 0.8, maxSpeed: 1000, friction: 420, recoil: 260 },
+      motion: { type: 'roll', speed: 400, keep: 0.8, maxSpeed: 1000, recoil: 260 },
       passThrough: true,
       hurtboxes: [{ x: -20, y: -50, w: 40, h: 50 }],
     },
@@ -535,14 +531,13 @@ export const CHARACTER_0002 = {
       airUses: 1,
       freeFall: true,
       motion: { type: 'rise', speed: 460 },
-      airMomentum: 0.6,
       airControl: 0.5,
     },
     // The Whirlwind (extra_attack). It turns and spins up a whirlwind
     // (frames 1-5), sends it off as a tornado (extra_attack_object) as
     // frame 6 shows, and spins down (7-9). No melee hitbox: the tornado
-    // is the attack. A long cooldown: a trap to set, not to spam. A cast,
-    // planted on purpose.
+    // is the attack. A long cooldown: a trap to set, not to spam. A run
+    // carries on through it.
     extra_attack: {
       animation: 'extra_attack',
       startup: 5 / FPS_0002.extra_attack,
@@ -552,8 +547,6 @@ export const CHARACTER_0002 = {
       projectile: { id: 'extra_attack_object', spawnAt: 5 / FPS_0002.extra_attack, offset: { x: 44, y: -39 } },
       cooldown: 1.4,
       groundOnly: true,
-      momentum: 0.4,
-      friction: 0.8,
     },
   },
 };

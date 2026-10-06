@@ -125,6 +125,20 @@ const bodyPoint = (target) => ({ x: target.body.x, y: target.body.y - target.bod
 // What a fighter's strike carries its target along at (see `carry`).
 const bodyVelocity = (f) => ({ x: f.body.vx, y: f.body.vy });
 
+// The run a sideways push hands on to its target: a fighter's own strike
+// (never a detached one: a projectile, a clone, a technique's burst) whose
+// Directional Launch is horizontal adds the speed its fighter goes the way
+// it pushes, up to a full run (top speed), to the push. No attack ever
+// takes a fighter's momentum (see steerAttack in
+// js/game/fighters/movement.js); it passes it on, so a string of pushes
+// thrown on the run parts the fighters as surely as one thrown standing.
+// Sideways velocity (0 when nothing is passed on).
+function passedOn(attacker, def, facing, detached) {
+  if (detached || def.directionalLaunch !== 'horizontal' || !attacker.body) return 0;
+  const forward = attacker.body.vx * facing;
+  return forward > 0 ? facing * Math.min(forward, attacker.movement?.maxSpeed ?? 0) : 0;
+}
+
 const scratchHit = {};
 const scratchHurt = {};
 const scratchBurst = {};
@@ -144,8 +158,8 @@ export class CombatSystem {
   constructor() {
     // { type: 'hit' | 'block', attacker, target, move, damage, energyCost,
     //   launchPointBefore, launchPointAfter, baseLaunch, directionalLaunch,
-    //   launchStrength, finalLaunch, launchSpeed, hitstun, perfect, point,
-    //   paralysis, stall, projectile, summon, technique }
+    //   launchStrength, finalLaunch, carried, launchSpeed, hitstun, perfect,
+    //   point, paralysis, stall, projectile, summon, technique }
     // `damage` is what the hit added to the target's Launch Point (0 on a
     // block), `move` the id of the attack or hit that dealt it and
     // `energyCost` what the target's Shield paid for it: shieldHitCost, or
@@ -156,7 +170,9 @@ export class CombatSystem {
     // was given: that strength at LAUNCH_UNIT_SPEED per point along the
     // direction (y grows downward; zero for no launch), bent by the
     // target's launch steering; `launchSpeed` its length and `hitstun` the
-    // stun it dealt, a harder launch's longer. `perfect` marks a block by a
+    // stun it dealt, a harder launch's longer. `carried` is the sideways run
+    // a fighter's own sideways push handed on to its target on top of
+    // finalLaunch (see passedOn; 0 for none). `perfect` marks a block by a
     // Shield raised just in time (see Fighter.perfectShield) and `point` is
     // where the hit landed, for the effects. `paralysis` is the hold it put
     // on its target (seconds, 0 for none) and `stall` how long a melee blow
@@ -393,10 +409,12 @@ export class CombatSystem {
     if (finalLaunch.x || finalLaunch.y) tc.releaseParalysis();
     else if (!blocked && def.paralyze > 0) tc.paralyze(def.paralyze);
     if (blocked && def.blockPush > 0) target.body.vx = facing * def.blockPush;
+    const carried = finalLaunch.x || finalLaunch.y ? passedOn(attacker, def, facing, detached) : 0;
     if (finalLaunch.x || finalLaunch.y) {
       // A launch replaces the target's sideways speed (a vertical one sends
-      // it straight up or down) and, when it has one, its vertical speed.
-      target.body.vx = finalLaunch.x;
+      // it straight up or down) and, when it has one, its vertical speed. A
+      // sideways push adds the run its attacker passes on (see passedOn).
+      target.body.vx = finalLaunch.x + carried;
       if (finalLaunch.y) {
         target.body.vy = finalLaunch.y;
         target.body.grounded = false;
@@ -412,7 +430,7 @@ export class CombatSystem {
     const event = {
       type: blocked ? 'block' : 'hit', attacker, target, move: def.id ?? null,
       damage, energyCost, launchPointBefore, launchPointAfter,
-      baseLaunch: def.baseLaunch, directionalLaunch: def.directionalLaunch, launchStrength, finalLaunch,
+      baseLaunch: def.baseLaunch, directionalLaunch: def.directionalLaunch, launchStrength, finalLaunch, carried,
       launchSpeed, hitstun: blocked ? 0 : hitstun, perfect, point,
       paralysis: blocked || finalLaunch.x || finalLaunch.y ? 0 : def.paralyze ?? 0, stall,
       projectile, summon, technique,
