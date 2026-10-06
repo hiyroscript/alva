@@ -1220,15 +1220,24 @@ each fighter's own values are in its character specification (7.2.9).
   - *Air.* The same shape with `airAcceleration`, `airTurnBoost` and a light
     `airDeceleration` drag: steering bends the drift instead of replacing
     it, and a running jump carries its speed.
-  - *Momentum.* A legal change of action never throws speed away: a jump
-    and an air jump keep the sideways speed they find, an attack keeps its
-    `momentum` share of it (all of it unless its data says otherwise, a
-    Dash's burst included), a Dash never slows a faster fighter and its
-    speed carries on after it, landing keeps the speed it lands with, and
-    the impact freeze holds a velocity without losing it. Only real forces
-    change momentum: a hit, a launch, a carry, a pull, a rebound, a wall, a
-    move whose own mechanic redirects the body (a motion, a step-in, a
-    technique's or summon's planted cast, a paralysis), the Void.
+  - *Momentum.* Momentum is never stopped by anything a fighter does: a
+    jump and an air jump keep the sideways speed they find; every attack,
+    technique and summon's startup keeps all of it and carries it on,
+    never braking it (no ground friction, no air drag; only speed above top
+    speed bleeds off, as it would for a fighter holding the way it goes),
+    a Dash's burst included; a Dash never slows a faster fighter and its
+    speed carries on after it; landing keeps the speed it lands with; and
+    the impact freeze holds a velocity without losing it. No fighter's data
+    can say otherwise (an attack declaring `momentum`, `airMomentum` or
+    `friction`, a homing dash's `exit`, a roll's `friction` is refused). A
+    sideways push passes the run behind it on: a fighter's own strike whose
+    Directional Launch is horizontal adds its forward speed, up to a full
+    run, to the push (a projectile's, a clone's or a technique's adds
+    none), so a string thrown on the run parts the fighters as one thrown
+    standing does. Only real forces change momentum: a hit, a launch, a
+    carry, a pull, a rebound, a wall, a move whose own mechanic redirects
+    the body (a motion's hang or dash, a paralysis), the player's own
+    steering (letting go, the Shield, pressing back), the Void.
   - *Jump.* Its strength is the universal `jumpVelocity` (920 units/s,
     about 170 units high); it is buffered (`jumpBuffer`) and has coyote time
     (`coyoteTime`). Takeoff is on the press step, and the jump only sets
@@ -1373,21 +1382,25 @@ each fighter's own values are in its character specification (7.2.9).
   attack (`pending: true`) is art only: one pass of its clip, no hit, and
   declaring combat fields on one is refused.
   - *Attack movement.* Normal locomotion is off while an attack plays, but
-    that is not the same as standing still: an attack keeps its share of
-    the horizontal speed it started with (`momentum` on the ground,
-    `airMomentum` in the air: all of it by default, never capped at top
-    speed, so a Dash's burst carries into a Dash attack), may be steered
-    with a share of the normal acceleration and top speed (`control`,
-    `airControl`), lets the rest of its speed run down under `friction` ×
-    the ground deceleration (above top speed the overspeed brake; the air
-    drag in the air), and may move by itself (`step: { at, speed }`:
-    forward speed raised to at least `speed` as its time crosses `at`, on
-    the ground, never lowered). Defaults (`momentum` 1, `control` 0,
-    `friction` 1, no step) keep the fighter's speed, unsteered; a planted
-    attack is one whose data says so (a low `momentum`, a high `friction`),
-    never the default. `lockMovement: false` keeps full locomotion. A
-    technique holds its fighter still instead and a clone never moves:
-    neither reads these.
+    that is never standing still: an attack never stops a fighter or takes
+    any of its momentum. It keeps all of the horizontal speed it started
+    with and carries it on (`carry` in `js/game/fighters/movement.js`): up
+    to top speed held exactly, on the ground and in the air, whatever is
+    held; above it (a Dash's burst, so a Dash attack) the excess bleeds
+    off as it would for a fighter holding the way it goes
+    (`overspeedHoldDeceleration` on the ground, a burst's
+    `airOverspeedDeceleration` in the air). It may lend steering (`control`,
+    `airControl`: a share of the normal acceleration and top speed) to
+    build speed up to that share or to turn, never to pull a faster
+    fighter down to it, and may move by itself (`step: { at, speed }`: as
+    its time crosses `at`, a fighter on the ground standing or going
+    forward slower lunges forward at `speed`; only that lunge fades again,
+    at `overspeedHoldDeceleration`, never below the speed brought in, and
+    one going the other way does not step). Defaults (`control` 0, no
+    step) keep the fighter's speed, unsteered. `momentum`, `airMomentum`
+    and `friction` are refused: no attack may keep less. `lockMovement:
+    false` keeps full locomotion. A technique and a summon's startup carry
+    their fighter on the same way; a clone never moves.
   - *Combat input buffer.* An ordinary attack press the fighter cannot act
     on yet (an attack or its recovery, a stun, a Dash before its cancel
     time, a cooldown, `shield` held for its Shield) is kept for the
@@ -1487,21 +1500,24 @@ each fighter's own values are in its character specification (7.2.9).
     struck it (the attacker's body, or the projectile), less `lift` upward.
   - **Motion** (`motion`, one of five kinds; a motion attack never changes physical facing for a visual turn
     while it plays): `hover` stands on the air for the whole attack (no
-    fall, its drift steered as its `airMomentum` and `airControl` allow);
-    `homing` hangs through its startup (no gravity), then
-    locks on to its opponent if in play, within `range` of its middle and
-    not behind it, and dashes at `speed`, re-aimed at the target's middle
-    every step, until its active phase ends (straight ahead with no target);
-    contact (hit or block) springs it off the target, `rebound` up and
-    `recoil` back; a dash that ends without contact keeps `exit` of its
-    velocity, and one that reaches the ground stops. `bounce` hangs, then
+    fall, its drift carried on, steered as far as its `airControl` lends);
+    `homing` hangs through its startup (no gravity, its sideways drift
+    carried on), then locks on to its opponent if in play, within `range`
+    of its middle and not behind it, and dashes at `speed` (or the speed it
+    already goes that way, if faster: a burst, as an air dash's is),
+    re-aimed at the target's middle every step, until its active phase
+    ends (straight ahead with no target); contact (hit or block) springs it
+    off the target, `rebound` up and `recoil` back; a dash that ends
+    without contact, or reaches the ground, keeps all of its velocity,
+    bleeding off above top speed as a burst does. `bounce` hangs, then
     plunges at a fixed `fallSpeed`; meeting the ground or an opponent sends
     it back up at `rebound` and ends the attack (a ground bounce is no
     landing). `rise` hangs, then rises at `speed` for its active phase and
     carries on up under gravity. `roll` curls through its startup (sliding
     on), then rolls the way it faces at `speed` plus `keep` × the running
-    speed it had, up to `maxSpeed`, losing `friction` per second on the
-    ground (none in the air); a wall stops it, and a Shield that blocks it
+    speed it had, up to `maxSpeed` (never slower than it goes that way as
+    the roll starts), at that one speed for the rest of the attack, on the
+    ground and off a ledge alike; a wall stops it, and a Shield that blocks it
     stops it dead and sends it back at `recoil`. No motion attack starts
     while its fighter is still flying from a launch (`Fighter.launch`): a
     hang, hover, dash, plunge or lift would cancel the launch, so it must
@@ -1647,8 +1663,9 @@ each fighter's own values are in its character specification (7.2.9).
 - **Deflect.** In the air, a fresh `shield` press (`shieldPressed`,
   never the button held) is the fighter's Deflect: an attack in every
   way, through `createAttackDefinition` (its own `deflect` clip, startup,
-  active phase, recovery, melee hitbox, stuns, hitstop, cooldown,
-  momentum and steering), resolved by the same `CombatSystem` as any
+  active phase, recovery, melee hitbox, stuns, hitstop, cooldown and
+  steering; like every attack it keeps all of the fighter's momentum),
+  resolved by the same `CombatSystem` as any
   attack, trading, interrupted and punished as one. Its strike is the
   same for every fighter: **3** Launch Points at **Base Launch 2**
   (`DEFLECT_DAMAGE`, `DEFLECT_BASE_LAUNCH`; a fighter authors neither, and
@@ -1776,8 +1793,9 @@ each fighter's own values are in its character specification (7.2.9).
   - *Startup.* With a `startupAnimation`, the accepted press puts the
     owner into its own summoning pose (`Fighter.pendingSummon`, visual
     state `summon`, between `bound` and `attack` in priority): it plays
-    once from the press step, the owner standing still (speed 0), keeping
-    its facing and unable to do anything else; the summon is queued the
+    once from the press step, the owner carried on at the speed it had
+    (never stopped, as an attack carries it), keeping its facing and unable
+    to do anything else; the summon is queued the
     step after its last frame, and the owner is free on that step. A hit
     (its hurt pose on the hit's own step), lost ground, the Void taking it
     or its target, a reset or respawn, a Practice Ground fighter or CPU
@@ -1821,11 +1839,12 @@ each fighter's own values are in its character specification (7.2.9).
   `js/game/combat/technique.js`) are multi-phase moves the fighter itself
   performs: not an attack (no `combat.attack`), a projectile or a summon.
   The runtime implements one form of technique, the **cast**: the fighter
-  stands committed to a casting pose, then lets go of what it casts all at
+  is committed to a casting pose, then lets go of what it casts all at
   once. Explicit phases, never inferred from animation frames: *cast*
-  (`castAnimation`, played once from the press step; the fighter stands
-  still in the facing snapshotted at the start, the direction held on the
-  press step if any, and can do nothing else), *release* (on its first
+  (`castAnimation`, played once from the press step; the fighter is
+  carried on at the speed it had, never braked, in the facing snapshotted
+  at the start, the direction held on the press step if any, and can do
+  nothing else), *release* (on its first
   step the technique releases, exactly once: its `projectile`, an entry of
   the character's `projectiles` sent the snapshotted way from its
   `offset`, exactly as an attack throws one, and its `burst`, whose `hit`

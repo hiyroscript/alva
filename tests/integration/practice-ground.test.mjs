@@ -594,6 +594,9 @@ test('moves that aim at an opponent fall back or miss with nobody there, without
   // Movement, jumping, both BAs in the air and the Shield still work alone.
   run({ runRight: true }, 30);
   assert.ok(p.body.x > PRACTICE_MAP.spawnPoints[0].x);
+  // Turned back toward the middle: a homing kick that misses flies on with
+  // all of its speed, so it heads where there is ground.
+  run({ runLeft: true }, 10);
   run({ jump: true, jumpPressed: true });
   run({}, 8);
   assert.equal(p.body.grounded, false);

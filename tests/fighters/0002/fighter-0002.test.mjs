@@ -441,7 +441,7 @@ test('the Homing Attack hangs for the lock-on, then dashes at its opponent, re-a
   assert.equal(me.airJumps, MOVEMENT.airJumps, 'both its air jumps given back');
 });
 
-test('with nobody in range it dashes straight ahead, and keeps a quarter of its speed as the dash ends', () => {
+test('with nobody in range it dashes straight ahead, and keeps all of its speed as the dash ends, bleeding off as a burst', () => {
   const { fighter, step } = solo();
   const far = makeFighter({ x: 1800, facing: -1 });
   fighter.opponent = far.fighter;
@@ -452,9 +452,28 @@ test('with nobody in range it dashes straight ahead, and keeps a quarter of its 
   assert.equal(fighter.combat.attack.motion.target, null);
   assert.equal(fighter.body.vx, 1100);
   assert.equal(fighter.body.vy, 0);
+  assert.equal(fighter.burst, true, 'a burst of its own');
   stepUntil(step, (f) => f.combat.phase === 'recovery', {});
-  // A quarter of its speed, less one step of the air's drag.
-  assert.ok(Math.abs(fighter.body.vx - (275 - MOVEMENT.airDeceleration * DT)) < 1e-6, 'a quarter of its speed');
+  // All of its speed, less one step of a burst's air bleed.
+  assert.ok(Math.abs(fighter.body.vx - (1100 - MOVEMENT.airOverspeedDeceleration * DT)) < 1e-6, `all of its speed (${fighter.body.vx})`);
+  // ...still well above top speed as the attack ends: never cut short.
+  stepUntil(step, (f) => !f.combat.attack, {});
+  assert.ok(fighter.body.vx > MOVEMENT.maxSpeed, `carried on (${fighter.body.vx})`);
+});
+
+test('a homing dash is never slower than the fighter already flies that way', () => {
+  const { fighter, step } = solo();
+  const far = makeFighter({ x: 1800, facing: -1 });
+  fighter.opponent = far.fighter;
+  airborne(step);
+  // Flung fast (no burst of its own: only the air's drag on it).
+  fighter.body.vx = 1300;
+  step(P('attack1'));
+  stepUntil(step, (f) => f.combat.phase === 'active', {});
+  const flying = fighter.body.vx;
+  step({});
+  assert.ok(flying > 1100, `its drift carried through the hang (${flying})`);
+  assert.equal(fighter.body.vx, flying, 'dashing at the speed it already had');
 });
 
 test('an opponent behind it is never locked on to', () => {
@@ -535,9 +554,26 @@ test('the Spin Attack curls up, then rolls at its own speed plus 0.8 of the run 
   assert.equal(run.fighter.body.vx, MOVEMENT.maxSpeed, 'running at the universal top speed');
   run.step(P('attack3'));
   stepUntil(run.step, (f) => f.combat.phase === 'active', {});
-  assert.ok(Math.abs(run.fighter.body.vx - (400 + 0.8 * MOVEMENT.maxSpeed)) < 1, 'plus 0.8 of the run');
-  stepUntil(run.step, (f) => !f.combat.attack, {});
+  const rolling = run.fighter.body.vx;
+  assert.ok(Math.abs(rolling - (400 + 0.8 * MOVEMENT.maxSpeed)) < 1, 'plus 0.8 of the run');
+  while (run.fighter.combat.attack) {
+    run.step({});
+    if (run.fighter.combat.attack) assert.equal(run.fighter.body.vx, rolling, 'at that one speed to its end: no braking');
+  }
   assert.deepEqual(run.fighter.hurtboxes, DEF.hurtboxes, 'its own hurtboxes back');
+});
+
+test('a roll is never slower than the fighter already goes, its own cap or not', () => {
+  const { fighter, step } = solo();
+  const spin = DEF.attacks.attack3;
+  fighter.body.vx = 1500;
+  step(P('attack3'));
+  assert.equal(fighter.combat.attack?.def.id, 'attack3');
+  stepUntil(step, (f) => f.combat.phase === 'active', {});
+  // The curl slides on, bleeding only above top speed, as any attack does.
+  const curled = 1500 - MOVEMENT.overspeedHoldDeceleration * spin.startup;
+  assert.ok(curled > spin.motion.maxSpeed);
+  assert.ok(Math.abs(fighter.body.vx - curled) < 1e-6, `rolling at the speed it had (${fighter.body.vx})`);
 });
 
 test('the roll bowls its target over and rolls on through it', () => {
@@ -664,14 +700,19 @@ test('a multi-hit attack refuses fields its strikes own, strikes out of order, a
   assert.throws(() => createAttackDefinition({ id: 'attack1', animation: 'attack1', pending: true, hits: [] }), /pending/);
 });
 
-test('a motion is one of four kinds, with the speed it cannot do without', () => {
+test('a motion is one of its kinds, with the speed it cannot do without, and never one that loses speed', () => {
   const base = { id: 'attack3', animation: 'attack3', hitbox: { x: 0, y: -40, w: 20, h: 20 } };
   assert.throws(() => createAttackDefinition({ ...base, motion: { type: 'teleport' } }), /homing, bounce, rise, roll/);
   assert.throws(() => createAttackDefinition({ ...base, motion: { type: 'roll' } }), /positive speed/);
   assert.throws(() => createAttackDefinition({ ...base, motion: { type: 'homing', speed: 900 } }), /positive range/);
   const roll = createAttackDefinition({ ...base, motion: { type: 'roll', speed: 400 } });
-  assert.deepEqual({ ...roll.motion }, { type: 'roll', speed: 400, keep: 0, maxSpeed: Infinity, friction: 0, recoil: 0 });
+  assert.deepEqual({ ...roll.motion }, { type: 'roll', speed: 400, keep: 0, maxSpeed: Infinity, recoil: 0 });
   assert.equal(createAttackDefinition(base).motion, null);
+  assert.throws(() => createAttackDefinition({ ...base, motion: { type: 'roll', speed: 400, friction: 420 } }), /declares friction: a motion keeps its speed/);
+  assert.throws(
+    () => createAttackDefinition({ ...base, motion: { type: 'homing', range: 200, speed: 900, exit: 0.25 } }),
+    /declares exit: a motion keeps its speed/,
+  );
 });
 
 test('attackReach sweeps a motion attack\'s box along its path, for the CPU', () => {

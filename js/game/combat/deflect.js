@@ -27,7 +27,7 @@
 //     startup: 1 / 15, active: 2 / 15, recovery: 2 / 15,
 //     hitbox: { x: 6, y: -118, w: 44, h: 98 },
 //     directionalLaunch: 'vertical', hitstun: 0.32, blockstun: 0.14, hitstop: 0.06,
-//     cooldown: 0.3, airMomentum: 0.7, airControl: 0.3,
+//     cooldown: 0.3, airControl: 0.3,
 //     deflectProjectiles: true,
 //   }
 //

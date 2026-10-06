@@ -87,10 +87,13 @@ not exhausted, not in free fall, not flying from a launch).
 It plays the faster game as a player does, through the same rules:
 
 - **Attack drift.** Where an attack carries it before it strikes is
-  computed by stepping the very rules the Fighter runs (`attackStartSpeed`
-  and `steerAttack` from `js/game/fighters/movement.js`) over the attack's
-  startup, so a Dash's burst carried into an attack is a lunge it plans
-  for.
+  computed by stepping the very rules the Fighter runs (`steerAttack` from
+  `js/game/fighters/movement.js`) over the attack's startup, so a run or a
+  Dash's burst carried into an attack is a lunge it plans for. An attack
+  never stops it, so it leaves alone a ground attack whose slide would
+  take it off its footing before the attack is over (`keepsFooting`), and
+  a technique or summon whose cast would (`carryDrift`, over its `hold`),
+  and judges a technique's reach from where the slide leaves it.
 - **The Dash.** It Dashes in from a little more than a Dash's length out
   to where a Dash, its run-on and a strike reach; a planned follow-up
   strikes out of the Dash as soon as one connects, cutting it short past
