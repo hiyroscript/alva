@@ -1,38 +1,362 @@
-Work directly in the current hiyroscript/alva repository on main. Read and follow CLAUDE.md, ALVA_SPEC.md, codename_rule, the character docs, and the relevant system docs before changing anything. character_rule is protected: NEVER edit, move, rename, reformat, or otherwise modify it.
+You are working in the GitHub repository hiyroscript/alva.
 
-This is a gameplay/balance update plus a cooldown presentation update. Implement it as a proper shared-system change, not as a collection of hacks. Alva uses one character system: shared behavior belongs in shared combat/movement/rendering code, while character-specific values belong in js/data/characters/<id>.js. Do not special-case 0001 or 0002 IDs in shared runtime code.
+Implement the following Quick Battle flow changes and overtime tie behavior. First inspect the existing implementation and preserve the project’s architecture, accessibility, localization, responsive behavior, tests, and documentation conventions. Do not rewrite unrelated gameplay systems.
 
-The current code has a recent regression/intentional balance pass that removed #0001’s cooldowns and restricted ordinary attack cooldowns to MAX_ATTACK_COOLDOWN = 0.05. That old restriction is no longer correct for this design and must be changed. The current cooldown ring in js/game/rendering/fighter-status.js also puts the numeric timer in the center and an internal label such as A4 / A5 underneath. That presentation must be changed.
+Goal
 
-Implement all of the following requirements:
+Make three related product changes:
 
-1. Universal 0.5-second repeat cooldown. Every actual discrete move, attack, and ability for every character must have at least a 0.5-second repeat cooldown unless it is one of the explicit exceptions or explicit longer overrides below. This is a reuse cooldown, NOT 0.5 seconds added to startup, active frames, recovery, animation timing, hitstun, or input latency. Ordinary grounded attacks, mid-air attacks, extra_attack, projectile-producing attacks, motion attacks, summons, techniques, Dash (mouvment) and air dash (midair_mouvment) all fall under this rule. Running/normal directional locomotion is not a cooldown ability. Fast fall/down remains a directional movement mechanic rather than a discrete move and should remain unchanged. Do not introduce a global cooldown that prevents using a different move; cooldowns are per move/action. Existing animations and phase timing should remain unchanged unless another requirement below explicitly changes a value. Make the 0.5-second baseline future-proof so a newly added fighter naturally receives the intended behavior instead of requiring manual edits everywhere. Explicit longer cooldowns must remain possible.
-2. The ONLY current gameplay exceptions to the universal 0.5-second rule are jumps, running, Shield, and Deflect. Ground jump and air jumps must behave exactly as they currently do. Normal running/left-right movement must behave exactly as it currently does. Ground Shield must behave exactly as it currently does. Deflect must also be left out of this new baseline cooldown rule. Do not accidentally turn #0001’s Deflect from its current cooldown: 0 into 0.5, and do not change #0002’s existing Deflect repeat cooldown just because the ordinary-attack cooldown rules are changing. The request is for these defensive mechanics not to be affected. Preserve their current behavior and Energy interaction.
-3. Dash and air dash ARE affected. mouvment and midair_mouvment are discrete moves, not normal running, so each must have a 0.5-second repeat lockout. Add this at the shared movement/Fighter level rather than on a particular character. The cooldown must be respected by player input and CPU decision-making. Combat Assist only moves like a Dash and is explicitly not a real Dash in the existing architecture; do not make Combat Assist consume, start, or get blocked by the new Dash cooldown. Its requested attack still follows that attack’s normal cooldown rules.
-4. Remove the obsolete 0.05-second ordinary-attack ceiling. js/game/combat/attacks.js currently defines MAX_ATTACK_COOLDOWN = 0.05 and documentation/tests are built around the idea that attacks can never have a meaningful timer. That rule is obsolete. Redesign it cleanly so ordinary attacks can support the 0.5-second baseline and longer character-specific cooldowns such as 5 seconds. Do not simply set a magic maximum that happens to fit one current move if a more general validated rule is cleaner. Keep invalid values such as negative or non-finite cooldowns rejected.
-5. #0001 ordinary attacks. #0001 currently has cooldown: 0 on Jab, Floating Straight, Red, Red Kick, Maximum Blue, Blue, and High Kick. They must now use the universal 0.5-second repeat cooldown. Preserve their current startup/active/recovery timing, damage, hit effects, movement mechanics, air-use rules, projectiles, hit-cancels, etc. The cooldown must still interact correctly with attack ending and hit-cancel behavior; do not create same-move spam through hit-cancel paths that bypasses the timer.
-6. #0001 Hollow Purple: 5-second cooldown. attack5, Hollow Purple, is the #0001 attack whose projectile currently deals 10 damage. Give the technique a 5.0-second cooldown. It must begin when the technique is accepted in the same way Alva’s existing technique cooldown system is designed to begin, and it must continue recovering in real time. A press during cooldown does nothing and must not buffer a delayed cast. Keep Hollow Purple’s 10 damage, projectile mechanics, erase/unblockable behavior, animation/cast timing, projectile speed/lifetime, and other combat properties unchanged.
-7. #0001 Unlimited Void/stun: 3-second cooldown. attack4, Unlimited Void, is the stun/paralyze technique. Give it a 3.0-second cooldown using the same ability cooldown system and the same acceptance/start semantics as Hollow Purple. Preserve its current burst, unblockable behavior, hit values, and paralysis behavior. Do not change the current paralyze: 1.7 merely because the ability cooldown is now 3 seconds.
-8. Redesign the visible long-cooldown indicator. The current world-space cooldown ring in js/game/rendering/fighter-status.js shows seconds in the middle and an internal code such as A4/A5 underneath. Change that layout. The center of the ring must show the ability’s actual icon/art — the same visual used by that ability’s touch button. The numeric cooldown must move to the bottom, replacing the A4, A5, EXTRA_ATTACK, or other internal codename label. Example: while Hollow Purple is cooling, its ring center should show the same Hollow Purple projectile art used by its touch button and underneath it should read something like 4.3. Unlimited Void should similarly show the same cast-frame artwork as its touch button. The old code-name label should not be visible.
-9. Reuse the existing ability-preview source of truth. Do not manually hard-code Hollow Purple/Unlimited Void images into fighter-status.js. #0001 already declares touch previews in mobileAbilities: Unlimited Void uses attack4_cast frame 5 and Hollow Purple uses attack5_object frame 0 from projectileAnimations. #0002’s Whirlwind already uses extra_attack_object frame 2. The world-space cooldown indicator should consume the same underlying preview metadata so the button and cooldown ring cannot drift apart. Respect the repository’s architecture: js/game/ should not start depending directly on DOM/UI code just to reuse a preview. If necessary, extract the preview-selection logic into a small shared data/presentation helper that both js/ui/mobile-abilities.js and the canvas status renderer can use. Use the fighter’s already-loaded sprite/projectile art and the existing canvas sprite helpers. Preserve the artwork’s own colors and transparency; do not tint it white. Scale it cleanly inside the ring and keep pixel art crisp.
-10. Only meaningful long cooldowns need the persistent world-space ring. Do not make the battlefield constantly flicker with rings for every universal 0.5-second repeat delay. The baseline 0.5-second lockout is gameplay state and can remain visually implicit. Show the existing world-space cooldown UI for explicit cooldowns longer than the universal baseline, including #0001 Unlimited Void (3s), #0001 Hollow Purple (5s), and #0002 Whirlwind (5s). Keep the current ring progress/clockwise recovery visualization, row centering, outline readability, and “nothing drawn when ready” behavior. If more than one long cooldown is active, they should still lay out side-by-side correctly.
-11. #0002 ordinary attacks. Replace the current blanket 0.05 cooldowns on its ordinary moves with the new 0.5-second baseline: One-Two, Homing Attack, Rapid Kicks, Bounce Attack, Spin Attack, and Blue Tornado. Preserve each move’s current attack phases, air-use rules, motion, damage, launch, carry, free-fall behavior, etc. Again, #0002’s Deflect is excluded from this change.
-12. #0002 Whirlwind (extra_attack) gets a 5-second cooldown. It is currently an ordinary projectile-producing attack with cooldown: 0.05; change its explicit repeat cooldown to 5.0 seconds. Because this is a meaningful long cooldown, include it in the redesigned world-space cooldown indicator even though it is an ordinary attack rather than a summon/technique. Its ring should use the same Whirlwind/tornado preview as the touch button and show the remaining seconds below the ring, never an internal codename.
-13. #0002 Whirlwind projectile travels faster. extra_attack_object currently has speed: 260 and lifetime: 1.6. Increase projectile speed to 360 units/s. Keep lifetime at 1.6 seconds unless a concrete collision/system invariant requires otherwise; the intended result is specifically that the tornado moves across the arena faster and therefore covers more distance during its life. Do not accelerate its animation or change the Whirlwind caster animation just to make the projectile faster.
-14. #0002 Whirlwind final hit deals 10 damage. The projectile currently uses repeated 1-damage hits with a finisher dealing 3. Keep the earlier trapping/piercing ticks at their existing damage and timing. Change only the final blow/finisher to 10 damage. Preserve its Base Launch 2 vertical finisher, hitstun/hitstop unless validation or a test reveals a specific incompatibility. The damage tier system already allows 10, so do not weaken the requested value to fit old balance assumptions.
-15. Increase #0001’s pull range slightly. #0001’s Attack 3 family has two pull mechanics. Increase them modestly without changing their pull speed or rewriting the mechanic: Maximum Blue’s projectile attack3_object.pull.radius should go from 120 to 140, and airborne Blue’s midair_attack3.pull.radius should go from 170 to 190. Keep their current pull speeds (360 for Maximum Blue and 1300 for Blue), offsets, projectile speed, lifetime, hit values, pierce behavior, and launch behavior unchanged. This should feel like a range buff, not a rework.
-16. CPU/AI must understand every cooldown. The CPU already avoids ordinary attacks whose CombatState.cooldowns are active and specials whose abilityCooldowns are active. Extend that discipline to the new Dash/air-dash cooldown and to #0002 Whirlwind’s long ordinary-attack cooldown. No CPU should repeatedly request an unavailable move or assume old 0.05-second timing. Do not weaken difficulty-independent gameplay values to compensate; difficulty should still only affect decision-making.
-17. Input buffering must not bypass cooldowns. A press made while a move is cooling down must not be transformed into an automatic delayed use unless that is already the explicit intended buffering rule for the particular action. In particular, an unavailable special/technique must continue to do nothing rather than firing when its cooldown later expires. Verify ordinary attack buffering, Combat Assist finishing, Dash requests during hitstop, and hit-cancel paths against the new longer delays so a buffered request cannot accidentally defeat the cooldown.
-18. Respawn/reset behavior. Follow the repository’s existing cooldown-reset semantics consistently. A new life/reset should not inherit stale attack, ability, or movement cooldowns unless the existing game specification explicitly says the state survives that transition. Preserve Quick Battle/overtime behavior where appropriate and update tests if the spec says a live match’s cooldowns carry through a phase transition. Do not invent a character-specific reset rule.
-19. Update all stale documentation and comments. At minimum audit ALVA_SPEC.md, docs/systems/combat.md, docs/systems/rendering.md, docs/systems/movement.md, docs/characters/0001.md, docs/characters/0002.md, comments in js/game/combat/attacks.js, combat-state.js, fighter-status.js, and both character definition files. Remove statements such as “#0001 has no cooldowns,” “every #0002 attack is 0.05s,” “ordinary attack cooldowns are capped at 0.05s,” and “#0001’s techniques never show cooldown rings.” Document the new baseline, exceptions, explicit longer cooldowns, icon-centered ring design, and new Whirlwind/pull tuning accurately. Do not edit character_rule.
-20. Tests are required, not optional. Update or add focused tests for the universal 0.5-second ordinary attack cooldown, every exemption, Dash and air-dash cooldowns, the 3s/5s explicit cooldowns, Whirlwind’s 5s timer, 360 projectile speed and 10-damage finisher, #0001’s two increased pull radii, CPU cooldown awareness, cooldown buffering, reset behavior, and the redesigned cooldown indicator. The current tests that explicitly assert MAX_ATTACK_COOLDOWN === 0.05, no #0001 cooldowns, or #0002’s 0.05 cooldowns must be rewritten to test the new rule rather than simply deleted. Update tests/systems/combat-rules.test.mjs, tests/systems/fighter-status.test.mjs, tests/systems/dash.test.mjs, tests/systems/air-mouvment.test.mjs, tests/systems/combo.test.mjs, relevant AI tests, tests/fighters/0001/moves-0001.test.mjs, tests/fighters/0002/fighter-0002.test.mjs, and any integration tests affected by the new timing. The fighter-status tests must verify that the center is ability artwork rather than numeric timer text and that the bottom text is the remaining cooldown rather than A4/A5 or another codename.
+1. A true tie at the end of overtime.
+If overtime expires and both sides have exactly the same score and the same knockback value—called Launch Point in this repository—the match must end in a tie. It must no longer silently restart a fresh battle.
 
-Implementation quality requirements: preserve the fixed-step 60 Hz simulation and PHASE_EPSILON behavior; do not use wall-clock timers; do not introduce fighter-ID conditionals in shared systems; do not rename canonical codenames; preserve the intentional spelling mouvment; do not duplicate touch-button preview definitions; do not fabricate missing art; and do not change unrelated damage, Energy, Launch, Shield, Deflect, movement speed, animation timing, or ability mechanics.
+2. Quick Battle gets a Regular Play / Custom Play choice.
+When the player selects Quick Battle on the existing Select Mode screen, open a modal dialog with exactly two playable choices:
 
-Before finishing, run the complete test suite with:
+Custom Play
+Regular Play
+
+Do not immediately advance to Select Difficulty until one of those choices is selected.
+
+3. Custom Play lets the player choose the CPU fighter, while Regular Play skips CPU and stage selection.
+
+The resulting Quick Battle flows should be:
+
+Home → Play → Select Mode → Quick Battle → Regular Play dialog choice → Select Difficulty → Select Fighter → Battle
+
+For Regular Play, when the player confirms their fighter, automatically choose a random playable CPU fighter and a random normal battle stage, then start the Battle immediately. This intentionally skips the new Select CPU step and the existing Select Stage step.
+
+The Custom Play flow should be:
+
+Home → Play → Select Mode → Quick Battle → Custom Play dialog choice → Select Difficulty → Select Fighter → Select CPU → Select Stage → Battle
+
+Custom Play therefore adds a new CPU fighter selection step immediately after Select Fighter.
+
+Watch Mode and Practice Ground must remain functionally unchanged.
+
+Existing architecture you must account for
+
+The current Quick Battle setup is defined by QUICK_BATTLE_SETUP in js/ui/components.js as:
+
+Mode → Difficulty → Fighter → Stage
+
+The current setup screens are:
+
+js/screens/mode-select-screen.js
+js/screens/difficulty-select-screen.js
+js/screens/character-select-screen.js
+js/screens/map-select-screen.js
+
+CharacterSelectScreen is already reusable and is also used by Watch Mode for CPU selection. Reuse that roster architecture for the new Quick Battle Select CPU step rather than creating a second fighter-grid implementation.
+
+js/screens/watch-screens.js demonstrates the existing pattern for configuring CharacterSelectScreen with a different title, selection key, step index, next screen, and preview ID.
+
+App.initialSelection() in js/core/app.js currently stores Quick Battle’s difficulty, characterId, and mapId, while Watch Mode keeps separate CPU selections. Add whatever Quick Battle state is needed for the selected Regular/Custom play type and CPU fighter without coupling it to selection.watch.
+
+The current BattleScreen.enter() in js/screens/battle-screen.js contains this Quick Battle assumption:
+
+Quick Battle resolves Player 1 from characterId, then sets p2Def = p1Def.
+
+Remove that mirror-match assumption. Quick Battle must resolve Player 1 and the CPU as two independently selected fighter definitions. The existing Battle constructor already accepts separate p1Def and p2Def, and BATTLE_MODES['quick-battle'] already correctly assigns Player 1 a PlayerController and Player 2 a CombatAIController, so do not duplicate or replace that controller architecture.
+
+The selected Quick Battle difficulty must continue to apply to the CPU exactly as it does now.
+
+If the two selected fighters happen to be the same fighter, the existing sprite-load deduplication should continue to load/share one sprite set. If they differ, both fighter sprite sets must load.
+
+Only playable fighters may ever be selected for the CPU. Locked, unavailable, removed, null, stale, or unknown fighters must not silently fall back to another fighter.
+
+The normal stages are the entries in MAPS from js/data/maps.js. Practice Ground is deliberately not in MAPS and must never be randomly selected by Regular Play.
+
+Quick Battle choice dialog
+
+Selecting the existing Quick Battle mode card in js/screens/mode-select-screen.js should open a proper modal choice dialog rather than immediately calling app.screens.go('difficulty').
+
+The visible choices must read exactly:
+
+Custom Play
+Regular Play
+
+Add English and French localization keys following the existing localization architecture in:
+
+js/localization/strings/en.js
+js/localization/strings/fr.js
+
+Do not hardcode visible interface strings into the screen implementation.
+
+Use the project’s existing glass-panel/modal visual language and MenuNavigator scope management. This is a normal choice dialog, so prefer role="dialog" rather than presenting it as an error or destructive alertdialog.
+
+Keyboard, gamepad, pointer, and accessibility behavior must all work. Focus must enter the dialog when it opens. Both choices must be reachable through normal menu navigation. Escape/Back must dismiss the dialog and return focus to the Quick Battle card without choosing either mode.
+
+This last point is important: the existing generic ConfirmDialog represents its second button and Escape/Back as the same false/cancel result. Do not simply label its cancel action Custom Play if that would make Escape accidentally start Custom Play. Either cleanly extend/generalize the dialog infrastructure to support explicit choices plus dismissal, or implement a small dedicated choice dialog using the same overlay/navigation conventions.
+
+Regular Play should be the convenient/default choice for focus unless doing so conflicts with an established navigation convention.
+
+Selecting either choice records the Quick Battle play type and proceeds to Select Difficulty.
+
+Returning Back to Select Mode and selecting Quick Battle again should present the choice dialog again so the player can switch between Regular and Custom Play.
+
+Setup progress and Back navigation
+
+The progress indicator must reflect the path the player actually selected.
+
+Custom Play has five setup steps:
+
+Mode → Difficulty → Fighter → CPU → Stage
+
+Regular Play has only the setup screens that the player actually visits:
+
+Mode → Difficulty → Fighter
+
+Do not show unreachable CPU and Stage steps as upcoming steps in Regular Play.
+
+It is acceptable to introduce separate setup definitions for Regular and Custom Quick Battle if that keeps screenHeader() clean. Preserve WATCH_SETUP exactly for Watch Mode.
+
+Custom Play Back behavior must be:
+
+Select Stage → Back → Select CPU
+Select CPU → Back → Select Fighter
+Select Fighter → Back → Select Difficulty
+Select Difficulty → Back → Select Mode
+
+Regular Play Back behavior before the Battle must remain:
+
+Select Fighter → Back → Select Difficulty
+Select Difficulty → Back → Select Mode
+
+Back/Escape from the Regular/Custom choice dialog itself dismisses the dialog and remains on Select Mode.
+
+Custom Play CPU selection
+
+Create/register a Quick Battle CPU selection screen after the player fighter screen.
+
+It should reuse CharacterSelectScreen and FighterRoster, in the same architectural style used by WatchFighterScreen.
+
+Its title should be localized as Select CPU.
+
+Its setup step should be the CPU step in Custom Play.
+
+Confirming a fighter stores it separately from Player 1—for example in a Quick Battle cpuCharacterId field—and advances to Select Stage.
+
+The CPU may use the same fighter as Player 1; do not introduce a restriction against mirror matches unless an existing product rule requires one.
+
+The new screen must have its own unique screen ID and roster preview ID, and must be registered in App.start() and represented by the appropriate <section> in index.html.
+
+Use the existing screen--character styling instead of duplicating the roster CSS.
+
+Regular Play random selection
+
+Regular Play still lets the player choose difficulty and their own fighter.
+
+After the player confirms their fighter, do not show Select CPU or Select Stage.
+
+Select:
+
+a random CPU fighter from the current playableCharacters() result, and
+a random stage from MAPS.
+
+Then start the Battle.
+
+The random CPU fighter may be the same fighter as the player unless there is already a repository rule saying otherwise. The critical requirement is that it must come from the currently playable roster and never from a locked/disabled placeholder.
+
+Factor random-choice behavior cleanly enough that it can be deterministic in tests, such as by keeping the selection helper small and allowing Math.random or an injected RNG to be controlled by the test.
+
+Randomization occurs when starting a new Regular Play setup after the player’s fighter is confirmed. Once that Battle has started, the selected random CPU and stage belong to that match setup.
+
+Restart Battle and Rematch must not reroll the CPU or stage.
+
+Starting another new Regular Play setup may pick new random values.
+
+Make sure the generated fighter and stage IDs are stored/passed in the same canonical state used by the Battle screen rather than creating a second hidden source of truth.
+
+Starting Quick Battle with different fighters
+
+Update Quick Battle parameters so the Battle receives:
+
+Player 1 fighter ID
+CPU fighter ID
+stage ID
+difficulty
+
+MapSelectScreen.battleParams() for Custom Play must pass the CPU fighter selection as well as Player 1.
+
+The Regular Play direct start after Select Fighter must pass or store the randomly chosen CPU and stage equivalently.
+
+Update BattleScreen.enter() so Quick Battle independently validates:
+
+characterId for Player 1
+cpuCharacterId for Player 2
+
+Do not use p1Def as an implicit CPU fallback anymore.
+
+The existing refusal/error behavior for unavailable fighters should remain: if either required fighter is invalid, do not build the Battle or load a partial match.
+
+Touch controls must continue to show Player 1’s fighter only. CPU selection must never alter Player 1’s touch-control artwork, labels, abilities, or Combat Assist.
+
+Combat Assist remains Player 1 only. The Quick Battle CPU must never receive it.
+
+Result-screen navigation
+
+Be careful with the existing result menu.
+
+Today BattleScreen’s Change Stage button works by going Back because the Battle normally comes directly from Select Stage. That assumption is no longer true for Regular Play, because Regular Play enters Battle directly from Select Fighter.
+
+Do not leave a button labeled Change Stage navigating to Select Fighter.
+
+Make Change Stage navigation explicit and coherent for the new flows. It should actually take the player to a stage-selection experience with the current player fighter, CPU fighter, and difficulty retained. It is acceptable for choosing Change Stage after a Regular Play match to enter the manual stage selector rather than rerolling a random stage.
+
+Do not break the existing Custom Play or Watch Mode Change Stage behavior.
+
+Overtime tie behavior
+
+The repository calls the knockback number shown on the HUD Launch Point, available through:
+
+fighter.combat.launchPoint
+
+The core Battle result logic in js/game/battle.js is already close to the requested behavior.
+
+At the end of overtime it currently:
+
+compares score first;
+if scores differ, more points wins;
+if scores are equal, compares Launch Point;
+lower Launch Point wins;
+if Launch Point is equal within the existing 1e-6 tolerance, returns a draw.
+
+Preserve those rules and the existing tolerance.
+
+The problem is the UI behavior in js/screens/battle-screen.js.
+
+finishBattle() currently does:
+
+if battle.result.outcome === 'draw', call restart();
+otherwise call showResult().
+
+Remove the automatic fresh-battle behavior for the overtime equality case.
+
+When overtime expires with both score and Launch Point equal, the current match is over and must display a terminal tie result.
+
+The result overlay should use the existing result-menu design and offer the normal post-match actions such as Rematch, Change Stage, and Return to Home.
+
+The tie must not declare Player 1, CPU, CPU 1, or CPU 2 the winner.
+
+Add localized tie result copy. A suitable English presentation is:
+
+Kicker: End of overtime
+Title: Tie
+Description: Overtime ended with the points and Launch Point equal.
+
+Use a natural equivalent in French and stay consistent with the repository’s established translation for “Launch Point”.
+
+Do not try to construct a winner key such as side.quickBattle.draw.wins. Handle a draw explicitly because showResult() currently assumes outcome is p1 or p2 and derives a loser from it.
+
+This true terminal tie behavior applies anywhere the shared Battle reaches the same overtime condition, including Watch Mode. Watch Mode must not silently restart a CPU-vs-CPU match after an exact overtime tie anymore.
+
+Preserve all other result behavior:
+
+a third point still immediately produces K.O.;
+more points at regulation expiration still wins without overtime;
+level points at regulation expiration still starts overtime;
+more points at overtime expiration still wins;
+level points with unequal Launch Point still awards the win to the lower Launch Point;
+Restart and Rematch still reset scores, Launch Point, overtime, the Void, and the timer normally.
+
+Do not alter the closing-Void mechanics, overtime duration, scoring, respawn rules, CPU logic, or combat physics.
+
+Localization, HTML and styling
+
+Update every affected English and French string.
+
+Add any required screen aria-label localization for the new Select CPU screen.
+
+If a new global dialog root is required, add it to index.html beside the existing overlay roots and use the existing overlay/glass styles where practical.
+
+Avoid inline styles and avoid duplicating the fighter roster styling.
+
+Any new CSS should live in the stylesheet area that already owns setup screens or overlays and follow the repository’s existing cascade/layout conventions.
+
+The modal and new CPU selection screen must remain usable on desktop and landscape mobile and with reduced motion.
+
+Documentation and specification
+
+Update the product specification and documentation so they no longer describe Quick Battle as a four-step mirror-match setup or describe an exact overtime draw as automatically beginning a fresh battle.
+
+At minimum inspect and update:
+
+ALVA_SPEC.md
+docs/gameplay/battle.md
+README.md where its Quick Battle description is affected
+relevant comments in js/screens/battle-screen.js, js/screens/character-select-screen.js, js/screens/map-select-screen.js, js/core/app.js, and js/ui/components.js
+
+Also search the repository for old statements such as:
+
+Mode → Difficulty → Fighter → Stage
+CPU plays the same fighter
+one fighter for both
+draw: no dialog
+fresh battle starts
+draw still starts a fresh battle
+
+Update stale documentation/comments/tests rather than leaving contradictory descriptions.
+
+Do not change Watch Mode’s setup flow:
+
+Difficulty → CPU 1 → CPU 2 → Stage
+
+Tests
+
+The project has no install step and its documented full test command is:
 
 node --test
 
-Also run any focused tests you changed while developing. Fix the implementation until the full suite passes. Then inspect the final diff for stale comments/specification text and ensure there are no accidental changes to character_rule.
+Add/update automated coverage for the new behavior and run the complete suite.
 
-In the final response, summarize the architecture changes, list the exact final tuning values, state which cooldowns are intentionally exempt, describe the new cooldown-ring presentation, and report the full test result. Do not merely say “implemented”; give the relevant files/systems changed and any design decision that was necessary.
+Relevant existing tests include:
+
+tests/integration/overtime.test.mjs
+tests/interface/battle-screen.test.mjs
+tests/integration/watch-mode.test.mjs
+tests/integration/difficulty.test.mjs
+
+There is currently an interface test asserting that equal points and equal Launch Point at the end of overtime produces “no dialog, a fresh battle”. Replace that expectation with the new terminal tie behavior.
+
+There is also Watch Mode coverage describing a draw as starting a fresh battle. Update that to the terminal tie rule.
+
+Add focused coverage for the Quick Battle choice and new setup routes instead of relying only on unit-level state tests.
+
+Acceptance criteria
+
+1. Clicking Quick Battle opens a modal with Custom Play and Regular Play instead of immediately entering Select Difficulty.
+2. Escape/Back dismisses that modal without choosing either option and restores focus to Quick Battle.
+3. Regular Play follows Mode → Difficulty → Fighter → Battle.
+4. Regular Play automatically chooses one valid playable CPU fighter and one valid MAPS stage.
+5. Regular Play never selects Practice Ground or an unavailable fighter.
+6. Regular Play’s Restart and Rematch preserve the already chosen random CPU and stage.
+7. Custom Play follows Mode → Difficulty → Fighter → CPU → Stage → Battle.
+8. Custom Play’s CPU screen uses the existing roster architecture and stores a CPU fighter independently from the player fighter.
+9. Quick Battle can run Player 1 and CPU as two different fighter definitions while preserving player/CPU controller roles.
+10. Difficulty continues to affect only the CPU’s decision-making.
+11. Touch controls and Combat Assist remain tied only to Player 1.
+12. Progress indicators and Back navigation match the actual Regular and Custom routes.
+13. Change Stage never incorrectly routes a Regular Play result back to Select Fighter.
+14. At overtime expiration, unequal scores still resolve by score.
+15. At overtime expiration with equal scores and unequal Launch Point, the lower Launch Point still wins.
+16. At overtime expiration with equal scores and equal Launch Point within the existing tolerance, the Battle result is a tie.
+17. That tie displays a terminal result menu instead of restarting the Battle.
+18. The tie result works in both Quick Battle and Watch Mode and declares no side the winner.
+19. Rematch from a tie starts a clean 0–0 match with full normal time and no overtime state.
+20. English and French localization, keyboard/gamepad navigation, focus management, ARIA semantics, reduced-motion behavior, and mobile layout remain valid.
+21. ALVA_SPEC.md and gameplay documentation describe the new flows and terminal tie correctly.
+22. node --test passes in full.
+
+Implementation quality
+
+Prefer small extensions to existing abstractions over duplicate screens or one-off UI systems.
+
+Keep Quick Battle state separate from Watch Mode state.
+
+Do not change gameplay balance, AI difficulty values, fighter data, stage data, overtime duration, the closing Void, or scoring beyond the requested tie presentation.
+
+Do not solve the CPU-selection requirement by modifying Battle into a special Quick Battle branch; Battle already supports different fighter definitions. Correct the setup and BattleScreen wiring instead.
+
+Do not solve the tie by inventing another scoring rule. Battle.result already expresses the correct equality case. Make that draw a real terminal result at the screen/product layer.
+
+After implementation, run node --test and fix all regressions. Also do a final repository-wide search for stale documentation, comments, strings, and tests that still describe Quick Battle as a same-fighter/mirror setup or exact overtime draws as automatically restarting.
