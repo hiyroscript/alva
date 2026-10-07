@@ -1,5 +1,5 @@
 // Multi-touch landscape controls using the existing Pointer Events input.
-// Joystick: horizontal stick with Left mouvement / Right mouvement Dash
+// Joystick: horizontal stick with Left movement / Right movement Dash
 // buttons above it. Classic: Left / Right, with sliding pointer capture.
 // Both share the same action buttons. Jump always uses the upward arrow;
 // Shield its shield, named and drawn as Deflect while the fighter is in the
@@ -92,8 +92,8 @@ export function attackSlots(shown) {
 }
 
 // The Joystick scheme's single-tap Dash buttons, mouvementLeft and
-// mouvementRight. Their codenames and English names are exactly these,
-// spelling included (Left mouvement, Right mouvement).
+// mouvementRight. Keep those internal codenames; their display names are
+// localized independently (Left movement / Right movement in English).
 const MOUVEMENT_BUTTONS = [
   { control: 'mouvementLeft', direction: -1, side: 'left', label: 'touch.mouvementLeft', icon: ICONS.left },
   { control: 'mouvementRight', direction: 1, side: 'right', label: 'touch.mouvementRight', icon: ICONS.right },

@@ -113,7 +113,7 @@ html:not(.is-pointer-input) .settings-tab:focus { box-shadow: var(--focus-ring);
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.16em;
-  text-transform: uppercase;
+  text-transform: none;
   color: var(--text-strong);
 }
 .settings-group-note { color: var(--text-secondary); font-size: clamp(12px, 1.9vh, 14px); line-height: 1.45; }
@@ -210,7 +210,7 @@ html:not(.is-pointer-input) .settings-option:focus { box-shadow: var(--focus-rin
   font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.1em;
-  text-transform: uppercase;
+  text-transform: none;
   color: var(--text-muted);
 }
 .settings-option-desc { color: var(--text-secondary); font-size: clamp(12px, 1.9vh, 14px); line-height: 1.45; }
@@ -363,11 +363,12 @@ html:not(.is-pointer-input) .touch-editor .is-editor-selected:focus { outline-co
 }
 .touch-editor.is-dragging .touch-editor-bar { opacity: 0.25; pointer-events: none; }
 .touch-editor-head { flex: 1 1 220px; display: grid; gap: 2px; min-width: 0; }
+.touch-editor-scheme { text-transform: none; }
 .touch-editor-heading { display: flex; align-items: baseline; flex-wrap: wrap; gap: 2px 10px; }
 .touch-editor-title { font-weight: 700; font-size: clamp(14px, 2.6vh, 18px); color: var(--text-strong); }
 .touch-editor-hint { color: var(--text-secondary); font-size: 12px; line-height: 1.35; }
 .touch-editor-size { flex: 1 1 240px; display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 2px 8px; }
-.touch-editor-size-label { font-family: var(--font-mono); font-size: 10px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-muted); }
+.touch-editor-size-label { font-family: var(--font-mono); font-size: 10px; font-weight: 600; letter-spacing: 0.14em; text-transform: none; color: var(--text-muted); }
 .touch-editor-name { font-size: 13px; font-weight: 600; color: var(--text-strong); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .touch-editor-size-controls { grid-column: 1 / -1; display: flex; align-items: center; gap: 6px; }
 .touch-editor-step {

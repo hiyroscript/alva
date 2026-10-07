@@ -23,7 +23,7 @@
 // follows the screen it is played on.
 
 import { el } from '../core/utils.js';
-import { t, tx, tattr, iconLabel, setText } from '../localization/i18n.js';
+import { t, tx, tattr, iconLabel, setText, localizeTree } from '../localization/i18n.js';
 import { resolveSetting } from '../core/settings.js';
 import {
   TOUCH_CONTROL_IDS, TOUCH_SCALE, TOUCH_NUDGE, clampScale, normalizePoint, placeControl,
@@ -195,6 +195,9 @@ export class TouchLayoutEditor {
     // will; the neutral look while none is playable.
     this.touch.setCharacter(getPlayableCharacter(this.app.selection?.characterId));
     this.touch.setScheme(this.scheme);
+    // The other scheme's controls were detached during a language switch.
+    // Translate them once mounted, before using their names in the toolbar.
+    localizeTree(this.touchRoot);
     this.touch.setLayout(this.layout);
     setText(this.schemeLabel, 'editor.layout', { scheme: { t: `settings.scheme.${this.scheme}` } });
     this.select(null);

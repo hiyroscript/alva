@@ -657,7 +657,7 @@ test('the editor opens on the scheme in use, as a modal with its own scope, the 
   assert.equal(root.getAttribute('aria-modal'), 'true');
   assert.equal(root.getAttribute('aria-labelledby'), 'touch-editor-title');
   assert.equal(root.querySelector('.touch-editor-title').textContent, 'Customize touch controls');
-  assert.equal(editor.schemeLabel.textContent, 'Classic Buttons layout');
+  assert.equal(editor.schemeLabel.textContent, 'Classic buttons layout');
   assert.equal(app.nav.scopes.at(-1), editor.scope);
   // The real controls, the scheme in use, never live.
   assert.equal(editor.touch.scheme, 'classic');
@@ -746,7 +746,7 @@ test('keyboard and gamepad: Enter / A moves a control with the arrows in small s
   assert.equal(editor.moving, 'stick');
   assert.equal(editor.selected, 'stick');
   assert.ok(editor.root.classList.contains('is-moving'));
-  assert.match(editor.live.textContent, /^Moving Movement joystick\./, 'announced');
+  assert.match(editor.live.textContent, /^Movement joystick: use the arrow keys or D-pad to move,/, 'announced');
   const home = { ...editor.touch.placements.get('stick').center };
   app.input.key('ArrowRight');
   app.nav.command('down', null); // D-pad
