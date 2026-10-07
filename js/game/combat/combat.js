@@ -359,6 +359,9 @@ export class CombatSystem {
     const damage = blocked ? 0 : def.damage;
     const launchPointBefore = tc.launchPoint;
     tc.launchPoint = Math.max(0, launchPointBefore + damage);
+    // Every real hit restarts recovery, including non-launching strikes.
+    // A block leaves the existing schedule untouched.
+    if (!blocked) tc.resetLaunchRecovery();
     const launchPointAfter = tc.launchPoint;
     const launchStrength = blocked ? 0 : resolveLaunchStrength(def.baseLaunch, launchPointAfter);
     // The target may bend its launch a little with the direction it holds

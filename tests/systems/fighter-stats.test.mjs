@@ -11,7 +11,7 @@ import { Fighter } from '../../js/game/fighters/fighter.js';
 import { CombatState } from '../../js/game/combat/combat-state.js';
 import { CombatSystem } from '../../js/game/combat/combat.js';
 import { SpriteSet } from '../../js/game/rendering/sprite-normalizer.js';
-import { STAGE, makeFighter, duel } from '../helpers/fighter-harness.mjs';
+import { STAGE, DT, makeFighter, duel } from '../helpers/fighter-harness.mjs';
 
 // A real Fighter for `character`, with its own (art-less) sprite set.
 const build = (character, facing = 1) => new Fighter({
@@ -82,6 +82,8 @@ test('a high Launch Point alone never stops a fighter acting: it runs, jumps, at
     for (let i = 0; i < 10; i++) step();
     step({ jump: true, jumpPressed: true });
     assert.equal(fighter.grounded, false, `jumps at ${value}`);
-    assert.equal(fighter.combat.launchPoint, value, 'acting never changes Launch Point');
+    const elapsed = fighter.steps * DT;
+    const recovered = Math.max(0, Math.floor((elapsed - 2 + 1e-6) / 0.5));
+    assert.equal(fighter.combat.launchPoint, value - recovered, 'only passive recovery changes Launch Point while acting');
   }
 });

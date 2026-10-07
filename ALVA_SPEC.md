@@ -662,8 +662,9 @@ A training room, entered straight from Home.
   no controller, so it never walks, jumps, drops, attacks, throws, summons
   or shields; it is otherwise a normal fighter (hurtboxes, real damage
   adding to its own Launch Point, so launching hits send it further as it
-  builds up, hitstun, hurt animations, launches, gravity, stage and pushbox
-  collisions, pulls, paralysis; it keeps its spawn's facing, never turning
+  builds up, passive Launch recovery between hits, hitstun, hurt animations,
+  launches, gravity, stage and pushbox collisions, pulls, paralysis; it
+  keeps its spawn's facing, never turning
   toward its opponent). With it, Player 1 and the CPU are
   each other's opponent, so clones, projectiles, pulls, techniques and
   melee target it and the camera frames both. Each hit it takes shows the
@@ -846,10 +847,11 @@ comes from its definition and its profile.
 - **Launch:** built only from the registry and reference copy in
   `js/data/launch.js` (`BASE_LAUNCH_VALUES`, `DIRECTIONAL_LAUNCHES` and their
   summaries), in the same entry and row language as Movement. Three entries:
-  - **Launch Point**: accumulated damage: it starts at 0, all damage taken is
-    added to it, the higher it is the harder a hit with a Base Launch above 0
-    launches, and it resets to 0 after an elimination, on respawn. Explained,
-    with no rows.
+  - **Launch Point**: starts at 0; each unblocked hit adds its damage and
+    restarts recovery. After 2 seconds without a hit, every following 0.5
+    seconds removes 1 point down to 0 (first point at 2.5 seconds). Blocks
+    do not restart recovery. Higher Launch Point means a harder launch;
+    respawning resets it to 0. Explained, with no rows.
   - **Base Launch**: every hit has a Base Launch of 0, 1, 2 or 3; the hit's
     damage is added to the Launch Point first, then the new Launch Point is
     multiplied by it. Rows: Base Launch 0 "No launch. The Launch Point is
@@ -2226,8 +2228,19 @@ attack or a button.
   goes below 0, has no maximum and is shown as a bare number (no % sign). A
   hit's `damage` is how much it adds (a hit a Shield blocks adds nothing);
   each fighter's hits are listed in its character specification (7.2.9).
-  Every fighter has a Launch Point that starts at 0 and increases by damage
-  received. Every hit declares a Base Launch of 0, 1, 2 or 3 and a
+  Every genuine unblocked hit resets recovery, including Base Launch 0
+  hits and each individual multi-hit strike, regardless of its source.
+  For the next **2.0 seconds**, no Launch Point recovers. After that grace
+  period, each complete **0.5-second** interval removes **1** point,
+  stopping at 0. The first point is removed at **2.5 seconds**, never at
+  2.0: a fighter hit to 10 points at t = 0 still has 10 at t = 2.0, then
+  9 at t = 2.5, 8 at t = 3.0 and 7 at t = 3.5. Any new real hit discards
+  all timing progress, including partial intervals; a Shield block does
+  not reset it. Recovery uses simulation time in the shared combat state,
+  through actions, stun and impact freeze alike, with no extra UI. Pausing
+  simulation pauses recovery. Out-of-play fighters do not update; fresh
+  fighters, respawns and restarts have fresh timing and 0 Launch Point.
+  Every hit declares a Base Launch of 0, 1, 2 or 3 and a
   Directional Launch. After a hit's damage is added, its launch strength is:
   Base Launch × the target's new Launch Point. Base Launch 0 therefore never
   launches, while 1 uses normal Launch Point strength, 2 doubles it, and 3
@@ -2236,7 +2249,7 @@ attack or a button.
   | Concept | Belongs to | Meaning |
   | --- | --- | --- |
   | Damage | the hit | how much it adds to the target's Launch Point |
-  | Launch Point | the fighter | the damage it has taken this life, a plain number |
+  | Launch Point | the fighter | damage received minus passive recovery this life, a plain number |
   | Base Launch | the hit | 0, 1, 2 or 3: how many times the new Launch Point the launch strength is |
   | Directional Launch | the hit | `null`, `'horizontal'`, `'vertical'` or `'reverseVertical'`: where that strength goes |
   | Launch strength | the hit's result | Base Launch × Launch Point (after this hit's damage) |

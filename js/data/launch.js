@@ -2,8 +2,9 @@
 //
 //   Launch Point: the fighter's own number (CombatState.launchPoint, the one
 //   the HUD shows). Starts at 0 on every fresh life and grows by exactly the
-//   damage the fighter receives. Never negative, no maximum, and it never
-//   defeats anyone by itself.
+//   damage each unblocked hit deals. After 2 seconds without another hit,
+//   it recovers 1 point per subsequent 0.5 seconds; blocks do not reset
+//   recovery. Never negative, no maximum, and it never defeats anyone itself.
 //
 //   Base Launch: the hit's own multiplier (`baseLaunch`), one of 0, 1, 2 or
 //   3. Not a velocity.
@@ -49,6 +50,14 @@
 
 // The only damage a hit may deal.
 export const ALLOWED_DAMAGE_VALUES = Object.freeze([1, 3, 5, 10]);
+
+// ---- Launch Point recovery -------------------------------------------------------
+
+// Simulation seconds: the first point recovers after delay + interval.
+// Every unblocked hit restarts both, even when its Base Launch is 0.
+export const LAUNCH_RECOVERY_DELAY = 2;
+export const LAUNCH_RECOVERY_INTERVAL = 0.5;
+export const LAUNCH_RECOVERY_AMOUNT = 1;
 
 // ---- Base Launch -----------------------------------------------------------------
 
@@ -152,9 +161,9 @@ export function resolveDirectionalLaunch(direction, strength, facing = 1) {
 // What Discover says about Launch. Mechanics only: no fighter or attack is
 // ever named.
 export const LAUNCH_POINT_SUMMARY =
-  'Launch Point is accumulated damage: it starts at 0, and all damage taken is added to it. ' +
-  'When a hit with a Base Launch above 0 connects, the Launch Point decides how strongly the target is launched: ' +
-  'the higher it is, the harder the launch. It resets to 0 after an elimination, on respawn.';
+  'Launch Point starts at 0. Each unblocked hit adds its damage and restarts recovery: ' +
+  'after 2 seconds without a hit, it drops by 1 every following 0.5 seconds, down to 0 (first point at 2.5 seconds). ' +
+  'Blocks do not restart recovery. Higher Launch Point means a harder launch. Respawning resets it to 0.';
 
 export const LAUNCH_FORMULA = 'Launch strength = Base Launch × Launch Point';
 

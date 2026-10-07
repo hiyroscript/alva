@@ -48,7 +48,8 @@ unavailable, with Back to Home.
   or defends, but it takes real hits, hitstun, launches, pulls and
   paralysis, so every move lands on it: attacks, projectiles, clones and
   techniques. Its
-  Launch Point builds up (and launching hits send it further) like anyone's.
+  Launch Point builds up with hits (and launching hits send it further)
+  and passively recovers between hits like anyone's (see [Launch](../systems/launch.md)).
   Each hit floats the Launch Point it added (for #0001: `+3` for a Jab,
   `+1` for each of Maximum Blue's grinding strikes and `+3` for its
   collapse, `+10` for Hollow Purple) in red over its head
