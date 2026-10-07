@@ -25,6 +25,7 @@ Where things are:
 | | |
 | --- | --- |
 | Definitions | [`js/data/characters/<id>.js`](../../js/data/characters/), registered in [`js/data/characters.js`](../../js/data/characters.js) |
+| Discover profiles (one 1–5 difficulty, a play-style description, a review hash): #0001 5/5, #0002 3/5 | [`js/data/fighter-profiles.js`](../../js/data/fighter-profiles.js), rechecked whenever a definition changes ([how](adding-characters.md#7-the-discover-profile)) |
 | Art | [`assets/characters/<id>/`](../../assets/characters/) |
 | Fighter-specific tests | [`tests/fighters/<id>/`](../../tests/fighters/) |
 | Test-only fighters (never in the game) | [`tests/fighters/fixtures/`](../../tests/fighters/fixtures/): a sample fighter with different moves on the same codenames, the loadout matrix, and screen-test fighters |

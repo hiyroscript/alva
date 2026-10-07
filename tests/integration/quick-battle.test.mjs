@@ -659,6 +659,33 @@ test('Custom Play: Mode → Difficulty → Fighter → CPU → Stage → Battle;
   screens.battle.exit();
 });
 
+test('Select Fighter, Select CPU and Watch Mode\'s rosters still say Available and keep Confirm: Discover\'s stars stay on Discover', () => {
+  const { app, screens } = boot();
+  app.selection.playType = 'custom';
+  for (const screen of [screens.character, screens.cpu, screens.watchCpu1, screens.watchCpu2]) {
+    app.screens.go(screen.id);
+    const { roster } = screen;
+    const slot = slotOf(screen, '0001');
+    slot.focus();
+    assert.equal(roster.status.hidden, false, screen.id);
+    assert.equal(roster.status.textContent, 'Available', screen.id);
+    assert.equal(roster.status.className, 'status-badge is-available');
+    assert.equal(slot.getAttribute('aria-label'), '#0001, available', 'the regular accessible name');
+    assert.ok(roster.previewPanel.contains(roster.confirmBtn), `${screen.id}: Confirm under the preview`);
+    assert.equal(roster.confirmBtn.disabled, false);
+    assert.equal(roster.previewPanel.querySelector('.difficulty-rating'), null, `${screen.id}: no difficulty stars`);
+    assert.equal(roster.previewPanel.querySelector('.play-style-action'), null, `${screen.id}: no play-style button`);
+    assert.ok(!roster.previewPanel.textContent.includes('★'));
+    roster.preview(roster.slots[TEST_DISABLED.rosterSlot]);
+    assert.equal(roster.status.textContent, 'Locked', screen.id);
+  }
+  // Confirming still picks the fighter and moves on.
+  app.screens.go('character');
+  slotOf(screens.character, '0002').click(0);
+  assert.equal(app.selection.characterId, '0002');
+  assert.equal(current(app), 'quick-cpu');
+});
+
 test('Select CPU is the shared roster on its own screen: its own preview id, the same locked slots, no disabled fighter', () => {
   const { app, screens } = boot();
   app.selection.playType = 'custom';

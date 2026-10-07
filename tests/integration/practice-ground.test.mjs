@@ -1433,6 +1433,28 @@ test('Enable CPU (once the CPU is disabled) opens a second shared roster in its 
   assert.deepEqual([previews, otherPreviews, frames], [1, 0, 0]);
 });
 
+test('both Practice rosters keep the regular status and Confirm: Available for a playable fighter, Locked for a locked slot, never Discover\'s stars', async () => {
+  const { screen } = await enterPractice();
+  screen.openMenu();
+  screen.openRoster();
+  for (const roster of [screen.roster, screen.cpuRoster]) {
+    roster.show('0001');
+    assert.equal(roster.status.hidden, false);
+    assert.equal(roster.status.textContent, 'Available');
+    assert.equal(roster.status.className, 'status-badge is-available');
+    assert.ok(roster.previewPanel.contains(roster.confirmBtn), 'Confirm under the preview');
+    assert.equal(roster.confirmBtn.textContent, 'Confirm fighter');
+    assert.equal(roster.slots[0].getAttribute('aria-label'), '#0001, available');
+    assert.equal(roster.previewPanel.querySelector('.difficulty-rating'), null, 'no difficulty stars');
+    assert.equal(roster.previewPanel.querySelector('.play-style-action'), null, 'no play-style button');
+    assert.ok(!roster.previewPanel.textContent.includes('★'));
+    const locked = roster.slots.find((s) => !s._def?.available);
+    roster.preview(locked);
+    assert.equal(roster.status.textContent, 'Locked');
+    assert.equal(roster.status.className, 'status-badge is-locked');
+  }
+});
+
 test('both Practice rosters keep unique ids and their own aria-labelledby links', async () => {
   const { screen } = await enterPractice();
   const ids = [];

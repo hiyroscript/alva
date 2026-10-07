@@ -275,14 +275,79 @@ the fighter or for its button: never a check for `'0027'` in shared code.
   keys with their English and French strings, exactly as the source was
   supplied; never invent a credit.
 
-## 7. Make it playable
+## 7. The Discover profile
+
+Before it is made playable, give it a profile in
+[`js/data/fighter-profiles.js`](../../js/data/fighter-profiles.js): the
+card Discover's Fighters page shows for it. A playable fighter without a
+valid, current one fails
+[`tests/fighters/profiles.test.mjs`](../../tests/fighters/profiles.test.mjs).
+
+```js
+'0027': Object.freeze({
+  difficulty: 3,
+  descriptionKey: 'discover.fighter.0027.playStyle',
+  reviewedSourceHash: '…',
+}),
+```
+
+1. **Read its finished definition and specification**, then assign ONE
+   difficulty rating, a whole number from 1 to 5. There is exactly one
+   rating: never a "to play" and a "to master" score. It rates both
+   together, how hard the fighter is to pick up and play effectively AND
+   how hard it is to master. Read it against the scale (also
+   `DIFFICULTY_SCALE` in the module), and compare it with the current
+   fighters' ratings so the roster stays consistent:
+
+   | Rating | Means | Today |
+   | --- | --- | --- |
+   | 1 | Very easy to learn and comparatively simple to master. | |
+   | 2 | An easy core game plan with little extra to master. | |
+   | 3 | Approachable fundamentals, with meaningful decision-making and execution depth at higher levels. | #0002: readable rushdown; mastery in momentum, air uses, free fall, approach angles, not overcommitting |
+   | 4 | Demanding to use well, with substantial mastery requirements. | |
+   | 5 | Difficult both to pilot effectively and to master: highly layered mechanics, situational decisions, setup or resource requirements, punishing commitments. | #0001: a large, contextual space-control and setup toolkit, Energy and cooldown management, punishable long casts |
+
+   Judge it; never compute it from move counts, Energy costs or any other
+   data.
+2. **Write its play-style description** under
+   `discover.fighter.0027.playStyle` in
+   [`en.js`](../../js/localization/strings/en.js) and a natural French
+   translation in [`fr.js`](../../js/localization/strings/fr.js) (its moves
+   by their names in each language). One paragraph on how it plays: its
+   game plan, what it is strong at, what makes it hard to master. Not a
+   move list (that is its specification's job), no rating or numbers in
+   the text (the stars show the rating), and no real or canonical
+   character name ([`codename_rule`](../../codename_rule)). It must agree
+   with the definition: the definition and the specification are the
+   authority, the profile only describes them.
+3. **Record the review hash**: the SHA-256 of its definition's source, its
+   line endings normalized to `\n`:
+
+   ```sh
+   node -e "const s=require('fs').readFileSync('js/data/characters/0027.js','utf8').replace(/\r\n?/g,'\n');console.log(require('crypto').createHash('sha256').update(s,'utf8').digest('hex'))"
+   ```
+
+   (or run `node --test tests/fighters/profiles.test.mjs`: a stale hash
+   fails with the current one in its message).
+
+**Whenever the definition changes later** (a retuned hit, a new move, a
+renamed clip, even a comment), the profile test fails: "#0027 changed
+since its Discover profile was reviewed. Recheck its difficulty and
+play-style description, then update reviewedSourceHash". Recheck the
+rating and the description against the new definition, change them if
+the change calls for it, and only then record the new hash. Never update
+the hash without that review, and never put the hash in the definition
+itself.
+
+## 8. Make it playable
 
 Set `available: true`. From then on it is preloaded, offered on every
-roster, and can start a Quick Battle, either side of Watch Mode, or
+roster, browsable on Discover's Fighters page with its rating and
+description, and can start a Quick Battle, either side of Watch Mode, or
 Practice Ground. Until then its slot shows locked and no route can start
 it.
 
-## 8. Test it
+## 9. Test it
 
 Run the whole suite (`node --test`; see [testing](../development/testing.md)).
 A new fighter is covered automatically by:
@@ -299,6 +364,9 @@ A new fighter is covered automatically by:
 - [`tests/integration/roster-matrix.test.mjs`](../../tests/integration/roster-matrix.test.mjs)
   (once playable: every pairing with the other fighters, both ways and
   mirrored, in a real Watch Mode battle);
+- [`tests/fighters/profiles.test.mjs`](../../tests/fighters/profiles.test.mjs)
+  (once playable: a valid Discover profile, a description in both
+  languages and a review hash matching its definition);
 - the localization and touch-control tests.
 
 Then add its own tests in `tests/fighters/0027/` for what is its own:

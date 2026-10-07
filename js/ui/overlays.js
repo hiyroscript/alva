@@ -1,4 +1,5 @@
-// Global overlays: loading screen, confirmation dialog and choice dialog.
+// Global overlays: loading screen, confirmation dialog, choice dialog and
+// information dialog.
 // Their own labels are translation keys (js/localization/i18n.js); a caller's
 // loading label, error message and confirmation copy arrive already
 // translated, a choice dialog's copy as translation keys.
@@ -145,6 +146,51 @@ export class ConfirmDialog {
   }
 }
 
+// The modal plumbing every role="dialog" overlay below shares: the root is
+// an aria-modal dialog labelled by its title, with a navigation scope of its
+// own (so Escape and gamepad Back reach `onBack`, and arrows stay inside),
+// the screen beneath inert while it is open, and focus returned on request
+// to what had it (the control that opened it). A press on the dim around
+// the panel dismisses it.
+class ModalDialog {
+  constructor(root, app, titleId) {
+    this.root = root;
+    this.app = app;
+    root.setAttribute('role', 'dialog');
+    root.setAttribute('aria-modal', 'true');
+    root.setAttribute('aria-labelledby', titleId);
+    root.addEventListener('click', (e) => {
+      if (e.target === root) this.dismiss();
+    });
+    this.scope = { el: root, onBack: () => this.dismiss() };
+    this.background = null;
+    this.returnFocus = null;
+  }
+
+  // Shows the dialog over the current screen and focuses `target`. Focus
+  // later returns to `opener`, else to whatever had it.
+  show(target, opener = null) {
+    this.returnFocus = opener ?? document.activeElement;
+    this.background = this.app.screens.current;
+    if (this.background) this.background.el.inert = true;
+    this.root.hidden = false;
+    this.app.nav.pushScope(this.scope);
+    target?.focus({ preventScroll: true });
+  }
+
+  // Hides it and frees the screen beneath; with `restoreFocus`, focus goes
+  // back to what had it before.
+  hide(restoreFocus) {
+    this.root.hidden = true;
+    this.app.nav.popScope(this.scope);
+    if (this.background) this.background.el.inert = false;
+    this.background = null;
+    if (restoreFocus) this.returnFocus?.focus?.({ preventScroll: true });
+  }
+
+  dismiss() {}
+}
+
 // A modal choice between a few options, none of them a cancel: role
 // "dialog" (not the confirm dialog's alertdialog), its own navigation scope,
 // focus on the default choice as it opens. Choosing resolves with the
@@ -152,10 +198,9 @@ export class ConfirmDialog {
 // dim around the panel dismiss it, resolving with null, and focus returns to
 // what had it (the control that opened it). The screen beneath is inert
 // while it is open.
-export class ChoiceDialog {
+export class ChoiceDialog extends ModalDialog {
   constructor(root, app) {
-    this.root = root;
-    this.app = app;
+    super(root, app, 'choice-dialog-title');
     this.resolve = null;
     this.kicker = el('span', { class: 'kicker' });
     this.title = el('h2', { class: 'dialog-title', id: 'choice-dialog-title' });
@@ -163,9 +208,6 @@ export class ChoiceDialog {
       class: 'dialog-close', type: 'button', 'data-nav': true, ...tattr('aria-label', 'common.close'), html: ICONS.close,
     });
     this.options = el('div', { class: 'choice-options' });
-    root.setAttribute('role', 'dialog');
-    root.setAttribute('aria-modal', 'true');
-    root.setAttribute('aria-labelledby', 'choice-dialog-title');
     root.replaceChildren(
       el('div', { class: 'dialog-panel choice-panel glass glass--panel' }, [
         el('div', { class: 'choice-header' }, [
@@ -176,10 +218,6 @@ export class ChoiceDialog {
       ]),
     );
     this.closeButton.addEventListener('click', () => this.dismiss());
-    root.addEventListener('click', (e) => {
-      if (e.target === root) this.dismiss();
-    });
-    this.scope = { el: root, onBack: () => this.dismiss() };
   }
 
   get isOpen() {
@@ -210,13 +248,8 @@ export class ChoiceDialog {
       ]) };
     });
     this.options.replaceChildren(...this.buttons.map((b) => b.option));
-    this.returnFocus = document.activeElement;
-    this.background = this.app.screens.current;
-    if (this.background) this.background.el.inert = true;
-    this.root.hidden = false;
-    this.app.nav.pushScope(this.scope);
     const first = this.buttons.find((b) => b.value === defaultValue) ?? this.buttons[0];
-    first?.button.focus({ preventScroll: true });
+    this.show(first?.button);
     return new Promise((resolve) => {
       this.resolve = resolve;
     });
@@ -233,13 +266,65 @@ export class ChoiceDialog {
 
   close(value) {
     if (!this.resolve) return;
-    this.root.hidden = true;
-    this.app.nav.popScope(this.scope);
-    if (this.background) this.background.el.inert = false;
-    this.background = null;
+    this.hide(value === null);
     const resolve = this.resolve;
     this.resolve = null;
-    if (value === null) this.returnFocus?.focus?.({ preventScroll: true });
     resolve(value);
+  }
+}
+
+// A modal that only informs (Discover's play-style description): role
+// "dialog", never an alertdialog, since nothing is confirmed or destroyed.
+// A kicker and a title over a paragraph, and a Close button that takes focus
+// as it opens. Escape, gamepad Back, the Close button or a press on the dim
+// around the panel close it, and focus returns to the control that opened
+// it. The screen beneath is inert while it is open.
+export class InfoDialog extends ModalDialog {
+  constructor(root, app) {
+    super(root, app, 'info-dialog-title');
+    this.kicker = el('span', { class: 'kicker' });
+    this.title = el('h2', { class: 'dialog-title', id: 'info-dialog-title' });
+    this.body = el('p', { class: 'dialog-message info-body', id: 'info-dialog-body' });
+    this.closeButton = el('button', {
+      class: 'dialog-close', type: 'button', 'data-nav': true, 'data-nav-default': true,
+      ...tattr('aria-label', 'common.close'), html: ICONS.close,
+    });
+    root.setAttribute('aria-describedby', 'info-dialog-body');
+    root.replaceChildren(
+      el('div', { class: 'dialog-panel info-panel glass glass--panel' }, [
+        el('div', { class: 'choice-header' }, [
+          el('div', { class: 'choice-heading' }, [this.kicker, this.title]),
+          this.closeButton,
+        ]),
+        this.body,
+      ]),
+    );
+    this.closeButton.addEventListener('click', () => this.close());
+    this.isOpen = false;
+  }
+
+  // `kicker` and `body` are translation keys (so they follow the language
+  // while open); `title` is text no translation owns, such as a fighter's
+  // name. `opener` is the control focus returns to (by default whatever had
+  // focus: a pressed button does not always take it).
+  open({ kicker = null, title, body, opener = null }) {
+    if (this.isOpen) this.close();
+    if (kicker) setText(this.kicker, kicker);
+    this.kicker.hidden = !kicker;
+    this.title.textContent = title;
+    this.title.setAttribute('data-i18n', '');
+    setText(this.body, body);
+    this.isOpen = true;
+    this.show(this.closeButton, opener);
+  }
+
+  dismiss() {
+    this.close();
+  }
+
+  close() {
+    if (!this.isOpen) return;
+    this.isOpen = false;
+    this.hide(true);
   }
 }

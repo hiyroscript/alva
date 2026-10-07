@@ -1,18 +1,32 @@
-// DISCOVER: the in-game reference. An index rail of sections (Movement,
-// Launch, Passives) beside one scrollable page; on narrow windows the rail
-// runs across the top instead. Each page is built from the registry the game
-// plays by, never the tuning values, so the reference cannot drift from
-// gameplay: Movement from MOVEMENT_GUIDE in js/data/movement.js (the
-// universal run, jumps and Dash every fighter shares), Launch from
-// js/data/launch.js (Launch Point, the Base Launch values and the formula
-// they follow, and every Directional Launch). It explains mechanics only:
-// it never says which fighter or attack uses which Base Launch or
-// direction, so it stays the same as the roster grows.
+// DISCOVER: the in-game reference. An index rail of sections (Fighters,
+// Movement, Launch, Passives) beside one page; on narrow windows the rail
+// runs across the top instead. Every visit opens on Fighters.
+//
+// Fighters is the one page about the fighters themselves: the roster,
+// browsed read-only (js/ui/fighter-browser.js) in the Select Fighter
+// roster's order and look, each playable fighter's one difficulty rating as
+// stars where a roster says Available, and its play-style description in a
+// modal (app.infoDialog). It reads the character registry and the fighter
+// profiles (js/data/fighter-profiles.js), never a fighter's id: it grows
+// with the roster. It starts nothing and confirms nothing.
+//
+// The other pages are built from the registry the game plays by, never the
+// tuning values, so the reference cannot drift from gameplay: Movement from
+// MOVEMENT_GUIDE in js/data/movement.js (the universal run, jumps and Dash
+// every fighter shares), Launch from js/data/launch.js (Launch Point, the
+// Base Launch values and the formula they follow, and every Directional
+// Launch). They explain mechanics only: they never read the roster or say
+// which fighter or attack uses which Base Launch or direction, so they stay
+// the same as the roster grows. Passives is empty on purpose.
 //
 // The rail is a tablist with automatic activation: keyboard or gamepad focus
 // on a section shows it, a click or tap selects it, and mouse hover is only a
-// preview. The open page is itself a stop in menu navigation so a gamepad can
-// scroll it: ↑ / ↓ scroll it, and leave it once it can scroll no further.
+// preview. A reference page is itself a stop in menu navigation so a gamepad
+// can scroll it: ↑ / ↓ scroll it, and leave it once it can scroll no further.
+// The Fighters page has controls of its own instead (its fighters and the
+// play-style button): moving from its tab toward it lands on the selected
+// fighter. Leaving any page toward the rail lands on the open section's tab,
+// never another one.
 //
 // The copy is read through the translations (js/localization/i18n.js), keyed by the
 // registries' own ids: English is the registries' copy itself, French its
@@ -23,6 +37,7 @@ import { findNeighbor } from '../core/menu-navigator.js';
 import { el } from '../core/utils.js';
 import { tx, tattr } from '../localization/i18n.js';
 import { screenHeader } from '../ui/components.js';
+import { FighterBrowser, playStyleDialog } from '../ui/fighter-browser.js';
 import { MOVEMENT_GUIDE } from '../data/movement.js';
 import { BASE_LAUNCH_VALUES, DIRECTIONAL_LAUNCHES } from '../data/launch.js';
 
@@ -103,13 +118,27 @@ function buildLaunchPage() {
   ]);
 }
 
+// Fighters: the read-only roster beside its preview, filling the page (no
+// page title of its own: the tab names the page and the roster panel its
+// grid). `screen` keeps the browser, to show, drive and focus it.
+function buildFightersPage(screen) {
+  screen.browser = new FighterBrowser(screen.app, {
+    host: screen.el,
+    onDescribe: (def, profile, opener) => screen.app.infoDialog?.open(playStyleDialog(def, profile, opener)),
+  });
+  return el('div', { class: 'discover-fighters char-layout' }, [screen.browser.rosterPanel, screen.browser.previewPanel]);
+}
+
 // Passives has no content yet, on purpose: the section is scaffolding for a
 // future passives registry, so its page stays empty rather than faked.
-// `label` is the tab's translation key.
+// `label` is the tab's translation key. A `page` section is a reference page
+// (a navigation stop of its own that ↑ / ↓ scroll); Fighters is not: its
+// controls take focus instead, from `enter`.
 const SECTIONS = [
-  { id: 'movement', label: 'discover.movement', build: buildMovementPage },
-  { id: 'launch', label: 'discover.launch', build: buildLaunchPage },
-  { id: 'passives', label: 'discover.passives', build: () => null },
+  { id: 'fighters', label: 'discover.fighters', build: buildFightersPage, page: false, enter: (screen) => screen.browser.focusSelected() },
+  { id: 'movement', label: 'discover.movement', build: buildMovementPage, page: true },
+  { id: 'launch', label: 'discover.launch', build: buildLaunchPage, page: true },
+  { id: 'passives', label: 'discover.passives', build: () => null, page: true },
 ];
 
 export class DiscoverScreen extends Screen {
@@ -122,10 +151,10 @@ export class DiscoverScreen extends Screen {
         'data-nav': true, 'data-nav-no-hover-focus': true, ...tx(section.label),
       });
       const panel = el('div', {
-        class: 'discover-panel', role: 'tabpanel', id: `discover-panel-${section.id}`,
-        'aria-labelledby': `discover-tab-${section.id}`, tabindex: '0', hidden: true,
-        'data-nav': true, 'data-nav-no-hover-focus': true,
-      }, [section.build()]);
+        class: `discover-panel discover-panel--${section.id}`, role: 'tabpanel', id: `discover-panel-${section.id}`,
+        'aria-labelledby': `discover-tab-${section.id}`, tabindex: section.page ? '0' : null, hidden: true,
+        'data-nav': section.page, 'data-nav-no-hover-focus': section.page,
+      }, [section.build(this)]);
       tab.addEventListener('click', () => this.show(section.id));
       tab.addEventListener('focus', () => this.show(section.id));
       return { ...section, tab, panel };
@@ -148,11 +177,18 @@ export class DiscoverScreen extends Screen {
     this.active = null;
   }
 
-  // Every visit opens on Movement, the first section.
+  // Every visit opens on Fighters, the first section, its roster on the
+  // fighter last browsed (else the first playable one, else none).
   enter() {
     this.active = null;
     this.show(SECTIONS[0].id);
+    this.browser.show(this.browser.selectedId);
     this.updateOrientation();
+  }
+
+  // The fighter preview animates only while its page is open.
+  update(dt) {
+    if (this.active === 'fighters') this.browser.update(dt);
   }
 
   focusDefault() {
@@ -182,15 +218,28 @@ export class DiscoverScreen extends Screen {
     this.rail.setAttribute('aria-orientation', this.narrowQuery?.matches ? 'horizontal' : 'vertical');
   }
 
-  // Directions while the open page has focus: ↑ / ↓ scroll it while it can
-  // still scroll that way. Leaving it toward the rail lands on the open
-  // section's tab, never on another one (which would switch pages). Anything
-  // else is the navigator's usual spatial move.
+  // Directions on the open section. From its tab toward a page with
+  // controls of its own (Fighters), focus lands on the page's default (the
+  // selected fighter), whatever is spatially nearest. On a reference page
+  // ↑ / ↓ scroll it while it can still scroll that way. Leaving a page
+  // toward the rail lands on the open section's tab, never on another one
+  // (which would switch pages). Anything else is the navigator's usual
+  // spatial move.
   onCommand(cmd) {
     const section = this.current;
-    if (!DIRECTIONS.includes(cmd) || !section || document.activeElement !== section.panel) return false;
-    if ((cmd === 'up' || cmd === 'down') && this.scrollPage(section.panel, cmd === 'down' ? 1 : -1)) return true;
-    const next = findNeighbor(section.panel, this.app.nav.candidates(this.el), cmd);
+    if (!DIRECTIONS.includes(cmd) || !section) return false;
+    const active = document.activeElement;
+    const candidates = this.app.nav.candidates(this.el);
+    if (active === section.tab) {
+      if (!section.enter) return false;
+      const next = findNeighbor(active, candidates, cmd);
+      if (!next || !section.panel.contains(next) || !section.enter(this)) return false;
+      this.app.audio.play('move');
+      return true;
+    }
+    if (!active || !section.panel.contains(active)) return false;
+    if (active === section.panel && (cmd === 'up' || cmd === 'down') && this.scrollPage(section.panel, cmd === 'down' ? 1 : -1)) return true;
+    const next = findNeighbor(active, candidates, cmd);
     if (!next || !this.tabs.includes(next)) return false;
     section.tab.focus({ preventScroll: true });
     this.app.audio.play('move');

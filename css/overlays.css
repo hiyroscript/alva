@@ -62,6 +62,25 @@
   .choice-desc { font-size: 12px; line-height: 1.35; }
 }
 
+/* The information dialog (Discover's play-style description): the same
+   heading and close button as the choice dialog over one readable
+   paragraph. The panel scrolls on its own when a short window cannot fit
+   the text, so the close button stays reachable. */
+.info-panel {
+  width: min(560px, 100%);
+  max-height: 100%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  gap: clamp(10px, 2.2vh, 16px);
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+.info-panel .kicker[hidden] { display: none; }
+.info-body { max-width: 62ch; font-size: 15px; line-height: 1.6; }
+@media (max-height: 420px) {
+  .info-body { font-size: 13px; line-height: 1.45; }
+}
+
 /* Match Home Play on the requested surfaces only. Keep shared radius
    tokens, intentional pills, and result-dialog styling unchanged. */
 .screen--mode .btn-back,

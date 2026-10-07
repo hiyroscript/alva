@@ -65,7 +65,8 @@ use.
   melee attack pressed just out of reach closes the short gap first, and
   never costs Energy. Never for ranged attacks, never for a CPU.
 - **The whole interface in English and French**, Settings, and a
-  **Discover** reference that explains universal movement and Launch.
+  **Discover** reference: the fighters, each with one 1–5 difficulty
+  rating and a play-style description, then universal movement and Launch.
 
 ## Run it
 
@@ -116,8 +117,8 @@ js/
   main.js, config.js    boot; codenames, bindings, timing and render settings
   core/                 app controller, screens, input, settings, assets, device
   data/                 registries: characters.js and one module per fighter in
-                        characters/, universal movement, loadout rules, Launch,
-                        difficulty, maps
+                        characters/, Discover's fighter profiles, universal
+                        movement, loadout rules, Launch, difficulty, maps
   game/                 arena, battle, practice, physics
     fighters/           the Fighter, its movement rules, controllers
     combat/             attacks, defense, combat state, hit resolution,
@@ -149,8 +150,11 @@ max                     the owner's working prompt for the current task (not a s
 ## Extending it
 
 - **A fighter:** art in `assets/characters/<id>/`, a definition module in
-  `js/data/characters/<id>.js`, one line in `js/data/characters.js`. No
-  engine code. See [adding a fighter](docs/characters/adding-characters.md).
+  `js/data/characters/<id>.js`, one line in `js/data/characters.js`, and,
+  before it is made playable, its Discover profile (one difficulty rating,
+  a play-style description in both languages and a review hash) in
+  `js/data/fighter-profiles.js`. No engine code. See [adding a
+  fighter](docs/characters/adding-characters.md).
 - **A stage:** an entry in `js/data/maps.js` and a theme in `js/stages/`.
   See [stages](docs/gameplay/stages.md#adding-a-stage).
 - **A mechanic:** add it to the shared system it belongs to, as data any

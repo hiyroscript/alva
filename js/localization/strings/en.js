@@ -258,6 +258,7 @@ export const EN = {
 
   'discover.title': 'Discover',
   'discover.sections': 'Discover sections',
+  'discover.fighters': 'Fighters',
   'discover.movement': 'Movement',
   'discover.launch': 'Launch',
   'discover.passives': 'Passives',
@@ -269,6 +270,18 @@ export const EN = {
   'discover.baseLaunchValues': 'Base Launch values',
   'discover.directionalLaunchTitle': 'Directional Launch',
   'discover.directions': 'Directional Launch directions',
+  'discover.difficulty': 'Difficulty',
+  'discover.difficultyRating': 'Difficulty: {rating} out of {max} stars',
+  'discover.unrated': 'Not rated',
+  'discover.noFighters': 'No fighters to show yet.',
+  'discover.fighterSlot': '{name}, difficulty {rating} out of {max}',
+  'discover.playStyle': 'Play style description',
+  'discover.playStyleTitle': 'Play style',
+  // Each fighter's play-style description (its profile's descriptionKey,
+  // js/data/fighter-profiles.js): how it plays, not a move list. Recheck it
+  // whenever the fighter's definition changes.
+  'discover.fighter.0001.playStyle': 'A space-control and setup fighter that wins by controlling range, pulling or repelling opponents, and converting openings into powerful launchers or technique sequences. Red and Maximum Blue control space, while Blue and High Kick turn close-range openings into launches. Unlimited Void creates a long follow-up window, and Hollow Purple is a slow, high-commitment finisher. Infinity and Deflect reward strong defensive timing. Its strongest options demand careful spacing, cooldown and Energy management, matchup knowledge and precise timing, and a missed setup or a long cast can leave it vulnerable.',
+  'discover.fighter.0002.playStyle': 'A momentum-driven rushdown and aerial-chase fighter. One-Two and Rapid Kicks provide straightforward ground pressure, while Homing Attack, Bounce Attack, Spin Attack and Blue Tornado let it approach, chase and launch from several angles. Whirlwind can control space and create launch opportunities, and Deflect can turn projectile pressure back on the opponent. Its core game plan is approachable, but strong play requires preserving momentum, managing limited air uses and free-fall states, choosing safe approach angles, and knowing when not to overcommit into Shields or punish windows.',
 
   'touch.dpad': 'Movement',
   'touch.joystick': 'Movement joystick',

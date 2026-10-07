@@ -15,7 +15,7 @@ import { ScreenManager } from './screen-manager.js';
 import { MenuNavigator } from './menu-navigator.js';
 import { Settings } from './settings.js';
 import { i18n, followSettings, onLanguageChange, localizeTree } from '../localization/i18n.js';
-import { LoadingOverlay, ConfirmDialog, ChoiceDialog } from '../ui/overlays.js';
+import { LoadingOverlay, ConfirmDialog, ChoiceDialog, InfoDialog } from '../ui/overlays.js';
 import { LanguageDialog } from '../ui/language-dialog.js';
 import { SettingsDialog } from '../ui/settings-dialog.js';
 import { TouchLayoutEditor } from '../ui/touch-layout-editor.js';
@@ -83,6 +83,7 @@ export class App {
     this.loading = new LoadingOverlay(document.getElementById('loading-overlay'));
     this.dialog = new ConfirmDialog(document.getElementById('confirm-dialog'), this);
     this.choiceDialog = new ChoiceDialog(document.getElementById('choice-dialog'), this);
+    this.infoDialog = new InfoDialog(document.getElementById('info-dialog'), this);
     this.languageDialog = new LanguageDialog(document.getElementById('language-dialog'), this);
     this.settingsDialog = new SettingsDialog(document.getElementById('settings-dialog'), this);
     this.touchEditor = new TouchLayoutEditor(document.getElementById('touch-editor'), this);
