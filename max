@@ -1,631 +1,694 @@
-You are modifying the hiyroscript/alva game repository.
+Work directly in the current hiyroscript/alva repository. First inspect the existing architecture, tests, documentation, and fighter definitions before modifying anything.
 
-Implement a complete combat/energy consistency pass. Do not make a superficial numbers-only patch. Trace each rule through character data, shared combat logic, AI assumptions, UI text, documentation, and tests so there is one authoritative implementation for each mechanic and no stale behavior remains.
+Objective
 
-Before changing code, read CLAUDE.md, ALVA_SPEC.md, docs/README.md, the relevant files under docs/systems/, and the character definitions. Respect the repository architecture:
+Implement one universal gameplay rule:
 
-* Shared mechanics belong in js/game/ or shared js/data/ modules.
-* Character-specific move data belongs in js/data/characters/<id>.js.
-* Never special-case a fighter ID in shared code.
-* Movement must remain universal through js/data/movement.js.
-* Do not edit, rename, move, or reformat character_rule.
-* mouvment is intentionally spelled that way by this project.
-* Run the complete suite with node --test.
+Every attack and every ability for every character must have a 0.5-second reuse wait. There are no character-specific exemptions.
 
-Required gameplay rules
+The ONLY actions that must NOT receive this new 0.5-second wait are:
 
-1. Energy is universally capped at exactly 100
+1. Normal run / left-right locomotion
+2. Ground jump and all air jumps
+3. Ground Shield
+4. Air Deflect
 
-Every playable fighter must have:
+Those four categories must preserve their current behavior.
 
-maximum Energy = 100
+Everything else that qualifies as an attack or actionable ability must obey the universal 0.5-second wait.
 
-There must be no fighter-specific ability to have a maximum above or below 100.
+This rule must apply to the current roster, test fighters where applicable, and all future fighters automatically. Do not implement it by manually patching only #0001 and #0002.
 
-Centralize/enforce this rule rather than relying only on the current character files happening to say max: 100.
+⸻
 
-If character energy configuration still permits max, either remove the per-character override or validate that it is exactly 100 and reject anything else.
+What “0.5-second wait” means
 
-Starting a match, respawning, restarting Practice, and any full refill must result in exactly 100 Energy.
+Treat this as a reuse cooldown, NOT an added startup animation.
 
-Add a regression test covering every registered fighter.
+When an affected action is successfully accepted/started:
 
-2. All Dash/mouvment actions cost exactly 25 Energy
+* that same action cannot successfully start again for 0.5 seconds;
+* its existing startup, active, recovery, cast, animation, movement, hitbox, projectile, hit-cancel and other timings remain unchanged;
+* do not insert 0.5 seconds of dead time before its animation or effect begins;
+* do not delay damage/projectile release by 0.5 seconds;
+* the cooldown runs in normal simulation time using the existing fixed-step timing model;
+* 0.5 seconds at 60 Hz is 30 fixed steps;
+* existing action commitment may make the practical time before reuse longer than 0.5 seconds. That is fine. Do not shorten an animation/recovery just to make the next use occur exactly at 0.5 seconds.
 
-In this repository, the Energy-consuming universal movement action is the Dash/mouvment system, not ordinary walking or jumping.
+A press made while the cooldown is active must never start the action before the full 0.5 seconds have elapsed. Existing attack buffering may continue to work, provided the actual action does not begin early.
 
-Set all of the following to exactly 25 Energy:
+⸻
 
-ground Dash / mouvment = 25
-air dash / midair_mouvment = 25
-Dash cancel out of an attack = 25
-air-dash cancel out of an attack = 25
+Critical scope: ALL affected actions
 
-Do not charge Energy for ordinary running, jumping, air jumps, fast falling, turning, normal air control, or passive movement.
+Do not interpret “all” as only attack1, attack2, etc.
 
-Remove the current character differences such as #0001’s 12/35 and #0002’s 15/40 costs.
+Audit every route by which a fighter can perform an attack or ability.
 
-Prefer one universal source of truth instead of repeating 25 in every fighter definition.
+Ordinary fighter attacks
 
-If dashCost and dashCancelCost remain part of the data schema, they must resolve to 25 universally and must not allow characters to override the rule.
+Every ordinary attack must receive the 0.5-second reuse wait:
 
-3. Blocking costs exactly 15 Energy per blocked hit
+* extra_attack
+* attack1
+* attack2
+* attack3
+* attack4
+* attack5
+* midair_attack1
+* midair_attack2
+* midair_attack3
+* midair_attack4
+* midair_attack5
+* any future ordinary attack exposed through the loadout system
 
-Every actual Shield block must consume exactly:
+This includes all mechanics contained inside those attacks:
 
-15 Energy
-
-This includes a Perfect Shield.
-
-The existing behavior where a Perfect Shield blocks for free must be removed.
-
-Keep the current general exhaustion semantics unless they conflict with these requirements: if the fighter is not already exhausted but has less than 15 Energy remaining, the block may consume the remainder and exhaust the fighter.
-
-Holding Shield without actually blocking an attack does not need to drain Energy continuously.
-
-A miss against a Shield does not need to cost Energy.
-
-The important invariant is:
-
-ordinary successful block = -15 Energy
-Perfect Shield successful block = -15 Energy
-
-Perfect timing may retain its other defensive benefits, but it must provide no Energy discount, refund, restoration, or other Energy advantage.
-
-Replace/retire the existing shieldHitCost values of 20/25 with one universal value of 15.
-
-4. Deflect costs exactly 15 Energy
-
-Starting a Deflect must consume exactly:
-
-15 Energy
-
-Charge it once when the Deflect action is successfully accepted/started.
-
-Do not wait to see whether the Deflect hits something before charging it.
-
-A Deflect that whiffs still cost 15 because the action was used.
-
-A successful Deflect must not refund Energy, regenerate Energy, discount the cost, or award any Energy advantage.
-
-An exhausted fighter must not be allowed to begin an Energy-costing Deflect.
-
-Preserve Deflect’s combat behavior otherwise:
-
-* It remains an airborne attack rather than a Shield.
-* It continues to deal its universal 3 damage.
-* It continues to turn back projectiles while its appropriate active hitbox is live.
-* Preserve its authored animation, hitbox, launch, hitstun, blockstun, momentum, etc.
-
-Do not implement the Energy cost by pretending a Deflect is a Shield. Add the cost cleanly to the Deflect start path, probably around Fighter.tryDeflect.
-
-If useful, introduce a universal Energy setting such as deflectCost: 15, but it must not be character-tunable.
-
-5. Combat Assist must never spend Energy
-
-Combat Assist is completely free.
-
-Remove every Energy payment from Combat Assist’s approach.
-
-Specifically, Combat Assist must:
-
-cost 0 Energy
-work when Energy is full
-work when Energy is partially depleted
-work when the fighter is Energy-exhausted
-not prevent Energy regeneration because an Assist was "paid for"
-never refund Energy because it never spends any
-
-Combat Assist may still use the universal Dash/air-dash movement speed and range as its movement model. Using Dash-like speed must not make it a Dash for Energy purposes.
-
-Remove any spendEnergy(dashCost) or equivalent Energy gate from the Combat Assist path in js/game/fighters/fighter.js.
-
-Audit tryCombatAssist, stepCombatAssist, finishing/cancelling the Assist, and any code that tracks whether Energy was spent during the frame.
-
-Update Settings UI copy and documentation that currently describes Combat Assist as moving “for Energy”.
-
-Do not accidentally make CPU movement use Combat Assist; preserve the existing player-only setting behavior.
-
-6. Successful defense must never grant an Energy advantage
-
-Audit every Shield, Perfect Shield, Deflect, projectile-reflect, and related defensive path for Energy side effects.
-
-There must be:
-
-no Energy gained for blocking
-no Energy gained for Perfect Shield
-no free Perfect Shield
-no Energy gained for Deflecting
-no Deflect refund
-no successful-reflect Energy refund
-no bonus regeneration triggered by defensive success
-
-Passive Energy regeneration can continue normally according to the Energy system, but defensive success itself cannot improve the Energy amount or waive the required cost.
-
-7. Damage values are restricted to exactly 1, 3, 5, or 10
-
-Create one strict shared damage rule:
-
-ALLOWED_DAMAGE = [1, 3, 5, 10]
-
-Every actual damaging hit authored by game content must have damage equal to one of those four numbers.
-
-There must never be an authored damaging hit for:
-
-0
-2
-4
-6
-7
-8
-9
-11+
-fractions
-negative numbers
-
-The minimum real damage is 1.
-
-The maximum real damage is 10.
-
-A blocked combat event may still report damage: 0 because no damage was actually dealt. Non-damaging system events are not attacks and are not subject to the minimum-damage rule.
-
-Likewise, an attack container with hitbox: null because its projectile performs the actual hit does not need an invented direct damage value.
-
-For multi-hit moves, validate every individual strike. Derived metadata that represents the mathematical sum of several legal strikes may naturally total a number outside [1, 3, 5, 10]; the important invariant is that every actual hit event uses one of the four allowed values.
-
-The damage validation must cover all real damage-producing content:
-
-* normal attacks
-* aerial attacks
-* multi-hit hits[] entries
-* Deflect
-* projectiles
-* projectile pierce/grind hits
-* projectile finishers
-* technique burst hits
-* summon attacks
-* future character content passing through these schemas
-
-Do not just fix the two current character files. Add schema-level validation so a future move authored with damage: 2 fails immediately with a useful error.
-
-Prefer one shared validation helper instead of independent slightly different checks in attacks, projectiles, techniques, etc.
-
-Current character values that definitely need retuning
-
-For #0001, preserve the intended move hierarchy while converting illegal values as follows:
-
-Jab:                    2 -> 3
-Floating Straight:      2 -> 3
-Red projectile:         2 -> 3
-Maximum Blue tick:      1 -> 1
-Maximum Blue finisher:  2 -> 3
-Red Kick:               3 -> 3
-Blue aerial:            2 -> 3
-Unlimited Void:         3 -> 3
-High Kick:              4 -> 5
-Hollow Purple:         12 -> 10
-Deflect:                3 -> 3
-
-For #0002, every existing damage-2 strike/finisher should become 3 unless there is an extremely strong documented reason to move it to another allowed tier.
-
-Known examples include:
-
-One-Two second strike:      2 -> 3
-Homing Attack:              2 -> 3
-Bounce Attack:              2 -> 3
-Spin Attack:                2 -> 3
-Blue Tornado finisher:      2 -> 3
-Whirlwind finisher:         2 -> 3
-
-Existing 1 and 3 values may remain.
-
-Audit the complete definition rather than assuming this list is exhaustive.
-
-For future balancing use the four intended tiers:
-
-1  = light/chip/multi-hit tick
-3  = normal/solid attack
-5  = heavy attack / major launcher
-10 = exceptional/ultimate-level attack
-
-8. Difficulty must NEVER modify damage
-
-Difficulty may affect CPU intelligence only.
-
-Easy, Medium, Hard, and Brutal may differ in things such as:
-
-* reaction time
-* perception/lapses
-* decision frequency
-* judgement noise
-* spacing accuracy
-* lookahead
-* guarding decisions
-* punish awareness
-* aggression
-* planning
-* stage awareness
-
-Difficulty must not affect:
-
-damage
-launch values
-Energy
-Energy costs
-movement speed
-jump height
-gravity
-Dash speed
-hitboxes
-hitstun
-blockstun
-attack cooldowns
-animation timing
-fighter physics
-
-The current js/data/difficulty.js architecture already states this principle. Preserve it and strengthen it with regression tests.
-
-Add a test that resolves the exact same attack/hit under Easy, Medium, Hard, and Brutal and verifies identical damage and relevant combat results.
-
-Do not multiply damage by a difficulty coefficient anywhere.
-
-9. Remove ALL #0001 move cooldowns
-
-#0001 must have zero cooldown on every move that currently declares a cooldown.
-
-This includes:
-
-ground attacks
-aerial attacks
-extra_attack / High Kick
-Deflect
-Unlimited Void
-Hollow Purple
-
-Known current values include short attack cooldowns, Deflect’s 0.3 second cooldown, Maximum Blue’s multi-second cooldown, and technique cooldowns of 14 and 12 seconds. Remove them all for #0001.
-
-Use cooldown: 0 where the schema requires a number, or omit the field only if omission unambiguously resolves to zero.
-
-For #0001’s techniques, starting Unlimited Void or Hollow Purple must not create an active abilityCooldowns entry.
-
-Do not special-case fighter.id === '0001' in shared runtime code. This is character data and should be expressed in #0001’s definition.
-
-“Remove cooldowns” does NOT mean deleting:
-
-* startup frames
-* active frames
-* recovery frames
-* cast animations
-* hitstop
-* hitstun
-* blockstun
-* paralysis
-* air-use limits
-* ordinary attack recovery
-* Perfect Shield’s separate timing mechanics unless they are literally implemented as a move cooldown
-
-The move still has to finish or satisfy normal cancellation rules before another action can happen. We are removing cooldown timers, not animation/combat phases.
-
-10. Make ordinary same-attack repeat delay much shorter
-
-For ordinary attacks on fighters other than #0001, shorten the authored repeat cooldown so repeating the same attack feels substantially more responsive.
-
-Use:
-
-maximum ordinary attack repeat cooldown = 0.05 seconds
-
-At 60 Hz this is three simulation frames.
-
-Any ordinary attack with an authored cooldown greater than 0.05 should effectively use no more than 0.05.
-
-Do not increase a cooldown already below 0.05.
-
-#0001 remains the special data case requested above: its attack cooldowns are exactly zero.
-
-This applies to the short ordinary-attack cooldown system (CombatState.cooldowns and the same-attack cancellableFor gate), not to animation recovery itself.
-
-Preserve the requirement that a move cannot magically restart in the same simulation instant when its animation/state does not permit it.
-
-Update comments/docs that currently describe moves as having intentionally “long cooldowns” if those descriptions become false.
-
-Do not leave hidden second cooldown systems that make the practical repeat delay much longer than 0.05 after the fighter is otherwise free to act.
-
-11. All characters must have identical baseline movement physics
-
-Preserve and enforce Alva’s existing universal movement architecture.
-
-Every character must share exactly the same baseline:
-
-max running speed
-ground acceleration
-ground deceleration
-turn behavior
-air acceleration
-air deceleration
-jump velocity
-normal jump height
-held/high-jump behavior
-number and strength of air jumps
-gravity scale
-maximum fall speed
-fast-fall behavior
-Dash speed
-Dash duration
-air-dash speed
-air-dash duration
-coyote time
-jump buffering
-attack input buffering as a universal movement/combat-response value
-
-The source of truth should remain BASE_FIGHTER_MOVEMENT in js/data/movement.js.
-
-World gravity must remain the same for everyone through CONFIG.sim.gravity.
-
-Do not add movement blocks to individual character files.
-
-Do not let a character override maxSpeed, jumpVelocity, gravityScale, Dash speed, etc.
-
-Retain the existing movementProblems / assertUniversalMovement style guard and add/strengthen tests that iterate over every registered fighter.
-
-The following are allowed to remain character/move-specific because they are move behavior, not baseline locomotion:
-
-* homing attack movement
-* rolls
-* attack-specific lunges
+* melee attacks
+* projectile attacks
+* multi-hit attacks
+* motion attacks
+* homing attacks
+* bounce attacks
+* rise attacks
+* roll attacks
 * hover attacks
-* rise/plunge/bounce motions
-* recoil
-* attack-specific momentum/control
-* projectile motion
+* pull attacks
+* attacks that erase or repel projectiles
+* ground-only attacks
+* air-only variants
+* attacks using airUses
+* attacks using freeFall
+* attacks using hit-cancel
+* attacks launched through Combat Assist
 
-Do not flatten character move identity just to satisfy universal neutral locomotion.
+A projectile spawned by an attack does not need an independent cooldown timer—the action which creates it is what is cooldown-gated.
 
-Character body dimensions, hurtboxes, art scale, and move-specific launch behavior are also not baseline run/jump/gravity values and should not be homogenized unless necessary for another requirement above.
+Techniques
 
-Architecture and implementation expectations
+Every technique must have the same universal 0.5-second reuse wait.
 
-Use shared constants/rules wherever a value is supposed to be universal.
+This includes #0001’s current:
 
-A reasonable end state would have authoritative constants conceptually equivalent to:
+* Unlimited Void (attack4)
+* Hollow Purple (attack5)
 
-MAX_ENERGY = 100;
-DASH_ENERGY_COST = 25;
-BLOCK_ENERGY_COST = 15;
-DEFLECT_ENERGY_COST = 15;
-MAX_ORDINARY_REPEAT_COOLDOWN = 0.05;
-ALLOWED_DAMAGE_VALUES = Object.freeze([1, 3, 5, 10]);
+They currently have effectively no cooldown beyond their own cast/release commitment. That must change.
 
-The exact module names and exports should fit the existing architecture. Do not create a random “constants dump” if the values naturally belong in combat-state.js, attacks.js, or another existing responsibility.
+Their gameplay/animation timings must remain otherwise unchanged.
 
-Remove stale per-character energy cost differences once universal rules own them.
+Summons
 
-Avoid duplicated constants between character files and runtime files.
+The repository supports summons even if the currently playable roster does not rely on one.
 
-Do not put #0001-specific logic into shared systems.
+Summons must also obey the universal 0.5-second rule.
 
-Areas that must be audited
+Do not leave the summon pathway using an arbitrary per-character cooldown that can bypass the universal rule.
 
-At minimum inspect and modify as necessary:
+Future summon characters must inherit the rule automatically.
 
-js/game/combat/combat-state.js
-js/game/combat/combat.js
-js/game/combat/attacks.js
-js/game/combat/deflect.js
-js/game/combat/projectile.js
-js/game/combat/technique.js
-js/game/combat/combat-assist.js
-js/game/fighters/fighter.js
-js/data/movement.js
-js/data/difficulty.js
-js/data/characters/0001.js
-js/data/characters/0002.js
-js/ui/settings-dialog.js
-js/game/rendering/fighter-status.js
-js/ui/hud.js
+Dash and air dash
 
-Also search the repository for:
+Dash and air dash ARE affected.
 
-dashCost
-dashCancelCost
-shieldHitCost
-spendEnergy
-tryCombatAssist
-tryDeflect
-cooldown
-abilityCooldowns
-damage:
-perfect
-Energy
-for Energy
-long cooldown
+Do not treat them as part of the “run” exemption.
 
-Do not assume the explicit file list is exhaustive.
+The repo treats normal locomotion and Dash as distinct mechanics. The exemption is only normal run movement.
 
-Documentation
+Therefore:
 
-Bring the product specification and developer documentation into agreement with the new mechanics.
+* grounded Dash must have a 0.5-second reuse wait;
+* air dash must have a 0.5-second reuse wait;
+* existing Energy costs, dash duration, dash cancel behavior, speed, momentum, available air-dash uses and animations remain unchanged.
 
-At minimum review/update:
+Choose stable cooldown identifiers/state for these shared actions rather than fighter-specific hacks.
 
-ALVA_SPEC.md
-README.md
-docs/systems/energy.md
-docs/systems/combat.md
-docs/systems/defense.md
-docs/systems/movement.md
-docs/systems/ai.md
-docs/characters/0001.md
-docs/characters/0002.md
+Combat Assist
 
-Also update comments embedded in source files.
+Combat Assist must not bypass this rule.
 
-Remove obsolete claims such as:
+If Combat Assist would approach a target before starting an attack, the attack must still be subject to the same 0.5-second availability check.
 
-Combat Assist costs Dash Energy
-Perfect Shield costs nothing
-Deflect costs nothing
-#0001's Energy "goes further" because of cheaper costs
-#0001's Unlimited Void has a 14 second cooldown
-#0001's Hollow Purple has a 12 second cooldown
-#0002 moves have long ordinary repeat cooldowns
-Hollow Purple deals 12
-High Kick deals 4
-various moves deal 2
+Do not allow Combat Assist to start or queue an approach in a way that lets the resulting attack bypass its cooldown.
 
-Do not alter character_rule.
+Combat Assist should still ultimately use the same fighter/action rules as normal player input.
 
-Do not invent a named UPDATES.md entry unless the owner has explicitly given this change a named update.
+CPU
+
+CPU-controlled fighters must obey exactly the same cooldowns.
+
+Do not implement a separate CPU cooldown approximation.
+
+The CPU already produces normal fighter inputs; preserve that architecture and make the fighter/shared combat layer authoritative.
+
+If AI move selection currently considers cooldown readiness, update its readers as necessary so it does not deliberately spam unavailable actions.
+
+⸻
+
+The four exemptions
+
+These are deliberate and must be tested.
+
+1. Run
+
+Normal horizontal movement must remain immediately responsive.
+
+Do not:
+
+* cooldown runLeft;
+* cooldown runRight;
+* stop directional steering because an offensive ability is cooling;
+* introduce a universal “all input lock” that accidentally prevents running.
+
+Dash is NOT covered by this exemption.
+
+2. Jumps
+
+Preserve all current jump behavior:
+
+* ground jump
+* high jump
+* air jumps
+* jump buffering
+* coyote time
+* jumping out of legal cancels where existing rules permit it
+
+Do not give jumps the new 0.5-second reuse timer.
+
+Existing limits such as the number of air jumps remain unchanged.
+
+3. Ground Shield
+
+The grounded Shield is exempt.
+
+Do not add the universal 0.5-second reuse wait to:
+
+* raising Shield;
+* holding Shield;
+* releasing and raising it again;
+* perfect-Shield timing.
+
+Keep its existing Energy/block rules and timing intact.
+
+4. Air Deflect
+
+Deflect is also completely exempt from the new rule.
+
+This is especially important because ALVA internally represents Deflect as an attack created through createAttackDefinition.
+
+Do NOT accidentally apply the offensive 0.5-second rule to Deflect simply because it uses the attack schema.
+
+Preserve each Deflect’s existing behavior and authored timing/cooldown rules.
+
+At the time of this task:
+
+* #0001’s Deflect uses cooldown: 0;
+* #0002’s Deflect uses cooldown: 0.05.
+
+Those are defensive behavior and should NOT be normalized to 0.5.
+
+createDeflectDefinition() must remain capable of creating an exempt Deflect without inheriting the universal offensive cooldown.
+
+⸻
+
+Current roster that must be verified
+
+Do not only test generic fixtures. Verify both playable fighters.
+
+#0001
+
+Affected:
+
+* High Kick — extra_attack
+* Jab — attack1
+* Floating Straight — midair_attack1
+* Red — attack2
+* Red Kick — midair_attack2
+* Maximum Blue — attack3
+* Blue — midair_attack3
+* Unlimited Void — attack4, technique
+* Hollow Purple — attack5, technique
+* ground Dash
+* air dash
+
+Exempt:
+
+* run
+* ground jump
+* air jumps
+* Shield
+* Deflect
+
+#0002
+
+Affected:
+
+* Whirlwind — extra_attack
+* One-Two — attack1
+* Homing Attack — midair_attack1
+* Rapid Kicks — attack2
+* Bounce Attack — midair_attack2
+* Spin Attack — attack3
+* Blue Tornado — midair_attack3
+* ground Dash
+* air dash
+
+Exempt:
+
+* run
+* ground jump
+* air jumps
+* Shield
+* Deflect
+
+Also verify generic loadout fixtures containing summons/techniques so future characters cannot escape the rule.
+
+⸻
+
+Architecture requirements
+
+ALVA intentionally centralizes gameplay rules.
+
+Preserve that design.
+
+Relevant areas include at minimum:
+
+* js/game/combat/attacks.js
+* js/game/combat/combat-state.js
+* js/game/fighters/fighter.js
+* js/game/combat/summon.js
+* js/game/combat/technique.js
+* js/game/combat/deflect.js
+* js/data/loadout.js
+* js/data/characters.js
+* js/game/ai/moveset.js
+* js/game/ai/combat-ai.js
+* relevant rendering/status code if cooldown-state assumptions change
+* fighter definitions and their comments where they currently describe cooldowns
+
+The existing architecture currently has two different cooldown concepts:
+
+1. CombatState.cooldowns for ordinary attack repeat cooldowns.
+2. CombatState.abilityCooldowns for summons/techniques.
+
+Ordinary attacks currently allow at most MAX_ATTACK_COOLDOWN = 0.05.
+
+That old 0.05-second design is no longer the desired offensive rule.
+
+Implement the new behavior cleanly rather than layering a collection of special cases over it.
+
+Prefer one clearly named universal constant/policy for the affected 0.5-second rule.
+
+For example, conceptually:
+
+ACTION_REUSE_WAIT = 0.5
+
+The exact name is up to you, but there should be a single authoritative value rather than 0.5 copied throughout character definitions.
+
+Do not use fighter IDs such as 0001 or 0002 in shared systems.
+
+Do not create logic like:
+
+if (fighter.id === '0001') ...
+
+The rule is capability/action based and universal.
+
+⸻
+
+Per-character cooldown data
+
+The new rule must not depend on every character author remembering to write:
+
+cooldown: 0.5
+
+into every attack.
+
+That would make future characters easy to implement incorrectly.
+
+The shared combat/loadout/runtime layer must guarantee the 0.5-second behavior.
+
+Existing character data may be cleaned up to match the new invariant, but character data must not be the only enforcement mechanism.
+
+Likewise, a future author should not be able to silently create an offensive attack with cooldown: 0 and bypass the rule.
+
+Decide on and enforce a clear schema policy.
+
+For offensive attacks/abilities, arbitrary shorter per-character reuse times should no longer defeat the universal rule.
+
+Deflect is the explicit exception and must retain its separate defensive timing.
+
+⸻
+
+Timing and cancellation behavior
+
+Audit all ways an action can end:
+
+* normal completion
+* hit-cancel
+* jump cancel
+* Dash cancel where legal
+* interruption from being hit
+* paralysis/stun
+* landing cancellation
+* motion ending early from contact
+* summon startup cancellation
+* technique interruption
+* Combat Assist cancellation
+* Void/reset/respawn
+
+The cooldown must not become corrupted, duplicated, skipped or permanently stuck because of one of these paths.
+
+Once an affected action has legitimately started, its 0.5-second reuse timer should behave consistently even if the move later misses, gets blocked, is interrupted, or is cancelled.
+
+A failed attempt that never actually starts an action must NOT consume/start its cooldown.
+
+Examples:
+
+* missing animation -> rejected action -> no new cooldown;
+* invalid summon because there is no valid target -> no new cooldown;
+* insufficient Energy for a Dash -> no Dash cooldown;
+* press while another same action is still cooling -> no restart of the timer;
+* successful accepted attack -> cooldown starts;
+* successful accepted technique -> cooldown starts;
+* successful accepted summon -> cooldown starts;
+* successful accepted Dash/air dash -> cooldown starts.
+
+Respawn/reset should continue restoring a clean fighter state, including clearing these cooldowns.
+
+⸻
+
+Different moves remain different actions
+
+The 0.5-second rule is a reuse wait for the affected action, not a blanket 0.5-second stun after pressing any attack.
+
+Do NOT freeze all controls for 0.5 seconds.
+
+The player must still be able to use legal different actions according to ALVA’s existing cancel/follow-up rules.
+
+For example, the new cooldown must not automatically prevent:
+
+* moving/running;
+* jumping;
+* Shield;
+* Deflect;
+* a different attack when the existing combat/cancel rules legally allow it.
+
+The cooldown prevents premature reuse of the affected action.
+
+Do not introduce a global inputLocked = true style solution.
+
+⸻
+
+Ground/air variants
+
+Respect ALVA’s actual move identity.
+
+attack1 and midair_attack1, for example, are distinct move definitions selected by grounded state.
+
+Maintain cooldown state in a way that is consistent with the repository’s move codenames and existing attack cooldown handling.
+
+Do not accidentally make the air Deflect share an offensive attack cooldown.
+
+⸻
+
+Buffering
+
+ALVA has an attack buffer (movement.attackBuffer, currently 0.15 s).
+
+Keep buffering functional.
+
+Expected behavior:
+
+* if an attack is pressed while its cooldown has substantial time left, it cannot start early;
+* if the press is still legitimately buffered when the cooldown reaches zero, it may start on the first legal fixed step;
+* an expired buffer must not be kept indefinitely waiting for a cooldown;
+* summons and techniques should preserve their current non-buffered semantics unless there is a compelling architectural reason to change them;
+* do not add hidden auto-repeat behavior.
+
+⸻
+
+UI / indicators
+
+Do not perform an unnecessary UI redesign.
+
+The existing visible cooldown-ring system is primarily designed around special abilities.
+
+If the internal cooldown representation changes, make sure existing cooldown indicators do not break or lie.
+
+Do not suddenly put a forest of cooldown rings under every ordinary attack unless the existing design clearly requires it.
+
+Gameplay correctness is the requirement; visual expansion of the cooldown UI is not.
+
+Touch controls, keyboard controls and CPU input must all obey the same gameplay state.
+
+⸻
 
 Tests
 
-Update existing expectations and add regression coverage rather than deleting tests just because behavior changed.
+Add or update tests so this cannot regress.
 
-At minimum cover these cases.
+At minimum test:
 
-Energy
+Ordinary attacks
 
-every registered fighter max Energy === 100
-ground Dash costs exactly 25
-air dash costs exactly 25
-Dash-cancel costs exactly 25
-ordinary Shield block costs exactly 15
-Perfect Shield block costs exactly 15
-Deflect startup costs exactly 15
-Deflect whiff still costs 15
-successful Deflect does not refund Energy
-projectile reflection does not refund Energy
-Combat Assist costs exactly 0
-Combat Assist works at 100 Energy
-Combat Assist works at partial Energy
-Combat Assist works while Energy-exhausted
-Combat Assist does not suppress normal regeneration because of a fake payment
+For more than one fighter:
 
-Damage
+1. Start an ordinary attack.
+2. Confirm its new cooldown exists/activates as intended.
+3. Attempt to reuse the exact move before 0.5 s.
+4. Assert it cannot start.
+5. Advance the required fixed steps.
+6. Assert it can start once the timer is complete and the fighter is otherwise free.
 
-Create a roster-wide/content-wide test that recursively inspects every actual damaging definition.
+Test both ground and aerial attacks.
 
-Every hit must be one of:
+Use precise fixed-step assertions around the boundary: immediately before expiry versus the first legal step at/after 0.5 s.
 
-new Set([1, 3, 5, 10])
+Extra attacks
 
-Explicitly cover:
+Verify both current extra attacks:
 
-single-hit attacks
-multi-hit strike entries
-projectiles
-projectile finishers
-technique burst hits
-Deflect
-summon-produced attacks
+* #0001 High Kick
+* #0002 Whirlwind
 
-Verify #0001 Hollow Purple is 10, not 12.
+Techniques
 
-Verify #0001 High Kick is 5, not 4.
+Verify:
 
-Verify representative former damage-2 moves now deal 3.
+* Unlimited Void
+* Hollow Purple
 
-Verify Deflect remains 3.
+Both must receive the new universal cooldown.
 
-Verify blocked events may still produce event damage 0 without violating authored damage validation.
+Replace stale tests asserting that #0001’s techniques have “no cooldown” or “may start again at once.”
 
-Difficulty
+Summons
 
-For all four difficulty levels, the exact same attack must resolve to identical:
+Use the existing summon/loadout fixture to prove summons inherit the same rule.
 
-damage
-launch inputs/results
-Energy costs
-attack timing
+Dash
 
-Difficulty should only affect CPU choice/timing behavior.
+Test grounded Dash cannot be reused before its 0.5-second cooldown has expired.
 
-Cooldowns
+Air dash
 
-For #0001:
+Test the same for air dash without breaking the existing per-airtime use limit.
 
-all ordinary attack cooldowns === 0
-Deflect cooldown === 0
-Unlimited Void cooldown === 0
-Hollow Purple cooldown === 0
-abilityCooldowns does not become active after either technique
+Exempt jump
 
-For ordinary non-#0001 attacks:
+Prove jumps did not acquire the new cooldown.
 
-effective repeat cooldown <= 0.05 seconds
+Test at least ground jump and air jump behavior.
 
-Test same-attack cancellation/repeat behavior so the cancellableFor rule agrees with the new delay.
+Exempt run
 
-Universal movement
+Prove left/right normal locomotion remains continuously usable with no 0.5-second gating.
 
-For every registered fighter verify the same shared baseline movement object/values are used.
+Exempt Shield
 
-Verify fighter definitions cannot declare private movement values.
+Prove Shield raising/holding/re-raising retains existing timing.
 
-Verify equal:
+Exempt Deflect
 
-run speed
-jump velocity
-gravityScale
-Dash speed
-air-dash speed
-air-jump configuration
-fall limits
+This requires an explicit regression test.
 
-Preserve the global CONFIG.sim.gravity path.
+Verify #0001 and #0002 Deflects preserve their existing cooldown values/behavior and do NOT become 0.5-second offensive cooldowns.
 
-Compatibility requirements
+Buffering
 
-Do not break:
+Test an attack pressed shortly before its cooldown expires:
 
-Quick Battle
-Practice Ground
-CPU controls
-player controls
-touch controls
-keyboard controls
-respawning
-Energy HUD/status rendering
-Shield rendering
-Deflect projectile reflection
-Combat Assist toggle
-attack buffering
-hit cancels
-air-use limits
-summons/techniques framework for future fighters
+* never starts early;
+* starts only after cooldown completion if still inside the normal attack buffer.
 
-The CPU must obey the exact same combat mechanics and Energy rules as the player. Difficulty can make the CPU smarter or faster to react, but can never give it modified damage or resource costs.
+Interruptions
 
-Completion criteria
+Start an attack, interrupt it, and prove its cooldown cannot be bypassed.
 
-The task is not complete until all of the following are true:
+Do the same for a technique or summon if existing lifecycle semantics make that meaningful.
 
-Energy max is universally 100.
-Every Dash/air dash/Dash cancel costs 25.
-Every successful Shield block, including Perfect Shield, costs 15.
-Every Deflect activation costs 15.
-No successful block/Deflect grants an Energy advantage.
-Combat Assist spends zero Energy under every circumstance.
-Every authored damaging hit is exactly 1, 3, 5, or 10.
-No authored damaging hit exceeds 10 or falls below 1.
-Difficulty has zero effect on damage.
-#0001 has zero move/ability cooldowns.
-Ordinary same-attack repeat cooldown is at most 0.05 s for other fighters.
-Every fighter still has identical baseline run/jump/gravity/Dash physics.
-Documentation agrees with runtime behavior.
-No #0001 ID special cases were added to shared code.
-`character_rule` is untouched.
-`node --test` passes completely.
+Reset / respawn
 
-After implementation, give me a concise report containing:
+Verify cooldown state is cleared by the existing clean reset/respawn behavior.
 
-1. Files changed.
-2. The final authoritative constants/rules and where each lives.
-3. Every damage value that was changed, old -> new.
-4. How #0001 cooldown removal was implemented.
-5. How Combat Assist was made completely Energy-free.
-6. What guarantees difficulty cannot affect damage.
-7. What guarantees all fighters have identical baseline movement.
-8. Test results from node --test.
-9. Any pre-existing failing test or unrelated issue, clearly separated from changes made for this task.
+CPU
 
-Do not stop after editing character numbers. Follow each requirement through runtime logic, validation, tests, UI copy, comments, and documentation.
+Verify CPU-controlled fighters cannot start a cooling action through any AI-only pathway.
+
+Do not create special CPU gameplay logic simply for the test.
+
+⸻
+
+Existing tests likely requiring updates
+
+Audit at least these areas:
+
+* tests/systems/combat-rules.test.mjs
+* tests/systems/combo.test.mjs
+* tests/systems/technique.test.mjs
+* tests/systems/loadout.test.mjs
+* tests/systems/movement.test.mjs
+* tests/systems/energy.test.mjs
+* tests/systems/deflect.test.mjs
+* tests/systems/defense.test.mjs
+* tests/systems/combat-ai.test.mjs
+* tests/systems/fighter-stats.test.mjs
+* #0001 move/combo tests
+* #0002 fighter/move tests
+* any integration tests that explicitly assert cooldown maps are empty after an offensive action
+
+Do not simply weaken failing assertions.
+
+Update tests to describe the new intended rule while retaining coverage of unrelated mechanics.
+
+Some current combo tests may rely on immediate repetition. Re-evaluate them against the new 0.5-second rule and update the expected timing rather than bypassing the new rule for the sake of the old combo.
+
+⸻
+
+Documentation cleanup
+
+Search the entire repository for stale statements such as:
+
+* MAX_ATTACK_COOLDOWN
+* 0.05
+* three steps
+* no cooldown
+* cooldown: 0
+* may be cast again at once
+* descriptions saying ordinary attacks may only have a maximum 0.05-second repeat cooldown
+* descriptions saying Unlimited Void/Hollow Purple have no cooldown
+
+Only change occurrences that actually describe this mechanic; do not replace unrelated 0.05-second values such as hitstop or dash-cancel timing.
+
+Update the authoritative documentation, including where applicable:
+
+* ALVA_SPEC.md
+* docs/systems/combat.md
+* movement documentation for Dash/air dash
+* defense documentation if necessary to state Deflect’s exemption
+* character documentation for #0001/#0002
+* architecture/character-authoring documentation
+* code comments describing cooldown invariants
+
+The docs must clearly state:
+
+All offensive attacks and actionable abilities use the universal 0.5-second reuse wait. Normal run, jumps, Shield and Deflect are exempt.
+
+Make sure documentation does not imply that character authors can choose a shorter offensive cooldown and escape the rule.
+
+⸻
+
+Do not change unrelated balance
+
+Unless a change is mechanically required to implement this rule, preserve:
+
+* damage
+* Launch values
+* hitstun
+* blockstun
+* hitstop
+* startup
+* active frames
+* recovery
+* animation FPS
+* animation frames
+* projectile speeds/lifetimes
+* pulls
+* homing values
+* rebound values
+* character movement speed
+* gravity
+* jump heights
+* air-jump counts
+* Energy maximum
+* Energy costs
+* Shield behavior
+* perfect-Shield behavior
+* Deflect behavior
+* hitboxes/hurtboxes
+* Dash speed/duration
+* Combat Assist distances
+* AI difficulty tuning
+
+This task is about reuse timing only.
+
+⸻
+
+Required implementation quality
+
+Do not use:
+
+* setTimeout;
+* wall-clock timers detached from the fixed-step simulation;
+* UI-only button disabling as the authoritative check;
+* character-ID checks;
+* repeated 0.5 magic numbers everywhere;
+* one-off special cases for the current two fighters.
+
+Use the existing simulation timing/cooldown architecture.
+
+The game logic must remain deterministic.
+
+⸻
+
+Final acceptance criteria
+
+The work is complete only when all of these are true:
+
+* Every ordinary offensive attack has the universal 0.5-second reuse wait.
+* Every aerial attack has it.
+* Every extra_attack has it.
+* Every projectile-producing attack has it.
+* Every technique has it.
+* Every summon has it.
+* Ground Dash has it.
+* Air dash has it.
+* Future characters automatically inherit it.
+* Combat Assist cannot bypass it.
+* CPU fighters cannot bypass it.
+* Running is unchanged.
+* Ground jumping is unchanged.
+* Air jumping is unchanged.
+* Shield is unchanged.
+* Deflect is unchanged and specifically does NOT become 0.5 seconds.
+* Failed move attempts do not start cooldowns.
+* Reset/respawn clears cooldown state correctly.
+* Existing attacks retain their animation/combat timing.
+* No unrelated balance values change.
+* All relevant tests pass.
+* Documentation and comments match the new rule.
+* There are no stale statements claiming offensive attacks are limited to a 0.05-second maximum cooldown or that #0001’s techniques have no cooldown.
+
+After implementing, run the full test suite, not just the new tests.
+
+Then provide a concise implementation report containing:
+
+1. the shared rule and where it lives;
+2. every action category covered;
+3. confirmation of the four exemptions;
+4. how Dash/air dash were handled;
+5. how Deflect was kept out despite using the attack schema;
+6. tests added/updated;
+7. documentation updated;
+8. full test-suite result;
+9. any assumptions or edge cases discovered during implementation.
