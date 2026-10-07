@@ -16,7 +16,7 @@
   .preview-info { gap: 7px; }
 }
 
-/* Four setup steps: between the full header and the phone layout (where
+/* Up to five setup steps: between the full header and the phone layout (where
    the steps hide), only the current step keeps its name. */
 @media (max-width: 1100px) {
   .steps li:not(.is-current) .step-name { display: none; }

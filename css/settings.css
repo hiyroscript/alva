@@ -42,7 +42,10 @@
   letter-spacing: -0.02em;
   color: var(--text-strong);
 }
-.settings-close {
+/* The settings dialog's close button, shared by the choice dialog's
+   (css/overlays.css). */
+.settings-close,
+.dialog-close {
   flex: none;
   display: grid;
   place-items: center;
@@ -54,10 +57,10 @@
   color: var(--text);
   transition: background-color var(--dur-fast) ease, border-color var(--dur-fast) ease, box-shadow var(--dur-fast) ease, transform 80ms ease;
 }
-.settings-close .icon { font-size: 20px; }
-.settings-close:hover { background: var(--surface-subtle); border-color: var(--border-hover); }
-.settings-close:focus { box-shadow: var(--focus-ring); }
-.settings-close:active { transform: scale(0.96); }
+.settings-close .icon, .dialog-close .icon { font-size: 20px; }
+.settings-close:hover, .dialog-close:hover { background: var(--surface-subtle); border-color: var(--border-hover); }
+.settings-close:focus, .dialog-close:focus { box-shadow: var(--focus-ring); }
+.settings-close:active, .dialog-close:active { transform: scale(0.96); }
 /* The body scrolls on its own on short landscape screens; Home never does. */
 .settings-body {
   display: grid;

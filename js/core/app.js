@@ -15,7 +15,7 @@ import { ScreenManager } from './screen-manager.js';
 import { MenuNavigator } from './menu-navigator.js';
 import { Settings } from './settings.js';
 import { i18n, followSettings, onLanguageChange, localizeTree } from '../localization/i18n.js';
-import { LoadingOverlay, ConfirmDialog } from '../ui/overlays.js';
+import { LoadingOverlay, ConfirmDialog, ChoiceDialog } from '../ui/overlays.js';
 import { LanguageDialog } from '../ui/language-dialog.js';
 import { SettingsDialog } from '../ui/settings-dialog.js';
 import { TouchLayoutEditor } from '../ui/touch-layout-editor.js';
@@ -29,6 +29,7 @@ import { HomeScreen } from '../screens/home-screen.js';
 import { ModeSelectScreen } from '../screens/mode-select-screen.js';
 import { DifficultySelectScreen } from '../screens/difficulty-select-screen.js';
 import { CharacterSelectScreen } from '../screens/character-select-screen.js';
+import { QuickCpuScreen } from '../screens/quick-cpu-screen.js';
 import { MapSelectScreen } from '../screens/map-select-screen.js';
 import { WatchDifficultyScreen, WatchFighterScreen, WatchMapScreen } from '../screens/watch-screens.js';
 import { BattleScreen } from '../screens/battle-screen.js';
@@ -36,16 +37,22 @@ import { PracticeGroundScreen } from '../screens/practice-screen.js';
 import { DiscoverScreen } from '../screens/discover-screen.js';
 
 // Quick Battle's choices, and Watch Mode's apart from them (one difficulty
-// for both CPUs, a fighter each), as they start. Practice Ground keeps its
-// own fighter, and its training-dummy CPU never reads the difficulty. Every
+// for both CPUs, a fighter each), as they start. Quick Battle's play type
+// (Regular Play until Custom Play is chosen in Select Mode), Player 1's
+// fighter, the CPU's fighter and the stage are the one state its Battle is
+// started from (js/screens/quick-battle-setup.js): Regular Play draws the
+// CPU's fighter and the stage into it. Practice Ground keeps its own
+// fighter, and its training-dummy CPU never reads the difficulty. Every
 // fighter is the first playable one, or null while there is none: never a
 // disabled one.
 export function initialSelection() {
   const firstFighter = playableCharacters()[0]?.id ?? null;
   return {
     mode: 'quick-battle',
+    playType: 'regular',
     difficulty: DEFAULT_DIFFICULTY,
     characterId: firstFighter,
+    cpuCharacterId: firstFighter,
     mapId: MAPS[0].id,
     watch: {
       difficulty: DEFAULT_DIFFICULTY,
@@ -75,6 +82,7 @@ export class App {
     this.nav = new MenuNavigator(this);
     this.loading = new LoadingOverlay(document.getElementById('loading-overlay'));
     this.dialog = new ConfirmDialog(document.getElementById('confirm-dialog'), this);
+    this.choiceDialog = new ChoiceDialog(document.getElementById('choice-dialog'), this);
     this.languageDialog = new LanguageDialog(document.getElementById('language-dialog'), this);
     this.settingsDialog = new SettingsDialog(document.getElementById('settings-dialog'), this);
     this.touchEditor = new TouchLayoutEditor(document.getElementById('touch-editor'), this);
@@ -94,7 +102,10 @@ export class App {
     s.register(new HomeScreen(this));
     s.register(new ModeSelectScreen(this));
     s.register(new DifficultySelectScreen(this));
+    // Quick Battle's setup: Mode → Difficulty → Fighter, then (Custom Play)
+    // CPU → Stage.
     s.register(new CharacterSelectScreen(this));
+    s.register(new QuickCpuScreen(this));
     s.register(new MapSelectScreen(this));
     // Watch Mode's setup: Difficulty → CPU 1 → CPU 2 → Stage.
     s.register(new WatchDifficultyScreen(this));

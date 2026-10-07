@@ -24,7 +24,8 @@ retraces them to Home, landing on each choice.
   all unchanged.
 - **The same clock and overtime.** 7 minutes, then, with the points level,
   60 seconds of overtime under the closing Void, then the lower Launch
-  Point, exactly as in [Quick Battle](battle.md). The HUD
+  Point, and level on that too a tie on the result menu (never a fresh
+  battle by itself), exactly as in [Quick Battle](battle.md). The HUD
   and the results name the sides **CPU 1** and **CPU 2** ("CPU 1 Wins",
   "CPU 2 fell into the Void for the final point.").
 - **Its own choices.** Watch Mode keeps them in `app.selection.watch`

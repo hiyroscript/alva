@@ -1280,6 +1280,61 @@ at speed), `hit-fx.test.mjs` (Dash trails), `tests/interface/discover.test.mjs`,
 `i18n.test.mjs`, `tests/fighters/0001/`, `tests/fighters/0002/` and others
 updated.
 
+## Quick Battle play types and the overtime tie
+
+Not a named update (it can become one if the owner names it). Asked for in
+`max`: give Quick Battle a Regular Play / Custom Play choice, let Custom
+Play pick the CPU's fighter, and end an exact overtime tie on a result
+instead of starting a fresh battle.
+
+**What it changed.**
+
+- **The play-type dialog.** Selecting Quick Battle on Select Mode opens a
+  modal `role="dialog"` choice (`ChoiceDialog`, `js/ui/overlays.js`, on a
+  new `#choice-dialog` root): **Custom Play** and **Regular Play**, Regular
+  Play the default focus. A choice becomes `app.selection.playType`;
+  Esc, gamepad Back, the close button or a press around the panel dismiss
+  it without choosing, focus back on the Quick Battle card. The confirm
+  dialog is unchanged (its cancel and Escape stay one result).
+- **Regular Play:** Mode → Difficulty → Fighter → Battle. Confirming the
+  fighter draws the CPU's fighter from `playableCharacters()` and the stage
+  from `MAPS` (`drawRegularPlay`, `js/screens/quick-battle-setup.js`) into
+  `cpuCharacterId` and `mapId`, then starts the Battle. Restart Battle and
+  Rematch keep the draw.
+- **Custom Play:** Mode → Difficulty → Fighter → CPU → Stage → Battle,
+  with a new Select CPU screen (`quick-cpu`, `js/screens/quick-cpu-screen.js`),
+  another instance of the fighter roster screen.
+- **Two fighters.** Quick Battle's CPU no longer plays Player 1's fighter:
+  `BattleScreen.enter()` checks `characterId` and `cpuCharacterId` on their
+  own and refuses the match if either is not playable. `Battle` itself is
+  unchanged.
+- **Setup steps** follow the play type (`QUICK_BATTLE_CUSTOM_SETUP`, five
+  steps; `QUICK_BATTLE_REGULAR_SETUP`, three; `js/ui/components.js`),
+  re-read as each setup screen is entered. `WATCH_SETUP` is unchanged.
+- **Change Stage** is explicit (`BattleScreen.changeStage`): the mode's own
+  Select Stage, which after Regular Play takes the Battle's place (steps
+  Mode · Difficulty · Fighter · Stage, Back to Select Fighter).
+- **The tie.** `Battle.result`'s rule is unchanged (points, then the lower
+  Launch Point within 1e-6, then `'draw'`). The battle screen now shows a
+  draw on the result menu ("End of overtime", "Tie", "Overtime ended with
+  the points and Launch Point equal.") instead of restarting, in Quick
+  Battle and Watch Mode alike.
+
+**Code:** `js/ui/components.js`, `js/ui/overlays.js`,
+`js/screens/mode-select-screen.js`, `difficulty-select-screen.js`,
+`character-select-screen.js`, `map-select-screen.js`, `battle-screen.js`,
+`quick-battle-setup.js` and `quick-cpu-screen.js` (new),
+`js/core/app.js`, `index.html`, `css/overlays.css`, `css/settings.css`
+(the shared close button), `js/localization/strings/`.
+
+**Tests:** `tests/integration/quick-battle.test.mjs` (new: the dialog,
+both routes, their steps and Back, the draw, the CPU's own fighter, Change
+Stage); `tests/interface/battle-screen.test.mjs` (the tie on the result
+menu, each side refused on its own), `tests/integration/watch-mode.test.mjs`
+(Watch Mode's tie), `tests/integration/difficulty.test.mjs` (the steps of
+each play type), `tests/interface/i18n.test.mjs` and
+`tests/integration/practice-ground.test.mjs` updated.
+
 ## Adding a named update
 
 When a new piece of work gets a name, add a row to the table and a section in

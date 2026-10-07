@@ -1,5 +1,8 @@
 // SELECT STAGE: large live preview of the highlighted stage + selectable cards.
-// Confirming starts Quick Battle's Battle.
+// Confirming starts Quick Battle's Battle. It is Custom Play's last step,
+// after Select CPU; Regular Play draws its stage instead, and reaches this
+// screen only by Change Stage after a match, as the step after Select Fighter
+// (its steps say so).
 //
 // Watch Mode's Select Stage is another instance (js/screens/watch-screens.js):
 // the options below name its screen, its setup and step, where its choice is
@@ -11,13 +14,17 @@ import { Screen } from '../core/screen-manager.js';
 import { el } from '../core/utils.js';
 import { tx, tattr, iconLabel, setAttr, plural } from '../localization/i18n.js';
 import { ICONS } from '../ui/icons.js';
-import { screenHeader, QUICK_BATTLE_SETUP } from '../ui/components.js';
+import { screenHeader, refreshSteps, currentSetup, quickBattleSetup } from '../ui/components.js';
+import { quickBattleParams } from './quick-battle-setup.js';
 import { MAPS, getMap } from '../data/maps.js';
 import { StagePreview } from '../ui/stage-preview.js';
 
 export class MapSelectScreen extends Screen {
   constructor(app, {
-    id = 'map', setup = QUICK_BATTLE_SETUP, step = 3, selection = () => app.selection, startLabel = 'map.start',
+    id = 'map',
+    setup = () => quickBattleSetup(app.selection, { stage: true }),
+    step = () => quickBattleSetup(app.selection, { stage: true }).steps.length - 1,
+    selection = () => app.selection, startLabel = 'map.start',
   } = {}) {
     super(app, id);
     // The object holding this setup's `mapId`, read on every use.
@@ -56,7 +63,7 @@ export class MapSelectScreen extends Screen {
     this.countEl = el('span', { class: 'panel-meta' });
 
     this.el.replaceChildren(
-      screenHeader({ title: 'map.title', kicker: setup.name, setup, step, onBack: () => this.onBack() }),
+      screenHeader({ title: 'map.title', kicker: currentSetup(setup).name, setup, step, onBack: () => this.onBack() }),
       el('div', { class: 'screen-body map-layout' }, [
         this.heroEl,
         el('div', { class: 'map-side' }, [
@@ -85,6 +92,7 @@ export class MapSelectScreen extends Screen {
   }
 
   enter() {
+    refreshSteps(this.el);
     this.select(getMap(this.selection().mapId) || MAPS[0]);
     this.showHero(getMap(this.selection().mapId) || MAPS[0]);
     this.renderThumbs();
@@ -126,11 +134,10 @@ export class MapSelectScreen extends Screen {
     this.app.screens.go('battle', this.battleParams());
   }
 
-  // Quick Battle: its stage, Player 1's fighter (the CPU plays the same one)
-  // and the CPU's level.
+  // Quick Battle: its stage, Player 1's fighter, the CPU's fighter and the
+  // CPU's level.
   battleParams() {
-    const { mapId, characterId, difficulty } = this.selection();
-    return { mapId, characterId, difficulty };
+    return quickBattleParams(this.selection());
   }
 
   update(dt) {

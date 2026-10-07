@@ -96,21 +96,26 @@ There are no import cycles (checked over every module).
 ## `js/screens/` and `js/ui/`
 
 Each screen (`splash`, `home`, `mode-select`, `difficulty-select`,
-`character-select`, `map-select`, `watch-screens` (Watch Mode's setup,
+`character-select`, `quick-cpu-screen` (Custom Play's Select CPU, built
+from Select Fighter), `map-select`, `watch-screens` (Watch Mode's setup,
 built from the setup screens), `battle`, `practice`, `discover`) is
 registered by `core/app.js` and owns its own section of `index.html`.
+`quick-battle-setup.js` is no screen: it is Quick Battle's setup logic
+(Regular Play's random draw, the Battle's start parameters, where Select
+Fighter goes next), used by `character-select-screen.js` and
+`map-select-screen.js`.
 
 | `js/ui/` module | Owns | Used by |
 | --- | --- | --- |
-| `components.js` | Shared menu pieces (headers, buttons, hint bars). | the setup screens, battle, practice, discover |
+| `components.js` | Shared menu pieces (headers with their setup steps, each setup's steps and Quick Battle's play types, buttons, hint bars). | the setup screens, battle, practice, discover |
 | `hud.js` | The battle and practice HUD (DOM). | `screens/battle-screen.js`, `screens/practice-screen.js` |
 | `touch-controls.js` | `TouchControls`: both touch layouts. | `screens/battle-screen.js`, `screens/practice-screen.js`, `touch-layout-editor.js` |
 | `mobile-abilities.js` | Which touch buttons a fighter has, their names and art. | `touch-controls.js` |
 | `touch-layout-editor.js` | The layout editor. | `core/app.js` |
-| `fighter-roster.js` | The 48-slot roster (Select Fighter, Watch Mode's CPU screens, Practice Ground's dialogs). | `screens/character-select-screen.js`, `screens/practice-screen.js` |
+| `fighter-roster.js` | The 48-slot roster (Select Fighter, Quick Battle's Select CPU, Watch Mode's CPU screens, Practice Ground's dialogs). | `screens/character-select-screen.js`, `screens/practice-screen.js` |
 | `sprite-art.js` | Portrait and preview painting. | `fighter-roster.js`, `hud.js`, `stage-preview.js` |
 | `stage-preview.js` | Select Stage's live preview. | `screens/map-select-screen.js` |
-| `overlays.js` | The loading overlay and the confirm dialog. | `core/app.js` |
+| `overlays.js` | The loading overlay, the confirm dialog and the choice dialog (Quick Battle's play type). | `core/app.js` |
 | `settings-dialog.js`, `language-dialog.js` | Settings; the first-launch language chooser. | `core/app.js` |
 | `credits.js`, `logo.js`, `icons.js` | The credits list, the wordmark, inline SVG glyphs. | Home, overlays, the HUD and touch controls |
 

@@ -1,11 +1,13 @@
 // BATTLE screen: hosts the canvas, HUD, touch controls, pause + result
 // overlays, and drives the Battle simulation from the app loop.
 //
-// It runs both kinds of Battle: Quick Battle (Player 1 against the CPU, one
-// fighter for both) and Watch Mode (params.mode 'watch': CPU 1 against
-// CPU 2, a fighter each, one difficulty for both). Watch Mode is for
-// watching only: no gameplay input and no touch controls, while pause,
-// restart, rematch and Return to Home work as in Quick Battle.
+// It runs both kinds of Battle: Quick Battle (Player 1 against the CPU, a
+// fighter each: characterId and cpuCharacterId, which may be the same one)
+// and Watch Mode (params.mode 'watch': CPU 1 against CPU 2, a fighter each,
+// one difficulty for both). Watch Mode is for watching only: no gameplay
+// input and no touch controls, while pause, restart, rematch and Return to
+// Home work as in Quick Battle. Every match ends on the result menu, a tie
+// at the end of overtime included.
 //
 // Every string is a translation key (js/localization/i18n.js); the touch controls
 // use the player's saved scheme and custom layout (Home › Settings ›
@@ -48,6 +50,17 @@ const RESULT_TEXT = {
   overtimePoints: { kicker: 'result.kickerOvertime', sub: 'result.overtimePoints' },
   overtimeLaunchPoint: { kicker: 'result.kickerOvertime', sub: 'result.overtimeLaunchPoint' },
 };
+
+// A tie (outcome 'draw': points and Launch Point equal when the clock runs
+// out for good) names no winner, in any mode: the end of overtime, or time
+// over when overtime is off.
+const TIE_TEXT = {
+  overtimeLaunchPoint: { kicker: 'result.kickerOvertime', title: 'result.tie', sub: 'result.overtimeTie' },
+  time: { kicker: 'result.kickerTime', title: 'result.tie', sub: 'result.timeTie' },
+};
+
+// Each mode's own Select Stage, where Change Stage goes.
+const STAGE_SCREEN = { 'quick-battle': 'map', watch: 'watch-map' };
 
 // How each mode names the two sides (side.<mode>.<p1|p2>.wins, the result
 // title when a side wins, and .name, the side as it starts a sentence), and
@@ -133,7 +146,7 @@ export class BattleScreen extends Screen {
     const stage = menuButton('result.changeStage');
     const home = menuButton('pause.home');
     rematch.addEventListener('click', () => this.rematch());
-    stage.addEventListener('click', () => this.leave(() => this.app.screens.back()));
+    stage.addEventListener('click', () => this.leave(() => this.changeStage()));
     home.addEventListener('click', () => this.leave(() => this.app.screens.go('home', {}, { reset: true })));
     this.resultOverlay = el('div', {
       class: 'overlay result-overlay', hidden: true, role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'result-title',
@@ -160,9 +173,9 @@ export class BattleScreen extends Screen {
     const pick = (key) => params?.[key] || selection[key];
     // Only a playable fighter can take a side: a missing, unknown, deleted
     // or disabled id (from a stale selection or a direct route) is null.
+    // Each side is checked on its own: neither ever stands in for the other.
     const p1Def = getPlayableCharacter(pick(watch ? 'cpu1CharacterId' : 'characterId'));
-    // Quick Battle's CPU plays Player 1's fighter.
-    const p2Def = watch ? getPlayableCharacter(pick('cpu2CharacterId')) : p1Def;
+    const p2Def = getPlayableCharacter(pick(watch ? 'cpu2CharacterId' : 'cpuCharacterId'));
     if (!p1Def || !p2Def) {
       this.refuse();
       return;
@@ -320,7 +333,7 @@ export class BattleScreen extends Screen {
     this.touch.setAirborne(!!battle.primary && !battle.primary.grounded);
     this.hud.update(battle);
     // Handled after the frame rather than from inside the simulation step, so
-    // a draw can restart the battle safely.
+    // the result menu opens on a settled battle.
     if (battle.phase === 'result') {
       this.finishBattle();
       return;
@@ -443,22 +456,27 @@ export class BattleScreen extends Screen {
 
   // ---- Result -----------------------------------------------------------------
 
-  // A draw opens no result dialog: once TIME (or K.O.) has played out, a
-  // fresh battle starts through the usual restart path. A winner gets the
-  // result menu.
+  // Every match ends on the result menu: a winner, or a tie when points and
+  // Launch Point are equal as overtime runs out. Nothing restarts by itself.
   finishBattle() {
-    if (this.battle.result.outcome === 'draw') this.restart();
-    else this.showResult();
+    this.showResult();
   }
 
   showResult() {
     const { outcome, reason = 'time' } = this.battle.result;
-    const text = RESULT_TEXT[reason] ?? RESULT_TEXT.time;
-    const sides = MODE_TEXT[this.mode].sides;
-    const loser = outcome === 'p1' ? 'p2' : 'p1';
-    setText(this.resultKicker, text.kicker);
-    setText(this.resultTitle, `${sides}.${outcome}.wins`);
-    setText(this.resultSub, text.sub, { loser: { t: `${sides}.${loser}.name` } });
+    if (outcome === 'draw') {
+      const tie = TIE_TEXT[reason] ?? TIE_TEXT.overtimeLaunchPoint;
+      setText(this.resultKicker, tie.kicker);
+      setText(this.resultTitle, tie.title);
+      setText(this.resultSub, tie.sub);
+    } else {
+      const text = RESULT_TEXT[reason] ?? RESULT_TEXT.time;
+      const sides = MODE_TEXT[this.mode].sides;
+      const loser = outcome === 'p1' ? 'p2' : 'p1';
+      setText(this.resultKicker, text.kicker);
+      setText(this.resultTitle, `${sides}.${outcome}.wins`);
+      setText(this.resultSub, text.sub, { loser: { t: `${sides}.${loser}.name` } });
+    }
     this.setBanner(null);
     this.setPlayActive(false);
     this.resultOverlay.hidden = false;
@@ -469,6 +487,18 @@ export class BattleScreen extends Screen {
   hideResult() {
     this.resultOverlay.hidden = true;
     this.app.nav.popScope(this.resultScope);
+  }
+
+  // Change Stage: the mode's own Select Stage, every other choice kept. It
+  // is the screen just behind the Battle when the match was started there
+  // (Custom Play, Watch Mode); Regular Play starts from Select Fighter, so
+  // its Select Stage takes the Battle's place, Back from it returning to
+  // Select Fighter.
+  changeStage() {
+    const screens = this.app.screens;
+    const target = STAGE_SCREEN[this.mode];
+    if (screens.stack.at(-1) === target) screens.back();
+    else screens.go(target, {}, { replace: true });
   }
 
   rematch() {

@@ -4,7 +4,8 @@
 // MenuNavigator with the real setup screens, its own selection apart from
 // Quick Battle's, the real Battle with a combat AI on each side, and the
 // Battle screen running it (loading, spectating, pause, restart, rematch,
-// results, Change Stage) before a Quick Battle that behaves as before.
+// results, a tie at the end of overtime, Change Stage) before a Quick
+// Battle that behaves as before.
 // The fighters picked on its screens are mostly test-only (see
 // tests/fighters/fixtures/test-fighters.mjs), beside #0001 in slot 01; the Battle-only checks build
 // #0001 straight from its definition. On a minimal fake DOM; layout and
@@ -170,9 +171,9 @@ const { CHARACTERS, getCharacter } = await import('../../js/data/characters.js')
 const { DIFFICULTIES, DIFFICULTY_IDS, DEFAULT_DIFFICULTY, getDifficultyProfile } = await import('../../js/data/difficulty.js');
 const { MAPS, getMap } = await import('../../js/data/maps.js');
 const { ICONS } = await import('../../js/ui/icons.js');
-const { ConfirmDialog } = await import('../../js/ui/overlays.js');
+const { ConfirmDialog, ChoiceDialog } = await import('../../js/ui/overlays.js');
 const { Settings } = await import('../../js/core/settings.js');
-const { WATCH_SETUP, QUICK_BATTLE_SETUP } = await import('../../js/ui/components.js');
+const { WATCH_SETUP, QUICK_BATTLE_CUSTOM_SETUP, QUICK_BATTLE_REGULAR_SETUP } = await import('../../js/ui/components.js');
 const { t } = await import('../../js/localization/i18n.js');
 const { ScreenManager } = await import('../../js/core/screen-manager.js');
 const { MenuNavigator } = await import('../../js/core/menu-navigator.js');
@@ -181,6 +182,7 @@ const { HomeScreen } = await import('../../js/screens/home-screen.js');
 const { ModeSelectScreen } = await import('../../js/screens/mode-select-screen.js');
 const { DifficultySelectScreen } = await import('../../js/screens/difficulty-select-screen.js');
 const { CharacterSelectScreen } = await import('../../js/screens/character-select-screen.js');
+const { QuickCpuScreen } = await import('../../js/screens/quick-cpu-screen.js');
 const { MapSelectScreen } = await import('../../js/screens/map-select-screen.js');
 const { WatchDifficultyScreen, WatchFighterScreen, WatchMapScreen } = await import('../../js/screens/watch-screens.js');
 const { BattleScreen } = await import('../../js/screens/battle-screen.js');
@@ -236,7 +238,7 @@ function boot({
   };
   const app = {
     selection: {
-      mode: 'quick-battle', difficulty: DEFAULT_DIFFICULTY, characterId: 'test-a', mapId: MAPS[0].id,
+      mode: 'quick-battle', playType: 'custom', difficulty: DEFAULT_DIFFICULTY, characterId: 'test-a', cpuCharacterId: 'test-a', mapId: MAPS[0].id,
       watch: { difficulty: DEFAULT_DIFFICULTY, cpu1CharacterId: 'test-a', cpu2CharacterId: 'test-a', mapId: MAPS[0].id },
     },
     input: fakeInput(),
@@ -258,11 +260,13 @@ function boot({
   app.screens = new ScreenManager(app);
   app.nav = new MenuNavigator(app);
   app.dialog = new ConfirmDialog(new Element('div'), app);
+  app.choiceDialog = new ChoiceDialog(new Element('div'), app);
   const screens = {
     home: new HomeScreen(app),
     mode: new ModeSelectScreen(app),
     difficulty: new DifficultySelectScreen(app),
     character: new CharacterSelectScreen(app),
+    quickCpu: new QuickCpuScreen(app),
     map: new MapSelectScreen(app),
     watchDifficulty: new WatchDifficultyScreen(app),
     watchCpu1: new WatchFighterScreen(app, 1),
@@ -305,12 +309,17 @@ async function startWatch(booted, opts) {
   return booted.screens.battle.battle;
 }
 
-// Home → Play → Quick Battle, straight through to its Battle.
-async function startQuickBattle({ app, screens }, { difficulty = 'easy', fighter = TEST_A } = {}) {
+// Home → Play → Quick Battle → Custom Play, straight through to its
+// Battle: `fighter` for Player 1, `cpu` (the same one unless given) for the
+// CPU.
+async function startQuickBattle({ app, screens }, { difficulty = 'easy', fighter = TEST_A, cpu = fighter } = {}) {
   screens.home.actions.play.click();
   screens.mode.el.querySelector('.mode-card').click();
+  app.choiceDialog.buttonFor('custom').click();
+  await settle();
   cardOf(screens.difficulty, difficulty).click();
   screens.character.confirm(fighter);
+  screens.quickCpu.confirm(cpu);
   app.loads.length = 0;
   screens.map.start();
   await settle();
@@ -445,14 +454,15 @@ test('the app registers the four Watch Mode screens, each with its own labelled 
   );
 });
 
-test('Watch setup screens show Difficulty, CPU 1, CPU 2, Stage under "Watch Mode setup"; Quick Battle\'s header is unchanged', () => {
+test('Watch setup screens show Difficulty, CPU 1, CPU 2, Stage under "Watch Mode setup"; Quick Battle\'s headers are its own', () => {
   const { screens } = boot();
   // The steps are translation keys ([key, params] for CPU n), English here.
   const names = (setup) => setup.steps.map((step) => t(...[].concat(step)));
   assert.deepEqual(names(WATCH_SETUP), ['Difficulty', 'CPU 1', 'CPU 2', 'Stage']);
-  assert.deepEqual(names(QUICK_BATTLE_SETUP), ['Mode', 'Difficulty', 'Fighter', 'Stage']);
+  assert.deepEqual(names(QUICK_BATTLE_CUSTOM_SETUP), ['Mode', 'Difficulty', 'Fighter', 'CPU', 'Stage']);
+  assert.deepEqual(names(QUICK_BATTLE_REGULAR_SETUP), ['Mode', 'Difficulty', 'Fighter']);
   assert.equal(t(WATCH_SETUP.name), 'Watch Mode');
-  assert.equal(t(QUICK_BATTLE_SETUP.name), 'Quick Battle');
+  assert.equal(t(QUICK_BATTLE_CUSTOM_SETUP.name), 'Quick Battle');
   const check = (screen, names, step, label) => {
     const list = screen.el.querySelector('.steps');
     assert.equal(list.getAttribute('aria-label'), label, screen.id);
@@ -479,12 +489,17 @@ test('Watch setup screens show Difficulty, CPU 1, CPU 2, Stage under "Watch Mode
     assert.equal(screen.el.querySelector('.screen-title').tagName, 'H1', 'one heading per screen');
     assert.equal(screen.el.querySelector('.btn-back').getAttribute('aria-label'), 'Back');
   }
-  const quick = [[screens.mode, 0, 'Play'], [screens.difficulty, 1, 'Quick Battle'], [screens.character, 2, 'Quick Battle'], [screens.map, 3, 'Quick Battle']];
+  // Quick Battle's Custom Play (the play type this app was booted on).
+  const quick = [
+    [screens.mode, 0, 'Play'], [screens.difficulty, 1, 'Quick Battle'], [screens.character, 2, 'Quick Battle'],
+    [screens.quickCpu, 3, 'Quick Battle'], [screens.map, 4, 'Quick Battle'],
+  ];
   for (const [screen, step, kicker] of quick) {
-    check(screen, ['Mode', 'Difficulty', 'Fighter', 'Stage'], step, 'Quick Battle setup');
+    check(screen, ['Mode', 'Difficulty', 'Fighter', 'CPU', 'Stage'], step, 'Quick Battle setup');
     assert.equal(screen.el.querySelector('.kicker').textContent, kicker);
   }
   assert.equal(screens.character.el.querySelector('.screen-title').textContent, 'Select Fighter');
+  assert.equal(screens.quickCpu.el.querySelector('.screen-title').textContent, 'Select CPU');
   assert.ok(screens.map.startBtn.html.includes('<span>Confirm and start battle</span>'));
   assert.ok(screens.watchMap.startBtn.html.includes('<span>Confirm and watch battle</span>'));
 });
@@ -645,12 +660,13 @@ test('locked roster slots stay locked on both Watch rosters, exactly as on Selec
 test('Watch choices never touch Quick Battle\'s, and Quick Battle never touches Watch Mode\'s', async () => {
   const booted = boot();
   const { app, screens } = booted;
-  const quick = { difficulty: app.selection.difficulty, characterId: app.selection.characterId, mapId: app.selection.mapId };
+  const quickOf = () => ({
+    playType: app.selection.playType, difficulty: app.selection.difficulty,
+    characterId: app.selection.characterId, cpuCharacterId: app.selection.cpuCharacterId, mapId: app.selection.mapId,
+  });
+  const quick = quickOf();
   await startWatch(booted, { difficulty: 'brutal', cpu1: DEF_9999, cpu2: DEF_9999, mapId: 'city' });
-  assert.deepEqual(
-    { difficulty: app.selection.difficulty, characterId: app.selection.characterId, mapId: app.selection.mapId }, quick,
-    'Quick Battle\'s difficulty, fighter and stage are untouched',
-  );
+  assert.deepEqual(quickOf(), quick, 'Quick Battle\'s play type, difficulty, fighters and stage are untouched');
   const watch = { ...app.selection.watch };
   assert.deepEqual(watch, { difficulty: 'brutal', cpu1CharacterId: '9999', cpu2CharacterId: '9999', mapId: 'city' });
   screens.battle.exit();
@@ -659,12 +675,16 @@ test('Watch choices never touch Quick Battle\'s, and Quick Battle never touches 
   // A Quick Battle with other choices.
   screens.home.actions.play.click();
   screens.mode.el.querySelector('.mode-card').click();
+  app.choiceDialog.buttonFor('custom').click();
+  await settle();
   cardOf(screens.difficulty, 'easy').click();
   assert.equal(document.activeElement, slotOf(screens.character, 'test-a'), 'Select Fighter shows Quick Battle\'s own fighter');
   screens.character.confirm(DEF_9999);
+  assert.equal(document.activeElement, slotOf(screens.quickCpu, 'test-a'), 'Select CPU shows Quick Battle\'s own CPU');
+  screens.quickCpu.confirm(TEST_A);
   assert.equal(document.activeElement, mapCard(screens.map, MAPS[0].id), 'and its own stage');
   mapCard(screens.map, MAPS[0].id).click();
-  assert.deepEqual([app.selection.difficulty, app.selection.characterId, app.selection.mapId], ['easy', '9999', MAPS[0].id]);
+  assert.deepEqual([app.selection.difficulty, app.selection.characterId, app.selection.cpuCharacterId, app.selection.mapId], ['easy', '9999', 'test-a', MAPS[0].id]);
   assert.deepEqual(app.selection.watch, watch, 'Watch Mode\'s choices are untouched');
 
   // And Watch Mode's screens still show its own.
@@ -973,7 +993,7 @@ test('Watch Mode with a fighter with different moves: either way round and mirro
   }
 });
 
-test('Quick Battle with a fighter with different moves: picked from slot 05, the CPU plays it too, with its own touch buttons', async () => {
+test('Quick Battle with a fighter with different moves: picked from slot 05 for both sides, with its own touch buttons', async () => {
   const booted = boot();
   const { app, screens } = booted;
   assert.equal(slotOf(screens.character, 'test-sample')._index, 4, 'Select Fighter: slot 05');
@@ -981,7 +1001,7 @@ test('Quick Battle with a fighter with different moves: picked from slot 05, the
   assert.equal(app.selection.characterId, 'test-sample');
   assert.deepEqual(app.loads, ['test-sample'], 'one fighter loaded');
   assert.deepEqual(app.loading.labels.at(-1), 'Loading Sample');
-  assert.deepEqual([battle.p1.def.id, battle.p2.def.id], ['test-sample', 'test-sample'], 'the CPU plays Player 1\'s fighter');
+  assert.deepEqual([battle.p1.def.id, battle.p2.def.id], ['test-sample', 'test-sample'], 'the CPU picked the same fighter');
   const touch = screens.battle.touch;
   const abilities = ['extra_attack', 'transform', 'attack1', 'attack2'];
   assert.deepEqual(abilities.map((a) => [touch.buttons.get(a).hidden ?? false, touch.buttons.get(a).getAttribute('aria-label')]), [
@@ -1234,14 +1254,36 @@ test('results name CPU 1 and CPU 2 in Watch Mode; Quick Battle\'s wording is unc
     assert.equal(document.activeElement.textContent, 'Rematch');
     screen.exit();
   }
-  // A draw still starts a fresh battle, with no dialog.
+  // A tie (points and Launch Point equal as overtime runs out) ends the
+  // match on the result menu too, naming neither CPU; Rematch starts a clean
+  // one.
   const booted = boot();
+  const screen = booted.screens.battle;
   const battle = await startWatch(booted);
+  battle.setPhase('fight');
+  battle.timeLeft = 0.01;
+  battle.update(DT);
+  assert.equal(battle.overtime, true);
+  battle.p1.combat.launchPoint = 25;
+  battle.p2.combat.launchPoint = 25;
+  battle.timeLeft = 0.01;
+  battle.update(DT);
   battle.phase = 'result';
-  booted.screens.battle.finishBattle();
-  assert.equal(booted.screens.battle.resultOverlay.hidden, true);
-  assert.equal(battle.phase, 'intro');
-  booted.screens.battle.exit();
+  assert.deepEqual(battle.result, { outcome: 'draw', reason: 'overtimeLaunchPoint' });
+  screen.finishBattle();
+  assert.equal(screen.resultOverlay.hidden, false, 'the result menu, not a fresh battle');
+  assert.equal(battle.phase, 'result');
+  assert.equal(screen.resultKicker.textContent, 'End of overtime');
+  assert.equal(screen.resultTitle.textContent, 'Tie');
+  assert.equal(screen.resultSub.textContent, 'Overtime ended with the points and Launch Point equal.');
+  assert.doesNotMatch(screen.resultOverlay.textContent, /Wins|Player 1|The CPU/);
+  assert.deepEqual(screen.resultOverlay.querySelectorAll('[data-nav]').map((b) => b.textContent), ['Rematch', 'Change Stage', 'Return to Home']);
+  byText(screen.resultOverlay, 'Rematch').click();
+  assert.equal(battle.overtime, false);
+  assert.deepEqual(battle.score, { p1: 0, p2: 0 });
+  assert.deepEqual([battle.p1.combat.launchPoint, battle.p2.combat.launchPoint], [0, 0]);
+  assert.equal(battle.mode, 'watch');
+  screen.exit();
 });
 
 test('Change Stage returns to Watch Mode\'s Select Stage after a Watch battle, and to Quick Battle\'s after a Quick Battle', async () => {
@@ -1276,7 +1318,7 @@ test('Change Stage returns to Watch Mode\'s Select Stage after a Watch battle, a
   assert.equal(current(app), 'map', 'Quick Battle\'s own Select Stage');
 });
 
-test('Quick Battle with a fighter with no moves: picked from slot 04, the CPU plays it too, and its touch controls have no ability buttons', async () => {
+test('Quick Battle with a fighter with no moves: picked from slot 04 for both sides, and its touch controls have no ability buttons', async () => {
   const booted = boot();
   const { app, screens } = booted;
   assert.equal(slotOf(screens.character, 'test-moveless')._index, 3, 'Select Fighter: slot 04');
@@ -1284,7 +1326,7 @@ test('Quick Battle with a fighter with no moves: picked from slot 04, the CPU pl
   assert.equal(app.selection.characterId, 'test-moveless');
   assert.deepEqual(app.loads, ['test-moveless'], 'one fighter loaded');
   assert.deepEqual(app.loading.labels.at(-1), 'Loading Moveless');
-  assert.deepEqual([battle.p1.def.id, battle.p2.def.id], ['test-moveless', 'test-moveless'], 'the CPU plays Player 1\'s fighter');
+  assert.deepEqual([battle.p1.def.id, battle.p2.def.id], ['test-moveless', 'test-moveless'], 'the CPU picked the same fighter');
   assert.equal(battle.p1.sprites, battle.p2.sprites);
   const touch = screens.battle.touch;
   const abilities = ['extra_attack', 'transform', 'attack1', 'attack2'];
@@ -1330,7 +1372,7 @@ test('Return to Home after watching, then a Quick Battle behaves exactly as befo
   assert.ok(battle.p1.controller instanceof PlayerController);
   assert.ok(battle.p2.controller instanceof CombatAIController);
   assert.equal(battle.p2.controller.difficulty, 'easy', 'Quick Battle\'s level, not Watch Mode\'s');
-  assert.deepEqual([battle.p1.def.id, battle.p2.def.id], ['test-a', 'test-a'], 'the CPU plays Player 1\'s fighter');
+  assert.deepEqual([battle.p1.def.id, battle.p2.def.id], ['test-a', 'test-a'], 'the CPU picked the same fighter');
   assert.equal(battle.p1.sprites, battle.p2.sprites);
   assert.deepEqual([battle.p1.label, battle.p2.label], ['P1', 'CPU']);
   assert.deepEqual([screen.hud.left.tag.textContent, screen.hud.right.tag.textContent], ['P1', 'CPU']);

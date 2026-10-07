@@ -1,5 +1,5 @@
-// SELECT DIFFICULTY: Quick Battle's second step, between Select Mode and
-// Select Fighter. Four levels in ascending order, each a large card with its
+// SELECT DIFFICULTY: Quick Battle's second step (Regular Play and Custom
+// Play alike), between Select Mode and Select Fighter. Four levels in ascending order, each a large card with its
 // index, a four-bar scale (one bar lit for Easy up to all four for Brutal),
 // its name and a short line. Choosing one makes it Quick Battle's difficulty
 // (app.selection.difficulty) and moves on to Select Fighter; the level only
@@ -13,14 +13,14 @@ import { Screen } from '../core/screen-manager.js';
 import { el } from '../core/utils.js';
 import { tx, tattr, iconLabel } from '../localization/i18n.js';
 import { ICONS } from '../ui/icons.js';
-import { screenHeader, QUICK_BATTLE_SETUP } from '../ui/components.js';
+import { screenHeader, refreshSteps, currentSetup, quickBattleSetup } from '../ui/components.js';
 import { DIFFICULTIES, resolveDifficulty } from '../data/difficulty.js';
 
 const LEVELS = DIFFICULTIES.length;
 
 export class DifficultySelectScreen extends Screen {
   constructor(app, {
-    id = 'difficulty', setup = QUICK_BATTLE_SETUP, step = 1, selection = () => app.selection, next = 'character',
+    id = 'difficulty', setup = () => quickBattleSetup(app.selection), step = 1, selection = () => app.selection, next = 'character',
   } = {}) {
     super(app, id);
     // The object holding this setup's `difficulty`, read on every use.
@@ -55,7 +55,7 @@ export class DifficultySelectScreen extends Screen {
     });
 
     this.el.replaceChildren(
-      screenHeader({ title: 'difficulty.title', kicker: setup.name, setup, step, onBack: () => this.onBack() }),
+      screenHeader({ title: 'difficulty.title', kicker: currentSetup(setup).name, setup, step, onBack: () => this.onBack() }),
       el('div', { class: 'screen-body difficulty-layout' }, [
         el('div', { class: 'difficulty-scale', role: 'group', ...tattr('aria-label', 'difficulty.group') }, this.cards),
       ]),
@@ -77,6 +77,7 @@ export class DifficultySelectScreen extends Screen {
   }
 
   enter() {
+    refreshSteps(this.el);
     this.markCurrent();
   }
 

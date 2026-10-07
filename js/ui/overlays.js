@@ -1,10 +1,12 @@
-// Global overlays: loading screen and confirmation dialog. Their own labels
-// are translation keys (js/localization/i18n.js); a caller's loading label, error
-// message and dialog copy arrive already translated.
+// Global overlays: loading screen, confirmation dialog and choice dialog.
+// Their own labels are translation keys (js/localization/i18n.js); a caller's
+// loading label, error message and confirmation copy arrive already
+// translated, a choice dialog's copy as translation keys.
 
 import { el } from '../core/utils.js';
-import { t, tx, setText } from '../localization/i18n.js';
+import { t, tx, tattr, setText } from '../localization/i18n.js';
 import { logoSVG } from './logo.js';
+import { ICONS } from './icons.js';
 
 export class LoadingOverlay {
   constructor(root) {
@@ -140,5 +142,104 @@ export class ConfirmDialog {
     this.resolve = null;
     if (!result) this.returnFocus?.focus?.({ preventScroll: true });
     resolve(result);
+  }
+}
+
+// A modal choice between a few options, none of them a cancel: role
+// "dialog" (not the confirm dialog's alertdialog), its own navigation scope,
+// focus on the default choice as it opens. Choosing resolves with the
+// choice's value; Escape, gamepad Back, the close button or a press on the
+// dim around the panel dismiss it, resolving with null, and focus returns to
+// what had it (the control that opened it). The screen beneath is inert
+// while it is open.
+export class ChoiceDialog {
+  constructor(root, app) {
+    this.root = root;
+    this.app = app;
+    this.resolve = null;
+    this.kicker = el('span', { class: 'kicker' });
+    this.title = el('h2', { class: 'dialog-title', id: 'choice-dialog-title' });
+    this.closeButton = el('button', {
+      class: 'dialog-close', type: 'button', 'data-nav': true, ...tattr('aria-label', 'common.close'), html: ICONS.close,
+    });
+    this.options = el('div', { class: 'choice-options' });
+    root.setAttribute('role', 'dialog');
+    root.setAttribute('aria-modal', 'true');
+    root.setAttribute('aria-labelledby', 'choice-dialog-title');
+    root.replaceChildren(
+      el('div', { class: 'dialog-panel choice-panel glass glass--panel' }, [
+        el('div', { class: 'choice-header' }, [
+          el('div', { class: 'choice-heading' }, [this.kicker, this.title]),
+          this.closeButton,
+        ]),
+        this.options,
+      ]),
+    );
+    this.closeButton.addEventListener('click', () => this.dismiss());
+    root.addEventListener('click', (e) => {
+      if (e.target === root) this.dismiss();
+    });
+    this.scope = { el: root, onBack: () => this.dismiss() };
+  }
+
+  get isOpen() {
+    return !!this.resolve;
+  }
+
+  // `kicker` and `title` are translation keys; each of `choices` is
+  // { value, label, description } (its label and line translation keys).
+  // The choice whose value is `defaultValue` is the primary one and takes
+  // focus (else the first). Resolves with the value chosen, or null.
+  open({ kicker = null, title, choices, defaultValue = choices[0]?.value }) {
+    if (this.resolve) this.close(null);
+    if (kicker) setText(this.kicker, kicker);
+    this.kicker.hidden = !kicker;
+    setText(this.title, title);
+    this.buttons = choices.map(({ value, label, description }) => {
+      const descId = `choice-dialog-desc-${value}`;
+      const primary = value === defaultValue;
+      const button = el('button', {
+        class: `btn choice-btn${primary ? ' btn--primary' : ''}`, type: 'button', 'data-nav': true,
+        'data-nav-default': primary || null, 'data-choice': value, 'aria-describedby': description ? descId : null,
+        ...tx(label),
+      });
+      button.addEventListener('click', () => this.close(value));
+      return { value, button, option: el('div', { class: 'choice-option' }, [
+        button,
+        description ? el('p', { class: 'choice-desc', id: descId, ...tx(description) }) : null,
+      ]) };
+    });
+    this.options.replaceChildren(...this.buttons.map((b) => b.option));
+    this.returnFocus = document.activeElement;
+    this.background = this.app.screens.current;
+    if (this.background) this.background.el.inert = true;
+    this.root.hidden = false;
+    this.app.nav.pushScope(this.scope);
+    const first = this.buttons.find((b) => b.value === defaultValue) ?? this.buttons[0];
+    first?.button.focus({ preventScroll: true });
+    return new Promise((resolve) => {
+      this.resolve = resolve;
+    });
+  }
+
+  // The button for `value`, while open.
+  buttonFor(value) {
+    return this.buttons?.find((b) => b.value === value)?.button ?? null;
+  }
+
+  dismiss() {
+    this.close(null);
+  }
+
+  close(value) {
+    if (!this.resolve) return;
+    this.root.hidden = true;
+    this.app.nav.popScope(this.scope);
+    if (this.background) this.background.el.inert = false;
+    this.background = null;
+    const resolve = this.resolve;
+    this.resolve = null;
+    if (value === null) this.returnFocus?.focus?.({ preventScroll: true });
+    resolve(value);
   }
 }
