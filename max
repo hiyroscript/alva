@@ -1,194 +1,631 @@
-Work directly in the hiyroscript/alva repository and implement this feature completely, including gameplay logic, rendering, UI/localization, documentation, and automated tests.
+You are modifying the hiyroscript/alva game repository.
 
-Before changing code, inspect the existing architecture and preserve its conventions. Alva is a pure HTML/CSS/JavaScript Canvas 2D platform fighter with no framework or build step. ALVA_SPEC.md is the product specification and must remain authoritative. Shared mechanics belong in shared systems and must not be implemented with fighter-ID-specific engine branches. Do not edit character_rule; it is protected. Preserve deterministic fixed-step gameplay and the existing separation between gameplay/simulation and presentation effects.
+Implement a complete combat/energy consistency pass. Do not make a superficial numbers-only patch. Trace each rule through character data, shared combat logic, AI assumptions, UI text, documentation, and tests so there is one authoritative implementation for each mechanic and no stale behavior remains.
 
-The relevant existing systems are primarily js/game/battle.js for match phases, score, timer and results; js/config.js for timing/configuration; js/game/arena.js for the shared world, Void handling and rendering; js/game/physics.js for StageCollision.inVoid; js/stages/stage-theme.js for the rendered Void; js/ui/hud.js and js/screens/battle-screen.js for the timer, banners and result flow; js/data/maps.js for stage/void geometry; js/game/rendering/hit-fx.js and related rendering modules for the existing procedural effect style; js/data/characters/<id>.js for fighter-owned visual data; js/localization/strings/en.js and fr.js; tests/integration/match-score.test.mjs; tests/systems/platform-stage.test.mjs; and the battle/HUD interface tests.
+Before changing code, read CLAUDE.md, ALVA_SPEC.md, docs/README.md, the relevant files under docs/systems/, and the character definitions. Respect the repository architecture:
 
-Quick Battle match timing
+* Shared mechanics belong in js/game/ or shared js/data/ modules.
+* Character-specific move data belongs in js/data/characters/<id>.js.
+* Never special-case a fighter ID in shared code.
+* Movement must remain universal through js/data/movement.js.
+* Do not edit, rename, move, or reformat character_rule.
+* mouvment is intentionally spelled that way by this project.
+* Run the complete suite with node --test.
 
-Change Quick Battle so its normal match clock begins at exactly 7:00 / 420 seconds.
+Required gameplay rules
 
-Do not simply change the current shared CONFIG.battle.roundSeconds in a way that unintentionally changes Watch Mode. The existing Battle class serves both quick-battle and watch, so make match duration explicitly mode-aware. Keep Watch Mode at its current 5:00 behavior unless some shared refactor is required internally.
+1. Energy is universally capped at exactly 100
 
-Quick Battle continues to be first to 3 points. Reaching the configured pointsToWin still ends the match immediately with the normal K.O. flow, including during overtime.
+Every playable fighter must have:
 
-At the end of the normal 7:00 clock:
+maximum Energy = 100
 
-If one side has more points, do not start overtime. Finish the match through the normal time-up/result flow and award the win to the side with more points.
+There must be no fighter-specific ability to have a maximum above or below 100.
 
-If the points are tied, do not use Launch Point yet and do not restart a draw. Enter a dedicated 60-second overtime period.
+Centralize/enforce this rule rather than relying only on the current character files happening to say max: 100.
 
-Overtime must be a real match state rather than resetting or starting a new battle. Keep the existing score, both fighters’ current Launch Points, Energy, cooldowns, positions, projectiles, summons, techniques, respawn state and all other live combat state. The fight simply continues under overtime rules.
+If character energy configuration still permits max, either remove the per-character override or validate that it is exactly 100 and reject anything else.
 
-The overtime clock starts at 1:00 and counts down to 0 using the same simulation-time semantics as the normal battle clock. Pause must continue to freeze the game exactly as it currently does.
+Starting a match, respawning, restarting Practice, and any full refill must result in exactly 100 Energy.
 
-At the end of overtime, determine the result in this order: first compare points; the side with more points wins. If points are still tied, compare the fighters’ current Launch Point values—the number already shown on the HUD. The fighter with the lower Launch Point wins. Preserve the existing epsilon-safe Launch Point comparison. If points and Launch Point are both equal, preserve Alva’s existing draw behavior: no result dialog, restart into a fresh match.
+Add a regression test covering every registered fighter.
 
-A fighter reaching 3 points during overtime still ends the match immediately as a normal Void/K.O. victory instead of waiting for the overtime clock to expire.
+2. All Dash/mouvment actions cost exactly 25 Energy
 
-Represent overtime explicitly in Battle rather than overloading unrelated states. A clean implementation may use an overtime phase or an explicit match-period/state field while keeping combat live. Fighters must remain controllable throughout overtime; unlike timeup or ko, overtime is active gameplay.
+In this repository, the Energy-consuming universal movement action is the Dash/mouvment system, not ordinary walking or jumping.
 
-Restart and rematch must completely clear overtime state and restore the normal starting Void, normal wave speed, 0–0 score and the correct 7:00 Quick Battle clock.
+Set all of the following to exactly 25 Energy:
 
-Overtime HUD and presentation
+ground Dash / mouvment = 25
+air dash / midair_mouvment = 25
+Dash cancel out of an attack = 25
+air-dash cancel out of an attack = 25
 
-When overtime begins, make it immediately obvious without obscuring gameplay.
+Do not charge Energy for ordinary running, jumping, air jumps, fast falling, turning, normal air control, or passive movement.
 
-The centre HUD timer should change to 1:00 and count down normally. Keep the existing urgent timer treatment for the final 10 seconds.
+Remove the current character differences such as #0001’s 12/35 and #0002’s 15/40 costs.
 
-Add an OVERTIME battle banner/state using the existing banner system in battle-screen.js, with proper English and French localization. It should appear briefly when overtime begins, analogous to the existing ROUND/FIGHT/TIME/K.O. presentation, then get out of the way while the fight continues.
+Prefer one universal source of truth instead of repeating 25 in every fighter definition.
 
-Do not call this “Round 2.” It is overtime of the same match.
+If dashCost and dashCancelCost remain part of the data schema, they must resolve to 25 universally and must not allow characters to override the rule.
 
-Update accessible timer labels so assistive technology correctly announces the overtime time remaining. Do not regress the current pause-button semantics.
+3. Blocking costs exactly 15 Energy per blocked hit
 
-Overtime Void pressure
+Every actual Shield block must consume exactly:
 
-During the normal 7:00 fight, the Void behaves exactly as it does now.
+15 Energy
 
-The overtime pressure begins at the instant overtime starts and increases continuously throughout the 60 seconds.
+This includes a Perfect Shield.
 
-The Void’s animated waves must become progressively faster as overtime advances. The current Void wave definitions live in js/stages/stage-theme.js as VOID.waves. Keep their existing organic shape, amplitudes, weights, red rim, black fill and general visual identity; increase their animation rate rather than changing them into a different effect.
+The existing behavior where a Perfect Shield blocks for free must be removed.
 
-Use an overtime progress value clamped from 0 to 1. The wave-speed multiplier should increase smoothly and monotonically from normal speed at overtime start to approximately 4× normal speed at the end of overtime. Prefer a progressive/ease-in curve such as 1 + 3 * progress² so the acceleration becomes increasingly noticeable rather than jumping immediately.
+Keep the current general exhaustion semantics unless they conflict with these requirements: if the fighter is not already exhausted but has less than 15 Energy remaining, the block may consume the remainder and exhaust the fighter.
 
-Respect the existing reduced-motion setting. With reduced motion enabled, the wave oscillation should remain still as it does now. The gameplay boundary movement described below still occurs because it affects gameplay, not merely presentation.
+Holding Shield without actually blocking an attack does not need to drain Energy continuously.
 
-At the same time, the actual Void must gradually close in on the arena from the left, right and bottom only.
+A miss against a Shield does not need to cost Energy.
 
-Do not move the top Void boundary at all.
+The important invariant is:
 
-This must not be a visual fake. The rendered Void edge and the actual StageCollision.inVoid kill boundary must use the same current bounds so a fighter is eliminated exactly where the displayed hazard says it should be. Projectiles and any other systems that use stage.inVoid should naturally respect the new bounds as well.
+ordinary successful block = -15 Energy
+Perfect Shield successful block = -15 Energy
 
-StageCollision currently freezes a copy of map.voidBounds. Refactor it cleanly so a Battle can update its active Void bounds while keeping the map’s original bounds immutable. Preserve the original bounds as the reset/baseline values.
+Perfect timing may retain its other defensive benefits, but it must provide no Energy discount, refund, restoration, or other Energy advantage.
 
-Over the 60 seconds, linearly bring the left/right boundaries inward and the bottom boundary upward. Centralize the tuning in CONFIG, not in the renderer. Use conservative final clearances approximately equivalent to:
+Replace/retire the existing shieldHitCost values of 20/25 with one universal value of 15.
 
-sideEndGap: 120 world units beyond each main-stage ledge.
+4. Deflect costs exactly 15 Energy
 
-bottomEndGap: 140 world units below mainStage.top.
+Starting a Deflect must consume exactly:
 
-These are minimum final gaps, not absolute world coordinates. Calculate the destination relative to each map’s mainStage, making the system stage-independent.
+15 Energy
 
-Therefore at 100% overtime progress:
+Charge it once when the Deflect action is successfully accepted/started.
 
-left = mainStage.left - sideEndGap
+Do not wait to see whether the Deflect hits something before charging it.
 
-right = mainStage.right + sideEndGap
+A Deflect that whiffs still cost 15 because the action was used.
 
-bottom = mainStage.top + bottomEndGap
+A successful Deflect must not refund Energy, regenerate Energy, discount the cost, or award any Energy advantage.
 
-top = originalVoid.top
+An exhausted fighter must not be allowed to begin an Energy-costing Deflect.
 
-Interpolate from each stage’s original voidBounds to those destinations over the complete 60 seconds.
+Preserve Deflect’s combat behavior otherwise:
 
-The left and right Void must never touch or cross the playable stage’s ledges, and the bottom Void must never reach or cross the main-stage surface. Clamp defensively even if future stage data changes.
+* It remains an airborne attack rather than a Shield.
+* It continues to deal its universal 3 damage.
+* It continues to turn back projectiles while its appropriate active hitbox is live.
+* Preserve its authored animation, hitbox, launch, hitstun, blockstun, momentum, etc.
 
-Do not change mainStage, platforms, solids, camera physics or spawn points. The arena itself is not shrinking; only the Void kill region is moving closer.
+Do not implement the Energy cost by pretending a Deflect is a Shield. Add the cost cleanly to the Deflect start path, probably around Fighter.tryDeflect.
 
-The existing camera bounds may stay based on the stage’s original Void envelope. Do not make the camera suddenly snap inward with the overtime boundary.
+If useful, introduce a universal Energy setting such as deflectCost: 15, but it must not be character-tunable.
 
-A fighter who remains outside a newly advanced Void boundary as it closes in should be eliminated normally on the next fixed simulation step. This should use the same shared Void flow as any other elimination.
+5. Combat Assist must never spend Energy
 
-Ensure the stage renderer uses the active Void bounds instead of continuing to read the original map.voidBounds. Avoid keeping an independent copy in the renderer that can drift out of sync with collision.
+Combat Assist is completely free.
 
-Fighter-colored elimination explosion
+Remove every Energy payment from Combat Assist’s approach.
 
-Whenever a fighter is eliminated by entering the Void, add a short procedural explosion/burst at that fighter’s final world position immediately before the fighter disappears.
+Specifically, Combat Assist must:
 
-This is a visual effect only. It must not damage, launch, stun or otherwise affect either fighter.
+cost 0 Energy
+work when Energy is full
+work when Energy is partially depleted
+work when the fighter is Energy-exhausted
+not prevent Energy regeneration because an Assist was "paid for"
+never refund Energy because it never spends any
 
-The effect should fit Alva’s existing Canvas style: crisp, readable, short-lived and not excessively flashy. Use a radial burst with approximately 20–30 particles/shards plus a quick expanding central flash or ring. It should last roughly 0.45–0.65 seconds, expand rapidly, then fade cleanly. Scale it relative to the fighter rather than using one enormous screen-space effect.
+Combat Assist may still use the universal Dash/air-dash movement speed and range as its movement model. Using Dash-like speed must not make it a Dash for Energy purposes.
 
-The explosion’s colors must come from the eliminated fighter’s own color palette.
+Remove any spendEnergy(dashCost) or equivalent Energy gate from the Combat Assist path in js/game/fighters/fighter.js.
 
-Do not implement this as if fighter.id === '0001' / if fighter.id === '0002' inside the renderer. Add reusable fighter-owned visual data, preferably something like visual.eliminationPalette, containing several representative colors for that fighter. Add appropriate palettes to the existing fighter definition modules after inspecting their sprite art. Use roughly 3–5 recognizable colors per fighter and provide a reasonable neutral fallback palette for future fighters that have not specified one.
+Audit tryCombatAssist, stepCombatAssist, finishing/cancelling the Assist, and any code that tracks whether Energy was spent during the frame.
 
-Keep palette ownership in character data and effect behavior in the shared rendering system.
+Update Settings UI copy and documentation that currently describes Combat Assist as moving “for Energy”.
 
-Trigger the effect in the shared Void/elimination path so it works consistently anywhere a real fighter is taken by the Void, including simultaneous eliminations. Capture the fighter’s location and palette before it is removed from inPlay.
+Do not accidentally make CPU movement use Combat Assist; preserve the existing player-only setting behavior.
 
-The effect should continue drawing after the fighter has disappeared. Do not depend on the eliminated fighter continuing to render.
+6. Successful defense must never grant an Energy advantage
 
-Make the burst deterministic enough for automated tests and consistent with the current deterministic procedural hit effects. Do not use uncontrolled gameplay randomness.
+Audit every Shield, Perfect Shield, Deflect, projectile-reflect, and related defensive path for Energy side effects.
 
-Reduced motion should remove or greatly reduce any screen shake/large movement associated with this effect, but a short color burst/fade may remain so elimination still has visual feedback.
+There must be:
 
-Do not add gore or character-specific death animations. This is a clean energy-like explosion effect.
+no Energy gained for blocking
+no Energy gained for Perfect Shield
+no free Perfect Shield
+no Energy gained for Deflecting
+no Deflect refund
+no successful-reflect Energy refund
+no bonus regeneration triggered by defensive success
 
-Architecture expectations
+Passive Energy regeneration can continue normally according to the Energy system, but defensive success itself cannot improve the Energy amount or waive the required cost.
 
-Keep match rules in Battle, generic arena/Void mechanics in Arena/StageCollision, and pure rendering concerns in the rendering/theme systems.
+7. Damage values are restricted to exactly 1, 3, 5, or 10
 
-Avoid duplicating overtime state between UI and gameplay. The HUD and theme should read authoritative state from the Battle/Arena.
+Create one strict shared damage rule:
 
-Do not make the stage theme responsible for deciding gameplay bounds.
+ALLOWED_DAMAGE = [1, 3, 5, 10]
 
-Do not mutate map.voidBounds.
+Every actual damaging hit authored by game content must have damage equal to one of those four numbers.
 
-Do not break Practice Ground. It should retain its normal static Void boundaries and existing respawn behavior. The fighter-colored elimination burst may appear there when a fighter falls into the Void, because that is a shared visual response, but Practice must not receive overtime behavior.
+There must never be an authored damaging hit for:
 
-Do not regress Combat AI. Because the active kill boundary becomes tighter in overtime, the AI should receive the active stage.void state through the same world object it already senses rather than a second hard-coded overtime boundary.
+0
+2
+4
+6
+7
+8
+9
+11+
+fractions
+negative numbers
 
-Do not add dependencies.
+The minimum real damage is 1.
 
-Configuration
+The maximum real damage is 10.
 
-Put the new numbers in central configuration instead of scattering magic numbers. Use clear names equivalent to quickBattleSeconds: 420, overtimeSeconds: 60, overtimeVoid.sideEndGap: 120, overtimeVoid.bottomEndGap: 140, and overtimeVoid.maxWaveSpeedMultiplier: 4.
+A blocked combat event may still report damage: 0 because no damage was actually dealt. Non-damaging system events are not attacks and are not subject to the minimum-damage rule.
 
-If you prefer a mode-duration object rather than separate duration keys, keep it obvious and documented.
+Likewise, an attack container with hitbox: null because its projectile performs the actual hit does not need an invented direct damage value.
 
-Results and localization
+For multi-hit moves, validate every individual strike. Derived metadata that represents the mathematical sum of several legal strikes may naturally total a number outside [1, 3, 5, 10]; the important invariant is that every actual hit event uses one of the four allowed values.
 
-Update the result copy so it accurately distinguishes a normal time victory from an overtime tiebreak where necessary.
+The damage validation must cover all real damage-producing content:
 
-A Quick Battle won because overtime ended with tied points but a lower Launch Point should clearly communicate that the lower Launch Point decided the overtime result.
+* normal attacks
+* aerial attacks
+* multi-hit hits[] entries
+* Deflect
+* projectiles
+* projectile pierce/grind hits
+* projectile finishers
+* technique burst hits
+* summon attacks
+* future character content passing through these schemas
 
-Add/update both English and French strings. Do not leave untranslated visible strings in JavaScript.
+Do not just fix the two current character files. Add schema-level validation so a future move authored with damage: 2 fails immediately with a useful error.
 
-If overtime ends with one side ahead on points, normal “more points wins” language is fine, but it should not falsely say the original 7:00 timer was the deciding moment if the match actually went through overtime.
+Prefer one shared validation helper instead of independent slightly different checks in attacks, projectiles, techniques, etc.
+
+Current character values that definitely need retuning
+
+For #0001, preserve the intended move hierarchy while converting illegal values as follows:
+
+Jab:                    2 -> 3
+Floating Straight:      2 -> 3
+Red projectile:         2 -> 3
+Maximum Blue tick:      1 -> 1
+Maximum Blue finisher:  2 -> 3
+Red Kick:               3 -> 3
+Blue aerial:            2 -> 3
+Unlimited Void:         3 -> 3
+High Kick:              4 -> 5
+Hollow Purple:         12 -> 10
+Deflect:                3 -> 3
+
+For #0002, every existing damage-2 strike/finisher should become 3 unless there is an extremely strong documented reason to move it to another allowed tier.
+
+Known examples include:
+
+One-Two second strike:      2 -> 3
+Homing Attack:              2 -> 3
+Bounce Attack:              2 -> 3
+Spin Attack:                2 -> 3
+Blue Tornado finisher:      2 -> 3
+Whirlwind finisher:         2 -> 3
+
+Existing 1 and 3 values may remain.
+
+Audit the complete definition rather than assuming this list is exhaustive.
+
+For future balancing use the four intended tiers:
+
+1  = light/chip/multi-hit tick
+3  = normal/solid attack
+5  = heavy attack / major launcher
+10 = exceptional/ultimate-level attack
+
+8. Difficulty must NEVER modify damage
+
+Difficulty may affect CPU intelligence only.
+
+Easy, Medium, Hard, and Brutal may differ in things such as:
+
+* reaction time
+* perception/lapses
+* decision frequency
+* judgement noise
+* spacing accuracy
+* lookahead
+* guarding decisions
+* punish awareness
+* aggression
+* planning
+* stage awareness
+
+Difficulty must not affect:
+
+damage
+launch values
+Energy
+Energy costs
+movement speed
+jump height
+gravity
+Dash speed
+hitboxes
+hitstun
+blockstun
+attack cooldowns
+animation timing
+fighter physics
+
+The current js/data/difficulty.js architecture already states this principle. Preserve it and strengthen it with regression tests.
+
+Add a test that resolves the exact same attack/hit under Easy, Medium, Hard, and Brutal and verifies identical damage and relevant combat results.
+
+Do not multiply damage by a difficulty coefficient anywhere.
+
+9. Remove ALL #0001 move cooldowns
+
+#0001 must have zero cooldown on every move that currently declares a cooldown.
+
+This includes:
+
+ground attacks
+aerial attacks
+extra_attack / High Kick
+Deflect
+Unlimited Void
+Hollow Purple
+
+Known current values include short attack cooldowns, Deflect’s 0.3 second cooldown, Maximum Blue’s multi-second cooldown, and technique cooldowns of 14 and 12 seconds. Remove them all for #0001.
+
+Use cooldown: 0 where the schema requires a number, or omit the field only if omission unambiguously resolves to zero.
+
+For #0001’s techniques, starting Unlimited Void or Hollow Purple must not create an active abilityCooldowns entry.
+
+Do not special-case fighter.id === '0001' in shared runtime code. This is character data and should be expressed in #0001’s definition.
+
+“Remove cooldowns” does NOT mean deleting:
+
+* startup frames
+* active frames
+* recovery frames
+* cast animations
+* hitstop
+* hitstun
+* blockstun
+* paralysis
+* air-use limits
+* ordinary attack recovery
+* Perfect Shield’s separate timing mechanics unless they are literally implemented as a move cooldown
+
+The move still has to finish or satisfy normal cancellation rules before another action can happen. We are removing cooldown timers, not animation/combat phases.
+
+10. Make ordinary same-attack repeat delay much shorter
+
+For ordinary attacks on fighters other than #0001, shorten the authored repeat cooldown so repeating the same attack feels substantially more responsive.
+
+Use:
+
+maximum ordinary attack repeat cooldown = 0.05 seconds
+
+At 60 Hz this is three simulation frames.
+
+Any ordinary attack with an authored cooldown greater than 0.05 should effectively use no more than 0.05.
+
+Do not increase a cooldown already below 0.05.
+
+#0001 remains the special data case requested above: its attack cooldowns are exactly zero.
+
+This applies to the short ordinary-attack cooldown system (CombatState.cooldowns and the same-attack cancellableFor gate), not to animation recovery itself.
+
+Preserve the requirement that a move cannot magically restart in the same simulation instant when its animation/state does not permit it.
+
+Update comments/docs that currently describe moves as having intentionally “long cooldowns” if those descriptions become false.
+
+Do not leave hidden second cooldown systems that make the practical repeat delay much longer than 0.05 after the fighter is otherwise free to act.
+
+11. All characters must have identical baseline movement physics
+
+Preserve and enforce Alva’s existing universal movement architecture.
+
+Every character must share exactly the same baseline:
+
+max running speed
+ground acceleration
+ground deceleration
+turn behavior
+air acceleration
+air deceleration
+jump velocity
+normal jump height
+held/high-jump behavior
+number and strength of air jumps
+gravity scale
+maximum fall speed
+fast-fall behavior
+Dash speed
+Dash duration
+air-dash speed
+air-dash duration
+coyote time
+jump buffering
+attack input buffering as a universal movement/combat-response value
+
+The source of truth should remain BASE_FIGHTER_MOVEMENT in js/data/movement.js.
+
+World gravity must remain the same for everyone through CONFIG.sim.gravity.
+
+Do not add movement blocks to individual character files.
+
+Do not let a character override maxSpeed, jumpVelocity, gravityScale, Dash speed, etc.
+
+Retain the existing movementProblems / assertUniversalMovement style guard and add/strengthen tests that iterate over every registered fighter.
+
+The following are allowed to remain character/move-specific because they are move behavior, not baseline locomotion:
+
+* homing attack movement
+* rolls
+* attack-specific lunges
+* hover attacks
+* rise/plunge/bounce motions
+* recoil
+* attack-specific momentum/control
+* projectile motion
+
+Do not flatten character move identity just to satisfy universal neutral locomotion.
+
+Character body dimensions, hurtboxes, art scale, and move-specific launch behavior are also not baseline run/jump/gravity values and should not be homogenized unless necessary for another requirement above.
+
+Architecture and implementation expectations
+
+Use shared constants/rules wherever a value is supposed to be universal.
+
+A reasonable end state would have authoritative constants conceptually equivalent to:
+
+MAX_ENERGY = 100;
+DASH_ENERGY_COST = 25;
+BLOCK_ENERGY_COST = 15;
+DEFLECT_ENERGY_COST = 15;
+MAX_ORDINARY_REPEAT_COOLDOWN = 0.05;
+ALLOWED_DAMAGE_VALUES = Object.freeze([1, 3, 5, 10]);
+
+The exact module names and exports should fit the existing architecture. Do not create a random “constants dump” if the values naturally belong in combat-state.js, attacks.js, or another existing responsibility.
+
+Remove stale per-character energy cost differences once universal rules own them.
+
+Avoid duplicated constants between character files and runtime files.
+
+Do not put #0001-specific logic into shared systems.
+
+Areas that must be audited
+
+At minimum inspect and modify as necessary:
+
+js/game/combat/combat-state.js
+js/game/combat/combat.js
+js/game/combat/attacks.js
+js/game/combat/deflect.js
+js/game/combat/projectile.js
+js/game/combat/technique.js
+js/game/combat/combat-assist.js
+js/game/fighters/fighter.js
+js/data/movement.js
+js/data/difficulty.js
+js/data/characters/0001.js
+js/data/characters/0002.js
+js/ui/settings-dialog.js
+js/game/rendering/fighter-status.js
+js/ui/hud.js
+
+Also search the repository for:
+
+dashCost
+dashCancelCost
+shieldHitCost
+spendEnergy
+tryCombatAssist
+tryDeflect
+cooldown
+abilityCooldowns
+damage:
+perfect
+Energy
+for Energy
+long cooldown
+
+Do not assume the explicit file list is exhaustive.
 
 Documentation
 
-Update ALVA_SPEC.md to make these rules authoritative.
+Bring the product specification and developer documentation into agreement with the new mechanics.
 
-Update docs/gameplay/battle.md from the old “5 minutes, then points / Launch Point” rule to the new Quick Battle flow: 7 minutes, tied points trigger 60 seconds of overtime, overtime accelerates and closes the Void from the sides/bottom, and an overtime tie on points is decided by lower Launch Point.
+At minimum review/update:
 
-Document that the top Void boundary does not advance.
+ALVA_SPEC.md
+README.md
+docs/systems/energy.md
+docs/systems/combat.md
+docs/systems/defense.md
+docs/systems/movement.md
+docs/systems/ai.md
+docs/characters/0001.md
+docs/characters/0002.md
 
-Document the fighter-colored elimination burst in the appropriate rendering/gameplay documentation.
+Also update comments embedded in source files.
 
-Because this request specifically changes Quick Battle, make the documentation clear about Watch Mode retaining its current 5-minute/shared behavior rather than accidentally claiming both modes use 7-minute overtime. Update any existing sentence claiming the two modes have identical timer/result rules if it becomes inaccurate.
+Remove obsolete claims such as:
 
-Automated tests and verification
+Combat Assist costs Dash Energy
+Perfect Shield costs nothing
+Deflect costs nothing
+#0001's Energy "goes further" because of cheaper costs
+#0001's Unlimited Void has a 14 second cooldown
+#0001's Hollow Purple has a 12 second cooldown
+#0002 moves have long ordinary repeat cooldowns
+Hollow Purple deals 12
+High Kick deals 4
+various moves deal 2
 
-Extend the existing tests rather than replacing them. At minimum, cover all of the following in one coherent test suite:
+Do not alter character_rule.
 
-* Quick Battle starts at exactly 420 seconds / HUD 7:00, while Watch Mode retains its existing 300-second duration.
-* Normal time expiry with unequal points does not start overtime and awards the higher score.
-* Normal time expiry with tied points enters overtime with the same score and combat state, and the overtime timer starts at 60 seconds.
-* Launch Point does not decide the match at the 7:00 boundary when points are tied.
-* Overtime remains playable and respawns/scoring continue normally.
-* Reaching 3 points during overtime still immediately triggers K.O.
-* At overtime expiry, unequal points choose the higher score.
-* At overtime expiry with tied points, lower Launch Point wins.
-* Equal overtime points and effectively equal Launch Points retain the existing draw/restart behavior.
-* Restart/rematch clears overtime and restores the original Void bounds and wave speed.
-* Overtime Void progress is deterministic, monotonic and clamped.
-* Left/right Void bounds move inward, bottom moves upward, and top never changes.
-* Final left/right bounds remain outside the stage ledges and final bottom remains below the surface.
-* StageCollision.inVoid actually uses the moving bounds.
-* The rendered Void receives/uses the same active bounds as collision.
-* Void wave speed increases progressively during overtime and reduced-motion still freezes wave animation.
-* Practice Ground never gets overtime shrinkage.
-* An elimination creates exactly one explosion for the eliminated fighter; simultaneous eliminations create one for each.
-* The explosion captures the correct fighter palette and position, survives after the fighter leaves inPlay, expires cleanly, and resets on battle restart.
-* Existing score, respawn, stage, Watch Mode, HUD and result tests continue passing.
+Do not invent a named UPDATES.md entry unless the owner has explicitly given this change a named update.
 
-Run the complete repository test suite with node --test, not only newly added tests.
+Tests
 
-After automated tests, manually verify Quick Battle in a browser on both Desert and City. Confirm 7:00 displays correctly, a tied 0:00 transition visibly announces OVERTIME and begins at 1:00 without resetting the fighters, the Void closes smoothly only from left/right/bottom, the top remains unchanged, the black edge and actual elimination boundary agree, the wave motion visibly accelerates, and eliminated fighters produce their palette-colored burst.
+Update existing expectations and add regression coverage rather than deleting tests just because behavior changed.
 
-Also manually verify reduced motion and a landscape mobile-sized viewport. No overtime effect should make the HUD unreadable or cause the stage to be visually boxed in during normal play.
+At minimum cover these cases.
 
-Preserve the existing game feel, first-to-three scoring, respawn rules, pause behavior, fixed-step determinism and overall Alva visual language. Do not treat this as a standalone new game mode; it is an extension of Quick Battle’s existing match flow.
+Energy
+
+every registered fighter max Energy === 100
+ground Dash costs exactly 25
+air dash costs exactly 25
+Dash-cancel costs exactly 25
+ordinary Shield block costs exactly 15
+Perfect Shield block costs exactly 15
+Deflect startup costs exactly 15
+Deflect whiff still costs 15
+successful Deflect does not refund Energy
+projectile reflection does not refund Energy
+Combat Assist costs exactly 0
+Combat Assist works at 100 Energy
+Combat Assist works at partial Energy
+Combat Assist works while Energy-exhausted
+Combat Assist does not suppress normal regeneration because of a fake payment
+
+Damage
+
+Create a roster-wide/content-wide test that recursively inspects every actual damaging definition.
+
+Every hit must be one of:
+
+new Set([1, 3, 5, 10])
+
+Explicitly cover:
+
+single-hit attacks
+multi-hit strike entries
+projectiles
+projectile finishers
+technique burst hits
+Deflect
+summon-produced attacks
+
+Verify #0001 Hollow Purple is 10, not 12.
+
+Verify #0001 High Kick is 5, not 4.
+
+Verify representative former damage-2 moves now deal 3.
+
+Verify Deflect remains 3.
+
+Verify blocked events may still produce event damage 0 without violating authored damage validation.
+
+Difficulty
+
+For all four difficulty levels, the exact same attack must resolve to identical:
+
+damage
+launch inputs/results
+Energy costs
+attack timing
+
+Difficulty should only affect CPU choice/timing behavior.
+
+Cooldowns
+
+For #0001:
+
+all ordinary attack cooldowns === 0
+Deflect cooldown === 0
+Unlimited Void cooldown === 0
+Hollow Purple cooldown === 0
+abilityCooldowns does not become active after either technique
+
+For ordinary non-#0001 attacks:
+
+effective repeat cooldown <= 0.05 seconds
+
+Test same-attack cancellation/repeat behavior so the cancellableFor rule agrees with the new delay.
+
+Universal movement
+
+For every registered fighter verify the same shared baseline movement object/values are used.
+
+Verify fighter definitions cannot declare private movement values.
+
+Verify equal:
+
+run speed
+jump velocity
+gravityScale
+Dash speed
+air-dash speed
+air-jump configuration
+fall limits
+
+Preserve the global CONFIG.sim.gravity path.
+
+Compatibility requirements
+
+Do not break:
+
+Quick Battle
+Practice Ground
+CPU controls
+player controls
+touch controls
+keyboard controls
+respawning
+Energy HUD/status rendering
+Shield rendering
+Deflect projectile reflection
+Combat Assist toggle
+attack buffering
+hit cancels
+air-use limits
+summons/techniques framework for future fighters
+
+The CPU must obey the exact same combat mechanics and Energy rules as the player. Difficulty can make the CPU smarter or faster to react, but can never give it modified damage or resource costs.
+
+Completion criteria
+
+The task is not complete until all of the following are true:
+
+Energy max is universally 100.
+Every Dash/air dash/Dash cancel costs 25.
+Every successful Shield block, including Perfect Shield, costs 15.
+Every Deflect activation costs 15.
+No successful block/Deflect grants an Energy advantage.
+Combat Assist spends zero Energy under every circumstance.
+Every authored damaging hit is exactly 1, 3, 5, or 10.
+No authored damaging hit exceeds 10 or falls below 1.
+Difficulty has zero effect on damage.
+#0001 has zero move/ability cooldowns.
+Ordinary same-attack repeat cooldown is at most 0.05 s for other fighters.
+Every fighter still has identical baseline run/jump/gravity/Dash physics.
+Documentation agrees with runtime behavior.
+No #0001 ID special cases were added to shared code.
+`character_rule` is untouched.
+`node --test` passes completely.
+
+After implementation, give me a concise report containing:
+
+1. Files changed.
+2. The final authoritative constants/rules and where each lives.
+3. Every damage value that was changed, old -> new.
+4. How #0001 cooldown removal was implemented.
+5. How Combat Assist was made completely Energy-free.
+6. What guarantees difficulty cannot affect damage.
+7. What guarantees all fighters have identical baseline movement.
+8. Test results from node --test.
+9. Any pre-existing failing test or unrelated issue, clearly separated from changes made for this task.
+
+Do not stop after editing character numbers. Follow each requirement through runtime logic, validation, tests, UI copy, comments, and documentation.
