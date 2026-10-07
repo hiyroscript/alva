@@ -1,573 +1,248 @@
-Work in the hiyroscript/alva repository. Inspect the current implementation and documentation before changing anything, and preserve the repository’s existing architecture, conventions, deterministic fixed-step simulation, and character-neutral shared systems.
+ALVA — Home Screen Grammar and Capitalization Fix
 
-Goal
+Objective
 
-Implement a universal Launch Point recovery mechanic.
+Review and correct all spelling, grammar, punctuation, and capitalization inconsistencies on the Home Screen only of ALVA.
 
-Alva does not use health. Each fighter has CombatState.launchPoint. Real hits add their damage to that value, and launch strength is calculated using the target’s new Launch Point.
+The goal is to make every user-facing Home Screen label grammatically correct, polished, professional, and consistent.
 
-Change Launch Point so that after a fighter has gone 2.0 seconds without taking a real hit, their Launch Point begins recovering toward 0.
+This is strictly a text-correction update, not a redesign or gameplay update.
 
-The exact rule is:
+Repository context
 
-* Taking a genuine, unblocked hit resets the recovery timer.
-* For the next 2.0 seconds, Launch Point does not recover at all.
-* After that 2.0-second grace period, remove 1 Launch Point every 0.5 seconds.
-* Continue removing 1 every 0.5 seconds while no new real hit occurs.
-* Stop when Launch Point reaches 0.
-* Launch Point must never go below 0.
-* A new genuine hit at any time completely resets the timer, including any partial progress toward the next 0.5-second recovery tick.
+Repository: hiyroscript/alva
 
-Exact timing example
+ALVA is a browser-based 2D platform fighting game built with HTML, CSS, and JavaScript.
 
-Suppose a fighter is hit at t = 0 and ends the hit with Launch Point 10.
+The Home Screen provides access to:
 
-Expected values:
+* Play — starts the battle setup flow.
+* Watch Mode — allows players to watch CPU-versus-CPU battles.
+* Practice Ground — opens the training environment.
+* Discover — opens the game’s reference information.
+* Settings — opens the settings dialog.
+* Credits — displays the scrolling contributor and attribution information.
 
-* t = 0.0: 10
-* t = 1.0: 10
-* immediately before t = 2.0: 10
-* t = 2.0: still 10
-* immediately before t = 2.5: still 10
-* t = 2.5: 9
-* t = 3.0: 8
-* t = 3.5: 7
-* continue at the same rate until 0
+The interface supports English and French through a localization system.
 
-The first recovered point therefore occurs 2.5 seconds after the most recent real hit, not at 2.0 seconds.
+Relevant source files
 
-If another hit connects at t = 2.30, discard all previous recovery progress. Add the new hit’s damage normally, then begin a completely new 2.0-second grace period. The first possible -1 is 2.5 seconds after that new hit.
+Inspect these files before implementing any changes:
 
-What counts as “getting hit”
+* js/screens/home-screen.js — Home Screen structure and navigation.
+* js/localization/strings/en.js — English interface strings.
+* js/localization/strings/fr.js — French interface strings.
+* js/localization/i18n.js — Translation and localization behavior.
+* js/ui/credits.js — Home Screen credits content.
+* css/home.css — Home Screen styling and responsiveness.
+* tests/interface/i18n.test.mjs — Localization tests.
 
-Only a genuine hit that is not blocked resets Launch Point recovery.
+Follow the repository’s existing conventions and architecture.
 
-CombatSystem.applyHit() is already the shared path for the game’s hit sources. Use that shared path instead of adding source-specific recovery code.
+1. Apply consistent capitalization
 
-Real hits from all of these must reset recovery:
+Use sentence case for Home Screen buttons and labels.
 
-* ordinary melee attacks;
-* individual strikes in multi-hit attacks;
-* projectiles;
-* projectile finishers;
-* summons/clones;
-* techniques;
-* Deflect strikes;
-* hits with baseLaunch: 0;
-* any future hit source that resolves through the normal shared applyHit() path.
+Sentence case means capitalizing the first word and proper nouns, rather than capitalizing every word.
 
-A hit is still a real hit even if its Base Launch is 0. Base Launch determines whether it launches; it does not determine whether the target was hit.
+Required English corrections
 
-Shield/block behavior
+Current wording	Corrected wording
+Watch Mode	Watch mode
+Practice Ground	Practice ground
+Play	Play
+Discover	Discover
+Settings	Settings
+Credits	Credits
 
-A Shielded hit currently becomes a block event:
+The last four examples are already correct and should remain unchanged.
 
-* damage becomes 0;
-* it adds no Launch Point;
-* it causes no launch.
+Apply the first two corrections specifically to the Home Screen’s localization keys:
 
-A blocked hit must not reset Launch Point recovery.
+* home.watch: Watch mode
+* home.practice: Practice ground
 
-If a fighter is already recovering and blocks an attack, its existing recovery schedule should continue uninterrupted.
+Do not change setup.watch, screen.practice, or any other strings belonging to different screens.
 
-Do not create special block logic elsewhere. CombatSystem.applyHit() already knows whether the hit was blocked.
+French consistency
 
-Preserve existing hit/launch ordering
+Apply the equivalent sentence-case convention where appropriate.
 
-Do not change Alva’s core hit-resolution formula.
+For example:
 
-For an unblocked hit the order must remain conceptually:
+* home.watch: Mode Spectateur → Mode spectateur
 
-1. Determine whether the hit was blocked.
-2. Determine real damage.
-3. Record the previous Launch Point.
-4. Add the hit’s damage to the target’s Launch Point.
-5. Calculate launch strength using that new Launch Point.
-6. Apply directional launch/reaction/stun as it already does.
-7. Emit the existing hit event.
+Keep existing French translations that are already grammatically correct.
 
-The recovery mechanic must not lower the Launch Point before calculating the current hit.
+Follow French capitalization and punctuation conventions rather than mechanically applying English rules.
 
-For example, if the target has Launch Point 20 and takes a 5-damage hit with Base Launch 2, that hit still uses:
+2. Audit all Home Screen text
 
-(20 + 5) × 2
+Review every piece of text rendered directly on the Home Screen, including:
 
-for a launch strength of 50.
+* Navigation buttons
+* The introductory tagline
+* Credits headings and descriptions
+* Contributor attribution
+* Footer text
+* Settings button tooltip and accessible name
+* Accessibility labels and instructions
+* Empty-roster messages
+* Any other text that appears specifically on Home
 
-Recovery begins only afterward as simulation time passes without another hit.
+Check for:
 
-Do not change the existing formula:
+1. Incorrect capitalization
+2. Spelling errors
+3. Grammar mistakes
+4. Missing or unnecessary punctuation
+5. Inconsistent terminology
+6. Awkward phrasing that reduces clarity
 
-launch strength = Base Launch × target's new Launch Point
+Keep corrections minimal. Preserve the original meaning, tone, and personality of ALVA.
 
-Repository architecture
+The tagline Fan project. Big heart. is intentionally short and expressive. Do not rewrite it simply because it uses sentence fragments.
 
-Read the relevant current files before editing, especially:
+Preserve proper nouns such as ALVA, DeviantArt, contributor names, character identifiers, and developer names.
 
-* CLAUDE.md
-* ALVA_SPEC.md
-* README.md
-* docs/systems/launch.md
-* docs/development/testing.md
-* docs/development/conventions.md
-* js/data/launch.js
-* js/game/combat/combat-state.js
-* js/game/combat/combat.js
-* js/game/fighters/fighter.js
-* js/game/arena.js
-* tests/systems/launch.test.mjs
-* tests/systems/fighter-stats.test.mjs
-* tests/helpers/fighter-harness.mjs
+3. Review Home Screen credits
 
-Relevant current architecture:
+The Home Screen includes scrolling credits populated from js/ui/credits.js and the localization dictionaries.
 
-js/data/launch.js
+Review the credits for grammatical accuracy and consistency.
 
-This owns the universal Launch rules:
+In particular, inspect the English credits.original.line text and consider replacing the awkward Desert / City stage artwork phrasing with natural wording such as Desert and City stage artwork.
 
-* allowed damage;
-* Base Launch;
-* Directional Launch;
-* Launch strength formula;
-* Launch speed conversion;
-* player-facing Launch reference copy.
+Maintain all original attribution information and legal meaning.
 
-Universal recovery constants belong with these shared Launch rules rather than in an individual character definition or UI module.
+Do not remove, rename, or alter contributor identities, source links, or ownership acknowledgments.
 
-Use clear named constants following the repository’s naming conventions for the equivalent of:
+If French credits require corresponding grammatical corrections, update those translations accurately.
 
-* recovery delay: 2.0
-* recovery interval: 0.5
-* recovery amount: 1
+4. Improve accessibility text when necessary
 
-Do not scatter 2, 0.5, and 1 as unexplained magic numbers across runtime code.
+The Home Screen includes accessibility descriptions such as:
 
-js/game/combat/combat-state.js
+Credits. Scroll or use arrow and Page keys to read.
 
-CombatState.launchPoint is the fighter’s current Launch Point.
+Review these instructions for clarity and grammatical correctness.
 
-This is the appropriate place for each fighter’s recovery timing state and passive recovery update.
+A clearer English alternative would be:
 
-At present its comments say Launch Point “only ever grows”; those comments will need to be corrected.
+Credits. Scroll or use the arrow keys, Page Up, and Page Down to read.
 
-Implement the state generically. Do not identify fighters, attacks, game modes, or screens here.
+Verify the actual supported keyboard interactions before changing any instructions.
 
-A clean implementation may use either:
+Ensure screen readers receive accurate labels and that language switching continues to update accessibility text correctly.
 
-* separate “time since last real hit” and “recovery tick progress” fields; or
-* one elapsed timer from which completed recovery intervals are calculated.
+5. Respect the Home Screen boundary
 
-Choose whichever produces the clearest deterministic boundary behavior.
+CRITICAL: Only modify text displayed on the Home Screen.
 
-The important semantics are:
+Do not make grammar or capitalization corrections elsewhere, even if similar inconsistencies exist.
 
-* a real hit completely resets recovery timing;
-* no recovery during the first 2 seconds;
-* first point removed after another full 0.5 seconds;
-* each following complete 0.5-second interval removes another point;
-* partial recovery progress is discarded on the next real hit;
-* reaching 0 cannot result in negative values or stored overdue recovery ticks that produce surprising behavior later.
+Specifically, do not change:
 
-Prefer a small explicit API on CombatState, for example conceptually:
+* Battle screens or gameplay HUD
+* Watch mode setup screens
+* Practice ground gameplay
+* Discover pages
+* Settings dialog contents
+* Character selection
+* Difficulty selection
+* Stage selection
+* Loading screens
+* Game mechanics or character data
+* General documentation or unrelated localization entries
 
-* reset/restart Launch recovery when a real hit lands;
-* update Launch recovery from dt.
+The Settings button’s Home Screen tooltip is in scope, but the Settings dialog itself is not.
 
-Follow existing naming style rather than blindly using those method names.
+If a translation key is shared between Home and another screen, do not change its global wording if doing so would affect another screen. Use an existing Home-specific key or introduce a narrowly scoped one only when necessary.
 
-js/game/fighters/fighter.js
+Do not perform a repository-wide capitalization replacement.
 
-Fighter.update(dt) already calls combat.update(dt) at the beginning of each fighter simulation step.
+6. Preserve the existing interface
 
-Integrate Launch recovery into the existing CombatState fixed-step update architecture.
+No visual redesign is permitted.
 
-Do not create a second timing loop in Fighter.
+Keep the following completely unchanged:
 
-Do not put Launch recovery directly into movement, Battle, Arena, Practice Ground, Watch Mode, AI, rendering, or HUD code.
+* Home Screen layout and structure
+* ALVA logo and branding
+* Fonts, typography, and font sizes
+* Colors, backgrounds, and borders
+* Button placement and dimensions
+* Spacing and alignment
+* Animations and transitions
+* Scrolling credits behavior
+* Responsive layouts
+* Keyboard, mouse, touch, and gamepad navigation
+* Button functionality and navigation destinations
 
-js/game/combat/combat.js
+Text corrections must not introduce clipping, overflow, or unnecessary line wrapping.
 
-CombatSystem.applyHit() is the shared hit-resolution path.
+Avoid CSS or component changes unless absolutely required to display the corrected text properly.
 
-Reset the target’s Launch Point recovery timing from this shared path only for an unblocked real hit.
+7. Preserve localization functionality
 
-Do not duplicate reset handling for:
+English and French must continue working correctly.
 
-* projectiles;
-* clones;
-* techniques;
-* multi-hit strikes;
-* Deflect;
-* particular attack IDs.
+Do not rename existing translation keys unnecessarily.
 
-They already converge here.
+Preserve interpolation placeholders such as {developer} and {title}.
 
-Be careful not to change the combat event contract unnecessarily. Existing tests check the event fields closely. Launch recovery does not need to add new fields to normal hit/block events unless there is a compelling architectural reason.
+Ensure that switching languages updates Home Screen text immediately, without requiring a reload.
 
-Fixed-step timing and determinism
+Do not introduce hardcoded text directly into the Home Screen component when the localization system should own that text.
 
-This mechanic must use the game’s simulation dt.
+8. Validation and testing
 
-Do not use:
+After making the corrections:
 
-* setTimeout;
-* setInterval;
-* Date.now;
-* performance.now;
-* render-frame timestamps;
-* CSS/animation time;
-* another wall clock.
+1. Verify every visible Home Screen label in English.
+2. Verify the French translations.
+3. Check the credits and footer.
+4. Confirm accessibility descriptions are accurate.
+5. Verify that all four primary navigation buttons still work.
+6. Confirm the Settings button still opens the Settings dialog.
+7. Confirm the credits still scroll and their links still work.
+8. Check desktop and mobile landscape layouts.
+9. Confirm no other game’s screens have changed.
 
-The game is fixed-step and deterministic. Launch recovery must remain deterministic as well.
+Run the relevant existing tests:
 
-Follow the repository’s existing floating-point boundary convention, including its use of PHASE_EPSILON or the appropriate equivalent where needed.
+node --test tests/interface/i18n.test.mjs
 
-The mechanic must work correctly when dt is not an exact divisor of a timing boundary.
+Then run the full test suite:
 
-It must also behave correctly if a call receives a dt larger than 0.5 seconds.
-
-For example, if enough simulation time passes in one update for three complete recovery ticks, remove 3 points rather than only 1.
-
-Do not silently lose elapsed complete intervals.
-
-Always clamp:
-
-launchPoint >= 0
-
-Do not introduce fractional Launch Points. Recovery always removes whole points.
-
-Interaction with fighter state
-
-The recovery clock is based solely on simulation time since the last genuine hit.
-
-It should not stop merely because the fighter is:
-
-* airborne;
-* grounded;
-* attacking;
-* in attack recovery;
-* shielding;
-* stunned;
-* paralyzed;
-* dashing;
-* air dashing;
-* using Combat Assist;
-* otherwise unable to act.
-
-Follow the same fixed-step timing conventions as Alva’s other passive combat timers.
-
-If simulation steps themselves are paused, recovery naturally pauses because dt is not advancing.
-
-Do not add a separate pause check solely for Launch recovery.
-
-Hitstop / impact freeze
-
-Respect the current simulation architecture.
-
-Fighter.update(dt) advances combat timers using the existing fixed-step conventions even around impact-freeze handling. Launch recovery should follow that same convention rather than inventing wall-clock behavior or a special hitstop clock.
-
-The hit itself resets the recovery timer, so any subsequent simulated time is measured from that hit.
-
-Void, elimination, respawn and restart
-
-Do not add a special out-of-play recovery loop.
-
-A fighter that falls into the Void is removed from normal fighter updating while waiting to respawn. Preserve that architecture.
-
-A fresh life already creates/resets combat state.
-
-Required behavior:
-
-* fresh fighter: Launch Point 0, fresh recovery timing;
-* restart/rematch: Launch Point 0, fresh recovery timing;
-* respawn after the Void: Launch Point 0, fresh recovery timing;
-* while eliminated and waiting for respawn, do not invent background Launch Point recovery.
-
-Do not change scoring, Void timing, or respawn timing.
-
-No fighter-specific configuration
-
-This is one universal rule.
-
-Do not add recovery fields to js/data/characters/<id>.js.
-
-Do not allow #0001 and #0002 to have different recovery values.
-
-Do not special-case:
-
-* fighter IDs;
-* attack IDs;
-* move IDs;
-* projectile IDs;
-* techniques;
-* game mode.
-
-The implementation must automatically apply to all current and future fighters because they share CombatState and CombatSystem.
-
-UI behavior
-
-Do not add a new:
-
-* recovery meter;
-* countdown;
-* icon;
-* status effect;
-* animation;
-* particle effect;
-* setting;
-* toggle;
-* sound;
-* HUD element.
-
-The existing HUD already reads CombatState.launchPoint, so it should naturally display the decreasing value.
-
-Practice Ground, Quick Battle, Watch Mode, and other modes should get the behavior automatically through the shared systems.
-
-Do not duplicate UI-specific recovery code.
-
-AI behavior
-
-Do not add AI-specific Launch recovery rules.
-
-The AI already reads current combat state. If a recovered Launch Point changes an AI decision naturally, that is expected.
-
-Difficulty must not change:
-
-* recovery delay;
-* recovery interval;
-* recovery amount.
-
-Tests
-
-Extend the shared Launch tests, principally:
-
-tests/systems/launch.test.mjs
-
-Use the real:
-
-* CombatState;
-* CombatSystem;
-* fighter harness;
-* probeHit/existing test helpers where appropriate.
-
-Do not create an isolated fake implementation just to make the tests pass.
-
-Add strong coverage for all important boundaries.
-
-At minimum prove:
-
-1. A fresh CombatState still starts at Launch Point 0.
-2. A real hit still adds exactly its damage.
-3. Launch strength still uses the Launch Point after the current hit’s damage is added.
-4. A real hit starts/restarts the Launch recovery timer.
-5. No recovery occurs during the complete first 2.0 seconds.
-6. At exactly the end of the grace period, no point has yet been removed.
-7. The first point is removed only after the following 0.5-second interval.
-8. One additional point is removed after every subsequent complete 0.5-second interval.
-9. Recovery works from a small Launch Point.
-10. Recovery works from a very large Launch Point.
-11. Recovery stops exactly at 0.
-12. Launch Point can never become negative.
-13. A hit during the initial 2-second grace period restarts the full delay.
-14. A hit after recovery has begun restarts the full delay.
-15. A hit during a partial 0.5-second recovery interval discards that fractional progress.
-16. A Shielded/blocked hit adds no Launch Point.
-17. A blocked hit does not reset the recovery schedule.
-18. An unblocked hit with baseLaunch: 0 still resets recovery.
-19. Multi-hit strikes behave like individual real hits and reset timing whenever a real strike connects.
-20. The mechanic is generic across hit sources.
-21. Respawn gives Launch Point 0 and fresh recovery state.
-22. Restart/rematch gives Launch Point 0 and fresh recovery state.
-23. Large dt updates apply every fully elapsed recovery interval rather than dropping ticks.
-24. Existing hit event fields and semantics remain intact.
-25. Existing launch calculations remain intact.
-
-Also preserve existing tests proving:
-
-* Launch Point has no maximum;
-* damage is added before launch is calculated;
-* Shield blocks add no Launch Point;
-* Base Launch 0 still deals its normal damage;
-* the Void, not Launch Point, eliminates a fighter;
-* respawn resets Launch Point;
-* combat is character-neutral;
-* source modules do not special-case fighter or attack IDs.
-
-Do not delete, weaken, skip, or rewrite unrelated tests simply to make the suite green.
-
-Run at minimum:
-
-node --test tests/systems/launch.test.mjs
-node --test tests/systems/fighter-stats.test.mjs
 node --test
 
-The full test suite must pass.
+Add focused tests where useful to verify the corrected Home Screen wording and prevent capitalization regressions.
 
-Documentation
+Do not unnecessarily rewrite existing tests.
 
-This is a core gameplay-rule change, so update the authoritative current documentation.
+9. Deliverables
 
-ALVA_SPEC.md
+Provide a concise final report containing:
 
-Update §7.2.7 Launch.
+* Every Home Screen string corrected
+* Its previous wording
+* Its corrected wording
+* The modified files
+* Any remaining text intentionally preserved
+* Test results
+* Confirmation that no other screen was modified
 
-It currently describes Launch Point as starting at 0, increasing from damage, never dropping below 0 and having no maximum.
+Final acceptance criteria
 
-Document that:
+The update is complete when:
 
-* every real unblocked hit adds its normal damage;
-* the hit resets Launch recovery;
-* after 2 seconds with no further real hit, recovery becomes active;
-* one point is removed for every subsequent 0.5 seconds;
-* a block does not reset that timer;
-* recovery stops at 0;
-* the Launch formula remains unchanged.
+* Watch Mode displays as Watch mode on Home.
+* Practice Ground displays as Practice ground on Home.
+* All other Home Screen wording has been audited for actual grammatical issues.
+* English and French remain consistent and correct.
+* Credits and accessibility labels are grammatically sound.
+* The Home Screen looks and functions exactly as before.
+* No other screen or gameplay system has been changed.
 
-docs/systems/launch.md
-
-Update the Launch Point / formula explanation with the same authoritative timing semantics.
-
-Include an exact timing example if useful.
-
-Make clear that Shield blocks are the exception.
-
-js/data/launch.js
-
-Update comments that currently say Launch Point only grows.
-
-Define the universal recovery constants here or in the most appropriate shared Launch module according to current repository conventions.
-
-Update LAUNCH_POINT_SUMMARY, because Discover uses this shared copy.
-
-The in-game Discover Launch page must not continue to describe Launch Point as accumulated damage that only resets on elimination.
-
-Keep the copy concise enough for the existing reference UI while making the recovery mechanic clear.
-
-README.md
-
-Update the high-level description where necessary so it is no longer misleading.
-
-Do not overload README with implementation details; the exact timing belongs in the system documentation and product spec.
-
-Other stale current documentation/comments
-
-Search the repository for current descriptions such as:
-
-* only ever grows
-* accumulated damage
-* grows by
-* all damage taken
-* Launch Point
-* claims that Launch Point changes only when hit or respawned
-
-Correct current source comments and active documentation that contradict the new rule.
-
-Do not rewrite historical UPDATES.md entries merely because they accurately describe an older version of the game.
-
-Do not modify protected owner-rule files such as character_rule.
-
-Do not modify the max working-prompt file as part of implementing the mechanic unless explicitly instructed to do so.
-
-Things that must not change
-
-Do not change:
-
-* damage tiers;
-* authored attack damage;
-* Base Launch values;
-* Directional Launch values;
-* launch speed conversion;
-* Launch reaction;
-* launch steering;
-* launch bounce;
-* hitstun;
-* blockstun;
-* hitstop;
-* Energy maximum;
-* Energy recovery;
-* Shield costs;
-* Dash costs;
-* fighter definitions;
-* fighter movement;
-* CPU difficulty;
-* attack cooldowns;
-* ability cooldowns;
-* scoring;
-* match timer;
-* overtime;
-* Void behavior;
-* respawn timing;
-* HUD layout.
-
-This task is specifically a universal passive reduction of CombatState.launchPoint after enough simulation time passes without another genuine hit.
-
-Quality requirements
-
-Keep the implementation:
-
-* small;
-* generic;
-* deterministic;
-* fixed-step;
-* character-neutral;
-* source-neutral;
-* easy to test;
-* consistent with existing module ownership.
-
-Prefer one universal implementation over duplicated behavior.
-
-Do not put gameplay state in rendering code.
-
-Do not introduce browser timers.
-
-Do not round wall-clock timestamps.
-
-Avoid adding unnecessary abstractions.
-
-Do not create a separate “health regen” system; this is Launch Point recovery and should remain part of the existing Launch/combat architecture.
-
-Before finishing, inspect the diff for stale comments claiming that Launch Point only increases.
-
-Acceptance criteria
-
-The implementation is complete when all of the following are true:
-
-A fighter takes a normal hit and receives the existing Launch Point increase. That current hit uses the new increased Launch Point for its launch calculation exactly as before.
-
-If that fighter then receives no genuine hit for 2 full seconds, nothing has yet been removed.
-
-After another 0.5 seconds, exactly 1 Launch Point is removed.
-
-Every following 0.5 seconds without another genuine hit removes exactly 1 more.
-
-Recovery stops at 0 and can never produce a negative Launch Point.
-
-Any later genuine unblocked hit immediately:
-
-* adds its normal damage;
-* uses the resulting new Launch Point for that hit’s launch;
-* discards all previous recovery timing/progress;
-* starts a fresh 2-second grace period.
-
-A Shielded/blocked attack:
-
-* adds no Launch Point as before;
-* causes no launch as before;
-* does not restart Launch recovery.
-
-The behavior works identically for every fighter and every normal hit source, including non-launching hits.
-
-Respawn/restart produces clean Launch Point 0 and clean recovery state.
-
-Discover, the product specification, system documentation, README/comments where applicable, and the gameplay implementation all describe the same rule.
-
-All existing and new tests pass.
-
-When finished, report:
-
-1. a concise implementation summary;
-2. the files changed;
-3. the timing/state model used;
-4. where the hit reset occurs;
-5. the test commands run and their results;
-6. any relevant documentation updates.
+Final instruction: Make the smallest possible set of changes. This task is exclusively about improving Home Screen text quality, capitalization, and grammatical consistency. Do not expand its scope.
