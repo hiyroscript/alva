@@ -2237,7 +2237,7 @@ test('the practice theme is registered and draws without building paths each fra
 
 // ---- Quick Battle is unchanged --------------------------------------------------
 
-test('Quick Battle still creates its AI CPU, round intro, 5-minute timer and two-panel HUD, with none of Practice\'s rules', () => {
+test('Quick Battle still creates its AI CPU, round intro, 7-minute timer and two-panel HUD, with none of Practice\'s rules', () => {
   const input = fakeInput();
   // Seeded: unseeded, about one CPU in twelve lands a hit in the first
   // second and the Launch Point check below would fail at random.
@@ -2257,12 +2257,12 @@ test('Quick Battle still creates its AI CPU, round intro, 5-minute timer and two
   assert.equal(battle.secondary, battle.p2);
   assert.equal(battle.phase, 'intro');
   assert.equal(battle.round, 1);
-  assert.equal(CONFIG.battle.roundSeconds, 300, '5 minutes');
-  assert.equal(battle.timeLeft, CONFIG.battle.roundSeconds);
+  assert.equal(CONFIG.battle.matchSeconds, 420, '7 minutes');
+  assert.equal(battle.timeLeft, CONFIG.battle.matchSeconds);
   assert.equal(battle.p1.inputLocked, true, 'locked through the intro');
   for (let i = 0; i < Math.ceil(CONFIG.battle.introSeconds * 60) + 60; i++) battle.update(DT);
   assert.equal(battle.phase, 'fight');
-  assert.ok(battle.timeLeft < CONFIG.battle.roundSeconds);
+  assert.ok(battle.timeLeft < CONFIG.battle.matchSeconds);
   // None of Practice Ground's rules: no damage numbers (its respawns are
   // Quick Battle's own, after a point; see match-score.test.mjs).
   assert.ok(!(battle instanceof PracticeSession));
@@ -2276,7 +2276,7 @@ test('Quick Battle still creates its AI CPU, round intro, 5-minute timer and two
   assert.equal(root.children.length, 3);
   assert.equal(hud.right.tag.textContent, 'CPU');
   assert.equal(hud.roundLabel.textContent, 'ROUND 1');
-  assert.equal(hud.timer.textContent, '5:00');
+  assert.equal(hud.timer.textContent, '7:00');
   assert.equal(hud.pauseButton.html, ICONS.pause);
 });
 

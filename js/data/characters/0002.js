@@ -266,6 +266,11 @@ export const CHARACTER_0002 = {
     anchor: 'torso',
     pixelSize: 1,
     portrait: { animation: 'idle', frame: 0, centerY: 0.3, size: 0.62 },
+    // The colours it bursts in when the Void takes it (see
+    // js/game/rendering/hit-fx.js), picked from its art: its royal-blue
+    // quills and their navy shade, its red shoes, its tan muzzle and its
+    // white gloves.
+    eliminationPalette: ['#2448d4', '#202090', '#f01818', '#f0b090', '#f4f4f6'],
   },
 
   // Its body, measured from its idle: the head and torso (the quills'

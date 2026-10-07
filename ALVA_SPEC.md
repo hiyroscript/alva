@@ -98,7 +98,10 @@ behave, and how it must look.
   convention every fighter's art pixel is the same world size, 88 / 52
   units (the roster's common art-pixel size): a fighter's `visual.height`
   is its reference clip's art height × 88 / 52, so fighters stand at their
-  own true heights side by side.
+  own true heights side by side. Its optional `visual.eliminationPalette`
+  (3–5 CSS colours picked from its art) is what the Void's burst is drawn
+  in when it is taken (7.3); without one the burst is a neutral white,
+  grey and amber.
 - Where automatic anchoring would drag the body, a clip authors its own
   anchors: `anchorX` (art pixels from the left of each frame's visible
   art) and `anchorY` (art pixels down from the top of each frame's art to
@@ -270,12 +273,16 @@ Practice Ground → More → Change Fighter (roster dialog) / Change CPU, or Ena
 Battle → Pause → Resume / Restart Battle / Return to Home (confirmed)
 Battle (a fighter falls into the Void) → the opponent scores a point → that fighter respawns 2 s later; the fight goes on
 Battle (a fighter scores its 3rd point) → K.O. → Result → Rematch / Change Stage / Return to Home
-Battle (time over, one fighter ahead on points, or level with the lower Launch Point) → Result → Rematch / Change Stage / Return to Home
-Battle (time over, level on points and Launch Point: a draw) → a fresh battle starts, no dialog
+Battle (7:00 over, one fighter ahead on points) → Result → Rematch / Change Stage / Return to Home
+Battle (7:00 over, level on points) → OVERTIME: the same fight 60 s more, the Void closing in from the sides and bottom
+Battle (overtime: a fighter scores its 3rd point) → K.O. → Result
+Battle (overtime over, one fighter ahead on points, or level with the lower Launch Point) → Result → Rematch / Change Stage / Return to Home
+Battle (overtime over, level on points and Launch Point: a draw) → a fresh battle starts, no dialog
 ```
 
 A Watch Mode battle follows the same Battle lines (pause, points, K.O.,
-result, draw); its Change Stage returns to Watch Mode's Select Stage.
+7:00, overtime and its closing Void, result, draw); its Change Stage
+returns to Watch Mode's Select Stage.
 
 Every menu screen except Home has a consistent Back action. Keyboard, mouse,
 touch and gamepad all navigate menus with one shared highlight (mouse hover
@@ -495,9 +502,10 @@ Select CPU 2 → Select Stage → CPU vs CPU Battle.
 - **The battle.** Starting hands the Battle screen `mode: 'watch'`, the
   stage, both fighters and the level. It is the real `Battle` (7.2) with a
   `CombatAIController` on each side and no `PlayerController`; everything
-  else, timer, points, Void scoring, respawns, Launch Point, Energy, Shields,
+  else, points, Void scoring, respawns, Launch Point, Energy, Shields,
   summons and techniques, clones, projectiles, stage physics, camera, hit effects,
-  results, rematch and restart, is unchanged. Both fighters' sprites load
+  the 7-minute clock and overtime with its closing Void, results, rematch
+  and restart, is unchanged (7.2.8). Both fighters' sprites load
   through the usual loading overlay (once for a mirror match); a failure of
   either uses the usual error with Retry and Back (to Select Stage).
 - **Spectator only.** No gameplay input is read and the touch controls are
@@ -986,8 +994,10 @@ French, concise game terms).
   drop through all of them except the water-tower deck. Neither CPU ever
   walks off the roof's edges on its own.
 - Collision comes only from map data, never from art.
-- **The Void:** a fighter whose centre leaves `voidBounds` (a fixed
-  rectangle, `StageCollision.inVoid`) is taken by it: it leaves play at once
+- **The Void:** a fighter whose centre leaves the Void in force
+  (`StageCollision.inVoid`, testing `stage.void`: the map's `voidBounds`,
+  copied once as `baseVoid` and never written; only a battle's overtime,
+  Quick Battle's or Watch Mode's, closes it in, below) is taken by it: it leaves play at once
   (frozen and no longer updated, drawn, collided, hit, targeted, pushed or
   framed; its Energy bar, name tag and cooldown rings go with it, its HUD card
   stays), and anything aiming at it lets go. Every fighter taken
@@ -1009,8 +1019,32 @@ French, concise game terms).
   the stage's side: the one set of edge points (`voidEdgePoints`) is stroked
   in red first, at twice that width, then filled black, which hides the
   rim's Void-side half and any of it under another side's black at a
-  corner. The wave, rim included, is art only (the kill line never moves)
-  and holds still with reduced motion.
+  corner. The wave, rim included, is art only (it wavers around the kill
+  line, never moves it) and holds still with reduced motion. The theme
+  draws the black around the very rectangle collision tests, handed to it
+  by the Arena each frame (`drawVoid(ctx, view, stage.void)`); it keeps no
+  copy of its own and never decides the boundary.
+- **Overtime's closing Void** (Quick Battle and Watch Mode, 7.2.8): through
+  overtime's 60 seconds the Void closes in, linearly over the whole period
+  (`StageCollision.closeVoid`, driven by `Battle.overtimeProgress`, 0 to 1,
+  from overtime's own clock): its left and right edges from the stage's
+  `voidBounds` to `CONFIG.battle.overtimeVoid.sideEndGap` (120) world units
+  past each main-stage ledge, its bottom to `bottomEndGap` (140) below the
+  main stage's top, all measured from the stage's own `mainStage`. **The
+  top never moves.** It never closes past those lines, never moves outward,
+  and never reaches a ledge or the surface whatever its tuning (at least
+  40 units clear), so standing on the main stage is always safe. The main
+  stage, platforms, solids, spawns and camera bounds do not change. It is
+  the real kill boundary: inVoid, projectiles, the lethal-launch preview and
+  the CPU (through `ctx.stage`) read it, the drawn edge is traced around
+  it, and a fighter the closing edge passes is taken on that very step
+  through the usual flow. Its drawn waves speed up with it, smoothly and
+  ever faster, from their normal speed to
+  `CONFIG.battle.overtimeVoid.maxWaveSpeedMultiplier` (4×) at its end
+  (`1 + 3 × progress²`), keeping their shape, amplitude, rim and black;
+  with reduced motion they hold still while the boundary still closes in.
+  Restart and rematch restore the stage's own Void and normal waves.
+  Practice Ground's Void never moves.
 - The camera frames both fighters in play (the one still in play alone
   while the other waits to respawn, and holding still if neither is;
   Practice Ground's fighter alone while its CPU is disabled), leaning toward
@@ -2046,9 +2080,11 @@ attack or a button.
   for its effects) and `energyCost` (the Shield's cost on a block, 0 on a
   hit or a perfect block). Launch Point
   never disables a fighter (`canAct()` never reads it) and never takes one
-  out: only the Void does. On time-up in Quick Battle, level on points, the
-  fighter with the lower Launch Point wins (a fighter still waiting to
-  respawn counts the Launch Point it fell with); equal is a draw.
+  out: only the Void does. At the end of overtime (Quick Battle and Watch
+  Mode alike), level on points, the fighter with the lower Launch Point
+  wins (a fighter still waiting to respawn counts the Launch Point it fell
+  with); equal is a draw. The normal 7:00 never goes to the Launch Point:
+  level on points there is overtime (7.2.8).
 - **Launch** (`js/data/launch.js`): how a hit sends its target flying.
   Every hit (an attack's, a projectile's, a
   technique's) declares its own `baseLaunch` and `directionalLaunch` beside
@@ -2177,7 +2213,9 @@ attack or a button.
 
 #### 7.2.8 Matches and the combat AI
 
-- Quick Battle: 5 minutes (`CONFIG.battle.roundSeconds`, 300 seconds),
+- Quick Battle: 7 minutes (`CONFIG.battle.matchSeconds`, 420
+  seconds; the HUD starts at `7:00`), then, with the points level, 60
+  seconds of overtime (`CONFIG.battle.overtimeSeconds`, below),
   first to `CONFIG.battle.pointsToWin` (3) points, against a CPU that uses the same fighter definition and fights with
   it at the difficulty chosen on Select Difficulty (6.3a): Quick Battle's
   combat AI, `CombatAIController` (`js/game/ai/combat-ai.js`). `BattleScreen`
@@ -2195,7 +2233,8 @@ attack or a button.
   is reproducible and the two never share one sequence, not even in a mirror
   match; unseeded, the seed comes from the clock. Restart and rematch keep
   both controllers and reset their plans. Every rule below is the same as in
-  Quick Battle.
+  Quick Battle, the 7-minute clock (`CONFIG.battle.matchSeconds`, one
+  clock for every Battle) and overtime included.
   - **Input only.** Like `PlayerController`, it only returns the standard
     input snapshot (`runLeft`, `runRight`, `down`, `jump`, `shield`,
     `extra_attack`, `transform`, `attack1` to `attack5` and their `…Pressed` edges, each edge true
@@ -2269,9 +2308,30 @@ attack or a button.
   reaches 3 ends the match: no respawn for the loser, the `ko` phase (the
   K.O. beat) and then the result. Once time is up or the match is won, a
   fall scores nothing and nobody respawns. The result: 3 points wins
-  (`reason: 'void'`); on time, more points wins (`'points'`), then the lower
-  Launch Point (`'time'`), else a draw. Restart and rematch reset both scores
+  (`reason: 'void'`, in overtime too); when the normal clock runs out, more
+  points wins (`'points'`); level on points, overtime (below). (With
+  overtime turned off, `CONFIG.battle.overtimeSeconds` 0, the lower Launch
+  Point would decide at once, `'time'`.) Restart and rematch reset both scores
   to 0 and cancel any respawn wait.
+- **Overtime** (Quick Battle and Watch Mode alike, `Battle.period`:
+  `'regulation'`, then `'overtime'`; `Battle.overtime`). When the normal clock runs
+  out with the points level, the Launch Point decides nothing yet: the
+  match goes straight on into 60 seconds of overtime
+  (`CONFIG.battle.overtimeSeconds`). It is the same match, never a reset
+  or a new round (`round` stays 1): the score, both Launch Points, Energy,
+  cooldowns, positions, velocities, projectiles, clones, summons,
+  techniques and respawn waits all carry on, the phase stays `fight` and
+  nobody's input is locked or flushed. Only the clock changes: `timeLeft`
+  becomes overtime's, counting down from 60 on the simulation clock like
+  the normal one (so pause freezes it), and the Void starts closing in
+  (7.1). Falls score, respawns run and the third point ends the match at
+  once (the K.O. beat, then the result) as ever. When overtime runs out:
+  more points wins (`'overtimePoints'`); level on points, the lower Launch
+  Point (`'overtimeLaunchPoint'`, compared within 1e-6); equal on both is a
+  draw (no dialog, a fresh battle). Ahead on points when the normal clock
+  runs out, there is no overtime: more points wins (`'points'`). Restart
+  and rematch clear overtime: the normal period, 0–0, `7:00`, the stage's
+  own Void and normal waves.
 
 #### 7.2.9 Character specifications
 
@@ -2362,10 +2422,13 @@ Adding one is described in
 - Timer + pause: one glass control at top centre. The round label and timer
   sit on top; a rectangular pause section sits directly beneath with no gap,
   the same width and a hairline seam, so only the outer corners are rounded.
-  The timer reads minutes and seconds (`5:00`, `1:27`, `0:09`). Both halves
+  The timer reads minutes and seconds (`7:00`, `1:27`, `0:09`). Both halves
   are buttons that pause the game; the timer half is labelled "Pause game,
   M minutes S seconds remaining" (just the minutes or just the seconds when
-  the other is 0). For the last ten seconds only the digits change, from a
+  the other is 0). Through overtime the round label reads **OVERTIME**
+  (never "ROUND 2"; white rather than muted), the timer shows overtime's
+  clock from `1:00`, and the timer half is labelled "Pause game, overtime,
+  S seconds remaining"; the pause half keeps its "Pause" label. For the last ten seconds only the digits change, from a
   slightly softened off-white to pure white; the glass never changes colour,
   inverts or flashes.
 - Player markers above fighters (under their Energy bars) and ground
@@ -2405,17 +2468,34 @@ Adding one is described in
     0.3 s, while the view closes in to 1.35 × on that fighter (never past
     the camera bounds) with a big shake. One at a time. Every step is
     still exactly one step.
-  - Reduced motion drops the shake and the zoom; the flash, sparks, trails
-    and slow motion stay.
+  - *Elimination burst:* whenever the Void takes a fighter (any mode, two
+    at once included), a short burst plays where it went in, caught in
+    `Arena.checkVoid` before it leaves play (its body's centre, its
+    `visual.height`, its `visual.eliminationPalette`) and drawn over the
+    Void after it has gone: a white flash that pops and fades, a ring
+    opening out in its first colour, and 24 shards in its colours, each
+    over a thin dark line, flung out to about a fighter's height and gone
+    after 0.55 s (`HIT_FX.elimination`), from a seeded generator so the same
+    burst always draws the same. A small shake comes with it. Paint only:
+    no damage, launch or stun to anyone. Never a character-specific death
+    animation, gore or a fighter id in the effect.
+  - Reduced motion drops the shake and the zoom (and the burst's shake, its
+    shards travelling only about a third as far); the flash, sparks,
+    trails, slow motion and the burst's colour flash and fade stay.
 - Round banners ("ROUND 1", "FIGHT", "TIME", and "K.O." under "VOID" when a
   fighter's fall gives the opponent its third point) in white on a dark
-  band.
+  band. As overtime starts, "OVERTIME" under "POINTS LEVEL" ("PROLONGATION"
+  under "ÉGALITÉ" in French), a size smaller, for about 1.4 s while the
+  fight goes on, then gone.
 - Pause menu: glass panel over a dimmed battle with "Quick Battle" ("Watch
   Mode" in Watch Mode; no stage name), "Paused", green **Resume** (default), **Restart Battle** and
   **Return to Home**, nothing else. `Esc` / Back resumes.
 - Time over: the fighter with more points wins ("Time ran out. More points
-  wins the match."); level on points, the one with the lower Launch Point
-  wins ("Time ran out with the points level. Lower Launch Point wins."). A glass result menu offers green **Rematch**, **Change Stage**
+  wins the match."); level on points, the match goes to overtime. Overtime over, under
+  the kicker "End of overtime": more points wins ("Overtime ran out. More
+  points wins the match."); level on points, the lower Launch Point
+  ("Overtime ran out with the points still level. The lower Launch Point
+  decides it."). A glass result menu offers green **Rematch**, **Change Stage**
   and **Return to Home**. Level on both is a draw: no dialog; once the TIME
   banner has played, a fresh battle starts.
 - Match K.O.: once the K.O. banner has played, the same result menu opens
@@ -2453,8 +2533,8 @@ Adding one is described in
   the attack and its phase (`attack4 release`), a `paralyzed s` label on a
   paralysed fighter with its seconds left, a `shield` label on a shielding
   one, a `ricochet n` label on a fighter flying off its n-th rebound,
-  solids with the main floor's block among them, and the Void's fixed kill
-  line, dashed violet).
+  solids with the main floor's block among them, and the Void's kill line
+  in force, dashed violet).
   For #0001, O (`attack3`) is Maximum Blue (Blue in the air), M
   (`attack4`) Unlimited Void and `,` (`attack5`) Hollow Purple, pressed
   directly like any numbered button (7.2); for #0002, M and `,` do

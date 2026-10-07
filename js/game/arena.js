@@ -40,6 +40,10 @@ export class Arena {
     // hold still with reduced motion.
     this.reducedMotion = reducedMotion;
     this.fxTime = 0;
+    // How far a mode has closed the Void in (0-1, see setVoidPressure):
+    // never, unless a mode says so (a Battle's overtime).
+    this.voidPressure = 0;
+    // The camera keeps the map's own bounds, whatever the Void in force.
     this.camera = new Camera();
     this.camera.setBounds(map.cameraBounds);
     this.camera.setAnchor(this.stage.centerX);
@@ -157,6 +161,7 @@ export class Arena {
     if (lead) this.camera.follow(lead, other, dt);
     this.syncView();
     this.theme.update(dt, this.view);
+    this.theme.advanceVoid(dt, this.voidWaveSpeed);
     this.fxTime += dt;
     this.render();
     // Aged after drawing, so what this frame's steps started (a one-frame
@@ -205,15 +210,41 @@ export class Arena {
 
   // ---- Void and respawn ----------------------------------------------------------
 
-  // Every fighter whose centre has crossed the stage's fixed Void boundary
-  // this step (StageCollision.inVoid, never the animated edge) is out of
-  // play (lostToVoid) and goes to onVoid, once. All of this step's are out
-  // before any is handed on, so two taken on the same step are seen as
-  // taken together (see Battle.onVoid).
+  // Every fighter whose centre has crossed the stage's Void boundary in
+  // force this step (StageCollision.inVoid, never the animated edge) is out
+  // of play (lostToVoid) and goes to onVoid, once. All of this step's are
+  // out before any is handed on, so two taken on the same step are seen as
+  // taken together (see Battle.onVoid). Each bursts where it was taken, in
+  // its own colours (HitEffects.addElimination), caught before it leaves
+  // play: the burst lives on in the effects, never on the fighter.
   checkVoid(fighters) {
     const taken = fighters.filter((f) => !f.lostToVoid && this.stage.inVoid(f.body));
-    for (const f of taken) f.lostToVoid = true;
+    for (const f of taken) {
+      this.fx.addElimination(f);
+      f.lostToVoid = true;
+    }
     for (const f of taken) this.onVoid(f);
+  }
+
+  // Closes the Void in by `progress` (0-1: 0 is the map's own Void), for
+  // collision and the drawn Void alike: both read the one rectangle in
+  // force, `stage.void` (see StageCollision.closeVoid), so the black edge
+  // is exactly where a fighter is taken. The tuning is
+  // CONFIG.battle.overtimeVoid. Only a mode that closes the Void calls it
+  // (a Battle's overtime); 0 also brings the waves back to their
+  // normal speed and phase.
+  setVoidPressure(progress) {
+    this.voidPressure = Math.min(1, Math.max(0, Number(progress) || 0));
+    this.stage.closeVoid(this.voidPressure, CONFIG.battle.overtimeVoid);
+    if (this.voidPressure === 0) this.theme.resetVoid();
+  }
+
+  // How many times their normal speed the Void's drawn waves run: 1, rising
+  // smoothly and ever faster with the Void's pressure to
+  // CONFIG.battle.overtimeVoid.maxWaveSpeedMultiplier (1 + (max - 1) p²).
+  get voidWaveSpeed() {
+    const p = this.voidPressure;
+    return 1 + (CONFIG.battle.overtimeVoid.maxWaveSpeedMultiplier - 1) * p * p;
   }
 
   // What entering the Void means is each mode's rule: Quick Battle scores a
@@ -336,8 +367,13 @@ export class Arena {
 
     theme.drawForeground(ctx, view);
     // The Void over everything on the stage: whatever falls into it is
-    // swallowed by the black.
-    theme.drawVoid(ctx, view);
+    // swallowed by the black. It is drawn at the boundary in force, the
+    // very rectangle collision tests (stage.void).
+    theme.drawVoid(ctx, view, this.stage.void);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    // A fighter the Void took bursts over the black where it went in, after
+    // it has gone from the stage.
+    this.fx.drawEliminations(ctx, (x, y) => this.toScreen(x, y), view.scale, view.dpr);
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     // The status of each fighter in play over everything, the Void
     // included, so it stays readable near its edge: name tags (or the

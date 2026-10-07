@@ -22,8 +22,12 @@
 // - A launch's rebound off a wall, floor or ceiling (see
 //   js/game/combat/launch-bounce.js): sparks thrown off the surface it struck and,
 //   for a hard one, a small shake. The rebound itself says the rest.
+// - A fighter the Void takes bursts where it went in: a flash, a ring and
+//   shards in its own colours (its visual.eliminationPalette, see
+//   eliminationPalette), drawn on after it has gone. Nothing but paint.
 //
-// With reduced motion there is no shake and no zoom; the rest stays.
+// With reduced motion there is no shake and no zoom, and an elimination's
+// shards barely travel; the rest stays.
 
 import { stepBody } from '../physics.js';
 import { bounceLaunch } from '../combat/launch-bounce.js';
@@ -59,6 +63,17 @@ export const HIT_FX = Object.freeze({
     max: 7,
     spark: 0.22, // lifetime
   },
+  // A fighter taken by the Void: its burst, sized from the fighter's own
+  // height (world units), so it reads the same at every zoom.
+  elimination: {
+    life: 0.55, // seconds
+    shards: 24,
+    radius: 0.95, // how far the shards fly, in fighter heights
+    shardLength: 0.2, // in fighter heights
+    ring: 0.85, // the ring's widest, in fighter heights
+    shake: 5, // px, none with reduced motion
+    reducedTravel: 0.3, // with reduced motion, this much of the flight
+  },
   lethal: {
     scale: 0.25, // the clock's speed at its slowest
     hold: 0.45, // real seconds held at its slowest
@@ -71,6 +86,19 @@ export const HIT_FX = Object.freeze({
 
 const AMBER = '#ffd27a';
 const RED = '#d21f2b';
+
+// The colours a fighter with no eliminationPalette of its own bursts in:
+// white, a light grey and the sparks' amber.
+export const NEUTRAL_ELIMINATION_PALETTE = Object.freeze(['#ffffff', '#c9c9cf', AMBER]);
+
+// The colours `def`'s elimination burst is drawn in: its own
+// visual.eliminationPalette (a few CSS colours, character data), or the
+// neutral one when it has none.
+export function eliminationPalette(def) {
+  const own = def?.visual?.eliminationPalette;
+  return Array.isArray(own) && own.length && own.every((c) => typeof c === 'string' && c)
+    ? own : NEUTRAL_ELIMINATION_PALETTE;
+}
 
 // Deterministic noise for the sparks: art only, but the same hit always
 // draws the same burst.
@@ -124,6 +152,7 @@ export class HitEffects {
     this.sparks = []; // { kind, x, y, dx, dy, size, age, life, seed }
     this.trails = new Map(); // fighter -> { ghosts: [{ x, y, frame, flip, age }], since }
     this.slow = null; // { time, focus: fighter } while the lethal slow motion runs
+    this.eliminations = []; // { slot, x, y, size, palette, age, life, seed }
   }
 
   // ---- From the simulation -------------------------------------------------------
@@ -166,6 +195,21 @@ export class HitEffects {
     });
   }
 
+  // `f` was just taken by the Void (Arena.checkVoid): its burst, at its
+  // body's centre where it went in, its height and its colours, all caught
+  // now, so the burst plays on after the fighter has left play. A small
+  // shake with it (none with reduced motion).
+  addElimination(f) {
+    const b = f.body;
+    const e = HIT_FX.elimination;
+    this.eliminations.push({
+      slot: f.slot ?? null, x: b.x, y: b.y - b.height / 2,
+      size: f.def?.visual?.height ?? b.height, palette: eliminationPalette(f.def),
+      age: 0, life: e.life, seed: b.x * 0.23 + b.y * 0.31 + this.eliminations.length,
+    });
+    this.addShake(e.shake);
+  }
+
   addShake(amp) {
     if (this.reducedMotion || !(amp > 0)) return;
     if (amp < this.shake.amp * (1 - this.shake.time / (this.shake.life || 1))) return;
@@ -198,6 +242,8 @@ export class HitEffects {
     }
     for (const s of this.sparks) s.age += dt;
     this.sparks = this.sparks.filter((s) => s.age < s.life);
+    for (const e of this.eliminations) e.age += dt;
+    this.eliminations = this.eliminations.filter((e) => e.age < e.life);
     if (this.slow) {
       this.slow.time += dt;
       const { hold, ease } = HIT_FX.lethal;
@@ -344,6 +390,75 @@ export class HitEffects {
           ctx.arc(x, y, r + px * 3, 0, Math.PI * 2);
           ctx.stroke();
         }
+      }
+      ctx.restore();
+    }
+  }
+
+  // Draws every live elimination burst: a bright flash that pops and fades,
+  // a ring opening out in the fighter's first colour, and shards in all its
+  // colours flung out round it, each over a thin dark line so it reads on the
+  // pale stages too, all fading out together. `toScreen(x, y)` maps world to
+  // device pixels, `scale` is device pixels per world unit and `dpr` device
+  // pixels per CSS pixel. The shards fly out fast and settle (an ease-out);
+  // with reduced motion they travel only a short way. The same burst always
+  // draws the same shards.
+  drawEliminations(ctx, toScreen, scale, dpr = 1) {
+    const cfg = HIT_FX.elimination;
+    const travel = this.reducedMotion ? cfg.reducedTravel : 1;
+    for (const e of this.eliminations) {
+      const [x, y] = toScreen(e.x, e.y);
+      const k = Math.min(1, e.age / e.life);
+      const fade = 1 - k;
+      const out = 1 - (1 - k) ** 3;
+      const size = e.size * scale;
+      const [main] = e.palette;
+      ctx.save();
+      ctx.lineCap = 'round';
+      // The flash: white, popping out and shrinking away in the first half.
+      if (k < 0.5) {
+        ctx.globalAlpha = (1 - k / 0.5) ** 2;
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(x, y, size * (0.18 + 0.22 * Math.min(1, k * 6)) * (1 - k), 0, Math.PI * 2);
+        ctx.fill();
+      }
+      // The ring.
+      ctx.globalAlpha = fade;
+      ctx.strokeStyle = main;
+      ctx.lineWidth = Math.max(1, size * 0.06 * fade);
+      ctx.beginPath();
+      ctx.arc(x, y, size * (0.15 + (cfg.ring - 0.15) * out * travel), 0, Math.PI * 2);
+      ctx.stroke();
+      // The shards, round the whole circle with a little jitter.
+      const rnd = seeded(e.seed);
+      const shards = [];
+      for (let i = 0; i < cfg.shards; i++) {
+        const a = (i / cfg.shards) * Math.PI * 2 + (rnd() - 0.5) * 0.5;
+        const reach = size * cfg.radius * (0.6 + rnd() * 0.5);
+        const r0 = size * 0.12 + reach * out * travel;
+        const r1 = r0 + size * cfg.shardLength * (0.6 + rnd() * 0.6) * (1 - 0.6 * k);
+        shards.push([e.palette[i % e.palette.length], x + Math.cos(a) * r0, y + Math.sin(a) * r0, x + Math.cos(a) * r1, y + Math.sin(a) * r1]);
+      }
+      const width = Math.max(1, size * 0.045 * (1 - 0.5 * k));
+      ctx.strokeStyle = 'rgba(0, 0, 0, 0.35)';
+      ctx.lineWidth = width + 2 * dpr;
+      ctx.beginPath();
+      for (const [, x0, y0, x1, y1] of shards) {
+        ctx.moveTo(x0, y0);
+        ctx.lineTo(x1, y1);
+      }
+      ctx.stroke();
+      ctx.lineWidth = width;
+      for (const color of e.palette) {
+        ctx.strokeStyle = color;
+        ctx.beginPath();
+        for (const [c, x0, y0, x1, y1] of shards) {
+          if (c !== color) continue;
+          ctx.moveTo(x0, y0);
+          ctx.lineTo(x1, y1);
+        }
+        ctx.stroke();
       }
       ctx.restore();
     }

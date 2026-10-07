@@ -28,7 +28,7 @@ export const REF_VIEW_H = 860;
 export const REF_FLOOR_LINE = 0.7;
 
 // The Void's look: one solid black layer whose single inner edge wavers
-// `amp` world units either way of the fixed kill boundary (art only:
+// `amp` world units either way of the kill boundary in force (art only:
 // gameplay tests the boundary itself), traced every `step` units, so it
 // reads as organic rather than a ruled line while staying close enough to
 // the boundary to show where the danger is. A thin red rim, `rimWidth` CSS
@@ -48,6 +48,11 @@ export class StageTheme {
     this.map = map;
     this.reducedMotion = reducedMotion;
     this.time = 0;
+    // How far the Void's waves have run ahead of `time` (seconds of wave
+    // motion): 0 while they run at their normal speed, growing while the
+    // Arena runs them faster (advanceVoid), so a change of speed never
+    // jumps their phase.
+    this.voidSurge = 0;
     // The main stage's top: the ground every layer is authored around.
     this.groundY = map.mainStage.top;
     // Camera y at which layers are authored (see REF_VIEW_H).
@@ -77,6 +82,19 @@ export class StageTheme {
   update(dt) {
     this.time += dt;
   }
+
+  // Runs the Void's waves on by `dt` seconds at `speed` times their normal
+  // rate (the Arena's voidWaveSpeed: 1 normally, faster through a
+  // Battle's overtime). Their shape, amplitude and colours never change.
+  advanceVoid(dt, speed = 1) {
+    this.voidSurge += dt * Math.max(0, speed - 1);
+  }
+
+  // The waves back at their normal speed and phase (a restart).
+  resetVoid() {
+    this.voidSurge = 0;
+  }
+
   drawBackground() {}
   drawTerrain() {}
   drawForeground() {}
@@ -91,16 +109,18 @@ export class StageTheme {
 
   // ---- Void -----------------------------------------------------------------
 
-  // The Void: one layer of pure black beyond the stage's kill boundary
-  // (map.voidBounds), with one gently wavering inner edge and a thin red rim
+  // The Void: one layer of pure black beyond `bounds`, the kill boundary in
+  // force (the Arena passes its stage's `void`, so what is drawn is what
+  // collision tests: the map's voidBounds, or closer in through overtime;
+  // the theme never decides it), with one gently wavering inner edge and a thin red rim
   // along it, drawn over everything at the fighters' depth. Only the sides
   // the view comes near are traced, all in one path and one fill, so in
   // neutral play the stage is never boxed in and no part of the black is
   // ever drawn twice. The rim is stroked from the very points the black is
   // filled from, so the two never drift apart. With reduced motion the edge,
   // rim included, holds still.
-  drawVoid(ctx, view) {
-    const v = this.map.voidBounds;
+  drawVoid(ctx, view, bounds) {
+    const v = bounds;
     if (!v) return;
     const reach = VOID.amp;
     const x0 = view.x;
@@ -113,12 +133,12 @@ export class StageTheme {
     if (y0 < v.top + reach) sides.push('top');
     if (y1 > v.bottom - reach) sides.push('bottom');
     if (!sides.length) return;
-    const t = this.reducedMotion ? 0 : this.time;
+    const t = this.reducedMotion ? 0 : this.time + this.voidSurge;
     const s = view.scale;
     ctx.setTransform(s, 0, 0, s, -view.x * s, -view.y * s);
     // Far past the view, so each region reaches the screen edge.
     const pad = 40;
-    const regions = sides.map((side) => this.voidEdgePoints(side, t, x0 - pad, x1 + pad, y0 - pad, y1 + pad));
+    const regions = sides.map((side) => this.voidEdgePoints(v, side, t, x0 - pad, x1 + pad, y0 - pad, y1 + pad));
     // The rim first, stroked twice its width along each wavy edge: the black
     // laid over it hides the half on the Void's side, and wherever another
     // side's black covers it (a corner), so what shows is a thin red line
@@ -135,12 +155,11 @@ export class StageTheme {
     ctx.fill();
   }
 
-  // One side's region as flat [x, y, ...] points: an outer corner past the
-  // view, the wavy edge (every `step` units, `amp` either way of the fixed
-  // line), then the other outer corner. Every side winds the same way, so
-  // where two meet at a corner the nonzero fill covers it once.
-  voidEdgePoints(side, t, x0, x1, y0, y1) {
-    const v = this.map.voidBounds;
+  // One side of `v`'s region as flat [x, y, ...] points: an outer corner
+  // past the view, the wavy edge (every `step` units, `amp` either way of
+  // the boundary), then the other outer corner. Every side winds the same
+  // way, so where two meet at a corner the nonzero fill covers it once.
+  voidEdgePoints(v, side, t, x0, x1, y0, y1) {
     const edge = (along) => VOID.amp * waveOffset(VOID.waves, along, t);
     const step = VOID.step;
     const pts = [];

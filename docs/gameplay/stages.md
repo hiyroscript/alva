@@ -17,19 +17,32 @@ Every stage is a compact platform-fighter stage. Its map (`js/data/maps.js`,
   around the main stage (`voidAround`): 340–380 units past each ledge,
   400–420 below the stage's top and 760–800 above it (clear of any jump from
   the highest footing, so only a launch reaches it). A fighter whose centre
-  leaves this fixed rectangle (`StageCollision.inVoid`) is taken by it: out
+  leaves the Void in force (`StageCollision.inVoid`, which tests
+  `stage.void`: this rectangle, except through a battle's overtime) is taken by it: out
   of play at once (not drawn, hit, targeted or framed), and back at its own
   spawn 2 seconds later (`CONFIG.battle.respawnSeconds`, on the simulation
   clock), fresh. In Quick Battle each fall is also a point for the opponent,
   and the third point ends the match instead (a short **K.O.** beat, then
-  the result). On screen
+  the result). Every fall bursts where the fighter went in, in its own
+  colours (`visual.eliminationPalette`), paint only. On screen
   the Void is one solid black layer with a single gently wavering edge,
   lined on the stage's side by a thin red rim (about 1.5 CSS px, no glow)
   traced from exactly the same points, so the two never drift apart; it
   only shows once the view nears it (never in neutral play), and holds still
   (rim included) with reduced motion. The drawn edge and its rim are art
-  only: the kill line never moves. The Shield's circle (see Shield) shares
-  this look, black with a red line, on the same kind of slow waves.
+  only: they waver around the kill line, never move it. The Shield's circle
+  (see Shield) shares this look, black with a red line, on the same kind of
+  slow waves.
+- **Overtime's closing Void** (Quick Battle and Watch Mode, see
+  [Quick Battle](battle.md)): through its 60 seconds the Void's left and
+  right edges close in to 120 units past each ledge and its bottom rises
+  to 140 below the main stage's top, linearly, from each stage's own
+  `voidBounds` (never written: `StageCollision` keeps the map's rectangle
+  as `baseVoid` and the one in force as `void`, see `closeVoid`). The top
+  never moves, and the Void never reaches a ledge or the surface. The
+  drawn Void is traced around the same rectangle collision tests, and its
+  waves run up to 4× faster (and hold still with reduced motion). The camera keeps
+  the stage's own bounds. Practice Ground's Void never moves.
 
 The camera is a platform-fighter view: fighters stand about a tenth of the
 viewport tall, the whole main stage with some air past its ledges fits across

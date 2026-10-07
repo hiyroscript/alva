@@ -30,15 +30,23 @@ const BANNERS = {
   fight: { sub: null, main: ['banner.fight'] },
   time: { sub: ['banner.timeOver'], main: ['banner.time'] },
   ko: { sub: ['banner.void'], main: ['banner.ko'] },
+  overtime: { sub: ['banner.pointsLevel'], main: ['banner.overtime'] },
 };
+
+// How long the OVERTIME banner shows once overtime starts (seconds of
+// overtime's clock), then it gets out of the way of the fight.
+const OVERTIME_BANNER_SECONDS = 1.4;
 
 // Result dialog kicker and line keys for each way a match ends
 // (Battle.result): the winning point from a fall, or on time by points, then
-// by Launch Point. The K.O. line names who fell ({loser}).
+// by Launch Point, when the normal clock ran out or when overtime did. The
+// K.O. line names who fell ({loser}).
 const RESULT_TEXT = {
   void: { kicker: 'result.kickerKo', sub: 'result.void' },
   points: { kicker: 'result.kickerTime', sub: 'result.points' },
   time: { kicker: 'result.kickerTime', sub: 'result.time' },
+  overtimePoints: { kicker: 'result.kickerOvertime', sub: 'result.overtimePoints' },
+  overtimeLaunchPoint: { kicker: 'result.kickerOvertime', sub: 'result.overtimeLaunchPoint' },
 };
 
 // How each mode names the two sides (side.<mode>.<p1|p2>.wins, the result
@@ -358,6 +366,7 @@ export class BattleScreen extends Screen {
     const b = this.battle;
     let state = null;
     if (b.phase === 'intro') state = b.phaseTime < CONFIG.battle.introSeconds * 0.58 ? 'round' : 'fight';
+    else if (b.phase === 'fight' && b.overtime && b.overtimeSeconds - b.timeLeft < OVERTIME_BANNER_SECONDS) state = 'overtime';
     else if (b.phase === 'fight' && b.phaseTime < 0.65 && b.timeLeft > 0) state = 'fight';
     else if (b.phase === 'timeup') state = 'time';
     else if (b.phase === 'ko') state = 'ko';
