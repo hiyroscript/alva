@@ -1,637 +1,194 @@
-Implement a new Combat Assist accessibility/ease-of-combat mechanic in the Alva repository.
+Work directly in the hiyroscript/alva repository and implement this feature completely, including gameplay logic, rendering, UI/localization, documentation, and automated tests.
 
-Before editing anything, inspect and follow the repository’s existing architecture and rules, especially:
+Before changing code, inspect the existing architecture and preserve its conventions. Alva is a pure HTML/CSS/JavaScript Canvas 2D platform fighter with no framework or build step. ALVA_SPEC.md is the product specification and must remain authoritative. Shared mechanics belong in shared systems and must not be implemented with fighter-ID-specific engine branches. Do not edit character_rule; it is protected. Preserve deterministic fixed-step gameplay and the existing separation between gameplay/simulation and presentation effects.
 
-* CLAUDE.md
-* ALVA_SPEC.md
-* codename_rule
-* character_rule — never edit, move, rename, or reformat this file
-* js/core/settings.js
-* js/ui/settings-dialog.js
-* css/settings.css
-* js/game/fighters/fighter.js
-* js/game/fighters/fighter-controller.js
-* js/game/combat/attacks.js
-* js/game/combat/combat-state.js
-* js/game/battle.js
-* js/game/practice.js
-* js/game/ai/moveset.js
-* js/game/ai/combat-ai.js
-* js/data/movement.js
-* js/screens/battle-screen.js
-* js/screens/practice-screen.js
-* js/localization/strings/en.js
-* js/localization/strings/fr.js
-* the relevant tests under tests/
+The relevant existing systems are primarily js/game/battle.js for match phases, score, timer and results; js/config.js for timing/configuration; js/game/arena.js for the shared world, Void handling and rendering; js/game/physics.js for StageCollision.inVoid; js/stages/stage-theme.js for the rendered Void; js/ui/hud.js and js/screens/battle-screen.js for the timer, banners and result flow; js/data/maps.js for stage/void geometry; js/game/rendering/hit-fx.js and related rendering modules for the existing procedural effect style; js/data/characters/<id>.js for fighter-owned visual data; js/localization/strings/en.js and fr.js; tests/integration/match-score.test.mjs; tests/systems/platform-stage.test.mjs; and the battle/HUD interface tests.
 
-Do not special-case fighter IDs. This must be a universal shared system that works from character data for every current and future fighter.
+Quick Battle match timing
 
-Preserve the repository’s intentional spelling of mouvment for the Dash animation/codename.
+Change Quick Battle so its normal match clock begins at exactly 7:00 / 420 seconds.
 
-Goal
+Do not simply change the current shared CONFIG.battle.roundSeconds in a way that unintentionally changes Watch Mode. The existing Battle class serves both quick-battle and watch, so make match duration explicitly mode-aware. Keep Watch Mode at its current 5:00 behavior unless some shared refactor is required internally.
 
-Add a new Combat section to Home → Settings.
+Quick Battle continues to be first to 3 points. Reaching the configured pointsToWin still ends the match immediately with the normal K.O. flow, including during overtime.
 
-Inside it add a setting named:
+At the end of the normal 7:00 clock:
 
-Combat Assist
+If one side has more points, do not start overtime. Finish the match through the normal time-up/result flow and award the win to the side with more points.
 
-Combat Assist is ON by default.
+If the points are tied, do not use Launch Point yet and do not restart a draw. Enter a dedicated 60-second overtime period.
 
-When enabled, a human player who presses a valid melee attack while close enough to their opponent, but just outside that attack’s normal melee reach, automatically closes the remaining distance using the fighter’s existing mouvment animation, then performs the requested melee attack.
+Overtime must be a real match state rather than resetting or starting a new battle. Keep the existing score, both fighters’ current Launch Points, Energy, cooldowns, positions, projectiles, summons, techniques, respawn state and all other live combat state. The fight simply continues under overtime rules.
 
-The intent is to make close-range fighting more forgiving without changing the attacks themselves or giving the CPU the same assistance.
+The overtime clock starts at 1:00 and counts down to 0 using the same simulation-time semantics as the normal battle clock. Pause must continue to freeze the game exactly as it currently does.
 
-Combat Assist must never teleport the fighter, extend a hitbox, modify attack damage, modify attack startup/active/recovery timing, or alter the actual melee attack definition. It is a short automatic movement phase that happens before the real attack begins.
+At the end of overtime, determine the result in this order: first compare points; the side with more points wins. If points are still tied, compare the fighters’ current Launch Point values—the number already shown on the HUD. The fighter with the lower Launch Point wins. Preserve the existing epsilon-safe Launch Point comparison. If points and Launch Point are both equal, preserve Alva’s existing draw behavior: no result dialog, restart into a fresh match.
 
-Player-only rule
+A fighter reaching 3 points during overtime still ends the match immediately as a normal Void/K.O. victory instead of waiting for the overtime clock to expire.
 
-Combat Assist is strictly for the human player.
+Represent overtime explicitly in Battle rather than overloading unrelated states. A clean implementation may use an overtime phase or an explicit match-period/state field while keeping combat live. Fighters must remain controllable throughout overtime; unlike timeup or ko, overtime is active gameplay.
 
-It must never be available to:
+Restart and rematch must completely clear overtime state and restore the normal starting Void, normal wave speed, 0–0 score and the correct 7:00 Quick Battle clock.
 
-* CombatAIController
-* Watch Mode CPU 1
-* Watch Mode CPU 2
-* Practice Ground’s CPU/dummy
-* any future controller whose kind is not player
+Overtime HUD and presentation
 
-Do not add Combat Assist logic to combat-ai.js.
+When overtime begins, make it immediately obvious without obscuring gameplay.
 
-The clean integration should preserve the existing controller separation. Pass the saved setting into the human PlayerController/player session and let shared Fighter logic recognize that the current controller is the human player with Combat Assist enabled.
+The centre HUD timer should change to 1:00 and count down normally. Keep the existing urgent timer treatment for the final 10 seconds.
 
-Quick Battle Player 1 and the Practice Ground player should use the setting.
+Add an OVERTIME battle banner/state using the existing banner system in battle-screen.js, with proper English and French localization. It should appear briefly when overtime begins, analogous to the existing ROUND/FIGHT/TIME/K.O. presentation, then get out of the way while the fight continues.
 
-Watch Mode should behave exactly as it does now because neither fighter is human-controlled.
+Do not call this “Round 2.” It is overtime of the same match.
 
-What counts as melee
+Update accessible timer labels so assistive technology correctly announces the overtime time remaining. Do not regress the current pause-button semantics.
 
-Use Alva’s existing attack model rather than attack names or fighter IDs.
+Overtime Void pressure
 
-The repository already distinguishes ordinary melee and ranged attacks in js/game/ai/moveset.js:
+During the normal 7:00 fight, the Void behaves exactly as it does now.
 
-* a projectile attack is ranged
-* an ordinary attack with a real hitbox and no projectile is melee
+The overtime pressure begins at the instant overtime starts and increases continuously throughout the 60 seconds.
 
-Use the same semantic distinction for Combat Assist.
+The Void’s animated waves must become progressively faster as overtime advances. The current Void wave definitions live in js/stages/stage-theme.js as VOID.waves. Keep their existing organic shape, amplitudes, weights, red rim, black fill and general visual identity; increase their animation rate rather than changing them into a different effect.
 
-Combat Assist may only be initiated by an ordinary combat-button attack that resolves to a genuine melee attack.
+Use an overtime progress value clamped from 0 to 1. The wave-speed multiplier should increase smoothly and monotonically from normal speed at overtime start to approximately 4× normal speed at the end of overtime. Prefer a progressive/ease-in curve such as 1 + 3 * progress² so the acceleration becomes increasingly noticeable rather than jumping immediately.
 
-It must not activate for:
+Respect the existing reduced-motion setting. With reduced motion enabled, the wave oscillation should remain still as it does now. The gameplay boundary movement described below still occurs because it affects gameplay, not merely presentation.
 
-* projectile/ranged attacks
-* summons
-* techniques
-* pending/art-only attacks with no actual melee hitbox
-* reserved/unmapped controls
-* Shield
-* Deflect
+At the same time, the actual Void must gradually close in on the arena from the left, right and bottom only.
 
-Deflect is an attack internally, but it is performed through the Shield input and is specifically a cancellation action for Combat Assist, not an assist-triggering melee attack.
+Do not move the top Void boundary at all.
 
-Do not duplicate a separate fighter-specific list of which moves are melee.
+This must not be a visual fake. The rendered Void edge and the actual StageCollision.inVoid kill boundary must use the same current bounds so a fighter is eliminated exactly where the displayed hazard says it should be. Projectiles and any other systems that use stage.inVoid should naturally respect the new bounds as well.
 
-If useful, extract a small shared attack-classification helper into the appropriate combat module so Fighter and AI moveset classification cannot drift apart.
+StageCollision currently freezes a copy of map.voidBounds. Refactor it cleanly so a Battle can update its active Void bounds while keeping the map’s original bounds immutable. Preserve the original bounds as the reset/baseline values.
 
-Grounded behavior
+Over the 60 seconds, linearly bring the left/right boundaries inward and the bottom boundary upward. Centralize the tuning in CONFIG, not in the renderer. Use conservative final clearances approximately equivalent to:
 
-Combat Assist uses the existing grounded mouvment animation.
+sideEndGap: 120 world units beyond each main-stage ledge.
 
-Therefore Combat Assist begins only for a grounded human player performing a grounded melee attack.
+bottomEndGap: 140 world units below mainStage.top.
 
-Do not invent an aerial Combat Assist and do not substitute midair_mouvment.
+These are minimum final gaps, not absolute world coordinates. Calculate the destination relative to each map’s mainStage, making the system stage-independent.
 
-Aerial melee attacks continue working normally.
+Therefore at 100% overtime progress:
 
-If the player jumps during Combat Assist, the assist is cancelled and the normal jump takes over.
+left = mainStage.left - sideEndGap
 
-When Combat Assist engages
+right = mainStage.right + sideEndGap
 
-On a fresh melee attack request:
+bottom = mainStage.top + bottomEndGap
 
-1. Resolve the exact ground attack that the pressed action would normally start.
-2. Verify that Combat Assist is enabled for this human-controlled fighter.
-3. Verify the fighter has a live opponent.
-4. Verify the opponent is not lost to the Void or otherwise out of play.
-5. Verify the player is grounded and otherwise in a state from which this request can sensibly initiate Combat Assist.
-6. Determine whether the requested move is a genuine melee attack.
-7. Determine the move’s actual normal melee reach using its authored attack/hitbox data.
-8. If the opponent is already within the attack’s ordinary usable reach, start the attack normally. Do not run Combat Assist and do not charge Energy.
-9. If the opponent is too far away for Combat Assist, start the attack normally from the current position. It may whiff normally. Do not charge Energy.
-10. If the opponent is outside ordinary attack reach but within Combat Assist’s acquisition range, begin Combat Assist.
+top = originalVoid.top
 
-Do not turn every melee press into an automatic movement.
+Interpolate from each stage’s original voidBounds to those destinations over the complete 60 seconds.
 
-The assist exists only for the small “almost in range” gap.
+The left and right Void must never touch or cross the playable stage’s ledges, and the bottom Void must never reach or cross the main-stage surface. Clamp defensively even if future stage data changes.
 
-Assist range
+Do not change mainStage, platforms, solids, camera physics or spawn points. The arena itself is not shrinking; only the Void kill region is moving closer.
 
-Do not introduce an arbitrary giant lock-on radius.
+The existing camera bounds may stay based on the stage’s original Void envelope. Do not make the camera suddenly snap inward with the overtime boundary.
 
-Derive the maximum distance Combat Assist can close from Alva’s existing universal Dash movement:
+A fighter who remains outside a newly advanced Void boundary as it closes in should be eliminated normally on the next fixed simulation step. This should use the same shared Void flow as any other elimination.
 
-dashSpeed × dashDuration
+Ensure the stage renderer uses the active Void bounds instead of continuing to read the original map.voidBounds. Avoid keeping an independent copy in the renderer that can drift out of sync with collision.
 
-This keeps the mechanic grounded in the game’s existing universal movement tuning.
+Fighter-colored elimination explosion
 
-The practical activation condition should be:
+Whenever a fighter is eliminated by entering the Void, add a short procedural explosion/burst at that fighter’s final world position immediately before the fighter disappears.
 
-ordinary melee reach + at most one normal grounded Dash’s travel
+This is a visual effect only. It must not damage, launch, stun or otherwise affect either fighter.
 
-The assist should only cover the amount of distance required to put the requested attack into its ordinary reach. It should not always travel the full Dash distance.
+The effect should fit Alva’s existing Canvas style: crisp, readable, short-lived and not excessively flashy. Use a radial burst with approximately 20–30 particles/shards plus a quick expanding central flash or ring. It should last roughly 0.45–0.65 seconds, expand rapidly, then fade cleanly. Scale it relative to the fighter rather than using one enormous screen-space effect.
 
-Use the attack and opponent geometry rather than only comparing centre-to-centre distance. Account for the opponent’s hurtbox/pushbox extent so the movement stops where the authored melee attack can legitimately reach.
+The explosion’s colors must come from the eliminated fighter’s own color palette.
 
-Vertical compatibility matters. Do not activate merely because two fighters are close diagonally when the requested ground melee could not reasonably reach the opponent.
+Do not implement this as if fighter.id === '0001' / if fighter.id === '0002' inside the renderer. Add reusable fighter-owned visual data, preferably something like visual.eliminationPalette, containing several representative colors for that fighter. Add appropriate palettes to the existing fighter definition modules after inspecting their sprite art. Use roughly 3–5 recognizable colors per fighter and provide a reasonable neutral fallback palette for future fighters that have not specified one.
 
-Do not use Combat Assist to manufacture impossible hits through floors, walls, or unrelated vertical levels.
+Keep palette ownership in character data and effect behavior in the shared rendering system.
 
-Movement phase
+Trigger the effect in the shared Void/elimination path so it works consistently anywhere a real fighter is taken by the Void, including simultaneous eliminations. Capture the fighter’s location and palette before it is removed from inPlay.
 
-Create an explicit Combat Assist runtime state rather than pretending the assist is an ordinary Dash.
+The effect should continue drawing after the fighter has disappeared. Do not depend on the eliminated fighter continuing to render.
 
-The mechanic can reuse existing movement values and animation infrastructure, but it has different lifecycle and cancellation rules and should remain distinguishable from fighter.dash.
+Make the burst deterministic enough for automated tests and consistent with the current deterministic procedural hit effects. Do not use uncontrolled gameplay randomness.
 
-A state similar in spirit to the following is appropriate:
+Reduced motion should remove or greatly reduce any screen shake/large movement associated with this effect, but a short color burst/fade may remain so elimination still has visual feedback.
 
-fighter.combatAssist
+Do not add gore or character-specific death animations. This is a clean energy-like explosion effect.
 
-It should retain enough information to know:
+Architecture expectations
 
-* the requested action
-* the currently selected melee attack
-* the target fighter
-* movement direction
-* whether the one-time Energy cost has already been paid
+Keep match rules in Battle, generic arena/Void mechanics in Arena/StageCollision, and pure rendering concerns in the rendering/theme systems.
 
-During the assist:
+Avoid duplicating overtime state between UI and gameplay. The HUD and theme should read authoritative state from the Battle/Arena.
 
-* face toward the opponent
-* play the fighter’s existing mouvment animation
-* move horizontally toward the opponent using the existing universal Dash speed
-* use normal stage/body collision
-* do not teleport or snap
-* do not create a hitbox
-* do not deal damage
-* do not grant invulnerability
-* do not pass through walls
-* do not pass through the opponent simply to guarantee the attack
-* do not override normal world collision
-* stop as soon as the currently requested melee attack can legitimately reach the opponent
-* immediately start that real attack once range is reached
+Do not make the stage theme responsible for deciding gameplay bounds.
 
-The movement animation should begin from its first frame and visibly cover the closing movement.
+Do not mutate map.voidBounds.
 
-Do not alter the attack’s own authored animation. Once Combat Assist finishes, startAttack should run the real attack exactly as it normally would.
+Do not break Practice Ground. It should retain its normal static Void boundaries and existing respawn behavior. The fighter-colored elimination burst may appear there when a fighter falls into the Void, because that is a shared visual response, but Practice must not receive overtime behavior.
 
-If the fighter has no usable mouvment art, fail gracefully: skip the assist and perform the attack normally. Never fake the movement with another animation.
+Do not regress Combat AI. Because the active kill boundary becomes tighter in overtime, the AI should receive the active stage.void state through the same world object it already senses rather than a second hard-coded overtime boundary.
 
-Energy / “Shield” cost
+Do not add dependencies.
 
-Alva does not have a separate Shield meter. Shield and Dash currently spend the fighter’s existing Energy resource.
+Configuration
 
-Therefore implement the requested “cost shield” behavior through Energy.
+Put the new numbers in central configuration instead of scattering magic numbers. Use clear names equivalent to quickBattleSeconds: 420, overtimeSeconds: 60, overtimeVoid.sideEndGap: 120, overtimeVoid.bottomEndGap: 140, and overtimeVoid.maxWaveSpeedMultiplier: 4.
 
-For Combat Assist, use the fighter’s existing:
+If you prefer a mode-duration object rather than separate duration keys, keep it obvious and documented.
 
-energyDef.dashCost
+Results and localization
 
-Do not create another resource bar.
+Update the result copy so it accurately distinguishes a normal time victory from an overtime tiebreak where necessary.
 
-Charge this cost exactly once, when Combat Assist actually commits to the automatic movement.
+A Quick Battle won because overtime ended with tied points but a lower Launch Point should clearly communicate that the lower Launch Point decided the overtime result.
 
-Do not charge anything when:
+Add/update both English and French strings. Do not leave untranslated visible strings in JavaScript.
 
-* Combat Assist is disabled
-* the attack is ranged/non-melee
-* the opponent is already in normal attack range
-* the opponent is outside assist range
-* the assist cannot begin
-* the attack simply starts normally
-
-Follow the same Energy/exhaustion semantics already used by Dash. If Energy cannot currently authorize the movement because the fighter is exhausted/has no usable Energy, Combat Assist must not engage; the requested melee attack should still execute normally from the player’s current position if it otherwise can.
-
-Replacing one melee request with another while already travelling must not charge Energy a second time.
-
-Cancelling Combat Assist does not refund Energy already spent.
-
-Ensure Energy does not receive its passive refill on the same simulation step that Combat Assist paid its cost, matching the existing Dash payment behavior.
-
-Update comments/documentation that currently claim Energy is spent only by Dash and Shield.
-
-Latest melee request wins
-
-This is a required part of the mechanic.
-
-Suppose Combat Assist begins because the player presses melee Attack A.
-
-While the fighter is still travelling in the mouvment phase, the player presses melee Attack B.
-
-Do not perform Attack A.
-
-Instead:
-
-* replace the pending attack with Attack B
-* keep travelling if necessary
-* recalculate the stopping/reach condition for Attack B
-* perform Attack B when its own normal range has been reached
-
-If Attack B is already in range at the moment it replaces Attack A, end the assist movement and start Attack B immediately.
-
-If the player presses Attack C afterward, Attack C becomes the new pending attack.
-
-The most recent valid melee request always wins.
-
-There should only ever be one pending Combat Assist melee request.
-
-A replacement does not restart or duplicate the Energy cost.
-
-Do not allow the original attack to leak into the existing general combat buffer and fire later.
-
-Carefully integrate this with bufferedAttack so a replaced/cancelled Combat Assist request cannot unexpectedly execute after the assist is gone.
-
-If the latest requested melee move becomes invalid before it can execute—cooldown, state change, target gone, required art unavailable, etc.—cancel cleanly. Do not silently fall back to the older attack.
-
-Required cancellation behavior
-
-While Combat Assist’s movement animation is active, it must be cancellable by all of the following:
-
-Jump
-
-A fresh jump request cancels Combat Assist. The jump should then proceed through the existing jump rules on that step where legal.
-
-The pending melee attack must not fire later.
-
-Mouvement / Dash
-
-A normal player Dash request—double-tap movement or the dedicated touch mouvementLeft / mouvementRight request—cancels Combat Assist.
-
-After cancelling, process the requested normal Dash according to the ordinary Dash rules.
-
-Combat Assist Energy that was already paid is not refunded, and a subsequent real Dash pays its own normal cost if it starts.
-
-Shield
-
-Attempting to Shield cancels Combat Assist.
-
-After cancellation, allow the existing Shield behavior to proceed normally when Shield is legal.
-
-Deflect
-
-A valid Deflect request cancels Combat Assist and should then be processed as a normal Deflect.
-
-Combat Assist must never reinterpret Deflect as its replacement melee attack.
-
-Any non-melee attack/action
-
-If the player requests a ranged attack, projectile attack, summon, technique, or other non-melee combat action during Combat Assist:
-
-* cancel Combat Assist
-* discard its pending melee
-* process the newly requested action normally on that same step where existing rules permit it
-
-Do not make the player wait for the discarded assist to finish.
-
-Other forced cancellations
-
-Combat Assist must also terminate safely if gameplay invalidates it, including:
-
-* the player is hit
-* hitstun begins
-* paralysis/immobilization begins
-* the fighter is lost to the Void
-* the opponent is lost to the Void
-* the opponent is removed/replaced in Practice Ground
-* the fighter leaves the ground
-* a wall or other stage collision prevents the closing movement
-* the match/session resets
-* the fighter respawns
-* the fighter is replaced/destroyed
-
-Do not fire the pending melee afterward.
-
-Input priority
-
-Preserve Alva’s existing responsiveness and input-priority principles.
-
-During Combat Assist, process fresh inputs in a deterministic order that supports the required behavior:
-
-* explicit cancellation actions must be able to take over immediately
-* a new valid melee press replaces the queued melee
-* a non-melee press cancels and becomes the new requested action
-* stale original presses must not survive cancellation
-
-Do not break the existing universal attackBuffer, jump buffer, Dash buffer, hit-cancel behavior, Shield priority, or Deflect rules outside Combat Assist.
-
-Avoid adding hidden special cases to InputManager; this mechanic belongs at the player/Fighter action-resolution layer because keyboard, gamepad, and touch already resolve into the same FighterInput snapshot.
-
-Settings storage
-
-Extend js/core/settings.js.
-
-The current settings schema is version 2. Bump it to the next schema version and add a persisted boolean:
-
-combatAssist
-
-Default:
-
-true
-
-A new installation, missing setting, corrupt value, unsupported value, or migrated older settings must all resolve Combat Assist to true.
-
-Add migration for the current version 2 schema so existing users preserve:
-
-* language
-* Mobile Controls choice
-* both custom touch layouts
-
-and simply receive:
-
-combatAssist: true
-
-Preserve the existing version 1 migration path as well.
-
-Do not directly access localStorage anywhere else. js/core/settings.js must remain the only owner of settings persistence.
-
-Expose a clean getter/setter such as:
-
-settings.combatAssist
-
-Validate it as a boolean; do not force it awkwardly into the current string-choice array.
-
-Saving a changed Combat Assist value should use the same save/emit semantics as the other settings.
-
-Settings UI
-
-Update js/ui/settings-dialog.js.
-
-The dialog currently has exactly Language and Controls. It should now contain exactly:
-
-1. Language
-2. Controls
-3. Combat
-
-Add the Combat section after Controls.
-
-The Combat section should contain the Combat Assist setting with clear On/Off selection.
-
-Use the existing Settings visual language rather than inventing an unrelated control style. An accessible two-choice radio group consistent with the existing Settings cards/buttons is appropriate.
-
-Requirements:
-
-* Combat Assist ON is marked as the default
-* current saved state is visually indicated
-* keyboard navigation works
-* gamepad menu navigation works
-* correct aria-checked/radiogroup semantics
-* changing it saves immediately
-* the dialog remains open after changing it
-* it works in both English and French
-* short landscape screens remain scrollable
-* do not break the touch layout editor or existing focus-return behavior
-
-Suggested player-facing English copy:
-
-Section:
-Combat
-
-Setting:
-Combat Assist
-
-Description:
-Automatically closes a short gap before a melee attack. Uses Energy and never affects ranged attacks.
-
-Choices:
-On
-Off
-
-You may polish the wording to match the existing UI voice, but do not obscure that it is melee-only and costs Energy.
-
-Add natural French translations in js/localization/strings/fr.js, not untranslated English placeholders.
-
-Reuse existing CSS where possible. Add only the minimum css/settings.css rules necessary.
-
-Passing the setting into gameplay
-
-The setting should be read when a player gameplay session is entered, consistent with how the screens currently read saved touch settings.
-
-Update the relevant construction flow so:
-
-BattleScreen
-→ Battle
-→ human PlayerController
-→ Fighter
-
-receives the Combat Assist preference.
-
-Likewise:
-
-PracticeGroundScreen
-→ PracticeSession
-→ human PlayerController
-→ Fighter
-
-must receive it.
-
-Do not give the setting to CombatAIController.
-
-A clean design would allow PlayerController to expose something such as:
-
-kind = 'player'
-combatAssist = true/false
-
-and let the shared Fighter rule require both player control and the enabled flag.
-
-The exact API can differ if there is a cleaner architecture, but CPU exclusion must be structural rather than an ad-hoc fighter-slot check such as slot === 'p1'.
-
-Do not infer human control from the label "P1".
-
-Existing attack motion
-
-Some melee attacks have their own authored motion such as roll, homing, bounce, rise, or hover.
-
-Combat Assist is a pre-attack approach, not a replacement for those authored motions.
-
-Once the assist has put the target into the requested attack’s legitimate starting/reach situation, start the attack normally and let its existing authored motion behave exactly as before.
-
-Do not remove, rewrite, or double-count its attack motion.
-
-The assist range calculation should be conservative for unusual motion attacks. Do not use a giant motion-expanded threat box as justification for assisting from across the stage.
-
-The assist exists to cover a short proximity gap, capped by one ordinary Dash’s travel.
-
-Simulation integrity
-
-Combat Assist must remain fixed-step and deterministic.
-
-Do not use:
-
-* timers outside the simulation
-* setTimeout
-* render coordinates for gameplay
-* DOM measurements
-* random values
-* interpolation state
-
-Gameplay decisions must use simulation body/attack data only.
-
-Rendering reads the state; it must never control the mechanic.
+If overtime ends with one side ahead on points, normal “more points wins” language is fine, but it should not falsely say the original 7:00 timer was the deciding moment if the match actually went through overtime.
 
 Documentation
 
-Update the project documentation so it matches the implemented behavior.
+Update ALVA_SPEC.md to make these rules authoritative.
 
-At minimum audit and update:
+Update docs/gameplay/battle.md from the old “5 minutes, then points / Launch Point” rule to the new Quick Battle flow: 7 minutes, tied points trigger 60 seconds of overtime, overtime accelerates and closes the Void from the sides/bottom, and an overtime tie on points is decided by lower Launch Point.
 
-* ALVA_SPEC.md
-* docs/systems/combat.md
-* docs/systems/movement.md if the mouvment/Dash-derived approach range belongs there
-* docs/architecture/module-responsibilities.md
-* Settings/storage documentation and comments
-* Energy documentation/comments that currently say only Dash and Shield spend Energy
+Document that the top Void boundary does not advance.
 
-Do not create fighter-specific Combat Assist documentation.
+Document the fighter-colored elimination burst in the appropriate rendering/gameplay documentation.
 
-Do not edit character_rule.
+Because this request specifically changes Quick Battle, make the documentation clear about Watch Mode retaining its current 5-minute/shared behavior rather than accidentally claiming both modes use 7-minute overtime. Update any existing sentence claiming the two modes have identical timer/result rules if it becomes inaccurate.
 
-Do not call this a named historical update in UPDATES.md unless repository convention genuinely requires it; do not invent an update name merely to add an entry.
+Automated tests and verification
 
-Tests
+Extend the existing tests rather than replacing them. At minimum, cover all of the following in one coherent test suite:
 
-Add focused automated coverage, preferably a dedicated system test such as:
+* Quick Battle starts at exactly 420 seconds / HUD 7:00, while Watch Mode retains its existing 300-second duration.
+* Normal time expiry with unequal points does not start overtime and awards the higher score.
+* Normal time expiry with tied points enters overtime with the same score and combat state, and the overtime timer starts at 60 seconds.
+* Launch Point does not decide the match at the 7:00 boundary when points are tied.
+* Overtime remains playable and respawns/scoring continue normally.
+* Reaching 3 points during overtime still immediately triggers K.O.
+* At overtime expiry, unequal points choose the higher score.
+* At overtime expiry with tied points, lower Launch Point wins.
+* Equal overtime points and effectively equal Launch Points retain the existing draw/restart behavior.
+* Restart/rematch clears overtime and restores the original Void bounds and wave speed.
+* Overtime Void progress is deterministic, monotonic and clamped.
+* Left/right Void bounds move inward, bottom moves upward, and top never changes.
+* Final left/right bounds remain outside the stage ledges and final bottom remains below the surface.
+* StageCollision.inVoid actually uses the moving bounds.
+* The rendered Void receives/uses the same active bounds as collision.
+* Void wave speed increases progressively during overtime and reduced-motion still freezes wave animation.
+* Practice Ground never gets overtime shrinkage.
+* An elimination creates exactly one explosion for the eliminated fighter; simultaneous eliminations create one for each.
+* The explosion captures the correct fighter palette and position, survives after the fighter leaves inPlay, expires cleanly, and resets on battle restart.
+* Existing score, respawn, stage, Watch Mode, HUD and result tests continue passing.
 
-tests/systems/combat-assist.test.mjs
+Run the complete repository test suite with node --test, not only newly added tests.
 
-Also update the existing Settings/interface tests.
+After automated tests, manually verify Quick Battle in a browser on both Desert and City. Confirm 7:00 displays correctly, a tied 0:00 transition visibly announces OVERTIME and begins at 1:00 without resetting the fighters, the Void closes smoothly only from left/right/bottom, the top remains unchanged, the black edge and actual elimination boundary agree, the wave motion visibly accelerates, and eliminated fighters produce their palette-colored burst.
 
-Cover all of the following behavior:
+Also manually verify reduced motion and a landscape mobile-sized viewport. No overtime effect should make the HUD unreadable or cause the stage to be visually boxed in during normal play.
 
-Settings
-
-* settings schema version is bumped correctly
-* fresh/default Combat Assist is true
-* version 2 migrates to Combat Assist ON without losing its existing settings
-* version 1 migration still works
-* persisted false reloads as false
-* persisted true reloads as true
-* invalid/non-boolean values safely resolve to the default
-* change events/save behavior work
-* Settings dialog now has Language, Controls, Combat
-* On is shown as the default
-* the selected state follows the saved preference
-* English and French strings exist
-
-Core assist
-
-* enabled human player just outside melee range enters Combat Assist
-* mouvment is the animation during approach
-* fighter physically closes the gap instead of teleporting
-* requested melee starts once ordinary reach is reached
-* attack’s normal authored timing/hitbox is unchanged
-* already-in-range melee starts immediately with no assist and no Energy charge
-* opponent beyond the assist limit gets a normal attack/whiff with no assist and no charge
-* disabled setting produces completely normal legacy attack behavior
-* ranged/projectile attacks never trigger assist
-* summons and techniques never trigger assist
-* Deflect never triggers assist
-* aerial melee never initiates the grounded assist
-* the feature works from generic attack data and not fighter IDs
-
-Energy
-
-* starting an assist charges exactly one dashCost
-* replacing the melee while travelling does not charge again
-* cancelling does not refund the cost
-* no assist means no assist cost
-* exhausted/no usable Energy prevents the assist but does not swallow an otherwise legal melee attack
-* Energy does not regenerate on the same step the assist cost was paid
-
-Replacement
-
-* Attack A starts the approach
-* Attack B pressed during approach replaces A
-* only B eventually begins
-* multiple replacements always leave the newest valid melee
-* changing to a move with a different reach recalculates when the approach ends
-* the old attack never appears later through bufferedAttack
-
-Cancellation
-
-* jump cancels and jumps
-* ordinary Dash/mouvement cancels and normal Dash behavior takes over
-* Shield cancels and can raise normally
-* Deflect cancels when legal
-* projectile/ranged attack cancels and that attack is processed
-* summon/technique cancels and the requested special is processed
-* hitstun cancels
-* paralysis/immobilization cancels
-* leaving the ground cancels
-* target loss/removal cancels
-* reset/respawn clears the state
-* stale pending melee never fires after any cancellation
-
-CPU isolation
-
-* Quick Battle CPU never receives Combat Assist
-* both Watch Mode CPUs never receive it
-* Practice CPU/dummy never receives it
-* enabling the player setting does not change CombatAIController decisions or movement
-* there is no fighter-ID or p1 slot hack providing the distinction
-
-World interaction
-
-* assist respects walls/solids
-* assist does not teleport through the opponent
-* assist does not produce a hitbox during movement
-* assist does not create damage or invulnerability by itself
-* it stops/cancels safely at a ledge rather than turning into an unintended aerial Dash
-
-Where old tests need to isolate unrelated behavior from the new default-on player feature, explicitly set Combat Assist off in those fixtures rather than weakening their assertions.
-
-Verification
-
-Run the complete suite:
-
-node --test
-
-Do not stop after the new tests pass.
-
-Fix every regression caused by this implementation.
-
-Also inspect the Settings UI manually enough to verify:
-
-* Combat section layout
-* scroll behavior
-* English/French localization
-* keyboard navigation
-* gamepad navigation semantics
-* On/Off selected state
-* no regression to Controls customization
-
-Acceptance criteria
-
-The work is complete only when the following player-visible sequence works:
-
-A human player has Combat Assist ON.
-
-They stand a short distance outside the reach of a melee attack and press it.
-
-Their fighter immediately faces the opponent, spends the existing Energy cost, plays its mouvment animation while physically closing only the required distance, then starts the real melee attack.
-
-While travelling, pressing a different melee attack changes the pending move so the newest melee is the one that comes out.
-
-While travelling, Jump, normal mouvement/Dash, Shield, Deflect, or any non-melee action cancels the assist immediately and takes over according to the normal rules.
-
-If the target is already in melee range, the attack happens normally without assist or Energy cost.
-
-If the target is too far away, the attack happens normally and may whiff; Combat Assist does not pull the player across the stage.
-
-Projectile/ranged attacks never receive assistance.
-
-CPU fighters never receive assistance under any mode.
-
-Turning Combat Assist OFF restores the existing combat behavior without otherwise changing movement, attacks, Energy, CPU behavior, or input.
-
-The setting defaults ON, persists correctly, migrates existing users safely, appears under Settings → Combat in English and French, and the complete node --test suite passes.
-
-Keep the implementation small, shared, deterministic, data-driven, and consistent with Alva’s existing architecture. Do not solve this by adding fighter-specific conditions, cloning attacks, extending hitboxes, teleporting fighters, or teaching the CPU to use the mechanic.
+Preserve the existing game feel, first-to-three scoring, respawn rules, pause behavior, fixed-step determinism and overall Alva visual language. Do not treat this as a standalone new game mode; it is an extension of Quick Battle’s existing match flow.
