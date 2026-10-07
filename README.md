@@ -42,7 +42,9 @@ use.
   thrower), and both Dash on the ground and air dash.
 - **Quick Battle** against a CPU at four difficulties (Easy, Medium, Hard,
   Brutal): difficulty changes how well it thinks, never what its fighter
-  can do.
+  can do. Seven minutes; level on points at the end, a minute of overtime
+  while the Void closes in from the sides and below, then the lower Launch
+  Point.
 - **Watch Mode**: CPU against CPU, any two fighters, mirror matches
   included.
 - **Practice Ground**: a training room with a stand-still dummy, damage

@@ -19,6 +19,9 @@
 // js/game/combat/launch-bounce.js). Physics itself never knows why.
 
 const EPS = 0.5;
+// The least a closing Void ever leaves past a ledge or below the main
+// stage's top, in world units, whatever its tuning (see closeVoid).
+const MIN_VOID_GAP = 40;
 
 export class StageCollision {
   constructor(map) {
@@ -38,8 +41,48 @@ export class StageCollision {
       this.floor,
       ...map.solids.map((s) => ({ ...s, oneWay: false, dropThrough: false })),
     ];
-    // The kill boundary, a fixed rectangle (see inVoid).
-    this.void = Object.freeze({ ...map.voidBounds });
+    // The main stage's edges, which the Void never closes past (see
+    // closeVoid).
+    this.main = Object.freeze({ left: main.left, right: main.right, top: main.top });
+    // The kill boundary (see inVoid): `baseVoid` is the map's own rectangle,
+    // copied once and never changed (map.voidBounds is never written);
+    // `void` is the one in force, the same rectangle unless a mode closes
+    // it in (closeVoid, Quick Battle's overtime). Each is frozen: a change
+    // replaces it whole, so whatever reads `void` (inVoid, projectiles, the
+    // drawn Void, the debug overlay) always sees one consistent rectangle.
+    this.baseVoid = Object.freeze({ ...map.voidBounds });
+    this.void = this.baseVoid;
+  }
+
+  // Closes the Void in by `progress` (clamped to 0-1) of the way from the
+  // map's own rectangle to `sideEndGap` world units past each ledge and
+  // `bottomEndGap` below the main stage's top, linearly; the top never
+  // moves. Never past those lines (a gap under MIN_VOID_GAP counts as
+  // that), never outward (an edge already closer stays put), and never
+  // past a ledge or the surface whatever the numbers, so standing on the
+  // main stage is always safe. 0 restores the map's own rectangle.
+  closeVoid(progress, { sideEndGap, bottomEndGap }) {
+    const base = this.baseVoid;
+    const p = Math.min(1, Math.max(0, Number(progress) || 0));
+    if (p === 0) {
+      this.void = base;
+      return this.void;
+    }
+    const m = this.main;
+    const side = Math.max(MIN_VOID_GAP, sideEndGap);
+    const below = Math.max(MIN_VOID_GAP, bottomEndGap);
+    const left = Math.max(base.left, m.left - side);
+    const right = Math.min(base.right, m.right + side);
+    const bottom = Math.min(base.bottom, m.top + below);
+    // Exact at both ends: the map's own edge at 0, the destination at 1.
+    const lerp = (a, b) => a * (1 - p) + b * p;
+    this.void = Object.freeze({
+      left: Math.min(lerp(base.left, left), m.left - MIN_VOID_GAP),
+      right: Math.max(lerp(base.right, right), m.right + MIN_VOID_GAP),
+      top: base.top,
+      bottom: Math.max(lerp(base.bottom, bottom), m.top + MIN_VOID_GAP),
+    });
+    return this.void;
   }
 
   // Highest surface at or below `y` under horizontal span [x0, x1]:
@@ -79,8 +122,10 @@ export class StageCollision {
   }
 
   // Whether a body has crossed into the Void: its centre (half its height
-  // above its feet) is outside voidBounds. A fixed, mathematical boundary:
-  // the wavering edge the themes draw is art only and never moves it.
+  // above its feet) is outside the Void in force (`void`: the map's
+  // voidBounds, or closer in through overtime, see closeVoid). A
+  // mathematical boundary: the wavering edge the themes draw around it is
+  // art only and never moves it.
   inVoid(b) {
     const v = this.void;
     const x = b.x;

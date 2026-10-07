@@ -44,7 +44,11 @@ is detected automatically (`visual.pixelSize: 'auto'`); if they are 1×
 (one file pixel per art pixel), set `visual.pixelSize: 1` and size each clip
 with `heightRatio` (its tallest frame over the reference clip's height).
 By convention every fighter's art pixel is 88 / 52 world units, so set
-`visual.height` to your reference clip's art height × 88 / 52.
+`visual.height` to your reference clip's art height × 88 / 52. Optionally
+give `visual.eliminationPalette`: 3–5 CSS colours picked from the art (its
+hair, clothes, skin, signature glow), which the Void's burst is drawn in
+when the fighter is taken; without one it bursts in a neutral white, grey
+and amber.
 
 ## 3. Write the definition module
 
@@ -79,6 +83,7 @@ export const CHARACTER_0027 = {
   visual: {
     height: 88, referenceAnimation: 'idle', anchor: 'torso', pixelSize: 'auto',
     portrait: { animation: 'idle', frame: 0, centerY: 0.25, size: 0.5 },
+    eliminationPalette: ['#e8e8ee', '#3a6fd8', '#d23a2a'], // optional
   },
   collider: { width: 32, height: 78 },
   pushbox: { width: 34 },

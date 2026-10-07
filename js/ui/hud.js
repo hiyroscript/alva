@@ -118,11 +118,13 @@ function clockText(time) {
   return `${Math.floor(time / 60)}:${String(time % 60).padStart(2, '0')}`;
 }
 
-function timeLabel(time) {
+// The timer half's spoken label: the time left, saying so when it is
+// overtime's.
+function timeLabel(time, overtime = false) {
   if (time === '∞') return t('hud.pauseNoLimit');
   const m = Math.floor(time / 60), s = time % 60;
   const left = [m && plural('unit.minute', m), (s || !m) && plural('unit.second', s)].filter(Boolean).join(' ');
-  return t('hud.pauseTime', { left });
+  return t(overtime ? 'hud.pauseOvertime' : 'hud.pauseTime', { left });
 }
 
 export class HUD {
@@ -143,6 +145,7 @@ export class HUD {
     root.replaceChildren(this.left.wrap, center, this.right.wrap);
     this.shownTime = null;
     this.shownRound = null;
+    this.shownOvertime = null;
   }
 
   // Each card is tagged with its fighter's label (Quick Battle's P1 and CPU
@@ -152,28 +155,35 @@ export class HUD {
     bindPanel(this.right, p2.label ?? 'CPU', p2);
     this.shownTime = null;
     this.shownRound = null;
+    this.shownOvertime = null;
   }
 
   // The match's points fill the dots the moment they are scored (a fighter
   // out of play keeps its card and its Launch Point until it respawns).
+  // Through overtime (the Battle's own `overtime`, never kept here) the
+  // timer shows overtime's clock, the label over it reads OVERTIME instead
+  // of the round, and the spoken label says it is overtime's time.
   update(battle) {
     const { p1, p2 } = battle;
     updatePanel(this.left, p1);
     updatePanel(this.right, p2);
     setScore(this.left, battle.score?.p1 ?? 0);
     setScore(this.right, battle.score?.p2 ?? 0);
+    const overtime = !!battle.overtime;
     const time = Number.isFinite(battle.timeLeft) ? Math.ceil(battle.timeLeft) : '∞';
-    if (time !== this.shownTime) {
+    if (time !== this.shownTime || overtime !== this.shownOvertime) {
       this.shownTime = time;
       this.timer.textContent = clockText(time);
       this.timer.classList.toggle('is-urgent', Number.isFinite(battle.timeLeft) && battle.timeLeft <= 10);
-      this.timeButton.setAttribute('aria-label', timeLabel(time));
+      this.timeButton.setAttribute('aria-label', timeLabel(time, overtime));
       this.timeButton.setAttribute('data-i18n-aria-label', '');
     }
-    if (battle.round !== this.shownRound) {
+    if (battle.round !== this.shownRound || overtime !== this.shownOvertime) {
       this.shownRound = battle.round;
-      this.roundLabel.textContent = t('hud.round', { n: battle.round });
+      this.roundLabel.textContent = overtime ? t('hud.overtime') : t('hud.round', { n: battle.round });
+      this.roundLabel.classList.toggle('is-overtime', overtime);
     }
+    this.shownOvertime = overtime;
   }
 }
 

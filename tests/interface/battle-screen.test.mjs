@@ -13,7 +13,9 @@ import { Battle } from '../../js/game/battle.js';
 import { CombatState } from '../../js/game/combat/combat-state.js';
 import { formatLaunchPoint, describeEnergy } from '../../js/ui/hud.js';
 import { CONFIG } from '../../js/config.js';
-import { duel, def as DEF_0001 } from '../helpers/fighter-harness.mjs';
+import { duel, def as DEF_0001, fakeSprites, DT } from '../helpers/fighter-harness.mjs';
+import { getMap } from '../../js/data/maps.js';
+import { setLanguage } from '../../js/localization/i18n.js';
 import { TEST_A, TEST_DISABLED, REMOVED_IDS, withTestFighters } from '../fighters/fixtures/test-fighters.mjs';
 import { stylesheet } from '../helpers/stylesheet.mjs';
 
@@ -689,6 +691,174 @@ test('the third point plays the K.O. banner with the dots filled, then the resul
     assert.equal(screen.resultTitle.textContent, 'Player 1 Wins');
     assert.equal(screen.resultSub.textContent, 'Time ran out. More points wins the match.');
   }
+});
+
+// ---- Quick Battle's clock and overtime ------------------------------------------------------
+
+// A real Quick Battle (both fighters standing still) run by the screen.
+function startRealBattle(screen, app) {
+  globalThis.Path2D ??= class {
+    constructor() {
+      return new Proxy(this, { get: (t, k) => (k in t ? t[k] : () => {}) });
+    }
+  };
+  const sprites = fakeSprites();
+  // The app's input, sampled as no keys held.
+  app.input.sample ??= () => ({});
+  const battle = new Battle({
+    canvas: { getContext: () => ({}) }, map: getMap('desert'), p1Def: DEF_0001, p2Def: DEF_0001,
+    p1Sprites: sprites, p2Sprites: sprites, input: app.input, seed: 1,
+  });
+  battle.p2.controller = null;
+  screen.battle = battle;
+  screen.mode = 'quick-battle';
+  screen.needsResize = false;
+  screen.hud.bind(battle.p1, battle.p2);
+  return battle;
+}
+
+// Plays the screen on until `done`, a frame of one fixed step at a time.
+function playUntil(screen, done, limit = 2000) {
+  for (let i = 0; i < limit && !done(); i++) screen.update(DT + 1e-9);
+}
+
+test('Quick Battle\'s HUD starts at 7:00; at a level 0:00 it turns to OVERTIME at 1:00, the fight going on, its time spoken as overtime\'s', () => {
+  const { app, screen } = setup();
+  const battle = startRealBattle(screen, app);
+  const { hud } = screen;
+  hud.update(battle);
+  assert.equal(hud.timer.textContent, '7:00');
+  assert.equal(hud.roundLabel.textContent, 'ROUND 1');
+  assert.equal(hud.timeButton.getAttribute('aria-label'), 'Pause game, 7 minutes remaining');
+  battle.setPhase('fight');
+  battle.phaseTime = 5;
+  battle.score.p1 = 1;
+  battle.score.p2 = 1;
+  battle.timeLeft = 0.01;
+  screen.update(DT + 1e-9);
+  assert.equal(battle.overtime, true);
+  assert.equal(battle.phase, 'fight');
+  assert.equal(hud.timer.textContent, '1:00');
+  assert.equal(hud.roundLabel.textContent, 'OVERTIME', 'not a second round');
+  assert.ok(hud.roundLabel.classList.contains('is-overtime'));
+  assert.equal(hud.timeButton.getAttribute('aria-label'), 'Pause game, overtime, 1 minute remaining');
+  assert.equal(hud.timer.classList.contains('is-urgent'), false);
+  assert.deepEqual([hud.left.dots.filter((d) => d.classList.contains('is-filled')).length, hud.right.dots.filter((d) => d.classList.contains('is-filled')).length], [1, 1], 'the score stays');
+  // The banner: OVERTIME under POINTS LEVEL, briefly, while play goes on.
+  assert.equal(screen.bannerState, 'overtime');
+  assert.equal(screen.bannerMain.textContent, 'OVERTIME');
+  assert.equal(screen.bannerSub.textContent, 'POINTS LEVEL');
+  assert.equal(screen.banner.dataset.state, 'overtime');
+  assert.equal(app.input.gameplayActive, true, 'controls stay live');
+  assert.equal(screen.isRunning, true);
+  playUntil(screen, () => screen.bannerState === null, 200);
+  assert.equal(screen.bannerState, null, 'then out of the way');
+  assert.ok(battle.timeLeft > 58 && battle.timeLeft < 59, `after about 1.4 s (${battle.timeLeft.toFixed(2)})`);
+  assert.equal(battle.phase, 'fight');
+  // The last ten seconds of overtime: the usual urgent digits.
+  battle.timeLeft = 9.5;
+  screen.update(DT + 1e-9);
+  assert.equal(hud.timer.textContent, '0:10');
+  assert.equal(hud.timer.classList.contains('is-urgent'), true);
+  assert.equal(hud.timeButton.getAttribute('aria-label'), 'Pause game, overtime, 10 seconds remaining');
+  assert.equal(hud.pauseButton.getAttribute('aria-label'), 'Pause', 'the pause half keeps its own label');
+  // Paused, the overtime clock and the closing Void hold exactly still.
+  screen.pause();
+  const held = [battle.timeLeft, battle.stage.void];
+  for (let i = 0; i < 30; i++) screen.update(DT);
+  assert.deepEqual([battle.timeLeft, battle.stage.void], held);
+  screen.resume();
+  screen.update(DT + 1e-9);
+  assert.ok(battle.timeLeft < held[0]);
+  // In French.
+  setLanguage('fr');
+  try {
+    hud.bind(battle.p1, battle.p2);
+    hud.update(battle);
+    assert.equal(hud.roundLabel.textContent, 'PROLONGATION');
+    assert.match(hud.timeButton.getAttribute('aria-label'), /^Mettre en pause, prolongation, il reste \d+ secondes$/);
+  } finally {
+    setLanguage('en');
+  }
+});
+
+test('Watch Mode\'s HUD keeps 5:00 and never shows OVERTIME', () => {
+  const { app, screen } = setup();
+  const sprites = fakeSprites();
+  const battle = new Battle({
+    canvas: { getContext: () => ({}) }, map: getMap('desert'), mode: 'watch', p1Def: DEF_0001, p2Def: DEF_0001,
+    p1Sprites: sprites, p2Sprites: sprites, input: app.input, seed: 1,
+  });
+  screen.hud.bind(battle.p1, battle.p2);
+  screen.hud.update(battle);
+  assert.equal(screen.hud.timer.textContent, '5:00');
+  battle.setPhase('fight');
+  battle.p1.controller = null;
+  battle.p2.controller = null;
+  battle.timeLeft = 0.01;
+  battle.update(DT);
+  screen.hud.update(battle);
+  assert.equal(battle.phase, 'timeup');
+  assert.equal(screen.hud.roundLabel.textContent, 'ROUND 1');
+});
+
+test('overtime results say overtime decided it: more points, or level on points the lower Launch Point', () => {
+  const cases = [
+    [{ p1: 2, p2: 1 }, [50, 0], 'Player 1 Wins', 'Overtime ran out. More points wins the match.'],
+    [{ p1: 1, p2: 1 }, [80, 20], 'CPU Wins', 'Overtime ran out with the points still level. The lower Launch Point decides it.'],
+  ];
+  for (const [score, [a, b], title, sub] of cases) {
+    const { app, screen } = setup();
+    const battle = startRealBattle(screen, app);
+    battle.setPhase('fight');
+    battle.timeLeft = 0.01;
+    screen.update(DT + 1e-9);
+    assert.equal(battle.overtime, true);
+    Object.assign(battle.score, score);
+    battle.p1.combat.launchPoint = a;
+    battle.p2.combat.launchPoint = b;
+    battle.timeLeft = 0.01;
+    screen.update(DT + 1e-9);
+    assert.equal(battle.phase, 'timeup');
+    assert.equal(screen.bannerState, 'time');
+    playUntil(screen, () => !screen.resultOverlay.hidden, 200);
+    assert.equal(screen.resultOverlay.hidden, false);
+    assert.equal(screen.resultKicker.textContent, 'End of overtime');
+    assert.equal(screen.resultTitle.textContent, title);
+    assert.equal(screen.resultSub.textContent, sub);
+    // A rematch: no overtime left, the full 7:00 and the map's own Void.
+    byText(screen.resultOverlay.querySelectorAll('[data-nav]'), 'Rematch').click();
+    assert.equal(battle.overtime, false);
+    assert.equal(battle.timeLeft, 420);
+    assert.equal(battle.stage.void, battle.stage.baseVoid);
+    assert.equal(screen.hud.roundLabel.textContent, 'ROUND 1');
+    assert.equal(screen.hud.timer.textContent, '7:00');
+  }
+});
+
+test('level on points and Launch Point at the end of overtime: no dialog, a fresh battle with no overtime left', () => {
+  const { app, screen } = setup();
+  const battle = startRealBattle(screen, app);
+  battle.setPhase('fight');
+  battle.timeLeft = 0.01;
+  screen.update(DT + 1e-9);
+  assert.equal(battle.overtime, true);
+  battle.score.p1 = 1;
+  battle.score.p2 = 1;
+  battle.p1.combat.launchPoint = 33;
+  battle.p2.combat.launchPoint = 33;
+  battle.timeLeft = 0.01;
+  playUntil(screen, () => battle.phase === 'intro', 200);
+  assert.equal(battle.phase, 'intro', 'restarted');
+  assert.equal(screen.resultOverlay.hidden, true);
+  assert.equal(battle.overtime, false);
+  assert.deepEqual(battle.score, { p1: 0, p2: 0 });
+  assert.equal(battle.timeLeft, 420);
+  assert.deepEqual({ ...battle.stage.void }, { ...battle.map.voidBounds });
+  assert.equal(battle.voidWaveSpeed, 1);
+  assert.equal(screen.hud.timer.textContent, '7:00');
+  assert.equal(screen.hud.roundLabel.textContent, 'ROUND 1');
+  assert.equal(screen.bannerState, null);
 });
 
 test('cancelling Return to Home keeps the pause menu and its focus', async () => {

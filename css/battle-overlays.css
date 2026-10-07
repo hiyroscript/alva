@@ -40,6 +40,9 @@
   color: var(--white);
   text-shadow: 0 2px 0 rgba(0, 0, 0, 0.6);
 }
+/* OVERTIME shows while the fight goes on: a size smaller than the beats
+   that stop it, so it reads at once and hides less of the stage. */
+.battle-banner[data-state="overtime"] .banner-main { font-size: clamp(30px, 8vh, 80px); }
 
 /* Pause + result overlays: glass panels over a dimmed battle ----------- */
 

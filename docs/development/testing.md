@@ -20,7 +20,7 @@ a real browser.
 | [`tests/fighters/0001/`](../../tests/fighters/0001/), [`tests/fighters/0002/`](../../tests/fighters/0002/) | One fighter's own art and moves, with its exact values. #0001's are split by subject: `fighter-0001` (registration, art, data, names), `moves-0001` (every move's mechanic), `combos-0001` (its combo routes) and `cpu-0001` (the CPU playing it and facing it). |
 | [`tests/fighters/fixtures/`](../../tests/fighters/fixtures/) | Test-only fighters (never in the game): `sample-fighter.mjs` (different moves on the same codenames), `loadout-fighters.mjs` (one fighter per loadout shape), `test-fighters.mjs` (fighters the screen tests register for their own run). |
 | [`tests/interface/`](../../tests/interface/) | Screens, the HUD, touch controls and their layouts, Settings, localization, the stylesheet parts, the splash. |
-| [`tests/integration/`](../../tests/integration/) | Whole modes: match scoring, difficulty, Watch Mode, Practice Ground, the empty roster, and every pairing of playable fighters. |
+| [`tests/integration/`](../../tests/integration/) | Whole modes: match scoring, Quick Battle's clock and overtime (`overtime`: the closing Void, its waves, the elimination burst), difficulty, Watch Mode, Practice Ground, the empty roster, and every pairing of playable fighters. |
 | [`tests/helpers/`](../../tests/helpers/) | `fighter-harness.mjs` (the Fighter on a test stage), `png-art.mjs` (a PNG decoder and just enough canvas to normalize a fighter's real frames), `stylesheet.mjs` (the CSS as the page links it). |
 
 ## Universal tests and fighter tests

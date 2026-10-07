@@ -520,10 +520,12 @@ function recordingContext() {
   return ctx;
 }
 
-function drawVoidAt(theme, view, time) {
+// The theme is handed the Void in force, as the Arena hands it its stage's
+// (here the map's own).
+function drawVoidAt(theme, view, time, bounds = theme.map.voidBounds) {
   const ctx = recordingContext();
   theme.time = time;
-  theme.drawVoid(ctx, { ...view, ctx });
+  theme.drawVoid(ctx, { ...view, ctx }, bounds);
   return ctx.points;
 }
 
@@ -584,7 +586,7 @@ test('the Void gains a thin red rim on exactly its wavy edge: the same points as
   const theme = createTheme(m, { reducedMotion: false });
   theme.time = 0.8;
   const { ctx, paints } = paintingContext();
-  theme.drawVoid(ctx, { ...corner, ctx });
+  theme.drawVoid(ctx, { ...corner, ctx }, v);
   assert.deepEqual(paints.map((p) => [p.fn, p.color]), [['stroke', '#d21f2b'], ['fill', '#000']], 'the red rim, then the black over it');
   const [rim, black] = paints;
   // Every point of the rim is a point of the black's edge, in the same
@@ -616,21 +618,21 @@ test('the Void gains a thin red rim on exactly its wavy edge: the same points as
   const shots = [0, 2.4].map((time) => {
     still.time = time;
     const rec = paintingContext();
-    still.drawVoid(rec.ctx, { ...corner, ctx: rec.ctx });
+    still.drawVoid(rec.ctx, { ...corner, ctx: rec.ctx }, v);
     return rec.paints.map((p) => p.path);
   });
   assert.deepEqual(shots[0], shots[1], 'reduced motion: the edge and its rim hold still');
   const moving = [0, 2.4].map((time) => {
     theme.time = time;
     const rec = paintingContext();
-    theme.drawVoid(rec.ctx, { ...corner, ctx: rec.ctx });
+    theme.drawVoid(rec.ctx, { ...corner, ctx: rec.ctx }, v);
     return rec.paints.map((p) => p.path);
   });
   assert.notDeepEqual(moving[0], moving[1], 'otherwise both drift together');
   // Nothing near the edge: neither the black nor the rim.
   const centre = { ...base, x: 1800 - 780, y: 860 - 616 };
   const none = paintingContext();
-  theme.drawVoid(none.ctx, { ...centre, ctx: none.ctx });
+  theme.drawVoid(none.ctx, { ...centre, ctx: none.ctx }, v);
   assert.deepEqual(none.paints, []);
 });
 

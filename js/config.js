@@ -52,7 +52,27 @@ export const CONFIG = Object.freeze({
   },
 
   battle: {
-    roundSeconds: 300,     // 5 minutes; set to 0 to disable the round timer
+    // The normal match clock, by mode (see BATTLE_MODES in
+    // js/game/battle.js); 0 disables it. Quick Battle plays 7 minutes;
+    // roundSeconds is every other Battle's (Watch Mode's 5 minutes).
+    quickBattleSeconds: 420,
+    roundSeconds: 300,
+    // Quick Battle only: the normal clock running out with the points
+    // level starts this much overtime, the same match played on (scores,
+    // Launch Points and everything in play kept) under a closing Void.
+    overtimeSeconds: 60,
+    // How the Void closes in through overtime, linearly over its whole
+    // length: its left and right edges in to `sideEndGap` world units past
+    // each main-stage ledge, its bottom up to `bottomEndGap` below the main
+    // stage's top (both measured at a fighter's centre, like
+    // StageCollision.inVoid, and never closer than that), its top never.
+    // Its drawn waves run up to `maxWaveSpeedMultiplier` times their
+    // normal speed, easing in (1 + (max - 1) x progress squared).
+    overtimeVoid: {
+      sideEndGap: 120,
+      bottomEndGap: 140,
+      maxWaveSpeedMultiplier: 4,
+    },
     introSeconds: 1.7,
     timeUpSeconds: 1.4,
     koSeconds: 1.4,        // the KO beat after the match-winning point, before the result

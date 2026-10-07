@@ -259,6 +259,11 @@ export const CHARACTER_0001 = {
     anchor: 'torso',
     pixelSize: 1,
     portrait: { animation: 'idle', frame: 0, centerY: 0.2, size: 0.42 },
+    // The colours it bursts in when the Void takes it (see
+    // js/game/rendering/hit-fx.js), picked from its art: its white hair,
+    // the silver of its trousers, its bright cyan eyes (Maximum Blue's
+    // glow) and its black shirt.
+    eliminationPalette: ['#f4f4f6', '#a8a8b2', '#58f0f0', '#1c1c22'],
   },
 
   // Its body, measured from its idle: the head and shirt, then the legs.
