@@ -903,7 +903,7 @@ test('Language: English and Français as two radio buttons; picking one saves it
     assert.deepEqual(dialog.root.querySelectorAll('.settings-group-title').map((h) => h.textContent), ['Langue', 'Commandes', 'Combat']);
     assert.equal(dialog.closeButton.getAttribute('aria-label'), 'Fermer les paramètres');
     assert.equal(schemeNamed(dialog, 'classic').querySelector('.settings-option-name').children[0].textContent, 'Boutons classiques');
-    assert.equal(dialog.customizeNote.textContent, 'Déplacez et redimensionnez chaque commande de la disposition Joystick.');
+    assert.equal(dialog.customizeNote.textContent, 'Joystick : déplacez et redimensionnez chaque commande.');
     // And behind it, Home: the gear, the tagline, the menu's name.
     assert.equal(home.settingsButton.getAttribute('aria-label'), 'Paramètres');
     assert.equal(home.el.querySelector('.home-lede').textContent, 'Un projet de fan, fait avec cœur.');
@@ -926,9 +926,9 @@ test('Controls: Joystick and Classic Buttons stay two radio cards, saved at once
     const group = dialog.root.querySelector('.settings-options');
     assert.equal(group.getAttribute('role'), 'radiogroup');
     assert.equal(group.getAttribute('aria-labelledby'), 'settings-mobile-title');
-    assert.equal(dialog.root.querySelector('.settings-subtitle').textContent, 'Mobile Controls');
+    assert.equal(dialog.root.querySelector('.settings-subtitle').textContent, 'Mobile controls');
     const names = dialog.schemeOptions.map((o) => o.querySelector('.settings-option-name').children[0].textContent);
-    assert.deepEqual(names, ['Joystick', 'Classic Buttons']);
+    assert.deepEqual(names, ['Joystick', 'Classic buttons']);
     for (const option of dialog.schemeOptions) {
       assert.equal(option.getAttribute('role'), 'radio');
       assert.equal(option.hasAttribute('data-nav'), true);
@@ -944,7 +944,7 @@ test('Controls: Joystick and Classic Buttons stay two radio cards, saved at once
     assert.deepEqual(checked(dialog.schemeOptions), ['false', 'true']);
     assert.equal(stored(storage).mobileControls, 'classic');
     assert.equal(dialog.isOpen, true);
-    assert.equal(dialog.customizeNote.textContent, 'Move and resize every control of the Classic Buttons layout.');
+    assert.equal(dialog.customizeNote.textContent, 'Classic buttons: move and resize each control.');
     // Reopened on a new visit (the same device): Classic Buttons, checked.
     const again = boot(storage);
     again.home.settingsButton.click();
@@ -977,6 +977,61 @@ test('Controls: Joystick and Classic Buttons stay two radio cards, saved at once
   }
 });
 
+test('both layouts keep localized copy, editor labels and saved choices across language switches', () => {
+  const { app, home, dialog, storage, done } = boot();
+  try {
+    home.settingsButton.click();
+    for (const language of ['en', 'fr', 'en']) {
+      dialog.showSection('language');
+      languageNamed(dialog, language).click();
+      dialog.showSection('controls');
+      for (const scheme of ['joystick', 'classic']) {
+        schemeNamed(dialog, scheme).click();
+        const name = t(`settings.scheme.${scheme}`);
+        assert.equal(dialog.customizeNote.textContent, language === 'en'
+          ? `${name}: move and resize each control.`
+          : `${name} : déplacez et redimensionnez chaque commande.`);
+        app.settings.setTouchLayout(scheme, { jump: { x: 0.8, y: 0.7, scale: 1.2 } });
+        assert.equal(dialog.customTag.hidden, false);
+        assert.equal(dialog.customTag.textContent, language === 'en' ? 'Custom layout' : 'Disposition personnalisée');
+        dialog.customizeButton.click();
+        const editor = app.touchEditor;
+        assert.equal(editor.schemeLabel.textContent, language === 'en' ? `${name} layout` : `Disposition : ${name}`);
+        assert.equal(editor.root.querySelector('.touch-editor-title').textContent, t('settings.customize'));
+        assert.equal(editor.root.querySelector('.touch-editor-size-label').textContent, language === 'en' ? 'Size' : 'Taille');
+        assert.equal(editor.nameEl.textContent, t('editor.none'));
+        assert.equal(editor.smaller.getAttribute('aria-label'), language === 'en' ? 'Smaller' : 'Réduire');
+        assert.equal(editor.larger.getAttribute('aria-label'), language === 'en' ? 'Larger' : 'Agrandir');
+        const id = scheme === 'joystick' ? 'mouvementLeft' : 'runLeft';
+        const controlName = t(scheme === 'joystick' ? 'touch.mouvementLeft' : 'control.runLeft');
+        editor.startMoving(id);
+        assert.equal(editor.nameEl.textContent, controlName);
+        assert.equal(editor.live.textContent, t('editor.moving', { name: controlName }));
+        editor.stopMoving();
+        assert.equal(editor.live.textContent, t('editor.placed', { name: controlName }));
+        editor.doneButton.click();
+        assert.equal(document.activeElement, dialog.customizeButton);
+        const reloaded = new Settings(storage);
+        assert.equal(reloaded.language, language);
+        assert.equal(reloaded.mobileControls, scheme);
+        assert.deepEqual(reloaded.touchLayout(scheme).jump, { x: 0.8, y: 0.7, scale: 1.2 });
+      }
+    }
+  } finally {
+    done();
+  }
+});
+
+test('Settings and the editor preserve translation case, including the shared kicker override', () => {
+  const css = stylesheet();
+  const rule = (selector) => css.match(new RegExp(`\\n${selector.replaceAll('.', '\\.')} \\{([^}]*)\\}`))?.[1] ?? '';
+  for (const selector of ['.settings-group-title', '.settings-option-tag', '.touch-editor-size-label', '.touch-editor-scheme']) {
+    assert.match(rule(selector), /text-transform: none;/, selector);
+  }
+  assert.doesNotMatch(read('css/settings.css'), /text-transform: (uppercase|capitalize);/);
+  assert.match(rule('.kicker'), /text-transform: uppercase;/, 'shared branding stays unchanged');
+});
+
 test('Combat: Combat Assist On (the default) and Off as two radio buttons, saved at once, in English and French', () => {
   const { app, home, dialog, storage, done } = boot();
   try {
@@ -984,7 +1039,7 @@ test('Combat: Combat Assist On (the default) and Off as two radio buttons, saved
     dialog.tabs[2].click();
     const section = dialog.sections.combat;
     assert.equal(section.getAttribute('data-settings-section'), 'combat');
-    assert.equal(section.querySelector('.settings-subtitle').textContent, 'Combat Assist');
+    assert.equal(section.querySelector('.settings-subtitle').textContent, 'Combat assist');
     const desc = section.querySelector('.settings-group-note');
     assert.equal(desc.textContent, 'Automatically closes a short gap before a melee attack. Never uses Energy and never affects ranged attacks.');
     // Its line says it is melee only and costs Energy.

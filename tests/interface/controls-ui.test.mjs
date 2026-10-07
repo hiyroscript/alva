@@ -8,7 +8,7 @@
 // (extra_attack, shield, jump, attack1 to attack5), Classic Buttons' Left / Right cluster
 // (runLeft / runRight), the Joystick scheme's stick (a plain base
 // and knob: deadzone, release, crossing the centre, multi-touch), its
-// single-tap Left mouvement / Right mouvement Dash buttons (mouvementLeft /
+// single-tap Left movement / Right movement Dash buttons (mouvementLeft /
 // mouvementRight) and switching
 // schemes, the desktop bindings and the page-zoom guard. Layout, paint and
 // real gestures still need real-browser verification.
@@ -676,7 +676,7 @@ test('the movement controls, Shield and Transform look exactly as before, whatev
   });
   const expected = {
     pad: [['runLeft', ICONS.left, 'Move left'], ['runRight', ICONS.right, 'Move right']],
-    dash: [[ICONS.left, 'Left mouvement'], [ICONS.right, 'Right mouvement']],
+    dash: [[ICONS.left, 'Left movement'], [ICONS.right, 'Right movement']],
     stick: [1, 0],
     shield: [ICONS.shield, 'Shield'],
     transform: [ICONS.transform, true],
@@ -1200,7 +1200,7 @@ test('Classic Buttons is the original layout: Left / Right at the lower left, th
   assert.deepEqual(calls, [['runRight', true], ['runRight', false], ['runRight', true], ['runRight', false]], 'two taps are two presses, no Dash request');
 });
 
-test('the Joystick scheme: a movement joystick between Left mouvement and Right mouvement', () => {
+test('the Joystick scheme: a movement joystick between Left movement and Right movement', () => {
   const { tc } = touchControls(DEF_0001, { scheme: 'joystick' });
   assert.deepEqual(tc.root.children, [tc.joystick, tc.actions]);
   const [mouvementLeft, stick, mouvementRight] = tc.joystick.children;
@@ -1213,10 +1213,10 @@ test('the Joystick scheme: a movement joystick between Left mouvement and Right 
   assert.equal(stick.querySelectorAll('.tc-stick-arrow').length, 0);
   assert.equal(stick.innerHTML, '');
   // The Dash buttons, mouvementLeft and mouvementRight: real buttons with
-  // exactly these names, spelling kept, and the readable arrow glyphs.
+  // localized display names, stable identifiers, and readable arrow glyphs.
   for (const [b, name, icon, side, control] of [
-    [mouvementLeft, 'Left mouvement', ICONS.left, 'left', 'mouvementLeft'],
-    [mouvementRight, 'Right mouvement', ICONS.right, 'right', 'mouvementRight'],
+    [mouvementLeft, 'Left movement', ICONS.left, 'left', 'mouvementLeft'],
+    [mouvementRight, 'Right movement', ICONS.right, 'right', 'mouvementRight'],
   ]) {
     assert.equal(b.tagName, 'BUTTON');
     assert.equal(b.getAttribute('type'), 'button');
@@ -1229,7 +1229,7 @@ test('the Joystick scheme: a movement joystick between Left mouvement and Right 
     assert.equal(tc.mouvementButtons.get(control), b);
   }
   assert.deepEqual([...tc.mouvementButtons.keys()], ['mouvementLeft', 'mouvementRight'], 'mouvement, as written');
-  assert.doesNotMatch(mouvementLeft.getAttribute('aria-label') + mouvementRight.getAttribute('aria-label'), /movement/, 'mouvement, as written');
+  assert.doesNotMatch(mouvementLeft.getAttribute('aria-label') + mouvementRight.getAttribute('aria-label'), /mouvement/, 'English display names use movement');
   // The old cluster is gone from the screen.
   assert.equal(tc.root.querySelectorAll('.tc-dpad').length, 0);
   assert.deepEqual(tc.root.querySelectorAll('.tc-text'), [], 'no letter anywhere');
@@ -1400,7 +1400,7 @@ test('the joystick works alongside Jump, every attack, Shield, the extra attack 
 
 // ---- Joystick: Dash buttons ----------------------------------------------------
 
-test('one tap of Left mouvement / Right mouvement asks for exactly one Dash, and holds nothing', () => {
+test('one tap of Left movement / Right movement asks for exactly one Dash, and holds nothing', () => {
   const { tc, calls } = touchControls(DEF_0001, { scheme: 'joystick' });
   const left = tc.mouvementButtons.get('mouvementLeft');
   const right = tc.mouvementButtons.get('mouvementRight');

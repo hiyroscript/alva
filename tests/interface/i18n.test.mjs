@@ -486,6 +486,46 @@ test('index.html\'s own labels are marked with the keys that translate them', ()
   assert.match(html, /<html lang="en">/, 'the page starts in English; App sets the player\'s language');
 });
 
+test('Settings labels use sentence case and dynamic editor copy preserves localized names', () => {
+  const labels = {
+    'settings.language': ['Language', 'Langue'],
+    'settings.controls': ['Controls', 'Commandes'],
+    'settings.combat': ['Combat', 'Combat'],
+    'settings.mobileControls': ['Mobile controls', 'Commandes tactiles'],
+    'settings.scheme.classic': ['Classic buttons', 'Boutons classiques'],
+    'settings.combatAssist': ['Combat assist', 'Assistance au combat'],
+    'settings.customized': ['Custom layout', 'Disposition personnalisée'],
+    'common.default': ['Default', 'Par défaut'],
+    'touch.mouvementLeft': ['Left movement', 'Mouvement à gauche'],
+    'touch.mouvementRight': ['Right movement', 'Mouvement à droite'],
+  };
+  for (const [index, language] of ['en', 'fr'].entries()) {
+    for (const [key, values] of Object.entries(labels)) assert.equal(t(key, undefined, language), values[index], key);
+    for (const scheme of ['joystick', 'classic']) {
+      const name = t(`settings.scheme.${scheme}`, undefined, language);
+      const params = { scheme: { t: `settings.scheme.${scheme}` } };
+      assert.equal(t('settings.customizeNote', params, language), language === 'en'
+        ? `${name}: move and resize each control.`
+        : `${name} : déplacez et redimensionnez chaque commande.`);
+      assert.equal(t('editor.layout', params, language), language === 'en' ? `${name} layout` : `Disposition : ${name}`);
+    }
+    const name = t('touch.joystick', undefined, language);
+    assert.equal(t('editor.moving', { name }, language), language === 'en'
+      ? 'Movement joystick: use the arrow keys or D-pad to move, then confirm or go back to finish.'
+      : 'Joystick de déplacement : utilisez les flèches ou la croix directionnelle pour déplacer la commande, puis validez ou revenez en arrière pour terminer.');
+    for (const [key, value] of Object.entries(STRINGS[language])) {
+      if (!/^(settings|editor)\./.test(key)) continue;
+      assert.equal(typeof value, 'string', key);
+      // Every dynamic field stays available in both languages.
+      const placeholders = (text) => [...text.matchAll(/\{(\w+)\}/g)].map((m) => m[1]).sort();
+      assert.deepEqual(placeholders(value), placeholders(STRINGS.en[key]), `${language}: ${key}`);
+    }
+  }
+  assert.doesNotMatch(STRINGS.en['settings.scheme.joystickDesc'], /mouvement|mouvment/);
+  assert.match(STRINGS.en['settings.scheme.joystickDesc'], /once to Dash left or right/);
+  assert.match(STRINGS.en['settings.scheme.classicDesc'], /Double-tap a direction to Dash/);
+});
+
 test('internal identifiers never change with the language', () => {
   inFrench(() => {
     const touch = new TouchControls(new Element('div'), { setTouch: noop, queueTouchMouvement: noop });
