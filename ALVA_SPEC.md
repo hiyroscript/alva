@@ -888,13 +888,18 @@ Home's Settings gear. Home stays visible behind a light dim, blurred where
 backdrop blur is supported, in the same glass as the pause and Practice
 panels (`.glass--panel`); the header holds the kicker "ALVA", the title
 "Settings" and a labelled close button. It holds the player's settings,
-saved on this device, in exactly three sections, in this order:
+saved on this device, in exactly three sections selected by horizontal tabs
+immediately beneath the header: **Language | Controls | Combat** (French:
+**Langue | Commandes | Combat**). Exactly one panel is visible; inactive
+panels are hidden from rendering, assistive technology and input navigation.
+The selected tab has stronger text, a subtle accent fill and a green bottom
+indicator. Each section keeps its existing settings, in this order:
 
 - **Language** — **English** and **Français**, each named in its own
   language and marked with its own `lang`, as a `radiogroup` of two `radio`
   buttons; the one in use is ticked and outlined in green. Choosing one saves
   it at once and the whole interface switches immediately (6.11), this
-  dialog included; the dialog stays open.
+  dialog included; the dialog stays open on Language.
 - **Controls** — **Mobile Controls**, the touch layout Quick Battle and
   Practice Ground use (7.4), with exactly two choices shown as two cards,
   each with a small drawing of its lower-left corner and a line on what it
@@ -909,7 +914,8 @@ saved on this device, in exactly three sections, in this order:
   "Selected" pill and border. Choosing one saves it at once; the next battle
   or practice uses it. Beneath them, **Customize touch controls** opens the
   touch layout editor (6.10a) for the layout in use, beside a line naming
-  that layout and a "Custom layout" tag once it has one.
+  that layout and a "Custom layout" tag once it has one. Leaving the editor
+  returns to the Controls tab with focus on Customize.
 - **Combat** — **Combat Assist** (7.2.4a), under the line "Automatically
   closes a short gap before a melee attack. Never uses Energy and never
   affects ranged attacks.", with exactly two choices in the Language section's
@@ -922,15 +928,36 @@ saved on this device, in exactly three sections, in this order:
 - **Modal behaviour.** `role="dialog"`, `aria-modal="true"`, labelled by its
   title. Opening it pushes its own navigation scope (arrows, D-pad, Enter,
   A move and choose inside it only; nothing behind it can be reached) and
-  makes Home `inert`; focus lands on the language in use. `Esc`, gamepad
+  makes Home `inert`; every opening selects Language and focuses its tab. `Esc`, gamepad
   Back, the close button or a press on the dim around the panel (never
   inside it) close it, removing exactly its scope, and focus returns to the
   gear. It is never a screen: the screen stays Home throughout.
-- **Responsive.** Up to 760 px wide; on short landscape screens the body
-  scrolls on its own (`overscroll-behavior: contain`, `touch-action: pan-y`)
-  while Home never scrolls, and the cards drop their lines below 460 px of
-  height (Combat Assist's line always shows: it says what the setting
-  costs). Narrow windows stack the cards.
+- **Section navigation.** Real buttons form a horizontal `tablist`, with
+  `role="tab"`, `aria-selected`, `aria-controls`, and matching `tabpanel`
+  labels. Only the selected tab participates in native Tab order. As on
+  Discover, keyboard/gamepad focus activates a tab immediately; click or tap
+  selects it, but hover never changes focus or selection. Left/Right arrows
+  and D-pad wrap through the tabs in configuration order. Down enters the
+  selected setting (or first control); Up goes to Close. Within a panel,
+  directional navigation moves among its controls; Up from the top row
+  returns to its active tab. Down from Close returns to that tab. Confirm
+  activates the focused setting; Tab/Shift+Tab wrap inside the dialog.
+- **Responsive.** Up to 760 px wide and 540 px tall, capped by the viewport,
+  with a stable height across sections, a fixed header, fixed navigation
+  row and a flexible content area. Only the active section scrolls vertically
+  (`overscroll-behavior: contain`, `touch-action: pan-y`); switching sections
+  resets that panel to its top. Home never scrolls. Tabs keep at least 44 px
+  of target height even in compact landscape, stay horizontal and scroll
+  horizontally if their labels exceed the available width. Selecting or
+  focusing a tab reveals it automatically, without widening the dialog.
+  The cards drop their optional lines below 460 px of height; Combat Assist's
+  explanation always remains. Narrow windows stack the cards. Transitions
+  respect the shared reduced-motion preference.
+- **Extensibility.** `SETTINGS_SECTIONS` in `js/ui/settings-dialog.js` defines
+  ordered stable IDs, translation keys and content builders. Tabs and panels
+  are generated from it; adding a category needs no layout or navigation
+  algorithm changes. The active section is presentation state only and is
+  never saved as a preference.
 - Presentation, input configuration and the human player's own Combat
   Assist only: keyboard bindings, gamepad mappings, fighters, the CPU and
   the rules of a fight never change, and Watch Mode stays free of player

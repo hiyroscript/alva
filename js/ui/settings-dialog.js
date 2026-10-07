@@ -1,5 +1,5 @@
 // SETTINGS: a translucent glass dialog over Home, opened by Home's gear
-// (top right). Exactly three sections:
+// (top right). Top tabs show one section at a time:
 //
 //   Language  English / Français, a single choice (radio buttons). Picking
 //             one saves it and the whole interface switches at once, this
@@ -22,9 +22,10 @@
 // aria-modal, its own navigation scope (arrows, D-pad, Enter, A), Home made
 // inert beneath it, Esc / gamepad Back, the close button or a press on the
 // dim around the panel close it, and focus returns to what opened it (the
-// gear). The panel scrolls on its own on short landscape screens; Home never
-// does.
+// gear). Only the active section scrolls on short landscape screens; the
+// header and tabs stay visible and Home never scrolls.
 
+import { findNeighbor } from '../core/menu-navigator.js';
 import { el } from '../core/utils.js';
 import { tx, tattr, iconLabel, setText, LANGUAGES, LANGUAGE_NAMES } from '../localization/i18n.js';
 import { MOBILE_CONTROLS, DEFAULT_MOBILE_CONTROLS, DEFAULT_COMBAT_ASSIST } from '../core/settings.js';
@@ -49,7 +50,10 @@ const schemeName = (scheme) => `settings.scheme.${scheme}`;
 
 // A section: its heading (and note) above its content.
 function section(id, titleKey, noteKey, content) {
-  return el('section', { class: 'settings-section', 'data-settings-section': id, 'aria-labelledby': `settings-${id}-title` }, [
+  return el('section', {
+    class: 'settings-section', 'data-settings-section': id, role: 'tabpanel',
+    id: `settings-panel-${id}`, 'aria-labelledby': `settings-tab-${id}`, hidden: true,
+  }, [
     el('div', { class: 'settings-group-head' }, [
       el('h3', { class: 'settings-group-title', id: `settings-${id}-title`, ...tx(titleKey) }),
       noteKey ? el('p', { class: 'settings-group-note', ...tx(noteKey) }) : null,
@@ -57,6 +61,14 @@ function section(id, titleKey, noteKey, content) {
     ...content,
   ]);
 }
+
+// Add a section here with its stable ID, translated label and content builder.
+// Selection is dialog state only; it never enters the saved settings schema.
+export const SETTINGS_SECTIONS = [
+  { id: 'language', label: 'settings.language', note: 'settings.languageNote', build: (dialog) => dialog.buildLanguage() },
+  { id: 'controls', label: 'settings.controls', note: 'settings.controlsNote', build: (dialog) => dialog.buildControls() },
+  { id: 'combat', label: 'settings.combat', build: (dialog) => dialog.buildCombat() },
+];
 
 export class SettingsDialog {
   constructor(root, app) {
@@ -69,7 +81,67 @@ export class SettingsDialog {
     root.setAttribute('aria-modal', 'true');
     root.setAttribute('aria-labelledby', 'settings-title');
 
-    // ---- Language ----------------------------------------------------------
+    // ---- Panel ---------------------------------------------------------------
+    this.closeButton = el('button', {
+      class: 'settings-close', type: 'button', 'data-nav': true, ...tattr('aria-label', 'settings.close'), html: ICONS.close,
+    });
+    this.closeButton.addEventListener('click', () => this.close());
+
+    this.categories = SETTINGS_SECTIONS.map(({ id, label, note, build }) => {
+      const tab = el('button', {
+        class: 'settings-tab', type: 'button', role: 'tab', id: `settings-tab-${id}`,
+        'aria-controls': `settings-panel-${id}`, 'aria-selected': 'false', tabindex: '-1',
+        'data-nav': true, 'data-nav-no-hover-focus': true, ...tx(label),
+      });
+      const panel = section(id, label, note, build(this));
+      tab.addEventListener('click', () => this.showSection(id, { focus: true }));
+      tab.addEventListener('focus', () => this.showSection(id));
+      return { id, tab, panel };
+    });
+    this.sections = Object.fromEntries(this.categories.map(({ id, panel }) => [id, panel]));
+    this.tabs = this.categories.map(({ tab }) => tab);
+    this.tablist = el('div', {
+      class: 'settings-tabs', role: 'tablist', 'aria-orientation': 'horizontal',
+      ...tattr('aria-label', 'settings.sections'),
+    }, this.tabs);
+    this.body = el('div', { class: 'settings-body' }, Object.values(this.sections));
+    this.panel = el('div', { class: 'settings-panel glass glass--panel' }, [
+      el('header', { class: 'settings-header' }, [
+        el('div', { class: 'settings-heading' }, [
+          el('span', { class: 'kicker', ...tx('brand.title') }),
+          el('h2', { class: 'settings-title', id: 'settings-title', ...tx('settings.title') }),
+        ]),
+        this.closeButton,
+      ]),
+      this.tablist,
+      this.body,
+    ]);
+    root.replaceChildren(this.panel);
+    // A press on the dim around the panel closes it; one inside never does.
+    root.addEventListener('click', (e) => {
+      if (e.target === root) this.close();
+    });
+
+    this.scope = { el: root, onBack: () => this.close(), onDirection: (dir) => this.onDirection(dir) };
+    // Native Tab is not a menu command. Wrap it inside this modal, skipping
+    // inactive tabs; arrows and gamepad still use the shared navigator.
+    root.addEventListener('keydown', (event) => {
+      if (event.key !== 'Tab' || this.app.nav.scopeEl !== root) return;
+      const items = this.app.nav.candidates(root).filter((item) => item.getAttribute('tabindex') !== '-1');
+      const index = items.indexOf(document.activeElement);
+      if (index < 0 || (event.shiftKey ? index === 0 : index === items.length - 1)) {
+        event.preventDefault();
+        (event.shiftKey ? items.at(-1) : items[0])?.focus();
+      }
+    });
+    app.settings.onChange(() => {
+      if (this.open_) this.markCurrent();
+    });
+    this.markCurrent();
+    this.showSection(this.categories[0].id);
+  }
+
+  buildLanguage() {
     this.languageOptions = LANGUAGES.map((language) => {
       const option = el('button', {
         class: 'settings-language', type: 'button', role: 'radio', 'aria-checked': 'false',
@@ -84,8 +156,10 @@ export class SettingsDialog {
     const languageGroup = el('div', {
       class: 'settings-languages', role: 'radiogroup', 'aria-labelledby': 'settings-language-title',
     }, this.languageOptions);
+    return [languageGroup];
+  }
 
-    // ---- Controls ------------------------------------------------------------
+  buildControls() {
     this.schemeOptions = MOBILE_CONTROLS.map((scheme) => {
       const descId = `settings-mobile-${scheme}-desc`;
       const option = el('button', {
@@ -124,8 +198,10 @@ export class SettingsDialog {
       this.customizeButton,
       el('p', { class: 'settings-customize-text' }, [this.customizeNote, this.customTag]),
     ]);
+    return [schemeGroup, customize];
+  }
 
-    // ---- Combat --------------------------------------------------------------
+  buildCombat() {
     // Combat Assist's two choices, On first, each named and ticked when it
     // is the saved one; the default says so, as Joystick's card does.
     this.assistOptions = [true, false].map((on) => {
@@ -150,40 +226,63 @@ export class SettingsDialog {
         'aria-labelledby': 'settings-assist-title', 'aria-describedby': 'settings-assist-desc',
       }, this.assistOptions),
     ]);
+    return [assistGroup];
+  }
 
-    // ---- Panel ---------------------------------------------------------------
-    this.closeButton = el('button', {
-      class: 'settings-close', type: 'button', 'data-nav': true, ...tattr('aria-label', 'settings.close'), html: ICONS.close,
-    });
-    this.closeButton.addEventListener('click', () => this.close());
+  get currentSection() {
+    return this.categories.find(({ id }) => id === this.activeSection);
+  }
 
-    this.sections = {
-      language: section('language', 'settings.language', 'settings.languageNote', [languageGroup]),
-      controls: section('controls', 'settings.controls', 'settings.controlsNote', [schemeGroup, customize]),
-      combat: section('combat', 'settings.combat', null, [assistGroup]),
-    };
-    this.body = el('div', { class: 'settings-body' }, Object.values(this.sections));
-    this.panel = el('div', { class: 'settings-panel glass glass--panel' }, [
-      el('header', { class: 'settings-header' }, [
-        el('div', { class: 'settings-heading' }, [
-          el('span', { class: 'kicker', ...tx('brand.title') }),
-          el('h2', { class: 'settings-title', id: 'settings-title', ...tx('settings.title') }),
-        ]),
-        this.closeButton,
-      ]),
-      this.body,
-    ]);
-    root.replaceChildren(this.panel);
-    // A press on the dim around the panel closes it; one inside never does.
-    root.addEventListener('click', (e) => {
-      if (e.target === root) this.close();
-    });
+  showSection(id, { focus = false } = {}) {
+    const next = this.categories.find((category) => category.id === id);
+    if (!next) return;
+    const previous = this.currentSection;
+    const hiddenFocus = previous !== next && previous?.panel.contains(document.activeElement);
+    if (previous !== next) {
+      this.activeSection = id;
+      for (const category of this.categories) {
+        const selected = category === next;
+        category.tab.setAttribute('aria-selected', String(selected));
+        category.tab.setAttribute('tabindex', selected ? '0' : '-1');
+        category.tab.classList.toggle('is-active', selected);
+        category.panel.hidden = !selected;
+      }
+      next.panel.scrollTop = 0;
+    }
+    if (focus || hiddenFocus) next.tab.focus({ preventScroll: true });
+    next.tab.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
+  }
 
-    this.scope = { el: root, onBack: () => this.close() };
-    app.settings.onChange(() => {
-      if (this.open_) this.markCurrent();
-    });
-    this.markCurrent();
+  // Keep horizontal tab movement independent of geometry or category count.
+  // Moving up out of a section always returns to its own tab.
+  onDirection(dir) {
+    const current = this.currentSection;
+    const active = document.activeElement;
+    let target = null;
+    const tabIndex = this.tabs.indexOf(active);
+    if (tabIndex >= 0) {
+      if (dir === 'left' || dir === 'right') {
+        target = this.tabs[(tabIndex + (dir === 'right' ? 1 : -1) + this.tabs.length) % this.tabs.length];
+      } else if (dir === 'up') {
+        target = this.closeButton;
+      } else if (dir === 'down') {
+        const items = this.app.nav.candidates(current.panel);
+        target = items.find((item) => item.getAttribute('aria-checked') === 'true') ?? items[0];
+      }
+    } else if (active === this.closeButton) {
+      if (dir === 'down') target = current.tab;
+    } else if (current.panel.contains(active)) {
+      target = findNeighbor(active, this.app.nav.candidates(current.panel), dir);
+      if (!target && dir === 'up') target = current.tab;
+    } else {
+      target = current.tab;
+    }
+    if (target) {
+      target.focus({ preventScroll: true });
+      target.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
+      this.app.audio.play('move');
+    }
+    return true;
   }
 
   get isOpen() {
@@ -203,7 +302,7 @@ export class SettingsDialog {
   }
 
   // Opens over the current screen (Home), which goes inert beneath it, and
-  // focuses the language in use. `returnFocus` gets focus back on close.
+  // focuses the Language tab. `returnFocus` gets focus back on close.
   open({ returnFocus = document.activeElement } = {}) {
     if (this.open_) return;
     this.open_ = true;
@@ -212,9 +311,9 @@ export class SettingsDialog {
     if (this.background) this.background.inert = true;
     this.markCurrent();
     this.root.hidden = false;
-    this.body.scrollTop = 0;
     this.app.nav.pushScope(this.scope);
-    this.languageFor(this.app.settings.language)?.focus({ preventScroll: true });
+    this.showSection(this.categories[0].id, { focus: true });
+    this.currentSection.panel.scrollTop = 0;
   }
 
   // Closes (the editor first, if it is open) and hands focus back.

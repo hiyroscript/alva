@@ -296,6 +296,7 @@ export const EN = {
 
   'settings.title': 'Settings',
   'settings.close': 'Close settings',
+  'settings.sections': 'Settings sections',
   'settings.language': 'Language',
   'settings.languageNote': 'The language of every menu, label and message.',
   'settings.controls': 'Controls',
