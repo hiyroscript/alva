@@ -1284,3 +1284,21 @@ test('fixed-step and deterministic: the same presses give the same approach, fro
   const assist = fighter.slice(fighter.indexOf('get combatAssistOn()'), fighter.indexOf('cancelCombatAssist() {'));
   assert.doesNotMatch(assist, /Math\.random|Date\.|setTimeout|renderX|renderY/);
 });
+
+test('Combat Assist ignores and never starts Dash timers, but completion still checks the attack timer', () => {
+  for (const coolingDash of [false, true]) {
+    const r = rig();
+    const f = r.player;
+    placeFoe(r, f.attacks.attack1, 80);
+    if (coolingDash) f.combat.movementCooldowns.start('mouvment', 0.5);
+    r.tick(press('attack1'));
+    assert.ok(f.combatAssist, 'approach allowed even while real Dash cools');
+    assert.equal(f.combat.movementCooldowns.size, coolingDash ? 1 : 0, 'approach did not create a timer');
+    const before = f.combat.movementCooldowns.remaining('mouvment');
+    f.combat.cooldowns.set('attack1', 5);
+    f.finishCombatAssist(0);
+    assert.equal(f.combat.attack, null, 'no attack through cooldown');
+    assert.equal(f.bufferedAttack, null, 'no delayed attack either');
+    assert.equal(f.combat.movementCooldowns.remaining('mouvment'), before);
+  }
+});

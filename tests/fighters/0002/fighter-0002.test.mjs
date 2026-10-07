@@ -22,7 +22,7 @@ import { CONFIG, NUMBERED_ATTACKS } from '../../../js/config.js';
 import { CHARACTERS, characterFramePaths, getCharacter, playableCharacters } from '../../../js/data/characters.js';
 import { abilityName } from '../../../js/data/abilities.js';
 import { describeLoadout, loadoutProblems, specialAttacks } from '../../../js/data/loadout.js';
-import { MAX_ATTACK_COOLDOWN, attackReach, createAttackDefinition, strikeLive } from '../../../js/game/combat/attacks.js';
+import { attackReach, createAttackDefinition, strikeLive } from '../../../js/game/combat/attacks.js';
 import { BLOCK_ENERGY_COST } from '../../../js/game/combat/combat-state.js';
 import { createProjectileDefinition } from '../../../js/game/combat/projectile.js';
 import { CombatAIController } from '../../../js/game/ai/combat-ai.js';
@@ -400,7 +400,7 @@ test('the Rapid Kicks: a 0.2 s wind-up, three kicks that hold the target, then t
   for (let i = 0; i < 3; i++) assert.ok(def.hits[i].hitstun > def.hits[i + 1].at - def.hits[i].at + def.hits[i].hitstop);
   assert.equal(def.startup, 4 / 20);
   assert.ok(def.hitCancel >= def.hits[3].at + def.hits[3].active - 1e-9, 'committed to the whole flurry: a chase only once the finisher is out');
-  assert.ok(def.cooldown <= MAX_ATTACK_COOLDOWN, 'the shortest repeat cooldown there is');
+  assert.equal(def.cooldown, 0.5, 'universal repeat cooldown');
   // Pressed over and over, flurries string only until their fling, growing
   // with the Launch Point, carries the target out of reach: never a loop.
   const spam = versus({ gap: 44 });
@@ -485,7 +485,7 @@ test('once per airtime: a second press before landing does nothing; landing give
   assert.equal(fighter.combat.attack, null, 'used up until it lands');
   stepUntil(step, (f) => f.grounded, {});
   // (A press that close to the ground may come out as the One-Two on it.)
-  stepUntil(step, (f) => f.canAct(), {});
+  stepUntil(step, (f) => f.canAct() && !f.combat.cooldowns.has('midair_attack1'), {});
   airborne(step, 4);
   step(P('attack1'));
   assert.equal(fighter.combat.attack?.def.id, 'midair_attack1');
@@ -505,10 +505,13 @@ test('the Bounce Attack plunges at a fixed speed and bounces back up off the gro
   assert.equal(fighter.grounded, false, 'no landing');
   assert.equal(fighter.combat.attack, null, 'the attack is over');
   assert.notEqual(fighter.state, 'land');
-  // Once more in the same airtime (the press kept through its short
-  // cooldown), and no more.
+  // A press near the beginning of the cooldown expires. A fresh press
+  // after the timer can use the second airborne attack.
   step(P('attack2'));
-  stepUntil(step, (f) => f.combat.attack?.def.id === 'midair_attack2', {}, 10);
+  stepUntil(step, (f) => !f.combat.cooldowns.has('midair_attack2'), {}, 40);
+  assert.equal(fighter.combat.attack, null);
+  step(P('attack2'));
+  assert.equal(fighter.combat.attack?.def.id, 'midair_attack2');
   stepUntil(step, (f) => !f.combat.attack, {});
   step(P('attack2'));
   for (let i = 0; i < 10; i++) {
@@ -616,11 +619,11 @@ test('the Whirlwind spins up a tornado and sends it off on frame 6: slow, and it
   d.until(() => d.projectiles.length === 1);
   const tornado = d.projectiles[0];
   assert.equal(frameName(d.attacker), '0002_extra_attack_6.png');
-  assert.equal(tornado.vx, 260);
+  assert.equal(tornado.vx, 360);
   d.until(() => d.events.length === 1);
   const first = d.events[0];
   assert.deepEqual([first.move, first.damage, first.launchSpeed], ['extra_attack_object', 1, 0]);
-  assert.equal(d.target.body.vx, 260, 'dragged along');
+  assert.equal(d.target.body.vx, 360, 'dragged along');
   assert.equal(d.target.body.vy, -300, 'and lifted');
   assert.equal(tornado.alive, true, 'it stays');
   // Strikes never come faster than its interval (by its own clock).
@@ -630,7 +633,7 @@ test('the Whirlwind spins up a tornado and sends it off on frame 6: slow, and it
     if (d.events.length > at.length) at.push(tornado.lastStrike);
   }
   for (let i = 1; i < at.length; i++) assert.ok(at[i] - at[i - 1] >= 0.14 - 1e-9, `strike ${i + 1}`);
-  assert.deepEqual(d.events.map((e) => e.damage), [1, 1, 1, 1, 3]);
+  assert.deepEqual(d.events.map((e) => e.damage), [1, 1, 1, 1, 10]);
   assert.equal(d.events[4].directionalLaunch, 'vertical', 'the finisher flings it upward');
   assert.equal(tornado.alive, false, 'spent after its fifth strike');
 });
@@ -838,4 +841,12 @@ test('a timing sanity check: the Dash is the universal one, its four frames play
   const frames = new Set();
   while (fighter.dash) frames.add(step({}).animator.index);
   assert.ok(frames.size >= 3, `the four frames shown across it (${[...frames]})`);
+});
+
+test('Whirlwind tuning is 5 seconds, 360 units/s for 1.6 seconds, four trapping ticks then a 10-damage finisher', () => {
+  const { fighter: f } = solo();
+  const p = f.projectileDefs.extra_attack_object;
+  assert.equal(f.attacks.extra_attack.cooldown, 5);
+  assert.deepEqual([p.speed, p.lifetime, p.damage, p.pierce.hits, p.pierce.interval], [360, 1.6, 1, 5, 0.14]);
+  assert.deepEqual([p.finisher.damage, p.finisher.baseLaunch, p.finisher.directionalLaunch, p.finisher.hitstun, p.finisher.hitstop], [10, 2, 'vertical', 0.4, 0.08]);
 });

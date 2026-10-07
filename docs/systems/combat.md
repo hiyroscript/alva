@@ -78,7 +78,7 @@ An attack entry (`attacks.<codename>`) becomes a frozen definition through
 | `damage` | — | Added to the target's Launch Point: 1, 3, 5 or 10 and nothing else (below). Required for an attack with a hitbox; one with none (a throw) may not declare it. |
 | `baseLaunch` / `directionalLaunch` | 0 / `null` | The hit's launch ([launch](launch.md)). |
 | `hitstun` / `blockstun` / `hitstop` | 0.2 / 0.12 / 0.06 s | |
-| `cooldown` | 0 | Its repeat cooldown, after it ends or is cut short: 0 (none) to `MAX_ATTACK_COOLDOWN` (0.05 s); a longer one is refused (below). |
+| `cooldown` | 0.5 | Per-move repeat delay after ending or interruption; finite longer overrides allowed (below). |
 | `groundOnly` | false | It never starts in the air (and an air press of it is never buffered). |
 | `lockMovement`, `momentum`, `airMomentum`, `control`, `airControl`, `friction`, `step` | true, 1, 1, 0, 0, 1, null | How the fighter moves while it plays ([movement](movement.md#5-attack-movement)): by default it keeps all the speed it starts with (a Dash's burst included), unsteered, under the normal friction. |
 | `hitCancel` | null | Seconds in: from then on, once it has hit, another attack (the Deflect included), a jump, a Dash or an air dash may cut it short. |
@@ -267,7 +267,7 @@ own attacks once.
 | `attack` | — | The owner attack the clone performs (needs a hitbox and real frames). |
 | `cloud` | — | The effect clip it appears and vanishes through (`effectAnimations`, named `<attack>_object`). |
 | `startupAnimation` | null | An owner clip played once before the clone is sent out (the owner committed, still, keeping its facing); none: sent out on the press. |
-| `cooldown` | 0 | Seconds before it can be used again, from the press. |
+| `cooldown` | 0.5 | Minimum seconds before reuse, from the accepted press; longer overrides allowed. |
 | `behindDistance` | 48 | World units behind the target it appears. |
 | `effectOffset` | `{ x: 0, y: 0 }` | The cloud's centre from the clone's origin, facing right. |
 | `noGround` | null | `{ attack, offset }`: where there is no ground behind the target, appear at `offset` from the target and perform this attack instead. |
@@ -337,25 +337,34 @@ never touches any of it ([AI](ai.md)).
 
 ## Cooldowns
 
-An ordinary attack's `cooldown` (`CombatState.cooldowns`) is its repeat
-delay: after it ends or is cut short, the same attack waits that long,
-and it may cut itself short into itself only once it has been
-cancellable that long (`CombatState.cancellableFor`). It is 0 (none) to
-`MAX_ATTACK_COOLDOWN`, 0.05 s (three steps), for every fighter, the
-Deflect included; `createAttackDefinition` refuses a longer one. So what
-holds an attack back is its own phases (startup, active, recovery,
-hit-cancel), never a timer: #0001's attacks and Deflect have no cooldown
-at all, #0002's 0.05 s. No attack restarts on the step it hit: its
-freeze holds it.
+`REPEAT_COOLDOWN` in `js/data/cooldowns.js` sets a **0.5-second minimum**
+for discrete moves: ordinary ground/air attacks, motion attacks, extra attacks,
+projectile casts, summons, techniques, Dash and air dash. Omitted or smaller
+non-negative values resolve to the baseline; explicit longer values are valid.
+Negative, non-numeric and non-finite values are refused. There is no maximum.
+Running, jumps (ground and air), Shield and Deflect are exempt; fast fall stays
+directional movement. Deflect preserves its authored delay (#0001 0, #0002 0.05 s)
+and Energy interaction. No timer changes an animation phase or locks other moves.
 
-Summons and techniques have their own, separate and optional
-(`CombatState.abilityCooldowns`, a `CooldownTimers` keyed by the button),
-the fighter's choice: 0, the default, starts none (#0001's Unlimited Void
-and Hollow Purple have none: their cast and release are what hold them
-back). One a fighter declares starts the moment the move is accepted,
-recovers in real time whatever the fighter does, and is drawn under the
-fighter as a ring labelled by the button (A4, A5) while it runs
-([rendering](rendering.md#fighter-status)). None of them costs Energy.
+Ordinary attacks use `CombatState.cooldowns`, starting on their end, a hit-cancel
+or interruption. An attack may cut itself short only after its hit-cancel has
+been open for its repeat delay. Deflect retains its old interruption behavior.
+The existing 0.15-second ordinary input buffer remains: early presses expire;
+a press within the last buffer window may start only once the timer is ready.
+Combat Assist rechecks its requested attack at completion and never bypasses it.
+
+Summons and techniques use `abilityCooldowns`: timers begin on acceptance and
+survive interrupted casts. An unavailable press is discarded, never buffered.
+Dash and air dash use separate `movementCooldowns` entries (`mouvment` and
+`midair_mouvment`), starting on acceptance. A cooling Dash request is discarded,
+even during hitstop; Combat Assist neither starts nor checks these timers.
+All stores recover on the fixed step, including hitstop, with `PHASE_EPSILON`
+at expiry. Reset/respawn clears all; a live overtime transition preserves them.
+
+#0001's Unlimited Void uses 3 s and Hollow Purple 5 s; #0002's Whirlwind uses 5 s.
+Only durations above the baseline draw a persistent world-space ring: the same
+artwork as the touch button in the center and remaining seconds below, never a
+codename ([rendering](rendering.md#fighter-status)).
 
 ## Combat Assist
 

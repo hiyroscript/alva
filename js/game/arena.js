@@ -4,7 +4,7 @@
 // (js/game/practice.js) runs Player 1 with a training-dummy CPU and none of
 // them. Both share the Void's respawn wait (updateRespawns). DOM concerns
 // (HUD, menus, overlays) live in each mode's screen; the status drawn over
-// each fighter (Energy bar, name tag, the summon and technique cooldowns)
+// each fighter (Energy bar, name tag, the long move cooldowns)
 // and the Shield round it are drawn here.
 
 import { CONFIG } from '../config.js';
@@ -378,7 +378,7 @@ export class Arena {
     // The status of each fighter in play over everything, the Void
     // included, so it stays readable near its edge: name tags (or the
     // off-screen pointers), then each on-screen fighter's Energy bar over
-    // its tag while below full and its A3 / A4 cooldowns under its feet
+    // its tag while below full and its long cooldown icons under its feet
     // while cooling down. A fighter out of play shows none of it.
     this.drawMarkers(fighters);
     this.drawStatus(fighters);
@@ -522,7 +522,7 @@ export class Arena {
     return energyBarState(f).visible ? this.energyBarRect(f).y - 1 : this.markerTop(f);
   }
 
-  // Energy bars and the summon and technique cooldowns, for the fighters
+  // Energy bars and the long move cooldowns, for the fighters
   // whose body is on screen: an off-screen fighter only gets its edge
   // pointer. Each draws only while it has something to show (see
   // js/game/rendering/fighter-status.js).

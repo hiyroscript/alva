@@ -279,3 +279,22 @@ test('knocked off the stage with its air dash left, a CPU air dashes home', () =
     assert.equal(dashed.direction, -1, 'toward the stage');
   }
 });
+
+test('air dash has its own 0.5-second timer, not refunded by airtime resources or a ground Dash', () => {
+  for (const character of FIGHTERS) {
+    const { fighter: f, step } = makeFighter({ character });
+    assert.equal(f.tryDash(1), true);
+    f.endDash();
+    aloft(f, -1000);
+    assert.equal(f.tryAirDash(-1), true, 'separate from ground Dash');
+    assert.equal(f.combat.movementCooldowns.remaining('midair_mouvment'), 0.5);
+    f.endDash();
+    f.takeHit({ launchSpeed: 0 });
+    assert.equal(f.airDashes, f.airDashUses);
+    assert.equal(f.tryAirDash(1), false, 'a hit refunds the airtime use, never the repeat timer');
+    for (let i = 0; i < 29; i++) step();
+    assert.equal(f.tryAirDash(1), false);
+    step();
+    assert.equal(f.tryAirDash(1), true);
+  }
+});

@@ -616,7 +616,7 @@ export class CombatAIController {
   // Fighter.tryAirDash).
   airDashFree(s) {
     const { self } = s;
-    return !s.grounded && s.canAct && !s.exhausted && self.airDashes > 0 && !self.freeFall && !self.launch;
+    return !s.grounded && self.movementReady(true) && s.canAct && !s.exhausted && self.airDashes > 0 && !self.freeFall && !self.launch;
   }
 
   // Knocked off the stage and still level with its top, but too far out
@@ -646,7 +646,7 @@ export class CombatAIController {
     const strike = this.meleeOptions(s).find((m) => m.id !== current);
     if (strike) return this.attackIntent(strike);
     const dash = s.ms.dash;
-    if (dash && p.dash > 0 && s.grounded && s.sameLevel && s.dist > s.myReach + 40 && s.dist < dash.reach + s.myReach &&
+    if (dash && self.movementReady(false) && p.dash > 0 && s.grounded && s.sameLevel && s.dist > s.myReach + 40 && s.dist < dash.reach + s.myReach &&
         s.energy >= dash.cancelCost + p.energyCare * 25 && this.groundAhead(self, s.stage, s.dir, dash.reach)) {
       return { kind: 'dash', dir: s.dir, then: p.plan > 0 };
     }
@@ -743,7 +743,7 @@ export class CombatAIController {
 
     // Dash away: a longer escape, paid in Energy.
     const dash = s.ms.dash;
-    if (dash && p.dash > 0 && threat.box && s.grounded && s.canAct && !s.exhausted && threat.contactIn > 3 / 60) {
+    if (dash && self.movementReady(false) && p.dash > 0 && threat.box && s.grounded && s.canAct && !s.exhausted && threat.contactIn > 3 / 60) {
       const away = threat.from > 0 ? -1 : 1;
       if (this.groundAhead(self, s.stage, away, dash.distance + 20)) {
         const spend = (dash.cost / Math.max(1, s.energy)) * p.energyCare * 0.5;
@@ -927,7 +927,7 @@ export class CombatAIController {
         // length out to where a Dash, its run-on and a strike out of it
         // reach (a strike may cut it short: see actDash).
         const dash = s.ms.dash;
-        if (dash && p.dash > 0 && s.dist > dash.distance * 0.8 && s.dist < dash.reach + s.myReach + 120 && !s.exhausted &&
+        if (dash && self.movementReady(false) && p.dash > 0 && s.dist > dash.distance * 0.8 && s.dist < dash.reach + s.myReach + 120 && !s.exhausted &&
             s.energy >= dash.cost + p.energyCare * 35 && this.groundAhead(self, s.stage, s.dir, dash.reach + 20)) {
           out.push({ score: score * (0.5 + p.dash * 0.9), intent: { kind: 'dash', dir: s.dir, then: p.plan > 0 } });
         }
@@ -1150,6 +1150,11 @@ export class CombatAIController {
       it.done = true;
       return;
     }
+    const id = it.deflect ? self.deflect?.id : self.attackFor(it.action);
+    if (self.combat.abilityCooldowns.active(it.action) || self.combat.cooldowns.has(id)) {
+      it.done = true;
+      return;
+    }
     if (it.deflect && this.prev[it.action]) return;
     held[it.action] = true;
     it.pressed = true;
@@ -1215,6 +1220,10 @@ export class CombatAIController {
   // recovering once it is over. A planned follow-up (`then`) strikes out of
   // the Dash as soon as one connects, cutting it short.
   actDash(self, foe, ctx, it, held) {
+    if (!self.dash && !self.movementReady(!!it.air)) {
+      it.done = true;
+      return;
+    }
     const key = DIR_KEY[it.dir];
     // Already holding that way (running there): let go for a step first, so
     // the first tap is a fresh press.

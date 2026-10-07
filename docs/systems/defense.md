@@ -77,7 +77,7 @@ or lower poses are skipped. There is no Dodge and no chip-damage Block.
 In the air the same button is the fighter's **Deflect**, its `deflect`
 entry: an attack in every way (it goes through `createAttackDefinition`,
 plays its own `deflect` clip, has a startup, an active phase, a recovery,
-a melee hitbox, its stuns and hitstop, a cooldown of at most 0.05 s, its
+a melee hitbox, its stuns and hitstop, its own cooldown, exempt from the 0.5 s baseline, its
 momentum and steering), resolved by the same `CombatSystem` as any attack.
 It costs 15 Energy (`DEFLECT_ENERGY_COST`), paid once as it starts. Its strike
 is always **3** Launch Points at **Base Launch 2**, the shared rule
@@ -89,7 +89,7 @@ any other value is refused. Its direction is the fighter's own.
 | `animation` | Its clip (`deflect`). Required; missing art refuses it (logged once), never faked. |
 | `startup` / `active` / `recovery` | Its phases, whole frames of its clip. |
 | `hitbox` | Its live box, facing right from the fighter's origin: what its strike meets, and what it catches projectiles with. Required. |
-| `directionalLaunch`, `hitstun`, `blockstun`, `hitstop`, `cooldown` (0 to 0.05 s), `airMomentum`, `airControl`, `airUses`, `hitCancel` | As for any attack ([combat](combat.md#attacks)). |
+| `directionalLaunch`, `hitstun`, `blockstun`, `hitstop`, `cooldown` (finite and non-negative, no baseline floor), `airMomentum`, `airControl`, `airUses`, `hitCancel` | As for any attack ([combat](combat.md#attacks)). |
 | `deflectProjectiles` | `true`: while it is live its box turns projectiles back (below). |
 | `damage` / `baseLaunch` | Never authored: always 3 and 2. |
 

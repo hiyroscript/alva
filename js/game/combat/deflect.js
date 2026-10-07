@@ -23,8 +23,8 @@
 //
 // Its strike is the same for every fighter: DEFLECT_DAMAGE (3) Launch
 // Points at Base Launch DEFLECT_BASE_LAUNCH (2). A fighter authors the rest
-// (its clip, timing, box, stuns, freeze, direction, cooldown up to
-// MAX_ATTACK_COOLDOWN, movement),
+// (its clip, timing, box, stuns, freeze, direction, finite non-negative
+// cooldown and movement). Deflect is exempt from the ordinary cooldown floor,
 // and may leave damage and baseLaunch out; any other value for either is
 // refused, so no fighter's Deflect can drift from the rule:
 //
@@ -70,5 +70,5 @@ export function createDeflectDefinition(spec) {
   if (!spec.hitbox) throw new Error(`[Alva] ${owner} needs a hitbox`);
   return createAttackDefinition({
     ...spec, id: 'deflect', damage: DEFLECT_DAMAGE, baseLaunch: DEFLECT_BASE_LAUNCH, groundOnly: false,
-  });
+  }, { cooldownExempt: true });
 }

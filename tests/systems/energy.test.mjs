@@ -160,7 +160,7 @@ test('a Dash spends exactly its cost (25) as it starts, and only then; spending 
   step();
   near(c.energy, 100 - E.dashCost + PER_STEP, 'then the refill carries on');
   // Exactly enough: it happens, and empties the bar.
-  while (fighter.dash || fighter.state !== 'idle') step();
+  while (fighter.dash || fighter.state !== 'idle' || !fighter.movementReady(false)) step();
   step({ runLeftPressed: true, runLeft: true });
   step({});
   c.setEnergy(E.dashCost);

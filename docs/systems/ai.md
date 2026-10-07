@@ -79,9 +79,9 @@ erasing projectile of its own, meets it instead.
 
 It does not play the same trick over and over: a summon, a technique or
 a ranged attack pressed in the last few seconds (`SPECIAL_REST`) is
-weighed down, each move apart, so a move with no cooldown (#0001's
-techniques and orbs have none) is one choice among its moves rather than
-the only one. The same on every level: judgement, not a rule of the fight.
+weighed down, each move apart, so a frequently available move remains one choice among its kit. Ordinary,
+ability and movement cooldowns are checked before planning or pressing,
+including Whirlwind's 5-second ordinary timer and both Dash timers. The same on every level: judgement, not a rule of the fight.
 
 In the air it never holds the Shield button (a Shield plan ends as it
 leaves the ground). Its answer to a projectile on course for it there is

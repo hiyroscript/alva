@@ -55,14 +55,14 @@ test('the Jab lands on its third frame for 3, pushing the target away (Base Laun
   assert.deepEqual({ ...e.finalLaunch }, { x: 32 * U, y: 0 });
 });
 
-test('a Jab that hits can be cut short into another Jab or a High Kick; one that whiffs cannot', () => {
-  for (const next of ['attack1', 'extra_attack']) {
+test('a Jab that hits can be cut short into a High Kick, but never an immediate repeated Jab; one that whiffs cannot', () => {
+  for (const next of ['extra_attack']) {
     const d = versus({ gap: 40 });
     d.tick(P('attack1'));
     tickUntil(d, () => d.events.length > 0);
     const first = d.attacker.combat.attack;
     tickUntil(d, () => d.attacker.combat.cancellable, {}, {}, 20);
-    // Into itself only once its own cooldown has run since it opened.
+    assert.equal(d.attacker.tryAction('attack1'), false, 'same move still locked');
     for (let i = 0; i < 20 && d.attacker.combat.attack === first; i++) d.tick(P(next));
     assert.notEqual(d.attacker.combat.attack, first, `${next}: the Jab cut short`);
     assert.equal(d.attacker.combat.attack?.def.id, next, `${next} straight out of the Jab`);
@@ -93,6 +93,7 @@ test('the Floating Straight stands on the air while it strikes: no fall, twice p
   airborne(step);
   step(P('attack1'));
   assert.equal(fighter.combat.attack?.def.id, 'midair_attack1');
+  fighter.body.y = -3000; // enough airtime to test two uses with their repeat delay
   const y = fighter.body.y;
   while (fighter.combat.attack) {
     step({});
@@ -306,10 +307,10 @@ test('Unlimited Void: half a second of cast, then a sure hit round #0001 that no
   // while longer.
   tickUntil(d, () => !d.attacker.technique, {}, {}, 60);
   assert.ok(d.target.combat.paralysis > 1.2, `still held (${d.target.combat.paralysis.toFixed(2)} s)`);
-  assert.equal(d.attacker.combat.abilityCooldowns.active('attack4'), false, 'no cooldown at all');
-  assert.equal(d.attacker.combat.abilityCooldowns.size, 0);
+  assert.equal(d.attacker.combat.abilityCooldowns.active('attack4'), true, '3-second cooldown still running');
+  assert.equal(d.attacker.combat.abilityCooldowns.size, 1);
   d.tick(P('attack4'));
-  assert.equal(d.attacker.technique?.action, 'attack4', 'cast again the moment #0001 is free');
+  assert.equal(d.attacker.technique, null, 'a free fighter still waits for the cooldown');
 });
 
 test('the domain reaches 250 units either side and well over #0001\'s head, and no further', () => {
@@ -391,9 +392,9 @@ test('Hollow Purple erases the projectiles it meets; a hit during the chant brea
   assert.equal(t.released, false);
   for (let i = 0; i < steps(1.5); i++) b.tick();
   assert.ok(b.projectiles.every((p) => p.def.id !== 'attack5_object'), 'no sphere');
-  assert.equal(b.attacker.combat.abilityCooldowns.active('attack5'), false, 'and no cooldown to spend');
+  assert.equal(b.attacker.combat.abilityCooldowns.active('attack5'), true, 'interruption does not refund the 5-second cooldown');
   b.tick(P('attack5'));
-  assert.equal(b.attacker.technique?.action, 'attack5', 'the chant may start again at once');
+  assert.equal(b.attacker.technique, null, 'the interrupted chant still waits for its cooldown');
 });
 
 // ---- Infinity -------------------------------------------------------------------------------
@@ -437,4 +438,11 @@ test('Infinity is the ground\'s: in the air the Shield button is the Deflect\'s 
   }
   assert.deepEqual([...new Set(shown)], ['0001_deflect_1.png', '0001_deflect_2.png', '0001_deflect_3.png', '0001_deflect_4.png']);
   assert.equal(shown.length, steps(DEF.deflect.startup + DEF.deflect.active + DEF.deflect.recovery), 'a third of a second');
+});
+
+test('the Attack 3 family gains only pull radius: Maximum Blue 140 and Blue 190', () => {
+  const { fighter: f } = solo();
+  assert.deepEqual([f.projectileDefs.attack3_object.pull.radius, f.projectileDefs.attack3_object.pull.speed], [140, 360]);
+  assert.deepEqual([f.attacks.midair_attack3.pull.radius, f.attacks.midair_attack3.pull.speed], [190, 1300]);
+  assert.equal(f.techniqueDefs.attack4.burst.hit.paralyze, 1.7);
 });

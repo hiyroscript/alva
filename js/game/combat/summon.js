@@ -64,6 +64,7 @@
 // launch travels along the clone's facing); the hit credits the owner
 // but freezes only the target and the clone itself, never the owner.
 
+import { resolveCooldown } from '../../data/cooldowns.js';
 import { SpriteAnimator } from '../rendering/sprite-animator.js';
 import { attackPhase } from './attacks.js';
 
@@ -71,7 +72,7 @@ const SUMMON_DEFAULTS = {
   attack: null,       // owner attack id the clone performs
   cloud: null,        // owner effect animation it appears / vanishes through
   startupAnimation: null, // owner fighter clip played once before the request (none: at once)
-  cooldown: 0,        // seconds before the owner can summon it again
+  cooldown: 0.5,        // seconds before the owner can summon it again
   behindDistance: 48, // world units behind the target
   effectOffset: { x: 0, y: 0 }, // cloud centre from the clone origin, facing right
   noGround: null,     // { attack, offset } where there is no ground behind
@@ -88,7 +89,7 @@ const TIME_EPSILON = 1e-6;
 
 export function createSummonDefinition(spec) {
   if (!spec?.id) throw new Error('[Alva] Summon definitions need an id');
-  const def = { ...SUMMON_DEFAULTS, ...spec };
+  const def = { ...SUMMON_DEFAULTS, ...spec, cooldown: resolveCooldown(spec.cooldown, `Summon "${spec.id}"`) };
   if (def.noGround) def.noGround = Object.freeze({ ...NO_GROUND_DEFAULTS, ...def.noGround });
   return Object.freeze(def);
 }

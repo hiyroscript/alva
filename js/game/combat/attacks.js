@@ -9,9 +9,7 @@
 // (unblockable, paralyze, blockPush) from js/game/combat/hit-effects.js.
 // Outputs: createAttackDefinition, attackPhase, strikeLive, attackReach,
 // isMeleeAttack / isRangedAttack (what kind of strike an attack is),
-// MOTION_TYPES, MAX_ATTACK_COOLDOWN (the longest repeat cooldown an attack
-// may have) and PHASE_EPSILON (the slack every phase boundary compares
-// with).
+// MOTION_TYPES and PHASE_EPSILON (the slack every phase boundary compares with).
 // Important constraints: definitions are frozen and validated once; a
 // field this schema does not know is carried along untouched, never
 // guessed at. Defaults below are the planted attack: changing one changes
@@ -32,7 +30,7 @@
 //     attack1: {
 //       animation: 'attack1', startup: 0.07, active: 0.05, recovery: 0.16,
 //       damage: 3, hitbox: { x: 18, y: -62, w: 34, h: 18 },
-//       baseLaunch: 1, directionalLaunch: 'horizontal', hitstun: 0.22, blockstun: 0.14, cooldown: 0.05,
+//       baseLaunch: 1, directionalLaunch: 'horizontal', hitstun: 0.22, blockstun: 0.14, cooldown: 0.5,
 //     },
 //     attack2: { ..., baseLaunch: 2, directionalLaunch: 'vertical' },
 //     midair_attack2: { animation: 'midair_attack2', ..., baseLaunch: 2, directionalLaunch: 'reverseVertical' },
@@ -54,15 +52,12 @@
 // launches. An attack that strikes (one with a hitbox) must declare its
 // damage; one without (a throw: its projectile is the hit) may not.
 //
-// `cooldown` is the short repeat delay of an ordinary attack: seconds,
-// from its end, before the same attack may start again (see
-// CombatState.cooldowns), and how long it must have been cancellable
-// before it may cut itself short into itself (CombatState.cancellableFor).
-// 0, the default, is none at all; it is never more than
-// MAX_ATTACK_COOLDOWN (3 steps at 60 Hz), so repeating an attack is held
-// back by its own phases (startup, active, recovery, hit-cancel), not by a
-// timer. A longer one is refused. A summon's or a technique's cooldown is
-// its own (see js/game/combat/summon.js and technique.js), never this.
+// `cooldown` is a per-move reuse delay, never added to attack phases.
+// resolveCooldown applies the universal 0.5-second floor and accepts any
+// finite non-negative longer override. Deflect alone keeps its authored
+// delay. Ordinary timers begin when an attack ends, is cut short or is
+// interrupted. Self-cancels must have been open for that move's delay.
+// Summons and techniques start their own timers on acceptance.
 //
 // An attack needs real frames for its `animation`; without them it is refused
 // rather than faked. Its hitbox only exists during the active phase.
@@ -104,7 +99,7 @@
 //   extra_attack: {
 //     animation: 'extra_attack', startup: 1 / 12, active: 1 / 12, recovery: 1 / 12,
 //     hitbox: null, projectile: { id: 'extra_attack_object', spawnAt: 1 / 12, offset: { x: 16, y: -38 } },
-//     cooldown: 0.05, groundOnly: true,
+//     cooldown: 0.5, groundOnly: true,
 //   },
 //
 // A multi-hit attack lists its strikes in `hits` instead of one hitbox:
@@ -223,12 +218,13 @@
 // them). Its length is one pass of its clip (the fighter's art decides it:
 // see createAttackDefinition's `clipDuration`), all of it recovery, so the
 // fighter is committed and harmless for exactly as long as the art plays.
-// No cooldown or hit-cancel, and it moves like any planted attack (the
+// The baseline repeat cooldown, no hit-cancel; it moves like any planted attack (the
 // defaults below). Nothing about it names a fighter: any fighter whose art
 // arrives before its attributes can use it.
 //
 //   attack1: { animation: 'attack1', pending: true },
 
+import { REPEAT_COOLDOWN, resolveCooldown } from '../../data/cooldowns.js';
 import { resolveHitDamage, resolveHitLaunch } from '../../data/launch.js';
 import { resolveHitEffects } from './hit-effects.js';
 
@@ -242,7 +238,7 @@ const ATTACK_DEFAULTS = {
   hitstun: 0.2,
   blockstun: 0.12,
   hitstop: 0.06,
-  cooldown: 0,
+  cooldown: REPEAT_COOLDOWN,
   groundOnly: false,
   // The attack governs the fighter's movement while it plays (see the
   // fields below). False leaves normal locomotion on throughout.
@@ -411,10 +407,6 @@ export function strikeLive(hit, time) {
   return time >= hit.at - PHASE_EPSILON && time < hit.at + hit.active - PHASE_EPSILON;
 }
 
-// The longest repeat cooldown an attack may have (see `cooldown` above):
-// three 60 Hz steps.
-export const MAX_ATTACK_COOLDOWN = 0.05;
-
 // Attack time is a sum of fixed steps, so compare phase boundaries with a
 // little slack: a phase that is a whole number of steps long (e.g. 1 / 12 s at
 // 60 Hz) then lasts exactly that many steps instead of drifting by one.
@@ -441,7 +433,7 @@ const PENDING_REFUSED = Object.freeze([
 // declared: neither is inferred from the damage, the hitbox or the other.
 // A pending attack (see above) lasts `clipDuration` seconds, one pass of
 // its clip, and strikes nothing.
-export function createAttackDefinition(spec, { clipDuration = 0 } = {}) {
+export function createAttackDefinition(spec, { clipDuration = 0, cooldownExempt = false } = {}) {
   if (!spec?.id) throw new Error('[Alva] Attack definitions need an id');
   if (spec.pending) {
     const declared = PENDING_REFUSED.filter((field) => spec[field] !== undefined);
@@ -465,9 +457,7 @@ export function createAttackDefinition(spec, { clipDuration = 0 } = {}) {
   else if (spec.damage !== undefined) {
     throw new Error(`[Alva] ${owner} declares damage but has no hitbox: its projectile's hit is the one that deals damage`);
   }
-  if (!(typeof def.cooldown === 'number' && def.cooldown >= 0 && def.cooldown <= MAX_ATTACK_COOLDOWN + PHASE_EPSILON)) {
-    throw new Error(`[Alva] ${owner} declares cooldown ${def.cooldown}: an attack's repeat cooldown is 0 to ${MAX_ATTACK_COOLDOWN} s`);
-  }
+  def.cooldown = resolveCooldown(spec.cooldown, owner, { exempt: cooldownExempt });
   def.motion = resolveMotion(spec.motion, owner);
   def.pull = resolvePull(spec.pull, owner);
   def.deflectProjectiles = !!def.deflectProjectiles;

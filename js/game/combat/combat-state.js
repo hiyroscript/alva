@@ -16,10 +16,9 @@
 // A summon or a technique on a numbered button (see js/data/loadout.js) is
 // not paid for: each has its own cooldown (CombatState.abilityCooldowns, see
 // CooldownTimers), keyed by the attack it is (attack4, attack5), started
-// when it is used (none at all when its cooldown is 0) and apart from the
-// short repeat cooldowns of ordinary attacks (CombatState.cooldowns, at most
-// MAX_ATTACK_COOLDOWN: see js/game/combat/attacks.js). Both run down in
-// real time.
+// on acceptance, apart from ordinary attack repeat timers (CombatState.cooldowns)
+// and Dash/air-dash timers (movementCooldowns). All recover every fixed step,
+// including impact freeze; a fresh life replaces all three stores.
 //
 // Energy (CombatState.energy, see resolveEnergy) is the one resource a
 // fighter spends (there is no Shield meter apart from it), on three things
@@ -166,13 +165,14 @@ export class CombatState {
     // motion attack its motion's progress (`motion`, see Fighter).
     this.attack = null;
     this.release = null;    // the attack's projectile, released this step (see Fighter.update)
-    // Ordinary attacks' short repeat cooldowns (MAX_ATTACK_COOLDOWN at
-    // most): attack id -> seconds left.
+    // Ordinary attack repeat cooldowns (baseline or longer override):
+    // attack id -> seconds left. Deflect keeps its authored delay.
     this.cooldowns = new Map();
     // The summons' and techniques' own cooldowns (e.g. #0001's attack4 and
     // attack5), by the attack each one is: the Fighter starts them, and
     // they recover in real time (see update).
     this.abilityCooldowns = new CooldownTimers();
+    this.movementCooldowns = new CooldownTimers();
     this.lastIntent = null; // last combat button pressed (see Fighter.tryAction)
     // Seconds this fighter is still held in place by a hit's `paralyze`
     // (see js/game/combat/hit-effects.js and paralyze below).
@@ -196,8 +196,7 @@ export class CombatState {
 
   // Seconds the attack in progress has been cancellable (see cancellable),
   // or -1 while it is not: it may cut itself short into itself only once
-  // its own cooldown (never more than MAX_ATTACK_COOLDOWN, none at all for
-  // a cooldown of 0) has run for that long.
+  // its own repeat delay has run for that long.
   get cancellableFor() {
     if (!this.cancellable) return -1;
     const a = this.attack;
@@ -213,9 +212,10 @@ export class CombatState {
     this.attack = null;
   }
 
-  // Drops the attack in progress with nothing left behind (no cooldown): a
-  // hit or a paralysis took the fighter out of it (see Fighter.update).
+  // A hit or paralysis discards the strike/release, retaining the ordinary
+  // repeat delay. Deflect keeps its existing no-timer interruption semantics.
   interruptAttack() {
+    if (this.attack?.def.id !== 'deflect') this.endAttack();
     this.attack = null;
     this.release = null;
   }
@@ -313,11 +313,12 @@ export class CombatState {
 
   update(dt) {
     for (const [id, t] of this.cooldowns) {
-      if (t - dt <= 0) this.cooldowns.delete(id);
+      if (t - dt <= PHASE_EPSILON) this.cooldowns.delete(id);
       else this.cooldowns.set(id, t - dt);
     }
     // Every step, frozen or not, whatever the fighter holds or does.
     this.abilityCooldowns.update(dt);
+    this.movementCooldowns.update(dt);
     if (this.hitstop > 0) {
       // To within a little slack, so a freeze a whole number of steps long
       // (0.05 s) lasts exactly that many.

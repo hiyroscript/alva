@@ -220,15 +220,15 @@ export const CHARACTER_0002 = {
   },
 
   projectiles: {
-    // The tornado. It travels slowly along the ground (about 416 units in
+    // The tornado. It travels at 360 units/s along the ground (about 576 units in
     // its 1.6 s), and whatever it catches it keeps: five strikes 0.14 s
     // apart, each 1 Launch Point with no launch, lifting the target 300
     // units/s and dragging it along with it (carry); the fifth is the
-    // finisher, 3 and a Base Launch 2 fling upward. 7 in all. A Shield
+    // finisher, 10 and a Base Launch 2 fling upward. 14 in all. A Shield
     // blocks it (and stops it there).
     extra_attack_object: {
       animation: 'extra_attack_object',
-      speed: 260,
+      speed: 360,
       lifetime: 1.6,
       // Round its middle (its art is about 60 x 78 units), as tall as the
       // funnel: a target it lifts stays in it.
@@ -241,7 +241,7 @@ export const CHARACTER_0002 = {
       hitstop: 0.03,
       carry: { lift: 300 },
       pierce: { hits: 5, interval: 0.14 },
-      finisher: { damage: 3, baseLaunch: 2, directionalLaunch: 'vertical', hitstun: 0.4, hitstop: 0.08 },
+      finisher: { damage: 10, baseLaunch: 2, directionalLaunch: 'vertical', hitstun: 0.4, hitstop: 0.08 },
     },
   },
 
@@ -319,7 +319,7 @@ export const CHARACTER_0002 = {
   // the hand swats; while the swat is live it knocks the other fighter's
   // projectiles back at their thrower, now #0002's. A quarter of a second
   // in all, falling as it swats and carrying the whole of its drift, and
-  // the shortest repeat cooldown there is (0.05 s).
+  // its existing defensive repeat cooldown (0.05 s), exempt from the baseline.
   deflect: {
     animation: 'deflect',
     startup: 1 / FPS_0002.deflect,
@@ -373,9 +373,8 @@ export const CHARACTER_0002 = {
   // and every hitbox is measured from its art (facing right from the
   // origin, mirrored with facing). Its speed is in its moves' own motion
   // (the homing dash, the plunge, the roll, the lift), never in how it runs.
-  // Every attack's repeat cooldown is the shortest there is, 0.05 s (three
-  // steps; MAX_ATTACK_COOLDOWN in js/game/combat/attacks.js): what holds
-  // one back from the next is its own startup, strikes and recovery.
+  // Ordinary moves use the universal 0.5-second repeat cooldown; Whirlwind
+  // overrides it to 5 seconds. Neither changes startup, strikes or recovery.
   attacks: {
     // The One-Two: two strikes in one press, light and quick (a quarter of
     // a second in all). The jab (frame 2, 1) holds the target for the
@@ -397,7 +396,7 @@ export const CHARACTER_0002 = {
           damage: 3, baseLaunch: 1, directionalLaunch: 'horizontal', hitstop: 0.05,
         },
       ],
-      cooldown: 0.05,
+      cooldown: 0.5,
       groundOnly: true,
       momentum: 1,
       friction: 0.5,
@@ -423,7 +422,7 @@ export const CHARACTER_0002 = {
       hitstun: 0.4,
       blockstun: 0.15,
       hitstop: 0.05,
-      cooldown: 0.05,
+      cooldown: 0.5,
       airUses: 1,
       motion: { type: 'homing', range: 240, speed: 1100, rebound: 760, recoil: 140, exit: 0.25 },
       airMomentum: 0.6,
@@ -438,9 +437,8 @@ export const CHARACTER_0002 = {
     // stage. Once the finisher has landed, a jump or a Dash may chase it.
     // The hitbox is the thick of the flurry just in front, where the feet
     // land, not the trails' tips. Pressed again and again, flurries string
-    // into each other only until the fling, growing with the Launch Point,
-    // carries the target out of reach (three from a fresh start): never a
-    // loop. A Shield stops the flurry at the kick it blocks. It keeps most
+    // with a repeat delay between flurries; different-move follow-ups can
+    // still chase the fling. A Shield stops the flurry at the kick it blocks. It keeps most
     // of a run.
     attack2: {
       animation: 'attack2',
@@ -458,7 +456,7 @@ export const CHARACTER_0002 = {
           damage: 3, baseLaunch: 2, directionalLaunch: 'horizontal', hitstun: 0.3, hitstop: 0.08,
         },
       ],
-      cooldown: 0.05,
+      cooldown: 0.5,
       groundOnly: true,
       momentum: 0.8,
       friction: 0.8,
@@ -482,7 +480,7 @@ export const CHARACTER_0002 = {
       hitstun: 0.3,
       blockstun: 0.14,
       hitstop: 0.05,
-      cooldown: 0.05,
+      cooldown: 0.5,
       airUses: 2,
       motion: { type: 'bounce', fallSpeed: 1400, rebound: 900 },
       airMomentum: 0.8,
@@ -510,7 +508,7 @@ export const CHARACTER_0002 = {
       hitstun: 0.24,
       blockstun: 0.15,
       hitstop: 0.06,
-      cooldown: 0.05,
+      cooldown: 0.5,
       groundOnly: true,
       motion: { type: 'roll', speed: 400, keep: 0.8, maxSpeed: 1000, friction: 420, recoil: 260 },
       passThrough: true,
@@ -540,7 +538,7 @@ export const CHARACTER_0002 = {
           damage: 3, baseLaunch: 2, directionalLaunch: 'vertical', hitstun: 0.4, hitstop: 0.07,
         },
       ],
-      cooldown: 0.05,
+      cooldown: 0.5,
       airUses: 1,
       freeFall: true,
       motion: { type: 'rise', speed: 460 },
@@ -559,7 +557,7 @@ export const CHARACTER_0002 = {
       recovery: 3 / FPS_0002.extra_attack,
       hitbox: null,
       projectile: { id: 'extra_attack_object', spawnAt: 5 / FPS_0002.extra_attack, offset: { x: 44, y: -39 } },
-      cooldown: 0.05,
+      cooldown: 5,
       groundOnly: true,
       momentum: 0.4,
       friction: 0.8,

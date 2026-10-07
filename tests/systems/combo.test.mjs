@@ -11,7 +11,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { def, DT, MOVEMENT, makeFighter, duel, startupSteps } from '../helpers/fighter-harness.mjs';
 import { DASH_ENERGY_COST } from '../../js/game/combat/combat-state.js';
-import { MAX_ATTACK_COOLDOWN } from '../../js/game/combat/attacks.js';
+import { REPEAT_COOLDOWN } from '../../js/data/cooldowns.js';
 
 const mv = MOVEMENT;
 const P = (k) => ({ [k]: true, [`${k}Pressed`]: true });
@@ -21,12 +21,10 @@ const KICK = P('extra_attack');
 const THROW = KICK;
 const JUMP = P('jump');
 const BUFFER_STEPS = Math.floor(mv.attackBuffer / DT + 1e-6);
-// #0001's attacks have no cooldown at all. For the rules of one, the same
-// fighter with every attack on the longest repeat cooldown there is
-// (MAX_ATTACK_COOLDOWN, three steps), as another fighter's may be.
+// Explicit baseline fixture for shared hit-cancel and buffer tests.
 const COOLING = {
   ...def,
-  attacks: Object.fromEntries(Object.entries(def.attacks).map(([id, a]) => [id, { ...a, cooldown: MAX_ATTACK_COOLDOWN }])),
+  attacks: Object.fromEntries(Object.entries(def.attacks).map(([id, a]) => [id, { ...a, cooldown: REPEAT_COOLDOWN }])),
 };
 
 // A duel whose target's every update is logged: `free[i]` is whether the
@@ -86,34 +84,18 @@ test('a press older than the buffer never comes out: no ancient inputs', () => {
   assert.equal(fighter.bufferedAttack, null);
 });
 
-test('a press during a cooldown comes out as the cooldown ends; the latest press wins', () => {
-  const { fighter, step } = makeFighter({ character: COOLING });
+test('ordinary attack buffering expires during long cooldowns, but a press within the final buffer still fires', () => {
+  const { fighter: f, step } = makeFighter();
   step(ATTACK1);
-  while (fighter.combat.attack) step({});
-  assert.ok(fighter.combat.cooldowns.has('attack1'));
+  while (f.combat.attack) step();
   step(ATTACK1);
-  assert.equal(fighter.combat.attack, null, 'still cooling down');
-  while (fighter.combat.cooldowns.has('attack1')) step({});
-  assert.equal(fighter.combat.attack?.def.id, 'attack1', 'the step the cooldown is over');
-  // No attack's cooldown outlasts the buffer, so a press made during one is
-  // never lost to it.
-  assert.ok(MAX_ATTACK_COOLDOWN < mv.attackBuffer);
-  // #0001's attacks have none: the same one again starts the step after
-  // the last ends.
-  const free = makeFighter();
-  free.step(THROW);
-  while (free.fighter.combat.attack) free.step({});
-  assert.equal(free.fighter.combat.cooldowns.size, 0, 'no cooldown left behind');
-  free.step(THROW);
-  assert.equal(free.fighter.combat.attack?.def.id, 'extra_attack', 'again at once');
-
-  const latest = makeFighter();
-  latest.step(ATTACK1);
-  while (latest.fighter.combat.attack.time < 3 / 12) latest.step({});
-  latest.step(ATTACK2);
-  latest.step(THROW);
-  while (latest.fighter.combat.attack?.def.id === 'attack1') latest.step({});
-  assert.equal(latest.fighter.combat.attack?.def.id, 'extra_attack');
+  for (let i = 0; i < 35; i++) step();
+  assert.equal(f.combat.attack, null, 'early press expired');
+  assert.equal(f.bufferedAttack, null);
+  f.combat.cooldowns.set('attack1', 0.1);
+  step(ATTACK1);
+  for (let i = 0; i < 5; i++) step();
+  assert.equal(f.combat.attack?.def.id, 'attack1', 'documented short buffer fires only once ready');
 });
 
 test('only presses that could start are kept: never transform or one without art; a ground-only one in the air waits for the ground; a technique press never', () => {
@@ -346,79 +328,29 @@ test('in the air the same cancel is the air dash: a midair_attack1 that hit is c
   assert.equal(air.attacker.airDashes, 0, 'its one air dash this airtime');
 });
 
-test('attack1 -> Dash -> attack1 chases a push attack1 -> High Kick no longer reaches, into high Launch Point', () => {
-  for (const lp of [50, 60]) {
-    const direct = combo({ gap: 40, lp });
-    direct.run((i) => (i === 0 ? ATTACK1 : i === 6 ? KICK : {}), 60);
-    assert.ok(direct.hits.length < 2 || !direct.held(0, 1), `LP ${lp}: the High Kick alone is out of reach`);
-
-    const d = combo({ gap: 40, lp });
-    let dashAt = -1;
-    d.run((i) => {
-      if (i === 0) return ATTACK1;
-      if (dashAt < 0 && d.attacker.combat.cancellable) {
-        dashAt = i;
-        return MOUVEMENT_RIGHT;
-      }
-      return dashAt > 0 && i === dashAt + 6 ? ATTACK1 : {};
-    }, 70);
-    assert.deepEqual(d.hits.map((h) => h.move), ['attack1', 'attack1'], `LP ${lp}`);
-    assert.ok(d.held(0, 1), `LP ${lp}: the target never got to act`);
-  }
-});
-
-test('attack1 -> Dash -> attack1 never loops: at 25 each, Energy runs out within four cancels, so the chase ends within seven hits', () => {
-  for (const lp of [30, 50]) {
-    const d = combo({ gap: 40, lp });
-    let dashAt = -1;
-    let cancels = 0;
-    d.run((i) => {
-      if (i === 0) return ATTACK1;
-      if (dashAt < 0 && d.attacker.combat.cancellable) {
-        dashAt = i;
-        return MOUVEMENT_RIGHT;
-      }
-      if (dashAt >= 0 && d.attacker.dash && d.attacker.dash.time === 0) cancels++;
-      if (dashAt >= 0 && i === dashAt + 5) {
-        dashAt = -1;
-        return ATTACK1;
-      }
-      return {};
-    }, 400);
-    let chain = 1;
-    while (chain < d.hits.length && d.held(chain - 1, chain)) chain++;
-    assert.ok(chain >= 3, `LP ${lp}: a real chase (${chain} hits)`);
-    assert.ok(chain <= 7, `LP ${lp}: ${chain} hits, never a loop`);
-    assert.ok(d.attacker.combat.energyExhausted || d.attacker.combat.energy < DASH_ENERGY_COST,
-      'the chase spent the Energy the Shield needs');
-  }
-});
-
-test('left alone, a connected attack plays out its whole clip; into itself only once its cooldown (if any) has run', () => {
+test('a hit-cancel cannot restart its own move or bypass its cooldown through a Dash', () => {
   const d = combo({ gap: 40 });
-  d.run((i) => (i === 0 ? ATTACK1 : {}), 1);
+  untilHit(d);
+  while (d.attacker.combat.hitstop > 0) d.run(() => ({}), 1);
+  const first = d.attacker.combat.attack;
+  assert.equal(d.attacker.tryAction('attack1'), false);
+  assert.equal(d.attacker.combat.attack, first);
+  assert.equal(d.attacker.tryDash(1), true);
+  assert.equal(d.attacker.combat.cooldowns.get('attack1'), 0.5);
+  d.run(() => ATTACK1, 5);
+  assert.equal(d.attacker.combat.attack, null);
+  d.run(() => ({}), 40);
+  assert.equal(d.attacker.combat.attack, null, 'buffer expired, no delayed Jab');
+});
+
+test('left alone a connected attack keeps its full clip and freeze before the repeat timer', () => {
+  const d = combo({ gap: 40 });
+  d.run(() => ATTACK1, 1);
   const atk = d.attacker.combat.attack;
   let n = 0;
-  for (; d.attacker.combat.attack === atk; n++) d.run(() => ({}), 1);
-  assert.equal(n, Math.round(atk.def.total / DT) + Math.round(atk.def.hitstop / DT), 'its whole clip and the freeze');
-
-  // Pressed again and again from the step its freeze ends: with no
-  // cooldown (#0001's) the first press there is the next Jab; with the
-  // longest there is, three steps later. Never on the step it hit.
-  for (const [character, expected] of [[def, 1], [COOLING, Math.round(MAX_ATTACK_COOLDOWN / DT)]]) {
-    const self = combo({ gap: 40, character });
-    untilHit(self);
-    assert.ok(self.attacker.combat.hitstop > 0, 'frozen on the hit: nothing restarts on its step');
-    while (self.attacker.combat.hitstop > 0) self.run(() => ({}), 1);
-    const first = self.attacker.combat.attack;
-    let steps = 0;
-    while (self.attacker.combat.attack === first) {
-      self.run(() => ATTACK1, 1);
-      steps++;
-    }
-    assert.equal(self.attacker.combat.attack?.def.id, 'attack1', 'into itself');
-    assert.equal(steps, expected, `cooldown ${first.def.cooldown}: counted from the cut's opening`);
-  }
+  while (d.attacker.combat.attack === atk) { d.run(() => ({}), 1); n++; }
+  assert.equal(n, Math.round(atk.def.total / DT) + Math.round(atk.def.hitstop / DT));
+  assert.equal(d.attacker.combat.cooldowns.get('attack1'), REPEAT_COOLDOWN);
 });
 
 // ---- Interruption --------------------------------------------------------------------

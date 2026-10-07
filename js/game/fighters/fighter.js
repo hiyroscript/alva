@@ -39,6 +39,7 @@ import { createProjectileDefinition } from '../combat/projectile.js';
 import { createSummonDefinition, summonProblem } from '../combat/summon.js';
 import { Technique, createTechniqueDefinition, techniqueProblem } from '../combat/technique.js';
 import { assistsAttack, assistSpeed, assistRange, approachMove, approachClear, REACHED } from '../combat/combat-assist.js';
+import { REPEAT_COOLDOWN } from '../../data/cooldowns.js';
 import { BASE_FIGHTER_MOVEMENT } from '../../data/movement.js';
 import { specialAction } from '../../data/loadout.js';
 import { COMBAT_BUTTONS } from '../../config.js';
@@ -370,7 +371,7 @@ export class Fighter {
       body.prevY = body.y;
       for (const action of COMBAT_ACTIONS) if (input[`${action}Pressed`]) this.bufferAttack(action);
       const frozenDash = this.dashAsked(input, 0);
-      if (frozenDash) this.bufferedDash = { direction: frozenDash, age: 0 };
+      if (frozenDash) this.bufferDash(frozenDash);
       combat.updateEnergy(dt);
       this.updateState(0);
       return;
@@ -482,7 +483,7 @@ export class Fighter {
     // replaces it), so a Dash pressed slightly early comes out on the first
     // step it can; so is one in the air that no air dash answers, which is
     // the Dash if the fighter lands in time. One refused on the ground for
-    // any other reason (no Energy, the Shield held, no art) is used up:
+    // any other reason (no Energy, the Shield held, no art, cooldown) is used up:
     // nothing is kept. Energy paid this step (for a Dash, an air dash or a
     // Deflect: see payEnergy) means no refill this step (see the end of
     // update).
@@ -495,7 +496,7 @@ export class Fighter {
     // first tap waiting, so it never pairs with one, and this step's own
     // direction press (if any) is not counted as one either. Both at once
     // ask for nothing.
-    if (dashDirection) this.bufferedDash = { direction: dashDirection, age: 0 };
+    if (dashDirection) this.bufferDash(dashDirection);
     const wantedDash = this.bufferedDash;
     if (wantedDash) {
       // Busy (or dashing still): wait for the first step it can start. In
@@ -504,7 +505,7 @@ export class Fighter {
       const busy = !this.canFollowUp() || !!this.dash || (!body.grounded && this.dashDuration > 0);
       if (this.tryMouvment(wantedDash.direction, input)) {
         this.bufferedDash = null;
-      } else if (!busy) {
+      } else if (!busy || !this.movementReady()) {
         this.bufferedDash = null;
       }
     }
@@ -981,6 +982,16 @@ export class Fighter {
     return Math.max(speed, this.body.vx * direction);
   }
 
+  // Per-action reuse readiness, shared by input and CPU planning.
+  movementReady(air = !this.body.grounded) {
+    return !this.combat.movementCooldowns.active(air ? 'midair_mouvment' : 'mouvment');
+  }
+
+  // Cooldown refusals are never buffered, even through impact freeze.
+  bufferDash(direction) {
+    this.bufferedDash = this.movementReady() ? { direction, age: 0 } : null;
+  }
+
   // Starts one Dash toward `direction` (1 right, -1 left): a short grounded
   // burst at movement.dashSpeed (or faster: see dashSpeedToward) for
   // movement.dashDuration, its mouvment clip played once across it.
@@ -999,7 +1010,7 @@ export class Fighter {
   // may use it.
   tryDash(direction, input = NEUTRAL_INPUT) {
     const speed = this.movement.dashSpeed;
-    if (!speed || !direction || this.dash) return false;
+    if (!speed || !direction || this.dash || !this.movementReady(false)) return false;
     if (!this.canFollowUp() || !this.body.grounded) return false;
     if (this.combat.shielding || (input.shield && this.shieldAllowed())) return false;
     // Never a fast run passed off as a Dash: require real mouvment frames.
@@ -1018,6 +1029,7 @@ export class Fighter {
     // Every Dash plays its clip from the first frame, even straight after
     // another one.
     this.animator.play('mouvment', { restart: true });
+    this.combat.movementCooldowns.start('mouvment', REPEAT_COOLDOWN);
     return true;
   }
 
@@ -1038,7 +1050,7 @@ export class Fighter {
   // another clip).
   tryAirDash(direction) {
     const speed = this.movement.airDashSpeed;
-    if (!(speed > 0) || !direction || this.body.grounded || this.dash) return false;
+    if (!(speed > 0) || !direction || this.body.grounded || this.dash || !this.movementReady(true)) return false;
     if (!this.canFollowUp() || this.airDashes <= 0 || this.freeFall || this.launch) return false;
     if (!this.airDashDuration || !this.sprites.has('midair_mouvment')) {
       console.warn('[Alva] Air dash has no midair_mouvment animation frames; ignoring.');
@@ -1056,6 +1068,7 @@ export class Fighter {
     this.body.vx = direction * burst;
     this.body.vy = 0;
     this.animator.play('midair_mouvment', { restart: true });
+    this.combat.movementCooldowns.start('midair_mouvment', REPEAT_COOLDOWN);
     return true;
   }
 

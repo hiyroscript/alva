@@ -88,13 +88,24 @@ whose art it is, whoever owns it now.
 
 ## Fighter status
 
-Over each fighter in play whose body is on screen: a thin bright purple
-**Energy bar** above its name tag, only while Energy is below full (gray
-through an exhaustion's refill), and under its feet one ring per summon or
-technique button cooling down, labelled by the button (**A4** / **A5**;
-#0001's techniques have no cooldown, so it never shows one),
-filling clockwise with the seconds left. Nothing is drawn while all are
-ready.
+Above each on-screen fighter's name tag, the bright purple **Energy bar**
+shows only below full and turns gray during exhaustion. Under the feet, a
+centered row shows only active cooldowns with a duration **above 0.5 seconds**:
+#0001 Unlimited Void (3 s), Hollow Purple (5 s), and #0002 Whirlwind (5 s),
+including long ordinary attacks as well as summons and techniques.
+
+Each white, black-outlined ring fills clockwise from the top. Its center shows
+the same art as its touch button, selected once by `js/data/ability-preview.js`
+from `mobileAbilities`: Unlimited Void's `attack4_cast` frame 5, Hollow Purple's
+`projectileAnimations.attack5_object` frame 0, Whirlwind's
+`projectileAnimations.extra_attack_object` frame 2. The renderer uses the
+fighter's loaded normalized sprites and `drawCenteredFrame`, preserving colors
+and transparency with smoothing off. There is no dependency on UI/DOM code and
+no duplicated preview definition. Missing art is not invented.
+
+Remaining seconds (`4.3`, one decimal rounded up) appear below the ring in
+outlined white text. No internal codename appears. Baseline timers are implicit;
+ready timers draw nothing and leave no gap in the centered row.
 
 ## Hit effects
 
