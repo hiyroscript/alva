@@ -1199,8 +1199,8 @@ each fighter's own values are in its character specification (7.2.9).
   states resume when it ends. The pose is
   visual only (no collider changes), but being hit is not: a hit (never a
   block) or a paralysis takes the fighter out of its own attack on its next step, so nothing of
-  that attack is left to strike, release a projectile or recover from (no
-  cooldown either). Checked on the fighter's next step, two attacks that
+  that attack is left to strike, release a projectile or recover from. Ordinary attacks start their repeat cooldown; Deflect retains
+  its existing interruption behavior. Checked on the fighter's next step, two attacks that
   connect on the same step still trade. A stunned fighter's push or
   launch runs down at its own `movement.hitstunFriction` on the ground and
   `hitstunAirDrag` in the air (half its deceleration and air drag when it
@@ -1400,6 +1400,13 @@ each fighter's own values are in its character specification (7.2.9).
   invulnerability, Shield or Deflect. Quick Battle's combat AI air dashes
   through the same double tap: home when knocked off the stage too far
   out, and in the air to close in.
+- **Movement repeat cooldowns.** `mouvment` and `midair_mouvment` each use
+  their own 0.5-second acceptance timer in `CombatState.movementCooldowns`.
+  Player and CPU use the same readiness check. A cooling request is discarded,
+  even during hitstop; it cannot become a delayed Dash. Combat Assist neither
+  starts nor checks these timers. Landing and hits restore airtime resources,
+  not timers. All attack, ability and movement timers clear on reset/respawn
+  and carry through a live Quick Battle overtime transition.
 - **Powers are retired.** Jump Power and Speed Power, tiers that once set
   a fighter's jump and top speed (`js/data/powers.js`), are gone with
   universal movement: a `powers` entry is refused. Their history is in
@@ -1417,7 +1424,7 @@ each fighter's own values are in its character specification (7.2.9).
   mirrored with facing, live only in the active phase, at most one hit per
   attack), its `damage` (one of the four tiers, below), `baseLaunch` and
   `directionalLaunch` (7.2.7), `hitstun`, `blockstun`, `hitstop` and a
-  `cooldown` (at most 0.05 s, below), `groundOnly`, and how it moves and
+  `cooldown` (at least 0.5 s, except Deflect; below), `groundOnly`, and how it moves and
   combos (below).
   - *Damage tiers.* Every hit in the game deals exactly **1, 3, 5 or 10**
     (`ALLOWED_DAMAGE_VALUES`, `resolveHitDamage` in `js/data/launch.js`),
@@ -1436,16 +1443,20 @@ each fighter's own values are in its character specification (7.2.9).
     `damage` is the sum of its strikes, derived (#0002's One-Two is 1 + 3),
     and a blocked hit's event reports 0 because it dealt none: neither is
     an authored hit.
-  - *Repeat cooldown.* An ordinary attack's `cooldown` is the short delay
-    before the same attack may start again (`CombatState.cooldowns`), and
-    how long it must have been cancellable before it may cut itself short
-    into itself (`CombatState.cancellableFor`). It is at most
-    `MAX_ATTACK_COOLDOWN`, **0.05 s** (three 60 Hz steps), for every
-    fighter, the Deflect included; a longer one is refused. 0 (the
-    default) is none. What holds an attack back is its own startup, active
-    phase, recovery and hit-cancel, never a timer. #0001's attacks have
-    none at all; #0002's are 0.05 s. A summon's or a technique's own
-    cooldown is a separate thing (7.2.6). An airborne version that lands
+  - *Repeat cooldown.* Every discrete ordinary ground/air attack, extra attack,
+    projectile-producing attack, motion attack, summon, technique, Dash and air
+    dash has a per-move **0.5-second minimum** (`REPEAT_COOLDOWN`,
+    `js/data/cooldowns.js`). Missing or smaller non-negative values resolve to
+    it; explicit longer cooldowns have no artificial maximum. Negative,
+    non-numeric and non-finite values are rejected. Running, ground/air jumps,
+    Shield and Deflect are exempt (Deflect keeps #0001's 0 and #0002's 0.05 s).
+    Fast fall stays directional movement. These are reuse timers, never added
+    to startup, active, recovery or animation timing and never global lockouts.
+    Ordinary attacks use `CombatState.cooldowns` from their end, hit-cancel or
+    interruption; same-move hit-cancels require the full repeat delay since
+    becoming cancellable. Summons and techniques use acceptance timers (7.2.6).
+    #0001's ordinary attacks use 0.5 s; #0002's use 0.5 s except Whirlwind's 5 s.
+    An airborne version that lands
   plays its startup and strike on (never restarted, never switched to the
   ground version or Land), and its recovery is over on touchdown: the
   **landing cancel**. Phases are whole frames of clips that play at a whole
@@ -1497,7 +1508,7 @@ each fighter's own values are in its character specification (7.2.9).
     same 25 Energy as any Dash): walking, the Shield, summons and techniques
     still wait for its end, and left alone it plays out in full. A Dash
     asked for during the hit's freeze comes out the step it ends. It cuts
-    into itself only once its own cooldown (none, or at most 0.05 s) has
+    into itself only once its own repeat cooldown has
     run since it became cancellable, and never on the step it hit (its
     freeze holds both fighters). The cut attack's cooldown, if any, starts
     as it is cut. A whiff or
@@ -1853,8 +1864,7 @@ attack or a button.
 - **Deflect.** In the air, a fresh `shield` press (`shieldPressed`,
   never the button held) is the fighter's Deflect: an attack in every
   way, through `createAttackDefinition` (its own `deflect` clip, startup,
-  active phase, recovery, melee hitbox, stuns, hitstop, cooldown (at most
-  0.05 s; #0001's none, #0002's 0.05 s), momentum and steering), resolved by the same `CombatSystem` as any
+  active phase, recovery, melee hitbox, stuns, hitstop, cooldown (exempt from the baseline; #0001's none, #0002's 0.05 s), momentum and steering), resolved by the same `CombatSystem` as any
   attack, trading, interrupted and punished as one. Its strike is the
   same for every fighter: **3** Launch Points at **Base Launch 2**
   (`DEFLECT_DAMAGE`, `DEFLECT_BASE_LAUNCH`; a fighter authors neither, and
@@ -1984,15 +1994,13 @@ attack or a button.
   ordinary attack in its place, never kept for later (the combat
   input buffer below keeps ordinary attacks only), never an invisible move.
   Holding the button does not repeat it, and neither Down nor any other
-  input changes what it does. Neither has any cost; each may have its own
-  cooldown, the fighter's choice: the summon's or technique's `cooldown`
-  (0, the default, is none: #0001's Unlimited Void and Hollow Purple have
-  none, held back only by their own cast and release),
+  input changes what it does. Neither spends Energy. Each cooldown has the
+  shared 0.5-second floor and may be longer: #0001 Unlimited Void is 3 s,
+  Hollow Purple 5 s, with cast/release timing and paralysis unchanged. It is
   kept per ability in `CombatState.abilityCooldowns` (a `CooldownTimers`:
   `{ remaining, duration }` per id, apart from ordinary attacks' short
   repeat cooldowns in `CombatState.cooldowns`), started the moment the
-  move is accepted (a summon's startup included; a cooldown of 0 starts
-  nothing) and recovering at 1 s per second, whatever the fighter does
+  move is accepted (a summon's startup included) and recovering at 1 s per second, whatever the fighter does
   (impact freezes included), never below 0. Neither spends Energy. The summon system never depends on technique
   code, nor the technique runtime on the summon system.
 - **Summons** (`summons` on the character; runtime in
@@ -2344,7 +2352,7 @@ attack or a button.
     nothing else, no module of the fighter or the combat engine reads it,
     and the same hit resolves identically on every level and for a player.
     Its judgement also keeps it from the same trick over and over: a move
-    with no cooldown (a technique, a throw) is weighed down for a few
+    with a short cooldown (a technique, a throw) is weighed down for a few
     seconds after it was last used, the same on every level.
   - It never walks off the main floor on its own, follows its opponent up and
     down platforms, and stands still while its opponent is out of play.
@@ -2467,17 +2475,18 @@ Adding one is described in
   (`#b026ff`), `energy / maxEnergy` wide, shrinking from the right; gray
   instead from the moment it empties and through the whole refill,
   proportional to what has come back, and gone, never purple, once full. Under the feet a row of
-  cooldown rings, one only for each summon or technique button actually
-  cooling down (`abilityCooldowns.active`), labelled by its button (`A4`
-  for `attack4`, `A5` for `attack5`; #0001's Unlimited Void and Hollow
-  Purple have no cooldown, so it shows none), in button order (`specialAttacks`): a lone ring centred under
-  the fighter, two side by side, no slot kept for a ready one and nothing
-  at all while all are ready. Each is a white ring with a black outline that
-  fills clockwise from the top as the ability recovers (`progress = 1 −
-  remaining / duration`, read straight from the cooldown state), the seconds left inside it (`4.3`, one decimal,
-  rounded up so it never reads `0.0`), and its white label (`A4`)
-  beneath, all text outlined in black; it disappears on the step the
-  cooldown ends. No green. With the bar hidden nothing is kept above the
+  cooldown rings only for active durations above the 0.5-second baseline:
+  ordinary attacks as well as summons and techniques (#0001 Unlimited Void 3 s,
+  Hollow Purple 5 s, #0002 Whirlwind 5 s). In control order, a lone ring is
+  centered, multiple rings side by side, with no slot kept for ready moves.
+  The white, black-outlined ring fills clockwise from the top (`progress =
+  1 - remaining / duration`). Its center is the same artwork as the touch
+  button, selected by the shared DOM-independent `js/data/ability-preview.js`
+  from `mobileAbilities`, drawn from already-loaded sprites with original
+  colors and transparency and smoothing off. Remaining seconds (`4.3`, one
+  decimal rounded up, never `0.0`) replace the codename below, outlined in
+  black. No internal labels appear. Ready timers disappear; baseline timers
+  remain visually implicit. With the Energy bar hidden nothing is kept above the
   tag (`Arena.statusTop`). A fighter off screen keeps only its edge
   pointer; one out of play shows none of it.
 - Accessibility: the Launch Point number sits in a group labelled "Launch

@@ -132,6 +132,7 @@ const ART_0002 = {
 };
 const sprite = (def, action) => ({
   url: def[def.mobileAbilities[action].preview.collection ?? 'animations'][def.mobileAbilities[action].preview.animation].frames[def.mobileAbilities[action].preview.frame],
+  collection: def.mobileAbilities[action].preview.collection ?? 'animations',
   animation: def.mobileAbilities[action].preview.animation,
   frame: def.mobileAbilities[action].preview.frame,
   mirrored: false,
@@ -279,7 +280,8 @@ test('#0001 authors its touch buttons as small, declarative UI data: a name and 
   const code = (file) => read(file).replace(/\/\/.*$/gm, '');
   // (The touch controls that present it are UI: js/ui/touch-controls.js.)
   for (const file of readdirSync(new URL('js/game/', ROOT), { recursive: true }).filter((f) => f.endsWith('.js'))) {
-    assert.doesNotMatch(code(`js/game/${file}`), /mobileAbilities|mobile-abilities|preview/, `${file} never reads mobileAbilities`);
+    assert.doesNotMatch(code(`js/game/${file}`), /mobileAbilities|mobile-abilities/, `${file} never reads mobileAbilities`);
+    if (file !== 'rendering/fighter-status.js') assert.doesNotMatch(code(`js/game/${file}`), /preview/, `${file}: presentation stays out of simulation`);
   }
   for (const file of ['js/ui/touch-controls.js', 'js/ui/mobile-abilities.js']) {
     assert.doesNotMatch(code(file), /\.(summons|techniques|projectiles)\b|'000\d'|#000\d|displayName/, `${file}: no inference, no fighter special case`);
@@ -291,9 +293,10 @@ test('#0001 authors its touch buttons as small, declarative UI data: a name and 
   // never its name.
   const abilities = code('js/ui/mobile-abilities.js');
   const presence = abilities.match(/export function abilityPresence\([^]*?\n\}\n/)[0];
-  const preview = abilities.match(/export function previewFrame\([^]*?\n\}\n/)[0];
+  const shared = code('js/data/ability-preview.js');
+  const preview = shared.match(/export function previewFrame\([^]*?\n\}\n/)[0];
   assert.match(presence, /def\?\.actions/);
-  assert.match(abilities, /export function abilityMove/, 'loadout resolution is centralized alongside presence');
+  assert.match(shared, /export function abilityMove/, 'loadout resolution is centralized alongside presence');
   assert.match(preview, /def\[collection\]/);
   assert.doesNotMatch(abilities.replace(preview, ''), /\.animations\b/, 'animations: read in previewFrame only');
   assert.doesNotMatch(code('js/ui/touch-controls.js'), /\bdef\??\.actions\b/);
@@ -330,7 +333,7 @@ test('mobileAbility gives each button its name, its frame of fighter art and a n
   assert.deepEqual(mobileAbility(partial, 'extra_attack'), { label: 'Kunai', sprite: null, icon: ICONS.ring, pending: false });
   assert.deepEqual(mobileAbility(partial, 'attack1'), { label: 'Jab', sprite: null, icon: ICONS.pip1, pending: false });
   assert.deepEqual(mobileAbility(partial, 'attack2'), {
-    label: 'Sweep', sprite: { url: './b.png', animation: 'idle', frame: 1, mirrored: false }, icon: ICONS.pip2, pending: false,
+    label: 'Sweep', sprite: { collection: 'animations', url: './b.png', animation: 'idle', frame: 1, mirrored: false }, icon: ICONS.pip2, pending: false,
   });
   assert.deepEqual(mobileAbility(partial, 'transform'), { label: 'Awaken', sprite: null, icon: ICONS.transform, pending: false }, 'its own Transform: no longer reserved');
   assert.equal(mobileAbility({ mobileAbilities: { transform: { label: 'Awaken', icon: 'up' } } }, 'transform').icon, ICONS.up, 'its own Transform glyph');

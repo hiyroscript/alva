@@ -21,7 +21,7 @@ motion included.
 | Layer | Where | What it decides |
 | --- | --- | --- |
 | **Shared systems** | `js/game/`, `js/data/movement.js`, `js/data/loadout.js`, `js/data/launch.js` | The rules: how movement, attacks, hits, launches, the Shield, Energy, summons, techniques, the CPU, input and rendering work. The same for every fighter, and so are movement's numbers. |
-| **Fighter configuration** | each fighter's definition, `js/data/characters/<id>.js` | The numbers and choices those rules read: its body, its Energy refill rate, launch reaction, which buttons it has and what kind of move each is, every attack's timing, hitbox, damage (one of the tiers 1, 3, 5, 10), launch and motion. Never its movement, its Energy maximum or costs, or a repeat cooldown over 0.05 s. |
+| **Fighter configuration** | each fighter's definition, `js/data/characters/<id>.js` | The numbers and choices those rules read: its body, its Energy refill rate, launch reaction, which buttons it has and what kind of move each is, every attack's timing, hitbox, damage (one of the tiers 1, 3, 5, 10), launch and motion. Never its movement or Energy maximum/costs. Repeat cooldowns have a shared 0.5 s floor, with finite longer overrides. |
 | **Fighter capabilities** | the same definition | Optional, explicit pieces a fighter may or may not have: a `defense` (the Shield, on the ground), a `deflect` (the Shield button in the air), the art for the universal Dash (a `mouvment` clip) and air dash (a `midair_mouvment` clip), projectiles (spinning ones with a `rotationSpeed`), summons, techniques, an extra attack, attack mechanics such as `motion`, `hits` or `deflectProjectiles`. A shared system checks for the capability, never for the fighter. |
 
 So "#0001's Maximum Blue drags its target in" is a capability (a `pull`
@@ -50,7 +50,7 @@ loadout rules (`assertLoadout`), for movement of its own
 (`assertUniversalMovement`: a `movement` profile, `powers` or any
 universal movement field is refused) and against the combat rules
 (`assertCombatRules`: every hit's damage one of 1, 3, 5 or 10, every
-attack's repeat cooldown at most 0.05 s, the Deflect's fixed strike, and
+attack's repeat cooldown finite and non-negative, the Deflect's fixed strike, and
 no Energy maximum or cost of its own); one that breaks a rule is refused
 with the problem named.
 
@@ -81,8 +81,8 @@ Shared code may *mention* a fighter in a comment as an example ("e.g.
 no module of the engine, the AI, the touch controls or the status display
 contains a fighter id or special-cases a numbered attack
 ([`tests/systems/loadout.test.mjs`](../../tests/systems/loadout.test.mjs)),
-the loadout rules name no fighter, combat names no attack, and nothing in
-`js/game/` reads touch art or ability names.
+the loadout rules name no fighter, combat names no attack, and simulation code never reads presentation metadata. Canvas status and touch
+buttons share the DOM-independent `js/data/ability-preview.js` selector.
 
 Two shared conventions came from the first fighter and are fixed
 references, not requirements on any fighter:

@@ -19,11 +19,11 @@
 //
 //   techniques: {
 //     attack5: {
-//       castAnimation: 'attack5_cast', releaseAnimation: 'attack5_release', cooldown: 0,
+//       castAnimation: 'attack5_cast', releaseAnimation: 'attack5_release', cooldown: 0.5,
 //       projectile: { id: 'attack5_object', offset: { x: 95, y: -60 } },
 //     },
 //     attack4: {
-//       castAnimation: 'attack4_cast', releaseAnimation: 'attack4_release', cooldown: 0,
+//       castAnimation: 'attack4_cast', releaseAnimation: 'attack4_release', cooldown: 0.5,
 //       burst: { hitbox: { x: -250, y: -210, w: 500, h: 230 }, hit: { damage: 3, unblockable: true, paralyze: 1.8 } },
 //     },
 //   },
@@ -62,12 +62,12 @@
 // `directionalLaunch` (see js/data/launch.js) and hit effects
 // (js/game/combat/hit-effects.js), validated here exactly like an attack's.
 //
-// A technique's `cooldown` (seconds, from its start) is its fighter's own
-// choice: 0, the default, is none, and then using it starts no cooldown at
-// all (CombatState.abilityCooldowns stays empty for it); the technique is
-// held back only by its own phases, a cast and a release that must play
-// out before the fighter is free. A horizontal launch travels along the technique's facing.
+// A technique's repeat cooldown starts on acceptance, even if interrupted.
+// The shared 0.5-second minimum applies unless the fighter declares longer.
+// It recovers every fixed step, including hitstop. Phase timing is separate.
+// A horizontal launch travels along the technique's facing.
 
+import { resolveCooldown } from '../../data/cooldowns.js';
 import { resolveHitDamage, resolveHitLaunch } from '../../data/launch.js';
 import { resolveHitEffects } from './hit-effects.js';
 
@@ -83,8 +83,8 @@ const TECHNIQUE_DEFAULTS = {
   castAnimation: null,
   releaseAnimation: null,
   // Seconds before the technique can be used again, from its start (see
-  // Fighter.tryTechnique): spent whether it lands or not. 0 is none.
-  cooldown: 0,
+  // Fighter.tryTechnique): spent whether it lands or not. At least 0.5 seconds.
+  cooldown: 0.5,
   // { id, offset }: the projectile it releases (see above), or null.
   projectile: null,
   // { hitbox, hit }: the burst round the fighter it releases, or null.
@@ -106,7 +106,7 @@ function createHit(id, spec) {
 
 export function createTechniqueDefinition(spec) {
   if (!spec?.id) throw new Error('[Alva] Technique definitions need an id');
-  const def = { ...TECHNIQUE_DEFAULTS, ...spec };
+  const def = { ...TECHNIQUE_DEFAULTS, ...spec, cooldown: resolveCooldown(spec.cooldown, `Technique "${spec.id}"`) };
   if (def.projectile) {
     const o = def.projectile.offset ?? {};
     def.projectile = Object.freeze({ id: def.projectile.id, offset: Object.freeze({ x: o.x ?? 0, y: o.y ?? 0 }) });

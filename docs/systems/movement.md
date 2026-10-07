@@ -245,6 +245,22 @@ frames there is no Dash, without `midair_mouvment` frames no air dash
 every playable fighter has the same capabilities
 ([`tests/systems/universal-movement.test.mjs`](../../tests/systems/universal-movement.test.mjs)).
 
+## Repeat cooldowns
+
+Dash and air dash are discrete actions, each with a separate 0.5-second reuse
+timer from acceptance (`CombatState.movementCooldowns`, `mouvment` and
+`midair_mouvment`). Their speed, duration, cancel time, Energy cost and airtime
+limits stay the same. Player and CPU check the same `Fighter.movementReady`.
+Requests made during these timers are discarded even through hitstop; busy
+requests for an otherwise ready Dash keep the existing short buffer. Landing
+or being hit refunds airtime resources but never the repeat timer. Reset and
+respawn clear both timers; live overtime preserves them.
+
+Running, ground/air jumps, Shield and Deflect are exempt from the new baseline.
+Fast fall remains directional movement. Combat Assist only looks like a Dash:
+it neither consumes nor checks its cooldown, and still checks the requested
+attack's timer at completion.
+
 ## History
 
 The rules came largely from the [movement

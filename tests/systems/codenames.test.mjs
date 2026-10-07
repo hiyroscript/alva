@@ -22,7 +22,7 @@ import { SAMPLE_FIGHTER } from '../fighters/fixtures/sample-fighter.mjs';
 import { COMBAT_ACTIONS, Fighter } from '../../js/game/fighters/fighter.js';
 import { blankInput } from '../../js/game/fighters/fighter-controller.js';
 import { readMoveset } from '../../js/game/ai/moveset.js';
-import { cooldownIndicators, cooldownLabel } from '../../js/game/rendering/fighter-status.js';
+import { cooldownIndicators } from '../../js/game/rendering/fighter-status.js';
 import { ABILITY_ACTIONS } from '../../js/ui/mobile-abilities.js';
 import { stylesheetFiles } from '../helpers/stylesheet.mjs';
 import { COOLING_CASTER } from '../fighters/fixtures/cooling-fighters.mjs';
@@ -247,17 +247,15 @@ test('attack4 is Unlimited Void\'s technique and attack5 Hollow Purple\'s, each 
     extra_attack: 'High Kick', attack1: 'Jab', midair_attack1: 'Floating Straight', attack2: 'Red', midair_attack2: 'Red Kick',
     attack3: 'Maximum Blue', midair_attack3: 'Blue', attack4: 'Unlimited Void', attack5: 'Hollow Purple',
   });
-  assert.equal(cooldownLabel('attack4'), 'A4');
-  assert.equal(cooldownLabel('attack5'), 'A5');
 });
 
-test('pressing attack4 and attack5 starts their cooldowns, keyed by those moves and shown as A4 and A5', () => {
-  // #0001's techniques have none: using them leaves nothing behind.
+test('pressing attack4 and attack5 starts their cooldowns, keyed by those moves with shared artwork', () => {
+  // The real roster technique starts its timer on the same press.
   const free = makeFighter();
   free.step({ attack4: true, attack4Pressed: true });
   assert.equal(free.fighter.technique?.def.id, 'attack4');
-  assert.equal(free.fighter.combat.abilityCooldowns.size, 0);
-  assert.deepEqual(cooldownIndicators(free.fighter), []);
+  assert.equal(free.fighter.combat.abilityCooldowns.size, 1);
+  assert.deepEqual(cooldownIndicators(free.fighter).map(c => c.id), ['attack4']);
   // A fighter whose techniques have one: keyed by the move, shown by it.
   const caster = makeFighter({ character: COOLING_CASTER });
   const foe = makeFighter({ x: 1400, facing: -1 });
@@ -269,7 +267,7 @@ test('pressing attack4 and attack5 starts their cooldowns, keyed by those moves 
   caster.step({ attack5: true, attack5Pressed: true });
   assert.equal(caster.fighter.technique?.def.id, 'attack5');
   assert.deepEqual([...caster.fighter.combat.abilityCooldowns.entries.keys()], ['attack4', 'attack5']);
-  assert.deepEqual(cooldownIndicators(caster.fighter).map((c) => [c.id, c.label]), [['attack4', 'A4'], ['attack5', 'A5']]);
+  assert.deepEqual(cooldownIndicators(caster.fighter).map((c) => c.id), ['attack4', 'attack5']);
 });
 
 test('the combat AI discovers the moveset by its canonical names, and reaches attack4 and attack5 through their own buttons', () => {

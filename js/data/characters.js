@@ -25,7 +25,7 @@
 //     (below) as this module loads, every problem named; one that breaks
 //     the loadout rules, declares movement of its own (a `movement`
 //     profile, `powers`), deals damage off the tiers (1, 3, 5, 10), gives an
-//     attack a repeat cooldown over 0.05 s or sets its own Energy maximum
+//     attack an invalid repeat cooldown or sets its own Energy maximum
 //     or costs never loads.
 //   - A definition existing is not the same as it being playable.
 //     getCharacter finds any definition (the engine and its tests build
@@ -114,7 +114,7 @@ export function characterFramePaths(def) {
 // shared rule: every attack (each strike of a multi-hit one), projectile
 // (its finisher too), technique burst and Deflect is built here exactly as
 // the Fighter builds it, so a hit dealing anything but 1, 3, 5 or 10, an
-// attack with a repeat cooldown over MAX_ATTACK_COOLDOWN, a Deflect off its
+// attack with a non-finite or negative cooldown, a Deflect off its
 // fixed strike or an `energy` entry that sets its own maximum or costs is
 // refused as the registry loads, not when a match first builds the
 // fighter. A summon performs one of these attacks, so its hits are checked

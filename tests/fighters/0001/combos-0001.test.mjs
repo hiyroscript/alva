@@ -48,12 +48,9 @@ test('Jab into High Kick: the Jab\'s follow-up launches, a true combo up to abou
   assert.equal(combo(route, { lp: 50 }).chain, 1, 'at 50 the Jab pushes it out of the kick\'s reach');
 });
 
-test('Jabs strung together: the Jab\'s own push ends the string, sooner the more battered the target', () => {
+test('repeated Jabs cannot form a true combo through the repeat cooldown', () => {
   const jabs = (i) => (i % 12 === 0 ? P('attack1') : {});
-  const chain = (lp) => combo(jabs, { lp, gap: 38, count: 200 }).chain;
-  assert.ok(chain(0) >= 4 && chain(0) <= 8, `a fresh target takes a few (${chain(0)})`);
-  assert.ok(chain(20) < chain(0), `fewer at 20 (${chain(20)})`);
-  assert.equal(chain(40), 1, 'none at 40');
+  for (const lp of [0, 20, 40]) assert.equal(combo(jabs, { lp, gap: 38, count: 200 }).chain, 1);
 });
 
 test('High Kick, jump, Floating Straight: the launcher chased up into the air, a true combo up to about 30', () => {

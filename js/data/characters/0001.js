@@ -26,8 +26,9 @@
 // (`stall`). In the air the Shield button is its Deflect, a sweep of the
 // arm that turns projectiles back at their thrower; and it has an air dash
 // of its own (its midair_mouvment), apart from its Dash. Its orbs spin as
-// they fly. None of its moves has a cooldown: each is held back only by its
-// own phases (startup, active, recovery, a technique's cast and release).
+// they fly. Ordinary moves repeat after 0.5 s; Unlimited Void after 3 s,
+// Hollow Purple after 5 s. These timers never alter their animation phases.
+// Deflect remains at 0; jumps, running and Shield are exempt.
 
 import { frames } from './helpers.js';
 
@@ -197,7 +198,7 @@ export const CHARACTER_0001 = {
       rotationSpeed: ORB_SPIN_0001,
     },
     // Maximum Blue: slow (about 240 units in its 1.5 s). It attracts: an
-    // opponent within 120 units of it is dragged in at up to 360 units/s
+    // opponent within 140 units of it is dragged in at up to 360 units/s
     // and held there, grinding: three strikes 0.25 s apart, 1 Launch Point
     // each with no launch, the third the collapse, 3 and a Base Launch 1
     // pop upward. 5 in all. A Shield is not pulled, and blocking a strike
@@ -213,7 +214,7 @@ export const CHARACTER_0001 = {
       hitstun: 0.3,
       blockstun: 0.12,
       hitstop: 0.02,
-      pull: { radius: 120, speed: 360 },
+      pull: { radius: 140, speed: 360 },
       pierce: { hits: 3, interval: 0.25 },
       finisher: { damage: 3, baseLaunch: 1, directionalLaunch: 'vertical', hitstun: 0.4, hitstop: 0.06 },
       rotationSpeed: ORB_SPIN_0001,
@@ -383,9 +384,8 @@ export const CHARACTER_0001 = {
   // Techniques, keyed by the attack they are (schema and phases:
   // js/game/combat/technique.js). Each is a cast: #0001 stands committed to
   // it, then lets go all at once. A hit on #0001 before it lets go breaks
-  // it (nothing released), and it needs the ground throughout. Neither has
-  // a cooldown (cooldown 0: using one starts none): the cast and the
-  // release, which must play out, are what hold each back.
+  // it (nothing released), and it needs the ground throughout. Cooldowns
+  // begin on acceptance and run on even if interrupted: 3 s and 5 s.
   techniques: {
     // Unlimited Void: half a second to cast, then the domain closes round
     // #0001 as it steps forward: every opponent within 250 units either
@@ -396,7 +396,7 @@ export const CHARACTER_0001 = {
     attack4: {
       castAnimation: 'attack4_cast',
       releaseAnimation: 'attack4_release',
-      cooldown: 0,
+      cooldown: 3,
       burst: {
         hitbox: { x: -250, y: -210, w: 500, h: 230 },
         hit: { damage: 3, unblockable: true, paralyze: 1.7, hitstun: 0.25, blockstun: 0, hitstop: 0.12 },
@@ -408,7 +408,7 @@ export const CHARACTER_0001 = {
     attack5: {
       castAnimation: 'attack5_cast',
       releaseAnimation: 'attack5_release',
-      cooldown: 0,
+      cooldown: 5,
       projectile: { id: 'attack5_object', offset: { x: 95, y: -60 } },
     },
   },
@@ -418,15 +418,14 @@ export const CHARACTER_0001 = {
   // every hitbox is measured from its art (facing right from the origin,
   // mirrored with facing). Every strike keeps the speed #0001 brings into
   // it unless its entry says otherwise: only its casts (Red, Maximum Blue)
-  // are planted. No attack has a cooldown (cooldown 0): the same one may
-  // start again as soon as the last has finished, or, once it has hit, as
-  // soon as its hit-cancel opens.
+  // are planted. Each ordinary move has a 0.5-second repeat delay,
+  // independent of its phases and of other moves' cooldowns.
   attacks: {
     // The Jab: frames 1-2 the wind-up, 3-4 the punch (its box out to 40
     // units, at the shoulders, just short of the fist's tip), 5-6 back,
     // 0.3 s in all. Light and quick (3), with a crisp two-step freeze, it
     // pushes (Base Launch 1 sideways) and opens a follow-up once it has
-    // hit; its own push ends a string of them within a few. It keeps all
+    // hit; its repeat timer prevents immediate same-move strings. It keeps all
     // the speed it is thrown at (a Dash's included), sliding on under 0.6
     // of the ground deceleration, never steered.
     attack1: {
@@ -441,7 +440,7 @@ export const CHARACTER_0001 = {
       hitstun: 0.3,
       blockstun: 0.14,
       hitstop: 1 / 30,
-      cooldown: 0,
+      cooldown: 0.5,
       groundOnly: true,
       momentum: 1,
       friction: 0.6,
@@ -464,7 +463,7 @@ export const CHARACTER_0001 = {
       hitstun: 0.34,
       blockstun: 0.14,
       hitstop: 1 / 30,
-      cooldown: 0,
+      cooldown: 0.5,
       airUses: 2,
       motion: { type: 'hover' },
       airMomentum: 0.8,
@@ -482,7 +481,7 @@ export const CHARACTER_0001 = {
       recovery: 2 / FPS_0001.attack2,
       hitbox: null,
       projectile: { id: 'attack2_object', spawnAt: 3 / FPS_0001.attack2, offset: { x: 44, y: -70 } },
-      cooldown: 0,
+      cooldown: 0.5,
       groundOnly: true,
       momentum: 0.5,
       friction: 0.8,
@@ -506,7 +505,7 @@ export const CHARACTER_0001 = {
       blockstun: 0.15,
       hitstop: 0.07,
       blockPush: 400,
-      cooldown: 0,
+      cooldown: 0.5,
       airUses: 1,
       motion: { type: 'homing', range: 230, speed: 1050, rebound: 620, recoil: 240, exit: 0.3 },
       airMomentum: 0.6,
@@ -523,13 +522,13 @@ export const CHARACTER_0001 = {
       recovery: 2 / FPS_0001.attack3,
       hitbox: null,
       projectile: { id: 'attack3_object', spawnAt: 4 / FPS_0001.attack3, offset: { x: 78, y: -69 } },
-      cooldown: 0,
+      cooldown: 0.5,
       groundOnly: true,
       momentum: 0.4,
       friction: 0.8,
     },
     // Blue: frame 1, then the palm thrust and the point (2-3): while they
-    // last, an opponent within 170 units of the palm is yanked in to it at
+    // last, an opponent within 190 units of the palm is yanked in to it at
     // up to 1300 units/s, and the palm strikes whoever it brought (3, Base
     // Launch 1 upward). Standing on the air throughout. Once per airtime.
     midair_attack3: {
@@ -544,9 +543,9 @@ export const CHARACTER_0001 = {
       hitstun: 0.36,
       blockstun: 0.14,
       hitstop: 0.05,
-      cooldown: 0,
+      cooldown: 0.5,
       airUses: 1,
-      pull: { radius: 170, speed: 1300, offset: { x: 50, y: -72 } },
+      pull: { radius: 190, speed: 1300, offset: { x: 50, y: -72 } },
       motion: { type: 'hover' },
       airMomentum: 0.6,
       airControl: 0.3,
@@ -572,7 +571,7 @@ export const CHARACTER_0001 = {
       hitstun: 0.3,
       blockstun: 0.15,
       hitstop: 0.08,
-      cooldown: 0,
+      cooldown: 0.5,
       momentum: 1,
       friction: 0.6,
       step: { at: 1 / FPS_0001.extra_attack, speed: 300 },

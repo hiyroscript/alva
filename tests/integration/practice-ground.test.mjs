@@ -1120,7 +1120,7 @@ test('confirming a fighter swaps it in place and resumes practice', async () => 
   old.combat.launchPoint = 30;
   // #0001's techniques leave no cooldown; one is left behind by hand, as a
   // fighter's whose technique cools down would.
-  assert.equal(old.combat.abilityCooldowns.active('attack4'), false);
+  assert.equal(old.combat.abilityCooldowns.active('attack4'), true);
   old.combat.abilityCooldowns.start('attack4', 14);
 
   screen.openMenu();
@@ -2091,8 +2091,8 @@ test('a Practice Void respawn is a fresh training state: 0 Launch Point, full En
   run({}, 2);
   run({ attack5: true, attack5Pressed: true });
   const cd = player.combat.abilityCooldowns;
-  // #0001's leave none; as a fighter's whose techniques cool down would:
-  assert.equal(cd.size, 0);
+  // Both accepted techniques are still cooling; lengthen them to span the respawn.
+  assert.equal(cd.size, 2);
   cd.start('attack4', 14);
   cd.start('attack5', 12);
   until(() => !player.technique, 400);

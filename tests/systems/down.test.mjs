@@ -188,7 +188,7 @@ test('holding Down never refills Energy faster: one passive rate, whatever is he
 
 test('holding Down never speeds up a cooldown: Attack 4 and Attack 5 recover in real time either way', () => {
   for (const button of ['attack4', 'attack5']) {
-    // A fighter whose techniques have cooldowns (#0001's have none).
+    // A fighter with alternative technique cooldown durations.
     const recover = (held) => {
       const d = duel({ gap: 600, attackerCharacter: COOLING_CASTER });
       d.tick(P(button));

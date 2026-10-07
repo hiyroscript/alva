@@ -173,6 +173,9 @@ test('time-up with the points level: overtime, the same live fight; its clock st
   p2.combat.launchPoint = 140;
   p1.combat.setEnergy(35);
   p1.combat.abilityCooldowns.start('attack3', 5);
+  p1.combat.cooldowns.set('extra_attack', 5);
+  p1.combat.movementCooldowns.start('mouvment', 0.5);
+  p1.combat.movementCooldowns.start('midair_mouvment', 0.5);
   p1.body.x = battle.map.mainStage.left + 50;
   p2.body.vx = 120;
   // A projectile in flight, out of the way.
@@ -184,6 +187,8 @@ test('time-up with the points level: overtime, the same live fight; its clock st
   run();
   assert.deepEqual(battle.score, { p1: 2, p2: 1 });
   battle.score.p1 = 1;
+  const ordinaryBefore = p1.combat.cooldowns.get('extra_attack');
+  const movementBefore = p1.combat.movementCooldowns.remaining('mouvment');
   const before = liveState(battle);
   const phaseTime = battle.phaseTime;
   // The very step the normal clock runs out.
@@ -192,6 +197,9 @@ test('time-up with the points level: overtime, the same live fight; its clock st
   run();
   assert.equal(battle.phase, 'fight', 'not time-up: the fight goes on');
   assert.equal(battle.period, PERIODS.overtime);
+  near(p1.combat.cooldowns.get('extra_attack'), ordinaryBefore - DT);
+  near(p1.combat.movementCooldowns.remaining('mouvment'), movementBefore - DT);
+  near(p1.combat.movementCooldowns.remaining('midair_mouvment'), movementBefore - DT);
   assert.equal(battle.overtime, true);
   near(battle.timeLeft, OT, 'overtime\'s clock starts full');
   assert.ok(battle.phaseTime > phaseTime, 'the same phase, never re-entered');

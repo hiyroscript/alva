@@ -11,7 +11,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { def, DT, cpuFight, fakeSprites, stageMap } from '../helpers/fighter-harness.mjs';
+import { def, DT, cpuFight, fakeSprites, fakeSpritesOf, stageMap } from '../helpers/fighter-harness.mjs';
 import { CONFIG } from '../../js/config.js';
 import { Fighter, separateFighters } from '../../js/game/fighters/fighter.js';
 import { CombatSystem } from '../../js/game/combat/combat.js';
@@ -52,7 +52,7 @@ function ring({
     def: foeDef, sprites, stage, slot: 'p1', label: 'P1', spawn: { x: foeX, y: foeY, facing: foeFacing },
     controller: { getInput: (self) => ({ ...script(n, self) }) },
   });
-  const cpu = new Fighter({ def: cpuDef, sprites, stage, slot: 'p2', label: 'CPU', spawn: { x: cpuX, facing: cpuFacing }, controller: ai });
+  const cpu = new Fighter({ def: cpuDef, sprites: fakeSpritesOf(cpuDef), stage, slot: 'p2', label: 'CPU', spawn: { x: cpuX, facing: cpuFacing }, controller: ai });
   foe.opponent = cpu;
   cpu.opponent = foe;
   const world = {
@@ -591,4 +591,32 @@ test('the CPU uses the new cancels as a player would: strikes out of its Dashes 
   const easy = count('easy');
   assert.equal(easy.dashStrikes, 0, 'Easy never Dashes at all');
   assert.ok(easy.followUps < brutal.followUps, `Easy follows up less (${easy.followUps})`);
+});
+
+test('CPU filters ground/air Dash timers and long ordinary cooldowns before planning or pressing', () => {
+  for (const difficulty of DIFFICULTY_IDS) {
+    const r = ring({ difficulty, cpuDef: getCharacter('0002'), foeX: 1200 });
+    r.hush();
+    const { cpu, foe, ai, ctx } = r;
+    cpu.combat.movementCooldowns.start('mouvment', 0.5);
+    cpu.combat.movementCooldowns.start('midair_mouvment', 0.5);
+    cpu.combat.cooldowns.set('extra_attack', 5);
+    const s = ai.sense(cpu, foe, ctx);
+    assert.ok(!ai.options(s).some(o => o.intent.kind === 'dash'));
+    const shot = readMoveset(cpu).ranged.find(m => m.id === 'extra_attack');
+    assert.equal(ai.rangedScore(shot, s), 0);
+    const held = {};
+    const cast = { action: 'extra_attack', until: ai.clock + 1 };
+    ai.actAttack(cpu, cast, held);
+    assert.equal(cast.done, true);
+    assert.equal(held.extra_attack, undefined);
+    const dash = { dir: 1 };
+    ai.actDash(cpu, foe, ctx, dash, held);
+    assert.equal(dash.done, true);
+    assert.equal(held.runRight, undefined);
+    Object.assign(cpu.body, { grounded: false, ground: null, y: 300 });
+    assert.equal(ai.airDashFree(ai.sense(cpu, foe, ctx)), false);
+    cpu.combat.movementCooldowns.clear();
+    assert.equal(ai.airDashFree(ai.sense(cpu, foe, ctx)), true);
+  }
 });

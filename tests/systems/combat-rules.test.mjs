@@ -5,8 +5,7 @@
 // Deflect; 15 for any block, a perfect one's included; nothing for Combat
 // Assist; nothing back for any defense), damage (1, 3, 5 or 10, every hit
 // that can land), difficulty (the CPU's judgement only, never a number of
-// the fight), cooldowns (none on #0001, at most MAX_ATTACK_COOLDOWN on any
-// attack) and movement (one baseline). Runs the real Fighter, CombatSystem,
+// the fight), cooldowns (the shared baseline and longer per-move overrides) and movement (one baseline). Runs the real Fighter, CombatSystem,
 // combat AI, Battle and Practice Ground (see tests/helpers/fighter-harness.mjs).
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -16,8 +15,10 @@ import { CHARACTERS, getCharacter, assertCombatRules } from '../../js/data/chara
 import { ALLOWED_DAMAGE_VALUES, resolveHitDamage } from '../../js/data/launch.js';
 import { BASE_FIGHTER_MOVEMENT, MOVEMENT_FIELDS, assertUniversalMovement } from '../../js/data/movement.js';
 import { DIFFICULTY_IDS, CAPABILITY, getDifficultyProfile } from '../../js/data/difficulty.js';
+import { REPEAT_COOLDOWN } from '../../js/data/cooldowns.js';
+import { createSummonDefinition } from '../../js/game/combat/summon.js';
 import { CONFIG } from '../../js/config.js';
-import { MAX_ATTACK_COOLDOWN, createAttackDefinition } from '../../js/game/combat/attacks.js';
+import { createAttackDefinition } from '../../js/game/combat/attacks.js';
 import {
   BLOCK_ENERGY_COST, DASH_ENERGY_COST, DEFLECT_ENERGY_COST, MAX_ENERGY, resolveEnergy,
 } from '../../js/game/combat/combat-state.js';
@@ -367,7 +368,7 @@ test('#0001 and #0002 deal the retuned tiers: Hollow Purple 10, the High Kick 5,
   assert.deepEqual(
     ['attack1 hit 2', 'midair_attack1', 'midair_attack2', 'attack3', 'midair_attack3 hit 4', 'extra_attack_object finisher', 'deflect']
       .map((id) => two[id]),
-    [3, 3, 3, 3, 3, 3, 3],
+    [3, 3, 3, 3, 3, 10, 3],
   );
   // Its ticks and the Rapid Kicks' finisher are as they were: 1 and 3.
   assert.deepEqual([two['attack1 hit 1'], two['attack2 hit 1'], two['attack2 hit 4'], two.extra_attack_object], [1, 1, 3, 1]);
@@ -509,71 +510,60 @@ test('a CPU at any level and a player deal the same damage with the same hit, th
 
 // ---- Cooldowns ------------------------------------------------------------------------------
 
-test('#0001 has no cooldown on any move: every attack, its Deflect, Unlimited Void and Hollow Purple', () => {
-  const { fighter } = makeFighter();
-  for (const [id, atk] of Object.entries(fighter.attacks)) assert.equal(atk.cooldown, 0, id);
-  for (const [id, spec] of Object.entries(DEF_0001.attacks)) assert.equal(spec.cooldown, 0, `${id}: written as 0`);
-  assert.equal(fighter.deflect.cooldown, 0, 'the Deflect');
-  assert.deepEqual(Object.values(fighter.techniqueDefs).map((t) => t.cooldown), [0, 0], 'Unlimited Void and Hollow Purple');
-  // Using each leaves no cooldown behind, and the next one may start as
-  // soon as the fighter is free.
-  for (const button of ['attack4', 'attack5']) {
-    const d = duel({ gap: 600 });
-    d.tick(P(button));
-    assert.equal(d.attacker.technique?.action, button);
-    assert.equal(d.attacker.combat.abilityCooldowns.active(button), false, `${button}: no cooldown`);
-    assert.equal(d.attacker.combat.abilityCooldowns.size, 0);
-    while (d.attacker.technique) d.tick();
-    d.tick(P(button));
-    assert.equal(d.attacker.technique?.action, button, `${button}: again at once`);
-  }
-  for (const id of Object.keys(DEF_0001.attacks)) {
-    const air = id.startsWith('midair_');
-    const { fighter: f, step } = makeFighter();
-    if (air) aloft(f, 100);
-    const button = id.replace('midair_', '');
-    step(P(button));
-    assert.equal(f.combat.attack?.def.id, id, id);
-    while (f.combat.attack) step({});
-    assert.equal(f.combat.cooldowns.size, 0, `${id}: nothing left to wait out`);
-  }
-  // Its phases are untouched: the moves still take their time.
-  assert.ok(fighter.attacks.attack1.total > 0 && fighter.attacks.extra_attack.startup > 0);
-  assert.ok(fighter.techniqueDefs.attack5 && makeFighter().fighter.sprites.duration('attack5_cast') > 0);
-});
-
-test('no fighter\'s attack waits more than 0.05 s to repeat; a longer cooldown is refused, and a summon or technique keeps its own', () => {
-  assert.equal(MAX_ATTACK_COOLDOWN, 0.05);
+test('all discrete attacks inherit the baseline; authored longer delays have no artificial ceiling', () => {
+  assert.equal(REPEAT_COOLDOWN, 0.5);
   for (const c of CONTENT) {
     const { fighter } = makeFighter({ character: c });
-    for (const atk of [...Object.values(fighter.attacks), fighter.deflect].filter(Boolean)) {
-      assert.ok(atk.cooldown >= 0 && atk.cooldown <= MAX_ATTACK_COOLDOWN, `#${c.id} ${atk.id}: ${atk.cooldown}`);
+    for (const atk of Object.values(fighter.attacks)) assert.ok(atk.cooldown >= 0.5);
+    if (fighter.deflect) assert.equal(fighter.deflect.cooldown, c.deflect.cooldown ?? 0);
+  }
+  for (const cooldown of [undefined, 0, 0.05, 0.5, 5, 120]) {
+    const expected = Math.max(0.5, cooldown ?? 0);
+    assert.equal(createAttackDefinition({ id: 'a', damage: 1, cooldown }).cooldown, expected);
+    assert.equal(createTechniqueDefinition({ id: 't', cooldown }).cooldown, expected);
+    assert.equal(createSummonDefinition({ id: 's', cooldown }).cooldown, expected);
+  }
+  for (const cooldown of [-1, Infinity, -Infinity, NaN, '0.5', null]) {
+    for (const create of [createAttackDefinition, createTechniqueDefinition, createSummonDefinition]) {
+      assert.throws(() => create({ id: 'a', damage: 1, cooldown }), /finite, non-negative/);
     }
+    assert.throws(() => createDeflectDefinition({ ...DEF_0002.deflect, cooldown }), /finite, non-negative/);
   }
-  // #0002's: every one of them the shortest there is, none raised.
-  const { fighter: two } = makeFighter({ character: DEF_0002 });
-  assert.deepEqual(
-    Object.fromEntries(Object.entries(two.attacks).map(([id, a]) => [id, a.cooldown])),
-    { attack1: 0.05, midair_attack1: 0.05, attack2: 0.05, midair_attack2: 0.05, attack3: 0.05, midair_attack3: 0.05, extra_attack: 0.05 },
-  );
-  assert.equal(two.deflect.cooldown, 0.05);
-  for (const cooldown of [0.06, 0.1, 1.2, -0.01, '0.05']) {
-    assert.throws(() => createAttackDefinition({ id: 'a', damage: 1, cooldown }), /repeat cooldown is 0 to 0\.05 s/, String(cooldown));
-    assert.throws(() => createDeflectDefinition({ ...DEF_0002.deflect, cooldown }), /repeat cooldown is 0 to 0\.05 s/);
-  }
-  // A summon's or a technique's own cooldown is its fighter's choice.
-  assert.equal(createTechniqueDefinition({ id: 't', cooldown: 12 }).cooldown, 12);
-  // The repeat delay it leaves after the fighter is free: three steps at most.
+});
+
+test('every roster attack waits its authored repeat delay after ending, independent of other attacks', () => {
   for (const c of CHARACTERS) {
     const { fighter: f, step } = makeFighter({ character: c });
     step(P('attack1'));
-    while (f.combat.attack) step({});
-    let waited = 0;
-    while (!f.combat.attack && waited < 30) {
-      step(P('attack1'));
-      waited++;
-    }
-    assert.ok(waited <= Math.round(MAX_ATTACK_COOLDOWN / DT) + 1, `#${c.id}: attack1 again within ${waited} steps`);
+    while (f.combat.attack) step();
+    assert.equal(f.combat.cooldowns.get('attack1'), 0.5);
+    for (let i = 0; i < 29; i++) { step(); assert.equal(f.tryAction('attack1'), false); }
+    step();
+    assert.equal(f.combat.cooldowns.has('attack1'), false, 'exactly 30 fixed steps');
+    assert.equal(f.tryAction('attack1'), true);
+    f.combat.endAttack();
+    assert.equal(f.tryAction('attack2'), true, 'no global cooldown');
+  }
+  const one = makeFighter().fighter;
+  assert.equal(one.deflect.cooldown, 0);
+  assert.deepEqual(Object.values(one.techniqueDefs).map((t) => t.cooldown), [3, 5]);
+  const two = makeFighter({ character: DEF_0002 }).fighter;
+  assert.equal(two.deflect.cooldown, 0.05);
+  for (const [id, atk] of Object.entries(two.attacks)) assert.equal(atk.cooldown, id === 'extra_attack' ? 5 : 0.5);
+});
+
+test('technique cooldowns begin on acceptance, tick through hitstop, and rejected presses never cast later', () => {
+  for (const [button, duration] of [['attack4', 3], ['attack5', 5]]) {
+    const { fighter: f, step } = makeFighter();
+    step(P(button));
+    assert.equal(f.combat.abilityCooldowns.remaining(button), duration);
+    f.endTechnique('hit');
+    f.combat.hitstop = 0.2;
+    for (let i = 0; i < duration * 60; i++) { step(i === 0 ? P(button) : {}); assert.equal(f.technique, null); }
+    assert.equal(f.bufferedAttack, null);
+    assert.equal(f.combat.abilityCooldowns.active(button), false);
+    step(P(button));
+    assert.equal(f.technique?.def.id, button);
   }
 });
 
@@ -607,4 +597,55 @@ test('every fighter runs, jumps, falls and Dashes on the one baseline, and no de
   // One world gravity for everyone, the arena's.
   assert.equal(CONFIG.sim.gravity, 2500);
   assert.match(readFileSync(ROOT + 'js/game/arena.js', 'utf8'), /this\.gravity = CONFIG\.sim\.gravity;/);
+});
+
+test('reset and respawn clear ordinary, ability and movement cooldowns together', () => {
+  for (const method of ['reset', 'respawn']) {
+    for (const c of CHARACTERS) {
+      const { fighter: f } = makeFighter({ character: c });
+      f.combat.cooldowns.set('extra_attack', 5);
+      f.combat.abilityCooldowns.start('attack4', 3);
+      f.combat.movementCooldowns.start('mouvment', 0.5);
+      f.combat.movementCooldowns.start('midair_mouvment', 0.5);
+      f[method](STAGE);
+      assert.deepEqual([f.combat.cooldowns.size, f.combat.abilityCooldowns.size, f.combat.movementCooldowns.size], [0, 0, 0]);
+    }
+  }
+});
+
+test('interrupted ordinary attacks cannot evade the repeat lockout; Deflect interruption stays exempt', () => {
+  const { fighter: f } = makeFighter();
+  assert.ok(f.tryAction('attack1'));
+  f.combat.interruptAttack();
+  assert.equal(f.combat.cooldowns.get('attack1'), 0.5);
+  assert.equal(f.tryAction('attack1'), false);
+  aloft(f);
+  assert.ok(f.tryDeflect());
+  f.combat.interruptAttack();
+  assert.equal(f.combat.cooldowns.has('deflect'), false);
+});
+
+test('the baseline never blocks running, Shield, ground/air jumps or fast fall', () => {
+  for (const c of CHARACTERS) {
+    const { fighter: f, step } = makeFighter({ character: c });
+    f.combat.movementCooldowns.start('mouvment', 0.5);
+    f.combat.movementCooldowns.start('midair_mouvment', 0.5);
+    f.combat.cooldowns.set('attack1', 0.5);
+    step({ runRight: true });
+    assert.ok(f.body.vx > 0);
+    step(HOLD);
+    assert.ok(f.combat.shielding);
+    step(P('jump'));
+    assert.ok(!f.grounded && f.body.vy < 0);
+    for (let i = 0; i < 6; i++) step();
+    step(P('jump'));
+    assert.ok(f.airJumped);
+    step();
+    step(P('jump'));
+    assert.ok(f.airJumped);
+    f.body.vy = 200;
+    step({ down: true });
+    assert.ok(f.fastFalling);
+    assert.deepEqual([...f.combat.movementCooldowns.entries.keys()].sort(), ['midair_mouvment', 'mouvment']);
+  }
 });

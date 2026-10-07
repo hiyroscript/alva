@@ -193,9 +193,9 @@ its `baseLaunch` (0 to
 big-impact attacks) and its `directionalLaunch` (`null`, `'horizontal'`,
 `'vertical'` or `'reverseVertical'`), each authored separately. Add how
 it moves (`momentum`, `control`, `friction`, `step`), whether a hit
-opens a follow-up (`hitCancel`) and, if you want one, a short repeat
-`cooldown` (0, the default, to 0.05 s at most: a longer one is refused;
-what holds a move back is its own phases,
+opens a follow-up (`hitCancel`) and an optional longer repeat
+`cooldown` (0.5 s minimum by default, with finite longer overrides;
+independent of the move's phases,
 [combat](../systems/combat.md#cooldowns)). For more than a timed hitbox, use the
 attack mechanics: strikes (`hits`), `carry`, `motion` (`hover`, `homing`,
 `bounce`, `rise`, `roll`), `pull`, `airUses`, `freeFall`, `passThrough`,
@@ -249,7 +249,7 @@ the fighter or for its button: never a check for `'0027'` in shared code.
   Deflect](../systems/defense.md#the-deflect)): an attack whose strike is
   always 3 at Base Launch 2 (leave `damage` and `baseLaunch` out) and that
   costs every fighter 15 Energy as it starts; its `cooldown`, if any, is
-  at most 0.05 s, as any attack's. Its box
+  exempt from the ordinary 0.5 s baseline. Its box
   is also what catches projectiles, so cover the front of the body the
   move sweeps. Leave it out for none (the button then does nothing in the
   air).

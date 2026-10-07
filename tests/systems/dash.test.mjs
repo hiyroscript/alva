@@ -759,3 +759,28 @@ test('end to end: a Right mouvement tap through the real InputManager and Player
   assert.deepEqual(dashes, [], 'one tap, one Dash: nothing repeats');
   assert.equal(input.isHeld('runRight'), false);
 });
+
+test('Dash repeat lockout is exactly 30 steps from acceptance, separate from attacks, running and jumps', () => {
+  const { fighter: f, step } = makeFighter();
+  step({ mouvementRightPressed: true });
+  assert.equal(f.combat.movementCooldowns.remaining('mouvment'), 0.5);
+  f.endDash();
+  assert.equal(f.tryDash(-1), false);
+  assert.equal(f.tryAction('attack1'), true, 'no global cooldown');
+  f.combat.interruptAttack();
+  for (let i = 0; i < 29; i++) { step(); assert.equal(f.tryDash(-1), false); }
+  step();
+  assert.equal(f.tryDash(-1), true, 'exactly half a second, no phase drift');
+});
+
+test('Dash requests during cooldown are dropped even in hitstop; a fresh ready request works', () => {
+  const { fighter: f, step } = makeFighter();
+  f.combat.movementCooldowns.start('mouvment', 0.1);
+  f.combat.hitstop = 0.3;
+  step({ mouvementRightPressed: true });
+  assert.equal(f.bufferedDash, null);
+  for (let i = 0; i < 25; i++) step();
+  assert.equal(f.dash, null, 'no delayed Dash after freeze or cooldown');
+  step({ mouvementRightPressed: true });
+  assert.ok(f.dash);
+});
