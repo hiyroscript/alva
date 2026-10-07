@@ -352,8 +352,8 @@ test('Home: Play, Watch Mode, Practice Ground, then Discover; Practice Ground an
   const { play, watch, practice, discover } = home.actions;
   assert.deepEqual(Object.keys(home.actions), ['play', 'watch', 'practice', 'discover'], 'exactly four menu actions');
   assert.ok(play.html.includes('<span>Play</span>'));
-  assert.ok(watch.html.includes('<span>Watch Mode</span>'));
-  assert.ok(practice.html.includes('<span>Practice Ground</span>'));
+  assert.ok(watch.html.includes('<span>Watch mode</span>'));
+  assert.ok(practice.html.includes('<span>Practice ground</span>'));
   assert.ok(discover.html.includes('<span>Discover</span>'));
   assert.deepEqual(home.el.querySelectorAll('.home-action'), [play, watch, practice, discover], 'Watch Mode under Play, Discover last');
   // Discover matches Practice Ground: the same outlined action and chevron.
