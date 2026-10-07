@@ -25,6 +25,7 @@ import { DIFFICULTY_IDS, getDifficultyProfile } from '../../js/data/difficulty.j
 import { getCharacter } from '../../js/data/characters.js';
 import { mulberry32 } from '../../js/core/utils.js';
 import { blankInput } from '../../js/game/fighters/fighter-controller.js';
+import { COOLING_CASTER } from '../fighters/fixtures/cooling-fighters.mjs';
 
 const BUTTONS = ['runLeft', 'runRight', 'down', 'jump', 'shield', 'extra_attack', 'transform', 'attack1', 'attack2', 'attack3', 'attack4', 'attack5'];
 const COMBAT = ['extra_attack', 'transform', 'attack1', 'attack2', 'attack3'];
@@ -42,7 +43,7 @@ const RAISED = new StageCollision(stageMap({ platforms: [{ id: 'deck', x: 1300, 
 // logged every step.
 function ring({
   difficulty = 'medium', seed = 1, stage = FLAT, cpuX = 1000, foeX = 1200, foeY, script = () => ({}),
-  cpuFacing = Math.sign(foeX - cpuX) || 1, foeFacing = -cpuFacing, foeDef = def,
+  cpuFacing = Math.sign(foeX - cpuX) || 1, foeFacing = -cpuFacing, foeDef = def, cpuDef = def,
 } = {}) {
   const sprites = fakeSprites();
   const ai = new CombatAIController({ difficulty, rng: mulberry32(seed) });
@@ -51,7 +52,7 @@ function ring({
     def: foeDef, sprites, stage, slot: 'p1', label: 'P1', spawn: { x: foeX, y: foeY, facing: foeFacing },
     controller: { getInput: (self) => ({ ...script(n, self) }) },
   });
-  const cpu = new Fighter({ def, sprites, stage, slot: 'p2', label: 'CPU', spawn: { x: cpuX, facing: cpuFacing }, controller: ai });
+  const cpu = new Fighter({ def: cpuDef, sprites, stage, slot: 'p2', label: 'CPU', spawn: { x: cpuX, facing: cpuFacing }, controller: ai });
   foe.opponent = cpu;
   cpu.opponent = foe;
   const world = {
@@ -354,8 +355,11 @@ test('a walk toward the ledge stops at it', () => {
 test('it presses Attack 4 and Attack 5 directly: one press on the move\'s own button, nothing held with it, and never again while it cools down', () => {
   const specials = readMoveset(ring().cpu).specials;
   assert.deepEqual(specials.map((c) => c.action), ['attack4', 'attack5']);
-  for (const special of specials) {
-    const r = ring({ difficulty: 'hard', seed: 17, cpuX: 900, foeX: 1100 });
+  // #0001's techniques have no cooldown; a fighter whose do (the same
+  // techniques, cooling down) shows the CPU waiting one out.
+  for (const [special, cpuDef] of specials.flatMap((c) => [[c, def], [c, COOLING_CASTER]])) {
+    const cooling = cpuDef.techniques[special.id].cooldown > 0;
+    const r = ring({ difficulty: 'hard', seed: 17, cpuX: 900, foeX: 1100, cpuDef });
     r.hush();
     const face = special.type === 'technique' ? 1 : 0;
     r.ai.setIntent({ kind: 'attack', action: special.action, face, until: r.ai.clock + 0.3 });
@@ -372,11 +376,13 @@ test('it presses Attack 4 and Attack 5 directly: one press on the move\'s own bu
     for (const other of ['attack1', 'attack2', 'attack3', 'extra_attack', 'shield']) {
       if (other !== special.action) assert.equal(press[other], false, `${special.id}: no ${other} with it`);
     }
-    assert.ok(r.cpu.combat.abilityCooldowns.active(special.id), `${special.id}: its cooldown runs`);
+    assert.equal(r.cpu.combat.abilityCooldowns.active(special.id), cooling, `${special.id}: a cooldown only where it has one`);
     assert.equal(cast?.action, special.action, `${special.id}: the technique came from its own button`);
     // Its own options never offer it again while it is cooling down.
-    const s = r.ai.sense(r.cpu, r.foe, r.ctx);
-    assert.ok(!r.ai.specialOptions(s).some((o) => o.intent.action === special.action), `${special.id}: not while cooling down`);
+    if (cooling) {
+      const s = r.ai.sense(r.cpu, r.foe, r.ctx);
+      assert.ok(!r.ai.specialOptions(s).some((o) => o.intent.action === special.action), `${special.id}: not while cooling down`);
+    }
   }
 });
 

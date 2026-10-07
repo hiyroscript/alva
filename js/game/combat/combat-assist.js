@@ -9,9 +9,10 @@
 // thrown anywhere in a jump), capped by one Dash's travel on the ground and
 // one air dash's in the air. The Fighter (js/game/fighters/fighter.js) owns
 // the rest: the runtime state (fighter.combatAssist), when in each fixed
-// step it is read, its Energy, the presses that replace or cancel it, and
-// who has it at all (a player's controller with the setting on, never a
-// CPU).
+// step it is read, the presses that replace or cancel it, and who has it at
+// all (a player's controller with the setting on, never a CPU). It moves at
+// the Dash's and the air dash's speed and range, but it is neither: it
+// never costs Energy (full, partly spent or exhausted, it is free).
 //
 // Inputs: a Fighter (its body, pushbox, universal movement values and its
 // Dash and air dash durations), the attack definition its press resolved to

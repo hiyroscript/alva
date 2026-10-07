@@ -25,6 +25,7 @@ import { readMoveset } from '../../js/game/ai/moveset.js';
 import { cooldownIndicators, cooldownLabel } from '../../js/game/rendering/fighter-status.js';
 import { ABILITY_ACTIONS } from '../../js/ui/mobile-abilities.js';
 import { stylesheetFiles } from '../helpers/stylesheet.mjs';
+import { COOLING_CASTER } from '../fighters/fixtures/cooling-fighters.mjs';
 
 const ROOT = new URL('../../', import.meta.url);
 const read = (path) => readFileSync(new URL(path, ROOT), 'utf8');
@@ -251,7 +252,14 @@ test('attack4 is Unlimited Void\'s technique and attack5 Hollow Purple\'s, each 
 });
 
 test('pressing attack4 and attack5 starts their cooldowns, keyed by those moves and shown as A4 and A5', () => {
-  const caster = makeFighter();
+  // #0001's techniques have none: using them leaves nothing behind.
+  const free = makeFighter();
+  free.step({ attack4: true, attack4Pressed: true });
+  assert.equal(free.fighter.technique?.def.id, 'attack4');
+  assert.equal(free.fighter.combat.abilityCooldowns.size, 0);
+  assert.deepEqual(cooldownIndicators(free.fighter), []);
+  // A fighter whose techniques have one: keyed by the move, shown by it.
+  const caster = makeFighter({ character: COOLING_CASTER });
   const foe = makeFighter({ x: 1400, facing: -1 });
   caster.fighter.opponent = foe.fighter;
   caster.step({ attack4: true, attack4Pressed: true });

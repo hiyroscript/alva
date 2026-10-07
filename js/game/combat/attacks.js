@@ -5,11 +5,12 @@
 //
 // Inputs: one attack entry from a character definition
 // (js/data/characters/<id>.js), plus its id; Base Launch / Directional
-// Launch validation from js/data/launch.js, and the hit effects
+// Launch and damage validation from js/data/launch.js, and the hit effects
 // (unblockable, paralyze, blockPush) from js/game/combat/hit-effects.js.
 // Outputs: createAttackDefinition, attackPhase, strikeLive, attackReach,
 // isMeleeAttack / isRangedAttack (what kind of strike an attack is),
-// MOTION_TYPES and PHASE_EPSILON (the slack every phase boundary compares
+// MOTION_TYPES, MAX_ATTACK_COOLDOWN (the longest repeat cooldown an attack
+// may have) and PHASE_EPSILON (the slack every phase boundary compares
 // with).
 // Important constraints: definitions are frozen and validated once; a
 // field this schema does not know is carried along untouched, never
@@ -30,8 +31,8 @@
 //   attacks: {
 //     attack1: {
 //       animation: 'attack1', startup: 0.07, active: 0.05, recovery: 0.16,
-//       damage: 6, hitbox: { x: 18, y: -62, w: 34, h: 18 },
-//       baseLaunch: 1, directionalLaunch: 'horizontal', hitstun: 0.22, blockstun: 0.14, cooldown: 0.1,
+//       damage: 3, hitbox: { x: 18, y: -62, w: 34, h: 18 },
+//       baseLaunch: 1, directionalLaunch: 'horizontal', hitstun: 0.22, blockstun: 0.14, cooldown: 0.05,
 //     },
 //     attack2: { ..., baseLaunch: 2, directionalLaunch: 'vertical' },
 //     midair_attack2: { animation: 'midair_attack2', ..., baseLaunch: 2, directionalLaunch: 'reverseVertical' },
@@ -43,12 +44,25 @@
 //     attack2: { ground: 'attack2', air: 'midair_attack2' },
 //   }
 //
-// Every hit (an attack's, a projectile's, a technique's) declares
-// its Base Launch (`baseLaunch`: 0, 1, 2 or 3, a multiplier, never a
+// Every hit (an attack's, a projectile's, a technique's) deals one of the
+// damage tiers (1, 3, 5 or 10: ALLOWED_DAMAGE_VALUES in js/data/launch.js)
+// and declares its Base Launch (`baseLaunch`: 0, 1, 2 or 3, a multiplier, never a
 // velocity) and its Directional Launch (`directionalLaunch`: null,
 // 'horizontal', 'vertical' or 'reverseVertical'), independently of each
 // other and of its damage (see js/data/launch.js). createAttackDefinition
-// validates them once; a hit that declares neither never launches.
+// validates all three once; a hit that declares neither launch field never
+// launches. An attack that strikes (one with a hitbox) must declare its
+// damage; one without (a throw: its projectile is the hit) may not.
+//
+// `cooldown` is the short repeat delay of an ordinary attack: seconds,
+// from its end, before the same attack may start again (see
+// CombatState.cooldowns), and how long it must have been cancellable
+// before it may cut itself short into itself (CombatState.cancellableFor).
+// 0, the default, is none at all; it is never more than
+// MAX_ATTACK_COOLDOWN (3 steps at 60 Hz), so repeating an attack is held
+// back by its own phases (startup, active, recovery, hit-cancel), not by a
+// timer. A longer one is refused. A summon's or a technique's cooldown is
+// its own (see js/game/combat/summon.js and technique.js), never this.
 //
 // An attack needs real frames for its `animation`; without them it is refused
 // rather than faked. Its hitbox only exists during the active phase.
@@ -90,19 +104,21 @@
 //   extra_attack: {
 //     animation: 'extra_attack', startup: 1 / 12, active: 1 / 12, recovery: 1 / 12,
 //     hitbox: null, projectile: { id: 'extra_attack_object', spawnAt: 1 / 12, offset: { x: 16, y: -38 } },
-//     cooldown: 0.25, groundOnly: true,
+//     cooldown: 0.05, groundOnly: true,
 //   },
 //
 // A multi-hit attack lists its strikes in `hits` instead of one hitbox:
 // each strikes at most once, while its own window is open (`at` to `at +
 // active`, seconds into the attack), on the first opponent its box meets,
-// and resolves with its own `damage`, `baseLaunch` and `directionalLaunch`
+// and resolves with its own `damage` (required: each strike is a hit of
+// its own, one of the damage tiers), `baseLaunch` and `directionalLaunch`
 // (0 and none unless it declares them). A strike's `hitbox`, `hitstun`,
 // `blockstun`, `hitstop` and `carry` default to the attack's own. The
 // attack's startup and active phase follow from its strikes (startup to the
 // first one's window, active until the last one's closes; declaring either
 // is refused), and so do the fields a reader of the whole attack goes by:
-// `hitbox` is the box round every strike's, `damage` their sum, and
+// `hitbox` is the box round every strike's, `damage` their sum (derived,
+// so it need not be a tier itself), and
 // `baseLaunch` / `directionalLaunch` the last strike's (the finisher). A
 // Shield that blocks a strike stops the string there: the later strikes
 // strike nothing (so a flurry can never empty a Shield on its own).
@@ -213,7 +229,7 @@
 //
 //   attack1: { animation: 'attack1', pending: true },
 
-import { resolveHitLaunch } from '../../data/launch.js';
+import { resolveHitDamage, resolveHitLaunch } from '../../data/launch.js';
 import { resolveHitEffects } from './hit-effects.js';
 
 const ATTACK_DEFAULTS = {
@@ -221,7 +237,7 @@ const ATTACK_DEFAULTS = {
   startup: 0.08,
   active: 0.06,
   recovery: 0.18,
-  damage: 0,
+  damage: 0,         // none until declared: an attack that strikes must declare its own (see above)
   hitbox: { x: 0, y: -60, w: 30, h: 20 },
   hitstun: 0.2,
   blockstun: 0.12,
@@ -313,7 +329,7 @@ function resolveStrikes(spec, base) {
     if (!(h.at >= 0) || !(h.active > 0)) throw new Error(`[Alva] ${who} needs an \`at\` from 0 and a positive \`active\``);
     if (h.at < last) throw new Error(`[Alva] ${who} starts before the strike listed ahead of it`);
     last = h.at;
-    const strike = { id: spec.id, index, at: h.at, active: h.active, damage: h.damage ?? 0 };
+    const strike = { id: spec.id, index, at: h.at, active: h.active, damage: resolveHitDamage(h.damage, who) };
     // The attack's own fields, or the defaults, except the box: a strike
     // with none of its own and none on the attack is refused, never given a
     // default box nobody drew.
@@ -395,6 +411,10 @@ export function strikeLive(hit, time) {
   return time >= hit.at - PHASE_EPSILON && time < hit.at + hit.active - PHASE_EPSILON;
 }
 
+// The longest repeat cooldown an attack may have (see `cooldown` above):
+// three 60 Hz steps.
+export const MAX_ATTACK_COOLDOWN = 0.05;
+
 // Attack time is a sum of fixed steps, so compare phase boundaries with a
 // little slack: a phase that is a whole number of steps long (e.g. 1 / 12 s at
 // 60 Hz) then lasts exactly that many steps instead of drifting by one.
@@ -441,6 +461,13 @@ export function createAttackDefinition(spec, { clipDuration = 0 } = {}) {
     : { ...ATTACK_DEFAULTS, ...spec, ...resolveHitLaunch(spec, owner) };
   Object.assign(def, resolveHitEffects(spec, owner));
   if (spec.hits) Object.assign(def, resolveStrikes(spec, def));
+  else if (def.hitbox) def.damage = resolveHitDamage(spec.damage, owner);
+  else if (spec.damage !== undefined) {
+    throw new Error(`[Alva] ${owner} declares damage but has no hitbox: its projectile's hit is the one that deals damage`);
+  }
+  if (!(typeof def.cooldown === 'number' && def.cooldown >= 0 && def.cooldown <= MAX_ATTACK_COOLDOWN + PHASE_EPSILON)) {
+    throw new Error(`[Alva] ${owner} declares cooldown ${def.cooldown}: an attack's repeat cooldown is 0 to ${MAX_ATTACK_COOLDOWN} s`);
+  }
   def.motion = resolveMotion(spec.motion, owner);
   def.pull = resolvePull(spec.pull, owner);
   def.deflectProjectiles = !!def.deflectProjectiles;

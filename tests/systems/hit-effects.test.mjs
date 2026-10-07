@@ -17,14 +17,15 @@ import { createTechniqueDefinition } from '../../js/game/combat/technique.js';
 import { CombatSystem } from '../../js/game/combat/combat.js';
 import { applyPulls } from '../../js/game/combat/pull.js';
 import { getCharacter } from '../../js/data/characters.js';
-import { def, DT, duel, makeFighter, steps } from '../helpers/fighter-harness.mjs';
+import { def, DT, duel, makeFighter, steps, probeHit } from '../helpers/fighter-harness.mjs';
 
 const P = (k) => ({ [k]: true, [`${k}Pressed`]: true });
 const SHIELD = { shield: true, shieldPressed: true };
 const HOLD = { shield: true };
 
-// A bespoke hit: no damage and no launch unless given, its own stuns.
-const hit = (spec = {}) => createAttackDefinition({
+// A bespoke hit: no damage and no launch unless given (a probe, see
+// probeHit), its own stuns.
+const hit = (spec = {}) => probeHit({
   id: 'testHit', damage: 0, hitstun: 0.2, blockstun: 0.12, hitstop: 0, ...spec,
 });
 
@@ -48,19 +49,19 @@ function pair({ shield = false } = {}) {
 test('every effect is optional, and its default changes nothing', () => {
   assert.deepEqual([...HIT_EFFECT_FIELDS], ['unblockable', 'paralyze', 'blockPush']);
   assert.deepEqual(resolveHitEffects(undefined), { unblockable: false, paralyze: 0, blockPush: 0 });
-  assert.deepEqual(resolveHitEffects({ damage: 4 }), { unblockable: false, paralyze: 0, blockPush: 0 });
+  assert.deepEqual(resolveHitEffects({ damage: 5 }), { unblockable: false, paralyze: 0, blockPush: 0 });
   assert.deepEqual(resolveHitEffects({ unblockable: true, paralyze: 1.5, blockPush: 400 }), { unblockable: true, paralyze: 1.5, blockPush: 400 });
   // An attack, a projectile, a technique's burst and a finisher all carry
   // them, resolved the same way.
   assert.equal(hit().unblockable, false);
   assert.equal(hit({ paralyze: 1 }).paralyze, 1);
   const proj = createProjectileDefinition({
-    id: 'testShot', speed: 100, unblockable: true, pierce: { hits: 2, interval: 0.1 }, finisher: { damage: 2 },
+    id: 'testShot', speed: 100, damage: 1, unblockable: true, pierce: { hits: 2, interval: 0.1 }, finisher: { damage: 3 },
   });
   assert.equal(proj.unblockable, true);
   assert.equal(proj.finisher.unblockable, true, 'a finisher inherits its projectile\'s');
   const tech = createTechniqueDefinition({
-    id: 'testCast', castAnimation: 'a', releaseAnimation: 'b', burst: { hitbox: { x: -1, y: -1, w: 2, h: 2 }, hit: { paralyze: 2 } },
+    id: 'testCast', castAnimation: 'a', releaseAnimation: 'b', burst: { hitbox: { x: -1, y: -1, w: 2, h: 2 }, hit: { damage: 1, paralyze: 2 } },
   });
   assert.equal(tech.burst.hit.paralyze, 2);
   // A multi-hit attack's strikes take the attack's unless they say.
@@ -76,7 +77,7 @@ test('a value of the wrong kind is refused, naming its owner', () => {
   assert.throws(() => resolveHitEffects({ paralyze: -1 }), /paralyze must be seconds from 0/);
   assert.throws(() => resolveHitEffects({ blockPush: '520' }), /blockPush must be a speed from 0/);
   assert.throws(() => hit({ paralyze: 'long' }), /Attack "testHit"'s paralyze/);
-  assert.throws(() => createProjectileDefinition({ id: 'testShot', blockPush: -5 }), /Projectile "testShot"'s blockPush/);
+  assert.throws(() => createProjectileDefinition({ id: 'testShot', damage: 1, blockPush: -5 }), /Projectile "testShot"'s blockPush/);
 });
 
 test('nothing in the shared code names a fighter or a move', () => {
@@ -130,15 +131,15 @@ test('a longer hold wins, a hit that only stuns keeps it, and any launching hit 
   system.applyHit(attacker, target, hit({ paralyze: 1.5 }));
   system.applyHit(attacker, target, hit({ paralyze: 0.5 }));
   assert.equal(target.combat.paralysis, 1.5, 'the longer hold');
-  system.applyHit(attacker, target, hit({ damage: 2 }));
+  system.applyHit(attacker, target, hit({ damage: 3 }));
   assert.equal(target.combat.paralysis, 1.5, 'a hit that launches nothing keeps it');
-  const e = system.applyHit(attacker, target, hit({ damage: 4, baseLaunch: 2, directionalLaunch: 'vertical' }));
+  const e = system.applyHit(attacker, target, hit({ damage: 5, baseLaunch: 2, directionalLaunch: 'vertical' }));
   assert.ok(e.launchSpeed > 0);
   assert.equal(target.combat.paralysis, 0, 'the launch is never held back');
   assert.ok(target.body.vy < 0, 'up it goes');
   // A paralysing hit that launches holds nothing.
   const other = pair();
-  const both = other.system.applyHit(other.attacker, other.target, hit({ damage: 4, baseLaunch: 2, directionalLaunch: 'vertical', paralyze: 2 }));
+  const both = other.system.applyHit(other.attacker, other.target, hit({ damage: 5, baseLaunch: 2, directionalLaunch: 'vertical', paralyze: 2 }));
   assert.equal(both.paralysis, 0);
   assert.equal(other.target.combat.immobilized, false);
 });

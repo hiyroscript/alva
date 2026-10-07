@@ -58,7 +58,8 @@
 // has no Launch Point of its own, controller, pushbox, hurtboxes, physics,
 // camera or HUD presence: it cannot be hit and nothing collides with it. Its
 // hitbox exists only during the attack's active phase and connects at most
-// once, with the attack's own damage, Base Launch and Directional Launch,
+// once, with the attack's own damage (one of the tiers, validated with the
+// attack: see createAttackDefinition), Base Launch and Directional Launch,
 // resolved by the same CombatSystem.applyHit as the owner's (a horizontal
 // launch travels along the clone's facing); the hit credits the owner
 // but freezes only the target and the clone itself, never the owner.

@@ -7,8 +7,9 @@
 // these fighters test): every ordinary numbered attack plays #0001's Jab
 // frames and every mid-air one its Floating Straight (without its hover:
 // a plain aerial), each under its own codename, and each hits for its own
-// number in damage (attack3 deals 3, midair_attack5 5), so a test can tell
-// which one landed.
+// number in damage rounded up to the next damage tier (loadoutDamage:
+// attack1 1, attack2 and attack3 3, attack4 and attack5 5; no hit may deal
+// 2 or 4), so its own data shows; its event's `move` tells which landed.
 //
 // The cases the loadout rules spell out:
 //
@@ -26,12 +27,17 @@
 // its own (#0001's Unlimited Void cast poses, borrowed as attack3_summon),
 // appearing through a cloud (the blue orb's frame); the technique is
 // #0001's Unlimited Void (its clips borrowed under attack4's own names),
-// and in Case G attack5 is #0001's Hollow Purple with its projectile.
+// and in Case G attack5 is #0001's Hollow Purple with its projectile, each
+// with a 6 s cooldown of its own (#0001's have none).
 import { getCharacter } from '../../../js/data/characters.js';
 import { NUMBERED_ATTACKS } from '../../../js/config.js';
 
 const BASE = getCharacter('0001');
 const A = BASE.animations;
+
+// What numbered attack `n` (and its mid-air version) deals: `n` rounded up
+// to the next damage tier (1, 3, 5 or 10, see js/data/launch.js).
+export const loadoutDamage = (n) => [1, 3, 5, 10].find((tier) => tier >= n);
 
 const UNIVERSAL = [
   'idle', 'run', 'jump', 'fall', 'mouvment', 'midair_mouvment', 'land', 'hurt', 'midair_hurt', 'shielding', 'deflect',
@@ -52,8 +58,8 @@ export function loadoutFighter({ id, count, specials = false, casts = [], extra 
     const air = `midair_${button}`;
     animations[button] = A.attack1;
     animations[air] = A.midair_attack1;
-    attacks[button] = { ...BASE.attacks.attack1, animation: button, damage: n };
-    attacks[air] = { ...BASE.attacks.midair_attack1, animation: air, damage: n, motion: undefined, airUses: 0 };
+    attacks[button] = { ...BASE.attacks.attack1, animation: button, damage: loadoutDamage(n) };
+    attacks[air] = { ...BASE.attacks.midair_attack1, animation: air, damage: loadoutDamage(n), motion: undefined, airUses: 0 };
     actions[button] = { ground: button, air };
   }
   const def = {
@@ -84,7 +90,9 @@ export function loadoutFighter({ id, count, specials = false, casts = [], extra 
   }
   for (const button of special.filter((b) => b === 'attack4' || b === 'attack5')) {
     actions[button] = { type: 'technique', id: button };
-    def.techniques[button] = BASE.techniques[button];
+    // #0001's own technique, with a cooldown of its own (#0001's has none),
+    // so the matrix covers the shared technique cooldown too.
+    def.techniques[button] = { ...BASE.techniques[button], cooldown: 6 };
     for (const key of Object.keys(BASE.animations).filter((k) => k.startsWith(`${button}_`))) animations[key] = A[key];
     const shot = BASE.techniques[button].projectile;
     if (shot) {

@@ -148,8 +148,12 @@ before a melee attack, on the ground and in the air
 from a fighter, as an attack's own `hitbox` (and no `projectile`) is what
 makes it melee.
 
-Optionally `energy` (Dash, air dash, Combat Assist and Shield costs; defaults in
-[Energy](../systems/energy.md)), `launchReaction` (extra stun, tumble,
+Optionally `energy: { regen }`, its refill rate per second (12 when left
+out). That is all a fighter sets of its Energy: the bar (100) and every
+cost (a Dash, an air dash or a Dash cancel 25, a Deflect 15, a block 15;
+Combat Assist nothing) are the same for everyone, and a definition that
+writes another is refused ([Energy](../systems/energy.md)).
+Optionally too `launchReaction` (extra stun, tumble,
 steering; [launch](../systems/launch.md#launch-reaction-per-fighter)) and
 `launchBounce` (overrides of the shared rebound settings).
 
@@ -179,12 +183,20 @@ hidden and the CPU never presses it).
 `startup` / `active` / `recovery` to whole frames of the clip so the
 hitbox is live only while the strike is on screen; measure the `hitbox`
 from the art, facing right from the fighter's origin. Every hit declares
-its `damage` (added to the target's Launch Point), its `baseLaunch` (0 to
+its `damage` (added to the target's Launch Point), one of the four tiers
+and nothing else: 1 for a light hit or a tick of a multi-hit string, 3
+for a solid one, 5 for a heavy hit or a major launcher, 10 for an
+exceptional, ultimate-level one (anything else, `damage: 2` included, is
+refused as the registry loads: [combat](../systems/combat.md#damage));
+its `baseLaunch` (0 to
 3: by `codename_rule`'s launch levels, 1 for light, 2 for medium, 3 for
 big-impact attacks) and its `directionalLaunch` (`null`, `'horizontal'`,
 `'vertical'` or `'reverseVertical'`), each authored separately. Add how
-it moves (`momentum`, `control`, `friction`, `step`) and whether a hit
-opens a follow-up (`hitCancel`). For more than a timed hitbox, use the
+it moves (`momentum`, `control`, `friction`, `step`), whether a hit
+opens a follow-up (`hitCancel`) and, if you want one, a short repeat
+`cooldown` (0, the default, to 0.05 s at most: a longer one is refused;
+what holds a move back is its own phases,
+[combat](../systems/combat.md#cooldowns)). For more than a timed hitbox, use the
 attack mechanics: strikes (`hits`), `carry`, `motion` (`hover`, `homing`,
 `bounce`, `rise`, `roll`), `pull`, `airUses`, `freeFall`, `passThrough`,
 `hurtboxes`, and on any hit the shared hit effects (`unblockable`,
@@ -202,14 +214,16 @@ back (`repel`) or erase them and fly through fighters (`erase`).
 
 **A summon** (a clone of the fighter performing one of its own attacks)
 is a `summons.attackN` entry with its `attack`, its `cloud` (an
-`effectAnimations` entry named `attackN_object`), `cooldown`, and
+`effectAnimations` entry named `attackN_object`), a `cooldown` if it
+should have one (0, the default, is none), and
 optionally `startupAnimation` (`attackN_summon`) and `noGround`
 ([summons](../systems/combat.md#summons)).
 
 **A technique** is a `techniques.attackN` entry. The runtime supports one
 form, the cast: two fighter clips (`castAnimation`, `releaseAnimation`,
-named `attackN_cast` and `attackN_release` by convention), a `cooldown`,
-and what it lets go of as the cast ends, a `projectile` (an entry of
+named `attackN_cast` and `attackN_release` by convention), a `cooldown`
+if it should have one (0, the default, is none: #0001's have none), and
+what it lets go of as the cast ends, a `projectile` (an entry of
 `projectiles`, `attackN_object`), a `burst` round the fighter (a `hitbox`
 and its `hit`), or both ([techniques](../systems/combat.md#techniques);
 #0001's Unlimited Void and Hollow Purple). A technique of a different
@@ -233,7 +247,9 @@ the fighter or for its button: never a check for `'0027'` in shared code.
   recovery, hitbox, directionalLaunch, ..., deflectProjectiles: true }`
   for the Shield button in the air ([the
   Deflect](../systems/defense.md#the-deflect)): an attack whose strike is
-  always 3 at Base Launch 2 (leave `damage` and `baseLaunch` out). Its box
+  always 3 at Base Launch 2 (leave `damage` and `baseLaunch` out) and that
+  costs every fighter 15 Energy as it starts; its `cooldown`, if any, is
+  at most 0.05 s, as any attack's. Its box
   is also what catches projectiles, so cover the front of the body the
   move sweeps. Leave it out for none (the button then does nothing in the
   air).

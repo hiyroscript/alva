@@ -19,7 +19,7 @@ import { fileURLToPath } from 'node:url';
 import { characterFramePaths, getCharacter } from '../../js/data/characters.js';
 import { COMBAT_ACTIONS } from '../../js/game/fighters/fighter.js';
 import { createDefenseDefinition } from '../../js/game/combat/defense.js';
-import { CombatState, resolveEnergy } from '../../js/game/combat/combat-state.js';
+import { BLOCK_ENERGY_COST, CombatState, resolveEnergy } from '../../js/game/combat/combat-state.js';
 import { CombatSystem } from '../../js/game/combat/combat.js';
 import { SpriteSet } from '../../js/game/rendering/sprite-normalizer.js';
 import {
@@ -42,8 +42,9 @@ const JUMP = { jump: true, jumpPressed: true };
 const RIGHT = { runRight: true };
 const SHIELD_FPS = 12;
 const POSE = steps(1 / SHIELD_FPS); // simulation steps the raise / lower pose shows
-// What each block costs #0001's Shield, and its refill rate.
-const COST = def.energy.shieldHitCost;
+// What each block costs (every fighter's Shield, a perfect block's
+// included), and #0001's refill rate.
+const COST = BLOCK_ENERGY_COST;
 const REGEN = def.energy.regen;
 // #0001 with no Energy refill, so a run of blocks lands on exact values.
 const NO_REGEN = { ...def, energy: { ...def.energy, regen: 0 } };
@@ -165,7 +166,8 @@ test('#0001 defends with a Shield: typed data, no Dodge fields, no chip-damage s
   assert.equal(fighter.defense.type, 'shield');
   assert.ok(Object.isFrozen(fighter.defense));
   assert.equal(def.stats?.blockDamageScale, undefined);
-  assert.equal(def.energy.shieldHitCost, COST);
+  assert.equal(fighter.energyDef.shieldHitCost, COST);
+  assert.equal('shieldHitCost' in def.energy, false, 'never a fighter\'s own');
   assert.equal('blockDrain' in def.energy, false, 'no drain while held');
   assert.equal('dodgeCost' in def.energy, false);
   // Generic: typed, so a future fighter may defend another way; none at all
@@ -489,18 +491,18 @@ test('no Shield while stunned, paralyzed or performing a technique', () => {
 
 // ---- Blocking (real hitboxes via CombatSystem) ------------------------------------
 
-test('each blocked hit costs exactly its Shield\'s cost: 100 -> 80 -> 60 -> 40 -> 20 -> 0, and the last still blocks', () => {
-  assert.equal(COST, 20);
+test('each blocked hit costs exactly 15: 100 -> 85 -> 70 -> 55 -> 40 -> 25 -> 10 -> 0, and the last still blocks', () => {
+  assert.equal(COST, 15);
   const d = duel({ targetCharacter: NO_REGEN });
   raiseShield(d);
   const trail = [];
-  for (const expected of [80, 60, 40, 20, 0]) {
+  for (const expected of [85, 70, 55, 40, 25, 10, 0]) {
     const [event, ...rest] = blockedAttack(d);
     assert.deepEqual(rest, [], 'one event per attack');
     assert.equal(event.type, 'block');
     assert.equal(event.move, 'attack1');
     assert.equal(event.damage, 0, 'no Launch Point');
-    assert.equal(event.energyCost, COST);
+    assert.equal(event.energyCost, expected ? COST : 10, 'its cost, or the last 10 it had');
     assert.equal(event.launchStrength, 0);
     assert.deepEqual({ ...event.finalLaunch }, { x: 0, y: 0 });
     assert.equal(d.target.combat.energy, expected);
@@ -513,7 +515,7 @@ test('each blocked hit costs exactly its Shield\'s cost: 100 -> 80 -> 60 -> 40 -
     trail.push(d.target.combat.energy);
     while (d.attacker.combat.attack || d.attacker.combat.cooldowns.size) d.tick({}, HOLD);
   }
-  assert.deepEqual(trail, [80, 60, 40, 20, 0]);
+  assert.deepEqual(trail, [85, 70, 55, 40, 25, 10, 0]);
   // The last emptied it: exhausted, the Shield dropped, the bar gray.
   assert.equal(d.target.combat.energyExhausted, true);
   assert.equal(d.target.combat.shielding, false);
@@ -1018,19 +1020,19 @@ test('the training CPU never presses Shield and never shields', async () => {
   }
 });
 
-test('CombatState starts with the Shield down and nothing held; resolveEnergy carries the Shield\'s cost', () => {
+test('CombatState starts with the Shield down and nothing held; resolveEnergy carries the Shield\'s one cost', () => {
   const c = new CombatState();
   assert.equal(c.shielding, false);
   assert.equal(c.shieldStun, 0);
-  assert.equal(c.energySpec.shieldHitCost, 25, 'the default cost');
-  assert.equal(resolveEnergy({ shieldHitCost: 10 }).shieldHitCost, 10);
-  assert.equal(resolveEnergy(def.energy).shieldHitCost, COST, '#0001\'s own');
+  assert.equal(c.energySpec.shieldHitCost, 15, 'the one cost');
+  assert.throws(() => resolveEnergy({ shieldHitCost: 10 }), /shieldHitCost 10: it is 15 for every fighter/);
+  assert.equal(resolveEnergy(def.energy).shieldHitCost, COST, '#0001\'s is everyone\'s');
   assert.equal(BASE, './assets/characters/0001/0001_');
 });
 
 // ---- Perfect Shield ---------------------------------------------------------------
 
-test('a Shield raised just before the hit blocks perfectly: no Energy, no blockstun, free to answer at once', () => {
+test('a Shield raised just before the hit blocks perfectly: no blockstun, free to answer at once, for the same 15 as any block', () => {
   const d = duel({ targetCharacter: NO_REGEN });
   // The Jab lands 8 steps after its press: raise the Shield 6 steps before.
   d.tick(ATTACK1);
@@ -1040,8 +1042,8 @@ test('a Shield raised just before the hit blocks perfectly: no Energy, no blocks
   const [e] = d.events;
   assert.equal(e.type, 'block');
   assert.equal(e.perfect, true);
-  assert.equal(e.energyCost, 0, 'free');
-  assert.equal(d.target.combat.energy, 100);
+  assert.equal(e.energyCost, COST, 'never free, never a discount');
+  assert.equal(d.target.combat.energy, 100 - COST, 'nothing given back');
   assert.equal(d.target.combat.shieldStun, 0, 'no blockstun');
   assert.ok(d.target.combat.hitstop > 0, 'the impact still freezes both');
   // Let go once the freeze is over: straight into its own punch, while the
@@ -1087,6 +1089,8 @@ test('only a fresh raise is perfect: held long, or tapped again too soon after l
     for (let i = 0; i < steps(def.defense.perfectRearm) + 1; i++) d.tick({}, {});
   }, true);
   assert.equal(fresh.perfect, true);
+  // Perfect or not, a block costs the same.
+  assert.deepEqual([held.energyCost, tapped.energyCost, fresh.energyCost], [COST, COST, COST]);
   // A hit is never perfect.
   const hit = duel();
   hit.tick(ATTACK1);

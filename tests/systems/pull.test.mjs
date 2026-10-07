@@ -31,17 +31,17 @@ test('a pull needs a positive radius and speed; its point defaults to the origin
   assert.ok(Object.isFrozen(resolvePull({ radius: 1, speed: 1, offset: { x: 3 } }, 'x').offset));
   assert.throws(() => resolvePull({ radius: 0, speed: 300 }, 'Attack "a"'), /Attack "a"'s pull needs a positive radius and speed/);
   assert.throws(() => resolvePull({ radius: 100 }, 'x'), /positive radius and speed/);
-  assert.throws(() => createAttackDefinition({ id: 'testPull', hitbox: { x: 0, y: 0, w: 1, h: 1 }, pull: { radius: -1, speed: 1 } }), /pull/);
-  assert.throws(() => createProjectileDefinition({ id: 'testOrb', pull: { speed: 5 } }), /pull/);
-  assert.equal(createProjectileDefinition({ id: 'testOrb' }).pull, null);
+  assert.throws(() => createAttackDefinition({ id: 'testPull', damage: 1, hitbox: { x: 0, y: 0, w: 1, h: 1 }, pull: { radius: -1, speed: 1 } }), /pull/);
+  assert.throws(() => createProjectileDefinition({ id: 'testOrb', damage: 1, pull: { speed: 5 } }), /pull/);
+  assert.equal(createProjectileDefinition({ id: 'testOrb', damage: 1 }).pull, null);
 });
 
 test('the CPU reads an attack\'s reach as its box widened to the pull\'s circle', () => {
   const atk = createAttackDefinition({
-    id: 'testPull', hitbox: { x: 10, y: -60, w: 30, h: 30 }, pull: { radius: 100, speed: 500, offset: { x: 40, y: -50 } },
+    id: 'testPull', damage: 1, hitbox: { x: 10, y: -60, w: 30, h: 30 }, pull: { radius: 100, speed: 500, offset: { x: 40, y: -50 } },
   });
   assert.deepEqual(attackReach(atk), { x: -60, y: -150, w: 200, h: 200 });
-  const plain = createAttackDefinition({ id: 'testPlain', hitbox: { x: 10, y: -60, w: 30, h: 30 } });
+  const plain = createAttackDefinition({ id: 'testPlain', damage: 1, hitbox: { x: 10, y: -60, w: 30, h: 30 } });
   assert.deepEqual(attackReach(plain), plain.hitbox);
 });
 
@@ -147,7 +147,7 @@ test('a projectile pulls toward its centre for as long as it flies, never its ow
   const target = standing(520).fighter;
   const orb = new Projectile({
     owner,
-    def: createProjectileDefinition({ id: 'testOrb', speed: 100, lifetime: 0.5, pull: { radius: 200, speed: 400 } }),
+    def: createProjectileDefinition({ id: 'testOrb', damage: 1, speed: 100, lifetime: 0.5, pull: { radius: 200, speed: 400 } }),
     anim: { frames: [{}], fps: 1, loop: true },
     x: 400, y: middle(target), direction: 1,
   });

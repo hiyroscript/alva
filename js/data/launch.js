@@ -28,12 +28,27 @@
 // Launch Point and launches nothing at all (see CombatSystem.applyHit in
 // js/game/combat/combat.js).
 //
-// Every hit (a fighter's attack, a projectile's, a technique's)
-// declares both fields in js/data/characters.js, independently:
+// Every hit (a fighter's attack or one of its strikes, a projectile's or
+// its finisher's, a technique's burst) declares its damage and both launch
+// fields in its fighter's definition (js/data/characters/<id>.js),
+// independently:
 //
 //   damage: 10, baseLaunch: 2, directionalLaunch: 'vertical'
 //
-// resolveHitLaunch validates them once, when the hit's definition is built.
+// A hit's damage is one of four tiers, ALLOWED_DAMAGE_VALUES, and nothing
+// else: 1 a light hit (a chip, one tick of a multi-hit string), 3 a solid
+// one (most attacks), 5 a heavy hit or a major launcher, 10 an exceptional,
+// ultimate-level one. Never 0 (a hit that deals nothing is no hit), never
+// more than 10, never a fraction. resolveHitDamage refuses anything else
+// and resolveHitLaunch validates the launch, both once, when the hit's
+// definition is built. (A multi-hit attack's `damage` is the sum of its
+// strikes, each one a tier; a blocked hit's event reports 0 because it
+// dealt none: neither is an authored hit.)
+
+// ---- Damage ----------------------------------------------------------------------
+
+// The only damage a hit may deal.
+export const ALLOWED_DAMAGE_VALUES = Object.freeze([1, 3, 5, 10]);
 
 // ---- Base Launch -----------------------------------------------------------------
 
@@ -89,6 +104,16 @@ export function resolveHitLaunch(spec, owner = 'A hit') {
     console.warn(`[Alva] ${owner} declares Base Launch ${baseLaunch} with no directionalLaunch; it never launches.`);
   }
   return { baseLaunch, directionalLaunch };
+}
+
+// A hit's damage from its declared `damage`, declared by `owner` (named
+// in the error): one of ALLOWED_DAMAGE_VALUES. Anything else, a missing
+// damage included, is refused outright: a hit authored with 2 or 12 never
+// loads.
+export function resolveHitDamage(value, owner = 'A hit') {
+  if (ALLOWED_DAMAGE_VALUES.includes(value)) return value;
+  const declared = value === undefined ? 'declares no damage' : `declares damage ${show(value)}`;
+  throw new Error(`[Alva] ${owner} ${declared}: every hit deals ${ALLOWED_DAMAGE_VALUES.join(', ').replace(/, (\d+)$/, ' or $1')}`);
 }
 
 // ---- Resolution ------------------------------------------------------------------

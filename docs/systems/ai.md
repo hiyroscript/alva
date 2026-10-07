@@ -52,8 +52,8 @@ The options come from `readMoveset(fighter)`, never from a fighter's id:
   it lands and its hit), only if their art and data are complete;
 - whether it has a Shield on the ground (`groundShield`; there is no
   Shield in the air, and nothing in the moveset says there is), a Deflect
-  in the air (`deflect`: its attack on the `shield` button, its reach and
-  whether it turns projectiles back), a Dash and an air dash (each with
+  in the air (`deflect`: its attack on the `shield` button, its reach,
+  whether it turns projectiles back and its Energy cost), a Dash and an air dash (each with
   its distance and cost; the Dash also with its `reach`, the distance its
   burst's run-on adds, and what a Dash cancel costs). The distances come
   from the universal movement values, the same for every fighter;
@@ -64,21 +64,34 @@ refuse for missing art is never in its moveset, so the CPU never presses a
 button that cannot do anything. A fighter with no summons or techniques
 never plans one; one with no Shield never shields.
 
+Its Shield is weighed by what a block costs, the same whether the block
+would be perfect or not (a perfect block's advantage is its missing
+blockstun, never Energy).
+
 How it weighs a hit is generic too: damage and launch (more at a high
 Launch Point and near a ledge it launches toward), a paralysis as the free
 hits it opens, and a paralysed opponent as an opening as long as the hold
 lasts. A technique that holds the fighter in place while it casts counts
 the risk of being struck first, smaller when its opponent hides behind a
 Shield that cannot stop it. And it never raises a Shield against a hit no
-Shield stops: it steps out, jumps, Dashes or strikes first instead.
+Shield stops: it steps out, jumps, Dashes, strikes first or, with an
+erasing projectile of its own, meets it instead.
+
+It does not play the same trick over and over: a summon, a technique or
+a ranged attack pressed in the last few seconds (`SPECIAL_REST`) is
+weighed down, each move apart, so a move with no cooldown (#0001's
+techniques and orbs have none) is one choice among its moves rather than
+the only one. The same on every level: judgement, not a rule of the fight.
 
 In the air it never holds the Shield button (a Shield plan ends as it
 leaves the ground). Its answer to a projectile on course for it there is
 its Deflect, considered when the Deflect pressed now would be live as the
 shot meets its box (and before the shot reaches its body); a careful
 level watches such a shot step by step, since the window is a few steps
-long. Unblockable shots too: a Deflect is no Shield. The Deflect is also
-one of its aerial strikes. The air dash is mobility: knocked off the stage
+long. Unblockable shots too: a Deflect is no Shield. It costs Energy as it
+starts, as it does a player, so the CPU never plans one while exhausted
+and weighs its price as it weighs a block's. The Deflect is also one of
+its aerial strikes. The air dash is mobility: knocked off the stage
 but level with its top and too far out to drift back, it air dashes home
 (as often as its level Dashes at all), and in the air it may air dash to
 close in, both only when an air dash could start (one left this airtime,
@@ -113,9 +126,15 @@ aggression, stage sense and Energy care. Every trait is ordered from Easy
 to Brutal; Brutal's reaction is fast but never zero. The reaction windows
 are the same for every fighter (set against startups from a jab's 1/12 s
 to a technique's half second or more);
-no level changes damage, launch, hitstun, speed, jumps, the Dash, the
-Shield, Energy, cooldowns, hitboxes, scoring or respawns: Easy and Brutal
-control the very same physical fighter.
+no level changes damage, launch, hitstun, blockstun, animation timing,
+speed, jumps, gravity, the Dash, the Shield, Energy or any cost in it,
+cooldowns, hitboxes, physics, scoring or respawns: Easy and Brutal
+control the very same physical fighter. A profile holds the traits above
+and nothing else, and no module of the fighter, the combat engine or the
+physics reads a difficulty, so there is nothing a level could multiply a
+hit by; [`tests/systems/combat-rules.test.mjs`](../../tests/systems/combat-rules.test.mjs)
+resolves the same attacks, blocks, Dash and Deflect under every level
+(and for a player) and finds them identical, step for step.
 
 ## Determinism
 

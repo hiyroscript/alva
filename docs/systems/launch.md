@@ -17,7 +17,8 @@ the Discover screen's LAUNCH page, built from the same registry.
 
 Every fighter has a **Launch Point** (`CombatState.launchPoint`): 0 on
 every fresh life (a new fighter, a restart or rematch, a respawn from the
-Void), raised by exactly the damage each hit deals, never below 0, with no
+Void), raised by exactly the damage each hit deals (1, 3, 5 or 10, the
+four damage tiers: [combat](combat.md#damage)), never below 0, with no
 maximum. It never stops a fighter acting and never takes one out: only
 the Void does.
 

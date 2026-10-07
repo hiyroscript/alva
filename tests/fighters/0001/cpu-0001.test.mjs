@@ -51,7 +51,7 @@ test('CPU fights with #0001 use its whole kit: the Jab, the High Kick, Red, Maxi
         if (f.def !== DEF) continue;
         for (const s of steps) {
           if (s.attack) used.add(s.attack);
-          for (const id of s.cooling) techniques.add(id);
+          if (s.technique) techniques.add(s.technique);
         }
       }
       for (const e of events) if (e.attacker.def === DEF && e.type === 'hit') landed.add(e.move);
@@ -65,7 +65,7 @@ test('CPU fights with #0001 use its whole kit: the Jab, the High Kick, Red, Maxi
   for (const move of ['attack2_object', 'attack3_object', 'attack5_object']) assert.ok(landed.has(move), `${move} lands`);
 });
 
-test('facing Hollow Purple or Unlimited Void, the CPU never raises a Shield: it gets out of the way instead', () => {
+test('facing Hollow Purple or Unlimited Void, the CPU never raises a Shield: it gets out of the way or erases it instead', () => {
   const stage = new StageCollision(stageMap());
   for (const [button, gap] of [['attack5', 420], ['attack4', 200]]) {
     let shields = 0;
@@ -90,6 +90,10 @@ test('facing Hollow Purple or Unlimited Void, the CPU never raises a Shield: it 
         cpu.update(DT, ctx);
         if (ai.out.shield) shields++;
         if (ai.out.jumpPressed || ai.out.runLeft || ai.out.runRight || cpu.dash) moved = true;
+        // Or it meets the sphere with an erasing one of its own (its own
+        // Hollow Purple: two erasing projectiles both go).
+        const shot = cpu.technique?.def.projectile;
+        if (shot && cpu.projectileDefs[shot.id]?.erase) moved = true;
       }
       if (moved) answered++;
     }

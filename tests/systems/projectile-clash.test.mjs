@@ -19,7 +19,7 @@ const STAGE = new StageCollision(stageMap());
 const ANIM = Object.freeze({ frames: [{}], fps: 1, loop: true });
 const kinds = {
   plain: createProjectileDefinition({ id: 'testPlain', speed: 300, lifetime: 2, hitbox: { x: -10, y: -10, w: 20, h: 20 }, damage: 1 }),
-  repel: createProjectileDefinition({ id: 'testRepel', speed: 500, lifetime: 2, hitbox: { x: -10, y: -10, w: 20, h: 20 }, damage: 2, repel: true }),
+  repel: createProjectileDefinition({ id: 'testRepel', speed: 500, lifetime: 2, hitbox: { x: -10, y: -10, w: 20, h: 20 }, damage: 3, repel: true }),
   erase: createProjectileDefinition({ id: 'testErase', speed: 400, lifetime: 2, hitbox: { x: -30, y: -30, w: 60, h: 60 }, damage: 3, erase: true }),
 };
 

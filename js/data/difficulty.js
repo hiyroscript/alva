@@ -5,9 +5,13 @@
 // profile tunes the controller's perception and judgement only: how soon it
 // notices what the opponent does, how often it reassesses, how noisy and how
 // careful its choices are and how far ahead it projects movement. Nothing here
-// reaches the fighter: damage, launch, speed, jumps, Dash, Shield, Energy,
-// cooldowns, hitboxes and every other mechanic are the character's own and
-// identical on every level (see Fighter in js/game/fighters/fighter.js).
+// reaches the fighter: damage, launch, speed, jumps, gravity, Dash, Shield,
+// Energy and its costs, cooldowns, hitboxes, hitstun, blockstun, timing and
+// every other mechanic are the character's own and the shared rules', and
+// identical on every level (see Fighter in js/game/fighters/fighter.js). No
+// module of the fighter or the combat engine reads a difficulty, and a
+// profile holds only the traits below (CAPABILITY): no multiplier for any
+// of those exists, so none can scale a hit.
 //
 // Profile traits (seconds and world units are simulation time and space):
 //
@@ -27,15 +31,17 @@
 //   punish      how readily an opening (a whiff, recovery, an exhausted
 //               opponent) is noticed and taken.
 //   specials    judgement with the fighter's summons and techniques (e.g.
-//               #0001's attack4 and attack5): when one is worth its long
-//               cooldown. A fighter with none never uses it.
+//               #0001's attack4 and attack5): when one is worth its cast
+//               (and its cooldown, if it has one). A fighter with none never
+//               uses it.
 //   dash        how much Dash is part of its movement.
 //   plan        seconds a multi-step plan (approach then strike, Dash then
 //               strike) is kept before it is thought over again.
 //   aggression  weight on offence against waiting and spacing.
 //   stage       stage awareness: ledge caution, centre-stage preference and
 //               the value of knocking the opponent toward the Void.
-//   energyCare  how much Energy it keeps back for the Shield.
+//   energyCare  how much Energy it keeps back for the Shield and the
+//               Deflect (what each costs is the same on every level).
 //
 // Every trait is ordered by level (see CAPABILITY): a higher level never has a
 // slower reaction, a lapse more often or a noisier judgement than a lower one.

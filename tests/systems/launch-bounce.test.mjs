@@ -14,7 +14,7 @@ import { HitEffects, HIT_FX, launchIsLethal } from '../../js/game/rendering/hit-
 import { LAUNCH_UNIT_SPEED } from '../../js/data/launch.js';
 import { getMap } from '../../js/data/maps.js';
 import { CONFIG } from '../../js/config.js';
-import { def, DT, makeFighter, duel, stageMap, fakeSprites, frameName, startupSteps } from '../helpers/fighter-harness.mjs';
+import { def, DT, makeFighter, duel, stageMap, fakeSprites, frameName, startupSteps, probeHit } from '../helpers/fighter-harness.mjs';
 import { LOADOUT_CASES } from '../fighters/fixtures/loadout-fighters.mjs';
 
 const G = CONFIG.sim.gravity;
@@ -38,7 +38,7 @@ const wallAt = (id, x, w = 60) => ({ id, x, y: FLOOR - 200, w, h: 200 });
 // of its own. Returns the hit's event.
 function launch(fighter, { speed, direction = 'horizontal', facing = 1, hitstun = 0.3 }) {
   fighter.combat.launchPoint = speed / LAUNCH_UNIT_SPEED;
-  const hit = createAttackDefinition({
+  const hit = probeHit({
     id: 'testLaunch', damage: 0, baseLaunch: 1, directionalLaunch: direction, hitstun, hitstop: 0,
   });
   return new CombatSystem().applyHit(fighter, fighter, hit, { facing, detached: true });

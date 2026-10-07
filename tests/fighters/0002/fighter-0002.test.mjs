@@ -22,7 +22,8 @@ import { CONFIG, NUMBERED_ATTACKS } from '../../../js/config.js';
 import { CHARACTERS, characterFramePaths, getCharacter, playableCharacters } from '../../../js/data/characters.js';
 import { abilityName } from '../../../js/data/abilities.js';
 import { describeLoadout, loadoutProblems, specialAttacks } from '../../../js/data/loadout.js';
-import { attackReach, createAttackDefinition, strikeLive } from '../../../js/game/combat/attacks.js';
+import { MAX_ATTACK_COOLDOWN, attackReach, createAttackDefinition, strikeLive } from '../../../js/game/combat/attacks.js';
+import { BLOCK_ENERGY_COST } from '../../../js/game/combat/combat-state.js';
 import { createProjectileDefinition } from '../../../js/game/combat/projectile.js';
 import { CombatAIController } from '../../../js/game/ai/combat-ai.js';
 import { readMoveset } from '../../../js/game/ai/moveset.js';
@@ -174,7 +175,7 @@ test('#0002 is a real CHARACTERS entry: available, in roster slot 02, after #000
 test('no summon or technique: every numbered button an ordinary attack, and Energy with its one refill rate', () => {
   for (const field of ['summons', 'techniques', 'stats']) assert.equal(DEF[field], undefined, field);
   assert.deepEqual(specialAttacks(DEF), []);
-  assert.deepEqual(Object.keys(DEF.energy).sort(), ['dashCancelCost', 'dashCost', 'max', 'regen', 'shieldHitCost']);
+  assert.deepEqual(Object.keys(DEF.energy), ['regen'], 'its refill rate only: the maximum and every cost are universal');
 });
 
 test('three numbered attacks, each a button of its own with its mid-air version, plus the extra_attack; Transform reserved', () => {
@@ -373,12 +374,12 @@ test('the One-Two strikes twice in one press: the jab on frame 2 holds, the stra
   d.until(() => d.events.length === 2);
   const [jab, straight] = d.events;
   assert.deepEqual([jab.move, jab.damage, jab.baseLaunch, jab.launchSpeed], ['attack1', 1, 0, 0]);
-  assert.deepEqual([straight.move, straight.damage, straight.baseLaunch, straight.directionalLaunch], ['attack1', 2, 1, 'horizontal']);
-  assert.equal(straight.finalLaunch.x, 30, 'Base Launch 1 x the 3 Launch Point, sideways');
+  assert.deepEqual([straight.move, straight.damage, straight.baseLaunch, straight.directionalLaunch], ['attack1', 3, 1, 'horizontal']);
+  assert.equal(straight.finalLaunch.x, 40, 'Base Launch 1 x the 4 Launch Point, sideways');
   assert.ok(straight.launchPointBefore === 1, 'the jab\'s Launch Point is there first');
   const def = createAttackDefinition({ id: 'attack1', ...DEF.attacks.attack1 });
   assert.deepEqual(def.hits.map((h) => h.at * 20), [1, 3], 'frames 2 and 4');
-  assert.equal(def.damage, 3, 'the whole attack: its strikes\' sum');
+  assert.equal(def.damage, 4, 'the whole attack: its strikes\' sum');
   assert.equal(def.startup, 1 / 20);
   assert.ok(Math.abs(def.total - 5 / 20) < 1e-9, 'a quarter of a second in all');
 });
@@ -399,7 +400,15 @@ test('the Rapid Kicks: a 0.2 s wind-up, three kicks that hold the target, then t
   for (let i = 0; i < 3; i++) assert.ok(def.hits[i].hitstun > def.hits[i + 1].at - def.hits[i].at + def.hits[i].hitstop);
   assert.equal(def.startup, 4 / 20);
   assert.ok(def.hitCancel >= def.hits[3].at + def.hits[3].active - 1e-9, 'committed to the whole flurry: a chase only once the finisher is out');
-  assert.ok(def.cooldown > def.hits[3].hitstun, 'free again well before another flurry');
+  assert.ok(def.cooldown <= MAX_ATTACK_COOLDOWN, 'the shortest repeat cooldown there is');
+  // Pressed over and over, flurries string only until their fling, growing
+  // with the Launch Point, carries the target out of reach: never a loop.
+  const spam = versus({ gap: 44 });
+  for (let i = 0; i < steps(4); i++) spam.tick(P('attack2'));
+  const strung = spam.events.length;
+  assert.ok(strung > 4 && strung <= 12, `a few flurries at most (${strung} kicks)`);
+  for (let i = 0; i < steps(4); i++) spam.tick(P('attack2'));
+  assert.equal(spam.events.length, strung, 'then the target is out of its reach for good');
 });
 
 test('a Shield stops the flurry at the kick it blocks: one block, one Energy cost, no later kick', () => {
@@ -407,7 +416,7 @@ test('a Shield stops the flurry at the kick it blocks: one block, one Energy cos
   d.tick(P('attack2'), { shield: true });
   for (let i = 0; i < 40; i++) d.tick({}, { shield: true });
   assert.deepEqual(d.events.map((e) => e.type), ['block']);
-  assert.equal(d.events[0].energyCost, DEF_0001.energy.shieldHitCost, 'one kick\'s cost');
+  assert.equal(d.events[0].energyCost, BLOCK_ENERGY_COST, 'one kick\'s cost');
   assert.equal(d.events[0].damage, 0);
 });
 
@@ -434,7 +443,7 @@ test('the Homing Attack hangs for the lock-on, then dashes at its opponent, re-a
   assert.ok(me.body.vx > 0 && me.body.vy > 0, 'down and ahead, at the grounded target');
   d.until(() => d.events.length > 0);
   const [hit] = d.events;
-  assert.deepEqual([hit.type, hit.move, hit.damage, hit.directionalLaunch], ['hit', 'midair_attack1', 2, 'vertical']);
+  assert.deepEqual([hit.type, hit.move, hit.damage, hit.directionalLaunch], ['hit', 'midair_attack1', 3, 'vertical']);
   // It springs off: up, and back.
   assert.equal(me.body.vy, -760);
   assert.equal(me.body.vx, -140);
@@ -516,7 +525,7 @@ test('a Bounce Attack that meets an opponent spikes it and bounces off', () => {
   d.tick(P('attack2'));
   d.until(() => d.events.length > 0);
   const [hit] = d.events;
-  assert.deepEqual([hit.type, hit.move, hit.damage, hit.baseLaunch, hit.directionalLaunch], ['hit', 'midair_attack2', 2, 2, 'reverseVertical']);
+  assert.deepEqual([hit.type, hit.move, hit.damage, hit.baseLaunch, hit.directionalLaunch], ['hit', 'midair_attack2', 3, 2, 'reverseVertical']);
   assert.equal(me.body.vy, -900);
   assert.equal(me.combat.attack, null);
 });
@@ -544,7 +553,7 @@ test('the roll bowls its target over and rolls on through it', () => {
   const d = versus({ gap: 120, pushboxes: true });
   d.tick(P('attack3'));
   d.until(() => d.events.length > 0);
-  assert.deepEqual([d.events[0].move, d.events[0].damage, d.events[0].directionalLaunch], ['attack3', 2, 'horizontal']);
+  assert.deepEqual([d.events[0].move, d.events[0].damage, d.events[0].directionalLaunch], ['attack3', 3, 'horizontal']);
   assert.equal(d.attacker.passingThrough, true);
   d.until(() => d.attacker.body.x > d.target.body.x + 30);
 });
@@ -572,7 +581,7 @@ test('the Blue Tornado rises about 175 units, carrying its target up with it, th
   d.until(() => d.events.length >= 1);
   assert.equal(target.body.vy, me.body.vy, 'carried: the target takes its velocity');
   d.until(() => d.events.length >= 4);
-  assert.deepEqual(d.events.map((e) => e.damage), [1, 1, 1, 2]);
+  assert.deepEqual(d.events.map((e) => e.damage), [1, 1, 1, 3]);
   assert.equal(d.events[3].directionalLaunch, 'vertical');
   let top = me.body.y;
   d.until(() => {
@@ -621,7 +630,7 @@ test('the Whirlwind spins up a tornado and sends it off on frame 6: slow, and it
     if (d.events.length > at.length) at.push(tornado.lastStrike);
   }
   for (let i = 1; i < at.length; i++) assert.ok(at[i] - at[i - 1] >= 0.14 - 1e-9, `strike ${i + 1}`);
-  assert.deepEqual(d.events.map((e) => e.damage), [1, 1, 1, 1, 2]);
+  assert.deepEqual(d.events.map((e) => e.damage), [1, 1, 1, 1, 3]);
   assert.equal(d.events[4].directionalLaunch, 'vertical', 'the finisher flings it upward');
   assert.equal(tornado.alive, false, 'spent after its fifth strike');
 });
@@ -641,13 +650,14 @@ test('a multi-hit attack derives its startup, active phase, box, damage and fini
     id: 'attack2', animation: 'attack2', recovery: 0.1, hitbox: { x: 0, y: -40, w: 20, h: 20 },
     hits: [
       { at: 0.1, active: 0.05, damage: 1 },
-      { at: 0.2, active: 0.05, damage: 2, hitbox: { x: 10, y: -60, w: 30, h: 10 }, baseLaunch: 2, directionalLaunch: 'vertical' },
+      { at: 0.2, active: 0.05, damage: 3, hitbox: { x: 10, y: -60, w: 30, h: 10 }, baseLaunch: 2, directionalLaunch: 'vertical' },
     ],
   });
   assert.equal(def.startup, 0.1);
   assert.ok(Math.abs(def.active - 0.15) < 1e-9);
   assert.deepEqual({ ...def.hitbox }, { x: 0, y: -60, w: 40, h: 40 });
-  assert.equal(def.damage, 3);
+  assert.equal(def.damage, 4, 'the sum of its strikes (1 + 3), derived: not a tier itself');
+  assert.deepEqual(def.hits.map((h) => h.damage), [1, 3], 'each strike a tier of its own');
   assert.deepEqual([def.baseLaunch, def.directionalLaunch], [2, 'vertical']);
   assert.deepEqual({ ...def.hits[0].hitbox }, { x: 0, y: -40, w: 20, h: 20 }, 'a strike takes the attack\'s box');
   assert.equal(strikeLive(def.hits[0], 0.1), true);
@@ -656,16 +666,18 @@ test('a multi-hit attack derives its startup, active phase, box, damage and fini
 
 test('a multi-hit attack refuses fields its strikes own, strikes out of order, and strikes with no box', () => {
   const base = { id: 'attack2', animation: 'attack2', hitbox: { x: 0, y: -40, w: 20, h: 20 } };
-  assert.throws(() => createAttackDefinition({ ...base, startup: 0.1, hits: [{ at: 0.1, active: 0.1 }] }), /declares startup/);
-  assert.throws(() => createAttackDefinition({ ...base, damage: 3, hits: [{ at: 0.1, active: 0.1 }] }), /declares damage/);
-  assert.throws(() => createAttackDefinition({ ...base, hits: [{ at: 0.2, active: 0.1 }, { at: 0.1, active: 0.1 }] }), /before/);
-  assert.throws(() => createAttackDefinition({ id: 'attack2', hits: [{ at: 0.1, active: 0.1 }] }), /no hitbox/);
+  assert.throws(() => createAttackDefinition({ ...base, startup: 0.1, hits: [{ at: 0.1, active: 0.1, damage: 1 }] }), /declares startup/);
+  assert.throws(() => createAttackDefinition({ ...base, damage: 3, hits: [{ at: 0.1, active: 0.1, damage: 1 }] }), /declares damage/);
+  assert.throws(() => createAttackDefinition({ ...base, hits: [{ at: 0.2, active: 0.1, damage: 1 }, { at: 0.1, active: 0.1, damage: 1 }] }), /before/);
+  assert.throws(() => createAttackDefinition({ id: 'attack2', hits: [{ at: 0.1, active: 0.1, damage: 1 }] }), /no hitbox/);
+  assert.throws(() => createAttackDefinition({ ...base, hits: [{ at: 0.1, active: 0.1 }] }), /Attack "attack2" hit 1 declares no damage/);
+  assert.throws(() => createAttackDefinition({ ...base, hits: [{ at: 0.1, active: 0.1, damage: 2 }] }), /hit 1 declares damage 2/);
   assert.throws(() => createAttackDefinition({ ...base, hits: [] }), /list of strikes/);
   assert.throws(() => createAttackDefinition({ id: 'attack1', animation: 'attack1', pending: true, hits: [] }), /pending/);
 });
 
 test('a motion is one of four kinds, with the speed it cannot do without', () => {
-  const base = { id: 'attack3', animation: 'attack3', hitbox: { x: 0, y: -40, w: 20, h: 20 } };
+  const base = { id: 'attack3', animation: 'attack3', hitbox: { x: 0, y: -40, w: 20, h: 20 }, damage: 3 };
   assert.throws(() => createAttackDefinition({ ...base, motion: { type: 'teleport' } }), /homing, bounce, rise, roll/);
   assert.throws(() => createAttackDefinition({ ...base, motion: { type: 'roll' } }), /positive speed/);
   assert.throws(() => createAttackDefinition({ ...base, motion: { type: 'homing', speed: 900 } }), /positive range/);
@@ -690,12 +702,14 @@ test('attackReach sweeps a motion attack\'s box along its path, for the CPU', ()
 });
 
 test('a piercing projectile needs 2 or more hits and an interval; a finisher needs a pierce', () => {
-  const base = { id: 'extra_attack_object', animation: 'extra_attack_object', speed: 100 };
+  const base = { id: 'extra_attack_object', animation: 'extra_attack_object', speed: 100, damage: 1 };
   assert.throws(() => createProjectileDefinition({ ...base, pierce: { hits: 1, interval: 0.1 } }), /2 or more hits/);
   assert.throws(() => createProjectileDefinition({ ...base, pierce: { hits: 3, interval: 0 } }), /positive interval/);
   assert.throws(() => createProjectileDefinition({ ...base, finisher: { damage: 1 } }), /no pierce/);
-  const p = createProjectileDefinition({ ...base, hitstun: 0.3, pierce: { hits: 3, interval: 0.1 }, finisher: { damage: 4 } });
-  assert.deepEqual([p.finisher.damage, p.finisher.hitstun, p.finisher.baseLaunch], [4, 0.3, 0]);
+  const p = createProjectileDefinition({ ...base, hitstun: 0.3, pierce: { hits: 3, interval: 0.1 }, finisher: { damage: 5 } });
+  assert.deepEqual([p.finisher.damage, p.finisher.hitstun, p.finisher.baseLaunch], [5, 0.3, 0]);
+  assert.throws(() => createProjectileDefinition({ ...base, pierce: { hits: 3, interval: 0.1 }, finisher: { damage: 4 } }), /finisher declares damage 4/);
+  assert.throws(() => createProjectileDefinition({ ...base, pierce: { hits: 3, interval: 0.1 }, finisher: {} }), /finisher declares no damage/);
 });
 
 test('no motion attack starts while it is still flying from a launch: it recovers first', () => {
@@ -786,10 +800,10 @@ test('the CPU sends its Whirlwind at an opponent turtling behind its Shield at m
 
 test('CPU fights with #0002 run: against #0001 and itself, every move used, no summon or technique cooldown of its own', () => {
   const used = new Set();
-  // A seeded sample of real fights (seed 3: one that sees the mid-air
-  // moves; which ones come up depends on how #0001 plays).
-  for (const [a, b] of [[DEF, DEF_0001], [DEF_0001, DEF], [DEF, DEF]]) {
-    const { log } = cpuFight(a, b, { seconds: 40, seed: 3, difficulty: 'brutal' });
+  // A seeded sample of real fights (seeds 3 and 5: between them they see
+  // the mid-air moves; which ones come up depends on how #0001 plays).
+  for (const [a, b, seed] of [3, 5].flatMap((n) => [[DEF, DEF_0001, n], [DEF_0001, DEF, n], [DEF, DEF, n]])) {
+    const { log } = cpuFight(a, b, { seconds: 40, seed, difficulty: 'brutal' });
     for (const [f, steps] of log) {
       if (f.def !== DEF) continue;
       for (const s of steps) {

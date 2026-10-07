@@ -4,7 +4,8 @@
 //
 // Inputs: the fighter's resolved Energy settings (resolveEnergy, from its
 // definition's `energy` entry).
-// Outputs: CombatState, CooldownTimers and resolveEnergy.
+// Outputs: CombatState, CooldownTimers, resolveEnergy and the Energy rules
+// (MAX_ENERGY, DASH_ENERGY_COST, BLOCK_ENERGY_COST, DEFLECT_ENERGY_COST).
 // Important constraints: the Fighter (js/game/fighters/fighter.js) and
 // CombatSystem.applyHit (js/game/combat/combat.js) are the only writers;
 // readers (the HUD, the status drawn over a fighter, the combat AI) only
@@ -15,45 +16,68 @@
 // A summon or a technique on a numbered button (see js/data/loadout.js) is
 // not paid for: each has its own cooldown (CombatState.abilityCooldowns, see
 // CooldownTimers), keyed by the attack it is (attack4, attack5), started
-// when it is used and apart from the short recovery cooldowns of ordinary
-// attacks (CombatState.cooldowns). Both run down in real time.
+// when it is used (none at all when its cooldown is 0) and apart from the
+// short repeat cooldowns of ordinary attacks (CombatState.cooldowns, at most
+// MAX_ATTACK_COOLDOWN: see js/game/combat/attacks.js). Both run down in
+// real time.
 //
 // Energy (CombatState.energy, see resolveEnergy) is the one resource a
-// fighter spends (there is no Shield meter apart from it), and only on the
-// Dash, Combat Assist's approach and the Shield: a Dash (or an air dash)
-// pays dashCost as it starts (dashCancelCost when it cuts short an attack
-// that hit), the human player's Combat Assist approach pays dashCost once
-// as it starts (see Fighter.tryCombatAssist), and every hit the Shield
-// blocks costs shieldHitCost. Each works with less left than it costs, but
-// then takes all of it. It refills by itself at one passive rate. Emptied,
-// it exhausts the fighter: no Dash, approach or Shield until it is full
-// again. Nothing else (movement, jumps, attacks, summons, techniques) ever
-// touches it.
+// fighter spends (there is no Shield meter apart from it), on three things
+// only, at the same price for every fighter: a Dash or an air dash pays
+// DASH_ENERGY_COST as it starts (the same when it cuts short an attack that
+// hit), the Deflect pays DEFLECT_ENERGY_COST as it starts, and every hit the
+// Shield blocks costs BLOCK_ENERGY_COST, a perfect Shield's included. Each
+// works with less left than it costs, but then takes all of it. It refills
+// by itself at one passive rate, and every fighter's bar holds MAX_ENERGY.
+// Emptied, it exhausts the fighter: no Dash, air dash, Deflect or Shield
+// until it is full again. Nothing else (movement, jumps, attacks, Combat
+// Assist, summons, techniques, a successful block or Deflect) ever touches
+// it: no defense gives any back.
 
 import { PHASE_EPSILON, attackPhase } from './attacks.js';
 
-// A character's `energy` entry, every field optional:
-//
-//   energy: {
-//     max: 100,           // full, and where every fighter starts
-//     regen: 12,          // per second, whatever the fighter is doing
-//     dashCost: 15,       // spent once as a Dash (or Combat Assist's approach) starts
-//     dashCancelCost: 40, // ...instead, by a Dash that cuts short an attack that hit
-//     shieldHitCost: 25,  // spent once for every hit the Shield blocks
-//   }
-//
-// A cost larger than what is left is still paid: it takes the rest, which
-// empties the bar and exhausts the fighter (see CombatState.spendEnergy).
-// Left out, dashCancelCost is the fighter's dashCost.
-const ENERGY_DEFAULTS = Object.freeze({
-  max: 100, regen: 12, dashCost: 15, shieldHitCost: 25,
+// The Energy rules, the same for every fighter: what a full bar holds
+// (where every fighter starts, and what a respawn or a restart refills it
+// to) and what each thing that spends it costs.
+export const MAX_ENERGY = 100;
+export const DASH_ENERGY_COST = 25;    // a Dash or an air dash, a Dash cancel included
+export const BLOCK_ENERGY_COST = 15;   // each hit the Shield blocks, a perfect Shield's included
+export const DEFLECT_ENERGY_COST = 15; // each Deflect, as it starts
+
+// The universal fields of a resolved Energy entry, by name. A fighter's
+// `energy` entry may leave any of them out (and should), and declaring one
+// with any other value is refused: no fighter holds more or less Energy,
+// or pays more or less for anything, than another.
+const ENERGY_RULES = Object.freeze({
+  max: MAX_ENERGY,
+  dashCost: DASH_ENERGY_COST,
+  dashCancelCost: DASH_ENERGY_COST,
+  shieldHitCost: BLOCK_ENERGY_COST,
+  deflectCost: DEFLECT_ENERGY_COST,
 });
 
-// Frozen Energy settings: the character's entry over the defaults.
-export function resolveEnergy(spec) {
-  const energy = { ...ENERGY_DEFAULTS, ...spec };
-  energy.dashCancelCost ??= energy.dashCost;
-  return Object.freeze(energy);
+// The one field a fighter's `energy` entry may set, its refill rate:
+//
+//   energy: { regen: 14 }  // per second, whatever the fighter is doing
+const DEFAULT_REGEN = 12;
+
+// Frozen Energy settings: the universal rules, and the fighter's own regen
+// (DEFAULT_REGEN left out). A field the schema does not know, a negative
+// regen, or a universal field declared with any other value than the rule's
+// is refused, naming `owner`.
+export function resolveEnergy(spec, owner = 'A fighter') {
+  for (const [field, value] of Object.entries(spec ?? {})) {
+    if (field === 'regen') {
+      if (!(typeof value === 'number' && value >= 0)) throw new Error(`[Alva] ${owner}'s Energy regen must be a number from 0`);
+    } else if (Object.hasOwn(ENERGY_RULES, field)) {
+      if (value !== ENERGY_RULES[field]) {
+        throw new Error(`[Alva] ${owner} declares Energy ${field} ${value}: it is ${ENERGY_RULES[field]} for every fighter`);
+      }
+    } else {
+      throw new Error(`[Alva] ${owner} declares an unknown Energy field "${field}" (only regen is a fighter's own)`);
+    }
+  }
+  return Object.freeze({ ...ENERGY_RULES, regen: spec?.regen ?? DEFAULT_REGEN });
 }
 
 // Named cooldowns that each remember their full length, so progress can be
@@ -119,13 +143,13 @@ export class CombatState {
     // negative, no maximum, and it never stops the fighter acting; a
     // launching hit multiplies it by its Base Launch.
     this.launchPoint = 0;
-    // Energy for the Dash, Combat Assist and the Shield (see
-    // resolveEnergy): full at the start, never below 0 or above
-    // maxEnergy. Emptying it (however it happens) exhausts the fighter,
-    // and only a full refill clears that (see setEnergy).
+    // Energy for the Dash, the Deflect and the Shield (see resolveEnergy):
+    // full at the start, never below 0 or above maxEnergy (MAX_ENERGY for
+    // every fighter). Emptying it (however it happens) exhausts the
+    // fighter, and only a full refill clears that (see setEnergy).
     this.energySpec = energy;
-    this.maxEnergy = energy.max;
-    this.energy = energy.max;
+    this.maxEnergy = MAX_ENERGY;
+    this.energy = MAX_ENERGY;
     this.energyExhausted = false;
     // The Shield is up (see Fighter.update): hits that reach the fighter are
     // blocked (see CombatSystem.applyHit).
@@ -142,7 +166,8 @@ export class CombatState {
     // motion attack its motion's progress (`motion`, see Fighter).
     this.attack = null;
     this.release = null;    // the attack's projectile, released this step (see Fighter.update)
-    // Ordinary attacks' short recovery cooldowns: attack id -> seconds left.
+    // Ordinary attacks' short repeat cooldowns (MAX_ATTACK_COOLDOWN at
+    // most): attack id -> seconds left.
     this.cooldowns = new Map();
     // The summons' and techniques' own cooldowns (e.g. #0001's attack4 and
     // attack5), by the attack each one is: the Fighter starts them, and
@@ -171,7 +196,8 @@ export class CombatState {
 
   // Seconds the attack in progress has been cancellable (see cancellable),
   // or -1 while it is not: it may cut itself short into itself only once
-  // its own cooldown has run for that long.
+  // its own cooldown (never more than MAX_ATTACK_COOLDOWN, none at all for
+  // a cooldown of 0) has run for that long.
   get cancellableFor() {
     if (!this.cancellable) return -1;
     const a = this.attack;

@@ -21,7 +21,7 @@ import * as loadoutModule from '../../js/data/loadout.js';
 import { COMBAT_ACTIONS } from '../../js/game/fighters/fighter.js';
 import { readMoveset } from '../../js/game/ai/moveset.js';
 import { DT, cpuFight, duel, fakeSpritesOf, makeFighter, startupSteps } from '../helpers/fighter-harness.mjs';
-import { LOADOUT_CASES, WITH_EXTRA, loadoutFighter } from '../fighters/fixtures/loadout-fighters.mjs';
+import { LOADOUT_CASES, WITH_EXTRA, loadoutFighter, loadoutDamage } from '../fighters/fixtures/loadout-fighters.mjs';
 import { SAMPLE_FIGHTER } from '../fighters/fixtures/sample-fighter.mjs';
 
 const DEF_0001 = getCharacter('0001');
@@ -88,7 +88,7 @@ for (const c of LOADOUT_CASES) {
       if (type === 'attack') {
         assert.equal(f.combat.attack?.def.id, button, `${button} on the ground`);
         assert.equal(air.fighter.combat.attack?.def.id, midairAttack(button), `${button} in the air`);
-        assert.equal(f.combat.attack.def.damage, Number(button.slice(6)), 'its own data');
+        assert.equal(f.combat.attack.def.damage, loadoutDamage(Number(button.slice(6))), 'its own data');
         assert.equal(f.combat.abilityCooldowns.size, 0);
       } else if (type === 'summon') {
         assert.equal(f.combat.attack, null, `${button}: no attack of the fighter's own`);
@@ -398,7 +398,7 @@ test('every definition the game loads keeps the rules, and a broken one is refus
     assert.doesNotThrow(() => assertLoadout(def));
   }
   const source = readFileSync(new URL('../../js/data/characters.js', import.meta.url), 'utf8');
-  assert.match(source, /for \(const def of CHARACTERS\) \{\s*assertLoadout\(def\);\s*assertUniversalMovement\(def\);\s*\}/, 'the registry validates every definition it loads');
+  assert.match(source, /for \(const def of CHARACTERS\) \{\s*assertLoadout\(def\);\s*assertUniversalMovement\(def\);\s*assertCombatRules\(def\);\s*\}/, 'the registry validates every definition it loads');
   // The rules are generic: nothing in them names a character.
   const rules = readFileSync(new URL('../../js/data/loadout.js', import.meta.url), 'utf8').replace(/^\s*\/\/.*$/gm, '');
   assert.doesNotMatch(rules, /'000\d'|#000\d|displayName|Punch|Kick|Shuriken|Clone|Sphere/);

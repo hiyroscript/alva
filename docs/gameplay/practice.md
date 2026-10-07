@@ -17,7 +17,7 @@ unavailable, with Back to Home.
   moves aimed at an opponent do nothing or miss: a summon has nobody to
   appear behind, so its press does nothing at all (no other attack, no
   cooldown started); a technique still casts and releases (e.g. #0001's
-  Unlimited Void, its burst meeting no one; its cooldown spent), a pull
+  Unlimited Void, its burst meeting no one), a pull
   draws nobody in and projectiles fly on and expire.
 - **Stage.** `PRACTICE_MAP` (`js/data/practice-map.js`) is deliberately not
   in `MAPS`, which feeds Select Stage. `js/stages/practice-theme.js` draws the
@@ -49,9 +49,9 @@ unavailable, with Back to Home.
   paralysis, so every move lands on it: attacks, projectiles, clones and
   techniques. Its
   Launch Point builds up (and launching hits send it further) like anyone's.
-  Each hit floats the Launch Point it added (for #0001: `+2` for a Jab,
-  `+1` for each of Maximum Blue's grinding strikes and `+2` for its
-  collapse, `+12` for Hollow Purple) in red over its head
+  Each hit floats the Launch Point it added (for #0001: `+3` for a Jab,
+  `+1` for each of Maximum Blue's grinding strikes and `+3` for its
+  collapse, `+10` for Hollow Purple) in red over its head
   for under a second, straight from the
   combat system's resolved hit. Change CPU swaps it for
   another fighter; **Disable CPU**, beside Back in that dialog, removes it

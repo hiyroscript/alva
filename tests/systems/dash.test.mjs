@@ -18,6 +18,7 @@ import { CONFIG } from '../../js/config.js';
 import {
   def, DT, BASE, MOVEMENT, SIM_CTX, fakeSprites, makeFighter, frameName, stageMap, duel,
 } from '../helpers/fighter-harness.mjs';
+import { DASH_ENERGY_COST } from '../../js/game/combat/combat-state.js';
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const RIGHT = { runRight: true, runRightPressed: true };
@@ -371,7 +372,7 @@ test('short of Energy a Dash still happens, but takes all that is left: the bar 
   // Exactly its cost left empties it too.
   const exact = makeFighter();
   tap(exact.step, RIGHT);
-  exact.fighter.combat.setEnergy(def.energy.dashCost);
+  exact.fighter.combat.setEnergy(DASH_ENERGY_COST);
   exact.step(RIGHT);
   assert.ok(exact.fighter.dash);
   assert.deepEqual([exact.fighter.combat.energy, exact.fighter.combat.energyExhausted], [0, true]);
@@ -380,7 +381,7 @@ test('short of Energy a Dash still happens, but takes all that is left: the bar 
   tap(plenty.step, RIGHT);
   plenty.fighter.combat.setEnergy(40);
   plenty.step(RIGHT);
-  assert.deepEqual([plenty.fighter.combat.energy, plenty.fighter.combat.energyExhausted], [40 - def.energy.dashCost, false]);
+  assert.deepEqual([plenty.fighter.combat.energy, plenty.fighter.combat.energyExhausted], [40 - DASH_ENERGY_COST, false]);
 });
 
 test('a double tap that cannot Dash is used up, never queued for later', () => {
@@ -401,14 +402,14 @@ test('a double tap that cannot Dash is used up, never queued for later', () => {
 
 // ---- Cost, movement and ending -----------------------------------------------------------
 
-test('a Dash spends its cost (12) exactly once as it starts, and bursts at dashSpeed for one pass of its clip', () => {
+test('a Dash spends its cost (25) exactly once as it starts, and bursts at dashSpeed for one pass of its clip', () => {
   const { fighter, step } = makeFighter();
   tap(step, RIGHT);
   const full = fighter.combat.energy;
   assert.equal(full, 100);
   step(RIGHT);
-  assert.equal(def.energy.dashCost, 12);
-  assert.equal(fighter.combat.energy, 88, 'exactly 12, no refill on that step');
+  assert.equal(DASH_ENERGY_COST, 25);
+  assert.equal(fighter.combat.energy, 75, 'exactly 25, no refill on that step');
   assert.equal(fighter.body.vx, MOVEMENT.dashSpeed, 'dash speed from the first step');
   const x0 = fighter.body.prevX;
   let n = 1;
@@ -485,7 +486,7 @@ test('Shield wins over a Dash on the same step; so does an attack; Down held nev
   down.step({ ...RIGHT, down: true });
   assert.ok(down.fighter.dash, 'a Dash with Down held');
   assert.equal(down.fighter.state, 'dash');
-  assert.equal(down.fighter.combat.energy, 100 - def.energy.dashCost);
+  assert.equal(down.fighter.combat.energy, 100 - DASH_ENERGY_COST);
   // And a Dash in progress rules out attacks, the Shield and jumps; Down
   // does nothing to it.
   const busy = makeFighter();
@@ -588,7 +589,7 @@ test('one request Dashes at once through tryDash: no double tap, no held directi
     assert.equal(fighter.animator.anim.key, 'mouvment');
     assert.equal(frameName(fighter), '0001_mouvment_1.png', 'the clip from its first frame');
     assert.equal(fighter.body.vx, direction * MOVEMENT.dashSpeed);
-    assert.equal(fighter.combat.energy, 100 - def.energy.dashCost, 'exactly the Dash cost');
+    assert.equal(fighter.combat.energy, 100 - DASH_ENERGY_COST, 'exactly the Dash cost');
     // It runs its one pass of the clip, then the fighter stands.
     let n = 1;
     while (fighter.dash) {
@@ -749,7 +750,7 @@ test('end to end: a Right mouvement tap through the real InputManager and Player
   input.queueTouchMouvement(1);
   fighter.update(DT, SIM_CTX);
   assert.equal(fighter.dash?.direction, 1);
-  assert.equal(fighter.combat.energy, 100 - def.energy.dashCost);
+  assert.equal(fighter.combat.energy, 100 - DASH_ENERGY_COST);
   const dashes = [];
   for (let i = 0; i < 40; i++) {
     fighter.update(DT, SIM_CTX);
