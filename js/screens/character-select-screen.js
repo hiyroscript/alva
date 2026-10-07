@@ -1,25 +1,29 @@
 // SELECT FIGHTER: the shared fighter roster (js/ui/fighter-roster.js) as a
 // full screen: a large 48-slot grid beside an animated preview panel.
-// Confirming a fighter makes it Quick Battle's selection and moves on to
-// Select Stage.
+// Confirming a fighter makes it Player 1's in Quick Battle, then Custom Play
+// moves on to Select CPU and Regular Play draws the CPU's fighter and the
+// stage and starts the Battle (js/screens/quick-battle-setup.js).
 //
-// Watch Mode's Select CPU 1 and Select CPU 2 are two more instances
-// (js/screens/watch-screens.js), each with its own roster: the options below
-// name the screen and its title, its setup and step, where its choice is kept
-// (`selection()[key]`), the screen that follows and the roster's preview id,
-// so the rosters never share an element id. Left out, they are Quick Battle's.
-// The title is a translation key, or [key, params].
+// Quick Battle's Select CPU (js/screens/quick-cpu-screen.js) and Watch Mode's
+// Select CPU 1 and Select CPU 2 (js/screens/watch-screens.js) are more
+// instances, each with its own roster: the options below name the screen and
+// its title, its setup and step, where its choice is kept
+// (`selection()[key]`), what follows (a screen id, or a function that
+// continues) and the roster's preview id, so the rosters never share an
+// element id. Left out, they are Quick Battle's Select Fighter, whose steps
+// follow the play type. The title is a translation key, or [key, params].
 
 import { Screen } from '../core/screen-manager.js';
 import { el } from '../core/utils.js';
-import { screenHeader, QUICK_BATTLE_SETUP } from '../ui/components.js';
+import { screenHeader, refreshSteps, currentSetup, quickBattleSetup } from '../ui/components.js';
+import { continueAfterFighter } from './quick-battle-setup.js';
 import { FighterRoster } from '../ui/fighter-roster.js';
 import { isPlayable } from '../data/characters.js';
 
 export class CharacterSelectScreen extends Screen {
   constructor(app, {
-    id = 'character', title = 'character.title', setup = QUICK_BATTLE_SETUP, step = 2,
-    selection = () => app.selection, key = 'characterId', next = 'map', previewId = 'preview-name',
+    id = 'character', title = 'character.title', setup = () => quickBattleSetup(app.selection), step = 2,
+    selection = () => app.selection, key = 'characterId', next = () => continueAfterFighter(app), previewId = 'preview-name',
   } = {}) {
     super(app, id);
     this.selection = selection;
@@ -32,7 +36,7 @@ export class CharacterSelectScreen extends Screen {
     });
 
     this.el.replaceChildren(
-      screenHeader({ title, kicker: setup.name, setup, step, onBack: () => this.onBack() }),
+      screenHeader({ title, kicker: currentSetup(setup).name, setup, step, onBack: () => this.onBack() }),
       el('div', { class: 'screen-body char-layout' }, [this.roster.rosterPanel, this.roster.previewPanel]),
     );
   }
@@ -56,13 +60,15 @@ export class CharacterSelectScreen extends Screen {
   }
 
   enter() {
+    refreshSteps(this.el);
     this.roster.show(this.chosenId);
   }
 
   confirm(def) {
     if (!isPlayable(def)) return;
     this.selection()[this.key] = def.id;
-    this.app.screens.go(this.next);
+    if (typeof this.next === 'function') this.next();
+    else this.app.screens.go(this.next);
   }
 
   update(dt) {

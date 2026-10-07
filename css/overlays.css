@@ -1,11 +1,12 @@
-/* Global overlays (loading, the confirm dialog, the rotate prompt), and
+/* Global overlays (loading, the confirm and choice dialogs, the rotate
+   prompt), and
    the shared surface finish that gives menu, battle, practice and dialog
    surfaces the Home Play look; it overrides the screens above, so it must
    stay after them. One part of the stylesheet index.html loads in order
    (css/base.css first; see docs/development/conventions.md). */
 
 /* ---------------------------------------------------------------------
-   Global overlays: loading, confirm dialog, rotate
+   Global overlays: loading, confirm and choice dialogs, rotate
    --------------------------------------------------------------------- */
 
 .loading-overlay {
@@ -43,6 +44,24 @@
 .dialog-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 8px; flex-wrap: wrap; }
 .dialog-actions .btn { flex: 1 1 180px; padding: 0 16px; }
 
+/* The choice dialog (Quick Battle's Custom Play / Regular Play): a heading
+   beside its close button, then one column per choice, its button over its
+   line; the columns stack on narrow screens. */
+.choice-panel { width: min(560px, 100%); gap: clamp(10px, 2.2vh, 16px); }
+.choice-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.choice-heading { display: grid; gap: 2px; min-width: 0; }
+.choice-heading .kicker[hidden] { display: none; }
+.choice-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.choice-option { display: grid; align-content: start; gap: 8px; }
+.choice-btn { width: 100%; padding: 0 16px; }
+.choice-desc { color: var(--text-secondary); font-size: 13px; line-height: 1.45; }
+@media (max-width: 520px) {
+  .choice-options { grid-template-columns: 1fr; }
+}
+@media (max-height: 420px) {
+  .choice-desc { font-size: 12px; line-height: 1.35; }
+}
+
 /* Match Home Play on the requested surfaces only. Keep shared radius
    tokens, intentional pills, and result-dialog styling unchanged. */
 .screen--mode .btn-back,
@@ -71,7 +90,8 @@
 .practice-roster-dialog,
 .practice-roster-dialog .btn-back,
 .dialog-overlay .dialog-panel,
-.dialog-overlay .dialog-actions .btn {
+.dialog-overlay .dialog-actions .btn,
+.dialog-overlay .choice-btn {
   border-radius: 3px;
 }
 
@@ -82,12 +102,14 @@
 /* Preserve hover/pressed feedback and distinguish enabled secondary actions. */
 .pause-overlay .pause-btn-item:not(.is-primary):enabled,
 .practice-menu-overlay .pause-btn-item:not(.is-primary):enabled,
-.dialog-overlay .dialog-actions .btn:not(.btn--primary):enabled {
+.dialog-overlay .dialog-actions .btn:not(.btn--primary):enabled,
+.dialog-overlay .choice-btn:not(.btn--primary):enabled {
   color: var(--text);
 }
 .pause-overlay .pause-btn-item:not(.is-primary):enabled:not(:hover):not(:active),
 .practice-menu-overlay .pause-btn-item:not(.is-primary):enabled:not(:hover):not(:active),
-.dialog-overlay .dialog-actions .btn:not(.btn--primary):enabled:not(:hover):not(:active) {
+.dialog-overlay .dialog-actions .btn:not(.btn--primary):enabled:not(:hover):not(:active),
+.dialog-overlay .choice-btn:not(.btn--primary):enabled:not(:hover):not(:active) {
   background: transparent;
 }
 /* Outline-only actions (pause Restart Battle / Return to Home, Practice

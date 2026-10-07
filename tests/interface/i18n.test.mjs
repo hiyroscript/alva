@@ -201,6 +201,7 @@ test('French is really French: only proper names, codes and shared words read th
     'slot.cpu', 'slot.cpu1', 'slot.cpu2', // CPU
     'banner.round', // ROUND n
     'step.cpu', // CPU n
+    'step.opponent', // CPU
     'step.mode', // Mode
     'touch.actions', // Actions
     'unit.minute.one', 'unit.minute.other', // minute(s)
@@ -406,7 +407,8 @@ test('changing the language re-reads the whole interface at once: menus, setup s
     steps: names(mode),
     stepsLabel: mode.el.querySelector('.steps').getAttribute('aria-label'),
   };
-  assert.deepEqual(english, { title: 'Select Mode', steps: ['Mode', 'Difficulty', 'Fighter', 'Stage'], stepsLabel: 'Quick Battle setup' });
+  // Regular Play, the default play type: its three steps.
+  assert.deepEqual(english, { title: 'Select Mode', steps: ['Mode', 'Difficulty', 'Fighter'], stepsLabel: 'Quick Battle setup' });
 
   const off = onLanguageChange(() => localizeTree(body));
   setLanguage('fr');
@@ -415,7 +417,7 @@ test('changing the language re-reads the whole interface at once: menus, setup s
     // Select Mode.
     assert.equal(mode.el.querySelector('.screen-title').textContent, 'Choisir le mode');
     assert.equal(mode.el.querySelector('.kicker').textContent, 'Jouer');
-    assert.deepEqual(names(mode), ['Mode', 'Difficulté', 'Combattant', 'Arène']);
+    assert.deepEqual(names(mode), ['Mode', 'Difficulté', 'Combattant']);
     assert.equal(mode.el.querySelector('.steps').getAttribute('aria-label'), 'Étapes : Combat rapide');
     assert.equal(mode.el.querySelector('.mode-name').textContent, 'Combat rapide');
     assert.equal(mode.el.querySelector('.btn-back').getAttribute('aria-label'), 'Retour');

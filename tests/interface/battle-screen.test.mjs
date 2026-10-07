@@ -15,7 +15,7 @@ import { formatLaunchPoint, describeEnergy } from '../../js/ui/hud.js';
 import { CONFIG } from '../../js/config.js';
 import { duel, def as DEF_0001, fakeSprites, DT } from '../helpers/fighter-harness.mjs';
 import { getMap } from '../../js/data/maps.js';
-import { setLanguage } from '../../js/localization/i18n.js';
+import { setLanguage, localizeTree } from '../../js/localization/i18n.js';
 import { TEST_A, TEST_DISABLED, REMOVED_IDS, withTestFighters } from '../fighters/fixtures/test-fighters.mjs';
 import { stylesheet } from '../helpers/stylesheet.mjs';
 
@@ -593,30 +593,34 @@ test('Quick Battle result: points first (3 wins at once, or more on time), then 
   assert.doesNotMatch(source, /health|\.energy\b/i, 'results never read Health or Energy');
 });
 
-test('a draw opens no result dialog and starts a fresh battle', () => {
+test('a draw is a tie on the result menu: no winner named, nothing restarts until Rematch', () => {
   const { app, screen } = setup();
   const battle = startBattle(screen);
   battle.frame = () => { battle.phase = 'result'; battle.timeLeft = 0; };
   screen.update(1 / 60);
 
   assert.equal(battle.result.outcome, 'draw');
-  assert.equal(battle.restarts, 1);
-  assert.equal(battle.phase, 'intro');
-  assert.equal(screen.resultOverlay.hidden, true);
-  assert.equal(screen.resultTitle.textContent, '');
-  assert.deepEqual(app.nav.scopes, []);
-  assert.equal(screen.paused, false);
-  assert.equal(screen.isRunning, true);
-  assert.equal(app.input.gameplayActive, true);
-  assert.equal(screen.touch.enabled, true);
-  assert.equal(screen.hud.timer.textContent, '1:39');
-  assert.equal(screen.bannerState, null);
+  assert.equal(battle.restarts, 0, 'no fresh battle');
+  assert.equal(battle.phase, 'result');
+  assert.equal(screen.resultOverlay.hidden, false);
+  // With overtime off (this stand-in has no period), time over decided it.
+  assert.equal(screen.resultKicker.textContent, 'Time over');
+  assert.equal(screen.resultTitle.textContent, 'Tie');
+  assert.equal(screen.resultSub.textContent, 'Time ran out with the points and Launch Point equal.');
+  assert.doesNotMatch(screen.resultOverlay.textContent, /Wins|Player 1|CPU/);
+  assert.deepEqual(app.nav.scopes, [screen.resultScope]);
+  assert.equal(document.activeElement.textContent, 'Rematch');
+  assert.equal(screen.isRunning, false);
+  assert.equal(app.input.gameplayActive, false);
+  assert.equal(screen.touch.enabled, false);
 
-  let frames = 0;
-  battle.frame = () => { frames++; };
   screen.update(1 / 60);
-  assert.equal(frames, 1, 'the new battle keeps running');
+  assert.equal(battle.restarts, 0, 'the result menu waits for the player');
+  byText(screen.resultOverlay.querySelectorAll('[data-nav]'), 'Rematch').click();
   assert.equal(battle.restarts, 1);
+  assert.equal(screen.resultOverlay.hidden, true);
+  assert.deepEqual(app.nav.scopes, []);
+  assert.equal(app.input.gameplayActive, true);
 });
 
 test('a winner still gets the result menu', () => {
@@ -851,29 +855,62 @@ test('overtime results say overtime decided it: more points, or level on points 
   }
 });
 
-test('level on points and Launch Point at the end of overtime: no dialog, a fresh battle with no overtime left', () => {
-  const { app, screen } = setup();
-  const battle = startRealBattle(screen, app);
-  battle.setPhase('fight');
-  battle.timeLeft = 0.01;
-  screen.update(DT + 1e-9);
-  assert.equal(battle.overtime, true);
-  battle.score.p1 = 1;
-  battle.score.p2 = 1;
-  battle.p1.combat.launchPoint = 33;
-  battle.p2.combat.launchPoint = 33;
-  battle.timeLeft = 0.01;
-  playUntil(screen, () => battle.phase === 'intro', 200);
-  assert.equal(battle.phase, 'intro', 'restarted');
-  assert.equal(screen.resultOverlay.hidden, true);
-  assert.equal(battle.overtime, false);
-  assert.deepEqual(battle.score, { p1: 0, p2: 0 });
-  assert.equal(battle.timeLeft, 420);
-  assert.deepEqual({ ...battle.stage.void }, { ...battle.map.voidBounds });
-  assert.equal(battle.voidWaveSpeed, 1);
-  assert.equal(screen.hud.timer.textContent, '7:00');
-  assert.equal(screen.hud.roundLabel.textContent, 'ROUND 1');
-  assert.equal(screen.bannerState, null);
+test('level on points and Launch Point at the end of overtime: a tie on the result menu; Rematch starts a clean match', () => {
+  // Equal, and equal within the Battle's 1e-6 tolerance.
+  for (const [a, b] of [[33, 33], [33, 33 + 5e-7]]) {
+    const { app, screen } = setup();
+    const battle = startRealBattle(screen, app);
+    battle.setPhase('fight');
+    battle.timeLeft = 0.01;
+    screen.update(DT + 1e-9);
+    assert.equal(battle.overtime, true);
+    battle.score.p1 = 1;
+    battle.score.p2 = 1;
+    battle.p1.combat.launchPoint = a;
+    battle.p2.combat.launchPoint = b;
+    battle.timeLeft = 0.01;
+    screen.update(DT + 1e-9);
+    assert.equal(battle.phase, 'timeup');
+    assert.equal(screen.bannerState, 'time');
+    playUntil(screen, () => !screen.resultOverlay.hidden, 200);
+    assert.equal(battle.phase, 'result', 'over: no fresh battle');
+    assert.deepEqual(battle.result, { outcome: 'draw', reason: 'overtimeLaunchPoint' });
+    assert.equal(screen.resultKicker.textContent, 'End of overtime');
+    assert.equal(screen.resultTitle.textContent, 'Tie');
+    assert.equal(screen.resultSub.textContent, 'Overtime ended with the points and Launch Point equal.');
+    assert.doesNotMatch(screen.resultOverlay.textContent, /Wins|Player 1|CPU/, 'no side is the winner');
+    assert.deepEqual(screen.resultOverlay.querySelectorAll('[data-nav]').map((b) => b.textContent), ['Rematch', 'Change Stage', 'Return to Home']);
+    assert.deepEqual(battle.score, { p1: 1, p2: 1 }, 'the match stands as it ended');
+    assert.equal(battle.overtime, true);
+    // It stays over until the player acts.
+    for (let i = 0; i < 120; i++) screen.update(DT + 1e-9);
+    assert.equal(battle.phase, 'result');
+    assert.equal(screen.resultOverlay.hidden, false);
+    // In French, the repository's Launch Point.
+    setLanguage('fr');
+    try {
+      localizeTree(screen.resultOverlay);
+      assert.equal(screen.resultKicker.textContent, 'Fin de la prolongation');
+      assert.equal(screen.resultTitle.textContent, 'Égalité');
+      assert.equal(screen.resultSub.textContent, 'La prolongation est terminée avec les points et le Point d’éjection à égalité.');
+    } finally {
+      setLanguage('en');
+      localizeTree(screen.resultOverlay);
+    }
+    // Rematch: 0-0, the full 7:00, no overtime and the map's own Void.
+    byText(screen.resultOverlay.querySelectorAll('[data-nav]'), 'Rematch').click();
+    assert.equal(screen.resultOverlay.hidden, true);
+    assert.equal(battle.phase, 'intro');
+    assert.equal(battle.overtime, false);
+    assert.deepEqual(battle.score, { p1: 0, p2: 0 });
+    assert.deepEqual([battle.p1.combat.launchPoint, battle.p2.combat.launchPoint], [0, 0]);
+    assert.equal(battle.timeLeft, 420);
+    assert.deepEqual({ ...battle.stage.void }, { ...battle.map.voidBounds });
+    assert.equal(battle.voidWaveSpeed, 1);
+    screen.hud.update(battle);
+    assert.equal(screen.hud.timer.textContent, '7:00');
+    assert.equal(screen.hud.roundLabel.textContent, 'ROUND 1');
+  }
 });
 
 test('cancelling Return to Home keeps the pause menu and its focus', async () => {
@@ -951,7 +988,7 @@ test('entering Quick Battle shows Player 1\'s fighter\'s own art on the touch bu
   const calls = [];
   const set = touch.setCharacter.bind(touch);
   touch.setCharacter = (def) => { calls.push(def?.id); set(def); };
-  app.selection = { characterId: TEST_A.id, mapId: MAPS[0].id };
+  app.selection = { characterId: TEST_A.id, cpuCharacterId: TEST_A.id, mapId: MAPS[0].id };
   // Stop at the load (no real sprites here): the buttons' art is already set
   // by then.
   let loadsBefore = null;
@@ -988,7 +1025,7 @@ test('Quick Battle uses the Mobile Controls setting: Joystick by default, Classi
   // A playable test-only fighter: no production one is.
   const { app, screen } = setup();
   const { MAPS } = await import('../../js/data/maps.js');
-  app.selection = { characterId: TEST_A.id, mapId: MAPS[0].id };
+  app.selection = { characterId: TEST_A.id, cpuCharacterId: TEST_A.id, mapId: MAPS[0].id };
   app.loadCharacter = () => Promise.resolve({ usable: false });
   app.loading = { show() {}, hide() {}, setProgress() {}, showError() {} };
   const touch = screen.touch;
@@ -1020,7 +1057,7 @@ test('Quick Battle places the touch controls by the saved custom layout of the s
   const { app, screen } = setup();
   const { MAPS } = await import('../../js/data/maps.js');
   app.selection = {
-    characterId: TEST_A.id, mapId: MAPS[0].id,
+    characterId: TEST_A.id, cpuCharacterId: TEST_A.id, mapId: MAPS[0].id,
     watch: { difficulty: 'medium', cpu1CharacterId: TEST_A.id, cpu2CharacterId: TEST_A.id, mapId: MAPS[0].id },
   };
   app.loadCharacter = () => Promise.resolve({ usable: false });
@@ -1074,7 +1111,7 @@ async function enterRefused({ params, selection }) {
   const went = [];
   const named = [];
   app.selection = {
-    characterId: null, mapId: MAPS[0].id,
+    characterId: null, cpuCharacterId: null, mapId: MAPS[0].id,
     watch: { difficulty: 'medium', cpu1CharacterId: null, cpu2CharacterId: null, mapId: MAPS[0].id },
     ...selection,
   };
@@ -1092,8 +1129,8 @@ async function enterRefused({ params, selection }) {
 }
 
 test('Battle never starts a fighter that is not playable: a disabled one, a removed one, null, missing or unknown, in Quick Battle and Watch Mode', () => withTestFighters([TEST_DISABLED], async () => {
-  const quick = (id) => ({ selection: { characterId: id } });
-  const quickDirect = (id) => ({ params: { characterId: id } });
+  const quick = (id) => ({ selection: { characterId: id, cpuCharacterId: id } });
+  const quickDirect = (id) => ({ params: { characterId: id, cpuCharacterId: id } });
   const watch = (id) => ({ params: { mode: 'watch' }, selection: { watch: { difficulty: 'hard', cpu1CharacterId: id, cpu2CharacterId: id } } });
   const watchDirect = (id) => ({ params: { mode: 'watch', cpu1CharacterId: id, cpu2CharacterId: id } });
   for (const id of [TEST_DISABLED.id, ...REMOVED_IDS, null, undefined, '', 'no-such-fighter']) {
@@ -1123,24 +1160,33 @@ test('Battle never starts a fighter that is not playable: a disabled one, a remo
   }
 }));
 
-test('Watch Mode refuses a pair with one fighter that cannot play, and Quick Battle a disabled one given directly, while others are playable', () => withTestFighters([TEST_A, TEST_DISABLED], async () => {
+test('Watch Mode and Quick Battle each refuse a pair with one fighter that cannot play, while others are playable', () => withTestFighters([TEST_A, TEST_DISABLED], async () => {
   const [removed] = REMOVED_IDS;
   const off = TEST_DISABLED.id;
-  for (const [cpu1, cpu2] of [[TEST_A.id, off], [off, TEST_A.id], [TEST_A.id, removed], [removed, TEST_A.id]]) {
-    const { screen, loads, errors } = await enterRefused({ params: { mode: 'watch', cpu1CharacterId: cpu1, cpu2CharacterId: cpu2 } });
-    assert.equal(screen.battle, null, `${cpu1} vs ${cpu2}`);
-    assert.deepEqual(loads, [], 'not even the playable one is loaded');
+  const pairs = [[TEST_A.id, off], [off, TEST_A.id], [TEST_A.id, removed], [removed, TEST_A.id], [TEST_A.id, 'no-such-fighter']];
+  for (const [a, b] of pairs) {
+    for (const params of [
+      { mode: 'watch', cpu1CharacterId: a, cpu2CharacterId: b },
+      { characterId: a, cpuCharacterId: b },
+    ]) {
+      const { screen, loads, errors, named } = await enterRefused({ params });
+      assert.equal(screen.battle, null, `${params.mode ?? 'quick'}: ${a} vs ${b}`);
+      assert.deepEqual(loads, [], 'not even the playable one is loaded');
+      assert.deepEqual(named, [], 'nothing on the touch controls');
+      assert.equal(errors.length, 1);
+    }
+  }
+  // Quick Battle checks the CPU's fighter on its own: a playable Player 1
+  // never stands in for a missing CPU, nor a playable CPU for Player 1.
+  for (const selection of [{ characterId: TEST_A.id }, { cpuCharacterId: TEST_A.id }, { characterId: off, cpuCharacterId: TEST_A.id }]) {
+    const { screen, loads, errors } = await enterRefused({ selection });
+    assert.equal(screen.battle, null, JSON.stringify(selection));
+    assert.deepEqual(loads, []);
     assert.equal(errors.length, 1);
   }
-  // A stale selection naming a disabled fighter is refused even with a
-  // playable fighter to hand: nothing falls back to it silently.
-  const { screen, loads, errors } = await enterRefused({ selection: { characterId: off } });
-  assert.equal(screen.battle, null);
-  assert.deepEqual(loads, []);
-  assert.equal(errors.length, 1);
   // A playable one gets past the check to its load (which fails here, with
   // the usual sprites error and its Retry).
-  const ok = await enterRefused({ params: { characterId: TEST_A.id } });
+  const ok = await enterRefused({ params: { characterId: TEST_A.id, cpuCharacterId: TEST_A.id } });
   assert.deepEqual(ok.loads, ['show: Loading Test A', TEST_A.id]);
   assert.match(ok.errors[0].message, /^Test A's sprite frames could not be loaded/);
   assert.equal(typeof ok.errors[0].opts.onRetry, 'function');
@@ -1201,7 +1247,7 @@ test('Quick Battle gives Player 1 the saved Combat Assist, read on every entry; 
   const { CombatAIController } = await import('../../js/game/ai/combat-ai.js');
   const { app, screen } = setup();
   app.selection = {
-    characterId: TEST_A.id, mapId: MAPS[0].id,
+    characterId: TEST_A.id, cpuCharacterId: TEST_A.id, mapId: MAPS[0].id,
     watch: { cpu1CharacterId: TEST_A.id, cpu2CharacterId: TEST_A.id, mapId: MAPS[0].id },
   };
   const sprites = fakeSpritesOf(TEST_A);

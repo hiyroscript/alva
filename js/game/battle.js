@@ -16,7 +16,8 @@
 // points wins. Level on points, the match goes to overtime
 // (startOvertime): the same fight played on for
 // CONFIG.battle.overtimeSeconds under a closing Void, then more points,
-// then the lower Launch Point, equal on both a draw.
+// then the lower Launch Point, equal on both a draw (a tie: the match is
+// over with no winner; the battle screen shows it like any result).
 
 import { CONFIG } from '../config.js';
 import { Arena } from './arena.js';

@@ -2286,8 +2286,9 @@ test('Quick Battle still creates its AI CPU, round intro, 7-minute timer and two
   assert.equal(hud.pauseButton.html, ICONS.pause);
 });
 
-test('Select Fighter still builds the full roster from the shared component and confirms into Select Stage', () => {
+test('Select Fighter still builds the full roster from the shared component and confirms into Custom Play\'s Select CPU', () => {
   const { app } = fakeApp();
+  app.selection.playType = 'custom';
   const select = new CharacterSelectScreen(app);
   select.enter();
   const { slots } = select.roster;
@@ -2299,7 +2300,7 @@ test('Select Fighter still builds the full roster from the shared component and 
   assert.equal(document.activeElement, slots[8], 'Quick Battle\'s own fighter, Test A in slot 09, not Practice\'s #0001');
   slots.find((s) => s._def?.id === '9999').click(0);
   assert.equal(app.selection.characterId, '9999');
-  assert.deepEqual(app.screens.calls, [['map']]);
+  assert.deepEqual(app.screens.calls, [['quick-cpu']]);
 
   // All three rosters can share the page: no id is used twice.
   const practice = new PracticeGroundScreen(app);

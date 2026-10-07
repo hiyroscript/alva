@@ -1,9 +1,10 @@
 // Run with node --test tests/integration/difficulty.test.mjs (no dependencies).
 // Quick Battle's Select Difficulty step: the four levels and their profiles
 // (js/data/difficulty.js), the Select Difficulty screen between Select Mode
-// and Select Fighter on the real ScreenManager and MenuNavigator (pointer,
-// keyboard and gamepad), the four-step setup header, and the chosen level
-// reaching the Battle's CPU and surviving restarts, rematches and respawns.
+// (and its Custom Play / Regular Play choice) and Select Fighter on the real
+// ScreenManager and MenuNavigator (pointer, keyboard and gamepad), the setup
+// header of either play type, and the chosen level reaching the Battle's CPU
+// and surviving restarts, rematches and respawns.
 // On a minimal fake DOM; layout and paint still need real-browser checks.
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -173,6 +174,8 @@ const { MenuNavigator } = await import('../../js/core/menu-navigator.js');
 const { ModeSelectScreen } = await import('../../js/screens/mode-select-screen.js');
 const { DifficultySelectScreen } = await import('../../js/screens/difficulty-select-screen.js');
 const { CharacterSelectScreen } = await import('../../js/screens/character-select-screen.js');
+const { QuickCpuScreen } = await import('../../js/screens/quick-cpu-screen.js');
+const { ChoiceDialog } = await import('../../js/ui/overlays.js');
 const { MapSelectScreen } = await import('../../js/screens/map-select-screen.js');
 const { BattleScreen } = await import('../../js/screens/battle-screen.js');
 const { Settings } = await import('../../js/core/settings.js');
@@ -218,7 +221,9 @@ class BattleStub extends Screen {
 
 function boot() {
   const app = {
-    selection: { mode: 'quick-battle', difficulty: DEFAULT_DIFFICULTY, characterId: TEST_A.id, mapId: MAPS[0].id },
+    selection: {
+      mode: 'quick-battle', playType: 'regular', difficulty: DEFAULT_DIFFICULTY, characterId: TEST_A.id, cpuCharacterId: TEST_A.id, mapId: MAPS[0].id,
+    },
     input: fakeInput(),
     device: { reducedMotion: true, blockedPortrait: false },
     audio: { play: noop },
@@ -230,10 +235,12 @@ function boot() {
   };
   app.screens = new ScreenManager(app);
   app.nav = new MenuNavigator(app);
+  app.choiceDialog = new ChoiceDialog(new Element('div'), app);
   const screens = {
     mode: new ModeSelectScreen(app),
     difficulty: new DifficultySelectScreen(app),
     character: new CharacterSelectScreen(app),
+    cpu: new QuickCpuScreen(app),
     map: new MapSelectScreen(app),
     battle: new BattleStub(app),
   };
@@ -244,6 +251,15 @@ function boot() {
 
 const cardOf = (screen, id) => screen.cards.find((c) => c.getAttribute('data-difficulty') === id);
 const current = (app) => app.screens.current.id;
+const settle = () => new Promise((resolve) => setImmediate(resolve));
+
+// Select Mode's Quick Battle card, then `type` (Custom Play or Regular
+// Play) in its choice dialog.
+async function openQuickBattle({ app, screens }, type = 'custom') {
+  screens.mode.el.querySelector('.mode-card').click();
+  app.choiceDialog.buttonFor(type).click();
+  await settle();
+}
 
 // ---- Data ---------------------------------------------------------------------
 
@@ -321,10 +337,11 @@ test('the app starts Quick Battle on Medium and registers Select Difficulty betw
   assert.match(html, /class="screen screen--menu screen--difficulty" data-screen="difficulty" aria-label="Select difficulty" hidden/);
 });
 
-test('Select Mode → Select Difficulty → Select Fighter → Select Stage → Battle, and Back retraces the steps', async () => {
-  const { app, screens } = boot();
+test('Select Mode → Select Difficulty → Select Fighter → Select CPU → Select Stage → Battle, and Back retraces the steps', async () => {
+  const booted = boot();
+  const { app, screens } = booted;
   assert.equal(current(app), 'mode');
-  screens.mode.el.querySelector('.mode-card').click();
+  await openQuickBattle(booted);
   assert.equal(current(app), 'difficulty', 'Quick Battle leads to Select Difficulty');
   assert.equal(app.selection.mode, 'quick-battle');
   cardOf(screens.difficulty, 'hard').click();
@@ -337,51 +354,61 @@ test('Select Mode → Select Difficulty → Select Fighter → Select Stage → 
   screens.difficulty.onBack();
   assert.equal(current(app), 'mode');
   // Forward again to the end.
-  screens.mode.el.querySelector('.mode-card').click();
+  await openQuickBattle(booted);
   cardOf(screens.difficulty, 'brutal').click();
   screens.character.confirm(TEST_A);
+  assert.equal(current(app), 'quick-cpu');
+  screens.cpu.confirm(TEST_A);
   assert.equal(current(app), 'map');
   screens.map.onBack();
-  assert.equal(current(app), 'character', 'Back from Stage is still Fighter');
+  assert.equal(current(app), 'quick-cpu', 'Back from Stage is CPU');
+  screens.cpu.onBack();
+  assert.equal(current(app), 'character', 'Back from CPU is Fighter');
   screens.character.confirm(TEST_A);
+  screens.cpu.confirm(TEST_A);
   screens.map.start();
   assert.equal(current(app), 'battle');
-  assert.deepEqual(screens.battle.started, [{ mapId: MAPS[0].id, characterId: TEST_A.id, difficulty: 'brutal' }]);
+  assert.deepEqual(screens.battle.started, [{ mapId: MAPS[0].id, characterId: TEST_A.id, cpuCharacterId: TEST_A.id, difficulty: 'brutal' }]);
   // The header's Back and Esc are the same navigation.
-  const { app: app2, screens: s2 } = boot();
-  s2.mode.el.querySelector('.mode-card').click();
+  const booted2 = boot();
+  const { app: app2, screens: s2 } = booted2;
+  await openQuickBattle(booted2, 'regular');
   s2.difficulty.el.querySelector('.btn-back').click();
   assert.equal(current(app2), 'mode');
-  s2.mode.el.querySelector('.mode-card').click();
+  await openQuickBattle(booted2, 'regular');
   app2.input.key('Escape');
   assert.equal(current(app2), 'mode');
 });
 
-test('every level can be chosen by pointer, keyboard and gamepad', () => {
+test('every level can be chosen by pointer, keyboard and gamepad', async () => {
   for (const id of DIFFICULTY_IDS) {
     // Pointer.
-    let { app, screens } = boot();
-    screens.mode.el.querySelector('.mode-card').click();
+    let booted = boot();
+    let { app, screens } = booted;
+    await openQuickBattle(booted);
     cardOf(screens.difficulty, id).click(1);
     assert.deepEqual([app.selection.difficulty, current(app)], [id, 'character'], `pointer: ${id}`);
     // Keyboard: focus it, confirm with J (Enter and Space are the button's own).
-    ({ app, screens } = boot());
-    screens.mode.el.querySelector('.mode-card').click();
+    booted = boot();
+    ({ app, screens } = booted);
+    await openQuickBattle(booted, 'regular');
     cardOf(screens.difficulty, id).focus();
     app.input.key('KeyJ');
     assert.deepEqual([app.selection.difficulty, current(app)], [id, 'character'], `keyboard: ${id}`);
     // Gamepad A.
-    ({ app, screens } = boot());
-    screens.mode.el.querySelector('.mode-card').click();
+    booted = boot();
+    ({ app, screens } = booted);
+    await openQuickBattle(booted);
     cardOf(screens.difficulty, id).focus();
     app.input.pad('confirm');
     assert.deepEqual([app.selection.difficulty, current(app)], [id, 'character'], `gamepad: ${id}`);
   }
 });
 
-test('arrows and the D-pad move between the levels in a row, and in the 2 x 2 grid', () => {
-  const { app, screens } = boot();
-  screens.mode.el.querySelector('.mode-card').click();
+test('arrows and the D-pad move between the levels in a row, and in the 2 x 2 grid', async () => {
+  const booted = boot();
+  const { app, screens } = booted;
+  await openQuickBattle(booted);
   const cards = DIFFICULTY_IDS.map((id) => cardOf(screens.difficulty, id));
   const back = screens.difficulty.el.querySelector('.btn-back');
   back.rect = { left: 40, top: 20, width: 90, height: 44 };
@@ -407,9 +434,10 @@ test('arrows and the D-pad move between the levels in a row, and in the 2 x 2 gr
   assert.equal(document.activeElement, cards[1], 'Medium over Brutal');
 });
 
-test('a fresh Quick Battle lands on Medium; coming back lands on the level chosen', () => {
-  const { app, screens } = boot();
-  screens.mode.el.querySelector('.mode-card').click();
+test('a fresh Quick Battle lands on Medium; coming back lands on the level chosen', async () => {
+  const booted = boot();
+  const { app, screens } = booted;
+  await openQuickBattle(booted);
   const medium = cardOf(screens.difficulty, 'medium');
   assert.equal(document.activeElement, medium, 'Medium focused by default');
   assert.ok(medium.classList.contains('is-current'));
@@ -460,21 +488,44 @@ test('each card: its index, a four-bar scale with one to four lit, its name and 
   assert.match(css, /grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/, 'a 2 x 2 grid on narrow screens');
 });
 
-test('the setup header has four steps, marked on each setup screen', () => {
-  const { screens } = boot();
-  const expected = { mode: 0, difficulty: 1, character: 2, map: 3 };
-  for (const [id, step] of Object.entries(expected)) {
-    const items = screens[id].el.querySelector('.steps').children;
-    assert.deepEqual(items.map((li) => li.querySelector('.step-name').textContent), ['Mode', 'Difficulty', 'Fighter', 'Stage'], id);
-    items.forEach((li, i) => {
-      assert.equal(li.classList.contains('is-done'), i < step, `${id} step ${i} done`);
-      assert.equal(li.classList.contains('is-current'), i === step, `${id} step ${i} current`);
-      assert.equal(li.getAttribute('aria-current'), i === step ? 'step' : null);
-      const num = li.querySelector('.step-num');
-      if (i < step) assert.equal(num.innerHTML, ICONS.check, 'completed steps show a check');
-      else assert.equal(num.textContent, String(i + 1));
-    });
-  }
+test('the setup header follows the play type: five steps for Custom Play, three for Regular Play, marked on each setup screen', async () => {
+  const check = (screens, expected, names) => {
+    for (const [id, step] of Object.entries(expected)) {
+      const items = screens[id].el.querySelector('.steps').children;
+      assert.deepEqual(items.map((li) => li.querySelector('.step-name').textContent), names, id);
+      assert.equal(screens[id].el.querySelector('.steps').getAttribute('aria-label'), 'Quick Battle setup');
+      items.forEach((li, i) => {
+        assert.equal(li.classList.contains('is-done'), i < step, `${id} step ${i} done`);
+        assert.equal(li.classList.contains('is-current'), i === step, `${id} step ${i} current`);
+        assert.equal(li.getAttribute('aria-current'), i === step ? 'step' : null);
+        const num = li.querySelector('.step-num');
+        if (i < step) assert.equal(num.innerHTML, ICONS.check, 'completed steps show a check');
+        else assert.equal(num.textContent, String(i + 1));
+      });
+    }
+  };
+  // Custom Play, screen by screen as the player reaches it.
+  const custom = boot();
+  await openQuickBattle(custom, 'custom');
+  check(custom.screens, { difficulty: 1 }, ['Mode', 'Difficulty', 'Fighter', 'CPU', 'Stage']);
+  cardOf(custom.screens.difficulty, 'easy').click();
+  custom.screens.character.confirm(TEST_A);
+  custom.screens.cpu.confirm(TEST_A);
+  check(custom.screens, { difficulty: 1, character: 2, cpu: 3, map: 4 }, ['Mode', 'Difficulty', 'Fighter', 'CPU', 'Stage']);
+  for (const id of ['map', 'cpu', 'character', 'difficulty']) custom.screens[id].onBack();
+  assert.equal(current(custom.app), 'mode');
+  check(custom.screens, { mode: 0 }, ['Mode', 'Difficulty', 'Fighter', 'CPU', 'Stage']);
+  // Regular Play: only the steps it visits, no CPU or Stage ahead.
+  const regular = boot();
+  await openQuickBattle(regular, 'regular');
+  cardOf(regular.screens.difficulty, 'easy').click();
+  check(regular.screens, { difficulty: 1, character: 2 }, ['Mode', 'Difficulty', 'Fighter']);
+  regular.screens.character.onBack();
+  regular.screens.difficulty.onBack();
+  check(regular.screens, { mode: 0 }, ['Mode', 'Difficulty', 'Fighter']);
+  // Choosing again in Select Mode redraws the steps for the new path.
+  await openQuickBattle(regular, 'custom');
+  check(regular.screens, { difficulty: 1 }, ['Mode', 'Difficulty', 'Fighter', 'CPU', 'Stage']);
 });
 
 // ---- The level reaches the CPU ------------------------------------------------------
@@ -517,7 +568,7 @@ test('the Battle\'s CPU plays the chosen level, and keeps it through restarts, r
 test('the Battle screen hands the selected level to its Battle, and a rematch or restart keeps it', async () => {
   const input = fakeInput();
   const app = {
-    selection: { mode: 'quick-battle', difficulty: 'brutal', characterId: TEST_A.id, mapId: MAPS[0].id },
+    selection: { mode: 'quick-battle', difficulty: 'brutal', characterId: TEST_A.id, cpuCharacterId: TEST_A.id, mapId: MAPS[0].id },
     input,
     settings: new Settings(null),
     device: { reducedMotion: true, blockedPortrait: false },
@@ -530,7 +581,7 @@ test('the Battle screen hands the selected level to its Battle, and a rematch or
   app.nav = new MenuNavigator(app);
   const screen = new BattleScreen(app);
   app.screens.current = screen;
-  await screen.enter({ mapId: MAPS[0].id, characterId: TEST_A.id, difficulty: 'brutal' });
+  await screen.enter({ mapId: MAPS[0].id, characterId: TEST_A.id, cpuCharacterId: TEST_A.id, difficulty: 'brutal' });
   const battle = screen.battle;
   assert.equal(battle.difficulty, 'brutal');
   assert.equal(battle.p2.controller.difficulty, 'brutal');

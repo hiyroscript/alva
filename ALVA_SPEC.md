@@ -263,7 +263,9 @@ fit the palette.
 
 ```
 First launch (no language chosen yet) → Splash → Home + Language chooser (6.11)
-Splash → Home → Select Mode → Select Difficulty → Select Fighter → Select Stage → Battle
+Splash → Home → Select Mode → Quick Battle → Regular Play → Select Difficulty → Select Fighter → Battle (the CPU's fighter and the stage drawn at random)
+Splash → Home → Select Mode → Quick Battle → Custom Play → Select Difficulty → Select Fighter → Select CPU → Select Stage → Battle
+Select Mode → Quick Battle → play-type dialog → Esc / Back / close → Select Mode (nothing chosen)
 Home → Watch Mode → Select Difficulty → Select CPU 1 → Select CPU 2 → Select Stage → CPU vs CPU Battle (6.5a)
 Home → Practice Ground (starts at once with the first playable fighter and a practice CPU of it)
 Home → Discover (Movement / Launch / Passives reference; Back returns Home)
@@ -277,11 +279,12 @@ Battle (7:00 over, one fighter ahead on points) → Result → Rematch / Change 
 Battle (7:00 over, level on points) → OVERTIME: the same fight 60 s more, the Void closing in from the sides and bottom
 Battle (overtime: a fighter scores its 3rd point) → K.O. → Result
 Battle (overtime over, one fighter ahead on points, or level with the lower Launch Point) → Result → Rematch / Change Stage / Return to Home
-Battle (overtime over, level on points and Launch Point: a draw) → a fresh battle starts, no dialog
+Battle (overtime over, level on points and Launch Point: a tie) → Result (Tie) → Rematch / Change Stage / Return to Home
+Result → Change Stage → Select Stage (Custom Play's own; after Regular Play, the stage selector in the Battle's place, Back to Select Fighter)
 ```
 
 A Watch Mode battle follows the same Battle lines (pause, points, K.O.,
-7:00, overtime and its closing Void, result, draw); its Change Stage
+7:00, overtime and its closing Void, result, tie); its Change Stage
 returns to Watch Mode's Select Stage.
 
 Every menu screen except Home has a consistent Back action. Keyboard, mouse,
@@ -384,25 +387,44 @@ no header, build label, eyebrow or keyboard hint bar.
 
 ### 6.3 Select Mode
 
-- Header "Select Mode" with setup steps (Mode · Difficulty · Fighter · Stage).
+- Header "Select Mode" with the setup steps of the play type in force
+  (Regular Play, the default: Mode · Difficulty · Fighter; Custom Play:
+  Mode · Difficulty · Fighter · CPU · Stage).
 - A compact Quick Battle card and a full-height Mode details panel, top-aligned.
   No artwork and no keyboard hint bar.
-- Quick Battle card (Mode 01, name, description "Choose a difficulty, a
-  fighter and a stage, then enter battle.", green Select action) in a rail
-  built for future modes.
+- Quick Battle card (Mode 01, name, description "Regular Play or Custom Play:
+  choose a difficulty and your fighter, then enter battle.", green Select
+  action) in a rail built for future modes.
 - Mode details panel: only its heading and a hairline beneath it.
 - Mouse hover only previews the card (lighter surface and border) and does not
   move focus. A click, Enter or gamepad confirm selects Quick Battle and opens
-  Select Difficulty. Keyboard/gamepad focus shows the standard focus ring, which
+  its **play-type dialog** (below); nothing advances until a play type is
+  chosen. Keyboard/gamepad focus shows the standard focus ring, which
   stays hidden while the last menu input was a pointer press.
+- **Play-type dialog** (`ChoiceDialog`, `js/ui/overlays.js`, on its own
+  `#choice-dialog` root): a modal `role="dialog"` glass panel over the dimmed
+  screen (which is inert meanwhile), kicker "Quick Battle", title "How do you
+  want to play?", a close button, and exactly two choices, each a button with
+  a line beneath it that describes it: **Custom Play** ("Choose the
+  difficulty, your fighter, the CPU's fighter and the stage.") and **Regular
+  Play** ("Choose the difficulty and your fighter. The CPU's fighter and the
+  stage are picked at random."), the green primary choice and the focus as it
+  opens. Arrows / D-pad move between the choices and the close button;
+  click, Enter / J or gamepad A chooses. A choice becomes
+  `app.selection.playType` and opens Select Difficulty. Esc, gamepad Back,
+  the close button or a press on the dim around the panel dismiss it without
+  choosing: Select Mode stays, focus back on the Quick Battle card. Coming
+  Back to Select Mode and selecting Quick Battle again asks again, so the
+  player can switch play type.
 - No fake modes or online matchmaking.
 
 ### 6.3a Select Difficulty
 
-- Quick Battle's second setup step (`js/screens/difficulty-select-screen.js`,
-  screen id `difficulty`): kicker "Quick Battle", header "Select Difficulty",
-  setup steps with Difficulty current (Mode checked). Back returns to Select
-  Mode; Back from Select Fighter returns here.
+- Quick Battle's second setup step, Regular Play and Custom Play alike
+  (`js/screens/difficulty-select-screen.js`, screen id `difficulty`): kicker
+  "Quick Battle", header "Select Difficulty", the play type's setup steps
+  with Difficulty current (Mode checked). Back returns to Select Mode; Back
+  from Select Fighter returns here.
 - Four large selectable cards in ascending order, inspired by Seren's
   four-level scale but in Alva's charcoal, off-white and green:
   **01 Easy** "Slower reactions. Leaves openings.", **02 Medium** "Balanced
@@ -425,8 +447,8 @@ no header, build label, eyebrow or keyboard hint bar.
   too short, so Back stays reachable. Back uses the setup screens' 3 px
   radius.
 - Between the full header and the phone layout (≤ 1100 px wide) the setup
-  steps keep only the current step's name, so four steps fit; completed steps
-  keep their check.
+  steps keep only the current step's name, so up to five steps fit; completed
+  steps keep their check.
 - Watch Mode's first step is another instance of this screen (6.5a).
 
 ### 6.4 Select Fighter
@@ -456,8 +478,29 @@ no header, build label, eyebrow or keyboard hint bar.
   No animation controls, frame facts, attack-set or roster-slot metadata,
   preview floor line, roster availability count, or bottom control hints.
   Keyboard/gamepad activation confirms immediately; pointer selects first and confirms on a second press.
-- Watch Mode's Select CPU 1 and Select CPU 2 are two more instances of this
-  screen, each with its own roster (6.5a).
+- In Quick Battle this is Player 1's fighter (`app.selection.characterId`).
+  Confirming it in **Custom Play** opens Select CPU (6.4a). In **Regular
+  Play** it draws the CPU's fighter at random from the fighters playable now
+  (`playableCharacters()`, never a locked one) and the stage at random from
+  `MAPS` (never Practice Ground), stores them as the setup's
+  `cpuCharacterId` and `mapId`, and starts the Battle at once: Select CPU and
+  Select Stage are skipped, and the setup steps show only Mode · Difficulty ·
+  Fighter. Restart Battle and Rematch keep what was drawn; only a new setup
+  draws again.
+- Quick Battle's Select CPU (6.4a) and Watch Mode's Select CPU 1 and Select
+  CPU 2 (6.5a) are more instances of this screen, each with its own roster.
+
+### 6.4a Select CPU (Custom Play)
+
+- Custom Play's fourth step (`js/screens/quick-cpu-screen.js`, screen id
+  `quick-cpu`), between Select Fighter and Select Stage: kicker "Quick
+  Battle", header "Select CPU", setup steps Mode · Difficulty · Fighter ·
+  CPU · Stage with CPU current. The shared fighter roster (6.4), its own
+  instance with its own preview id, the same locked slots.
+- Confirming a fighter makes it the CPU's (`app.selection.cpuCharacterId`,
+  apart from Player 1's) and opens Select Stage. The CPU may be the same
+  fighter as Player 1. Back returns to Select Fighter; Back from Select Stage
+  returns here.
 
 ### 6.5 Select Stage
 
@@ -470,6 +513,12 @@ no header, build label, eyebrow or keyboard hint bar.
   the standard neutral focus ring.
 - "Confirm and start battle" primary action (same label for every
   stage). No bottom control hints.
+- Custom Play's last step (steps Mode · Difficulty · Fighter · CPU · Stage).
+  Starting hands the Battle screen the stage, Player 1's fighter, the CPU's
+  fighter and the level. Regular Play draws its stage instead and comes here
+  only through Change Stage after a match (7.3): this screen then takes the
+  Battle's place, its steps Mode · Difficulty · Fighter · Stage, both fighters
+  and the level kept, and Back returns to Select Fighter.
 
 ### 6.5a Watch Mode
 
@@ -560,7 +609,8 @@ Select CPU 2 → Select Stage → CPU vs CPU Battle.
   short delay so instant loads don't flash.
 - Error state: readable message, green **Retry** and outlined **Back**.
   Battle never starts before its sprites are ready.
-- Fighter unavailable: a Battle (Quick Battle, or either side of Watch Mode)
+- Fighter unavailable: a Battle (either side of Quick Battle, Player 1 or
+  the CPU, each checked on its own, or either side of Watch Mode)
   or a Practice Ground session asked to start with a fighter that is not
   playable (disabled, removed, missing or unknown, from a stale
   selection or the route itself) loads nothing and shows the same overlay
@@ -572,6 +622,13 @@ Select CPU 2 → Select Stage → CPU vs CPU Battle.
   cancel (**Keep Playing**, focused) and green confirm (**Return Home**).
   Returning Home from a battle is always confirmed; cancelling returns focus
   to the pause menu.
+- Choice dialog (`dialog`, modal; Quick Battle's play type, 6.3): the same
+  glass panel and dim, a kicker, a title and a close button over one button
+  per choice, each with its line; the default choice green and focused. A
+  choice and a dismissal (Esc, Back, the close button, a press on the dim)
+  are distinct: dismissing chooses nothing and returns focus to the control
+  that opened it. One column per choice side by side, stacked below 520 px
+  wide.
 - Portrait on touch devices: a dark "Rotate your device — Alva is designed for
   landscape play." overlay; the battle pauses and resumes correctly on return
   to landscape.
@@ -2151,7 +2208,8 @@ attack or a button.
   out: only the Void does. At the end of overtime (Quick Battle and Watch
   Mode alike), level on points, the fighter with the lower Launch Point
   wins (a fighter still waiting to respawn counts the Launch Point it fell
-  with); equal is a draw. The normal 7:00 never goes to the Launch Point:
+  with); equal is a tie, the match over with no winner (7.3). The normal
+  7:00 never goes to the Launch Point:
   level on points there is overtime (7.2.8).
 - **Launch** (`js/data/launch.js`): how a hit sends its target flying.
   Every hit (an attack's, a projectile's, a
@@ -2285,10 +2343,15 @@ attack or a button.
 - Quick Battle: 7 minutes (`CONFIG.battle.matchSeconds`, 420
   seconds; the HUD starts at `7:00`), then, with the points level, 60
   seconds of overtime (`CONFIG.battle.overtimeSeconds`, below),
-  first to `CONFIG.battle.pointsToWin` (3) points, against a CPU that uses the same fighter definition and fights with
-  it at the difficulty chosen on Select Difficulty (6.3a): Quick Battle's
-  combat AI, `CombatAIController` (`js/game/ai/combat-ai.js`). `BattleScreen`
-  passes `app.selection.difficulty` to `Battle`, which validates it once
+  first to `CONFIG.battle.pointsToWin` (3) points, Player 1's fighter
+  (`characterId`) against the CPU's own (`cpuCharacterId`: picked on Custom
+  Play's Select CPU or drawn by Regular Play, 6.4; it may be the same
+  fighter), which fights at the difficulty chosen on Select Difficulty
+  (6.3a): Quick Battle's combat AI, `CombatAIController`
+  (`js/game/ai/combat-ai.js`). `BattleScreen` checks each side's fighter on
+  its own (neither stands in for the other), loads each fighter's sprites
+  once (a mirror match shares one set) and passes
+  `app.selection.difficulty` to `Battle`, which validates it once
   (`resolveDifficulty`: anything unknown is Medium), keeps it for the whole
   battle (restart, rematch and every respawn keep it; a restart also clears
   the controller's plans) and builds the CPU's controller with it and a
@@ -2403,7 +2466,8 @@ attack or a button.
   once (the K.O. beat, then the result) as ever. When overtime runs out:
   more points wins (`'overtimePoints'`); level on points, the lower Launch
   Point (`'overtimeLaunchPoint'`, compared within 1e-6); equal on both is a
-  draw (no dialog, a fresh battle). Ahead on points when the normal clock
+  tie (outcome `'draw'`): the match is over, and the result menu says so
+  with no winner (7.3). Ahead on points when the normal clock
   runs out, there is no overtime: more points wins (`'points'`). Restart
   and rematch clear overtime: the normal period, 0–0, `7:00`, the stage's
   own Void and normal waves.
@@ -2572,8 +2636,18 @@ Adding one is described in
   points wins the match."); level on points, the lower Launch Point
   ("Overtime ran out with the points still level. The lower Launch Point
   decides it."). A glass result menu offers green **Rematch**, **Change Stage**
-  and **Return to Home**. Level on both is a draw: no dialog; once the TIME
-  banner has played, a fresh battle starts.
+  and **Return to Home**. Level on both as overtime runs out is a tie: once
+  the TIME banner has played, the same result menu opens with the kicker
+  "End of overtime", the title "Tie" and the line "Overtime ended with the
+  points and Launch Point equal.", naming no winner, in Quick Battle and
+  Watch Mode alike. Nothing restarts by itself: Rematch starts a clean match
+  (0–0, 7:00, no overtime, the stage's own Void).
+- **Change Stage** opens the mode's own Select Stage with every other choice
+  kept: Custom Play's and Watch Mode's, the screen the Battle was started
+  from; after Regular Play, which starts from Select Fighter, the stage
+  selector takes the Battle's place (its steps Mode · Difficulty · Fighter ·
+  Stage) and Back from it returns to Select Fighter. It never lands on
+  Select Fighter itself.
 - Match K.O.: once the K.O. banner has played, the same result menu opens
   with the kicker "K.O." and the line "The CPU fell into the Void for the
   final point." (or "Player 1 fell ...").
