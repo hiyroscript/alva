@@ -23,7 +23,7 @@ A fighter's `energy` entry; every field is optional:
 | --- | --- | --- |
 | `max` | 100 | Full, and where every fighter starts (a respawn and a restart refill it). |
 | `regen` | 12 | Refill per second, one passive rate whatever the fighter does. |
-| `dashCost` | 15 | Paid once as a Dash or an air dash starts (the air dash has no cost of its own), and once as Combat Assist's approach starts (a replacement melee press during it pays nothing more). |
+| `dashCost` | 15 | Paid once as a Dash or an air dash starts (the air dash has no cost of its own), and once as Combat Assist's approach starts, on the ground or in the air (a replacement melee press during it pays nothing more). |
 | `dashCancelCost` | the fighter's `dashCost` | Paid instead by a Dash or an air dash that cuts short an attack that hit. |
 | `shieldHitCost` | 25 | Paid once for every hit the Shield blocks. |
 

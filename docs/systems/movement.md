@@ -208,18 +208,20 @@ Energy, the Shield held, no art) is used up.
 
 **Combat Assist's approach.** The human player's melee press made just out
 of reach may close the gap first ([combat](combat.md#combat-assist)), on
-the Dash's own numbers: at most one Dash's travel (`dashSpeed` ×
-`dashDuration`, `assistRange` in
+the Dash's own numbers on the ground and the air dash's in the air: at
+most one Dash's (or air dash's) travel (`assistRange` in
 [`js/game/combat/combat-assist.js`](../../js/game/combat/combat-assist.js)),
-at up to `dashSpeed`, its `mouvment` clip played at the Dash's rate, for
-the Dash's `dashCost`, grounded only. It is not a Dash
-(`fighter.combatAssist`, never `fighter.dash`): it covers only the
-distance the attack needs, ends by starting that attack (stopped where it
-reached), and a jump, a Dash request (which then Dashes as above), the
-Shield or another move cancels it at any time, with no `dashCancelTime`
-to wait out. It never leaves its ground: an approach that would end past
-a ledge does not start, and one whose target moves out over a gap stops
-at the edge rather than flying off.
+at up to `dashSpeed` (or `airDashSpeed`), its `mouvment` (or
+`midair_mouvment`) clip played at that movement's rate, for `dashCost`.
+In the air it is flat across with no fall, as an air dash, and uses up the
+airtime's air dash. It is not a Dash (`fighter.combatAssist`, never
+`fighter.dash`): it covers only the distance the attack needs, ends by
+starting that attack (stopped where it reached), and a jump, a Dash
+request (which then Dashes as above), the Shield, the Deflect or another
+move cancels it at any time, with no `dashCancelTime` to wait out. One on
+the ground never leaves it: an approach that would end past a ledge does
+not start, and one whose target moves out over a gap stops at the edge
+rather than flying off. One in the air ends if it meets the ground.
 
 ## 7. Landing
 

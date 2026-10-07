@@ -1126,9 +1126,9 @@ each fighter's own values are in its character specification (7.2.9).
   into its stance; Land is a visual state only and never changes movement
   or collision, and a new jump, attack or hitstun cuts it short); Hurt and
   Mid-air Hurt for hitstun; its attacks', Shield's, Deflect's, Dash's and
-  air dash's clips (the Dash's `mouvment` also plays through Combat
-  Assist's approach, 7.2.4a); and its projectile and effect art. No
-  invented frames.
+  air dash's clips (which also play through Combat Assist's approach,
+  7.2.4a: `mouvment` on the ground, `midair_mouvment` in the air); and its
+  projectile and effect art. No invented frames.
   If the airborne, landing or hurt frames fail to load, the fighter holds
   the frame its `animationFallbacks` names (e.g. #0001's and #0002's first
   idle frame) without stretching or rotating; attacks, the Shield, the
@@ -1618,54 +1618,71 @@ attack or a button.
   sorts melee and ranged by). Never a projectile attack, a pending
   (art-only) attack, a summon, a technique, a reserved or unmapped button,
   the Shield or the Deflect (which is an attack, but on `shield`, and only
-  in the air). Only on the ground, for the ground attack, with the fighter
-  free to act (never cutting an attack, a hit-cancel or a Dash short), its
-  opponent in play (not lost to the Void), Energy usable (not exhausted)
-  and its `mouvment` art present; an aerial attack never starts one.
-- **When.** The attack's own hitbox, facing the opponent, is measured
-  against the opponent's hurtboxes where they are (`meleeGap`): only
-  hurtboxes at the box's height count, so a target on another level, in
-  the air above it or behind it is out of reach. Already in reach: the
-  attack starts at once, as ever, nothing paid. Out of reach by no more
-  than **one grounded Dash's travel** (`movement.dashSpeed` × its
-  duration, 208⅓ units: `assistRange`), with ground under the whole way, no
-  solid's side across it, and short of the two pushboxes meeting: the
-  approach starts. Anything else (further, another level, a wall or a gap
-  in the way, a box that could only reach through the target): the attack
-  starts where the fighter stands and may whiff, nothing paid. An attack's
-  own motion (a roll, a step-in, a homing dash) is never counted, so no
-  attack's assist reaches further for one.
+  in the air). On the ground for the ground attack, in the air for the
+  mid-air one (whichever the button starts where the fighter is), with the
+  fighter free to act (never cutting an attack, a hit-cancel or a Dash
+  short), its opponent in play (not lost to the Void), Energy usable (not
+  exhausted) and its art present: `mouvment` on the ground,
+  `midair_mouvment` in the air, where it also needs the airtime's air dash
+  still unused (`airDashUses`), and never in free fall or while still
+  flying from a launch.
+- **When.** The attack is measured against the opponent's hurtboxes where
+  they are (`meleeGap`), facing it: only hurtboxes at the box's height
+  count, so a target on another level, in the air above or below it or
+  behind it is out of reach. Already within the attack's own reach
+  (`attackReach`: its box, or where its motion or pull takes it, as a
+  roll's path or a homing dash's lock-on): the attack starts at once, as
+  ever, nothing paid; such an attack needs no help. Otherwise, with the box
+  its strike is drawn with (never its motion) out of reach by no more than
+  **one Dash's travel** on the ground (`movement.dashSpeed` × its duration,
+  208⅓ units) or **one air dash's** in the air (`airDashSpeed` × its
+  duration, 208⅓ units: `assistRange`), no solid's side across the way,
+  ground under it to the end on the ground, and short of the two pushboxes
+  meeting: the approach starts. Anything else (further, another level, a
+  wall or a gap in the way, a box that could only reach through the
+  target, no air dash left): the attack starts where the fighter is and
+  may whiff, nothing paid. So no attack's assist ever reaches further for
+  its motion: a homing dash, whose box is more than an air dash short of
+  its lock-on, is never assisted.
 - **The approach** (`fighter.combatAssist`: the press it serves, its
-  attack, its target, its direction, what is left to go, what it has
-  covered and for how long; its own state, never `fighter.dash`). It pays
-  `energy.dashCost` once as it starts, as a Dash does (that step has no
-  refill), faces the opponent and plays the fighter's `mouvment` clip from
-  its first frame, at the Dash's rate. It runs straight at the target at
-  `dashSpeed`, covering only what is left (its last step exactly that,
-  `ASSIST_MARGIN`, 1 unit, past the edge of reach) under ordinary physics:
-  no hitbox, damage or invulnerability, never through a wall or its target.
-  It is measured afresh every step (the target may move). Once the
-  attack's box reaches, it stops where it is and the attack starts there by
-  the ordinary rules (`tryAction`): its own phases, hitbox, motion and held
-  direction, exactly the attack thrown in reach from that spot. Once it can
-  get no closer (a Dash's travel or duration spent, the target off its
-  level or behind it), it stops and the attack starts where it is.
+  attack, its target, its direction, whether it is the air's, its clip,
+  what is left to go, what it has covered and for how long; its own state,
+  never `fighter.dash`). It pays `energy.dashCost` once as it starts, as a
+  Dash or an air dash does (that step has no refill), faces the opponent
+  and plays its clip from the first frame, at that movement's rate. On the
+  ground it is the Dash's: `mouvment`, straight at the target at
+  `dashSpeed`. In the air it is the air dash's: `midair_mouvment`, flat
+  across at `airDashSpeed` (its vertical speed zeroed as it starts and
+  gravity held off: no fall, no fast fall), and it uses up the airtime's
+  air dash, so a second burst never follows it before landing. Either
+  covers only what is left (its last step exactly that, `ASSIST_MARGIN`,
+  1 unit, past the edge of reach) under ordinary physics: no hitbox, damage
+  or invulnerability, never through a wall or its target. It is measured
+  afresh every step (the target may move). Once the attack reaches, it
+  stops where it is (in the air, hanging there, gravity back) and the
+  attack starts there by the ordinary rules (`tryAction`): its own phases,
+  hitbox, motion and held direction, exactly the attack thrown in reach
+  from that spot. Once it can get no closer (its travel or duration spent,
+  the target off its level or behind it), it stops and the attack starts
+  where it is.
 - **The newest melee press wins.** While it runs, a fresh melee press
   replaces the attack it ends in (no new cost) and the approach is measured
   for that attack's own reach; one already in reach starts at once. There
   is only ever one: a replaced attack never comes out, and nothing of the
   approach ever goes into the combat buffer. A replacement that cannot
-  start (its cooldown, no art) ends the approach with nothing, never the
-  older attack.
-- **Cancelled**, with its attack never coming and its Energy never given
-  back, by: a jump (the jump takes over on that step), a Dash (a double tap
-  or a mouvement button: the ordinary Dash, paying its own cost), the
-  Shield (pressed, or held where it may go up: the Shield goes up) or a
-  Deflect (in the air, should something lift the fighter), any combat
-  button whose move is not melee (a projectile attack, a pending attack, a
-  summon or a technique: it is tried at once as a press of its own), a hit
-  or a paralysis, leaving the ground, a wall or a ledge in the way (it
-  stops there), its target lost to the Void, taken out or replaced
+  start (its cooldown, no art, its starts for the airtime used up) ends
+  the approach with nothing, never the older attack.
+- **Cancelled**, with its attack never coming and its Energy (and air
+  dash) never given back, by: a jump (the jump, or in the air an air jump,
+  takes over on that step), a Dash (a double tap or a mouvement button:
+  the ordinary Dash, paying its own cost; in the air the air dash, already
+  used up, so the request waits for the ground as ever), the Shield
+  (pressed, or held where it may go up: the Shield goes up) or the Deflect
+  (in the air: the Deflect starts), any combat button whose move is not
+  melee (a projectile attack, a pending attack, a summon or a technique: it
+  is tried at once as a press of its own), a hit or a paralysis, leaving
+  the ground (one on the ground) or meeting it (one in the air), a wall or,
+  on the ground, a ledge in the way (it stops there), its target lost to the Void, taken out or replaced
   (Practice Ground), its own fighter lost to the Void, input locked (time
   up), a reset, a rematch, a respawn, a replaced fighter or the arena
   going. A combat button pressed together with a jump, Dash or Shield that

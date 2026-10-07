@@ -1,10 +1,12 @@
 // Run with node --test tests/systems/combat-assist.test.mjs (no dependencies).
 // Combat Assist (Home › Settings › Combat): a human player's melee press made
 // just out of reach closes the gap first with the fighter's mouvment clip,
-// for one dashCost of Energy, then starts the very attack asked for. Covered
-// here: which presses get it (melee by the attack's own data, on the ground,
-// within one Dash's travel; never a ranged attack, a pending one, a summon,
-// a technique, the Deflect or an aerial attack), its Energy, the newest melee
+// for one dashCost of Energy, then starts the very attack asked for; in the
+// air the same, flat across as an air dash, with midair_mouvment. Covered
+// here: which presses get it (melee by the attack's own data, within one
+// Dash's or air dash's travel, unless the attack's own reach already covers
+// its target; never a ranged attack, a pending one, a summon, a technique or
+// the Deflect), its Energy (and the air dash it uses), the newest melee
 // press winning, everything that cancels it, who has it (the player's
 // controller with the setting on; never a CPU, in any mode) and what the
 // stage does to it. Shared rules: driven from each fighter's own data or a
@@ -18,7 +20,7 @@ import { PlayerController, TrainingAIController, blankInput } from '../../js/gam
 import { CombatAIController } from '../../js/game/ai/combat-ai.js';
 import { readMoveset } from '../../js/game/ai/moveset.js';
 import { CombatSystem } from '../../js/game/combat/combat.js';
-import { isMeleeAttack, isRangedAttack } from '../../js/game/combat/attacks.js';
+import { isMeleeAttack, isRangedAttack, attackReach } from '../../js/game/combat/attacks.js';
 import { assistRange, meleeGap, ASSIST_MARGIN } from '../../js/game/combat/combat-assist.js';
 import { spawnProjectiles, removeDeadProjectiles, clashProjectiles } from '../../js/game/combat/projectile.js';
 import { spawnClones, updateClones, removeDeadClones } from '../../js/game/combat/summon.js';
@@ -102,20 +104,33 @@ function rig({
   return { player, foe, tick, events, projectiles, clones, system, input, held };
 }
 
-// Moves the foe so `atk`'s box is `gap` world units short of it (meleeGap).
-function placeFoe(r, atk, gap) {
-  const now = meleeGap(r.player, atk.hitbox, r.foe, 1);
+// Moves the foe so `box` (by default `atk`'s own reach, attackReach: its
+// box, or where its motion or pull takes it) is `gap` world units short of
+// it (meleeGap).
+function placeFoe(r, atk, gap, box = attackReach(atk)) {
+  const now = meleeGap(r.player, box, r.foe, 1);
   r.foe.body.x += gap - now;
   r.foe.body.prevX = r.foe.body.x;
 }
 
-// Every combat button whose ground attack is melee, for `character`.
-function groundMelee(character) {
+// Every combat button whose attack (on the ground, or in the air: `air`)
+// is melee, for `character`.
+function meleeButtons(character, air) {
   const f = rig({ character }).player;
   return COMBAT_BUTTONS.filter((action) => {
-    const id = f.attackFor(action, true);
+    const id = f.attackFor(action, !air);
     return !!id && isMeleeAttack(f.attacks[id]);
-  }).map((action) => ({ action, id: f.attackFor(action, true) }));
+  }).map((action) => ({ action, id: f.attackFor(action, !air) }));
+}
+const groundMelee = (character) => meleeButtons(character, false);
+
+// The player a little way into a jump (rising, two steps after the press),
+// at the height its mid-air attacks meet a standing foe.
+function airborne(r) {
+  r.tick(press('jump'));
+  r.tick({ jump: true });
+  assert.equal(r.player.grounded, false);
+  return r.player;
 }
 
 // Steps with nothing pressed until the player's attack starts; returns the
@@ -182,7 +197,7 @@ test('just out of reach, a melee press closes the gap with the mouvment clip, th
       const { player, foe } = r;
       const atk = player.attacks[id];
       const before = JSON.stringify(atk);
-      placeFoe(r, atk, 100);
+      placeFoe(r, atk, 60);
       const max = player.combat.energy;
       const x0 = player.body.x;
       r.tick(press(action));
@@ -220,10 +235,10 @@ test('just out of reach, a melee press closes the gap with the mouvment clip, th
       assert.equal(JSON.stringify(atk), before, `${why}: the attack is unchanged`);
       assert.ok(Object.isFrozen(atk));
       // It stopped where the attack reaches, having covered only that.
-      const gap = meleeGap(player, atk.hitbox, foe, 1);
+      const gap = meleeGap(player, attackReach(atk), foe, 1);
       assert.ok(gap < 0 && gap >= -ASSIST_MARGIN - EPS, `${why}: in reach at ${gap}`);
-      assert.ok(Math.abs(player.body.x - x0 - (100 + ASSIST_MARGIN)) < 1e-3, `${why}: 101 units covered`);
-      assert.ok(started <= Math.ceil((100 + ASSIST_MARGIN) / (MV.dashSpeed * DT)) + 1, why);
+      assert.ok(Math.abs(player.body.x - x0 - (60 + ASSIST_MARGIN)) < 1e-3, `${why}: 61 units covered`);
+      assert.ok(started <= Math.ceil((60 + ASSIST_MARGIN) / (MV.dashSpeed * DT)) + 1, why);
       // Paid once, refilling since.
       assert.ok(player.combat.energy > max - player.energyDef.dashCost, why);
     }
@@ -238,10 +253,11 @@ test('from its first step the assisted attack is exactly the attack thrown in re
       placeFoe(assisted, assisted.player.attacks[id], 60);
       assisted.tick(press(action));
       untilAttack(assisted);
-      const at = meleeGap(assisted.player, assisted.player.attacks[id].hitbox, assisted.foe, 1);
+      const box = assisted.player.attacks[id].hitbox;
+      const at = meleeGap(assisted.player, box, assisted.foe, 1);
       // The same attack, Combat Assist off, thrown from that very spot.
       const plain = rig({ character: c, assist: false });
-      placeFoe(plain, plain.player.attacks[id], at);
+      placeFoe(plain, plain.player.attacks[id], at, box);
       plain.tick(press(action));
       assert.ok(plain.player.combat.attack, why);
       const record = (r) => {
@@ -295,9 +311,10 @@ test('too far for one Dash: the attack starts where the fighter stands and may w
       // Its own motion only (a step-in, a roll), never a run across the stage.
       for (let i = 0; i < 60; i++) r.tick();
       assert.equal(r.events.filter((e) => e.attacker === r.player).length, 0, 'a whiff');
-      // Just inside the limit, the same press is assisted.
+      // Just inside the limit (measured from the box its strike is drawn
+      // with, never its motion), the same press is assisted.
       const near = rig({ character: c });
-      placeFoe(near, near.player.attacks[id], range - ASSIST_MARGIN - 1);
+      placeFoe(near, near.player.attacks[id], range - ASSIST_MARGIN - 1, near.player.attacks[id].hitbox);
       near.tick(press(action));
       assert.ok(near.player.combatAssist, `#${c.id} ${action}: within one Dash`);
     }
@@ -397,27 +414,206 @@ test('summons, techniques, pending attacks and reserved buttons never get it', (
   assert.equal(p.player.combat.energy, p.player.combat.maxEnergy);
 });
 
-test('the Deflect never gets it, and neither does an aerial attack: the approach is the ground\'s alone', () => {
+test('the Deflect never gets it: on the ground the button is the Shield, in the air the Deflect, as ever', () => {
   for (const c of playableCharacters()) {
-    // Shield on the ground is the Shield.
     const g = rig({ character: c, gap: 150 });
     g.tick(press('shield'));
     assert.equal(g.player.combatAssist, null);
     assert.equal(g.player.combat.shielding, true, `#${c.id}: the Shield`);
-    // In the air: the Deflect, and the mid-air attacks, as ever.
-    for (const action of ['shield', ...groundMelee(c).map((m) => m.action)]) {
-      const r = rig({ character: c, gap: 150 });
-      r.tick(press('jump'));
-      for (let i = 0; i < 6; i++) r.tick({ jump: true });
-      assert.equal(r.player.grounded, false);
-      const energy = r.player.combat.energy;
+    const r = rig({ character: c });
+    airborne(r);
+    placeFoe(r, r.player.deflect, 40);
+    const energy = r.player.combat.energy;
+    r.tick(press('shield'));
+    assert.equal(r.player.combatAssist, null, `#${c.id}: no approach`);
+    assert.equal(r.player.combat.attack?.def, r.player.deflect, `#${c.id}: the Deflect, where it is`);
+    assert.equal(r.player.combat.energy, energy);
+  }
+});
+
+// ---- In the air ------------------------------------------------------------------------
+
+test('in the air, a melee press just out of reach closes in flat across, the air dash\'s way, then its mid-air attack starts', () => {
+  let tried = 0;
+  for (const c of playableCharacters()) {
+    for (const { action, id } of meleeButtons(c, true)) {
+      const why = `#${c.id} ${action} (${id})`;
+      const r = rig({ character: c });
+      const { player, foe } = r;
+      const atk = player.attacks[id];
+      // A homing dash's own lock-on is its approach (see the next test).
+      if (atk.motion?.type === 'homing') continue;
+      tried++;
+      airborne(r);
+      placeFoe(r, atk, 30);
+      const max = player.combat.energy;
+      const airDashes = player.airDashes;
+      const y = player.body.y;
+      const x0 = player.body.x;
       r.tick(press(action));
-      assert.equal(r.player.combatAssist, null, `#${c.id} ${action} in the air`);
-      assert.equal(r.player.combat.energy, energy);
-      if (action === 'shield') assert.equal(r.player.combat.attack?.def, r.player.deflect, `#${c.id}: the Deflect`);
-      else assert.ok(!r.player.combat.attack || r.player.combat.attack.airborne, `#${c.id} ${action}: its mid-air attack`);
+      const a = player.combatAssist;
+      assert.ok(a, `${why}: the approach starts`);
+      assert.equal(a.air, true);
+      assert.equal(a.attack, atk);
+      assert.equal(player.state, 'assist');
+      assert.equal(player.animator.anim.key, 'midair_mouvment', `${why}: the air dash's own clip`);
+      assert.equal(frameName(player), `${c.id}_midair_mouvment_1.png`, `${why}: from its first frame`);
+      assert.equal(player.combat.energy, max - player.energyDef.dashCost, `${why}: one dashCost, no refill on its step`);
+      assert.equal(player.airDashes, airDashes - 1, `${why}: it uses the airtime's air dash`);
+      assert.ok(Math.abs(player.body.vx - MV.airDashSpeed) < EPS, `${why}: at the air dash's speed`);
+      while (player.combatAssist) {
+        assert.equal(player.body.y, y, `${why}: flat across, no fall`);
+        assert.equal(player.combat.attack, null, `${why}: no hitbox meanwhile`);
+        assert.equal(player.animator.anim.key, 'midair_mouvment');
+        r.tick();
+      }
+      assert.equal(player.combat.attack?.def, atk, `${why}: the very mid-air attack asked for`);
+      assert.equal(player.combat.attack.airborne, true);
+      assert.equal(player.combat.attack.time, 0);
+      assert.ok(Math.abs(player.body.x - x0 - (30 + ASSIST_MARGIN)) < 1e-3, `${why}: only the gap covered`);
+      assert.ok(meleeGap(player, attackReach(atk), foe, 1) < 0, why);
+      assert.equal(player.body.vx, 0, `${why}: stopped where it reached`);
     }
   }
+  assert.ok(tried >= 4, 'every playable fighter has a mid-air melee attack to try');
+});
+
+test('an attack that already reaches its target by its own motion needs no approach: a homing dash\'s lock-on, a roll\'s path', () => {
+  for (const c of playableCharacters()) {
+    for (const air of [true, false]) {
+      for (const { action, id } of meleeButtons(c, air)) {
+        const r = rig({ character: c });
+        const atk = r.player.attacks[id];
+        const reach = attackReach(atk);
+        const box = atk.hitbox;
+        // Only attacks whose own reach is longer than their box.
+        if (reach.x + reach.w <= box.x + box.w) continue;
+        if (air) airborne(r);
+        // Out of the box's reach, inside the attack's own.
+        placeFoe(r, atk, -5);
+        assert.ok(meleeGap(r.player, box, r.foe, 1) > 0, `#${c.id} ${id}: out of its box's reach`);
+        const energy = r.player.combat.energy;
+        r.tick(press(action));
+        assert.equal(r.player.combatAssist, null, `#${c.id} ${id}: no approach`);
+        assert.equal(r.player.combat.attack?.def, atk, `#${c.id} ${id}: it starts at once`);
+        assert.equal(r.player.combat.energy, energy);
+      }
+    }
+  }
+  // Further off, a homing dash is never assisted: how far an approach may
+  // start is measured from the box its strike is drawn with, never its
+  // lock-on, and its box is more than an air dash short.
+  for (const c of playableCharacters()) {
+    for (const { action, id } of meleeButtons(c, true)) {
+      const r = rig({ character: c });
+      const atk = r.player.attacks[id];
+      if (atk.motion?.type !== 'homing') continue;
+      airborne(r);
+      placeFoe(r, atk, 20);
+      r.tick(press(action));
+      assert.equal(r.player.combatAssist, null, `#${c.id} ${id}`);
+      assert.equal(r.player.combat.attack?.def, atk);
+    }
+  }
+});
+
+test('in the air it takes the airtime\'s air dash: with none left there is no approach, but the attack still starts', () => {
+  const r = rig();
+  airborne(r);
+  r.player.airDashes = 0;
+  placeFoe(r, r.player.attacks.midair_attack1, 30);
+  r.tick(press('attack1'));
+  assert.equal(r.player.combatAssist, null);
+  assert.equal(r.player.combat.attack?.def.id, 'midair_attack1', 'where it is');
+  // After an approach, an air dash asked for has none left: it waits for the
+  // ground, as one asked for with none left always does.
+  const used = rig();
+  airborne(used);
+  placeFoe(used, used.player.attacks.midair_attack1, 30);
+  used.tick(press('attack1'));
+  assert.ok(used.player.combatAssist);
+  assert.equal(used.player.airDashes, 0);
+  untilAttack(used);
+  for (let i = 0; i < 20; i++) used.tick();
+  used.tick({ mouvementRightPressed: true });
+  assert.equal(used.player.dash, null, 'no second burst in the same airtime');
+  // Exhausted, the same: no approach, the attack where it is.
+  const tired = rig();
+  airborne(tired);
+  tired.player.combat.setEnergy(0);
+  placeFoe(tired, tired.player.attacks.midair_attack1, 30);
+  tired.tick(press('attack1'));
+  assert.equal(tired.player.combatAssist, null);
+  assert.equal(tired.player.combat.attack?.def.id, 'midair_attack1');
+  assert.equal(tired.player.airDashes, 1, 'its air dash kept');
+});
+
+test('in the air the newest melee press wins too, and an air jump, the Deflect, a Dash request or another move cancels it', () => {
+  // Replaced: the High Kick instead of the Floating Straight.
+  const swap = rig();
+  airborne(swap);
+  placeFoe(swap, swap.player.attacks.midair_attack1, 60);
+  swap.tick(press('attack1'));
+  swap.tick(press('extra_attack'));
+  assert.equal(swap.player.combatAssist?.action, 'extra_attack');
+  const energy = swap.player.combat.energy;
+  untilAttack(swap);
+  assert.equal(swap.player.combat.attack.def.id, 'extra_attack');
+  assert.ok(swap.player.combat.energy >= energy, 'no second cost');
+  assert.equal(watchAttacks(swap, 60).has('midair_attack1'), false);
+  const closingAir = (character = C1, action = 'attack1') => {
+    const r = rig({ character });
+    airborne(r);
+    placeFoe(r, r.player.attacks[r.player.attackFor(action, false)], 60);
+    r.tick(press(action));
+    assert.ok(r.player.combatAssist?.air, 'closing in, in the air');
+    return r;
+  };
+  // An air jump: from where it is, on that step.
+  const jump = closingAir();
+  const jumps = jump.player.airJumps;
+  jump.tick(press('jump'));
+  assert.equal(jump.player.combatAssist, null);
+  assert.equal(jump.player.airJumps, jumps - 1, 'an air jump');
+  assert.ok(jump.player.body.vy < 0);
+  assert.equal(watchAttacks(jump, 60).has('midair_attack1'), false);
+  // The Deflect.
+  const deflect = closingAir();
+  deflect.tick(press('shield'));
+  assert.equal(deflect.player.combatAssist, null);
+  assert.equal(deflect.player.combat.attack?.def, deflect.player.deflect);
+  // A Dash request: no air dash is left, so it waits for the ground.
+  const dash = closingAir();
+  dash.tick({ mouvementRightPressed: true });
+  assert.equal(dash.player.combatAssist, null);
+  assert.equal(dash.player.dash, null);
+  assert.equal(watchAttacks(dash, 60).has('midair_attack1'), false);
+  // Another move: #0002's Whirlwind (a projectile attack) cancels its
+  // approach for the Bounce Attack.
+  const other = closingAir(getCharacter('0002'), 'attack2');
+  other.tick(press('extra_attack'));
+  assert.equal(other.player.combatAssist, null);
+  assert.equal(watchAttacks(other, 60).has('midair_attack2'), false);
+  // A hit.
+  const hit = closingAir();
+  hit.system.applyHit(hit.foe, hit.player, hit.foe.attacks.attack1);
+  assert.equal(hit.player.combatAssist, null);
+});
+
+test('in the air it never passes a wall either, nor reaches another level: no approach, the attack where it is', () => {
+  const walled = new StageCollision(stageMap({ solids: [{ id: 'pillar', x: 860, y: 600, w: 20, h: 200 }] }));
+  const r = rig({ stage: walled, x: 800, gap: 120 });
+  airborne(r);
+  r.tick(press('attack1'));
+  assert.equal(r.player.combatAssist, null);
+  assert.equal(r.player.combat.attack?.def.id, 'midair_attack1');
+  // High in a jump, well above a standing foe's head.
+  const high = rig({ gap: 140 });
+  high.tick(press('jump'));
+  for (let i = 0; i < 9; i++) high.tick({ jump: true });
+  assert.ok(high.player.body.y < 800 - 110, 'well up');
+  high.tick(press('attack1'));
+  assert.equal(high.player.combatAssist, null);
 });
 
 test('what an attack reaches is its own data: a longer box stops the approach sooner, whoever the fighter is', () => {
@@ -846,8 +1042,9 @@ test('while closing in it strikes nothing, never passes through its target and i
   for (const c of playableCharacters()) {
     for (const { action, id } of groundMelee(c)) {
       const r = rig({ character: c });
-      placeFoe(r, r.player.attacks[id], 140);
+      placeFoe(r, r.player.attacks[id], 60);
       r.tick(press(action));
+      assert.ok(r.player.combatAssist, `#${c.id} ${action}`);
       const contact = (r.player.def.pushbox.width + r.foe.def.pushbox.width) / 2;
       while (r.player.combatAssist) {
         assert.equal(r.player.combat.attack, null, 'no hitbox');

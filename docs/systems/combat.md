@@ -330,7 +330,8 @@ button (A4, A5) while they run
 The human player's option (Home › Settings › Combat, on by default; the
 store is [`js/core/settings.js`](../../js/core/settings.js)): a melee
 press made just out of reach closes the gap first, with the Dash's
-`mouvment` clip, then starts the very attack asked for. The rules are
+`mouvment` clip on the ground or flat across with the air dash's
+`midair_mouvment` in the air, then starts the very attack asked for. The rules are
 [`ALVA_SPEC.md`](../../ALVA_SPEC.md) §7.2.4a; here is how the code does it.
 
 - **Who.** `Fighter.combatAssistOn`: the fighter's controller is a
@@ -344,15 +345,19 @@ press made just out of reach closes the gap first, with the Dash's
   Combat Assist code.
 - **Start.** `tryAction` has checked the press may start its attack now;
   before `startAttack`, `tryCombatAssist` may start the approach instead:
-  a melee attack (`isMeleeAttack`), on the ground, the fighter free to act
-  (`canAct`: never out of a hit-cancel or a Dash), its opponent in play,
-  `mouvment` art and a Dash duration, and `approachDistance` finite and
-  above 0 (out of reach by at most `assistRange`, one Dash's travel, on
-  the box's level and short of the pushboxes meeting), with
-  `approachClear` (no solid's side on the way, footing where it stops).
-  Then it pays `dashCost` (`spendEnergy`: never while exhausted) and sets
-  `fighter.combatAssist`. Otherwise the attack starts where the fighter
-  stands, as ever.
+  a melee attack (`isMeleeAttack`), the fighter free to act (`canAct`:
+  never out of a hit-cancel or a Dash), its opponent in play, the art
+  (`mouvment` on the ground, `midair_mouvment` in the air, where an air
+  dash must also be left, with no free fall or launch), and
+  `approachDistance` finite and above 0: not already within the attack's
+  own reach (`attackReach`, its motion and pull included), its box out of
+  reach by at most `assistRange` (one Dash's travel, or one air dash's),
+  on the box's level and short of the pushboxes meeting; with
+  `approachClear` (no solid's side on the way; on the ground, footing
+  where it stops). Then it pays `dashCost` (`spendEnergy`: never while
+  exhausted), in the air takes the air dash (`airDashes`), and sets
+  `fighter.combatAssist` (`air` says which kind). Otherwise the attack
+  starts where the fighter is, as ever.
 - **Each step.** While `fighter.combatAssist` is set, `Fighter.update`
   hands the step's presses to `assistIntents` instead of the ordinary
   loop: a jump, a Dash request (read before the intents now, by
@@ -363,14 +368,16 @@ press made just out of reach closes the gap first, with the Dash's
   Then `stepCombatAssist` checks it may go on, measures again and either
   finishes (`finishCombatAssist`: stop, then `tryAction(action, held,
   false)`, never another approach) or plans this step's move (`need`),
-  which the horizontal movement turns into `dashSpeed` or less. After the
-  body moves, leaving the ground or a wall cancels it; a hit cancels it in
+  which the horizontal movement turns into `dashSpeed` (`airDashSpeed`,
+  flat with gravity held off, in the air) or less. After the body moves,
+  leaving the ground (in the air, meeting it) or a wall cancels it; a hit cancels it in
   `takeHit`, a stun or paralysis on the next step, and the arena and
   Practice Ground cancel it when its target or its fighter goes. It is
   never in the combat buffer, so a replaced or cancelled attack never
   comes out later.
 - **State and art.** `canAct()` is false while it runs; the visual state
-  is `assist`, playing `mouvment` at the Dash's rate; facing is locked
+  is `assist`, playing `mouvment` at the Dash's rate (`midair_mouvment` at
+  the air dash's, in the air); facing is locked
   toward the target; the speed trail draws as a Dash's. `reset` and
   `respawn` clear it.
 
