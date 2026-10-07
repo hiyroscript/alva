@@ -433,49 +433,86 @@ test('the Deflect never gets it: on the ground the button is the Shield, in the 
 
 // ---- In the air ------------------------------------------------------------------------
 
-test('in the air, a melee press just out of reach closes in flat across, the air dash\'s way, then its mid-air attack starts', () => {
+// The player `steps` steps into a jump (Jump held throughout: past
+// highJumpWindow it is the higher jump), so anywhere from just off the
+// ground to the top of the arc.
+function jumpFor(r, steps) {
+  r.tick(press('jump'));
+  for (let i = 1; i < steps; i++) r.tick({ jump: true });
+  assert.equal(r.player.grounded, false);
+  return r.player;
+}
+
+test('in the air, a melee press out of reach closes in straight at the target, from anywhere in a jump, and its mid-air attack lands', () => {
   let tried = 0;
   for (const c of playableCharacters()) {
     for (const { action, id } of meleeButtons(c, true)) {
-      const why = `#${c.id} ${action} (${id})`;
-      const r = rig({ character: c });
-      const { player, foe } = r;
-      const atk = player.attacks[id];
-      // A homing dash's own lock-on is its approach (see the next test).
-      if (atk.motion?.type === 'homing') continue;
-      tried++;
-      airborne(r);
-      placeFoe(r, atk, 30);
-      const max = player.combat.energy;
-      const airDashes = player.airDashes;
-      const y = player.body.y;
-      const x0 = player.body.x;
-      r.tick(press(action));
-      const a = player.combatAssist;
-      assert.ok(a, `${why}: the approach starts`);
-      assert.equal(a.air, true);
-      assert.equal(a.attack, atk);
-      assert.equal(player.state, 'assist');
-      assert.equal(player.animator.anim.key, 'midair_mouvment', `${why}: the air dash's own clip`);
-      assert.equal(frameName(player), `${c.id}_midair_mouvment_1.png`, `${why}: from its first frame`);
-      assert.equal(player.combat.energy, max - player.energyDef.dashCost, `${why}: one dashCost, no refill on its step`);
-      assert.equal(player.airDashes, airDashes - 1, `${why}: it uses the airtime's air dash`);
-      assert.ok(Math.abs(player.body.vx - MV.airDashSpeed) < EPS, `${why}: at the air dash's speed`);
-      while (player.combatAssist) {
-        assert.equal(player.body.y, y, `${why}: flat across, no fall`);
-        assert.equal(player.combat.attack, null, `${why}: no hitbox meanwhile`);
-        assert.equal(player.animator.anim.key, 'midair_mouvment');
-        r.tick();
+      // A homing dash's own lock-on is its approach (tested below).
+      if (rig({ character: c }).player.attacks[id].motion?.type === 'homing') continue;
+      // Low in the jump, near its top, and high in the higher jump.
+      for (const steps of [3, 8, 14]) {
+        const why = `#${c.id} ${action} (${id}), ${steps} steps into a jump`;
+        const r = rig({ character: c, gap: 150 });
+        const { player, foe } = r;
+        const atk = player.attacks[id];
+        jumpFor(r, steps);
+        // Its own reach already meets the target: the attack as ever.
+        if (meleeGap(player, attackReach(atk), foe, 1) < 0) continue;
+        tried++;
+        const max = player.combat.energy;
+        const airDashes = player.airDashes;
+        const start = { x: player.body.x, y: player.body.y };
+        r.tick(press(action));
+        const a = player.combatAssist;
+        assert.ok(a, `${why}: the approach starts`);
+        assert.equal(a.air, true);
+        assert.equal(a.attack, atk);
+        assert.equal(player.state, 'assist');
+        assert.equal(player.animator.anim.key, 'midair_mouvment', `${why}: the air dash's own clip`);
+        assert.equal(frameName(player), `${c.id}_midair_mouvment_1.png`, `${why}: from its first frame`);
+        assert.equal(player.combat.energy, max - player.energyDef.dashCost, `${why}: one dashCost, no refill on its step`);
+        assert.equal(player.airDashes, airDashes - 1, `${why}: it uses the airtime's air dash`);
+        while (player.combatAssist) {
+          const step = Math.hypot(player.body.x - player.body.prevX, player.body.y - player.body.prevY);
+          assert.ok(step <= MV.airDashSpeed * DT + EPS, `${why}: never faster than the air dash (${step})`);
+          assert.ok(Number.isFinite(player.body.x) && Number.isFinite(player.body.y), `${why}: a real position`);
+          assert.equal(player.grounded, false, `${why}: it never lands on the way`);
+          assert.equal(player.combat.attack, null, `${why}: no hitbox meanwhile`);
+          r.tick();
+        }
+        assert.equal(player.combat.attack?.def, atk, `${why}: the very mid-air attack asked for`);
+        assert.equal(player.combat.attack.airborne, true);
+        assert.ok(Math.hypot(player.body.x - start.x, player.body.y - start.y) <= assistRange(player, true) + EPS, `${why}: one air dash at most`);
+        for (let i = 0; i < 50 && !r.events.some((e) => e.attacker === player); i++) r.tick();
+        assert.ok(r.events.some((e) => e.attacker === player && e.move === id), `${why}: it lands`);
+        assert.ok(Number.isFinite(player.body.x) && Number.isFinite(player.body.y));
       }
-      assert.equal(player.combat.attack?.def, atk, `${why}: the very mid-air attack asked for`);
-      assert.equal(player.combat.attack.airborne, true);
-      assert.equal(player.combat.attack.time, 0);
-      assert.ok(Math.abs(player.body.x - x0 - (30 + ASSIST_MARGIN)) < 1e-3, `${why}: only the gap covered`);
-      assert.ok(meleeGap(player, attackReach(atk), foe, 1) < 0, why);
-      assert.equal(player.body.vx, 0, `${why}: stopped where it reached`);
     }
   }
-  assert.ok(tried >= 4, 'every playable fighter has a mid-air melee attack to try');
+  assert.ok(tried >= 10, `mid-air attacks tried from several heights (${tried})`);
+});
+
+test('at the target\'s height, low in a jump, the mid-air approach is the air dash\'s: flat across, only the gap covered', () => {
+  const r = rig();
+  const { player, foe } = r;
+  const atk = player.attacks.midair_attack1;
+  airborne(r);
+  placeFoe(r, atk, 30);
+  // Its box already shares the target's height, deep enough: no rise or fall.
+  const y = player.body.y;
+  const x0 = player.body.x;
+  r.tick(press('attack1'));
+  assert.ok(player.combatAssist?.air);
+  assert.ok(Math.abs(player.body.vx - MV.airDashSpeed) < EPS, 'at the air dash\'s speed');
+  while (player.combatAssist) {
+    assert.equal(player.body.y, y, 'flat across, no fall');
+    r.tick();
+  }
+  assert.equal(player.combat.attack?.def, atk);
+  assert.ok(player.body.x - x0 < 30 + atk.hitbox.w, 'only into reach, never far past it');
+  assert.ok(meleeGap(player, atk.hitbox, foe, 1) < -ASSIST_MARGIN, 'well into reach, not at its edge');
+  assert.equal(player.body.vx, 0, 'stopped where it reached');
+  assert.equal(player.body.vy, 0);
 });
 
 test('an attack that already reaches its target by its own motion needs no approach: a homing dash\'s lock-on, a roll\'s path', () => {
@@ -649,20 +686,45 @@ test('in the air the newest melee press wins too, and an air jump, the Deflect, 
   assert.equal(hit.player.combatAssist, null);
 });
 
-test('in the air it never passes a wall either, nor reaches another level: no approach, the attack where it is', () => {
+test('in the air it never passes a wall, a ceiling or a floor in the way, nor goes further than one air dash: no approach, the attack where it is', () => {
+  // A pillar between them.
   const walled = new StageCollision(stageMap({ solids: [{ id: 'pillar', x: 860, y: 600, w: 20, h: 200 }] }));
   const r = rig({ stage: walled, x: 800, gap: 120 });
   airborne(r);
   r.tick(press('attack1'));
   assert.equal(r.player.combatAssist, null);
   assert.equal(r.player.combat.attack?.def.id, 'midair_attack1');
-  // High in a jump, well above a standing foe's head.
-  const high = rig({ gap: 140 });
-  high.tick(press('jump'));
-  for (let i = 0; i < 9; i++) high.tick({ jump: true });
-  assert.ok(high.player.body.y < 800 - 110, 'well up');
-  high.tick(press('attack1'));
-  assert.equal(high.player.combatAssist, null);
+  // A platform it would land on, diving at a target past it.
+  // (The dive ends with the attacker's feet about 40 units over the
+  // target's: a deck lower than that is no obstacle, one higher is.)
+  const below = new StageCollision(stageMap({ platforms: [{ id: 'deck', x: 830, y: 775, w: 60, h: 16 }] }));
+  const clear = rig({ stage: below, x: 800, gap: 160 });
+  jumpFor(clear, 14);
+  clear.tick(press('attack1'));
+  assert.ok(clear.player.combatAssist, 'over a low deck it still dives');
+  const decked = new StageCollision(stageMap({ platforms: [{ id: 'deck', x: 830, y: 745, w: 60, h: 16 }] }));
+  const d = rig({ stage: decked, x: 800, gap: 160 });
+  jumpFor(d, 14);
+  assert.ok(d.player.body.y < 745 - 90, 'well above the deck');
+  d.tick(press('attack1'));
+  assert.equal(d.player.combatAssist, null, 'it would land on the deck on the way');
+  // Beyond one air dash's travel, straight line: high in the higher jump,
+  // the target far along the floor.
+  const far = rig({ gap: 230 });
+  jumpFor(far, 22);
+  far.tick(press('attack1'));
+  assert.equal(far.player.combatAssist, null);
+  assert.equal(far.player.combat.attack?.def.id, 'midair_attack1', 'it starts where it is, and may whiff');
+  // A wall reached mid-way ends it: the target moved behind the pillar.
+  const mid = rig({ stage: walled, x: 700, gap: 150 });
+  airborne(mid);
+  mid.tick(press('attack1'));
+  assert.ok(mid.player.combatAssist);
+  mid.foe.body.x = 940;
+  mid.foe.body.prevX = 940;
+  mid.tick();
+  assert.equal(mid.player.combatAssist, null);
+  assert.equal(watchAttacks(mid, 40).has('midair_attack1'), false);
 });
 
 test('what an attack reaches is its own data: a longer box stops the approach sooner, whoever the fighter is', () => {

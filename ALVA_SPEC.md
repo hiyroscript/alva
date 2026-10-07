@@ -1629,37 +1629,48 @@ attack or a button.
   still unused (`airDashUses`), and never in free fall or while still
   flying from a launch.
 - **When.** The attack is measured against the opponent's hurtboxes where
-  they are (`meleeGap`), facing it: only hurtboxes at the box's height
-  count, so a target on another level, in the air above or below it or
-  behind it is out of reach. Already within the attack's own reach
+  they are, facing it (`reachVector`). On the ground only hurtboxes at the
+  box's height count, so a target on another level, in the air above it
+  or behind it is out of reach. In the air the approach may also go up or
+  down, so a target anywhere around it counts (an aerial is thrown from
+  anywhere in a jump, its top included); one behind it never does.
+  Already within the attack's own reach
   (`attackReach`: its box, or where its motion or pull takes it, as a
   roll's path or a pull's circle): the attack starts at once, as
   ever, nothing paid; such an attack needs no help. Otherwise, with the box
   its strike is drawn with (never its motion) out of reach by no more than
   **one Dash's travel** on the ground (`movement.dashSpeed` × its duration,
   208⅓ units) or **one air dash's** in the air (`airDashSpeed` × its
-  duration, 208⅓ units: `assistRange`), no solid's side across the way,
-  ground under it to the end on the ground, and short of the two pushboxes
-  meeting: the approach starts. Anything else (further, another level, a
-  wall or a gap in the way, a box that could only reach through the
-  target, no air dash left): the attack starts where the fighter is and
-  may whiff, nothing paid. So no attack's assist ever reaches further for
-  its motion.
+  duration, 208⅓ units, in a straight line: `assistRange`), no solid
+  across the way, on the ground ground under it to the end, in the air
+  nothing it would land on, and short of the two pushboxes meeting where
+  the bodies end side by side: the approach starts. Anything else
+  (further, another level for the ground, a wall, a ceiling, a gap or a
+  floor in the way, a box that could only reach through the target, no
+  air dash left): the attack starts where the fighter is and may whiff,
+  nothing paid. So no attack's assist ever reaches further for its
+  motion.
 - **The approach** (`fighter.combatAssist`: the press it serves, its
   attack, its target, its direction, whether it is the air's, its clip,
   what is left to go, what it has covered and for how long; its own state,
   never `fighter.dash`). It pays `energy.dashCost` once as it starts, as a
   Dash or an air dash does (that step has no refill), faces the opponent
   and plays its clip from the first frame, at that movement's rate. On the
-  ground it is the Dash's: `mouvment`, straight at the target at
-  `dashSpeed`. In the air it is the air dash's: `midair_mouvment`, flat
-  across at `airDashSpeed` (its vertical speed zeroed as it starts and
-  gravity held off: no fall, no fast fall), and it uses up the airtime's
-  air dash, so a second burst never follows it before landing. Either
-  covers only what is left (its last step exactly that, `ASSIST_MARGIN`,
-  1 unit, past the edge of reach) under ordinary physics: no hitbox, damage
-  or invulnerability, never through a wall or its target. It is measured
-  afresh every step (the target may move). Once the attack reaches, it
+  ground it is the Dash's: `mouvment`, straight across at the target at
+  `dashSpeed`, stopping `ASSIST_MARGIN` (1 unit) past the edge of reach.
+  In the air it is the air dash's: `midair_mouvment` at `airDashSpeed`,
+  gravity held off (no fall, no fast fall), straight at the target, down,
+  up or across: unless the attack's own motion passes through the target's
+  middle (a plunge onto a target below, a lift into one above), it brings
+  the strike into the target's body half the shorter of the two deep, and
+  across half the narrower of the two deep (as deep as the two bodies
+  leave room for, at least past the edge of reach), since in the air both
+  may move and an edge is too easily lost. It uses up the airtime's air
+  dash, so a second burst never follows it before landing. Either covers
+  only what is left, under ordinary physics: no hitbox, damage or
+  invulnerability, never through a wall, a ceiling or its target. It is
+  measured afresh every step (the target may move), its limit of one Dash
+  (or air dash) applying to the whole approach. Once the attack reaches, it
   stops where it is (in the air, hanging there, gravity back) and the
   attack starts there by the ordinary rules (`tryAction`): its own phases,
   hitbox, motion and held direction, exactly the attack thrown in reach
