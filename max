@@ -1,41 +1,115 @@
-Work in the hiyroscript/alva repository on the current main branch.
+Work in the hiyroscript/alva repository. Inspect the current implementation and documentation before changing anything, and preserve the repository’s existing architecture, conventions, deterministic fixed-step simulation, and character-neutral shared systems.
 
-Implement a universal Launch Point recovery/decay mechanic for the game.
+Goal
 
-Required gameplay behavior
+Implement a universal Launch Point recovery mechanic.
 
-Alva currently uses Launch Point instead of health. Hits add their damage to the target’s CombatState.launchPoint, and launch strength is calculated from the target’s new Launch Point.
+Alva does not use health. Each fighter has CombatState.launchPoint. Real hits add their damage to that value, and launch strength is calculated using the target’s new Launch Point.
 
-Change the universal Launch Point rules so that:
+Change Launch Point so that after a fighter has gone 2.0 seconds without taking a real hit, their Launch Point begins recovering toward 0.
 
-* Whenever a fighter goes 2.0 seconds without being hit by a real, unblocked hit, their Launch Point begins recovering.
-* After that 2.0-second grace period, reduce their Launch Point by exactly 1 point every 0.5 seconds.
-* Recovery continues at that rate until the fighter is hit again or reaches 0.
+The exact rule is:
+
+* Taking a genuine, unblocked hit resets the recovery timer.
+* For the next 2.0 seconds, Launch Point does not recover at all.
+* After that 2.0-second grace period, remove 1 Launch Point every 0.5 seconds.
+* Continue removing 1 every 0.5 seconds while no new real hit occurs.
+* Stop when Launch Point reaches 0.
 * Launch Point must never go below 0.
-* Any new real hit immediately resets the entire recovery timer, including any partially accumulated 0.5-second recovery interval.
-* After a new hit, there must again be a full 2.0-second grace period followed by a full 0.5-second interval before the first recovered point. In other words, if a hit lands at t = 0, the first -1 happens at t = 2.5, the next at t = 3.0, then 3.5, etc.
-* A blocked hit does not count as “getting hit” for this mechanic. It already adds 0 Launch Point and produces a block event, so it must not reset the recovery timer.
-* Every genuine unblocked hit counts, regardless of whether its Base Launch is 0: melee attacks, individual multi-hit strikes, projectiles, summons/clones, techniques, Deflect strikes, etc. Do not implement separate handling for those sources; they already converge on CombatSystem.applyHit.
-* Do not special-case any fighter ID or move ID.
-* Do not give fighters character-specific recovery values. This is one universal Launch rule.
+* A new genuine hit at any time completely resets the timer, including any partial progress toward the next 0.5-second recovery tick.
 
-The mechanic must use the game’s fixed-step simulation time, not setTimeout, setInterval, Date.now, render-frame time, or another wall clock. It should therefore remain deterministic.
+Exact timing example
 
-Recovery should depend only on elapsed simulation time since the last real hit. Being airborne, grounded, attacking, shielding, stunned, paralyzed, dashing, or otherwise occupied must not stop the recovery clock. Impact freeze/hitstop should follow the same fixed-step clock convention used by the other passive combat timers/cooldowns rather than introducing a separate wall-clock behavior.
+Suppose a fighter is hit at t = 0 and ends the hit with Launch Point 10.
 
-When the game itself is paused and fixed simulation steps are not advancing, Launch Point recovery naturally must not advance either.
+Expected values:
 
-A fighter that has fallen into the Void is out of play and is not being updated, so do not add a special out-of-play recovery loop. Its Launch Point should continue behaving as it does now while waiting for respawn, and the fresh CombatState created on respawn should start at Launch Point 0 with fresh recovery timing.
+* t = 0.0: 10
+* t = 1.0: 10
+* immediately before t = 2.0: 10
+* t = 2.0: still 10
+* immediately before t = 2.5: still 10
+* t = 2.5: 9
+* t = 3.0: 8
+* t = 3.5: 7
+* continue at the same rate until 0
 
-Repository architecture to preserve
+The first recovered point therefore occurs 2.5 seconds after the most recent real hit, not at 2.0 seconds.
 
-Read the repository documentation and existing implementation before editing, especially:
+If another hit connects at t = 2.30, discard all previous recovery progress. Add the new hit’s damage normally, then begin a completely new 2.0-second grace period. The first possible -1 is 2.5 seconds after that new hit.
+
+What counts as “getting hit”
+
+Only a genuine hit that is not blocked resets Launch Point recovery.
+
+CombatSystem.applyHit() is already the shared path for the game’s hit sources. Use that shared path instead of adding source-specific recovery code.
+
+Real hits from all of these must reset recovery:
+
+* ordinary melee attacks;
+* individual strikes in multi-hit attacks;
+* projectiles;
+* projectile finishers;
+* summons/clones;
+* techniques;
+* Deflect strikes;
+* hits with baseLaunch: 0;
+* any future hit source that resolves through the normal shared applyHit() path.
+
+A hit is still a real hit even if its Base Launch is 0. Base Launch determines whether it launches; it does not determine whether the target was hit.
+
+Shield/block behavior
+
+A Shielded hit currently becomes a block event:
+
+* damage becomes 0;
+* it adds no Launch Point;
+* it causes no launch.
+
+A blocked hit must not reset Launch Point recovery.
+
+If a fighter is already recovering and blocks an attack, its existing recovery schedule should continue uninterrupted.
+
+Do not create special block logic elsewhere. CombatSystem.applyHit() already knows whether the hit was blocked.
+
+Preserve existing hit/launch ordering
+
+Do not change Alva’s core hit-resolution formula.
+
+For an unblocked hit the order must remain conceptually:
+
+1. Determine whether the hit was blocked.
+2. Determine real damage.
+3. Record the previous Launch Point.
+4. Add the hit’s damage to the target’s Launch Point.
+5. Calculate launch strength using that new Launch Point.
+6. Apply directional launch/reaction/stun as it already does.
+7. Emit the existing hit event.
+
+The recovery mechanic must not lower the Launch Point before calculating the current hit.
+
+For example, if the target has Launch Point 20 and takes a 5-damage hit with Base Launch 2, that hit still uses:
+
+(20 + 5) × 2
+
+for a launch strength of 50.
+
+Recovery begins only afterward as simulation time passes without another hit.
+
+Do not change the existing formula:
+
+launch strength = Base Launch × target's new Launch Point
+
+Repository architecture
+
+Read the relevant current files before editing, especially:
 
 * CLAUDE.md
 * ALVA_SPEC.md
 * README.md
 * docs/systems/launch.md
 * docs/development/testing.md
+* docs/development/conventions.md
 * js/data/launch.js
 * js/game/combat/combat-state.js
 * js/game/combat/combat.js
@@ -43,218 +117,457 @@ Read the repository documentation and existing implementation before editing, es
 * js/game/arena.js
 * tests/systems/launch.test.mjs
 * tests/systems/fighter-stats.test.mjs
+* tests/helpers/fighter-harness.mjs
 
-Important existing architecture:
-
-js/data/launch.js owns the universal Launch concepts and formula.
-
-CombatState.launchPoint is the fighter’s current accumulated Launch Point.
-
-Fighter.update(dt) calls combat.update(dt) once per fixed simulation step.
-
-CombatSystem.applyHit() is the shared hit-resolution path for melee, projectiles, summoned clones and techniques. It currently determines whether a hit was blocked, adds damage to target.combat.launchPoint, calculates launch using the new Launch Point, and emits the hit/block event.
-
-A blocked hit currently does:
-
-* damage = 0
-* no Launch Point gain
-* no launch
-* event type block
-
-A real hit produces event type hit.
-
-Preserve this architecture. The new mechanic belongs in the shared Launch/CombatState system, not Battle, Practice, the HUD, individual fighter definitions, or individual attack implementations.
-
-Implementation design
-
-Use per-fighter state in CombatState to track Launch Point recovery timing.
-
-Choose clear names that match this repository’s style. The implementation should represent the two concepts cleanly:
-
-1. elapsed/grace time since the most recent real hit;
-2. progress toward the next 0.5-second recovery tick once recovery is active.
-
-It is acceptable to model this as one total elapsed timer if that produces simpler and less error-prone boundary behavior, provided resetting a hit also clears all fractional recovery progress.
-
-Prefer defining the universal timing/value constants alongside the universal Launch rules, rather than scattering magic numbers through the runtime. Suitable conceptual constants are:
-
-* recovery delay: 2
-* recovery interval: 0.5
-* recovery amount: 1
-
-Follow existing naming/style conventions rather than blindly using those exact constant names.
-
-The fixed-step update must be robust if an update receives a dt larger than 0.5 seconds. It must be capable of applying however many complete recovery intervals elapsed rather than silently dropping ticks. Clamp the result at 0.
-
-Once Launch Point reaches 0, it must stay at 0. Avoid negative values and avoid accumulating behavior that could later cause an unexpected immediate recovery after a new hit. A new hit must always begin a completely fresh timing cycle.
-
-Reset the recovery timer from the shared unblocked-hit path in CombatSystem.applyHit. Do it only for a real hit, not for a Shield block.
-
-Do not change the fundamental ordering of hit resolution:
-
-1. determine block;
-2. determine real damage;
-3. add damage to Launch Point;
-4. use that new Launch Point for this hit’s launch calculation.
-
-The recovery feature must not alter how much the current hit launches its target. The hit still adds damage first and uses that resulting number immediately. Recovery only happens later as simulation time passes without another hit.
-
-Do not introduce fractional Launch Point recovery. Launch Point may be high and has no maximum, but this recovery removes whole points: 1 per completed 0.5-second recovery interval.
-
-Timing/boundary requirements
-
-Pay particular attention to exact fixed-step boundaries and the repository’s existing floating-point timing conventions such as PHASE_EPSILON.
-
-Expected example:
-
-A fighter is hit and finishes that hit at Launch Point 10.
-
-* 0.0 s after hit: 10
-* 1.0 s after hit: 10
-* immediately before 2.0 s: 10
-* 2.0 s: still 10
-* immediately before 2.5 s: 10
-* 2.5 s: 9
-* 3.0 s: 8
-* 3.5 s: 7
-* and so on until 0
-
-If another hit lands at 2.30 seconds, any progress toward the pending recovery tick is discarded. Add that hit’s damage normally and restart the full schedule from that hit. The first possible recovered point is 2.5 seconds after the new hit.
-
-Make boundary behavior deterministic under the normal fixed timestep.
-
-Tests
-
-Extend the shared Launch system tests rather than creating fighter-specific behavior.
-
-Add strong automated coverage in tests/systems/launch.test.mjs and, only where appropriate, existing related system tests.
-
-Tests should prove at minimum:
-
-* A fresh CombatState still starts at Launch Point 0.
-* Launch Point still increases by exactly hit damage.
-* An unblocked hit resets the Launch recovery timing.
-* No recovery occurs before the entire 2-second grace period has elapsed.
-* No point is removed exactly at the end of the grace period if the first recovery tick is not yet due.
-* The first point is removed after the following 0.5 seconds.
-* Another point is removed every subsequent 0.5 seconds.
-* Recovery works from both small and very large Launch Point values.
-* Recovery stops at exactly 0 and never produces a negative value.
-* A hit during the 2-second grace period restarts the full grace period.
-* A hit after recovery has started resets both the 2-second delay and any partial 0.5-second interval.
-* A blocked hit does not add Launch Point and does not reset the “time since last real hit” recovery schedule.
-* A real hit with Base Launch 0 still resets recovery because it is still a real hit.
-* Recovery is generic and does not depend on fighter ID, attack ID or hit source.
-* Respawn/restart still gives a fresh Launch Point of 0 with clean recovery state.
-* Large dt values do not lose completed recovery intervals.
-* Existing hit-event fields and launch calculations remain correct.
-
-Use the repository’s real CombatState, CombatSystem, fighter harness and probeHit patterns where appropriate rather than mocking the mechanic into existence.
-
-Preserve existing tests that establish:
-
-* Launch Point has no maximum.
-* Damage is added before launch strength is calculated.
-* Shield blocks add no Launch Point.
-* Respawning after the Void resets Launch Point to 0.
-* Combat remains character-neutral.
-
-Do not weaken or delete tests merely to accommodate this change.
-
-Run:
-
-node --test tests/systems/launch.test.mjs
-node --test
-
-The complete suite must pass.
-
-Documentation and in-game reference
-
-This changes a core documented gameplay rule, so update all authoritative/current descriptions of Launch Point.
-
-At minimum update:
-
-ALVA_SPEC.md §7.2.7 Launch
-
-It currently describes Launch Point as starting at 0, growing by damage received, never going below 0 and having no maximum. Amend that rule to explicitly describe the 2-second no-hit grace period and the subsequent -1 every 0.5 s recovery.
-
-docs/systems/launch.md
-
-Update “The formula” / Launch Point explanation to document the recovery rules, exact timing, reset-on-real-hit behavior and Shield exception.
+Relevant current architecture:
 
 js/data/launch.js
 
-Update the module comments describing Launch Point.
+This owns the universal Launch rules:
 
-Update LAUNCH_POINT_SUMMARY, because this is the shared copy used by the in-game Discover Launch reference. The Discover page must not continue telling players that Launch Point only accumulates until an elimination.
+* allowed damage;
+* Base Launch;
+* Directional Launch;
+* Launch strength formula;
+* Launch speed conversion;
+* player-facing Launch reference copy.
 
-Keep the existing formula unchanged:
+Universal recovery constants belong with these shared Launch rules rather than in an individual character definition or UI module.
 
-launch strength = Base Launch × the target's new Launch Point
+Use clear named constants following the repository’s naming conventions for the equivalent of:
 
-Update README.md where appropriate so its high-level explanation is no longer misleading. Keep it concise; detailed timing belongs in the specification/system documentation.
+* recovery delay: 2.0
+* recovery interval: 0.5
+* recovery amount: 1
 
-Update comments in js/game/combat/combat-state.js, js/game/combat/combat.js, or other touched files if they currently claim Launch Point “only ever grows” or otherwise contradict the new rule.
+Do not scatter 2, 0.5, and 1 as unexplained magic numbers across runtime code.
 
-Search the repository for wording such as:
+js/game/combat/combat-state.js
+
+CombatState.launchPoint is the fighter’s current Launch Point.
+
+This is the appropriate place for each fighter’s recovery timing state and passive recovery update.
+
+At present its comments say Launch Point “only ever grows”; those comments will need to be corrected.
+
+Implement the state generically. Do not identify fighters, attacks, game modes, or screens here.
+
+A clean implementation may use either:
+
+* separate “time since last real hit” and “recovery tick progress” fields; or
+* one elapsed timer from which completed recovery intervals are calculated.
+
+Choose whichever produces the clearest deterministic boundary behavior.
+
+The important semantics are:
+
+* a real hit completely resets recovery timing;
+* no recovery during the first 2 seconds;
+* first point removed after another full 0.5 seconds;
+* each following complete 0.5-second interval removes another point;
+* partial recovery progress is discarded on the next real hit;
+* reaching 0 cannot result in negative values or stored overdue recovery ticks that produce surprising behavior later.
+
+Prefer a small explicit API on CombatState, for example conceptually:
+
+* reset/restart Launch recovery when a real hit lands;
+* update Launch recovery from dt.
+
+Follow existing naming style rather than blindly using those method names.
+
+js/game/fighters/fighter.js
+
+Fighter.update(dt) already calls combat.update(dt) at the beginning of each fighter simulation step.
+
+Integrate Launch recovery into the existing CombatState fixed-step update architecture.
+
+Do not create a second timing loop in Fighter.
+
+Do not put Launch recovery directly into movement, Battle, Arena, Practice Ground, Watch Mode, AI, rendering, or HUD code.
+
+js/game/combat/combat.js
+
+CombatSystem.applyHit() is the shared hit-resolution path.
+
+Reset the target’s Launch Point recovery timing from this shared path only for an unblocked real hit.
+
+Do not duplicate reset handling for:
+
+* projectiles;
+* clones;
+* techniques;
+* multi-hit strikes;
+* Deflect;
+* particular attack IDs.
+
+They already converge here.
+
+Be careful not to change the combat event contract unnecessarily. Existing tests check the event fields closely. Launch recovery does not need to add new fields to normal hit/block events unless there is a compelling architectural reason.
+
+Fixed-step timing and determinism
+
+This mechanic must use the game’s simulation dt.
+
+Do not use:
+
+* setTimeout;
+* setInterval;
+* Date.now;
+* performance.now;
+* render-frame timestamps;
+* CSS/animation time;
+* another wall clock.
+
+The game is fixed-step and deterministic. Launch recovery must remain deterministic as well.
+
+Follow the repository’s existing floating-point boundary convention, including its use of PHASE_EPSILON or the appropriate equivalent where needed.
+
+The mechanic must work correctly when dt is not an exact divisor of a timing boundary.
+
+It must also behave correctly if a call receives a dt larger than 0.5 seconds.
+
+For example, if enough simulation time passes in one update for three complete recovery ticks, remove 3 points rather than only 1.
+
+Do not silently lose elapsed complete intervals.
+
+Always clamp:
+
+launchPoint >= 0
+
+Do not introduce fractional Launch Points. Recovery always removes whole points.
+
+Interaction with fighter state
+
+The recovery clock is based solely on simulation time since the last genuine hit.
+
+It should not stop merely because the fighter is:
+
+* airborne;
+* grounded;
+* attacking;
+* in attack recovery;
+* shielding;
+* stunned;
+* paralyzed;
+* dashing;
+* air dashing;
+* using Combat Assist;
+* otherwise unable to act.
+
+Follow the same fixed-step timing conventions as Alva’s other passive combat timers.
+
+If simulation steps themselves are paused, recovery naturally pauses because dt is not advancing.
+
+Do not add a separate pause check solely for Launch recovery.
+
+Hitstop / impact freeze
+
+Respect the current simulation architecture.
+
+Fighter.update(dt) advances combat timers using the existing fixed-step conventions even around impact-freeze handling. Launch recovery should follow that same convention rather than inventing wall-clock behavior or a special hitstop clock.
+
+The hit itself resets the recovery timer, so any subsequent simulated time is measured from that hit.
+
+Void, elimination, respawn and restart
+
+Do not add a special out-of-play recovery loop.
+
+A fighter that falls into the Void is removed from normal fighter updating while waiting to respawn. Preserve that architecture.
+
+A fresh life already creates/resets combat state.
+
+Required behavior:
+
+* fresh fighter: Launch Point 0, fresh recovery timing;
+* restart/rematch: Launch Point 0, fresh recovery timing;
+* respawn after the Void: Launch Point 0, fresh recovery timing;
+* while eliminated and waiting for respawn, do not invent background Launch Point recovery.
+
+Do not change scoring, Void timing, or respawn timing.
+
+No fighter-specific configuration
+
+This is one universal rule.
+
+Do not add recovery fields to js/data/characters/<id>.js.
+
+Do not allow #0001 and #0002 to have different recovery values.
+
+Do not special-case:
+
+* fighter IDs;
+* attack IDs;
+* move IDs;
+* projectile IDs;
+* techniques;
+* game mode.
+
+The implementation must automatically apply to all current and future fighters because they share CombatState and CombatSystem.
+
+UI behavior
+
+Do not add a new:
+
+* recovery meter;
+* countdown;
+* icon;
+* status effect;
+* animation;
+* particle effect;
+* setting;
+* toggle;
+* sound;
+* HUD element.
+
+The existing HUD already reads CombatState.launchPoint, so it should naturally display the decreasing value.
+
+Practice Ground, Quick Battle, Watch Mode, and other modes should get the behavior automatically through the shared systems.
+
+Do not duplicate UI-specific recovery code.
+
+AI behavior
+
+Do not add AI-specific Launch recovery rules.
+
+The AI already reads current combat state. If a recovered Launch Point changes an AI decision naturally, that is expected.
+
+Difficulty must not change:
+
+* recovery delay;
+* recovery interval;
+* recovery amount.
+
+Tests
+
+Extend the shared Launch tests, principally:
+
+tests/systems/launch.test.mjs
+
+Use the real:
+
+* CombatState;
+* CombatSystem;
+* fighter harness;
+* probeHit/existing test helpers where appropriate.
+
+Do not create an isolated fake implementation just to make the tests pass.
+
+Add strong coverage for all important boundaries.
+
+At minimum prove:
+
+1. A fresh CombatState still starts at Launch Point 0.
+2. A real hit still adds exactly its damage.
+3. Launch strength still uses the Launch Point after the current hit’s damage is added.
+4. A real hit starts/restarts the Launch recovery timer.
+5. No recovery occurs during the complete first 2.0 seconds.
+6. At exactly the end of the grace period, no point has yet been removed.
+7. The first point is removed only after the following 0.5-second interval.
+8. One additional point is removed after every subsequent complete 0.5-second interval.
+9. Recovery works from a small Launch Point.
+10. Recovery works from a very large Launch Point.
+11. Recovery stops exactly at 0.
+12. Launch Point can never become negative.
+13. A hit during the initial 2-second grace period restarts the full delay.
+14. A hit after recovery has begun restarts the full delay.
+15. A hit during a partial 0.5-second recovery interval discards that fractional progress.
+16. A Shielded/blocked hit adds no Launch Point.
+17. A blocked hit does not reset the recovery schedule.
+18. An unblocked hit with baseLaunch: 0 still resets recovery.
+19. Multi-hit strikes behave like individual real hits and reset timing whenever a real strike connects.
+20. The mechanic is generic across hit sources.
+21. Respawn gives Launch Point 0 and fresh recovery state.
+22. Restart/rematch gives Launch Point 0 and fresh recovery state.
+23. Large dt updates apply every fully elapsed recovery interval rather than dropping ticks.
+24. Existing hit event fields and semantics remain intact.
+25. Existing launch calculations remain intact.
+
+Also preserve existing tests proving:
+
+* Launch Point has no maximum;
+* damage is added before launch is calculated;
+* Shield blocks add no Launch Point;
+* Base Launch 0 still deals its normal damage;
+* the Void, not Launch Point, eliminates a fighter;
+* respawn resets Launch Point;
+* combat is character-neutral;
+* source modules do not special-case fighter or attack IDs.
+
+Do not delete, weaken, skip, or rewrite unrelated tests simply to make the suite green.
+
+Run at minimum:
+
+node --test tests/systems/launch.test.mjs
+node --test tests/systems/fighter-stats.test.mjs
+node --test
+
+The full test suite must pass.
+
+Documentation
+
+This is a core gameplay-rule change, so update the authoritative current documentation.
+
+ALVA_SPEC.md
+
+Update §7.2.7 Launch.
+
+It currently describes Launch Point as starting at 0, increasing from damage, never dropping below 0 and having no maximum.
+
+Document that:
+
+* every real unblocked hit adds its normal damage;
+* the hit resets Launch recovery;
+* after 2 seconds with no further real hit, recovery becomes active;
+* one point is removed for every subsequent 0.5 seconds;
+* a block does not reset that timer;
+* recovery stops at 0;
+* the Launch formula remains unchanged.
+
+docs/systems/launch.md
+
+Update the Launch Point / formula explanation with the same authoritative timing semantics.
+
+Include an exact timing example if useful.
+
+Make clear that Shield blocks are the exception.
+
+js/data/launch.js
+
+Update comments that currently say Launch Point only grows.
+
+Define the universal recovery constants here or in the most appropriate shared Launch module according to current repository conventions.
+
+Update LAUNCH_POINT_SUMMARY, because Discover uses this shared copy.
+
+The in-game Discover Launch page must not continue to describe Launch Point as accumulated damage that only resets on elimination.
+
+Keep the copy concise enough for the existing reference UI while making the recovery mechanic clear.
+
+README.md
+
+Update the high-level description where necessary so it is no longer misleading.
+
+Do not overload README with implementation details; the exact timing belongs in the system documentation and product spec.
+
+Other stale current documentation/comments
+
+Search the repository for current descriptions such as:
 
 * only ever grows
-* grows by
 * accumulated damage
+* grows by
+* all damage taken
 * Launch Point
-* descriptions implying it changes only from damage/respawn
+* claims that Launch Point changes only when hit or respawned
 
-Update current product/system documentation where necessary. Do not rewrite historical records in UPDATES.md simply because they describe the game as it existed at that time.
+Correct current source comments and active documentation that contradict the new rule.
 
-Do not edit, move, rename or reformat character_rule.
+Do not rewrite historical UPDATES.md entries merely because they accurately describe an older version of the game.
 
-UI and gameplay scope
+Do not modify protected owner-rule files such as character_rule.
 
-Do not add a new meter, icon, countdown, animation, effect, setting or control for this mechanic unless the existing architecture actually requires one.
+Do not modify the max working-prompt file as part of implementing the mechanic unless explicitly instructed to do so.
 
-The existing HUD already reads CombatState.launchPoint, so it should simply display the recovered value automatically.
+Things that must not change
 
 Do not change:
 
 * damage tiers;
+* authored attack damage;
 * Base Launch values;
-* Directional Launch;
+* Directional Launch values;
 * launch speed conversion;
-* hitstun;
-* launch reaction;
+* Launch reaction;
 * launch steering;
 * launch bounce;
-* Energy;
+* hitstun;
+* blockstun;
+* hitstop;
+* Energy maximum;
+* Energy recovery;
 * Shield costs;
+* Dash costs;
 * fighter definitions;
-* CPU difficulty rules;
+* fighter movement;
+* CPU difficulty;
+* attack cooldowns;
+* ability cooldowns;
 * scoring;
-* Void/respawn timing.
+* match timer;
+* overtime;
+* Void behavior;
+* respawn timing;
+* HUD layout.
 
-The AI may naturally observe the lower current Launch Point through the same state it already reads. Do not add AI-specific recovery logic.
+This task is specifically a universal passive reduction of CombatState.launchPoint after enough simulation time passes without another genuine hit.
 
-Quality constraints
+Quality requirements
 
-Keep the solution small, generic and deterministic.
+Keep the implementation:
 
-There must be one universal implementation, not duplicated logic across Battle, Watch Mode and Practice Ground.
+* small;
+* generic;
+* deterministic;
+* fixed-step;
+* character-neutral;
+* source-neutral;
+* easy to test;
+* consistent with existing module ownership.
 
-Do not put the mechanic in rendering or UI code.
+Prefer one universal implementation over duplicated behavior.
 
-Do not create fighter-specific configuration for it.
+Do not put gameplay state in rendering code.
 
-Do not use browser timers.
+Do not introduce browser timers.
 
-Do not round simulation timestamps based on wall time.
+Do not round wall-clock timestamps.
 
-Avoid magic numbers when the Launch system can own named constants.
+Avoid adding unnecessary abstractions.
 
-Respect the repository’s module responsibility rules and source-scanning architecture tests.
+Do not create a separate “health regen” system; this is Launch Point recovery and should remain part of the existing Launch/combat architecture.
 
-Before finishing, inspect the diff for stale comments or documentation that still says Launch Point only increases.
+Before finishing, inspect the diff for stale comments claiming that Launch Point only increases.
 
 Acceptance criteria
 
-The change is complete when a fighter who takes a hit gets the usual Launch Point increase and launch calculation, stays at that value for a full 2 seconds without another real hit, then loses exactly 1 Launch Point every 0.5 seconds until reaching 0; any later real hit adds its damage and completely restarts that timing; Shielded/blocked hits do not restart it; no value can fall below 0; this behaves identically for every fighter and every shared hit source; respawns/restarts remain clean; Discover/spec/system documentation explains the new mechanic; and the full node --test suite passes.
+The implementation is complete when all of the following are true:
 
-When done, provide a concise implementation summary, list the files changed, describe the timing/state model you chose, and report the test commands and results.
+A fighter takes a normal hit and receives the existing Launch Point increase. That current hit uses the new increased Launch Point for its launch calculation exactly as before.
+
+If that fighter then receives no genuine hit for 2 full seconds, nothing has yet been removed.
+
+After another 0.5 seconds, exactly 1 Launch Point is removed.
+
+Every following 0.5 seconds without another genuine hit removes exactly 1 more.
+
+Recovery stops at 0 and can never produce a negative Launch Point.
+
+Any later genuine unblocked hit immediately:
+
+* adds its normal damage;
+* uses the resulting new Launch Point for that hit’s launch;
+* discards all previous recovery timing/progress;
+* starts a fresh 2-second grace period.
+
+A Shielded/blocked attack:
+
+* adds no Launch Point as before;
+* causes no launch as before;
+* does not restart Launch recovery.
+
+The behavior works identically for every fighter and every normal hit source, including non-launching hits.
+
+Respawn/restart produces clean Launch Point 0 and clean recovery state.
+
+Discover, the product specification, system documentation, README/comments where applicable, and the gameplay implementation all describe the same rule.
+
+All existing and new tests pass.
+
+When finished, report:
+
+1. a concise implementation summary;
+2. the files changed;
+3. the timing/state model used;
+4. where the hit reset occurs;
+5. the test commands run and their results;
+6. any relevant documentation updates.
