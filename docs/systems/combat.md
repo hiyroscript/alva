@@ -14,7 +14,7 @@ The product rules are [`ALVA_SPEC.md`](../../ALVA_SPEC.md) §7.2.4 (combat),
 | --- | --- |
 | [`js/data/loadout.js`](../../js/data/loadout.js) | The loadout rules and the readers of a fighter's `actions` (`loadoutProblems`, `assertLoadout`, `actionType`, `specialAction`, `specialAttacks`, `describeLoadout`). |
 | [`js/game/combat/attacks.js`](../../js/game/combat/attacks.js) | The attack schema: `createAttackDefinition`, attack phases (`attackPhase`, `strikeLive`), motions, strikes, `attackReach` (for readers such as the CPU), and what kind of strike an attack is (`isMeleeAttack`, `isRangedAttack`: one reading for Combat Assist and the CPU's moveset). |
-| [`js/game/combat/combat-assist.js`](../../js/game/combat/combat-assist.js) | Combat Assist's measurements: `meleeGap` (an attack's box against a target's hurtboxes), `approachDistance`, `approachClear`, `assistRange` (one Dash's travel), `ASSIST_MARGIN`. |
+| [`js/game/combat/combat-assist.js`](../../js/game/combat/combat-assist.js) | Combat Assist's rules of measure: `assistsAttack` (melee, never homing), `meleeGap` (an attack's box against a target's hurtboxes), `approachDistance`, `approachClear`, `assistRange` and `assistSpeed` (one Dash's travel, or one air dash's), `ASSIST_MARGIN`. |
 | [`js/game/combat/combat-state.js`](../../js/game/combat/combat-state.js) | `CombatState`, one per fighter: Launch Point, Energy, the attack in progress and its clock, stun, blockstun, hitstop, paralysis, cooldowns (`CooldownTimers` for summons and techniques). |
 | [`js/game/combat/combat.js`](../../js/game/combat/combat.js) | `CombatSystem`: turns back the projectiles a live `deflectProjectiles` box meets (`deflectProjectiles`), then finds every hit each fixed step and resolves it through one `applyHit`; launch reaction (`resolveLaunchReaction`, `resolveLaunchStun`, `steerLaunch`); `worldBox`. |
 | [`js/game/combat/deflect.js`](../../js/game/combat/deflect.js) | The Deflect's schema (`createDeflectDefinition`): an attack definition with the fixed strike every Deflect has ([defense](defense.md#the-deflect)). |
@@ -345,7 +345,9 @@ press made just out of reach closes the gap first, with the Dash's
   Combat Assist code.
 - **Start.** `tryAction` has checked the press may start its attack now;
   before `startAttack`, `tryCombatAssist` may start the approach instead:
-  a melee attack (`isMeleeAttack`), the fighter free to act (`canAct`:
+  a melee attack with no homing motion (`assistsAttack`: a homing dash's
+  own lock-on is its approach, so it is never served, whatever its range),
+  the fighter free to act (`canAct`:
   never out of a hit-cancel or a Dash), its opponent in play, the art
   (`mouvment` on the ground, `midair_mouvment` in the air, where an air
   dash must also be left, with no free fall or launch), and
@@ -363,8 +365,9 @@ press made just out of reach closes the gap first, with the Dash's
   loop: a jump, a Dash request (read before the intents now, by
   `dashAsked`), a Shield press or hold cancels it and the move goes on
   through its own section of the step; else the first combat button
-  decides (a melee attack replaces the attack served, anything else cancels
-  and is tried by `tryAction` at once, a reserved button does nothing).
+  decides (an attack `assistsAttack` accepts replaces the attack served,
+  anything else, a homing attack included, cancels and is tried by
+  `tryAction` at once, a reserved button does nothing).
   Then `stepCombatAssist` checks it may go on, measures again and either
   finishes (`finishCombatAssist`: stop, then `tryAction(action, held,
   false)`, never another approach) or plans this step's move (`need`),

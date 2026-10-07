@@ -15,22 +15,31 @@
 // Dash and air dash durations), the attack definition its press resolved to
 // (js/game/combat/attacks.js), its opponent (body, facing, hurtboxes and
 // pushbox) and the stage collision (js/game/physics.js).
-// Outputs: assistSpeed, assistRange, meleeGap, approachDistance,
-// approachClear and ASSIST_MARGIN.
+// Outputs: assistsAttack, assistSpeed, assistRange, meleeGap,
+// approachDistance, approachClear and ASSIST_MARGIN.
 //
 // Important constraints: pure and deterministic, from simulation data only
 // (bodies and definitions, never render positions, the DOM or a clock).
 // Nothing here names a fighter, an attack or a button: an attack is melee
-// by its data (isMeleeAttack). The attack is measured, never changed: its
-// hitbox, damage, timing and motion stay exactly as authored. An attack
-// whose own reach (attackReach: a roll's path, a homing dash's lock-on, a
+// by its data (isMeleeAttack), and homing by its motion. The attack is
+// measured, never changed: its hitbox, damage, timing and motion stay
+// exactly as authored. A homing attack is never served at all
+// (assistsAttack). An attack whose own reach (attackReach: a roll's path, a
 // pull's circle) already covers its target needs no approach, and one that
 // gets one stops as soon as that reach does; but how far away an approach
 // may start is measured from the box its strike is drawn with alone, so no
 // attack's assist reaches further for its motion.
 
 import { worldBox } from './combat.js';
-import { attackReach } from './attacks.js';
+import { attackReach, isMeleeAttack } from './attacks.js';
+
+// Whether attack `atk` may be served by an approach at all: a melee attack
+// (isMeleeAttack), unless it homes in on its target by itself (a `homing`
+// motion: its own lock-on is its approach, however far it reaches). Read
+// from the attack's data alone.
+export function assistsAttack(atk) {
+  return isMeleeAttack(atk) && atk.motion?.type !== 'homing';
+}
 
 // World units past the edge of reach the approach stops at, so the strike's
 // box overlaps a hurtbox (the hit test is strict) rather than touching it.

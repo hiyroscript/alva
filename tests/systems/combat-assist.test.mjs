@@ -21,7 +21,7 @@ import { CombatAIController } from '../../js/game/ai/combat-ai.js';
 import { readMoveset } from '../../js/game/ai/moveset.js';
 import { CombatSystem } from '../../js/game/combat/combat.js';
 import { isMeleeAttack, isRangedAttack, attackReach } from '../../js/game/combat/attacks.js';
-import { assistRange, meleeGap, ASSIST_MARGIN } from '../../js/game/combat/combat-assist.js';
+import { assistsAttack, assistRange, meleeGap, ASSIST_MARGIN } from '../../js/game/combat/combat-assist.js';
 import { spawnProjectiles, removeDeadProjectiles, clashProjectiles } from '../../js/game/combat/projectile.js';
 import { spawnClones, updateClones, removeDeadClones } from '../../js/game/combat/summon.js';
 import { applyPulls } from '../../js/game/combat/pull.js';
@@ -500,21 +500,70 @@ test('an attack that already reaches its target by its own motion needs no appro
       }
     }
   }
-  // Further off, a homing dash is never assisted: how far an approach may
-  // start is measured from the box its strike is drawn with, never its
-  // lock-on, and its box is more than an air dash short.
+});
+
+test('a homing attack is never served by an approach, however short its lock-on: it homes in by itself', () => {
+  // Every playable fighter's homing attacks, beyond their lock-on.
+  let homing = 0;
   for (const c of playableCharacters()) {
-    for (const { action, id } of meleeButtons(c, true)) {
-      const r = rig({ character: c });
-      const atk = r.player.attacks[id];
-      if (atk.motion?.type !== 'homing') continue;
-      airborne(r);
-      placeFoe(r, atk, 20);
-      r.tick(press(action));
-      assert.equal(r.player.combatAssist, null, `#${c.id} ${id}`);
-      assert.equal(r.player.combat.attack?.def, atk);
+    for (const air of [true, false]) {
+      for (const { action, id } of meleeButtons(c, air)) {
+        const r = rig({ character: c });
+        const atk = r.player.attacks[id];
+        if (atk.motion?.type !== 'homing') continue;
+        homing++;
+        assert.equal(assistsAttack(atk), false, `#${c.id} ${id}`);
+        if (air) airborne(r);
+        placeFoe(r, atk, 20);
+        const energy = r.player.combat.energy;
+        r.tick(press(action));
+        assert.equal(r.player.combatAssist, null, `#${c.id} ${id}`);
+        assert.equal(r.player.combat.attack?.def, atk, `#${c.id} ${id}: it starts at once`);
+        assert.equal(r.player.combat.energy, energy);
+      }
     }
   }
+  assert.ok(homing >= 2, 'both playable fighters have a homing attack');
+  // A fighter whose homing attacks lock on from only 40 units: an attack
+  // without homing would be assisted from where they are pressed, these
+  // never are, on the ground or in the air.
+  const shortLock = { type: 'homing', range: 40, speed: 900, rebound: 300, recoil: 100, exit: 0.2 };
+  const homer = variant('assist-homer', {
+    attacks: {
+      ...C1.attacks,
+      attack1: { ...C1.attacks.attack1, motion: shortLock },
+      midair_attack1: { ...C1.attacks.midair_attack1, motion: shortLock },
+    },
+  });
+  for (const air of [false, true]) {
+    const r = rig({ character: homer });
+    if (air) airborne(r);
+    const atk = r.player.attacks[air ? 'midair_attack1' : 'attack1'];
+    placeFoe(r, atk, 40);
+    assert.ok(meleeGap(r.player, atk.hitbox, r.foe, 1) + ASSIST_MARGIN < assistRange(r.player, air), 'within an approach\'s range');
+    r.tick(press('attack1'));
+    assert.equal(r.player.combatAssist, null, air ? 'in the air' : 'on the ground');
+    assert.equal(r.player.combat.attack?.def, atk, 'the homing attack, at once');
+  }
+  // The same box without homing is assisted from there.
+  const plain = rig();
+  airborne(plain);
+  placeFoe(plain, plain.player.attacks.midair_attack1, 40);
+  plain.tick(press('attack1'));
+  assert.ok(plain.player.combatAssist);
+  // Pressed while an approach runs, a homing attack is another move: the
+  // approach ends and it starts at once, where the fighter is.
+  const r = rig();
+  airborne(r);
+  placeFoe(r, r.player.attacks.midair_attack1, 60);
+  r.tick(press('attack1'));
+  assert.ok(r.player.combatAssist?.air);
+  const energy = r.player.combat.energy;
+  r.tick(press('attack2'));
+  assert.equal(r.player.combatAssist, null);
+  assert.equal(r.player.combat.attack?.def.id, 'midair_attack2', 'the Red Kick, at once');
+  assert.ok(r.player.combat.energy >= energy, 'nothing more paid');
+  assert.equal(watchAttacks(r, 60).has('midair_attack1'), false, 'the Floating Straight never comes');
 });
 
 test('in the air it takes the airtime\'s air dash: with none left there is no approach, but the attack still starts', () => {

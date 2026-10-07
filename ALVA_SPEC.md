@@ -1615,10 +1615,12 @@ attack or a button.
   buffer retries) that resolves to a **melee** attack: one with a hitbox of
   its own and no projectile (`isMeleeAttack` in
   `js/game/combat/attacks.js`, the very reading the combat AI's moveset
-  sorts melee and ranged by). Never a projectile attack, a pending
-  (art-only) attack, a summon, a technique, a reserved or unmapped button,
-  the Shield or the Deflect (which is an attack, but on `shield`, and only
-  in the air). On the ground for the ground attack, in the air for the
+  sorts melee and ranged by). Never an attack with a **homing** motion
+  (a homing dash, whatever its lock-on range: it closes on its target by
+  itself; `assistsAttack` in `js/game/combat/combat-assist.js`), a
+  projectile attack, a pending (art-only) attack, a summon, a technique, a
+  reserved or unmapped button, the Shield or the Deflect (which is an
+  attack, but on `shield`, and only in the air). On the ground for the ground attack, in the air for the
   mid-air one (whichever the button starts where the fighter is), with the
   fighter free to act (never cutting an attack, a hit-cancel or a Dash
   short), its opponent in play (not lost to the Void), Energy usable (not
@@ -1631,7 +1633,7 @@ attack or a button.
   count, so a target on another level, in the air above or below it or
   behind it is out of reach. Already within the attack's own reach
   (`attackReach`: its box, or where its motion or pull takes it, as a
-  roll's path or a homing dash's lock-on): the attack starts at once, as
+  roll's path or a pull's circle): the attack starts at once, as
   ever, nothing paid; such an attack needs no help. Otherwise, with the box
   its strike is drawn with (never its motion) out of reach by no more than
   **one Dash's travel** on the ground (`movement.dashSpeed` × its duration,
@@ -1642,8 +1644,7 @@ attack or a button.
   wall or a gap in the way, a box that could only reach through the
   target, no air dash left): the attack starts where the fighter is and
   may whiff, nothing paid. So no attack's assist ever reaches further for
-  its motion: a homing dash, whose box is more than an air dash short of
-  its lock-on, is never assisted.
+  its motion.
 - **The approach** (`fighter.combatAssist`: the press it serves, its
   attack, its target, its direction, whether it is the air's, its clip,
   what is left to go, what it has covered and for how long; its own state,
@@ -1671,7 +1672,8 @@ attack or a button.
   is only ever one: a replaced attack never comes out, and nothing of the
   approach ever goes into the combat buffer. A replacement that cannot
   start (its cooldown, no art, its starts for the airtime used up) ends
-  the approach with nothing, never the older attack.
+  the approach with nothing, never the older attack. A homing attack
+  pressed meanwhile is not one: it is another move (below).
 - **Cancelled**, with its attack never coming and its Energy (and air
   dash) never given back, by: a jump (the jump, or in the air an air jump,
   takes over on that step), a Dash (a double tap or a mouvement button:
@@ -1679,8 +1681,9 @@ attack or a button.
   used up, so the request waits for the ground as ever), the Shield
   (pressed, or held where it may go up: the Shield goes up) or the Deflect
   (in the air: the Deflect starts), any combat button whose move is not
-  melee (a projectile attack, a pending attack, a summon or a technique: it
-  is tried at once as a press of its own), a hit or a paralysis, leaving
+  served by an approach (a homing attack, a projectile attack, a pending
+  attack, a summon or a technique: it is tried at once as a press of its
+  own), a hit or a paralysis, leaving
   the ground (one on the ground) or meeting it (one in the air), a wall or,
   on the ground, a ledge in the way (it stops there), its target lost to the Void, taken out or replaced
   (Practice Ground), its own fighter lost to the Void, input locked (time

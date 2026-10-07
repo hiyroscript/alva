@@ -21,16 +21,16 @@
 // / defense / Energy schemas and Combat Assist's measurements in
 // js/game/combat/, and nothing here names a fighter or a button's role: a
 // summon or technique is whatever the character's `actions` say it is, and
-// an attack is melee or ranged by its own data (isMeleeAttack). Combat
-// Assist is the human player's only: its controller says so (kind 'player'
-// with combatAssist on), never a slot, a label or a fighter. The
-// simulation is fixed-step and deterministic; rendering reads it
-// (interpolate, spriteFlip) and never feeds back.
+// whether Combat Assist serves an attack is its own data too (melee, and no
+// homing: assistsAttack). Combat Assist is the human player's only: its
+// controller says so (kind 'player' with combatAssist on), never a slot, a
+// label or a fighter. The simulation is fixed-step and deterministic;
+// rendering reads it (interpolate, spriteFlip) and never feeds back.
 
 import { SpriteAnimator } from '../rendering/sprite-animator.js';
 import { createBody, stepBody, dropThrough, separate } from '../physics.js';
 import { startLaunch, bounceLaunch, resolveLaunchBounce } from '../combat/launch-bounce.js';
-import { attackPhase, createAttackDefinition, isMeleeAttack } from '../combat/attacks.js';
+import { attackPhase, createAttackDefinition } from '../combat/attacks.js';
 import { createDefenseDefinition } from '../combat/defense.js';
 import { createDeflectDefinition } from '../combat/deflect.js';
 import { CombatState, resolveEnergy } from '../combat/combat-state.js';
@@ -38,7 +38,7 @@ import { resolveLaunchReaction } from '../combat/combat.js';
 import { createProjectileDefinition } from '../combat/projectile.js';
 import { createSummonDefinition, summonProblem } from '../combat/summon.js';
 import { Technique, createTechniqueDefinition, techniqueProblem } from '../combat/technique.js';
-import { assistSpeed, assistRange, approachDistance, approachClear } from '../combat/combat-assist.js';
+import { assistsAttack, assistSpeed, assistRange, approachDistance, approachClear } from '../combat/combat-assist.js';
 import { BASE_FIGHTER_MOVEMENT } from '../../data/movement.js';
 import { specialAction } from '../../data/loadout.js';
 import { COMBAT_BUTTONS } from '../../config.js';
@@ -1073,9 +1073,10 @@ export class Fighter {
   // Starts Combat Assist's approach for `action`'s attack `atk` instead of
   // the attack itself, if it should (tryAction has checked the attack may
   // start now, on the ground or in the air as the fighter is): the fighter
-  // has it (combatAssistOn), `atk` is melee (isMeleeAttack: never a
-  // projectile attack, a pending one, a summon, a technique or the Deflect,
-  // which is never a combat button's), the fighter is free to act (never
+  // has it (combatAssistOn), `atk` is melee and homes in on nothing by
+  // itself (assistsAttack: never a projectile attack, a pending one, a
+  // homing dash, a summon, a technique or the Deflect, which is never a
+  // combat button's), the fighter is free to act (never
   // cutting an attack or a Dash short), its opponent is in play, and the
   // attack is out of reach of it but its box within one Dash's travel
   // (approachDistance: on its level, ahead of it, never through it), with
@@ -1092,7 +1093,7 @@ export class Fighter {
   // is false with nothing spent, and the attack starts where the fighter
   // is, as ever.
   tryCombatAssist(action, atk) {
-    if (!this.combatAssistOn || !isMeleeAttack(atk) || !this.canAct() || this.combat.shielding) return false;
+    if (!this.combatAssistOn || !assistsAttack(atk) || !this.canAct() || this.combat.shielding) return false;
     const foe = this.opponent;
     if (!foe || foe.lostToVoid) return false;
     const air = !this.body.grounded;
@@ -1125,14 +1126,15 @@ export class Fighter {
   //     up) cancels it, and goes through its own rules on this same step; a
   //     combat button pressed with it is dropped. In the air the `shield`
   //     press is its Deflect, as ever.
-  //   - else the first combat button pressed: a melee attack for where the
-  //     approach runs (the ground's, or the air's) replaces the attack it
-  //     ends in (no new cost), unless it cannot start (its cooldown, no art,
-  //     its starts for the airtime used up), which cancels the approach
-  //     with nothing in its place, never the older attack; any other move
-  //     (a projectile attack, a pending one, a summon, a technique) cancels
-  //     it and is tried at once as a press of its own; a reserved button
-  //     does nothing, as ever.
+  //   - else the first combat button pressed: a melee attack an approach
+  //     may serve (assistsAttack), for where it runs (the ground's, or the
+  //     air's), replaces the attack it ends in (no new cost), unless it
+  //     cannot start (its cooldown, no art, its starts for the airtime used
+  //     up), which cancels the approach with nothing in its place, never
+  //     the older attack; any other move (a projectile attack, a pending
+  //     one, a homing dash, a summon, a technique) cancels it and is tried
+  //     at once as a press of its own; a reserved button does nothing, as
+  //     ever.
   // The attack the approach serves is never put in the combat buffer, so a
   // replaced or cancelled one never comes out later.
   assistIntents(input, held, shieldHeld, dashDirection) {
@@ -1147,7 +1149,7 @@ export class Fighter {
       const id = special ? null : this.attackFor(action, !this.combatAssist.air);
       const atk = id ? this.attacks[id] : null;
       if (!special && !atk) continue;
-      if (isMeleeAttack(atk)) {
+      if (assistsAttack(atk)) {
         const blocked = this.combatAssist.air && this.airStartBlocked(atk);
         if (blocked || this.combat.cooldowns.has(id) || !atk.animation || !this.sprites.has(atk.animation)) {
           this.cancelCombatAssist();
