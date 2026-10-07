@@ -846,12 +846,15 @@ test('the Launch page explains Launch Point, then Base Launch 0-3 and its formul
     assert.equal(entry.getAttribute('aria-labelledby'), title.id);
   }
 
-  // Launch Point: starts at 0, grows with damage, launches harder, resets.
+  // Launch Point: damage, recovery with the block exception, launch and respawn.
   const lp = text(entries[0]);
   assert.match(lp, /starts at 0/);
-  assert.match(lp, /damage taken is added/);
-  assert.match(lp, /the higher it is, the harder the launch/);
-  assert.match(lp, /resets to 0/);
+  assert.match(lp, /Each unblocked hit adds its damage and restarts recovery/);
+  assert.match(lp, /after 2 seconds.*drops by 1 every following 0\.5 seconds, down to 0/);
+  assert.match(lp, /first point at 2\.5 seconds/);
+  assert.match(lp, /Blocks do not restart recovery/);
+  assert.match(lp, /Higher Launch Point means a harder launch/);
+  assert.match(lp, /Respawning resets it to 0/);
   assert.equal(entries[0].querySelector('.discover-tiers'), null, 'explained, not listed');
 
   // Base Launch: the four literal values, each marked with the number itself,
@@ -909,13 +912,13 @@ test('the Launch page carries none of the old Knockback system: no Low / Mid / H
   }
 });
 
-test('the Launch page shows no tuning numbers, no fighter or attack, and nothing interactive', () => {
+test('the Launch page shows only Base Launch and recovery numbers, no fighter or attack, and nothing interactive', () => {
   const { discover } = openDiscover();
   const { launch } = sectionsOf(discover);
   launch.tab.click();
   const page = launch.panel;
-  // The only numbers are the Base Launch values themselves.
-  assert.doesNotMatch(text(page), /[4-9]|\d{2,}/, 'no velocities or other tuning values');
+  // The Base Launch values and the recovery rule, never velocity tuning.
+  assert.deepEqual([...new Set(text(page).match(/\d+(?:\.\d+)?/g))].sort(), ['0', '0.5', '1', '2', '2.5', '3']);
   assert.doesNotMatch(everything(page), /#0001|\battack\s?\d|extra.attack|mid-?air|Throw|shuriken|Sphere|Rush|clone/i, 'no fighter or attack is named');
   assert.deepEqual(page.querySelectorAll('button').concat(page.querySelectorAll('[data-nav]')), []);
 });

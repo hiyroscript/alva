@@ -32,7 +32,7 @@ import { createTechniqueDefinition } from '../../js/game/combat/technique.js';
 import { Battle } from '../../js/game/battle.js';
 import { getMap } from '../../js/data/maps.js';
 import { CONFIG } from '../../js/config.js';
-import { def, DT, fakeSprites, makeFighter, duel, probeHit } from '../helpers/fighter-harness.mjs';
+import { def, DT, STAGE, fakeSprites, makeFighter, duel, probeHit } from '../helpers/fighter-harness.mjs';
 import { stylesheetFiles } from '../helpers/stylesheet.mjs';
 
 const ROOT = new URL('../../', import.meta.url);
@@ -107,6 +107,7 @@ test('the launch module is small: values, directions, validation, resolution and
   assert.deepEqual(Object.keys(launchModule).sort(), [
     'BASE_LAUNCH_DESCRIPTIONS', 'BASE_LAUNCH_SUMMARY', 'BASE_LAUNCH_VALUES', 'DIRECTIONAL_LAUNCHES',
     'DIRECTIONAL_LAUNCH_SUMMARY', 'LAUNCH_FORMULA', 'LAUNCH_POINT_SUMMARY', 'LAUNCH_UNIT_SPEED', 'resolveBaseLaunch',
+    'LAUNCH_RECOVERY_DELAY', 'LAUNCH_RECOVERY_INTERVAL', 'LAUNCH_RECOVERY_AMOUNT',
     'resolveDirectionalLaunch', 'resolveDirectionalLaunchValue', 'resolveHitLaunch', 'resolveLaunchStrength',
   ].concat(['ALLOWED_DAMAGE_VALUES', 'resolveHitDamage']).sort());
   const code = read('js/data/launch.js').replace(/^\s*\/\/.*$/gm, '');
@@ -212,6 +213,193 @@ test('the hit\'s own damage is added before its launch: 115 + 5 = 120, so Base L
   assert.equal(event.launchStrength, 120);
   assert.notEqual(event.launchStrength, 115);
   assert.equal(target.body.vx, 120 * U, '120 points of strength, as a speed');
+});
+
+// ---- Passive recovery -------------------------------------------------------------
+
+test('recovery constants are universal: two seconds of grace, half-second ticks, one point per tick', () => {
+  assert.deepEqual([
+    launchModule.LAUNCH_RECOVERY_DELAY, launchModule.LAUNCH_RECOVERY_INTERVAL, launchModule.LAUNCH_RECOVERY_AMOUNT,
+  ], [2, 0.5, 1]);
+});
+
+test('recovery waits two full seconds, then a full half second, and ticks every half second', () => {
+  const { target } = hitAt(0, probe(10, 0, null));
+  const c = target.combat;
+  for (const [dt, expected] of [[1, 10], [0.99, 10], [0.01, 10], [0.49, 10], [0.01, 9], [0.5, 8], [0.5, 7]]) {
+    c.update(dt);
+    assert.equal(c.launchPoint, expected);
+  }
+});
+
+test('fixed steps hit exact recovery boundaries and non-divisor steps retain partial intervals', () => {
+  for (const dt of [DT, 0.07, 0.3]) {
+    const { target } = hitAt(0, probe(10, 0, null));
+    for (let step = 1; step <= Math.ceil(5 / dt); step++) {
+      target.combat.update(dt);
+      const ticks = Math.max(0, Math.floor((step * dt - 2 + 1e-6) / 0.5));
+      assert.equal(target.combat.launchPoint, 10 - ticks, `dt ${dt}, step ${step}`);
+    }
+  }
+});
+
+test('large updates consume all complete intervals and keep the remainder', () => {
+  const { target } = hitAt(0, probe(10, 0, null));
+  target.combat.update(3.7); // three ticks, with 0.2 s toward the fourth
+  assert.equal(target.combat.launchPoint, 7);
+  target.combat.update(0.29);
+  assert.equal(target.combat.launchPoint, 7);
+  target.combat.update(0.01);
+  assert.equal(target.combat.launchPoint, 6);
+});
+
+test('small and very large Launch Points recover whole points, stop at zero, and bank no spare time', () => {
+  for (const value of [1, 3, 1e6]) {
+    const { attacker, target } = hitAt(0, probe(value, 0, null));
+    const c = target.combat;
+    c.update(2.5);
+    assert.equal(c.launchPoint, value - 1);
+    c.update(value * 0.5 + 100);
+    assert.equal(c.launchPoint, 0);
+    c.update(100);
+    assert.equal(c.launchPoint, 0);
+    new CombatSystem().applyHit(attacker, target, probe(3, 0, null));
+    c.update(2.49);
+    assert.equal(c.launchPoint, 3, 'no overdue ticks after reaching zero');
+    c.update(0.01);
+    assert.equal(c.launchPoint, 2);
+  }
+  const fresh = new CombatState();
+  fresh.update(100);
+  assert.equal(fresh.launchPoint, 0);
+});
+
+test('hits during grace, before the first tick, and during recovery discard every partial interval', () => {
+  for (const elapsed of [1, 2.3, 2.8, 3.5]) {
+    const { attacker, target } = hitAt(0, probe(10, 0, null));
+    const c = target.combat;
+    c.update(elapsed);
+    const before = c.launchPoint;
+    const event = new CombatSystem().applyHit(attacker, target, probe(5, 2, 'horizontal'));
+    assert.deepEqual([event.launchPointBefore, event.launchPointAfter, event.launchStrength], [before, before + 5, (before + 5) * 2]);
+    c.update(2);
+    assert.equal(c.launchPoint, before + 5);
+    c.update(0.49);
+    assert.equal(c.launchPoint, before + 5);
+    c.update(0.01);
+    assert.equal(c.launchPoint, before + 4);
+  }
+});
+
+test('Shield blocks preserve recovery during grace and after recovery starts, including impact freeze', () => {
+  for (const elapsed of [1.8, 2.3, 2.8]) {
+    const { attacker, target } = hitAt(0, probe(10, 0, null));
+    const c = target.combat;
+    c.update(elapsed);
+    const before = c.launchPoint;
+    c.shielding = true;
+    const hit = probeHit({ id: 'blocked-probe', damage: 5, baseLaunch: 2, directionalLaunch: 'horizontal', hitstop: 1, blockstun: 1 });
+    const event = new CombatSystem().applyHit(attacker, target, hit);
+    assert.deepEqual([event.type, event.damage, event.launchStrength, c.launchPoint], ['block', 0, 0, before]);
+    const nextTick = elapsed < 2.5 ? 2.5 : 3;
+    c.update(nextTick - elapsed - 0.01);
+    assert.equal(c.launchPoint, before);
+    c.update(0.01);
+    assert.equal(c.launchPoint, before - 1);
+  }
+});
+
+test('all fighters and resolved hit sources restart recovery, including Base Launch 0 and Deflect', () => {
+  for (const character of CHARACTERS) {
+    const { attacker, target } = duel({ attackerCharacter: character, targetCharacter: character });
+    const hits = [];
+    for (const attack of Object.values(attacker.attacks)) {
+      if (attack.hits) hits.push(...attack.hits.map(h => [h, {}]));
+      else if (attack.hitbox) hits.push([attack, {}]);
+    }
+    for (const projectile of Object.values(attacker.projectileDefs)) {
+      hits.push([projectile, { projectile }]);
+      if (projectile.finisher) hits.push([projectile.finisher, { projectile }]);
+    }
+    for (const summon of Object.values(attacker.summonDefs)) hits.push([attacker.attacks[summon.attack], { summon }]);
+    for (const technique of Object.values(attacker.techniqueDefs)) {
+      if (technique.burst) hits.push([technique.burst.hit, { technique }]);
+    }
+    if (attacker.deflect) hits.push([attacker.deflect, {}]);
+    // A future, unauthored source uses the same path with no ID-specific setup.
+    hits.push([probe(1, 0, null), {}]);
+    for (const [hit, options] of hits) {
+      const c = target.combat;
+      c.shielding = false;
+      c.launchPoint = 20;
+      c.resetLaunchRecovery();
+      c.update(2.3);
+      const e = new CombatSystem().applyHit(attacker, target, hit, options);
+      assert.equal(e.type, 'hit');
+      assert.equal(c.launchPoint, 20 + hit.damage);
+      assert.equal(e.launchStrength, hit.baseLaunch * (20 + hit.damage));
+      c.update(2.49);
+      assert.equal(c.launchPoint, 20 + hit.damage, `${character.id}: ${hit.id}`);
+      c.update(0.01);
+      assert.equal(c.launchPoint, 19 + hit.damage);
+    }
+  }
+});
+
+test('each connecting strike in a real multi-hit attack restarts recovery', () => {
+  const { attacker, target } = duel();
+  const system = new CombatSystem();
+  const attack = createAttackDefinition({
+    id: 'recovery-probe', hitbox: { x: 0, y: -120, w: 150, h: 120 }, hitstop: 0, hitstun: 0,
+    hits: [0, 2.3, 4.6].map(at => ({ at, active: 0.1, damage: 1, baseLaunch: 0, directionalLaunch: null })),
+  });
+  attacker.combat.attack = { def: attack, time: 0, hasHit: false };
+  for (let i = 0; i < attack.hits.length; i++) {
+    if (i) target.combat.update(2.3);
+    attacker.combat.attack.time = attack.hits[i].at;
+    const events = system.update([attacker, target]);
+    assert.equal(events.length, 1);
+    assert.equal(events[0].type, 'hit');
+    assert.equal(target.combat.launchPoint, i + 1);
+    assert.equal(system.update([attacker, target]).length, 0, 'the same strike cannot hit twice');
+  }
+  target.combat.update(2.49);
+  assert.equal(target.combat.launchPoint, 3);
+  target.combat.update(0.01);
+  assert.equal(target.combat.launchPoint, 2);
+});
+
+test('Fighter.update advances recovery while frozen, stunned, paralyzed or shielding, on the ground or airborne', () => {
+  for (const character of CHARACTERS) {
+    for (const state of ['hitstop', 'stun', 'paralysis', 'shielding', 'airborne']) {
+      const { fighter, step } = makeFighter({ character });
+      fighter.combat.launchPoint = 10;
+      if (['hitstop', 'stun', 'paralysis'].includes(state)) fighter.combat[state] = 10;
+      if (state === 'airborne') Object.assign(fighter.body, { y: -10000, grounded: false, ground: null });
+      for (let i = 0; i < Math.round(2.5 / DT); i++) step(state === 'shielding' ? { shield: true } : {});
+      assert.equal(fighter.combat.launchPoint, 9, `${character.id}: ${state}`);
+    }
+  }
+});
+
+test('reset and respawn replace partially elapsed recovery with fresh state for every fighter', () => {
+  for (const character of CHARACTERS) {
+    for (const method of ['reset', 'respawn']) {
+      const { attacker, target } = duel({ targetCharacter: character });
+      target.combat.launchPoint = 10;
+      target.combat.update(2.3);
+      const previous = target.combat;
+      target[method](STAGE);
+      assert.notEqual(target.combat, previous);
+      assert.equal(target.combat.launchPoint, 0);
+      assert.equal(target.combat.launchRecoveryRemaining, new CombatState().launchRecoveryRemaining);
+      new CombatSystem().applyHit(attacker, target, probe(3, 0, null));
+      target.combat.update(2.49);
+      assert.equal(target.combat.launchPoint, 3);
+      target.combat.update(0.01);
+      assert.equal(target.combat.launchPoint, 2);
+    }
+  }
 });
 
 // ---- Strength ---------------------------------------------------------------------
@@ -451,21 +639,28 @@ test('a fighter with Launch Point that falls into the Void is eliminated, scores
   const e = new CombatSystem().applyHit(p1, p2, realHits().attack1);
   assert.equal(e.launchPointAfter, def.attacks.attack1.damage);
   p2.combat.launchPoint = 240;
+  p2.combat.update(2.3);
   Object.assign(p2.body, { y: battle.stage.void.bottom + 100, vy: 0, grounded: false, ground: null });
   battle.update(DT);
   assert.equal(p2.lostToVoid, true, 'eliminated');
   assert.deepEqual(battle.score, { p1: 1, p2: 0 }, 'the opponent\'s point');
   assert.equal(p2.combat.launchPoint, 240, 'kept while out of play');
+  const recoveryAtElimination = p2.combat.launchRecoveryRemaining;
   const wait = Math.round(CONFIG.battle.respawnSeconds / DT);
   for (let i = 1; i < wait; i++) battle.update(DT);
   assert.equal(p2.lostToVoid, true, 'not a step early');
+  assert.equal(p2.combat.launchPoint, 240, 'no background recovery while eliminated');
+  assert.equal(p2.combat.launchRecoveryRemaining, recoveryAtElimination, 'out-of-play timing is paused');
   battle.update(DT);
   assert.equal(p2.lostToVoid, false, 'back after the respawn delay');
   assert.equal(p2.combat.launchPoint, 0, 'a fresh life starts at 0');
+  assert.equal(p2.combat.launchRecoveryRemaining, new CombatState().launchRecoveryRemaining);
   // A rematch starts everyone at 0 too.
   p1.combat.launchPoint = 77;
+  p1.combat.update(2.3);
   battle.restart();
   assert.deepEqual([p1.combat.launchPoint, p2.combat.launchPoint], [0, 0]);
+  for (const f of [p1, p2]) assert.equal(f.combat.launchRecoveryRemaining, new CombatState().launchRecoveryRemaining);
   battle.destroy();
 });
 

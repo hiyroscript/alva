@@ -13,7 +13,8 @@ first to 3 points wins. There is no health bar. Every hit's damage adds to
 the target's **Launch Point**, and a launching hit sends it flying harder
 the higher that number is (its **Base Launch** × the new Launch Point,
 along its **Directional Launch**), so fights build from close combos to
-pursuit and ring-outs.
+pursuit and ring-outs. Launch Point gradually recovers toward 0 when a
+fighter goes without taking an unblocked hit.
 
 Every fighter runs on the same shared systems (movement, combat, the
 Shield, Energy, Launch, the CPU, controls) and brings its own moves and

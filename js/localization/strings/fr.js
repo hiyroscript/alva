@@ -55,9 +55,9 @@ export const FR = {
   'movement.airDash.description': 'Le sprint en l’air, à l’horizontale, une fois avant de retoucher le sol.',
 
   'launch.pointSummary':
-    'Le Point d’éjection correspond aux dégâts accumulés : il part de 0 et tous les dégâts subis s’y ajoutent. ' +
-    'Quand un coup dont l’Éjection de base dépasse 0 touche, le Point d’éjection détermine la force de l’éjection : ' +
-    'plus il est élevé, plus l’éjection est forte. Il revient à 0 après une élimination, à la réapparition.',
+    'Le Point d’éjection part de 0. Chaque coup non bloqué ajoute ses dégâts et relance la récupération : ' +
+    'après 2 secondes sans coup reçu, il baisse de 1 toutes les 0,5 secondes suivantes, jusqu’à 0 (premier point à 2,5 secondes). ' +
+    'Les coups bloqués ne relancent pas ce délai. Plus il est élevé, plus l’éjection est forte. Il revient à 0 à la réapparition.',
   'launch.formula': 'Force d’éjection = Éjection de base × Point d’éjection',
   'launch.baseSummary':
     'Chaque coup a une Éjection de base de 0, 1, 2 ou 3. Les dégâts du coup s’ajoutent d’abord au Point d’éjection, ' +

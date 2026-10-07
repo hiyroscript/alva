@@ -1771,16 +1771,22 @@ test('the CPU is never knocked out: at any Launch Point it keeps taking hits, wi
   run({ attack4: true, attack4Pressed: true });
   until(() => events.length > 0, 120);
   assert.equal(cpu.combat.launchPoint, 503);
+  const firstHitStep = cpu.steps;
   assert.equal(numbers.at(-1).text, '+3', 'the number is what the hit added');
   until(() => cpu.canAct(), 240);
   assert.equal(cpu.lostToVoid, false);
-  assert.equal(cpu.combat.immobilized, false, '503 Launch Point never stops it, once the paralysis is over');
+  assert.equal(cpu.combat.immobilized, false, 'high Launch Point never stops it, once the paralysis is over');
   // ...and can be hit again.
   run({}, 30);
   run({ attack3: true, attack3Pressed: true });
   until(() => events.length > 1, 180);
   assert.equal(events[1].target, cpu);
-  assert.equal(cpu.combat.launchPoint, 504);
+  const elapsed = (cpu.steps - firstHitStep) * DT;
+  const recovered = Math.max(0, Math.floor((elapsed - 2 + 1e-6) / 0.5));
+  assert.ok(recovered > 0, 'passive recovery also runs on the practice CPU');
+  assert.equal(events[1].launchPointBefore, 503 - recovered);
+  assert.equal(events[1].damage, 1);
+  assert.equal(cpu.combat.launchPoint, 504 - recovered);
 });
 
 test('Change CPU replaces the CPU in place and leaves Player 1 alone', async () => {

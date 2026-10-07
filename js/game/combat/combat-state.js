@@ -34,6 +34,7 @@
 // it: no defense gives any back.
 
 import { PHASE_EPSILON, attackPhase } from './attacks.js';
+import { LAUNCH_RECOVERY_DELAY, LAUNCH_RECOVERY_INTERVAL, LAUNCH_RECOVERY_AMOUNT } from '../../data/launch.js';
 
 // The Energy rules, the same for every fighter: what a full bar holds
 // (where every fighter starts, and what a respawn or a restart refills it
@@ -137,11 +138,12 @@ export class CooldownTimers {
 // Per-fighter combat state.
 export class CombatState {
   constructor(energy = resolveEnergy()) {
-    // Launch Point: starts at 0 on every fresh life and only ever grows, by
-    // exactly the damage each hit deals (see CombatSystem.applyHit). Never
-    // negative, no maximum, and it never stops the fighter acting; a
-    // launching hit multiplies it by its Base Launch.
+    // Launch Point: each real hit adds its damage and restarts passive
+    // recovery (see CombatSystem.applyHit). Never negative, no maximum,
+    // and it never stops the fighter acting; a launching hit multiplies
+    // the new total by its Base Launch.
     this.launchPoint = 0;
+    this.resetLaunchRecovery();
     // Energy for the Dash, the Deflect and the Shield (see resolveEnergy):
     // full at the start, never below 0 or above maxEnergy (MAX_ENERGY for
     // every fighter). Emptying it (however it happens) exhausts the
@@ -253,6 +255,31 @@ export class CombatState {
     return !this.attack && this.stun <= 0 && this.shieldStun <= 0 && !this.immobilized;
   }
 
+  // ---- Launch Point recovery ---------------------------------------------------
+
+  // A real hit discards all progress, including a partial recovery tick.
+  resetLaunchRecovery() {
+    this.launchRecoveryRemaining = LAUNCH_RECOVERY_DELAY + LAUNCH_RECOVERY_INTERVAL;
+  }
+
+  // Seconds until the next whole point: grace + interval after a hit,
+  // then just interval. Consume every elapsed tick, retaining the fraction.
+  // At zero discard spare time so no overdue recovery can be banked.
+  updateLaunchRecovery(dt) {
+    if (this.launchPoint > 0) {
+      this.launchRecoveryRemaining -= dt;
+      if (this.launchRecoveryRemaining <= PHASE_EPSILON) {
+        const ticks = 1 + Math.floor((PHASE_EPSILON - this.launchRecoveryRemaining) / LAUNCH_RECOVERY_INTERVAL);
+        this.launchPoint = Math.max(0, this.launchPoint - ticks * LAUNCH_RECOVERY_AMOUNT);
+        this.launchRecoveryRemaining += ticks * LAUNCH_RECOVERY_INTERVAL;
+      }
+    }
+    if (this.launchPoint <= 0) {
+      this.launchPoint = 0;
+      this.resetLaunchRecovery();
+    }
+  }
+
   // ---- Energy -----------------------------------------------------------------
 
   // Whether something that costs Energy may start now: any time the fighter
@@ -317,6 +344,7 @@ export class CombatState {
       else this.cooldowns.set(id, t - dt);
     }
     // Every step, frozen or not, whatever the fighter holds or does.
+    this.updateLaunchRecovery(dt);
     this.abilityCooldowns.update(dt);
     this.movementCooldowns.update(dt);
     if (this.hitstop > 0) {

@@ -10,6 +10,7 @@ the Discover screen's LAUNCH page, built from the same registry.
 | --- | --- |
 | [`js/data/launch.js`](../../js/data/launch.js) | The registry and the one formula: `BASE_LAUNCH_VALUES` (`[0, 1, 2, 3]`), `DIRECTIONAL_LAUNCHES` (`null`, `'horizontal'`, `'vertical'`, `'reverseVertical'`), `LAUNCH_UNIT_SPEED` (10 units/s per point), `resolveHitLaunch` (validation), `resolveLaunchStrength`, `resolveDirectionalLaunch`, and the reference copy Discover shows. |
 | [`js/game/combat/combat.js`](../../js/game/combat/combat.js) | `CombatSystem.applyHit` (the order below) and the launch reaction: `resolveLaunchReaction`, `resolveLaunchStun`, `steerLaunch`. |
+| [`js/game/combat/combat-state.js`](../../js/game/combat/combat-state.js) | Each fighter's Launch Point and passive recovery clock, advanced by the existing fixed-step update. |
 | [`js/game/combat/launch-bounce.js`](../../js/game/combat/launch-bounce.js) | Rebounds: `LAUNCH_BOUNCE` (every setting), `resolveLaunchBounce`, `startLaunch`, `bounceLaunch`. |
 | [`js/game/physics.js`](../../js/game/physics.js) | Stops a body at whatever it meets and reports the speed it stopped (`impactVx`, `impactVy`); never bounces anything itself. |
 
@@ -21,6 +22,24 @@ Void), raised by exactly the damage each hit deals (1, 3, 5 or 10, the
 four damage tiers: [combat](combat.md#damage)), never below 0, with no
 maximum. It never stops a fighter acting and never takes one out: only
 the Void does.
+
+Every real, unblocked hit restarts recovery, including Base Launch 0 hits
+and each strike of a multi-hit attack. Nothing recovers for 2 seconds;
+then each complete 0.5-second interval removes 1 point, stopping at 0.
+The first point therefore recovers **2.5 seconds after the last hit**.
+For 10 points at t = 0: still 10 at t = 2.0, 9 at t = 2.5, 8 at t = 3.0,
+and 7 at t = 3.5. A new hit discards all partial progress and starts the
+full wait again. Shield blocks add nothing and **do not reset recovery**.
+
+The universal `LAUNCH_RECOVERY_DELAY`, `LAUNCH_RECOVERY_INTERVAL` and
+`LAUNCH_RECOVERY_AMOUNT` live in `js/data/launch.js`. `CombatState` keeps
+the seconds until the next point: initially delay + interval, then one
+interval per tick. Its existing `update(dt)` consumes every complete tick
+(even with a large dt), using `PHASE_EPSILON` at boundaries and preserving
+partial time. It advances in every fighter simulation step, including
+impact freeze and any action or stun; a paused simulation advances nothing.
+At 0 it clears spare time. Fresh lives replace the combat state; fighters
+waiting out of play for respawn receive no background updates.
 
 Every hit (an attack's, a strike's, a projectile's, a technique's)
 declares, independently of each other and of its damage, a **Base
@@ -97,7 +116,8 @@ and ignored. #0001 and #0002 override none. The settings came from the
 
 - [`tests/systems/launch.test.mjs`](../../tests/systems/launch.test.mjs):
   the registry, the formula, validation, every direction, the Shield's
-  exception, and that nothing in combat singles out a fighter or attack.
+  exception, recovery boundaries and resets across hit sources and fresh
+  lives, and that nothing in combat singles out a fighter or attack.
 - [`tests/systems/launch-reaction.test.mjs`](../../tests/systems/launch-reaction.test.mjs),
   [`tests/systems/launch-bounce.test.mjs`](../../tests/systems/launch-bounce.test.mjs).
 - Each fighter's own hits: its tests under [`tests/fighters/`](../../tests/fighters/).

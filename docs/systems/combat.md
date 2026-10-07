@@ -209,7 +209,8 @@ attack or technique it is resolving:
 2. Otherwise the hit's `damage` is added to the target's Launch Point,
    then its launch strength is `baseLaunch` × that new Launch Point, sent
    along its `directionalLaunch` and bent by the target's launch steering
-   ([launch](launch.md)).
+   ([launch](launch.md)). The unblocked hit also restarts Launch Point
+   recovery; a block preserves the existing recovery schedule.
 3. Hitstun (plus the launch's extra stun) or blockstun, and the hit's
    hitstop (the attacker freezes too, unless the hit is detached: a
    projectile's, a clone's or a technique's).

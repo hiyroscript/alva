@@ -13,7 +13,7 @@
 // it never turns toward its opponent by itself. It is otherwise a normal
 // fighter: it takes real hits, hitstun, launches and paralysis, collides, and
 // the camera frames it as the secondary fighter. Its Launch Point builds up
-// like anyone's (and launching hits send it further as it does), shown on
+// with hits and recovers between them like anyone's, shown on
 // its own HUD card, and every hit it takes also floats the Launch Point it
 // added over its head (damageNumbers, "+5").
 //
